@@ -1,0 +1,3 @@
+# Authored media and text fixtures must retain their exact wire bytes.
+crates/**/fixtures/** -text
+harness/fixtures/** -text

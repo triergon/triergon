@@ -1,0 +1,97 @@
+{
+  "qualification": false,
+  "required_cases": 11,
+  "source": "Exact copies of frozen cp27 primary-authored inputs/source proofs and exact actual Linux native rows. No expectation changes, timestamp normalization, packet sorting or case-name production branches.",
+  "reference_worker": "e8fcc2429e2086b5d0edf4929c098e0150c715ffa3faafc00e9b691e0128c14f",
+  "frozen_review_sha256": "fd4a5ee2b465354c84940bd36262a72a6dd16e0db08f546f39797884eead883f",
+  "cases": [
+    {
+      "id": "order27-MIN-scale1000-cat12",
+      "input_sha256": "ce48cc374457264c7a90b7d4aca77068ab086eae173a4c488c3eccc5d815cc33",
+      "required": true,
+      "gap": "native-global-rescale-overflow-gap",
+      "new_regression_coverage": false,
+      "native_stdout_sha256": "a3c91ea17c20fd53e904796d4f9b9bcacdab8bc64a9b216c3f76500102b14619"
+    },
+    {
+      "id": "order27-MIN-scale1000-cat21",
+      "input_sha256": "8cdc2287ba6be46b24fec6c2e130e742283cdea9844f214073b6c1f48533bfdc",
+      "required": true,
+      "gap": "native-global-rescale-overflow-gap",
+      "new_regression_coverage": false,
+      "native_stdout_sha256": "5b036b706ab0886f3cc01510e6c655dbc9632edb431d71091c4ac469f5baff0b"
+    },
+    {
+      "id": "order27-MIN-physical21-cat12",
+      "input_sha256": "94ef6c4478a2ddb67613e74d024eea11bb2858e140ee7acd9fdf9f98401ffbbb",
+      "required": true,
+      "gap": "native-global-rescale-overflow-gap",
+      "new_regression_coverage": false,
+      "native_stdout_sha256": "82c43ce7fa096fec548d05ab1281e7868b79dfaf96f1bd2bad4eafdce78ef643"
+    },
+    {
+      "id": "order27-MIN-u32max-scale-cat12",
+      "input_sha256": "41d248edb01b18b13c2ce11d744801564ab7e1c970c9f42451d3cbfe3fb06b84",
+      "required": true,
+      "gap": "native-large-timescale-catalogue-gap",
+      "new_regression_coverage": false,
+      "native_stdout_sha256": "3fb87f50162e3b74d77c00571668bbcf06f313e6fda8b9077472e2db0fd4fd29"
+    },
+    {
+      "id": "order27-MIN-next-scale1000-cat12",
+      "input_sha256": "86e107da0ae5312e5769574cafda4cc2e9c1b54ab1a8f46994ac0b364772f652",
+      "required": true,
+      "gap": "native-global-rescale-overflow-gap",
+      "new_regression_coverage": false,
+      "native_stdout_sha256": "d012fa369d582a7743905d8f8ff8d468453165b5bd4eabd0edf5e8d0dd88f859"
+    },
+    {
+      "id": "order27-MIN-next-scale1000-cat21",
+      "input_sha256": "92ea0b5a595f47eebb3b7779999d023ccf7743e717f678562c614c1e168c400a",
+      "required": true,
+      "gap": "native-global-rescale-overflow-gap",
+      "new_regression_coverage": false,
+      "native_stdout_sha256": "bbcee49c2ccab535c08dcc0d9c47072ad1d248709fa896bc2a5095f3a94830c8"
+    },
+    {
+      "id": "order27-MIN-next-physical21-cat12",
+      "input_sha256": "023e6cf4ca230c2e782edbfc42fec66a80b1d1a9e24cce8edb9e3cdb8cb88400",
+      "required": true,
+      "gap": "native-global-rescale-overflow-gap",
+      "new_regression_coverage": false,
+      "native_stdout_sha256": "8cc7b3a34c47b15a762173348026c89abfdee6a03352b33429954123ca3fa50b"
+    },
+    {
+      "id": "order27-MIN-next-u32max-scale-cat12",
+      "input_sha256": "17a8efd9e256a66b058b7e0ecfa345b2def9f04106bc4cd73e23393446571962",
+      "required": true,
+      "gap": "native-large-timescale-catalogue-gap",
+      "new_regression_coverage": false,
+      "native_stdout_sha256": "8c687443da5b166004bd53f3a5c78a60f00b5184effe45bcec48b370f833b0b4"
+    },
+    {
+      "id": "order27-signed-safe-microsecond-crossing",
+      "input_sha256": "df1cc0db6f1d11d2ca63851ac18b6bb1786d7bce15fe54cffb40296e13dc8b90",
+      "required": true,
+      "gap": "native-global-rescale-overflow-gap",
+      "new_regression_coverage": false,
+      "native_stdout_sha256": "74a3195012ce1c4d55e12b5be49515c44af2870a110bd54da21666bcaf1d352f"
+    },
+    {
+      "id": "edit27-trailing-empty",
+      "input_sha256": "a7c7f0d13ae90b138149996be5b79ca3876d50200f689d46213a28f027269b54",
+      "required": true,
+      "gap": "native-nonleading-empty-edit-gap",
+      "new_regression_coverage": false,
+      "native_stdout_sha256": "77683383495054b4e7e99947f51c61b62291a398180710132e4b45cb77c43b10"
+    },
+    {
+      "id": "edit27-head-half-sample",
+      "input_sha256": "dd8e34cb1c04c7a2aa6839e28c541f6486b90cefbdceeb000e2eb07e1f7416cf",
+      "required": true,
+      "gap": "native-fractional-nonaligned-media-start-gap",
+      "new_regression_coverage": false,
+      "native_stdout_sha256": "6264c0c206bc40d6a6be816340d07ef1cde12129e9feff5766163b47238d3581"
+    }
+  ]
+}

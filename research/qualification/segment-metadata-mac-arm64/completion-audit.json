@@ -1,0 +1,15 @@
+{
+  "all_116_cases_pass_parity_runtime_and_both_memory_gates": true,
+  "all_six_contracts_unchanged_at_080_runtime_and_lower_memory": true,
+  "all_30_raw_pairs_and_current_probe_observer_worker_input_identities_verified": true,
+  "k5_exact_source_trees_and_native_catalogue_views_mandatory": true,
+  "intact_external_hdr_is_mandatory_and_passes_same_gates": true,
+  "source_snapshot_and_failures_retained": true,
+  "checkpoint_replay_preserves_unvisited_original_clean_passes_and_failures": true,
+  "two_upstream_fate_targets_and_three_packet_comparisons_pass": true,
+  "host_checks_50_rust_39_python_pass": true,
+  "seven_primary_specification_hashes_verified": true,
+  "complete_module_accepted": false,
+  "streem_or_tv_integration_claimed": false,
+  "committed_or_published": false
+}

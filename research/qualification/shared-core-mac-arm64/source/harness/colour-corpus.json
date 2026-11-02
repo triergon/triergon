@@ -1,0 +1,236 @@
+{
+  "schema": 1,
+  "cases": [
+    {
+      "id": "colour-absent",
+      "profile": "colour-absent",
+      "file": "colour-absent.mkv",
+      "sha256": "6de926fecf007a83df6db2060c60a1510f346eceac63f01aba270bd337c4da3e",
+      "rights": "authored-synthetic"
+    },
+    {
+      "id": "colour-empty",
+      "profile": "colour-empty",
+      "file": "colour-empty.mkv",
+      "sha256": "b3eb465a75875a6564c291083ffad4c130015c7f39d2d7ab26667e0a472a54c5",
+      "rights": "authored-synthetic"
+    },
+    {
+      "id": "colour-sdr",
+      "profile": "colour-sdr",
+      "file": "colour-sdr.mkv",
+      "sha256": "155e23880aef88d59688d641638a2a85378fa15551590c2376b03e71331c9402",
+      "rights": "authored-synthetic"
+    },
+    {
+      "id": "colour-rgb-full",
+      "profile": "colour-rgb-full",
+      "file": "colour-rgb-full.mkv",
+      "sha256": "a3b3306759a6035f77e0a92385200859ac13f54a1b3d54abcfc8ebcb6d49dc4a",
+      "rights": "authored-synthetic"
+    },
+    {
+      "id": "colour-hdr10",
+      "profile": "colour-hdr10",
+      "file": "colour-hdr10.mkv",
+      "sha256": "cdfa5cae8aff2d3fd02bf1cff61757996bc6fc1f369d4cfe713e428c472d6544",
+      "rights": "authored-synthetic"
+    },
+    {
+      "id": "colour-hdr32",
+      "profile": "colour-hdr32",
+      "file": "colour-hdr32.mkv",
+      "sha256": "6ef17b3621aac4fa57bb2fb09890f8d8b4e9ec1643fcbfbbfdd03ee999ddedbf",
+      "rights": "authored-synthetic"
+    },
+    {
+      "id": "colour-hlg",
+      "profile": "colour-hlg",
+      "file": "colour-hlg.mkv",
+      "sha256": "6308f4de962f144906468ef7c9b99a4c7e4dd3918e00b5a404bc5814f80dbef1",
+      "rights": "authored-synthetic"
+    },
+    {
+      "id": "colour-p3",
+      "profile": "colour-p3",
+      "file": "colour-p3.mkv",
+      "sha256": "bc1986a73ea497298748628701c8ad459d9ae086fb981dd5b2bbd15313570c35",
+      "rights": "authored-synthetic"
+    },
+    {
+      "id": "colour-cll-only",
+      "profile": "colour-cll-only",
+      "file": "colour-cll-only.mkv",
+      "sha256": "d78488d5469aa905437ec862d39b2199c39bb540c50b582713bbf8a80aed8de5",
+      "rights": "authored-synthetic"
+    },
+    {
+      "id": "colour-fall-only",
+      "profile": "colour-fall-only",
+      "file": "colour-fall-only.mkv",
+      "sha256": "03c6ea87e49b79a551a7a3a036551ac2f316892bfc5d3237c8ccdb80859e2ff3",
+      "rights": "authored-synthetic"
+    },
+    {
+      "id": "colour-light-zero",
+      "profile": "colour-light-zero",
+      "file": "colour-light-zero.mkv",
+      "sha256": "a7e1ed3579d502328253104a14d0221992a6539ef9b37cad535fbe15f566d8ea",
+      "rights": "authored-synthetic"
+    },
+    {
+      "id": "colour-master-empty",
+      "profile": "colour-master-empty",
+      "file": "colour-master-empty.mkv",
+      "sha256": "bca24744a7bf0de17b3a9dc99632495605802bac79e202ae2681516944e84a60",
+      "rights": "authored-synthetic"
+    },
+    {
+      "id": "colour-master-partial",
+      "profile": "colour-master-partial",
+      "file": "colour-master-partial.mkv",
+      "sha256": "41b24f0ce86e8b70cbe9cbd1588397c20538b6495e019c8eeb5274a3671a3c7e",
+      "rights": "authored-synthetic"
+    },
+    {
+      "id": "colour-master-zero",
+      "profile": "colour-master-zero",
+      "file": "colour-master-zero.mkv",
+      "sha256": "0bb151f94fb49a80c567dd6789370ce5dd7e8822a476f8e799cab346969a23df",
+      "rights": "authored-synthetic"
+    },
+    {
+      "id": "colour-master-boundary",
+      "profile": "colour-master-boundary",
+      "file": "colour-master-boundary.mkv",
+      "sha256": "25c9dad4ae5f290e507061c62b24a13cccc610c75af45af55337c5c056d3a389",
+      "rights": "authored-synthetic"
+    },
+    {
+      "id": "colour-subsampling",
+      "profile": "colour-subsampling",
+      "file": "colour-subsampling.mkv",
+      "sha256": "1dbce166586356df14a68594a506b090dbf6000fc2481c8f89346821da6d868e",
+      "rights": "authored-synthetic"
+    },
+    {
+      "id": "colour-many-tracks",
+      "profile": "colour-many-tracks",
+      "file": "colour-many-tracks.mkv",
+      "sha256": "7e356ffcefc0ff384146488a2e5fb8c6c84822767925f2b168ad7846a718593d",
+      "rights": "authored-synthetic"
+    },
+    {
+      "id": "colour-siting-0-0",
+      "profile": "colour-siting-0-0",
+      "file": "colour-siting-0-0.mkv",
+      "sha256": "146c7e4b3275fc508416febfc595f1b4ac00cfcc473fc3aafeabb0ff336ac2e8",
+      "rights": "authored-synthetic"
+    },
+    {
+      "id": "colour-siting-0-1",
+      "profile": "colour-siting-0-1",
+      "file": "colour-siting-0-1.mkv",
+      "sha256": "a05c9991439494b8f071eee30cfc02370aadbccb60995f9c1790f67049e8c765",
+      "rights": "authored-synthetic"
+    },
+    {
+      "id": "colour-siting-0-2",
+      "profile": "colour-siting-0-2",
+      "file": "colour-siting-0-2.mkv",
+      "sha256": "6e0b4777ac08ec32cc5e624f90dc38391e99e147f78f1ace7e0d3b5f29f389b8",
+      "rights": "authored-synthetic"
+    },
+    {
+      "id": "colour-siting-1-0",
+      "profile": "colour-siting-1-0",
+      "file": "colour-siting-1-0.mkv",
+      "sha256": "e511894e2ba0ff60628003bd138cfda1cfe4060f097425f145d83750ad6eabf9",
+      "rights": "authored-synthetic"
+    },
+    {
+      "id": "colour-siting-1-1",
+      "profile": "colour-siting-1-1",
+      "file": "colour-siting-1-1.mkv",
+      "sha256": "ea016864e94a1cb83aa7ea9beda3063e3cc0c0a37b0de15f7dfd5ca60e44ca29",
+      "rights": "authored-synthetic"
+    },
+    {
+      "id": "colour-siting-1-2",
+      "profile": "colour-siting-1-2",
+      "file": "colour-siting-1-2.mkv",
+      "sha256": "0beec78c72b9d73af3b42c1d499d12d7dd0bb6e15fd4b72dc3bfe65326d1c001",
+      "rights": "authored-synthetic"
+    },
+    {
+      "id": "colour-siting-2-0",
+      "profile": "colour-siting-2-0",
+      "file": "colour-siting-2-0.mkv",
+      "sha256": "324a36adf57b1a89249f54f0bf1cc379bae55f5521be8db56b6752a3a2dc193e",
+      "rights": "authored-synthetic"
+    },
+    {
+      "id": "colour-siting-2-1",
+      "profile": "colour-siting-2-1",
+      "file": "colour-siting-2-1.mkv",
+      "sha256": "ff37ec26cbc1aad82fbd87712802c3d3db9fec4e46cb6ecdf1ca95307205f832",
+      "rights": "authored-synthetic"
+    },
+    {
+      "id": "colour-siting-2-2",
+      "profile": "colour-siting-2-2",
+      "file": "colour-siting-2-2.mkv",
+      "sha256": "492d7e01a02bfe9d0a9dd4abbf88b55955457a0b50d2333246734a1c88abac07",
+      "rights": "authored-synthetic"
+    },
+    {
+      "id": "colour-empty-elements",
+      "profile": "colour-empty-elements",
+      "file": "colour-empty-elements.mkv",
+      "sha256": "f64301f9b79693fd2a2dfe9e27514fe60388160f662d5bd4d20bbd91d78d18cc",
+      "rights": "authored-synthetic"
+    },
+    {
+      "id": "colour-registry-codes",
+      "profile": "colour-registry-codes",
+      "file": "colour-registry-codes.mkv",
+      "sha256": "ef80022ad96a13ba790007e076934f9aa4b19e7e086bec6f3c595c812b8f8bc2",
+      "rights": "authored-synthetic"
+    },
+    {
+      "id": "colour-luminance-only",
+      "profile": "colour-luminance-only",
+      "file": "colour-luminance-only.mkv",
+      "sha256": "cd4c0dad292b5f09fa446f48cc5a6c8c058f0dc738e14864c2ae9493e3027e6b",
+      "rights": "authored-synthetic"
+    },
+    {
+      "id": "colour-primaries-only",
+      "profile": "colour-primaries-only",
+      "file": "colour-primaries-only.mkv",
+      "sha256": "faeb1b671e495517ed775877f3653191a242050679b56a94d1795918bdf6273e",
+      "rights": "authored-synthetic"
+    },
+    {
+      "id": "colour-master-ones",
+      "profile": "colour-master-ones",
+      "file": "colour-master-ones.mkv",
+      "sha256": "bf25251a64617038b31b57957ff2653e2152271cf0c9decd3b806f1ba2185333",
+      "rights": "authored-synthetic"
+    },
+    {
+      "id": "colour-master-tiny",
+      "profile": "colour-master-tiny",
+      "file": "colour-master-tiny.mkv",
+      "sha256": "0a0f3c48b915457e8c7e598d2e73c979b0cf58ee6f115fd700a4feaf429b1b90",
+      "rights": "authored-synthetic"
+    },
+    {
+      "id": "colour-master-half-minimum",
+      "profile": "colour-master-half-minimum",
+      "file": "colour-master-half-minimum.mkv",
+      "sha256": "c494e29b91bd2d9598a326b23d1ab9a0086cefce07a5da1ace03aa696076525c",
+      "rights": "authored-synthetic"
+    }
+  ]
+}

@@ -1,0 +1,13 @@
+{
+  "schema":1,
+  "id":"K1-header-removal-v1",
+  "operation":"container-demux-v1",
+  "contract":["single header-removal encoding, scopes 1/2/3", "prefix restoration per laced frame", "empty encoded payload", "CodecPrivate restoration", "all K0 canonical packet fields", "exact independent source timing", "short sequential reads", "bounded decoded output"],
+  "required_profiles":["header-empty","header-lace","header-private","header-both"],
+  "required_targets":["aarch64-apple-darwin"],
+  "runtime_ratio_max":0.8,
+  "memory_ratio_max_exclusive":1.0,
+  "minimum_pairs":30,
+  "confidence":0.95,
+  "pending_module_requirements":["remaining M01/M02 features", "complete applicable FATE mapping and asset qualification"]
+}

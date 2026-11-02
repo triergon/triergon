@@ -1,0 +1,768 @@
+{
+  "schema": "m05-DVB-native-closure-actual-facts-v1",
+  "eod5": [
+    {
+      "id": "shared-ancillary-end",
+      "original_source": {
+        "path": ".research/parallel-subtitles/ancillary-eod-batch-1/fixtures/shared-ancillary-end.0.dvb",
+        "bytes": 103,
+        "sha256": "3df88240deb7531a7ee73785abf93180971e4ec4bfaa1706cfece6b92cc70712"
+      },
+      "raw_native_log": {
+        "path": ".research/dvb-ancillary-eod-native-v1-observed/shared-ancillary-end.jsonl",
+        "sha256": "48ec0a578b8cb75a7e0287d9d0e0ec423e55fa35111ac2f68d19a957d4b83b68"
+      },
+      "identity": {
+        "kind": "identity",
+        "operation": "public-container-dvb-trace-v1",
+        "expected_source_pin": "d32b387f2b0a484599d4587d651891f0c63c4238",
+        "avformat_version": 4129124,
+        "avcodec_version": 4129124,
+        "avutil_version": 3998052,
+        "compiler": "Apple LLVM 17.0.0 (clang-1700.6.3.2)",
+        "avformat_configuration": "--prefix=/Users/jonasgrosch/projects/safe-media/.research/reference-formats/install --disable-everything --disable-autodetect --disable-doc --disable-debug --enable-protocol='file,pipe' --enable-demuxer='matroska,mov,mpegts,h264,hevc,srt,ass,webvtt,sup,vobsub' --enable-muxer=framecrc --enable-decoder='pcm_s16le,pgssub,dvdsub,dvbsub,ass,srt,subrip,text,mov_text,webvtt' --enable-encoder='pcm_s16le,rawvideo' --enable-parser='h264,hevc,aac,ac3,vorbis,dvdsub,dvbsub' --enable-ffmpeg --enable-ffprobe --enable-pic --enable-zlib --enable-bsf='h264_mp4toannexb,hevc_mp4toannexb,extract_extradata'",
+        "avcodec_configuration": "--prefix=/Users/jonasgrosch/projects/safe-media/.research/reference-formats/install --disable-everything --disable-autodetect --disable-doc --disable-debug --enable-protocol='file,pipe' --enable-demuxer='matroska,mov,mpegts,h264,hevc,srt,ass,webvtt,sup,vobsub' --enable-muxer=framecrc --enable-decoder='pcm_s16le,pgssub,dvdsub,dvbsub,ass,srt,subrip,text,mov_text,webvtt' --enable-encoder='pcm_s16le,rawvideo' --enable-parser='h264,hevc,aac,ac3,vorbis,dvdsub,dvbsub' --enable-ffmpeg --enable-ffprobe --enable-pic --enable-zlib --enable-bsf='h264_mp4toannexb,hevc_mp4toannexb,extract_extradata'",
+        "header_versions": [
+          4129124,
+          4129124,
+          3998052
+        ],
+        "sizeof_packet": 104,
+        "sizeof_subtitle": 32,
+        "sizeof_pointer": 8,
+        "native_little_endian": true,
+        "av_nopts_value": -9223372036854775808,
+        "dvb_decoder_available": true,
+        "codec_private_options": null,
+        "caller_envelope_adaptation": false,
+        "caller_pts_rescale": false,
+        "benchmark_mode": false,
+        "qualification": false
+      },
+      "raw_codec_input": {
+        "kind": "codec-input",
+        "packet": 0,
+        "stream": 0,
+        "offset": 0,
+        "size": 103,
+        "pos": 277,
+        "flags": 1,
+        "pts_raw": 1000,
+        "dts_raw": 1000,
+        "pts": 1000,
+        "dts": 1000,
+        "duration_raw": 2000,
+        "packet_time_base": [
+          0,
+          1
+        ],
+        "data_hex": "0f140001000507000f000b0f1000010008020701ff000100010f1100010010010f000500022700000f00010000f0000f120002001a000f009f00000000019feb808000029feb808000039f108080000f130002000c00010100040000105580f0000f8000020000",
+        "side_data": []
+      },
+      "raw_decode_calls": [
+        {
+          "kind": "decode-call",
+          "packet": 0,
+          "stream": 0,
+          "offset": 0,
+          "supplied": 103,
+          "returned": 103,
+          "got": 1
+        }
+      ],
+      "raw_subtitle": {
+        "kind": "subtitle",
+        "stream": 0,
+        "packet": 0,
+        "packet_offset": 0,
+        "consumed": 103,
+        "drain": false,
+        "format": 0,
+        "pts_raw": 1000000,
+        "pts_microseconds": 1000000,
+        "pts_timebase": [
+          1,
+          1000000
+        ],
+        "start_display_ms": 0,
+        "end_display_ms": 2000,
+        "context_canvas": [
+          16,
+          12
+        ],
+        "rectangles": [
+          {
+            "order": 0,
+            "type": 1,
+            "x": 1,
+            "y": 1,
+            "width": 5,
+            "height": 2,
+            "flags": 0,
+            "native_stride": 5,
+            "indices_hex": "01010101020101010102",
+            "palette_entries": 4,
+            "raw_native_palette_hex": "00880000ffffffffffffffff000000ff",
+            "palette_native_u32": [
+              34816,
+              4294967295,
+              4294967295,
+              4278190080
+            ]
+          }
+        ]
+      },
+      "source_classification": "Selected source conforms to specific7.2.6 EOD page rule; composition segments precede shared data",
+      "source_expected_error": null
+    },
+    {
+      "id": "ancillary-end-nonempty",
+      "original_source": {
+        "path": ".research/parallel-subtitles/ancillary-eod-batch-1/fixtures/ancillary-end-nonempty.0.dvb",
+        "bytes": 104,
+        "sha256": "82f76eccfe53ab89fc5aa79c2099a68dcd17033c8ab5b4b69a812d5ae9bbb21c"
+      },
+      "raw_native_log": {
+        "path": ".research/dvb-ancillary-eod-native-v1-observed/ancillary-end-nonempty.jsonl",
+        "sha256": "ff5e765c8f989b733bf6e417501ee91a6ffd656e899c8e46b5426b141b05fb0a"
+      },
+      "identity": {
+        "kind": "identity",
+        "operation": "public-container-dvb-trace-v1",
+        "expected_source_pin": "d32b387f2b0a484599d4587d651891f0c63c4238",
+        "avformat_version": 4129124,
+        "avcodec_version": 4129124,
+        "avutil_version": 3998052,
+        "compiler": "Apple LLVM 17.0.0 (clang-1700.6.3.2)",
+        "avformat_configuration": "--prefix=/Users/jonasgrosch/projects/safe-media/.research/reference-formats/install --disable-everything --disable-autodetect --disable-doc --disable-debug --enable-protocol='file,pipe' --enable-demuxer='matroska,mov,mpegts,h264,hevc,srt,ass,webvtt,sup,vobsub' --enable-muxer=framecrc --enable-decoder='pcm_s16le,pgssub,dvdsub,dvbsub,ass,srt,subrip,text,mov_text,webvtt' --enable-encoder='pcm_s16le,rawvideo' --enable-parser='h264,hevc,aac,ac3,vorbis,dvdsub,dvbsub' --enable-ffmpeg --enable-ffprobe --enable-pic --enable-zlib --enable-bsf='h264_mp4toannexb,hevc_mp4toannexb,extract_extradata'",
+        "avcodec_configuration": "--prefix=/Users/jonasgrosch/projects/safe-media/.research/reference-formats/install --disable-everything --disable-autodetect --disable-doc --disable-debug --enable-protocol='file,pipe' --enable-demuxer='matroska,mov,mpegts,h264,hevc,srt,ass,webvtt,sup,vobsub' --enable-muxer=framecrc --enable-decoder='pcm_s16le,pgssub,dvdsub,dvbsub,ass,srt,subrip,text,mov_text,webvtt' --enable-encoder='pcm_s16le,rawvideo' --enable-parser='h264,hevc,aac,ac3,vorbis,dvdsub,dvbsub' --enable-ffmpeg --enable-ffprobe --enable-pic --enable-zlib --enable-bsf='h264_mp4toannexb,hevc_mp4toannexb,extract_extradata'",
+        "header_versions": [
+          4129124,
+          4129124,
+          3998052
+        ],
+        "sizeof_packet": 104,
+        "sizeof_subtitle": 32,
+        "sizeof_pointer": 8,
+        "native_little_endian": true,
+        "av_nopts_value": -9223372036854775808,
+        "dvb_decoder_available": true,
+        "codec_private_options": null,
+        "caller_envelope_adaptation": false,
+        "caller_pts_rescale": false,
+        "benchmark_mode": false,
+        "qualification": false
+      },
+      "raw_codec_input": {
+        "kind": "codec-input",
+        "packet": 0,
+        "stream": 0,
+        "offset": 0,
+        "size": 104,
+        "pos": 277,
+        "flags": 1,
+        "pts_raw": 1000,
+        "dts_raw": 1000,
+        "pts": 1000,
+        "dts": 1000,
+        "duration_raw": 2000,
+        "packet_time_base": [
+          0,
+          1
+        ],
+        "data_hex": "0f140001000507000f000b0f1000010008020701ff000100010f1100010010010f000500022700000f00010000f0000f120002001a000f009f00000000019feb808000029feb808000039f108080000f130002000c00010100040000105580f0000f800002000100",
+        "side_data": []
+      },
+      "raw_decode_calls": [
+        {
+          "kind": "decode-call",
+          "packet": 0,
+          "stream": 0,
+          "offset": 0,
+          "supplied": 104,
+          "returned": 104,
+          "got": 1
+        }
+      ],
+      "raw_subtitle": {
+        "kind": "subtitle",
+        "stream": 0,
+        "packet": 0,
+        "packet_offset": 0,
+        "consumed": 104,
+        "drain": false,
+        "format": 0,
+        "pts_raw": 1000000,
+        "pts_microseconds": 1000000,
+        "pts_timebase": [
+          1,
+          1000000
+        ],
+        "start_display_ms": 0,
+        "end_display_ms": 2000,
+        "context_canvas": [
+          16,
+          12
+        ],
+        "rectangles": [
+          {
+            "order": 0,
+            "type": 1,
+            "x": 1,
+            "y": 1,
+            "width": 5,
+            "height": 2,
+            "flags": 0,
+            "native_stride": 5,
+            "indices_hex": "01010101020101010102",
+            "palette_entries": 4,
+            "raw_native_palette_hex": "00880000ffffffffffffffff000000ff",
+            "palette_native_u32": [
+              34816,
+              4294967295,
+              4294967295,
+              4278190080
+            ]
+          }
+        ]
+      },
+      "source_classification": "Deliberately nonconforming:7.2.6 requires zero payload",
+      "source_expected_error": "DVB EOD payload"
+    },
+    {
+      "id": "composition-end-control",
+      "original_source": {
+        "path": ".research/parallel-subtitles/ancillary-eod-batch-1/fixtures/composition-end-control.0.dvb",
+        "bytes": 103,
+        "sha256": "03e022663f363d55fc28c42f0e47015d11a2c2964794e86423117672a3ededb6"
+      },
+      "raw_native_log": {
+        "path": ".research/dvb-ancillary-eod-native-v1-observed/composition-end-control.jsonl",
+        "sha256": "6988ec4422b3cba54a187d1d7d9077d3bcd0121f74aabc977d36a745f3b5bddd"
+      },
+      "identity": {
+        "kind": "identity",
+        "operation": "public-container-dvb-trace-v1",
+        "expected_source_pin": "d32b387f2b0a484599d4587d651891f0c63c4238",
+        "avformat_version": 4129124,
+        "avcodec_version": 4129124,
+        "avutil_version": 3998052,
+        "compiler": "Apple LLVM 17.0.0 (clang-1700.6.3.2)",
+        "avformat_configuration": "--prefix=/Users/jonasgrosch/projects/safe-media/.research/reference-formats/install --disable-everything --disable-autodetect --disable-doc --disable-debug --enable-protocol='file,pipe' --enable-demuxer='matroska,mov,mpegts,h264,hevc,srt,ass,webvtt,sup,vobsub' --enable-muxer=framecrc --enable-decoder='pcm_s16le,pgssub,dvdsub,dvbsub,ass,srt,subrip,text,mov_text,webvtt' --enable-encoder='pcm_s16le,rawvideo' --enable-parser='h264,hevc,aac,ac3,vorbis,dvdsub,dvbsub' --enable-ffmpeg --enable-ffprobe --enable-pic --enable-zlib --enable-bsf='h264_mp4toannexb,hevc_mp4toannexb,extract_extradata'",
+        "avcodec_configuration": "--prefix=/Users/jonasgrosch/projects/safe-media/.research/reference-formats/install --disable-everything --disable-autodetect --disable-doc --disable-debug --enable-protocol='file,pipe' --enable-demuxer='matroska,mov,mpegts,h264,hevc,srt,ass,webvtt,sup,vobsub' --enable-muxer=framecrc --enable-decoder='pcm_s16le,pgssub,dvdsub,dvbsub,ass,srt,subrip,text,mov_text,webvtt' --enable-encoder='pcm_s16le,rawvideo' --enable-parser='h264,hevc,aac,ac3,vorbis,dvdsub,dvbsub' --enable-ffmpeg --enable-ffprobe --enable-pic --enable-zlib --enable-bsf='h264_mp4toannexb,hevc_mp4toannexb,extract_extradata'",
+        "header_versions": [
+          4129124,
+          4129124,
+          3998052
+        ],
+        "sizeof_packet": 104,
+        "sizeof_subtitle": 32,
+        "sizeof_pointer": 8,
+        "native_little_endian": true,
+        "av_nopts_value": -9223372036854775808,
+        "dvb_decoder_available": true,
+        "codec_private_options": null,
+        "caller_envelope_adaptation": false,
+        "caller_pts_rescale": false,
+        "benchmark_mode": false,
+        "qualification": false
+      },
+      "raw_codec_input": {
+        "kind": "codec-input",
+        "packet": 0,
+        "stream": 0,
+        "offset": 0,
+        "size": 103,
+        "pos": 277,
+        "flags": 1,
+        "pts_raw": 1000,
+        "dts_raw": 1000,
+        "pts": 1000,
+        "dts": 1000,
+        "duration_raw": 2000,
+        "packet_time_base": [
+          0,
+          1
+        ],
+        "data_hex": "0f140001000507000f000b0f1000010008020701ff000100010f1100010010010f000500022700000f00010000f0000f120001001a000f009f00000000019feb808000029feb808000039f108080000f130001000c00010100040000105580f0000f8000010000",
+        "side_data": []
+      },
+      "raw_decode_calls": [
+        {
+          "kind": "decode-call",
+          "packet": 0,
+          "stream": 0,
+          "offset": 0,
+          "supplied": 103,
+          "returned": 103,
+          "got": 1
+        }
+      ],
+      "raw_subtitle": {
+        "kind": "subtitle",
+        "stream": 0,
+        "packet": 0,
+        "packet_offset": 0,
+        "consumed": 103,
+        "drain": false,
+        "format": 0,
+        "pts_raw": 1000000,
+        "pts_microseconds": 1000000,
+        "pts_timebase": [
+          1,
+          1000000
+        ],
+        "start_display_ms": 0,
+        "end_display_ms": 2000,
+        "context_canvas": [
+          16,
+          12
+        ],
+        "rectangles": [
+          {
+            "order": 0,
+            "type": 1,
+            "x": 1,
+            "y": 1,
+            "width": 5,
+            "height": 2,
+            "flags": 0,
+            "native_stride": 5,
+            "indices_hex": "01010101020101010102",
+            "palette_entries": 4,
+            "raw_native_palette_hex": "00880000ffffffffffffffff000000ff",
+            "palette_native_u32": [
+              34816,
+              4294967295,
+              4294967295,
+              4278190080
+            ]
+          }
+        ]
+      },
+      "source_classification": "No shared data: composition-page EOD",
+      "source_expected_error": null
+    },
+    {
+      "id": "shared-composition-end-compat",
+      "original_source": {
+        "path": ".research/parallel-subtitles/ancillary-eod-batch-1/fixtures/shared-composition-end-compat.0.dvb",
+        "bytes": 103,
+        "sha256": "0c0eb7442bf747649f23324c3619a2d8cfb1ecdfa6a3c67c1f8b414ebf6036c7"
+      },
+      "raw_native_log": {
+        "path": ".research/dvb-ancillary-eod-native-v1-observed/shared-composition-end-compat.jsonl",
+        "sha256": "2fb24247257704c3f11d212114d2c338d64d775cd6b6669bb1ef16c18c3767a5"
+      },
+      "identity": {
+        "kind": "identity",
+        "operation": "public-container-dvb-trace-v1",
+        "expected_source_pin": "d32b387f2b0a484599d4587d651891f0c63c4238",
+        "avformat_version": 4129124,
+        "avcodec_version": 4129124,
+        "avutil_version": 3998052,
+        "compiler": "Apple LLVM 17.0.0 (clang-1700.6.3.2)",
+        "avformat_configuration": "--prefix=/Users/jonasgrosch/projects/safe-media/.research/reference-formats/install --disable-everything --disable-autodetect --disable-doc --disable-debug --enable-protocol='file,pipe' --enable-demuxer='matroska,mov,mpegts,h264,hevc,srt,ass,webvtt,sup,vobsub' --enable-muxer=framecrc --enable-decoder='pcm_s16le,pgssub,dvdsub,dvbsub,ass,srt,subrip,text,mov_text,webvtt' --enable-encoder='pcm_s16le,rawvideo' --enable-parser='h264,hevc,aac,ac3,vorbis,dvdsub,dvbsub' --enable-ffmpeg --enable-ffprobe --enable-pic --enable-zlib --enable-bsf='h264_mp4toannexb,hevc_mp4toannexb,extract_extradata'",
+        "avcodec_configuration": "--prefix=/Users/jonasgrosch/projects/safe-media/.research/reference-formats/install --disable-everything --disable-autodetect --disable-doc --disable-debug --enable-protocol='file,pipe' --enable-demuxer='matroska,mov,mpegts,h264,hevc,srt,ass,webvtt,sup,vobsub' --enable-muxer=framecrc --enable-decoder='pcm_s16le,pgssub,dvdsub,dvbsub,ass,srt,subrip,text,mov_text,webvtt' --enable-encoder='pcm_s16le,rawvideo' --enable-parser='h264,hevc,aac,ac3,vorbis,dvdsub,dvbsub' --enable-ffmpeg --enable-ffprobe --enable-pic --enable-zlib --enable-bsf='h264_mp4toannexb,hevc_mp4toannexb,extract_extradata'",
+        "header_versions": [
+          4129124,
+          4129124,
+          3998052
+        ],
+        "sizeof_packet": 104,
+        "sizeof_subtitle": 32,
+        "sizeof_pointer": 8,
+        "native_little_endian": true,
+        "av_nopts_value": -9223372036854775808,
+        "dvb_decoder_available": true,
+        "codec_private_options": null,
+        "caller_envelope_adaptation": false,
+        "caller_pts_rescale": false,
+        "benchmark_mode": false,
+        "qualification": false
+      },
+      "raw_codec_input": {
+        "kind": "codec-input",
+        "packet": 0,
+        "stream": 0,
+        "offset": 0,
+        "size": 103,
+        "pos": 277,
+        "flags": 1,
+        "pts_raw": 1000,
+        "dts_raw": 1000,
+        "pts": 1000,
+        "dts": 1000,
+        "duration_raw": 2000,
+        "packet_time_base": [
+          0,
+          1
+        ],
+        "data_hex": "0f140001000507000f000b0f1000010008020701ff000100010f1100010010010f000500022700000f00010000f0000f120002001a000f009f00000000019feb808000029feb808000039f108080000f130002000c00010100040000105580f0000f8000010000",
+        "side_data": []
+      },
+      "raw_decode_calls": [
+        {
+          "kind": "decode-call",
+          "packet": 0,
+          "stream": 0,
+          "offset": 0,
+          "supplied": 103,
+          "returned": 103,
+          "got": 1
+        }
+      ],
+      "raw_subtitle": {
+        "kind": "subtitle",
+        "stream": 0,
+        "packet": 0,
+        "packet_offset": 0,
+        "consumed": 103,
+        "drain": false,
+        "format": 0,
+        "pts_raw": 1000000,
+        "pts_microseconds": 1000000,
+        "pts_timebase": [
+          1,
+          1000000
+        ],
+        "start_display_ms": 0,
+        "end_display_ms": 2000,
+        "context_canvas": [
+          16,
+          12
+        ],
+        "rectangles": [
+          {
+            "order": 0,
+            "type": 1,
+            "x": 1,
+            "y": 1,
+            "width": 5,
+            "height": 2,
+            "flags": 0,
+            "native_stride": 5,
+            "indices_hex": "01010101020101010102",
+            "palette_entries": 4,
+            "raw_native_palette_hex": "00880000ffffffffffffffff000000ff",
+            "palette_native_u32": [
+              34816,
+              4294967295,
+              4294967295,
+              4278190080
+            ]
+          }
+        ]
+      },
+      "source_classification": "Deliberately nonconforming EOD page; preserve existing receiver tolerance",
+      "source_expected_error": null
+    },
+    {
+      "id": "foreign-end-filter-control",
+      "original_source": {
+        "path": ".research/parallel-subtitles/ancillary-eod-batch-1/fixtures/foreign-end-filter-control.0.dvb",
+        "bytes": 109,
+        "sha256": "842aa8a29f0e234349ea35663d137c48b9bad604c300bc1f310101dfd2ef4f3c"
+      },
+      "raw_native_log": {
+        "path": ".research/dvb-ancillary-eod-native-v1-observed/foreign-end-filter-control.jsonl",
+        "sha256": "57b717761df21583d596bcfda33c9a673a311634736a6aedd80f352a0b6716bf"
+      },
+      "identity": {
+        "kind": "identity",
+        "operation": "public-container-dvb-trace-v1",
+        "expected_source_pin": "d32b387f2b0a484599d4587d651891f0c63c4238",
+        "avformat_version": 4129124,
+        "avcodec_version": 4129124,
+        "avutil_version": 3998052,
+        "compiler": "Apple LLVM 17.0.0 (clang-1700.6.3.2)",
+        "avformat_configuration": "--prefix=/Users/jonasgrosch/projects/safe-media/.research/reference-formats/install --disable-everything --disable-autodetect --disable-doc --disable-debug --enable-protocol='file,pipe' --enable-demuxer='matroska,mov,mpegts,h264,hevc,srt,ass,webvtt,sup,vobsub' --enable-muxer=framecrc --enable-decoder='pcm_s16le,pgssub,dvdsub,dvbsub,ass,srt,subrip,text,mov_text,webvtt' --enable-encoder='pcm_s16le,rawvideo' --enable-parser='h264,hevc,aac,ac3,vorbis,dvdsub,dvbsub' --enable-ffmpeg --enable-ffprobe --enable-pic --enable-zlib --enable-bsf='h264_mp4toannexb,hevc_mp4toannexb,extract_extradata'",
+        "avcodec_configuration": "--prefix=/Users/jonasgrosch/projects/safe-media/.research/reference-formats/install --disable-everything --disable-autodetect --disable-doc --disable-debug --enable-protocol='file,pipe' --enable-demuxer='matroska,mov,mpegts,h264,hevc,srt,ass,webvtt,sup,vobsub' --enable-muxer=framecrc --enable-decoder='pcm_s16le,pgssub,dvdsub,dvbsub,ass,srt,subrip,text,mov_text,webvtt' --enable-encoder='pcm_s16le,rawvideo' --enable-parser='h264,hevc,aac,ac3,vorbis,dvdsub,dvbsub' --enable-ffmpeg --enable-ffprobe --enable-pic --enable-zlib --enable-bsf='h264_mp4toannexb,hevc_mp4toannexb,extract_extradata'",
+        "header_versions": [
+          4129124,
+          4129124,
+          3998052
+        ],
+        "sizeof_packet": 104,
+        "sizeof_subtitle": 32,
+        "sizeof_pointer": 8,
+        "native_little_endian": true,
+        "av_nopts_value": -9223372036854775808,
+        "dvb_decoder_available": true,
+        "codec_private_options": null,
+        "caller_envelope_adaptation": false,
+        "caller_pts_rescale": false,
+        "benchmark_mode": false,
+        "qualification": false
+      },
+      "raw_codec_input": {
+        "kind": "codec-input",
+        "packet": 0,
+        "stream": 0,
+        "offset": 0,
+        "size": 109,
+        "pos": 277,
+        "flags": 1,
+        "pts_raw": 1000,
+        "dts_raw": 1000,
+        "pts": 1000,
+        "dts": 1000,
+        "duration_raw": 2000,
+        "packet_time_base": [
+          0,
+          1
+        ],
+        "data_hex": "0f80000300000f140001000507000f000b0f1000010008020701ff000100010f1100010010010f000500022700000f00010000f0000f120001001a000f009f00000000019feb808000029feb808000039f108080000f130001000c00010100040000105580f0000f8000010000",
+        "side_data": []
+      },
+      "raw_decode_calls": [
+        {
+          "kind": "decode-call",
+          "packet": 0,
+          "stream": 0,
+          "offset": 0,
+          "supplied": 109,
+          "returned": 109,
+          "got": 1
+        }
+      ],
+      "raw_subtitle": {
+        "kind": "subtitle",
+        "stream": 0,
+        "packet": 0,
+        "packet_offset": 0,
+        "consumed": 109,
+        "drain": false,
+        "format": 0,
+        "pts_raw": 1000000,
+        "pts_microseconds": 1000000,
+        "pts_timebase": [
+          1,
+          1000000
+        ],
+        "start_display_ms": 0,
+        "end_display_ms": 2000,
+        "context_canvas": [
+          16,
+          12
+        ],
+        "rectangles": [
+          {
+            "order": 0,
+            "type": 1,
+            "x": 1,
+            "y": 1,
+            "width": 5,
+            "height": 2,
+            "flags": 0,
+            "native_stride": 5,
+            "indices_hex": "01010101020101010102",
+            "palette_entries": 4,
+            "raw_native_palette_hex": "00880000ffffffffffffffff000000ff",
+            "palette_native_u32": [
+              34816,
+              4294967295,
+              4294967295,
+              4278190080
+            ]
+          }
+        ]
+      },
+      "source_classification": "Selected service complete; foreign service marker ignored, foreign completeness not asserted",
+      "source_expected_error": null
+    }
+  ],
+  "tail_pair": [
+    {
+      "container": "matroska",
+      "original_log": ".research/dvb-container-trace-observed/matroska--header--dvb-truncated-segment.jsonl",
+      "log_sha256": "1fe040f4bc048844dba7fe9859d77d99421baecb0700624a136e42091b890ce6",
+      "original_codec_input": {
+        "kind": "codec-input",
+        "packet": 0,
+        "stream": 0,
+        "offset": 0,
+        "size": 106,
+        "pos": 277,
+        "flags": 1,
+        "pts_raw": 1000,
+        "dts_raw": 1000,
+        "pts": 1000,
+        "dts": 1000,
+        "duration_raw": 2000,
+        "packet_time_base": [
+          0,
+          1
+        ],
+        "data_hex": "0f14000100050703ff02ff0f1000010008020b01ff000700090f1100010010010f000400022700000300010000f0000f120001001a000f009f00000000019feb808000029f10808000039feb8080000f130001001000010100040004106140f0109440f0000f80000100",
+        "side_data": []
+      },
+      "decode_calls": [
+        {
+          "kind": "decode-call",
+          "packet": 0,
+          "stream": 0,
+          "offset": 0,
+          "supplied": 106,
+          "returned": 101,
+          "got": 1
+        },
+        {
+          "kind": "decode-call",
+          "packet": 0,
+          "stream": 0,
+          "offset": 101,
+          "supplied": 5,
+          "returned": -1094995529,
+          "got": 0
+        }
+      ],
+      "subtitles": [
+        {
+          "kind": "subtitle",
+          "stream": 0,
+          "packet": 0,
+          "packet_offset": 0,
+          "consumed": 101,
+          "drain": false,
+          "format": 0,
+          "pts_raw": 1000000,
+          "pts_microseconds": 1000000,
+          "pts_timebase": [
+            1,
+            1000000
+          ],
+          "start_display_ms": 0,
+          "end_display_ms": 2000,
+          "context_canvas": [
+            1024,
+            768
+          ],
+          "rectangles": [
+            {
+              "order": 0,
+              "type": 1,
+              "x": 7,
+              "y": 9,
+              "width": 4,
+              "height": 2,
+              "flags": 0,
+              "native_stride": 4,
+              "indices_hex": "0102000102010100",
+              "palette_entries": 4,
+              "raw_native_palette_hex": "00880000ffffffff000000ffffffffff",
+              "palette_native_u32": [
+                34816,
+                4294967295,
+                4278190080,
+                4294967295
+              ]
+            }
+          ]
+        }
+      ],
+      "errors": [
+        {
+          "kind": "error",
+          "stage": "decode",
+          "code": -1094995529,
+          "stream": 0,
+          "message": "Invalid data found when processing input",
+          "note": "native error/invalid progress; prefix events retained",
+          "qualification": false
+        }
+      ]
+    },
+    {
+      "container": "mpegts",
+      "original_log": ".research/dvb-container-trace-observed/mpegts--header--dvb-truncated-segment.jsonl",
+      "log_sha256": "7bc0b40bdff6536e3203003fa07f7057472bbc1c53e3aafed2f040851ad3b2d4",
+      "original_codec_input": {
+        "kind": "codec-input",
+        "packet": 0,
+        "stream": 0,
+        "offset": 0,
+        "size": 101,
+        "pos": 376,
+        "flags": 1,
+        "pts_raw": 90000,
+        "dts_raw": 90000,
+        "pts": 90000,
+        "dts": 90000,
+        "duration_raw": 0,
+        "packet_time_base": [
+          0,
+          1
+        ],
+        "data_hex": "0f14000100050703ff02ff0f1000010008020b01ff000700090f1100010010010f000400022700000300010000f0000f120001001a000f009f00000000019feb808000029f10808000039feb8080000f130001001000010100040004106140f0109440f000",
+        "side_data": [
+          {
+            "type": 19,
+            "size": 1,
+            "data_hex": "bd"
+          }
+        ]
+      },
+      "decode_calls": [
+        {
+          "kind": "decode-call",
+          "packet": 0,
+          "stream": 0,
+          "offset": 0,
+          "supplied": 101,
+          "returned": 101,
+          "got": 1
+        }
+      ],
+      "subtitles": [
+        {
+          "kind": "subtitle",
+          "stream": 0,
+          "packet": 0,
+          "packet_offset": 0,
+          "consumed": 101,
+          "drain": false,
+          "format": 0,
+          "pts_raw": 1000000,
+          "pts_microseconds": 1000000,
+          "pts_timebase": [
+            1,
+            1000000
+          ],
+          "start_display_ms": 0,
+          "end_display_ms": 2000,
+          "context_canvas": [
+            1024,
+            768
+          ],
+          "rectangles": [
+            {
+              "order": 0,
+              "type": 1,
+              "x": 7,
+              "y": 9,
+              "width": 4,
+              "height": 2,
+              "flags": 0,
+              "native_stride": 4,
+              "indices_hex": "0102000102010100",
+              "palette_entries": 4,
+              "raw_native_palette_hex": "00880000ffffffff000000ffffffffff",
+              "palette_native_u32": [
+                34816,
+                4294967295,
+                4278190080,
+                4294967295
+              ]
+            }
+          ]
+        }
+      ],
+      "errors": []
+    }
+  ],
+  "RGBA_view": "Explicit AARRGGBB->straightRGBA preserves all RGB/alpha bits; raw words remain beside it",
+  "originals_unchanged": true,
+  "strict_source_rules_unchanged": true,
+  "qualified": false
+}

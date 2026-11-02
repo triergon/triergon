@@ -1,0 +1,40 @@
+{
+  "schema": 1,
+  "id": "K2-bounded-zlib-v1",
+  "operation": "container-demux-v1",
+  "contract": [
+    "RFC 1950 checksum and wrapper",
+    "RFC 1951 stored/fixed/dynamic blocks",
+    "ContentEncoding scopes 1/2/3",
+    "all lacing schemes",
+    "ordered mixed header/zlib encodings",
+    "exact source and FFmpeg packet times",
+    "bounded decoded output, expansion ratio, work and cancellation"
+  ],
+  "required_profiles": [
+    "zlib-stored",
+    "zlib-fixed",
+    "zlib-dynamic",
+    "zlib-empty",
+    "zlib-private",
+    "zlib-both",
+    "zlib-mixed",
+    "zlib-xiph",
+    "zlib-fixed-lace",
+    "zlib-ebml"
+  ],
+  "required_targets": [
+    "aarch64-unknown-linux-gnu"
+  ],
+  "runtime_ratio_max": 1.25,
+  "memory_ratio_max_exclusive": 1.0,
+  "minimum_pairs": 30,
+  "confidence": 0.95,
+  "pending_module_requirements": [
+    "remaining M01/M02 features",
+    "complete applicable FATE coverage",
+    "deferred targets"
+  ],
+  "runtime_optimization_ratio_target": 0.8,
+  "runtime_policy": "initial-delivery-runtime-v1"
+}

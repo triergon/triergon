@@ -1,0 +1,155 @@
+{
+  "schema": "m05-default-CLUT-source-native-provenance-v1",
+  "primary": {
+    "path": ".research/parallel-subtitles/dvb-native-closure-1/default-clut-1/CONTRACT.json",
+    "sha256": "fb678d09bbe512ad1bd5325c1a4b577c8aea06bbc865d83de287ff798c024c2c",
+    "bytes": 3565
+  },
+  "unchanged_original_native_palettes_and_source_art": {
+    "path": ".research/parallel-subtitles/dvb-native-closure-1/default-clut-1/ACTUAL-PALETTES.json",
+    "sha256": "7064e03777bbf2935ddbee46211fd6737e0435b71e34ee57638666354bb46a56",
+    "bytes": 16040
+  },
+  "runtime_red": {
+    "path": ".research/parallel-subtitles/dvb-native-closure-1/default-clut-1/ACTUAL-RED-REVIEW.json",
+    "sha256": "0b5d7c91aa3400339e3d39cd14b29be8349299ce52a94df0916d42c0abce474a",
+    "bytes": 14264
+  },
+  "actual_default8": {
+    "request": {
+      "path": ".research/aws-linux-extended1/exports/3.76.29.106/controls-generated/parent-request.json",
+      "sha256": "dd232856425c68d11c1273e82953c3301d2e15ef5ebb8eef3b2351ed2ca8bb0b",
+      "bytes": 25187
+    },
+    "binding": {
+      "path": ".research/aws-linux-extended1/exports/3.76.29.106/builder-review-v1/binding.json",
+      "sha256": "48c393e87dc2687897550806ebdef4250b889e0891dfc9b5ccc5ac6aa4890f1a",
+      "bytes": 1845
+    },
+    "review": {
+      "path": ".research/aws-linux-extended1/exports/3.76.29.106/builder-review-v1/review.json",
+      "sha256": "5ec29c369e22a52df1346de9c1a174ef783c00df3248ae04de41b664d2787016",
+      "bytes": 5970
+    },
+    "raw_results": {
+      "path": ".research/aws-linux-extended1/exports/3.76.29.106/builder-native-v1/results.json",
+      "sha256": "79fcf10997dcfdd2747ceab8758555f6210acb74e2d0f33dfc90466ddd3cea83",
+      "bytes": 3901
+    },
+    "summary": {
+      "path": ".research/aws-linux-extended1/exports/3.76.29.106/builder-native-v1/review/summary.json",
+      "sha256": "bbda278933c3c29cfede7650c5330e47c327a1eeb1d2ba29808fd35c0d0bffa9",
+      "bytes": 137185
+    }
+  },
+  "actual_edge8": {
+    "request": {
+      "path": ".research/aws-linux-extended1/exports/3.76.29.106/builder-edge-native-v1/request.json",
+      "sha256": "e337c2a926de722bf5103a806e0ce266171500ad8ee3d6819fce3f7ea0202665",
+      "bytes": 16231
+    },
+    "results": {
+      "path": ".research/aws-linux-extended1/exports/3.76.29.106/builder-edge-native-v1/results.json",
+      "sha256": "991955f05216ab72bc7376f5610341e7deb7af8b8f6550d5e0acb1337ece08d9",
+      "bytes": 3769
+    },
+    "terminal": {
+      "path": ".research/aws-linux-extended1/exports/3.76.29.106/builder-edge-native-v1/terminal.json",
+      "sha256": "f75f07c2a9f79604377b6215b1c47d873c9e21ee5708e41064ffe73fbea22fba",
+      "bytes": 153
+    }
+  },
+  "exact107_green": {
+    "path": ".research/aws-linux-extended1/exports/3.76.29.106/gate-v3/completion.json",
+    "sha256": "b8c457ad95275075d57b897820dd5f7f17a97f6e6cda43a88c3a2fa6837eecbb",
+    "bytes": 2446
+  },
+  "retained_field_comparisons96": {
+    "path": ".research/aws-linux-extended1/exports/3.76.29.106/trace-comparison-v2/summary.json",
+    "sha256": "f805665a955615f6897e79c6cbdf60fe04b5388c05a699f8cb97881aca515cd3",
+    "bytes": 49499
+  },
+  "functional_pressure16": {
+    "path": ".research/aws-linux-extended1/exports/3.76.29.106/pressure-v3/summary.json",
+    "sha256": "dd70f8806623eef9588a3767f472290dd1e0525a3abcf5238df05c8927f48aed",
+    "bytes": 2555
+  },
+  "fixtures": [
+    {
+      "source": {
+        "path": ".research/parallel-subtitles/dvb-native-closure-1/default-clut-1/fixtures/dvb-default-clut2.dvb",
+        "sha256": "6f2e59ab5bc9dffcf460035d0ce35ada3125babe6915d75fa616db4b1cc0ecf1",
+        "bytes": 64
+      },
+      "target": "crates/subtitles/tests/native-defaults-fixtures/dvb-default-clut2.dvb"
+    },
+    {
+      "source": {
+        "path": ".research/parallel-subtitles/dvb-native-closure-1/default-clut-1/fixtures/dvb-default-clut2.indices",
+        "sha256": "94ff8a743f6c7d6abcf43d3027c43994df5f3170a39fd8fd532633b8bbb74e36",
+        "bytes": 8
+      },
+      "target": "crates/subtitles/tests/native-defaults-fixtures/dvb-default-clut2.indices"
+    },
+    {
+      "source": {
+        "path": ".research/parallel-subtitles/dvb-native-closure-1/default-clut-1/fixtures/dvb-default-clut2.native-rgba",
+        "sha256": "0a2657f0d2344ff709c6c3446fc7e723cc2e05d65ca80c7bc807f52fa5dab805",
+        "bytes": 16
+      },
+      "target": "crates/subtitles/tests/native-defaults-fixtures/dvb-default-clut2.native-rgba"
+    },
+    {
+      "source": {
+        "path": ".research/parallel-subtitles/dvb-native-closure-1/default-clut-1/fixtures/dvb4-literals-fields.dvb",
+        "sha256": "2d34bd9703f2bcfab040be4b3842d2aab27296777fedb5213597dfbf1fe7ebf5",
+        "bytes": 173
+      },
+      "target": "crates/subtitles/tests/native-defaults-fixtures/dvb4-literals-fields.dvb"
+    },
+    {
+      "source": {
+        "path": ".research/parallel-subtitles/dvb-native-closure-1/default-clut-1/fixtures/dvb4-literals-fields.indices",
+        "sha256": "67bc4c1ed6a28e3ec50ad82830e95097e94652fbd8d1d22c2c80d3940bd8ab0a",
+        "bytes": 12
+      },
+      "target": "crates/subtitles/tests/native-defaults-fixtures/dvb4-literals-fields.indices"
+    },
+    {
+      "source": {
+        "path": ".research/parallel-subtitles/dvb-native-closure-1/default-clut-1/fixtures/dvb4-literals-fields.native-rgba",
+        "sha256": "3fcf372d814083e8f5413f7d4c9b7a7dcec73cc25d1b08bd4688155522855b12",
+        "bytes": 64
+      },
+      "target": "crates/subtitles/tests/native-defaults-fixtures/dvb4-literals-fields.native-rgba"
+    },
+    {
+      "source": {
+        "path": ".research/parallel-subtitles/dvb-native-closure-1/default-clut-1/fixtures/dvb8-literals-fields.dvb",
+        "sha256": "3b0a8ea3a22ede5a486db5102871fee8bca0fa6de84fcd2d5e931d4f2d53e067",
+        "bytes": 211
+      },
+      "target": "crates/subtitles/tests/native-defaults-fixtures/dvb8-literals-fields.dvb"
+    },
+    {
+      "source": {
+        "path": ".research/parallel-subtitles/dvb-native-closure-1/default-clut-1/fixtures/dvb8-literals-fields.indices",
+        "sha256": "c4e13a2c3000629cc33bfb72c623a47022a920b0dba9c1bb6791b3dbf300c054",
+        "bytes": 12
+      },
+      "target": "crates/subtitles/tests/native-defaults-fixtures/dvb8-literals-fields.indices"
+    },
+    {
+      "source": {
+        "path": ".research/parallel-subtitles/dvb-native-closure-1/default-clut-1/fixtures/dvb8-literals-fields.native-rgba",
+        "sha256": "8754160bc6390d38f0b23f46b8f43bf0fcb4938c8d7a355fc72a9aefb0588e37",
+        "bytes": 1024
+      },
+      "target": "crates/subtitles/tests/native-defaults-fixtures/dvb8-literals-fields.native-rgba"
+    }
+  ],
+  "source_policy": "All276 standard defaults retain original source-nearest/studio projections and raw default/encoded facts. Native policy is a separate observed D32 view.",
+  "native_policy": "No-CDS: per-region used numeric-index rank; lowest used transparent, singleton/unused zero, alpha floor(rank*255/(distinct-1)), R/B alpha>>1,G alpha. CDS presence uses fixed/encoded family until mode change. Complete fixed grid observations retain exact quantization/alpha.",
+  "operation_limits": "Field comparison consumes exact public-native codec-input bytes/config/clock; container work and equivalent reference retention/performance are not qualified. All full raw records remain retained.",
+  "qualified": false
+}

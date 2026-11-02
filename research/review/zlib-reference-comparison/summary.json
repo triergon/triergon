@@ -1,0 +1,16 @@
+[
+  {
+    "case": "zlib-empty",
+    "time_upper_95": 0.1836418317503392,
+    "rss_upper_95": 0.2903225806451613,
+    "heap_upper_95": 0.04038397881496193,
+    "official_accepted": false
+  },
+  {
+    "case": "zlib-mixed",
+    "time_upper_95": 0.5814765943266236,
+    "rss_upper_95": 0.3142857142857143,
+    "heap_upper_95": 0.4983718176435761,
+    "official_accepted": false
+  }
+]

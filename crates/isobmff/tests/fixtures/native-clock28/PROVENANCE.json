@@ -1,0 +1,428 @@
+{
+  "qualification": false,
+  "all48_remain_required": true,
+  "runtime_subset": {
+    "clock": 11,
+    "fractional": 18
+  },
+  "subset_bounds_not_feature_waivers": "Literal frozen native observations, structural supported profile and all nonfits/gaps preserved. This is runtime regression coverage, not parity acceptance or removal of unsupported required controls.",
+  "reference_worker_sha256": "e8fcc2429e2086b5d0edf4929c098e0150c715ffa3faafc00e9b691e0128c14f",
+  "reference_host": "Linux-7.0.0-1014-aws-aarch64-with-glibc2.39",
+  "review": ".research/parallel-mp4/implementation/clock-boundary28-review/frozen48-model-review.json",
+  "review_sha256": "fd4a5ee2b465354c84940bd36262a72a6dd16e0db08f546f39797884eead883f",
+  "cases": [
+    {
+      "id": "clock27-i63-minus2-step12",
+      "input_sha256": "0cf757dd06904c03a0d0d5410078f0f6426c893274ad23b4d47704bdcba75bdf",
+      "required": true,
+      "gap": "reference-failure-retained",
+      "new_regression_coverage": false,
+      "native_stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "id": "clock27-i63-minus2-step21",
+      "input_sha256": "e1b5744e8f06400d5ed34106a150e8144c27700f25714167698f8e72747444b3",
+      "required": true,
+      "gap": "reference-failure-retained",
+      "new_regression_coverage": false,
+      "native_stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "id": "clock27-i63-minus1-step12",
+      "input_sha256": "34da09539cbe016fbed836ae14ce90512a673f2c80785218bebdfe889aa6ab05",
+      "required": true,
+      "gap": "reference-failure-retained",
+      "new_regression_coverage": false,
+      "native_stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "id": "clock27-i63-minus1-step21",
+      "input_sha256": "af3406797326c3c402aee8754eb17136d35047ad718c15dc83874f090fe7cf0b",
+      "required": true,
+      "gap": "reference-failure-retained",
+      "new_regression_coverage": false,
+      "native_stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "id": "clock27-i63-step12",
+      "input_sha256": "bd63834436d793df81e7fd51e293bb9121606f7421c700a2b1ca5af6dcd8ebf7",
+      "required": true,
+      "gap": null,
+      "new_regression_coverage": true,
+      "native_stdout_sha256": "45bc136dea4e143594f362e9be9ff8c3e324e9c3e55aded33bc59350f6449a1c",
+      "fixture": "crates/isobmff/tests/fixtures/native-clock28/clock27-i63-step12.mp4"
+    },
+    {
+      "id": "clock27-i63-step21",
+      "input_sha256": "1cbf5465b021d60eb007f47640b8322375216adf92d779ea864c980e954d0727",
+      "required": true,
+      "gap": null,
+      "new_regression_coverage": true,
+      "native_stdout_sha256": "d972db6dafd7b78348fac0e6956d02717b282012587d61a7226fbff8f20c398d",
+      "fixture": "crates/isobmff/tests/fixtures/native-clock28/clock27-i63-step21.mp4"
+    },
+    {
+      "id": "clock27-i63-plus1-step12",
+      "input_sha256": "6cb9fca2f266f5e76ea1234251afce13e0002e2763ae8dc4cbca120866bb5681",
+      "required": true,
+      "gap": null,
+      "new_regression_coverage": true,
+      "native_stdout_sha256": "dc21a3e408a0024f8792e3927028614ca85aae80b8c3dff8321204065dc5c1c2",
+      "fixture": "crates/isobmff/tests/fixtures/native-clock28/clock27-i63-plus1-step12.mp4"
+    },
+    {
+      "id": "clock27-i63-plus1-step21",
+      "input_sha256": "4b3d5e214140bf68be72d187fbd0090d62ee272193088e9d653210f2c9370bfa",
+      "required": true,
+      "gap": null,
+      "new_regression_coverage": true,
+      "native_stdout_sha256": "d2799d014115ced085e05d6327e2cc88bb55179a06d3abc39fdb0abf9bfc5508",
+      "fixture": "crates/isobmff/tests/fixtures/native-clock28/clock27-i63-plus1-step21.mp4"
+    },
+    {
+      "id": "clock27-u64-minus2-step12",
+      "input_sha256": "292180ec04ec368b397f4b651e6883d391de36606c86634c80b357251a2860ac",
+      "required": true,
+      "gap": null,
+      "new_regression_coverage": true,
+      "native_stdout_sha256": "40ab517b9e2412bf27b9b2947b81658c637204781c7afc7ebf331247ebc89124",
+      "fixture": "crates/isobmff/tests/fixtures/native-clock28/clock27-u64-minus2-step12.mp4"
+    },
+    {
+      "id": "clock27-u64-minus2-step21",
+      "input_sha256": "0bce4940e79a81253083abb94556790debb4aacd9d66584e2869201396fbba57",
+      "required": true,
+      "gap": null,
+      "new_regression_coverage": true,
+      "native_stdout_sha256": "ac9460685db69ad3b6862390420bc94ab34572f7af97ef0b50e9f78459f9a51d",
+      "fixture": "crates/isobmff/tests/fixtures/native-clock28/clock27-u64-minus2-step21.mp4"
+    },
+    {
+      "id": "clock27-u64-minus1-step12",
+      "input_sha256": "f49cb79419b93aff4ac9c3ec1446a982ef84910728ef33296e5a2b0977bf86b8",
+      "required": true,
+      "gap": null,
+      "new_regression_coverage": true,
+      "native_stdout_sha256": "8b9c51efc6bcb30aaf1e4b902165b3f24c0ebce37e829ab45da37277ee0d83d5",
+      "fixture": "crates/isobmff/tests/fixtures/native-clock28/clock27-u64-minus1-step12.mp4"
+    },
+    {
+      "id": "clock27-u64-minus1-step21",
+      "input_sha256": "2398163b8ab518a0cff7d30caba215702bc682a25ca76c6ff95258dd9627891b",
+      "required": true,
+      "gap": null,
+      "new_regression_coverage": true,
+      "native_stdout_sha256": "c890569baab19f1f12f8cb637c0f4c60a63b0cff44bfe9680894568dcad57aea",
+      "fixture": "crates/isobmff/tests/fixtures/native-clock28/clock27-u64-minus1-step21.mp4"
+    },
+    {
+      "id": "clock27-PTS-enters-MIN-before-DTS",
+      "input_sha256": "8b3fe092067c64974ee93fd783e09075d6337994f24fe073870bbfadb0784262",
+      "required": true,
+      "gap": "reference-failure-retained",
+      "new_regression_coverage": false,
+      "native_stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "id": "clock27-DTS-MIN-PTS-next",
+      "input_sha256": "a5eb9b6ce94732d4d1e6b330736ead6c84ef6e6d8b476780ddc10a52ba070b67",
+      "required": true,
+      "gap": null,
+      "new_regression_coverage": true,
+      "native_stdout_sha256": "1d0e57f94078229db205ff75c9e25966009bd4020394ae5cc378d029c9ce129b",
+      "fixture": "crates/isobmff/tests/fixtures/native-clock28/clock27-DTS-MIN-PTS-next.mp4"
+    },
+    {
+      "id": "clock27-signed-CTO-crossing",
+      "input_sha256": "48b82767ca56929c36ecf993cde24e3e655822be573f607b091c553a94cd7229",
+      "required": true,
+      "gap": "reference-failure-retained",
+      "new_regression_coverage": false,
+      "native_stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "id": "clock27-split-runs-at-MIN",
+      "input_sha256": "714e9028dd6d4dfb83b1f9abad94299be9d615f8e4107cb66f78eb9ec93af073",
+      "required": true,
+      "gap": "reference-failure-retained",
+      "new_regression_coverage": false,
+      "native_stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "id": "order27-MIN-scale1000-cat12",
+      "input_sha256": "ce48cc374457264c7a90b7d4aca77068ab086eae173a4c488c3eccc5d815cc33",
+      "required": true,
+      "gap": "native-global-rescale-overflow-gap",
+      "new_regression_coverage": false,
+      "native_stdout_sha256": "a3c91ea17c20fd53e904796d4f9b9bcacdab8bc64a9b216c3f76500102b14619"
+    },
+    {
+      "id": "order27-MIN-scale1000-cat21",
+      "input_sha256": "8cdc2287ba6be46b24fec6c2e130e742283cdea9844f214073b6c1f48533bfdc",
+      "required": true,
+      "gap": "native-global-rescale-overflow-gap",
+      "new_regression_coverage": false,
+      "native_stdout_sha256": "5b036b706ab0886f3cc01510e6c655dbc9632edb431d71091c4ac469f5baff0b"
+    },
+    {
+      "id": "order27-MIN-physical21-cat12",
+      "input_sha256": "94ef6c4478a2ddb67613e74d024eea11bb2858e140ee7acd9fdf9f98401ffbbb",
+      "required": true,
+      "gap": "native-global-rescale-overflow-gap",
+      "new_regression_coverage": false,
+      "native_stdout_sha256": "82c43ce7fa096fec548d05ab1281e7868b79dfaf96f1bd2bad4eafdce78ef643"
+    },
+    {
+      "id": "order27-MIN-u32max-scale-cat12",
+      "input_sha256": "41d248edb01b18b13c2ce11d744801564ab7e1c970c9f42451d3cbfe3fb06b84",
+      "required": true,
+      "gap": "native-large-timescale-catalogue-gap",
+      "new_regression_coverage": false,
+      "native_stdout_sha256": "3fb87f50162e3b74d77c00571668bbcf06f313e6fda8b9077472e2db0fd4fd29"
+    },
+    {
+      "id": "order27-MIN-next-scale1000-cat12",
+      "input_sha256": "86e107da0ae5312e5769574cafda4cc2e9c1b54ab1a8f46994ac0b364772f652",
+      "required": true,
+      "gap": "native-global-rescale-overflow-gap",
+      "new_regression_coverage": false,
+      "native_stdout_sha256": "d012fa369d582a7743905d8f8ff8d468453165b5bd4eabd0edf5e8d0dd88f859"
+    },
+    {
+      "id": "order27-MIN-next-scale1000-cat21",
+      "input_sha256": "92ea0b5a595f47eebb3b7779999d023ccf7743e717f678562c614c1e168c400a",
+      "required": true,
+      "gap": "native-global-rescale-overflow-gap",
+      "new_regression_coverage": false,
+      "native_stdout_sha256": "bbcee49c2ccab535c08dcc0d9c47072ad1d248709fa896bc2a5095f3a94830c8"
+    },
+    {
+      "id": "order27-MIN-next-physical21-cat12",
+      "input_sha256": "023e6cf4ca230c2e782edbfc42fec66a80b1d1a9e24cce8edb9e3cdb8cb88400",
+      "required": true,
+      "gap": "native-global-rescale-overflow-gap",
+      "new_regression_coverage": false,
+      "native_stdout_sha256": "8cc7b3a34c47b15a762173348026c89abfdee6a03352b33429954123ca3fa50b"
+    },
+    {
+      "id": "order27-MIN-next-u32max-scale-cat12",
+      "input_sha256": "17a8efd9e256a66b058b7e0ecfa345b2def9f04106bc4cd73e23393446571962",
+      "required": true,
+      "gap": "native-large-timescale-catalogue-gap",
+      "new_regression_coverage": false,
+      "native_stdout_sha256": "8c687443da5b166004bd53f3a5c78a60f00b5184effe45bcec48b370f833b0b4"
+    },
+    {
+      "id": "order27-u64-last-scale1000-cat12",
+      "input_sha256": "fe8d50c4ce7f8675ab70422237ca52f6cc1a58b6ec3f535d28a82893a1adbd17",
+      "required": true,
+      "gap": null,
+      "new_regression_coverage": true,
+      "native_stdout_sha256": "9b41860247dd77781dded1a3c0f79b1c41740b44cd4f7407be158c42065e6190",
+      "fixture": "crates/isobmff/tests/fixtures/native-clock28/order27-u64-last-scale1000-cat12.mp4"
+    },
+    {
+      "id": "order27-u64-last-scale1000-cat21",
+      "input_sha256": "ae808105a234b90969380137d9290646827939d8eb604d3e69d207628f3520fd",
+      "required": true,
+      "gap": null,
+      "new_regression_coverage": true,
+      "native_stdout_sha256": "435e1279534ed13a60adee3e5162535ec2a46c4e7fd119396ab8952c2603934c",
+      "fixture": "crates/isobmff/tests/fixtures/native-clock28/order27-u64-last-scale1000-cat21.mp4"
+    },
+    {
+      "id": "order27-signed-max-rescale-overflow",
+      "input_sha256": "8aebb029fd190cbed7968440b19d787f3a4bdf17ca810581f49c1f5ce96cac10",
+      "required": true,
+      "gap": "reference-failure-retained",
+      "new_regression_coverage": false,
+      "native_stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "id": "order27-signed-safe-microsecond-crossing",
+      "input_sha256": "df1cc0db6f1d11d2ca63851ac18b6bb1786d7bce15fe54cffb40296e13dc8b90",
+      "required": true,
+      "gap": "native-global-rescale-overflow-gap",
+      "new_regression_coverage": false,
+      "native_stdout_sha256": "74a3195012ce1c4d55e12b5be49515c44af2870a110bd54da21666bcaf1d352f"
+    },
+    {
+      "id": "edit27-count5",
+      "input_sha256": "d9f48885005957c7fffd51bb81b9e086da33effba911bc8709b46feb9d456f98",
+      "required": true,
+      "gap": null,
+      "new_regression_coverage": true,
+      "native_stdout_sha256": "e4efafaf4900d1ba4b7dd564a2c96884ead2b4967854fca05cd6893122d616f4",
+      "fixture": "crates/isobmff/tests/fixtures/native-clock28/edit27-count5.mov"
+    },
+    {
+      "id": "edit27-count6",
+      "input_sha256": "d3159ac6360d732c0eeaa90cf97ec2273288e52408d587eed62c619bc94c3589",
+      "required": true,
+      "gap": null,
+      "new_regression_coverage": true,
+      "native_stdout_sha256": "fcf1045657c82df853d2abfb8e7641cfdf33a02fe219a00dbaece82abb71e5c4",
+      "fixture": "crates/isobmff/tests/fixtures/native-clock28/edit27-count6.mov"
+    },
+    {
+      "id": "edit27-count8",
+      "input_sha256": "f028f7229c6ec6df3904e8b9f2e37cc696a6803a42b82f4ebc1c1a3bc97a13fa",
+      "required": true,
+      "gap": null,
+      "new_regression_coverage": true,
+      "native_stdout_sha256": "cee9028d20c3cc1d8665f4fdee3766c1a232abd2c0882b456cdd53c872007e01",
+      "fixture": "crates/isobmff/tests/fixtures/native-clock28/edit27-count8.mov"
+    },
+    {
+      "id": "edit27-sixths",
+      "input_sha256": "d2bb837099729da35f4c86a1f430c0ba1a77b8049001c582bb5483c203bfd7f2",
+      "required": true,
+      "gap": null,
+      "new_regression_coverage": true,
+      "native_stdout_sha256": "a44fea1273eca26daec1826139c0c35a8eb115797eb0b90cd6b425824f7d5929",
+      "fixture": "crates/isobmff/tests/fixtures/native-clock28/edit27-sixths.mov"
+    },
+    {
+      "id": "edit27-half-tick",
+      "input_sha256": "c1cabc235ae37a5c0d77d9f28ab92e375d06ce2e04ffef520b84efb327398ba4",
+      "required": true,
+      "gap": null,
+      "new_regression_coverage": true,
+      "native_stdout_sha256": "7be7fbfd63df5a9dabf6bcf71e800f05265f088d6a99a0d26ab123b057a84373",
+      "fixture": "crates/isobmff/tests/fixtures/native-clock28/edit27-half-tick.mov"
+    },
+    {
+      "id": "edit27-sixty-two-half-ticks",
+      "input_sha256": "ab8d5345a114e0bc0424c057c2bedde3d93634c5227a72c18c3b5fee60957115",
+      "required": true,
+      "gap": null,
+      "new_regression_coverage": true,
+      "native_stdout_sha256": "5b1b65131f00c678032d75ced9932a01956cb71487f02885a3cbabe358998c18",
+      "fixture": "crates/isobmff/tests/fixtures/native-clock28/edit27-sixty-two-half-ticks.mov"
+    },
+    {
+      "id": "edit27-sevenths",
+      "input_sha256": "bc711d114c8b0b06844ab0bd216a5dc93003adada2b3c229ed70e33ad24405e8",
+      "required": true,
+      "gap": null,
+      "new_regression_coverage": true,
+      "native_stdout_sha256": "951f14a65c03ad6075f8f16ff43d5d8976b5ffc2c6532d70d01c55fba1f0c625",
+      "fixture": "crates/isobmff/tests/fixtures/native-clock28/edit27-sevenths.mov"
+    },
+    {
+      "id": "edit27-alternating12",
+      "input_sha256": "de9ca744febdb9b5569e4f67c652791fea2516bba8ee98e1fb33feef0ce1a0c5",
+      "required": true,
+      "gap": null,
+      "new_regression_coverage": true,
+      "native_stdout_sha256": "bb09f55e091a0dec9f5484fa437d5e851f170fc1b339a3dccaa59028db6efd7c",
+      "fixture": "crates/isobmff/tests/fixtures/native-clock28/edit27-alternating12.mov"
+    },
+    {
+      "id": "edit27-alternating21",
+      "input_sha256": "3b1335512f5c39ba9c81665793c9ac9ea45e6c95a29d49021f7c4420aa8c9c71",
+      "required": true,
+      "gap": null,
+      "new_regression_coverage": true,
+      "native_stdout_sha256": "b5eb11956fe2a7e496717a6bd0c9d7d65ccf7cfb9d59413d4a488d6b4078162a",
+      "fixture": "crates/isobmff/tests/fixtures/native-clock28/edit27-alternating21.mov"
+    },
+    {
+      "id": "edit27-leading-empty",
+      "input_sha256": "33dc7c7084a10376c1333efaddc085c612e4a173c1871062062a5bccca6a5c04",
+      "required": true,
+      "gap": null,
+      "new_regression_coverage": true,
+      "native_stdout_sha256": "5d4eadf2b9046405abbc808ada316c9e1fcc060c4316aa5360d9d477be083f09",
+      "fixture": "crates/isobmff/tests/fixtures/native-clock28/edit27-leading-empty.mov"
+    },
+    {
+      "id": "edit27-trailing-empty",
+      "input_sha256": "a7c7f0d13ae90b138149996be5b79ca3876d50200f689d46213a28f027269b54",
+      "required": true,
+      "gap": "native-nonleading-empty-edit-gap",
+      "new_regression_coverage": false,
+      "native_stdout_sha256": "77683383495054b4e7e99947f51c61b62291a398180710132e4b45cb77c43b10"
+    },
+    {
+      "id": "edit27-nonzero-media-sync",
+      "input_sha256": "d69279eca5a5cfb2540ba88e97ef2acf734f593f9d3912238503879b50a484b0",
+      "required": true,
+      "gap": null,
+      "new_regression_coverage": true,
+      "native_stdout_sha256": "e8b6e1a9e7c414f192573e0b8ed81c8bd0d0515a80c10796ec0d3d9eec4877d5",
+      "fixture": "crates/isobmff/tests/fixtures/native-clock28/edit27-nonzero-media-sync.mov"
+    },
+    {
+      "id": "edit27-alternating-media",
+      "input_sha256": "b738a5df2eee796b62af34a2709660aea0f384a0ab933ec07d5614716c7b53ae",
+      "required": true,
+      "gap": null,
+      "new_regression_coverage": true,
+      "native_stdout_sha256": "8fe686c97e93da9d14264133176874f32523aa55fb284937e2262e997dae42e6",
+      "fixture": "crates/isobmff/tests/fixtures/native-clock28/edit27-alternating-media.mov"
+    },
+    {
+      "id": "edit27-head-half-sample",
+      "input_sha256": "dd8e34cb1c04c7a2aa6839e28c541f6486b90cefbdceeb000e2eb07e1f7416cf",
+      "required": true,
+      "gap": "native-fractional-nonaligned-media-start-gap",
+      "new_regression_coverage": false,
+      "native_stdout_sha256": "6264c0c206bc40d6a6be816340d07ef1cde12129e9feff5766163b47238d3581"
+    },
+    {
+      "id": "edit27-source-count4",
+      "input_sha256": "9638de1e3fc2912d0eaf7de38601f15380fe3317aff42106b5f64a248cce4789",
+      "required": true,
+      "gap": null,
+      "new_regression_coverage": true,
+      "native_stdout_sha256": "1a9ee4a62c714a3fbc9c7746b8951ef668b952ae2537fcfc7efe7f788f6cb486",
+      "fixture": "crates/isobmff/tests/fixtures/native-clock28/edit27-source-count4.mov"
+    },
+    {
+      "id": "edit27-source-count8",
+      "input_sha256": "ba820845f1640d61b8fcf0353d1ee10f384362433db46b8a840151dfcdadd591",
+      "required": true,
+      "gap": null,
+      "new_regression_coverage": true,
+      "native_stdout_sha256": "09b5edd79ec2f1ef2d82c07e01ed56aff2a76791591db112a8125e6a686b96f7",
+      "fixture": "crates/isobmff/tests/fixtures/native-clock28/edit27-source-count8.mov"
+    },
+    {
+      "id": "edit27-first-delta500",
+      "input_sha256": "37bf07f732bdf838090a5e8bf00657cb49a6baadfc95564819694391cf20cae0",
+      "required": true,
+      "gap": null,
+      "new_regression_coverage": true,
+      "native_stdout_sha256": "ea136e3c411060b0718634da7974f7f44d2c73d15f1c8bff97ff34e4d4954922",
+      "fixture": "crates/isobmff/tests/fixtures/native-clock28/edit27-first-delta500.mov"
+    },
+    {
+      "id": "edit27-first-delta1500",
+      "input_sha256": "00cc1eb79b2fbcafc3fbc9ca65614ef8060f73e723cc319962ed7f06755590e9",
+      "required": true,
+      "gap": null,
+      "new_regression_coverage": true,
+      "native_stdout_sha256": "91a0ab30edf2b0a6a3184ec95b9b704d5c57d9b32ad3ee68903690d05497f170",
+      "fixture": "crates/isobmff/tests/fixtures/native-clock28/edit27-first-delta1500.mov"
+    },
+    {
+      "id": "edit27-final-two-thirds",
+      "input_sha256": "e1b41ec09f4c77739bf3b005335aad0979759cc2ce3cd7bc27b6bb30ffb560b8",
+      "required": true,
+      "gap": null,
+      "new_regression_coverage": true,
+      "native_stdout_sha256": "da2c80a28e7fdd2a267c7d57234b37993babb94915bcd0cb964b01b47049fd79",
+      "fixture": "crates/isobmff/tests/fixtures/native-clock28/edit27-final-two-thirds.mov"
+    },
+    {
+      "id": "edit27-final-four-thirds",
+      "input_sha256": "39c6c33e03e2c3e6ee69230d5f73dae011878a1508a1506bfa61066ad320cc48",
+      "required": true,
+      "gap": null,
+      "new_regression_coverage": true,
+      "native_stdout_sha256": "323f81bb51bb84e4c470931873dad31ed71bde389c3952e30e3a674a1ebb2f52",
+      "fixture": "crates/isobmff/tests/fixtures/native-clock28/edit27-final-four-thirds.mov"
+    }
+  ]
+}

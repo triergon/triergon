@@ -1,0 +1,82 @@
+{
+  "schema": "safe-media.m03.edit-fixtures.v1",
+  "qualification": false,
+  "request_sha256": "ed20009234746c953b77e6ef3d115b25cae877b00d6bf016171ae7cbf126f194",
+  "native_observation_manifest_sha256": "d077d1d1d7d5595c302e6ecbb7ced097463f707f59a47f71a5434f19f59c1d3c",
+  "native_worker_sha256": "d97ce08126efe876cf92dfaac3655073da87fd8c590793a7d37ffd9e1fbea2d2",
+  "note": "Raw observations retained by parent; native expectations are compatibility regression facts, not normative source clocks. Original56 corpus/PROVENANCE unchanged. Copying these small existing authored inputs is not new CPU-heavy generation.",
+  "cases": [
+    {
+      "id": "edit-single-one",
+      "file": "edit-single-one.mov",
+      "sha256": "a38de7c889f880b400880169726f96638c9558c290cf808d460215ebf2858039",
+      "authorship": "Independent lane authored synthetic media; source writer/inspector/Fraction intent retained; no third-party media or implementation code."
+    },
+    {
+      "id": "edit-single-two",
+      "file": "edit-single-two.mov",
+      "sha256": "18309ca1ae52b8ac702de0ed775f7f80c5153435bd06801070fdce18b74d1c70",
+      "authorship": "Independent lane authored synthetic media; source writer/inspector/Fraction intent retained; no third-party media or implementation code."
+    },
+    {
+      "id": "edit-single-trim",
+      "file": "edit-single-trim.mov",
+      "sha256": "06d3598789c294ef277ae741278771b5eee4e4bac5e51923b7f11a8a31fbb236",
+      "authorship": "Independent lane authored synthetic media; source writer/inspector/Fraction intent retained; no third-party media or implementation code."
+    },
+    {
+      "id": "edit-single-late",
+      "file": "edit-single-late.mov",
+      "sha256": "a53607c021fd67707c6b619330c95d23302f8431bfb1741cdd4e8baba020f83a",
+      "authorship": "Independent lane authored synthetic media; source writer/inspector/Fraction intent retained; no third-party media or implementation code."
+    },
+    {
+      "id": "edit-two-repeat-one",
+      "file": "edit-two-repeat-one.mov",
+      "sha256": "81f98f47f5516394d6e5e09944995f2ec4644cc8cbea8dfc5910ca112503074b",
+      "authorship": "Independent lane authored synthetic media; source writer/inspector/Fraction intent retained; no third-party media or implementation code."
+    },
+    {
+      "id": "edit-two-repeat-two",
+      "file": "edit-two-repeat-two.mov",
+      "sha256": "0490d4b307fa4f92e5f51bea03682260d1a002d498121f40b2b3f13df25dac34",
+      "authorship": "Independent lane authored synthetic media; source writer/inspector/Fraction intent retained; no third-party media or implementation code."
+    },
+    {
+      "id": "edit-three-repeat-one",
+      "file": "edit-three-repeat-one.mov",
+      "sha256": "0837ad805378408e83cb4ab14f8309bfaae258221ecf28e8e03d932282cf3dd4",
+      "authorship": "Independent lane authored synthetic media; source writer/inspector/Fraction intent retained; no third-party media or implementation code."
+    },
+    {
+      "id": "edit-three-repeat-two",
+      "file": "edit-three-repeat-two.mov",
+      "sha256": "51fac82dc0f04af66f22d032be99341bf8880988fb2cfbe095221d788ce879a8",
+      "authorship": "Independent lane authored synthetic media; source writer/inspector/Fraction intent retained; no third-party media or implementation code."
+    },
+    {
+      "id": "edit-three-repeat-three",
+      "file": "edit-three-repeat-three.mov",
+      "sha256": "20232dddded8d79f4b716de0b4511fc2a8692852dc578a63528f56f4e8423ebc",
+      "authorship": "Independent lane authored synthetic media; source writer/inspector/Fraction intent retained; no third-party media or implementation code."
+    },
+    {
+      "id": "edit-three-repeat-late",
+      "file": "edit-three-repeat-late.mov",
+      "sha256": "758e9c24a9349f98767c163bc7c6894fccec39beb2991facf94caed0e9a0b747",
+      "authorship": "Independent lane authored synthetic media; source writer/inspector/Fraction intent retained; no third-party media or implementation code."
+    },
+    {
+      "id": "edit-four-repeat-one",
+      "file": "edit-four-repeat-one.mov",
+      "sha256": "6c9558cdd550e96bfb0c6cd3e31d23b9f868c11eefebf141e7ac748314246078",
+      "authorship": "Independent lane authored synthetic media; source writer/inspector/Fraction intent retained; no third-party media or implementation code."
+    },
+    {
+      "id": "edit-leading-empty-one",
+      "file": "edit-leading-empty-one.mov",
+      "sha256": "27dead7eb1e0659e09a7cfd3ba40162d920379edb57761a06a17cb3d397ed0be",
+      "authorship": "Independent lane authored synthetic media; source writer/inspector/Fraction intent retained; no third-party media or implementation code."
+    }
+  ]
+}

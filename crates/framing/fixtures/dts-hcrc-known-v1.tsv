@@ -1,0 +1,16 @@
+# dts-hcrc-known-v1: exact14 original prefixes; parent-authorized CPF-known0 absence policy
+# original_id	logical_source_hex
+primary::original-header::short-header-cpf-0-bytes-5	7ffe8001fc
+primary::original-header::short-header-cpf-0-bytes-6	7ffe8001fc3c
+primary::original-header::short-header-cpf-0-bytes-7	7ffe8001fc3c05
+primary::original-header::short-header-cpf-0-bytes-8	7ffe8001fc3c05f0
+primary::original-header::short-header-cpf-0-bytes-9	7ffe8001fc3c05f0b5
+primary::original-header::short-header-cpf-0-bytes-10	7ffe8001fc3c05f0b5e0
+primary::original-stream-start::truncated-10	7ffe8001fc3c05f0b5e0
+poison::original-header::short-header-cpf-0-bytes-5	7ffe8001fc
+poison::original-header::short-header-cpf-0-bytes-6	7ffe8001fc3c
+poison::original-header::short-header-cpf-0-bytes-7	7ffe8001fc3c05
+poison::original-header::short-header-cpf-0-bytes-8	7ffe8001fc3c05f0
+poison::original-header::short-header-cpf-0-bytes-9	7ffe8001fc3c05f0b5
+poison::original-header::short-header-cpf-0-bytes-10	7ffe8001fc3c05f0b5e0
+poison::original-stream-start::truncated-10	7ffe8001fc3c05f0b5e0

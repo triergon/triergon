@@ -1,0 +1,13 @@
+[package]
+name = "triergon-mpegts"
+version = "0.0.0"
+repository.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+
+[dependencies]
+triergon-core = { path = "../core" }
+
+[lints]
+workspace = true

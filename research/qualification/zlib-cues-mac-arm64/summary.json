@@ -1,0 +1,84 @@
+{
+  "schema": 1,
+  "target": "aarch64-apple-darwin",
+  "full_module_accepted": false,
+  "thresholds": {
+    "runtime_upper_95_max": 0.8,
+    "memory_upper_95_max_exclusive": 1.0,
+    "minimum_pairs": 30
+  },
+  "slices": {
+    "zlib": {
+      "contract": "K2-bounded-zlib-v1",
+      "cases": 10,
+      "exact_parity_pass": 8,
+      "parity_failed": [
+        "zlib-empty",
+        "zlib-mixed"
+      ],
+      "speed_failed": [
+        "zlib-stored",
+        "zlib-fixed",
+        "zlib-dynamic",
+        "zlib-both",
+        "zlib-xiph",
+        "zlib-fixed-lace",
+        "zlib-ebml"
+      ],
+      "memory_failed": [],
+      "runtime_upper_95_max": 0.8678396443075784,
+      "rss_upper_95_max": 0.46018145161290325,
+      "heap_upper_95_max": 0.6300819061801936,
+      "minimum_pairs": 30,
+      "slice_accepted": false,
+      "report_sha256": "6f351a0b6062406dc68a3288e2ed5cdc34b8912a71337ee347d9861d33ebb43f"
+    },
+    "seek": {
+      "contract": "K3-cues-preroll-v1",
+      "cases": 8,
+      "exact_parity_pass": 6,
+      "parity_failed": [
+        "cues-delay-preroll",
+        "cues-unknown-cluster"
+      ],
+      "speed_failed": [],
+      "memory_failed": [],
+      "runtime_upper_95_max": 0.751546775779757,
+      "rss_upper_95_max": 0.26666666666666666,
+      "heap_upper_95_max": 0.12898188632104934,
+      "minimum_pairs": 30,
+      "slice_accepted": false,
+      "report_sha256": "7f81695c2960fb5554cda6c8f605cc01919b83d17dd1ae6dd3a97b8814f00482"
+    },
+    "k0": {
+      "contract": "K0-container-demux-v1",
+      "cases": 12,
+      "exact_parity_pass": 12,
+      "parity_failed": [],
+      "speed_failed": [],
+      "memory_failed": [],
+      "runtime_upper_95_max": 0.780204754388778,
+      "rss_upper_95_max": 0.2962962962962963,
+      "heap_upper_95_max": 0.17237715803452855,
+      "minimum_pairs": 30,
+      "slice_accepted": true,
+      "report_sha256": "0a1c88f596f59eb316c752b053dd804db570ec3573e0814ac65fd1226efa6e1a"
+    },
+    "header": {
+      "contract": "K1-header-removal-v1",
+      "cases": 4,
+      "exact_parity_pass": 4,
+      "parity_failed": [],
+      "speed_failed": [],
+      "memory_failed": [],
+      "runtime_upper_95_max": 0.20283653846153846,
+      "rss_upper_95_max": 0.2857142857142857,
+      "heap_upper_95_max": 0.05038461538461538,
+      "minimum_pairs": 30,
+      "slice_accepted": true,
+      "report_sha256": "18a3aed5ced7a3919ebdc29017b1e1b50aa8ccf84edd7c1718bd0c35550e6f03"
+    }
+  },
+  "camera_resumed": true,
+  "source_snapshot": "source/"
+}

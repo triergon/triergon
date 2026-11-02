@@ -1,0 +1,65 @@
+# Bounded segment metadata development block (K5)
+
+K5 is qualified on native Mac ARM64: all 48 authored profiles and the mandatory
+intact original HDR vector pass selected source/native parity, runtime upper
+ratio <=0.80 and both memory upper ratios <1. K0–K4 also pass on the same source.
+The [receipt](../research/qualification/segment-metadata-mac-arm64/README.md) retains
+all 116 workloads, exact source/workers/inputs and preserved failures. See the
+[contract](../harness/catalogue-slice.json) and
+[investigation](../research/dispositions/segment-metadata-status.md).
+
+The source API follows RFC 9559 §§5.1.2, 5.1.4.1 and 5.1.6–8 plus the pinned schema.
+It retains complete edition/chapter trees, displays/languages, exact unsigned
+chapter nanoseconds, recursive text/binary SimpleTags and every target UID. Info
+retains exact IEEE duration values and signed DateUTC nanoseconds. Source BCP47
+language precedence does not depend on element order. Track optional flags retain
+absence versus explicit false, and forbidden lacing/duplicate UIDs fail.
+
+Documents own one raw buffer with a compact immutable arena. Borrowed typed views
+allocate no strings or payload copies. Owned attachment handles share that document
+and remain valid after reader teardown. Defaults are 1 MiB of structural metadata,
+8 MiB of attachment payload, 4096 cumulative document nodes, nesting 32 (absolute
+recursion ceiling 64), and 16 MiB of document storage. Storage charges raw/vector
+capacities, document/list/Arc storage and bounded validation workspace. The arena
+uses twelve-byte nodes, 32-bit source offsets and at most 65535 nodes per document.
+Unknown extensions stay opaque in the source buffer. These are per-reader document
+limits; broader retained packet/track budgets remain M00 work.
+
+Seekable input resolves referenced late documents without scanning media to invent
+an index. Source offsets identify physical payload locations. Repeated reads/seeks
+reuse loaded documents and skip cached payloads through the seek capability; a
+sequential reader consumes them normally. Seek/transport failures remain failures,
+and require explicit reset before more packets. Invalid scalar widths, duplicate
+fields/UIDs, malformed UTF-8, nesting/storage limits and chapter ranges have tests.
+This is demuxed chapter/menu data, not execution of ordered editions or DVD scripts.
+
+The harness has two explicit views. `catalogue-source` checks every document byte,
+node, scalar and original track field against an independent Python EBML traversal.
+Schema 2's native catalogue view checks media packets/configuration/colour plus
+public dictionaries, flat chapters and static attachments. Language/name values
+occur once in native dictionaries; original track values remain in source proof.
+Both views are mandatory. No source precision is rounded to make a comparison pass.
+
+Pinned native API observations are represented only in the worker adapter: legacy
+language fields take precedence there; nested/decreasing flat chapters, incomplete
+metadata and empty attachments may be omitted; repeated targets collapse to one
+UID and route attachment before chapter before track. The core source API retains
+all those objects/fields. Attached-picture packets are represented as static
+attachment objects with their full bytes, distinct from timed media packets.
+Native processing still runs in full. These rules neither edit the input nor add
+restoration/decoder work to FFmpeg. Every canonical dictionary/attachment byte and
+media packet contributes to the ordered in-operation checksum in both workers.
+
+The original `hdr10tags-both.mkv` opens and reads intact and passes both catalogue
+and exact-source proof. Its old chapter/attachment refusal remains in the previous
+sealed receipt. Its full upstream decoded-frame priority tests are not claimed;
+external sample redistribution rights remain unreviewed. The original vector passes the same local parity/time/memory gates and is
+mandatory in K5 acceptance.
+
+The first 30-pair memory campaign failed 512 chapters (heap upper ratio 4.2881,
+RSS 1.4572, rounded upward) and 512 tags (heap 1.3888). Its exact source, workers,
+inputs and observations are retained. The adapter now borrows source strings,
+keeps a single dictionary entry inline and uses compact source nodes. The final memory/runtime campaign passes on all 49 K5 workloads; no
+case or threshold was removed. The 1 MiB attachment runtime failure and checkpoint
+replay defect were also resolved and retained in the receipt.
+Full M01/M02, deferred targets and actual Streem offboarding remain open.

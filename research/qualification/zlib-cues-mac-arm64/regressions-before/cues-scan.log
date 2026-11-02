@@ -1,0 +1,22 @@
+   Compiling safe-media v0.0.0 (/Users/jonasgrosch/projects/safe-media/crates/media)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 1.24s
+     Running tests/matroska.rs (target/debug/build/safe-media/a55b27fe3aa8e21a/out/matroska-a55b27fe3aa8e21a)
+
+running 1 test
+test cues_seek_skips_distant_data_with_a_small_scan_budget ... FAILED
+
+failures:
+
+---- cues_seek_skips_distant_data_with_a_small_scan_budget stdout ----
+
+thread 'cues_seek_skips_distant_data_with_a_small_scan_budget' (48426679) panicked at crates/media/tests/matroska.rs:475:63:
+called `Result::unwrap()` on an `Err` value: Limit("skip bytes")
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    cues_seek_skips_distant_data_with_a_small_scan_budget
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 16 filtered out; finished in 0.00s
+
+error: test failed, to rerun pass `-p safe-media --test matroska`

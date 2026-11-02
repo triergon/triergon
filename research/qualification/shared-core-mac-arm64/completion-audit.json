@@ -1,0 +1,110 @@
+{
+  "status": "Qualified frozen selected K0-K5 snapshot; complete module and offboarding closure remain false",
+  "target": "aarch64-apple-darwin",
+  "selected_graph_sha256": "f98621af49df5b1790d37c09c7429faa753f3525891d5a836a9ae9d230a3e6b5",
+  "selected_packages": [
+    "media-worker",
+    "safe-media",
+    "safe-media-core"
+  ],
+  "selected_workloads": 116,
+  "authored_workloads": 115,
+  "required_intact_external_inputs": 1,
+  "required_pairs": 30,
+  "raw_iterations_per_timing_worker": 50,
+  "runtime_upper_ratio_maximum_allowed": 0.8,
+  "live_heap_and_attributable_rss_upper_ratio_maximum_exclusive": 1,
+  "contract_and_required_corpus_hashes_unchanged": true,
+  "comparison_exceptions_unchanged": "Only the two input-bound owner-approved K2 rules",
+  "exact_0_through_29_timing_pair_ids_required": true,
+  "manifest_operation_view_and_seek_targets_verified": true,
+  "all_first_clean_measurements_preserved": true,
+  "terminal_noncontamination_errors_not_retryable": true,
+  "fate_reference_samples_build_revision_and_upstream_binary_verified": true,
+  "ambient_and_pinned_build_ffprobe_roles_distinguished": true,
+  "source_export_files": 589,
+  "frozen_host_files": 588,
+  "frozen_host_rust_passed": 315,
+  "frozen_host_python_passed": 51,
+  "independent_arithmetic_cases_debug_and_release": 51235,
+  "source_export_restores_original_names_via": "source-manifest.json",
+  "raw_gate_audit": "audit.py",
+  "raw_gate_audit_sha256": "8cf25b6eb2f48ad2c5b9456397c953f143ec1ade558147afcdd485556fa12cda",
+  "audit_log_sha256": "a1ac51938ab562295c0eb029982aa5b4ab41496981a0683171ad6b77954bf615",
+  "per_group_summary": {
+    "k0": {
+      "cases": 12,
+      "slice_accepted": true,
+      "complete_module_accepted": false,
+      "time_ratio_upper_95_max": 0.5589773058574694,
+      "live_heap_ratio_upper_95_max": 0.1949535192563081,
+      "attributable_rss_ratio_upper_95_max": 0.5555555555555556
+    },
+    "header": {
+      "cases": 4,
+      "slice_accepted": true,
+      "complete_module_accepted": false,
+      "time_ratio_upper_95_max": 0.37711360694857327,
+      "live_heap_ratio_upper_95_max": 0.12384615384615384,
+      "attributable_rss_ratio_upper_95_max": 0.5555555555555556
+    },
+    "zlib": {
+      "cases": 10,
+      "slice_accepted": true,
+      "complete_module_accepted": false,
+      "time_ratio_upper_95_max": 0.6700278679966922,
+      "live_heap_ratio_upper_95_max": 0.8524199553239017,
+      "attributable_rss_ratio_upper_95_max": 0.71875
+    },
+    "seek": {
+      "cases": 8,
+      "slice_accepted": true,
+      "complete_module_accepted": false,
+      "time_ratio_upper_95_max": 0.5147471315092674,
+      "live_heap_ratio_upper_95_max": 0.18457214241099312,
+      "attributable_rss_ratio_upper_95_max": 0.4666666666666667
+    },
+    "colour": {
+      "cases": 33,
+      "slice_accepted": true,
+      "complete_module_accepted": false,
+      "time_ratio_upper_95_max": 0.44227558461773786,
+      "live_heap_ratio_upper_95_max": 0.29177244163302674,
+      "attributable_rss_ratio_upper_95_max": 0.5172413793103449
+    },
+    "catalogue": {
+      "cases": 48,
+      "slice_accepted": true,
+      "complete_module_accepted": false,
+      "time_ratio_upper_95_max": 0.6720569993502924,
+      "live_heap_ratio_upper_95_max": 0.8418953788411917,
+      "attributable_rss_ratio_upper_95_max": 0.7142857142857143
+    },
+    "external": {
+      "cases": 1,
+      "slice_accepted": true,
+      "complete_module_accepted": false,
+      "time_ratio_upper_95_max": 0.3407384851665022,
+      "live_heap_ratio_upper_95_max": 0.07307612384844497,
+      "attributable_rss_ratio_upper_95_max": 0.4615942028985507
+    }
+  },
+  "complete_core_or_format_module_qualification": false,
+  "offboarding_goal_complete": false,
+  "streem_modified": false,
+  "tv_operated": false,
+  "committed_or_published": false,
+  "claim_audit": {
+    "result": "pass",
+    "remaining_contradictions": 0,
+    "live_prose_files_reviewed": 27,
+    "path": "claim-audit.md",
+    "sha256": "85fdd262a54001552deca5c91af164cb49739e0029979f7244b5acc153b7a945"
+  },
+  "git_state": {
+    "branch": "codex/harness-matroska",
+    "unborn_head": true,
+    "remote_names": [],
+    "committed_or_published": false
+  }
+}

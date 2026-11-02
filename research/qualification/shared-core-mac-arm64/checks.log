@@ -1,0 +1,678 @@
+CARGO_INCREMENTAL=0 cargo +nightly fmt --all --check
+CARGO_INCREMENTAL=0 cargo +nightly test --workspace --locked
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.05s
+     Running unittests src/main.rs (target/debug/build/media-worker/68756feb866ad7c0/out/media_worker-68756feb866ad7c0)
+
+running 1 test
+test checksum_tests::polynomial_fold_is_identical_to_ordered_byte_recurrence ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+     Running unittests src/lib.rs (target/debug/build/safe-media/54f617eba5116bee/out/safe_media-54f617eba5116bee)
+
+running 34 tests
+test colour::tests::exact_binary_rationals_and_bounded_approximation ... ok
+test colour::source_tests::numerical_boundaries_do_not_panic_or_lose_source_values ... ok
+test ebml::tests::all_vint_widths_unknown_sizes_and_truncation ... ok
+test colour::source_tests::defaults_zero_widths_future_values_and_source_precision ... ok
+test colour::source_tests::malformed_metadata_duplicates_and_non_finite_or_out_of_range_values_fail ... ok
+test matroska::tests::all_lacing_schemes_and_malformed_lengths ... ok
+test metadata::tests::attachments_share_one_owned_source_after_reader_owner_is_gone ... ok
+test matroska::lace_storage_tests::laced_output_backpressure_discards_no_source_and_publishes_no_partial_batch ... ok
+test matroska::lace_storage_tests::charged_laced_source_needs_only_the_owned_decoded_outputs_remaining_capacity ... ok
+test matroska::lace_storage_tests::cancellation_before_a_pending_lace_leaves_retained_output_valid_and_reader_failed ... ok
+test metadata::tests::complete_nested_source_and_defaults_remain_available ... ok
+test metadata::tests::completed_ranges_preserve_nested_opaque_and_final_empty_payloads_in_twelve_byte_nodes ... ok
+test metadata::tests::incomplete_arena_tail_keeps_encoded_length_before_a_sibling_is_inserted ... ok
+test metadata::tests::info_preserves_signed_dates_and_exact_float_values ... ok
+test metadata::tests::invalid_cardinality_uids_utf8_binary_and_lengths_fail ... ok
+test metadata::tests::ordered_leaf_and_nested_chapter_ranges_obey_rfc9559 ... ok
+test metadata::tests::cumulative_arena_limits_and_absolute_depth_remain_bounded ... ok
+test metadata::tests::structural_attachment_node_and_depth_limits_are_independent ... ok
+test time::tests::negative_and_extreme_time_is_not_saturated ... ok
+test matroska::lace_storage_tests::later_encoded_lace_checksum_or_truncation_cannot_publish_earlier_frames ... ok
+test cues::tests::many_out_of_order_cues_keep_all_positions_and_enforce_the_entry_limit ... ok
+test timing::tests::fractional_lace_duration_remains_exact ... ok
+test timing::tests::integral_exact_time_keeps_signed_extremes_unknowns_and_rounding_errors ... ok
+test timing::tests::nanosecond_source_and_packet_clock_are_separate ... ok
+test timing::tests::negative_block_time_is_retained_in_source ... ok
+test timing::tests::non_laced_packet_clock_keeps_wide_delay_fallback_zero_and_overflow ... ok
+test zlib::incremental::tests::cancellation_interrupts_dynamic_lookup_fill_without_a_completed_table ... ok
+test zlib::incremental::tests::quick_lookup_never_promotes_zero_padding_into_missing_input ... ok
+test zlib::incremental::tests::dynamic_quick_fill_resumes_one_actual_slot_at_a_time_and_keeps_long_codes ... ok
+test zlib::incremental::tests::immutable_fixed_tables_match_every_rfc_code_including_reserved_symbols ... ok
+test zlib::incremental::tests::short_dynamic_alphabets_build_with_work_proportional_to_their_prefix_space ... ok
+test zlib::tests::malformed_trees_and_cancel_are_explicit_errors ... ok
+test zlib::incremental::tests::short_tree_lookup_preserves_following_bits_and_rejects_missing_input ... ok
+test zlib::tests::checksum_lanes_match_the_scalar_definition_at_every_boundary ... ok
+
+test result: ok. 34 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+     Running tests/core_migration.rs (target/debug/build/safe-media/5e6f3f87d2585760/out/core_migration-5e6f3f87d2585760)
+
+running 11 tests
+test incremental_starvation_transport_failure_and_explicit_completion_are_distinct ... ok
+test skipped_block_outside_cluster_does_not_reset_scan_policy ... ok
+test completed_leaf_survives_freeze_backpressure_without_consuming_more_input ... ok
+test packet_track_and_catalogue_aliases_keep_one_live_pool_after_reader_drop ... ok
+test cluster_range_reset_invalidates_old_input_but_preserves_earlier_leaf_storage ... ok
+test earlier_packets_remain_charged_through_seek_and_cross_thread_release ... ok
+test small_stored_zlib_laces_keep_the_existing_decoded_capacity_policy ... ok
+test one_byte_windows_and_one_unit_work_preserve_incremental_envelopes ... ok
+test direct_destination_reads_handle_short_reads_and_interruptions_without_zero_packets ... ok
+test packet_output_backpressure_retries_the_same_event_without_reading_ahead ... ok
+test opaque_document_handles_keep_the_charge_through_cross_thread_last_release ... ok
+
+test result: ok. 11 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/inflate.rs (target/debug/build/safe-media/92e5eebf56e23ab3/out/inflate-92e5eebf56e23ab3)
+
+running 12 tests
+test empty_decoded_event_after_checksum_needs_no_empty_storage_owner ... ok
+test inflate_backpressure_preserves_literal_or_match_state_for_retry ... ok
+test history_copy_retry_keeps_the_middle_of_an_overlapping_match ... ok
+test literal_backpressure_under_larger_steps_keeps_exact_permanent_work_and_cancel_state ... ok
+test corrupt_checksum_cancellation_and_permanent_limits_never_publish_partial_output ... ok
+test all_deflate_block_types_progress_with_one_unit_and_keep_output_private_until_checksum ... ok
+test overlapping_three_byte_history_keeps_its_phase_across_work_schedules ... ok
+test mixed_dynamic_fixed_and_stored_blocks_keep_bit_state_across_uneven_yields ... ok
+test dynamic_distance_alphabet_keeps_fifteen_bit_codes_under_all_work_schedules ... ok
+test successive_dynamic_blocks_replace_code_lengths_literals_and_empty_distance_tables ... ok
+test multi_stored_batches_and_checksum_boundaries_preserve_exact_bytes_and_work_policy ... ok
+test long_match_stream_stays_within_its_decode_and_checksum_work_bound ... ok
+
+test result: ok. 12 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+
+     Running tests/matroska.rs (target/debug/build/safe-media/777ed1b83ca61f57/out/matroska-777ed1b83ca61f57)
+
+running 30 tests
+test compressed_private_data_is_charged_to_the_shared_metadata_budget ... ok
+test colour_metadata_obeys_byte_and_track_budgets_and_retains_source_after_drop ... ok
+test disabled_track_lacing_and_duplicate_track_uid_are_rejected ... ok
+test beginning_replay_is_a_source_position_fact_not_a_zero_timestamp_guess ... ok
+test extreme_cue_timestamps_never_overflow_during_lookup ... ok
+test cyclic_seek_heads_are_bounded_and_cannot_fabricate_missing_tracks ... ok
+test cancel_and_failed_seek_cannot_leave_stale_pending_packets ... ok
+test failed_index_load_cannot_become_a_silent_missing_index_on_retry ... ok
+test cues_seek_skips_distant_data_with_a_small_scan_budget ... ok
+test invalid_or_duplicate_colour_cannot_become_playable_packets ... ok
+test ietf_source_language_precedes_legacy_independently_of_storage_order ... ok
+test header_restore_handles_each_lace_and_rejects_duplicate_encoding_orders ... ok
+test laced_keyframe_seek_receipt_describes_the_block_that_is_replayed ... ok
+test every_truncated_finite_document_fails_without_becoming_clean_eof ... ok
+test header_removal_restores_zero_length_blocks_and_private_scope_independently ... ok
+test later_lace_timestamps_remain_unknown_without_container_duration ... ok
+test restored_header_is_bounded_by_the_decoded_packet_limit ... ok
+test negative_relative_time_and_unknown_decode_time_are_preserved ... ok
+test forged_cue_targets_and_index_limits_are_rejected_without_stale_packets ... ok
+test laced_decompression_shares_one_decoded_block_budget ... ok
+test resource_limits_reject_before_allocating_large_elements ... ok
+test retained_packet_view_survives_reads_and_reader_drop_without_header_bytes ... ok
+test seek_after_eof_lands_on_previous_keyframe_and_restarts_packet_reads ... ok
+test playback_seek_retains_all_track_preroll_and_resets_after_eof_and_cancel ... ok
+test transport_failure_is_not_eof ... ok
+test unknown_cluster_ends_at_a_sibling_cluster_and_at_physical_eof ... ok
+test zlib_compressed_frames_and_private_restore_their_original_bytes ... ok
+test sparse_cues_seek_past_end_reaches_the_last_actual_random_access_block ... ok
+test late_catalogue_metadata_and_attachments_survive_eof_repeated_seeks_and_faults ... ok
+test bounded_deterministic_mutation_campaign_does_not_panic_or_hang ... ok
+
+test result: ok. 30 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+     Running tests/track_storage.rs (target/debug/build/safe-media/744e3024cbaaf0ed/out/track_storage-744e3024cbaaf0ed)
+
+running 5 tests
+test sibling_source_views_keep_one_charged_tracks_owner_after_teardown ... ok
+test non_static_track_strings_share_storage_after_reader_destruction ... ok
+test source_metadata_clones_share_storage_after_reader_destruction ... ok
+test codec_private_clones_share_storage_after_reader_destruction ... ok
+test encoded_private_and_owned_text_are_checked_views_of_the_complete_source_entry ... ok
+
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src/lib.rs (target/debug/build/safe-media-core/39eaef3cb332ba20/out/safe_media_core-39eaef3cb332ba20)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/bulk_storage.rs (target/debug/build/safe-media-core/5bb3f70f56403c26/out/bulk_storage-5bb3f70f56403c26)
+
+running 4 tests
+test initialized_resize_preserves_capacity_on_shrink_and_rolls_back_rejected_growth ... ok
+test history_repetition_handles_overlap_and_retains_the_complete_charge ... ok
+test rejected_history_growth_and_invalid_ranges_preserve_the_original_buffer ... ok
+test empty_reservations_and_repeated_growth_do_not_leak_or_exceed_the_pool ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/input.rs (target/debug/build/safe-media-core/e4c4c4e497f95f4e/out/input-e4c4c4e497f95f4e)
+
+running 7 tests
+test completing_one_resource_is_not_completion_of_a_transport_or_playlist ... ok
+test old_ranges_errors_and_source_reuse_cannot_poison_a_new_request ... ok
+test source_offsets_above_four_gib_are_not_lengths_or_usize_indices ... ok
+test tokens_identify_the_pool_and_new_parser_instance_not_just_a_small_counter ... ok
+test failure_is_sticky_even_at_known_end_and_cancellation_needs_explicit_recovery ... ok
+test invalid_windows_and_truncation_are_checked_before_committing ... ok
+test starvation_empty_input_work_yield_and_explicit_entity_end_are_distinct ... ok
+
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/ownership.rs (target/debug/build/safe-media-core/d00439318efc98e6/out/ownership-d00439318efc98e6)
+
+running 9 tests
+test capacity_and_hidden_prefixes_remain_charged_until_the_last_view_drops ... ok
+test invalid_ranges_and_failed_reservations_do_not_change_live_usage ... ok
+test freeze_preserves_allocation_and_returns_builder_when_a_header_cannot_fit ... ok
+test rejected_transfer_returns_the_original_allocation_without_a_charge ... ok
+test temporary_backpressure_recovers_after_caller_retention_ends ... ok
+test vector_growth_and_workspace_stay_in_the_same_live_pool ... ok
+test work_exhaustion_yields_without_spending_unavailable_units ... ok
+test vector_backpressure_preserves_the_rejected_value_and_existing_contents ... ok
+test storage_outlives_the_reader_and_can_be_released_on_another_thread ... ok
+
+test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/time.rs (target/debug/build/safe-media-core/699b085e4da722d9/out/time-699b085e4da722d9)
+
+running 7 tests
+test relative_codec_time_and_negative_packet_time_are_added_exactly ... ok
+test mixed_prime_clocks_preserve_their_full_rational ... ok
+test a_movie_media_and_codec_clock_can_require_more_than_u64_denominator ... ok
+test each_rounding_mode_is_explicit_at_negative_and_positive_ties ... ok
+test signed_extremes_and_comparison_do_not_overflow_or_use_floats ... ok
+test unsigned_fragment_time_above_i64_is_a_source_value_not_a_sentinel ... ok
+test representable_results_survive_wider_intermediates ... ok
+
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src/lib.rs (target/debug/build/safe-media-framing/901fa3deccc2d2c3/out/safe_media_framing-901fa3deccc2d2c3)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/ac3.rs (target/debug/build/safe-media-framing/5f92eb76aea56b83/out/ac3-5f92eb76aea56b83)
+
+running 13 tests
+test declared_family_and_frame_size_limits_reject_before_body_allocation ... ok
+test atomic_audio_cancel_releases_internal_scratch_and_stays_sticky ... ok
+test audio_count_limit_preserves_previously_emitted_frame ... ok
+test incomplete_audio_never_becomes_eof_on_transport_failure_or_cancel ... ok
+test config_limits_pool_and_cancel_have_no_hidden_allocations_or_partial_results ... ok
+test audio_reserve_and_freeze_pressure_never_reparse_or_lose_input ... ok
+test audio_source_pool_generation_starvation_and_zero_work_are_explicit ... ok
+test audio_owned_output_and_config_views_survive_reader_drop_and_thread_release ... ok
+test reduced_rate_field_presence_and_dependent_sample_span_are_source_facts ... ok
+test independent_dec3_records_preserve_all_substreams_presence_and_reserved_tail ... ok
+test independent_dac3_records_preserve_reserved_fields_and_declared_config ... ok
+test authored_header_matrix_matches_primary_tables_and_fraction_duration ... ok
+test authored_frames_preserve_all_bytes_with_split_sync_prefix_body_and_crc ... ok
+
+test result: ok. 13 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.10s
+
+     Running tests/av1.rs (target/debug/build/safe-media-framing/da19b1a30238687e/out/av1-da19b1a30238687e)
+
+running 13 tests
+test config_descriptor_pressure_is_retryable_and_cancel_drops_private_ownership ... ok
+test record_pool_source_and_version_boundaries_are_explicit ... ok
+test atomic_obu_cancel_releases_scratch_and_retained_input_without_resuming ... ok
+test explicit_single_obu_requires_known_nonempty_boundary ... ok
+test obu_count_failure_preserves_prior_owned_output ... ok
+test obu_input_identity_starvation_and_zero_work_are_not_eof ... ok
+test obu_reserve_and_freeze_pressure_preserve_exact_prefix_and_payload ... ok
+test obu_unknown_length_needs_explicit_finish_and_failures_stay_sticky ... ok
+test owned_obu_and_config_views_keep_charges_after_teardown_and_thread_release ... ok
+test zero_work_and_cancellation_apply_to_owned_record_parsers ... ok
+test independent_vp9_records_keep_context_fields_and_opaque_initialization ... ok
+test independent_av1c_records_preserve_fields_presence_reserved_bits_and_obus ... ok
+test independent_obu_corpus_survives_all_chunk_sizes_and_tiny_work ... ok
+
+test result: ok. 13 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.28s
+
+     Running tests/framing.rs (target/debug/build/safe-media-framing/462116f32dc52d13/out/framing-462116f32dc52d13)
+
+running 13 tests
+test configuration_allocation_retry_and_cancel_release_internal_ownership ... ok
+test adapter_retries_completed_freeze_and_cancellation_is_sticky ... ok
+test size_padding_count_and_configuration_limits_are_hard ... ok
+test input_starvation_generation_pool_and_cancel_are_explicit ... ok
+test unit_count_limit_does_not_erase_previously_emitted_output ... ok
+test prefix_and_padding_facts_retain_exact_offsets ... ok
+test annex_b_config_keeps_duplicates_order_source_and_classification ... ok
+test declared_records_preserve_unknown_source_without_claiming_to_parse_it ... ok
+test reserve_and_freeze_backpressure_do_not_consume_or_reparse_payload ... ok
+test malformed_and_truncated_inputs_are_not_empty_success ... ok
+test unknown_length_completion_and_failure_never_publish_partial_nals ... ok
+test length_field_byte_boundaries_and_annex_payload_limit ... ok
+test authored_corpus_all_chunk_boundaries_and_small_work ... ok
+
+test result: ok. 13 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+
+     Running unittests src/lib.rs (target/debug/build/safe-media-isobmff/8beec3737b81908b/out/safe_media_isobmff-8beec3737b81908b)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/edit_occurrences.rs (target/debug/build/safe-media-isobmff/482b32d89fbe8121/out/edit_occurrences-482b32d89fbe8121)
+
+running 5 tests
+test ready_occurrence_waits_for_the_caller_without_advancing_or_spending_work ... ok
+test occurrence_and_cumulative_source_scan_limits_are_explicit ... ok
+test unreviewed_rate_and_expanded_fractional_terminal_rules_stay_unsupported ... ok
+test original_four_edit_cases_are_separate_holdouts_including_exact_prime_clocks ... ok
+test all_twelve_native_probe_occurrences_preserve_unique_source_samples_at_both_work_schedules ... ok
+
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/fragment_time.rs (target/debug/build/safe-media-isobmff/38ce782dc7296231/out/fragment_time-38ce782dc7296231)
+
+running 2 tests
+test tfdt_invalid_width_version_flags_are_not_repaired ... ok
+test normative_tfdt_preserves_unsigned_32_and_64_bit_source_ticks ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/fragments.rs (target/debug/build/safe-media-isobmff/53d4d8972316cb22/out/fragments-53d4d8972316cb22)
+
+running 4 tests
+test modern_fragment_flags_remain_an_explicit_specification_gap ... ok
+test backward_fragment_run_is_preserved_but_not_used_as_an_implicit_predecessor ... ok
+test legacy_implicit_traf_chaining_uses_source_bytes_and_leaves_missing_time_unknown ... ok
+test sourced_absolute_base_fragments_match_independent_source_facts ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/input.rs (target/debug/build/safe-media-isobmff/8734779c52d45398/out/input-8734779c52d45398)
+
+running 9 tests
+test starvation_then_explicit_end_inside_header_is_truncation ... ok
+test cancellation_during_metadata_stays_cancelled_after_flag_clear ... ok
+test unknown_terminal_mdat_requires_explicit_source_completion ... ok
+test source_continuation_keeps_logical_generation_and_old_metadata_bytes ... ok
+test freeze_backpressure_keeps_the_completed_metadata_for_exact_retry ... ok
+test a_transport_failure_near_known_end_does_not_become_clean_eof ... ok
+test stale_range_reply_after_mdat_skip_is_rejected_without_losing_reader_state ... ok
+test cursor_reset_requires_an_explicit_format_reader_reset ... ok
+test one_byte_windows_and_internal_ranges_keep_the_logical_generation ... ok
+
+test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/interleaving.rs (target/debug/build/safe-media-isobmff/04e9aac0ad59224c/out/interleaving-04e9aac0ad59224c)
+
+running 16 tests
+test checked_media_rejects_invalid_extent_arrays_before_any_samples ... ok
+test empty_track_set_finishes_without_allocating_sample_storage ... ok
+test backward_track_offsets_fail_before_any_physical_output_and_remain_source_accessible ... ok
+test equal_addresses_and_zero_sizes_preserve_declared_track_order ... ok
+test checked_media_empty_sources_and_zero_byte_endpoints_are_explicit ... ok
+test checked_media_sparse_ranges_reject_holes_and_cross_extent_samples ... ok
+test checked_media_validates_later_tracks_before_rejecting_valid_backward_layout ... ok
+test checked_media_rejects_original_outside_mdat_before_layout_policy ... ok
+test checked_media_work_yields_cancellation_and_borrowed_storage_are_bounded ... ok
+test pinned_default_native_order_remains_distinct_from_source_physical_order ... ok
+test physical_regular_interleaving_matches_independent_source_ranges_in_both_schedules ... ok
+test interleaved_source_samples_drive_real_core_range_reads_under_tiny_windows ... ok
+test sparse_legacy_tracks_merge_without_narrowing_or_inventing_missing_clocks ... ok
+test regular_samples_then_legacy_fragments_keep_source_identity_and_unknown_fragment_origin ... ok
+test track_and_sample_limits_reject_without_output_or_leaking_charges ... ok
+test zero_work_and_cancellation_do_not_advance_or_release_waiting_output ... ok
+
+test result: ok. 16 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/native_view.rs (target/debug/build/safe-media-isobmff/700f2a9037e0ed3c/out/native_view-700f2a9037e0ed3c)
+
+running 6 tests
+test native_stream_projection_retains_tx3g_private_bytes_without_copy ... ok
+test native_duration_can_follow_occurrence_clock_without_changing_decode_delta ... ok
+test empty_sync_table_native_first_key_fallback_is_not_a_source_fact ... ok
+test source_edit_points_produce_observed_native_clock_and_discard_views ... ok
+test native_video_vendor_tag_uses_regular_sample_context_and_preserves_source_bytes ... ok
+test unedited_native_projection_matches_pinned_observation_without_mutating_source ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/packet.rs (target/debug/build/safe-media-isobmff/cff83b68590759fd/out/packet-cff83b68590759fd)
+
+running 6 tests
+test packet_does_not_reinterpret_transport_failure_as_eof ... ok
+test completed_packet_survives_freeze_backpressure_without_repeating_io ... ok
+test packet_rejects_external_range_transaction_and_zero_size_cancellation ... ok
+test packet_explicit_short_unknown_source_is_truncated ... ok
+test packet_range_and_limit_rejection_leave_input_transaction_untouched ... ok
+test packet_tiny_windows_preserve_source_and_retained_ownership ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/regular.rs (target/debug/build/safe-media-isobmff/e0bb837b67ef45cd/out/regular-e0bb837b67ef45cd)
+
+running 2 tests
+test sparse_co64_offsets_never_narrow_to_host_slice_indices ... ok
+test original_regular_corpus_and_explicit_specification_gaps ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/sidx.rs (target/debug/build/safe-media-isobmff/58a6a7f74faf3e80/out/sidx-58a6a7f74faf3e80)
+
+running 3 tests
+test sidx_limits_and_range_overflow_are_explicit_without_partial_cursor_commit ... ok
+test normative_sidx_cursor_preserves_references_sap_and_exact_movie_times ... ok
+test sidx_large_unsigned_time_and_sparse_offsets_do_not_narrow_to_i64_or_u32 ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/syntax.rs (target/debug/build/safe-media-isobmff/9a8dbd10c37e139c/out/syntax-9a8dbd10c37e139c)
+
+running 4 tests
+test headers_are_incremental_and_u64_endpoints_are_checked ... ok
+test child_work_yield_does_not_skip_a_box ... ok
+test composition_wire_bits_and_versioned_sign_are_both_preserved ... ok
+test retained_sample_entry_keeps_the_shared_core_charge_alive ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/time.rs (target/debug/build/safe-media-isobmff/c51264207cd05891/out/time-c51264207cd05891)
+
+running 2 tests
+test empty_and_non_unit_edit_rates_do_not_fabricate_point_mappings ... ok
+test prime_scale_edit_mapping_keeps_the_independent_fraction_exact ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src/lib.rs (target/debug/build/safe-media-mpegts/71e1944520ba8294/out/safe_media_mpegts-71e1944520ba8294)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/composed.rs (target/debug/build/safe-media-mpegts/60b650429eb5277d/out/composed-60b650429eb5277d)
+
+running 10 tests
+test m2ts_and_ts_produce_the_same_pes_without_treating_prefix_as_time ... ok
+test rejected_pat_pointer_is_a_source_diagnostic_and_a_new_pusi_can_recover ... ok
+test raw_header_timestamp_and_optional_dts_remain_independent_of_native_inference ... ok
+test full_pat_version_is_required_and_next_tables_never_activate ... ok
+test continuity_loss_changes_byte_run_identity_without_inventing_a_clock_reset ... ok
+test composed_pat_pmt_and_pes_keep_original_payload_header_and_source_ranges ... ok
+test truncated_final_transport_packet_reports_its_actual_start ... ok
+test contiguous_source_entity_end_carries_the_selected_pes ... ok
+test rejected_pmt_pointer_does_not_prevent_a_later_complete_program_map ... ok
+test duplicate_payload_is_ignored_and_counter_loss_does_not_join_partial_pes ... ok
+
+test result: ok. 10 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/dvb_signalling.rs (target/debug/build/safe-media-mpegts/6c93543c60b3a9b2/out/dvb_signalling-6c93543c60b3a9b2)
+
+running 13 tests
+test subtitling_view_borrows_original_tlv_and_keeps_big_endian_page_ids ... ok
+test service_shape_has_a_31_entry_bound_and_no_invented_empty_service ... ok
+test pmt_dvb_summary_is_work_bounded_cancellable_charged_and_owned ... ok
+test registration_or_private_specifier_does_not_infer_a_dvb_namespace ... ok
+test services_retain_order_duplicates_raw_language_and_reserved_type ... ok
+test duplicate_descriptors_are_counted_against_the_same_source_limit ... ok
+test scoped_bad_shape_is_rejected_before_a_program_map_but_raw_section_survives ... ok
+test only_explicit_dvb_private_pes_es_context_identifies_dvb_subtitles ... ok
+test multi_service_and_repeated_tlvs_never_select_a_first_native_service ... ok
+test conflicting_dvb_audio_signals_do_not_silently_win_or_disappear ... ok
+test named_single_service_native_view_keeps_its_source_and_explicit_pin ... ok
+test unknown_namespace_keeps_even_malformed_private_tag_bodies_opaque ... ok
+test six_d0_carriers_keep_pes_envelopes_raw33_absent_dts_and_service_epochs ... ok
+
+test result: ok. 13 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+     Running tests/regressions.rs (target/debug/build/safe-media-mpegts/66835d934603e079/out/regressions-66835d934603e079)
+
+running 21 tests
+test forbidden_timing_flags_and_marker_bits_preserve_bad_header_for_diagnosis ... ok
+test bad_crc_remains_observable_and_cannot_become_a_pat ... ok
+test crc_and_pat_preserve_source_and_network_program_identity ... ok
+test malformed_adaptation_and_pcr_cannot_reach_payload ... ok
+test cancellation_and_limits_leave_the_input_observable_for_explicit_recovery ... ok
+test a_header_only_finite_pes_finalizes_without_needing_another_source_byte ... ok
+test framing_survives_every_input_byte_and_work_yield_without_duplicate_packets ... ok
+test incomplete_finite_pes_is_truncation_and_zero_length_audio_is_invalid ... ok
+test network_pid_zero_program_is_preserved_as_a_non_playable_association ... ok
+test pes_header_can_cross_every_payload_boundary_and_keeps_raw33_bits ... ok
+test descriptors_cannot_overrun_crc_or_accept_multi_section_pmt ... ok
+test continuity_wrap_adaptation_duplicate_and_changed_pcr_are_distinct ... ok
+test pes_span_backpressure_and_one_unit_work_do_not_change_packet_boundaries ... ok
+test pmt_preserves_ordered_unknown_and_multilingual_descriptor_bytes ... ok
+test pes_is_not_an_access_unit_and_contiguous_segment_end_does_not_flush_it ... ok
+test psi_backpressure_keeps_completed_and_partial_source_bytes_for_exactly_once_retry ... ok
+test entity_eof_is_separate_from_logical_pes_eof_in_the_concrete_cursor ... ok
+test section_pointer_can_complete_a_partial_section_then_start_another ... ok
+test transport_192_preserves_prefix_pcr_and_large_physical_offsets ... ok
+test transport_failure_and_reset_cannot_be_reinterpreted_as_eof_or_old_packet_bytes ... ok
+test retained_owned_pes_keeps_its_hidden_source_capacity_charged_after_parser_drop ... ok
+
+test result: ok. 21 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/signalling.rs (target/debug/build/safe-media-mpegts/bc9603dca0abf0a4/out/signalling-bc9603dca0abf0a4)
+
+running 9 tests
+test hevc_copied_profile_bits_are_not_misclassified_as_reserved_zero ... ok
+test dvb_ac3_optional_fields_and_additional_bytes_need_an_explicit_namespace_call ... ok
+test hevc_temporal_ids_use_the_high_three_bits_and_do_not_swallow_trailing_bytes ... ok
+test dvb_eac3_mix_flag_consumes_no_byte_and_three_substreams_keep_their_order ... ok
+test language_entries_keep_order_non_ascii_bytes_and_complete_audio_types ... ok
+test registration_keeps_four_identifier_bytes_and_opaque_additional_identity ... ok
+test avc_fixed_body_retains_compatible_bits_and_rejects_length_or_reserved_damage ... ok
+test pmt_video_descriptor_parsing_yields_cancels_and_keeps_owned_raw_source ... ok
+test pmt_validates_selected_video_descriptors_before_output_and_checks_hevc_context ... ok
+
+test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src/lib.rs (target/debug/build/safe-media-subtitles/4fd9cb448f0ce622/out/safe_media_subtitles-4fd9cb448f0ce622)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/boundary_state.rs (target/debug/build/safe-media-subtitles/1e30987e88f7500b/out/boundary_state-1e30987e88f7500b)
+
+running 8 tests
+test empty_segments_are_not_a_drain_or_entity_end ... ok
+test declared_segments_never_autodetect_a_pes_envelope ... ok
+test empty_pes_data_field_is_not_a_display ... ok
+test raw_malformed_source_tail_is_not_replaced_with_the_native_ts_prefix ... ok
+test unknown_update_pts_is_not_filled_from_the_previous_packet ... ok
+test increasing_exact_pts_need_no_representable_subtraction ... ok
+test a_pes_marker_does_not_finish_a_split_display_set ... ok
+test pes_second_selected_display_set_preserves_first_event_then_fails ... ok
+
+test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/colour.rs (target/debug/build/safe-media-subtitles/38bb0cdb819038dd/out/colour-38bb0cdb819038dd)
+
+running 2 tests
+test transparent_rgb_views_do_not_change_raw_source_facts_or_opacity ... ok
+test independent_projection_vectors_preserve_source_and_unrepaired_views ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/configured_boundary.rs (target/debug/build/safe-media-subtitles/bfe48b8f96dc9f64/out/configured_boundary-bfe48b8f96dc9f64)
+
+running 9 tests
+test unknown_and_known_native_sentinel_integer_are_separate_source_values ... ok
+test declared_clock_ratio_and_inferred_dts_do_not_replace_source_facts ... ok
+test malformed_or_foreign_configuration_rejects_without_taking_ownership ... ok
+test descriptor_service_selection_keeps_all_original_entries_and_language_bytes ... ok
+test configured_pes_packets_keep_the_declared_envelope_across_a_split_display ... ok
+test configured_decoder_rejects_mutated_envelope_time_or_missing_facts_before_acceptance ... ok
+test changed_boundary_requires_reset_and_retained_old_event_keeps_its_clock ... ok
+test retained_event_keeps_original_configuration_after_decoder_and_input_drop ... ok
+test source_private_descriptor_and_clock_are_explicit_and_preserved ... ok
+
+test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/display.rs (target/debug/build/safe-media-subtitles/b6b68f214d036191/out/display-b6b68f214d036191)
+
+running 12 tests
+test colour_quantization_is_named_and_preserves_exact_source_opacity ... ok
+test cancellation_poisons_private_work_and_requires_explicit_reset ... ok
+test cross_display_object_reuse_requires_an_explicit_extension_profile ... ok
+test overlapping_current_object_codes_are_rejected ... ok
+test display_limits_fail_explicitly_without_publishing_partial_regions ... ok
+test input_generation_pool_and_reset_do_not_corrupt_retained_output ... ok
+test zero_work_and_entity_end_do_not_synthesize_eod ... ok
+test source_clut_components_and_private_segments_remain_available ... ok
+test exact_optional_pts_and_same_pts_display_set_constraint ... ok
+test allocation_pressure_preserves_the_exact_transaction_for_retry ... ok
+test pes_data_field_envelope_is_explicit ... ok
+test complete_state_cases_match_original_art_with_tiny_work ... ok
+
+test result: ok. 12 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/raster.rs (target/debug/build/safe-media-subtitles/3557ef832219cc48/out/raster-3557ef832219cc48)
+
+running 12 tests
+test zero_work_starvation_and_a_truncated_final_field_are_distinct ... ok
+test compound_region_keeps_one_private_plane_until_all_objects_complete ... ok
+test malformed_stuffing_reserved_subblocks_and_short_explicit_eight_bit_runs_fail ... ok
+test freeze_backpressure_keeps_the_finished_builder_for_retry_and_output_clones_keep_one_charge ... ok
+test clipping_does_not_move_source_rows_or_skip_invalid_source_bounds ... ok
+test an_out_of_row_run_is_invalid_even_when_the_output_clip_is_empty ... ok
+test cancellation_during_a_long_run_is_terminal_and_releases_private_plane_storage ... ok
+test source_and_work_limits_fail_explicitly_and_do_not_release_caller_owned_source ... ok
+test ragged_right_edges_and_nonmodifying_pixels_preserve_an_immutable_initial_plane ... ok
+test every_truncated_prefix_keeps_the_original_field_length_and_cannot_publish_a_plane ... ok
+test maps_are_explicit_field_state_and_raw_palette_bytes_are_not_rewritten ... ok
+test original_planes_match_across_byte_starvation_and_single_unit_work ... ok
+
+test result: ok. 12 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+   Doc-tests safe_media
+
+running 1 test
+test crates/media/src/matroska.rs - matroska::Demuxer<R>::metadata_documents (line 376) - compile fail ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.18s
+
+   Doc-tests safe_media_core
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests safe_media_framing
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests safe_media_isobmff
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests safe_media_mpegts
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests safe_media_subtitles
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+CARGO_INCREMENTAL=0 cargo +nightly clippy --workspace --all-targets --locked -- -D warnings
+    Checking safe-media v0.0.0 (/Users/jonasgrosch/projects/safe-media/crates/media)
+    Checking media-worker v0.0.0 (/Users/jonasgrosch/projects/safe-media/crates/worker)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.73s
+CARGO_INCREMENTAL=0 cargo +nightly check --workspace --no-default-features --locked
+    Checking safe-media v0.0.0 (/Users/jonasgrosch/projects/safe-media/crates/media)
+    Checking media-worker v0.0.0 (/Users/jonasgrosch/projects/safe-media/crates/worker)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.48s
+CARGO_INCREMENTAL=0 cargo +nightly build --workspace --release --locked
+    Finished `release` profile [optimized] target(s) in 0.01s
+python3 -m unittest harness.test_runner harness.test_timing harness.test_header harness.test_zlib harness.test_content harness.test_seek harness.test_checksum harness.test_comparison harness.test_reference_encodings harness.test_specs harness.test_colour harness.test_catalogue harness.test_provenance
+......................[matroska,webm @ 0x13660f130] Unknown-sized element at 0xf9 inside parent with finite size
+[matroska,webm @ 0x13260f0e0] Unknown-sized element at 0xf9 inside parent with finite size
+[matroska,webm @ 0x13960f130] Unknown-sized element at 0xf9 inside parent with finite size
+[matroska,webm @ 0x150e0f0e0] Unknown-sized element at 0xf9 inside parent with finite size
+[matroska,webm @ 0x126805c30] Unknown-sized element at 0xf9 inside parent with finite size
+[matroska,webm @ 0x151b077a0] Unknown-sized element at 0xf9 inside parent with finite size
+[matroska,webm @ 0x11e3040a0] Unknown-sized element at 0xf9 inside parent with finite size
+[matroska,webm @ 0x135704080] Unknown-sized element at 0xf9 inside parent with finite size
+[matroska,webm @ 0x158e0f130] Unknown-sized element at 0xf9 inside parent with finite size
+[matroska,webm @ 0x137e0f0e0] Unknown-sized element at 0xf9 inside parent with finite size
+[matroska,webm @ 0x13460f130] Unknown-sized element at 0xf9 inside parent with finite size
+[matroska,webm @ 0x146e0f0e0] Unknown-sized element at 0xf9 inside parent with finite size
+.............................
+----------------------------------------------------------------------
+Ran 51 tests in 12.069s
+
+OK
+python3 tools/check-safety.py
+Strict-safe workspace: 7 owned packages; no third-party packages, build scripts or unsafe syntax
+python3 tools/check-design.py
+Design integrity OK: local links, JSON, 6 unaccepted module gates, 177 unmapped FATE identities, 12 candidate observations.
+This is not a feature-parity, performance, memory or FATE pass.
+python3 tools/test-core-time.py
+{
+  "cases": {
+    "time": 34502,
+    "wide": 15024
+  },
+  "wide_reduction_coverage": {
+    "successful_addsub_with_numerator_over_127_bits": 107,
+    "successful_addsub_with_lcm_over_128_bits": 880
+  }
+}
+{
+  "status": "frozen-bytes-verified",
+  "corpus_version": "core-time-edge-v2",
+  "output": "/Users/jonasgrosch/projects/safe-media/.research/core-time-edge-oracle/v2",
+  "row_counts": {
+    "time": 1280,
+    "wide": 429
+  },
+  "operations": {
+    "time": {
+      "add": 640,
+      "sub": 640
+    },
+    "wide": {
+      "w_build": 203,
+      "w_div": 226
+    }
+  },
+  "shapes": {
+    "time_both_pre_reduction_quantities_over_128": 1280,
+    "opposite_sign_cancellation_cases": 640,
+    "minimum_time_lcm_denominator_bits": 159,
+    "minimum_time_pre_reduction_numerator_bits": 136,
+    "maximum_time_lcm_denominator_bits": 192,
+    "maximum_time_pre_reduction_numerator_bits": 188,
+    "minimum_cancellation_lost_bits": 19,
+    "wide_dense_quotients_over_128": 117,
+    "wide_division_cases_by_divisor": {
+      "1": 8,
+      "2": 16,
+      "3": 22,
+      "18446744073709551615": 29,
+      "18446744073709551616": 32,
+      "18446744073709551617": 29,
+      "340282366920938463463374607431768211455": 29,
+      "340282366920938463463374607431768211456": 32,
+      "340282366920938463463374607431768211457": 29
+    },
+    "wide_maximum_quotient_bits": 256
+  }
+}
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.01s
+debug/time: 34502 cases, 0 mismatches, exit 0
+debug/wide: 15024 cases, 0 mismatches, exit 0
+debug/edge-time: 1280 cases, 0 mismatches, exit 0
+debug/edge-wide: 429 cases, 0 mismatches, exit 0
+    Finished `release` profile [optimized] target(s) in 0.00s
+release/time: 34502 cases, 0 mismatches, exit 0
+release/wide: 15024 cases, 0 mismatches, exit 0
+release/edge-time: 1280 cases, 0 mismatches, exit 0
+release/edge-wide: 429 cases, 0 mismatches, exit 0
+exact arithmetic pass

@@ -1,0 +1,63 @@
+{
+  "k0": {
+    "contract_id": "K0-container-demux-v1",
+    "cases": 12,
+    "slice_accepted": true,
+    "complete_module_accepted": false,
+    "time_ratio_upper_95_max": 0.7030671566508142,
+    "attributable_rss_ratio_upper_95_max": 0.2962962962962963,
+    "live_heap_ratio_upper_95_max": 0.1893758300132802,
+    "references": [
+      "pinned native FFmpeg"
+    ]
+  },
+  "header": {
+    "contract_id": "K1-header-removal-v1",
+    "cases": 4,
+    "slice_accepted": true,
+    "complete_module_accepted": false,
+    "time_ratio_upper_95_max": 0.20341136081405303,
+    "attributable_rss_ratio_upper_95_max": 0.2857142857142857,
+    "live_heap_ratio_upper_95_max": 0.075,
+    "references": [
+      "pinned native FFmpeg"
+    ]
+  },
+  "zlib": {
+    "contract_id": "K2-bounded-zlib-v1",
+    "cases": 10,
+    "slice_accepted": true,
+    "complete_module_accepted": false,
+    "time_ratio_upper_95_max": 0.7921021361815754,
+    "attributable_rss_ratio_upper_95_max": 0.4375,
+    "live_heap_ratio_upper_95_max": 0.6396128071481757,
+    "references": [
+      "pinned FFmpeg plus native scope-1 combined-encoding restoration",
+      "pinned native FFmpeg"
+    ]
+  },
+  "seek": {
+    "contract_id": "K3-cues-preroll-v1",
+    "cases": 8,
+    "slice_accepted": true,
+    "complete_module_accepted": false,
+    "time_ratio_upper_95_max": 0.6827542334659797,
+    "attributable_rss_ratio_upper_95_max": 0.26666666666666666,
+    "live_heap_ratio_upper_95_max": 0.14900249376558602,
+    "references": [
+      "pinned native FFmpeg"
+    ]
+  },
+  "colour": {
+    "contract_id": "K4-colour-hdr-v1",
+    "cases": 33,
+    "slice_accepted": true,
+    "complete_module_accepted": false,
+    "time_ratio_upper_95_max": 0.6600139916536556,
+    "attributable_rss_ratio_upper_95_max": 0.32142857142857145,
+    "live_heap_ratio_upper_95_max": 0.2642640143160348,
+    "references": [
+      "pinned native FFmpeg"
+    ]
+  }
+}

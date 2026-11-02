@@ -1,0 +1,50 @@
+[
+  {
+    "role": "candidate",
+    "source_path": "target/release/media-worker",
+    "frozen_path": ".research/frozen-workers/b7581c8ba9be9262c078e7a132117520b69ce3068e4cb0e7a16fa81034de3b50/media-worker",
+    "sha256": "b7581c8ba9be9262c078e7a132117520b69ce3068e4cb0e7a16fa81034de3b50"
+  },
+  {
+    "role": "ffmpeg-worker",
+    "source_path": "target/harness/ffmpeg-worker",
+    "frozen_path": ".research/frozen-workers/b17f66c82f42aa50ac2851074c678cd627d96320acad080ca99e16ac7a5d96e6/ffmpeg-worker",
+    "sha256": "b17f66c82f42aa50ac2851074c678cd627d96320acad080ca99e16ac7a5d96e6"
+  },
+  {
+    "role": "ffmpeg-combined-worker",
+    "source_path": "target/harness/ffmpeg-combined-worker",
+    "frozen_path": ".research/frozen-workers/a1397934dbf421a54e32f696ba72273c7bc5178d932cf126f76b30c78cc1207b/ffmpeg-combined-worker",
+    "sha256": "a1397934dbf421a54e32f696ba72273c7bc5178d932cf126f76b30c78cc1207b"
+  },
+  {
+    "role": "allocations.dylib",
+    "source_path": "target/harness/allocations.dylib",
+    "frozen_path": ".research/frozen-workers/facf4133c0454f44107d2a39f46f112f30dfd4a27e7b09429c0d7b901fda30c1/allocations.dylib",
+    "sha256": "facf4133c0454f44107d2a39f46f112f30dfd4a27e7b09429c0d7b901fda30c1"
+  },
+  {
+    "role": "memory-check",
+    "source_path": "target/harness/memory-check",
+    "frozen_path": ".research/frozen-workers/2da4e2a8511023f95e9c7bd4b19ebaeb9231fbda6a71aa05ec2913d5a7495736/memory-check",
+    "sha256": "2da4e2a8511023f95e9c7bd4b19ebaeb9231fbda6a71aa05ec2913d5a7495736"
+  },
+  {
+    "role": "upstream-fate-ffmpeg",
+    "source_path": ".research/reference/FFmpeg-d32b387f2b0a484599d4587d651891f0c63c4238/ffmpeg",
+    "frozen_path": ".research/frozen-workers/ea3dcb1e34f2250c0c7912bd6de943385117286de17bb0eec9f368e80ccc389a/ffmpeg",
+    "sha256": "ea3dcb1e34f2250c0c7912bd6de943385117286de17bb0eec9f368e80ccc389a"
+  },
+  {
+    "role": "pinned-build-auxiliary-ffprobe",
+    "source_path": ".research/reference/FFmpeg-d32b387f2b0a484599d4587d651891f0c63c4238/ffprobe",
+    "frozen_path": ".research/frozen-workers/1baf52cef64203f6473ea0f815c44a19a8317520a12d2b7265251e49e8f1f210/ffprobe",
+    "sha256": "1baf52cef64203f6473ea0f815c44a19a8317520a12d2b7265251e49e8f1f210"
+  },
+  {
+    "role": "identity-bound-ambient-diagnostic-ffprobe",
+    "source_path": "/opt/homebrew/bin/ffprobe",
+    "frozen_path": ".research/frozen-workers/072b4ddb060a6173b274510da92a96a8433d200cd40b277ed8117ffb718f2cbe/ffprobe",
+    "sha256": "072b4ddb060a6173b274510da92a96a8433d200cd40b277ed8117ffb718f2cbe"
+  }
+]

@@ -1,0 +1,106 @@
+{
+  "schema": "m05-text-original-resource-regressions-v1",
+  "scope": "Additional original constraints over unchanged authored source cases, no native oracle",
+  "cases": [
+    {
+      "test": "line_capacity_limit_is_a_policy_error",
+      "source_case": "srt-basic",
+      "overrides_or_extra_source": {
+        "max_line_bytes": 4
+      },
+      "expected": "Limit; no event"
+    },
+    {
+      "test": "cue_limit_preserves_the_already_published_prefix",
+      "source_case": "srt-overlap-order",
+      "overrides_or_extra_source": {
+        "max_cues": 1
+      },
+      "expected": "first source cue, then Limit; no reordered or duplicate cue"
+    },
+    {
+      "test": "modifier_count_limit_precedes_atomic_packet_publication",
+      "source_case": "tx3g-style-highlight-raw",
+      "overrides_or_extra_source": {
+        "max_modifiers": 1
+      },
+      "expected": "Limit; no partially published packet"
+    },
+    {
+      "test": "decoded_utf8_limit_is_independent_of_source_byte_limit",
+      "source_case": "srt-utf16be-bom",
+      "overrides_or_extra_source": {
+        "max_decoded_bytes": 2
+      },
+      "expected": "Limit; no event"
+    },
+    {
+      "test": "validated_utf8_packet_view_aliases_original_charged_storage",
+      "source_case": "utf8-packet-markup",
+      "overrides_or_extra_source": {},
+      "expected": "validated decoded view aliases same charged owner"
+    },
+    {
+      "test": "utf16_output_retains_source_and_new_immutable_utf8_charge",
+      "source_case": "srt-utf16be-bom",
+      "overrides_or_extra_source": {},
+      "expected": "exact source+decoded charges survive decoder drop; final alias returns captured baseline"
+    },
+    {
+      "test": "output_pressure_yields_then_resumes_identical_utf16_cue",
+      "source_case": "srt-utf16be-bom",
+      "overrides_or_extra_source": {
+        "reserve_all_available_after_provide": true
+      },
+      "expected": "NeedOutput; release reservation; identical original cue"
+    },
+    {
+      "test": "cancellation_during_utf16_work_resumes_without_skipping_scalar",
+      "source_case": "srt-utf16le-bom",
+      "overrides_or_extra_source": {
+        "work_before_cancel": 1
+      },
+      "expected": "Cancelled before work; resume exact cue with surrogate pair"
+    },
+    {
+      "test": "long_utf8_validation_yields_and_charges_every_source_byte",
+      "source_case": "tx3g-u16-byte-count-boundary",
+      "overrides_or_extra_source": {
+        "input_source_range": [
+          2,
+          65537
+        ],
+        "format": "Utf8Packet",
+        "work": 1
+      },
+      "expected": "65535 original ASCII text bytes; yields and charges at least each source byte"
+    },
+    {
+      "test": "oversized_charset_label_returns_exact_unconsumed_source",
+      "source_case": null,
+      "overrides_or_extra_source": {
+        "opaque_payload_hex": "6f7061717565",
+        "charset_label_ascii_byte": 120,
+        "charset_label_count": 257
+      },
+      "expected": "Limit requested257 maximum256; exact owner returned"
+    },
+    {
+      "test": "addition_limit_returns_all_source_facts_without_reclassification",
+      "source_case": "mkv-vtt-settings-id-comments",
+      "overrides_or_extra_source": {
+        "max_addition_bytes": 16
+      },
+      "expected": "Limit requested51 maximum16; all original owners returned"
+    },
+    {
+      "test": "unknown_declared_charset_is_not_guessed_or_lossily_decoded",
+      "source_case": "srt-basic",
+      "overrides_or_extra_source": {
+        "encoding": "Opaque",
+        "charset_label_ascii": "unknown-author-charset"
+      },
+      "expected": "Unsupported:declared charset conversion; no guessed decoded output"
+    }
+  ]
+}

@@ -1,0 +1,24 @@
+   Compiling safe-media v0.0.0 (/Users/jonasgrosch/projects/safe-media/crates/media)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.93s
+     Running tests/matroska.rs (target/debug/build/safe-media/a55b27fe3aa8e21a/out/matroska-a55b27fe3aa8e21a)
+
+running 1 test
+test sparse_cues_seek_past_end_reaches_the_last_actual_random_access_block ... FAILED
+
+failures:
+
+---- sparse_cues_seek_past_end_reaches_the_last_actual_random_access_block stdout ----
+
+thread 'sparse_cues_seek_past_end_reaches_the_last_actual_random_access_block' (49051176) panicked at crates/media/tests/matroska.rs:721:9:
+assertion `left == right` failed
+  left: 4000000000
+ right: 8000000000
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    sparse_cues_seek_past_end_reaches_the_last_actual_random_access_block
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 22 filtered out; finished in 0.00s
+
+error: test failed, to rerun pass `-p safe-media --test matroska`

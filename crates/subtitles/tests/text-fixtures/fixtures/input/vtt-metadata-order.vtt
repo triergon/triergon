@@ -1,0 +1,16 @@
+WEBVTT
+
+NOTE original comment
+retained verbatim
+
+STYLE
+::cue { color: lime; }
+
+REGION
+id:r1
+width:40%
+lines:2
+
+00:00:00.000 --> 00:00:01.000 region:r1
+region cue
+

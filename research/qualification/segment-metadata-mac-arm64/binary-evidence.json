@@ -1,0 +1,32 @@
+[
+  {
+    "source_path": "target/release/media-worker",
+    "frozen_path": ".research/frozen-workers/fca708e85c5be273bd2a2fd76bddabbe1bce0344f6891f7c7d670236caaa3dc4/media-worker",
+    "sha256": "fca708e85c5be273bd2a2fd76bddabbe1bce0344f6891f7c7d670236caaa3dc4"
+  },
+  {
+    "source_path": "target/harness/ffmpeg-worker",
+    "frozen_path": ".research/frozen-workers/b8bc442787f76d0990a6090e4b4ec74bdbe76d9f1d9e63a5af6e6cebebb2737a/ffmpeg-worker",
+    "sha256": "b8bc442787f76d0990a6090e4b4ec74bdbe76d9f1d9e63a5af6e6cebebb2737a"
+  },
+  {
+    "source_path": "target/harness/ffmpeg-combined-worker",
+    "frozen_path": ".research/frozen-workers/e701bd8bee3e17326fc04d1e26aa2a13474b945ad581be896ca5cc5c7f830b3d/ffmpeg-combined-worker",
+    "sha256": "e701bd8bee3e17326fc04d1e26aa2a13474b945ad581be896ca5cc5c7f830b3d"
+  },
+  {
+    "source_path": "target/harness/allocations.dylib",
+    "frozen_path": ".research/frozen-workers/facf4133c0454f44107d2a39f46f112f30dfd4a27e7b09429c0d7b901fda30c1/allocations.dylib",
+    "sha256": "facf4133c0454f44107d2a39f46f112f30dfd4a27e7b09429c0d7b901fda30c1"
+  },
+  {
+    "source_path": "target/harness/memory-check",
+    "frozen_path": ".research/frozen-workers/066ffef360aeb21c443bd8c9e385a3db13eb3a743ad138356f66bff79fd9bd7d/memory-check",
+    "sha256": "066ffef360aeb21c443bd8c9e385a3db13eb3a743ad138356f66bff79fd9bd7d"
+  },
+  {
+    "source_path": ".research/reference/FFmpeg-d32b387f2b0a484599d4587d651891f0c63c4238/ffmpeg",
+    "frozen_path": ".research/frozen-workers/ea3dcb1e34f2250c0c7912bd6de943385117286de17bb0eec9f368e80ccc389a/ffmpeg",
+    "sha256": "ea3dcb1e34f2250c0c7912bd6de943385117286de17bb0eec9f368e80ccc389a"
+  }
+]

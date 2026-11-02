@@ -1,0 +1,13 @@
+[package]
+name = "triergon-subtitles"
+version = "0.0.0"
+repository.workspace = true
+edition = "2024"
+rust-version = "1.85"
+publish = false
+
+[dependencies]
+triergon-core = { path = "../core" }
+
+[lints.rust]
+unsafe_code = "forbid"

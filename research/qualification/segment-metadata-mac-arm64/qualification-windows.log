@@ -1,0 +1,59 @@
+Waiting for quiet compiler window; camera running.
+Camera paused with watchdog, window 0
+external measurement-complete=True slice-accepted=True
+catalogue measurement-complete=False slice-accepted=False
+Camera resumed=True
+Waiting for quiet compiler window; camera running.
+Camera paused with watchdog, window 1
+catalogue measurement-complete=False slice-accepted=False
+Camera resumed=True
+Waiting for quiet compiler window; camera running.
+Camera paused with watchdog, window 2
+catalogue measurement-complete=True slice-accepted=True
+Camera resumed=True
+Waiting for quiet compiler window; camera running.
+Camera paused with watchdog, window 3
+colour measurement-complete=False slice-accepted=False
+Camera resumed=True
+Waiting for quiet compiler window; camera running.
+Camera paused with watchdog, window 4
+colour measurement-complete=False slice-accepted=False
+Camera resumed=True
+Waiting for quiet compiler window; camera running.
+Waiting for quiet compiler window; camera running.
+Camera paused with watchdog, window 5
+colour measurement-complete=True slice-accepted=True
+Camera resumed=True
+Waiting for quiet compiler window; camera running.
+Camera paused with watchdog, window 6
+zlib measurement-complete=True slice-accepted=True
+Camera resumed=True
+Waiting for quiet compiler window; camera running.
+Camera paused with watchdog, window 7
+seek measurement-complete=True slice-accepted=True
+Camera resumed=True
+Waiting for quiet compiler window; camera running.
+Camera paused with watchdog, window 8
+k0 measurement-complete=False slice-accepted=False
+Camera resumed=True
+Waiting for quiet compiler window; camera running.
+Camera paused with watchdog, window 9
+k0 measurement-complete=False slice-accepted=False
+header measurement-complete=False slice-accepted=False
+Camera resumed=True
+Waiting for quiet compiler window; camera running.
+Camera paused with watchdog, window 10
+k0 measurement-complete=False slice-accepted=False
+header measurement-complete=False slice-accepted=False
+Camera resumed=True
+Waiting for quiet compiler window; camera running.
+Camera paused with watchdog, window 11
+k0 measurement-complete=False slice-accepted=False
+header measurement-complete=False slice-accepted=False
+Camera resumed=True
+Waiting for quiet compiler window; camera running.
+Camera paused with watchdog, window 12
+k0 measurement-complete=True slice-accepted=True
+header measurement-complete=True slice-accepted=True
+Camera resumed=True
+All measurements complete. Numerical failures remain preserved.

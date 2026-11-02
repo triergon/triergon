@@ -1,0 +1,62 @@
+{
+  "schema": 1,
+  "id": "K4-colour-hdr-v1",
+  "operation": "container-colour-demux-v1",
+  "contract": [
+    "All Matroska Colour integer elements with schema defaults; preserve unknown numeric codes and absent optional values",
+    "MasteringMetadata: all ten IEEE source floats, 0/4/8-byte widths, partial/absent masters and strict finite/range validation",
+    "Exact source metadata and full raw TrackEntry retained; no precision epsilon",
+    "Pinned FFmpeg public colour/content-light/mastering rational representation compared separately",
+    "All packets/configuration/timestamps and 1/7/4096-byte sequential reads preserved",
+    "Metadata byte/track/work limits, duplicate-field and malformed-width/range regressions",
+    "HDR10 static metadata and HLG signalling; no dynamic codec-side-data or decoder/display claim"
+  ],
+  "required_profiles": [
+    "colour-absent",
+    "colour-empty",
+    "colour-sdr",
+    "colour-rgb-full",
+    "colour-hdr10",
+    "colour-hdr32",
+    "colour-hlg",
+    "colour-p3",
+    "colour-cll-only",
+    "colour-fall-only",
+    "colour-light-zero",
+    "colour-master-empty",
+    "colour-master-partial",
+    "colour-master-zero",
+    "colour-master-boundary",
+    "colour-subsampling",
+    "colour-many-tracks",
+    "colour-siting-0-0",
+    "colour-siting-0-1",
+    "colour-siting-0-2",
+    "colour-siting-1-0",
+    "colour-siting-1-1",
+    "colour-siting-1-2",
+    "colour-siting-2-0",
+    "colour-siting-2-1",
+    "colour-siting-2-2",
+    "colour-empty-elements",
+    "colour-registry-codes",
+    "colour-luminance-only",
+    "colour-primaries-only",
+    "colour-master-ones",
+    "colour-master-tiny",
+    "colour-master-half-minimum"
+  ],
+  "required_targets": [
+    "aarch64-apple-darwin"
+  ],
+  "runtime_ratio_max": 0.8,
+  "memory_ratio_max_exclusive": 1.0,
+  "minimum_pairs": 30,
+  "confidence": 0.95,
+  "pending_module_requirements": [
+    "remaining M01/M02 features including dynamic codec side data",
+    "complete applicable FATE coverage",
+    "deferred targets"
+  ],
+  "reference_view": "32 exact public FFmpeg colour/side-data integers; complete source IEEE bits/defaults/raw TrackEntry separately mandatory"
+}

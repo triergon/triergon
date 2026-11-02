@@ -1,0 +1,24 @@
+{
+  "schema": "safe-media.m03.clock27.regression-provenance.v1",
+  "qualification": false,
+  "source": "Exact copies of three existing independently authored inputs; input hashes and all native rows come from preserved actual v9 outputs. Source proof from separate raw parser/integer/Fraction oracle, never candidate expectations.",
+  "regression_artifact": ".research/parallel-mp4/implementation/clock-boundary27/existing-actual-v9-refusals.json",
+  "regression_artifact_sha256": "ad9d6186a8fead8222d8e45bcd5f7c283a7f91f782194d6b49bb219d2e1172df",
+  "files": [
+    {
+      "id": "f-tfdt-above-i64",
+      "input_sha256": "cb4d316199d2b7eb08ef8930690009f8a17f58831e942134cf80f310f2045dbd",
+      "expected_sha256": "5c54e525a776679a29e9bb55c4843847afcb4bf15265a9e96ce4d0ce205c208b"
+    },
+    {
+      "id": "modern-iso6-tfdt-above-i64",
+      "input_sha256": "8d387e6cbf686c1fa915b66f6aa56b531d91a1e5889c409d3bb989ab986bec30",
+      "expected_sha256": "54e7a829b4ab8f2e03f5381ff0339b4846116b8ed89f61b5c623903d029942ee"
+    },
+    {
+      "id": "boundary-expanded-fractional",
+      "input_sha256": "09205eda194c8098de11e46686a6e54e6f9541e65622b2ff306f23a3948d6418",
+      "expected_sha256": "c21bf46a0fe7bae99a60b23c4e6c2c483595c37d814088c376a8f19c99a57d48"
+    }
+  ]
+}

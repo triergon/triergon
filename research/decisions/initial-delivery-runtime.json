@@ -1,0 +1,57 @@
+{
+  "schema": "initial-delivery-runtime-policy-decision-v1",
+  "authorized_date": "2026-10-31",
+  "owner_choice": "Allow 1.25x FFmpeg time for initial delivery; retain 0.80x as the optimization target",
+  "delivery_runtime_ratio_max": 1.25,
+  "optimization_runtime_ratio_target": 0.8,
+  "unchanged": [
+    "full selected-feature parity",
+    "strictly lower live heap",
+    "strictly lower attributable RSS",
+    "all required inputs and profiles",
+    "equal measured work",
+    "minimum pairs30 and95percent confidence",
+    "all first clean observations and failures"
+  ],
+  "contract_changes": [
+    {
+      "path": "harness/slice.json",
+      "before_sha256": "4949aa6d7f4ca8b747fb983eed45581be5398d8546ac10fc4f2c497f02674abb",
+      "after_sha256": "ead6d286477fda92f836f5cc032ccb937e2f4b6116de0f225ce455b8062c810e",
+      "all_other_fields_unchanged": true
+    },
+    {
+      "path": "harness/header-slice.json",
+      "before_sha256": "30bfb474cb7ea692cfa5b2ba380e763ea8335001f310375b516c02dec0b611bb",
+      "after_sha256": "01c301c09e70fb1ad465a37aef71d5cebacbb511e17abaa634a89028ee8ecd7f",
+      "all_other_fields_unchanged": true
+    },
+    {
+      "path": "harness/zlib-slice.json",
+      "before_sha256": "a47518d9915477d769f6d246f5ac8a4ccfcdf96ba205f056012e9ad8d45e5308",
+      "after_sha256": "7a55a06f1bc0a63413c42e45045f7018ae39daef6fe1971c243c855720ed0955",
+      "all_other_fields_unchanged": true
+    },
+    {
+      "path": "harness/seek-slice.json",
+      "before_sha256": "e014e78f4b3dbaae2151c08336ccfee0a62e01dc1160c104dcf64749fc56c12d",
+      "after_sha256": "b3a64c801a45bc829f6147ef04ab89acf0faa40e30e5f3cf162e8fc3722fcd81",
+      "all_other_fields_unchanged": true
+    },
+    {
+      "path": "harness/colour-slice.json",
+      "before_sha256": "880d93cdbec69279e671a169e749e78078c93c85c6e9e050d3a81a3b8335fd7d",
+      "after_sha256": "8c4b81dda90c8d2f63b1792873caf1e8b3d9c9d1e772268e79fe46ba1f1c792c",
+      "all_other_fields_unchanged": true
+    },
+    {
+      "path": "harness/catalogue-slice.json",
+      "before_sha256": "e10987cb3fe2c1ed0abc47eea3443d67c7c2cef5547492111518652818a88774",
+      "after_sha256": "dbfd6dbec40bd4f58a906c6008711c7eedbd698009395d3de855a3f77d4e6cb1",
+      "all_other_fields_unchanged": true
+    }
+  ],
+  "historical_receipts_modified": false,
+  "historical_reference_baselines_modified": false,
+  "existing_measurements_resampled": false
+}

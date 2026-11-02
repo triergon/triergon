@@ -1,0 +1,15 @@
+{
+  "source_graph_sha256": "f98621af49df5b1790d37c09c7429faa753f3525891d5a836a9ae9d230a3e6b5",
+  "frozen_selected_source": ".research/core-migration-parity-1793438243152823000/frozen",
+  "frozen_whole_host_source": ".research/workspace-check-12/source",
+  "numeric_run": ".research/core-migration-b7581c8ba9be-1793438604754186000",
+  "all_116_frozen_development_workloads_pass": true,
+  "minimum_pairs": 30,
+  "runtime_upper_max": 0.8,
+  "lower_heap_and_rss_required": true,
+  "complete_modules_qualified": false,
+  "streem_or_tv_modified": false,
+  "committed_or_published": false,
+  "sealed": true,
+  "claim_audit_passed": true
+}

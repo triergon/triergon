@@ -1,0 +1,241 @@
+{
+  "schema": 1,
+  "purpose": "Source-preserving undefined legacy-language catalogue projection regression",
+  "primary": "RFC9559 TrackEntry Language default and exact text facts; native dictionary is separately observed pinned behavior",
+  "generator": "tools/generate-catalogue-corpus.py make with explicit authored language/tag fields",
+  "generator_sha256": "364f536796ec16c6490099250a149242c9aa96fb5119ae6098e0da296550e7e1",
+  "reference_worker_sha256": "b17f66c82f42aa50ac2851074c678cd627d96320acad080ca99e16ac7a5d96e6",
+  "reference_operation": "catalogue-trace, same pinned stock FFmpeg, no source-field normalization",
+  "cases": [
+    {
+      "id": "absent",
+      "file": "absent.mkv",
+      "sha256": "4d465702584ef0d24dab5f27c0c5cd2c483260b9aff310897be3f6cbf864c5ef",
+      "rights": "authored-synthetic",
+      "native_track_tags": [
+        [
+          "language",
+          "eng"
+        ],
+        [
+          "title",
+          "Language probe"
+        ]
+      ]
+    },
+    {
+      "id": "empty",
+      "file": "empty.mkv",
+      "sha256": "c8636d2dfe793b2a525d0bfb87b9f8e4e3d7eef250829f95ca9daa03b791db16",
+      "rights": "authored-synthetic",
+      "native_track_tags": [
+        [
+          "language",
+          "eng"
+        ],
+        [
+          "title",
+          "Language probe"
+        ]
+      ]
+    },
+    {
+      "id": "eng",
+      "file": "eng.mkv",
+      "sha256": "8c7b1417cf4710093052b4628271dedc12bdf04aaeb5b52192ef00e21626c5df",
+      "rights": "authored-synthetic",
+      "native_track_tags": [
+        [
+          "language",
+          "eng"
+        ],
+        [
+          "title",
+          "Language probe"
+        ]
+      ]
+    },
+    {
+      "id": "und",
+      "file": "und.mkv",
+      "sha256": "d2eb2ccb522a370b42bc4b12262827fdfdb19e9316962860d8a06c34a249cf84",
+      "rights": "authored-synthetic",
+      "native_track_tags": [
+        [
+          "title",
+          "Language probe"
+        ]
+      ]
+    },
+    {
+      "id": "upper",
+      "file": "upper.mkv",
+      "sha256": "c9dfc8f3f8c06660748711bf007e1a4f37a66b989ce4e996d2305440f77f8d72",
+      "rights": "authored-synthetic",
+      "native_track_tags": [
+        [
+          "language",
+          "UND"
+        ],
+        [
+          "title",
+          "Language probe"
+        ]
+      ]
+    },
+    {
+      "id": "mixed",
+      "file": "mixed.mkv",
+      "sha256": "4de942a35b8e8db65aa60ce6206da5b8b7f9986522c8c01d81025f7e101aa215",
+      "rights": "authored-synthetic",
+      "native_track_tags": [
+        [
+          "language",
+          "Und"
+        ],
+        [
+          "title",
+          "Language probe"
+        ]
+      ]
+    },
+    {
+      "id": "unknown",
+      "file": "unknown.mkv",
+      "sha256": "2f0a0ab2aab9744a3b9a4a6bf338092900fbb7eae5075b20d236d95dab72069b",
+      "rights": "authored-synthetic",
+      "native_track_tags": [
+        [
+          "language",
+          "xyz"
+        ],
+        [
+          "title",
+          "Language probe"
+        ]
+      ]
+    },
+    {
+      "id": "no-linguistic",
+      "file": "no-linguistic.mkv",
+      "sha256": "2e1bbc11ae78c0d0fe78935ffa3ac9fd44e3f4e60a0d84ae233e681abf4ce36e",
+      "rights": "authored-synthetic",
+      "native_track_tags": [
+        [
+          "language",
+          "zxx"
+        ],
+        [
+          "title",
+          "Language probe"
+        ]
+      ]
+    },
+    {
+      "id": "multi",
+      "file": "multi.mkv",
+      "sha256": "37f74c0e5d42d22eaabea8c64a799b3b78a7cdab5f7ef4359115848d0c46440d",
+      "rights": "authored-synthetic",
+      "native_track_tags": [
+        [
+          "language",
+          "mul"
+        ],
+        [
+          "title",
+          "Language probe"
+        ]
+      ]
+    },
+    {
+      "id": "nul-padded",
+      "file": "nul-padded.mkv",
+      "sha256": "8161e080807a8bd3db3b594c5e2c59f9ac4938bd74b74190a163d6b7e0aeaa22",
+      "rights": "authored-synthetic",
+      "native_track_tags": [
+        [
+          "title",
+          "Language probe"
+        ]
+      ]
+    },
+    {
+      "id": "ietf-only",
+      "file": "ietf-only.mkv",
+      "sha256": "33a0b60be6e55e9a61f9ba21bec8a78fb0fd274315cf7236d4fe30ed652cadec",
+      "rights": "authored-synthetic",
+      "native_track_tags": [
+        [
+          "language",
+          "eng"
+        ],
+        [
+          "title",
+          "Language probe"
+        ]
+      ]
+    },
+    {
+      "id": "legacy-und-ietf",
+      "file": "legacy-und-ietf.mkv",
+      "sha256": "c5b73da7058fd5ad3d78ba6a110da50c6bf4648a413d7fec575decfab0b591cb",
+      "rights": "authored-synthetic",
+      "native_track_tags": [
+        [
+          "title",
+          "Language probe"
+        ]
+      ]
+    },
+    {
+      "id": "legacy-eng-ietf-und",
+      "file": "legacy-eng-ietf-und.mkv",
+      "sha256": "ff914cdb2339db5a54aebc00bb06b07af46ddf39f44495efdfe3b4dace56adc2",
+      "rights": "authored-synthetic",
+      "native_track_tags": [
+        [
+          "language",
+          "eng"
+        ],
+        [
+          "title",
+          "Language probe"
+        ]
+      ]
+    },
+    {
+      "id": "tag-overrides-und",
+      "file": "tag-overrides-und.mkv",
+      "sha256": "907639e689c95b10a95c05ed828fd18f433e95149687b1844f6f2438746d0f91",
+      "rights": "authored-synthetic",
+      "native_track_tags": [
+        [
+          "language",
+          "French"
+        ],
+        [
+          "title",
+          "Language probe"
+        ]
+      ]
+    },
+    {
+      "id": "tag-und-overrides-eng",
+      "file": "tag-und-overrides-eng.mkv",
+      "sha256": "8d3f64991b34f89b2497ed5531c61dcacf4c4d6232bef8c1ac173a41859e9ce1",
+      "rights": "authored-synthetic",
+      "native_track_tags": [
+        [
+          "language",
+          "und"
+        ],
+        [
+          "title",
+          "Language probe"
+        ]
+      ]
+    }
+  ],
+  "qualification": false,
+  "retained_additional_finding": "NUL-first legacy value is rejected by strict source parser while native exposes empty language; separate malformed-input disposition remains open"
+}

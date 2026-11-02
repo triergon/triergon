@@ -1,0 +1,5 @@
+WEBVTT
+
+STYLE
+::cue { color: lime; }
+

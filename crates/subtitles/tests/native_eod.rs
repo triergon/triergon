@@ -1,0 +1,308 @@
+#![forbid(unsafe_code)]
+use std::sync::atomic::AtomicBool;
+use triergon_core::{Budget, Bytes, Error, Time, WorkBudget};
+use triergon_subtitles::dvb::{
+    ClockOrigin, ClockValue, ColourSource, D32_PIN, D32_VIEW, DecodeStatus, Decoder, DisplayEvent,
+    DisplayLimits, NativeFailure, PacketIdentity, PacketTiming, PublicationReason, ReceiverView,
+    SourceClock, SourceConfiguration,
+};
+
+struct Case {
+    id: &'static str,
+    payload: &'static [u8],
+    rgba: &'static [u8],
+    indices: &'static [u8],
+    words: &'static [u32],
+    consumed: usize,
+    pts_raw: i64,
+    end_ms: u32,
+    canvas: [u32; 2],
+    geometry: [u32; 4],
+    source_error: Option<Error>,
+}
+#[path = "native-dvb-fixtures/cases.rs"]
+mod cases;
+struct ResultView {
+    events: Vec<DisplayEvent>,
+    error: Option<Error>,
+    native_error: Option<NativeFailure>,
+}
+
+fn decode(pool: &Budget, bytes: &[u8], view: ReceiverView, quantum: u64) -> ResultView {
+    let private = Bytes::copy_from_slice(pool, &[0, 1, 0, 2, 0x14]).unwrap();
+    let config = SourceConfiguration::from_matroska_private(
+        pool,
+        &private,
+        SourceClock::new(1, 1000).unwrap(),
+    )
+    .unwrap();
+    let cancel = AtomicBool::new(false);
+    let mut decoder = Decoder::new_configured_with_receiver_view(
+        pool,
+        &config,
+        13,
+        DisplayLimits::default(),
+        view,
+        &cancel,
+    )
+    .unwrap();
+    let raw = Bytes::copy_from_slice(pool, bytes).unwrap();
+    let packet = config
+        .packet(
+            pool,
+            &raw,
+            PacketTiming {
+                pts: Some(ClockValue {
+                    ticks: 1000,
+                    origin: ClockOrigin::Source,
+                }),
+                dts: Some(ClockValue {
+                    ticks: 1000,
+                    origin: ClockOrigin::Source,
+                }),
+                duration: Some(ClockValue {
+                    ticks: 2000,
+                    origin: ClockOrigin::Source,
+                }),
+            },
+            PacketIdentity {
+                generation: 13,
+                sequence: 0,
+                container_position: None,
+            },
+        )
+        .unwrap();
+    decoder.provide(&packet).unwrap();
+    let mut result = ResultView {
+        events: Vec::new(),
+        error: None,
+        native_error: None,
+    };
+    let mut ended = false;
+    for _ in 0..1_000_000 {
+        let progress = match decoder.step(&mut WorkBudget::new(quantum), &cancel) {
+            Ok(p) => p,
+            Err(e) => {
+                result.error = Some(e);
+                result.native_error = decoder.native_failure();
+                return result;
+            }
+        };
+        match progress.status {
+            DecodeStatus::Yield => {}
+            DecodeStatus::Event => result.events.push(progress.event.unwrap()),
+            DecodeStatus::NeedPacket => {
+                assert!(!ended);
+                decoder.finish_input().unwrap();
+                ended = true;
+            }
+            DecodeStatus::NeedOutput => panic!("small exact case cannot exhaust pool"),
+            DecodeStatus::Finished => return result,
+        }
+    }
+    panic!("bounded source exceeded poll cap")
+}
+fn check(index: usize) {
+    let case = &cases::CASES[index];
+    for quantum in [1, 7, 4096] {
+        let pool = Budget::new(4 << 20).unwrap();
+        let baseline = pool.used();
+        let observed = decode(&pool, case.payload, ReceiverView::NativeD32, quantum);
+        assert_eq!(observed.error, None, "{} quantum={quantum}", case.id);
+        assert_eq!(observed.events.len(), 1);
+        assert!(observed.native_error.is_none());
+        let event = &observed.events[0];
+        assert_eq!(event.receiver_view, ReceiverView::NativeD32);
+        assert_eq!(event.pts, Some(Time::new(1, 1).unwrap()));
+        let publication = event.native_publication.unwrap();
+        assert_eq!(publication.source_pin, D32_PIN);
+        assert_eq!(publication.identifier, D32_VIEW);
+        assert_eq!(publication.consumed_prefix_bytes, case.consumed);
+        assert_eq!(publication.packet_sequence, 0);
+        assert_eq!(publication.reason, PublicationReason::EndOfDisplay);
+        assert_eq!(publication.exact_pts_microseconds, Some(case.pts_raw));
+        assert_eq!(publication.start_display_ms, 0);
+        assert_eq!(publication.end_display_ms, case.end_ms);
+        assert_eq!(
+            [event.definition.size.width, event.definition.size.height],
+            case.canvas
+        );
+        assert_eq!(event.source_packets().len(), 1);
+        assert_eq!(event.source_packets()[0].payload.as_ref(), case.payload);
+        let source = event.source_packets()[0].source.as_ref().unwrap();
+        assert_eq!(source.timing().pts.unwrap().ticks, 1000);
+        assert_eq!(source.timing().duration.unwrap().ticks, 2000);
+        assert_eq!(event.regions().len(), 1);
+        let region = &event.regions()[0];
+        assert_eq!(
+            [
+                region.position.x,
+                region.position.y,
+                region.size.width,
+                region.size.height
+            ],
+            case.geometry
+        );
+        assert_eq!(region.plane.pixels.as_ref(), case.indices);
+        let native = region.palette.native_d32.as_ref().unwrap();
+        assert!(native.all_entries_explicit);
+        assert_eq!(
+            native.rgba.as_ref(),
+            case.rgba,
+            "entire native palette including unused transparent RGB"
+        );
+        assert_eq!(native.words.as_slice(), case.words);
+        assert_eq!(native.source_pin, D32_PIN);
+        assert_eq!(native.identifier, D32_VIEW);
+        assert_eq!(native.rgba.len(), case.words.len() * 4);
+        // The source projection and every encoded CLUT component remain distinct.
+        assert_eq!(&region.palette.rgba.as_ref()[..4], &[0, 0, 0, 0]);
+        assert_eq!(
+            region.palette.entries()[0].source,
+            ColourSource::YCrCbT {
+                y: 0,
+                cr: 0,
+                cb: 0,
+                transparency: 0,
+                full_resolution: true
+            }
+        );
+        assert!(region.palette.entries()[0].original_segment.is_some());
+        drop(observed);
+        assert_eq!(pool.used(), baseline);
+    }
+}
+#[test]
+fn native_shared_ancillary_end() {
+    check(0)
+}
+#[test]
+fn native_nonempty_ancillary_end_tolerance() {
+    check(1)
+}
+#[test]
+fn native_composition_end_control() {
+    check(2)
+}
+#[test]
+fn native_shared_composition_end_tolerance() {
+    check(3)
+}
+#[test]
+fn native_foreign_end_filter_control() {
+    check(4)
+}
+
+#[test]
+fn source_profile_keeps_all_five_old_expectations_and_raw_colour() {
+    for case in cases::CASES {
+        let pool = Budget::new(4 << 20).unwrap();
+        let observed = decode(&pool, case.payload, ReceiverView::Source, 7);
+        assert_eq!(observed.error, case.source_error);
+        assert_eq!(
+            observed.events.len(),
+            usize::from(case.source_error.is_none())
+        );
+        for event in observed.events {
+            assert_eq!(event.receiver_view, ReceiverView::Source);
+            assert!(event.native_publication.is_none());
+            assert!(event.regions()[0].palette.native_d32.is_none());
+            assert_eq!(
+                &event.regions()[0].palette.rgba.as_ref()[..4],
+                &[0, 0, 0, 0]
+            );
+        }
+    }
+}
+#[test]
+fn native_original106_keeps_prefix_event_then_exact_unconsumed_five_byte_error() {
+    for quantum in [1, 7, 4096] {
+        let pool = Budget::new(4 << 20).unwrap();
+        let bytes = include_bytes!("native-dvb-fixtures/input/tail106.dvb");
+        let observed = decode(&pool, bytes, ReceiverView::NativeD32, quantum);
+        assert_eq!(observed.events.len(), 1);
+        assert_eq!(observed.error, Some(Error::Truncated));
+        let publication = observed.events[0].native_publication.unwrap();
+        assert_eq!(publication.reason, PublicationReason::CompletePrefix);
+        assert_eq!(publication.consumed_prefix_bytes, 101);
+        let error = observed.native_error.unwrap();
+        assert_eq!(error.packet_offset, 101);
+        assert_eq!(error.unconsumed_bytes, 5);
+        assert_eq!(error.code, -1094995529);
+        assert_eq!(error.packet_sequence, 0);
+        assert_eq!(
+            observed.events[0].source_packets()[0].payload.as_ref(),
+            bytes
+        );
+        assert_eq!(bytes.len(), 106);
+    }
+}
+#[test]
+fn native_actual_ts101_prefix_needs_no_invented_eod_or_error() {
+    for quantum in [1, 7, 4096] {
+        let pool = Budget::new(4 << 20).unwrap();
+        let bytes = include_bytes!("native-dvb-fixtures/input/prefix101.dvb");
+        let observed = decode(&pool, bytes, ReceiverView::NativeD32, quantum);
+        assert_eq!(observed.error, None);
+        assert_eq!(observed.events.len(), 1);
+        assert!(observed.native_error.is_none());
+        let publication = observed.events[0].native_publication.unwrap();
+        assert_eq!(publication.reason, PublicationReason::CompletePrefix);
+        assert_eq!(publication.consumed_prefix_bytes, 101);
+        assert_eq!(
+            observed.events[0].source_packets()[0].payload.as_ref(),
+            bytes
+        );
+    }
+}
+#[test]
+fn source_tail_and_prefix_stay_truncated_without_publication() {
+    for bytes in [
+        &include_bytes!("native-dvb-fixtures/input/tail106.dvb")[..],
+        &include_bytes!("native-dvb-fixtures/input/prefix101.dvb")[..],
+    ] {
+        let pool = Budget::new(4 << 20).unwrap();
+        let observed = decode(&pool, bytes, ReceiverView::Source, 7);
+        assert_eq!(observed.error, Some(Error::Truncated));
+        assert!(observed.events.is_empty());
+        assert!(observed.native_error.is_none());
+    }
+}
+#[test]
+fn native_palette_owner_alone_survives_decoder_event_and_configuration_drop() {
+    let pool = Budget::new(4 << 20).unwrap();
+    let baseline = pool.used();
+    let observed = decode(&pool, cases::CASES[0].payload, ReceiverView::NativeD32, 1);
+    let rgba = observed.events[0].regions()[0]
+        .palette
+        .native_d32
+        .as_ref()
+        .unwrap()
+        .rgba
+        .clone();
+    drop(observed);
+    assert_eq!(rgba.as_ref(), cases::CASES[0].rgba);
+    assert_eq!(pool.used(), baseline + rgba.retained_storage_bytes());
+    drop(rgba);
+    assert_eq!(pool.used(), baseline);
+}
+#[test]
+fn native_default_clut_adaptation_gap_remains_visible() {
+    let pool = Budget::new(4 << 20).unwrap();
+    let observed = decode(
+        &pool,
+        include_bytes!("native-dvb-fixtures/input/default-clut2.dvb"),
+        ReceiverView::NativeD32,
+        7,
+    );
+    assert_eq!(observed.error, None);
+    assert_eq!(observed.events.len(), 1);
+    assert!(
+        !observed.events[0].regions()[0]
+            .palette
+            .native_d32
+            .as_ref()
+            .unwrap()
+            .all_entries_explicit
+    );
+}

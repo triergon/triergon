@@ -1,0 +1,91 @@
+{
+  "schema": 1,
+  "status": "original synthetic corpus, not upstream FATE execution",
+  "generator": "tools/generate-corpus.py",
+  "cases": [
+    {
+      "id": "avc-aac-sub",
+      "profile": "avc-aac-sub",
+      "file": "avc-aac-sub.mkv",
+      "sha256": "8b245102b6278a1952870d0fd8d65a924187ea285c52f07fb72e76227d038cbb",
+      "rights": "authored-synthetic"
+    },
+    {
+      "id": "hevc-aac",
+      "profile": "hevc-aac",
+      "file": "hevc-aac.mkv",
+      "sha256": "3174607d8387db7f6d3ffc432f6d59a1f2e5678cd2798b98fc5d27e36787d072",
+      "rights": "authored-synthetic"
+    },
+    {
+      "id": "avc-ac3",
+      "profile": "avc-ac3",
+      "file": "avc-ac3.mkv",
+      "sha256": "954f348411280e1a1ab73a78a7593cfe070cb727428184dd61d788e6072b1df4",
+      "rights": "authored-synthetic"
+    },
+    {
+      "id": "avc-eac3",
+      "profile": "avc-eac3",
+      "file": "avc-eac3.mkv",
+      "sha256": "88666800c01039ff7c459e2d673f2bfd9e3ebb5cf7b91191076f9057ed568c27",
+      "rights": "authored-synthetic"
+    },
+    {
+      "id": "unknown-cluster",
+      "profile": "unknown-cluster",
+      "file": "unknown-cluster.mkv",
+      "sha256": "a69def9569727a6f9f2f1c7352122a45ef9e95caef72c8b82d63a78e0d4f7a54",
+      "rights": "authored-synthetic"
+    },
+    {
+      "id": "xiph-lace",
+      "profile": "xiph-lace",
+      "file": "xiph-lace.mkv",
+      "sha256": "6d40f23169fd2d558e1f7c487f8dec1fe0b69fcf5761d0edf5c305a1039e3eb0",
+      "rights": "authored-synthetic"
+    },
+    {
+      "id": "fixed-lace",
+      "profile": "fixed-lace",
+      "file": "fixed-lace.mkv",
+      "sha256": "fa962589de06469fa15ab8bf37b3e4d78b46a5f8217ee341b4263beb06670447",
+      "rights": "authored-synthetic"
+    },
+    {
+      "id": "ebml-lace",
+      "profile": "ebml-lace",
+      "file": "ebml-lace.mkv",
+      "sha256": "2615b74e78535bf182c19b791d8dce1cba53cecd4b09feb079e97f4c743df726",
+      "rights": "authored-synthetic"
+    },
+    {
+      "id": "negative-block-time",
+      "profile": "negative-block-time",
+      "file": "negative-block-time.mkv",
+      "sha256": "cfb7b2f3fd95650d7994aa5edb1568b9b0c12e13be9d24dcd8aa3f6a18f31cd7",
+      "rights": "authored-synthetic"
+    },
+    {
+      "id": "blockgroup-reference",
+      "profile": "blockgroup-reference",
+      "file": "blockgroup-reference.mkv",
+      "sha256": "fc5351fe517a9c37fc84cd3c52f816176b2758d717ee1ec1552507fd201b4efd",
+      "rights": "authored-synthetic"
+    },
+    {
+      "id": "codec-delay",
+      "profile": "codec-delay",
+      "file": "codec-delay.mkv",
+      "sha256": "7b12dabc51995bf3e04c25844445de0edbe794e5664cda0b3a8aad36b5000765",
+      "rights": "authored-synthetic"
+    },
+    {
+      "id": "discard-padding",
+      "profile": "discard-padding",
+      "file": "discard-padding.mkv",
+      "sha256": "4920cdbd517b0dd2eac64a371b0905aa239498168787675af4e7e3dda8023ad1",
+      "rights": "authored-synthetic"
+    }
+  ]
+}

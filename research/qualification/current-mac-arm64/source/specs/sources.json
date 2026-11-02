@@ -1,0 +1,46 @@
+{
+  "schema": 1,
+  "recorded": "2026-10-30",
+  "sources": [
+    {
+      "id": "rfc8794",
+      "url": "https://www.rfc-editor.org/rfc/rfc8794.txt",
+      "sha256": "3b39e9f494f040e3b7b91d9bbe2441af5f4b4e2ae4a374b8dcf917ab9aecd409",
+      "bytes": 118551,
+      "role": "EBML normative publication",
+      "cached_path": ".research/specs/rfc8794"
+    },
+    {
+      "id": "rfc9559",
+      "url": "https://www.rfc-editor.org/rfc/rfc9559.txt",
+      "sha256": "f251c1e9b6879bb308000fbd9b2359de9472160c56d121b9345b6433afb00cb7",
+      "bytes": 385933,
+      "role": "Matroska normative publication; updates RFC 8794",
+      "cached_path": ".research/specs/rfc9559"
+    },
+    {
+      "id": "matroska-schema",
+      "url": "https://raw.githubusercontent.com/ietf-wg-cellar/matroska-specification/f93ab02b845ec2a6a2fe4dce5f4c81ad21c34b4c/ebml_matroska.xml",
+      "sha256": "a42a9c6ea47dfd83589ce04a508b6a7f5d038560cee11dee1e4cbe2e746d0939",
+      "bytes": 141668,
+      "role": "Pinned current element schema; differences from RFC require explicit disposition",
+      "cached_path": ".research/specs/matroska-schema"
+    },
+    {
+      "id": "matroska-notes",
+      "url": "https://www.matroska.org/technical/notes.html",
+      "sha256": "565ed4463d9fa6f4e115adf68a51f3a9e4e7d4eb0d0e3b36c2ed32260ab9697e",
+      "bytes": 108416,
+      "role": "Explanatory timestamp/block/lacing notes; moving page frozen by content hash",
+      "cached_path": ".research/specs/matroska-notes"
+    },
+    {
+      "id": "matroska-codecs",
+      "url": "https://www.matroska.org/technical/codec_specs.html",
+      "sha256": "57882d5ec5e579106b2b850e90fb491a6428a9029e14336ef83aa03f78291295",
+      "bytes": 82358,
+      "role": "Codec carriage mappings; moving page frozen by content hash",
+      "cached_path": ".research/specs/matroska-codecs"
+    }
+  ]
+}

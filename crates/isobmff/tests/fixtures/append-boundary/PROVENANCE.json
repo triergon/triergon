@@ -1,0 +1,192 @@
+{
+  "schema": "safe-media.m03.original-append-boundary-fixture-provenance.v1",
+  "qualification": false,
+  "authorship": "Exact copies of this lane original synthetic fixtures; no native/reference/third-party implementation code.",
+  "reference_worker_sha256": "d97ce08126efe876cf92dfaac3655073da87fd8c590793a7d37ffd9e1fbea2d2",
+  "reference_source_sha256": "0eb5ff945085bb5419aee9e668f0bf0cc01792006f988f80eaabd58620b8dd9a",
+  "cases": [
+    {
+      "id": "discard22-explicit-equivalent",
+      "fixture": "discard22-explicit-equivalent.mp4",
+      "source_path": ".research/parallel-mp4/implementation/discard22-probes/discard22-explicit-equivalent.mp4",
+      "input_sha256": "f4aeb5f0664fe3c4ec3e6f479e66f53e95c5a5dcb557788447ce4937a9aa9a92",
+      "fixture_sha256": "f4aeb5f0664fe3c4ec3e6f479e66f53e95c5a5dcb557788447ce4937a9aa9a92",
+      "source_oracle_sha256": "c2ddb555daf48486d5ef462c95aa4616b5b6258573784db143e045957a3c9fce",
+      "raw_native_path": ".research/mov-discard22-native-v1-observed/cases/discard22-explicit-equivalent/stdout.json",
+      "raw_native_sha256": "d076589a3a4b1a3166c570a331d783a069a78fbefa1b9d5bbea7c9b17466a903",
+      "actual_native_flags": [
+        1,
+        0,
+        4,
+        5,
+        0,
+        0
+      ],
+      "actual_native_dts": [
+        7000,
+        8000,
+        1000,
+        2000,
+        3000,
+        4000
+      ],
+      "actual_native_durations": [
+        1000,
+        1000,
+        1000,
+        1000,
+        1000,
+        1000
+      ]
+    },
+    {
+      "id": "discard22-later-anchor-5000",
+      "fixture": "discard22-later-anchor-5000.mp4",
+      "source_path": ".research/parallel-mp4/implementation/discard22-probes/discard22-later-anchor-5000.mp4",
+      "input_sha256": "ab2a23fe92e2914bec808386a5ea29e0131fa7d3da4e5e11b952148793be5e0e",
+      "fixture_sha256": "ab2a23fe92e2914bec808386a5ea29e0131fa7d3da4e5e11b952148793be5e0e",
+      "source_oracle_sha256": "34fb0b080425da01b4d1abd563b8f69b8874e2d72835fa9e438f7f8ddeca15a8",
+      "raw_native_path": ".research/mov-discard22-native-v1-observed/cases/discard22-later-anchor-5000/stdout.json",
+      "raw_native_sha256": "68ca095e0ea5c5e98b81ba2a54e06b56c17bbdef539d896203c295666ad131e1",
+      "actual_native_flags": [
+        1,
+        0,
+        4,
+        5,
+        0,
+        0,
+        1,
+        0
+      ],
+      "actual_native_dts": [
+        7000,
+        8000,
+        1000,
+        2000,
+        3000,
+        4000,
+        5000,
+        6000
+      ],
+      "actual_native_durations": [
+        1000,
+        1000,
+        1000,
+        1000,
+        1000,
+        1000,
+        1000,
+        1000
+      ]
+    },
+    {
+      "id": "discard22-long-derived-then-intermediate-anchor",
+      "fixture": "discard22-long-derived-then-intermediate-anchor.mp4",
+      "source_path": ".research/parallel-mp4/implementation/discard22-probes/discard22-long-derived-then-intermediate-anchor.mp4",
+      "input_sha256": "edb7cbd5224e2a6a9bce6c3b3c9c53c48d170f25bfb7ea651547a8c8c0bb7cf1",
+      "fixture_sha256": "edb7cbd5224e2a6a9bce6c3b3c9c53c48d170f25bfb7ea651547a8c8c0bb7cf1",
+      "source_oracle_sha256": "5d5c0efa1c6e171885ab24b6866b9fb31cd6619eb20ec2e8524f0ba17363fb9f",
+      "raw_native_path": ".research/mov-discard22-native-v1-observed/cases/discard22-long-derived-then-intermediate-anchor/stdout.json",
+      "raw_native_sha256": "dd514c90c867b7126a474ba483dd8ce1e9f5938fc8c71f977f21070a2399c102",
+      "actual_native_flags": [
+        1,
+        0,
+        4,
+        5,
+        0,
+        0,
+        5,
+        4
+      ],
+      "actual_native_dts": [
+        7000,
+        8000,
+        1000,
+        2000,
+        25000,
+        26000,
+        10000,
+        11000
+      ],
+      "actual_native_durations": [
+        1000,
+        1000,
+        1000,
+        23000,
+        1000,
+        1000,
+        1000,
+        1000
+      ]
+    },
+    {
+      "id": "discard22-zero-delta-derived-equality",
+      "fixture": "discard22-zero-delta-derived-equality.mp4",
+      "source_path": ".research/parallel-mp4/implementation/discard22-probes/discard22-zero-delta-derived-equality.mp4",
+      "input_sha256": "d6cecee5ae763f52033434bc0f8802460c9d11d04ef108918585514a5fdb92ca",
+      "fixture_sha256": "d6cecee5ae763f52033434bc0f8802460c9d11d04ef108918585514a5fdb92ca",
+      "source_oracle_sha256": "efe5799e6e23e50116b51f04dc9500fdab52eafc5b548f25a87463cc62b2cd66",
+      "raw_native_path": ".research/mov-discard22-native-v1-observed/cases/discard22-zero-delta-derived-equality/stdout.json",
+      "raw_native_sha256": "d2248a7af0b42cd6718c318b7605d19476133ff0e20b874a3c53e22a1dd33675",
+      "actual_native_flags": [
+        1,
+        0,
+        4,
+        5,
+        0,
+        0
+      ],
+      "actual_native_dts": [
+        7000,
+        8000,
+        1000,
+        2000,
+        3000,
+        3000
+      ],
+      "actual_native_durations": [
+        1000,
+        1000,
+        1000,
+        1000,
+        0,
+        1000
+      ]
+    },
+    {
+      "id": "discard24-split-backward-run",
+      "fixture": "discard24-split-backward-run.mp4",
+      "source_path": ".research/parallel-mp4/implementation/discard24-run-partition/discard24-split-backward-run.mp4",
+      "input_sha256": "6ecd94faa882e90c17429acc55867cf839f0ada7452e6727db9f450b01875081",
+      "fixture_sha256": "6ecd94faa882e90c17429acc55867cf839f0ada7452e6727db9f450b01875081",
+      "source_oracle_sha256": "baeee662550f3c7ba9b8849fdaaa7a18185d935032b7c557ff15c86e05448d99",
+      "raw_native_path": ".research/mov-discard24-native-v1-observed/cases/discard24-split-backward-run/stdout.json",
+      "raw_native_sha256": "5284004f2fabf2d4508aee0ca77ccd96c12865bc60e299be6a0fb3776b2b5364",
+      "actual_native_flags": [
+        1,
+        0,
+        4,
+        1,
+        0,
+        0
+      ],
+      "actual_native_dts": [
+        7000,
+        8000,
+        1000,
+        2000,
+        3000,
+        4000
+      ],
+      "actual_native_durations": [
+        1000,
+        1000,
+        1000,
+        1000,
+        1000,
+        1000
+      ]
+    }
+  ],
+  "note": "Actual captures and predeclared/postcapture status retained in private reports. No existing207 source input/oracle or earlier regression altered. New83rd definition will cover these genuine run/rollback/append/zero-delta controls plus original missing-tfdt RED."
+}

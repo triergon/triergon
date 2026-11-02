@@ -1,0 +1,13 @@
+{
+  "schema": "safe-media.m03.authored-derived-discard-fixture.v1",
+  "qualification": false,
+  "authorship": "Original lane synthetic generator; no external implementation copying or translation.",
+  "source_path": ".research/parallel-mp4/implementation/selected-native-probes18/origin18-three-backward-then-absent.mp4",
+  "source_sha256": "edd5dfc92eb1bfef5bc722eabbff24710fef782f93eee46313d0ffbffdd3d2ed",
+  "copied_fixture_sha256": "edd5dfc92eb1bfef5bc722eabbff24710fef782f93eee46313d0ffbffdd3d2ed",
+  "source_oracle_sha256": "3ffe2a7b57617637b131650f7ee204f2f24dc9028b400758250073fac955d8b4",
+  "actual_red_receipt": ".research/parallel-mp4/implementation/v8-derived-discard-mismatch.json",
+  "actual_red_receipt_sha256": "4d224397d313674462e67d2ef4287962cd3f0bf0637792a4e5258a8b26eaed1f",
+  "reference_worker_sha256": "d97ce08126efe876cf92dfaac3655073da87fd8c590793a7d37ffd9e1fbea2d2",
+  "note": "Exact authored copy only. Existing202 inputs/oracles and old82 regressions remain unchanged. Added regression is not run by this lane; parent existing v8 failure is accepted actual RED."
+}

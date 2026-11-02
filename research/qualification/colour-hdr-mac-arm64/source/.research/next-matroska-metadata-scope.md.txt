@@ -1,0 +1,24 @@
+# Next substantial M01 metadata increment (preparation only)
+
+After K4 is archived, freeze a new independent contract for chapters/tags/attachments
+and remaining track navigation/disposition fields before implementation. No current
+source, worker, input, numeric gate or running measurement is changed by this note.
+
+Use RFC9559 sections5.1.6–5.1.8 and pinned schema as primary requirements. Cover
+finite metadata before/after Clusters, seekable late-metadata loading, exact chapter
+nanosecond times, nested editions/atoms, display names and languages, tag target
+UIDs and typed text/binary values, attachment names/MIME/data and source extensions.
+Track fields need independent language/IETF precedence and flag-default cases.
+
+Preserve original raw metadata as provenance. Use owned bounded spans to avoid
+copying attachment data repeatedly; no references into caller-lifetime buffers.
+Choose explicit attachment and aggregate retained-byte limits, depth/node/work
+bounds and malformed/fault regressions before accepting untrusted input. Do not
+claim this closes broader resumable-input or retained-capacity work automatically.
+
+Native reference must expose all selected public chapter/tag/attachment fields and
+consume equivalent bytes/metadata inside matched open/read-all/teardown timing.
+Add an independent source oracle for facts the reference cannot represent exactly.
+Freeze the workload profiles before optimization, preserve every required input and
+run all unchanged parity/runtime<=0.80/live-heap<1/RSS<1 gates on native Mac ARM64.
+Requalify affected preceding slices and retain all failed/partial attempts.

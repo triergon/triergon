@@ -1,0 +1,26 @@
+{
+  "original_directory": ".research/core-migration-b7581c8ba9be-1793438604754186000/header-window-7",
+  "sha256": {
+    "header-both/candidate.json": "2bf766d3cc04d52b78623b7c60ed4b7f831c2613fe1e69d9a901b67c102390a2",
+    "header-both/reference.json": "f5ed11961494c6608cfe7c9a643b5e06ce853d13e6065935133e6ef5887cb38c",
+    "header-both/source-candidate.json": "9162f65d5f84038f8efcfe38c5f598b9a1ee07c5ff4aa9c5b104a6d0b4ca6c37",
+    "header-both/source-frame-candidate.json": "2bf766d3cc04d52b78623b7c60ed4b7f831c2613fe1e69d9a901b67c102390a2",
+    "header-both/source-oracle.json": "0632b680be7a1d35d73501b8cb671aa9cdea771ce2fe19befbe91eac2a85684a",
+    "header-empty/candidate.json": "6721cef14f8998feeae9fb0cbc5d729b7622a7ba1725efd1acb887a00c98ed40",
+    "header-empty/reference.json": "50217c06b2f02cc4f212abd229e4686b221e4718970c522f9018f1bac37031ed",
+    "header-empty/source-candidate.json": "874609e8a1558668520ad69312a531aabfee5d1cd0d1d61880032e32cea70163",
+    "header-empty/source-frame-candidate.json": "6721cef14f8998feeae9fb0cbc5d729b7622a7ba1725efd1acb887a00c98ed40",
+    "header-empty/source-oracle.json": "0632b680be7a1d35d73501b8cb671aa9cdea771ce2fe19befbe91eac2a85684a",
+    "header-lace/candidate.json": "593e5a44a687ae408faf5b7df06de2dd9f48617e85af7f056139da90c3486636",
+    "header-lace/reference.json": "523a34931dfd9af36aaeb356a8de99dec5c7dd824154769527a9841a4bd0b280",
+    "header-lace/source-candidate.json": "e8eb1606b4459d94f56d6dfb84ad9cd9c016306d8ebcc8730d2601bfbf02cc9c",
+    "header-lace/source-frame-candidate.json": "593e5a44a687ae408faf5b7df06de2dd9f48617e85af7f056139da90c3486636",
+    "header-lace/source-oracle.json": "a6143073ef61dfacccc89e5735821f210b4fb092ddc5c68a406ded98a9f774c6",
+    "header-private/candidate.json": "9ac9739348499eca40c6ab7700bdc171b340a90ead42d22193a67184c299d3da",
+    "header-private/reference.json": "15e3adbd3d9835482baa75df970006e66fb4e3cea4d797fd223a8f0f21b4dc00",
+    "header-private/source-candidate.json": "930e7addbb528509235245c96b87588a345b16081dfc5fe4a96edf68d2541342",
+    "header-private/source-frame-candidate.json": "9ac9739348499eca40c6ab7700bdc171b340a90ead42d22193a67184c299d3da",
+    "header-private/source-oracle.json": "0632b680be7a1d35d73501b8cb671aa9cdea771ce2fe19befbe91eac2a85684a"
+  },
+  "external_payload_not_vendored": false
+}

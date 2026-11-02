@@ -1,0 +1,100 @@
+{
+  "boundary_cases": 11,
+  "failures": [
+    {
+      "value_hex": "0x1.0000000200000p-32",
+      "differences": [
+        {
+          "path": "/tracks/0/colour/12",
+          "actual": 0,
+          "expected": 1
+        },
+        {
+          "path": "/tracks/0/colour/13",
+          "actual": 1,
+          "expected": 2147483647
+        },
+        {
+          "path": "/tracks/0/colour/14",
+          "actual": 0,
+          "expected": 1
+        },
+        {
+          "path": "/tracks/0/colour/15",
+          "actual": 1,
+          "expected": 2147483647
+        },
+        {
+          "path": "/tracks/0/colour/16",
+          "actual": 0,
+          "expected": 1
+        },
+        {
+          "path": "/tracks/0/colour/17",
+          "actual": 1,
+          "expected": 2147483647
+        },
+        {
+          "path": "/tracks/0/colour/18",
+          "actual": 0,
+          "expected": 1
+        },
+        {
+          "path": "/tracks/0/colour/19",
+          "actual": 1,
+          "expected": 2147483647
+        },
+        {
+          "path": "/tracks/0/colour/20",
+          "actual": 0,
+          "expected": 1
+        },
+        {
+          "path": "/tracks/0/colour/21",
+          "actual": 1,
+          "expected": 2147483647
+        },
+        {
+          "path": "/tracks/0/colour/22",
+          "actual": 0,
+          "expected": 1
+        },
+        {
+          "path": "/tracks/0/colour/23",
+          "actual": 1,
+          "expected": 2147483647
+        },
+        {
+          "path": "/tracks/0/colour/24",
+          "actual": 0,
+          "expected": 1
+        },
+        {
+          "path": "/tracks/0/colour/25",
+          "actual": 1,
+          "expected": 2147483647
+        },
+        {
+          "path": "/tracks/0/colour/26",
+          "actual": 0,
+          "expected": 1
+        },
+        {
+          "path": "/tracks/0/colour/27",
+          "actual": 1,
+          "expected": 2147483647
+        },
+        {
+          "path": "/tracks/0/colour/28",
+          "actual": 0,
+          "expected": 1
+        },
+        {
+          "path": "/tracks/0/colour/29",
+          "actual": 1,
+          "expected": 2147483647
+        }
+      ]
+    }
+  ]
+}

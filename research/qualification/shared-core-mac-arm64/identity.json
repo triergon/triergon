@@ -1,0 +1,440 @@
+{
+  "version": "9.0",
+  "configuration": "--prefix=/Users/jonasgrosch/projects/safe-media/.research/reference/install --disable-everything --disable-autodetect --disable-doc --disable-debug --enable-protocol='file,pipe' --enable-demuxer=matroska --enable-muxer=framecrc --enable-decoder=pcm_s16le --enable-encoder='pcm_s16le,rawvideo' --enable-parser='h264,hevc,aac,ac3,vorbis' --enable-ffmpeg --enable-ffprobe --enable-pic --enable-zlib",
+  "adapter": "native-ffmpeg-packets",
+  "schema": 2,
+  "reference_kind": "pinned local source build",
+  "candidate_command": [
+    "cargo",
+    "+nightly",
+    "build",
+    "-p",
+    "media-worker",
+    "--release",
+    "--locked"
+  ],
+  "selected_graph": {
+    "schema": 1,
+    "root_package": "media-worker",
+    "workspace_settings": {
+      "workspace": {
+        "resolver": "3",
+        "package": {
+          "edition": "2024",
+          "rust-version": "1.85",
+          "publish": false
+        },
+        "lints": {
+          "rust": {
+            "unsafe_code": "forbid"
+          }
+        }
+      },
+      "profile": {
+        "release": {
+          "lto": "thin",
+          "codegen-units": 1
+        }
+      }
+    },
+    "packages": [
+      {
+        "name": "media-worker",
+        "version": "0.0.0",
+        "manifest": "crates/worker/Cargo.toml",
+        "features": [],
+        "dependencies": [
+          {
+            "alias": "safe_media",
+            "package": "safe-media",
+            "manifest": "crates/media/Cargo.toml",
+            "kinds": [
+              {
+                "kind": null,
+                "target": null
+              }
+            ]
+          }
+        ],
+        "files": {
+          "crates/worker/Cargo.toml": "cb86c19503237bac707220ffc3fbf68b90071a1cc7aac888c7b3bebbd4cb7a23",
+          "crates/worker/src/catalogue.rs": "81b15fbcd0b8e9a9f6a06944ed0cca622f2b3f1fa5ff55740a1fa99cf307f166",
+          "crates/worker/src/main.rs": "30c70c272abc7d26d9898d66572082b02d509870adf3b91d40454e9d99d34c6d"
+        }
+      },
+      {
+        "name": "safe-media",
+        "version": "0.0.0",
+        "manifest": "crates/media/Cargo.toml",
+        "features": [],
+        "dependencies": [
+          {
+            "alias": "safe_media_core",
+            "package": "safe-media-core",
+            "manifest": "crates/core/Cargo.toml",
+            "kinds": [
+              {
+                "kind": null,
+                "target": null
+              }
+            ]
+          }
+        ],
+        "files": {
+          "crates/media/Cargo.toml": "e826576ab3f514a0811a35cfb3ed3831220ac1eacbd077451cb65ee6b3154918",
+          "crates/media/src/colour.rs": "31801abf3e9f57cb6bc7893634e8729db614bd99423fb6982534bb196e06185b",
+          "crates/media/src/content_encoding.rs": "399261dad52c978b8bd374baf2c296887bf374e4864c1bad3501f7723913b5ed",
+          "crates/media/src/cues.rs": "dc8bcaedacb86027d5cc260cdf50fadbe19f0f662dc4453bd635245fb25806ca",
+          "crates/media/src/ebml.rs": "0e1cef70d6b98564957e58ac649c4c37ec0fad6e824e2ea26121cec014976dc7",
+          "crates/media/src/error.rs": "cebebcf64d9fbff7f16c9e686669a09fc43968a6e5671599e06e0daaf12bc86a",
+          "crates/media/src/incremental.rs": "7bdc8b621e4ab8da60b3df1a6e42b31732f233caa3cad62e6fe09d3e74218752",
+          "crates/media/src/inflate.rs": "bde9adf6d509510524ac1868fe23a84779b06e1d324a10ebf9971ae8f6c843dd",
+          "crates/media/src/inflate_prefix_tests.rs": "d7b8b730c0a033eda1cdc6580dbce9ef7a7b1422844c24a898b5f0e463549433",
+          "crates/media/src/lib.rs": "cc20a18d97aa90f5fcf72037d9aa11715c0848280c2dac6c87781fa21149bc9b",
+          "crates/media/src/matroska.rs": "709e30c7a360380a7fe11d4ecbb70041134efaba70cbcbd67cf1c921a269839f",
+          "crates/media/src/matroska_lace_tests.rs": "ae8c94705ec26a272bd927e774f6044b33e0c339743369868a38c5c9f350a740",
+          "crates/media/src/metadata.rs": "b43cf72e4bf694a6ab5e16715c49d9d0edf6d23d3ef65af9e66fb5138497fb95",
+          "crates/media/src/metadata_tests.rs": "47b65e2f6f6b44bcb7b2b084a056d030289265e1d2f6b2676c85a2e8960bde08",
+          "crates/media/src/metadata_views.rs": "4db9ff213c7cac75835fc39be093875947afe8bb3335790c60a11d30c5fa1e89",
+          "crates/media/src/storage.rs": "edc9808f15b6904241d5d576ed263899a7ae58f585dbf5b51911e5cb959bab5c",
+          "crates/media/src/time.rs": "f78844b2905ea19144ebe7c698c5f6db8c8fa7017657759d23afc24d1fe6eb94",
+          "crates/media/src/timing.rs": "a2308a0de82b00339cec5c62cb2e491cf67246021ab999998d4a3cb189915aa7",
+          "crates/media/src/zlib.rs": "a05e5f685ddc660b61fecf9d3dbb959155cd58748502d17ae35facd4ee5c8942",
+          "crates/media/tests/core_migration.rs": "fc17c7afcf45ba33f3b4db52f14ff3e48bd44bfee8572fb2f6f90e003c0e6fc3",
+          "crates/media/tests/inflate.rs": "15338e7efee80a64f34330d061280278944a8373653ef2bfec86edf6a7c64aa2",
+          "crates/media/tests/matroska.rs": "42e5c8cad7d57ab3aeca9f5f749527eba4241b224f94a1caac9d516fe7584e99",
+          "crates/media/tests/track_storage.rs": "546b7de8d7179d03b620fa0c6f1a2798c7da21dca31c6d18cf04a8beb078020f"
+        }
+      },
+      {
+        "name": "safe-media-core",
+        "version": "0.0.0",
+        "manifest": "crates/core/Cargo.toml",
+        "features": [],
+        "dependencies": [],
+        "files": {
+          "crates/core/Cargo.toml": "724b5a63a3922681b5861f8ee892788032e010c0d7e3446ea27e499d822e4604",
+          "crates/core/examples/time-oracle.rs": "0ebae7d62e624199fb44d96bea2e5df6fe1ae26554e73431b9125e407c5cba8e",
+          "crates/core/src/budget.rs": "1c359226edda6430d03aa6a52b859fca86e8cfd345cf856dd1edd3cca16d68a2",
+          "crates/core/src/bytes.rs": "5e71cf983c6ef11967cc0169da891ba06bd8292ce51b912526487c45fb683a6b",
+          "crates/core/src/error.rs": "9f2900cf89a539f46dcc9368288bdad60dc9d524314eb3176b10c967a64c23ea",
+          "crates/core/src/input.rs": "67d0f0f233843d08ebdb096d1b734b4d6785ff46a3bed1b75e81aac7f40d2c9b",
+          "crates/core/src/lib.rs": "b06b577352a1e5cd2bf883033bd626c805246ced6636999fb13f82baf1560fc4",
+          "crates/core/src/time.rs": "5b0f315d26650fdd39b17b78f6d2b09d4c9f595b8d56c3b55128f9cd96416f86",
+          "crates/core/src/wide.rs": "506ce7ef546b67ddb2ec2b79cb14de13970e6479abd64f562dfc6109612e7988",
+          "crates/core/src/work.rs": "8c52a27632d7a2466c0db9289a6eceda6091c8ae48aed97b253049e118d376a8",
+          "crates/core/tests/bulk_storage.rs": "54ce16ac629ed2523dc5887f0d4947c94f511a959759291cef363fde4a532db7",
+          "crates/core/tests/input.rs": "357fdb989b13fa41c205d8946877ecad943fd99d1ca7af7de7db5aaf687b11b7",
+          "crates/core/tests/ownership.rs": "69120396ecc2dd397172477f061299f22e89c7f10594585831e07df25bf83724",
+          "crates/core/tests/time.rs": "2045e5790ef9c0d18be7e76049cf8f7216b05a710d6cad816dc31e568614b6fb"
+        }
+      }
+    ],
+    "shared_files": {
+      "Makefile": "86533b88e9e8e302eb60a46c84e4e4c6b95e0dc411ecdf8626c7fb7e2866b5e5",
+      "harness/allocations.c": "16eae29746b4995ec4fa4fb057f4e39f9aa5b4c6273508cc78bb751d7cbdf8e1",
+      "harness/catalogue-corpus.json": "b42c892d52aea7e6f893349e962c843d81d7a99e96de01a40ed722304a4a721e",
+      "harness/catalogue-slice.json": "b49abe5b47ed9db0ece292168bd1e2a855410c2db06ee4887b904181a9697187",
+      "harness/catalogue_oracle.py": "98355b66b3293dd8cdd93403c210bdea35439075811be70fe3e8caedf2417ee5",
+      "harness/colour-corpus.json": "04d4b3256ce8654c849eaa3c95ee3fb44679062df35d144430df91d0c23a71ff",
+      "harness/colour-slice.json": "446ac3aad678bb587dfba7e007075d58436521d2b46938c3f4a0b887ebe81834",
+      "harness/colour_oracle.py": "42569aeaf00c145e4a2a02d35405864c363483690444d474b2ddb174e289cb46",
+      "harness/comparison-rules.json": "30a0b6f11afb73617b98f43e66b038643dece37515e765b64d2f883330c93ac7",
+      "harness/comparison.py": "97f0575ad07b50386fa4e2f8a0fa1ab9e339f32504d68a7084b6c7a2fce67410",
+      "harness/content_oracle.py": "0af05377bd6ae49abfe55057bd2b8cbaae43e3c89a451ef563729ec893846dee",
+      "harness/corpus.json": "6763146d864e92085034359c8a013ebfa9486249aad5b1fc9ab75754cc7eed80",
+      "harness/fate-map.json": "383ef0ff65f8ba8a52858ce18b03cec6773fc28d7b3959f42de58b8c90b75980",
+      "harness/header-corpus.json": "1c7d8f5da17ac5b06c12552a61dca3c810a3793b157d484e475104a7f4c0ba2f",
+      "harness/header-slice.json": "24eb1b3dae6514271ce7edea66f53f12bdce32bf6a1aa35ad5cc09d9dcd47d53",
+      "harness/memory-check.c": "a5ac597801f3e753a38053f88424d63f17de8043b9868bc8df6609c216649fcf",
+      "harness/memory.py": "c0c3ff064c5a0d490f9fbf878fc8e4242409fef553b5dc0e8a93331af6489565",
+      "harness/provenance.py": "f27a183438d564c1bd48a7a14dc6fc899ee1a41a05056c2485c0dccd1684fe2e",
+      "harness/reference.c": "a76e761302ea2260b4bcde271cacf42558042e18b4196aa8401fc0251128ff5d",
+      "harness/reference_catalogue.h": "12fc6032c525aabb881a22632925dc7a559fb9e127c39f47e55f01734e5c2be2",
+      "harness/reference_colour.h": "c68e79f22a5cf8998b85e2b70e9486f97fbbbc2031249994990a27cd053d8f80",
+      "harness/reference_content_encoding.h": "528f91e647cc288e1c860c1ba4ab8aeff6af57d5c4561389fc9542c0879017d1",
+      "harness/runner.py": "98ff31d93a89ffe9fb04e6572e743155c774f5935f2c0ba8d3e335e921a6a93e",
+      "harness/seek-corpus.json": "de1fb4b3f0b44e2e7790a24c9fae2896a550dd1f42814a7a447ad81968fd1798",
+      "harness/seek-slice.json": "5f377519b258fdce660419b0d44df4d7d75f49c131e5da57638300a5c01e7542",
+      "harness/slice.json": "1958e3942f2e7235d66935f319ad2c9a62e80f0d6e47daeb6c23cd4bbc1add10",
+      "harness/spec_oracle.py": "539944968504f11674887e758cc818743bf2e2e82a44f0e10a406be63a529716",
+      "harness/zlib-corpus.json": "9359184b2064dc3bc93477ffcf35e0819c88fccb9012039de083ce8705642e44",
+      "harness/zlib-slice.json": "e8f299977c6729e2149dd661a3c8d74ed81f75c3cb7f5e0216b89977da0dcb69",
+      "research/fate-index.json": "6fd66491a8159d538f72c811a6344f1cc20a0bb6763d1815db00ab1608178ae7",
+      "specs/sources.json": "7e9cb7a4fa88b63e96f6658d670c4110bf2368da4d33e9729b17d2fbe3a9b7ce",
+      "tools/build-harness.py": "ca293cf0a8d383f6434c045843fdccdbbe8681a229d1356f7f74bbadcca62ee5",
+      "tools/run-fate.py": "e71abf6d4ecdb35c1c3500875aeea31aefe6bddee5fa7cfe9fa207c403620496",
+      "tools/test-catalogue-vector.py": "6c790ec84a195392fa563e30cc89ab2370106a2e70b373b1b972b7c75f69bcd7",
+      "tools/test-media.py": "9236248f4a9f19d6e0f51fd5ed5f432d3d0103e1e55fc227448ff733da8e27bc"
+    },
+    "sha256": "f98621af49df5b1790d37c09c7429faa753f3525891d5a836a9ae9d230a3e6b5"
+  },
+  "build_environment": {},
+  "source_revision": "d32b387f2b0a484599d4587d651891f0c63c4238",
+  "compiler_command": [
+    "cc",
+    "-O3",
+    "-Wall",
+    "-Wextra",
+    "-Werror",
+    "/Users/jonasgrosch/projects/safe-media/harness/reference.c",
+    "-I/Users/jonasgrosch/projects/safe-media/.research/reference/install/include",
+    "-L/Users/jonasgrosch/projects/safe-media/.research/reference/install/lib",
+    "-lavformat",
+    "-lm",
+    "-lz",
+    "-lavcodec",
+    "-pthread",
+    "-lm",
+    "-lz",
+    "-lavutil",
+    "-lm",
+    "-lz",
+    "-framework",
+    "CoreFoundation",
+    "-framework",
+    "CoreVideo",
+    "-framework",
+    "CoreMedia",
+    "-pthread",
+    "-o",
+    "/Users/jonasgrosch/projects/safe-media/target/harness/ffmpeg-worker"
+  ],
+  "comparison_rules": {
+    "schema": 1,
+    "approval": {
+      "status": "approved",
+      "date": "2026-10-31",
+      "owner_message": "you are saying we are going to support more what ffmpeg does in that case? I approve then",
+      "scope": "The two-case proposal explained in research/review/zlib-reference-comparison/README.md; numerical gates and required cases unchanged"
+    },
+    "reference_source_revision": "d32b387f2b0a484599d4587d651891f0c63c4238",
+    "rules": [
+      {
+        "id": "empty-pcm-decoder-input-v1",
+        "case": "zlib-empty",
+        "profile": "zlib-empty",
+        "input_sha256": "a0f7fdd0fca32f9f0f6276fc792c4f2e039cf24349ce2efedbd929118ba11ca5",
+        "view": "optional-pcm-decoder-packets-v1",
+        "reference": "ffmpeg-native",
+        "source_content_oracle_required": true,
+        "raw_native_difference_paths": [
+          "/packets"
+        ],
+        "raw_native_output_sha256": "d80a13db550c11ab307d33e1c11bd31a81835b5371412e6503a158eb70394940"
+      },
+      {
+        "id": "combined-encoding-native-reference-v1",
+        "case": "zlib-mixed",
+        "profile": "zlib-mixed",
+        "input_sha256": "fb07fdc1b9945594270a5dfc1ce3e1e937e0054aafcea3f2a5dea53bf6de1509",
+        "view": "optional-pcm-decoder-packets-v1",
+        "reference": "ffmpeg-combined-native",
+        "source_content_oracle_required": true,
+        "raw_native_difference_paths": [
+          "/packets/0/payload"
+        ],
+        "raw_native_output_sha256": "c417b3d74840209883e9d2f704510705b29b88b64eb67b8714630a46fea31566"
+      }
+    ]
+  },
+  "comparison_references": {
+    "ffmpeg-native": {
+      "path": "target/harness/ffmpeg-worker",
+      "sha256": "b17f66c82f42aa50ac2851074c678cd627d96320acad080ca99e16ac7a5d96e6",
+      "kind": "pinned native FFmpeg"
+    },
+    "ffmpeg-combined-native": {
+      "path": "target/harness/ffmpeg-combined-worker",
+      "sha256": "a1397934dbf421a54e32f696ba72273c7bc5178d932cf126f76b30c78cc1207b",
+      "kind": "pinned FFmpeg plus native scope-1 combined-encoding restoration",
+      "compiler_command": [
+        "cc",
+        "-DSAFE_MEDIA_COMBINED_REFERENCE=1",
+        "-O3",
+        "-Wall",
+        "-Wextra",
+        "-Werror",
+        "/Users/jonasgrosch/projects/safe-media/harness/reference.c",
+        "-I/Users/jonasgrosch/projects/safe-media/.research/reference/install/include",
+        "-L/Users/jonasgrosch/projects/safe-media/.research/reference/install/lib",
+        "-lavformat",
+        "-lm",
+        "-lz",
+        "-lavcodec",
+        "-pthread",
+        "-lm",
+        "-lz",
+        "-lavutil",
+        "-lm",
+        "-lz",
+        "-framework",
+        "CoreFoundation",
+        "-framework",
+        "CoreVideo",
+        "-framework",
+        "CoreMedia",
+        "-pthread",
+        "-o",
+        "/Users/jonasgrosch/projects/safe-media/target/harness/ffmpeg-combined-worker"
+      ],
+      "worker_identity": {
+        "version": "9.0",
+        "configuration": "--prefix=/Users/jonasgrosch/projects/safe-media/.research/reference/install --disable-everything --disable-autodetect --disable-doc --disable-debug --enable-protocol='file,pipe' --enable-demuxer=matroska --enable-muxer=framecrc --enable-decoder=pcm_s16le --enable-encoder='pcm_s16le,rawvideo' --enable-parser='h264,hevc,aac,ac3,vorbis' --enable-ffmpeg --enable-ffprobe --enable-pic --enable-zlib",
+        "adapter": "ffmpeg-plus-native-combined-encoding"
+      },
+      "system_libraries": {
+        "status": "recorded",
+        "dynamic_links": "/Users/jonasgrosch/projects/safe-media/target/harness/ffmpeg-combined-worker:\n\t/usr/lib/libSystem.B.dylib (compatibility version 1.0.0, current version 1356.0.0)\n\t/usr/lib/libz.1.dylib (compatibility version 1.0.0, current version 1.2.12)\n\t/System/Library/Frameworks/CoreFoundation.framework/Versions/A/CoreFoundation (compatibility version 150.0.0, current version 4201.0.0)\n\t/System/Library/Frameworks/CoreVideo.framework/Versions/A/CoreVideo (compatibility version 1.2.0, current version 726.2.0)\n\t/System/Library/Frameworks/CoreMedia.framework/Versions/A/CoreMedia (compatibility version 1.0.0, current version 3290.6.5)\n",
+        "os_build": "24G90",
+        "system_zlib": {
+          "path": "/usr/lib/libz.1.dylib",
+          "version": "1.2.12",
+          "provenance": "OS shared-cache component identified by path, runtime version and OS build; not a standalone content hash"
+        }
+      }
+    }
+  },
+  "system_libraries": {
+    "status": "recorded",
+    "dynamic_links": "/Users/jonasgrosch/projects/safe-media/target/harness/ffmpeg-worker:\n\t/usr/lib/libSystem.B.dylib (compatibility version 1.0.0, current version 1356.0.0)\n\t/usr/lib/libz.1.dylib (compatibility version 1.0.0, current version 1.2.12)\n\t/System/Library/Frameworks/CoreFoundation.framework/Versions/A/CoreFoundation (compatibility version 150.0.0, current version 4201.0.0)\n\t/System/Library/Frameworks/CoreVideo.framework/Versions/A/CoreVideo (compatibility version 1.2.0, current version 726.2.0)\n\t/System/Library/Frameworks/CoreMedia.framework/Versions/A/CoreMedia (compatibility version 1.0.0, current version 3290.6.5)\n",
+    "os_build": "24G90",
+    "system_zlib": {
+      "path": "/usr/lib/libz.1.dylib",
+      "version": "1.2.12",
+      "provenance": "OS shared-cache component identified by path, runtime version and OS build; not a standalone content hash"
+    }
+  },
+  "instrumentation": {
+    "observer_sha256": "facf4133c0454f44107d2a39f46f112f30dfd4a27e7b09429c0d7b901fda30c1",
+    "probe_sha256": "2da4e2a8511023f95e9c7bd4b19ebaeb9231fbda6a71aa05ec2913d5a7495736"
+  },
+  "compiler": "Apple clang version 17.0.0 (clang-1700.6.3.2)\nTarget: arm64-apple-darwin24.6.0\nThread model: posix\nInstalledDir: /Library/Developer/CommandLineTools/usr/bin\n",
+  "ffmpeg_version": "ffmpeg version 9.0.2 Copyright (c) 2000-2026 the FFmpeg developers\nbuilt with Apple clang version 17.0.0 (clang-1700.6.4.2)\nconfiguration: --prefix=/opt/homebrew/Cellar/ffmpeg/9.0.2_1 --enable-shared --enable-pthreads --enable-version3 --cc=clang --host-cflags= --host-ldflags= --enable-ffplay --enable-gpl --enable-libsvtav1 --enable-libopus --enable-libx264 --enable-libmp3lame --enable-libdav1d --enable-libvmaf --enable-libvpx --enable-libx265 --enable-openssl --enable-videotoolbox --enable-audiotoolbox --enable-neon\nlibavutil      61.  1.102 / 61.  1.102\nlibavcodec     63.  1.102 / 63.  1.102\nlibavformat    63.  1.102 / 63.  1.102\nlibavdevice    63.  1.102 / 63.  1.102\nlibavfilter    12.  1.102 / 12.  1.102\nlibswscale     10.  1.102 / 10.  1.102\nlibswresample   7.  1.102 /  7.  1.102\n\nExiting with exit code 0\n",
+  "rustc": "rustc 1.101.0-nightly (5d8fec066 2026-10-16)\nbinary: rustc\ncommit-hash: 5d8fec0669a64607db9ccbf663e7c23125bf4748\ncommit-date: 2026-10-16\nhost: aarch64-apple-darwin\nrelease: 1.101.0-nightly\nLLVM version: 23.1.4\n",
+  "binaries": {
+    "candidate": "b7581c8ba9be9262c078e7a132117520b69ce3068e4cb0e7a16fa81034de3b50",
+    "reference": "b17f66c82f42aa50ac2851074c678cd627d96320acad080ca99e16ac7a5d96e6"
+  },
+  "source_hashes": {
+    "crates/worker/Cargo.toml": "cb86c19503237bac707220ffc3fbf68b90071a1cc7aac888c7b3bebbd4cb7a23",
+    "crates/worker/src/catalogue.rs": "81b15fbcd0b8e9a9f6a06944ed0cca622f2b3f1fa5ff55740a1fa99cf307f166",
+    "crates/worker/src/main.rs": "30c70c272abc7d26d9898d66572082b02d509870adf3b91d40454e9d99d34c6d",
+    "crates/media/Cargo.toml": "e826576ab3f514a0811a35cfb3ed3831220ac1eacbd077451cb65ee6b3154918",
+    "crates/media/src/colour.rs": "31801abf3e9f57cb6bc7893634e8729db614bd99423fb6982534bb196e06185b",
+    "crates/media/src/content_encoding.rs": "399261dad52c978b8bd374baf2c296887bf374e4864c1bad3501f7723913b5ed",
+    "crates/media/src/cues.rs": "dc8bcaedacb86027d5cc260cdf50fadbe19f0f662dc4453bd635245fb25806ca",
+    "crates/media/src/ebml.rs": "0e1cef70d6b98564957e58ac649c4c37ec0fad6e824e2ea26121cec014976dc7",
+    "crates/media/src/error.rs": "cebebcf64d9fbff7f16c9e686669a09fc43968a6e5671599e06e0daaf12bc86a",
+    "crates/media/src/incremental.rs": "7bdc8b621e4ab8da60b3df1a6e42b31732f233caa3cad62e6fe09d3e74218752",
+    "crates/media/src/inflate.rs": "bde9adf6d509510524ac1868fe23a84779b06e1d324a10ebf9971ae8f6c843dd",
+    "crates/media/src/inflate_prefix_tests.rs": "d7b8b730c0a033eda1cdc6580dbce9ef7a7b1422844c24a898b5f0e463549433",
+    "crates/media/src/lib.rs": "cc20a18d97aa90f5fcf72037d9aa11715c0848280c2dac6c87781fa21149bc9b",
+    "crates/media/src/matroska.rs": "709e30c7a360380a7fe11d4ecbb70041134efaba70cbcbd67cf1c921a269839f",
+    "crates/media/src/matroska_lace_tests.rs": "ae8c94705ec26a272bd927e774f6044b33e0c339743369868a38c5c9f350a740",
+    "crates/media/src/metadata.rs": "b43cf72e4bf694a6ab5e16715c49d9d0edf6d23d3ef65af9e66fb5138497fb95",
+    "crates/media/src/metadata_tests.rs": "47b65e2f6f6b44bcb7b2b084a056d030289265e1d2f6b2676c85a2e8960bde08",
+    "crates/media/src/metadata_views.rs": "4db9ff213c7cac75835fc39be093875947afe8bb3335790c60a11d30c5fa1e89",
+    "crates/media/src/storage.rs": "edc9808f15b6904241d5d576ed263899a7ae58f585dbf5b51911e5cb959bab5c",
+    "crates/media/src/time.rs": "f78844b2905ea19144ebe7c698c5f6db8c8fa7017657759d23afc24d1fe6eb94",
+    "crates/media/src/timing.rs": "a2308a0de82b00339cec5c62cb2e491cf67246021ab999998d4a3cb189915aa7",
+    "crates/media/src/zlib.rs": "a05e5f685ddc660b61fecf9d3dbb959155cd58748502d17ae35facd4ee5c8942",
+    "crates/media/tests/core_migration.rs": "fc17c7afcf45ba33f3b4db52f14ff3e48bd44bfee8572fb2f6f90e003c0e6fc3",
+    "crates/media/tests/inflate.rs": "15338e7efee80a64f34330d061280278944a8373653ef2bfec86edf6a7c64aa2",
+    "crates/media/tests/matroska.rs": "42e5c8cad7d57ab3aeca9f5f749527eba4241b224f94a1caac9d516fe7584e99",
+    "crates/media/tests/track_storage.rs": "546b7de8d7179d03b620fa0c6f1a2798c7da21dca31c6d18cf04a8beb078020f",
+    "crates/core/Cargo.toml": "724b5a63a3922681b5861f8ee892788032e010c0d7e3446ea27e499d822e4604",
+    "crates/core/examples/time-oracle.rs": "0ebae7d62e624199fb44d96bea2e5df6fe1ae26554e73431b9125e407c5cba8e",
+    "crates/core/src/budget.rs": "1c359226edda6430d03aa6a52b859fca86e8cfd345cf856dd1edd3cca16d68a2",
+    "crates/core/src/bytes.rs": "5e71cf983c6ef11967cc0169da891ba06bd8292ce51b912526487c45fb683a6b",
+    "crates/core/src/error.rs": "9f2900cf89a539f46dcc9368288bdad60dc9d524314eb3176b10c967a64c23ea",
+    "crates/core/src/input.rs": "67d0f0f233843d08ebdb096d1b734b4d6785ff46a3bed1b75e81aac7f40d2c9b",
+    "crates/core/src/lib.rs": "b06b577352a1e5cd2bf883033bd626c805246ced6636999fb13f82baf1560fc4",
+    "crates/core/src/time.rs": "5b0f315d26650fdd39b17b78f6d2b09d4c9f595b8d56c3b55128f9cd96416f86",
+    "crates/core/src/wide.rs": "506ce7ef546b67ddb2ec2b79cb14de13970e6479abd64f562dfc6109612e7988",
+    "crates/core/src/work.rs": "8c52a27632d7a2466c0db9289a6eceda6091c8ae48aed97b253049e118d376a8",
+    "crates/core/tests/bulk_storage.rs": "54ce16ac629ed2523dc5887f0d4947c94f511a959759291cef363fde4a532db7",
+    "crates/core/tests/input.rs": "357fdb989b13fa41c205d8946877ecad943fd99d1ca7af7de7db5aaf687b11b7",
+    "crates/core/tests/ownership.rs": "69120396ecc2dd397172477f061299f22e89c7f10594585831e07df25bf83724",
+    "crates/core/tests/time.rs": "2045e5790ef9c0d18be7e76049cf8f7216b05a710d6cad816dc31e568614b6fb"
+  },
+  "build_input_hashes": {
+    "Makefile": "86533b88e9e8e302eb60a46c84e4e4c6b95e0dc411ecdf8626c7fb7e2866b5e5",
+    "harness/allocations.c": "16eae29746b4995ec4fa4fb057f4e39f9aa5b4c6273508cc78bb751d7cbdf8e1",
+    "harness/catalogue-corpus.json": "b42c892d52aea7e6f893349e962c843d81d7a99e96de01a40ed722304a4a721e",
+    "harness/catalogue-slice.json": "b49abe5b47ed9db0ece292168bd1e2a855410c2db06ee4887b904181a9697187",
+    "harness/catalogue_oracle.py": "98355b66b3293dd8cdd93403c210bdea35439075811be70fe3e8caedf2417ee5",
+    "harness/colour-corpus.json": "04d4b3256ce8654c849eaa3c95ee3fb44679062df35d144430df91d0c23a71ff",
+    "harness/colour-slice.json": "446ac3aad678bb587dfba7e007075d58436521d2b46938c3f4a0b887ebe81834",
+    "harness/colour_oracle.py": "42569aeaf00c145e4a2a02d35405864c363483690444d474b2ddb174e289cb46",
+    "harness/comparison-rules.json": "30a0b6f11afb73617b98f43e66b038643dece37515e765b64d2f883330c93ac7",
+    "harness/comparison.py": "97f0575ad07b50386fa4e2f8a0fa1ab9e339f32504d68a7084b6c7a2fce67410",
+    "harness/content_oracle.py": "0af05377bd6ae49abfe55057bd2b8cbaae43e3c89a451ef563729ec893846dee",
+    "harness/corpus.json": "6763146d864e92085034359c8a013ebfa9486249aad5b1fc9ab75754cc7eed80",
+    "harness/fate-map.json": "383ef0ff65f8ba8a52858ce18b03cec6773fc28d7b3959f42de58b8c90b75980",
+    "harness/header-corpus.json": "1c7d8f5da17ac5b06c12552a61dca3c810a3793b157d484e475104a7f4c0ba2f",
+    "harness/header-slice.json": "24eb1b3dae6514271ce7edea66f53f12bdce32bf6a1aa35ad5cc09d9dcd47d53",
+    "harness/memory-check.c": "a5ac597801f3e753a38053f88424d63f17de8043b9868bc8df6609c216649fcf",
+    "harness/memory.py": "c0c3ff064c5a0d490f9fbf878fc8e4242409fef553b5dc0e8a93331af6489565",
+    "harness/provenance.py": "f27a183438d564c1bd48a7a14dc6fc899ee1a41a05056c2485c0dccd1684fe2e",
+    "harness/reference.c": "a76e761302ea2260b4bcde271cacf42558042e18b4196aa8401fc0251128ff5d",
+    "harness/reference_catalogue.h": "12fc6032c525aabb881a22632925dc7a559fb9e127c39f47e55f01734e5c2be2",
+    "harness/reference_colour.h": "c68e79f22a5cf8998b85e2b70e9486f97fbbbc2031249994990a27cd053d8f80",
+    "harness/reference_content_encoding.h": "528f91e647cc288e1c860c1ba4ab8aeff6af57d5c4561389fc9542c0879017d1",
+    "harness/runner.py": "98ff31d93a89ffe9fb04e6572e743155c774f5935f2c0ba8d3e335e921a6a93e",
+    "harness/seek-corpus.json": "de1fb4b3f0b44e2e7790a24c9fae2896a550dd1f42814a7a447ad81968fd1798",
+    "harness/seek-slice.json": "5f377519b258fdce660419b0d44df4d7d75f49c131e5da57638300a5c01e7542",
+    "harness/slice.json": "1958e3942f2e7235d66935f319ad2c9a62e80f0d6e47daeb6c23cd4bbc1add10",
+    "harness/spec_oracle.py": "539944968504f11674887e758cc818743bf2e2e82a44f0e10a406be63a529716",
+    "harness/zlib-corpus.json": "9359184b2064dc3bc93477ffcf35e0819c88fccb9012039de083ce8705642e44",
+    "harness/zlib-slice.json": "e8f299977c6729e2149dd661a3c8d74ed81f75c3cb7f5e0216b89977da0dcb69",
+    "research/fate-index.json": "6fd66491a8159d538f72c811a6344f1cc20a0bb6763d1815db00ab1608178ae7",
+    "specs/sources.json": "7e9cb7a4fa88b63e96f6658d670c4110bf2368da4d33e9729b17d2fbe3a9b7ce",
+    "tools/build-harness.py": "ca293cf0a8d383f6434c045843fdccdbbe8681a229d1356f7f74bbadcca62ee5",
+    "tools/run-fate.py": "e71abf6d4ecdb35c1c3500875aeea31aefe6bddee5fa7cfe9fa207c403620496",
+    "tools/test-catalogue-vector.py": "6c790ec84a195392fa563e30cc89ab2370106a2e70b373b1b972b7c75f69bcd7",
+    "tools/test-media.py": "9236248f4a9f19d6e0f51fd5ed5f432d3d0103e1e55fc227448ff733da8e27bc"
+  },
+  "workspace_provenance": {
+    "manifest_sha256": "a5c82a121bf6bc8ce30e9abc20853315a3727346b2f4be3440077a59508b3e05",
+    "lock_sha256": "de805e9b8c11b3887b8269d14a2a5419b42c481cf4b99322b7e7f6ed4724959d"
+  },
+  "reference_archives": {
+    "libavcodec.a": "dcbdc25cd754dede86e9d74c319b8da92a7d6f0dfb9f1d85a2452b64bbbcd807",
+    "libavdevice.a": "fa7e4dc68f05c0aa24520ff20abe181f694fe6bdcf3af8bcad046569e506d2f3",
+    "libavfilter.a": "5f440c383d5a5fd6fa1a948bf07410633d90da182ab1d5c088cb063b61c00b65",
+    "libavformat.a": "a9c25863067cd6c2cba9e1423f519c5f483e55072645cc1cbbb84ebfd05db013",
+    "libavutil.a": "f0178d9dbeef8680f9bcee31a8c1d0a14774ee9a009432941ca7fcd84be9eb21",
+    "libswresample.a": "adf4fa0a30c78bd246962f208fe9921127c5ad49162e3b2e5b4449a01ffaf84e",
+    "libswscale.a": "89ba4fba977fbeaf79173a96a02506f6d1546743e7fb4a1b30993c105fc4a1ec"
+  },
+  "reference_build": {
+    "schema": 1,
+    "revision": "d32b387f2b0a484599d4587d651891f0c63c4238",
+    "archive_sha256": "8a830a34bfaf98514b5d45cf6c01b1fe78b38d5e4c10eab0de2531b783c15f90",
+    "configure_argv": [
+      "./configure",
+      "--prefix=/Users/jonasgrosch/projects/safe-media/.research/reference/install",
+      "--disable-everything",
+      "--disable-autodetect",
+      "--disable-doc",
+      "--disable-debug",
+      "--enable-protocol=file,pipe",
+      "--enable-demuxer=matroska",
+      "--enable-muxer=framecrc",
+      "--enable-decoder=pcm_s16le",
+      "--enable-encoder=pcm_s16le,rawvideo",
+      "--enable-parser=h264,hevc,aac,ac3,vorbis",
+      "--enable-ffmpeg",
+      "--enable-ffprobe",
+      "--enable-pic",
+      "--enable-zlib"
+    ],
+    "fate_list_sha256": "14cbf9632bbc4903515a33594afebecdbcfd4ba30632b9e1e809f560ec95e04a",
+    "fate_enabled_count": 192,
+    "note": "Configured case identities only; upstream FATE cases have not been executed."
+  },
+  "reference_source_sha256": "a76e761302ea2260b4bcde271cacf42558042e18b4196aa8401fc0251128ff5d",
+  "lock_sha256": "de805e9b8c11b3887b8269d14a2a5419b42c481cf4b99322b7e7f6ed4724959d",
+  "ffprobe_sha256": "072b4ddb060a6173b274510da92a96a8433d200cd40b277ed8117ffb718f2cbe"
+}

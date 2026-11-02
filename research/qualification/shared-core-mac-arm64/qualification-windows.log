@@ -1,0 +1,111 @@
+Waiting for quiet compiler window; camera running.
+Camera paused with watchdog; window 0
+zlib complete=False slice_accepted=False
+Camera resumed=True
+Waiting for quiet compiler window; camera running.
+Waiting for quiet compiler window; camera running.
+Waiting for quiet compiler window; camera running.
+Camera paused with watchdog; window 1
+zlib complete=False slice_accepted=False
+k0 complete=False slice_accepted=False
+header complete=False slice_accepted=False
+seek complete=False slice_accepted=False
+colour complete=False slice_accepted=False
+Camera resumed=True
+Waiting for quiet compiler window; camera running.
+Waiting for quiet compiler window; camera running.
+Waiting for quiet compiler window; camera running.
+Camera paused with watchdog; window 2
+zlib complete=True slice_accepted=True
+k0 complete=False slice_accepted=False
+header complete=False slice_accepted=False
+seek complete=False slice_accepted=False
+colour complete=False slice_accepted=False
+Camera resumed=True
+Waiting for quiet compiler window; camera running.
+Waiting for quiet compiler window; camera running.
+Waiting for quiet compiler window; camera running.
+Waiting for quiet compiler window; camera running.
+Waiting for quiet compiler window; camera running.
+Waiting for quiet compiler window; camera running.
+Waiting for quiet compiler window; camera running.
+Camera paused with watchdog; window 3
+k0 complete=False slice_accepted=False
+header complete=False slice_accepted=False
+seek complete=False slice_accepted=False
+Camera resumed=True
+Waiting for quiet compiler window; camera running.
+Camera paused with watchdog; window 4
+k0 complete=True slice_accepted=True
+Camera resumed=True
+Waiting for quiet compiler window; camera running.
+Camera paused with watchdog; window 5
+header complete=False slice_accepted=False
+seek complete=False slice_accepted=False
+colour complete=False slice_accepted=False
+external complete=False slice_accepted=False
+Camera resumed=True
+Waiting for quiet compiler window; camera running.
+Camera paused with watchdog; window 6
+header complete=False slice_accepted=False
+seek complete=False slice_accepted=False
+colour complete=False slice_accepted=False
+external complete=False slice_accepted=False
+Camera resumed=True
+Waiting for quiet compiler window; camera running.
+Waiting for quiet compiler window; camera running.
+Waiting for quiet compiler window; camera running.
+Camera paused with watchdog; window 7
+header complete=True slice_accepted=True
+seek complete=True slice_accepted=True
+Camera resumed=True
+Waiting for quiet compiler window; camera running.
+Camera paused with watchdog; window 8
+colour complete=False slice_accepted=False
+Camera resumed=True
+Waiting for quiet compiler window; camera running.
+Waiting for quiet compiler window; camera running.
+Camera paused with watchdog; window 9
+colour complete=False slice_accepted=False
+Camera resumed=True
+Waiting for quiet compiler window; camera running.
+Camera paused with watchdog; window 10
+colour complete=False slice_accepted=False
+Camera resumed=True
+Waiting for quiet compiler window; camera running.
+Camera paused with watchdog; window 11
+colour complete=True slice_accepted=True
+Camera resumed=True
+Waiting for quiet compiler window; camera running.
+Camera paused with watchdog; window 12
+external complete=True slice_accepted=True
+catalogue complete=False slice_accepted=False
+Camera resumed=True
+Waiting for quiet compiler window; camera running.
+Camera paused with watchdog; window 13
+catalogue complete=False slice_accepted=False
+Camera resumed=True
+Waiting for quiet compiler window; camera running.
+Camera paused with watchdog; window 14
+catalogue complete=False slice_accepted=False
+Camera resumed=True
+Waiting for quiet compiler window; camera running.
+Camera paused with watchdog; window 15
+catalogue complete=False slice_accepted=False
+Camera resumed=True
+Waiting for quiet compiler window; camera running.
+Camera paused with watchdog; window 16
+catalogue complete=False slice_accepted=False
+Camera resumed=True
+Waiting for quiet compiler window; camera running.
+Waiting for quiet compiler window; camera running.
+Camera paused with watchdog; window 17
+catalogue complete=False slice_accepted=False
+Camera resumed=True
+Waiting for quiet compiler window; camera running.
+Waiting for quiet compiler window; camera running.
+Waiting for quiet compiler window; camera running.
+Camera paused with watchdog; window 18
+catalogue complete=True slice_accepted=True
+Camera resumed=True
+Collection complete; all numerical/source failures preserved.

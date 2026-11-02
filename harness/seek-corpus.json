@@ -1,0 +1,69 @@
+{
+  "schema": 1,
+  "cases": [
+    {
+      "id": "cues-end",
+      "profile": "cues-end",
+      "file": "cues-end.mkv",
+      "sha256": "437acef111322f4d02a39f1311de3897e574c968423f33fe23099a6ddee6f8ca",
+      "rights": "authored-synthetic",
+      "seek_target_ns": 7500000000
+    },
+    {
+      "id": "cues-relative",
+      "profile": "cues-relative",
+      "file": "cues-relative.mkv",
+      "sha256": "9b6c87bd7f1c5d66826528915c1f2513e81f284ec068d7fc7b9667ee72cd3f47",
+      "rights": "authored-synthetic",
+      "seek_target_ns": 7500000000
+    },
+    {
+      "id": "cues-front",
+      "profile": "cues-front",
+      "file": "cues-front.mkv",
+      "sha256": "351995e88b3d0c65f051bf02f3878ae70964b63c36a380a60e4993254faddd80",
+      "rights": "authored-synthetic",
+      "seek_target_ns": 7500000000
+    },
+    {
+      "id": "cues-preroll",
+      "profile": "cues-preroll",
+      "file": "cues-preroll.mkv",
+      "sha256": "6ebe453549ff9515ce1d995ca31307013e6c1a46a61bb492190544ae91a3ca13",
+      "rights": "authored-synthetic",
+      "seek_target_ns": 7500000000
+    },
+    {
+      "id": "cues-delay-preroll",
+      "profile": "cues-delay-preroll",
+      "file": "cues-delay-preroll.mkv",
+      "sha256": "c43816aab6dc703643453e254707860efd7ef49077678ac177d094f18997aed2",
+      "rights": "authored-synthetic",
+      "seek_target_ns": 7500000000
+    },
+    {
+      "id": "cues-sparse",
+      "profile": "cues-sparse",
+      "file": "cues-sparse.mkv",
+      "sha256": "f5ceca71358ca958218177cf28109d4e5caf8561e384f31c9295958102dd47b4",
+      "rights": "authored-synthetic",
+      "seek_target_ns": 7500000000
+    },
+    {
+      "id": "cues-unknown-cluster",
+      "profile": "cues-unknown-cluster",
+      "file": "cues-unknown-cluster.mkv",
+      "sha256": "fa2ac230577597ee9ae893785f7f5de75899424de0bf4c747212aaf3cc7cb67a",
+      "rights": "authored-synthetic",
+      "seek_target_ns": 7500000000
+    },
+    {
+      "id": "cues-missing",
+      "profile": "cues-missing",
+      "file": "cues-missing.mkv",
+      "sha256": "7f8bb1773ab0db5442851b7b435b90085aae0a34543cdc1f83e2157f4a87dccb",
+      "rights": "authored-synthetic",
+      "seek_target_ns": 7500000000
+    }
+  ]
+}

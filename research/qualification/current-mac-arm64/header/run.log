@@ -1,0 +1,6 @@
+header-empty pass
+header-lace pass
+header-private pass
+header-both pass
+NOT ACCEPTED: FATE mapping/asset/expected-output coverage pending; broader module requirements remain pending
+K1-header-removal-v1 SLICE ACCEPTED

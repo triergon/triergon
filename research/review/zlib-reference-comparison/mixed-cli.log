@@ -1,0 +1,26 @@
+ffprobe version 9.0 Copyright (c) 2007-2026 the FFmpeg developers
+  built with Apple clang version 17.0.0 (clang-1700.6.3.2)
+  configuration: --prefix=/Users/jonasgrosch/projects/safe-media/.research/reference/install --disable-everything --disable-autodetect --disable-doc --disable-debug --enable-protocol='file,pipe' --enable-demuxer=matroska --enable-muxer=framecrc --enable-decoder=pcm_s16le --enable-encoder='pcm_s16le,rawvideo' --enable-parser='h264,hevc,aac,ac3,vorbis' --enable-ffmpeg --enable-ffprobe --enable-pic --enable-zlib
+  libavutil      61.  1.100 / 61.  1.100
+  libavcodec     63.  1.100 / 63.  1.100
+  libavformat    63.  1.100 / 63.  1.100
+  libavdevice    63.  1.100 / 63.  1.100
+  libavfilter    12.  1.100 / 12.  1.100
+  libswscale     10.  1.100 / 10.  1.100
+  libswresample   7.  1.100 /  7.  1.100
+[AVFormatContext @ 0x14e7077f0] Opening '.research/zlib-fixtures/zlib-mixed.mkv' for reading
+[file @ 0x14e707ae0] Setting default whitelist 'file,crypto,data'
+[matroska,webm @ 0x14e7077f0] Format matroska,webm probed with size=2048 and score=100
+[matroska,webm @ 0x14e7077f0] Multiple combined encodings not supported
+st:0 removing common factor 1000000 from timebase
+[matroska,webm @ 0x14e7077f0] Before avformat_find_stream_info() pos: 173 bytes read:392 seeks:0 nb_streams:1
+[matroska,webm @ 0x14e7077f0] parser not found for codec pcm_s16le, packets or times may be invalid.
+    Last message repeated 1 times
+[matroska,webm @ 0x14e7077f0] All info found
+[matroska,webm @ 0x14e7077f0] Estimating duration from bitrate, this may be inaccurate
+[matroska,webm @ 0x14e7077f0] After avformat_find_stream_info() pos: 392 bytes read:392 seeks:0 frames:1
+Input #0, matroska,webm, from '.research/zlib-fixtures/zlib-mixed.mkv':
+  Duration: 00:00:00.01, start: 0.000000, bitrate: 224 kb/s
+  Stream #0:0(eng), 1, 1/1000: Audio: pcm_s16le, 8000 Hz, 1 channels, s16, 128 kb/s (default)
+Processing read interval id:0 start:N/A end:N/A
+[AVIOContext @ 0x14e707c20] Statistics: 392 bytes read, 0 seeks

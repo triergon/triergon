@@ -1,0 +1,1251 @@
+{
+  "schema": 1,
+  "review_sha256": "fa91524b33a930347398e44833cdcde6426b34da1adc755ce8184b5cf5bc7a2c",
+  "workloads_sha256": "e70deddc0240a224deebf2e55b0877037a0a09778bf05ced17fa10204baa01c8",
+  "observations": [
+    {
+      "id": "srt-basic--carriage--header",
+      "profile": "original-default-carriage",
+      "raw_jsonl": ".research/aws-linux/exports/18.194.177.174/linux-native-features-1793468441758970535/text/srt-basic--carriage--header.jsonl",
+      "sha256": "8d15a8addb17247ad441587dd5edc2d07a95673abe155dfac0ffdeaf5621f2a9",
+      "records": 28
+    },
+    {
+      "id": "srt-basic--carriage--streaminfo",
+      "profile": "original-default-carriage",
+      "raw_jsonl": ".research/aws-linux/exports/18.194.177.174/linux-native-features-1793468441758970535/text/srt-basic--carriage--streaminfo.jsonl",
+      "sha256": "359e002d13a9a288bfa65dde2cc4593ab81039bbbb2b28d06fc7a0d416cdd636",
+      "records": 28
+    },
+    {
+      "id": "srt-basic--decoder-observation",
+      "profile": "compiled-decoder-control-not-Streem-text-runtime",
+      "raw_jsonl": ".research/aws-linux/exports/18.194.177.174/linux-native-features-1793468441758970535/text/srt-basic--decoder-observation.jsonl",
+      "sha256": "72750fc77c1e98d47e7a0b9c2c2bd9bfb755432fde83e0de29ceb9fb6be50bda",
+      "records": 38
+    },
+    {
+      "id": "srt-crlf-multiline--carriage--header",
+      "profile": "original-default-carriage",
+      "raw_jsonl": ".research/aws-linux/exports/18.194.177.174/linux-native-features-1793468441758970535/text/srt-crlf-multiline--carriage--header.jsonl",
+      "sha256": "43fba0aeb81f9602b8f7a69cb417b829130f636bcd454739d44e194d94006d93",
+      "records": 28
+    },
+    {
+      "id": "srt-crlf-multiline--carriage--streaminfo",
+      "profile": "original-default-carriage",
+      "raw_jsonl": ".research/aws-linux/exports/18.194.177.174/linux-native-features-1793468441758970535/text/srt-crlf-multiline--carriage--streaminfo.jsonl",
+      "sha256": "348a2411e7623e2b4e7889e6ea113aed35a844138f89d5600d89e397ae259d71",
+      "records": 28
+    },
+    {
+      "id": "srt-crlf-multiline--decoder-observation",
+      "profile": "compiled-decoder-control-not-Streem-text-runtime",
+      "raw_jsonl": ".research/aws-linux/exports/18.194.177.174/linux-native-features-1793468441758970535/text/srt-crlf-multiline--decoder-observation.jsonl",
+      "sha256": "f76d901997db2518b8ac33ed21bbe03a348348400451f9820899450de8f20f05",
+      "records": 38
+    },
+    {
+      "id": "srt-unicode-no-normalization--carriage--header",
+      "profile": "original-default-carriage",
+      "raw_jsonl": ".research/aws-linux/exports/18.194.177.174/linux-native-features-1793468441758970535/text/srt-unicode-no-normalization--carriage--header.jsonl",
+      "sha256": "95ddca3db0ae33314704854d5293a43ad7ad548780f49457a1f502b706409d05",
+      "records": 28
+    },
+    {
+      "id": "srt-unicode-no-normalization--carriage--streaminfo",
+      "profile": "original-default-carriage",
+      "raw_jsonl": ".research/aws-linux/exports/18.194.177.174/linux-native-features-1793468441758970535/text/srt-unicode-no-normalization--carriage--streaminfo.jsonl",
+      "sha256": "f8d389a01fa1be3b332f2b2379ed1914ce6d37da5c8c40b8feb92a6064a78684",
+      "records": 28
+    },
+    {
+      "id": "srt-unicode-no-normalization--decoder-observation",
+      "profile": "compiled-decoder-control-not-Streem-text-runtime",
+      "raw_jsonl": ".research/aws-linux/exports/18.194.177.174/linux-native-features-1793468441758970535/text/srt-unicode-no-normalization--decoder-observation.jsonl",
+      "sha256": "8cb5eee4b8788fb5b01e270c05941936b524f9c49de3cbb251f824fd5bceda10",
+      "records": 38
+    },
+    {
+      "id": "srt-overlap-order--carriage--header",
+      "profile": "original-default-carriage",
+      "raw_jsonl": ".research/aws-linux/exports/18.194.177.174/linux-native-features-1793468441758970535/text/srt-overlap-order--carriage--header.jsonl",
+      "sha256": "983b95023336cc752dbe439a9b50e36bd0a22415493a3d01138375352916dc98",
+      "records": 33
+    },
+    {
+      "id": "srt-overlap-order--carriage--streaminfo",
+      "profile": "original-default-carriage",
+      "raw_jsonl": ".research/aws-linux/exports/18.194.177.174/linux-native-features-1793468441758970535/text/srt-overlap-order--carriage--streaminfo.jsonl",
+      "sha256": "57d5cda8077990bb9845375e0b1691ae1394df6db1858bd3ddcd5df966acd302",
+      "records": 33
+    },
+    {
+      "id": "srt-overlap-order--decoder-observation",
+      "profile": "compiled-decoder-control-not-Streem-text-runtime",
+      "raw_jsonl": ".research/aws-linux/exports/18.194.177.174/linux-native-features-1793468441758970535/text/srt-overlap-order--decoder-observation.jsonl",
+      "sha256": "4d5b1b4038fcce2dc19d2b4276a3d9941b0a477449ccb37ee9c980b2c7153d38",
+      "records": 46
+    },
+    {
+      "id": "srt-wide-hours-profile--carriage--header",
+      "profile": "original-default-carriage",
+      "raw_jsonl": ".research/aws-linux/exports/18.194.177.174/linux-native-features-1793468441758970535/text/srt-wide-hours-profile--carriage--header.jsonl",
+      "sha256": "cd902c98b6e0f71da372a5d45e3f03bc16044067337e0bda94d3ec057322bdab",
+      "records": 28
+    },
+    {
+      "id": "srt-wide-hours-profile--carriage--streaminfo",
+      "profile": "original-default-carriage",
+      "raw_jsonl": ".research/aws-linux/exports/18.194.177.174/linux-native-features-1793468441758970535/text/srt-wide-hours-profile--carriage--streaminfo.jsonl",
+      "sha256": "57aa9250a839428d4818d376589582d986766ea871f3983b1129a49ef733e34d",
+      "records": 28
+    },
+    {
+      "id": "srt-wide-hours-profile--decoder-observation",
+      "profile": "compiled-decoder-control-not-Streem-text-runtime",
+      "raw_jsonl": ".research/aws-linux/exports/18.194.177.174/linux-native-features-1793468441758970535/text/srt-wide-hours-profile--decoder-observation.jsonl",
+      "sha256": "5d3f5560b2c2df7f35ed4b746b868154ac344d5f64d67757081ed952cedd8162",
+      "records": 38
+    },
+    {
+      "id": "srt-utf8-bom--carriage--header",
+      "profile": "original-default-carriage",
+      "raw_jsonl": ".research/aws-linux/exports/18.194.177.174/linux-native-features-1793468441758970535/text/srt-utf8-bom--carriage--header.jsonl",
+      "sha256": "4b30c6c3c3b2b98e52275a85fb40a58c62ba063c3e532f490a1625ca7d8bd3fe",
+      "records": 28
+    },
+    {
+      "id": "srt-utf8-bom--carriage--streaminfo",
+      "profile": "original-default-carriage",
+      "raw_jsonl": ".research/aws-linux/exports/18.194.177.174/linux-native-features-1793468441758970535/text/srt-utf8-bom--carriage--streaminfo.jsonl",
+      "sha256": "62a39b32e8a1afff9d1a50ca9d3c832605d73537fb3ea767760e66b5ba71ddd2",
+      "records": 28
+    },
+    {
+      "id": "srt-utf8-bom--decoder-observation",
+      "profile": "compiled-decoder-control-not-Streem-text-runtime",
+      "raw_jsonl": ".research/aws-linux/exports/18.194.177.174/linux-native-features-1793468441758970535/text/srt-utf8-bom--decoder-observation.jsonl",
+      "sha256": "4450b472ea858fddf873f15df6020cc431ecad815609a2500481d2156eddd412",
+      "records": 38
+    },
+    {
+      "id": "srt-utf16be-bom--carriage--header",
+      "profile": "original-default-carriage",
+      "raw_jsonl": ".research/aws-linux/exports/18.194.177.174/linux-native-features-1793468441758970535/text/srt-utf16be-bom--carriage--header.jsonl",
+      "sha256": "f0cba8ab484c5d510343994818b3e467ac44220c4f969f58155091b69fadbe81",
+      "records": 28
+    },
+    {
+      "id": "srt-utf16be-bom--carriage--streaminfo",
+      "profile": "original-default-carriage",
+      "raw_jsonl": ".research/aws-linux/exports/18.194.177.174/linux-native-features-1793468441758970535/text/srt-utf16be-bom--carriage--streaminfo.jsonl",
+      "sha256": "9b52ebb99fbc271ce99b573016499c072d5687654674d60cd7bb071d899c9026",
+      "records": 28
+    },
+    {
+      "id": "srt-utf16be-bom--decoder-observation",
+      "profile": "compiled-decoder-control-not-Streem-text-runtime",
+      "raw_jsonl": ".research/aws-linux/exports/18.194.177.174/linux-native-features-1793468441758970535/text/srt-utf16be-bom--decoder-observation.jsonl",
+      "sha256": "424a17eb210d31836d3ce7fa6ef4553338fa36b41f3408188f073c66be47cf34",
+      "records": 35
+    },
+    {
+      "id": "srt-utf16le-bom--carriage--header",
+      "profile": "original-default-carriage",
+      "raw_jsonl": ".research/aws-linux/exports/18.194.177.174/linux-native-features-1793468441758970535/text/srt-utf16le-bom--carriage--header.jsonl",
+      "sha256": "ca92b73d46029437ff106e5f9eade31e68909eaea9bd27cf899c9a3cbdd5d66b",
+      "records": 28
+    },
+    {
+      "id": "srt-utf16le-bom--carriage--streaminfo",
+      "profile": "original-default-carriage",
+      "raw_jsonl": ".research/aws-linux/exports/18.194.177.174/linux-native-features-1793468441758970535/text/srt-utf16le-bom--carriage--streaminfo.jsonl",
+      "sha256": "ca0e27a790b283527f9973ca325f33eb4b77ec504bf4481fbb17614839d4c2af",
+      "records": 28
+    },
+    {
+      "id": "srt-utf16le-bom--decoder-observation",
+      "profile": "compiled-decoder-control-not-Streem-text-runtime",
+      "raw_jsonl": ".research/aws-linux/exports/18.194.177.174/linux-native-features-1793468441758970535/text/srt-utf16le-bom--decoder-observation.jsonl",
+      "sha256": "00c914cd992ae6061dde95d0d376da2f7d5985acd9039fc4155bad1faf67ca03",
+      "records": 38
+    },
+    {
+      "id": "srt-explicit-utf16be--carriage--header",
+      "profile": "original-default-carriage",
+      "raw_jsonl": ".research/aws-linux/exports/18.194.177.174/linux-native-features-1793468441758970535/text/srt-explicit-utf16be--carriage--header.jsonl",
+      "sha256": "cafa8c2e92b5181117605ced9f861eab67b51bc25bcfce35e663003cbfabd705",
+      "records": 19
+    },
+    {
+      "id": "srt-explicit-utf16be--carriage--streaminfo",
+      "profile": "original-default-carriage",
+      "raw_jsonl": ".research/aws-linux/exports/18.194.177.174/linux-native-features-1793468441758970535/text/srt-explicit-utf16be--carriage--streaminfo.jsonl",
+      "sha256": "cc889e72f02f70b579b98a25112caa0524367b653df5f89f5d28a52b4c445572",
+      "records": 19
+    },
+    {
+      "id": "srt-explicit-utf16be--decoder-observation",
+      "profile": "compiled-decoder-control-not-Streem-text-runtime",
+      "raw_jsonl": ".research/aws-linux/exports/18.194.177.174/linux-native-features-1793468441758970535/text/srt-explicit-utf16be--decoder-observation.jsonl",
+      "sha256": "3c59844663409590b8bcbcc1b1c85b41f94ffd8611fd1f3f820853072910693f",
+      "records": 19
+    },
+    {
+      "id": "srt-end-before-start--carriage--header",
+      "profile": "original-default-carriage",
+      "raw_jsonl": ".research/aws-linux/exports/18.194.177.174/linux-native-features-1793468441758970535/text/srt-end-before-start--carriage--header.jsonl",
+      "sha256": "d4592565ef059235c2aa544a9282717e548232d04a2c5d32130a53e5e8d77dc7",
+      "records": 28
+    },
+    {
+      "id": "srt-end-before-start--carriage--streaminfo",
+      "profile": "original-default-carriage",
+      "raw_jsonl": ".research/aws-linux/exports/18.194.177.174/linux-native-features-1793468441758970535/text/srt-end-before-start--carriage--streaminfo.jsonl",
+      "sha256": "6864f6f46da0e5f6628fad60843ccaa87882bfecb621efe6cb00d969078d573e",
+      "records": 28
+    },
+    {
+      "id": "srt-end-before-start--decoder-observation",
+      "profile": "compiled-decoder-control-not-Streem-text-runtime",
+      "raw_jsonl": ".research/aws-linux/exports/18.194.177.174/linux-native-features-1793468441758970535/text/srt-end-before-start--decoder-observation.jsonl",
+      "sha256": "abc1782f2fdf07b541c220ebab13f56c5c84f37b009bad24c9f9397081ea84c3",
+      "records": 38
+    },
+    {
+      "id": "srt-sequence-missing--carriage--header",
+      "profile": "original-default-carriage",
+      "raw_jsonl": ".research/aws-linux/exports/18.194.177.174/linux-native-features-1793468441758970535/text/srt-sequence-missing--carriage--header.jsonl",
+      "sha256": "d9db07f6a15ff3f333563381ebf549eb20d68e9bfc2dae448214d95227936b36",
+      "records": 19
+    },
+    {
+      "id": "srt-sequence-missing--carriage--streaminfo",
+      "profile": "original-default-carriage",
+      "raw_jsonl": ".research/aws-linux/exports/18.194.177.174/linux-native-features-1793468441758970535/text/srt-sequence-missing--carriage--streaminfo.jsonl",
+      "sha256": "c6878957e6f7af17394acffa56e4f1235f99d73c439a70f6902c22527ffdd7bd",
+      "records": 19
+    },
+    {
+      "id": "srt-sequence-missing--decoder-observation",
+      "profile": "compiled-decoder-control-not-Streem-text-runtime",
+      "raw_jsonl": ".research/aws-linux/exports/18.194.177.174/linux-native-features-1793468441758970535/text/srt-sequence-missing--decoder-observation.jsonl",
+      "sha256": "4d4c4a243dafa123ad1c294e73026a3015dd6ec3de1ceb3069dc7f6f6c87abbd",
+      "records": 19
+    },
+    {
+      "id": "srt-fraction-width--carriage--header",
+      "profile": "original-default-carriage",
+      "raw_jsonl": ".research/aws-linux/exports/18.194.177.174/linux-native-features-1793468441758970535/text/srt-fraction-width--carriage--header.jsonl",
+      "sha256": "9b977ec53ea2cd680ec39c3a769ad1eda61459a316e982eac5a4797a69bbcf4e",
+      "records": 28
+    },
+    {
+      "id": "srt-fraction-width--carriage--streaminfo",
+      "profile": "original-default-carriage",
+      "raw_jsonl": ".research/aws-linux/exports/18.194.177.174/linux-native-features-1793468441758970535/text/srt-fraction-width--carriage--streaminfo.jsonl",
+      "sha256": "ef64ecf34ca6bba5f9c88c6ec640e68a0c0f461bcf59cd1dd2090e1d1273cc99",
+      "records": 28
+    },
+    {
+      "id": "srt-fraction-width--decoder-observation",
+      "profile": "compiled-decoder-control-not-Streem-text-runtime",
+      "raw_jsonl": ".research/aws-linux/exports/18.194.177.174/linux-native-features-1793468441758970535/text/srt-fraction-width--decoder-observation.jsonl",
+      "sha256": "7a3c55e70b9b6d5ea633605f882e0b8699f37b52413dfa819f0deb34d70f09f7",
+      "records": 38
+    },
+    {
+      "id": "srt-overlong-utf8--carriage--header",
+      "profile": "original-default-carriage",
+      "raw_jsonl": ".research/aws-linux/exports/18.194.177.174/linux-native-features-1793468441758970535/text/srt-overlong-utf8--carriage--header.jsonl",
+      "sha256": "1366c8844a30f78b84be31f113526d8c463b431e526bf0aae5a199cababc0064",
+      "records": 28
+    },
+    {
+      "id": "srt-overlong-utf8--carriage--streaminfo",
+      "profile": "original-default-carriage",
+      "raw_jsonl": ".research/aws-linux/exports/18.194.177.174/linux-native-features-1793468441758970535/text/srt-overlong-utf8--carriage--streaminfo.jsonl",
+      "sha256": "290980bc41d4a6c5eefb9ba4c32a5db4f992bc1e1a179072ae5f318b6ba1d9dd",
+      "records": 28
+    },
+    {
+      "id": "srt-overlong-utf8--decoder-observation",
+      "profile": "compiled-decoder-control-not-Streem-text-runtime",
+      "raw_jsonl": ".research/aws-linux/exports/18.194.177.174/linux-native-features-1793468441758970535/text/srt-overlong-utf8--decoder-observation.jsonl",
+      "sha256": "c70fd0009e26213e498d186311d97f9688563232c9627fcc221672fc51d6dfc8",
+      "records": 35
+    },
+    {
+      "id": "srt-lone-surrogate--carriage--header",
+      "profile": "original-default-carriage",
+      "raw_jsonl": ".research/aws-linux/exports/18.194.177.174/linux-native-features-1793468441758970535/text/srt-lone-surrogate--carriage--header.jsonl",
+      "sha256": "44c42575cddd0ca0af56e1eaf5533a7aea563ac14060d783fbda5a2de03ec7d0",
+      "records": 23
+    },
+    {
+      "id": "srt-lone-surrogate--carriage--streaminfo",
+      "profile": "original-default-carriage",
+      "raw_jsonl": ".research/aws-linux/exports/18.194.177.174/linux-native-features-1793468441758970535/text/srt-lone-surrogate--carriage--streaminfo.jsonl",
+      "sha256": "075bc3620dafdcebc3b80ba89fbd7283a8f6f6f1d87ea7297d2ff688c26e5a49",
+      "records": 23
+    },
+    {
+      "id": "srt-lone-surrogate--decoder-observation",
+      "profile": "compiled-decoder-control-not-Streem-text-runtime",
+      "raw_jsonl": ".research/aws-linux/exports/18.194.177.174/linux-native-features-1793468441758970535/text/srt-lone-surrogate--decoder-observation.jsonl",
+      "sha256": "c4916c80a3572e7a9f1df5242e22007031b060ddbef9eab85f21ec044f3626ce",
+      "records": 23
+    },
+    {
+      "id": "vtt-short-timestamps--carriage--header",
+      "profile": "original-default-carriage",
+      "raw_jsonl": ".research/aws-linux/exports/18.194.177.174/linux-native-features-1793468441758970535/text/vtt-short-timestamps--carriage--header.jsonl",
+      "sha256": "9a72f86114260d022ce943072eb91b02b5e7bff2b860d725f568e0efc7fc27df",
+      "records": 28
+    },
+    {
+      "id": "vtt-short-timestamps--carriage--streaminfo",
+      "profile": "original-default-carriage",
+      "raw_jsonl": ".research/aws-linux/exports/18.194.177.174/linux-native-features-1793468441758970535/text/vtt-short-timestamps--carriage--streaminfo.jsonl",
+      "sha256": "002445698b3fcfcc0d923160ab25937765da16438ecf27bdb6f60c39ee37fc08",
+      "records": 28
+    },
+    {
+      "id": "vtt-short-timestamps--decoder-observation",
+      "profile": "compiled-decoder-control-not-Streem-text-runtime",
+      "raw_jsonl": ".research/aws-linux/exports/18.194.177.174/linux-native-features-1793468441758970535/text/vtt-short-timestamps--decoder-observation.jsonl",
+      "sha256": "355b0dbf9ae7e92a9ba48eefbdf86b2cdb002ad65e08aef96bc9da6d7a269f20",
+      "records": 38
+    },
+    {
+      "id": "vtt-id-settings--carriage--header",
+      "profile": "original-default-carriage",
+      "raw_jsonl": ".research/aws-linux/exports/18.194.177.174/linux-native-features-1793468441758970535/text/vtt-id-settings--carriage--header.jsonl",
+      "sha256": "d56b009059bf54815c0f7f430698cb9dce57c8e6aa3b8ad751c86acf3d815098",
+      "records": 28
+    },
+    {
+      "id": "vtt-id-settings--carriage--streaminfo",
+      "profile": "original-default-carriage",
+      "raw_jsonl": ".research/aws-linux/exports/18.194.177.174/linux-native-features-1793468441758970535/text/vtt-id-settings--carriage--streaminfo.jsonl",
+      "sha256": "16301baa75e2ad5443a76b10648c7732b244625d7bdfb8748e4237ccd7e20ca1",
+      "records": 28
+    },
+    {
+      "id": "vtt-id-settings--decoder-observation",
+      "profile": "compiled-decoder-control-not-Streem-text-runtime",
+      "raw_jsonl": ".research/aws-linux/exports/18.194.177.174/linux-native-features-1793468441758970535/text/vtt-id-settings--decoder-observation.jsonl",
+      "sha256": "a8f038454111dce18cb28c38e9164c7f6b0b907da8cd8eeb8510ed756ae5d8ac",
+      "records": 38
+    },
+    {
+      "id": "vtt-crlf-multiline--carriage--header",
+      "profile": "original-default-carriage",
+      "raw_jsonl": ".research/aws-linux/exports/18.194.177.174/linux-native-features-1793468441758970535/text/vtt-crlf-multiline--carriage--header.jsonl",
+      "sha256": "feea137c89aa681e6255816eb34281355473fc15470cd6e749d83f8ac65f5954",
+      "records": 28
+    },
+    {
+      "id": "vtt-crlf-multiline--carriage--streaminfo",
+      "profile": "original-default-carriage",
+      "raw_jsonl": ".research/aws-linux/exports/18.194.177.174/linux-native-features-1793468441758970535/text/vtt-crlf-multiline--carriage--streaminfo.jsonl",
+      "sha256": "82a712e8197443bfc023b1456a2c38c28f15308c2d8f8e677f49aaaf89df1d70",
+      "records": 28
+    },
+    {
+      "id": "vtt-crlf-multiline--decoder-observation",
+      "profile": "compiled-decoder-control-not-Streem-text-runtime",
+      "raw_jsonl": ".research/aws-linux/exports/18.194.177.174/linux-native-features-1793468441758970535/text/vtt-crlf-multiline--decoder-observation.jsonl",
+      "sha256": "6de7dae531c666e880eb6e741af37f088703bdc9fe0e6713341ac9a72b8dfa18",
+      "records": 38
+    },
+    {
+      "id": "vtt-cr-lines--carriage--header",
+      "profile": "original-default-carriage",
+      "raw_jsonl": ".research/aws-linux/exports/18.194.177.174/linux-native-features-1793468441758970535/text/vtt-cr-lines--carriage--header.jsonl",
+      "sha256": "86e8eb1144086d5f81e17446d112898d4a11de2d3066ae9e44e376e052635db1",
+      "records": 23
+    },
+    {
+      "id": "vtt-cr-lines--carriage--streaminfo",
+      "profile": "original-default-carriage",
+      "raw_jsonl": ".research/aws-linux/exports/18.194.177.174/linux-native-features-1793468441758970535/text/vtt-cr-lines--carriage--streaminfo.jsonl",
+      "sha256": "2b322bc707f84b39b27a0aa51fb4ab6789609ca192a291b3603726e732afa907",
+      "records": 23
+    },
+    {
+      "id": "vtt-cr-lines--decoder-observation",
+      "profile": "compiled-decoder-control-not-Streem-text-runtime",
+      "raw_jsonl": ".research/aws-linux/exports/18.194.177.174/linux-native-features-1793468441758970535/text/vtt-cr-lines--decoder-observation.jsonl",
+      "sha256": "a78791fcbfae521fb7350a184c2f37885d670641bd2b212c35a7e41a5eed200c",
+      "records": 23
+    },
+    {
+      "id": "vtt-utf8-bom--carriage--header",
+      "profile": "original-default-carriage",
+      "raw_jsonl": ".research/aws-linux/exports/18.194.177.174/linux-native-features-1793468441758970535/text/vtt-utf8-bom--carriage--header.jsonl",
+      "sha256": "ba9b971ad3cb028ad5333a403b4a3ba58152644ca94694c4797390687bea389d",
+      "records": 28
+    },
+    {
+      "id": "vtt-utf8-bom--carriage--streaminfo",
+      "profile": "original-default-carriage",
+      "raw_jsonl": ".research/aws-linux/exports/18.194.177.174/linux-native-features-1793468441758970535/text/vtt-utf8-bom--carriage--streaminfo.jsonl",
+      "sha256": "c2aebf86c7d44bdc7cac402ba55f7ce1dfdfb7e7c41906b305918b1a99ca7b08",
+      "records": 28
+    },
+    {
+      "id": "vtt-utf8-bom--decoder-observation",
+      "profile": "compiled-decoder-control-not-Streem-text-runtime",
+      "raw_jsonl": ".research/aws-linux/exports/18.194.177.174/linux-native-features-1793468441758970535/text/vtt-utf8-bom--decoder-observation.jsonl",
+      "sha256": "027aa41b45461ef5ed6f14ab2852e0bde498cb9d9b5ec76b5f42d32731964eb8",
+      "records": 38
+    },
+    {
+      "id": "vtt-payload-markup-exact--carriage--header",
+      "profile": "original-default-carriage",
+      "raw_jsonl": ".research/aws-linux/exports/18.194.177.174/linux-native-features-1793468441758970535/text/vtt-payload-markup-exact--carriage--header.jsonl",
+      "sha256": "2393ba3f2ec3eb610689b6713dd456e0ca017cbb6582319399bd5370db4d0d0d",
+      "records": 28
+    },
+    {
+      "id": "vtt-payload-markup-exact--carriage--streaminfo",
+      "profile": "original-default-carriage",
+      "raw_jsonl": ".research/aws-linux/exports/18.194.177.174/linux-native-features-1793468441758970535/text/vtt-payload-markup-exact--carriage--streaminfo.jsonl",
+      "sha256": "4487888b46ac6bc91259c7f7b0ea3b6723db0f2d21ddd67a0005f01ef59369d8",
+      "records": 28
+    },
+    {
+      "id": "vtt-payload-markup-exact--decoder-observation",
+      "profile": "compiled-decoder-control-not-Streem-text-runtime",
+      "raw_jsonl": ".research/aws-linux/exports/18.194.177.174/linux-native-features-1793468441758970535/text/vtt-payload-markup-exact--decoder-observation.jsonl",
+      "sha256": "362a22aaa4d90ae1b12c55dc5381bce91bdea3d410e1e47b7d2691fa759d290a",
+      "records": 38
+    },
+    {
+      "id": "vtt-metadata-order--carriage--header",
+      "profile": "original-default-carriage",
+      "raw_jsonl": ".research/aws-linux/exports/18.194.177.174/linux-native-features-1793468441758970535/text/vtt-metadata-order--carriage--header.jsonl",
+      "sha256": "15c12ebf92ab1d848e41352cde13d88199615b6065284cb04401aad5dc35589b",
+      "records": 28
+    },
+    {
+      "id": "vtt-metadata-order--carriage--streaminfo",
+      "profile": "original-default-carriage",
+      "raw_jsonl": ".research/aws-linux/exports/18.194.177.174/linux-native-features-1793468441758970535/text/vtt-metadata-order--carriage--streaminfo.jsonl",
+      "sha256": "655dd6e8544001c7ad1a6409733223825631a3c3d79b48366d93debcc750d61b",
+      "records": 28
+    },
+    {
+      "id": "vtt-metadata-order--decoder-observation",
+      "profile": "compiled-decoder-control-not-Streem-text-runtime",
+      "raw_jsonl": ".research/aws-linux/exports/18.194.177.174/linux-native-features-1793468441758970535/text/vtt-metadata-order--decoder-observation.jsonl",
+      "sha256": "868a2b3c014362f01d7cd41bab181b0c5192b23067c1f0448efd420d49dc731f",
+      "records": 38
+    },
+    {
+      "id": "vtt-note-between-cues--carriage--header",
+      "profile": "original-default-carriage",
+      "raw_jsonl": ".research/aws-linux/exports/18.194.177.174/linux-native-features-1793468441758970535/text/vtt-note-between-cues--carriage--header.jsonl",
+      "sha256": "0d5ee9ca373a1ea2e99c5e409723fc0e1c9824fb85974961793a718221ca6acc",
+      "records": 33
+    },
+    {
+      "id": "vtt-note-between-cues--carriage--streaminfo",
+      "profile": "original-default-carriage",
+      "raw_jsonl": ".research/aws-linux/exports/18.194.177.174/linux-native-features-1793468441758970535/text/vtt-note-between-cues--carriage--streaminfo.jsonl",
+      "sha256": "6012d1d9c0cc22bbc3b2161da1f3495163957ea2783a8c73c7bc15d76f124ef1",
+      "records": 33
+    },
+    {
+      "id": "vtt-note-between-cues--decoder-observation",
+      "profile": "compiled-decoder-control-not-Streem-text-runtime",
+      "raw_jsonl": ".research/aws-linux/exports/18.194.177.174/linux-native-features-1793468441758970535/text/vtt-note-between-cues--decoder-observation.jsonl",
+      "sha256": "9eecf24600c414e4ae65b0e75c2dfe50e8f280cafe988893d082a25ed771271c",
+      "records": 46
+    },
+    {
+      "id": "vtt-tab-separators--carriage--header",
+      "profile": "original-default-carriage",
+      "raw_jsonl": ".research/aws-linux/exports/18.194.177.174/linux-native-features-1793468441758970535/text/vtt-tab-separators--carriage--header.jsonl",
+      "sha256": "c04ceb44bfcaed75af0859dd0da763305f0c153d478eb89ae919143fab919983",
+      "records": 28
+    },
+    {
+      "id": "vtt-tab-separators--carriage--streaminfo",
+      "profile": "original-default-carriage",
+      "raw_jsonl": ".research/aws-linux/exports/18.194.177.174/linux-native-features-1793468441758970535/text/vtt-tab-separators--carriage--streaminfo.jsonl",
+      "sha256": "021b3d2f21e242c6c440c1bbede40bf1f2e8c3ffe4cc43b1583065efed394617",
+      "records": 28
+    },
+    {
+      "id": "vtt-tab-separators--decoder-observation",
+      "profile": "compiled-decoder-control-not-Streem-text-runtime",
+      "raw_jsonl": ".research/aws-linux/exports/18.194.177.174/linux-native-features-1793468441758970535/text/vtt-tab-separators--decoder-observation.jsonl",
+      "sha256": "cfffaffaa57a59053b36f6aa442b0176d04bafbcdd9ba390faf1eac7d36f5b2e",
+      "records": 38
+    },
+    {
+      "id": "vtt-wide-hours--carriage--header",
+      "profile": "original-default-carriage",
+      "raw_jsonl": ".research/aws-linux/exports/18.194.177.174/linux-native-features-1793468441758970535/text/vtt-wide-hours--carriage--header.jsonl",
+      "sha256": "7829f13ef0728425826b41a89ec067dfe3b6000d5006d8d62f0175de345364f3",
+      "records": 28
+    },
+    {
+      "id": "vtt-wide-hours--carriage--streaminfo",
+      "profile": "original-default-carriage",
+      "raw_jsonl": ".research/aws-linux/exports/18.194.177.174/linux-native-features-1793468441758970535/text/vtt-wide-hours--carriage--streaminfo.jsonl",
+      "sha256": "892ecb8c5a7831bccf5d20db558c40cb8a3255f2b0a7b8dfeba6775477dac5e8",
+      "records": 28
+    },
+    {
+      "id": "vtt-wide-hours--decoder-observation",
+      "profile": "compiled-decoder-control-not-Streem-text-runtime",
+      "raw_jsonl": ".research/aws-linux/exports/18.194.177.174/linux-native-features-1793468441758970535/text/vtt-wide-hours--decoder-observation.jsonl",
+      "sha256": "f8ece8c09b1dfcab2f5dc08f3a6f8ecfd18d14ae44d79dcfd004ca318b0b18bc",
+      "records": 38
+    },
+    {
+      "id": "vtt-overlap-order--carriage--header",
+      "profile": "original-default-carriage",
+      "raw_jsonl": ".research/aws-linux/exports/18.194.177.174/linux-native-features-1793468441758970535/text/vtt-overlap-order--carriage--header.jsonl",
+      "sha256": "b3e0f084b6a67ea8eb5192c78d61ed870fe566e78365f1c6f7e70f2088121cf9",
+      "records": 33
+    },
+    {
+      "id": "vtt-overlap-order--carriage--streaminfo",
+      "profile": "original-default-carriage",
+      "raw_jsonl": ".research/aws-linux/exports/18.194.177.174/linux-native-features-1793468441758970535/text/vtt-overlap-order--carriage--streaminfo.jsonl",
+      "sha256": "0f8960929d5dc62f9ac2e7214f8eedb0e36c3327242cb8b6c5d3810736ff63b1",
+      "records": 33
+    },
+    {
+      "id": "vtt-overlap-order--decoder-observation",
+      "profile": "compiled-decoder-control-not-Streem-text-runtime",
+      "raw_jsonl": ".research/aws-linux/exports/18.194.177.174/linux-native-features-1793468441758970535/text/vtt-overlap-order--decoder-observation.jsonl",
+      "sha256": "489660b8c605042b5023f21f23265aa66c0ee4621910fdff6675d17195442243",
+      "records": 46
+    },
+    {
+      "id": "vtt-header-annotation--carriage--header",
+      "profile": "original-default-carriage",
+      "raw_jsonl": ".research/aws-linux/exports/18.194.177.174/linux-native-features-1793468441758970535/text/vtt-header-annotation--carriage--header.jsonl",
+      "sha256": "1d2206a896f0146475dd2508c401e92b6797c4748fd347d5c02994816c3a4f5e",
+      "records": 28
+    },
+    {
+      "id": "vtt-header-annotation--carriage--streaminfo",
+      "profile": "original-default-carriage",
+      "raw_jsonl": ".research/aws-linux/exports/18.194.177.174/linux-native-features-1793468441758970535/text/vtt-header-annotation--carriage--streaminfo.jsonl",
+      "sha256": "9795a512c6c4e333daba5cd9e3a97356f073e9e4e9e097b302c726fba6782cae",
+      "records": 28
+    },
+    {
+      "id": "vtt-header-annotation--decoder-observation",
+      "profile": "compiled-decoder-control-not-Streem-text-runtime",
+      "raw_jsonl": ".research/aws-linux/exports/18.194.177.174/linux-native-features-1793468441758970535/text/vtt-header-annotation--decoder-observation.jsonl",
+      "sha256": "a28f023522d8b637d4b6ff74bfe43b07ef0f77c13206ec7abfae1b260ff9ac38",
+      "records": 38
+    },
+    {
+      "id": "vtt-empty-document--carriage--header",
+      "profile": "original-default-carriage",
+      "raw_jsonl": ".research/aws-linux/exports/18.194.177.174/linux-native-features-1793468441758970535/text/vtt-empty-document--carriage--header.jsonl",
+      "sha256": "00fc94ffb52039c8f311aa85b813d8e03a9295f1e2fd5a2796fe838ffcc1bdb8",
+      "records": 23
+    },
+    {
+      "id": "vtt-empty-document--carriage--streaminfo",
+      "profile": "original-default-carriage",
+      "raw_jsonl": ".research/aws-linux/exports/18.194.177.174/linux-native-features-1793468441758970535/text/vtt-empty-document--carriage--streaminfo.jsonl",
+      "sha256": "361739479916a883f020920bc36c7d19ddc6c38d00fda3d55297fc4c48840a99",
+      "records": 23
+    },
+    {
+      "id": "vtt-empty-document--decoder-observation",
+      "profile": "compiled-decoder-control-not-Streem-text-runtime",
+      "raw_jsonl": ".research/aws-linux/exports/18.194.177.174/linux-native-features-1793468441758970535/text/vtt-empty-document--decoder-observation.jsonl",
+      "sha256": "8106e7847605aea4ae41cb343f19bbd93d9ae9dec808980dd9603eef9805302a",
+      "records": 23
+    },
+    {
+      "id": "vtt-bad-signature--carriage--header",
+      "profile": "original-default-carriage",
+      "raw_jsonl": ".research/aws-linux/exports/18.194.177.174/linux-native-features-1793468441758970535/text/vtt-bad-signature--carriage--header.jsonl",
+      "sha256": "4181898040a40298c236a0cac70b813485756ed878f2c1f2ee0fd8e96cfeaeb8",
+      "records": 23
+    },
+    {
+      "id": "vtt-bad-signature--carriage--streaminfo",
+      "profile": "original-default-carriage",
+      "raw_jsonl": ".research/aws-linux/exports/18.194.177.174/linux-native-features-1793468441758970535/text/vtt-bad-signature--carriage--streaminfo.jsonl",
+      "sha256": "f95ef4eb7d9c4607b2d9bb3aa875487b7b6c541233508fb1721d35e1b51f1b44",
+      "records": 23
+    },
+    {
+      "id": "vtt-bad-signature--decoder-observation",
+      "profile": "compiled-decoder-control-not-Streem-text-runtime",
+      "raw_jsonl": ".research/aws-linux/exports/18.194.177.174/linux-native-features-1793468441758970535/text/vtt-bad-signature--decoder-observation.jsonl",
+      "sha256": "9dc9aacabb241bcf0f283c401e715d2316b542b33aad0d963d15dbea6e4b947c",
+      "records": 23
+    },
+    {
+      "id": "vtt-utf16-refused--carriage--header",
+      "profile": "original-default-carriage",
+      "raw_jsonl": ".research/aws-linux/exports/18.194.177.174/linux-native-features-1793468441758970535/text/vtt-utf16-refused--carriage--header.jsonl",
+      "sha256": "321c6847c0fa358a4b8d2cce4a58e72d577f0162e611040fdb6878d37b1406c0",
+      "records": 23
+    },
+    {
+      "id": "vtt-utf16-refused--carriage--streaminfo",
+      "profile": "original-default-carriage",
+      "raw_jsonl": ".research/aws-linux/exports/18.194.177.174/linux-native-features-1793468441758970535/text/vtt-utf16-refused--carriage--streaminfo.jsonl",
+      "sha256": "93dca3fc35dd245c412d1c59eb8f9a578714143d0489a85db7c453ca3d116b23",
+      "records": 23
+    },
+    {
+      "id": "vtt-utf16-refused--decoder-observation",
+      "profile": "compiled-decoder-control-not-Streem-text-runtime",
+      "raw_jsonl": ".research/aws-linux/exports/18.194.177.174/linux-native-features-1793468441758970535/text/vtt-utf16-refused--decoder-observation.jsonl",
+      "sha256": "d4dce39f1f869c479da3981e176fb1578836965d6ccee1f6b5e7112808a6267d",
+      "records": 23
+    },
+    {
+      "id": "vtt-zero-interval-strict--carriage--header",
+      "profile": "original-default-carriage",
+      "raw_jsonl": ".research/aws-linux/exports/18.194.177.174/linux-native-features-1793468441758970535/text/vtt-zero-interval-strict--carriage--header.jsonl",
+      "sha256": "ec17c3c010b059f832144a044e2b591b0b498443fb1c724d7d809e263c9846f0",
+      "records": 28
+    },
+    {
+      "id": "vtt-zero-interval-strict--carriage--streaminfo",
+      "profile": "original-default-carriage",
+      "raw_jsonl": ".research/aws-linux/exports/18.194.177.174/linux-native-features-1793468441758970535/text/vtt-zero-interval-strict--carriage--streaminfo.jsonl",
+      "sha256": "1f4c213b8a37580f8bfb5f45d4afe83c8c4cd6cab7ca495c89ba64bd08d03f0b",
+      "records": 28
+    },
+    {
+      "id": "vtt-zero-interval-strict--decoder-observation",
+      "profile": "compiled-decoder-control-not-Streem-text-runtime",
+      "raw_jsonl": ".research/aws-linux/exports/18.194.177.174/linux-native-features-1793468441758970535/text/vtt-zero-interval-strict--decoder-observation.jsonl",
+      "sha256": "1aa42c857e3ec4307e25f8cbc77bce92b3cb12258013e1f2a1f460ccb7d0704e",
+      "records": 38
+    },
+    {
+      "id": "vtt-surrogate-utf8--carriage--header",
+      "profile": "original-default-carriage",
+      "raw_jsonl": ".research/aws-linux/exports/18.194.177.174/linux-native-features-1793468441758970535/text/vtt-surrogate-utf8--carriage--header.jsonl",
+      "sha256": "f341e45c2ce6878018a63114f9e8328c3c8f292038c1dc7934465e9065b1fb1a",
+      "records": 28
+    },
+    {
+      "id": "vtt-surrogate-utf8--carriage--streaminfo",
+      "profile": "original-default-carriage",
+      "raw_jsonl": ".research/aws-linux/exports/18.194.177.174/linux-native-features-1793468441758970535/text/vtt-surrogate-utf8--carriage--streaminfo.jsonl",
+      "sha256": "f15b2d096e31029c8acee938bd799a0f8c6dafea284f6e335c38bfad379dd581",
+      "records": 28
+    },
+    {
+      "id": "vtt-surrogate-utf8--decoder-observation",
+      "profile": "compiled-decoder-control-not-Streem-text-runtime",
+      "raw_jsonl": ".research/aws-linux/exports/18.194.177.174/linux-native-features-1793468441758970535/text/vtt-surrogate-utf8--decoder-observation.jsonl",
+      "sha256": "a715c93186a6f6b0d48fd8f7ed19be245feb3328f30c08f65e44b9fc90f12ba1",
+      "records": 35
+    },
+    {
+      "id": "vtt-missing-fraction--carriage--header",
+      "profile": "original-default-carriage",
+      "raw_jsonl": ".research/aws-linux/exports/18.194.177.174/linux-native-features-1793468441758970535/text/vtt-missing-fraction--carriage--header.jsonl",
+      "sha256": "3eb6bb6faceb910a8752306a86ad257ac153c07002fb51520689a806abae31a8",
+      "records": 23
+    },
+    {
+      "id": "vtt-missing-fraction--carriage--streaminfo",
+      "profile": "original-default-carriage",
+      "raw_jsonl": ".research/aws-linux/exports/18.194.177.174/linux-native-features-1793468441758970535/text/vtt-missing-fraction--carriage--streaminfo.jsonl",
+      "sha256": "dfe0053dc8fb8e94ba183a756f294945b587a00398896cc08a2b5945c0654d08",
+      "records": 23
+    },
+    {
+      "id": "vtt-missing-fraction--decoder-observation",
+      "profile": "compiled-decoder-control-not-Streem-text-runtime",
+      "raw_jsonl": ".research/aws-linux/exports/18.194.177.174/linux-native-features-1793468441758970535/text/vtt-missing-fraction--decoder-observation.jsonl",
+      "sha256": "476f2785d896e2329e75e1ffde935145ddd2bd922bfb8f6ec734a1570a5682a8",
+      "records": 23
+    },
+    {
+      "id": "tx3g-basic--none",
+      "profile": "original-default-carriage",
+      "raw_jsonl": ".research/aws-linux/exports/18.194.177.174/linux-native-features-1793468441758970535/text/tx3g-basic--none.jsonl",
+      "sha256": "077fa423ef97ee03574a6390c276047c88b0d94b9b3070a30b8834bea14814f6",
+      "records": 24
+    },
+    {
+      "id": "tx3g-basic--observe",
+      "profile": "compiled-decoder-control-not-Streem-text-runtime",
+      "raw_jsonl": ".research/aws-linux/exports/18.194.177.174/linux-native-features-1793468441758970535/text/tx3g-basic--observe.jsonl",
+      "sha256": "28e2a47181b6241683030fb11712e6239402e804d7e9dd795cdf7f7f0281ed22",
+      "records": 25
+    },
+    {
+      "id": "tx3g-byte-not-character-count--none",
+      "profile": "original-default-carriage",
+      "raw_jsonl": ".research/aws-linux/exports/18.194.177.174/linux-native-features-1793468441758970535/text/tx3g-byte-not-character-count--none.jsonl",
+      "sha256": "8f97b5e5d7ccca68d7358f5b9d4ca7f33ccf2786c803490ab4aefab18028b91b",
+      "records": 24
+    },
+    {
+      "id": "tx3g-byte-not-character-count--observe",
+      "profile": "compiled-decoder-control-not-Streem-text-runtime",
+      "raw_jsonl": ".research/aws-linux/exports/18.194.177.174/linux-native-features-1793468441758970535/text/tx3g-byte-not-character-count--observe.jsonl",
+      "sha256": "0e5e012eb1f6be5b5fe5536e0dde7b57da436afc5a205f22af6ab9501f2e72ae",
+      "records": 25
+    },
+    {
+      "id": "tx3g-utf16be-bom--none",
+      "profile": "original-default-carriage",
+      "raw_jsonl": ".research/aws-linux/exports/18.194.177.174/linux-native-features-1793468441758970535/text/tx3g-utf16be-bom--none.jsonl",
+      "sha256": "041602b114aa02e198f36809fb4d75dccff2952c2fc5b603f7c0ecd49e6ec31b",
+      "records": 24
+    },
+    {
+      "id": "tx3g-utf16be-bom--observe",
+      "profile": "compiled-decoder-control-not-Streem-text-runtime",
+      "raw_jsonl": ".research/aws-linux/exports/18.194.177.174/linux-native-features-1793468441758970535/text/tx3g-utf16be-bom--observe.jsonl",
+      "sha256": "55f48167bc42f0b5244b2cce02c237a4400ec1e377b981c7fbab6b9651d1d2f0",
+      "records": 25
+    },
+    {
+      "id": "tx3g-empty-sample--none",
+      "profile": "original-default-carriage",
+      "raw_jsonl": ".research/aws-linux/exports/18.194.177.174/linux-native-features-1793468441758970535/text/tx3g-empty-sample--none.jsonl",
+      "sha256": "58a3810082bd5564798f69d62d87eb5f37217860218bcd11acfc53fb0ab2b296",
+      "records": 24
+    },
+    {
+      "id": "tx3g-empty-sample--observe",
+      "profile": "compiled-decoder-control-not-Streem-text-runtime",
+      "raw_jsonl": ".research/aws-linux/exports/18.194.177.174/linux-native-features-1793468441758970535/text/tx3g-empty-sample--observe.jsonl",
+      "sha256": "6e8d51a25a30afb05eaed729203a52b4192169fbc33b9382f660c6129a306ad4",
+      "records": 25
+    },
+    {
+      "id": "tx3g-embedded-nul--none",
+      "profile": "original-default-carriage",
+      "raw_jsonl": ".research/aws-linux/exports/18.194.177.174/linux-native-features-1793468441758970535/text/tx3g-embedded-nul--none.jsonl",
+      "sha256": "4e1c42c9e6c1f29ed334d16493ea1cc9fc4b6116c8fcde89e69451e2c4905c31",
+      "records": 24
+    },
+    {
+      "id": "tx3g-embedded-nul--observe",
+      "profile": "compiled-decoder-control-not-Streem-text-runtime",
+      "raw_jsonl": ".research/aws-linux/exports/18.194.177.174/linux-native-features-1793468441758970535/text/tx3g-embedded-nul--observe.jsonl",
+      "sha256": "ad0f6dd8562211a3dae986b99f44ac627bfb96e76d2a9e41bc3360516b5243ac",
+      "records": 25
+    },
+    {
+      "id": "tx3g-line-codepoints-exact--none",
+      "profile": "original-default-carriage",
+      "raw_jsonl": ".research/aws-linux/exports/18.194.177.174/linux-native-features-1793468441758970535/text/tx3g-line-codepoints-exact--none.jsonl",
+      "sha256": "21f687f9d0217730485382f745793ec7fedb4ad4a73b60a0551322975c3fd8d3",
+      "records": 24
+    },
+    {
+      "id": "tx3g-line-codepoints-exact--observe",
+      "profile": "compiled-decoder-control-not-Streem-text-runtime",
+      "raw_jsonl": ".research/aws-linux/exports/18.194.177.174/linux-native-features-1793468441758970535/text/tx3g-line-codepoints-exact--observe.jsonl",
+      "sha256": "147f16e2ba31a99fb4d9f465753fbf33d301054a74375b6cca87289f2c709616",
+      "records": 25
+    },
+    {
+      "id": "tx3g-style-highlight-raw--none",
+      "profile": "original-default-carriage",
+      "raw_jsonl": ".research/aws-linux/exports/18.194.177.174/linux-native-features-1793468441758970535/text/tx3g-style-highlight-raw--none.jsonl",
+      "sha256": "2bfcb9304ed06e224f1009a3b26548d841c7b1c36fc8dcdc18607b7d15b519d2",
+      "records": 24
+    },
+    {
+      "id": "tx3g-style-highlight-raw--observe",
+      "profile": "compiled-decoder-control-not-Streem-text-runtime",
+      "raw_jsonl": ".research/aws-linux/exports/18.194.177.174/linux-native-features-1793468441758970535/text/tx3g-style-highlight-raw--observe.jsonl",
+      "sha256": "7964cb1f9dd621a35642ddc974865457552a4703ed5fa303a900382efb134b58",
+      "records": 25
+    },
+    {
+      "id": "tx3g-unknown-modifier--none",
+      "profile": "original-default-carriage",
+      "raw_jsonl": ".research/aws-linux/exports/18.194.177.174/linux-native-features-1793468441758970535/text/tx3g-unknown-modifier--none.jsonl",
+      "sha256": "92212b989105c7d07faf53d32798a8db8f937d7f8319d8ac6bc30cf0c0111dab",
+      "records": 24
+    },
+    {
+      "id": "tx3g-unknown-modifier--observe",
+      "profile": "compiled-decoder-control-not-Streem-text-runtime",
+      "raw_jsonl": ".research/aws-linux/exports/18.194.177.174/linux-native-features-1793468441758970535/text/tx3g-unknown-modifier--observe.jsonl",
+      "sha256": "6b5891de02d7034e6dc2a78a6dc2de5646fe892e21526e9b197303168b6dfad6",
+      "records": 25
+    },
+    {
+      "id": "tx3g-modifier-order--none",
+      "profile": "original-default-carriage",
+      "raw_jsonl": ".research/aws-linux/exports/18.194.177.174/linux-native-features-1793468441758970535/text/tx3g-modifier-order--none.jsonl",
+      "sha256": "a4ff340d956b98908be665383badef41bc525def9693f42ef62ed0393e31af09",
+      "records": 24
+    },
+    {
+      "id": "tx3g-modifier-order--observe",
+      "profile": "compiled-decoder-control-not-Streem-text-runtime",
+      "raw_jsonl": ".research/aws-linux/exports/18.194.177.174/linux-native-features-1793468441758970535/text/tx3g-modifier-order--observe.jsonl",
+      "sha256": "053740b70ae1a0392cc0565166963257de5af7022d82b5dd98a7caa18b6dc5b3",
+      "records": 25
+    },
+    {
+      "id": "tx3g-empty-with-modifier--none",
+      "profile": "original-default-carriage",
+      "raw_jsonl": ".research/aws-linux/exports/18.194.177.174/linux-native-features-1793468441758970535/text/tx3g-empty-with-modifier--none.jsonl",
+      "sha256": "b8f7ea26e52d5718a0db8b4f9337c14c76b1f3ebf168dbaba23d62669ee105dc",
+      "records": 24
+    },
+    {
+      "id": "tx3g-empty-with-modifier--observe",
+      "profile": "compiled-decoder-control-not-Streem-text-runtime",
+      "raw_jsonl": ".research/aws-linux/exports/18.194.177.174/linux-native-features-1793468441758970535/text/tx3g-empty-with-modifier--observe.jsonl",
+      "sha256": "5942afd4a86334f688227af1b75fb3b914cc9d5021a483df8faca089f5b10b30",
+      "records": 25
+    },
+    {
+      "id": "tx3g-u16-byte-count-boundary--none",
+      "profile": "original-default-carriage",
+      "raw_jsonl": ".research/aws-linux/exports/18.194.177.174/linux-native-features-1793468441758970535/text/tx3g-u16-byte-count-boundary--none.jsonl",
+      "sha256": "2745d6f2a6acb2898bc11d8050432e1543011eeccf756563567d88ea96255e68",
+      "records": 24
+    },
+    {
+      "id": "tx3g-u16-byte-count-boundary--observe",
+      "profile": "compiled-decoder-control-not-Streem-text-runtime",
+      "raw_jsonl": ".research/aws-linux/exports/18.194.177.174/linux-native-features-1793468441758970535/text/tx3g-u16-byte-count-boundary--observe.jsonl",
+      "sha256": "9281256c9969068dd7633f4e444a2249c4904f89cbc20626a782816ffb84a074",
+      "records": 25
+    },
+    {
+      "id": "tx3g-missing-length--none",
+      "profile": "original-default-carriage",
+      "raw_jsonl": ".research/aws-linux/exports/18.194.177.174/linux-native-features-1793468441758970535/text/tx3g-missing-length--none.jsonl",
+      "sha256": "677435250065db57cd040a33babe84469feeaf14e35b60039172f1ffe2565d81",
+      "records": 24
+    },
+    {
+      "id": "tx3g-missing-length--observe",
+      "profile": "compiled-decoder-control-not-Streem-text-runtime",
+      "raw_jsonl": ".research/aws-linux/exports/18.194.177.174/linux-native-features-1793468441758970535/text/tx3g-missing-length--observe.jsonl",
+      "sha256": "2215e0bccb0bbfc73015a93b6a21bf1269f158ea7c33a2ec2859a1f71719c513",
+      "records": 25
+    },
+    {
+      "id": "tx3g-text-overrun--none",
+      "profile": "original-default-carriage",
+      "raw_jsonl": ".research/aws-linux/exports/18.194.177.174/linux-native-features-1793468441758970535/text/tx3g-text-overrun--none.jsonl",
+      "sha256": "e18a267e6e98c26ec1c190d49e66b948fe46cb991e1bae395757053603d85afb",
+      "records": 24
+    },
+    {
+      "id": "tx3g-text-overrun--observe",
+      "profile": "compiled-decoder-control-not-Streem-text-runtime",
+      "raw_jsonl": ".research/aws-linux/exports/18.194.177.174/linux-native-features-1793468441758970535/text/tx3g-text-overrun--observe.jsonl",
+      "sha256": "d68e1382b2440adb43ac936753d315540f7f0269a106bd11d93858b40f5e9144",
+      "records": 25
+    },
+    {
+      "id": "tx3g-utf16-odd--none",
+      "profile": "original-default-carriage",
+      "raw_jsonl": ".research/aws-linux/exports/18.194.177.174/linux-native-features-1793468441758970535/text/tx3g-utf16-odd--none.jsonl",
+      "sha256": "789f3986b22f1a0a20085a2fe64304f70185305d98404371f310760ec0734e6a",
+      "records": 24
+    },
+    {
+      "id": "tx3g-utf16-odd--observe",
+      "profile": "compiled-decoder-control-not-Streem-text-runtime",
+      "raw_jsonl": ".research/aws-linux/exports/18.194.177.174/linux-native-features-1793468441758970535/text/tx3g-utf16-odd--observe.jsonl",
+      "sha256": "fd36ae190567b630a74411722a98e3506a37cd3d7da680c4982722939d36cca5",
+      "records": 25
+    },
+    {
+      "id": "tx3g-lone-surrogate--none",
+      "profile": "original-default-carriage",
+      "raw_jsonl": ".research/aws-linux/exports/18.194.177.174/linux-native-features-1793468441758970535/text/tx3g-lone-surrogate--none.jsonl",
+      "sha256": "6a3ca896c15d784518b61fce479546b8c77cbba5e2137a0680f571bc87116e79",
+      "records": 24
+    },
+    {
+      "id": "tx3g-lone-surrogate--observe",
+      "profile": "compiled-decoder-control-not-Streem-text-runtime",
+      "raw_jsonl": ".research/aws-linux/exports/18.194.177.174/linux-native-features-1793468441758970535/text/tx3g-lone-surrogate--observe.jsonl",
+      "sha256": "3b03d5b1959d24644f153f784a7bfca70b8a32f7b45121e862b2159b1e3ffbe7",
+      "records": 25
+    },
+    {
+      "id": "tx3g-short-box--none",
+      "profile": "original-default-carriage",
+      "raw_jsonl": ".research/aws-linux/exports/18.194.177.174/linux-native-features-1793468441758970535/text/tx3g-short-box--none.jsonl",
+      "sha256": "2da2d5dd7e1eb8a83e56a02da9164ad9a542d2a617477e2fc0a3ea43eaaabc52",
+      "records": 24
+    },
+    {
+      "id": "tx3g-short-box--observe",
+      "profile": "compiled-decoder-control-not-Streem-text-runtime",
+      "raw_jsonl": ".research/aws-linux/exports/18.194.177.174/linux-native-features-1793468441758970535/text/tx3g-short-box--observe.jsonl",
+      "sha256": "72e4454857b33cea03e6052f51e959e97c5fd6728f8e4d4361062241ea9177bf",
+      "records": 25
+    },
+    {
+      "id": "tx3g-box-overrun--none",
+      "profile": "original-default-carriage",
+      "raw_jsonl": ".research/aws-linux/exports/18.194.177.174/linux-native-features-1793468441758970535/text/tx3g-box-overrun--none.jsonl",
+      "sha256": "53da801dff9a732804ad3a1750f092675c5c5c9563eee428c8928491b3bc3c16",
+      "records": 24
+    },
+    {
+      "id": "tx3g-box-overrun--observe",
+      "profile": "compiled-decoder-control-not-Streem-text-runtime",
+      "raw_jsonl": ".research/aws-linux/exports/18.194.177.174/linux-native-features-1793468441758970535/text/tx3g-box-overrun--observe.jsonl",
+      "sha256": "7692f7cfdc1c41eb48f96d7c8bb35beed2bbc21b070a6a70970d98ee0a22b7ac",
+      "records": 25
+    },
+    {
+      "id": "tx3g-extended-box-gap--none",
+      "profile": "original-default-carriage",
+      "raw_jsonl": ".research/aws-linux/exports/18.194.177.174/linux-native-features-1793468441758970535/text/tx3g-extended-box-gap--none.jsonl",
+      "sha256": "84a967834b929a6bfd3d8a2df894c18d69ba252d21279d5f82f61f24ab1eeca8",
+      "records": 24
+    },
+    {
+      "id": "tx3g-extended-box-gap--observe",
+      "profile": "compiled-decoder-control-not-Streem-text-runtime",
+      "raw_jsonl": ".research/aws-linux/exports/18.194.177.174/linux-native-features-1793468441758970535/text/tx3g-extended-box-gap--observe.jsonl",
+      "sha256": "755a5aa3f4ff44becbed1bd291644a6ca239a133627861be6c68530dca7b1902",
+      "records": 25
+    },
+    {
+      "id": "utf8-packet-markup--none",
+      "profile": "original-default-carriage",
+      "raw_jsonl": ".research/aws-linux/exports/18.194.177.174/linux-native-features-1793468441758970535/text/utf8-packet-markup--none.jsonl",
+      "sha256": "e6583b8cf4505b5d9fa32ba9590d7290a9c298228e1ea9b956ffc400b071b9fa",
+      "records": 24
+    },
+    {
+      "id": "utf8-packet-markup--observe",
+      "profile": "compiled-decoder-control-not-Streem-text-runtime",
+      "raw_jsonl": ".research/aws-linux/exports/18.194.177.174/linux-native-features-1793468441758970535/text/utf8-packet-markup--observe.jsonl",
+      "sha256": "15079c73e8124360fb8d4e3e0856543cca699524f1518cade5e73476c2316837",
+      "records": 34
+    },
+    {
+      "id": "utf8-packet-unknown-time--none",
+      "profile": "original-default-carriage",
+      "raw_jsonl": ".research/aws-linux/exports/18.194.177.174/linux-native-features-1793468441758970535/text/utf8-packet-unknown-time--none.jsonl",
+      "sha256": "d08d650bd91c6879f75a427b26c1406fbadebb0a787f62325ea622dd8ee9f32b",
+      "records": 24
+    },
+    {
+      "id": "utf8-packet-unknown-time--observe",
+      "profile": "compiled-decoder-control-not-Streem-text-runtime",
+      "raw_jsonl": ".research/aws-linux/exports/18.194.177.174/linux-native-features-1793468441758970535/text/utf8-packet-unknown-time--observe.jsonl",
+      "sha256": "2f1cfc8a549e573bf86229b3865670aabb8635596e9fc94d958320557e791626",
+      "records": 34
+    },
+    {
+      "id": "utf8-packet-known-zero-duration--none",
+      "profile": "original-default-carriage",
+      "raw_jsonl": ".research/aws-linux/exports/18.194.177.174/linux-native-features-1793468441758970535/text/utf8-packet-known-zero-duration--none.jsonl",
+      "sha256": "1323cfa105e69e23827315d95bf8f701321d3e43f8a20293a2d844c721ee3f74",
+      "records": 24
+    },
+    {
+      "id": "utf8-packet-known-zero-duration--observe",
+      "profile": "compiled-decoder-control-not-Streem-text-runtime",
+      "raw_jsonl": ".research/aws-linux/exports/18.194.177.174/linux-native-features-1793468441758970535/text/utf8-packet-known-zero-duration--observe.jsonl",
+      "sha256": "667320fc3052c65f7b5f4d5283af8ca82e8c80c084e363c44383f8828968ba76",
+      "records": 34
+    },
+    {
+      "id": "utf8-packet-negative-start--none",
+      "profile": "original-default-carriage",
+      "raw_jsonl": ".research/aws-linux/exports/18.194.177.174/linux-native-features-1793468441758970535/text/utf8-packet-negative-start--none.jsonl",
+      "sha256": "b37f73e0f979a27e3ec83b99b1f7e80202d7d60592c9819d93d473813b026ee7",
+      "records": 24
+    },
+    {
+      "id": "utf8-packet-negative-start--observe",
+      "profile": "compiled-decoder-control-not-Streem-text-runtime",
+      "raw_jsonl": ".research/aws-linux/exports/18.194.177.174/linux-native-features-1793468441758970535/text/utf8-packet-negative-start--observe.jsonl",
+      "sha256": "ee5a5e41c4a92b89049f92f9ca67fd1edd6a9ec6071fd2acf209cf12ba1f79ac",
+      "records": 34
+    },
+    {
+      "id": "utf8-packet-raw-clock--none",
+      "profile": "original-default-carriage",
+      "raw_jsonl": ".research/aws-linux/exports/18.194.177.174/linux-native-features-1793468441758970535/text/utf8-packet-raw-clock--none.jsonl",
+      "sha256": "858ddccbb5be65add472f8be11671b05201138d9a4748a05070c6534e2781679",
+      "records": 24
+    },
+    {
+      "id": "utf8-packet-raw-clock--observe",
+      "profile": "compiled-decoder-control-not-Streem-text-runtime",
+      "raw_jsonl": ".research/aws-linux/exports/18.194.177.174/linux-native-features-1793468441758970535/text/utf8-packet-raw-clock--observe.jsonl",
+      "sha256": "5b87f27671cd25fb0d80588d05ce2498726b7e7a9c5d2613cd70aea5f0615fa3",
+      "records": 34
+    },
+    {
+      "id": "utf8-packet-bom-nul-content--none",
+      "profile": "original-default-carriage",
+      "raw_jsonl": ".research/aws-linux/exports/18.194.177.174/linux-native-features-1793468441758970535/text/utf8-packet-bom-nul-content--none.jsonl",
+      "sha256": "d3c67e5fac26c88832b25b9a789380e9efb84d316a1148597b658fa3507156db",
+      "records": 24
+    },
+    {
+      "id": "utf8-packet-bom-nul-content--observe",
+      "profile": "compiled-decoder-control-not-Streem-text-runtime",
+      "raw_jsonl": ".research/aws-linux/exports/18.194.177.174/linux-native-features-1793468441758970535/text/utf8-packet-bom-nul-content--observe.jsonl",
+      "sha256": "326f60acb9bf240ba5a6f857383a5515ff25bda55b010ac49305ac8dacff8987",
+      "records": 34
+    },
+    {
+      "id": "utf8-packet-too-large-scalar--none",
+      "profile": "original-default-carriage",
+      "raw_jsonl": ".research/aws-linux/exports/18.194.177.174/linux-native-features-1793468441758970535/text/utf8-packet-too-large-scalar--none.jsonl",
+      "sha256": "c5610f0f156279448a3ea0a0e3b25ffbc18e71fbb1292a07f79298505ba8c5b4",
+      "records": 24
+    },
+    {
+      "id": "utf8-packet-too-large-scalar--observe",
+      "profile": "compiled-decoder-control-not-Streem-text-runtime",
+      "raw_jsonl": ".research/aws-linux/exports/18.194.177.174/linux-native-features-1793468441758970535/text/utf8-packet-too-large-scalar--observe.jsonl",
+      "sha256": "b53e483f0dbf137160228b3a1e25d7907ecf45705fb4a13dcd51af9505676283",
+      "records": 32
+    },
+    {
+      "id": "utf8-packet-input-limit--none",
+      "profile": "original-default-carriage",
+      "raw_jsonl": ".research/aws-linux/exports/18.194.177.174/linux-native-features-1793468441758970535/text/utf8-packet-input-limit--none.jsonl",
+      "sha256": "8d4774b83a7ecf9159fd68b9ef46ddda75ae7c12172b06bcbc957cc47b8075f7",
+      "records": 24
+    },
+    {
+      "id": "utf8-packet-input-limit--observe",
+      "profile": "compiled-decoder-control-not-Streem-text-runtime",
+      "raw_jsonl": ".research/aws-linux/exports/18.194.177.174/linux-native-features-1793468441758970535/text/utf8-packet-input-limit--observe.jsonl",
+      "sha256": "c975e9deb66ea7f238a6e65869d46356f1c5237d79b62837ea1d2fc383eff154",
+      "records": 34
+    },
+    {
+      "id": "mkv-vtt-no-addition--none",
+      "profile": "original-default-carriage",
+      "raw_jsonl": ".research/aws-linux/exports/18.194.177.174/linux-native-features-1793468441758970535/text/mkv-vtt-no-addition--none.jsonl",
+      "sha256": "8663219a84c3246d7481a411a17bce9d3e09689708944cda6e6780390c02f633",
+      "records": 24
+    },
+    {
+      "id": "mkv-vtt-no-addition--observe",
+      "profile": "compiled-decoder-control-not-Streem-text-runtime",
+      "raw_jsonl": ".research/aws-linux/exports/18.194.177.174/linux-native-features-1793468441758970535/text/mkv-vtt-no-addition--observe.jsonl",
+      "sha256": "4195efd4bf9c6bb3e0ceab3c800cb3cb24b641a54f17f03ec95b56944baf4f7c",
+      "records": 34
+    },
+    {
+      "id": "mkv-vtt-settings-id-comments--none",
+      "profile": "original-default-carriage",
+      "raw_jsonl": ".research/aws-linux/exports/18.194.177.174/linux-native-features-1793468441758970535/text/mkv-vtt-settings-id-comments--none.jsonl",
+      "sha256": "01dc0946ac41821654aa1813eafe51ac3c3f8266a9697d8bbbee7bc69da72e50",
+      "records": 24
+    },
+    {
+      "id": "mkv-vtt-settings-id-comments--observe",
+      "profile": "compiled-decoder-control-not-Streem-text-runtime",
+      "raw_jsonl": ".research/aws-linux/exports/18.194.177.174/linux-native-features-1793468441758970535/text/mkv-vtt-settings-id-comments--observe.jsonl",
+      "sha256": "ef41a009db02538528a4a71ac2a760ba82fc7d5254b90d25a6ff779ea540235a",
+      "records": 34
+    },
+    {
+      "id": "mkv-vtt-present-empty-fields--none",
+      "profile": "original-default-carriage",
+      "raw_jsonl": ".research/aws-linux/exports/18.194.177.174/linux-native-features-1793468441758970535/text/mkv-vtt-present-empty-fields--none.jsonl",
+      "sha256": "4f2aeabbcf6178e53425aa37165a92bebfa488468b999a6606401a18581b88b0",
+      "records": 24
+    },
+    {
+      "id": "mkv-vtt-present-empty-fields--observe",
+      "profile": "compiled-decoder-control-not-Streem-text-runtime",
+      "raw_jsonl": ".research/aws-linux/exports/18.194.177.174/linux-native-features-1793468441758970535/text/mkv-vtt-present-empty-fields--observe.jsonl",
+      "sha256": "708ecba40d0b217fec3fb7163f68870315e2f862845d31ebf78e1b61157e007c",
+      "records": 34
+    },
+    {
+      "id": "mkv-vtt-relative-inline-time--none",
+      "profile": "original-default-carriage",
+      "raw_jsonl": ".research/aws-linux/exports/18.194.177.174/linux-native-features-1793468441758970535/text/mkv-vtt-relative-inline-time--none.jsonl",
+      "sha256": "68588561e4599bf9472aa08f59c69d093a1153b166b5019c7361ce92842a7cb2",
+      "records": 24
+    },
+    {
+      "id": "mkv-vtt-relative-inline-time--observe",
+      "profile": "compiled-decoder-control-not-Streem-text-runtime",
+      "raw_jsonl": ".research/aws-linux/exports/18.194.177.174/linux-native-features-1793468441758970535/text/mkv-vtt-relative-inline-time--observe.jsonl",
+      "sha256": "8acdd00fc256fd36cec1196189a71aeb7e827e295006042826041781bec49280",
+      "records": 34
+    },
+    {
+      "id": "mkv-vtt-unknown-addition-opaque--none",
+      "profile": "original-default-carriage",
+      "raw_jsonl": ".research/aws-linux/exports/18.194.177.174/linux-native-features-1793468441758970535/text/mkv-vtt-unknown-addition-opaque--none.jsonl",
+      "sha256": "9809906ed4255a8e58d493db75f2d316d5f61fadcdc18780e806960cd3a96187",
+      "records": 24
+    },
+    {
+      "id": "mkv-vtt-unknown-addition-opaque--observe",
+      "profile": "compiled-decoder-control-not-Streem-text-runtime",
+      "raw_jsonl": ".research/aws-linux/exports/18.194.177.174/linux-native-features-1793468441758970535/text/mkv-vtt-unknown-addition-opaque--observe.jsonl",
+      "sha256": "4fcfc14020a1fa19602477ed8481d77d86b344cfc7b2213fb579c147538e3fa5",
+      "records": 34
+    },
+    {
+      "id": "mkv-vtt-truncated-addition--none",
+      "profile": "original-default-carriage",
+      "raw_jsonl": ".research/aws-linux/exports/18.194.177.174/linux-native-features-1793468441758970535/text/mkv-vtt-truncated-addition--none.jsonl",
+      "sha256": "7dd039bd17ce7dc2d481dd968e967ad3540566e5f8650059fa9fa1bb9c894458",
+      "records": 24
+    },
+    {
+      "id": "mkv-vtt-truncated-addition--observe",
+      "profile": "compiled-decoder-control-not-Streem-text-runtime",
+      "raw_jsonl": ".research/aws-linux/exports/18.194.177.174/linux-native-features-1793468441758970535/text/mkv-vtt-truncated-addition--observe.jsonl",
+      "sha256": "9bc5c3b989573fe64b9e082f5a25ca522ed5d67ce9dedcbe12a890369228bccf",
+      "records": 34
+    },
+    {
+      "id": "ass-raw-order-overrides--none",
+      "profile": "original-default-carriage",
+      "raw_jsonl": ".research/aws-linux/exports/18.194.177.174/linux-native-features-1793468441758970535/text/ass-raw-order-overrides--none.jsonl",
+      "sha256": "9122fc5c7c69379436e0a802380d92f01d95c0dc2c1f487d72d466c831b9b0c5",
+      "records": 24
+    },
+    {
+      "id": "ass-raw-order-overrides--observe",
+      "profile": "compiled-decoder-control-not-Streem-text-runtime",
+      "raw_jsonl": ".research/aws-linux/exports/18.194.177.174/linux-native-features-1793468441758970535/text/ass-raw-order-overrides--observe.jsonl",
+      "sha256": "86c61a4505a83e4f02a0b747ae4160a665880668905cce8afbfccde16b251aa0",
+      "records": 34
+    },
+    {
+      "id": "ass-ssa-empty-layer--none",
+      "profile": "original-default-carriage",
+      "raw_jsonl": ".research/aws-linux/exports/18.194.177.174/linux-native-features-1793468441758970535/text/ass-ssa-empty-layer--none.jsonl",
+      "sha256": "796cbf1a95748b80448b1d31a0485074993df165fdfa3ef073f88ac192f189a2",
+      "records": 24
+    },
+    {
+      "id": "ass-ssa-empty-layer--observe",
+      "profile": "compiled-decoder-control-not-Streem-text-runtime",
+      "raw_jsonl": ".research/aws-linux/exports/18.194.177.174/linux-native-features-1793468441758970535/text/ass-ssa-empty-layer--observe.jsonl",
+      "sha256": "9b5b5a795b3b21c6a8d198c0bdd3455913080af515996bbe6c0474ba43bcc31f",
+      "records": 34
+    },
+    {
+      "id": "ass-private-verbatim--none",
+      "profile": "original-default-carriage",
+      "raw_jsonl": ".research/aws-linux/exports/18.194.177.174/linux-native-features-1793468441758970535/text/ass-private-verbatim--none.jsonl",
+      "sha256": "a2b75b2c57fb34720496b550c0dbd510b3379faef591df78c9fbb88f37e37350",
+      "records": 24
+    },
+    {
+      "id": "ass-private-verbatim--observe",
+      "profile": "compiled-decoder-control-not-Streem-text-runtime",
+      "raw_jsonl": ".research/aws-linux/exports/18.194.177.174/linux-native-features-1793468441758970535/text/ass-private-verbatim--observe.jsonl",
+      "sha256": "9ef7f08fd389ee934677ea6c582ff53096be160764aa1cfd3806ae363c9fd960",
+      "records": 34
+    },
+    {
+      "id": "ass-unknown-charset-opaque--none",
+      "profile": "original-default-carriage",
+      "raw_jsonl": ".research/aws-linux/exports/18.194.177.174/linux-native-features-1793468441758970535/text/ass-unknown-charset-opaque--none.jsonl",
+      "sha256": "d067174f66527758bc5d6c34a807899b9c3de53e1ddfc5c51013d26fde8b6dc1",
+      "records": 24
+    },
+    {
+      "id": "ass-unknown-charset-opaque--observe",
+      "profile": "compiled-decoder-control-not-Streem-text-runtime",
+      "raw_jsonl": ".research/aws-linux/exports/18.194.177.174/linux-native-features-1793468441758970535/text/ass-unknown-charset-opaque--observe.jsonl",
+      "sha256": "7666035ac759ebf9a1537f0fc4531a925fc35a13e63a2dafbca10a005c6db192",
+      "records": 32
+    },
+    {
+      "id": "ass-unknown-charset-opaque--documented-charset-control",
+      "profile": "explicit-sub-charenc-control-not-baseline",
+      "raw_jsonl": ".research/aws-linux/exports/18.194.177.174/linux-native-features-1793468441758970535/text/ass-unknown-charset-opaque--documented-charset-control.jsonl",
+      "sha256": "674beeb1843919051da93d3c4becbdf54c801d7d9eb498c029a94c3e29d88e0c",
+      "records": 34
+    },
+    {
+      "id": "ass-empty-not-clear--none",
+      "profile": "original-default-carriage",
+      "raw_jsonl": ".research/aws-linux/exports/18.194.177.174/linux-native-features-1793468441758970535/text/ass-empty-not-clear--none.jsonl",
+      "sha256": "d5d27fadac3297026b4efa2aa4ebb55fb66b21204b45a847e4214225f482e2fa",
+      "records": 24
+    },
+    {
+      "id": "ass-empty-not-clear--observe",
+      "profile": "compiled-decoder-control-not-Streem-text-runtime",
+      "raw_jsonl": ".research/aws-linux/exports/18.194.177.174/linux-native-features-1793468441758970535/text/ass-empty-not-clear--observe.jsonl",
+      "sha256": "f98466133839c6abadc20d4476b20e985b0399a1fe6ff541b5bb10b0a82889c0",
+      "records": 32
+    },
+    {
+      "id": "ass-known-duration-unknown-start--none",
+      "profile": "original-default-carriage",
+      "raw_jsonl": ".research/aws-linux/exports/18.194.177.174/linux-native-features-1793468441758970535/text/ass-known-duration-unknown-start--none.jsonl",
+      "sha256": "2e351e892fea94b5e1f1d5ac51af573cebc95a4ef8dce5d11b7df74a5eaa8bf4",
+      "records": 24
+    },
+    {
+      "id": "ass-known-duration-unknown-start--observe",
+      "profile": "compiled-decoder-control-not-Streem-text-runtime",
+      "raw_jsonl": ".research/aws-linux/exports/18.194.177.174/linux-native-features-1793468441758970535/text/ass-known-duration-unknown-start--observe.jsonl",
+      "sha256": "f0c5e394b5c56cfe65f4cf13a5fc5d32034e64aaf8e1b1a26c954d0dc8366eb5",
+      "records": 34
+    },
+    {
+      "id": "ass-private-present-empty--none",
+      "profile": "original-default-carriage",
+      "raw_jsonl": ".research/aws-linux/exports/18.194.177.174/linux-native-features-1793468441758970535/text/ass-private-present-empty--none.jsonl",
+      "sha256": "fccac9337c8ca2239091928fd38750363978b365906f8f1d6c66fb8d2967ee9f",
+      "records": 24
+    },
+    {
+      "id": "ass-private-present-empty--observe",
+      "profile": "compiled-decoder-control-not-Streem-text-runtime",
+      "raw_jsonl": ".research/aws-linux/exports/18.194.177.174/linux-native-features-1793468441758970535/text/ass-private-present-empty--observe.jsonl",
+      "sha256": "dffe4999e43671be3e8f4e327a442161a575a25b6fba066495276a366bfb7f8e",
+      "records": 34
+    },
+    {
+      "id": "ass-invalid-utf8-unvalidated--none",
+      "profile": "original-default-carriage",
+      "raw_jsonl": ".research/aws-linux/exports/18.194.177.174/linux-native-features-1793468441758970535/text/ass-invalid-utf8-unvalidated--none.jsonl",
+      "sha256": "833ef62bc9062d6959db32d58bbba8bcc4ca1301a8f08d7db5d683cfceed6547",
+      "records": 24
+    },
+    {
+      "id": "ass-invalid-utf8-unvalidated--observe",
+      "profile": "compiled-decoder-control-not-Streem-text-runtime",
+      "raw_jsonl": ".research/aws-linux/exports/18.194.177.174/linux-native-features-1793468441758970535/text/ass-invalid-utf8-unvalidated--observe.jsonl",
+      "sha256": "03e885b16b1969cc198c01a0fd3095b75821c96c39b520dbbac70f32002df629",
+      "records": 32
+    }
+  ],
+  "actual": 177,
+  "original_carriage_cases": 104,
+  "decoder_charset_controls_retained": 73,
+  "normalization": false,
+  "qualification": false
+}

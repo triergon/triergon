@@ -1,0 +1,21 @@
+EE
+======================================================================
+ERROR: test_ambiguous_cached_case_identity_fails_closed (harness.test_runner.CheckpointTests.test_ambiguous_cached_case_identity_fails_closed)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/jonasgrosch/projects/safe-media/harness/test_runner.py", line 135, in test_ambiguous_cached_case_identity_fails_closed
+    from .runner import measurement_cache
+ImportError: cannot import name 'measurement_cache' from 'harness.runner' (/Users/jonasgrosch/projects/safe-media/harness/runner.py)
+
+======================================================================
+ERROR: test_interrupted_replay_keeps_unvisited_clean_passes_and_failures (harness.test_runner.CheckpointTests.test_interrupted_replay_keeps_unvisited_clean_passes_and_failures)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/jonasgrosch/projects/safe-media/harness/test_runner.py", line 117, in test_interrupted_replay_keeps_unvisited_clean_passes_and_failures
+    from .runner import checkpoint_report, measurement_cache
+ImportError: cannot import name 'checkpoint_report' from 'harness.runner' (/Users/jonasgrosch/projects/safe-media/harness/runner.py)
+
+----------------------------------------------------------------------
+Ran 2 tests in 0.000s
+
+FAILED (errors=2)

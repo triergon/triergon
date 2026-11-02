@@ -1,0 +1,601 @@
+{
+  "schema_version": 1,
+  "status": "Native Linux ARM64 qualification active; no complete module or current Linux slice accepted. Historical sealed Mac K0-K5 receipts unchanged.",
+  "owner_requirements": {
+    "foundation": "independent bootstrap",
+    "dependency_policy": "pure safe Rust across selected graph; exact fit; mature/optimal; justified against bootstrap",
+    "feature_parity": "all frozen selected features and required cases",
+    "runtime_ratio_max": 1.25,
+    "runtime_interpretation": "Initial delivery permits up to25percent more executiontime;20percent less remains optimization target",
+    "runtime_confidence": "upper paired95percent bound <=1.25 for delivery; <=0.80 for optimization",
+    "peak_live_allocation_ratio_max_exclusive": 1.0,
+    "attributable_peak_rss_ratio_max_exclusive": 1.0,
+    "comparison_decision": "decisions/2026-10-31-zlib-comparisons.md",
+    "runtime_optimization_ratio_target": 0.8,
+    "runtime_policy": "initial-delivery-runtime-v1"
+  },
+  "targets": [
+    "armv7-linux-webos-32",
+    "aarch64-apple-darwin",
+    "x86_64-unknown-linux-gnu",
+    "aarch64-unknown-linux-gnu"
+  ],
+  "modules": [
+    {
+      "id": "M00",
+      "name": "core",
+      "implementation_status": "Shared charged ownership, exact i128/u128 time and incremental input implemented; complete core contract remains open",
+      "parity_status": "Core50 host tests and51235 independent exact-arithmetic cases remain green. The recovery M01 graph passes116 frozen comparisons plus78 fixed-input operations; complete core qualification remains open.",
+      "performance_status": "Earlier dependent b5 has103/116 delivery passes; private pre-recovery compiler-PGO b2 has104/116. Neither qualifies the changed recovery graph;0.80 remains the optimization target.",
+      "memory_status": "All116 earlier dependent b5/b2 cases passed strictly lower live heap and attributableRSS with capture-time Linux evidence. The changed recovery graph needs fresh measurement; complete M00 acceptance remains open.",
+      "accepted": false
+    },
+    {
+      "id": "M01",
+      "name": "matroska",
+      "implementation_status": "Typed incremental input/packet/configuration/catalogue/Cues jobs and same-state blocking adapter implemented with shared retained-capacity/work accounting. The selected worker now uses this typed adapter; broader module features remain open.",
+      "parity_status": "The earlier recovery implementation passed231 media and5 worker tests,116 frozen comparisons,224 strictCue pairs,10 boundary traces and78 fixed-input operations. The later discard/core41 checkpoint passes65 core/238 media/5 worker definitions per profile,Clippy/no-default,116 comparisons,224 Cues and78 fixed-input operations; collected bodies and source unknownness are unchanged. Combined public-source gates and complete side-data/CodecState/native scope remain separate.",
+      "performance_status": "Current recovery graph is unqualified. Historical b5 first-clean30-pair results pass103/116 delivery and11 optimization gates; private pre-recovery compiler-PGO b2 passes104/116 and15. Balanced fixed26 training after recovery passed full work/correctness; its five-pair diagnostic is not qualification. Original first results/failures and thresholds remain unchanged.",
+      "memory_status": "Current recovery graph requires fresh lower-heap/RSS qualification. Earlier b5 and private b2 passed all116 strictly lower live-heap and attributableRSS cases; those source-specific receipts remain immutable.",
+      "accepted": false
+    },
+    {
+      "id": "M02",
+      "name": "packet-adapters",
+      "implementation_status": "Bounded packet framing and source prototypes plus selected ISO14496-15:2010/incorporated2006FRExt AVC wire records and CPF/HCRC source-presence clarification. Later AVC grammar/SPS consistency,hvcC,AAC/ADTS and complete profiles remain open.",
+      "parity_status": "Combined selected source passes165 debug/release framing definitions,Clippy/no-default/release examples. All148 DTS guards and82 AVC records retained. HCRC4152-call source replay changes only14 authorized presence annotations; all numeric/raw/range/native24 facts unchanged. Original793/71/224,784/320 and cycle-high24/lifetime90/EOF90 remain required; complete native/numerical gates open.",
+      "performance_status": "unmeasured",
+      "memory_status": "unmeasured",
+      "accepted": false
+    },
+    {
+      "id": "M03",
+      "name": "isobmff",
+      "implementation_status": "Source-preserving regular/fragmented syntax, source seek/preroll/range plans, tfra/mfro hints, exact movie/edit/composition targeting and roll/prol mappings. Separate bounded pinned-MOV native indexes and metadata-replay backward/global seek cover the observed equal-native-timebase profile. Original clock/configuration/flags and raw ranges remain intact; null/overlap/rescale, broader decoder recovery and complete module semantics stay open.",
+      "parity_status": "V37 implementation passes155 debug/release all-target definitions,targeted32,Clippy/no-default/release examples; all116 predecessor test definitions are unchanged and included. Both open/index255 operations have236 ordered matches/19 required nonpasses per schedule. New workers retain944 full-object matches/76 nonpasses over1020 rows. Original255 source/physical comparisons retain16 unresolved dispositions and828 earlier source sequences. Complete native/module parity and numerical qualification remain open. Later private metadata40/core41/packet42 gates pass58 core+159 M03 definitions and10 standalone consumer tests per profile; all1530 operation outcomes byte-equal41. Its1020 whole-operation rows retain944 matches/76 nonpasses and original37 source admission; source39 was inactive at that checkpoint. Combined public-tree gates require their own receipt. A separate exact42 source39 approval corrects16 checker-domain errors:944 source/native-eligible rows and76 denied native/error rows. Literal source unknownness and12 independent native continuity checks remain mandatory; later workers need their own transfer.",
+      "performance_status": "Source-specific first-clean measurements/failures are preserved. Recorded private42 selected24-row/30-pair diagnostic passes16 delivery and6 optimization targets; the8 tiny fragmented rows remain1.388-1.516 upper95 and need9.9-17.5percent less own time. Other996 rows remain required and memory is unmeasured. This does not qualify the combined public graph;0.80 remains the optimization target.",
+      "memory_status": "unmeasured",
+      "accepted": false
+    },
+    {
+      "id": "M04",
+      "name": "mpeg-ts",
+      "implementation_status": "Bounded selected-program transport/continuity/PSI/PES composition implemented; broader demux and access-unit work pending",
+      "parity_status": "The selected-diagnostic258 TS+50 core checkpoint passes debug/release,Clippy,no-default and both release observers on its frozenLinux graph; all222 predecessors retained. The unchanged272-request registry ran272Rust+281native observations:80 declared packet-field matches,0 packet differences,0 source/owner/cause failures. All6 prior fault gaps close;23 nonpass/context rows,1 empty observation,9 multi-entity operation gaps and original17/15 memberships remain required. Encoded native clocks/rejected carriers stay separate from source acceptance and raw33/unknown facts. Combined public-source,full module and numerical gates remain separate.",
+      "performance_status": "unmeasured",
+      "memory_status": "unmeasured",
+      "accepted": false
+    },
+    {
+      "id": "M05",
+      "name": "subtitles",
+      "implementation_status": "Owned subtitle context and an explicit pinned-native DVB receiver view are implemented alongside strict source text/bitmap APIs and versioned native carriage. Source clocks, metadata, Unicode, raw CLUTs and default receiver behavior remain separate from native projections. Complete text/charset/PGS/DVD/DVB scope remains open.",
+      "parity_status": "The reset421 checkpoint passes421 guards in debug/release,Clippy/no-default on nativeLinux, preserving all414 predecessors and source facts/golds. Explicit NativeD32 encoded-colour projection matches5300 display sets/17044028 palette slots including every full8bit YCrCb triple at T=0 plus separate alpha/reduced controls. Native-only effective276-value charged source state preserves observed final-reduced updates and reset/drop lifetime. Broader state/profile,PGS/DVD/charset,equivalent container/reference retention and numerical qualification remain open. Receiver-view selection survives reset/configuration reset/fatal cleanup while stream state is released; combined public-source gates are separate.",
+      "performance_status": "unmeasured",
+      "memory_status": "unmeasured",
+      "accepted": false
+    }
+  ],
+  "current_qualification": {
+    "target": "aarch64-unknown-linux-gnu",
+    "deferred_targets": [
+      "armv7-linux-webos-32",
+      "x86_64-unknown-linux-gnu"
+    ],
+    "authorization": "Owner authorized native Linux qualification on 2026-10-31; parity/time/memory thresholds unchanged; historical Mac receipts retain exact scope",
+    "evidence": "decisions/native-linux-qualification.md",
+    "accepted_slices": [],
+    "unaccepted_slices": [
+      "M00-C1-shared-core-v1",
+      "M03-initial-index-prototype",
+      "M04-source-primitives-prototype",
+      "M05-DVB-R0",
+      "M05-DVB-display-state",
+      "M02-AVC-HEVC-framing",
+      "M00-C2-M01-shared-storage-and-incremental-envelopes",
+      "M00-C3-M01-bulk-read-track-optimization",
+      "M02-AV1-VP9-framing",
+      "M01-adaptive-inflater-borrowed-laces",
+      "M03-physical-source-cursor",
+      "M01-compact-inflater-opaque-document-handles",
+      "M02-AC3-EAC3-framing-config",
+      "M05-DVB-boundary-state"
+    ],
+    "source_qualification_status": "No current Linux slice is accepted. The historical last_qualified_snapshot remains specific to the sealed Mac graph. All current required cases and complete-module gates remain open.",
+    "unaccepted_additional_inputs": [],
+    "last_qualified_snapshot": {
+      "evidence": "qualification/shared-core-mac-arm64/README.md",
+      "accepted_slices": [
+        "K0-container-demux-v1",
+        "K1-header-removal-v1",
+        "K2-bounded-zlib-v1",
+        "K3-cues-preroll-v1",
+        "K4-colour-hdr-v1",
+        "K5-segment-metadata-v1"
+      ],
+      "accepted_additional_inputs": [
+        {
+          "sample": "mkv/hdr10tags-both.mkv",
+          "status": "intact mandatory K5 input passes unchanged selected parity/time/both memory gates",
+          "evidence": "qualification/shared-core-mac-arm64/external/report.json"
+        }
+      ],
+      "target": "aarch64-apple-darwin",
+      "selected_graph_sha256": "f98621af49df5b1790d37c09c7429faa753f3525891d5a836a9ae9d230a3e6b5"
+    },
+    "unaccepted_slices_note": "Existing entries retain broader prototype contracts or historical unqualified snapshots; none is silently removed by qualifying the frozen K0-K5 operations",
+    "accepted_additional_inputs": [],
+    "selected_graph_sha256": "385b567d95d04ba7c7af4349232088efebd9b8b6551714356ab87ed1c251c909",
+    "previous_qualified_snapshot": {
+      "evidence": "qualification/segment-metadata-mac-arm64/README.md",
+      "accepted_slices": [
+        "K0-container-demux-v1",
+        "K1-header-removal-v1",
+        "K2-bounded-zlib-v1",
+        "K3-cues-preroll-v1",
+        "K4-colour-hdr-v1",
+        "K5-segment-metadata-v1"
+      ],
+      "accepted_additional_inputs": [
+        {
+          "sample": "mkv/hdr10tags-both.mkv",
+          "status": "intact mandatory K5 input passes selected parity/time/both memory gates",
+          "evidence": "qualification/segment-metadata-mac-arm64/external/report.json"
+        }
+      ]
+    },
+    "working_source_status": "Current working source includes Matroska discard/core43,AVC/HCRC165,metadata/packet43,TS diagnostics258 and subtitle reset421. Each private checkpoint retains its own actual gate/raw/source receipt; combined public gates and new worker identity are pending. Source39 has a separate exact42-only approval, with19 native/error cases denied. Historical numerical graphs do not qualify changed source. No complete module or current changed slice accepted."
+  },
+  "latest_development_observations": {
+    "mp4_modern_syntax_red": {
+      "evidence": ".research/mov-modern-before/idle-run-1793441107279408000/run.log",
+      "failed": 2,
+      "qualification": false
+    },
+    "ts_clock_red": {
+      "evidence": ".research/ts-clock-red-observed-1793441445237521000/run.log",
+      "passed_controls": 2,
+      "failed": 20,
+      "qualification": false
+    },
+    "dvb_configured_source_trace": {
+      "evidence": ".research/dvb-rust-d0-observed/comparison.log",
+      "executed": 36,
+      "source_findings": {},
+      "native_qualification": false
+    },
+    "ac3_sid_controls": {
+      "evidence": ".research/ac3-header-sid-native-v2-observed/summary.json",
+      "executed": 69,
+      "public_api_facts_only": true,
+      "qualification": false
+    },
+    "mp4_modern_syntax_green": {
+      "evidence": ".research/mp4-modern-host-1793442419925548000/result.json",
+      "rust_tests": 66,
+      "clippy_and_release_trace": true,
+      "qualification": false
+    },
+    "framing_eac3_bsi_host_green": {
+      "evidence": ".research/framing-eac3-bsi-green-1793442766080271000/result.json",
+      "rust_tests": 50,
+      "source_unchanged": true,
+      "qualification": false
+    },
+    "ts_clock_green": {
+      "evidence": ".research/ts-clock-host-1793443666396670000/result.json",
+      "rust_tests": 75,
+      "clippy_and_release_trace": true,
+      "qualification": false
+    },
+    "dvb_rcs_fill_green": {
+      "evidence": ".research/dvb-rcs-fill-green-1793444038077152000/result.json",
+      "rust_tests": 47,
+      "clippy": true,
+      "qualification": false
+    },
+    "typed_matroska_parity": {
+      "evidence": ".research/typed-matroska-parity-v2-1793456658864326000/completion.json",
+      "selected_cases": 116,
+      "all_parity_passed": true,
+      "timing_memory_measured": false,
+      "qualification": false
+    },
+    "typed_matroska_host": {
+      "evidence": ".research/typed-host4-1793456554760715000/results.json",
+      "rust_tests_passed": 141,
+      "worker_tests_passed": 5,
+      "clippy_release_no_default": true,
+      "qualification": false
+    },
+    "core_footprint_host": {
+      "evidence": ".research/core-owner-footprint-host-1793449749030274000",
+      "rust_tests": 31,
+      "clippy_and_no_default": true,
+      "qualification": false
+    },
+    "framing_dts_host": {
+      "evidence": ".research/dts-core-host-1793454330158626000/results.json",
+      "rust_tests": 62,
+      "clippy_and_release": true,
+      "qualification": false
+    },
+    "dca_public_observer": {
+      "evidence": ".research/dca-public-observer-native-v1/observations.json",
+      "executed": 256,
+      "complete_observation": 256,
+      "qualification": false
+    },
+    "mp4_selected_fields_red": {
+      "evidence": ".research/mp4-selected18-red-1793454764146107000",
+      "runtime_failures": 4,
+      "native_observations": 30,
+      "qualification": false
+    },
+    "h0_mutation_integrity": {
+      "evidence": ".research/python-h0-gate-current-v3",
+      "python_tests": 93,
+      "qualification": false
+    },
+    "matroska_mutation_fresh": {
+      "evidence": ".research/matroska-mutation-frozen-v2",
+      "inputs": 580,
+      "actual_worker_runs": 6380,
+      "ungraded_findings": 1046,
+      "product_workers": "frozen pre-typed graph",
+      "qualification": false
+    },
+    "dvb_eod_native": {
+      "evidence": ".research/dvb-ancillary-eod-native-v1-observed/observations.json",
+      "executed": 5,
+      "qualification": false
+    },
+    "typed_matroska_tie_replay": {
+      "evidence": ".research/cue-tie-native-typed-v2-observed/observations.json",
+      "paired_cases": 224,
+      "actual_worker_runs": 448,
+      "strict_agreements": 224,
+      "qualification": false
+    },
+    "mp4_selected_fields_host": {
+      "evidence": ".research/mp4-native-host20-1793456191947296000/results.json",
+      "rust_tests_passed": 82,
+      "clippy_and_release": true,
+      "qualification": false
+    },
+    "public_text_host": {
+      "evidence": ".research/subtitles-text-promoted-host1-1793458809112021000/results.json",
+      "rust_tests_passed": 161,
+      "clippy_and_release": true,
+      "qualification": false
+    },
+    "ts_composed_host": {
+      "evidence": ".research/ts-native-composed-host-v1-1793459116821845000/results.json",
+      "rust_tests_passed": 130,
+      "clippy_and_both_release_examples": true,
+      "qualification": false
+    },
+    "typed_numeric_partial_rejected": {
+      "evidence": ".research/typed-reader-partial-baseline-stop-v1.json",
+      "source_graph": "c67e5577eca4aca6fbc3fc3bec3382b82073c9713787477b292d9849705bb049",
+      "clean_complete_workloads": 115,
+      "remaining_compiler_contaminated": 1,
+      "qualification": false,
+      "per_case_numeric_thresholds_met": 2,
+      "final_partial_audit": ".research/typed-reader-partial-baseline-final-audit-v1.json"
+    },
+    "ts_composed_actual": {
+      "evidence": ".research/ts-composed-v1-observed/observations.json",
+      "actual_operations": 266,
+      "zero_exit": 223,
+      "nonzero_exit": 43,
+      "NDJSON_errors": 0,
+      "all_identities_unchanged": true,
+      "qualification": false
+    },
+    "linux_sprint_20261031": {
+      "target": "aarch64-unknown-linux-gnu",
+      "matroska_tests": 192,
+      "selected_parity_cases": 116,
+      "strict_cues_pairs": 224,
+      "mp4_tests": 92,
+      "mp4_fresh_worker_calls": 1275,
+      "mp4_remaining_new_clock_profiles_closed": 11,
+      "framing_tests": 76,
+      "framing_scope": "declared layouts only; ISO avcC/hvcC wire grammar remains open",
+      "qualified": false,
+      "runtime_pass": 10,
+      "runtime_fail": 106,
+      "qualified_lower_heap": 116,
+      "qualified_lower_rss": 116,
+      "numerics_combined_acceptance": false
+    },
+    "combined_linux_af47_first_clean": {
+      "evidence": ".research/aws-linux-extended1/combined-raw-audit.json",
+      "worker_sha256": "af47af1450357093aef3da02b8e484134877e2e250b11368f93700a39784f5e8",
+      "target": "aarch64-unknown-linux-gnu",
+      "matroska_tests": 211,
+      "core_tests": 50,
+      "selected_parity_cases": 116,
+      "strict_cues_pairs": 224,
+      "runtime_delivery_pass": 98,
+      "runtime_delivery_fail": 18,
+      "runtime_optimization_met": 10,
+      "qualified_lower_heap": 116,
+      "qualified_lower_rss": 116,
+      "paired_samples_per_case": 30,
+      "complete_module_accepted": false,
+      "later_private_candidates_included": false
+    },
+    "text_carriage_linux_323": {
+      "evidence": ".research/aws-linux-extended1/exports/3.122.247.247/extended-feature-expansion-1793485227269489839/results.json",
+      "rust_tests": 323,
+      "old_tests_unchanged": 161,
+      "debug_release_clippy_shipping_docs": true,
+      "qualification": false
+    },
+    "mp4_seek32_linux_116": {
+      "evidence": ".research/aws-linux-extended1/exports/63.183.208.230/m3-candidate32-1793485608259220511/results.json",
+      "rust_tests": 116,
+      "old_tests_unchanged": 102,
+      "actual_runtime_red_tests": 14,
+      "clippy_shipping_release_examples": true,
+      "qualification": false
+    },
+    "mp4_seek32_fresh_replay": {
+      "evidence": ".research/aws-linux-extended1/exports/63.183.208.230/linux-mov-replay-1793486166995463460/observations.json",
+      "actual_runs": 1275,
+      "native_runs": 255,
+      "candidate_runs": 1020,
+      "timeouts": 0,
+      "protocol_errors": 0,
+      "exact_inputs_sources_workers_unchanged": true,
+      "qualification": false
+    },
+    "minimal_linux_ea8c_first_clean": {
+      "evidence": ".research/aws-linux-extended1/minimal-raw-audit.json",
+      "worker_sha256": "ea8c4e0a912c38ce24b5004433937abca1b1a34670b505da5f39578ff75eea87",
+      "target": "aarch64-unknown-linux-gnu",
+      "matroska_tests": 220,
+      "core_tests": 50,
+      "selected_parity_cases": 116,
+      "strict_cues_pairs": 224,
+      "runtime_delivery_pass": 102,
+      "runtime_delivery_fail": 14,
+      "runtime_optimization_met": 10,
+      "qualified_lower_heap": 116,
+      "qualified_lower_rss": 116,
+      "paired_samples_per_case": 30,
+      "complete_module_accepted": false
+    },
+    "combined_linux_b5e4_first_clean": {
+      "evidence": ".research/aws-linux-extended1/combination-raw-audit.json",
+      "worker_sha256": "b5e47713f2cabe5875eeaa75da0c3e149bb801fd157777588c51915d716dc184",
+      "target": "aarch64-unknown-linux-gnu",
+      "matroska_tests": 220,
+      "core_tests": 50,
+      "selected_parity_cases": 116,
+      "strict_cues_pairs": 224,
+      "runtime_delivery_pass": 103,
+      "runtime_delivery_fail": 13,
+      "runtime_optimization_met": 11,
+      "qualified_lower_heap": 116,
+      "qualified_lower_rss": 116,
+      "paired_samples_per_case": 30,
+      "complete_module_accepted": false
+    },
+    "subtitle_context_dvb_368": {
+      "evidence": ".research/aws-linux-extended1/exports/63.183.208.230/subtitles-integration-1793492796634603276/results.json",
+      "rust_tests": 368,
+      "earlier_unchanged_tests": 323,
+      "context_tests": 34,
+      "native_dvb_tests": 11,
+      "native_explicit_clut_eod_cases_matched": 5,
+      "native_runtime_red_pass": 3,
+      "native_runtime_red_fail": 8,
+      "context_runtime_red_pass": 1,
+      "context_runtime_red_fail": 33,
+      "debug_release_clippy_shipping_docs_passed": true,
+      "complete_module_accepted": false,
+      "numerical_qualification": false
+    },
+    "subtitle_native_order_378": {
+      "evidence": ".research/aws-linux-extended1/exports/3.76.29.106/subtitles-order378-1793495735838501975/results.json",
+      "rust_tests": 378,
+      "earlier_unchanged_tests": 368,
+      "native_order_tests": 10,
+      "native_runtime_red_pass": 6,
+      "native_runtime_red_fail": 4,
+      "actual_order_controls": 4,
+      "debug_release_clippy_shipping_docs_passed": true,
+      "complete_module_accepted": false,
+      "numerical_qualification": false
+    },
+    "subtitle_native_nonmodifying_393": {
+      "evidence": ".research/aws-linux-extended1/exports/3.76.29.106/subtitles-nonmodifying393-1793500180361456104/results.json",
+      "rust_tests": 393,
+      "earlier_unchanged_tests": 378,
+      "native_nonmodifying_tests": 15,
+      "native_runtime_red_pass": 9,
+      "native_runtime_red_fail": 6,
+      "actual_mapped_controls": 2,
+      "debug_release_clippy_shipping_docs_passed": true,
+      "complete_module_accepted": false,
+      "numerical_qualification": false
+    },
+    "mp4_native37_linux_155": {
+      "evidence": ".research/aws-linux-extended1/exports/63.183.208.230/native37-parent-1793502238561659368/identity.json",
+      "source_gate_identity_sha256": "7cfa9e4146302aea0181e13dca1219d2b7297b545d94ec4af378e15ca8c8dca8",
+      "rust_debug_tests": 155,
+      "rust_release_tests": 155,
+      "old_tests_byte_identical": 116,
+      "targeted_tests": 32,
+      "clippy_shipping_release_examples": true,
+      "consumer_worker_sha256": "87c00c534fc1d3bd18b4279b5fe80e742a52e317cfe2fad2df19026efe7a4a8e",
+      "source_review": ".research/parallel-mp4/implementation/native37-final-proof/actual255-reviewed/assessment.json",
+      "source_actual_runs": 1275,
+      "source_original_sequences_equal": 828,
+      "legacy16_preserved": true,
+      "native_open_index_matches_per_schedule": 236,
+      "native_open_index_nonpasses_per_schedule": 19,
+      "performance": "unmeasured",
+      "memory": "unmeasured",
+      "public_adoption": true,
+      "qualification": false
+    },
+    "matroska_subtitle_recovery_linux_231": {
+      "evidence": ".research/parallel-ts/matroska-inplace-v1/seek-subtitle-recovery-ready-v1/checkpoint.json",
+      "worker_sha256": "eb12b3dac9d3c089a09f25e7a13841e6b100ad8bae2d947dda65d37af62d5152",
+      "tests": 231,
+      "frozen_comparisons": 116,
+      "cue_pairs": 224,
+      "boundary_traces": 10,
+      "fixed_entities": 26,
+      "fixed_operations": 78,
+      "source_unknown_end_preserved": true,
+      "previous_RAP_preserved": true,
+      "runtime_qualified": false,
+      "memory_qualified": false,
+      "qualification": false
+    },
+    "ts_current167_recorded272": {
+      "evidence": ".research/aws-linux-extended1/exports/3.122.247.247/ts-current-replay-1793505027039897249/actual-review-remote-1.json",
+      "rust_tests": 167,
+      "required_operations": 272,
+      "source_causality_failures": 0,
+      "binding_errors": 0,
+      "native_discrepancy_cases": 10,
+      "native_nonpass_cases": 39,
+      "historical17_15_preserved": true,
+      "cross_target_recorded_reference_only": true,
+      "qualification": false
+    },
+    "subtitles_default399": {
+      "evidence": ".research/parallel-subtitles/dvb-native-closure-1/default-clut-1/adoption-399-1/FINAL-HANDOFF.json",
+      "tests": 399,
+      "old_guards_preserved": 393,
+      "default_native_captures": 16,
+      "retained_field_controls": 96,
+      "pressure_controls": 16,
+      "qualification": false
+    },
+    "mp4_consumer_scratch_v1_functional": {
+      "evidence": ".research/parallel-mp4/consumer-scratch-v1/runs/a-functional-v1/OBSERVED.json",
+      "codegen": ".research/parallel-mp4/consumer-scratch-v1/runs/a-functional-v1/CODEGEN-REVIEW.json",
+      "variant_contract_sha256": "e687199aa09d725d74ed60aa21c17c8ba93354e42f11b01772d67255b9c20b51",
+      "operation_contract_sha256": "0a924396626871e84b2f91ec612a0c60b09258f0f016afe0753cf7c75fdecf8a",
+      "benchmark_candidate_sha256": "67da59c7e9d992852797f0499db6b906581a3a9af80c36f29618f2a3202e9f8c",
+      "benchmark_reference_sha256": "7ff6742eaafa59884b6dc95f65c701c26b18975c265aa8401d61154eb2ef1204",
+      "copied_public_debug_tests": 155,
+      "copied_public_release_tests": 155,
+      "worker_debug_tests": 9,
+      "worker_release_tests": 9,
+      "protocol_lifecycle_controls": 42,
+      "full_rows": 1020,
+      "ordered_matches": 944,
+      "required_nonpasses": 76,
+      "source_blocked_cases_preserved": 35,
+      "final_shipping_small_scratch_codegen": "128-byte helper frame;12initialized bytes; no64KiB clearing on small branch",
+      "public_adoption_at_observation": false,
+      "qualification": false,
+      "module_accepted": false,
+      "numerical_status": "not established by this functional observation; parent holds new formal campaign",
+      "public_adoption_after_observation": true
+    },
+    "framing_dts148": {
+      "evidence": ".research/parallel-framing/dts-public148-adoption-v1/manifest.json",
+      "tests": 148,
+      "predecessor_tests_preserved": 103,
+      "numeric_eligible": false,
+      "qualification": false
+    },
+    "ts_private_audio195": {
+      "evidence": ".research/parallel-ts/ac3-eac3-carriage-v1/ready-v1/checkpoint.json",
+      "tests": 195,
+      "predecessor_tests_preserved": 167,
+      "recorded_native_carriage_matches": 4,
+      "source_namespace_unknowns_preserved": true,
+      "qualification": false
+    },
+    "subtitles_explicit414": {
+      "evidence": ".research/parallel-subtitles/dvb-native-closure-1/explicit-clut-1/integration-414-1/FINAL-HANDOFF.json",
+      "tests": 414,
+      "predecessor_tests_preserved": 399,
+      "display_sets": 5300,
+      "palette_slots": 17044028,
+      "full_RGB_cube_transparency": 0,
+      "native_retained_values_per_family": 276,
+      "equivalent_container_lifecycle_qualified": false,
+      "qualification": false
+    },
+    "mp4_packet42_private_functional": {
+      "qualification": false,
+      "variant_contract": ".research/parallel-mp4/implementation/packet-direct42/variant-contract42.json",
+      "worker_sha256": "72a1c8604b691b351ca4394508e46141102a17f626c4ea473343c16505814da8",
+      "core_tests": 58,
+      "mp4_tests": 159,
+      "consumer_tests": 10,
+      "profiles": [
+        "debug",
+        "release"
+      ],
+      "whole_operation_rows": 1020,
+      "ordered_full_object_matches": 944,
+      "required_nonpasses": 76,
+      "source_index_rows": 510,
+      "all1530_byte_equal_to41": true,
+      "source39_active": false,
+      "combined_public_gate": "separate parent-owned evidence",
+      "numerical_qualification": false
+    },
+    "mp4_source39_approved_for42": {
+      "approval": ".research/parallel-mp4/qualification-native42-transfer-v1/SOURCE39-ACTIVATED42-PARENT.json",
+      "approval_sha256": "b9a1d7cc84b858fc11603107a3b1e8ab5092a84cc6f31797f27fb22be39e1d1a",
+      "source_only": true,
+      "original_source_eligible_rows": 880,
+      "corrected_source_eligible_rows": 944,
+      "native_error_rows_denied": 76,
+      "new_source_event_replay": false,
+      "numeric_execution_permission": false,
+      "qualification": false
+    },
+    "mp4_packet42_first_diagnostic": {
+      "review": ".research/aws-linux-extended1/direct42-first-diagnostic-reviewed.json",
+      "measured_rows": 24,
+      "required_rows": 1020,
+      "pairs_each": 30,
+      "delivery_pass": 16,
+      "optimization_pass": 6,
+      "memory": "unmeasured",
+      "qualification": false
+    },
+    "mp4_profile43_private_functional": {
+      "qualification": false,
+      "variant_contract": ".research/parallel-mp4/implementation/profile-batch43-v2/variant-contract43-v2.json",
+      "worker_sha256": "92e919ad9ade78cf5abb70fd28a139829f289fc9634c8d6e6550a1be305d5e6d",
+      "core_tests": 59,
+      "mp4_tests": 159,
+      "consumer_tests": 11,
+      "fresh_independent_clock_cases_each_profile": 51235,
+      "actual_byte_equal42_rows": 1530,
+      "compiled_hot_append_boundary_removed": true,
+      "text_delta_vs42_bytes": 256,
+      "runtime": "unmeasured",
+      "memory": "unmeasured",
+      "combined_public_gate": "pending"
+    },
+    "ts_selected_faults258": {
+      "checkpoint": ".research/parallel-ts/selected-faults-v1/ready-v1/checkpoint.json",
+      "TS_tests": 258,
+      "core_tests_at_checkpoint": 50,
+      "original_request_rows": 272,
+      "fresh_Rust_calls": 272,
+      "fresh_native_calls": 281,
+      "declared_packet_matches": 80,
+      "packet_differences": 0,
+      "nonpass_context_rows": 23,
+      "original17_15_memberships": "unchanged",
+      "qualification": false
+    }
+  }
+}

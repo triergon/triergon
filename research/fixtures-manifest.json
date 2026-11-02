@@ -1,0 +1,41 @@
+{
+  "ffmpeg_version": "ffmpeg version 9.0.2 Copyright (c) 2000-2026 the FFmpeg developers",
+  "files": [
+    {
+      "name": "avc-aac-fragmented.mp4",
+      "bytes": 85478,
+      "sha256": "a9accd9b718e206a8359997657adf3724ac7ce4a4200efec304caa61d04ed8e4",
+      "origin": "synthetic lavfi test signals / authored test captions"
+    },
+    {
+      "name": "avc-aac-sub.mkv",
+      "bytes": 84288,
+      "sha256": "8b245102b6278a1952870d0fd8d65a924187ea285c52f07fb72e76227d038cbb",
+      "origin": "synthetic lavfi test signals / authored test captions"
+    },
+    {
+      "name": "avc-aac.mp4",
+      "bytes": 85028,
+      "sha256": "7f2f92cb0e7a97920828fc9f79daeec2471a58d990572305d7aa08c30fb512fd",
+      "origin": "synthetic lavfi test signals / authored test captions"
+    },
+    {
+      "name": "avc-aac.ts",
+      "bytes": 102648,
+      "sha256": "3cc3aee7d8a8b1e0d4451743ecb76b3cbb4fbd35fcb54b61f11e27cb85d678ce",
+      "origin": "synthetic lavfi test signals / authored test captions"
+    },
+    {
+      "name": "captions.srt",
+      "bytes": 98,
+      "sha256": "b01814301e0ce898a33491b8e0dd196de5229ac41af6236e2ba6d00b7d39f497",
+      "origin": "synthetic lavfi test signals / authored test captions"
+    },
+    {
+      "name": "hevc-aac.mkv",
+      "bytes": 77097,
+      "sha256": "3174607d8387db7f6d3ffc432f6d59a1f2e5678cd2798b98fc5d27e36787d072",
+      "origin": "synthetic lavfi test signals / authored test captions"
+    }
+  ]
+}

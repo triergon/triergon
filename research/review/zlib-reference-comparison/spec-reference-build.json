@@ -1,0 +1,32 @@
+{
+  "command": [
+    "cc",
+    "-O3",
+    "-Wall",
+    "-Wextra",
+    "-Werror",
+    "/Users/jonasgrosch/projects/safe-media/.research/reference-investigation/spec-reference.c",
+    "-I/Users/jonasgrosch/projects/safe-media/.research/reference/install/include",
+    "-L/Users/jonasgrosch/projects/safe-media/.research/reference/install/lib",
+    "-lavformat",
+    "-lm",
+    "-lz",
+    "-lavcodec",
+    "-pthread",
+    "-lm",
+    "-lz",
+    "-lavutil",
+    "-lm",
+    "-lz",
+    "-framework",
+    "CoreFoundation",
+    "-framework",
+    "CoreVideo",
+    "-framework",
+    "CoreMedia",
+    "-pthread",
+    "-o",
+    "/Users/jonasgrosch/projects/safe-media/.research/reference-investigation/spec-reference"
+  ],
+  "status": 0
+}

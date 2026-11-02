@@ -1,0 +1,49 @@
+# Original authored source contract. Header: kind filename outcome count caller-origin.
+# S: ordinal start end DTS CTS delta CTO-version raw32 ticks signed-value raw-fragment-flags sync.
+stbl unsupported-width-0.bin unsupported 1 null
+
+stbl unsupported-width-1.bin unsupported 1 null
+
+stbl unsupported-width-3.bin unsupported 1 null
+
+stbl unsupported-width-5.bin unsupported 1 null
+
+stbl unsupported-width-12.bin unsupported 1 null
+
+stbl unsupported-width-24.bin unsupported 1 null
+
+stbl unsupported-width-32.bin unsupported 1 null
+
+stbl unsupported-width-255.bin unsupported 1 null
+
+stbl reserved-nonzero.bin unsupported 3 null
+
+stbl unknown-version.bin unsupported 3 null
+
+stbl unknown-flags.bin unsupported 3 null
+
+stbl truncated-fixed-header.bin truncated 3 null
+
+stbl truncated-odd-array.bin truncated 3 null
+
+stbl truncated-u16-array.bin truncated 3 null
+
+stbl declared-u32max-short-array.bin truncated 3 null
+
+stbl extra-full-byte-opaque-unsupported.bin unsupported 3 null
+
+stbl both-size-tables.bin invalid 3 null
+
+traf trun-unknown-version.bin unsupported 1 null
+
+traf trun-unknown-flag.bin unsupported 1 null
+
+traf trun-truncated-cto.bin truncated 2 null
+
+traf trun-conflicting-flags.bin invalid 1 null
+
+traf trun-range-overflow.bin overflow 1 null
+
+traf trun-negative-range-underflow.bin overflow 1 null
+
+traf trun-caller-end-overflow.bin overflow 1 170141183460469231731687303715884105726

@@ -1,0 +1,474 @@
+{
+  "schema": "m05-actual-order4-regression-facts-v1",
+  "raw_review": {
+    "path": ".research/aws-linux-extended1/exports/63.183.208.230/order-observed-parent-1793494688875492982/review/summary.json",
+    "sha256": "b6d9ba59b87dd31723c514b2b72a7f7e65e51dac9e3c8f18216a4bf37bc4a05a"
+  },
+  "all_four_usable": true,
+  "only_consistent_hypothesis": "reverse_PCS",
+  "cases": [
+    {
+      "id": "original-pcs12-rcs12",
+      "source_input": {
+        "path": ".research/parallel-subtitles/dvb-native-closure-1/order-controls/original-pcs12-rcs12.dvb",
+        "bytes": 185,
+        "sha256": "c5f8748ea6676a393369e75a13d5e8818e0742cda40fb0e56257c1b517a8588e"
+      },
+      "whole_carrier": {
+        "path": ".research/parallel-subtitles/dvb-native-closure-1/order-controls/original-pcs12-rcs12.mkv",
+        "bytes": 496,
+        "sha256": "dff90194e60f23585a609012f22ad764c8f23a1177d43df4e3863c54ecb74a0b"
+      },
+      "source_classification": "selected ordered PCS/RCS control",
+      "raw_log": {
+        "path": ".research/aws-linux-extended1/exports/63.183.208.230/order-observed-parent-1793494688875492982/original-pcs12-rcs12.jsonl",
+        "sha256": "30c1fd02857e17c403e17483770ad23d920d894644b1d80219123dc4b8d40a6f"
+      },
+      "raw_codec_inputs": [
+        {
+          "kind": "codec-input",
+          "packet": 0,
+          "stream": 0,
+          "offset": 0,
+          "size": 185,
+          "pos": 280,
+          "flags": 1,
+          "pts_raw": 1000,
+          "dts_raw": 1000,
+          "pts": 1000,
+          "dts": 1000,
+          "duration_raw": 2000,
+          "packet_time_base": [
+            0,
+            1
+          ],
+          "data_hex": "0f140001000507000f000b0f100001000e020b01ff0001000102ff000200050f1100010016010f000400022700000300010000f00000020002f0000f1100010010020f000200022700000300030000f0000f120001001a000f009f00000000019feb808000029f10808000039feb8080000f130001001000010100040004106000f0109000f0000f130001001000020100040004109000f0106000f0000f130001001000030100040004105000f010a000f0000f8000010000",
+          "side_data": []
+        }
+      ],
+      "raw_events": [
+        {
+          "kind": "subtitle",
+          "stream": 0,
+          "packet": 0,
+          "packet_offset": 0,
+          "consumed": 185,
+          "drain": false,
+          "format": 0,
+          "pts_raw": 1000000,
+          "pts_microseconds": 1000000,
+          "pts_timebase": [
+            1,
+            1000000
+          ],
+          "start_display_ms": 0,
+          "end_display_ms": 2000,
+          "context_canvas": [
+            16,
+            12
+          ],
+          "rectangles": [
+            {
+              "order": 0,
+              "type": 1,
+              "x": 2,
+              "y": 5,
+              "width": 2,
+              "height": 2,
+              "flags": 0,
+              "native_stride": 2,
+              "indices_hex": "01010202",
+              "palette_entries": 4,
+              "raw_native_palette_hex": "00880000ffffffff000000ffffffffff",
+              "palette_native_u32": [
+                34816,
+                4294967295,
+                4278190080,
+                4294967295
+              ]
+            },
+            {
+              "order": 1,
+              "type": 1,
+              "x": 1,
+              "y": 1,
+              "width": 4,
+              "height": 2,
+              "flags": 0,
+              "native_stride": 4,
+              "indices_hex": "0102020102010102",
+              "palette_entries": 4,
+              "raw_native_palette_hex": "00880000ffffffff000000ffffffffff",
+              "palette_native_u32": [
+                34816,
+                4294967295,
+                4278190080,
+                4294967295
+              ]
+            }
+          ]
+        }
+      ],
+      "raw_decode_calls": [
+        {
+          "kind": "decode-call",
+          "packet": 0,
+          "stream": 0,
+          "offset": 0,
+          "supplied": 185,
+          "returned": 185,
+          "got": 1
+        }
+      ],
+      "source_ID_mapping": "Unique geometry/position association in original authored PCS; region IDs are independent source facts, not a native exposed field"
+    },
+    {
+      "id": "same-pcs12-swapped-rcs21",
+      "source_input": {
+        "path": ".research/parallel-subtitles/dvb-native-closure-1/order-controls/same-pcs12-swapped-rcs21.dvb",
+        "bytes": 185,
+        "sha256": "3ac0b2a98a52b96679d4a8c2c658fba86aa5bfe4514f3cafad5372bf35221d36"
+      },
+      "whole_carrier": {
+        "path": ".research/parallel-subtitles/dvb-native-closure-1/order-controls/same-pcs12-swapped-rcs21.mkv",
+        "bytes": 496,
+        "sha256": "979cc3b8824e057b0093b4519ddb6f626098cbba3873f9b065c694b91c1d51cd"
+      },
+      "source_classification": "selected ordered PCS/RCS control",
+      "raw_log": {
+        "path": ".research/aws-linux-extended1/exports/63.183.208.230/order-observed-parent-1793494688875492982/same-pcs12-swapped-rcs21.jsonl",
+        "sha256": "cf07d9b4a38069ea2a0a868b1f329ebe7b345f9779ce8d2e1e0223b8e17d984b"
+      },
+      "raw_codec_inputs": [
+        {
+          "kind": "codec-input",
+          "packet": 0,
+          "stream": 0,
+          "offset": 0,
+          "size": 185,
+          "pos": 280,
+          "flags": 1,
+          "pts_raw": 1000,
+          "dts_raw": 1000,
+          "pts": 1000,
+          "dts": 1000,
+          "duration_raw": 2000,
+          "packet_time_base": [
+            0,
+            1
+          ],
+          "data_hex": "0f140001000507000f000b0f100001000e020b01ff0001000102ff000200050f1100010010020f000200022700000300030000f0000f1100010016010f000400022700000300010000f00000020002f0000f120001001a000f009f00000000019feb808000029f10808000039feb8080000f130001001000010100040004106000f0109000f0000f130001001000020100040004109000f0106000f0000f130001001000030100040004105000f010a000f0000f8000010000",
+          "side_data": []
+        }
+      ],
+      "raw_events": [
+        {
+          "kind": "subtitle",
+          "stream": 0,
+          "packet": 0,
+          "packet_offset": 0,
+          "consumed": 185,
+          "drain": false,
+          "format": 0,
+          "pts_raw": 1000000,
+          "pts_microseconds": 1000000,
+          "pts_timebase": [
+            1,
+            1000000
+          ],
+          "start_display_ms": 0,
+          "end_display_ms": 2000,
+          "context_canvas": [
+            16,
+            12
+          ],
+          "rectangles": [
+            {
+              "order": 0,
+              "type": 1,
+              "x": 2,
+              "y": 5,
+              "width": 2,
+              "height": 2,
+              "flags": 0,
+              "native_stride": 2,
+              "indices_hex": "01010202",
+              "palette_entries": 4,
+              "raw_native_palette_hex": "00880000ffffffff000000ffffffffff",
+              "palette_native_u32": [
+                34816,
+                4294967295,
+                4278190080,
+                4294967295
+              ]
+            },
+            {
+              "order": 1,
+              "type": 1,
+              "x": 1,
+              "y": 1,
+              "width": 4,
+              "height": 2,
+              "flags": 0,
+              "native_stride": 4,
+              "indices_hex": "0102020102010102",
+              "palette_entries": 4,
+              "raw_native_palette_hex": "00880000ffffffff000000ffffffffff",
+              "palette_native_u32": [
+                34816,
+                4294967295,
+                4278190080,
+                4294967295
+              ]
+            }
+          ]
+        }
+      ],
+      "raw_decode_calls": [
+        {
+          "kind": "decode-call",
+          "packet": 0,
+          "stream": 0,
+          "offset": 0,
+          "supplied": 185,
+          "returned": 185,
+          "got": 1
+        }
+      ],
+      "source_ID_mapping": "Unique geometry/position association in original authored PCS; region IDs are independent source facts, not a native exposed field"
+    },
+    {
+      "id": "renamed-pcs92-rcs92",
+      "source_input": {
+        "path": ".research/parallel-subtitles/dvb-native-closure-1/order-controls/renamed-pcs92-rcs92.dvb",
+        "bytes": 185,
+        "sha256": "82f798a43cf283c8a4efce48f2afa7dc67b72d09d816e7ecd280cf2314feb7d7"
+      },
+      "whole_carrier": {
+        "path": ".research/parallel-subtitles/dvb-native-closure-1/order-controls/renamed-pcs92-rcs92.mkv",
+        "bytes": 496,
+        "sha256": "4815a1ad58083780307a2b7a1a280a8dbf32441271a14066febd97353fa1c78a"
+      },
+      "source_classification": "selected ordered PCS/RCS control",
+      "raw_log": {
+        "path": ".research/aws-linux-extended1/exports/63.183.208.230/order-observed-parent-1793494688875492982/renamed-pcs92-rcs92.jsonl",
+        "sha256": "5c9fd48913635e0c681dba56fcb630091e6a8a34f1894673eb0418d4fc52ea76"
+      },
+      "raw_codec_inputs": [
+        {
+          "kind": "codec-input",
+          "packet": 0,
+          "stream": 0,
+          "offset": 0,
+          "size": 185,
+          "pos": 280,
+          "flags": 1,
+          "pts_raw": 1000,
+          "dts_raw": 1000,
+          "pts": 1000,
+          "dts": 1000,
+          "duration_raw": 2000,
+          "packet_time_base": [
+            0,
+            1
+          ],
+          "data_hex": "0f140001000507000f000b0f100001000e020b09ff0001000102ff000200050f1100010016090f000400022700000300010000f00000020002f0000f1100010010020f000200022700000300030000f0000f120001001a000f009f00000000019feb808000029f10808000039feb8080000f130001001000010100040004106000f0109000f0000f130001001000020100040004109000f0106000f0000f130001001000030100040004105000f010a000f0000f8000010000",
+          "side_data": []
+        }
+      ],
+      "raw_events": [
+        {
+          "kind": "subtitle",
+          "stream": 0,
+          "packet": 0,
+          "packet_offset": 0,
+          "consumed": 185,
+          "drain": false,
+          "format": 0,
+          "pts_raw": 1000000,
+          "pts_microseconds": 1000000,
+          "pts_timebase": [
+            1,
+            1000000
+          ],
+          "start_display_ms": 0,
+          "end_display_ms": 2000,
+          "context_canvas": [
+            16,
+            12
+          ],
+          "rectangles": [
+            {
+              "order": 0,
+              "type": 1,
+              "x": 2,
+              "y": 5,
+              "width": 2,
+              "height": 2,
+              "flags": 0,
+              "native_stride": 2,
+              "indices_hex": "01010202",
+              "palette_entries": 4,
+              "raw_native_palette_hex": "00880000ffffffff000000ffffffffff",
+              "palette_native_u32": [
+                34816,
+                4294967295,
+                4278190080,
+                4294967295
+              ]
+            },
+            {
+              "order": 1,
+              "type": 1,
+              "x": 1,
+              "y": 1,
+              "width": 4,
+              "height": 2,
+              "flags": 0,
+              "native_stride": 4,
+              "indices_hex": "0102020102010102",
+              "palette_entries": 4,
+              "raw_native_palette_hex": "00880000ffffffff000000ffffffffff",
+              "palette_native_u32": [
+                34816,
+                4294967295,
+                4278190080,
+                4294967295
+              ]
+            }
+          ]
+        }
+      ],
+      "raw_decode_calls": [
+        {
+          "kind": "decode-call",
+          "packet": 0,
+          "stream": 0,
+          "offset": 0,
+          "supplied": 185,
+          "returned": 185,
+          "got": 1
+        }
+      ],
+      "source_ID_mapping": "Unique geometry/position association in original authored PCS; region IDs are independent source facts, not a native exposed field"
+    },
+    {
+      "id": "reversed-pcs21-rcs12",
+      "source_input": {
+        "path": ".research/parallel-subtitles/dvb-native-closure-1/order-controls/reversed-pcs21-rcs12.dvb",
+        "bytes": 185,
+        "sha256": "a70b2f8944898f130aa474619e5628338fdfdaaf9023ee01ab9c1d2f05346d40"
+      },
+      "whole_carrier": {
+        "path": ".research/parallel-subtitles/dvb-native-closure-1/order-controls/reversed-pcs21-rcs12.mkv",
+        "bytes": 496,
+        "sha256": "2f4443b407297708ac97a653da743dfb3d6cadf38b7d139c697dcd515f05dd86"
+      },
+      "source_classification": "deliberately nonconforming PCS order; receiver causality only, strict source rejection remains",
+      "raw_log": {
+        "path": ".research/aws-linux-extended1/exports/63.183.208.230/order-observed-parent-1793494688875492982/reversed-pcs21-rcs12.jsonl",
+        "sha256": "4752ffbdb0941385a04d073334b2d245dd5df59074f037f42eddc815310b91ed"
+      },
+      "raw_codec_inputs": [
+        {
+          "kind": "codec-input",
+          "packet": 0,
+          "stream": 0,
+          "offset": 0,
+          "size": 185,
+          "pos": 280,
+          "flags": 1,
+          "pts_raw": 1000,
+          "dts_raw": 1000,
+          "pts": 1000,
+          "dts": 1000,
+          "duration_raw": 2000,
+          "packet_time_base": [
+            0,
+            1
+          ],
+          "data_hex": "0f140001000507000f000b0f100001000e020b02ff0002000501ff000100010f1100010016010f000400022700000300010000f00000020002f0000f1100010010020f000200022700000300030000f0000f120001001a000f009f00000000019feb808000029f10808000039feb8080000f130001001000010100040004106000f0109000f0000f130001001000020100040004109000f0106000f0000f130001001000030100040004105000f010a000f0000f8000010000",
+          "side_data": []
+        }
+      ],
+      "raw_events": [
+        {
+          "kind": "subtitle",
+          "stream": 0,
+          "packet": 0,
+          "packet_offset": 0,
+          "consumed": 185,
+          "drain": false,
+          "format": 0,
+          "pts_raw": 1000000,
+          "pts_microseconds": 1000000,
+          "pts_timebase": [
+            1,
+            1000000
+          ],
+          "start_display_ms": 0,
+          "end_display_ms": 2000,
+          "context_canvas": [
+            16,
+            12
+          ],
+          "rectangles": [
+            {
+              "order": 0,
+              "type": 1,
+              "x": 1,
+              "y": 1,
+              "width": 4,
+              "height": 2,
+              "flags": 0,
+              "native_stride": 4,
+              "indices_hex": "0102020102010102",
+              "palette_entries": 4,
+              "raw_native_palette_hex": "00880000ffffffff000000ffffffffff",
+              "palette_native_u32": [
+                34816,
+                4294967295,
+                4278190080,
+                4294967295
+              ]
+            },
+            {
+              "order": 1,
+              "type": 1,
+              "x": 2,
+              "y": 5,
+              "width": 2,
+              "height": 2,
+              "flags": 0,
+              "native_stride": 2,
+              "indices_hex": "01010202",
+              "palette_entries": 4,
+              "raw_native_palette_hex": "00880000ffffffff000000ffffffffff",
+              "palette_native_u32": [
+                34816,
+                4294967295,
+                4278190080,
+                4294967295
+              ]
+            }
+          ]
+        }
+      ],
+      "raw_decode_calls": [
+        {
+          "kind": "decode-call",
+          "packet": 0,
+          "stream": 0,
+          "offset": 0,
+          "supplied": 185,
+          "returned": 185,
+          "got": 1
+        }
+      ],
+      "source_ID_mapping": "Unique geometry/position association in original authored PCS; region IDs are independent source facts, not a native exposed field"
+    }
+  ],
+  "invalid_geometry_controls": "Local existing-bound preservation tests only; no native result assigned",
+  "Native_source_config_colour_clock_or_order_normalized": false,
+  "qualified": false
+}

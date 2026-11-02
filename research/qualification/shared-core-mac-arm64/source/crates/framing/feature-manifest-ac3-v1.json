@@ -1,0 +1,109 @@
+{
+  "schema": "safe-media-framing-ac3-eac3-development-v1",
+  "status": "prepared independent source; new Rust execution pending parent queue",
+  "runtime_dependency": "safe-media-core only",
+  "unsafe_code": "forbidden by existing crate root",
+  "primary_sources": {
+    "frames": "ATSC A/52:2018 base 5.3/5.4, Table 5.18 and Annex E 2.2/2.3",
+    "records": "ETSI TS 102 366 V1.4.1 Annex F.4/F.6",
+    "hash_manifest": ".research/parallel-framing/audio-batch/spec-sources-v1.json",
+    "edition_difference": "Reduced-rate fscod2 follows explicit ATSC syntax; it is not inferred from the inspected ETSI frame syntax"
+  },
+  "selected_features": [
+    {
+      "id": "C01",
+      "feature": "Strict aligned big-endian AC-3/E-AC-3 syncframe envelopes; explicit family selection; no recovery scanning"
+    },
+    {
+      "id": "C02",
+      "feature": "Bounded twelve-byte/ninety-bit prefix probes; bsid 0..8 or 11..16; checked frame/rate/block/sample facts"
+    },
+    {
+      "id": "C03",
+      "feature": "AC-3 mode/service/CRC1/mix/dialnorm/compression facts and exact optional presence; reserved values retained"
+    },
+    {
+      "id": "C04",
+      "feature": "E-AC-3 stream/substream/word-size/rate-or-block/dual-mono/compression/dependent map fields and presence; ATSC reduced rates"
+    },
+    {
+      "id": "C05",
+      "feature": "Exact coded sample span and bitrate ratio, distinct nominal rate; no invented programme time or aggregate channels"
+    },
+    {
+      "id": "C06",
+      "feature": "Byte-identical owned complete frame/CRC words; source/generation/offset facts; work/cancel/pool and reserve/freeze checkpoints"
+    },
+    {
+      "id": "C07",
+      "feature": "Actual primary dac3 three-byte payload syntax, raw reserved/coded fields and local issues"
+    },
+    {
+      "id": "C08",
+      "feature": "Actual primary dec3 header/1..8 inline descriptors, conditional chan_loc versus reserved-bit presence, asvc and opaque trailing reserved bytes"
+    },
+    {
+      "id": "C09",
+      "feature": "Bounded owned-record inspection; unchanged raw/spans; explicit record kind and local source issues; no output allocation"
+    }
+  ],
+  "gaps": [
+    {
+      "id": "CG01",
+      "gap": "CRC1/CRC2 verification, full BSI/audio blocks/metadata and decoder conformance unimplemented"
+    },
+    {
+      "id": "CG02",
+      "gap": "Search/resynchronization, word-swapped and IEC transport representations unsupported"
+    },
+    {
+      "id": "CG03",
+      "gap": "bsid 9/10 and >16 unsupported; no guessed reduced AC-3/future layout"
+    },
+    {
+      "id": "CG04",
+      "gap": "Independent/dependent grouping, actual dependency counts/channel topology, record/sample/aggregate-rate consistency and configuration epochs not implemented"
+    },
+    {
+      "id": "CG05",
+      "gap": "Remaining BSI and reserved-tail/immersive extensions opaque; raw num_dep_sub semantics not converted into observed stream counts"
+    },
+    {
+      "id": "CG06",
+      "gap": "DTS core excluded; normative syntax not inspected/frozen for a coherent batch, not claimed unavailable"
+    },
+    {
+      "id": "G01",
+      "gap": "AVC/hvcC primary record grammar still unsupported; previous SPS/AV1 semantic gaps unchanged"
+    },
+    {
+      "id": "CG07",
+      "gap": "All new Rust compile/tests/lints/target, native reference, full parity/time/memory and integration/device gates pending parent"
+    }
+  ],
+  "authored_corpus": {
+    "generator": ".research/parallel-framing/audio-batch/generate.py",
+    "generator_sha256": "aab5cc11d3e070438e04fa7f5d8d055ce26b5c8a4f25300ad46dd2c5fcd58ef2",
+    "header_cases": 240,
+    "frame_cases": 18,
+    "dac3_cases": 101,
+    "dec3_cases": 31,
+    "cases": 390,
+    "authored_wire_bytes": 13731,
+    "negative_repros": 33,
+    "new_rust_test_functions": 13,
+    "new_rust_tests_executed": 0,
+    "python_oracle": "small bit-authoring/whole-buffer/Fraction calculations passed",
+    "validity_scope": "source facts and deliberate opaque/unchecked bodies/CRCs, not encoded audio conformance",
+    "runtime_reference": "none executed"
+  },
+  "hard_gates": {
+    "full_selected_parity": "unqualified",
+    "runtime_upper_paired95_maximum": 0.8,
+    "runtime": "unmeasured",
+    "live_heap": "must be lower; unmeasured",
+    "attributable_rss": "must be lower; unmeasured",
+    "numerical_target": "native Mac ARM64",
+    "shipping_target": "separate 32-bit webOS/integration/device proof"
+  }
+}

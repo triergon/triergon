@@ -1,0 +1,128 @@
+# Original authored source contract. Header: kind filename outcome count caller-origin.
+# S: ordinal start end DTS CTS delta CTO-version raw32 ticks signed-value raw-fragment-flags sync.
+stbl w4-asymmetric-five.bin ready 5 null
+S 1 1099511627776 1099511627776 0 0 2 null null null null null true
+S 2 1099511627776 1099511627777 2 2 2 null null null null null true
+S 3 1099511627777 1099511627792 4 4 2 null null null null null true
+S 4 1099511627792 1099511627794 6 6 2 null null null null null true
+S 5 1099511627794 1099511627808 8 8 2 null null null null null true
+
+stbl w4-even-four.bin ready 4 null
+S 1 1099511627776 1099511627777 0 0 2 null null null null null true
+S 2 1099511627777 1099511627779 2 2 2 null null null null null true
+S 3 1099511627779 1099511627782 4 4 2 null null null null null true
+S 4 1099511627782 1099511627786 6 6 2 null null null null null true
+
+stbl w4-one.bin ready 1 null
+S 1 1099511627776 1099511627791 0 0 2 null null null null null true
+
+stbl w4-empty.bin ready 0 null
+
+stbl w8-asymmetric-five.bin ready 5 null
+S 1 1099511627776 1099511627776 0 0 2 null null null null null true
+S 2 1099511627776 1099511627777 2 2 2 null null null null null true
+S 3 1099511627777 1099511627904 4 4 2 null null null null null true
+S 4 1099511627904 1099511628032 6 6 2 null null null null null true
+S 5 1099511628032 1099511628287 8 8 2 null null null null null true
+
+stbl w8-empty.bin ready 0 null
+
+stbl w16-boundaries.bin ready 6 null
+S 1 1099511627776 1099511627776 0 0 2 null null null null null true
+S 2 1099511627776 1099511627777 2 2 2 null null null null null true
+S 3 1099511627777 1099511628032 4 4 2 null null null null null true
+S 4 1099511628032 1099511628288 6 6 2 null null null null null true
+S 5 1099511628288 1099511661056 8 8 2 null null null null null true
+S 6 1099511661056 1099511726591 10 10 2 null null null null null true
+
+stbl w16-empty.bin ready 0 null
+
+stbl w4-source-end-u64max.bin ready 1 null
+S 1 18446744073709551600 18446744073709551615 0 0 2 null null null null null true
+
+stbl w4-five-opaque-tail.bin ready 5 null
+S 1 1099511627776 1099511627776 0 0 2 null null null null null true
+S 2 1099511627776 1099511627777 2 2 2 null null null null null true
+S 3 1099511627777 1099511627792 4 4 2 null null null null null true
+S 4 1099511627792 1099511627794 6 6 2 null null null null null true
+S 5 1099511627794 1099511627808 8 8 2 null null null null null true
+
+stbl w4-odd-tail-0.bin ready 3 null
+S 1 1099511627776 1099511627777 0 0 2 null null null null null true
+S 2 1099511627777 1099511627779 2 2 2 null null null null null true
+S 3 1099511627779 1099511627782 4 4 2 null null null null null true
+
+stbl w4-odd-tail-1.bin ready 3 null
+S 1 1099511627776 1099511627777 0 0 2 null null null null null true
+S 2 1099511627777 1099511627779 2 2 2 null null null null null true
+S 3 1099511627779 1099511627782 4 4 2 null null null null null true
+
+stbl w4-odd-tail-2.bin ready 3 null
+S 1 1099511627776 1099511627777 0 0 2 null null null null null true
+S 2 1099511627777 1099511627779 2 2 2 null null null null null true
+S 3 1099511627779 1099511627782 4 4 2 null null null null null true
+
+stbl w4-odd-tail-3.bin ready 3 null
+S 1 1099511627776 1099511627777 0 0 2 null null null null null true
+S 2 1099511627777 1099511627779 2 2 2 null null null null null true
+S 3 1099511627779 1099511627782 4 4 2 null null null null null true
+
+stbl w4-odd-tail-4.bin ready 3 null
+S 1 1099511627776 1099511627777 0 0 2 null null null null null true
+S 2 1099511627777 1099511627779 2 2 2 null null null null null true
+S 3 1099511627779 1099511627782 4 4 2 null null null null null true
+
+stbl w4-odd-tail-5.bin ready 3 null
+S 1 1099511627776 1099511627777 0 0 2 null null null null null true
+S 2 1099511627777 1099511627779 2 2 2 null null null null null true
+S 3 1099511627779 1099511627782 4 4 2 null null null null null true
+
+stbl w4-odd-tail-6.bin ready 3 null
+S 1 1099511627776 1099511627777 0 0 2 null null null null null true
+S 2 1099511627777 1099511627779 2 2 2 null null null null null true
+S 3 1099511627779 1099511627782 4 4 2 null null null null null true
+
+stbl w4-odd-tail-7.bin ready 3 null
+S 1 1099511627776 1099511627777 0 0 2 null null null null null true
+S 2 1099511627777 1099511627779 2 2 2 null null null null null true
+S 3 1099511627779 1099511627782 4 4 2 null null null null null true
+
+stbl w4-odd-tail-8.bin ready 3 null
+S 1 1099511627776 1099511627777 0 0 2 null null null null null true
+S 2 1099511627777 1099511627779 2 2 2 null null null null null true
+S 3 1099511627779 1099511627782 4 4 2 null null null null null true
+
+stbl w4-odd-tail-9.bin ready 3 null
+S 1 1099511627776 1099511627777 0 0 2 null null null null null true
+S 2 1099511627777 1099511627779 2 2 2 null null null null null true
+S 3 1099511627779 1099511627782 4 4 2 null null null null null true
+
+stbl w4-odd-tail-10.bin ready 3 null
+S 1 1099511627776 1099511627777 0 0 2 null null null null null true
+S 2 1099511627777 1099511627779 2 2 2 null null null null null true
+S 3 1099511627779 1099511627782 4 4 2 null null null null null true
+
+stbl w4-odd-tail-11.bin ready 3 null
+S 1 1099511627776 1099511627777 0 0 2 null null null null null true
+S 2 1099511627777 1099511627779 2 2 2 null null null null null true
+S 3 1099511627779 1099511627782 4 4 2 null null null null null true
+
+stbl w4-odd-tail-12.bin ready 3 null
+S 1 1099511627776 1099511627777 0 0 2 null null null null null true
+S 2 1099511627777 1099511627779 2 2 2 null null null null null true
+S 3 1099511627779 1099511627782 4 4 2 null null null null null true
+
+stbl w4-odd-tail-13.bin ready 3 null
+S 1 1099511627776 1099511627777 0 0 2 null null null null null true
+S 2 1099511627777 1099511627779 2 2 2 null null null null null true
+S 3 1099511627779 1099511627782 4 4 2 null null null null null true
+
+stbl w4-odd-tail-14.bin ready 3 null
+S 1 1099511627776 1099511627777 0 0 2 null null null null null true
+S 2 1099511627777 1099511627779 2 2 2 null null null null null true
+S 3 1099511627779 1099511627782 4 4 2 null null null null null true
+
+stbl w4-odd-tail-15.bin ready 3 null
+S 1 1099511627776 1099511627777 0 0 2 null null null null null true
+S 2 1099511627777 1099511627779 2 2 2 null null null null null true
+S 3 1099511627779 1099511627782 4 4 2 null null null null null true

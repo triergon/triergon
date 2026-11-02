@@ -1,0 +1,317 @@
+FFFFFFFFFFFFFFFFFFFFFFFFFF
+======================================================================
+FAIL: test_every_frozen_colour_profile_matches_native_and_exact_source (harness.test_colour.ColourParityTests.test_every_frozen_colour_profile_matches_native_and_exact_source) (profile='colour-absent')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/jonasgrosch/projects/safe-media/harness/test_colour.py", line 17, in test_every_frozen_colour_profile_matches_native_and_exact_source
+    self.assertEqual(left['status'],'ok',left)
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: 'worker-error' != 'ok'
+- worker-error
++ ok
+ : {'status': 'worker-error', 'exit_code': 1, 'stderr': 'unknown operation\n'}
+
+======================================================================
+FAIL: test_every_frozen_colour_profile_matches_native_and_exact_source (harness.test_colour.ColourParityTests.test_every_frozen_colour_profile_matches_native_and_exact_source) (profile='colour-empty')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/jonasgrosch/projects/safe-media/harness/test_colour.py", line 17, in test_every_frozen_colour_profile_matches_native_and_exact_source
+    self.assertEqual(left['status'],'ok',left)
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: 'worker-error' != 'ok'
+- worker-error
++ ok
+ : {'status': 'worker-error', 'exit_code': 1, 'stderr': 'unknown operation\n'}
+
+======================================================================
+FAIL: test_every_frozen_colour_profile_matches_native_and_exact_source (harness.test_colour.ColourParityTests.test_every_frozen_colour_profile_matches_native_and_exact_source) (profile='colour-sdr')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/jonasgrosch/projects/safe-media/harness/test_colour.py", line 17, in test_every_frozen_colour_profile_matches_native_and_exact_source
+    self.assertEqual(left['status'],'ok',left)
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: 'worker-error' != 'ok'
+- worker-error
++ ok
+ : {'status': 'worker-error', 'exit_code': 1, 'stderr': 'unknown operation\n'}
+
+======================================================================
+FAIL: test_every_frozen_colour_profile_matches_native_and_exact_source (harness.test_colour.ColourParityTests.test_every_frozen_colour_profile_matches_native_and_exact_source) (profile='colour-rgb-full')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/jonasgrosch/projects/safe-media/harness/test_colour.py", line 17, in test_every_frozen_colour_profile_matches_native_and_exact_source
+    self.assertEqual(left['status'],'ok',left)
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: 'worker-error' != 'ok'
+- worker-error
++ ok
+ : {'status': 'worker-error', 'exit_code': 1, 'stderr': 'unknown operation\n'}
+
+======================================================================
+FAIL: test_every_frozen_colour_profile_matches_native_and_exact_source (harness.test_colour.ColourParityTests.test_every_frozen_colour_profile_matches_native_and_exact_source) (profile='colour-hdr10')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/jonasgrosch/projects/safe-media/harness/test_colour.py", line 17, in test_every_frozen_colour_profile_matches_native_and_exact_source
+    self.assertEqual(left['status'],'ok',left)
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: 'worker-error' != 'ok'
+- worker-error
++ ok
+ : {'status': 'worker-error', 'exit_code': 1, 'stderr': 'unknown operation\n'}
+
+======================================================================
+FAIL: test_every_frozen_colour_profile_matches_native_and_exact_source (harness.test_colour.ColourParityTests.test_every_frozen_colour_profile_matches_native_and_exact_source) (profile='colour-hdr32')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/jonasgrosch/projects/safe-media/harness/test_colour.py", line 17, in test_every_frozen_colour_profile_matches_native_and_exact_source
+    self.assertEqual(left['status'],'ok',left)
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: 'worker-error' != 'ok'
+- worker-error
++ ok
+ : {'status': 'worker-error', 'exit_code': 1, 'stderr': 'unknown operation\n'}
+
+======================================================================
+FAIL: test_every_frozen_colour_profile_matches_native_and_exact_source (harness.test_colour.ColourParityTests.test_every_frozen_colour_profile_matches_native_and_exact_source) (profile='colour-hlg')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/jonasgrosch/projects/safe-media/harness/test_colour.py", line 17, in test_every_frozen_colour_profile_matches_native_and_exact_source
+    self.assertEqual(left['status'],'ok',left)
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: 'worker-error' != 'ok'
+- worker-error
++ ok
+ : {'status': 'worker-error', 'exit_code': 1, 'stderr': 'unknown operation\n'}
+
+======================================================================
+FAIL: test_every_frozen_colour_profile_matches_native_and_exact_source (harness.test_colour.ColourParityTests.test_every_frozen_colour_profile_matches_native_and_exact_source) (profile='colour-p3')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/jonasgrosch/projects/safe-media/harness/test_colour.py", line 17, in test_every_frozen_colour_profile_matches_native_and_exact_source
+    self.assertEqual(left['status'],'ok',left)
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: 'worker-error' != 'ok'
+- worker-error
++ ok
+ : {'status': 'worker-error', 'exit_code': 1, 'stderr': 'unknown operation\n'}
+
+======================================================================
+FAIL: test_every_frozen_colour_profile_matches_native_and_exact_source (harness.test_colour.ColourParityTests.test_every_frozen_colour_profile_matches_native_and_exact_source) (profile='colour-cll-only')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/jonasgrosch/projects/safe-media/harness/test_colour.py", line 17, in test_every_frozen_colour_profile_matches_native_and_exact_source
+    self.assertEqual(left['status'],'ok',left)
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: 'worker-error' != 'ok'
+- worker-error
++ ok
+ : {'status': 'worker-error', 'exit_code': 1, 'stderr': 'unknown operation\n'}
+
+======================================================================
+FAIL: test_every_frozen_colour_profile_matches_native_and_exact_source (harness.test_colour.ColourParityTests.test_every_frozen_colour_profile_matches_native_and_exact_source) (profile='colour-fall-only')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/jonasgrosch/projects/safe-media/harness/test_colour.py", line 17, in test_every_frozen_colour_profile_matches_native_and_exact_source
+    self.assertEqual(left['status'],'ok',left)
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: 'worker-error' != 'ok'
+- worker-error
++ ok
+ : {'status': 'worker-error', 'exit_code': 1, 'stderr': 'unknown operation\n'}
+
+======================================================================
+FAIL: test_every_frozen_colour_profile_matches_native_and_exact_source (harness.test_colour.ColourParityTests.test_every_frozen_colour_profile_matches_native_and_exact_source) (profile='colour-light-zero')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/jonasgrosch/projects/safe-media/harness/test_colour.py", line 17, in test_every_frozen_colour_profile_matches_native_and_exact_source
+    self.assertEqual(left['status'],'ok',left)
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: 'worker-error' != 'ok'
+- worker-error
++ ok
+ : {'status': 'worker-error', 'exit_code': 1, 'stderr': 'unknown operation\n'}
+
+======================================================================
+FAIL: test_every_frozen_colour_profile_matches_native_and_exact_source (harness.test_colour.ColourParityTests.test_every_frozen_colour_profile_matches_native_and_exact_source) (profile='colour-master-empty')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/jonasgrosch/projects/safe-media/harness/test_colour.py", line 17, in test_every_frozen_colour_profile_matches_native_and_exact_source
+    self.assertEqual(left['status'],'ok',left)
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: 'worker-error' != 'ok'
+- worker-error
++ ok
+ : {'status': 'worker-error', 'exit_code': 1, 'stderr': 'unknown operation\n'}
+
+======================================================================
+FAIL: test_every_frozen_colour_profile_matches_native_and_exact_source (harness.test_colour.ColourParityTests.test_every_frozen_colour_profile_matches_native_and_exact_source) (profile='colour-master-partial')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/jonasgrosch/projects/safe-media/harness/test_colour.py", line 17, in test_every_frozen_colour_profile_matches_native_and_exact_source
+    self.assertEqual(left['status'],'ok',left)
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: 'worker-error' != 'ok'
+- worker-error
++ ok
+ : {'status': 'worker-error', 'exit_code': 1, 'stderr': 'unknown operation\n'}
+
+======================================================================
+FAIL: test_every_frozen_colour_profile_matches_native_and_exact_source (harness.test_colour.ColourParityTests.test_every_frozen_colour_profile_matches_native_and_exact_source) (profile='colour-master-zero')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/jonasgrosch/projects/safe-media/harness/test_colour.py", line 17, in test_every_frozen_colour_profile_matches_native_and_exact_source
+    self.assertEqual(left['status'],'ok',left)
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: 'worker-error' != 'ok'
+- worker-error
++ ok
+ : {'status': 'worker-error', 'exit_code': 1, 'stderr': 'unknown operation\n'}
+
+======================================================================
+FAIL: test_every_frozen_colour_profile_matches_native_and_exact_source (harness.test_colour.ColourParityTests.test_every_frozen_colour_profile_matches_native_and_exact_source) (profile='colour-master-boundary')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/jonasgrosch/projects/safe-media/harness/test_colour.py", line 17, in test_every_frozen_colour_profile_matches_native_and_exact_source
+    self.assertEqual(left['status'],'ok',left)
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: 'worker-error' != 'ok'
+- worker-error
++ ok
+ : {'status': 'worker-error', 'exit_code': 1, 'stderr': 'unknown operation\n'}
+
+======================================================================
+FAIL: test_every_frozen_colour_profile_matches_native_and_exact_source (harness.test_colour.ColourParityTests.test_every_frozen_colour_profile_matches_native_and_exact_source) (profile='colour-subsampling')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/jonasgrosch/projects/safe-media/harness/test_colour.py", line 17, in test_every_frozen_colour_profile_matches_native_and_exact_source
+    self.assertEqual(left['status'],'ok',left)
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: 'worker-error' != 'ok'
+- worker-error
++ ok
+ : {'status': 'worker-error', 'exit_code': 1, 'stderr': 'unknown operation\n'}
+
+======================================================================
+FAIL: test_every_frozen_colour_profile_matches_native_and_exact_source (harness.test_colour.ColourParityTests.test_every_frozen_colour_profile_matches_native_and_exact_source) (profile='colour-many-tracks')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/jonasgrosch/projects/safe-media/harness/test_colour.py", line 17, in test_every_frozen_colour_profile_matches_native_and_exact_source
+    self.assertEqual(left['status'],'ok',left)
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: 'worker-error' != 'ok'
+- worker-error
++ ok
+ : {'status': 'worker-error', 'exit_code': 1, 'stderr': 'unknown operation\n'}
+
+======================================================================
+FAIL: test_every_frozen_colour_profile_matches_native_and_exact_source (harness.test_colour.ColourParityTests.test_every_frozen_colour_profile_matches_native_and_exact_source) (profile='colour-siting-0-0')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/jonasgrosch/projects/safe-media/harness/test_colour.py", line 17, in test_every_frozen_colour_profile_matches_native_and_exact_source
+    self.assertEqual(left['status'],'ok',left)
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: 'worker-error' != 'ok'
+- worker-error
++ ok
+ : {'status': 'worker-error', 'exit_code': 1, 'stderr': 'unknown operation\n'}
+
+======================================================================
+FAIL: test_every_frozen_colour_profile_matches_native_and_exact_source (harness.test_colour.ColourParityTests.test_every_frozen_colour_profile_matches_native_and_exact_source) (profile='colour-siting-0-1')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/jonasgrosch/projects/safe-media/harness/test_colour.py", line 17, in test_every_frozen_colour_profile_matches_native_and_exact_source
+    self.assertEqual(left['status'],'ok',left)
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: 'worker-error' != 'ok'
+- worker-error
++ ok
+ : {'status': 'worker-error', 'exit_code': 1, 'stderr': 'unknown operation\n'}
+
+======================================================================
+FAIL: test_every_frozen_colour_profile_matches_native_and_exact_source (harness.test_colour.ColourParityTests.test_every_frozen_colour_profile_matches_native_and_exact_source) (profile='colour-siting-0-2')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/jonasgrosch/projects/safe-media/harness/test_colour.py", line 17, in test_every_frozen_colour_profile_matches_native_and_exact_source
+    self.assertEqual(left['status'],'ok',left)
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: 'worker-error' != 'ok'
+- worker-error
++ ok
+ : {'status': 'worker-error', 'exit_code': 1, 'stderr': 'unknown operation\n'}
+
+======================================================================
+FAIL: test_every_frozen_colour_profile_matches_native_and_exact_source (harness.test_colour.ColourParityTests.test_every_frozen_colour_profile_matches_native_and_exact_source) (profile='colour-siting-1-0')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/jonasgrosch/projects/safe-media/harness/test_colour.py", line 17, in test_every_frozen_colour_profile_matches_native_and_exact_source
+    self.assertEqual(left['status'],'ok',left)
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: 'worker-error' != 'ok'
+- worker-error
++ ok
+ : {'status': 'worker-error', 'exit_code': 1, 'stderr': 'unknown operation\n'}
+
+======================================================================
+FAIL: test_every_frozen_colour_profile_matches_native_and_exact_source (harness.test_colour.ColourParityTests.test_every_frozen_colour_profile_matches_native_and_exact_source) (profile='colour-siting-1-1')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/jonasgrosch/projects/safe-media/harness/test_colour.py", line 17, in test_every_frozen_colour_profile_matches_native_and_exact_source
+    self.assertEqual(left['status'],'ok',left)
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: 'worker-error' != 'ok'
+- worker-error
++ ok
+ : {'status': 'worker-error', 'exit_code': 1, 'stderr': 'unknown operation\n'}
+
+======================================================================
+FAIL: test_every_frozen_colour_profile_matches_native_and_exact_source (harness.test_colour.ColourParityTests.test_every_frozen_colour_profile_matches_native_and_exact_source) (profile='colour-siting-1-2')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/jonasgrosch/projects/safe-media/harness/test_colour.py", line 17, in test_every_frozen_colour_profile_matches_native_and_exact_source
+    self.assertEqual(left['status'],'ok',left)
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: 'worker-error' != 'ok'
+- worker-error
++ ok
+ : {'status': 'worker-error', 'exit_code': 1, 'stderr': 'unknown operation\n'}
+
+======================================================================
+FAIL: test_every_frozen_colour_profile_matches_native_and_exact_source (harness.test_colour.ColourParityTests.test_every_frozen_colour_profile_matches_native_and_exact_source) (profile='colour-siting-2-0')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/jonasgrosch/projects/safe-media/harness/test_colour.py", line 17, in test_every_frozen_colour_profile_matches_native_and_exact_source
+    self.assertEqual(left['status'],'ok',left)
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: 'worker-error' != 'ok'
+- worker-error
++ ok
+ : {'status': 'worker-error', 'exit_code': 1, 'stderr': 'unknown operation\n'}
+
+======================================================================
+FAIL: test_every_frozen_colour_profile_matches_native_and_exact_source (harness.test_colour.ColourParityTests.test_every_frozen_colour_profile_matches_native_and_exact_source) (profile='colour-siting-2-1')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/jonasgrosch/projects/safe-media/harness/test_colour.py", line 17, in test_every_frozen_colour_profile_matches_native_and_exact_source
+    self.assertEqual(left['status'],'ok',left)
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: 'worker-error' != 'ok'
+- worker-error
++ ok
+ : {'status': 'worker-error', 'exit_code': 1, 'stderr': 'unknown operation\n'}
+
+======================================================================
+FAIL: test_every_frozen_colour_profile_matches_native_and_exact_source (harness.test_colour.ColourParityTests.test_every_frozen_colour_profile_matches_native_and_exact_source) (profile='colour-siting-2-2')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/jonasgrosch/projects/safe-media/harness/test_colour.py", line 17, in test_every_frozen_colour_profile_matches_native_and_exact_source
+    self.assertEqual(left['status'],'ok',left)
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: 'worker-error' != 'ok'
+- worker-error
++ ok
+ : {'status': 'worker-error', 'exit_code': 1, 'stderr': 'unknown operation\n'}
+
+----------------------------------------------------------------------
+Ran 1 test in 0.501s
+
+FAILED (failures=26)

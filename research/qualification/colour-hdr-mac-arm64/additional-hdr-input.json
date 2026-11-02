@@ -1,0 +1,65 @@
+{
+  "sample": "mkv/hdr10tags-both.mkv",
+  "sample_sha256": "a136317f7151436a4e25b3c4a9f78d0d378adde3283c81232cfdaf657f9b1a9b",
+  "origin": "https://fate-suite.ffmpeg.org/mkv/hdr10tags-both.mkv",
+  "rights": "external public vector; redistribution unreviewed",
+  "related_upstream_cases": [
+    "fate-matroska-side-data-pref-codec",
+    "fate-matroska-side-data-pref-packet"
+  ],
+  "upstream_case_executed": false,
+  "operation": "no-parser container packet/static-colour demux and independent source proof; no decoded-frame side-data priority claim",
+  "script_sha256": "13906031ea6910125a7283df64c1f36a997d662532763322ff30b5d96870c7ed",
+  "raw_trace_sha256": {
+    "candidate.json": "00fddae3824357b163340f3671ea8c05404f656c0517d62ed8db413c8854c03f",
+    "colour-candidate.json": "00fddae3824357b163340f3671ea8c05404f656c0517d62ed8db413c8854c03f",
+    "colour-native.json": "be18a8376e31ec7c4b5e1d74e0f3c3762b1b50a5db2ff4092edf6502f1698dd0",
+    "colour-oracle.json": "557b65b266bd18a9d1ed8191052eeecd1a92998695f5b4b71f0c8a3cee66645c",
+    "colour-source.json": "00fddae3824357b163340f3671ea8c05404f656c0517d62ed8db413c8854c03f",
+    "reference.json": "fd2c4e12cefe1238c84ec4c3365b18144f2cd97a64b52f372c61cac4d3bb7a31",
+    "source-frame-candidate.json": "00fddae3824357b163340f3671ea8c05404f656c0517d62ed8db413c8854c03f"
+  },
+  "status": "unsupported-chapters-attachments",
+  "result": {
+    "status": "mismatch",
+    "candidate": "worker-error",
+    "reference": "ok",
+    "source_colour_status": "mismatch",
+    "source_colour_differences": [
+      {
+        "path": "",
+        "actual": null,
+        "expected": "<large value>"
+      }
+    ],
+    "colour_reference_status": "mismatch",
+    "colour_reference_differences": [
+      {
+        "path": "",
+        "actual": null,
+        "expected": "<large value>"
+      }
+    ],
+    "colour_short_reads": [
+      {
+        "chunk": 1,
+        "status": "mismatch"
+      },
+      {
+        "chunk": 7,
+        "status": "mismatch"
+      },
+      {
+        "chunk": 4096,
+        "status": "mismatch"
+      }
+    ]
+  },
+  "source_path": ".research/fate-samples/mkv/hdr10tags-both.mkv",
+  "adapter_binaries": {
+    "candidate": "eea67ad1ddb31dc39f87e7cf47ae52a1f81f75a33ecbfbadd1c7d6b99c51fb57",
+    "reference": "99858009f017beb54447b3b00e4a686717b065d17d7883fea826c2eb58dac163"
+  },
+  "complete_module_acceptance": false,
+  "frozen_path": ".research/frozen-external/a136317f7151436a4e25b3c4a9f78d0d378adde3283c81232cfdaf657f9b1a9b/hdr10tags-both.mkv"
+}

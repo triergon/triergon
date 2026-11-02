@@ -1,0 +1,54 @@
+{
+  "schema": "safe-media-framing-development-v1",
+  "lane": "O21/M02 bounded AVC/HEVC configuration and NAL framing",
+  "status": "source checkpoint; not compiled or qualified",
+  "production_dependency": "safe-media-core only",
+  "unsafe_code": "forbidden",
+  "source_implementation_provenance": "Original specification-based code; O00 inventory is requirements evidence only",
+  "implemented": [
+    {"id": "F01", "feature": "AVC one-byte fixed header facts; forbidden_zero_bit check; type and nal_ref_idc retained"},
+    {"id": "F02", "feature": "HEVC two-byte fixed header facts; forbidden_zero_bit and nonzero temporal_id_plus1 checks; type/layer/temporal retained"},
+    {"id": "F03", "feature": "Explicit big-endian length-prefix widths 1/2/3/4; complete NALs; checked declared sizes; no ISO record inference"},
+    {"id": "F04", "feature": "Incremental Annex-B three/four-byte prefix, leading/trailing zero and source-offset facts; literal termination extraction"},
+    {"id": "F05", "feature": "Arbitrary input chunks, explicit starvation/completion/failure, same-pool and generation enforcement through core"},
+    {"id": "F06", "feature": "Explicit work yields and sticky cancellation; bounds on NALs/padding/count/windows/output; retryable reserve/freeze pressure"},
+    {"id": "F07", "feature": "Pool-owned complete outputs and immutable clone lifetime; charged retained capacity; no unchecked vector-growth copies"},
+    {"id": "F08", "feature": "Resumable four-byte Annex-B prefix plus byte-identical NAL; original source facts accompany output"},
+    {"id": "F09", "feature": "Opaque avcC/hvcC source record retention with declared sample framing and explicit DeclaredOpaque inspection"},
+    {"id": "F10", "feature": "Bounded Annex-B configuration framing/classification for AVC 7/8 and HEVC 32/33/34; source/order/duplicates preserved; zero-copy source views"}
+  ],
+  "gaps": [
+    {"id": "G01", "feature": "avcC/hvcC ISO/IEC 14496-15 record parsing", "state": "not implemented; primary syntax/version acquisition open; widths/arrays/extensions/reserved fields/completeness not inferred"},
+    {"id": "G02", "feature": "SPS/PPS/VPS semantics and probing", "state": "not implemented; no IDs, references, profile, dimensions, level, timing, reorder/delay or consistency proof"},
+    {"id": "G03", "feature": "Extended AVC headers and extra config NAL types", "state": "fixed header only; AVC 13/15/16 and config SEI/other NALs unsupported by config parser"},
+    {"id": "G04", "feature": "Full EBSP/RBSP and Annex-B conformance", "state": "not implemented; no full prohibited-byte, payload trailing-bit or AU-dependent zero_byte validation; reserved/layer facts are not codec support"},
+    {"id": "G05", "feature": "Access units, random access and decoder adaptation", "state": "not implemented; no frame/keyframe inference, injection, reordering, drain, HDR/DV rewrite or platform decoder"},
+    {"id": "G06", "feature": "Source/configuration transactions and parent packet integration", "state": "not integrated; fresh reader per entity/reset; no cross-entity NAL continuation, unknown-framing config model or configuration epoch policy"},
+    {"id": "G07", "feature": "Annex-B retained-capacity efficiency", "state": "maximum_nal_bytes scratch per complete NAL; shorter-output/segmented strategy needs bounded-work design and measurement"},
+    {"id": "G08", "feature": "Other O21 families", "state": "AV1/VP9/AAC/AC3/EAC3/DTS and all simulator decoder/capture tasks untouched"},
+    {"id": "G09", "feature": "Build/target/safety-graph and numerical qualification", "state": "parent queue pending; no Rust execution, no FFmpeg comparison, no full parity/performance/memory result, no 32-bit or TV evidence"}
+  ],
+  "authored_evidence": {
+    "fixture_table": "fixtures/framing-v1.tsv",
+    "fixture_sha256": "05c9403368838664097907d1d695ebc1da023be37b6bd9891518198b70c7f265",
+    "python_generator": ".research/parallel-framing/generate.py",
+    "generator_version": "framing-authored-v2",
+    "cases": 30,
+    "nals": 54,
+    "input_bytes": 501,
+    "rust_test_functions": 13,
+    "python_oracle_execution": "passed",
+    "rust_execution": "not run by instruction",
+    "native_reference_execution": "not run",
+    "fixture_scope": "opaque bit-authored framing/header data; not valid encoded-picture or SPS/PPS/VPS conformance corpus"
+  },
+  "hard_gates": {
+    "full_selected_parity": "unmeasured",
+    "runtime_upper_paired95_ratio_maximum": 0.80,
+    "runtime_result": "unmeasured",
+    "live_heap": "must be lower; unmeasured",
+    "attributable_rss": "must be lower; unmeasured",
+    "numerical_target": "native Mac ARM64",
+    "webos_32_bit": "pending"
+  }
+}

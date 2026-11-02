@@ -1,0 +1,24 @@
+{
+  "requirements": {
+    "all_four_frozen_profile_sets_preserved": true,
+    "k2_source_bytes_private_and_exact_times_verified": true,
+    "k3_all_96_fresh_eof_packet_sequences_match": true,
+    "all_34_case_parity_gates_pass": true,
+    "all_34_case_runtime_upper_bounds_at_most_080": true,
+    "all_34_case_live_heap_and_attributable_rss_upper_bounds_below_1": true,
+    "all_case_samples_current_selected_workers_inputs_and_instrumentation": true,
+    "all_numerical_verdicts_recomputed": true,
+    "owner_approved_rules_bound_to_exact_input_and_raw_reference_output": true,
+    "all_seven_primary_specification_hashes_verified": true,
+    "host_tests_34_rust_29_python_and_shipping_feature_check_pass": true,
+    "actual_two_upstream_fate_cases_and_separate_zero_length_demux_pass": true,
+    "exact_owned_inputs_workers_sources_and_raw_pairs_retained": true
+  },
+  "remaining_broader_module_work": true,
+  "deferred_targets": [
+    "x86_64-unknown-linux-gnu",
+    "armv7-linux-webos-32"
+  ],
+  "streem_integration_claimed": false,
+  "published_or_committed": false
+}

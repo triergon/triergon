@@ -1,0 +1,5 @@
+id	wire_hex	result
+additional-one-byte-overlaps-tail	0b7700043587c4000000	invalid
+additional-sixtyfour-overlaps-tail	0b7700043587c7f00000	invalid
+informational-production-overlaps-tail	0b7700043587cfe40000	invalid
+auxiliary-length-overlaps-selected-prefix	0b7700043587c0020000	invalid

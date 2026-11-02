@@ -1,0 +1,35 @@
+{
+  "schema": 1,
+  "objective": "Remove every enabled Streem application-runtime and packaging dependency on FFmpeg, including release playback, desktop simulator playback and development capture, while preserving selected features and unchanged parity/time/memory gates",
+  "status": "active",
+  "scope_document": "../docs/offboarding-target.md",
+  "current_execution_milestone": "Complete the remaining selected M01/M02 features, beginning with bounded Matroska track/colour/HDR metadata, using frozen parity/runtime/lower-memory gates on native Mac ARM64",
+  "completion_milestones": [
+    "O00",
+    "O10",
+    "O20",
+    "O21",
+    "O30",
+    "O31",
+    "O40",
+    "O50",
+    "O60",
+    "O61",
+    "O62",
+    "O70"
+  ],
+  "reference_tools_retained": true,
+  "streem_inventory_revision": "9c7c0fb5f7316c92ab8086beb19db03d5855dd6e",
+  "qualified_complete_modules": [],
+  "required_additional_runtime_surfaces": [
+    "desktop simulator video/audio FFmpeg subprocesses",
+    "development MPEG-1/TS capture and swscale"
+  ],
+  "qualified_development_slices": [
+    "K0-container-demux-v1",
+    "K1-header-removal-v1",
+    "K2-bounded-zlib-v1",
+    "K3-cues-preroll-v1"
+  ],
+  "slice_evidence": "qualification/zlib-cues-approved-mac-arm64/README.md"
+}

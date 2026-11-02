@@ -1,0 +1,130 @@
+{
+  "schema_version": 1,
+  "revision": "9c7c0fb5f7316c92ab8086beb19db03d5855dd6e",
+  "source": {
+    "path": "$STREEM_ROOT/ci/build-ffmpeg.sh",
+    "sha256": "7517eda7a653b5f9ca58dd19b4411c0e2e2c46c09368f376e4735d904cad5e26",
+    "component_lines": [
+      188,
+      208
+    ]
+  },
+  "status": "declared source configuration only; configure expansion and binary inspection not executed",
+  "version": "9.0",
+  "tarball_sha256": "7f607a00dd0d28a729d5a4811205812eef01cf6ef6155025febb6f36a9062d52",
+  "source_url": "https://ffmpeg.org/releases/ffmpeg-9.0.tar.xz",
+  "tarball_fetched_in_this_lane": false,
+  "release_components": {
+    "demuxer": [
+      "matroska",
+      "mov",
+      "mpegts",
+      "h264",
+      "hevc"
+    ],
+    "parser": [
+      "h264",
+      "hevc",
+      "aac",
+      "ac3",
+      "dvdsub",
+      "dvbsub"
+    ],
+    "bsf": [
+      "h264_mp4toannexb",
+      "hevc_mp4toannexb",
+      "extract_extradata"
+    ],
+    "decoder": [
+      "pgssub",
+      "dvdsub",
+      "dvbsub",
+      "ass",
+      "srt",
+      "subrip",
+      "text",
+      "mov_text",
+      "webvtt"
+    ],
+    "protocol": [
+      "file"
+    ]
+  },
+  "development_additions": {
+    "encoder": [
+      "mpeg1video"
+    ],
+    "muxer": [
+      "mpegts"
+    ]
+  },
+  "release_libraries": [
+    "libavutil-plx.so.61",
+    "libavcodec-plx.so.63",
+    "libavformat-plx.so.63"
+  ],
+  "development_additional_library": "libswscale-plx.so.10",
+  "host_macos_staged": [
+    "libavutil-plx.61.dylib",
+    "libavcodec-plx.63.dylib",
+    "libavformat-plx.63.dylib",
+    "libswscale-plx.10.dylib"
+  ],
+  "host_linux_staged": [
+    "linux-host/libavutil-plx.so.61",
+    "linux-host/libavcodec-plx.so.63",
+    "linux-host/libavformat-plx.so.63",
+    "linux-host/libswscale-plx.so.10"
+  ],
+  "disabled": [
+    "network",
+    "programs",
+    "avdevice",
+    "avfilter",
+    "swresample",
+    "autodetect",
+    "swscale when RELEASE=1"
+  ],
+  "explicitly_enabled_external_library": "zlib; existing FFmpeg build only, not a safe-media dependency",
+  "internal_auto_selected_components": "unresolved without parent-controlled expanded config/registry audit",
+  "runtime_imports_by_library": {
+    "avformat": 16,
+    "avcodec": 20,
+    "avutil": 11,
+    "swscale": 3
+  },
+  "dynamic_load_evidence": [
+    "rust-modules/src/ff.rs:374-533",
+    "rust-modules/src/ff.rs:1598-1649",
+    "Makefile:754-759"
+  ],
+  "bsf_application_use": "get-by-name presence checks only; no BSF processing API bound",
+  "decoder_application_use": "avcodec_decode_subtitle2 for Bitmap-kind tracks; text packets bypass decoder API",
+  "simulator_subprocesses": [
+    {
+      "path": "rust-modules/src/player/sim_video.rs",
+      "line": 150,
+      "binary": "NJ_SIM_FFMPEG or PATH ffmpeg",
+      "input": [
+        "h264",
+        "hevc"
+      ],
+      "output": "rawvideo RGBA 1920x1080",
+      "role": "movie decode + scale/pad/format"
+    },
+    {
+      "path": "rust-modules/src/player/sim_audio.rs",
+      "line": 132,
+      "binary": "NJ_SIM_FFMPEG or PATH ffmpeg",
+      "input": [
+        "ac3",
+        "eac3",
+        "aac",
+        "dts"
+      ],
+      "output": "stereo Pulse or ALSA",
+      "role": "movie decode + stereo/output format conversion + device output"
+    }
+  ],
+  "simulator_system_binary_identity": "not inspected or executed; not necessarily bundled/pinned reference version"
+}

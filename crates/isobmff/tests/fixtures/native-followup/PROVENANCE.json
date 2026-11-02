@@ -1,0 +1,410 @@
+{
+  "schema": "safe-media.m03.native-followup-regression-fixtures.v1",
+  "qualification": false,
+  "provenance": "Exact copies of original lane-authored bytes, independent source inspector/Fraction oracles and actual pinned scalar/native packet observations only; no copied implementation code.",
+  "generator_sha256": "6a1bd12582d0bcfe868548d19994b840ea17c6d07902f3de847d0499a11057b8",
+  "native_worker_sha256": "d97ce08126efe876cf92dfaac3655073da87fd8c590793a7d37ffd9e1fbea2d2",
+  "native_source_sha256": "0eb5ff945085bb5419aee9e668f0bf0cc01792006f988f80eaabd58620b8dd9a",
+  "parent_capture_identity_sha256": "2032e8ce0c130d1a57eae493fbba5f4199845427d35bd2b60b1e4d15418e442e",
+  "request_sha256": "f56ebc95b9f20e654ee2c55ccf7cfe1881ad188db62159a62d2c472ecd258b11",
+  "cases": [
+    {
+      "id": "follow-clock-uniform-one",
+      "family": "clock",
+      "source_path": ".research/parallel-mp4/implementation/native-behavior-followup/follow-clock-uniform-one.mov",
+      "input_sha256": "5552a41c422a144deeac0fdc4ef0e174f421ef27c0762641ef4d3b9ad0f1a04e",
+      "source_oracle_sha256": "680035d62a8a7ea976fec9ee43d6381cb87be66fe28b3a5bb09a9a5e46e670ec",
+      "native_stdout": ".research/mov-native-behavior-v2-observed/native/follow-clock-uniform-one.stdout",
+      "native_stdout_sha256": "fa803ac2d9b2543a88173b9b1ac789396707e0cdf82a27fd656354b7c018b0a6"
+    },
+    {
+      "id": "follow-clock-uniform-two",
+      "family": "clock",
+      "source_path": ".research/parallel-mp4/implementation/native-behavior-followup/follow-clock-uniform-two.mov",
+      "input_sha256": "075ea1ae15d6902f246947a5666cac3c70b93d7754852ad20904e62d7738b632",
+      "source_oracle_sha256": "b47603b8c0fe038ab86ca05d260233d41bcd76d313aff668766ca97d050f0577",
+      "native_stdout": ".research/mov-native-behavior-v2-observed/native/follow-clock-uniform-two.stdout",
+      "native_stdout_sha256": "fa803ac2d9b2543a88173b9b1ac789396707e0cdf82a27fd656354b7c018b0a6"
+    },
+    {
+      "id": "follow-clock-uniform-three",
+      "family": "clock",
+      "source_path": ".research/parallel-mp4/implementation/native-behavior-followup/follow-clock-uniform-three.mov",
+      "input_sha256": "40876252a951a7049f35bda759dbb946e5ddfeea23704a48e985ed39cf176322",
+      "source_oracle_sha256": "70c4fcddf96726b1e250cf91ea7df3082474a227e5c37bc86f67d2b890aae225",
+      "native_stdout": ".research/mov-native-behavior-v2-observed/native/follow-clock-uniform-three.stdout",
+      "native_stdout_sha256": "a1700550e8c22ffc05d0e22dd13f4bdee1892337738ca259dcaf6cbdd00bd42f"
+    },
+    {
+      "id": "follow-clock-uniform-six",
+      "family": "clock",
+      "source_path": ".research/parallel-mp4/implementation/native-behavior-followup/follow-clock-uniform-six.mov",
+      "input_sha256": "5d044d3f120b7d45ac6df1ecb38cf379d8068b0d08ebb49d4340a2f3201dbcd9",
+      "source_oracle_sha256": "06762e68d060468cef0dbcae9af76d9992276ec99f8d3b72023c2cc14716b167",
+      "native_stdout": ".research/mov-native-behavior-v2-observed/native/follow-clock-uniform-six.stdout",
+      "native_stdout_sha256": "a1700550e8c22ffc05d0e22dd13f4bdee1892337738ca259dcaf6cbdd00bd42f"
+    },
+    {
+      "id": "follow-clock-later-minimum-four",
+      "family": "clock",
+      "source_path": ".research/parallel-mp4/implementation/native-behavior-followup/follow-clock-later-minimum-four.mov",
+      "input_sha256": "7d2c6ff900443dc857c258a2d12e50bd01ab9108a1c527d731cd336e123d299f",
+      "source_oracle_sha256": "69f26d6757457e5ac083c61c5b51975b9ad36d3141f9f11d5e87f2a06cb9640d",
+      "native_stdout": ".research/mov-native-behavior-v2-observed/native/follow-clock-later-minimum-four.stdout",
+      "native_stdout_sha256": "3d367f20c00e95c5aacdef64410923eb360ae381aa07202f21094504057f0438"
+    },
+    {
+      "id": "follow-clock-later-minimum-five",
+      "family": "clock",
+      "source_path": ".research/parallel-mp4/implementation/native-behavior-followup/follow-clock-later-minimum-five.mov",
+      "input_sha256": "8c32144ddad1e3204fceb6ee53866457bad7740665de737f83d00db474b25677",
+      "source_oracle_sha256": "2378e4a20f22be40b61b436fe86a040b966d6f386ab2fe695621ab7b2f3ab3f0",
+      "native_stdout": ".research/mov-native-behavior-v2-observed/native/follow-clock-later-minimum-five.stdout",
+      "native_stdout_sha256": "808b063edbb7f20633e362e529339862f2869e9a1134f7d4512bc410ab64871f"
+    },
+    {
+      "id": "follow-clock-later-minimum-six",
+      "family": "clock",
+      "source_path": ".research/parallel-mp4/implementation/native-behavior-followup/follow-clock-later-minimum-six.mov",
+      "input_sha256": "e0415422b052ccc92c97128ef0f38f94a40a773c83b1109f719bb6de7f326ee4",
+      "source_oracle_sha256": "00f043789e6ddb6fdd5b0fac61065edf6f8e63e2ca6681f6d0a20bcbd00b0b6b",
+      "native_stdout": ".research/mov-native-behavior-v2-observed/native/follow-clock-later-minimum-six.stdout",
+      "native_stdout_sha256": "808b063edbb7f20633e362e529339862f2869e9a1134f7d4512bc410ab64871f"
+    },
+    {
+      "id": "follow-clock-tail-minimum-three",
+      "family": "clock",
+      "source_path": ".research/parallel-mp4/implementation/native-behavior-followup/follow-clock-tail-minimum-three.mov",
+      "input_sha256": "067589cf523d5e9c37622c3d3bb2e2baefacaa07b807605d6a2fbe4683e27031",
+      "source_oracle_sha256": "de95f694753f8cb1a7193c70a0435c1b6e9ade2e215b547cca750136e899621d",
+      "native_stdout": ".research/mov-native-behavior-v2-observed/native/follow-clock-tail-minimum-three.stdout",
+      "native_stdout_sha256": "73d51d98d67159c58fcdc4a4f0467c2873a89437e639dbfcf764b20961d8ab6a"
+    },
+    {
+      "id": "follow-clock-tail-minimum-four",
+      "family": "clock",
+      "source_path": ".research/parallel-mp4/implementation/native-behavior-followup/follow-clock-tail-minimum-four.mov",
+      "input_sha256": "e77409ad65f8558dabbed5253db49fb426f128800a791de64e376f8635df0409",
+      "source_oracle_sha256": "ea5385d89f2d5324f3884238c734ba2185a347fe2e57642effae0f11b704377f",
+      "native_stdout": ".research/mov-native-behavior-v2-observed/native/follow-clock-tail-minimum-four.stdout",
+      "native_stdout_sha256": "6f0928db11910225a9bdaa18edc6173df8a03013c3312e2e1a469514aabe64f4"
+    },
+    {
+      "id": "follow-clock-v0-high-uniform-one",
+      "family": "clock",
+      "source_path": ".research/parallel-mp4/implementation/native-behavior-followup/follow-clock-v0-high-uniform-one.mov",
+      "input_sha256": "eb839ec6d3e6c46405849c7530a28ffc6078643e466fd4d6c7c91e7103a468a7",
+      "source_oracle_sha256": "086206a858ee8e6d20efe48a161a91b5c76ac47ce22d61ce2906864e06a2e353",
+      "native_stdout": ".research/mov-native-behavior-v2-observed/native/follow-clock-v0-high-uniform-one.stdout",
+      "native_stdout_sha256": "d8015933079f0f7df3e5e04ce81590b714e1bf4cc5d6e52cf53ffa1bc9a156a4"
+    },
+    {
+      "id": "follow-clock-v0-high-uniform-three",
+      "family": "clock",
+      "source_path": ".research/parallel-mp4/implementation/native-behavior-followup/follow-clock-v0-high-uniform-three.mov",
+      "input_sha256": "c9119e5bc8b5aef6c2bc57ec8b192b981e63a833575565921475684885dca7eb",
+      "source_oracle_sha256": "b862a2ad179416e98062d4bc0c73c3f6e0485b59ba18324182cb49eae5617dfe",
+      "native_stdout": ".research/mov-native-behavior-v2-observed/native/follow-clock-v0-high-uniform-three.stdout",
+      "native_stdout_sha256": "4a031dd39d44a63a3d35c7ec9604a2de92f4ab1e3302eacf7fcac5f7cdd8d414"
+    },
+    {
+      "id": "follow-clock-v0-high-uniform-six",
+      "family": "clock",
+      "source_path": ".research/parallel-mp4/implementation/native-behavior-followup/follow-clock-v0-high-uniform-six.mov",
+      "input_sha256": "0f8910944a099c75d8db9633b53c106be560f970953699bc1a89f52bc798c6a7",
+      "source_oracle_sha256": "fbb8947ed0284595d83062af2718e4b5707a044f3647fa9892e6cf0dafbcfe12",
+      "native_stdout": ".research/mov-native-behavior-v2-observed/native/follow-clock-v0-high-uniform-six.stdout",
+      "native_stdout_sha256": "4a031dd39d44a63a3d35c7ec9604a2de92f4ab1e3302eacf7fcac5f7cdd8d414"
+    },
+    {
+      "id": "follow-clock-v1-positive-three",
+      "family": "clock",
+      "source_path": ".research/parallel-mp4/implementation/native-behavior-followup/follow-clock-v1-positive-three.mov",
+      "input_sha256": "076a328b7abd8896703a606437b1f769e1c2498a64e52745588dd2f54a403245",
+      "source_oracle_sha256": "a8981999acfdae1e6ce37bab7acb6ef542f0e5db0e5dded8751fd1b94f57a11b",
+      "native_stdout": ".research/mov-native-behavior-v2-observed/native/follow-clock-v1-positive-three.stdout",
+      "native_stdout_sha256": "cb43f45511675ec02975ba9e5984a46459bf5a38237acba44b428e713e17e278"
+    },
+    {
+      "id": "follow-flag-point-minus-one",
+      "family": "flags",
+      "source_path": ".research/parallel-mp4/implementation/native-behavior-followup/follow-flag-point-minus-one.mp4",
+      "input_sha256": "c1e8ea7ead65eba2441e848b15a14d891c77ba357a300915a760bacb72a6f35c",
+      "source_oracle_sha256": "0ea543fb374ebc282c1b00dafb48c7c8cd1a1dd967453b89d5055a7ec443f3a2",
+      "native_stdout": ".research/mov-native-behavior-v2-observed/native/follow-flag-point-minus-one.stdout",
+      "native_stdout_sha256": "7b875055c056078b23c9e4fcc89fac1dd352e2f9f040574d12931d04ed4be5a8"
+    },
+    {
+      "id": "follow-flag-point-equal",
+      "family": "flags",
+      "source_path": ".research/parallel-mp4/implementation/native-behavior-followup/follow-flag-point-equal.mp4",
+      "input_sha256": "95e56421e648177b581c66fc719565cb454069ac45ba187502ade9ebd2bc61fe",
+      "source_oracle_sha256": "2bb062b4a9659c1d31b7f180da71994423ee39ef97b413ac4306c468610bd417",
+      "native_stdout": ".research/mov-native-behavior-v2-observed/native/follow-flag-point-equal.stdout",
+      "native_stdout_sha256": "c955b6a6487d561ac5809ca1503d1baa9c77cc247c013e355bf8fd98a1b2b189"
+    },
+    {
+      "id": "follow-flag-point-plus-one",
+      "family": "flags",
+      "source_path": ".research/parallel-mp4/implementation/native-behavior-followup/follow-flag-point-plus-one.mp4",
+      "input_sha256": "23b6d649965abe2198d92b35f4ed8ee5ce2ed2af7dca0f873703a5f5dae64f9d",
+      "source_oracle_sha256": "f13f628386ab1486ea66f2ba6dcdc656d2b21a0d737c1821325fb74a4b40f40a",
+      "native_stdout": ".research/mov-native-behavior-v2-observed/native/follow-flag-point-plus-one.stdout",
+      "native_stdout_sha256": "b141f7e00a3fcca0194b601b544a630eeae2b5d08acd568bc87fb7de2c1acd7a"
+    },
+    {
+      "id": "follow-flag-point-plus-one-last-delta-one",
+      "family": "flags",
+      "source_path": ".research/parallel-mp4/implementation/native-behavior-followup/follow-flag-point-plus-one-last-delta-one.mp4",
+      "input_sha256": "bc2acc29b10881fe59a71cf4f9e57eea96556bf719db9c23aac19615d508673b",
+      "source_oracle_sha256": "7d8d6428de80d44f847c484c625c0ce55feee97b4fad4ef93f14d921cc64e563",
+      "native_stdout": ".research/mov-native-behavior-v2-observed/native/follow-flag-point-plus-one-last-delta-one.stdout",
+      "native_stdout_sha256": "10ffb459d79ca3209b6175e9ccb081f3f3ffa7385cb20eccec013351943d2e58"
+    },
+    {
+      "id": "follow-flag-point-plus-one-last-delta-long",
+      "family": "flags",
+      "source_path": ".research/parallel-mp4/implementation/native-behavior-followup/follow-flag-point-plus-one-last-delta-long.mp4",
+      "input_sha256": "503137d49243c57c77806d9ac1b9707594e4d5dbac1bb7211aad25e8dc5abea2",
+      "source_oracle_sha256": "b9cc013069b9d54cf084e5dcc7fc67424d64f341c0e714cb641204c5310219a2",
+      "native_stdout": ".research/mov-native-behavior-v2-observed/native/follow-flag-point-plus-one-last-delta-long.stdout",
+      "native_stdout_sha256": "6911c0b55674ebb5296f554367794747fbfa5c2ef087bb276ed83cb793094f4a"
+    },
+    {
+      "id": "follow-flag-three-fragment-backward",
+      "family": "flags",
+      "source_path": ".research/parallel-mp4/implementation/native-behavior-followup/follow-flag-three-fragment-backward.mp4",
+      "input_sha256": "e74b0908cc23a57a794f55aeaba362492f7a921c98830f7219d48f292db5235e",
+      "source_oracle_sha256": "cf77a305ae33e23a073aeab00a99caa026df1f9b74f661c86d076d9c64a8fcda",
+      "native_stdout": ".research/mov-native-behavior-v2-observed/native/follow-flag-three-fragment-backward.stdout",
+      "native_stdout_sha256": "9208f882113b35daa6dd5ffda648a8dfd20e0829036e0ff4dcafcb8b7b4b0e8c"
+    },
+    {
+      "id": "follow-flag-track-isolation-12",
+      "family": "flags",
+      "source_path": ".research/parallel-mp4/implementation/native-behavior-followup/follow-flag-track-isolation-12.mp4",
+      "input_sha256": "e5b19e5ec0c74f8b9cb757896159d294235c8a6da6500c8bff346fdb9170cda8",
+      "source_oracle_sha256": "de1d8375991b6cd3c3603cc7e40d7c4e77cf9a74857aa602643f32a38841fc68",
+      "native_stdout": ".research/mov-native-behavior-v2-observed/native/follow-flag-track-isolation-12.stdout",
+      "native_stdout_sha256": "01b73dca9a8465c3ffa3fb1236014db402a6e1fb55dd25e0a98cee79f70e7582"
+    },
+    {
+      "id": "follow-flag-track-isolation-21",
+      "family": "flags",
+      "source_path": ".research/parallel-mp4/implementation/native-behavior-followup/follow-flag-track-isolation-21.mp4",
+      "input_sha256": "956172148ac4603796c65106218c317297605d644a2dda41e849c2b6f806ed89",
+      "source_oracle_sha256": "2030c806858ef8b7b0bce0d1029fa676545f0178468aae5808380c2ab6148bc7",
+      "native_stdout": ".research/mov-native-behavior-v2-observed/native/follow-flag-track-isolation-21.stdout",
+      "native_stdout_sha256": "f32eee53e3fecf5f1b0ce58337ce925b9f21846c708031849d5b36868497ce1b"
+    },
+    {
+      "id": "follow-order-cycle-123",
+      "family": "order",
+      "source_path": ".research/parallel-mp4/implementation/native-behavior-followup/follow-order-cycle-123.mov",
+      "input_sha256": "9aa4c4284d2ed45a11519f6edc6eb85af3399c84b229bcb1b0cf1daf70d05169",
+      "source_oracle_sha256": "29721f9c8530bcecc022d3c76ccae542c5912bc9460014322072d68921be0bfb",
+      "native_stdout": ".research/mov-native-behavior-v2-observed/native/follow-order-cycle-123.stdout",
+      "native_stdout_sha256": "dd58ce045d400335866078e711206e8332099a7bda17af769e8459fd13a9b3e4"
+    },
+    {
+      "id": "follow-order-cycle-132",
+      "family": "order",
+      "source_path": ".research/parallel-mp4/implementation/native-behavior-followup/follow-order-cycle-132.mov",
+      "input_sha256": "83a810502ffcebda7ce2e86a375fcc3a72c26cc2cea9ee7883ce13ee12bbafa0",
+      "source_oracle_sha256": "bee6ae7c5123f84668708e4b0f2c43d8b6db9dcbfa616162b98ed33aa6c0199a",
+      "native_stdout": ".research/mov-native-behavior-v2-observed/native/follow-order-cycle-132.stdout",
+      "native_stdout_sha256": "154e3d919d3f988c6a7230d55163cbe3be5f88470c2800457a670299300a14bf"
+    },
+    {
+      "id": "follow-order-cycle-213",
+      "family": "order",
+      "source_path": ".research/parallel-mp4/implementation/native-behavior-followup/follow-order-cycle-213.mov",
+      "input_sha256": "38e58ad61d11b2d4170573f11836494898bdded76b7ba80fcd57ed52e2d42165",
+      "source_oracle_sha256": "54ba54e4c560812974f2a01eb6caff70c12ee4b849bc551916ebbb4df90b9b27",
+      "native_stdout": ".research/mov-native-behavior-v2-observed/native/follow-order-cycle-213.stdout",
+      "native_stdout_sha256": "d7d24dabae3fae65c76d63cada2f5e7b1ac2670381013d66c9372738a6eda8ca"
+    },
+    {
+      "id": "follow-order-cycle-231",
+      "family": "order",
+      "source_path": ".research/parallel-mp4/implementation/native-behavior-followup/follow-order-cycle-231.mov",
+      "input_sha256": "aae6e93329f3b632ac0af0e512659973cae5cc2e28c074c6a5934c32eb782e20",
+      "source_oracle_sha256": "af60da12f4bb192f349666e14e84641039a2df60ca8986830efcedd1ff2fb40f",
+      "native_stdout": ".research/mov-native-behavior-v2-observed/native/follow-order-cycle-231.stdout",
+      "native_stdout_sha256": "298897d1021b44dc1c0d37d6233dd7a805ec2cf91d452cb5a2569745dafc0b46"
+    },
+    {
+      "id": "follow-order-cycle-312",
+      "family": "order",
+      "source_path": ".research/parallel-mp4/implementation/native-behavior-followup/follow-order-cycle-312.mov",
+      "input_sha256": "d2b057283a8fb297c11f35b1e786e5eddf550dab88affcf0c0fbd1cafb9c7832",
+      "source_oracle_sha256": "0eb868cd94a306cf17287aceda63c6ef8ffae67f7ab32663fe2fa0ec305cb77b",
+      "native_stdout": ".research/mov-native-behavior-v2-observed/native/follow-order-cycle-312.stdout",
+      "native_stdout_sha256": "b61f2bcabd88e41ea3c547b2abbf4a87e27485e2f385b3e57a275202a6c582f0"
+    },
+    {
+      "id": "follow-order-cycle-321",
+      "family": "order",
+      "source_path": ".research/parallel-mp4/implementation/native-behavior-followup/follow-order-cycle-321.mov",
+      "input_sha256": "0be85ef2787c2e6a623e2e5c6699c1ff26038a9bca12843ac984b54c52be5f89",
+      "source_oracle_sha256": "a9aa1e7acd6ab87e751187d8040af33584686879b5908900f216a4027d40b0de",
+      "native_stdout": ".research/mov-native-behavior-v2-observed/native/follow-order-cycle-321.stdout",
+      "native_stdout_sha256": "ed9d493f32c861e18ae38172d027a126b102471a340d2eadaf89b7622ddcd16f"
+    },
+    {
+      "id": "follow-order-first-2999998-over-3000000",
+      "family": "order",
+      "source_path": ".research/parallel-mp4/implementation/native-behavior-followup/follow-order-first-2999998-over-3000000.mov",
+      "input_sha256": "12c4087cdf27c26cf7f24e839a4839a943038824457e7be46995df3abc645c45",
+      "source_oracle_sha256": "84e640dcef071caac100c0c709170b962fa50b378e8150445f840d38be3f9dbf",
+      "native_stdout": ".research/mov-native-behavior-v2-observed/native/follow-order-first-2999998-over-3000000.stdout",
+      "native_stdout_sha256": "5bcabafb0033cbfb9e6f5f790e65fd338d407ac8b647c17d5d2f9fc28a60106a"
+    },
+    {
+      "id": "follow-order-first-2999999-over-3000000",
+      "family": "order",
+      "source_path": ".research/parallel-mp4/implementation/native-behavior-followup/follow-order-first-2999999-over-3000000.mov",
+      "input_sha256": "df0aea5ff24b68b5b5c164878db9742f1b3ba8b01dfaabf7786d0adc30cc80a1",
+      "source_oracle_sha256": "e620decabfb462c1feabbeca4ab26a43b96f58075b23463401b3221bfbd7eed8",
+      "native_stdout": ".research/mov-native-behavior-v2-observed/native/follow-order-first-2999999-over-3000000.stdout",
+      "native_stdout_sha256": "07e7ba69f661b1a7467b1b1a98a3987415fdf874cc44f5e91460d80983d7a99a"
+    },
+    {
+      "id": "follow-order-first-3000000-over-3000000",
+      "family": "order",
+      "source_path": ".research/parallel-mp4/implementation/native-behavior-followup/follow-order-first-3000000-over-3000000.mov",
+      "input_sha256": "5c1f27da8a1f1a7c54f11ba10457c2d2e6bf517146568f62317369af92fd9125",
+      "source_oracle_sha256": "e42a060e922de98a98561488b1bdddd82911719b83c4115c3de8e93cb687b221",
+      "native_stdout": ".research/mov-native-behavior-v2-observed/native/follow-order-first-3000000-over-3000000.stdout",
+      "native_stdout_sha256": "40d6f13b005430e5cb4f2aa0424a0440bd1039fe503f466038817438283abcce"
+    },
+    {
+      "id": "follow-order-first-3000001-over-3000000",
+      "family": "order",
+      "source_path": ".research/parallel-mp4/implementation/native-behavior-followup/follow-order-first-3000001-over-3000000.mov",
+      "input_sha256": "fdd80047db64b0a28d3a5423d3c0608fef6e30a3011ccecd74fe8425f7f0d2bb",
+      "source_oracle_sha256": "44003748413f9d2f1e44a8c0737356874bd62024df61394918d5879451fed5b3",
+      "native_stdout": ".research/mov-native-behavior-v2-observed/native/follow-order-first-3000001-over-3000000.stdout",
+      "native_stdout_sha256": "7d7aa0e08946594427320bbd45b5e3166fe4d52d3007854c90ed1e4554f8b143"
+    },
+    {
+      "id": "follow-order-first-3000002-over-3000000",
+      "family": "order",
+      "source_path": ".research/parallel-mp4/implementation/native-behavior-followup/follow-order-first-3000002-over-3000000.mov",
+      "input_sha256": "9073788e50010e185e62780164714060002f6207b0aa1a281de4cadd3f48a990",
+      "source_oracle_sha256": "1b83a93cced4d44ae9bffed3da8b38e87a06b5f1606ac6c5792dd66754cfcf6a",
+      "native_stdout": ".research/mov-native-behavior-v2-observed/native/follow-order-first-3000002-over-3000000.stdout",
+      "native_stdout_sha256": "2ae4cd6f47b7224f9f30b32fd594ae1283f747501d64c9818c56d2796685c0fc"
+    },
+    {
+      "id": "follow-order-first-1999999-over-2000000",
+      "family": "order",
+      "source_path": ".research/parallel-mp4/implementation/native-behavior-followup/follow-order-first-1999999-over-2000000.mov",
+      "input_sha256": "6621e00469b3bda7c8a4fbd3484d65939ea72254d1dc207f3b7ad5fff05a57ee",
+      "source_oracle_sha256": "e3d40db4701c943dacd05b27d13847ee742cd4c04291eb2bf6d1653f52dd54ce",
+      "native_stdout": ".research/mov-native-behavior-v2-observed/native/follow-order-first-1999999-over-2000000.stdout",
+      "native_stdout_sha256": "1622bf77ac5acf121fb5667cb89660b70c1188f963bbeb73f16fc70c483d3167"
+    },
+    {
+      "id": "follow-order-first-2000001-over-2000000",
+      "family": "order",
+      "source_path": ".research/parallel-mp4/implementation/native-behavior-followup/follow-order-first-2000001-over-2000000.mov",
+      "input_sha256": "68b9b147b6d373d78817429015c7311f251477a45ad6fb2159e9a2f3984e43cc",
+      "source_oracle_sha256": "d54876f87634040a39d10f6017cc967e52dc43b6d97212200c65bf5bc7595e93",
+      "native_stdout": ".research/mov-native-behavior-v2-observed/native/follow-order-first-2000001-over-2000000.stdout",
+      "native_stdout_sha256": "9aeb1e132f6fea6704e47b59f50d1f0b1905cd976aee1763d97409ca8a339400"
+    },
+    {
+      "id": "follow-brand-major-qt-compat-qt",
+      "family": "brand",
+      "source_path": ".research/parallel-mp4/implementation/native-behavior-followup/follow-brand-major-qt-compat-qt.mov",
+      "input_sha256": "01ca869b5588e23800cd0a28ba0a7ab49e0079b0cd4d73700dcfae1b602ed8cc",
+      "source_oracle_sha256": "1b6d1a8857cd7fc795c1a721e8efff206cc03535aad8a5669a1b6ff47e1cf9eb",
+      "native_stdout": ".research/mov-native-behavior-v2-observed/native/follow-brand-major-qt-compat-qt.stdout",
+      "native_stdout_sha256": "7e502b081ce5c1f33b8ac9e56a9bed9c2ef5da9448c47d8ee69fa611985c1a7c"
+    },
+    {
+      "id": "follow-brand-major-isom-compat-qt",
+      "family": "brand",
+      "source_path": ".research/parallel-mp4/implementation/native-behavior-followup/follow-brand-major-isom-compat-qt.mov",
+      "input_sha256": "65ffcc7524f2cd419d5caf2e2850e632a9be728a24bdb1c36807042c2eb94aff",
+      "source_oracle_sha256": "b1f7a768ff41697795c5fcc4aa3d1ad90f65bf520d9047104846769967dfe8c0",
+      "native_stdout": ".research/mov-native-behavior-v2-observed/native/follow-brand-major-isom-compat-qt.stdout",
+      "native_stdout_sha256": "81c002f09b366fde59e193db581d82f70b3424a985dc59dc55230accde88a835"
+    },
+    {
+      "id": "follow-brand-major-iso6-compat-qt",
+      "family": "brand",
+      "source_path": ".research/parallel-mp4/implementation/native-behavior-followup/follow-brand-major-iso6-compat-qt.mov",
+      "input_sha256": "c6144e284873689fd1b76d0419aa9adfa67185f93d75bccd709a80f2b2fcad23",
+      "source_oracle_sha256": "4207117dde9664d35de6b800eb5f9cb3c26cc03b3661fd9601f380dfc1e29769",
+      "native_stdout": ".research/mov-native-behavior-v2-observed/native/follow-brand-major-iso6-compat-qt.stdout",
+      "native_stdout_sha256": "81c002f09b366fde59e193db581d82f70b3424a985dc59dc55230accde88a835"
+    },
+    {
+      "id": "follow-brand-major-qt-compat-iso6",
+      "family": "brand",
+      "source_path": ".research/parallel-mp4/implementation/native-behavior-followup/follow-brand-major-qt-compat-iso6.mov",
+      "input_sha256": "0aedbac4391850980517685c4f97f631d2f585cf4d80f06c9184dcbeae5bde2f",
+      "source_oracle_sha256": "412358cf0cd5a29fce733681580bd2d6e62a1855f32be24f7b15c6e2873813f1",
+      "native_stdout": ".research/mov-native-behavior-v2-observed/native/follow-brand-major-qt-compat-iso6.stdout",
+      "native_stdout_sha256": "7e502b081ce5c1f33b8ac9e56a9bed9c2ef5da9448c47d8ee69fa611985c1a7c"
+    },
+    {
+      "id": "follow-brand-major-iso6-compat-iso6",
+      "family": "brand",
+      "source_path": ".research/parallel-mp4/implementation/native-behavior-followup/follow-brand-major-iso6-compat-iso6.mov",
+      "input_sha256": "fb6a2c09ab37824f3fa198de63fc3db39f6f74c7c4a7ab586565bd72371ac7fb",
+      "source_oracle_sha256": "8c2895799b8c9bbe0b7096cf81d5975871894a2d5c38c186895f698ec83c4185",
+      "native_stdout": ".research/mov-native-behavior-v2-observed/native/follow-brand-major-iso6-compat-iso6.stdout",
+      "native_stdout_sha256": "81c002f09b366fde59e193db581d82f70b3424a985dc59dc55230accde88a835"
+    }
+  ],
+  "files": {
+    "brand.txt": "d3ace0ba9cd0b1db2e147c80b8ff05a1d6c3dd7d56f37eaa16a8ea3baa6aac2c",
+    "clock.txt": "dcd83c61c46a02ea743359a3d0ffa47bd5948e318b9af126e0d9dd95e6c48b0c",
+    "flags.txt": "9bba0e9acd0467aec8e3b46ad4029056b755e76430ad033f6726c54249b05986",
+    "follow-brand-major-iso6-compat-iso6.mov": "fb6a2c09ab37824f3fa198de63fc3db39f6f74c7c4a7ab586565bd72371ac7fb",
+    "follow-brand-major-iso6-compat-qt.mov": "c6144e284873689fd1b76d0419aa9adfa67185f93d75bccd709a80f2b2fcad23",
+    "follow-brand-major-isom-compat-qt.mov": "65ffcc7524f2cd419d5caf2e2850e632a9be728a24bdb1c36807042c2eb94aff",
+    "follow-brand-major-qt-compat-iso6.mov": "0aedbac4391850980517685c4f97f631d2f585cf4d80f06c9184dcbeae5bde2f",
+    "follow-brand-major-qt-compat-qt.mov": "01ca869b5588e23800cd0a28ba0a7ab49e0079b0cd4d73700dcfae1b602ed8cc",
+    "follow-clock-later-minimum-five.mov": "8c32144ddad1e3204fceb6ee53866457bad7740665de737f83d00db474b25677",
+    "follow-clock-later-minimum-four.mov": "7d2c6ff900443dc857c258a2d12e50bd01ab9108a1c527d731cd336e123d299f",
+    "follow-clock-later-minimum-six.mov": "e0415422b052ccc92c97128ef0f38f94a40a773c83b1109f719bb6de7f326ee4",
+    "follow-clock-tail-minimum-four.mov": "e77409ad65f8558dabbed5253db49fb426f128800a791de64e376f8635df0409",
+    "follow-clock-tail-minimum-three.mov": "067589cf523d5e9c37622c3d3bb2e2baefacaa07b807605d6a2fbe4683e27031",
+    "follow-clock-uniform-one.mov": "5552a41c422a144deeac0fdc4ef0e174f421ef27c0762641ef4d3b9ad0f1a04e",
+    "follow-clock-uniform-six.mov": "5d044d3f120b7d45ac6df1ecb38cf379d8068b0d08ebb49d4340a2f3201dbcd9",
+    "follow-clock-uniform-three.mov": "40876252a951a7049f35bda759dbb946e5ddfeea23704a48e985ed39cf176322",
+    "follow-clock-uniform-two.mov": "075ea1ae15d6902f246947a5666cac3c70b93d7754852ad20904e62d7738b632",
+    "follow-clock-v0-high-uniform-one.mov": "eb839ec6d3e6c46405849c7530a28ffc6078643e466fd4d6c7c91e7103a468a7",
+    "follow-clock-v0-high-uniform-six.mov": "0f8910944a099c75d8db9633b53c106be560f970953699bc1a89f52bc798c6a7",
+    "follow-clock-v0-high-uniform-three.mov": "c9119e5bc8b5aef6c2bc57ec8b192b981e63a833575565921475684885dca7eb",
+    "follow-clock-v1-positive-three.mov": "076a328b7abd8896703a606437b1f769e1c2498a64e52745588dd2f54a403245",
+    "follow-flag-point-equal.mp4": "95e56421e648177b581c66fc719565cb454069ac45ba187502ade9ebd2bc61fe",
+    "follow-flag-point-minus-one.mp4": "c1e8ea7ead65eba2441e848b15a14d891c77ba357a300915a760bacb72a6f35c",
+    "follow-flag-point-plus-one-last-delta-long.mp4": "503137d49243c57c77806d9ac1b9707594e4d5dbac1bb7211aad25e8dc5abea2",
+    "follow-flag-point-plus-one-last-delta-one.mp4": "bc2acc29b10881fe59a71cf4f9e57eea96556bf719db9c23aac19615d508673b",
+    "follow-flag-point-plus-one.mp4": "23b6d649965abe2198d92b35f4ed8ee5ce2ed2af7dca0f873703a5f5dae64f9d",
+    "follow-flag-three-fragment-backward.mp4": "e74b0908cc23a57a794f55aeaba362492f7a921c98830f7219d48f292db5235e",
+    "follow-flag-track-isolation-12.mp4": "e5b19e5ec0c74f8b9cb757896159d294235c8a6da6500c8bff346fdb9170cda8",
+    "follow-flag-track-isolation-21.mp4": "956172148ac4603796c65106218c317297605d644a2dda41e849c2b6f806ed89",
+    "follow-order-cycle-123.mov": "9aa4c4284d2ed45a11519f6edc6eb85af3399c84b229bcb1b0cf1daf70d05169",
+    "follow-order-cycle-132.mov": "83a810502ffcebda7ce2e86a375fcc3a72c26cc2cea9ee7883ce13ee12bbafa0",
+    "follow-order-cycle-213.mov": "38e58ad61d11b2d4170573f11836494898bdded76b7ba80fcd57ed52e2d42165",
+    "follow-order-cycle-231.mov": "aae6e93329f3b632ac0af0e512659973cae5cc2e28c074c6a5934c32eb782e20",
+    "follow-order-cycle-312.mov": "d2b057283a8fb297c11f35b1e786e5eddf550dab88affcf0c0fbd1cafb9c7832",
+    "follow-order-cycle-321.mov": "0be85ef2787c2e6a623e2e5c6699c1ff26038a9bca12843ac984b54c52be5f89",
+    "follow-order-first-1999999-over-2000000.mov": "6621e00469b3bda7c8a4fbd3484d65939ea72254d1dc207f3b7ad5fff05a57ee",
+    "follow-order-first-2000001-over-2000000.mov": "68b9b147b6d373d78817429015c7311f251477a45ad6fb2159e9a2f3984e43cc",
+    "follow-order-first-2999998-over-3000000.mov": "12c4087cdf27c26cf7f24e839a4839a943038824457e7be46995df3abc645c45",
+    "follow-order-first-2999999-over-3000000.mov": "df0aea5ff24b68b5b5c164878db9742f1b3ba8b01dfaabf7786d0adc30cc80a1",
+    "follow-order-first-3000000-over-3000000.mov": "5c1f27da8a1f1a7c54f11ba10457c2d2e6bf517146568f62317369af92fd9125",
+    "follow-order-first-3000001-over-3000000.mov": "fdd80047db64b0a28d3a5423d3c0608fef6e30a3011ccecd74fe8425f7f0d2bb",
+    "follow-order-first-3000002-over-3000000.mov": "9073788e50010e185e62780164714060002f6207b0aa1a281de4cadd3f48a990",
+    "order.txt": "44afe9c115976b34cba759f034800df897d1dd70eca2dac9898cb668ddf94bcf"
+  },
+  "Rust_tests_executed": false,
+  "complete_M03": false
+}

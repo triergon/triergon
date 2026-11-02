@@ -1,0 +1,106 @@
+{
+  "schema": "m05-text-primary-cache-lock-v1",
+  "provenance": "Verified existing acquired primary bytes; no third-party decoder implementation used",
+  "sources": [
+    {
+      "id": "timed-text-ts126245-v18",
+      "url": "https://www.etsi.org/deliver/etsi_ts/126200_126299/126245/18.00.00_60/ts_126245v180000p.pdf",
+      "role": "versioned normative tx3g syntax",
+      "retrieved_utc": "2026-10-31T03:22:29.959693+00:00",
+      "final_url": "https://www.etsi.org/deliver/etsi_ts/126200_126299/126245/18.00.00_60/ts_126245v180000p.pdf",
+      "content_type": "application/pdf",
+      "http_status": 200,
+      "path": ".research/parallel-subtitles/sources/timed-text-ts126245-v18.0.0.pdf",
+      "bytes": 174532,
+      "sha256": "76f1e5591aa984906ea90fb8ccef8e73f4cbbe592dda67d73c7fc8ea5bed9024",
+      "status": "cached"
+    },
+    {
+      "id": "webvtt-crd-20260520",
+      "url": "https://www.w3.org/TR/2026/CRD-webvtt1-20260520/",
+      "role": "dated candidate recommendation draft, not final Recommendation",
+      "retrieved_utc": "2026-10-31T03:22:30.192529+00:00",
+      "final_url": "https://www.w3.org/TR/2026/CRD-webvtt1-20260520/",
+      "content_type": "text/html; charset=utf-8",
+      "http_status": 200,
+      "path": ".research/parallel-subtitles/sources/webvtt-crd-20260520.html",
+      "bytes": 834970,
+      "sha256": "1fd10e09adc72c7545671eadec72282124699b5192d3dff9028020dfa785d154",
+      "status": "cached"
+    },
+    {
+      "id": "rfc3629",
+      "url": "https://www.rfc-editor.org/rfc/rfc3629.txt",
+      "role": "immutable RFC UTF-8",
+      "retrieved_utc": "2026-10-31T03:22:30.426506+00:00",
+      "final_url": "https://www.rfc-editor.org/rfc/rfc3629.txt",
+      "content_type": "text/plain;charset=utf-8",
+      "http_status": 200,
+      "path": ".research/parallel-subtitles/sources/rfc3629.txt",
+      "bytes": 33856,
+      "sha256": "a2a3a39457d30420c812f87a38cc2b9194832f6982ef17e619de7d816879d6a6",
+      "status": "cached"
+    },
+    {
+      "id": "rfc2781",
+      "url": "https://www.rfc-editor.org/rfc/rfc2781.txt",
+      "role": "immutable RFC UTF-16",
+      "retrieved_utc": "2026-10-31T03:22:30.637961+00:00",
+      "final_url": "https://www.rfc-editor.org/rfc/rfc2781.txt",
+      "content_type": "text/plain;charset=utf-8",
+      "http_status": 200,
+      "path": ".research/parallel-subtitles/sources/rfc2781.txt",
+      "bytes": 29870,
+      "sha256": "e3fed703a962e1e8a1740fef500d1908df3eca2d80de8bad012835f0ae75b502",
+      "status": "cached"
+    },
+    {
+      "id": "rfc9559",
+      "url": "https://www.rfc-editor.org/rfc/rfc9559.txt",
+      "role": "immutable RFC Matroska",
+      "retrieved_utc": "2026-10-31T03:22:30.838879+00:00",
+      "final_url": "https://www.rfc-editor.org/rfc/rfc9559.txt",
+      "content_type": "text/plain;charset=utf-8",
+      "http_status": 200,
+      "path": ".research/parallel-subtitles/sources/rfc9559.txt",
+      "bytes": 385933,
+      "sha256": "f251c1e9b6879bb308000fbd9b2359de9472160c56d121b9345b6433afb00cb7",
+      "status": "cached"
+    },
+    {
+      "id": "matroska-subtitles",
+      "url": "https://www.matroska.org/technical/subtitles.html",
+      "role": "mutable primary mapping snapshot; content hash freezes local observation",
+      "retrieved_utc": "2026-10-31T03:22:31.103937+00:00",
+      "final_url": "https://www.matroska.org/technical/subtitles.html",
+      "content_type": "text/html; charset=utf-8",
+      "http_status": 200,
+      "path": ".research/parallel-subtitles/sources/matroska-subtitles.html",
+      "bytes": 41399,
+      "sha256": "7734202689f0a08e3efecc231de17609a10901c0fd65c388c3e2c898ce813cc8",
+      "status": "cached"
+    },
+    {
+      "id": "draft-ietf-cellar-codec-21",
+      "url": "https://www.ietf.org/archive/id/draft-ietf-cellar-codec-21.txt",
+      "role": "immutable-numbered Internet-Draft; not an RFC; container mappings only",
+      "retrieved_utc": "2026-10-31T03:23:41.706161+00:00",
+      "final_url": "https://www.ietf.org/archive/id/draft-ietf-cellar-codec-21.txt",
+      "http_status": 200,
+      "content_type": "text/plain; charset=utf-8",
+      "status": "cached",
+      "path": ".research/parallel-subtitles/sources/draft-ietf-cellar-codec-21.txt",
+      "bytes": 161258,
+      "sha256": "4f08f15fb4ea04f7ca20fe9ad7b59744f52655fece7a126317c7b45ae936415e"
+    }
+  ],
+  "unavailable_normative_sources": [
+    "Blu-ray PGS bitstream normative source not acquired",
+    "DVD-Video SPU bitstream normative source not acquired"
+  ],
+  "additional_open_sources": [
+    "inherited ISO box size forms and concrete tx3g configuration boundary",
+    "exhaustive Streem-selected legacy charset profile inventory"
+  ],
+  "qualification": false
+}

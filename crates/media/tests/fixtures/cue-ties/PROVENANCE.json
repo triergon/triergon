@@ -1,0 +1,228 @@
+{
+  "schema": 1,
+  "origin": "authored synthetic fixture, own RFC wire generation; source signal fixture reused under user authorization",
+  "source_input_sha256": "8b245102b6278a1952870d0fd8d65a924187ea285c52f07fb72e76227d038cbb",
+  "source_proof": {
+    "source_path": "/Users/jonasgrosch/projects/safe-media/.research/fixtures/avc-aac-sub.mkv",
+    "source_sha256": "8b245102b6278a1952870d0fd8d65a924187ea285c52f07fb72e76227d038cbb",
+    "source_bytes": 84288,
+    "recorded_origin": "synthetic lavfi test signals / authored test captions",
+    "origin_record": "/Users/jonasgrosch/projects/safe-media/.research/fixtures/manifest.json",
+    "coded_body_validation": "UNVERIFIED here: no decoder or native executable was run",
+    "tracks": {
+      "avc": {
+        "number": 1,
+        "codec": "V_MPEG4/ISO/AVC",
+        "delay_ns": 0,
+        "default_duration_ns": 83333333,
+        "packet_span": {
+          "start": 924,
+          "end": 4004,
+          "element_start": 917,
+          "cluster_start": 901,
+          "cluster_ticks": 0,
+          "block_offset_ticks": 0,
+          "stored_ticks": 0,
+          "track_number": 1,
+          "flags": 128
+        },
+        "packet_bytes": 3080,
+        "packet_sha256": "d4a0548f72a9737053e25d0f2a4f14d42433eafe8314d78906e6291c38640dbb",
+        "codec_private_bytes": 45,
+        "codec_private_sha256": "70686408c399616a8c3362b7afa77b3dfc85e90117d096f58c85f05a8669dd8b",
+        "codec_private_source_span": {
+          "id": 25506,
+          "start": 400,
+          "data": 403,
+          "end": 448,
+          "unknown": false
+        },
+        "avcc_nal_length_bytes": 4,
+        "length_delimited_nals": [
+          {
+            "offset": 4,
+            "bytes": 684,
+            "header_byte": 6,
+            "nal_unit_type_bits": 6
+          },
+          {
+            "offset": 692,
+            "bytes": 2388,
+            "header_byte": 101,
+            "nal_unit_type_bits": 5
+          }
+        ]
+      },
+      "aac": {
+        "number": 2,
+        "codec": "A_AAC",
+        "delay_ns": 21333333,
+        "default_duration_ns": 21333333,
+        "packet_span": {
+          "start": 5253,
+          "end": 5441,
+          "element_start": 5246,
+          "cluster_start": 901,
+          "cluster_ticks": 0,
+          "block_offset_ticks": 0,
+          "stored_ticks": 0,
+          "track_number": 2,
+          "flags": 128
+        },
+        "packet_bytes": 188,
+        "packet_sha256": "4315bdf0b9ac88eaad1c09d9c4c7a2a934a3500904cace032ef527fbe4a30277",
+        "codec_private_bytes": 5,
+        "codec_private_sha256": "643b0e23faf2831be78dddd3de11c0f1b4aac4d4f762554c9bdaab7cc1e9e409",
+        "codec_private_source_span": {
+          "id": 25506,
+          "start": 532,
+          "data": 535,
+          "end": 540,
+          "unknown": false
+        }
+      }
+    },
+    "rap_proof_scope": "Exact source span/hash, SimpleBlock key flag and AVC NAL header/length facts only; coded-body decode validity unverified"
+  },
+  "native_worker_sha256": "b17f66c82f42aa50ac2851074c678cd627d96320acad080ca99e16ac7a5d96e6",
+  "actual_native_observation_sha256": "2f9eb688bf39701bd93aadadca6b66aff6be8c22cd459bbaddd1dabebb9d40ff",
+  "native_proof": "224 exact native traces, 56 complete-JSON wire-permutation invariant groups, physical earliest-Cluster rule matches all 224; raw failed typed receipts preserved separately",
+  "within_cluster_equal_time_relative_winner": "not established by v1; production behavior for equal Cluster addresses is preserved",
+  "coded_body_decode_validation": "UNVERIFIED; exact source AVC keyframe/AAC bytes and codec-private reused; no decoder was executed here",
+  "fixtures": [
+    {
+      "id": "ties-03-physical-preroll-0",
+      "file": "ties-03-physical-preroll-0.mkv",
+      "sha256": "c6b629923f6172fea89bbda8cfa413bb9b61325a888adc54b68e55d33e833bde",
+      "ties_per_bucket": 3,
+      "audio_seek_preroll_ns": 0,
+      "wire_oracle_sha256": "6a9398f882ca1161de868c6864d4761ab04ff506df55bc90a00ac61c27c8d7e0"
+    },
+    {
+      "id": "ties-03-physical-preroll-500000000",
+      "file": "ties-03-physical-preroll-500000000.mkv",
+      "sha256": "f0c0561d700a9cce84808b097a2d3a15e43bc3dd4a1939c3b0a7e7c7344d8529",
+      "ties_per_bucket": 3,
+      "audio_seek_preroll_ns": 500000000,
+      "wire_oracle_sha256": "2d63f726e40e0ff6bd894d2307d0dbfcf79c7a9c78f9c07dc09412df3b94b359"
+    },
+    {
+      "id": "ties-03-reverse-ties-preroll-0",
+      "file": "ties-03-reverse-ties-preroll-0.mkv",
+      "sha256": "15fbf52ae1203ef4e5ba0eee3e0bb4b2c8eea714caf31656885c6549f82852c0",
+      "ties_per_bucket": 3,
+      "audio_seek_preroll_ns": 0,
+      "wire_oracle_sha256": "e22d13d8ae2e15870e05218d851b2bdbdb466b80c380e480de43b12bebf26368"
+    },
+    {
+      "id": "ties-03-reverse-ties-preroll-500000000",
+      "file": "ties-03-reverse-ties-preroll-500000000.mkv",
+      "sha256": "755b1c5e72debd76f2ceef1849286a8c716296f8f217ab1bc895c2c9d7a195e6",
+      "ties_per_bucket": 3,
+      "audio_seek_preroll_ns": 500000000,
+      "wire_oracle_sha256": "c87b348e265e59aa151be60003cacec373c4e235c2744f1edd63e28e16d3667b"
+    },
+    {
+      "id": "ties-03-rotate-ties-preroll-0",
+      "file": "ties-03-rotate-ties-preroll-0.mkv",
+      "sha256": "4f0c739fc91c268e54ae60b9d6fc51c3798c817b354127483497ca260daab2d0",
+      "ties_per_bucket": 3,
+      "audio_seek_preroll_ns": 0,
+      "wire_oracle_sha256": "a034c39b878fd0307348c895d396cdc88b483645d9a6045e5768eaee843fc927"
+    },
+    {
+      "id": "ties-03-rotate-ties-preroll-500000000",
+      "file": "ties-03-rotate-ties-preroll-500000000.mkv",
+      "sha256": "2dcf5ff3a721e5f64094385e627799ae58ffc73b70a083c4b79455f4ad7b7458",
+      "ties_per_bucket": 3,
+      "audio_seek_preroll_ns": 500000000,
+      "wire_oracle_sha256": "d3500f7a3cf62a9e6b8394d246822f9447cc10bae30068555a363bea06e2a37e"
+    },
+    {
+      "id": "ties-03-audio-position-first-preroll-0",
+      "file": "ties-03-audio-position-first-preroll-0.mkv",
+      "sha256": "e5c3ef25cc88c81641c26a82056a245cf49e39c96128e86b713706d8c73ee16c",
+      "ties_per_bucket": 3,
+      "audio_seek_preroll_ns": 0,
+      "wire_oracle_sha256": "8400e5bdfd84f1060c16f9e8035ec8aa5ee2e93f9af41b5ffd5a4f6962f32e78"
+    },
+    {
+      "id": "ties-03-audio-position-first-preroll-500000000",
+      "file": "ties-03-audio-position-first-preroll-500000000.mkv",
+      "sha256": "440753acedc0d2b6ad9e2c0ec9aae427e73e0a1d93666eaaddb20183a55fda84",
+      "ties_per_bucket": 3,
+      "audio_seek_preroll_ns": 500000000,
+      "wire_oracle_sha256": "b6a1145b80e185016950fdbc1c7a961416dafc30b29c6ff0890b2652955d6b9e"
+    },
+    {
+      "id": "ties-24-physical-preroll-0",
+      "file": "ties-24-physical-preroll-0.mkv",
+      "sha256": "d27802d7ef0472c078dda2c0f3899bb9e1b4b6e6b79f1c1b42ad3c53b0c59960",
+      "ties_per_bucket": 24,
+      "audio_seek_preroll_ns": 0,
+      "wire_oracle_sha256": "88fe9152d09a540866b5f4d8fbb8898665d12f82153f4dac834feadfbe3a1732"
+    },
+    {
+      "id": "ties-24-physical-preroll-500000000",
+      "file": "ties-24-physical-preroll-500000000.mkv",
+      "sha256": "10d6c3495b9768948ff40c8ba38a99d4ef80f81e2f2c83376c6e64da2704ad63",
+      "ties_per_bucket": 24,
+      "audio_seek_preroll_ns": 500000000,
+      "wire_oracle_sha256": "7a7facd474cd32f6b290a22187d18c4ac547af4d1e363747e284a3b0fdc619f4"
+    },
+    {
+      "id": "ties-24-reverse-ties-preroll-0",
+      "file": "ties-24-reverse-ties-preroll-0.mkv",
+      "sha256": "062b77145eb048331211627f548c6b7ae33f273e3e634f7c189997272ee675f6",
+      "ties_per_bucket": 24,
+      "audio_seek_preroll_ns": 0,
+      "wire_oracle_sha256": "8eb3e92666a1a96f3c32b5012cb17070a7d70bda1051cc07276b752c2c1699da"
+    },
+    {
+      "id": "ties-24-reverse-ties-preroll-500000000",
+      "file": "ties-24-reverse-ties-preroll-500000000.mkv",
+      "sha256": "e4ccd90740262ca3e92df88562aeb93f0b36c912b26c6f825ccf6265fe6dc46d",
+      "ties_per_bucket": 24,
+      "audio_seek_preroll_ns": 500000000,
+      "wire_oracle_sha256": "c88eceb47d515ccee9a5cbd7b328943fab06eab8d56d07513beeecd97c517cd0"
+    },
+    {
+      "id": "ties-24-rotate-ties-preroll-0",
+      "file": "ties-24-rotate-ties-preroll-0.mkv",
+      "sha256": "d065e88553147a54e7090899ccaea6006592e4690d80edccb7b59407964a2a4f",
+      "ties_per_bucket": 24,
+      "audio_seek_preroll_ns": 0,
+      "wire_oracle_sha256": "91c52f7e96b320338a04c2b3faaa117c32015ef1fdd85c26bf14c774a4239416"
+    },
+    {
+      "id": "ties-24-rotate-ties-preroll-500000000",
+      "file": "ties-24-rotate-ties-preroll-500000000.mkv",
+      "sha256": "4c7b636ea825a1eb3f2fcf2f086c23e46c9df62a2601d2986d1889190604abfe",
+      "ties_per_bucket": 24,
+      "audio_seek_preroll_ns": 500000000,
+      "wire_oracle_sha256": "66fa92aea3fa821972452e0f86fb8a17cbe2ccd9c37bcc90b986b37dfce9f80f"
+    },
+    {
+      "id": "ties-24-audio-position-first-preroll-0",
+      "file": "ties-24-audio-position-first-preroll-0.mkv",
+      "sha256": "31930d7c0cea0f3cc83139616e7c5c731f60c45c572826e2b7c74d142d90a3f1",
+      "ties_per_bucket": 24,
+      "audio_seek_preroll_ns": 0,
+      "wire_oracle_sha256": "4bb8d09ff370ea3899ef9e4fee62f2b80099360bc744a2608e205173a4282a0a"
+    },
+    {
+      "id": "ties-24-audio-position-first-preroll-500000000",
+      "file": "ties-24-audio-position-first-preroll-500000000.mkv",
+      "sha256": "64594e87972e211425670aab4d4b0f0d570f13c134143d9c1ec344bd099357a3",
+      "ties_per_bucket": 24,
+      "audio_seek_preroll_ns": 500000000,
+      "wire_oracle_sha256": "b5b55ffa57637083c6aea0cc3ac300965a5b37afb760200607af12f365773db2"
+    }
+  ],
+  "tables": {
+    "wire-cues.tsv": "c88512674e112ae4a235e8ff8560264afe12ac72213937b80817ef9fa02ea6c5",
+    "native-landings.tsv": "e2d29027cf2fc70209e34c3ac9fc767cf563cea0dff1c035f97fb33a61c5703d"
+  },
+  "independent_parent_analysis_sha256": "e9530edb8b221bfc4c4ddb05aa2ed73a3501a5021fdc8671f0a5d449e9eebc5e",
+  "wire_table_policy": "absolute_cluster_header is the decoded absolute Cue.cluster used by the parser; wire_cluster_position separately preserves the stored Segment-relative scalar"
+}

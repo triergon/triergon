@@ -1,0 +1,28 @@
+{
+  "zlib": {
+    "measurement_complete": true,
+    "slice_accepted": false,
+    "case_count": 10,
+    "parity_pass": 8,
+    "time_upper_max": 0.7928229907866411
+  },
+  "seek": {
+    "measurement_complete": true,
+    "slice_accepted": true,
+    "case_count": 8,
+    "parity_pass": 8,
+    "time_upper_max": 0.6907154531782509
+  },
+  "k0": {
+    "measurement_complete": false,
+    "slice_accepted": false,
+    "case_count": 12,
+    "parity_pass": 12
+  },
+  "header": {
+    "measurement_complete": false,
+    "slice_accepted": false,
+    "case_count": 4,
+    "parity_pass": 4
+  }
+}

@@ -1,0 +1,44 @@
+{
+  "schema": 1,
+  "rights": "authored-synthetic",
+  "content": "Original testsrc2 video and sine audio, with the authored caption stream. These small canonical encodings preserve the frozen corpus hashes across encoder versions.",
+  "original_encoder": "ffmpeg version 9.0.2 Copyright (c) 2000-2026 the FFmpeg developers",
+  "original_generation_recipes": [
+    "research/qualification/shared-core-mac-arm64/source/tools/generate-fixtures.py",
+    "research/qualification/shared-core-mac-arm64/source/tools/generate-corpus.py"
+  ],
+  "cases": [
+    {
+      "id": "avc-aac-sub",
+      "profile": "avc-aac-sub",
+      "file": "avc-aac-sub.mkv",
+      "sha256": "8b245102b6278a1952870d0fd8d65a924187ea285c52f07fb72e76227d038cbb",
+      "rights": "authored-synthetic"
+    },
+    {
+      "id": "hevc-aac",
+      "profile": "hevc-aac",
+      "file": "hevc-aac.mkv",
+      "sha256": "3174607d8387db7f6d3ffc432f6d59a1f2e5678cd2798b98fc5d27e36787d072",
+      "rights": "authored-synthetic"
+    },
+    {
+      "id": "avc-ac3",
+      "profile": "avc-ac3",
+      "file": "avc-ac3.mkv",
+      "sha256": "954f348411280e1a1ab73a78a7593cfe070cb727428184dd61d788e6072b1df4",
+      "rights": "authored-synthetic"
+    },
+    {
+      "id": "avc-eac3",
+      "profile": "avc-eac3",
+      "file": "avc-eac3.mkv",
+      "sha256": "88666800c01039ff7c459e2d673f2bfd9e3ebb5cf7b91191076f9057ed568c27",
+      "rights": "authored-synthetic"
+    }
+  ],
+  "recipe_sha256": {
+    "research/qualification/shared-core-mac-arm64/source/tools/generate-fixtures.py": "bc3b6589f068ea01565250d3979cfe8c551963b9c306b159ec6bd4376b058e92",
+    "research/qualification/shared-core-mac-arm64/source/tools/generate-corpus.py": "8791b4c1572ce4e604f5eb7af01dc98aa3a5fef380e03767c0b132d3e0879c96"
+  }
+}

@@ -1,0 +1,106 @@
+{
+  "DTS_acquisition": "parent-owned; not duplicated",
+  "active_tests_authored": 50,
+  "corpora": {
+    "boundary_negative_repros": 4,
+    "broader_native_requests_separate_v1": 648,
+    "complete_bsi_cases": 228,
+    "complete_bsi_facts": 203,
+    "complete_bsi_negatives": 25,
+    "complete_bsi_wire_bytes": 17216,
+    "diagnosis_request_rows": 69,
+    "initial_sid_type_priority_rows": 36,
+    "new_rust_tests_executed": 0,
+    "new_test_functions": 11,
+    "original_native_nonpasses_unchanged": 62,
+    "original_prefixes_unchanged": 240,
+    "rust_fixture_rows": 301,
+    "separate_diagnosis_controls": 23
+  },
+  "gaps": [
+    {
+      "gap": "Flexible mixing definition3 explicitly unimplemented; no guessed internal/fill interpretation",
+      "id": "BG01"
+    },
+    {
+      "gap": "Audio-frame/audio-block/auxiliary payload conformance, CRC calculation/verification, complete BSI semantics, decoder readiness unproved",
+      "id": "BG02"
+    },
+    {
+      "gap": "Substream/programme grouping and count/rate/epoch agreement unimplemented; local count true is not conformance",
+      "id": "BG03"
+    },
+    {
+      "gap": "Native API validation depth and SID/map/error contracts unresolved; all62 original nonpasses retained without waiver",
+      "id": "BG04"
+    },
+    {
+      "gap": "BSID9/10 and >16 remain unsupported; acquired ATSC decoder requirements explicitly exclude9/10",
+      "id": "BG05"
+    },
+    {
+      "gap": "AVC/hvcC complete primary base record grammar still unacquired; no parser/layout guessed",
+      "id": "G01"
+    },
+    {
+      "gap": "All new Rust compile/fmt/lint/release/target/reference/equivalent-work/numerical gates pending parent queue",
+      "id": "BG06"
+    }
+  ],
+  "hard_gates": {
+    "attributable_rss": "lower required; unmeasured",
+    "full_selected_parity": "unqualified",
+    "live_heap": "lower required; unmeasured",
+    "runtime": "unmeasured",
+    "runtime_upper_paired95_max": 0.8,
+    "target": "native Mac ARM64, separate32-bit/device proof"
+  },
+  "native_prediction": "none; parent only after active full30 numerical window",
+  "native_request": ".research/parallel-framing/eac3-bsi-batch/diagnosis-v2/manifest.json",
+  "other_implementation_copy_translation": false,
+  "primary_identity_manifest": ".research/parallel-framing/eac3-bsi-batch/spec-sources-v1.json",
+  "publication_graph_boundary": {
+    "C3_selected_graph_sha256": "f98621af49df5b1790d37c09c7429faa753f3525891d5a836a9ae9d230a3e6b5",
+    "framing_files_selected": false,
+    "selected_packages": [
+      "media-worker",
+      "safe-media",
+      "safe-media-core"
+    ]
+  },
+  "schema": "safe-media-framing-eac3-bsi-development-v1",
+  "selected_features": [
+    {
+      "feature": "Opt-in same-pool complete E-AC-3 frame BSI inspector, retaining source/generation/offset and immutable wire bytes",
+      "id": "B01"
+    },
+    {
+      "feature": "Selected full BSI mixing definitions0/1/2 including mode/programme/pan/block branches; exact raw group bit spans",
+      "id": "B02"
+    },
+    {
+      "feature": "Informational service/copyright/original/surround/packed-production/source-rate fields with exact physical presence",
+      "id": "B03"
+    },
+    {
+      "feature": "Converter sync, physical versus inferred block ID, converted size and one-to-64-byte unaligned additional BSI",
+      "id": "B04"
+    },
+    {
+      "feature": "Raw auxiliary/encoding/CRC trailer facts and fixed mandatory-tail overlap bounds; no CRC/audio validation",
+      "id": "B05"
+    },
+    {
+      "feature": "Weighted MSB-first dependent map count and observable local count consistency, preserving old prefix issue bits",
+      "id": "B06"
+    },
+    {
+      "feature": "Per-bit resumable work, explicit fixed setup, sticky cancellation/content/limits, shared views and no output allocation",
+      "id": "B07"
+    }
+  ],
+  "sole_dependency": "safe-media-core (owned), standard library foundation; no Cargo change",
+  "status": "coherent active source; 11 new Rust regressions unexecuted; HOLD for parent queue after C3 window",
+  "third_party_dependency_admitted": false,
+  "unsafe_code": false
+}

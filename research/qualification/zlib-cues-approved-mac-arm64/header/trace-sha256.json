@@ -1,0 +1,22 @@
+{
+  "header-empty/source-oracle.json": "0632b680be7a1d35d73501b8cb671aa9cdea771ce2fe19befbe91eac2a85684a",
+  "header-empty/candidate.json": "1ddcfc7fbe88c60a36dd2a414012c9a9fad8594a8bdf9ca454ef1d1acc4516a8",
+  "header-empty/reference.json": "bbd353dfac378b3f8b6777e2af4fafef8454db0d2214a4592e0e479aa5b91226",
+  "header-empty/source-candidate.json": "c9bcb7b8d4ae39d480baec9d3a65b957384bda8c1c09cc4ebcb53923ae4d85ce",
+  "header-empty/source-frame-candidate.json": "1ddcfc7fbe88c60a36dd2a414012c9a9fad8594a8bdf9ca454ef1d1acc4516a8",
+  "header-lace/source-oracle.json": "a6143073ef61dfacccc89e5735821f210b4fb092ddc5c68a406ded98a9f774c6",
+  "header-lace/candidate.json": "0d96305ecf391c00bc94d89114ab33fb815da0f20183f997461ac80da6b80e14",
+  "header-lace/reference.json": "4fd9548bcd31980fbcaf5717a2a8a6dd3d4c4288bfa212f3de72038960381ae3",
+  "header-lace/source-candidate.json": "07a87fb4456084af366f1f39d6c24726923289336b0ff321c8b7075aa51b944b",
+  "header-lace/source-frame-candidate.json": "0d96305ecf391c00bc94d89114ab33fb815da0f20183f997461ac80da6b80e14",
+  "header-private/source-oracle.json": "0632b680be7a1d35d73501b8cb671aa9cdea771ce2fe19befbe91eac2a85684a",
+  "header-private/candidate.json": "ed242c0da75d9216c9da270b7144ff4bb89c570ac20a9fbccc827388634c7b52",
+  "header-private/reference.json": "02751816939c663ccc0ea27e0efae6096d7a0a63b9ecb647a3a1c6722f1833f2",
+  "header-private/source-candidate.json": "6dc2a7379c9ed46bc76b8de1c07134072094eb5f1528c48e722bbce6323db616",
+  "header-private/source-frame-candidate.json": "ed242c0da75d9216c9da270b7144ff4bb89c570ac20a9fbccc827388634c7b52",
+  "header-both/source-oracle.json": "0632b680be7a1d35d73501b8cb671aa9cdea771ce2fe19befbe91eac2a85684a",
+  "header-both/candidate.json": "eec9b5cb38cfaae4ebfbe7bd32251e693f1f8b13a0c0b73b194edb2906fb6fe7",
+  "header-both/reference.json": "49be3a5a919c033e31519cbde3506c4f5455a0e8a5890c1d6ae64b48109b6da6",
+  "header-both/source-candidate.json": "780720e9a0c79bfc00719c1bd78597df64199fd491eab8e707188f778ca62c5c",
+  "header-both/source-frame-candidate.json": "eec9b5cb38cfaae4ebfbe7bd32251e693f1f8b13a0c0b73b194edb2906fb6fe7"
+}

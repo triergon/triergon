@@ -1,0 +1,3009 @@
+{
+  "schema_version": 1,
+  "status": "identity inventory only; not the configure-expanded runnable FATE suite",
+  "source_root_role": "externally cached FFmpeg snapshot",
+  "definition_sha256": {
+    "tests/fate/matroska.mak": "4de57456eb811f141e755c2614fef2df4e352338b4415ce1cdffeecfc066be95",
+    "tests/fate/mov.mak": "e6f363d9336c9bb6aa203a1fae632eb91f5e23c438f6ad451c050b0aa2eded9a",
+    "tests/fate/mpegts.mak": "0ec2308d9bc217d0a3ee690d3a3d637f7f68cc0f531e1f736113468ce0345d45",
+    "tests/fate/subtitles.mak": "a9acafe6b2b4bba78dd8acd9cf13b4ae335b109c7ad4dd4de8f5ec1b08b05143"
+  },
+  "cases": [
+    {
+      "id": "fate-binsub-mksenc",
+      "definition_files": [
+        "tests/fate/subtitles.mak:19",
+        "tests/fate/subtitles.mak:20"
+      ],
+      "command_sha256": [
+        "59ce773764e2497fd807981a663c191861d33c29eb2c90786c08164bace69a2a"
+      ],
+      "sample_references": [
+        "sub/1ededcbd7b.ass"
+      ],
+      "unresolved_sample_references": [],
+      "status": "unmapped",
+      "rights": "unreviewed",
+      "configured": false
+    },
+    {
+      "id": "fate-binsub-movtextenc",
+      "definition_files": [
+        "tests/fate/subtitles.mak:47",
+        "tests/fate/subtitles.mak:48"
+      ],
+      "command_sha256": [
+        "f0181794678322bfe96e24e6d54e5514787d0c4395453024b95ebe7202be8037"
+      ],
+      "sample_references": [
+        "sub/MovText_capability_tester.mp4"
+      ],
+      "unresolved_sample_references": [],
+      "status": "unmapped",
+      "rights": "unreviewed",
+      "configured": false
+    },
+    {
+      "id": "fate-matroska",
+      "definition_files": [
+        "tests/fate/matroska.mak:304"
+      ],
+      "command_sha256": [],
+      "sample_references": [],
+      "unresolved_sample_references": [],
+      "status": "unmapped",
+      "rights": "unreviewed",
+      "configured": false
+    },
+    {
+      "id": "fate-matroska-alac-remux",
+      "definition_files": [
+        "tests/fate/matroska.mak:37",
+        "tests/fate/matroska.mak:38"
+      ],
+      "command_sha256": [
+        "758c15edaacb1a2795aa56937f96887d09a1519a8119e177187b719d946c4bcf"
+      ],
+      "sample_references": [
+        "lossless-audio/inside.m4a"
+      ],
+      "unresolved_sample_references": [],
+      "status": "unmapped",
+      "rights": "unreviewed",
+      "configured": false
+    },
+    {
+      "id": "fate-matroska-avoid-negative-ts",
+      "definition_files": [
+        "tests/fate/matroska.mak:149",
+        "tests/fate/matroska.mak:150"
+      ],
+      "command_sha256": [
+        "bfcf83600250b5d4d262039c23b8742aa4906b1496125f251c4dbba1021abb93"
+      ],
+      "sample_references": [
+        "mpeg2/t.mpg"
+      ],
+      "unresolved_sample_references": [],
+      "status": "unmapped",
+      "rights": "unreviewed",
+      "configured": false
+    },
+    {
+      "id": "fate-matroska-crop",
+      "definition_files": [
+        "tests/fate/matroska.mak:106",
+        "tests/fate/matroska.mak:107"
+      ],
+      "command_sha256": [
+        "0a7f16e3dc921818b8cf97429b3c3bf1b2436cd2823a85e915fc97252835908b"
+      ],
+      "sample_references": [
+        "heif-conformance/MIAF007.heic"
+      ],
+      "unresolved_sample_references": [],
+      "status": "unmapped",
+      "rights": "unreviewed",
+      "configured": false
+    },
+    {
+      "id": "fate-matroska-dovi-hvce-mkv-read",
+      "definition_files": [
+        "tests/fate/matroska.mak:291",
+        "tests/fate/matroska.mak:292"
+      ],
+      "command_sha256": [
+        "696bf1a6ca80dadd04a0402d33cc68cf05a2838a9121dadc636e628bb9b31caa"
+      ],
+      "sample_references": [
+        "mkv/dovi-p7-hvce.mkv"
+      ],
+      "unresolved_sample_references": [],
+      "status": "unmapped",
+      "rights": "unreviewed",
+      "configured": false
+    },
+    {
+      "id": "fate-matroska-dovi-hvce-mkv-to-mkv",
+      "definition_files": [
+        "tests/fate/matroska.mak:135",
+        "tests/fate/matroska.mak:136"
+      ],
+      "command_sha256": [
+        "61678a235828bb5959200e04a6654ecf44abf8a74081a6ced444b0de231a6cfb"
+      ],
+      "sample_references": [
+        "mkv/dovi-p7-hvce.mkv"
+      ],
+      "unresolved_sample_references": [],
+      "status": "unmapped",
+      "rights": "unreviewed",
+      "configured": false
+    },
+    {
+      "id": "fate-matroska-dovi-hvce-mp4-to-mkv",
+      "definition_files": [
+        "tests/fate/matroska.mak:131",
+        "tests/fate/matroska.mak:132"
+      ],
+      "command_sha256": [
+        "453230120ebfe2fa3823378a7122f1b2acfb2e5ff3d2f1236ab56e757149983a"
+      ],
+      "sample_references": [
+        "mov/dovi-p7-hvce.mp4"
+      ],
+      "unresolved_sample_references": [],
+      "status": "unmapped",
+      "rights": "unreviewed",
+      "configured": false
+    },
+    {
+      "id": "fate-matroska-dovi-write-config7",
+      "definition_files": [
+        "tests/fate/matroska.mak:117",
+        "tests/fate/matroska.mak:118"
+      ],
+      "command_sha256": [
+        "0721f85582c485dfb9174f40ce31a68fb58b06b481b3731330e64ae9ea3466a8"
+      ],
+      "sample_references": [
+        "mov/dovi-p7.mp4"
+      ],
+      "unresolved_sample_references": [],
+      "status": "unmapped",
+      "rights": "unreviewed",
+      "configured": false
+    },
+    {
+      "id": "fate-matroska-dovi-write-config8",
+      "definition_files": [
+        "tests/fate/matroska.mak:122",
+        "tests/fate/matroska.mak:123"
+      ],
+      "command_sha256": [
+        "317c71b6203cb8bf0fc96ffc6bef515b2becf2be679b3a7caacb46655701ef77"
+      ],
+      "sample_references": [
+        "hevc/dv84.mov"
+      ],
+      "unresolved_sample_references": [],
+      "status": "unmapped",
+      "rights": "unreviewed",
+      "configured": false
+    },
+    {
+      "id": "fate-matroska-dvbsub-remux",
+      "definition_files": [
+        "tests/fate/matroska.mak:246",
+        "tests/fate/matroska.mak:247"
+      ],
+      "command_sha256": [
+        "1ce4be527b34625f36fdfaf8ad66fd7f00105f9c6d20a548acef4f7f9866ac5f"
+      ],
+      "sample_references": [
+        "sub/dvbsubtest_filter.ts"
+      ],
+      "unresolved_sample_references": [],
+      "status": "unmapped",
+      "rights": "unreviewed",
+      "configured": false
+    },
+    {
+      "id": "fate-matroska-encoding-delay",
+      "definition_files": [
+        "tests/fate/matroska.mak:228",
+        "tests/fate/matroska.mak:229"
+      ],
+      "command_sha256": [
+        "a615167e49dbe0d932fb596c8eb0fceedcbf85efe5bbb1d3f1b1a4c76d451cd6"
+      ],
+      "sample_references": [
+        "mxf/Sony-00001.mxf"
+      ],
+      "unresolved_sample_references": [],
+      "status": "unmapped",
+      "rights": "unreviewed",
+      "configured": false
+    },
+    {
+      "id": "fate-matroska-flac-channel-mapping",
+      "definition_files": [
+        "tests/fate/matroska.mak:43",
+        "tests/fate/matroska.mak:44"
+      ],
+      "command_sha256": [
+        "3c0061242d633c8ebd3106e517d2de64b3b40e9c3a636f3a8208b2f2cff14f38"
+      ],
+      "sample_references": [
+        "mkv/flac_channel_layouts.mka"
+      ],
+      "unresolved_sample_references": [],
+      "status": "unmapped",
+      "rights": "unreviewed",
+      "configured": false
+    },
+    {
+      "id": "fate-matroska-flac-extradata-update",
+      "definition_files": [
+        "tests/fate/matroska.mak:53",
+        "tests/fate/matroska.mak:54"
+      ],
+      "command_sha256": [
+        "cd78e16fbf0b3924ada16898348039a61241ace47af880a51ab40a6a6061542d"
+      ],
+      "sample_references": [
+        "mkv/flac_channel_layouts.mka"
+      ],
+      "unresolved_sample_references": [],
+      "status": "unmapped",
+      "rights": "unreviewed",
+      "configured": false
+    },
+    {
+      "id": "fate-matroska-h264-remux",
+      "definition_files": [
+        "tests/fate/matroska.mak:195",
+        "tests/fate/matroska.mak:196"
+      ],
+      "command_sha256": [
+        "021ded0c54f6374174aa9f6748d19dcf279929f739a0c29943fcc65e2c99f229"
+      ],
+      "sample_references": [
+        "h264/h264_intra_first-small.ts"
+      ],
+      "unresolved_sample_references": [],
+      "status": "unmapped",
+      "rights": "unreviewed",
+      "configured": false
+    },
+    {
+      "id": "fate-matroska-hdr10-plus-remux",
+      "definition_files": [
+        "tests/fate/matroska.mak:288",
+        "tests/fate/matroska.mak:289"
+      ],
+      "command_sha256": [
+        "4e32ea35f9337e36a3a843f4ba9829e9b5d9bfd37cd19206473c97da5d6415f9"
+      ],
+      "sample_references": [
+        "mkv/hdr10_plus_vp9_sample.webm"
+      ],
+      "unresolved_sample_references": [],
+      "status": "unmapped",
+      "rights": "unreviewed",
+      "configured": false
+    },
+    {
+      "id": "fate-matroska-lzo-decompression",
+      "definition_files": [
+        "tests/fate/matroska.mak:31",
+        "tests/fate/matroska.mak:32"
+      ],
+      "command_sha256": [
+        "a6b0097374c24e48a77c7024e439e54b8c923a22c1dd0c8043112e7e2e0fbd30"
+      ],
+      "sample_references": [
+        "mkv/lzo.mka"
+      ],
+      "unresolved_sample_references": [],
+      "status": "unmapped",
+      "rights": "unreviewed",
+      "configured": true
+    },
+    {
+      "id": "fate-matroska-mastering-display-metadata",
+      "definition_files": [
+        "tests/fate/matroska.mak:179",
+        "tests/fate/matroska.mak:180"
+      ],
+      "command_sha256": [
+        "2f0b7edd33ed9a56f6a2333528ad24e07c2a6d744330c1a6ba58ab41a7efede2"
+      ],
+      "sample_references": [
+        "mxf/Meridian-Apple_ProResProxy-HDR10.mxf"
+      ],
+      "unresolved_sample_references": [],
+      "status": "unmapped",
+      "rights": "unreviewed",
+      "configured": false
+    },
+    {
+      "id": "fate-matroska-move-cues-to-front",
+      "definition_files": [
+        "tests/fate/matroska.mak:88",
+        "tests/fate/matroska.mak:89"
+      ],
+      "command_sha256": [
+        "a30c99161ffa8e3a80080bccc28ba799669d0443a25e06753c68b50cbfbcf289"
+      ],
+      "sample_references": [
+        "audio-reference/divertimenti_2ch_96kHz_s24.wav"
+      ],
+      "unresolved_sample_references": [],
+      "status": "unmapped",
+      "rights": "unreviewed",
+      "configured": false
+    },
+    {
+      "id": "fate-matroska-mpegts-remux",
+      "definition_files": [
+        "tests/fate/matroska.mak:208",
+        "tests/fate/matroska.mak:209"
+      ],
+      "command_sha256": [
+        "0a5a54a75e177d7aef8b351c93d168dcd4129b1ac4066a731ec438b5ae00f025"
+      ],
+      "sample_references": [
+        "mpegts/pmtchange.ts"
+      ],
+      "unresolved_sample_references": [],
+      "status": "unmapped",
+      "rights": "unreviewed",
+      "configured": false
+    },
+    {
+      "id": "fate-matroska-ms-mode",
+      "definition_files": [
+        "tests/fate/matroska.mak:156",
+        "tests/fate/matroska.mak:157"
+      ],
+      "command_sha256": [
+        "78d7b5156aa72b508ca1ec6a8eaafea488a1b6232e9fdea5af15cf405284474f"
+      ],
+      "sample_references": [
+        "vp5/potter512-400-partial.avi"
+      ],
+      "unresolved_sample_references": [],
+      "status": "unmapped",
+      "rights": "unreviewed",
+      "configured": false
+    },
+    {
+      "id": "fate-matroska-non-rotation-displaymatrix",
+      "definition_files": [
+        "tests/fate/matroska.mak:95",
+        "tests/fate/matroska.mak:96"
+      ],
+      "command_sha256": [
+        "89deca69f07943cac691e058d571ec5a9798d76aa3b8b0125ed1437ccc75875a"
+      ],
+      "sample_references": [
+        "mov/displaymatrix.mov"
+      ],
+      "unresolved_sample_references": [],
+      "status": "unmapped",
+      "rights": "unreviewed",
+      "configured": false
+    },
+    {
+      "id": "fate-matroska-ogg-opus-remux",
+      "definition_files": [
+        "tests/fate/matroska.mak:219",
+        "tests/fate/matroska.mak:220"
+      ],
+      "command_sha256": [
+        "f1280497b34abae1cb342ec64677187751a487a556febe171c39e1ea43744fcc"
+      ],
+      "sample_references": [
+        "ogg/intro-partial.opus"
+      ],
+      "unresolved_sample_references": [],
+      "status": "unmapped",
+      "rights": "unreviewed",
+      "configured": false
+    },
+    {
+      "id": "fate-matroska-opus-remux",
+      "definition_files": [
+        "tests/fate/matroska.mak:215",
+        "tests/fate/matroska.mak:216"
+      ],
+      "command_sha256": [
+        "49b2d88eed8571365caba3a5a9384ecd29cfecc418be493ba681be93fb040094"
+      ],
+      "sample_references": [
+        "mkv/codec_delay_opus.mkv"
+      ],
+      "unresolved_sample_references": [],
+      "status": "unmapped",
+      "rights": "unreviewed",
+      "configured": false
+    },
+    {
+      "id": "fate-matroska-pgs-remux",
+      "definition_files": [
+        "tests/fate/matroska.mak:231",
+        "tests/fate/matroska.mak:232"
+      ],
+      "command_sha256": [
+        "65303f06b5efc43629f9c046ef6e406c2d4627a8dd690c7dd0a5ad457bf845a2"
+      ],
+      "sample_references": [
+        "sub/pgs_sub.sup"
+      ],
+      "unresolved_sample_references": [],
+      "status": "unmapped",
+      "rights": "unreviewed",
+      "configured": false
+    },
+    {
+      "id": "fate-matroska-pgs-remux-durations",
+      "definition_files": [
+        "tests/fate/matroska.mak:236",
+        "tests/fate/matroska.mak:237"
+      ],
+      "command_sha256": [
+        "0b21840154918072ea44b0f2ededc495f061bd8c64f354823702891614abebac"
+      ],
+      "sample_references": [
+        "sub/pgs_sub.sup"
+      ],
+      "unresolved_sample_references": [],
+      "status": "unmapped",
+      "rights": "unreviewed",
+      "configured": false
+    },
+    {
+      "id": "fate-matroska-prores-header-insertion-bz2",
+      "definition_files": [
+        "tests/fate/matroska.mak:6",
+        "tests/fate/matroska.mak:7"
+      ],
+      "command_sha256": [
+        "dee38a81aa8e4587912fbbbab256cd584f9af8dc0bfa1fcd814db6c705927ac8"
+      ],
+      "sample_references": [
+        "mkv/prores_bz2.mkv"
+      ],
+      "unresolved_sample_references": [],
+      "status": "unmapped",
+      "rights": "unreviewed",
+      "configured": false
+    },
+    {
+      "id": "fate-matroska-prores-zlib",
+      "definition_files": [
+        "tests/fate/matroska.mak:1",
+        "tests/fate/matroska.mak:2"
+      ],
+      "command_sha256": [
+        "fa00dc0debd7eb1c0e7655e6bab068ee5d5564df55a9cb29c7153e73508f1e27"
+      ],
+      "sample_references": [
+        "mkv/prores_zlib.mkv"
+      ],
+      "unresolved_sample_references": [],
+      "status": "unmapped",
+      "rights": "unreviewed",
+      "configured": true
+    },
+    {
+      "id": "fate-matroska-qt-mode",
+      "definition_files": [
+        "tests/fate/matroska.mak:160",
+        "tests/fate/matroska.mak:161"
+      ],
+      "command_sha256": [
+        "d515b7686c0558f27ea48a6b84a0289ec6fe733e404e34fe01679808794c6269"
+      ],
+      "sample_references": [
+        "svq1/marymary-shackles.mov"
+      ],
+      "unresolved_sample_references": [],
+      "status": "unmapped",
+      "rights": "unreviewed",
+      "configured": false
+    },
+    {
+      "id": "fate-matroska-remux",
+      "definition_files": [
+        "tests/fate/matroska.mak:12",
+        "tests/fate/matroska.mak:13",
+        "tests/fate/matroska.mak:14",
+        "tests/fate/matroska.mak:15"
+      ],
+      "command_sha256": [
+        "9454982d5571ff0fb0a83bdc1f3bb3291023e727657022282b1740e07ff50d42"
+      ],
+      "sample_references": [
+        "vp9-test-vectors/vp90-2-2pass-akiyo.webm"
+      ],
+      "unresolved_sample_references": [],
+      "status": "unmapped",
+      "rights": "unreviewed",
+      "configured": false
+    },
+    {
+      "id": "fate-matroska-side-data-pref-codec",
+      "definition_files": [
+        "tests/fate/matroska.mak:294",
+        "tests/fate/matroska.mak:298"
+      ],
+      "command_sha256": [
+        "9df92263cc9380889440ba08cf11048868e237818112bb374d02b7dfdfe57ca0"
+      ],
+      "sample_references": [
+        "mkv/hdr10tags-both.mkv"
+      ],
+      "unresolved_sample_references": [],
+      "status": "unmapped",
+      "rights": "unreviewed",
+      "configured": false
+    },
+    {
+      "id": "fate-matroska-side-data-pref-packet",
+      "definition_files": [
+        "tests/fate/matroska.mak:296",
+        "tests/fate/matroska.mak:298"
+      ],
+      "command_sha256": [
+        "1c41273fbee721b32e3576ec38c749ec394eed8072d384597486f93fa074dea0"
+      ],
+      "sample_references": [
+        "mkv/hdr10tags-both.mkv"
+      ],
+      "unresolved_sample_references": [],
+      "status": "unmapped",
+      "rights": "unreviewed",
+      "configured": false
+    },
+    {
+      "id": "fate-matroska-spherical-mono",
+      "definition_files": [
+        "tests/fate/matroska.mak:249",
+        "tests/fate/matroska.mak:250"
+      ],
+      "command_sha256": [
+        "8f24f0888bbbe191f29c58c6d4337f0338c60e12516375c27040343dcdf329e1"
+      ],
+      "sample_references": [
+        "mkv/spherical.mkv"
+      ],
+      "unresolved_sample_references": [],
+      "status": "unmapped",
+      "rights": "unreviewed",
+      "configured": false
+    },
+    {
+      "id": "fate-matroska-spherical-mono-remux",
+      "definition_files": [
+        "tests/fate/matroska.mak:167",
+        "tests/fate/matroska.mak:168"
+      ],
+      "command_sha256": [
+        "4e7f46e4a05783f0cdf9018fae1c5473923cc1bcfcbf2dcf004939ea321d1325"
+      ],
+      "sample_references": [
+        "mkv/spherical.mkv"
+      ],
+      "unresolved_sample_references": [],
+      "status": "unmapped",
+      "rights": "unreviewed",
+      "configured": false
+    },
+    {
+      "id": "fate-matroska-stereo_mode",
+      "definition_files": [
+        "tests/fate/matroska.mak:261",
+        "tests/fate/matroska.mak:262"
+      ],
+      "command_sha256": [
+        "f09a6b42ac456a60f6a0e0f1030786ffd67a19ce4c1a6acebb0a29d25a4522bc"
+      ],
+      "sample_references": [
+        "vp3/offset_test.ogv"
+      ],
+      "unresolved_sample_references": [],
+      "status": "unmapped",
+      "rights": "unreviewed",
+      "configured": false
+    },
+    {
+      "id": "fate-matroska-vp8-alpha-remux",
+      "definition_files": [
+        "tests/fate/matroska.mak:203",
+        "tests/fate/matroska.mak:204"
+      ],
+      "command_sha256": [
+        "93daf3a2be896f2cf12f348d8bfce55db38f069146fe39478ed1ee35c3559743"
+      ],
+      "sample_references": [
+        "vp8_alpha/vp8_video_with_alpha.webm"
+      ],
+      "unresolved_sample_references": [],
+      "status": "unmapped",
+      "rights": "unreviewed",
+      "configured": false
+    },
+    {
+      "id": "fate-matroska-wavpack-missing-codecprivate",
+      "definition_files": [
+        "tests/fate/matroska.mak:22",
+        "tests/fate/matroska.mak:23"
+      ],
+      "command_sha256": [
+        "6df4b16be29096b45112ef379bb6f21a7a072eb96e71225f713af31b7253cb03"
+      ],
+      "sample_references": [
+        "mkv/wavpack_missing_codecprivate.mka"
+      ],
+      "unresolved_sample_references": [],
+      "status": "unmapped",
+      "rights": "unreviewed",
+      "configured": true
+    },
+    {
+      "id": "fate-matroska-xiph-lacing",
+      "definition_files": [
+        "tests/fate/matroska.mak:17",
+        "tests/fate/matroska.mak:18"
+      ],
+      "command_sha256": [
+        "fbd746f931520bfe5543e43e8f7a240a2dd1fc28dc23ba962df0bf84e19b0320"
+      ],
+      "sample_references": [
+        "mkv/xiph_lacing.mka"
+      ],
+      "unresolved_sample_references": [],
+      "status": "unmapped",
+      "rights": "unreviewed",
+      "configured": true
+    },
+    {
+      "id": "fate-matroska-zero-length-block",
+      "definition_files": [
+        "tests/fate/matroska.mak:77",
+        "tests/fate/matroska.mak:78"
+      ],
+      "command_sha256": [
+        "d4748cd7751b31e67a84a800ba85651b74d0acb63ce277daac6ce157f9f93bf4"
+      ],
+      "sample_references": [
+        "mkv/zero_length_block.mks"
+      ],
+      "unresolved_sample_references": [],
+      "status": "unmapped",
+      "rights": "unreviewed",
+      "configured": false
+    },
+    {
+      "id": "fate-matroska-zlib-decompression",
+      "definition_files": [
+        "tests/fate/matroska.mak:27",
+        "tests/fate/matroska.mak:28"
+      ],
+      "command_sha256": [
+        "aa3c723940df3f251a66ff2dfd3fd51ae253433200bcecb7434513e923695517"
+      ],
+      "sample_references": [
+        "mkv/subtitle_zlib.mks"
+      ],
+      "unresolved_sample_references": [],
+      "status": "unmapped",
+      "rights": "unreviewed",
+      "configured": true
+    },
+    {
+      "id": "fate-mov",
+      "definition_files": [
+        "tests/fate/mov.mak:387"
+      ],
+      "command_sha256": [],
+      "sample_references": [],
+      "unresolved_sample_references": [],
+      "status": "unmapped",
+      "rights": "unreviewed",
+      "configured": false
+    },
+    {
+      "id": "fate-mov-1elist-1ctts",
+      "definition_files": [
+        "tests/fate/mov.mak:3",
+        "tests/fate/mov.mak:54"
+      ],
+      "command_sha256": [
+        "217547a055ee9070b7848c117ff0a32c607f6e7cbd461ce0d2f8ffe5c2de871b"
+      ],
+      "sample_references": [
+        "mov/mov-1elist-1ctts.mov"
+      ],
+      "unresolved_sample_references": [],
+      "status": "unmapped",
+      "rights": "unreviewed",
+      "configured": false
+    },
+    {
+      "id": "fate-mov-1elist-ends-last-bframe",
+      "definition_files": [
+        "tests/fate/mov.mak:6",
+        "tests/fate/mov.mak:82"
+      ],
+      "command_sha256": [
+        "e40a7ea93edecf251bbb5181798ec5b5841f9e48c4f2a0a7fe9118e9220c4693"
+      ],
+      "sample_references": [
+        "mov/mov-1elist-ends-last-bframe.mov"
+      ],
+      "unresolved_sample_references": [],
+      "status": "unmapped",
+      "rights": "unreviewed",
+      "configured": false
+    },
+    {
+      "id": "fate-mov-1elist-noctts",
+      "definition_files": [
+        "tests/fate/mov.mak:4",
+        "tests/fate/mov.mak:53"
+      ],
+      "command_sha256": [
+        "7670d3ae6c0f65f733a73608c0656cfb48dfb2535fbb30f485d523f33f41cfa4"
+      ],
+      "sample_references": [
+        "mov/mov-1elist-noctts.mov"
+      ],
+      "unresolved_sample_references": [],
+      "status": "unmapped",
+      "rights": "unreviewed",
+      "configured": false
+    },
+    {
+      "id": "fate-mov-2elist-elist1-ends-bframe",
+      "definition_files": [
+        "tests/fate/mov.mak:7",
+        "tests/fate/mov.mak:85"
+      ],
+      "command_sha256": [
+        "95050aafdec95500e3815182c7186cfae2a83475c246121b3bf800783ed53602"
+      ],
+      "sample_references": [
+        "mov/mov-2elist-elist1-ends-bframe.mov"
+      ],
+      "unresolved_sample_references": [],
+      "status": "unmapped",
+      "rights": "unreviewed",
+      "configured": false
+    },
+    {
+      "id": "fate-mov-3elist",
+      "definition_files": [
+        "tests/fate/mov.mak:1",
+        "tests/fate/mov.mak:55"
+      ],
+      "command_sha256": [
+        "6fc5a787734e4ec89d7552a0fcccbfecaaf4fdbebc3ec13233bd5a5f17bee361"
+      ],
+      "sample_references": [
+        "mov/mov-3elist.mov"
+      ],
+      "unresolved_sample_references": [],
+      "status": "unmapped",
+      "rights": "unreviewed",
+      "configured": false
+    },
+    {
+      "id": "fate-mov-3elist-1ctts",
+      "definition_files": [
+        "tests/fate/mov.mak:2",
+        "tests/fate/mov.mak:56"
+      ],
+      "command_sha256": [
+        "5571a8d0980fc3f0ec159d0b2d560a7ef82e02798612a5b6beba84c0f8743870"
+      ],
+      "sample_references": [
+        "mov/mov-3elist-1ctts.mov"
+      ],
+      "unresolved_sample_references": [],
+      "status": "unmapped",
+      "rights": "unreviewed",
+      "configured": false
+    },
+    {
+      "id": "fate-mov-3elist-encrypted",
+      "definition_files": [
+        "tests/fate/mov.mak:8",
+        "tests/fate/mov.mak:59"
+      ],
+      "command_sha256": [
+        "41d593041f1930eca071721ebada1897015521ca1f5ad8d2e67b6dff8c085325"
+      ],
+      "sample_references": [
+        "mov/mov-3elist-encrypted.mov"
+      ],
+      "unresolved_sample_references": [],
+      "status": "unmapped",
+      "rights": "unreviewed",
+      "configured": false
+    },
+    {
+      "id": "fate-mov-3elist-encrypted-kid",
+      "definition_files": [
+        "tests/fate/mov.mak:11",
+        "tests/fate/mov.mak:68"
+      ],
+      "command_sha256": [
+        "6a79524c6b7d1fcd31330f4a68a3abde42aef03c2de6675b335104ca6d0194e3"
+      ],
+      "sample_references": [
+        "mov/mov-3elist-encrypted.mov"
+      ],
+      "unresolved_sample_references": [],
+      "status": "unmapped",
+      "rights": "unreviewed",
+      "configured": false
+    },
+    {
+      "id": "fate-mov-440hz-10ms",
+      "definition_files": [
+        "tests/fate/mov.mak:92",
+        "tests/fate/mov.mak:93"
+      ],
+      "command_sha256": [
+        "9fa709d0e410e38c70018223039a1afdee2e1ec063414b54c093862cb5cc2053"
+      ],
+      "sample_references": [
+        "mov/440hz-10ms.m4a"
+      ],
+      "unresolved_sample_references": [],
+      "status": "unmapped",
+      "rights": "unreviewed",
+      "configured": false
+    },
+    {
+      "id": "fate-mov-aac-2048-priming",
+      "definition_files": [
+        "tests/fate/mov.mak:30",
+        "tests/fate/mov.mak:136"
+      ],
+      "command_sha256": [
+        "950b3effde5fc6e86e2d1bc3c2ed23909e74c12fb6eab6a313f15e75c339829a"
+      ],
+      "sample_references": [
+        "mov/aac-2048-priming.mov"
+      ],
+      "unresolved_sample_references": [],
+      "status": "unmapped",
+      "rights": "unreviewed",
+      "configured": false
+    },
+    {
+      "id": "fate-mov-avif-demux-still-image-1-item",
+      "definition_files": [
+        "tests/fate/mov.mak:203",
+        "tests/fate/mov.mak:204"
+      ],
+      "command_sha256": [
+        "e04ce7aae152dfe3615ec6b3264a526d42ff01b08d43bd93d3227e0892802e2d"
+      ],
+      "sample_references": [
+        "avif/still_image.avif"
+      ],
+      "unresolved_sample_references": [],
+      "status": "unmapped",
+      "rights": "unreviewed",
+      "configured": false
+    },
+    {
+      "id": "fate-mov-avif-demux-still-image-multiple-items",
+      "definition_files": [
+        "tests/fate/mov.mak:208",
+        "tests/fate/mov.mak:209"
+      ],
+      "command_sha256": [
+        "a36f1bb221ceb804588e6431a2e54a9c0d22cafd0201a8b2fba36f8ef58ac51e"
+      ],
+      "sample_references": [
+        "avif/still_image_exif.avif"
+      ],
+      "unresolved_sample_references": [],
+      "status": "unmapped",
+      "rights": "unreviewed",
+      "configured": false
+    },
+    {
+      "id": "fate-mov-bbi-elst-starts-b",
+      "definition_files": [
+        "tests/fate/mov.mak:120",
+        "tests/fate/mov.mak:121"
+      ],
+      "command_sha256": [
+        "6149a60be417fa0c26f42d1757f89ea3b09a9467e8d02d0b8acb268275c6413b"
+      ],
+      "sample_references": [
+        "h264/twofields_packet.mp4"
+      ],
+      "unresolved_sample_references": [],
+      "status": "unmapped",
+      "rights": "unreviewed",
+      "configured": false
+    },
+    {
+      "id": "fate-mov-channel-description",
+      "definition_files": [
+        "tests/fate/mov.mak:276",
+        "tests/fate/mov.mak:277",
+        "tests/fate/mov.mak:278"
+      ],
+      "command_sha256": [
+        "a544dbd4b573d6e181500f9881164d647901a2b868fcdacdf0f5a3fc0697fc93"
+      ],
+      "sample_references": [],
+      "unresolved_sample_references": [],
+      "status": "unmapped",
+      "rights": "unreviewed",
+      "configured": false
+    },
+    {
+      "id": "fate-mov-cover-image",
+      "definition_files": [
+        "tests/fate/mov.mak:173",
+        "tests/fate/mov.mak:174"
+      ],
+      "command_sha256": [
+        "5c32e0311da855aa19a69d40485d5796102bd5d780288b725d51ddd32da68b96"
+      ],
+      "sample_references": [
+        "cover_art/Owner-iTunes_9.0.3.15.m4a"
+      ],
+      "unresolved_sample_references": [],
+      "status": "unmapped",
+      "rights": "unreviewed",
+      "configured": false
+    },
+    {
+      "id": "fate-mov-displaymatrix",
+      "definition_files": [
+        "tests/fate/mov.mak:33",
+        "tests/fate/mov.mak:142"
+      ],
+      "command_sha256": [
+        "7fff47dc1a7964e2ef62e32a84f62cd45c8d438a4446c4799ebe4f1bb13705a3"
+      ],
+      "sample_references": [
+        "mov/displaymatrix.mov"
+      ],
+      "unresolved_sample_references": [],
+      "status": "unmapped",
+      "rights": "unreviewed",
+      "configured": false
+    },
+    {
+      "id": "fate-mov-dovi-hvce-mkv-to-mp4",
+      "definition_files": [
+        "tests/fate/mov.mak:269",
+        "tests/fate/mov.mak:270"
+      ],
+      "command_sha256": [
+        "c17c577b20cb1ebb33b9bfe47f57dbbccba25d59598afcac3c75335cbbfc049f"
+      ],
+      "sample_references": [
+        "mkv/dovi-p7-hvce.mkv"
+      ],
+      "unresolved_sample_references": [],
+      "status": "unmapped",
+      "rights": "unreviewed",
+      "configured": false
+    },
+    {
+      "id": "fate-mov-dovi-hvce-mp4-read",
+      "definition_files": [
+        "tests/fate/mov.mak:44",
+        "tests/fate/mov.mak:148"
+      ],
+      "command_sha256": [
+        "9bb333c5ff62a03b46eee4bceefd0f7f14285b479988b56fae9ff6444c4318d4"
+      ],
+      "sample_references": [
+        "mov/dovi-p7-hvce.mp4"
+      ],
+      "unresolved_sample_references": [],
+      "status": "unmapped",
+      "rights": "unreviewed",
+      "configured": false
+    },
+    {
+      "id": "fate-mov-dovi-hvce-mp4-to-mp4",
+      "definition_files": [
+        "tests/fate/mov.mak:265",
+        "tests/fate/mov.mak:266"
+      ],
+      "command_sha256": [
+        "bbf847709f4fb7a6e095672bb8fcfe03187e846bcd737fd22758b78a8f2dac8e"
+      ],
+      "sample_references": [
+        "mov/dovi-p7-hvce.mp4"
+      ],
+      "unresolved_sample_references": [],
+      "status": "unmapped",
+      "rights": "unreviewed",
+      "configured": false
+    },
+    {
+      "id": "fate-mov-elist-starts-ctts-2ndsample",
+      "definition_files": [
+        "tests/fate/mov.mak:5",
+        "tests/fate/mov.mak:77"
+      ],
+      "command_sha256": [
+        "cb4892915f4f52d603970db8a2ef4f0e0948800d1ed090d4ebc6e9c999a59cad"
+      ],
+      "sample_references": [
+        "mov/mov-elist-starts-ctts-2ndsample.mov"
+      ],
+      "unresolved_sample_references": [],
+      "status": "unmapped",
+      "rights": "unreviewed",
+      "configured": false
+    },
+    {
+      "id": "fate-mov-elst-ends-betn-b-and-i",
+      "definition_files": [
+        "tests/fate/mov.mak:22",
+        "tests/fate/mov.mak:88"
+      ],
+      "command_sha256": [
+        "3e1e50c20cf03fac3afc8178d3f59649c3ccc7ba23c49f5df62db8ffde917858"
+      ],
+      "sample_references": [
+        "mov/elst_ends_betn_b_and_i.mp4"
+      ],
+      "unresolved_sample_references": [],
+      "status": "unmapped",
+      "rights": "unreviewed",
+      "configured": false
+    },
+    {
+      "id": "fate-mov-faststart-4gb-overflow",
+      "definition_files": [
+        "tests/fate/mov.mak:46",
+        "tests/fate/mov.mak:158",
+        "tests/fate/mov.mak:159",
+        "tests/fate/mov.mak:160"
+      ],
+      "command_sha256": [
+        "9de067fe79c22f471836fdd5a4f3a7d7ab72aaf903fa44bdb9458d2de5047eaa"
+      ],
+      "sample_references": [
+        "mov/faststart-4gb-overflow.mov"
+      ],
+      "unresolved_sample_references": [],
+      "status": "unmapped",
+      "rights": "unreviewed",
+      "configured": true
+    },
+    {
+      "id": "fate-mov-frag-encrypted",
+      "definition_files": [
+        "tests/fate/mov.mak:9",
+        "tests/fate/mov.mak:62"
+      ],
+      "command_sha256": [
+        "a01259ba7991942c6d61a07ed502727b37f4849855a18ccb0eefb0390d21ec0e"
+      ],
+      "sample_references": [
+        "mov/mov-frag-encrypted.mp4"
+      ],
+      "unresolved_sample_references": [],
+      "status": "unmapped",
+      "rights": "unreviewed",
+      "configured": false
+    },
+    {
+      "id": "fate-mov-frag-encrypted-kid",
+      "definition_files": [
+        "tests/fate/mov.mak:12",
+        "tests/fate/mov.mak:71"
+      ],
+      "command_sha256": [
+        "2baf0cfc2d9b584b4fa1033f9207a2d3c0dde0c886ae529f8b6a58d7579ab56b"
+      ],
+      "sample_references": [
+        "mov/mov-frag-encrypted.mp4"
+      ],
+      "unresolved_sample_references": [],
+      "status": "unmapped",
+      "rights": "unreviewed",
+      "configured": false
+    },
+    {
+      "id": "fate-mov-frag-overlap",
+      "definition_files": [
+        "tests/fate/mov.mak:14",
+        "tests/fate/mov.mak:106"
+      ],
+      "command_sha256": [
+        "0bf6e2fa6e7c9c28c842cb67057338c87102eacc425cd0c408aa2378eaaff664"
+      ],
+      "sample_references": [
+        "mov/frag_overlap.mp4"
+      ],
+      "unresolved_sample_references": [],
+      "status": "unmapped",
+      "rights": "unreviewed",
+      "configured": false
+    },
+    {
+      "id": "fate-mov-gpmf-remux",
+      "definition_files": [
+        "tests/fate/mov.mak:24",
+        "tests/fate/mov.mak:150",
+        "tests/fate/mov.mak:151",
+        "tests/fate/mov.mak:152"
+      ],
+      "command_sha256": [
+        "d5c6e9d0e9225603b52d2fd52a4d0dec7cfd393c35264dcfc66c9fc5f3dadcfe"
+      ],
+      "sample_references": [
+        "mov/fake-gp-media-with-real-gpmf.mp4"
+      ],
+      "unresolved_sample_references": [],
+      "status": "unmapped",
+      "rights": "unreviewed",
+      "configured": false
+    },
+    {
+      "id": "fate-mov-guess-delay-1",
+      "definition_files": [
+        "tests/fate/mov.mak:36",
+        "tests/fate/mov.mak:154"
+      ],
+      "command_sha256": [
+        "61a24ec34b5f08ae3690886307bf83fd81c9cf1dd1b0b4a02f8b64a693994344"
+      ],
+      "sample_references": [
+        "h264/h264_3bf_nopyramid_nobsrestriction.mp4"
+      ],
+      "unresolved_sample_references": [],
+      "status": "unmapped",
+      "rights": "unreviewed",
+      "configured": false
+    },
+    {
+      "id": "fate-mov-guess-delay-2",
+      "definition_files": [
+        "tests/fate/mov.mak:37",
+        "tests/fate/mov.mak:155"
+      ],
+      "command_sha256": [
+        "6abbbe3dad990330df40bb5c05dc7c877a570c3194b4dee6b28b06c911e775bf"
+      ],
+      "sample_references": [
+        "h264/h264_3bf_pyramid_nobsrestriction.mp4"
+      ],
+      "unresolved_sample_references": [],
+      "status": "unmapped",
+      "rights": "unreviewed",
+      "configured": false
+    },
+    {
+      "id": "fate-mov-guess-delay-3",
+      "definition_files": [
+        "tests/fate/mov.mak:38",
+        "tests/fate/mov.mak:156"
+      ],
+      "command_sha256": [
+        "e295aab74d9e7f1440058afe72e69d3cf6b4eb44dfc48acec7eb3f51c2954590"
+      ],
+      "sample_references": [
+        "h264/h264_4bf_pyramid_nobsrestriction.mp4"
+      ],
+      "unresolved_sample_references": [],
+      "status": "unmapped",
+      "rights": "unreviewed",
+      "configured": false
+    },
+    {
+      "id": "fate-mov-heic-demux-clap-irot-imir",
+      "definition_files": [
+        "tests/fate/mov.mak:223",
+        "tests/fate/mov.mak:224"
+      ],
+      "command_sha256": [
+        "27e9195564c4325937031a43795a13ee6b0499877197d5b7796f7d4f910699e5"
+      ],
+      "sample_references": [
+        "heif-conformance/MIAF007.heic"
+      ],
+      "unresolved_sample_references": [],
+      "status": "unmapped",
+      "rights": "unreviewed",
+      "configured": false
+    },
+    {
+      "id": "fate-mov-heic-demux-still-image-1-item",
+      "definition_files": [
+        "tests/fate/mov.mak:213",
+        "tests/fate/mov.mak:214"
+      ],
+      "command_sha256": [
+        "387264f9868e1d27cba97a9e554533ca624b19cf460a25bf8b3ec15e2a7125fe"
+      ],
+      "sample_references": [
+        "heif-conformance/C002.heic"
+      ],
+      "unresolved_sample_references": [],
+      "status": "unmapped",
+      "rights": "unreviewed",
+      "configured": false
+    },
+    {
+      "id": "fate-mov-heic-demux-still-image-grid",
+      "definition_files": [
+        "tests/fate/mov.mak:235",
+        "tests/fate/mov.mak:236"
+      ],
+      "command_sha256": [
+        "d1a658743bd46ded4f35855bd910b372c15cd8522c557a5d8e36a7c6d39f4c40"
+      ],
+      "sample_references": [
+        "heif-conformance/C007.heic"
+      ],
+      "unresolved_sample_references": [],
+      "status": "unmapped",
+      "rights": "unreviewed",
+      "configured": false
+    },
+    {
+      "id": "fate-mov-heic-demux-still-image-iovl",
+      "definition_files": [
+        "tests/fate/mov.mak:241",
+        "tests/fate/mov.mak:242"
+      ],
+      "command_sha256": [
+        "3981cb05d5ae87873c058f34cc15d588713b74c14fd532b0df58174d32db06b9"
+      ],
+      "sample_references": [
+        "heif-conformance/C015.heic"
+      ],
+      "unresolved_sample_references": [],
+      "status": "unmapped",
+      "rights": "unreviewed",
+      "configured": false
+    },
+    {
+      "id": "fate-mov-heic-demux-still-image-iovl-2",
+      "definition_files": [
+        "tests/fate/mov.mak:247",
+        "tests/fate/mov.mak:248"
+      ],
+      "command_sha256": [
+        "10252d25cefa76b01f0b111cb0bd690efedf3c5f53fa756d93fefe3abf127f37"
+      ],
+      "sample_references": [
+        "heif-conformance/C021.heic"
+      ],
+      "unresolved_sample_references": [],
+      "status": "unmapped",
+      "rights": "unreviewed",
+      "configured": false
+    },
+    {
+      "id": "fate-mov-heic-demux-still-image-multiple-items",
+      "definition_files": [
+        "tests/fate/mov.mak:218",
+        "tests/fate/mov.mak:219"
+      ],
+      "command_sha256": [
+        "1fd8f5ad2cf1f7dcb126661250b7eb1a5fe4fcd8a7490464d2d7a060a023a312"
+      ],
+      "sample_references": [
+        "heif-conformance/C003.heic"
+      ],
+      "unresolved_sample_references": [],
+      "status": "unmapped",
+      "rights": "unreviewed",
+      "configured": false
+    },
+    {
+      "id": "fate-mov-heic-demux-still-image-multiple-thumb",
+      "definition_files": [
+        "tests/fate/mov.mak:229",
+        "tests/fate/mov.mak:230"
+      ],
+      "command_sha256": [
+        "73c7c99ecd3c2c0e2cafc234e61dededb94ed9935b768c9cffabe1281b657bdb"
+      ],
+      "sample_references": [
+        "heif/P1001091.HIF"
+      ],
+      "unresolved_sample_references": [],
+      "status": "unmapped",
+      "rights": "unreviewed",
+      "configured": false
+    },
+    {
+      "id": "fate-mov-ibi-elst-starts-b",
+      "definition_files": [
+        "tests/fate/mov.mak:21",
+        "tests/fate/mov.mak:103"
+      ],
+      "command_sha256": [
+        "2e4a45cadbf9e712827d83b4d642cb4a6b5ab80974d5ac6b40dfbd8235340ae4"
+      ],
+      "sample_references": [
+        "mov/mov_ibi_elst_starts_b.mov"
+      ],
+      "unresolved_sample_references": [],
+      "status": "unmapped",
+      "rights": "unreviewed",
+      "configured": false
+    },
+    {
+      "id": "fate-mov-init-nonkeyframe",
+      "definition_files": [
+        "tests/fate/mov.mak:32",
+        "tests/fate/mov.mak:140"
+      ],
+      "command_sha256": [
+        "2035f332b19067cee72ecdf7c9941e3c69ee6975bb29baa13698fa0c3d6fdc99"
+      ],
+      "sample_references": [
+        "mov/mp4-init-nonkeyframe.mp4"
+      ],
+      "unresolved_sample_references": [],
+      "status": "unmapped",
+      "rights": "unreviewed",
+      "configured": false
+    },
+    {
+      "id": "fate-mov-invalid-elst-entry-count",
+      "definition_files": [
+        "tests/fate/mov.mak:19",
+        "tests/fate/mov.mak:96"
+      ],
+      "command_sha256": [
+        "000e9157d93e5fae4af75283bbb21535708289cbf10331d5f257de090f0618f0"
+      ],
+      "sample_references": [
+        "mov/invalid_elst_entry_count.mov"
+      ],
+      "unresolved_sample_references": [],
+      "status": "unmapped",
+      "rights": "unreviewed",
+      "configured": false
+    },
+    {
+      "id": "fate-mov-mime-codecstring",
+      "definition_files": [
+        "tests/fate/mov.mak:40",
+        "tests/fate/mov.mak:166"
+      ],
+      "command_sha256": [
+        "0c61e0397be267376863caf242bfbde65702422d4149676d7dc7643f4a804aa6"
+      ],
+      "sample_references": [
+        "mov/mov_stream_shorter_than_movie.mov"
+      ],
+      "unresolved_sample_references": [],
+      "status": "unmapped",
+      "rights": "unreviewed",
+      "configured": false
+    },
+    {
+      "id": "fate-mov-mp4-chapters",
+      "definition_files": [
+        "tests/fate/mov.mak:169",
+        "tests/fate/mov.mak:170"
+      ],
+      "command_sha256": [
+        "b658c5246dc6a91aff11fc2d72cc2fbe1a62f979ac845dd29fbb2debf6b95783"
+      ],
+      "sample_references": [
+        "vorbis/vorbis_chapter_extension_demo.ogg"
+      ],
+      "unresolved_sample_references": [],
+      "status": "unmapped",
+      "rights": "unreviewed",
+      "configured": false
+    },
+    {
+      "id": "fate-mov-mp4-disposition-mpegts-remux",
+      "definition_files": [
+        "tests/fate/mov.mak:255",
+        "tests/fate/mov.mak:256"
+      ],
+      "command_sha256": [
+        "6f271e13cb25ff1199d49d20e3a7c476f8c1b72dff6b5a1cfea4a7d90cfd0e2d"
+      ],
+      "sample_references": [
+        "mpegts/pmtchange.ts"
+      ],
+      "unresolved_sample_references": [],
+      "status": "unmapped",
+      "rights": "unreviewed",
+      "configured": false
+    },
+    {
+      "id": "fate-mov-mp4-edst-remainder",
+      "definition_files": [
+        "tests/fate/mov.mak:381",
+        "tests/fate/mov.mak:382"
+      ],
+      "command_sha256": [
+        "81271263c3b272b4bdf212da4292a72f8423186fd2b56221d51d5fc1c729159e"
+      ],
+      "sample_references": [
+        "audiomatch/tones_fdkaac_44100_stereo_aac_lc.m4a"
+      ],
+      "unresolved_sample_references": [],
+      "status": "unmapped",
+      "rights": "unreviewed",
+      "configured": false
+    },
+    {
+      "id": "fate-mov-mp4-extended-atom",
+      "definition_files": [
+        "tests/fate/mov.mak:42",
+        "tests/fate/mov.mak:164"
+      ],
+      "command_sha256": [
+        "4905e57c1663aa2f2c116e5fbdd7b7618f056cadaf4c14ac5e35580767cc3632"
+      ],
+      "sample_references": [
+        "mov/extended_atom_size_probe"
+      ],
+      "unresolved_sample_references": [],
+      "status": "unmapped",
+      "rights": "unreviewed",
+      "configured": false
+    },
+    {
+      "id": "fate-mov-mp4-frag-flush",
+      "definition_files": [
+        "tests/fate/mov.mak:108",
+        "tests/fate/mov.mak:109",
+        "tests/fate/mov.mak:110",
+        "tests/fate/mov.mak:114"
+      ],
+      "command_sha256": [
+        "190d9b091cfd0451a0828bebaf24b711488e60fd402b8424d9b7267e8d720404"
+      ],
+      "sample_references": [],
+      "unresolved_sample_references": [],
+      "status": "unmapped",
+      "rights": "unreviewed",
+      "configured": false
+    },
+    {
+      "id": "fate-mov-mp4-fragmented-ttml-dfxp",
+      "definition_files": [
+        "tests/fate/mov.mak:191",
+        "tests/fate/mov.mak:192"
+      ],
+      "command_sha256": [
+        "721df07e7f13cc69530d6bcba73fc1306bf8313f6a37081466d013ff00f6cbfc"
+      ],
+      "sample_references": [
+        "sub/SubRip_capability_tester.srt"
+      ],
+      "unresolved_sample_references": [],
+      "status": "unmapped",
+      "rights": "unreviewed",
+      "configured": false
+    },
+    {
+      "id": "fate-mov-mp4-fragmented-ttml-stpp",
+      "definition_files": [
+        "tests/fate/mov.mak:180",
+        "tests/fate/mov.mak:181"
+      ],
+      "command_sha256": [
+        "cf5bfc8858075d7e05afa08eca5fd231d4f9d1e39685bf005d2143406abdb769"
+      ],
+      "sample_references": [
+        "sub/SubRip_capability_tester.srt"
+      ],
+      "unresolved_sample_references": [],
+      "status": "unmapped",
+      "rights": "unreviewed",
+      "configured": false
+    },
+    {
+      "id": "fate-mov-mp4-iamf-5_1_4",
+      "definition_files": [
+        "tests/fate/mov.mak:311",
+        "tests/fate/mov.mak:312",
+        "tests/fate/mov.mak:313",
+        "tests/fate/mov.mak:314"
+      ],
+      "command_sha256": [
+        "aa316d75986acab8431fccfbc01ea8fe2a2212e894e83b48b42b096faa8d0deb"
+      ],
+      "sample_references": [],
+      "unresolved_sample_references": [],
+      "status": "unmapped",
+      "rights": "unreviewed",
+      "configured": false
+    },
+    {
+      "id": "fate-mov-mp4-iamf-7_1_4-video-first",
+      "definition_files": [
+        "tests/fate/mov.mak:335",
+        "tests/fate/mov.mak:336",
+        "tests/fate/mov.mak:337"
+      ],
+      "command_sha256": [
+        "a9d5fa51cccef964ae555ebd136acb66b416a84c7d8bcf08266973fa61b429fa"
+      ],
+      "sample_references": [],
+      "unresolved_sample_references": [],
+      "status": "unmapped",
+      "rights": "unreviewed",
+      "configured": false
+    },
+    {
+      "id": "fate-mov-mp4-iamf-7_1_4-video-first-2",
+      "definition_files": [
+        "tests/fate/mov.mak:342",
+        "tests/fate/mov.mak:343",
+        "tests/fate/mov.mak:344"
+      ],
+      "command_sha256": [
+        "6b7ea6daf7855a845f767af578f5220ef4e7970eb624522e2bffe7a5a867b4d8"
+      ],
+      "sample_references": [],
+      "unresolved_sample_references": [],
+      "status": "unmapped",
+      "rights": "unreviewed",
+      "configured": false
+    },
+    {
+      "id": "fate-mov-mp4-iamf-7_1_4-video-first-3",
+      "definition_files": [
+        "tests/fate/mov.mak:348",
+        "tests/fate/mov.mak:349",
+        "tests/fate/mov.mak:350"
+      ],
+      "command_sha256": [
+        "a4b011f06c5e9ac955f0c0131295f63d7ec304250e8217dd248e1b472ae56bee"
+      ],
+      "sample_references": [],
+      "unresolved_sample_references": [],
+      "status": "unmapped",
+      "rights": "unreviewed",
+      "configured": false
+    },
+    {
+      "id": "fate-mov-mp4-iamf-7_1_4-video-last",
+      "definition_files": [
+        "tests/fate/mov.mak:354",
+        "tests/fate/mov.mak:355",
+        "tests/fate/mov.mak:356",
+        "tests/fate/mov.mak:357",
+        "tests/fate/mov.mak:358"
+      ],
+      "command_sha256": [
+        "49ddd347de07b201f001c7e1ee1e28dd668d66e915451346d27202bd32062ae8"
+      ],
+      "sample_references": [],
+      "unresolved_sample_references": [],
+      "status": "unmapped",
+      "rights": "unreviewed",
+      "configured": false
+    },
+    {
+      "id": "fate-mov-mp4-iamf-ambisonic_1",
+      "definition_files": [
+        "tests/fate/mov.mak:366",
+        "tests/fate/mov.mak:367",
+        "tests/fate/mov.mak:368",
+        "tests/fate/mov.mak:369"
+      ],
+      "command_sha256": [
+        "27a3c09e885d905a9d5e23f3036c06282b1d094494201ea2869ecb86dd0c2f20"
+      ],
+      "sample_references": [],
+      "unresolved_sample_references": [],
+      "status": "unmapped",
+      "rights": "unreviewed",
+      "configured": false
+    },
+    {
+      "id": "fate-mov-mp4-iamf-stereo",
+      "definition_files": [
+        "tests/fate/mov.mak:302",
+        "tests/fate/mov.mak:303",
+        "tests/fate/mov.mak:304",
+        "tests/fate/mov.mak:305"
+      ],
+      "command_sha256": [
+        "a84c91347c8076f59cfdec061d08fe105bb8ac239e3c0a452a7a7693d942b4c3"
+      ],
+      "sample_references": [],
+      "unresolved_sample_references": [],
+      "status": "unmapped",
+      "rights": "unreviewed",
+      "configured": false
+    },
+    {
+      "id": "fate-mov-mp4-multiple-stsd-muxing",
+      "definition_files": [
+        "tests/fate/mov.mak:377",
+        "tests/fate/mov.mak:378"
+      ],
+      "command_sha256": [
+        "42e165b66bec176d234bcfd4869da6bc385cba973a33c9308e058716807fc0ed"
+      ],
+      "sample_references": [
+        "h264/extradata-reload-multi-stsd.mov"
+      ],
+      "unresolved_sample_references": [],
+      "status": "unmapped",
+      "rights": "unreviewed",
+      "configured": false
+    },
+    {
+      "id": "fate-mov-mp4-pcm",
+      "definition_files": [
+        "tests/fate/mov.mak:282",
+        "tests/fate/mov.mak:283",
+        "tests/fate/mov.mak:284"
+      ],
+      "command_sha256": [
+        "25a1a56eca6cdabfa6bab15cd4745c453c12eac3bde21f9d993c8d32527e2537"
+      ],
+      "sample_references": [],
+      "unresolved_sample_references": [],
+      "status": "unmapped",
+      "rights": "unreviewed",
+      "configured": false
+    },
+    {
+      "id": "fate-mov-mp4-pcm-float",
+      "definition_files": [
+        "tests/fate/mov.mak:288",
+        "tests/fate/mov.mak:289",
+        "tests/fate/mov.mak:290"
+      ],
+      "command_sha256": [
+        "9909cde106c829d6260706e79804f57db6e2f638afba2ae9ac41ca0e824d4122"
+      ],
+      "sample_references": [],
+      "unresolved_sample_references": [],
+      "status": "unmapped",
+      "rights": "unreviewed",
+      "configured": false
+    },
+    {
+      "id": "fate-mov-mp4-ttml-dfxp",
+      "definition_files": [
+        "tests/fate/mov.mak:176",
+        "tests/fate/mov.mak:178"
+      ],
+      "command_sha256": [
+        "99b5b2b0555d2d6d7c1aba9f496750a854bb545eeb50475fd519f50bcd91f55a"
+      ],
+      "sample_references": [
+        "sub/SubRip_capability_tester.srt"
+      ],
+      "unresolved_sample_references": [],
+      "status": "unmapped",
+      "rights": "unreviewed",
+      "configured": false
+    },
+    {
+      "id": "fate-mov-mp4-ttml-stpp",
+      "definition_files": [
+        "tests/fate/mov.mak:176",
+        "tests/fate/mov.mak:177"
+      ],
+      "command_sha256": [
+        "8c25dacfbbd9749b5d1722dd48e442125151fa72dd9ebf3389b3d844384937e2"
+      ],
+      "sample_references": [
+        "sub/SubRip_capability_tester.srt"
+      ],
+      "unresolved_sample_references": [],
+      "status": "unmapped",
+      "rights": "unreviewed",
+      "configured": false
+    },
+    {
+      "id": "fate-mov-mp4-with-mov-in24-ver",
+      "definition_files": [
+        "tests/fate/mov.mak:39",
+        "tests/fate/mov.mak:162"
+      ],
+      "command_sha256": [
+        "261956737372cc6057163f9a861761be3c696113d0115f7eb0bbdc2ca21b1c04"
+      ],
+      "sample_references": [
+        "mov/mp4-with-mov-in24-ver.mp4"
+      ],
+      "unresolved_sample_references": [],
+      "status": "unmapped",
+      "rights": "unreviewed",
+      "configured": false
+    },
+    {
+      "id": "fate-mov-neg-firstpts-discard",
+      "definition_files": [
+        "tests/fate/mov.mak:28",
+        "tests/fate/mov.mak:124"
+      ],
+      "command_sha256": [
+        "b240190e87080b6d5f991adba5d71cbbf45c93456b89d3f6f57c98b704db1bc2"
+      ],
+      "sample_references": [
+        "mov/mov_neg_first_pts_discard.mov"
+      ],
+      "unresolved_sample_references": [],
+      "status": "unmapped",
+      "rights": "unreviewed",
+      "configured": false
+    },
+    {
+      "id": "fate-mov-neg-firstpts-discard-frames",
+      "definition_files": [
+        "tests/fate/mov.mak:15",
+        "tests/fate/mov.mak:131"
+      ],
+      "command_sha256": [
+        "beea8601fbe0c5b0f7ffedce07e235b7aa2a315475d71b789f0111b1d5a925b7"
+      ],
+      "sample_references": [
+        "mov/mov_neg_first_pts_discard.mov"
+      ],
+      "unresolved_sample_references": [],
+      "status": "unmapped",
+      "rights": "unreviewed",
+      "configured": false
+    },
+    {
+      "id": "fate-mov-neg-firstpts-discard-vorbis",
+      "definition_files": [
+        "tests/fate/mov.mak:29",
+        "tests/fate/mov.mak:128"
+      ],
+      "command_sha256": [
+        "6f35870aa33ad1b82adda05842b7de698f2721892d64c1d5553e83fc492dc00c"
+      ],
+      "sample_references": [
+        "mov/mov_neg_first_pts_discard_vorbis.mp4"
+      ],
+      "unresolved_sample_references": [],
+      "status": "unmapped",
+      "rights": "unreviewed",
+      "configured": false
+    },
+    {
+      "id": "fate-mov-pcm-remux",
+      "definition_files": [
+        "tests/fate/mov.mak:26",
+        "tests/fate/mov.mak:292",
+        "tests/fate/mov.mak:293",
+        "tests/fate/mov.mak:294",
+        "tests/fate/mov.mak:295"
+      ],
+      "command_sha256": [
+        "970c5a81e05c3aecfb63427a2136a1c5842777fd003bcfe4eb82b6a22c7b0546"
+      ],
+      "sample_references": [],
+      "unresolved_sample_references": [],
+      "status": "unmapped",
+      "rights": "unreviewed",
+      "configured": false
+    },
+    {
+      "id": "fate-mov-read-amve",
+      "definition_files": [
+        "tests/fate/mov.mak:34",
+        "tests/fate/mov.mak:144"
+      ],
+      "command_sha256": [
+        "c56ca985e53ed0f65889985a8a5759a2bc65a64169154c532abf25cea283b810"
+      ],
+      "sample_references": [
+        "mov/amve.mov"
+      ],
+      "unresolved_sample_references": [],
+      "status": "unmapped",
+      "rights": "unreviewed",
+      "configured": false
+    },
+    {
+      "id": "fate-mov-spherical-mono",
+      "definition_files": [
+        "tests/fate/mov.mak:35",
+        "tests/fate/mov.mak:146"
+      ],
+      "command_sha256": [
+        "84a2aa47e11f65bb71c5260c18b3bc98af8d53545d14261e43c631a09d4da2fb"
+      ],
+      "sample_references": [
+        "mov/spherical.mov"
+      ],
+      "unresolved_sample_references": [],
+      "status": "unmapped",
+      "rights": "unreviewed",
+      "configured": false
+    },
+    {
+      "id": "fate-mov-stream-shorter-than-movie",
+      "definition_files": [
+        "tests/fate/mov.mak:17",
+        "tests/fate/mov.mak:134"
+      ],
+      "command_sha256": [
+        "c03cef738b1b83131ca446f3f42891cdf435af7147b755af80c4d2a50b5f6883"
+      ],
+      "sample_references": [
+        "mov/mov_stream_shorter_than_movie.mov"
+      ],
+      "unresolved_sample_references": [],
+      "status": "unmapped",
+      "rights": "unreviewed",
+      "configured": false
+    },
+    {
+      "id": "fate-mov-tenc-only-encrypted",
+      "definition_files": [
+        "tests/fate/mov.mak:10",
+        "tests/fate/mov.mak:65"
+      ],
+      "command_sha256": [
+        "52533678726caa32074bbe6fffc054c7577815ea2fe7ada338835f485b87ab73"
+      ],
+      "sample_references": [
+        "mov/mov-tenc-only-encrypted.mp4"
+      ],
+      "unresolved_sample_references": [],
+      "status": "unmapped",
+      "rights": "unreviewed",
+      "configured": false
+    },
+    {
+      "id": "fate-mov-tenc-only-encrypted-kid",
+      "definition_files": [
+        "tests/fate/mov.mak:13",
+        "tests/fate/mov.mak:74"
+      ],
+      "command_sha256": [
+        "127e964ea4c4bb5bc902f7ce2ef7475e4f3d9960c3196253752ed96666313228"
+      ],
+      "sample_references": [
+        "mov/mov-tenc-only-encrypted.mp4"
+      ],
+      "unresolved_sample_references": [],
+      "status": "unmapped",
+      "rights": "unreviewed",
+      "configured": false
+    },
+    {
+      "id": "fate-mov-vfr",
+      "definition_files": [
+        "tests/fate/mov.mak:297",
+        "tests/fate/mov.mak:298",
+        "tests/fate/mov.mak:299",
+        "tests/fate/mov.mak:300"
+      ],
+      "command_sha256": [
+        "0605b976b7947d1430d8d572355250bc62f59c5f2a65d339395aca378b0e84dc"
+      ],
+      "sample_references": [],
+      "unresolved_sample_references": [],
+      "status": "unmapped",
+      "rights": "unreviewed",
+      "configured": false
+    },
+    {
+      "id": "fate-mov-write-amve",
+      "definition_files": [
+        "tests/fate/mov.mak:259",
+        "tests/fate/mov.mak:260"
+      ],
+      "command_sha256": [
+        "8818b0b26b625415e6dfbbd5864a6382ec6801579324a73fed5b9be016ef01c0"
+      ],
+      "sample_references": [
+        "mov/amve.mov"
+      ],
+      "unresolved_sample_references": [],
+      "status": "unmapped",
+      "rights": "unreviewed",
+      "configured": false
+    },
+    {
+      "id": "fate-mov-zombie",
+      "definition_files": [
+        "tests/fate/mov.mak:31",
+        "tests/fate/mov.mak:138"
+      ],
+      "command_sha256": [
+        "ffdbe3aca8838516316f03d2a560677735a4ec1cf72d32e57b95b0de6e2c339a"
+      ],
+      "sample_references": [
+        "mov/white_zombie_scrunch-part.mov"
+      ],
+      "unresolved_sample_references": [],
+      "status": "unmapped",
+      "rights": "unreviewed",
+      "configured": false
+    },
+    {
+      "id": "fate-mpegts",
+      "definition_files": [
+        "tests/fate/mpegts.mak:55"
+      ],
+      "command_sha256": [],
+      "sample_references": [],
+      "unresolved_sample_references": [],
+      "status": "unmapped",
+      "rights": "unreviewed",
+      "configured": false
+    },
+    {
+      "id": "fate-mpegts-lcevc-h264-dual-track",
+      "definition_files": [
+        "tests/fate/mpegts.mak:37",
+        "tests/fate/mpegts.mak:38"
+      ],
+      "command_sha256": [
+        "6e7f12e709c8e4063daa1f4e0aa9c1f581999758b84b1fbb28e1bcb8b0f821da"
+      ],
+      "sample_references": [
+        "lcevc/L_H264_640x360p_8bit8bit_2D_dd_dualTrack.ts"
+      ],
+      "unresolved_sample_references": [],
+      "status": "unmapped",
+      "rights": "unreviewed",
+      "configured": false
+    },
+    {
+      "id": "fate-mpegts-lcevc-h264-single-track",
+      "definition_files": [
+        "tests/fate/mpegts.mak:22",
+        "tests/fate/mpegts.mak:23"
+      ],
+      "command_sha256": [
+        "009d2c311d12cc886ffa4cffd19748223de197a9b1eb2a9c593f0759696842d9"
+      ],
+      "sample_references": [
+        "lcevc/L_H264_640x360p_8bit8bit_2D_dd.ts"
+      ],
+      "unresolved_sample_references": [],
+      "status": "unmapped",
+      "rights": "unreviewed",
+      "configured": false
+    },
+    {
+      "id": "fate-mpegts-lcevc-hevc-dual-track",
+      "definition_files": [
+        "tests/fate/mpegts.mak:42",
+        "tests/fate/mpegts.mak:43"
+      ],
+      "command_sha256": [
+        "354fac246966d0f1128df28487e1d698967c18856a87a8e913d0a808543a2f60"
+      ],
+      "sample_references": [
+        "lcevc/L_HEVC_640x360p_8bit8bit_2D_dd_dualTrack.ts"
+      ],
+      "unresolved_sample_references": [],
+      "status": "unmapped",
+      "rights": "unreviewed",
+      "configured": false
+    },
+    {
+      "id": "fate-mpegts-lcevc-hevc-single-track",
+      "definition_files": [
+        "tests/fate/mpegts.mak:27",
+        "tests/fate/mpegts.mak:28"
+      ],
+      "command_sha256": [
+        "f2b6d1359ded8277bdc363deeb81a4e31bcdad3bc9d4b4633a757665ab605457"
+      ],
+      "sample_references": [
+        "lcevc/L_HEVC_640x360p_8bit8bit_2D_dd.ts"
+      ],
+      "unresolved_sample_references": [],
+      "status": "unmapped",
+      "rights": "unreviewed",
+      "configured": false
+    },
+    {
+      "id": "fate-mpegts-lcevc-vvc-dual-track",
+      "definition_files": [
+        "tests/fate/mpegts.mak:47",
+        "tests/fate/mpegts.mak:48"
+      ],
+      "command_sha256": [
+        "ce70ff3f22d03828ac790933ea0d0964df9697f06887ca689ec6a25c3f265d52"
+      ],
+      "sample_references": [
+        "lcevc/L_VVC_640x360p_8bit8bit_2D_dd_dualTrack.ts"
+      ],
+      "unresolved_sample_references": [],
+      "status": "unmapped",
+      "rights": "unreviewed",
+      "configured": false
+    },
+    {
+      "id": "fate-mpegts-lcevc-vvc-single-track",
+      "definition_files": [
+        "tests/fate/mpegts.mak:32",
+        "tests/fate/mpegts.mak:33"
+      ],
+      "command_sha256": [
+        "5297f66ee5132cf731487be7c41ebadae15a2eafcb0ff22872fd44c6ddd8b9c8"
+      ],
+      "sample_references": [
+        "lcevc/L_VVC_640x360p_8bit8bit_2D_dd.ts"
+      ],
+      "unresolved_sample_references": [],
+      "status": "unmapped",
+      "rights": "unreviewed",
+      "configured": false
+    },
+    {
+      "id": "fate-mpegts-probe-latm",
+      "definition_files": [
+        "tests/fate/mpegts.mak:8",
+        "tests/fate/mpegts.mak:9",
+        "tests/fate/mpegts.mak:10"
+      ],
+      "command_sha256": [
+        "dee9f38b92b6601f0946c8e9e436f2ea410be8d5977908b937e75a4da6dcfa50"
+      ],
+      "sample_references": [
+        "mpegts/loewe.ts"
+      ],
+      "unresolved_sample_references": [],
+      "status": "unmapped",
+      "rights": "unreviewed",
+      "configured": false
+    },
+    {
+      "id": "fate-mpegts-probe-pmt-merge",
+      "definition_files": [
+        "tests/fate/mpegts.mak:18",
+        "tests/fate/mpegts.mak:19",
+        "tests/fate/mpegts.mak:20"
+      ],
+      "command_sha256": [
+        "b7b55c78354d678f1759a23735969286bb01abc4397a6b2b5ecf8d55ca5a6b45"
+      ],
+      "sample_references": [
+        "mpegts/pmtchange.ts"
+      ],
+      "unresolved_sample_references": [],
+      "status": "unmapped",
+      "rights": "unreviewed",
+      "configured": true
+    },
+    {
+      "id": "fate-mpegts-probe-program",
+      "definition_files": [
+        "tests/fate/mpegts.mak:13",
+        "tests/fate/mpegts.mak:14",
+        "tests/fate/mpegts.mak:15"
+      ],
+      "command_sha256": [
+        "2d76c6e0bbf1574f94b372d3f4b0f677aabcc363206b549ea5a9787453406bdd"
+      ],
+      "sample_references": [
+        "mpegts/loewe.ts"
+      ],
+      "unresolved_sample_references": [],
+      "status": "unmapped",
+      "rights": "unreviewed",
+      "configured": false
+    },
+    {
+      "id": "fate-sub-",
+      "definition_files": [
+        "tests/fate/subtitles.mak:164"
+      ],
+      "command_sha256": [],
+      "sample_references": [],
+      "unresolved_sample_references": [],
+      "status": "unmapped",
+      "rights": "unreviewed",
+      "configured": false
+    },
+    {
+      "id": "fate-sub-aqtitle",
+      "definition_files": [
+        "tests/fate/subtitles.mak:1",
+        "tests/fate/subtitles.mak:2"
+      ],
+      "command_sha256": [
+        "7ee2e9241d3756526a0b8ef7fcd44d5cd6162b015170e0654335d4cd70c3f643"
+      ],
+      "sample_references": [
+        "sub/AQTitle_capability_tester.aqt"
+      ],
+      "unresolved_sample_references": [],
+      "status": "unmapped",
+      "rights": "unreviewed",
+      "configured": false
+    },
+    {
+      "id": "fate-sub-ass-to-ass-transcode",
+      "definition_files": [
+        "tests/fate/subtitles.mak:13",
+        "tests/fate/subtitles.mak:14"
+      ],
+      "command_sha256": [
+        "338a1e38a595abd05f727a5d429c0073f54260f6719c58f568151a18f5a379ce"
+      ],
+      "sample_references": [
+        "sub/1ededcbd7b.ass"
+      ],
+      "unresolved_sample_references": [],
+      "status": "unmapped",
+      "rights": "unreviewed",
+      "configured": false
+    },
+    {
+      "id": "fate-sub-cc",
+      "definition_files": [
+        "tests/fate/subtitles.mak:4",
+        "tests/fate/subtitles.mak:5"
+      ],
+      "command_sha256": [
+        "b05a134ec79eef12082110b353aa5b3e27b18859c9a6419666fc4d99b43e11c1"
+      ],
+      "sample_references": [
+        "sub/Closedcaption_rollup.m2v[out0+subcc]"
+      ],
+      "unresolved_sample_references": [],
+      "status": "unmapped",
+      "rights": "unreviewed",
+      "configured": false
+    },
+    {
+      "id": "fate-sub-cc-realtime",
+      "definition_files": [
+        "tests/fate/subtitles.mak:7",
+        "tests/fate/subtitles.mak:8"
+      ],
+      "command_sha256": [
+        "28bb2e37d039b811b0320d27895fe59a4d5c545675d973bf61b03ddb7ffcceee"
+      ],
+      "sample_references": [
+        "sub/Closedcaption_rollup.m2v[out0+subcc]"
+      ],
+      "unresolved_sample_references": [],
+      "status": "unmapped",
+      "rights": "unreviewed",
+      "configured": false
+    },
+    {
+      "id": "fate-sub-cc-scte20",
+      "definition_files": [
+        "tests/fate/subtitles.mak:10",
+        "tests/fate/subtitles.mak:11"
+      ],
+      "command_sha256": [
+        "1c289eec4091913b8519acf27ca665c0936f879a09247e5c088f58739699ae70"
+      ],
+      "sample_references": [
+        "sub/scte20.ts[out0+subcc]"
+      ],
+      "unresolved_sample_references": [],
+      "status": "unmapped",
+      "rights": "unreviewed",
+      "configured": false
+    },
+    {
+      "id": "fate-sub-charenc",
+      "definition_files": [
+        "tests/fate/subtitles.mak:118",
+        "tests/fate/subtitles.mak:119"
+      ],
+      "command_sha256": [
+        "1d9d092f42d639afc7e2becdee144e0d7d095fcae729c17040b21fa7c1ca4543"
+      ],
+      "sample_references": [
+        "sub/cp1251-subtitles.sub"
+      ],
+      "unresolved_sample_references": [],
+      "status": "unmapped",
+      "rights": "unreviewed",
+      "configured": false
+    },
+    {
+      "id": "fate-sub-dvb",
+      "definition_files": [
+        "tests/fate/subtitles.mak:154",
+        "tests/fate/subtitles.mak:155"
+      ],
+      "command_sha256": [
+        "b0db34710909c71a7be68656e79c25fd04b6fb863bca78aab59b7957ac6a91f2"
+      ],
+      "sample_references": [
+        "sub/dvbsubtest_filter.ts"
+      ],
+      "unresolved_sample_references": [],
+      "status": "unmapped",
+      "rights": "unreviewed",
+      "configured": false
+    },
+    {
+      "id": "fate-sub-jacosub",
+      "definition_files": [
+        "tests/fate/subtitles.mak:22",
+        "tests/fate/subtitles.mak:23"
+      ],
+      "command_sha256": [
+        "1ab31e90a16b098be5fc187dffd3ff03ce47eddeb4f16cc4c45d73c7d729bbc9"
+      ],
+      "sample_references": [
+        "sub/JACOsub_capability_tester.jss"
+      ],
+      "unresolved_sample_references": [],
+      "status": "unmapped",
+      "rights": "unreviewed",
+      "configured": false
+    },
+    {
+      "id": "fate-sub-jacosub-remux",
+      "definition_files": [
+        "tests/fate/subtitles.mak:25",
+        "tests/fate/subtitles.mak:26",
+        "tests/fate/subtitles.mak:27"
+      ],
+      "command_sha256": [
+        "04754752ea118f2babf26ff29225fdf9ca51563356cfc72bdc9335f4fdd5ef55"
+      ],
+      "sample_references": [
+        "sub/JACOsub_capability_tester.jss"
+      ],
+      "unresolved_sample_references": [],
+      "status": "unmapped",
+      "rights": "unreviewed",
+      "configured": false
+    },
+    {
+      "id": "fate-sub-lrc-ms-ms-remux",
+      "definition_files": [
+        "tests/fate/subtitles.mak:35",
+        "tests/fate/subtitles.mak:36"
+      ],
+      "command_sha256": [
+        "ce8565f3b47759ce25f9569514c5717075f18d4566b47ae36835cb12bfa70427"
+      ],
+      "sample_references": [
+        "sub/test-lrc-ms.lrc"
+      ],
+      "unresolved_sample_references": [],
+      "status": "unmapped",
+      "rights": "unreviewed",
+      "configured": false
+    },
+    {
+      "id": "fate-sub-lrc-ms-remux",
+      "definition_files": [
+        "tests/fate/subtitles.mak:32",
+        "tests/fate/subtitles.mak:33"
+      ],
+      "command_sha256": [
+        "eec6412d3955ff1efb86d4ba3d5802e261b2dee4e93d0a48beecaae725b756f2"
+      ],
+      "sample_references": [
+        "sub/test-lrc-ms.lrc"
+      ],
+      "unresolved_sample_references": [],
+      "status": "unmapped",
+      "rights": "unreviewed",
+      "configured": false
+    },
+    {
+      "id": "fate-sub-lrc-remux",
+      "definition_files": [
+        "tests/fate/subtitles.mak:29",
+        "tests/fate/subtitles.mak:30"
+      ],
+      "command_sha256": [
+        "8caa21b68f3651fbff5eee51804ad0503be9f280ea3083028b9e698d7d23d5f2"
+      ],
+      "sample_references": [
+        "sub/test-lrc.lrc"
+      ],
+      "unresolved_sample_references": [],
+      "status": "unmapped",
+      "rights": "unreviewed",
+      "configured": false
+    },
+    {
+      "id": "fate-sub-mcc",
+      "definition_files": [
+        "tests/fate/subtitles.mak:133",
+        "tests/fate/subtitles.mak:134",
+        "tests/fate/subtitles.mak:135",
+        "tests/fate/subtitles.mak:136"
+      ],
+      "command_sha256": [
+        "3528963479ce26716bcbe6d773f4931eb9f6ea945ce8cd607a9b1c0f11aba169"
+      ],
+      "sample_references": [
+        "sub/scte20.ts[out0+subcc]"
+      ],
+      "unresolved_sample_references": [],
+      "status": "unmapped",
+      "rights": "unreviewed",
+      "configured": false
+    },
+    {
+      "id": "fate-sub-mcc-remux",
+      "definition_files": [
+        "tests/fate/subtitles.mak:150",
+        "tests/fate/subtitles.mak:151",
+        "tests/fate/subtitles.mak:152"
+      ],
+      "command_sha256": [
+        "382f5d69994eb023a03340c8eb34e7c6b10e0604719396e3f3206ebb9c765d31"
+      ],
+      "sample_references": [],
+      "unresolved_sample_references": [],
+      "status": "unmapped",
+      "rights": "unreviewed",
+      "configured": false
+    },
+    {
+      "id": "fate-sub-mcc-remux-eia608",
+      "definition_files": [
+        "tests/fate/subtitles.mak:142",
+        "tests/fate/subtitles.mak:143",
+        "tests/fate/subtitles.mak:144"
+      ],
+      "command_sha256": [
+        "e5a14caafe7c9bdb78440fcd6f00efee2478820ba39ab230ed12ae63da8d60ab"
+      ],
+      "sample_references": [],
+      "unresolved_sample_references": [],
+      "status": "unmapped",
+      "rights": "unreviewed",
+      "configured": false
+    },
+    {
+      "id": "fate-sub-mcc-remux-eia608-bsf",
+      "definition_files": [
+        "tests/fate/subtitles.mak:138",
+        "tests/fate/subtitles.mak:139",
+        "tests/fate/subtitles.mak:140"
+      ],
+      "command_sha256": [
+        "e6fa34b1ffcbe19ea83b1296414aac539b59bfdda269577c73598167fbc7e7e2"
+      ],
+      "sample_references": [],
+      "unresolved_sample_references": [],
+      "status": "unmapped",
+      "rights": "unreviewed",
+      "configured": false
+    },
+    {
+      "id": "fate-sub-mcc-remux-eia608-recode",
+      "definition_files": [
+        "tests/fate/subtitles.mak:146",
+        "tests/fate/subtitles.mak:147",
+        "tests/fate/subtitles.mak:148"
+      ],
+      "command_sha256": [
+        "ce7399b284f96cced83ce1e59a52fdd48ec8222094787e6704b0bf5771b56b44"
+      ],
+      "sample_references": [],
+      "unresolved_sample_references": [],
+      "status": "unmapped",
+      "rights": "unreviewed",
+      "configured": false
+    },
+    {
+      "id": "fate-sub-microdvd",
+      "definition_files": [
+        "tests/fate/subtitles.mak:38",
+        "tests/fate/subtitles.mak:39"
+      ],
+      "command_sha256": [
+        "fda245ef9ef66a1c51a261c4be3535da92ac9e8aa39dcbc861ed8e40e8d7f6bc"
+      ],
+      "sample_references": [
+        "sub/MicroDVD_capability_tester.sub"
+      ],
+      "unresolved_sample_references": [],
+      "status": "unmapped",
+      "rights": "unreviewed",
+      "configured": false
+    },
+    {
+      "id": "fate-sub-microdvd-remux",
+      "definition_files": [
+        "tests/fate/subtitles.mak:41",
+        "tests/fate/subtitles.mak:42"
+      ],
+      "command_sha256": [
+        "6437758bf2d801226fcc414339543bc8d70935727cf9f8b74871cd5a74efab82"
+      ],
+      "sample_references": [
+        "sub/MicroDVD_capability_tester.sub"
+      ],
+      "unresolved_sample_references": [],
+      "status": "unmapped",
+      "rights": "unreviewed",
+      "configured": false
+    },
+    {
+      "id": "fate-sub-movtext",
+      "definition_files": [
+        "tests/fate/subtitles.mak:44",
+        "tests/fate/subtitles.mak:45"
+      ],
+      "command_sha256": [
+        "516f58dae4ca35278dd6e9db66429858332b403f59142236f6a1a4d5ef408bfa"
+      ],
+      "sample_references": [
+        "sub/MovText_capability_tester.mp4"
+      ],
+      "unresolved_sample_references": [],
+      "status": "unmapped",
+      "rights": "unreviewed",
+      "configured": false
+    },
+    {
+      "id": "fate-sub-mpl2",
+      "definition_files": [
+        "tests/fate/subtitles.mak:50",
+        "tests/fate/subtitles.mak:51"
+      ],
+      "command_sha256": [
+        "5ddb316b237885dd6a935d4dbc075ddd2291ef4f083b728637589225bc657315"
+      ],
+      "sample_references": [
+        "sub/MPL2_capability_tester.txt"
+      ],
+      "unresolved_sample_references": [],
+      "status": "unmapped",
+      "rights": "unreviewed",
+      "configured": false
+    },
+    {
+      "id": "fate-sub-mpsub",
+      "definition_files": [
+        "tests/fate/subtitles.mak:53",
+        "tests/fate/subtitles.mak:54"
+      ],
+      "command_sha256": [
+        "f54dd392f75dc6f6fc06f8241d66551b29bcb3ee94beda35cc301e0923acf99a"
+      ],
+      "sample_references": [
+        "sub/MPSub_capability_tester.sub"
+      ],
+      "unresolved_sample_references": [],
+      "status": "unmapped",
+      "rights": "unreviewed",
+      "configured": false
+    },
+    {
+      "id": "fate-sub-mpsub-frames",
+      "definition_files": [
+        "tests/fate/subtitles.mak:56",
+        "tests/fate/subtitles.mak:57"
+      ],
+      "command_sha256": [
+        "53c5a25af29be0e66bb6c64741f8747be4feaf69047e6f8cb8ff6bf2cd47b78d"
+      ],
+      "sample_references": [
+        "sub/MPSub_capability_tester_frames.sub"
+      ],
+      "unresolved_sample_references": [],
+      "status": "unmapped",
+      "rights": "unreviewed",
+      "configured": false
+    },
+    {
+      "id": "fate-sub-pgs-remux",
+      "definition_files": [
+        "tests/fate/subtitles.mak:61",
+        "tests/fate/subtitles.mak:62"
+      ],
+      "command_sha256": [
+        "ce6010767842b30571f5450851524df003af665f7b0409f33926b8b5392cbf38"
+      ],
+      "sample_references": [
+        "sub/pgs_sub.sup"
+      ],
+      "unresolved_sample_references": [],
+      "status": "unmapped",
+      "rights": "unreviewed",
+      "configured": false
+    },
+    {
+      "id": "fate-sub-pjs",
+      "definition_files": [
+        "tests/fate/subtitles.mak:64",
+        "tests/fate/subtitles.mak:65"
+      ],
+      "command_sha256": [
+        "5fb938a652823e8fd08455f65c1a1e70f1e2ed001f6142b2a0dde6911bcf3dd6"
+      ],
+      "sample_references": [
+        "sub/PJS_capability_tester.pjs"
+      ],
+      "unresolved_sample_references": [],
+      "status": "unmapped",
+      "rights": "unreviewed",
+      "configured": false
+    },
+    {
+      "id": "fate-sub-rcwt",
+      "definition_files": [
+        "tests/fate/subtitles.mak:128",
+        "tests/fate/subtitles.mak:129",
+        "tests/fate/subtitles.mak:130",
+        "tests/fate/subtitles.mak:131"
+      ],
+      "command_sha256": [
+        "856ce4ba976aca0d9e593dad909b0d85450c29f4ef07d87fac31a17e2ed4a8fd"
+      ],
+      "sample_references": [
+        "sub/witch.scc"
+      ],
+      "unresolved_sample_references": [],
+      "status": "unmapped",
+      "rights": "unreviewed",
+      "configured": false
+    },
+    {
+      "id": "fate-sub-realtext",
+      "definition_files": [
+        "tests/fate/subtitles.mak:67",
+        "tests/fate/subtitles.mak:68"
+      ],
+      "command_sha256": [
+        "f445d01c4e1499c80eb4d85d3c7cf3de2be285e9cca0100727c73a0a4bd154a3"
+      ],
+      "sample_references": [
+        "sub/RealText_capability_tester.rt"
+      ],
+      "unresolved_sample_references": [],
+      "status": "unmapped",
+      "rights": "unreviewed",
+      "configured": false
+    },
+    {
+      "id": "fate-sub-sami",
+      "definition_files": [
+        "tests/fate/subtitles.mak:70",
+        "tests/fate/subtitles.mak:71"
+      ],
+      "command_sha256": [
+        "0b6df566b64956e10679eecc758e80cc4787061b4959f741a3bf2b1151c27844"
+      ],
+      "sample_references": [
+        "sub/SAMI_capability_tester.smi"
+      ],
+      "unresolved_sample_references": [],
+      "status": "unmapped",
+      "rights": "unreviewed",
+      "configured": false
+    },
+    {
+      "id": "fate-sub-sami2",
+      "definition_files": [
+        "tests/fate/subtitles.mak:73",
+        "tests/fate/subtitles.mak:74"
+      ],
+      "command_sha256": [
+        "4f9dcd6b78ceb8d85eb93d17555d28d27eeece3917122bac17b53df4b88c23ec"
+      ],
+      "sample_references": [
+        "sub/SAMI_multilang_tweak_tester.smi"
+      ],
+      "unresolved_sample_references": [],
+      "status": "unmapped",
+      "rights": "unreviewed",
+      "configured": false
+    },
+    {
+      "id": "fate-sub-scc",
+      "definition_files": [
+        "tests/fate/subtitles.mak:121",
+        "tests/fate/subtitles.mak:122",
+        "tests/fate/subtitles.mak:123"
+      ],
+      "command_sha256": [
+        "096fb8619dd136b4ecedeb36add1e0fe3a551a3815d598e0064e927ebb4908cc"
+      ],
+      "sample_references": [
+        "sub/witch.scc"
+      ],
+      "unresolved_sample_references": [],
+      "status": "unmapped",
+      "rights": "unreviewed",
+      "configured": false
+    },
+    {
+      "id": "fate-sub-scc-remux",
+      "definition_files": [
+        "tests/fate/subtitles.mak:125",
+        "tests/fate/subtitles.mak:126"
+      ],
+      "command_sha256": [
+        "73149438b253c8f0814d714539160a5550fdbd19c7eda8e7cd962ff83375fb80"
+      ],
+      "sample_references": [
+        "sub/witch.scc"
+      ],
+      "unresolved_sample_references": [],
+      "status": "unmapped",
+      "rights": "unreviewed",
+      "configured": false
+    },
+    {
+      "id": "fate-sub-srt",
+      "definition_files": [
+        "tests/fate/subtitles.mak:76",
+        "tests/fate/subtitles.mak:77"
+      ],
+      "command_sha256": [
+        "b94f8b64c6fd921d1700e13e61b40cd4ec77f0bd3c71fd3428aac59b1b6eedbb"
+      ],
+      "sample_references": [
+        "sub/SubRip_capability_tester.srt"
+      ],
+      "unresolved_sample_references": [],
+      "status": "unmapped",
+      "rights": "unreviewed",
+      "configured": false
+    },
+    {
+      "id": "fate-sub-srt-badsyntax",
+      "definition_files": [
+        "tests/fate/subtitles.mak:79",
+        "tests/fate/subtitles.mak:80"
+      ],
+      "command_sha256": [
+        "3b3192aab52755a0da85d6de47a71bdafedee4046c32f131c2a463b1bd6153ca"
+      ],
+      "sample_references": [
+        "sub/badsyntax.srt"
+      ],
+      "unresolved_sample_references": [],
+      "status": "unmapped",
+      "rights": "unreviewed",
+      "configured": false
+    },
+    {
+      "id": "fate-sub-srt-empty-events",
+      "definition_files": [
+        "tests/fate/subtitles.mak:88",
+        "tests/fate/subtitles.mak:89"
+      ],
+      "command_sha256": [
+        "121d3fa9ff47ab8f7fc3834d8e526c52d546d781aa19ac0f5e84fd6f7e987fd3"
+      ],
+      "sample_references": [
+        "sub/empty-events-2167.srt"
+      ],
+      "unresolved_sample_references": [],
+      "status": "unmapped",
+      "rights": "unreviewed",
+      "configured": false
+    },
+    {
+      "id": "fate-sub-srt-madness-timeshift",
+      "definition_files": [
+        "tests/fate/subtitles.mak:85",
+        "tests/fate/subtitles.mak:86"
+      ],
+      "command_sha256": [
+        "2d079ae06eebb70083a106ba5c940ffdad5aefba25e1970a656a47d619459c18"
+      ],
+      "sample_references": [
+        "sub/madness.srt"
+      ],
+      "unresolved_sample_references": [],
+      "status": "unmapped",
+      "rights": "unreviewed",
+      "configured": false
+    },
+    {
+      "id": "fate-sub-srt-rrn-remux",
+      "definition_files": [
+        "tests/fate/subtitles.mak:82",
+        "tests/fate/subtitles.mak:83"
+      ],
+      "command_sha256": [
+        "0e66e588890d11b5e4e1423635249125526cd90be7492cc6402d21a2e32d60d2"
+      ],
+      "sample_references": [
+        "sub/ticket5032-rrn.srt"
+      ],
+      "unresolved_sample_references": [],
+      "status": "unmapped",
+      "rights": "unreviewed",
+      "configured": false
+    },
+    {
+      "id": "fate-sub-ssa-to-ass-remux",
+      "definition_files": [
+        "tests/fate/subtitles.mak:16",
+        "tests/fate/subtitles.mak:17"
+      ],
+      "command_sha256": [
+        "f72a53d4e4620bc19cb54c298c393e160abe559713294c112f7ada4f19c15e44"
+      ],
+      "sample_references": [
+        "sub/a9-misc.ssa"
+      ],
+      "unresolved_sample_references": [],
+      "status": "unmapped",
+      "rights": "unreviewed",
+      "configured": false
+    },
+    {
+      "id": "fate-sub-stl",
+      "definition_files": [
+        "tests/fate/subtitles.mak:91",
+        "tests/fate/subtitles.mak:92"
+      ],
+      "command_sha256": [
+        "816b8cc729a27ee98cf5225b66985b641f8391ccdacd434c94ae1105aed33f66"
+      ],
+      "sample_references": [
+        "sub/STL_capability_tester.stl"
+      ],
+      "unresolved_sample_references": [],
+      "status": "unmapped",
+      "rights": "unreviewed",
+      "configured": false
+    },
+    {
+      "id": "fate-sub-subripenc",
+      "definition_files": [
+        "tests/fate/subtitles.mak:94",
+        "tests/fate/subtitles.mak:95"
+      ],
+      "command_sha256": [
+        "13483ac191b444791e7eee01af3bf23ea54e11fe785d5d738288d015a82e7edc"
+      ],
+      "sample_references": [
+        "sub/MovText_capability_tester.mp4"
+      ],
+      "unresolved_sample_references": [],
+      "status": "unmapped",
+      "rights": "unreviewed",
+      "configured": false
+    },
+    {
+      "id": "fate-sub-subviewer",
+      "definition_files": [
+        "tests/fate/subtitles.mak:100",
+        "tests/fate/subtitles.mak:101"
+      ],
+      "command_sha256": [
+        "642c6a9d3693903700281b6a6bed5268787cebc6d043ff505c5f73c679169535"
+      ],
+      "sample_references": [
+        "sub/SubViewer_capability_tester.sub"
+      ],
+      "unresolved_sample_references": [],
+      "status": "unmapped",
+      "rights": "unreviewed",
+      "configured": false
+    },
+    {
+      "id": "fate-sub-subviewer1",
+      "definition_files": [
+        "tests/fate/subtitles.mak:97",
+        "tests/fate/subtitles.mak:98"
+      ],
+      "command_sha256": [
+        "0c4d55f8b5e5dda1c7f49143e452ddc399c4ce1e4874fec9c83bd423e04d8d78"
+      ],
+      "sample_references": [
+        "sub/SubViewer1_capability_tester.sub"
+      ],
+      "unresolved_sample_references": [],
+      "status": "unmapped",
+      "rights": "unreviewed",
+      "configured": false
+    },
+    {
+      "id": "fate-sub-textenc",
+      "definition_files": [
+        "tests/fate/subtitles.mak:115",
+        "tests/fate/subtitles.mak:116"
+      ],
+      "command_sha256": [
+        "bf3786fb2a0cfd119e0620f2d1d19781663902306539ec8ae7a8c533d1e1d4d1"
+      ],
+      "sample_references": [
+        "sub/SubRip_capability_tester.srt"
+      ],
+      "unresolved_sample_references": [],
+      "status": "unmapped",
+      "rights": "unreviewed",
+      "configured": false
+    },
+    {
+      "id": "fate-sub-ttmlenc",
+      "definition_files": [
+        "tests/fate/subtitles.mak:157",
+        "tests/fate/subtitles.mak:158"
+      ],
+      "command_sha256": [
+        "dbbf44e70362dffa96dec8e61ef5f0cc005dc6c4cd75f0eeaee200dd6f60cf7f"
+      ],
+      "sample_references": [
+        "sub/SubRip_capability_tester.srt"
+      ],
+      "unresolved_sample_references": [],
+      "status": "unmapped",
+      "rights": "unreviewed",
+      "configured": false
+    },
+    {
+      "id": "fate-sub-vplayer",
+      "definition_files": [
+        "tests/fate/subtitles.mak:103",
+        "tests/fate/subtitles.mak:104"
+      ],
+      "command_sha256": [
+        "bfc6e984504764c7de375eb1a81666e5a178f60638c240ff8166e2b8c2243452"
+      ],
+      "sample_references": [
+        "sub/VPlayer_capability_tester.txt"
+      ],
+      "unresolved_sample_references": [],
+      "status": "unmapped",
+      "rights": "unreviewed",
+      "configured": false
+    },
+    {
+      "id": "fate-sub-webvtt",
+      "definition_files": [
+        "tests/fate/subtitles.mak:106",
+        "tests/fate/subtitles.mak:107"
+      ],
+      "command_sha256": [
+        "2d8077d1ee76077aaa0cd6a1bba9f221453a357fc95e246edc06a4a3ce668338"
+      ],
+      "sample_references": [
+        "sub/WebVTT_capability_tester.vtt"
+      ],
+      "unresolved_sample_references": [],
+      "status": "unmapped",
+      "rights": "unreviewed",
+      "configured": false
+    },
+    {
+      "id": "fate-sub-webvtt2",
+      "definition_files": [
+        "tests/fate/subtitles.mak:109",
+        "tests/fate/subtitles.mak:110"
+      ],
+      "command_sha256": [
+        "7fdb04101adcc61c3c9f181f8885f4d780a0eb56b60f9f6535694fa7140d1de6"
+      ],
+      "sample_references": [
+        "sub/WebVTT_extended_tester.vtt"
+      ],
+      "unresolved_sample_references": [],
+      "status": "unmapped",
+      "rights": "unreviewed",
+      "configured": false
+    },
+    {
+      "id": "fate-sub-webvttenc",
+      "definition_files": [
+        "tests/fate/subtitles.mak:112",
+        "tests/fate/subtitles.mak:113"
+      ],
+      "command_sha256": [
+        "d718807788943e2ba2a274751794899754afa24242c5d889b1ec5ee46f4e67f1"
+      ],
+      "sample_references": [
+        "sub/SubRip_capability_tester.srt"
+      ],
+      "unresolved_sample_references": [],
+      "status": "unmapped",
+      "rights": "unreviewed",
+      "configured": false
+    },
+    {
+      "id": "fate-subtitles",
+      "definition_files": [
+        "tests/fate/subtitles.mak:167"
+      ],
+      "command_sha256": [],
+      "sample_references": [],
+      "unresolved_sample_references": [],
+      "status": "unmapped",
+      "rights": "unreviewed",
+      "configured": false
+    },
+    {
+      "id": "fate-webm-av1-extradata-update",
+      "definition_files": [
+        "tests/fate/matroska.mak:60",
+        "tests/fate/matroska.mak:61"
+      ],
+      "command_sha256": [
+        "2ac0c5d3d25fe8e8f3e73c0b220b347e883f8954e432f4949f59b5c016035df2"
+      ],
+      "sample_references": [
+        "av1/decode_model.ivf"
+      ],
+      "unresolved_sample_references": [],
+      "status": "unmapped",
+      "rights": "unreviewed",
+      "configured": false
+    },
+    {
+      "id": "fate-webm-dash-chapters",
+      "definition_files": [
+        "tests/fate/matroska.mak:67",
+        "tests/fate/matroska.mak:68"
+      ],
+      "command_sha256": [
+        "229b28547649f98c44c465ebad0c4a78ed8bafd491813233746edc198c84a001"
+      ],
+      "sample_references": [
+        "vorbis/vorbis_chapter_extension_demo.ogg"
+      ],
+      "unresolved_sample_references": [],
+      "status": "unmapped",
+      "rights": "unreviewed",
+      "configured": false
+    },
+    {
+      "id": "fate-webm-hdr10-plus-remux",
+      "definition_files": [
+        "tests/fate/matroska.mak:284",
+        "tests/fate/matroska.mak:285"
+      ],
+      "command_sha256": [
+        "64b8a2d93726b3ca4bffef3dc843ec20b84f59ba05f81dd7e32df3093133978e"
+      ],
+      "sample_references": [
+        "mkv/hdr10_plus_vp9_sample.webm"
+      ],
+      "unresolved_sample_references": [],
+      "status": "unmapped",
+      "rights": "unreviewed",
+      "configured": false
+    },
+    {
+      "id": "fate-webm-webvtt-remux",
+      "definition_files": [
+        "tests/fate/matroska.mak:280",
+        "tests/fate/matroska.mak:281"
+      ],
+      "command_sha256": [
+        "58d816ca0d1d289fc96dcfa5ebe8eb21b8d0e7f3d754da14689ae42c5c4abeec"
+      ],
+      "sample_references": [
+        "sub/WebVTT_capability_tester.vtt"
+      ],
+      "unresolved_sample_references": [],
+      "status": "unmapped",
+      "rights": "unreviewed",
+      "configured": false
+    }
+  ],
+  "configured_list": {
+    "sha256": "9c0ca743a6d997a03d2824c4564f283f0306394a5ea717494c426e22c1e2552c",
+    "identities": 203,
+    "executed": false
+  }
+}

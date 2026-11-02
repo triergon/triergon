@@ -1,0 +1,33 @@
+{
+  "schema": 1,
+  "cases": [
+    {
+      "id": "header-empty",
+      "profile": "header-empty",
+      "file": "header-empty.mkv",
+      "sha256": "5eb13fccbc7dd19d12ba235c3a094adb47e5764b88b60ca200a5fbbe68ba326c",
+      "rights": "authored-synthetic"
+    },
+    {
+      "id": "header-lace",
+      "profile": "header-lace",
+      "file": "header-lace.mkv",
+      "sha256": "d14d2e5b8eada04356c5e979e01636064285470cca5de2fbdd559f09f65411bb",
+      "rights": "authored-synthetic"
+    },
+    {
+      "id": "header-private",
+      "profile": "header-private",
+      "file": "header-private.mkv",
+      "sha256": "5cfca475103816e1aafa63b957c9e5ffe03ea4b84c2995a081b380fa424bfd39",
+      "rights": "authored-synthetic"
+    },
+    {
+      "id": "header-both",
+      "profile": "header-both",
+      "file": "header-both.mkv",
+      "sha256": "e1725c46695ec6421f99dc32227206802568d49068b17c6f678bfa15f91cfa03",
+      "rights": "authored-synthetic"
+    }
+  ]
+}

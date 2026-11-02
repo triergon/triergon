@@ -1,0 +1,39 @@
+# ADR-0002: Dependency admission — perfect fit versus bootstrapping
+
+**Status:** Required decision process; no third-party production dependency admitted.  
+**Date:** 2026-10-30.
+
+Default: write the bounded component ourselves from specifications and tests. A proposal must identify a specific crate/version/feature set and the exact component it replaces. “Rust”, “popular”, “AI makes it easy”, a download count, an active commit stream, or a broad feature table is not an admission argument.
+
+## Hard gates
+
+1. **Pure safe Rust:** inspect the selected source and complete target-specific transitive graph. No C/assembly, `*-sys`, FFI, `unsafe` blocks/traits/impls/functions or unsafe build-time code generation in the admitted runtime graph. A safe wrapper is insufficient. Macro expansion, conditional code, default/optional features, target differences and build scripts must be reviewed. Standard library/compiler/OS facilities are the documented foundation; adding third-party unsafe allocators or SIMD crates is not equivalent to using `std`.
+2. **Exact semantic fit:** signed/unknown timestamps, random access, codec configuration/side data, incremental unknown-length input, cancellation/work bounds, metadata fidelity and error behavior fit our API. No full-file buffering, dropped information, sidecar re-parser or wrapper that fixes a wrong answer silently.
+3. **Full selected feature parity:** the same module/corpus gates as an own implementation. A future roadmap item is not current support.
+4. **Performance and memory:** measured against pinned FFmpeg and an independently built prototype where available. Must preserve the end-to-end 20%-less-time and lower-memory gates. A claimed upstream benchmark is not local evidence.
+5. **Maturity:** history of actual format regressions, independent use, conformance corpus, fuzz targets/results, releases, reproducible builds, failure handling, 32-bit checks and maintained security process. Date of last commit is evidence of activity only.
+6. **License/provenance:** exact SPDX expression and file-level exceptions from source, notices, source obligations, sample rights and compatible distribution plan recorded before incorporation.
+
+## Mandatory comparison record
+
+Each proposal records:
+
+- Task/feature ID, full source pin, version, features and dependency lockfile.
+- Own-bootstrap alternative: API, estimated implementation + validation + future maintenance effort, unknowns and prototype results. Estimates must name their assumptions.
+- Reuse cost: audit, adaptations, feature removal, upstream coordination, ownership of future fixes, updates/re-audits, and any fork burden. A “thin adapter” must be measured in responsibilities, not line count.
+- Correctness, throughput/time, memory, input-read/copy/allocation and target results for **both** alternatives where implemented. If the own alternative does not exist, the claimed advantage is provisional and admission is pending.
+- Explicit benefit: what mature, independently validated work is bought that bootstrapping cannot currently justify repeating. If the justification is only faster initial coding, the default remains bootstrap.
+- Decision and reversibility: admit, reject, reference-only or pending; owner; review date and triggers. Any new unsafe or native dependency in an update blocks it until resolved.
+
+Do not relax this policy by giving an unsafe crate a safe facade, moving it behind a feature selected by default, statically linking it, or treating an entire framework as a “utility”. A component that requires substantial repair is usually a bootstrap candidate instead of a dependency.
+
+## Initial dispositions
+
+- **Symphonia:** reference-only. Small corpus results are useful, but no blanket adoption; its selected `symphonia-core` depends on `bytemuck`, whose implementation contains unsafe code. Selected transitive source must be audited under the owner's stricter policy, despite first-party `forbid(unsafe_code)` declarations.
+- **OxideAV core:** rejects the current strict-safe gate: unsafe arena allocation and unsafe Send/Sync implementations are in core, not solely optional platform adapters.
+- **Rust-AV data:** unsafe code observed in the sampled frame implementation. Reference-only.
+- **Remade FFmpeg:** no unsafe syntax found in sampled relevant files, but this is not a whole-graph audit. Public demuxer seek contract is missing; reference-only.
+- **matroska-demuxer / mpeg2ts-reader / h264-reader / mp4parse:** possible narrow references or future leaf proposals. None is admitted until the same semantic, graph, corpus and performance gates pass.
+- **zlib/DEFLATE:** needed for selected compressed Matroska tracks; compare an own bounded inflater against a precisely configured safe-Rust implementation. No native zlib dependency is admitted. A pure-Rust label alone is not enough; optional SIMD/transitive code still needs inspection.
+
+The research spike deliberately builds upstream candidates to evaluate them. Its isolated Cargo package, Python tooling and external FFmpeg oracle are not the production crate graph and are not evidence that their dependencies have been admitted.

@@ -1,0 +1,31 @@
+Waiting for quiet compiler window; camera running.
+Camera paused with watchdog, window 0
+colour measurement-complete=False slice-accepted=False
+Camera resumed=True
+Waiting for quiet compiler window; camera running.
+Camera paused with watchdog, window 1
+colour measurement-complete=False slice-accepted=False
+Camera resumed=True
+Waiting for quiet compiler window; camera running.
+Camera paused with watchdog, window 2
+colour measurement-complete=False slice-accepted=False
+zlib measurement-complete=False slice-accepted=False
+Camera resumed=True
+Waiting for quiet compiler window; camera running.
+Camera paused with watchdog, window 3
+colour measurement-complete=True slice-accepted=True
+Camera resumed=True
+Waiting for quiet compiler window; camera running.
+Camera paused with watchdog, window 4
+zlib measurement-complete=True slice-accepted=True
+seek measurement-complete=True slice-accepted=True
+Camera resumed=True
+Waiting for quiet compiler window; camera running.
+Camera paused with watchdog, window 5
+k0 measurement-complete=True slice-accepted=True
+Camera resumed=True
+Waiting for quiet compiler window; camera running.
+Camera paused with watchdog, window 6
+header measurement-complete=True slice-accepted=True
+Camera resumed=True
+All measurements complete; failing hard gates remain recorded.

@@ -1,0 +1,167 @@
+# Shared harness and Matroska development slices
+
+All four frozen K0–K3 development slices pass selected parity,
+at least 20% less execution time, and lower operation memory on native macOS ARM64.
+The [current qualification bundle](../research/qualification/zlib-cues-approved-mac-arm64/README.md)
+retains all 34 cases, exact sources/inputs/workers and raw observations. Later source
+or workload changes require qualification against that new identity.
+Earlier snapshots remain in `research/qualification/current-mac-arm64/` and
+`research/qualification/k0-mac-arm64/`. Linux and
+32-bit webOS qualification are deferred by the owner's 2026-10-30 instruction.
+The broader M01/M02 module gate remains closed; nothing has replaced FFmpeg in Streem.
+
+The workspace contains two owned Rust packages and no third-party packages. Both
+forbid unsafe code. External FFmpeg, the memory observer and Python control plane
+are test tooling. No native library is linked into the production Rust crate.
+
+The current source resolves both seek discrepancies and implements the owner's
+[approved zlib comparison rules](../research/decisions/2026-10-31-zlib-comparisons.md).
+All ten K2 and eight K3 selected parity comparisons pass. The final
+[qualification receipt](../research/qualification/zlib-cues-approved-mac-arm64/README.md)
+also passes the unchanged numerical gates for K0–K3. The mixed chain names its
+FFmpeg-plus-native-restoration reference explicitly; complete source bytes/private
+data and source timestamps remain independent assertions.
+
+## Commands
+
+```sh
+python3 tools/fetch-specs.py
+python3 tools/prepare-ffmpeg.py
+python3 tools/generate-corpus.py
+python3 tools/generate-header-corpus.py
+python3 tools/generate-zlib-corpus.py
+python3 tools/generate-seek-corpus.py
+python3 tools/build-harness.py
+make check
+python3 tools/run-fate.py --case fate-matroska-xiph-lacing
+python3 tools/run-fate.py --case fate-matroska-zlib-decompression
+python3 tools/run-fate.py --case fate-matroska-zero-length-block --demux-only
+python3 tools/test-media.py --benchmark --memory --pairs 30 --iterations 50 \
+  --output .research/qualification-k0 --fate-cache .research/fate-samples \
+  --require-slice-acceptance
+python3 tools/test-media.py --benchmark --memory --pairs 30 --iterations 50 \
+  --manifest harness/header-corpus.json --contract harness/header-slice.json \
+  --corpus .research/header-fixtures --output .research/qualification-header \
+  --require-slice-acceptance
+python3 tools/test-media.py --benchmark --memory --pairs 30 --iterations 50 \
+  --manifest harness/zlib-corpus.json --contract harness/zlib-slice.json \
+  --corpus .research/zlib-fixtures --output .research/qualification-zlib \
+  --require-slice-acceptance
+python3 tools/test-media.py --benchmark --memory --pairs 30 --iterations 50 \
+  --manifest harness/seek-corpus.json --contract harness/seek-slice.json \
+  --corpus .research/seek-fixtures --output .research/qualification-seek \
+  --require-slice-acceptance
+```
+
+These are setup/generation commands for a new corpus. Preserve recorded corpus
+files when reproducing an existing receipt; fresh encoder/container generation can
+change input hashes, including mux metadata. The two approved rules require their
+recorded input hashes. Run performance commands only in an isolated window; this
+session's camera pause/resume authorization is specific to the identified process.
+
+Requires Python 3.12+, Rust nightly, a C compiler, Make and pkg-config. Initial
+synthetic movie fixture generation additionally uses a full FFmpeg CLI with the
+selected encoders; it is separate from the pinned comparison build. The pinned
+FFmpeg builder verifies the source archive and every upstream source file. Source/build inputs, static reference archives, binaries and corpus are hash-pinned;
+compiler identities and raw measurements are retained. System-library paths, runtime
+zlib version and OS build are recorded; no standalone OS shared-cache hash is claimed.
+The collector rejects stale binaries/source and changed inputs. Synthetic generation
+can change across encoder versions; each actual materialized input is hash-pinned.
+
+`--reuse-report` accepts evidence only for identical workers, feature contract and
+input hashes. Memory reuse additionally requires the same calibration probe and observer
+binaries. Raw timing and memory statistics are recomputed at acceptance. Invalid
+windows remain recorded. The first complete clean measurement is retained; a valid
+speed failure requires a code change before requalification.
+
+## Scope and gates
+
+`slice_accepted` requires every declared current profile to pass strict packet and
+source-time comparisons, all short-read/seek requirements, the 0.80 runtime ratio
+with paired 95% upper confidence bound, and lower measured RSS/live allocations.
+It requires all 30 raw pairs and rejects missing evidence, unequal work, corruption,
+invalid instrumentation, CPU contamination and non-finite numbers.
+
+`accepted` additionally includes broader module/FATE requirements. It remains false
+for unfinished M01/M02 work. `--require-acceptance` therefore still exits 2. The
+separate `--require-slice-acceptance` reports the frozen K0–K3 contracts while
+preserving the stricter complete-module gate. The stage split does not clear or
+remove pending module requirements or change numeric thresholds.
+
+The current snapshot's worst 95% upper runtime ratio is 0.7902 across all 34 declared
+cases (rounded upward). Conservative attributable RSS and live-allocation upper
+ratios are at most 0.4118 and 0.6301. Every case has 30 paired timing and memory
+observations. These describe this exact native Mac corpus and source; they do not
+establish TV behavior. The mixed-compression result uses the explicitly augmented
+reference. Each receipt pins its source and binaries.
+
+## Exact timing and FFmpeg compatibility
+
+The five initial differences came from distinct timing representations. The parser
+preserves exact rational source nanoseconds, including fractional laced durations and
+negative PTS. An explicit `BlockTiming::ffmpeg9()` adapter exposes the pinned FFmpeg
+packet-clock behavior. No source precision is discarded and no epsilon comparison
+is used. The independent Python/Fraction RFC oracle checks the exact source values;
+the native FFmpeg worker checks the compatibility timeline, bytes and metadata.
+Both must pass. Seven additional boundary fixtures test fractional/absent durations,
+half-tick delays, explicit zero durations and pre-zero timestamps.
+
+The initial performance failure on AC3/EAC3 was measured, retained and fixed in the
+reader: ordinary packets now own a view into their block buffer, avoiding two
+allocations and a payload copy. Safe `Read::read_to_end` fills reserved capacity
+without first zeroing the entire compressed payload. Checksums consume all packet
+bytes, selected metadata, timestamps, flags and trims identically in both workers.
+The benchmark checksum operation was preserved.
+
+## Measurement isolation and memory
+
+Timing uses optimized matched open/read-all/teardown workers, warmups, seeded random
+A/B order, raw pairs and confidence intervals. Process startup/trace serialization
+are outside operation timing. A host-wide lock and compiler/encoder CPU counters
+reject competing work; merely existing idle processes are not active CPU work.
+The camera capture was paused only with explicit owner authorization, with cleanup
+and an independent resume watchdog. Every pause/resume event is recorded.
+
+Heap and RSS use separate external observer runs with explicit operation boundaries;
+no observer is loaded for speed measurements. The known-allocation probe reproduces
+its independently calculated live peak exactly and returns to its starting live
+allocation count. Imported allocator entry points of both selected workers are
+covered. Certificates identify the probe, observer and worker binaries.
+
+RSS uses the candidate's OS high-water upper bound plus two pages of uncertainty,
+and the reference's observed operation peak less two pages, measured within each
+process. An unresolved/zero reference lower bound fails. The conservative ratios,
+raw observations, work checksums and calibration receipts are retained. This certifies
+these worker paths, not arbitrary system-library allocation behavior.
+
+## Subsequent component: content encoding and late metadata
+
+Header removal is implemented for frame and CodecPrivate scopes, including their
+combination. Header restoration occurs per laced frame. Empty encoded payloads,
+ordered headers, duplicate-order rejection and decoded-size limits are tested.
+Bounded zlib frame/CodecPrivate decompression and ordered header/zlib chains are now
+implemented. bzip2/lzo, encryption and next-encoding scope remain unsupported.
+
+Seekable opening can resolve bounded, chained SeekHeads to load Tracks after the
+first Cluster. Target IDs/bounds, cycles, read budgets and replay of already loaded
+Tracks are guarded. Sequential opening keeps its declared metadata-first restriction;
+late metadata does not cause full-file buffering.
+
+The real FATE zero-length-block vector matches both packets/21 payload bytes and
+source timing through the independent adapters. It requires seekable input. The
+upstream full remux test is not claimed as executed. The Xiph-lacing and zlib upstream cases
+and their separate packet-demux comparisons also pass. External vectors remain outside git and
+redistribution rights remain unreviewed.
+
+Validated Cues lookup and all-track preroll are now implemented, with a bounded
+missing-index fallback. The K2/K3 contracts retain every required profile and the approved reference
+rules; see [the feature contract and evidence](zlib-cues.md).
+Archived timing/memory reports preserve each exact source separately. K0/K1 passed
+requalification together with K2/K3 on the final archived source. The final audit
+recomputes every verdict and verifies current calibration/worker/input hashes.
+Earlier binary receipts never qualify a changed tree.
+
+Remaining complete-module work includes push input/work yields, typed HDR/side
+data, complete chapters/tags/attachments, packet adapters, retained-capacity
+budgets and sustained coverage-guided fuzzing. No full Matroska, codec-decoder or
+shipping-TV qualification is claimed.

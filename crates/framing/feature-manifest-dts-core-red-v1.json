@@ -1,0 +1,55 @@
+{
+  "DTS_whole_PDF_cached": false,
+  "DTS_whole_PDF_sha256": null,
+  "corpus": {
+    "dts-core-frame-author-v1.tsv": {
+      "rows": 17,
+      "sha256": "87fb969222680058d06edd5037702eb0dd0e84ead9ae32329ecb2238916a75f6"
+    },
+    "dts-core-header-author-v1.tsv": {
+      "rows": 188,
+      "sha256": "6bb339702ec47930cb523246128bc03f668c5587ae5732432c0c26cfaa569261"
+    }
+  },
+  "dependencies": [
+    "safe-media-core (owned)"
+  ],
+  "execution": "uncompiled/unexecuted by agent; parent actual runtime red pending; compile failure is not the intended red",
+  "hard_gates": "Unchanged full frozen selected parity; runtime upper paired95<=0.80; lower live heap and lower attributable RSS; native Mac ARM64 plus separate32-bit/device proof",
+  "header_fact_keys": 35,
+  "interfaces": [
+    "DtsCoreHeader",
+    "probe_dts_core_header",
+    "DtsCoreFrameLimits",
+    "DtsCoreFrameFacts",
+    "DtsCoreFrame",
+    "DtsCoreFrameReader"
+  ],
+  "native69_observations_waiver": false,
+  "new_regression_functions": 12,
+  "old_test_bodies_unchanged": 50,
+  "original240_and_native62_nonpasses_changed": false,
+  "own_Cargo_rustc_rustfmt_native_fuzz_bench": false,
+  "proposed_selected": "Normal canonical big-endian core bitstream-header and complete declared frame envelope; no payload normalization",
+  "qualification": false,
+  "raw_excerpt_sha256": {
+    "dts-web-excerpt.txt": "9bb7f71a9c5fe820270b84ca8bbb13afdee115ce4d67a5e823571a8358d5d1ee",
+    "dts-web-semantics.txt": "2fec6d6cf75fe1a79fd8c7496eea53c83b2bbe3e75ded04987a90babc6426158"
+  },
+  "raw_format_implementation": false,
+  "required_gaps": [
+    "14-bit and word-swapped carrier packing/length/padding/conversion",
+    "Termination frame SHORT/presentation accounting",
+    "HD asset descriptors/navigation/static-state/core extraction and extension CRC",
+    "Primary audio coding header/audio/internal extension/auxiliary/CRC and cross-field conformance",
+    "G01 AVC/hvcC and AAC ASC/ADTS primary grammar still open"
+  ],
+  "schema": "framing-dts-core-runtime-red-v1",
+  "source": ".research/parallel-framing/m02-primary-next-v1/primary-proof.json",
+  "source_proof_sha256": "0827fa1e230550ba0ee771894a4f04390d75562ada2d97d0dd12850198d50628",
+  "staging_error": "Unsupported: DTS core implementation pending parent runtime red",
+  "state": "HOLD staged interfaces/tests for parent actual runtime red before format implementation",
+  "stream_variants": 544,
+  "third_party_dependencies": [],
+  "unsafe_code": false
+}
