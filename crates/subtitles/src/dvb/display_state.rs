@@ -573,28 +573,32 @@ impl Segment {
             };
             let old = state.slots[usize::from(id)].map(|i| &state.regions.as_slice()[i]);
             if let Some(old) = old {
-                if old.size != size
+                if (old.size != size && state.receiver_view == super::ReceiverView::Source)
                     || old.depth != depth
                     || old.compatibility != compatibility
                     || old.clut != b[7]
                 {
                     return Err(Error::Invalid("DVB region shape changed within epoch"));
                 }
-                self.duplicate = old.version == version;
+                // Both distinguished width-change controls discard the old
+                // native plane, including the unchanged-version control.
+                // Other footprint changes retain their original rejection.
+                self.duplicate = old.version == version && old.size == size;
             } else if !state.allow_new {
                 return Err(Error::Invalid("DVB new region within epoch"));
             }
             let area = usize::try_from(u64::from(size.width) * u64::from(size.height))
                 .map_err(|_| Error::Overflow)?;
-            if old.is_none() {
-                limit(
-                    state
-                        .total_pixels
-                        .checked_add(area)
-                        .ok_or(Error::Overflow)?,
-                    state.limits.aggregate_region_pixels,
-                )?;
-            }
+            let old_area = old.map_or(Ok(0), |region| {
+                usize::try_from(u64::from(region.size.width) * u64::from(region.size.height))
+                    .map_err(|_| Error::Overflow)
+            })?;
+            let pixels = state
+                .total_pixels
+                .checked_sub(old_area)
+                .and_then(|n| n.checked_add(area))
+                .ok_or(Error::Overflow)?;
+            limit(pixels, state.limits.aggregate_region_pixels)?;
             let mut refs = BudgetVec::new(&state.budget);
             let count = (b.len() - 10) / 6;
             limit(count, state.limits.object_references)?;
@@ -610,7 +614,7 @@ impl Segment {
                 fill,
                 refs,
                 original: self.original.clone(),
-                plane: old.and_then(|r| r.plane.clone()),
+                plane: old.filter(|r| r.size == size).and_then(|r| r.plane.clone()),
                 dirty: true,
                 seen: true,
                 changed: true,
@@ -659,9 +663,22 @@ impl Segment {
                 .and_then(|n| n.checked_add(draft.refs.len()))
                 .ok_or(Error::Overflow)?;
             limit(total, state.limits.object_references)?;
+            let old = &state.regions.as_slice()[index];
+            let old_area = usize::try_from(u64::from(old.size.width) * u64::from(old.size.height))
+                .map_err(|_| Error::Overflow)?;
+            let new_area =
+                usize::try_from(u64::from(draft.size.width) * u64::from(draft.size.height))
+                    .map_err(|_| Error::Overflow)?;
+            let pixels = state
+                .total_pixels
+                .checked_sub(old_area)
+                .and_then(|n| n.checked_add(new_area))
+                .ok_or(Error::Overflow)?;
+            limit(pixels, state.limits.aggregate_region_pixels)?;
             state.regions.as_mut_slice()[index] =
                 self.draft.take().ok_or(Error::Invalid("DVB RCS draft"))?;
             state.total_refs = total;
+            state.total_pixels = pixels;
         } else {
             limit(state.regions.len() + 1, state.limits.regions)?;
             let total = state

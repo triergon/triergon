@@ -20,6 +20,7 @@ pub(crate) struct Renderer {
     found: Option<usize>,
     raster: Option<Raster>,
     active_object: Option<Object>,
+    drew_object: bool,
     parity: FieldParity,
     offset: usize,
     credit: usize,
@@ -53,6 +54,7 @@ impl Renderer {
             found: None,
             raster: None,
             active_object: None,
+            drew_object: false,
             parity: FieldParity::Top,
             offset: 0,
             credit: 0,
@@ -269,6 +271,21 @@ impl Renderer {
                         self.lookup += 1;
                         self.credit = 0;
                     }
+                    if self.found.is_none() && state.receiver_view == super::ReceiverView::NativeD32
+                    {
+                        // Frozen source controls establish that an unavailable
+                        // ODS is not an instruction to replay old compressed
+                        // data or to reject the native receiver transaction.
+                        // Pay even when the object table is empty, and preserve
+                        // this reference cursor across yield/backpressure.
+                        if !work.pay(&mut self.credit, 1)? {
+                            return Ok(false);
+                        }
+                        self.object_ref += 1;
+                        self.lookup = 0;
+                        self.credit = 0;
+                        continue;
+                    }
                     let object = state
                         .objects
                         .as_slice()
@@ -326,11 +343,23 @@ impl Renderer {
                         .ok_or(Error::Invalid("DVB raster absent"))?
                         .start_field(FieldSpec::new(FieldParity::Bottom, length))?;
                 } else {
+                    self.drew_object = true;
                     self.active_object = None;
                     self.object_ref += 1;
                     self.lookup = 0;
                     self.found = None;
                 }
+            }
+            if state.receiver_view == super::ReceiverView::NativeD32
+                && state.regions.as_slice()[self.region].plane.is_none()
+                && !self.drew_object
+            {
+                // Native fresh-fill/no-ODS and missing-object controls emit an
+                // empty rectangle list. Retain RCS/PCS/CDS and source packets;
+                // no invented object or valid-looking filled plane is emitted.
+                self.raster = None;
+                self.next_region();
+                continue;
             }
             let plane = self
                 .raster
@@ -353,6 +382,7 @@ impl Renderer {
         self.object_ref = 0;
         self.lookup = 0;
         self.found = None;
+        self.drew_object = false;
         self.credit = 0;
         self.offset = 0;
     }
@@ -391,6 +421,15 @@ impl Renderer {
             let index = state.slots[usize::from(visible.id)]
                 .ok_or(Error::Invalid("DVB missing visible region"))?;
             let region = &state.regions.as_slice()[index];
+            if state.receiver_view == super::ReceiverView::NativeD32 && region.plane.is_none() {
+                if !work.pay(&mut self.credit, 1)? {
+                    return Ok(false);
+                }
+                self.snapshot += 1;
+                self.overlap_at = 0;
+                self.credit = 0;
+                continue;
+            }
             let clut = region.clut;
             if !self.choose_family(state, clut, work)? {
                 return Ok(false);

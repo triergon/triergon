@@ -436,14 +436,18 @@ impl Decoder {
             .pts
             .map(|time| time.checked_add(Time::new(i128::from(self.state.timeout), 1)?))
             .transpose()?;
-        let action = if self.state.visible.is_empty() {
+        let has_visible = match self.state.receiver_view {
+            super::ReceiverView::Source => !self.state.visible.is_empty(),
+            super::ReceiverView::NativeD32 => !renderer.output.is_empty(),
+        };
+        let action = if !has_visible {
             DisplayAction::Clear
         } else if self.state.had_visible {
             DisplayAction::Update
         } else {
             DisplayAction::Present
         };
-        self.state.had_visible = !self.state.visible.is_empty();
+        self.state.had_visible = has_visible;
         let packets = std::mem::replace(&mut self.packets, BudgetVec::new(&self.state.budget));
         let opaque = std::mem::replace(&mut self.state.opaque, BudgetVec::new(&self.state.budget));
         let native_publication = if self.state.receiver_view == super::ReceiverView::NativeD32 {
