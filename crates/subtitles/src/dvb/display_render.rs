@@ -77,6 +77,24 @@ impl Renderer {
         }
     }
 
+    fn region_position(state: &State, address: Point, size: super::Size) -> Result<Point> {
+        let window = state.definition.window.unwrap_or(DisplayWindow {
+            x: 0,
+            y: 0,
+            width: state.definition.size.width,
+            height: state.definition.size.height,
+        });
+        let right = address.x.checked_add(size.width).ok_or(Error::Overflow)?;
+        let bottom = address.y.checked_add(size.height).ok_or(Error::Overflow)?;
+        if right > window.width || bottom > window.height {
+            return Err(Error::Invalid("DVB region outside display window"));
+        }
+        Ok(Point {
+            x: window.x.checked_add(address.x).ok_or(Error::Overflow)?,
+            y: window.y.checked_add(address.y).ok_or(Error::Overflow)?,
+        })
+    }
+
     fn source_facts(
         state: &State,
         family: usize,
@@ -422,6 +440,7 @@ impl Renderer {
                 .ok_or(Error::Invalid("DVB missing visible region"))?;
             let region = &state.regions.as_slice()[index];
             if state.receiver_view == super::ReceiverView::NativeD32 && region.plane.is_none() {
+                Self::region_position(state, visible.address, region.size)?;
                 if !work.pay(&mut self.credit, 1)? {
                     return Ok(false);
                 }
@@ -435,35 +454,7 @@ impl Renderer {
                 return Ok(false);
             }
             let region = &state.regions.as_slice()[index];
-            let window = state.definition.window.unwrap_or(DisplayWindow {
-                x: 0,
-                y: 0,
-                width: state.definition.size.width,
-                height: state.definition.size.height,
-            });
-            let right = visible
-                .address
-                .x
-                .checked_add(region.size.width)
-                .ok_or(Error::Overflow)?;
-            let bottom = visible
-                .address
-                .y
-                .checked_add(region.size.height)
-                .ok_or(Error::Overflow)?;
-            if right > window.width || bottom > window.height {
-                return Err(Error::Invalid("DVB region outside display window"));
-            }
-            let position = Point {
-                x: window
-                    .x
-                    .checked_add(visible.address.x)
-                    .ok_or(Error::Overflow)?,
-                y: window
-                    .y
-                    .checked_add(visible.address.y)
-                    .ok_or(Error::Overflow)?,
-            };
+            let position = Self::region_position(state, visible.address, region.size)?;
             if state.receiver_view == super::ReceiverView::NativeD32 {
                 // Native source PCS order may be nonascending. Check actual
                 // vertical intersections without assuming emission order. The
