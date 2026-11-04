@@ -1,0 +1,29 @@
+{
+  "schema": "triergon.initial-delivery-memory-policy.v2",
+  "id": "initial-delivery-total-resident-rss-v2",
+  "owner_decision": "research/decisions/2026-11-03-total-resident-rss.md",
+  "qualification_target": "native Linux ARM64",
+  "required_cases": "all original selected memberships; no exclusions",
+  "paired_samples_per_case": 30,
+  "initial_delivery": {
+    "feature_parity": "full selected-feature parity",
+    "runtime_upper_paired95_max": 1.25,
+    "peak_live_heap_upper_paired95_max_exclusive": 1.0,
+    "total_resident_peak_RSS_upper_paired95_max_exclusive": 1.0,
+    "candidate_RSS_numerator": "proven resident peak ceiling plus two pages",
+    "reference_RSS_denominator": "observed resident peak minus two pages"
+  },
+  "optimization_targets": {
+    "runtime_upper_paired95_max": 0.80,
+    "operation_growth_RSS_upper_paired95_max_exclusive": 1.0
+  },
+  "unchanged": [
+    "complete work and original input/reference comparison rules",
+    "all receipt, calibration, provenance and isolation validation",
+    "absolute resource and ownership limits",
+    "frozen v1 raw data, claims, source and binary identities and original verdicts",
+    "no unchanged-worker retiming or retry"
+  ],
+  "implementation": "harness/delivery_memory_v2.py",
+  "not_complete_module_or_target_acceptance": true
+}

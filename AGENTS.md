@@ -18,6 +18,10 @@ docs/testing.md and specs/README.md before implementation.
   reducing the work or excluding inconvenient required inputs.
   The 0.80 runtime ratio remains the optimization target; see
   research/decisions/initial-delivery-runtime.md for the owner's later authorization.
+  The owner also approved total resident peak RSS for initial delivery; use the
+  versioned policy in research/decisions/2026-11-03-total-resident-rss.md. Keep
+  original operation-growth verdicts as diagnostics and never rewrite frozen H0
+  collectors, raw data or claims to apply the newer policy.
 - Begin implementation with the shared H0 harness and corpus mapping, then bounded core and
   the first MKV packet slice. Do not claim all of FFmpeg or even full module parity from a slice.
 - Use immutable source pins and input hashes. FATE identities are not tests executed. Sample
