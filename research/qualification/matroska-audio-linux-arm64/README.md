@@ -8,6 +8,14 @@ selected AAC-LC, AC-3 and E-AC-3 packet through EOF. The comparison covers
 track order, PTS, DTS, duration and every packet payload byte. The
 reference uses FFmpeg revision `d32b387f2b0a484599d4587d651891f0c63c4238`.
 
+A separate native Linux ARM64 observer compared the ordered track index,
+PTS, DTS, duration, payload length and SHA-256 of each of the 75 packets
+against the frozen FFprobe packet records. All ten inputs reached EOF and
+matched. This comparison supplies packet-level parity evidence alongside
+the original timing and memory run. The original workers and results are
+retained. The receipt lists hashes for the trace files, observer, checker
+and verified private archive.
+
 | Gate | Passing cases | Worst paired upper ratio |
 |---|---:|---:|
 | Selected parity | 10/10 | |

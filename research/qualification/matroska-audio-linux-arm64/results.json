@@ -202,5 +202,70 @@
         }
       }
     }
-  ]
+  ],
+  "ordered_packet_parity": {
+    "source_commit": "2e8cab493af770ee48526cac1f258e776163bb0b",
+    "compiler_commit": "92b5b8c87c61b20adc9001b41baf587634a74734",
+    "manifest_sha256": "ec0a0d85c099810d2330150f8bef5e123e5192330db94d3ec2d36427520f992c",
+    "source_manifest_sha256": "5d48af583b8b79b2cd535c99b723567522f809c547e1edcd175c225e9644233f",
+    "observer_sha256": "d67d773afbb0c74fdb9dd0d2a4f725854cd61ada0348485d7254beebf95016dd",
+    "checker_sha256": "28eda79370e14da7c185ff2c0715eccdce2188985b4dc49003eb769e5533192b",
+    "worker_sha256": "06947b6c5c9c6696f960b8b1f1f72d84dd300ac7d9f0d993658e7c9d1b3bf2db",
+    "native_traces_sha256": "0af6116e1cde469e125aaf43db795d3516d91c3df1ae9d11bafecc3e0903e02a",
+    "verified_archive_sha256": "2d6f98fef7918355fa7b9f19e7ebb971f71b90892e9f6e5966ed732e6bdbb987",
+    "cases": 10,
+    "packets": 75,
+    "rows": [
+      {
+        "id": "aac-pair",
+        "packets": 13,
+        "trace_sha256": "d653028e6d222aafd505401bf13d8b0a19031331fa2027b1e71868804802d219"
+      },
+      {
+        "id": "audio-mixed",
+        "packets": 21,
+        "trace_sha256": "b4f42890f2ead49b623c68fa734297e5a23c831cb16acdd91e49dad8d0ae384d"
+      },
+      {
+        "id": "damaged-lace-before-valid-anchor",
+        "packets": 4,
+        "trace_sha256": "efd4ac97b3ea5722ec8d400838d668b5a8031e91464429363e9e128e9cf42e85"
+      },
+      {
+        "id": "dolby-bad-first",
+        "packets": 8,
+        "trace_sha256": "b3f47ce9cab9c5b6565ba0c065d81d4b983777163b2a920dc3619d7e6545e099"
+      },
+      {
+        "id": "dolby-pair",
+        "packets": 8,
+        "trace_sha256": "54ec445234e653322e7066da7b9aecd517ab7d52811947d6c5cff9bf666f72cb"
+      },
+      {
+        "id": "initial-negative-cluster-relative",
+        "packets": 3,
+        "trace_sha256": "1f2c670947a8ee2818fb9a95430720391387fc1fefddf6eb3796f133595f4c93"
+      },
+      {
+        "id": "laced-fractional-cadence",
+        "packets": 8,
+        "trace_sha256": "a74aaa93ed4a1d9df0c057c92ee164e85616dc41578f60cdce05242604277b21"
+      },
+      {
+        "id": "laced-unknown-duration",
+        "packets": 4,
+        "trace_sha256": "72d1574b821d52faac2d9e6d10896c2ea6e63d7635c5f1abf47fea560587a98a"
+      },
+      {
+        "id": "no-absolute-anchor",
+        "packets": 2,
+        "trace_sha256": "bbfc028b7b1829796ded09017534fa6bfa55df0bc9b9ceeddb9e70cd9eb9acf9"
+      },
+      {
+        "id": "two-laced-before-first-known-pts",
+        "packets": 4,
+        "trace_sha256": "23e60cf97b31dd32f8ac9f14e61725bdcb16c2f1029ab9549965d1c3e00a101e"
+      }
+    ]
+  }
 }
