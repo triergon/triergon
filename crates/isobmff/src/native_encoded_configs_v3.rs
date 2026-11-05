@@ -1,8 +1,7 @@
 //! Source-description transitions and track creation tags in a separately named
 //! pinned receiver operation. No sample/configuration bytes are reconstructed.
 use crate::{
-    BoxView, EncodedEntryKindV1, Mov9EncodedStreamV1, Mov9StreamView, Sample, SampleTable,
-    TrackHeader, fields,
+    BoxView, Mov9EncodedStreamV1, Mov9StreamView, Sample, SampleTable, TrackHeader, fields,
 };
 use std::sync::atomic::AtomicBool;
 use triergon_core::{Budget, Bytes, Error, InputCursor, InputToken, Result, SourceId, WorkBudget};
@@ -134,6 +133,15 @@ pub(crate) fn validate_configs(
     configs: &[Mov9EncodedStreamV1],
     pool: &Budget,
 ) -> Result<()> {
+    validate_range_configs(table, configs, pool)?;
+    configs[0].kind().require_pinned_codec()
+}
+
+pub(crate) fn validate_range_configs(
+    table: &SampleTable,
+    configs: &[Mov9EncodedStreamV1],
+    pool: &Budget,
+) -> Result<()> {
     if configs.is_empty() || configs.len() != table.descriptions().len() {
         return Err(Error::Invalid("encoded description coverage"));
     }
@@ -164,12 +172,7 @@ pub(crate) fn validate_configs(
             ));
         }
     }
-    if configs.len() > 1
-        && !matches!(
-            first.kind(),
-            EncodedEntryKindV1::Avc | EncodedEntryKindV1::Hevc
-        )
-    {
+    if configs.len() > 1 && !first.kind().is_video() {
         return Err(Error::Unsupported(
             "encoded audio description transition not established",
         ));

@@ -236,6 +236,7 @@ impl<'a> Mov9EncodedEditJobV2<'a> {
         limits: Mov9EncodedEditLimitsV2,
         _profile: PinnedMovD32EncodedEditsV2,
     ) -> Result<Self> {
+        context.stream.kind().require_pinned_codec()?;
         Self::new_description_bound(context, input, limits, 1, false)
     }
     pub fn new_v3(
@@ -296,7 +297,15 @@ impl<'a> Mov9EncodedEditJobV2<'a> {
         _profile: crate::PinnedMovD32EncodedContextsV7,
     ) -> Result<Self> {
         crate::native_encoded_configs_v3::validate_configs(context.table, configs, input.budget())?;
-        let count = u32::try_from(configs.len()).map_err(|_| Error::Overflow)?;
+        Self::new_recovery_bound(context, input, limits, configs.len())
+    }
+    fn new_recovery_bound(
+        context: Mov9EncodedEditContextV2<'a>,
+        input: &InputCursor,
+        limits: Mov9EncodedEditLimitsV2,
+        descriptions: usize,
+    ) -> Result<Self> {
+        let count = u32::try_from(descriptions).map_err(|_| Error::Overflow)?;
         let dependency = context.table.has_dependency_table();
         let recovery = crate::native_recovery_context_v7::RecoveryReceiverV7::new(
             context.table,
@@ -317,13 +326,12 @@ impl<'a> Mov9EncodedEditJobV2<'a> {
         input: &InputCursor,
         limits: Mov9EncodedEditLimitsV2,
     ) -> Result<Self> {
-        let mut job = Self::new_v7(
-            context,
+        crate::native_encoded_configs_v3::validate_range_configs(
+            context.table,
             configs,
-            input,
-            limits,
-            crate::PinnedMovD32EncodedContextsV7,
+            input.budget(),
         )?;
+        let mut job = Self::new_recovery_bound(context, input, limits, configs.len())?;
         let stream = job.context.stream;
         let kind = match stream.kind() {
             EncodedEntryKindV1::Ac3 => Ac3ConfigKind::Dac3,
@@ -558,7 +566,7 @@ impl<'a> Mov9EncodedEditJobV2<'a> {
                 return Err(Error::Unsupported("encoded edit sub-tick duration"));
             }
             match self.context.stream.kind() {
-                EncodedEntryKindV1::Avc | EncodedEntryKindV1::Hevc => {}
+                kind if kind.is_video() => {}
                 EncodedEntryKindV1::Aac => {
                     // Narrow LC/standard-rate/channel-config profile. Body
                     // tools, PCE, SBR signalling and decoder validity stay opaque.
