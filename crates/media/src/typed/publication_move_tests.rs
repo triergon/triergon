@@ -109,13 +109,19 @@ fn final_laced_group_keeps_configuration_state_and_raw_source_after_earlier_pack
     let last = packets.pop().unwrap();
     drop((job, packets, changed));
     assert_eq!(last.packet.data.as_ref(), b"B");
-    assert_eq!(last.configuration.initialization(0).unwrap().data, b"state");
+    let initialization = last.configuration.initialization(0).unwrap();
+    assert_eq!(initialization.data, b"state");
+    let owner = last.configuration.initialization_bytes(0).unwrap();
+    assert!(std::ptr::eq(initialization.data, owner.as_ref()));
     let group = last.group.as_ref().unwrap().clone();
     drop(last);
     assert_eq!(group.raw_body(), raw.as_slice());
     assert_eq!(group.codec_state().unwrap().data(), b"state");
     assert!(pool.used() > baseline);
     drop(group);
+    assert_eq!(owner.as_ref(), b"state");
+    assert!(pool.used() > baseline);
+    drop(owner);
     assert_eq!(pool.used(), baseline);
 }
 

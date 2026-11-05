@@ -764,6 +764,69 @@ fn transport_failure_and_reset_cannot_be_reinterpreted_as_eof_or_old_packet_byte
 }
 
 #[test]
+fn psi_stuffing_run_keeps_the_first_invalid_byte_and_work_limit() {
+    let pool = pool();
+    let mut assembler = SectionAssembler::new(0, pool.clone(), ParseLimits::default()).unwrap();
+    let mut payload = [0xff; 184];
+    payload[0] = 0;
+    payload[101] = 0x00;
+    assembler
+        .push(bytes(&pool, &payload), true, SourceId(1), 0)
+        .unwrap();
+
+    let mut first = WorkBudget::new(100);
+    assert!(matches!(
+        assembler.poll(&mut first, &cancel()),
+        Ok(AssemblyStep::Yield)
+    ));
+    assert_eq!(first.spent(), 100);
+    assert!(matches!(
+        assembler.poll(&mut WorkBudget::new(0), &cancel()),
+        Ok(AssemblyStep::Yield)
+    ));
+
+    let mut rest = WorkBudget::new(80);
+    assert!(matches!(
+        assembler.poll(&mut rest, &cancel()),
+        Err(Error::Invalid("PSI stuffing tail"))
+    ));
+    assert_eq!(rest.spent(), 1);
+}
+
+#[test]
+fn psi_stuffing_before_pointer_preserves_the_following_section() {
+    let pool = pool();
+    let mut assembler = SectionAssembler::new(0, pool.clone(), ParseLimits::default()).unwrap();
+    let mut first = vec![0];
+    first.extend_from_slice(&PAT[..7]);
+    assembler
+        .push(bytes(&pool, &first), true, SourceId(1), 0)
+        .unwrap();
+    assert!(matches!(
+        assembler.poll(&mut WorkBudget::new(128), &cancel()),
+        Ok(AssemblyStep::NeedPayload)
+    ));
+
+    let mut second = vec![80];
+    second.extend_from_slice(&PAT[7..]);
+    second.resize(81, 0xff);
+    second.extend_from_slice(PAT);
+    assembler
+        .push(bytes(&pool, &second), true, SourceId(1), 188)
+        .unwrap();
+    for expected_offset in [1, 269] {
+        let AssemblyStep::Output(section) = assembler
+            .poll(&mut WorkBudget::new(128), &cancel())
+            .unwrap()
+        else {
+            panic!("expected section")
+        };
+        assert_eq!(section.bytes().as_ref(), PAT);
+        assert_eq!(section.source_ranges()[0].offset, expected_offset);
+    }
+}
+
+#[test]
 fn psi_backpressure_keeps_completed_and_partial_source_bytes_for_exactly_once_retry() {
     let pool = Budget::new(4096).unwrap();
     let mut reader = SectionAssembler::new(0, pool.clone(), ParseLimits::default()).unwrap();

@@ -410,6 +410,15 @@ impl<W: Write> Driver<W> {
                     source.cts_ticks.is_some()
                 )?;
             }
+            Mov9ClockOrigin::FrontSourceMediaStartV1 => {
+                writeln!(
+                    self.out,
+                    "{{\"event\":\"native_origin\",\"kind\":\"front-source-media-start-v1\",\"track_id\":{track_id},\"source_sample\":{},\"derived_dts_ticks\":0,\"source_dts_known\":{},\"source_cts_known\":{}}}",
+                    source.ordinal,
+                    source.dts_ticks.is_some(),
+                    source.cts_ticks.is_some()
+                )?;
+            }
         }
         Ok(())
     }
@@ -939,8 +948,8 @@ impl<W: Write> Driver<W> {
                                 self.out,
                                 "{{\"event\":\"native_timebase_projection\",\"track_id\":{},\"cause\":\"observed-all-ones-scale-word\",\"source_time_base\":[{},{}],\"native_time_base\":[{},{}],\"source_knownness_unchanged\":true}}",
                                 stream.track_id,
-                                stream.clock.source_base.numerator(),
-                                stream.clock.source_base.denominator(),
+                                stream.clock.source_base.require()?.numerator(),
+                                stream.clock.source_base.require()?.denominator(),
                                 stream.clock.native_base.numerator(),
                                 stream.clock.native_base.denominator()
                             )?;

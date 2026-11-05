@@ -55,6 +55,11 @@ impl AsRef<[u8]> for PesSpan {
     }
 }
 impl PesSpan {
+    /// An exact charged alias of this elementary payload span.
+    pub fn payload_bytes(&self) -> Result<Bytes> {
+        self.bytes.slice(self.range.clone())
+    }
+
     pub fn source_range(&self) -> SourceRange {
         self.source
     }

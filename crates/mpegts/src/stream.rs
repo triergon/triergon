@@ -4,8 +4,8 @@ use crate::psi::{
     TableStep,
 };
 use crate::{
-    AssemblyStep, Continuity, ContinuityOutcome, PacketFormat, ParseLimits, Pes, PesAssembler,
-    SectionAssembler, SourceEpochs, TransportFramer, TransportPacket,
+    AssemblyStep, Continuity, ContinuityOutcome, NullCarrierRun, PacketFormat, ParseLimits, Pes,
+    PesAssembler, SectionAssembler, SourceEpochs, TransportFramer, TransportPacket,
 };
 use std::sync::atomic::{AtomicBool, Ordering};
 use triergon_core::{
@@ -112,15 +112,28 @@ struct MapBuild {
     epoch: u64,
 }
 
-/// The selected program is explicit and part of operation identity. All PAT
-/// associations and raw transport/section facts remain visible; other programs'
-/// PES are outside this named operation, not silently counted as selected output.
+/// Opt-in source view. A run expands to one transport event per carrier,
+/// in physical order, with no intervening continuity or clock events.
+#[derive(Debug)]
+#[allow(
+    clippy::large_enum_variant,
+    reason = "keep one owned source event inline"
+)]
+pub enum CompactTraceEvent {
+    Event(TraceEvent),
+    NullRun(NullCarrierRun),
+}
+
+/// The caller selects the program explicitly or requests single-program
+/// discovery. All PAT associations and raw transport/section facts remain
+/// visible.
 #[derive(Debug)]
 pub struct TransportStream {
     budget: Budget,
     format: PacketFormat,
     limits: ParseLimits,
     program: u16,
+    discover_program: bool,
     descriptor_namespace: DescriptorNamespace,
     framer: TransportFramer,
     pat: PsiRoute,
@@ -189,6 +202,32 @@ impl TransportStream {
         if program == 0 {
             return Err(Error::Invalid("network PID is not a selected program"));
         }
+        Self::new_with_program(budget, format, limits, Some(program), descriptor_namespace)
+    }
+
+    /// Read one TS188 segment with an in-band PAT and PMT. The complete PAT
+    /// must identify exactly one media program. Program zero is a network PID.
+    pub fn new_single_program_segment(
+        budget: Budget,
+        limits: ParseLimits,
+        descriptor_namespace: DescriptorNamespace,
+    ) -> Result<Self> {
+        Self::new_with_program(
+            budget,
+            PacketFormat::Ts188,
+            limits,
+            None,
+            descriptor_namespace,
+        )
+    }
+
+    fn new_with_program(
+        budget: Budget,
+        format: PacketFormat,
+        limits: ParseLimits,
+        program: Option<u16>,
+        descriptor_namespace: DescriptorNamespace,
+    ) -> Result<Self> {
         limits.validate()?;
         Ok(Self {
             framer: TransportFramer::new(budget.clone(), format),
@@ -198,7 +237,8 @@ impl TransportStream {
             budget,
             format,
             limits,
-            program,
+            program: program.unwrap_or_default(),
+            discover_program: program.is_none(),
             descriptor_namespace,
             pmt: None,
             pmt_source: None,
@@ -227,6 +267,7 @@ impl TransportStream {
             boundary_event: false,
         })
     }
+    /// Zero until the first complete PAT in single-program discovery mode.
     pub fn selected_program(&self) -> u16 {
         self.program
     }
@@ -334,6 +375,51 @@ impl TransportStream {
         self.boundary_event = true;
         Ok(())
     }
+    /// Seal the actual core End after this source operation has drained. Pending
+    /// PSI/PES may remain: an entity End is not a logical EOF or discontinuity.
+    pub fn media_entity_end_v1(
+        &self,
+        input: &mut InputCursor,
+        work: &mut WorkBudget,
+        cancel: &AtomicBool,
+    ) -> Result<Option<crate::MediaEntityEndV1>> {
+        if cancel.load(Ordering::Relaxed) {
+            return Err(Error::Cancelled);
+        }
+        if !self.budget.same_pool(input.budget()) {
+            return Err(Error::ForeignPool);
+        }
+        let location = self
+            .entity_end
+            .ok_or(Error::Invalid("media entity End not observed"))?;
+        if self.logical_end
+            || self.finished
+            || self.packet.is_some()
+            || self.job.is_some()
+            || self.section.is_some()
+            || self.map_build.is_some()
+            || self.boundary_event
+            || location.source != input.source()
+            || location.offset != input.position()
+            || !self.framer.observed_entity_end(input)
+        {
+            return Err(Error::Invalid("media entity End not drained"));
+        }
+        if !work.try_charge(1) {
+            return Ok(None);
+        }
+        match input.read_into(&mut [0_u8; 1], work, cancel)? {
+            Step::End(actual) if actual == location => Ok(Some(crate::MediaEntityEndV1 {
+                location,
+                token: input.token(),
+                epochs: self.source_epochs(),
+                program: self.program,
+                format: self.format,
+                budget: self.budget.clone(),
+            })),
+            _ => Err(Error::Invalid("media entity End not confirmed by core")),
+        }
+    }
     /// Call after an observed entity End and only when that is the logical EOF.
     pub fn end_of_source(&mut self) -> Result<()> {
         if self.entity_end.is_none()
@@ -348,12 +434,27 @@ impl TransportStream {
         Ok(())
     }
     fn apply_pat(&mut self, table: &PatTable) -> Result<()> {
-        let pid = table
-            .programs
-            .as_slice()
-            .iter()
-            .find(|entry| entry.program_number == self.program)
-            .map(|entry| entry.pid);
+        let programs = table.programs.as_slice();
+        let entry = if self.discover_program {
+            let mut media = programs.iter().filter(|entry| entry.program_number != 0);
+            let entry = media
+                .next()
+                .ok_or(Error::Invalid("segment PAT has no media program"))?;
+            if media.next().is_some() {
+                return Err(Error::Unsupported(
+                    "segment PAT has multiple media programs",
+                ));
+            }
+            if self.program != 0 && self.program != entry.program_number {
+                return Err(Error::Unsupported("segment PAT changed media program"));
+            }
+            Some(entry)
+        } else {
+            programs
+                .iter()
+                .find(|entry| entry.program_number == self.program)
+        };
+        let pid = entry.map(|entry| entry.pid);
         if self.pmt.as_ref().map(|pmt| pmt.pid) != pid || self.tsid != Some(table.header.extension)
         {
             let epoch = self.config_epoch.checked_add(1).ok_or(Error::Overflow)?;
@@ -370,6 +471,9 @@ impl TransportStream {
             self.clock_signal = false;
             self.clock_samples = None;
             self.config_epoch = epoch;
+        }
+        if let Some(entry) = entry {
+            self.program = entry.program_number;
         }
         self.tsid = Some(table.header.extension);
         Ok(())
@@ -956,6 +1060,33 @@ impl TransportStream {
         work: &mut WorkBudget,
         cancel: &AtomicBool,
     ) -> Result<Step<TraceEvent>> {
+        match self.poll_inner::<false>(input, work, cancel)? {
+            Step::Ready(CompactTraceEvent::Event(event)) => Ok(Step::Ready(event)),
+            Step::Ready(CompactTraceEvent::NullRun(_)) => unreachable!("literal source mode"),
+            Step::NeedInput(request) => Ok(Step::NeedInput(request)),
+            Step::Yield => Ok(Step::Yield),
+            Step::End(location) => Ok(Step::End(location)),
+        }
+    }
+
+    pub fn poll_compact(
+        &mut self,
+        input: &mut InputCursor,
+        work: &mut WorkBudget,
+        cancel: &AtomicBool,
+    ) -> Result<Step<CompactTraceEvent>> {
+        self.poll_inner::<true>(input, work, cancel)
+    }
+
+    fn poll_inner<const COMPACT: bool>(
+        &mut self,
+        input: &mut InputCursor,
+        work: &mut WorkBudget,
+        cancel: &AtomicBool,
+    ) -> Result<Step<CompactTraceEvent>> {
+        fn ready(event: TraceEvent) -> Step<CompactTraceEvent> {
+            Step::Ready(CompactTraceEvent::Event(event))
+        }
         if self.finished {
             return Err(Error::Invalid("TS stream already finished"));
         }
@@ -965,12 +1096,12 @@ impl TransportStream {
             }
             if self.boundary_event {
                 self.boundary_event = false;
-                return Ok(Step::Ready(TraceEvent::Discontinuity {
+                return Ok(ready(TraceEvent::Discontinuity {
                     epochs: self.source_epochs(),
                 }));
             }
             if let Some(event) = self.poll_jobs(work, cancel)? {
-                return Ok(Step::Ready(event));
+                return Ok(ready(event));
             }
             if self.job.is_some() || self.section.is_some() || self.map_build.is_some() {
                 return Ok(Step::Yield);
@@ -985,7 +1116,7 @@ impl TransportStream {
                             return Ok(Step::Yield);
                         }
                         if let Some(outcome) = self.outcome.take() {
-                            return Ok(Step::Ready(TraceEvent::Continuity {
+                            return Ok(ready(TraceEvent::Continuity {
                                 pid: self
                                     .packet
                                     .as_ref()
@@ -998,13 +1129,13 @@ impl TransportStream {
                     2 => {
                         self.phase = 5;
                         if let Some(event) = self.clock_transition()? {
-                            return Ok(Step::Ready(event));
+                            return Ok(ready(event));
                         }
                     }
                     5 => self.feed()?,
                     6 => {
                         if let Some(event) = self.drain(work, cancel)? {
-                            return Ok(Step::Ready(event));
+                            return Ok(ready(event));
                         }
                     }
                     7 => {
@@ -1016,7 +1147,19 @@ impl TransportStream {
                 continue;
             }
             if self.logical_end {
-                return self.eof(work, cancel);
+                return match self.eof(work, cancel)? {
+                    Step::Ready(event) => Ok(ready(event)),
+                    Step::NeedInput(request) => Ok(Step::NeedInput(request)),
+                    Step::Yield => Ok(Step::Yield),
+                    Step::End(location) => Ok(Step::End(location)),
+                };
+            }
+            if COMPACT
+                && matches!(self.find_route(0x1fff), Route::Ignore)
+                && let Some(run) = self.framer.try_null_run(input, work, cancel)?
+            {
+                self.entity_end = None;
+                return Ok(Step::Ready(CompactTraceEvent::NullRun(run)));
             }
             match self.framer.poll(input, work, cancel) {
                 Ok(Step::Ready(packet)) => {
@@ -1025,7 +1168,7 @@ impl TransportStream {
                     self.phase = 1;
                     let event = TraceEvent::Transport(packet.clone());
                     self.packet = Some(packet);
-                    return Ok(Step::Ready(event));
+                    return Ok(ready(event));
                 }
                 Ok(Step::NeedInput(request)) => return Ok(Step::NeedInput(request)),
                 Ok(Step::Yield) => return Ok(Step::Yield),
@@ -1052,7 +1195,7 @@ impl TransportStream {
                             assembler.discard(route.epochs);
                         }
                     }
-                    return Ok(Step::Ready(TraceEvent::Diagnostic(TraceFault {
+                    return Ok(ready(TraceEvent::Diagnostic(TraceFault {
                         kind: FaultKind::Transport,
                         pid: None,
                         location,

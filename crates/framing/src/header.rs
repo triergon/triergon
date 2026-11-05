@@ -30,15 +30,40 @@ pub enum NalHeader {
     },
 }
 
+/// The fixed-header parser has exactly these three failures. Keep its hot
+/// internal result and retained refusal facts compact; the public API still
+/// returns the original core Error without changing priority or diagnostics.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum NalHeaderError {
+    Truncated,
+    ForbiddenZeroBit,
+    ZeroTemporalId,
+}
+impl NalHeaderError {
+    pub(crate) fn error(self) -> Error {
+        match self {
+            Self::Truncated => Error::Truncated,
+            Self::ForbiddenZeroBit => Error::Invalid("NAL forbidden_zero_bit"),
+            Self::ZeroTemporalId => Error::Invalid("HEVC temporal_id_plus1 is zero"),
+        }
+    }
+}
+
 impl NalHeader {
     /// H.264 (08/2024) 7.3.1 and H.265 (07/2024) 7.3.1.2. Extended AVC
     /// headers, RBSP syntax and type-specific constraints are outside this call.
     pub fn parse(codec: Codec, nal: &[u8]) -> Result<Self> {
+        Self::parse_compact(codec, nal).map_err(NalHeaderError::error)
+    }
+    pub(crate) fn parse_compact(
+        codec: Codec,
+        nal: &[u8],
+    ) -> std::result::Result<Self, NalHeaderError> {
         if nal.len() < codec.minimum_header_bytes() {
-            return Err(Error::Truncated);
+            return Err(NalHeaderError::Truncated);
         }
         if nal[0] & 0x80 != 0 {
-            return Err(Error::Invalid("NAL forbidden_zero_bit"));
+            return Err(NalHeaderError::ForbiddenZeroBit);
         }
         match codec {
             Codec::Avc => Ok(Self::Avc {
@@ -48,7 +73,7 @@ impl NalHeader {
             Codec::Hevc => {
                 let temporal_id_plus_one = nal[1] & 7;
                 if temporal_id_plus_one == 0 {
-                    return Err(Error::Invalid("HEVC temporal_id_plus1 is zero"));
+                    return Err(NalHeaderError::ZeroTemporalId);
                 }
                 Ok(Self::Hevc {
                     nal_unit_type: (nal[0] >> 1) & 63,

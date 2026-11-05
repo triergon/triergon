@@ -156,6 +156,7 @@ pub struct NalReader {
     codec: Codec,
     framing: Framing,
     limits: ReaderLimits,
+    compact_annex_b: bool,
     phase: Phase,
     buffer: Option<BudgetVec<u8>>,
     current: Option<NalFraming>,
@@ -188,6 +189,7 @@ impl NalReader {
             codec,
             framing,
             limits,
+            compact_annex_b: false,
             phase: match framing {
                 Framing::LengthPrefixed(_) => Phase::Length,
                 Framing::AnnexB => Phase::AnnexPrefix,
@@ -207,6 +209,18 @@ impl NalReader {
             completed: 0,
             failure: None,
         })
+    }
+
+    pub(crate) fn compact_annex_b(
+        pool: &Budget,
+        codec: Codec,
+        source: SourceId,
+        capabilities: SourceCapabilities,
+        limits: ReaderLimits,
+    ) -> Result<Self> {
+        let mut reader = Self::new(pool, codec, Framing::AnnexB, source, capabilities, limits)?;
+        reader.compact_annex_b = true;
+        Ok(reader)
     }
 
     pub fn request(&self) -> InputRequest {
@@ -262,7 +276,7 @@ impl NalReader {
         Ok(())
     }
 
-    fn stop(&mut self, error: Error) {
+    pub(crate) fn stop(&mut self, error: Error) {
         if error == Error::Cancelled {
             let _ = self.cursor.fail(
                 self.cursor.source(),
@@ -339,10 +353,44 @@ impl NalReader {
                 maximum: self.limits.maximum_nal_bytes,
             });
         }
-        // Capacity was reserved before any payload input was consumed.
+        self.reserve_compact_payload(1)?;
         self.buffer()?
             .try_push(byte)
             .map_err(|rejected| rejected.error)
+    }
+
+    fn reserve_compact_payload(&mut self, count: usize) -> Result<()> {
+        if !self.compact_annex_b {
+            return Ok(());
+        }
+        let maximum = self.limits.maximum_nal_bytes;
+        let buffer = self.buffer()?;
+        let needed = buffer.len().checked_add(count).ok_or(Error::Overflow)?;
+        if needed > maximum {
+            return Err(Error::Limit {
+                requested: needed,
+                maximum,
+            });
+        }
+        if needed > buffer.capacity() {
+            let target = buffer
+                .capacity()
+                .saturating_mul(2)
+                .max(64)
+                .min(maximum)
+                .max(needed);
+            let length = buffer.len();
+            buffer.try_reserve_exact(target - length).or_else(|error| {
+                if target != needed
+                    && matches!(error, Error::Backpressure { .. } | Error::Limit { .. })
+                {
+                    buffer.try_reserve_exact(needed - length)
+                } else {
+                    Err(error)
+                }
+            })?;
+        }
+        Ok(())
     }
 
     fn observed_prefix(&self, leading_zero_bytes: usize) -> Result<NalFraming> {
@@ -461,6 +509,7 @@ impl NalReader {
                     }
                     let capacity = match self.framing {
                         Framing::LengthPrefixed(_) => self.declared_length,
+                        Framing::AnnexB if self.compact_annex_b => 0,
                         Framing::AnnexB => self.limits.maximum_nal_bytes,
                     };
                     if self.buffer.is_none() {
@@ -493,6 +542,27 @@ impl NalReader {
                     }
                 }
                 Phase::AnnexPayload => {
+                    if self.compact_annex_b && self.zeroes == 0 {
+                        let window = self.cursor.buffered();
+                        let maximum = window.len().min(work.remaining().min(4096) as usize);
+                        let count = window[..maximum]
+                            .iter()
+                            .position(|&byte| byte == 0)
+                            .unwrap_or(maximum);
+                        if count != 0 {
+                            self.reserve_compact_payload(count)?;
+                            let buffer = self
+                                .buffer
+                                .as_mut()
+                                .ok_or(Error::Invalid("missing NAL builder"))?;
+                            match self.cursor.read_append(buffer, count, work, cancel)? {
+                                Step::Ready(_) => continue,
+                                Step::NeedInput(request) => return Ok(Step::NeedInput(request)),
+                                Step::Yield => return Ok(Step::Yield),
+                                Step::End(_) => return Err(Error::Truncated),
+                            }
+                        }
+                    }
                     let mut byte = [0];
                     match self.cursor.read_into(&mut byte, work, cancel)? {
                         Step::Ready(_) if byte[0] == 0 => self.add_zero()?,

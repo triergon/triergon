@@ -299,3 +299,32 @@ impl Storage for crate::matroska::Track {
         }
     }
 }
+
+/// Ephemeral view of an operation and its explicit immutable input owner.
+/// Existing Bytes identity deduplication counts windows/packets/root once.
+/// No second source handle is retained in Reader and ordinary callers keep
+/// their original graph, slots and pressure-work sequence.
+pub(crate) struct WithSource<'a> {
+    pub graph: &'a dyn Storage,
+    pub source: &'a dyn Storage,
+}
+impl Storage for WithSource<'_> {
+    fn storage_slots(&self) -> Result<usize> {
+        self.graph
+            .storage_slots()?
+            .checked_add(self.source.storage_slots()?)
+            .ok_or(Error::Overflow)
+    }
+    fn storage_owner(&self, index: usize) -> Result<Option<Owner>> {
+        let slots = self.graph.storage_slots()?;
+        if index < slots {
+            self.graph.storage_owner(index)
+        } else {
+            self.source.storage_owner(index - slots)
+        }
+    }
+}
+
+#[cfg(test)]
+#[path = "owned_source_pressure.rs"]
+mod owned_source_pressure;

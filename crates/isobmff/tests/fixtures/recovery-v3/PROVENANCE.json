@@ -1,0 +1,97 @@
+{
+  "schema": 1,
+  "files": [
+    {
+      "path": "desc-1,0,1.mov",
+      "sha256": "a54dcf7cb8a86ca389f1c59d1ff8a452e48798e50cc430088d1705ca98f80ac6",
+      "source_origin": ".research/parallel-mp4/bounded-native-recovery-next-v2/controls-v1/desc-1,0,1.mov",
+      "exact_immutable_source_copy": true
+    },
+    {
+      "path": "desc-1,1,0.mov",
+      "sha256": "e95df1dc30021beefd74d095e605cc272d779e4b75f2d799b037dbac6083ec7e",
+      "source_origin": ".research/parallel-mp4/bounded-native-recovery-next-v2/controls-v1/desc-1,1,0.mov",
+      "exact_immutable_source_copy": true
+    },
+    {
+      "path": "desc-0,0,0.mov",
+      "sha256": "aeabd30b5618ea2bc96b3af00596236066fa8f8a0ad0da20346f0942f7ca42c7",
+      "source_origin": ".research/parallel-mp4/bounded-native-recovery-next-v2/controls-v1/desc-0,0,0.mov",
+      "exact_immutable_source_copy": true
+    },
+    {
+      "path": "desc-0,1,0.mov",
+      "sha256": "f43d992fc313d675f1dae5f84f25336ce63d61d3d3c9005205281cf57cc0e315",
+      "source_origin": ".research/parallel-mp4/bounded-native-recovery-next-v2/controls-v1/desc-0,1,0.mov",
+      "exact_immutable_source_copy": true
+    },
+    {
+      "path": "desc-1,0,0.mov",
+      "sha256": "702acd181c8c80b310e94aef0d5f881cbd80b95cc603dc755eff1c6fc3a1d101",
+      "source_origin": ".research/parallel-mp4/bounded-native-recovery-next-v2/controls-v1/desc-1,0,0.mov",
+      "exact_immutable_source_copy": true
+    },
+    {
+      "path": "desc-0,0,1.mov",
+      "sha256": "210e325ee09773bd1a12d1405be3614bb05ecd57905c95edd4dc01d01675cbd4",
+      "source_origin": ".research/parallel-mp4/bounded-native-recovery-next-v2/controls-v1/desc-0,0,1.mov",
+      "exact_immutable_source_copy": true
+    },
+    {
+      "path": "desc-2,1,1.mov",
+      "sha256": "ebdac9fce9b49dac7755388da5c38393cd83fb3d831687f472799035efb91cf9",
+      "source_origin": ".research/parallel-mp4/bounded-native-recovery-next-v2/controls-v1/desc-2,1,1.mov",
+      "exact_immutable_source_copy": true
+    },
+    {
+      "path": "desc-4294967295,1,1.mov",
+      "sha256": "2dc2ea061e3bfe90e25708e5000f411bc01fed05924d01f7127e2b1201b563e9",
+      "source_origin": ".research/parallel-mp4/bounded-native-recovery-next-v2/controls-v1/desc-4294967295,1,1.mov",
+      "exact_immutable_source_copy": true
+    },
+    {
+      "path": "offset-33444.mov",
+      "sha256": "881d2d33458552a4f425ddc068b6571c8c6857fe58f241f7dd334042d6c9aa22",
+      "source_origin": ".research/parallel-mp4/bounded-native-recovery-next-v2/controls-v1/offset-33444.mov",
+      "exact_immutable_source_copy": true
+    },
+    {
+      "path": "edge-33444.mov",
+      "sha256": "881d2d33458552a4f425ddc068b6571c8c6857fe58f241f7dd334042d6c9aa22",
+      "source_origin": ".research/parallel-mp4/bounded-native-recovery-next-v2/controls-v2/edge-33444.mov",
+      "exact_immutable_source_copy": true
+    },
+    {
+      "path": "edge-33445.mov",
+      "sha256": "079ffa2e7aa8f601b942d8b491dc61780a97c443da8407551b2f502d7a903c88",
+      "source_origin": ".research/parallel-mp4/bounded-native-recovery-next-v2/controls-v2/edge-33445.mov",
+      "exact_immutable_source_copy": true
+    },
+    {
+      "path": "edge-33514.mov",
+      "sha256": "2ca485ea243226c647043501f19bf505cb4eb61727b78f7988f752457a565909",
+      "source_origin": ".research/parallel-mp4/bounded-native-recovery-next-v2/controls-v2/edge-33514.mov",
+      "exact_immutable_source_copy": true
+    },
+    {
+      "path": "edge-33515.mov",
+      "sha256": "442b505fbed38b83fd480525b13a84fbddac5eb106e1a8cd754876d94f939e3a",
+      "source_origin": ".research/parallel-mp4/bounded-native-recovery-next-v2/controls-v2/edge-33515.mov",
+      "exact_immutable_source_copy": true
+    },
+    {
+      "path": "prefix-100-edge-1.mov",
+      "sha256": "b46d2d24bc1496abb4eefe3572e7c01448f8006792f88f75dc2816fc24a035ff",
+      "source_origin": ".research/parallel-mp4/bounded-native-recovery-next-v2/controls-prefix/prefix-100-edge-1.mov",
+      "exact_immutable_source_copy": true
+    },
+    {
+      "path": "prefix-4096-edge-1.mov",
+      "sha256": "a5ea9d58e411d0b5da8cf5ed91a5cdd1b795061b55716089a59ab46bc39990cd",
+      "source_origin": ".research/parallel-mp4/bounded-native-recovery-next-v2/controls-prefix/prefix-4096-edge-1.mov",
+      "exact_immutable_source_copy": true
+    }
+  ],
+  "source_data_only": true,
+  "original_sources_unmodified": true
+}

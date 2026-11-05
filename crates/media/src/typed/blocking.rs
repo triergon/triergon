@@ -31,12 +31,20 @@ struct Pending {
     buffer: Option<BudgetVec<u8>>,
     phase: Phase,
 }
+// Sealed to the explicit Cursor<Bytes> constructor below. Generic Read/Seek
+// sources cannot opt into immutable views or acquire an implicit input cache.
+#[derive(Debug)]
+struct OwnedWindows<R> {
+    read: fn(&mut R, usize) -> Result<Option<Bytes>>,
+    root: fn(&R) -> &Bytes,
+}
 #[derive(Debug)]
 pub(crate) struct InputFeeder<R> {
     reader: R,
     position: u64,
     maximum: usize,
     pending: Option<Pending>,
+    owned: Option<OwnedWindows<R>>,
 }
 impl<R: Read> InputFeeder<R> {
     /// The ordinary blocking API begins a source at offset zero. A caller using
@@ -53,7 +61,25 @@ impl<R: Read> InputFeeder<R> {
             position,
             maximum,
             pending: None,
+            owned: None,
         })
+    }
+    pub fn owned_source(&self) -> Option<&Bytes> {
+        self.owned.as_ref().map(|owned| (owned.root)(&self.reader))
+    }
+    // Construct only a borrowed graph reference on the hot poll path. The
+    // source-root callback runs solely during a real cold pressure walk.
+    pub fn owned_source_storage(&self) -> Option<&dyn crate::matroska::typed::usage::Storage> {
+        self.owned
+            .as_ref()
+            .map(|_| self as &dyn crate::matroska::typed::usage::Storage)
+    }
+    pub fn into_inner(self) -> R {
+        let Self {
+            reader, pending, ..
+        } = self;
+        drop(pending);
+        reader
     }
     pub fn has_pending_read(&self) -> bool {
         self.pending.is_some()
@@ -105,6 +131,36 @@ impl<R: Read> InputFeeder<R> {
     ) -> Result<FeedStep> {
         self.feed(input, cancel, reposition, Some(request), header)
     }
+    /// Bytes the parser discards cannot become a payload owner. An immutable
+    /// source supplies them as a view of its charged root, with the exact same
+    /// request; any other source takes the ordinary copied body path.
+    pub fn feed_typed_discard_request(
+        &mut self,
+        input: &mut InputCursor,
+        request: &InputRequest,
+        cancel: &AtomicBool,
+        reposition: Option<fn(&mut R, u64) -> io::Result<u64>>,
+    ) -> Result<FeedStep> {
+        match self.advance_with(input, cancel, reposition, Some(request), false, None, true) {
+            Err(Error::Backpressure { requested, .. }) => Ok(FeedStep::Backpressure { requested }),
+            other => other,
+        }
+    }
+    /// A bounded widened discard (see `bounded_discard_refill`); immutable only.
+    pub fn feed_typed_discard_refill(
+        &mut self,
+        input: &mut InputCursor,
+        plan: &crate::incremental::typed_bridge::HeaderRefillRequest,
+        cancel: &AtomicBool,
+        reposition: Option<fn(&mut R, u64) -> io::Result<u64>>,
+    ) -> Result<FeedStep> {
+        if self.owned.is_none() {
+            return Err(Error::Invalid(
+                "widened discard requires an immutable source",
+            ));
+        }
+        self.feed_typed_discard_request(input, plan.expanded(), cancel, reposition)
+    }
     pub fn feed_typed_header_refill(
         &mut self,
         input: &mut InputCursor,
@@ -144,7 +200,28 @@ impl<R: Read> InputFeeder<R> {
         reposition: Option<fn(&mut R, u64) -> io::Result<u64>>,
         requested: Option<&InputRequest>,
         inline_header: bool,
+        inline_fallback: Option<usize>,
+    ) -> Result<FeedStep> {
+        self.advance_with(
+            input,
+            cancel,
+            reposition,
+            requested,
+            inline_header,
+            inline_fallback,
+            false,
+        )
+    }
+    #[allow(clippy::too_many_arguments)]
+    fn advance_with(
+        &mut self,
+        input: &mut InputCursor,
+        cancel: &AtomicBool,
+        reposition: Option<fn(&mut R, u64) -> io::Result<u64>>,
+        requested: Option<&InputRequest>,
+        inline_header: bool,
         mut inline_fallback: Option<usize>,
+        discard: bool,
     ) -> Result<FeedStep> {
         // Probe starvation without consuming a byte or fabricating EOF from a
         // declared length. An unread core window yields with zero work.
@@ -221,6 +298,12 @@ impl<R: Read> InputFeeder<R> {
             }
             if inline_header && request.maximum.min(self.maximum) <= InputCursor::INLINE_CAPACITY {
                 return self.read_inline_header(input, request, cancel);
+            }
+            // Only expanded header supply uses immutable views. Exact body
+            // refills keep their historical capacity-N/direct-body/work path.
+            // Inline headers and the pre-read exact fallback above are literal.
+            if (inline_header || discard) && self.owned.is_some() {
+                return self.read_owned_header(input, request, cancel);
             }
             self.pending = Some(Pending {
                 request,
@@ -304,6 +387,36 @@ impl<R: Read> InputFeeder<R> {
         self.pending = None;
         Ok(FeedStep::Provided)
     }
+    fn read_owned_header(
+        &mut self,
+        input: &mut InputCursor,
+        request: InputRequest,
+        cancel: &AtomicBool,
+    ) -> Result<FeedStep> {
+        let owned = self.owned.as_ref().required("missing immutable source")?;
+        if !(owned.root)(&self.reader).belongs_to(input.budget()) {
+            return Err(triergon_core::Error::ForeignPool.into());
+        }
+        let maximum = request.maximum.min(self.maximum);
+        let Some(bytes) = (owned.read)(&mut self.reader, maximum)? else {
+            input.finish(request.source, request.token)?;
+            return Ok(FeedStep::End);
+        };
+        self.position = self
+            .position
+            .checked_add(bytes.len() as u64)
+            .ok_or(Error::Overflow)?;
+        // Match the ordinary post-read health/cancellation boundary before
+        // publication. Source position moved, parser position/work did not.
+        input.read_into(&mut [], &mut WorkBudget::new(0), cancel)?;
+        input.provide_owned(InputWindow::new(
+            request.source,
+            request.token,
+            request.offset,
+            bytes,
+        )?)?;
+        Ok(FeedStep::Provided)
+    }
     fn read_inline_header(
         &mut self,
         input: &mut InputCursor,
@@ -340,6 +453,19 @@ impl<R: Read> InputFeeder<R> {
             &bytes[..count],
         )?;
         Ok(FeedStep::Provided)
+    }
+}
+impl<R: Read> crate::matroska::typed::usage::Storage for InputFeeder<R> {
+    fn storage_slots(&self) -> Result<usize> {
+        Ok(usize::from(self.owned.is_some()))
+    }
+    fn storage_owner(&self, index: usize) -> Result<Option<crate::matroska::typed::usage::Owner>> {
+        Ok(if index == 0 {
+            self.owned_source()
+                .map(|source| crate::matroska::typed::usage::Owner::Bytes(source.clone()))
+        } else {
+            None
+        })
     }
 }
 impl<R: Read + Seek> InputFeeder<R> {
@@ -392,6 +518,31 @@ fn read_retry<R: Read>(reader: &mut R, buffer: &mut [u8]) -> io::Result<usize> {
             Err(error) if error.kind() == io::ErrorKind::Interrupted => continue,
             other => return other,
         }
+    }
+}
+
+impl InputFeeder<std::io::Cursor<triergon_core::OwnedInputBytes>> {
+    pub fn from_owned(
+        source: std::io::Cursor<triergon_core::OwnedInputBytes>,
+        maximum: usize,
+    ) -> Result<Self> {
+        let mut result = Self::new(source, maximum)?;
+        result.owned = Some(OwnedWindows {
+            read: |source, maximum| {
+                let start = usize::try_from(source.position()).unwrap_or(usize::MAX);
+                let root = source.get_ref().as_bytes();
+                if start >= root.len() {
+                    return Ok(None);
+                }
+                let count = maximum.min(root.len() - start);
+                let end = start.checked_add(count).ok_or(Error::Overflow)?;
+                let bytes = root.slice(start..end)?;
+                source.set_position(u64::try_from(end).map_err(|_| Error::Overflow)?);
+                Ok(Some(bytes))
+            },
+            root: |source| source.get_ref().as_bytes(),
+        });
+        Ok(result)
     }
 }
 
@@ -713,3 +864,11 @@ mod header_refill_feeder_tests {
         assert_eq!(feeder.reader_mut().sizes, [1]);
     }
 }
+
+#[cfg(test)]
+#[path = "owned_header_windows.rs"]
+mod owned_header_windows;
+
+#[cfg(test)]
+#[path = "owned_window_work_traces.rs"]
+mod owned_window_work_traces;

@@ -81,7 +81,7 @@ impl ColourSource {
     /// Retains the source-nearest view, adding a separate mathematical view that
     /// applies the studio inverse to encoded Y=0 without an RGB-zero convention
     /// or the informative EN300743 Y=16 repair, and floors 8-bit opacity.
-    /// Observed native [0,136,0,0] and T=128 alpha 127 are consistent with this
+    /// Observed native `[0,136,0,0]` and T=128 alpha 127 are consistent with this
     /// view; that observation does not establish general native equivalence.
     pub fn rgba(self, projection: ColourProjection) -> Result<[u8; 4]> {
         if projection == ColourProjection::SourceNearest8 {

@@ -17,6 +17,30 @@ dependencies = [
 ]
 
 [[package]]
+name = "triergon-capture"
+version = "0.0.0"
+
+[[package]]
+name = "triergon-codec-aac"
+version = "0.0.0"
+
+[[package]]
+name = "triergon-codec-ac3"
+version = "0.0.0"
+
+[[package]]
+name = "triergon-codec-dca"
+version = "0.0.0"
+
+[[package]]
+name = "triergon-codec-h264"
+version = "0.0.0"
+
+[[package]]
+name = "triergon-codec-hevc"
+version = "0.0.0"
+
+[[package]]
 name = "triergon-core"
 version = "0.0.0"
 
@@ -39,6 +63,30 @@ name = "triergon-mpegts"
 version = "0.0.0"
 dependencies = [
  "triergon-core",
+]
+
+[[package]]
+name = "triergon-playback"
+version = "0.0.0"
+dependencies = [
+ "triergon",
+ "triergon-core",
+ "triergon-framing",
+ "triergon-isobmff",
+ "triergon-mpegts",
+ "triergon-sim",
+ "triergon-subtitles",
+]
+
+[[package]]
+name = "triergon-sim"
+version = "0.0.0"
+dependencies = [
+ "triergon-codec-aac",
+ "triergon-codec-ac3",
+ "triergon-codec-dca",
+ "triergon-codec-h264",
+ "triergon-codec-hevc",
 ]
 
 [[package]]

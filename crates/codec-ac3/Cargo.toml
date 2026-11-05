@@ -1,0 +1,16 @@
+[package]
+name = "triergon-codec-ac3"
+version = "0.0.0"
+repository.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+
+[dependencies]
+
+[features]
+# Analysis aid for research/d4/ac3 scripts (per-block dumps); never needed in production.
+debug-dump = []
+
+[lints]
+workspace = true

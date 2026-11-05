@@ -38,6 +38,7 @@ pub struct BoxReader {
     metadata_limit: usize,
     metadata: Option<BudgetVec<u8>>,
     failed: Option<Error>,
+    recovery_terminal_mdat: bool,
 }
 impl BoxReader {
     pub fn new(input: &InputCursor, metadata_limit: usize) -> Result<Self> {
@@ -57,10 +58,29 @@ impl BoxReader {
             metadata_limit,
             metadata: None,
             failed: None,
+            recovery_terminal_mdat: false,
         })
+    }
+    /// Exposes a terminal MDAT declaration separately from the physical source
+    /// end. It never admits incomplete metadata or changes the Strict parser.
+    /// Callers must preserve declared/available bounds and stop before skip when
+    /// the terminal declaration exceeds known length; no range beyond EOF is made.
+    pub fn new_pinned_mov_recovery(
+        input: &InputCursor,
+        metadata_limit: usize,
+        _profile: crate::PinnedMovD32RegularRecoveryV1,
+    ) -> Result<Self> {
+        let mut reader = Self::new(input, metadata_limit)?;
+        reader.recovery_terminal_mdat = true;
+        Ok(reader)
     }
     pub fn source(&self) -> SourceId {
         self.source
+    }
+    /// The current announced MDAT's wire size is zero, even if parsing
+    /// resolved it to a finite extent using the known source length.
+    pub fn announced_open_mdat(&self) -> bool {
+        self.phase == Phase::Announced && self.prefix[..8] == *b"\0\0\0\0mdat"
     }
     fn binding(&self, input: &InputCursor) -> Result<()> {
         if self.source != input.source()
@@ -131,6 +151,7 @@ impl BoxReader {
         self.phase = Phase::Skipping;
         Ok(())
     }
+    #[inline(always)]
     pub fn poll(
         &mut self,
         input: &mut InputCursor,
@@ -149,6 +170,7 @@ impl BoxReader {
         }
         result
     }
+    #[inline(always)]
     fn poll_inner(
         &mut self,
         input: &mut InputCursor,
@@ -184,12 +206,16 @@ impl BoxReader {
                     if !work.try_charge(1) {
                         return Ok(Step::Yield);
                     }
-                    match BoxHeader::parse(
-                        &self.prefix[..self.filled],
-                        self.start,
-                        input.capabilities().length,
-                        true,
-                    )? {
+                    let declared_mdat = self.recovery_terminal_mdat
+                        && input.capabilities().length.is_some()
+                        && self.prefix.get(4..8) == Some(b"mdat".as_slice())
+                        && self.prefix[..4] != [0; 4];
+                    let bound = if declared_mdat {
+                        None
+                    } else {
+                        input.capabilities().length
+                    };
+                    match BoxHeader::parse(&self.prefix[..self.filled], self.start, bound, true)? {
                         HeaderRead::Need(count) => {
                             if count > self.prefix.len() {
                                 return Err(Error::Unsupported(

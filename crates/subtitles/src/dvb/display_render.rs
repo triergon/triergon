@@ -20,6 +20,7 @@ pub(crate) struct Renderer {
     found: Option<usize>,
     raster: Option<Raster>,
     active_object: Option<Object>,
+    drew_object: bool,
     parity: FieldParity,
     offset: usize,
     credit: usize,
@@ -35,6 +36,7 @@ pub(crate) struct Renderer {
     frozen_unrepaired_rgba: Option<Bytes>,
     pending_region: Option<DisplayRegion>,
     pub output: BudgetVec<DisplayRegion>,
+    pub omitted: BudgetVec<super::NativeOmittedRegion>,
     rendered: bool,
     cleanup_region: usize,
     cleanup_family: usize,
@@ -53,6 +55,7 @@ impl Renderer {
             found: None,
             raster: None,
             active_object: None,
+            drew_object: false,
             parity: FieldParity::Top,
             offset: 0,
             credit: 0,
@@ -68,11 +71,30 @@ impl Renderer {
             frozen_unrepaired_rgba: None,
             pending_region: None,
             output: BudgetVec::new(budget),
+            omitted: BudgetVec::new(budget),
             rendered: false,
             cleanup_region: 0,
             cleanup_family: 0,
             cleanup_object: 0,
         }
+    }
+
+    fn region_position(state: &State, address: Point, size: super::Size) -> Result<Point> {
+        let window = state.definition.window.unwrap_or(DisplayWindow {
+            x: 0,
+            y: 0,
+            width: state.definition.size.width,
+            height: state.definition.size.height,
+        });
+        let right = address.x.checked_add(size.width).ok_or(Error::Overflow)?;
+        let bottom = address.y.checked_add(size.height).ok_or(Error::Overflow)?;
+        if right > window.width || bottom > window.height {
+            return Err(Error::Invalid("DVB region outside display window"));
+        }
+        Ok(Point {
+            x: window.x.checked_add(address.x).ok_or(Error::Overflow)?,
+            y: window.y.checked_add(address.y).ok_or(Error::Overflow)?,
+        })
     }
 
     fn source_facts(
@@ -269,6 +291,21 @@ impl Renderer {
                         self.lookup += 1;
                         self.credit = 0;
                     }
+                    if self.found.is_none() && state.receiver_view == super::ReceiverView::NativeD32
+                    {
+                        // Frozen source controls establish that an unavailable
+                        // ODS is not an instruction to replay old compressed
+                        // data or to reject the native receiver transaction.
+                        // Pay even when the object table is empty, and preserve
+                        // this reference cursor across yield/backpressure.
+                        if !work.pay(&mut self.credit, 1)? {
+                            return Ok(false);
+                        }
+                        self.object_ref += 1;
+                        self.lookup = 0;
+                        self.credit = 0;
+                        continue;
+                    }
                     let object = state
                         .objects
                         .as_slice()
@@ -326,11 +363,23 @@ impl Renderer {
                         .ok_or(Error::Invalid("DVB raster absent"))?
                         .start_field(FieldSpec::new(FieldParity::Bottom, length))?;
                 } else {
+                    self.drew_object = true;
                     self.active_object = None;
                     self.object_ref += 1;
                     self.lookup = 0;
                     self.found = None;
                 }
+            }
+            if state.receiver_view == super::ReceiverView::NativeD32
+                && state.regions.as_slice()[self.region].plane.is_none()
+                && !self.drew_object
+            {
+                // Native fresh-fill/no-ODS and missing-object controls emit an
+                // empty rectangle list. Retain RCS/PCS/CDS and source packets;
+                // no invented object or valid-looking filled plane is emitted.
+                self.raster = None;
+                self.next_region();
+                continue;
             }
             let plane = self
                 .raster
@@ -353,6 +402,7 @@ impl Renderer {
         self.object_ref = 0;
         self.lookup = 0;
         self.found = None;
+        self.drew_object = false;
         self.credit = 0;
         self.offset = 0;
     }
@@ -391,40 +441,40 @@ impl Renderer {
             let index = state.slots[usize::from(visible.id)]
                 .ok_or(Error::Invalid("DVB missing visible region"))?;
             let region = &state.regions.as_slice()[index];
+            if state.receiver_view == super::ReceiverView::NativeD32 && region.plane.is_none() {
+                let source_error = Self::region_position(state, visible.address, region.size).err();
+                if let (super::NativeGeometryPolicy::ValidateSource, Some(error)) =
+                    (state.native_geometry_policy, source_error)
+                {
+                    return Err(error);
+                }
+                if !work.pay(&mut self.credit, 1)? {
+                    return Ok(false);
+                }
+                if state.native_geometry_policy == super::NativeGeometryPolicy::OmitUnrendered {
+                    // Retain the strict Source failure and original RCS owner.
+                    // No raster, address, clock or packet is repaired or clipped.
+                    self.omitted
+                        .try_push(super::NativeOmittedRegion {
+                            id: region.id,
+                            source_address: visible.address,
+                            source_size: region.size,
+                            original_composition: region.original.clone(),
+                            source_error,
+                        })
+                        .map_err(|error| error.error)?;
+                }
+                self.snapshot += 1;
+                self.overlap_at = 0;
+                self.credit = 0;
+                continue;
+            }
             let clut = region.clut;
             if !self.choose_family(state, clut, work)? {
                 return Ok(false);
             }
             let region = &state.regions.as_slice()[index];
-            let window = state.definition.window.unwrap_or(DisplayWindow {
-                x: 0,
-                y: 0,
-                width: state.definition.size.width,
-                height: state.definition.size.height,
-            });
-            let right = visible
-                .address
-                .x
-                .checked_add(region.size.width)
-                .ok_or(Error::Overflow)?;
-            let bottom = visible
-                .address
-                .y
-                .checked_add(region.size.height)
-                .ok_or(Error::Overflow)?;
-            if right > window.width || bottom > window.height {
-                return Err(Error::Invalid("DVB region outside display window"));
-            }
-            let position = Point {
-                x: window
-                    .x
-                    .checked_add(visible.address.x)
-                    .ok_or(Error::Overflow)?,
-                y: window
-                    .y
-                    .checked_add(visible.address.y)
-                    .ok_or(Error::Overflow)?,
-            };
+            let position = Self::region_position(state, visible.address, region.size)?;
             if state.receiver_view == super::ReceiverView::NativeD32 {
                 // Native source PCS order may be nonascending. Check actual
                 // vertical intersections without assuming emission order. The

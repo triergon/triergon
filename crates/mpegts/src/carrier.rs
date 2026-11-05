@@ -102,7 +102,7 @@ enum Phase {
 }
 
 /// One <=192-byte input. Fixed header/clock actions inspect at most six bytes;
-/// stuffing advances one actual byte per unit. No countdown or repeated parse.
+/// stuffing is scanned in bounded runs with one unit per inspected byte.
 #[derive(Debug)]
 pub struct TransportInspector {
     bytes: Option<Bytes>,
@@ -211,13 +211,38 @@ impl TransportInspector {
             if self.bytes.is_none() {
                 return Ok(AssemblyStep::Finished);
             }
+            if matches!(self.phase, Phase::Stuffing) && self.position < self.fields.adaptation_end {
+                // The carrier stays owned by the inspector. Inspect only the
+                // funded bytes and stop charging at the first syntax error.
+                let available = (self.fields.adaptation_end - self.position).min(64) as u64;
+                let count = available.min(work.remaining()) as usize;
+                if count == 0 {
+                    return Ok(AssemblyStep::Yield);
+                }
+                let prefix = self.format.prefix_bytes();
+                let start = prefix + self.position;
+                let source = self
+                    .bytes
+                    .as_ref()
+                    .ok_or(Error::Invalid("carrier owner missing"))?;
+                let stuffing = &source.as_ref()[start..start + count];
+                if let Some(invalid) = stuffing.iter().position(|&byte| byte != 0xff) {
+                    work.take((invalid + 1) as u64);
+                    self.position += invalid;
+                    self.fail(Error::Invalid("adaptation stuffing"));
+                } else {
+                    work.take(count as u64);
+                    self.position += count;
+                }
+                continue;
+            }
             if !work.try_charge(1) {
                 return Ok(AssemblyStep::Yield);
             }
             if matches!(self.phase, Phase::Finish) {
                 return self.finish().map(AssemblyStep::Output);
             }
-            // The following borrow is confined to one fixed field or stuffing byte.
+            // The following borrow is confined to one fixed field.
             let source = self
                 .bytes
                 .as_ref()
@@ -336,15 +361,8 @@ impl TransportInspector {
                         };
                     }
                     Phase::Stuffing => {
-                        if self.position == self.fields.adaptation_end {
-                            self.complete_check = true;
-                            self.phase = Phase::Finish;
-                        } else {
-                            if data[self.position] != 0xff {
-                                return Err(Error::Invalid("adaptation stuffing"));
-                            }
-                            self.position += 1;
-                        }
+                        self.complete_check = true;
+                        self.phase = Phase::Finish;
                     }
                     Phase::Finish => unreachable!(),
                 }

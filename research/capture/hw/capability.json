@@ -1,0 +1,301 @@
+{
+ "required_contract": "MPEG-1 video (ISO/IEC 11172-2) I/P pictures in MPEG-TS from RGBA capture frames; research/capture/contract.json. No other codec may be substituted.",
+ "encoder_hardware": {
+  "apple_m3pro_videotoolbox": {
+   "os": "Version 15.6.1 (Build 24G90)",
+   "encoders_listed": [
+    "24-bit RGB",
+    "32-bit ARGB",
+    "Apple ProRes 422",
+    "Apple ProRes 422 HQ",
+    "Apple ProRes 422 LT",
+    "Apple ProRes 422 Proxy",
+    "Apple ProRes 4444",
+    "Apple ProRes 4444 XQ",
+    "AppleProResHW 422 (hardware)",
+    "AppleProResHW 422 HQ (hardware)",
+    "AppleProResHW 422 LT (hardware)",
+    "AppleProResHW 422 Proxy (hardware)",
+    "AppleProResHW 4444 (hardware)",
+    "AppleProResHW 4444 XQ (hardware)",
+    "Depth",
+    "Depth (hardware)",
+    "Disparity",
+    "Disparity (hardware)",
+    "H.263",
+    "H.264",
+    "H.264 (hardware)",
+    "HEVC",
+    "HEVC (hardware)",
+    "JPEG",
+    "JPEG (hardware)",
+    "Muxed Alpha",
+    "Muxed Alpha (hardware)"
+   ],
+   "session_attempts": [
+    {
+     "codec": "mpeg1",
+     "created": false,
+     "fourcc": "mp1v",
+     "status": -12908
+    },
+    {
+     "codec": "mpeg2",
+     "created": false,
+     "fourcc": "mp2v",
+     "status": -12908
+    },
+    {
+     "codec": "h264-control",
+     "created": true,
+     "fourcc": "avc1",
+     "status": 0
+    }
+   ],
+   "verdict": "no MPEG-1 (or MPEG-2) encoder: VTCompressionSessionCreate for mp1v/mp2v returns -12908 (kVTCouldNotFindVideoEncoderErr); the avc1 control session is created",
+   "tool": "harness/capture/hw/vt_encoders.swift"
+  },
+  "nvidia_t4g_nvenc": {
+   "probe": {
+    "gpu": "NVIDIA T4G",
+    "nvenc_max_api": "13.0",
+    "header_api": "13.0",
+    "encode_codecs": [
+     {
+      "codec": "H.264",
+      "guid": "6bc82762-4e63-4ca4"
+     },
+     {
+      "codec": "HEVC",
+      "guid": "790cdc88-4522-4d7b"
+     }
+    ],
+    "note": "NVENC API has no MPEG-1 or MPEG-2 codec GUID at all"
+   },
+   "driver": "NVIDIA T4G, 580.178.04, 90.04.AF.00.02",
+   "nv_codec_headers_commit": "e844e5b26f46bb77479f063029595293aa8f812d",
+   "verdict": "NVENC on the T4G enumerates H.264 and HEVC only; the NVENC API defines no MPEG-1/MPEG-2 encode GUID",
+   "tool": "harness/capture/hw/nvenc_probe.c"
+  },
+  "nvidia_t4g_vulkan_video": {
+   "observed_device_extensions": [
+    "VK_KHR_video_encode_h264",
+    "VK_KHR_video_encode_h265"
+   ],
+   "verdict": "Vulkan Video encode on this device covers H.264/H.265 only; Vulkan Video defines no MPEG-1 encode operation"
+  },
+  "conclusion": "No evaluated device can encode the required MPEG-1 stream in hardware; encoder acceleration is not proposed and no other codec is substituted."
+ },
+ "conversion_hardware_ffmpeg_9_0_2": {
+  "scale_vulkan_4_2_0_direct": {
+   "apple_m3pro": [
+    "== yuv420p",
+    "[Vulkan @ 0x148706410] Device 0 selected: Apple M3 Pro (integrated) (0xf060209)",
+    "[swscaler @ 0x140030000] Failed initializing scaling graph (Operation not supported): fmt:rgba csp:gbr prim:unknown trc:unknown -> fmt:yuv420p csp:bt470bg prim:unknown trc:unknown",
+    "hw_capture: buffersink get: Operation not supported",
+    "== nv12",
+    "[Vulkan @ 0x146e0c7f0] Device 0 selected: Apple M3 Pro (integrated) (0xf060209)",
+    "[swscaler @ 0x118018000] Failed initializing scaling graph (Operation not supported): fmt:rgba csp:gbr prim:unknown trc:unknown -> fmt:nv12 csp:bt470bg prim:unknown trc:unknown",
+    "hw_capture: buffersink get: Operation not supported",
+    "== yuv444p",
+    "[Vulkan @ 0x15960c7f0] Device 0 selected: Apple M3 Pro (integrated) (0xf060209)",
+    "[swscaler @ 0x140018000] Compiled using backend 'spirv': block size = 0, over-read = {0 0 0 0}, over-write = {0 0 0 0}, cpu flags = 0x0"
+   ],
+   "nvidia_t4g": [
+    "b69f0d18b2a40708e697f569e610d34e66ae66d520225da4446d9e959f4a618e  /home/ubuntu/capture-hw/bin/hw_capture",
+    "== yuv420p",
+    "[Vulkan @ 0xb3a7cb81d2a0] Device 0 selected: NVIDIA T4G (discrete) (0x1eb4)",
+    "[swscaler @ 0xb3a7ccfe1a10] Failed initializing scaling graph (Operation not supported): fmt:rgba csp:gbr prim:unknown trc:unknown -> fmt:yuv420p csp:bt470bg prim:unknown trc:unknown",
+    "hw_capture: buffersink get",
+    "== nv12",
+    "[Vulkan @ 0xbe92e9a072a0] Device 0 selected: NVIDIA T4G (discrete) (0x1eb4)",
+    "[swscaler @ 0xbe92eb1cb830] Failed initializing scaling graph (Operation not supported): fmt:rgba csp:gbr prim:unknown trc:unknown -> fmt:nv12 csp:bt470bg prim:unknown trc:unknown",
+    "hw_capture: buffersink get",
+    "== yuv444p",
+    "[Vulkan @ 0xae5c0f9212a0] Device 0 selected: NVIDIA T4G (discrete) (0x1eb4)",
+    "[swscaler @ 0xae5c110e58c0] Failed initializing scaling graph (Operation not supported): fmt:rgba csp:gbr prim:unknown trc:unknown -> fmt:yuv444p csp:bt470bg prim:unknown trc:unknown",
+    "hw_capture: buffersink get"
+   ],
+   "verdict": "swscale's Vulkan ops backend (used by scale_vulkan at equal size) has no 4:2:0 subsampling: yuv420p and nv12 fail with ENOTSUP on both devices; yuv444p compiles on MoltenVK only"
+  },
+  "scale_vulkan_on_nvidia_t4g": "the SPIR-V backend fails even for yuv444p: 'No memory type found for flags 0x3' (it asks for DEVICE_LOCAL|HOST_VISIBLE memory for a buffer whose memoryTypeBits exclude the T4G's only such type), so FFmpeg 9.0.2 has no working scale_vulkan conversion on this GPU",
+  "scale_cuda": "scale_cuda in 9.0.2 has no RGB-input to YUV-output kernels (format table in libavfilter/vf_scale_cuda.c, inspected on the pinned source); not usable for the contract",
+  "scale_vt": "scale_vt (VideoToolbox) in 9.0.2 resizes VideoToolbox surfaces but cannot convert pixel formats (source inspection during this evaluation); not usable for RGBA -> YUV 4:2:0",
+  "libplacebo": "vf_libplacebo (libplacebo v7.351.0) converts RGBA -> YUV 4:2:0 entirely on the GPU on both devices; it always holds one frame back (pl_queue needs the next frame), declares alpha-composited input unless the input is RGB0, and its chroma downsampling differs from swscale's (see platform results)",
+  "upstream_observations": [
+   "vflip_vulkan (libavfilter/vulkan/flip.comp.glsl) writes row size.y - pos.y instead of size.y - 1 - pos.y: the output is shifted one row and row 0 is never written",
+   "libavfilter/vulkan/Makefile builds flip.comp.spv.o only under CONFIG_FLIP_VULKAN_FILTER, so enabling vflip_vulkan alone fails to link",
+   "hwupload of a frame with a negative linesize (swscale's bottom-up idiom) segfaults on MoltenVK (eval-mac-v1, cases c09/c07)",
+   "libplacebo v7.351.0's vk.xml generator fails under Python 3.15's ElementTree (TypeError: expected an Element, not ElementTree); built with Python 3.12"
+  ]
+ },
+ "pins": {
+  "ffmpeg_archive_sha256": "8c3850283eb25fa026482078a04051e0be17347b09ef81a0849bec15a96e002e",
+  "linux_hw_configure_args": [
+   "--enable-shared",
+   "--disable-static",
+   "--enable-pic",
+   "--extra-cflags=-Dstatic_assert=_Static_assert -I/home/ubuntu/capture-hw/headers/Vulkan-Headers/include -I/home/ubuntu/capture-hw/headers/SPIRV-Headers/include -I/home/ubuntu/capture-hw/headers/nv-codec-headers/include",
+   "--disable-programs",
+   "--disable-doc",
+   "--disable-avdevice",
+   "--disable-network",
+   "--disable-swresample",
+   "--disable-debug",
+   "--disable-everything",
+   "--disable-autodetect",
+   "--enable-zlib",
+   "--enable-demuxer=matroska,mov,mpegts,h264,hevc",
+   "--enable-parser=h264,hevc,aac,ac3,flac,dvdsub,dvbsub",
+   "--enable-bsf=h264_mp4toannexb,hevc_mp4toannexb,extract_extradata",
+   "--enable-decoder=pgssub,dvdsub,dvbsub,ass,srt,subrip,text,mov_text,webvtt",
+   "--enable-decoder=aac,ac3,eac3,dca,mp3,mp2,flac,opus,vorbis,truehd,mlp,alac,pcm_s16le,pcm_s24le,pcm_s16be,pcm_s24be,pcm_s32le,pcm_s32be",
+   "--enable-protocol=file",
+   "--enable-encoder=mpeg1video",
+   "--enable-muxer=mpegts",
+   "--enable-avfilter",
+   "--enable-filter=buffer,buffersink,format,hwupload,hwdownload,scale,scale_vulkan,vflip_vulkan,flip_vulkan",
+   "--enable-vulkan",
+   "--enable-libdrm"
+  ],
+  "linux_hw_placebo_configure_args": [
+   "--enable-shared",
+   "--disable-static",
+   "--enable-pic",
+   "--extra-cflags=-Dstatic_assert=_Static_assert -I/home/ubuntu/capture-hw/headers/Vulkan-Headers/include -I/home/ubuntu/capture-hw/headers/SPIRV-Headers/include -I/home/ubuntu/capture-hw/headers/nv-codec-headers/include",
+   "--disable-programs",
+   "--disable-doc",
+   "--disable-avdevice",
+   "--disable-network",
+   "--disable-swresample",
+   "--disable-debug",
+   "--disable-everything",
+   "--disable-autodetect",
+   "--enable-zlib",
+   "--enable-demuxer=matroska,mov,mpegts,h264,hevc",
+   "--enable-parser=h264,hevc,aac,ac3,flac,dvdsub,dvbsub",
+   "--enable-bsf=h264_mp4toannexb,hevc_mp4toannexb,extract_extradata",
+   "--enable-decoder=pgssub,dvdsub,dvbsub,ass,srt,subrip,text,mov_text,webvtt",
+   "--enable-decoder=aac,ac3,eac3,dca,mp3,mp2,flac,opus,vorbis,truehd,mlp,alac,pcm_s16le,pcm_s24le,pcm_s16be,pcm_s24be,pcm_s32le,pcm_s32be",
+   "--enable-protocol=file",
+   "--enable-encoder=mpeg1video",
+   "--enable-muxer=mpegts",
+   "--enable-avfilter",
+   "--enable-filter=buffer,buffersink,format,hwupload,hwdownload,scale,scale_vulkan,vflip_vulkan,flip_vulkan,libplacebo",
+   "--enable-vulkan",
+   "--enable-libdrm",
+   "--enable-libplacebo",
+   "--extra-ldflags=-Wl,-rpath,/home/ubuntu/capture-hw/ffmpeg/libplacebo/lib"
+  ],
+  "linux_headers": {
+   "Vulkan-Headers": "5ceb9ed481e58e705d0d9b5326537daedd06b97d",
+   "SPIRV-Headers": "aa6cef192b8e693916eb713e7a9ccadf06062ceb",
+   "nv-codec-headers": "e844e5b26f46bb77479f063029595293aa8f812d"
+  },
+  "libplacebo_commit": "3188549fba13bbdf3a5a98de2a38c2e71f04e21e",
+  "linux_toolchain": {
+   "cc": "cc (Ubuntu 13.3.0-6ubuntu2~24.04.1) 13.3.0",
+   "rustc": "rustc 1.101.0-nightly (3e92e1a2d 2026-11-01)",
+   "glslang": "Glslang Version: 11:15.1.0",
+   "apt": [
+    "libshaderc-dev:arm64\t2023.8-1build1",
+    "libvulkan-dev:arm64\t1.3.275.0-1build1",
+    "meson\t1.3.2-1ubuntu1",
+    "ninja-build\t1.11.1-2",
+    ""
+   ]
+  },
+  "linux_vulkan": [
+   "apiVersion         = 1.4.312",
+   "deviceName         = NVIDIA T4G",
+   "driverInfo         = 580.178.04",
+   "apiVersion         = 1.4.318",
+   "deviceName         = llvmpipe (LLVM 20.1.2, 128 bits)",
+   "driverInfo         = Mesa 25.2.8-0ubuntu0.24.04.4 (LLVM 20.1.2)"
+  ],
+  "linux_binaries_sha256": {
+   "nvenc_probe": "787517eff73b6c12e3af66e03524279fde4e306e17c797a983242a2b572dd815",
+   "capture-rust-phases": "52be625f86765a06aed06750878db24cf73b3c3330682e13822a98dc15756c15",
+   "hw_capture_placebo": "f04b431872d950471aabe47cfb11eddc0caeb0a85bb596da80061b4b13f724cf",
+   "hw_capture": "9af41b6b4c0308bd45b47a7cc487908d7016a08ade718720849d55d42cc26b88",
+   "heapcount.so": "6492eea342ba3c147acebc3a8fa83f968abadda4566188b0ef733ad7c65e5cf3"
+  },
+  "linux_capture_worker_sha256": "5498f92ddd202431616655bafee0267030b0572e34c5a4b8e2b15015c761a0e1",
+  "mac_receipt": [
+   "f98c7b6c81245ee16b4ac786bcae8ea4d3562394b478134619eff1d23489771a  $CAPTURE_WORKTREE/.research/capture-d5/hw/hw_capture",
+   "61e16acf0adf1f48f766361651d11e32dd3513e0d8c0224c619d0a693f9d51ea  $CAPTURE_WORKTREE/.research/capture-d5/hw/hw_capture_placebo",
+   "libplacebo 3188549fba13bbdf3a5a98de2a38c2e71f04e21e",
+   "meson 1.12.1",
+   "molten-vk 1.4.2",
+   "ninja 1.13.2 1.13.1",
+   "shaderc 2026.4",
+   "spirv-headers 1.4.363.0",
+   "vulkan-headers 1.4.363.0",
+   "vulkan-loader 1.4.363.0",
+   "Apple clang version 17.0.0 (clang-1700.6.3.2)"
+  ],
+  "mac_configure_args": {
+   "hw": [
+    "--enable-shared",
+    "--disable-static",
+    "--enable-pic",
+    "--extra-cflags=-Dstatic_assert=_Static_assert -I/opt/homebrew/include",
+    "--disable-programs",
+    "--disable-doc",
+    "--disable-avdevice",
+    "--disable-network",
+    "--disable-swresample",
+    "--disable-debug",
+    "--disable-everything",
+    "--disable-autodetect",
+    "--enable-zlib",
+    "--enable-demuxer=matroska,mov,mpegts,h264,hevc",
+    "--enable-parser=h264,hevc,aac,ac3,flac,dvdsub,dvbsub",
+    "--enable-bsf=h264_mp4toannexb,hevc_mp4toannexb,extract_extradata",
+    "--enable-decoder=pgssub,dvdsub,dvbsub,ass,srt,subrip,text,mov_text,webvtt",
+    "--enable-decoder=aac,ac3,eac3,dca,mp3,mp2,flac,opus,vorbis,truehd,mlp,alac,pcm_s16le,pcm_s24le,pcm_s16be,pcm_s24be,pcm_s32le,pcm_s32be",
+    "--enable-protocol=file",
+    "--enable-encoder=mpeg1video",
+    "--enable-muxer=mpegts",
+    "--enable-avfilter",
+    "--enable-vulkan",
+    "--enable-videotoolbox",
+    "--enable-filter=buffer,buffersink,format,hwupload,hwdownload,scale,scale_vulkan,vflip_vulkan,flip_vulkan,scale_vt"
+   ],
+   "placebo": [
+    "--enable-shared",
+    "--disable-static",
+    "--enable-pic",
+    "--extra-cflags=-Dstatic_assert=_Static_assert -I/opt/homebrew/include",
+    "--disable-programs",
+    "--disable-doc",
+    "--disable-avdevice",
+    "--disable-network",
+    "--disable-swresample",
+    "--disable-debug",
+    "--disable-everything",
+    "--disable-autodetect",
+    "--enable-zlib",
+    "--enable-demuxer=matroska,mov,mpegts,h264,hevc",
+    "--enable-parser=h264,hevc,aac,ac3,flac,dvdsub,dvbsub",
+    "--enable-bsf=h264_mp4toannexb,hevc_mp4toannexb,extract_extradata",
+    "--enable-decoder=pgssub,dvdsub,dvbsub,ass,srt,subrip,text,mov_text,webvtt",
+    "--enable-decoder=aac,ac3,eac3,dca,mp3,mp2,flac,opus,vorbis,truehd,mlp,alac,pcm_s16le,pcm_s24le,pcm_s16be,pcm_s24be,pcm_s32le,pcm_s32be",
+    "--enable-protocol=file",
+    "--enable-encoder=mpeg1video",
+    "--enable-muxer=mpegts",
+    "--enable-avfilter",
+    "--enable-vulkan",
+    "--enable-videotoolbox",
+    "--enable-filter=buffer,buffersink,format,hwupload,hwdownload,scale,scale_vulkan,vflip_vulkan,flip_vulkan,scale_vt,libplacebo",
+    "--enable-libplacebo",
+    "--extra-ldflags=-Wl,-rpath,$CAPTURE_WORKTREE/.research/capture-d5/hw/libplacebo-mac/lib"
+   ]
+  },
+  "build_scripts": [
+   "harness/capture/hw/gpu-setup.sh",
+   "harness/capture/hw/gpu-placebo-setup.sh",
+   "harness/capture/hw/mac-hw-setup.sh"
+  ]
+ }
+}

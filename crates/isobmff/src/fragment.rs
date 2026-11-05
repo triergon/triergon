@@ -366,6 +366,7 @@ pub struct FragmentBuilder {
     total_bytes: u64,
     total_duration: u64,
     implicit_safe: bool,
+    reject_zero_size: bool,
     failed: Option<Error>,
 }
 impl FragmentBuilder {
@@ -409,8 +410,22 @@ impl FragmentBuilder {
             total_bytes: 0,
             total_duration: 0,
             implicit_safe: true,
+            reject_zero_size: false,
             failed: None,
         })
+    }
+    /// The pinned MOV receiver rejects a zero-size sample in a fragment
+    /// reached during header opening. Source and packet-stage parsing retain it.
+    pub fn new_pinned_mov_header(
+        raw: BoxView,
+        trex: Trex,
+        context: FragmentContext,
+        budget: Budget,
+        limits: Limits,
+    ) -> Result<Self> {
+        let mut builder = Self::new(raw, trex, context, budget, limits)?;
+        builder.reject_zero_size = true;
+        Ok(builder)
     }
     pub fn raw(&self) -> &BoxView {
         &self.raw
@@ -583,6 +598,11 @@ impl FragmentBuilder {
                         .defaults
                         .ok_or(Error::Invalid("missing fragment defaults"))?;
                     if run.wire.constant_extents() {
+                        if self.reject_zero_size && run.wire.count != 0 && defaults.size == 0 {
+                            return Err(Error::Invalid(
+                                "zero-size fragment sample in native MOV header",
+                            ));
+                        }
                         self.total_bytes = u64::from(run.wire.count)
                             .checked_mul(u64::from(defaults.size))
                             .ok_or(Error::Overflow)?;
@@ -592,6 +612,11 @@ impl FragmentBuilder {
                         self.phase = Phase::Commit;
                     } else if self.sample < run.wire.count {
                         let value = run.wire.values(self.sample, defaults)?;
+                        if self.reject_zero_size && value.size == 0 {
+                            return Err(Error::Invalid(
+                                "zero-size fragment sample in native MOV header",
+                            ));
+                        }
                         self.total_bytes = self
                             .total_bytes
                             .checked_add(u64::from(value.size))
@@ -850,5 +875,61 @@ impl FragmentLocator<'_> {
                 }
             }
         }
+    }
+}
+
+/// An owned iterator over one immutable fragment index. Reborrows the same source
+/// cursor on each poll; no self-reference, alternate parser or retained-state injection.
+pub struct OwnedFragmentCursor {
+    index: FragmentIndex,
+    run: usize,
+    sample: u32,
+    byte: u64,
+    decode: Option<i128>,
+}
+impl FragmentIndex {
+    pub fn into_cursor(self) -> OwnedFragmentCursor {
+        OwnedFragmentCursor {
+            index: self,
+            run: 0,
+            sample: 0,
+            byte: 0,
+            decode: None,
+        }
+    }
+}
+impl OwnedFragmentCursor {
+    pub(crate) fn restart(&mut self) {
+        self.run = 0;
+        self.sample = 0;
+        self.byte = 0;
+        self.decode = None;
+    }
+    pub(crate) fn run_index(&self) -> usize {
+        self.run
+    }
+    pub(crate) fn delivered_run_start(&self) -> bool {
+        self.sample == 1
+    }
+    pub(crate) fn remaining_in_delivered_run(&self) -> u32 {
+        self.index.runs.as_slice()[self.run].wire.count - self.sample
+    }
+    pub fn index(&self) -> &FragmentIndex {
+        &self.index
+    }
+    pub fn poll(&mut self, work: &mut WorkBudget) -> Result<SampleStep> {
+        let mut cursor = FragmentCursor {
+            index: &self.index,
+            run: self.run,
+            sample: self.sample,
+            byte: self.byte,
+            decode: self.decode,
+        };
+        let result = cursor.poll(work);
+        self.run = cursor.run;
+        self.sample = cursor.sample;
+        self.byte = cursor.byte;
+        self.decode = cursor.decode;
+        result
     }
 }

@@ -1,5 +1,5 @@
 [workspace]
-members = ["crates/core", "crates/media", "crates/worker", "crates/isobmff", "crates/mpegts", "crates/subtitles", "crates/framing"]
+members = ["crates/core", "crates/media", "crates/worker", "crates/isobmff", "crates/mpegts", "crates/subtitles", "crates/framing", "crates/playback", "crates/capture", "crates/codec-aac", "crates/codec-ac3", "crates/codec-dca", "crates/codec-h264", "crates/codec-hevc", "crates/sim"]
 exclude = ["research/spike"]
 resolver = "3"
 

@@ -1,6 +1,35 @@
 use triergon_core::{Budget, BudgetVec, Bytes, Error, WorkBudget};
 
 #[test]
+fn reused_bytes_keep_the_same_allocation_and_charge() {
+    let budget = Budget::new(4096).unwrap();
+    let original = Bytes::copy_from_slice(&budget, b"abcdefgh").unwrap();
+    let address = original.as_ptr();
+    let charged = budget.used();
+    let alias = original.slice(2..4).unwrap();
+    let original = original.try_reuse().unwrap_err();
+    assert_eq!(alias.as_ref(), b"cd");
+    assert_eq!(original.as_ref(), b"abcdefgh");
+    assert_eq!(alias.try_reuse().unwrap_err().as_ref(), b"cd");
+    let mut writer = original.try_reuse().unwrap();
+    assert!(writer.belongs_to(&budget));
+    assert_eq!(budget.used(), charged);
+    writer.append_repeated(9, 3).unwrap();
+    assert!(
+        writer
+            .append_runs([(1, 1), (2, writer.capacity())])
+            .is_err()
+    );
+    writer.append_runs([(7, 1), (7, 1)]).unwrap();
+    let updated = writer.finish();
+    assert_eq!(updated.as_ptr(), address);
+    assert_eq!(updated.as_ref(), &[9, 9, 9, 7, 7]);
+    assert_eq!(budget.used(), charged);
+    drop(updated);
+    assert_eq!(budget.used(), Budget::control_storage_bytes());
+}
+
+#[test]
 fn capacity_and_hidden_prefixes_remain_charged_until_the_last_view_drops() {
     let budget = Budget::new(4096).unwrap();
     let baseline = budget.used();
@@ -176,4 +205,23 @@ fn freeze_preserves_allocation_and_returns_builder_when_a_header_cannot_fit() {
     assert!(budget.used() > baseline);
     drop(alias);
     assert_eq!(budget.used(), baseline);
+}
+
+#[test]
+fn consuming_vector_keeps_capacity_charged_until_iterator_drops() {
+    let pool = Budget::new(4096).unwrap();
+    let baseline = pool.used();
+    let mut values = BudgetVec::new(&pool);
+    values.try_reserve_exact(32).unwrap();
+    values.try_push(7_u64).unwrap();
+    values.try_push(9).unwrap();
+    let allocated = pool.used();
+    let mut iter = values.into_iter();
+    assert_eq!(iter.next(), Some(7));
+    assert_eq!(iter.len(), 1);
+    assert_eq!(pool.used(), allocated);
+    assert_eq!(iter.next(), Some(9));
+    assert_eq!(pool.used(), allocated);
+    drop(iter);
+    assert_eq!(pool.used(), baseline);
 }

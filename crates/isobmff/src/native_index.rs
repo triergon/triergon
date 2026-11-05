@@ -10,7 +10,7 @@ use std::{
     ops::Range,
     sync::atomic::{AtomicBool, Ordering},
 };
-use triergon_core::{Budget, BudgetVec, Error, Result, WorkBudget};
+use triergon_core::{Budget, BudgetVec, Error, Result, Rounding, TimeBase, WorkBudget};
 
 #[derive(Clone, Copy, Debug)]
 pub struct Mov9NativeIndexLimits {
@@ -111,6 +111,8 @@ pub struct Mov9NativeIndexCursor<'a> {
     carry: Option<RunCarry>,
     ready: Option<Mov9NativeIndexEntry>,
     failed: Option<Error>,
+    recovery_initial_nonkey: bool,
+    dependency_v4: bool,
 }
 impl<'a> Mov9NativeIndexCursor<'a> {
     pub fn new_complete_source(
@@ -131,7 +133,41 @@ impl<'a> Mov9NativeIndexCursor<'a> {
             carry: None,
             ready: None,
             failed: None,
+            recovery_initial_nonkey: false,
+            dependency_v4: false,
         })
+    }
+    pub fn new_encoded_regular_v2(
+        pool: &Budget,
+        track: Mov9Track<'a>,
+        media: &'a [Range<u64>],
+        limits: Mov9NativeIndexLimits,
+        plans: &'a [Option<crate::Mov9EncodedEditPlanV2>],
+        profile: crate::PinnedMovD32EncodedEditsV2,
+    ) -> Result<Self> {
+        let cursor = Mov9PacketCursor::new_encoded_regular_v2(
+            pool,
+            &[track],
+            media,
+            limits.packets,
+            plans,
+            profile,
+        )?;
+        Ok(Self {
+            cursor,
+            limits,
+            next: 0,
+            distance: 0,
+            run: None,
+            carry: None,
+            ready: None,
+            failed: None,
+            recovery_initial_nonkey: false,
+            dependency_v4: plans.iter().flatten().any(|p| p.has_dependency_view_v4()),
+        })
+    }
+    pub(crate) fn allow_recovery_initial_nonkey(&mut self) {
+        self.recovery_initial_nonkey = true;
     }
     pub fn poll(&mut self, work: &mut WorkBudget, cancel: &AtomicBool) -> Result<Mov9CursorStatus> {
         if let Some(error) = self.failed {
@@ -166,7 +202,11 @@ impl<'a> Mov9NativeIndexCursor<'a> {
                 bound(next, self.limits.max_entries)?;
                 let source_run = self.cursor.ready_source_run()?;
                 let occurrence = self.cursor.take_occurrence()?;
-                if occurrence.native.flags & !5 != 0 {
+                // Public AVIndexEntry has key/discard bits, independently of
+                // AVPacket's disposable hint. Preserve that hint on the retained
+                // occurrence, while the separately typed index keeps its own ABI.
+                let admitted = 5 | if self.dependency_v4 { 16 } else { 0 };
+                if occurrence.native.flags & !admitted != 0 {
                     return Err(Error::Unsupported("native index packet flag projection"));
                 }
                 let size = occurrence
@@ -227,7 +267,7 @@ impl<'a> Mov9NativeIndexCursor<'a> {
                     _ => false,
                 };
                 if !key
-                    && (self.next == 0
+                    && ((self.next == 0 && !self.recovery_initial_nonkey)
                         || (run.is_some() && run != self.run && !continued_run && !starts_fragment))
                 {
                     return Err(Error::Unsupported(
@@ -239,13 +279,14 @@ impl<'a> Mov9NativeIndexCursor<'a> {
                 // 0,0,1. Keep the last emitted distance, carry it once at an
                 // accepted append boundary, then increment inside that run.
                 // Flag presence alone does not introduce a per-sample lag.
-                let distance = if key || starts_fragment {
-                    0
-                } else if run.is_some() && run != self.run {
-                    self.distance
-                } else {
-                    self.distance.checked_add(1).ok_or(Error::Overflow)?
-                };
+                let distance =
+                    if key || starts_fragment || (self.next == 0 && self.recovery_initial_nonkey) {
+                        0
+                    } else if run.is_some() && run != self.run {
+                        self.distance
+                    } else {
+                        self.distance.checked_add(1).ok_or(Error::Overflow)?
+                    };
                 let raw_flag_bits = u8::from(key)
                     | if occurrence.native.flags & 4 != 0 {
                         2
@@ -595,8 +636,8 @@ impl Mov9NativeSeekCursor<'_> {
 }
 
 /// Aligns every stream to the selected reference entry's native clock, not the
-/// original request or its physical position. Actual consumer33/27 controls
-/// distinguish these models. Unequal native timebases still need rounding proof.
+/// original request or its physical position. The rescaled profile converts
+/// that anchor to each other track's native base, rounding ties away from zero.
 pub struct Mov9NativeGlobalSeekJob<'a> {
     pool: Budget,
     tracks: BudgetVec<Mov9Track<'a>>,
@@ -604,6 +645,7 @@ pub struct Mov9NativeGlobalSeekJob<'a> {
     limits: Mov9NativeSeekLimits,
     profile: Mov9Profile,
     reference_index: usize,
+    reference_base: TimeBase,
     reference: Option<Mov9NativeSeekReceipt>,
     anchors: BudgetVec<Mov9ResumePoint>,
     child: Option<Mov9NativeSeekJob<'a>>,
@@ -631,6 +673,48 @@ impl<'a> Mov9NativeGlobalSeekJob<'a> {
         limits: Mov9NativeSeekLimits,
         profile: Mov9Profile,
     ) -> Result<Self> {
+        Self::build(
+            pool,
+            tracks,
+            media,
+            (track_id, timestamp),
+            limits,
+            profile,
+            false,
+        )
+    }
+
+    /// Admit unequal native timebases using the pinned MOV seek rescale.
+    pub fn new_complete_source_rescaled(
+        pool: &Budget,
+        tracks: &[Mov9Track<'a>],
+        media: &'a [Range<u64>],
+        track_id: u32,
+        timestamp: i64,
+        limits: Mov9NativeSeekLimits,
+        profile: Mov9Profile,
+    ) -> Result<Self> {
+        Self::build(
+            pool,
+            tracks,
+            media,
+            (track_id, timestamp),
+            limits,
+            profile,
+            true,
+        )
+    }
+
+    fn build(
+        pool: &Budget,
+        tracks: &[Mov9Track<'a>],
+        media: &'a [Range<u64>],
+        request: (u32, i64),
+        limits: Mov9NativeSeekLimits,
+        profile: Mov9Profile,
+        rescale_clocks: bool,
+    ) -> Result<Self> {
+        let (track_id, timestamp) = request;
         let maximum = limits.index.packets.max_tracks.min(64);
         if tracks.len() > maximum {
             return Err(Error::Limit {
@@ -651,7 +735,8 @@ impl<'a> Mov9NativeGlobalSeekJob<'a> {
             if tracks[..i].iter().any(|t| t.track_id == track.track_id) {
                 return Err(Error::Invalid("duplicate native seek track"));
             }
-            if Mov9MediaClock::from_source(track.media_base)?.native_base != base {
+            let track_base = Mov9MediaClock::from_source(track.media_base)?.native_base;
+            if !rescale_clocks && track_base != base {
                 return Err(Error::Unsupported(
                     "native global seek unequal timebase rescale",
                 ));
@@ -679,6 +764,7 @@ impl<'a> Mov9NativeGlobalSeekJob<'a> {
             limits,
             profile,
             reference_index,
+            reference_base: base,
             reference: None,
             anchors,
             child,
@@ -754,9 +840,17 @@ impl<'a> Mov9NativeGlobalSeekJob<'a> {
                 .ok_or(Error::Invalid("native reference selection absent"))?
                 .selected
                 .timestamp;
+            let track = self.tracks.as_slice()[self.at];
+            let base = Mov9MediaClock::from_source(track.media_base)?.native_base;
+            let timestamp = if self.reference_base == base {
+                timestamp
+            } else {
+                self.reference_base
+                    .rescale(timestamp, base, Rounding::NearestAway)?
+            };
             self.child = Some(Mov9NativeSeekJob::new_complete_source(
                 &self.pool,
-                self.tracks.as_slice()[self.at],
+                track,
                 self.media,
                 timestamp,
                 self.limits,

@@ -1,4 +1,6 @@
 //! Authored format-job regressions behind the additive typed reader.
+#[path = "cue_reference_tests.rs"]
+mod cue_reference_closure;
 #[path = "side_data_tests.rs"]
 mod packet_side_data;
 use super::*;
@@ -1770,3 +1772,6 @@ mod chapter_walk_tests;
 
 #[path = "seek_subtitle_recovery_tests.rs"]
 mod seek_subtitle_recovery_tests;
+
+#[path = "ready_slot_tests.rs"]
+mod ready_slot_tests;

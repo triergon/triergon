@@ -1,9 +1,9 @@
 {
   "schema": 1,
-  "objective": "Remove every enabled Streem application-runtime and packaging dependency on FFmpeg, including release playback, desktop simulator playback and development capture, while preserving selected features and unchanged parity/time/memory gates",
+  "objective": "Adopt Triergon across all enabled Streem TV playback, desktop simulator and development capture paths, then remove every application-runtime and packaging dependency on FFmpeg.",
   "status": "active",
   "scope_document": "../docs/offboarding-target.md",
-  "current_execution_milestone": "Stabilise shared input/packet/retained-budget APIs; complete Matroska packet side data/configuration state; prepare parallel MP4/TS/subtitle lanes with one build/qualification queue",
+  "current_execution_milestone": "Establish the public Triergon integration baseline. Continue through PRs, close the selected library parity and numerical gaps, and prepare the opt-in Streem adapter.",
   "completion_milestones": [
     "O00",
     "O10",
@@ -39,5 +39,20 @@
     "TS/M2TS specifications, contract, original corpus and oracle",
     "Subtitle specifications, contract, original corpus and oracle",
     "Current Streem enabled-runtime inventory"
+  ],
+  "delivery_policy": {
+    "qualification_target": "native Linux ARM64",
+    "parity": "complete frozen selected-feature contract per case",
+    "runtime_upper95_max": 1.25,
+    "optimization_upper95_target": 0.8,
+    "memory": "strictly lower peak live heap and total peak resident RSS",
+    "shipping_evidence": "32-bit ARM webOS build and real TV verification"
+  },
+  "adoption_sequence": [
+    "Public baseline and reviewed PRs",
+    "Pinned opt-in playback and HTTP range integration",
+    "Full TV playback scope and device verification",
+    "Simulator and capture adoption",
+    "Runtime and package removal audit"
   ]
 }

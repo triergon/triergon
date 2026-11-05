@@ -1,5 +1,8 @@
 //! Original byte-resumable scalar decoding from RFC 3629 / RFC 2781.
-use super::Encoding;
+use super::{
+    Encoding,
+    charset::multibyte::{DecodeStep, MultibyteDecoder},
+};
 use std::{
     ops::Range,
     sync::atomic::{AtomicBool, Ordering},
@@ -42,6 +45,7 @@ pub(crate) struct Cursor {
     unit_first: Option<u8>,
     high: Option<u16>,
     decoded: usize,
+    multibyte: Option<MultibyteDecoder>,
 }
 
 impl Cursor {
@@ -57,6 +61,12 @@ impl Cursor {
             unit_first: None,
             high: None,
             decoded: 0,
+            multibyte: match encoding {
+                Encoding::Multibyte(profile) => {
+                    Some(MultibyteDecoder::at_offset(profile, range.start))
+                }
+                _ => None,
+            },
         }
     }
 
@@ -80,12 +90,46 @@ impl Cursor {
         })
     }
 
+    fn poll_multibyte(
+        &mut self,
+        bytes: &[u8],
+        work: &mut WorkBudget,
+        cancel: &AtomicBool,
+    ) -> Result<Poll<Scalar>> {
+        loop {
+            cancelled(cancel)?;
+            let decoder = self
+                .multibyte
+                .as_mut()
+                .ok_or(Error::Invalid("multibyte cursor absent"))?;
+            if self.at == self.end {
+                decoder.finish(cancel)?;
+                return Ok(Poll::End);
+            }
+            let byte = *bytes
+                .get(self.at)
+                .ok_or(Error::Invalid("multibyte source range"))?;
+            match decoder.push(byte, work, cancel)? {
+                DecodeStep::Yield => return Ok(Poll::Yield),
+                DecodeStep::NeedInput => self.at = decoder.position(),
+                DecodeStep::Scalar(scalar) => {
+                    self.at = scalar.range.end;
+                    self.scalar_start = scalar.range.start;
+                    return self.scalar(u32::from(scalar.value)).map(Poll::Ready);
+                }
+            }
+        }
+    }
+
     pub fn poll(
         &mut self,
         bytes: &[u8],
         work: &mut WorkBudget,
         cancel: &AtomicBool,
     ) -> Result<Poll<Scalar>> {
+        if self.multibyte.is_some() {
+            return self.poll_multibyte(bytes, work, cancel);
+        }
         loop {
             cancelled(cancel)?;
             if self.at == self.end {
@@ -103,6 +147,22 @@ impl Cursor {
             let byte_at = self.at;
             self.at = self.at.checked_add(1).ok_or(Error::Overflow)?;
             match self.encoding {
+                Encoding::Ascii
+                | Encoding::Latin1
+                | Encoding::Windows1251
+                | Encoding::Windows1252 => {
+                    let charset = match self.encoding {
+                        Encoding::Ascii => super::charset::Charset::Ascii,
+                        Encoding::Latin1 => super::charset::Charset::Latin1,
+                        Encoding::Windows1251 => super::charset::Charset::Windows1251,
+                        Encoding::Windows1252 => super::charset::Charset::Windows1252,
+                        _ => unreachable!(),
+                    };
+                    self.scalar_start = byte_at;
+                    return self
+                        .scalar(u32::from(charset.scalar(byte)?))
+                        .map(Poll::Ready);
+                }
                 Encoding::Utf8 => {
                     if self.continuation != 0 {
                         if byte & 0xc0 != 0x80 {
@@ -200,7 +260,14 @@ impl Probe {
         cancel: &AtomicBool,
     ) -> Result<Poll<(Encoding, Range<usize>)>> {
         match self.requested {
-            Encoding::Utf8 | Encoding::Utf16Be | Encoding::Utf16Le => {
+            Encoding::Utf8
+            | Encoding::Utf16Be
+            | Encoding::Utf16Le
+            | Encoding::Ascii
+            | Encoding::Latin1
+            | Encoding::Windows1251
+            | Encoding::Windows1252
+            | Encoding::Multibyte(_) => {
                 return Ok(Poll::Ready((self.requested, self.range.clone())));
             }
             Encoding::Opaque => return Err(Error::Unsupported("declared charset conversion")),

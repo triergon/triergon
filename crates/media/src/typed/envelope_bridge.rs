@@ -1,7 +1,10 @@
 //! Intended child of incremental; methods on the existing ElementReader.
 //! There is still exactly one core InputCursor, no second buffered I/O layer.
 //! Internal ranges keep generation; the explicit seek transition resets once.
-use super::{ClusterCheckpoint, ElementHeader, ElementReader, Master, ParseStep, Phase};
+use super::{
+    CLUSTER, ClusterCheckpoint, EBML, ElementHeader, ElementReader, Master, ParseStep, Phase,
+    SEGMENT, ScanBody, is_level_one,
+};
 use crate::matroska::typed::syntax::Required;
 use crate::{Error, Result};
 use std::sync::atomic::AtomicBool;
@@ -11,6 +14,47 @@ use triergon_core::{InputCursor, InputRequest, WorkBudget};
 pub(crate) enum EnvelopeProgress {
     Header(ElementHeader),
     Step(ParseStep),
+}
+
+/// Same source events, with no temporary owned leaf event in typed delivery.
+#[derive(Debug)]
+pub(crate) enum CompactElementEvent {
+    Start(ElementHeader),
+    Leaf(ElementHeader),
+    Skipped(ElementHeader),
+    End {
+        id: u64,
+        offset: u64,
+        generation: u64,
+    },
+}
+#[derive(Debug)]
+pub(crate) enum CompactEnvelopeProgress {
+    Header(ElementHeader),
+    Step(ParseStep<CompactElementEvent>),
+}
+struct CompactDelivery;
+impl super::EnvelopeDelivery for CompactDelivery {
+    type Event = CompactElementEvent;
+    const RETAIN_LEAF: bool = true;
+    fn start(header: ElementHeader) -> Self::Event {
+        CompactElementEvent::Start(header)
+    }
+    fn end(id: u64, offset: u64, generation: u64) -> Self::Event {
+        CompactElementEvent::End {
+            id,
+            offset,
+            generation,
+        }
+    }
+    fn skipped(header: ElementHeader) -> Self::Event {
+        CompactElementEvent::Skipped(header)
+    }
+    fn leaf(body: &mut super::BodyState, bytes: triergon_core::Bytes) -> Self::Event {
+        body.direct = Some(bytes);
+        body.transfer = super::BodyTransfer::Ready;
+        CompactElementEvent::Leaf(body.header)
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -47,20 +91,85 @@ impl ElementReader {
     }
     /// One shared envelope engine pauses before leaf allocation for typed
     /// admission. No zero-work probe, one-unit facade, second parser or I/O.
+    #[cfg(test)]
     pub(crate) fn step_typed_envelope(
         &mut self,
         work: &mut WorkBudget,
         cancel: &AtomicBool,
     ) -> Result<EnvelopeProgress> {
-        let step = self.step_mode(work, cancel, true)?;
+        self.step_typed_envelope_admitting(None, work, cancel)
+    }
+    fn step_typed_envelope_admitting(
+        &mut self,
+        admission: Option<super::EpochAdmission>,
+        work: &mut WorkBudget,
+        cancel: &AtomicBool,
+    ) -> Result<EnvelopeProgress> {
+        let admit = admission.map_or(super::Admit::Pause, super::Admit::Epoch);
+        let step = self.step_mode::<super::PublicDelivery>(work, cancel, admit)?;
         if let Some(header) = self.awaiting_typed_admission() {
             Ok(EnvelopeProgress::Header(header))
         } else {
             Ok(EnvelopeProgress::Step(step))
         }
     }
+    pub(crate) fn step_typed_compact(
+        &mut self,
+        work: &mut WorkBudget,
+        cancel: &AtomicBool,
+    ) -> Result<CompactEnvelopeProgress> {
+        self.step_typed_compact_admitting_blocks(false, work, cancel)
+    }
+
+    pub(crate) fn step_typed_compact_admitting_blocks(
+        &mut self,
+        ordinary_blocks: bool,
+        work: &mut WorkBudget,
+        cancel: &AtomicBool,
+    ) -> Result<CompactEnvelopeProgress> {
+        let admit = if ordinary_blocks {
+            super::Admit::OrdinaryBlocks
+        } else {
+            super::Admit::Pause
+        };
+        let step = self.step_mode::<CompactDelivery>(work, cancel, admit)?;
+        if let Some(header) = self.awaiting_typed_admission() {
+            Ok(CompactEnvelopeProgress::Header(header))
+        } else {
+            Ok(CompactEnvelopeProgress::Step(step))
+        }
+    }
+    /// Called immediately by the typed controller after its ordinary read debit.
+    /// No allocation, copy, new owner, charged work or cancellation boundary.
+    pub(crate) fn take_compact_leaf(
+        &mut self,
+        header: ElementHeader,
+    ) -> Result<crate::storage::SharedBytes> {
+        let Phase::Body(body) = &mut self.phase else {
+            return Err(Error::Invalid("missing compact leaf body"));
+        };
+        if body.header != header || body.transfer != super::BodyTransfer::Ready {
+            return Err(Error::Invalid("compact leaf identity changed"));
+        }
+        let bytes = body.direct.take().required("missing compact leaf owner")?;
+        self.phase = Phase::Between;
+        Ok(crate::storage::SharedBytes::from_core(bytes))
+    }
+    /// A late controller debit error dropped the old owned event. Match its
+    /// phase/drop boundary rather than retaining a leaf after that failure.
+    pub(crate) fn discard_compact_leaf(&mut self) {
+        if matches!(&self.phase, Phase::Body(body) if body.transfer == super::BodyTransfer::Ready) {
+            self.phase = Phase::Between;
+        }
+    }
+
     pub(crate) fn needs_header_input(&self) -> bool {
         matches!(&self.phase, Phase::Header(header) if header.have < header.target)
+    }
+    /// The pending request only supplies bytes this envelope consumes without
+    /// collecting them, so no payload owner can retain the supplied window.
+    pub(crate) fn needs_discard_input(&self) -> bool {
+        matches!(&self.phase, Phase::Body(body) if !body.collect && body.remaining != 0)
     }
     pub(crate) fn admit_typed_leaf(
         &mut self,
@@ -82,6 +191,85 @@ impl ElementReader {
         }
         body.typed_admitted = true;
         Ok(())
+    }
+    /// Only an active scan may arm this after normal typed admission. At least
+    /// four source bytes are needed for even the shortest SimpleBlock prefix.
+    pub(crate) fn arm_scan_prefix(&mut self, header: ElementHeader) -> Result<()> {
+        let Phase::Body(body) = &mut self.phase else {
+            return Err(Error::Invalid("no scan leaf admission"));
+        };
+        if body.header != header
+            || !body.typed_admitted
+            || body.allocated
+            || !body.collect
+            || header.id != 0xa3
+            || body.scan != ScanBody::Off
+        {
+            return Err(Error::Invalid("scan leaf admission identity changed"));
+        }
+        if body.remaining >= 4 {
+            body.scan = ScanBody::FirstSpan;
+        }
+        Ok(())
+    }
+    pub(crate) fn scan_prefix_header(&self) -> Option<ElementHeader> {
+        match &self.phase {
+            Phase::Body(body) if body.scan == ScanBody::Prefix => Some(body.header),
+            _ => None,
+        }
+    }
+    pub(crate) fn scan_prefix_bytes(&self, header: ElementHeader) -> Result<&[u8]> {
+        let Phase::Body(body) = &self.phase else {
+            return Err(Error::Invalid("no retained scan prefix"));
+        };
+        if body.header != header || body.scan != ScanBody::Prefix {
+            return Err(Error::Invalid("scan prefix identity changed"));
+        }
+        let bytes = body
+            .span
+            .as_ref()
+            .or(body.direct.as_ref())
+            .required("missing actual scan span")?;
+        Ok(&bytes[..bytes.len().min(11)])
+    }
+    /// Rejection keeps the exact span/direct/builder decision and all source
+    /// bytes. It never retries the prefix or exposes an early syntax error.
+    pub(crate) fn resolve_scan_prefix(&mut self, header: ElementHeader, drain: bool) -> Result<()> {
+        let Phase::Body(body) = &mut self.phase else {
+            return Err(Error::Invalid("no pending scan prefix"));
+        };
+        if body.header != header || body.scan != ScanBody::Prefix {
+            return Err(Error::Invalid("scan prefix identity changed"));
+        }
+        body.scan = if drain {
+            ScanBody::Drain
+        } else {
+            ScanBody::Off
+        };
+        if drain {
+            body.collect = false;
+            body.span = None;
+            body.direct = None;
+            body.transfer = super::BodyTransfer::Copy;
+            body.buffer = None;
+            body.copied = 0;
+        }
+        Ok(())
+    }
+    /// A distinct, already work-charged private completion. No public event,
+    /// owner, packet or location is fabricated by discarding the opaque body.
+    pub(crate) fn finish_scanned_leaf(&mut self, header: ElementHeader) -> Result<bool> {
+        let Phase::Body(body) = &self.phase else {
+            return Err(Error::Invalid("missing scan drain body"));
+        };
+        if body.header != header {
+            return Err(Error::Invalid("scan drain identity changed"));
+        }
+        if body.scan != ScanBody::Complete {
+            return Ok(false);
+        }
+        self.phase = Phase::Between;
+        Ok(true)
     }
     #[inline(always)]
     pub(crate) fn healthy_for_job(
@@ -137,11 +325,7 @@ impl ElementReader {
         self.install_cluster_range(anchor);
         Ok(request)
     }
-    pub(crate) fn block_replay_location(
-        &self,
-        header: ElementHeader,
-        cluster_time: Option<u64>,
-    ) -> Result<ReplayLocation> {
+    fn replay_block_context(&self, header: ElementHeader) -> Result<(Master, Master)> {
         if !matches!(header.id, 0xa0 | 0xa3) || header.generation != self.generation() {
             return Err(Error::Invalid("invalid replay block identity"));
         }
@@ -150,16 +334,64 @@ impl ElementReader {
             return Err(Error::Invalid("replay block outside Cluster"));
         }
         self.check_parent(header, cluster.end)?;
-        let checkpoint = self
-            .cluster_checkpoint()
-            .required("missing replay Cluster context")?;
-        Ok(ReplayLocation {
-            checkpoint,
+        let segment = self.segment.required("missing replay Cluster context")?;
+        Ok((cluster, segment))
+    }
+    fn replay_location_from_context(
+        &self,
+        header: ElementHeader,
+        cluster_time: Option<u64>,
+        cluster: Master,
+        segment: Master,
+    ) -> ReplayLocation {
+        ReplayLocation {
+            checkpoint: ClusterCheckpoint {
+                pool: self.input.budget().clone(),
+                parser: self.parser,
+                source: self.input.source(),
+                offset: cluster.start,
+                segment,
+            },
             cluster,
             position: header.start,
             generation: self.generation(),
             cluster_time,
-        })
+        }
+    }
+    pub(crate) fn block_replay_location(
+        &self,
+        header: ElementHeader,
+        cluster_time: Option<u64>,
+    ) -> Result<ReplayLocation> {
+        let (cluster, segment) = self.replay_block_context(header)?;
+        Ok(self.replay_location_from_context(header, cluster_time, cluster, segment))
+    }
+    /// Validate before mutating the existing value. Earlier cloned locations
+    /// remain independent; only this slot's scalar wire context changes.
+    #[inline]
+    pub(crate) fn refresh_block_replay_location(
+        &self,
+        slot: &mut Option<ReplayLocation>,
+        header: ElementHeader,
+        cluster_time: Option<u64>,
+    ) -> Result<()> {
+        let (cluster, segment) = self.replay_block_context(header)?;
+        if let Some(location) = slot.as_mut().filter(|location| {
+            location.checkpoint.pool.same_pool(self.input.budget())
+                && location.checkpoint.parser == self.parser
+                && location.checkpoint.source == self.input.source()
+                && location.generation == self.generation()
+        }) {
+            location.checkpoint.offset = cluster.start;
+            location.checkpoint.segment = segment;
+            location.cluster = cluster;
+            location.position = header.start;
+            location.generation = self.generation();
+            location.cluster_time = cluster_time;
+        } else {
+            *slot = Some(self.replay_location_from_context(header, cluster_time, cluster, segment));
+        }
+        Ok(())
     }
     pub(crate) fn restore_internal_block(
         &mut self,
@@ -212,7 +444,42 @@ impl ElementReader {
     }
 }
 
-crate::matroska::typed::usage::storage!(super::BodyState, |s| [s.buffer, s.span, s.direct]);
+impl super::BodyState {
+    fn builder_descriptor_active(&self) -> bool {
+        // begin() historically installs an empty builder workspace. Deferring
+        // its pool owner must preserve the real descriptor visit and the
+        // indices used by the bounded pressure walk. Drain/completion and
+        // retained-leaf publication are the original workspace-drop points.
+        self.buffer.is_some()
+            || (self.transfer != super::BodyTransfer::Ready
+                && !matches!(self.scan, ScanBody::Drain | ScanBody::Complete))
+    }
+}
+impl crate::matroska::typed::usage::Storage for super::BodyState {
+    fn storage_slots(&self) -> Result<usize> {
+        let tail = crate::matroska::typed::usage::slots(&[&self.span, &self.direct])?;
+        usize::from(self.builder_descriptor_active())
+            .checked_add(tail)
+            .ok_or(Error::Overflow)
+    }
+    fn storage_owner(
+        &self,
+        mut index: usize,
+    ) -> Result<Option<crate::matroska::typed::usage::Owner>> {
+        if self.builder_descriptor_active() {
+            if index == 0 {
+                // This is an actual field inspection, including its deferred
+                // empty state. The unchanged Pressure job charges/checks each
+                // visit; no work is prepaid and no owner is manufactured.
+                return self.buffer.as_ref().map_or(Ok(None), |buffer| {
+                    crate::matroska::typed::usage::Storage::storage_owner(buffer, 0)
+                });
+            }
+            index -= 1;
+        }
+        crate::matroska::typed::usage::owner(&[&self.span, &self.direct], index)
+    }
+}
 impl crate::matroska::typed::usage::Storage for ElementReader {
     fn storage_slots(&self) -> Result<usize> {
         let body = match &self.phase {
@@ -293,8 +560,50 @@ impl ElementReader {
         if exact.maximum == 0 {
             return Ok(None);
         }
-        let mut cap = core.maximum.min(maximum).min(4096);
-        cap = cap.min(usize::try_from(self.scan_left).unwrap_or(usize::MAX));
+        let cap = core.maximum.min(maximum).min(4096);
+        self.expanded_refill(exact, core, cap)
+    }
+    /// A discarded body's exact request may be widened in the same bounded way
+    /// as a header refill, so the following header needs no separate supply.
+    /// Discarded bytes never become a payload owner. Only an immutable source,
+    /// whose views need no new storage, uses this (see the blocking adapter).
+    pub(crate) fn bounded_discard_refill(
+        &self,
+        exact: &InputRequest,
+        maximum: usize,
+    ) -> Result<Option<HeaderRefillRequest>> {
+        let Phase::Body(body) = &self.phase else {
+            return Ok(None);
+        };
+        if body.collect || body.remaining == 0 || self.failed || maximum == 0 {
+            return Ok(None);
+        }
+        if self.seen_segment && self.segment.is_none() {
+            return Ok(None);
+        }
+        let core = self.input.request();
+        let body_maximum =
+            usize::try_from(body.remaining.min(8192)).map_err(|_| Error::Overflow)?;
+        if exact.source != core.source
+            || exact.token != core.token
+            || exact.offset != core.offset
+            || exact.maximum != core.maximum.min(body_maximum)
+        {
+            return Err(Error::Invalid("discard refill request identity changed"));
+        }
+        if exact.maximum == 0 {
+            return Ok(None);
+        }
+        let cap = core.maximum.min(maximum);
+        self.expanded_refill(exact, core, cap)
+    }
+    fn expanded_refill(
+        &self,
+        exact: &InputRequest,
+        core: InputRequest,
+        cap: usize,
+    ) -> Result<Option<HeaderRefillRequest>> {
+        let mut cap = cap.min(usize::try_from(self.scan_left).unwrap_or(usize::MAX));
         for end in [
             self.segment.and_then(|m| m.end),
             self.cluster.and_then(|m| m.end),
@@ -316,18 +625,123 @@ impl ElementReader {
     }
 }
 
+/// A finite Cluster header found by [`ElementReader::owned_plain_prefix`].
+#[derive(Clone, Copy, Debug)]
+pub(crate) struct PrefixBoundary {
+    pub consumed: u64,
+    pub data: u64,
+    pub end: u64,
+}
 impl ElementReader {
+    /// Checks a complete in-memory Cluster prefix with this envelope's own
+    /// structure and limit rules, from the Cluster at `start` up to and
+    /// including the header of the Cluster at `boundary`. Only finite Clusters
+    /// whose children are SimpleBlocks, Timestamps and other non-master leaves
+    /// qualify; segment-level Void/CRC-32 are skipped. Any BlockGroup, unknown
+    /// size, level-one element, malformed/truncated header, limit or parent
+    /// violation returns `None`, leaving the ordinary scan to report it.
+    pub(crate) fn owned_plain_prefix(
+        &self,
+        root: &[u8],
+        start: u64,
+        boundary: u64,
+        segment_end: Option<u64>,
+        scan_left: u64,
+        cancel: &AtomicBool,
+    ) -> Option<PrefixBoundary> {
+        let header = |at: u64| -> Option<(u64, Option<u64>, u64)> {
+            let bytes = root.get(usize::try_from(at).ok()?..)?;
+            let (id, id_width, _) = crate::ebml::vint(bytes, true).ok()?;
+            let (size, size_width, unknown) = crate::ebml::vint(&bytes[id_width..], false).ok()?;
+            let data = at.checked_add((id_width + size_width) as u64)?;
+            Some((id, (!unknown).then_some(size), data))
+        };
+        let mut left = scan_left;
+        let mut elements = 0_u64;
+        let consume = |bytes: u64, left: &mut u64| -> Option<()> {
+            *left = left.checked_sub(bytes)?;
+            Some(())
+        };
+        let mut position = start;
+        loop {
+            let (id, size, data) = header(position)?;
+            // The ordinary range reader requires the anchor to be a Cluster.
+            if position == start && id != CLUSTER {
+                return None;
+            }
+            elements += 1;
+            if elements % 1024 == 0 && cancel.load(std::sync::atomic::Ordering::Relaxed) {
+                return None;
+            }
+            if elements >= self.limits.elements {
+                return None;
+            }
+            consume(data - position, &mut left)?;
+            let size = size?;
+            let end = data.checked_add(size)?;
+            if segment_end.is_some_and(|limit| data > limit || end > limit) {
+                return None;
+            }
+            match id {
+                CLUSTER if position == boundary => {
+                    return Some(PrefixBoundary {
+                        consumed: data - start,
+                        data,
+                        end,
+                    });
+                }
+                CLUSTER if position < boundary => {
+                    let mut child = data;
+                    while child < end {
+                        let (id, size, child_data) = header(child)?;
+                        elements += 1;
+                        if elements % 1024 == 0 && cancel.load(std::sync::atomic::Ordering::Relaxed)
+                        {
+                            return None;
+                        }
+                        if elements >= self.limits.elements {
+                            return None;
+                        }
+                        consume(child_data - child, &mut left)?;
+                        let size = size?;
+                        let child_end = child_data.checked_add(size)?;
+                        if child_end > end || size > left {
+                            return None;
+                        }
+                        match id {
+                            0xa3 if size <= self.limits.block_bytes as u64 => (),
+                            0xe7 if size <= 8 => (),
+                            CLUSTER | SEGMENT | EBML | 0xa0 | 0xa3 | 0xe7 => return None,
+                            id if is_level_one(id) => return None,
+                            _ => (),
+                        }
+                        consume(size, &mut left)?;
+                        child = child_end;
+                    }
+                    position = end;
+                }
+                0xec | 0xbf if size <= left => {
+                    consume(size, &mut left)?;
+                    position = end;
+                }
+                _ => return None,
+            }
+        }
+    }
     /// The existing seek byte policy, with the ordinary typed leaf admission
     /// boundary exposed to the state-history job. One parser and one cursor.
+    /// With `admission`, that job's own admission rule is applied inside the
+    /// envelope instead of pausing for it after each leaf header.
     pub(crate) fn step_typed_seek_operation(
         &mut self,
         remaining: &mut u64,
+        admission: Option<super::EpochAdmission>,
         work: &mut WorkBudget,
         cancel: &AtomicBool,
     ) -> Result<EnvelopeProgress> {
         self.scan_left = *remaining;
         let before = self.input.position();
-        let result = self.step_typed_envelope(work, cancel);
+        let result = self.step_typed_envelope_admitting(admission, work, cancel);
         let consumed = self
             .input
             .position()
@@ -485,3 +899,7 @@ mod header_refill_bounds_tests {
         assert_eq!(reader.position(), 0);
     }
 }
+
+#[cfg(test)]
+#[path = "replay_refresh_regressions.rs"]
+mod replay_refresh_regressions;

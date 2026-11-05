@@ -1,7 +1,8 @@
 //! Immutable charged compatibility views. Cloning these handles shares storage.
 use crate::{Error, Result};
 use std::ops::{Deref, DerefMut, Range};
-use triergon_core::{Budget, BudgetVec, Bytes};
+use triergon_core::BudgetVec;
+pub use triergon_core::{Budget, Bytes, OwnedInputBytes};
 
 /// Empty values need no allocation. Nonempty spans retain their complete backing
 /// allocation's charge, including bytes hidden by a slice.
@@ -16,6 +17,9 @@ impl SharedBytes {
     }
     pub(crate) fn from_core(bytes: Bytes) -> Self {
         Self(Some(bytes))
+    }
+    pub(crate) fn as_core(&self) -> Option<&Bytes> {
+        self.0.as_ref()
     }
     #[cfg(test)]
     pub(crate) fn try_from_vec(pool: &Budget, bytes: Vec<u8>) -> Result<Self> {
@@ -263,3 +267,13 @@ impl crate::matroska::typed::usage::Storage for SharedBytes {
     }
 }
 crate::matroska::typed::usage::storage!(SharedText, |s| [s.bytes]);
+
+/// Explicit typed-reader block-payload policy. Top-level metadata leaves remain
+/// OwnedExact; side data inside a borrowed BlockGroup shares its actual parent.
+/// SharedBounded reports the full real parent capacity/charge of borrowed views.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum PayloadOwnership {
+    #[default]
+    OwnedExact,
+    SharedBounded,
+}

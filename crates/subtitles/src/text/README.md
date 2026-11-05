@@ -16,10 +16,26 @@ acceptance is claimed.
 | --- | --- | --- |
 | `SubRipStrict1` | `SubRip` | Numeric sequence identifier, two-or-more-digit hours, exact `hh:mm:ss,mmm --> hh:mm:ss,mmm`, multiline text, CRLF/LF/CR framing. This declared profile is not a universal SRT standard. |
 | `WebVttSourceStrict1` | `WebVtt` | UTF-8 file/BOM marker, exact cue times and original identifier/settings/payload/NOTE/STYLE/REGION order. Strict malformed-input/interval errors; no claim of the complete browser recovery, CSS, DOM or semantic text view. |
-| `Tx3gCarriage1` | `Tx3g` | u16 big-endian text-byte length, UTF-8 or FEFF-prefixed UTF-16BE, original modifier boxes/ranges/order. The 2048-byte recommendation is not treated as the syntax maximum. Modifier rendering/precedence and inherited size0/size1 box forms remain required gaps. |
+| `Tx3gCarriage1` | `Tx3g` | u16 big-endian text-byte length, UTF-8 or FEFF-prefixed UTF-16BE, original modifier boxes/ranges/order. The 2048-byte recommendation is not treated as the syntax maximum. Modifier semantics and extended box forms use the separately named operations below. |
 | `Utf8Packet1` | `Utf8Packet` | Strict UTF-8 packet validation with an immutable alias of the original payload and exact caller timing; no invented document framing. |
 | `MatroskaWebVttCarriage1` | `MatroskaWebVtt` | Raw stored cue text and opaque CodecPrivate; ID1 BlockAdditional settings/identifier/comments, unknown additions retained unchanged. Inline timestamps remain block-relative as stored. This is not WebM carriage. |
 | `OpaqueAss1` | `OpaqueAss` | Exact ASS/SSA packet, configuration, declared charset label, source identity and raw clock carriage. No ASS syntax validation, charset-truth assertion, Dialogue reconstruction, reordering or renderer-clear inference. |
+
+The additive tx3g ISO-box, explicit legacy-charset and typed configuration APIs are documented in [D2-CONTRACT.md](D2-CONTRACT.md). They preserve the original profiles and native selector.
+The separately named [multibyte profiles](MULTIBYTE-CONTRACT.md) add strict
+conversion and explicit SubRip ingestion without changing the original label
+resolver, source ownership, default formats or native reference history.
+The additive [tx3g semantic operation](TX3G-SEMANTICS.md) resolves defined
+modifier ranges, description/style authority and timed effect intents while
+retaining the entire original source Cue. It does not implement glyph rendering.
+
+The opt-in [native mov_text receiver](native_mov_text/README.md) emits the
+selected native packet-to-ASS output. Its standalone functional run matched
+82 selected cases at each of three work quanta in both profiles. The original
+source and semantic operations remain separately tested, including all 79
+tx3g semantic guards. The retained Streem revision handles mov_text through
+its existing packet-text path. Rendering and a change to that consumer route
+remain separate work.
 
 The byte-pinned primary register is
 `tests/text-fixtures/SOURCE-LOCK.json`, relative to the subtitles crate. It
@@ -93,9 +109,15 @@ also preserves author.py, an independently written source oracle, primary pins,
 resource cases and the original private contract snapshot. Private originals
 remain intact. No native output supplied these golden expectations.
 
-Complete selected native text compatibility/recovery, legacy charset coverage,
-tx3g semantic/configuration integration, matched native output ownership and
-all per-case paired95 delivery runtime<=1.25 (optimization target <=0.80) plus lower live heap/RSS gates remain required.
+The additive [Tx3gSourceSemantics1](TX3G-SEMANTICS.md) operation implements the
+defined sample-modifier grammar, source-level precedence and timed effect intents;
+the original carriage profiles keep their separate source-only boundary. The
+remaining tx3g integration is complete container/configuration-to-consumer and
+native/renderer integration. Earlier D2 and multibyte batch contracts retain their
+original batch scope. Complete selected native text compatibility/recovery,
+remaining legacy charset coverage, matched native output ownership and all
+per-case paired95 delivery runtime<=1.25 (optimization target <=0.80) plus lower
+live heap/RSS gates remain required.
 PGS, VobSub/DVD SPU and remaining DVB work are still required. Unavailable Blu-ray/
 DVD normative bitstream sources are not replaced by inferred decoder grammar.
 The original DVB source/native palette, order, tail and source-legality/tolerance

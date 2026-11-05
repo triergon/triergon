@@ -24,9 +24,9 @@ mod dvb;
 pub use audio::{NativePrivateAudioCarriage, NativePrivateAudioDescriptors};
 pub use dvb::NativeDvbSubtitlesDescriptors;
 
-/// Explicit single-program/single-PID diagnostic profile, from validated source
-/// signalling. Other stream types/IDs and entity/config/clock transitions remain
-/// required, visibly unsupported contexts until their operation is established.
+/// Explicit single-program/single-PID profile from validated source signalling.
+/// Legacy pushes reject entity transitions; the explicit media transaction and
+/// selected lifecycle APIs admit only their checked boundary contracts.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct NativePesScope {
     pub program: u16,
@@ -178,12 +178,15 @@ pub struct NativePesObserver {
     scope: NativePesScope,
     // No source owner or auxiliary queue; only selects a bounded native view.
     private_audio: Option<NativePrivateAudioCarriage>,
+    native_input: Option<crate::native_input::NativeInputBinding>,
     dvb_subtitles: bool,
     budget: Budget,
     limits: ParseLimits,
     pending: Option<Pending>,
     ended: bool,
     last_input: Option<(u64, u64)>,
+    entity_first: bool,
+    media_position_base: u64,
     previous_counter: Option<u8>,
     active: bool,
     origin: Option<SourceLocation>,
@@ -258,6 +261,7 @@ impl NativePesObserver {
             profile,
             scope,
             private_audio: None,
+            native_input: None,
             dvb_subtitles: false,
             header_ranges: BudgetVec::new(&budget),
             spans: BudgetVec::new(&budget),
@@ -267,6 +271,8 @@ impl NativePesObserver {
             pending: None,
             ended: false,
             last_input: None,
+            entity_first: false,
+            media_position_base: 0,
             previous_counter: None,
             active: false,
             origin: None,
@@ -284,6 +290,61 @@ impl NativePesObserver {
             emission: None,
             fault: None,
         })
+    }
+    /// Install once, before any carrier. Sequential input, clock and PMT
+    /// epochs are separate; every bound push/poll must supply the actual cursor.
+    pub fn bind_native_input_v1(
+        &mut self,
+        context: &crate::native_input::NativeInputContext,
+        input: &triergon_core::InputCursor,
+    ) -> Result<()> {
+        context.validate_cursor(input)?;
+        if !self.recovery_idle() || self.last_input.is_some() || self.native_input.is_some() {
+            return Err(Error::Invalid("native startup binding after input"));
+        }
+        if input.source() != self.scope.entity || !context.backing_bytes().belongs_to(&self.budget)
+        {
+            return Err(Error::ForeignPool);
+        }
+        self.native_input = Some(context.binding());
+        Ok(())
+    }
+    pub(crate) fn validate_native_input(
+        &self,
+        input: Option<&triergon_core::InputCursor>,
+    ) -> Result<()> {
+        match (&self.native_input, input) {
+            (Some(context), Some(input)) => context.validate_cursor(input),
+            (Some(_), None) => Err(Error::Invalid(
+                "bound native operation requires input cursor",
+            )),
+            (None, _) => Ok(()),
+        }
+    }
+    #[allow(
+        clippy::result_large_err,
+        reason = "recover the original charged inline carrier"
+    )]
+    pub fn push_with_input(
+        &mut self,
+        packet: TransportPacket,
+        context: NativeSourceContext,
+        input: &triergon_core::InputCursor,
+    ) -> std::result::Result<(), PushError<TransportPacket>> {
+        self.push_input_boundary(packet, context, false, input)
+    }
+    #[allow(
+        clippy::result_large_err,
+        reason = "recover the original charged inline carrier"
+    )]
+    pub(crate) fn push_input_boundary(
+        &mut self,
+        packet: TransportPacket,
+        context: NativeSourceContext,
+        boundary: bool,
+        input: &triergon_core::InputCursor,
+    ) -> std::result::Result<(), PushError<TransportPacket>> {
+        self.push_boundary(packet, context, boundary, Some(input))
     }
     pub(crate) fn is_dvb_subtitles(&self) -> bool {
         self.dvb_subtitles
@@ -304,6 +365,7 @@ impl NativePesObserver {
     pub(crate) fn note_recovered(&mut self, counter: u8, offset: u64, ordinal: u64) {
         self.previous_counter = Some(counter);
         self.last_input = Some((ordinal, offset));
+        self.entity_first = false;
     }
 
     pub fn profile(&self) -> NativeClockProfile {
@@ -314,6 +376,73 @@ impl NativePesObserver {
     }
     pub fn scope(&self) -> NativePesScope {
         self.scope
+    }
+    /// Retain the same logical TS/PES/native-clock operation across a confirmed
+    /// entity End. Only physical entity/order and input-binding facts change.
+    /// A false result is a work yield; every rejection leaves assembly intact.
+    pub fn continue_media_entity_v1(
+        &mut self,
+        end: &crate::MediaEntityEndV1,
+        input: &mut triergon_core::InputCursor,
+        work: &mut WorkBudget,
+        cancel: &AtomicBool,
+    ) -> Result<bool> {
+        if cancel.load(Ordering::Relaxed) {
+            return Err(Error::Cancelled);
+        }
+        if work.remaining() == 0 {
+            return Ok(false);
+        }
+        end.validate_continuation(input)?;
+        if !self.budget.same_pool(&end.budget) {
+            return Err(Error::ForeignPool);
+        }
+        if end.location.source != self.scope.entity
+            || end.epochs != self.scope.epochs
+            || end.program != self.scope.program
+        {
+            return Err(Error::Invalid("native media entity source scope mismatch"));
+        }
+        if self.pending.is_some()
+            || self.emission.is_some()
+            || self.growth.is_some()
+            || self.fault.is_some()
+            || self.ended
+        {
+            return Err(Error::Invalid("native media entity operation not drained"));
+        }
+        let position = self
+            .media_position_base
+            .checked_add(end.location.offset)
+            .ok_or(Error::Overflow)?;
+        i64::try_from(position).map_err(|_| Error::Overflow)?;
+        let binding = self
+            .native_input
+            .as_ref()
+            .map(|b| b.continued_media_entity_v1(end, input))
+            .transpose()?;
+        // An empty core read checks sticky transport/cancellation failure without
+        // consuming an already supplied new-entity window.
+        input.read_into(&mut [], work, cancel)?;
+        if !work.try_charge(1) {
+            return Ok(false);
+        }
+        if cancel.load(Ordering::Relaxed) {
+            return Err(Error::Cancelled);
+        }
+        self.scope.entity = input.source();
+        self.native_input = binding;
+        self.entity_first = true;
+        self.media_position_base = position;
+        Ok(true)
+    }
+    pub(crate) fn media_native_position_v1(&self, offset: u64) -> Result<i64> {
+        i64::try_from(
+            self.media_position_base
+                .checked_add(offset)
+                .ok_or(Error::Overflow)?,
+        )
+        .map_err(|_| Error::Overflow)
     }
     pub fn limits(&self) -> ParseLimits {
         self.limits
@@ -329,7 +458,7 @@ impl NativePesObserver {
         packet: TransportPacket,
         context: NativeSourceContext,
     ) -> std::result::Result<(), PushError<TransportPacket>> {
-        self.push_boundary(packet, context, false)
+        self.push_boundary(packet, context, false, None)
     }
     #[allow(
         clippy::result_large_err,
@@ -340,10 +469,18 @@ impl NativePesObserver {
         packet: TransportPacket,
         context: NativeSourceContext,
     ) -> std::result::Result<(), PushError<TransportPacket>> {
-        self.push_boundary(packet, context, true)
+        self.push_boundary(packet, context, true, None)
     }
     pub(crate) fn commit_clock_epoch_v1(&mut self, epochs: SourceEpochs) {
         self.scope.epochs = epochs;
+    }
+    /// A drained codec-map commit. Returned old packets keep their original
+    /// headers/owners. Retire only the idle internal header alias; preserve wire
+    /// counter/order and charged arena capacity, without copying a payload.
+    pub(crate) fn commit_pmt_scope_v1(&mut self, scope: NativePesScope) {
+        self.scope = scope;
+        self.header = None;
+        self.origin = None;
     }
     pub(crate) fn recovery_counter(&self) -> Option<u8> {
         self.previous_counter
@@ -357,8 +494,11 @@ impl NativePesObserver {
         packet: TransportPacket,
         context: NativeSourceContext,
         selected_boundary: bool,
+        input: Option<&triergon_core::InputCursor>,
     ) -> std::result::Result<(), PushError<TransportPacket>> {
-        let error = if !packet.source.belongs_to(&self.budget) {
+        let error = if let Err(error) = self.validate_native_input(input) {
+            Some(error)
+        } else if !packet.source.belongs_to(&self.budget) {
             Some(Error::Invalid("foreign native PES byte pool"))
         } else if self.pending.is_some() || self.emission.is_some() {
             Some(Error::Invalid("native PES input not drained"))
@@ -402,7 +542,8 @@ impl NativePesObserver {
                 "native PCR clock boundary context unobserved",
             ))
         } else if self.last_input.is_some_and(|(event, offset)| {
-            context.source_event_ordinal <= event || packet.source_offset <= offset
+            context.source_event_ordinal <= event
+                || (!self.entity_first && packet.source_offset <= offset)
         }) {
             Some(Error::Invalid("native PES source event order"))
         } else if packet
@@ -421,6 +562,7 @@ impl NativePesObserver {
             });
         }
         self.last_input = Some((context.source_event_ordinal, packet.source_offset));
+        self.entity_first = false;
         self.pending = Some(Pending {
             packet,
             context,
@@ -472,6 +614,23 @@ impl NativePesObserver {
         work: &mut WorkBudget,
         cancel: &AtomicBool,
     ) -> Result<AssemblyStep<NativePesPacket>> {
+        self.poll_bound(work, cancel, None)
+    }
+    pub fn poll_with_input(
+        &mut self,
+        input: &triergon_core::InputCursor,
+        work: &mut WorkBudget,
+        cancel: &AtomicBool,
+    ) -> Result<AssemblyStep<NativePesPacket>> {
+        self.poll_bound(work, cancel, Some(input))
+    }
+    pub(crate) fn poll_bound(
+        &mut self,
+        work: &mut WorkBudget,
+        cancel: &AtomicBool,
+        input: Option<&triergon_core::InputCursor>,
+    ) -> Result<AssemblyStep<NativePesPacket>> {
+        self.validate_native_input(input)?;
         if cancel.load(Ordering::Relaxed) {
             return Err(Error::Cancelled);
         }
@@ -570,19 +729,26 @@ impl NativePesObserver {
             .pending
             .as_ref()
             .ok_or(Error::Invalid("native PES input missing"))?;
-        let prefix = pending
-            .packet
-            .prefix
-            .as_ref()
-            .map_or(0, |bytes| bytes.len());
-        self.native_position = i64::try_from(
-            pending
+        let local_position = if let Some(context) = &self.native_input {
+            context.position(&pending.packet)?
+        } else {
+            let prefix = pending
                 .packet
-                .source_offset
-                .checked_add(prefix as u64)
-                .ok_or(Error::Overflow)?,
-        )
-        .map_err(|_| Error::Overflow)?;
+                .prefix
+                .as_ref()
+                .map_or(0, |bytes| bytes.len());
+            i64::try_from(
+                pending
+                    .packet
+                    .source_offset
+                    .checked_add(prefix as u64)
+                    .ok_or(Error::Overflow)?,
+            )
+            .map_err(|_| Error::Overflow)?
+        };
+        self.native_position = self.media_native_position_v1(
+            u64::try_from(local_position).map_err(|_| Error::Overflow)?,
+        )?;
         self.origin = Some(SourceLocation {
             source: self.scope.entity,
             offset: pending.packet.source_offset,

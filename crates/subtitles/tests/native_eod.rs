@@ -4,7 +4,7 @@ use triergon_core::{Budget, Bytes, Error, Time, WorkBudget};
 use triergon_subtitles::dvb::{
     ClockOrigin, ClockValue, ColourSource, D32_PIN, D32_VIEW, DecodeStatus, Decoder, DisplayEvent,
     DisplayLimits, NativeFailure, PacketIdentity, PacketTiming, PublicationReason, ReceiverView,
-    SourceClock, SourceConfiguration,
+    Size, SourceClock, SourceConfiguration,
 };
 
 struct Case {
@@ -123,6 +123,17 @@ fn check(index: usize) {
         assert_eq!(publication.exact_pts_microseconds, Some(case.pts_raw));
         assert_eq!(publication.start_display_ms, 0);
         assert_eq!(publication.end_display_ms, case.end_ms);
+        assert_eq!(
+            publication.context_canvas,
+            Some(Size {
+                width: case.canvas[0],
+                height: case.canvas[1]
+            })
+        );
+        let (clock, timing) = publication.packet_clock.unwrap();
+        assert_eq!(clock, SourceClock::new(1, 1000).unwrap());
+        assert_eq!(timing.pts.unwrap().ticks, 1000);
+        assert_eq!(timing.dts.unwrap().ticks, 1000);
         assert_eq!(
             [event.definition.size.width, event.definition.size.height],
             case.canvas
@@ -304,5 +315,50 @@ fn native_default_clut_adaptation_gap_remains_visible() {
             .as_ref()
             .unwrap()
             .all_entries_explicit
+    );
+}
+
+#[test]
+fn native_canvas_uses_first_definition_or_complete_packet_default() {
+    let pool = Budget::new(4 << 20).unwrap();
+    let original = cases::CASES[0].payload;
+    assert_eq!(original[1], 0x14);
+    let definition_end = 6 + usize::from(u16::from_be_bytes([original[4], original[5]]));
+    let without = decode(
+        &pool,
+        &original[definition_end..],
+        ReceiverView::NativeD32,
+        1,
+    );
+    assert_eq!(without.error, None);
+    assert_eq!(
+        without.events[0].native_publication.unwrap().context_canvas,
+        Some(Size {
+            width: 720,
+            height: 576
+        })
+    );
+
+    let mut changed = original[..definition_end].to_vec();
+    changed[6] ^= 0x10;
+    changed[7..11].copy_from_slice(&[0, 31, 0, 23]);
+    let mut packet = original[..definition_end].to_vec();
+    packet.extend_from_slice(&changed);
+    packet.extend_from_slice(&original[definition_end..]);
+    let later = decode(&pool, &packet, ReceiverView::NativeD32, 7);
+    assert_eq!(later.error, None);
+    assert_eq!(
+        later.events[0].definition.size,
+        Size {
+            width: 32,
+            height: 24
+        }
+    );
+    assert_eq!(
+        later.events[0].native_publication.unwrap().context_canvas,
+        Some(Size {
+            width: cases::CASES[0].canvas[0],
+            height: cases::CASES[0].canvas[1]
+        })
     );
 }

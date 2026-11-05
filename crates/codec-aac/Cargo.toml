@@ -1,0 +1,12 @@
+[package]
+name = "triergon-codec-aac"
+version = "0.0.0"
+repository.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+
+[dependencies]
+
+[lints]
+workspace = true

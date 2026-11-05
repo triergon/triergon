@@ -56,15 +56,42 @@ impl Mov9StreamView {
         has_fragments: bool,
         major_brand: Option<[u8; 4]>,
     ) -> Result<Self> {
-        let mut view = Self::for_sample_table(header, table, has_fragments)?;
-        if view.codec == "rawvideo" {
+        Self::for_sample_table(header, table, has_fragments)?.with_major_brand(major_brand)
+    }
+
+    pub fn for_pinned_zero_scale_source(
+        header: &TrackHeader,
+        table: &SampleTable,
+        major_brand: Option<[u8; 4]>,
+        profile: crate::PinnedMovD32RegularRecoveryV1,
+    ) -> Result<Self> {
+        let [entry] = table.descriptions() else {
+            return Err(Error::Unsupported(
+                "zero-scale native catalogue description count",
+            ));
+        };
+        if header.timescale != 0
+            || header.handler != *b"vide"
+            || entry.format != *b"raw "
+            || table.sample_count() == 0
+        {
+            return Err(Error::Unsupported("zero-scale native raw-video catalogue"));
+        }
+        let clock = Mov9MediaClock::for_pinned_zero_scale(profile)?;
+        let mut view = Self::with_projection_base(header, entry, clock.native_base)?;
+        view.clock = clock;
+        view.with_major_brand(major_brand)
+    }
+
+    fn with_major_brand(mut self, major_brand: Option<[u8; 4]>) -> Result<Self> {
+        if self.codec == "rawvideo" {
             match major_brand {
                 Some(brand) if brand == *b"qt  " => {}
-                Some(_) => view.vendor_id = None,
+                Some(_) => self.vendor_id = None,
                 None => return Err(Error::Unsupported("native major-brand context absent")),
             }
         }
-        Ok(view)
+        Ok(self)
     }
     /// Source-operation context is required for native tag presence. The pinned
     /// no-stream-info operation omits the raw-video vendor tag for an empty regular
@@ -93,7 +120,14 @@ impl Mov9StreamView {
     /// Description-only projection for the regular sample profile. Whole source
     /// operations use `for_sample_table` to retain initialization context.
     pub fn new(header: &TrackHeader, entry: &SampleDescription) -> Result<Self> {
-        let clock = Mov9MediaClock::from_source(header.time_base()?)?;
+        Self::with_projection_base(header, entry, header.time_base()?)
+    }
+    pub(crate) fn with_projection_base(
+        header: &TrackHeader,
+        entry: &SampleDescription,
+        native_base: TimeBase,
+    ) -> Result<Self> {
+        let clock = Mov9MediaClock::from_source(native_base)?;
         let (codec, media_type, vendor_id, extra_start) = match (&header.handler, &entry.format) {
             (b"vide", b"raw ") => {
                 fields::slice(entry.raw().payload(), 0, 78)?;

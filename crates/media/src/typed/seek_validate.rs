@@ -69,6 +69,7 @@ pub(crate) struct CueTarget {
     pub whole_cluster: bool,
 }
 impl CueValidationJob {
+    #[inline(always)]
     pub fn new(
         target: CueTarget,
         configuration: Configuration,
@@ -309,9 +310,25 @@ impl CueValidationJob {
                             if self.relative.is_some_and(|p| p != location.block_offset())
                                 || self.cue.block.is_some_and(|n| n != self.blocks)
                             {
-                                return Err(Error::Invalid(
-                                    "cue position disagrees with referenced block",
-                                ));
+                                // Equal-time RAPs can precede the explicitly
+                                // referenced Block. Keep validating complete
+                                // batches until its actual address is reached.
+                                // A passed address or conflicting selectors
+                                // cannot be repaired into another source RAP.
+                                let position = location.block_offset();
+                                let passed = self.relative.is_some_and(|p| p < position)
+                                    || self.cue.block.is_some_and(|n| n < self.blocks);
+                                let conflict = self.relative == Some(position)
+                                    && self.cue.block.is_some_and(|n| n != self.blocks)
+                                    || self.cue.block == Some(self.blocks)
+                                        && self.relative.is_some_and(|p| p != position);
+                                if passed || conflict {
+                                    return Err(Error::Invalid(
+                                        "cue position disagrees with referenced block",
+                                    ));
+                                }
+                                self.first = false;
+                                continue;
                             }
                             // From the first physical Cluster there is no
                             // earlier per-track state history. This forward

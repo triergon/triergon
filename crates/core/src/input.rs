@@ -213,6 +213,16 @@ impl InputCursor {
     fn remaining(&self) -> usize {
         self.window.as_ref().map_or(self.inline_len, Bytes::len) - self.consumed
     }
+    /// The unconsumed bytes already supplied at the current position. Looking
+    /// consumes no byte or work and creates no owner.
+    #[inline]
+    pub fn buffered(&self) -> &[u8] {
+        let bytes = match &self.window {
+            Some(window) => window.as_ref(),
+            None => &self.inline[..self.inline_len],
+        };
+        &bytes[self.consumed..]
+    }
     fn validate_window(&self, offset: u64, length: usize, maximum: usize) -> Result<()> {
         if offset != self.position || self.remaining() != 0 || self.end.is_some() {
             return Err(Error::Invalid("input window is not currently requested"));
@@ -351,7 +361,7 @@ impl InputCursor {
             self.discard_window();
         }
     }
-    #[inline]
+    #[inline(always)]
     pub fn read_into(
         &mut self,
         output: &mut [u8],

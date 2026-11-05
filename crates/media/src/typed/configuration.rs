@@ -2,17 +2,18 @@
 //! separate retained job; this seal accepts its charged, validated vector.
 use super::syntax::check;
 use crate::matroska::typed::syntax::Required;
-use crate::{Error, Result, incremental::ParseStep, matroska::Track};
+use crate::{Error, Result, incremental::ParseStep, matroska::Track, storage::SharedBytes};
 use std::{
     mem::size_of,
     sync::{Arc, atomic::AtomicBool},
 };
-use triergon_core::{Budget, BudgetVec, Reservation, WorkBudget};
+use triergon_core::{Budget, BudgetVec, Bytes, Reservation, WorkBudget};
 #[derive(Debug)]
 struct Data {
     tracks: BudgetVec<Track>,
     pool: Budget,
     _charge: Reservation,
+    webm_vp9_t35: bool,
 }
 /// Opaque charged snapshot. The private Arc cannot be weakened by callers.
 ///
@@ -82,21 +83,58 @@ impl Configuration {
     /// CodecState view carries its written bytes and explicit origin; this API
     /// does not guess a frame/private content-encoding scope for CodecState.
     pub fn initialization(&self, track: usize) -> Option<Initialization<'_>> {
+        let (data, origin) = self.initialization_storage(track)?;
+        Some(Initialization {
+            data,
+            origin,
+            generation: self.generation,
+            revision: self.revision,
+        })
+    }
+
+    /// Share a nonempty effective record for a parser that needs owned bytes.
+    /// The original pool and complete allocation remain charged to the handle.
+    pub fn initialization_bytes(&self, track: usize) -> Option<Bytes> {
+        let (data, _) = self.initialization_storage(track)?;
+        data.as_core().filter(|bytes| !bytes.is_empty()).cloned()
+    }
+
+    fn initialization_storage(&self, track: usize) -> Option<(&SharedBytes, InitializationOrigin)> {
         let initial = self.tracks().get(track)?;
         Some(match self.codec_state(track) {
-            Some(state) => Initialization {
-                data: state.data(),
-                origin: InitializationOrigin::CodecState(state.position),
-                generation: self.generation,
-                revision: self.revision,
-            },
-            None => Initialization {
-                data: &initial.codec_private,
-                origin: InitializationOrigin::InitialTrackEntry,
-                generation: self.generation,
-                revision: self.revision,
-            },
+            Some(state) => (
+                &state.data,
+                InitializationOrigin::CodecState(state.position),
+            ),
+            None => (
+                &initial.codec_private,
+                InitializationOrigin::InitialTrackEntry,
+            ),
         })
+    }
+    pub(crate) fn validate_additions(
+        &self,
+        track: usize,
+        group: &super::side_data::BlockGroupSource,
+        extensions: &super::mapping::TrackExtensions,
+    ) -> Result<()> {
+        let maximum = group.max_addition_id();
+        if maximum <= extensions.max_block_addition_id() {
+            return Ok(());
+        }
+        if self.data.webm_vp9_t35
+            && maximum == 4
+            && group.additions().len() == 1
+            && extensions.maximum_presence() == super::side_data::Presence::Absent
+            && extensions.mappings().len() == 0
+            && self
+                .tracks()
+                .get(track)
+                .is_some_and(|track| track.codec.as_ref() == "V_VP9")
+        {
+            return Ok(());
+        }
+        Err(Error::Invalid("BlockAddID exceeds track maximum"))
     }
     pub fn track_extensions_job(
         &self,
@@ -121,6 +159,7 @@ pub(crate) struct ConfigurationJob {
     result: Option<Configuration>,
     failed: bool,
     states: Option<CodecStates>,
+    webm_vp9_t35: bool,
 }
 impl ConfigurationJob {
     /// Internal seam, not a public raw-Track admission API. The future Tracks
@@ -140,12 +179,17 @@ impl ConfigurationJob {
             result: None,
             failed: false,
             states: None,
+            webm_vp9_t35: false,
         }
     }
     /// Only the Tracks builder calls this after preserving the previous Track
     /// prefix. Sparse state slots for newly appended tracks mean initial state.
     pub(crate) fn inherit_states(mut self, previous: Option<&Configuration>) -> Self {
         self.states = previous.and_then(|configuration| configuration.states.clone());
+        self
+    }
+    pub(crate) fn with_webm_vp9_t35(mut self, enabled: bool) -> Self {
+        self.webm_vp9_t35 = enabled;
         self
     }
     pub fn step(
@@ -192,6 +236,7 @@ impl ConfigurationJob {
             tracks,
             pool: self.pool.clone(),
             _charge: charge,
+            webm_vp9_t35: self.webm_vp9_t35,
         });
         let result = Configuration {
             data,

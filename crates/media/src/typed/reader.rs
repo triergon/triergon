@@ -1,11 +1,11 @@
-use super::{Configuration, Event, SeekRequest};
+use super::{BlockAdditionContainer, Configuration, Event, SeekRequest};
 use crate::matroska::typed::syntax::Required;
 use crate::matroska::typed::{
     copy_vec::CopyVec,
     cues::CuesJob,
     epoch::{EpochReference, EpochRestoreJob, EpochTarget},
     header::{EbmlJob, SeekHeadJob},
-    packet::PacketBatchJob,
+    packet::{PacketBatchJob, SimplePacketJob, SimpleProgress},
     seek::SeekPlanJob,
     seek_validate::CueValidationJob,
     tracks::TracksJob,
@@ -14,7 +14,9 @@ use crate::{
     Error, Limits, Result, ebml,
     incremental::{
         ClusterCheckpoint, ElementEvent, ElementHeader, ElementReader, ParseStep,
-        typed_bridge::{EnvelopeProgress, ReplayLocation},
+        typed_bridge::{
+            CompactElementEvent, CompactEnvelopeProgress as EnvelopeProgress, ReplayLocation,
+        },
     },
     metadata::{
         Attachment, Catalogue, SharedDocument,
@@ -32,11 +34,18 @@ use triergon_core::{
 mod blocking;
 #[path = "reader_resolve.rs"]
 mod resolving;
+#[path = "reader_seek_index.rs"]
+mod seek_index;
 #[path = "reader_seek.rs"]
 mod seeking;
 pub use blocking::BlockingReader;
 use resolving::{Opening, ResolvePurpose, Resolver};
-use seeking::{ReplayPrefix, ScanState, SeekMode, SubtitleRecovery};
+use seeking::{ReplayPrefix, ScanContext, ScanSimple, ScanState, SeekMode, SubtitleRecovery};
+#[path = "reader_projection.rs"]
+mod projection;
+use projection::{
+    LegacyEvent, LegacyProjection, PacketProjection, ScanEvent, ScanProjection, TypedProjection,
+};
 
 const SEGMENT: u64 = 0x18538067;
 const CLUSTER: u64 = 0x1f43b675;
@@ -60,6 +69,27 @@ fn document(id: u64) -> bool {
         id,
         INFO | crate::metadata::ATTACHMENTS | crate::metadata::CHAPTERS | crate::metadata::TAGS
     )
+}
+
+fn packet_replay_prefix(
+    prefix: &mut Option<ReplayPrefix>,
+    location: Option<&ReplayLocation>,
+    envelope: &ElementReader,
+) -> Result<Option<i64>> {
+    if let Some(value) = *prefix {
+        if value.source != envelope.request().source || value.generation != envelope.generation() {
+            return Err(Error::Invalid("recovery replay source identity changed"));
+        }
+        let location = location.required("missing recovery block location")?;
+        if location.block_offset() >= value.until_block {
+            *prefix = None;
+            Ok(None)
+        } else {
+            Ok(Some(value.lower_ns))
+        }
+    } else {
+        Ok(None)
+    }
 }
 
 #[derive(Debug)]
@@ -119,7 +149,9 @@ enum State {
         reserved: bool,
         previous_len: usize,
     },
+    Simple(SimplePacketJob),
     Packet(PacketBatchJob),
+    ScanSimple(ScanSimple),
     Cue(CueValidationJob),
     Epoch(EpochRestoreJob),
 }
@@ -164,8 +196,13 @@ pub struct Reader {
     // An allocation-free negative proof: normal sequential parsing has validated
     // every group through this offset. Range jumps never extend this prefix.
     state_coverage_end: u64,
+    // An immutable source's root, lent by the blocking adapter for one seek
+    // poll and never retained across polls.
+    pub(crate) owned_root: Option<triergon_core::Bytes>,
+    seek_index: Option<Box<seek_index::ImmutableSeekIndex>>,
     state_coverage_contiguous: bool,
     state_seen: bool,
+    webm_vp9_t35: bool,
     epoch_reference: Option<EpochReference>,
 }
 impl Reader {
@@ -212,10 +249,77 @@ impl Reader {
             pressure: None,
             adapter_storage: 0,
             state_coverage_end: 0,
+            owned_root: None,
+            seek_index: None,
             state_coverage_contiguous: true,
             state_seen: false,
+            webm_vp9_t35: false,
             epoch_reference: None,
         })
+    }
+    /// Admit the observed WebM VP9 implicit T.35 addition when the track omits
+    /// MaxBlockAdditionID. The EBML DocType still decides applicability.
+    pub fn new_webm_vp9_t35_v1(
+        pool: &Budget,
+        source: SourceId,
+        capabilities: SourceCapabilities,
+        limits: Limits,
+        maximum_window: usize,
+    ) -> Result<Self> {
+        let mut reader = Self::new(pool, source, capabilities, limits, maximum_window)?;
+        reader.webm_vp9_t35 = true;
+        Ok(reader)
+    }
+    /// Select an explicit block-payload ownership contract at construction.
+    /// Default constructors and top-level metadata leaves retain OwnedExact.
+    pub fn new_with_payload_ownership(
+        pool: &Budget,
+        source: SourceId,
+        capabilities: SourceCapabilities,
+        limits: Limits,
+        maximum_window: usize,
+        policy: crate::storage::PayloadOwnership,
+    ) -> Result<Self> {
+        let mut reader = Self::new(pool, source, capabilities, limits, maximum_window)?;
+        reader.envelope.set_payload_ownership(policy);
+        Ok(reader)
+    }
+    /// For a source backed by these exact immutable bytes, remember a bounded
+    /// set of keyframe positions until a complete sequential pass validates it.
+    /// Covered playback seeks emit their receipt without intermediate scan events.
+    /// Supplied windows must be views of this input at their declared offsets.
+    /// Contiguous block payloads may share the charged input allocation.
+    pub fn new_with_immutable_seek_index(
+        pool: &Budget,
+        source: SourceId,
+        bytes: triergon_core::Bytes,
+        limits: Limits,
+        maximum_window: usize,
+    ) -> Result<Self> {
+        if !bytes.belongs_to(pool) {
+            return Err(triergon_core::Error::ForeignPool.into());
+        }
+        let capabilities = SourceCapabilities {
+            length: Some(u64::try_from(bytes.len()).map_err(|_| Error::Overflow)?),
+            random_access: true,
+        };
+        let mut reader = Self::new_with_payload_ownership(
+            pool,
+            source,
+            capabilities,
+            limits,
+            maximum_window,
+            crate::storage::PayloadOwnership::SharedBounded,
+        )?;
+        reader.seek_index = Some(seek_index::ImmutableSeekIndex::new(
+            bytes,
+            pool,
+            limits.index_entries,
+        )?);
+        Ok(reader)
+    }
+    pub fn payload_ownership(&self) -> crate::storage::PayloadOwnership {
+        self.envelope.payload_ownership()
     }
     pub fn budget(&self) -> &Budget {
         &self.pool
@@ -262,6 +366,9 @@ impl Reader {
             && self.resolver.is_none()
     }
     pub fn provide(&mut self, window: &InputWindow) -> Result<()> {
+        if let Some(index) = &self.seek_index {
+            index.verify(window)?;
+        }
         self.envelope.provide(window)?;
         if let Some(pressure) = &self.pressure {
             self.pressure = Some(crate::matroska::typed::usage::Pressure::new(
@@ -297,6 +404,9 @@ impl Reader {
         self.segment_end = None;
         self.revision = 0;
         self.state_coverage_end = 0;
+        if let Some(index) = &mut self.seek_index {
+            index.reset(self.limits.index_entries);
+        }
         self.state_coverage_contiguous = true;
         self.state_seen = false;
         self.epoch_reference = None;
@@ -320,6 +430,44 @@ impl Reader {
     }
     #[inline]
     pub fn step(&mut self, work: &mut WorkBudget, cancel: &AtomicBool) -> Result<ParseStep<Event>> {
+        let result = self.step_projected::<TypedProjection>(work, cancel);
+        if self.state_coverage_contiguous
+            && let Some(index) = &mut self.seek_index
+            && index.is_collecting()
+        {
+            if self.state_seen || self.cues.as_ref().is_some_and(|cues| !cues.is_empty()) {
+                index.discard();
+            } else {
+                match &result {
+                    Ok(ParseStep::Event(Event::Packet(packet))) => {
+                        if packet.configuration.tracks()[packet.packet.track].kind == 1 {
+                            if let Some(location) = &self.last_location {
+                                index.observe(packet, location.cluster_offset(), work);
+                            }
+                        }
+                    }
+                    Ok(ParseStep::Finished) => index.seal(self.envelope.position()),
+                    _ => {}
+                }
+            }
+        }
+        result
+    }
+    #[inline]
+    fn step_projected<D: PacketProjection>(
+        &mut self,
+        work: &mut WorkBudget,
+        cancel: &AtomicBool,
+    ) -> Result<ParseStep<D::Event>> {
+        self.step_projected_with_source::<D>(work, cancel, None)
+    }
+    #[inline]
+    fn step_projected_with_source<D: PacketProjection>(
+        &mut self,
+        work: &mut WorkBudget,
+        cancel: &AtomicBool,
+        source: Option<&dyn crate::matroska::typed::usage::Storage>,
+    ) -> Result<ParseStep<D::Event>> {
         let result = (|| {
             self.envelope.healthy_for_job(work, cancel)?;
             if self.failed {
@@ -328,16 +476,16 @@ impl Reader {
                 ));
             }
             if self.pressure.is_some() {
-                return self.step_pressure(work, cancel);
+                return D::progress(self.step_pressure(work, cancel, source));
             }
             let result = if self.resolver.is_some() {
-                self.step_resolver(work, cancel)
+                D::progress(self.step_resolver(work, cancel))
             } else if self.opening.is_some() {
-                self.step_opening(work, cancel)
+                D::progress(self.step_opening(work, cancel))
             } else if self.pending_seek.is_some() {
-                self.step_seeking(work, cancel)
+                D::seeking(self, work, cancel)
             } else {
-                let result = self.step_demux(work, cancel, None);
+                let result = self.step_demux_after_health_check::<D>(work, cancel, None, false);
                 if self.state_coverage_contiguous && matches!(result, Ok(ParseStep::Event(_))) {
                     self.state_coverage_end = self.state_coverage_end.max(self.envelope.position());
                 }
@@ -347,9 +495,11 @@ impl Reader {
                 Err(Error::Backpressure { requested, .. })
                 | Ok(ParseStep::Backpressure { requested, .. }) => {
                     self.allocation_blocked(requested);
-                    self.step_pressure(work, cancel)
+                    D::progress(self.step_pressure(work, cancel, source))
                 }
-                Ok(ParseStep::NeedInput(request)) => self.canonical_input_hint(request),
+                Ok(ParseStep::NeedInput(request)) => {
+                    D::progress(self.canonical_input_hint(request))
+                }
                 other => other,
             }
         })();
@@ -358,8 +508,8 @@ impl Reader {
         }
         result
     }
-    // Ordinary Reader, including its blocking adapter, uses this same policy.
-    // Indexed metadata/range/seek/scan transactions keep their exact hints.
+    // The ordinary reader and the blocking adapter use this header policy.
+    // Seek and metadata transactions have separate refill boundaries.
     fn ordinary_header_refill(
         &self,
     ) -> Result<Option<crate::incremental::typed_bridge::HeaderRefillRequest>> {
@@ -379,11 +529,23 @@ impl Reader {
         self.envelope.bounded_header_refill(&exact, 4096)
     }
     fn canonical_input_hint(&self, request: InputRequest) -> Result<ParseStep<Event>> {
-        let Some(plan) = self.ordinary_header_refill()? else {
+        let mut plan = self.ordinary_header_refill()?;
+        if plan.is_none() && self.seek_index.is_some() {
+            // These windows are checked against the immutable source. Read
+            // ahead within the same scan/parent bounds as the blocking adapter.
+            plan = if self.needs_header_input() {
+                self.blocking_seek_header_refill(&request)?
+            } else if self.needs_discard_input() {
+                self.blocking_seek_discard_refill(&request)?
+            } else {
+                None
+            };
+        }
+        let Some(plan) = plan else {
             return Ok(ParseStep::NeedInput(request));
         };
         if !plan.matches_exact(&request) {
-            return Err(Error::Invalid("ordinary header request identity changed"));
+            return Err(Error::Invalid("canonical refill request identity changed"));
         }
         Ok(ParseStep::NeedInput(plan.expanded().clone()))
     }
@@ -403,13 +565,88 @@ impl Reader {
         Ok(Some(plan))
     }
 
+    // Engine-only supply certificate. Public canonical NeedInput and the old
+    // ordinary refill policy remain separate. This expanded response policy is
+    // an explicit new blocking seek contract, not an ordinary-hint override.
+    fn blocking_seek_header_refill(
+        &self,
+        request: &InputRequest,
+    ) -> Result<Option<crate::incremental::typed_bridge::HeaderRefillRequest>> {
+        if self.pending_seek.is_none() || self.resolver.is_some() || self.opening.is_some() {
+            return Ok(None);
+        }
+        let stop = match self.seek_mode {
+            SeekMode::Scan => self
+                .scan
+                .as_ref()
+                .required("missing active scan")?
+                .read_ahead_stop(),
+            SeekMode::Epoch => {
+                let State::Epoch(job) = &self.state else {
+                    return Err(Error::Invalid("missing active epoch"));
+                };
+                Some(job.read_ahead_stop())
+            }
+            // Cue validation and metadata ranges retain their exact path.
+            _ => return Ok(None),
+        };
+        let mut maximum = 4096;
+        if let Some(stop) = stop {
+            let Some(left) = stop.checked_sub(request.offset) else {
+                return Ok(None);
+            };
+            maximum = maximum.min(usize::try_from(left).unwrap_or(usize::MAX));
+        }
+        self.envelope.bounded_header_refill(request, maximum)
+    }
+    // The same engine-only certificate for a discarded body: bounded by the
+    // active stop, parent/source ends and scan allowance. Immutable sources only.
+    fn blocking_seek_discard_refill(
+        &self,
+        request: &InputRequest,
+    ) -> Result<Option<crate::incremental::typed_bridge::HeaderRefillRequest>> {
+        if self.pending_seek.is_none() || self.resolver.is_some() || self.opening.is_some() {
+            return Ok(None);
+        }
+        let stop = match self.seek_mode {
+            SeekMode::Scan => self
+                .scan
+                .as_ref()
+                .required("missing active scan")?
+                .read_ahead_stop(),
+            SeekMode::Epoch => {
+                let State::Epoch(job) = &self.state else {
+                    return Err(Error::Invalid("missing active epoch"));
+                };
+                Some(job.read_ahead_stop())
+            }
+            _ => return Ok(None),
+        };
+        let mut maximum = usize::MAX;
+        if let Some(stop) = stop {
+            let Some(left) = stop.checked_sub(request.offset) else {
+                return Ok(None);
+            };
+            maximum = usize::try_from(left).unwrap_or(usize::MAX);
+        }
+        self.envelope.bounded_discard_refill(request, maximum)
+    }
+
     fn needs_header_input(&self) -> bool {
         self.resolver.as_ref().map_or_else(
             || self.envelope.needs_header_input(),
             Resolver::needs_header_input,
         )
     }
+    fn needs_discard_input(&self) -> bool {
+        self.resolver.is_none() && self.envelope.needs_discard_input()
+    }
     fn allocation_blocked(&mut self, requested: usize) {
+        if let Some(index) = &mut self.seek_index
+            && (index.is_collecting() || index.is_complete())
+        {
+            index.discard();
+        }
         self.pressure = Some(crate::matroska::typed::usage::Pressure::new(requested));
     }
     fn set_adapter_storage(&mut self, bytes: usize) {
@@ -426,12 +663,26 @@ impl Reader {
         &mut self,
         work: &mut WorkBudget,
         cancel: &AtomicBool,
+        source: Option<&dyn crate::matroska::typed::usage::Storage>,
     ) -> Result<ParseStep<Event>> {
         let mut pressure = self
             .pressure
             .take()
             .required("missing storage assessment")?;
-        match pressure.step(self, &self.pool, work, cancel) {
+        let result = if let Some(source) = source {
+            pressure.step(
+                &crate::matroska::typed::usage::WithSource {
+                    graph: self,
+                    source,
+                },
+                &self.pool,
+                work,
+                cancel,
+            )
+        } else {
+            pressure.step(self, &self.pool, work, cancel)
+        };
+        match result {
             Ok(ParseStep::Event(())) => Ok(ParseStep::Yield),
             Ok(step) => {
                 self.pressure = Some(pressure);
@@ -441,18 +692,27 @@ impl Reader {
         }
     }
     fn record_demux_read(&mut self, before: u64) -> Result<()> {
-        let bytes = self
-            .position()
+        Self::record_demux_bytes(
+            &mut self.scan_remaining,
+            &mut self.demux_read_bytes,
+            before,
+            self.envelope.position(),
+        )
+    }
+    fn record_demux_bytes(
+        remaining: &mut Option<u64>,
+        total: &mut u64,
+        before: u64,
+        after: u64,
+    ) -> Result<()> {
+        let bytes = after
             .checked_sub(before)
             .required("range changed during input step")?;
-        if let Some(left) = &mut self.scan_remaining {
+        if let Some(left) = remaining {
             *left = left
                 .checked_sub(bytes)
                 .ok_or(Error::Limit("operation read bytes"))?;
-            self.demux_read_bytes = self
-                .demux_read_bytes
-                .checked_add(bytes)
-                .ok_or(Error::Overflow)?;
+            *total = total.checked_add(bytes).ok_or(Error::Overflow)?;
         }
         Ok(())
     }
@@ -480,6 +740,14 @@ impl Reader {
     }
     #[inline]
     fn start_leaf(&mut self, header: ElementHeader, data: SharedBytes) -> Result<()> {
+        self.start_leaf_projected::<TypedProjection>(header, data)
+    }
+    #[inline(never)]
+    fn start_leaf_projected<D: PacketProjection>(
+        &mut self,
+        header: ElementHeader,
+        data: SharedBytes,
+    ) -> Result<()> {
         let left = self
             .limits
             .metadata_bytes
@@ -506,7 +774,8 @@ impl Reader {
                         &self.pool,
                         self.generation(),
                         self.revision.checked_add(1).ok_or(Error::Overflow)?,
-                    )?,
+                    )?
+                    .with_webm_vp9_t35(self.webm_vp9_t35),
                 };
             }
             INFO
@@ -557,40 +826,75 @@ impl Reader {
                 self.state = State::Envelope;
             }
             0xa0 | 0xa3 => {
-                let configuration = self.configuration.clone().required("missing Tracks")?;
+                let configuration = self.configuration.as_ref().required("missing Tracks")?;
                 let time = self
                     .cluster_time
                     .required("Block before Cluster Timestamp")?;
-                self.last_location = Some(
-                    self.envelope
-                        .block_replay_location(header, self.cluster_time)?,
-                );
-                self.state = State::Packet(PacketBatchJob::new(
-                    data,
-                    header.id == 0xa3,
-                    time,
-                    self.scale,
-                    configuration,
-                    self.limits,
-                    &self.pool,
-                )?);
-                // SimpleBlock has no group source context. It must not pass the
-                // entire large retained job through a consuming builder just
-                // to discard that context. Mutate the installed BlockGroup job.
-                if header.id == 0xa0 {
-                    let State::Packet(job) = &mut self.state else {
-                        return Err(Error::Invalid("missing installed packet batch"));
-                    };
-                    job.set_location(crate::matroska::typed::side_data::GroupLocation {
-                        source: self.envelope.request().source,
-                        segment_data: self.segment_data,
-                        header: header.start,
-                        data: header.data,
-                    })?;
+                self.envelope.refresh_block_replay_location(
+                    &mut self.last_location,
+                    header,
+                    self.cluster_time,
+                )?;
+                if header.id == 0xa3 {
+                    self.state = State::Simple(D::simple(
+                        data,
+                        time,
+                        self.scale,
+                        configuration,
+                        self.limits,
+                        &self.pool,
+                    )?);
+                } else {
+                    self.start_group_batch(header, data, configuration.clone(), time)?;
                 }
             }
             _ => return Err(Error::Invalid("unexpected collected leaf")),
         }
+        Ok(())
+    }
+    // Keep the large fallback constructor out of the ordinary small packet's
+    // call frame. This is the same complete BlockGroup constructor/context order.
+    #[inline(never)]
+    fn start_group_batch(
+        &mut self,
+        header: ElementHeader,
+        data: SharedBytes,
+        configuration: Configuration,
+        time: u64,
+    ) -> Result<()> {
+        self.state = State::Packet(PacketBatchJob::new(
+            data,
+            false,
+            time,
+            self.scale,
+            configuration,
+            self.limits,
+            &self.pool,
+        )?);
+        let State::Packet(job) = &mut self.state else {
+            return Err(Error::Invalid("missing installed packet batch"));
+        };
+        job.set_location(crate::matroska::typed::side_data::GroupLocation {
+            source: self.envelope.request().source,
+            segment_data: self.segment_data,
+            header: header.start,
+            data: header.data,
+        })?;
+        Ok(())
+    }
+    // Header/Track validation and all fallibility precede this infallible
+    // assembly. Only laced/encoded SimpleBlocks pay for the full workspace.
+    #[inline(never)]
+    fn promote_simple_packet(&mut self) -> Result<()> {
+        let State::Simple(job) = &mut self.state else {
+            return Err(Error::Invalid("missing SimpleBlock promotion"));
+        };
+        if !job.needs_batch() {
+            return Err(Error::Invalid("missing SimpleBlock promotion"));
+        }
+        job.own_configuration(self.configuration.as_ref())?;
+        let batch = job.take_batch(self.limits);
+        self.state = State::Packet(batch);
         Ok(())
     }
     fn step_demux(
@@ -599,13 +903,51 @@ impl Reader {
         cancel: &AtomicBool,
         stop: Option<u64>,
     ) -> Result<ParseStep<Event>> {
+        self.step_demux_mode(work, cancel, stop, false)
+    }
+    fn step_demux_mode(
+        &mut self,
+        work: &mut WorkBudget,
+        cancel: &AtomicBool,
+        stop: Option<u64>,
+        scan_prefix: bool,
+    ) -> Result<ParseStep<Event>> {
+        self.step_demux_projected::<TypedProjection>(work, cancel, stop, scan_prefix)
+    }
+    fn step_demux_projected<D: PacketProjection>(
+        &mut self,
+        work: &mut WorkBudget,
+        cancel: &AtomicBool,
+        stop: Option<u64>,
+        scan_prefix: bool,
+    ) -> Result<ParseStep<D::Event>> {
+        self.envelope.healthy_for_job(work, cancel)?;
+        self.step_demux_after_health_check::<D>(work, cancel, stop, scan_prefix)
+    }
+
+    fn step_demux_after_health_check<D: PacketProjection>(
+        &mut self,
+        work: &mut WorkBudget,
+        cancel: &AtomicBool,
+        stop: Option<u64>,
+        scan_prefix: bool,
+    ) -> Result<ParseStep<D::Event>> {
+        // Every metadata commit returns its event before this call continues.
+        // Limits are immutable; the remaining metadata allowance is therefore
+        // constant across these pure transitions. Input errors also propagate
+        // immediately, with no input-supply callback inside this exclusive call.
+        let left = self
+            .limits
+            .metadata_bytes
+            .checked_sub(self.metadata_used)
+            .ok_or(Error::Limit("metadata"))?;
+        let mut first = true;
         loop {
-            self.envelope.healthy_for_job(work, cancel)?;
-            let left = self
-                .limits
-                .metadata_bytes
-                .checked_sub(self.metadata_used)
-                .ok_or(Error::Limit("metadata"))?;
+            if first {
+                first = false;
+            } else {
+                self.envelope.check_inner_cancel(work, cancel)?;
+            }
             match &mut self.state {
                 State::Envelope => {
                     if stop.is_some_and(|stop| self.position() >= stop) {
@@ -615,9 +957,62 @@ impl Reader {
                         self.envelope.set_scan_remaining(remaining);
                     }
                     let before = self.envelope.position();
-                    let progress = self.envelope.step_typed_envelope(work, cancel);
-                    self.record_demux_read(before)?;
-                    match progress? {
+                    // A collected block needs only the admission work unit.
+                    // Keep the header boundary for seek stops and scan debits.
+                    let ordinary_blocks =
+                        stop.is_none() && !scan_prefix && self.scan_remaining.is_none();
+                    let progress = self.envelope.step_typed_compact_admitting_blocks(
+                        ordinary_blocks,
+                        work,
+                        cancel,
+                    );
+                    if let Err(error) = self.record_demux_read(before) {
+                        self.envelope.discard_compact_leaf();
+                        return Err(error);
+                    }
+                    let progress = progress?;
+                    if scan_prefix {
+                        if let Some(header) = self.envelope.scan_prefix_header() {
+                            let context = ScanContext {
+                                configuration: self.configuration.as_ref(),
+                                pool: &self.pool,
+                                source: self.envelope.request().source,
+                                generation: self.envelope.generation(),
+                                cluster_ticks: self.cluster_time,
+                                scale: self.scale,
+                            };
+                            self.state = State::ScanSimple(ScanSimple::new(header, &context));
+                            continue;
+                        }
+                    }
+                    match progress {
+                        // Non-metadata leaves have no lookup or reservation:
+                        // the Admit unit and decision apply here directly, and
+                        // only an unpaid unit leaves the Admission state behind.
+                        EnvelopeProgress::Header(header) if !metadata(header.id) => {
+                            if !work.try_charge(1) {
+                                self.state = State::Admission(Admission {
+                                    header,
+                                    at: 0,
+                                    phase: AdmitPhase::Admit,
+                                    maximum: None,
+                                    prepare: None,
+                                });
+                                return Ok(ParseStep::Yield);
+                            }
+                            self.envelope.admit_typed_leaf(header, None, false)?;
+                            if scan_prefix
+                                && header.id == 0xa3
+                                && stop.is_none_or(|stop| {
+                                    header
+                                        .size
+                                        .and_then(|size| header.data.checked_add(size))
+                                        .is_some_and(|end| end < stop)
+                                })
+                            {
+                                self.envelope.arm_scan_prefix(header)?;
+                            }
+                        }
                         EnvelopeProgress::Header(header) => {
                             self.state = State::Admission(Admission {
                                 header,
@@ -628,7 +1023,7 @@ impl Reader {
                             })
                         }
                         EnvelopeProgress::Step(ParseStep::Event(event)) => match event {
-                            ElementEvent::Start(header) => {
+                            CompactElementEvent::Start(header) => {
                                 if header.id == SEGMENT {
                                     self.segment_data = header.data;
                                     self.segment_end = header
@@ -645,11 +1040,11 @@ impl Reader {
                                         self.opening = Some(Opening::new());
                                     }
                                 }
-                                return Ok(ParseStep::Event(Event::Envelope(ElementEvent::Start(
+                                return Ok(ParseStep::Event(D::envelope(ElementEvent::Start(
                                     header,
-                                ))));
+                                ))?));
                             }
-                            ElementEvent::End {
+                            CompactElementEvent::End {
                                 id,
                                 offset,
                                 generation,
@@ -657,18 +1052,21 @@ impl Reader {
                                 if id == CLUSTER {
                                     self.cluster_time = None;
                                 }
-                                return Ok(ParseStep::Event(Event::Envelope(ElementEvent::End {
+                                return Ok(ParseStep::Event(D::envelope(ElementEvent::End {
                                     id,
                                     offset,
                                     generation,
-                                })));
+                                })?));
                             }
-                            ElementEvent::Skipped(header) => {
-                                return Ok(ParseStep::Event(Event::Envelope(
-                                    ElementEvent::Skipped(header),
-                                )));
+                            CompactElementEvent::Skipped(header) => {
+                                return Ok(ParseStep::Event(D::envelope(ElementEvent::Skipped(
+                                    header,
+                                ))?));
                             }
-                            ElementEvent::Leaf { header, data } => self.start_leaf(header, data)?,
+                            CompactElementEvent::Leaf(header) => {
+                                let data = self.envelope.take_compact_leaf(header)?;
+                                self.start_leaf_projected::<D>(header, data)?;
+                            }
                         },
                         EnvelopeProgress::Step(other) => {
                             return crate::matroska::typed::pending(other);
@@ -767,6 +1165,20 @@ impl Reader {
                             admission.maximum,
                             false,
                         )?;
+                        // A block touching a finite scan stop keeps the old
+                        // body/stop scheduling, including work-boundary cases.
+                        if scan_prefix
+                            && admission.header.id == 0xa3
+                            && stop.is_none_or(|stop| {
+                                admission
+                                    .header
+                                    .size
+                                    .and_then(|size| admission.header.data.checked_add(size))
+                                    .is_some_and(|end| end < stop)
+                            })
+                        {
+                            self.envelope.arm_scan_prefix(admission.header)?;
+                        }
                         self.state = State::Envelope;
                     }
                 },
@@ -775,14 +1187,15 @@ impl Reader {
                     source,
                     job,
                 } => match job.step(work, cancel)? {
-                    ParseStep::Event(()) => {
+                    ParseStep::Event(doctype) => {
+                        self.webm_vp9_t35 &= doctype == BlockAdditionContainer::WebM;
                         self.metadata_used = source.len();
                         let event = ElementEvent::Leaf {
                             header: *header,
                             data: source.clone(),
                         };
                         self.state = State::Envelope;
-                        return Ok(ParseStep::Event(Event::Envelope(event)));
+                        return Ok(ParseStep::Event(D::envelope(event)?));
                     }
                     other => return crate::matroska::typed::pending(other),
                 },
@@ -794,7 +1207,7 @@ impl Reader {
                         self.revision = configuration.revision();
                         self.configuration = Some(configuration.clone());
                         self.state = State::Envelope;
-                        return Ok(ParseStep::Event(Event::Configuration(configuration)));
+                        return Ok(ParseStep::Event(D::configuration(configuration)?));
                     }
                     other => return crate::matroska::typed::pending(other),
                 },
@@ -811,7 +1224,7 @@ impl Reader {
                                 self.scale = scale;
                             }
                             self.state = State::Envelope;
-                            return Ok(ParseStep::Event(Event::Document(commit.document)));
+                            return Ok(ParseStep::Event(D::document(commit.document)?));
                         }
                         other => return crate::matroska::typed::pending(other),
                     }
@@ -823,10 +1236,10 @@ impl Reader {
                         self.commit_metadata(h, source.len())?;
                         self.cues = Some(cues.entries);
                         self.state = State::Envelope;
-                        return Ok(ParseStep::Event(Event::Envelope(ElementEvent::Leaf {
+                        return Ok(ParseStep::Event(D::envelope(ElementEvent::Leaf {
                             header: h,
                             data: source,
-                        })));
+                        })?));
                     }
                     other => return crate::matroska::typed::pending(other),
                 },
@@ -868,10 +1281,10 @@ impl Reader {
                         let source = source.clone();
                         self.commit_metadata(h, source.len())?;
                         self.state = State::Envelope;
-                        return Ok(ParseStep::Event(Event::Envelope(ElementEvent::Leaf {
+                        return Ok(ParseStep::Event(D::envelope(ElementEvent::Leaf {
                             header: h,
                             data: source,
-                        })));
+                        })?));
                     }
                     if !work.try_charge(1) {
                         return Ok(ParseStep::Yield);
@@ -879,42 +1292,121 @@ impl Reader {
                     self.seek_targets.push_precharged(entries.as_slice()[*at])?;
                     *at += 1;
                 }
+                State::ScanSimple(job) => {
+                    if !scan_prefix {
+                        return Err(Error::Invalid("scan probe outside seek scan"));
+                    }
+                    let context = ScanContext {
+                        configuration: self.configuration.as_ref(),
+                        pool: &self.pool,
+                        source: self.envelope.request().source,
+                        generation: self.envelope.generation(),
+                        cluster_ticks: self.cluster_time,
+                        scale: self.scale,
+                    };
+                    if job.completed_fields().is_some() {
+                        // advance_scan consumes this scalar completion in this
+                        // same call; it is never a public packet/event boundary.
+                        return Ok(ParseStep::Yield);
+                    }
+                    if job.draining() {
+                        if !job.context_matches(&context) {
+                            return Err(Error::Invalid("scan drain source context changed"));
+                        }
+                        if let Some(remaining) = self.scan_remaining {
+                            self.envelope.set_scan_remaining(remaining);
+                        }
+                        let before = self.envelope.position();
+                        let progress = self.envelope.step_typed_compact(work, cancel);
+                        if let Err(error) = Self::record_demux_bytes(
+                            &mut self.scan_remaining,
+                            &mut self.demux_read_bytes,
+                            before,
+                            self.envelope.position(),
+                        ) {
+                            self.envelope.discard_compact_leaf();
+                            return Err(error);
+                        }
+                        let progress = progress?;
+                        if self.envelope.finish_scanned_leaf(job.header())? {
+                            job.finish();
+                            return Ok(ParseStep::Yield);
+                        }
+                        match progress {
+                            EnvelopeProgress::Step(step) => {
+                                return crate::matroska::typed::pending(step);
+                            }
+                            EnvelopeProgress::Header(_) => {
+                                return Err(Error::Invalid(
+                                    "new header before scan drain completed",
+                                ));
+                            }
+                        }
+                    }
+                    let header = job.header();
+                    match job.step_prefix(
+                        self.envelope.scan_prefix_bytes(header)?,
+                        &context,
+                        work,
+                        cancel,
+                    )? {
+                        ParseStep::Event(drain) => {
+                            self.envelope.resolve_scan_prefix(header, drain)?;
+                            if !drain {
+                                self.state = State::Envelope;
+                            }
+                        }
+                        step => return crate::matroska::typed::pending(step),
+                    }
+                }
                 State::Cue(_) | State::Epoch(_) => {
                     return Err(Error::Invalid("range validation outside seek controller"));
+                }
+                State::Simple(job) => {
+                    let prefix = packet_replay_prefix(
+                        &mut self.replay_prefix,
+                        self.last_location.as_ref(),
+                        &self.envelope,
+                    )?;
+                    let configuration = self.configuration.as_ref();
+                    match job.step_compact_borrowing(configuration, prefix, work, cancel)? {
+                        SimpleProgress::Promote => {
+                            self.promote_simple_packet()?;
+                            first = true;
+                            continue;
+                        }
+                        SimpleProgress::Ready => {
+                            return Ok(ParseStep::Event(D::take_simple(job, configuration)?));
+                        }
+                        SimpleProgress::Finished => self.state = State::Envelope,
+                        SimpleProgress::Yield => return Ok(ParseStep::Yield),
+                        SimpleProgress::Backpressure {
+                            requested,
+                            available,
+                        } => {
+                            return Ok(ParseStep::Backpressure {
+                                requested,
+                                available,
+                            });
+                        }
+                    }
                 }
                 State::Packet(job) => {
                     if let Some(configuration) = job.take_configuration_change() {
                         self.state_seen |= configuration.has_codec_states();
                         self.revision = configuration.revision();
                         self.configuration = Some(configuration.clone());
-                        return Ok(ParseStep::Event(Event::Configuration(configuration)));
+                        return Ok(ParseStep::Event(D::configuration(configuration)?));
                     }
-                    let prefix = if let Some(prefix) = self.replay_prefix {
-                        let source = self.envelope.request().source;
-                        let generation = self.envelope.generation();
-                        if prefix.source != source || prefix.generation != generation {
-                            return Err(Error::Invalid("recovery replay source identity changed"));
-                        }
-                        let location = self
-                            .last_location
-                            .as_ref()
-                            .required("missing recovery block location")?;
-                        if location.block_offset() >= prefix.until_block {
-                            self.replay_prefix = None;
-                            None
-                        } else {
-                            Some(prefix.lower_ns)
-                        }
-                    } else {
-                        None
-                    };
-                    let step = match prefix {
-                        Some(lower) => job.step_recovery_prefix(lower, work, cancel),
-                        None => job.step(work, cancel),
-                    }?;
+                    let prefix = packet_replay_prefix(
+                        &mut self.replay_prefix,
+                        self.last_location.as_ref(),
+                        &self.envelope,
+                    )?;
+                    let step = job.step_ready(prefix, work, cancel)?;
                     match step {
-                        ParseStep::Event(packet) => {
-                            return Ok(ParseStep::Event(Event::Packet(packet)));
+                        ParseStep::Event(()) => {
+                            return Ok(ParseStep::Event(D::packet(job.take_ready()?)?));
                         }
                         ParseStep::Finished => self.state = State::Envelope,
                         other => return crate::matroska::typed::pending(other),
@@ -930,7 +1422,7 @@ impl crate::matroska::typed::usage::Storage for State {
     fn storage_slots(&self) -> Result<usize> {
         use crate::matroska::typed::usage::{Storage, slots};
         match self {
-            Self::Envelope => Ok(0),
+            Self::Envelope | Self::ScanSimple(_) => Ok(0),
             Self::Admission(job) => Storage::storage_slots(job),
             Self::Ebml { job, .. } => Storage::storage_slots(job),
             Self::Tracks { job, .. } => Storage::storage_slots(job),
@@ -940,6 +1432,7 @@ impl crate::matroska::typed::usage::Storage for State {
             Self::MergeHead {
                 source, entries, ..
             } => slots(&[source, entries]),
+            Self::Simple(job) => Storage::storage_slots(job),
             Self::Packet(job) => Storage::storage_slots(job),
             Self::Cue(job) => Storage::storage_slots(job),
             Self::Epoch(job) => Storage::storage_slots(job),
@@ -948,7 +1441,7 @@ impl crate::matroska::typed::usage::Storage for State {
     fn storage_owner(&self, index: usize) -> Result<Option<crate::matroska::typed::usage::Owner>> {
         use crate::matroska::typed::usage::{Storage, owner};
         match self {
-            Self::Envelope => Ok(None),
+            Self::Envelope | Self::ScanSimple(_) => Ok(None),
             Self::Admission(job) => Storage::storage_owner(job, index),
             Self::Ebml { job, .. } => Storage::storage_owner(job, index),
             Self::Tracks { job, .. } => Storage::storage_owner(job, index),
@@ -958,6 +1451,7 @@ impl crate::matroska::typed::usage::Storage for State {
             Self::MergeHead {
                 source, entries, ..
             } => owner(&[source, entries], index),
+            Self::Simple(job) => Storage::storage_owner(job, index),
             Self::Packet(job) => Storage::storage_owner(job, index),
             Self::Cue(job) => Storage::storage_owner(job, index),
             Self::Epoch(job) => Storage::storage_owner(job, index),
@@ -974,6 +1468,7 @@ crate::matroska::typed::usage::storage!(Reader, |s| [
     s.state,
     s.resolver,
     s.scan,
+    s.seek_index.as_deref(),
     s.plan,
     crate::matroska::typed::usage::Charge(s.adapter_storage)
 ]);
@@ -1145,3 +1640,46 @@ mod header_refill_canonical_runtime_red {
         );
     }
 }
+
+#[cfg(test)]
+#[path = "shared_bounded_tests.rs"]
+mod shared_bounded_tests;
+
+#[cfg(test)]
+#[path = "shared_bounded_followup_tests.rs"]
+mod shared_bounded_followup_tests;
+
+#[cfg(test)]
+#[path = "inner_guard_regressions.rs"]
+mod inner_guard_regressions;
+
+#[cfg(test)]
+#[path = "simple_direct_regressions.rs"]
+mod simple_direct_regressions;
+
+#[cfg(test)]
+impl Reader {
+    fn simple_direct_test_job_step(
+        &mut self,
+        work: &mut WorkBudget,
+        cancel: &AtomicBool,
+    ) -> Option<Result<ParseStep<()>>> {
+        match &mut self.state {
+            State::Packet(job) => Some(job.step_ready(None, work, cancel)),
+            State::Simple(job) => Some(job.step_ready(None, work, cancel)),
+            _ => None,
+        }
+    }
+}
+
+#[cfg(test)]
+#[path = "compact_controller_regressions.rs"]
+mod compact_controller_regressions;
+
+#[cfg(test)]
+#[path = "lazy_pressure_regressions.rs"]
+mod lazy_pressure_regressions;
+
+#[cfg(test)]
+#[path = "demux_slot_regressions.rs"]
+mod demux_slot_regressions;

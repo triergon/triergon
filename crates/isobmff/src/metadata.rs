@@ -27,6 +27,13 @@ impl MovieHeader {
 }
 
 fn clock_fields(b: &[u8]) -> Result<(u32, u64)> {
+    let (scale, duration) = raw_clock_fields(b)?;
+    if scale == 0 {
+        return Err(Error::Invalid("zero media/movie timescale"));
+    }
+    Ok((scale, duration))
+}
+fn raw_clock_fields(b: &[u8]) -> Result<(u32, u64)> {
     let (version, flags) = fields::full(b)?;
     if flags != 0 {
         return Err(Error::Unsupported("clock header flags"));
@@ -36,9 +43,6 @@ fn clock_fields(b: &[u8]) -> Result<(u32, u64)> {
         1 => (fields::u32_at(b, 20)?, fields::u64_at(b, 24)?),
         _ => return Err(Error::Unsupported("clock header version")),
     };
-    if scale == 0 {
-        return Err(Error::Invalid("zero media/movie timescale"));
-    }
     Ok((scale, duration))
 }
 
@@ -58,6 +62,14 @@ impl TrackHeader {
         TimeBase::new(1, u64::from(self.timescale))
     }
     pub fn parse(tkhd: &BoxView, mdhd: &BoxView, hdlr: &BoxView) -> Result<Self> {
+        Self::parse_inner(tkhd, mdhd, hdlr, false)
+    }
+    fn parse_inner(
+        tkhd: &BoxView,
+        mdhd: &BoxView,
+        hdlr: &BoxView,
+        observed_zero: bool,
+    ) -> Result<Self> {
         if tkhd.header().kind != *b"tkhd"
             || mdhd.header().kind != *b"mdhd"
             || hdlr.header().kind != *b"hdlr"
@@ -74,7 +86,11 @@ impl TrackHeader {
         if track_id == 0 {
             return Err(Error::Invalid("zero track ID"));
         }
-        let (timescale, duration) = clock_fields(mdhd.payload())?;
+        let (timescale, duration) = if observed_zero {
+            raw_clock_fields(mdhd.payload())?
+        } else {
+            clock_fields(mdhd.payload())?
+        };
         fields::full_zero(hdlr.payload())?;
         let handler = fields::fourcc(hdlr.payload(), 8)?;
         Ok(Self {
@@ -245,5 +261,39 @@ impl EditList {
             rate_integer: fields::i16_at(b, rate)?,
             rate_fraction: fields::i16_at(b, rate + 2)?,
         })
+    }
+}
+
+/// Raw source clock remains zero/invalid. Only the explicitly labelled native
+/// projection has a fallback base; source_seconds must still reject that scale.
+#[derive(Debug)]
+pub struct Mov9RecoveryTrackHeader {
+    source: TrackHeader,
+}
+impl Mov9RecoveryTrackHeader {
+    pub fn parse(
+        tkhd: &BoxView,
+        mdhd: &BoxView,
+        hdlr: &BoxView,
+        _profile: crate::PinnedMovD32RegularRecoveryV1,
+    ) -> Result<Self> {
+        Ok(Self {
+            source: TrackHeader::parse_inner(tkhd, mdhd, hdlr, true)?,
+        })
+    }
+    pub fn source(&self) -> &TrackHeader {
+        &self.source
+    }
+    pub fn into_source(self) -> TrackHeader {
+        self.source
+    }
+    pub fn native_projection_base(&self) -> Result<TimeBase> {
+        TimeBase::new(1, u64::from(self.source.timescale.max(1)))
+    }
+    pub fn source_clock_valid(&self) -> bool {
+        self.source.timescale != 0
+    }
+    pub fn source_clock_error(&self) -> Option<Error> {
+        (!self.source_clock_valid()).then_some(Error::Invalid("zero media/movie timescale"))
     }
 }

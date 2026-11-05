@@ -10,6 +10,25 @@ pub enum ReceiverView {
     NativeD32,
 }
 
+/// Source validation stays the default. Omission is only an explicit native
+/// projection of a region with no raster, never geometry repair or clipping.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum NativeGeometryPolicy {
+    ValidateSource,
+    OmitUnrendered,
+}
+
+/// Native emits no rectangle. The original source geometry and any strict
+/// validation error are retained rather than relabelled as a conforming region.
+#[derive(Debug)]
+pub struct NativeOmittedRegion {
+    pub id: u8,
+    pub source_address: super::Point,
+    pub source_size: super::Size,
+    pub original_composition: Bytes,
+    pub source_error: Option<triergon_core::Error>,
+}
+
 #[derive(Debug)]
 pub struct NativePalette {
     pub identifier: &'static str,
@@ -32,8 +51,14 @@ pub struct NativePublication {
     pub identifier: &'static str,
     pub source_pin: &'static str,
     pub packet_sequence: u64,
+    /// Relative to the codec packet when a native PES projection is attached
+    /// to the event, or to the declared decoder input otherwise.
     pub consumed_prefix_bytes: usize,
     pub reason: PublicationReason,
+    /// The packet that triggered publication can differ from the first packet
+    /// of the display set. Keep its configured source clock separately.
+    pub packet_clock: Option<(super::SourceClock, super::PacketTiming)>,
+    pub context_canvas: Option<super::Size>,
     /// Only an exactly representable sampled source instant is assigned here.
     /// Unknown/nonintegral/overflow clocks remain explicitly unresolved.
     pub exact_pts_microseconds: Option<i64>,

@@ -14,7 +14,7 @@ check:
 	CARGO_INCREMENTAL=0 cargo +nightly clippy --workspace --all-targets --locked -- -D warnings
 	CARGO_INCREMENTAL=0 cargo +nightly check --workspace --no-default-features --locked
 	CARGO_INCREMENTAL=0 cargo +nightly build --workspace --release --locked
-	python3 -m unittest harness.test_runner harness.test_timing harness.test_header harness.test_zlib harness.test_content harness.test_seek harness.test_checksum harness.test_comparison harness.test_reference_encodings harness.test_specs harness.test_colour harness.test_catalogue harness.test_provenance harness.test_fuzz harness.test_fuzz_integrity harness.test_reuse harness.test_linux_port harness.test_linux_guard harness.test_linux_kernel_bound harness.test_delivery_policy harness.test_required_vectors
+	python3 -m unittest harness.test_runner harness.test_timing harness.test_header harness.test_zlib harness.test_content harness.test_seek harness.test_checksum harness.test_comparison harness.test_reference_encodings harness.test_specs harness.test_colour harness.test_catalogue harness.test_provenance harness.test_fuzz harness.test_fuzz_integrity harness.test_reuse harness.test_linux_port harness.test_linux_guard harness.test_linux_kernel_bound harness.test_delivery_policy harness.test_delivery_memory_v2 harness.test_capture_contract harness.test_required_vectors
 	python3 tools/check-safety.py
 	python3 tools/check-design.py
 	python3 tools/test-core-time.py

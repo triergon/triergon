@@ -328,8 +328,19 @@ error behavior for in-epoch resize/missing object. No native options profile is
 adopted as a performance baseline. Source facts unavailable through AVSubtitle
 remain an explicit comparison/adapter gap.
 
-No PGS or DVD/SPU implementation is present: their normative source gaps remain
-blockers. Cross-field map-table lifetime, composition/ancillary ID collisions,
+The `pgs` and `dvd` modules provide bounded wire views and indexed RLE expansion.
+PGS also implements owned ODS assembly and display-set/cache/palette updates,
+with retained source facts and explicitly named native output projections. DVD
+adds SPU byte-fragment assembly, VobSub CodecPrivate fields, cooperative
+traditional control-program facts and an explicit supplied-palette view. The
+separate native crop projection borrows rows from the unchanged indexed plane;
+externally supplied narrow-palette indices are validated before publication.
+Source state, unsupported command operands and transparent RGB remain retained.
+The projection does not establish receiver palette generation or a full decoder. Full DVD control/presentation and extended-variant work,
+wall-clock scheduling, complete native compatibility and numerical qualification
+remain open. Licensed implementation evidence
+and native controls support implementation; unavailable paid texts restrict
+normative claims rather than blocking all development. Cross-field map-table lifetime, composition/ancillary ID collisions,
 progressive/character/ROM/ACS/disparity/depth-reduction capabilities, text cues,
 M01/M03/M04 integration and every numerical gate remain open. M05 stays unqualified.
 
@@ -409,8 +420,8 @@ library check and docs at `default-clut-1/combined399-v1`; its six new guards an
 all393 predecessors are included in this workspace. This bounded codec
 field proof does not establish equivalent container work, reference retention,
 full native compatibility or numerical acceptance. Original8/additive8 raw native
-records, original48/13 gaps, all393 preceding guards and PGS/DVD source blockers
-remain retained and required.
+records, original48/13 gaps and all393 preceding guards remain retained and
+required. Complete PGS/DVD contracts and qualification remain open.
 
 The encoded NativeD32 view additionally uses an independently authored integer
 projection supported by the frozen explicit-CLUT controls. The original D0
@@ -504,4 +515,4 @@ Mandatory cached compressed-ODS replay is still unknown. All original65/96 sourc
 tests, original177+40 text controls and
 all old DVB observations remain preserved and required. Full O40/M05/native and
 initial1.25/optimization0.80/lower-heap/RSS qualification remain open, as do the
-PGS/DVD normative-source blockers. No TV or shipping-device result follows.
+PGS/DVD complete decoder contracts and qualification. No TV or shipping-device result follows.

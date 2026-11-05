@@ -1,10 +1,43 @@
 //! Pinned native signed/null field representation, never a source clock type.
 use triergon_core::{Error, Result, Rounding, Time, TimeBase};
 
+/// A usable timebase from the source declaration, when available.
+#[derive(Clone, Copy, PartialEq, Eq)]
+#[repr(transparent)]
+pub struct SourceTimeBase(Option<TimeBase>);
+
+impl SourceTimeBase {
+    pub const UNAVAILABLE: Self = Self(None);
+
+    pub const fn get(self) -> Option<TimeBase> {
+        self.0
+    }
+
+    pub fn require(self) -> Result<TimeBase> {
+        self.0.ok_or(Error::Invalid("zero media/movie timescale"))
+    }
+}
+
+impl From<TimeBase> for SourceTimeBase {
+    fn from(base: TimeBase) -> Self {
+        Self(Some(base))
+    }
+}
+
+impl std::fmt::Debug for SourceTimeBase {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self.0 {
+            Some(base) => base.fmt(f),
+            None => f.write_str("Unavailable"),
+        }
+    }
+}
+
 /// Observation provenance for the separately exposed native stream clock.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Mov9MediaClockCause {
     SourceScale,
+    ObservedZeroScaleWord,
     /// Only this observed all-ones word is supported. Other out-of-range
     /// denominators remain refused; no general fallback timebase is guessed.
     ObservedAllOnesScaleWord,
@@ -12,15 +45,22 @@ pub enum Mov9MediaClockCause {
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Mov9MediaClock {
-    pub source_base: TimeBase,
+    pub source_base: SourceTimeBase,
     pub native_base: TimeBase,
     pub cause: Mov9MediaClockCause,
 }
 impl Mov9MediaClock {
+    pub fn for_pinned_zero_scale(_profile: crate::PinnedMovD32RegularRecoveryV1) -> Result<Self> {
+        Ok(Self {
+            source_base: SourceTimeBase::UNAVAILABLE,
+            native_base: TimeBase::new(1, 1)?,
+            cause: Mov9MediaClockCause::ObservedZeroScaleWord,
+        })
+    }
     pub fn from_source(source_base: TimeBase) -> Result<Self> {
         if source_base.numerator() == 1 && source_base.denominator() == u64::from(u32::MAX) {
             return Ok(Self {
-                source_base,
+                source_base: source_base.into(),
                 native_base: TimeBase::new(1, 1)?,
                 cause: Mov9MediaClockCause::ObservedAllOnesScaleWord,
             });
@@ -31,7 +71,7 @@ impl Mov9MediaClock {
             ));
         }
         Ok(Self {
-            source_base,
+            source_base: source_base.into(),
             native_base: source_base,
             cause: Mov9MediaClockCause::SourceScale,
         })
@@ -43,9 +83,13 @@ impl Mov9MediaClock {
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Mov9SchedulingClock {
     SingleTrack,
+    /// Explicit from-start nonseekable operation selects by actual byte address.
+    NonseekableSourcePosition(u64),
     ExactMicroseconds(i64),
     ApiSentinel,
-    RescaleOverflow { exact_microseconds: Option<i128> },
+    RescaleOverflow {
+        exact_microseconds: Option<i128>,
+    },
 }
 impl Mov9SchedulingClock {
     pub fn from_native(field: Mov9ClockField, base: TimeBase) -> Result<Self> {

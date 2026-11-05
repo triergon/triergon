@@ -67,7 +67,16 @@ pub(crate) struct Emitter {
 
 impl Emitter {
     pub fn new(plan: Plan, pool: &Budget) -> Self {
-        let transcode = matches!(plan.span.encoding, Encoding::Utf16Be | Encoding::Utf16Le);
+        let transcode = matches!(
+            plan.span.encoding,
+            Encoding::Utf16Be
+                | Encoding::Utf16Le
+                | Encoding::Ascii
+                | Encoding::Latin1
+                | Encoding::Windows1251
+                | Encoding::Windows1252
+                | Encoding::Multibyte(_)
+        );
         let cursor = transcode.then(|| Cursor::new(plan.span.decode.clone(), plan.span.encoding));
         let builder = transcode.then(|| BudgetVec::new(pool));
         Self {
@@ -111,7 +120,16 @@ impl Emitter {
                 }
                 self.decoded = Some(input.payload.slice(plan.span.text.clone())?);
             }
-        } else if matches!(encoding, Encoding::Utf16Be | Encoding::Utf16Le) {
+        } else if matches!(
+            encoding,
+            Encoding::Utf16Be
+                | Encoding::Utf16Le
+                | Encoding::Ascii
+                | Encoding::Latin1
+                | Encoding::Windows1251
+                | Encoding::Windows1252
+                | Encoding::Multibyte(_)
+        ) {
             if !self.reserved {
                 if !work.try_charge(1) {
                     return Ok(Poll::Yield);

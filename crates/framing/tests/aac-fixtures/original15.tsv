@@ -1,0 +1,16 @@
+id	ASC_hex	render_rate_hz	core_rate_hz	core_channels	render_channels	provenance	normative_parser_expectation
+AAC-LC-mono-32000	1288	32000	32000	1	1	ATSC-A153-Part8-2012-TableA.1-printed11	unassigned; examples do not supply complete grammar
+AAC-LC-stereo-32000	1290	32000	32000	2	2	ATSC-A153-Part8-2012-TableA.1-printed11	unassigned; examples do not supply complete grammar
+HE-AAC-mono-32000	2c0a8800	32000	16000	1	1	ATSC-A153-Part8-2012-TableA.1-printed11	unassigned; examples do not supply complete grammar
+HE-AAC-stereo-32000	2c128800	32000	16000	2	2	ATSC-A153-Part8-2012-TableA.1-printed11	unassigned; examples do not supply complete grammar
+HE-AAC-v2-stereo-32000	ec0a8800	32000	16000	1	2	ATSC-A153-Part8-2012-TableA.1-printed11	unassigned; examples do not supply complete grammar
+AAC-LC-mono-44100	1208	44100	44100	1	1	ATSC-A153-Part8-2012-TableA.1-printed11	unassigned; examples do not supply complete grammar
+AAC-LC-stereo-44100	1210	44100	44100	2	2	ATSC-A153-Part8-2012-TableA.1-printed11	unassigned; examples do not supply complete grammar
+HE-AAC-mono-44100	2b8a0800	44100	22050	1	1	ATSC-A153-Part8-2012-TableA.1-printed11	unassigned; examples do not supply complete grammar
+HE-AAC-stereo-44100	2b920800	44100	22050	2	2	ATSC-A153-Part8-2012-TableA.1-printed11	unassigned; examples do not supply complete grammar
+HE-AAC-v2-stereo-44100	eb8a0800	44100	22050	1	2	ATSC-A153-Part8-2012-TableA.1-printed11	unassigned; examples do not supply complete grammar
+AAC-LC-mono-48000	1188	48000	48000	1	1	ATSC-A153-Part8-2012-TableA.1-printed11	unassigned; examples do not supply complete grammar
+AAC-LC-stereo-48000	1190	48000	48000	2	2	ATSC-A153-Part8-2012-TableA.1-printed11	unassigned; examples do not supply complete grammar
+HE-AAC-mono-48000	2b098800	48000	24000	1	1	ATSC-A153-Part8-2012-TableA.1-printed11	unassigned; examples do not supply complete grammar
+HE-AAC-stereo-48000	2b118800	48000	24000	2	2	ATSC-A153-Part8-2012-TableA.1-printed11	unassigned; examples do not supply complete grammar
+HE-AAC-v2-stereo-48000	eb098800	48000	24000	1	2	ATSC-A153-Part8-2012-TableA.1-printed11	unassigned; examples do not supply complete grammar

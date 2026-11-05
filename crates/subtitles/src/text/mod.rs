@@ -7,6 +7,11 @@
 #![forbid(unsafe_code)]
 
 pub mod carriage;
+pub mod charset;
+pub mod native_charset;
+pub mod native_mov_text;
+pub mod tx3g_config;
+pub mod tx3g_semantics;
 
 mod clock;
 mod document;
@@ -54,6 +59,7 @@ const _: () = assert!(std::mem::size_of::<Result<Status>>() <= 688);
 #[derive(Debug)]
 pub struct Extractor {
     pool: Budget,
+    iso_tx3g: bool,
     limits: Limits,
     generation: u64,
     pending: Option<Input>,
@@ -63,9 +69,17 @@ pub struct Extractor {
 }
 
 impl Extractor {
+    /// Additive ISO-box tx3g profile; original constructor stays unchanged.
+    pub fn tx3g_iso_boxes(pool: &Budget, limits: Limits, generation: u64) -> Self {
+        let mut result = Self::new(pool, limits, generation);
+        result.iso_tx3g = true;
+        result
+    }
+
     pub fn new(pool: &Budget, limits: Limits, generation: u64) -> Self {
         Self {
             pool: pool.clone(),
+            iso_tx3g: false,
             limits,
             generation,
             pending: None,
@@ -82,7 +96,7 @@ impl Extractor {
     pub fn provide(&mut self, input: Input) -> std::result::Result<(), ProvideError> {
         match self.check_input(&input) {
             Ok(()) => {
-                self.session = Some(Session::new(&input, &self.pool));
+                self.session = Some(Session::new(&input, &self.pool, self.iso_tx3g));
                 self.pending = Some(input);
                 Ok(())
             }

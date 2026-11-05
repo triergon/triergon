@@ -281,3 +281,33 @@ fn window_bounds_still_fail_without_partial_event_in_either_order() {
         }
     }
 }
+
+#[test]
+fn empty_native_regions_still_validate_display_bounds() {
+    // PCS + a fresh filled 2x2 RCS + EODS, without ODS or a display definition.
+    // The default 720x576 canvas applies even when no rectangle is published.
+    const EMPTY_REGION: &[u8] = &[
+        0x0f, 0x10, 0, 1, 0, 8, 2, 0x0b, 1, 0xff, 0, 0, 0, 0, 0x0f, 0x11, 0, 1, 0, 10, 1, 0x0f, 0,
+        2, 0, 2, 0x27, 0, 0, 3, 0x0f, 0x80, 0, 1, 0, 0,
+    ];
+    for (x, y) in [(719_u16, 0_u16), (0, 575)] {
+        let mut payload = EMPTY_REGION.to_vec();
+        payload[10..12].copy_from_slice(&x.to_be_bytes());
+        payload[12..14].copy_from_slice(&y.to_be_bytes());
+        for view in [ReceiverView::Source, ReceiverView::NativeD32] {
+            for quantum in [1, 7, 4096] {
+                let pool = Budget::new(4 << 20).unwrap();
+                let baseline = pool.used();
+                let result = decode(&pool, &payload, view, quantum);
+                assert_eq!(
+                    result.error,
+                    Some(Error::Invalid("DVB region outside display window")),
+                    "view={view:?} work={quantum} position=({x},{y})"
+                );
+                assert!(result.events.is_empty());
+                drop(result);
+                assert_eq!(pool.used(), baseline);
+            }
+        }
+    }
+}

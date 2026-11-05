@@ -3,7 +3,9 @@
 //! Apple QTFF establishes the chunk/sample byte addresses, not a mandated merged
 //! demux packet schedule. This module implements an explicitly selected physical
 //! address order. It does not claim the pinned MOV reader's default interleaving.
-use crate::{FragmentCursor, FragmentIndex, Sample, SampleCursor, SampleStep, SampleTable};
+use crate::{
+    BoxHeader, FragmentCursor, FragmentIndex, Sample, SampleCursor, SampleStep, SampleTable,
+};
 use std::{
     ops::Range,
     sync::atomic::{AtomicBool, Ordering},
@@ -164,6 +166,7 @@ enum Phase {
     Fill,
     ReadHead,
     Select,
+    TrackOrder,
     End,
 }
 
@@ -186,6 +189,8 @@ enum Phase {
 pub struct PhysicalSampleCursor<'a> {
     slots: BudgetVec<Slot<'a>>,
     media_extents: Option<&'a [Range<u64>]>,
+    forward_media: Option<ForwardRegularMdatV1>,
+    deferred_media: bool,
     limits: PhysicalInterleaveLimits,
     phase: Phase,
     index: usize,
@@ -200,6 +205,46 @@ pub struct PhysicalSampleCursor<'a> {
     ready: Option<InterleavedSample>,
     failed: Option<Error>,
 }
+
+/// Evidence for the first finite MDAT of a forward-only regular movie.
+/// Later sample declarations are pending until their actual MDAT is read.
+#[derive(Clone, Copy, Debug)]
+pub struct ForwardRegularMdatV1 {
+    first_start: u64,
+    first_end: u64,
+    source_length: Option<u64>,
+}
+impl ForwardRegularMdatV1 {
+    pub fn new(header: BoxHeader, source_length: Option<u64>) -> Result<Self> {
+        if header.kind != *b"mdat" {
+            return Err(Error::Invalid("forward regular media header"));
+        }
+        let extent = header.payload_range()?;
+        if extent.start > extent.end || source_length.is_some_and(|end| extent.end > end) {
+            return Err(Error::Invalid("forward regular media extent"));
+        }
+        Ok(Self {
+            first_start: extent.start,
+            first_end: extent.end,
+            source_length,
+        })
+    }
+    pub(crate) fn require_initial_extent(self, media: &[Range<u64>]) -> Result<()> {
+        if let [extent] = media
+            && extent.start == self.first_start
+            && extent.end == self.first_end
+        {
+            return Ok(());
+        }
+        Err(Error::Invalid("forward regular initial media extent"))
+    }
+    pub(crate) fn can_defer(self, sample: &Sample) -> bool {
+        sample.range.start >= self.first_end
+            && sample.range.end > self.first_end
+            && self.source_length.is_none_or(|end| sample.range.end <= end)
+    }
+}
+
 impl<'a> PhysicalSampleCursor<'a> {
     /// Metadata-only source traversal. The caller retains responsibility for
     /// establishing self-contained media containment before accessing payloads.
@@ -223,6 +268,28 @@ impl<'a> PhysicalSampleCursor<'a> {
         limits: PhysicalInterleaveLimits,
     ) -> Result<Self> {
         Self::from_sources(budget, tracks, Some(media_extents), limits)
+    }
+    /// Preserve regular table declarations beyond the observed first MDAT.
+    /// The caller must admit each deferred row against a real later extent
+    /// before reading or publishing its payload.
+    pub fn new_forward_regular_v1(
+        budget: &Budget,
+        tracks: &[SourceTrack<'a>],
+        media: &'a [Range<u64>],
+        bounds: ForwardRegularMdatV1,
+        limits: PhysicalInterleaveLimits,
+    ) -> Result<Self> {
+        bounds.require_initial_extent(media)?;
+        let mut cursor = Self::new_with_media_extents(budget, tracks, media, limits)?;
+        if tracks.iter().any(|track| !track.fragments.is_empty()) {
+            return Err(Error::Unsupported("forward regular media with fragments"));
+        }
+        cursor.forward_media = Some(bounds);
+        Ok(cursor)
+    }
+    /// Indicates that the completed metadata pass contains deferred ranges.
+    pub fn deferred_media(&self) -> bool {
+        self.deferred_media
     }
     fn from_sources(
         budget: &Budget,
@@ -261,6 +328,8 @@ impl<'a> PhysicalSampleCursor<'a> {
         Ok(Self {
             slots,
             media_extents,
+            forward_media: None,
+            deferred_media: false,
             limits,
             phase: if media_extents.is_some() {
                 Phase::ValidateMedia
@@ -286,6 +355,23 @@ impl<'a> PhysicalSampleCursor<'a> {
     /// polling returns an error. After successful preflight this is the full count.
     pub fn validated_samples(&self) -> u64 {
         self.validated
+    }
+    /// Resume at the first validated sample after a physical-layout refusal.
+    /// Samples are then emitted in catalogue track order, with original ordinals
+    /// within each track. Callers needing physical order must sort the result.
+    pub fn resume_in_track_order(&mut self) -> bool {
+        if self.phase != Phase::ValidateEnter
+            || self.index != self.slots.len()
+            || self.layout_error.is_none()
+            || self.failed != self.layout_error
+            || self.deferred_media
+        {
+            return false;
+        }
+        self.failed = None;
+        self.index = 0;
+        self.phase = Phase::TrackOrder;
+        true
     }
     pub fn take_sample(&mut self) -> Result<InterleavedSample> {
         if let Some(error) = self.failed {
@@ -414,7 +500,14 @@ impl<'a> PhysicalSampleCursor<'a> {
                         .extent_low
                         .checked_sub(1)
                         .ok_or(Error::Invalid("sample outside self-contained mdat"))?;
-                    sample.require_within(media[selected].clone())?;
+                    if self
+                        .forward_media
+                        .is_some_and(|bounds| bounds.can_defer(sample))
+                    {
+                        self.deferred_media = true;
+                    } else {
+                        sample.require_within(media[selected].clone())?;
+                    }
                     self.phase = Phase::ValidateOrder;
                 }
                 Phase::ValidateOrder => {
@@ -516,6 +609,22 @@ impl<'a> PhysicalSampleCursor<'a> {
                         }
                     }
                     self.index += 1;
+                }
+                Phase::TrackOrder => {
+                    let Some(slot) = self.slots.as_mut_slice().get_mut(self.index) else {
+                        self.phase = Phase::End;
+                        continue;
+                    };
+                    match slot.cursor.poll(work)? {
+                        SampleStep::Yield => return Ok(InterleaveStatus::Yield),
+                        SampleStep::End => self.index += 1,
+                        SampleStep::Sample(sample) => {
+                            self.ready = Some(InterleavedSample {
+                                track_id: slot.source.track_id,
+                                sample,
+                            });
+                        }
+                    }
                 }
                 Phase::End => return Ok(InterleaveStatus::End),
             }

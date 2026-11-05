@@ -1,5 +1,24 @@
 # triergon-mpegts syntax slice
 
+The selected audio/M2TS whole-object checkpoint adds the explicit
+`--native-selected-object-v2` operation. Its frozen Linux source passes569
+core/TS/example tests per debug/release profile, including18 new format,
+namespace, work/cancellation, pressure and retained-owner guards; the existing
+input-export helper remains intentionally ignored. All17 selected raw native
+objects and independent source traces match byte-for-byte: six finite188-byte
+AAC/AC-3/E-AC-3 cases, two video controls and nine finite192-byte video cases.
+The unchanged695 registry,21 packet objects,21 prior whole-object and21 PSI
+views, entity controls and argument refusals are preserved. Clippy, formatting,
+shipping and ARM32 checks pass. Evidence is
+`.research/ts-m2ts-audio-closure-v1/handoff-1/` (source411c83d1).
+The original TS188/video constructors and operation flags retain their previous
+admissions and refusals. Private audio names are explicit archived-native views;
+raw source stream types, descriptors, `Unspecified` namespace and unknown clocks
+are retained. The observed four-byte M2TS prefix/position view is not a Blu-ray
+conformance claim. This checkpoint has no new runtime or heap/RSS qualification;
+complete M04, unobserved audio/M2TS combinations, long/nonfinite startup and
+broader recovery remain required.
+
 Independent pure safe Rust; only dependency is `triergon-core` at `../core`.
 
 The selected-diagnostic checkpoint passes258 TS and50 core tests in each

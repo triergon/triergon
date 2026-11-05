@@ -1,0 +1,2529 @@
+{
+ "platform_label": "MacBook Pro M3 Pro (macOS 15.6.1, MoltenVK 1.4.2; not isolated)",
+ "platform": {
+  "system": "Darwin",
+  "node": "Jonass-MacBook-Pro-4.local",
+  "release": "24.6.0",
+  "version": "Darwin Kernel Version 24.6.0: Mon Jul 14 11:28:30 PDT 2025; root:xnu-11417.140.69~1/RELEASE_ARM64_T6030",
+  "machine": "arm64",
+  "processor": "arm"
+ },
+ "rounds": 10,
+ "configs": [
+  "rust",
+  "ffmpeg-sws",
+  "ffmpeg-gpu",
+  "ffmpeg-gpu-transfer",
+  "ffmpeg-gpu-placebo"
+ ],
+ "host_loadavg": [
+  [
+   9.82275390625,
+   7.35546875,
+   7.83935546875
+  ],
+  [
+   9.91162109375,
+   8.37841796875,
+   8.20947265625
+  ]
+ ],
+ "cases": {
+  "c04-motion-960": {
+   "gpu_check": {
+    "selected": [
+     "Device 0 selected: Apple M3 Pro (integrated) (0xf060209)"
+    ],
+    "backend": [
+     "Compiled using backend 'spirv': block size = 0, over-read = {0 0 0 0}, over-write = {0 0 0 0}, cpu flags = 0x0"
+    ],
+    "exit": 0
+   },
+   "correctness": {
+    "ffmpeg-gpu": {
+     "compare_py": {
+      "conversion": false,
+      "conversion_max_abs": 20,
+      "conversion_exact": 0.75894,
+      "mux": false,
+      "encoder": false,
+      "encoder_v1": false,
+      "encoder_mode": "equal-or-fewer-bits",
+      "interpolated_psnr_y": null,
+      "reference_exceeds_request": true,
+      "bits_ratio": 1.0034,
+      "psnr_y": [
+       42.507,
+       42.588
+      ],
+      "psnr_delta": -0.081,
+      "vbv_underflow": [
+       0.0,
+       0.0
+      ],
+      "pipeline": false
+     },
+     "ffmpeg_candidate": {
+      "conversion": false,
+      "mux_tables_identical": true,
+      "encoder_same_frames_and_quality": true,
+      "frames": [
+       89,
+       89
+      ],
+      "bits_ratio": 1.0034,
+      "psnr_y_db": [
+       42.507,
+       42.588
+      ],
+      "psnr_y_delta_db": -0.081
+     }
+    },
+    "ffmpeg-gpu-placebo": {
+     "compare_py": {
+      "conversion": false,
+      "conversion_max_abs": 41,
+      "conversion_exact": 0.82827,
+      "mux": false,
+      "encoder": false,
+      "encoder_v1": false,
+      "encoder_mode": "equal-or-fewer-bits",
+      "interpolated_psnr_y": null,
+      "reference_exceeds_request": true,
+      "bits_ratio": 0.9981,
+      "psnr_y": [
+       42.592,
+       42.588
+      ],
+      "psnr_delta": 0.004,
+      "vbv_underflow": [
+       0.0,
+       0.0
+      ],
+      "pipeline": false
+     },
+     "ffmpeg_candidate": {
+      "conversion": false,
+      "mux_tables_identical": true,
+      "encoder_same_frames_and_quality": true,
+      "frames": [
+       89,
+       89
+      ],
+      "bits_ratio": 0.9981,
+      "psnr_y_db": [
+       42.592,
+       42.588
+      ],
+      "psnr_y_delta_db": 0.004
+     }
+    },
+    "rust-vs-ffmpeg-sws": {
+     "compare_py": {
+      "conversion": true,
+      "conversion_max_abs": 1,
+      "conversion_exact": 0.99235,
+      "mux": true,
+      "encoder": true,
+      "encoder_v1": true,
+      "encoder_mode": "equal-or-fewer-bits",
+      "interpolated_psnr_y": null,
+      "reference_exceeds_request": true,
+      "bits_ratio": 0.9072,
+      "psnr_y": [
+       42.699,
+       42.588
+      ],
+      "psnr_delta": 0.11,
+      "vbv_underflow": [
+       0.0,
+       0.0
+      ],
+      "pipeline": true
+     }
+    }
+   },
+   "configs": {
+    "rust": {
+     "runs": 10,
+     "session_ms": 275.7845835,
+     "startup_device_ms": 0.0,
+     "open_ms": 0.1666045,
+     "frames_ms": 275.35347950000005,
+     "throughput_fps": 326.8662181394004,
+     "frame_latency_median_ms": 3.010646,
+     "frame_latency_p95_ms": 3.596438,
+     "convert_median_ms": 0.36583350000000003,
+     "drain_ms": 4.1e-05,
+     "reset_ms": 0.23910349999999997,
+     "close_ms": 0.006813,
+     "shutdown_device_ms": 0.0,
+     "cpu_s_minus_load": 0.2542085,
+     "cpu_per_frame_ms": 2.824538888888889,
+     "rss_peak_mb": 191.660032,
+     "footprint_peak_mb": 0.0,
+     "gpu_util_median": 84,
+     "gpu_util_max": 94,
+     "gpu_process_mem_mib_max": 0,
+     "heap_peak_mb": [
+      3.23,
+      3.23,
+      3.23
+     ],
+     "heap_status": [
+      "measured"
+     ],
+     "output_hashes": [
+      "656ac0de06930128"
+     ],
+     "session_ms_min_max": [
+      251.481,
+      360.135
+     ],
+     "process_wall_ms_median": 325.79,
+     "gpu_device_mem_mib_max": 0,
+     "gpu_system_mem_in_use_max": 1974976512,
+     "heap_runs": [
+      {
+       "status": "measured",
+       "heap_peak_bytes": 3232752,
+       "result": {
+        "bytes": 982300,
+        "fnv1a64": "656ac0de06930128"
+       }
+      },
+      {
+       "status": "measured",
+       "heap_peak_bytes": 3232752,
+       "result": {
+        "bytes": 982300,
+        "fnv1a64": "656ac0de06930128"
+       }
+      },
+      {
+       "status": "measured",
+       "heap_peak_bytes": 3232752,
+       "result": {
+        "bytes": 982300,
+        "fnv1a64": "656ac0de06930128"
+       }
+      }
+     ],
+     "session_ratio_vs_ffmpeg_sws": {
+      "median": 1.11,
+      "min": 1.043,
+      "max": 1.312,
+      "pairs": 10
+     },
+     "attributable_rss_mb": 6.88,
+     "rss_pass": {
+      "load_maxrss": [
+       187957248,
+       187940864,
+       188153856
+      ],
+      "phases_maxrss": [
+       194166784,
+       194985984,
+       194838528
+      ],
+      "phases_exit": [
+       0,
+       0,
+       0
+      ],
+      "attributable_bytes": [
+       6209536,
+       7028736,
+       6881280
+      ]
+     }
+    },
+    "ffmpeg-sws": {
+     "runs": 10,
+     "session_ms": 243.90449999999998,
+     "startup_device_ms": 0.0,
+     "open_ms": 0.44,
+     "frames_ms": 241.835,
+     "throughput_fps": 372.1545959160303,
+     "frame_latency_median_ms": 2.4525,
+     "frame_latency_p95_ms": 5.582000000000001,
+     "convert_median_ms": 0.6605000000000001,
+     "drain_ms": 1.4609999999999999,
+     "reset_ms": 0.242,
+     "close_ms": 0.009000000000000001,
+     "shutdown_device_ms": 0.0,
+     "cpu_s_minus_load": 0.232294,
+     "cpu_per_frame_ms": 2.5810444444444443,
+     "rss_peak_mb": 198.623232,
+     "footprint_peak_mb": 196.32291199999997,
+     "gpu_util_median": 83.0,
+     "gpu_util_max": 90,
+     "gpu_process_mem_mib_max": 0,
+     "heap_peak_mb": [
+      7.23,
+      7.23,
+      7.23
+     ],
+     "heap_status": [
+      "measured"
+     ],
+     "output_hashes": [
+      "02e52f8b5b8af5c0"
+     ],
+     "session_ms_min_max": [
+      229.161,
+      308.492
+     ],
+     "process_wall_ms_median": 290.916,
+     "gpu_device_mem_mib_max": 0,
+     "gpu_system_mem_in_use_max": 1857617920,
+     "heap_runs": [
+      {
+       "status": "measured",
+       "heap_peak_bytes": 7232624,
+       "result": {
+        "bytes": 1073292,
+        "fnv1a64": "02e52f8b5b8af5c0",
+        "maxrss": 202883072,
+        "footprint_peak": 198625344
+       }
+      },
+      {
+       "status": "measured",
+       "heap_peak_bytes": 7232624,
+       "result": {
+        "bytes": 1073292,
+        "fnv1a64": "02e52f8b5b8af5c0",
+        "maxrss": 202866688,
+        "footprint_peak": 198608960
+       }
+      },
+      {
+       "status": "measured",
+       "heap_peak_bytes": 7232624,
+       "result": {
+        "bytes": 1073292,
+        "fnv1a64": "02e52f8b5b8af5c0",
+        "maxrss": 203030528,
+        "footprint_peak": 198789248
+       }
+      }
+     ],
+     "session_cpu_per_frame_ms": 2.678,
+     "footprint_peak_mb_median": 196.32,
+     "session_ratio_vs_ffmpeg_sws": {
+      "median": 1.0,
+      "min": 1.0,
+      "max": 1.0,
+      "pairs": 10
+     },
+     "attributable_rss_mb": 10.21,
+     "rss_pass": {
+      "load_maxrss": [
+       189284352,
+       189300736,
+       189612032
+      ],
+      "phases_maxrss": [
+       199245824,
+       199507968,
+       199589888
+      ],
+      "phases_exit": [
+       0,
+       0,
+       0
+      ],
+      "attributable_bytes": [
+       9945088,
+       10207232,
+       10289152
+      ]
+     }
+    },
+    "ffmpeg-gpu": {
+     "runs": 10,
+     "session_ms": 558.5609999999999,
+     "startup_device_ms": 22.7225,
+     "open_ms": 1.113,
+     "frames_ms": 549.7985,
+     "throughput_fps": 163.70900459873678,
+     "frame_latency_median_ms": 6.2375,
+     "frame_latency_p95_ms": 9.5815,
+     "convert_median_ms": 4.0005,
+     "drain_ms": 1.8165,
+     "reset_ms": 1.4224999999999999,
+     "close_ms": 0.17099999999999999,
+     "shutdown_device_ms": 1.678,
+     "cpu_s_minus_load": 0.4039475,
+     "cpu_per_frame_ms": 4.488305555555556,
+     "rss_peak_mb": 221.298688,
+     "footprint_peak_mb": 301.836736,
+     "gpu_util_median": 85,
+     "gpu_util_max": 95,
+     "gpu_process_mem_mib_max": 0,
+     "heap_peak_mb": [
+      15.4,
+      15.39,
+      15.4
+     ],
+     "heap_status": [
+      "measured"
+     ],
+     "output_hashes": [
+      "59d9688cf8a80849"
+     ],
+     "session_ms_min_max": [
+      494.506,
+      751.202
+     ],
+     "process_wall_ms_median": 644.383,
+     "gpu_device_mem_mib_max": 0,
+     "gpu_system_mem_in_use_max": 1959313408,
+     "heap_runs": [
+      {
+       "status": "measured",
+       "heap_peak_bytes": 15396032,
+       "result": {
+        "bytes": 1082128,
+        "fnv1a64": "59d9688cf8a80849",
+        "maxrss": 226754560,
+        "footprint_peak": 304417728
+       }
+      },
+      {
+       "status": "measured",
+       "heap_peak_bytes": 15394480,
+       "result": {
+        "bytes": 1082128,
+        "fnv1a64": "59d9688cf8a80849",
+        "maxrss": 226344960,
+        "footprint_peak": 303958784
+       }
+      },
+      {
+       "status": "measured",
+       "heap_peak_bytes": 15399808,
+       "result": {
+        "bytes": 1082128,
+        "fnv1a64": "59d9688cf8a80849",
+        "maxrss": 226099200,
+        "footprint_peak": 303663680
+       }
+      }
+     ],
+     "session_cpu_per_frame_ms": 4.273,
+     "footprint_peak_mb_median": 301.84,
+     "session_ratio_vs_ffmpeg_sws": {
+      "median": 2.228,
+      "min": 2.037,
+      "max": 2.881,
+      "pairs": 10
+     },
+     "attributable_rss_mb": 33.34,
+     "rss_pass": {
+      "load_maxrss": [
+       189530112,
+       189431808,
+       189251584
+      ],
+      "phases_maxrss": [
+       221708288,
+       222904320,
+       222773248
+      ],
+      "phases_exit": [
+       0,
+       0,
+       0
+      ],
+      "attributable_bytes": [
+       32276480,
+       33472512,
+       33341440
+      ]
+     }
+    },
+    "ffmpeg-gpu-transfer": {
+     "runs": 10,
+     "session_ms": 208.375,
+     "startup_device_ms": 21.490499999999997,
+     "open_ms": 1.4195,
+     "frames_ms": 204.3625,
+     "throughput_fps": 440.7047536713005,
+     "frame_latency_median_ms": 2.1705,
+     "frame_latency_p95_ms": 5.4465,
+     "convert_median_ms": 1.7414999999999998,
+     "drain_ms": 0.279,
+     "reset_ms": 0.819,
+     "close_ms": 0.1195,
+     "shutdown_device_ms": 1.855,
+     "cpu_s_minus_load": 0.10198449999999999,
+     "cpu_per_frame_ms": 1.1331611111111108,
+     "rss_peak_mb": 213.663744,
+     "footprint_peak_mb": 291.91609600000004,
+     "gpu_util_median": 86,
+     "gpu_util_max": 96,
+     "gpu_process_mem_mib_max": 0,
+     "heap_peak_mb": [
+      11.1,
+      11.07,
+      11.1
+     ],
+     "heap_status": [
+      "measured"
+     ],
+     "output_hashes": [
+      "bb889e66a675e1f1"
+     ],
+     "session_ms_min_max": [
+      186.863,
+      327.509
+     ],
+     "process_wall_ms_median": 279.464,
+     "gpu_device_mem_mib_max": 0,
+     "gpu_system_mem_in_use_max": 1970552832,
+     "heap_runs": [
+      {
+       "status": "measured",
+       "heap_peak_bytes": 11097840,
+       "result": {
+        "bytes": 52452,
+        "fnv1a64": "bb889e66a675e1f1",
+        "maxrss": 218546176,
+        "footprint_peak": 293718272
+       }
+      },
+      {
+       "status": "measured",
+       "heap_peak_bytes": 11072288,
+       "result": {
+        "bytes": 52452,
+        "fnv1a64": "bb889e66a675e1f1",
+        "maxrss": 218710016,
+        "footprint_peak": 293898752
+       }
+      },
+      {
+       "status": "measured",
+       "heap_peak_bytes": 11098016,
+       "result": {
+        "bytes": 52452,
+        "fnv1a64": "bb889e66a675e1f1",
+        "maxrss": 218710016,
+        "footprint_peak": 302270912
+       }
+      }
+     ],
+     "session_cpu_per_frame_ms": 0.999,
+     "footprint_peak_mb_median": 291.92,
+     "session_ratio_vs_ffmpeg_sws": {
+      "median": 0.862,
+      "min": 0.794,
+      "max": 1.343,
+      "pairs": 10
+     },
+     "attributable_rss_mb": 24.99,
+     "rss_pass": {
+      "load_maxrss": [
+       189497344,
+       189431808,
+       189317120
+      ],
+      "phases_maxrss": [
+       214401024,
+       215007232,
+       214417408
+      ],
+      "phases_exit": [
+       0,
+       0,
+       0
+      ],
+      "attributable_bytes": [
+       24969216,
+       25575424,
+       24985600
+      ]
+     }
+    },
+    "ffmpeg-gpu-placebo": {
+     "runs": 10,
+     "session_ms": 664.7305,
+     "startup_device_ms": 19.22,
+     "open_ms": 1.6935,
+     "frames_ms": 655.905,
+     "throughput_fps": 137.21630480107677,
+     "frame_latency_median_ms": 5.856,
+     "frame_latency_p95_ms": 9.366,
+     "convert_median_ms": 3.6775,
+     "drain_ms": 1.5335,
+     "reset_ms": 4.7605,
+     "close_ms": 0.2595,
+     "shutdown_device_ms": 1.1600000000000001,
+     "cpu_s_minus_load": 0.548349,
+     "cpu_per_frame_ms": 6.092766666666666,
+     "rss_peak_mb": 268.320768,
+     "footprint_peak_mb": 484.248096,
+     "gpu_util_median": 89.0,
+     "gpu_util_max": 95,
+     "gpu_process_mem_mib_max": 0,
+     "heap_peak_mb": [
+      45.58,
+      45.58,
+      45.58
+     ],
+     "heap_status": [
+      "measured"
+     ],
+     "output_hashes": [
+      "056ebd6234b68f00"
+     ],
+     "session_ms_min_max": [
+      605.516,
+      922.793
+     ],
+     "process_wall_ms_median": 737.053,
+     "gpu_device_mem_mib_max": 0,
+     "gpu_system_mem_in_use_max": 2254061568,
+     "heap_runs": [
+      {
+       "status": "measured",
+       "heap_peak_bytes": 45576736,
+       "result": {
+        "bytes": 1070660,
+        "fnv1a64": "056ebd6234b68f00",
+        "maxrss": 272613376,
+        "footprint_peak": 485788544
+       }
+      },
+      {
+       "status": "measured",
+       "heap_peak_bytes": 45576736,
+       "result": {
+        "bytes": 1070660,
+        "fnv1a64": "056ebd6234b68f00",
+        "maxrss": 272449536,
+        "footprint_peak": 487099264
+       }
+      },
+      {
+       "status": "measured",
+       "heap_peak_bytes": 45581344,
+       "result": {
+        "bytes": 1070660,
+        "fnv1a64": "056ebd6234b68f00",
+        "maxrss": 272662528,
+        "footprint_peak": 542477056
+       }
+      }
+     ],
+     "session_cpu_per_frame_ms": 6.0,
+     "footprint_peak_mb_median": 484.25,
+     "session_ratio_vs_ffmpeg_sws": {
+      "median": 2.706,
+      "min": 2.483,
+      "max": 3.085,
+      "pairs": 10
+     },
+     "attributable_rss_mb": 78.07,
+     "rss_pass": {
+      "load_maxrss": [
+       190496768,
+       190414848,
+       190267392
+      ],
+      "phases_maxrss": [
+       267812864,
+       268910592,
+       268484608
+      ],
+      "phases_exit": [
+       0,
+       0,
+       0
+      ],
+      "attributable_bytes": [
+       77398016,
+       78495744,
+       78069760
+      ]
+     }
+    }
+   }
+  },
+  "c02-ui-scroll-960": {
+   "gpu_check": {
+    "selected": [
+     "Device 0 selected: Apple M3 Pro (integrated) (0xf060209)"
+    ],
+    "backend": [
+     "Compiled using backend 'spirv': block size = 0, over-read = {0 0 0 0}, over-write = {0 0 0 0}, cpu flags = 0x0"
+    ],
+    "exit": 0
+   },
+   "correctness": {
+    "ffmpeg-gpu": {
+     "compare_py": {
+      "conversion": false,
+      "conversion_max_abs": 12,
+      "conversion_exact": 0.8089,
+      "mux": false,
+      "encoder": false,
+      "encoder_v1": false,
+      "encoder_mode": "equal-or-fewer-bits",
+      "interpolated_psnr_y": null,
+      "reference_exceeds_request": false,
+      "bits_ratio": 0.998,
+      "psnr_y": [
+       50.638,
+       52.219
+      ],
+      "psnr_delta": -1.581,
+      "vbv_underflow": [
+       0.0,
+       0.0
+      ],
+      "pipeline": false
+     },
+     "ffmpeg_candidate": {
+      "conversion": false,
+      "mux_tables_identical": true,
+      "encoder_same_frames_and_quality": false,
+      "frames": [
+       89,
+       89
+      ],
+      "bits_ratio": 0.998,
+      "psnr_y_db": [
+       50.638,
+       52.219
+      ],
+      "psnr_y_delta_db": -1.581
+     }
+    },
+    "ffmpeg-gpu-placebo": {
+     "compare_py": {
+      "conversion": false,
+      "conversion_max_abs": 26,
+      "conversion_exact": 0.91607,
+      "mux": false,
+      "encoder": false,
+      "encoder_v1": false,
+      "encoder_mode": "equal-or-fewer-bits",
+      "interpolated_psnr_y": null,
+      "reference_exceeds_request": false,
+      "bits_ratio": 0.9965,
+      "psnr_y": [
+       52.207,
+       52.219
+      ],
+      "psnr_delta": -0.012,
+      "vbv_underflow": [
+       0.0,
+       0.0
+      ],
+      "pipeline": false
+     },
+     "ffmpeg_candidate": {
+      "conversion": false,
+      "mux_tables_identical": true,
+      "encoder_same_frames_and_quality": true,
+      "frames": [
+       89,
+       89
+      ],
+      "bits_ratio": 0.9965,
+      "psnr_y_db": [
+       52.207,
+       52.219
+      ],
+      "psnr_y_delta_db": -0.012
+     }
+    },
+    "rust-vs-ffmpeg-sws": {
+     "compare_py": {
+      "conversion": true,
+      "conversion_max_abs": 1,
+      "conversion_exact": 0.99428,
+      "mux": true,
+      "encoder": true,
+      "encoder_v1": false,
+      "encoder_mode": "within-requested-budget",
+      "interpolated_psnr_y": null,
+      "reference_exceeds_request": false,
+      "bits_ratio": 1.0662,
+      "psnr_y": [
+       52.118,
+       52.219
+      ],
+      "psnr_delta": -0.101,
+      "vbv_underflow": [
+       0.0,
+       0.0
+      ],
+      "pipeline": true
+     }
+    }
+   },
+   "configs": {
+    "rust": {
+     "runs": 10,
+     "session_ms": 135.5595,
+     "startup_device_ms": 0.0,
+     "open_ms": 0.1740835,
+     "frames_ms": 135.13070800000003,
+     "throughput_fps": 666.0227869942123,
+     "frame_latency_median_ms": 1.4388960000000002,
+     "frame_latency_p95_ms": 2.0850415,
+     "convert_median_ms": 0.375979,
+     "drain_ms": 4.2e-05,
+     "reset_ms": 0.2471045,
+     "close_ms": 0.00675,
+     "shutdown_device_ms": 0.0,
+     "cpu_s_minus_load": 0.12743449999999998,
+     "cpu_per_frame_ms": 1.4159388888888886,
+     "rss_peak_mb": 191.594496,
+     "footprint_peak_mb": 0.0,
+     "gpu_util_median": 79.0,
+     "gpu_util_max": 90,
+     "gpu_process_mem_mib_max": 0,
+     "heap_peak_mb": [
+      3.23,
+      3.23,
+      3.23
+     ],
+     "heap_status": [
+      "measured"
+     ],
+     "output_hashes": [
+      "ccf68ae351de05cc"
+     ],
+     "session_ms_min_max": [
+      131.702,
+      142.881
+     ],
+     "process_wall_ms_median": 182.567,
+     "gpu_device_mem_mib_max": 0,
+     "gpu_system_mem_in_use_max": 1906098176,
+     "heap_runs": [
+      {
+       "status": "measured",
+       "heap_peak_bytes": 3232752,
+       "result": {
+        "bytes": 632996,
+        "fnv1a64": "ccf68ae351de05cc"
+       }
+      },
+      {
+       "status": "measured",
+       "heap_peak_bytes": 3232752,
+       "result": {
+        "bytes": 632996,
+        "fnv1a64": "ccf68ae351de05cc"
+       }
+      },
+      {
+       "status": "measured",
+       "heap_peak_bytes": 3232752,
+       "result": {
+        "bytes": 632996,
+        "fnv1a64": "ccf68ae351de05cc"
+       }
+      }
+     ],
+     "session_ratio_vs_ffmpeg_sws": {
+      "median": 0.922,
+      "min": 0.678,
+      "max": 0.993,
+      "pairs": 10
+     },
+     "attributable_rss_mb": 6.52,
+     "rss_pass": {
+      "load_maxrss": [
+       187940864,
+       188039168,
+       188006400
+      ],
+      "phases_maxrss": [
+       194215936,
+       194740224,
+       194527232
+      ],
+      "phases_exit": [
+       0,
+       0,
+       0
+      ],
+      "attributable_bytes": [
+       6209536,
+       6733824,
+       6520832
+      ]
+     }
+    },
+    "ffmpeg-sws": {
+     "runs": 10,
+     "session_ms": 147.063,
+     "startup_device_ms": 0.0,
+     "open_ms": 0.405,
+     "frames_ms": 145.7945,
+     "throughput_fps": 617.3935156961052,
+     "frame_latency_median_ms": 1.487,
+     "frame_latency_p95_ms": 2.2775,
+     "convert_median_ms": 0.7095,
+     "drain_ms": 0.635,
+     "reset_ms": 0.247,
+     "close_ms": 0.007,
+     "shutdown_device_ms": 0.0,
+     "cpu_s_minus_load": 0.14466199999999999,
+     "cpu_per_frame_ms": 1.6073555555555554,
+     "rss_peak_mb": 198.57407999999998,
+     "footprint_peak_mb": 196.142496,
+     "gpu_util_median": 77,
+     "gpu_util_max": 88,
+     "gpu_process_mem_mib_max": 0,
+     "heap_peak_mb": [
+      7.23,
+      7.23,
+      7.23
+     ],
+     "heap_status": [
+      "measured"
+     ],
+     "output_hashes": [
+      "ff711e943eb57dbc"
+     ],
+     "session_ms_min_max": [
+      141.511,
+      200.313
+     ],
+     "process_wall_ms_median": 207.129,
+     "gpu_device_mem_mib_max": 0,
+     "gpu_system_mem_in_use_max": 1910505472,
+     "heap_runs": [
+      {
+       "status": "measured",
+       "heap_peak_bytes": 7232624,
+       "result": {
+        "bytes": 595020,
+        "fnv1a64": "ff711e943eb57dbc",
+        "maxrss": 202424320,
+        "footprint_peak": 198133696
+       }
+      },
+      {
+       "status": "measured",
+       "heap_peak_bytes": 7232624,
+       "result": {
+        "bytes": 595020,
+        "fnv1a64": "ff711e943eb57dbc",
+        "maxrss": 202457088,
+        "footprint_peak": 198150016
+       }
+      },
+      {
+       "status": "measured",
+       "heap_peak_bytes": 7232624,
+       "result": {
+        "bytes": 595020,
+        "fnv1a64": "ff711e943eb57dbc",
+        "maxrss": 202342400,
+        "footprint_peak": 198002432
+       }
+      }
+     ],
+     "session_cpu_per_frame_ms": 1.607,
+     "footprint_peak_mb_median": 196.14,
+     "session_ratio_vs_ffmpeg_sws": {
+      "median": 1.0,
+      "min": 1.0,
+      "max": 1.0,
+      "pairs": 10
+     },
+     "attributable_rss_mb": 9.44,
+     "rss_pass": {
+      "load_maxrss": [
+       189497344,
+       189366272,
+       189349888
+      ],
+      "phases_maxrss": [
+       198803456,
+       198787072,
+       199000064
+      ],
+      "phases_exit": [
+       0,
+       0,
+       0
+      ],
+      "attributable_bytes": [
+       9437184,
+       9420800,
+       9633792
+      ]
+     }
+    },
+    "ffmpeg-gpu": {
+     "runs": 10,
+     "session_ms": 382.993,
+     "startup_device_ms": 19.192999999999998,
+     "open_ms": 1.1179999999999999,
+     "frames_ms": 377.37800000000004,
+     "throughput_fps": 238.48777822641352,
+     "frame_latency_median_ms": 3.8259999999999996,
+     "frame_latency_p95_ms": 7.079000000000001,
+     "convert_median_ms": 2.8680000000000003,
+     "drain_ms": 0.6565000000000001,
+     "reset_ms": 1.5055,
+     "close_ms": 0.17099999999999999,
+     "shutdown_device_ms": 1.6880000000000002,
+     "cpu_s_minus_load": 0.2746835,
+     "cpu_per_frame_ms": 3.052038888888889,
+     "rss_peak_mb": 221.02835199999998,
+     "footprint_peak_mb": 301.54995199999996,
+     "gpu_util_median": 80.0,
+     "gpu_util_max": 88,
+     "gpu_process_mem_mib_max": 0,
+     "heap_peak_mb": [
+      15.41,
+      15.41,
+      15.41
+     ],
+     "heap_status": [
+      "measured"
+     ],
+     "output_hashes": [
+      "47d04767b131b281"
+     ],
+     "session_ms_min_max": [
+      348.73,
+      563.969
+     ],
+     "process_wall_ms_median": 463.167,
+     "gpu_device_mem_mib_max": 0,
+     "gpu_system_mem_in_use_max": 2062172160,
+     "heap_runs": [
+      {
+       "status": "measured",
+       "heap_peak_bytes": 15412416,
+       "result": {
+        "bytes": 593328,
+        "fnv1a64": "47d04767b131b281",
+        "maxrss": 226066432,
+        "footprint_peak": 303614464
+       }
+      },
+      {
+       "status": "measured",
+       "heap_peak_bytes": 15412336,
+       "result": {
+        "bytes": 593328,
+        "fnv1a64": "47d04767b131b281",
+        "maxrss": 225755136,
+        "footprint_peak": 303286720
+       }
+      },
+      {
+       "status": "measured",
+       "heap_peak_bytes": 15412416,
+       "result": {
+        "bytes": 593328,
+        "fnv1a64": "47d04767b131b281",
+        "maxrss": 225918976,
+        "footprint_peak": 303499904
+       }
+      }
+     ],
+     "session_cpu_per_frame_ms": 2.871,
+     "footprint_peak_mb_median": 301.55,
+     "session_ratio_vs_ffmpeg_sws": {
+      "median": 2.592,
+      "min": 1.898,
+      "max": 3.575,
+      "pairs": 10
+     },
+     "attributable_rss_mb": 32.92,
+     "rss_pass": {
+      "load_maxrss": [
+       189251584,
+       189464576,
+       189382656
+      ],
+      "phases_maxrss": [
+       222691328,
+       222216192,
+       222298112
+      ],
+      "phases_exit": [
+       0,
+       0,
+       0
+      ],
+      "attributable_bytes": [
+       33308672,
+       32833536,
+       32915456
+      ]
+     }
+    },
+    "ffmpeg-gpu-transfer": {
+     "runs": 10,
+     "session_ms": 197.2505,
+     "startup_device_ms": 19.056,
+     "open_ms": 0.87,
+     "frames_ms": 193.406,
+     "throughput_fps": 465.57775022790105,
+     "frame_latency_median_ms": 2.0905,
+     "frame_latency_p95_ms": 5.07,
+     "convert_median_ms": 1.691,
+     "drain_ms": 0.256,
+     "reset_ms": 0.865,
+     "close_ms": 0.1365,
+     "shutdown_device_ms": 1.8555000000000001,
+     "cpu_s_minus_load": 0.099849,
+     "cpu_per_frame_ms": 1.109433333333333,
+     "rss_peak_mb": 213.64736,
+     "footprint_peak_mb": 291.899648,
+     "gpu_util_median": 82.5,
+     "gpu_util_max": 91,
+     "gpu_process_mem_mib_max": 0,
+     "heap_peak_mb": [
+      11.09,
+      11.09,
+      11.08
+     ],
+     "heap_status": [
+      "measured"
+     ],
+     "output_hashes": [
+      "bb889e66a675e1f1"
+     ],
+     "session_ms_min_max": [
+      171.625,
+      229.421
+     ],
+     "process_wall_ms_median": 275.722,
+     "gpu_device_mem_mib_max": 0,
+     "gpu_system_mem_in_use_max": 2030911488,
+     "heap_runs": [
+      {
+       "status": "measured",
+       "heap_peak_bytes": 11085040,
+       "result": {
+        "bytes": 52452,
+        "fnv1a64": "bb889e66a675e1f1",
+        "maxrss": 218382336,
+        "footprint_peak": 293587392
+       }
+      },
+      {
+       "status": "measured",
+       "heap_peak_bytes": 11085088,
+       "result": {
+        "bytes": 52452,
+        "fnv1a64": "bb889e66a675e1f1",
+        "maxrss": 218595328,
+        "footprint_peak": 293783872
+       }
+      },
+      {
+       "status": "measured",
+       "heap_peak_bytes": 11080096,
+       "result": {
+        "bytes": 52452,
+        "fnv1a64": "bb889e66a675e1f1",
+        "maxrss": 218677248,
+        "footprint_peak": 293882240
+       }
+      }
+     ],
+     "session_cpu_per_frame_ms": 0.914,
+     "footprint_peak_mb_median": 291.9,
+     "session_ratio_vs_ffmpeg_sws": {
+      "median": 1.322,
+      "min": 0.962,
+      "max": 1.559,
+      "pairs": 10
+     },
+     "attributable_rss_mb": 25.4,
+     "rss_pass": {
+      "load_maxrss": [
+       189480960,
+       189399040,
+       189333504
+      ],
+      "phases_maxrss": [
+       214794240,
+       214368256,
+       214941696
+      ],
+      "phases_exit": [
+       0,
+       0,
+       0
+      ],
+      "attributable_bytes": [
+       25395200,
+       24969216,
+       25542656
+      ]
+     }
+    },
+    "ffmpeg-gpu-placebo": {
+     "runs": 10,
+     "session_ms": 525.024,
+     "startup_device_ms": 18.506999999999998,
+     "open_ms": 1.2135,
+     "frames_ms": 516.764,
+     "throughput_fps": 174.1652499139672,
+     "frame_latency_median_ms": 4.394500000000001,
+     "frame_latency_p95_ms": 8.161999999999999,
+     "convert_median_ms": 3.259,
+     "drain_ms": 0.676,
+     "reset_ms": 4.907500000000001,
+     "close_ms": 0.23399999999999999,
+     "shutdown_device_ms": 1.13,
+     "cpu_s_minus_load": 0.4437399999999999,
+     "cpu_per_frame_ms": 4.9304444444444435,
+     "rss_peak_mb": 268.435456,
+     "footprint_peak_mb": 483.92051200000003,
+     "gpu_util_median": 87,
+     "gpu_util_max": 94,
+     "gpu_process_mem_mib_max": 0,
+     "heap_peak_mb": [
+      45.59,
+      45.58,
+      45.58
+     ],
+     "heap_status": [
+      "measured"
+     ],
+     "output_hashes": [
+      "81eb324c748d9260"
+     ],
+     "session_ms_min_max": [
+      491.427,
+      711.423
+     ],
+     "process_wall_ms_median": 606.515,
+     "gpu_device_mem_mib_max": 0,
+     "gpu_system_mem_in_use_max": 2217508864,
+     "heap_runs": [
+      {
+       "status": "measured",
+       "heap_peak_bytes": 45592160,
+       "result": {
+        "bytes": 593328,
+        "fnv1a64": "81eb324c748d9260",
+        "maxrss": 273088512,
+        "footprint_peak": 478727168
+       }
+      },
+      {
+       "status": "measured",
+       "heap_peak_bytes": 45584416,
+       "result": {
+        "bytes": 593328,
+        "fnv1a64": "81eb324c748d9260",
+        "maxrss": 272711680,
+        "footprint_peak": 487148352
+       }
+      },
+      {
+       "status": "measured",
+       "heap_peak_bytes": 45583968,
+       "result": {
+        "bytes": 593328,
+        "fnv1a64": "81eb324c748d9260",
+        "maxrss": 273104896,
+        "footprint_peak": 486280128
+       }
+      }
+     ],
+     "session_cpu_per_frame_ms": 4.745,
+     "footprint_peak_mb_median": 483.92,
+     "session_ratio_vs_ffmpeg_sws": {
+      "median": 3.489,
+      "min": 2.711,
+      "max": 4.268,
+      "pairs": 10
+     },
+     "attributable_rss_mb": 79.09,
+     "rss_pass": {
+      "load_maxrss": [
+       190480384,
+       190365696,
+       190365696
+      ],
+      "phases_maxrss": [
+       268402688,
+       269451264,
+       269697024
+      ],
+      "phases_exit": [
+       0,
+       0,
+       0
+      ],
+      "attributable_bytes": [
+       78036992,
+       79085568,
+       79331328
+      ]
+     }
+    }
+   }
+  },
+  "c09-motion-480-bottomup": {
+   "gpu_check": {
+    "selected": [
+     "Device 0 selected: Apple M3 Pro (integrated) (0xf060209)"
+    ],
+    "backend": [
+     "Compiled using backend 'spirv': block size = 0, over-read = {0 0 0 0}, over-write = {0 0 0 0}, cpu flags = 0x0"
+    ],
+    "exit": 0
+   },
+   "correctness": {
+    "ffmpeg-gpu": {
+     "compare_py": {
+      "conversion": false,
+      "conversion_max_abs": 19,
+      "conversion_exact": 0.75442,
+      "mux": false,
+      "encoder": false,
+      "encoder_v1": false,
+      "encoder_mode": "equal-or-fewer-bits",
+      "interpolated_psnr_y": null,
+      "reference_exceeds_request": false,
+      "bits_ratio": 0.9902,
+      "psnr_y": [
+       43.719,
+       43.793
+      ],
+      "psnr_delta": -0.074,
+      "vbv_underflow": [
+       0.0,
+       0.0
+      ],
+      "pipeline": false
+     },
+     "ffmpeg_candidate": {
+      "conversion": false,
+      "mux_tables_identical": true,
+      "encoder_same_frames_and_quality": true,
+      "frames": [
+       89,
+       89
+      ],
+      "bits_ratio": 0.9902,
+      "psnr_y_db": [
+       43.719,
+       43.793
+      ],
+      "psnr_y_delta_db": -0.074
+     }
+    },
+    "ffmpeg-gpu-placebo": {
+     "compare_py": {
+      "conversion": false,
+      "conversion_max_abs": 40,
+      "conversion_exact": 0.8231,
+      "mux": false,
+      "encoder": false,
+      "encoder_v1": false,
+      "encoder_mode": "equal-or-fewer-bits",
+      "interpolated_psnr_y": null,
+      "reference_exceeds_request": false,
+      "bits_ratio": 0.9876,
+      "psnr_y": [
+       43.798,
+       43.793
+      ],
+      "psnr_delta": 0.005,
+      "vbv_underflow": [
+       0.0,
+       0.0
+      ],
+      "pipeline": false
+     },
+     "ffmpeg_candidate": {
+      "conversion": false,
+      "mux_tables_identical": true,
+      "encoder_same_frames_and_quality": true,
+      "frames": [
+       89,
+       89
+      ],
+      "bits_ratio": 0.9876,
+      "psnr_y_db": [
+       43.798,
+       43.793
+      ],
+      "psnr_y_delta_db": 0.005
+     }
+    },
+    "rust-vs-ffmpeg-sws": {
+     "compare_py": {
+      "conversion": true,
+      "conversion_max_abs": 1,
+      "conversion_exact": 0.99218,
+      "mux": true,
+      "encoder": true,
+      "encoder_v1": false,
+      "encoder_mode": "within-requested-budget",
+      "interpolated_psnr_y": null,
+      "reference_exceeds_request": false,
+      "bits_ratio": 1.031,
+      "psnr_y": [
+       43.899,
+       43.793
+      ],
+      "psnr_delta": 0.106,
+      "vbv_underflow": [
+       0.0,
+       0.0
+      ],
+      "pipeline": true
+     }
+    }
+   },
+   "configs": {
+    "rust": {
+     "runs": 10,
+     "session_ms": 100.84258299999999,
+     "startup_device_ms": 0.0,
+     "open_ms": 0.0664995,
+     "frames_ms": 100.66325,
+     "throughput_fps": 895.4924276968432,
+     "frame_latency_median_ms": 1.029979,
+     "frame_latency_p95_ms": 1.5653745,
+     "convert_median_ms": 0.1070005,
+     "drain_ms": 4.15e-05,
+     "reset_ms": 0.074125,
+     "close_ms": 0.0016665,
+     "shutdown_device_ms": 0.0,
+     "cpu_s_minus_load": 0.10083500000000001,
+     "cpu_per_frame_ms": 1.1203888888888889,
+     "rss_peak_mb": 49.119232,
+     "footprint_peak_mb": 0.0,
+     "gpu_util_median": 77,
+     "gpu_util_max": 88,
+     "gpu_process_mem_mib_max": 0,
+     "heap_peak_mb": [
+      0.88,
+      0.88,
+      0.88
+     ],
+     "heap_status": [
+      "measured"
+     ],
+     "output_hashes": [
+      "06e0da14efe8413c"
+     ],
+     "session_ms_min_max": [
+      90.283,
+      120.178
+     ],
+     "process_wall_ms_median": 163.981,
+     "gpu_device_mem_mib_max": 0,
+     "gpu_system_mem_in_use_max": 1908097024,
+     "heap_runs": [
+      {
+       "status": "measured",
+       "heap_peak_bytes": 875312,
+       "result": {
+        "bytes": 980796,
+        "fnv1a64": "06e0da14efe8413c"
+       }
+      },
+      {
+       "status": "measured",
+       "heap_peak_bytes": 875312,
+       "result": {
+        "bytes": 980796,
+        "fnv1a64": "06e0da14efe8413c"
+       }
+      },
+      {
+       "status": "measured",
+       "heap_peak_bytes": 875312,
+       "result": {
+        "bytes": 980796,
+        "fnv1a64": "06e0da14efe8413c"
+       }
+      }
+     ],
+     "session_ratio_vs_ffmpeg_sws": {
+      "median": 0.938,
+      "min": 0.869,
+      "max": 1.201,
+      "pairs": 10
+     },
+     "attributable_rss_mb": 1.8,
+     "rss_pass": {
+      "load_maxrss": [
+       47939584,
+       47972352,
+       48005120
+      ],
+      "phases_maxrss": [
+       49758208,
+       49774592,
+       49774592
+      ],
+      "phases_exit": [
+       0,
+       0,
+       0
+      ],
+      "attributable_bytes": [
+       1785856,
+       1802240,
+       1802240
+      ]
+     }
+    },
+    "ffmpeg-sws": {
+     "runs": 10,
+     "session_ms": 107.9135,
+     "startup_device_ms": 0.0,
+     "open_ms": 0.41000000000000003,
+     "frames_ms": 105.4915,
+     "throughput_fps": 853.7013203598143,
+     "frame_latency_median_ms": 1.1055000000000001,
+     "frame_latency_p95_ms": 1.674,
+     "convert_median_ms": 0.1915,
+     "drain_ms": 0.9165000000000001,
+     "reset_ms": 0.1795,
+     "close_ms": 0.0095,
+     "shutdown_device_ms": 0.0,
+     "cpu_s_minus_load": 0.1037535,
+     "cpu_per_frame_ms": 1.1528166666666666,
+     "rss_peak_mb": 54.165504,
+     "footprint_peak_mb": 51.897536,
+     "gpu_util_median": 80.5,
+     "gpu_util_max": 88,
+     "gpu_process_mem_mib_max": 0,
+     "heap_peak_mb": [
+      2.64,
+      2.64,
+      2.64
+     ],
+     "heap_status": [
+      "measured"
+     ],
+     "output_hashes": [
+      "4a4cf91683786f58"
+     ],
+     "session_ms_min_max": [
+      93.664,
+      121.941
+     ],
+     "process_wall_ms_median": 163.93,
+     "gpu_device_mem_mib_max": 0,
+     "gpu_system_mem_in_use_max": 1880260608,
+     "heap_runs": [
+      {
+       "status": "measured",
+       "heap_peak_bytes": 2636320,
+       "result": {
+        "bytes": 953536,
+        "fnv1a64": "4a4cf91683786f58",
+        "maxrss": 57737216,
+        "footprint_peak": 53282112
+       }
+      },
+      {
+       "status": "measured",
+       "heap_peak_bytes": 2636320,
+       "result": {
+        "bytes": 953536,
+        "fnv1a64": "4a4cf91683786f58",
+        "maxrss": 57835520,
+        "footprint_peak": 53429760
+       }
+      },
+      {
+       "status": "measured",
+       "heap_peak_bytes": 2636320,
+       "result": {
+        "bytes": 953536,
+        "fnv1a64": "4a4cf91683786f58",
+        "maxrss": 57901056,
+        "footprint_peak": 53528192
+       }
+      }
+     ],
+     "session_cpu_per_frame_ms": 1.135,
+     "footprint_peak_mb_median": 51.9,
+     "session_ratio_vs_ffmpeg_sws": {
+      "median": 1.0,
+      "min": 1.0,
+      "max": 1.0,
+      "pairs": 10
+     },
+     "attributable_rss_mb": 4.88,
+     "rss_pass": {
+      "load_maxrss": [
+       49364992,
+       49315840,
+       49414144
+      ],
+      "phases_maxrss": [
+       54247424,
+       54476800,
+       54149120
+      ],
+      "phases_exit": [
+       0,
+       0,
+       0
+      ],
+      "attributable_bytes": [
+       4882432,
+       5111808,
+       4784128
+      ]
+     }
+    },
+    "ffmpeg-gpu": {
+     "runs": 10,
+     "session_ms": 342.13250000000005,
+     "startup_device_ms": 22.1325,
+     "open_ms": 1.182,
+     "frames_ms": 336.0505,
+     "throughput_fps": 268.42214641525254,
+     "frame_latency_median_ms": 3.2430000000000003,
+     "frame_latency_p95_ms": 6.8875,
+     "convert_median_ms": 2.356,
+     "drain_ms": 0.8975,
+     "reset_ms": 1.471,
+     "close_ms": 0.1955,
+     "shutdown_device_ms": 2.482,
+     "cpu_s_minus_load": 0.23987799999999998,
+     "cpu_per_frame_ms": 2.6653111111111114,
+     "rss_peak_mb": 76.111872,
+     "footprint_peak_mb": 150.612256,
+     "gpu_util_median": 81.5,
+     "gpu_util_max": 90,
+     "gpu_process_mem_mib_max": 0,
+     "heap_peak_mb": [
+      10.1,
+      10.1,
+      10.1
+     ],
+     "heap_status": [
+      "measured"
+     ],
+     "output_hashes": [
+      "d883c3e6f8378ed4"
+     ],
+     "session_ms_min_max": [
+      298.399,
+      458.202
+     ],
+     "process_wall_ms_median": 403.364,
+     "gpu_device_mem_mib_max": 0,
+     "gpu_system_mem_in_use_max": 1995833344,
+     "heap_runs": [
+      {
+       "status": "measured",
+       "heap_peak_bytes": 10096176,
+       "result": {
+        "bytes": 945640,
+        "fnv1a64": "d883c3e6f8378ed4",
+        "maxrss": 80723968,
+        "footprint_peak": 152144064
+       }
+      },
+      {
+       "status": "measured",
+       "heap_peak_bytes": 10095968,
+       "result": {
+        "bytes": 945640,
+        "fnv1a64": "d883c3e6f8378ed4",
+        "maxrss": 80871424,
+        "footprint_peak": 152291520
+       }
+      },
+      {
+       "status": "measured",
+       "heap_peak_bytes": 10096240,
+       "result": {
+        "bytes": 945640,
+        "fnv1a64": "d883c3e6f8378ed4",
+        "maxrss": 80478208,
+        "footprint_peak": 151914752
+       }
+      }
+     ],
+     "session_cpu_per_frame_ms": 2.436,
+     "footprint_peak_mb_median": 150.61,
+     "session_ratio_vs_ffmpeg_sws": {
+      "median": 3.466,
+      "min": 2.627,
+      "max": 3.998,
+      "pairs": 10
+     },
+     "attributable_rss_mb": 27.72,
+     "rss_pass": {
+      "load_maxrss": [
+       49332224,
+       49381376,
+       49315840
+      ],
+      "phases_maxrss": [
+       77053952,
+       77119488,
+       76955648
+      ],
+      "phases_exit": [
+       0,
+       0,
+       0
+      ],
+      "attributable_bytes": [
+       27721728,
+       27787264,
+       27623424
+      ]
+     }
+    },
+    "ffmpeg-gpu-transfer": {
+     "runs": 10,
+     "session_ms": 131.3465,
+     "startup_device_ms": 22.5285,
+     "open_ms": 0.8474999999999999,
+     "frames_ms": 127.77349999999998,
+     "throughput_fps": 707.4000496715544,
+     "frame_latency_median_ms": 0.982,
+     "frame_latency_p95_ms": 3.933,
+     "convert_median_ms": 0.8195,
+     "drain_ms": 0.0755,
+     "reset_ms": 0.7685,
+     "close_ms": 0.14600000000000002,
+     "shutdown_device_ms": 1.7975,
+     "cpu_s_minus_load": 0.0761305,
+     "cpu_per_frame_ms": 0.8458944444444445,
+     "rss_peak_mb": 68.03456,
+     "footprint_peak_mb": 143.141056,
+     "gpu_util_median": 84.0,
+     "gpu_util_max": 96,
+     "gpu_process_mem_mib_max": 0,
+     "heap_peak_mb": [
+      5.25,
+      5.24,
+      5.23
+     ],
+     "heap_status": [
+      "measured"
+     ],
+     "output_hashes": [
+      "3c6ab3a857e65120"
+     ],
+     "session_ms_min_max": [
+      84.301,
+      175.933
+     ],
+     "process_wall_ms_median": 187.746,
+     "gpu_device_mem_mib_max": 0,
+     "gpu_system_mem_in_use_max": 2010464256,
+     "heap_runs": [
+      {
+       "status": "measured",
+       "heap_peak_bytes": 5246240,
+       "result": {
+        "bytes": 34968,
+        "fnv1a64": "3c6ab3a857e65120",
+        "maxrss": 73138176,
+        "footprint_peak": 145180928
+       }
+      },
+      {
+       "status": "measured",
+       "heap_peak_bytes": 5238752,
+       "result": {
+        "bytes": 34968,
+        "fnv1a64": "3c6ab3a857e65120",
+        "maxrss": 72990720,
+        "footprint_peak": 145033344
+       }
+      },
+      {
+       "status": "measured",
+       "heap_peak_bytes": 5233440,
+       "result": {
+        "bytes": 34968,
+        "fnv1a64": "3c6ab3a857e65120",
+        "maxrss": 72957952,
+        "footprint_peak": 144934976
+       }
+      }
+     ],
+     "session_cpu_per_frame_ms": 0.619,
+     "footprint_peak_mb_median": 143.14,
+     "session_ratio_vs_ffmpeg_sws": {
+      "median": 1.228,
+      "min": 0.9,
+      "max": 1.524,
+      "pairs": 10
+     },
+     "attributable_rss_mb": 18.99,
+     "rss_pass": {
+      "load_maxrss": [
+       49381376,
+       49283072,
+       49348608
+      ],
+      "phases_maxrss": [
+       68337664,
+       68665344,
+       68239360
+      ],
+      "phases_exit": [
+       0,
+       0,
+       0
+      ],
+      "attributable_bytes": [
+       18989056,
+       19316736,
+       18890752
+      ]
+     }
+    },
+    "ffmpeg-gpu-placebo": {
+     "runs": 10,
+     "session_ms": 514.9025,
+     "startup_device_ms": 22.4265,
+     "open_ms": 1.7385000000000002,
+     "frames_ms": 503.798,
+     "throughput_fps": 178.6453359872925,
+     "frame_latency_median_ms": 4.0265,
+     "frame_latency_p95_ms": 6.901,
+     "convert_median_ms": 3.1115,
+     "drain_ms": 0.905,
+     "reset_ms": 5.0600000000000005,
+     "close_ms": 0.264,
+     "shutdown_device_ms": 1.258,
+     "cpu_s_minus_load": 0.48286799999999996,
+     "cpu_per_frame_ms": 5.3652,
+     "rss_peak_mb": 125.370368,
+     "footprint_peak_mb": 330.295648,
+     "gpu_util_median": 87,
+     "gpu_util_max": 94,
+     "gpu_process_mem_mib_max": 0,
+     "heap_peak_mb": [
+      46.04,
+      46.04,
+      46.03
+     ],
+     "heap_status": [
+      "measured"
+     ],
+     "output_hashes": [
+      "989549a0fff8d825"
+     ],
+     "session_ms_min_max": [
+      432.165,
+      630.636
+     ],
+     "process_wall_ms_median": 583.91,
+     "gpu_device_mem_mib_max": 0,
+     "gpu_system_mem_in_use_max": 2138046464,
+     "heap_runs": [
+      {
+       "status": "measured",
+       "heap_peak_bytes": 46037392,
+       "result": {
+        "bytes": 942632,
+        "fnv1a64": "989549a0fff8d825",
+        "maxrss": 130187264,
+        "footprint_peak": 331598528
+       }
+      },
+      {
+       "status": "measured",
+       "heap_peak_bytes": 46042640,
+       "result": {
+        "bytes": 942632,
+        "fnv1a64": "989549a0fff8d825",
+        "maxrss": 129581056,
+        "footprint_peak": 323291840
+       }
+      },
+      {
+       "status": "measured",
+       "heap_peak_bytes": 46031904,
+       "result": {
+        "bytes": 942632,
+        "fnv1a64": "989549a0fff8d825",
+        "maxrss": 129761280,
+        "footprint_peak": 331008576
+       }
+      }
+     ],
+     "session_cpu_per_frame_ms": 5.1,
+     "footprint_peak_mb_median": 330.3,
+     "session_ratio_vs_ffmpeg_sws": {
+      "median": 4.699,
+      "min": 4.354,
+      "max": 5.502,
+      "pairs": 10
+     },
+     "attributable_rss_mb": 76.22,
+     "rss_pass": {
+      "load_maxrss": [
+       50348032,
+       50315264,
+       50282496
+      ],
+      "phases_maxrss": [
+       126664704,
+       125665280,
+       126533632
+      ],
+      "phases_exit": [
+       0,
+       0,
+       0
+      ],
+      "attributable_bytes": [
+       76349440,
+       75350016,
+       76218368
+      ]
+     }
+    }
+   }
+  },
+  "c07-ui-static-480-bottomup": {
+   "gpu_check": {
+    "selected": [
+     "Device 0 selected: Apple M3 Pro (integrated) (0xf060209)"
+    ],
+    "backend": [
+     "Compiled using backend 'spirv': block size = 0, over-read = {0 0 0 0}, over-write = {0 0 0 0}, cpu flags = 0x0"
+    ],
+    "exit": 0
+   },
+   "correctness": {
+    "ffmpeg-gpu": {
+     "compare_py": {
+      "conversion": false,
+      "conversion_max_abs": 7,
+      "conversion_exact": 0.79815,
+      "mux": false,
+      "encoder": false,
+      "encoder_v1": false,
+      "encoder_mode": "equal-or-fewer-bits",
+      "interpolated_psnr_y": null,
+      "reference_exceeds_request": false,
+      "bits_ratio": 0.9738,
+      "psnr_y": [
+       50.379,
+       51.597
+      ],
+      "psnr_delta": -1.218,
+      "vbv_underflow": [
+       0.0,
+       0.0
+      ],
+      "pipeline": false
+     },
+     "ffmpeg_candidate": {
+      "conversion": false,
+      "mux_tables_identical": true,
+      "encoder_same_frames_and_quality": false,
+      "frames": [
+       89,
+       89
+      ],
+      "bits_ratio": 0.9738,
+      "psnr_y_db": [
+       50.379,
+       51.597
+      ],
+      "psnr_y_delta_db": -1.218
+     }
+    },
+    "ffmpeg-gpu-placebo": {
+     "compare_py": {
+      "conversion": false,
+      "conversion_max_abs": 13,
+      "conversion_exact": 0.94063,
+      "mux": false,
+      "encoder": false,
+      "encoder_v1": false,
+      "encoder_mode": "equal-or-fewer-bits",
+      "interpolated_psnr_y": null,
+      "reference_exceeds_request": false,
+      "bits_ratio": 1.0062,
+      "psnr_y": [
+       51.625,
+       51.597
+      ],
+      "psnr_delta": 0.029,
+      "vbv_underflow": [
+       0.0,
+       0.0
+      ],
+      "pipeline": false
+     },
+     "ffmpeg_candidate": {
+      "conversion": false,
+      "mux_tables_identical": true,
+      "encoder_same_frames_and_quality": true,
+      "frames": [
+       89,
+       89
+      ],
+      "bits_ratio": 1.0062,
+      "psnr_y_db": [
+       51.625,
+       51.597
+      ],
+      "psnr_y_delta_db": 0.029
+     }
+    },
+    "rust-vs-ffmpeg-sws": {
+     "compare_py": {
+      "conversion": true,
+      "conversion_max_abs": 1,
+      "conversion_exact": 0.9963,
+      "mux": true,
+      "encoder": true,
+      "encoder_v1": false,
+      "encoder_mode": "within-requested-budget",
+      "interpolated_psnr_y": null,
+      "reference_exceeds_request": false,
+      "bits_ratio": 1.3403,
+      "psnr_y": [
+       52.154,
+       51.597
+      ],
+      "psnr_delta": 0.557,
+      "vbv_underflow": [
+       0.0,
+       0.0
+      ],
+      "pipeline": true
+     }
+    }
+   },
+   "configs": {
+    "rust": {
+     "runs": 10,
+     "session_ms": 36.061313,
+     "startup_device_ms": 0.0,
+     "open_ms": 0.0548125,
+     "frames_ms": 35.899728999999994,
+     "throughput_fps": 2507.1506943223876,
+     "frame_latency_median_ms": 0.3410625,
+     "frame_latency_p95_ms": 0.6740005,
+     "convert_median_ms": 0.1139375,
+     "drain_ms": 4.15e-05,
+     "reset_ms": 0.0772295,
+     "close_ms": 0.001334,
+     "shutdown_device_ms": 0.0,
+     "cpu_s_minus_load": 0.0362965,
+     "cpu_per_frame_ms": 0.40329444444444446,
+     "rss_peak_mb": 17.883136,
+     "footprint_peak_mb": 0.0,
+     "gpu_util_median": 67.0,
+     "gpu_util_max": 81,
+     "gpu_process_mem_mib_max": 0,
+     "heap_peak_mb": [
+      0.89,
+      0.89,
+      0.89
+     ],
+     "heap_status": [
+      "measured"
+     ],
+     "output_hashes": [
+      "99a6a4623e05df1e"
+     ],
+     "session_ms_min_max": [
+      29.51,
+      43.571
+     ],
+     "process_wall_ms_median": 54.071,
+     "gpu_device_mem_mib_max": 0,
+     "gpu_system_mem_in_use_max": 1817526272,
+     "heap_runs": [
+      {
+       "status": "measured",
+       "heap_peak_bytes": 888112,
+       "result": {
+        "bytes": 97948,
+        "fnv1a64": "99a6a4623e05df1e"
+       }
+      },
+      {
+       "status": "measured",
+       "heap_peak_bytes": 888112,
+       "result": {
+        "bytes": 97948,
+        "fnv1a64": "99a6a4623e05df1e"
+       }
+      },
+      {
+       "status": "measured",
+       "heap_peak_bytes": 888112,
+       "result": {
+        "bytes": 97948,
+        "fnv1a64": "99a6a4623e05df1e"
+       }
+      }
+     ],
+     "session_ratio_vs_ffmpeg_sws": {
+      "median": 1.097,
+      "min": 0.955,
+      "max": 1.36,
+      "pairs": 10
+     },
+     "attributable_rss_mb": 1.69,
+     "rss_pass": {
+      "load_maxrss": [
+       48005120,
+       47972352,
+       48021504
+      ],
+      "phases_maxrss": [
+       49774592,
+       49119232,
+       49692672
+      ],
+      "phases_exit": [
+       0,
+       0,
+       0
+      ],
+      "attributable_bytes": [
+       1769472,
+       1114112,
+       1687552
+      ]
+     }
+    },
+    "ffmpeg-sws": {
+     "runs": 10,
+     "session_ms": 31.7325,
+     "startup_device_ms": 0.0,
+     "open_ms": 0.3745,
+     "frames_ms": 30.9085,
+     "throughput_fps": 2911.8326632098133,
+     "frame_latency_median_ms": 0.295,
+     "frame_latency_p95_ms": 0.639,
+     "convert_median_ms": 0.1755,
+     "drain_ms": 0.1005,
+     "reset_ms": 0.185,
+     "close_ms": 0.007,
+     "shutdown_device_ms": 0.0,
+     "cpu_s_minus_load": 0.030615499999999997,
+     "cpu_per_frame_ms": 0.3401722222222222,
+     "rss_peak_mb": 1.8350080000000002,
+     "footprint_peak_mb": 51.463264,
+     "gpu_util_median": 69.5,
+     "gpu_util_max": 82,
+     "gpu_process_mem_mib_max": 0,
+     "heap_peak_mb": [
+      2.64,
+      2.64,
+      2.64
+     ],
+     "heap_status": [
+      "measured"
+     ],
+     "output_hashes": [
+      "4717dc663edebfb6"
+     ],
+     "session_ms_min_max": [
+      26.316,
+      41.644
+     ],
+     "process_wall_ms_median": 55.254,
+     "gpu_device_mem_mib_max": 0,
+     "gpu_system_mem_in_use_max": 1817526272,
+     "heap_runs": [
+      {
+       "status": "measured",
+       "heap_peak_bytes": 2636320,
+       "result": {
+        "bytes": 78584,
+        "fnv1a64": "4717dc663edebfb6",
+        "maxrss": 57769984,
+        "footprint_peak": 53364224
+       }
+      },
+      {
+       "status": "measured",
+       "heap_peak_bytes": 2636320,
+       "result": {
+        "bytes": 78584,
+        "fnv1a64": "4717dc663edebfb6",
+        "maxrss": 57737216,
+        "footprint_peak": 53380800
+       }
+      },
+      {
+       "status": "measured",
+       "heap_peak_bytes": 2636320,
+       "result": {
+        "bytes": 78584,
+        "fnv1a64": "4717dc663edebfb6",
+        "maxrss": 57753600,
+        "footprint_peak": 53331392
+       }
+      }
+     ],
+     "session_cpu_per_frame_ms": 0.345,
+     "footprint_peak_mb_median": 51.46,
+     "session_ratio_vs_ffmpeg_sws": {
+      "median": 1.0,
+      "min": 1.0,
+      "max": 1.0,
+      "pairs": 10
+     },
+     "attributable_rss_mb": 4.77,
+     "rss_pass": {
+      "load_maxrss": [
+       49364992,
+       49364992,
+       49446912
+      ],
+      "phases_maxrss": [
+       54067200,
+       54214656,
+       54132736
+      ],
+      "phases_exit": [
+       0,
+       0,
+       0
+      ],
+      "attributable_bytes": [
+       4702208,
+       4849664,
+       4767744
+      ]
+     }
+    },
+    "ffmpeg-gpu": {
+     "runs": 10,
+     "session_ms": 214.671,
+     "startup_device_ms": 22.534,
+     "open_ms": 1.4705,
+     "frames_ms": 208.655,
+     "throughput_fps": 431.9334476562956,
+     "frame_latency_median_ms": 1.837,
+     "frame_latency_p95_ms": 4.802,
+     "convert_median_ms": 1.5335,
+     "drain_ms": 0.1145,
+     "reset_ms": 1.4895,
+     "close_ms": 0.1935,
+     "shutdown_device_ms": 2.5115,
+     "cpu_s_minus_load": 0.18075799999999997,
+     "cpu_per_frame_ms": 2.008422222222222,
+     "rss_peak_mb": 75.890688,
+     "footprint_peak_mb": 150.300672,
+     "gpu_util_median": 71,
+     "gpu_util_max": 81,
+     "gpu_process_mem_mib_max": 0,
+     "heap_peak_mb": [
+      10.1,
+      10.1,
+      10.1
+     ],
+     "heap_status": [
+      "measured"
+     ],
+     "output_hashes": [
+      "24ab39e29aa962d8"
+     ],
+     "session_ms_min_max": [
+      154.326,
+      237.823
+     ],
+     "process_wall_ms_median": 266.82,
+     "gpu_device_mem_mib_max": 0,
+     "gpu_system_mem_in_use_max": 1901248512,
+     "heap_runs": [
+      {
+       "status": "measured",
+       "heap_peak_bytes": 10096000,
+       "result": {
+        "bytes": 77080,
+        "fnv1a64": "24ab39e29aa962d8",
+        "maxrss": 80658432,
+        "footprint_peak": 152127872
+       }
+      },
+      {
+       "status": "measured",
+       "heap_peak_bytes": 10096128,
+       "result": {
+        "bytes": 77080,
+        "fnv1a64": "24ab39e29aa962d8",
+        "maxrss": 80740352,
+        "footprint_peak": 152160448
+       }
+      },
+      {
+       "status": "measured",
+       "heap_peak_bytes": 10095776,
+       "result": {
+        "bytes": 77080,
+        "fnv1a64": "24ab39e29aa962d8",
+        "maxrss": 80805888,
+        "footprint_peak": 152291776
+       }
+      }
+     ],
+     "session_cpu_per_frame_ms": 1.754,
+     "footprint_peak_mb_median": 150.3,
+     "session_ratio_vs_ffmpeg_sws": {
+      "median": 5.829,
+      "min": 5.408,
+      "max": 7.73,
+      "pairs": 10
+     },
+     "attributable_rss_mb": 27.25,
+     "rss_pass": {
+      "load_maxrss": [
+       49528832,
+       49348608,
+       49463296
+      ],
+      "phases_maxrss": [
+       76136448,
+       77545472,
+       76709888
+      ],
+      "phases_exit": [
+       0,
+       0,
+       0
+      ],
+      "attributable_bytes": [
+       26673152,
+       28082176,
+       27246592
+      ]
+     }
+    },
+    "ffmpeg-gpu-transfer": {
+     "runs": 10,
+     "session_ms": 116.588,
+     "startup_device_ms": 24.511000000000003,
+     "open_ms": 1.011,
+     "frames_ms": 113.0385,
+     "throughput_fps": 796.4620949823652,
+     "frame_latency_median_ms": 0.7865,
+     "frame_latency_p95_ms": 2.9105,
+     "convert_median_ms": 0.5575000000000001,
+     "drain_ms": 0.0755,
+     "reset_ms": 0.771,
+     "close_ms": 0.13,
+     "shutdown_device_ms": 1.7545000000000002,
+     "cpu_s_minus_load": 0.0881805,
+     "cpu_per_frame_ms": 0.9797833333333332,
+     "rss_peak_mb": 67.969024,
+     "footprint_peak_mb": 143.050848,
+     "gpu_util_median": 70,
+     "gpu_util_max": 86,
+     "gpu_process_mem_mib_max": 0,
+     "heap_peak_mb": [
+      5.24,
+      5.23,
+      5.25
+     ],
+     "heap_status": [
+      "measured"
+     ],
+     "output_hashes": [
+      "3c6ab3a857e65120"
+     ],
+     "session_ms_min_max": [
+      67.51,
+      123.536
+     ],
+     "process_wall_ms_median": 166.104,
+     "gpu_device_mem_mib_max": 0,
+     "gpu_system_mem_in_use_max": 1890975744,
+     "heap_runs": [
+      {
+       "status": "measured",
+       "heap_peak_bytes": 5241328,
+       "result": {
+        "bytes": 34968,
+        "fnv1a64": "3c6ab3a857e65120",
+        "maxrss": 72482816,
+        "footprint_peak": 144443328
+       }
+      },
+      {
+       "status": "measured",
+       "heap_peak_bytes": 5230880,
+       "result": {
+        "bytes": 34968,
+        "fnv1a64": "3c6ab3a857e65120",
+        "maxrss": 72695808,
+        "footprint_peak": 144607168
+       }
+      },
+      {
+       "status": "measured",
+       "heap_peak_bytes": 5246112,
+       "result": {
+        "bytes": 34968,
+        "fnv1a64": "3c6ab3a857e65120",
+        "maxrss": 72564736,
+        "footprint_peak": 144558144
+       }
+      }
+     ],
+     "session_cpu_per_frame_ms": 0.737,
+     "footprint_peak_mb_median": 143.05,
+     "session_ratio_vs_ffmpeg_sws": {
+      "median": 3.075,
+      "min": 2.501,
+      "max": 3.889,
+      "pairs": 10
+     },
+     "attributable_rss_mb": 19.4,
+     "rss_pass": {
+      "load_maxrss": [
+       49381376,
+       49463296,
+       49594368
+      ],
+      "phases_maxrss": [
+       68861952,
+       68304896,
+       68960256
+      ],
+      "phases_exit": [
+       0,
+       0,
+       0
+      ],
+      "attributable_bytes": [
+       19398656,
+       18841600,
+       19496960
+      ]
+     }
+    },
+    "ffmpeg-gpu-placebo": {
+     "runs": 10,
+     "session_ms": 383.56600000000003,
+     "startup_device_ms": 20.785,
+     "open_ms": 1.6840000000000002,
+     "frames_ms": 375.599,
+     "throughput_fps": 239.63865881695148,
+     "frame_latency_median_ms": 2.7859999999999996,
+     "frame_latency_p95_ms": 5.659,
+     "convert_median_ms": 2.5415,
+     "drain_ms": 0.121,
+     "reset_ms": 5.0725,
+     "close_ms": 0.2575,
+     "shutdown_device_ms": 1.1835,
+     "cpu_s_minus_load": 0.3967445,
+     "cpu_per_frame_ms": 4.408272222222222,
+     "rss_peak_mb": 125.66528,
+     "footprint_peak_mb": 329.771392,
+     "gpu_util_median": 79.5,
+     "gpu_util_max": 90,
+     "gpu_process_mem_mib_max": 0,
+     "heap_peak_mb": [
+      46.03,
+      46.04,
+      46.04
+     ],
+     "heap_status": [
+      "measured"
+     ],
+     "output_hashes": [
+      "0bba85a9b3ed6cef"
+     ],
+     "session_ms_min_max": [
+      335.249,
+      500.117
+     ],
+     "process_wall_ms_median": 438.892,
+     "gpu_device_mem_mib_max": 0,
+     "gpu_system_mem_in_use_max": 2037858304,
+     "heap_runs": [
+      {
+       "status": "measured",
+       "heap_peak_bytes": 46032272,
+       "result": {
+        "bytes": 78584,
+        "fnv1a64": "0bba85a9b3ed6cef",
+        "maxrss": 129728512,
+        "footprint_peak": 331139712
+       }
+      },
+      {
+       "status": "measured",
+       "heap_peak_bytes": 46042656,
+       "result": {
+        "bytes": 78584,
+        "fnv1a64": "0bba85a9b3ed6cef",
+        "maxrss": 129531904,
+        "footprint_peak": 330959488
+       }
+      },
+      {
+       "status": "measured",
+       "heap_peak_bytes": 46042640,
+       "result": {
+        "bytes": 78584,
+        "fnv1a64": "0bba85a9b3ed6cef",
+        "maxrss": 130285568,
+        "footprint_peak": 332990784
+       }
+      }
+     ],
+     "session_cpu_per_frame_ms": 4.192,
+     "footprint_peak_mb_median": 329.77,
+     "session_ratio_vs_ffmpeg_sws": {
+      "median": 12.127,
+      "min": 10.76,
+      "max": 13.126,
+      "pairs": 10
+     },
+     "attributable_rss_mb": 75.37,
+     "rss_pass": {
+      "load_maxrss": [
+       50249728,
+       50364416,
+       50200576
+      ],
+      "phases_maxrss": [
+       125059072,
+       125616128,
+       125632512
+      ],
+      "phases_exit": [
+       0,
+       0,
+       0
+      ],
+      "attributable_bytes": [
+       74809344,
+       75366400,
+       75382784
+      ]
+     }
+    }
+   }
+  }
+ }
+}

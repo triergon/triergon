@@ -1,20 +1,48 @@
 //! Complete-packet method-0 DVB service decoder. Format boundaries are explicit;
 //! an input entity End never synthesizes EOD, a clear cue or a codec reset.
 use super::bits::cancelled;
-use super::boundary::SourceConfiguration;
+use super::boundary::{ClockOrigin, ClockValue, PacketTiming, SourceClock, SourceConfiguration};
 use super::display_model::*;
 use super::display_render::Renderer;
 use super::display_state::{DecodeWork, Segment, SegmentResult, State, limit};
+use super::pes_parser::NativePesPacket;
 use std::sync::atomic::AtomicBool;
-use triergon_core::{Budget, BudgetVec, Error, Result, Time, WorkBudget};
+use triergon_core::{Budget, BudgetVec, Bytes, Error, Result, Time, WorkBudget};
 
 #[derive(Debug)]
 struct PendingPacket {
     packet: DvbPacket,
+    native_pes: Option<NativePesPacket>,
+    effective_pts: Option<Time>,
     offset: usize,
     end: usize,
     selected_display_ended: bool,
+    canvas_segments: u8,
 }
+
+impl PendingPacket {
+    fn bytes(&self) -> &Bytes {
+        self.native_pes
+            .as_ref()
+            .map_or(&self.packet.payload, NativePesPacket::codec)
+    }
+
+    fn packet_clock(&self) -> Option<(SourceClock, PacketTiming)> {
+        let facts = self.packet.source.as_ref()?;
+        let mut timing = facts.timing();
+        if let Some(parsed) = &self.native_pes {
+            if parsed.codec_pts() != parsed.source_pts() {
+                timing.pts = parsed.codec_pts().map(|ticks| ClockValue {
+                    ticks,
+                    origin: ClockOrigin::Inferred,
+                });
+            }
+        }
+        Some((facts.configuration().clock(), timing))
+    }
+}
+
+const CANVAS_SEGMENTS: u8 = 0b111;
 
 #[derive(Debug)]
 pub struct Decoder {
@@ -146,6 +174,28 @@ impl Decoder {
         decoder.state.receiver_view = view;
         Ok(decoder)
     }
+    /// Additive native projection. Both older constructors retain strict
+    /// bounds validation, including empty regions. No source packet is trimmed.
+    pub fn new_configured_with_native_geometry_policy(
+        budget: &Budget,
+        configuration: &SourceConfiguration,
+        generation: u64,
+        limits: DisplayLimits,
+        policy: super::NativeGeometryPolicy,
+        cancel: &AtomicBool,
+    ) -> Result<Self> {
+        let mut decoder = Self::new_configured_with_receiver_view(
+            budget,
+            configuration,
+            generation,
+            limits,
+            super::ReceiverView::NativeD32,
+            cancel,
+        )?;
+        decoder.state.native_geometry_policy = policy;
+        Ok(decoder)
+    }
+
     pub fn native_failure(&self) -> Option<super::NativeFailure> {
         self.native_failure
     }
@@ -153,6 +203,21 @@ impl Decoder {
     /// Caller keeps its immutable packet on rejection. Whole codec packets are
     /// supplied after core InputCursor/demux validation, not a second I/O window.
     pub fn provide(&mut self, packet: &DvbPacket) -> Result<()> {
+        self.admit(packet, None)
+    }
+
+    /// Decode the explicit native codec packet while retaining the original PES
+    /// and its source declaration. A pass-through keeps the same decoder syntax
+    /// validation as any other codec packet.
+    pub fn provide_native_pes(
+        &mut self,
+        packet: &DvbPacket,
+        parsed: &NativePesPacket,
+    ) -> Result<()> {
+        self.admit(packet, Some(parsed))
+    }
+
+    fn admit(&mut self, packet: &DvbPacket, parsed: Option<&NativePesPacket>) -> Result<()> {
         if let Some(error) = self.failed {
             return Err(error);
         }
@@ -198,32 +263,62 @@ impl Decoder {
             return Err(Error::Invalid("DVB configured packet source facts absent"));
         }
         limit(packet.payload.len(), self.state.limits.packet_bytes)?;
-        let (offset, end) = match packet.envelope {
-            PacketEnvelope::Segments => {
-                if packet.payload.is_empty() {
-                    return Err(Error::Invalid("DVB empty segment packet"));
-                }
-                (0, packet.payload.len())
+        let (offset, end, effective_pts) = if let Some(parsed) = parsed {
+            if self.state.receiver_view != super::ReceiverView::NativeD32
+                || packet.envelope != PacketEnvelope::PesDataField
+            {
+                return Err(Error::Unsupported("DVB native PES decoder boundary"));
             }
-            PacketEnvelope::PesDataField => {
-                let bytes = packet.payload.as_ref();
-                if bytes.len() < 3 {
-                    return Err(Error::Truncated);
-                }
-                if bytes[..2] != [0x20, 0] || bytes.last() != Some(&0xff) {
-                    return Err(Error::Invalid("DVB PES data-field envelope"));
-                }
-                if bytes.len() == 3 {
-                    return Err(Error::Invalid("DVB empty PES data field"));
-                }
-                (2, bytes.len() - 1)
+            let facts = packet.source.as_ref().ok_or(Error::SourceMismatch)?;
+            if !std::ptr::eq(packet.payload.as_ref(), parsed.pes().as_ref())
+                || facts.timing().pts.map(|value| value.ticks) != parsed.source_pts()
+            {
+                return Err(Error::SourceMismatch);
             }
+            if !parsed.codec().belongs_to(&self.state.budget) {
+                return Err(Error::ForeignPool);
+            }
+            limit(parsed.codec().len(), self.state.limits.packet_bytes)?;
+            if parsed.codec().len() <= 6 || parsed.codec().first() != Some(&0x0f) {
+                return Err(Error::Invalid("DVB native codec packet header"));
+            }
+            let pts = parsed
+                .codec_pts()
+                .map(|ticks| Time::from_ticks(ticks, facts.configuration().clock().time_base()))
+                .transpose()?;
+            (0, parsed.codec().len(), pts)
+        } else {
+            let (offset, end) = match packet.envelope {
+                PacketEnvelope::Segments => {
+                    if packet.payload.is_empty() {
+                        return Err(Error::Invalid("DVB empty segment packet"));
+                    }
+                    (0, packet.payload.len())
+                }
+                PacketEnvelope::PesDataField => {
+                    let bytes = packet.payload.as_ref();
+                    if bytes.len() < 3 {
+                        return Err(Error::Truncated);
+                    }
+                    if bytes[..2] != [0x20, 0] || bytes.last() != Some(&0xff) {
+                        return Err(Error::Invalid("DVB PES data-field envelope"));
+                    }
+                    if bytes.len() == 3 {
+                        return Err(Error::Invalid("DVB empty PES data field"));
+                    }
+                    (2, bytes.len() - 1)
+                }
+            };
+            (offset, end, packet.pts)
         };
         self.packet = Some(PendingPacket {
             packet: packet.clone(),
+            native_pes: parsed.cloned(),
+            effective_pts,
             offset,
             end,
             selected_display_ended: false,
+            canvas_segments: 0,
         });
         if self.configuration.is_none() {
             self.configuration = packet
@@ -259,6 +354,7 @@ impl Decoder {
             self.state.object_retention,
         );
         state.receiver_view = self.state.receiver_view;
+        state.native_geometry_policy = self.state.native_geometry_policy;
         self.state = state;
         self.generation = generation;
         self.sequence = 0;
@@ -302,6 +398,7 @@ impl Decoder {
             cancel,
         )?;
         next.state.receiver_view = self.state.receiver_view;
+        next.state.native_geometry_policy = self.state.native_geometry_policy;
         *self = next;
         Ok(())
     }
@@ -313,6 +410,7 @@ impl Decoder {
         self.renderer = None;
         self.packets = BudgetVec::new(&self.state.budget);
         let view = self.state.receiver_view;
+        let geometry = self.state.native_geometry_policy;
         self.state = State::new(
             &self.state.budget,
             self.state.service,
@@ -320,6 +418,7 @@ impl Decoder {
             self.state.object_retention,
         );
         self.state.receiver_view = view;
+        self.state.native_geometry_policy = geometry;
     }
 
     fn progress(status: DecodeStatus) -> DisplayProgress {
@@ -330,8 +429,8 @@ impl Decoder {
         }
     }
 
-    fn include_packet(&mut self, packet: &DvbPacket) -> Result<()> {
-        if self.display_started && packet.pts != self.pts {
+    fn include_packet(&mut self, packet: &DvbPacket, pts: Option<Time>) -> Result<()> {
+        if self.display_started && pts != self.pts {
             return Err(Error::Invalid("DVB display-set PTS changed"));
         }
         if self
@@ -346,7 +445,7 @@ impl Decoder {
             )?;
             self.packets.try_push(packet.clone()).map_err(|e| e.error)?;
         }
-        self.pts = packet.pts;
+        self.pts = pts;
         self.display_started = true;
         Ok(())
     }
@@ -388,7 +487,7 @@ impl Decoder {
         if !charged.pay(&mut self.header_credit, 6)? {
             return Ok(false);
         }
-        let bytes = packet.packet.payload.as_ref();
+        let bytes = packet.bytes().as_ref();
         let at = packet.offset;
         if bytes[at] != 15 {
             return Err(Error::Invalid("DVB segment sync"));
@@ -404,6 +503,7 @@ impl Decoder {
             return Err(Error::Truncated);
         }
         if packet.packet.envelope == PacketEnvelope::PesDataField
+            && packet.native_pes.is_none()
             && packet.selected_display_ended
             && page == self.state.service.composition_page
         {
@@ -416,15 +516,26 @@ impl Decoder {
             self.state.limits.segments_per_display,
         )?;
         let source = packet.packet.clone();
-        let original = source.payload.slice(at..end)?;
-        if self.state.page_slot(page).is_some() {
-            self.include_packet(&source)?;
+        let original = packet.bytes().slice(at..end)?;
+        let pts = packet.effective_pts;
+        let selected = self.state.page_slot(page).is_some();
+        if selected {
+            self.include_packet(&source, pts)?;
         }
         let segment = Segment::new(kind, page, original)?;
-        self.packet
+        let packet = self
+            .packet
             .as_mut()
-            .ok_or(Error::Invalid("DVB packet absent"))?
-            .offset = end;
+            .ok_or(Error::Invalid("DVB packet absent"))?;
+        packet.offset = end;
+        if selected && self.state.receiver_view == super::ReceiverView::NativeD32 {
+            packet.canvas_segments |= match kind {
+                0x10 => 0b001,
+                0x11 => 0b010,
+                0x13 => 0b100,
+                _ => 0,
+            };
+        }
         self.segment = Some(segment);
         self.segments += 1;
         self.header_credit = 0;
@@ -432,18 +543,23 @@ impl Decoder {
     }
 
     fn build_event(&mut self, renderer: Renderer) -> Result<DisplayEvent> {
+        self.establish_default_native_canvas();
         let expiry = self
             .pts
             .map(|time| time.checked_add(Time::new(i128::from(self.state.timeout), 1)?))
             .transpose()?;
-        let action = if self.state.visible.is_empty() {
+        let has_visible = match self.state.receiver_view {
+            super::ReceiverView::Source => !self.state.visible.is_empty(),
+            super::ReceiverView::NativeD32 => !renderer.output.is_empty(),
+        };
+        let action = if !has_visible {
             DisplayAction::Clear
         } else if self.state.had_visible {
             DisplayAction::Update
         } else {
             DisplayAction::Present
         };
-        self.state.had_visible = !self.state.visible.is_empty();
+        self.state.had_visible = has_visible;
         let packets = std::mem::replace(&mut self.packets, BudgetVec::new(&self.state.budget));
         let opaque = std::mem::replace(&mut self.state.opaque, BudgetVec::new(&self.state.budget));
         let native_publication = if self.state.receiver_view == super::ReceiverView::NativeD32 {
@@ -457,6 +573,8 @@ impl Decoder {
                 } else {
                     super::PublicationReason::EndOfDisplay
                 },
+                packet_clock: packet.packet_clock(),
+                context_canvas: self.state.native_canvas,
                 exact_pts_microseconds: super::native_view::exact_microseconds(self.pts),
                 start_display_ms: 0,
                 end_display_ms: u32::from(self.state.timeout) * 1000,
@@ -467,6 +585,12 @@ impl Decoder {
         let event = DisplayEvent {
             receiver_view: self.state.receiver_view,
             native_publication,
+            native_pes: self
+                .packet
+                .as_ref()
+                .and_then(|packet| packet.native_pes.clone()),
+            native_geometry_policy: self.state.native_geometry_policy,
+            omitted_regions: renderer.omitted,
             service: self.state.service,
             object_retention: self.state.object_retention,
             generation: self.generation,
@@ -492,6 +616,18 @@ impl Decoder {
         self.segments = 0;
         self.total_work = 0;
         Ok(event)
+    }
+
+    fn establish_default_native_canvas(&mut self) {
+        if self
+            .packet
+            .as_ref()
+            .is_some_and(|p| p.canvas_segments == CANVAS_SEGMENTS)
+        {
+            self.state
+                .native_canvas
+                .get_or_insert_with(|| DisplayDefinition::default().size);
+        }
     }
 
     fn step_inner(
@@ -547,6 +683,7 @@ impl Decoder {
                 continue;
             }
             if self.packet.as_ref().is_some_and(|p| p.offset == p.end) {
+                self.establish_default_native_canvas();
                 if self.state.receiver_view == super::ReceiverView::NativeD32
                     && self.display_started
                     && self.state.acquired

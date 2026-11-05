@@ -11,12 +11,136 @@ use crate::zlib::typed_restore::{RestoreJob, RestorePlan};
 use crate::{
     Error, Limits, Result, ebml,
     incremental::ParseStep,
-    matroska::{Packet, PacketData},
+    matroska::{Packet, PacketData, Track},
     storage::SharedBytes,
     timing::BlockTiming,
 };
 use std::{ops::Range, sync::atomic::AtomicBool};
 use triergon_core::{Budget, BudgetVec, Time, WorkBudget};
+
+/// Shared Block/SimpleBlock syntax. A caller may supply just the actual prefix;
+/// the same failure is retained until full-body parsing by the scan controller.
+#[derive(Clone, Copy, Debug)]
+pub(crate) struct BlockPrefix {
+    pub number: u64,
+    pub offset: i16,
+    pub flags: u8,
+    pub payload_start: usize,
+}
+pub(crate) fn block_prefix(bytes: &[u8]) -> Result<BlockPrefix> {
+    let (number, width, _) = ebml::vint(bytes, false)?;
+    let header = bytes.get(width..width + 3).ok_or(Error::Truncated)?;
+    Ok(BlockPrefix {
+        number,
+        offset: i16::from_be_bytes([header[0], header[1]]),
+        flags: header[2],
+        payload_start: width + 3,
+    })
+}
+pub(crate) fn block_track(
+    configuration: &Configuration,
+    at: usize,
+    number: u64,
+) -> Result<Option<&Track>> {
+    let Some(track) = configuration.tracks().get(at) else {
+        return Err(Error::Invalid("unregistered block track"));
+    };
+    Ok((track.number == number).then_some(track))
+}
+
+/// Format-private eligibility; source restoration stays in the packet module.
+pub(crate) fn scan_track_is_plain(track: &Track) -> bool {
+    track.packet_decoder.is_none() && track.packet_prefix.is_empty()
+}
+
+/// Source parameters only; all timestamp/duration validation remains in the
+/// existing PacketFields constructor, including its nullable rounded PTS view.
+#[derive(Clone, Copy, Debug)]
+pub(crate) struct FrameParameters {
+    pub cluster_ticks: u64,
+    pub offset: i16,
+    pub scale: u64,
+    pub duration_ticks: Option<u64>,
+    pub frame: u16,
+    pub frames: u16,
+}
+#[derive(Clone, Copy, Debug)]
+pub(crate) struct ScanPacketFields {
+    pub track: usize,
+    pub pts_ns: Option<i64>,
+    pub keyframe: bool,
+}
+impl FrameParameters {
+    fn fields(
+        self,
+        index: usize,
+        track: &Track,
+        keyframe: bool,
+        discard: i64,
+    ) -> Result<super::super::PacketFields> {
+        let timing = BlockTiming {
+            timestamp_ticks: i128::from(self.cluster_ticks) + i128::from(self.offset),
+            scale_ns: self.scale,
+            codec_delay_ns: track.codec_delay_ns,
+            default_duration_ns: track.default_duration_ns,
+            duration_ticks: self.duration_ticks,
+            frame: self.frame,
+            frames: self.frames,
+        };
+        super::super::PacketFields::new(index, timing, keyframe, discard)
+    }
+    pub(crate) fn scan_fields(
+        self,
+        index: usize,
+        track: &Track,
+        keyframe: bool,
+    ) -> Result<ScanPacketFields> {
+        let fields = self.fields(index, track, keyframe, 0)?;
+        Ok(ScanPacketFields {
+            track: fields.track,
+            pts_ns: fields.pts_ns,
+            keyframe: fields.keyframe,
+        })
+    }
+}
+
+#[path = "simple_packet.rs"]
+mod simple;
+pub(crate) use simple::{SimplePacketJob, SimpleProgress};
+
+fn validate_batch_input(
+    source: &SharedBytes,
+    configuration: &Configuration,
+    limits: Limits,
+    scale: u64,
+    pool: &Budget,
+) -> Result<()> {
+    if !source.belongs_to(pool) || !configuration.belongs_to(pool) {
+        return Err(triergon_core::Error::ForeignPool.into());
+    }
+    if source.len() > limits.block_bytes {
+        return Err(Error::Limit("element bytes"));
+    }
+    if scale == 0 {
+        return Err(Error::Invalid("zero TimestampScale"));
+    }
+    Ok(())
+}
+fn validate_track_lacing(flags: u8, track: &Track) -> Result<()> {
+    if (flags >> 1) & 3 != 0 && !track.lacing {
+        return Err(Error::Invalid("lacing forbidden by track"));
+    }
+    Ok(())
+}
+fn validate_decoded_capacity(capacity: usize, maximum: usize) -> Result<()> {
+    if capacity > maximum {
+        return Err(Error::Limit("decoded laced block capacity"));
+    }
+    Ok(())
+}
+fn keep_recovery_packet(kind: u64, pts: Option<i64>, lower: i64) -> bool {
+    kind == 17 || pts.is_none_or(|pts| pts >= lower)
+}
 
 #[derive(Clone, Debug)]
 pub struct TypedPacket {
@@ -57,6 +181,7 @@ enum Phase {
     Frame,
     Store,
     Publish,
+    Ready,
     Done,
 }
 /// The ordinary one-frame batch needs no pointer-vector allocation. Laced
@@ -115,6 +240,17 @@ impl Staged {
                 }
             },
         }
+    }
+    fn peek(&self, index: usize) -> Result<&Packet> {
+        let slot = match self {
+            Self::Single(slot) if index == 0 => slot,
+            Self::Single(_) => return Err(Error::Invalid("missing staged packet")),
+            Self::Laced(packets) => packets
+                .as_slice()
+                .get(index)
+                .required("missing staged packet")?,
+        };
+        slot.as_ref().required("missing staged packet")
     }
     fn take(&mut self, index: usize) -> Result<Packet> {
         let slot = match self {
@@ -184,15 +320,7 @@ impl PacketBatchJob {
         limits: Limits,
         pool: &Budget,
     ) -> Result<Self> {
-        if !source.belongs_to(pool) || !configuration.belongs_to(pool) {
-            return Err(triergon_core::Error::ForeignPool.into());
-        }
-        if source.len() > limits.block_bytes {
-            return Err(Error::Limit("element bytes"));
-        }
-        if scale == 0 {
-            return Err(Error::Invalid("zero TimestampScale"));
-        }
+        validate_batch_input(&source, &configuration, limits, scale, pool)?;
         let len = source.len();
         let job = if simple {
             BatchWork::Idle
@@ -275,22 +403,19 @@ impl PacketBatchJob {
         work: &mut WorkBudget,
         cancel: &AtomicBool,
     ) -> Result<ParseStep<TypedPacket>> {
-        self.step_selected(None, work, cancel)
+        match self.step_ready(None, work, cancel)? {
+            ParseStep::Event(()) => Ok(ParseStep::Event(self.take_ready()?)),
+            other => super::pending(other),
+        }
     }
-    pub(crate) fn step_recovery_prefix(
-        &mut self,
-        lower_ns: i64,
-        work: &mut WorkBudget,
-        cancel: &AtomicBool,
-    ) -> Result<ParseStep<TypedPacket>> {
-        self.step_selected(Some(lower_ns), work, cancel)
-    }
-    fn step_selected(
+    /// The validated packet stays in Staged; return progress without moving a
+    /// TypedPacket through the batch parser's Result/ParseStep return slot.
+    pub(crate) fn step_ready(
         &mut self,
         prefix_ns: Option<i64>,
         work: &mut WorkBudget,
         cancel: &AtomicBool,
-    ) -> Result<ParseStep<TypedPacket>> {
+    ) -> Result<ParseStep<()>> {
         if self.failed {
             return Err(Error::Invalid(
                 "packet batch requires replacement after error",
@@ -317,7 +442,7 @@ impl PacketBatchJob {
         prefix_ns: Option<i64>,
         work: &mut WorkBudget,
         cancel: &AtomicBool,
-    ) -> Result<ParseStep<TypedPacket>> {
+    ) -> Result<ParseStep<()>> {
         loop {
             check(cancel)?;
             match self.phase {
@@ -344,15 +469,11 @@ impl PacketBatchJob {
                     };
                     match job.step(work, cancel)? {
                         ParseStep::Event(extensions) => {
-                            if self
-                                .group
-                                .as_ref()
-                                .required("missing source group")?
-                                .max_addition_id()
-                                > extensions.max_block_addition_id()
-                            {
-                                return Err(Error::Invalid("BlockAddID exceeds track maximum"));
-                            }
+                            self.live_configuration()?.validate_additions(
+                                self.track,
+                                self.group.as_ref().required("missing source group")?,
+                                &extensions,
+                            )?;
                             self.job = BatchWork::Idle;
                             self.phase = Phase::StartLace;
                         }
@@ -399,29 +520,27 @@ impl PacketBatchJob {
                     }
                     let block = self.block.as_ref().required("BlockGroup without Block")?;
                     let b = &self.source[block.clone()];
-                    let (number, width, _) = ebml::vint(b, false)?;
-                    let header = b.get(width..width + 3).ok_or(Error::Truncated)?;
-                    self.number = number;
-                    self.offset = i16::from_be_bytes([header[0], header[1]]);
-                    self.flags = header[2];
-                    self.payload =
-                        block.start.checked_add(width + 3).ok_or(Error::Overflow)?..block.end;
+                    let prefix = block_prefix(b)?;
+                    self.number = prefix.number;
+                    self.offset = prefix.offset;
+                    self.flags = prefix.flags;
+                    self.payload = block
+                        .start
+                        .checked_add(prefix.payload_start)
+                        .ok_or(Error::Overflow)?..block.end;
                     self.phase = Phase::Track;
                 }
                 Phase::Track => {
                     if !work.try_charge(1) {
                         return Ok(ParseStep::Yield);
                     }
-                    let Some(track) = self.live_configuration()?.tracks().get(self.track) else {
-                        return Err(Error::Invalid("unregistered block track"));
-                    };
-                    if track.number != self.number {
+                    let Some(track) =
+                        block_track(self.live_configuration()?, self.track, self.number)?
+                    else {
                         self.track += 1;
                         continue;
-                    }
-                    if (self.flags >> 1) & 3 != 0 && !track.lacing {
-                        return Err(Error::Invalid("lacing forbidden by track"));
-                    }
+                    };
+                    validate_track_lacing(self.flags, track)?;
                     if self
                         .group
                         .as_ref()
@@ -559,21 +678,18 @@ impl PacketBatchJob {
                     } else {
                         0
                     };
-                    if capacity > self.limits.block_bytes {
-                        return Err(Error::Limit("decoded laced block capacity"));
-                    }
-                    let timing = BlockTiming {
-                        timestamp_ticks: i128::from(self.cluster_ticks) + i128::from(self.offset),
-                        scale_ns: self.scale,
-                        codec_delay_ns: track.codec_delay_ns,
-                        default_duration_ns: track.default_duration_ns,
+                    validate_decoded_capacity(capacity, self.limits.block_bytes)?;
+                    let fields = FrameParameters {
+                        cluster_ticks: self.cluster_ticks,
+                        offset: self.offset,
+                        scale: self.scale,
                         duration_ticks: self.duration,
                         frame: self.frame as u16,
                         frames: frames as u16,
-                    };
-                    let fields = super::super::PacketFields::new(
+                    }
+                    .fields(
                         self.track,
-                        timing,
+                        track,
                         if self.simple {
                             self.flags & 0x80 != 0
                         } else {
@@ -605,42 +721,75 @@ impl PacketBatchJob {
                     if !work.try_charge(1) {
                         return Ok(ParseStep::Yield);
                     }
-                    let packet = self.staged.take(self.publish)?;
-                    self.publish += 1;
                     if let Some(lower) = prefix_ns {
+                        let packet = self.staged.peek(self.publish)?;
                         let kind = self.live_configuration()?.tracks()[packet.track].kind;
                         // Consumer recovery selection at the real replay input
                         // boundary. The pinned public-API observations retain
                         // all subtitle packets in this prefix, including known
                         // ends before the cutoff. This is not a visibility test:
                         // None and every source timestamp/duration stay intact.
-                        let keep = kind == 17 || packet.pts_ns.is_none_or(|pts| pts >= lower);
+                        let keep = keep_recovery_packet(kind, packet.pts_ns, lower);
                         if !keep {
+                            drop(self.staged.take(self.publish)?);
+                            self.publish += 1;
                             continue;
                         }
                     }
-                    let last = self.publish == self.staged.len();
-                    let configuration = if last {
-                        self.configuration
-                            .take()
-                            .required("missing packet configuration")?
-                    } else {
-                        self.live_configuration()?.clone()
-                    };
-                    let group = if last {
-                        self.group.take()
-                    } else {
-                        self.group.clone()
-                    };
-                    return Ok(ParseStep::Event(TypedPacket {
-                        packet,
-                        configuration,
-                        group,
-                    }));
+                    self.phase = Phase::Ready;
+                    return Ok(ParseStep::Event(()));
                 }
+                Phase::Ready => return Ok(ParseStep::Event(())),
                 Phase::Done => return Ok(ParseStep::Finished),
             }
         }
+    }
+    /// One caller-side extraction after step_ready's original publication work
+    /// and validation. No new owner, allocation or cancellation boundary.
+    #[inline(always)]
+    pub(crate) fn take_ready(&mut self) -> Result<TypedPacket> {
+        if self.failed {
+            return Err(Error::Invalid(
+                "packet batch requires replacement after error",
+            ));
+        }
+        if !matches!(self.phase, Phase::Ready) {
+            self.failed = true;
+            return Err(Error::Invalid("packet is not ready"));
+        }
+        let packet = match self.staged.take(self.publish) {
+            Ok(packet) => packet,
+            Err(error) => {
+                self.failed = true;
+                return Err(error);
+            }
+        };
+        self.publish += 1;
+        let last = self.publish == self.staged.len();
+        let configuration = if last {
+            let Some(configuration) = self.configuration.take() else {
+                self.failed = true;
+                return Err(Error::Invalid("missing packet configuration"));
+            };
+            configuration
+        } else {
+            let Some(configuration) = self.configuration.as_ref() else {
+                self.failed = true;
+                return Err(Error::Invalid("missing packet configuration"));
+            };
+            configuration.clone()
+        };
+        let group = if last {
+            self.group.take()
+        } else {
+            self.group.clone()
+        };
+        self.phase = Phase::Publish;
+        Ok(TypedPacket {
+            packet,
+            configuration,
+            group,
+        })
     }
 }
 

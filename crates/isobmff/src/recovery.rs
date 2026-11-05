@@ -58,7 +58,7 @@ pub struct RecoveryDescription {
     pub source_range: Range<u64>,
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct RecoveryDescriptions {
     raw: BoxView,
     kind: RecoveryKind,
@@ -141,11 +141,40 @@ impl RecoveryDescriptions {
     pub fn version(&self) -> u8 {
         self.version
     }
+    pub(crate) fn fixed_entry_length(&self) -> u32 {
+        self.length
+    }
     pub fn entry_count(&self) -> u32 {
         self.count
     }
     pub fn default_index(&self) -> Option<u32> {
         self.default
+    }
+    pub(crate) fn validation_start(&self) -> usize {
+        self.records
+    }
+    // A private continuation for the original lookup parser. Its caller stores
+    // only an end already returned by a validated two-byte source record.
+    pub(crate) fn validation_at(
+        &self,
+        index: u32,
+        offset: usize,
+    ) -> Result<RecoveryDescriptionLookup<'_>> {
+        if index == 0
+            || index > self.count
+            || offset < self.records
+            || offset > self.raw.payload().len()
+        {
+            return Err(Error::Invalid("recovery validation continuation"));
+        }
+        Ok(RecoveryDescriptionLookup {
+            descriptions: self,
+            target: index,
+            row: index - 1,
+            offset,
+            ready: None,
+            failed: None,
+        })
     }
     pub fn locate(&self, index: u32) -> Result<RecoveryDescriptionLookup<'_>> {
         if index == 0 || index > self.count {
@@ -253,7 +282,7 @@ impl RecoveryDescriptionLookup<'_> {
     }
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct RecoveryMappings {
     raw: BoxView,
     kind: RecoveryKind,
@@ -302,7 +331,7 @@ impl RecoveryMappings {
     pub fn grouping_parameter(&self) -> Option<u32> {
         self.parameter
     }
-    fn run(&self, row: u32) -> Result<(u32, u32)> {
+    pub(crate) fn run(&self, row: u32) -> Result<(u32, u32)> {
         if row >= self.count {
             return Err(Error::Invalid("recovery run index"));
         }

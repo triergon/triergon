@@ -177,6 +177,46 @@ fn laces_share_complete_addition_sources_and_mapping_fields_survive_reader_drop(
         extensions.unknown_mapping_fields().next().unwrap().data(),
         b"unknown-map"
     );
+    use triergon::typed::{BlockAdditionContainer::Matroska, NativeBlockAddition};
+    let before_projection = pool.used();
+    for packet in [&a, &b] {
+        assert!(matches!(
+            packet
+                .project_native_block_additions_v1(
+                    &extensions,
+                    Matroska,
+                    &mut WorkBudget::new(0),
+                    &cancel,
+                )
+                .unwrap(),
+            ParseStep::Yield
+        ));
+        let ParseStep::Event([Some(projected), None]) = packet
+            .project_native_block_additions_v1(
+                &extensions,
+                Matroska,
+                &mut WorkBudget::new(18),
+                &cancel,
+            )
+            .unwrap()
+        else {
+            panic!("expected one native opaque addition");
+        };
+        assert_eq!(
+            projected,
+            NativeBlockAddition::Opaque {
+                id: u64::MAX,
+                payload: b"opaque-4"
+            }
+        );
+        let (prefix, data) = projected.wire_parts();
+        assert_eq!(prefix, Some(u64::MAX.to_be_bytes()));
+        assert_eq!(
+            data.as_ptr(),
+            source.additions().nth(1).unwrap().data().as_ptr()
+        );
+    }
+    assert_eq!(pool.used(), before_projection);
     let group_alias = source.clone();
     let before_clone = pool.used();
     let another = group_alias.clone();
@@ -194,6 +234,76 @@ fn laces_share_complete_addition_sources_and_mapping_fields_survive_reader_drop(
     );
     drop((group_alias, extensions));
     assert_eq!(pool.used(), baseline);
+}
+
+#[test]
+fn native_projection_keeps_lcevc_and_rejects_foreign_mapping_context() {
+    use triergon::typed::{BlockAdditionContainer::Matroska, NativeBlockAddition};
+
+    let mapped = e(0x41e4, &[u(0x41f0, 4), u(0x41e7, 4)].concat());
+    let config = [u(0x55ee, 4), mapped].concat();
+    let packet = e(
+        0xa0,
+        &[
+            block(),
+            additions(&[
+                more(Some(&[4]), b"\xb4\x00\x50\x00ab"),
+                more(None, b"opaque"),
+            ]),
+        ]
+        .concat(),
+    );
+    let raw = file(&config, &[packet]);
+    let cancel = AtomicBool::new(false);
+    let open = || {
+        let mut reader = BlockingReader::open(Cursor::new(&raw), Limits::default()).unwrap();
+        let packet = reader.next_typed_packet(&cancel).unwrap().unwrap();
+        let extensions = finish_mapping(
+            packet
+                .configuration
+                .track_extensions_job(0, Limits::default())
+                .unwrap(),
+        );
+        (packet, extensions)
+    };
+    let (packet, extensions) = open();
+    let (_, foreign) = open();
+    assert!(matches!(
+        packet.project_native_block_additions_v1(
+            &foreign,
+            Matroska,
+            &mut WorkBudget::new(18),
+            &cancel
+        ),
+        Err(Error::Invalid("packet additions TrackEntry mismatch"))
+    ));
+    let mut work = WorkBudget::new(18);
+    let ParseStep::Event(result) = packet
+        .project_native_block_additions_v1(&extensions, Matroska, &mut work, &cancel)
+        .unwrap()
+    else {
+        panic!("projection has its exact grant");
+    };
+    assert_eq!(
+        result,
+        [
+            Some(NativeBlockAddition::Lcevc(b"ab")),
+            Some(NativeBlockAddition::Opaque {
+                id: 1,
+                payload: b"opaque"
+            })
+        ]
+    );
+    assert_eq!(work.spent(), 18);
+    assert!(matches!(
+        packet.project_native_block_additions_v1(
+            &extensions,
+            Matroska,
+            &mut work,
+            &AtomicBool::new(true)
+        ),
+        Err(Error::Cancelled)
+    ));
 }
 
 #[test]
@@ -879,4 +989,148 @@ fn whole_first_cluster_replay_restores_all_tracks_without_a_second_input_pass() 
         ),
         "a false initial-state Cue is still invalid in the first Cluster"
     );
+}
+
+// Independently packed App 4 control with one window and a 2 × 3 peak grid.
+const HDR10_PLUS: &[u8] = &[
+    0xb5, 0x0, 0x3c, 0x0, 0x1, 0x4, 0x1, 0x40, 0x0, 0xc, 0x84, 0x43, 0x12, 0x34, 0x56, 0x0, 0x32,
+    0x0, 0x32, 0x0, 0x25, 0x80, 0x3, 0x21, 0xb4, 0x30, 0x39, 0x19, 0x10, 0x64, 0xc, 0x82, 0x19,
+    0xc, 0x89, 0x0,
+];
+
+#[test]
+fn hdr10_plus_preserves_wire_values_and_borrowed_grid() {
+    use triergon::typed::Hdr10Plus;
+    let cancel = AtomicBool::new(false);
+    assert!(matches!(
+        Hdr10Plus::parse_t35_v1(HDR10_PLUS, &mut WorkBudget::new(0), &cancel).unwrap(),
+        ParseStep::Yield
+    ));
+    let ParseStep::Event(metadata) =
+        Hdr10Plus::parse_t35_v1(HDR10_PLUS, &mut WorkBudget::new(4096), &cancel).unwrap()
+    else {
+        panic!("bounded HDR10+ control");
+    };
+    assert_eq!(metadata.raw().as_ptr(), HDR10_PLUS.as_ptr());
+    assert_eq!(metadata.body_bits(), 235);
+    assert_eq!(
+        (metadata.application_version, metadata.target_luminance),
+        (1, 400)
+    );
+    let grid = metadata.target_grid.unwrap();
+    assert_eq!((grid.rows(), grid.columns()), (2, 3));
+    assert_eq!(grid.values().collect::<Vec<_>>(), [1, 2, 3, 4, 5, 6]);
+    let window = &metadata.windows()[0];
+    assert!(window.geometry.is_none() && metadata.mastering_grid.is_none());
+    assert_eq!(window.max_scl, [100, 200, 300]);
+    assert_eq!(window.average_max_rgb, 50);
+    assert_eq!(window.percentiles()[0].max_rgb, 12345);
+    assert_eq!(window.fraction_bright_pixels, 100);
+    assert_eq!(window.tone_curve.unwrap().knee, [100, 200]);
+    assert_eq!(window.tone_curve.unwrap().anchors(), [100, 200]);
+    assert_eq!(window.saturation_weight, Some(8));
+    for length in 6..HDR10_PLUS.len() {
+        assert!(
+            matches!(
+                Hdr10Plus::parse_t35_v1(&HDR10_PLUS[..length], &mut WorkBudget::new(4096), &cancel),
+                Err(Error::Truncated)
+            ),
+            "truncated prefix length {length}"
+        );
+    }
+    let mut oversized = HDR10_PLUS.to_vec();
+    oversized.resize(914, 0);
+    assert!(matches!(
+        Hdr10Plus::parse_t35_v1(&oversized, &mut WorkBudget::new(8192), &cancel),
+        Err(Error::Limit("HDR10+ payload"))
+    ));
+}
+
+#[test]
+fn implicit_vp9_hdr10_plus_admission_is_bound_to_the_webm_track() {
+    use triergon::typed::{BlockAdditionContainer::WebM, PayloadOwnership};
+    use triergon_core::OwnedInputBytes;
+    let cancel = AtomicBool::new(false);
+    for (doctype, codec, maximum, profile, admitted) in [
+        (b"webm".as_slice(), b"V_VP9".as_slice(), None, true, true),
+        (b"webm".as_slice(), b"V_VP9".as_slice(), None, false, false),
+        (
+            b"matroska".as_slice(),
+            b"V_VP9".as_slice(),
+            None,
+            true,
+            false,
+        ),
+        (b"webm".as_slice(), b"V_AV1".as_slice(), None, true, false),
+        (
+            b"webm".as_slice(),
+            b"V_VP9".as_slice(),
+            Some(0),
+            true,
+            false,
+        ),
+    ] {
+        let mut track = [u(0xd7, 1), u(0x73c5, 1), u(0x83, 1), e(0x86, codec)].concat();
+        if let Some(maximum) = maximum {
+            track.extend(u(0x55ee, maximum));
+        }
+        let group = e(
+            0xa0,
+            &[block(), additions(&[more(Some(&[4]), HDR10_PLUS)])].concat(),
+        );
+        let cluster = e(0x1f43b675, &[u(0xe7, 0), group].concat());
+        let data = [
+            e(0x1a45dfa3, &e(0x4282, doctype)),
+            e(
+                0x18538067,
+                &[e(0x1654ae6b, &e(0xae, &track)), cluster].concat(),
+            ),
+        ]
+        .concat();
+        let pool = Budget::new(256 * 1024).unwrap();
+        let source = OwnedInputBytes::try_from_vec(&pool, data).unwrap();
+        let open = if profile {
+            BlockingReader::open_owned_seekable_webm_vp9_t35_v1
+        } else {
+            BlockingReader::open_owned_seekable_in
+        };
+        let mut reader = open(
+            source,
+            Limits::default(),
+            &pool,
+            PayloadOwnership::SharedBounded,
+        )
+        .unwrap();
+        let result = reader.next_typed_packet(&cancel);
+        if !admitted {
+            assert!(matches!(
+                result,
+                Err(Error::Invalid("BlockAddID exceeds track maximum"))
+            ));
+            continue;
+        }
+        let packet = result.unwrap().unwrap();
+        let map = finish_mapping(
+            packet
+                .configuration
+                .track_extensions_job(0, Limits::default())
+                .unwrap(),
+        );
+        let ParseStep::Event(Some(hdr)) = packet
+            .project_native_hdr10_plus_v1(&map, WebM, &mut WorkBudget::new(4096), &cancel)
+            .unwrap()
+        else {
+            panic!("implicit T.35 event");
+        };
+        assert_eq!(hdr.raw(), HDR10_PLUS);
+        assert_eq!(map.max_block_addition_id(), 0);
+        assert!(reader.next_typed_packet(&cancel).unwrap().is_none());
+        let seek = reader.seek_for_playback(0, 0, &cancel).unwrap();
+        assert_eq!(seek.actual_ns, 0);
+        let replay = reader.next_typed_packet(&cancel).unwrap().unwrap();
+        assert_eq!(
+            replay.group.unwrap().additions().next().unwrap().data(),
+            HDR10_PLUS
+        );
+    }
 }

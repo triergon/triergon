@@ -227,6 +227,42 @@ fn exact_primary_error_does_not_mask_bad_opcr_encoding() {
 }
 
 #[test]
+fn adaptation_stuffing_stops_at_the_first_error_across_work_steps() {
+    let budget = Budget::new(16384).unwrap();
+    let mut raw = [0xff; 188];
+    raw[..6].copy_from_slice(&[0x47, 0, 0, 0x20, 183, 0]);
+    raw[101] = 0;
+    let mut inspector = TransportInspector::new(
+        Bytes::copy_from_slice(&budget, &raw).unwrap(),
+        PacketFormat::Ts188,
+        SourceLocation {
+            source: SourceId(1),
+            offset: 0,
+        },
+        &budget,
+    )
+    .unwrap();
+    let mut before_error = WorkBudget::new(103);
+    let cancel = AtomicBool::new(false);
+    assert!(matches!(
+        inspector.poll(&mut before_error, &cancel),
+        Ok(AssemblyStep::Yield)
+    ));
+    assert_eq!(before_error.spent(), 103);
+
+    let mut remainder = WorkBudget::new(100);
+    let Ok(AssemblyStep::Output(TransportInspection::Rejected(rejection))) =
+        inspector.poll(&mut remainder, &cancel)
+    else {
+        panic!("expected stuffing rejection")
+    };
+    assert_eq!(remainder.spent(), 2);
+    assert_eq!(rejection.error(), Error::Invalid("adaptation stuffing"));
+    assert_eq!(rejection.bytes().as_ref(), &raw);
+    assert!(!rejection.fully_checked());
+}
+
+#[test]
 fn exact_primary_error_does_not_mask_bad_stuffing() {
     let budget = Budget::new(16384).unwrap();
     let mut raw = INPUT[376..564].to_vec();

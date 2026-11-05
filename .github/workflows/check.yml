@@ -1,0 +1,28 @@
+name: Workspace checks
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+    env:
+      CARGO_INCREMENTAL: '0'
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      - name: Install check dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential pkg-config zlib1g-dev nasm
+          rustup toolchain install nightly --profile minimal --component rustfmt --component clippy
+          rustc +nightly -vV
+      - name: Prepare pinned reference and fixtures
+        run: make prepare-check || make prepare-check
+      - name: Verify workspace
+        run: make check

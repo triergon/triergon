@@ -1,0 +1,20 @@
+M1CUES big_first unbounded: entries 259 spent 2842 yields 0 base (3384, 3384) peak 49688 used_end 34104 maxused 34104
+M1CUES big_first chunk7: entries 259 spent 2842 yields 405 base (3384, 3384) peak 49688 used_end 34104 maxused 49688
+M1CUES big_first live=24000: Backpressure { requested: 10240, available: 10216 } spent 6948 peak 23896
+M1CUES big_first live=26000: Backpressure { requested: 11264, available: 11192 } spent 9788 peak 25944
+M1CUES big_first live=28000: Backpressure { requested: 15424, available: 9032 } spent 2419 peak 26648
+M1CUES big_first live=30000: Backpressure { requested: 15424, available: 11032 } spent 2419 peak 26648
+M1CUES big_first live=32000: Backpressure { requested: 15424, available: 13032 } spent 2419 peak 26648
+M1CUES big_first live=34000: Backpressure { requested: 15424, available: 15032 } spent 2419 peak 26648
+M1CUES big_first live=36000: Backpressure { requested: 16256, available: 16200 } spent 5760 peak 35928
+M1CUES big_first live=40000: entries 259 spent 7351 yields 0 base (3384, 3384) peak 36696 used_end 19960 maxused 19960
+M1CUES uniform unbounded: entries 300 spent 2706 yields 0 base (3112, 3112) peak 52488 used_end 35880 maxused 35880
+M1CUES uniform chunk7: entries 300 spent 2706 yields 386 base (3112, 3112) peak 52488 used_end 35880 maxused 52488
+M1CUES uniform live=24000: Backpressure { requested: 10560, available: 10296 } spent 3049 peak 23880
+M1CUES uniform live=26000: Backpressure { requested: 11520, available: 11336 } spent 4004 peak 25800
+M1CUES uniform live=28000: Backpressure { requested: 16512, available: 8280 } spent 2136 peak 27912
+M1CUES uniform live=30000: Backpressure { requested: 16512, available: 10280 } spent 2136 peak 27912
+M1CUES uniform live=32000: Backpressure { requested: 16512, available: 12280 } spent 2136 peak 27912
+M1CUES uniform live=34000: Backpressure { requested: 16512, available: 14280 } spent 2136 peak 27912
+M1CUES uniform live=36000: Backpressure { requested: 16512, available: 16280 } spent 2136 peak 27912
+M1CUES uniform live=40000: Backpressure { requested: 18432, available: 18424 } spent 5051 peak 39624

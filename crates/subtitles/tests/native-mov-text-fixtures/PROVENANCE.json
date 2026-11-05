@@ -1,0 +1,1948 @@
+{
+  "bad-two": {
+    "case": {
+      "config": null,
+      "dimensions": [
+        0,
+        0
+      ],
+      "duration": "1001",
+      "id": "bad-two",
+      "original_memberships": [],
+      "packets": [
+        "cases/bad-two/packet-0.bin"
+      ],
+      "pts": "1",
+      "timebase": [
+        1,
+        1000
+      ]
+    },
+    "original_v1_observation_preserved": true,
+    "recorded_stdout": ".research/native-mov-text-ass-v1/oracle/actual-v1/actual-observations-v1/bad-two.stdout",
+    "stdout_sha256": "60718cb2996d33ffc30ea293a3240ca2c39be04d8cd3d7ee01e8f0b4c2e58aaf"
+  },
+  "bom": {
+    "case": {
+      "config": null,
+      "dimensions": [
+        0,
+        0
+      ],
+      "duration": "1001",
+      "id": "bom",
+      "original_memberships": [],
+      "packets": [
+        "cases/bom/packet-0.bin"
+      ],
+      "pts": "1",
+      "timebase": [
+        1,
+        1000
+      ]
+    },
+    "original_v1_observation_preserved": true,
+    "recorded_stdout": ".research/native-mov-text-ass-v1/oracle/actual-v1/actual-observations-v1/bom.stdout",
+    "stdout_sha256": "49a2cec63e33f423b15c09392239ba46b67a09037b20f5b2f6319efc83e03397"
+  },
+  "box-refusal-then-good": {
+    "case": {
+      "config": null,
+      "dimensions": [
+        0,
+        0
+      ],
+      "duration": "1001",
+      "id": "box-refusal-then-good",
+      "original_memberships": [],
+      "packets": [
+        "cases/box-refusal-then-good/packet-0.bin",
+        "cases/box-refusal-then-good/packet-1.bin"
+      ],
+      "pts": "1",
+      "timebase": [
+        1,
+        1000
+      ]
+    },
+    "original_v1_observation_preserved": true,
+    "recorded_stdout": ".research/native-mov-text-ass-v1/oracle/actual-v1/actual-observations-v1/box-refusal-then-good.stdout",
+    "stdout_sha256": "1169e7eaf22b038fbd37b2af3d92d62f5d830f3ffbd18991063ab8c5609d6f19"
+  },
+  "clear": {
+    "case": {
+      "config": null,
+      "dimensions": [
+        0,
+        0
+      ],
+      "duration": "1001",
+      "id": "clear",
+      "original_memberships": [],
+      "packets": [
+        "cases/clear/packet-0.bin"
+      ],
+      "pts": "1",
+      "timebase": [
+        1,
+        1000
+      ]
+    },
+    "original_v1_observation_preserved": true,
+    "recorded_stdout": ".research/native-mov-text-ass-v1/oracle/actual-v1/actual-observations-v1/clear.stdout",
+    "stdout_sha256": "460f709a8e30a4e1dfc2d8facbd0ffa5013ab582b3ce1a4107381d5afffb4d17"
+  },
+  "clear-then-good": {
+    "case": {
+      "config": null,
+      "dimensions": [
+        0,
+        0
+      ],
+      "duration": "1001",
+      "id": "clear-then-good",
+      "original_memberships": [],
+      "packets": [
+        "cases/clear-then-good/packet-0.bin",
+        "cases/clear-then-good/packet-1.bin"
+      ],
+      "pts": "1",
+      "timebase": [
+        1,
+        1000
+      ]
+    },
+    "original_v1_observation_preserved": true,
+    "recorded_stdout": ".research/native-mov-text-ass-v1/oracle/actual-v1/actual-observations-v1/clear-then-good.stdout",
+    "stdout_sha256": "2fa45826e620af202194b6d7602b997eeac2834a0d68fbcc6de13277fb88ba09"
+  },
+  "config-invalid-font-size": {
+    "case": {
+      "config": "cases/config-invalid-font-size/extradata.bin",
+      "dimensions": [
+        0,
+        0
+      ],
+      "duration": "1001",
+      "id": "config-invalid-font-size",
+      "original_memberships": [],
+      "packets": [
+        "cases/config-invalid-font-size/packet-0.bin"
+      ],
+      "pts": "1",
+      "timebase": [
+        1,
+        1000
+      ]
+    },
+    "original_v1_observation_preserved": true,
+    "recorded_stdout": ".research/native-mov-text-ass-v1/oracle/actual-v1/actual-observations-v1/config-invalid-font-size.stdout",
+    "stdout_sha256": "292de524582d808731654b9c05d3fa74a3d3efc8210c0b0e261b3205fac41548"
+  },
+  "config-one-dimension": {
+    "case": {
+      "config": "cases/config-one-dimension/extradata.bin",
+      "dimensions": [
+        1920,
+        0
+      ],
+      "duration": "1001",
+      "id": "config-one-dimension",
+      "original_memberships": [],
+      "packets": [
+        "cases/config-one-dimension/packet-0.bin"
+      ],
+      "pts": "1",
+      "timebase": [
+        1,
+        1000
+      ]
+    },
+    "original_v1_observation_preserved": true,
+    "recorded_stdout": ".research/native-mov-text-ass-v1/oracle/actual-v1/actual-observations-v1/config-one-dimension.stdout",
+    "stdout_sha256": "ed5b877e92eaada2e6f11ea23565696fcb12d1b3ca90d6b262471f2f3d764642"
+  },
+  "config-too-short": {
+    "case": {
+      "config": "cases/config-too-short/extradata.bin",
+      "dimensions": [
+        0,
+        0
+      ],
+      "duration": "1001",
+      "id": "config-too-short",
+      "original_memberships": [],
+      "packets": [
+        "cases/config-too-short/packet-0.bin"
+      ],
+      "pts": "1",
+      "timebase": [
+        1,
+        1000
+      ]
+    },
+    "original_v1_observation_preserved": true,
+    "recorded_stdout": ".research/native-mov-text-ass-v1/oracle/actual-v1/actual-observations-v1/config-too-short.stdout",
+    "stdout_sha256": "5b72dd12b8185553c4c4d5320f0c190559801d7597f817e3a08fad3964355d13"
+  },
+  "config-valid-empty-fonts": {
+    "case": {
+      "config": "cases/config-valid-empty-fonts/extradata.bin",
+      "dimensions": [
+        0,
+        0
+      ],
+      "duration": "1001",
+      "id": "config-valid-empty-fonts",
+      "original_memberships": [],
+      "packets": [
+        "cases/config-valid-empty-fonts/packet-0.bin"
+      ],
+      "pts": "1",
+      "timebase": [
+        1,
+        1000
+      ]
+    },
+    "original_v1_observation_preserved": true,
+    "recorded_stdout": ".research/native-mov-text-ass-v1/oracle/actual-v1/actual-observations-v1/config-valid-empty-fonts.stdout",
+    "stdout_sha256": "c86efdb1863b904f6f26f094c8ef76ce0604a6e15e2148a2a43e40abbb43c15e"
+  },
+  "configured-defaults": {
+    "case": {
+      "config": "cases/configured-defaults/extradata.bin",
+      "dimensions": [
+        1920,
+        1080
+      ],
+      "duration": "1001",
+      "id": "configured-defaults",
+      "original_memberships": [],
+      "packets": [
+        "cases/configured-defaults/packet-0.bin"
+      ],
+      "pts": "1",
+      "timebase": [
+        1,
+        1000
+      ]
+    },
+    "original_v1_observation_preserved": true,
+    "recorded_stdout": ".research/native-mov-text-ass-v1/oracle/actual-v1/actual-observations-v1/configured-defaults.stdout",
+    "stdout_sha256": "e8bdca59ec59254abf4875195353c697c0e0d2f1537463d35c410966e75c7fd5"
+  },
+  "configured-style-font": {
+    "case": {
+      "config": "cases/configured-style-font/extradata.bin",
+      "dimensions": [
+        0,
+        0
+      ],
+      "duration": "1001",
+      "id": "configured-style-font",
+      "original_memberships": [],
+      "packets": [
+        "cases/configured-style-font/packet-0.bin"
+      ],
+      "pts": "1",
+      "timebase": [
+        1,
+        1000
+      ]
+    },
+    "original_v1_observation_preserved": true,
+    "recorded_stdout": ".research/native-mov-text-ass-v1/oracle/actual-v1/actual-observations-v1/configured-style-font.stdout",
+    "stdout_sha256": "cf86fee635127bba5c3a54cf942b150a211fab07fe7c8d021acde0c058a7bd7f"
+  },
+  "cr-lf-markup": {
+    "case": {
+      "config": null,
+      "dimensions": [
+        0,
+        0
+      ],
+      "duration": "1001",
+      "id": "cr-lf-markup",
+      "original_memberships": [],
+      "packets": [
+        "cases/cr-lf-markup/packet-0.bin"
+      ],
+      "pts": "1",
+      "timebase": [
+        1,
+        1000
+      ]
+    },
+    "original_v1_observation_preserved": true,
+    "recorded_stdout": ".research/native-mov-text-ass-v1/oracle/actual-v1/actual-observations-v1/cr-lf-markup.stdout",
+    "stdout_sha256": "4744607912514b25195fabe98d92ed7b81511040f74c27585ec885249d5af32e"
+  },
+  "duplicate-fonts": {
+    "case": {
+      "config": "cases/duplicate-fonts/extradata.bin",
+      "dimensions": [
+        0,
+        0
+      ],
+      "duration": "1001",
+      "id": "duplicate-fonts",
+      "original_memberships": [],
+      "packets": [
+        "cases/duplicate-fonts/packet-0.bin"
+      ],
+      "pts": "1",
+      "timebase": [
+        1,
+        1000
+      ]
+    },
+    "original_v1_observation_preserved": true,
+    "recorded_stdout": ".research/native-mov-text-ass-v1/oracle/actual-v1/actual-observations-v1/duplicate-fonts.stdout",
+    "stdout_sha256": "d6f96cee787894283ea692a84873ea72e33ae9b83dc025d749a7c086d55be8b2"
+  },
+  "duplicate-wrap": {
+    "case": {
+      "config": null,
+      "dimensions": [
+        0,
+        0
+      ],
+      "duration": "1001",
+      "id": "duplicate-wrap",
+      "original_memberships": [],
+      "packets": [
+        "cases/duplicate-wrap/packet-0.bin"
+      ],
+      "pts": "1",
+      "timebase": [
+        1,
+        1000
+      ]
+    },
+    "original_v1_observation_preserved": true,
+    "recorded_stdout": ".research/native-mov-text-ass-v1/oracle/actual-v1/actual-observations-v1/duplicate-wrap.stdout",
+    "stdout_sha256": "b1c3d16b97507ef7c030a84bbd2f6b406d5f1403fa014f899d59df002be7194c"
+  },
+  "empty-event": {
+    "case": {
+      "config": null,
+      "dimensions": [
+        0,
+        0
+      ],
+      "duration": "1001",
+      "id": "empty-event",
+      "original_memberships": [],
+      "packets": [
+        "cases/empty-event/packet-0.bin"
+      ],
+      "pts": "1",
+      "timebase": [
+        1,
+        1000
+      ]
+    },
+    "original_v1_observation_preserved": true,
+    "recorded_stdout": ".research/native-mov-text-ass-v1/oracle/actual-v1/actual-observations-v1/empty-event.stdout",
+    "stdout_sha256": "42088bcc3f3fe9db8c012c2c4da25a63f3a2307d4a71d7724b7d046047a48ed7"
+  },
+  "empty-physical": {
+    "case": {
+      "config": null,
+      "dimensions": [
+        0,
+        0
+      ],
+      "duration": "1001",
+      "id": "empty-physical",
+      "original_memberships": [],
+      "packets": [
+        "cases/empty-physical/packet-0.bin"
+      ],
+      "pts": "1",
+      "timebase": [
+        1,
+        1000
+      ]
+    },
+    "original_v1_observation_preserved": true,
+    "recorded_stdout": ".research/native-mov-text-ass-v1/oracle/actual-v1/actual-observations-v1/empty-physical.stdout",
+    "stdout_sha256": "460f709a8e30a4e1dfc2d8facbd0ffa5013ab582b3ce1a4107381d5afffb4d17"
+  },
+  "extended-short": {
+    "case": {
+      "config": null,
+      "dimensions": [
+        0,
+        0
+      ],
+      "duration": "1001",
+      "id": "extended-short",
+      "original_memberships": [],
+      "packets": [
+        "cases/extended-short/packet-0.bin"
+      ],
+      "pts": "1",
+      "timebase": [
+        1,
+        1000
+      ]
+    },
+    "original_v1_observation_preserved": true,
+    "recorded_stdout": ".research/native-mov-text-ass-v1/oracle/actual-v1/actual-observations-v1/extended-short.stdout",
+    "stdout_sha256": "c0d3a20eb0f5b64f1fd3b85464dfc633f4315b23fdbb470e039c1d0b1fc4e13a"
+  },
+  "extended-wrap": {
+    "case": {
+      "config": null,
+      "dimensions": [
+        0,
+        0
+      ],
+      "duration": "1001",
+      "id": "extended-wrap",
+      "original_memberships": [],
+      "packets": [
+        "cases/extended-wrap/packet-0.bin"
+      ],
+      "pts": "1",
+      "timebase": [
+        1,
+        1000
+      ]
+    },
+    "original_v1_observation_preserved": true,
+    "recorded_stdout": ".research/native-mov-text-ass-v1/oracle/actual-v1/actual-observations-v1/extended-wrap.stdout",
+    "stdout_sha256": "4b7d4cb07e926107ba29c516ea9509d6c53b3ecfb7f98c84bd2abe9bf678a1d0"
+  },
+  "ffff": {
+    "case": {
+      "config": null,
+      "dimensions": [
+        0,
+        0
+      ],
+      "duration": "1001",
+      "id": "ffff",
+      "original_memberships": [],
+      "packets": [
+        "cases/ffff/packet-0.bin"
+      ],
+      "pts": "1",
+      "timebase": [
+        1,
+        1000
+      ]
+    },
+    "original_v1_observation_preserved": true,
+    "recorded_stdout": ".research/native-mov-text-ass-v1/oracle/actual-v1/actual-observations-v1/ffff.stdout",
+    "stdout_sha256": "22befa44acaf6d37641dc64e2d6944f767c6a53f67d065b022043b572ee5a02b"
+  },
+  "flush-read-order": {
+    "case": {
+      "config": null,
+      "dimensions": [
+        0,
+        0
+      ],
+      "duration": "1001",
+      "id": "flush-read-order",
+      "original_memberships": [],
+      "packets": [
+        "cases/flush-read-order/packet-0.bin",
+        "--flush",
+        "cases/flush-read-order/packet-2.bin"
+      ],
+      "pts": "1",
+      "timebase": [
+        1,
+        1000
+      ]
+    },
+    "original_v1_observation_preserved": true,
+    "recorded_stdout": ".research/native-mov-text-ass-v1/oracle/actual-v1/actual-observations-v1/flush-read-order.stdout",
+    "stdout_sha256": "f7a691c8c9294e3f72bf4a7ee6bd8360cd913981d7ad49e39a96a0c64c8c760f"
+  },
+  "font-nul": {
+    "case": {
+      "config": "cases/font-nul/extradata.bin",
+      "dimensions": [
+        0,
+        0
+      ],
+      "duration": "1001",
+      "id": "font-nul",
+      "original_memberships": [],
+      "packets": [
+        "cases/font-nul/packet-0.bin"
+      ],
+      "pts": "1",
+      "timebase": [
+        1,
+        1000
+      ]
+    },
+    "original_v1_observation_preserved": true,
+    "recorded_stdout": ".research/native-mov-text-ass-v1/oracle/actual-v1/actual-observations-v1/font-nul.stdout",
+    "stdout_sha256": "63519b475f90a5fcbf9f8e294f0eb6975e36d0bbbaaab77cfd9a07e7772aa499"
+  },
+  "font-utf16": {
+    "case": {
+      "config": "cases/font-utf16/extradata.bin",
+      "dimensions": [
+        0,
+        0
+      ],
+      "duration": "1001",
+      "id": "font-utf16",
+      "original_memberships": [],
+      "packets": [
+        "cases/font-utf16/packet-0.bin"
+      ],
+      "pts": "1",
+      "timebase": [
+        1,
+        1000
+      ]
+    },
+    "original_v1_observation_preserved": true,
+    "recorded_stdout": ".research/native-mov-text-ass-v1/oracle/actual-v1/actual-observations-v1/font-utf16.stdout",
+    "stdout_sha256": "5169cd0f65d8847a45ee529f80226b64823bfd6f348f06bac52db324ffcdc69e"
+  },
+  "highlight-color": {
+    "case": {
+      "config": null,
+      "dimensions": [
+        0,
+        0
+      ],
+      "duration": "1001",
+      "id": "highlight-color",
+      "original_memberships": [],
+      "packets": [
+        "cases/highlight-color/packet-0.bin"
+      ],
+      "pts": "1",
+      "timebase": [
+        1,
+        1000
+      ]
+    },
+    "original_v1_observation_preserved": true,
+    "recorded_stdout": ".research/native-mov-text-ass-v1/oracle/actual-v1/actual-observations-v1/highlight-color.stdout",
+    "stdout_sha256": "a138a8d773aa02eb799571abe94727abadf92b3352e647e657f778fcd714fa64"
+  },
+  "highlight-empty": {
+    "case": {
+      "config": null,
+      "dimensions": [
+        0,
+        0
+      ],
+      "duration": "1001",
+      "id": "highlight-empty",
+      "original_memberships": [],
+      "packets": [
+        "cases/highlight-empty/packet-0.bin"
+      ],
+      "pts": "1",
+      "timebase": [
+        1,
+        1000
+      ]
+    },
+    "original_v1_observation_preserved": true,
+    "recorded_stdout": ".research/native-mov-text-ass-v1/oracle/actual-v1/actual-observations-v1/highlight-empty.stdout",
+    "stdout_sha256": "8c2800ee67acea10d12998517d98ca477cac1567e5c7e035b3c93f4b15952def"
+  },
+  "highlight-inverse": {
+    "case": {
+      "config": null,
+      "dimensions": [
+        0,
+        0
+      ],
+      "duration": "1001",
+      "id": "highlight-inverse",
+      "original_memberships": [],
+      "packets": [
+        "cases/highlight-inverse/packet-0.bin"
+      ],
+      "pts": "1",
+      "timebase": [
+        1,
+        1000
+      ]
+    },
+    "original_v1_observation_preserved": true,
+    "recorded_stdout": ".research/native-mov-text-ass-v1/oracle/actual-v1/actual-observations-v1/highlight-inverse.stdout",
+    "stdout_sha256": "b8851b016e3e8de38b549cfce3fa5baba8ea9729226d9c767d01e8ef588b4330"
+  },
+  "invalid-overlong": {
+    "case": {
+      "config": null,
+      "dimensions": [
+        0,
+        0
+      ],
+      "duration": "1001",
+      "id": "invalid-overlong",
+      "original_memberships": [],
+      "packets": [
+        "cases/invalid-overlong/packet-0.bin"
+      ],
+      "pts": "1",
+      "timebase": [
+        1,
+        1000
+      ]
+    },
+    "original_v1_observation_preserved": true,
+    "recorded_stdout": ".research/native-mov-text-ass-v1/oracle/actual-v1/actual-observations-v1/invalid-overlong.stdout",
+    "stdout_sha256": "60718cb2996d33ffc30ea293a3240ca2c39be04d8cd3d7ee01e8f0b4c2e58aaf"
+  },
+  "invalid-tail": {
+    "case": {
+      "config": null,
+      "dimensions": [
+        0,
+        0
+      ],
+      "duration": "1001",
+      "id": "invalid-tail",
+      "original_memberships": [],
+      "packets": [
+        "cases/invalid-tail/packet-0.bin"
+      ],
+      "pts": "1",
+      "timebase": [
+        1,
+        1000
+      ]
+    },
+    "original_v1_observation_preserved": true,
+    "recorded_stdout": ".research/native-mov-text-ass-v1/oracle/actual-v1/actual-observations-v1/invalid-tail.stdout",
+    "stdout_sha256": "60718cb2996d33ffc30ea293a3240ca2c39be04d8cd3d7ee01e8f0b4c2e58aaf"
+  },
+  "known-zero-duration": {
+    "case": {
+      "config": null,
+      "dimensions": [
+        0,
+        0
+      ],
+      "duration": "0",
+      "id": "known-zero-duration",
+      "original_memberships": [],
+      "packets": [
+        "cases/known-zero-duration/packet-0.bin"
+      ],
+      "pts": "0",
+      "timebase": [
+        1,
+        1000
+      ]
+    },
+    "original_v1_observation_preserved": true,
+    "recorded_stdout": ".research/native-mov-text-ass-v1/oracle/actual-v1/actual-observations-v1/known-zero-duration.stdout",
+    "stdout_sha256": "c4425455d326930ca7bf6323b1f8548d9b7e9ed0873d2b54700966432a3478cb"
+  },
+  "negative-half": {
+    "case": {
+      "config": null,
+      "dimensions": [
+        0,
+        0
+      ],
+      "duration": "-1",
+      "id": "negative-half",
+      "original_memberships": [],
+      "packets": [
+        "cases/negative-half/packet-0.bin"
+      ],
+      "pts": "-1",
+      "timebase": [
+        1,
+        2000
+      ]
+    },
+    "original_v1_observation_preserved": true,
+    "recorded_stdout": ".research/native-mov-text-ass-v1/oracle/actual-v1/actual-observations-v1/negative-half.stdout",
+    "stdout_sha256": "f428118ec921684abe7b17c969bfb43b83cc07448576a7eb3c24548c5aa3b23e"
+  },
+  "noncharacter-fffe": {
+    "case": {
+      "config": null,
+      "dimensions": [
+        0,
+        0
+      ],
+      "duration": "1001",
+      "id": "noncharacter-fffe",
+      "original_memberships": [],
+      "packets": [
+        "cases/noncharacter-fffe/packet-0.bin"
+      ],
+      "pts": "1",
+      "timebase": [
+        1,
+        1000
+      ]
+    },
+    "original_v1_observation_preserved": true,
+    "recorded_stdout": ".research/native-mov-text-ass-v1/oracle/actual-v1/actual-observations-v1/noncharacter-fffe.stdout",
+    "stdout_sha256": "60718cb2996d33ffc30ea293a3240ca2c39be04d8cd3d7ee01e8f0b4c2e58aaf"
+  },
+  "nul-invalid-tail": {
+    "case": {
+      "config": null,
+      "dimensions": [
+        0,
+        0
+      ],
+      "duration": "1001",
+      "id": "nul-invalid-tail",
+      "original_memberships": [],
+      "packets": [
+        "cases/nul-invalid-tail/packet-0.bin"
+      ],
+      "pts": "1",
+      "timebase": [
+        1,
+        1000
+      ]
+    },
+    "original_v1_observation_preserved": true,
+    "recorded_stdout": ".research/native-mov-text-ass-v1/oracle/actual-v1/actual-observations-v1/nul-invalid-tail.stdout",
+    "stdout_sha256": "25af38879e1d0ff7283cf1e851c4ee3357f740b6582ec35051af158e6ca579bb"
+  },
+  "one-byte": {
+    "case": {
+      "config": null,
+      "dimensions": [
+        0,
+        0
+      ],
+      "duration": "1001",
+      "id": "one-byte",
+      "original_memberships": [],
+      "packets": [
+        "cases/one-byte/packet-0.bin"
+      ],
+      "pts": "1",
+      "timebase": [
+        1,
+        1000
+      ]
+    },
+    "original_v1_observation_preserved": true,
+    "recorded_stdout": ".research/native-mov-text-ass-v1/oracle/actual-v1/actual-observations-v1/one-byte.stdout",
+    "stdout_sha256": "60718cb2996d33ffc30ea293a3240ca2c39be04d8cd3d7ee01e8f0b4c2e58aaf"
+  },
+  "original177-tx3g-basic": {
+    "case": {
+      "config": null,
+      "dimensions": [
+        0,
+        0
+      ],
+      "duration": "1001",
+      "id": "original177-tx3g-basic",
+      "original_memberships": [
+        "tx3g-basic--none",
+        "tx3g-basic--observe"
+      ],
+      "packets": [
+        "cases/original177-tx3g-basic/packet-0.bin"
+      ],
+      "pts": "1",
+      "timebase": [
+        1,
+        1000
+      ]
+    },
+    "original_v1_observation_preserved": true,
+    "recorded_stdout": ".research/native-mov-text-ass-v1/oracle/actual-v1/actual-observations-v1/original177-tx3g-basic.stdout",
+    "stdout_sha256": "c2a837e91697c75ca84b70858842de36f73ebe77c9c5c2498b1fc267b7b79284"
+  },
+  "original177-tx3g-box-overrun": {
+    "case": {
+      "config": null,
+      "dimensions": [
+        0,
+        0
+      ],
+      "duration": "unknown",
+      "id": "original177-tx3g-box-overrun",
+      "original_memberships": [
+        "tx3g-box-overrun--none",
+        "tx3g-box-overrun--observe"
+      ],
+      "packets": [
+        "cases/original177-tx3g-box-overrun/packet-0.bin"
+      ],
+      "pts": "unknown",
+      "timebase": [
+        1,
+        1000
+      ]
+    },
+    "original_v1_observation_preserved": true,
+    "recorded_stdout": ".research/native-mov-text-ass-v1/history/checkpoint-v1/actual-clock-supplement-v2/original177-tx3g-box-overrun.stdout",
+    "stdout_sha256": "3b821be1812783add3180dffc76dd3eb195d6842cbfe2f6f87383dd1668025f9"
+  },
+  "original177-tx3g-byte-not-character-count": {
+    "case": {
+      "config": null,
+      "dimensions": [
+        0,
+        0
+      ],
+      "duration": "1001",
+      "id": "original177-tx3g-byte-not-character-count",
+      "original_memberships": [
+        "tx3g-byte-not-character-count--none",
+        "tx3g-byte-not-character-count--observe"
+      ],
+      "packets": [
+        "cases/original177-tx3g-byte-not-character-count/packet-0.bin"
+      ],
+      "pts": "1",
+      "timebase": [
+        1,
+        1000
+      ]
+    },
+    "original_v1_observation_preserved": true,
+    "recorded_stdout": ".research/native-mov-text-ass-v1/oracle/actual-v1/actual-observations-v1/original177-tx3g-byte-not-character-count.stdout",
+    "stdout_sha256": "993649dca31522a6883616226574cc1b5b4297a941525c7a5fe6ad9121a65dd4"
+  },
+  "original177-tx3g-embedded-nul": {
+    "case": {
+      "config": null,
+      "dimensions": [
+        0,
+        0
+      ],
+      "duration": "1001",
+      "id": "original177-tx3g-embedded-nul",
+      "original_memberships": [
+        "tx3g-embedded-nul--none",
+        "tx3g-embedded-nul--observe"
+      ],
+      "packets": [
+        "cases/original177-tx3g-embedded-nul/packet-0.bin"
+      ],
+      "pts": "1",
+      "timebase": [
+        1,
+        1000
+      ]
+    },
+    "original_v1_observation_preserved": true,
+    "recorded_stdout": ".research/native-mov-text-ass-v1/oracle/actual-v1/actual-observations-v1/original177-tx3g-embedded-nul.stdout",
+    "stdout_sha256": "038c3bc31854a7cacc502b68b3ca40c2b80102263c33bf068c21f76db2720b52"
+  },
+  "original177-tx3g-empty-sample": {
+    "case": {
+      "config": null,
+      "dimensions": [
+        0,
+        0
+      ],
+      "duration": "1001",
+      "id": "original177-tx3g-empty-sample",
+      "original_memberships": [
+        "tx3g-empty-sample--none",
+        "tx3g-empty-sample--observe"
+      ],
+      "packets": [
+        "cases/original177-tx3g-empty-sample/packet-0.bin"
+      ],
+      "pts": "1",
+      "timebase": [
+        1,
+        1000
+      ]
+    },
+    "original_v1_observation_preserved": true,
+    "recorded_stdout": ".research/native-mov-text-ass-v1/oracle/actual-v1/actual-observations-v1/original177-tx3g-empty-sample.stdout",
+    "stdout_sha256": "460f709a8e30a4e1dfc2d8facbd0ffa5013ab582b3ce1a4107381d5afffb4d17"
+  },
+  "original177-tx3g-empty-with-modifier": {
+    "case": {
+      "config": null,
+      "dimensions": [
+        0,
+        0
+      ],
+      "duration": "1001",
+      "id": "original177-tx3g-empty-with-modifier",
+      "original_memberships": [
+        "tx3g-empty-with-modifier--none",
+        "tx3g-empty-with-modifier--observe"
+      ],
+      "packets": [
+        "cases/original177-tx3g-empty-with-modifier/packet-0.bin"
+      ],
+      "pts": "1",
+      "timebase": [
+        1,
+        1000
+      ]
+    },
+    "original_v1_observation_preserved": true,
+    "recorded_stdout": ".research/native-mov-text-ass-v1/oracle/actual-v1/actual-observations-v1/original177-tx3g-empty-with-modifier.stdout",
+    "stdout_sha256": "42088bcc3f3fe9db8c012c2c4da25a63f3a2307d4a71d7724b7d046047a48ed7"
+  },
+  "original177-tx3g-extended-box-gap": {
+    "case": {
+      "config": null,
+      "dimensions": [
+        0,
+        0
+      ],
+      "duration": "unknown",
+      "id": "original177-tx3g-extended-box-gap",
+      "original_memberships": [
+        "tx3g-extended-box-gap--none",
+        "tx3g-extended-box-gap--observe"
+      ],
+      "packets": [
+        "cases/original177-tx3g-extended-box-gap/packet-0.bin"
+      ],
+      "pts": "unknown",
+      "timebase": [
+        1,
+        1000
+      ]
+    },
+    "original_v1_observation_preserved": true,
+    "recorded_stdout": ".research/native-mov-text-ass-v1/history/checkpoint-v1/actual-clock-supplement-v2/original177-tx3g-extended-box-gap.stdout",
+    "stdout_sha256": "a137d43de748be5a73d31eff4342087ded8bfee448e059d7d8066645ee3da209"
+  },
+  "original177-tx3g-line-codepoints-exact": {
+    "case": {
+      "config": null,
+      "dimensions": [
+        0,
+        0
+      ],
+      "duration": "1001",
+      "id": "original177-tx3g-line-codepoints-exact",
+      "original_memberships": [
+        "tx3g-line-codepoints-exact--none",
+        "tx3g-line-codepoints-exact--observe"
+      ],
+      "packets": [
+        "cases/original177-tx3g-line-codepoints-exact/packet-0.bin"
+      ],
+      "pts": "1",
+      "timebase": [
+        1,
+        1000
+      ]
+    },
+    "original_v1_observation_preserved": true,
+    "recorded_stdout": ".research/native-mov-text-ass-v1/oracle/actual-v1/actual-observations-v1/original177-tx3g-line-codepoints-exact.stdout",
+    "stdout_sha256": "e9180b2ecd4e039b5b3c7e6023ce793e618725d453606c2a6ba7bddf0b063367"
+  },
+  "original177-tx3g-lone-surrogate": {
+    "case": {
+      "config": null,
+      "dimensions": [
+        0,
+        0
+      ],
+      "duration": "unknown",
+      "id": "original177-tx3g-lone-surrogate",
+      "original_memberships": [
+        "tx3g-lone-surrogate--none",
+        "tx3g-lone-surrogate--observe"
+      ],
+      "packets": [
+        "cases/original177-tx3g-lone-surrogate/packet-0.bin"
+      ],
+      "pts": "unknown",
+      "timebase": [
+        1,
+        1000
+      ]
+    },
+    "original_v1_observation_preserved": true,
+    "recorded_stdout": ".research/native-mov-text-ass-v1/history/checkpoint-v1/actual-clock-supplement-v2/original177-tx3g-lone-surrogate.stdout",
+    "stdout_sha256": "60718cb2996d33ffc30ea293a3240ca2c39be04d8cd3d7ee01e8f0b4c2e58aaf"
+  },
+  "original177-tx3g-missing-length": {
+    "case": {
+      "config": null,
+      "dimensions": [
+        0,
+        0
+      ],
+      "duration": "unknown",
+      "id": "original177-tx3g-missing-length",
+      "original_memberships": [
+        "tx3g-missing-length--none",
+        "tx3g-missing-length--observe"
+      ],
+      "packets": [
+        "cases/original177-tx3g-missing-length/packet-0.bin"
+      ],
+      "pts": "unknown",
+      "timebase": [
+        1,
+        1000
+      ]
+    },
+    "original_v1_observation_preserved": true,
+    "recorded_stdout": ".research/native-mov-text-ass-v1/history/checkpoint-v1/actual-clock-supplement-v2/original177-tx3g-missing-length.stdout",
+    "stdout_sha256": "60718cb2996d33ffc30ea293a3240ca2c39be04d8cd3d7ee01e8f0b4c2e58aaf"
+  },
+  "original177-tx3g-modifier-order": {
+    "case": {
+      "config": null,
+      "dimensions": [
+        0,
+        0
+      ],
+      "duration": "1001",
+      "id": "original177-tx3g-modifier-order",
+      "original_memberships": [
+        "tx3g-modifier-order--none",
+        "tx3g-modifier-order--observe"
+      ],
+      "packets": [
+        "cases/original177-tx3g-modifier-order/packet-0.bin"
+      ],
+      "pts": "1",
+      "timebase": [
+        1,
+        1000
+      ]
+    },
+    "original_v1_observation_preserved": true,
+    "recorded_stdout": ".research/native-mov-text-ass-v1/oracle/actual-v1/actual-observations-v1/original177-tx3g-modifier-order.stdout",
+    "stdout_sha256": "71ad970d1c4b6ea6c6ed2108dd9e11604826ee33c1dd567b3b61f35e35e330d2"
+  },
+  "original177-tx3g-short-box": {
+    "case": {
+      "config": null,
+      "dimensions": [
+        0,
+        0
+      ],
+      "duration": "unknown",
+      "id": "original177-tx3g-short-box",
+      "original_memberships": [
+        "tx3g-short-box--none",
+        "tx3g-short-box--observe"
+      ],
+      "packets": [
+        "cases/original177-tx3g-short-box/packet-0.bin"
+      ],
+      "pts": "unknown",
+      "timebase": [
+        1,
+        1000
+      ]
+    },
+    "original_v1_observation_preserved": true,
+    "recorded_stdout": ".research/native-mov-text-ass-v1/history/checkpoint-v1/actual-clock-supplement-v2/original177-tx3g-short-box.stdout",
+    "stdout_sha256": "60718cb2996d33ffc30ea293a3240ca2c39be04d8cd3d7ee01e8f0b4c2e58aaf"
+  },
+  "original177-tx3g-style-highlight-raw": {
+    "case": {
+      "config": null,
+      "dimensions": [
+        0,
+        0
+      ],
+      "duration": "1001",
+      "id": "original177-tx3g-style-highlight-raw",
+      "original_memberships": [
+        "tx3g-style-highlight-raw--none",
+        "tx3g-style-highlight-raw--observe"
+      ],
+      "packets": [
+        "cases/original177-tx3g-style-highlight-raw/packet-0.bin"
+      ],
+      "pts": "1",
+      "timebase": [
+        1,
+        1000
+      ]
+    },
+    "original_v1_observation_preserved": true,
+    "recorded_stdout": ".research/native-mov-text-ass-v1/oracle/actual-v1/actual-observations-v1/original177-tx3g-style-highlight-raw.stdout",
+    "stdout_sha256": "76993a9213708ae9d46d48de4e1103384a69ca6f5eddcdbce6bad5f74749bb7c"
+  },
+  "original177-tx3g-text-overrun": {
+    "case": {
+      "config": null,
+      "dimensions": [
+        0,
+        0
+      ],
+      "duration": "unknown",
+      "id": "original177-tx3g-text-overrun",
+      "original_memberships": [
+        "tx3g-text-overrun--none",
+        "tx3g-text-overrun--observe"
+      ],
+      "packets": [
+        "cases/original177-tx3g-text-overrun/packet-0.bin"
+      ],
+      "pts": "unknown",
+      "timebase": [
+        1,
+        1000
+      ]
+    },
+    "original_v1_observation_preserved": true,
+    "recorded_stdout": ".research/native-mov-text-ass-v1/history/checkpoint-v1/actual-clock-supplement-v2/original177-tx3g-text-overrun.stdout",
+    "stdout_sha256": "595486ae6a53b239ce16d670e26004bd01bb8240be6563f6402a72ea81a04cad"
+  },
+  "original177-tx3g-u16-byte-count-boundary": {
+    "case": {
+      "config": null,
+      "dimensions": [
+        0,
+        0
+      ],
+      "duration": "1001",
+      "id": "original177-tx3g-u16-byte-count-boundary",
+      "original_memberships": [
+        "tx3g-u16-byte-count-boundary--none",
+        "tx3g-u16-byte-count-boundary--observe"
+      ],
+      "packets": [
+        "cases/original177-tx3g-u16-byte-count-boundary/packet-0.bin"
+      ],
+      "pts": "1",
+      "timebase": [
+        1,
+        1000
+      ]
+    },
+    "original_v1_observation_preserved": true,
+    "recorded_stdout": ".research/native-mov-text-ass-v1/oracle/actual-v1/actual-observations-v1/original177-tx3g-u16-byte-count-boundary.stdout",
+    "stdout_sha256": "06ab7128ce676c6081393b2c9b9a45a54cbd20f731e309ad05b579e41fe750d4"
+  },
+  "original177-tx3g-unknown-modifier": {
+    "case": {
+      "config": null,
+      "dimensions": [
+        0,
+        0
+      ],
+      "duration": "1001",
+      "id": "original177-tx3g-unknown-modifier",
+      "original_memberships": [
+        "tx3g-unknown-modifier--none",
+        "tx3g-unknown-modifier--observe"
+      ],
+      "packets": [
+        "cases/original177-tx3g-unknown-modifier/packet-0.bin"
+      ],
+      "pts": "1",
+      "timebase": [
+        1,
+        1000
+      ]
+    },
+    "original_v1_observation_preserved": true,
+    "recorded_stdout": ".research/native-mov-text-ass-v1/oracle/actual-v1/actual-observations-v1/original177-tx3g-unknown-modifier.stdout",
+    "stdout_sha256": "e477f8c299aa121872cb9710bfc41cb93d03d7f9024fe974c8012ff0cef68f2e"
+  },
+  "original177-tx3g-utf16-odd": {
+    "case": {
+      "config": null,
+      "dimensions": [
+        0,
+        0
+      ],
+      "duration": "unknown",
+      "id": "original177-tx3g-utf16-odd",
+      "original_memberships": [
+        "tx3g-utf16-odd--none",
+        "tx3g-utf16-odd--observe"
+      ],
+      "packets": [
+        "cases/original177-tx3g-utf16-odd/packet-0.bin"
+      ],
+      "pts": "unknown",
+      "timebase": [
+        1,
+        1000
+      ]
+    },
+    "original_v1_observation_preserved": true,
+    "recorded_stdout": ".research/native-mov-text-ass-v1/history/checkpoint-v1/actual-clock-supplement-v2/original177-tx3g-utf16-odd.stdout",
+    "stdout_sha256": "60718cb2996d33ffc30ea293a3240ca2c39be04d8cd3d7ee01e8f0b4c2e58aaf"
+  },
+  "original177-tx3g-utf16be-bom": {
+    "case": {
+      "config": null,
+      "dimensions": [
+        0,
+        0
+      ],
+      "duration": "1001",
+      "id": "original177-tx3g-utf16be-bom",
+      "original_memberships": [
+        "tx3g-utf16be-bom--none",
+        "tx3g-utf16be-bom--observe"
+      ],
+      "packets": [
+        "cases/original177-tx3g-utf16be-bom/packet-0.bin"
+      ],
+      "pts": "1",
+      "timebase": [
+        1,
+        1000
+      ]
+    },
+    "original_v1_observation_preserved": true,
+    "recorded_stdout": ".research/native-mov-text-ass-v1/oracle/actual-v1/actual-observations-v1/original177-tx3g-utf16be-bom.stdout",
+    "stdout_sha256": "60718cb2996d33ffc30ea293a3240ca2c39be04d8cd3d7ee01e8f0b4c2e58aaf"
+  },
+  "overflow-clock": {
+    "case": {
+      "config": null,
+      "dimensions": [
+        0,
+        0
+      ],
+      "duration": "9223372036854775807",
+      "id": "overflow-clock",
+      "original_memberships": [],
+      "packets": [
+        "cases/overflow-clock/packet-0.bin"
+      ],
+      "pts": "9223372036854775807",
+      "timebase": [
+        2,
+        1
+      ]
+    },
+    "original_v1_observation_preserved": true,
+    "recorded_stdout": ".research/native-mov-text-ass-v1/oracle/actual-v1/actual-observations-v1/overflow-clock.stdout",
+    "stdout_sha256": "d2f4ac1d7a3975401cf3585e6520e89eb5471336dc0e402b9ebe9259aef63a41"
+  },
+  "overrun-box": {
+    "case": {
+      "config": null,
+      "dimensions": [
+        0,
+        0
+      ],
+      "duration": "1001",
+      "id": "overrun-box",
+      "original_memberships": [],
+      "packets": [
+        "cases/overrun-box/packet-0.bin"
+      ],
+      "pts": "1",
+      "timebase": [
+        1,
+        1000
+      ]
+    },
+    "original_v1_observation_preserved": true,
+    "recorded_stdout": ".research/native-mov-text-ass-v1/oracle/actual-v1/actual-observations-v1/overrun-box.stdout",
+    "stdout_sha256": "c67147f84d104b6252bcec3aa8a7e9ad0750a28b956a99e95f8b9c0e3c902fe2"
+  },
+  "overstated": {
+    "case": {
+      "config": null,
+      "dimensions": [
+        0,
+        0
+      ],
+      "duration": "1001",
+      "id": "overstated",
+      "original_memberships": [],
+      "packets": [
+        "cases/overstated/packet-0.bin"
+      ],
+      "pts": "1",
+      "timebase": [
+        1,
+        1000
+      ]
+    },
+    "original_v1_observation_preserved": true,
+    "recorded_stdout": ".research/native-mov-text-ass-v1/oracle/actual-v1/actual-observations-v1/overstated.stdout",
+    "stdout_sha256": "5b72dd12b8185553c4c4d5320f0c190559801d7597f817e3a08fad3964355d13"
+  },
+  "positive-half": {
+    "case": {
+      "config": null,
+      "dimensions": [
+        0,
+        0
+      ],
+      "duration": "1",
+      "id": "positive-half",
+      "original_memberships": [],
+      "packets": [
+        "cases/positive-half/packet-0.bin"
+      ],
+      "pts": "1",
+      "timebase": [
+        1,
+        2000
+      ]
+    },
+    "original_v1_observation_preserved": true,
+    "recorded_stdout": ".research/native-mov-text-ass-v1/oracle/actual-v1/actual-observations-v1/positive-half.stdout",
+    "stdout_sha256": "23851eb6a959289ca4951a96d814361b23eab0a884d4f80ac1d6d4afc623b83a"
+  },
+  "rational-clock": {
+    "case": {
+      "config": null,
+      "dimensions": [
+        0,
+        0
+      ],
+      "duration": "1",
+      "id": "rational-clock",
+      "original_memberships": [],
+      "packets": [
+        "cases/rational-clock/packet-0.bin"
+      ],
+      "pts": "30",
+      "timebase": [
+        1001,
+        30000
+      ]
+    },
+    "original_v1_observation_preserved": true,
+    "recorded_stdout": ".research/native-mov-text-ass-v1/oracle/actual-v1/actual-observations-v1/rational-clock.stdout",
+    "stdout_sha256": "76afc6b6ae88d401337836933875af054785ba4bef799882cd8d5aae9ace0700"
+  },
+  "short-body": {
+    "case": {
+      "config": null,
+      "dimensions": [
+        0,
+        0
+      ],
+      "duration": "1001",
+      "id": "short-body",
+      "original_memberships": [],
+      "packets": [
+        "cases/short-body/packet-0.bin"
+      ],
+      "pts": "1",
+      "timebase": [
+        1,
+        1000
+      ]
+    },
+    "original_v1_observation_preserved": true,
+    "recorded_stdout": ".research/native-mov-text-ass-v1/oracle/actual-v1/actual-observations-v1/short-body.stdout",
+    "stdout_sha256": "c67147f84d104b6252bcec3aa8a7e9ad0750a28b956a99e95f8b9c0e3c902fe2"
+  },
+  "short-box": {
+    "case": {
+      "config": null,
+      "dimensions": [
+        0,
+        0
+      ],
+      "duration": "1001",
+      "id": "short-box",
+      "original_memberships": [],
+      "packets": [
+        "cases/short-box/packet-0.bin"
+      ],
+      "pts": "1",
+      "timebase": [
+        1,
+        1000
+      ]
+    },
+    "original_v1_observation_preserved": true,
+    "recorded_stdout": ".research/native-mov-text-ass-v1/oracle/actual-v1/actual-observations-v1/short-box.stdout",
+    "stdout_sha256": "60718cb2996d33ffc30ea293a3240ca2c39be04d8cd3d7ee01e8f0b4c2e58aaf"
+  },
+  "size0": {
+    "case": {
+      "config": null,
+      "dimensions": [
+        0,
+        0
+      ],
+      "duration": "1001",
+      "id": "size0",
+      "original_memberships": [],
+      "packets": [
+        "cases/size0/packet-0.bin"
+      ],
+      "pts": "1",
+      "timebase": [
+        1,
+        1000
+      ]
+    },
+    "original_v1_observation_preserved": true,
+    "recorded_stdout": ".research/native-mov-text-ass-v1/oracle/actual-v1/actual-observations-v1/size0.stdout",
+    "stdout_sha256": "60718cb2996d33ffc30ea293a3240ca2c39be04d8cd3d7ee01e8f0b4c2e58aaf"
+  },
+  "style-adjacent-different": {
+    "case": {
+      "config": null,
+      "dimensions": [
+        0,
+        0
+      ],
+      "duration": "1001",
+      "id": "style-adjacent-different",
+      "original_memberships": [],
+      "packets": [
+        "cases/style-adjacent-different/packet-0.bin"
+      ],
+      "pts": "1",
+      "timebase": [
+        1,
+        1000
+      ]
+    },
+    "original_v1_observation_preserved": true,
+    "recorded_stdout": ".research/native-mov-text-ass-v1/oracle/actual-v1/actual-observations-v1/style-adjacent-different.stdout",
+    "stdout_sha256": "ce23a4db39250126b355a70e54554bcb8cf2d2497ec79dd940a0fd04ca0404c9"
+  },
+  "style-adjacent-equal": {
+    "case": {
+      "config": null,
+      "dimensions": [
+        0,
+        0
+      ],
+      "duration": "1001",
+      "id": "style-adjacent-equal",
+      "original_memberships": [],
+      "packets": [
+        "cases/style-adjacent-equal/packet-0.bin"
+      ],
+      "pts": "1",
+      "timebase": [
+        1,
+        1000
+      ]
+    },
+    "original_v1_observation_preserved": true,
+    "recorded_stdout": ".research/native-mov-text-ass-v1/oracle/actual-v1/actual-observations-v1/style-adjacent-equal.stdout",
+    "stdout_sha256": "a5ba878fec79f8c83cba37d62243f66193d2bb641604462fdc4acab2683593e4"
+  },
+  "style-all": {
+    "case": {
+      "config": null,
+      "dimensions": [
+        0,
+        0
+      ],
+      "duration": "1001",
+      "id": "style-all",
+      "original_memberships": [],
+      "packets": [
+        "cases/style-all/packet-0.bin"
+      ],
+      "pts": "1",
+      "timebase": [
+        1,
+        1000
+      ]
+    },
+    "original_v1_observation_preserved": true,
+    "recorded_stdout": ".research/native-mov-text-ass-v1/oracle/actual-v1/actual-observations-v1/style-all.stdout",
+    "stdout_sha256": "a763391772526ef5c6b2455dd99c521b649fffe1709d4aede6c24aac69b49196"
+  },
+  "style-empty": {
+    "case": {
+      "config": null,
+      "dimensions": [
+        0,
+        0
+      ],
+      "duration": "1001",
+      "id": "style-empty",
+      "original_memberships": [],
+      "packets": [
+        "cases/style-empty/packet-0.bin"
+      ],
+      "pts": "1",
+      "timebase": [
+        1,
+        1000
+      ]
+    },
+    "original_v1_observation_preserved": true,
+    "recorded_stdout": ".research/native-mov-text-ass-v1/oracle/actual-v1/actual-observations-v1/style-empty.stdout",
+    "stdout_sha256": "42d18b9c4654dc1c27c07890875b4646847bb145f0f2a3d239c09d506ff7793c"
+  },
+  "style-malformed-after-good": {
+    "case": {
+      "config": null,
+      "dimensions": [
+        0,
+        0
+      ],
+      "duration": "1001",
+      "id": "style-malformed-after-good",
+      "original_memberships": [],
+      "packets": [
+        "cases/style-malformed-after-good/packet-0.bin"
+      ],
+      "pts": "1",
+      "timebase": [
+        1,
+        1000
+      ]
+    },
+    "original_v1_observation_preserved": true,
+    "recorded_stdout": ".research/native-mov-text-ass-v1/oracle/actual-v1/actual-observations-v1/style-malformed-after-good.stdout",
+    "stdout_sha256": "59f9d100753685c4f1bb377d9ab18bab95a1a96dc15e06dc241bfd733e34fc92"
+  },
+  "style-outside": {
+    "case": {
+      "config": null,
+      "dimensions": [
+        0,
+        0
+      ],
+      "duration": "1001",
+      "id": "style-outside",
+      "original_memberships": [],
+      "packets": [
+        "cases/style-outside/packet-0.bin"
+      ],
+      "pts": "1",
+      "timebase": [
+        1,
+        1000
+      ]
+    },
+    "original_v1_observation_preserved": true,
+    "recorded_stdout": ".research/native-mov-text-ass-v1/oracle/actual-v1/actual-observations-v1/style-outside.stdout",
+    "stdout_sha256": "9a0020e94a9eb0962030be484cbf53a86f36e50212d1e67413cfe82b99fd7327"
+  },
+  "style-overlap": {
+    "case": {
+      "config": null,
+      "dimensions": [
+        0,
+        0
+      ],
+      "duration": "1001",
+      "id": "style-overlap",
+      "original_memberships": [],
+      "packets": [
+        "cases/style-overlap/packet-0.bin"
+      ],
+      "pts": "1",
+      "timebase": [
+        1,
+        1000
+      ]
+    },
+    "original_v1_observation_preserved": true,
+    "recorded_stdout": ".research/native-mov-text-ass-v1/oracle/actual-v1/actual-observations-v1/style-overlap.stdout",
+    "stdout_sha256": "b05157bd0ba87c0714e88fd958db5cddb235708a4ac0a77509df49a6caa353a0"
+  },
+  "style-repeated": {
+    "case": {
+      "config": null,
+      "dimensions": [
+        0,
+        0
+      ],
+      "duration": "1001",
+      "id": "style-repeated",
+      "original_memberships": [],
+      "packets": [
+        "cases/style-repeated/packet-0.bin"
+      ],
+      "pts": "1",
+      "timebase": [
+        1,
+        1000
+      ]
+    },
+    "original_v1_observation_preserved": true,
+    "recorded_stdout": ".research/native-mov-text-ass-v1/oracle/actual-v1/actual-observations-v1/style-repeated.stdout",
+    "stdout_sha256": "8346b7cd65bc8c119b7dd6393c045c9fa822cf192b2b46b7cd764c01dd30acea"
+  },
+  "style-reversed": {
+    "case": {
+      "config": null,
+      "dimensions": [
+        0,
+        0
+      ],
+      "duration": "1001",
+      "id": "style-reversed",
+      "original_memberships": [],
+      "packets": [
+        "cases/style-reversed/packet-0.bin"
+      ],
+      "pts": "1",
+      "timebase": [
+        1,
+        1000
+      ]
+    },
+    "original_v1_observation_preserved": true,
+    "recorded_stdout": ".research/native-mov-text-ass-v1/oracle/actual-v1/actual-observations-v1/style-reversed.stdout",
+    "stdout_sha256": "9a0020e94a9eb0962030be484cbf53a86f36e50212d1e67413cfe82b99fd7327"
+  },
+  "style-unicode": {
+    "case": {
+      "config": null,
+      "dimensions": [
+        0,
+        0
+      ],
+      "duration": "1001",
+      "id": "style-unicode",
+      "original_memberships": [],
+      "packets": [
+        "cases/style-unicode/packet-0.bin"
+      ],
+      "pts": "1",
+      "timebase": [
+        1,
+        1000
+      ]
+    },
+    "original_v1_observation_preserved": true,
+    "recorded_stdout": ".research/native-mov-text-ass-v1/oracle/actual-v1/actual-observations-v1/style-unicode.stdout",
+    "stdout_sha256": "060b2151c9b522303358772592de0037d5e97ce7bc0d6e7ac803a4fbed971c97"
+  },
+  "style-zero-after-good": {
+    "case": {
+      "config": null,
+      "dimensions": [
+        0,
+        0
+      ],
+      "duration": "1001",
+      "id": "style-zero-after-good",
+      "original_memberships": [],
+      "packets": [
+        "cases/style-zero-after-good/packet-0.bin"
+      ],
+      "pts": "1",
+      "timebase": [
+        1,
+        1000
+      ]
+    },
+    "original_v1_observation_preserved": true,
+    "recorded_stdout": ".research/native-mov-text-ass-v1/oracle/actual-v1/actual-observations-v1/style-zero-after-good.stdout",
+    "stdout_sha256": "b9e5b9eaae550325623a1cc3faccfd83556daba33e1fbcdc2c20ec5aced70868"
+  },
+  "two-packets": {
+    "case": {
+      "config": null,
+      "dimensions": [
+        0,
+        0
+      ],
+      "duration": "1001",
+      "id": "two-packets",
+      "original_memberships": [],
+      "packets": [
+        "cases/two-packets/packet-0.bin",
+        "cases/two-packets/packet-1.bin"
+      ],
+      "pts": "1",
+      "timebase": [
+        1,
+        1000
+      ]
+    },
+    "original_v1_observation_preserved": true,
+    "recorded_stdout": ".research/native-mov-text-ass-v1/oracle/actual-v1/actual-observations-v1/two-packets.stdout",
+    "stdout_sha256": "70e9552116ef1b4e84f76a5e0c8bf9445ceb4c0ddbd1202bd950bf44b6263943"
+  },
+  "understated": {
+    "case": {
+      "config": null,
+      "dimensions": [
+        0,
+        0
+      ],
+      "duration": "1001",
+      "id": "understated",
+      "original_memberships": [],
+      "packets": [
+        "cases/understated/packet-0.bin"
+      ],
+      "pts": "1",
+      "timebase": [
+        1,
+        1000
+      ]
+    },
+    "original_v1_observation_preserved": true,
+    "recorded_stdout": ".research/native-mov-text-ass-v1/oracle/actual-v1/actual-observations-v1/understated.stdout",
+    "stdout_sha256": "038c3bc31854a7cacc502b68b3ca40c2b80102263c33bf068c21f76db2720b52"
+  },
+  "unicode": {
+    "case": {
+      "config": null,
+      "dimensions": [
+        0,
+        0
+      ],
+      "duration": "1001",
+      "id": "unicode",
+      "original_memberships": [],
+      "packets": [
+        "cases/unicode/packet-0.bin"
+      ],
+      "pts": "1",
+      "timebase": [
+        1,
+        1000
+      ]
+    },
+    "original_v1_observation_preserved": true,
+    "recorded_stdout": ".research/native-mov-text-ass-v1/oracle/actual-v1/actual-observations-v1/unicode.stdout",
+    "stdout_sha256": "99c1dff1adbe2cf87d989973ac40c624648c4e65fa958679b9ba1c5f4b91398b"
+  },
+  "unknown": {
+    "case": {
+      "config": null,
+      "dimensions": [
+        0,
+        0
+      ],
+      "duration": "1001",
+      "id": "unknown",
+      "original_memberships": [],
+      "packets": [
+        "cases/unknown/packet-0.bin"
+      ],
+      "pts": "1",
+      "timebase": [
+        1,
+        1000
+      ]
+    },
+    "original_v1_observation_preserved": true,
+    "recorded_stdout": ".research/native-mov-text-ass-v1/oracle/actual-v1/actual-observations-v1/unknown.stdout",
+    "stdout_sha256": "df4cae1b2ede45ccb640732b1e5ac36b2dc043ab22a7f0463b813a2aea2a99d2"
+  },
+  "unknown-clock": {
+    "case": {
+      "config": null,
+      "dimensions": [
+        0,
+        0
+      ],
+      "duration": "unknown",
+      "id": "unknown-clock",
+      "original_memberships": [],
+      "packets": [
+        "cases/unknown-clock/packet-0.bin"
+      ],
+      "pts": "unknown",
+      "timebase": [
+        1,
+        1000
+      ]
+    },
+    "original_v1_observation_preserved": true,
+    "recorded_stdout": ".research/native-mov-text-ass-v1/oracle/actual-v1/actual-observations-v1/unknown-clock.stdout",
+    "stdout_sha256": "d2f4ac1d7a3975401cf3585e6520e89eb5471336dc0e402b9ebe9259aef63a41"
+  },
+  "unset-clock": {
+    "case": {
+      "config": null,
+      "dimensions": [
+        0,
+        0
+      ],
+      "duration": "2000",
+      "id": "unset-clock",
+      "original_memberships": [],
+      "packets": [
+        "cases/unset-clock/packet-0.bin"
+      ],
+      "pts": "123",
+      "timebase": [
+        0,
+        1
+      ]
+    },
+    "original_v1_observation_preserved": true,
+    "recorded_stdout": ".research/native-mov-text-ass-v1/oracle/actual-v1/actual-observations-v1/unset-clock.stdout",
+    "stdout_sha256": "d2f4ac1d7a3975401cf3585e6520e89eb5471336dc0e402b9ebe9259aef63a41"
+  },
+  "utf16be": {
+    "case": {
+      "config": null,
+      "dimensions": [
+        0,
+        0
+      ],
+      "duration": "1001",
+      "id": "utf16be",
+      "original_memberships": [],
+      "packets": [
+        "cases/utf16be/packet-0.bin"
+      ],
+      "pts": "1",
+      "timebase": [
+        1,
+        1000
+      ]
+    },
+    "original_v1_observation_preserved": true,
+    "recorded_stdout": ".research/native-mov-text-ass-v1/oracle/actual-v1/actual-observations-v1/utf16be.stdout",
+    "stdout_sha256": "60718cb2996d33ffc30ea293a3240ca2c39be04d8cd3d7ee01e8f0b4c2e58aaf"
+  },
+  "utf16le": {
+    "case": {
+      "config": null,
+      "dimensions": [
+        0,
+        0
+      ],
+      "duration": "1001",
+      "id": "utf16le",
+      "original_memberships": [],
+      "packets": [
+        "cases/utf16le/packet-0.bin"
+      ],
+      "pts": "1",
+      "timebase": [
+        1,
+        1000
+      ]
+    },
+    "original_v1_observation_preserved": true,
+    "recorded_stdout": ".research/native-mov-text-ass-v1/oracle/actual-v1/actual-observations-v1/utf16le.stdout",
+    "stdout_sha256": "60718cb2996d33ffc30ea293a3240ca2c39be04d8cd3d7ee01e8f0b4c2e58aaf"
+  },
+  "utf8-refusal-then-good": {
+    "case": {
+      "config": null,
+      "dimensions": [
+        0,
+        0
+      ],
+      "duration": "1001",
+      "id": "utf8-refusal-then-good",
+      "original_memberships": [],
+      "packets": [
+        "cases/utf8-refusal-then-good/packet-0.bin",
+        "cases/utf8-refusal-then-good/packet-1.bin"
+      ],
+      "pts": "1",
+      "timebase": [
+        1,
+        1000
+      ]
+    },
+    "original_v1_observation_preserved": true,
+    "recorded_stdout": ".research/native-mov-text-ass-v1/oracle/actual-v1/actual-observations-v1/utf8-refusal-then-good.stdout",
+    "stdout_sha256": "e190fa9bdb2288935d97f85f09b23808e4e79e4ca9ee92b3d3d64608f1959d2b"
+  },
+  "wrap-0": {
+    "case": {
+      "config": null,
+      "dimensions": [
+        0,
+        0
+      ],
+      "duration": "1001",
+      "id": "wrap-0",
+      "original_memberships": [],
+      "packets": [
+        "cases/wrap-0/packet-0.bin"
+      ],
+      "pts": "1",
+      "timebase": [
+        1,
+        1000
+      ]
+    },
+    "original_v1_observation_preserved": true,
+    "recorded_stdout": ".research/native-mov-text-ass-v1/oracle/actual-v1/actual-observations-v1/wrap-0.stdout",
+    "stdout_sha256": "6163d00619122bbf20c74cdfc0470e1cacef8f2e400127b86a86d9c8bd708809"
+  },
+  "wrap-1": {
+    "case": {
+      "config": null,
+      "dimensions": [
+        0,
+        0
+      ],
+      "duration": "1001",
+      "id": "wrap-1",
+      "original_memberships": [],
+      "packets": [
+        "cases/wrap-1/packet-0.bin"
+      ],
+      "pts": "1",
+      "timebase": [
+        1,
+        1000
+      ]
+    },
+    "original_v1_observation_preserved": true,
+    "recorded_stdout": ".research/native-mov-text-ass-v1/oracle/actual-v1/actual-observations-v1/wrap-1.stdout",
+    "stdout_sha256": "6c5175840206614a3dbc0666d6576654f0a73c3b620b5469afb50886c0978357"
+  },
+  "wrap-2": {
+    "case": {
+      "config": null,
+      "dimensions": [
+        0,
+        0
+      ],
+      "duration": "1001",
+      "id": "wrap-2",
+      "original_memberships": [],
+      "packets": [
+        "cases/wrap-2/packet-0.bin"
+      ],
+      "pts": "1",
+      "timebase": [
+        1,
+        1000
+      ]
+    },
+    "original_v1_observation_preserved": true,
+    "recorded_stdout": ".research/native-mov-text-ass-v1/oracle/actual-v1/actual-observations-v1/wrap-2.stdout",
+    "stdout_sha256": "6163d00619122bbf20c74cdfc0470e1cacef8f2e400127b86a86d9c8bd708809"
+  },
+  "wrap-nul": {
+    "case": {
+      "config": null,
+      "dimensions": [
+        0,
+        0
+      ],
+      "duration": "1001",
+      "id": "wrap-nul",
+      "original_memberships": [],
+      "packets": [
+        "cases/wrap-nul/packet-0.bin"
+      ],
+      "pts": "1",
+      "timebase": [
+        1,
+        1000
+      ]
+    },
+    "original_v1_observation_preserved": true,
+    "recorded_stdout": ".research/native-mov-text-ass-v1/oracle/actual-v1/actual-observations-v1/wrap-nul.stdout",
+    "stdout_sha256": "d03849f0d09822ec7b97117eb8b65d27b650c52fe8f4a7c5d75881a730fd1b63"
+  }
+}

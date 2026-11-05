@@ -30,5 +30,7 @@ docs/testing.md and specs/README.md before implementation.
   fuzzing or other benchmarks. Mac results do not establish 32-bit TV performance.
 - Distinguish authored code, upstream observations, a working prototype, full parity and a
   release-qualified result. The current spike collects mismatches; its exit 0 is not a parity pass.
-- Set CARGO_INCREMENTAL=0 on direct cargo commands. Do not modify Streem, deploy to a TV,
-  publish a repository, commit or push unless the current task authorizes it.
+- Keep `main` as the public development baseline. Develop follow-up changes on
+  short-lived branches and land them through reviewed PRs with revision-specific evidence.
+- Set CARGO_INCREMENTAL=0 on direct cargo commands. Keep Triergon source publication,
+  Streem integration, and TV deployment under their respective task authorizations.

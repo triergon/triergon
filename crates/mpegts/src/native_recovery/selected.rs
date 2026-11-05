@@ -194,9 +194,10 @@ impl NativePesRecoveryObserver {
                 "selected diagnostic source context unobserved",
             ));
         }
-        if self
-            .last
-            .is_some_and(|(event, old)| c.source_event_ordinal <= event || offset <= old)
+        if !self.after_pmt_binding_v1(c)
+            || self.last.is_some_and(|(event, old)| {
+                c.source_event_ordinal <= event || (!self.entity_first && offset <= old)
+            })
         {
             return Err(Error::Invalid("selected diagnostic source order"));
         }
@@ -261,6 +262,7 @@ impl NativePesRecoveryObserver {
             }
         };
         self.last = Some((c.source_event_ordinal, packet.source_offset));
+        self.entity_first = false;
         self.pending = Some(RecoveryPending::Selected(SelectedPending {
             carrier: NativeDiagnosticCarrier::Transport(packet),
             kind,
@@ -286,6 +288,12 @@ impl NativePesRecoveryObserver {
         fault: TraceFault,
         c: NativeSourceContext,
     ) -> std::result::Result<(), PushError<TraceFault>> {
+        if let Err(error) = self.inner.validate_native_input(None) {
+            return Err(PushError {
+                error,
+                value: fault,
+            });
+        }
         let admission = (|| {
             let r = fault
                 .rejected
@@ -330,6 +338,7 @@ impl NativePesRecoveryObserver {
             }
         };
         self.last = Some((c.source_event_ordinal, r.source_offset()));
+        self.entity_first = false;
         self.pending = Some(RecoveryPending::Selected(SelectedPending {
             carrier: NativeDiagnosticCarrier::Rejected(r),
             kind: NativeSelectedFault::PcrEncoding,
@@ -372,6 +381,7 @@ impl NativePesRecoveryObserver {
         }
         p.diagnostic = Some((fault.clone(), c));
         self.last = Some((c.source_event_ordinal, p.carrier.source_offset()));
+        self.entity_first = false;
         Ok(())
     }
     /// Acknowledge only the real next source Timeline after a previously seen
@@ -566,7 +576,7 @@ impl NativePesRecoveryObserver {
                     };
                     let offset = p.carrier.source_offset();
                     let counter = p.counter();
-                    let position = i64::try_from(offset).map_err(|_| Error::Overflow)?;
+                    let position = self.inner.media_native_position_v1(offset)?;
                     let Some(RecoveryPending::Selected(p)) = self.pending.take() else {
                         unreachable!()
                     };

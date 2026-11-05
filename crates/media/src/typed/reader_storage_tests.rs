@@ -422,3 +422,6 @@ fn performance_blocking_supply_preserves_canonical_exact_read_requests() {
         "do not widen hints/read buffers or move I/O across a source boundary"
     );
 }
+
+#[path = "reader_ready_reset_tests.rs"]
+mod reader_ready_reset_tests;

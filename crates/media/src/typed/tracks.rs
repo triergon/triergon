@@ -521,6 +521,7 @@ pub(crate) struct TracksJob {
     seal: Option<ConfigurationJob>,
     result: Option<Configuration>,
     failed: bool,
+    webm_vp9_t35: bool,
 }
 impl TracksJob {
     pub fn metadata_bytes(&self) -> Result<usize> {
@@ -567,7 +568,12 @@ impl TracksJob {
             seal: None,
             result: None,
             failed: false,
+            webm_vp9_t35: false,
         })
+    }
+    pub(crate) fn with_webm_vp9_t35(mut self, enabled: bool) -> Self {
+        self.webm_vp9_t35 = enabled;
+        self
     }
     pub fn step(
         &mut self,
@@ -660,7 +666,8 @@ impl TracksJob {
                                 self.generation,
                                 self.revision,
                             )
-                            .inherit_states(self.previous.as_ref()),
+                            .inherit_states(self.previous.as_ref())
+                            .with_webm_vp9_t35(self.webm_vp9_t35),
                         );
                         self.phase = Phase::Seal;
                     }

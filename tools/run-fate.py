@@ -16,7 +16,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 from harness.runner import parity, digest
 from harness.provenance import source_identity_error
-CASES={"fate-matroska-xiph-lacing":("mkv/xiph_lacing.mka","xiph",True),"fate-matroska-zero-length-block":("mkv/zero_length_block.mks","zero-length",False),"fate-matroska-zlib-decompression":("mkv/subtitle_zlib.mks","zlib",True)}
+CASES={"fate-matroska-xiph-lacing":("mkv/xiph_lacing.mka","xiph",True),"fate-matroska-zero-length-block":("mkv/zero_length_block.mks","zero-length",False),"fate-matroska-zlib-decompression":("mkv/subtitle_zlib.mks","zlib",True),"fate-matroska-opus-remux":("mkv/codec_delay_opus.mkv","opus",True)}
 
 
 def main():
@@ -26,6 +26,10 @@ def main():
     args=parser.parse_args()
     case=args.case
     sample,label,sequential=CASES[case]
+    candidate = ROOT / "target/release/media-worker"
+    reference = ROOT / "target/harness/ffmpeg-worker"
+    if args.demux_only and not (candidate.is_file() and reference.is_file()):
+        raise ValueError("Demux comparison requires both candidate and reference workers; run tools/build-harness.py first")
     cache = ROOT / ".research/reference"
     build = json.loads((cache / "build.json").read_text())
     enabled = (cache / "fate-list.txt").read_text().split()
@@ -51,14 +55,12 @@ def main():
                "reference_status": "not-run-demux-only" if args.demux_only else "pass" if result.returncode == 0 else "fail", "upstream_case_executed":not args.demux_only,"exit_code": result.returncode,
                "stdout": result.stdout, "stderr": result.stderr, "candidate_status": "not tested by upstream FATE",
                "upstream_ffmpeg_sha256": digest(source / "ffmpeg"), "reference_build": build}
-    candidate = ROOT / "target/release/media-worker"
-    reference = ROOT / "target/harness/ffmpeg-worker"
     if candidate.exists() and reference.exists():
         identity = json.loads((ROOT / "target/harness/identity.json").read_text())
         if source_identity_error(ROOT,identity) or identity["binaries"] != {"candidate": digest(candidate), "reference": digest(reference)}:
             raise ValueError("Stale adapter identity; rebuild before evaluating FATE vectors")
         receipt["candidate_demux_comparison"] = parity(candidate, reference, path, ROOT / (".research/fate-candidate-"+label),sequential_required=sequential)
-        receipt["candidate_status"] = "demux portion " + receipt["candidate_demux_comparison"]["status"] + "; not upstream framecrc execution"
+        receipt["candidate_status"] = "demux portion " + receipt["candidate_demux_comparison"]["status"] + "; not complete upstream FATE execution"
         receipt["adapter_identity"] = identity
         if source_identity_error(ROOT,identity) or identity["binaries"] != {"candidate": digest(candidate), "reference": digest(reference)}:
             raise ValueError("Adapter/source changed during FATE comparison")

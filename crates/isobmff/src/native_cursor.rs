@@ -20,7 +20,10 @@ use std::{
 use triergon_core::{Budget, BudgetVec, Error, Result, TimeBase, WorkBudget};
 
 /// Opt-in compatibility operation, not a source/presentation conformance rule.
-/// Forced mov, seekable input, no stream-info, NOPARSE|NOFILLIN (48), pinned n9.0.
+/// The original constructors use forced MOV, seekable input, no stream-info and
+/// NOPARSE|NOFILLIN (48), pinned n9.0. `new_front_source_v1` explicitly adds the
+/// separately observed nonseekable, from-start profile; it does not change those
+/// default operations or establish a complete-entity/EOF Source fact.
 #[derive(Clone, Copy, Debug)]
 pub enum Mov9Profile {
     PinnedNoParseNoFillin,
@@ -79,9 +82,11 @@ pub struct Mov9EditIdentity {
 pub enum Mov9ClockOrigin {
     SourceClock,
     PredecessorEnd(Mov9PredecessorClock),
-    /// Only the explicit complete-source constructor may establish this native
-    /// observation baseline at source ordinal1 with an empty regular table.
+    /// Only the explicit complete-source constructor establishes this origin.
     CompleteMediaStart,
+    /// Explicit from-start front metadata establishes a native origin, without
+    /// claiming that the entity has reached physical EOF or filling Source time.
+    FrontSourceMediaStartV1,
 }
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Mov9PredecessorClock {
@@ -102,13 +107,36 @@ pub struct Mov9PacketOccurrence {
     pub scheduling_clock: Mov9SchedulingClock,
 }
 
+/// Whether this seekable MOV head replaces the incumbent during a
+/// left-to-right catalogue scan. Incomparable and tied heads keep the incumbent.
+pub fn mov9_seekable_head_precedes(
+    contender: &Mov9PacketOccurrence,
+    incumbent: &Mov9PacketOccurrence,
+) -> bool {
+    match (contender.scheduling_clock, incumbent.scheduling_clock) {
+        (
+            Mov9SchedulingClock::ExactMicroseconds(contender_clock),
+            Mov9SchedulingClock::ExactMicroseconds(incumbent_clock),
+        ) => {
+            let distance = (i128::from(contender_clock) - i128::from(incumbent_clock)).abs();
+            if distance > 1_000_000 {
+                contender_clock < incumbent_clock
+            } else {
+                contender.native.source_range.start < incumbent.native.source_range.start
+            }
+        }
+        // Undefined/native-overflow heads retain the incumbent catalogue slot.
+        _ => false,
+    }
+}
+
 #[derive(Clone, Copy, Debug)]
-struct PreviousClock {
-    sample: u64,
-    dts: i128,
-    signed_dts: i64,
-    duration: u32,
-    source_known: bool,
+pub(crate) struct PreviousClock {
+    pub(crate) sample: u64,
+    pub(crate) dts: i128,
+    pub(crate) signed_dts: i64,
+    pub(crate) duration: u32,
+    pub(crate) source_known: bool,
 }
 #[derive(Debug)]
 struct Slot<'a> {
@@ -116,9 +144,9 @@ struct Slot<'a> {
     track: Mov9Track<'a>,
     cursor: TrackSampleCursor<'a>,
     edited: Option<Mov9EditCursor<'a>>,
+    encoded_edit: Option<&'a crate::Mov9EncodedEditPlanV2>,
     head: Option<Mov9PacketOccurrence>,
     clock: Mov9MediaClock,
-    scheduling_clock: Mov9SchedulingClock,
     shift: i64,
     append_run: Option<(usize, usize)>,
     discard_boundary: Option<i128>,
@@ -139,6 +167,7 @@ impl<'a> Slot<'a> {
         &self,
         sample: &Sample,
         complete_source: bool,
+        front_source: bool,
     ) -> Result<(i128, Mov9ClockOrigin)> {
         if sample.dts_ticks.is_some() != sample.cts_ticks.is_some() {
             return Err(Error::Invalid("inconsistent source clock knownness"));
@@ -168,6 +197,9 @@ impl<'a> Slot<'a> {
         if complete_source && self.track.table.sample_count() == 0 && sample.ordinal == 1 {
             return Ok((0, Mov9ClockOrigin::CompleteMediaStart));
         }
+        if front_source && self.track.table.sample_count() == 0 && sample.ordinal == 1 {
+            return Ok((0, Mov9ClockOrigin::FrontSourceMediaStartV1));
+        }
         Err(Error::Unsupported(
             "native first origin needs complete-source context",
         ))
@@ -177,8 +209,32 @@ impl<'a> Slot<'a> {
         work: &mut WorkBudget,
         complete_source: bool,
         global_schedule: bool,
+        front_source: bool,
     ) -> Result<Mov9CursorStatus> {
-        let mut occurrence = if let Some(cursor) = &mut self.edited {
+        let mut occurrence = if let Some(plan) = self.encoded_edit {
+            let sample = match self.cursor.poll(work)? {
+                SampleStep::Yield => return Ok(Mov9CursorStatus::Yield),
+                SampleStep::End => return Ok(Mov9CursorStatus::End),
+                SampleStep::Sample(s) => s,
+            };
+            let Some(native) = plan.project(&sample)? else {
+                return Ok(Mov9CursorStatus::Yield);
+            };
+            let edit = Mov9EditIdentity {
+                sequence: sample.ordinal,
+                edit_ordinal: 0,
+                duration_basis: Mov9DurationBasis::OriginalDecodeTableOrdinal,
+            };
+            Mov9PacketOccurrence {
+                track_id: self.track.track_id,
+                source: sample,
+                native,
+                edit: Some(edit),
+                clock_origin: Mov9ClockOrigin::SourceClock,
+                media_clock: self.clock,
+                scheduling_clock: Mov9SchedulingClock::SingleTrack,
+            }
+        } else if let Some(cursor) = &mut self.edited {
             match cursor.poll(work)? {
                 Mov9CursorStatus::Ready => {
                     let occurrence = cursor.take_occurrence()?;
@@ -213,7 +269,7 @@ impl<'a> Slot<'a> {
                 },
             );
             let (dts, clock_origin) = if sample.fragment_flags.is_some() {
-                self.fragment_origin(&sample, complete_source)?
+                self.fragment_origin(&sample, complete_source, front_source)?
             } else {
                 (
                     sample
@@ -251,6 +307,8 @@ impl<'a> Slot<'a> {
                 {
                     native.flags |= 4;
                 }
+            }
+            if sample.fragment_flags.is_some() || front_source {
                 self.previous_clock = Some(PreviousClock {
                     sample: sample.ordinal,
                     dts,
@@ -269,12 +327,13 @@ impl<'a> Slot<'a> {
                 scheduling_clock: Mov9SchedulingClock::SingleTrack,
             }
         };
-        self.scheduling_clock = if global_schedule {
+        occurrence.scheduling_clock = if front_source {
+            Mov9SchedulingClock::NonseekableSourcePosition(occurrence.native.source_range.start)
+        } else if global_schedule {
             Mov9SchedulingClock::from_native(occurrence.native.dts_field, self.clock.native_base)?
         } else {
             Mov9SchedulingClock::SingleTrack
         };
-        occurrence.scheduling_clock = self.scheduling_clock;
         self.head = Some(occurrence);
         Ok(Mov9CursorStatus::Ready)
     }
@@ -315,6 +374,9 @@ pub struct Mov9PacketCursor<'a> {
     ready: Option<Mov9PacketOccurrence>,
     failed: Option<Error>,
     complete_source: bool,
+    front_source: bool,
+    terminal: Option<crate::TerminalMdat>,
+    forward_regular: Option<crate::ForwardRegularMdatV1>,
 }
 
 fn count(value: u64, maximum: u64) -> Result<()> {
@@ -372,9 +434,9 @@ impl<'a> Mov9PacketCursor<'a> {
                     track: *track,
                     cursor: TrackSampleCursor::new(source),
                     edited: None,
+                    encoded_edit: None,
                     head: None,
                     clock: Mov9MediaClock::from_source(track.media_base)?,
-                    scheduling_clock: Mov9SchedulingClock::SingleTrack,
                     shift: 0,
                     append_run: None,
                     discard_boundary: None,
@@ -402,6 +464,9 @@ impl<'a> Mov9PacketCursor<'a> {
             ready: None,
             failed: None,
             complete_source: false,
+            front_source: false,
+            terminal: None,
+            forward_regular: None,
         })
     }
     /// The caller establishes one complete original media source and all its
@@ -419,6 +484,142 @@ impl<'a> Mov9PacketCursor<'a> {
         let mut cursor = Self::new(budget, tracks, media, limits, profile)?;
         cursor.complete_source = true;
         Ok(cursor)
+    }
+    /// Explicit front-metadata, from-start nonseekable native operation. A
+    /// terminal declaration remains open; it is never a fabricated finite range.
+    /// Only the source-bound playback opener should establish this context.
+    pub fn new_front_source_v1(
+        budget: &Budget,
+        tracks: &[Mov9Track<'a>],
+        media: &'a [Range<u64>],
+        terminal: Option<crate::TerminalMdat>,
+        limits: Mov9PacketLimits,
+        profile: Mov9Profile,
+    ) -> Result<Self> {
+        let media_count = media
+            .len()
+            .checked_add(usize::from(terminal.is_some()))
+            .ok_or(Error::Overflow)?;
+        if media_count > limits.max_media_extents {
+            return Err(Error::Limit {
+                requested: media_count,
+                maximum: limits.max_media_extents,
+            });
+        }
+        if let Some(tail) = terminal {
+            if media
+                .last()
+                .is_some_and(|range| range.end > tail.payload_start())
+            {
+                return Err(Error::Invalid("front terminal overlaps finite media"));
+            }
+        }
+        let mut cursor = Self::new(budget, tracks, media, limits, profile)?;
+        cursor.front_source = true;
+        cursor.terminal = terminal;
+        Ok(cursor)
+    }
+    /// Project unedited regular declarations for a forward-only front movie.
+    /// An occurrence outside the first extent still needs actual later media
+    /// admission before it may carry a packet payload.
+    pub fn new_front_regular_v1(
+        budget: &Budget,
+        tracks: &[Mov9Track<'a>],
+        media: &'a [Range<u64>],
+        bounds: crate::ForwardRegularMdatV1,
+        limits: Mov9PacketLimits,
+        profile: Mov9Profile,
+    ) -> Result<Self> {
+        bounds.require_initial_extent(media)?;
+        let mut cursor = Self::new_front_source_v1(budget, tracks, media, None, limits, profile)?;
+        if tracks
+            .iter()
+            .any(|track| !track.fragments.is_empty() || track.edits.is_some())
+        {
+            return Err(Error::Unsupported(
+                "forward regular media with edits or fragments",
+            ));
+        }
+        cursor.forward_regular = Some(bounds);
+        Ok(cursor)
+    }
+    /// Snapshot only an exhausted, checked front-source track. The private state
+    /// cannot be manufactured from a caller's expected clock or source token.
+    pub fn front_track_v1(&self, at: usize) -> Result<crate::Mov9FrontTrackV1> {
+        if !self.front_source
+            || !matches!(self.phase, Phase::End)
+            || self.failed.is_some()
+            || self.ready.is_some()
+        {
+            return Err(Error::Invalid("front native index not exhausted"));
+        }
+        let slot = self
+            .slots
+            .as_slice()
+            .get(at)
+            .ok_or(Error::Invalid("front native track"))?;
+        Ok(crate::Mov9FrontTrackV1::from_index(
+            slot.track.track_id,
+            slot.track.media_base,
+            slot.clock,
+            slot.previous_clock,
+            slot.fragment_cto_minimum,
+            slot.track.table.sample_count(),
+            slot.edited.is_some(),
+        ))
+    }
+    /// Explicit encoded edit admission; the default/native-source constructors
+    /// keep their original policy and every raw source/edit field.
+    pub fn new_encoded_regular_v2(
+        budget: &Budget,
+        tracks: &[Mov9Track<'a>],
+        media: &'a [Range<u64>],
+        limits: Mov9PacketLimits,
+        plans: &'a [Option<crate::Mov9EncodedEditPlanV2>],
+        _profile: crate::PinnedMovD32EncodedEditsV2,
+    ) -> Result<Self> {
+        if plans.len() != tracks.len() {
+            return Err(Error::Invalid("encoded edit track coverage"));
+        }
+        let mut cursor = Self::new_complete_source(
+            budget,
+            tracks,
+            media,
+            limits,
+            Mov9Profile::PinnedNoParseNoFillin,
+        )?;
+        for (slot, plan) in cursor.slots.as_mut_slice().iter_mut().zip(plans) {
+            if let Some(plan) = plan {
+                if !plan.source_table().bytes().belongs_to(budget) {
+                    return Err(Error::ForeignPool);
+                }
+                let Some((edits, _)) = slot.track.edits else {
+                    return Err(Error::Invalid("encoded edit plan without source edit"));
+                };
+                if !slot.track.fragments.is_empty()
+                    || !plan.matches(slot.track.table, edits, slot.track.media_base)
+                {
+                    return Err(Error::Invalid("encoded edit source association"));
+                }
+                slot.encoded_edit = Some(plan);
+            }
+        }
+        Ok(cursor)
+    }
+    pub fn ready_encoded_skip_v2(&self) -> Result<Option<[u8; 10]>> {
+        let item = self.ready.as_ref().ok_or(Error::Invalid(
+            "encoded skip requires ready source occurrence",
+        ))?;
+        let slot = self
+            .slots
+            .as_slice()
+            .iter()
+            .find(|s| s.track.track_id == item.track_id)
+            .ok_or(Error::Invalid("encoded occurrence track"))?;
+        match slot.encoded_edit {
+            Some(plan) => plan.skip_samples(&item.source),
+            None => Ok(None),
+        }
     }
     pub fn validated_samples(&self) -> u64 {
         self.validated
@@ -588,12 +789,22 @@ impl<'a> Mov9PacketCursor<'a> {
                             self.high = mid;
                         }
                     } else {
-                        let extent = self
-                            .low
-                            .checked_sub(1)
-                            .and_then(|at| self.media.get(at))
-                            .ok_or(Error::Invalid("native sample outside mdat"))?;
-                        sample.require_within(extent.clone())?;
+                        if let Some(terminal) = self
+                            .terminal
+                            .filter(|tail| sample.range.start >= tail.payload_start())
+                        {
+                            terminal.require_sample(sample)?;
+                        } else if !self
+                            .forward_regular
+                            .is_some_and(|bounds| bounds.can_defer(sample))
+                        {
+                            let extent = self
+                                .low
+                                .checked_sub(1)
+                                .and_then(|at| self.media.get(at))
+                                .ok_or(Error::Invalid("native sample outside mdat"))?;
+                            sample.require_within(extent.clone())?;
+                        }
                         self.checking = None;
                         self.phase = Phase::Validate;
                     }
@@ -639,7 +850,9 @@ impl<'a> Mov9PacketCursor<'a> {
                             "native mixed regular/fragment clock profile",
                         ));
                     }
-                    slot.edited = if let Some((edits, movie_base)) = slot.track.edits {
+                    slot.edited = if slot.encoded_edit.is_some() {
+                        None
+                    } else if let Some((edits, movie_base)) = slot.track.edits {
                         if slot.saw_fragment {
                             return Err(Error::Unsupported(
                                 "native edited fragment occurrence profile",
@@ -686,7 +899,12 @@ impl<'a> Mov9PacketCursor<'a> {
                         self.at += 1;
                         continue;
                     }
-                    match slot.fill(work, self.complete_source, global_schedule)? {
+                    match slot.fill(
+                        work,
+                        self.complete_source,
+                        global_schedule,
+                        self.front_source,
+                    )? {
                         Mov9CursorStatus::Yield => return Ok(Mov9CursorStatus::Yield),
                         Mov9CursorStatus::End => {
                             if slot.resume_remaining != 0 {
@@ -731,28 +949,11 @@ impl<'a> Mov9PacketCursor<'a> {
                                 .head
                                 .as_ref()
                                 .ok_or(Error::Invalid("native selector head missing"))?;
-                            match (
-                                slots[self.at].scheduling_clock,
-                                slots[best].scheduling_clock,
-                            ) {
-                                (
-                                    Mov9SchedulingClock::ExactMicroseconds(contender_clock),
-                                    Mov9SchedulingClock::ExactMicroseconds(incumbent_clock),
-                                ) => {
-                                    let distance = (i128::from(contender_clock)
-                                        - i128::from(incumbent_clock))
-                                    .abs();
-                                    if distance > 1_000_000 {
-                                        contender_clock < incumbent_clock
-                                    } else {
-                                        contender.native.source_range.start
-                                            < incumbent.native.source_range.start
-                                    }
-                                }
-                                // Observed undefined/native-overflow scheduling
-                                // heads retain the incumbent catalogue slot.
-                                // No source timestamp/key is synthesized.
-                                _ => false,
+                            if self.front_source {
+                                contender.native.source_range.start
+                                    < incumbent.native.source_range.start
+                            } else {
+                                mov9_seekable_head_precedes(contender, incumbent)
                             }
                         } else {
                             true

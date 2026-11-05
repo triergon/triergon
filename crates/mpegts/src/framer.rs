@@ -5,8 +5,66 @@ use crate::{
 };
 use std::sync::atomic::{AtomicBool, Ordering};
 use triergon_core::{
-    Budget, BudgetVec, Error, InputCursor, InputToken, Result, SourceId, Step, WorkBudget,
+    Budget, BudgetVec, Bytes, Error, InputCursor, InputToken, Result, SourceId, SourceLocation,
+    Step, WorkBudget,
 };
+
+/// A validated run of null carriers on the source grid. The shared backing
+/// span includes every opaque M2TS prefix and every byte of null payload.
+#[derive(Clone, Debug)]
+pub struct NullCarrierRun {
+    bytes: Bytes,
+    format: PacketFormat,
+    start: SourceLocation,
+}
+
+impl NullCarrierRun {
+    pub fn bytes(&self) -> &Bytes {
+        &self.bytes
+    }
+
+    pub fn format(&self) -> PacketFormat {
+        self.format
+    }
+
+    pub fn start(&self) -> SourceLocation {
+        self.start
+    }
+
+    pub fn len(&self) -> usize {
+        self.bytes.len() / self.format.bytes()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.bytes.is_empty()
+    }
+
+    /// Expand one retained carrier through the normal strict inspector.
+    pub fn packet(&self, index: usize) -> Result<TransportPacket> {
+        if index >= self.len() {
+            return Err(Error::Invalid("null carrier index"));
+        }
+        let stride = self.format.bytes();
+        let at = index * stride;
+        let bytes = self.bytes.slice(at..at + stride)?;
+        let mut packet = crate::parse_transport(bytes, self.format, self.start.offset + at as u64)?;
+        packet.source_id = Some(self.start.source);
+        Ok(packet)
+    }
+}
+
+// H.222.0 2.4.3.3–4. Limit the fast path to clear, unflagged null
+// packets with payload and no adaptation syntax beyond a zero flags byte.
+fn plain_null(ts: &[u8]) -> bool {
+    if ts[0] != 0x47 || ts[1] & 0xdf != 0x1f || ts[2] != 0xff {
+        return false;
+    }
+    match ts[3] & 0xf0 {
+        0x10 => true,
+        0x30 => ts[4] == 0 || (ts[4] == 1 && ts[5] == 0),
+        _ => false,
+    }
+}
 
 #[derive(Debug)]
 #[allow(
@@ -73,6 +131,14 @@ impl TransportFramer {
     pub fn pending_or_last_packet_offset(&self) -> Option<u64> {
         self.start.or(self.last_packet_offset)
     }
+    pub(crate) fn observed_entity_end(&self, input: &InputCursor) -> bool {
+        self.entity_end_seen
+            && self.entity == Some(input.source())
+            && self.token.as_ref() == Some(&input.token())
+            && self.inspection.is_none()
+            && self.push_ack.is_none()
+            && self.carry.as_ref().is_some_and(|carry| carry.is_empty())
+    }
     /// Take the real owned syntax rejection before advancing/discarding this framer.
     pub fn take_rejection(&mut self) -> Option<RejectedTransport> {
         self.rejection.take()
@@ -131,6 +197,62 @@ impl TransportFramer {
             _ => Err(Error::Invalid("carrier inspection state")),
         }
     }
+    pub(crate) fn try_null_run(
+        &mut self,
+        input: &mut InputCursor,
+        work: &mut WorkBudget,
+        cancel: &AtomicBool,
+    ) -> Result<Option<NullCarrierRun>> {
+        // A changed binding, partial carrier or outstanding entity boundary
+        // must go through the regular framer state machine.
+        if !input.budget().same_pool(&self.budget)
+            || self.entity != Some(input.source())
+            || self.token.as_ref() != Some(&input.token())
+            || self.next != Some(input.position())
+            || self.entity_end_seen
+            || self.start.is_some()
+            || self.inspection.is_some()
+            || self.rejection.is_some()
+            || self.push_ack.is_some()
+            || self.carry.as_ref().is_none_or(|carry| !carry.is_empty())
+        {
+            return Ok(None);
+        }
+        let stride = self.format.bytes();
+        if input.position() % stride as u64 != 0 {
+            return Ok(None);
+        }
+        let prefix = self.format.prefix_bytes();
+        let granted = (work.remaining() / stride as u64).min(128) as usize;
+        let mut count = 0;
+        for carrier in input.buffered().chunks_exact(stride).take(granted) {
+            if cancel.load(Ordering::Relaxed) {
+                return Err(Error::Cancelled);
+            }
+            if !plain_null(&carrier[prefix..]) {
+                break;
+            }
+            count += 1;
+        }
+        if count == 0 {
+            return Ok(None);
+        }
+        let start = SourceLocation {
+            source: input.source(),
+            offset: input.position(),
+        };
+        let Step::Ready(bytes) = input.read_span(count * stride, work, cancel)? else {
+            return Err(Error::Invalid("validated null run lost buffered span"));
+        };
+        self.next = Some(input.position());
+        self.last_packet_offset = Some(input.position() - stride as u64);
+        Ok(Some(NullCarrierRun {
+            bytes,
+            format: self.format,
+            start,
+        }))
+    }
+
     /// Uses the shared cursor's source/pool/generation/request/failure contract.
     /// A completed entity is surfaced as Step::End; the format coordinator decides
     /// logical EOF versus continue_source. PES state is unaffected by this reader.
@@ -199,11 +321,9 @@ impl TransportFramer {
                 }
                 carry.try_reserve_exact(missing)?;
             }
-            let mut scratch = [0_u8; 192];
             let offset = input.position();
-            match input.read_into(&mut scratch[..missing], work, cancel)? {
-                Step::Ready(count) => {
-                    carry.try_extend_from_slice(&scratch[..count])?;
+            match input.read_append(carry, missing, work, cancel)? {
+                Step::Ready(_) => {
                     if self.start.is_none() {
                         self.start = Some(offset);
                     }
@@ -221,7 +341,7 @@ impl TransportFramer {
             }
         }
     }
-    /// `offset` identifies input[0], not the start of a previous partial packet.
+    /// `offset` identifies `input[0]`, not the start of a previous partial packet.
     /// Always honour consumed, including on a later freeze/parse error. Backpressure
     /// retains a complete carry for retry and never consumes the next source packet.
     pub fn push(
@@ -338,5 +458,58 @@ impl TransportFramer {
         } else {
             Ok(())
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use triergon_core::{InputWindow, SourceCapabilities};
+
+    #[test]
+    fn null_runs_require_an_aligned_source_grid() {
+        let budget = Budget::new(8192).unwrap();
+        let mut input = InputCursor::new(
+            &budget,
+            SourceId(1),
+            SourceCapabilities {
+                length: None,
+                random_access: true,
+            },
+            4096,
+        )
+        .unwrap();
+        let request = input.reset(1).unwrap();
+        let mut carrier = [0xff; 188];
+        carrier[..4].copy_from_slice(&[0x47, 0x1f, 0xff, 0x10]);
+        input
+            .provide_owned(
+                InputWindow::new(
+                    request.source,
+                    request.token,
+                    request.offset,
+                    Bytes::copy_from_slice(&budget, &[carrier, carrier].concat()).unwrap(),
+                )
+                .unwrap(),
+            )
+            .unwrap();
+        let mut framer = TransportFramer::new(budget, PacketFormat::Ts188);
+        let mut work = WorkBudget::new(4096);
+        let cancel = AtomicBool::new(false);
+        assert!(
+            matches!(framer.poll(&mut input, &mut work, &cancel).unwrap(),
+            Step::Ready(packet) if packet.source_offset == 1)
+        );
+        assert!(
+            framer
+                .try_null_run(&mut input, &mut work, &cancel)
+                .unwrap()
+                .is_none()
+        );
+        assert_eq!(input.position(), 189);
+        assert!(
+            matches!(framer.poll(&mut input, &mut work, &cancel).unwrap(),
+            Step::Ready(packet) if packet.source_offset == 189)
+        );
     }
 }

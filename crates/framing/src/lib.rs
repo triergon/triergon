@@ -1,16 +1,34 @@
 //! Bounded NAL/OBU framing, AV1/VP9 records and AC-3/E-AC-3 source facts.
 //! These development slices are not qualified O21.
 //!
-//! Payloads are opaque encoded bytes: no RBSP unescaping, access-unit
-//! assembly, parameter-set injection, decoder, or display policy is applied.
+//! The fixed NAL reader preserves encoded bytes and source coordinates.
+//! The raw reader groups NALs using access-unit boundary syntax. A separate
+//! pinned native packet view can inject configuration NALs while retaining source.
 //! See `README.md` for the exact configuration and validation boundary.
 #![forbid(unsafe_code)]
+
+mod dts_operation;
+pub use dts_operation::{
+    DtsD32ClockDisposition, DtsD32ClockProjection, DtsFactAssociation, DtsFactAssociationJob,
+    DtsOperation, DtsOperationContext, DtsOperationEvent, DtsOperationLane, DtsOperationLimits,
+    DtsOperationStep, DtsOperationTerminal, DtsParserPacket,
+};
+
+mod nal_packet;
+pub use nal_packet::{
+    NalPacket, NalPacketCompactJob, NalPacketCompactOutput, NalPacketConfiguration,
+    NalPacketFields, NalPacketJob, NalPacketLimits, NalPacketOrigin, NalPacketOutput,
+    NalPacketProgress, NalPacketRangeSegment, NalPacketReceiverErrorKind, NalPacketRejection,
+    NalPacketSegment, NalPacketSession, NalPacketViewConfiguration, NalPacketViewJob,
+};
 
 mod ac3;
 mod ac3_config;
 mod annexb;
 mod av1;
 mod av1_config;
+mod av1_temporal_unit;
+mod avc_picture;
 mod config;
 mod declared_config;
 mod dts_core;
@@ -19,6 +37,7 @@ mod dts_packing;
 mod dts_source;
 mod eac3_bsi;
 mod header;
+mod raw_annex_b;
 mod reader;
 mod record_input;
 mod vp9_config;
@@ -39,6 +58,10 @@ pub use av1::{
 pub use av1_config::{
     Av1ConfigFields, Av1ConfigLimits, Av1ConfigParser, Av1ConfigSyntaxIssues, Av1Configuration,
 };
+pub use av1_temporal_unit::{
+    Av1TemporalUnit, Av1TemporalUnitConfig, Av1TemporalUnitJob, Av1TemporalUnitLimits,
+};
+pub use avc_access_unit::{AvcAnnexBAccessUnit, AvcAnnexBConfig, AvcAnnexBJob, AvcAnnexBLimits};
 pub use config::{
     AnnexBConfigParser, ConfigEncoding, ConfigInspection, ConfigLimits, Configuration, ParameterSet,
 };
@@ -85,8 +108,95 @@ pub use dts_normal::{
 pub use dts_packed::{DtsPackedLimits, DtsPackedPayload, DtsPackedPayloadJob, DtsPacking};
 pub use dts_packed_header::{DtsPackedHeader, inspect_dts_header_bits};
 
+mod avc_access_unit;
 mod avc_config;
 pub use avc_config::{
     AvcConfigArray, AvcConfigArrayKind, AvcConfigFields, AvcConfigLimits, AvcConfigNal,
     AvcConfigParser, AvcConfigSource, AvcConfiguration,
 };
+
+mod dts14_frame;
+pub use dts14_frame::{Dts14Frame, Dts14FrameReader};
+mod dts14_carrier;
+pub use dts14_carrier::{
+    Dts14CarrierBoundary, Dts14CarrierLimits, Dts14CarrierPacket, Dts14CarrierProvision,
+    Dts14CarrierReader, Dts14CarrierSyntax,
+};
+mod dts14_parser_view;
+pub use dts14_parser_view::{
+    DTS14_D32_POSITION_PROFILE, Dts14D32ParserHints, Dts14ParserHintOrigin,
+};
+
+mod hevc_access_unit;
+pub use hevc_access_unit::{
+    HevcAnnexBAccessUnit, HevcAnnexBConfig, HevcAnnexBJob, HevcAnnexBLimits,
+};
+
+mod hevc_config;
+pub use hevc_config::{
+    HvcConfigArray, HvcConfigFields, HvcConfigLimits, HvcConfigNal, HvcConfigParser,
+    HvcConfigSource, HvcConfiguration, inspect_hvc_config_prefix,
+};
+
+mod aac_config;
+pub use aac_config::{
+    AacAscFacts, AacAscParser, AacAudioSpecificConfig, AacBitRange, AacConfigLimits,
+    AacExtensionSignal, AacFrequency, AacGaSpecific, AacObjectType, AacPceElement,
+    AacPceElementKind, AacPceFacts, AacProgramConfig, AacSource, indexed_aac_frequency,
+};
+
+mod aac_adts;
+pub use aac_adts::{
+    AacAdtsFrame, AacAdtsHeader, AacAdtsOutput, AacAdtsParameters, AacAdtsParser, AacAdtsWriter,
+    inspect_aac_adts_header,
+};
+pub use aac_adts::{AacAdtsStreamLimits, AacAdtsStreamReader};
+
+mod hevc_config_annexb;
+pub use hevc_config_annexb::{HvcAnnexBOutput, HvcAnnexBWriter};
+
+mod hevc_config_decoder;
+pub use hevc_config_decoder::{
+    HvcDecoderConfigOutput, HvcDecoderConfigRefusal, HvcDecoderConfigWriter,
+};
+mod aac_config_views;
+pub use aac_config_views::{
+    AacAscScopeOutcome, AacAscScopeParser, AacAscScopeViews, AacDecoderChannelReason,
+    AacDecoderChannelView, aac_decoder_channel_view,
+};
+
+pub use aac_adts::{
+    AacAdtsCarrier, AacAdtsCarrierBoundary, AacAdtsCarrierLimits, AacAdtsCarrierReader,
+};
+
+pub use aac_config_views::{
+    AacDecoderConfigDecision, AacDecoderConfigPolicy, AacDecoderConfigRefusal,
+    aac_decoder_configuration_view,
+};
+
+mod nal_packet_config;
+pub use nal_packet_config::{
+    NalPacketConfigOutput, NalPacketConfigRejection, NalPacketConfigWriter,
+};
+
+mod nal_observed_config;
+pub use nal_observed_config::{
+    NalAvcUpdateRejection, NalObservedAvcConfigParser, NalObservedAvcConfiguration,
+    NalObservedHevcConfigParser, NalObservedHevcConfiguration,
+};
+
+// Additive product-facing compact configuration inspection and retained exports.
+pub use avc_config::{
+    AvcConfigArrayRef, AvcConfigNalRef, AvcConfigViewParser, AvcConfigurationView,
+    RetainedAvcConfigArray, RetainedAvcConfigNal,
+};
+pub use hevc_config::{
+    HvcConfigArrayRef, HvcConfigNalRef, HvcConfigViewParser, HvcConfigurationView,
+    RetainedHvcConfigArray, RetainedHvcConfigNal,
+};
+pub use nal_observed_config::{
+    NalObservedAvcConfigViewParser, NalObservedAvcConfigurationView,
+    NalObservedHevcConfigViewParser, NalObservedHevcConfigurationView,
+};
+
+pub use raw_annex_b::{RawAccessUnit, RawAnnexBLimits, RawAnnexBReader};

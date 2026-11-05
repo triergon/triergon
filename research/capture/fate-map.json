@@ -1,0 +1,13 @@
+{
+  "schema": 1,
+  "source": "FFmpeg 9.0.2 release tarball (sha256 8c3850283eb25fa026482078a04051e0be17347b09ef81a0849bec15a96e002e), tests/fate/*.mak, lexical search for mpeg1video, mpegts muxing and swscale RGB->YUV",
+  "executed": false,
+  "note": "Lexical identities, classified before execution. None maps to the selected capture operation, so none was run; the predeclared native comparisons in contract.json are the correctness evidence. FATE identities are not tests executed.",
+  "cases": [
+    {"id": "fate-vsynth1-mpeg1, fate-vsynth2-mpeg1, fate-vsynth3-mpeg1, fate-vsynth_lena-mpeg1", "location": "tests/fate/vcodec.mak:256-259", "operation": "mpeg1video encode at fixed -qscale 10 of vsynth sources; bitstream md5 + decode PSNR against FFmpeg's own output", "disposition": "outside frozen scope", "reason": "Streem never runs fixed-qscale mode (bitrate/maxrate/bufsize rate control, contract encoder.bit_rate); and the reference value is FFmpeg's own byte-exact bitstream, which an independent encoder is not required to reproduce (docs/testing.md Encoder row)."},
+    {"id": "fate-vsynth*-mpeg1b", "location": "tests/fate/vcodec.mak:261-263", "operation": "mpeg1video with -bf 3 -ps 200 -qscale 8", "disposition": "outside frozen scope", "reason": "B pictures and packet-size slicing are not enabled by Streem (bf 0)."},
+    {"id": "fate-lavf-ts", "location": "tests/fate/lavf-container.mak:20,68", "operation": "MPEG-2 video + MP2 audio into mpegts with transport_stream_id 42", "disposition": "outside frozen scope", "reason": "Two streams, MPEG-2 video and audio; capture muxes one MPEG-1 video stream with default identifiers."},
+    {"id": "fate-seek-vsynth*-mpeg1*", "location": "tests/fate/seek.mak", "operation": "seeking in the vsynth mpeg1 outputs", "disposition": "outside frozen scope", "reason": "Demux/seek behaviour, not capture."},
+    {"id": "fate-sws-unscaled, fate-sws-unstable, fate-sws-ops-*", "location": "tests/fate/libswscale.mak", "operation": "self-tests of swscale's new ops backend", "disposition": "not applicable", "reason": "Internal consistency checks of a different swscale code path; capture uses the legacy sws_getContext/sws_scale RGBA->NV12 path, compared directly instead."}
+  ]
+}

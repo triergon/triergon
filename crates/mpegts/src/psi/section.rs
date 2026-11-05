@@ -57,6 +57,21 @@ impl Section {
     pub fn crc_remainder(&self) -> Option<u32> {
         self.crc
     }
+    /// Internal fallible clone of the actual immutable source section. It adds
+    /// no validation or acceptance and preserves the original owners and ranges.
+    pub(crate) fn try_clone_charged_v1(&self, budget: &Budget) -> Result<Self> {
+        if !self.source.belongs_to(budget) {
+            return Err(Error::ForeignPool);
+        }
+        let mut ranges = BudgetVec::new(budget);
+        ranges.try_extend_from_slice(self.source_ranges())?;
+        Ok(Self {
+            pid: self.pid,
+            source: self.source.clone(),
+            ranges,
+            crc: self.crc,
+        })
+    }
 }
 
 #[derive(Debug)]
@@ -277,20 +292,34 @@ impl SectionAssembler {
                     .position += count;
                 continue;
             }
-            if !work.try_charge(1) {
-                return Ok(AssemblyStep::Yield);
-            }
             if payload.stuffing || (length == 0 && byte == 0xff) {
-                if byte != 0xff {
+                // Check a bounded prefix of the stuffing run per cancellation
+                // poll. The pointer may start a fresh section inside this payload.
+                let end = payload
+                    .fresh_at
+                    .filter(|&start| payload.position < start)
+                    .unwrap_or(payload.bytes.len());
+                let available = (end - payload.position).min(64) as u64;
+                let count = available.min(work.remaining()) as usize;
+                if count == 0 {
+                    return Ok(AssemblyStep::Yield);
+                }
+                let run = &payload.bytes.as_ref()[payload.position..payload.position + count];
+                if let Some(invalid) = run.iter().position(|&byte| byte != 0xff) {
+                    work.take((invalid + 1) as u64);
                     return Err(Error::Invalid("PSI stuffing tail"));
                 }
+                work.take(count as u64);
                 let payload = self
                     .payload
                     .as_mut()
                     .ok_or(Error::Invalid("PSI payload missing"))?;
                 payload.stuffing = true;
-                payload.position += 1;
+                payload.position += count;
                 continue;
+            }
+            if !work.try_charge(1) {
+                return Ok(AssemblyStep::Yield);
             }
             let physical = payload
                 .offset

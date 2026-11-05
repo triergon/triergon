@@ -56,6 +56,24 @@ impl Av1Leb128 {
     }
 }
 
+pub(crate) fn push_leb_byte(value: &mut u64, width: &mut u8, byte: u8) -> Result<bool> {
+    let shift = u32::from(*width) * 7;
+    *value |= u64::from(byte & 127)
+        .checked_shl(shift)
+        .ok_or(Error::Overflow)?;
+    *width += 1;
+    if byte & 128 == 0 {
+        if *value > u64::from(u32::MAX) {
+            return Err(Error::Invalid("AV1 LEB128 exceeds 32 bits"));
+        }
+        return Ok(true);
+    }
+    if *width == 8 {
+        return Err(Error::Invalid("AV1 eighth LEB128 byte continues"));
+    }
+    Ok(false)
+}
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Av1ObuExtension {
     pub raw_byte: u8,
@@ -418,18 +436,9 @@ impl Av1ObuReader {
                                     Phase::Resolve
                                 };
                             } else {
-                                let shift = u32::from(self.leb_width) * 7;
-                                self.leb_value |= u64::from(byte[0] & 127)
-                                    .checked_shl(shift)
-                                    .ok_or(Error::Overflow)?;
-                                self.leb_width += 1;
-                                if byte[0] & 128 == 0 {
-                                    if self.leb_value > u64::from(u32::MAX) {
-                                        return Err(Error::Invalid("AV1 LEB128 exceeds 32 bits"));
-                                    }
+                                if push_leb_byte(&mut self.leb_value, &mut self.leb_width, byte[0])?
+                                {
                                     self.phase = Phase::Resolve;
-                                } else if self.leb_width == 8 {
-                                    return Err(Error::Invalid("AV1 eighth LEB128 byte continues"));
                                 }
                             }
                         }

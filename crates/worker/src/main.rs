@@ -10,6 +10,30 @@ use std::{
 use triergon::timing::ExactTime;
 use triergon::{Limits, typed::BlockingReader as Demuxer};
 
+// Explicit private operation binding. Library defaults remain OwnedExact.
+fn open_shared<R: Read>(source: R, limits: Limits) -> triergon::Result<Demuxer<R>> {
+    Demuxer::open_with_payload_ownership(
+        source,
+        limits,
+        triergon::typed::PayloadOwnership::SharedBounded,
+    )
+}
+
+fn open_owned(
+    data: Vec<u8>,
+    limits: Limits,
+) -> triergon::Result<Demuxer<Cursor<triergon::storage::OwnedInputBytes>>> {
+    let pool = triergon::storage::Budget::new(limits.live_storage_bytes)?;
+    let source = triergon::storage::OwnedInputBytes::try_from_vec(&pool, data)
+        .map_err(|error| error.error())?;
+    Demuxer::open_owned_seekable_in(
+        source,
+        limits,
+        &pool,
+        triergon::typed::PayloadOwnership::SharedBounded,
+    )
+}
+
 fn quote(s: &str) -> String {
     let mut out = String::from("\"");
     for c in s.chars() {
@@ -45,6 +69,7 @@ fn codec(s: &str) -> &str {
         "A_AC3" => "ac3",
         "A_EAC3" => "eac3",
         "A_VORBIS" => "vorbis",
+        "A_OPUS" => "opus",
         "A_PCM/INT/LIT" => "pcm_s16le",
         "S_TEXT/UTF8" => "subrip",
         "S_TEXT/ASS" => "ass",
@@ -356,7 +381,7 @@ fn trace<R: Read>(
 }
 
 fn run(
-    data: &[u8],
+    data: &mut Vec<u8>,
     iterations: u32,
     seek: Option<i64>,
     codec_packets: bool,
@@ -367,7 +392,7 @@ fn run(
     let mut digest = 0_u64;
     let cancel = AtomicBool::new(false);
     for _ in 0..iterations {
-        let mut d = Demuxer::open_seekable(Cursor::new(data), Limits::default())?;
+        let mut d = open_owned(std::mem::take(data), Limits::default())?;
         let initial_trim = if let Some(target) = seek {
             d.seek_for_playback(0, target, &cancel)?.replays_from_start
         } else {
@@ -430,6 +455,13 @@ fn run(
         if metadata == 2 {
             catalogue::CatalogueView::new(&d)?.output(None, &mut digest)?;
         }
+        // Match the old reverse-local drop order: bookkeeping before reader.
+        drop(seen);
+        *data = d
+            .into_inner()
+            .into_inner()
+            .try_into_vec()
+            .map_err(|_| "completed operation retained its immutable input owner")?;
     }
     Ok((packets, bytes, std::hint::black_box(digest)))
 }
@@ -453,7 +485,7 @@ fn entry() -> Result<(), Box<dyn std::error::Error>> {
     }
     match mode.as_str() {
         "trace" | "codec-trace" | "metadata-trace" | "catalogue-trace" => trace(
-            Demuxer::open_seekable(Cursor::new(&data), Limits::default())?,
+            open_owned(std::mem::take(&mut data), Limits::default())?,
             true,
             mode == "codec-trace",
             if mode == "catalogue-trace" {
@@ -462,24 +494,19 @@ fn entry() -> Result<(), Box<dyn std::error::Error>> {
                 u8::from(mode == "metadata-trace")
             },
         )?,
-        "catalogue-source" => catalogue::source(Demuxer::open_seekable(
-            Cursor::new(&data),
-            Limits::default(),
-        )?)?,
-        "metadata-source" => trace_colour_source(Demuxer::open_seekable(
-            Cursor::new(&data),
-            Limits::default(),
-        )?)?,
-        "trace-source" => trace_source(Demuxer::open_seekable(
-            Cursor::new(&data),
-            Limits::default(),
-        )?)?,
+        "catalogue-source" => {
+            catalogue::source(open_owned(std::mem::take(&mut data), Limits::default())?)?
+        }
+        "metadata-source" => {
+            trace_colour_source(open_owned(std::mem::take(&mut data), Limits::default())?)?
+        }
+        "trace-source" => trace_source(open_owned(std::mem::take(&mut data), Limits::default())?)?,
         "trace-source-short" => {
             let n: usize = a.get(3).ok_or("missing chunk")?.parse()?;
             if n == 0 {
                 return Err("zero chunk".into());
             }
-            trace_source(Demuxer::open(
+            trace_source(open_shared(
                 Short {
                     inner: Cursor::new(&data),
                     maximum: n,
@@ -493,7 +520,7 @@ fn entry() -> Result<(), Box<dyn std::error::Error>> {
                 return Err("zero chunk".into());
             }
             trace(
-                Demuxer::open(
+                open_shared(
                     Short {
                         inner: Cursor::new(&data),
                         maximum: n,
@@ -525,7 +552,7 @@ fn entry() -> Result<(), Box<dyn std::error::Error>> {
                 None
             };
             let (packets, bytes, digest) = run(
-                &data,
+                &mut data,
                 n,
                 seek,
                 mode == "codec-bench",
@@ -558,7 +585,7 @@ fn entry() -> Result<(), Box<dyn std::error::Error>> {
                     None
                 };
                 run(
-                    &data,
+                    &mut data,
                     1,
                     seek,
                     mode == "codec-memory",
@@ -581,7 +608,7 @@ fn entry() -> Result<(), Box<dyn std::error::Error>> {
         }
         "seek-trace" => {
             let target = a.get(3).ok_or("missing seek target")?.parse()?;
-            let mut demux = Demuxer::open_seekable(Cursor::new(&data), Limits::default())?;
+            let mut demux = open_owned(std::mem::take(&mut data), Limits::default())?;
             if a.get(4).is_some_and(|value| value == "after-eof") {
                 while demux.next_packet(&AtomicBool::new(false))?.is_some() {}
             }
@@ -599,7 +626,7 @@ fn entry() -> Result<(), Box<dyn std::error::Error>> {
         }
         "seek" => {
             let target: i64 = a.get(3).ok_or("missing seek time")?.parse()?;
-            let mut d = Demuxer::open_seekable(Cursor::new(&data), Limits::default())?;
+            let mut d = open_owned(std::mem::take(&mut data), Limits::default())?;
             let cancel = AtomicBool::new(false);
             while d.next_packet(&cancel)?.is_some() {} // Deliberately seek after EOF.
             let track = d

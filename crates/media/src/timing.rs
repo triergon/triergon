@@ -116,6 +116,9 @@ impl BlockTiming {
                 .transpose()?
         };
         let pts = match duration {
+            // A validated single frame always has index zero. Its integral
+            // duration does not contribute to its presentation timestamp.
+            _ if self.frames == 1 => Some(ExactTime::new(base, 1)?),
             Some(d) => {
                 let value = base
                     .checked_mul(i128::from(d.denominator))
@@ -138,18 +141,21 @@ impl BlockTiming {
     pub fn ffmpeg9(self) -> Result<PacketTiming> {
         self.validate()?;
         let scale = i128::from(self.scale_ns);
-        let delay = match self.codec_delay_ns.checked_add(self.scale_ns / 2) {
-            Some(value) => i128::from(value / self.scale_ns),
-            None => (i128::from(self.codec_delay_ns) + scale / 2) / scale,
+        let delay = if self.codec_delay_ns == 0 {
+            0
+        } else {
+            match self.codec_delay_ns.checked_add(self.scale_ns / 2) {
+                Some(value) => i128::from(value / self.scale_ns),
+                None => (i128::from(self.codec_delay_ns) + scale / 2) / scale,
+            }
         };
         let total_ticks = match self.duration_ticks.filter(|d| *d != 0) {
             Some(d) => i128::from(d),
-            None if self.frames == 1 => {
-                i128::from(self.default_duration_ns.unwrap_or(0) / self.scale_ns)
-            }
-            None => {
-                i128::from(self.default_duration_ns.unwrap_or(0)) * i128::from(self.frames) / scale
-            }
+            None => match self.default_duration_ns {
+                Some(duration) if self.frames == 1 => i128::from(duration / self.scale_ns),
+                Some(duration) => i128::from(duration) * i128::from(self.frames) / scale,
+                None => 0,
+            },
         };
         let (start, duration, previous_duration) = if self.frames == 1 {
             (0, total_ticks, 1)

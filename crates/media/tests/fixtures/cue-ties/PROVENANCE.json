@@ -3,11 +3,11 @@
   "origin": "authored synthetic fixture, own RFC wire generation; source signal fixture reused under user authorization",
   "source_input_sha256": "8b245102b6278a1952870d0fd8d65a924187ea285c52f07fb72e76227d038cbb",
   "source_proof": {
-    "source_path": "/Users/jonasgrosch/projects/safe-media/.research/fixtures/avc-aac-sub.mkv",
+    "source_path": "$TRIERGON_ROOT/.research/fixtures/avc-aac-sub.mkv",
     "source_sha256": "8b245102b6278a1952870d0fd8d65a924187ea285c52f07fb72e76227d038cbb",
     "source_bytes": 84288,
     "recorded_origin": "synthetic lavfi test signals / authored test captions",
-    "origin_record": "/Users/jonasgrosch/projects/safe-media/.research/fixtures/manifest.json",
+    "origin_record": "$TRIERGON_ROOT/.research/fixtures/manifest.json",
     "coded_body_validation": "UNVERIFIED here: no decoder or native executable was run",
     "tracks": {
       "avc": {

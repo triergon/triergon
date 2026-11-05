@@ -21,7 +21,34 @@ impl<R: Read> BlockingReader<R> {
         Self::open_in(source, limits, &pool)
     }
     pub fn open_in(source: R, limits: Limits, pool: &Budget) -> Result<Self> {
-        Self::construct(source, limits, pool, false, None, None)
+        Self::construct(
+            source,
+            limits,
+            pool,
+            false,
+            None,
+            None,
+            crate::storage::PayloadOwnership::OwnedExact,
+        )
+    }
+    pub fn open_with_payload_ownership(
+        source: R,
+        limits: Limits,
+        policy: crate::storage::PayloadOwnership,
+    ) -> Result<Self> {
+        let pool = Budget::new(limits.live_storage_bytes)?;
+        Self::open_in_with_payload_ownership(source, limits, &pool, policy)
+    }
+    pub fn open_in_with_payload_ownership(
+        source: R,
+        limits: Limits,
+        pool: &Budget,
+        policy: crate::storage::PayloadOwnership,
+    ) -> Result<Self> {
+        Self::construct(source, limits, pool, false, None, None, policy)
+    }
+    pub fn payload_ownership(&self) -> crate::storage::PayloadOwnership {
+        self.reader.payload_ownership()
     }
     fn construct(
         source: R,
@@ -30,8 +57,9 @@ impl<R: Read> BlockingReader<R> {
         random_access: bool,
         reposition: Option<Reposition<R>>,
         position: Option<Position<R>>,
+        policy: crate::storage::PayloadOwnership,
     ) -> Result<Self> {
-        let reader = Reader::new(
+        let mut reader = Reader::new(
             pool,
             SourceId(1),
             SourceCapabilities {
@@ -41,12 +69,15 @@ impl<R: Read> BlockingReader<R> {
             limits,
             8192,
         )?;
-        let mut result = Self {
+        reader.envelope.set_payload_ownership(policy);
+        Self::initialize(Self {
             reader,
             input: InputFeeder::new(source, 8192)?,
             reposition,
             position,
-        };
+        })
+    }
+    fn initialize(mut result: Self) -> Result<Self> {
         let cancel = AtomicBool::new(false);
         while !result.reader.is_ready() {
             match result.poll(&cancel)? {
@@ -61,22 +92,54 @@ impl<R: Read> BlockingReader<R> {
         Ok(result)
     }
     fn poll(&mut self, cancel: &AtomicBool) -> Result<ParseStep<Event>> {
+        self.poll_projected::<TypedProjection>(cancel)
+    }
+    fn poll_projected<D: PacketProjection>(
+        &mut self,
+        cancel: &AtomicBool,
+    ) -> Result<ParseStep<D::Event>> {
         if self.input.has_pending_read() {
             self.input.discard_stale(&self.reader.request());
         }
         self.reader
             .set_adapter_storage(self.input.retained_buffer_bytes());
-        match self.reader.step(&mut WorkBudget::new(8192), cancel)? {
+        match self.reader.step_projected_with_source::<D>(
+            &mut WorkBudget::new(8192),
+            cancel,
+            self.input.owned_source_storage(),
+        )? {
             ParseStep::NeedInput(request) => {
                 let header = self.reader.needs_header_input();
-                // This is the exact canonical Reader hint, not an adapter
-                // lookahead override. The plan only authorizes pre-read prefix
-                // fallback when the full charged refill cannot be allocated.
-                let refill = self.reader.header_refill_for_request(&request)?;
-                let result = if let Some(plan) = refill {
+                // Ordinary canonical refill stays unchanged. The seek engine
+                // can separately certify a whole core-owned input response,
+                // bounded by its active stop, parent/source and scan allowance.
+                // Existing pre-read exact-prefix pressure fallback is retained.
+                let discard = !header && self.reader.needs_discard_input();
+                let refill = match self.reader.header_refill_for_request(&request)? {
+                    Some(plan) => Some(plan),
+                    None if discard && self.input.owned_source().is_some() => {
+                        self.reader.blocking_seek_discard_refill(&request)?
+                    }
+                    None => self.reader.blocking_seek_header_refill(&request)?,
+                };
+                let result = if let Some(plan) = refill.as_ref().filter(|_| discard) {
+                    self.input.feed_typed_discard_refill(
+                        self.reader.envelope.range_input(),
+                        plan,
+                        cancel,
+                        self.reposition,
+                    )
+                } else if let Some(plan) = refill {
                     self.input.feed_typed_header_refill(
                         self.reader.envelope.range_input(),
                         &plan,
+                        cancel,
+                        self.reposition,
+                    )
+                } else if discard {
+                    self.input.feed_typed_discard_request(
+                        self.reader.envelope.range_input(),
+                        &request,
                         cancel,
                         self.reposition,
                     )
@@ -132,6 +195,13 @@ impl<R: Read> BlockingReader<R> {
             .set_adapter_storage(self.input.retained_buffer_bytes());
         Ok(())
     }
+    /// Closes parser jobs and pending supply before returning the input source.
+    /// Caller-retained packet/configuration aliases retain their original charge.
+    pub fn into_inner(self) -> R {
+        let Self { reader, input, .. } = self;
+        drop(reader);
+        input.into_inner()
+    }
     pub fn budget(&self) -> &Budget {
         self.reader.budget()
     }
@@ -169,22 +239,33 @@ impl<R: Read> BlockingReader<R> {
         }
     }
     pub fn next_packet(&mut self, cancel: &AtomicBool) -> Result<Option<crate::matroska::Packet>> {
-        let Some(packet) = self.next_typed_packet(cancel)? else {
-            return Ok(None);
-        };
-        if packet
-            .group
-            .as_ref()
-            .is_some_and(|group| group.additions().len() != 0 || group.codec_state().is_some())
-        {
-            // Preserve this compatibility shape's explicit feature refusal.
-            // The typed method carries the complete, already validated source.
-            self.reader.failed = true;
-            return Err(Error::Unsupported(
-                "Block additions/CodecState require next_typed_packet",
-            ));
+        if self.reader.pending_seek().is_some() {
+            return Err(Error::Invalid("pending seek must be completed"));
         }
-        Ok(Some(packet.packet))
+        loop {
+            match self.poll_projected::<LegacyProjection>(cancel)? {
+                ParseStep::Event(LegacyEvent::Packet(packet)) => return Ok(Some(packet)),
+                ParseStep::Event(LegacyEvent::FullPacket(packet)) => {
+                    if packet.group.as_ref().is_some_and(|group| {
+                        group.additions().len() != 0 || group.codec_state().is_some()
+                    }) {
+                        self.reader.failed = true;
+                        return Err(Error::Unsupported(
+                            "Block additions/CodecState require next_typed_packet",
+                        ));
+                    }
+                    return Ok(Some(packet.packet));
+                }
+                ParseStep::Event(LegacyEvent::Envelope(event)) => drop(event),
+                ParseStep::Event(LegacyEvent::Configuration(configuration)) => drop(configuration),
+                ParseStep::Event(LegacyEvent::Document(document)) => drop(document),
+                ParseStep::Event(LegacyEvent::Seek(receipt)) => {
+                    let _ = receipt;
+                }
+                ParseStep::Finished => return Ok(None),
+                _ => (),
+            }
+        }
     }
     pub fn seek_previous(
         &mut self,
@@ -231,12 +312,16 @@ impl<R: Read> BlockingReader<R> {
             }
         }
         loop {
-            match self.poll(cancel)? {
-                ParseStep::Event(Event::Seek(receipt)) => {
+            // Lent for this poll only; see EpochRestoreJob::try_owned_prefix.
+            self.reader.owned_root = self.input.owned_source().cloned();
+            let step = self.poll_projected::<ScanProjection>(cancel);
+            self.reader.owned_root = None;
+            match step? {
+                ParseStep::Event(ScanEvent::Seek(receipt)) => {
                     self.synchronize(cancel)?;
                     return Ok(receipt);
                 }
-                ParseStep::Event(Event::Packet(_)) => {
+                ParseStep::Event(ScanEvent::Packet(_)) => {
                     return Err(Error::Invalid("packet before seek receipt"));
                 }
                 ParseStep::Finished => {
@@ -252,6 +337,32 @@ impl<R: Read + Seek> BlockingReader<R> {
         let pool = Budget::new(limits.live_storage_bytes)?;
         Self::open_seekable_in(source, limits, &pool)
     }
+    pub fn open_seekable_with_payload_ownership(
+        source: R,
+        limits: Limits,
+        policy: crate::storage::PayloadOwnership,
+    ) -> Result<Self> {
+        let pool = Budget::new(limits.live_storage_bytes)?;
+        Self::open_seekable_in_with_payload_ownership(source, limits, &pool, policy)
+    }
+    pub fn open_seekable_in_with_payload_ownership(
+        source: R,
+        limits: Limits,
+        pool: &Budget,
+        policy: crate::storage::PayloadOwnership,
+    ) -> Result<Self> {
+        Self::construct(
+            source,
+            limits,
+            pool,
+            true,
+            Some(|reader, offset| std::io::Seek::seek(reader, std::io::SeekFrom::Start(offset))),
+            Some(|feed, cursor, request, cancel| {
+                feed.synchronize_seekable_position(cursor, request, cancel)
+            }),
+            policy,
+        )
+    }
     pub fn open_seekable_in(source: R, limits: Limits, pool: &Budget) -> Result<Self> {
         Self::construct(
             source,
@@ -262,7 +373,63 @@ impl<R: Read + Seek> BlockingReader<R> {
             Some(|feed, cursor, request, cancel| {
                 feed.synchronize_seekable_position(cursor, request, cancel)
             }),
+            crate::storage::PayloadOwnership::OwnedExact,
         )
+    }
+}
+
+impl BlockingReader<std::io::Cursor<triergon_core::OwnedInputBytes>> {
+    /// Explicit immutable-input operation. The complete caller-supplied input capability
+    /// owner must already belong to this pool; windows and packet views retain
+    /// that full charge. No source is buffered here. Generic Read/Seek and its
+    /// default OwnedExact payload policy remain unchanged.
+    pub fn open_owned_seekable_in(
+        source: triergon_core::OwnedInputBytes,
+        limits: Limits,
+        pool: &Budget,
+        policy: crate::storage::PayloadOwnership,
+    ) -> Result<Self> {
+        Self::open_owned_with_profile(source, limits, pool, policy, false)
+    }
+
+    /// Opt into the implicit WebM VP9 T.35 admission on an owned input.
+    pub fn open_owned_seekable_webm_vp9_t35_v1(
+        source: triergon_core::OwnedInputBytes,
+        limits: Limits,
+        pool: &Budget,
+        policy: crate::storage::PayloadOwnership,
+    ) -> Result<Self> {
+        Self::open_owned_with_profile(source, limits, pool, policy, true)
+    }
+
+    fn open_owned_with_profile(
+        source: triergon_core::OwnedInputBytes,
+        limits: Limits,
+        pool: &Budget,
+        policy: crate::storage::PayloadOwnership,
+        webm_vp9_t35: bool,
+    ) -> Result<Self> {
+        if !source.as_bytes().belongs_to(pool) {
+            return Err(triergon_core::Error::ForeignPool.into());
+        }
+        let capabilities = SourceCapabilities {
+            length: None,
+            random_access: true,
+        };
+        let mut reader = if webm_vp9_t35 {
+            Reader::new_webm_vp9_t35_v1(pool, SourceId(1), capabilities, limits, 8192)?
+        } else {
+            Reader::new(pool, SourceId(1), capabilities, limits, 8192)?
+        };
+        reader.envelope.set_payload_ownership(policy);
+        Self::initialize(Self {
+            reader,
+            input: InputFeeder::from_owned(std::io::Cursor::new(source), 8192)?,
+            reposition: Some(|reader, offset| reader.seek(std::io::SeekFrom::Start(offset))),
+            position: Some(|feed, cursor, request, cancel| {
+                feed.synchronize_seekable_position(cursor, request, cancel)
+            }),
+        })
     }
 }
 
@@ -525,3 +692,27 @@ mod header_refill_runtime_red {
         );
     }
 }
+
+#[cfg(test)]
+#[path = "legacy_projection_regressions.rs"]
+mod legacy_projection_regressions;
+
+#[cfg(test)]
+#[path = "seek_window_regressions.rs"]
+mod seek_window_regressions;
+
+#[cfg(test)]
+#[path = "seek_window_independent_helpers.rs"]
+mod seek_window_independent_helpers;
+
+#[cfg(test)]
+#[path = "scan_projection_regressions.rs"]
+mod scan_projection_regressions;
+
+#[cfg(test)]
+#[path = "owned_blocking_source.rs"]
+mod owned_blocking_source;
+
+#[cfg(test)]
+#[path = "owned_epoch_prefix_tests.rs"]
+mod owned_epoch_prefix_tests;

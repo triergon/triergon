@@ -1,11 +1,35 @@
 # Packet framing development slices
 
+Root3477 retains the compact `AvcConfigViewParser` and
+`HvcConfigViewParser` alongside the eager and strict source entry points.
+The packed HEVC descriptor stores a full-width payload start and the wire
+u16 length. The scanner checks the endpoint before descriptor creation.
+Borrowed and retained NAL views preserve exact source spans and owner
+lifetimes. On ARM64 the compact descriptor uses 16 bytes per NAL, down
+from 24 in Framing44. The two new guards check layout and exact pool
+occupancy with a maximum-length NAL and a later full-width range.
+
+The standalone packed-framing gates passed 539 ordinary tests and nine
+doctests per profile, including both new guards. Root3477 adds those guards
+to the 35 names from the earlier Framing44 overlay. Framing44's separate RSS
+campaign did not pass its delivery gate. The separate packed-worker timing
+run passed all 125 selected cases at the 1.25× delivery ceiling, with a
+worst paired upper bound of 1.2395×. Five reached the 0.80× optimization
+target. The same packed worker used less live heap and total peak RSS
+on all 125 cases under the approved tight kernel observer. The worst upper
+bounds were 0.9842× for heap and 0.9876× for RSS. The older operation-growth
+diagnostic remains unresolved on all 125. This qualification applies to the
+exact standalone worker and selected operation. The integrated root result
+is functional evidence.
+
+## Historical checkpoints
+
 The combined selected AVC/HCRC checkpoint passes165 debug/release framing
 regressions, all-target Clippy with warnings denied, no-default release checks
 and release examples on native Linux ARM64. All148 DTS predecessors and82
 independent AVC records are retained. `AvcConfigParser` implements the acquired
 ISO14496-15:2010/incorporated2006FRExt wire grammar; later profiles/corrigenda,
-SPS/RBSP and decoder consistency, hvcC and complete AAC/ADTS remain open.
+SPS/RBSP and decoder consistency, hvcC and complete AAC/ADTS were open at that checkpoint.
 The CPF=0 HCRC clarification preserves unknown CPF as `NotReached` and actual
 missing/partial/present CRC bits. Its4152-call unchanged-input replay changes
 only14 authorized HCRC presence annotations;4138 stdout records and all stderr
@@ -92,8 +116,8 @@ declared array/NAL ranges and big-endian length fields. It owns all output
 descriptors and preserves raw record bytes and zero-copy source spans. This is
 not an ISO avcC/hvcC wire parser. That historical76-test checkpoint passed
 Clippy and no-default checks on native Linux. The separate selected AVC wire
-parser is described above; hvcC, later AVC grammar and numerical qualification
-remain open.
+parser is described above. hvcC, later AVC grammar and numerical qualification
+were open at that checkpoint.
 
 The earlier [DTS source jobs](DTS-SOURCE-JOBS.md) brought that native Linux
 checkpoint to 103 passing tests: all 76 existing tests, 14 source inspection tests
@@ -118,9 +142,10 @@ explicit `Unsupported`. Output parameter sets share the original immutable
 configuration storage; source padding and prefixes remain in `source_bytes()`.
 
 The framing of configuration bytes and the declared framing of media samples are
-separate facts. No parameter set is inserted, deduplicated, sorted or rewritten.
-Configuration/source generations, packet timestamps and side-data association
-remain responsibilities of the parent packet/demux contract.
+separate facts. These source readers preserve parameter-set order and bytes.
+Packet/demux code supplies source/configuration generations, timestamps and side
+data. `NalPacketSession` adds the separately scoped pinned packet projection in
+[PACKET-BSF.md](PACKET-BSF.md).
 
 ## Incremental NAL input
 
@@ -160,6 +185,29 @@ without a prefix are rejected. Access-unit/type-dependent mandatory `zero_byte`
 rules are not checked by this framing-only reader; it accepts an initial
 three-byte prefix. Full EBSP/RBSP validity, including prohibited payload patterns,
 is outside fixed-header inspection.
+
+## Raw Annex B access units
+
+Use `RawAnnexBReader` with an explicitly identified AVC or HEVC source.
+It preserves original byte ranges and start-code widths and retains one
+access unit plus a lookahead NAL under charged limits. The scatter output
+shares the validated NAL payloads. The raw path uses incremental NAL
+capacity instead of reserving the configured ceiling for each NAL.
+
+The AVC boundary detector reads bounded SPS, PPS and slice-header prefixes
+and compares primary-picture identity. This covers multiple slices and
+streams without AUDs. Partitioned, redundant and extended AVC profiles
+have explicit refusals. The HEVC reader uses base-layer first-slice and
+leading-NAL rules and retains suffix and other-layer bytes in order. The
+reader reports coded random-access flags and preserves raw bytes without
+adding a presentation clock.
+[H.264 §§7.4.1.2.3–4](https://www.itu.int/rec/T-REC-H.264-202408-I/en)
+[H.265 §7.4.2.4.4](https://www.itu.int/rec/T-REC-H.265-202601-I/en)
+
+Four authored fixtures compare exact packet extents, key flags and complete
+source bytes. Four intact FATE streams add 243 access units. Native Linux
+runtime and memory remain open. The playback crate provides the separate
+[raw codec probe and decoder configuration](../playback/README.md#raw-avc-and-hevc-input).
 
 ## Annex-B output, limits and work
 
@@ -254,3 +302,28 @@ Acquisition and version selection for hvcC and later AVC profiles/corrigenda
 remain open. The selected older AVC grammar is acquired as described above.
 Neither a framework's record parser nor recollection of its layout substitutes
 for primary source evidence.
+
+
+## Selected hvcC and AAC source operations
+
+The earlier checkpoints above retain their original scopes and counts.
+The additive [hvcC/AAC API contract](HVCC-AAC.md) covers the selected full
+hvcC fixed fields and NAL arrays, ordered all-NAL conversion, AAC-LC/HE-AAC/
+HE-AACv2 ASC/GASpecific/PCE, ADTS records/streams, and separately named pinned
+receiver views. Raw source facts and default behavior remain independent of
+those views. All current DTS code, guards, fixtures and documentation remain
+unchanged. The complete prerequisite set adds 106 named framing guards
+(80 base + 26 compatibility), for an expected 317 framing guards. The
+composed adopted1863 + framing source has an expected 1969 passing Rust
+tests and its existing one ignored test; this source-only adoption package
+has not run that gate. Native and numerical/full-module qualification
+remain separate and open.
+
+## Stateful packet projection
+
+The independent `NalPacketSession` and `NalPacketConfigWriter` preserve the source
+record and complete packet while producing a separately named pinned d32
+AVC/HEVC packet view. Injection origins, opaque caller metadata, receiver epochs,
+work, cancellation, ownership and refusals are explicit. Source readers and all
+317 existing guards are unchanged. [PACKET-BSF.md](PACKET-BSF.md) defines the
+implemented operation and remaining validation/qualification gaps.

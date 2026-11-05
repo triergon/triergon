@@ -36,7 +36,6 @@ enum Phase {
 #[derive(Debug)]
 pub(crate) struct CuesJob {
     source: SharedBytes,
-    pool: Budget,
     segment: u64,
     segment_end: Option<u64>,
     limit: usize,
@@ -65,7 +64,6 @@ impl CuesJob {
         let len = source.len();
         Ok(Self {
             source,
-            pool: pool.clone(),
             segment,
             segment_end,
             limit,
@@ -126,7 +124,7 @@ impl CuesJob {
                     ParseStep::Event(Some(child)) => {
                         if child.id == 0xbb {
                             self.point = Some(ChildCursor::new(child.payload));
-                            self.positions = CopyVec::new(&self.pool);
+                            self.positions.reset();
                             self.ticks = None;
                             self.phase = Phase::Point;
                         }
@@ -252,7 +250,7 @@ impl CuesJob {
                 },
                 Phase::Merge => {
                     if self.merge == self.positions.len() {
-                        self.positions = CopyVec::new(&self.pool);
+                        self.positions.reset();
                         self.point = None;
                         self.phase = Phase::Root;
                         continue;
@@ -293,3 +291,7 @@ impl CuesJob {
 }
 
 super::usage::storage!(CuesJob, |s| [s.source, s.positions, s.output]);
+
+#[cfg(test)]
+#[path = "cue_arena_regressions.rs"]
+mod cue_arena_regressions;

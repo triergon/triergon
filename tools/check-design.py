@@ -4,7 +4,8 @@ import json,pathlib,re
 root=pathlib.Path(__file__).resolve().parents[1]
 errors=[]
 for p in root.rglob('*.md'):
- if '.research' in p.parts or 'target' in p.parts:continue
+ relative_parts=p.relative_to(root).parts
+ if '.research' in relative_parts or 'target' in relative_parts:continue
  for target in re.findall(r'\]\(([^)]+)\)',p.read_text()):
   if '://' in target or target.startswith('#'):continue
   f=(p.parent/target.split('#',1)[0]).resolve()

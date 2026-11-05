@@ -15,7 +15,9 @@ use triergon_mpegts::clock::NativePesClockV1;
 use triergon_mpegts::psi::{
     DescriptorNamespace, DvbNamespaceEvidence, DvbNativeViewProfile, ElementaryStream,
 };
-use triergon_mpegts::{PacketFormat, ParseLimits, Pes, TraceEvent, TransportStream};
+use triergon_mpegts::{
+    CompactTraceEvent, PacketFormat, ParseLimits, Pes, TraceEvent, TransportStream,
+};
 
 pub(crate) fn hex(output: &mut impl Write, bytes: &[u8]) -> io::Result<()> {
     output.write_all(b"\"")?;
@@ -378,7 +380,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         Some("192") => PacketFormat::M2ts192,
         _ => {
             return Err(
-                "usage: mpegts_source_trace 188|192 PROGRAM [--dvb] [--native-clock-v1] FILE... [--discontinuity FILE...]"
+                "usage: mpegts_source_trace 188|192 PROGRAM [--dvb] [--native-clock-v1] [--media-entities-v1] [--compact] FILE... [--discontinuity FILE...]"
                     .into(),
             );
         }
@@ -389,6 +391,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .parse()?;
     let mut descriptor_namespace = DescriptorNamespace::Unspecified;
     let mut native_clock_enabled = false;
+    let mut media_entities_enabled = false;
+    let mut compact = false;
     let mut path = loop {
         let argument = arguments.next().ok_or("missing source entity")?;
         match argument.as_str() {
@@ -397,6 +401,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     DescriptorNamespace::Dvb(DvbNamespaceEvidence::CallerDeclaredTransportProfile)
             }
             "--native-clock-v1" => native_clock_enabled = true,
+            "--media-entities-v1" => media_entities_enabled = true,
+            "--compact" => compact = true,
             _ => break argument,
         }
     };
@@ -425,8 +431,30 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let stdout = io::stdout();
     let mut output = stdout.lock();
     loop {
-        match demux.poll(&mut input, &mut WorkBudget::new(4096), &cancel)? {
-            Step::Ready(value) => {
+        let mut work = WorkBudget::new(4096);
+        let step = if compact {
+            demux.poll_compact(&mut input, &mut work, &cancel)?
+        } else {
+            match demux.poll(&mut input, &mut work, &cancel)? {
+                Step::Ready(value) => Step::Ready(CompactTraceEvent::Event(value)),
+                Step::NeedInput(request) => Step::NeedInput(request),
+                Step::End(location) => Step::End(location),
+                Step::Yield => Step::Yield,
+            }
+        };
+        match step {
+            Step::Ready(CompactTraceEvent::NullRun(run)) => {
+                for index in 0..run.len() {
+                    event(
+                        &mut output,
+                        TraceEvent::Transport(run.packet(index)?),
+                        native_clock.as_mut(),
+                        demux.clock_is_quarantined(),
+                        &cancel,
+                    )?;
+                }
+            }
+            Step::Ready(CompactTraceEvent::Event(value)) => {
                 if event(
                     &mut output,
                     value,
@@ -469,6 +497,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     };
                     if discontinuity {
                         demux.discontinuity()?;
+                        if media_entities_enabled && native_clock_enabled {
+                            native_clock = Some(NativePesClockV1::new(program)?);
+                        }
                     }
                     file = File::open(&path)?;
                     source_id = source_id.checked_add(1).ok_or("source id overflow")?;

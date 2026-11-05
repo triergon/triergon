@@ -15,6 +15,7 @@ mod model;
 mod native_palette;
 mod native_palette_buffer;
 mod native_view;
+mod pes_parser;
 mod pixel;
 mod raster;
 
@@ -39,6 +40,8 @@ pub use model::{
 pub use raster::Raster;
 
 pub use native_view::{
-    D32_PIN, D32_VIEW, NativeFailure, NativePalette, NativePublication, PublicationReason,
-    ReceiverView,
+    D32_PIN, D32_VIEW, NativeFailure, NativeGeometryPolicy, NativeOmittedRegion, NativePalette,
+    NativePublication, PublicationReason, ReceiverView,
 };
+
+pub use pes_parser::{NativePesFraming, NativePesPacket, NativePesParser, NativePesProgress};

@@ -3,7 +3,12 @@
 //! numerical qualification. Existing blocking Demuxer compatibility is retained.
 pub use crate::matroska::typed::{
     configuration::{CodecState, Configuration, Initialization, InitializationOrigin},
+    hdr10_plus::{
+        Hdr10Plus, Hdr10PlusGeometry, Hdr10PlusPeakGrid, Hdr10PlusPercentile, Hdr10PlusToneCurve,
+        Hdr10PlusWindow,
+    },
     mapping::{MappingExtension, MappingView, TrackExtensions, TrackExtensionsJob},
+    native_additions::{BlockAdditionContainer, NativeBlockAddition},
     packet::TypedPacket as Packet,
     side_data::{
         AdditionView, BlockGroupSource, ExtensionScope, ExtensionView, Presence, SourcePosition,
@@ -30,3 +35,5 @@ pub struct SeekRequest {
     pub requested_ns: i64,
     pub playback_preroll: bool,
 }
+
+pub use crate::storage::PayloadOwnership;

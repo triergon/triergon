@@ -1,6 +1,37 @@
 use triergon_core::{Error, Rounding, Time, TimeBase};
 
 #[test]
+fn integer_rescale_agrees_with_canonical_time_at_ties_and_extremes() {
+    let bases = [
+        (1, 1),
+        (1, 2),
+        (1, 90_000),
+        (1, 1_000_000),
+        (1, 1_000_000_000),
+        (1001, 24_000),
+        (u64::MAX, 1),
+        (1, u64::MAX),
+        (u64::MAX, u64::MAX - 1),
+        (u64::MAX - 1, u64::MAX),
+    ]
+    .map(|(num, den)| TimeBase::new(num, den).unwrap());
+    for from in bases {
+        for to in bases {
+            for ticks in [i64::MIN, -90_001, -3, -1, 0, 1, 3, 90_001, i64::MAX] {
+                let time = Time::from_ticks(i128::from(ticks), from).unwrap();
+                for rounding in UNIT53_ROUNDINGS {
+                    assert_eq!(
+                        from.rescale(ticks, to, rounding),
+                        time.to_i64_ticks(to, rounding),
+                        "{ticks}, {from:?}, {to:?}, {rounding:?}"
+                    );
+                }
+            }
+        }
+    }
+}
+
+#[test]
 fn mixed_prime_clocks_preserve_their_full_rational() {
     let a = Time::from_ticks(1, TimeBase::new(1, 1_000_003).unwrap()).unwrap();
     let b = Time::from_ticks(1, TimeBase::new(1, 1_000_033).unwrap()).unwrap();
@@ -141,4 +172,211 @@ fn a_movie_media_and_codec_clock_can_require_more_than_u64_denominator() {
         .unwrap()
     );
     assert_eq!(sum.checked_sub(c).unwrap(), a.checked_add(b).unwrap());
+}
+
+const UNIT53_ROUNDINGS: [Rounding; 5] = [
+    Rounding::TowardZero,
+    Rounding::AwayFromZero,
+    Rounding::Floor,
+    Rounding::Ceil,
+    Rounding::NearestAway,
+];
+
+#[test]
+fn unit_conversion_53_exact_clocks_include_above_u64_and_both_signed_limits() {
+    // Expected integer values authored independently with Python Fraction.
+    let cases: &[(i128, u128, u64, i128)] = &[
+        (0, 1, 1, 0),
+        (1, 3, 90000, 30000),
+        (-1, 3, 90000, -30000),
+        (3, 2, 4, 6),
+        (18446744073709551614, 1000, 1000, 18446744073709551614),
+        (18446744073709551615, 1000, 1000, 18446744073709551615),
+        (18446744073709551616, 1000, 1000, 18446744073709551616),
+        (-18446744073709551616, 1000, 1000, -18446744073709551616),
+        (18446744073709551616, 1, 1000, 18446744073709551616000),
+        (-18446744073709551617, 1, 1000, -18446744073709551617000),
+        (
+            170141183460469231731687303715884105727,
+            1,
+            1,
+            170141183460469231731687303715884105727,
+        ),
+        (
+            -170141183460469231731687303715884105728,
+            1,
+            1,
+            -170141183460469231731687303715884105728,
+        ),
+        (
+            85070591730234615865843651857942052863,
+            1,
+            2,
+            170141183460469231731687303715884105726,
+        ),
+        (
+            -85070591730234615865843651857942052864,
+            1,
+            2,
+            -170141183460469231731687303715884105728,
+        ),
+        (
+            -170141183460469231731687303715884105728,
+            2,
+            2,
+            -170141183460469231731687303715884105728,
+        ),
+        (
+            170141183460469231731687303715884105727,
+            3,
+            3,
+            170141183460469231731687303715884105727,
+        ),
+    ];
+    for &(n, d, scale, expected) in cases {
+        let time = Time::new(n, d).unwrap();
+        let base = TimeBase::new(1, scale).unwrap();
+        for mode in UNIT53_ROUNDINGS {
+            assert_eq!(
+                time.to_ticks(base, mode),
+                Ok(expected),
+                "n={n} d={d} scale={scale} mode={mode:?}"
+            );
+        }
+    }
+}
+
+#[test]
+fn unit_conversion_53_overflows_keep_public_signed_and_wide_product_bounds() {
+    let cases: &[(i128, u128, u64)] = &[
+        (170141183460469231731687303715884105727, 1, 2),
+        (-170141183460469231731687303715884105728, 1, 2),
+        (
+            170141183460469231731687303715884105727,
+            1,
+            18446744073709551615,
+        ),
+        (
+            -170141183460469231731687303715884105728,
+            1,
+            18446744073709551615,
+        ),
+        (85070591730234615865843651857942052864, 1, 2),
+        (-85070591730234615865843651857942052865, 1, 2),
+    ];
+    for &(n, d, scale) in cases {
+        let time = Time::new(n, d).unwrap();
+        let base = TimeBase::new(1, scale).unwrap();
+        for mode in UNIT53_ROUNDINGS {
+            assert_eq!(
+                time.to_ticks(base, mode),
+                Err(Error::Overflow),
+                "n={n} scale={scale} mode={mode:?}"
+            );
+        }
+    }
+}
+
+#[test]
+fn unit_conversion_53_nonunit_nonexact_and_wide_denominator_keep_all_roundings() {
+    let cases: &[(i128, u128, u64, u64, [i128; 5])] = &[
+        (1, 3, 1, 2, [0, 1, 0, 1, 1]),
+        (-1, 3, 1, 2, [0, -1, -1, 0, -1]),
+        (3, 2, 1, 1, [1, 2, 1, 2, 2]),
+        (-3, 2, 1, 1, [-1, -2, -2, -1, -2]),
+        (2, 3, 2, 5, [1, 2, 1, 2, 2]),
+        (-2, 3, 2, 5, [-1, -2, -2, -1, -2]),
+        (1, 3, 1, 1000, [333, 334, 333, 334, 333]),
+        (-1, 3, 1, 1000, [-333, -334, -334, -333, -333]),
+        (
+            1,
+            18446744073709551617,
+            1,
+            18446744073709551615,
+            [0, 1, 0, 1, 1],
+        ),
+        (
+            -1,
+            18446744073709551617,
+            1,
+            18446744073709551615,
+            [0, -1, -1, 0, -1],
+        ),
+        (45, 7, 3, 7, [15, 15, 15, 15, 15]),
+    ];
+    for &(n, d, base_n, base_d, expected) in cases {
+        let time = Time::new(n, d).unwrap();
+        let base = TimeBase::new(base_n, base_d).unwrap();
+        for (mode, value) in UNIT53_ROUNDINGS.into_iter().zip(expected) {
+            assert_eq!(
+                time.to_ticks(base, mode),
+                Ok(value),
+                "n={n} d={d} base={base_n}/{base_d} mode={mode:?}"
+            );
+        }
+    }
+}
+
+#[test]
+fn wide_gcd_54_can_reenter_u64_after_one_or_more_euclidean_steps() {
+    // Independent Python Fraction reduction; no expected values from this gcd.
+    let cases: &[(i128, u128, i128, u128)] = &[
+        (
+            79228162514264337593543950342,
+            12,
+            39614081257132168796771975171,
+            6,
+        ),
+        (
+            1267650600228229401496703205377,
+            1267650600228229401496703205375,
+            1267650600228229401496703205377,
+            1267650600228229401496703205375,
+        ),
+        (
+            1329227995784915872903807060280344587,
+            79228162514264337593543950339,
+            1329227995784915872903807060280344587,
+            79228162514264337593543950339,
+        ),
+        (
+            -170141183460469231731687303715884105728,
+            65536,
+            -2596148429267413814265248164610048,
+            1,
+        ),
+    ];
+    for &(n, d, expected_n, expected_d) in cases {
+        let value = Time::new(n, d).unwrap();
+        assert_eq!(
+            (value.numerator(), value.denominator()),
+            (expected_n, expected_d)
+        );
+    }
+}
+
+#[test]
+fn wide_gcd_54_keeps_wide_gcd_when_remainder_is_zero() {
+    let cases: &[(i128, u128, i128, u128)] = &[
+        (
+            1329227995784915872903807060280344576,
+            1267650600228229401496703205376,
+            1048576,
+            1,
+        ),
+        (
+            -170141183460469231731687303715884105728,
+            85070591730234615865843651857942052864,
+            -2,
+            1,
+        ),
+        (0, 340282366920938463463374607431768211455, 0, 1),
+    ];
+    for &(n, d, expected_n, expected_d) in cases {
+        let value = Time::new(n, d).unwrap();
+        assert_eq!(
+            (value.numerator(), value.denominator()),
+            (expected_n, expected_d)
+        );
+    }
 }

@@ -12,6 +12,7 @@ pub(crate) mod copy_vec;
 pub(crate) mod cues;
 #[path = "epoch.rs"]
 pub(crate) mod epoch;
+pub(crate) mod hdr10_plus;
 #[path = "header.rs"]
 pub(crate) mod header;
 #[path = "info.rs"]
@@ -21,6 +22,7 @@ pub(crate) mod info;
 pub(crate) mod lace;
 #[path = "mapping.rs"]
 pub(crate) mod mapping;
+pub(crate) mod native_additions;
 #[path = "packet.rs"]
 pub(crate) mod packet;
 #[path = "range.rs"]

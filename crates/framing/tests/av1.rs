@@ -864,3 +864,177 @@ fn atomic_obu_cancel_releases_scratch_and_retained_input_without_resuming() {
     );
     assert_eq!(source.as_ref(), &[0x2a, 2, 0x12, 0x80]);
 }
+
+fn temporal_limits() -> triergon_framing::Av1TemporalUnitLimits {
+    triergon_framing::Av1TemporalUnitLimits {
+        maximum_sample_bytes: 512,
+        maximum_output_bytes: 512,
+        maximum_obus: 8,
+    }
+}
+
+fn temporal_unit<'a>(
+    input: &'a [u8],
+    config: Option<triergon_framing::Av1TemporalUnitConfig<'a>>,
+    key: bool,
+    units: u64,
+) -> Result<triergon_framing::Av1TemporalUnit<'a>, Error> {
+    let mut job = triergon_framing::Av1TemporalUnitJob::new(input, config, key, temporal_limits())?;
+    let cancel = AtomicBool::new(false);
+    for _ in 0..8 {
+        match job.step(&mut WorkBudget::new(units), &cancel)? {
+            BuildStep::Ready(output) => {
+                assert!(matches!(
+                    job.step(&mut WorkBudget::new(units), &cancel)?,
+                    BuildStep::Complete
+                ));
+                return Ok(output);
+            }
+            BuildStep::Yield => {}
+            BuildStep::Complete => panic!("unit completed before publication"),
+        }
+    }
+    panic!("unit made no bounded progress")
+}
+
+#[test]
+fn temporal_unit_borrows_the_complete_sample_and_in_band_configuration() {
+    use triergon_framing::Av1TemporalUnitConfig;
+    let pool = Budget::new(1 << 20).unwrap();
+    let record = parse_config(&pool, &hex("81000c000a01b12a02c1807a0100"), 1).unwrap();
+    let config = Av1TemporalUnitConfig::new(&record).unwrap();
+    let frame = hex("3202d1e2");
+    let output = temporal_unit(&frame, Some(config), true, 1).unwrap();
+    let segments: Vec<_> = output.segments().collect();
+    assert_eq!(segments.concat(), hex("12000a01b12a02c1803202d1e2"));
+    assert_eq!(segments.concat().len(), output.byte_len());
+    assert!(std::ptr::eq(output.source(), frame.as_slice()));
+    assert!(std::ptr::eq(segments[1], &record.raw_record()[4..7]));
+    assert!(std::ptr::eq(segments[2], &record.raw_record()[7..11]));
+    assert!(std::ptr::eq(segments[3], frame.as_slice()));
+
+    for units in [1, 3, 64] {
+        let without_insert = temporal_unit(&frame, Some(config), false, units).unwrap();
+        assert_eq!(
+            without_insert.segments().collect::<Vec<_>>().concat(),
+            hex("12003202d1e2")
+        );
+
+        let source = hex("1280000a01ff3201e2");
+        let output = temporal_unit(&source, Some(config), true, units).unwrap();
+        assert_eq!(output.segments().collect::<Vec<_>>().concat(), source);
+        assert!(std::ptr::eq(
+            output.segments().next().unwrap(),
+            &source[..3]
+        ));
+    }
+}
+
+#[test]
+fn temporal_unit_sizes_only_the_final_unbounded_obu() {
+    let mut source = hex("2a8100e43428");
+    source.extend([0x7f; 128]);
+    let output = temporal_unit(&source, None, false, 1).unwrap();
+    let segments: Vec<_> = output.segments().collect();
+    assert_eq!(
+        segments,
+        [
+            &[0x12, 0][..],
+            &source[..4],
+            &[0x36, 0x28, 0x80, 1],
+            &source[6..]
+        ]
+    );
+    assert_eq!(output.byte_len(), source.len() + 4);
+    assert!(std::ptr::eq(segments[3], &source[6..]));
+
+    let source = hex("12003099");
+    let output = temporal_unit(&source, None, false, 1).unwrap();
+    assert_eq!(
+        output.segments().collect::<Vec<_>>().concat(),
+        hex("1200320199")
+    );
+}
+
+#[test]
+fn temporal_unit_rejects_ambiguous_and_malformed_envelopes() {
+    for (input, expected) in [
+        ("~", "invalid"),
+        ("1200", "invalid"),
+        ("10", "invalid"),
+        ("1201aa", "invalid"),
+        ("3200", "ok"),
+        ("3201321200", "invalid"),
+        ("3280", "truncated"),
+        ("32808080808080808000", "invalid"),
+        ("32ffffffff1f", "invalid"),
+        ("320201", "truncated"),
+        ("34", "truncated"),
+        ("360102", "invalid"),
+        ("b20100", "invalid"),
+        ("330100", "invalid"),
+    ] {
+        let sample = hex(input);
+        let result = temporal_unit(&sample, None, true, 1);
+        if expected == "ok" {
+            assert!(result.is_ok(), "{input}");
+        } else {
+            assert_eq!(error_class(result.err().unwrap()), expected, "{input}");
+        }
+    }
+}
+
+#[test]
+fn temporal_unit_fences_yield_cancel_and_enforces_both_size_limits() {
+    use triergon_framing::Av1TemporalUnitJob;
+    let input = hex("1200320199");
+    let cancel = AtomicBool::new(false);
+    let mut limits = temporal_limits();
+    limits.maximum_sample_bytes = 4;
+    assert!(matches!(
+        Av1TemporalUnitJob::new(&input, None, true, limits),
+        Err(Error::Limit {
+            requested: 5,
+            maximum: 4
+        })
+    ));
+    let mut job = Av1TemporalUnitJob::new(&input, None, true, temporal_limits()).unwrap();
+    for units in [0, 1] {
+        assert!(matches!(
+            job.step(&mut WorkBudget::new(units), &cancel).unwrap(),
+            BuildStep::Yield
+        ));
+    }
+    cancel.store(true, Ordering::Relaxed);
+    assert!(matches!(
+        job.step(&mut WorkBudget::new(4), &cancel),
+        Err(Error::Cancelled)
+    ));
+    cancel.store(false, Ordering::Relaxed);
+    assert!(matches!(
+        job.step(&mut WorkBudget::new(4), &cancel),
+        Err(Error::Cancelled)
+    ));
+
+    let source = [0x30, 0x41];
+    let mut limits = temporal_limits();
+    limits.maximum_output_bytes = 4;
+    let mut job = Av1TemporalUnitJob::new(&source, None, true, limits).unwrap();
+    assert!(matches!(
+        job.step(&mut WorkBudget::new(1), &cancel),
+        Err(Error::Limit {
+            requested: 5,
+            maximum: 4
+        })
+    ));
+    limits = temporal_limits();
+    limits.maximum_obus = 1;
+    let mut job = Av1TemporalUnitJob::new(&input, None, true, limits).unwrap();
+    assert!(matches!(
+        job.step(&mut WorkBudget::new(2), &cancel),
+        Err(Error::Limit {
+            requested: 2,
+            maximum: 1
+        })
+    ));
+}

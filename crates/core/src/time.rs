@@ -40,7 +40,31 @@ impl TimeBase {
         self.denominator.get()
     }
     pub fn rescale(self, ticks: i64, to: Self, rounding: Rounding) -> Result<i64> {
-        Time::from_ticks(i128::from(ticks), self)?.to_i64_ticks(to, rounding)
+        if self == to || ticks == 0 {
+            return Ok(ticks);
+        }
+        // A rounded conversion needs the original ratio, without first
+        // reducing it to canonical seconds.
+        let scale = u128::from(self.numerator()) * u128::from(to.denominator());
+        let divisor = u128::from(self.denominator()) * u128::from(to.numerator());
+        let Some(magnitude) = scale.checked_mul(u128::from(ticks.unsigned_abs())) else {
+            return Time::from_ticks(i128::from(ticks), self)?.to_i64_ticks(to, rounding);
+        };
+        let (quotient, remainder) = match (u64::try_from(magnitude), u64::try_from(divisor)) {
+            (Ok(magnitude), Ok(divisor)) => (
+                u128::from(magnitude / divisor),
+                u128::from(magnitude % divisor),
+            ),
+            _ => (magnitude / divisor, magnitude % divisor),
+        };
+        let result = rounded(
+            quotient,
+            remainder != 0,
+            remainder >= divisor - remainder,
+            ticks < 0,
+            rounding,
+        )?;
+        i64::try_from(result).map_err(|_| Error::Overflow)
     }
 }
 
@@ -54,14 +78,19 @@ pub struct Time {
 }
 
 #[inline]
-fn gcd(mut a: u128, mut b: u128) -> u128 {
-    if let (Ok(mut a), Ok(mut b)) = (u64::try_from(a), u64::try_from(b)) {
-        while b != 0 {
-            (a, b) = (b, a % b);
-        }
-        return u128::from(a);
-    }
+fn gcd_u64(mut a: u64, mut b: u64) -> u64 {
     while b != 0 {
+        (a, b) = (b, a % b);
+    }
+    a
+}
+
+#[inline]
+fn gcd(mut a: u128, mut b: u128) -> u128 {
+    while b != 0 {
+        if let (Ok(a), Ok(b)) = (u64::try_from(a), u64::try_from(b)) {
+            return u128::from(gcd_u64(a, b));
+        }
         (a, b) = (b, a % b);
     }
     a
@@ -72,9 +101,21 @@ impl Time {
         if denominator == 0 {
             return Err(Error::Invalid("zero time denominator"));
         }
-        let divisor = gcd(numerator.unsigned_abs(), denominator);
+        let magnitude = numerator.unsigned_abs();
+        if let (Ok(magnitude), Ok(denominator)) =
+            (u64::try_from(magnitude), u64::try_from(denominator))
+        {
+            let divisor = gcd_u64(magnitude, denominator);
+            let reduced = i128::from(magnitude / divisor);
+            return Ok(Self {
+                numerator: if numerator < 0 { -reduced } else { reduced },
+                denominator: NonZeroU128::new(u128::from(denominator / divisor))
+                    .ok_or(Error::Invalid("time denominator"))?,
+            });
+        }
+        let divisor = gcd(magnitude, denominator);
         Ok(Self {
-            numerator: signed(numerator.unsigned_abs() / divisor, numerator < 0)?,
+            numerator: signed(magnitude / divisor, numerator < 0)?,
             denominator: NonZeroU128::new(denominator / divisor)
                 .ok_or(Error::Invalid("time denominator"))?,
         })
@@ -112,8 +153,16 @@ impl Time {
     }
     fn combine(self, other: Self, subtract: bool) -> Result<Self> {
         let divisor = gcd(self.denominator(), other.denominator());
-        let left_factor = other.denominator() / divisor;
-        let right_factor = self.denominator() / divisor;
+        let (left_factor, right_factor) = if let (Ok(left), Ok(right)) = (
+            u64::try_from(self.denominator()),
+            u64::try_from(other.denominator()),
+        ) {
+            // Both denominators are positive; their gcd is nonzero and fits u64.
+            let divisor = divisor as u64;
+            (u128::from(right / divisor), u128::from(left / divisor))
+        } else {
+            (other.denominator() / divisor, self.denominator() / divisor)
+        };
         let fast = || {
             let denominator = self.denominator().checked_mul(left_factor)?;
             let left = self
@@ -170,6 +219,18 @@ impl Time {
         self.combine(other, true)
     }
     pub fn to_ticks(self, base: TimeBase, rounding: Rounding) -> Result<i128> {
+        let exact_denominator = self.denominator();
+        if base.numerator() == 1
+            && exact_denominator <= u128::from(u64::MAX)
+            && base.denominator() % (exact_denominator as u64) == 0
+        {
+            let magnitude = self
+                .numerator
+                .unsigned_abs()
+                .checked_mul(u128::from(base.denominator() / exact_denominator as u64))
+                .ok_or(Error::Overflow)?;
+            return signed(magnitude, self.numerator < 0);
+        }
         // Cancel both cross factors before multiplication. This preserves large
         // source clocks, including unsigned tfdt values, without float conversion.
         let a = gcd(self.numerator.unsigned_abs(), u128::from(base.numerator()));

@@ -1,0 +1,16 @@
+[package]
+name = "triergon-playback"
+version = "0.0.0"
+edition = "2024"
+publish = false
+[dependencies]
+triergon-core = { path = "../core" }
+triergon = { path = "../media" }
+triergon-isobmff = { path = "../isobmff" }
+triergon-mpegts = { path = "../mpegts" }
+triergon-framing = { path = "../framing" }
+triergon-subtitles = { path = "../subtitles" }
+[dev-dependencies]
+triergon-sim = { path = "../sim", features = ["codecs"] }
+[lints.rust]
+unsafe_code = "forbid"

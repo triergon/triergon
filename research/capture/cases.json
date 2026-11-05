@@ -1,0 +1,24 @@
+{
+  "schema": 1,
+  "id": "D5/O62 required cases v1",
+  "frozen_utc": "2026-11-02",
+  "rationale": "Covers both enabled geometries, both row orientations (960x540 is top-down; Streem's 480x270 chain is bottom-up, plus one cross case each), the default 2.5 Mbps rate, both extreme hello rate bytes (1 -> 0.1 Mbps, 255 -> 25.5 Mbps) and intermediate rates, and five content classes from idle keepalive to worst-case noise. 90 frames = three GOPs per session. Every case is required; none may be dropped to obtain acceptance.",
+  "generator": "harness/capture/generate_inputs.py <content> <width> <height> <frames> <out>",
+  "cases": [
+    {"id": "c01-ui-static-960", "content": "ui_static", "width": 960, "height": 540, "flip": 0, "frames": 90, "bitrate": 2500000},
+    {"id": "c02-ui-scroll-960", "content": "ui_scroll", "width": 960, "height": 540, "flip": 0, "frames": 90, "bitrate": 2500000},
+    {"id": "c03-ui-transition-960", "content": "ui_transition", "width": 960, "height": 540, "flip": 0, "frames": 90, "bitrate": 2500000},
+    {"id": "c04-motion-960", "content": "motion", "width": 960, "height": 540, "flip": 0, "frames": 90, "bitrate": 2500000},
+    {"id": "c05-noise-960", "content": "noise", "width": 960, "height": 540, "flip": 0, "frames": 90, "bitrate": 2500000},
+    {"id": "c06-ui-scroll-960-bottomup", "content": "ui_scroll", "width": 960, "height": 540, "flip": 1, "frames": 90, "bitrate": 2500000},
+    {"id": "c07-ui-static-480-bottomup", "content": "ui_static", "width": 480, "height": 270, "flip": 1, "frames": 90, "bitrate": 2500000},
+    {"id": "c08-ui-scroll-480-bottomup", "content": "ui_scroll", "width": 480, "height": 270, "flip": 1, "frames": 90, "bitrate": 2500000},
+    {"id": "c09-motion-480-bottomup", "content": "motion", "width": 480, "height": 270, "flip": 1, "frames": 90, "bitrate": 2500000},
+    {"id": "c10-ui-transition-480-topdown", "content": "ui_transition", "width": 480, "height": 270, "flip": 0, "frames": 90, "bitrate": 2500000},
+    {"id": "c11-motion-960-rate1", "content": "motion", "width": 960, "height": 540, "flip": 0, "frames": 90, "bitrate": 100000},
+    {"id": "c12-motion-960-1m", "content": "motion", "width": 960, "height": 540, "flip": 0, "frames": 90, "bitrate": 1000000},
+    {"id": "c13-motion-960-6m", "content": "motion", "width": 960, "height": 540, "flip": 0, "frames": 90, "bitrate": 6000000},
+    {"id": "c14-motion-960-rate255", "content": "motion", "width": 960, "height": 540, "flip": 0, "frames": 90, "bitrate": 25500000},
+    {"id": "c15-noise-480-bottomup", "content": "noise", "width": 480, "height": 270, "flip": 1, "frames": 90, "bitrate": 2500000}
+  ]
+}

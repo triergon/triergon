@@ -82,6 +82,15 @@ impl std::ops::Deref for PacketData {
     }
 }
 impl PacketData {
+    /// Share the restored frame in its original charged allocation.
+    pub fn shared_bytes(&self) -> Result<Option<crate::storage::Bytes>> {
+        self.storage
+            .as_core()
+            .map(|storage| storage.slice(self.range.clone()))
+            .transpose()
+            .map_err(Into::into)
+    }
+
     pub fn retained_capacity(&self) -> usize {
         self.storage.retained_capacity()
     }

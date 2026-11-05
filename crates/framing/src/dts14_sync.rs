@@ -103,6 +103,7 @@ pub struct Dts14SyncReader {
     ready: Option<Dts14SyncFrame>,
     facts: Option<Dts14SyncFacts>,
     interval: Option<usize>,
+    require_fixed_interval: bool,
     skipped_interior_syncs: usize,
     completed: usize,
     ended: Option<SourceLocation>,
@@ -155,6 +156,7 @@ impl Dts14SyncReader {
             ready: None,
             facts: None,
             interval: None,
+            require_fixed_interval: true,
             skipped_interior_syncs: 0,
             completed: 0,
             ended: None,
@@ -173,6 +175,20 @@ impl Dts14SyncReader {
             .as_ref()
             .map_or(self.last_request.offset, InputCursor::position)
     }
+    /// Edition-bound per-frame cadence. Geometry and every source bit are still
+    /// validated independently for each record; no universal FSIZE/tail rule.
+    pub(crate) fn per_frame(
+        pool: &Budget,
+        source: SourceId,
+        capabilities: SourceCapabilities,
+        order: DtsWordOrder,
+        limits: Dts14SyncLimits,
+    ) -> Result<Self> {
+        let mut reader = Self::new(pool, source, capabilities, order, limits)?;
+        reader.require_fixed_interval = false;
+        Ok(reader)
+    }
+
     pub fn request(&self) -> InputRequest {
         self.cursor
             .as_ref()
@@ -503,7 +519,9 @@ impl Dts14SyncReader {
                             "DTS14 unresolved FSIZE domain or tail geometry",
                         ));
                     }
-                    if self.interval.is_some_and(|distance| distance != length) {
+                    if self.require_fixed_interval
+                        && self.interval.is_some_and(|distance| distance != length)
+                    {
                         return Err(Error::Unsupported("DTS14 changing source-sync intervals"));
                     }
                     let end = self
@@ -669,7 +687,7 @@ fn normal_sync(source: &[u8; 6], order: DtsWordOrder) -> bool {
     prefix >> 4 == ((0x7ffe8001_u64 << 6) | 0x3f)
 }
 
-fn header_payload(source: &[u8; 18], order: DtsWordOrder) -> Result<[u8; 15]> {
+pub(crate) fn header_payload(source: &[u8; 18], order: DtsWordOrder) -> Result<[u8; 15]> {
     // Fixed120-bit stack probe. Complete source words stay in the raw owner.
     let mut output = [0_u8; 15];
     for bit in 0..120_usize {

@@ -1,3 +1,7 @@
 # Authored media and text fixtures must retain their exact wire bytes.
 crates/**/fixtures/** -text
 harness/fixtures/** -text
+
+# Keep the upstream mapping fixtures byte-for-byte, including line endings.
+crates/subtitles/tests/multibyte-mapping-data/*.TXT -text -diff
+crates/subtitles/tests/receiver-mapping-data/bestfit932.txt -text -diff

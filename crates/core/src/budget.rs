@@ -131,7 +131,11 @@ impl Budget {
                 Ordering::Relaxed,
             ) {
                 Ok(_) => {
-                    self.0.peak.fetch_max(total, Ordering::Relaxed);
+                    // The high-water mark never decreases, so an observed peak at
+                    // or above this total already records it without another RMW.
+                    if total > self.0.peak.load(Ordering::Relaxed) {
+                        self.0.peak.fetch_max(total, Ordering::Relaxed);
+                    }
                     return Ok(());
                 }
                 Err(current) => used = current,
@@ -157,6 +161,21 @@ impl Reservation {
             budget: budget.clone(),
             bytes: 0,
         }
+    }
+    /// Returns part of this charge to its pool once the storage it covered is gone.
+    pub(crate) fn shrink_by(&mut self, bytes: usize) {
+        debug_assert!(bytes <= self.bytes);
+        if bytes != 0 {
+            self.budget.0.used.fetch_sub(bytes, Ordering::Relaxed);
+            self.bytes -= bytes;
+        }
+    }
+    /// Claims `extra` more bytes, with the pool's own limit and pressure checks.
+    pub(crate) fn grow_by(&mut self, extra: usize) -> Result<()> {
+        self.budget.claim(extra)?;
+        // Both terms are bounded by the pool limit after a successful claim.
+        self.bytes += extra;
+        Ok(())
     }
     pub(crate) fn grow_to(&mut self, bytes: usize) -> Result<()> {
         if bytes < self.bytes {

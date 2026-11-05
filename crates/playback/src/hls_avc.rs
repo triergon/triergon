@@ -1,0 +1,691 @@
+//! AVC access units for independent MPEG-TS segments with in-band AUDs.
+//! H.222.0 §2.14.1 supplies the delimiter contract. Annex B and the RBSP
+//! prefixes used for active SPS/PPS resolution follow H.264 §7.3 and Annex B.
+
+pub(crate) mod syntax;
+
+use crate::{TrackKey, TsNativeCarriage, TsNativeConfiguration};
+use std::sync::atomic::{AtomicBool, Ordering};
+use triergon_core::{Budget, BudgetVec, Bytes, Error, Result, SourceId, WorkBudget};
+use triergon_framing::{Codec, NalHeader};
+use triergon_mpegts::{
+    clock::NativePesTimeView,
+    native_pes::{NativePesPacket, NativePesPayloadKind, NativeRegisteredCarriage},
+};
+
+pub use syntax::AvcRaster;
+
+const AUD: u8 = 9;
+const PREFIX: &[u8] = &[0, 0, 0, 1];
+const LOOKAHEAD: usize = PREFIX.len() + 1;
+
+#[derive(Clone, Copy, Debug)]
+pub struct AvcTsLimits {
+    pub maximum_access_unit_bytes: usize,
+    pub maximum_parameter_set_bytes: usize,
+}
+
+impl Default for AvcTsLimits {
+    fn default() -> Self {
+        Self {
+            maximum_access_unit_bytes: 4 * 1024 * 1024,
+            maximum_parameter_set_bytes: 4096,
+        }
+    }
+}
+
+#[derive(Debug)]
+pub struct AvcTsAccessUnit {
+    source: Bytes,
+    sps: Option<Bytes>,
+    pps: Option<Bytes>,
+    pub clock: Option<AvcTsClock>,
+    pub raster: AvcRaster,
+    pub idr: bool,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct AvcTsClock {
+    pub source_pts_raw33: Option<u64>,
+    pub source_dts_raw33: Option<u64>,
+    pub pts90: Option<i64>,
+    pub dts90: Option<i64>,
+}
+
+impl TryFrom<NativePesTimeView> for AvcTsClock {
+    type Error = Error;
+
+    fn try_from(clock: NativePesTimeView) -> Result<Self> {
+        let narrow = |value: Option<i128>| {
+            value
+                .map(i64::try_from)
+                .transpose()
+                .map_err(|_| Error::Overflow)
+        };
+        Ok(Self {
+            source_pts_raw33: clock.source_pts_raw33,
+            source_dts_raw33: clock.source_dts_raw33,
+            pts90: narrow(clock.pts90)?,
+            dts90: narrow(clock.dts90)?,
+        })
+    }
+}
+
+impl AvcTsAccessUnit {
+    pub fn source_bytes(&self) -> &Bytes {
+        &self.source
+    }
+
+    /// Annex B with the referenced SPS/PPS supplied on IDR if absent in-band.
+    /// The original access unit follows any inserted sets byte for byte.
+    pub fn feed_spans(&self) -> impl Iterator<Item = &[u8]> {
+        self.sps
+            .iter()
+            .chain(self.pps.iter())
+            .flat_map(|set| [PREFIX, set.as_ref()])
+            .chain(std::iter::once(self.source.as_ref()))
+    }
+
+    /// A contiguous queue payload. Share the original access unit unless an
+    /// IDR needs cached parameter sets added in front of it.
+    pub fn contiguous_feed(&self, pool: &Budget) -> Result<Bytes> {
+        if !self.source.belongs_to(pool) {
+            return Err(Error::ForeignPool);
+        }
+        if self.sps.is_none() && self.pps.is_none() {
+            return Ok(self.source.clone());
+        }
+        let total = self.feed_spans().try_fold(0_usize, |size, span| {
+            size.checked_add(span.len()).ok_or(Error::Overflow)
+        })?;
+        let mut output = BudgetVec::new(pool);
+        output.try_reserve_exact(total)?;
+        for span in self.feed_spans() {
+            output.try_extend_from_slice(span)?;
+        }
+        output.freeze().map_err(|error| error.error)
+    }
+}
+
+#[derive(Debug)]
+pub enum AvcTsStep {
+    NeedInput,
+    Yield,
+    Ready(AvcTsAccessUnit),
+    End,
+}
+
+#[derive(Clone, Copy)]
+struct Anchor {
+    serial: u64,
+    clock: AvcTsClock,
+}
+
+struct Chunk {
+    bytes: Bytes,
+    offset: usize,
+}
+
+struct PendingPes {
+    packet: NativePesPacket,
+    span: usize,
+    remaining: usize,
+}
+
+#[derive(Clone, Copy)]
+struct Prefix {
+    start: usize,
+    anchor: Option<Anchor>,
+}
+
+#[derive(Clone, Copy)]
+struct Nal {
+    prefix: Prefix,
+    header: usize,
+    kind: u8,
+}
+
+#[derive(Clone, Copy)]
+struct Picture {
+    pps: u8,
+    idr: bool,
+}
+
+struct Unit {
+    clock: Option<AvcTsClock>,
+    picture: Option<Picture>,
+}
+
+struct ParameterSet<T> {
+    id: u8,
+    seen_in_unit: u64,
+    bytes: Bytes,
+    value: T,
+}
+
+fn remember<T>(
+    sets: &mut BudgetVec<ParameterSet<T>>,
+    id: u8,
+    seen_in_unit: u64,
+    raw: &[u8],
+    value: T,
+) -> Result<()> {
+    let existing = sets.as_slice().iter().position(|set| set.id == id);
+    if let Some(index) = existing
+        && sets.as_slice()[index].bytes.as_ref() == raw
+    {
+        sets.as_mut_slice()[index].seen_in_unit = seen_in_unit;
+        return Ok(());
+    }
+    let bytes = Bytes::copy_from_slice(sets.budget(), raw)?;
+    let set = ParameterSet {
+        id,
+        seen_in_unit,
+        bytes,
+        value,
+    };
+    if let Some(index) = existing {
+        sets.as_mut_slice()[index] = set;
+    } else {
+        sets.try_push(set).map_err(|error| error.error)?;
+    }
+    Ok(())
+}
+
+/// One selected AVC track and segment. PES and carrier boundaries can occur
+/// anywhere in an access unit. Create a fresh reader at a segment or track reset.
+pub struct AvcTsReader {
+    pool: Budget,
+    limits: AvcTsLimits,
+    config: TsNativeConfiguration,
+    source_clock_epoch: Option<(SourceId, u64)>,
+    pending_pes: Option<PendingPes>,
+    input: Option<Chunk>,
+    pes: Option<Anchor>,
+    pes_serial: u64,
+    stamped_serial: u64,
+    zero_anchors: [Option<Anchor>; 3],
+    zeroes: usize,
+    prefix: Option<Prefix>,
+    next_nal: Option<Nal>,
+    nal: Option<Nal>,
+    nal_data_end: usize,
+    unit: Option<Unit>,
+    unit_serial: u64,
+    bytes: BudgetVec<u8>,
+    sps: BudgetVec<ParameterSet<AvcRaster>>,
+    pps: BudgetVec<ParameterSet<u8>>,
+    ended: bool,
+    failure: Option<Error>,
+}
+
+impl AvcTsReader {
+    pub fn new(pool: &Budget, config: TsNativeConfiguration, limits: AvcTsLimits) -> Result<Self> {
+        if config.carriage != TsNativeCarriage::Registered(NativeRegisteredCarriage::Avc) {
+            return Err(Error::Unsupported("HLS AVC needs selected AVC carriage"));
+        }
+        if !matches!(config.track, TrackKey::Ts { program, pid } if program != 0 && (1..0x1fff).contains(&pid))
+            || limits.maximum_access_unit_bytes == 0
+            || limits.maximum_parameter_set_bytes == 0
+        {
+            return Err(Error::Invalid("AVC TS reader policy"));
+        }
+        limits
+            .maximum_access_unit_bytes
+            .checked_add(LOOKAHEAD)
+            .ok_or(Error::Overflow)?;
+        Ok(Self {
+            pool: pool.clone(),
+            limits,
+            config,
+            source_clock_epoch: None,
+            pending_pes: None,
+            input: None,
+            pes: None,
+            pes_serial: 0,
+            stamped_serial: 0,
+            zero_anchors: [None; 3],
+            zeroes: 0,
+            prefix: None,
+            next_nal: None,
+            nal: None,
+            nal_data_end: 0,
+            unit: None,
+            unit_serial: 0,
+            bytes: BudgetVec::new(pool),
+            sps: BudgetVec::new(pool),
+            pps: BudgetVec::new(pool),
+            ended: false,
+            failure: None,
+        })
+    }
+
+    /// Moves a PES only on acceptance. Drain to NeedInput before offering another.
+    pub fn push(
+        &mut self,
+        mailbox: &mut Option<NativePesPacket>,
+        clock: NativePesTimeView,
+    ) -> Result<bool> {
+        if let Some(error) = self.failure {
+            return Err(error);
+        }
+        if self.ended {
+            return Err(Error::Invalid("AVC TS input after EOF"));
+        }
+        if self.input.is_some() || self.pending_pes.is_some() {
+            return Ok(false);
+        }
+        let Some(packet) = mailbox.as_ref() else {
+            return Ok(false);
+        };
+        if self.config.track
+            != (TrackKey::Ts {
+                program: packet.program,
+                pid: packet.pid,
+            })
+            || packet.source_epochs.configuration != self.config.configuration_epoch
+            || packet.source_header.stream_id & 0xf0 != 0xe0
+        {
+            return Err(Error::Invalid("AVC TS PES track or configuration"));
+        }
+        if packet.native_flags & 2 != 0
+            || packet.payload_kind == NativePesPayloadKind::DeclaredIncomplete
+            || packet.spans.is_empty()
+            || packet.payload_len == 0
+        {
+            return Err(Error::Invalid("AVC TS corrupt or empty PES"));
+        }
+        if !packet.spans.budget().same_pool(&self.pool) {
+            return Err(Error::ForeignPool);
+        }
+        let origin = (packet.source_origin.source, packet.source_epochs.clock);
+        if self
+            .source_clock_epoch
+            .is_some_and(|current| current != origin)
+        {
+            return Err(Error::Invalid("AVC TS PES crosses source or clock epoch"));
+        }
+        let header = packet.time_header();
+        if clock.program != packet.program
+            || clock.pid != packet.pid
+            || clock.profile != packet.profile
+            || clock.source_epochs != packet.source_epochs
+            || clock.source_pts_raw33 != header.and_then(|header| header.pts_raw33)
+            || clock.source_dts_raw33 != header.and_then(|header| header.dts_raw33)
+        {
+            return Err(Error::Invalid("AVC TS clock does not describe this PES"));
+        }
+        if header.is_some() {
+            let clock = AvcTsClock::try_from(clock)?;
+            self.pes_serial = self.pes_serial.checked_add(1).ok_or(Error::Overflow)?;
+            self.pes = Some(Anchor {
+                serial: self.pes_serial,
+                clock,
+            });
+        }
+        self.source_clock_epoch = Some(origin);
+        self.pending_pes = mailbox.take().map(|packet| PendingPes {
+            remaining: packet.payload_len,
+            packet,
+            span: 0,
+        });
+        Ok(true)
+    }
+
+    /// Seal only after definitive segment EOF. Already provided bytes drain.
+    pub fn finish(&mut self) {
+        self.ended = true;
+    }
+
+    pub fn step(&mut self, work: &mut WorkBudget, cancel: &AtomicBool) -> Result<AvcTsStep> {
+        if let Some(error) = self.failure {
+            return Err(error);
+        }
+        let step = self.advance(work, cancel);
+        if let Err(error) = step
+            && !matches!(error, Error::Allocation | Error::Backpressure { .. })
+        {
+            self.failure = Some(error);
+            self.pending_pes = None;
+            self.input = None;
+            self.bytes = BudgetVec::new(&self.pool);
+            self.sps = BudgetVec::new(&self.pool);
+            self.pps = BudgetVec::new(&self.pool);
+        }
+        step
+    }
+
+    fn advance(&mut self, work: &mut WorkBudget, cancel: &AtomicBool) -> Result<AvcTsStep> {
+        loop {
+            if cancel.load(Ordering::Relaxed) {
+                return Err(Error::Cancelled);
+            }
+            if let Some(next) = self.next_nal {
+                if !work.try_charge(1) {
+                    return Ok(AvcTsStep::Yield);
+                }
+                if let Some(nal) = self.nal {
+                    self.end_nal(nal)?;
+                    self.nal = None;
+                }
+                if next.kind == AUD {
+                    if self.unit.is_some() {
+                        let result = self.emit(next.prefix.start)?;
+                        let header = next.header - next.prefix.start;
+                        self.begin(Nal {
+                            header,
+                            prefix: Prefix {
+                                start: 0,
+                                ..next.prefix
+                            },
+                            ..next
+                        })?;
+                        return Ok(AvcTsStep::Ready(result));
+                    }
+                    self.begin(next)?;
+                } else {
+                    if self.unit.is_none() {
+                        return Err(Error::Unsupported(
+                            "AVC TS access unit has no initial delimiter",
+                        ));
+                    }
+                    self.begin_nal(next);
+                }
+                continue;
+            }
+            if let Some(chunk) = &mut self.input {
+                if chunk.offset == chunk.bytes.len() {
+                    self.input = None;
+                    continue;
+                }
+                let available = &chunk.bytes.as_ref()[chunk.offset..];
+                let count = available.len().min(work.remaining().min(4096) as usize);
+                if count == 0 {
+                    return Ok(AvcTsStep::Yield);
+                }
+                let first = available[0];
+                // Between prefix candidates, append a whole nonzero run. All
+                // possible cross-span prefixes are still handled bytewise.
+                let copy =
+                    if first != 0 && self.prefix.is_none() && self.zeroes < 2 && self.nal.is_some()
+                    {
+                        available[..count]
+                            .iter()
+                            .position(|&byte| byte == 0)
+                            .unwrap_or(count)
+                    } else {
+                        1
+                    };
+                append(
+                    &mut self.bytes,
+                    &available[..copy],
+                    self.limits.maximum_access_unit_bytes + LOOKAHEAD,
+                )?;
+                chunk.offset += copy;
+                work.try_charge(copy as u64);
+                if copy == 1 {
+                    self.accept(first)?;
+                } else {
+                    self.zeroes = 0;
+                    self.nal_data_end = self.bytes.len();
+                }
+                continue;
+            }
+            if let Some(pending) = &mut self.pending_pes {
+                if let Some(span) = pending.packet.spans.as_slice().get(pending.span) {
+                    if !work.try_charge(1) {
+                        return Ok(AvcTsStep::Yield);
+                    }
+                    let bytes = span.backing_bytes();
+                    if !bytes.belongs_to(&self.pool) {
+                        return Err(Error::ForeignPool);
+                    }
+                    pending.remaining = pending
+                        .remaining
+                        .checked_sub(bytes.len())
+                        .ok_or(Error::Invalid("AVC TS PES payload extent"))?;
+                    self.input = Some(Chunk {
+                        bytes: bytes.clone(),
+                        offset: 0,
+                    });
+                    pending.span += 1;
+                } else {
+                    if pending.remaining != 0 {
+                        return Err(Error::Invalid("AVC TS PES payload extent"));
+                    }
+                    self.pending_pes = None;
+                }
+                continue;
+            }
+            if !self.ended {
+                return Ok(AvcTsStep::NeedInput);
+            }
+            if self.prefix.is_some() || (self.unit.is_none() && !self.bytes.is_empty()) {
+                return Err(Error::Truncated);
+            }
+            if self.unit.is_none() {
+                return Ok(AvcTsStep::End);
+            }
+            if !work.try_charge(1) {
+                return Ok(AvcTsStep::Yield);
+            }
+            let end = self.bytes.len();
+            if let Some(nal) = self.nal {
+                self.end_nal(nal)?;
+                self.nal = None;
+            }
+            return self.emit(end).map(AvcTsStep::Ready);
+        }
+    }
+
+    fn accept(&mut self, byte: u8) -> Result<()> {
+        if let Some(prefix) = self.prefix.take() {
+            let kind = NalHeader::parse(Codec::Avc, &[byte])?.nal_unit_type();
+            self.next_nal = Some(Nal {
+                prefix,
+                header: self.bytes.len() - 1,
+                kind,
+            });
+        } else if byte == 0 {
+            self.zero_anchors.rotate_left(1);
+            self.zero_anchors[2] = self.pes;
+            self.zeroes = (self.zeroes + 1).min(3);
+            return Ok(());
+        } else if byte == 1 && self.zeroes >= 2 {
+            self.prefix = Some(Prefix {
+                start: self.bytes.len() - self.zeroes - 1,
+                anchor: self.zero_anchors[3 - self.zeroes],
+            });
+        } else if self.nal.is_none() {
+            return Err(Error::Invalid("bytes before AVC Annex B start code"));
+        } else {
+            self.nal_data_end = self.bytes.len();
+        }
+        self.zeroes = 0;
+        Ok(())
+    }
+
+    fn begin(&mut self, delimiter: Nal) -> Result<()> {
+        self.unit_serial = self.unit_serial.checked_add(1).ok_or(Error::Overflow)?;
+        let clock = delimiter
+            .prefix
+            .anchor
+            .filter(|anchor| anchor.serial > self.stamped_serial)
+            .map(|anchor| {
+                self.stamped_serial = anchor.serial;
+                anchor.clock
+            });
+        self.unit = Some(Unit {
+            clock,
+            picture: None,
+        });
+        self.begin_nal(delimiter);
+        Ok(())
+    }
+
+    fn begin_nal(&mut self, nal: Nal) {
+        self.nal_data_end = nal.header + 1;
+        self.nal = Some(nal);
+        self.next_nal = None;
+    }
+
+    fn end_nal(&mut self, nal: Nal) -> Result<()> {
+        let raw = &self.bytes.as_slice()[nal.header..self.nal_data_end];
+        let payload = &raw[1..];
+        let unit = self
+            .unit
+            .as_mut()
+            .ok_or(Error::Invalid("AVC NAL outside an access unit"))?;
+        match nal.kind {
+            AUD if matches!(payload, [value] if value & 0x1f == 0x10) => {}
+            AUD => return Err(Error::Invalid("AVC access unit delimiter RBSP")),
+            1 | 5 => {
+                let (first_mb, pps) = syntax::slice_header_prefix(payload)?;
+                let idr = nal.kind == 5;
+                if let Some(picture) = unit.picture {
+                    if picture.pps != pps || picture.idr != idr || first_mb == 0 {
+                        return Err(Error::Unsupported(
+                            "AVC TS picture or redundant slices without a new delimiter",
+                        ));
+                    }
+                } else {
+                    if first_mb != 0 {
+                        return Err(Error::Unsupported(
+                            "AVC TS picture starts outside macroblock zero",
+                        ));
+                    }
+                    unit.picture = Some(Picture { pps, idr });
+                }
+            }
+            7 | 8 => {
+                if unit.picture.is_some() {
+                    return Err(Error::Invalid("AVC parameter set after picture slices"));
+                }
+                let length = raw.len();
+                if length > self.limits.maximum_parameter_set_bytes {
+                    return Err(Error::Limit {
+                        requested: length,
+                        maximum: self.limits.maximum_parameter_set_bytes,
+                    });
+                }
+                if nal.kind == 7 {
+                    let (id, raster) = syntax::sps(payload)?;
+                    remember(&mut self.sps, id, self.unit_serial, raw, raster)?;
+                } else {
+                    let (id, sps) = syntax::pps(payload)?;
+                    remember(&mut self.pps, id, self.unit_serial, raw, sps)?;
+                }
+            }
+            6 | 10 | 11 | 12 => {}
+            _ => return Err(Error::Unsupported("AVC TS NAL type")),
+        }
+        Ok(())
+    }
+
+    fn emit(&mut self, end: usize) -> Result<AvcTsAccessUnit> {
+        if end > self.limits.maximum_access_unit_bytes {
+            return Err(Error::Limit {
+                requested: end,
+                maximum: self.limits.maximum_access_unit_bytes,
+            });
+        }
+        let unit = self
+            .unit
+            .as_ref()
+            .ok_or(Error::Invalid("missing AVC access unit"))?;
+        let picture = unit.picture.ok_or(Error::Truncated)?;
+        if self.unit_serial == 1 && !picture.idr {
+            return Err(Error::Unsupported(
+                "independent AVC segment must start with IDR",
+            ));
+        }
+        let pps = self
+            .pps
+            .as_slice()
+            .iter()
+            .find(|set| set.id == picture.pps)
+            .ok_or(Error::Invalid("AVC slice references unknown PPS"))?;
+        let sps = self
+            .sps
+            .as_slice()
+            .iter()
+            .find(|set| set.id == pps.value)
+            .ok_or(Error::Invalid("AVC PPS references unknown SPS"))?;
+        let sps_feed =
+            (picture.idr && sps.seen_in_unit != self.unit_serial).then(|| sps.bytes.clone());
+        let pps_feed =
+            (picture.idr && pps.seen_in_unit != self.unit_serial).then(|| pps.bytes.clone());
+        let feed_bytes = sps_feed
+            .iter()
+            .chain(pps_feed.iter())
+            .try_fold(end, |total, set| {
+                total
+                    .checked_add(PREFIX.len())
+                    .and_then(|total| total.checked_add(set.len()))
+                    .ok_or(Error::Overflow)
+            })?;
+        if feed_bytes > self.limits.maximum_access_unit_bytes {
+            return Err(Error::Limit {
+                requested: feed_bytes,
+                maximum: self.limits.maximum_access_unit_bytes,
+            });
+        }
+        let clock = unit.clock;
+        let raster = sps.value;
+        let mut next = BudgetVec::new(&self.pool);
+        next.try_extend_from_slice(&self.bytes.as_slice()[end..])?;
+        let builder = std::mem::replace(&mut self.bytes, next);
+        let source = match builder.freeze() {
+            Ok(bytes) => bytes.into_slice(0..end)?,
+            Err(error) => {
+                self.bytes = error.buffer;
+                return Err(error.error);
+            }
+        };
+        self.unit = None;
+        Ok(AvcTsAccessUnit {
+            source,
+            sps: sps_feed,
+            pps: pps_feed,
+            clock,
+            raster,
+            idr: picture.idr,
+        })
+    }
+}
+
+fn append(buffer: &mut BudgetVec<u8>, bytes: &[u8], limit: usize) -> Result<()> {
+    let end = buffer
+        .len()
+        .checked_add(bytes.len())
+        .ok_or(Error::Overflow)?;
+    if end > limit {
+        return Err(Error::Limit {
+            requested: end,
+            maximum: limit,
+        });
+    }
+    if end > buffer.capacity() {
+        let target = buffer
+            .capacity()
+            .saturating_mul(2)
+            .max(64)
+            .max(end)
+            .min(limit);
+        if let Err(error) = buffer.try_reserve_exact(target - buffer.len()) {
+            if target == end
+                || !matches!(
+                    error,
+                    Error::Backpressure { .. } | Error::Limit { .. } | Error::Allocation
+                )
+            {
+                return Err(error);
+            }
+            buffer.try_reserve_exact(end - buffer.len())?;
+        }
+    }
+    buffer.try_extend_from_slice(bytes)
+}
+
+#[cfg(test)]
+mod tests;

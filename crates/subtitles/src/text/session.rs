@@ -54,7 +54,7 @@ pub(crate) struct Session {
 }
 
 impl Session {
-    pub fn new(input: &Input, pool: &Budget) -> Self {
+    pub fn new(input: &Input, pool: &Budget, iso_tx3g: bool) -> Self {
         Self {
             phase: Phase::Init,
             text_range: 0..input.payload.len(),
@@ -64,7 +64,7 @@ impl Session {
             probe: None,
             validator: None,
             document: None,
-            tx3g: (input.format == Format::Tx3g).then(|| sample::Tx3g::new(pool)),
+            tx3g: (input.format == Format::Tx3g).then(|| sample::Tx3g::new(pool, iso_tx3g)),
             addition: None,
             fields: Fields::default(),
             emitter: None,
@@ -159,6 +159,11 @@ impl Session {
                                     | Encoding::Utf16Bom
                                     | Encoding::Utf16Be
                                     | Encoding::Utf16Le
+                                    | Encoding::Ascii
+                                    | Encoding::Latin1
+                                    | Encoding::Windows1251
+                                    | Encoding::Windows1252
+                                    | Encoding::Multibyte(_)
                             ) {
                                 return Err(Error::Unsupported("declared charset conversion"));
                             }

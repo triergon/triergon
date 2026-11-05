@@ -13,13 +13,37 @@ mod input_boxes;
 mod interleave;
 mod metadata;
 mod native_clock;
+mod native_front;
+pub use native_front::{
+    Mov9FrontFragmentV1, Mov9FrontReadBoundaryV1, Mov9FrontSampleV1, Mov9FrontTrackV1,
+};
 mod native_cursor;
 mod native_edits;
+mod native_operation_v5;
+mod native_transport_v3;
 mod native_view;
+pub use native_operation_v5::{
+    Mov9InitialOperationJobV5, Mov9InitialOperationV5, Mov9RejectedPacketSeekV5,
+    PinnedMovD32RejectedPacketSeekV5,
+};
+pub use native_transport_v3::{
+    Mov9V3EntryRevisit, Mov9V3ModeledInitialRead, Mov9V3ModeledOpenState, Mov9V3TransportBuilder,
+    Mov9V3TransportModel, PinnedMovD32SmallRawVideoTransportV3,
+};
 mod packet;
+mod physical_read_v4;
+mod recovery_payload;
+pub use physical_read_v4::{
+    Mov9PhysicalPayloadV4, Mov9PhysicalReadV4, Mov9PhysicalReaderV4, PinnedMovD32PhysicalReadV4,
+};
 mod regular;
+pub use recovery_payload::{Mov9PartialSampleReader, Mov9PayloadBounds, Mov9RecoveredPayload};
 mod sidx;
+mod sound_v0;
 mod tables;
+pub use sound_v0::{
+    QtPcmEncodingV0, QtPcmLayoutV0, QtPcmSampleReaderV0, QtPcmSourcePacketV0, QtSoundDescriptionV0,
+};
 
 pub use boxes::{BoxChildren, BoxHeader, BoxStep, BoxView, HeaderRead};
 pub use fragment::{
@@ -29,21 +53,43 @@ pub use fragment::{
 pub use fragment_time::FragmentDecodeTime;
 pub use input_boxes::{BoxEvent, BoxReader};
 pub use interleave::{
-    InterleaveStatus, InterleavedSample, PhysicalInterleaveLimits, PhysicalSampleCursor,
-    SourceTrack, TrackSampleCursor,
+    ForwardRegularMdatV1, InterleaveStatus, InterleavedSample, PhysicalInterleaveLimits,
+    PhysicalSampleCursor, SourceTrack, TrackSampleCursor,
 };
-pub use metadata::{EditEntry, EditList, EntryLayout, MovieHeader, SampleDescription, TrackHeader};
-pub use native_clock::{Mov9ClockField, Mov9MediaClock, Mov9MediaClockCause, Mov9SchedulingClock};
+pub use metadata::{
+    EditEntry, EditList, EntryLayout, Mov9RecoveryTrackHeader, MovieHeader, SampleDescription,
+    TrackHeader,
+};
+pub use native_clock::{
+    Mov9ClockField, Mov9MediaClock, Mov9MediaClockCause, Mov9SchedulingClock, SourceTimeBase,
+};
 pub use native_cursor::{
     Mov9ClockOrigin, Mov9EditIdentity, Mov9PacketCursor, Mov9PacketLimits, Mov9PacketOccurrence,
-    Mov9PredecessorClock, Mov9Profile, Mov9ResumePoint, Mov9Track,
+    Mov9PredecessorClock, Mov9Profile, Mov9ResumePoint, Mov9Track, mov9_seekable_head_precedes,
 };
 pub use native_edits::{
     Mov9CursorStatus, Mov9DurationBasis, Mov9EditCursor, Mov9EditLimits, Mov9Occurrence,
 };
 pub use native_view::{Mov9Edit, Mov9PacketView, Mov9StreamView, Mov9View};
-pub use packet::{SampleReader, SourcePacket};
-pub use regular::{SampleCursor, SampleLocator, SampleTable, SampleTableBuilder};
+pub use packet::{
+    Mov9SampleExtent, Mov9SampleRead, Mov9ShortSample, SampleReader, SourcePacket, TerminalMdat,
+};
+pub use regular::{
+    Mov9InitialDescriptionDiagnostic, Mov9RecoveryIndexCursor, Mov9RecoveryIndexEntry,
+    Mov9RecoveryOccurrence, Mov9RecoveryPacketCursor, Mov9RecoverySourceCursor,
+    Mov9RecoveryV2Association, Mov9RecoveryV2Context, Mov9RecoveryV2IndexCursor,
+    Mov9RecoveryV2IndexEntry, Mov9RecoveryV2Occurrence, Mov9RecoveryV2PacketCursor,
+    Mov9RecoveryV2Read, Mov9RunCoverage, Mov9RunKind, Mov9RunRecoveryBuilder, Mov9RunRecoveryTable,
+    Mov9SyncDiagnostic, PinnedMovD32RegularRecoveryV1, PinnedMovD32RegularRecoveryV2, SampleCursor,
+    SampleLocator, SampleTable, SampleTableBuilder,
+};
+pub use regular::{
+    Mov9RecoveryV3Association, Mov9RecoveryV3Context, Mov9RecoveryV3DescriptionDiagnostic,
+    Mov9RecoveryV3Emission, Mov9RecoveryV3Event, Mov9RecoveryV3IndexCursor,
+    Mov9RecoveryV3IndexEvent, Mov9RecoveryV3NativeIndexEntry, Mov9RecoveryV3PacketCursor,
+    Mov9RecoveryV3Read, Mov9RunRecoveryV3Builder, Mov9RunRecoveryV3Table,
+    PinnedMovD32RegularRecoveryV3,
+};
 pub use sidx::{IndexStep, SegmentIndex, SegmentIndexCursor, SegmentReference};
 use std::ops::Range;
 use triergon_core::{Error, Result, Time, TimeBase};
@@ -221,3 +267,85 @@ pub use native_index::{
     Mov9NativeIndexLimits, Mov9NativeSeekCursor, Mov9NativeSeekJob, Mov9NativeSeekLimits,
     Mov9NativeSeekPlan, Mov9NativeSeekReceipt,
 };
+
+mod native_transport_v4;
+pub use native_transport_v4::{
+    Mov9V4RootWalkTransportBuilder, Mov9V4RootWalkTransportModel, PinnedMovD32RootWalkTransportV4,
+};
+
+mod native_open_clock_v6;
+pub use native_open_clock_v6::{
+    Mov9FragmentClockJobV6, Mov9FragmentClockResultV6, PinnedMovD32FragmentClockV6,
+};
+
+mod native_pcm_v1;
+pub use native_pcm_v1::{
+    Mov9PcmCursorV1, Mov9PcmLimitsV1, Mov9PcmPacketV1, Mov9PcmPayloadV1, Mov9PcmReaderV1,
+    Mov9PcmStreamV1, PinnedMovD32PcmV1,
+};
+
+mod native_public_receiver_v6;
+pub use native_public_receiver_v6::{
+    Mov9PublicClockV6, Mov9PublicPacketTimesV6, Mov9ReceiverOriginV6, PinnedMovD32PublicReceiverV6,
+};
+
+mod native_header_v7;
+pub use native_header_v7::{
+    Mov9HeaderCauseV7, Mov9HeaderRejectionV7, Mov9SampleEntryHeaderJobV7, Mov9SampleEntryHeaderV7,
+    PinnedMovD32SampleEntryHeaderV7,
+};
+
+mod native_encoded_v1;
+pub use native_encoded_v1::{
+    EncodedEntryKindV1, Mov9EncodedLimitsV1, Mov9EncodedStreamJobV1, Mov9EncodedStreamV1,
+    PinnedMovD32EncodedRegularV1,
+};
+
+mod native_encoded_edits_v2;
+pub use native_encoded_edits_v2::{
+    Mov9EncodedEditContextV2, Mov9EncodedEditJobV2, Mov9EncodedEditLimitsV2, Mov9EncodedEditPlanV2,
+    PinnedMovD32EncodedEditsV2,
+};
+
+mod native_encoded_configs_v3;
+pub use native_encoded_configs_v3::{
+    Mov9EncodedConfigSequenceV3, Mov9EncodedConfigStepV3, Mov9EncodedCreationV3,
+    Mov9EncodedInitialV3, PinnedMovD32EncodedRegularV3,
+};
+
+mod native_encoded_metadata_v4;
+pub use native_encoded_metadata_v4::{
+    Mov9CreationCauseV4, Mov9DependedOnV4, Mov9DependencyViewV4, Mov9EncodedCreationV4,
+    Mov9EncodedSelectionV4, Mov9EncodedSourceV4, Mov9HandlerV4, Mov9LanguageCauseV4,
+    Mov9LanguageV4, Mov9SoundV1SourceV4, PinnedMovD32EncodedRegularV4,
+};
+
+mod native_encoded_dependency_v4;
+
+mod native_private_catalogue_v8;
+pub use native_private_catalogue_v8::{
+    Mov9PrivateConfigCauseV8, Mov9PrivateConfigurationJobV8, Mov9PrivateConfigurationV8,
+    PinnedMovD32OpaquePrivateCatalogueV8,
+};
+
+mod native_encoded_recovery_v5;
+pub use native_encoded_recovery_v5::{
+    Mov9DependencyCauseV5, Mov9DependencyObservationV5, Mov9RecoveryFactsV5, Mov9RecoveryGroupV5,
+    Mov9RecoveryReceiverCauseV5, PinnedMovD32EncodedRecoveryV5,
+};
+
+mod native_context_reports_v7;
+pub use native_context_reports_v7::{
+    Mov9SourceProfileFaultV7, Mov9WaveObservationV7, PinnedMovD32EncodedContextsV7,
+};
+
+mod native_recovery_context_v7;
+pub use native_recovery_context_v7::Mov9RecoveryObservationV7;
+
+mod native_private_diagnostics_v7;
+pub use native_private_diagnostics_v7::{
+    Mov9DiagnosticKindV7, Mov9NativeDiagnosticV7, Mov9PrivateDiagnosticJobV7,
+    Mov9PrivateDiagnosticsV7,
+};
+
+pub use fragment::OwnedFragmentCursor;

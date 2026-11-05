@@ -8,6 +8,43 @@ vector. Every case has 30 raw paired timing/memory observations. K0–K4 contrac
 and all numeric thresholds are unchanged. Complete modules and Streem offboarding
 remain open; the earlier source snapshots remain immutable historical receipts.
 
+The earlier experimental review tree adopted the frozen 5,095-file Root3477 composition.
+Native Linux ARM64 debug and release each recorded 3,477 passed, zero failed and
+one ignored test, plus 15 passing doctests per profile. All 13 root checks
+passed, including shipping and ARM32. The successor retains every Root3474
+test name and adds one capture guard and two HEVC storage guards. Root3474's
+historical 177-name delta covers 22 playback, 35 framing, 16 native PGS and
+104 native mov_text tests. Earlier counts retain their own source scope.
+
+- The explicit [terminal-MDAT operation](../crates/playback/README.md) matched
+  120 whole native observations across five required fixtures in its standalone
+  functional run. Source completion still requires the matching actual EOF.
+  The default native refusal and the wider matrix's 252 native nonpasses remain.
+- The [compact framing views](../crates/framing/README.md) now include the
+  packed HEVC descriptor. The packed worker and Root3477 have separate
+  functional receipts. The Framing44 RSS campaign did not pass its gate.
+- The standalone [native PGS first-event operation](../crates/subtitles/src/pgs/README.md)
+  passed runtime, heap and total peak RSS for all 229 memberships on the
+  exact b545 candidate. That qualification applies to the approved receiver
+  operation and its pinned workers. The integrated root has functional evidence.
+- The explicit [mov_text receiver](../crates/subtitles/src/text/native_mov_text/README.md)
+  matched 82 selected cases at each of three work quanta per profile. The
+  retained Streem revision routes mov_text through its existing packet-text path.
+
+D1–D6 remain open. Root3477 includes capture85. The standalone capture85
+quality run passed all 15 selected cases under the six-factor contract.
+The exact standalone packed-framing worker passed runtime, heap and
+total peak RSS delivery on all 125 selected cases. The standalone
+capture85 worker passed runtime delivery on 15/15 cases; its memory
+qualification remains open. These runs are outside the root receipt.
+Actual consumer integration remains open.
+
+The current review tree adds regular front-moov MP4 playback across multiple
+finite MDATs. Deferred samples need containment in an observed MDAT before
+payload delivery. Backward layouts return an unsupported-layout error. The
+[desktop session composition](../crates/sim/README.md) uses the same playback
+crate to exercise real MP4 packet delivery, decode and seek reset.
+
 The numerically selected graph has three owned Rust packages, no third-party packages, and forbids
 unsafe production code. Native FFmpeg, allocation/RSS observers and Python remain
 isolated test tools. The frozen whole-workspace host snapshot passes 315 Rust and
@@ -45,8 +82,9 @@ header/frame/configuration parsing. Later DTS-core work passes 62 host regressio
 Clippy and a release build at its recorded checkpoint. The later selected AVC
 wire parser and HCRC clarification pass165 framing regressions on their frozen
 Linux source; acquired ISO14496-15:2010/incorporated2006FRExt grammar is bounded.
-Later AVC profiles, hvcC, remaining packet semantics and full native/numerical
-qualification remain open. The metadata40/core41/packet42 snapshots have separate
+At that recorded checkpoint, later AVC profiles, hvcC, remaining packet semantics
+and full native/numerical qualification were open. This historical feature list
+is not the current integration inventory. The metadata40/core41/packet42 snapshots have separate
 functional and code-generation receipts; they do not qualify the combined public
 tree or close complete M03/source/native/numerical gates.
 The fused-inflater snapshot's explicitly unqualified three-pair screen retains

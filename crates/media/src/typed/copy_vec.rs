@@ -12,7 +12,6 @@ enum Operation<T> {
 }
 #[derive(Debug)]
 pub(crate) struct CopyVec<T: Copy> {
-    pool: Budget,
     data: BudgetVec<T>,
     operation: Option<Operation<T>>,
     growth: Option<(BudgetVec<T>, usize)>,
@@ -20,7 +19,6 @@ pub(crate) struct CopyVec<T: Copy> {
 impl<T: Copy> CopyVec<T> {
     pub fn new(pool: &Budget) -> Self {
         Self {
-            pool: pool.clone(),
             data: BudgetVec::new(pool),
             operation: None,
             growth: None,
@@ -35,6 +33,12 @@ impl<T: Copy> CopyVec<T> {
     pub fn cancel_pending(&mut self) {
         self.operation = None;
         self.growth = None;
+    }
+    /// Drops every element and the allocation (and its charge), keeping only
+    /// the pool: the same state as a new arena, without another pool handle.
+    pub fn reset(&mut self) {
+        self.cancel_pending();
+        self.data = BudgetVec::new(self.data.budget());
     }
     pub fn truncate(&mut self, len: usize) -> Result<()> {
         if len > self.data.len() {
@@ -105,7 +109,7 @@ impl<T: Copy> CopyVec<T> {
             }
             if needed > self.data.capacity() {
                 let target = needed.max(self.data.capacity().saturating_mul(2)).max(4);
-                let mut replacement = BudgetVec::new(&self.pool);
+                let mut replacement = BudgetVec::new(self.data.budget());
                 replacement.try_reserve_exact(target).or_else(|error| {
                     if target > needed
                         && matches!(

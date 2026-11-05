@@ -13,18 +13,22 @@ pub(crate) struct Tx3g {
     length: [u8; 2],
     length_read: usize,
     at: usize,
-    header: [u8; 8],
+    header: [u8; 16],
+    header_length: usize,
+    iso_boxes: bool,
     header_read: usize,
     modifiers: BudgetVec<Modifier>,
 }
 
 impl Tx3g {
-    pub fn new(pool: &Budget) -> Self {
+    pub fn new(pool: &Budget, iso_boxes: bool) -> Self {
         Self {
             length: [0; 2],
             length_read: 0,
             at: 0,
-            header: [0; 8],
+            header: [0; 16],
+            header_length: 8,
+            iso_boxes,
             header_read: 0,
             modifiers: BudgetVec::new(pool),
         }
@@ -69,7 +73,7 @@ impl Tx3g {
             if self.at == bytes.len() && self.header_read == 0 {
                 return Ok(Poll::Ready(()));
             }
-            while self.header_read < self.header.len() {
+            while self.header_read < self.header_length {
                 let offset = self
                     .at
                     .checked_add(self.header_read)
@@ -83,6 +87,10 @@ impl Tx3g {
                 self.header[self.header_read] = *byte;
                 self.header_read += 1;
             }
+            if self.header_length == 8 && self.iso_boxes && self.header[..4] == [0, 0, 0, 1] {
+                self.header_length = 16;
+                continue;
+            }
             if !work.try_charge(1) {
                 return Ok(Poll::Yield);
             }
@@ -92,16 +100,24 @@ impl Tx3g {
                 self.header[2],
                 self.header[3],
             ]);
-            match size {
+            let size = match size {
+                0 if self.iso_boxes => bytes.len() - self.at,
+                1 if self.iso_boxes => usize::try_from(u64::from_be_bytes(
+                    self.header[8..16]
+                        .try_into()
+                        .map_err(|_| Error::Truncated)?,
+                ))
+                .map_err(|_| Error::Overflow)?,
                 0 => return Err(Error::Unsupported("tx3g box-to-end size")),
                 1 => return Err(Error::Unsupported("tx3g extended box size")),
-                2..=7 => return Err(Error::Invalid("tx3g modifier box smaller than header")),
-                _ => {}
+                value => usize::try_from(value).map_err(|_| Error::Overflow)?,
+            };
+            let uuid = self.iso_boxes && self.header[4..8] == *b"uuid";
+            let minimum = self.header_length + if uuid { 16 } else { 0 };
+            if size < minimum {
+                return Err(Error::Invalid("tx3g modifier box smaller than header"));
             }
-            let end = self
-                .at
-                .checked_add(usize::try_from(size).map_err(|_| Error::Overflow)?)
-                .ok_or(Error::Overflow)?;
+            let end = self.at.checked_add(size).ok_or(Error::Overflow)?;
             if end > bytes.len() {
                 return Err(Error::Truncated);
             }
@@ -128,6 +144,7 @@ impl Tx3g {
                 .map_err(|failure| failure.error)?;
             self.at = end;
             self.header_read = 0;
+            self.header_length = 8;
             // The complete body is retained by the immutable input owner.
             // Skipping its opaque range is fixed work, not a synthetic byte loop.
         }

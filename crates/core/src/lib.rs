@@ -10,7 +10,10 @@ mod wide;
 mod work;
 
 pub use budget::{Budget, Reservation};
-pub use bytes::{BudgetVec, Bytes, FreezeError, PushError, TransferError};
+pub use bytes::{
+    BudgetVec, BudgetVecIntoIter, Bytes, BytesWriter, FreezeError, OwnedInputBytes, PushError,
+    TransferError,
+};
 pub use error::{Error, Result};
 pub use input::{
     InputCursor, InputRequest, InputToken, InputWindow, SourceCapabilities, SourceFailure,

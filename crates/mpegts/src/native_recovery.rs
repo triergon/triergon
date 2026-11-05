@@ -14,7 +14,9 @@ use triergon_core::{
     Budget, BudgetVec, Bytes, Error, PushError, Result, SourceLocation, WorkBudget,
 };
 
+mod lifecycle;
 mod selected;
+pub use lifecycle::{NativePatRoute, NativePatSelection, NativePmtBinding, NativePmtBindingJob};
 pub use selected::{
     NativeDiagnosticCarrier, NativeDiagnosticHeader, NativeDiagnosticPesPacket, NativeSelectedFault,
 };
@@ -107,12 +109,14 @@ enum RecoveryPending {
 #[derive(Debug)]
 pub struct NativePesRecoveryObserver {
     inner: NativePesObserver,
+    pmt_binding: Option<NativePmtBinding>,
     budget: Budget,
     policy: NativeRejectedPolicy,
     pending: Option<RecoveryPending>,
     selected_faults: bool,
     pending_timeline: Option<(u64, SourceEpochs)>,
     last: Option<(u64, u64)>,
+    entity_first: bool,
     fault: Option<Error>,
 }
 impl NativePesRecoveryObserver {
@@ -134,10 +138,12 @@ impl NativePesRecoveryObserver {
             )?,
             budget,
             policy,
+            pmt_binding: None,
             pending: None,
             selected_faults: false,
             pending_timeline: None,
             last: None,
+            entity_first: false,
             fault: None,
         })
     }
@@ -162,10 +168,12 @@ impl NativePesRecoveryObserver {
             )?,
             budget,
             policy: NativeRejectedPolicy::NoRejectedCarrierV1,
+            pmt_binding: None,
             pending: None,
             selected_faults: false,
             pending_timeline: None,
             last: None,
+            entity_first: false,
             fault: None,
         })
     }
@@ -189,16 +197,69 @@ impl NativePesRecoveryObserver {
             )?,
             budget,
             policy: NativeRejectedPolicy::NoRejectedCarrierV1,
+            pmt_binding: None,
             pending: None,
             selected_faults: false,
             pending_timeline: None,
             last: None,
+            entity_first: false,
             fault: None,
         })
     }
 
+    pub fn bind_native_input_v1(
+        &mut self,
+        context: &crate::native_input::NativeInputContext,
+        input: &triergon_core::InputCursor,
+    ) -> Result<()> {
+        if self.pending.is_some() || self.last.is_some() {
+            return Err(Error::Invalid(
+                "native recovery startup binding after input",
+            ));
+        }
+        self.inner.bind_native_input_v1(context, input)
+    }
+    pub fn validate_native_input_v1(&self, input: &triergon_core::InputCursor) -> Result<()> {
+        self.inner.validate_native_input(Some(input))
+    }
+    /// No active assembly/output/fault: required before dropping an unusable
+    /// carrier in the separate complete-object view. Does not alter continuity.
+    pub fn discard_idle_v1(&self) -> bool {
+        self.pending.is_none()
+            && self.pending_timeline.is_none()
+            && self.fault.is_none()
+            && self.inner.recovery_idle()
+    }
     pub fn scope(&self) -> NativePesScope {
         self.inner.scope()
+    }
+    /// Explicit contiguous media transaction; legacy pushes stay single-entity.
+    pub fn continue_media_entity_v1(
+        &mut self,
+        end: &crate::MediaEntityEndV1,
+        input: &mut triergon_core::InputCursor,
+        work: &mut WorkBudget,
+        cancel: &AtomicBool,
+    ) -> Result<bool> {
+        if cancel.load(Ordering::Relaxed) {
+            return Err(Error::Cancelled);
+        }
+        if work.remaining() == 0 {
+            return Ok(false);
+        }
+        if self.pending.is_some() || self.pending_timeline.is_some() || self.fault.is_some() {
+            return Err(Error::Invalid(
+                "native recovery media entity operation not drained",
+            ));
+        }
+        if !self
+            .inner
+            .continue_media_entity_v1(end, input, work, cancel)?
+        {
+            return Ok(false);
+        }
+        self.entity_first = true;
+        Ok(true)
     }
     pub fn policy(&self) -> NativeRejectedPolicy {
         self.policy
@@ -218,10 +279,42 @@ impl NativePesRecoveryObserver {
         packet: TransportPacket,
         context: NativeSourceContext,
     ) -> std::result::Result<(), PushError<TransportPacket>> {
+        self.push_accepted_bound(packet, context, None)
+    }
+    #[allow(
+        clippy::result_large_err,
+        reason = "recover original charged inline carrier"
+    )]
+    pub fn push_accepted_with_input(
+        &mut self,
+        packet: TransportPacket,
+        context: NativeSourceContext,
+        input: &triergon_core::InputCursor,
+    ) -> std::result::Result<(), PushError<TransportPacket>> {
+        self.push_accepted_bound(packet, context, Some(input))
+    }
+    #[allow(
+        clippy::result_large_err,
+        reason = "recover original charged inline carrier"
+    )]
+    fn push_accepted_bound(
+        &mut self,
+        packet: TransportPacket,
+        context: NativeSourceContext,
+        input: Option<&triergon_core::InputCursor>,
+    ) -> std::result::Result<(), PushError<TransportPacket>> {
+        if let Err(error) = self.inner.validate_native_input(input) {
+            return Err(PushError {
+                error,
+                value: packet,
+            });
+        }
         if self.pending.is_some()
+            || !self.after_pmt_binding_v1(context)
             || self.fault.is_some()
             || self.last.is_some_and(|(event, offset)| {
-                context.source_event_ordinal <= event || packet.source_offset <= offset
+                context.source_event_ordinal <= event
+                    || (!self.entity_first && packet.source_offset <= offset)
             })
         {
             return Err(PushError {
@@ -246,12 +339,23 @@ impl NativePesRecoveryObserver {
                     value: packet,
                 });
             }
-            self.inner.push_clock_boundary_v1(packet, context)?;
+            if let Some(input) = input {
+                self.inner
+                    .push_input_boundary(packet, context, true, input)?;
+            } else {
+                self.inner.push_clock_boundary_v1(packet, context)?;
+            }
             self.pending_timeline = Some((context.source_event_ordinal, context.epochs));
         } else {
-            self.inner.push(packet, context)?;
+            if let Some(input) = input {
+                self.inner
+                    .push_input_boundary(packet, context, false, input)?;
+            } else {
+                self.inner.push(packet, context)?;
+            }
         }
         self.last = Some((context.source_event_ordinal, offset));
+        self.entity_first = false;
         Ok(())
     }
     #[allow(
@@ -263,6 +367,14 @@ impl NativePesRecoveryObserver {
         rejection: RejectedTransport,
         context: NativeSourceContext,
     ) -> std::result::Result<(), PushError<RejectedTransport>> {
+        // This finite-input position view does not admit new rejected-carrier
+        // contexts. Legacy unbound recovery remains exactly the old operation.
+        if let Err(error) = self.inner.validate_native_input(None) {
+            return Err(PushError {
+                error,
+                value: rejection,
+            });
+        }
         let scope = self.scope();
         let f = rejection.envelope();
         let error = if let Some(error) = self.fault {
@@ -284,9 +396,11 @@ impl NativePesRecoveryObserver {
             Some(Error::Unsupported(
                 "native rejected carrier context unobserved",
             ))
-        } else if self.last.is_some_and(|(event, offset)| {
-            context.source_event_ordinal <= event || rejection.source_offset() <= offset
-        }) {
+        } else if !self.after_pmt_binding_v1(context)
+            || self.last.is_some_and(|(event, offset)| {
+                context.source_event_ordinal <= event || rejection.source_offset() <= offset
+            })
+        {
             Some(Error::Invalid("native recovery source event order"))
         } else if rejection.error() != Error::Invalid("OPCR without PCR")
             || rejection.secondary_error().is_some()
@@ -339,10 +453,27 @@ impl NativePesRecoveryObserver {
         work: &mut WorkBudget,
         cancel: &AtomicBool,
     ) -> Result<AssemblyStep<NativePesObservation>> {
+        self.poll_bound(work, cancel, None)
+    }
+    pub fn poll_with_input(
+        &mut self,
+        input: &triergon_core::InputCursor,
+        work: &mut WorkBudget,
+        cancel: &AtomicBool,
+    ) -> Result<AssemblyStep<NativePesObservation>> {
+        self.poll_bound(work, cancel, Some(input))
+    }
+    fn poll_bound(
+        &mut self,
+        work: &mut WorkBudget,
+        cancel: &AtomicBool,
+        input: Option<&triergon_core::InputCursor>,
+    ) -> Result<AssemblyStep<NativePesObservation>> {
+        self.inner.validate_native_input(input)?;
         if let Some(error) = self.fault {
             return Err(error);
         }
-        let result = self.poll_inner(work, cancel);
+        let result = self.poll_inner(work, cancel, input);
         if let Err(error) = &result {
             if !matches!(
                 error,
@@ -357,16 +488,20 @@ impl NativePesRecoveryObserver {
         &mut self,
         work: &mut WorkBudget,
         cancel: &AtomicBool,
+        input: Option<&triergon_core::InputCursor>,
     ) -> Result<AssemblyStep<NativePesObservation>> {
         if self.pending.is_none() {
-            return self.inner.poll(work, cancel).map(|step| match step {
-                AssemblyStep::Output(packet) => {
-                    AssemblyStep::Output(NativePesObservation::Accepted(packet))
-                }
-                AssemblyStep::Yield => AssemblyStep::Yield,
-                AssemblyStep::NeedPayload => AssemblyStep::NeedPayload,
-                AssemblyStep::Finished => AssemblyStep::Finished,
-            });
+            return self
+                .inner
+                .poll_bound(work, cancel, input)
+                .map(|step| match step {
+                    AssemblyStep::Output(packet) => {
+                        AssemblyStep::Output(NativePesObservation::Accepted(packet))
+                    }
+                    AssemblyStep::Yield => AssemblyStep::Yield,
+                    AssemblyStep::NeedPayload => AssemblyStep::NeedPayload,
+                    AssemblyStep::Finished => AssemblyStep::Finished,
+                });
         }
         if matches!(self.pending, Some(RecoveryPending::Selected(_))) {
             return self.poll_selected(work, cancel);
@@ -461,7 +596,7 @@ impl NativePesRecoveryObserver {
                         bytes: p.rejection.bytes().slice(start..start + 14)?,
                         pts: p.pts.ok_or(Error::Invalid("native encoded PTS missing"))?,
                     };
-                    let position = i64::try_from(offset).map_err(|_| Error::Overflow)?;
+                    let position = self.inner.media_native_position_v1(offset)?;
                     let Some(RecoveryPending::Opcr(p)) = self.pending.take() else {
                         return Err(Error::Invalid("native rejected input missing"));
                     };

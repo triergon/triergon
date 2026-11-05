@@ -11,13 +11,18 @@ use super::{
 use crate::{
     Error, Limits, Result, ebml,
     incremental::{
-        ClusterCheckpoint, ElementEvent, ElementHeader, ElementReader, ParseStep,
+        ClusterCheckpoint, ElementEvent, ElementHeader, ElementReader, EpochAdmission, ParseStep,
         typed_bridge::{EnvelopeProgress, ReplayLocation},
     },
     storage::SharedBytes,
 };
 use std::sync::atomic::AtomicBool;
 use triergon_core::{Budget, WorkBudget};
+
+/// How often the owned-prefix shortcut replaced the ordinary scan (tests only).
+#[cfg(test)]
+pub(crate) static OWNED_PREFIX_HITS: std::sync::atomic::AtomicUsize =
+    std::sync::atomic::AtomicUsize::new(0);
 
 #[derive(Clone, Copy, Debug)]
 pub(crate) struct EpochReference {
@@ -125,6 +130,15 @@ impl EpochRestoreJob {
             failed: false,
         })
     }
+    // Never prefetch over the next boundary whose identity decides whether
+    // state reconstruction may finish. The exact boundary header stays exact.
+    pub(crate) fn read_ahead_stop(&self) -> u64 {
+        self.target
+            .reference
+            .map_or(self.boundary_offset(), |reference| {
+                self.boundary_offset().min(reference.block)
+            })
+    }
     fn boundary_offset(&self) -> u64 {
         if self.target.whole_cluster {
             self.target.replay.cluster_offset()
@@ -192,6 +206,75 @@ impl EpochRestoreJob {
         }
         Ok(())
     }
+    /// An immutable in-memory source already holds the whole prefix. When it
+    /// is a plain Cluster/SimpleBlock prefix ending at the validated boundary
+    /// Cluster, the result of the ordinary scan follows directly from those
+    /// bytes: no CodecState exists in it, the boundary snapshot is the initial
+    /// configuration and the reference check runs on it. Every other prefix,
+    /// and every error, stays with the ordinary scan below.
+    pub(crate) fn try_owned_prefix(
+        &mut self,
+        reader: &mut ElementReader,
+        root: &[u8],
+        cancel: &AtomicBool,
+    ) -> Result<bool> {
+        // The ordinary step's own entry checks come first; any failure is left
+        // for that step to report.
+        if !matches!(self.phase, Phase::Begin)
+            || self.failed
+            || !self.target.whole_cluster
+            || cancel.load(std::sync::atomic::Ordering::Relaxed)
+            || !self.pool.same_pool(reader.budget())
+            || self.configuration.generation() != reader.generation()
+            || reader
+                .healthy_for_job(&mut WorkBudget::new(0), cancel)
+                .is_err()
+        {
+            return Ok(false);
+        }
+        let boundary = self.boundary_offset();
+        let reference = self.target.reference;
+        if reference.is_some_and(|reference| reference.unchanged_cluster_prefix != Some(boundary)) {
+            return Ok(false);
+        }
+        let Some(found) = reader.owned_plain_prefix(
+            root,
+            self.target.anchor.offset(),
+            boundary,
+            self.target.anchor.segment_end(),
+            self.remaining,
+            cancel,
+        ) else {
+            return Ok(false);
+        };
+        if let Some(reference) = reference {
+            let actual = self
+                .configuration
+                .codec_state(reference.track)
+                .and_then(|state| state.position())
+                .map_or(0, |position| position.segment_position);
+            if reference.block < found.data
+                || reference.block >= found.end
+                || actual != reference.state
+                || self.configuration.codec_state(reference.track).is_some()
+            {
+                return Ok(false);
+            }
+        }
+        if reader
+            .begin_internal_cluster_range(&self.target.anchor, self.target.anchor.offset())
+            .is_err()
+        {
+            return Ok(false);
+        }
+        #[cfg(test)]
+        OWNED_PREFIX_HITS.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+        self.remaining -= found.consumed;
+        self.boundary = Some(self.configuration.clone());
+        self.reference_checked = reference.is_some();
+        self.phase = Phase::Replay;
+        Ok(true)
+    }
     pub(crate) fn step(
         &mut self,
         reader: &mut ElementReader,
@@ -252,8 +335,15 @@ impl EpochRestoreJob {
                     self.phase = Phase::Envelope;
                 }
                 Phase::Envelope => {
+                    let admission = EpochAdmission {
+                        keep: [
+                            (!self.target.whole_cluster).then(|| self.boundary_offset()),
+                            self.target.reference.map(|reference| reference.block),
+                        ],
+                    };
                     let step = match reader.step_typed_seek_operation(
                         &mut self.remaining,
+                        Some(admission),
                         work,
                         cancel,
                     )? {
@@ -429,15 +519,11 @@ impl EpochRestoreJob {
                     .step(work, cancel)?
                 {
                     ParseStep::Event(mapping) => {
-                        if self
-                            .group
-                            .as_ref()
-                            .required("missing state source group")?
-                            .max_addition_id()
-                            > mapping.max_block_addition_id()
-                        {
-                            return Err(Error::Invalid("BlockAddID exceeds track maximum"));
-                        }
+                        self.configuration.validate_additions(
+                            self.track,
+                            self.group.as_ref().required("missing state source group")?,
+                            &mapping,
+                        )?;
                         self.mapping = None;
                         self.start_copy()?;
                     }

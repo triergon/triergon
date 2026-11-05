@@ -9,6 +9,10 @@ pub mod carrier;
 pub mod clock;
 mod continuity;
 mod framer;
+mod media_entity;
+pub mod native_catalogue;
+pub mod native_input;
+pub mod native_packet_completion;
 pub mod native_pes;
 pub mod native_recovery;
 pub mod pes;
@@ -18,10 +22,11 @@ mod transport;
 
 pub use carrier::{RejectedTransport, TransportInspection, TransportInspector};
 pub use continuity::{Continuity, ContinuityOutcome};
-pub use framer::{FrameState, FrameStep, TransportFramer};
+pub use framer::{FrameState, FrameStep, NullCarrierRun, TransportFramer};
+pub use media_entity::MediaEntityEndV1;
 pub use pes::{Pes, PesAssembler, PesHeader, PesSpan};
 pub use psi::SectionAssembler;
-pub use stream::{FaultKind, TraceEvent, TraceFault, TransportStream};
+pub use stream::{CompactTraceEvent, FaultKind, TraceEvent, TraceFault, TransportStream};
 pub use transport::{Adaptation, PacketFormat, Pcr, TransportPacket, parse_transport};
 
 use triergon_core::{BudgetVec, Error, Result, SourceId};

@@ -1,6 +1,7 @@
 //! Bounded EBML document and SeekHead syntax. No blocking parser calls.
 use super::{
     copy_vec::CopyVec,
+    native_additions::BlockAdditionContainer,
     syntax::{ChildCursor, check},
 };
 use crate::matroska::typed::syntax::Required;
@@ -11,7 +12,7 @@ use triergon_core::{Budget, BudgetVec, WorkBudget};
 pub(crate) struct EbmlJob {
     source: SharedBytes,
     cursor: ChildCursor,
-    doctype: bool,
+    doctype: Option<BlockAdditionContainer>,
     done: bool,
 }
 impl EbmlJob {
@@ -20,20 +21,26 @@ impl EbmlJob {
         Self {
             source,
             cursor: ChildCursor::new(0..end),
-            doctype: false,
+            doctype: None,
             done: false,
         }
     }
-    pub fn step(&mut self, work: &mut WorkBudget, cancel: &AtomicBool) -> Result<ParseStep<()>> {
+    pub fn step(
+        &mut self,
+        work: &mut WorkBudget,
+        cancel: &AtomicBool,
+    ) -> Result<ParseStep<BlockAdditionContainer>> {
         loop {
             check(cancel)?;
             if self.done {
-                return Ok(ParseStep::Event(()));
+                return Ok(ParseStep::Event(
+                    self.doctype.ok_or(Error::Unsupported("document type"))?,
+                ));
             }
             match self.cursor.step(&self.source, work, cancel)? {
                 ParseStep::Yield => return Ok(ParseStep::Yield),
                 ParseStep::Event(None) => {
-                    if !self.doctype {
+                    if self.doctype.is_none() {
                         return Err(Error::Unsupported("document type"));
                     }
                     self.done = true;
@@ -41,7 +48,13 @@ impl EbmlJob {
                 ParseStep::Event(Some(child)) => {
                     let bytes = &self.source[child.payload];
                     match child.id {
-                        0x4282 => self.doctype = bytes == b"matroska" || bytes == b"webm",
+                        0x4282 => {
+                            self.doctype = match bytes {
+                                b"matroska" => Some(BlockAdditionContainer::Matroska),
+                                b"webm" => Some(BlockAdditionContainer::WebM),
+                                _ => None,
+                            };
+                        }
                         0x4285 if ebml::uint(bytes)? > 4 => {
                             return Err(Error::Unsupported("DocTypeReadVersion"));
                         }
