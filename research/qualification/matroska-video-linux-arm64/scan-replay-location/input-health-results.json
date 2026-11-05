@@ -1,0 +1,950 @@
+{
+  "source_commit": "f3b95b50a6f8e234758cc51e49b980457967fbcd",
+  "operation": "MatroskaNativeVideoSessionV1",
+  "platform": "native Linux ARM64, Neoverse V2",
+  "manifest_sha256": "a1337803d40d2a1ca71874dc0fe021b9a498c851d957ea757718c14505bff55f",
+  "source_manifest_sha256": "0d1b6e24ea7047be39135d0301b1d424fc9ca2519f8e0dd95a44279215aa923b",
+  "input_manifest_sha256": "82b6d274a0ceecaf7d39491e363e2754c54db32fd09362c7e6aa74582ffce860",
+  "controller_archive_sha256": "88760488e6c30a15bc62565e031c98d764dde4aa8ee902b5ba8098b2b0ae0c9e",
+  "source_archive_sha256": "9cc6345f0ffa51bd685794aebc8c18b829a1cc27057167262fb80a4ced4cfe5e",
+  "native_archive_sha256": "395234a080b0905e4dc3fca27e959304eae18bb5f1b0fe476e4b16e3b3fb3321",
+  "candidate_sha256": "f3df16f7c6bfc7fc050e591b684997f6c33c5285e46e6bb17748728b84d3786c",
+  "reference_sha256": "48a4dafe3d18d5ccc81aa20516fd560d10c849f1a48a9a62b5ea489caf8d253c",
+  "rustc_identity_sha256": "5bcb90aa6b735501af2f51f578888c5c41404b2c6d3c3d3828772236bf53e2b8",
+  "reference_sdk_receipt_sha256": "95769531431da6b1bccf3799f5b84ce2151c6ce14152f171a8f01a22a05d0539",
+  "memory_observer_identity_sha256": "46b88ec60c3126be4fd34a85805666eed37889cf3278f89bb589e78ed82f8669",
+  "cases": 44,
+  "packets": 1344,
+  "selected_parity_passes": 44,
+  "runtime_delivery_passes": 44,
+  "heap_delivery_passes": 44,
+  "rss_delivery_passes": 44,
+  "all_delivery_passes": 44,
+  "optimization_passes": 27,
+  "rows": [
+    {
+      "id": "startup-avc-eight-pictures",
+      "packets": 8,
+      "runtime_upper95": 0.09454133644363777,
+      "heap_upper95": 0.023458904109589042,
+      "total_resident_rss_upper95": 0.5561958901973546,
+      "delivery": true,
+      "optimization": true,
+      "per_iteration_ns": {
+        "candidate": {
+          "p50": 20849.53,
+          "p95": 21264.97
+        },
+        "reference": {
+          "p50": 222214.55,
+          "p95": 225314.855
+        }
+      },
+      "time_raw_sha256": "aa4fa1b5a834b597f5b6de86020f384a04411f8677f256aebf02e9567d1b6e04",
+      "memory_raw_sha256": "b6af8c6d27fee8aad5c12c9f1ea367484ba5a33d52817e22b181b87261c25fea"
+    },
+    {
+      "id": "startup-avc-high-b",
+      "packets": 12,
+      "runtime_upper95": 0.0819188724627152,
+      "heap_upper95": 0.012250868531724263,
+      "total_resident_rss_upper95": 0.5349761526232114,
+      "delivery": true,
+      "optimization": true,
+      "per_iteration_ns": {
+        "candidate": {
+          "p50": 20528.129999999997,
+          "p95": 20815.657
+        },
+        "reference": {
+          "p50": 252110.96000000002,
+          "p95": 253757.32200000001
+        }
+      },
+      "time_raw_sha256": "9df9ea902af76773cff7a3566f5a8e522bc4e8d91c4bb1d631a14464657d463a",
+      "memory_raw_sha256": "a4c6657ad8f8585b73eaaacbfa567cd27ab7d5c15de218809c5b91acd90aa1ea"
+    },
+    {
+      "id": "startup-avc-high-b0",
+      "packets": 12,
+      "runtime_upper95": 0.11253755201245028,
+      "heap_upper95": 0.020900022168033695,
+      "total_resident_rss_upper95": 0.533175355450237,
+      "delivery": true,
+      "optimization": true,
+      "per_iteration_ns": {
+        "candidate": {
+          "p50": 21113.93,
+          "p95": 21462.164999999997
+        },
+        "reference": {
+          "p50": 188011.19,
+          "p95": 189347.842
+        }
+      },
+      "time_raw_sha256": "3f273006683b04d9577527177855b35f30a3b62803e334bb5e3f2b48482834f5",
+      "memory_raw_sha256": "b61664271ca77d83d95be3519b38917dd0bc980db7e367e7ab913ea35afcba7f"
+    },
+    {
+      "id": "startup-avc-high-b1",
+      "packets": 12,
+      "runtime_upper95": 0.1355318700328582,
+      "heap_upper95": 0.012255798639057585,
+      "total_resident_rss_upper95": 0.5347636918795167,
+      "delivery": true,
+      "optimization": true,
+      "per_iteration_ns": {
+        "candidate": {
+          "p50": 20498.120000000003,
+          "p95": 20876.493
+        },
+        "reference": {
+          "p50": 152005.90999999997,
+          "p95": 153235.328
+        }
+      },
+      "time_raw_sha256": "30c760d6d2b7996f2b9598cb9a04609ba9a7f13bceb7b1b7f68297e560ceaacf",
+      "memory_raw_sha256": "82c218bf0f255bf45f6ec6e422bba229aa3024415e62b5c3fa770cd1dd483648"
+    },
+    {
+      "id": "startup-avc-mixed",
+      "packets": 8,
+      "runtime_upper95": 0.11549451588354476,
+      "heap_upper95": 0.03011302326868273,
+      "total_resident_rss_upper95": 0.3987341772151899,
+      "delivery": true,
+      "optimization": true,
+      "per_iteration_ns": {
+        "candidate": {
+          "p50": 64636.34,
+          "p95": 66218.06599999999
+        },
+        "reference": {
+          "p50": 562385.79,
+          "p95": 566175.0989999999
+        }
+      },
+      "time_raw_sha256": "34d504c6fd5f32e18fd73368a0423d8d305723cef5a3adde662a5ab4ab054b4f",
+      "memory_raw_sha256": "61ddd316fb3a4930cf2fdfbd28061c6a4b932a284528034083992601bbb2fa61"
+    },
+    {
+      "id": "startup-avc-six-pictures",
+      "packets": 6,
+      "runtime_upper95": 0.1355896555783502,
+      "heap_upper95": 0.025433404008327498,
+      "total_resident_rss_upper95": 0.5691399662731872,
+      "delivery": true,
+      "optimization": true,
+      "per_iteration_ns": {
+        "candidate": {
+          "p50": 20140.67,
+          "p95": 20480.956
+        },
+        "reference": {
+          "p50": 149517.82,
+          "p95": 151306.74300000002
+        }
+      },
+      "time_raw_sha256": "2174e802c32d5ca5bab29211e56d847fcebfdfac08294c6d2f7715bfe6161447",
+      "memory_raw_sha256": "c6d3a85ba5a1f9fb0f2d26e172546364aedb3815052226a1c16a1496952768a3"
+    },
+    {
+      "id": "startup-hevc-b0",
+      "packets": 12,
+      "runtime_upper95": 0.5303957656032503,
+      "heap_upper95": 0.08403361344537816,
+      "total_resident_rss_upper95": 0.6870540265035678,
+      "delivery": true,
+      "optimization": true,
+      "per_iteration_ns": {
+        "candidate": {
+          "p50": 21220.92,
+          "p95": 21608.288999999997
+        },
+        "reference": {
+          "p50": 40127.03,
+          "p95": 41397.518000000004
+        }
+      },
+      "time_raw_sha256": "e52d55d6185edc71a282ac762132737f2c2bf6523e7cd30600f34b0801411025",
+      "memory_raw_sha256": "f3ee628504136afa0d275ac078ee39b1ba2c06d43f8db673dc5138d37255884d"
+    },
+    {
+      "id": "startup-hevc-b1",
+      "packets": 12,
+      "runtime_upper95": 0.5263343890449346,
+      "heap_upper95": 0.08381030253475061,
+      "total_resident_rss_upper95": 0.686734693877551,
+      "delivery": true,
+      "optimization": true,
+      "per_iteration_ns": {
+        "candidate": {
+          "p50": 21402.78,
+          "p95": 21821.402
+        },
+        "reference": {
+          "p50": 40817.15,
+          "p95": 41629.273
+        }
+      },
+      "time_raw_sha256": "89251d8c7a9205722f773a8fd153466631172d46b03ecfcd12b187442a4db289",
+      "memory_raw_sha256": "75c4ae447f9f6cb280e57ee88829a5433d6dfa2f2da61137c90c29a4cb80d115"
+    },
+    {
+      "id": "startup-hevc-b3",
+      "packets": 12,
+      "runtime_upper95": 0.5357215765718057,
+      "heap_upper95": 0.08361374528398083,
+      "total_resident_rss_upper95": 0.6868943601905595,
+      "delivery": true,
+      "optimization": true,
+      "per_iteration_ns": {
+        "candidate": {
+          "p50": 21589.0,
+          "p95": 22134.703999999998
+        },
+        "reference": {
+          "p50": 40812.630000000005,
+          "p95": 41530.943
+        }
+      },
+      "time_raw_sha256": "0f73b533064af6b9cf2456bba097c3487b1d89505ad18011dc6c96876214a17f",
+      "memory_raw_sha256": "9f54708b4d6bc32a24ff90bc4ea0296ac7a910ec686129a70d401984bc07ee3f"
+    },
+    {
+      "id": "startup-hevc-mixed",
+      "packets": 10,
+      "runtime_upper95": 0.17190959324913624,
+      "heap_upper95": 0.019265816193699558,
+      "total_resident_rss_upper95": 0.5402658326817826,
+      "delivery": true,
+      "optimization": true,
+      "per_iteration_ns": {
+        "candidate": {
+          "p50": 43128.67999999999,
+          "p95": 43681.206
+        },
+        "reference": {
+          "p50": 252038.84,
+          "p95": 255308.988
+        }
+      },
+      "time_raw_sha256": "307d43bb46a54979453480f5c626ba3522d8707ed2e6d2fbf1978e2ccf51d871",
+      "memory_raw_sha256": "1feeb419e3ffc7fd6efa6dbadd814d9ae02548e756f1fd93f75df4e77610489e"
+    },
+    {
+      "id": "startup-hevc-no-default-duration",
+      "packets": 12,
+      "runtime_upper95": 0.3241347192457834,
+      "heap_upper95": 0.13327648475120385,
+      "total_resident_rss_upper95": 0.6903063206021663,
+      "delivery": true,
+      "optimization": true,
+      "per_iteration_ns": {
+        "candidate": {
+          "p50": 21624.29,
+          "p95": 22442.731
+        },
+        "reference": {
+          "p50": 67213.29000000001,
+          "p95": 67848.355
+        }
+      },
+      "time_raw_sha256": "b9800484981a2d292eb0ed46a6f21ab436c2c1e459dd1fca2987c84b7d7e6c65",
+      "memory_raw_sha256": "33c8df92c2f82ac7b31ccdd2305a794eed5f678ac9e24b377a2adf91e3d7b937"
+    },
+    {
+      "id": "startup-hevc-vps-timed-no-default",
+      "packets": 12,
+      "runtime_upper95": 0.32051968391174057,
+      "heap_upper95": 0.13336342662252984,
+      "total_resident_rss_upper95": 0.6901840490797546,
+      "delivery": true,
+      "optimization": true,
+      "per_iteration_ns": {
+        "candidate": {
+          "p50": 21474.550000000003,
+          "p95": 22000.728
+        },
+        "reference": {
+          "p50": 67370.1,
+          "p95": 68347.81300000001
+        }
+      },
+      "time_raw_sha256": "afecdde9ef70e96cc70bc8ef27fcf5e4546147a7676335798dd10c7bf4003239",
+      "memory_raw_sha256": "7a248e9c9db27f7afea49ff9f92a1d17c3719b10244c1acaf4acd4584b05b6d5"
+    },
+    {
+      "id": "seek-avc-seek-0-fresh",
+      "packets": 64,
+      "runtime_upper95": 0.18247299986513382,
+      "heap_upper95": 0.012963879267689262,
+      "total_resident_rss_upper95": 0.540252590189424,
+      "delivery": true,
+      "optimization": true,
+      "per_iteration_ns": {
+        "candidate": {
+          "p50": 62763.29,
+          "p95": 64222.808
+        },
+        "reference": {
+          "p50": 346173.30000000005,
+          "p95": 349840.888
+        }
+      },
+      "time_raw_sha256": "a19f72f3d1ab1f1c6ab04dae3e9a3347375d7ba6f4e86e0cb55caddf00d24774",
+      "memory_raw_sha256": "6d9d8a07404af2409052dfe64d8c4b71c95da4fde61c5c4b55d981a08417a6a4"
+    },
+    {
+      "id": "seek-avc-seek-0-eof",
+      "packets": 64,
+      "runtime_upper95": 0.2415852526250177,
+      "heap_upper95": 0.012963879267689262,
+      "total_resident_rss_upper95": 0.5402843601895735,
+      "delivery": true,
+      "optimization": true,
+      "per_iteration_ns": {
+        "candidate": {
+          "p50": 91271.65,
+          "p95": 92204.059
+        },
+        "reference": {
+          "p50": 379679.87,
+          "p95": 385191.861
+        }
+      },
+      "time_raw_sha256": "92703b7a67bc5cfc8bdf0e9a60d44036bc0f860fa0efbce6d01902463076dfc7",
+      "memory_raw_sha256": "fc508eb565af6cae0c55eb934ca2fe51f4bb8a38dfa504035f800c973a2d2fe9"
+    },
+    {
+      "id": "seek-avc-seek-700-fresh",
+      "packets": 48,
+      "runtime_upper95": 0.20215044321986747,
+      "heap_upper95": 0.012963879267689262,
+      "total_resident_rss_upper95": 0.5398265231931625,
+      "delivery": true,
+      "optimization": true,
+      "per_iteration_ns": {
+        "candidate": {
+          "p50": 62750.88,
+          "p95": 64570.437
+        },
+        "reference": {
+          "p50": 312003.98,
+          "p95": 314907.676
+        }
+      },
+      "time_raw_sha256": "5cf71585a14f94f88fcf77f7f45ae6c4e522f8fffe91f775a5f64277cfff417a",
+      "memory_raw_sha256": "4469f6623fd05da951bcd0750c353b884b3530a9cc3f2a029f310198622eb377"
+    },
+    {
+      "id": "seek-avc-seek-700-eof",
+      "packets": 48,
+      "runtime_upper95": 0.2376985143213563,
+      "heap_upper95": 0.012963879267689262,
+      "total_resident_rss_upper95": 0.5398579321231255,
+      "delivery": true,
+      "optimization": true,
+      "per_iteration_ns": {
+        "candidate": {
+          "p50": 87949.17,
+          "p95": 88764.461
+        },
+        "reference": {
+          "p50": 370757.18,
+          "p95": 374794.708
+        }
+      },
+      "time_raw_sha256": "37fae11cf518ca3305254e4fef6384b057c06bbf908545959e0563bebb4d184f",
+      "memory_raw_sha256": "12e1a18c9c8d4cd8ee0af84fd73ee136f4fa207f7f00a44a69ae0b0f011dc1e4"
+    },
+    {
+      "id": "seek-avc-seek-1420-fresh",
+      "packets": 32,
+      "runtime_upper95": 0.1677516730382832,
+      "heap_upper95": 0.012963879267689262,
+      "total_resident_rss_upper95": 0.5404657791476676,
+      "delivery": true,
+      "optimization": true,
+      "per_iteration_ns": {
+        "candidate": {
+          "p50": 54380.04,
+          "p95": 55134.144
+        },
+        "reference": {
+          "p50": 325658.24,
+          "p95": 328141.34500000003
+        }
+      },
+      "time_raw_sha256": "78dbc752471b8153d8c6155183b7f043dfc554d6451473b76b0d3b99a313c2fe",
+      "memory_raw_sha256": "4f9ba7542a74099456d636dfd0a942a4709864d27212993a3b0ade2a3f5c9ae4"
+    },
+    {
+      "id": "seek-avc-seek-1420-eof",
+      "packets": 32,
+      "runtime_upper95": 0.21608399515052445,
+      "heap_upper95": 0.012963879267689262,
+      "total_resident_rss_upper95": 0.5400711461563494,
+      "delivery": true,
+      "optimization": true,
+      "per_iteration_ns": {
+        "candidate": {
+          "p50": 77920.67,
+          "p95": 79042.176
+        },
+        "reference": {
+          "p50": 361104.92000000004,
+          "p95": 364450.71900000004
+        }
+      },
+      "time_raw_sha256": "5e08339c9fd92aec0dcceb5e2e51c74ad3119e06e5e0949c301204885dd57f9d",
+      "memory_raw_sha256": "5b3ac5483876250958ff2859bb3ec032b8761df82e73570718202753bf17fbe9"
+    },
+    {
+      "id": "seek-avc-seek-2700-fresh",
+      "packets": 8,
+      "runtime_upper95": 0.15748224421777712,
+      "heap_upper95": 0.012963879267689262,
+      "total_resident_rss_upper95": 0.5398579321231255,
+      "delivery": true,
+      "optimization": true,
+      "per_iteration_ns": {
+        "candidate": {
+          "p50": 46912.490000000005,
+          "p95": 47324.875
+        },
+        "reference": {
+          "p50": 299503.42000000004,
+          "p95": 301687.121
+        }
+      },
+      "time_raw_sha256": "32dd49ef3cb2e6a2997fd0c6c17e2ce71e9b38f3ad328f2574b8e8f1232f6ba7",
+      "memory_raw_sha256": "b5d599f08718cb55e99aa76de6dbc8ac8711313b23f11da58d731dc44bed9863"
+    },
+    {
+      "id": "seek-avc-seek-2700-eof",
+      "packets": 8,
+      "runtime_upper95": 0.19226296465059947,
+      "heap_upper95": 0.012963879267689262,
+      "total_resident_rss_upper95": 0.5398579321231255,
+      "delivery": true,
+      "optimization": true,
+      "per_iteration_ns": {
+        "candidate": {
+          "p50": 66885.92000000001,
+          "p95": 68127.05
+        },
+        "reference": {
+          "p50": 349549.1,
+          "p95": 352770.619
+        }
+      },
+      "time_raw_sha256": "d34b542f5be98a76fd98c9f3f309372504c505f3edacccca255d0eb301e67e56",
+      "memory_raw_sha256": "cbc42bd68717feb9733e8547c70796233dff78597d5f932de0bda5fb22a73360"
+    },
+    {
+      "id": "seek-hevc-seek-0-fresh",
+      "packets": 64,
+      "runtime_upper95": 0.9838727440531374,
+      "heap_upper95": 0.08760995224930887,
+      "total_resident_rss_upper95": 0.6913705583756345,
+      "delivery": true,
+      "optimization": false,
+      "per_iteration_ns": {
+        "candidate": {
+          "p50": 61490.93,
+          "p95": 62424.845
+        },
+        "reference": {
+          "p50": 62988.81,
+          "p95": 63772.633
+        }
+      },
+      "time_raw_sha256": "35ef1b8fdc954c92541102d6b06213ba61489cc4a109ead5bf3e1cf5c784002b",
+      "memory_raw_sha256": "d80cbdfdfd00b5ebeee3fd303fed5464062007a983a8a6f5ea5169a8f1478e95"
+    },
+    {
+      "id": "seek-hevc-seek-0-eof",
+      "packets": 64,
+      "runtime_upper95": 1.1224835350821574,
+      "heap_upper95": 0.08760995224930887,
+      "total_resident_rss_upper95": 0.690982776089159,
+      "delivery": true,
+      "optimization": false,
+      "per_iteration_ns": {
+        "candidate": {
+          "p50": 89092.44,
+          "p95": 89805.319
+        },
+        "reference": {
+          "p50": 79546.95,
+          "p95": 80108.02
+        }
+      },
+      "time_raw_sha256": "a9caf307ac0210a7bb95fbe73fe0179bd727401de351a2eb2de680f3f1989259",
+      "memory_raw_sha256": "c0477762109797c4bb6ef8e4f1acde531c486b55ebdf4225ba1c142547a36bd1"
+    },
+    {
+      "id": "seek-hevc-seek-700-fresh",
+      "packets": 48,
+      "runtime_upper95": 1.0682912557898825,
+      "heap_upper95": 0.08760995224930887,
+      "total_resident_rss_upper95": 0.6911766672323968,
+      "delivery": true,
+      "optimization": false,
+      "per_iteration_ns": {
+        "candidate": {
+          "p50": 61880.03,
+          "p95": 62960.950000000004
+        },
+        "reference": {
+          "p50": 58482.91,
+          "p95": 59315.174
+        }
+      },
+      "time_raw_sha256": "7f8c1453dfbc2fdbc70895350ff5b92c763d411d7fcad22db0675aafa1cffca1",
+      "memory_raw_sha256": "0805482dfb997e0b8a388fb7c9cbd16c7d217327d557365c195e39f0b564a42e"
+    },
+    {
+      "id": "seek-hevc-seek-700-eof",
+      "packets": 48,
+      "runtime_upper95": 1.1465986306116316,
+      "heap_upper95": 0.08760995224930887,
+      "total_resident_rss_upper95": 0.691683569979716,
+      "delivery": true,
+      "optimization": false,
+      "per_iteration_ns": {
+        "candidate": {
+          "p50": 85860.89,
+          "p95": 87787.81999999999
+        },
+        "reference": {
+          "p50": 74945.72,
+          "p95": 75537.084
+        }
+      },
+      "time_raw_sha256": "3c82b3f2f41836478a3bb038b4111a71cf8f262b70557e56f38878f530aade63",
+      "memory_raw_sha256": "651b28125843a740389d2e14401d7ea9a6a8acb87e72b5a8130321d97d6b0a7b"
+    },
+    {
+      "id": "seek-hevc-seek-1420-fresh",
+      "packets": 32,
+      "runtime_upper95": 1.0161961015724073,
+      "heap_upper95": 0.08760995224930887,
+      "total_resident_rss_upper95": 0.6915270641776753,
+      "delivery": true,
+      "optimization": false,
+      "per_iteration_ns": {
+        "candidate": {
+          "p50": 53532.66,
+          "p95": 54220.811
+        },
+        "reference": {
+          "p50": 53007.369999999995,
+          "p95": 53825.318
+        }
+      },
+      "time_raw_sha256": "59d0439eb50318b8421c73041ea1edde3b95b9857b506e0e850781ffd2184def",
+      "memory_raw_sha256": "2cf1156e138c5d48b900e3ef46d47d45a699e098cd1ace22bde5df791bd4ffa4"
+    },
+    {
+      "id": "seek-hevc-seek-1420-eof",
+      "packets": 32,
+      "runtime_upper95": 1.0904069771125724,
+      "heap_upper95": 0.08760995224930887,
+      "total_resident_rss_upper95": 0.6915270641776753,
+      "delivery": true,
+      "optimization": false,
+      "per_iteration_ns": {
+        "candidate": {
+          "p50": 75849.65,
+          "p95": 77003.416
+        },
+        "reference": {
+          "p50": 69975.7,
+          "p95": 70825.288
+        }
+      },
+      "time_raw_sha256": "dec20585ce211d68225220306d6cc91384e069b017f4b05f545223d1d205e5a1",
+      "memory_raw_sha256": "f3d27b5dec70f9f1bcdad6d57c84d3825c1dd98a3e557baa05c65e983fda6942"
+    },
+    {
+      "id": "seek-hevc-seek-2700-fresh",
+      "packets": 8,
+      "runtime_upper95": 0.9512965185329194,
+      "heap_upper95": 0.08760995224930887,
+      "total_resident_rss_upper95": 0.691683569979716,
+      "delivery": true,
+      "optimization": false,
+      "per_iteration_ns": {
+        "candidate": {
+          "p50": 46160.47,
+          "p95": 46823.14
+        },
+        "reference": {
+          "p50": 48823.69,
+          "p95": 49796.957
+        }
+      },
+      "time_raw_sha256": "c6d465817b3c6a95330ab688ab7c593201c5f1eef23ce6874e0d166e91af15d8",
+      "memory_raw_sha256": "d94ede10cd04cfd6449ec9433eaa3460e90d446a5e1bb3c4da941a906e28220a"
+    },
+    {
+      "id": "seek-hevc-seek-2700-eof",
+      "packets": 8,
+      "runtime_upper95": 1.0203146637418812,
+      "heap_upper95": 0.08760995224930887,
+      "total_resident_rss_upper95": 0.6906693711967545,
+      "delivery": true,
+      "optimization": false,
+      "per_iteration_ns": {
+        "candidate": {
+          "p50": 65834.25,
+          "p95": 66560.875
+        },
+        "reference": {
+          "p50": 64599.149999999994,
+          "p95": 65733.61
+        }
+      },
+      "time_raw_sha256": "af34dfda9330f3e39d8f94948770644cc2544f14b341eed36dce11f20e0cbe6c",
+      "memory_raw_sha256": "73ae0ec6a52f730640f302ff3b0bae039303e48ded42c4fb2f0fcf349d0824ce"
+    },
+    {
+      "id": "seek-hevc-seek-no-default-0-fresh",
+      "packets": 64,
+      "runtime_upper95": 0.8023239626441148,
+      "heap_upper95": 0.40371702118442143,
+      "total_resident_rss_upper95": 0.7010567939358203,
+      "delivery": true,
+      "optimization": false,
+      "per_iteration_ns": {
+        "candidate": {
+          "p50": 95572.65,
+          "p95": 96394.796
+        },
+        "reference": {
+          "p50": 119276.82,
+          "p95": 120172.692
+        }
+      },
+      "time_raw_sha256": "e85e169178ac3b2374d2e2d55a14dc70b7dc77f2c620d282e560c6789bceb512",
+      "memory_raw_sha256": "67032d75e8d580f00bf43b6caaf7a05edc318f728205557996f40089d9138c2d"
+    },
+    {
+      "id": "seek-hevc-seek-no-default-0-eof",
+      "packets": 64,
+      "runtime_upper95": 0.759253055025052,
+      "heap_upper95": 0.40371702118442143,
+      "total_resident_rss_upper95": 0.700502512562814,
+      "delivery": true,
+      "optimization": true,
+      "per_iteration_ns": {
+        "candidate": {
+          "p50": 95038.93,
+          "p95": 96597.511
+        },
+        "reference": {
+          "p50": 125646.20999999999,
+          "p95": 126121.37700000001
+        }
+      },
+      "time_raw_sha256": "8ad2b76fd9759aea920a26c4f98225d50442a414484fe7f3e95672fefcdd923c",
+      "memory_raw_sha256": "889b94811137984b9056e1b3b6af1d9d93460d2132e0c144aab2ee61766d2934"
+    },
+    {
+      "id": "seek-hevc-seek-no-default-700-fresh",
+      "packets": 48,
+      "runtime_upper95": 0.8076175878928753,
+      "heap_upper95": 0.40371702118442143,
+      "total_resident_rss_upper95": 0.7014100733432855,
+      "delivery": true,
+      "optimization": false,
+      "per_iteration_ns": {
+        "candidate": {
+          "p50": 92214.97,
+          "p95": 93218.412
+        },
+        "reference": {
+          "p50": 114707.48000000001,
+          "p95": 115501.961
+        }
+      },
+      "time_raw_sha256": "b2a9de78d3c4140bc0487a3aa6488e7caab2f13f445170cbae95157f68cffba7",
+      "memory_raw_sha256": "d5a7c17b0e9ba2800d4158a4266a8cfc77700896aa7ade24da95cd44e701f0ad"
+    },
+    {
+      "id": "seek-hevc-seek-no-default-700-eof",
+      "packets": 48,
+      "runtime_upper95": 0.7651832562444908,
+      "heap_upper95": 0.40371702118442143,
+      "total_resident_rss_upper95": 0.7010567939358203,
+      "delivery": true,
+      "optimization": true,
+      "per_iteration_ns": {
+        "candidate": {
+          "p50": 92207.98000000001,
+          "p95": 93065.364
+        },
+        "reference": {
+          "p50": 120576.09,
+          "p95": 121243.946
+        }
+      },
+      "time_raw_sha256": "91c2c960dd5a08a5075b8eda7601701767a91e3e9e82c26b856ff26f1fde601b",
+      "memory_raw_sha256": "e675914558881d5718d0bbb70afc12b9cfe0043b62718395a113e9ad25b4b71a"
+    },
+    {
+      "id": "seek-hevc-seek-no-default-1420-fresh",
+      "packets": 32,
+      "runtime_upper95": 0.7526619807403201,
+      "heap_upper95": 0.40371702118442143,
+      "total_resident_rss_upper95": 0.7003518599031374,
+      "delivery": true,
+      "optimization": true,
+      "per_iteration_ns": {
+        "candidate": {
+          "p50": 82226.72,
+          "p95": 83073.359
+        },
+        "reference": {
+          "p50": 109569.34,
+          "p95": 110679.45300000001
+        }
+      },
+      "time_raw_sha256": "1a68a3eacb40f86e9b65f0170671d9d38c80750e0b6df2f461ebdc899682d706",
+      "memory_raw_sha256": "48de7447b9f542697ee4e7c458d4c56097f6507c517df5b15c7f42f089be1928"
+    },
+    {
+      "id": "seek-hevc-seek-no-default-1420-eof",
+      "packets": 32,
+      "runtime_upper95": 0.7168524279382412,
+      "heap_upper95": 0.40371702118442143,
+      "total_resident_rss_upper95": 0.7008548780117894,
+      "delivery": true,
+      "optimization": true,
+      "per_iteration_ns": {
+        "candidate": {
+          "p50": 82631.05,
+          "p95": 83964.274
+        },
+        "reference": {
+          "p50": 115821.9,
+          "p95": 116435.375
+        }
+      },
+      "time_raw_sha256": "d0c62865ce873fe2bb1f2dce5321b2961874ffc643730fd5eabd25095b505a80",
+      "memory_raw_sha256": "6be79e59158016cc492aa5172e373df67af77bbc56e0a7df0673fd183430f3f8"
+    },
+    {
+      "id": "seek-hevc-seek-no-default-2700-fresh",
+      "packets": 8,
+      "runtime_upper95": 0.6923373077248985,
+      "heap_upper95": 0.40371702118442143,
+      "total_resident_rss_upper95": 0.7008548780117894,
+      "delivery": true,
+      "optimization": true,
+      "per_iteration_ns": {
+        "candidate": {
+          "p50": 72139.48000000001,
+          "p95": 73634.92199999999
+        },
+        "reference": {
+          "p50": 104423.63,
+          "p95": 104989.742
+        }
+      },
+      "time_raw_sha256": "155a55b858bbc811dafe0c0d727c2e9f9b9d9bebd535e6fadf7718c3c8feeb9c",
+      "memory_raw_sha256": "151d5a99a7dd7ffd68d5c54ff7e73db56af5eabb109ccb134f8c53496c686111"
+    },
+    {
+      "id": "seek-hevc-seek-no-default-2700-eof",
+      "packets": 8,
+      "runtime_upper95": 0.6580292160608352,
+      "heap_upper95": 0.40371702118442143,
+      "total_resident_rss_upper95": 0.7012072434607646,
+      "delivery": true,
+      "optimization": true,
+      "per_iteration_ns": {
+        "candidate": {
+          "p50": 72329.4,
+          "p95": 73196.79999999999
+        },
+        "reference": {
+          "p50": 110433.20999999999,
+          "p95": 111165.903
+        }
+      },
+      "time_raw_sha256": "f7d9c7672db25eb091ffa32d326482fec8451a4fe47a3c005c13fd9ce81a5c50",
+      "memory_raw_sha256": "d5b394a0ef5cc61c16f998eb1438a3adb91ca243f9c1d526c09a4bac331aa327"
+    },
+    {
+      "id": "seek-hevc-seek-no-cues-0-fresh",
+      "packets": 64,
+      "runtime_upper95": 1.2397093895333429,
+      "heap_upper95": 0.08259527304013362,
+      "total_resident_rss_upper95": 0.7138364779874213,
+      "delivery": true,
+      "optimization": false,
+      "per_iteration_ns": {
+        "candidate": {
+          "p50": 75845.43,
+          "p95": 77048.355
+        },
+        "reference": {
+          "p50": 61513.44,
+          "p95": 62338.611
+        }
+      },
+      "time_raw_sha256": "efb76d1dc13a87e61263d2bb0831f12e4c2ff3a0016b448cad223969874ed993",
+      "memory_raw_sha256": "e8bb07fbca3870f499ad3f39fb352b3a955071821c33a9e7ee30fd10ad121466"
+    },
+    {
+      "id": "seek-hevc-seek-no-cues-0-eof",
+      "packets": 64,
+      "runtime_upper95": 1.0924766964607997,
+      "heap_upper95": 0.08259527304013362,
+      "total_resident_rss_upper95": 0.7142109986999017,
+      "delivery": true,
+      "optimization": false,
+      "per_iteration_ns": {
+        "candidate": {
+          "p50": 82914.68,
+          "p95": 83590.645
+        },
+        "reference": {
+          "p50": 76181.73,
+          "p95": 77137.501
+        }
+      },
+      "time_raw_sha256": "7e6dbf91602e73835b2b82dfa826f6a636370bff56f44f138188b85da3a613d4",
+      "memory_raw_sha256": "100d2e994cba8b9d77eaf637cb44eba6673a1bb47dd4bf98ad84bb5dd82cfda2"
+    },
+    {
+      "id": "seek-hevc-seek-no-cues-700-fresh",
+      "packets": 48,
+      "runtime_upper95": 1.142949700448521,
+      "heap_upper95": 0.08259527304013362,
+      "total_resident_rss_upper95": 0.7139863018209358,
+      "delivery": true,
+      "optimization": false,
+      "per_iteration_ns": {
+        "candidate": {
+          "p50": 68356.27,
+          "p95": 69496.718
+        },
+        "reference": {
+          "p50": 60150.54,
+          "p95": 61081.731
+        }
+      },
+      "time_raw_sha256": "f22a6ff310ebe9b4d072f11fbf0be90c0ecf43f95eb2708f1c3bc70e873fc7f8",
+      "memory_raw_sha256": "4fe64db1d99e706b9a329a3495dcda8ed4a76458ecced6014e8b6248b54d104a"
+    },
+    {
+      "id": "seek-hevc-seek-no-cues-700-eof",
+      "packets": 48,
+      "runtime_upper95": 1.0570452357075526,
+      "heap_upper95": 0.08259527304013362,
+      "total_resident_rss_upper95": 0.7138364779874213,
+      "delivery": true,
+      "optimization": false,
+      "per_iteration_ns": {
+        "candidate": {
+          "p50": 75213.54000000001,
+          "p95": 76163.478
+        },
+        "reference": {
+          "p50": 71517.69,
+          "p95": 72281.112
+        }
+      },
+      "time_raw_sha256": "58d68f556e3898c3c745de88782fb5e7c4507e200ec8db72dd43d25b69c78422",
+      "memory_raw_sha256": "2dd08d348f29493677bea3ca0e93c74386916b1fdbeca56fe7d1b60df26b568a"
+    },
+    {
+      "id": "seek-hevc-seek-no-cues-1420-fresh",
+      "packets": 32,
+      "runtime_upper95": 1.0062310543644024,
+      "heap_upper95": 0.08259527304013362,
+      "total_resident_rss_upper95": 0.7138364779874213,
+      "delivery": true,
+      "optimization": false,
+      "per_iteration_ns": {
+        "candidate": {
+          "p50": 58782.9,
+          "p95": 59499.367
+        },
+        "reference": {
+          "p50": 58885.58,
+          "p95": 59790.788
+        }
+      },
+      "time_raw_sha256": "1eee7b4460c15c95554a8a7988be66b53aecd3c72023d6f3ec59b96a1891da3f",
+      "memory_raw_sha256": "94549f3afa666a72f8169e3efa1eae70801787601f723edf61ab819aa89dcaa0"
+    },
+    {
+      "id": "seek-hevc-seek-no-cues-1420-eof",
+      "packets": 32,
+      "runtime_upper95": 0.9920371433494815,
+      "heap_upper95": 0.08259527304013362,
+      "total_resident_rss_upper95": 0.7138364779874213,
+      "delivery": true,
+      "optimization": false,
+      "per_iteration_ns": {
+        "candidate": {
+          "p50": 65754.98000000001,
+          "p95": 66194.16100000001
+        },
+        "reference": {
+          "p50": 66806.88,
+          "p95": 67624.48
+        }
+      },
+      "time_raw_sha256": "884191d48e1d45dbaf867ed2cd827e309848e89022990152929689bad32a27eb",
+      "memory_raw_sha256": "7783027a78b5c1e0d6b5ce7ae37fd14f592f8daf7c5fb49ef97b1971b45c603f"
+    },
+    {
+      "id": "seek-hevc-seek-no-cues-2700-fresh",
+      "packets": 8,
+      "runtime_upper95": 0.7941943860727165,
+      "heap_upper95": 0.08259527304013362,
+      "total_resident_rss_upper95": 0.7138364779874213,
+      "delivery": true,
+      "optimization": true,
+      "per_iteration_ns": {
+        "candidate": {
+          "p50": 44300.11,
+          "p95": 44902.3
+        },
+        "reference": {
+          "p50": 56105.880000000005,
+          "p95": 57164.804000000004
+        }
+      },
+      "time_raw_sha256": "ec765468d9ee919a8d0f2c0c537c5908e1a3d9a922a9a37d1945b58a694494b8",
+      "memory_raw_sha256": "864d44c26cf08bdfd475f3fb82d5cc446c8d39a21c6d46ee7fc93a6ef74bcc05"
+    },
+    {
+      "id": "seek-hevc-seek-no-cues-2700-eof",
+      "packets": 8,
+      "runtime_upper95": 0.8311271396848203,
+      "heap_upper95": 0.08259527304013362,
+      "total_resident_rss_upper95": 0.7138364779874213,
+      "delivery": true,
+      "optimization": false,
+      "per_iteration_ns": {
+        "candidate": {
+          "p50": 50604.06,
+          "p95": 51247.505
+        },
+        "reference": {
+          "p50": 61229.0,
+          "p95": 62223.839
+        }
+      },
+      "time_raw_sha256": "82b43ef4174dafaf8dc4d0b25af24d26aa40097f71f6e172eaeb992797896a39",
+      "memory_raw_sha256": "c9e2f1c0899fdc7fa46225e28efb26a650f3c75c77d9bd8ec59485c9df87de15"
+    }
+  ]
+}

@@ -39,11 +39,11 @@ webOS builds and TV validation remain required before shipping offboarding.
    Audit the completed app, package contents and enabled runtime features,
    then validate a clean install without an FFmpeg runtime dependency.
 
-The selected AVC/HEVC video startup and seek operation matched all 44
-frozen cases on native Linux ARM64. All 44 passed both memory gates and 43
-passed delivery timing. The retained candidate's fresh no-Cues seek was 1.25157× against
-the 1.25× ceiling. The preceding 1.2543× failure is retained. These
-receipts cover the immutable-input library route.
+The selected AVC/HEVC video startup and seek operation passed all 44
+frozen parity, runtime, heap and total peak RSS cases on native Linux ARM64.
+The worst runtime upper bound was 1.2397× against the 1.25× ceiling.
+The receipt covers the immutable-input library route and retains the
+earlier failed comparisons by revision.
 See the [latest selected video evidence](../research/qualification/matroska-video-linux-arm64/scan-replay-location/README.md).
 
 ## Completion ledger

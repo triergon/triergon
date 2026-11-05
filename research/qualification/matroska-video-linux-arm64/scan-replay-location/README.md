@@ -1,5 +1,29 @@
 # Matroska video sessions with lazy scan replay locations
 
+## Input health at the typed reader step boundary
+
+The source commit `f3b95b50a6f8e234758cc51e49b980457967fbcd` checks source
+health once per typed reader step. It propagates subsequent input errors
+and continues to check cancellation at each bounded operation. Prefix
+inspection runs when the parser yields.
+
+All 44 frozen startup and seek cases matched all 1,344 ordered packets
+on payload, PTS, DTS and duration. All 44 passed the runtime, peak live
+heap and total peak RSS delivery gates on native Linux ARM64. The worst
+paired upper runtime ratio was **1.2397093895333429×** for the fresh HEVC
+seek without Cues. The worst paired upper heap and RSS ratios were
+0.403718× and 0.714211×, rounded upward. Twenty-seven cases reached the
+0.80× optimization target.
+
+The [source-bound results](input-health-results.json) preserve the exact
+manifest, workers, observation hashes and all 44 per-case rows. The
+campaign used the same case manifest, reference worker and 30-pair
+comparison. The earlier nonpasses below retain their original scopes.
+This qualifies the selected immutable-input library operation.
+Application adoption and television verification remain open.
+
+## Earlier scan replay results
+
 The source commit `14c03b528db8c681b62b44b5710e02f7de7efb80`
 matched all 44 frozen selected cases and all 1,344 packets on native
 Linux ARM64. The comparison includes ordered payload bytes, PTS, DTS
@@ -44,6 +68,6 @@ summary](inline-attempt.json) retains all 44 rows and artifact hashes.
 
 Directly decoding the common short EBML headers passed the host suite
 and all 44 native parity and memory cases. Its fresh no-Cues upper runtime
-ratio was 1.2566436315641156×, with 43/44 runtime passes. The PR keeps
-the lazy scan candidate measured at 1.2515724977139935×.
+ratio was 1.2566436315641156×, with 43/44 runtime passes. The retained
+baseline for that experiment was 1.2515724977139935×.
 [Short header experiment and hashes](short-headers-attempt.json)
