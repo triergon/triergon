@@ -74,6 +74,27 @@ a separate cold resume into the secondary track in each container.
 These runs cover the recorded MP4 and Matroska profiles. The private
 receipts bind the fixtures, exact binaries, and logs.
 
+The feature-length MP4 preview at `a387d2d9c66a9583d9de0e5a8ae4fa910a8ec31f`
+pins Triergon `cd66cb9b073e006c11e18f7227fb51bd79c22781`. Its 32-bit
+debug IPK, SHA-256 `c895589d5c1f63d33002867c54bea7658499b42d336c42a159f4fc9e97dfb1e8`,
+resumed a synthetic two-hour AVC/AAC MP4 at one hour on the same G4.
+Starfish accepted both feeds after 12.4 seconds. The forward
+seek landed in 2.5 seconds and the frame clock advanced with
+a single Starfish load for the session. Pause, Resume, and Stop succeeded,
+and the mock server recorded the selected audio track in the Stop report.
+The installed binaries matched the IPK, the HTTP server returned ranges,
+and the app process maps were FFmpeg-free. The screen-on request was
+declined in Active Standby. The simulator decoded the picture and
+identified the secondary AAC track by its PCM tone.
+
+The previous range preview needed 64.3 seconds before feeding and 71.1
+seconds to recover its forward seek after a reload on the same fixture.
+The current route reuses checked track state for regular seeks and
+releases the optional cache under pool pressure. The recorded hardware
+times are single-fixture observations. The reviewed library tree also
+passed 73 native Linux ARM64 functional tests. Full numerical
+qualification remains open.
+
 ## Completion ledger
 
 | ID | Required work | Completion evidence |
