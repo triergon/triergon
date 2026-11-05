@@ -15,9 +15,8 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use triergon_core::{Budget, BudgetVec, Error as CoreError, InputCursor, InputRequest, WorkBudget};
 use triergon_mpegts::{
     AssemblyStep, FaultKind, ParseLimits, TraceEvent,
-    clock::SourceTimePolicy,
     native_pes::{NativePrivateAudioCarriage, NativePrivateAudioDescriptors},
-    psi::{DescriptorNamespace, ElementaryStream, ProgramMap},
+    psi::{ElementaryStream, ProgramMap},
 };
 
 mod lanes;
@@ -337,15 +336,11 @@ where
             check_extent(length, 0, limits.maximum_source_bytes)?;
         }
         let pool = input.budget().clone();
-        let engine = match tracks {
-            TrackSelection::AvcAac(_) => Engine::ts_native_segment_v1(
-                input,
-                limits.transport,
-                SourceTimePolicy::Unanchored,
-                DescriptorNamespace::Unspecified,
-            )?,
-            TrackSelection::Media(_) => Engine::ts_native_media_segment(input, limits.transport)?,
-        };
+        let engine = Engine::ts_hls_segment(
+            input,
+            limits.transport,
+            matches!(tracks, TrackSelection::Media(_)),
+        )?;
         let mut player = Player::new(
             engine,
             owner,
@@ -475,10 +470,11 @@ where
         match self.phase {
             Phase::Read => {
                 let player = self.player.as_mut().ok_or(Error::Closed)?;
-                match player.advance(work, cancel)? {
+                let mut slot = None;
+                match player.read_output(&mut slot, work, cancel)? {
                     Progress::Yield => {}
                     Progress::Queued => {
-                        let output = player.pop().ok_or(CoreError::Invalid("HLS player queue"))?;
+                        let output = slot.ok_or(CoreError::Invalid("HLS player output"))?;
                         self.on_event(output.into_event())?;
                     }
                     Progress::NeedInput(mut request) => {

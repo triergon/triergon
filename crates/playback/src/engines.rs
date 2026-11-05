@@ -292,7 +292,8 @@ impl TsNativeTracks {
 #[derive(Clone, Copy, PartialEq, Eq)]
 enum SegmentDiscovery {
     Native,
-    Media,
+    AvcAacFeed,
+    MediaFeed,
 }
 
 pub struct TsEngine {
@@ -744,16 +745,21 @@ impl Engine {
         Self::ts_native_segment(input, limits, policy, namespace, SegmentDiscovery::Native)
     }
 
-    pub(crate) fn ts_native_media_segment(
+    pub(crate) fn ts_hls_segment(
         input: InputCursor,
         limits: ts::ParseLimits,
+        media: bool,
     ) -> Result<Self> {
         Self::ts_native_segment(
             input,
             limits,
             SourceTimePolicy::Unanchored,
             DescriptorNamespace::Unspecified,
-            SegmentDiscovery::Media,
+            if media {
+                SegmentDiscovery::MediaFeed
+            } else {
+                SegmentDiscovery::AvcAacFeed
+            },
         )
     }
 
@@ -1555,7 +1561,7 @@ impl TsEngine {
                 0x24 => TsNativeCarriage::Registered(NativeRegisteredCarriage::Hevc),
                 0x0f | 0x11 | 0x81 | 0x87 => TsNativeCarriage::AudioFromPmt,
                 0x06 if (matches!(map.descriptor_namespace, DescriptorNamespace::Dvb(_))
-                    || self.segment_discovery == Some(SegmentDiscovery::Media))
+                    || self.segment_discovery == Some(SegmentDiscovery::MediaFeed))
                     && stream.descriptors().any(|entry| {
                         entry.is_ok_and(|descriptor| matches!(descriptor.tag, 0x6a | 0x7a))
                     }) =>
@@ -1617,7 +1623,7 @@ impl TsEngine {
             program: map.program_descriptors.as_ref(),
             elementary: stream.descriptor_bytes.as_ref(),
         };
-        let hls_audio = self.segment_discovery == Some(SegmentDiscovery::Media);
+        let hls_audio = self.segment_discovery == Some(SegmentDiscovery::MediaFeed);
         let carriage = match spec.carriage {
             TsNativeCarriage::AudioFromPmt => match stream.stream_type {
                 0x0f => TsNativeCarriage::Registered(NativeRegisteredCarriage::AacAdts),
@@ -1694,6 +1700,29 @@ impl TsEngine {
             TsNativeCarriage::AudioFromPmt => Err(mismatch),
         }?;
         Ok((observer, carriage))
+    }
+
+    fn offer_native_transport(&mut self, index: usize, packet: ts::TransportPacket) {
+        let track = &mut self.native_tracks.as_mut_slice()[index];
+        if let Some(observer) = track.observer.as_mut() {
+            let context = NativeSourceContext {
+                source_event_ordinal: self.event_ordinal,
+                epochs: self.stream.source_epochs(),
+                byte_run_epoch: None,
+            };
+            let pushed = if self.native_context.is_some() {
+                observer.push_with_input(packet, context, &self.input)
+            } else {
+                observer.push(packet, context)
+            };
+            match pushed {
+                Ok(()) => self.native_active = Some(index),
+                Err(rejected) => {
+                    track.refuse(rejected.error);
+                    self.native_update_at = Some(index);
+                }
+            }
+        }
     }
 
     // Keep backend-specific polling workspaces out of the shared dispatcher.
@@ -1813,7 +1842,11 @@ impl TsEngine {
                 }
             }
         }
-        if !matches!(self.pending, Some(TraceEvent::Pes(_))) && !w.try_charge(1) {
+        let feed_only = matches!(
+            self.segment_discovery,
+            Some(SegmentDiscovery::AvcAacFeed | SegmentDiscovery::MediaFeed)
+        );
+        if (feed_only || !matches!(self.pending, Some(TraceEvent::Pes(_)))) && !w.try_charge(1) {
             return Ok(BackendStep::Yield);
         }
         let event = self
@@ -1926,11 +1959,40 @@ impl TsEngine {
         if let TraceEvent::Pat(table) = event {
             if self.program == 0 {
                 let program = self.stream.selected_program();
-                self.native = Some(NativePesClockV1::new(program)?);
+                if !feed_only {
+                    self.native = Some(NativePesClockV1::new(program)?);
+                }
                 self.native_packet_clock = Some(NativePesClockV1::new(program)?);
                 self.program = program;
             }
             self.tsid = Some(table.header.extension);
+        }
+        // The HLS feed consumes active maps, faults and native payloads. The
+        // source parser still validates every packet and advances its epochs.
+        if feed_only
+            && !matches!(
+                event,
+                TraceEvent::ProgramMap { active: true, .. } | TraceEvent::Diagnostic(_)
+            )
+        {
+            let event = self
+                .pending
+                .take()
+                .ok_or(Error::Invalid("TS event missing"))?;
+            match event {
+                TraceEvent::Transport(packet) => {
+                    if let Some(index) = self.native_tracks.index(packet.pid) {
+                        self.offer_native_transport(index, packet);
+                    }
+                }
+                TraceEvent::Pes(_) if self.program == 0 => {
+                    return Err(Error::Invalid("TS PES before program discovery").into());
+                }
+                TraceEvent::Finished => self.ended = true,
+                _ => {}
+            }
+            self.event_ordinal = self.event_ordinal.checked_add(1).ok_or(Error::Overflow)?;
+            return Ok(BackendStep::Yield);
         }
         let key = match (self.tsid, self.pcr_pid) {
             (Some(tsid), Some(pcr_pid)) => Some(ClockKey {
@@ -1970,26 +2032,7 @@ impl TsEngine {
         if let TraceEvent::Transport(packet) = &event
             && let Some(index) = self.native_tracks.index(packet.pid)
         {
-            let track = &mut self.native_tracks.as_mut_slice()[index];
-            if let Some(observer) = track.observer.as_mut() {
-                let context = NativeSourceContext {
-                    source_event_ordinal: self.event_ordinal,
-                    epochs: self.stream.source_epochs(),
-                    byte_run_epoch: None,
-                };
-                let pushed = if self.native_context.is_some() {
-                    observer.push_with_input(packet.clone(), context, &self.input)
-                } else {
-                    observer.push(packet.clone(), context)
-                };
-                match pushed {
-                    Ok(()) => self.native_active = Some(index),
-                    Err(rejected) => {
-                        track.refuse(rejected.error);
-                        self.native_update_at = Some(index);
-                    }
-                }
-            }
+            self.offer_native_transport(index, packet.clone());
         }
         self.event_ordinal = self.event_ordinal.checked_add(1).ok_or(Error::Overflow)?;
         if matches!(event, TraceEvent::Finished) {
