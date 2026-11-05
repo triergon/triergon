@@ -41,9 +41,10 @@ webOS builds and TV validation remain required before shipping offboarding.
 
 The selected AVC/HEVC video startup and seek operation matched all 44
 frozen cases on native Linux ARM64. All 44 passed both memory gates and 43
-passed delivery timing. The remaining fresh no-Cues seek was 1.2543× against
-the 1.25× ceiling. This receipt covers the immutable-input library route.
-See the [selected video evidence](../research/qualification/matroska-video-linux-arm64/README.md).
+passed delivery timing. The latest fresh no-Cues seek was 1.25157× against
+the 1.25× ceiling. The preceding 1.2543× failure is retained. These
+receipts cover the immutable-input library route.
+See the [latest selected video evidence](../research/qualification/matroska-video-linux-arm64/scan-replay-location/README.md).
 
 ## Completion ledger
 
