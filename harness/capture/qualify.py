@@ -9,7 +9,7 @@ For every required case in research/capture/cases.json:
      median of `--iterations` in-process sessions after one discarded warm-up
      session; the ratio interval is the shared harness's bootstrap of the
      median paired ratio (harness.runner.ratio_interval). Gate: upper 95%
-     bound <= 1.25 (target 0.80);
+     bound <= 1.20 (target 0.80);
   4. memory: the shared glibc observer (harness/allocations-linux.c) in heap
      and rss mode, separate runs, alternating order. Gates: candidate heap
      peak strictly below the reference in every pair, and the approved
@@ -36,7 +36,7 @@ ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT))
 from harness.runner import competing_builds, ratio_interval  # noqa: E402
 
-RUNTIME_GATE = 1.25
+RUNTIME_GATE = 1.2
 RUNTIME_TARGET = 0.80
 
 
