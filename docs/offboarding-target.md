@@ -60,6 +60,20 @@ This evidence covers the recorded debug package and these two hardware
 playback profiles. Wider media coverage and shipping-build qualification
 remain open.
 
+The two-audio-track preview at `5bd1f877a3c264e7f79d532707ee0073bca4f64d`
+pins Triergon `942b8ee2f41ab6277c80c0b0b82a8f7e68b9ee09`. Its debug IPK,
+SHA-256 `037f7b685de6e3e98372a82b0c8e812f236eb2eafbb5233fe99bda51a14632e7`,
+passed two catalog replays on the same G4. Each AVC/AAC file resumed at
+12 seconds, switched to the other audio track through the track menu,
+paused and resumed, then sought over HTTP ranges. Starfish accepted both
+feeds and reported frames after the seek. Both Stop reports named the
+new audio track and returned to the item detail after teardown. The IPK
+and app process were checked for FFmpeg libraries. Simulator replays
+verified the distinct PCM tones before and after the switch, including
+a separate cold resume into the secondary track in each container.
+These runs cover the recorded MP4 and Matroska profiles. The private
+receipts bind the fixtures, exact binaries, and logs.
+
 ## Completion ledger
 
 | ID | Required work | Completion evidence |
@@ -81,7 +95,7 @@ The frozen O00 source inventory records Streem revision
 `9c7c0fb5f7316c92ab8086beb19db03d5855dd6e`. The historical K0–K5 receipt qualifies selected packet/header/zlib/Cues/static-colour
 and bounded segment-metadata slices. O00's source review is complete for that
 revision; all eleven implementation/integration/qualification/removal milestones
-remain open. Configured registries and actual package/runtime audits are later gates.
+remain open. Shipping package and runtime audits are still required.
 The earlier experimental Root3477 integration froze a 5,095-file snapshot that
 passed all 13 native Linux ARM64 functional gates with 3,477 passed, zero
 failed and one ignored test per profile. It includes the typed playback
@@ -116,8 +130,9 @@ The selected AAC-LC, AC-3 and E-AC-3 startup and forward packet clocks
 matched all ten native Linux ARM64 cases and 75 packets. All ten passed
 runtime, live heap and total peak RSS. The source clock also retains the
 damaged AC-3 control's original bytes and timing. The receipt covers the
-selected audio clock operation. Audio seek, combined application playback
-and device validation remain open.
+selected forward audio clock operation. The debug evidence above covers AAC
+playback on the G4. Full audio seek and wider combined playback qualification
+remain open.
 [Native audio clock evidence](../research/qualification/matroska-audio-linux-arm64/README.md)
 
 ## Raw AVC and HEVC input
@@ -156,6 +171,9 @@ exposes the selected encoded-audio trim on the emitted packet. The plan
 must match both the track and movie time bases. An authored B-frame AVC/AAC
 fixture checks the selected decode timestamp, first byte range, and the
 original bytes, clocks and trim at the landing.
+Seek input accounting ends when a complete reference packet reaches the
+target time. The original presentation target continues to govern reordered
+preroll. [Seek budget regression](https://github.com/triergon/triergon/pull/14)
 Selected QuickTime AVC and HEVC entries and the leading AC-3 and E-AC-3
 edit profile are also admitted. The Dolby profile validates the full
 configuration and requires an edit duration that converts to whole
@@ -168,8 +186,9 @@ of the same entity for seek. The explicit native progressive player can
 also reopen the same entity as a complete pinned native range plan and
 resume in native seek order. Host tests verify the late range, exact
 fragment packets, paused handoff and sink generation in both views.
-Overlapping native clock queries, native recovery seeks, Streem adoption
-and numerical qualification remain open.
+The opt-in Streem debug adapter uses the native range path. Overlapping native
+clock queries, native recovery seeks, shipping adoption and full numerical
+qualification remain open.
 [Playback API and scope](../crates/playback/README.md#range-backed-mp4-sync-seek)
 
 ## Independent AVC/AAC HLS segments
@@ -189,10 +208,12 @@ movie decode/output remains LG hardware, and text rendering remains libass. Thes
 are existing consumer/platform responsibilities, not FFmpeg components to rebuild
 as part of the initial TV offboarding.
 
-Desktop simulator playback currently launches external FFmpeg for video and audio.
-Development capture uses MPEG-1 encoding, TS muxing and swscale paths excluded by
-RELEASE=1. These uses are required open milestones O61/O62 in the complete target. They need
-replacements and explicit decoder/encoder/conversion feature contracts and gates.
+The default desktop simulator launches external FFmpeg for video and audio.
+The opt-in preview uses in-process Triergon decoders. The default development
+capture uses FFmpeg for MPEG-1 encoding, TS muxing and pixel conversion.
+These paths are excluded by `RELEASE=1` on the TV. The opt-in debug package uses
+Triergon for capture. O61 and O62 still require full qualification and adoption
+of the selected decoder, encoder, muxer and conversion contracts.
 Their presence does not imply the TV release needs a universal software movie
 decoder. A platform decoder in a consumer adapter is a separate, declared boundary;
 it does not admit unsafe/native dependencies into the safe Rust core.
