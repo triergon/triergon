@@ -19,7 +19,7 @@ jobs:
       - name: Install check dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y build-essential pkg-config zlib1g-dev nasm
+          sudo apt-get install -y build-essential pkg-config zlib1g-dev nasm rsync
           rustup toolchain install nightly --profile minimal --component rustfmt --component clippy
           rustc +nightly -vV
       - name: Prepare pinned reference and fixtures
