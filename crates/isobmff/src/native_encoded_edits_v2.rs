@@ -10,6 +10,9 @@ use triergon_core::{
     Budget, Error, InputCursor, InputToken, Result, Rounding, SourceId, TimeBase, WorkBudget,
 };
 
+// ETSI TS 102 366 Annex F.2: an AC-3 or E-AC-3 ISO media sample covers six blocks.
+const DOLBY_SAMPLE_TICKS: u32 = 1536;
+
 #[derive(Clone, Copy, Debug)]
 pub struct PinnedMovD32EncodedEditsV2;
 #[derive(Clone, Copy, Debug)]
@@ -37,13 +40,12 @@ pub struct Mov9EncodedEditPlanV2 {
     source_config: BoxView,
     entry: EditEntry,
     base: TimeBase,
-    kind: EncodedEntryKindV1,
     anchor: i128,
     end: i128,
     source_end: i128,
     presentation_end: i128,
     count: u64,
-    frame: u32,
+    frame: u32, // PCM samples per coded audio sample. Zero for video.
     dependency_v4: bool,
     dependency_v5: bool,
     recovery_source_v5: Option<crate::Mov9RecoveryFactsV5>,
@@ -98,7 +100,7 @@ impl Mov9EncodedEditPlanV2 {
         let cts = source
             .cts_ticks
             .ok_or(Error::Unsupported("encoded edit source CTS unknown"))?;
-        if self.kind == EncodedEntryKindV1::Aac && dts >= self.end {
+        if self.frame != 0 && dts >= self.end {
             return Ok(None);
         }
         let dts_field = Mov9ClockField::from_exact_native_ticks(
@@ -110,7 +112,7 @@ impl Mov9EncodedEditPlanV2 {
         let source_end = dts
             .checked_add(i128::from(source.duration_ticks))
             .ok_or(Error::Overflow)?;
-        let discard = if self.kind == EncodedEntryKindV1::Aac {
+        let discard = if self.frame != 0 {
             source_end <= i128::from(self.entry.media_time)
         } else {
             cts < self.anchor || cts >= self.presentation_end
@@ -148,7 +150,7 @@ impl Mov9EncodedEditPlanV2 {
     /// Public AV_PKT_DATA_SKIP_SAMPLES layout, derived before packet publication.
     /// This is an explicit native view, never a change to source sample duration.
     pub(crate) fn skip_samples(&self, source: &Sample) -> Result<Option<[u8; 10]>> {
-        if self.kind != EncodedEntryKindV1::Aac {
+        if self.frame == 0 {
             return Ok(None);
         }
         let dts = source
@@ -205,6 +207,7 @@ pub struct Mov9EncodedEditJobV2<'a> {
     source_end: i128,
     count: u64,
     frame: u32,
+    range_playback: bool,
     descriptions: u32,
     dependency_v4: bool,
     recovery_v4: Option<crate::native_encoded_dependency_v4::EmptyRecoveryWalkV4>,
@@ -294,6 +297,24 @@ impl<'a> Mov9EncodedEditJobV2<'a> {
         out.recovery_v7 = Some(recovery);
         Ok(out)
     }
+    /// The range playback view additionally admits a leading AC-3 or E-AC-3
+    /// encoder-delay edit on a complete regular track with a fixed frame clock.
+    pub fn new_range_playback(
+        context: Mov9EncodedEditContextV2<'a>,
+        configs: &[crate::Mov9EncodedStreamV1],
+        input: &InputCursor,
+        limits: Mov9EncodedEditLimitsV2,
+    ) -> Result<Self> {
+        let mut job = Self::new_v7(
+            context,
+            configs,
+            input,
+            limits,
+            crate::PinnedMovD32EncodedContextsV7,
+        )?;
+        job.range_playback = true;
+        Ok(job)
+    }
     fn new_description_bound(
         context: Mov9EncodedEditContextV2<'a>,
         input: &InputCursor,
@@ -378,6 +399,7 @@ impl<'a> Mov9EncodedEditJobV2<'a> {
             source_end: 0,
             count: 0,
             frame: 0,
+            range_playback: false,
             descriptions,
             dependency_v4,
             recovery_v4,
@@ -513,6 +535,28 @@ impl<'a> Mov9EncodedEditJobV2<'a> {
                         ));
                     }
                 }
+                EncodedEntryKindV1::Ac3 | EncodedEntryKindV1::Eac3 if self.range_playback => {
+                    let stream = self.context.stream;
+                    let sample_rate =
+                        crate::fields::u32_at(stream.source_description().raw().payload(), 24)?;
+                    let config = stream.configuration_box().payload();
+                    let code = match (stream.kind(), config) {
+                        (EncodedEntryKindV1::Ac3, [rate, _, _])
+                        | (EncodedEntryKindV1::Eac3, [_, _, rate, _, _, ..]) => rate >> 6,
+                        _ => return Err(Error::Invalid("encoded Dolby configuration extent")),
+                    };
+                    let rate = [48000, 44100, 32000].get(usize::from(code)).copied();
+                    if self.descriptions != 1
+                        || self.context.media_base.numerator() != 1
+                        || rate.map(u64::from) != Some(self.context.media_base.denominator())
+                        || rate.map(|r| r << 16) != Some(sample_rate)
+                        || self.entry.media_time >= i64::from(DOLBY_SAMPLE_TICKS)
+                    {
+                        return Err(Error::Unsupported("encoded Dolby audio clock profile"));
+                    }
+                    self.frame = DOLBY_SAMPLE_TICKS;
+                    self.anchor = Some(i128::from(self.entry.media_time));
+                }
                 _ => {
                     return Err(Error::Unsupported(
                         "encoded edited audio codec frame clock not established",
@@ -531,7 +575,12 @@ impl<'a> Mov9EncodedEditJobV2<'a> {
                 let anchor = self.anchor.ok_or(Error::Unsupported(
                     "encoded edit has no presentation anchor",
                 ))?;
-                if self.context.stream.kind() != EncodedEntryKindV1::Aac {
+                if self.frame == DOLBY_SAMPLE_TICKS && self.end != self.source_end {
+                    return Err(Error::Unsupported(
+                        "encoded Dolby edit must end at source end",
+                    ));
+                }
+                if self.frame == 0 {
                     let duration = self
                         .end
                         .checked_sub(i128::from(self.entry.media_time))
@@ -549,7 +598,6 @@ impl<'a> Mov9EncodedEditJobV2<'a> {
                     source_config: self.context.stream.configuration_box().clone(),
                     entry: self.entry,
                     base: self.context.media_base,
-                    kind: self.context.stream.kind(),
                     anchor,
                     end: self.end,
                     source_end: self.source_end,
@@ -606,8 +654,14 @@ impl<'a> Mov9EncodedEditJobV2<'a> {
                             .map_err(|_| Error::Overflow)?,
                     });
                 }
-                if self.context.stream.kind() == EncodedEntryKindV1::Aac {
-                    if c != d || s.duration_ticks > self.frame {
+                if self.frame != 0 {
+                    if self.frame == DOLBY_SAMPLE_TICKS {
+                        if c != d || s.duration_ticks != self.frame {
+                            return Err(Error::Unsupported(
+                                "encoded Dolby source packet clock profile",
+                            ));
+                        }
+                    } else if c != d || s.duration_ticks > self.frame {
                         return Err(Error::Unsupported(
                             "encoded AAC source packet clock profile",
                         ));

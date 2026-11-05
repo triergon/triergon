@@ -7,9 +7,9 @@ use triergon_core::{
 use triergon_isobmff::{
     EditList, Limits, Mov9CursorStatus, Mov9EditCursor, Mov9EditLimits, Mov9EncodedEditContextV2,
     Mov9EncodedEditJobV2, Mov9EncodedEditLimitsV2, Mov9EncodedEditPlanV2, Mov9EncodedLimitsV1,
-    Mov9EncodedStreamJobV1, Mov9EncodedStreamV1, Mov9NativeIndexCursor, Mov9NativeIndexLimits,
-    Mov9PacketCursor, Mov9PacketLimits, Mov9Track, PinnedMovD32EncodedEditsV2,
-    PinnedMovD32EncodedRegularV1, SampleTable, TrackHeader,
+    Mov9EncodedSelectionV4, Mov9EncodedStreamJobV1, Mov9EncodedStreamV1, Mov9NativeIndexCursor,
+    Mov9NativeIndexLimits, Mov9PacketCursor, Mov9PacketLimits, Mov9Track, MovieHeader,
+    PinnedMovD32EncodedEditsV2, PinnedMovD32EncodedRegularV1, SampleTable, TrackHeader,
 };
 const ORIGINAL: &[u8] = include_bytes!("fixtures/encoded-edit-v2/original.mp4");
 const AUDIO0: &[u8] = include_bytes!("fixtures/encoded-edit-v2/audio0.mp4");
@@ -24,6 +24,7 @@ struct Source {
     edits: EditList,
     media: Vec<Range<u64>>,
     length: u64,
+    movie_base: TimeBase,
 }
 impl Source {
     fn new(data: &[u8], handler: &[u8; 4]) -> Self {
@@ -74,6 +75,10 @@ impl Source {
             edits,
             media,
             length: data.len() as u64,
+            movie_base: MovieHeader::parse(&child(movie, b"mvhd").unwrap())
+                .unwrap()
+                .time_base()
+                .unwrap(),
         }
     }
     fn input(&self) -> InputCursor {
@@ -188,6 +193,95 @@ fn rows(
     }
     panic!("occurrence progress")
 }
+
+fn range_plan(p: &Source, major: [u8; 4]) -> Result<Mov9EncodedEditPlanV2, Error> {
+    let mut input = p.input();
+    let cancel = AtomicBool::new(false);
+    let mut stream = Mov9EncodedStreamJobV1::new_range_playback(
+        &p.header,
+        &p.table,
+        &input,
+        Mov9EncodedSelectionV4 {
+            major_brand: Some(major),
+            description: 1,
+            limits: Default::default(),
+        },
+    )?;
+    let config = loop {
+        if stream.poll(&mut input, &mut WorkBudget::new(1), &cancel)? == Mov9CursorStatus::Ready {
+            break stream.take(&mut input, &cancel)?;
+        }
+    };
+    let configs = [config];
+    let mut edit = Mov9EncodedEditJobV2::new_range_playback(
+        Mov9EncodedEditContextV2 {
+            table: &p.table,
+            edits: &p.edits,
+            stream: &configs[0],
+            media_base: p.header.time_base()?,
+            movie_base: p.movie_base,
+        },
+        &configs,
+        &input,
+        Default::default(),
+    )?;
+    complete(&mut edit, &mut input, 1)
+}
+
+#[test]
+fn range_playback_keeps_quicktime_visual_decode_order_and_signed_clocks() {
+    let raw = include_bytes!("fixtures/range-encoded-edits/quicktime-avc.mov");
+    let source = Source::new(raw, b"vide");
+    let packets = rows(&source, range_plan(&source, *b"qt  ").unwrap());
+    assert_eq!(packets.len(), 6);
+    for ((packet, skip), (pts, dts, offset, length, key)) in packets.into_iter().zip([
+        (0, -1024, 36, 716, 1),
+        (1024, -512, 752, 12, 0),
+        (512, 0, 764, 12, 0),
+        (1536, 512, 776, 30, 1),
+        (2560, 1024, 806, 12, 0),
+        (2048, 1536, 818, 12, 0),
+    ]) {
+        assert_eq!(packet.source.range, offset..offset + length);
+        assert_eq!(
+            (packet.native.pts, packet.native.dts),
+            (Some(pts), Some(dts))
+        );
+        assert_eq!((packet.native.duration, packet.native.flags), (512, key));
+        assert_eq!(skip, None);
+    }
+}
+
+#[test]
+fn range_playback_keeps_dolby_packets_and_reports_the_leading_sample_skip() {
+    for raw in [
+        include_bytes!("fixtures/range-encoded-edits/leading-ac3.mp4").as_slice(),
+        include_bytes!("fixtures/range-encoded-edits/leading-eac3.mp4").as_slice(),
+    ] {
+        let source = Source::new(raw, b"soun");
+        assert!(matches!(
+            source.plan(1),
+            Err(Error::Unsupported(
+                "encoded edited audio codec frame clock not established"
+            ))
+        ));
+        let plan = range_plan(&source, *b"isom").unwrap();
+        let packets = rows(&source, plan);
+        assert_eq!(packets.len(), 6);
+        for (i, (packet, skip)) in packets.into_iter().enumerate() {
+            let offset = 48 + i as u64 * 384;
+            let pts = i as i64 * 1536 - 256;
+            assert_eq!(packet.source.range, offset..offset + 384);
+            assert_eq!(
+                (packet.native.pts, packet.native.dts),
+                (Some(pts), Some(pts))
+            );
+            assert_eq!((packet.native.duration, packet.native.flags), (1536, 1));
+            assert_eq!(skip, (i == 0).then_some([0, 1, 0, 0, 0, 0, 0, 0, 0, 0]));
+        }
+    }
+}
+
 #[test]
 fn original_video_all48_source_ranges_raw_cto_and_shift_are_separate() {
     let p = Source::new(ORIGINAL, b"vide");
