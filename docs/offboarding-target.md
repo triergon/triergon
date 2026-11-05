@@ -336,10 +336,13 @@ at 22 seconds and reported Stop at 32.832 seconds after Back. Both feeds
 resumed after the seek, the process maps were FFmpeg-free, and the set
 remained in Active Standby.
 
-The expanded profiles require their own frozen native parity, runtime and
-memory evidence. O31 also requires the remaining selected TS/M2TS,
-elementary and HLS profiles. Broader target and shipping qualification
-remain open.
+The expanded [native Linux ARM64 receipt](../research/qualification/hls-av-family-linux-arm64/README.md)
+covers 70 matching segments and a separate allocation control. All ten
+timed workloads use strictly lower peak live heap and total peak RSS.
+Two meet the runtime ceiling and eight miss it, with the slowest upper
+95% runtime ratio at 3.2944× FFmpeg. O31 still requires those runtime
+fixes and the remaining selected TS/M2TS, elementary and HLS profiles.
+Broader target and shipping qualification remain open.
 
 ## Additional application-runtime surfaces
 
