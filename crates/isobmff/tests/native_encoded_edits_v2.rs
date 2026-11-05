@@ -421,7 +421,7 @@ fn dts_core_descriptions_agree_with_range_admission() {
         assert_eq!(packets.len(), 6);
         assert_eq!(packets[5].0.native.dts, Some(2560));
         assert_eq!(packets[5].0.native.duration, 384);
-        assert_eq!(packets[5].1, None);
+        assert_eq!(packets[5].1, Some([0, 0, 0, 0, 128, 0, 0, 0, 0, 0]));
     }
 
     let aac = Source::new(AUDIO0, b"soun");
