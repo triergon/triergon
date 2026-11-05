@@ -154,6 +154,7 @@ impl Mov9SoundV1SourceV4 {
 pub enum Mov9LanguageCauseV4 {
     IsoPacked,
     QuickTimeEnglishZero,
+    QuickTimeUnspecified,
 }
 #[derive(Clone, Copy, Debug)]
 pub struct Mov9LanguageV4 {
@@ -161,7 +162,7 @@ pub struct Mov9LanguageV4 {
     pub native: [u8; 3],
     pub cause: Mov9LanguageCauseV4,
 }
-pub(crate) fn language(header: &TrackHeader) -> Result<Mov9LanguageV4> {
+pub(crate) fn language(header: &TrackHeader, allow_unspecified: bool) -> Result<Mov9LanguageV4> {
     let b = header.raw_mdhd.payload();
     let (version, flags) = fields::full(b)?;
     if flags != 0 {
@@ -178,6 +179,13 @@ pub(crate) fn language(header: &TrackHeader) -> Result<Mov9LanguageV4> {
             raw_word: word,
             native: *b"eng",
             cause: Mov9LanguageCauseV4::QuickTimeEnglishZero,
+        });
+    }
+    if word == 0x7fff && allow_unspecified {
+        return Ok(Mov9LanguageV4 {
+            raw_word: word,
+            native: *b"und",
+            cause: Mov9LanguageCauseV4::QuickTimeUnspecified,
         });
     }
     let mut native = [0; 3];

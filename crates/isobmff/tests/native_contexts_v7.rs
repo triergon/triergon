@@ -184,7 +184,7 @@ fn rows(
 
 fn strict_config(s: &Source) -> Result<Mov9EncodedStreamV1, Error> {
     let mut i = s.input();
-    let mut job = Mov9EncodedStreamJobV1::new_description_v4(
+    let job = Mov9EncodedStreamJobV1::new_description_v4(
         &s.header,
         &s.table,
         &i,
@@ -195,14 +195,33 @@ fn strict_config(s: &Source) -> Result<Mov9EncodedStreamV1, Error> {
         },
         PinnedMovD32EncodedRegularV4,
     )?;
+    finish_config(job, &mut i)
+}
+fn range_config(s: &Source) -> Result<Mov9EncodedStreamV1, Error> {
+    let mut i = s.input();
+    let job = Mov9EncodedStreamJobV1::new_range_playback(
+        &s.header,
+        &s.table,
+        &i,
+        Mov9EncodedSelectionV4 {
+            major_brand: Some(s.brand),
+            description: 1,
+            limits: Mov9EncodedLimitsV1::default(),
+        },
+    )?;
+    finish_config(job, &mut i)
+}
+fn finish_config(
+    mut job: Mov9EncodedStreamJobV1<'_>,
+    input: &mut InputCursor,
+) -> Result<Mov9EncodedStreamV1, Error> {
+    let cancel = AtomicBool::new(false);
     for _ in 0..20000 {
-        if job.poll(&mut i, &mut WorkBudget::new(1), &AtomicBool::new(false))?
-            == Mov9CursorStatus::Ready
-        {
-            return job.take(&mut i, &AtomicBool::new(false));
+        if job.poll(input, &mut WorkBudget::new(1), &cancel)? == Mov9CursorStatus::Ready {
+            return job.take(input, &cancel);
         }
     }
-    panic!("strict config progress");
+    panic!("config progress");
 }
 fn strict_plan(s: &Source) -> Result<Mov9EncodedEditPlanV2, Error> {
     let mut i = s.input();
@@ -276,6 +295,58 @@ wave_case!(wave_terminator_body, "qt-v1-terminator-body");
 wave_case!(wave_after_terminator, "qt-v1-after-terminator");
 wave_case!(wave_duplicate_esds, "qt-v1-duplicate-esds");
 wave_case!(wave_unframed_compression, "qt-v1-unframed-compression");
+
+#[test]
+fn range_playback_refuses_malformed_quicktime_aac_wave() {
+    macro_rules! refuse {
+        ($name:literal) => {
+            assert!(
+                range_config(&Source::new(include_bytes!(concat!(
+                    "fixtures/encoded-metadata-v4/qt-v1-",
+                    $name,
+                    ".mov"
+                ))))
+                .is_err(),
+                "range playback admitted the malformed wave fixture {}",
+                $name
+            );
+        };
+    }
+    refuse!("wrong-frma");
+    refuse!("duplicate-frma");
+    refuse!("missing-frma");
+    refuse!("duplicate-esds");
+    refuse!("after-terminator");
+    refuse!("missing-terminator");
+    refuse!("terminator-body");
+}
+
+#[test]
+fn range_playback_keeps_valid_quicktime_aac_wave() {
+    for raw in [
+        include_bytes!("fixtures/encoded-metadata-v4/qt-v1-wave.mov").as_slice(),
+        include_bytes!("fixtures/encoded-metadata-v4/qt-v1-unknown.mov").as_slice(),
+        include_bytes!("fixtures/encoded-metadata-v4/qt-v1-unframed-compression.mov").as_slice(),
+    ] {
+        let s = Source::new(raw);
+        let config = range_config(&s).unwrap();
+        assert!(config.wave_source_v7().is_none());
+        assert_eq!(
+            config.native().extradata.as_ref(),
+            [0x11, 0x88, 0x56, 0xe5, 0]
+        );
+    }
+}
+
+#[test]
+fn range_playback_refuses_an_extra_iso_aac_wave_path() {
+    let mut raw = include_bytes!("fixtures/encoded-metadata-v4/creation-v0-0.mov").to_vec();
+    assert!(range_config(&Source::new(&raw)).is_ok());
+    let bitrate = raw.windows(4).position(|bytes| bytes == b"btrt").unwrap();
+    raw[bitrate..bitrate + 4].copy_from_slice(b"wave");
+    assert!(range_config(&Source::new(&raw)).is_err());
+}
+
 recovery_case!(recovery_dangling_description, "dangling-description");
 recovery_case!(recovery_empty_run, "empty-run");
 recovery_case!(recovery_coverage_over, "coverage-over");
