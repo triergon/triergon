@@ -62,4 +62,10 @@ Full parity for a selected lane means every declared valid combination, metadata
 
 ## What this phase has not established
 
-Independent Rust core/Matroska slices and the shared harness are implemented experimentally. Nothing has been substituted into Streem. The shared-core K0–K5 snapshot has qualified native Mac parity/timing/memory results on all 116 frozen workloads; this does not qualify subsequent source, complete core/format modules, full FATE coverage, 32-bit cross-builds or TV behavior. Parallel MP4, TS, framing and DVB implementations remain unqualified prototypes. The earlier candidate spike informs the dependency decision; newer evidence is recorded separately in `implementation.md`. Estimated effort remains dependent on coverage gaps; AI-generated code does not waive independent verification.
+The shared-core K0–K5 snapshot qualified on native Mac ARM64 across all 116
+frozen workloads. Those results apply to that source snapshot and the selected
+operations. The [offboarding ledger](offboarding-target.md) records later
+native Linux receipts and opt-in Streem integration and device verification.
+Complete module and shipping qualification remain open. The earlier candidate
+spike informs the dependency decision. See [implementation evidence](implementation.md)
+for the subsequent slices.
