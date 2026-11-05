@@ -2,16 +2,16 @@
 
 All four frozen cases match the pinned FFmpeg reference and pass runtime,
 peak live heap and total peak RSS at Triergon revision
-e499beacb4132ccbc40f6cb6235e0414e7cc8cc9. This is the development revision
-used by Streem's opt-in HLS integration. It is the head of [PR #8](https://github.com/triergon/triergon/pull/8);
-the result does not qualify a different revision of main.
+3f7547922e7be74ab21baf12f92851a161388c33. Streem's current opt-in
+integration uses this development revision from [PR #10](https://github.com/triergon/triergon/pull/10).
+The native runner rebuilt the candidate and collected fresh measurements.
 
 | Frozen case | Triergon median µs | FFmpeg median µs | Time upper 95% | Heap upper 95% | Total RSS upper 95% |
 | --- | ---: | ---: | ---: | ---: | ---: |
-| bframes-multislice | 172.11 | 210.34 | 0.82118× | 0.00569× | 0.60314× |
-| baseline-stereo | 115.86 | 159.98 | 0.72683× | 0.00478× | 0.62513× |
-| media-00 | 329.36 | 432.97 | 0.76292× | 0.00453× | 0.59789× |
-| media-01 | 326.52 | 435.36 | 0.75206× | 0.00435× | 0.59962× |
+| bframes-multislice | 172.27 | 209.12 | 0.82437× | 0.00569× | 0.58783× |
+| baseline-stereo | 116.12 | 160.75 | 0.72310× | 0.00478× | 0.60941× |
+| media-00 | 329.78 | 430.20 | 0.76865× | 0.00453× | 0.58309× |
+| media-01 | 326.91 | 434.17 | 0.75414× | 0.00435× | 0.58373× |
 
 Delivery passed 4/4 at 1.25× time and strictly lower memory. Three cases
 met the 0.80× optimization target. Time and memory each use 30 isolated
@@ -31,7 +31,9 @@ and HLS profiles remain open.
 
 [Current per-case results and artifact identities](results.json) bind the
 source, input hashes, workers, observers and retained native archive.
-[Earlier results](historical.json) apply to the earlier archived source
+The [previous Streem pin results](e499beac-results.json) preserve the
+separate native run of e499beac. [Earlier results](historical.json)
+apply to the archived source
 with overlays. That run also passed delivery in all four cases, with
 different source and candidate binary identities. Its original cold
 control failure remains in the archived run.
