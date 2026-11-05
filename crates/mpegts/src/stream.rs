@@ -135,7 +135,7 @@ pub struct TransportStream {
     program: u16,
     discover_program: bool,
     feed_omissions: Option<u64>,
-    deferred_feed_continuity: bool,
+    deferred_feed_events: u64,
     descriptor_namespace: DescriptorNamespace,
     framer: TransportFramer,
     pat: PsiRoute,
@@ -243,12 +243,12 @@ impl TransportStream {
         self.feed_omissions.as_mut().map_or(0, std::mem::take)
     }
 
-    fn omit_feed_event(&mut self) -> Result<()> {
+    fn omit_feed_events(&mut self, count: u64) -> Result<()> {
         let omissions = self
             .feed_omissions
             .as_mut()
             .ok_or(Error::Invalid("feed event omitted from source trace"))?;
-        *omissions = omissions.checked_add(1).ok_or(Error::Overflow)?;
+        *omissions = omissions.checked_add(count).ok_or(Error::Overflow)?;
         Ok(())
     }
 
@@ -271,7 +271,7 @@ impl TransportStream {
             program: program.unwrap_or_default(),
             discover_program: program.is_none(),
             feed_omissions: None,
-            deferred_feed_continuity: false,
+            deferred_feed_events: 0,
             descriptor_namespace,
             pmt: None,
             pmt_source: None,
@@ -379,7 +379,7 @@ impl TransportStream {
     /// Source IDs and core generations are not rewritten into clock/config epochs.
     pub fn discontinuity(&mut self) -> Result<()> {
         if self.packet.is_some()
-            || self.deferred_feed_continuity
+            || self.deferred_feed_events != 0
             || self.job.is_some()
             || self.section.is_some()
             || self.map_build.is_some()
@@ -885,9 +885,9 @@ impl TransportStream {
             .assembler
             .as_mut()
             .ok_or(Error::Invalid("PES route missing"))?;
-        if !assembler.validate_body_carrier(payload.len(), work) {
+        let Some(completed) = assembler.validate_body_carrier(payload.len(), work)? else {
             return Ok(false);
-        }
+        };
         let outcome = continuity.observe(packet)?;
         debug_assert_eq!(outcome, ContinuityOutcome::Continuous);
         if self.pcr_pid == Some(packet.pid) {
@@ -895,7 +895,7 @@ impl TransportStream {
         }
         // Transport is observed first in the full trace. Count continuity
         // only when the consumer asks for the next source event.
-        self.deferred_feed_continuity = true;
+        self.deferred_feed_events = 1 + u64::from(completed);
         Ok(true)
     }
 
@@ -996,7 +996,7 @@ impl TransportStream {
                 // These exact section bytes already passed CRC and table
                 // validation. There is no other table in this carrier.
                 work.take(payload.len() as u64);
-                self.omit_feed_event()?;
+                self.omit_feed_events(1)?;
                 self.phase = 7;
                 return Ok(());
             }
@@ -1090,7 +1090,7 @@ impl TransportStream {
                 match step {
                     Ok(AssemblyStep::Output(Some(pes))) => return Ok(Some(TraceEvent::Pes(pes))),
                     Ok(AssemblyStep::Output(None)) => {
-                        self.omit_feed_event()?;
+                        self.omit_feed_events(1)?;
                         Ok(false)
                     }
                     Ok(AssemblyStep::Yield) => Ok(false),
@@ -1176,7 +1176,7 @@ impl TransportStream {
                 Ok(AssemblyStep::Output(Some(pes))) => {
                     return Ok(Step::Ready(TraceEvent::Pes(pes)));
                 }
-                Ok(AssemblyStep::Output(None)) => self.omit_feed_event()?,
+                Ok(AssemblyStep::Output(None)) => self.omit_feed_events(1)?,
                 Ok(AssemblyStep::Yield) => return Ok(Step::Yield),
                 Err(error) if retryable(error) => return Err(error),
                 Err(error) => {
@@ -1232,9 +1232,9 @@ impl TransportStream {
             if cancel.load(Ordering::Relaxed) {
                 return Err(Error::Cancelled);
             }
-            if self.deferred_feed_continuity {
-                self.omit_feed_event()?;
-                self.deferred_feed_continuity = false;
+            if self.deferred_feed_events != 0 {
+                self.omit_feed_events(self.deferred_feed_events)?;
+                self.deferred_feed_events = 0;
             }
             if self.boundary_event {
                 self.boundary_event = false;
@@ -1259,7 +1259,7 @@ impl TransportStream {
                         }
                         if let Some(outcome) = self.outcome.take() {
                             if self.feed_omissions.is_some() {
-                                self.omit_feed_event()?;
+                                self.omit_feed_events(1)?;
                                 continue;
                             }
                             return Ok(ready(TraceEvent::Continuity {

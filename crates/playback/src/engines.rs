@@ -31,7 +31,7 @@ use ts::clock::NativeClockProfile;
 use ts::native_pes::{
     NativeDvbSubtitlesDescriptors, NativePesObserver, NativePesPacket, NativePesScope,
     NativePrivateAudioCarriage, NativePrivateAudioDescriptors, NativeRegisteredCarriage,
-    NativeSourceContext,
+    NativeSourceContext, ReadyContinuation,
 };
 use ts::psi::{DescriptorNamespace, ProgramMap};
 #[derive(Clone, Debug)]
@@ -1731,10 +1731,15 @@ impl TsEngine {
                 epochs: self.stream.source_epochs(),
                 byte_run_epoch: None,
             };
-            if let Some((work, cancel)) = ready
-                && observer.append_ready_continuation(&mut packet, context, work, cancel)?
-            {
-                return Ok(true);
+            if let Some((work, cancel)) = ready {
+                match observer.append_ready_continuation(&mut packet, context, work, cancel)? {
+                    ReadyContinuation::Buffered => return Ok(true),
+                    ReadyContinuation::Complete => {
+                        self.native_active = Some(index);
+                        return Ok(false);
+                    }
+                    ReadyContinuation::Unhandled => {}
+                }
             }
             let pushed = if self.native_context.is_some() {
                 observer.push_with_input(packet, context, &self.input)

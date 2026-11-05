@@ -144,6 +144,16 @@ impl NativePesPacket {
     }
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum ReadyContinuation {
+    /// Retry through the regular input state machine.
+    Unhandled,
+    /// Payload was retained. The observer can accept the next carrier.
+    Buffered,
+    /// A finite PES completed. Poll the observer before offering more input.
+    Complete,
+}
+
 #[derive(Debug)]
 struct Pending {
     packet: TransportPacket,
@@ -588,16 +598,16 @@ impl NativePesObserver {
     }
 
     /// Append an ordinary TS188 continuation when it fits the existing arena.
-    /// False leaves the carrier, observer and budget ready for normal polling.
+    /// Unhandled leaves the carrier, observer and budget ready for normal polling.
     pub fn append_ready_continuation(
         &mut self,
         packet: &mut TransportPacket,
         context: NativeSourceContext,
         work: &mut WorkBudget,
         cancel: &AtomicBool,
-    ) -> Result<bool> {
+    ) -> Result<ReadyContinuation> {
         let Some(payload) = packet.payload.as_ref() else {
-            return Ok(false);
+            return Ok(ReadyContinuation::Unhandled);
         };
         let count = payload.len();
         let next = self.payload_len.checked_add(count).ok_or(Error::Overflow)?;
@@ -608,7 +618,7 @@ impl NativePesObserver {
             || !self.active
             || self.header.is_none()
             || self.spans.len() >= self.spans.capacity().min(self.limits.source_spans)
-            || self.body_limit.is_some_and(|limit| next >= limit)
+            || self.body_limit.is_some_and(|limit| next > limit)
             || next >= DEFAULT_NATIVE_PACKET_CAP
             || self.header_used + next > self.limits.pes_bytes
             || self.previous_counter.map(|value| (value + 1) & 15)
@@ -617,7 +627,7 @@ impl NativePesObserver {
             || cancel.load(Ordering::Relaxed)
             || !work.try_charge(2)
         {
-            return Ok(false);
+            return Ok(ReadyContinuation::Unhandled);
         }
         let bytes = packet
             .payload
@@ -643,7 +653,11 @@ impl NativePesObserver {
         self.entity_first = false;
         self.previous_counter = Some(packet.continuity_counter);
         self.payload_len = next;
-        Ok(true)
+        Ok(if self.body_limit == Some(next) {
+            ReadyContinuation::Complete
+        } else {
+            ReadyContinuation::Buffered
+        })
     }
     pub(crate) fn transport_bounds(packet: &TransportPacket) -> Result<()> {
         let prefix = packet.prefix.as_ref().map_or(0, |bytes| bytes.len());

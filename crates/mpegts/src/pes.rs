@@ -215,9 +215,13 @@ impl PesAssembler {
         &self.raw_header[..self.header_used]
     }
 
-    /// Common body-only carrier in a validation-only feed. Leave every
-    /// boundary, fault and unfunded chunk to the ordinary PES state machine.
-    pub(crate) fn validate_body_carrier(&mut self, count: usize, work: &mut WorkBudget) -> bool {
+    /// Validate one ordinary body carrier. A successful result records whether
+    /// this finishes the finite PES. Other cases use the incremental parser.
+    pub(crate) fn validate_body_carrier(
+        &mut self,
+        count: usize,
+        work: &mut WorkBudget,
+    ) -> Result<Option<bool>> {
         if self.payload.is_some()
             || self.ended
             || self.fault.is_some()
@@ -225,17 +229,21 @@ impl PesAssembler {
             || self.header.is_none()
             || self.next_chunk == u64::MAX
             || self.validated_spans == self.limits.source_spans
-            || count >= self.total.unwrap_or(self.limits.pes_bytes) - self.seen
+            || count > self.total.unwrap_or(self.limits.pes_bytes) - self.seen
             || !work.try_charge(count as u64 + 1)
         {
-            return false;
+            return Ok(None);
         }
         self.validated_chunk = Some(self.next_chunk);
         self.next_chunk += 1;
         self.validated_spans += 1;
         self.payload_len += count;
         self.seen += count;
-        true
+        let completed = self.total == Some(self.seen);
+        if completed {
+            self.emit::<false>()?;
+        }
+        Ok(Some(completed))
     }
 
     /// Explicit continuity/configuration/clock recovery. Caller retains source
