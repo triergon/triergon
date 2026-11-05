@@ -1196,6 +1196,7 @@ impl<S: Source> Player<S> {
             && matches!(delivery, Delivery::Present | Delivery::Unselected)
             && event.track() == Some(seek.intent.track)
             && !matches!(&event, RawEvent::Mp4(crate::Mp4Event::NativeShortPacket(_)))
+            && !matches!(&event, RawEvent::NativeTs { packet, .. } if packet.native_flags & 2 != 0)
         {
             // Reordered packets still need the original presentation target.
             // Only the preroll input accounting ends here.
