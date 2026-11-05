@@ -15,9 +15,17 @@ use crate::{
 };
 use std::{
     ops::Range,
-    sync::atomic::{AtomicBool, Ordering},
+    sync::{
+        Arc,
+        atomic::{AtomicBool, Ordering},
+    },
 };
 use triergon_core::{Budget, BudgetVec, Error, Result, TimeBase, WorkBudget};
+
+#[path = "native_range_seek.rs"]
+mod range_seek;
+use range_seek::Checkpoints;
+pub use range_seek::Mov9RangeSeekJob;
 
 /// Opt-in compatibility operation, not a source/presentation conformance rule.
 /// The original constructors use forced MOV, seekable input, no stream-info and
@@ -138,7 +146,7 @@ pub(crate) struct PreviousClock {
     pub(crate) duration: u32,
     pub(crate) source_known: bool,
 }
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 struct Slot<'a> {
     resume_remaining: u64,
     track: Mov9Track<'a>,
@@ -397,6 +405,8 @@ pub struct Mov9PacketCursor<'a> {
     front_source: bool,
     terminal: Option<crate::TerminalMdat>,
     forward_regular: Option<crate::ForwardRegularMdatV1>,
+    recording_seek_checkpoints: bool,
+    seek_checkpoints: Option<Arc<Checkpoints<'a>>>,
 }
 
 fn count(value: u64, maximum: u64) -> Result<()> {
@@ -479,6 +489,8 @@ impl<'a> Mov9PacketCursor<'a> {
             front_source: false,
             terminal: None,
             forward_regular: None,
+            recording_seek_checkpoints: false,
+            seek_checkpoints: None,
         }
     }
     /// The caller establishes one complete original media source and all its
@@ -667,6 +679,9 @@ impl<'a> Mov9PacketCursor<'a> {
         if starts.len() != self.slots.len() {
             return Err(Error::Invalid("native resume track coverage"));
         }
+        if self.recording_seek_checkpoints && starts.iter().any(|start| start.occurrence != 0) {
+            self.discard_seek_checkpoints();
+        }
         let skipped = starts.iter().try_fold(0u64, |sum, p| {
             sum.checked_add(p.occurrence).ok_or(Error::Overflow)
         })?;
@@ -747,6 +762,9 @@ impl<'a> Mov9PacketCursor<'a> {
         replay.complete_source = true;
         replay.phase = Phase::Initialize;
         replay.validated = self.validated;
+        if !self.recording_seek_checkpoints {
+            replay.seek_checkpoints.clone_from(&self.seek_checkpoints);
+        }
         Ok(replay)
     }
 
@@ -773,6 +791,7 @@ impl<'a> Mov9PacketCursor<'a> {
             slot.previous_clock = None;
             slot.ended = false;
         }
+        self.recording_seek_checkpoints = false;
         self.at = 0;
         self.generated = 0;
         self.phase = Phase::Initialize;
@@ -1029,6 +1048,9 @@ impl<'a> Mov9PacketCursor<'a> {
                         }
                         self.generated = self.generated.checked_add(1).ok_or(Error::Overflow)?;
                         count(self.generated, self.limits.max_occurrences)?;
+                        if self.recording_seek_checkpoints {
+                            self.record_seek_checkpoint(best);
+                        }
                         self.ready = self.slots.as_mut_slice()[best].head.take();
                         self.at = 0;
                         self.phase = Phase::Fill;

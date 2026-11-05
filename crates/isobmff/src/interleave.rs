@@ -53,7 +53,7 @@ impl<'a> SourceTrack<'a> {
 /// One track's original sample sequence: regular samples, then the matching
 /// fragment indexes in the caller's established order. No edit repetition,
 /// source clock filling, cross-track ordering or expanded sample array.
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct TrackSampleCursor<'a> {
     source: SourceTrack<'a>,
     regular: Option<SampleCursor<'a>>,

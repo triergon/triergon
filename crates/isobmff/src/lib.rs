@@ -65,7 +65,8 @@ pub use native_clock::{
 };
 pub use native_cursor::{
     Mov9ClockOrigin, Mov9EditIdentity, Mov9PacketCursor, Mov9PacketLimits, Mov9PacketOccurrence,
-    Mov9PredecessorClock, Mov9Profile, Mov9ResumePoint, Mov9Track, mov9_seekable_head_precedes,
+    Mov9PredecessorClock, Mov9Profile, Mov9RangeSeekJob, Mov9ResumePoint, Mov9Track,
+    mov9_seekable_head_precedes,
 };
 pub use native_edits::{
     Mov9CursorStatus, Mov9DurationBasis, Mov9EditCursor, Mov9EditLimits, Mov9Occurrence,

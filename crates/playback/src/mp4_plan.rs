@@ -704,7 +704,14 @@ impl<'a> Mp4IndexJob<'a> {
                     }
                     push(&mut p.media_cache, extent.clone())?;
                 } else {
-                    self.phase = if self.range_duration.is_some() { 4 } else { 3 };
+                    self.phase = if self.range_duration.is_some() {
+                        if let Some(cursor) = &mut self.native {
+                            cursor.enable_range_seek_checkpoints();
+                        }
+                        4
+                    } else {
+                        3
+                    };
                 }
             }
             3 => {
