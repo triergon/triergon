@@ -383,11 +383,11 @@ impl Active {
                         if end > input.end || (input.spans.len() == 0 && end != input.end) {
                             return Err(Error::Invalid("HLS HEVC PES payload extent"));
                         }
-                        self.reader.provide(&InputWindow::new(
+                        self.reader.provide_owned(InputWindow::new(
                             request.source,
                             request.token,
                             request.offset,
-                            bytes.clone(),
+                            span.into_bytes(),
                         )?)?;
                         self.supplied = end;
                     } else if self.eof {

@@ -433,6 +433,9 @@ impl Ac3Frame {
     pub fn bytes(&self) -> &Bytes {
         &self.bytes
     }
+    pub fn into_bytes(self) -> Bytes {
+        self.bytes
+    }
     pub const fn facts(&self) -> Ac3FrameFacts {
         self.facts
     }
@@ -525,6 +528,12 @@ impl Ac3FrameReader {
             return Err(error);
         }
         self.cursor.provide(window)
+    }
+    pub fn provide_owned(&mut self, window: InputWindow) -> Result<()> {
+        if let Some(error) = self.failure {
+            return Err(error);
+        }
+        self.cursor.provide_owned(window)
     }
     pub fn finish(&mut self, source: SourceId, token: InputToken) -> Result<()> {
         if let Some(error) = self.failure {

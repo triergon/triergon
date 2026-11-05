@@ -6,8 +6,8 @@ use crate::{
 };
 use std::sync::atomic::{AtomicBool, Ordering};
 use triergon_core::{
-    Budget, BudgetVec, Bytes, Error, InputCursor, InputToken, Result, SourceId, SourceLocation,
-    Step, WorkBudget,
+    Budget, BudgetVec, ByteStorageAddress, Bytes, Error, InputCursor, InputToken, Result, SourceId,
+    SourceLocation, Step, WorkBudget,
 };
 
 const MAX_SHARED_INPUT_CAPACITY: usize = 128 * 1024;
@@ -91,7 +91,7 @@ pub struct TransportFramer {
     budget: Budget,
     format: PacketFormat,
     share_input: bool,
-    shared_owner: Option<Bytes>,
+    shared_owner: Option<ByteStorageAddress>,
     carry: Option<BudgetVec<u8>>,
     start: Option<u64>,
     next: Option<u64>,
@@ -130,7 +130,6 @@ impl TransportFramer {
     pub fn discard(&mut self) {
         self.carry = Some(BudgetVec::new(&self.budget));
         self.start = None;
-        self.shared_owner = None;
         self.next = None;
         self.token = None;
         self.entity = None;
@@ -214,21 +213,23 @@ impl TransportFramer {
         Ok(())
     }
 
-    fn share_buffered_owner(shared_owner: &mut Option<Bytes>, input: &InputCursor) -> bool {
+    fn share_buffered_owner(
+        shared_owner: &mut Option<ByteStorageAddress>,
+        input: &InputCursor,
+    ) -> bool {
         let Some(window) = input.buffered_owner() else {
             return false;
         };
-        if let Some(owner) = shared_owner {
-            return owner.shares_storage_with(window);
-        }
         // One bounded owner per segment. A short read backed by an oversized
         // allocation must not keep that capacity alive through a PES span.
         let capacity = window.retained_capacity();
         if capacity > MAX_SHARED_INPUT_CAPACITY || capacity > window.len().saturating_mul(8) {
             return false;
         }
-        *shared_owner = Some(window.clone());
-        true
+        let address = window.storage_address();
+        // Address reuse requires the former allocation and all its views to
+        // have dropped. At most one shared backing allocation can be live.
+        *shared_owner.get_or_insert(address) == address
     }
 
     pub(crate) fn try_null_run(
@@ -596,6 +597,7 @@ mod tests {
         framer.share_input();
         let mut wire = [0xff; 188];
         wire[..4].copy_from_slice(&[0x47, 0x1f, 0xff, 0x10]);
+        let mut owners = Vec::new();
         for (capacity, share) in [(64 * 1024, false), (188, true), (188, false)] {
             let mut data = Vec::with_capacity(capacity);
             data.extend_from_slice(&wire);
@@ -619,7 +621,51 @@ mod tests {
             };
             assert_eq!(packet.source.as_ref(), &wire);
             assert_eq!(packet.source.shares_storage_with(&owner), share);
+            owners.push(owner);
         }
+    }
+
+    #[test]
+    fn an_unretained_shared_carrier_returns_its_window_budget() {
+        let limit = 188 + Bytes::owner_overhead_bytes() + Budget::control_storage_bytes();
+        let budget = Budget::new(limit).unwrap();
+        let mut input = InputCursor::new(
+            &budget,
+            SourceId(1),
+            SourceCapabilities {
+                length: Some(188),
+                random_access: false,
+            },
+            188,
+        )
+        .unwrap();
+        let request = input.request();
+        let mut wire = [0xff; 188];
+        wire[..4].copy_from_slice(&[0x47, 0x1f, 0xff, 0x10]);
+        input
+            .provide_owned(
+                InputWindow::new(
+                    request.source,
+                    request.token,
+                    0,
+                    Bytes::copy_from_slice(&budget, &wire).unwrap(),
+                )
+                .unwrap(),
+            )
+            .unwrap();
+        let mut framer = TransportFramer::new(budget.clone(), PacketFormat::Ts188);
+        framer.share_input();
+        assert!(matches!(
+            framer
+                .poll(
+                    &mut input,
+                    &mut WorkBudget::new(4096),
+                    &AtomicBool::new(false)
+                )
+                .unwrap(),
+            Step::Ready(_)
+        ));
+        assert_eq!(budget.used(), Budget::control_storage_bytes());
     }
 
     #[test]

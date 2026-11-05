@@ -249,6 +249,13 @@ impl NalReader {
         self.cursor.provide(window)
     }
 
+    pub fn provide_owned(&mut self, window: InputWindow) -> Result<()> {
+        if let Some(error) = self.failure {
+            return Err(error);
+        }
+        self.cursor.provide_owned(window)
+    }
+
     pub fn finish(&mut self, source: SourceId, token: InputToken) -> Result<()> {
         if let Some(error) = self.failure {
             return Err(error);

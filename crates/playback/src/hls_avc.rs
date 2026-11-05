@@ -7,12 +7,13 @@ pub(crate) mod syntax;
 use crate::{TrackKey, TsNativeCarriage, TsNativeConfiguration};
 use std::sync::atomic::{AtomicBool, Ordering};
 use triergon_core::{
-    Budget, BudgetVec, Bytes, Error, Result, SourceId, WorkBudget, nonzero_prefix_len,
+    Budget, BudgetVec, BudgetVecIntoIter, Bytes, Error, Result, SourceId, WorkBudget,
+    nonzero_prefix_len,
 };
 use triergon_framing::{Codec, NalHeader};
 use triergon_mpegts::{
     clock::NativePesTimeView,
-    native_pes::{NativePesPacket, NativePesPayloadKind, NativeRegisteredCarriage},
+    native_pes::{NativePesPacket, NativePesPayloadKind, NativePesSpan, NativeRegisteredCarriage},
 };
 
 pub use syntax::AvcRaster;
@@ -129,8 +130,7 @@ struct Chunk {
 }
 
 struct PendingPes {
-    packet: NativePesPacket,
-    span: usize,
+    spans: BudgetVecIntoIter<NativePesSpan>,
     remaining: usize,
 }
 
@@ -328,8 +328,7 @@ impl AvcTsReader {
         self.source_clock_epoch = Some(origin);
         self.pending_pes = mailbox.take().map(|packet| PendingPes {
             remaining: packet.payload_len,
-            packet,
-            span: 0,
+            spans: packet.spans.into_iter(),
         });
         Ok(true)
     }
@@ -431,11 +430,15 @@ impl AvcTsReader {
                 continue;
             }
             if let Some(pending) = &mut self.pending_pes {
-                if let Some(span) = pending.packet.spans.as_slice().get(pending.span) {
+                if pending.spans.len() != 0 {
                     if !work.try_charge(1) {
                         return Ok(AvcTsStep::Yield);
                     }
-                    let bytes = span.backing_bytes();
+                    let bytes = pending
+                        .spans
+                        .next()
+                        .ok_or(Error::Invalid("AVC TS missing PES span"))?
+                        .into_bytes();
                     if !bytes.belongs_to(&self.pool) {
                         return Err(Error::ForeignPool);
                     }
@@ -443,11 +446,7 @@ impl AvcTsReader {
                         .remaining
                         .checked_sub(bytes.len())
                         .ok_or(Error::Invalid("AVC TS PES payload extent"))?;
-                    self.input = Some(Chunk {
-                        bytes: bytes.clone(),
-                        offset: 0,
-                    });
-                    pending.span += 1;
+                    self.input = Some(Chunk { bytes, offset: 0 });
                 } else {
                     if pending.remaining != 0 {
                         return Err(Error::Invalid("AVC TS PES payload extent"));

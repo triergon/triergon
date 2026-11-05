@@ -17,6 +17,10 @@ pub struct Bytes {
     range: Range<usize>,
 }
 
+/// A shared allocation's address. It can be reused after the last owner drops.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct ByteStorageAddress(usize);
+
 impl Bytes {
     pub fn copy_from_slice(budget: &Budget, input: &[u8]) -> Result<Self> {
         let size = input
@@ -111,6 +115,10 @@ impl Bytes {
     }
     pub fn shares_storage_with(&self, other: &Self) -> bool {
         Arc::ptr_eq(&self.storage, &other.storage)
+    }
+    /// Compare backing allocations without extending their lifetimes.
+    pub fn storage_address(&self) -> ByteStorageAddress {
+        ByteStorageAddress(Arc::as_ptr(&self.storage).addr())
     }
     pub fn belongs_to(&self, budget: &Budget) -> bool {
         self.storage.charge.budget.same_pool(budget)

@@ -102,6 +102,11 @@ impl NativePesSpan {
     pub fn backing_bytes(&self) -> &Bytes {
         &self.bytes
     }
+
+    /// Transfer the charged payload to another reader.
+    pub fn into_bytes(self) -> Bytes {
+        self.bytes
+    }
 }
 
 /// This may be a corrupt/partial/headerless native packet, NEVER a complete
@@ -496,7 +501,32 @@ impl NativePesObserver {
         selected_boundary: bool,
         input: Option<&triergon_core::InputCursor>,
     ) -> std::result::Result<(), PushError<TransportPacket>> {
-        let error = if let Err(error) = self.validate_native_input(input) {
+        if let Some(error) = self.input_error(&packet, context, selected_boundary, input) {
+            return Err(PushError {
+                error,
+                value: packet,
+            });
+        }
+        self.last_input = Some((context.source_event_ordinal, packet.source_offset));
+        self.entity_first = false;
+        self.pending = Some(Pending {
+            packet,
+            context,
+            position: 0,
+            counter_checked: false,
+            started: false,
+        });
+        Ok(())
+    }
+
+    fn input_error(
+        &self,
+        packet: &TransportPacket,
+        context: NativeSourceContext,
+        selected_boundary: bool,
+        input: Option<&triergon_core::InputCursor>,
+    ) -> Option<Error> {
+        if let Err(error) = self.validate_native_input(input) {
             Some(error)
         } else if !packet.source.belongs_to(&self.budget) {
             Some(Error::Invalid("foreign native PES byte pool"))
@@ -553,24 +583,67 @@ impl NativePesObserver {
         {
             Some(Error::Overflow)
         } else {
-            Self::transport_bounds(&packet).err()
-        };
-        if let Some(error) = error {
-            return Err(PushError {
-                error,
-                value: packet,
-            });
+            Self::transport_bounds(packet).err()
         }
+    }
+
+    /// Append an ordinary TS188 continuation when it fits the existing arena.
+    /// False leaves the carrier, observer and budget ready for normal polling.
+    pub fn append_ready_continuation(
+        &mut self,
+        packet: &mut TransportPacket,
+        context: NativeSourceContext,
+        work: &mut WorkBudget,
+        cancel: &AtomicBool,
+    ) -> Result<bool> {
+        let Some(payload) = packet.payload.as_ref() else {
+            return Ok(false);
+        };
+        let count = payload.len();
+        let next = self.payload_len.checked_add(count).ok_or(Error::Overflow)?;
+        if packet.payload_unit_start
+            || packet.adaptation.is_some()
+            || packet.prefix.is_some()
+            || count == 0
+            || !self.active
+            || self.header.is_none()
+            || self.spans.len() >= self.spans.capacity().min(self.limits.source_spans)
+            || self.body_limit.is_some_and(|limit| next >= limit)
+            || next >= DEFAULT_NATIVE_PACKET_CAP
+            || self.header_used + next > self.limits.pes_bytes
+            || self.previous_counter.map(|value| (value + 1) & 15)
+                != Some(packet.continuity_counter)
+            || self.input_error(packet, context, false, None).is_some()
+            || cancel.load(Ordering::Relaxed)
+            || !work.try_charge(2)
+        {
+            return Ok(false);
+        }
+        let bytes = packet
+            .payload
+            .take()
+            .ok_or(Error::Invalid("native PES payload missing"))?;
+        self.spans
+            .try_push(NativePesSpan {
+                bytes,
+                source: SourceRange {
+                    entity: self.scope.entity,
+                    offset: packet.payload_source_offset,
+                    bytes: count,
+                },
+                transport: SourceRange {
+                    entity: self.scope.entity,
+                    offset: packet.source_offset,
+                    bytes: packet.source.len(),
+                },
+                context,
+            })
+            .map_err(|error| error.error)?;
         self.last_input = Some((context.source_event_ordinal, packet.source_offset));
         self.entity_first = false;
-        self.pending = Some(Pending {
-            packet,
-            context,
-            position: 0,
-            counter_checked: false,
-            started: false,
-        });
-        Ok(())
+        self.previous_counter = Some(packet.continuity_counter);
+        self.payload_len = next;
+        Ok(true)
     }
     pub(crate) fn transport_bounds(packet: &TransportPacket) -> Result<()> {
         let prefix = packet.prefix.as_ref().map_or(0, |bytes| bytes.len());
