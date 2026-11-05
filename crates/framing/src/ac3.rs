@@ -277,12 +277,19 @@ impl PrefixBits<'_> {
         if end > self.bytes.len().checked_mul(8).ok_or(Error::Overflow)? {
             return Err(Error::Truncated);
         }
-        let mut value = 0_u16;
-        for position in self.position..end {
-            value = (value << 1) | u16::from((self.bytes[position / 8] >> (7 - position % 8)) & 1);
+        if count == 0 {
+            return Ok(0);
         }
+        let word = match &self.bytes[self.position / 8..end.div_ceil(8)] {
+            [a] => u32::from(*a),
+            [a, b] => u32::from(u16::from_be_bytes([*a, *b])),
+            [a, b, c] => u32::from_be_bytes([0, *a, *b, *c]),
+            _ => return Err(Error::Invalid("audio probe bit width")),
+        };
+        let shift = (8 - end % 8) % 8;
+        let value = (word >> shift) & ((1 << count) - 1);
         self.position = end;
-        Ok(value)
+        Ok(value as u16)
     }
     fn small(&mut self, count: usize) -> Result<u8> {
         u8::try_from(self.take(count)?).map_err(|_| Error::Overflow)
@@ -296,12 +303,35 @@ impl PrefixBits<'_> {
     }
 }
 
+#[cfg(test)]
+#[test]
+fn prefix_bits_match_a_scalar_read_at_each_alignment() {
+    let bytes = [0x86, 0x1d, 0xc7, 0x30];
+    for position in 0..16 {
+        for count in 0..=16 {
+            let mut probe = PrefixBits {
+                bytes: &bytes,
+                position,
+                limit: 32,
+            };
+            let expected = (position..position + count).fold(0_u16, |value, offset| {
+                (value << 1) | u16::from((bytes[offset / 8] >> (7 - offset % 8)) & 1)
+            });
+            assert_eq!(probe.take(count).unwrap(), expected);
+            assert_eq!(probe.position, position + count);
+        }
+    }
+}
+
 /// Reads at most twelve bytes / ninety selected bits. Extra supplied bytes are
 /// not scanned. Truncated means the bounded prefix needs more bytes; unsupported
 /// BSIDs and byte order are not guessed. CRCs/audio payload remain unchecked.
 pub fn probe_ac3_header(prefix: &[u8]) -> Result<Ac3FrameHeader> {
     let prefix = &prefix[..prefix.len().min(MAX_PREFIX)];
-    let info = layout(prefix)?;
+    probe_with_layout(prefix, layout(prefix)?)
+}
+
+fn probe_with_layout(prefix: &[u8], info: Layout) -> Result<Ac3FrameHeader> {
     let limit = info
         .frame_bytes
         .checked_mul(8)
@@ -474,6 +504,7 @@ pub struct Ac3FrameReader {
     copied: usize,
     offset: u64,
     frame_bytes: usize,
+    layout: Option<Layout>,
     header: Option<Ac3FrameHeader>,
     buffer: Option<BudgetVec<u8>>,
     completed: usize,
@@ -505,6 +536,7 @@ impl Ac3FrameReader {
             copied: 0,
             offset: 0,
             frame_bytes: 0,
+            layout: None,
             header: None,
             buffer: None,
             completed: 0,
@@ -683,6 +715,7 @@ impl Ac3FrameReader {
                         return Err(Error::Truncated);
                     }
                     self.frame_bytes = info.frame_bytes;
+                    self.layout = Some(info);
                     self.target = info.frame_bytes.min(MAX_PREFIX);
                     self.phase = Phase::ProbeBytes;
                 }
@@ -690,7 +723,11 @@ impl Ac3FrameReader {
                     if !work.try_charge(1) {
                         return Ok(Step::Yield);
                     }
-                    self.header = Some(probe_ac3_header(&self.prefix[..self.used])?);
+                    let info = self
+                        .layout
+                        .take()
+                        .ok_or(Error::Invalid("missing audio frame layout"))?;
+                    self.header = Some(probe_with_layout(&self.prefix[..self.used], info)?);
                     self.phase = Phase::Reserve;
                 }
                 Phase::Reserve => {
