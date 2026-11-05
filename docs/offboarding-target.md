@@ -291,15 +291,21 @@ clock queries, native recovery seeks, shipping adoption and full numerical
 qualification remain open.
 [Playback API and scope](../crates/playback/README.md#range-backed-mp4-sync-seek)
 
-## Independent AVC/AAC HLS segments
+## Independent TS188 HLS segments
 
 Four frozen independent TS188 segment cases matched the pinned FFmpeg
 parser and app clock, and passed delivery timing, peak live heap and total
 peak RSS on native Linux ARM64. The [HLS receipt](../research/qualification/hls-avc-aac-linux-arm64/README.md)
 binds the exact development revision used by Streem's opt-in HLS work.
-O31 still requires the other selected TS/M2TS, elementary and HLS
-profiles. Playlist lifecycle, hardware playback and full application
-offboarding remain separate gates.
+
+`HlsMediaSegmentReader` adds negotiated AVC or HEVC with ADTS AAC, AC-3
+or E-AC-3 in independent TS188 segments. E-AC-3 admission covers a single
+independent substream. The selected reader checks the program map,
+preserves source video clocks and seals only after confirmed transport
+EOF. The original AVC/AAC reader keeps its existing API and clock views.
+The expanded profiles require their own frozen native parity, runtime and
+memory evidence. O31 also requires the remaining selected TS/M2TS,
+elementary and HLS profiles. Target and shipping qualification remain open.
 
 ## Additional application-runtime surfaces
 

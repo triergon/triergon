@@ -71,4 +71,6 @@ pub mod catalogue;
 pub mod hls_aac;
 pub mod hls_avc;
 pub mod hls_clock;
+mod hls_dolby;
+mod hls_hevc;
 pub mod hls_segment;
