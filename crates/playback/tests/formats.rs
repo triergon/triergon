@@ -3032,24 +3032,24 @@ fn native_range_seek_matches_ffprobe_packet_order_bytes_and_clocks() {
     }
 }
 
-#[test]
-fn native_range_seek_replays_the_encoded_edit_occurrences() {
+fn encoded_range_player(raw: &[u8]) -> (Player<ByteSource>, mp4_open::Movie) {
     use triergon_isobmff::{
-        Mov9CursorStatus, Mov9EncodedEditContextV2, Mov9EncodedEditJobV2, Mov9EncodedStreamJobV1,
-        PinnedMovD32EncodedEditsV2, PinnedMovD32EncodedRegularV1,
+        Mov9CursorStatus, Mov9EncodedEditContextV2, Mov9EncodedEditJobV2, Mov9EncodedSelectionV4,
+        Mov9EncodedStreamJobV1,
     };
-    let raw = include_bytes!("../../isobmff/tests/fixtures/encoded-edit-v2/original.mp4");
     let (mut opened, _) = open(raw, 97, 4096).unwrap();
     let cancel = off();
     let mut plans = Vec::new();
     for track in opened.movie.tracks() {
-        let mut stream = Mov9EncodedStreamJobV1::new(
+        let mut stream = Mov9EncodedStreamJobV1::new_range_playback(
             track.header(),
             track.table(),
             &opened.input,
-            opened.movie.major_brand(),
-            Default::default(),
-            PinnedMovD32EncodedRegularV1,
+            Mov9EncodedSelectionV4 {
+                major_brand: opened.movie.major_brand(),
+                description: 1,
+                limits: Default::default(),
+            },
         )
         .unwrap();
         while stream
@@ -3058,7 +3058,7 @@ fn native_range_seek_replays_the_encoded_edit_occurrences() {
             != Mov9CursorStatus::Ready
         {}
         let stream = stream.take(&mut opened.input, &cancel).unwrap();
-        let mut edit = Mov9EncodedEditJobV2::new(
+        let mut edit = Mov9EncodedEditJobV2::new_range_playback(
             Mov9EncodedEditContextV2 {
                 table: track.table(),
                 edits: track.edits().unwrap(),
@@ -3066,9 +3066,9 @@ fn native_range_seek_replays_the_encoded_edit_occurrences() {
                 media_base: track.header().time_base().unwrap(),
                 movie_base: opened.movie.header().time_base().unwrap(),
             },
+            std::slice::from_ref(&stream),
             &opened.input,
             Default::default(),
-            PinnedMovD32EncodedEditsV2,
         )
         .unwrap();
         while edit
@@ -3095,6 +3095,44 @@ fn native_range_seek_replays_the_encoded_edit_occurrences() {
     player
         .set_clock_view(ClockChoice::ExplicitNativeProjection)
         .unwrap();
+    (player, opened.movie)
+}
+
+#[test]
+fn native_range_player_carries_dolby_leading_trim() {
+    let fixtures: [&[u8]; 2] = [
+        include_bytes!("../../isobmff/tests/fixtures/range-encoded-edits/leading-ac3.mp4"),
+        include_bytes!("../../isobmff/tests/fixtures/range-encoded-edits/leading-eac3.mp4"),
+    ];
+    for raw in fixtures {
+        let (mut player, _) = encoded_range_player(raw);
+        let events = collect(&mut player, 4096).unwrap();
+        let packets: Vec<_> = events
+            .iter()
+            .filter_map(|event| match event.event() {
+                RawEvent::Mp4(Mp4Event::Packet(packet)) => Some(packet),
+                _ => None,
+            })
+            .collect();
+        assert_eq!(packets.len(), 6);
+        assert_eq!(
+            packets[0].encoded_skip_samples,
+            Some([0, 1, 0, 0, 0, 0, 0, 0, 0, 0]),
+        );
+        assert_eq!(packets[0].source.payload.as_ref(), &raw[48..432]);
+        assert!(
+            packets[1..]
+                .iter()
+                .all(|p| p.encoded_skip_samples.is_none())
+        );
+    }
+}
+
+#[test]
+fn native_range_seek_replays_the_encoded_edit_occurrences() {
+    let raw = include_bytes!("../../isobmff/tests/fixtures/encoded-edit-v2/original.mp4");
+    let (mut player, movie) = encoded_range_player(raw);
+    let cancel = off();
     let leading = [0xf0, 3, 0, 0, 0, 0, 0, 0, 0, 0];
     let trailing = [0, 0, 0, 0, 0xf0, 1, 0, 0, 0, 0];
     let linear = collect(&mut player, 4096).unwrap();
@@ -3112,7 +3150,7 @@ fn native_range_seek_replays_the_encoded_edit_occurrences() {
     let command = {
         let mut job = player
             .prepare_mp4_native_seek(
-                &opened.movie,
+                &movie,
                 Mp4NativeSeekRequest {
                     video: 1,
                     timestamp: 43_200,

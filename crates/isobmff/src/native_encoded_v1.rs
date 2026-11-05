@@ -492,6 +492,19 @@ struct WaveV4 {
     terminator: Option<BoxView>,
 }
 
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum DescriptionView {
+    Regular,
+    MetadataV4,
+    ContextsV7,
+    RangePlayback,
+}
+impl DescriptionView {
+    fn observes_contexts(self) -> bool {
+        self == Self::ContextsV7
+    }
+}
+
 /// Metadata-only job over the original charged source owners. Source/request
 /// generations, work, cancellation and transport checks use the shared core.
 pub struct Mov9EncodedStreamJobV1<'a> {
@@ -509,12 +522,11 @@ pub struct Mov9EncodedStreamJobV1<'a> {
     result: Option<Mov9EncodedStreamV1>,
     failed: Option<Error>,
     finished: bool,
-    receiver_v4: bool,
+    view: DescriptionView,
     major: Option<[u8; 4]>,
     sound_v4: Option<crate::Mov9SoundV1SourceV4>,
     wave_v4: Option<WaveV4>,
     inspected_boxes: u32,
-    receiver_v7: bool,
     wave_source_v7: Option<crate::Mov9WaveObservationV7>,
     pending_esds_v7: Option<(BoxView, EsdsWalk)>,
     descriptors_left_v7: u32,
@@ -537,8 +549,7 @@ impl<'a> Mov9EncodedStreamJobV1<'a> {
                 limits,
                 description: 1,
             },
-            false,
-            false,
+            DescriptionView::Regular,
         )
     }
     pub fn new_description_v3(
@@ -559,8 +570,7 @@ impl<'a> Mov9EncodedStreamJobV1<'a> {
                 limits,
                 description,
             },
-            false,
-            false,
+            DescriptionView::Regular,
         )
     }
     /// V4 admits the independently sourced QuickTime VBR AudioV1/wave layout
@@ -572,7 +582,7 @@ impl<'a> Mov9EncodedStreamJobV1<'a> {
         selection: crate::Mov9EncodedSelectionV4,
         _profile: crate::PinnedMovD32EncodedRegularV4,
     ) -> Result<Self> {
-        Self::new_description_inner(header, table, input, selection, true, false)
+        Self::new_description_inner(header, table, input, selection, DescriptionView::MetadataV4)
     }
     /// Named receiver context: source wave words/ordering and the old strict
     /// profile's first fault remain owned; no valid-source result is fabricated.
@@ -583,21 +593,37 @@ impl<'a> Mov9EncodedStreamJobV1<'a> {
         selection: crate::Mov9EncodedSelectionV4,
         _profile: crate::PinnedMovD32EncodedContextsV7,
     ) -> Result<Self> {
-        Self::new_description_inner(header, table, input, selection, true, true)
+        Self::new_description_inner(header, table, input, selection, DescriptionView::ContextsV7)
+    }
+    /// Range playback requires an unambiguous AAC configuration and admits
+    /// AVC and HEVC visual entries in a QuickTime movie.
+    pub fn new_range_playback(
+        header: &'a TrackHeader,
+        table: &SampleTable,
+        input: &InputCursor,
+        selection: crate::Mov9EncodedSelectionV4,
+    ) -> Result<Self> {
+        Self::new_description_inner(
+            header,
+            table,
+            input,
+            selection,
+            DescriptionView::RangePlayback,
+        )
     }
     fn new_description_inner(
         header: &'a TrackHeader,
         table: &SampleTable,
         input: &InputCursor,
         selection: crate::Mov9EncodedSelectionV4,
-        receiver_v4: bool,
-        receiver_v7: bool,
+        view: DescriptionView,
     ) -> Result<Self> {
         let crate::Mov9EncodedSelectionV4 {
             major_brand: major,
             limits,
             description,
         } = selection;
+        let receiver_v4 = view != DescriptionView::Regular;
         if !table.raw().bytes().belongs_to(input.budget())
             || [&header.raw_tkhd, &header.raw_mdhd, &header.raw_hdlr]
                 .iter()
@@ -649,15 +675,18 @@ impl<'a> Mov9EncodedStreamJobV1<'a> {
             && kind == EncodedEntryKindV1::Aac
             && fields::u16_at(entry.raw().payload(), 8)? == 1
         {
-            Some(if receiver_v7 {
-                crate::Mov9SoundV1SourceV4::parse_v7(&entry)?
-            } else {
-                crate::Mov9SoundV1SourceV4::parse(&entry)?
+            Some(match view {
+                DescriptionView::ContextsV7 | DescriptionView::RangePlayback => {
+                    crate::Mov9SoundV1SourceV4::parse_v7(&entry)?
+                }
+                _ => crate::Mov9SoundV1SourceV4::parse(&entry)?,
             })
         } else {
             None
         };
-        if receiver_v4 && major == Some(*b"qt  ") && sound_v4.is_none() {
+        let quicktime_visual =
+            view == DescriptionView::RangePlayback && matches!(layout, EntryLayout::Visual);
+        if receiver_v4 && major == Some(*b"qt  ") && sound_v4.is_none() && !quicktime_visual {
             return Err(Error::Unsupported(
                 "encoded V4 QuickTime AudioV1/mp4a profile only",
             ));
@@ -682,19 +711,18 @@ impl<'a> Mov9EncodedStreamJobV1<'a> {
             result: None,
             failed: None,
             finished: false,
-            receiver_v4,
+            view,
             major,
             sound_v4,
             wave_v4: None,
             inspected_boxes: 0,
-            receiver_v7,
             wave_source_v7: None,
             pending_esds_v7: None,
             descriptors_left_v7: limits.max_descriptors,
         })
     }
     fn inspect_box(&mut self) -> Result<()> {
-        if self.receiver_v4 {
+        if self.view != DescriptionView::Regular {
             self.inspected_boxes = self.inspected_boxes.checked_add(1).ok_or(Error::Overflow)?;
             if self.inspected_boxes > self.limits.max_child_boxes {
                 return Err(Error::Limit {
@@ -712,7 +740,10 @@ impl<'a> Mov9EncodedStreamJobV1<'a> {
                 maximum: self.limits.max_config_bytes,
             });
         }
-        if self.receiver_v7 && self.wave_v4.is_some() && self.kind == EncodedEntryKindV1::Aac {
+        if self.view.observes_contexts()
+            && self.wave_v4.is_some()
+            && self.kind == EncodedEntryKindV1::Aac
+        {
             if let Some(report) = &mut self.wave_source_v7 {
                 report.configuration_count = report
                     .configuration_count
@@ -961,7 +992,7 @@ impl<'a> Mov9EncodedStreamJobV1<'a> {
                                     ..Limits::default()
                                 },
                             )?;
-                            if self.receiver_v7 {
+                            if self.view.observes_contexts() {
                                 let mut report = crate::Mov9WaveObservationV7::new(raw.clone());
                                 if self
                                     .sound_v4
@@ -985,6 +1016,13 @@ impl<'a> Mov9EncodedStreamJobV1<'a> {
                                 marker: None,
                                 terminator: None,
                             });
+                        } else if raw.header().kind == *b"wave"
+                            && self.view == DescriptionView::RangePlayback
+                            && self.kind == EncodedEntryKindV1::Aac
+                        {
+                            return Err(Error::Unsupported(
+                                "encoded AAC wave requires QuickTime AudioV1",
+                            ));
                         } else if raw.header().kind == self.config_kind {
                             if self.sound_v4.is_some() {
                                 return Err(Error::Unsupported(
@@ -1051,25 +1089,22 @@ impl<'a> Mov9EncodedStreamJobV1<'a> {
                 &self.entry,
                 self.kind,
                 extradata,
-                if self.receiver_v4 {
-                    Some(self.major)
-                } else {
-                    None
-                },
+                self.view,
+                self.major,
             )?;
             let receiver_source_v4 = receiver_source_v4.map(|mut source| {
                 source.sound = self.sound_v4.clone();
                 source.wave = self.wave_v4.as_ref().map(|w| w.raw.clone());
                 source
             });
-            if self.receiver_v4 && self.major == Some(*b"qt  ") {
-                let vendor = fields::slice(self.entry.raw().payload(), 12, 4)?;
-                if vendor != [0; 4] {
+            if self.view != DescriptionView::Regular && self.major == Some(*b"qt  ") {
+                let vendor = fields::fourcc(self.entry.raw().payload(), 12)?;
+                if self.sound_v4.is_some() && vendor != [0; 4] {
                     return Err(Error::Unsupported(
                         "encoded QuickTime nonzero vendor profile",
                     ));
                 }
-                native.vendor_id = Some([0; 4]);
+                native.vendor_id = Some(vendor);
             }
             self.result = Some(Mov9EncodedStreamV1 {
                 native,
@@ -1126,7 +1161,8 @@ fn metadata(
     entry: &SampleDescription,
     kind: EncodedEntryKindV1,
     extradata: Bytes,
-    receiver_v4: Option<Option<[u8; 4]>>,
+    view: DescriptionView,
+    major: Option<[u8; 4]>,
 ) -> Result<MetadataParts> {
     let parsed = TrackHeader::parse(&header.raw_tkhd, &header.raw_mdhd, &header.raw_hdlr)?;
     if (
@@ -1147,10 +1183,13 @@ fn metadata(
         ));
     }
     let clock = Mov9MediaClock::from_source(header.time_base()?)?;
-    let source_v4 = receiver_v4
-        .map(|major| -> Result<_> {
+    let source_v4 = (view != DescriptionView::Regular)
+        .then(|| -> Result<_> {
             Ok(crate::Mov9EncodedSourceV4 {
-                language: crate::native_encoded_metadata_v4::language(header)?,
+                language: crate::native_encoded_metadata_v4::language(
+                    header,
+                    view == DescriptionView::RangePlayback && major == Some(*b"qt  "),
+                )?,
                 handler: crate::native_encoded_metadata_v4::handler(header, major)?,
                 sound: None,
                 wave: None,

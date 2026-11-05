@@ -9,6 +9,7 @@ publish.workspace = true
 
 [dependencies]
 triergon-core = { path = "../core" }
+triergon-framing = { path = "../framing" }
 
 [lints]
 workspace = true

@@ -7,9 +7,9 @@ use triergon_core::{
 use triergon_isobmff::{
     EditList, Limits, Mov9CursorStatus, Mov9EditCursor, Mov9EditLimits, Mov9EncodedEditContextV2,
     Mov9EncodedEditJobV2, Mov9EncodedEditLimitsV2, Mov9EncodedEditPlanV2, Mov9EncodedLimitsV1,
-    Mov9EncodedStreamJobV1, Mov9EncodedStreamV1, Mov9NativeIndexCursor, Mov9NativeIndexLimits,
-    Mov9PacketCursor, Mov9PacketLimits, Mov9Track, PinnedMovD32EncodedEditsV2,
-    PinnedMovD32EncodedRegularV1, SampleTable, TrackHeader,
+    Mov9EncodedSelectionV4, Mov9EncodedStreamJobV1, Mov9EncodedStreamV1, Mov9NativeIndexCursor,
+    Mov9NativeIndexLimits, Mov9PacketCursor, Mov9PacketLimits, Mov9Track, MovieHeader,
+    PinnedMovD32EncodedEditsV2, PinnedMovD32EncodedRegularV1, SampleTable, TrackHeader,
 };
 const ORIGINAL: &[u8] = include_bytes!("fixtures/encoded-edit-v2/original.mp4");
 const AUDIO0: &[u8] = include_bytes!("fixtures/encoded-edit-v2/audio0.mp4");
@@ -17,6 +17,8 @@ const AUDIO1024: &[u8] = include_bytes!("fixtures/encoded-edit-v2/audio1024.mp4"
 const AUDIO2048: &[u8] = include_bytes!("fixtures/encoded-edit-v2/audio2048.mp4");
 const VIDEO0: &[u8] = include_bytes!("fixtures/encoded-edit-v2/video0.mp4");
 const VIDEO2673: &[u8] = include_bytes!("fixtures/encoded-edit-v2/video2673.mp4");
+const LEADING_AC3: &[u8] = include_bytes!("fixtures/range-encoded-edits/leading-ac3.mp4");
+const LEADING_EAC3: &[u8] = include_bytes!("fixtures/range-encoded-edits/leading-eac3.mp4");
 struct Source {
     pool: Budget,
     header: TrackHeader,
@@ -24,6 +26,7 @@ struct Source {
     edits: EditList,
     media: Vec<Range<u64>>,
     length: u64,
+    movie_base: TimeBase,
 }
 impl Source {
     fn new(data: &[u8], handler: &[u8; 4]) -> Self {
@@ -74,6 +77,10 @@ impl Source {
             edits,
             media,
             length: data.len() as u64,
+            movie_base: MovieHeader::parse(&child(movie, b"mvhd").unwrap())
+                .unwrap()
+                .time_base()
+                .unwrap(),
         }
     }
     fn input(&self) -> InputCursor {
@@ -120,7 +127,7 @@ impl Source {
                 edits: &self.edits,
                 stream: s,
                 media_base: self.header.time_base().unwrap(),
-                movie_base: TimeBase::new(1, 1000).unwrap(),
+                movie_base: self.movie_base,
             },
             i,
             Mov9EncodedEditLimitsV2 {
@@ -140,7 +147,7 @@ impl Source {
             table: &self.table,
             fragments: &[],
             media_base: self.header.time_base().unwrap(),
-            edits: Some((&self.edits, TimeBase::new(1, 1000).unwrap())),
+            edits: Some((&self.edits, self.movie_base)),
         }
     }
 }
@@ -188,6 +195,168 @@ fn rows(
     }
     panic!("occurrence progress")
 }
+
+fn range_plan(p: &Source, major: [u8; 4]) -> Result<Mov9EncodedEditPlanV2, Error> {
+    let mut input = p.input();
+    let cancel = AtomicBool::new(false);
+    let mut stream = Mov9EncodedStreamJobV1::new_range_playback(
+        &p.header,
+        &p.table,
+        &input,
+        Mov9EncodedSelectionV4 {
+            major_brand: Some(major),
+            description: 1,
+            limits: Default::default(),
+        },
+    )?;
+    let config = loop {
+        if stream.poll(&mut input, &mut WorkBudget::new(1), &cancel)? == Mov9CursorStatus::Ready {
+            break stream.take(&mut input, &cancel)?;
+        }
+    };
+    let configs = [config];
+    let mut edit = Mov9EncodedEditJobV2::new_range_playback(
+        Mov9EncodedEditContextV2 {
+            table: &p.table,
+            edits: &p.edits,
+            stream: &configs[0],
+            media_base: p.header.time_base()?,
+            movie_base: p.movie_base,
+        },
+        &configs,
+        &input,
+        Default::default(),
+    )?;
+    complete(&mut edit, &mut input, 1)
+}
+
+#[test]
+fn range_playback_keeps_quicktime_visual_decode_order_and_signed_clocks() {
+    let raw = include_bytes!("fixtures/range-encoded-edits/quicktime-avc.mov");
+    let source = Source::new(raw, b"vide");
+    let packets = rows(&source, range_plan(&source, *b"qt  ").unwrap());
+    assert_eq!(packets.len(), 6);
+    for ((packet, skip), (pts, dts, offset, length, key)) in packets.into_iter().zip([
+        (0, -1024, 36, 716, 1),
+        (1024, -512, 752, 12, 0),
+        (512, 0, 764, 12, 0),
+        (1536, 512, 776, 30, 1),
+        (2560, 1024, 806, 12, 0),
+        (2048, 1536, 818, 12, 0),
+    ]) {
+        assert_eq!(packet.source.range, offset..offset + length);
+        assert_eq!(
+            (packet.native.pts, packet.native.dts),
+            (Some(pts), Some(dts))
+        );
+        assert_eq!((packet.native.duration, packet.native.flags), (512, key));
+        assert_eq!(skip, None);
+    }
+}
+
+#[test]
+fn range_playback_keeps_dolby_packets_and_reports_the_leading_sample_skip() {
+    for raw in [LEADING_AC3, LEADING_EAC3] {
+        let source = Source::new(raw, b"soun");
+        assert!(matches!(
+            source.plan(1),
+            Err(Error::Unsupported(
+                "encoded edited audio codec frame clock not established"
+            ))
+        ));
+        let plan = range_plan(&source, *b"isom").unwrap();
+        let packets = rows(&source, plan);
+        assert_eq!(packets.len(), 6);
+        for (i, (packet, skip)) in packets.into_iter().enumerate() {
+            let offset = 48 + i as u64 * 384;
+            let pts = i as i64 * 1536 - 256;
+            assert_eq!(packet.source.range, offset..offset + 384);
+            assert_eq!(
+                (packet.native.pts, packet.native.dts),
+                (Some(pts), Some(pts))
+            );
+            assert_eq!((packet.native.duration, packet.native.flags), (1536, 1));
+            assert_eq!(skip, (i == 0).then_some([0, 1, 0, 0, 0, 0, 0, 0, 0, 0]));
+        }
+    }
+}
+
+fn fixture_payload(raw: &[u8], kind: &[u8; 4]) -> usize {
+    raw.windows(4).position(|bytes| bytes == kind).unwrap() + 4
+}
+
+#[test]
+fn range_playback_refuses_truncated_dec3_descriptors() {
+    // Each flag declares bytes beyond the fixture's one three-byte descriptor.
+    for (field, flag) in [(1, 1), (4, 2)] {
+        let mut raw = LEADING_EAC3.to_vec();
+        let config = fixture_payload(&raw, b"dec3");
+        raw[config + field] |= flag;
+        let source = Source::new(&raw, b"soun");
+        assert!(matches!(
+            range_plan(&source, *b"isom"),
+            Err(Error::Truncated)
+        ));
+    }
+}
+
+#[test]
+fn range_playback_requires_one_clock_across_dec3_descriptors() {
+    let mut raw = LEADING_EAC3.to_vec();
+    let config = fixture_payload(&raw, b"dec3");
+    let descriptor = [raw[config + 2], raw[config + 3], raw[config + 4]];
+    raw[config + 1] |= 1;
+    // The enclosing boxes are all after mdat, so packet offsets stay valid.
+    for kind in [
+        b"dec3", b"ec-3", b"stsd", b"stbl", b"minf", b"mdia", b"trak", b"moov",
+    ] {
+        let at = fixture_payload(&raw, kind) - 8;
+        let size = u32::from_be_bytes(raw[at..at + 4].try_into().unwrap());
+        raw[at..at + 4].copy_from_slice(&(size + 3).to_be_bytes());
+    }
+    raw.splice(config + 5..config + 5, descriptor);
+    assert!(range_plan(&Source::new(&raw, b"soun"), *b"isom").is_ok());
+
+    // Give the second descriptor a different fscod from the first.
+    raw[config + 5] |= 0x40;
+    assert!(range_plan(&Source::new(&raw, b"soun"), *b"isom").is_err());
+}
+
+#[test]
+fn range_playback_refuses_invalid_dac3_fields() {
+    let mut raw = LEADING_AC3.to_vec();
+    let config = fixture_payload(&raw, b"dac3");
+    // Change bsid from 8 to 9 while retaining the same rate code.
+    raw[config] |= 2;
+    let source = Source::new(&raw, b"soun");
+    assert!(range_plan(&source, *b"isom").is_err());
+}
+
+#[test]
+fn range_playback_requires_an_exact_dolby_edit_end() {
+    for fixture in [LEADING_AC3, LEADING_EAC3] {
+        for duration in [17_920u32, 17_921, 17_918, 17_922] {
+            let mut raw = fixture.to_vec();
+            for (kind, field, value) in [
+                (b"mvhd", 12, 96_000u32),
+                (b"mvhd", 16, duration),
+                (b"tkhd", 20, duration),
+                (b"elst", 8, duration),
+            ] {
+                let offset = fixture_payload(&raw, kind) + field;
+                raw[offset..offset + 4].copy_from_slice(&value.to_be_bytes());
+            }
+            let source = Source::new(&raw, b"soun");
+            let plan = range_plan(&source, *b"isom");
+            if duration == 17_920 {
+                assert_eq!(plan.unwrap().selected_end_ticks(), 9216);
+            } else {
+                assert!(plan.is_err(), "range playback admitted duration {duration}");
+            }
+        }
+    }
+}
+
 #[test]
 fn original_video_all48_source_ranges_raw_cto_and_shift_are_separate() {
     let p = Source::new(ORIGINAL, b"vide");

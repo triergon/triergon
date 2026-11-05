@@ -134,6 +134,11 @@ exposes the selected encoded-audio trim on the emitted packet. The plan
 must match both the track and movie time bases. An authored B-frame AVC/AAC
 fixture checks the selected decode timestamp, first byte range, and the
 original bytes, clocks and trim at the landing.
+Selected QuickTime AVC and HEVC entries and the leading AC-3 and E-AC-3
+edit profile are also admitted. The Dolby profile validates the full
+configuration and requires an edit duration that converts to whole
+samples on the configured clock. The QuickTime playback view requires
+an unambiguous AAC configuration.
 Five FFprobe comparisons cover regular, fragmented, repeated-edit,
 description-change and mixed-clock AVC/AAC playback. SourcePhysical can
 start with front metadata on a range source and switch to a complete index
