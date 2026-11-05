@@ -247,15 +247,26 @@ impl<'a> Mp4NativeSeekJob<'a> {
                 })
                 .map_err(|error| error.error)?;
         }
-        let global = Mov9NativeGlobalSeekJob::new_complete_source_rescaled(
-            &plan.pool,
-            native.as_slice(),
-            movie.media.as_slice(),
-            request.video,
-            request.timestamp,
-            request.limits,
-            Mov9Profile::PinnedNoParseNoFillin,
-        )?;
+        let global = if let Some(plans) = &plan.encoded_edits {
+            Mov9NativeGlobalSeekJob::new_encoded_regular_v2_rescaled(
+                &plan.pool,
+                native.as_slice(),
+                movie.media.as_slice(),
+                (request.video, request.timestamp),
+                request.limits,
+                plans.as_slice(),
+            )?
+        } else {
+            Mov9NativeGlobalSeekJob::new_complete_source_rescaled(
+                &plan.pool,
+                native.as_slice(),
+                movie.media.as_slice(),
+                request.video,
+                request.timestamp,
+                request.limits,
+                Mov9Profile::PinnedNoParseNoFillin,
+            )?
+        };
         Ok(Self {
             plan,
             global: Some(global),

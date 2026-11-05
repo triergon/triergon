@@ -3033,6 +3033,112 @@ fn native_range_seek_matches_ffprobe_packet_order_bytes_and_clocks() {
 }
 
 #[test]
+fn native_range_seek_replays_the_encoded_edit_occurrences() {
+    use triergon_isobmff::{
+        Mov9CursorStatus, Mov9EncodedEditContextV2, Mov9EncodedEditJobV2, Mov9EncodedStreamJobV1,
+        PinnedMovD32EncodedEditsV2, PinnedMovD32EncodedRegularV1,
+    };
+    let raw = include_bytes!("../../isobmff/tests/fixtures/encoded-edit-v2/original.mp4");
+    let (mut opened, _) = open(raw, 97, 4096).unwrap();
+    let cancel = off();
+    let mut plans = Vec::new();
+    for track in opened.movie.tracks() {
+        let mut stream = Mov9EncodedStreamJobV1::new(
+            track.header(),
+            track.table(),
+            &opened.input,
+            opened.movie.major_brand(),
+            Default::default(),
+            PinnedMovD32EncodedRegularV1,
+        )
+        .unwrap();
+        while stream
+            .poll(&mut opened.input, &mut WorkBudget::new(4096), &cancel)
+            .unwrap()
+            != Mov9CursorStatus::Ready
+        {}
+        let stream = stream.take(&mut opened.input, &cancel).unwrap();
+        let mut edit = Mov9EncodedEditJobV2::new(
+            Mov9EncodedEditContextV2 {
+                table: track.table(),
+                edits: track.edits().unwrap(),
+                stream: &stream,
+                media_base: track.header().time_base().unwrap(),
+                movie_base: opened.movie.header().time_base().unwrap(),
+            },
+            &opened.input,
+            Default::default(),
+            PinnedMovD32EncodedEditsV2,
+        )
+        .unwrap();
+        while edit
+            .poll(&mut opened.input, &mut WorkBudget::new(4096), &cancel)
+            .unwrap()
+            != Mov9CursorStatus::Ready
+        {}
+        plans.push(Some(edit.take(&mut opened.input, &cancel).unwrap()));
+    }
+    let mut index =
+        Mp4IndexJob::new_native_encoded_range(&opened.movie, &plans, PlanLimits::default())
+            .unwrap();
+    while !index.poll(&mut WorkBudget::new(4096), &cancel).unwrap() {}
+    let plan = index.finish().unwrap();
+    drop(plans);
+    let engine = Engine::mp4(opened.input, plan, 1 << 20).unwrap();
+    let mut player = Player::new_direct(
+        engine,
+        opened.source,
+        Selection::All,
+        PlayerPolicy::default(),
+    )
+    .unwrap();
+    player
+        .set_clock_view(ClockChoice::ExplicitNativeProjection)
+        .unwrap();
+    let command = {
+        let mut job = player
+            .prepare_mp4_native_seek(
+                &opened.movie,
+                Mp4NativeSeekRequest {
+                    video: 1,
+                    timestamp: 43_200,
+                    limits: Default::default(),
+                },
+                Selection::All,
+            )
+            .unwrap();
+        while !job.poll(&mut WorkBudget::new(4096), &cancel).unwrap() {}
+        job.finish().unwrap()
+    };
+    assert_eq!(command.receipt().selected.timestamp, 29_328);
+    assert_eq!(command.start_offset(), 38_074);
+    assert!(
+        player
+            .apply_mp4_native_seek(&command, &mut WorkBudget::new(4096), &cancel)
+            .unwrap()
+    );
+    let output = collect(&mut player, 4096).unwrap();
+    let packets: Vec<_> = output
+        .iter()
+        .filter_map(|event| match event.event() {
+            RawEvent::Mp4(Mp4Event::Packet(packet)) => Some(packet),
+            _ => None,
+        })
+        .collect();
+    // First two public packets from the independent range seek oracle.
+    for (packet, (id, pts, dts, start, length)) in packets.iter().zip([
+        (2, 87_048, 87_048, 38_074, 133),
+        (1, 32_000, 29_328, 38_207, 3220),
+    ]) {
+        let native = &packet.native.as_ref().unwrap().native;
+        assert_eq!(packet.configuration.track.track_id, id);
+        assert_eq!((native.pts, native.dts), (Some(pts), Some(dts)));
+        assert_eq!(packet.source.payload.as_ref(), &raw[start..start + length]);
+    }
+    assert!(packets.len() > 2);
+}
+
+#[test]
 fn native_range_seek_refusals_leave_the_current_player_untouched() {
     let (mut player, movie, calls, _) =
         native_range_player(include_bytes!("fixtures/mp4/r-edits-repeat.mov"));

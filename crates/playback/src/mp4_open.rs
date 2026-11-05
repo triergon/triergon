@@ -83,6 +83,7 @@ struct Parts {
 struct Frame {
     children: BoxChildren,
     track: Option<usize>,
+    kind: [u8; 4],
 }
 struct Walk {
     frames: BudgetVec<Option<Frame>>,
@@ -103,6 +104,7 @@ impl Walk {
         frames.as_mut_slice()[0] = Some(Frame {
             children: root.children(0, l.format)?,
             track: None,
+            kind: root.header().kind,
         });
         Ok(Self {
             frames,
@@ -194,11 +196,16 @@ impl Walk {
             }
             push(&mut self.trex, Trex::parse(&raw)?)?;
         } else if let Some(t) = track {
+            let parent = self.frames.as_slice()[self.depth - 1]
+                .as_ref()
+                .ok_or(Error::Invalid("frame missing"))?
+                .kind;
             let p = &mut self.parts.as_mut_slice()[t];
             match &kind {
                 b"tkhd" => unique(&mut p.tkhd, raw)?,
                 b"mdhd" => unique(&mut p.mdhd, raw)?,
-                b"hdlr" => unique(&mut p.hdlr, raw)?,
+                // QuickTime also carries a data handler inside minf.
+                b"hdlr" if parent == *b"mdia" => unique(&mut p.hdlr, raw)?,
                 b"stbl" => unique(&mut p.stbl, raw)?,
                 b"elst" => unique(&mut p.elst, raw)?,
                 b"dref" => unique(&mut p.dref, raw)?,
@@ -218,6 +225,7 @@ impl Walk {
         self.frames.as_mut_slice()[self.depth] = Some(Frame {
             children: raw.children(0, l.format)?,
             track,
+            kind: raw.header().kind,
         });
         self.depth += 1;
         Ok(())
@@ -312,6 +320,9 @@ pub struct Movie {
     pub(crate) pool: Budget,
 }
 impl Movie {
+    pub fn major_brand(&self) -> Option<[u8; 4]> {
+        self.major_brand
+    }
     pub fn read_scope(&self) -> MetadataReadScope {
         self.read_scope
     }
@@ -335,6 +346,9 @@ impl Movie {
     }
 }
 impl MovieTrack {
+    pub fn edits(&self) -> Option<&EditList> {
+        self.edits.as_ref()
+    }
     pub fn header(&self) -> &TrackHeader {
         &self.header
     }
