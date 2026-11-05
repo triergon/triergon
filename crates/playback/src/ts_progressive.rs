@@ -11,8 +11,7 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use triergon_core::{Error as CoreError, InputCursor, InputRequest, Time, WorkBudget};
 use triergon_mpegts::{
     AssemblyStep, ContinuityOutcome, FaultKind, ParseLimits, TraceEvent,
-    clock::SourceTimePolicy,
-    psi::{DescriptorNamespace, PatTable, ProgramMap},
+    psi::{PatTable, ProgramMap},
 };
 
 #[derive(Clone, Copy, Debug, Default)]
@@ -100,12 +99,7 @@ impl<S: Source> TsProgressiveReader<S> {
         if input.position() != 0 || input.capabilities().random_access {
             return Err(CoreError::Invalid("progressive TS requires a sequential body").into());
         }
-        let engine = Engine::ts_native_segment_v1(
-            input,
-            limits.transport,
-            SourceTimePolicy::Unanchored,
-            DescriptorNamespace::Unspecified,
-        )?;
+        let engine = Engine::ts_progressive(input, limits.transport)?;
         let mut player = Player::new_direct(
             engine,
             owner,

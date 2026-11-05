@@ -139,13 +139,28 @@ fn closed(pool: &Budget, state: &BodyState) {
 
 #[test]
 fn early_units_and_eof_match_retained_payload_order_and_wire_clocks() {
+    let baseline_rows = include_str!("fixtures/hls/baseline-stereo.tsv");
+    let baseline_order = include_str!("fixtures/hls/baseline-stereo.order");
+    // Repeat one AAC continuation on PID 257 with continuity counter 1.
+    let carrier = &BASELINE[26 * 188..27 * 188];
+    assert_eq!(carrier[..4], [0x47, 0x01, 0x01, 0x11]);
+    let duplicate = [&BASELINE[..27 * 188], carrier, &BASELINE[27 * 188..]].concat();
     for (raw, rows, order, prefix, rate, channels, has_video_dts) in [
         (
             BASELINE,
-            include_str!("fixtures/hls/baseline-stereo.tsv"),
-            include_str!("fixtures/hls/baseline-stereo.order"),
+            baseline_rows,
+            baseline_order,
             BASELINE_PREFIX,
             44_100_u32,
+            2,
+            false,
+        ),
+        (
+            duplicate.as_slice(),
+            baseline_rows,
+            baseline_order,
+            BASELINE_PREFIX + 188,
+            44_100,
             2,
             false,
         ),

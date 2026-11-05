@@ -291,8 +291,15 @@ impl TsNativeTracks {
 
 #[derive(Clone, Copy, PartialEq, Eq)]
 enum SegmentDiscovery {
+    Progressive,
     Native,
     Media,
+}
+
+struct NativeCarrier {
+    index: usize,
+    packet: ts::TransportPacket,
+    context: NativeSourceContext,
 }
 
 pub struct TsEngine {
@@ -322,6 +329,7 @@ pub struct TsEngine {
     segment_discovery: Option<SegmentDiscovery>,
     segmented: bool,
     boundary: Option<ts::MediaEntityEndV1>,
+    progressive_carrier: Option<NativeCarrier>,
 }
 pub struct MkvEngine {
     reader: Reader,
@@ -593,6 +601,7 @@ impl Engine {
             segment_discovery: None,
             segmented: false,
             boundary: None,
+            progressive_carrier: None,
         }))
     }
     pub fn ts_native(
@@ -778,6 +787,16 @@ impl Engine {
             ts.segment_discovery = Some(discovery);
         }
         Ok(engine)
+    }
+
+    pub(crate) fn ts_progressive(input: InputCursor, limits: ts::ParseLimits) -> Result<Self> {
+        Self::ts_native_segment(
+            input,
+            limits,
+            SourceTimePolicy::Unanchored,
+            DescriptorNamespace::Unspecified,
+            SegmentDiscovery::Progressive,
+        )
     }
 
     pub fn ts_segmented(
@@ -1967,30 +1986,7 @@ impl TsEngine {
             .pending
             .take()
             .ok_or(Error::Invalid("TS event missing"))?;
-        if let TraceEvent::Transport(packet) = &event
-            && let Some(index) = self.native_tracks.index(packet.pid)
-        {
-            let track = &mut self.native_tracks.as_mut_slice()[index];
-            if let Some(observer) = track.observer.as_mut() {
-                let context = NativeSourceContext {
-                    source_event_ordinal: self.event_ordinal,
-                    epochs: self.stream.source_epochs(),
-                    byte_run_epoch: None,
-                };
-                let pushed = if self.native_context.is_some() {
-                    observer.push_with_input(packet.clone(), context, &self.input)
-                } else {
-                    observer.push(packet.clone(), context)
-                };
-                match pushed {
-                    Ok(()) => self.native_active = Some(index),
-                    Err(rejected) => {
-                        track.refuse(rejected.error);
-                        self.native_update_at = Some(index);
-                    }
-                }
-            }
-        }
+        self.route_native_carrier(&event)?;
         self.event_ordinal = self.event_ordinal.checked_add(1).ok_or(Error::Overflow)?;
         if matches!(event, TraceEvent::Finished) {
             self.ended = true;
@@ -2002,6 +1998,68 @@ impl TsEngine {
             native_clock,
             clock_key: key,
         })))
+    }
+
+    fn route_native_carrier(&mut self, event: &TraceEvent) -> Result<()> {
+        let NativeCarrier {
+            index,
+            packet,
+            context,
+        } = if let Some(carrier) = self.progressive_carrier.take() {
+            let TraceEvent::Continuity { pid, outcome } = event else {
+                return Err(Error::Invalid("progressive TS missing carrier continuity").into());
+            };
+            if *pid != carrier.packet.pid {
+                return Err(Error::Invalid("progressive TS continuity PID mismatch").into());
+            }
+            // The source parser drops duplicates and reports faults separately.
+            if !matches!(
+                outcome,
+                ts::ContinuityOutcome::First | ts::ContinuityOutcome::Continuous
+            ) {
+                return Ok(());
+            }
+            carrier
+        } else if let TraceEvent::Transport(packet) = event
+            && let Some(index) = self.native_tracks.index(packet.pid)
+            && self.native_tracks.as_slice()[index].observer.is_some()
+        {
+            let carrier = NativeCarrier {
+                index,
+                packet: packet.clone(),
+                context: NativeSourceContext {
+                    source_event_ordinal: self.event_ordinal,
+                    epochs: self.stream.source_epochs(),
+                    byte_run_epoch: None,
+                },
+            };
+            if self.segment_discovery == Some(SegmentDiscovery::Progressive) {
+                self.progressive_carrier = Some(carrier);
+                return Ok(());
+            }
+            carrier
+        } else {
+            return Ok(());
+        };
+
+        let track = &mut self.native_tracks.as_mut_slice()[index];
+        let observer = track
+            .observer
+            .as_mut()
+            .ok_or(Error::Invalid("native TS observer missing for carrier"))?;
+        let pushed = if self.native_context.is_some() {
+            observer.push_with_input(packet, context, &self.input)
+        } else {
+            observer.push(packet, context)
+        };
+        match pushed {
+            Ok(()) => self.native_active = Some(index),
+            Err(rejected) => {
+                track.refuse(rejected.error);
+                self.native_update_at = Some(index);
+            }
+        }
+        Ok(())
     }
 }
 impl RawEvent {
