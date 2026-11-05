@@ -1176,3 +1176,49 @@ fn matroska_aac_clock_matches_pinned_mixed_rates_from_probe_through_eof() {
         assert_eq!(timings, expected);
     }
 }
+
+#[test]
+fn matroska_dolby_source_clock_preserves_damaged_ac3_before_decoder_admission() {
+    use triergon_playback::matroska_feed::MatroskaDolbyTiming;
+
+    let fixture = include_bytes!("fixtures/mkv-feed/audio-bad-first-discovery.mkv");
+    let (mut player, pool) = player_with_input(fixture, 7);
+    let outputs = collect_with_work(&mut player, 1);
+    let configuration = outputs
+        .iter()
+        .find_map(|output| match output.event() {
+            RawEvent::Matroska(Event::Configuration(c)) => Some(c),
+            _ => None,
+        })
+        .unwrap();
+    assert_eq!(configuration.tracks()[0].codec, "A_AC3");
+    let feed = hevc_dolby_setup(&pool, configuration, 0);
+    let mut packets = outputs.iter().filter_map(|output| match output.event() {
+        RawEvent::Matroska(Event::Packet(packet)) if packet.packet.track == 0 => {
+            Some((output, packet))
+        }
+        _ => None,
+    });
+    let (first, source) = packets.next().unwrap();
+    let raw = source.packet.data.as_ref();
+    assert_eq!(raw[0], 0);
+    let mut frame = feed.packet(first).unwrap().unwrap();
+    let cancel = AtomicBool::new(false);
+    assert!(frame.step(&mut WorkBudget::new(4096), &cancel).is_err());
+
+    let mut probe = feed.native_dolby_clock_probe(&pool, 1).unwrap().unwrap();
+    assert_eq!(probe.push_source(source).unwrap(), 0);
+    let prefix = probe.finish();
+    let expected = |pts_ns| MatroskaDolbyTiming {
+        pts_ns: Some(pts_ns),
+        dts_ns: Some(pts_ns),
+        duration_ns: Some(32_000_000),
+    };
+    assert_eq!(prefix.timing(0).unwrap(), expected(-5_000_000));
+    assert_eq!(source.packet.data.as_ref(), raw);
+    assert_eq!(source.packet.dts_ns, None);
+    let mut live = prefix.into_live();
+    for ((_, packet), pts_ns) in packets.zip([27_000_000, 59_000_000, 91_000_000]) {
+        assert_eq!(live.observe_source(packet).unwrap(), expected(pts_ns));
+    }
+}

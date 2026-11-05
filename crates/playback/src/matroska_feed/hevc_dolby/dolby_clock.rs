@@ -1,13 +1,15 @@
 //! Native-compatible timing for ordered AC-3 family packets.
 use super::{
     FeedCodec, MatroskaHevcDolbyFeed, MatroskaHevcDolbyPacket, MatroskaHevcDolbyPayload,
-    check_limit, dolby_duration_ns,
+    check_limit, dolby_final_syncframe, syncframe_duration_ns,
 };
 use crate::{
     Result,
     matroska_feed::probe_clock::{NativePacketTiming, PacketClock, ProbeTimeline, Timeline},
 };
+use triergon::typed::Packet;
 use triergon_core::{Budget, BudgetVec, Error};
+use triergon_framing::Ac3Family;
 
 const MAX_PREFIX_PACKETS: usize = 4096;
 
@@ -57,22 +59,52 @@ impl MatroskaHevcDolbyFeed {
         else {
             return Err(Error::Invalid("native Dolby clock packet codec").into());
         };
-        if !self.association.matches(packet.source)
-            || *family != codec.family()
-            || !std::ptr::eq(*raw, packet.source.packet.data.as_ref())
-        {
+        if *family != codec.family() || !std::ptr::eq(*raw, packet.source.packet.data.as_ref()) {
             return Err(Error::Invalid("native Dolby clock feed association").into());
         }
+        self.dolby_source_timing(packet.source)
+    }
+
+    fn dolby_source_timing(&self, packet: &Packet) -> Result<NativePacketTiming> {
+        let FeedCodec::Dolby(codec) = &self.codec else {
+            return Err(Error::Invalid("native Dolby clock packet codec").into());
+        };
+        if !self.association.matches(packet) {
+            return Err(Error::Invalid("native Dolby clock feed association").into());
+        }
+        let raw = packet.packet.data.as_ref();
         check_limit(raw.len(), self.limits.dolby_packet.maximum_packet_bytes)?;
-        let mut timing = NativePacketTiming::demux(packet.source)?;
+        let mut timing = NativePacketTiming::demux(packet)?;
         if timing.duration_ns.is_none() {
-            // The native header parser supplies duration in whole packet ticks
-            // before the demuxer uses it to advance PTS and DTS.
-            timing.duration_ns =
-                dolby_duration_ns(*family, raw, packet.source.packet.timing.scale_ns);
+            let scale = packet.packet.timing.scale_ns;
+            timing.duration_ns = match dolby_final_syncframe(codec.family(), raw) {
+                Some(frame) => {
+                    syncframe_duration_ns(frame.coded_samples(), frame.sample_rate_hz, scale)
+                }
+                None if codec.family() == Ac3Family::Ac3 => {
+                    let rate = packet.configuration.tracks()[packet.packet.track].sample_rate;
+                    integral_nominal_ac3_duration(rate, scale)
+                }
+                None => None,
+            };
         }
         Ok(timing)
     }
+}
+
+fn integral_nominal_ac3_duration(rate: f64, scale: u64) -> Option<u64> {
+    // When the selected native parser has no usable AC-3 header, the
+    // demux clock can still use the track rate and fixed 1536-sample period.
+    // This fallback admits only periods integral on the source clock.
+    if !(1.0..=f64::from(i32::MAX)).contains(&rate) {
+        return None;
+    }
+    let rate = rate as u32;
+    let tick = u64::from(rate).checked_mul(scale)?;
+    if !(1536 * 1_000_000_000_u64).is_multiple_of(tick) {
+        return None;
+    }
+    syncframe_duration_ns(1536, rate, scale)
 }
 
 /// Retain scalar timing rows for the caller's selected packets during discovery.
@@ -87,12 +119,25 @@ impl<'feed> MatroskaDolbyClockProbe<'feed> {
     /// Observe one checked packet and return its ordinal within this prefix.
     /// Allocation pressure leaves both the ordinal and the clock unchanged.
     pub fn push(&mut self, packet: &MatroskaHevcDolbyPacket<'_>) -> Result<usize> {
+        self.push_packet(|feed| feed.dolby_timing(packet))
+    }
+
+    /// Project the original demux packet even when syncframe validation
+    /// would refuse it for the decoder. The bytes stay with the caller.
+    pub fn push_source(&mut self, packet: &Packet) -> Result<usize> {
+        self.push_packet(|feed| feed.dolby_source_timing(packet))
+    }
+
+    fn push_packet(
+        &mut self,
+        project: impl FnOnce(&MatroskaHevcDolbyFeed) -> Result<NativePacketTiming>,
+    ) -> Result<usize> {
         let ordinal = self.rows.len();
         check_limit(
             ordinal.checked_add(1).ok_or(Error::Overflow)?,
             self.maximum_packets,
         )?;
-        let timing = self.feed.dolby_timing(packet)?;
+        let timing = project(self.feed)?;
         let mut next = self.timeline;
         let row = next.push(ordinal, timing)?;
         self.rows.try_push(row).map_err(|failure| failure.error)?;
@@ -137,7 +182,15 @@ pub struct MatroskaDolbyClock<'feed> {
 
 impl MatroskaDolbyClock<'_> {
     pub fn observe(&mut self, packet: &MatroskaHevcDolbyPacket<'_>) -> Result<MatroskaDolbyTiming> {
-        let timing = self.feed.dolby_timing(packet)?;
+        self.advance(self.feed.dolby_timing(packet)?)
+    }
+
+    /// Continue the source clock without requiring decoder admission.
+    pub fn observe_source(&mut self, packet: &Packet) -> Result<MatroskaDolbyTiming> {
+        self.advance(self.feed.dolby_source_timing(packet)?)
+    }
+
+    fn advance(&mut self, timing: NativePacketTiming) -> Result<MatroskaDolbyTiming> {
         let mut next = self.timeline;
         let row = next.push(timing)?;
         let result = next.resolve(row)?;

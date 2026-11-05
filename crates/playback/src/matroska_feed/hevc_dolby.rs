@@ -13,8 +13,9 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use triergon::typed::{Configuration, Packet};
 use triergon_core::{Budget, Bytes, Error, SourceId, WorkBudget};
 use triergon_framing::{
-    Ac3Family, Ac3FrameDetails, BuildStep, HevcAnnexBAccessUnit, HevcAnnexBConfig, HevcAnnexBJob,
-    HevcAnnexBLimits, HvcConfigLimits, HvcConfigSource, HvcConfigViewParser, probe_ac3_header,
+    Ac3Family, Ac3FrameDetails, Ac3FrameHeader, BuildStep, HevcAnnexBAccessUnit, HevcAnnexBConfig,
+    HevcAnnexBJob, HevcAnnexBLimits, HvcConfigLimits, HvcConfigSource, HvcConfigViewParser,
+    probe_ac3_header,
 };
 
 #[derive(Clone, Copy, Debug)]
@@ -257,7 +258,12 @@ impl MatroskaHevcDolbyPacket<'_> {
     }
 }
 
-fn dolby_duration_ns(family: Ac3Family, mut raw: &[u8], scale_ns: u64) -> Option<u64> {
+fn dolby_duration_ns(family: Ac3Family, raw: &[u8], scale_ns: u64) -> Option<u64> {
+    let frame = dolby_final_syncframe(family, raw)?;
+    syncframe_duration_ns(frame.coded_samples(), frame.sample_rate_hz, scale_ns)
+}
+
+fn dolby_final_syncframe(family: Ac3Family, mut raw: &[u8]) -> Option<Ac3FrameHeader> {
     for _ in 0..32 {
         let header = probe_ac3_header(raw).ok()?;
         if header.family != family
@@ -281,7 +287,7 @@ fn dolby_duration_ns(family: Ac3Family, mut raw: &[u8], scale_ns: u64) -> Option
             if !dolby_crc_valid(&frame[2..]) {
                 return None;
             }
-            return syncframe_duration_ns(header.coded_samples(), header.sample_rate_hz, scale_ns);
+            return Some(header);
         }
         raw = remaining;
     }

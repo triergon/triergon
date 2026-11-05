@@ -270,7 +270,13 @@ rows. Call `finish` and replay the prefix timings by ordinal. Use
 `into_live` to release the rows and advance the same clock as more
 packets arrive. Rebuild the feed and clock after seek or configuration
 change, and keep the player's delivery classification when replaying the
-original packets. See the [timing controls](tests/fixtures/dolby-clock/README.md).
+original packets. The source-clock methods `push_source` and
+`observe_source` accept the original selected demux packet. They let the
+caller preserve packet bytes and timing even when the syncframe job
+refuses a damaged packet. A missing AC-3 duration can use its declared
+rate and fixed 1536-sample period when that period is a whole number of
+Matroska ticks. The decoder still checks frame admission separately.
+See the [timing controls](tests/fixtures/dolby-clock/README.md).
 
 ## Matroska bitmap subtitles
 
