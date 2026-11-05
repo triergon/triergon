@@ -115,6 +115,12 @@ qualification remain open.
 
 ## Range-backed MP4 playback seek
 
+The bounded AAC sample-entry reader extracts the exact AudioSpecificConfig
+from an ISO `esds` or QuickTime `wave/esds` description without requiring
+a populated sample table. The same descriptor walk serves the encoded
+catalogue and the playback adapter. Unit tests cover byte offsets, descriptor
+limits and duplicate refusal.
+
 The SourcePhysical player now has a generation-bound sync seek over its
 checked sample rows. It preserves selected prefix state and explicitly
 requested audio preroll, then resumes video at a container sync sample
