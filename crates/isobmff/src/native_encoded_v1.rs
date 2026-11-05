@@ -28,9 +28,24 @@ impl Default for Mov9EncodedLimitsV1 {
 pub enum EncodedEntryKindV1 {
     Avc,
     Hevc,
+    Av1,
+    Vp9,
     Aac,
     Ac3,
     Eac3,
+}
+
+impl EncodedEntryKindV1 {
+    pub(crate) const fn is_video(self) -> bool {
+        matches!(self, Self::Avc | Self::Hevc | Self::Av1 | Self::Vp9)
+    }
+
+    pub(crate) fn require_pinned_codec(self) -> Result<()> {
+        if matches!(self, Self::Av1 | Self::Vp9) {
+            return Err(Error::Unsupported("encoded codec requires range playback"));
+        }
+        Ok(())
+    }
 }
 #[derive(Clone, Debug)]
 pub struct Mov9EncodedStreamV1 {
@@ -596,7 +611,7 @@ impl<'a> Mov9EncodedStreamJobV1<'a> {
         Self::new_description_inner(header, table, input, selection, DescriptionView::ContextsV7)
     }
     /// Range playback requires an unambiguous AAC configuration and admits
-    /// AVC and HEVC visual entries in a QuickTime movie.
+    /// AVC, HEVC, AV1 and VP9 visual entries for packet playback.
     pub fn new_range_playback(
         header: &'a TrackHeader,
         table: &SampleTable,
@@ -660,6 +675,12 @@ impl<'a> Mov9EncodedStreamJobV1<'a> {
             }
             (b"vide", b"hvc1" | b"hev1") => {
                 (EncodedEntryKindV1::Hevc, *b"hvcC", EntryLayout::Visual)
+            }
+            (b"vide", b"av01") if view == DescriptionView::RangePlayback => {
+                (EncodedEntryKindV1::Av1, *b"av1C", EntryLayout::Visual)
+            }
+            (b"vide", b"vp09") if view == DescriptionView::RangePlayback => {
+                (EncodedEntryKindV1::Vp9, *b"vpcC", EntryLayout::Visual)
             }
             (b"soun", b"mp4a") => (EncodedEntryKindV1::Aac, *b"esds", EntryLayout::AudioV0),
             (b"soun", b"ac-3") => (EncodedEntryKindV1::Ac3, *b"dac3", EntryLayout::AudioV0),
@@ -1066,10 +1087,10 @@ impl<'a> Mov9EncodedStreamJobV1<'a> {
                     .ok_or(Error::Unsupported(
                         "encoded AAC decoder-specific config absent",
                     ))?,
-                EncodedEntryKindV1::Avc | EncodedEntryKindV1::Hevc => cfg
+                EncodedEntryKindV1::Avc | EncodedEntryKindV1::Hevc | EncodedEntryKindV1::Av1 => cfg
                     .bytes()
                     .slice(usize::from(cfg.header().header_size)..cfg.bytes().len())?,
-                EncodedEntryKindV1::Ac3 | EncodedEntryKindV1::Eac3 => {
+                EncodedEntryKindV1::Ac3 | EncodedEntryKindV1::Eac3 | EncodedEntryKindV1::Vp9 => {
                     cfg.bytes().slice(cfg.bytes().len()..cfg.bytes().len())?
                 }
             };
@@ -1245,7 +1266,7 @@ fn metadata(
         let start = usize::from(header.raw_hdlr.header().header_size) + 24;
         header.raw_hdlr.bytes().slice(start..start + n)?
     };
-    let video = matches!(kind, EncodedEntryKindV1::Avc | EncodedEntryKindV1::Hevc);
+    let video = kind.is_video();
     let encoder = if video {
         let body = entry.raw().payload();
         let n = usize::from(*body.get(42).ok_or(Error::Truncated)?);
@@ -1268,6 +1289,8 @@ fn metadata(
     let codec = match kind {
         EncodedEntryKindV1::Avc => "h264",
         EncodedEntryKindV1::Hevc => "hevc",
+        EncodedEntryKindV1::Av1 => "av1",
+        EncodedEntryKindV1::Vp9 => "vp9",
         EncodedEntryKindV1::Aac => "aac",
         EncodedEntryKindV1::Ac3 => "ac3",
         EncodedEntryKindV1::Eac3 => "eac3",
