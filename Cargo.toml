@@ -8,6 +8,7 @@ edition = "2024"
 rust-version = "1.85"
 publish = false
 repository = "https://github.com/triergon/triergon"
+license = "MIT OR Apache-2.0"
 
 [workspace.lints.rust]
 unsafe_code = "forbid"
