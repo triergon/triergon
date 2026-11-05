@@ -3609,11 +3609,13 @@ fn native_range_cursor_keeps_edited_av1_and_vp9_description_transitions() {
             })
             .collect();
         assert_eq!(events.len(), 6);
-        for (pair, (description, revision, range, pts, flags)) in events.chunks_exact(2).zip([
-            (1, 1, 915..3995, -40, 5),
-            (2, 2, 3995..4395, 0, 1),
-            (1, 3, 4395..7475, 40, 1),
-        ]) {
+        for (pair, (description, revision, range, pts, flags)) in
+            events.as_chunks::<2>().0.iter().zip([
+                (1, 1, 915..3995, -40, 5),
+                (2, 2, 3995..4395, 0, 1),
+                (1, 3, 4395..7475, 40, 1),
+            ])
+        {
             let [Mp4Event::Configuration(config), Mp4Event::Packet(packet)] = pair else {
                 panic!("configuration must precede its packet");
             };
