@@ -611,7 +611,9 @@ fn range_dts_edit_and_seek_use_media_ticks_and_sample_entry_trim_units() {
             *skip,
             match i {
                 0 => Some([32, 0, 0, 0, 0, 0, 0, 0, 0, 0]),
-                5 => Some([0, 0, 0, 0, 32, 0, 0, 0, 0, 0]),
+                // 128 samples from the shorter stts duration and 32
+                // more from the edit's presentation end.
+                5 => Some([0, 0, 0, 0, 160, 0, 0, 0, 0, 0]),
                 _ => None,
             }
         );

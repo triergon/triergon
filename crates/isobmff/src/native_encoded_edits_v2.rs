@@ -188,12 +188,11 @@ impl Mov9EncodedEditPlanV2 {
         let terminal = source.ordinal == self.count || next >= self.end;
         let end = if terminal {
             let desired = self.end.min(self.source_end);
-            let nominal = if self.dts_scale.is_some() {
-                next
-            } else {
-                dts.checked_add(i128::from(self.frame))
-                    .ok_or(Error::Overflow)?
-            };
+            // stts can shorten the last DTS packet without changing the
+            // number of samples it decodes. Measure trim from the coded size.
+            let nominal = dts
+                .checked_add(i128::from(self.frame))
+                .ok_or(Error::Overflow)?;
             u32::try_from(nominal.checked_sub(desired).ok_or(Error::Overflow)?.max(0))
                 .map_err(|_| Error::Overflow)?
         } else {
