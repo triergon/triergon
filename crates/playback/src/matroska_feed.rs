@@ -4,6 +4,7 @@ mod bitmap;
 mod bitmap_probe;
 mod discovery;
 mod hevc_dolby;
+mod probe_clock;
 mod video_clock;
 mod video_seek;
 use crate::{Delivery, Output, RawEvent, Result};
@@ -17,7 +18,8 @@ pub use discovery::{
     MatroskaStartupSource,
 };
 pub use hevc_dolby::{
-    MatroskaDolbyLimits, MatroskaHevcClock, MatroskaHevcDolbyFeed, MatroskaHevcDolbyJob,
+    MatroskaDolbyClock, MatroskaDolbyClockPrefix, MatroskaDolbyClockProbe, MatroskaDolbyLimits,
+    MatroskaDolbyTiming, MatroskaHevcClock, MatroskaHevcDolbyFeed, MatroskaHevcDolbyJob,
     MatroskaHevcDolbyLimits, MatroskaHevcDolbyPacket, MatroskaHevcDolbyPayload,
     MatroskaHevcDolbySetup,
 };

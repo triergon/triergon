@@ -237,7 +237,7 @@ then SPS VUI timing if the VPS has no clock, and rounds down to whole
 packet ticks. The original container packet still carries its source
 clocks.
 
-## Matroska Dolby audio duration
+## Matroska Dolby audio packet clocks
 
 `MatroskaHevcDolbyPacket::native_duration_ns` returns the declared
 duration on the native packet clock. When that duration is absent, the
@@ -245,6 +245,17 @@ method checks up to 32 complete independent AC-3 or E-AC-3 syncframes.
 It checks the final frame’s CRC and projects that frame’s coded sample
 span down to a whole Matroska clock tick. Source timing remains available
 on the packet.
+
+For native-compatible PTS and DTS, create a `native_dolby_clock_probe`
+from the selected feed. Push the selected, checked packets once in input
+order through the caller's discovery cutoff. The probe retains up to 4096
+budgeted timing rows. An absolute timestamp within that prefix can anchor
+earlier packets, and a later coded duration can fill eligible leading
+rows. Call `finish` and replay the prefix timings by ordinal. Use
+`into_live` to release the rows and advance the same clock as more
+packets arrive. Rebuild the feed and clock after seek or configuration
+change, and keep the player's delivery classification when replaying the
+original packets. See the [timing controls](tests/fixtures/dolby-clock/README.md).
 
 ## Matroska bitmap subtitles
 
