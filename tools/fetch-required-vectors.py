@@ -5,6 +5,7 @@ from http.client import HTTPException
 import json
 from pathlib import Path, PurePosixPath
 import subprocess
+import sys
 import tempfile
 import urllib.request
 
@@ -24,8 +25,17 @@ def download(relative):
         # the same immutable digest for either transport before caching it.
         with tempfile.TemporaryDirectory(prefix='triergon-fate-') as directory:
             temporary = Path(directory) / 'vector'
+            # The sender's file-list size can differ from what arrives.
+            # Set a child-only filesystem limit before starting the receiver.
+            limit_and_exec = (
+                'import os, resource, sys\n'
+                'limit = int(sys.argv[1])\n'
+                'resource.setrlimit(resource.RLIMIT_FSIZE, (limit, limit))\n'
+                'os.execvp(sys.argv[2], sys.argv[2:])\n'
+            )
             try:
                 subprocess.run([
+                    sys.executable, '-c', limit_and_exec, str(MAXIMUM_BYTES),
                     'rsync', '--contimeout=10', '--timeout=20',
                     f'--max-size={MAXIMUM_BYTES}', '--',
                     'rsync://fate-suite.ffmpeg.org/fate-suite/' + str(relative), str(temporary),

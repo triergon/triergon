@@ -2,6 +2,7 @@ import hashlib
 import importlib.util
 import io
 import json
+import os
 from pathlib import Path
 import subprocess
 import tempfile
@@ -76,6 +77,24 @@ class RequiredVectorTests(unittest.TestCase):
             with patch.object(fetcher.urllib.request, 'urlopen', side_effect=TimeoutError), \
                  self.rsync_vector(b'wrong'):
                 with self.assertRaisesRegex(ValueError, 'download hash mismatch'):
+                    fetcher.fetch_required(root)
+            self.assertFalse((root / '.research/fate-samples/mkv/required.mkv').exists())
+
+    @unittest.skipUnless(os.name == 'posix', 'rsync staging uses a POSIX file-size limit')
+    def test_rsync_cannot_write_past_the_staging_limit(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            self.contract(root)
+            receiver = root / 'rsync'
+            receiver.write_text('#!/usr/bin/env python3\n'
+                                'import sys\n'
+                                'with open(sys.argv[-1], "wb", buffering=0) as file:\n'
+                                '    sys.exit(0 if file.write(bytes(2048)) == 2048 else 1)\n')
+            receiver.chmod(0o700)
+            with patch.dict(os.environ, PATH=f'{root}{os.pathsep}{os.environ["PATH"]}'), \
+                 patch.object(fetcher, 'MAXIMUM_BYTES', 1024), \
+                 patch.object(fetcher.urllib.request, 'urlopen', side_effect=TimeoutError):
+                with self.assertRaisesRegex(RuntimeError, 'could not fetch required vector'):
                     fetcher.fetch_required(root)
             self.assertFalse((root / '.research/fate-samples/mkv/required.mkv').exists())
 
