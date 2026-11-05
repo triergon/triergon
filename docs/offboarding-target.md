@@ -46,6 +46,20 @@ The receipt covers the immutable-input library route and retains the
 earlier failed comparisons by revision.
 See the [latest selected video evidence](../research/qualification/matroska-video-linux-arm64/scan-replay-location/README.md).
 
+The opt-in Streem preview at `c0046d7a3aadc89aa875a7b77f871ec60b350063`
+pins Triergon `bf8e7758c4c5ebd6ecb3589285d6eec34fa8e425`. Its 32-bit debug
+package, SHA-256 `ec692146c24384b929026c48c6bf5f1ad5c1d9e7899b747b670d2dbbc2e16e02`,
+installed on an LG G4 running webOS 10.3.1. The installed executables and
+shared library matched the package. Starfish accepted audio and video
+feeds from two synthetic AVC/AAC catalog items, one in MP4 and one in
+Matroska. Both sessions paused, resumed, sought to 52 seconds and stopped
+back to detail after teardown. Each run included HTTP 206 responses, and
+Starfish reported frame-ready callbacks after each seek. The app's memory
+maps contained no FFmpeg libraries. The device logs are retained privately.
+This evidence covers the recorded debug package and these two hardware
+playback profiles. Wider media coverage and shipping-build qualification
+remain open.
+
 ## Completion ledger
 
 | ID | Required work | Completion evidence |
