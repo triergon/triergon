@@ -132,8 +132,8 @@ on a single Load. The app returned to detail and the mock Plex server
 acknowledged the stopped position and DTS track ID. An earlier MP4
 replay was backgrounded before Stop was reported. The Matroska replay
 resumed at 32 seconds after two in-place watchdog retries and a fresh
-Load. Same-Load Matroska seek remains open. The set remained in Active
-Standby, so panel picture and audible output were unobserved.
+Load. The set remained in Active Standby, so panel picture and audible
+output were unobserved.
 
 The reviewed DTS library tree passed 126 native Linux ARM64 functional
 tests. Core bytes matched FFmpeg on 37,125 authored packet projections
@@ -161,6 +161,17 @@ stopped position and the old encoder retirement. Both replays used
 sequential reads and the app process maps contained no FFmpeg libraries.
 The set remained in Active Standby. The hardware observations cover
 Starfish's accepted feeds and advancing playback clock.
+
+The Matroska seek follow-up at Streem
+`4d81cb919f4e4daaba2845651c34f111dbcf4a96` credits ongoing validation to
+the existing seek watchdog. The same DTS fixture first reproduced the
+retries on the conversion preview. The follow-up's 32-bit debug IPK,
+SHA-256 `ca2cddc539021a7d0255a928a015c6975be694e4f1c6bccfc3674973b1a8ebd7`,
+resumed at 12 seconds on the G4. It accepted native Seek to the
+30-second keyframe for a 31.582-second request. HTTP ranges, post-seek
+audio and video feeds, and Back teardown all completed on one Load.
+The simulator also passed the same fixture. Broader seek and shipping
+qualification remain open.
 
 ## Completion ledger
 
