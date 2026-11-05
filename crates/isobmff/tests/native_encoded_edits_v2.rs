@@ -5,11 +5,14 @@ use triergon_core::{
     Budget, Error, InputCursor, SourceCapabilities, SourceFailure, SourceId, TimeBase, WorkBudget,
 };
 use triergon_isobmff::{
-    EditList, Limits, Mov9CursorStatus, Mov9EditCursor, Mov9EditLimits, Mov9EncodedEditContextV2,
-    Mov9EncodedEditJobV2, Mov9EncodedEditLimitsV2, Mov9EncodedEditPlanV2, Mov9EncodedLimitsV1,
-    Mov9EncodedSelectionV4, Mov9EncodedStreamJobV1, Mov9EncodedStreamV1, Mov9NativeIndexCursor,
+    BuildStatus, EditList, EncodedEntryKindV1, Limits, Mov9CursorStatus, Mov9EditCursor,
+    Mov9EditLimits, Mov9EncodedConfigSequenceV3, Mov9EncodedEditContextV2, Mov9EncodedEditJobV2,
+    Mov9EncodedEditLimitsV2, Mov9EncodedEditPlanV2, Mov9EncodedLimitsV1, Mov9EncodedSelectionV4,
+    Mov9EncodedStreamJobV1, Mov9EncodedStreamV1, Mov9NativeGlobalSeekJob, Mov9NativeIndexCursor,
     Mov9NativeIndexLimits, Mov9PacketCursor, Mov9PacketLimits, Mov9Track, MovieHeader,
-    PinnedMovD32EncodedEditsV2, PinnedMovD32EncodedRegularV1, SampleTable, TrackHeader,
+    PinnedMovD32EncodedContextsV7, PinnedMovD32EncodedEditsV2, PinnedMovD32EncodedRecoveryV5,
+    PinnedMovD32EncodedRegularV1, PinnedMovD32EncodedRegularV3, PinnedMovD32EncodedRegularV4,
+    SampleTable, TrackHeader, check_dts_core_description,
 };
 const ORIGINAL: &[u8] = include_bytes!("fixtures/encoded-edit-v2/original.mp4");
 const AUDIO0: &[u8] = include_bytes!("fixtures/encoded-edit-v2/audio0.mp4");
@@ -196,25 +199,34 @@ fn rows(
     panic!("occurrence progress")
 }
 
-fn range_plan(p: &Source, major: [u8; 4]) -> Result<Mov9EncodedEditPlanV2, Error> {
-    let mut input = p.input();
+fn range_config(
+    p: &Source,
+    major: [u8; 4],
+    input: &mut InputCursor,
+    limits: Mov9EncodedLimitsV1,
+) -> Result<Mov9EncodedStreamV1, Error> {
     let cancel = AtomicBool::new(false);
     let mut stream = Mov9EncodedStreamJobV1::new_range_playback(
         &p.header,
         &p.table,
-        &input,
+        input,
         Mov9EncodedSelectionV4 {
             major_brand: Some(major),
             description: 1,
-            limits: Default::default(),
+            limits,
         },
     )?;
-    let config = loop {
-        if stream.poll(&mut input, &mut WorkBudget::new(1), &cancel)? == Mov9CursorStatus::Ready {
-            break stream.take(&mut input, &cancel)?;
+    for _ in 0..10000 {
+        if stream.poll(input, &mut WorkBudget::new(1), &cancel)? == Mov9CursorStatus::Ready {
+            return stream.take(input, &cancel);
         }
-    };
-    let configs = [config];
+    }
+    panic!("range description progress")
+}
+
+fn range_plan(p: &Source, major: [u8; 4]) -> Result<Mov9EncodedEditPlanV2, Error> {
+    let mut input = p.input();
+    let configs = [range_config(p, major, &mut input, Default::default())?];
     let mut edit = Mov9EncodedEditJobV2::new_range_playback(
         Mov9EncodedEditContextV2 {
             table: &p.table,
@@ -283,6 +295,427 @@ fn range_playback_keeps_dolby_packets_and_reports_the_leading_sample_skip() {
 
 fn fixture_payload(raw: &[u8], kind: &[u8; 4]) -> usize {
     raw.windows(4).position(|bytes| bytes == kind).unwrap() + 4
+}
+
+fn atom(kind: &[u8; 4], body: &[u8]) -> Vec<u8> {
+    let mut raw = ((body.len() + 8) as u32).to_be_bytes().to_vec();
+    raw.extend_from_slice(kind);
+    raw.extend_from_slice(body);
+    raw
+}
+
+fn ddts(construction: u8, frequency: u32, frame_code: u8) -> Vec<u8> {
+    let mut record = [0; 20];
+    record[..4].copy_from_slice(&frequency.to_be_bytes());
+    record[12] = 24;
+    record[13] = frame_code << 6 | construction << 1;
+    let core = (2u32 << 18) | (384 << 4); // Stereo, 384-byte core.
+    record[14..17].copy_from_slice(&core.to_be_bytes()[1..]);
+    record[18] = 2; // Left and right front channels.
+    atom(b"ddts", &record)
+}
+
+fn mp4a_esds(oti: u8) -> Vec<u8> {
+    // MPEG-4 descriptors with FFmpeg-style four-byte lengths and no DSI.
+    atom(
+        b"esds",
+        &[
+            0, 0, 0, 0, 3, 0x80, 0x80, 0x80, 27, 0, 1, 0, 4, 0x80, 0x80, 0x80, 13, oti, 0x15, 0, 0,
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 6, 0x80, 0x80, 0x80, 1, 2,
+        ],
+    )
+}
+
+fn replace_fixture_body(raw: &mut Vec<u8>, kind: &[u8; 4], parents: &[&[u8; 4]], body: &[u8]) {
+    let at = fixture_payload(raw, kind);
+    let old_size = u32::from_be_bytes(raw[at - 8..at - 4].try_into().unwrap());
+    for name in std::iter::once(&kind).chain(parents) {
+        let size_at = fixture_payload(raw, name) - 8;
+        let size = u32::from_be_bytes(raw[size_at..size_at + 4].try_into().unwrap());
+        let size = size - old_size + 8 + body.len() as u32;
+        raw[size_at..size_at + 4].copy_from_slice(&size.to_be_bytes());
+    }
+    raw.splice(at..at - 8 + old_size as usize, body.iter().copied());
+}
+
+fn dts_fixture(
+    format: &[u8; 4],
+    version: u8,
+    config: &[u8],
+    rate: u32,
+    frame: u32,
+    tail: u32,
+    edits: &[(u32, i32)],
+) -> Vec<u8> {
+    // Reuse the bounded six-packet table and its extents. The tests only use
+    // metadata. All edited boxes come after mdat, so offsets remain valid.
+    let mut raw = LEADING_EAC3.to_vec();
+    let at = fixture_payload(&raw, b"ec-3");
+    let mut entry = raw[at..at + 28].to_vec();
+    entry[9] = version;
+    if version == 1 {
+        entry[20..22].copy_from_slice(&0xfffeu16.to_be_bytes());
+        entry.extend_from_slice(&512u32.to_be_bytes());
+        entry.extend_from_slice(&[0; 8]);
+        entry.extend_from_slice(&2u32.to_be_bytes());
+    }
+    entry.extend_from_slice(config);
+    let mut stsd = vec![0, 0, 0, 0, 0, 0, 0, 1];
+    stsd.extend(atom(format, &entry));
+    let table_parents = [b"stbl", b"minf", b"mdia", b"trak", b"moov"];
+    replace_fixture_body(&mut raw, b"stsd", &table_parents, &stsd);
+
+    let stts: Vec<_> = [0u32, 2, 5, frame, 1, tail]
+        .into_iter()
+        .flat_map(u32::to_be_bytes)
+        .collect();
+    replace_fixture_body(&mut raw, b"stts", &table_parents, &stts);
+    let mut elst = vec![0; 4];
+    elst.extend_from_slice(&(edits.len() as u32).to_be_bytes());
+    for &(duration, start) in edits {
+        elst.extend_from_slice(&duration.to_be_bytes());
+        elst.extend_from_slice(&start.to_be_bytes());
+        elst.extend_from_slice(&[0, 1, 0, 0]);
+    }
+    replace_fixture_body(&mut raw, b"elst", &[b"edts", b"trak", b"moov"], &elst);
+    let duration = edits.iter().map(|(duration, _)| duration).sum();
+    for (kind, field, word) in [
+        (b"mdhd", 12, rate),
+        (b"mdhd", 16, 5 * frame + tail),
+        (b"mvhd", 12, rate),
+        (b"mvhd", 16, duration),
+        (b"tkhd", 20, duration),
+    ] {
+        let at = fixture_payload(&raw, kind) + field;
+        raw[at..at + 4].copy_from_slice(&word.to_be_bytes());
+    }
+    raw
+}
+
+#[test]
+fn dts_core_descriptions_agree_with_range_admission() {
+    for (tag, version, config, major, configuration_box) in [
+        (b"dtsc", 0, ddts(1, 48_000, 0), b"isom", b"ddts"),
+        (b"dtsh", 0, ddts(14, 96_000, 1), b"isom", b"ddts"),
+        (b"dtsl", 0, ddts(14, 96_000, 1), b"isom", b"ddts"),
+        (b"dtsc", 1, vec![], b"qt  ", b"dtsc"),
+        (b"mp4a", 0, mp4a_esds(0xa9), b"isom", b"esds"),
+        (b"mp4a", 0, mp4a_esds(0xaa), b"isom", b"esds"),
+    ] {
+        let source = Source::new(
+            &dts_fixture(tag, version, &config, 48_000, 512, 384, &[(2944, 0)]),
+            b"soun",
+        );
+        let description = &source.table.descriptions()[0];
+        let checked = check_dts_core_description(description, Default::default())
+            .unwrap()
+            .unwrap();
+        assert_eq!(checked.sample_entry_rate_hz(), 48_000);
+        let stream =
+            range_config(&source, *major, &mut source.input(), Default::default()).unwrap();
+        assert_eq!(stream.kind(), EncodedEntryKindV1::Dts);
+        assert_eq!(stream.native().codec, "dts");
+        assert!(stream.native().extradata.is_empty());
+        assert_eq!(stream.configuration_box().header().kind, *configuration_box);
+        let packets = rows(&source, range_plan(&source, *major).unwrap());
+        assert_eq!(packets.len(), 6);
+        assert_eq!(packets[5].0.native.dts, Some(2560));
+        assert_eq!(packets[5].0.native.duration, 384);
+        assert_eq!(packets[5].1, Some([0, 0, 0, 0, 128, 0, 0, 0, 0, 0]));
+    }
+
+    let aac = Source::new(AUDIO0, b"soun");
+    assert_eq!(
+        check_dts_core_description(&aac.table.descriptions()[0], Default::default()),
+        Ok(None)
+    );
+}
+
+#[test]
+fn dts_single_packet_edit_needs_a_declared_coded_frame_clock() {
+    for (tag, config, has_clock) in [
+        (b"mp4a", mp4a_esds(0xa9), false),
+        (b"dtsc", ddts(1, 48_000, 0), true),
+    ] {
+        let mut raw = dts_fixture(tag, 0, &config, 48_000, 512, 384, &[(384, 0)]);
+        let stts: Vec<_> = [0u32, 1, 1, 384]
+            .into_iter()
+            .flat_map(u32::to_be_bytes)
+            .collect();
+        replace_fixture_body(
+            &mut raw,
+            b"stts",
+            &[b"stbl", b"minf", b"mdia", b"trak", b"moov"],
+            &stts,
+        );
+        for (kind, field, word) in [(b"stsc", 12, 1u32), (b"stsz", 8, 1), (b"mdhd", 16, 384)] {
+            let at = fixture_payload(&raw, kind) + field;
+            raw[at..at + 4].copy_from_slice(&word.to_be_bytes());
+        }
+        let source = Source::new(&raw, b"soun");
+        let plan = range_plan(&source, *b"isom");
+        if has_clock {
+            let packets = rows(&source, plan.unwrap());
+            assert_eq!(packets.len(), 1);
+            assert_eq!(packets[0].0.native.duration, 384);
+            assert_eq!(packets[0].1, Some([0, 0, 0, 0, 128, 0, 0, 0, 0, 0]));
+        } else {
+            assert!(matches!(
+                plan,
+                Err(Error::Unsupported("DTS edit needs a coded frame clock"))
+            ));
+        }
+    }
+}
+
+#[test]
+fn dts_core_description_refusals_and_limits_precede_publication() {
+    let ddts = ddts(1, 48_000, 0);
+    let mut invalid_esds = mp4a_esds(0xa9);
+    invalid_esds[26] = 0x11; // DecoderConfigDescriptor StreamType is no longer audio.
+    for (tag, config) in [
+        (b"dtsc", vec![]),
+        (b"dtsc", atom(b"ddts", &ddts[8..27])),
+        (b"dtsc", [ddts.clone(), ddts.clone()].concat()),
+        (b"dtsc", [ddts[..27].to_vec(), vec![1]].concat()),
+        (
+            b"dtsh",
+            [ddts[..21].to_vec(), vec![19 << 1], ddts[22..].to_vec()].concat(),
+        ),
+        (
+            b"dtsl",
+            [ddts[..21].to_vec(), vec![17 << 1], ddts[22..].to_vec()].concat(),
+        ),
+        (b"mp4a", invalid_esds),
+        (b"mp4a", mp4a_esds(0xab)),
+    ] {
+        let source = Source::new(
+            &dts_fixture(tag, 0, &config, 48_000, 512, 384, &[(2944, 0)]),
+            b"soun",
+        );
+        assert!(
+            check_dts_core_description(&source.table.descriptions()[0], Default::default())
+                .is_err()
+        );
+        assert!(range_config(&source, *b"isom", &mut source.input(), Default::default()).is_err());
+    }
+    for (tag, config, limits) in [
+        (
+            b"dtsc",
+            ddts,
+            Mov9EncodedLimitsV1 {
+                max_config_bytes: 19,
+                ..Default::default()
+            },
+        ),
+        (
+            b"mp4a",
+            mp4a_esds(0xa9),
+            Mov9EncodedLimitsV1 {
+                max_descriptors: 2,
+                ..Default::default()
+            },
+        ),
+        (
+            b"mp4a",
+            mp4a_esds(0xa9),
+            Mov9EncodedLimitsV1 {
+                max_child_boxes: 0,
+                ..Default::default()
+            },
+        ),
+    ] {
+        let source = Source::new(
+            &dts_fixture(tag, 0, &config, 48_000, 512, 384, &[(2944, 0)]),
+            b"soun",
+        );
+        assert!(matches!(
+            check_dts_core_description(&source.table.descriptions()[0], limits),
+            Err(Error::Limit { .. })
+        ));
+        assert!(matches!(
+            range_config(&source, *b"isom", &mut source.input(), limits),
+            Err(Error::Limit { .. })
+        ));
+    }
+}
+
+#[test]
+fn pinned_encoded_views_refuse_caller_supplied_dts_range_configurations() {
+    let source = Source::new(
+        &dts_fixture(b"mp4a", 0, &mp4a_esds(0xa9), 48_000, 512, 384, &[(2944, 0)]),
+        b"soun",
+    );
+    let mut input = source.input();
+    let limits = Mov9EncodedLimitsV1::default();
+    let mut pinned = Mov9EncodedStreamJobV1::new(
+        &source.header,
+        &source.table,
+        &input,
+        Some(*b"isom"),
+        limits,
+        PinnedMovD32EncodedRegularV1,
+    )
+    .unwrap();
+    let cancel = AtomicBool::new(false);
+    assert_eq!(
+        pinned.poll(&mut input, &mut WorkBudget::new(4096), &cancel),
+        Err(Error::Unsupported(
+            "encoded mp4a object-type is not selected AAC"
+        )),
+    );
+
+    let configs = [range_config(&source, *b"isom", &mut input, limits).unwrap()];
+    let context = || Mov9EncodedEditContextV2 {
+        table: &source.table,
+        edits: &source.edits,
+        stream: &configs[0],
+        media_base: source.header.time_base().unwrap(),
+        movie_base: source.movie_base,
+    };
+    let limits = Mov9EncodedEditLimitsV2::default();
+    for admission in [
+        Mov9EncodedEditJobV2::new(context(), &input, limits, PinnedMovD32EncodedEditsV2),
+        Mov9EncodedEditJobV2::new_v3(
+            context(),
+            &configs,
+            &input,
+            limits,
+            PinnedMovD32EncodedRegularV3,
+        ),
+        Mov9EncodedEditJobV2::new_v4(
+            context(),
+            &configs,
+            &input,
+            limits,
+            PinnedMovD32EncodedRegularV4,
+        ),
+        Mov9EncodedEditJobV2::new_v5(
+            context(),
+            &configs,
+            &input,
+            limits,
+            PinnedMovD32EncodedRecoveryV5,
+        ),
+        Mov9EncodedEditJobV2::new_v7(
+            context(),
+            &configs,
+            &input,
+            limits,
+            PinnedMovD32EncodedContextsV7,
+        ),
+    ] {
+        assert!(matches!(
+            admission,
+            Err(Error::Unsupported("encoded codec requires range playback"))
+        ));
+    }
+    assert!(matches!(
+        Mov9EncodedConfigSequenceV3::new(
+            &source.table,
+            &configs,
+            &input,
+            PinnedMovD32EncodedRegularV3
+        ),
+        Err(Error::Unsupported("encoded codec requires range playback"))
+    ));
+}
+
+#[test]
+fn range_dts_edit_and_seek_use_media_ticks_and_sample_entry_trim_units() {
+    let raw = dts_fixture(
+        b"dtsh",
+        0,
+        &ddts(14, 96_000, 1),
+        144_000,
+        1536,
+        1152,
+        &[(300, -1), (8640, 96)],
+    );
+    let source = Source::new(&raw, b"soun");
+    let plan = range_plan(&source, *b"isom").unwrap();
+    assert_eq!(plan.native_anchor_ticks(), -204);
+    assert_eq!(plan.selected_end_ticks(), 8736);
+    let packets = rows(&source, plan.clone());
+    assert_eq!(packets.len(), 6);
+    for (i, (packet, skip)) in packets.iter().enumerate() {
+        assert_eq!(packet.native.pts, Some(204 + i as i64 * 1536));
+        assert_eq!(packet.native.pts, packet.native.dts);
+        assert_eq!(packet.native.flags, 1);
+        assert_eq!(packet.edit.as_ref().unwrap().edit_ordinal, 1);
+        assert_eq!(packet.native.duration, if i == 5 { 1152 } else { 1536 });
+        assert_eq!(
+            *skip,
+            match i {
+                0 => Some([32, 0, 0, 0, 0, 0, 0, 0, 0, 0]),
+                // 128 samples from the shorter stts duration and 32
+                // more from the edit's presentation end.
+                5 => Some([0, 0, 0, 0, 160, 0, 0, 0, 0, 0]),
+                _ => None,
+            }
+        );
+    }
+
+    let plans = [Some(plan)];
+    let tracks = [source.track()];
+    let cancel = AtomicBool::new(false);
+    let mut cursor = Mov9PacketCursor::new_encoded_regular_v2(
+        &source.pool,
+        &tracks,
+        &source.media,
+        Default::default(),
+        &plans,
+        PinnedMovD32EncodedEditsV2,
+    )
+    .unwrap();
+    cursor.enable_range_seek_checkpoints();
+    loop {
+        match cursor.poll(&mut WorkBudget::new(1), &cancel).unwrap() {
+            Mov9CursorStatus::Yield => {}
+            Mov9CursorStatus::Ready => {
+                cursor.take_occurrence().unwrap();
+            }
+            Mov9CursorStatus::End => break,
+        }
+    }
+    cursor.rewind_at_end().unwrap();
+    let request = (source.header.track_id, 1750);
+    let mut checked = cursor
+        .prepare_checked_range_seek(request.0, request.1, Default::default())
+        .unwrap()
+        .unwrap();
+    while checked.poll(&mut WorkBudget::new(1), &cancel).unwrap() == BuildStatus::Yield {}
+    let (mut landed, receipt) = checked.finish().unwrap();
+    assert_eq!(receipt.selected.timestamp, 1740);
+    assert_eq!(
+        receipt.selected.occurrence.source.range,
+        packets[1].0.source.range
+    );
+    assert_eq!(
+        landed.poll(&mut WorkBudget::new(128), &cancel).unwrap(),
+        Mov9CursorStatus::Ready
+    );
+    assert_eq!(landed.take_occurrence().unwrap().native.dts, Some(1740));
+
+    let mut fallback = Mov9NativeGlobalSeekJob::new_encoded_regular_v2_rescaled(
+        &source.pool,
+        &tracks,
+        &source.media,
+        request,
+        Default::default(),
+        &plans,
+    )
+    .unwrap();
+    while fallback.poll(&mut WorkBudget::new(1), &cancel).unwrap() == BuildStatus::Yield {}
+    let fallback = fallback.finish().unwrap();
+    assert_eq!(
+        fallback.receipt().selected.timestamp,
+        receipt.selected.timestamp
+    );
+    assert_eq!(
+        fallback.receipt().selected.position,
+        receipt.selected.position
+    );
 }
 
 #[test]

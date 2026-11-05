@@ -250,7 +250,7 @@ impl<'a> Slot<'a> {
             };
             let edit = Mov9EditIdentity {
                 sequence: sample.ordinal,
-                edit_ordinal: 0,
+                edit_ordinal: plan.edit_ordinal(),
                 duration_basis: Mov9DurationBasis::OriginalDecodeTableOrdinal,
             };
             Mov9PacketOccurrence {
