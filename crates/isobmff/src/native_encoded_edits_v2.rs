@@ -448,6 +448,9 @@ impl<'a> Mov9EncodedEditJobV2<'a> {
         }
         let (dts_scale, frame, anchor) = if let Some(dts) = dts {
             let (scale, frame) = dts.media_clock(context.media_base)?;
+            if frame.is_none() && context.table.sample_count() < 2 {
+                return Err(Error::Unsupported("DTS edit needs a coded frame clock"));
+            }
             let anchor = i128::from(entry.media_time)
                 .checked_sub(leading_ticks)
                 .ok_or(Error::Overflow)?;

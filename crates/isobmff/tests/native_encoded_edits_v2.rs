@@ -432,6 +432,43 @@ fn dts_core_descriptions_agree_with_range_admission() {
 }
 
 #[test]
+fn dts_single_packet_edit_needs_a_declared_coded_frame_clock() {
+    for (tag, config, has_clock) in [
+        (b"mp4a", mp4a_esds(0xa9), false),
+        (b"dtsc", ddts(1, 48_000, 0), true),
+    ] {
+        let mut raw = dts_fixture(tag, 0, &config, 48_000, 512, 384, &[(384, 0)]);
+        let stts: Vec<_> = [0u32, 1, 1, 384]
+            .into_iter()
+            .flat_map(u32::to_be_bytes)
+            .collect();
+        replace_fixture_body(
+            &mut raw,
+            b"stts",
+            &[b"stbl", b"minf", b"mdia", b"trak", b"moov"],
+            &stts,
+        );
+        for (kind, field, word) in [(b"stsc", 12, 1u32), (b"stsz", 8, 1), (b"mdhd", 16, 384)] {
+            let at = fixture_payload(&raw, kind) + field;
+            raw[at..at + 4].copy_from_slice(&word.to_be_bytes());
+        }
+        let source = Source::new(&raw, b"soun");
+        let plan = range_plan(&source, *b"isom");
+        if has_clock {
+            let packets = rows(&source, plan.unwrap());
+            assert_eq!(packets.len(), 1);
+            assert_eq!(packets[0].0.native.duration, 384);
+            assert_eq!(packets[0].1, Some([0, 0, 0, 0, 128, 0, 0, 0, 0, 0]));
+        } else {
+            assert!(matches!(
+                plan,
+                Err(Error::Unsupported("DTS edit needs a coded frame clock"))
+            ));
+        }
+    }
+}
+
+#[test]
 fn dts_core_description_refusals_and_limits_precede_publication() {
     let ddts = ddts(1, 48_000, 0);
     let mut invalid_esds = mp4a_esds(0xa9);
