@@ -36,7 +36,8 @@ pub struct Mov9EncodedEditPlanV2 {
     source_edit: BoxView,
     source_config: BoxView,
     entry: EditEntry,
-    base: TimeBase,
+    media_base: TimeBase,
+    movie_base: TimeBase,
     kind: EncodedEntryKindV1,
     anchor: i128,
     end: i128,
@@ -78,8 +79,15 @@ impl Mov9EncodedEditPlanV2 {
     pub fn selected_end_ticks(&self) -> i128 {
         self.end
     }
-    pub(crate) fn matches(&self, table: &SampleTable, edits: &EditList, base: TimeBase) -> bool {
-        self.base == base
+    pub(crate) fn matches(
+        &self,
+        table: &SampleTable,
+        edits: &EditList,
+        media_base: TimeBase,
+        movie_base: TimeBase,
+    ) -> bool {
+        self.media_base == media_base
+            && self.movie_base == movie_base
             && self.source_table.header() == table.raw().header()
             && self.source_edit.header() == edits.raw().header()
             && self.count == table.sample_count()
@@ -549,7 +557,8 @@ impl<'a> Mov9EncodedEditJobV2<'a> {
                     source_edit: self.context.edits.raw().clone(),
                     source_config: self.context.stream.configuration_box().clone(),
                     entry: self.entry,
-                    base: self.context.media_base,
+                    media_base: self.context.media_base,
+                    movie_base: self.context.movie_base,
                     kind: self.context.stream.kind(),
                     anchor,
                     end: self.end,

@@ -42,6 +42,23 @@ fn unique(slot: &mut Option<BoxView>, raw: BoxView) -> Result<()> {
     *slot = Some(raw);
     Ok(())
 }
+fn validate_quicktime_data_handler(raw: &BoxView) -> Result<()> {
+    // QTFF Handler reference atom with a counted component name.
+    let (fields, name) = raw.payload().split_at_checked(24).ok_or(Error::Truncated)?;
+    let (&name_length, name) = name.split_first().ok_or(Error::Truncated)?;
+    if fields[..4] != [0; 4]
+        || fields[4..8] != *b"dhlr"
+        || fields[12..24] != [0; 12]
+        || name.len() != usize::from(name_length)
+    {
+        return Err(Error::Invalid("QuickTime data handler").into());
+    }
+    // Only self-contained URL data references are supported by this opener.
+    if fields[8..12] != *b"url " {
+        return Err(Error::Unsupported("QuickTime data handler reference type").into());
+    }
+    Ok(())
+}
 pub(crate) fn word(b: &[u8], at: usize) -> Result<u32> {
     Ok(u32::from_be_bytes(
         b.get(at..at.checked_add(4).ok_or(Error::Overflow)?)
@@ -79,15 +96,18 @@ struct Parts {
     stbl: Option<BoxView>,
     elst: Option<BoxView>,
     dref: Option<BoxView>,
+    data_handler_seen: bool,
 }
 struct Frame {
     children: BoxChildren,
     track: Option<usize>,
     kind: [u8; 4],
+    data_info_seen: bool,
 }
 struct Walk {
     frames: BudgetVec<Option<Frame>>,
     depth: usize,
+    quicktime: bool,
     parts: BudgetVec<Parts>,
     movie: Option<MovieHeader>,
     trex: BudgetVec<Trex>,
@@ -95,7 +115,12 @@ struct Walk {
     pending: Option<(BoxView, Option<usize>)>,
 }
 impl Walk {
-    fn new(root: &BoxView, b: &Budget, l: OpenLimits) -> Result<Self> {
+    fn new(
+        root: &BoxView,
+        b: &Budget,
+        l: OpenLimits,
+        major_brand: Option<[u8; 4]>,
+    ) -> Result<Self> {
         let mut frames = BudgetVec::new(b);
         frames.try_reserve_exact(l.depth)?;
         for _ in 0..l.depth {
@@ -105,10 +130,12 @@ impl Walk {
             children: root.children(0, l.format)?,
             track: None,
             kind: root.header().kind,
+            data_info_seen: false,
         });
         Ok(Self {
             frames,
             depth: 1,
+            quicktime: major_brand == Some(*b"qt  "),
             parts: BudgetVec::new(b),
             movie: None,
             trex: BudgetVec::new(b),
@@ -180,7 +207,14 @@ impl Walk {
             self.descend(raw, Some(index), l)?;
             push(&mut self.parts, Parts::default())?;
         } else if [*b"mdia", *b"minf", *b"dinf", *b"edts", *b"mvex"].contains(&kind) {
+            let parent = self.depth - 1;
             self.descend(raw, track, l)?;
+            if self.quicktime
+                && kind == *b"dinf"
+                && let Some(frame) = &mut self.frames.as_mut_slice()[parent]
+            {
+                frame.data_info_seen = true;
+            }
         } else if kind == *b"mvhd" {
             if self.movie.is_some() {
                 return Err(Error::Invalid("duplicate movie header").into());
@@ -196,16 +230,38 @@ impl Walk {
             }
             push(&mut self.trex, Trex::parse(&raw)?)?;
         } else if let Some(t) = track {
-            let parent = self.frames.as_slice()[self.depth - 1]
+            let frames = &self.frames.as_slice()[..self.depth];
+            let parent = frames[self.depth - 1]
                 .as_ref()
-                .ok_or(Error::Invalid("frame missing"))?
-                .kind;
+                .ok_or(Error::Invalid("frame missing"))?;
             let p = &mut self.parts.as_mut_slice()[t];
             match &kind {
                 b"tkhd" => unique(&mut p.tkhd, raw)?,
                 b"mdhd" => unique(&mut p.mdhd, raw)?,
-                // QuickTime also carries a data handler inside minf.
-                b"hdlr" if parent == *b"mdia" => unique(&mut p.hdlr, raw)?,
+                b"hdlr" if parent.kind == *b"mdia" => unique(&mut p.hdlr, raw)?,
+                b"hdlr"
+                    if self.quicktime
+                        && matches!(
+                            frames,
+                            [_, Some(trak), Some(mdia), Some(minf)]
+                                if [trak.kind, mdia.kind, minf.kind] == [*b"trak", *b"mdia", *b"minf"]
+                        ) =>
+                {
+                    if p.data_handler_seen {
+                        return Err(Error::Invalid("duplicate QuickTime data handler").into());
+                    }
+                    if parent.data_info_seen
+                        || !p
+                            .hdlr
+                            .as_ref()
+                            .is_some_and(|handler| handler.payload().get(4..8) == Some(b"mhlr"))
+                    {
+                        return Err(Error::Invalid("QuickTime data handler placement").into());
+                    }
+                    validate_quicktime_data_handler(&raw)?;
+                    p.data_handler_seen = true;
+                }
+                b"hdlr" => return Err(Error::Invalid("unexpected track handler box").into()),
                 b"stbl" => unique(&mut p.stbl, raw)?,
                 b"elst" => unique(&mut p.elst, raw)?,
                 b"dref" => unique(&mut p.dref, raw)?,
@@ -226,6 +282,7 @@ impl Walk {
             children: raw.children(0, l.format)?,
             track,
             kind: raw.header().kind,
+            data_info_seen: false,
         });
         self.depth += 1;
         Ok(())
@@ -577,6 +634,7 @@ impl<S: Source> Mp4Open<S> {
                             .ok_or(Error::Invalid("MP4 missing moov"))?,
                         &self.pool,
                         self.limits,
+                        self.brand,
                     )?;
                     self.walk = Some(walk);
                     self.scan_done = true;
@@ -868,6 +926,7 @@ impl<S: Source> Mp4Open<S> {
                     self.moov.as_ref().ok_or(Error::Invalid("moov missing"))?,
                     &self.pool,
                     self.limits,
+                    self.brand,
                 )?)
             } else {
                 None

@@ -593,11 +593,11 @@ impl<'a> Mov9PacketCursor<'a> {
                 if !plan.source_table().bytes().belongs_to(budget) {
                     return Err(Error::ForeignPool);
                 }
-                let Some((edits, _)) = slot.track.edits else {
+                let Some((edits, movie_base)) = slot.track.edits else {
                     return Err(Error::Invalid("encoded edit plan without source edit"));
                 };
                 if !slot.track.fragments.is_empty()
-                    || !plan.matches(slot.track.table, edits, slot.track.media_base)
+                    || !plan.matches(slot.track.table, edits, slot.track.media_base, movie_base)
                 {
                     return Err(Error::Invalid("encoded edit source association"));
                 }

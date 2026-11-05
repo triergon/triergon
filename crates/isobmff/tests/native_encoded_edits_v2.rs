@@ -235,6 +235,39 @@ fn original_audio189_keeps_source_delta_and_both_skip_recommendations() {
     assert_eq!(r[188].1, Some([0, 0, 0, 0, 0xf0, 1, 0, 0, 0, 0]));
 }
 #[test]
+fn encoded_cursor_rejects_plan_with_wrong_movie_timebase() {
+    let p = Source::new(ORIGINAL, b"soun");
+    let mut input = p.input();
+    let stream = p.stream(&mut input);
+    let mut job = Mov9EncodedEditJobV2::new(
+        Mov9EncodedEditContextV2 {
+            table: &p.table,
+            edits: &p.edits,
+            stream: &stream,
+            media_base: p.header.time_base().unwrap(),
+            movie_base: TimeBase::new(1, 2000).unwrap(),
+        },
+        &input,
+        Mov9EncodedEditLimitsV2::default(),
+        PinnedMovD32EncodedEditsV2,
+    )
+    .unwrap();
+    let plans = [Some(complete(&mut job, &mut input, 1).unwrap())];
+    let result = Mov9PacketCursor::new_encoded_regular_v2(
+        &p.pool,
+        &[p.track()],
+        &p.media,
+        Mov9PacketLimits::default(),
+        &plans,
+        PinnedMovD32EncodedEditsV2,
+    )
+    .map(|_| ());
+    assert_eq!(
+        result,
+        Err(Error::Invalid("encoded edit source association"))
+    );
+}
+#[test]
 fn zero_audio_edit_selects188_but_preserves_original189_source_table() {
     let p = Source::new(AUDIO0, b"soun");
     let r = rows(&p, p.plan(1).unwrap());
