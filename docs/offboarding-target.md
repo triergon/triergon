@@ -95,8 +95,16 @@ VPS/SPS/PPS on IRAP. Dolby audio borrows the original packet after bounding
 and checking syncframe extents. The source packet and its timing survive both
 projections. The host regression covers all 52 packets of a mixed HEVC/Dolby
 file and checks the HEVC seek and E-AC-3 track switch against stale feed
-bindings. Native timing and memory, Streem adoption and device proof remain
-open for this feed. [Fixture and oracle](../crates/playback/tests/fixtures/mkv-feed/README.md)
+bindings. The combined sink feed and device behavior still need
+qualification. [Fixture and oracle](../crates/playback/tests/fixtures/mkv-feed/README.md)
+
+The selected AAC-LC, AC-3 and E-AC-3 startup and forward packet clocks
+matched all ten native Linux ARM64 cases and 75 packets. All ten passed
+runtime, live heap and total peak RSS. The source clock also retains the
+damaged AC-3 control's original bytes and timing. The receipt covers the
+selected audio clock operation. Audio seek, combined application playback
+and device validation remain open.
+[Native audio clock evidence](../research/qualification/matroska-audio-linux-arm64/README.md)
 
 ## Raw AVC and HEVC input
 

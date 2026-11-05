@@ -1,16 +1,21 @@
 //! HEVC Annex B and AC-3 family feeds with borrowed packet storage.
 
 mod clock;
+mod dolby_clock;
 pub use clock::MatroskaHevcClock;
+pub use dolby_clock::{
+    MatroskaDolbyClock, MatroskaDolbyClockPrefix, MatroskaDolbyClockProbe, MatroskaDolbyTiming,
+};
 
-use super::Association;
+use super::{Association, check_limit, probe_clock::syncframe_duration_ns};
 use crate::{Output, Result};
 use std::sync::atomic::{AtomicBool, Ordering};
 use triergon::typed::{Configuration, Packet};
 use triergon_core::{Budget, Bytes, Error, SourceId, WorkBudget};
 use triergon_framing::{
-    Ac3Family, Ac3FrameDetails, BuildStep, HevcAnnexBAccessUnit, HevcAnnexBConfig, HevcAnnexBJob,
-    HevcAnnexBLimits, HvcConfigLimits, HvcConfigSource, HvcConfigViewParser, probe_ac3_header,
+    Ac3Family, Ac3FrameDetails, Ac3FrameHeader, BuildStep, HevcAnnexBAccessUnit, HevcAnnexBConfig,
+    HevcAnnexBJob, HevcAnnexBLimits, HvcConfigLimits, HvcConfigSource, HvcConfigViewParser,
+    probe_ac3_header,
 };
 
 #[derive(Clone, Copy, Debug)]
@@ -253,7 +258,12 @@ impl MatroskaHevcDolbyPacket<'_> {
     }
 }
 
-fn dolby_duration_ns(family: Ac3Family, mut raw: &[u8], scale_ns: u64) -> Option<u64> {
+fn dolby_duration_ns(family: Ac3Family, raw: &[u8], scale_ns: u64) -> Option<u64> {
+    let frame = dolby_final_syncframe(family, raw)?;
+    syncframe_duration_ns(frame.coded_samples(), frame.sample_rate_hz, scale_ns)
+}
+
+fn dolby_final_syncframe(family: Ac3Family, mut raw: &[u8]) -> Option<Ac3FrameHeader> {
     for _ in 0..32 {
         let header = probe_ac3_header(raw).ok()?;
         if header.family != family
@@ -277,19 +287,11 @@ fn dolby_duration_ns(family: Ac3Family, mut raw: &[u8], scale_ns: u64) -> Option
             if !dolby_crc_valid(&frame[2..]) {
                 return None;
             }
-            return syncframe_duration_ns(header.coded_samples(), header.sample_rate_hz, scale_ns);
+            return Some(header);
         }
         raw = remaining;
     }
     None
-}
-
-fn syncframe_duration_ns(samples: u16, sample_rate: u32, scale_ns: u64) -> Option<u64> {
-    let span_ns = u64::from(samples) * 1_000_000_000 / u64::from(sample_rate);
-    // Flooring twice gives the same whole tick count without multiplying
-    // the sample rate by an arbitrary container scale.
-    let ticks = span_ns.checked_div(scale_ns)?;
-    (ticks != 0).then_some(ticks * scale_ns)
 }
 
 // ATSC A/52 CRC-16 with generator x^16 + x^15 + x^2 + 1.
@@ -413,13 +415,6 @@ impl<'a> DolbyJob<'a> {
         }
         Ok(BuildStep::Complete)
     }
-}
-
-fn check_limit(requested: usize, maximum: usize) -> triergon_core::Result<()> {
-    if requested > maximum {
-        return Err(Error::Limit { requested, maximum });
-    }
-    Ok(())
 }
 
 #[cfg(test)]

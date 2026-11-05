@@ -1,5 +1,5 @@
 //! Matroska bitmap subtitle handoff to the existing bounded receivers.
-use super::Association;
+use super::{Association, probe_clock::NativePacketTiming};
 use crate::{
     Delivery, Output, RawEvent, Result, TrackKey,
     bitmap_bridge::{BitmapInput, BitmapScope},
@@ -10,27 +10,6 @@ use triergon_core::{Budget, Bytes, Error, SourceLocation, TimeBase};
 use triergon_subtitles::{dvb, dvd, pgs::PacketClock};
 
 const NS_PER_SECOND: u64 = 1_000_000_000;
-
-#[derive(Clone, Copy)]
-pub(super) struct BitmapTiming {
-    pub pts: Option<i64>,
-    pub dts: Option<i64>,
-    pub duration_ns: Option<u64>,
-}
-
-impl BitmapTiming {
-    pub fn demux(packet: &Packet) -> Result<Self> {
-        let timing = packet.packet.timing.ffmpeg9()?;
-        Ok(Self {
-            pts: timing.pts.map(|time| time.rounded_ns()).transpose()?,
-            dts: None,
-            duration_ns: timing
-                .duration
-                .map(|time| time.rounded_duration_ns())
-                .transpose()?,
-        })
-    }
-}
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum MatroskaBitmapCodec {
@@ -259,7 +238,7 @@ impl MatroskaBitmapTrack {
             packet,
             output.delivery(),
             sequence,
-            BitmapTiming::demux(packet)?,
+            NativePacketTiming::demux(packet)?,
         )
         .map(Some)
     }
@@ -297,7 +276,7 @@ impl MatroskaBitmapTrack {
         packet: &Packet,
         delivery: Delivery,
         sequence: u64,
-        timing: BitmapTiming,
+        timing: NativePacketTiming,
     ) -> Result<BitmapInput<MatroskaBitmapSource>> {
         let raw = match packet.packet.data.shared_bytes()? {
             Some(raw) => raw,
