@@ -114,6 +114,24 @@ MP4 sync and the container playback suite. These receipts cover the selected
 application playback paths. Full per-case numerical qualification, remaining
 carriage profiles and shipping adoption remain open.
 
+The DTS core preview at Streem `3c16fb4eb74914eed6e70dcd1c813a3468ebd78e`
+pins Triergon `4bd3d8f12b877fd71848e9bd718520309f022a19`. Five mock-catalog simulator
+replays used Matroska, regular and fragmented MP4, QuickTime and a separate
+14-bit packed Matroska file. The cases exercised HTTP 206, the selected
+DTS track's PCM, resume, pause, a seek on the same Load and Stop. The
+simulator used the FFmpeg-free build. Three refusal cases covered an
+absent core, an untimestamped later lace and an edit that needed PCM trim.
+The 32-bit debug IPK SHA-256 is
+`3352e26c35036af755a68643bd6b25c3dc77f8e73c41c5478068755013b34e62`.
+Its four packaged ELF files passed the FFmpeg-free link audit.
+
+The reviewed DTS library tree passed 126 native Linux ARM64 functional
+tests. Core bytes matched FFmpeg on 37,125 authored packet projections
+and all 1,172 packets of the FATE DTS-HD MA sample and its three remuxes.
+The edited range view keeps packet clocks and sample-entry trim separate.
+Streem admits MP4 DTS edits that can submit whole access units. DTS
+playback on hardware and numerical qualification remain open.
+
 ## Completion ledger
 
 | ID | Required work | Completion evidence |
@@ -217,8 +235,9 @@ preroll. [Seek budget regression](https://github.com/triergon/triergon/pull/14)
 Selected QuickTime AVC and HEVC entries and the leading AC-3 and E-AC-3
 edit profile are also admitted. The Dolby profile validates the full
 configuration and requires an edit duration that converts to whole
-samples on the configured clock. The QuickTime playback view requires
-an unambiguous AAC configuration.
+samples on the configured clock. QuickTime AAC playback requires an
+unambiguous AAC configuration. The range path also accepts selected DTS
+core descriptions and exposes regular rate-one edit clocks and trim.
 Five FFprobe comparisons cover regular, fragmented, repeated-edit,
 description-change and mixed-clock AVC/AAC playback. SourcePhysical can
 start with front metadata on a range source and switch to a complete index
