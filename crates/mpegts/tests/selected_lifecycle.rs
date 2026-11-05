@@ -38,18 +38,18 @@ fn collect_entity(case: Case, b: &Budget, entity: SourceId) -> Events {
         fixtures::selected(case),
     )
     .unwrap();
-    collect_stream(case, b, entity, source).0
+    collect_stream(&fixtures::bytes(case), b, entity, source, 1).0
 }
 
 fn collect_stream(
-    case: Case,
+    data: &[u8],
     b: &Budget,
     entity: SourceId,
     mut source: TransportStream,
+    quantum: u64,
 ) -> (Events, Vec<u64>) {
-    let data = fixtures::bytes(case);
-    let mut capacity = Vec::with_capacity(4096);
-    capacity.extend_from_slice(&data);
+    let mut capacity = Vec::with_capacity(data.len().max(4096));
+    capacity.extend_from_slice(data);
     let owner = Bytes::try_from_vec(b, capacity).unwrap();
     let mut input = InputCursor::new(
         b,
@@ -66,7 +66,11 @@ fn collect_stream(
     let mut ordinal = 0;
     for _ in 0..100_000 {
         let step = source
-            .poll(&mut input, &mut WorkBudget::new(1), &AtomicBool::new(false))
+            .poll(
+                &mut input,
+                &mut WorkBudget::new(quantum),
+                &AtomicBool::new(false),
+            )
             .unwrap();
         ordinal += source.take_feed_omissions();
         match step {
@@ -107,19 +111,30 @@ fn collect_stream(
 
 #[test]
 fn segment_feed_preserves_source_faults_epochs_and_retained_event_ordinals() {
-    for case in [
+    let program_changes = [
         Case::Repeat,
         Case::BadMapCrc,
         Case::PendingBody,
         Case::PendingHeader,
-    ] {
+    ]
+    .map(fixtures::bytes);
+    let carrier_cases = [
+        include_bytes!("data/pes-multiple-ts.ts").as_slice(),
+        include_bytes!("data/cc-loss-mid-pes.ts").as_slice(),
+        include_bytes!("data/pcr-timeline-discontinuity.ts").as_slice(),
+    ];
+    for data in program_changes
+        .iter()
+        .map(Vec::as_slice)
+        .chain(carrier_cases)
+    {
         let b = Budget::new(1 << 20).unwrap();
         let limits = ParseLimits::default();
         let ns = DescriptorNamespace::Unspecified;
         let source = TransportStream::new_single_program_segment(b.clone(), limits, ns).unwrap();
         let feed = TransportStream::new_single_program_feed(b.clone(), limits, ns).unwrap();
-        let (raw, raw_ordinals) = collect_stream(case, &b, SourceId(1), source);
-        let (fed, fed_ordinals) = collect_stream(case, &b, SourceId(1), feed);
+        let (raw, raw_ordinals) = collect_stream(data, &b, SourceId(1), source, 1);
+        let (fed, fed_ordinals) = collect_stream(data, &b, SourceId(1), feed, 4096);
         let key = |(event, epochs): &(TraceEvent, SourceEpochs)| {
             let fault = match event {
                 TraceEvent::Diagnostic(fault) => {

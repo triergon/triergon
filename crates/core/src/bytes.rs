@@ -500,16 +500,17 @@ impl BudgetVec<u8> {
 /// Length of the leading run of nonzero bytes.
 #[inline]
 pub fn nonzero_prefix_len(bytes: &[u8]) -> usize {
-    let (words, tail) = bytes.as_chunks::<8>();
-    for (index, chunk) in words.iter().enumerate() {
-        let word = u64::from_le_bytes(*chunk);
+    let mut words = bytes.chunks_exact(8);
+    for (index, chunk) in words.by_ref().enumerate() {
+        let word = u64::from_le_bytes(chunk.try_into().expect("eight-byte chunk"));
         let zeroes = word.wrapping_sub(0x0101_0101_0101_0101) & !word & 0x8080_8080_8080_8080;
         if zeroes != 0 {
             // Borrow can mark a following byte, so use the lowest marked octet.
             return index * 8 + zeroes.trailing_zeros() as usize / 8;
         }
     }
-    words.len() * 8
+    let tail = words.remainder();
+    bytes.len() - tail.len()
         + tail
             .iter()
             .position(|&byte| byte == 0)

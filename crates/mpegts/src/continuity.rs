@@ -47,6 +47,11 @@ impl Continuity {
         self.duplicated = false;
     }
 
+    pub(crate) fn expects_payload_counter(&self, counter: u8) -> bool {
+        self.counter
+            .is_some_and(|previous| (previous + 1) & 15 == counter)
+    }
+
     /// A bounded 188-byte operation. The caller charges one packet work unit before
     /// calling and checks cancellation at that boundary; no heap allocation occurs.
     /// PCR observations on Duplicate remain usable; do not re-assemble its payload.

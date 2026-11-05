@@ -135,6 +135,7 @@ pub struct TransportStream {
     program: u16,
     discover_program: bool,
     feed_omissions: Option<u64>,
+    deferred_feed_continuity: bool,
     descriptor_namespace: DescriptorNamespace,
     framer: TransportFramer,
     pat: PsiRoute,
@@ -270,6 +271,7 @@ impl TransportStream {
             program: program.unwrap_or_default(),
             discover_program: program.is_none(),
             feed_omissions: None,
+            deferred_feed_continuity: false,
             descriptor_namespace,
             pmt: None,
             pmt_source: None,
@@ -377,6 +379,7 @@ impl TransportStream {
     /// Source IDs and core generations are not rewritten into clock/config epochs.
     pub fn discontinuity(&mut self) -> Result<()> {
         if self.packet.is_some()
+            || self.deferred_feed_continuity
             || self.job.is_some()
             || self.section.is_some()
             || self.map_build.is_some()
@@ -847,6 +850,53 @@ impl TransportStream {
         self.outcome = outcome;
         Ok(true)
     }
+
+    fn validate_feed_continuation(
+        &mut self,
+        packet: &TransportPacket,
+        work: &mut WorkBudget,
+    ) -> Result<bool> {
+        if self.feed_omissions.is_none()
+            || packet.payload_unit_start
+            || packet.adaptation.is_some()
+            || packet.transport_error
+            || packet.scrambling != 0
+            || (self.clock_pending && self.pcr_pid == Some(packet.pid))
+        {
+            return Ok(false);
+        }
+        let Route::Pes(index) = self.route else {
+            return Ok(false);
+        };
+        let Some(payload) = packet.payload.as_ref() else {
+            return Ok(false);
+        };
+        let route = &mut self.routes.as_mut_slice()[index];
+        let continuity = route
+            .continuity
+            .as_mut()
+            .ok_or(Error::Invalid("PES continuity missing"))?;
+        if payload.is_empty() || !continuity.expects_payload_counter(packet.continuity_counter) {
+            return Ok(false);
+        }
+        let assembler = route
+            .assembler
+            .as_mut()
+            .ok_or(Error::Invalid("PES route missing"))?;
+        if !assembler.validate_body_carrier(payload.len(), work) {
+            return Ok(false);
+        }
+        let outcome = continuity.observe(packet)?;
+        debug_assert_eq!(outcome, ContinuityOutcome::Continuous);
+        if self.pcr_pid == Some(packet.pid) {
+            self.clock_signal = false;
+        }
+        // Transport is observed first in the full trace. Count continuity
+        // only when the consumer asks for the next source event.
+        self.deferred_feed_continuity = true;
+        Ok(true)
+    }
+
     fn clock_transition(&mut self) -> Result<Option<TraceEvent>> {
         let packet = self
             .packet
@@ -1155,6 +1205,10 @@ impl TransportStream {
             if cancel.load(Ordering::Relaxed) {
                 return Err(Error::Cancelled);
             }
+            if self.deferred_feed_continuity {
+                self.omit_feed_event()?;
+                self.deferred_feed_continuity = false;
+            }
             if self.boundary_event {
                 self.boundary_event = false;
                 return Ok(ready(TraceEvent::Discontinuity {
@@ -1230,6 +1284,9 @@ impl TransportStream {
                 Ok(Step::Ready(packet)) => {
                     self.entity_end = None;
                     self.route = self.find_route(packet.pid);
+                    if self.validate_feed_continuation(&packet, work)? {
+                        return Ok(ready(TraceEvent::Transport(packet)));
+                    }
                     self.phase = 1;
                     let event = TraceEvent::Transport(packet.clone());
                     self.packet = Some(packet);

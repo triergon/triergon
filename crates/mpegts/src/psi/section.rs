@@ -337,6 +337,15 @@ impl SectionAssembler {
             if !work.try_charge(1) {
                 return Ok(AssemblyStep::Yield);
             }
+            let target = self.target.unwrap_or(3);
+            let stop = payload
+                .fresh_at
+                .filter(|&start| payload.position < start)
+                .unwrap_or(payload.bytes.len());
+            let count = (target - length)
+                .min(stop - payload.position)
+                .min(work.remaining().min(63) as usize + 1);
+            let run = &payload.bytes.as_ref()[payload.position..payload.position + count];
             let physical = payload
                 .offset
                 .checked_add(payload.position as u64)
@@ -344,7 +353,7 @@ impl SectionAssembler {
             let extent = SourceRange {
                 entity: payload.entity,
                 offset: physical,
-                bytes: 1,
+                bytes: count,
             };
             let builder = self
                 .buffer
@@ -353,16 +362,19 @@ impl SectionAssembler {
             if length == self.limits.section_bytes {
                 return Err(limit(length.saturating_add(1), self.limits.section_bytes));
             }
-            builder.try_reserve_exact(self.target.unwrap_or(3) - length)?;
+            builder.try_reserve_exact(target - length)?;
             let merge = prepare_range(&mut self.ranges, extent, self.limits.source_spans)?;
-            builder.try_push(byte).map_err(|error| error.error)?;
+            builder.try_extend_from_slice(run)?;
             commit_range(&mut self.ranges, extent, merge)?;
-            self.crc.update_byte(byte);
+            for &byte in run {
+                self.crc.update_byte(byte);
+            }
+            work.take(count as u64 - 1);
             self.payload
                 .as_mut()
                 .ok_or(Error::Invalid("PSI payload missing"))?
-                .position += 1;
-            if length + 1 == 3 {
+                .position += count;
+            if length + count == 3 {
                 let data = self
                     .buffer
                     .as_ref()

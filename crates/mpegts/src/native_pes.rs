@@ -990,27 +990,36 @@ impl NativePesObserver {
         if !work.try_charge(1) {
             return Ok(false);
         }
-        let merge = prepare_range(&mut self.header_ranges, extent, self.limits.source_spans)?;
         let pending = self
             .pending
             .as_ref()
             .ok_or(Error::Invalid("native PES input missing"))?;
-        let byte = pending
+        let payload = pending
             .packet
             .payload
             .as_ref()
             .ok_or(Error::Invalid("native PES payload missing"))?
-            .as_ref()[pending.position];
+            .as_ref();
+        let count = (self.header_target - self.header_used)
+            .min(payload.len() - pending.position)
+            .min(work.remaining().min(HEADER_MAX as u64) as usize + 1);
+        let bytes = &payload[pending.position..pending.position + count];
+        let extent = SourceRange {
+            bytes: count,
+            ..extent
+        };
+        let merge = prepare_range(&mut self.header_ranges, extent, self.limits.source_spans)?;
         if cancel.load(Ordering::Relaxed) {
             return Err(Error::Cancelled);
         }
         commit_range(&mut self.header_ranges, extent, merge)?;
-        self.raw_header[self.header_used] = byte;
-        self.header_used += 1;
+        self.raw_header[self.header_used..self.header_used + count].copy_from_slice(bytes);
+        work.take(count as u64 - 1);
+        self.header_used += count;
         self.pending
             .as_mut()
             .ok_or(Error::Invalid("native PES input missing"))?
-            .position += 1;
+            .position += count;
         Ok(true)
     }
 

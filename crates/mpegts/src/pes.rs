@@ -214,6 +214,30 @@ impl PesAssembler {
     pub fn partial_header(&self) -> &[u8] {
         &self.raw_header[..self.header_used]
     }
+
+    /// Common body-only carrier in a validation-only feed. Leave every
+    /// boundary, fault and unfunded chunk to the ordinary PES state machine.
+    pub(crate) fn validate_body_carrier(&mut self, count: usize, work: &mut WorkBudget) -> bool {
+        if self.payload.is_some()
+            || self.ended
+            || self.fault.is_some()
+            || !self.active
+            || self.header.is_none()
+            || self.next_chunk == u64::MAX
+            || self.validated_spans == self.limits.source_spans
+            || count >= self.total.unwrap_or(self.limits.pes_bytes) - self.seen
+            || !work.try_charge(count as u64 + 1)
+        {
+            return false;
+        }
+        self.validated_chunk = Some(self.next_chunk);
+        self.next_chunk += 1;
+        self.validated_spans += 1;
+        self.payload_len += count;
+        self.seen += count;
+        true
+    }
+
     /// Explicit continuity/configuration/clock recovery. Caller retains source
     /// bytes if it intends to replay the current PUSI after this transition.
     pub fn discard(&mut self, epochs: SourceEpochs) {
@@ -431,25 +455,30 @@ impl PesAssembler {
                 if self.seen == self.limits.pes_bytes {
                     return Err(limit(self.seen.saturating_add(1), self.limits.pes_bytes));
                 }
-                let byte = pending.bytes.as_ref()[pending.position];
+                let count = (self.header_target - self.header_used)
+                    .min(self.limits.pes_bytes - self.seen)
+                    .min(pending.bytes.len() - pending.position)
+                    .min(work.remaining().min(HEADER_MAX as u64) as usize + 1);
+                let bytes = &pending.bytes.as_ref()[pending.position..pending.position + count];
                 let extent = SourceRange {
                     entity: pending.entity,
                     offset: pending
                         .offset
                         .checked_add(pending.position as u64)
                         .ok_or(Error::Overflow)?,
-                    bytes: 1,
+                    bytes: count,
                 };
                 let merge =
                     prepare_range(&mut self.header_ranges, extent, self.limits.source_spans)?;
                 commit_range(&mut self.header_ranges, extent, merge)?;
-                self.raw_header[self.header_used] = byte;
-                self.header_used += 1;
-                self.seen += 1;
+                self.raw_header[self.header_used..self.header_used + count].copy_from_slice(bytes);
+                work.take(count as u64 - 1);
+                self.header_used += count;
+                self.seen += count;
                 self.payload
                     .as_mut()
                     .ok_or(Error::Invalid("PES payload missing"))?
-                    .position += 1;
+                    .position += count;
                 continue;
             }
             let available = pending.bytes.len() - pending.position;
