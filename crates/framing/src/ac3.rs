@@ -727,19 +727,23 @@ impl Ac3FrameReader {
                     self.copied = end;
                 }
                 Phase::Body => {
-                    let length = self.buffer()?.len();
+                    let buffer = self
+                        .buffer
+                        .as_mut()
+                        .ok_or(Error::Invalid("missing audio frame builder"))?;
                     let remaining = self
                         .frame_bytes
-                        .checked_sub(length)
+                        .checked_sub(buffer.len())
                         .ok_or(Error::Overflow)?;
                     if remaining == 0 {
                         self.phase = Phase::Freeze;
                         continue;
                     }
-                    match self.cursor.read_span(remaining.min(4096), work, cancel)? {
-                        Step::Ready(bytes) => {
-                            self.buffer()?.try_extend_from_slice(bytes.as_ref())?
-                        }
+                    match self
+                        .cursor
+                        .read_append(buffer, remaining.min(4096), work, cancel)?
+                    {
+                        Step::Ready(_) => {}
                         Step::NeedInput(request) => return Ok(Step::NeedInput(request)),
                         Step::Yield => return Ok(Step::Yield),
                         Step::End(_) => return Err(Error::Truncated),

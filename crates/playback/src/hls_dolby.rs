@@ -49,6 +49,7 @@ pub(crate) struct HlsDolby {
     frame_start: u64,
     frame_anchor: PesAnchor,
     next_anchor: PesAnchor,
+    last_duration: Option<(u32, u16, Time)>,
     eof: bool,
 }
 
@@ -97,6 +98,7 @@ impl HlsDolby {
             frame_start: 0,
             frame_anchor: PesAnchor::default(),
             next_anchor: PesAnchor::default(),
+            last_duration: None,
             eof: false,
         })
     }
@@ -227,7 +229,20 @@ impl HlsDolby {
                         }
                         _ => {}
                     }
-                    let duration = header.sample_span()?;
+                    let rate = header.sample_rate_hz;
+                    let samples = header.coded_samples();
+                    let duration = match self.last_duration {
+                        Some((last_rate, last_samples, duration))
+                            if (rate, samples) == (last_rate, last_samples) =>
+                        {
+                            duration
+                        }
+                        _ => {
+                            let duration = header.sample_span()?;
+                            self.last_duration = Some((rate, samples, duration));
+                            duration
+                        }
+                    };
                     let anchor = std::mem::replace(
                         &mut self.frame_anchor,
                         std::mem::take(&mut self.next_anchor),
