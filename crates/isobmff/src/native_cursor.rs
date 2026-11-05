@@ -691,6 +691,30 @@ impl<'a> Mov9PacketCursor<'a> {
             .ok_or(Error::Invalid("native source fragment absent"))?;
         Ok(Some((fragment, run, index.run_flags(run)?)))
     }
+    /// Inspect the current occurrence without consuming its place in the
+    /// native schedule.
+    pub fn occurrence(&self) -> Option<&Mov9PacketOccurrence> {
+        self.ready.as_ref()
+    }
+
+    /// Replay the same checked sample tables from their beginning after End.
+    /// The extent and clock preflight still applies to these borrowed tables.
+    pub fn rewind_at_end(&mut self) -> Result<()> {
+        if !matches!(self.phase, Phase::End) || self.failed.is_some() {
+            return Err(Error::Invalid("native occurrence rewind needs a clean end"));
+        }
+        for slot in self.slots.as_mut_slice() {
+            slot.append_run = None;
+            slot.discard_boundary = None;
+            slot.previous_clock = None;
+            slot.ended = false;
+        }
+        self.at = 0;
+        self.generated = 0;
+        self.phase = Phase::Initialize;
+        Ok(())
+    }
+
     pub fn take_occurrence(&mut self) -> Result<Mov9PacketOccurrence> {
         if let Some(error) = self.failed {
             return Err(error);

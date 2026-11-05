@@ -163,6 +163,14 @@ reference order, even when the next range moves backward. Planning reads no payl
 starts at the command's `start_offset()`, and the engine republishes
 configuration before delivering a packet that uses it.
 
+`Mp4RangeOpen` offers the same native order and range seek over the borrowed
+complete `Movie` and any checked encoded edit plans. Its direct-output player
+validates source extents and keeps the compact sample tables and per-track
+cursor state. It constructs packet locations and clocks as they are used.
+The same packet reader checks each range and the same player binds output to
+the active seek generation. With an unknown movie duration, the open job
+scans packet metadata and rewinds the checked tables before reading payload.
+
 Five FFprobe replays compare the full post-seek sequence for regular,
 fragmented, repeated-edit, description-change and mixed-clock AVC/AAC
 files. The profile requires a supported index clock query.

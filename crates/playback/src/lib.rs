@@ -16,8 +16,9 @@ pub use engines::{
 };
 pub use player::{
     ClockChoice, Delivery, Mp4NativeSeekCommand, Mp4NativeSeekJob, Mp4NativeSeekRequest,
-    Mp4SyncSeekCommand, Mp4SyncSeekJob, Mp4SyncSeekRequest, Output, Player, PlayerPolicy, Progress,
-    SeekIntent, Selection, State, TrackKey, TrackKind,
+    Mp4RangeOpen, Mp4RangePlayer, Mp4RangeSeek, Mp4RangeSeekJob, Mp4SyncSeekCommand,
+    Mp4SyncSeekJob, Mp4SyncSeekRequest, Output, Player, PlayerPolicy, Progress, SeekIntent,
+    Selection, State, TrackKey, TrackKind,
 };
 use triergon_core::Error as CoreError;
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]

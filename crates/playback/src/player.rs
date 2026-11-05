@@ -2,10 +2,13 @@ use crate::input::{Source, SourceReply};
 use crate::{BackendStep, Engine, RawEvent, Result, io::SourceOwner};
 use std::sync::atomic::{AtomicBool, Ordering};
 use triergon_core::{Budget, BudgetVec, Error, InputRequest, Time, WorkBudget};
+use triergon_isobmff::Mov9PacketCursor;
 
 mod mp4_native_seek;
+mod mp4_range;
 mod mp4_sync_seek;
 pub use mp4_native_seek::{Mp4NativeSeekCommand, Mp4NativeSeekJob, Mp4NativeSeekRequest};
+pub use mp4_range::{Mp4RangeOpen, Mp4RangePlayer, Mp4RangeSeek, Mp4RangeSeekJob};
 pub use mp4_sync_seek::{Mp4SyncSeekCommand, Mp4SyncSeekJob, Mp4SyncSeekRequest};
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum TrackKey {
@@ -880,14 +883,14 @@ impl<S: Source> Player<S> {
         Ok(accepted)
     }
     pub fn advance(&mut self, w: &mut WorkBudget, c: &AtomicBool) -> Result<Progress> {
-        self.drive::<false>(w, c, None)
+        self.drive::<false>(w, c, None, None)
     }
 
     /// Publish a ready backend event in this call when its queue charge fits.
     /// If work or queue space runs out, retain the original event for retry.
     /// This is the same FIFO and delivery policy as [Self::advance].
     pub fn advance_ready(&mut self, w: &mut WorkBudget, c: &AtomicBool) -> Result<Progress> {
-        self.drive::<true>(w, c, None)
+        self.drive::<true>(w, c, None, None)
     }
 
     /// Drive toward one output in the supplied empty slot. An older queued
@@ -902,6 +905,16 @@ impl<S: Source> Player<S> {
         slot: &mut Option<Output>,
         work: &mut WorkBudget,
         cancel: &AtomicBool,
+    ) -> Result<Progress> {
+        self.read_output_inner(slot, work, cancel, None)
+    }
+
+    fn read_output_inner(
+        &mut self,
+        slot: &mut Option<Output>,
+        work: &mut WorkBudget,
+        cancel: &AtomicBool,
+        mut cursor: Option<&mut Mov9PacketCursor<'_>>,
     ) -> Result<Progress> {
         if cancel.load(Ordering::Relaxed) {
             self.cancel();
@@ -922,7 +935,7 @@ impl<S: Source> Player<S> {
         }
         loop {
             let before = work.remaining();
-            let result = self.drive::<true>(work, cancel, Some(slot))?;
+            let result = self.drive::<true>(work, cancel, Some(slot), cursor.as_deref_mut())?;
             if work.remaining() == 0 {
                 return Ok(result);
             }
@@ -945,12 +958,13 @@ impl<S: Source> Player<S> {
         w: &mut WorkBudget,
         c: &AtomicBool,
         slot: Option<&mut Option<Output>>,
+        cursor: Option<&mut Mov9PacketCursor<'_>>,
     ) -> Result<Progress> {
         if c.load(Ordering::Relaxed) {
             self.cancel();
             return Err(Error::Cancelled.into());
         }
-        let result = self.inner::<READY>(w, slot);
+        let result = self.inner::<READY>(w, slot, cursor);
         if let Err(crate::Error::Core(Error::Backpressure {
             requested,
             available,
@@ -970,6 +984,7 @@ impl<S: Source> Player<S> {
         &mut self,
         w: &mut WorkBudget,
         slot: Option<&mut Option<Output>>,
+        cursor: Option<&mut Mov9PacketCursor<'_>>,
     ) -> Result<Progress> {
         match self.state {
             State::Paused => return Ok(Progress::Paused),
@@ -1022,6 +1037,8 @@ impl<S: Source> Player<S> {
                 }
                 step => BackendStep::from_matroska(step),
             }
+        } else if let Some(cursor) = cursor {
+            engine.poll_mp4_range(cursor, w, &self.cancel)?
         } else {
             engine.poll(w, &self.cancel)?
         };
