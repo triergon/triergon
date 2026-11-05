@@ -125,12 +125,42 @@ The 32-bit debug IPK SHA-256 is
 `3352e26c35036af755a68643bd6b25c3dc77f8e73c41c5478068755013b34e62`.
 Its four packaged ELF files passed the FFmpeg-free link audit.
 
+The same package ran two DTS catalog fixtures on the G4. Both resumed
+at 12 seconds and Starfish accepted the AVC and DTS feeds. The MP4
+Back-control replay paused, resumed and sought to the 30-second keyframe
+on a single Load. The app returned to detail and the mock Plex server
+acknowledged the stopped position and DTS track ID. An earlier MP4
+replay was backgrounded before Stop was reported. The Matroska replay
+resumed at 32 seconds after two in-place watchdog retries and a fresh
+Load. Same-Load Matroska seek remains open. The set remained in Active
+Standby, so panel picture and audible output were unobserved.
+
 The reviewed DTS library tree passed 126 native Linux ARM64 functional
 tests. Core bytes matched FFmpeg on 37,125 authored packet projections
 and all 1,172 packets of the FATE DTS-HD MA sample and its three remuxes.
 The edited range view keeps packet clocks and sample-entry trim separate.
-Streem admits MP4 DTS edits that can submit whole access units. DTS
-playback on hardware and numerical qualification remain open.
+Streem admits MP4 DTS edits that can submit whole access units. Full
+DTS target coverage and numerical qualification remain open.
+
+The progressive conversion preview at Streem
+`15cd9563cc3f16d1810d236523a2b08b53ce813c` retains the same Triergon pin.
+Its FFmpeg-free simulator passed AVC/AAC Matroska remux through Plex
+and conversion through Jellyfin. Each replay resumed at 12 seconds,
+paused and resumed, and sought through a new encoder response. The
+simulator decoded distinct PCM tones before and after seek. Two cut
+Jellyfin responses, one before and one after producer selection, reached
+the transport error path and retired the encoder when leaving playback.
+
+The preview's 32-bit debug IPK, SHA-256
+`c0b28af510cf748bea6dd667831dd6c454f775d0027fa2309a5e3e3de3bd47ab`,
+passed the FFmpeg-free link audit on all four packaged ELFs. On the G4,
+the Plex and Jellyfin replays paused, resumed and each sought through
+a new chunked stream at 38 seconds. Starfish accepted audio and video
+on both Loads of each replay. The mock providers acknowledged the final
+stopped position and the old encoder retirement. Both replays used
+sequential reads and the app process maps contained no FFmpeg libraries.
+The set remained in Active Standby. The hardware observations cover
+Starfish's accepted feeds and advancing playback clock.
 
 ## Completion ledger
 
