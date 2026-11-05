@@ -3,6 +3,7 @@ import importlib.util
 import io
 import json
 from pathlib import Path
+import subprocess
 import tempfile
 import unittest
 from unittest.mock import patch
@@ -46,6 +47,34 @@ class RequiredVectorTests(unittest.TestCase):
             root = Path(directory)
             self.contract(root)
             with patch.object(fetcher.urllib.request, 'urlopen', return_value=io.BytesIO(b'wrong')):
+                with self.assertRaisesRegex(ValueError, 'download hash mismatch'):
+                    fetcher.fetch_required(root)
+            self.assertFalse((root / '.research/fate-samples/mkv/required.mkv').exists())
+
+    def rsync_vector(self, content):
+        def transfer(args, **kwargs):
+            self.assertEqual(args[-2], 'rsync://fate-suite.ffmpeg.org/fate-suite/mkv/required.mkv')
+            self.assertTrue(kwargs['check'])
+            Path(args[-1]).write_bytes(content)
+
+        return patch.object(subprocess, 'run', side_effect=transfer)
+
+    def test_https_timeout_fetches_the_exact_vector_over_rsync(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            self.contract(root)
+            with patch.object(fetcher.urllib.request, 'urlopen', side_effect=TimeoutError), \
+                 self.rsync_vector(b'original vector'):
+                self.assertEqual(fetcher.fetch_required(root), ['mkv/required.mkv'])
+            self.assertEqual((root / '.research/fate-samples/mkv/required.mkv').read_bytes(),
+                             b'original vector')
+
+    def test_wrong_rsync_download_is_not_published(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            self.contract(root)
+            with patch.object(fetcher.urllib.request, 'urlopen', side_effect=TimeoutError), \
+                 self.rsync_vector(b'wrong'):
                 with self.assertRaisesRegex(ValueError, 'download hash mismatch'):
                     fetcher.fetch_required(root)
             self.assertFalse((root / '.research/fate-samples/mkv/required.mkv').exists())
