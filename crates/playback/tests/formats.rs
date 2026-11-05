@@ -2576,6 +2576,67 @@ fn indexed_seek_request(source_time: Time) -> Mp4SyncSeekRequest {
 }
 
 #[test]
+fn indexed_mp4_seek_budget_covers_preroll_and_stops_at_the_target() {
+    let raw = include_bytes!("fixtures/mp4/r-description-change.mov");
+    let target = Time::new(7, 2).unwrap();
+    // Five seven-byte windows reach the 4s packet. The final
+    // 5s packet needs a sixth window.
+    for seek_input_bytes in [34, 35] {
+        let (opened, _) = open(raw, 7, 64).unwrap();
+        let mut index = Mp4IndexJob::new(
+            &opened.movie,
+            Mp4View::SourcePhysical,
+            PlanLimits::default(),
+        )
+        .unwrap();
+        while !index.poll(&mut WorkBudget::new(64), &off()).unwrap() {}
+        let engine = Engine::mp4(opened.input, index.finish().unwrap(), 1 << 20).unwrap();
+        let mut player = Player::new(
+            engine,
+            opened.source,
+            Selection::All,
+            PlayerPolicy {
+                seek_input_bytes,
+                ..PlayerPolicy::default()
+            },
+        )
+        .unwrap();
+        let mut job = player
+            .prepare_mp4_sync_seek(indexed_seek_request(target), Selection::All)
+            .unwrap();
+        while !job.poll(&mut WorkBudget::new(64), &off()).unwrap() {}
+        assert!(
+            player
+                .apply_mp4_sync_seek(&job.finish().unwrap(), &mut WorkBudget::new(64), &off())
+                .unwrap()
+        );
+        let output = collect(&mut player, 64);
+        if seek_input_bytes == 34 {
+            assert!(matches!(
+                output,
+                Err(Error::Core(C::Limit { maximum: 34, .. }))
+            ));
+        } else {
+            let output = output.unwrap();
+            let deliveries: Vec<_> = output
+                .iter()
+                .filter(|output| matches!(output.event(), RawEvent::Mp4(Mp4Event::Packet(_))))
+                .map(Output::delivery)
+                .collect();
+            assert_eq!(
+                deliveries,
+                [
+                    Delivery::DecodeOnly { until: target },
+                    Delivery::Present,
+                    Delivery::Present,
+                ]
+            );
+            assert_eq!(player.seek_intent().unwrap().target, target);
+        }
+    }
+}
+
+#[test]
 fn indexed_mp4_seek_keeps_selected_subtitle_prefix_and_only_late_video() {
     let raw = include_bytes!("fixtures/mp4/r-multitrack.mov");
     let (mut p, _) = mp4(raw, Mp4View::SourcePhysical, 7, 1).unwrap();
