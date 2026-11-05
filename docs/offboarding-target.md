@@ -95,6 +95,25 @@ times are single-fixture observations. The reviewed library tree also
 passed 73 native Linux ARM64 functional tests. Full numerical
 qualification remains open.
 
+The AV1 and VP9 preview at Streem `b1431a78ec68f1293648c17cdf5ab0f5be563cbc`
+pins Triergon `b1fb7ef0275866a8d6fc09fc9bf38db2af116d5a`. Its 32-bit debug IPK,
+SHA-256 `c9c7cbf3513a0eaa835394f359b2d51c490cf1150adbea97f738382bc3816677`,
+passed four catalog replays on the G4. Each codec used a 144-second synthetic
+AAC file in MP4 and Matroska. The tests checked HTTP 206 reads, resume at 12
+seconds, pause, a single Starfish Load across the forward seek, accepted audio
+and video feeds, frame callbacks after seek and Stop. The process maps
+showed zero FFmpeg libraries. The settings service reported SDR while the
+set remained in Active Standby. The simulator exercised the same routes
+through its video clock sink and decoded 659 Hz AAC before and after seek.
+A separate simulator fixture verified AV1 configuration replacement before
+the first Matroska video packet. MP4 admission requires consistent VP9 colour
+across its sample descriptions for the platform's single sourceInfo envelope.
+
+The reviewed library tree passed 74 native Linux ARM64 functional tests for
+MP4 sync and the container playback suite. These receipts cover the selected
+application playback paths. Full per-case numerical qualification, remaining
+carriage profiles and shipping adoption remain open.
+
 ## Completion ledger
 
 | ID | Required work | Completion evidence |
