@@ -997,6 +997,80 @@ fn compact_discovery_replays_every_output_and_reduces_prefix_storage() {
 }
 
 #[test]
+fn av_discovery_hands_off_before_pgs_and_delivers_every_late_packet() {
+    use triergon_playback::matroska_feed::{
+        MatroskaCompactDiscovery, MatroskaDiscoveryCutoff, MatroskaDiscoveryStep,
+    };
+
+    let fixture = include_bytes!("fixtures/matroska-subtitle-probe/known-anchor.mkv");
+    let (engine, source, _) =
+        matroska_source(fixture, 7, triergon::typed::PayloadOwnership::OwnedExact);
+    let cancel = AtomicBool::new(false);
+    let mut discovery = MatroskaCompactDiscovery::for_av_feed(
+        engine,
+        source,
+        Selection::All,
+        PlayerPolicy::default(),
+        Default::default(),
+    )
+    .unwrap();
+    let mut confirmed = false;
+    let cutoff = (0..10_000)
+        .find_map(|_| {
+            let progress = discovery.poll(&mut WorkBudget::new(1), &cancel).unwrap();
+            if let MatroskaDiscoveryStep::Ready(cutoff) = progress {
+                return Some(cutoff);
+            }
+            if !confirmed
+                && let Some(Event::Packet(packet)) = discovery.buffered_events().last()
+                && packet.packet.track == 0
+            {
+                discovery
+                    .confirm_stream_ready(1, packet.configuration.revision())
+                    .unwrap();
+                confirmed = true;
+            }
+            None
+        })
+        .expect("A/V discovery stalled");
+    assert!(confirmed);
+    assert_eq!(cutoff, MatroskaDiscoveryCutoff::StreamsReady);
+    assert!(
+        discovery
+            .buffered_events()
+            .all(|event| { !matches!(event, Event::Packet(packet) if packet.packet.track == 1) })
+    );
+    let mut discovered = discovery.finish().unwrap();
+    let mut keys: Vec<_> = discovered
+        .prefix
+        .into_outputs()
+        .map(|o| event_key(&o))
+        .collect();
+    let mut output = None;
+    let mut ended = false;
+    for _ in 0..10_000 {
+        let status = discovered
+            .player
+            .read_output(&mut output, &mut WorkBudget::new(1), &cancel)
+            .unwrap();
+        if let Some(output) = output.take() {
+            keys.push(event_key(&output));
+        }
+        if matches!(status, Progress::Ended) {
+            ended = true;
+            break;
+        }
+    }
+    assert!(ended);
+    let (mut reference, _) = player_with_input(fixture, 7);
+    let reference = collect(&mut reference);
+    assert_eq!(reference.iter().filter(|output| {
+        matches!(output.event(), RawEvent::Matroska(Event::Packet(packet)) if packet.packet.track == 1)
+    }).count(), 5);
+    assert_eq!(keys, reference.iter().map(event_key).collect::<Vec<_>>());
+}
+
+#[test]
 fn matroska_integral_packet_delivery_preserves_fractional_seek_targets() {
     let fixture = include_bytes!("fixtures/mkv-feed/hevc-indexed-seek.mkv");
     let (mut player, _) = player_with_input(fixture, 7);
