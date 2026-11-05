@@ -1,0 +1,366 @@
+{
+  "scope": "forced inline buffered EBML header experiment",
+  "source_commit": "de7d544e935dd798fd88110b322488e6ba0c551a",
+  "manifest_sha256": "a1337803d40d2a1ca71874dc0fe021b9a498c851d957ea757718c14505bff55f",
+  "source_manifest_sha256": "8cb9650c7770b70a0cd9b19a3b92bdd2e774870e012d368a9f5030e668eb3ea7",
+  "native_archive_sha256": "5daaf3a687f6046d775886ff33576010b6db67164c6313f4833a43ebebc1a407",
+  "candidate_sha256": "4ba4006d44ef4e92b17b3e9d0c6a78b045434562f81e8e7d94c153c3d1e35b51",
+  "reference_sha256": "48a4dafe3d18d5ccc81aa20516fd560d10c849f1a48a9a62b5ea489caf8d253c",
+  "selected_parity_passes": 44,
+  "all_delivery_passes": 43,
+  "optimization_passes": 26,
+  "rows": [
+    {
+      "id": "startup-avc-eight-pictures",
+      "runtime_upper95": 0.09534066540680355,
+      "heap_upper95": 0.023458904109589042,
+      "total_resident_rss_upper95": 0.5691927512355849,
+      "delivery": true,
+      "optimization": true
+    },
+    {
+      "id": "startup-avc-high-b",
+      "runtime_upper95": 0.0826272733646382,
+      "heap_upper95": 0.012250868531724263,
+      "total_resident_rss_upper95": 0.5470797854809442,
+      "delivery": true,
+      "optimization": true
+    },
+    {
+      "id": "startup-avc-high-b0",
+      "runtime_upper95": 0.11295920519877174,
+      "heap_upper95": 0.020900022168033695,
+      "total_resident_rss_upper95": 0.5454545454545454,
+      "delivery": true,
+      "optimization": true
+    },
+    {
+      "id": "startup-avc-high-b1",
+      "runtime_upper95": 0.1362295646568472,
+      "heap_upper95": 0.012255798639057585,
+      "total_resident_rss_upper95": 0.5476947535771065,
+      "delivery": true,
+      "optimization": true
+    },
+    {
+      "id": "startup-avc-mixed",
+      "runtime_upper95": 0.1162138904641691,
+      "heap_upper95": 0.03011302326868273,
+      "total_resident_rss_upper95": 0.4077055779183439,
+      "delivery": true,
+      "optimization": true
+    },
+    {
+      "id": "startup-avc-six-pictures",
+      "runtime_upper95": 0.13609876462769838,
+      "heap_upper95": 0.025433404008327498,
+      "total_resident_rss_upper95": 0.5830522765598651,
+      "delivery": true,
+      "optimization": true
+    },
+    {
+      "id": "startup-hevc-b0",
+      "runtime_upper95": 0.5307907273804073,
+      "heap_upper95": 0.08403361344537816,
+      "total_resident_rss_upper95": 0.7034201984953378,
+      "delivery": true,
+      "optimization": true
+    },
+    {
+      "id": "startup-hevc-b1",
+      "runtime_upper95": 0.5282811162558596,
+      "heap_upper95": 0.08381030253475061,
+      "total_resident_rss_upper95": 0.7044412249067145,
+      "delivery": true,
+      "optimization": true
+    },
+    {
+      "id": "startup-hevc-b3",
+      "runtime_upper95": 0.537358878591515,
+      "heap_upper95": 0.08361374528398083,
+      "total_resident_rss_upper95": 0.7035716405369019,
+      "delivery": true,
+      "optimization": true
+    },
+    {
+      "id": "startup-hevc-mixed",
+      "runtime_upper95": 0.17363049829821192,
+      "heap_upper95": 0.019265816193699558,
+      "total_resident_rss_upper95": 0.5527756059421423,
+      "delivery": true,
+      "optimization": true
+    },
+    {
+      "id": "startup-hevc-no-default-duration",
+      "runtime_upper95": 0.3214231351126247,
+      "heap_upper95": 0.13327648475120385,
+      "total_resident_rss_upper95": 0.7064220183486238,
+      "delivery": true,
+      "optimization": true
+    },
+    {
+      "id": "startup-hevc-vps-timed-no-default",
+      "runtime_upper95": 0.31985083324565017,
+      "heap_upper95": 0.13336342662252984,
+      "total_resident_rss_upper95": 0.7071428571428572,
+      "delivery": true,
+      "optimization": true
+    },
+    {
+      "id": "seek-avc-seek-0-fresh",
+      "runtime_upper95": 0.18337224712406563,
+      "heap_upper95": 0.012963879267689262,
+      "total_resident_rss_upper95": 0.5530990223326113,
+      "delivery": true,
+      "optimization": true
+    },
+    {
+      "id": "seek-avc-seek-0-eof",
+      "runtime_upper95": 0.24136034300870043,
+      "heap_upper95": 0.012963879267689262,
+      "total_resident_rss_upper95": 0.5527043893412933,
+      "delivery": true,
+      "optimization": true
+    },
+    {
+      "id": "seek-avc-seek-700-fresh",
+      "runtime_upper95": 0.2034162490544398,
+      "heap_upper95": 0.012963879267689262,
+      "total_resident_rss_upper95": 0.5524861878453039,
+      "delivery": true,
+      "optimization": true
+    },
+    {
+      "id": "seek-avc-seek-700-eof",
+      "runtime_upper95": 0.23833213339512532,
+      "heap_upper95": 0.012963879267689262,
+      "total_resident_rss_upper95": 0.5527043893412933,
+      "delivery": true,
+      "optimization": true
+    },
+    {
+      "id": "seek-avc-seek-1420-fresh",
+      "runtime_upper95": 0.16762089165876057,
+      "heap_upper95": 0.012963879267689262,
+      "total_resident_rss_upper95": 0.5533596837944664,
+      "delivery": true,
+      "optimization": true
+    },
+    {
+      "id": "seek-avc-seek-1420-eof",
+      "runtime_upper95": 0.2163863018562636,
+      "heap_upper95": 0.012963879267689262,
+      "total_resident_rss_upper95": 0.5524861878453039,
+      "delivery": true,
+      "optimization": true
+    },
+    {
+      "id": "seek-avc-seek-2700-fresh",
+      "runtime_upper95": 0.16007220388360643,
+      "heap_upper95": 0.012963879267689262,
+      "total_resident_rss_upper95": 0.5524861878453039,
+      "delivery": true,
+      "optimization": true
+    },
+    {
+      "id": "seek-avc-seek-2700-eof",
+      "runtime_upper95": 0.19356287272292194,
+      "heap_upper95": 0.012963879267689262,
+      "total_resident_rss_upper95": 0.5528391167192429,
+      "delivery": true,
+      "optimization": true
+    },
+    {
+      "id": "seek-hevc-seek-0-fresh",
+      "runtime_upper95": 0.9802910044179998,
+      "heap_upper95": 0.08760995224930887,
+      "total_resident_rss_upper95": 0.7075521331056267,
+      "delivery": true,
+      "optimization": false
+    },
+    {
+      "id": "seek-hevc-seek-0-eof",
+      "runtime_upper95": 1.1215862982150993,
+      "heap_upper95": 0.08760995224930887,
+      "total_resident_rss_upper95": 0.7076142131979696,
+      "delivery": true,
+      "optimization": false
+    },
+    {
+      "id": "seek-hevc-seek-700-fresh",
+      "runtime_upper95": 1.0588929032218266,
+      "heap_upper95": 0.08760995224930887,
+      "total_resident_rss_upper95": 0.7076142131979696,
+      "delivery": true,
+      "optimization": false
+    },
+    {
+      "id": "seek-hevc-seek-700-eof",
+      "runtime_upper95": 1.1399521497610494,
+      "heap_upper95": 0.08760995224930887,
+      "total_resident_rss_upper95": 0.7076767603668055,
+      "delivery": true,
+      "optimization": false
+    },
+    {
+      "id": "seek-hevc-seek-1420-fresh",
+      "runtime_upper95": 1.0141876589729186,
+      "heap_upper95": 0.08760995224930887,
+      "total_resident_rss_upper95": 0.7079736865455131,
+      "delivery": true,
+      "optimization": false
+    },
+    {
+      "id": "seek-hevc-seek-1420-eof",
+      "runtime_upper95": 1.0861308377508152,
+      "heap_upper95": 0.08760995224930887,
+      "total_resident_rss_upper95": 0.7068965517241379,
+      "delivery": true,
+      "optimization": false
+    },
+    {
+      "id": "seek-hevc-seek-2700-fresh",
+      "runtime_upper95": 0.9511235411528559,
+      "heap_upper95": 0.08760995224930887,
+      "total_resident_rss_upper95": 0.7074038644510618,
+      "delivery": true,
+      "optimization": false
+    },
+    {
+      "id": "seek-hevc-seek-2700-eof",
+      "runtime_upper95": 1.0115634139136844,
+      "heap_upper95": 0.08760995224930887,
+      "total_resident_rss_upper95": 0.707193515704154,
+      "delivery": true,
+      "optimization": false
+    },
+    {
+      "id": "seek-hevc-seek-no-default-0-fresh",
+      "runtime_upper95": 0.8011861782491646,
+      "heap_upper95": 0.40371702118442143,
+      "total_resident_rss_upper95": 0.7170191339375629,
+      "delivery": true,
+      "optimization": false
+    },
+    {
+      "id": "seek-hevc-seek-no-default-0-eof",
+      "runtime_upper95": 0.7591708454208987,
+      "heap_upper95": 0.40371702118442143,
+      "total_resident_rss_upper95": 0.7175228792107484,
+      "delivery": true,
+      "optimization": true
+    },
+    {
+      "id": "seek-hevc-seek-no-default-700-fresh",
+      "runtime_upper95": 0.8032010524779136,
+      "heap_upper95": 0.40371702118442143,
+      "total_resident_rss_upper95": 0.7170191339375629,
+      "delivery": true,
+      "optimization": false
+    },
+    {
+      "id": "seek-hevc-seek-no-default-700-eof",
+      "runtime_upper95": 0.7625478555225016,
+      "heap_upper95": 0.40371702118442143,
+      "total_resident_rss_upper95": 0.7165829145728643,
+      "delivery": true,
+      "optimization": true
+    },
+    {
+      "id": "seek-hevc-seek-no-default-1420-fresh",
+      "runtime_upper95": 0.7467285507473158,
+      "heap_upper95": 0.40371702118442143,
+      "total_resident_rss_upper95": 0.7164403506465931,
+      "delivery": true,
+      "optimization": true
+    },
+    {
+      "id": "seek-hevc-seek-no-default-1420-eof",
+      "runtime_upper95": 0.7078435339184941,
+      "heap_upper95": 0.40371702118442143,
+      "total_resident_rss_upper95": 0.7164403506465931,
+      "delivery": true,
+      "optimization": true
+    },
+    {
+      "id": "seek-hevc-seek-no-default-2700-fresh",
+      "runtime_upper95": 0.6890417664398396,
+      "heap_upper95": 0.40371702118442143,
+      "total_resident_rss_upper95": 0.7173038229376257,
+      "delivery": true,
+      "optimization": true
+    },
+    {
+      "id": "seek-hevc-seek-no-default-2700-eof",
+      "runtime_upper95": 0.6504952277344835,
+      "heap_upper95": 0.40371702118442143,
+      "total_resident_rss_upper95": 0.7173038229376257,
+      "delivery": true,
+      "optimization": true
+    },
+    {
+      "id": "seek-hevc-seek-no-cues-0-fresh",
+      "runtime_upper95": 1.2525941549145712,
+      "heap_upper95": 0.08259527304013362,
+      "total_resident_rss_upper95": 0.7307088202421814,
+      "delivery": false,
+      "optimization": false
+    },
+    {
+      "id": "seek-hevc-seek-no-cues-0-eof",
+      "runtime_upper95": 1.0915376369069767,
+      "heap_upper95": 0.08259527304013362,
+      "total_resident_rss_upper95": 0.7306079664570231,
+      "delivery": true,
+      "optimization": false
+    },
+    {
+      "id": "seek-hevc-seek-no-cues-700-fresh",
+      "runtime_upper95": 1.149282922214745,
+      "heap_upper95": 0.08259527304013362,
+      "total_resident_rss_upper95": 0.7309912864813972,
+      "delivery": true,
+      "optimization": false
+    },
+    {
+      "id": "seek-hevc-seek-no-cues-700-eof",
+      "runtime_upper95": 1.0516803077842425,
+      "heap_upper95": 0.08259527304013362,
+      "total_resident_rss_upper95": 0.7313746065057712,
+      "delivery": true,
+      "optimization": false
+    },
+    {
+      "id": "seek-hevc-seek-no-cues-1420-fresh",
+      "runtime_upper95": 1.0130381359006364,
+      "heap_upper95": 0.08259527304013362,
+      "total_resident_rss_upper95": 0.7306079664570231,
+      "delivery": true,
+      "optimization": false
+    },
+    {
+      "id": "seek-hevc-seek-no-cues-1420-eof",
+      "runtime_upper95": 0.9898972933192943,
+      "heap_upper95": 0.08259527304013362,
+      "total_resident_rss_upper95": 0.7309912864813972,
+      "delivery": true,
+      "optimization": false
+    },
+    {
+      "id": "seek-hevc-seek-no-cues-2700-fresh",
+      "runtime_upper95": 0.8100929430721526,
+      "heap_upper95": 0.08259527304013362,
+      "total_resident_rss_upper95": 0.7316561844863732,
+      "delivery": true,
+      "optimization": false
+    },
+    {
+      "id": "seek-hevc-seek-no-cues-2700-eof",
+      "runtime_upper95": 0.8297978373967096,
+      "heap_upper95": 0.08259527304013362,
+      "total_resident_rss_upper95": 0.7306079664570231,
+      "delivery": true,
+      "optimization": false
+    }
+  ]
+}

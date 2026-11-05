@@ -34,3 +34,10 @@ The [per-case results and source, input, worker and archive
 hashes](results.json) bind this selected operation. The raw measurements,
 observer certificates and original failures remain in the retained
 native archive. Application adoption and TV validation are open.
+
+A separate diagnostic profile attributed 3.29% of candidate CPU samples
+directly to the buffered EBML header helper. The forced-inlining
+candidate again passed 44 parity and both memory gates, with 43 runtime
+passes and the same fresh no-Cues failure at 1.2525941549145712×. The
+candidate was reverted from the PR. The [full failed variant
+summary](inline-attempt.json) retains all 44 rows and artifact hashes.
