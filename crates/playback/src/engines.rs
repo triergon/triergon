@@ -770,8 +770,15 @@ impl Engine {
         namespace: DescriptorNamespace,
         discovery: SegmentDiscovery,
     ) -> Result<Self> {
-        let stream =
-            TransportStream::new_single_program_segment(input.budget().clone(), limits, namespace)?;
+        let budget = input.budget().clone();
+        let stream = match discovery {
+            SegmentDiscovery::Native => {
+                TransportStream::new_single_program_segment(budget, limits, namespace)?
+            }
+            SegmentDiscovery::AvcAacFeed | SegmentDiscovery::MediaFeed => {
+                TransportStream::new_single_program_feed(budget, limits, namespace)?
+            }
+        };
         let mut engine = Self::ts_from_stream(
             input,
             ts::PacketFormat::Ts188,

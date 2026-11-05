@@ -221,6 +221,18 @@ impl TransportStream {
         )
     }
 
+    /// Read one independent segment, sharing complete carriers with the
+    /// input window. Retained packet views can keep that whole window live.
+    pub fn new_single_program_feed(
+        budget: Budget,
+        limits: ParseLimits,
+        descriptor_namespace: DescriptorNamespace,
+    ) -> Result<Self> {
+        let mut stream = Self::new_single_program_segment(budget, limits, descriptor_namespace)?;
+        stream.framer.share_input();
+        Ok(stream)
+    }
+
     fn new_with_program(
         budget: Budget,
         format: PacketFormat,

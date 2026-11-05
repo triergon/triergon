@@ -87,6 +87,7 @@ pub struct FrameStep {
 pub struct TransportFramer {
     budget: Budget,
     format: PacketFormat,
+    share_input: bool,
     carry: Option<BudgetVec<u8>>,
     start: Option<u64>,
     next: Option<u64>,
@@ -105,6 +106,7 @@ impl TransportFramer {
             carry: Some(BudgetVec::new(&budget)),
             budget,
             format,
+            share_input: false,
             start: None,
             next: None,
             token: None,
@@ -116,6 +118,10 @@ impl TransportFramer {
             push_ack: None,
         }
     }
+    pub(crate) fn share_input(&mut self) {
+        self.share_input = true;
+    }
+
     pub fn discard(&mut self) {
         self.carry = Some(BudgetVec::new(&self.budget));
         self.start = None;
@@ -171,11 +177,7 @@ impl TransportFramer {
                 .take()
                 .ok_or(Error::Invalid("missing packet start"))?;
             self.carry = Some(BudgetVec::new(&self.budget));
-            self.last_packet_offset = Some(start);
-            self.inspection = Some(
-                TransportInspector::detached(source, self.format, start, self.entity)
-                    .map_err(|failure| failure.error)?,
-            );
+            self.inspect(source, start)?;
         }
         let result = self
             .inspection
@@ -197,6 +199,15 @@ impl TransportFramer {
             _ => Err(Error::Invalid("carrier inspection state")),
         }
     }
+    fn inspect(&mut self, source: Bytes, start: u64) -> Result<()> {
+        self.last_packet_offset = Some(start);
+        self.inspection = Some(
+            TransportInspector::detached(source, self.format, start, self.entity)
+                .map_err(|failure| failure.error)?,
+        );
+        Ok(())
+    }
+
     pub(crate) fn try_null_run(
         &mut self,
         input: &mut InputCursor,
@@ -312,6 +323,21 @@ impl TransportFramer {
                 return self
                     .complete(work, cancel)
                     .map(|value| value.map_or(Step::Yield, Step::Ready));
+            }
+            // Segment feeds already retain source windows. Share a complete
+            // carrier and use the same inspector as split or budgeted reads.
+            if self.share_input
+                && carry.is_empty()
+                && input.buffered().len() >= missing
+                && work.remaining() >= missing as u64
+            {
+                let start = input.position();
+                let Step::Ready(source) = input.read_span(missing, work, cancel)? else {
+                    return Err(Error::Invalid("buffered carrier span missing"));
+                };
+                self.next = Some(input.position());
+                self.inspect(source, start)?;
+                continue;
             }
             // Reserve before advancing the shared cursor; a failed allocation has
             // consumed no source bytes. A complete carry survives failed freeze.
@@ -465,6 +491,55 @@ impl TransportFramer {
 mod tests {
     use super::*;
     use triergon_core::{InputWindow, SourceCapabilities};
+
+    #[test]
+    fn shared_segment_carriers_keep_their_owner_and_rejection_offsets() {
+        let budget = Budget::new(8192).unwrap();
+        let mut input = InputCursor::new(
+            &budget,
+            SourceId(1),
+            SourceCapabilities {
+                length: Some(376),
+                random_access: false,
+            },
+            376,
+        )
+        .unwrap();
+        let mut wire = [0xff; 376];
+        wire[..4].copy_from_slice(&[0x47, 0x1f, 0xff, 0x10]);
+        let window = Bytes::copy_from_slice(&budget, &wire).unwrap();
+        let request = input.request();
+        input
+            .provide_owned(
+                InputWindow::new(request.source, request.token, 0, window.clone()).unwrap(),
+            )
+            .unwrap();
+        let mut framer = TransportFramer::new(budget, PacketFormat::Ts188);
+        framer.share_input();
+        let cancel = AtomicBool::new(false);
+        // Spend only the carrier read this call. Inspection must resume
+        // without consuming the next carrier.
+        assert!(matches!(
+            framer
+                .poll(&mut input, &mut WorkBudget::new(188), &cancel)
+                .unwrap(),
+            Step::Yield
+        ));
+        let mut work = WorkBudget::new(4096);
+        let Step::Ready(packet) = framer.poll(&mut input, &mut work, &cancel).unwrap() else {
+            panic!("expected the buffered carrier");
+        };
+        assert!(packet.source.shares_storage_with(&window));
+        assert_eq!(input.position(), 188);
+        assert_eq!(
+            framer.poll(&mut input, &mut work, &cancel).unwrap_err(),
+            Error::Invalid("TS sync byte")
+        );
+        let rejected = framer.take_rejection().unwrap();
+        assert_eq!(rejected.source_offset(), 188);
+        assert_eq!(rejected.bytes().as_ref(), &wire[188..]);
+        assert!(rejected.backing_bytes().shares_storage_with(&window));
+    }
 
     #[test]
     fn null_runs_require_an_aligned_source_grid() {

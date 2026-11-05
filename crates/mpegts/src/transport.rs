@@ -78,19 +78,8 @@ impl TransportPacket {
     pub fn is_null(&self) -> bool {
         self.pid == 0x1fff
     }
-    pub(crate) fn ts_byte(&self, index: usize) -> u8 {
-        self.source.as_ref()[self.sync + index]
-    }
-    pub(crate) fn normalized_byte(&self, index: usize) -> u8 {
-        if self
-            .pcr_range
-            .as_ref()
-            .is_some_and(|range| range.contains(&index))
-        {
-            0
-        } else {
-            self.ts_byte(index)
-        }
+    pub(crate) fn ts_bytes(&self) -> &[u8] {
+        &self.source.as_ref()[self.sync..self.sync + 188]
     }
 }
 
