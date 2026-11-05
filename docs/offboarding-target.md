@@ -129,6 +129,9 @@ payloads and the actual late read offset. Complete range-backed native
 playback also supports a generation-bound seek for the pinned MOV profile.
 The planner rescales the selected reference anchor for each track. The
 engine resumes from those anchors and replays the pinned packet order.
+The encoded range view also retains its validated edit plans for seek.
+An authored B-frame AVC/AAC fixture checks the selected decode timestamp,
+first byte range, and the original bytes and clocks at the landing.
 Five FFprobe comparisons cover regular, fragmented, repeated-edit,
 description-change and mixed-clock AVC/AAC playback. SourcePhysical can
 start with front metadata on a range source and switch to a complete index

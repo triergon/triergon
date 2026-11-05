@@ -99,6 +99,7 @@ pub struct PreparedMp4 {
     pub(crate) front_tracks: BudgetVec<iso::Mov9FrontTrackV1>,
     pub(crate) source_rows: BudgetVec<SourceRow>,
     pub(crate) native_rows: BudgetVec<Mov9PacketOccurrence>,
+    pub(crate) encoded_edits: Option<BudgetVec<Option<iso::Mov9EncodedEditPlanV2>>>,
     pub(crate) tracks: BudgetVec<PlanTrack>,
     pub(crate) media: BudgetVec<Range<u64>>,
     pub(crate) media_cache: BudgetVec<CachedMedia>,
@@ -257,16 +258,45 @@ impl<'a> Mp4IndexJob<'a> {
                 Error::Invalid("native front operation needs actual front metadata").into(),
             );
         }
-        Self::new_inner(movie, Mp4View::PinnedMov9NoParseNoFillin, limits, true)
+        Self::new_inner(
+            movie,
+            Mp4View::PinnedMov9NoParseNoFillin,
+            limits,
+            true,
+            None,
+        )
     }
     pub fn new(movie: &'a Movie, view: Mp4View, limits: PlanLimits) -> Result<Self> {
-        Self::new_inner(movie, view, limits, false)
+        Self::new_inner(movie, view, limits, false, None)
+    }
+    /// Build the native range view with explicitly validated encoded edits.
+    /// The retained plans also govern seeks on this exact range index.
+    pub fn new_native_encoded_range(
+        movie: &'a Movie,
+        plans: &'a [Option<iso::Mov9EncodedEditPlanV2>],
+        limits: PlanLimits,
+    ) -> Result<Self> {
+        if movie.native_recovery
+            || movie.read_scope != crate::mp4_open::MetadataReadScope::CompleteEntity
+        {
+            return Err(
+                Error::Unsupported("encoded edits require a complete native range source").into(),
+            );
+        }
+        Self::new_inner(
+            movie,
+            Mp4View::PinnedMov9NoParseNoFillin,
+            limits,
+            false,
+            Some(plans),
+        )
     }
     fn new_inner(
         movie: &'a Movie,
         view: Mp4View,
         limits: PlanLimits,
         native_front: bool,
+        encoded_edits: Option<&'a [Option<iso::Mov9EncodedEditPlanV2>]>,
     ) -> Result<Self> {
         if movie.native_recovery && view == Mp4View::SourcePhysical {
             return Err(Error::Invalid("native recovery open requires native packet view").into());
@@ -388,7 +418,16 @@ impl<'a> Mp4IndexJob<'a> {
                 max_occurrences: limits.occurrences,
                 ..Mov9PacketLimits::default()
             };
-            Some(if let Some(bounds) = forward_regular {
+            Some(if let Some(plans) = encoded_edits {
+                Mov9PacketCursor::new_encoded_regular_v2(
+                    b,
+                    native.as_slice(),
+                    movie.media.as_slice(),
+                    native_limits,
+                    plans,
+                    iso::PinnedMovD32EncodedEditsV2,
+                )?
+            } else if let Some(bounds) = forward_regular {
                 Mov9PacketCursor::new_front_regular_v1(
                     b,
                     native.as_slice(),
@@ -426,6 +465,16 @@ impl<'a> Mp4IndexJob<'a> {
         } else {
             None
         };
+        let encoded_edits = if let Some(plans) = encoded_edits {
+            let mut retained = BudgetVec::new(b);
+            retained.try_reserve_exact(plans.len())?;
+            for plan in plans {
+                push(&mut retained, plan.clone())?;
+            }
+            Some(retained)
+        } else {
+            None
+        };
         let native_empty_duration = if native_front
             && let [track] = movie.tracks.as_slice()
             && track.edits.is_none()
@@ -454,6 +503,7 @@ impl<'a> Mp4IndexJob<'a> {
                 front_tracks: BudgetVec::new(b),
                 source_rows: BudgetVec::new(b),
                 native_rows: BudgetVec::new(b),
+                encoded_edits,
                 tracks: BudgetVec::new(b),
                 media: BudgetVec::new(b),
                 media_cache: BudgetVec::new(b),
