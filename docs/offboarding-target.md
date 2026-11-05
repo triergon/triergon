@@ -134,6 +134,16 @@ Overlapping native clock queries, native recovery seeks, Streem adoption
 and numerical qualification remain open.
 [Playback API and scope](../crates/playback/README.md#range-backed-mp4-sync-seek)
 
+## Independent AVC/AAC HLS segments
+
+Four frozen independent TS188 segment cases matched the pinned FFmpeg
+parser and app clock, and passed delivery timing, peak live heap and total
+peak RSS on native Linux ARM64. The [HLS receipt](../research/qualification/hls-avc-aac-linux-arm64/README.md)
+binds the exact development revision used by Streem's opt-in HLS work.
+O31 still requires the other selected TS/M2TS, elementary and HLS
+profiles. Playlist lifecycle, hardware playback and full application
+offboarding remain separate gates.
+
 ## Additional application-runtime surfaces
 
 The TV release component list does not enable movie software decoders. Its normal
