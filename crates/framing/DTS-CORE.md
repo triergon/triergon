@@ -87,11 +87,20 @@ Backpressure/allocation errors keep the exact reserve/copy/freeze retry position
 Rejected external input responses leave the parser unchanged. Known length does
 not imply EOF: explicit completion, starvation and transport failure stay distinct.
 
+## Container packet delivery
+
+`DtsCorePacket` checks the leading sync and core length of a complete
+container packet. It borrows canonical big-endian cores and can normalize
+the word-swapped and 14-bit packings into caller-owned storage. The output
+is bounded by the 14-bit frame-size field. Trailing extension bytes remain
+available in the original packet. This projection checks the core envelope
+and leaves the coded audio opaque.
+
 ## Required unresolved scope and native comparison
 
 14-bit/word-swapped carrier grammar, physical/logical lengths, padding/conversion,
-termination SHORT/presentation accounting and HD asset/core extraction remain
-required gaps. The primary audio coding header, audio blocks, internal extension
+termination SHORT/presentation accounting and extraction from HD asset headers
+remain required gaps. The primary audio coding header, audio blocks, internal extension
 semantics, auxiliary/timestamp payloads, other CRCs and cross-field/audio validity
 remain unvalidated. Encoded opaque fixture bodies do not establish audio conformance.
 No G01/AAC grammar or additional BSI feature is inferred or implemented here.

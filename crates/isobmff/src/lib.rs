@@ -6,6 +6,8 @@
 #![forbid(unsafe_code)]
 
 mod boxes;
+mod dts_description;
+pub use dts_description::DtsCoreDescription;
 mod fields;
 mod fragment;
 mod fragment_time;
@@ -299,7 +301,7 @@ pub use native_header_v7::{
 mod native_encoded_v1;
 pub use native_encoded_v1::{
     EncodedEntryKindV1, Mov9EncodedLimitsV1, Mov9EncodedStreamJobV1, Mov9EncodedStreamV1,
-    Mp4AacConfig, Mp4AacConfigJob, PinnedMovD32EncodedRegularV1,
+    Mp4AacConfig, Mp4AacConfigJob, PinnedMovD32EncodedRegularV1, check_dts_core_description,
 };
 
 mod native_encoded_edits_v2;
