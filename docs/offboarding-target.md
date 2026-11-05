@@ -146,7 +146,7 @@ playback on hardware and numerical qualification remain open.
 | O50 | Streem integration | Backend adapter, track selection, buffers/backpressure, generation changes, retries, accurate seek/resume and teardown; preserve route, auth, clocks and watch state |
 | O60 | Target qualification | Simulator/integration tests, native Linux gates, 32-bit ARM build and actual TV tests, with source/binary/input provenance |
 | O61 | Desktop simulator playback | Replace external FFmpeg video/audio subprocesses with qualified decoding/output paths; preserve enabled simulator behavior and record platform boundaries |
-| O62 | Development capture | Replace the enabled MPEG-1 encoder, TS muxer and RGBA/YUV conversion; freeze each contract and pass the same applicable gates |
+| O62 | Development capture | Capture85 passed quality and delivery timing on all 15 selected MPEG-1/TS operations. Peak live heap, total peak RSS and target execution remain open. [Capture evidence](../research/qualification/capture85-linux-arm64/README.md) |
 | O70 | Runtime/package removal | No enabled application-runtime FFmpeg imports, dynamic loads, subprocesses, staged libraries or unresolved call sites; clean install and end-to-end verification without an installed FFmpeg fallback |
 
 The frozen O00 source inventory records Streem revision
