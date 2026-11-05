@@ -134,6 +134,7 @@ pub struct TransportStream {
     limits: ParseLimits,
     program: u16,
     discover_program: bool,
+    feed_omissions: Option<u64>,
     descriptor_namespace: DescriptorNamespace,
     framer: TransportFramer,
     pat: PsiRoute,
@@ -222,7 +223,8 @@ impl TransportStream {
     }
 
     /// Read one independent segment, sharing complete carriers with the
-    /// input window. Retained packet views can keep that whole window live.
+    /// input window and validating source PES without retaining it. Feed
+    /// callers still receive transport packets, program tables and faults.
     pub fn new_single_program_feed(
         budget: Budget,
         limits: ParseLimits,
@@ -230,7 +232,23 @@ impl TransportStream {
     ) -> Result<Self> {
         let mut stream = Self::new_single_program_segment(budget, limits, descriptor_namespace)?;
         stream.framer.share_input();
+        stream.feed_omissions = Some(0);
         Ok(stream)
+    }
+
+    /// Count validated PES and continuity events suppressed since the last
+    /// call, for consumers that track positions in the full source trace.
+    pub fn take_feed_omissions(&mut self) -> u64 {
+        self.feed_omissions.as_mut().map_or(0, std::mem::take)
+    }
+
+    fn omit_feed_event(&mut self) -> Result<()> {
+        let omissions = self
+            .feed_omissions
+            .as_mut()
+            .ok_or(Error::Invalid("feed event omitted from source trace"))?;
+        *omissions = omissions.checked_add(1).ok_or(Error::Overflow)?;
+        Ok(())
     }
 
     fn new_with_program(
@@ -251,6 +269,7 @@ impl TransportStream {
             limits,
             program: program.unwrap_or_default(),
             discover_program: program.is_none(),
+            feed_omissions: None,
             descriptor_namespace,
             pmt: None,
             pmt_source: None,
@@ -614,6 +633,22 @@ impl TransportStream {
             return self.poll_map(work, cancel);
         }
         if let Some(section) = self.section.as_ref() {
+            if self.feed_omissions.is_some()
+                && matches!(self.route, Route::Pmt)
+                && section.crc_remainder() == Some(0)
+                && self
+                    .pmt_source
+                    .as_ref()
+                    .is_some_and(|current| current.as_ref() == section.bytes().as_ref())
+            {
+                // An identical CRC-checked section already passed the PMT
+                // parser in this program and descriptor namespace.
+                let section = self
+                    .section
+                    .take()
+                    .ok_or(Error::Invalid("PSI source missing"))?;
+                return Ok(Some(TraceEvent::Section(section)));
+            }
             let job = match self.route {
                 Route::Pat => PatReader::new(section, &self.budget, self.limits).map(Job::Pat),
                 Route::Pmt => PmtReader::new_with_namespace(
@@ -966,13 +1001,21 @@ impl TransportStream {
                     _ => true,
                 }),
             Route::Pes(index) => {
-                match self.routes.as_mut_slice()[index]
+                let assembler = self.routes.as_mut_slice()[index]
                     .assembler
                     .as_mut()
-                    .ok_or(Error::Invalid("PES route missing"))?
-                    .poll(work, cancel)
-                {
-                    Ok(AssemblyStep::Output(pes)) => return Ok(Some(TraceEvent::Pes(pes))),
+                    .ok_or(Error::Invalid("PES route missing"))?;
+                let step = if self.feed_omissions.is_some() {
+                    assembler.poll_source::<false>(work, cancel)
+                } else {
+                    assembler.poll_source::<true>(work, cancel)
+                };
+                match step {
+                    Ok(AssemblyStep::Output(Some(pes))) => return Ok(Some(TraceEvent::Pes(pes))),
+                    Ok(AssemblyStep::Output(None)) => {
+                        self.omit_feed_event()?;
+                        Ok(false)
+                    }
                     Ok(AssemblyStep::Yield) => Ok(false),
                     Ok(_) => Ok(true),
                     Err(error) => Err(error),
@@ -1047,10 +1090,16 @@ impl TransportStream {
                 .as_mut()
                 .ok_or(Error::Invalid("PES route missing at EOF"))?;
             assembler.end_of_source();
-            match assembler.poll(work, cancel) {
-                Ok(AssemblyStep::Output(pes)) => {
+            let step = if self.feed_omissions.is_some() {
+                assembler.poll_source::<false>(work, cancel)
+            } else {
+                assembler.poll_source::<true>(work, cancel)
+            };
+            match step {
+                Ok(AssemblyStep::Output(Some(pes))) => {
                     return Ok(Step::Ready(TraceEvent::Pes(pes)));
                 }
+                Ok(AssemblyStep::Output(None)) => self.omit_feed_event()?,
                 Ok(AssemblyStep::Yield) => return Ok(Step::Yield),
                 Err(error) if retryable(error) => return Err(error),
                 Err(error) => {
@@ -1128,6 +1177,10 @@ impl TransportStream {
                             return Ok(Step::Yield);
                         }
                         if let Some(outcome) = self.outcome.take() {
+                            if self.feed_omissions.is_some() {
+                                self.omit_feed_event()?;
+                                continue;
+                            }
                             return Ok(ready(TraceEvent::Continuity {
                                 pid: self
                                     .packet

@@ -1818,8 +1818,19 @@ impl TsEngine {
         if self.boundary.is_some() {
             return Ok(BackendStep::AwaitEntity);
         }
+        let feed_only = matches!(
+            self.segment_discovery,
+            Some(SegmentDiscovery::AvcAacFeed | SegmentDiscovery::MediaFeed)
+        );
         if self.pending.is_none() {
-            match self.stream.poll(&mut self.input, w, c)? {
+            let step = self.stream.poll(&mut self.input, w, c);
+            if feed_only {
+                self.event_ordinal = self
+                    .event_ordinal
+                    .checked_add(self.stream.take_feed_omissions())
+                    .ok_or(Error::Overflow)?;
+            }
+            match step? {
                 Step::Ready(e) => self.pending = Some(e),
                 Step::NeedInput(r) => return Ok(BackendStep::NeedInput(r)),
                 Step::Yield => return Ok(BackendStep::Yield),
@@ -1849,10 +1860,6 @@ impl TsEngine {
                 }
             }
         }
-        let feed_only = matches!(
-            self.segment_discovery,
-            Some(SegmentDiscovery::AvcAacFeed | SegmentDiscovery::MediaFeed)
-        );
         if (feed_only || !matches!(self.pending, Some(TraceEvent::Pes(_)))) && !w.try_charge(1) {
             return Ok(BackendStep::Yield);
         }

@@ -9,7 +9,7 @@ use triergon_mpegts::native_recovery::{
     NativePatRoute, NativePatSelection, NativePesObservation, NativePesRecoveryObserver,
     NativePmtBinding,
 };
-use triergon_mpegts::psi::{PatTable, ProgramMap, TableStep};
+use triergon_mpegts::psi::{DescriptorNamespace, PatTable, ProgramMap, TableStep};
 use triergon_mpegts::{
     AssemblyStep, PacketFormat, ParseLimits, SourceEpochs, TraceEvent, TransportStream,
 };
@@ -26,6 +26,27 @@ fn context(n: usize, e: SourceEpochs) -> NativeSourceContext {
     }
 }
 fn collect_entity(case: Case, b: &Budget, entity: SourceId) -> Events {
+    let format = if fixtures::width(case) == 192 {
+        PacketFormat::M2ts192
+    } else {
+        PacketFormat::Ts188
+    };
+    let source = TransportStream::new(
+        b.clone(),
+        format,
+        ParseLimits::default(),
+        fixtures::selected(case),
+    )
+    .unwrap();
+    collect_stream(case, b, entity, source).0
+}
+
+fn collect_stream(
+    case: Case,
+    b: &Budget,
+    entity: SourceId,
+    mut source: TransportStream,
+) -> (Events, Vec<u64>) {
     let data = fixtures::bytes(case);
     let mut capacity = Vec::with_capacity(4096);
     capacity.extend_from_slice(&data);
@@ -40,29 +61,22 @@ fn collect_entity(case: Case, b: &Budget, entity: SourceId) -> Events {
         4096,
     )
     .unwrap();
-    let format = if fixtures::width(case) == 192 {
-        PacketFormat::M2ts192
-    } else {
-        PacketFormat::Ts188
-    };
-    let mut source = TransportStream::new(
-        b.clone(),
-        format,
-        ParseLimits::default(),
-        fixtures::selected(case),
-    )
-    .unwrap();
     let mut out = Vec::new();
+    let mut ordinals = Vec::new();
+    let mut ordinal = 0;
     for _ in 0..100_000 {
-        match source
+        let step = source
             .poll(&mut input, &mut WorkBudget::new(1), &AtomicBool::new(false))
-            .unwrap()
-        {
+            .unwrap();
+        ordinal += source.take_feed_omissions();
+        match step {
             Step::Ready(e) => {
                 let done = matches!(e, TraceEvent::Finished);
                 out.push((e, source.source_epochs()));
+                ordinals.push(ordinal);
+                ordinal += 1;
                 if done {
-                    return out;
+                    return (out, ordinals);
                 }
             }
             Step::Yield => {}
@@ -89,6 +103,48 @@ fn collect_entity(case: Case, b: &Budget, entity: SourceId) -> Events {
         }
     }
     panic!("source did not finish within authored bound");
+}
+
+#[test]
+fn segment_feed_preserves_source_faults_epochs_and_retained_event_ordinals() {
+    for case in [
+        Case::Repeat,
+        Case::BadMapCrc,
+        Case::PendingBody,
+        Case::PendingHeader,
+    ] {
+        let b = Budget::new(1 << 20).unwrap();
+        let limits = ParseLimits::default();
+        let ns = DescriptorNamespace::Unspecified;
+        let source = TransportStream::new_single_program_segment(b.clone(), limits, ns).unwrap();
+        let feed = TransportStream::new_single_program_feed(b.clone(), limits, ns).unwrap();
+        let (raw, raw_ordinals) = collect_stream(case, &b, SourceId(1), source);
+        let (fed, fed_ordinals) = collect_stream(case, &b, SourceId(1), feed);
+        let key = |(event, epochs): &(TraceEvent, SourceEpochs)| {
+            let fault = match event {
+                TraceEvent::Diagnostic(fault) => {
+                    Some((fault.kind, fault.pid, fault.location, fault.error))
+                }
+                _ => None,
+            };
+            (std::mem::discriminant(event), *epochs, fault)
+        };
+        let expected: Vec<_> = raw_ordinals
+            .into_iter()
+            .zip(raw.iter())
+            .filter(|(_, (event, _))| {
+                !matches!(event, TraceEvent::Continuity { .. } | TraceEvent::Pes(_))
+            })
+            .map(|(ordinal, event)| (ordinal, key(event)))
+            .collect();
+        assert_eq!(
+            fed_ordinals
+                .into_iter()
+                .zip(fed.iter().map(key))
+                .collect::<Vec<_>>(),
+            expected
+        );
+    }
 }
 fn collect(case: Case, b: &Budget) -> Events {
     collect_entity(case, b, SourceId(1))
