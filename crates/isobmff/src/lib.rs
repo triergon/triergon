@@ -6,6 +6,8 @@
 #![forbid(unsafe_code)]
 
 mod boxes;
+mod dts_description;
+pub use dts_description::DtsCoreDescription;
 mod fields;
 mod fragment;
 mod fragment_time;
@@ -65,7 +67,8 @@ pub use native_clock::{
 };
 pub use native_cursor::{
     Mov9ClockOrigin, Mov9EditIdentity, Mov9PacketCursor, Mov9PacketLimits, Mov9PacketOccurrence,
-    Mov9PredecessorClock, Mov9Profile, Mov9ResumePoint, Mov9Track, mov9_seekable_head_precedes,
+    Mov9PredecessorClock, Mov9Profile, Mov9RangeSeekJob, Mov9ResumePoint, Mov9Track,
+    mov9_seekable_head_precedes,
 };
 pub use native_edits::{
     Mov9CursorStatus, Mov9DurationBasis, Mov9EditCursor, Mov9EditLimits, Mov9Occurrence,
@@ -298,7 +301,7 @@ pub use native_header_v7::{
 mod native_encoded_v1;
 pub use native_encoded_v1::{
     EncodedEntryKindV1, Mov9EncodedLimitsV1, Mov9EncodedStreamJobV1, Mov9EncodedStreamV1,
-    PinnedMovD32EncodedRegularV1,
+    Mp4AacConfig, Mp4AacConfigJob, PinnedMovD32EncodedRegularV1, check_dts_core_description,
 };
 
 mod native_encoded_edits_v2;

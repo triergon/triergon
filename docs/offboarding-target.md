@@ -39,11 +39,98 @@ webOS builds and TV validation remain required before shipping offboarding.
    Audit the completed app, package contents and enabled runtime features,
    then validate a clean install without an FFmpeg runtime dependency.
 
-The selected AVC/HEVC video startup and seek operation matched all 44
-frozen cases on native Linux ARM64. All 44 passed both memory gates and 43
-passed delivery timing. The remaining fresh no-Cues seek was 1.2543× against
-the 1.25× ceiling. This receipt covers the immutable-input library route.
-See the [selected video evidence](../research/qualification/matroska-video-linux-arm64/README.md).
+The selected AVC/HEVC video startup and seek operation passed all 44
+frozen parity, runtime, heap and total peak RSS cases on native Linux ARM64.
+The worst runtime upper bound was 1.2397× against the 1.25× ceiling.
+The receipt covers the immutable-input library route and retains the
+earlier failed comparisons by revision.
+See the [latest selected video evidence](../research/qualification/matroska-video-linux-arm64/scan-replay-location/README.md).
+
+The opt-in Streem preview at `c0046d7a3aadc89aa875a7b77f871ec60b350063`
+pins Triergon `bf8e7758c4c5ebd6ecb3589285d6eec34fa8e425`. Its 32-bit debug
+package, SHA-256 `ec692146c24384b929026c48c6bf5f1ad5c1d9e7899b747b670d2dbbc2e16e02`,
+installed on an LG G4 running webOS 10.3.1. The installed executables and
+shared library matched the package. Starfish accepted audio and video
+feeds from two synthetic AVC/AAC catalog items, one in MP4 and one in
+Matroska. Both sessions paused, resumed, sought to 52 seconds and stopped
+back to detail after teardown. Each run included HTTP 206 responses, and
+Starfish reported frame-ready callbacks after each seek. The app's memory
+maps contained no FFmpeg libraries. The device logs are retained privately.
+This evidence covers the recorded debug package and these two hardware
+playback profiles. Wider media coverage and shipping-build qualification
+remain open.
+
+The two-audio-track preview at `5bd1f877a3c264e7f79d532707ee0073bca4f64d`
+pins Triergon `942b8ee2f41ab6277c80c0b0b82a8f7e68b9ee09`. Its debug IPK,
+SHA-256 `037f7b685de6e3e98372a82b0c8e812f236eb2eafbb5233fe99bda51a14632e7`,
+passed two catalog replays on the same G4. Each AVC/AAC file resumed at
+12 seconds, switched to the other audio track through the track menu,
+paused and resumed, then sought over HTTP ranges. Starfish accepted both
+feeds and reported frames after the seek. Both Stop reports named the
+new audio track and returned to the item detail after teardown. The IPK
+and app process were checked for FFmpeg libraries. Simulator replays
+verified the distinct PCM tones before and after the switch, including
+a separate cold resume into the secondary track in each container.
+These runs cover the recorded MP4 and Matroska profiles. The private
+receipts bind the fixtures, exact binaries, and logs.
+
+The feature-length MP4 preview at `a387d2d9c66a9583d9de0e5a8ae4fa910a8ec31f`
+pins Triergon `cd66cb9b073e006c11e18f7227fb51bd79c22781`. Its 32-bit
+debug IPK, SHA-256 `c895589d5c1f63d33002867c54bea7658499b42d336c42a159f4fc9e97dfb1e8`,
+resumed a synthetic two-hour AVC/AAC MP4 at one hour on the same G4.
+Starfish accepted both feeds after 12.4 seconds. The forward
+seek landed in 2.5 seconds and the frame clock advanced with
+a single Starfish load for the session. Pause, Resume, and Stop succeeded,
+and the mock server recorded the selected audio track in the Stop report.
+The installed binaries matched the IPK, the HTTP server returned ranges,
+and the app process maps were FFmpeg-free. The screen-on request was
+declined in Active Standby. The simulator decoded the picture and
+identified the secondary AAC track by its PCM tone.
+
+The previous range preview needed 64.3 seconds before feeding and 71.1
+seconds to recover its forward seek after a reload on the same fixture.
+The current route reuses checked track state for regular seeks and
+releases the optional cache under pool pressure. The recorded hardware
+times are single-fixture observations. The reviewed library tree also
+passed 73 native Linux ARM64 functional tests. Full numerical
+qualification remains open.
+
+The AV1 and VP9 preview at Streem `b1431a78ec68f1293648c17cdf5ab0f5be563cbc`
+pins Triergon `b1fb7ef0275866a8d6fc09fc9bf38db2af116d5a`. Its 32-bit debug IPK,
+SHA-256 `c9c7cbf3513a0eaa835394f359b2d51c490cf1150adbea97f738382bc3816677`,
+passed four catalog replays on the G4. Each codec used a 144-second synthetic
+AAC file in MP4 and Matroska. The tests checked HTTP 206 reads, resume at 12
+seconds, pause, a single Starfish Load across the forward seek, accepted audio
+and video feeds, frame callbacks after seek and Stop. The process maps
+showed zero FFmpeg libraries. The settings service reported SDR while the
+set remained in Active Standby. The simulator exercised the same routes
+through its video clock sink and decoded 659 Hz AAC before and after seek.
+A separate simulator fixture verified AV1 configuration replacement before
+the first Matroska video packet. MP4 admission requires consistent VP9 colour
+across its sample descriptions for the platform's single sourceInfo envelope.
+
+The reviewed library tree passed 74 native Linux ARM64 functional tests for
+MP4 sync and the container playback suite. These receipts cover the selected
+application playback paths. Full per-case numerical qualification, remaining
+carriage profiles and shipping adoption remain open.
+
+The DTS core preview at Streem `3c16fb4eb74914eed6e70dcd1c813a3468ebd78e`
+pins Triergon `4bd3d8f12b877fd71848e9bd718520309f022a19`. Five mock-catalog simulator
+replays used Matroska, regular and fragmented MP4, QuickTime and a separate
+14-bit packed Matroska file. The cases exercised HTTP 206, the selected
+DTS track's PCM, resume, pause, a seek on the same Load and Stop. The
+simulator used the FFmpeg-free build. Three refusal cases covered an
+absent core, an untimestamped later lace and an edit that needed PCM trim.
+The 32-bit debug IPK SHA-256 is
+`3352e26c35036af755a68643bd6b25c3dc77f8e73c41c5478068755013b34e62`.
+Its four packaged ELF files passed the FFmpeg-free link audit.
+
+The reviewed DTS library tree passed 126 native Linux ARM64 functional
+tests. Core bytes matched FFmpeg on 37,125 authored packet projections
+and all 1,172 packets of the FATE DTS-HD MA sample and its three remuxes.
+The edited range view keeps packet clocks and sample-entry trim separate.
+Streem admits MP4 DTS edits that can submit whole access units. DTS
+playback on hardware and numerical qualification remain open.
 
 ## Completion ledger
 
@@ -59,14 +146,14 @@ See the [selected video evidence](../research/qualification/matroska-video-linux
 | O50 | Streem integration | Backend adapter, track selection, buffers/backpressure, generation changes, retries, accurate seek/resume and teardown; preserve route, auth, clocks and watch state |
 | O60 | Target qualification | Simulator/integration tests, native Linux gates, 32-bit ARM build and actual TV tests, with source/binary/input provenance |
 | O61 | Desktop simulator playback | Replace external FFmpeg video/audio subprocesses with qualified decoding/output paths; preserve enabled simulator behavior and record platform boundaries |
-| O62 | Development capture | Capture85 quality and delivery timing passed all 15 selected cases. Memory and target execution remain open. [Capture evidence](../research/qualification/capture85-linux-arm64/README.md) |
+| O62 | Development capture | Capture85 passed quality and delivery timing on all 15 selected MPEG-1/TS operations. Peak live heap, total peak RSS and target execution remain open. [Capture evidence](../research/qualification/capture85-linux-arm64/README.md) |
 | O70 | Runtime/package removal | No enabled application-runtime FFmpeg imports, dynamic loads, subprocesses, staged libraries or unresolved call sites; clean install and end-to-end verification without an installed FFmpeg fallback |
 
 The frozen O00 source inventory records Streem revision
 `9c7c0fb5f7316c92ab8086beb19db03d5855dd6e`. The historical K0–K5 receipt qualifies selected packet/header/zlib/Cues/static-colour
 and bounded segment-metadata slices. O00's source review is complete for that
 revision; all eleven implementation/integration/qualification/removal milestones
-remain open. Configured registries and actual package/runtime audits are later gates.
+remain open. Shipping package and runtime audits are still required.
 The earlier experimental Root3477 integration froze a 5,095-file snapshot that
 passed all 13 native Linux ARM64 functional gates with 3,477 passed, zero
 failed and one ignored test per profile. It includes the typed playback
@@ -94,8 +181,17 @@ VPS/SPS/PPS on IRAP. Dolby audio borrows the original packet after bounding
 and checking syncframe extents. The source packet and its timing survive both
 projections. The host regression covers all 52 packets of a mixed HEVC/Dolby
 file and checks the HEVC seek and E-AC-3 track switch against stale feed
-bindings. Native timing and memory, Streem adoption and device proof remain
-open for this feed. [Fixture and oracle](../crates/playback/tests/fixtures/mkv-feed/README.md)
+bindings. The combined sink feed and device behavior still need
+qualification. [Fixture and oracle](../crates/playback/tests/fixtures/mkv-feed/README.md)
+
+The selected AAC-LC, AC-3 and E-AC-3 startup and forward packet clocks
+matched all ten native Linux ARM64 cases and 75 packets. All ten passed
+runtime, live heap and total peak RSS. The source clock also retains the
+damaged AC-3 control's original bytes and timing. The receipt covers the
+selected forward audio clock operation. The debug evidence above covers AAC
+playback on the G4. Full audio seek and wider combined playback qualification
+remain open.
+[Native audio clock evidence](../research/qualification/matroska-audio-linux-arm64/README.md)
 
 ## Raw AVC and HEVC input
 
@@ -114,6 +210,12 @@ qualification remain open.
 
 ## Range-backed MP4 playback seek
 
+The bounded AAC sample-entry reader extracts the exact AudioSpecificConfig
+from an ISO `esds` or QuickTime `wave/esds` description without requiring
+a populated sample table. The same descriptor walk serves the encoded
+catalogue and the playback adapter. Unit tests cover byte offsets, descriptor
+limits and duplicate refusal.
+
 The SourcePhysical player now has a generation-bound sync seek over its
 checked sample rows. It preserves selected prefix state and explicitly
 requested audio preroll, then resumes video at a container sync sample
@@ -122,6 +224,20 @@ payloads and the actual late read offset. Complete range-backed native
 playback also supports a generation-bound seek for the pinned MOV profile.
 The planner rescales the selected reference anchor for each track. The
 engine resumes from those anchors and replays the pinned packet order.
+The encoded range view retains its validated edit plans for seek and
+exposes the selected encoded-audio trim on the emitted packet. The plan
+must match both the track and movie time bases. An authored B-frame AVC/AAC
+fixture checks the selected decode timestamp, first byte range, and the
+original bytes, clocks and trim at the landing.
+Seek input accounting ends when a complete reference packet reaches the
+target time. The original presentation target continues to govern reordered
+preroll. [Seek budget regression](https://github.com/triergon/triergon/pull/14)
+Selected QuickTime AVC and HEVC entries and the leading AC-3 and E-AC-3
+edit profile are also admitted. The Dolby profile validates the full
+configuration and requires an edit duration that converts to whole
+samples on the configured clock. QuickTime AAC playback requires an
+unambiguous AAC configuration. The range path also accepts selected DTS
+core descriptions and exposes regular rate-one edit clocks and trim.
 Five FFprobe comparisons cover regular, fragmented, repeated-edit,
 description-change and mixed-clock AVC/AAC playback. SourcePhysical can
 start with front metadata on a range source and switch to a complete index
@@ -129,9 +245,20 @@ of the same entity for seek. The explicit native progressive player can
 also reopen the same entity as a complete pinned native range plan and
 resume in native seek order. Host tests verify the late range, exact
 fragment packets, paused handoff and sink generation in both views.
-Overlapping native clock queries, native recovery seeks, Streem adoption
-and numerical qualification remain open.
+The opt-in Streem debug adapter uses the native range path. Overlapping native
+clock queries, native recovery seeks, shipping adoption and full numerical
+qualification remain open.
 [Playback API and scope](../crates/playback/README.md#range-backed-mp4-sync-seek)
+
+## Independent AVC/AAC HLS segments
+
+Four frozen independent TS188 segment cases matched the pinned FFmpeg
+parser and app clock, and passed delivery timing, peak live heap and total
+peak RSS on native Linux ARM64. The [HLS receipt](../research/qualification/hls-avc-aac-linux-arm64/README.md)
+binds the exact development revision used by Streem's opt-in HLS work.
+O31 still requires the other selected TS/M2TS, elementary and HLS
+profiles. Playlist lifecycle, hardware playback and full application
+offboarding remain separate gates.
 
 ## Additional application-runtime surfaces
 
@@ -140,12 +267,15 @@ movie decode/output remains LG hardware, and text rendering remains libass. Thes
 are existing consumer/platform responsibilities, not FFmpeg components to rebuild
 as part of the initial TV offboarding.
 
-The default Streem simulator still uses external FFmpeg for picture and sound.
-The opt-in simulator can decode selected video and audio in-process.
-Streem's combined debug integration exercises the Triergon MPEG-1/TS capture
-session alongside playback and omits libswscale from its package. The older
-playback fallback libraries are still bundled. O61 and O62 require complete
-selected-profile qualification and target validation before adoption.
+The default desktop simulator launches external FFmpeg for video and audio.
+The opt-in preview uses in-process Triergon decoders. The default development
+capture uses FFmpeg for MPEG-1 encoding, TS muxing and pixel conversion.
+These paths are excluded by `RELEASE=1` on the TV. The opt-in debug package uses
+Triergon for capture. O61 and O62 still require full qualification and adoption
+of the selected decoder, encoder, muxer and conversion contracts.
+Their presence does not imply the TV release needs a universal software movie
+decoder. A platform decoder in a consumer adapter is a separate, declared boundary;
+it does not admit unsafe/native dependencies into the safe Rust core.
 
 External FFmpeg remains the correctness/performance oracle in the independent test
 harness. Fixture generation and explicitly external development tools are recorded

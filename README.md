@@ -49,3 +49,10 @@ Preparation builds the pinned FFmpeg reference and caches the hash-verified requ
 - [Reproducible research](research/README.md)
 
 The project lives at [triergon/triergon](https://github.com/triergon/triergon). Streem remains unchanged. Downloaded upstream sources, specification caches, large generated media and active experiments stay outside version control; archived research receipts retain their original names and provenance.
+
+## License
+
+Triergon's independently authored source code is available under your choice
+of the [MIT License](LICENSE-MIT) or the [Apache License 2.0](LICENSE-APACHE).
+See the [license scope and provenance policy](docs/licensing.md) for fixtures
+and other third-party material.

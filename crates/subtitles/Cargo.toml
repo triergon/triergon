@@ -2,6 +2,7 @@
 name = "triergon-subtitles"
 version = "0.0.0"
 repository.workspace = true
+license-file = "LICENSE"
 edition = "2024"
 rust-version = "1.85"
 publish = false

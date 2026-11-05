@@ -73,6 +73,8 @@ pub use dts_core::{
     DtsCoreFrame, DtsCoreFrameFacts, DtsCoreFrameLimits, DtsCoreFrameReader, DtsCoreHeader,
     probe_dts_core_header,
 };
+mod dts_core_packet;
+pub use dts_core_packet::DtsCorePacket;
 pub use dts_inspect::{
     DtsCoreField, DtsHeaderInspector, DtsInspection, DtsInspectionIdentity, DtsInspectionIssues,
     DtsInspectionSourceStatus, DtsInspectionStep, DtsInspectionViews, FieldObservation,

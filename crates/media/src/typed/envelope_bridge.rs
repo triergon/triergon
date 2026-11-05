@@ -113,15 +113,17 @@ impl ElementReader {
             Ok(EnvelopeProgress::Step(step))
         }
     }
+    #[cfg(test)]
     pub(crate) fn step_typed_compact(
         &mut self,
         work: &mut WorkBudget,
         cancel: &AtomicBool,
     ) -> Result<CompactEnvelopeProgress> {
-        self.step_typed_compact_admitting_blocks(false, work, cancel)
+        self.healthy_for_job(work, cancel)?;
+        self.step_typed_compact_after_input_health(false, work, cancel)
     }
 
-    pub(crate) fn step_typed_compact_admitting_blocks(
+    pub(crate) fn step_typed_compact_after_input_health(
         &mut self,
         ordinary_blocks: bool,
         work: &mut WorkBudget,
@@ -132,8 +134,10 @@ impl ElementReader {
         } else {
             super::Admit::Pause
         };
-        let step = self.step_mode::<CompactDelivery>(work, cancel, admit)?;
-        if let Some(header) = self.awaiting_typed_admission() {
+        let step = self.step_after_input_health::<CompactDelivery>(work, cancel, admit)?;
+        if matches!(step, ParseStep::Yield)
+            && let Some(header) = self.awaiting_typed_admission()
+        {
             Ok(CompactEnvelopeProgress::Header(header))
         } else {
             Ok(CompactEnvelopeProgress::Step(step))

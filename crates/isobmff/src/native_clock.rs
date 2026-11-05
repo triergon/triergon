@@ -96,24 +96,28 @@ impl Mov9SchedulingClock {
         let Some(ticks) = field.api_ticks() else {
             return Ok(Self::ApiSentinel);
         };
-        let time = Time::from_ticks(i128::from(ticks), base)?;
-        let rounded = match time.to_ticks(TimeBase::new(1, 1_000_000)?, Rounding::NearestAway) {
-            Ok(value) => value,
-            Err(Error::Overflow) => {
-                return Ok(Self::RescaleOverflow {
-                    exact_microseconds: None,
-                });
+        let microseconds = TimeBase::new(1, 1_000_000)?;
+        match base.rescale(ticks, microseconds, Rounding::NearestAway) {
+            Ok(i64::MIN) => {
+                return Err(Error::Unsupported(
+                    "native exact scheduling sentinel collision unreviewed",
+                ));
             }
+            Ok(value) => return Ok(Self::ExactMicroseconds(value)),
+            Err(Error::Overflow) => {}
             Err(error) => return Err(error),
-        };
-        match i64::try_from(rounded) {
-            Ok(value) if value != i64::MIN => Ok(Self::ExactMicroseconds(value)),
-            Ok(_) => Err(Error::Unsupported(
-                "native exact scheduling sentinel collision unreviewed",
-            )),
-            Err(_) => Ok(Self::RescaleOverflow {
-                exact_microseconds: Some(rounded),
+        }
+        // Keep the wide diagnostic value when the scheduling clock itself
+        // cannot fit in the native signed field.
+        let time = Time::from_ticks(i128::from(ticks), base)?;
+        match time.to_ticks(microseconds, Rounding::NearestAway) {
+            Ok(value) => Ok(Self::RescaleOverflow {
+                exact_microseconds: Some(value),
             }),
+            Err(Error::Overflow) => Ok(Self::RescaleOverflow {
+                exact_microseconds: None,
+            }),
+            Err(error) => Err(error),
         }
     }
 }

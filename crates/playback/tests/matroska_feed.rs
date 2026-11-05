@@ -997,6 +997,80 @@ fn compact_discovery_replays_every_output_and_reduces_prefix_storage() {
 }
 
 #[test]
+fn av_discovery_hands_off_before_pgs_and_delivers_every_late_packet() {
+    use triergon_playback::matroska_feed::{
+        MatroskaCompactDiscovery, MatroskaDiscoveryCutoff, MatroskaDiscoveryStep,
+    };
+
+    let fixture = include_bytes!("fixtures/matroska-subtitle-probe/known-anchor.mkv");
+    let (engine, source, _) =
+        matroska_source(fixture, 7, triergon::typed::PayloadOwnership::OwnedExact);
+    let cancel = AtomicBool::new(false);
+    let mut discovery = MatroskaCompactDiscovery::for_av_feed(
+        engine,
+        source,
+        Selection::All,
+        PlayerPolicy::default(),
+        Default::default(),
+    )
+    .unwrap();
+    let mut confirmed = false;
+    let cutoff = (0..10_000)
+        .find_map(|_| {
+            let progress = discovery.poll(&mut WorkBudget::new(1), &cancel).unwrap();
+            if let MatroskaDiscoveryStep::Ready(cutoff) = progress {
+                return Some(cutoff);
+            }
+            if !confirmed
+                && let Some(Event::Packet(packet)) = discovery.buffered_events().last()
+                && packet.packet.track == 0
+            {
+                discovery
+                    .confirm_stream_ready(1, packet.configuration.revision())
+                    .unwrap();
+                confirmed = true;
+            }
+            None
+        })
+        .expect("A/V discovery stalled");
+    assert!(confirmed);
+    assert_eq!(cutoff, MatroskaDiscoveryCutoff::StreamsReady);
+    assert!(
+        discovery
+            .buffered_events()
+            .all(|event| { !matches!(event, Event::Packet(packet) if packet.packet.track == 1) })
+    );
+    let mut discovered = discovery.finish().unwrap();
+    let mut keys: Vec<_> = discovered
+        .prefix
+        .into_outputs()
+        .map(|o| event_key(&o))
+        .collect();
+    let mut output = None;
+    let mut ended = false;
+    for _ in 0..10_000 {
+        let status = discovered
+            .player
+            .read_output(&mut output, &mut WorkBudget::new(1), &cancel)
+            .unwrap();
+        if let Some(output) = output.take() {
+            keys.push(event_key(&output));
+        }
+        if matches!(status, Progress::Ended) {
+            ended = true;
+            break;
+        }
+    }
+    assert!(ended);
+    let (mut reference, _) = player_with_input(fixture, 7);
+    let reference = collect(&mut reference);
+    assert_eq!(reference.iter().filter(|output| {
+        matches!(output.event(), RawEvent::Matroska(Event::Packet(packet)) if packet.packet.track == 1)
+    }).count(), 5);
+    assert_eq!(keys, reference.iter().map(event_key).collect::<Vec<_>>());
+}
+
+#[test]
 fn matroska_integral_packet_delivery_preserves_fractional_seek_targets() {
     let fixture = include_bytes!("fixtures/mkv-feed/hevc-indexed-seek.mkv");
     let (mut player, _) = player_with_input(fixture, 7);
@@ -1032,5 +1106,193 @@ fn matroska_integral_packet_delivery_preserves_fractional_seek_targets() {
             }
         }
         assert!(packets > 0);
+    }
+}
+
+#[test]
+fn matroska_dolby_clock_matches_pinned_startup_and_forward_lace_timestamps() {
+    use triergon_playback::matroska_feed::MatroskaDolbyTiming;
+
+    let cases: &[(&[u8], usize, u64, &[i64])] = &[
+        (
+            include_bytes!("fixtures/dolby-clock/laced-unknown-duration.mkv"),
+            1,
+            32_000_000,
+            &[0, 32, 96, 128],
+        ),
+        (
+            include_bytes!("fixtures/dolby-clock/initial-negative-cluster-relative.mkv"),
+            2,
+            32_000_000,
+            &[-32, 0, 64],
+        ),
+        (
+            include_bytes!("fixtures/dolby-clock/two-laced-before-first-known-pts.mkv"),
+            3,
+            32_000_000,
+            &[32, 64, 96, 128],
+        ),
+        (
+            include_bytes!("fixtures/dolby-clock/no-absolute-anchor.mkv"),
+            2,
+            32_000_000,
+            &[0, 32],
+        ),
+        (
+            include_bytes!("fixtures/dolby-clock/damaged-lace-before-valid-anchor.mkv"),
+            3,
+            32_000_000,
+            &[32, 64, 96, 128],
+        ),
+        (
+            include_bytes!("fixtures/dolby-clock/laced-fractional-cadence.mkv"),
+            3,
+            34_000_000,
+            &[52, 86, 120, 154, 188, 222, 256, 290],
+        ),
+    ];
+    for &(source, count, duration_ns, expected) in cases {
+        let (mut player, pool) = player_with_input(source, 7);
+        let outputs = collect_with_work(&mut player, 1);
+        let mut packets = outputs
+            .iter()
+            .filter(|output| matches!(output.event(), RawEvent::Matroska(Event::Packet(_))));
+        let configuration = outputs
+            .iter()
+            .find_map(|output| match output.event() {
+                RawEvent::Matroska(Event::Configuration(configuration)) => Some(configuration),
+                _ => None,
+            })
+            .unwrap();
+        let feed = hevc_dolby_setup(&pool, configuration, 0);
+        let mut probe = feed
+            .native_dolby_clock_probe(&pool, count)
+            .unwrap()
+            .unwrap();
+        for (ordinal, output) in packets.by_ref().take(count).enumerate() {
+            let packet = hevc_dolby_frame(&feed, output);
+            assert_eq!(probe.push(&packet).unwrap(), ordinal);
+            assert_eq!(packet.source.packet.dts_ns, None);
+            assert_eq!(&packet.source.configuration.tracks()[0].codec, "A_EAC3");
+        }
+        let prefix = probe.finish();
+        let mut timings = (0..count)
+            .map(|at| prefix.timing(at).unwrap())
+            .collect::<Vec<_>>();
+        assert!(prefix.timing(count).is_err());
+        let mut live = prefix.into_live();
+        timings.extend(packets.map(|output| {
+            let packet = hevc_dolby_frame(&feed, output);
+            live.observe(&packet).unwrap()
+        }));
+        let expected: Vec<_> = expected
+            .iter()
+            .map(|time| MatroskaDolbyTiming {
+                pts_ns: Some(time * 1_000_000),
+                dts_ns: Some(time * 1_000_000),
+                duration_ns: Some(duration_ns),
+            })
+            .collect();
+        assert_eq!(timings, expected);
+    }
+}
+
+#[test]
+fn matroska_aac_clock_matches_pinned_mixed_rates_from_probe_through_eof() {
+    use triergon_playback::matroska_feed::MatroskaAacTiming;
+
+    let fixture = include_bytes!("fixtures/mkv-feed/audio-mixed-discovery.mkv");
+    let (mut player, pool) = player_with_input(fixture, 7);
+    let outputs = collect_with_work(&mut player, 1);
+    let configuration = outputs
+        .iter()
+        .find_map(|output| match output.event() {
+            RawEvent::Matroska(Event::Configuration(configuration)) => Some(configuration),
+            _ => None,
+        })
+        .unwrap();
+    let cases: &[(usize, u64, &[i64])] = &[
+        (0, 21_000_000, &[-21, 0, 21, 43, 64, 85, 107]),
+        (1, 23_000_000, &[-23, 0, 23, 46, 70, 93]),
+    ];
+    for &(track, duration_ns, expected) in cases {
+        let feed = setup(&pool, configuration, track);
+        assert!(feed.native_aac_clock_probe(&pool, 4097).is_err());
+        let foreign = Budget::new(1 << 20).unwrap();
+        assert!(feed.native_aac_clock_probe(&foreign, 2).is_err());
+        let mut packets = outputs.iter().filter(|output| {
+            matches!(output.event(), RawEvent::Matroska(Event::Packet(packet))
+                if packet.packet.track == track)
+        });
+        let mut probe = feed.native_aac_clock_probe(&pool, 2).unwrap().unwrap();
+        for (ordinal, output) in packets.by_ref().take(2).enumerate() {
+            let packet = frame(&feed, output);
+            assert_eq!(packet.source.packet.dts_ns, None);
+            assert_eq!(probe.push(&packet).unwrap(), ordinal);
+        }
+        let next = frame(&feed, packets.clone().next().unwrap());
+        assert!(probe.push(&next).is_err());
+        let prefix = probe.finish();
+        let mut timings = (0..2)
+            .map(|ordinal| prefix.timing(ordinal).unwrap())
+            .collect::<Vec<_>>();
+        assert!(prefix.timing(2).is_err());
+        let mut live = prefix.into_live();
+        timings.extend(packets.map(|output| live.observe(&frame(&feed, output)).unwrap()));
+        let expected: Vec<_> = expected
+            .iter()
+            .map(|pts| MatroskaAacTiming {
+                pts_ns: Some(pts * 1_000_000),
+                dts_ns: Some(pts * 1_000_000),
+                duration_ns: Some(duration_ns),
+            })
+            .collect();
+        assert_eq!(timings, expected);
+    }
+}
+
+#[test]
+fn matroska_dolby_source_clock_preserves_damaged_ac3_before_decoder_admission() {
+    use triergon_playback::matroska_feed::MatroskaDolbyTiming;
+
+    let fixture = include_bytes!("fixtures/mkv-feed/audio-bad-first-discovery.mkv");
+    let (mut player, pool) = player_with_input(fixture, 7);
+    let outputs = collect_with_work(&mut player, 1);
+    let configuration = outputs
+        .iter()
+        .find_map(|output| match output.event() {
+            RawEvent::Matroska(Event::Configuration(c)) => Some(c),
+            _ => None,
+        })
+        .unwrap();
+    assert_eq!(configuration.tracks()[0].codec, "A_AC3");
+    let feed = hevc_dolby_setup(&pool, configuration, 0);
+    let mut packets = outputs.iter().filter_map(|output| match output.event() {
+        RawEvent::Matroska(Event::Packet(packet)) if packet.packet.track == 0 => {
+            Some((output, packet))
+        }
+        _ => None,
+    });
+    let (first, source) = packets.next().unwrap();
+    let raw = source.packet.data.as_ref();
+    assert_eq!(raw[0], 0);
+    let mut frame = feed.packet(first).unwrap().unwrap();
+    let cancel = AtomicBool::new(false);
+    assert!(frame.step(&mut WorkBudget::new(4096), &cancel).is_err());
+
+    let mut probe = feed.native_dolby_clock_probe(&pool, 1).unwrap().unwrap();
+    assert_eq!(probe.push_source(source).unwrap(), 0);
+    let prefix = probe.finish();
+    let expected = |pts_ns| MatroskaDolbyTiming {
+        pts_ns: Some(pts_ns),
+        dts_ns: Some(pts_ns),
+        duration_ns: Some(32_000_000),
+    };
+    assert_eq!(prefix.timing(0).unwrap(), expected(-5_000_000));
+    assert_eq!(source.packet.data.as_ref(), raw);
+    assert_eq!(source.packet.dts_ns, None);
+    let mut live = prefix.into_live();
+    for ((_, packet), pts_ns) in packets.zip([27_000_000, 59_000_000, 91_000_000]) {
+        assert_eq!(live.observe_source(packet).unwrap(), expected(pts_ns));
     }
 }

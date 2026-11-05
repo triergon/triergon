@@ -163,6 +163,16 @@ reference order, even when the next range moves backward. Planning reads no payl
 starts at the command's `start_offset()`, and the engine republishes
 configuration before delivering a packet that uses it.
 
+`Mp4RangeOpen` offers the same native order and range seek over the borrowed
+complete `Movie` and any checked encoded edit plans. The open job validates
+source extents and native occurrences, then rewinds the checked tables before
+reading payload. It also derives the duration when the movie header omits it.
+The direct-output player keeps the compact tables and per-track cursor state
+and constructs packet locations and clocks as they are used. For regular
+tracks with strictly increasing native clocks, seeking can resume from
+charged, sparse checkpoints collected during preflight. The full seek planner
+still handles other supported queries over the checked tables.
+
 Five FFprobe replays compare the full post-seek sequence for regular,
 fragmented, repeated-edit, description-change and mixed-clock AVC/AAC
 files. The profile requires a supported index clock query.
@@ -237,7 +247,22 @@ then SPS VUI timing if the VPS has no clock, and rounds down to whole
 packet ticks. The original container packet still carries its source
 clocks.
 
-## Matroska Dolby audio duration
+## Matroska AAC packet clocks
+
+Create `native_aac_clock_probe` from an admitted AAC feed and retain
+the caller's selected packets through discovery. Push each packet once,
+then `finish` and replay its timing by ordinal. `into_live` continues
+that clock after releasing the probe rows. The bounded projector uses the
+declared duration when available. Otherwise, it projects the admitted
+1024-sample AAC-LC core period onto whole Matroska ticks. A new seek
+generation needs a fresh feed and clock. The original packet retains its
+source clocks and bytes.
+
+The mixed-audio regression checks all thirteen AAC packets at 48 kHz and
+44.1 kHz against pinned FFprobe, including negative startup time, DTS and
+duration. [Authored fixture](tests/fixtures/mkv-feed/README.md)
+
+## Matroska Dolby audio packet clocks
 
 `MatroskaHevcDolbyPacket::native_duration_ns` returns the declared
 duration on the native packet clock. When that duration is absent, the
@@ -245,6 +270,23 @@ method checks up to 32 complete independent AC-3 or E-AC-3 syncframes.
 It checks the final frame’s CRC and projects that frame’s coded sample
 span down to a whole Matroska clock tick. Source timing remains available
 on the packet.
+
+For native-compatible PTS and DTS, create a `native_dolby_clock_probe`
+from the selected feed. Push the selected, checked packets once in input
+order through the caller's discovery cutoff. The probe retains up to 4096
+budgeted timing rows. An absolute timestamp within that prefix can anchor
+earlier packets, and a later coded duration can fill eligible leading
+rows. Call `finish` and replay the prefix timings by ordinal. Use
+`into_live` to release the rows and advance the same clock as more
+packets arrive. Rebuild the feed and clock after seek or configuration
+change, and keep the player's delivery classification when replaying the
+original packets. The source-clock methods `push_source` and
+`observe_source` accept the original selected demux packet. They let the
+caller preserve packet bytes and timing even when the syncframe job
+refuses a damaged packet. A missing AC-3 duration can use its declared
+rate and fixed 1536-sample period when that period is a whole number of
+Matroska ticks. The decoder still checks frame admission separately.
+See the [timing controls](tests/fixtures/dolby-clock/README.md).
 
 ## Matroska bitmap subtitles
 

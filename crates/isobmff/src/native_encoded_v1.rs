@@ -1,8 +1,12 @@
 //! Explicit regular encoded catalogue view. Config records stay opaque; NAL,
 //! ASC/ADTS and decoder validation belong to their existing separate adapters.
 use crate::{
-    BoxChildren, BoxStep, BoxView, EntryLayout, Limits, Mov9CursorStatus, Mov9MediaClock,
-    Mov9StreamView, SampleDescription, SampleTable, TrackHeader, fields,
+    BoxChildren, BoxStep, BoxView, DtsCoreDescription, EntryLayout, Limits, Mov9CursorStatus,
+    Mov9MediaClock, Mov9StreamView, SampleDescription, SampleTable, TrackHeader,
+    dts_description::{
+        check_dts_sample_entry, check_mp4a_dts, dts_entry_children, dts_object_type,
+    },
+    fields,
 };
 use std::sync::atomic::AtomicBool;
 use triergon_core::{Budget, Bytes, Error, InputCursor, InputToken, Result, SourceId, WorkBudget};
@@ -28,15 +32,32 @@ impl Default for Mov9EncodedLimitsV1 {
 pub enum EncodedEntryKindV1 {
     Avc,
     Hevc,
+    Av1,
+    Vp9,
     Aac,
     Ac3,
     Eac3,
+    Dts,
+}
+
+impl EncodedEntryKindV1 {
+    pub(crate) const fn is_video(self) -> bool {
+        matches!(self, Self::Avc | Self::Hevc | Self::Av1 | Self::Vp9)
+    }
+
+    pub(crate) fn require_pinned_codec(self) -> Result<()> {
+        if matches!(self, Self::Av1 | Self::Vp9 | Self::Dts) {
+            return Err(Error::Unsupported("encoded codec requires range playback"));
+        }
+        Ok(())
+    }
 }
 #[derive(Clone, Debug)]
 pub struct Mov9EncodedStreamV1 {
     native: Mov9StreamView,
     entry: SampleDescription,
     configuration: BoxView,
+    pub(crate) dts: Option<DtsCoreDescription>,
     encoder: Option<Bytes>,
     kind: EncodedEntryKindV1,
     raw_headers: [BoxView; 3],
@@ -54,6 +75,8 @@ impl Mov9EncodedStreamV1 {
     pub fn source_description(&self) -> &SampleDescription {
         &self.entry
     }
+    /// The source configuration box, or the original sample entry for the
+    /// selected QuickTime DTS description with in-band configuration.
     pub fn configuration_box(&self) -> &BoxView {
         &self.configuration
     }
@@ -93,6 +116,14 @@ enum DescriptorPhase {
         end: usize,
     },
 }
+
+#[derive(Clone, Copy)]
+enum EsdsProfile {
+    Aac,
+    RangeAudio,
+    ObjectType,
+}
+
 struct EsdsWalk {
     raw: Bytes,
     at: usize,
@@ -101,12 +132,18 @@ struct EsdsWalk {
     phase: DescriptorPhase,
     rows: u32,
     limit: u32,
-    dsi: Option<Bytes>,
+    dsi: Option<(usize, Bytes)>,
     decoder_seen: bool,
+    object_type: Option<u8>,
+    profile: EsdsProfile,
     completed: bool,
 }
 impl EsdsWalk {
     fn new(raw: Bytes, limit: u32) -> Result<Self> {
+        Self::with_profile(raw, limit, EsdsProfile::Aac)
+    }
+
+    fn with_profile(raw: Bytes, limit: u32, profile: EsdsProfile) -> Result<Self> {
         if raw.as_ref().get(..4) != Some(&[0; 4]) {
             return Err(Error::Unsupported("encoded esds full-box version/flags"));
         }
@@ -121,6 +158,8 @@ impl EsdsWalk {
             limit,
             dsi: None,
             decoder_seen: false,
+            object_type: None,
+            profile,
             completed: false,
         })
     }
@@ -218,13 +257,25 @@ impl EsdsWalk {
                     let b = self.byte()?;
                     let next = index.checked_add(1).ok_or(Error::Overflow)?;
                     let done = if tag == 4 {
-                        if index == 0 && b != 0x40 {
-                            return Err(Error::Unsupported(
-                                "encoded mp4a object-type is not selected AAC",
-                            ));
+                        if index == 0 {
+                            let allowed = match self.profile {
+                                EsdsProfile::Aac => b == 0x40,
+                                EsdsProfile::RangeAudio => b == 0x40 || dts_object_type(b)?,
+                                EsdsProfile::ObjectType => true,
+                            };
+                            if !allowed {
+                                return Err(Error::Unsupported(
+                                    "encoded mp4a object-type is not selected AAC",
+                                ));
+                            }
+                            self.object_type = Some(b);
                         }
                         if index == 1 && (b >> 2 != 5 || b & 1 == 0) {
-                            return Err(Error::Unsupported("encoded AAC decoder stream-type"));
+                            return Err(Error::Unsupported(if self.object_type == Some(0x40) {
+                                "encoded AAC decoder stream-type"
+                            } else {
+                                "encoded mp4a decoder stream-type"
+                            }));
                         }
                         next == 13
                     } else {
@@ -270,13 +321,309 @@ impl EsdsWalk {
                                 "encoded duplicate decoder-specific config",
                             ));
                         }
-                        self.dsi = Some(self.raw.slice(self.at..end)?);
+                        self.dsi = Some((self.at, self.raw.slice(self.at..end)?));
                     }
                     self.at = end;
                     self.phase = DescriptorPhase::Tag;
                 }
             }
         }
+    }
+}
+
+/// Decoder-specific bytes borrowed from the original AAC sample entry.
+#[derive(Debug)]
+pub struct Mp4AacConfig {
+    pub offset: u64,
+    pub bytes: Bytes,
+}
+
+/// Extracts AudioSpecificConfig from an `mp4a` description independently
+/// of its sample table. A QuickTime sound description may carry one
+/// `wave` container around the elementary stream descriptor.
+pub struct Mp4AacConfigJob {
+    children: BoxChildren,
+    wave: Option<BoxChildren>,
+    seen_wave: bool,
+    wave_fields: AacWaveFields,
+    scanned: bool,
+    limits: Mov9EncodedLimitsV1,
+    inspected_boxes: u32,
+    profile: EsdsProfile,
+    esds: Option<(u64, EsdsWalk)>,
+    failed: Option<Error>,
+}
+
+impl Mp4AacConfigJob {
+    pub fn new(entry: &SampleDescription, limits: Mov9EncodedLimitsV1) -> Result<Self> {
+        Self::with_profile(entry, limits, EsdsProfile::Aac)
+    }
+
+    fn with_profile(
+        entry: &SampleDescription,
+        limits: Mov9EncodedLimitsV1,
+        profile: EsdsProfile,
+    ) -> Result<Self> {
+        if entry.format != *b"mp4a" {
+            return Err(Error::Invalid(
+                "AAC configuration requires an mp4a description",
+            ));
+        }
+        let child_limits = Limits {
+            max_boxes: limits.max_child_boxes,
+            ..Limits::default()
+        };
+        let children = if fields::u16_at(entry.raw().payload(), 8)? == 1 {
+            crate::Mov9SoundV1SourceV4::parse_v7(entry)?;
+            entry.raw().children(44, child_limits)?
+        } else {
+            entry.extensions(EntryLayout::AudioV0, child_limits)?
+        };
+        Ok(Self {
+            children,
+            wave: None,
+            seen_wave: false,
+            wave_fields: AacWaveFields::default(),
+            scanned: false,
+            limits,
+            inspected_boxes: 0,
+            profile,
+            esds: None,
+            failed: None,
+        })
+    }
+
+    /// Yields when the work budget runs out. A parse error ends this job.
+    pub fn poll(
+        &mut self,
+        work: &mut WorkBudget,
+        cancel: &AtomicBool,
+    ) -> Result<Option<Mp4AacConfig>> {
+        if let Some(error) = self.failed {
+            return Err(error);
+        }
+        let result = self.advance(work, cancel);
+        if let Err(error) = result {
+            self.failed = Some(error);
+        }
+        result
+    }
+
+    fn advance(
+        &mut self,
+        work: &mut WorkBudget,
+        cancel: &AtomicBool,
+    ) -> Result<Option<Mp4AacConfig>> {
+        if cancel.load(std::sync::atomic::Ordering::Relaxed) {
+            return Err(Error::Cancelled);
+        }
+        if !self.scan_configuration(work)? {
+            return Ok(None);
+        }
+        let (base, walker) = self
+            .esds
+            .as_mut()
+            .ok_or(Error::Invalid("missing AAC elementary stream descriptor"))?;
+        let (relative, bytes) = walker
+            .dsi
+            .take()
+            .ok_or(Error::Invalid("missing AAC decoder-specific bytes"))?;
+        if bytes.is_empty() {
+            return Err(Error::Invalid("empty AAC decoder-specific bytes"));
+        }
+        let offset = base.checked_add(relative as u64).ok_or(Error::Overflow)?;
+        Ok(Some(Mp4AacConfig { offset, bytes }))
+    }
+
+    fn scan_configuration(&mut self, work: &mut WorkBudget) -> Result<bool> {
+        while !self.scanned {
+            let nested = self.wave.is_some();
+            let children = self.wave.as_mut().unwrap_or(&mut self.children);
+            match children.poll(work)? {
+                BoxStep::Yield => return Ok(false),
+                BoxStep::End if nested => {
+                    if !self.wave_fields.complete() || self.esds.is_none() {
+                        return Err(Error::Unsupported("incomplete AAC wave context"));
+                    }
+                    self.wave = None;
+                }
+                BoxStep::End => self.scanned = true,
+                BoxStep::Box(raw) => {
+                    self.inspected_boxes =
+                        self.inspected_boxes.checked_add(1).ok_or(Error::Overflow)?;
+                    if self.inspected_boxes > self.limits.max_child_boxes {
+                        return Err(Error::Limit {
+                            requested: self.inspected_boxes as usize,
+                            maximum: self.limits.max_child_boxes as usize,
+                        });
+                    }
+                    if nested {
+                        self.wave_fields.inspect(&raw)?;
+                    }
+                    match &raw.header().kind {
+                        b"esds" => self.accept_descriptor(raw)?,
+                        b"wave" => {
+                            if self.seen_wave || self.esds.is_some() {
+                                return Err(Error::Unsupported("multiple AAC configuration paths"));
+                            }
+                            self.seen_wave = true;
+                            self.wave = Some(raw.children(
+                                0,
+                                Limits {
+                                    max_boxes: self.limits.max_child_boxes,
+                                    ..Limits::default()
+                                },
+                            )?);
+                        }
+                        _ => {}
+                    }
+                }
+            }
+        }
+        let (_, walker) = self
+            .esds
+            .as_mut()
+            .ok_or(Error::Invalid("missing AAC elementary stream descriptor"))?;
+        walker.poll(work)
+    }
+
+    fn accept_descriptor(&mut self, raw: BoxView) -> Result<()> {
+        if self.esds.is_some() {
+            return Err(Error::Invalid("duplicate AAC elementary stream descriptor"));
+        }
+        check_configuration_size(&raw, self.limits)?;
+        let header = raw.header();
+        let offset = header
+            .start
+            .checked_add(u64::from(header.header_size))
+            .ok_or(Error::Overflow)?;
+        let bytes = raw
+            .bytes()
+            .slice(usize::from(header.header_size)..raw.bytes().len())?;
+        self.esds = Some((
+            offset,
+            EsdsWalk::with_profile(bytes, self.limits.max_descriptors, self.profile)?,
+        ));
+        Ok(())
+    }
+}
+
+/// Check a selected sample description for DTS core playback. Direct DTS
+/// entries and DTS object types in `mp4a` are checked within the caller's
+/// box, configuration-byte and descriptor limits. Other formats and valid
+/// non-DTS object types return `None`. A positive result describes container
+/// signalling only. The caller must verify each packet's usable core.
+pub fn check_dts_core_description(
+    description: &SampleDescription,
+    limits: Mov9EncodedLimitsV1,
+) -> Result<Option<DtsCoreDescription>> {
+    if description.format != description.raw().header().kind {
+        return Err(Error::Invalid(
+            "sample entry format differs from raw source",
+        ));
+    }
+    // Each box/descriptor consumes a bounded number of work units. Opaque
+    // bodies are skipped without iterating their bytes.
+    let mut work = WorkBudget::new(u64::MAX);
+    match &description.format {
+        b"mp4a" => {
+            let mut job =
+                Mp4AacConfigJob::with_profile(description, limits, EsdsProfile::ObjectType)?;
+            if !job.scan_configuration(&mut work)? {
+                return Err(Error::Overflow);
+            }
+            let object_type = job
+                .esds
+                .and_then(|(_, walk)| walk.object_type)
+                .ok_or(Error::Invalid("missing mp4a decoder object type"))?;
+            if object_type == 0 {
+                return Err(Error::Invalid("forbidden mp4a decoder object type"));
+            }
+            if !dts_object_type(object_type)? {
+                return Ok(None);
+            }
+            if job.seen_wave {
+                return Err(Error::Unsupported("DTS mp4a wave configuration"));
+            }
+            Ok(Some(check_mp4a_dts(description)?))
+        }
+        b"dtsc" | b"dtsh" | b"dtsl" => {
+            let mut children = dts_entry_children(
+                description,
+                Limits {
+                    max_boxes: limits.max_child_boxes,
+                    ..Limits::default()
+                },
+            )?;
+            let mut config = None;
+            loop {
+                match children.poll(&mut work)? {
+                    BoxStep::Box(raw) if raw.header().kind == *b"ddts" => {
+                        check_configuration_size(&raw, limits)?;
+                        if config.replace(raw).is_some() {
+                            return Err(Error::Unsupported("encoded duplicate configuration box"));
+                        }
+                    }
+                    BoxStep::Box(_) => {}
+                    BoxStep::End => break,
+                    BoxStep::Yield => return Err(Error::Overflow),
+                }
+            }
+            Ok(Some(check_dts_sample_entry(description, config.as_ref())?))
+        }
+        b"dtse" | b"dtsx" => Err(Error::Unsupported("DTS entry without selected core")),
+        _ => Ok(None),
+    }
+}
+
+fn check_configuration_size(raw: &BoxView, limits: Mov9EncodedLimitsV1) -> Result<()> {
+    if raw.payload().len() > limits.max_config_bytes {
+        return Err(Error::Limit {
+            requested: raw.payload().len(),
+            maximum: limits.max_config_bytes,
+        });
+    }
+    Ok(())
+}
+
+#[derive(Default)]
+struct AacWaveFields {
+    format: bool,
+    marker: bool,
+    terminator: bool,
+}
+
+impl AacWaveFields {
+    fn inspect(&mut self, raw: &BoxView) -> Result<()> {
+        if self.terminator {
+            return Err(Error::Invalid("AAC wave child after terminator"));
+        }
+        match &raw.header().kind {
+            b"frma" => {
+                if self.format || raw.payload() != b"mp4a" {
+                    return Err(Error::Invalid("AAC wave format"));
+                }
+                self.format = true;
+            }
+            b"mp4a" => {
+                if self.marker || raw.payload() != [0; 4] {
+                    return Err(Error::Invalid("AAC wave marker"));
+                }
+                self.marker = true;
+            }
+            [0, 0, 0, 0] => {
+                if !raw.payload().is_empty() {
+                    return Err(Error::Invalid("AAC wave terminator data"));
+                }
+                self.terminator = true;
+            }
+            _ => {}
+        }
+        Ok(())
+    }
+
+    fn complete(&self) -> bool {
+        self.format && self.marker && self.terminator
     }
 }
 
@@ -287,6 +634,19 @@ struct WaveV4 {
     format: Option<BoxView>,
     marker: Option<BoxView>,
     terminator: Option<BoxView>,
+}
+
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum DescriptionView {
+    Regular,
+    MetadataV4,
+    ContextsV7,
+    RangePlayback,
+}
+impl DescriptionView {
+    fn observes_contexts(self) -> bool {
+        self == Self::ContextsV7
+    }
 }
 
 /// Metadata-only job over the original charged source owners. Source/request
@@ -306,12 +666,11 @@ pub struct Mov9EncodedStreamJobV1<'a> {
     result: Option<Mov9EncodedStreamV1>,
     failed: Option<Error>,
     finished: bool,
-    receiver_v4: bool,
+    view: DescriptionView,
     major: Option<[u8; 4]>,
     sound_v4: Option<crate::Mov9SoundV1SourceV4>,
     wave_v4: Option<WaveV4>,
     inspected_boxes: u32,
-    receiver_v7: bool,
     wave_source_v7: Option<crate::Mov9WaveObservationV7>,
     pending_esds_v7: Option<(BoxView, EsdsWalk)>,
     descriptors_left_v7: u32,
@@ -334,8 +693,7 @@ impl<'a> Mov9EncodedStreamJobV1<'a> {
                 limits,
                 description: 1,
             },
-            false,
-            false,
+            DescriptionView::Regular,
         )
     }
     pub fn new_description_v3(
@@ -356,8 +714,7 @@ impl<'a> Mov9EncodedStreamJobV1<'a> {
                 limits,
                 description,
             },
-            false,
-            false,
+            DescriptionView::Regular,
         )
     }
     /// V4 admits the independently sourced QuickTime VBR AudioV1/wave layout
@@ -369,7 +726,7 @@ impl<'a> Mov9EncodedStreamJobV1<'a> {
         selection: crate::Mov9EncodedSelectionV4,
         _profile: crate::PinnedMovD32EncodedRegularV4,
     ) -> Result<Self> {
-        Self::new_description_inner(header, table, input, selection, true, false)
+        Self::new_description_inner(header, table, input, selection, DescriptionView::MetadataV4)
     }
     /// Named receiver context: source wave words/ordering and the old strict
     /// profile's first fault remain owned; no valid-source result is fabricated.
@@ -380,21 +737,37 @@ impl<'a> Mov9EncodedStreamJobV1<'a> {
         selection: crate::Mov9EncodedSelectionV4,
         _profile: crate::PinnedMovD32EncodedContextsV7,
     ) -> Result<Self> {
-        Self::new_description_inner(header, table, input, selection, true, true)
+        Self::new_description_inner(header, table, input, selection, DescriptionView::ContextsV7)
+    }
+    /// Range playback requires unambiguous audio configuration and admits
+    /// AV1, VP9 and selected DTS core descriptions in addition to the pinned codecs.
+    pub fn new_range_playback(
+        header: &'a TrackHeader,
+        table: &SampleTable,
+        input: &InputCursor,
+        selection: crate::Mov9EncodedSelectionV4,
+    ) -> Result<Self> {
+        Self::new_description_inner(
+            header,
+            table,
+            input,
+            selection,
+            DescriptionView::RangePlayback,
+        )
     }
     fn new_description_inner(
         header: &'a TrackHeader,
         table: &SampleTable,
         input: &InputCursor,
         selection: crate::Mov9EncodedSelectionV4,
-        receiver_v4: bool,
-        receiver_v7: bool,
+        view: DescriptionView,
     ) -> Result<Self> {
         let crate::Mov9EncodedSelectionV4 {
             major_brand: major,
             limits,
             description,
         } = selection;
+        let receiver_v4 = view != DescriptionView::Regular;
         if !table.raw().bytes().belongs_to(input.budget())
             || [&header.raw_tkhd, &header.raw_mdhd, &header.raw_hdlr]
                 .iter()
@@ -432,9 +805,18 @@ impl<'a> Mov9EncodedStreamJobV1<'a> {
             (b"vide", b"hvc1" | b"hev1") => {
                 (EncodedEntryKindV1::Hevc, *b"hvcC", EntryLayout::Visual)
             }
+            (b"vide", b"av01") if view == DescriptionView::RangePlayback => {
+                (EncodedEntryKindV1::Av1, *b"av1C", EntryLayout::Visual)
+            }
+            (b"vide", b"vp09") if view == DescriptionView::RangePlayback => {
+                (EncodedEntryKindV1::Vp9, *b"vpcC", EntryLayout::Visual)
+            }
             (b"soun", b"mp4a") => (EncodedEntryKindV1::Aac, *b"esds", EntryLayout::AudioV0),
             (b"soun", b"ac-3") => (EncodedEntryKindV1::Ac3, *b"dac3", EntryLayout::AudioV0),
             (b"soun", b"ec-3") => (EncodedEntryKindV1::Eac3, *b"dec3", EntryLayout::AudioV0),
+            (b"soun", b"dtsc" | b"dtsh" | b"dtsl") if view == DescriptionView::RangePlayback => {
+                (EncodedEntryKindV1::Dts, *b"ddts", EntryLayout::AudioV0)
+            }
             _ => return Err(Error::Unsupported("encoded catalogue namespace/handler")),
         };
         let child_limits = Limits {
@@ -446,20 +828,33 @@ impl<'a> Mov9EncodedStreamJobV1<'a> {
             && kind == EncodedEntryKindV1::Aac
             && fields::u16_at(entry.raw().payload(), 8)? == 1
         {
-            Some(if receiver_v7 {
-                crate::Mov9SoundV1SourceV4::parse_v7(&entry)?
-            } else {
-                crate::Mov9SoundV1SourceV4::parse(&entry)?
+            Some(match view {
+                DescriptionView::ContextsV7 | DescriptionView::RangePlayback => {
+                    crate::Mov9SoundV1SourceV4::parse_v7(&entry)?
+                }
+                _ => crate::Mov9SoundV1SourceV4::parse(&entry)?,
             })
         } else {
             None
         };
-        if receiver_v4 && major == Some(*b"qt  ") && sound_v4.is_none() {
+        let quicktime_visual =
+            view == DescriptionView::RangePlayback && matches!(layout, EntryLayout::Visual);
+        if receiver_v4
+            && major == Some(*b"qt  ")
+            && sound_v4.is_none()
+            && !quicktime_visual
+            && kind != EncodedEntryKindV1::Dts
+        {
             return Err(Error::Unsupported(
                 "encoded V4 QuickTime AudioV1/mp4a profile only",
             ));
         }
-        let children = if sound_v4.is_some() {
+        let children = if kind == EncodedEntryKindV1::Dts {
+            if major != Some(*b"qt  ") && fields::u16_at(entry.raw().payload(), 8)? != 0 {
+                return Err(Error::Unsupported("DTS QuickTime sample entry brand"));
+            }
+            dts_entry_children(&entry, child_limits)?
+        } else if sound_v4.is_some() {
             entry.raw().children(44, child_limits)?
         } else {
             entry.extensions(layout, child_limits)?
@@ -479,19 +874,18 @@ impl<'a> Mov9EncodedStreamJobV1<'a> {
             result: None,
             failed: None,
             finished: false,
-            receiver_v4,
+            view,
             major,
             sound_v4,
             wave_v4: None,
             inspected_boxes: 0,
-            receiver_v7,
             wave_source_v7: None,
             pending_esds_v7: None,
             descriptors_left_v7: limits.max_descriptors,
         })
     }
     fn inspect_box(&mut self) -> Result<()> {
-        if self.receiver_v4 {
+        if self.view != DescriptionView::Regular {
             self.inspected_boxes = self.inspected_boxes.checked_add(1).ok_or(Error::Overflow)?;
             if self.inspected_boxes > self.limits.max_child_boxes {
                 return Err(Error::Limit {
@@ -503,13 +897,11 @@ impl<'a> Mov9EncodedStreamJobV1<'a> {
         Ok(())
     }
     fn accept_configuration(&mut self, raw: BoxView) -> Result<()> {
-        if raw.payload().len() > self.limits.max_config_bytes {
-            return Err(Error::Limit {
-                requested: raw.payload().len(),
-                maximum: self.limits.max_config_bytes,
-            });
-        }
-        if self.receiver_v7 && self.wave_v4.is_some() && self.kind == EncodedEntryKindV1::Aac {
+        check_configuration_size(&raw, self.limits)?;
+        if self.view.observes_contexts()
+            && self.wave_v4.is_some()
+            && self.kind == EncodedEntryKindV1::Aac
+        {
             if let Some(report) = &mut self.wave_source_v7 {
                 report.configuration_count = report
                     .configuration_count
@@ -758,7 +1150,7 @@ impl<'a> Mov9EncodedStreamJobV1<'a> {
                                     ..Limits::default()
                                 },
                             )?;
-                            if self.receiver_v7 {
+                            if self.view.observes_contexts() {
                                 let mut report = crate::Mov9WaveObservationV7::new(raw.clone());
                                 if self
                                     .sound_v4
@@ -782,6 +1174,13 @@ impl<'a> Mov9EncodedStreamJobV1<'a> {
                                 marker: None,
                                 terminator: None,
                             });
+                        } else if raw.header().kind == *b"wave"
+                            && self.view == DescriptionView::RangePlayback
+                            && self.kind == EncodedEntryKindV1::Aac
+                        {
+                            return Err(Error::Unsupported(
+                                "encoded AAC wave requires QuickTime AudioV1",
+                            ));
                         } else if raw.header().kind == self.config_kind {
                             if self.sound_v4.is_some() {
                                 return Err(Error::Unsupported(
@@ -793,13 +1192,27 @@ impl<'a> Mov9EncodedStreamJobV1<'a> {
                     }
                     BoxStep::End => {
                         self.children = None;
+                        if self.kind == EncodedEntryKindV1::Dts {
+                            continue;
+                        }
                         let cfg = self.configuration.as_ref().ok_or(Error::Unsupported(
                             "encoded configuration path or absence not established",
                         ))?;
                         if self.kind == EncodedEntryKindV1::Aac && self.esds.is_none() {
                             let start = usize::from(cfg.header().header_size);
                             let bytes = cfg.bytes().slice(start..cfg.bytes().len())?;
-                            self.esds = Some(EsdsWalk::new(bytes, self.limits.max_descriptors)?);
+                            let profile = if self.view == DescriptionView::RangePlayback
+                                && self.sound_v4.is_none()
+                            {
+                                EsdsProfile::RangeAudio
+                            } else {
+                                EsdsProfile::Aac
+                            };
+                            self.esds = Some(EsdsWalk::with_profile(
+                                bytes,
+                                self.limits.max_descriptors,
+                                profile,
+                            )?);
                         }
                     }
                 }
@@ -813,23 +1226,45 @@ impl<'a> Mov9EncodedStreamJobV1<'a> {
             if !work.try_charge(1) {
                 return Ok(Mov9CursorStatus::Yield);
             }
-            let cfg = self
-                .configuration
-                .as_ref()
-                .ok_or(Error::Invalid("encoded config missing at publication"))?;
-            let extradata = match self.kind {
-                EncodedEntryKindV1::Aac => {
-                    self.esds
-                        .as_ref()
-                        .and_then(|x| x.dsi.clone())
-                        .ok_or(Error::Unsupported(
-                            "encoded AAC decoder-specific config absent",
-                        ))?
+            let cfg = match self.configuration.as_ref() {
+                Some(cfg) => cfg,
+                None if self.kind == EncodedEntryKindV1::Dts => self.entry.raw(),
+                None => return Err(Error::Invalid("encoded config missing at publication")),
+            };
+            let dts = match self.kind {
+                EncodedEntryKindV1::Dts => Some(check_dts_sample_entry(
+                    &self.entry,
+                    self.configuration.as_ref(),
+                )?),
+                EncodedEntryKindV1::Aac if self.view == DescriptionView::RangePlayback => {
+                    match self.esds.as_ref().and_then(|esds| esds.object_type) {
+                        Some(oti) if dts_object_type(oti)? => {
+                            self.kind = EncodedEntryKindV1::Dts;
+                            Some(check_mp4a_dts(&self.entry)?)
+                        }
+                        _ => None,
+                    }
                 }
-                EncodedEntryKindV1::Avc | EncodedEntryKindV1::Hevc => cfg
+                _ => None,
+            };
+            if let Some(dts) = dts {
+                dts.media_clock(self.header.time_base()?)?;
+            }
+            let extradata = match self.kind {
+                EncodedEntryKindV1::Aac => self
+                    .esds
+                    .as_ref()
+                    .and_then(|x| x.dsi.as_ref().map(|(_, bytes)| bytes.clone()))
+                    .ok_or(Error::Unsupported(
+                        "encoded AAC decoder-specific config absent",
+                    ))?,
+                EncodedEntryKindV1::Avc | EncodedEntryKindV1::Hevc | EncodedEntryKindV1::Av1 => cfg
                     .bytes()
                     .slice(usize::from(cfg.header().header_size)..cfg.bytes().len())?,
-                EncodedEntryKindV1::Ac3 | EncodedEntryKindV1::Eac3 => {
+                EncodedEntryKindV1::Ac3
+                | EncodedEntryKindV1::Eac3
+                | EncodedEntryKindV1::Vp9
+                | EncodedEntryKindV1::Dts => {
                     cfg.bytes().slice(cfg.bytes().len()..cfg.bytes().len())?
                 }
             };
@@ -849,30 +1284,28 @@ impl<'a> Mov9EncodedStreamJobV1<'a> {
                 &self.entry,
                 self.kind,
                 extradata,
-                if self.receiver_v4 {
-                    Some(self.major)
-                } else {
-                    None
-                },
+                self.view,
+                self.major,
             )?;
             let receiver_source_v4 = receiver_source_v4.map(|mut source| {
                 source.sound = self.sound_v4.clone();
                 source.wave = self.wave_v4.as_ref().map(|w| w.raw.clone());
                 source
             });
-            if self.receiver_v4 && self.major == Some(*b"qt  ") {
-                let vendor = fields::slice(self.entry.raw().payload(), 12, 4)?;
-                if vendor != [0; 4] {
+            if self.view != DescriptionView::Regular && self.major == Some(*b"qt  ") {
+                let vendor = fields::fourcc(self.entry.raw().payload(), 12)?;
+                if self.sound_v4.is_some() && vendor != [0; 4] {
                     return Err(Error::Unsupported(
                         "encoded QuickTime nonzero vendor profile",
                     ));
                 }
-                native.vendor_id = Some([0; 4]);
+                native.vendor_id = Some(vendor);
             }
             self.result = Some(Mov9EncodedStreamV1 {
                 native,
                 entry: self.entry.clone(),
                 configuration: cfg.clone(),
+                dts,
                 encoder,
                 kind: self.kind,
                 receiver_source_v4,
@@ -924,7 +1357,8 @@ fn metadata(
     entry: &SampleDescription,
     kind: EncodedEntryKindV1,
     extradata: Bytes,
-    receiver_v4: Option<Option<[u8; 4]>>,
+    view: DescriptionView,
+    major: Option<[u8; 4]>,
 ) -> Result<MetadataParts> {
     let parsed = TrackHeader::parse(&header.raw_tkhd, &header.raw_mdhd, &header.raw_hdlr)?;
     if (
@@ -945,10 +1379,13 @@ fn metadata(
         ));
     }
     let clock = Mov9MediaClock::from_source(header.time_base()?)?;
-    let source_v4 = receiver_v4
-        .map(|major| -> Result<_> {
+    let source_v4 = (view != DescriptionView::Regular)
+        .then(|| -> Result<_> {
             Ok(crate::Mov9EncodedSourceV4 {
-                language: crate::native_encoded_metadata_v4::language(header)?,
+                language: crate::native_encoded_metadata_v4::language(
+                    header,
+                    view == DescriptionView::RangePlayback && major == Some(*b"qt  "),
+                )?,
                 handler: crate::native_encoded_metadata_v4::handler(header, major)?,
                 sound: None,
                 wave: None,
@@ -1004,7 +1441,7 @@ fn metadata(
         let start = usize::from(header.raw_hdlr.header().header_size) + 24;
         header.raw_hdlr.bytes().slice(start..start + n)?
     };
-    let video = matches!(kind, EncodedEntryKindV1::Avc | EncodedEntryKindV1::Hevc);
+    let video = kind.is_video();
     let encoder = if video {
         let body = entry.raw().payload();
         let n = usize::from(*body.get(42).ok_or(Error::Truncated)?);
@@ -1027,9 +1464,12 @@ fn metadata(
     let codec = match kind {
         EncodedEntryKindV1::Avc => "h264",
         EncodedEntryKindV1::Hevc => "hevc",
+        EncodedEntryKindV1::Av1 => "av1",
+        EncodedEntryKindV1::Vp9 => "vp9",
         EncodedEntryKindV1::Aac => "aac",
         EncodedEntryKindV1::Ac3 => "ac3",
         EncodedEntryKindV1::Eac3 => "eac3",
+        EncodedEntryKindV1::Dts => "dts",
     };
     Ok((
         Mov9StreamView {
@@ -1046,4 +1486,164 @@ fn metadata(
         encoder,
         source_v4,
     ))
+}
+
+#[cfg(test)]
+mod aac_entry_tests {
+    use super::*;
+
+    const ASC: [u8; 2] = [0x11, 0x90];
+    const START: u64 = 1024;
+
+    fn atom(kind: &[u8; 4], body: &[u8]) -> Vec<u8> {
+        let mut bytes = Vec::new();
+        bytes.extend_from_slice(&((body.len() + 8) as u32).to_be_bytes());
+        bytes.extend_from_slice(kind);
+        bytes.extend_from_slice(body);
+        bytes
+    }
+
+    fn esds(config: &[u8]) -> Vec<u8> {
+        let length = u8::try_from(config.len()).unwrap();
+        let mut body = vec![0; 4];
+        body.extend([3, 20 + length, 0, 1, 0, 4, 15 + length, 0x40, 0x15]);
+        body.extend([0; 11]);
+        body.extend([5, length]);
+        body.extend_from_slice(config);
+        atom(b"esds", &body)
+    }
+
+    fn wave_config(format: &[u8; 4], trailing_child: bool) -> Vec<u8> {
+        let mut children = atom(b"frma", format);
+        children.extend(atom(b"mp4a", &[0; 4]));
+        children.extend(esds(&ASC));
+        children.extend(atom(&[0; 4], &[]));
+        if trailing_child {
+            children.extend(atom(b"free", &[]));
+        }
+        children
+    }
+
+    fn description(children: &[u8], wave: bool) -> (SampleDescription, Vec<u8>) {
+        let mut body = vec![0; if wave { 44 } else { 28 }];
+        body[7] = 1;
+        if wave {
+            body[9] = 1;
+            body[20..22].copy_from_slice(&0xfffeu16.to_be_bytes());
+            body.extend(atom(b"wave", children));
+        } else {
+            body.extend_from_slice(children);
+        }
+        let bytes = atom(b"mp4a", &body);
+        let pool = Budget::new(4096).unwrap();
+        let raw = BoxView::new(Bytes::copy_from_slice(&pool, &bytes).unwrap(), START).unwrap();
+        (SampleDescription::parse(raw, 1).unwrap(), bytes)
+    }
+
+    #[test]
+    fn extracts_aac_from_iso_and_quicktime_entries_without_a_sample_table() {
+        for wave in [false, true] {
+            let children = if wave {
+                wave_config(b"mp4a", false)
+            } else {
+                esds(&ASC)
+            };
+            let (entry, bytes) = description(&children, wave);
+            let mut job = Mp4AacConfigJob::new(&entry, Mov9EncodedLimitsV1::default()).unwrap();
+            let cancel = AtomicBool::new(false);
+            assert!(
+                job.poll(&mut WorkBudget::new(0), &cancel)
+                    .unwrap()
+                    .is_none()
+            );
+            let config = (0..200)
+                .find_map(|_| job.poll(&mut WorkBudget::new(16), &cancel).unwrap())
+                .expect("AAC configuration");
+            let trailing = if wave { 8 } else { 0 };
+            assert_eq!(
+                config.offset,
+                START + (bytes.len() - ASC.len() - trailing) as u64
+            );
+            assert_eq!(config.bytes.as_ref(), ASC);
+        }
+    }
+
+    #[test]
+    fn refuses_duplicate_descriptors_and_enforces_the_descriptor_work_limit() {
+        let mut duplicate = esds(&ASC);
+        duplicate.extend(esds(&ASC));
+        let (entry, _) = description(&duplicate, false);
+        let mut job = Mp4AacConfigJob::new(&entry, Mov9EncodedLimitsV1::default()).unwrap();
+        let cancel = AtomicBool::new(false);
+        let duplicate_error = Error::Invalid("duplicate AAC elementary stream descriptor");
+        for _ in 0..2 {
+            assert_eq!(
+                job.poll(&mut WorkBudget::new(1024), &cancel).unwrap_err(),
+                duplicate_error
+            );
+        }
+
+        let (entry, _) = description(&esds(&ASC), false);
+        let mut job = Mp4AacConfigJob::new(
+            &entry,
+            Mov9EncodedLimitsV1 {
+                max_descriptors: 2,
+                ..Mov9EncodedLimitsV1::default()
+            },
+        )
+        .unwrap();
+        assert!(matches!(
+            job.poll(&mut WorkBudget::new(1024), &cancel),
+            Err(Error::Limit {
+                requested: 3,
+                maximum: 2
+            })
+        ));
+    }
+
+    #[test]
+    fn refuses_inconsistent_wave_and_empty_decoder_configuration() {
+        let cancel = AtomicBool::new(false);
+        for (children, wave, error) in [
+            (
+                wave_config(b"ac-3", false),
+                true,
+                Error::Invalid("AAC wave format"),
+            ),
+            (
+                wave_config(b"mp4a", true),
+                true,
+                Error::Invalid("AAC wave child after terminator"),
+            ),
+            (
+                esds(&[]),
+                false,
+                Error::Invalid("empty AAC decoder-specific bytes"),
+            ),
+        ] {
+            let (entry, _) = description(&children, wave);
+            let mut job = Mp4AacConfigJob::new(&entry, Mov9EncodedLimitsV1::default()).unwrap();
+            assert_eq!(
+                job.poll(&mut WorkBudget::new(1024), &cancel).unwrap_err(),
+                error
+            );
+        }
+    }
+
+    #[test]
+    fn counts_outer_and_wave_children_against_one_box_limit() {
+        let (entry, _) = description(&wave_config(b"mp4a", false), true);
+        let limits = Mov9EncodedLimitsV1 {
+            max_child_boxes: 4,
+            ..Mov9EncodedLimitsV1::default()
+        };
+        let mut job = Mp4AacConfigJob::new(&entry, limits).unwrap();
+        assert!(matches!(
+            job.poll(&mut WorkBudget::new(1024), &AtomicBool::new(false)),
+            Err(Error::Limit {
+                requested: 5,
+                maximum: 4
+            })
+        ));
+    }
 }

@@ -1,7 +1,7 @@
 //! Typed AV1 packet delivery with an explicit container configuration binding.
-use crate::{Error as PlaybackError, Mp4Packet, Result};
+use crate::{Error as PlaybackError, Mp4Packet, Result, mp4_plan::Mp4Configuration};
 use std::sync::atomic::{AtomicBool, Ordering};
-use triergon::typed::Packet as MatroskaPacket;
+use triergon::typed::{Configuration, Packet as MatroskaPacket};
 use triergon_core::{Budget, Bytes, Error, SourceId, WorkBudget};
 use triergon_framing::{
     Av1ConfigLimits, Av1ConfigParser, Av1Configuration, Av1TemporalUnitConfig, Av1TemporalUnitJob,
@@ -56,68 +56,98 @@ impl Av1BridgeSetup {
         config_limits: Av1ConfigLimits,
         packet_limits: Av1TemporalUnitLimits,
     ) -> Result<Self> {
-        let (binding, entry, record) = match packet {
-            Av1Input::Matroska(packet) => {
-                let track = packet.packet.track;
-                let configuration = &packet.configuration;
-                if !configuration.belongs_to(pool) {
-                    return Err(Error::ForeignPool.into());
-                }
-                if configuration.tracks().get(track).map(|t| t.codec.as_str()) != Some("V_AV1") {
-                    return Err(Error::Invalid("source track is not AV1").into());
-                }
-                let init = configuration
-                    .initialization(track)
-                    .ok_or(Error::Invalid("missing Matroska track configuration"))?;
-                if init.data.len() > config_limits.maximum_record_bytes {
-                    return Err(Error::Limit {
-                        requested: init.data.len(),
-                        maximum: config_limits.maximum_record_bytes,
-                    }
-                    .into());
-                }
-                let record = configuration.initialization_bytes(track);
-                (
-                    Binding::Matroska {
-                        configuration: configuration.clone(),
-                        track,
-                    },
-                    None,
-                    record,
-                )
-            }
+        match packet {
+            Av1Input::Matroska(packet) => Self::for_matroska(
+                pool,
+                source,
+                &packet.configuration,
+                packet.packet.track,
+                config_limits,
+                packet_limits,
+            ),
             Av1Input::Mp4(packet) => {
-                let configuration = &packet.configuration;
                 if packet.source.source != source {
                     return Err(Error::SourceMismatch.into());
                 }
-                if configuration.description.format != *b"av01" {
-                    return Err(Error::Invalid("source entry is not AV1").into());
-                }
-                let entry = configuration.description.raw().bytes();
-                if !entry.belongs_to(pool) {
-                    return Err(Error::ForeignPool.into());
-                }
-                let children = configuration
-                    .description
-                    .extensions(EntryLayout::Visual, Limits::default())?;
-                (
-                    Binding::Mp4 {
-                        source,
-                        track: configuration.track.track_id,
-                        revision: configuration.revision,
-                        entry: entry.clone(),
-                    },
-                    Some(children),
-                    None,
+                Self::for_mp4(
+                    pool,
+                    source,
+                    &packet.configuration,
+                    config_limits,
+                    packet_limits,
                 )
             }
-        };
+        }
+    }
+
+    /// Bind the selected track before the first packet of a Matroska generation.
+    pub fn for_matroska(
+        pool: &Budget,
+        source: SourceId,
+        configuration: &Configuration,
+        track: usize,
+        config_limits: Av1ConfigLimits,
+        packet_limits: Av1TemporalUnitLimits,
+    ) -> Result<Self> {
+        if !configuration.belongs_to(pool) {
+            return Err(Error::ForeignPool.into());
+        }
+        if configuration.tracks().get(track).map(|t| t.codec.as_str()) != Some("V_AV1") {
+            return Err(Error::Invalid("source track is not AV1").into());
+        }
+        let init = configuration
+            .initialization(track)
+            .ok_or(Error::Invalid("missing Matroska track configuration"))?;
+        if init.data.len() > config_limits.maximum_record_bytes {
+            return Err(Error::Limit {
+                requested: init.data.len(),
+                maximum: config_limits.maximum_record_bytes,
+            }
+            .into());
+        }
         Ok(Self {
             pool: pool.clone(),
-            binding: Some(binding),
-            entry,
-            record,
+            binding: Some(Binding::Matroska {
+                configuration: configuration.clone(),
+                track,
+            }),
+            entry: None,
+            record: configuration.initialization_bytes(track),
+            parser: None,
+            source,
+            config_limits,
+            packet_limits,
+        })
+    }
+
+    /// Bind the checked MP4 sample description to the producer's input identity.
+    pub fn for_mp4(
+        pool: &Budget,
+        source: SourceId,
+        configuration: &Mp4Configuration,
+        config_limits: Av1ConfigLimits,
+        packet_limits: Av1TemporalUnitLimits,
+    ) -> Result<Self> {
+        if configuration.description.format != *b"av01" {
+            return Err(Error::Invalid("source entry is not AV1").into());
+        }
+        let entry = configuration.description.raw().bytes();
+        if !entry.belongs_to(pool) {
+            return Err(Error::ForeignPool.into());
+        }
+        let children = configuration
+            .description
+            .extensions(EntryLayout::Visual, Limits::default())?;
+        Ok(Self {
+            pool: pool.clone(),
+            binding: Some(Binding::Mp4 {
+                source,
+                track: configuration.track.track_id,
+                revision: configuration.revision,
+                entry: entry.clone(),
+            }),
+            entry: Some(children),
+            record: None,
             parser: None,
             source,
             config_limits,

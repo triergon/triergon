@@ -961,7 +961,7 @@ impl Reader {
                     // Keep the header boundary for seek stops and scan debits.
                     let ordinary_blocks =
                         stop.is_none() && !scan_prefix && self.scan_remaining.is_none();
-                    let progress = self.envelope.step_typed_compact_admitting_blocks(
+                    let progress = self.envelope.step_typed_compact_after_input_health(
                         ordinary_blocks,
                         work,
                         cancel,
@@ -971,19 +971,20 @@ impl Reader {
                         return Err(error);
                     }
                     let progress = progress?;
-                    if scan_prefix {
-                        if let Some(header) = self.envelope.scan_prefix_header() {
-                            let context = ScanContext {
-                                configuration: self.configuration.as_ref(),
-                                pool: &self.pool,
-                                source: self.envelope.request().source,
-                                generation: self.envelope.generation(),
-                                cluster_ticks: self.cluster_time,
-                                scale: self.scale,
-                            };
-                            self.state = State::ScanSimple(ScanSimple::new(header, &context));
-                            continue;
-                        }
+                    if scan_prefix
+                        && matches!(progress, EnvelopeProgress::Step(ParseStep::Yield))
+                        && let Some(header) = self.envelope.scan_prefix_header()
+                    {
+                        let context = ScanContext {
+                            configuration: self.configuration.as_ref(),
+                            pool: &self.pool,
+                            source: self.envelope.request().source,
+                            generation: self.envelope.generation(),
+                            cluster_ticks: self.cluster_time,
+                            scale: self.scale,
+                        };
+                        self.state = State::ScanSimple(ScanSimple::new(header, &context));
+                        continue;
                     }
                     match progress {
                         // Non-metadata leaves have no lookup or reservation:
@@ -1317,7 +1318,9 @@ impl Reader {
                             self.envelope.set_scan_remaining(remaining);
                         }
                         let before = self.envelope.position();
-                        let progress = self.envelope.step_typed_compact(work, cancel);
+                        let progress = self
+                            .envelope
+                            .step_typed_compact_after_input_health(false, work, cancel);
                         if let Err(error) = Self::record_demux_bytes(
                             &mut self.scan_remaining,
                             &mut self.demux_read_bytes,

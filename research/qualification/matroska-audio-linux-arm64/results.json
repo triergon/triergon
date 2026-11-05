@@ -1,0 +1,271 @@
+{
+  "source_commit": "2e8cab493af770ee48526cac1f258e776163bb0b",
+  "operation": "MatroskaNativeAudioSessionV1",
+  "platform": "native Linux ARM64, Neoverse V2",
+  "selected_parity_passes": 10,
+  "all_delivery_passes": 10,
+  "optimization_passes": 10,
+  "packets": 75,
+  "manifest_sha256": "ec0a0d85c099810d2330150f8bef5e123e5192330db94d3ec2d36427520f992c",
+  "source_manifest_sha256": "b837cae041801da5fe04e759221c109cf2504daae4b83229098a846384717394",
+  "candidate_sha256": "450ad23773bf67508c97b6baf15d9ce6420ed016f27c3e9915d3f05fa07df21b",
+  "reference_sha256": "e6cd5b679ca5cfb27fb3faa326f29f20f5868e2d36e2fc38370efab891238e0a",
+  "native_archive_sha256": "63fc13fc72f1a64eedfebd1a06ea46cb26acea5f32938dc4738de425349235a1",
+  "rows": [
+    {
+      "id": "aac-pair",
+      "packets": 13,
+      "runtime_upper95": 0.0424682911615524,
+      "heap_upper95": 0.024747387775734785,
+      "total_resident_rss_upper95": 0.48177842565597667,
+      "delivery": true,
+      "optimization": true,
+      "per_iteration_ns": {
+        "candidate": {
+          "p50": 22869.160000000003,
+          "p95": 23308.291
+        },
+        "reference": {
+          "p50": 539890.37,
+          "p95": 541961.809
+        }
+      }
+    },
+    {
+      "id": "audio-mixed",
+      "packets": 21,
+      "runtime_upper95": 0.06275442779625681,
+      "heap_upper95": 0.019468925307151407,
+      "total_resident_rss_upper95": 0.42391304347826086,
+      "delivery": true,
+      "optimization": true,
+      "per_iteration_ns": {
+        "candidate": {
+          "p50": 39499.88,
+          "p95": 39829.099
+        },
+        "reference": {
+          "p50": 632252.51,
+          "p95": 635502.298
+        }
+      }
+    },
+    {
+      "id": "damaged-lace-before-valid-anchor",
+      "packets": 4,
+      "runtime_upper95": 0.1509377256921871,
+      "heap_upper95": 0.036467784948951414,
+      "total_resident_rss_upper95": 0.5942028985507246,
+      "delivery": true,
+      "optimization": true,
+      "per_iteration_ns": {
+        "candidate": {
+          "p50": 20311.86,
+          "p95": 20587.977
+        },
+        "reference": {
+          "p50": 135094.75,
+          "p95": 137876.20500000002
+        }
+      }
+    },
+    {
+      "id": "dolby-bad-first",
+      "packets": 8,
+      "runtime_upper95": 0.15889801308456028,
+      "heap_upper95": 0.04695554804360686,
+      "total_resident_rss_upper95": 0.5677530017152659,
+      "delivery": true,
+      "optimization": true,
+      "per_iteration_ns": {
+        "candidate": {
+          "p50": 28553.98,
+          "p95": 28905.733
+        },
+        "reference": {
+          "p50": 180547.79,
+          "p95": 182136.496
+        }
+      }
+    },
+    {
+      "id": "dolby-pair",
+      "packets": 8,
+      "runtime_upper95": 0.14787760625872873,
+      "heap_upper95": 0.04655717787041498,
+      "total_resident_rss_upper95": 0.5669661166902984,
+      "delivery": true,
+      "optimization": true,
+      "per_iteration_ns": {
+        "candidate": {
+          "p50": 28554.2,
+          "p95": 28881.447
+        },
+        "reference": {
+          "p50": 193891.69,
+          "p95": 195689.308
+        }
+      }
+    },
+    {
+      "id": "initial-negative-cluster-relative",
+      "packets": 3,
+      "runtime_upper95": 0.11960921512813755,
+      "heap_upper95": 0.034812081280983224,
+      "total_resident_rss_upper95": 0.595108695652174,
+      "delivery": true,
+      "optimization": true,
+      "per_iteration_ns": {
+        "candidate": {
+          "p50": 16089.529999999999,
+          "p95": 16329.071
+        },
+        "reference": {
+          "p50": 135086.22999999998,
+          "p95": 137162.049
+        }
+      }
+    },
+    {
+      "id": "laced-fractional-cadence",
+      "packets": 8,
+      "runtime_upper95": 0.1702284762050513,
+      "heap_upper95": 0.03591983155267878,
+      "total_resident_rss_upper95": 0.5934959349593496,
+      "delivery": true,
+      "optimization": true,
+      "per_iteration_ns": {
+        "candidate": {
+          "p50": 23460.53,
+          "p95": 23871.793999999998
+        },
+        "reference": {
+          "p50": 138539.3,
+          "p95": 139935.035
+        }
+      }
+    },
+    {
+      "id": "laced-unknown-duration",
+      "packets": 4,
+      "runtime_upper95": 0.1490558454251506,
+      "heap_upper95": 0.03481980198019802,
+      "total_resident_rss_upper95": 0.595108695652174,
+      "delivery": true,
+      "optimization": true,
+      "per_iteration_ns": {
+        "candidate": {
+          "p50": 20204.97,
+          "p95": 20554.591999999997
+        },
+        "reference": {
+          "p50": 135810.06,
+          "p95": 137407.184
+        }
+      }
+    },
+    {
+      "id": "no-absolute-anchor",
+      "packets": 2,
+      "runtime_upper95": 0.10344249291356643,
+      "heap_upper95": 0.06972762152392428,
+      "total_resident_rss_upper95": 0.5978260869565217,
+      "delivery": true,
+      "optimization": true,
+      "per_iteration_ns": {
+        "candidate": {
+          "p50": 13726.31,
+          "p95": 14005.473
+        },
+        "reference": {
+          "p50": 133727.24,
+          "p95": 135226.788
+        }
+      }
+    },
+    {
+      "id": "two-laced-before-first-known-pts",
+      "packets": 4,
+      "runtime_upper95": 0.15122422219576892,
+      "heap_upper95": 0.036467784948951414,
+      "total_resident_rss_upper95": 0.5945701357466063,
+      "delivery": true,
+      "optimization": true,
+      "per_iteration_ns": {
+        "candidate": {
+          "p50": 20329.03,
+          "p95": 20496.008
+        },
+        "reference": {
+          "p50": 134788.71,
+          "p95": 136864.777
+        }
+      }
+    }
+  ],
+  "ordered_packet_parity": {
+    "source_commit": "2e8cab493af770ee48526cac1f258e776163bb0b",
+    "compiler_commit": "92b5b8c87c61b20adc9001b41baf587634a74734",
+    "manifest_sha256": "ec0a0d85c099810d2330150f8bef5e123e5192330db94d3ec2d36427520f992c",
+    "source_manifest_sha256": "5d48af583b8b79b2cd535c99b723567522f809c547e1edcd175c225e9644233f",
+    "observer_sha256": "d67d773afbb0c74fdb9dd0d2a4f725854cd61ada0348485d7254beebf95016dd",
+    "checker_sha256": "28eda79370e14da7c185ff2c0715eccdce2188985b4dc49003eb769e5533192b",
+    "worker_sha256": "06947b6c5c9c6696f960b8b1f1f72d84dd300ac7d9f0d993658e7c9d1b3bf2db",
+    "native_traces_sha256": "0af6116e1cde469e125aaf43db795d3516d91c3df1ae9d11bafecc3e0903e02a",
+    "verified_archive_sha256": "2d6f98fef7918355fa7b9f19e7ebb971f71b90892e9f6e5966ed732e6bdbb987",
+    "cases": 10,
+    "packets": 75,
+    "rows": [
+      {
+        "id": "aac-pair",
+        "packets": 13,
+        "trace_sha256": "d653028e6d222aafd505401bf13d8b0a19031331fa2027b1e71868804802d219"
+      },
+      {
+        "id": "audio-mixed",
+        "packets": 21,
+        "trace_sha256": "b4f42890f2ead49b623c68fa734297e5a23c831cb16acdd91e49dad8d0ae384d"
+      },
+      {
+        "id": "damaged-lace-before-valid-anchor",
+        "packets": 4,
+        "trace_sha256": "efd4ac97b3ea5722ec8d400838d668b5a8031e91464429363e9e128e9cf42e85"
+      },
+      {
+        "id": "dolby-bad-first",
+        "packets": 8,
+        "trace_sha256": "b3f47ce9cab9c5b6565ba0c065d81d4b983777163b2a920dc3619d7e6545e099"
+      },
+      {
+        "id": "dolby-pair",
+        "packets": 8,
+        "trace_sha256": "54ec445234e653322e7066da7b9aecd517ab7d52811947d6c5cff9bf666f72cb"
+      },
+      {
+        "id": "initial-negative-cluster-relative",
+        "packets": 3,
+        "trace_sha256": "1f2c670947a8ee2818fb9a95430720391387fc1fefddf6eb3796f133595f4c93"
+      },
+      {
+        "id": "laced-fractional-cadence",
+        "packets": 8,
+        "trace_sha256": "a74aaa93ed4a1d9df0c057c92ee164e85616dc41578f60cdce05242604277b21"
+      },
+      {
+        "id": "laced-unknown-duration",
+        "packets": 4,
+        "trace_sha256": "72d1574b821d52faac2d9e6d10896c2ea6e63d7635c5f1abf47fea560587a98a"
+      },
+      {
+        "id": "no-absolute-anchor",
+        "packets": 2,
+        "trace_sha256": "bbfc028b7b1829796ded09017534fa6bfa55df0bc9b9ceeddb9e70cd9eb9acf9"
+      },
+      {
+        "id": "two-laced-before-first-known-pts",
+        "packets": 4,
+        "trace_sha256": "23e60cf97b31dd32f8ac9f14e61725bdcb16c2f1029ab9549965d1c3e00a101e"
+      }
+    ]
+  }
+}

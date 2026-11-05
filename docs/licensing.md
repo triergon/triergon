@@ -1,10 +1,22 @@
 # License, dependency and corpus provenance
 
-Date checked: 2026-10-30. This records the upstream terms relevant to architecture and distribution; final release inventories must check actual files and locked packages, not only repository badges.
+Upstream terms reviewed on 2026-10-30. Release inventories must check the actual
+files and locked packages.
 
 ## Independently written code
 
-Proposed policy for the future library is `MIT OR Apache-2.0` for independently authored files, subject to the owner's selection before publication. No production library license grant or public repository has been created by this design phase. The research package is unpublished. Do not import third-party implementation files and describe them as independently licensed code.
+Copyright © 2026 Triergon contributors. Triergon's independently authored
+implementation, test source and tooling are licensed under your choice of
+the [MIT License](../LICENSE-MIT) or the [Apache License 2.0](../LICENSE-APACHE).
+Workspace packages use `MIT OR Apache-2.0` for independently authored code.
+The subtitles package uses a [Cargo license file](../crates/subtitles/LICENSE)
+that includes both code licenses and the separate Unicode and GNU Big5
+mapping data notices.
+
+Media fixtures, specification texts, upstream reference code and binaries,
+and other third-party material retain their original terms. Check their
+individual provenance and redistribution permissions. Preserve applicable
+third-party notices when distributing them.
 
 Streem's current repository carries GPL-3.0 text. Its existing packet-framing helpers are therefore references/integration code, not automatically reusable under a new permissive license. Keep the consumer adapter in Streem; independently implement generic algorithms from specifications and original tests, or resolve rights before copying anything. Likewise, translating or mechanically rewriting FFmpeg implementation code into Rust does not by itself remove its source-license obligations. The project plan is specification-first bootstrapping, not an automatic C-to-Rust translation.
 
