@@ -35,5 +35,5 @@ runner. The private archive was restored and hash-verified, and the raw
 samples reproduce the recorded arithmetic. [Exact identities and hashes](results.json)
 
 The [earlier AVC/AAC qualification](../hls-avc-aac-linux-arm64/README.md)
-keeps its original workers, inputs, protocol and verdicts. The expanded
-HLS runtime gate remains open.
+keeps its original workers, inputs, protocol and verdicts. See the
+[optimization runs](optimization.md) for later candidates.
