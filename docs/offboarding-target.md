@@ -296,16 +296,50 @@ qualification remain open.
 Four frozen independent TS188 segment cases matched the pinned FFmpeg
 parser and app clock, and passed delivery timing, peak live heap and total
 peak RSS on native Linux ARM64. The [HLS receipt](../research/qualification/hls-avc-aac-linux-arm64/README.md)
-binds the exact development revision used by Streem's opt-in HLS work.
+binds these four AVC/AAC cases to the earlier opt-in integration revision
+`3f7547922e7be74ab21baf12f92851a161388c33`.
 
 `HlsMediaSegmentReader` adds negotiated AVC or HEVC with ADTS AAC, AC-3
 or E-AC-3 in independent TS188 segments. E-AC-3 admission covers a single
 independent substream. The selected reader checks the program map,
 preserves source video clocks and seals only after confirmed transport
 EOF. The original AVC/AAC reader keeps its existing API and clock views.
+
+The preview at Streem `55567117abf02234bd52e83066bc931f5abf9715` pins
+Triergon `4d4c4cfb5326700f01b432344db10cece0e3ac23`. In a local packet
+comparison against FFmpeg, 60 synthetic segments across six codec pairs
+and six separate DVB-style TS muxes matched payloads in each lane, video
+PTS/DTS and key flags, and audio PTS and durations. The development
+simulator used the same parser source and passed six Jellyfin playlist
+replays with decoded picture and PCM, pause, resume, seek and Stop.
+
+The preview's ARM debug IPK SHA-256 is
+`1cae873ed9f3458e9864ef11ff227d9cd19bd273b2c031c6fc5fa2ad2d74448b`.
+All four packaged ELFs passed the FFmpeg-free link audit. On the LG G4,
+the HEVC/E-AC-3 fixture played from a synthetic Jellyfin catalog through
+Starfish. The app paused and resumed at 7.832 seconds. It reopened the
+HLS session at 24 seconds, and both feeds and the playback clock resumed.
+Back stopped at 34.832 seconds, returned to detail and Jellyfin confirmed
+the Stop report. The process had no FFmpeg library mappings. The set
+remained in Active Standby, so panel picture and audible output were
+unobserved. The private receipts preserve the two earlier incomplete
+replays and the final fixture and package hashes.
+
+The follow-up at Streem `b2cb7e4b9022f82bc4c347e8fd08e4f1fd1595ea`
+adds documentation to the same playback source. All six simulator replays
+passed on that exact app revision and its pinned dependency. The ARM debug
+IPK SHA-256 is
+`71e3c0ff6da51918442f9d22cef96ed6d2f18e7143241ba871fbcd6015e1db34`.
+It passed the link audit and an AVC/AC-3 catalog replay on the same G4.
+The app paused and resumed at 8.249 seconds, sought to the segment starting
+at 22 seconds and reported Stop at 32.832 seconds after Back. Both feeds
+resumed after the seek, the process maps were FFmpeg-free, and the set
+remained in Active Standby.
+
 The expanded profiles require their own frozen native parity, runtime and
 memory evidence. O31 also requires the remaining selected TS/M2TS,
-elementary and HLS profiles. Target and shipping qualification remain open.
+elementary and HLS profiles. Broader target and shipping qualification
+remain open.
 
 ## Additional application-runtime surfaces
 

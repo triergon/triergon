@@ -2,8 +2,8 @@
 
 All four frozen cases match the pinned FFmpeg reference and pass runtime,
 peak live heap and total peak RSS at Triergon revision
-3f7547922e7be74ab21baf12f92851a161388c33. Streem's current opt-in
-integration uses this development revision from [PR #10](https://github.com/triergon/triergon/pull/10).
+3f7547922e7be74ab21baf12f92851a161388c33. The earlier AVC/AAC opt-in
+integration used this development revision from [PR #10](https://github.com/triergon/triergon/pull/10).
 The native runner rebuilt the candidate and collected fresh measurements.
 
 | Frozen case | Triergon median µs | FFmpeg median µs | Time upper 95% | Heap upper 95% | Total RSS upper 95% |
