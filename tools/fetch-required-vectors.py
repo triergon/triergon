@@ -30,6 +30,9 @@ def download(relative):
             limit_and_exec = (
                 'import os, resource, sys\n'
                 'limit = int(sys.argv[1])\n'
+                'for inherited in resource.getrlimit(resource.RLIMIT_FSIZE):\n'
+                '    if inherited != resource.RLIM_INFINITY:\n'
+                '        limit = min(limit, inherited)\n'
                 'resource.setrlimit(resource.RLIMIT_FSIZE, (limit, limit))\n'
                 'os.execvp(sys.argv[2], sys.argv[2:])\n'
             )
