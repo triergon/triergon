@@ -123,14 +123,17 @@ impl ScanSimple {
         work: &mut WorkBudget,
         cancel: &AtomicBool,
     ) -> Result<ParseStep<bool>> {
+        check(cancel)?;
+        if !work.try_charge(1) {
+            return Ok(ParseStep::Yield);
+        }
+        if !self.context_matches(context) {
+            return Ok(ParseStep::Event(false));
+        }
+        let configuration = context
+            .configuration
+            .required("missing scan configuration")?;
         loop {
-            check(cancel)?;
-            if !work.try_charge(1) {
-                return Ok(ParseStep::Yield);
-            }
-            if !self.context_matches(context) {
-                return Ok(ParseStep::Event(false));
-            }
             match self.phase {
                 SimplePhase::Header => {
                     let Ok(prefix) = block_prefix(bytes) else {
@@ -143,9 +146,6 @@ impl ScanSimple {
                     self.phase = SimplePhase::Track;
                 }
                 SimplePhase::Track => {
-                    let configuration = context
-                        .configuration
-                        .required("missing scan configuration")?;
                     let prefix = self.prefix.required("missing scan block prefix")?;
                     match block_track(configuration, self.track, prefix.number) {
                         Ok(Some(track)) if scan_track_is_plain(track) => {
@@ -156,9 +156,6 @@ impl ScanSimple {
                     }
                 }
                 SimplePhase::Clock => {
-                    let configuration = context
-                        .configuration
-                        .required("missing scan configuration")?;
                     let track = configuration
                         .tracks()
                         .get(self.track)
@@ -185,6 +182,10 @@ impl ScanSimple {
                 SimplePhase::Drain | SimplePhase::Complete => {
                     return Err(Error::Invalid("scan prefix already resolved"));
                 }
+            }
+            check(cancel)?;
+            if !work.try_charge(1) {
+                return Ok(ParseStep::Yield);
             }
         }
     }
@@ -278,33 +279,33 @@ impl Reader {
     fn consider_scan_packet(
         &self,
         scan: &mut ScanState,
-        location: &ReplayLocation,
+        block: u64,
         fields: ScanPacketFields,
+        locate: impl FnOnce() -> Result<ReplayLocation>,
     ) -> Result<()> {
         let request = self.pending_seek.required("missing seek request")?;
-        let first = scan.previous != Some(location.block_offset());
-        // Every physical block, including other tracks and nullable PTS, updates
-        // this boundary exactly as the full-packet scan did.
-        scan.previous = Some(location.block_offset());
-        if let Some(pts) = fields.pts_ns {
-            if first
-                && fields.track == request.track
-                && fields.keyframe
-                && pts <= scan.policy.target_ns
-                && scan.best.as_ref().is_none_or(|(old, _)| pts > *old)
-            {
-                scan.best = Some((pts, location.clone()));
-                scan.best_configuration = if scan.prefix_from_initial {
-                    let boundary = scan
-                        .cluster_configuration
-                        .as_ref()
-                        .required("missing scanned Cluster configuration")?;
-                    boundary.validate(self, location)?;
-                    Some(boundary.clone())
-                } else {
-                    None
-                };
-            }
+        // Advance the physical boundary for every packet, including other
+        // tracks and subsequent frames from the same block.
+        let first = scan.previous.replace(block) != Some(block);
+        if let Some(pts) = fields.pts_ns
+            && first
+            && fields.track == request.track
+            && fields.keyframe
+            && pts <= scan.policy.target_ns
+            && scan.best.as_ref().is_none_or(|(old, _)| pts > *old)
+        {
+            let location = locate()?;
+            scan.best_configuration = if scan.prefix_from_initial {
+                let boundary = scan
+                    .cluster_configuration
+                    .as_ref()
+                    .required("missing scanned Cluster configuration")?;
+                boundary.validate(self, &location)?;
+                Some(boundary.clone())
+            } else {
+                None
+            };
+            scan.best = Some((pts, location));
         }
         Ok(())
     }
@@ -939,17 +940,15 @@ impl Reader {
                     if !job.context_matches(&context) {
                         return Err(Error::Invalid("completed scan source context changed"));
                     }
-                    self.envelope.refresh_block_replay_location(
-                        &mut self.last_location,
-                        job.header(),
-                        self.cluster_time,
-                    )?;
+                    let header = job.header();
                     self.state = State::Envelope;
-                    let location = self
-                        .last_location
-                        .as_ref()
-                        .required("missing scanned block location")?;
-                    self.consider_scan_packet(scan, location, fields)?;
+                    // The envelope has already admitted and drained this
+                    // complete SimpleBlock. Retain a replay location only if
+                    // it improves the landing.
+                    self.consider_scan_packet(scan, header.start, fields, || {
+                        self.envelope
+                            .block_replay_location(header, self.cluster_time)
+                    })?;
                     continue;
                 }
             }
@@ -959,7 +958,12 @@ impl Reader {
                         .last_location
                         .as_ref()
                         .required("missing scanned block location")?;
-                    let result = self.consider_scan_packet(scan, location, packet.fields);
+                    let result = self.consider_scan_packet(
+                        scan,
+                        location.block_offset(),
+                        packet.fields,
+                        || Ok(location.clone()),
+                    );
                     // Keep payload/configuration/group owners through every
                     // fallible consideration, then drop at the old arm boundary.
                     drop(packet);

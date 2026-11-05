@@ -447,6 +447,18 @@ impl ElementReader {
         // Empty read checks sticky transport/cancellation without consuming bytes
         // or depending on an OS read. Even a completed/pending event observes it.
         self.input.read_into(&mut [], work, cancel)?;
+        self.step_after_input_health::<D>(work, cancel, admit)
+    }
+
+    // The typed controller checks source health once on entry and propagates
+    // every subsequent input error. The envelope still checks its own latch
+    // and cancellation at each bounded operation.
+    fn step_after_input_health<D: EnvelopeDelivery>(
+        &mut self,
+        work: &mut WorkBudget,
+        cancel: &AtomicBool,
+        admit: Admit,
+    ) -> Result<ParseStep<D::Event>> {
         if self.failed {
             return Err(Error::Invalid("reader requires explicit reset after error"));
         }
