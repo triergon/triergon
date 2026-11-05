@@ -1,5 +1,5 @@
 //! Format-specific <=192-byte carry, not an I/O cursor/token framework.
-use crate::carrier::CarrierHeader;
+use crate::carrier::PlainCarrier;
 use crate::{
     AssemblyStep, PacketFormat, RejectedTransport, TransportInspection, TransportInspector,
     TransportPacket,
@@ -349,8 +349,8 @@ impl TransportFramer {
                     .complete(work, cancel)
                     .map(|value| value.map_or(Step::Yield, Step::Ready));
             }
-            // Share a complete carrier. Payload-only TS188 ends after the
-            // common header. Adaptations and faults use the full inspector.
+            // Share complete carriers. The common layouts need only the
+            // header and padding check. Other fields use the full inspector.
             if self.share_input
                 && carry.is_empty()
                 && input.buffered().len() >= missing
@@ -364,12 +364,10 @@ impl TransportFramer {
                 self.next = Some(input.position());
                 if self.format == PacketFormat::Ts188
                     && !cancel.load(Ordering::Relaxed)
-                    && let Ok(header) = CarrierHeader::parse(source.as_ref())
-                    && header.afc == 1
-                    && work.try_charge(2)
+                    && let Some(carrier) = PlainCarrier::inspect_ts188(&source, work)
                 {
                     self.last_packet_offset = Some(start);
-                    return Ok(Step::Ready(header.payload_only_ts188(
+                    return Ok(Step::Ready(carrier.into_packet(
                         source,
                         start,
                         self.entity,

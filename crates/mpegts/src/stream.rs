@@ -237,8 +237,8 @@ impl TransportStream {
         Ok(stream)
     }
 
-    /// Count validated PES and continuity events suppressed since the last
-    /// call, for consumers that track positions in the full source trace.
+    /// Count source events suppressed since the last call, for consumers
+    /// that track positions in the full source trace.
     pub fn take_feed_omissions(&mut self) -> u64 {
         self.feed_omissions.as_mut().map_or(0, std::mem::take)
     }
@@ -858,10 +858,12 @@ impl TransportStream {
     ) -> Result<bool> {
         if self.feed_omissions.is_none()
             || packet.payload_unit_start
-            || packet.adaptation.is_some()
+            || packet.discontinuity_indicator()
             || packet.transport_error
             || packet.scrambling != 0
-            || (self.clock_pending && self.pcr_pid == Some(packet.pid))
+            || (self.pcr_pid == Some(packet.pid)
+                && (self.clock_pending
+                    || packet.adaptation.as_ref().is_some_and(|a| a.pcr.is_some())))
         {
             return Ok(false);
         }
@@ -959,13 +961,13 @@ impl TransportStream {
         self.clock_quarantined = true;
         self.diagnostic(FaultKind::Transport, Some(pid), Error::Invalid(reason))
     }
-    fn feed(&mut self) -> Result<()> {
+    fn feed(&mut self, work: &mut WorkBudget) -> Result<()> {
         let packet = self
             .packet
             .as_ref()
             .ok_or(Error::Invalid("TS packet missing"))?;
         let payload = match packet.payload.as_ref() {
-            Some(payload) => payload.clone(),
+            Some(payload) => payload,
             None => {
                 self.phase = 7;
                 return Ok(());
@@ -975,6 +977,31 @@ impl TransportStream {
         let pid = packet.pid;
         let pusi = packet.payload_unit_start;
         let offset = packet.payload_source_offset;
+        if self.feed_omissions.is_some()
+            && pusi
+            && work.remaining() >= payload.len() as u64
+            && let [0, section_and_stuffing @ ..] = payload.as_ref()
+        {
+            let accepted = match self.route {
+                Route::Pat if self.pat.assembler.idle() => self.collector.active_single_section(),
+                Route::Pmt if self.pmt.as_ref().is_some_and(|pmt| pmt.assembler.idle()) => {
+                    self.pmt_source.as_ref()
+                }
+                _ => None,
+            };
+            if let Some(section) = accepted
+                && let Some(stuffing) = section_and_stuffing.strip_prefix(section.as_ref())
+                && stuffing.iter().all(|&byte| byte == 0xff)
+            {
+                // These exact section bytes already passed CRC and table
+                // validation. There is no other table in this carrier.
+                work.take(payload.len() as u64);
+                self.omit_feed_event()?;
+                self.phase = 7;
+                return Ok(());
+            }
+        }
+        let payload = payload.clone();
         let pushed = match self.route {
             Route::Pat => self
                 .pat
@@ -1251,7 +1278,7 @@ impl TransportStream {
                             return Ok(ready(event));
                         }
                     }
-                    5 => self.feed()?,
+                    5 => self.feed(work)?,
                     6 => {
                         if let Some(event) = self.drain(work, cancel)? {
                             return Ok(ready(event));

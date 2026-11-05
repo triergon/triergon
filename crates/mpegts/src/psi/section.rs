@@ -185,6 +185,13 @@ impl SectionAssembler {
     pub fn partial_bytes(&self) -> &[u8] {
         self.buffer.as_ref().map_or(&[], |buffer| buffer.as_slice())
     }
+    pub(crate) fn idle(&self) -> bool {
+        self.payload.is_none()
+            && self.target.is_none()
+            && self.fault.is_none()
+            && !self.ended
+            && self.buffer.as_ref().is_some_and(BudgetVec::is_empty)
+    }
     /// Explicit loss/recovery transition; normal EndSegment must not call this.
     pub fn discard(&mut self) {
         self.buffer = Some(BudgetVec::new(&self.budget));

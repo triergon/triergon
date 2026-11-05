@@ -148,14 +148,19 @@ fn segment_feed_preserves_source_faults_epochs_and_retained_event_ordinals() {
             .into_iter()
             .zip(raw.iter())
             .filter(|(_, (event, _))| {
-                !matches!(event, TraceEvent::Continuity { .. } | TraceEvent::Pes(_))
+                !matches!(
+                    event,
+                    TraceEvent::Continuity { .. } | TraceEvent::Pes(_) | TraceEvent::Section(_)
+                )
             })
             .map(|(ordinal, event)| (ordinal, key(event)))
             .collect();
         assert_eq!(
             fed_ordinals
                 .into_iter()
-                .zip(fed.iter().map(key))
+                .zip(fed.iter())
+                .filter(|(_, (event, _))| !matches!(event, TraceEvent::Section(_)))
+                .map(|(ordinal, event)| (ordinal, key(event)))
                 .collect::<Vec<_>>(),
             expected
         );

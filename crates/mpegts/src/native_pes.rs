@@ -602,7 +602,7 @@ impl NativePesObserver {
         let count = payload.len();
         let next = self.payload_len.checked_add(count).ok_or(Error::Overflow)?;
         if packet.payload_unit_start
-            || packet.adaptation.is_some()
+            || packet.discontinuity_indicator()
             || packet.prefix.is_some()
             || count == 0
             || !self.active
