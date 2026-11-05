@@ -59,7 +59,7 @@ See the [selected video evidence](../research/qualification/matroska-video-linux
 | O50 | Streem integration | Backend adapter, track selection, buffers/backpressure, generation changes, retries, accurate seek/resume and teardown; preserve route, auth, clocks and watch state |
 | O60 | Target qualification | Simulator/integration tests, native Linux gates, 32-bit ARM build and actual TV tests, with source/binary/input provenance |
 | O61 | Desktop simulator playback | Replace external FFmpeg video/audio subprocesses with qualified decoding/output paths; preserve enabled simulator behavior and record platform boundaries |
-| O62 | Development capture | Replace the enabled MPEG-1 encoder, TS muxer and RGBA/YUV conversion; freeze each contract and pass the same applicable gates |
+| O62 | Development capture | Capture85 quality and delivery timing passed all 15 selected cases. Memory and target execution remain open. [Capture evidence](../research/qualification/capture85-linux-arm64/README.md) |
 | O70 | Runtime/package removal | No enabled application-runtime FFmpeg imports, dynamic loads, subprocesses, staged libraries or unresolved call sites; clean install and end-to-end verification without an installed FFmpeg fallback |
 
 The frozen O00 source inventory records Streem revision
@@ -140,13 +140,12 @@ movie decode/output remains LG hardware, and text rendering remains libass. Thes
 are existing consumer/platform responsibilities, not FFmpeg components to rebuild
 as part of the initial TV offboarding.
 
-Desktop simulator playback currently launches external FFmpeg for video and audio.
-Development capture uses MPEG-1 encoding, TS muxing and swscale paths excluded by
-RELEASE=1. These uses are required open milestones O61/O62 in the complete target. They need
-replacements and explicit decoder/encoder/conversion feature contracts and gates.
-Their presence does not imply the TV release needs a universal software movie
-decoder. A platform decoder in a consumer adapter is a separate, declared boundary;
-it does not admit unsafe/native dependencies into the safe Rust core.
+The default Streem simulator still uses external FFmpeg for picture and sound.
+The opt-in simulator can decode selected video and audio in-process.
+Streem's combined debug integration exercises the Triergon MPEG-1/TS capture
+session alongside playback and omits libswscale from its package. The older
+playback fallback libraries are still bundled. O61 and O62 require complete
+selected-profile qualification and target validation before adoption.
 
 External FFmpeg remains the correctness/performance oracle in the independent test
 harness. Fixture generation and explicitly external development tools are recorded
