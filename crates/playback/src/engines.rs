@@ -16,8 +16,9 @@ use triergon_core::{
     SourceLocation, Step, Time, TimeBase, WorkBudget,
 };
 use triergon_isobmff::{
-    Mov9FrontReadBoundaryV1, Mov9PacketOccurrence, Mov9SampleExtent, Mov9SampleRead,
-    Mov9ShortSample, PinnedMovD32RegularRecoveryV1, SampleReader, SourcePacket,
+    Mov9CursorStatus, Mov9FrontReadBoundaryV1, Mov9PacketCursor, Mov9PacketOccurrence,
+    Mov9SampleExtent, Mov9SampleRead, Mov9ShortSample, PinnedMovD32RegularRecoveryV1, SampleReader,
+    SourcePacket,
 };
 use triergon_mpegts::{
     self as ts, TraceEvent, TransportStream,
@@ -164,6 +165,7 @@ pub(crate) struct Mp4SyncLanding {
 pub(crate) enum Mp4RangeLanding<'a> {
     Source(Mp4SyncLanding),
     Native(&'a NativeMp4Replay),
+    NativeCursor(u64),
 }
 
 pub struct Mp4Engine {
@@ -879,8 +881,20 @@ impl Engine {
     pub fn poll(&mut self, w: &mut WorkBudget, c: &AtomicBool) -> Result<BackendStep> {
         match self {
             Self::Matroska(r) => Ok(BackendStep::from_matroska(r.step(w, c)?)),
-            Self::Mp4(r) => r.poll(w, c),
+            Self::Mp4(r) => r.poll(w, c, None),
             Self::Ts(r) => r.poll(w, c),
+        }
+    }
+
+    pub(crate) fn poll_mp4_range(
+        &mut self,
+        cursor: &mut Mov9PacketCursor<'_>,
+        work: &mut WorkBudget,
+        cancel: &AtomicBool,
+    ) -> Result<BackendStep> {
+        match self {
+            Self::Mp4(mp4) => mp4.poll(work, cancel, Some(cursor)),
+            _ => Err(Error::Invalid("native range cursor requires MP4").into()),
         }
     }
     pub(crate) fn facts(&self) -> Result<BudgetVec<TrackFact>> {
@@ -1011,6 +1025,7 @@ impl Engine {
                             Some(replay.clone()),
                         )
                     }
+                    Some(Mp4RangeLanding::NativeCursor(offset)) => (0, offset, None, None),
                     None => (0, 0, None, None),
                 };
                 r.input.reset(offset)?;
@@ -1141,9 +1156,17 @@ impl Mp4Engine {
         Ok((at_track, self.plan.config(row, revision)?))
     }
 
-    fn emit_packet(&mut self, row: &SourceRow, source: SourcePacket) -> Result<BackendStep> {
+    fn emit_packet(
+        &mut self,
+        row: &SourceRow,
+        source: SourcePacket,
+        cursor: Option<&mut Mov9PacketCursor<'_>>,
+    ) -> Result<BackendStep> {
         let (at_track, cfg) = self.packet_config(row)?;
-        let native = self.plan.native(self.row).cloned();
+        let native = match cursor {
+            Some(cursor) => Some(cursor.take_occurrence()?),
+            None => self.plan.native(self.row).cloned(),
+        };
         let encoded_skip_samples =
             if let (Some(occurrence), Some(plans)) = (&native, &self.plan.encoded_edits) {
                 plans.as_slice()[at_track]
@@ -1239,7 +1262,12 @@ impl Mp4Engine {
 
     // Keep backend-specific polling workspaces out of the shared dispatcher.
     #[inline(never)]
-    fn poll(&mut self, w: &mut WorkBudget, c: &AtomicBool) -> Result<BackendStep> {
+    fn poll(
+        &mut self,
+        w: &mut WorkBudget,
+        c: &AtomicBool,
+        mut cursor: Option<&mut Mov9PacketCursor<'_>>,
+    ) -> Result<BackendStep> {
         if self.native_recovery_end {
             self.input.read_into(&mut [], w, c)?;
             return Ok(BackendStep::End);
@@ -1300,7 +1328,7 @@ impl Mp4Engine {
                         .pending
                         .take()
                         .ok_or(Error::Invalid("pending sample missing"))?;
-                    let event = self.emit_packet(&row, source)?;
+                    let event = self.emit_packet(&row, source, cursor)?;
                     self.packet = None;
                     Ok(event)
                 }
@@ -1352,7 +1380,24 @@ impl Mp4Engine {
                 self.indexed_sync = None;
             }
         }
-        let Some(row) = self.plan.row(self.row) else {
+        let row = if let Some(cursor) = cursor.as_deref_mut() {
+            match cursor.poll(w, c)? {
+                Mov9CursorStatus::Ready => {
+                    let occurrence = cursor
+                        .occurrence()
+                        .ok_or(Error::Invalid("missing native range occurrence"))?;
+                    Some(SourceRow {
+                        track_id: occurrence.track_id,
+                        sample: occurrence.source.clone(),
+                    })
+                }
+                Mov9CursorStatus::Yield => return Ok(BackendStep::Yield),
+                Mov9CursorStatus::End => return Ok(BackendStep::End),
+            }
+        } else {
+            self.plan.row(self.row)
+        };
+        let Some(row) = row else {
             return self.poll_progressive(w, c);
         };
         if self.plan.forward_regular_extents.is_some() {
@@ -1426,7 +1471,7 @@ impl Mp4Engine {
                     source: self.input.source(),
                     token: self.input.token(),
                 };
-                return self.emit_packet(&row, source);
+                return self.emit_packet(&row, source, cursor);
             }
             return Err(Error::Unsupported("sequential source sample bytes already passed").into());
         }

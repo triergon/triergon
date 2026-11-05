@@ -13,8 +13,8 @@ use crate::{
 use std::sync::atomic::{AtomicBool, Ordering};
 use triergon_core::{Budget, BudgetVec, Error, Time, WorkBudget};
 use triergon_isobmff::{
-    BuildStatus, Mov9MediaClock, Mov9NativeGlobalSeekJob, Mov9NativeSeekLimits,
-    Mov9NativeSeekReceipt, Mov9Profile, Mov9Track,
+    BuildStatus, Mov9EncodedEditPlanV2, Mov9MediaClock, Mov9NativeGlobalSeekJob,
+    Mov9NativeSeekLimits, Mov9NativeSeekReceipt, Mov9Profile, Mov9Track,
 };
 
 #[derive(Clone, Copy, Debug)]
@@ -224,49 +224,11 @@ impl<'a> Mp4NativeSeekJob<'a> {
         }
         let base = Mov9MediaClock::from_source(selected.snapshot.base.require()?)?.native_base;
         let target = Time::from_ticks(i128::from(request.timestamp), base)?;
-        let tracks = movie.tracks();
-        let maximum = request.limits.index.packets.max_tracks.min(64);
-        if tracks.len() > maximum {
-            return Err(Error::Limit {
-                requested: tracks.len(),
-                maximum,
-            }
-            .into());
-        }
-        let mut native = BudgetVec::new(&plan.pool);
-        native.try_reserve_exact(tracks.len())?;
-        let movie_base = movie.header().time_base()?;
-        for track in tracks {
-            native
-                .try_push(Mov9Track {
-                    track_id: track.header().track_id,
-                    table: track.table(),
-                    fragments: track.fragments(),
-                    media_base: track.header().time_base()?,
-                    edits: track.edits.as_ref().map(|edits| (edits, movie_base)),
-                })
-                .map_err(|error| error.error)?;
-        }
-        let global = if let Some(plans) = &plan.encoded_edits {
-            Mov9NativeGlobalSeekJob::new_encoded_regular_v2_rescaled(
-                &plan.pool,
-                native.as_slice(),
-                movie.media.as_slice(),
-                (request.video, request.timestamp),
-                request.limits,
-                plans.as_slice(),
-            )?
-        } else {
-            Mov9NativeGlobalSeekJob::new_complete_source_rescaled(
-                &plan.pool,
-                native.as_slice(),
-                movie.media.as_slice(),
-                request.video,
-                request.timestamp,
-                request.limits,
-                Mov9Profile::PinnedNoParseNoFillin,
-            )?
-        };
+        let global = native_global_seek(
+            movie,
+            plan.encoded_edits.as_ref().map(BudgetVec::as_slice),
+            request,
+        )?;
         Ok(Self {
             plan,
             global: Some(global),
@@ -284,6 +246,56 @@ impl<'a> Mp4NativeSeekJob<'a> {
             failure: None,
         })
     }
+}
+
+pub(super) fn native_global_seek<'a>(
+    movie: &'a Movie,
+    edits: Option<&'a [Option<Mov9EncodedEditPlanV2>]>,
+    request: Mp4NativeSeekRequest,
+) -> Result<Mov9NativeGlobalSeekJob<'a>> {
+    let tracks = movie.tracks();
+    let maximum = request.limits.index.packets.max_tracks.min(64);
+    if tracks.len() > maximum {
+        return Err(Error::Limit {
+            requested: tracks.len(),
+            maximum,
+        }
+        .into());
+    }
+    let mut native = BudgetVec::new(&movie.pool);
+    native.try_reserve_exact(tracks.len())?;
+    let movie_base = movie.header().time_base()?;
+    for track in tracks {
+        native
+            .try_push(Mov9Track {
+                track_id: track.header().track_id,
+                table: track.table(),
+                fragments: track.fragments(),
+                media_base: track.header().time_base()?,
+                edits: track.edits.as_ref().map(|edits| (edits, movie_base)),
+            })
+            .map_err(|error| error.error)?;
+    }
+    Ok(if let Some(plans) = edits {
+        Mov9NativeGlobalSeekJob::new_encoded_regular_v2_rescaled(
+            &movie.pool,
+            native.as_slice(),
+            movie.media.as_slice(),
+            (request.video, request.timestamp),
+            request.limits,
+            plans,
+        )?
+    } else {
+        Mov9NativeGlobalSeekJob::new_complete_source_rescaled(
+            &movie.pool,
+            native.as_slice(),
+            movie.media.as_slice(),
+            request.video,
+            request.timestamp,
+            request.limits,
+            Mov9Profile::PinnedNoParseNoFillin,
+        )?
+    })
 }
 
 impl Mp4NativeSeekJob<'_> {

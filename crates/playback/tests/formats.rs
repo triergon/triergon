@@ -2910,7 +2910,7 @@ fn combined_playback_probe_opens_real_sequential_mp4() {
     assert_eq!(b.used(), Budget::control_storage_bytes());
 }
 
-fn native_range_player(bytes: &[u8]) -> (Player<Observed>, mp4_open::Movie, Calls, Budget) {
+fn observed_mp4_open(bytes: &[u8]) -> (mp4_open::OpenedMp4<Observed>, Calls, Budget) {
     let pool = pool();
     let (source, calls, _) = observed(&pool, bytes, 23, false);
     let input = InputCursor::new(
@@ -2936,7 +2936,11 @@ fn native_range_player(bytes: &[u8]) -> (Player<Observed>, mp4_open::Movie, Call
         opener.advance(&mut WorkBudget::new(17), &off()).unwrap(),
         OpenProgress::Ready
     )));
-    let opened = opener.finish().unwrap();
+    (opener.finish().unwrap(), calls, pool)
+}
+
+fn native_range_player(bytes: &[u8]) -> (Player<Observed>, mp4_open::Movie, Calls, Budget) {
+    let (opened, calls, pool) = observed_mp4_open(bytes);
     let mut job = Mp4IndexJob::new(
         &opened.movie,
         Mp4View::PinnedMov9NoParseNoFillin,
@@ -2958,9 +2962,8 @@ fn native_range_player(bytes: &[u8]) -> (Player<Observed>, mp4_open::Movie, Call
     (player, opened.movie, calls, pool)
 }
 
-#[test]
-fn native_range_seek_matches_ffprobe_packet_order_bytes_and_clocks() {
-    let cases = [
+fn native_seek_cases() -> [(&'static [u8], i64, i64, &'static str); 5] {
+    [
         (
             include_bytes!("fixtures/mp4/r-multitrack.mov").as_slice(),
             3500,
@@ -2991,8 +2994,12 @@ fn native_range_seek_matches_ffprobe_packet_order_bytes_and_clocks() {
             16384,
             include_str!("fixtures/mp4/encoded-avc-aac-native-seek.mp4.native-seek"),
         ),
-    ];
-    for (bytes, target, selected, expected) in cases {
+    ]
+}
+
+#[test]
+fn native_range_seek_matches_ffprobe_packet_order_bytes_and_clocks() {
+    for (bytes, target, selected, expected) in native_seek_cases() {
         let (mut player, movie, calls, pool) = native_range_player(bytes);
         let old = first_packet(&mut player);
         calls.lock().unwrap().clear();
@@ -3031,53 +3038,7 @@ fn native_range_seek_matches_ffprobe_packet_order_bytes_and_clocks() {
         ));
 
         let events = collect(&mut player, 1).unwrap();
-        assert!(matches!(
-            events[0].event(),
-            RawEvent::Seek(SeekIntent {
-                clock: ClockChoice::ExplicitNativeProjection,
-                replay_from_start: false,
-                ..
-            })
-        ));
-        let mut configurations = [None; 2];
-        let mut wanted = expected.lines();
-        for event in &events[1..] {
-            match event.event() {
-                RawEvent::Mp4(Mp4Event::Configuration(config)) => {
-                    configurations[(config.track.track_id - 1) as usize] =
-                        Some((config.revision, config.description.index));
-                }
-                RawEvent::Mp4(Mp4Event::Packet(packet)) => {
-                    let fields: Vec<_> = wanted
-                        .next()
-                        .expect("extra packet after native seek")
-                        .split_ascii_whitespace()
-                        .collect();
-                    let track: u32 = fields[0].parse().unwrap();
-                    assert_eq!(packet.configuration.track.track_id, track);
-                    assert_eq!(
-                        configurations[(track - 1) as usize],
-                        Some((
-                            packet.configuration.revision,
-                            packet.configuration.description.index
-                        ))
-                    );
-                    let native = packet.native.as_ref().unwrap();
-                    assert_eq!(native.track_id, track);
-                    assert_eq!(native.native.pts, fields[1].parse().ok());
-                    assert_eq!(native.native.dts, fields[2].parse().ok());
-                    assert_eq!(native.native.duration, fields[3].parse::<i64>().unwrap());
-                    assert_eq!(native.native.flags, fields[6].parse::<u32>().unwrap());
-                    let pos: usize = fields[4].parse().unwrap();
-                    let size: usize = fields[5].parse().unwrap();
-                    assert_eq!(packet.source.sample.range, pos as u64..(pos + size) as u64);
-                    assert_eq!(packet.source.payload.as_ref(), &bytes[pos..pos + size]);
-                    assert!(player.current(event));
-                }
-                _ => panic!("unexpected native seek output"),
-            }
-        }
-        assert!(wanted.next().is_none(), "short native seek packet sequence");
+        assert_native_seek_packets(bytes, expected, &events, |event| player.current(event));
         let first_read = calls.lock().unwrap().iter().find_map(|call| match call {
             Call::Poll(offset) => Some(*offset),
             _ => None,
@@ -3093,7 +3054,250 @@ fn native_range_seek_matches_ffprobe_packet_order_bytes_and_clocks() {
     }
 }
 
-fn encoded_range_player(raw: &[u8]) -> (Player<ByteSource>, mp4_open::Movie) {
+fn assert_native_seek_packets(
+    bytes: &[u8],
+    expected: &str,
+    events: &[Output],
+    current: impl Fn(&Output) -> bool,
+) {
+    assert!(matches!(
+        events[0].event(),
+        RawEvent::Seek(SeekIntent {
+            clock: ClockChoice::ExplicitNativeProjection,
+            replay_from_start: false,
+            ..
+        })
+    ));
+    let mut configurations = [None; 2];
+    let mut wanted = expected.lines();
+    for event in &events[1..] {
+        match event.event() {
+            RawEvent::Mp4(Mp4Event::Configuration(config)) => {
+                configurations[(config.track.track_id - 1) as usize] =
+                    Some((config.revision, config.description.index));
+            }
+            RawEvent::Mp4(Mp4Event::Packet(packet)) => {
+                let fields: Vec<_> = wanted
+                    .next()
+                    .expect("extra packet after native seek")
+                    .split_ascii_whitespace()
+                    .collect();
+                let track: u32 = fields[0].parse().unwrap();
+                assert_eq!(packet.configuration.track.track_id, track);
+                assert_eq!(
+                    configurations[(track - 1) as usize],
+                    Some((
+                        packet.configuration.revision,
+                        packet.configuration.description.index
+                    ))
+                );
+                let native = packet.native.as_ref().unwrap();
+                assert_eq!(native.track_id, track);
+                assert_eq!(native.native.pts, fields[1].parse().ok());
+                assert_eq!(native.native.dts, fields[2].parse().ok());
+                assert_eq!(native.native.duration, fields[3].parse::<i64>().unwrap());
+                assert_eq!(native.native.flags, fields[6].parse::<u32>().unwrap());
+                let pos: usize = fields[4].parse().unwrap();
+                let size: usize = fields[5].parse().unwrap();
+                assert_eq!(packet.source.sample.range, pos as u64..(pos + size) as u64);
+                assert_eq!(packet.source.payload.as_ref(), &bytes[pos..pos + size]);
+                assert!(current(event));
+            }
+            _ => panic!("unexpected native seek output"),
+        }
+    }
+    assert!(wanted.next().is_none(), "short native seek packet sequence");
+}
+
+fn next_range_output<S: Source>(player: &mut Mp4RangePlayer<'_, S>) -> Option<Output> {
+    let mut slot = None;
+    for _ in 0..100_000 {
+        match player
+            .read_output(&mut slot, &mut WorkBudget::new(1), &off())
+            .unwrap()
+        {
+            Progress::Queued => return slot,
+            Progress::Ended => return None,
+            Progress::NeedInput(_) | Progress::Yield => {}
+            progress => panic!("unexpected range progress {progress:?}"),
+        }
+    }
+    panic!("native range output stalled");
+}
+
+#[test]
+fn native_range_cursor_matches_ffprobe_and_preserves_seek_lifecycle() {
+    for (bytes, target, selected, expected) in native_seek_cases() {
+        let (opened, calls, pool) = observed_mp4_open(bytes);
+        let mut job = Mp4RangeOpen::new(&opened.movie, None, PlanLimits::default()).unwrap();
+        assert!((0..100_000).any(|_| job.poll(&mut WorkBudget::new(1), &off()).unwrap()));
+        let mut player = job
+            .finish(
+                opened.input,
+                opened.source,
+                1 << 20,
+                Selection::All,
+                PlayerPolicy::default(),
+            )
+            .unwrap();
+        let old = std::iter::from_fn(|| next_range_output(&mut player))
+            .find(|event| event.event().track().is_some())
+            .unwrap();
+        player.pause(true).unwrap();
+        calls.lock().unwrap().clear();
+        let mut job = player
+            .prepare_seek(Mp4NativeSeekRequest {
+                video: 1,
+                timestamp: target,
+                limits: Default::default(),
+            })
+            .unwrap();
+        assert!(!job.poll(&mut WorkBudget::new(0), &off()).unwrap());
+        assert!((0..100_000).any(|_| job.poll(&mut WorkBudget::new(1), &off()).unwrap()));
+        let mut command = job.finish().unwrap();
+        assert_eq!(command.receipt().selected.timestamp, selected);
+        assert!(calls.lock().unwrap().is_empty());
+        assert!(
+            !player
+                .apply_seek(&mut command, &mut WorkBudget::new(0), &off())
+                .unwrap()
+        );
+        assert!(player.current(&old));
+        assert!(
+            player
+                .apply_seek(&mut command, &mut WorkBudget::new(1), &off())
+                .unwrap()
+        );
+        assert!(!player.current(&old));
+        assert!(matches!(
+            player.apply_seek(&mut command, &mut WorkBudget::new(1), &off()),
+            Err(Error::Core(C::StaleGeneration { .. }))
+        ));
+        assert!(matches!(
+            player
+                .read_output(&mut None, &mut WorkBudget::new(10), &off())
+                .unwrap(),
+            Progress::Paused
+        ));
+        player.pause(false).unwrap();
+        let events: Vec<_> = std::iter::from_fn(|| next_range_output(&mut player)).collect();
+        assert_native_seek_packets(bytes, expected, &events, |event| player.current(event));
+        let first_read = calls.lock().unwrap().iter().find_map(|call| match call {
+            Call::Poll(offset) => Some(*offset),
+            _ => None,
+        });
+        assert_eq!(first_read, Some(command.start_offset()));
+        assert!(command.start_offset() > 0);
+        drop((command, events, old, player));
+        drop(opened.movie);
+        assert_eq!(pool.used(), Budget::control_storage_bytes());
+    }
+}
+
+#[test]
+fn native_range_cursor_checks_all_extents_and_replays_after_duration_scan() {
+    use triergon_core::{Rounding, TimeBase};
+
+    let mut raw = include_bytes!("fixtures/mp4/f-multitrack.mp4").to_vec();
+    let at = raw.windows(4).position(|kind| kind == b"mvhd").unwrap() + 4;
+    assert_eq!(raw[at], 0);
+    raw[at + 16..at + 20].fill(0);
+    let (mut indexed, _, _, _) = native_range_player(&raw);
+    let expected = collect(&mut indexed, 4096).unwrap();
+    let expected = mp4_packets(&expected);
+    let (opened, _, _) = observed_mp4_open(&raw);
+    assert_eq!(opened.movie.header().duration, 0);
+    let mut limited = Mp4RangeOpen::new(
+        &opened.movie,
+        None,
+        PlanLimits {
+            samples: 1,
+            ..PlanLimits::default()
+        },
+    )
+    .unwrap();
+    let refusal = (0..1000).find_map(|_| match limited.poll(&mut WorkBudget::new(4096), &off()) {
+        Ok(false) => None,
+        result => Some(result),
+    });
+    assert!(matches!(
+        refusal,
+        Some(Err(Error::Core(C::Limit { maximum: 1, .. })))
+    ));
+    drop(limited);
+    let mut job = Mp4RangeOpen::new(&opened.movie, None, PlanLimits::default()).unwrap();
+    while !job.poll(&mut WorkBudget::new(4096), &off()).unwrap() {}
+    let mut ranged = job
+        .finish(
+            opened.input,
+            opened.source,
+            1 << 20,
+            Selection::All,
+            PlayerPolicy::default(),
+        )
+        .unwrap();
+    let end = expected
+        .iter()
+        .map(|packet| {
+            let row = packet.native.as_ref().unwrap();
+            row.media_clock
+                .native_base
+                .rescale(
+                    row.native.pts.unwrap() + row.native.duration,
+                    TimeBase::new(1, 1_000_000).unwrap(),
+                    Rounding::NearestAway,
+                )
+                .unwrap()
+        })
+        .max()
+        .unwrap();
+    assert_eq!(ranged.duration_us(), end);
+    let actual: Vec<_> = std::iter::from_fn(|| next_range_output(&mut ranged)).collect();
+    let actual = mp4_packets(&actual);
+    assert_eq!(actual.len(), expected.len());
+    for (actual, expected) in actual.into_iter().zip(expected) {
+        assert_eq!(actual.source.sample, expected.source.sample);
+        assert_eq!(
+            actual.native.as_ref().unwrap().native,
+            expected.native.as_ref().unwrap().native
+        );
+        assert_eq!(
+            actual.source.payload.as_ref(),
+            expected.source.payload.as_ref()
+        );
+    }
+}
+
+#[test]
+fn native_range_open_refuses_late_unprojectable_metadata_before_playback() {
+    let mut raw = include_bytes!("fixtures/mp4/encoded-avc-aac-native-seek.mp4").to_vec();
+    let at = raw.windows(4).position(|kind| kind == b"stss").unwrap();
+    assert_eq!(&raw[at + 12..at + 16], &1u32.to_be_bytes());
+    raw[at..at + 4].copy_from_slice(b"stps");
+    raw[at + 12..at + 16].copy_from_slice(&2u32.to_be_bytes());
+    let (opened, calls, _) = observed_mp4_open(&raw);
+    assert!(opened.movie.header().duration > 0);
+    calls.lock().unwrap().clear();
+    let mut job = Mp4RangeOpen::new(&opened.movie, None, PlanLimits::default()).unwrap();
+    let result = (0..1000).find_map(|_| match job.poll(&mut WorkBudget::new(4096), &off()) {
+        Ok(false) => None,
+        result => Some(result),
+    });
+    assert!(matches!(
+        result,
+        Some(Err(Error::Core(C::Unsupported(
+            "native dependency/recovery flag profile not frozen"
+        ))))
+    ));
+    assert!(calls.lock().unwrap().is_empty());
+}
+
+fn encoded_range_open(
+    raw: &[u8],
+) -> (
+    mp4_open::OpenedMp4<ByteSource>,
+    Vec<Option<triergon_isobmff::Mov9EncodedEditPlanV2>>,
+) {
     use triergon_isobmff::{
         Mov9CursorStatus, Mov9EncodedEditContextV2, Mov9EncodedEditJobV2, Mov9EncodedSelectionV4,
         Mov9EncodedStreamJobV1,
@@ -3139,6 +3343,12 @@ fn encoded_range_player(raw: &[u8]) -> (Player<ByteSource>, mp4_open::Movie) {
         {}
         plans.push(Some(edit.take(&mut opened.input, &cancel).unwrap()));
     }
+    (opened, plans)
+}
+
+fn encoded_range_player(raw: &[u8]) -> (Player<ByteSource>, mp4_open::Movie) {
+    let (opened, plans) = encoded_range_open(raw);
+    let cancel = off();
     let mut index =
         Mp4IndexJob::new_native_encoded_range(&opened.movie, &plans, PlanLimits::default())
             .unwrap();
@@ -3157,6 +3367,55 @@ fn encoded_range_player(raw: &[u8]) -> (Player<ByteSource>, mp4_open::Movie) {
         .set_clock_view(ClockChoice::ExplicitNativeProjection)
         .unwrap();
     (player, opened.movie)
+}
+
+#[test]
+fn native_range_cursor_keeps_encoded_source_clocks_and_trim() {
+    let fixtures: [&[u8]; 3] = [
+        include_bytes!("../../isobmff/tests/fixtures/encoded-edit-v2/original.mp4"),
+        include_bytes!("../../isobmff/tests/fixtures/range-encoded-edits/leading-ac3.mp4"),
+        include_bytes!("../../isobmff/tests/fixtures/range-encoded-edits/leading-eac3.mp4"),
+    ];
+    for raw in fixtures {
+        let (mut indexed, _) = encoded_range_player(raw);
+        let expected = collect(&mut indexed, 4096).unwrap();
+        let (opened, plans) = encoded_range_open(raw);
+        let mut job =
+            Mp4RangeOpen::new(&opened.movie, Some(&plans), PlanLimits::default()).unwrap();
+        while !job.poll(&mut WorkBudget::new(4096), &off()).unwrap() {}
+        let mut streamed = job
+            .finish(
+                opened.input,
+                opened.source,
+                1 << 20,
+                Selection::All,
+                PlayerPolicy::default(),
+            )
+            .unwrap();
+        let actual: Vec<_> = std::iter::from_fn(|| next_range_output(&mut streamed)).collect();
+        let actual = mp4_packets(&actual);
+        let expected = mp4_packets(&expected);
+        assert_eq!(actual.len(), expected.len());
+        for (a, e) in actual.into_iter().zip(expected) {
+            assert_eq!(a.source.sample, e.source.sample);
+            assert_eq!(a.source.payload.as_ref(), e.source.payload.as_ref());
+            assert_eq!(a.encoded_skip_samples, e.encoded_skip_samples);
+            assert_eq!(
+                a.configuration.track.track_id,
+                e.configuration.track.track_id
+            );
+            assert_eq!(
+                a.configuration.description.index,
+                e.configuration.description.index
+            );
+            let (a, e) = (a.native.as_ref().unwrap(), e.native.as_ref().unwrap());
+            assert_eq!(a.native, e.native);
+            assert_eq!(a.edit, e.edit);
+            assert_eq!(a.clock_origin, e.clock_origin);
+            assert_eq!(a.media_clock, e.media_clock);
+            assert_eq!(a.scheduling_clock, e.scheduling_clock);
+        }
+    }
 }
 
 #[test]

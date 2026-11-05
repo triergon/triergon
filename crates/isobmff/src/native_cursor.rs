@@ -156,6 +156,26 @@ struct Slot<'a> {
     ended: bool,
 }
 impl<'a> Slot<'a> {
+    fn new(track: Mov9Track<'a>) -> Result<Self> {
+        let source = SourceTrack::new(track.track_id, Some(track.table), track.fragments)?;
+        Ok(Self {
+            resume_remaining: 0,
+            track,
+            cursor: TrackSampleCursor::new(source),
+            edited: None,
+            encoded_edit: None,
+            head: None,
+            clock: Mov9MediaClock::from_source(track.media_base)?,
+            shift: 0,
+            append_run: None,
+            discard_boundary: None,
+            fragment_cto_minimum: 0,
+            previous_clock: None,
+            saw_fragment: false,
+            ended: false,
+        })
+    }
+
     fn source(&self) -> Result<SourceTrack<'a>> {
         SourceTrack::new(
             self.track.track_id,
@@ -427,27 +447,19 @@ impl<'a> Mov9PacketCursor<'a> {
         let mut slots = BudgetVec::new(budget);
         slots.try_reserve_exact(tracks.len())?;
         for track in tracks {
-            let source = SourceTrack::new(track.track_id, Some(track.table), track.fragments)?;
             slots
-                .try_push(Slot {
-                    resume_remaining: 0,
-                    track: *track,
-                    cursor: TrackSampleCursor::new(source),
-                    edited: None,
-                    encoded_edit: None,
-                    head: None,
-                    clock: Mov9MediaClock::from_source(track.media_base)?,
-                    shift: 0,
-                    append_run: None,
-                    discard_boundary: None,
-                    fragment_cto_minimum: 0,
-                    previous_clock: None,
-                    saw_fragment: false,
-                    ended: false,
-                })
+                .try_push(Slot::new(*track)?)
                 .map_err(|error| error.error)?;
         }
-        Ok(Self {
+        Ok(Self::from_slots(slots, media, limits))
+    }
+
+    fn from_slots(
+        slots: BudgetVec<Slot<'a>>,
+        media: &'a [Range<u64>],
+        limits: Mov9PacketLimits,
+    ) -> Self {
+        Self {
             slots,
             media,
             limits,
@@ -467,7 +479,7 @@ impl<'a> Mov9PacketCursor<'a> {
             front_source: false,
             terminal: None,
             forward_regular: None,
-        })
+        }
     }
     /// The caller establishes one complete original media source and all its
     /// preceding track samples. This enables the pinned native start-zero rule
@@ -643,6 +655,15 @@ impl<'a> Mov9PacketCursor<'a> {
         starts: &[Mov9ResumePoint],
         limits: Mov9PacketLimits,
     ) -> Result<Self> {
+        self.set_resume_points(starts, limits)?;
+        Ok(self)
+    }
+
+    fn set_resume_points(
+        &mut self,
+        starts: &[Mov9ResumePoint],
+        limits: Mov9PacketLimits,
+    ) -> Result<u64> {
         if starts.len() != self.slots.len() {
             return Err(Error::Invalid("native resume track coverage"));
         }
@@ -663,7 +684,7 @@ impl<'a> Mov9PacketCursor<'a> {
                 .ok_or(Error::Invalid("unknown native resume track"))?;
             slot.resume_remaining = start.occurrence;
         }
-        Ok(self)
+        Ok(skipped)
     }
     /// Provenance of the currently held source run, accessed before take. O(1)
     /// in the selected single-track index cursor; no run/sample array expansion.
@@ -691,6 +712,73 @@ impl<'a> Mov9PacketCursor<'a> {
             .ok_or(Error::Invalid("native source fragment absent"))?;
         Ok(Some((fragment, run, index.run_flags(run)?)))
     }
+    /// Inspect the current occurrence without consuming its place in the
+    /// native schedule.
+    pub fn occurrence(&self) -> Option<&Mov9PacketOccurrence> {
+        self.ready.as_ref()
+    }
+
+    /// Start a separate replay of these immutable complete-source tables.
+    /// Reuse the verified extents and initial clock facts with the same limits.
+    pub fn fork_checked_replay(&self) -> Result<Self> {
+        if !self.complete_source
+            || self.front_source
+            || self.failed.is_some()
+            || !matches!(
+                self.phase,
+                Phase::Initialize | Phase::Fill | Phase::Select | Phase::End
+            )
+        {
+            return Err(Error::Invalid(
+                "native replay needs complete checked tables",
+            ));
+        }
+        let mut slots = BudgetVec::new(self.slots.budget());
+        slots.try_reserve_exact(self.slots.len())?;
+        for checked in self.slots.as_slice() {
+            let mut slot = Slot::new(checked.track)?;
+            slot.encoded_edit = checked.encoded_edit;
+            slot.shift = checked.shift;
+            slot.fragment_cto_minimum = checked.fragment_cto_minimum;
+            slot.saw_fragment = checked.saw_fragment;
+            slots.try_push(slot).map_err(|error| error.error)?;
+        }
+        let mut replay = Self::from_slots(slots, self.media, self.limits);
+        replay.complete_source = true;
+        replay.phase = Phase::Initialize;
+        replay.validated = self.validated;
+        Ok(replay)
+    }
+
+    /// Choose initial per-track occurrence positions on a fresh checked replay.
+    pub fn resume_checked_replay(mut self, starts: &[Mov9ResumePoint]) -> Result<Self> {
+        if !matches!(self.phase, Phase::Initialize) || self.at != 0 {
+            return Err(Error::Invalid(
+                "native resume positions need a fresh replay",
+            ));
+        }
+        self.generated = self.set_resume_points(starts, self.limits)?;
+        Ok(self)
+    }
+
+    /// Replay the same checked sample tables from their beginning after End.
+    /// The extent and clock preflight still applies to these borrowed tables.
+    pub fn rewind_at_end(&mut self) -> Result<()> {
+        if !matches!(self.phase, Phase::End) || self.failed.is_some() {
+            return Err(Error::Invalid("native occurrence rewind needs a clean end"));
+        }
+        for slot in self.slots.as_mut_slice() {
+            slot.append_run = None;
+            slot.discard_boundary = None;
+            slot.previous_clock = None;
+            slot.ended = false;
+        }
+        self.at = 0;
+        self.generated = 0;
+        self.phase = Phase::Initialize;
+        Ok(())
+    }
+
     pub fn take_occurrence(&mut self) -> Result<Mov9PacketOccurrence> {
         if let Some(error) = self.failed {
             return Err(error);
