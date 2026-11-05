@@ -168,8 +168,10 @@ complete `Movie` and any checked encoded edit plans. The open job validates
 source extents and native occurrences, then rewinds the checked tables before
 reading payload. It also derives the duration when the movie header omits it.
 The direct-output player keeps the compact tables and per-track cursor state
-and constructs packet locations and clocks as they are used. Seek replay
-reuses the extent and clock preflight for those same tables.
+and constructs packet locations and clocks as they are used. For regular
+tracks with strictly increasing native clocks, seeking can resume from
+charged, sparse checkpoints collected during preflight. The full seek planner
+still handles other supported queries over the checked tables.
 
 Five FFprobe replays compare the full post-seek sequence for regular,
 fragmented, repeated-edit, description-change and mixed-clock AVC/AAC

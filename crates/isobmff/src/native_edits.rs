@@ -63,7 +63,7 @@ enum Phase {
 /// Allocates no occurrence/sample array. Source scans and generated occurrences
 /// have separate cumulative limits; each poll obeys the shared work budget.
 /// The caller associates this table/edit list with the same source track.
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct Mov9EditCursor<'a> {
     table: &'a SampleTable,
     edits: &'a EditList,
@@ -82,6 +82,7 @@ pub struct Mov9EditCursor<'a> {
     native_source_start: Time,
     staged_empty_endpoint: bool,
     active: Option<Mov9Edit>,
+    active_ticks: Option<EditTicks>,
     source_start: Time,
     source_end: Time,
     last_source_end: Option<Time>,
@@ -92,6 +93,13 @@ pub struct Mov9EditCursor<'a> {
     pending: Option<Mov9Occurrence>,
     ready: Option<Mov9Occurrence>,
     failed: Option<Error>,
+}
+
+#[derive(Clone, Copy, Debug)]
+struct EditTicks {
+    shift: i64,
+    start: i64,
+    end: i64,
 }
 
 fn count_limit(value: u64, maximum: u64) -> Result<()> {
@@ -135,6 +143,7 @@ impl<'a> Mov9EditCursor<'a> {
             native_source_start: zero,
             staged_empty_endpoint: false,
             active: None,
+            active_ticks: None,
             source_start: zero,
             source_end: zero,
             last_source_end: None,
@@ -186,9 +195,73 @@ impl<'a> Mov9EditCursor<'a> {
         self.first = self.preceding_sync.ok_or(Error::Unsupported(
             "native edit has no preceding declared sync",
         ))?;
+        self.active_ticks = self.edit_ticks();
         self.scan = self.table.cursor();
         self.phase = Phase::Emit;
         Ok(())
+    }
+
+    fn edit_ticks(&self) -> Option<EditTicks> {
+        // These starts were constructed in the media base. With its unit
+        // numerator, subtracting two signed64 ticks and adding a third fits
+        // the exact-time representation. The end comparison uses the ceiling
+        // since it is tested against integer source ticks.
+        if self.media_base.numerator() != 1 {
+            return None;
+        }
+        let edit = self.active?;
+        let movie = edit
+            .movie_start
+            .to_i64_ticks(self.media_base, Rounding::NearestAway)
+            .ok()?;
+        let decode = self
+            .native_source_start
+            .to_i64_ticks(self.media_base, Rounding::NearestAway)
+            .ok()?;
+        Some(EditTicks {
+            shift: movie.checked_sub(decode)?,
+            start: edit.entry.media_time,
+            end: self
+                .source_end
+                .to_i64_ticks(self.media_base, Rounding::Ceil)
+                .ok()?,
+        })
+    }
+
+    fn project(&self, source: &Sample, edit: Mov9Edit) -> Result<Mov9PacketView> {
+        // scan_sample has already established equal, known DTS and CTS and
+        // checked the edit's source flag profile.
+        if let Some(ticks) = self.active_ticks
+            && let Some(dts) = source.dts_ticks.and_then(|dts| i64::try_from(dts).ok())
+        {
+            let field =
+                Mov9ClockField::from_exact_native_ticks(i128::from(dts) + i128::from(ticks.shift))?;
+            return Ok(Mov9PacketView {
+                source_ordinal: source.ordinal,
+                source_description: source.description_index,
+                source_range: source.range.clone(),
+                pts: field.api_ticks(),
+                dts: field.api_ticks(),
+                pts_field: field,
+                dts_field: field,
+                duration: i64::from(source.duration_ticks),
+                flags: u32::from(source.is_container_sync())
+                    | if dts < ticks.start || dts >= ticks.end {
+                        4
+                    } else {
+                        0
+                    },
+            });
+        }
+        self.view
+            .project_native_edit(source, edit, self.native_source_start)
+    }
+
+    fn reached_edit_end(&self, ticks: i128) -> Result<bool> {
+        if let Some(edit) = self.active_ticks {
+            return Ok(ticks >= i128::from(edit.end));
+        }
+        Ok(Time::from_ticks(ticks, self.media_base)? >= self.source_end)
     }
     fn terminal(&self, mut occurrence: Mov9Occurrence) -> Result<Mov9Occurrence> {
         if self.generated > self.table.sample_count() {
@@ -362,18 +435,13 @@ impl<'a> Mov9EditCursor<'a> {
                             .ok_or(Error::Invalid("missing source DTS"))?
                             .checked_add(i128::from(source.duration_ticks))
                             .ok_or(Error::Overflow)?;
-                        self.after_emit = if source.is_container_sync()
-                            && Time::from_ticks(end_ticks, self.media_base)? >= self.source_end
-                        {
-                            Phase::Advance
-                        } else {
-                            Phase::Emit
-                        };
-                        let native = self.view.project_native_edit(
-                            &source,
-                            active,
-                            self.native_source_start,
-                        )?;
+                        self.after_emit =
+                            if source.is_container_sync() && self.reached_edit_end(end_ticks)? {
+                                Phase::Advance
+                            } else {
+                                Phase::Emit
+                            };
+                        let native = self.project(&source, active)?;
                         self.staged_empty_endpoint = false;
                         self.generated = self.generated.checked_add(1).ok_or(Error::Overflow)?;
                         count_limit(self.generated, self.limits.max_occurrences)?;

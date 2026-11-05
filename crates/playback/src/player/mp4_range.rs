@@ -16,7 +16,7 @@ use std::sync::atomic::AtomicBool;
 use triergon_core::{Budget, Error, InputCursor, Time, WorkBudget};
 use triergon_isobmff::{
     BuildStatus, Mov9CursorStatus, Mov9EncodedEditPlanV2, Mov9MediaClock, Mov9NativeGlobalSeekJob,
-    Mov9NativeSeekReceipt, Mov9PacketCursor,
+    Mov9NativeSeekReceipt, Mov9PacketCursor, Mov9RangeSeekJob,
 };
 
 type Edits<'a> = &'a [Option<Mov9EncodedEditPlanV2>];
@@ -117,6 +117,19 @@ impl<'a, S: Source> Mp4RangePlayer<'a, S> {
             return Err(Error::Invalid("native seek requires selected MP4 video").into());
         }
         let base = Mov9MediaClock::from_source(selected.snapshot.base.require()?)?.native_base;
+        let checked = self.cursor.prepare_checked_range_seek(
+            request.video,
+            request.timestamp,
+            request.limits,
+        )?;
+        let (global, replay_seed) = if checked.is_some() {
+            (None, None)
+        } else {
+            (
+                Some(native_global_seek(self.movie, self.edits, request)?),
+                Some(self.cursor.fork_checked_replay()?),
+            )
+        };
         Ok(Mp4RangeSeekJob {
             scope: SeekScope {
                 pool: self.player.pool.clone(),
@@ -125,9 +138,10 @@ impl<'a, S: Source> Mp4RangePlayer<'a, S> {
                 video: request.video,
                 target: Time::from_ticks(i128::from(request.timestamp), base)?,
             },
-            global: Some(native_global_seek(self.movie, self.edits, request)?),
+            checked,
+            global,
             replay: None,
-            replay_seed: Some(self.cursor.fork_checked_replay()?),
+            replay_seed,
             maximum_skipped: request.limits.max_replayed_occurrences,
             failure: None,
         })
@@ -182,6 +196,7 @@ struct SeekScope {
 
 pub struct Mp4RangeSeekJob<'a> {
     scope: SeekScope,
+    checked: Option<Mov9RangeSeekJob<'a>>,
     global: Option<Mov9NativeGlobalSeekJob<'a>>,
     replay: Option<(Mov9PacketCursor<'a>, Mov9NativeSeekReceipt)>,
     replay_seed: Option<Mov9PacketCursor<'a>>,
@@ -206,6 +221,12 @@ impl<'a> Mp4RangeSeekJob<'a> {
         work: &mut WorkBudget,
         cancel: &AtomicBool,
     ) -> triergon_core::Result<bool> {
+        if let Some(checked) = &mut self.checked {
+            if checked.poll(work, cancel)? == BuildStatus::Yield || !work.try_charge(1) {
+                return Ok(false);
+            }
+            self.replay = Some(self.checked.take().expect("polled checked seek").finish()?);
+        }
         if let Some(global) = &mut self.global {
             if global.poll(work, cancel)? == BuildStatus::Yield || !work.try_charge(1) {
                 return Ok(false);

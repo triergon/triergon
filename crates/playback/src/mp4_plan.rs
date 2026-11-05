@@ -469,7 +469,7 @@ impl<'a> Mp4IndexJob<'a> {
                 interleave_limits,
             )?)
         };
-        let native = if view == Mp4View::PinnedMov9NoParseNoFillin {
+        let mut native = if view == Mp4View::PinnedMov9NoParseNoFillin {
             let native_limits = limits.native_packet_limits();
             Some(if let Some(plans) = encoded_edits {
                 Mov9PacketCursor::new_encoded_regular_v2(
@@ -518,6 +518,11 @@ impl<'a> Mp4IndexJob<'a> {
         } else {
             None
         };
+        if range_duration.is_some()
+            && let Some(cursor) = &mut native
+        {
+            cursor.enable_range_seek_checkpoints();
+        }
         let encoded_edits = if let Some(plans) = encoded_edits {
             let mut retained = BudgetVec::new(b);
             retained.try_reserve_exact(plans.len())?;
