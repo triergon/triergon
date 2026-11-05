@@ -3,6 +3,7 @@ name = "triergon-playback"
 version = "0.0.0"
 edition = "2024"
 publish = false
+license.workspace = true
 [dependencies]
 triergon-core = { path = "../core" }
 triergon = { path = "../media" }
