@@ -1122,3 +1122,57 @@ fn matroska_dolby_clock_matches_pinned_startup_and_forward_lace_timestamps() {
         assert_eq!(timings, expected);
     }
 }
+
+#[test]
+fn matroska_aac_clock_matches_pinned_mixed_rates_from_probe_through_eof() {
+    use triergon_playback::matroska_feed::MatroskaAacTiming;
+
+    let fixture = include_bytes!("fixtures/mkv-feed/audio-mixed-discovery.mkv");
+    let (mut player, pool) = player_with_input(fixture, 7);
+    let outputs = collect_with_work(&mut player, 1);
+    let configuration = outputs
+        .iter()
+        .find_map(|output| match output.event() {
+            RawEvent::Matroska(Event::Configuration(configuration)) => Some(configuration),
+            _ => None,
+        })
+        .unwrap();
+    let cases: &[(usize, u64, &[i64])] = &[
+        (0, 21_000_000, &[-21, 0, 21, 43, 64, 85, 107]),
+        (1, 23_000_000, &[-23, 0, 23, 46, 70, 93]),
+    ];
+    for &(track, duration_ns, expected) in cases {
+        let feed = setup(&pool, configuration, track);
+        assert!(feed.native_aac_clock_probe(&pool, 4097).is_err());
+        let foreign = Budget::new(1 << 20).unwrap();
+        assert!(feed.native_aac_clock_probe(&foreign, 2).is_err());
+        let mut packets = outputs.iter().filter(|output| {
+            matches!(output.event(), RawEvent::Matroska(Event::Packet(packet))
+                if packet.packet.track == track)
+        });
+        let mut probe = feed.native_aac_clock_probe(&pool, 2).unwrap().unwrap();
+        for (ordinal, output) in packets.by_ref().take(2).enumerate() {
+            let packet = frame(&feed, output);
+            assert_eq!(packet.source.packet.dts_ns, None);
+            assert_eq!(probe.push(&packet).unwrap(), ordinal);
+        }
+        let next = frame(&feed, packets.clone().next().unwrap());
+        assert!(probe.push(&next).is_err());
+        let prefix = probe.finish();
+        let mut timings = (0..2)
+            .map(|ordinal| prefix.timing(ordinal).unwrap())
+            .collect::<Vec<_>>();
+        assert!(prefix.timing(2).is_err());
+        let mut live = prefix.into_live();
+        timings.extend(packets.map(|output| live.observe(&frame(&feed, output)).unwrap()));
+        let expected: Vec<_> = expected
+            .iter()
+            .map(|pts| MatroskaAacTiming {
+                pts_ns: Some(pts * 1_000_000),
+                dts_ns: Some(pts * 1_000_000),
+                duration_ns: Some(duration_ns),
+            })
+            .collect();
+        assert_eq!(timings, expected);
+    }
+}

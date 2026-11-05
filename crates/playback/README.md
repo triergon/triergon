@@ -237,6 +237,21 @@ then SPS VUI timing if the VPS has no clock, and rounds down to whole
 packet ticks. The original container packet still carries its source
 clocks.
 
+## Matroska AAC packet clocks
+
+Create `native_aac_clock_probe` from an admitted AAC feed and retain
+the caller's selected packets through discovery. Push each packet once,
+then `finish` and replay its timing by ordinal. `into_live` continues
+that clock after releasing the probe rows. The bounded projector uses the
+declared duration when available. Otherwise, it projects the admitted
+1024-sample AAC-LC core period onto whole Matroska ticks. A new seek
+generation needs a fresh feed and clock. The original packet retains its
+source clocks and bytes.
+
+The mixed-audio regression checks all thirteen AAC packets at 48 kHz and
+44.1 kHz against pinned FFprobe, including negative startup time, DTS and
+duration. [Authored fixture](tests/fixtures/mkv-feed/README.md)
+
 ## Matroska Dolby audio packet clocks
 
 `MatroskaHevcDolbyPacket::native_duration_ns` returns the declared

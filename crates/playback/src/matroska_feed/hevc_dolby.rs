@@ -7,7 +7,7 @@ pub use dolby_clock::{
     MatroskaDolbyClock, MatroskaDolbyClockPrefix, MatroskaDolbyClockProbe, MatroskaDolbyTiming,
 };
 
-use super::Association;
+use super::{Association, check_limit, probe_clock::syncframe_duration_ns};
 use crate::{Output, Result};
 use std::sync::atomic::{AtomicBool, Ordering};
 use triergon::typed::{Configuration, Packet};
@@ -288,14 +288,6 @@ fn dolby_duration_ns(family: Ac3Family, mut raw: &[u8], scale_ns: u64) -> Option
     None
 }
 
-fn syncframe_duration_ns(samples: u16, sample_rate: u32, scale_ns: u64) -> Option<u64> {
-    let span_ns = u64::from(samples) * 1_000_000_000 / u64::from(sample_rate);
-    // Flooring twice gives the same whole tick count without multiplying
-    // the sample rate by an arbitrary container scale.
-    let ticks = span_ns.checked_div(scale_ns)?;
-    (ticks != 0).then_some(ticks * scale_ns)
-}
-
 // ATSC A/52 CRC-16 with generator x^16 + x^15 + x^2 + 1.
 const DOLBY_CRC: [u16; 256] = {
     let mut table = [0; 256];
@@ -417,13 +409,6 @@ impl<'a> DolbyJob<'a> {
         }
         Ok(BuildStep::Complete)
     }
-}
-
-fn check_limit(requested: usize, maximum: usize) -> triergon_core::Result<()> {
-    if requested > maximum {
-        return Err(Error::Limit { requested, maximum });
-    }
-    Ok(())
 }
 
 #[cfg(test)]

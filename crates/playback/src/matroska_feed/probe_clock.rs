@@ -213,3 +213,11 @@ impl ProbeTimeline {
         self.timeline
     }
 }
+
+pub(super) fn syncframe_duration_ns(samples: u16, sample_rate: u32, scale_ns: u64) -> Option<u64> {
+    let span_ns = u64::from(samples) * 1_000_000_000 / u64::from(sample_rate);
+    // Flooring twice gives the same whole tick count without multiplying
+    // the sample rate by an arbitrary container scale.
+    let ticks = span_ns.checked_div(scale_ns)?;
+    (ticks != 0).then_some(ticks * scale_ns)
+}
