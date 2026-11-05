@@ -962,31 +962,22 @@ impl<'a> Mov9NativeGlobalSeekPlan<'a> {
         self.anchors.as_slice()
     }
     pub fn cursor(&self) -> Result<Mov9PacketCursor<'a>> {
-        self.cursor_with_packet_limits(self.limits.index.packets)
-    }
-
-    /// Use the consumer's packet bounds for continued playback after a seek.
-    /// The preceding index lookup has its own independent bounds.
-    pub fn cursor_with_packet_limits(
-        &self,
-        limits: Mov9PacketLimits,
-    ) -> Result<Mov9PacketCursor<'a>> {
         if let Some(plans) = self.encoded_edits {
             return Mov9PacketCursor::new_encoded_regular_v2(
                 &self.pool,
                 self.tracks.as_slice(),
                 self.media,
-                limits,
+                self.limits.index.packets,
                 plans,
                 crate::PinnedMovD32EncodedEditsV2,
             )?
-            .with_resume_points(self.anchors.as_slice(), limits);
+            .with_resume_points(self.anchors.as_slice(), self.limits.index.packets);
         }
         Mov9PacketCursor::new_complete_source_at(
             &self.pool,
             self.tracks.as_slice(),
             self.media,
-            limits,
+            self.limits.index.packets,
             self.profile,
             self.anchors.as_slice(),
         )

@@ -43,7 +43,7 @@ impl Default for PlanLimits {
 }
 
 impl PlanLimits {
-    pub(crate) fn native_packet_limits(self) -> Mov9PacketLimits {
+    fn native_packet_limits(self) -> Mov9PacketLimits {
         Mov9PacketLimits {
             max_tracks: self.tracks,
             max_media_extents: self.media_extents,
@@ -822,11 +822,16 @@ impl<'a> Mp4IndexJob<'a> {
                         .native
                         .as_mut()
                         .ok_or(Error::Invalid("missing native range cursor"))?;
-                    match cursor.poll(w, c)? {
-                        Mov9CursorStatus::Yield => {}
-                        Mov9CursorStatus::Ready if duration.scan => {
-                            let row = cursor.take_occurrence()?;
-                            if let Some(pts) = row.native.pts {
+                    loop {
+                        match cursor.poll(w, c)? {
+                            Mov9CursorStatus::Yield => return Ok(false),
+                            Mov9CursorStatus::Ready if !w.try_charge(1) => return Ok(false),
+                            Mov9CursorStatus::Ready => {
+                                let row = cursor.take_occurrence()?;
+                                if !duration.scan {
+                                    continue;
+                                }
+                                let Some(pts) = row.native.pts else { continue };
                                 let end = pts
                                     .checked_add(row.native.duration)
                                     .ok_or(Error::Overflow)?;
@@ -837,16 +842,13 @@ impl<'a> Mp4IndexJob<'a> {
                                 )?;
                                 duration.micros = duration.micros.max(micros);
                             }
-                        }
-                        Mov9CursorStatus::Ready => self.ready = true,
-                        Mov9CursorStatus::End => {
-                            if duration.scan {
+                            Mov9CursorStatus::End => {
                                 cursor.rewind_at_end()?;
+                                self.ready = true;
+                                return Ok(true);
                             }
-                            self.ready = true;
                         }
                     }
-                    return Ok(self.ready);
                 }
                 if self.pending_native.is_some() && !w.try_charge(1) {
                     return Ok(false);

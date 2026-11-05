@@ -16,18 +16,18 @@ use std::sync::atomic::AtomicBool;
 use triergon_core::{Budget, Error, InputCursor, Time, WorkBudget};
 use triergon_isobmff::{
     BuildStatus, Mov9CursorStatus, Mov9EncodedEditPlanV2, Mov9MediaClock, Mov9NativeGlobalSeekJob,
-    Mov9NativeSeekReceipt, Mov9PacketCursor, Mov9PacketLimits,
+    Mov9NativeSeekReceipt, Mov9PacketCursor,
 };
 
 type Edits<'a> = &'a [Option<Mov9EncodedEditPlanV2>];
 
 /// Prepare range playback from a complete, checked MP4 open transaction.
-/// The native cursor checks every source sample extent before publishing data.
+/// The native cursor checks every source extent and projected occurrence
+/// before publishing data.
 pub struct Mp4RangeOpen<'a> {
     movie: &'a Movie,
     edits: Option<Edits<'a>>,
     index: Mp4IndexJob<'a>,
-    limits: Mov9PacketLimits,
 }
 
 impl<'a> Mp4RangeOpen<'a> {
@@ -36,7 +36,6 @@ impl<'a> Mp4RangeOpen<'a> {
             movie,
             edits,
             index: Mp4IndexJob::new_native_range(movie, edits, limits)?,
-            limits: limits.native_packet_limits(),
         })
     }
 
@@ -65,7 +64,6 @@ impl<'a> Mp4RangeOpen<'a> {
             edits: self.edits,
             cursor,
             player,
-            limits: self.limits,
             duration_us,
         })
     }
@@ -79,7 +77,6 @@ pub struct Mp4RangePlayer<'a, S: Source> {
     edits: Option<Edits<'a>>,
     cursor: Mov9PacketCursor<'a>,
     player: Player<S>,
-    limits: Mov9PacketLimits,
     duration_us: i64,
 }
 
@@ -130,7 +127,7 @@ impl<'a, S: Source> Mp4RangePlayer<'a, S> {
             },
             global: Some(native_global_seek(self.movie, self.edits, request)?),
             replay: None,
-            limits: self.limits,
+            replay_seed: Some(self.cursor.fork_checked_replay()?),
             maximum_skipped: request.limits.max_replayed_occurrences,
             failure: None,
         })
@@ -187,7 +184,7 @@ pub struct Mp4RangeSeekJob<'a> {
     scope: SeekScope,
     global: Option<Mov9NativeGlobalSeekJob<'a>>,
     replay: Option<(Mov9PacketCursor<'a>, Mov9NativeSeekReceipt)>,
-    limits: Mov9PacketLimits,
+    replay_seed: Option<Mov9PacketCursor<'a>>,
     maximum_skipped: u64,
     failure: Option<Error>,
 }
@@ -223,10 +220,12 @@ impl<'a> Mp4RangeSeekJob<'a> {
                     maximum: usize::try_from(self.maximum_skipped).map_err(|_| Error::Overflow)?,
                 });
             }
-            self.replay = Some((
-                plan.cursor_with_packet_limits(self.limits)?,
-                plan.receipt().clone(),
-            ));
+            let cursor = self
+                .replay_seed
+                .take()
+                .ok_or(Error::Invalid("native range replay seed missing"))?
+                .resume_checked_replay(plan.anchors())?;
+            self.replay = Some((cursor, plan.receipt().clone()));
         }
         let (cursor, _) = self
             .replay

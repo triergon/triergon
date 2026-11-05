@@ -3268,6 +3268,30 @@ fn native_range_cursor_checks_all_extents_and_replays_after_duration_scan() {
     }
 }
 
+#[test]
+fn native_range_open_refuses_late_unprojectable_metadata_before_playback() {
+    let mut raw = include_bytes!("fixtures/mp4/encoded-avc-aac-native-seek.mp4").to_vec();
+    let at = raw.windows(4).position(|kind| kind == b"stss").unwrap();
+    assert_eq!(&raw[at + 12..at + 16], &1u32.to_be_bytes());
+    raw[at..at + 4].copy_from_slice(b"stps");
+    raw[at + 12..at + 16].copy_from_slice(&2u32.to_be_bytes());
+    let (opened, calls, _) = observed_mp4_open(&raw);
+    assert!(opened.movie.header().duration > 0);
+    calls.lock().unwrap().clear();
+    let mut job = Mp4RangeOpen::new(&opened.movie, None, PlanLimits::default()).unwrap();
+    let result = (0..1000).find_map(|_| match job.poll(&mut WorkBudget::new(4096), &off()) {
+        Ok(false) => None,
+        result => Some(result),
+    });
+    assert!(matches!(
+        result,
+        Some(Err(Error::Core(C::Unsupported(
+            "native dependency/recovery flag profile not frozen"
+        ))))
+    ));
+    assert!(calls.lock().unwrap().is_empty());
+}
+
 fn encoded_range_open(
     raw: &[u8],
 ) -> (
