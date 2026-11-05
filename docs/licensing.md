@@ -8,7 +8,10 @@ files and locked packages.
 Copyright © 2026 Triergon contributors. Triergon's independently authored
 implementation, test source and tooling are licensed under your choice of
 the [MIT License](../LICENSE-MIT) or the [Apache License 2.0](../LICENSE-APACHE).
-The workspace packages declare `MIT OR Apache-2.0`.
+Workspace packages use `MIT OR Apache-2.0` for independently authored code.
+The subtitles package uses a [Cargo license file](../crates/subtitles/LICENSE)
+that includes both code licenses and the separate Unicode and GNU Big5
+mapping data notices.
 
 Media fixtures, specification texts, upstream reference code and binaries,
 and other third-party material retain their original terms. Check their
