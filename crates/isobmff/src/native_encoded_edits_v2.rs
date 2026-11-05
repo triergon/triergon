@@ -145,9 +145,10 @@ impl Mov9EncodedEditPlanV2 {
                 },
         }))
     }
-    /// Public AV_PKT_DATA_SKIP_SAMPLES layout, derived before packet publication.
-    /// This is an explicit native view, never a change to source sample duration.
-    pub(crate) fn skip_samples(&self, source: &Sample) -> Result<Option<[u8; 10]>> {
+    /// Native skip-samples side data for a sample from this plan's source track.
+    /// The first two little-endian words give leading and trailing sample counts.
+    /// The packet retains the original source sample duration.
+    pub fn skip_samples(&self, source: &Sample) -> Result<Option<[u8; 10]>> {
         if self.kind != EncodedEntryKindV1::Aac {
             return Ok(None);
         }

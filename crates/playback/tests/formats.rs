@@ -3095,6 +3095,20 @@ fn native_range_seek_replays_the_encoded_edit_occurrences() {
     player
         .set_clock_view(ClockChoice::ExplicitNativeProjection)
         .unwrap();
+    let leading = [0xf0, 3, 0, 0, 0, 0, 0, 0, 0, 0];
+    let trailing = [0, 0, 0, 0, 0xf0, 1, 0, 0, 0, 0];
+    let linear = collect(&mut player, 4096).unwrap();
+    let audio_trim: Vec<_> = linear
+        .iter()
+        .filter_map(|output| match output.event() {
+            RawEvent::Mp4(Mp4Event::Packet(packet)) if packet.configuration.track.track_id == 2 => {
+                packet.encoded_skip_samples
+            }
+            _ => None,
+        })
+        .collect();
+    assert_eq!(audio_trim, [leading, trailing]);
+    drop(linear);
     let command = {
         let mut job = player
             .prepare_mp4_native_seek(
@@ -3136,6 +3150,13 @@ fn native_range_seek_replays_the_encoded_edit_occurrences() {
         assert_eq!(packet.source.payload.as_ref(), &raw[start..start + length]);
     }
     assert!(packets.len() > 2);
+    assert_eq!(
+        packets
+            .iter()
+            .filter_map(|packet| packet.encoded_skip_samples)
+            .collect::<Vec<_>>(),
+        [trailing],
+    );
 }
 
 #[test]

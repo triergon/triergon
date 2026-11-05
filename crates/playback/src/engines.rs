@@ -41,6 +41,8 @@ pub struct Mp4Packet {
     pub source: SourcePacket,
     pub configuration: Mp4Configuration,
     pub native: Option<Mov9PacketOccurrence>,
+    /// Sample trim from the associated encoded edit plan, in native skip-samples layout.
+    pub encoded_skip_samples: Option<[u8; 10]>,
 }
 /// An unassociated empty packet in the pinned native receiver view. Its public
 /// position is a receiver field, with no corresponding physical sample.
@@ -1125,7 +1127,7 @@ impl Mp4Engine {
         Ok(())
     }
 
-    fn packet_config(&self, row: &SourceRow) -> Result<Mp4Configuration> {
+    fn packet_config(&self, row: &SourceRow) -> Result<(usize, Mp4Configuration)> {
         let at_track = self
             .plan
             .tracks
@@ -1136,12 +1138,20 @@ impl Mp4Engine {
         let revision = self.configs[at_track]
             .ok_or(Error::Invalid("configuration missing"))?
             .revision;
-        self.plan.config(row, revision)
+        Ok((at_track, self.plan.config(row, revision)?))
     }
 
     fn emit_packet(&mut self, row: &SourceRow, source: SourcePacket) -> Result<BackendStep> {
-        let cfg = self.packet_config(row)?;
+        let (at_track, cfg) = self.packet_config(row)?;
         let native = self.plan.native(self.row).cloned();
+        let encoded_skip_samples =
+            if let (Some(occurrence), Some(plans)) = (&native, &self.plan.encoded_edits) {
+                plans.as_slice()[at_track]
+                    .as_ref()
+                    .map_or(Ok(None), |plan| plan.skip_samples(&occurrence.source))?
+            } else {
+                None
+            };
         if native.is_some() && source.sample.range.is_empty() {
             self.native_boundary_observed =
                 self.plan
@@ -1163,6 +1173,7 @@ impl Mp4Engine {
                 source,
                 configuration: cfg,
                 native,
+                encoded_skip_samples,
             },
         ))))
     }
@@ -1298,7 +1309,7 @@ impl Mp4Engine {
                         .pending
                         .take()
                         .ok_or(Error::Invalid("pending sample missing"))?;
-                    let configuration = self.packet_config(&row)?;
+                    let (_, configuration) = self.packet_config(&row)?;
                     let mut native = self
                         .plan
                         .native(self.row)
