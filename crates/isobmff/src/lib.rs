@@ -298,7 +298,7 @@ pub use native_header_v7::{
 mod native_encoded_v1;
 pub use native_encoded_v1::{
     EncodedEntryKindV1, Mov9EncodedLimitsV1, Mov9EncodedStreamJobV1, Mov9EncodedStreamV1,
-    PinnedMovD32EncodedRegularV1,
+    Mp4AacConfig, Mp4AacConfigJob, PinnedMovD32EncodedRegularV1,
 };
 
 mod native_encoded_edits_v2;
