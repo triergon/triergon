@@ -66,3 +66,5 @@ cases or weaken correctness to pass it.
 ## Consequences and next work
 
 H0, the comparison/performance harness, and an initial K0 reader are now implemented experimentally; [implementation status](implementation.md) records qualified snapshot evidence, current incomplete coverage and closed broader gates. A standalone library remains reusable beyond Streem, while the TV integration can retain FFmpeg during development. We must budget substantial work for unusual files and standards compliance. Every later codec gets an independent feature decision and benchmark. No third-party production dependency is selected by this ADR.
+
+Proposed follow-ups: [ADR-0003](container-model.md) turns the API sketch above into one shared container model, and [ADR-0004](refactor-plan.md) lays out a behaviour-preserving refactor towards a layered, modular workspace.
