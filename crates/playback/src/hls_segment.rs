@@ -1,13 +1,13 @@
-//! Complete, bounded AVC/AAC feed for one independent TS188 media segment.
+//! Complete, bounded playback feed for one independent TS188 media segment.
 
 use crate::{
     ClockChoice, Engine, Error, Player, PlayerPolicy, Progress, RawEvent, Result, Selection,
     Source, SourceReply, State, TrackKey,
     hls_aac::{HlsAac, HlsAacFrame},
-    hls_avc::{AvcRaster, AvcTsAccessUnit, AvcTsLimits, AvcTsReader, AvcTsStep},
+    hls_avc::{AvcRaster, AvcTsAccessUnit, AvcTsLimits, AvcTsReader},
     hls_clock::{
         HlsAacClock, HlsParserOnlyAudioClock, parser_only_aac_clocks, parser_only_aac_pts_ns,
-        resolve_hls_aac_clocks,
+        parser_only_audio_clocks, resolve_hls_aac_clocks,
     },
     io::SourceOwner,
 };
@@ -16,8 +16,13 @@ use triergon_core::{Budget, BudgetVec, Error as CoreError, InputCursor, InputReq
 use triergon_mpegts::{
     AssemblyStep, FaultKind, ParseLimits, TraceEvent,
     clock::SourceTimePolicy,
-    psi::{DescriptorNamespace, ProgramMap},
+    native_pes::{NativePrivateAudioCarriage, NativePrivateAudioDescriptors},
+    psi::{DescriptorNamespace, ElementaryStream, ProgramMap},
 };
+
+mod lanes;
+use lanes::{AudioAssembler, LaneAssembler, VideoAssembler, VideoPicture};
+pub use lanes::{HlsMediaAudioUnit, HlsMediaVideoUnit};
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub enum HlsSegmentAudio {
@@ -62,14 +67,14 @@ enum Lane {
 }
 
 #[derive(Debug)]
-pub enum HlsFeedUnit<'a, C = HlsAacClock> {
-    Video(&'a AvcTsAccessUnit),
-    Audio(&'a HlsAacFrame, &'a C),
+pub enum HlsFeedUnit<'a, C = HlsAacClock, V = AvcTsAccessUnit, A = HlsAacFrame> {
+    Video(&'a V),
+    Audio(&'a A, &'a C),
 }
 
-pub struct HlsSegment<C = HlsAacClock> {
-    video: BudgetVec<AvcTsAccessUnit>,
-    audio: BudgetVec<HlsAacFrame>,
+pub struct HlsSegment<C = HlsAacClock, V = AvcTsAccessUnit, A = HlsAacFrame> {
+    video: BudgetVec<V>,
+    audio: BudgetVec<A>,
     clocks: BudgetVec<C>,
     order: BudgetVec<Lane>,
     initial_raster: AvcRaster,
@@ -93,13 +98,13 @@ impl HlsSegment {
     }
 }
 
-impl HlsSegment<HlsParserOnlyAudioClock> {
+impl<V, A> HlsSegment<HlsParserOnlyAudioClock, V, A> {
     pub fn audio_tail_ns(&self) -> Option<i64> {
         self.clocks.as_slice().last().map(|clock| clock.pts_ns)
     }
 }
 
-impl<C> HlsSegment<C> {
+impl<C, V, A> HlsSegment<C, V, A> {
     pub fn initial_raster(&self) -> AvcRaster {
         self.initial_raster
     }
@@ -112,7 +117,7 @@ impl<C> HlsSegment<C> {
         self.feed_bytes
     }
 
-    pub fn access_units(&self) -> impl ExactSizeIterator<Item = HlsFeedUnit<'_, C>> {
+    pub fn access_units(&self) -> impl ExactSizeIterator<Item = HlsFeedUnit<'_, C, V, A>> {
         let mut video = self.video.as_slice().iter();
         let mut audio = self.audio.as_slice().iter().zip(self.clocks.as_slice());
         self.order.as_slice().iter().map(move |lane| match lane {
@@ -145,27 +150,82 @@ enum Phase {
     Failed,
 }
 
-enum Unit {
-    Video(AvcTsAccessUnit),
-    Audio(HlsAacFrame),
+enum Unit<V, A> {
+    Video(V),
+    Audio(A),
 }
+
+type AssembledSegment<C, V, A> =
+    HlsSegment<C, <V as LaneAssembler>::Unit, <A as LaneAssembler>::Unit>;
 
 /// Acquire one independent media segment. Completed units stay private until
 /// the transport has reported EOF and both assemblers have drained. A failed
 /// attempt releases its source and staged output. To retry the transport,
 /// construct a fresh reader with a new source owner.
 pub struct HlsSegmentReader<S: Source> {
+    inner: SegmentReader<S, AvcTsReader, HlsAac>,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum HlsVideoCodec {
+    Avc,
+    Hevc,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum HlsAudioCodec {
+    Aac,
+    Ac3,
+    Eac3,
+}
+
+/// The negotiated codecs for one independent segment. A supplied audio codec
+/// requires one unambiguous matching track and at least one complete frame.
+#[derive(Clone, Copy, Debug)]
+pub struct HlsMediaProfile {
+    pub video: HlsVideoCodec,
+    pub audio: Option<HlsAudioCodec>,
+}
+
+pub type HlsMediaSegment =
+    HlsSegment<HlsParserOnlyAudioClock, HlsMediaVideoUnit, HlsMediaAudioUnit>;
+
+pub struct HlsMediaSegmentReader<S: Source> {
+    inner: SegmentReader<S, VideoAssembler, AudioAssembler>,
+}
+
+#[derive(Clone, Copy)]
+enum TrackSelection {
+    AvcAac(HlsSegmentTracks),
+    Media(HlsMediaProfile),
+}
+
+impl TrackSelection {
+    fn requires_audio(self) -> bool {
+        match self {
+            Self::AvcAac(tracks) => {
+                matches!(
+                    tracks.audio,
+                    HlsSegmentAudio::Required | HlsSegmentAudio::Pid(_)
+                )
+            }
+            Self::Media(profile) => profile.audio.is_some(),
+        }
+    }
+}
+
+struct SegmentReader<S: Source, V: LaneAssembler, A: LaneAssembler> {
     pool: Budget,
     player: Option<Player<LimitedSource<S>>>,
     limits: HlsSegmentLimits,
-    tracks: HlsSegmentTracks,
+    tracks: TrackSelection,
     map: Option<(TrackKey, Option<TrackKey>, u64)>,
-    avc: Option<AvcTsReader>,
-    aac: Option<HlsAac>,
+    video_assembler: Option<V>,
+    audio_assembler: Option<A>,
     phase: Phase,
-    pending: Option<Unit>,
-    video: BudgetVec<AvcTsAccessUnit>,
-    audio: BudgetVec<HlsAacFrame>,
+    pending: Option<Unit<V::Unit, A::Unit>>,
+    video: BudgetVec<V::Unit>,
+    audio: BudgetVec<A::Unit>,
     order: BudgetVec<Lane>,
     video_tail90: Option<i64>,
     feed_bytes: usize,
@@ -176,6 +236,91 @@ impl<S: Source> HlsSegmentReader<S> {
         input: InputCursor,
         source: S,
         tracks: HlsSegmentTracks,
+        limits: HlsSegmentLimits,
+    ) -> Result<Self> {
+        Ok(Self {
+            inner: SegmentReader::new(input, source, TrackSelection::AvcAac(tracks), limits)?,
+        })
+    }
+
+    pub fn provide(&mut self, reply: &SourceReply) -> Result<bool> {
+        self.inner.provide(reply)
+    }
+
+    pub fn advance(
+        &mut self,
+        work: &mut WorkBudget,
+        cancel: &AtomicBool,
+    ) -> Result<HlsSegmentProgress> {
+        self.inner.advance(work, cancel)
+    }
+
+    /// Computes the original AAC demux clock without changing source facts.
+    pub fn take(&mut self, cancel: &AtomicBool) -> Result<Option<HlsSegment>> {
+        self.inner.take_with(cancel, |reader| {
+            resolve_hls_aac_clocks(
+                &reader.pool,
+                reader.audio.as_slice(),
+                reader.limits.maximum_access_units,
+                cancel,
+            )
+        })
+    }
+
+    pub fn take_parser_only(
+        &mut self,
+        cancel: &AtomicBool,
+    ) -> Result<Option<HlsSegment<HlsParserOnlyAudioClock>>> {
+        self.inner.take_with(cancel, |reader| {
+            parser_only_aac_clocks(&reader.audio, cancel, |clock| clock)
+        })
+    }
+}
+
+impl<S: Source> HlsMediaSegmentReader<S> {
+    pub fn new(
+        input: InputCursor,
+        source: S,
+        profile: HlsMediaProfile,
+        limits: HlsSegmentLimits,
+    ) -> Result<Self> {
+        Ok(Self {
+            inner: SegmentReader::new(input, source, TrackSelection::Media(profile), limits)?,
+        })
+    }
+
+    pub fn provide(&mut self, reply: &SourceReply) -> Result<bool> {
+        self.inner.provide(reply)
+    }
+
+    pub fn advance(
+        &mut self,
+        work: &mut WorkBudget,
+        cancel: &AtomicBool,
+    ) -> Result<HlsSegmentProgress> {
+        self.inner.advance(work, cancel)
+    }
+
+    pub fn take(&mut self, cancel: &AtomicBool) -> Result<Option<HlsMediaSegment>> {
+        self.inner.take_with(cancel, |reader| {
+            parser_only_audio_clocks(
+                &reader.audio,
+                cancel,
+                |frame| (frame.pts.or(frame.dts), frame.duration),
+                |clock| clock,
+            )
+        })
+    }
+}
+
+impl<S: Source, V: LaneAssembler, A: LaneAssembler> SegmentReader<S, V, A>
+where
+    V::Unit: VideoPicture,
+{
+    fn new(
+        input: InputCursor,
+        source: S,
+        tracks: TrackSelection,
         limits: HlsSegmentLimits,
     ) -> Result<Self> {
         let owner = SourceOwner::new(LimitedSource {
@@ -192,12 +337,15 @@ impl<S: Source> HlsSegmentReader<S> {
             check_extent(length, 0, limits.maximum_source_bytes)?;
         }
         let pool = input.budget().clone();
-        let engine = Engine::ts_native_segment_v1(
-            input,
-            limits.transport,
-            SourceTimePolicy::Unanchored,
-            DescriptorNamespace::Unspecified,
-        )?;
+        let engine = match tracks {
+            TrackSelection::AvcAac(_) => Engine::ts_native_segment_v1(
+                input,
+                limits.transport,
+                SourceTimePolicy::Unanchored,
+                DescriptorNamespace::Unspecified,
+            )?,
+            TrackSelection::Media(_) => Engine::ts_native_media_segment(input, limits.transport)?,
+        };
         let mut player = Player::new(
             engine,
             owner,
@@ -215,8 +363,8 @@ impl<S: Source> HlsSegmentReader<S> {
             limits,
             tracks,
             map: None,
-            avc: None,
-            aac: None,
+            video_assembler: None,
+            audio_assembler: None,
             phase: Phase::Read,
             pending: None,
             video: BudgetVec::new(&pool),
@@ -229,7 +377,7 @@ impl<S: Source> HlsSegmentReader<S> {
 
     /// The caller may supply an asynchronous reply here or let Source::poll
     /// provide it. Stale replies leave the active attempt intact.
-    pub fn provide(&mut self, reply: &SourceReply) -> Result<bool> {
+    fn provide(&mut self, reply: &SourceReply) -> Result<bool> {
         validate_reply(reply, self.limits.maximum_source_bytes)?;
         let result = self.player.as_mut().ok_or(Error::Closed)?.provide(reply);
         if matches!(
@@ -243,7 +391,7 @@ impl<S: Source> HlsSegmentReader<S> {
         result
     }
 
-    pub fn advance(
+    fn advance(
         &mut self,
         work: &mut WorkBudget,
         cancel: &AtomicBool,
@@ -276,35 +424,11 @@ impl<S: Source> HlsSegmentReader<S> {
         }
     }
 
-    /// Returns the sealed segment once. Computing the audio clock is bounded
-    /// by maximum_access_units. Pool pressure leaves the sealed data available.
-    pub fn take(&mut self, cancel: &AtomicBool) -> Result<Option<HlsSegment>> {
-        self.take_with(cancel, |reader| {
-            resolve_hls_aac_clocks(
-                &reader.pool,
-                reader.audio.as_slice(),
-                reader.limits.maximum_access_units,
-                cancel,
-            )
-        })
-    }
-
-    /// Returns the sealed segment with the parser-only AAC delivery clock.
-    /// Exact source clocks remain on each frame. Work and retry follow take.
-    pub fn take_parser_only(
-        &mut self,
-        cancel: &AtomicBool,
-    ) -> Result<Option<HlsSegment<HlsParserOnlyAudioClock>>> {
-        self.take_with(cancel, |reader| {
-            parser_only_aac_clocks(&reader.audio, cancel, |clock| clock)
-        })
-    }
-
     fn take_with<C>(
         &mut self,
         cancel: &AtomicBool,
         resolve: impl FnOnce(&Self) -> triergon_core::Result<BudgetVec<C>>,
-    ) -> Result<Option<HlsSegment<C>>> {
+    ) -> Result<Option<AssembledSegment<C, V, A>>> {
         if cancel.load(Ordering::Relaxed) {
             self.fail();
             return Err(CoreError::Cancelled.into());
@@ -327,7 +451,7 @@ impl<S: Source> HlsSegmentReader<S> {
                 return Err(error.into());
             }
         };
-        let initial_raster = self.video.as_slice()[0].raster;
+        let initial_raster = self.video.as_slice()[0].raster();
         let video_tail90 = self.video_tail90.expect("sealed video clock");
         self.phase = Phase::Taken;
         Ok(Some(HlsSegment {
@@ -372,13 +496,13 @@ impl<S: Source> HlsSegmentReader<S> {
                     }
                     Progress::Ended => {
                         self.player = None;
-                        let avc = self
-                            .avc
+                        let video = self
+                            .video_assembler
                             .as_mut()
-                            .ok_or(CoreError::Invalid("HLS segment has no AVC configuration"))?;
-                        avc.finish();
-                        if let Some(aac) = &mut self.aac {
-                            aac.finish();
+                            .ok_or(CoreError::Invalid("HLS segment has no video configuration"))?;
+                        video.finish();
+                        if let Some(audio) = &mut self.audio_assembler {
+                            audio.finish();
                         }
                         self.phase = Phase::EndVideo;
                     }
@@ -386,34 +510,36 @@ impl<S: Source> HlsSegmentReader<S> {
                 }
             }
             Phase::Video | Phase::EndVideo => {
-                let avc = self
-                    .avc
+                let video = self
+                    .video_assembler
                     .as_mut()
-                    .ok_or(CoreError::Invalid("HLS AVC assembler unavailable"))?;
-                match avc.step(work, cancel)? {
-                    AvcTsStep::Ready(unit) => self.pending = Some(Unit::Video(unit)),
-                    AvcTsStep::Yield => {}
-                    AvcTsStep::NeedInput if self.phase == Phase::Video => self.phase = Phase::Read,
-                    AvcTsStep::End if self.phase == Phase::EndVideo => {
-                        self.avc = None;
+                    .ok_or(CoreError::Invalid("HLS video assembler unavailable"))?;
+                match video.poll(work, cancel)? {
+                    AssemblyStep::Output(unit) => self.pending = Some(Unit::Video(unit)),
+                    AssemblyStep::Yield => {}
+                    AssemblyStep::NeedPayload if self.phase == Phase::Video => {
+                        self.phase = Phase::Read;
+                    }
+                    AssemblyStep::Finished if self.phase == Phase::EndVideo => {
+                        self.video_assembler = None;
                         self.phase = Phase::EndAudio;
                     }
-                    _ => return Err(CoreError::Invalid("unexpected HLS AVC state").into()),
+                    _ => return Err(CoreError::Invalid("unexpected HLS video state").into()),
                 }
             }
             Phase::Audio | Phase::EndAudio => {
-                if let Some(aac) = &mut self.aac {
-                    match aac.poll(work, cancel)? {
+                if let Some(audio) = &mut self.audio_assembler {
+                    match audio.poll(work, cancel)? {
                         AssemblyStep::Output(unit) => self.pending = Some(Unit::Audio(unit)),
                         AssemblyStep::Yield => {}
                         AssemblyStep::NeedPayload if self.phase == Phase::Audio => {
                             self.phase = Phase::Read
                         }
                         AssemblyStep::Finished if self.phase == Phase::EndAudio => {
-                            self.aac = None;
+                            self.audio_assembler = None;
                             self.seal()?;
                         }
-                        _ => return Err(CoreError::Invalid("unexpected HLS AAC state").into()),
+                        _ => return Err(CoreError::Invalid("unexpected HLS audio state").into()),
                     }
                 } else {
                     self.seal()?;
@@ -443,7 +569,12 @@ impl<S: Source> HlsSegmentReader<S> {
                         )
                         .into());
                     }
-                    self.map = Some(select_tracks(&map, self.tracks, configuration_epoch)?);
+                    self.map = Some(select_tracks(
+                        &map,
+                        self.tracks,
+                        configuration_epoch,
+                        self.limits.transport,
+                    )?);
                 }
                 TraceEvent::Diagnostic(fault)
                     if fault.kind == FaultKind::Transport
@@ -461,9 +592,9 @@ impl<S: Source> HlsSegmentReader<S> {
                     return Err(CoreError::Invalid("HLS configuration epoch").into());
                 }
                 if config.track == video {
-                    self.avc = Some(AvcTsReader::new(&self.pool, config, self.limits.avc)?);
+                    self.video_assembler = Some(V::bind(&self.pool, config, self.limits)?);
                 } else if Some(config.track) == audio {
-                    self.aac = Some(HlsAac::new(&self.pool, config, 8191)?);
+                    self.audio_assembler = Some(A::bind(&self.pool, config, self.limits)?);
                 }
             }
             RawEvent::NativeTs { packet, clock } => {
@@ -476,21 +607,19 @@ impl<S: Source> HlsSegmentReader<S> {
                 };
                 let mut mailbox = Some(packet);
                 if track == video {
-                    let reader = self
-                        .avc
-                        .as_mut()
-                        .ok_or(CoreError::Invalid("HLS AVC packet precedes configuration"))?;
+                    let reader = self.video_assembler.as_mut().ok_or(CoreError::Invalid(
+                        "HLS video packet precedes configuration",
+                    ))?;
                     if !reader.push(&mut mailbox, clock)? {
-                        return Err(CoreError::Invalid("HLS AVC mailbox still busy").into());
+                        return Err(CoreError::Invalid("HLS video mailbox still busy").into());
                     }
                     self.phase = Phase::Video;
                 } else if Some(track) == audio {
-                    let reader = self
-                        .aac
-                        .as_mut()
-                        .ok_or(CoreError::Invalid("HLS AAC packet precedes configuration"))?;
+                    let reader = self.audio_assembler.as_mut().ok_or(CoreError::Invalid(
+                        "HLS audio packet precedes configuration",
+                    ))?;
                     if !reader.push(&mut mailbox, clock)? {
-                        return Err(CoreError::Invalid("HLS AAC mailbox still busy").into());
+                        return Err(CoreError::Invalid("HLS audio mailbox still busy").into());
                     }
                     self.phase = Phase::Audio;
                 }
@@ -524,14 +653,13 @@ impl<S: Source> HlsSegmentReader<S> {
         let (lane, bytes, video_pts) = match unit {
             Unit::Video(unit) => (
                 Lane::Video,
-                unit.feed_spans().map(<[u8]>::len).sum(),
+                V::unit_bytes(unit),
                 Some(
-                    unit.clock
-                        .and_then(|clock| clock.pts90)
+                    unit.pts90()
                         .ok_or(CoreError::Unsupported("HLS video picture without PTS"))?,
                 ),
             ),
-            Unit::Audio(frame) => (Lane::Audio, frame.bytes.len(), None),
+            Unit::Audio(frame) => (Lane::Audio, A::unit_bytes(frame), None),
         };
         let total = self
             .feed_bytes
@@ -567,12 +695,8 @@ impl<S: Source> HlsSegmentReader<S> {
         if self.video.is_empty() {
             return Err(CoreError::Invalid("HLS segment produced no video pictures").into());
         }
-        if matches!(
-            self.tracks.audio,
-            HlsSegmentAudio::Required | HlsSegmentAudio::Pid(_)
-        ) && self.audio.is_empty()
-        {
-            return Err(CoreError::Invalid("HLS segment produced no required AAC frames").into());
+        if self.tracks.requires_audio() && self.audio.is_empty() {
+            return Err(CoreError::Invalid("HLS segment produced no required audio frames").into());
         }
         self.phase = Phase::Sealed;
         Ok(())
@@ -580,8 +704,8 @@ impl<S: Source> HlsSegmentReader<S> {
 
     fn fail(&mut self) {
         self.player = None;
-        self.avc = None;
-        self.aac = None;
+        self.video_assembler = None;
+        self.audio_assembler = None;
         self.pending = None;
         self.video = BudgetVec::new(&self.pool);
         self.audio = BudgetVec::new(&self.pool);
@@ -592,38 +716,117 @@ impl<S: Source> HlsSegmentReader<S> {
 
 fn select_tracks(
     map: &ProgramMap,
-    selection: HlsSegmentTracks,
+    selection: TrackSelection,
     epoch: u64,
+    limits: ParseLimits,
 ) -> triergon_core::Result<(TrackKey, Option<TrackKey>, u64)> {
-    let find = |stream_type, pid: Option<u16>| {
-        let mut matches = map.streams.as_slice().iter().filter(|stream| {
-            stream.stream_type == stream_type && pid.is_none_or(|pid| stream.pid == pid)
-        });
-        let first = matches.next().map(|stream| TrackKey::Ts {
+    let (video, audio) = match selection {
+        TrackSelection::AvcAac(tracks) => {
+            let video = find_track(map, tracks.video_pid, |stream| {
+                Ok(stream.stream_type == 0x1b)
+            })?
+            .ok_or(CoreError::Unsupported(
+                "HLS segment has no selected AVC track",
+            ))?;
+            let find_aac = |pid| find_track(map, pid, |stream| Ok(stream.stream_type == 0x0f));
+            let audio = match tracks.audio {
+                HlsSegmentAudio::Disabled => None,
+                HlsSegmentAudio::Optional => find_aac(None)?,
+                HlsSegmentAudio::Required => Some(find_aac(None)?.ok_or(
+                    CoreError::Unsupported("HLS segment has no required AAC track"),
+                )?),
+                HlsSegmentAudio::Pid(pid) => Some(find_aac(Some(pid))?.ok_or(
+                    CoreError::Unsupported("HLS segment has no requested AAC PID"),
+                )?),
+            };
+            (video, audio)
+        }
+        TrackSelection::Media(profile) => {
+            let video_type = match profile.video {
+                HlsVideoCodec::Avc => 0x1b,
+                HlsVideoCodec::Hevc => 0x24,
+            };
+            let video = find_track(map, None, |stream| Ok(stream.stream_type == video_type))?
+                .ok_or(CoreError::Unsupported(
+                    "HLS segment has no matching video track",
+                ))?;
+            let audio = if let Some(codec) = profile.audio {
+                Some(
+                    find_track(map, None, |stream| {
+                        media_audio_matches(map, stream, codec, limits)
+                    })?
+                    .ok_or(CoreError::Unsupported(
+                        "HLS segment has no matching audio track",
+                    ))?,
+                )
+            } else {
+                None
+            };
+            (video, audio)
+        }
+    };
+    Ok((video, audio, epoch))
+}
+
+fn find_track(
+    map: &ProgramMap,
+    pid: Option<u16>,
+    accepts: impl Fn(&ElementaryStream) -> triergon_core::Result<bool>,
+) -> triergon_core::Result<Option<TrackKey>> {
+    let mut selected = None;
+    for stream in map.streams.as_slice() {
+        if pid.is_some_and(|pid| stream.pid != pid) || !accepts(stream)? {
+            continue;
+        }
+        let track = TrackKey::Ts {
             program: map.header.extension,
             pid: stream.pid,
-        });
-        if matches.next().is_some() {
+        };
+        if selected.replace(track).is_some() {
             return Err(CoreError::Unsupported(
                 "HLS segment requires explicit PID selection",
             ));
         }
-        Ok(first)
-    };
-    let video = find(0x1b, selection.video_pid)?.ok_or(CoreError::Unsupported(
-        "HLS segment has no selected AVC track",
-    ))?;
-    let audio = match selection.audio {
-        HlsSegmentAudio::Disabled => None,
-        HlsSegmentAudio::Optional => find(0x0f, None)?,
-        HlsSegmentAudio::Required => Some(find(0x0f, None)?.ok_or(CoreError::Unsupported(
-            "HLS segment has no required AAC track",
-        ))?),
-        HlsSegmentAudio::Pid(pid) => Some(find(0x0f, Some(pid))?.ok_or(CoreError::Unsupported(
-            "HLS segment has no requested AAC PID",
-        ))?),
-    };
-    Ok((video, audio, epoch))
+    }
+    Ok(selected)
+}
+
+fn media_audio_matches(
+    map: &ProgramMap,
+    stream: &ElementaryStream,
+    codec: HlsAudioCodec,
+    limits: ParseLimits,
+) -> triergon_core::Result<bool> {
+    use NativePrivateAudioCarriage as Dolby;
+    if codec == HlsAudioCodec::Aac {
+        return Ok(stream.stream_type == 0x0f);
+    }
+    match stream.stream_type {
+        0x81 if codec == HlsAudioCodec::Ac3 => {}
+        0x87 if codec == HlsAudioCodec::Eac3 => {}
+        0x06 if stream
+            .descriptors()
+            .any(|entry| entry.is_ok_and(|descriptor| matches!(descriptor.tag, 0x6a | 0x7a))) => {}
+        _ => return Ok(false),
+    }
+    let carriage = Dolby::from_hls_pmt(
+        stream.stream_type,
+        NativePrivateAudioDescriptors {
+            program: map.program_descriptors.as_ref(),
+            elementary: stream.descriptor_bytes.as_ref(),
+        },
+        limits,
+    )?;
+    Ok(matches!(
+        (codec, carriage),
+        (
+            HlsAudioCodec::Ac3,
+            Dolby::DvbAc3Tag | Dolby::PrivateType81Ac3
+        ) | (
+            HlsAudioCodec::Eac3,
+            Dolby::DvbEac3Tag | Dolby::PrivateType87Eac3
+        )
+    ))
 }
 
 fn reserve_one<T>(list: &mut BudgetVec<T>, maximum: usize) -> triergon_core::Result<()> {

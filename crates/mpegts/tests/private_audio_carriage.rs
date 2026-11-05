@@ -481,6 +481,62 @@ fn audio_registration_specifier_and_program_tags_are_explicit_nonpasses_not_name
 }
 
 #[test]
+fn hls_audio_registration_confirms_the_existing_carriage_rules() {
+    let ac3 = b"\x05\x04AC-3";
+    let eac3 = b"\x05\x04EAC3";
+    let descriptors = |elementary| NativePrivateAudioDescriptors {
+        program: &[],
+        elementary,
+    };
+    let limits = ParseLimits::default();
+    for (stream_type, elementary, carriage) in [
+        (0x81, &ac3[..], NativePrivateAudioCarriage::PrivateType81Ac3),
+        (
+            0x87,
+            &eac3[..],
+            NativePrivateAudioCarriage::PrivateType87Eac3,
+        ),
+        (
+            6,
+            &b"\x05\x04AC-3\x6a\x03\xc0\x42\x08"[..],
+            NativePrivateAudioCarriage::DvbAc3Tag,
+        ),
+        (
+            6,
+            &b"\x05\x04EAC3\x7a\x01\x00"[..],
+            NativePrivateAudioCarriage::DvbEac3Tag,
+        ),
+    ] {
+        assert_eq!(
+            NativePrivateAudioCarriage::from_hls_pmt(stream_type, descriptors(elementary), limits),
+            Ok(carriage)
+        );
+        assert!(
+            NativePrivateAudioCarriage::from_observed_pmt(
+                stream_type,
+                descriptors(elementary),
+                limits
+            )
+            .is_err()
+        );
+    }
+    for (stream_type, elementary) in [
+        (0x87, &ac3[..]),
+        (0x81, &eac3[..]),
+        (6, &ac3[..]),
+        (6, &b"\x6a\x03\xc0\x42\x08"[..]),
+        (6, &b"\x7a\x01\x00"[..]),
+        (6, &b"\x05\x04AC-3\x7a\x01\x00"[..]),
+        (0x81, &b"\x05\x04AC-3\x05\x04EAC3"[..]),
+    ] {
+        assert!(
+            NativePrivateAudioCarriage::from_hls_pmt(stream_type, descriptors(elementary), limits)
+                .is_err()
+        );
+    }
+}
+
+#[test]
 fn audio_descriptor_optional_fields_duplicates_languages_and_opaque_tails_stay_raw() {
     let raw = [
         0x6a, 3, 0x80, 0x11, 0xaa, 0x0a, 4, b'e', b'n', b'g', 0x80, 0x90, 1, 0xff, 0x6a, 1, 0,

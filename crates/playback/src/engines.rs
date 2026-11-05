@@ -289,6 +289,12 @@ impl TsNativeTracks {
     }
 }
 
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum SegmentDiscovery {
+    Native,
+    Media,
+}
+
 pub struct TsEngine {
     native_context: Option<ts::native_input::NativeInputContext>,
     native_prefix_failed: bool,
@@ -313,7 +319,7 @@ pub struct TsEngine {
     native_packet_clock: Option<NativePesClockV1>,
     event_ordinal: u64,
     native_update_at: Option<usize>,
-    discover_native_tracks: bool,
+    segment_discovery: Option<SegmentDiscovery>,
     segmented: bool,
     boundary: Option<ts::MediaEntityEndV1>,
 }
@@ -584,7 +590,7 @@ impl Engine {
             native_packet_clock: clock()?,
             event_ordinal: 0,
             native_update_at: None,
-            discover_native_tracks: false,
+            segment_discovery: None,
             segmented: false,
             boundary: None,
         }))
@@ -720,7 +726,7 @@ impl Engine {
     }
 
     pub fn has_native_packet_view(&self) -> bool {
-        matches!(self, Self::Ts(t) if t.discover_native_tracks || !t.native_tracks.as_slice().is_empty())
+        matches!(self, Self::Ts(t) if t.segment_discovery.is_some() || !t.native_tracks.as_slice().is_empty())
     }
     pub(crate) fn replaces_source_ts_pes(&self, pid: u16) -> bool {
         matches!(self, Self::Ts(t) if t.native_tracks.index(pid).is_some())
@@ -735,6 +741,29 @@ impl Engine {
         policy: SourceTimePolicy,
         namespace: DescriptorNamespace,
     ) -> Result<Self> {
+        Self::ts_native_segment(input, limits, policy, namespace, SegmentDiscovery::Native)
+    }
+
+    pub(crate) fn ts_native_media_segment(
+        input: InputCursor,
+        limits: ts::ParseLimits,
+    ) -> Result<Self> {
+        Self::ts_native_segment(
+            input,
+            limits,
+            SourceTimePolicy::Unanchored,
+            DescriptorNamespace::Unspecified,
+            SegmentDiscovery::Media,
+        )
+    }
+
+    fn ts_native_segment(
+        input: InputCursor,
+        limits: ts::ParseLimits,
+        policy: SourceTimePolicy,
+        namespace: DescriptorNamespace,
+        discovery: SegmentDiscovery,
+    ) -> Result<Self> {
         let stream =
             TransportStream::new_single_program_segment(input.budget().clone(), limits, namespace)?;
         let mut engine = Self::ts_from_stream(
@@ -746,7 +775,7 @@ impl Engine {
             stream,
         )?;
         if let Self::Ts(ts) = &mut engine {
-            ts.discover_native_tracks = true;
+            ts.segment_discovery = Some(discovery);
         }
         Ok(engine)
     }
@@ -1038,7 +1067,7 @@ impl Engine {
                 r.configs = [None; 64];
             }
             Self::Ts(r) => {
-                if r.discover_native_tracks {
+                if r.segment_discovery.is_some() {
                     return Err(Error::Unsupported("seek needs a fresh TS segment").into());
                 }
                 if r.native_context.is_some() {
@@ -1525,7 +1554,8 @@ impl TsEngine {
                 0x1b => TsNativeCarriage::Registered(NativeRegisteredCarriage::Avc),
                 0x24 => TsNativeCarriage::Registered(NativeRegisteredCarriage::Hevc),
                 0x0f | 0x11 | 0x81 | 0x87 => TsNativeCarriage::AudioFromPmt,
-                0x06 if matches!(map.descriptor_namespace, DescriptorNamespace::Dvb(_))
+                0x06 if (matches!(map.descriptor_namespace, DescriptorNamespace::Dvb(_))
+                    || self.segment_discovery == Some(SegmentDiscovery::Media))
                     && stream.descriptors().any(|entry| {
                         entry.is_ok_and(|descriptor| matches!(descriptor.tag, 0x6a | 0x7a))
                     }) =>
@@ -1587,22 +1617,31 @@ impl TsEngine {
             program: map.program_descriptors.as_ref(),
             elementary: stream.descriptor_bytes.as_ref(),
         };
+        let hls_audio = self.segment_discovery == Some(SegmentDiscovery::Media);
         let carriage = match spec.carriage {
             TsNativeCarriage::AudioFromPmt => match stream.stream_type {
                 0x0f => TsNativeCarriage::Registered(NativeRegisteredCarriage::AacAdts),
                 0x11 => TsNativeCarriage::Registered(NativeRegisteredCarriage::AacLatm),
-                0x06 if !matches!(map.descriptor_namespace, DescriptorNamespace::Dvb(_)) => {
+                0x06 if !hls_audio
+                    && !matches!(map.descriptor_namespace, DescriptorNamespace::Dvb(_)) =>
+                {
                     return Err(Error::Unsupported(
                         "native PMT audio needs explicit DVB context",
                     ));
                 }
-                0x06 | 0x81 | 0x87 => {
-                    TsNativeCarriage::PrivateAudio(NativePrivateAudioCarriage::from_observed_pmt(
+                0x06 | 0x81 | 0x87 => TsNativeCarriage::PrivateAudio(if hls_audio {
+                    NativePrivateAudioCarriage::from_hls_pmt(
                         stream.stream_type,
                         private_audio,
                         self.limits,
-                    )?)
-                }
+                    )?
+                } else {
+                    NativePrivateAudioCarriage::from_observed_pmt(
+                        stream.stream_type,
+                        private_audio,
+                        self.limits,
+                    )?
+                }),
                 _ => return Err(mismatch),
             },
             fixed => fixed,
@@ -1622,6 +1661,16 @@ impl TsEngine {
                 }
                 scope.stream_id = stream_id;
                 NativePesObserver::new_registered(profile, scope, carriage, pool, self.limits)
+            }
+            TsNativeCarriage::PrivateAudio(carriage) if hls_audio => {
+                NativePesObserver::new_hls_private_audio_v1(
+                    profile,
+                    scope,
+                    carriage,
+                    private_audio,
+                    pool,
+                    self.limits,
+                )
             }
             TsNativeCarriage::PrivateAudio(carriage) => NativePesObserver::new_private_audio_v1(
                 profile,
@@ -1749,7 +1798,7 @@ impl TsEngine {
                         }
                         return Ok(BackendStep::Yield);
                     }
-                    if self.discover_native_tracks && self.pcr_pid.is_none() {
+                    if self.segment_discovery.is_some() && self.pcr_pid.is_none() {
                         return Err(Error::Invalid("TS segment ended without an active PMT").into());
                     }
                     self.stream.end_of_source()?;
@@ -1802,7 +1851,7 @@ impl TsEngine {
                 }
                 .into());
             }
-            if self.discover_native_tracks && self.native_map_next == 0 {
+            if self.segment_discovery.is_some() && self.native_map_next == 0 {
                 self.native_tracks = self.discover_tracks(map)?;
             }
             if !self.native_prefix_failed
@@ -1816,7 +1865,7 @@ impl TsEngine {
                             observer.bind_native_input_v1(context, &self.input)?;
                         }
                         track.observer = Some(observer);
-                        track.update = (self.discover_native_tracks
+                        track.update = (self.segment_discovery.is_some()
                             || track.selection.carriage == TsNativeCarriage::AudioFromPmt)
                             .then_some(TsNativeUpdate::Configuration(TsNativeConfiguration {
                                 track: TrackKey::Ts {

@@ -47,6 +47,26 @@ impl NativePrivateAudioCarriage {
         source: NativePrivateAudioDescriptors<'_>,
         limits: ParseLimits,
     ) -> Result<Self> {
+        Self::from_pmt(stream_type, source, limits, false)
+    }
+
+    /// Admit the same carriage types in a negotiated independent media
+    /// segment. An elementary registration may confirm the stream type or
+    /// audio descriptor. The source PMT and its namespace stay intact.
+    pub fn from_hls_pmt(
+        stream_type: u8,
+        source: NativePrivateAudioDescriptors<'_>,
+        limits: ParseLimits,
+    ) -> Result<Self> {
+        Self::from_pmt(stream_type, source, limits, true)
+    }
+
+    fn from_pmt(
+        stream_type: u8,
+        source: NativePrivateAudioDescriptors<'_>,
+        limits: ParseLimits,
+        hls: bool,
+    ) -> Result<Self> {
         limits.validate()?;
         if !matches!(stream_type, 6 | 0x81 | 0x87) {
             return Err(Error::Unsupported(
@@ -64,6 +84,7 @@ impl NativePrivateAudioCarriage {
         let mut count = 0_usize;
         let mut ac3 = false;
         let mut eac3 = false;
+        let mut registration = None;
         for (program, raw) in [(true, source.program), (false, source.elementary)] {
             for item in Descriptors::new(raw) {
                 let descriptor = item?;
@@ -73,6 +94,19 @@ impl NativePrivateAudioCarriage {
                 }
                 descriptor.validate_selected_syntax()?;
                 match descriptor.tag {
+                    0x05 if hls && !program => {
+                        let enhanced = match &descriptor.registration()?.format_identifier {
+                            b"AC-3" => false,
+                            b"EAC3" => true,
+                            _ => return Err(Error::Unsupported("HLS private audio registration")),
+                        };
+                        if registration
+                            .replace(enhanced)
+                            .is_some_and(|prior| prior != enhanced)
+                        {
+                            return Err(Error::Invalid("conflicting HLS audio registrations"));
+                        }
+                    }
                     // These contexts can change private interpretation; they
                     // are not established by the four retained observations.
                     0x05 | 0x5f => {
@@ -104,7 +138,7 @@ impl NativePrivateAudioCarriage {
                 }
             }
         }
-        match (stream_type, ac3, eac3) {
+        let carriage = match (stream_type, ac3, eac3) {
             (6, true, false) => Ok(Self::DvbAc3Tag),
             (6, false, true) => Ok(Self::DvbEac3Tag),
             (0x81, _, false) => Ok(Self::PrivateType81Ac3),
@@ -115,7 +149,17 @@ impl NativePrivateAudioCarriage {
             _ => Err(Error::Unsupported(
                 "native private audio conflicting descriptor context",
             )),
+        }?;
+        if hls && stream_type == 6 && registration.is_none() {
+            return Err(Error::Unsupported("HLS private audio registration absent"));
         }
+        let enhanced = matches!(carriage, Self::DvbEac3Tag | Self::PrivateType87Eac3);
+        if registration.is_some_and(|registered| registered != enhanced) {
+            return Err(Error::Invalid(
+                "HLS audio registration disagrees with the PMT",
+            ));
+        }
+        Ok(carriage)
     }
 }
 
@@ -130,6 +174,32 @@ impl NativePesObserver {
         budget: Budget,
         limits: ParseLimits,
     ) -> Result<Self> {
+        Self::with_private_audio(profile, scope, carriage, budget, limits, || {
+            NativePrivateAudioCarriage::from_observed_pmt(scope.stream_type, source, limits)
+        })
+    }
+
+    pub fn new_hls_private_audio_v1(
+        profile: NativeClockProfile,
+        scope: NativePesScope,
+        carriage: NativePrivateAudioCarriage,
+        source: NativePrivateAudioDescriptors<'_>,
+        budget: Budget,
+        limits: ParseLimits,
+    ) -> Result<Self> {
+        Self::with_private_audio(profile, scope, carriage, budget, limits, || {
+            NativePrivateAudioCarriage::from_hls_pmt(scope.stream_type, source, limits)
+        })
+    }
+
+    fn with_private_audio(
+        profile: NativeClockProfile,
+        scope: NativePesScope,
+        carriage: NativePrivateAudioCarriage,
+        budget: Budget,
+        limits: ParseLimits,
+        observe: impl FnOnce() -> Result<NativePrivateAudioCarriage>,
+    ) -> Result<Self> {
         if scope.program == 0 {
             return Err(Error::Invalid("native PES selected program"));
         }
@@ -143,9 +213,7 @@ impl NativePesObserver {
                 "native private audio stream ID unobserved",
             ));
         }
-        if NativePrivateAudioCarriage::from_observed_pmt(scope.stream_type, source, limits)?
-            != carriage
-        {
+        if observe()? != carriage {
             return Err(Error::Invalid("native private audio carriage mismatch"));
         }
         let mut observer = Self::admitted(profile, scope, budget, limits)?;

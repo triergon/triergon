@@ -146,18 +146,32 @@ pub(crate) fn parser_only_aac_clocks<T>(
     cancel: &AtomicBool,
     make: impl Fn(HlsParserOnlyAudioClock) -> T,
 ) -> Result<BudgetVec<T>> {
+    parser_only_audio_clocks(
+        frames,
+        cancel,
+        |frame| (frame.pts.or(frame.dts), frame.duration),
+        make,
+    )
+}
+
+pub(crate) fn parser_only_audio_clocks<F, T>(
+    frames: &BudgetVec<F>,
+    cancel: &AtomicBool,
+    facts: impl Fn(&F) -> (Option<Time>, Time),
+    make: impl Fn(HlsParserOnlyAudioClock) -> T,
+) -> Result<BudgetVec<T>> {
     let mut output = BudgetVec::new(frames.budget());
     if cancel.load(Ordering::Relaxed) {
         return Err(Error::Cancelled);
     }
-    let anchor = |frame: &HlsAacFrame| frame.pts.or(frame.dts);
     let mut leading = 0_i64;
     let mut next = 0;
     for frame in frames.as_slice() {
         if cancel.load(Ordering::Relaxed) {
             return Err(Error::Cancelled);
         }
-        if let Some(time) = anchor(frame) {
+        let (anchor, duration) = facts(frame);
+        if let Some(time) = anchor {
             next = time
                 .to_nanoseconds(Rounding::NearestAway)?
                 .checked_sub(leading)
@@ -165,7 +179,7 @@ pub(crate) fn parser_only_aac_clocks<T>(
             break;
         }
         leading = leading
-            .checked_add(frame.duration.to_nanoseconds(Rounding::Floor)?)
+            .checked_add(duration.to_nanoseconds(Rounding::Floor)?)
             .ok_or(Error::Overflow)?;
     }
     output.try_reserve_exact(frames.len())?;
@@ -174,14 +188,15 @@ pub(crate) fn parser_only_aac_clocks<T>(
         if cancel.load(Ordering::Relaxed) {
             return Err(Error::Cancelled);
         }
-        let pts = match anchor(frame) {
+        let (anchor, duration) = facts(frame);
+        let pts = match anchor {
             Some(time) => time.to_nanoseconds(Rounding::NearestAway)?,
             None => next,
         };
         if previous.is_some_and(|previous| pts < previous) {
-            return Err(Error::Invalid("AAC segment timestamps move backwards"));
+            return Err(Error::Invalid("HLS audio timestamps move backwards"));
         }
-        let duration_ns = frame.duration.to_nanoseconds(Rounding::Floor)?;
+        let duration_ns = duration.to_nanoseconds(Rounding::Floor)?;
         output
             .try_push(make(HlsParserOnlyAudioClock {
                 pts_ns: pts,
