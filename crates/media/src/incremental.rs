@@ -501,7 +501,7 @@ impl ElementReader {
         self.begin::<D>(header)
     }
 
-    #[inline]
+    #[inline(always)]
     fn take_buffered_header(
         &mut self,
         work: &mut WorkBudget,
