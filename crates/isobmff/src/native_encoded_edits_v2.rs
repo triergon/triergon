@@ -36,7 +36,8 @@ pub struct Mov9EncodedEditPlanV2 {
     source_edit: BoxView,
     source_config: BoxView,
     entry: EditEntry,
-    base: TimeBase,
+    media_base: TimeBase,
+    movie_base: TimeBase,
     kind: EncodedEntryKindV1,
     anchor: i128,
     end: i128,
@@ -78,8 +79,15 @@ impl Mov9EncodedEditPlanV2 {
     pub fn selected_end_ticks(&self) -> i128 {
         self.end
     }
-    pub(crate) fn matches(&self, table: &SampleTable, edits: &EditList, base: TimeBase) -> bool {
-        self.base == base
+    pub(crate) fn matches(
+        &self,
+        table: &SampleTable,
+        edits: &EditList,
+        media_base: TimeBase,
+        movie_base: TimeBase,
+    ) -> bool {
+        self.media_base == media_base
+            && self.movie_base == movie_base
             && self.source_table.header() == table.raw().header()
             && self.source_edit.header() == edits.raw().header()
             && self.count == table.sample_count()
@@ -145,9 +153,10 @@ impl Mov9EncodedEditPlanV2 {
                 },
         }))
     }
-    /// Public AV_PKT_DATA_SKIP_SAMPLES layout, derived before packet publication.
-    /// This is an explicit native view, never a change to source sample duration.
-    pub(crate) fn skip_samples(&self, source: &Sample) -> Result<Option<[u8; 10]>> {
+    /// Native skip-samples side data for a sample from this plan's source track.
+    /// The first two little-endian words give leading and trailing sample counts.
+    /// The packet retains the original source sample duration.
+    pub fn skip_samples(&self, source: &Sample) -> Result<Option<[u8; 10]>> {
         if self.kind != EncodedEntryKindV1::Aac {
             return Ok(None);
         }
@@ -548,7 +557,8 @@ impl<'a> Mov9EncodedEditJobV2<'a> {
                     source_edit: self.context.edits.raw().clone(),
                     source_config: self.context.stream.configuration_box().clone(),
                     entry: self.entry,
-                    base: self.context.media_base,
+                    media_base: self.context.media_base,
+                    movie_base: self.context.movie_base,
                     kind: self.context.stream.kind(),
                     anchor,
                     end: self.end,

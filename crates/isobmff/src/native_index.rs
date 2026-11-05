@@ -368,7 +368,9 @@ struct Context<'a> {
     media: &'a [Range<u64>],
     limits: Mov9NativeSeekLimits,
     profile: Mov9Profile,
+    encoded_edits: Option<EncodedEdits<'a>>,
 }
+type EncodedEdits<'a> = &'a [Option<crate::Mov9EncodedEditPlanV2>];
 /// Native signed ticks are a separately named API argument. No rounding,
 /// source-time wrap or conversion through SourceTime is performed here.
 pub struct Mov9NativeSeekJob<'a> {
@@ -409,19 +411,42 @@ impl<'a> Mov9NativeSeekJob<'a> {
         limits: Mov9NativeSeekLimits,
         profile: Mov9Profile,
     ) -> Result<Self> {
-        if timestamp == i64::MIN {
-            return Err(Error::Unsupported("native seek null timestamp argument"));
-        }
-        let index =
-            Mov9NativeIndexCursor::new_complete_source(pool, track, media, limits.index, profile)?;
-        Ok(Self {
-            context: Context {
+        Self::build(
+            Context {
                 pool: pool.clone(),
                 track,
                 media,
                 limits,
                 profile,
+                encoded_edits: None,
             },
+            timestamp,
+        )
+    }
+    fn build(context: Context<'a>, timestamp: i64) -> Result<Self> {
+        if timestamp == i64::MIN {
+            return Err(Error::Unsupported("native seek null timestamp argument"));
+        }
+        let index = if let Some(plans) = context.encoded_edits {
+            Mov9NativeIndexCursor::new_encoded_regular_v2(
+                &context.pool,
+                context.track,
+                context.media,
+                context.limits.index,
+                plans,
+                crate::PinnedMovD32EncodedEditsV2,
+            )?
+        } else {
+            Mov9NativeIndexCursor::new_complete_source(
+                &context.pool,
+                context.track,
+                context.media,
+                context.limits.index,
+                context.profile,
+            )?
+        };
+        Ok(Self {
+            context,
             index,
             timestamp,
             first: None,
@@ -534,13 +559,24 @@ impl<'a> Mov9NativeSeekPlan<'a> {
     }
     pub fn cursor(&self) -> Result<Mov9NativeSeekCursor<'a>> {
         let c = &self.context;
-        let cursor = Mov9PacketCursor::new_complete_source(
-            &c.pool,
-            &[c.track],
-            c.media,
-            c.limits.index.packets,
-            c.profile,
-        )?;
+        let cursor = if let Some(plans) = c.encoded_edits {
+            Mov9PacketCursor::new_encoded_regular_v2(
+                &c.pool,
+                &[c.track],
+                c.media,
+                c.limits.index.packets,
+                plans,
+                crate::PinnedMovD32EncodedEditsV2,
+            )?
+        } else {
+            Mov9PacketCursor::new_complete_source(
+                &c.pool,
+                &[c.track],
+                c.media,
+                c.limits.index.packets,
+                c.profile,
+            )?
+        };
         Ok(Mov9NativeSeekCursor {
             cursor,
             selected: self.receipt.selected.clone(),
@@ -644,6 +680,7 @@ pub struct Mov9NativeGlobalSeekJob<'a> {
     media: &'a [Range<u64>],
     limits: Mov9NativeSeekLimits,
     profile: Mov9Profile,
+    encoded_edits: Option<EncodedEdits<'a>>,
     reference_index: usize,
     reference_base: TimeBase,
     reference: Option<Mov9NativeSeekReceipt>,
@@ -660,8 +697,14 @@ pub struct Mov9NativeGlobalSeekPlan<'a> {
     media: &'a [Range<u64>],
     limits: Mov9NativeSeekLimits,
     profile: Mov9Profile,
+    encoded_edits: Option<EncodedEdits<'a>>,
     reference: Mov9NativeSeekReceipt,
     anchors: BudgetVec<Mov9ResumePoint>,
+}
+enum GlobalSeekMode<'a> {
+    SameBase,
+    Rescaled,
+    Encoded(EncodedEdits<'a>),
 }
 impl<'a> Mov9NativeGlobalSeekJob<'a> {
     pub fn new_complete_source(
@@ -680,7 +723,7 @@ impl<'a> Mov9NativeGlobalSeekJob<'a> {
             (track_id, timestamp),
             limits,
             profile,
-            false,
+            GlobalSeekMode::SameBase,
         )
     }
 
@@ -701,7 +744,28 @@ impl<'a> Mov9NativeGlobalSeekJob<'a> {
             (track_id, timestamp),
             limits,
             profile,
-            true,
+            GlobalSeekMode::Rescaled,
+        )
+    }
+
+    /// Use the same encoded edit plans that produced the indexed packet
+    /// occurrences. The selected anchor is rescaled for each other track.
+    pub fn new_encoded_regular_v2_rescaled(
+        pool: &Budget,
+        tracks: &[Mov9Track<'a>],
+        media: &'a [Range<u64>],
+        reference: (u32, i64),
+        limits: Mov9NativeSeekLimits,
+        plans: EncodedEdits<'a>,
+    ) -> Result<Self> {
+        Self::build(
+            pool,
+            tracks,
+            media,
+            reference,
+            limits,
+            Mov9Profile::PinnedNoParseNoFillin,
+            GlobalSeekMode::Encoded(plans),
         )
     }
 
@@ -712,9 +776,16 @@ impl<'a> Mov9NativeGlobalSeekJob<'a> {
         request: (u32, i64),
         limits: Mov9NativeSeekLimits,
         profile: Mov9Profile,
-        rescale_clocks: bool,
+        mode: GlobalSeekMode<'a>,
     ) -> Result<Self> {
         let (track_id, timestamp) = request;
+        let encoded_edits = match mode {
+            GlobalSeekMode::Encoded(plans) if plans.len() == tracks.len() => Some(plans),
+            GlobalSeekMode::Encoded(_) => {
+                return Err(Error::Invalid("encoded edit track coverage"));
+            }
+            _ => None,
+        };
         let maximum = limits.index.packets.max_tracks.min(64);
         if tracks.len() > maximum {
             return Err(Error::Limit {
@@ -736,7 +807,7 @@ impl<'a> Mov9NativeGlobalSeekJob<'a> {
                 return Err(Error::Invalid("duplicate native seek track"));
             }
             let track_base = Mov9MediaClock::from_source(track.media_base)?.native_base;
-            if !rescale_clocks && track_base != base {
+            if matches!(mode, GlobalSeekMode::SameBase) && track_base != base {
                 return Err(Error::Unsupported(
                     "native global seek unequal timebase rescale",
                 ));
@@ -749,30 +820,38 @@ impl<'a> Mov9NativeGlobalSeekJob<'a> {
                 })
                 .map_err(|e| e.error)?;
         }
-        let child = Some(Mov9NativeSeekJob::new_complete_source(
-            pool,
-            tracks[reference_index],
-            media,
-            timestamp,
-            limits,
-            profile,
-        )?);
-        Ok(Self {
+        let mut job = Self {
             pool: pool.clone(),
             tracks: owned,
             media,
             limits,
             profile,
+            encoded_edits,
             reference_index,
             reference_base: base,
             reference: None,
             anchors,
-            child,
+            child: None,
             at: 0,
             scanned: 0,
             ready: false,
             failed: None,
-        })
+        };
+        job.child = Some(Mov9NativeSeekJob::build(
+            job.track_context(reference_index),
+            timestamp,
+        )?);
+        Ok(job)
+    }
+    fn track_context(&self, at: usize) -> Context<'a> {
+        Context {
+            pool: self.pool.clone(),
+            track: self.tracks.as_slice()[at],
+            media: self.media,
+            limits: self.limits,
+            profile: self.profile,
+            encoded_edits: self.encoded_edits.map(|plans| &plans[at..at + 1]),
+        }
     }
     pub fn poll(&mut self, work: &mut WorkBudget, cancel: &AtomicBool) -> Result<BuildStatus> {
         if let Some(error) = self.failed {
@@ -848,13 +927,9 @@ impl<'a> Mov9NativeGlobalSeekJob<'a> {
                 self.reference_base
                     .rescale(timestamp, base, Rounding::NearestAway)?
             };
-            self.child = Some(Mov9NativeSeekJob::new_complete_source(
-                &self.pool,
-                track,
-                self.media,
+            self.child = Some(Mov9NativeSeekJob::build(
+                self.track_context(self.at),
                 timestamp,
-                self.limits,
-                self.profile,
             )?);
         }
     }
@@ -871,6 +946,7 @@ impl<'a> Mov9NativeGlobalSeekJob<'a> {
             media: self.media,
             limits: self.limits,
             profile: self.profile,
+            encoded_edits: self.encoded_edits,
             reference: self
                 .reference
                 .ok_or(Error::Invalid("native reference selection absent"))?,
@@ -886,6 +962,17 @@ impl<'a> Mov9NativeGlobalSeekPlan<'a> {
         self.anchors.as_slice()
     }
     pub fn cursor(&self) -> Result<Mov9PacketCursor<'a>> {
+        if let Some(plans) = self.encoded_edits {
+            return Mov9PacketCursor::new_encoded_regular_v2(
+                &self.pool,
+                self.tracks.as_slice(),
+                self.media,
+                self.limits.index.packets,
+                plans,
+                crate::PinnedMovD32EncodedEditsV2,
+            )?
+            .with_resume_points(self.anchors.as_slice(), self.limits.index.packets);
+        }
         Mov9PacketCursor::new_complete_source_at(
             &self.pool,
             self.tracks.as_slice(),

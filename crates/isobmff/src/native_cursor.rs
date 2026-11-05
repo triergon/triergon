@@ -593,11 +593,11 @@ impl<'a> Mov9PacketCursor<'a> {
                 if !plan.source_table().bytes().belongs_to(budget) {
                     return Err(Error::ForeignPool);
                 }
-                let Some((edits, _)) = slot.track.edits else {
+                let Some((edits, movie_base)) = slot.track.edits else {
                     return Err(Error::Invalid("encoded edit plan without source edit"));
                 };
                 if !slot.track.fragments.is_empty()
-                    || !plan.matches(slot.track.table, edits, slot.track.media_base)
+                    || !plan.matches(slot.track.table, edits, slot.track.media_base, movie_base)
                 {
                     return Err(Error::Invalid("encoded edit source association"));
                 }
@@ -635,8 +635,15 @@ impl<'a> Mov9PacketCursor<'a> {
         profile: Mov9Profile,
         starts: &[Mov9ResumePoint],
     ) -> Result<Self> {
-        let mut cursor = Self::new_complete_source(budget, tracks, media, limits, profile)?;
-        if starts.len() != tracks.len() {
+        Self::new_complete_source(budget, tracks, media, limits, profile)?
+            .with_resume_points(starts, limits)
+    }
+    pub(crate) fn with_resume_points(
+        mut self,
+        starts: &[Mov9ResumePoint],
+        limits: Mov9PacketLimits,
+    ) -> Result<Self> {
+        if starts.len() != self.slots.len() {
             return Err(Error::Invalid("native resume track coverage"));
         }
         let skipped = starts.iter().try_fold(0u64, |sum, p| {
@@ -648,7 +655,7 @@ impl<'a> Mov9PacketCursor<'a> {
                 return Err(Error::Invalid("duplicate native resume track"));
             }
             count(start.occurrence, limits.max_occurrences)?;
-            let slot = cursor
+            let slot = self
                 .slots
                 .as_mut_slice()
                 .iter_mut()
@@ -656,7 +663,7 @@ impl<'a> Mov9PacketCursor<'a> {
                 .ok_or(Error::Invalid("unknown native resume track"))?;
             slot.resume_remaining = start.occurrence;
         }
-        Ok(cursor)
+        Ok(self)
     }
     /// Provenance of the currently held source run, accessed before take. O(1)
     /// in the selected single-track index cursor; no run/sample array expansion.
