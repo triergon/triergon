@@ -153,7 +153,11 @@ impl InputCursor {
     /// A fixed inline response has no heap owner and returns `None` until a
     /// span read promotes it into charged shared storage.
     pub fn retained_window(&self) -> Option<Bytes> {
-        self.window.clone()
+        self.buffered_owner().cloned()
+    }
+    /// The current shared input window, including its consumed prefix.
+    pub fn buffered_owner(&self) -> Option<&Bytes> {
+        self.window.as_ref()
     }
     pub fn source(&self) -> SourceId {
         self.source

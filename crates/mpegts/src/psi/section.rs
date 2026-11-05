@@ -4,6 +4,29 @@ use crate::{
 use std::sync::atomic::{AtomicBool, Ordering};
 use triergon_core::{Budget, BudgetVec, Bytes, Error, PushError, Result, SourceId, WorkBudget};
 
+// H.222.0 Annex A uses the most-significant bit first and polynomial
+// 0x04c11db7. Compute the eight shifts for each possible high byte once.
+const CRC_OCTET: [u32; 256] = {
+    let mut table = [0; 256];
+    let mut byte = 0;
+    while byte < table.len() {
+        let mut remainder = (byte as u32) << 24;
+        let mut bits = 0;
+        while bits < 8 {
+            remainder = (remainder << 1)
+                ^ if remainder & 0x8000_0000 != 0 {
+                    0x04c1_1db7
+                } else {
+                    0
+                };
+            bits += 1;
+        }
+        table[byte] = remainder;
+        byte += 1;
+    }
+    table
+};
+
 #[derive(Clone, Copy, Debug)]
 pub struct PsiCrc32(u32);
 impl Default for PsiCrc32 {
@@ -13,15 +36,8 @@ impl Default for PsiCrc32 {
 }
 impl PsiCrc32 {
     pub fn update_byte(&mut self, byte: u8) {
-        self.0 ^= u32::from(byte) << 24;
-        for _ in 0..8 {
-            self.0 = (self.0 << 1)
-                ^ if self.0 & 0x8000_0000 != 0 {
-                    0x04c1_1db7
-                } else {
-                    0
-                };
-        }
+        let index = (self.0 >> 24) as u8 ^ byte;
+        self.0 = (self.0 << 8) ^ CRC_OCTET[usize::from(index)];
     }
     pub fn remainder(self) -> u32 {
         self.0
@@ -168,6 +184,13 @@ impl SectionAssembler {
     }
     pub fn partial_bytes(&self) -> &[u8] {
         self.buffer.as_ref().map_or(&[], |buffer| buffer.as_slice())
+    }
+    pub(crate) fn idle(&self) -> bool {
+        self.payload.is_none()
+            && self.target.is_none()
+            && self.fault.is_none()
+            && !self.ended
+            && self.buffer.as_ref().is_some_and(BudgetVec::is_empty)
     }
     /// Explicit loss/recovery transition; normal EndSegment must not call this.
     pub fn discard(&mut self) {
@@ -321,6 +344,15 @@ impl SectionAssembler {
             if !work.try_charge(1) {
                 return Ok(AssemblyStep::Yield);
             }
+            let target = self.target.unwrap_or(3);
+            let stop = payload
+                .fresh_at
+                .filter(|&start| payload.position < start)
+                .unwrap_or(payload.bytes.len());
+            let count = (target - length)
+                .min(stop - payload.position)
+                .min(work.remaining().min(63) as usize + 1);
+            let run = &payload.bytes.as_ref()[payload.position..payload.position + count];
             let physical = payload
                 .offset
                 .checked_add(payload.position as u64)
@@ -328,7 +360,7 @@ impl SectionAssembler {
             let extent = SourceRange {
                 entity: payload.entity,
                 offset: physical,
-                bytes: 1,
+                bytes: count,
             };
             let builder = self
                 .buffer
@@ -337,16 +369,19 @@ impl SectionAssembler {
             if length == self.limits.section_bytes {
                 return Err(limit(length.saturating_add(1), self.limits.section_bytes));
             }
-            builder.try_reserve_exact(self.target.unwrap_or(3) - length)?;
+            builder.try_reserve_exact(target - length)?;
             let merge = prepare_range(&mut self.ranges, extent, self.limits.source_spans)?;
-            builder.try_push(byte).map_err(|error| error.error)?;
+            builder.try_extend_from_slice(run)?;
             commit_range(&mut self.ranges, extent, merge)?;
-            self.crc.update_byte(byte);
+            for &byte in run {
+                self.crc.update_byte(byte);
+            }
+            work.take(count as u64 - 1);
             self.payload
                 .as_mut()
                 .ok_or(Error::Invalid("PSI payload missing"))?
-                .position += 1;
-            if length + 1 == 3 {
+                .position += count;
+            if length + count == 3 {
                 let data = self
                     .buffer
                     .as_ref()

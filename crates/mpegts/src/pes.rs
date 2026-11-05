@@ -126,6 +126,8 @@ pub struct PesAssembler {
     byte_run_epoch: u64,
     header_ranges: BudgetVec<SourceRange>,
     spans: BudgetVec<PesSpan>,
+    validated_spans: usize,
+    validated_chunk: Option<u64>,
 }
 
 impl PesAssembler {
@@ -160,6 +162,8 @@ impl PesAssembler {
             payload_len: 0,
             elementary_offset: 0,
             byte_run_epoch: 0,
+            validated_spans: 0,
+            validated_chunk: None,
         })
     }
     /// One TS payload at a time. Drain poll before supplying another. A rejected
@@ -210,6 +214,38 @@ impl PesAssembler {
     pub fn partial_header(&self) -> &[u8] {
         &self.raw_header[..self.header_used]
     }
+
+    /// Validate one ordinary body carrier. A successful result records whether
+    /// this finishes the finite PES. Other cases use the incremental parser.
+    pub(crate) fn validate_body_carrier(
+        &mut self,
+        count: usize,
+        work: &mut WorkBudget,
+    ) -> Result<Option<bool>> {
+        if self.payload.is_some()
+            || self.ended
+            || self.fault.is_some()
+            || !self.active
+            || self.header.is_none()
+            || self.next_chunk == u64::MAX
+            || self.validated_spans == self.limits.source_spans
+            || count > self.total.unwrap_or(self.limits.pes_bytes) - self.seen
+            || !work.try_charge(count as u64 + 1)
+        {
+            return Ok(None);
+        }
+        self.validated_chunk = Some(self.next_chunk);
+        self.next_chunk += 1;
+        self.validated_spans += 1;
+        self.payload_len += count;
+        self.seen += count;
+        let completed = self.total == Some(self.seen);
+        if completed {
+            self.emit::<false>()?;
+        }
+        Ok(Some(completed))
+    }
+
     /// Explicit continuity/configuration/clock recovery. Caller retains source
     /// bytes if it intends to replay the current PUSI after this transition.
     pub fn discard(&mut self, epochs: SourceEpochs) {
@@ -233,16 +269,31 @@ impl PesAssembler {
         self.epochs = epochs;
         self.header_ranges = BudgetVec::new(&self.budget);
         self.spans = BudgetVec::new(&self.budget);
+        self.validated_spans = 0;
+        self.validated_chunk = None;
     }
     pub fn poll(
         &mut self,
         work: &mut WorkBudget,
         cancel: &AtomicBool,
     ) -> Result<AssemblyStep<Pes>> {
+        Ok(match self.poll_source::<true>(work, cancel)? {
+            AssemblyStep::Output(Some(pes)) => AssemblyStep::Output(pes),
+            AssemblyStep::Output(None) => return Err(Error::Invalid("missing source PES")),
+            AssemblyStep::Yield => AssemblyStep::Yield,
+            AssemblyStep::NeedPayload => AssemblyStep::NeedPayload,
+            AssemblyStep::Finished => AssemblyStep::Finished,
+        })
+    }
+    pub(crate) fn poll_source<const RETAIN: bool>(
+        &mut self,
+        work: &mut WorkBudget,
+        cancel: &AtomicBool,
+    ) -> Result<AssemblyStep<Option<Pes>>> {
         if let Some(error) = self.fault {
             return Err(error);
         }
-        let result = self.poll_inner(work, cancel);
+        let result = self.poll_inner::<RETAIN>(work, cancel);
         if let Err(error) = result.as_ref() {
             if !matches!(
                 error,
@@ -253,13 +304,13 @@ impl PesAssembler {
         }
         result
     }
-    fn emit(&mut self) -> Result<AssemblyStep<Pes>> {
+    fn emit<const RETAIN: bool>(&mut self) -> Result<AssemblyStep<Option<Pes>>> {
         let next = self
             .elementary_offset
             .checked_add(self.payload_len as u64)
             .ok_or(Error::Overflow)?;
         let header = self.header.take().ok_or(Error::Truncated)?;
-        let result = Pes {
+        let result = RETAIN.then(|| Pes {
             pid: self.pid,
             header,
             epochs: self.epochs,
@@ -271,7 +322,12 @@ impl PesAssembler {
                 BudgetVec::new(&self.budget),
             ),
             spans: std::mem::replace(&mut self.spans, BudgetVec::new(&self.budget)),
-        };
+        });
+        if !RETAIN {
+            self.header_ranges.clear();
+            self.validated_spans = 0;
+            self.validated_chunk = None;
+        }
         self.elementary_offset = next;
         self.active = false;
         self.header_used = 0;
@@ -281,11 +337,11 @@ impl PesAssembler {
         self.payload_len = 0;
         Ok(AssemblyStep::Output(result))
     }
-    fn poll_inner(
+    fn poll_inner<const RETAIN: bool>(
         &mut self,
         work: &mut WorkBudget,
         cancel: &AtomicBool,
-    ) -> Result<AssemblyStep<Pes>> {
+    ) -> Result<AssemblyStep<Option<Pes>>> {
         loop {
             if cancel.load(Ordering::Relaxed) {
                 return Err(Error::Cancelled);
@@ -301,7 +357,7 @@ impl PesAssembler {
                 // A completed finite PES consumes its current payload. Release the
                 // input slot before publishing, so the caller can supply the next.
                 self.payload = None;
-                return self.emit();
+                return self.emit::<RETAIN>();
             }
             if self.active && self.header.is_none() && self.header_used == self.header_target {
                 if !work.try_charge(1) {
@@ -359,7 +415,7 @@ impl PesAssembler {
                         if !self.active {
                             Ok(AssemblyStep::Finished)
                         } else if self.total.is_none() && self.header.is_some() {
-                            self.emit()
+                            self.emit::<RETAIN>()
                         } else {
                             Err(Error::Truncated)
                         }
@@ -372,7 +428,7 @@ impl PesAssembler {
                 if pending.pusi {
                     if self.active {
                         if self.total.is_none() && self.header.is_some() {
-                            return self.emit();
+                            return self.emit::<RETAIN>();
                         }
                         return Err(Error::Truncated);
                     }
@@ -407,25 +463,30 @@ impl PesAssembler {
                 if self.seen == self.limits.pes_bytes {
                     return Err(limit(self.seen.saturating_add(1), self.limits.pes_bytes));
                 }
-                let byte = pending.bytes.as_ref()[pending.position];
+                let count = (self.header_target - self.header_used)
+                    .min(self.limits.pes_bytes - self.seen)
+                    .min(pending.bytes.len() - pending.position)
+                    .min(work.remaining().min(HEADER_MAX as u64) as usize + 1);
+                let bytes = &pending.bytes.as_ref()[pending.position..pending.position + count];
                 let extent = SourceRange {
                     entity: pending.entity,
                     offset: pending
                         .offset
                         .checked_add(pending.position as u64)
                         .ok_or(Error::Overflow)?,
-                    bytes: 1,
+                    bytes: count,
                 };
                 let merge =
                     prepare_range(&mut self.header_ranges, extent, self.limits.source_spans)?;
                 commit_range(&mut self.header_ranges, extent, merge)?;
-                self.raw_header[self.header_used] = byte;
-                self.header_used += 1;
-                self.seen += 1;
+                self.raw_header[self.header_used..self.header_used + count].copy_from_slice(bytes);
+                work.take(count as u64 - 1);
+                self.header_used += count;
+                self.seen += count;
                 self.payload
                     .as_mut()
                     .ok_or(Error::Invalid("PES payload missing"))?
-                    .position += 1;
+                    .position += count;
                 continue;
             }
             let available = pending.bytes.len() - pending.position;
@@ -439,24 +500,36 @@ impl PesAssembler {
             if work.remaining() == 0 {
                 return Ok(AssemblyStep::Yield);
             }
-            let merge = self.spans.as_slice().last().is_some_and(|last| {
-                last.chunk == pending.chunk && last.range.end == pending.position
-            });
+            // Validation-only feeds count exactly the same spans. Each chunk
+            // is contiguous and consumed monotonically, so no owners are needed.
+            let (merge, spans) = if RETAIN {
+                (
+                    self.spans.as_slice().last().is_some_and(|last| {
+                        last.chunk == pending.chunk && last.range.end == pending.position
+                    }),
+                    self.spans.len(),
+                )
+            } else {
+                (
+                    self.validated_chunk == Some(pending.chunk),
+                    self.validated_spans,
+                )
+            };
             if !merge {
-                if self.spans.len() == self.limits.source_spans {
-                    return Err(limit(
-                        self.spans.len().saturating_add(1),
-                        self.limits.source_spans,
-                    ));
+                if spans == self.limits.source_spans {
+                    return Err(limit(spans.saturating_add(1), self.limits.source_spans));
                 }
-                self.spans.try_reserve_exact(1)?;
+                if RETAIN {
+                    self.spans.try_reserve_exact(1)?;
+                }
             }
             let count = work.take(maximum as u64) as usize;
-            let physical = pending
-                .offset
-                .checked_add(pending.position as u64)
-                .ok_or(Error::Overflow)?;
-            if merge {
+            if !RETAIN {
+                if !merge {
+                    self.validated_spans += 1;
+                    self.validated_chunk = Some(pending.chunk);
+                }
+            } else if merge {
                 let span = self
                     .spans
                     .as_mut_slice()
@@ -465,6 +538,10 @@ impl PesAssembler {
                 span.range.end += count;
                 span.source.bytes += count;
             } else {
+                let physical = pending
+                    .offset
+                    .checked_add(pending.position as u64)
+                    .ok_or(Error::Overflow)?;
                 self.spans
                     .try_push(PesSpan {
                         bytes: pending.bytes.clone(),

@@ -3,6 +3,7 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use triergon_core::{
     Budget, BudgetVec, Bytes, Error, InputCursor, InputRequest, InputToken, InputWindow, Result,
     SourceCapabilities, SourceFailure, SourceId, SourceLocation, Step, WorkBudget,
+    nonzero_prefix_len,
 };
 
 /// Width of an explicitly declared unsigned big-endian length field.
@@ -246,6 +247,13 @@ impl NalReader {
             return Err(error);
         }
         self.cursor.provide(window)
+    }
+
+    pub fn provide_owned(&mut self, window: InputWindow) -> Result<()> {
+        if let Some(error) = self.failure {
+            return Err(error);
+        }
+        self.cursor.provide_owned(window)
     }
 
     pub fn finish(&mut self, source: SourceId, token: InputToken) -> Result<()> {
@@ -545,10 +553,7 @@ impl NalReader {
                     if self.compact_annex_b && self.zeroes == 0 {
                         let window = self.cursor.buffered();
                         let maximum = window.len().min(work.remaining().min(4096) as usize);
-                        let count = window[..maximum]
-                            .iter()
-                            .position(|&byte| byte == 0)
-                            .unwrap_or(maximum);
+                        let count = nonzero_prefix_len(&window[..maximum]);
                         if count != 0 {
                             self.reserve_compact_payload(count)?;
                             let buffer = self

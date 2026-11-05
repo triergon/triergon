@@ -2,14 +2,16 @@
 use crate::{TrackKey, TsNativeCarriage, TsNativeConfiguration};
 use std::sync::atomic::AtomicBool;
 use triergon_core::{
-    Budget, Bytes, Error, InputWindow, Result, SourceCapabilities, SourceId, Step, Time, WorkBudget,
+    Budget, BudgetVecIntoIter, Bytes, Error, InputWindow, Result, SourceCapabilities, SourceId,
+    Step, Time, WorkBudget,
 };
 use triergon_framing::{Ac3FrameDetails, Ac3FrameLimits, Ac3FrameReader, Ac3StreamSelection};
 use triergon_mpegts::{
     AssemblyStep,
     clock::NativePesTimeView,
     native_pes::{
-        NativePesBoundary, NativePesPacket, NativePesPayloadKind, NativePrivateAudioCarriage,
+        NativePesBoundary, NativePesPacket, NativePesPayloadKind, NativePesSpan,
+        NativePrivateAudioCarriage,
     },
 };
 
@@ -32,8 +34,7 @@ struct PesAnchor {
 }
 
 struct PendingPes {
-    packet: NativePesPacket,
-    span: usize,
+    spans: BudgetVecIntoIter<NativePesSpan>,
     remaining: usize,
 }
 
@@ -48,6 +49,7 @@ pub(crate) struct HlsDolby {
     frame_start: u64,
     frame_anchor: PesAnchor,
     next_anchor: PesAnchor,
+    last_duration: Option<(u32, u16, Time)>,
     eof: bool,
 }
 
@@ -96,6 +98,7 @@ impl HlsDolby {
             frame_start: 0,
             frame_anchor: PesAnchor::default(),
             next_anchor: PesAnchor::default(),
+            last_duration: None,
             eof: false,
         })
     }
@@ -178,8 +181,7 @@ impl HlsDolby {
         self.source_clock_epoch = Some(origin);
         self.pending = mailbox.take().map(|packet| PendingPes {
             remaining: packet.payload_len,
-            packet,
-            span: 0,
+            spans: packet.spans.into_iter(),
         });
         Ok(true)
     }
@@ -227,14 +229,27 @@ impl HlsDolby {
                         }
                         _ => {}
                     }
-                    let duration = header.sample_span()?;
+                    let rate = header.sample_rate_hz;
+                    let samples = header.coded_samples();
+                    let duration = match self.last_duration {
+                        Some((last_rate, last_samples, duration))
+                            if (rate, samples) == (last_rate, last_samples) =>
+                        {
+                            duration
+                        }
+                        _ => {
+                            let duration = header.sample_span()?;
+                            self.last_duration = Some((rate, samples, duration));
+                            duration
+                        }
+                    };
                     let anchor = std::mem::replace(
                         &mut self.frame_anchor,
                         std::mem::take(&mut self.next_anchor),
                     );
                     self.frame_start = reader.position();
                     return Ok(AssemblyStep::Output(HlsDolbyFrame {
-                        bytes: frame.bytes().clone(),
+                        bytes: frame.into_bytes(),
                         pts: anchor.pts,
                         dts: anchor.dts,
                         duration,
@@ -242,30 +257,29 @@ impl HlsDolby {
                 }
                 Step::NeedInput(request) => {
                     if let Some(input) = &mut self.pending {
-                        let Some(span) = input.packet.spans.as_slice().get(input.span) else {
+                        if input.spans.len() == 0 {
                             if input.remaining != 0 {
                                 return Err(Error::Invalid("HLS Dolby PES payload extent"));
                             }
                             self.pending = None;
                             continue;
-                        };
+                        }
                         if !work.try_charge(1) {
                             return Ok(AssemblyStep::Yield);
                         }
-                        let bytes = span.backing_bytes();
+                        let bytes = input
+                            .spans
+                            .next()
+                            .ok_or(Error::Invalid("HLS Dolby missing PES span"))?
+                            .into_bytes();
                         let remaining = input
                             .remaining
                             .checked_sub(bytes.len())
                             .ok_or(Error::Invalid("HLS Dolby PES payload extent"))?;
-                        let window = InputWindow::new(
-                            request.source,
-                            request.token,
-                            request.offset,
-                            bytes.clone(),
-                        )?;
-                        reader.provide(&window)?;
+                        let window =
+                            InputWindow::new(request.source, request.token, request.offset, bytes)?;
+                        reader.provide_owned(window)?;
                         input.remaining = remaining;
-                        input.span += 1;
                     } else if self.eof {
                         reader.finish(request.source, request.token)?;
                     } else {

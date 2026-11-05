@@ -164,6 +164,17 @@ pub(crate) fn parser_only_audio_clocks<F, T>(
     if cancel.load(Ordering::Relaxed) {
         return Err(Error::Cancelled);
     }
+    let mut last_duration = None;
+    let mut duration_nanoseconds = |duration: Time| -> Result<i64> {
+        if let Some((cached, nanoseconds)) = last_duration
+            && duration == cached
+        {
+            return Ok(nanoseconds);
+        }
+        let nanoseconds = duration.to_nanoseconds(Rounding::Floor)?;
+        last_duration = Some((duration, nanoseconds));
+        Ok(nanoseconds)
+    };
     let mut leading = 0_i64;
     let mut next = 0;
     for frame in frames.as_slice() {
@@ -179,7 +190,7 @@ pub(crate) fn parser_only_audio_clocks<F, T>(
             break;
         }
         leading = leading
-            .checked_add(duration.to_nanoseconds(Rounding::Floor)?)
+            .checked_add(duration_nanoseconds(duration)?)
             .ok_or(Error::Overflow)?;
     }
     output.try_reserve_exact(frames.len())?;
@@ -196,7 +207,7 @@ pub(crate) fn parser_only_audio_clocks<F, T>(
         if previous.is_some_and(|previous| pts < previous) {
             return Err(Error::Invalid("HLS audio timestamps move backwards"));
         }
-        let duration_ns = duration.to_nanoseconds(Rounding::Floor)?;
+        let duration_ns = duration_nanoseconds(duration)?;
         output
             .try_push(make(HlsParserOnlyAudioClock {
                 pts_ns: pts,

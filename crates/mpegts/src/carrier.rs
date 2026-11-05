@@ -8,6 +8,115 @@ use triergon_core::{
     Budget, Bytes, Error, PushError, Result, SourceId, SourceLocation, WorkBudget,
 };
 
+const STUFFING: [u8; 182] = [0xff; 182];
+
+struct CarrierHeader {
+    pid: u16,
+    pusi: bool,
+    priority: bool,
+    tei: bool,
+    scrambling: u8,
+    cc: u8,
+    afc: u8,
+}
+
+impl CarrierHeader {
+    fn parse(data: &[u8]) -> Result<Self> {
+        let [0x47, high, low, control, ..] = data else {
+            return Err(Error::Invalid("TS sync byte"));
+        };
+        Ok(Self {
+            pid: (u16::from(high & 31) << 8) | u16::from(*low),
+            pusi: high & 64 != 0,
+            priority: high & 32 != 0,
+            tei: high & 128 != 0,
+            scrambling: control >> 6,
+            cc: control & 15,
+            afc: (control >> 4) & 3,
+        })
+    }
+}
+
+pub(crate) struct PlainCarrier {
+    header: CarrierHeader,
+    payload_start: usize,
+    flags: Option<u8>,
+}
+
+impl PlainCarrier {
+    /// Validate payload-only carriers and adaptations containing only flags
+    /// and stuffing. Charge the same fields and bytes as the incremental path.
+    pub(crate) fn inspect_ts188(source: &Bytes, work: &mut WorkBudget) -> Option<Self> {
+        let data = source.as_ref();
+        if data.len() != 188 {
+            return None;
+        }
+        let header = CarrierHeader::parse(data).ok()?;
+        let (payload_start, flags, charge) = match header.afc {
+            1 => (4, None, 2),
+            3 if data[4] == 0 => (5, Some(0), 4),
+            3 if data[4] <= 182 && data[5] & 31 == 0 => {
+                let end = 5 + usize::from(data[4]);
+                let stuffing = end - 6;
+                let charge = 10 + stuffing as u64;
+                if work.remaining() < charge || data[6..end] != STUFFING[..stuffing] {
+                    return None;
+                }
+                (end, Some(data[5]), charge)
+            }
+            _ => return None,
+        };
+        work.try_charge(charge).then_some(Self {
+            header,
+            payload_start,
+            flags,
+        })
+    }
+
+    pub(crate) fn into_packet(
+        self,
+        source: Bytes,
+        source_offset: u64,
+        source_id: Option<SourceId>,
+    ) -> Result<TransportPacket> {
+        let payload = source.slice(self.payload_start..188)?;
+        let adaptation = if let Some(flags) = self.flags {
+            Some(Adaptation {
+                source: source.slice(4..self.payload_start)?,
+                discontinuity: flags & 128 != 0,
+                random_access_indicator: flags & 64 != 0,
+                elementary_priority: flags & 32 != 0,
+                pcr: None,
+                opcr: None,
+                splice_countdown: None,
+                private_data: None,
+                extension: None,
+            })
+        } else {
+            None
+        };
+        Ok(TransportPacket {
+            source,
+            source_offset,
+            source_id,
+            prefix: None,
+            pid: self.header.pid,
+            payload_unit_start: self.header.pusi,
+            transport_priority: self.header.priority,
+            transport_error: self.header.tei,
+            scrambling: self.header.scrambling,
+            continuity_counter: self.header.cc,
+            adaptation,
+            payload: Some(payload),
+            payload_source_offset: source_offset
+                .checked_add(self.payload_start as u64)
+                .ok_or(Error::Overflow)?,
+            sync: 0,
+            pcr_range: None,
+        })
+    }
+}
+
 #[derive(Clone, Debug)]
 pub(crate) struct Envelope {
     pub pid: u16,
@@ -191,9 +300,9 @@ impl TransportInspector {
         }
         self.phase = Phase::Finish;
     }
-    fn end(&self, count: usize) -> Result<usize> {
-        let next = self.position.checked_add(count).ok_or(Error::Overflow)?;
-        if next > self.fields.adaptation_end {
+    fn field_end(position: usize, end: usize, count: usize) -> Result<usize> {
+        let next = position.checked_add(count).ok_or(Error::Overflow)?;
+        if next > end {
             Err(Error::Invalid("adaptation field length"))
         } else {
             Ok(next)
@@ -226,7 +335,10 @@ impl TransportInspector {
                     .as_ref()
                     .ok_or(Error::Invalid("carrier owner missing"))?;
                 let stuffing = &source.as_ref()[start..start + count];
-                if let Some(invalid) = stuffing.iter().position(|&byte| byte != 0xff) {
+                let invalid = (stuffing != &STUFFING[..count])
+                    .then(|| stuffing.iter().position(|&byte| byte != 0xff))
+                    .flatten();
+                if let Some(invalid) = invalid {
                     work.take((invalid + 1) as u64);
                     self.position += invalid;
                     self.fail(Error::Invalid("adaptation stuffing"));
@@ -246,22 +358,19 @@ impl TransportInspector {
             let source = self
                 .bytes
                 .as_ref()
-                .ok_or(Error::Invalid("carrier owner missing"))?
-                .clone();
+                .ok_or(Error::Invalid("carrier owner missing"))?;
             let data = &source.as_ref()[self.format.prefix_bytes()..];
             let action: Result<()> = (|| {
                 match self.phase {
                     Phase::Header => {
-                        if data[0] != 0x47 {
-                            return Err(Error::Invalid("TS sync byte"));
-                        }
-                        self.fields.pid = (u16::from(data[1] & 31) << 8) | u16::from(data[2]);
-                        self.fields.pusi = data[1] & 64 != 0;
-                        self.fields.priority = data[1] & 32 != 0;
-                        self.fields.tei = data[1] & 128 != 0;
-                        self.fields.scrambling = data[3] >> 6;
-                        self.fields.cc = data[3] & 15;
-                        self.fields.afc = (data[3] >> 4) & 3;
+                        let header = CarrierHeader::parse(data)?;
+                        self.fields.pid = header.pid;
+                        self.fields.pusi = header.pusi;
+                        self.fields.priority = header.priority;
+                        self.fields.tei = header.tei;
+                        self.fields.scrambling = header.scrambling;
+                        self.fields.cc = header.cc;
+                        self.fields.afc = header.afc;
                         if self.fields.afc == 0 {
                             return Err(Error::Invalid("reserved adaptation control"));
                         }
@@ -295,11 +404,16 @@ impl TransportInspector {
                         if data[5] & 0x18 == 0x08 {
                             self.error = Some(Error::Invalid("OPCR without PCR"));
                         }
-                        self.phase = Phase::Pcr;
+                        self.phase = if self.fields.flags & 31 == 0 && work.try_charge(5) {
+                            Phase::Stuffing
+                        } else {
+                            Phase::Pcr
+                        };
                     }
                     Phase::Pcr => {
                         if self.fields.flags & 0x10 != 0 {
-                            let next = self.end(6)?;
+                            let next =
+                                Self::field_end(self.position, self.fields.adaptation_end, 6)?;
                             match crate::transport::pcr(&data[self.position..next]) {
                                 Ok(clock) => {
                                     self.fields.pcr = Some(clock);
@@ -317,11 +431,16 @@ impl TransportInspector {
                             }
                             self.position = next;
                         }
-                        self.phase = Phase::Opcr;
+                        self.phase = if self.fields.flags & 15 == 0 && work.try_charge(4) {
+                            Phase::Stuffing
+                        } else {
+                            Phase::Opcr
+                        };
                     }
                     Phase::Opcr => {
                         if self.fields.flags & 8 != 0 {
-                            let next = self.end(6)?;
+                            let next =
+                                Self::field_end(self.position, self.fields.adaptation_end, 6)?;
                             self.fields.opcr =
                                 Some(crate::transport::pcr(&data[self.position..next])?);
                             self.position = next;
@@ -330,7 +449,8 @@ impl TransportInspector {
                     }
                     Phase::Splice => {
                         if self.fields.flags & 4 != 0 {
-                            let next = self.end(1)?;
+                            let next =
+                                Self::field_end(self.position, self.fields.adaptation_end, 1)?;
                             self.fields.splice = Some(data[self.position] as i8);
                             self.position = next;
                         }
@@ -340,7 +460,7 @@ impl TransportInspector {
                         let private = matches!(self.phase, Phase::Private);
                         let flag = if private { 2 } else { 1 };
                         if self.fields.flags & flag != 0 {
-                            self.end(1)?;
+                            Self::field_end(self.position, self.fields.adaptation_end, 1)?;
                             let count = usize::from(data[self.position]);
                             let start = self.position + 1;
                             let next = start.checked_add(count).ok_or(Error::Overflow)?;
@@ -446,5 +566,54 @@ impl TransportInspector {
             sync,
             pcr_range: f.pcr_range.clone(),
         }))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn plain_adaptation_matches_incremental_work_fields_and_payload() {
+        let pool = Budget::new(8192).unwrap();
+        let mut wire = [0xff; 188];
+        wire[..6].copy_from_slice(&[0x47, 0x61, 0, 0x37, 100, 0xe0]);
+        wire[105..].fill(0x42);
+        let bytes = Bytes::copy_from_slice(&pool, &wire).unwrap();
+        let source = Some(SourceId(7));
+        let mut fast_work = WorkBudget::new(4096);
+        let plain = PlainCarrier::inspect_ts188(&bytes, &mut fast_work).unwrap();
+        let fast = plain.into_packet(bytes.clone(), 188, source).unwrap();
+        let mut slow_work = WorkBudget::new(4096);
+        let mut inspector =
+            TransportInspector::detached(bytes, PacketFormat::Ts188, 188, source).unwrap();
+        let AssemblyStep::Output(TransportInspection::Accepted(slow)) = inspector
+            .poll(&mut slow_work, &AtomicBool::new(false))
+            .unwrap()
+        else {
+            panic!("expected a valid padded carrier");
+        };
+        assert_eq!(fast_work.spent(), slow_work.spent());
+        assert_eq!(fast.pid, slow.pid);
+        assert_eq!(fast.payload_source_offset, slow.payload_source_offset);
+        assert_eq!(
+            fast.payload.unwrap().as_ref(),
+            slow.payload.unwrap().as_ref()
+        );
+        let adaptation = fast.adaptation.unwrap();
+        assert!(
+            adaptation.discontinuity
+                && adaptation.random_access_indicator
+                && adaptation.elementary_priority
+        );
+        assert_eq!(
+            adaptation.source.as_ref(),
+            slow.adaptation.unwrap().source.as_ref()
+        );
+        wire[104] = 0;
+        let malformed = Bytes::copy_from_slice(&pool, &wire).unwrap();
+        let mut work = WorkBudget::new(4096);
+        assert!(PlainCarrier::inspect_ts188(&malformed, &mut work).is_none());
+        assert_eq!(work.spent(), 0);
     }
 }

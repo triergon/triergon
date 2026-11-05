@@ -188,6 +188,11 @@ impl RawAnnexBReader {
         self.nal.provide(window)
     }
 
+    pub fn provide_owned(&mut self, window: InputWindow) -> Result<()> {
+        self.healthy()?;
+        self.nal.provide_owned(window)
+    }
+
     pub fn finish(&mut self, source: SourceId, token: InputToken) -> Result<()> {
         self.healthy()?;
         let result = self.nal.finish(source, token);
