@@ -8,6 +8,59 @@ use triergon_core::{
     Budget, Bytes, Error, PushError, Result, SourceId, SourceLocation, WorkBudget,
 };
 
+pub(crate) struct CarrierHeader {
+    pid: u16,
+    pusi: bool,
+    priority: bool,
+    tei: bool,
+    scrambling: u8,
+    cc: u8,
+    pub(crate) afc: u8,
+}
+
+impl CarrierHeader {
+    pub(crate) fn parse(data: &[u8]) -> Result<Self> {
+        let [0x47, high, low, control, ..] = data else {
+            return Err(Error::Invalid("TS sync byte"));
+        };
+        Ok(Self {
+            pid: (u16::from(high & 31) << 8) | u16::from(*low),
+            pusi: high & 64 != 0,
+            priority: high & 32 != 0,
+            tei: high & 128 != 0,
+            scrambling: control >> 6,
+            cc: control & 15,
+            afc: (control >> 4) & 3,
+        })
+    }
+
+    pub(crate) fn payload_only_ts188(
+        self,
+        source: Bytes,
+        source_offset: u64,
+        source_id: Option<SourceId>,
+    ) -> Result<TransportPacket> {
+        let payload = source.slice(4..188)?;
+        Ok(TransportPacket {
+            source,
+            source_offset,
+            source_id,
+            prefix: None,
+            pid: self.pid,
+            payload_unit_start: self.pusi,
+            transport_priority: self.priority,
+            transport_error: self.tei,
+            scrambling: self.scrambling,
+            continuity_counter: self.cc,
+            adaptation: None,
+            payload: Some(payload),
+            payload_source_offset: source_offset.checked_add(4).ok_or(Error::Overflow)?,
+            sync: 0,
+            pcr_range: None,
+        })
+    }
+}
+
 #[derive(Clone, Debug)]
 pub(crate) struct Envelope {
     pub pid: u16,
@@ -252,16 +305,14 @@ impl TransportInspector {
             let action: Result<()> = (|| {
                 match self.phase {
                     Phase::Header => {
-                        if data[0] != 0x47 {
-                            return Err(Error::Invalid("TS sync byte"));
-                        }
-                        self.fields.pid = (u16::from(data[1] & 31) << 8) | u16::from(data[2]);
-                        self.fields.pusi = data[1] & 64 != 0;
-                        self.fields.priority = data[1] & 32 != 0;
-                        self.fields.tei = data[1] & 128 != 0;
-                        self.fields.scrambling = data[3] >> 6;
-                        self.fields.cc = data[3] & 15;
-                        self.fields.afc = (data[3] >> 4) & 3;
+                        let header = CarrierHeader::parse(data)?;
+                        self.fields.pid = header.pid;
+                        self.fields.pusi = header.pusi;
+                        self.fields.priority = header.priority;
+                        self.fields.tei = header.tei;
+                        self.fields.scrambling = header.scrambling;
+                        self.fields.cc = header.cc;
+                        self.fields.afc = header.afc;
                         if self.fields.afc == 0 {
                             return Err(Error::Invalid("reserved adaptation control"));
                         }

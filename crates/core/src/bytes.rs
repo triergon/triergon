@@ -496,3 +496,38 @@ impl BudgetVec<u8> {
         Ok(Bytes::from_storage(data, charge))
     }
 }
+
+/// Length of the leading run of nonzero bytes.
+#[inline]
+pub fn nonzero_prefix_len(bytes: &[u8]) -> usize {
+    let (words, tail) = bytes.as_chunks::<8>();
+    for (index, chunk) in words.iter().enumerate() {
+        let word = u64::from_le_bytes(*chunk);
+        let zeroes = word.wrapping_sub(0x0101_0101_0101_0101) & !word & 0x8080_8080_8080_8080;
+        if zeroes != 0 {
+            // Borrow can mark a following byte, so use the lowest marked octet.
+            return index * 8 + zeroes.trailing_zeros() as usize / 8;
+        }
+    }
+    words.len() * 8
+        + tail
+            .iter()
+            .position(|&byte| byte == 0)
+            .unwrap_or(tail.len())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::nonzero_prefix_len;
+
+    #[test]
+    fn nonzero_prefix_stops_at_the_first_zero_in_words_and_tails() {
+        for length in 0..32 {
+            for zero in 0..=length {
+                let mut data = [1; 33];
+                data[zero + 1] = 0;
+                assert_eq!(nonzero_prefix_len(&data[1..length + 1]), zero);
+            }
+        }
+    }
+}

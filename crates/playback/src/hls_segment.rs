@@ -912,3 +912,52 @@ fn check_extent(offset: u64, count: usize, maximum: usize) -> triergon_core::Res
     }
     Ok(())
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::ByteSource;
+    use triergon_core::{Bytes, SourceCapabilities, SourceId};
+
+    #[test]
+    fn suppressed_source_events_still_charge_the_player_event_limit() {
+        let fixture = include_bytes!("../tests/fixtures/hls/baseline-stereo.ts");
+        let pool = Budget::new(1024 * 1024).unwrap();
+        let source = SourceId(1);
+        let cursor = InputCursor::new(
+            &pool,
+            source,
+            SourceCapabilities {
+                length: Some(fixture.len() as u64),
+                random_access: false,
+            },
+            4096,
+        )
+        .unwrap();
+        let bytes = Bytes::copy_from_slice(&pool, fixture).unwrap();
+        let engine = Engine::ts_hls_segment(cursor, ParseLimits::default(), false).unwrap();
+        let mut player = Player::new(
+            engine,
+            SourceOwner::new(ByteSource::new(source, bytes, 4096).unwrap()),
+            Selection::All,
+            PlayerPolicy {
+                maximum_events: 1,
+                ..PlayerPolicy::default()
+            },
+        )
+        .unwrap();
+        let mut slot = None;
+        assert!(matches!(
+            player.read_output(
+                &mut slot,
+                &mut WorkBudget::new(4096),
+                &AtomicBool::new(false)
+            ),
+            Err(Error::Core(CoreError::Limit {
+                requested: 2,
+                maximum: 1
+            }))
+        ));
+        assert!(slot.is_none());
+    }
+}

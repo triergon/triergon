@@ -1,4 +1,5 @@
 //! Format-specific <=192-byte carry, not an I/O cursor/token framework.
+use crate::carrier::CarrierHeader;
 use crate::{
     AssemblyStep, PacketFormat, RejectedTransport, TransportInspection, TransportInspector,
     TransportPacket,
@@ -8,6 +9,8 @@ use triergon_core::{
     Budget, BudgetVec, Bytes, Error, InputCursor, InputToken, Result, SourceId, SourceLocation,
     Step, WorkBudget,
 };
+
+const MAX_SHARED_INPUT_CAPACITY: usize = 128 * 1024;
 
 /// A validated run of null carriers on the source grid. The shared backing
 /// span includes every opaque M2TS prefix and every byte of null payload.
@@ -88,6 +91,7 @@ pub struct TransportFramer {
     budget: Budget,
     format: PacketFormat,
     share_input: bool,
+    shared_owner: Option<Bytes>,
     carry: Option<BudgetVec<u8>>,
     start: Option<u64>,
     next: Option<u64>,
@@ -107,6 +111,7 @@ impl TransportFramer {
             budget,
             format,
             share_input: false,
+            shared_owner: None,
             start: None,
             next: None,
             token: None,
@@ -125,6 +130,7 @@ impl TransportFramer {
     pub fn discard(&mut self) {
         self.carry = Some(BudgetVec::new(&self.budget));
         self.start = None;
+        self.shared_owner = None;
         self.next = None;
         self.token = None;
         self.entity = None;
@@ -206,6 +212,23 @@ impl TransportFramer {
                 .map_err(|failure| failure.error)?,
         );
         Ok(())
+    }
+
+    fn share_buffered_owner(shared_owner: &mut Option<Bytes>, input: &InputCursor) -> bool {
+        let Some(window) = input.buffered_owner() else {
+            return false;
+        };
+        if let Some(owner) = shared_owner {
+            return owner.shares_storage_with(window);
+        }
+        // One bounded owner per segment. A short read backed by an oversized
+        // allocation must not keep that capacity alive through a PES span.
+        let capacity = window.retained_capacity();
+        if capacity > MAX_SHARED_INPUT_CAPACITY || capacity > window.len().saturating_mul(8) {
+            return false;
+        }
+        *shared_owner = Some(window.clone());
+        true
     }
 
     pub(crate) fn try_null_run(
@@ -295,6 +318,7 @@ impl TransportFramer {
                 self.start = None;
                 self.next = None;
                 self.entity_end_seen = false;
+                self.shared_owner = None;
             }
         }
         self.token = Some(token);
@@ -324,18 +348,32 @@ impl TransportFramer {
                     .complete(work, cancel)
                     .map(|value| value.map_or(Step::Yield, Step::Ready));
             }
-            // Segment feeds already retain source windows. Share a complete
-            // carrier and use the same inspector as split or budgeted reads.
+            // Share a complete carrier. Payload-only TS188 ends after the
+            // common header. Adaptations and faults use the full inspector.
             if self.share_input
                 && carry.is_empty()
                 && input.buffered().len() >= missing
                 && work.remaining() >= missing as u64
+                && Self::share_buffered_owner(&mut self.shared_owner, input)
             {
                 let start = input.position();
                 let Step::Ready(source) = input.read_span(missing, work, cancel)? else {
                     return Err(Error::Invalid("buffered carrier span missing"));
                 };
                 self.next = Some(input.position());
+                if self.format == PacketFormat::Ts188
+                    && !cancel.load(Ordering::Relaxed)
+                    && let Ok(header) = CarrierHeader::parse(source.as_ref())
+                    && header.afc == 1
+                    && work.try_charge(2)
+                {
+                    self.last_packet_offset = Some(start);
+                    return Ok(Step::Ready(header.payload_only_ts188(
+                        source,
+                        start,
+                        self.entity,
+                    )?));
+                }
                 self.inspect(source, start)?;
                 continue;
             }
@@ -539,6 +577,49 @@ mod tests {
         assert_eq!(rejected.source_offset(), 188);
         assert_eq!(rejected.bytes().as_ref(), &wire[188..]);
         assert!(rejected.backing_bytes().shares_storage_with(&window));
+    }
+
+    #[test]
+    fn segment_carriers_copy_sparse_and_independent_windows() {
+        let budget = Budget::new(256 * 1024).unwrap();
+        let mut input = InputCursor::new(
+            &budget,
+            SourceId(1),
+            SourceCapabilities {
+                length: Some(3 * 188),
+                random_access: false,
+            },
+            188,
+        )
+        .unwrap();
+        let mut framer = TransportFramer::new(budget.clone(), PacketFormat::Ts188);
+        framer.share_input();
+        let mut wire = [0xff; 188];
+        wire[..4].copy_from_slice(&[0x47, 0x1f, 0xff, 0x10]);
+        for (capacity, share) in [(64 * 1024, false), (188, true), (188, false)] {
+            let mut data = Vec::with_capacity(capacity);
+            data.extend_from_slice(&wire);
+            let owner = Bytes::try_from_vec(&budget, data).unwrap();
+            let request = input.request();
+            input
+                .provide_owned(
+                    InputWindow::new(request.source, request.token, request.offset, owner.clone())
+                        .unwrap(),
+                )
+                .unwrap();
+            let Step::Ready(packet) = framer
+                .poll(
+                    &mut input,
+                    &mut WorkBudget::new(4096),
+                    &AtomicBool::new(false),
+                )
+                .unwrap()
+            else {
+                panic!("expected a complete carrier");
+            };
+            assert_eq!(packet.source.as_ref(), &wire);
+            assert_eq!(packet.source.shares_storage_with(&owner), share);
+        }
     }
 
     #[test]

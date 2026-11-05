@@ -319,6 +319,7 @@ pub struct TsEngine {
     native_pending: Option<NativePesPacket>,
     native_packet_clock: Option<NativePesClockV1>,
     event_ordinal: u64,
+    suppressed_events: u64,
     native_update_at: Option<usize>,
     segment_discovery: Option<SegmentDiscovery>,
     segmented: bool,
@@ -590,6 +591,7 @@ impl Engine {
             native_pending: None,
             native_packet_clock: clock()?,
             event_ordinal: 0,
+            suppressed_events: 0,
             native_update_at: None,
             segment_discovery: None,
             segmented: false,
@@ -925,6 +927,13 @@ impl Engine {
             Self::Matroska(r) => Ok(BackendStep::from_matroska(r.step(w, c)?)),
             Self::Mp4(r) => r.poll(w, c, None),
             Self::Ts(r) => r.poll(w, c),
+        }
+    }
+
+    pub(crate) fn take_suppressed_events(&mut self) -> u64 {
+        match self {
+            Self::Ts(engine) => std::mem::take(&mut engine.suppressed_events),
+            _ => 0,
         }
     }
 
@@ -1825,10 +1834,12 @@ impl TsEngine {
         if self.pending.is_none() {
             let step = self.stream.poll(&mut self.input, w, c);
             if feed_only {
+                let omitted = self.stream.take_feed_omissions();
                 self.event_ordinal = self
                     .event_ordinal
-                    .checked_add(self.stream.take_feed_omissions())
+                    .checked_add(omitted)
                     .ok_or(Error::Overflow)?;
+                self.suppressed_events += omitted;
             }
             match step? {
                 Step::Ready(e) => self.pending = Some(e),
@@ -2006,6 +2017,7 @@ impl TsEngine {
                 _ => {}
             }
             self.event_ordinal = self.event_ordinal.checked_add(1).ok_or(Error::Overflow)?;
+            self.suppressed_events += 1;
             return Ok(BackendStep::Yield);
         }
         let key = match (self.tsid, self.pcr_pid) {

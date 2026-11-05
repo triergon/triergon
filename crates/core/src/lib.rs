@@ -12,7 +12,7 @@ mod work;
 pub use budget::{Budget, Reservation};
 pub use bytes::{
     BudgetVec, BudgetVecIntoIter, Bytes, BytesWriter, FreezeError, OwnedInputBytes, PushError,
-    TransferError,
+    TransferError, nonzero_prefix_len,
 };
 pub use error::{Error, Result};
 pub use input::{

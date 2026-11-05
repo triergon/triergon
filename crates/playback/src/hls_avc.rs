@@ -6,7 +6,9 @@ pub(crate) mod syntax;
 
 use crate::{TrackKey, TsNativeCarriage, TsNativeConfiguration};
 use std::sync::atomic::{AtomicBool, Ordering};
-use triergon_core::{Budget, BudgetVec, Bytes, Error, Result, SourceId, WorkBudget};
+use triergon_core::{
+    Budget, BudgetVec, Bytes, Error, Result, SourceId, WorkBudget, nonzero_prefix_len,
+};
 use triergon_framing::{Codec, NalHeader};
 use triergon_mpegts::{
     clock::NativePesTimeView,
@@ -409,10 +411,7 @@ impl AvcTsReader {
                 let copy =
                     if first != 0 && self.prefix.is_none() && self.zeroes < 2 && self.nal.is_some()
                     {
-                        available[..count]
-                            .iter()
-                            .position(|&byte| byte == 0)
-                            .unwrap_or(count)
+                        nonzero_prefix_len(&available[..count])
                     } else {
                         1
                     };
