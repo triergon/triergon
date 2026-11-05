@@ -41,3 +41,9 @@ candidate again passed 44 parity and both memory gates, with 43 runtime
 passes and the same fresh no-Cues failure at 1.2525941549145712×. The
 candidate was reverted from the PR. The [full failed variant
 summary](inline-attempt.json) retains all 44 rows and artifact hashes.
+
+Directly decoding the common short EBML headers passed the host suite
+and all 44 native parity and memory cases. Its fresh no-Cues upper runtime
+ratio was 1.2566436315641156×, with 43/44 runtime passes. The PR keeps
+the lazy scan candidate measured at 1.2515724977139935×.
+[Short header experiment and hashes](short-headers-attempt.json)
