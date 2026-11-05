@@ -105,7 +105,7 @@ struct Readiness {
 }
 
 impl Readiness {
-    fn new(configuration: &Configuration) -> Result<Self> {
+    fn new(configuration: &Configuration, probe_subtitles: bool) -> Result<Self> {
         let tracks = configuration.tracks();
         if tracks.len() > 64 {
             return Err(Error::Limit {
@@ -119,6 +119,7 @@ impl Readiness {
         for (index, track) in tracks.iter().enumerate() {
             let bit = 1_u64 << index;
             match (track.kind, track.codec.as_str()) {
+                (17, _) if !probe_subtitles => {}
                 (17, "S_HDMV/PGS") => {
                     pgs |= bit;
                     waiting |= bit;
@@ -209,6 +210,7 @@ pub struct MatroskaDiscovery<S: Source> {
     pending: Option<Output>,
     pending_segment: usize,
     pending_observed: bool,
+    probe_subtitles: bool,
     packet_bytes: usize,
     readiness: Option<Readiness>,
     cutoff: Option<MatroskaDiscoveryCutoff>,
@@ -274,6 +276,21 @@ impl<S: Source> MatroskaCompactDiscovery<S> {
             limits,
             |budget| ReplayBuffer::Matroska(BudgetVec::new(budget)),
         )?))
+    }
+
+    /// Start an A/V feed as soon as its streams are ready. Subtitle packets
+    /// remain selected and are replayed or read in source order. Their first
+    /// display set may occur well after the start of playback.
+    pub fn for_av_feed(
+        engine: Engine,
+        source: SourceOwner<S>,
+        selection: Selection,
+        player_policy: PlayerPolicy,
+        limits: MatroskaDiscoveryLimits,
+    ) -> Result<Self> {
+        let mut discovery = Self::new(engine, source, selection, player_policy, limits)?;
+        discovery.0.probe_subtitles = false;
+        Ok(discovery)
     }
 
     pub fn buffered_events(&self) -> impl ExactSizeIterator<Item = &Event> {
@@ -358,6 +375,7 @@ impl<S: Source> MatroskaDiscovery<S> {
             pending: None,
             pending_segment: 0,
             pending_observed: false,
+            probe_subtitles: true,
             packet_bytes: 0,
             readiness: None,
             cutoff: None,
@@ -478,7 +496,7 @@ impl<S: Source> MatroskaDiscovery<S> {
             }
             RawEvent::Matroska(Event::Configuration(configuration)) => {
                 if !self.pending_observed {
-                    self.readiness = Some(Readiness::new(configuration)?);
+                    self.readiness = Some(Readiness::new(configuration, self.probe_subtitles)?);
                 }
                 0
             }
