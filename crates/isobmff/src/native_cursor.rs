@@ -679,6 +679,9 @@ impl<'a> Mov9PacketCursor<'a> {
         if starts.len() != self.slots.len() {
             return Err(Error::Invalid("native resume track coverage"));
         }
+        if self.recording_seek_checkpoints && starts.iter().any(|start| start.occurrence != 0) {
+            self.discard_seek_checkpoints();
+        }
         let skipped = starts.iter().try_fold(0u64, |sum, p| {
             sum.checked_add(p.occurrence).ok_or(Error::Overflow)
         })?;

@@ -17,16 +17,18 @@ const CHECKPOINT_INTERVAL: u64 = 8192;
 const MAX_CHECKPOINTS: usize = 256;
 
 #[derive(Clone, Debug)]
-struct Key<'a> {
+struct Checkpoint<'a> {
     ordinal: u64,
     timestamp: i64,
+    previous_sync: u64,
     slot: Slot<'a>,
 }
 
 #[derive(Debug)]
 struct Track<'a> {
-    keys: BudgetVec<Key<'a>>,
+    points: BudgetVec<Checkpoint<'a>>,
     previous: Option<i64>,
+    previous_sync: u64,
     entries: u64,
 }
 
@@ -46,8 +48,9 @@ impl<'a> Checkpoints<'a> {
         for _ in 0..tracks {
             slots
                 .try_push(Track {
-                    keys: BudgetVec::new(budget),
+                    points: BudgetVec::new(budget),
                     previous: None,
+                    previous_sync: 0,
                     entries: 0,
                 })
                 .map_err(|e| e.error)?;
@@ -84,21 +87,19 @@ impl<'a> Checkpoints<'a> {
         {
             return None;
         }
-        if key
-            && track
-                .keys
-                .as_slice()
-                .last()
-                .is_none_or(|last| track.entries - last.ordinal >= CHECKPOINT_INTERVAL)
-        {
+        if key {
+            track.previous_sync = track.entries;
+        }
+        if track.entries % CHECKPOINT_INTERVAL == 0 {
             if self.stored == MAX_CHECKPOINTS {
                 return None;
             }
             track
-                .keys
-                .try_push(Key {
+                .points
+                .try_push(Checkpoint {
                     ordinal: track.entries,
                     timestamp,
+                    previous_sync: track.previous_sync,
                     slot: slot.clone(),
                 })
                 .ok()?;
@@ -123,13 +124,19 @@ impl<'a> Mov9PacketCursor<'a> {
                 .slots
                 .as_slice()
                 .iter()
-                .all(|slot| slot.track.fragments.is_empty())
+                .all(|slot| slot.resume_remaining == 0 && slot.track.fragments.is_empty())
         {
             self.seek_checkpoints = Checkpoints::new(self.slots.budget(), self.slots.len())
                 .ok()
                 .map(Arc::new);
             self.recording_seek_checkpoints = self.seek_checkpoints.is_some();
         }
+    }
+
+    /// Release optional seek state without moving the active packet cursor.
+    pub fn discard_seek_checkpoints(&mut self) -> bool {
+        self.recording_seek_checkpoints = false;
+        self.seek_checkpoints.take().is_some()
     }
 
     pub(super) fn record_seek_checkpoint(&mut self, at: usize) {
@@ -169,7 +176,7 @@ impl<'a> Mov9PacketCursor<'a> {
                 .tracks
                 .as_slice()
                 .iter()
-                .any(|track| track.keys.is_empty())
+                .any(|track| track.points.is_empty())
         {
             return Ok(None);
         }
@@ -186,7 +193,7 @@ impl<'a> Mov9PacketCursor<'a> {
         slots.try_reserve_exact(self.slots.len())?;
         for track in index.tracks.as_slice() {
             slots
-                .try_push(track.keys.as_slice()[0].slot.clone())
+                .try_push(track.points.as_slice()[0].slot.clone())
                 .map_err(|e| e.error)?;
         }
         Ok(Some(Mov9RangeSeekJob {
@@ -207,46 +214,74 @@ impl<'a> Mov9PacketCursor<'a> {
     }
 }
 
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum Search {
+    Forward,
+    PreviousSync,
+    Ready,
+}
+
 struct TrackSeek<'a> {
     target: i64,
     next: u64,
-    best: Key<'a>,
+    best: Option<Checkpoint<'a>>,
     cursor: Slot<'a>,
+    previous_sync: u64,
     fallback: bool,
-    done: bool,
+    search: Search,
 }
 
 impl<'a> TrackSeek<'a> {
-    fn new(keys: &[Key<'a>], target: i64) -> Self {
-        let at = keys.partition_point(|key| key.timestamp <= target);
-        let best = keys[at.saturating_sub(1)].clone();
-        let mut cursor = best.slot.clone();
-        cursor.head = None;
+    fn new(points: &[Checkpoint<'a>], target: i64) -> Self {
+        let at = points.partition_point(|point| point.timestamp <= target);
+        let point = &points[at.saturating_sub(1)];
         Self {
             target,
-            next: best.ordinal + 1,
-            best,
-            cursor,
+            next: point.ordinal,
+            best: (at == 0).then(|| point.clone()),
+            cursor: point.slot.clone(),
+            previous_sync: point.previous_sync,
             fallback: at == 0,
-            done: false,
+            search: if at == 0 {
+                Search::Ready
+            } else {
+                Search::Forward
+            },
         }
     }
 
-    fn poll(&mut self, work: &mut WorkBudget, cancel: &AtomicBool) -> Result<bool> {
-        if self.done || self.fallback || self.best.timestamp == self.target {
-            return Ok(true);
+    fn finish_forward(&mut self, points: &[Checkpoint<'a>]) {
+        if self.best.is_some() {
+            self.search = Search::Ready;
+        } else {
+            // The target falls within a long non-key interval. The recorded
+            // preceding sync may be in an earlier interval; restart there.
+            let at = points.partition_point(|point| point.ordinal <= self.previous_sync);
+            let point = &points[at - 1];
+            self.cursor = point.slot.clone();
+            self.next = point.ordinal;
+            self.search = Search::PreviousSync;
         }
-        loop {
+    }
+
+    fn poll(
+        &mut self,
+        points: &[Checkpoint<'a>],
+        work: &mut WorkBudget,
+        cancel: &AtomicBool,
+    ) -> Result<bool> {
+        while self.search != Search::Ready {
             if cancel.load(Ordering::Relaxed) {
                 return Err(Error::Cancelled);
             }
             if self.cursor.head.is_none() {
                 match self.cursor.fill(work, true, false, false)? {
                     Mov9CursorStatus::Yield => return Ok(false),
-                    Mov9CursorStatus::End => {
-                        self.done = true;
-                        return Ok(true);
+                    Mov9CursorStatus::End if self.search == Search::Forward => {
+                        self.finish_forward(points);
+                        continue;
                     }
+                    Mov9CursorStatus::End => return Err(Error::Invalid("checked seek lost sync")),
                     Mov9CursorStatus::Ready => {}
                 }
             }
@@ -262,20 +297,32 @@ impl<'a> TrackSeek<'a> {
                 .native
                 .dts
                 .ok_or(Error::Invalid("checked seek clock missing"))?;
-            if timestamp > self.target {
-                self.done = true;
-                return Ok(true);
+            let key = head.native.flags & 1 != 0;
+            let previous_sync =
+                self.search == Search::PreviousSync && self.next == self.previous_sync;
+            if self.search == Search::Forward && timestamp > self.target {
+                self.finish_forward(points);
+                continue;
             }
-            if head.native.flags & 1 != 0 {
-                self.best = Key {
+            if previous_sync && !key {
+                return Err(Error::Invalid("checked seek lost sync"));
+            }
+            if previous_sync || (self.search == Search::Forward && key) {
+                self.best = Some(Checkpoint {
                     ordinal: self.next,
                     timestamp,
+                    previous_sync: self.next,
                     slot: self.cursor.clone(),
-                };
+                });
+                if previous_sync || timestamp == self.target {
+                    self.search = Search::Ready;
+                    continue;
+                }
             }
             self.next += 1;
             self.cursor.head = None;
         }
+        Ok(true)
     }
 }
 
@@ -321,8 +368,9 @@ impl<'a> Mov9RangeSeekJob<'a> {
             } else {
                 self.at
             };
+            let points = self.index.tracks.as_slice()[at].points.as_slice();
             if let Some(scan) = self.scan.as_mut() {
-                if !scan.poll(work, cancel)? || !work.try_charge(1) {
+                if !scan.poll(points, work, cancel)? || !work.try_charge(1) {
                     return Ok(BuildStatus::Yield);
                 }
                 let scan = self.scan.take().expect("polled track seek");
@@ -350,19 +398,19 @@ impl<'a> Mov9RangeSeekJob<'a> {
             if target == i64::MIN {
                 return Err(Error::Unsupported("native seek null timestamp argument"));
             }
-            self.scan = Some(TrackSeek::new(
-                self.index.tracks.as_slice()[at].keys.as_slice(),
-                target,
-            ));
+            self.scan = Some(TrackSeek::new(points, target));
         }
     }
 
     fn finish_track(&mut self, at: usize, scan: TrackSeek<'a>) -> Result<()> {
-        let Key {
+        let Checkpoint {
             ordinal,
             timestamp,
             mut slot,
-        } = scan.best;
+            ..
+        } = scan
+            .best
+            .ok_or(Error::Invalid("missing checked seek key"))?;
         let head = slot
             .head
             .as_mut()

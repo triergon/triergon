@@ -3126,6 +3126,29 @@ fn next_range_output<S: Source>(player: &mut Mp4RangePlayer<'_, S>) -> Option<Ou
 }
 
 #[test]
+fn native_range_packet_reclaims_optional_seek_state_under_pool_pressure() {
+    let bytes = include_bytes!("fixtures/mp4/r-front-stco.mov");
+    let (opened, _, pool) = observed_mp4_open(bytes);
+    let mut job = Mp4RangeOpen::new(&opened.movie, None, PlanLimits::default()).unwrap();
+    assert!((0..100_000).any(|_| job.poll(&mut WorkBudget::new(64), &off()).unwrap()));
+    let mut player = job
+        .finish(
+            opened.input,
+            opened.source,
+            1 << 20,
+            Selection::All,
+            PlayerPolicy::default(),
+        )
+        .unwrap();
+    let _held = pool.reserve(pool.available()).unwrap();
+    let packet = std::iter::from_fn(|| next_range_output(&mut player))
+        .find(|output| matches!(output.event(), RawEvent::Mp4(Mp4Event::Packet(_))))
+        .unwrap();
+    assert!(player.current(&packet));
+    assert!(!player.discard_seek_checkpoints());
+}
+
+#[test]
 fn native_range_cursor_matches_ffprobe_and_preserves_seek_lifecycle() {
     for (bytes, target, selected, expected) in native_seek_cases() {
         let (opened, calls, pool) = observed_mp4_open(bytes);

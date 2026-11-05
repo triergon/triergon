@@ -5,8 +5,8 @@ use std::sync::atomic::AtomicBool;
 use triergon_core::{Budget, Error, TimeBase, WorkBudget};
 use triergon_isobmff::{
     BoxView, BuildStatus, EditList, Limits, Mov9CursorStatus, Mov9EditCursor, Mov9EditLimits,
-    Mov9NativeGlobalSeekJob, Mov9PacketCursor, Mov9Profile, Mov9Track, MovieHeader, Sample,
-    SampleCursor, SampleStep, TrackHeader,
+    Mov9NativeGlobalSeekJob, Mov9PacketCursor, Mov9Profile, Mov9ResumePoint, Mov9Track,
+    MovieHeader, Sample, SampleCursor, SampleStep, TrackHeader,
 };
 
 fn word_box(kind: &[u8; 4], rows: &[u32], version: u8) -> Vec<u8> {
@@ -84,6 +84,11 @@ fn drain(mut cursor: SampleCursor<'_>) -> Vec<Sample> {
 
 #[test]
 fn late_regular_seek_restarts_from_a_checked_sample_table_checkpoint() {
+    check_late_regular_seek(None);
+    check_late_regular_seek(Some(&[1, 19_999]));
+}
+
+fn check_late_regular_seek(sync: Option<&[u32]>) {
     let budget = Budget::new(2 * 1024 * 1024).unwrap();
     let original = authored_stbl(&budget, None, None, 0);
     let samples = 20_000;
@@ -100,6 +105,9 @@ fn late_regular_seek_restarts_from_a_checked_sample_table_checkpoint() {
     }
     bytes.extend_from_slice(&word_box(b"stsz", &[samples], 0));
     bytes.extend_from_slice(&word_box(b"stco", &[1000], 0));
+    if let Some(sync) = sync {
+        bytes.extend_from_slice(&word_box(b"stss", sync, 0));
+    }
     let size = bytes.len() as u32;
     bytes[..4].copy_from_slice(&size.to_be_bytes());
     let table = common::table(
@@ -115,28 +123,20 @@ fn late_regular_seek_restarts_from_a_checked_sample_table_checkpoint() {
         media_base: TimeBase::new(1, 1000).unwrap(),
         edits: None,
     };
-    let media = [1000..1000 + u64::from(samples)];
+    let extent = 1000..1000 + u64::from(samples);
+    let media = std::slice::from_ref(&extent);
     let cancel = AtomicBool::new(false);
     let profile = Mov9Profile::PinnedNoParseNoFillin;
     let mut cursor = Mov9PacketCursor::new_complete_source(
         &budget,
         &[track],
-        &media,
+        media,
         Default::default(),
         profile,
     )
     .unwrap();
     cursor.enable_range_seek_checkpoints();
-    loop {
-        match cursor.poll(&mut WorkBudget::new(64), &cancel).unwrap() {
-            Mov9CursorStatus::Ready => {
-                cursor.take_occurrence().unwrap();
-            }
-            Mov9CursorStatus::Yield => {}
-            Mov9CursorStatus::End => break,
-        }
-    }
-    cursor.rewind_at_end().unwrap();
+    exhaust_and_rewind(&mut cursor, &cancel);
 
     let target = (16_384 + 7) * 40 + 1;
     let mut checked = cursor
@@ -152,7 +152,7 @@ fn late_regular_seek_restarts_from_a_checked_sample_table_checkpoint() {
     let mut full = Mov9NativeGlobalSeekJob::new_complete_source(
         &budget,
         &[track],
-        &media,
+        media,
         1,
         target,
         Default::default(),
@@ -171,6 +171,10 @@ fn late_regular_seek_restarts_from_a_checked_sample_table_checkpoint() {
         full.receipt().selected.occurrence.native
     );
     assert_eq!(receipt.scanned_entries, u64::from(samples));
+    assert_eq!(
+        receipt.selected.ordinal,
+        if sync.is_some() { 0 } else { 16_391 }
+    );
     for ordinal in receipt.selected.ordinal + 1..=receipt.selected.ordinal + 5 {
         assert_eq!(
             replay.poll(&mut WorkBudget::new(128), &cancel).unwrap(),
@@ -181,6 +185,44 @@ fn late_regular_seek_restarts_from_a_checked_sample_table_checkpoint() {
         assert_eq!(packet.source.range, 999 + ordinal..1000 + ordinal);
         assert_eq!(packet.native.dts, Some((ordinal as i64 - 1) * 40));
     }
+    drop(replay);
+    let before = budget.used();
+    assert!(cursor.discard_seek_checkpoints());
+    assert!(budget.used() < before);
+
+    let mut resumed = Mov9PacketCursor::new_complete_source_at(
+        &budget,
+        &[track],
+        media,
+        Default::default(),
+        profile,
+        &[Mov9ResumePoint {
+            track_id: 1,
+            occurrence: 1,
+        }],
+    )
+    .unwrap();
+    resumed.enable_range_seek_checkpoints();
+    exhaust_and_rewind(&mut resumed, &cancel);
+    assert!(
+        resumed
+            .prepare_checked_range_seek(1, 0, Default::default())
+            .unwrap()
+            .is_none()
+    );
+}
+
+fn exhaust_and_rewind(cursor: &mut Mov9PacketCursor<'_>, cancel: &AtomicBool) {
+    loop {
+        match cursor.poll(&mut WorkBudget::new(64), cancel).unwrap() {
+            Mov9CursorStatus::Ready => {
+                cursor.take_occurrence().unwrap();
+            }
+            Mov9CursorStatus::Yield => {}
+            Mov9CursorStatus::End => break,
+        }
+    }
+    cursor.rewind_at_end().unwrap();
 }
 
 fn check_membership(sync: Option<&[u32]>, partial: Option<&[u32]>) {

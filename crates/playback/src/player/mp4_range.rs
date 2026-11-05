@@ -55,7 +55,14 @@ impl<'a> Mp4RangeOpen<'a> {
         if !input.capabilities().random_access {
             return Err(Error::Unsupported("native range playback needs random access").into());
         }
-        let (plan, cursor, duration_us) = self.index.finish_native_range()?;
+        let (plan, mut cursor, duration_us) = self.index.finish_native_range()?;
+        // Leave space for packet/input staging and selection validation.
+        // The fact vector grows over at most 64 tracks, including its old
+        // allocation during a growth step.
+        let fact_bytes = 128 * size_of::<crate::engines::TrackFact>();
+        if input.budget().available() < maximum_packet.saturating_mul(2).max(fact_bytes) {
+            cursor.discard_seek_checkpoints();
+        }
         let engine = Engine::mp4(input, plan, maximum_packet)?;
         let mut player = Player::new_direct(engine, source, selection, policy)?;
         player.set_clock_view(ClockChoice::ExplicitNativeProjection)?;
@@ -93,14 +100,30 @@ impl<'a, S: Source> Mp4RangePlayer<'a, S> {
         self.player.current(output)
     }
 
+    /// Let an input adapter release optional seek state when it needs the
+    /// same pool for range I/O or a retained output.
+    pub fn discard_seek_checkpoints(&mut self) -> bool {
+        self.cursor.discard_seek_checkpoints()
+    }
+
     pub fn read_output(
         &mut self,
         output: &mut Option<Output>,
         work: &mut WorkBudget,
         cancel: &AtomicBool,
     ) -> Result<Progress> {
-        self.player
-            .read_output_inner(output, work, cancel, Some(&mut self.cursor))
+        let result = self
+            .player
+            .read_output_inner(output, work, cancel, Some(&mut self.cursor))?;
+        if matches!(result, Progress::Backpressure { .. })
+            && output.is_none()
+            && self.discard_seek_checkpoints()
+        {
+            return self
+                .player
+                .read_output_inner(output, work, cancel, Some(&mut self.cursor));
+        }
+        Ok(result)
     }
 
     /// Plan a seek from the same checked tables. This reads no payload and
@@ -168,17 +191,33 @@ impl<'a, S: Source> Mp4RangePlayer<'a, S> {
             }
             .into());
         }
-        if command.cursor.is_none() {
-            return Err(Error::Invalid("native range seek command already applied").into());
-        }
-        let applied = self.player.apply_seek(
-            TrackKey::Mp4(scope.video),
-            scope.target,
-            self.player.selection,
-            Some(Mp4RangeLanding::NativeCursor(command.offset)),
-            work,
-            cancel,
-        )?;
+        let replacement = command
+            .cursor
+            .as_mut()
+            .ok_or(Error::Invalid("native range seek command already applied"))?;
+        let mut apply = |work: &mut WorkBudget| {
+            self.player.apply_seek(
+                TrackKey::Mp4(scope.video),
+                scope.target,
+                self.player.selection,
+                Some(Mp4RangeLanding::NativeCursor(command.offset)),
+                work,
+                cancel,
+            )
+        };
+        let applied = match apply(work) {
+            Err(crate::Error::Core(Error::Backpressure { .. }))
+                if {
+                    // Only the selection/fact allocation can return backpressure,
+                    // before the engine starts the seek transaction.
+                    let current = self.cursor.discard_seek_checkpoints();
+                    replacement.discard_seek_checkpoints() || current
+                } =>
+            {
+                apply(work)?
+            }
+            result => result?,
+        };
         if applied {
             self.cursor = command.cursor.take().expect("checked range seek cursor");
         }
