@@ -205,6 +205,7 @@ pub enum State {
 pub struct PlayerPolicy {
     pub slots: usize,
     pub queued_payload_bytes: usize,
+    /// Input consumed before the seek reference track reaches the requested time.
     pub seek_input_bytes: u64,
     pub maximum_events: u64,
 }
@@ -233,6 +234,7 @@ pub enum Progress {
 struct ActiveSeek {
     intent: SeekIntent,
     matroska_ceiling_ns: Option<i64>,
+    reached_target: bool,
 }
 
 pub struct Player<S: Source> {
@@ -532,6 +534,7 @@ impl<S: Source> Player<S> {
         self.seek = Some(ActiveSeek {
             intent,
             matroska_ceiling_ns,
+            reached_target: false,
         });
         self.seek_read = 0;
         self.pending = Some(RawEvent::Seek(intent));
@@ -856,7 +859,7 @@ impl<S: Source> Player<S> {
             .ok_or(crate::Error::Closed)?
             .provide(reply)?;
         if accepted {
-            if self.seek.is_some()
+            if self.seek.is_some_and(|seek| !seek.reached_target)
                 && let SourceReply::Data(window) = reply
             {
                 self.seek_read = self
@@ -1140,6 +1143,7 @@ impl<S: Source> Player<S> {
                         Some(ActiveSeek {
                             intent,
                             matroska_ceiling_ns: Some(ceiling),
+                            ..
                         }),
                         RawEvent::Matroska(triergon::typed::Event::Packet(packet)),
                     ) if packet.packet.timing.frames == 1 => match packet.packet.pts_ns {
@@ -1187,6 +1191,22 @@ impl<S: Source> Player<S> {
         delivery: Delivery,
         slot: Option<&mut Option<Output>>,
     ) -> Progress {
+        if let Some(seek) = self.seek.as_mut().filter(|seek| !seek.reached_target)
+            && bytes != 0
+            && matches!(delivery, Delivery::Present | Delivery::Unselected)
+            && event.track() == Some(seek.intent.track)
+            && !matches!(&event, RawEvent::Mp4(crate::Mp4Event::NativeShortPacket(_)))
+            && !matches!(&event, RawEvent::NativeTs { packet, .. } if packet.native_flags & 2 != 0)
+        {
+            // Reordered packets still need the original presentation target.
+            // Only the preroll input accounting ends here.
+            seek.reached_target = delivery == Delivery::Present
+                || match seek.intent.clock {
+                    ClockChoice::SourceExact => event.source_pts(),
+                    ClockChoice::ExplicitNativeProjection => event.native_pts(),
+                }
+                .is_ok_and(|pts| pts.is_some_and(|pts| pts >= seek.intent.target));
+        }
         let destination = if let Some(slot) = slot {
             slot
         } else {
