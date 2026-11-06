@@ -1,5 +1,5 @@
-//! Playback measurement worker: Matroska video startup and seek through the playback
-//! engine. Serialization and process startup are outside the timed loop.
+//! Playback measurement worker; serialization and startup are outside the timed loop.
+#![forbid(unsafe_code)]
 use std::{
     io::{self, Write},
     process::ExitCode,
