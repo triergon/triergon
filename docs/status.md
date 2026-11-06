@@ -14,7 +14,7 @@ against FFmpeg 9.0.
 | Matroska audio clocks | AAC, AC-3, E-AC-3 startup and forward clocks | 10 inputs | 0.17 | heap 0.07, RSS 0.60 | audio seek |
 | ISO BMFF / MP4 | Regular and fragmented files, edit lists, seek and range plans, QuickTime compatibility; AVC, HEVC, AAC, AC-3, E-AC-3, DTS core, AV1, VP9 | 255 inputs, 1,020 operations (944 match) | diagnostic only: 16 of 24 timed rows within 1.25, worst 1.52 | not measured | timing and memory for the full set |
 | MPEG-TS | PSI, continuity, PES assembly; TS188 and M2TS192 | 272-request set (80 field matches, 23 open) | not measured | not measured | access-unit demux, broader profiles |
-| HLS segments | Independent TS188 segments: AVC or HEVC with AAC, AC-3 or E-AC-3 | 14 workloads, 71 segments | 1.2254 | heap ≤0.02, RSS ≤0.71 | one DVB workload above 1.20; other profiles |
+| HLS segments | Independent TS188 segments: AVC or HEVC with AAC, AC-3 or E-AC-3 | 71 packet comparisons, 10 measured workloads | 1.1817 (10/10 within 1.20) | heap ≤0.022, RSS ≤0.690 | other profiles |
 | Packet framing | AVC/HEVC configuration and NAL framing, AV1, VP9, AC-3, E-AC-3, DTS core | 125 cases; DTS core byte-exact on 37,125 projections and 1,172 FATE packets | 1.2395 | heap 0.98, RSS 0.99 | above 1.20; full AVC/HEVC/ADTS grammar |
 | Subtitles, text | SRT, WebVTT, ASS passthrough, mov_text and tx3g to ASS, charset handling | 82 mov_text cases, 79 tx3g regressions | not measured | not measured | timing and memory |
 | Subtitles, bitmap | PGS, DVB display state and colour lookup, DVD units | 229 PGS cases; 5,300 DVB display sets | PGS 1.11 | PGS heap 0.62, RSS 0.90 | full PGS recovery, DVB and DVD decoding |
@@ -30,7 +30,9 @@ against FFmpeg 9.0.
 | Matroska startup and seek: HEVC seek without Cues | 1.2397 |
 | Packet framing: 125-case set | 1.2395 |
 | Matroska: nested chapters (`chapters-depth`, `chapters-many`) | 1.2411, 1.2143 |
-| HLS: DVB AVC with AC-3 | 1.2254 |
+
+The HLS measurements use revision `763f05cf762dadd293328b33cc4dae54136695d4`.
+Raw samples SHA-256 `de885f051789ceeff07556b40fcd3928c9e651d3c6b5ee3b193b8126d82435c1`.
 
 ## Platforms
 
