@@ -7763,6 +7763,24 @@
    "reason": "Capture status row",
    "key": "evidence/capture-pipeline-linux-arm64/fac200b915c2b9a984e5b91cba29e7a3c016690596f128524f46c8f2cb40b6e6.tar.gz",
    "sha256": "fac200b915c2b9a984e5b91cba29e7a3c016690596f128524f46c8f2cb40b6e6"
+  },
+  {
+   "name": "avc-hevc-framing-linux-arm64",
+   "retention": "retained",
+   "reason": "Packet framing in the measured revisions table",
+   "key": "evidence/avc-hevc-framing-linux-arm64/edd793b50d38a95cfa0305aedde3982401b82f4b45507e163e6fd068cee9fde2.tar.gz",
+   "sha256": "edd793b50d38a95cfa0305aedde3982401b82f4b45507e163e6fd068cee9fde2",
+   "bytes": 19675043,
+   "files": [
+    {
+     "path": "time.tar.gz",
+     "sha256": "0f3d82dfe8ab49e0eb85c32e4b9adc6579cc70590c89b8f09d4842550c8348c5"
+    },
+    {
+     "path": "memory.tar.gz",
+     "sha256": "6f7dcfa92afbe4a025d4a0c1a8a4132fc3a3125f796ef8c20be8606bdba843d8"
+    }
+   ]
   }
  ]
 }
