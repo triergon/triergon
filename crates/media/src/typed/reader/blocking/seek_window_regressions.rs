@@ -379,7 +379,7 @@ fn seek_window_whole_core_response_reduces_physical_callback_bounces() {
 fn seek_window_epoch_certificate_keeps_public_hint_and_stops_before_replay() {
     let raw = include_bytes!(concat!(
         env!("CARGO_MANIFEST_DIR"),
-        "/../../.research/seek-fixtures/cues-end.mkv"
+        "/tests/fixtures/seek/cues-end.mkv"
     ));
     let pool = Budget::new(512 * 1024).unwrap();
     let base = pool.used();
