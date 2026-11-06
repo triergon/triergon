@@ -1463,27 +1463,6 @@ impl DemuxObserver {
         Ok(true)
     }
 
-    fn reserve_finite_body_hint(&mut self, work: &mut WorkBudget) {
-        let Some(length) = self.body_limit else {
-            return;
-        };
-        // Full carriers give a lower bound. Reserve on the same capacity
-        // ladder as ordinary growth so a short carrier cannot increase the
-        // peak required by a later replacement.
-        let minimum = length.div_ceil(PLAIN_PAYLOAD_BYTES);
-        if !(5..=self.limits.source_spans.min(32)).contains(&minimum) {
-            return;
-        }
-        let spans = minimum.next_power_of_two().min(self.limits.source_spans);
-        let bytes = spans * size_of::<NativePesSpan>();
-        if work.remaining() >= bytes as u64
-            && self.budget.available() >= 2 * bytes
-            && self.spans.try_reserve_exact(spans).is_ok()
-        {
-            work.take(bytes as u64);
-        }
-    }
-
     fn poll_body(&mut self, work: &mut WorkBudget, cancel: &AtomicBool) -> Result<bool> {
         let pending = self
             .pending
@@ -1528,9 +1507,6 @@ impl DemuxObserver {
         }
         if next >= DEFAULT_PACKET_CAP {
             return Err(Error::Unsupported("native packet-cap boundary unobserved"));
-        }
-        if self.spans.capacity() == 0 && self.growth.is_none() {
-            self.reserve_finite_body_hint(work);
         }
         if !self.reserve(Arena::Payload, work, cancel)? || !work.try_charge(1) {
             return Ok(false);
@@ -1649,9 +1625,13 @@ mod tests {
     use super::*;
 
     #[test]
-    fn finite_body_hint_preserves_room_for_growth_after_a_short_first_span() {
-        let span_bytes = size_of::<NativePesSpan>();
-        let pool = Budget::new(Budget::control_storage_bytes() + 12 * span_bytes).unwrap();
+    fn finite_body_reserves_only_the_received_span() {
+        let pool = Budget::new(8192).unwrap();
+        let entity = SourceId(1);
+        let epochs = SourceEpochs {
+            configuration: 0,
+            clock: 0,
+        };
         let mut observer = NativePesObserver::new(
             NativeClockProfile::ArchivedPesV1,
             NativePesScope {
@@ -1659,20 +1639,43 @@ mod tests {
                 pid: 256,
                 stream_type: 0x1b,
                 stream_id: 0xe0,
-                entity: SourceId(1),
-                epochs: SourceEpochs {
-                    configuration: 0,
-                    clock: 0,
-                },
+                entity,
+                epochs,
             },
-            pool,
+            pool.clone(),
             ParseLimits::default(),
         )
         .unwrap();
-        // The header can make a body of five full payloads occupy six spans.
-        // The budget can grow from four slots to eight with both charged.
-        observer.body_limit = Some(5 * PLAIN_PAYLOAD_BYTES);
-        observer.reserve_finite_body_hint(&mut WorkBudget::new(u64::MAX));
-        assert_eq!(observer.spans.capacity(), 0);
+        let length = (3 + 5 * PLAIN_PAYLOAD_BYTES) as u16;
+        let [hi, lo] = length.to_be_bytes();
+        let mut raw = [0xff; TS188_BYTES];
+        raw[..13].copy_from_slice(&[0x47, 0x41, 0, 0x10, 0, 0, 1, 0xe0, hi, lo, 0x80, 0, 0]);
+        let mut carrier = crate::parse_transport(
+            Bytes::copy_from_slice(&pool, &raw).unwrap(),
+            crate::PacketFormat::Ts188,
+            0,
+        )
+        .unwrap();
+        carrier.source_id = Some(entity);
+        observer
+            .push(
+                carrier,
+                NativeSourceContext {
+                    source_event_ordinal: 0,
+                    epochs,
+                    byte_run_epoch: None,
+                },
+            )
+            .unwrap();
+        assert!(matches!(
+            observer
+                .poll(&mut WorkBudget::new(u64::MAX), &AtomicBool::new(false))
+                .unwrap(),
+            AssemblyStep::NeedPayload
+        ));
+        assert_eq!(observer.spans.len(), 1);
+        // The first append uses the ordinary arena size. Other tracks can
+        // still use the pool while this one waits for its remaining carriers.
+        assert_eq!(observer.spans.capacity(), 4);
     }
 }
