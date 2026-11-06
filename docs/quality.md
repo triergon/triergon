@@ -11,6 +11,9 @@ is complete only when it passes all three gates on every case in its corpus.
 | Runtime | `T_triergon / T_ffmpeg` at most **1.20** per case, using the upper bound of a paired 95% confidence interval. The optimisation target is **0.80**. |
 | Memory | Peak live heap and total resident peak RSS both strictly lower than the reference, each at the upper bound of a paired 95% interval. |
 
+The harness reads these limits from `harness/policy.json`. Each feature's contract and
+corpus manifest live in `harness/features/<feature>/`.
+
 The work being compared must be identical: the same selection, the same packets, the
 same output. A gate is never passed by narrowing the work, dropping slow cases or
 weakening a comparison. A failed result stays recorded against the exact source and
