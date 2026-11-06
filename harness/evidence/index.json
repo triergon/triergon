@@ -7763,6 +7763,13 @@
    "reason": "Capture status row",
    "key": "evidence/capture-pipeline-linux-arm64/fac200b915c2b9a984e5b91cba29e7a3c016690596f128524f46c8f2cb40b6e6.tar.gz",
    "sha256": "fac200b915c2b9a984e5b91cba29e7a3c016690596f128524f46c8f2cb40b6e6"
+  },
+  {
+   "name": "mp4-range-playback-linux-arm64",
+   "retention": "retained",
+   "reason": "MP4 range playback status row",
+   "key": "evidence/mp4-range-playback-linux-arm64/475345439338ad74a057e89ffaf8837a508c5f4e6e110916de12a1ec5048646d.tar.gz",
+   "sha256": "475345439338ad74a057e89ffaf8837a508c5f4e6e110916de12a1ec5048646d"
   }
  ]
 }
