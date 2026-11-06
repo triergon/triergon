@@ -973,9 +973,6 @@ pub fn evaluate(
         if total_lower <= 0 || total_upper <= 0 {
             return failed("total-rss-attribution-unresolved");
         }
-        if lower <= 0 || upper <= 0 {
-            return failed("rss-attribution-unresolved");
-        }
         rss.push((upper, lower));
         let heap = |k: &str| {
             row.get(k)
@@ -997,10 +994,12 @@ pub fn evaluate(
             ("upper_95", Value::float(i.upper_95)),
         ]))
     };
-    let (Ok(rss), Ok(heap), Ok(total)) = (interval(&rss), interval(&heaps), interval(&totals))
-    else {
+    let (Ok(heap), Ok(total)) = (interval(&heaps), interval(&totals)) else {
         return failed("invalid-memory-observation");
     };
+    // The page allowance can make a growth bound nonpositive even when
+    // both total resident bounds are valid.
+    let growth = interval(&rss).unwrap_or(Value::Null);
     let mut fields = vec![
         ("status", Value::str("qualified")),
         (
@@ -1013,11 +1012,11 @@ pub fn evaluate(
         ),
         (
             "rss_growth_ratio_upper_95",
-            rss.get("upper_95").cloned().unwrap(),
+            growth.get("upper_95").cloned().unwrap_or(Value::Null),
         ),
         ("total_rss_ratio", total),
         ("heap_ratio", heap),
-        ("rss_growth_ratio", rss),
+        ("rss_growth_ratio", growth),
         ("pairs", Value::int(pairs)),
         ("samples", Value::Array(samples.to_vec())),
         ("certificate", certificate.clone()),
