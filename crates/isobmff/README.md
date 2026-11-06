@@ -107,6 +107,16 @@ the bytes and determine the audio object type separately.
   `FragmentContext::decode_origin` has unknown DTS/CTS, not zero.
   `CompositionOffset` keeps version, raw bits and the signed reading separate;
   an absent offset differs from an explicit zero.
+- **Surplus timing entries.** `SampleTableBuilder::with_timing_policy`
+  accepts `TimingRunPolicy::BoundedPrefix` for the QuickTime-compatible
+  interpretation of overlong timing runs. The last decode run may cross
+  the sample count if it starts within it. Positive composition runs may
+  extend beyond it. The sample table retains all raw runs and reports the
+  unused counts through `SampleTable::timing_run_surplus`. The source
+  seek planners and default physical cursor constructors require exact
+  coverage. Compatibility playback can opt into physical range validation
+  for a checked prefix, including forward-only media, through the physical
+  cursor constructors that accept a timing policy.
 - **Payload ranges.** `SampleReader::new` requires the sample to lie inside the
   caller's `mdat` payload extent. `PhysicalSampleCursor::new_with_media_extents`
   checks every track's ranges against the `mdat` extents before emitting

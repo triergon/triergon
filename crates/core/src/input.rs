@@ -204,6 +204,17 @@ impl InputCursor {
             maximum,
         }
     }
+    /// Returns the next request if the cursor has consumed its buffered input
+    /// and the source is still active. Checks for cancellation and sticky
+    /// failure before requesting bytes.
+    #[inline]
+    pub fn pending_request(&mut self, cancel: &AtomicBool) -> Result<Option<InputRequest>> {
+        if self.inline_len != 0 || self.window.is_some() || self.end.is_some() {
+            return Ok(None);
+        }
+        self.check_cancel(cancel)?;
+        Ok(Some(self.request()))
+    }
     fn verify(&self, source: SourceId, token: &InputToken) -> Result<()> {
         if self.pool.identity() != token.pool {
             return Err(Error::ForeignPool);
@@ -242,7 +253,12 @@ impl InputCursor {
         &bytes[self.consumed..]
     }
     fn validate_window(&self, offset: u64, length: usize, maximum: usize) -> Result<()> {
-        if offset != self.position || self.remaining() != 0 || self.end.is_some() {
+        // A complete read clears either representation, including its consumed count.
+        if offset != self.position
+            || self.inline_len != 0
+            || self.window.is_some()
+            || self.end.is_some()
+        {
             return Err(Error::Invalid("input window is not currently requested"));
         }
         if length > maximum {
@@ -309,9 +325,7 @@ impl InputCursor {
             self.maximum_window.min(Self::INLINE_CAPACITY),
         )?;
         self.inline[..bytes.len()].copy_from_slice(bytes);
-        self.window = None;
         self.inline_len = bytes.len();
-        self.consumed = 0;
         Ok(())
     }
     fn discard_window(&mut self) {
@@ -390,27 +404,25 @@ impl InputCursor {
         if output.is_empty() {
             return Ok(Step::Ready(0));
         }
-        if self.remaining() == 0 {
+        let buffered = self.buffered();
+        if buffered.is_empty() {
             return Ok(self.wait());
         }
         let maximum =
-            u64::try_from(output.len().min(self.remaining())).map_err(|_| Error::Overflow)?;
+            u64::try_from(output.len().min(buffered.len())).map_err(|_| Error::Overflow)?;
         let count = work.take(maximum) as usize; // bounded by the original slice length
         if count == 0 {
             return Ok(Step::Yield);
         }
-        let bytes = match &self.window {
-            Some(window) => window.as_ref(),
-            None => &self.inline[..self.inline_len],
-        };
-        output[..count].copy_from_slice(&bytes[self.consumed..self.consumed + count]);
-        self.advance(count, count == self.remaining());
+        output[..count].copy_from_slice(&buffered[..count]);
+        let complete = count == buffered.len();
+        self.advance(count, complete);
         Ok(Step::Ready(count))
     }
-    /// Consume buffered bytes without copying them or creating a retained owner.
+    /// Consume buffered bytes in place.
     /// Each byte costs one work unit. Zero maximum, starvation, explicit end,
     /// sticky failure and cancellation follow `read_into` ordering. Completing
-    /// a window releases only the cursor's owner; independent aliases remain.
+    /// a window releases the cursor's reference. Independent views remain valid.
     #[inline]
     pub fn read_discard(
         &mut self,
@@ -422,15 +434,16 @@ impl InputCursor {
         if maximum == 0 {
             return Ok(Step::Ready(0));
         }
-        if self.remaining() == 0 {
+        let remaining = self.remaining();
+        if remaining == 0 {
             return Ok(self.wait());
         }
-        let maximum = u64::try_from(maximum.min(self.remaining())).map_err(|_| Error::Overflow)?;
+        let maximum = u64::try_from(maximum.min(remaining)).map_err(|_| Error::Overflow)?;
         let count = work.take(maximum) as usize; // bounded by the buffered window
         if count == 0 {
             return Ok(Step::Yield);
         }
-        self.advance(count, count == self.remaining());
+        self.advance(count, count == remaining);
         Ok(Step::Ready(count))
     }
     /// Copy buffered input straight into an initialized, capacity-accounted byte
@@ -449,22 +462,20 @@ impl InputCursor {
         if maximum == 0 {
             return Ok(Step::Ready(0));
         }
-        if self.remaining() == 0 {
+        let buffered = self.buffered();
+        if buffered.is_empty() {
             return Ok(self.wait());
         }
-        let maximum = u64::try_from(maximum.min(self.remaining())).map_err(|_| Error::Overflow)?;
+        let maximum = u64::try_from(maximum.min(buffered.len())).map_err(|_| Error::Overflow)?;
         let count = work.remaining().min(maximum) as usize; // bounded by the buffered slice
         if count == 0 {
             return Ok(Step::Yield);
         }
-        let bytes = match &self.window {
-            Some(window) => window.as_ref(),
-            None => &self.inline[..self.inline_len],
-        };
         // BudgetVec reserves before extending; neither source nor work has moved.
-        output.try_extend_from_slice(&bytes[self.consumed..self.consumed + count])?;
+        output.try_extend_from_slice(&buffered[..count])?;
+        let complete = count == buffered.len();
         work.take(count as u64);
-        self.advance(count, count == self.remaining());
+        self.advance(count, complete);
         Ok(Step::Ready(count))
     }
     pub fn read_span(

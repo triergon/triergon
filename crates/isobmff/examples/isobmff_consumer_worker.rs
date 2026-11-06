@@ -17,7 +17,7 @@ use std::{
     time::Instant,
 };
 use triergon_core::{Error, Time};
-use triergon_isobmff::{RecoveryKind, RecoverySyntax};
+use triergon_isobmff::{RecoveryKind, RecoverySyntax, TimingRunPolicy};
 
 #[derive(Clone, Copy)]
 struct Options {
@@ -116,6 +116,7 @@ fn operation(
     input: &mut Input,
     o: Options,
     op: NativeOperation,
+    timing_policy: TimingRunPolicy,
     mut trace: Option<&mut String>,
 ) -> Result<Stats> {
     let (transport, length) = input.transport();
@@ -124,7 +125,7 @@ fn operation(
     let mut driver = Driver::new(transport, length, o.window, o.quantum)?;
     let pool = driver.budget.clone();
     let mut retained = Retention::new(&pool, o.retain)?;
-    let model = driver.open()?;
+    let model = driver.open_with_timing_policy(timing_policy)?;
     if matches!(op, NativeOperation::Open) {
         driver.native_open(&model, &mut stats, &mut retained, trace.as_deref_mut())?;
     } else {
@@ -154,7 +155,13 @@ fn output_stats(stats: &Stats, iterations: u64, elapsed: u128) -> Result<()> {
     Ok(())
 }
 fn main_result() -> Result<()> {
-    let args: Vec<_> = env::args().collect();
+    let mut args: Vec<_> = env::args().collect();
+    let timing_policy = if args.get(1).is_some_and(|arg| arg == "--bounded-timing") {
+        args.remove(1);
+        TimingRunPolicy::BoundedPrefix
+    } else {
+        TimingRunPolicy::Strict
+    };
     let mode = args
         .get(1)
         .map(String::as_str)
@@ -208,7 +215,7 @@ fn main_result() -> Result<()> {
         }
         "open-trace" | "native-index-trace" | "seek-trace" => {
             let mut trace = String::new();
-            operation(&mut input, o, op, Some(&mut trace))?;
+            operation(&mut input, o, op, timing_policy, Some(&mut trace))?;
             println!("{trace}");
         }
         "open-bench" | "native-index-bench" | "seek-bench" => {
@@ -219,7 +226,7 @@ fn main_result() -> Result<()> {
             let mut total = Stats::default();
             let start = Instant::now();
             for _ in 0..n {
-                total.add(operation(&mut input, o, op, None)?)?;
+                total.add(operation(&mut input, o, op, timing_policy, None)?)?;
             }
             let elapsed = start.elapsed().as_nanos();
             std::hint::black_box(&total);
@@ -232,13 +239,16 @@ fn main_result() -> Result<()> {
             let result = if mode == "open-memory-baseline" {
                 input.rewind().map(|()| Stats::default())
             } else {
-                operation(&mut input, o, op, None)
+                operation(&mut input, o, op, timing_policy, None)
             };
             io::stdout().write_all(b"SAFE_MEDIA_END_V1\n")?;
             io::stdout().flush()?;
             output_stats(&result?, 1, 0)?;
         }
         "index-trace" | "source-seek-trace" => {
+            if timing_policy != TimingRunPolicy::Strict {
+                return Err(Error::Invalid("source audit requires exact timing coverage").into());
+            }
             if o.retain != 0 {
                 return Err(Error::Invalid(
                     "source audit retention must be zero; native retention is a separate operation",

@@ -177,6 +177,7 @@ impl<'a> SourceSeekPlanner<'a> {
         if request.target_ordinal == 0 {
             return Err(Error::Invalid("zero seek sample ordinal"));
         }
+        source.require_exact_timing()?;
         count_limit(source.fragment_indexes().len(), limits.max_fragments)?;
         count_limit(media_extents.len(), limits.max_media_extents)?;
         let next_ordinal = source

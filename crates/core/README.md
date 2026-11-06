@@ -103,6 +103,9 @@ source is the separate `finish` call, after which reads return
 Reads come in four forms: `read_into` (copy into a slice), `read_append` (copy
 into a `BudgetVec<u8>`), `read_discard` (skip without copy) and `read_span`
 (zero-copy `Bytes` alias of the window). `buffered()` peeks without consuming.
+A parser that still needs bytes after a partial read can use `pending_request()`
+to ask for the next window once the current window is empty and the source is
+still active. It checks cancellation before returning a request.
 A read that yields, starves or hits backpressure keeps its position, so the
 caller retries the same call.
 

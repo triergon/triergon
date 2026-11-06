@@ -20,8 +20,8 @@ use triergon_isobmff::{
     Mov9PacketLimits, Mov9Profile, Mov9StreamView, Mov9Track, MovieHeader, MovieSeekClocks,
     MovieSeekLimits, MovieSourceSeekContext, MovieSourceSeekPlanner, RecoveryDescriptions,
     RecoveryKind, RecoveryMappings, RecoveryScope, RecoverySyntax, Sample, SampleReader,
-    SampleStep, SampleTable, SampleTableBuilder, SourcePacket, SourceTrack, TrackHeader,
-    TrackSampleCursor, Trex,
+    SampleStep, SampleTable, SampleTableBuilder, SourcePacket, SourceTrack, TimingRunPolicy,
+    TrackHeader, TrackSampleCursor, Trex,
 };
 #[derive(Debug)]
 pub enum Failure {
@@ -124,7 +124,12 @@ fn track_header(track: &BoxView, budget: &Budget) -> Result<(TrackHeader, BoxVie
     )?;
     Ok((header, mdia))
 }
-fn self_contained_table(mdia: &BoxView, budget: &Budget, quantum: u64) -> Result<SampleTable> {
+fn self_contained_table(
+    mdia: &BoxView,
+    budget: &Budget,
+    quantum: u64,
+    timing_policy: TimingRunPolicy,
+) -> Result<SampleTable> {
     let minf = child(mdia, b"minf", budget)?;
     let dref = child(&child(&minf, b"dinf", budget)?, b"dref", budget)?;
     if word(dref.payload(), 0)? != 0 {
@@ -134,10 +139,11 @@ fn self_contained_table(mdia: &BoxView, budget: &Budget, quantum: u64) -> Result
     if refs.len() != usize::try_from(word(dref.payload(), 4)?).map_err(|_| Error::Overflow)? {
         return Err(Error::Invalid("data reference count").into());
     }
-    let mut builder = SampleTableBuilder::new(
+    let mut builder = SampleTableBuilder::with_timing_policy(
         child(&minf, b"stbl", budget)?,
         budget.clone(),
         Limits::default(),
+        timing_policy,
     )?;
     while builder.poll(&mut WorkBudget::new(quantum))? != BuildStatus::Ready {}
     let table = builder.finish()?;
@@ -508,6 +514,10 @@ impl<'a> Driver<'a> {
         })
     }
     pub fn open(&mut self) -> Result<Model> {
+        self.open_with_timing_policy(TimingRunPolicy::Strict)
+    }
+
+    pub fn open_with_timing_policy(&mut self, timing_policy: TimingRunPolicy) -> Result<Model> {
         let scanned = self.scan()?;
         let movie = MovieHeader::parse(&child(&scanned.movie, b"mvhd", &self.budget)?)?;
         let fragments = index_fragments(
@@ -537,7 +547,7 @@ impl<'a> Driver<'a> {
             {
                 return Err(Error::Invalid("duplicate track ID").into());
             }
-            let table = self_contained_table(&mdia, &self.budget, self.quantum)?;
+            let table = self_contained_table(&mdia, &self.budget, self.quantum, timing_policy)?;
             let edits = optional(track, b"edts", &self.budget)?
                 .map(|raw| {
                     child(&raw, b"elst", &self.budget).and_then(|raw| {

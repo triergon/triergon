@@ -5,6 +5,7 @@
 //! address order. It does not claim the pinned MOV reader's default interleaving.
 use crate::{
     BoxHeader, FragmentCursor, FragmentIndex, Sample, SampleCursor, SampleStep, SampleTable,
+    TimingRunPolicy, TimingRunSurplus,
 };
 use std::{
     ops::Range,
@@ -47,6 +48,15 @@ impl<'a> SourceTrack<'a> {
     }
     pub(crate) fn fragment_indexes(self) -> &'a [FragmentIndex] {
         self.fragments
+    }
+    pub(crate) fn require_exact_timing(self) -> Result<()> {
+        if self
+            .regular
+            .is_some_and(|table| table.timing_run_surplus() != TimingRunSurplus::default())
+        {
+            return Err(Error::Invalid("source view requires exact timing coverage"));
+        }
+        Ok(())
     }
 }
 
@@ -253,7 +263,7 @@ impl<'a> PhysicalSampleCursor<'a> {
         tracks: &[SourceTrack<'a>],
         limits: PhysicalInterleaveLimits,
     ) -> Result<Self> {
-        Self::from_sources(budget, tracks, None, limits)
+        Self::with_timing_policy(budget, tracks, None, limits, TimingRunPolicy::Strict)
     }
     /// Borrow checked source-entity mdat payload extents without copying them.
     /// Their bounds, nonoverlap and ascending order are validated during poll.
@@ -267,7 +277,13 @@ impl<'a> PhysicalSampleCursor<'a> {
         media_extents: &'a [Range<u64>],
         limits: PhysicalInterleaveLimits,
     ) -> Result<Self> {
-        Self::from_sources(budget, tracks, Some(media_extents), limits)
+        Self::with_timing_policy(
+            budget,
+            tracks,
+            Some(media_extents),
+            limits,
+            TimingRunPolicy::Strict,
+        )
     }
     /// Preserve regular table declarations beyond the observed first MDAT.
     /// The caller must admit each deferred row against a real later extent
@@ -279,8 +295,27 @@ impl<'a> PhysicalSampleCursor<'a> {
         bounds: ForwardRegularMdatV1,
         limits: PhysicalInterleaveLimits,
     ) -> Result<Self> {
+        Self::new_forward_regular_with_timing_policy(
+            budget,
+            tracks,
+            media,
+            bounds,
+            limits,
+            TimingRunPolicy::Strict,
+        )
+    }
+    /// Apply the selected timing policy to forward media range validation.
+    pub fn new_forward_regular_with_timing_policy(
+        budget: &Budget,
+        tracks: &[SourceTrack<'a>],
+        media: &'a [Range<u64>],
+        bounds: ForwardRegularMdatV1,
+        limits: PhysicalInterleaveLimits,
+        timing_policy: TimingRunPolicy,
+    ) -> Result<Self> {
         bounds.require_initial_extent(media)?;
-        let mut cursor = Self::new_with_media_extents(budget, tracks, media, limits)?;
+        let mut cursor =
+            Self::with_timing_policy(budget, tracks, Some(media), limits, timing_policy)?;
         if tracks.iter().any(|track| !track.fragments.is_empty()) {
             return Err(Error::Unsupported("forward regular media with fragments"));
         }
@@ -291,11 +326,15 @@ impl<'a> PhysicalSampleCursor<'a> {
     pub fn deferred_media(&self) -> bool {
         self.deferred_media
     }
-    fn from_sources(
+    /// Traverse checked tracks using the selected timing coverage policy.
+    /// Compatibility playback can validate the physical ranges of a bounded
+    /// prefix. The default constructors require exact timing coverage.
+    pub fn with_timing_policy(
         budget: &Budget,
         tracks: &[SourceTrack<'a>],
         media_extents: Option<&'a [Range<u64>]>,
         limits: PhysicalInterleaveLimits,
+        timing_policy: TimingRunPolicy,
     ) -> Result<Self> {
         if tracks.len() > limits.max_tracks {
             return Err(Error::Limit {
@@ -306,6 +345,9 @@ impl<'a> PhysicalSampleCursor<'a> {
         // Constructor work is bounded by the caller's explicit track policy.
         // Detect duplicates before allocating any retained per-track storage.
         for (at, track) in tracks.iter().enumerate() {
+            if timing_policy == TimingRunPolicy::Strict {
+                track.require_exact_timing()?;
+            }
             if tracks[..at]
                 .iter()
                 .any(|prior| prior.track_id == track.track_id)

@@ -16,7 +16,7 @@ pub enum BoxEvent {
 enum Phase {
     Header,
     Announced,
-    Metadata,
+    Metadata { target: usize },
     Skipping,
     Skipped,
 }
@@ -126,7 +126,7 @@ impl BoxReader {
         buffer.try_reserve_exact(length)?;
         buffer.try_extend_from_slice(&self.prefix[..self.filled])?;
         self.metadata = Some(buffer);
-        self.phase = Phase::Metadata;
+        self.phase = Phase::Metadata { target: length };
         Ok(())
     }
     pub fn skip(&mut self, input: &mut InputCursor) -> Result<()> {
@@ -177,8 +177,6 @@ impl BoxReader {
         work: &mut WorkBudget,
         cancel: &AtomicBool,
     ) -> Result<Step<BoxEvent>> {
-        // Delegates even already-buffered cancellation/failure checks to core.
-        input.read_into(&mut [], work, cancel)?;
         loop {
             match self.phase {
                 Phase::Header => {
@@ -191,6 +189,11 @@ impl BoxReader {
                             Step::Ready(count) => {
                                 self.filled += count;
                                 self.position = input.position();
+                                if self.filled < self.needed
+                                    && let Some(request) = input.pending_request(cancel)?
+                                {
+                                    return Ok(Step::NeedInput(request));
+                                }
                             }
                             Step::NeedInput(request) => return Ok(Step::NeedInput(request)),
                             Step::Yield => return Ok(Step::Yield),
@@ -203,6 +206,9 @@ impl BoxReader {
                         }
                         continue;
                     }
+                    // Reads check input status; publishing a complete prefix
+                    // can proceed without reading.
+                    input.read_into(&mut [], work, cancel)?;
                     if !work.try_charge(1) {
                         return Ok(Step::Yield);
                     }
@@ -232,19 +238,17 @@ impl BoxReader {
                     }
                 }
                 Phase::Announced => {
+                    input.read_into(&mut [], work, cancel)?;
                     return Err(Error::Invalid("choose metadata or skip after header"));
                 }
-                Phase::Metadata => {
-                    let header = self.header.ok_or(Error::Invalid("missing header"))?;
-                    let target =
-                        usize::try_from(header.size.ok_or(Error::Invalid("metadata bound"))?)
-                            .map_err(|_| Error::Overflow)?;
-                    let filled = self
+                Phase::Metadata { target } => {
+                    let buffer = self
                         .metadata
-                        .as_ref()
-                        .ok_or(Error::Invalid("missing metadata buffer"))?
-                        .len();
-                    if filled == target {
+                        .as_mut()
+                        .ok_or(Error::Invalid("missing metadata buffer"))?;
+                    let remaining = target - buffer.len();
+                    if remaining == 0 {
+                        input.read_into(&mut [], work, cancel)?;
                         if !work.try_charge(1) {
                             return Ok(Step::Yield);
                         }
@@ -259,17 +263,18 @@ impl BoxReader {
                                 return Err(rejected.error);
                             }
                         };
-                        let raw = BoxView::new(bytes, header.start)?;
+                        let raw = BoxView::new(bytes, self.start)?;
                         self.next_header(input);
                         return Ok(Step::Ready(BoxEvent::Metadata(raw)));
                     }
-                    let buffer = self
-                        .metadata
-                        .as_mut()
-                        .ok_or(Error::Invalid("missing metadata buffer"))?;
-                    match input.read_append(buffer, target - filled, work, cancel)? {
-                        Step::Ready(_) => {
+                    match input.read_append(buffer, remaining, work, cancel)? {
+                        Step::Ready(count) => {
                             self.position = input.position();
+                            if count < remaining
+                                && let Some(request) = input.pending_request(cancel)?
+                            {
+                                return Ok(Step::NeedInput(request));
+                            }
                         }
                         Step::NeedInput(request) => return Ok(Step::NeedInput(request)),
                         Step::Yield => return Ok(Step::Yield),
@@ -313,6 +318,7 @@ impl BoxReader {
                     }
                 }
                 Phase::Skipped => {
+                    input.read_into(&mut [], work, cancel)?;
                     if !work.try_charge(1) {
                         return Ok(Step::Yield);
                     }

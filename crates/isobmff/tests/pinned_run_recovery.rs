@@ -1,10 +1,12 @@
 mod common;
 use common::{child, roots};
 use std::sync::atomic::{AtomicBool, Ordering};
-use triergon_core::{Budget, Error, WorkBudget};
+use triergon_core::{Budget, Error, Time, TimeBase, WorkBudget};
 use triergon_isobmff::{
     BoxView, BuildStatus, Limits, Mov9RunKind, Mov9RunRecoveryBuilder, Mov9RunRecoveryTable,
-    PinnedMovD32RegularRecoveryV1, SampleStep,
+    PhysicalInterleaveLimits, PhysicalSampleCursor, PinnedMovD32RegularRecoveryV1, SampleStep,
+    SampleTableBuilder, SourceCompositionLookup, SourceSeekLimits, SourceSeekPlanner,
+    SourceSeekRequest, SourceTrack, TimingRunPolicy,
 };
 const STTS: &[u8] = include_bytes!("fixtures/bad-stts-count-mismatch.mov");
 const CTTS: &[u8] = include_bytes!("fixtures/bad-ctts-count-mismatch.mov");
@@ -65,6 +67,93 @@ fn strict_stts_and_ctts_errors_remain_exact() {
         );
     }
 }
+#[test]
+fn bounded_timing_keeps_short_runs_and_invalid_sync_entries_strict() {
+    let pool = Budget::new(1 << 20).unwrap();
+    for (bytes, expected) in [
+        (
+            include_bytes!("fixtures/pinned-run-recovery/run57-04-r-front-stco-lastcount5.mov")
+                .as_slice(),
+            Error::Invalid("time table sample count mismatch"),
+        ),
+        (
+            include_bytes!("fixtures/pinned-run-recovery/run57-05-r-front-stco-lastcount0.mov")
+                .as_slice(),
+            Error::Invalid("zero sample count in time run"),
+        ),
+        (
+            include_bytes!("fixtures/bad-stss-out-of-range.mov").as_slice(),
+            Error::Invalid("sync sample order/range"),
+        ),
+    ] {
+        let mut builder = SampleTableBuilder::with_timing_policy(
+            stbl(bytes, &pool),
+            pool.clone(),
+            Limits::default(),
+            TimingRunPolicy::BoundedPrefix,
+        )
+        .unwrap();
+        let error = (0..100_000)
+            .find_map(|_| match builder.poll(&mut WorkBudget::new(1)) {
+                Ok(BuildStatus::Yield) => None,
+                Ok(BuildStatus::Ready) => panic!("invalid table admitted"),
+                Err(error) => Some(error),
+            })
+            .expect("table validation stalled");
+        assert_eq!(error, expected);
+    }
+}
+
+#[test]
+fn source_only_cursors_require_exact_timing_coverage() {
+    let pool = Budget::new(1 << 20).unwrap();
+    let base = TimeBase::new(1, 1000).unwrap();
+    let start = Time::from_ticks(0, base).unwrap();
+    let error = Some(Error::Invalid("source view requires exact timing coverage"));
+    for bytes in [STTS, CTTS] {
+        let mut builder = SampleTableBuilder::with_timing_policy(
+            stbl(bytes, &pool),
+            pool.clone(),
+            Limits::default(),
+            TimingRunPolicy::BoundedPrefix,
+        )
+        .unwrap();
+        assert_eq!(
+            builder.poll(&mut WorkBudget::new(4096)).unwrap(),
+            BuildStatus::Ready
+        );
+        let table = builder.finish().unwrap();
+        let source = SourceTrack::new(1, Some(&table), &[]).unwrap();
+        let limits = PhysicalInterleaveLimits::default();
+        assert_eq!(
+            PhysicalSampleCursor::new(&pool, &[source], limits).err(),
+            error
+        );
+        assert!(
+            PhysicalSampleCursor::with_timing_policy(
+                &pool,
+                &[source],
+                None,
+                limits,
+                TimingRunPolicy::BoundedPrefix,
+            )
+            .is_ok()
+        );
+        let request = SourceSeekRequest {
+            target_ordinal: 1,
+            preroll_samples: 0,
+        };
+        assert_eq!(
+            SourceSeekPlanner::new(source, request, &[], SourceSeekLimits::default()).err(),
+            error
+        );
+        assert_eq!(
+            SourceCompositionLookup::new(source, start, base, 64).err(),
+            error
+        );
+    }
+}
+
 #[test]
 fn final_stts_positive_surplus_is_observed_not_rewritten() {
     let p = Budget::new(1 << 20).unwrap();

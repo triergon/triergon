@@ -423,6 +423,11 @@ impl<'a> Mp4IndexJob<'a> {
             max_tracks: limits.tracks,
             max_samples: limits.samples,
         };
+        let timing_policy = if view == Mp4View::SourcePhysical {
+            iso::TimingRunPolicy::Strict
+        } else {
+            iso::TimingRunPolicy::BoundedPrefix
+        };
         let forward_regular = match movie.read_scope {
             crate::mp4_open::MetadataReadScope::FrontMetadataBeforeMdat(h)
                 if movie.terminal_mdat.is_none()
@@ -446,27 +451,33 @@ impl<'a> Mp4IndexJob<'a> {
         let source = if range_duration.is_some() {
             None
         } else if let Some(bounds) = forward_regular {
-            Some(PhysicalSampleCursor::new_forward_regular_v1(
-                b,
-                sources.as_slice(),
-                movie.media.as_slice(),
-                bounds,
-                interleave_limits,
-            )?)
+            Some(
+                PhysicalSampleCursor::new_forward_regular_with_timing_policy(
+                    b,
+                    sources.as_slice(),
+                    movie.media.as_slice(),
+                    bounds,
+                    interleave_limits,
+                    timing_policy,
+                )?,
+            )
         } else if movie.terminal_mdat.is_some() {
             // Metadata traversal preserves declared source coordinates. Each row
             // is checked against the terminal declaration, then read physically.
-            Some(PhysicalSampleCursor::new(
+            Some(PhysicalSampleCursor::with_timing_policy(
                 b,
                 sources.as_slice(),
+                None,
                 interleave_limits,
+                timing_policy,
             )?)
         } else {
-            Some(PhysicalSampleCursor::new_with_media_extents(
+            Some(PhysicalSampleCursor::with_timing_policy(
                 b,
                 sources.as_slice(),
-                movie.media.as_slice(),
+                Some(movie.media.as_slice()),
                 interleave_limits,
+                timing_policy,
             )?)
         };
         let native = if view == Mp4View::PinnedMov9NoParseNoFillin {

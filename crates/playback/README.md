@@ -93,6 +93,10 @@ reordering retains at most 32 KiB of media. An in-band second `moov` is not
 accepted; replace the catalogue explicitly with a freshly opened source.
 Range seeks plan from the sample tables without reading payload; the first
 media request starts at the command's `start_offset()`.
+For a file with surplus timing entries, `Mp4Open::with_timing_policy` can
+use the timing prefix covered by the sample sizes for forward playback and
+`Mp4RangeOpen`. Each track's table reports the unused timing occurrences. The source playback view
+requires exact coverage.
 
 **MPEG-TS.** `ts_native_program_v1` selects up to 64 PIDs of one program.
 Private stream type `0x06` is audio only after explicit AC-3/E-AC-3 or DVB

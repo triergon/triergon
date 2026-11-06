@@ -230,6 +230,7 @@ impl<'a> SourceCompositionLookup<'a> {
         media_base: TimeBase,
         max_samples: u64,
     ) -> Result<Self> {
+        source.require_exact_timing()?;
         Ok(Self {
             cursor: TrackSampleCursor::new(source),
             requested,
@@ -421,6 +422,7 @@ impl<'a> MovieSourceSeekPlanner<'a> {
         requested: Time,
         limits: MovieSeekLimits,
     ) -> Result<Self> {
+        context.source.require_exact_timing()?;
         if context.recovery_scopes.len() > limits.max_recovery_scopes {
             return Err(Error::Limit {
                 requested: context.recovery_scopes.len(),
