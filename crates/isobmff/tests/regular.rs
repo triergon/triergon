@@ -1,7 +1,86 @@
 mod common;
 use common::{child, fixtures::CASES};
 use triergon_core::{Budget, Error, WorkBudget};
-use triergon_isobmff::{EditList, MovieHeader, SampleStep, TrackHeader};
+use triergon_isobmff::{
+    EditList, Limits, MovieHeader, SampleStep, SampleTable, SampleTableBuilder, SampleTablePolicy,
+    SyncSamplePolicy, TrackHeader,
+};
+
+fn sync_table(bytes: &[u8], policy: SyncSamplePolicy, quantum: u64) -> Result<SampleTable, Error> {
+    let budget = Budget::new(1 << 20)?;
+    let top = common::roots(&budget, bytes)?;
+    let moov = top
+        .iter()
+        .find(|b| b.header().kind == *b"moov")
+        .ok_or(Error::Invalid("missing movie"))?;
+    let media = child(&child(moov, b"trak")?, b"mdia")?;
+    let stbl = child(&child(&media, b"minf")?, b"stbl")?;
+    let mut builder = SampleTableBuilder::with_policy(
+        stbl.clone(),
+        budget,
+        Limits::default(),
+        SampleTablePolicy {
+            sync_samples: policy,
+            ..SampleTablePolicy::default()
+        },
+    )?;
+    for _ in 0..1000 {
+        if builder.poll(&mut WorkBudget::new(quantum))? == triergon_isobmff::BuildStatus::Ready {
+            let table = builder.finish()?;
+            assert_eq!(table.raw().bytes().as_ref(), stbl.bytes().as_ref());
+            return Ok(table);
+        }
+    }
+    panic!("sample table did not complete")
+}
+
+#[test]
+fn bounded_sync_keeps_only_the_reachable_prefix() {
+    let unreachable = include_bytes!("fixtures/bad-stss-out-of-range.mov");
+    let mut reachable = unreachable.to_vec();
+    let start = reachable
+        .windows(4)
+        .position(|part| part == b"stss")
+        .unwrap()
+        + 12;
+    assert_eq!(&reachable[start..start + 8], &[0, 0, 0, 100, 0, 0, 0, 4]);
+    reachable[start..start + 4].copy_from_slice(&1u32.to_be_bytes());
+    reachable[start + 4..start + 8].copy_from_slice(&100u32.to_be_bytes());
+    let error = Error::Invalid("sync sample order/range");
+    for quantum in [1, 4096] {
+        for (bytes, unused, first_sync) in [
+            (unreachable.as_slice(), 2, None),
+            (reachable.as_slice(), 1, Some(1)),
+        ] {
+            assert_eq!(
+                sync_table(bytes, SyncSamplePolicy::Strict, quantum).unwrap_err(),
+                error
+            );
+            let table = sync_table(bytes, SyncSamplePolicy::BoundedPrefix, quantum).unwrap();
+            assert_eq!(table.sync_entry_count(), Some(2));
+            assert_eq!(table.unused_sync_entries(), unused);
+            assert_eq!(
+                table.previous_sync(table.sample_count()).unwrap(),
+                first_sync
+            );
+            let mut cursor = table.cursor();
+            for ordinal in 1..=table.sample_count() {
+                let SampleStep::Sample(sample) = cursor.poll(&mut WorkBudget::new(1)).unwrap()
+                else {
+                    panic!("missing sample {ordinal}");
+                };
+                assert_eq!(sample.ordinal, ordinal);
+                assert_eq!(sample.is_container_sync(), Some(ordinal) == first_sync);
+            }
+        }
+    }
+    reachable[start..start + 4].copy_from_slice(&4u32.to_be_bytes());
+    reachable[start + 4..start + 8].copy_from_slice(&1u32.to_be_bytes());
+    assert_eq!(
+        sync_table(&reachable, SyncSamplePolicy::BoundedPrefix, 1).unwrap_err(),
+        error
+    );
+}
 
 fn exercise(case: &common::fixtures::Case) -> Result<(), Error> {
     let budget = Budget::new(8 * 1024 * 1024)?;

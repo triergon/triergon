@@ -117,6 +117,12 @@ the bytes and determine the audio object type separately.
   coverage. Compatibility playback can opt into physical range validation
   for a checked prefix, including forward-only media, through the physical
   cursor constructors that accept a timing policy.
+- **Out-of-range sync entries.** `SampleTableBuilder::with_policy` can select
+  `SyncSamplePolicy::BoundedPrefix`. The first `stss` entry past the last
+  sample ends the usable prefix. That entry and the rest of the table remain
+  available as raw metadata, with their count in
+  `SampleTable::unused_sync_entries`. They never mark a sample or provide a
+  seek point. The default policy rejects an out-of-range entry.
 - **Payload ranges.** `SampleReader::new` requires the sample to lie inside the
   caller's `mdat` payload extent. `PhysicalSampleCursor::new_with_media_extents`
   checks every track's ranges against the `mdat` extents before emitting
