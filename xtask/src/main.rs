@@ -39,7 +39,8 @@ commands:
   fetch-vectors  cache the required external test vectors and verify their hashes
   report         [--contract F] [--manifest F] [--corpus DIR] [--output DIR] [--fate-cache DIR]
                  [--additional-report F]... [--require-acceptance] [--require-slice-acceptance]
-                 correctness report of the built workers against one feature contract
+                 [--benchmark [--pairs N] [--iterations N] [--seed N] [--reuse-report F]]
+                 correctness (and paired runtime) report of the built workers for one contract
   compare        --candidate W --reference W --input FILE --output DIR
                  [--operation plain|seek|colour|catalogue] [--content] [--no-short-reads]
                  compare one input across a candidate and a reference worker
@@ -147,6 +148,21 @@ fn report(root: &Path, args: &[String]) -> ExitCode {
                 "--additional-report" => options.additional_reports.push(value()?),
                 "--require-acceptance" => options.require_acceptance = true,
                 "--require-slice-acceptance" => options.require_slice_acceptance = true,
+                "--benchmark" => options.benchmark = true,
+                "--reuse-report" => options.reuse_report = Some(value()?),
+                "--pairs" | "--iterations" | "--seed" => {
+                    let text = value()?.display().to_string();
+                    let number: u64 = text
+                        .parse()
+                        .map_err(|_| format!("{flag}: not a number: {text}"))?;
+                    match flag.as_str() {
+                        "--pairs" => options.pairs = number as usize,
+                        "--iterations" => {
+                            options.iterations = u32::try_from(number).map_err(|e| e.to_string())?
+                        }
+                        _ => options.seed = number,
+                    }
+                }
                 _ => return Err(USAGE.to_owned()),
             }
         }

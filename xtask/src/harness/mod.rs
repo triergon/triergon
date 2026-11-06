@@ -12,4 +12,5 @@ pub mod provenance;
 pub mod report;
 #[cfg(test)]
 mod tests;
+pub mod timing;
 pub mod worker;

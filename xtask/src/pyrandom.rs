@@ -1,13 +1,14 @@
 //! Python's `random.Random`, for the draws the corpus and harness rely on: seeded
-//! byte streams, `random()` and `choices`, each bit-identical to CPython.
+//! byte streams, `random()`, `choices` and `shuffle`, each bit-identical to CPython.
 //!
 //! This is tooling only and is never linked into a library crate.
 //!
 //! Derived work. The generator is MT19937 with its reference initialisation
 //! (`init_genrand`, `init_by_array`) by Makoto Matsumoto and Takuji Nishimura.
 //! Seeding from an integer (its little-endian 32-bit words as the key), bounded
-//! draws by rejection from `getrandbits`, the 53-bit `random()` and `choices`
-//! follow CPython's `random` module. Changes from CPython: a Rust rendering of only these operations.
+//! draws by rejection from `getrandbits`, the 53-bit `random()`, `choices` and
+//! `shuffle` follow CPython's `random` module. Changes from CPython: a Rust
+//! rendering of only these operations.
 //!
 //! Copyright (c) 2001 Python Software Foundation; All Rights Reserved. Used
 //! under the Python Software Foundation License Version 2 (see
@@ -148,6 +149,14 @@ impl PyRandom {
             .map(|_| population[(self.random() * n).floor() as usize])
             .collect()
     }
+
+    /// `shuffle(items)` in place.
+    pub fn shuffle<T>(&mut self, items: &mut [T]) {
+        for i in (1..items.len()).rev() {
+            let j = self.below(i as u32 + 1) as usize;
+            items.swap(i, j);
+        }
+    }
 }
 
 #[cfg(test)]
@@ -166,6 +175,20 @@ mod tests {
     }
 
     const PYTHON_1951: &str = "47f4b2da9c2f343f";
+
+    #[test]
+    fn shuffles_match_python() {
+        // Six shuffles of [candidate, reference] with Random(280): first names c c r c c c.
+        let mut r = PyRandom::new(280);
+        let firsts: String = (0..6)
+            .map(|_| {
+                let mut order = ['c', 'r'];
+                r.shuffle(&mut order);
+                order[0]
+            })
+            .collect();
+        assert_eq!(firsts, "ccrccc");
+    }
 
     #[test]
     fn floats_match_python() {

@@ -495,3 +495,65 @@ fn the_selected_worker_and_complete_source_proof_cannot_be_substituted() {
     put(&mut row, &["reference"], "sha256", Value::str("native"));
     assert!(validate_case_evidence(&row, &identity, ZLIB).is_err());
 }
+
+#[test]
+fn terminal_and_complete_timing_is_kept_and_contamination_retried() {
+    use super::report::retained_timing;
+    for status in ["unequal-work", "worker-error", "timeout", "input-changed"] {
+        let old = Value::object([
+            ("status", Value::str(status)),
+            ("raw", Value::str("first failed observation")),
+        ]);
+        assert_eq!(
+            retained_timing(&old, 30, 200, 30).unwrap(),
+            Some(old.clone())
+        );
+    }
+    assert_eq!(
+        retained_timing(
+            &v(r#"{"status": "contaminated", "samples": [{}]}"#),
+            30,
+            200,
+            30
+        )
+        .unwrap(),
+        None
+    );
+    assert_eq!(retained_timing(&v("{}"), 30, 200, 30).unwrap(), None);
+    let complete =
+        v(r#"{"status": "measured", "pairs": 30, "iterations": 50, "ratio": {"upper_95": 0.9}}"#);
+    assert!(
+        retained_timing(&complete, 30, 200, 30).is_err(),
+        "changing iterations cannot replace a clean run"
+    );
+    assert_eq!(
+        retained_timing(&complete, 30, 50, 30).unwrap(),
+        Some(complete)
+    );
+    let diagnostic = v(r#"{"status": "measured", "pairs": 3, "iterations": 50}"#);
+    assert_eq!(
+        retained_timing(&diagnostic, 30, 50, 30).unwrap(),
+        None,
+        "a short screen can advance"
+    );
+}
+
+#[test]
+fn interrupted_runs_keep_unvisited_measurements_and_reject_ambiguous_ids() {
+    use super::report::measurement_cache;
+    let old = v(
+        r#"{"cases": [{"id": "later-failure", "timing": {"samples": ["original-failure"]}}, {"id": "later-pass"}],
+                    "cached_cases": [{"id": "early"}]}"#,
+    );
+    let cache = measurement_cache(&old).unwrap();
+    assert_eq!(
+        cache.iter().map(|(k, _)| k.as_str()).collect::<Vec<_>>(),
+        ["early", "later-failure", "later-pass"]
+    );
+    assert!(
+        measurement_cache(&v(
+            r#"{"cases": [{"id": "same"}], "cached_cases": [{"id": "same"}]}"#
+        ))
+        .is_err()
+    );
+}
