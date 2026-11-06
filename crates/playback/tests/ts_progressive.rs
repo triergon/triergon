@@ -1,7 +1,7 @@
 use std::{cell::Cell, rc::Rc, sync::atomic::AtomicBool};
 use triergon_core::{
-    Budget, Bytes, Error as CoreError, InputCursor, InputRequest, InputWindow, SourceCapabilities,
-    SourceFailure, SourceId, Time, WorkBudget,
+    Budget, Bytes, InputCursor, InputRequest, InputWindow, SourceCapabilities, SourceFailure,
+    SourceId, Time, WorkBudget,
 };
 use triergon_mpegts::psi::PsiCrc32;
 use triergon_playback::{
@@ -12,7 +12,7 @@ use triergon_playback::{
 };
 
 const BASELINE: &[u8] = include_bytes!("fixtures/hls/baseline-stereo.ts");
-// Both lanes have produced complete units by the end of the first audio PES.
+// Audio and video have produced complete units by the end of the first audio PES.
 const BASELINE_PREFIX: usize = 39 * 188;
 const ID: SourceId = SourceId(31);
 
@@ -358,25 +358,20 @@ fn a_pes_at_the_window_boundary_leaves_room_for_the_next_reply() {
 #[test]
 fn transport_cut_short_length_and_partial_carrier_refuse_without_eof_flush() {
     for (prefix, length, completion, error) in [
-        (BASELINE_PREFIX, None, Completion::Cut, CoreError::Transport),
+        (BASELINE_PREFIX, None, Completion::Cut, Error::Transport),
         (
             BASELINE.len(),
             Some(BASELINE.len() as u64),
             Completion::Cut,
-            CoreError::Transport,
+            Error::Transport,
         ),
         (
             BASELINE_PREFIX,
             Some(BASELINE.len() as u64),
             Completion::End,
-            CoreError::Truncated,
+            Error::Truncated,
         ),
-        (
-            BASELINE.len() - 1,
-            None,
-            Completion::End,
-            CoreError::Truncated,
-        ),
+        (BASELINE.len() - 1, None, Completion::End, Error::Truncated),
     ] {
         let pool = Budget::new(64 * 1024).unwrap();
         let (mut reader, source) = reader(&pool, BASELINE, length, 301);
@@ -385,7 +380,7 @@ fn transport_cut_short_length_and_partial_carrier_refuse_without_eof_flush() {
         source.completion.set(Some(completion));
         let result = next(&mut reader, 4096);
         assert!(
-            matches!(result, Err(Error::Core(actual)) if actual == error),
+            matches!(result, Err(actual) if actual == error),
             "{result:?}"
         );
         assert!(matches!(next(&mut reader, 4096), Err(Error::Closed)));
@@ -412,7 +407,7 @@ fn corrupt_selected_carriers_retire_the_feed() {
         loop {
             match next(&mut reader, 4096) {
                 Ok(TsProgressiveStep::Unit(_) | TsProgressiveStep::NeedInput(_)) => {}
-                Err(Error::Core(CoreError::Invalid(actual))) if actual == expected => break,
+                Err(Error::Invalid(actual)) if actual == expected => break,
                 other => panic!("expected {expected}, got {other:?}"),
             }
         }
@@ -442,9 +437,7 @@ fn carrier_aligned_end_inside_a_finite_audio_pes_is_refused() {
     loop {
         match next(&mut reader, 4096) {
             Ok(TsProgressiveStep::Unit(TsProgressiveUnit::Video(_))) => {}
-            Err(Error::Core(
-                CoreError::Truncated | CoreError::Invalid("HLS AAC corrupt or empty PES"),
-            )) => break,
+            Err(Error::Truncated | Error::Invalid("HLS AAC corrupt or empty PES")) => break,
             other => panic!("expected refusal of truncated audio PES, got {other:?}"),
         }
     }
@@ -461,7 +454,7 @@ fn cancellation_retires_the_body_and_old_completion_cannot_end_its_replacement()
     let cancel = AtomicBool::new(true);
     assert!(matches!(
         first.advance(&mut WorkBudget::new(0), &cancel),
-        Err(Error::Core(CoreError::Cancelled))
+        Err(Error::Cancelled)
     ));
     closed(&pool, &source);
     drop(first);
@@ -475,7 +468,7 @@ fn cancellation_retires_the_body_and_old_completion_cannot_end_its_replacement()
     };
     assert!(matches!(
         reopened.provide(&late),
-        Err(Error::Core(CoreError::StaleGeneration { .. }))
+        Err(Error::StaleGeneration { .. })
     ));
     source.available.set(BASELINE.len());
     let pressure = pool.reserve(pool.available()).unwrap();
@@ -502,10 +495,7 @@ fn pmt_requires_unique_avc_and_adts_even_if_payload_is_unchanged() {
         let (mut reader, source) = reader(&pool, &raw, None, 188);
         source.available.set(raw.len());
         let result = next(&mut reader, 4096);
-        assert!(
-            matches!(result, Err(Error::Core(CoreError::Unsupported(_)))),
-            "{result:?}"
-        );
+        assert!(matches!(result, Err(Error::Unsupported(_))), "{result:?}");
         closed(&pool, &source);
     }
 }
@@ -522,9 +512,7 @@ fn active_pmt_change_retires_the_feed_after_early_delivery() {
     source.available.set(raw.len());
     assert!(matches!(
         next(&mut reader, 4096),
-        Err(Error::Core(CoreError::Unsupported(
-            "progressive TS changes active PMT"
-        )))
+        Err(Error::Unsupported("progressive TS changes active PMT"))
     ));
     closed(&pool, &source);
 }

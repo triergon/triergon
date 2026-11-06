@@ -8,7 +8,7 @@ use crate::{
     io::SourceOwner,
 };
 use std::sync::atomic::{AtomicBool, Ordering};
-use triergon_core::{Error as CoreError, InputCursor, InputRequest, Time, WorkBudget};
+use triergon_core::{InputCursor, InputRequest, Time, WorkBudget};
 use triergon_mpegts::{
     AssemblyStep, ContinuityOutcome, FaultKind, ParseLimits, TraceEvent,
     psi::{PatTable, ProgramMap},
@@ -98,7 +98,7 @@ impl<S: Source> TsProgressiveReader<S> {
     pub fn new(input: InputCursor, source: S, limits: TsProgressiveLimits) -> Result<Self> {
         let source = SourceOwner::new(source);
         if input.position() != 0 || input.capabilities().random_access {
-            return Err(CoreError::Invalid("progressive TS requires a sequential body").into());
+            return Err(Error::Invalid("progressive TS requires a sequential body"));
         }
         let engine = Engine::ts_progressive(input, limits.transport)?;
         let mut player = Player::new_direct(
@@ -132,9 +132,7 @@ impl<S: Source> TsProgressiveReader<S> {
         let result = self.player.as_mut().ok_or(Error::Closed)?.provide(reply);
         if matches!(
             result,
-            Err(Error::Core(
-                CoreError::Transport | CoreError::Truncated | CoreError::Cancelled
-            ))
+            Err(Error::Transport | Error::Truncated | Error::Cancelled)
         ) {
             self.fail();
         }
@@ -148,21 +146,19 @@ impl<S: Source> TsProgressiveReader<S> {
     ) -> Result<TsProgressiveStep> {
         if cancel.load(Ordering::Relaxed) {
             self.fail();
-            return Err(CoreError::Cancelled.into());
+            return Err(Error::Cancelled);
         }
         match self.step(work, cancel) {
-            Err(Error::Core(CoreError::Backpressure {
+            Err(Error::Backpressure {
                 requested,
                 available,
-            })) => Ok(TsProgressiveStep::Backpressure {
+            }) => Ok(TsProgressiveStep::Backpressure {
                 requested,
                 available,
             }),
             // The frame assemblers retain state across allocation failure.
             // A native track refusal while reading is terminal.
-            Err(Error::Core(CoreError::Allocation)) if self.phase != Phase::Read => {
-                Err(CoreError::Allocation.into())
-            }
+            Err(Error::Allocation) if self.phase != Phase::Read => Err(Error::Allocation),
             Err(error) => {
                 self.fail();
                 Err(error)
@@ -178,7 +174,7 @@ impl<S: Source> TsProgressiveReader<S> {
                 let mut output = None;
                 match player.read_output(&mut output, work, cancel)? {
                     Progress::Queued => {
-                        let event = output.ok_or(CoreError::Invalid("missing TS player output"))?;
+                        let event = output.ok_or(Error::Invalid("missing TS player output"))?;
                         self.on_event(event.into_event())?;
                     }
                     Progress::NeedInput(request) => {
@@ -195,12 +191,12 @@ impl<S: Source> TsProgressiveReader<S> {
                     }
                     Progress::Ended => {
                         self.player = None;
-                        self.video.as_mut().ok_or(CoreError::Truncated)?.finish();
-                        self.audio.as_mut().ok_or(CoreError::Truncated)?.finish();
+                        self.video.as_mut().ok_or(Error::Truncated)?.finish();
+                        self.audio.as_mut().ok_or(Error::Truncated)?.finish();
                         self.phase = Phase::DrainVideo;
                     }
                     Progress::Yield => {}
-                    _ => return Err(CoreError::Invalid("unexpected TS player state").into()),
+                    _ => return Err(Error::Invalid("unexpected TS player state")),
                 }
             }
             Phase::Video | Phase::DrainVideo => {
@@ -208,10 +204,7 @@ impl<S: Source> TsProgressiveReader<S> {
                 match video.step(work, cancel)? {
                     AvcTsStep::Ready(unit) => {
                         if unit.clock.and_then(|clock| clock.pts90).is_none() {
-                            return Err(CoreError::Unsupported(
-                                "progressive AVC picture without PTS",
-                            )
-                            .into());
+                            return Err(Error::Unsupported("progressive AVC picture without PTS"));
                         }
                         self.saw_video = true;
                         return Ok(TsProgressiveStep::Unit(TsProgressiveUnit::Video(unit)));
@@ -224,7 +217,7 @@ impl<S: Source> TsProgressiveReader<S> {
                         self.video = None;
                         self.phase = Phase::DrainAudio;
                     }
-                    _ => return Err(CoreError::Invalid("unexpected progressive AVC state").into()),
+                    _ => return Err(Error::Invalid("unexpected progressive AVC state")),
                 }
             }
             Phase::Audio | Phase::DrainAudio => {
@@ -243,16 +236,13 @@ impl<S: Source> TsProgressiveReader<S> {
                     }
                     AssemblyStep::Finished if self.phase == Phase::DrainAudio => {
                         if !self.saw_video || self.audio_times.is_none() {
-                            return Err(CoreError::Invalid(
-                                "progressive TS lacks a complete A/V feed",
-                            )
-                            .into());
+                            return Err(Error::Invalid("progressive TS lacks a complete A/V feed"));
                         }
                         self.audio = None;
                         self.phase = Phase::End;
                         return Ok(TsProgressiveStep::End);
                     }
-                    _ => return Err(CoreError::Invalid("unexpected progressive AAC state").into()),
+                    _ => return Err(Error::Invalid("unexpected progressive AAC state")),
                 }
             }
             Phase::End => return Ok(TsProgressiveStep::End),
@@ -268,9 +258,9 @@ impl<S: Source> TsProgressiveReader<S> {
                 let tracks = self
                     .tracks
                     .as_ref()
-                    .ok_or(CoreError::Invalid("missing TS PMT"))?;
+                    .ok_or(Error::Invalid("missing TS PMT"))?;
                 if config.configuration_epoch != tracks.epoch {
-                    return Err(CoreError::Invalid("progressive TS configuration epoch").into());
+                    return Err(Error::Invalid("progressive TS configuration epoch"));
                 }
                 let pool = self.player.as_ref().ok_or(Error::Closed)?.budget();
                 if config.track == tracks.video {
@@ -283,7 +273,7 @@ impl<S: Source> TsProgressiveReader<S> {
                 let tracks = self
                     .tracks
                     .as_ref()
-                    .ok_or(CoreError::Invalid("missing TS PMT"))?;
+                    .ok_or(Error::Invalid("missing TS PMT"))?;
                 let track = TrackKey::Ts {
                     program: packet.program,
                     pid: packet.pid,
@@ -293,18 +283,18 @@ impl<S: Source> TsProgressiveReader<S> {
                     let video = self
                         .video
                         .as_mut()
-                        .ok_or(CoreError::Invalid("missing AVC configuration"))?;
+                        .ok_or(Error::Invalid("missing AVC configuration"))?;
                     if !video.push(&mut mailbox, clock)? {
-                        return Err(CoreError::Invalid("progressive AVC mailbox is busy").into());
+                        return Err(Error::Invalid("progressive AVC mailbox is busy"));
                     }
                     self.phase = Phase::Video;
                 } else if track == tracks.audio {
                     let audio = self
                         .audio
                         .as_mut()
-                        .ok_or(CoreError::Invalid("missing AAC configuration"))?;
+                        .ok_or(Error::Invalid("missing AAC configuration"))?;
                     if !audio.push(&mut mailbox, clock)? {
-                        return Err(CoreError::Invalid("progressive AAC mailbox is busy").into());
+                        return Err(Error::Invalid("progressive AAC mailbox is busy"));
                     }
                     self.phase = Phase::Audio;
                 }
@@ -315,7 +305,7 @@ impl<S: Source> TsProgressiveReader<S> {
                     .as_ref()
                     .is_some_and(|t| track == t.video || track == t.audio) =>
             {
-                return Err(error.into());
+                return Err(error);
             }
             _ => {}
         }
@@ -327,7 +317,7 @@ impl<S: Source> TsProgressiveReader<S> {
             TraceEvent::Pat(table) => {
                 let binding = pat_binding(&table)?;
                 if self.pat.is_some_and(|previous| binding != previous) {
-                    return Err(CoreError::Unsupported("progressive TS changes PAT binding").into());
+                    return Err(Error::Unsupported("progressive TS changes PAT binding"));
                 }
                 self.pat = Some(binding);
             }
@@ -337,7 +327,7 @@ impl<S: Source> TsProgressiveReader<S> {
                 configuration_epoch,
             } => {
                 if self.tracks.is_some() {
-                    return Err(CoreError::Unsupported("progressive TS changes active PMT").into());
+                    return Err(Error::Unsupported("progressive TS changes active PMT"));
                 }
                 self.tracks = Some(Tracks {
                     video: select_track(&map, 0x1b)?,
@@ -352,16 +342,16 @@ impl<S: Source> TsProgressiveReader<S> {
                     FaultKind::Transport | FaultKind::Psi | FaultKind::Program
                 ) || fault.pid.is_some_and(|pid| self.required_pid(pid)) =>
             {
-                return Err(fault.error.into());
+                return Err(fault.error);
             }
             TraceEvent::Continuity {
                 pid,
                 outcome: ContinuityOutcome::SignalledDiscontinuity,
             } if self.required_pid(pid) => {
-                return Err(CoreError::Unsupported("progressive TS continuity break").into());
+                return Err(Error::Unsupported("progressive TS continuity break"));
             }
             TraceEvent::Timeline { .. } => {
-                return Err(CoreError::Unsupported("progressive TS clock discontinuity").into());
+                return Err(Error::Unsupported("progressive TS clock discontinuity"));
             }
             _ => {}
         }
@@ -384,14 +374,14 @@ impl<S: Source> TsProgressiveReader<S> {
             .pts
             .or(frame.dts)
             .or(self.audio_times.map(|(_, next)| next))
-            .ok_or(CoreError::Unsupported(
+            .ok_or(Error::Unsupported(
                 "progressive AAC starts without PES time",
             ))?;
         if self
             .audio_times
             .is_some_and(|(previous, _)| presentation < previous)
         {
-            return Err(CoreError::Invalid("progressive AAC timestamps move backwards").into());
+            return Err(Error::Invalid("progressive AAC timestamps move backwards"));
         }
         self.audio_times = Some((presentation, presentation.checked_add(frame.duration)?));
         Ok(presentation)
@@ -412,7 +402,7 @@ fn pat_binding(table: &PatTable) -> triergon_core::Result<PatBinding> {
         .as_slice()
         .iter()
         .find(|entry| !entry.is_network_pid())
-        .ok_or(CoreError::Invalid("progressive TS PAT without program"))?;
+        .ok_or(Error::Invalid("progressive TS PAT without program"))?;
     Ok(PatBinding {
         tsid: table.header.extension,
         program: entry.program_number,
@@ -426,11 +416,11 @@ fn select_track(map: &ProgramMap, stream_type: u8) -> triergon_core::Result<Trac
         .as_slice()
         .iter()
         .filter(|stream| stream.stream_type == stream_type);
-    let stream = streams.next().ok_or(CoreError::Unsupported(
+    let stream = streams.next().ok_or(Error::Unsupported(
         "progressive TS requires AVC and ADTS AAC",
     ))?;
     if streams.next().is_some() {
-        return Err(CoreError::Unsupported("ambiguous progressive TS track"));
+        return Err(Error::Unsupported("ambiguous progressive TS track"));
     }
     Ok(TrackKey::Ts {
         program: map.header.extension,
