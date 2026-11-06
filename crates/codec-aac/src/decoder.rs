@@ -287,7 +287,11 @@ impl Core {
     }
 
     /// Decode one raw_data_block(); appends `frame_len()` samples per plane to `planes`.
-    pub(crate) fn decode_block(&mut self, br: &mut BitReader, block_start: usize) -> Result<bool> {
+    pub(crate) fn decode_block(
+        &mut self,
+        br: &mut BitReader<'_>,
+        block_start: usize,
+    ) -> Result<bool> {
         for e in &mut self.elements {
             e.decoded = false;
             e.ch_decoded = [false; 2];
@@ -455,7 +459,7 @@ impl Core {
 
     fn decode_sce(
         &mut self,
-        br: &mut BitReader,
+        br: &mut BitReader<'_>,
         cfg: &CoreCfg,
         ei: usize,
         chan: usize,
@@ -470,7 +474,7 @@ impl Core {
         Ok(())
     }
 
-    fn decode_cpe(&mut self, br: &mut BitReader, cfg: &CoreCfg, ei: usize) -> Result<()> {
+    fn decode_cpe(&mut self, br: &mut BitReader<'_>, cfg: &CoreCfg, ei: usize) -> Result<()> {
         let e = &mut self.elements[ei];
         let common = br.bit();
         let mut ms_present = 0u8;
@@ -530,7 +534,7 @@ impl Core {
 
     fn decode_sbr_ext(
         &mut self,
-        br: &mut BitReader,
+        br: &mut BitReader<'_>,
         ei: usize,
         crc: bool,
         bits: usize,
@@ -648,7 +652,7 @@ impl Core {
                     let (cd, st, out) = (&mut e.cd[c], &mut e.ch[c], &mut e.out[c]);
                     process_channel(&mut self.fb, &cfg, cd, st, out, &mut self.cce, kind, tag, c);
                 } else if e.kind == ID_CPE {
-                    for v in e.out[c][..1024].iter_mut() {
+                    for v in &mut e.out[c][..1024] {
                         *v = 0.0;
                     }
                 }
@@ -756,7 +760,10 @@ pub(crate) fn process_channel(
 /// Element layout of channel_configuration 1..7 (ISO/IEC 14496-3 Table 1.19) with the
 /// speaker positions FFmpeg assigns.
 pub(crate) fn fixed_config_slots(cfg: u8) -> Vec<Slot> {
-    use Speaker::*;
+    use Speaker::{
+        BackCenter, BackLeft, BackRight, FrontCenter, FrontLeft, FrontRight, LowFrequency,
+        SideLeft, SideRight,
+    };
     let sce = |s| Slot {
         kind: ID_SCE,
         tag: 0,
@@ -814,7 +821,12 @@ pub(crate) fn fixed_config_slots(cfg: u8) -> Vec<Slot> {
 /// `harness/codecs/aac/tools/probe_layout.py`). Returns the slots and whether the output keeps
 /// PCE order (FFmpeg "unknown" layouts) instead of native order.
 pub(crate) fn pce_slots(p: &Pce) -> (Vec<Slot>, bool) {
-    use Speaker::*;
+    use Speaker::{
+        BackCenter, BackLeft, BackRight, BottomFrontCenter, BottomFrontLeft, BottomFrontRight,
+        FrontCenter, FrontLeft, FrontLeftOfCenter, FrontRight, FrontRightOfCenter, LowFrequency,
+        LowFrequency2, SideLeft, SideRight, TopBackCenter, TopBackLeft, TopBackRight, TopCenter,
+        TopFrontCenter, TopFrontLeft, TopFrontRight, TopSideLeft, TopSideRight,
+    };
     let mut slots = Vec::new();
     let mut unordered = false;
     let normal = |v: &[crate::pce::PceElement]| -> Vec<crate::pce::PceElement> {

@@ -541,7 +541,7 @@ impl NalReader {
                     // caller grants a very large step budget/window.
                     match self.cursor.read_span(remaining.min(4096), work, cancel)? {
                         Step::Ready(bytes) => {
-                            self.buffer()?.try_extend_from_slice(bytes.as_ref())?
+                            self.buffer()?.try_extend_from_slice(bytes.as_ref())?;
                         }
                         Step::NeedInput(request) => return Ok(Step::NeedInput(request)),
                         Step::Yield => return Ok(Step::Yield),

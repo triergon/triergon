@@ -5,7 +5,18 @@
 //! SBR, plane order = FFmpeg native channel order, float full scale 1.0; see
 //! [`triergon_codec::layout`]).
 #![forbid(unsafe_code)]
-
+#![warn(unreachable_pub, clippy::print_stdout, clippy::print_stderr)]
+// Pending: `missing_docs`, `missing_debug_implementations`, `clippy::unwrap_used`, `clippy::expect_used`.
+// Pending: these rewrites change the generated code of measured hot paths and are
+// adopted with an A/B timing run.
+#![allow(
+    clippy::bool_to_int_with_if,
+    clippy::needless_for_each,
+    clippy::nonminimal_bool,
+    clippy::redundant_closure_for_method_calls,
+    clippy::single_match_else,
+    clippy::unnested_or_patterns
+)]
 pub mod adts;
 mod bits;
 mod cce;

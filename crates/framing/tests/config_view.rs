@@ -217,13 +217,11 @@ fn avc_both(raw: &[u8], limits: AvcConfigLimits, quantum: u64) -> Both<AvcFacts>
     let pool = Budget::new(4_000_000).unwrap();
     let baseline = pool.used();
     let (et, e) = AvcConfigParser::new(&pool, avc_source(), bytes(&pool, raw), limits)
-        .map(|mut p| run(&mut p, quantum))
-        .unwrap_or_else(|e| (Vec::new(), Err(e)));
+        .map_or_else(|e| (Vec::new(), Err(e)), |mut p| run(&mut p, quantum));
     let e = e.map(|c| avc_eager_facts(&c));
     assert_eq!(pool.used(), baseline);
     let (vt, v) = AvcConfigViewParser::new(&pool, avc_source(), bytes(&pool, raw), limits)
-        .map(|mut p| run(&mut p, quantum))
-        .unwrap_or_else(|e| (Vec::new(), Err(e)));
+        .map_or_else(|e| (Vec::new(), Err(e)), |mut p| run(&mut p, quantum));
     let v = v.map(|v| {
         // Parser and caller handle are gone: only the record handle and the
         // charged descriptor table remain live in the pool.
@@ -335,7 +333,7 @@ fn hvc_example(suffix: &[u8]) -> Vec<u8> {
     hvc_record(
         4,
         &[
-            (33 | 128, vec![hvc_nal(33, 9), hvc_nal(33, 9)]),
+            (0x80 | 0x21, vec![hvc_nal(33, 9), hvc_nal(33, 9)]),
             (55, vec![]),
             (32, vec![hvc_nal(32, 7)]),
             (33, vec![hvc_nal(34, 6)]),
@@ -461,13 +459,11 @@ fn hvc_both(raw: &[u8], limits: HvcConfigLimits, quantum: u64) -> Both<HvcFacts>
     let pool = Budget::new(8_000_000).unwrap();
     let baseline = pool.used();
     let (et, e) = HvcConfigParser::new(&pool, hvc_source(), bytes(&pool, raw), limits)
-        .map(|mut p| run(&mut p, quantum))
-        .unwrap_or_else(|e| (Vec::new(), Err(e)));
+        .map_or_else(|e| (Vec::new(), Err(e)), |mut p| run(&mut p, quantum));
     let e = e.map(|c| hvc_eager_facts(&c));
     assert_eq!(pool.used(), baseline);
     let (vt, v) = HvcConfigViewParser::new(&pool, hvc_source(), bytes(&pool, raw), limits)
-        .map(|mut p| run(&mut p, quantum))
-        .unwrap_or_else(|e| (Vec::new(), Err(e)));
+        .map_or_else(|e| (Vec::new(), Err(e)), |mut p| run(&mut p, quantum));
     let v = v.map(|v| {
         assert_eq!(pool.used(), baseline + v.retained_storage_bytes().unwrap());
         hvc_view_facts(&v)
@@ -496,7 +492,10 @@ fn hvc_corpus() -> Vec<(&'static str, Vec<u8>)> {
             "reserved-and-empty",
             hvc_record(
                 4,
-                &[(64 | 39, vec![]), (128 | 64 | 40, vec![hvc_nal(40, 2)])],
+                &[
+                    (0x40 | 0x27, vec![]),
+                    (0x80 | 0x40 | 0x28, vec![hvc_nal(40, 2)]),
+                ],
                 &[],
             ),
         ),
@@ -823,7 +822,11 @@ fn g02_batch_export_charges_its_own_actual_capacity() {
     drop(view);
     // The batch keeps its own capacity charge plus one deduplicated backing.
     assert_eq!(pool.used(), baseline + raw_charge + batch_charge);
-    let ranges: Vec<_> = batch.as_slice().iter().map(|n| n.source_range()).collect();
+    let ranges: Vec<_> = batch
+        .as_slice()
+        .iter()
+        .map(RetainedHvcConfigNal::source_range)
+        .collect();
     assert_eq!(ranges, [28..34, 36..42, 50..56, 61..67]);
     drop(batch);
     assert_eq!(pool.used(), baseline);
@@ -1466,7 +1469,7 @@ fn g11_strict_and_observed_views_keep_distinct_typed_refusals() {
         assert_eq!((v.source(), v.fields()), (e.source(), e.fields()));
         assert_eq!(v.source_bytes().as_ref(), e.source_bytes().as_ref());
         let ranges: Vec<_> = v.nals().map(|n| n.source_range()).collect();
-        let eager_ranges: Vec<_> = e.nals().iter().map(|n| n.source_range()).collect();
+        let eager_ranges: Vec<_> = e.nals().iter().map(AvcConfigNal::source_range).collect();
         assert_eq!(ranges, eager_ranges);
         assert_eq!(v.nal_count(), e.nals().len());
         assert_eq!(v.trailing_bytes(), [0xaa, 0xbb]);

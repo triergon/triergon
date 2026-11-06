@@ -143,7 +143,7 @@ fn letterbox_matches_reference_digests() {
 /// over (see `codec::Plane`). `RGBA_BENCH=N` converts the first picture N
 /// times instead and prints the median time.
 #[test]
-#[ignore]
+#[ignore = "needs RGBA_RAW input"]
 fn raw_letterbox() {
     let Ok(spec) = std::env::var("RGBA_RAW") else {
         return;

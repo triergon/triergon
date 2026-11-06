@@ -53,7 +53,7 @@ fn options(args: &[String], offset: usize) -> Result<Options> {
     }
     let window = argument(args, offset, 65536)?;
     let retain = argument(args, offset + 1, 0)?;
-    let file = match args.get(offset + 2).map(String::as_str).unwrap_or("memory") {
+    let file = match args.get(offset + 2).map_or("memory", String::as_str) {
         "memory" => false,
         "file" => true,
         _ => return Err(Error::Invalid("I/O mode").into()),

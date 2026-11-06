@@ -338,7 +338,7 @@ fn truncated_final_transport_packet_reports_its_actual_start() {
         .iter()
         .find_map(|event| {
             if let TraceEvent::Diagnostic(value) = event {
-                if value.kind == triergon_mpegts::FaultKind::Transport {
+                if value.kind == FaultKind::Transport {
                     Some(value)
                 } else {
                     None

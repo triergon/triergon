@@ -132,7 +132,7 @@ fn feed(o: &mut NativePesRecoveryObserver, event: &TraceEvent, c: NativeSourceCo
     match event {
         TraceEvent::Transport(p) if p.pid == 256 => o.push_accepted(p.clone(), c).unwrap(),
         TraceEvent::Diagnostic(f) if f.rejected.is_some() => {
-            o.push_diagnostic_rejection_v1(f.clone(), c).unwrap()
+            o.push_diagnostic_rejection_v1(f.clone(), c).unwrap();
         }
         TraceEvent::Diagnostic(f)
             if f.pid == Some(256)
@@ -145,7 +145,7 @@ fn feed(o: &mut NativePesRecoveryObserver, event: &TraceEvent, c: NativeSourceCo
                     ) | Error::Unsupported("scrambled TS payload")
                 ) =>
         {
-            o.confirm_source_fault_v1(f, c).unwrap()
+            o.confirm_source_fault_v1(f, c).unwrap();
         }
         TraceEvent::Timeline { .. } => o.commit_source_timeline_v1(c).unwrap(),
         _ => {}
@@ -161,7 +161,7 @@ fn drain(o: &mut NativePesRecoveryObserver) -> Vec<NativePesObservation> {
             AssemblyStep::Yield => {}
             AssemblyStep::Output(p) => results.push(p),
             AssemblyStep::NeedPayload => return results,
-            other => panic!("unexpected {other:?}"),
+            other @ AssemblyStep::Finished => panic!("unexpected {other:?}"),
         }
     }
     panic!("bounded native assembly failed to progress");
@@ -431,7 +431,7 @@ fn timeline(id: &str, times: &[u64]) {
     };
     assert_eq!(
         last.source_epochs.clock,
-        if times.len() == 3 { 1 } else { 0 },
+        u64::from(times.len() == 3),
         "real transport precedes source Timeline; do not relabel its epoch"
     );
 }

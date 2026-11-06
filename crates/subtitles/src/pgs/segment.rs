@@ -122,7 +122,7 @@ impl<'a> Cursor<'a> {
     }
 }
 
-fn body<'a>(segment: Segment<'a>, kind: u8) -> Result<Cursor<'a>> {
+fn body(segment: Segment<'_>, kind: u8) -> Result<Cursor<'_>> {
     if segment.kind != kind {
         return Err(Error::Invalid("PGS unexpected typed segment"));
     }

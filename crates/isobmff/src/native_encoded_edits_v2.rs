@@ -254,7 +254,7 @@ impl<'a> Mov9EncodedEditJobV2<'a> {
     }
     pub fn new_v3(
         context: Mov9EncodedEditContextV2<'a>,
-        configs: &[crate::Mov9EncodedStreamV1],
+        configs: &[Mov9EncodedStreamV1],
         input: &InputCursor,
         limits: Mov9EncodedEditLimitsV2,
         _profile: crate::PinnedMovD32EncodedRegularV3,
@@ -267,7 +267,7 @@ impl<'a> Mov9EncodedEditJobV2<'a> {
     /// recovery memberships and unproven group namespaces remain unsupported.
     pub fn new_v4(
         context: Mov9EncodedEditContextV2<'a>,
-        configs: &[crate::Mov9EncodedStreamV1],
+        configs: &[Mov9EncodedStreamV1],
         input: &InputCursor,
         limits: Mov9EncodedEditLimitsV2,
         _profile: crate::PinnedMovD32EncodedRegularV4,
@@ -284,7 +284,7 @@ impl<'a> Mov9EncodedEditJobV2<'a> {
     /// source records are validated and retained; this is not decoder preroll.
     pub fn new_v5(
         context: Mov9EncodedEditContextV2<'a>,
-        configs: &[crate::Mov9EncodedStreamV1],
+        configs: &[Mov9EncodedStreamV1],
         input: &InputCursor,
         limits: Mov9EncodedEditLimitsV2,
         _profile: crate::PinnedMovD32EncodedRecoveryV5,
@@ -304,7 +304,7 @@ impl<'a> Mov9EncodedEditJobV2<'a> {
     }
     pub fn new_v7(
         context: Mov9EncodedEditContextV2<'a>,
-        configs: &[crate::Mov9EncodedStreamV1],
+        configs: &[Mov9EncodedStreamV1],
         input: &InputCursor,
         limits: Mov9EncodedEditLimitsV2,
         _profile: crate::PinnedMovD32EncodedContextsV7,
@@ -335,7 +335,7 @@ impl<'a> Mov9EncodedEditJobV2<'a> {
     /// and DTS. DTS also supports a leading empty edit before the media edit.
     pub fn new_range_playback(
         context: Mov9EncodedEditContextV2<'a>,
-        configs: &[crate::Mov9EncodedStreamV1],
+        configs: &[Mov9EncodedStreamV1],
         input: &InputCursor,
         limits: Mov9EncodedEditLimitsV2,
     ) -> Result<Self> {
@@ -761,7 +761,7 @@ impl<'a> Mov9EncodedEditJobV2<'a> {
                 }
                 if self.dependency_v4
                     && !self.dependency_v5
-                    && s.dependency.is_some_and(|raw| raw & 12 == 12)
+                    && s.dependency.is_some_and(|raw| raw & 0x0c == 12)
                 {
                     return Err(Error::Unsupported("encoded V4 reserved depended-on value"));
                 }

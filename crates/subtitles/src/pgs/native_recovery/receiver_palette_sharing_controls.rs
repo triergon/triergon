@@ -92,7 +92,7 @@ fn complete_literal_palette_reuses_the_actual_source_owner_without_an_inline_kib
         source.native_words().as_ptr()
     ));
     assert_eq!(rect.palette().as_slice(), source.native_words());
-    assert!(std::mem::size_of::<RecoveredRect>() < 256);
+    assert!(size_of::<RecoveredRect>() < 256);
     assert_eq!(&rect.pixels()[..], &[1]);
 }
 

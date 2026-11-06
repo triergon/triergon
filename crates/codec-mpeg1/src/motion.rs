@@ -405,7 +405,7 @@ impl Search<'_> {
     pub fn run(
         &self,
         predictors: &[Mv],
-        coarse: &Coarse,
+        coarse: &Coarse<'_>,
         mb_x: usize,
         mb_y: usize,
         neighbour_sad: u32,
@@ -579,7 +579,7 @@ impl Search<'_> {
     }
 
     /// The best `COARSE_KEEP` vectors of an exhaustive decimated search.
-    fn coarse(&self, coarse: &Coarse, mb_x: usize, mb_y: usize) -> [Mv; COARSE_KEEP] {
+    fn coarse(&self, coarse: &Coarse<'_>, mb_x: usize, mb_y: usize) -> [Mv; COARSE_KEEP] {
         let width = coarse.width;
         let (x0, y0) = (mb_x * 4, mb_y * 4);
         let mut block = [0u8; 16];

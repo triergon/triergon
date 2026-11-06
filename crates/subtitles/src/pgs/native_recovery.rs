@@ -502,26 +502,25 @@ impl<S: RecoveryRole> Decoder<S> {
                                 .or_else(|| {
                                     self.palettes.as_slice().iter().position(|p| p.id.is_none())
                                 });
-                            let index = match index {
-                                Some(i) => i,
-                                None => {
-                                    if self.palettes.len() == self.limits.max_palettes {
-                                        return Err(Error::Limit {
-                                            requested: self.palettes.len() + 1,
-                                            maximum: self.limits.max_palettes,
-                                        });
-                                    }
-                                    if self.palettes.is_empty() {
-                                        self.palettes.try_reserve_exact(1)?;
-                                    }
-                                    self.palettes
-                                        .try_push(PaletteSlot {
-                                            id: None,
-                                            words: [0; 256],
-                                        })
-                                        .map_err(|e| e.error)?;
-                                    self.palettes.len() - 1
+                            let index = if let Some(i) = index {
+                                i
+                            } else {
+                                if self.palettes.len() == self.limits.max_palettes {
+                                    return Err(Error::Limit {
+                                        requested: self.palettes.len() + 1,
+                                        maximum: self.limits.max_palettes,
+                                    });
                                 }
+                                if self.palettes.is_empty() {
+                                    self.palettes.try_reserve_exact(1)?;
+                                }
+                                self.palettes
+                                    .try_push(PaletteSlot {
+                                        id: None,
+                                        words: [0; 256],
+                                    })
+                                    .map_err(|e| e.error)?;
+                                self.palettes.len() - 1
                             };
                             self.palettes.as_mut_slice()[index].id = Some(id);
                             self.palette_index = index;
@@ -535,30 +534,29 @@ impl<S: RecoveryRole> Decoder<S> {
                         0x15 if payload.len() >= 4 => {
                             let id = u16::from_be_bytes([payload[0], payload[1]]);
                             let found = self.objects.as_slice().iter().position(|o| o.id == id);
-                            let slot = match found {
-                                Some(i) => i,
-                                None => {
-                                    if self.objects.len() == self.limits.max_objects {
-                                        return Err(Error::Limit {
-                                            requested: self.objects.len() + 1,
-                                            maximum: self.limits.max_objects,
-                                        });
-                                    }
-                                    if self.objects.is_empty() {
-                                        self.objects.try_reserve_exact(1)?;
-                                    }
-                                    self.objects
-                                        .try_push(Object {
-                                            id,
-                                            width: 0,
-                                            height: 0,
-                                            declared: 0,
-                                            encoded: BudgetVec::new(&self.budget),
-                                            fragments: 0,
-                                        })
-                                        .map_err(|e| e.error)?;
-                                    self.objects.len() - 1
+                            let slot = if let Some(i) = found {
+                                i
+                            } else {
+                                if self.objects.len() == self.limits.max_objects {
+                                    return Err(Error::Limit {
+                                        requested: self.objects.len() + 1,
+                                        maximum: self.limits.max_objects,
+                                    });
                                 }
+                                if self.objects.is_empty() {
+                                    self.objects.try_reserve_exact(1)?;
+                                }
+                                self.objects
+                                    .try_push(Object {
+                                        id,
+                                        width: 0,
+                                        height: 0,
+                                        declared: 0,
+                                        encoded: BudgetVec::new(&self.budget),
+                                        fragments: 0,
+                                    })
+                                    .map_err(|e| e.error)?;
+                                self.objects.len() - 1
                             };
                             let first = payload[3] & 0x80 != 0;
                             let mut data_at = start + 4;
@@ -1073,7 +1071,7 @@ impl<S: RecoveryRole> Decoder<S> {
             .as_ref()
             .ok_or(Error::Invalid("PGS recovery rectangle absent"))?;
         if matches!(rect.palette, ReceiverPalette::Fallback) {
-            let charge = self.budget.reserve(std::mem::size_of::<[u32; 256]>())?;
+            let charge = self.budget.reserve(size_of::<[u32; 256]>())?;
             let words = Box::new(*self.rect_words(rect));
             self.rect_next
                 .as_mut()

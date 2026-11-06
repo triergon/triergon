@@ -57,7 +57,7 @@ fn defaults() -> Vec<u8> {
     ));
     b
 }
-fn parse(raw: &[u8], config: Option<&[u8]>, q: u64) -> Result<Semantics, triergon_core::Error> {
+fn parse(raw: &[u8], config: Option<&[u8]>, q: u64) -> Result<Semantics, Error> {
     let pool = Budget::new(8 * 1024 * 1024).unwrap();
     let input = source(&pool, raw, config);
     let layout = config.map(|_| ConfigLayout::DefaultsRecord);
@@ -115,7 +115,7 @@ fn original_duplicate_wrap_fixture_keeps_source_but_strict_semantics_refuses_amb
     let raw = include_bytes!("text-fixtures/fixtures/input/tx3g-modifier-order.tx3g");
     assert!(matches!(
         parse(raw, Some(&defaults()), 1),
-        Err(triergon_core::Error::Invalid(_))
+        Err(Error::Invalid(_))
     ));
 }
 #[test]
@@ -165,7 +165,7 @@ fn point(
 fn style(start: u16, end: u16, font: u16, flags: u8, size: u8, rgba: [u8; 4]) -> Vec<u8> {
     let mut b = Vec::new();
     for value in [start, end, font] {
-        b.extend_from_slice(&value.to_be_bytes())
+        b.extend_from_slice(&value.to_be_bytes());
     }
     b.extend_from_slice(&[flags, size]);
     b.extend_from_slice(&rgba);
@@ -176,7 +176,7 @@ fn styles(records: &[Vec<u8>]) -> Vec<u8> {
         .to_be_bytes()
         .to_vec();
     for r in records {
-        b.extend_from_slice(r)
+        b.extend_from_slice(r);
     }
     boxed(b"styl", &b)
 }
@@ -191,7 +191,7 @@ fn karaoke(start: u32, events: &[(u32, u16, u16)]) -> Vec<u8> {
     for (end, a, z) in events {
         b.extend_from_slice(&end.to_be_bytes());
         b.extend_from_slice(&a.to_be_bytes());
-        b.extend_from_slice(&z.to_be_bytes())
+        b.extend_from_slice(&z.to_be_bytes());
     }
     boxed(b"krok", &b)
 }
@@ -281,7 +281,7 @@ fn zero_length_style_records_are_preserved_and_apply_to_no_character() {
     .unwrap();
     assert_eq!(out.styles()[0].span.characters, 1..1);
     for c in 0..3 {
-        assert_eq!(point(&out, c, Some(0), 1).base_style.unwrap().font_size, 12)
+        assert_eq!(point(&out, c, Some(0), 1).base_style.unwrap().font_size, 12);
     }
     assert_eq!(out.runs().len(), 1);
 }
@@ -352,7 +352,7 @@ fn style_and_blink_ranges_do_not_adopt_the_highlight_sentinel() {
         styles(&[style(0, 4, 1, 0, 12, [1; 4])]),
         spanbox(b"blnk", 0, 4),
     ] {
-        assert!(parse(&sample(b"abc", &[b]), Some(&defaults()), 1).is_err())
+        assert!(parse(&sample(b"abc", &[b]), Some(&defaults()), 1).is_err());
     }
 }
 #[test]
@@ -365,7 +365,7 @@ fn inverted_and_beyond_text_ranges_refuse_without_clamping() {
                 1
             )
             .is_err()
-        )
+        );
     }
 }
 #[test]
@@ -440,7 +440,7 @@ fn hyperlink_utf8_url_alt_fields_are_strict_length_delimited() {
         (&[0xff][..], b"x".as_slice()),
         (b"x".as_slice(), &[0xc0, 0x80][..]),
     ] {
-        assert!(parse(&sample(b"a", &[link(0, 1, url, alt)]), Some(&defaults()), 1).is_err())
+        assert!(parse(&sample(b"a", &[link(0, 1, url, alt)]), Some(&defaults()), 1).is_err());
     }
 }
 #[test]
@@ -455,7 +455,7 @@ fn overlaps_within_highlights_links_and_blinks_are_rejected() {
         vec![link(0, 2, b"a", b""), link(1, 3, b"b", b"")],
         vec![spanbox(b"blnk", 0, 2), spanbox(b"blnk", 1, 3)],
     ] {
-        assert!(parse(&sample(b"abc", &boxes), Some(&defaults()), 1).is_err())
+        assert!(parse(&sample(b"abc", &boxes), Some(&defaults()), 1).is_err());
     }
 }
 #[test]
@@ -478,7 +478,7 @@ fn karaoke_events_have_half_open_time_intervals_and_zero_range_pauses() {
         (30, 1, Truth::Yes),
         (40, 1, Truth::No),
     ] {
-        assert_eq!(point(&out, c, Some(tick), 1).karaoke, expected)
+        assert_eq!(point(&out, c, Some(tick), 1).karaoke, expected);
     }
 }
 #[test]
@@ -617,7 +617,7 @@ fn unknown_time_character_membership_is_logarithmic_resumable_and_allocation_fre
         let used = pool.used();
         let mut query = PointQuery::new(&out, character, None).unwrap();
         for _ in 0..32 {
-            assert_eq!(query.poll(&mut WorkBudget::new(0), &cancel).unwrap(), None)
+            assert_eq!(query.poll(&mut WorkBudget::new(0), &cancel).unwrap(), None);
         }
         let mut result = None;
         for _ in 0..24 {
@@ -637,7 +637,7 @@ fn duplicate_karaoke_even_empty_and_unordered_times_refuse() {
         vec![karaoke(20, &[(19, 0, 1)])],
         vec![karaoke(0, &[(20, 0, 1), (10, 1, 2)])],
     ] {
-        assert!(parse(&sample(b"abc", &boxes), Some(&defaults()), 1).is_err())
+        assert!(parse(&sample(b"abc", &boxes), Some(&defaults()), 1).is_err());
     }
 }
 #[test]
@@ -650,7 +650,7 @@ fn karaoke_character_ranges_must_be_ordered_nonoverlapping() {
                 1
             )
             .is_err()
-        )
+        );
     }
 }
 #[test]
@@ -663,7 +663,7 @@ fn static_dynamic_and_dynamic_link_conflicts_are_rejected() {
                 1
             )
             .is_err()
-        )
+        );
     }
 }
 #[test]
@@ -837,13 +837,13 @@ fn wrap_known_modes_and_reserved_modes_have_distinct_outcomes() {
                 .unwrap()
                 .value,
             mode
-        )
+        );
     }
     for v in [2, 127, 255] {
         assert!(matches!(
             parse(&sample(b"x", &[boxed(b"twrp", &[v])]), None, 1),
             Err(Error::Unsupported(_))
-        ))
+        ));
     }
 }
 #[test]
@@ -1083,7 +1083,7 @@ fn zero_work_semantics_performs_no_progress_or_allocation() {
                 .unwrap(),
             SemanticStatus::Pending
         );
-        assert_eq!(pool.used(), baseline)
+        assert_eq!(pool.used(), baseline);
     }
     while job
         .poll(&mut WorkBudget::new(1), &AtomicBool::new(false))
@@ -1114,7 +1114,7 @@ fn query_zero_work_and_cancel_preserve_search_progress() {
     let mut q = PointQuery::new(&out, 1, Some(1)).unwrap();
     let c = AtomicBool::new(false);
     for _ in 0..5 {
-        assert!(q.poll(&mut WorkBudget::new(0), &c).unwrap().is_none())
+        assert!(q.poll(&mut WorkBudget::new(0), &c).unwrap().is_none());
     }
     assert!(q.poll(&mut WorkBudget::new(1), &c).unwrap().is_none());
     c.store(true, Ordering::Relaxed);
@@ -1298,7 +1298,7 @@ fn pool_pressure_and_repeated_zero_work_retry_do_not_duplicate_modifiers() {
             job.poll(&mut WorkBudget::new(0), &c).unwrap(),
             SemanticStatus::Pending
         );
-        assert_eq!(pool.used(), used)
+        assert_eq!(pool.used(), used);
     }
     drop(pressure);
     while job.poll(&mut WorkBudget::new(1), &c).unwrap() != SemanticStatus::Ready {}
@@ -1420,7 +1420,7 @@ fn empty_karaoke_header_start_obeys_known_sample_duration() {
     let raw = sample(b"a", &[karaoke(135001, &[])]);
     assert!(matches!(
         parse(&raw, Some(&defaults()), 1),
-        Err(triergon_core::Error::Invalid(_))
+        Err(Error::Invalid(_))
     ));
 }
 #[test]
@@ -1459,7 +1459,7 @@ fn zero_duration_only_overlap_does_not_conflict_with_static_highlight() {
         for tick in [None, Some(0), Some(9), Some(10), Some(11)] {
             let at = point(&out, 4, tick, q);
             assert_eq!(at.karaoke, Truth::No);
-            assert_eq!(at.paint, PaintIntent::StaticTerminalInvert)
+            assert_eq!(at.paint, PaintIntent::StaticTerminalInvert);
         }
     }
 }
@@ -1479,7 +1479,7 @@ fn zero_duration_only_overlap_does_not_conflict_with_hyperlink() {
         for tick in [None, Some(9), Some(10), Some(11)] {
             let at = point(&out, 4, tick, q);
             assert_eq!(at.karaoke, Truth::No);
-            assert_eq!(at.paint, PaintIntent::HyperlinkTerminalStyle)
+            assert_eq!(at.paint, PaintIntent::HyperlinkTerminalStyle);
         }
     }
 }

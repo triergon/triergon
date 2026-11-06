@@ -131,7 +131,7 @@ fn check_late_regular_seek(sync: Option<&[u32]>) {
         &budget,
         &[track],
         media,
-        Default::default(),
+        triergon_isobmff::Mov9PacketLimits::default(),
         profile,
     )
     .unwrap();
@@ -140,7 +140,7 @@ fn check_late_regular_seek(sync: Option<&[u32]>) {
 
     let target = (16_384 + 7) * 40 + 1;
     let mut checked = cursor
-        .prepare_checked_range_seek(1, target, Default::default())
+        .prepare_checked_range_seek(1, target, triergon_isobmff::Mov9NativeSeekLimits::default())
         .unwrap()
         .expect("regular track supplies checkpoints");
     assert_eq!(
@@ -155,7 +155,7 @@ fn check_late_regular_seek(sync: Option<&[u32]>) {
         media,
         1,
         target,
-        Default::default(),
+        triergon_isobmff::Mov9NativeSeekLimits::default(),
         profile,
     )
     .unwrap();
@@ -194,7 +194,7 @@ fn check_late_regular_seek(sync: Option<&[u32]>) {
         &budget,
         &[track],
         media,
-        Default::default(),
+        triergon_isobmff::Mov9PacketLimits::default(),
         profile,
         &[Mov9ResumePoint {
             track_id: 1,
@@ -206,7 +206,7 @@ fn check_late_regular_seek(sync: Option<&[u32]>) {
     exhaust_and_rewind(&mut resumed, &cancel);
     assert!(
         resumed
-            .prepare_checked_range_seek(1, 0, Default::default())
+            .prepare_checked_range_seek(1, 0, triergon_isobmff::Mov9NativeSeekLimits::default())
             .unwrap()
             .is_none()
     );

@@ -572,7 +572,7 @@ fn scan_prefix_control_invalid_or_valid_prefix_keeps_late_source_error_priority(
         ));
         assert!(matches!(
             seek_error(&fixture, Some((cut, true)), 64),
-            triergon_core::Error::Transport
+            Error::Transport
         ));
     }
 }
@@ -609,7 +609,7 @@ fn scan_prefix_control_bad_prefix_and_clock_errors_are_not_silently_accepted() {
     ));
     assert!(matches!(
         seek_error(&overflow, Some((cut, true)), 64),
-        triergon_core::Error::Transport
+        Error::Transport
     ));
 }
 
@@ -975,7 +975,7 @@ fn scan_prefix_control_short_prefix_and_missing_timestamp_keep_body_error_order(
     ));
     assert!(matches!(
         seek_error(&fixture, Some((cut, true)), 64),
-        triergon_core::Error::Transport
+        Error::Transport
     ));
 }
 
@@ -1064,7 +1064,7 @@ fn scan_prefix_control_real_subtitle_recovery_prefix_preserves_all_native_suffix
 
 // Additional semantic guards for keeping the same seek job in its Reader slot.
 // Original guards above remain byte-for-byte unchanged.
-fn inplace_trace_step(step: &Step<Event, triergon_core::Backpressure>) -> String {
+fn inplace_trace_step(step: &Step<Event, Backpressure>) -> String {
     match step {
         Step::NeedInput(r) => format!(
             "input:{}:{}:{}:{}:{}",
@@ -1076,7 +1076,7 @@ fn inplace_trace_step(step: &Step<Event, triergon_core::Backpressure>) -> String
         ),
         Step::Yield => "yield".to_owned(),
         Step::End(_) => "finished".to_owned(),
-        Step::Backpressure(triergon_core::Backpressure {
+        Step::Backpressure(Backpressure {
             requested,
             available,
         }) => format!("pressure:{requested}:{available}"),
@@ -1265,13 +1265,13 @@ fn scan_inplace_guard_pending_best_cancel_reset_retained_alias() {
 }
 #[test]
 fn scan_inplace_guard_layout_and_late_fault_priority() {
-    assert!(std::mem::size_of::<Reader>() <= 10048);
-    assert!(std::mem::size_of::<PacketBatchJob>() <= 3408);
+    assert!(size_of::<Reader>() <= 10048);
+    assert!(size_of::<PacketBatchJob>() <= 3408);
     println!(
         "SCAN_INPLACE_LAYOUT|reader={}|batch={}|scan={}|scan_offset={}",
-        std::mem::size_of::<Reader>(),
-        std::mem::size_of::<PacketBatchJob>(),
-        std::mem::size_of::<ScanState>(),
+        size_of::<Reader>(),
+        size_of::<PacketBatchJob>(),
+        size_of::<ScanState>(),
         std::mem::offset_of!(Reader, scan)
     );
     let fixture = repeated(3, 256);
@@ -1279,7 +1279,7 @@ fn scan_inplace_guard_layout_and_late_fault_priority() {
     for chunk in [1, 64] {
         assert!(matches!(
             seek_error(&fixture, Some((end, true)), chunk),
-            triergon_core::Error::Transport
+            Error::Transport
         ));
         assert!(matches!(
             seek_error(&fixture, Some((end, false)), chunk),
@@ -1374,7 +1374,7 @@ fn immutable_seek_index_rejects_foreign_owner_and_wrong_offset_views() {
             InputWindow::new(request.source, request.token.clone(), request.offset, bytes).unwrap();
         assert!(matches!(
             reader.provide(&window),
-            Err(triergon_core::Error::SourceMismatch)
+            Err(Error::SourceMismatch)
         ));
     }
     open(&mut reader, &mut feed).unwrap();
@@ -1414,7 +1414,7 @@ fn immutable_cold_seek_coalesces_refills_and_keeps_scan_faults() {
         match (ordinary_result, fast_result) {
             (Ok((expected, _)), Ok((receipt, _))) => assert_eq!(receipt, expected),
             (Err(expected), Err(error)) => {
-                assert_eq!(format!("{error:?}"), format!("{expected:?}"))
+                assert_eq!(format!("{error:?}"), format!("{expected:?}"));
             }
             (ordinary, fast) => panic!("ordinary {ordinary:?}, immutable {fast:?}"),
         }

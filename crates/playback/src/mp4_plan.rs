@@ -930,7 +930,7 @@ impl<'a> Mp4IndexJob<'a> {
                     match native.poll(w, c)? {
                         Mov9CursorStatus::Yield => {}
                         Mov9CursorStatus::Ready => {
-                            self.pending_native = Some(native.take_occurrence()?)
+                            self.pending_native = Some(native.take_occurrence()?);
                         }
                         Mov9CursorStatus::End => {
                             self.track = 0;
@@ -1020,7 +1020,7 @@ impl PreparedMp4 {
     pub fn movie_seek(
         &self,
         track: u32,
-        requested_movie_time: triergon_core::Time,
+        requested_movie_time: Time,
         maximum_edits: u32,
     ) -> Result<MovieSeekJob<'_>> {
         let t = self.track(track)?;
@@ -1066,7 +1066,5 @@ pub enum MovieSeekOutcome {
     Applied(iso::MovieSourcePoint),
     Yield,
     Empty(iso::MovieEmptyEdit),
-    Outside {
-        requested_movie_time: triergon_core::Time,
-    },
+    Outside { requested_movie_time: Time },
 }

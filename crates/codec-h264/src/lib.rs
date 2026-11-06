@@ -4,7 +4,20 @@
 //! High profiles, 8-bit 4:2:0 and 4:0:0, frames, field pictures (PAFF) and MBAFF, CAVLC and
 //! CABAC. Development prototype.
 #![forbid(unsafe_code)]
-
+#![warn(clippy::print_stdout, clippy::print_stderr, clippy::expect_used)]
+// Pending: `missing_docs`, `missing_debug_implementations`, `unreachable_pub`, `clippy::unwrap_used`.
+// Pending: these rewrites change the generated code of measured hot paths and are
+// adopted with an A/B timing run.
+#![allow(
+    clippy::bool_to_int_with_if,
+    clippy::manual_slice_fill,
+    clippy::map_unwrap_or,
+    clippy::nonminimal_bool,
+    clippy::overly_complex_bool_expr,
+    clippy::single_match_else,
+    clippy::stable_sort_primitive,
+    clippy::unnested_or_patterns
+)]
 mod bitreader;
 mod cabac;
 mod cavlc;
@@ -323,7 +336,7 @@ impl Decoder {
         self.finish_picture();
         self.close_pending_field();
         while self.bump() {}
-        for fs in self.dpb.iter_mut() {
+        for fs in &mut self.dpb {
             fs.in_use = false;
             fs.mark = [RefMark::None; 2];
             fs.needed_for_output = false;
@@ -334,7 +347,7 @@ impl Decoder {
     pub fn reset(&mut self) {
         self.active = None;
         self.pending_field = None;
-        for fs in self.dpb.iter_mut() {
+        for fs in &mut self.dpb {
             fs.in_use = false;
             fs.mark = [RefMark::None; 2];
             fs.needed_for_output = false;
@@ -474,7 +487,7 @@ impl Decoder {
             // Resolution change: output everything and drop the DPB.
             self.close_pending_field();
             while self.bump() {}
-            for fs in self.dpb.iter_mut() {
+            for fs in &mut self.dpb {
                 fs.in_use = false;
                 fs.mark = [RefMark::None; 2];
             }
@@ -736,7 +749,7 @@ impl Decoder {
             fs.pts = None;
             let mbs = sps.pic_width_in_mbs as usize * sps.frame_height_in_mbs() as usize;
             fs.motion[0].alloc(mbs);
-            for f in fs.motion[0].mb_flags.iter_mut() {
+            for f in &mut fs.motion[0].mb_flags {
                 *f = MBF_INTRA;
             }
             self.poc_state.prev_frame_num_offset = fno;

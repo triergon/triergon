@@ -455,7 +455,7 @@ fn freeze_backpressure_preserves_bytes_token_and_paid_completion_work() {
             r.poll(&mut input, &mut work, &AtomicBool::new(false)),
             Err(Error::Backpressure { .. })
         ));
-        assert_eq!(work.spent(), if attempt == 0 { 1 } else { 0 });
+        assert_eq!(work.spent(), u64::from(attempt == 0));
         assert_eq!(input.token(), token);
         assert_eq!(input.position(), position);
     }

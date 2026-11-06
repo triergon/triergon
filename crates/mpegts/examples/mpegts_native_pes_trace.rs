@@ -802,7 +802,7 @@ impl NativeAdapter {
         if let (Some(failure), TraceEvent::Diagnostic(fault)) = (self.failure.as_mut(), event)
             && failure.rejection.is_none()
         {
-            failure.rejection = fault.rejected.clone();
+            failure.rejection.clone_from(&fault.rejected);
         }
     }
     fn observe_with_input(
@@ -829,7 +829,7 @@ impl NativeAdapter {
         if let (Some(failure), TraceEvent::Diagnostic(fault)) = (self.failure.as_mut(), event)
             && failure.rejection.is_none()
         {
-            failure.rejection = fault.rejected.clone();
+            failure.rejection.clone_from(&fault.rejected);
         }
     }
     fn observe_inner(
@@ -2021,7 +2021,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         match argument.as_str() {
             "--dvb" => {
                 namespace =
-                    DescriptorNamespace::Dvb(DvbNamespaceEvidence::CallerDeclaredTransportProfile)
+                    DescriptorNamespace::Dvb(DvbNamespaceEvidence::CallerDeclaredTransportProfile);
             }
             "--native-clock-v1" => source_clock_enabled = true,
             "--native-input-v1" => native_input_enabled = true,
@@ -2212,10 +2212,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                                 output.write_all(b",\"qualified\":false}\n")?;
                             } else {
                                 output.write_all(b"null,\"error\":")?;
-                                let error =
-                                    native.object.as_ref().and_then(|o| o.error()).unwrap_or(
-                                        Error::Unsupported("native whole object incomplete"),
-                                    );
+                                let error = native
+                                    .object
+                                    .as_ref()
+                                    .and_then(native_object_v1::ObjectAdapter::error)
+                                    .unwrap_or(Error::Unsupported(
+                                        "native whole object incomplete",
+                                    ));
                                 triergon_harness_protocol::write_quoted(
                                     &mut output,
                                     &error.to_string(),

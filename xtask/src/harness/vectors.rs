@@ -221,7 +221,7 @@ pub fn external_vector(root: &Path, options: &ExternalOptions) -> R<i32> {
         s(&result, "status").unwrap_or_default(),
         if slice { "True" } else { "False" }
     );
-    Ok(if passed { 0 } else { 1 })
+    Ok(i32::from(!passed))
 }
 
 /// Upstream cases this runner supports: sample, label, whether short reads apply.
@@ -257,7 +257,7 @@ pub trait FateHost {
     fn download(&self, url: &str, limit: usize) -> R<Vec<u8>>;
     /// `make -j2 CASE SAMPLES=...` in the pinned source: exit code, stdout, stderr.
     fn make(&self, source: &Path, case: &str, samples: &Path) -> R<(i64, String, String)>;
-    fn parity(&self, run: &Run, sequential: bool) -> R<Value>;
+    fn parity(&self, run: &Run<'_>, sequential: bool) -> R<Value>;
     fn source_error(&self, root: &Path, identity: &Value) -> Option<String>;
 }
 
@@ -285,7 +285,7 @@ impl FateHost for NativeFate {
         ))
     }
 
-    fn parity(&self, run: &Run, sequential: bool) -> R<Value> {
+    fn parity(&self, run: &Run<'_>, sequential: bool) -> R<Value> {
         parity::parity(run, sequential, None, false, "")
     }
 
@@ -419,10 +419,8 @@ pub fn fate_run(root: &Path, case: &str, demux_only: bool, host: &dyn FateHost) 
     println!("{reference_status} {}", receipt_path.display());
     Ok(if code != 0 {
         code as i32
-    } else if demux_status.is_some_and(|s| s != "pass") {
-        1
     } else {
-        0
+        i32::from(demux_status.is_some_and(|s| s != "pass"))
     })
 }
 
@@ -650,7 +648,7 @@ mod tests {
             Ok((code, out.into(), String::new()))
         }
 
-        fn parity(&self, run: &Run, sequential: bool) -> R<Value> {
+        fn parity(&self, run: &Run<'_>, sequential: bool) -> R<Value> {
             self.calls.borrow_mut().push(format!(
                 "parity {} {sequential}",
                 run.input.file_name().unwrap().to_string_lossy()

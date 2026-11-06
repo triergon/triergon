@@ -63,7 +63,7 @@ pub(crate) struct Cabac<'a> {
 
 /// DecodeDecision (9.3.3.2.1) with branchless interval selection and clz renormalisation.
 #[inline(always)]
-fn decide(e: &mut Engine, ctx: &mut [u8; NUM_CTX], ctx_idx: usize) -> u32 {
+fn decide(e: &mut Engine<'_>, ctx: &mut [u8; NUM_CTX], ctx_idx: usize) -> u32 {
     let bin = decide_nr(e, ctx, ctx_idx);
     e.refill();
     bin
@@ -72,7 +72,7 @@ fn decide(e: &mut Engine, ctx: &mut [u8; NUM_CTX], ctx_idx: usize) -> u32 {
 /// `decide` without the look-ahead refill: a decision consumes at most 6 bits (rangeTabLPS >= 6),
 /// so two of them may follow one `refill` (which leaves at least 16 bits).
 #[inline(always)]
-fn decide_nr(e: &mut Engine, ctx: &mut [u8; NUM_CTX], ctx_idx: usize) -> u32 {
+fn decide_nr(e: &mut Engine<'_>, ctx: &mut [u8; NUM_CTX], ctx_idx: usize) -> u32 {
     let ci = ctx_idx & (NUM_CTX - 1);
     let st = (ctx[ci] & 127) as usize;
     let row = LPS_ROW[st];
@@ -197,7 +197,7 @@ impl<'a> Cabac<'a> {
     }
 
     pub(crate) fn reinit_at(&mut self, byte_pos: usize) {
-        self.e.reinit_at(byte_pos)
+        self.e.reinit_at(byte_pos);
     }
     pub(crate) fn pcm_byte_pos(&self) -> usize {
         self.e.pcm_byte_pos()
@@ -452,7 +452,7 @@ impl<'a> Cabac<'a> {
 
 #[inline(always)]
 fn residual_inner(
-    e: &mut Engine,
+    e: &mut Engine<'_>,
     ctx: &mut [u8; NUM_CTX],
     cat: usize,
     field: bool,

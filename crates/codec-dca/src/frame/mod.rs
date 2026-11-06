@@ -309,7 +309,7 @@ fn optional_info(br: &mut BitReader<'_>, f: &CoreFrame<'_>) -> usize {
 /// Core audio channel arrangements supported (AMODE 0..=9, Table 5-4): coded channel
 /// order mapped to speakers.
 fn amode_speakers(amode: u8) -> Option<&'static [Speaker]> {
-    use Speaker::*;
+    use Speaker::{BackCenter, FrontCenter, FrontLeft, FrontRight, SideLeft, SideRight};
     Some(match amode {
         0 => &[FrontCenter],
         1..=4 => &[FrontLeft, FrontRight],

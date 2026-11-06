@@ -34,7 +34,7 @@ pub(crate) enum Action {
     Complete,
 }
 
-const _: () = assert!(std::mem::size_of::<Action>() <= 688);
+const _: () = assert!(size_of::<Action>() <= 688);
 
 #[derive(Debug)]
 pub(crate) struct Session {

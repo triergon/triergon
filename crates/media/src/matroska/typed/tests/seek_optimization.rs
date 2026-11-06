@@ -174,7 +174,7 @@ fn seek_optimization_epoch_zero_work_and_cancel_preserve_cursor_and_sticky_failu
     cancel.store(true, std::sync::atomic::Ordering::Relaxed);
     assert!(matches!(
         job.step(&mut reader, &mut WorkBudget::new(1), &cancel),
-        Err(crate::Error::Cancelled)
+        Err(Error::Cancelled)
     ));
     cancel.store(false, std::sync::atomic::Ordering::Relaxed);
     assert!(
@@ -430,7 +430,7 @@ fn seek_optimization_foreign_pool_configuration_is_rejected_before_range_io() {
             crate::Limits::default(),
             &pool
         ),
-        Err(triergon_core::Error::ForeignPool)
+        Err(Error::ForeignPool)
     ));
 }
 
@@ -456,8 +456,5 @@ fn seek_optimization_skipped_payload_keeps_the_full_remaining_scan_limit() {
         }
         assert!(work.spent() <= 1);
     }
-    assert!(matches!(
-        error,
-        Some(crate::Error::Policy("operation read bytes"))
-    ));
+    assert!(matches!(error, Some(Error::Policy("operation read bytes"))));
 }

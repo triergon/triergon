@@ -1104,13 +1104,16 @@ fn groups(
             descriptions = Some(RecoveryDescriptions::parse(
                 box_.clone(),
                 syntax,
-                Default::default(),
+                triergon_isobmff::RecoveryLimits::default(),
             )?);
         } else {
             if mappings.is_some() {
                 return Err(Error::Invalid("duplicate recovery mappings").into());
             }
-            mappings = Some(RecoveryMappings::parse(box_.clone(), Default::default())?);
+            mappings = Some(RecoveryMappings::parse(
+                box_.clone(),
+                triergon_isobmff::RecoveryLimits::default(),
+            )?);
         }
     }
     Ok((descriptions, mappings))
@@ -1160,12 +1163,12 @@ impl Driver<'_> {
         match sample.dts_ticks {
             Some(v) => write!(out, "{v}").expect("String write"),
             None => out.push_str("null"),
-        };
+        }
         out.push_str(",\"cts\":");
         match sample.cts_ticks {
             Some(v) => write!(out, "{v}").expect("String write"),
             None => out.push_str("null"),
-        };
+        }
         match sample.composition_offset {
             Some(v) => write!(
                 out,
@@ -1175,7 +1178,7 @@ impl Driver<'_> {
             )
             .expect("String write"),
             None => out.push_str(",\"offset_version\":null,\"offset_bits\":null"),
-        };
+        }
         write!(
             out,
             ",\"access\":\"{:?}\",\"partial_sync\":{},\"dependency\":",
@@ -1185,12 +1188,12 @@ impl Driver<'_> {
         match sample.dependency {
             Some(v) => write!(out, "{v}").expect("String write"),
             None => out.push_str("null"),
-        };
+        }
         out.push_str(",\"fragment_flags\":");
         match sample.fragment_flags {
             Some(v) => write!(out, "{v}").expect("String write"),
             None => out.push_str("null"),
-        };
+        }
         write!(
             out,
             ",\"source\":{},\"generation\":{},\"request\":{},\"payload\":\"",
@@ -1378,7 +1381,7 @@ impl Driver<'_> {
         match result.point.as_ref().and_then(|p| p.edit_ordinal) {
             Some(v) => write!(out, "{v}").expect("String write"),
             None => out.push_str("null"),
-        };
+        }
         write!(
             out,
             ",\"source_drain\":{{\"packets\":{},\"bytes\":{},\"digest\":{}}}",

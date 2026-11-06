@@ -340,7 +340,7 @@ impl SimplePacketJob {
             },
         })
     }
-    fn take_packet_ready(&mut self) -> Result<crate::matroska::Packet> {
+    fn take_packet_ready(&mut self) -> Result<Packet> {
         if self.failed {
             return Err(Error::Invalid(
                 "packet batch requires replacement after error",
@@ -395,7 +395,7 @@ impl SimplePacketJob {
     /// Plain SimpleBlocks have no group state or additions. The same staged
     /// packet already contains the validated timing/source facts and owner.
     #[inline(always)]
-    pub(crate) fn take_legacy_ready(&mut self) -> Result<crate::matroska::Packet> {
+    pub(crate) fn take_legacy_ready(&mut self) -> Result<Packet> {
         let packet = self.take_packet_ready()?;
         let configuration = self.configuration.take();
         drop(configuration);

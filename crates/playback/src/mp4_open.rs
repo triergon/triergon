@@ -21,7 +21,7 @@ pub(crate) fn box_reader(
     input: &InputCursor,
     metadata_bytes: usize,
     native_recovery: bool,
-) -> triergon_core::Result<BoxReader> {
+) -> Result<BoxReader> {
     if native_recovery {
         BoxReader::new_pinned_mov_recovery(
             input,
@@ -248,10 +248,9 @@ impl Walk {
                         return Err(Error::Invalid("duplicate QuickTime data handler"));
                     }
                     if parent.data_info_seen
-                        || !p
-                            .hdlr
+                        || p.hdlr
                             .as_ref()
-                            .is_some_and(|handler| handler.payload().get(4..8) == Some(b"mhlr"))
+                            .is_none_or(|handler| handler.payload().get(4..8) != Some(b"mhlr"))
                     {
                         return Err(Error::Invalid("QuickTime data handler placement"));
                     }
@@ -562,7 +561,7 @@ impl<S: Source> Mp4Open<S> {
     }
     pub fn advance(&mut self, w: &mut WorkBudget, c: &AtomicBool) -> Result<OpenProgress> {
         if self.failed {
-            return Err(crate::Error::Closed);
+            return Err(Error::Closed);
         }
         let result = self.advance_inner(w, c);
         if result.is_err() && !matches!(&result, Err(Error::Backpressure { .. })) {
@@ -1094,7 +1093,7 @@ impl<S: Source> Mp4Open<S> {
     }
     pub fn finish(mut self) -> Result<OpenedMp4<S>> {
         if self.failed {
-            return Err(crate::Error::Closed);
+            return Err(Error::Closed);
         }
         if !self.ready {
             return Err(Error::Invalid("movie not ready"));

@@ -132,7 +132,7 @@ fn drain(o: &mut NativePesObserver) -> Vec<NativePesPacket> {
             AssemblyStep::Yield => (),
             AssemblyStep::NeedPayload => return out,
             AssemblyStep::Finished => panic!("starvation is not entity EOF"),
-        };
+        }
         assert!(w.spent() <= 1);
     }
     panic!("bounded field work stalled")
@@ -708,7 +708,7 @@ fn dvb_wrong_sid_and_time_markers_are_bounded_errors() {
             0 => p[3] = 0xe0,
             1 => p[7] = 0x40,
             _ => p[9] &= 0xfe,
-        };
+        }
         o.push(packet(&b, &ts(&p, true, 0), 376), context(8))
             .unwrap();
         assert!(matches!(

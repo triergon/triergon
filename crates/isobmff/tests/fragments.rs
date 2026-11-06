@@ -69,7 +69,7 @@ fn sourced_absolute_base_fragments_match_independent_source_facts() {
                 match cursor.poll(&mut WorkBudget::new(1)).unwrap() {
                     SampleStep::End => break,
                     SampleStep::Yield => {}
-                    _ => panic!(),
+                    SampleStep::Sample(_) => panic!(),
                 }
             }
         }
@@ -143,7 +143,7 @@ fn selected_draft_signed_trun_preserves_frozen_source_and_raw_bits() {
             match cursor.poll(&mut WorkBudget::new(1)).unwrap() {
                 SampleStep::Yield => {}
                 SampleStep::End => break,
-                _ => panic!("extra signed-trun sample"),
+                SampleStep::Sample(_) => panic!("extra signed-trun sample"),
             }
         }
     }

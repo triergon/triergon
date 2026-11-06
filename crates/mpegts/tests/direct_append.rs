@@ -112,7 +112,7 @@ fn reserved_inline_carriers_need_no_temporary_owner_and_retry_freeze_pressure() 
         assert_eq!(packet.source_offset, 0);
         assert_eq!(packet.source_id, Some(SourceId(51)));
         assert_eq!(
-            packet.prefix.as_ref().map(|bytes| bytes.as_ref()),
+            packet.prefix.as_ref().map(AsRef::as_ref),
             (format == PacketFormat::M2ts192).then_some(&wire[..4])
         );
         assert!(matches!(

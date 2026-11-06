@@ -69,7 +69,7 @@ impl Driver {
     // One real work unit cannot perform both a charged range jump and a byte
     // read. Observe actual cursor deltas in the same request, not a seek receipt
     // counter. Input provision itself never advances the parser cursor.
-    fn step(&mut self, cancel: bool) -> crate::Result<ParseStep<Event>> {
+    fn step(&mut self, cancel: bool) -> Result<ParseStep<Event>> {
         let before = self.reader.request();
         let mut work = WorkBudget::new(1);
         let result = self.reader.step_parse(&mut work, &AtomicBool::new(cancel));

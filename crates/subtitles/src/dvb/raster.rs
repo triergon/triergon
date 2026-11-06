@@ -519,7 +519,7 @@ impl Raster {
                     return Err(Error::Invalid("DVB initial plane uses another budget"));
                 }
             }
-            _ => {}
+            InitialPlane::Fill(_) => {}
         }
         let mut pixels = BudgetVec::new(budget);
         pixels.try_reserve_exact(area)?;

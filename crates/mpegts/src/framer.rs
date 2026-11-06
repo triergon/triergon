@@ -148,7 +148,7 @@ impl TransportFramer {
             && self.token.as_ref() == Some(&input.token())
             && self.inspection.is_none()
             && self.push_ack.is_none()
-            && self.carry.as_ref().is_some_and(|carry| carry.is_empty())
+            && self.carry.as_ref().is_some_and(BudgetVec::is_empty)
     }
     /// Take the real owned syntax rejection before advancing/discarding this framer.
     pub fn take_rejection(&mut self) -> Option<RejectedTransport> {
@@ -309,7 +309,7 @@ impl TransportFramer {
                 });
             }
             if old.request() != token.request() {
-                let empty = self.carry.as_ref().is_some_and(|carry| carry.is_empty());
+                let empty = self.carry.as_ref().is_some_and(BudgetVec::is_empty);
                 if !self.entity_end_seen || !empty {
                     return Err(Error::StaleRequest {
                         expected: old.request(),
@@ -448,9 +448,8 @@ impl TransportFramer {
             if self.next.is_some_and(|expected| expected != offset) {
                 return FrameState::Error(Error::Invalid("non-contiguous transport input"));
             }
-            let carry = match self.carry.as_mut() {
-                Some(carry) => carry,
-                None => return FrameState::Error(Error::Invalid("missing packet carry")),
+            let Some(carry) = self.carry.as_mut() else {
+                return FrameState::Error(Error::Invalid("missing packet carry"));
             };
             let missing = self.format.bytes() - carry.len();
             if missing != 0 {
@@ -473,9 +472,8 @@ impl TransportFramer {
                 if count == 0 {
                     return FrameState::Yield;
                 }
-                let next = match offset.checked_add(count as u64) {
-                    Some(next) => next,
-                    None => return FrameState::Error(Error::Overflow),
+                let Some(next) = offset.checked_add(count as u64) else {
+                    return FrameState::Error(Error::Overflow);
                 };
                 if let Err(error) = carry.try_extend_from_slice(&input[..count]) {
                     return FrameState::Error(error);
@@ -512,7 +510,7 @@ impl TransportFramer {
         FrameStep { consumed, state }
     }
     /// Only call for definitive source EOF, never for starvation/EndSegment/failure.
-    pub fn finish(&self) -> triergon_core::Result<()> {
+    pub fn finish(&self) -> Result<()> {
         if self.inspection.is_some() || self.push_ack.is_some() {
             return Err(Error::Invalid("TS inspection pending"));
         }

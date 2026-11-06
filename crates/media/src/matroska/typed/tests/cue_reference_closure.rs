@@ -8,7 +8,7 @@ fn landing(
     laced: bool,
     conflict: bool,
     quantum: u64,
-) -> crate::Result<(u64, u64)> {
+) -> Result<(u64, u64)> {
     let pool = Budget::new(128 * 1024).unwrap();
     let config = seed_configuration(&pool, &[]);
     let stamp = uint(0xe7, 2);
@@ -114,6 +114,6 @@ fn direct_referenced_lace_validates_and_positions_the_whole_batch() {
 fn direct_conflicting_selectors_remain_invalid() {
     assert!(matches!(
         landing(false, true, true, false, true, 1),
-        Err(crate::Error::Invalid(_))
+        Err(Error::Invalid(_))
     ));
 }

@@ -7,7 +7,10 @@ pub const MAX_CHANNELS: usize = 16;
 /// Conventional name of a well-known layout (e.g. `5.1(side)`, as ffprobe prints it),
 /// else the speaker list.
 pub fn layout_name(layout: &ChannelLayout) -> String {
-    use Speaker::*;
+    use Speaker::{
+        BackCenter, BackLeft, BackRight, FrontCenter, FrontLeft, FrontRight, LowFrequency,
+        SideLeft, SideRight,
+    };
     let known: &[(&[Speaker], &str)] = &[
         (&[FrontCenter], "mono"),
         (&[FrontLeft, FrontRight], "stereo"),

@@ -54,7 +54,7 @@ impl X96Header {
     /// `Ok(None)`: the extension must be ignored (REVNO 0 or above 8; Table 6-2), and the
     /// core decodes at its own rate, as FFmpeg does.
     pub(crate) fn parse(
-        br: &mut BitReader,
+        br: &mut BitReader<'_>,
         nch: usize,
         cpf: bool,
     ) -> Result<Option<Self>, DecodeError> {
@@ -151,7 +151,7 @@ impl X96Side {
 /// rows `ch`, samples `t0 .. t0 + nssc * 8`.
 #[allow(clippy::too_many_arguments)]
 pub(crate) fn decode_subframe(
-    br: &mut BitReader,
+    br: &mut BitReader<'_>,
     h: &X96Header,
     side: &mut X96Side,
     nssc: usize,
@@ -298,7 +298,7 @@ pub(crate) fn decode_subframe(
                 if a <= 10 && sel < nh {
                     let book = books::sample_book(a, sel)
                         .ok_or(DecodeError::InvalidData("X96 codebook"))?;
-                    for v in q.iter_mut() {
+                    for v in &mut q {
                         *v = br.huff(book);
                     }
                 } else if a <= 7 {
@@ -316,7 +316,7 @@ pub(crate) fn decode_subframe(
                     }
                 } else {
                     let bits = a - 3;
-                    for v in q.iter_mut() {
+                    for v in &mut q {
                         *v = br.read_signed(bits);
                     }
                 }

@@ -61,7 +61,7 @@ compares canonical output. Workers speak one line protocol with `trace`, `bench`
 
 ```sh
 make prepare-check   # build the FFmpeg reference, fixtures and adapters
-cargo xtask check    # format, test, clippy, release build, harness tests, design checks
+cargo xtask check    # format, test, clippy, rustdoc, release build, harness tests, design checks
 make report          # correctness report against the reference
 make qualify         # correctness, runtime and memory with acceptance
 ```

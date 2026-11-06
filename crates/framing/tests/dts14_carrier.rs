@@ -110,8 +110,8 @@ fn endian_views_do_not_change_source_bytes_or_order() {
     let (_, b) = acquire(&le, DtsWordOrder::LittleEndian, 31, 1);
     for (a, b) in a.iter().zip(&b) {
         assert_eq!(
-            a.canonical_bytes().map(|v| v.as_ref()),
-            b.canonical_bytes().map(|v| v.as_ref())
+            a.canonical_bytes().map(AsRef::as_ref),
+            b.canonical_bytes().map(AsRef::as_ref)
         );
         assert_eq!(a.syntax, b.syntax);
     }
@@ -208,12 +208,11 @@ fn cancelled_zero_work_is_cancelled_and_sticky() {
 #[test]
 fn transport_never_flushes_buffer_as_eof() {
     let (b, mut r) = reader();
-    let q = match r
+    let Step::NeedInput(q) = r
         .step(&mut WorkBudget::new(31), &AtomicBool::new(false))
         .unwrap()
-    {
-        Step::NeedInput(q) => q,
-        _ => panic!(),
+    else {
+        panic!()
     };
     r.provide(
         &InputWindow::new(

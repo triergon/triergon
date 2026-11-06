@@ -993,11 +993,11 @@ mod bench {
 
     /// Development micro-benchmark.
     #[test]
-    #[ignore]
+    #[ignore = "timing probe; run on demand with --release"]
     fn bench_mc() {
         let mut plane = Plane::<u8>::new(256, 256, 0);
         let mut seed = 5u32;
-        for v in plane.data.iter_mut() {
+        for v in &mut plane.data {
             seed = seed.wrapping_mul(1103515245).wrapping_add(12345);
             *v = (seed >> 16) as u8;
         }
@@ -1093,12 +1093,12 @@ mod bench_big {
     use super::*;
 
     #[test]
-    #[ignore]
+    #[ignore = "timing probe; run on demand with --release"]
     fn bench_mc_big() {
         let (pw, ph) = (2560usize, 1600usize);
         let mut plane = Plane::<u8>::new(pw, ph, 0);
         let mut seed = 5u32;
-        for v in plane.data.iter_mut() {
+        for v in &mut plane.data {
             seed = seed.wrapping_mul(1103515245).wrapping_add(12345);
             *v = (seed >> 16) as u8;
         }

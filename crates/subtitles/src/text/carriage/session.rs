@@ -91,15 +91,21 @@ impl Session {
             .ok_or(Error::Invalid("empty carriage input"))?;
         bound(input.payload.len(), self.limits.payload_bytes)?;
         bound(
-            input.codec_private.as_ref().map_or(0, |value| value.len()),
+            input
+                .codec_private
+                .as_ref()
+                .map_or(0, triergon_core::Bytes::len),
             self.limits.config_bytes,
         )?;
         bound(
-            input.codec_id.as_ref().map_or(0, |value| value.len()),
+            input.codec_id.as_ref().map_or(0, triergon_core::Bytes::len),
             self.limits.tag_bytes,
         )?;
         bound(
-            input.charset_label.as_ref().map_or(0, |value| value.len()),
+            input
+                .charset_label
+                .as_ref()
+                .map_or(0, triergon_core::Bytes::len),
             self.limits.label_bytes,
         )?;
         bound(
@@ -250,4 +256,4 @@ impl Session {
     }
 }
 
-const _: () = assert!(std::mem::size_of::<Session>() <= 4096);
+const _: () = assert!(size_of::<Session>() <= 4096);

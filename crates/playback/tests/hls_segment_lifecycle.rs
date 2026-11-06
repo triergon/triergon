@@ -112,7 +112,9 @@ fn ready(reader: &mut HlsSegmentReader<ObservedSource>) -> triergon_playback::Re
         match poll(reader)? {
             HlsSegmentProgress::Ready => return Ok(()),
             HlsSegmentProgress::Yield | HlsSegmentProgress::NeedInput(_) => {}
-            other => panic!("unexpected segment progress {other:?}"),
+            other @ HlsSegmentProgress::Backpressure { .. } => {
+                panic!("unexpected segment progress {other:?}")
+            }
         }
     }
     panic!("segment stalled");

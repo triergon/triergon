@@ -35,8 +35,8 @@ pub struct ProvideError {
 
 // Failure must return the exact input even when no output budget is available.
 // The Result envelope permits one extra 16-byte alignment unit for its tag.
-const _: () = assert!(std::mem::size_of::<ProvideError>() <= 432);
-const _: () = assert!(std::mem::size_of::<std::result::Result<(), ProvideError>>() <= 448);
+const _: () = assert!(size_of::<ProvideError>() <= 432);
+const _: () = assert!(size_of::<std::result::Result<(), ProvideError>>() <= 448);
 
 #[derive(Debug)]
 #[expect(
@@ -51,8 +51,8 @@ pub enum Status {
     Finished,
 }
 
-const _: () = assert!(std::mem::size_of::<Status>() <= 672);
-const _: () = assert!(std::mem::size_of::<Result<Status>>() <= 688);
+const _: () = assert!(size_of::<Status>() <= 672);
+const _: () = assert!(size_of::<Result<Status>>() <= 688);
 
 /// One complete immutable document or demuxed sample per provide operation.
 /// Transport assembly, charset selection and container discovery stay upstream.

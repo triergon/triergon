@@ -83,7 +83,7 @@ fn recovered(observer: &mut NativePesRecoveryObserver) -> NativeRecoveredPesPack
         {
             AssemblyStep::Yield => {}
             AssemblyStep::Output(NativePesObservation::FromRejectedCarrier(packet)) => {
-                assert!(result.replace(packet).is_none())
+                assert!(result.replace(packet).is_none());
             }
             AssemblyStep::NeedPayload => {
                 return result.expect("real rejected carrier must produce its finite packet");

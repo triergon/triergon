@@ -59,7 +59,7 @@ impl CuesJob {
         pool: &Budget,
     ) -> Result<Self> {
         if !source.belongs_to(pool) {
-            return Err(triergon_core::Error::ForeignPool);
+            return Err(Error::ForeignPool);
         }
         let len = source.len();
         Ok(Self {

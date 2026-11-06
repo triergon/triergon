@@ -176,8 +176,7 @@ fn exercise(case: &common::fixtures::Case) -> Result<(), Error> {
         assert!(index.locate(0).is_err());
         assert!(index.locate(index.sample_count() + 1).is_err());
         if let Ok(edts) = child(track, b"edts") {
-            let edits =
-                EditList::parse(child(&edts, b"elst")?, triergon_isobmff::Limits::default())?;
+            let edits = EditList::parse(child(&edts, b"elst")?, Limits::default())?;
             assert!(!edits.is_empty());
             assert!(edits.entry(edits.len()).is_err());
         }
@@ -352,7 +351,7 @@ fn sparse_co64_offsets_never_narrow_to_host_slice_indices() {
         match locate.poll(&mut WorkBudget::new(1)).unwrap() {
             SampleStep::Sample(s) => break s,
             SampleStep::Yield => {}
-            _ => panic!(),
+            SampleStep::End => panic!(),
         }
     };
     assert_eq!(sample.range, SPARSE_OFFSET + 60..SPARSE_LENGTH);

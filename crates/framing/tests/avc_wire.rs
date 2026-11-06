@@ -175,7 +175,7 @@ fn all82_independent_records_and_spans_agree_at_each_work_quantum() {
                 "truncated" => assert!(matches!(result, Err(Error::Truncated)), "{}", cells[0]),
                 "invalid" => assert!(matches!(result, Err(Error::Invalid(_))), "{}", cells[0]),
                 "unsupported" => {
-                    assert!(matches!(result, Err(Error::Unsupported(_))), "{}", cells[0])
+                    assert!(matches!(result, Err(Error::Unsupported(_))), "{}", cells[0]);
                 }
                 _ => panic!("unknown oracle status"),
             }

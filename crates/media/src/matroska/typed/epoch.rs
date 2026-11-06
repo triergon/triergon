@@ -91,7 +91,7 @@ impl EpochRestoreJob {
         pool: &Budget,
     ) -> Result<Self> {
         if !configuration.belongs_to(pool) {
-            return Err(triergon_core::Error::ForeignPool);
+            return Err(Error::ForeignPool);
         }
         if target
             .reference
@@ -287,10 +287,10 @@ impl EpochRestoreJob {
             ));
         }
         if !self.pool.same_pool(reader.budget()) {
-            return Err(triergon_core::Error::ForeignPool);
+            return Err(Error::ForeignPool);
         }
         if self.configuration.generation() != reader.generation() {
-            return Err(triergon_core::Error::StaleGeneration {
+            return Err(Error::StaleGeneration {
                 expected: reader.generation(),
                 received: self.configuration.generation(),
             });

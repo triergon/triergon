@@ -319,7 +319,7 @@ mod tests {
         };
         let mut seed = 99u32;
         let mut x = [0f32; 256];
-        for v in x.iter_mut() {
+        for v in &mut x {
             seed = seed.wrapping_mul(1664525).wrapping_add(1013904223);
             *v = (seed >> 8) as f32 / (1u32 << 24) as f32 - 0.5;
         }
@@ -375,7 +375,7 @@ mod tests {
         let mut rdelay = [0f64; 256];
         for _block in 0..3 {
             let mut x = [0f32; 256];
-            for v in x.iter_mut() {
+            for v in &mut x {
                 seed = seed.wrapping_mul(1664525).wrapping_add(1013904223);
                 *v = (seed >> 8) as f32 / (1u32 << 24) as f32 - 0.5;
             }
@@ -416,7 +416,7 @@ mod tests {
 mod perf {
     use super::*;
     #[test]
-    #[ignore]
+    #[ignore = "timing probe; run on demand with --release"]
     fn imdct_speed() {
         let mut t = Imdct::new();
         let mut x = [0f32; 256];

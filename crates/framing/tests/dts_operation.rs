@@ -480,7 +480,9 @@ fn malformed_source_refusal_is_an_event_and_other_view_is_not_removed() {
                 return;
             }
             DtsOperationStep::Yield => {}
-            other => panic!("unexpected real failure outcome {other:?}"),
+            other @ DtsOperationStep::End { .. } => {
+                panic!("unexpected real failure outcome {other:?}")
+            }
         }
     }
     panic!("bounded malformed input did not terminate")
@@ -524,7 +526,7 @@ fn parser_clock_is_an_explicit_prefix_fact_not_source_completeness() {
                     }
                 }
                 DtsOperationStep::End { .. } => break,
-                _ => {}
+                DtsOperationStep::Yield => {}
             }
         }
         let clock = result.unwrap();
@@ -698,10 +700,10 @@ fn association_requires_literal_source_bytes_not_header_or_gold_agreement() {
             DtsOperationStep::Event => match op.take_event().unwrap() {
                 DtsOperationEvent::SourceFrame(f) => frames.push(f),
                 DtsOperationEvent::ParserPacket(p) => packets.push(p),
-                _ => {}
+                DtsOperationEvent::ViewRefusal { .. } => {}
             },
             DtsOperationStep::End { .. } => break,
-            _ => {}
+            DtsOperationStep::Yield => {}
         }
     }
     let mut association =
@@ -747,7 +749,9 @@ fn reach_ready(pool: &Budget, op: &mut DtsOperation) {
                 }
             }
             DtsOperationStep::Yield => {}
-            other => panic!("unexpected readiness outcome {other:?}"),
+            other @ DtsOperationStep::End { .. } => {
+                panic!("unexpected readiness outcome {other:?}")
+            }
         }
     }
     panic!("bounded ready slot did not fill")

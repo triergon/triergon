@@ -52,7 +52,7 @@ fn uni16(v: I16x8) -> U8x8 {
 /// Output stage on 8 predicted samples v (see `inter::Out`); v fits i16.
 #[inline(always)]
 fn put(v: I32x8, x: usize, mode: u8, pred: &mut [i16], dst: &mut [u8], other: &[i16]) {
-    put16(v.cast(), x, mode, pred, dst, other)
+    put16(v.cast(), x, mode, pred, dst, other);
 }
 
 /// 8-bit output stage computed in i16 lanes.
@@ -230,7 +230,7 @@ fn put_bytes(b: U8x8, d: &mut [u8], n: usize) {
 /// 2-D results (acc >> 6) fit i16.
 #[inline(always)]
 fn put_block32(v: I32x8, x: usize, y: usize, mode: u8, o: &mut BlockOut<'_>) {
-    put_block16(v.cast(), x, y, mode, o)
+    put_block16(v.cast(), x, y, mode, o);
 }
 
 type U8x16 = Simd<u8, 16>;

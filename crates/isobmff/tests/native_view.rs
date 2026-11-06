@@ -25,7 +25,7 @@ fn source_sample(name: &str, ordinal: u64) -> (triergon_isobmff::Sample, Option<
         match locate.poll(&mut WorkBudget::new(1)).unwrap() {
             SampleStep::Sample(s) => break s,
             SampleStep::Yield => {}
-            _ => panic!(),
+            SampleStep::End => panic!(),
         }
     };
     (sample, table.sync_entry_count())

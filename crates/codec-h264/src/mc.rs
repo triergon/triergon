@@ -48,7 +48,7 @@ const WIN: usize = 24; // max window (16 + 5) rounded up
 /// Fetch a `ww` x `wh` window at (x0, y0) (may lie outside) into `out` with stride WIN,
 /// replicating edge samples (equations 8-228 / 8-229, 8-237 / 8-238).
 #[inline(never)]
-fn fetch(r: &PlaneRef, x0: i32, y0: i32, ww: usize, wh: usize, out: &mut [u8; WIN * WIN]) {
+fn fetch(r: &PlaneRef<'_>, x0: i32, y0: i32, ww: usize, wh: usize, out: &mut [u8; WIN * WIN]) {
     // Columns [xa, xb) are inside the plane.
     let xa = (-x0).clamp(0, ww as i32) as usize;
     let xb = (r.w - x0).clamp(xa as i32, ww as i32) as usize;
@@ -71,7 +71,7 @@ fn fetch(r: &PlaneRef, x0: i32, y0: i32, ww: usize, wh: usize, out: &mut [u8; WI
 /// written to `dst` with stride `ds` (8.4.2.2.1).
 #[allow(clippy::too_many_arguments)]
 pub(crate) fn luma_mc(
-    r: &PlaneRef,
+    r: &PlaneRef<'_>,
     xi: i32,
     yi: i32,
     fx: u32,
@@ -172,7 +172,7 @@ fn copy_block<const W: usize>(
 #[allow(clippy::too_many_arguments)]
 #[inline(always)]
 fn luma_mc_w<const W: usize>(
-    r: &PlaneRef,
+    r: &PlaneRef<'_>,
     xi: i32,
     yi: i32,
     fx: u32,
@@ -299,7 +299,7 @@ fn luma_kernel<const W: usize>(
 /// Chroma prediction (8.4.2.2.2) of a w x h block at integer (xi, yi), eighth fraction (fx, fy).
 #[allow(clippy::too_many_arguments)]
 pub(crate) fn chroma_mc(
-    r: &PlaneRef,
+    r: &PlaneRef<'_>,
     xi: i32,
     yi: i32,
     fx: u32,
@@ -319,7 +319,7 @@ pub(crate) fn chroma_mc(
 #[allow(clippy::too_many_arguments)]
 #[inline(always)]
 fn chroma_mc_w<const W: usize>(
-    r: &PlaneRef,
+    r: &PlaneRef<'_>,
     xi: i32,
     yi: i32,
     fx: u32,

@@ -429,7 +429,7 @@ pub fn observe(
                     status
                         .code()
                         .map_or_else(|| -i64::from(status.signal().unwrap_or(0)), i64::from),
-                )
+                );
             }
             Ok(None) if Instant::now() >= deadline => {
                 state = "timeout";
@@ -690,8 +690,9 @@ pub fn campaign(root: &Path, args: &Campaign) -> R<i32> {
     if !(1..=10000).contains(&args.rounds) || !(1..=64 << 20).contains(&args.maximum_input_bytes) {
         return Err("invalid finite mutation bounds".into());
     }
-    if !(1..=64 << 20).contains(&args.maximum_output_bytes)
-        || !(args.timeout_seconds > 0.0 && args.timeout_seconds <= 60.0)
+    if !((1..=64 << 20).contains(&args.maximum_output_bytes)
+        && args.timeout_seconds > 0.0
+        && args.timeout_seconds <= 60.0)
     {
         return Err("invalid finite observation bounds".into());
     }
@@ -1333,7 +1334,7 @@ mod tests {
             r#"[{"offset": 0, "remove": 0, "insert_hex": "f"}]"#,
             r#"[{"offset": true, "remove": 0, "insert_hex": ""}]"#,
             r#"[{"offset": 0, "remove": 0, "insert_hex": "", "extra": 1}]"#,
-            r#"[]"#,
+            r"[]",
         ] {
             assert!(replay(&seed, &recipe(edits, &seed), 16).is_err(), "{edits}");
         }
@@ -1367,7 +1368,7 @@ mod tests {
         assert!(result.get("findings").is_some_and(Value::truthy));
         let long = format!("0.{}", "1".repeat(300));
         let result = compare(&[
-            ("candidate".into(), ok(&format!(r#"[{long}]"#))),
+            ("candidate".into(), ok(&format!(r"[{long}]"))),
             ("reference".into(), ok("[0.5]")),
         ])
         .unwrap();

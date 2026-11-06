@@ -7,7 +7,7 @@ use super::{
 use crate::picture::{Mv, Pixel, PuMotion};
 use crate::state::*;
 
-impl<'a, P: Pixel> SliceDecoder<'a, P> {
+impl<P: Pixel> SliceDecoder<'_, P> {
     #[inline(never)]
     pub(super) fn deblock_cu_edges(&mut self, cu: &Cu) {
         let n = 1u32 << cu.log2;

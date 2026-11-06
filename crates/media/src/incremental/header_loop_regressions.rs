@@ -228,7 +228,7 @@ fn header_loop_partial_header_transport_precedes_cancel_and_reset_rejects_stale(
     cancel.store(true, Ordering::Relaxed);
     assert!(matches!(
         reader.step(&mut WorkBudget::new(0), &cancel),
-        Err(triergon_core::Error::Transport)
+        Err(Error::Transport)
     ));
     reader.reset().unwrap();
     cancel.store(false, Ordering::Relaxed);

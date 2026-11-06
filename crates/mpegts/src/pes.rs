@@ -408,21 +408,18 @@ impl PesAssembler {
                 }
                 continue;
             }
-            let pending = match self.payload.as_ref() {
-                Some(payload) => payload,
-                None => {
-                    return if self.ended {
-                        if !self.active {
-                            Ok(AssemblyStep::Finished)
-                        } else if self.total.is_none() && self.header.is_some() {
-                            self.emit::<RETAIN>()
-                        } else {
-                            Err(Error::Truncated)
-                        }
+            let Some(pending) = self.payload.as_ref() else {
+                return if self.ended {
+                    if !self.active {
+                        Ok(AssemblyStep::Finished)
+                    } else if self.total.is_none() && self.header.is_some() {
+                        self.emit::<RETAIN>()
                     } else {
-                        Ok(AssemblyStep::NeedPayload)
-                    };
-                }
+                        Err(Error::Truncated)
+                    }
+                } else {
+                    Ok(AssemblyStep::NeedPayload)
+                };
             };
             if !pending.started {
                 if pending.pusi {
@@ -583,9 +580,9 @@ fn timestamp(bytes: &[u8], prefix: u8) -> Result<u64> {
     {
         return Err(Error::Invalid("PES timestamp markers"));
     }
-    Ok((u64::from(bytes[0] & 14) << 29)
+    Ok((u64::from(bytes[0] & 0x0e) << 29)
         | (u64::from(bytes[1]) << 22)
-        | (u64::from(bytes[2] & 254) << 14)
+        | (u64::from(bytes[2] & 0xfe) << 14)
         | (u64::from(bytes[3]) << 7)
         | u64::from(bytes[4] >> 1))
 }
@@ -643,7 +640,7 @@ pub(crate) fn parse_header(raw: &[u8; HEADER_MAX], used: usize) -> Result<PesHea
     }
     if flags & 1 != 0 {
         let ext = take(bytes, &mut position, 1)?[0];
-        if ext & 14 != 14 {
+        if ext & 0x0e != 14 {
             return Err(Error::Invalid("PES extension reserved bits"));
         }
         if ext & 128 != 0 {

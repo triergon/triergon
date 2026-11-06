@@ -283,8 +283,8 @@ pub struct DtsOperation {
     parser_end: Option<DtsOperationTerminal>,
     failure: Option<Error>,
 }
-const _: () = assert!(std::mem::size_of::<DtsOperation>() <= 4096);
-const _: () = assert!(std::mem::size_of::<DtsOperationStep>() <= 256);
+const _: () = assert!(size_of::<DtsOperation>() <= 4096);
+const _: () = assert!(size_of::<DtsOperationStep>() <= 256);
 
 impl DtsOperation {
     pub fn new(
@@ -438,11 +438,11 @@ impl DtsOperation {
         match lane {
             DtsOperationLane::Source => {
                 self.source = None;
-                self.source_end = Some(terminal)
+                self.source_end = Some(terminal);
             }
             DtsOperationLane::ParserProjection => {
                 self.parser = None;
-                self.parser_end = Some(terminal)
+                self.parser_end = Some(terminal);
             }
         }
         self.next_turn();

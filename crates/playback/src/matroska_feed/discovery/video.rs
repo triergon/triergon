@@ -158,7 +158,7 @@ fn propagate(error: Error) -> bool {
 }
 
 impl Setup {
-    fn new(output: &Output, packet: &Packet, track: &Track) -> triergon_core::Result<Option<Self>> {
+    fn new(output: &Output, packet: &Packet, track: &Track) -> Result<Option<Self>> {
         // The native Matroska probe has both frame rates at open for this range.
         // Keep away from the rounded endpoints of its rational reduction.
         if !track
@@ -214,11 +214,7 @@ impl Setup {
         }))
     }
 
-    fn poll(
-        &mut self,
-        work: &mut WorkBudget,
-        cancel: &AtomicBool,
-    ) -> triergon_core::Result<BuildStep<Chain>> {
+    fn poll(&mut self, work: &mut WorkBudget, cancel: &AtomicBool) -> Result<BuildStep<Chain>> {
         match self {
             Self::Avc(parser) => match parser.step(work, cancel)? {
                 BuildStep::Ready(view) => {
@@ -252,10 +248,7 @@ impl Setup {
     }
 }
 
-fn hevc_chain<'a>(
-    length: LengthSize,
-    nals: impl Iterator<Item = &'a [u8]>,
-) -> triergon_core::Result<Chain> {
+fn hevc_chain<'a>(length: LengthSize, nals: impl Iterator<Item = &'a [u8]>) -> Result<Chain> {
     let chain = hevc::startup_chain(nals)?;
     Ok(Chain {
         codec: Codec::Hevc,
@@ -274,7 +267,7 @@ impl Sample {
         first_packet: bool,
         work: &mut WorkBudget,
         cancel: &AtomicBool,
-    ) -> triergon_core::Result<Option<bool>> {
+    ) -> Result<Option<bool>> {
         while self.cursor != raw.len() {
             if cancel.load(Ordering::Relaxed) {
                 return Err(Error::Cancelled);
@@ -301,7 +294,7 @@ impl Sample {
     }
 }
 
-fn split_nal(raw: &[u8], width: LengthSize) -> triergon_core::Result<(&[u8], usize)> {
+fn split_nal(raw: &[u8], width: LengthSize) -> Result<(&[u8], usize)> {
     let width = usize::from(width.bytes());
     let (prefix, rest) = raw.split_at_checked(width).ok_or(Error::Truncated)?;
     let size = prefix

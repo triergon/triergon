@@ -78,7 +78,7 @@ impl<S: Source> NativeStartup<S> {
 
     pub fn advance(&mut self, w: &mut WorkBudget, c: &AtomicBool) -> Result<StartupStep> {
         if self.failed {
-            return Err(crate::Error::Closed);
+            return Err(Error::Closed);
         }
         let result = self.inner(w, c);
         let retry = self.prefix.is_some()
@@ -101,8 +101,8 @@ impl<S: Source> NativeStartup<S> {
         if self.context.is_some() {
             return Ok(StartupStep::Ready);
         }
-        let input = self.input.as_mut().ok_or(crate::Error::Closed)?;
-        let source = self.source.as_mut().ok_or(crate::Error::Closed)?;
+        let input = self.input.as_mut().ok_or(Error::Closed)?;
+        let source = self.source.as_mut().ok_or(Error::Closed)?;
         if let Some(prefix) = self.prefix.as_mut() {
             if let Some(bootstrap) = prefix.poll(input, source, w, c)? {
                 self.bootstrap = Some(bootstrap);
@@ -121,8 +121,8 @@ impl<S: Source> NativeStartup<S> {
                 } => {
                     input.fail(source, token, failure)?;
                     return Err(match failure {
-                        triergon_core::SourceFailure::Cancelled => Error::Cancelled,
-                        triergon_core::SourceFailure::Transport => Error::Transport,
+                        SourceFailure::Cancelled => Error::Cancelled,
+                        SourceFailure::Transport => Error::Transport,
                     });
                 }
                 SourceReply::End { source, token } => {
@@ -163,8 +163,8 @@ impl<S: Source> NativeStartup<S> {
                 } => {
                     input.fail(source, token, failure)?;
                     return Err(match failure {
-                        triergon_core::SourceFailure::Cancelled => Error::Cancelled,
-                        triergon_core::SourceFailure::Transport => Error::Transport,
+                        SourceFailure::Cancelled => Error::Cancelled,
+                        SourceFailure::Transport => Error::Transport,
                     });
                 }
                 SourceReply::Data(window) => {
@@ -190,7 +190,7 @@ impl<S: Source> NativeStartup<S> {
                 SourceReply::End { source, token } => {
                     self.bootstrap
                         .as_mut()
-                        .ok_or(crate::Error::Closed)?
+                        .ok_or(Error::Closed)?
                         .observe_entity_eof(input, source, &token, request.offset)?;
                     self.eof_request = None;
                 }
@@ -200,7 +200,7 @@ impl<S: Source> NativeStartup<S> {
         match self
             .bootstrap
             .as_mut()
-            .ok_or(crate::Error::Closed)?
+            .ok_or(Error::Closed)?
             .poll(input, w, c)?
         {
             NativeInputStep::NeedEntityEof => Ok(StartupStep::NeedEof),
@@ -213,15 +213,15 @@ impl<S: Source> NativeStartup<S> {
     }
     pub fn finish(mut self) -> Result<PreparedNative<S>> {
         if self.failed {
-            return Err(crate::Error::Closed);
+            return Err(Error::Closed);
         }
         Ok(PreparedNative {
             context: self
                 .context
                 .take()
                 .ok_or(Error::Invalid("native startup not ready"))?,
-            input: self.input.take().ok_or(crate::Error::Closed)?,
-            source: self.source.take().ok_or(crate::Error::Closed)?,
+            input: self.input.take().ok_or(Error::Closed)?,
+            source: self.source.take().ok_or(Error::Closed)?,
             format: self.format,
         })
     }

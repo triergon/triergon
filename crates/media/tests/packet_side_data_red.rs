@@ -101,7 +101,9 @@ fn drive(raw: &[u8], known: bool, events: &mut Vec<Event>) -> triergon_matroska:
                     )?)?;
                 }
             }
-            other => panic!("ample-pool work-one job must progress: {other:?}"),
+            other @ Step::Backpressure(_) => {
+                panic!("ample-pool work-one job must progress: {other:?}")
+            }
         }
     }
     panic!("work-one job did not finish")

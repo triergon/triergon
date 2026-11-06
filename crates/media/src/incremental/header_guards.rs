@@ -67,6 +67,6 @@ fn oversized_growth_reports_the_pool_limit_not_overflow() {
     vec.try_extend_from_slice(&[1; 16]).unwrap();
     assert!(matches!(
         vec.try_reserve_exact(usize::MAX - 16),
-        Err(triergon_core::Error::Limit { .. })
+        Err(Error::Limit { .. })
     ));
 }

@@ -277,19 +277,18 @@ impl RawAnnexBReader {
                 .pending
                 .as_mut()
                 .ok_or(Error::Invalid("raw pending NAL"))?;
-            let role = match pending.role {
-                Some(role) => role,
-                None => {
-                    if !work.try_charge(1) {
-                        return Ok(Step::Yield);
-                    }
-                    let role = match &mut self.avc {
-                        Some(pictures) => avc_role(pictures, &pending.nal, self.has_vcl)?,
-                        None => hevc_role(&pending.nal)?,
-                    };
-                    pending.role = Some(role);
-                    role
+            let role = if let Some(role) = pending.role {
+                role
+            } else {
+                if !work.try_charge(1) {
+                    return Ok(Step::Yield);
                 }
+                let role = match &mut self.avc {
+                    Some(pictures) => avc_role(pictures, &pending.nal, self.has_vcl)?,
+                    None => hevc_role(&pending.nal)?,
+                };
+                pending.role = Some(role);
+                role
             };
             if self.has_vcl && role.begins {
                 return Ok(Step::Ready(self.publish()));

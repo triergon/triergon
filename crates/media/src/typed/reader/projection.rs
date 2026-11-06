@@ -7,7 +7,7 @@ use crate::matroska::typed::packet::ScanPacketFields;
 pub(super) enum LegacyEvent {
     Envelope(ElementEvent),
     Configuration(Configuration),
-    Document(crate::metadata::SharedDocument),
+    Document(SharedDocument),
     Packet(crate::matroska::Packet),
     FullPacket(crate::typed::Packet),
     Seek(crate::matroska::SeekReceipt),
@@ -21,7 +21,7 @@ pub(super) trait PacketProjection {
     fn configuration(value: Configuration) -> Result<Self::Event> {
         Self::event(Event::Configuration(value))
     }
-    fn document(value: crate::metadata::SharedDocument) -> Result<Self::Event> {
+    fn document(value: SharedDocument) -> Result<Self::Event> {
         Self::event(Event::Document(value))
     }
     fn packet(value: crate::typed::Packet) -> Result<Self::Event> {
@@ -157,7 +157,7 @@ impl ScanPacket {
 pub(super) enum ScanEvent {
     Envelope(ElementEvent),
     Configuration(Configuration),
-    Document(crate::metadata::SharedDocument),
+    Document(SharedDocument),
     Packet(ScanPacket),
     Seek(crate::matroska::SeekReceipt),
 }
@@ -179,7 +179,7 @@ impl PacketProjection for ScanProjection {
     fn configuration(value: Configuration) -> Result<Self::Event> {
         Ok(ScanEvent::Configuration(value))
     }
-    fn document(value: crate::metadata::SharedDocument) -> Result<Self::Event> {
+    fn document(value: SharedDocument) -> Result<Self::Event> {
         Ok(ScanEvent::Document(value))
     }
     fn packet(value: crate::typed::Packet) -> Result<Self::Event> {

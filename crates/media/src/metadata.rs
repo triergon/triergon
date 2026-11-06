@@ -30,7 +30,7 @@ pub struct Document {
     source_offset: Option<u64>,
     // Reserve the enclosing Arc/object before Arc::new; release children first.
     _pool: Budget,
-    _owner_charge: Reservation,
+    owner_charge: Reservation,
 }
 
 /// Shared immutable source document. The private Arc prevents weak handles from

@@ -571,7 +571,7 @@ mod timing {
     /// Development aid: `AAC_TIME=dct4|fft COUNT cargo test --release ... -- --ignored`, run
     /// under `/usr/bin/time -l` to read instructions / cycles per call.
     #[test]
-    #[ignore]
+    #[ignore = "timing probe; run on demand with --release"]
     fn time_transform() {
         let which = std::env::var("AAC_TIME").unwrap_or_default();
         let count: usize = std::env::var("AAC_COUNT")
@@ -592,7 +592,7 @@ mod timing {
             match which.as_str() {
                 "dct4" => {
                     let (ye, yo) = y.split_at_mut(512);
-                    d.run_split(&x, ye, yo)
+                    d.run_split(&x, ye, yo);
                 }
                 "fft" => {
                     fft.run_permuted(&mut re, &mut im);

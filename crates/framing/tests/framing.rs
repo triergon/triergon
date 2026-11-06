@@ -432,9 +432,8 @@ fn reserve_and_freeze_backpressure_do_not_consume_or_reparse_payload() {
     assert_eq!(pool.used(), retained);
     assert_eq!(parser.position(), 4);
     drop(blocker);
-    let nal = match parser.step(&mut WorkBudget::new(1), &cancel).unwrap() {
-        Step::Ready(nal) => nal,
-        _ => panic!("freeze retry lost completed NAL"),
+    let Step::Ready(nal) = parser.step(&mut WorkBudget::new(1), &cancel).unwrap() else {
+        panic!("freeze retry lost completed NAL")
     };
     assert_eq!(nal.bytes().as_ref(), &[0x65, 0x80]);
     let held = nal.clone();
@@ -472,9 +471,8 @@ fn adapter_retries_completed_freeze_and_cancellation_is_sticky() {
         Err(Error::Backpressure { .. })
     ));
     drop(blocker);
-    let output = match writer.step(&mut WorkBudget::new(1), &cancel).unwrap() {
-        BuildStep::Ready(output) => output,
-        _ => panic!("adapter freeze retry lost output"),
+    let BuildStep::Ready(output) = writer.step(&mut WorkBudget::new(1), &cancel).unwrap() else {
+        panic!("adapter freeze retry lost output")
     };
     assert_eq!(output.bytes().as_ref(), &[0, 0, 0, 1, 0x26, 1, 0, 0]);
     assert!(matches!(
@@ -599,7 +597,7 @@ fn annex_b_config_keeps_duplicates_order_source_and_classification() {
             config
                 .parameter_sets()
                 .iter()
-                .map(|p| p.kind())
+                .map(triergon_framing::ParameterSet::kind)
                 .collect::<Vec<_>>(),
             kinds
         );
@@ -762,12 +760,11 @@ fn unknown_length_completion_and_failure_never_publish_partial_nals() {
             );
         } else {
             parser.finish(request.source, request.token).unwrap();
-            let nal = match parser
+            let Step::Ready(nal) = parser
                 .step(&mut WorkBudget::new(100), &AtomicBool::new(false))
                 .unwrap()
-            {
-                Step::Ready(nal) => nal,
-                _ => panic!("explicit completion did not finish NAL"),
+            else {
+                panic!("explicit completion did not finish NAL")
             };
             assert_eq!(nal.bytes().as_ref(), &[0x42, 1, 0x80]);
             assert!(matches!(
@@ -803,12 +800,11 @@ fn unit_count_limit_does_not_erase_previously_emitted_output() {
     parser
         .provide(&InputWindow::new(request.source, request.token, 0, source).unwrap())
         .unwrap();
-    let first = match parser
+    let Step::Ready(first) = parser
         .step(&mut WorkBudget::new(100), &AtomicBool::new(false))
         .unwrap()
-    {
-        Step::Ready(nal) => nal,
-        _ => panic!("first bounded NAL omitted"),
+    else {
+        panic!("first bounded NAL omitted")
     };
     assert_eq!(
         parser

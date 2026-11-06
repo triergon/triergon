@@ -303,7 +303,7 @@ mod tests {
 
     #[test]
     fn reports_missing_links_outside_build_output() {
-        let root = crate::walk::scratch("links");
+        let root = walk::scratch("links");
         fs::create_dir_all(root.join("docs")).unwrap();
         fs::create_dir_all(root.join("target")).unwrap();
         fs::write(
@@ -319,7 +319,7 @@ mod tests {
 
     #[test]
     fn link_components_must_match_case_exactly() {
-        let root = crate::walk::scratch("links-case");
+        let root = walk::scratch("links-case");
         fs::create_dir_all(root.join("docs/Sub")).unwrap();
         fs::write(root.join("docs/Sub/Note.md"), "").unwrap();
         fs::write(root.join("README.md"), "").unwrap();
@@ -341,7 +341,7 @@ mod tests {
 
     #[test]
     fn design_reports_invalid_json_and_gate_changes() {
-        let root = crate::walk::scratch("design");
+        let root = walk::scratch("design");
         fs::create_dir_all(root.join("research/sub")).unwrap();
         fs::create_dir_all(root.join("harness/fate")).unwrap();
         let policy = r#"{"runtime": {"ratio_max": 1.2, "optimisation_target": 0.8}}"#;

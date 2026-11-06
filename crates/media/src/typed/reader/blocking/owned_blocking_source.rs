@@ -140,7 +140,7 @@ fn an_unrelated_pool_cannot_admit_a_charged_source_as_operation_storage() {
             &second,
             crate::storage::PayloadOwnership::SharedBounded
         ),
-        Err(triergon_core::Error::ForeignPool)
+        Err(Error::ForeignPool)
     ));
     assert_eq!(first.used(), before.0);
     assert_eq!(second.used(), before.1);

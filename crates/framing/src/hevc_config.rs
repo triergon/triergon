@@ -121,6 +121,8 @@ pub struct HvcConfigArray {
     first_nal: u32,
     nal_count: u16,
 }
+// Shows the derived ranges and counts instead of their stored parts.
+#[allow(clippy::missing_fields_in_debug)]
 impl std::fmt::Debug for HvcConfigArray {
     fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         formatter
@@ -165,6 +167,8 @@ pub struct HvcConfigNal {
     array: u8,
     declared_type: u8,
 }
+// Shows the derived ranges and counts instead of their stored parts.
+#[allow(clippy::missing_fields_in_debug)]
 impl std::fmt::Debug for HvcConfigNal {
     fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         formatter
@@ -773,6 +777,8 @@ struct HvcNalDescriptor {
     array: u8,
     declared_type: u8,
 }
+// Shows the derived ranges and counts instead of their stored parts.
+#[allow(clippy::missing_fields_in_debug)]
 impl std::fmt::Debug for HvcNalDescriptor {
     fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         formatter
@@ -825,7 +831,7 @@ impl HvcStorage for CompactHvc {
         // wire bytes. Its payload range therefore has this u16 length.
         debug_assert!(length.end == payload.start && length.len() == 2);
         let payload_len = payload.len();
-        debug_assert!(payload_len <= usize::from(u16::MAX));
+        debug_assert!(u16::try_from(payload_len).is_ok());
         Ok(HvcNalDescriptor {
             payload_start: payload.start,
             payload_len: payload_len as u16,

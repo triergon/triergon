@@ -435,11 +435,12 @@ impl Av1ObuReader {
                                 } else {
                                     Phase::Resolve
                                 };
-                            } else {
-                                if push_leb_byte(&mut self.leb_value, &mut self.leb_width, byte[0])?
-                                {
-                                    self.phase = Phase::Resolve;
-                                }
+                            } else if push_leb_byte(
+                                &mut self.leb_value,
+                                &mut self.leb_width,
+                                byte[0],
+                            )? {
+                                self.phase = Phase::Resolve;
                             }
                         }
                         Step::NeedInput(request) => return Ok(Step::NeedInput(request)),
@@ -550,7 +551,7 @@ impl Av1ObuReader {
                     }
                     match self.cursor.read_span(remaining.min(4096), work, cancel)? {
                         Step::Ready(bytes) => {
-                            self.buffer()?.try_extend_from_slice(bytes.as_ref())?
+                            self.buffer()?.try_extend_from_slice(bytes.as_ref())?;
                         }
                         Step::NeedInput(request) => return Ok(Step::NeedInput(request)),
                         Step::Yield => return Ok(Step::Yield),

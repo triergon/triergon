@@ -151,7 +151,7 @@ impl MatroskaHevcDolbySetup {
         &mut self,
         work: &mut WorkBudget,
         cancel: &AtomicBool,
-    ) -> triergon_core::Result<Option<FeedCodec>> {
+    ) -> Result<Option<FeedCodec>> {
         match &mut self.codec {
             SetupCodec::Hevc(parser) => match parser.step(work, cancel)? {
                 BuildStep::Ready(record) => {
@@ -349,11 +349,7 @@ struct DolbyJob<'a> {
 }
 
 impl<'a> DolbyJob<'a> {
-    fn new(
-        codec: DolbyCodec,
-        data: &'a [u8],
-        limits: MatroskaDolbyLimits,
-    ) -> triergon_core::Result<Self> {
+    fn new(codec: DolbyCodec, data: &'a [u8], limits: MatroskaDolbyLimits) -> Result<Self> {
         if data.is_empty() {
             return Err(Error::Invalid("empty Dolby packet"));
         }
@@ -368,11 +364,7 @@ impl<'a> DolbyJob<'a> {
         })
     }
 
-    fn step(
-        &mut self,
-        work: &mut WorkBudget,
-        cancel: &AtomicBool,
-    ) -> triergon_core::Result<BuildStep<&'a [u8]>> {
+    fn step(&mut self, work: &mut WorkBudget, cancel: &AtomicBool) -> Result<BuildStep<&'a [u8]>> {
         if let Some(error) = self.failure {
             return Err(error);
         }
@@ -384,11 +376,7 @@ impl<'a> DolbyJob<'a> {
         result
     }
 
-    fn scan(
-        &mut self,
-        work: &mut WorkBudget,
-        cancel: &AtomicBool,
-    ) -> triergon_core::Result<BuildStep<&'a [u8]>> {
+    fn scan(&mut self, work: &mut WorkBudget, cancel: &AtomicBool) -> Result<BuildStep<&'a [u8]>> {
         while let Some(remaining) = self.remaining {
             if cancel.load(Ordering::Relaxed) {
                 return Err(Error::Cancelled);

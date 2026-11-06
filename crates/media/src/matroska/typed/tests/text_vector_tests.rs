@@ -2,7 +2,7 @@
 use super::*;
 use crate::{Error, storage::text_job::TextJob};
 
-fn text_result(raw: &[u8], ascii: bool, quantum: u64) -> crate::Result<(String, usize, u64)> {
+fn text_result(raw: &[u8], ascii: bool, quantum: u64) -> Result<(String, usize, u64)> {
     let pool = Budget::new(32 * 1024).unwrap();
     let baseline = pool.used();
     let source = SharedBytes::copy_from_slice(&pool, raw).unwrap();

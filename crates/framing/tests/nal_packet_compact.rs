@@ -504,9 +504,8 @@ fn noncopy_metadata_and_old_configuration_survive_update_flush_and_producer_clos
     let output = output.unwrap();
     drop(job);
     let new_raw = hidden(&pool, &avcc(129));
-    let update = match config(&pool, new_raw.clone(), Codec::Avc) {
-        NalPacketConfiguration::Avc(value) => value,
-        _ => unreachable!(),
+    let NalPacketConfiguration::Avc(update) = config(&pool, new_raw.clone(), Codec::Avc) else {
+        unreachable!()
     };
     let mut second = packet(hidden(&pool, &[0, 0, 0, 3, 0x65, 0xb8, 128]));
     second.new_extradata = Some(new_raw);

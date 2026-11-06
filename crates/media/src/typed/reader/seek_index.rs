@@ -47,7 +47,7 @@ impl ImmutableSeekIndex {
         {
             return Ok(());
         }
-        Err(triergon_core::Error::SourceMismatch)
+        Err(Error::SourceMismatch)
     }
 
     pub fn reset(&mut self, limit: usize) {

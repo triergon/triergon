@@ -34,7 +34,7 @@ fn min_positive(x: i32, y: i32) -> i32 {
     if x >= 0 && y >= 0 { x.min(y) } else { x.max(y) }
 }
 
-impl<'a> SliceDecoder<'a> {
+impl SliceDecoder<'_> {
     /// Motion data of the neighbouring partition covering luma location (xN, yN) (8.4.1.3.2).
     #[inline]
     fn nb_mv(&self, list: usize, xn: i32, yn: i32) -> NbMv {
@@ -1206,7 +1206,7 @@ fn chroma_src<'a>(
 /// (8.4.2.3), written into `out` at the geometry's offsets.
 #[inline]
 fn mc_part<'r, F: Fn(usize) -> &'r FrameBuf>(
-    c: &McCtx,
+    c: &McCtx<'_>,
     refbuf: F,
     p: &PartMv,
     out: &mut FrameBuf,

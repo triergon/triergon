@@ -4,7 +4,18 @@
 //! Receives charged metadata bytes and absolute coordinates from the shared core;
 //! owns no I/O, transport tokens, allocator, codec adaptation or presentation clock.
 #![forbid(unsafe_code)]
-
+#![warn(clippy::print_stdout, clippy::print_stderr, clippy::unwrap_used)]
+// Pending: `missing_docs`, `missing_debug_implementations`, `unreachable_pub`, `clippy::expect_used`.
+// Pending: these rewrites change the generated code of measured hot paths and are
+// adopted with an A/B timing run.
+#![allow(
+    clippy::assigning_clones,
+    clippy::checked_conversions,
+    clippy::map_unwrap_or,
+    clippy::redundant_closure_for_method_calls,
+    clippy::ref_option,
+    clippy::unnested_or_patterns
+)]
 mod boxes;
 mod dts_description;
 pub(crate) use dts_description::DtsCoreDescription;

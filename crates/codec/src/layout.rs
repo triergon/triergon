@@ -46,7 +46,14 @@ pub enum Speaker {
 impl Speaker {
     /// FFmpeg's short channel name (`FL`, `FR`, ...).
     pub fn name(self) -> &'static str {
-        use Speaker::*;
+        use Speaker::{
+            BackCenter, BackLeft, BackRight, BottomFrontCenter, BottomFrontLeft, BottomFrontRight,
+            FrontCenter, FrontLeft, FrontLeftOfCenter, FrontRight, FrontRightOfCenter,
+            LowFrequency, LowFrequency2, SideLeft, SideRight, SurroundDirectLeft,
+            SurroundDirectRight, TopBackCenter, TopBackLeft, TopBackRight, TopCenter,
+            TopFrontCenter, TopFrontLeft, TopFrontRight, TopSideLeft, TopSideRight, WideLeft,
+            WideRight,
+        };
         match self {
             FrontLeft => "FL",
             FrontRight => "FR",

@@ -268,7 +268,7 @@ fn bounded_text_keeps_terminator_utf8_ascii_error_precedence() {
             }
             assert!(work.spent() <= 1);
         }
-        assert!(matches!(error,Some(crate::Error::Invalid(value)) if value==message));
+        assert!(matches!(error,Some(Error::Invalid(value)) if value==message));
     }
 }
 
@@ -326,7 +326,7 @@ fn packet_batch_rejects_a_bad_last_crc_without_publishing_any_lace() {
         let mut work = WorkBudget::new(1);
         match job.step(&mut work, &AtomicBool::new(false)) {
             Ok(ParseStep::Yield) => (),
-            Err(crate::Error::Invalid("Adler-32 mismatch")) => {
+            Err(Error::Invalid("Adler-32 mismatch")) => {
                 failed = true;
                 break;
             }
@@ -337,7 +337,7 @@ fn packet_batch_rejects_a_bad_last_crc_without_publishing_any_lace() {
     assert!(failed);
     assert!(matches!(
         job.step(&mut WorkBudget::new(1000), &AtomicBool::new(false)),
-        Err(crate::Error::Invalid(_))
+        Err(Error::Invalid(_))
     ));
 }
 
@@ -461,11 +461,11 @@ fn packet_batch_keeps_pending_output_across_pressure_and_checks_cancel_before_pu
     ));
     assert!(matches!(
         job.step(&mut WorkBudget::new(1000), &AtomicBool::new(true)),
-        Err(crate::Error::Cancelled)
+        Err(Error::Cancelled)
     ));
     assert!(matches!(
         job.step(&mut WorkBudget::new(1000), &AtomicBool::new(false)),
-        Err(crate::Error::Invalid(_))
+        Err(Error::Invalid(_))
     ));
 }
 
@@ -567,9 +567,9 @@ fn raw_tracks_job_keeps_late_duplicate_and_decoded_private_limits_atomic() {
         // The private decoder may reject its output cap before the final
         // retained-capacity check; both are explicit permanent policy failures.
         if message == "decoded private metadata" {
-            assert!(matches!(error, Some(crate::Error::Policy(_))));
+            assert!(matches!(error, Some(Error::Policy(_))));
         } else {
-            assert!(matches!(error,Some(crate::Error::Invalid(value)) if value==message));
+            assert!(matches!(error,Some(Error::Invalid(value)) if value==message));
         }
     }
 }
@@ -759,7 +759,7 @@ fn async_cue_validation_requests_ranges_checks_all_laces_and_repositions_before_
     };
     let configuration = configuration.rebind(generation, 3);
     let mut job = seek_validate::CueValidationJob::new(
-        crate::matroska::typed::seek_validate::CueTarget {
+        seek_validate::CueTarget {
             cue,
             track: 0,
             scale: 1_000_000,
@@ -868,7 +868,7 @@ fn async_cue_validation_cannot_turn_bad_last_crc_or_wrong_source_position_into_l
             codec_state: 0,
         };
         let mut job = seek_validate::CueValidationJob::new(
-            crate::matroska::typed::seek_validate::CueTarget {
+            seek_validate::CueTarget {
                 cue,
                 track: 0,
                 scale: 1_000_000,
@@ -907,7 +907,7 @@ fn async_cue_validation_cannot_turn_bad_last_crc_or_wrong_source_position_into_l
                             .unwrap();
                     }
                 }
-                Err(crate::Error::Invalid(message)) => {
+                Err(Error::Invalid(message)) => {
                     assert_eq!(
                         message,
                         if bad_crc {
@@ -980,7 +980,7 @@ fn seek_plan_uses_all_track_preroll_negative_floor_and_keeps_extreme_unselected_
     assert!(matches!(
         result.landing,
         seek::LandingPlan::Cue {
-            cue: crate::cues::Cue { ticks: 0, .. },
+            cue: Cue { ticks: 0, .. },
             whole_cluster: true,
             scan_after_validation: None
         }
@@ -1151,16 +1151,16 @@ fn blocking_feeder_keeps_transport_failure_distinct_from_explicit_end() {
     let mut feeder = blocking::InputFeeder::new(Broken, 4).unwrap();
     assert!(matches!(
         feeder.feed_sequential(&mut input, &AtomicBool::new(false)),
-        Err(crate::Error::Io(_))
+        Err(Error::Io(_))
     ));
     assert!(matches!(
         input.read_into(&mut [0], &mut WorkBudget::new(1), &AtomicBool::new(false)),
-        Err(triergon_core::Error::Transport)
+        Err(Error::Transport)
     ));
     let request = input.request();
     assert!(matches!(
         input.finish(request.source, request.token),
-        Err(triergon_core::Error::Transport)
+        Err(Error::Transport)
     ));
 }
 
@@ -1223,7 +1223,7 @@ fn finite_child_cursor_rejects_even_an_empty_span_outside_its_owner() {
     let mut cursor = syntax::ChildCursor::new(4..4);
     assert!(matches!(
         cursor.step(b"abc", &mut WorkBudget::new(1), &AtomicBool::new(false)),
-        Err(crate::Error::Truncated)
+        Err(Error::Truncated)
     ));
 }
 
@@ -1364,7 +1364,7 @@ fn range_job_rejects_stale_generation_and_a_transport_failure_even_at_its_pendin
     input.reset(0).unwrap();
     assert!(matches!(
         stale.step(&mut input, &mut WorkBudget::new(1), &AtomicBool::new(false)),
-        Err(triergon_core::Error::StaleGeneration { .. })
+        Err(Error::StaleGeneration { .. })
     ));
     drop(stale);
     let mut job = range::RangeLeafJob::begin(&mut input, 0, 0x1c53bb6b, None, 1024).unwrap();
@@ -1415,7 +1415,7 @@ fn range_job_rejects_stale_generation_and_a_transport_failure_even_at_its_pendin
             &mut WorkBudget::new(1000),
             &AtomicBool::new(false)
         ),
-        Err(triergon_core::Error::Transport)
+        Err(Error::Transport)
     ));
 }
 
@@ -1484,7 +1484,7 @@ fn playback_preroll_plan_validates_video_but_replays_the_earlier_interleaved_aud
     };
     assert!(whole_cluster);
     let mut job = seek_validate::CueValidationJob::new(
-        crate::matroska::typed::seek_validate::CueTarget {
+        seek_validate::CueTarget {
             cue,
             track: 0,
             scale: 1_000_000,
@@ -1697,7 +1697,7 @@ fn typed_document_rejects_uid_reuse_ordered_missing_end_and_nested_start_range_a
                 other => panic!("invalid catalogue published: {other:?}"),
             }
         }
-        assert!(matches!(error,Some(crate::Error::Invalid(value)) if value==message));
+        assert!(matches!(error,Some(Error::Invalid(value)) if value==message));
     }
 }
 
@@ -1728,7 +1728,7 @@ fn typed_catalogue_keeps_cumulative_node_limits_and_prior_document_after_rejecte
                     accepted = true;
                     break;
                 }
-                Err(crate::Error::Policy("metadata nodes")) => {
+                Err(Error::Policy("metadata nodes")) => {
                     rejected = true;
                     break;
                 }

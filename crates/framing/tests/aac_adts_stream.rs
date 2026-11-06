@@ -95,9 +95,7 @@ fn drive(
             }
             Ok(Step::NeedInput(q)) => {
                 if q.offset as usize == data.len() {
-                    if finished {
-                        panic!("requested past completed source")
-                    };
+                    assert!(!finished, "requested past completed source");
                     let token = r.token();
                     if let Err(e) = r.finish(q.source, token) {
                         return Outcome {
@@ -563,12 +561,11 @@ fn completed_payload_survives_freeze_backpressure_and_zero_work_retry() {
     ));
     assert_eq!((r.position(), pool.used()), (position, used));
     drop(blocker);
-    let f = match r
+    let Step::Ready(f) = r
         .step(&mut WorkBudget::new(1), &AtomicBool::new(false))
         .unwrap()
-    {
-        Step::Ready(f) => f,
-        _ => panic!("freeze retry must not repeat prefix/payload work"),
+    else {
+        panic!("freeze retry must not repeat prefix/payload work")
     };
     assert_eq!(f.source_bytes().as_ref(), data);
     assert_eq!(r.completed_frames(), 1);

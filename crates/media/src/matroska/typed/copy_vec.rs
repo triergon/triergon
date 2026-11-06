@@ -114,9 +114,7 @@ impl<T: Copy> CopyVec<T> {
                     if target > needed
                         && matches!(
                             error,
-                            triergon_core::Error::Backpressure { .. }
-                                | triergon_core::Error::Limit { .. }
-                                | triergon_core::Error::Overflow
+                            Error::Backpressure { .. } | Error::Limit { .. } | Error::Overflow
                         )
                     {
                         replacement.try_reserve_exact(needed)

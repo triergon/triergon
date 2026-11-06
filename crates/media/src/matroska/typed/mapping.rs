@@ -37,7 +37,7 @@ struct Data {
     maximum: Option<(Span, u64)>,
     mappings: BudgetVec<Mapping>,
     unknown: BudgetVec<Unknown>,
-    _charge: Reservation,
+    charge: Reservation,
 }
 /// Opaque immutable source owner; no public weak handle can escape its charge.
 #[derive(Clone, Debug)]
@@ -84,7 +84,7 @@ impl TrackExtensions {
                         .checked_mul(size_of::<Unknown>())?,
                 )
             })
-            .and_then(|n| n.checked_add(self.0._charge.bytes()))
+            .and_then(|n| n.checked_add(self.0.charge.bytes()))
             .ok_or(Error::Overflow)
     }
 }
@@ -194,7 +194,7 @@ pub struct TrackExtensionsJob {
 impl TrackExtensionsJob {
     pub(crate) fn new(raw: SharedBytes, limits: Limits, pool: &Budget) -> Result<Self> {
         if !raw.belongs_to(pool) {
-            return Err(triergon_core::Error::ForeignPool);
+            return Err(Error::ForeignPool);
         }
         if raw.len() > limits.metadata_bytes {
             return Err(Error::Policy("track extension bytes"));
@@ -436,7 +436,7 @@ impl TrackExtensionsJob {
                         maximum: self.maximum,
                         mappings,
                         unknown,
-                        _charge: charge,
+                        charge,
                     })));
                     self.phase = Phase::Done;
                 }

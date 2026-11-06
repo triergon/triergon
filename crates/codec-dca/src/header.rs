@@ -40,7 +40,7 @@ pub(crate) struct FrameHeader {
 }
 
 impl FrameHeader {
-    pub(crate) fn parse(br: &mut BitReader) -> Result<Self, DecodeError> {
+    pub(crate) fn parse(br: &mut BitReader<'_>) -> Result<Self, DecodeError> {
         if br.read(32) != 0x7FFE_8001 {
             return Err(DecodeError::InvalidData("core sync word"));
         }
@@ -117,7 +117,7 @@ const ADJ_TABLE: [f32; 4] = [1.0, 1.125, 1.25, 1.4375];
 
 impl SetHeader {
     /// Parse from PCHS onwards (`SUBFS` is read by the caller for the core).
-    pub(crate) fn parse(br: &mut BitReader, cpf: bool) -> Result<Self, DecodeError> {
+    pub(crate) fn parse(br: &mut BitReader<'_>, cpf: bool) -> Result<Self, DecodeError> {
         let nch = br.read(3) as usize + 1;
         let mut h = SetHeader {
             nch,

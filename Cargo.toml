@@ -11,14 +11,77 @@ license = "MIT OR Apache-2.0"
 
 [workspace.lints.rust]
 unsafe_code = "forbid"
+rust_2018_idioms = { level = "warn", priority = -1 }
+unused_qualifications = "warn"
+# Library crates also enable `missing_docs`, `missing_debug_implementations`,
+# `unreachable_pub`, `clippy::print_stdout`, `clippy::print_stderr`, `clippy::unwrap_used`
+# and `clippy::expect_used` at the top of their `lib.rs`, each listing the ones still
+# pending. Tests, examples, workers and xtask may print and unwrap.
 
 [workspace.lints.clippy]
+all = { level = "warn", priority = -1 }
+pedantic = { level = "warn", priority = -1 }
+dbg_macro = "warn"
+todo = "warn"
+unimplemented = "warn"
 # DSP and table code indexes several arrays by one spec-defined loop variable.
 needless_range_loop = "allow"
 # Hot loops keep their measured slice-chunk forms: as_chunks rewrites changed
 # vectorisation (work digest about 8% slower on AAC-heavy Matroska workloads, AC-3/E-AC-3
 # decode 0.3-1.4% slower on native Linux ARM64). Adopt per loop with A/B evidence.
 chunks_exact_to_as_chunks = "allow"
+# Pedantic lints the code base does not follow, by policy.
+# Constants and tables are written as the specifications print them.
+unreadable_literal = "allow"
+# Names follow the specification's syntax elements and equations.
+many_single_char_names = "allow"
+similar_names = "allow"
+struct_excessive_bools = "allow"
+fn_params_excessive_bools = "allow"
+# Parsers and decoders follow the specification's syntax tables in one function.
+too_many_lines = "allow"
+# Inlining, argument passing and branch order in hot code are chosen by measurement.
+inline_always = "allow"
+trivially_copy_pass_by_ref = "allow"
+large_types_passed_by_value = "allow"
+needless_pass_by_value = "allow"
+if_not_else = "allow"
+# `a..b + 1` keeps the half-open range, which iterates faster than `a..=b`; bit tests,
+# comparisons and averages keep the form the specification writes and the code measured.
+range_plus_one = "allow"
+verbose_bit_mask = "allow"
+comparison_chain = "allow"
+manual_midpoint = "allow"
+# Arms that share a body stay separate where they are distinct cases of a table.
+match_same_arms = "allow"
+# `assert!(x.is_empty())` reads better than comparing with a typed empty array.
+assert_is_empty = "allow"
+# Submodules split out of one parent share the parent's scope.
+wildcard_imports = "allow"
+# An explicit `continue` names the retry arm of a step loop.
+needless_continue = "allow"
+# Report, digest and debug formatting favours `format!` over hand-written writers.
+format_collect = "allow"
+format_push_string = "allow"
+# Constants and helpers sit next to the statement that uses them.
+items_after_statements = "allow"
+# Functions keep the signature of the table, trait or callback they belong to.
+unnecessary_wraps = "allow"
+unused_self = "allow"
+# Field names follow the specification's syntax elements.
+struct_field_names = "allow"
+# `#[must_use]` marks results that are likely bugs to ignore, not every pure function.
+must_use_candidate = "allow"
+# Pending: numeric conversions are reviewed per crate where 32-bit targets matter.
+cast_possible_truncation = "allow"
+cast_sign_loss = "allow"
+cast_possible_wrap = "allow"
+cast_lossless = "allow"
+cast_precision_loss = "allow"
+# Pending: enabled with the crate documentation pass.
+doc_markdown = "allow"
+missing_errors_doc = "allow"
+missing_panics_doc = "allow"
 
 [profile.release]
 lto = "fat"

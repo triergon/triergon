@@ -69,9 +69,9 @@ fn pmt(descriptors: &[u8]) -> Vec<u8> {
 
 fn stamp(raw: u64, prefix: u8) -> [u8; 5] {
     [
-        prefix << 4 | ((raw >> 29) as u8 & 14) | 1,
+        prefix << 4 | ((raw >> 29) as u8 & 0x0e) | 1,
         (raw >> 22) as u8,
-        ((raw >> 14) as u8 & 254) | 1,
+        ((raw >> 14) as u8 & 0xfe) | 1,
         (raw >> 7) as u8,
         ((raw << 1) as u8) | 1,
     ]

@@ -267,6 +267,6 @@ mod tests {
     fn neutral_values_stay_small_on_32_bit_targets() {
         assert!(size_of::<Trim>() <= 32);
         assert!(size_of::<Sourced<u64>>() <= 16);
-        assert!(size_of::<TrackId>() == 8);
+        assert_eq!(size_of::<TrackId>(), 8);
     }
 }

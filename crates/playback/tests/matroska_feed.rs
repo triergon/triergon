@@ -831,7 +831,7 @@ fn direct_player_defers_queue_storage_and_retries_fifo_pressure() {
     );
     let policy = PlayerPolicy::default();
     let mut direct = Player::new_direct(engine, source, Selection::All, policy).unwrap();
-    let queue_charge = policy.slots * std::mem::size_of::<Option<Output>>();
+    let queue_charge = policy.slots * size_of::<Option<Output>>();
     assert_eq!(eager_pool.used() - pool.used(), queue_charge);
 
     let cancel = AtomicBool::new(false);
@@ -957,7 +957,7 @@ fn compact_discovery_replays_every_output_and_reduces_prefix_storage() {
         .find_map(
             |_| match full.poll(&mut WorkBudget::new(1), &cancel).unwrap() {
                 MatroskaDiscoveryStep::Ready(cutoff) => Some(cutoff),
-                _ => None,
+                MatroskaDiscoveryStep::Progress(_) => None,
             },
         )
         .expect("full discovery stalled");
@@ -979,7 +979,7 @@ fn compact_discovery_replays_every_output_and_reduces_prefix_storage() {
         .find_map(
             |_| match compact.poll(&mut WorkBudget::new(1), &cancel).unwrap() {
                 MatroskaDiscoveryStep::Ready(cutoff) => Some(cutoff),
-                _ => None,
+                MatroskaDiscoveryStep::Progress(_) => None,
             },
         )
         .expect("compact discovery stalled");
@@ -1016,7 +1016,7 @@ fn av_discovery_hands_off_before_pgs_and_delivers_every_late_packet() {
         source,
         Selection::All,
         PlayerPolicy::default(),
-        Default::default(),
+        triergon_playback::matroska_feed::MatroskaDiscoveryLimits::default(),
     )
     .unwrap();
     let mut confirmed = false;

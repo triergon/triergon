@@ -566,7 +566,7 @@ impl Source for Observed {
         r: &InputRequest,
         w: &mut WorkBudget,
         c: &AtomicBool,
-    ) -> triergon_core::Result<SourceReply> {
+    ) -> Result<SourceReply> {
         if w.remaining() == 0 {
             return Ok(SourceReply::Pending);
         }
@@ -632,7 +632,7 @@ fn probe(
     raw: &[u8],
     q: usize,
     sequential: bool,
-) -> (io::SelectedInput<io::ReplaySource<Observed>>, Budget, Calls) {
+) -> (SelectedInput<io::ReplaySource<Observed>>, Budget, Calls) {
     let b = pool();
     let (source, calls, _) = observed(&b, raw, q, sequential);
     let mut probe = Probe::new(
@@ -2469,7 +2469,7 @@ fn av1_bridge_matches_delimiter_framing_from_real_mp4_and_webm_packets() {
             assert_eq!(packets, 6);
             assert_eq!(bytes.as_slice(), expected);
 
-            if std::ptr::eq(pool, &mkv_pool) {
+            if std::ptr::eq(pool, &raw const mkv_pool) {
                 let track = outputs.iter().find_map(|o| o.event().track()).unwrap();
                 assert!(
                     mkv.seek_and_select(
@@ -3248,7 +3248,7 @@ fn bounded_timing_range_playback_preserves_packets_and_seeks() {
             .prepare_seek(Mp4NativeSeekRequest {
                 video: track.header().track_id,
                 timestamp: 3000,
-                limits: Default::default(),
+                limits: triergon_isobmff::Mov9NativeSeekLimits::default(),
             })
             .unwrap();
         assert!((0..100_000).any(|_| seek.poll(&mut WorkBudget::new(3), &off()).unwrap()));
@@ -3323,7 +3323,7 @@ fn native_range_cursor_matches_ffprobe_and_preserves_seek_lifecycle() {
             .prepare_seek(Mp4NativeSeekRequest {
                 video: 1,
                 timestamp: target,
-                limits: Default::default(),
+                limits: triergon_isobmff::Mov9NativeSeekLimits::default(),
             })
             .unwrap();
         assert!(!job.poll(&mut WorkBudget::new(0), &off()).unwrap());
@@ -3482,7 +3482,7 @@ fn range_configs(
                 Mov9EncodedSelectionV4 {
                     major_brand,
                     description: description.index,
-                    limits: Default::default(),
+                    limits: triergon_isobmff::ConfigurationLimits::default(),
                 },
             )
             .unwrap();
@@ -3519,7 +3519,7 @@ fn encoded_range_open(
             },
             &configs,
             &opened.input,
-            Default::default(),
+            triergon_isobmff::Mov9EncodedEditLimitsV2::default(),
         )
         .unwrap();
         while edit
@@ -3647,7 +3647,7 @@ fn native_range_cursor_keeps_edited_av1_and_vp9_description_transitions() {
                     Mov9EncodedSelectionV4 {
                         major_brand: opened.movie.major_brand(),
                         description,
-                        limits: Default::default(),
+                        limits: triergon_isobmff::ConfigurationLimits::default(),
                     },
                     PinnedMovD32EncodedContextsV7,
                 ),
@@ -3695,7 +3695,7 @@ fn native_range_cursor_keeps_edited_av1_and_vp9_description_transitions() {
                 },
                 &configs,
                 &opened.input,
-                Default::default(),
+                triergon_isobmff::Mov9EncodedEditLimitsV2::default(),
                 PinnedMovD32EncodedContextsV7,
             )
             .err(),
@@ -3875,7 +3875,7 @@ fn native_range_seek_replays_the_encoded_edit_occurrences() {
                 Mp4NativeSeekRequest {
                     video: 1,
                     timestamp: 43_200,
-                    limits: Default::default(),
+                    limits: triergon_isobmff::Mov9NativeSeekLimits::default(),
                 },
                 Selection::All,
             )

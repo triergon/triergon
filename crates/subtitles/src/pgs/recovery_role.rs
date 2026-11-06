@@ -246,7 +246,11 @@ impl<A: ArgbStorage> RecoveryRole for FullRecovery<A> {
         if A::MATERIALIZE {
             None
         } else {
-            Some(self.strict.as_ref().map_or(0, |d| d.evidence_slots()))
+            Some(
+                self.strict
+                    .as_ref()
+                    .map_or(0, StoredDisplayDecoder::evidence_slots),
+            )
         }
     }
 
@@ -261,7 +265,7 @@ impl<A: ArgbStorage> RecoveryRole for FullRecovery<A> {
             .as_ref()
             .and_then(|sets| sets.as_slice().last())
             .and_then(|set| set.objects().first())
-            .map(|object| object.palette())
+            .map(super::display_model::StoredDisplayObject::palette)
             .filter(|_| self.source_error.is_none())
     }
 
@@ -326,7 +330,7 @@ impl<A: ArgbStorage> RecoveryRole for FullRecovery<A> {
             {
                 Ok(()) => (),
                 Err(error @ (Error::Truncated | Error::Invalid(_) | Error::Unsupported(_))) => {
-                    self.source_error = Some(error)
+                    self.source_error = Some(error);
                 }
                 Err(error) => return Err(error),
             }

@@ -58,7 +58,7 @@ impl Vlc {
 
     /// Decode one symbol. Returns `None` on an invalid code.
     #[inline(always)]
-    pub(crate) fn decode(&self, br: &mut BitReader) -> Option<u32> {
+    pub(crate) fn decode(&self, br: &mut BitReader<'_>) -> Option<u32> {
         let bits = br.peek32();
         let e = self.table[(bits >> (32 - self.primary_bits)) as usize];
         if e & SUB_FLAG == 0 {

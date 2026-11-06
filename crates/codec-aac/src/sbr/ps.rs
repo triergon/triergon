@@ -380,7 +380,7 @@ impl Ps {
     }
 
     /// ps_data(); `bits` is the number of bits available in the SBR extension.
-    pub(crate) fn parse(&mut self, br: &mut BitReader, bits: usize) -> Result<usize> {
+    pub(crate) fn parse(&mut self, br: &mut BitReader<'_>, bits: usize) -> Result<usize> {
         let start = br.position();
         let bk = books();
         if br.bit() {
@@ -996,7 +996,7 @@ fn map_pd(p: &[i8; 17], n: usize, to: usize) -> [i8; 17] {
 }
 
 fn read_par(
-    br: &mut BitReader,
+    br: &mut BitReader<'_>,
     v: &Vlc,
     dt: bool,
     off: i32,
@@ -1019,7 +1019,7 @@ fn read_par(
 }
 
 fn read_ipd(
-    br: &mut BitReader,
+    br: &mut BitReader<'_>,
     v: &Vlc,
     dt: bool,
     n: usize,

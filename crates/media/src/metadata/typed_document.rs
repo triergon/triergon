@@ -222,7 +222,7 @@ impl DocumentJob {
             return Err(Error::Invalid("metadata document type"));
         }
         if !raw.belongs_to(pool) {
-            return Err(triergon_core::Error::ForeignPool);
+            return Err(Error::ForeignPool);
         }
         u32::try_from(raw.len()).map_err(|_| Error::Policy("metadata offset space"))?;
         let end = raw.len();
@@ -866,7 +866,7 @@ impl DocumentJob {
                         attachment_bytes: self.attachment_bytes,
                         source_offset: self.source_offset,
                         _pool: self.pool.clone(),
-                        _owner_charge: charge,
+                        owner_charge: charge,
                     };
                     self.result = Some(SharedDocument(Arc::new(document)));
                     self.phase = Phase::Done;
@@ -1123,7 +1123,7 @@ impl CatalogueJob {
         pool: &Budget,
     ) -> Result<Self> {
         if !raw.belongs_to(pool) {
-            return Err(triergon_core::Error::ForeignPool);
+            return Err(Error::ForeignPool);
         }
         Ok(Self {
             kind,
@@ -1154,7 +1154,7 @@ impl CatalogueJob {
             ));
         }
         if !catalogue.pool.same_pool(&self.pool) {
-            return Err(triergon_core::Error::ForeignPool);
+            return Err(Error::ForeignPool);
         }
         let result = self.advance(catalogue, work, cancel);
         match result {
@@ -1342,7 +1342,7 @@ impl CatalogueJob {
         self.job = Some(DocumentJob::new(
             self.kind,
             self.raw.clone(),
-            crate::metadata::typed_document::DocumentLimits {
+            DocumentLimits {
                 node_limit: nodes,
                 depth_limit: self.limits.metadata_depth,
                 storage_limit: storage,
@@ -1364,7 +1364,7 @@ impl SharedDocument {
         self.nodes
             .capacity()
             .checked_mul(size_of::<Node>())
-            .and_then(|bytes| bytes.checked_add(self._owner_charge.bytes()))
+            .and_then(|bytes| bytes.checked_add(self.owner_charge.bytes()))
             .ok_or(Error::Overflow)
     }
 }

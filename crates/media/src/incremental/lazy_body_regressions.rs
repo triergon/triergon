@@ -149,7 +149,7 @@ fn lazy_body_empty_freeze_transport_wins_cancel_and_reset_rejects_old_generation
     let mut zero = WorkBudget::new(0);
     assert!(matches!(
         reader.step(&mut zero, &AtomicBool::new(true)),
-        Err(triergon_core::Error::Transport)
+        Err(Error::Transport)
     ));
     assert_eq!(zero.spent(), 0);
     let next = reader.reset().unwrap();

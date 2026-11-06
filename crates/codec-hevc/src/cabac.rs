@@ -519,7 +519,7 @@ mod bench {
 
     /// Development micro-benchmark.
     #[test]
-    #[ignore]
+    #[ignore = "timing probe; run on demand with --release"]
     fn bench_cabac() {
         let mut seed = 99u32;
         let data: Vec<u8> = (0..1 << 20)

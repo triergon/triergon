@@ -132,7 +132,7 @@ impl<'a, S: Source> Mp4RangePlayer<'a, S> {
     /// leaves the active generation and any pending input usable until apply.
     pub fn prepare_seek(&self, request: Mp4NativeSeekRequest) -> Result<Mp4RangeSeekJob<'a>> {
         let Some(Engine::Mp4(engine)) = self.player.engine.as_ref() else {
-            return Err(crate::Error::Closed);
+            return Err(Error::Closed);
         };
         let selected = engine.plan.track(request.video)?;
         if selected.snapshot.handler != *b"vide"
@@ -256,11 +256,7 @@ impl<'a> Mp4RangeSeekJob<'a> {
         result
     }
 
-    fn poll_inner(
-        &mut self,
-        work: &mut WorkBudget,
-        cancel: &AtomicBool,
-    ) -> triergon_core::Result<bool> {
+    fn poll_inner(&mut self, work: &mut WorkBudget, cancel: &AtomicBool) -> Result<bool> {
         if let Some(checked) = &mut self.checked {
             if checked.poll(work, cancel)? == BuildStatus::Yield || !work.try_charge(1) {
                 return Ok(false);

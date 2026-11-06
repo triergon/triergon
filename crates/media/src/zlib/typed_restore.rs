@@ -88,7 +88,7 @@ impl CopyJob {
         pool: &Budget,
     ) -> Result<Self> {
         if !prefix.belongs_to(pool) || !input.belongs_to(pool) {
-            return Err(triergon_core::Error::ForeignPool);
+            return Err(Error::ForeignPool);
         }
         let size = prefix
             .len()
@@ -407,7 +407,7 @@ impl RestoreJob {
         pool: &Budget,
     ) -> Result<Self> {
         if !source.belongs_to(pool) {
-            return Err(triergon_core::Error::ForeignPool);
+            return Err(Error::ForeignPool);
         }
         if plan.count > plan.steps.len() {
             return Err(Error::Policy("content encoding count"));

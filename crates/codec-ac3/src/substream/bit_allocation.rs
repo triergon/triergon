@@ -71,7 +71,7 @@ impl Substream {
                 }
                 self.csnroffst = self.frmcsnroffst;
                 let f = self.frmfsnroffst;
-                for v in self.fsnroffst.iter_mut() {
+                for v in &mut self.fsnroffst {
                     if *v != f {
                         all_dirty = all_dirty.max(1);
                     }
@@ -174,7 +174,7 @@ impl Substream {
             mode[ch] = br.get(2) as u8;
         }
         let order: [usize; 6] = [CPL, 0, 1, 2, 3, 4];
-        for &ch in order.iter() {
+        for &ch in &order {
             if ch == CPL && !cplinu {
                 continue;
             }
@@ -205,7 +205,7 @@ impl Substream {
             && self.coded_channels().all(|ch| self.fsnroffst[ch] == 0)
             && (!cplinu || self.fsnroffst[CPL] == 0);
         let chans: [usize; 7] = [0, 1, 2, 3, 4, CPL, LFE];
-        for &ch in chans.iter() {
+        for &ch in &chans {
             let present = if ch == CPL {
                 cplinu
             } else if ch == LFE {

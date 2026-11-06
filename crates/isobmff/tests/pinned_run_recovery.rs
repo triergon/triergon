@@ -49,7 +49,7 @@ fn clock_prefix(table: &Mov9RunRecoveryTable) -> Vec<(u64, i128, i128)> {
     loop {
         match cursor.poll(&mut WorkBudget::new(1)).unwrap() {
             SampleStep::Sample(v) => {
-                rows.push((v.ordinal, v.dts_ticks.unwrap(), v.cts_ticks.unwrap()))
+                rows.push((v.ordinal, v.dts_ticks.unwrap(), v.cts_ticks.unwrap()));
             }
             SampleStep::Yield => {}
             SampleStep::End => break,

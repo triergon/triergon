@@ -32,7 +32,7 @@ pub(crate) enum Item {
 }
 
 // Physical value ceiling, including enum layout. This is not a heap/RSS bound.
-const _: () = assert!(std::mem::size_of::<Item>() <= 272);
+const _: () = assert!(size_of::<Item>() <= 272);
 
 #[derive(Debug)]
 pub(crate) struct Document {

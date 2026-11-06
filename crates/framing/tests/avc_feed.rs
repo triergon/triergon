@@ -69,7 +69,10 @@ fn borrowed_avc_output_preserves_every_nal_and_prepends_parameters_only_for_idr(
             panic!("expected a bounded AVC access unit");
         };
         let chunks: Vec<_> = unit.segments().collect();
-        assert!(std::ptr::eq(chunks.last().copied().unwrap(), &sample[9..]));
+        assert!(std::ptr::eq(
+            chunks.last().copied().unwrap(),
+            &raw const sample[9..]
+        ));
         assert_eq!(unit.is_idr(), nal == 0x65);
         let mut expected = Vec::new();
         if nal == 0x65 {

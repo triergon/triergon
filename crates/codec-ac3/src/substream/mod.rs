@@ -258,7 +258,7 @@ pub(crate) struct BlockSink<'a> {
 
 /// Speaker/channel description of a coded channel, used by the layout logic.
 pub(crate) fn acmod_channels(acmod: u8) -> &'static [crate::Speaker] {
-    use crate::Speaker::*;
+    use crate::Speaker::{BackCenter, FrontCenter, FrontLeft, FrontRight, SideLeft, SideRight};
     match acmod {
         0 => &[FrontLeft, FrontRight],
         1 => &[FrontCenter],
@@ -355,6 +355,7 @@ impl Substream {
             cplfleak: 0,
             cplsleak: 0,
             dba: [Dba::default(); NCH],
+            #[allow(clippy::large_stack_arrays)] // Built once per decoder.
             aht_coef: Box::new([[[0.0; 256]; 6]; NCH]),
             icoef: [[0; 256]; NCH],
             coef: [[0.0; 256]; NCH],
@@ -365,7 +366,7 @@ impl Substream {
     }
 
     pub(crate) fn reset(&mut self) {
-        for d in self.delay.iter_mut() {
+        for d in &mut self.delay {
             d.fill(0.0);
         }
         self.config_key = u32::MAX;

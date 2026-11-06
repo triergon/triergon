@@ -8,7 +8,7 @@ use crate::{
     },
 };
 
-fn parse(raw: &[u8], quantum: u64) -> crate::Result<(SharedDocument, u64)> {
+fn parse(raw: &[u8], quantum: u64) -> Result<(SharedDocument, u64)> {
     let pool = Budget::new(2 * 1024 * 1024)?;
     let source = SharedBytes::copy_from_slice(&pool, raw)?;
     let mut job = DocumentJob::new(

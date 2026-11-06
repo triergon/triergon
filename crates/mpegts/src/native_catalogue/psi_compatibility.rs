@@ -744,7 +744,7 @@ impl NativeCatalogueV1 {
             NativePsiCompatibilityV1::PmtNonzeroSectionV1 => {
                 Error::Invalid("PMT single-section program identity")
             }
-            _ => {
+            NativePsiCompatibilityV1::CurrentPatSectionBeforeWholeTableV1 => {
                 return Err(Error::Invalid(
                     "PSI compatibility rejection policy is not PMT",
                 ));

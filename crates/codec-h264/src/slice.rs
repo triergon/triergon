@@ -77,7 +77,7 @@ fn inval(what: &'static str) -> DecodeError {
 }
 
 /// Parse only the fields needed to find the PPS (first_mb_in_slice, slice_type, pps_id).
-pub(crate) fn peek_pps_id(r: &mut BitReader) -> R<(u32, u32, u32)> {
+pub(crate) fn peek_pps_id(r: &mut BitReader<'_>) -> R<(u32, u32, u32)> {
     let first_mb = r.ue();
     let st = r.ue();
     let pps_id = r.ue();
@@ -89,7 +89,7 @@ pub(crate) fn peek_pps_id(r: &mut BitReader) -> R<(u32, u32, u32)> {
 
 #[allow(clippy::needless_range_loop)] // indexed form over parallel fixed-size arrays (mirrors the spec loops, keeps the hot loop vectorisable)
 pub(crate) fn parse_slice_header(
-    r: &mut BitReader,
+    r: &mut BitReader<'_>,
     nal: NalHeader,
     sps: &Sps,
     pps: &Pps,
@@ -220,7 +220,7 @@ pub(crate) fn parse_slice_header(
                     entry.luma = Some((lw, lo));
                 }
                 if chroma && r.flag() {
-                    for c in entry.chroma.iter_mut() {
+                    for c in &mut entry.chroma {
                         let cw = r.se();
                         let co = r.se();
                         if !(-128..=127).contains(&cw) || !(-128..=127).contains(&co) {

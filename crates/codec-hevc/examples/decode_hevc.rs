@@ -113,7 +113,7 @@ fn main() {
             consumed += au.len();
             if let Err(e) = dec.send(au, Some(au_index as i64)) {
                 errors += 1;
-                eprintln!("{{\"error\":\"{}\",\"au\":{}}}", e, au_index);
+                eprintln!("{{\"error\":\"{e}\",\"au\":{au_index}}}");
             }
             au_index += 1;
             while let Some(p) = dec.receive() {

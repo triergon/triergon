@@ -94,10 +94,26 @@ fn sample_row(sample: &Sample) -> Vec<String> {
         value(sample.dts_ticks),
         value(sample.cts_ticks),
         sample.duration_ticks.to_string(),
-        value(sample.composition_offset.map(|v| v.version())),
-        value(sample.composition_offset.map(|v| v.raw_bits())),
-        value(sample.composition_offset.map(|v| v.ticks())),
-        value(sample.composition_offset.and_then(|v| v.signed_value())),
+        value(
+            sample
+                .composition_offset
+                .map(triergon_isobmff::CompositionOffset::version),
+        ),
+        value(
+            sample
+                .composition_offset
+                .map(triergon_isobmff::CompositionOffset::raw_bits),
+        ),
+        value(
+            sample
+                .composition_offset
+                .map(triergon_isobmff::CompositionOffset::ticks),
+        ),
+        value(
+            sample
+                .composition_offset
+                .and_then(triergon_isobmff::CompositionOffset::signed_value),
+        ),
         value(sample.fragment_flags),
         sample.is_container_sync().to_string(),
     ]

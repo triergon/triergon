@@ -214,9 +214,10 @@ pub fn fetch(root: &Path, name: &str, into: Option<&Path>) -> Result<String, Str
     if listed.is_some_and(|l| l.len() != entries.len()) {
         return Err(format!("{name}: archive and index list different files"));
     }
-    let target = into
-        .map(Path::to_path_buf)
-        .unwrap_or_else(|| root.join(".research/evidence").join(name));
+    let target = into.map_or_else(
+        || root.join(".research/evidence").join(name),
+        Path::to_path_buf,
+    );
     for (at, entry) in entries.iter().enumerate() {
         let relative = entry.path.as_str();
         if let Some(file) = listed.map(|l| &l[at]) {

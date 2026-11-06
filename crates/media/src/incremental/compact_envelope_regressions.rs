@@ -294,7 +294,7 @@ fn first_leaf(reader: &mut ElementReader, payload: &[u8]) -> ElementHeader {
             .unwrap()
         {
             CompactEnvelopeProgress::Header(header) => {
-                reader.admit_typed_leaf(header, None, false).unwrap()
+                reader.admit_typed_leaf(header, None, false).unwrap();
             }
             CompactEnvelopeProgress::Step(ParseStep::Event(CompactElementEvent::Leaf(header))) => {
                 return header;
@@ -374,7 +374,7 @@ fn compact_envelope_transport_at_ready_precedes_cancel_and_reset_changes_generat
         .unwrap();
     assert!(matches!(
         reader.step_typed_compact(&mut WorkBudget::new(0), &AtomicBool::new(true)),
-        Err(triergon_core::Error::Transport)
+        Err(Error::Transport)
     ));
     assert_eq!(pool.used(), held);
     let next = reader.reset().unwrap();
@@ -413,7 +413,7 @@ fn compact_envelope_freeze_pressure_retains_builder_and_retries_once() {
             .unwrap()
         {
             CompactEnvelopeProgress::Header(header) => {
-                reader.admit_typed_leaf(header, None, false).unwrap()
+                reader.admit_typed_leaf(header, None, false).unwrap();
             }
             CompactEnvelopeProgress::Step(ParseStep::Yield) => (),
             other => panic!("unexpected before freeze {other:?}"),
@@ -508,7 +508,7 @@ fn compact_envelope_shared_hidden_parent_is_charged_once_through_reset_and_alias
             .unwrap()
         {
             CompactEnvelopeProgress::Header(header) => {
-                reader.admit_typed_leaf(header, None, false).unwrap()
+                reader.admit_typed_leaf(header, None, false).unwrap();
             }
             CompactEnvelopeProgress::Step(ParseStep::Event(CompactElementEvent::Leaf(header))) => {
                 if header.id == 0xa3 {

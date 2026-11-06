@@ -174,6 +174,7 @@ struct Tones {
     layout: ChannelLayout,
 }
 impl Tones {
+    #[allow(clippy::unnecessary_box_returns)] // The session takes a boxed decoder.
     fn new(speakers: impl IntoIterator<Item = Speaker>) -> Box<Self> {
         Box::new(Tones {
             layout: ChannelLayout::new(speakers).unwrap(),

@@ -540,7 +540,7 @@ impl<'a> MovieSourceSeekPlanner<'a> {
                             None,
                         ),
                         MoviePoint::Outside { .. } => {
-                            self.settle(MovieSeekStatus::OutsideTimeline, None, None)
+                            self.settle(MovieSeekStatus::OutsideTimeline, None, None);
                         }
                     }
                 }
@@ -574,10 +574,10 @@ impl<'a> MovieSourceSeekPlanner<'a> {
                             self.phase = Phase::InitialSeek;
                         }
                         CompositionTarget::BeforeFirst => {
-                            self.settle(MovieSeekStatus::BeforeFirstSample, None, None)
+                            self.settle(MovieSeekStatus::BeforeFirstSample, None, None);
                         }
                         CompositionTarget::UnknownSourceTime { ordinal } => {
-                            self.settle(MovieSeekStatus::UnknownSourceTime { ordinal }, None, None)
+                            self.settle(MovieSeekStatus::UnknownSourceTime { ordinal }, None, None);
                         }
                         CompositionTarget::Ambiguous {
                             first_ordinal,

@@ -76,7 +76,7 @@ fn euc_c1_controls_are_explicit_not_cp949_alias() {
         assert_eq!(
             decode(&p, &[b, b'A'], M::ReceiverEucKrC1).unwrap(),
             format!("{}A", char::from(b)).as_bytes()
-        )
+        );
     }
     assert!(decode(&p, &[0x81, 0x41], M::EucKr).is_err());
     assert_eq!(
@@ -390,7 +390,7 @@ fn pressure_retry_never_consumes_unbudgeted_work_or_discards_source() {
         let mut work = WorkBudget::new(0);
         assert_eq!(j.poll(&mut work, &c).unwrap(), PacketStatus::Pending);
         assert_eq!(work.remaining(), 0);
-        assert_eq!(p.used(), used)
+        assert_eq!(p.used(), used);
     }
     drop(held);
     for _ in 0..1000 {
@@ -453,38 +453,35 @@ fn original74_literal_native_payloads_and_refusals_keep_physical_geometry() {
                     assert_eq!(v.visible().unwrap(), *expected, "{id}");
                 }
                 if q == 1 {
-                    counts[0] += 1
+                    counts[0] += 1;
                 }
             } else if !available {
                 assert_eq!(v.outcome(), Outcome::UnsupportedLabel, "{id}");
                 if q == 1 {
-                    counts[1] += 1
+                    counts[1] += 1;
                 }
             } else if raw.is_empty() {
                 assert_eq!(v.outcome(), Outcome::Converted, "{id}");
                 assert_eq!(v.visible(), Some(b"".as_slice()));
                 assert_eq!(v.text(), None);
                 if q == 1 {
-                    counts[2] += 1
+                    counts[2] += 1;
                 }
             } else {
                 assert!(matches!(v.outcome(), Outcome::ConversionRefused(_)), "{id}");
                 if q == 1 {
-                    counts[3] += 1
+                    counts[3] += 1;
                 }
             }
             println!(
                 "receiver-row {{\"id\":\"{id}\",\"quantum\":{q},\"source_hex\":\"{}\",\"full_utf8_hex\":{},\"visible_hex\":{},\"text_hex\":{},\"outcome\":\"{}\"}}",
                 hex(raw),
                 v.converted()
-                    .map(|c| format!("\"{}\"", hex(c.utf8.as_ref())))
-                    .unwrap_or("null".into()),
+                    .map_or("null".into(), |c| format!("\"{}\"", hex(c.utf8.as_ref()))),
                 v.visible()
-                    .map(|b| format!("\"{}\"", hex(b)))
-                    .unwrap_or("null".into()),
+                    .map_or("null".into(), |b| format!("\"{}\"", hex(b))),
                 v.text()
-                    .map(|b| format!("\"{}\"", hex(b)))
-                    .unwrap_or("null".into()),
+                    .map_or("null".into(), |b| format!("\"{}\"", hex(b))),
                 format!("{:?}", v.outcome())
                     .replace('\\', "\\\\")
                     .replace('"', "\\\"")
@@ -573,7 +570,7 @@ fn receiver_v2_adds_primary_a2e8_without_upgrading_strict_or_v1() {
         b" euc-kr",
         b"euc-kr\0",
     ] {
-        assert!(receiver_charset_v2(label).is_err())
+        assert!(receiver_charset_v2(label).is_err());
     }
 }
 #[test]

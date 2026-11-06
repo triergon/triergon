@@ -6,6 +6,15 @@
 //! [`ChannelLayout`] of [`Speaker`]s in the documented [channel order](layout).
 //! Sessions and workers drive decoders only through these traits.
 #![forbid(unsafe_code)]
+#![warn(
+    missing_debug_implementations,
+    unreachable_pub,
+    clippy::print_stdout,
+    clippy::print_stderr,
+    clippy::unwrap_used,
+    clippy::expect_used
+)]
+// Pending: `missing_docs`.
 
 pub mod layout;
 

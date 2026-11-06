@@ -93,7 +93,10 @@ impl DecodeClock {
             return Err(error);
         }
         let native = timing.ffmpeg9()?;
-        let pts_ns = native.pts.map(|pts| pts.rounded_ns()).transpose()?;
+        let pts_ns = native
+            .pts
+            .map(triergon_matroska::timing::ExactTime::rounded_ns)
+            .transpose()?;
         let duration_ns = match native.duration {
             Some(duration) => Some(duration.rounded_duration_ns()?),
             None => fallback_duration(timing.scale_ns),
@@ -107,10 +110,7 @@ impl DecodeClock {
         })
     }
 
-    fn validate_picture<'a>(
-        &self,
-        nals: impl Iterator<Item = &'a [u8]>,
-    ) -> triergon_core::Result<()> {
+    fn validate_picture<'a>(&self, nals: impl Iterator<Item = &'a [u8]>) -> Result<()> {
         let mut picture = false;
         for (index, nal) in nals.enumerate() {
             if index == 128 {
@@ -149,9 +149,7 @@ impl DecodeClock {
     }
 }
 
-pub(super) fn avc_chain<'a>(
-    nals: impl Iterator<Item = &'a [u8]>,
-) -> triergon_core::Result<(u8, u8)> {
+pub(super) fn avc_chain<'a>(nals: impl Iterator<Item = &'a [u8]>) -> Result<(u8, u8)> {
     let mut sps = None;
     let mut pps = None;
     for nal in nals {
@@ -180,14 +178,14 @@ pub(super) fn picture_nal(
     codec: Codec,
     nal: &[u8],
     reorders: bool,
-) -> triergon_core::Result<Option<(bool, bool, u8)>> {
+) -> Result<Option<(bool, bool, u8)>> {
     match NalHeader::parse(codec, nal)? {
         NalHeader::Avc {
             nal_unit_type: kind @ (1 | 5),
             ..
         } => {
             let (address, slice_type, pps) = avc::slice_picture(&nal[1..])?;
-            if !matches!(slice_type, 0 | 2) && !(reorders && slice_type == 1) {
+            if !(matches!(slice_type, 0 | 2) || reorders && slice_type == 1) {
                 return Err(Error::Unsupported("AVC clock slice type"));
             }
             Ok(Some((address == 0, kind == 5, pps)))

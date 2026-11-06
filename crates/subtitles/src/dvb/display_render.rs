@@ -125,16 +125,15 @@ impl Renderer {
         clut: u8,
         work: &mut DecodeWork<'_>,
     ) -> Result<bool> {
-        let index = match self.family {
-            Some(index) => index,
-            None => {
-                let index = match state.family_index(clut)? {
-                    Some(index) => index,
-                    None => state.ensure_family(state.service.composition_page, clut)?,
-                };
-                self.family = Some(index);
-                index
-            }
+        let index = if let Some(index) = self.family {
+            index
+        } else {
+            let index = match state.family_index(clut)? {
+                Some(index) => index,
+                None => state.ensure_family(state.service.composition_page, clut)?,
+            };
+            self.family = Some(index);
+            index
         };
         state.init_family(index, &mut self.credit, work)
     }

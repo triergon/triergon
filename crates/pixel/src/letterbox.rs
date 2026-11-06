@@ -12,18 +12,18 @@
 //!   offsets included); padding is opaque black.
 //! * Same-size 8-bit pictures take a direct converter: luma at 15 fractional
 //!   bits, each chroma product floored to 14 bits, one final rounding, chroma
-//!   shared by each 2x2 block ([`Direct`]).
+//!   shared by each 2x2 block (`Direct`).
 //! * Everything else (any resampling, and every 10-bit picture) takes the
 //!   separable path: a horizontal pass to 15-bit intermediates (14-bit taps,
 //!   `>> (bit_depth - 1)`, clamped above at 32767), a vertical pass with
 //!   12-bit taps rounded to 8 bits, chroma resampled as its own plane to half
 //!   the fitted width and the full fitted height, then luma-domain table
-//!   offsets and one grey ramp per range ([`Conversion`]). Taps come from
-//!   [`Filter::new`].
-//! * An odd fitted width switches to the [`Wide`] stage (chroma at full
+//!   offsets and one grey ramp per range (`Conversion`). Taps come from
+//!   `Filter::new`.
+//! * An odd fitted width switches to the `Wide` stage (chroma at full
 //!   width, 13-bit coefficients, wrapping 32-bit sum).
 //! * The picture is first widened by the part of a left crop the reference
-//!   decoder keeps for alignment ([`reference_crop`]).
+//!   decoder keeps for alignment (`reference_crop`).
 //!
 //! Tap weights use the fixed-point bicubic stages of the selected receiver
 //! profile. The tap and complete picture comparisons are separate checks.
@@ -690,7 +690,7 @@ fn plane_layout(plane: &Plane<'_>) -> (usize, usize) {
     }
 }
 
-fn shifted<'a>(plane: Plane<'a>, by: usize) -> Plane<'a> {
+fn shifted(plane: Plane<'_>, by: usize) -> Plane<'_> {
     match plane {
         Plane::U8 {
             data,

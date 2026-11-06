@@ -291,7 +291,7 @@ fn selected_ts_service_reaches_the_dvb_renderer_with_source_bytes_and_clocks() {
                             })
                         );
                         let region = picture.rectangles().next().unwrap();
-                        assert!(std::ptr::eq(region, &event.regions()[0]));
+                        assert!(std::ptr::eq(region, &raw const event.regions()[0]));
                         assert_eq!(region.plane.pixels.as_ref(), indices);
                         assert!(region.palette.native_d32.is_some());
                         let (_, timing) = event

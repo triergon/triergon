@@ -272,7 +272,7 @@ impl PacketConfig for NalPacketConfiguration {
         self.hevc_record()?
             .arrays()
             .get(index)
-            .map(|a| a.declared_nal_type())
+            .map(super::hevc_config::HvcConfigArray::declared_nal_type)
     }
     fn config_nal(&self, index: usize) -> Option<ConfigNal<'_>> {
         if let Some(c) = self.avc_record() {
@@ -394,8 +394,11 @@ impl PacketConfig for NalPacketViewConfiguration {
     }
     fn config_nal_count(&self) -> usize {
         self.avc_view()
-            .map(|c| c.nal_count())
-            .or_else(|| self.hevc_view().map(|c| c.nal_count()))
+            .map(super::avc_config::AvcConfigurationView::nal_count)
+            .or_else(|| {
+                self.hevc_view()
+                    .map(super::hevc_config::HvcConfigurationView::nal_count)
+            })
             .unwrap_or(0)
     }
 }

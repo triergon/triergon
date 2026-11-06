@@ -407,7 +407,7 @@ impl Inflater {
     #[inline(always)]
     pub fn new(source: SharedBytes, limits: InflateLimits, pool: &Budget) -> Result<Self> {
         if !source.belongs_to(pool) {
-            return Err(triergon_core::Error::ForeignPool);
+            return Err(Error::ForeignPool);
         }
         let limit = limits
             .output_bytes
@@ -510,9 +510,7 @@ impl State {
             if target > needed
                 && matches!(
                     error,
-                    triergon_core::Error::Backpressure { .. }
-                        | triergon_core::Error::Limit { .. }
-                        | triergon_core::Error::Overflow
+                    Error::Backpressure { .. } | Error::Limit { .. } | Error::Overflow
                 )
             {
                 buffer.try_reserve_exact(needed)
@@ -967,7 +965,7 @@ impl State {
                     }
                 }
                 Phase::Repeat { value, remaining } => {
-                    self.repeat_lengths(value, remaining, work)?
+                    self.repeat_lengths(value, remaining, work)?;
                 }
                 Phase::Symbol => self.symbol(bits, work, cancel)?,
                 Phase::Literal(value) => {

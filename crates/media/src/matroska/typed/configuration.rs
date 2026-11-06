@@ -12,7 +12,7 @@ use triergon_core::{Budget, BudgetVec, Bytes, Reservation, WorkBudget};
 struct Data {
     tracks: BudgetVec<Track>,
     pool: Budget,
-    _charge: Reservation,
+    charge: Reservation,
     webm_vp9_t35: bool,
 }
 /// Opaque charged snapshot. The private Arc cannot be weakened by callers.
@@ -217,7 +217,7 @@ impl ConfigurationJob {
             .reserve(size_of::<Data>() + 2 * size_of::<usize>())
         {
             Ok(charge) => charge,
-            Err(triergon_core::Error::Backpressure {
+            Err(Error::Backpressure {
                 requested,
                 available,
             }) => {
@@ -235,7 +235,7 @@ impl ConfigurationJob {
         let data = Arc::new(Data {
             tracks,
             pool: self.pool.clone(),
-            _charge: charge,
+            charge,
             webm_vp9_t35: self.webm_vp9_t35,
         });
         let result = Configuration {
@@ -258,7 +258,7 @@ impl Configuration {
             .tracks
             .capacity()
             .checked_mul(size_of::<Track>())
-            .and_then(|bytes| bytes.checked_add(self.data._charge.bytes()))
+            .and_then(|bytes| bytes.checked_add(self.data.charge.bytes()))
             .ok_or(Error::Overflow)
     }
 }
@@ -304,7 +304,7 @@ pub struct Initialization<'a> {
 /// a decoder/native packet-side-data layout from the initial CodecPrivate.
 #[derive(Clone, Debug)]
 pub struct CodecState {
-    data: crate::storage::SharedBytes,
+    data: SharedBytes,
     position: Option<super::side_data::SourcePosition>,
 }
 impl CodecState {
@@ -321,7 +321,7 @@ impl CodecState {
 #[derive(Debug)]
 struct StateData {
     entries: BudgetVec<Option<CodecState>>,
-    _charge: Reservation,
+    charge: Reservation,
 }
 #[derive(Clone, Debug)]
 pub(crate) struct CodecStates(Arc<StateData>);
@@ -334,7 +334,7 @@ impl CodecStates {
             .entries
             .capacity()
             .checked_mul(size_of::<Option<CodecState>>())
-            .and_then(|n| n.checked_add(self.0._charge.bytes()))
+            .and_then(|n| n.checked_add(self.0.charge.bytes()))
             .ok_or(Error::Overflow)
     }
 }
@@ -353,7 +353,7 @@ impl StateCopyJob {
         let state = group.codec_state().required("missing CodecState source")?;
         Ok(Self {
             copy: crate::zlib::typed_restore::CopyJob::new(
-                crate::storage::SharedBytes::default(),
+                SharedBytes::default(),
                 state.owner()?,
                 limit,
                 pool,
@@ -408,7 +408,7 @@ impl StateChangeJob {
                 .as_ref()
                 .is_some_and(|state| !state.data.belongs_to(pool))
         {
-            return Err(triergon_core::Error::ForeignPool);
+            return Err(Error::ForeignPool);
         }
         if track >= base.tracks().len() {
             return Err(Error::Invalid("unknown state track"));
@@ -495,10 +495,7 @@ impl StateChangeJob {
                 .pool
                 .reserve(size_of::<StateData>() + 2 * size_of::<usize>())?;
             let entries = self.entries.take().required("missing state arena")?;
-            let states = CodecStates(Arc::new(StateData {
-                entries,
-                _charge: charge,
-            }));
+            let states = CodecStates(Arc::new(StateData { entries, charge }));
             let result = Configuration {
                 data: self.base.data.clone(),
                 generation: self.base.generation,

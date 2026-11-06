@@ -183,7 +183,7 @@ fn run(raw: &[u8], quantum: u64, chunk: usize, shared: bool) -> (Vec<Vec<u8>>, O
             Ok(Step::NeedInput(q)) => format!("need:{}/{}", q.offset, q.maximum),
             Ok(Step::Yield) => "yield".into(),
             Ok(Step::End(_)) => "finished".into(),
-            Ok(Step::Backpressure(triergon_core::Backpressure {
+            Ok(Step::Backpressure(Backpressure {
                 requested,
                 available,
             })) => format!("pressure:{requested}/{available}"),
@@ -305,7 +305,7 @@ fn simple_direct_ready_cancel_transport_reset_and_retained_parent() {
                     break;
                 }
                 x => panic!("{x:?}"),
-            };
+            }
             total += work.spent();
         }
         assert!(ready);
@@ -319,7 +319,7 @@ fn simple_direct_ready_cancel_transport_reset_and_retained_parent() {
         let mut work = WorkBudget::new(0);
         let answer = r.step(&mut work, &AtomicBool::new(true));
         if transport {
-            assert!(matches!(answer, Err(triergon_core::Error::Transport)));
+            assert!(matches!(answer, Err(Error::Transport)));
         } else {
             assert!(matches!(answer, Err(Error::Cancelled)));
         }

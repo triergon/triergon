@@ -102,7 +102,7 @@ mod tests {
 
     /// Timing probe (development only): `cargo test --release -- --ignored qmf_speed --nocapture`.
     #[test]
-    #[ignore]
+    #[ignore = "timing probe; run on demand with --release"]
     fn qmf_speed() {
         for (proto, n) in [
             (&crate::tables::QMF_NONPERFECT[..], 32usize),

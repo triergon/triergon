@@ -38,7 +38,7 @@ use ts::psi::{DescriptorNamespace, ProgramMap};
 pub struct Mp4Packet {
     /// Explicit native read boundary, independent of the full Source stream.
     /// Later Source packets remain present with `native == None`.
-    pub native_front_read_boundary_v1: Option<triergon_isobmff::Mov9FrontReadBoundaryV1>,
+    pub native_front_read_boundary_v1: Option<Mov9FrontReadBoundaryV1>,
     pub source: SourcePacket,
     pub configuration: Mp4Configuration,
     pub native: Option<Mov9PacketOccurrence>,
@@ -171,7 +171,7 @@ pub(crate) enum Mp4RangeLanding<'a> {
 pub struct Mp4Engine {
     progressive: Option<crate::progressive::ProgressiveState>,
     replay_media: Option<PendingMedia>,
-    native_boundary_observed: Option<triergon_isobmff::Mov9FrontReadBoundaryV1>,
+    native_boundary_observed: Option<Mov9FrontReadBoundaryV1>,
     native_empty_run: Option<(Mp4NativeEmptyPacket, u32)>,
     native_recovery_end: bool,
     pub(crate) input: InputCursor,
@@ -1572,7 +1572,7 @@ impl Mp4Engine {
     }
 }
 impl TsEngine {
-    fn discover_tracks(&self, map: &ProgramMap) -> triergon_core::Result<TsNativeTracks> {
+    fn discover_tracks(&self, map: &ProgramMap) -> Result<TsNativeTracks> {
         let mut selections = map.streams.as_slice().iter().filter_map(|stream| {
             let carriage = match stream.stream_type {
                 0x1b => TsNativeCarriage::Registered(NativeRegisteredCarriage::Avc),
@@ -1617,7 +1617,7 @@ impl TsEngine {
         spec: TsNativeTrackSelection,
         map: &ProgramMap,
         configuration_epoch: u64,
-    ) -> triergon_core::Result<(NativePesObserver, TsNativeCarriage)> {
+    ) -> Result<(NativePesObserver, TsNativeCarriage)> {
         let mismatch =
             Error::Unsupported("selected native carriage disagrees with accepted source PMT");
         let stream = map
@@ -1766,7 +1766,7 @@ impl TsEngine {
         &mut self,
         work: &mut WorkBudget,
         cancel: &AtomicBool,
-    ) -> triergon_core::Result<Step<TraceEvent>> {
+    ) -> Result<Step<TraceEvent>> {
         let tracks = &mut self.native_tracks;
         let active = &mut self.native_active;
         let ordinal = self.event_ordinal;
@@ -1965,7 +1965,7 @@ impl TsEngine {
                 && self
                     .native_context
                     .as_ref()
-                    .is_some_and(|context| context.is_prefix_v2())
+                    .is_some_and(triergon_mpegts::native_input::NativeInputContext::is_prefix_v2)
             {
                 self.native_prefix_failed = true;
                 for track in self.native_tracks.as_mut_slice() {
@@ -2209,7 +2209,7 @@ impl RawEvent {
                         .transpose()
                 })
                 .transpose()
-                .map(|x| x.flatten()),
+                .map(Option::flatten),
             Self::Mp4(Mp4Event::NativeShortPacket(p)) => p
                 .native
                 .native

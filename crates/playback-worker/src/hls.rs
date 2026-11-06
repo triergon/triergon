@@ -145,7 +145,9 @@ fn open_segment(pool: &Budget, raw: &Bytes, profile: HlsMediaProfile) -> Result<
                 return segment.ok_or_else(|| "missing sealed segment".into());
             }
             HlsSegmentProgress::Yield | HlsSegmentProgress::NeedInput(_) => {}
-            other => return Err(format!("unexpected preloaded source state: {other:?}").into()),
+            other @ HlsSegmentProgress::Backpressure { .. } => {
+                return Err(format!("unexpected preloaded source state: {other:?}").into());
+            }
         }
     }
     Err("segment never reached logical EOF".into())

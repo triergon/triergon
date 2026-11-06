@@ -288,7 +288,7 @@ fn independent_dac3_records_preserve_reserved_fields_and_declared_config() {
             assert_eq!(
                 fields
                     .iter()
-                    .map(|v| v.to_string())
+                    .map(ToString::to_string)
                     .collect::<Vec<_>>()
                     .join(","),
                 row[2]
@@ -485,12 +485,11 @@ fn audio_reserve_and_freeze_pressure_never_reparse_or_lose_input() {
     ));
     assert_eq!(reader.position(), input.len() as u64);
     drop(blocker);
-    let output = match reader
+    let Step::Ready(output) = reader
         .step(&mut WorkBudget::new(1), &AtomicBool::new(false))
         .unwrap()
-    {
-        Step::Ready(frame) => frame,
-        _ => panic!("frame lost at freeze retry"),
+    else {
+        panic!("frame lost at freeze retry")
     };
     assert_eq!(output.bytes().as_ref(), input.as_slice());
 }
@@ -783,12 +782,11 @@ fn audio_count_limit_preserves_previously_emitted_frame() {
             .unwrap(),
         )
         .unwrap();
-    let first = match reader
+    let Step::Ready(first) = reader
         .step(&mut WorkBudget::new(10000), &AtomicBool::new(false))
         .unwrap()
-    {
-        Step::Ready(frame) => frame,
-        _ => panic!("first frame missing"),
+    else {
+        panic!("first frame missing")
     };
     assert!(matches!(
         reader.step(&mut WorkBudget::new(10000), &AtomicBool::new(false)),

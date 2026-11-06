@@ -125,46 +125,43 @@ fn check(
             assert_eq!(row.occurrence.native.dts, api);
             assert_eq!(row.occurrence.native.pts, api);
             assert_eq!(row.occurrence.native.duration, i64::from(durations[i]));
-            match source_ticks[i] {
-                Some(source_tick) => {
-                    assert_eq!(row.occurrence.clock_origin, Mov9ClockOrigin::SourceClock);
-                    assert_eq!(
-                        row.occurrence.native.dts_field.exact_native_ticks,
-                        source_tick
-                    );
-                }
-                None => {
-                    let witness = match row.occurrence.clock_origin {
-                        Mov9ClockOrigin::PredecessorEnd(witness) => witness,
-                        other => panic!("unknown source lost explicit native witness: {other:?}"),
-                    };
-                    let previous = i.checked_sub(1).unwrap();
-                    assert_eq!(witness.predecessor_sample, samples[previous].ordinal);
-                    assert_eq!(witness.predecessor_duration_ticks, durations[previous]);
-                    assert_eq!(
-                        witness.predecessor_source_dts_known,
-                        source_ticks[previous].is_some()
-                    );
-                    assert_eq!(
-                        witness.predecessor_native_dts_ticks,
-                        rows[previous]
-                            .occurrence
-                            .native
-                            .dts_field
-                            .exact_native_ticks
-                    );
-                    assert_eq!(witness.derived_dts_ticks, i128::from(expected.1));
-                    assert_eq!(
-                        witness
-                            .predecessor_native_dts_ticks
-                            .checked_add(i128::from(durations[previous])),
-                        Some(witness.derived_dts_ticks)
-                    );
-                    assert_eq!(
-                        row.occurrence.native.dts_field.exact_native_ticks,
-                        witness.derived_dts_ticks
-                    );
-                }
+            if let Some(source_tick) = source_ticks[i] {
+                assert_eq!(row.occurrence.clock_origin, Mov9ClockOrigin::SourceClock);
+                assert_eq!(
+                    row.occurrence.native.dts_field.exact_native_ticks,
+                    source_tick
+                );
+            } else {
+                let witness = match row.occurrence.clock_origin {
+                    Mov9ClockOrigin::PredecessorEnd(witness) => witness,
+                    other => panic!("unknown source lost explicit native witness: {other:?}"),
+                };
+                let previous = i.checked_sub(1).unwrap();
+                assert_eq!(witness.predecessor_sample, samples[previous].ordinal);
+                assert_eq!(witness.predecessor_duration_ticks, durations[previous]);
+                assert_eq!(
+                    witness.predecessor_source_dts_known,
+                    source_ticks[previous].is_some()
+                );
+                assert_eq!(
+                    witness.predecessor_native_dts_ticks,
+                    rows[previous]
+                        .occurrence
+                        .native
+                        .dts_field
+                        .exact_native_ticks
+                );
+                assert_eq!(witness.derived_dts_ticks, i128::from(expected.1));
+                assert_eq!(
+                    witness
+                        .predecessor_native_dts_ticks
+                        .checked_add(i128::from(durations[previous])),
+                    Some(witness.derived_dts_ticks)
+                );
+                assert_eq!(
+                    row.occurrence.native.dts_field.exact_native_ticks,
+                    witness.derived_dts_ticks
+                );
             }
         }
         drop(cursor);

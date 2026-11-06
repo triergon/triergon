@@ -608,5 +608,5 @@ pub fn run(root: &Path, options: &Options) -> Result<i32, String> {
         && rows
             .iter()
             .all(|r| r.get("parity").and_then(|p| s(p, "status")) == Some("pass"));
-    Ok(if all_pass { 0 } else { 1 })
+    Ok(i32::from(!all_pass))
 }

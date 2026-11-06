@@ -39,7 +39,7 @@ impl ShortTermRps {
 
 /// st_ref_pic_set( stRpsIdx ). `sets` holds candidate RPSs 0..stRpsIdx-1.
 pub fn parse_st_rps(
-    r: &mut BitReader,
+    r: &mut BitReader<'_>,
     st_rps_idx: usize,
     num_short_term_ref_pic_sets: usize,
     sets: &[ShortTermRps],
@@ -179,7 +179,7 @@ impl ScalingListRaw {
         }
     }
 
-    fn parse(r: &mut BitReader) -> Result<Self> {
+    fn parse(r: &mut BitReader<'_>) -> Result<Self> {
         let mut s = ScalingListRaw::default_lists();
         for size_id in 0..4usize {
             let step = if size_id == 3 { 3 } else { 1 };
@@ -292,7 +292,7 @@ pub struct ProfileInfo {
     pub level_idc: u8,
 }
 
-fn parse_ptl(r: &mut BitReader, max_sub_layers_minus1: u32) -> Result<ProfileInfo> {
+fn parse_ptl(r: &mut BitReader<'_>, max_sub_layers_minus1: u32) -> Result<ProfileInfo> {
     let mut p = ProfileInfo {
         profile_space: r.u(2)? as u8,
         tier: r.flag()?,
@@ -371,7 +371,7 @@ const SAR_TABLE: [(u32, u32); 17] = [
     (2, 1),
 ];
 
-fn parse_sub_layer_hrd(r: &mut BitReader, cpb_cnt: u32, sub_pic: bool) -> Result<()> {
+fn parse_sub_layer_hrd(r: &mut BitReader<'_>, cpb_cnt: u32, sub_pic: bool) -> Result<()> {
     for _ in 0..cpb_cnt {
         r.ue()?;
         r.ue()?;
@@ -384,7 +384,7 @@ fn parse_sub_layer_hrd(r: &mut BitReader, cpb_cnt: u32, sub_pic: bool) -> Result
     Ok(())
 }
 
-fn parse_hrd(r: &mut BitReader, common: bool, max_sub_layers_minus1: u32) -> Result<()> {
+fn parse_hrd(r: &mut BitReader<'_>, common: bool, max_sub_layers_minus1: u32) -> Result<()> {
     let mut nal = false;
     let mut vcl = false;
     let mut sub_pic = false;
@@ -427,7 +427,7 @@ fn parse_hrd(r: &mut BitReader, common: bool, max_sub_layers_minus1: u32) -> Res
     Ok(())
 }
 
-fn parse_vui(r: &mut BitReader, max_sub_layers_minus1: u32) -> Result<Vui> {
+fn parse_vui(r: &mut BitReader<'_>, max_sub_layers_minus1: u32) -> Result<Vui> {
     let mut v = Vui {
         sar: (0, 1),
         colour_primaries: 2,
@@ -470,7 +470,7 @@ fn parse_vui(r: &mut BitReader, max_sub_layers_minus1: u32) -> Result<Vui> {
     v.field_seq_flag = r.flag()?;
     r.skip(1)?; // frame_field_info_present_flag
     if r.flag()? {
-        for e in v.default_display_window.iter_mut() {
+        for e in &mut v.default_display_window {
             *e = r.ue()?;
         }
     }
@@ -594,7 +594,7 @@ pub fn parse_sps(rbsp: &[u8]) -> Result<Sps> {
     let height = r.ue()?;
     let mut conf_win = [0u32; 4];
     if r.flag()? {
-        for c in conf_win.iter_mut() {
+        for c in &mut conf_win {
             *c = r.ue()?;
         }
     }

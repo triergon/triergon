@@ -504,7 +504,7 @@ fn source_group_owner_survives_producer_and_pool_handles() {
         let before = s.pool.used();
         (s.pool.clone(), plan, before)
     };
-    assert!(pool.used() > triergon_core::Budget::control_storage_bytes());
+    assert!(pool.used() > Budget::control_storage_bytes());
     assert!(pool.used() <= before);
     let source = selection(&plan, RecoveryKind::Roll, 2).description.unwrap();
     assert_eq!(source.distance, -1);
@@ -518,9 +518,9 @@ fn source_group_owner_survives_producer_and_pool_handles() {
         .bytes()
         .clone();
     drop(plan);
-    assert!(pool.used() > triergon_core::Budget::control_storage_bytes());
+    assert!(pool.used() > Budget::control_storage_bytes());
     drop(raw);
-    assert_eq!(pool.used(), triergon_core::Budget::control_storage_bytes());
+    assert_eq!(pool.used(), Budget::control_storage_bytes());
 }
 #[test]
 fn zero_work_does_not_charge_allocate_or_read_group_bytes() {

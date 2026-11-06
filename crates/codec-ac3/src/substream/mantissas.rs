@@ -127,7 +127,7 @@ impl Substream {
 
     fn coef_clear(&mut self) {
         let n = self.nfchans;
-        for c in self.icoef[..n].iter_mut() {
+        for c in &mut self.icoef[..n] {
             c.fill(0);
         }
         if self.cplinu {
@@ -195,7 +195,7 @@ impl Substream {
                 // No bits. FFmpeg 9.0.2 fills these DCT coefficients with uniform noise in
                 // [-0.5, 0.5) independent of dithflag (black-box).
                 if noise == NoiseMode::Normal {
-                    for xj in x.iter_mut() {
+                    for xj in &mut x {
                         *xj = rng.aht_coefficient();
                     }
                 }
@@ -226,7 +226,7 @@ impl Substream {
                 } else {
                     0
                 };
-                for xj in x.iter_mut() {
+                for xj in &mut x {
                     *xj = gaq_mantissa(br, h, m, gain_log);
                 }
             }

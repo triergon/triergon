@@ -255,11 +255,11 @@ fn external_vector(root: &Path, args: &[String]) -> ExitCode {
             match flag.as_str() {
                 "--output" => options.output = PathBuf::from(value()?),
                 "--pairs" => {
-                    options.pairs = value()?.parse().map_err(|_| "--pairs: not a number")?
+                    options.pairs = value()?.parse().map_err(|_| "--pairs: not a number")?;
                 }
                 "--iterations" => {
                     options.iterations =
-                        value()?.parse().map_err(|_| "--iterations: not a number")?
+                        value()?.parse().map_err(|_| "--iterations: not a number")?;
                 }
                 "--benchmark" => options.benchmark = true,
                 "--memory" => options.memory = true,
@@ -343,7 +343,7 @@ fn fuzz_campaign(root: &Path, args: &[String]) -> ExitCode {
                 "--maximum-output-bytes" => campaign.maximum_output_bytes = number()? as usize,
                 "--timeout-seconds" => {
                     campaign.timeout_seconds =
-                        value.parse().map_err(|_| format!("{flag}: not a number"))?
+                        value.parse().map_err(|_| format!("{flag}: not a number"))?;
                 }
                 _ => return Err(USAGE.to_owned()),
             }
@@ -391,7 +391,7 @@ fn report(root: &Path, args: &[String]) -> ExitCode {
                         "--pairs" => options.pairs = number as usize,
                         "--iterations" => {
                             options.iterations =
-                                Some(u32::try_from(number).map_err(|e| e.to_string())?)
+                                Some(u32::try_from(number).map_err(|e| e.to_string())?);
                         }
                         _ => options.seed = number,
                     }
@@ -703,6 +703,11 @@ fn check(root: &Path) -> Task {
         None,
         &["check", "--workspace", "--no-default-features", "--locked"],
     )?;
+    run(Command::new("cargo")
+        .args(["doc", "--workspace", "--no-deps", "--locked"])
+        .env("CARGO_INCREMENTAL", "0")
+        .env("RUSTDOCFLAGS", "-D warnings")
+        .current_dir(root))?;
     cargo(
         root,
         None,

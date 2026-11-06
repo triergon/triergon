@@ -7,7 +7,7 @@ fn configuration(pool: &Budget, codec: Codec, width: u8) -> NalPacketConfigurati
     let cancel = AtomicBool::new(false);
     match codec {
         Codec::Avc => {
-            let raw = [1, 66, 0, 10, 252 | (width - 1), 224, 0];
+            let raw = [1, 66, 0, 10, 0xfc | (width - 1), 224, 0];
             let mut parser = NalObservedAvcConfigParser::new(
                 pool,
                 AvcConfigSource {
@@ -54,7 +54,7 @@ fn configuration(pool: &Budget, codec: Codec, width: u8) -> NalPacketConfigurati
                 248,
                 0,
                 0,
-                12 | (width - 1),
+                0x0c | (width - 1),
                 0,
             ];
             let mut parser = NalObservedHevcConfigParser::new(

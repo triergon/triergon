@@ -413,7 +413,7 @@ fn performance_blocking_supply_preserves_canonical_exact_read_requests() {
         cursor: Cursor::new(raw),
         reads: reads.clone(),
     };
-    let mut blocking = crate::typed::BlockingReader::open(source, Limits::default()).unwrap();
+    let mut blocking = BlockingReader::open(source, Limits::default()).unwrap();
     let mut packets = 0;
     while blocking.next_packet(&cancel).unwrap().is_some() {
         packets += 1;

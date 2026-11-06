@@ -273,17 +273,13 @@ fn shared_bounded_partial_commit_transport_stays_before_cancel_and_final_unit() 
     let (mut reader, root) = pending_commit(&pool);
     let request = reader.request();
     reader
-        .fail(
-            request.source,
-            request.token,
-            triergon_core::SourceFailure::Transport,
-        )
+        .fail(request.source, request.token, SourceFailure::Transport)
         .unwrap();
     assert!(matches!(
         reader
             .envelope
             .step(&mut WorkBudget::new(1), &AtomicBool::new(true)),
-        Err(triergon_core::Error::Transport)
+        Err(Error::Transport)
     ));
     assert_eq!(root.as_ref(), b"pre\x81\0\0\x80abctail");
     drop((reader, root));

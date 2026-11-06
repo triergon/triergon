@@ -136,7 +136,7 @@ fn validate_batch_input(
     pool: &Budget,
 ) -> Result<()> {
     if !source.belongs_to(pool) || !configuration.belongs_to(pool) {
-        return Err(triergon_core::Error::ForeignPool);
+        return Err(Error::ForeignPool);
     }
     if source.len() > limits.block_bytes {
         return Err(Error::Policy("element bytes"));

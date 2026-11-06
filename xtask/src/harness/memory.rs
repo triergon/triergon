@@ -588,8 +588,7 @@ fn linux_qualification(host: &dyn Host, root: &Path, candidate: &Path, reference
             let data = linked
                 .iter()
                 .find(|(k, _)| k == role)
-                .map(|(_, v)| v.clone())
-                .unwrap_or(Value::Null);
+                .map_or(Value::Null, |(_, v)| v.clone());
             let mut targets = vec![path.clone()];
             for row in data
                 .get("libraries")
@@ -755,31 +754,30 @@ fn linux_qualification(host: &dyn Host, root: &Path, candidate: &Path, reference
                         .unwrap_or(Value::Null),
                 ),
             ]));
-            kernel_certificate = match cached(&KERNEL_CACHE, &key) {
-                Some(certificate) => certificate,
-                None => {
-                    for case in ["default", "writev", "transient"] {
-                        let arguments = if case == "default" {
-                            vec![]
-                        } else {
-                            vec![case.to_owned()]
-                        };
-                        let observed = host.observe(&probe, None, None, "rss", &arguments, true);
-                        kernel_records.push(Value::object([
-                            ("case", Value::str(case)),
-                            ("observed", observed),
-                        ]));
-                    }
-                    let certificate = linux::certify_kernel(
-                        root,
-                        &kernel_records,
-                        &profile,
-                        &observer_sha,
-                        &probe_sha,
-                    )?;
-                    store(&KERNEL_CACHE, key, certificate.clone());
-                    certificate
+            kernel_certificate = if let Some(certificate) = cached(&KERNEL_CACHE, &key) {
+                certificate
+            } else {
+                for case in ["default", "writev", "transient"] {
+                    let arguments = if case == "default" {
+                        vec![]
+                    } else {
+                        vec![case.to_owned()]
+                    };
+                    let observed = host.observe(&probe, None, None, "rss", &arguments, true);
+                    kernel_records.push(Value::object([
+                        ("case", Value::str(case)),
+                        ("observed", observed),
+                    ]));
                 }
+                let certificate = linux::certify_kernel(
+                    root,
+                    &kernel_records,
+                    &profile,
+                    &observer_sha,
+                    &probe_sha,
+                )?;
+                store(&KERNEL_CACHE, key, certificate.clone());
+                certificate
             };
             if !linux::kernel_certificate_valid(
                 root,

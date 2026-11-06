@@ -609,10 +609,8 @@ impl AacAscParser {
                         .map_err(|e| e.error)?;
                     let channels = if p.group < 3 {
                         if flag == Some(true) { 2 } else { 1 }
-                    } else if p.group == 3 {
-                        1
                     } else {
-                        0
+                        u16::from(p.group == 3)
                     };
                     p.facts.channel_count = p
                         .facts

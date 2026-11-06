@@ -175,7 +175,11 @@ pub fn allocator_symbols(listing: &str, linux: bool) -> R<Value> {
             "execve",
             "execveat",
         ]);
-        allocation.extend(extra.filter(|n| names.contains(**n)).map(|n| n.to_string()));
+        allocation.extend(
+            extra
+                .filter(|n| names.contains(**n))
+                .map(ToString::to_string),
+        );
         (raw, allocation)
     } else {
         let raw: Vec<String> = listing
@@ -369,8 +373,8 @@ fn main_elf_closure(worker: &Path, libraries: &[Value], program_headers: &str) -
         facts.insert(
             path.clone(),
             (
-                needed.iter().map(|n| n.to_string()).collect::<Vec<_>>(),
-                soname.first().map(|n| n.to_string()),
+                needed.iter().map(ToString::to_string).collect::<Vec<_>>(),
+                soname.first().map(ToString::to_string),
             ),
         );
     }

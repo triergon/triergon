@@ -1,5 +1,12 @@
 //! Shared media primitives. Experimental.
 #![forbid(unsafe_code)]
+#![warn(
+    unreachable_pub,
+    clippy::print_stdout,
+    clippy::print_stderr,
+    clippy::unwrap_used
+)]
+// Pending: `missing_docs`, `missing_debug_implementations`, `clippy::expect_used`.
 
 mod budget;
 mod bytes;

@@ -466,7 +466,7 @@ impl SemanticJob {
                         Poll::Yield => return Ok(SemanticStatus::Pending),
                         Poll::Ready(_) => {
                             self.characters =
-                                self.characters.checked_add(1).ok_or(Error::Overflow)?
+                                self.characters.checked_add(1).ok_or(Error::Overflow)?;
                         }
                         Poll::End => {
                             self.cursor = None;

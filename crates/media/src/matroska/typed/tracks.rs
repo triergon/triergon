@@ -71,7 +71,7 @@ impl TrackJob {
         pool: &Budget,
     ) -> Result<Self> {
         if !source.belongs_to(pool) {
-            return Err(triergon_core::Error::ForeignPool);
+            return Err(Error::ForeignPool);
         }
         let end = source.len();
         let out = Track {
@@ -541,7 +541,7 @@ impl TracksJob {
         revision: u64,
     ) -> Result<Self> {
         if !source.belongs_to(pool) || previous.as_ref().is_some_and(|old| !old.belongs_to(pool)) {
-            return Err(triergon_core::Error::ForeignPool);
+            return Err(Error::ForeignPool);
         }
         if source.len() > limits.metadata_bytes {
             return Err(Error::Policy("metadata"));

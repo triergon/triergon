@@ -268,19 +268,16 @@ impl SectionAssembler {
                     crc,
                 }));
             }
-            let payload = match self.payload.as_ref() {
-                Some(payload) => payload,
-                None => {
-                    return if self.ended {
-                        if length != 0 {
-                            Err(Error::Truncated)
-                        } else {
-                            Ok(AssemblyStep::Finished)
-                        }
+            let Some(payload) = self.payload.as_ref() else {
+                return if self.ended {
+                    if length != 0 {
+                        Err(Error::Truncated)
                     } else {
-                        Ok(AssemblyStep::NeedPayload)
-                    };
-                }
+                        Ok(AssemblyStep::Finished)
+                    }
+                } else {
+                    Ok(AssemblyStep::NeedPayload)
+                };
             };
             if payload.fresh_at == Some(payload.position) && !payload.fresh {
                 if length != 0 {

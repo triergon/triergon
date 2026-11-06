@@ -62,7 +62,7 @@ impl CceState {
     }
 }
 
-pub(crate) fn parse_cce(core: &mut Core, br: &mut BitReader, cfg: &CoreCfg) -> Result<usize> {
+pub(crate) fn parse_cce(core: &mut Core, br: &mut BitReader<'_>, cfg: &CoreCfg) -> Result<usize> {
     let tag = br.read(4) as u8;
     let ci = match core.cce.iter().position(|c| c.tag == tag) {
         Some(i) => i,
@@ -218,7 +218,7 @@ pub(crate) fn apply_spectral(
 
 /// Time-domain (independently switched) coupling into a target channel's output.
 pub(crate) fn apply_time(cce: &[CceState], kind: u8, tag: u8, ch: usize, out: &mut [f32]) {
-    for c in cce.iter() {
+    for c in cce {
         if !c.decoded || !c.ind_sw {
             continue;
         }
@@ -238,7 +238,7 @@ pub(crate) fn process_cces(core: &mut Core) {
         aot: core.aot,
         sf_index: core.sf_index,
     };
-    for c in core.cce.iter_mut() {
+    for c in &mut core.cce {
         if !c.decoded {
             continue;
         }

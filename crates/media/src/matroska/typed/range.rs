@@ -103,20 +103,20 @@ impl RangeLeafJob {
     }
     fn identity(&self, input: &InputCursor) -> Result<()> {
         if !self.pool.same_pool(input.budget()) {
-            return Err(triergon_core::Error::ForeignPool);
+            return Err(Error::ForeignPool);
         }
         if self.source != input.source() {
-            return Err(triergon_core::Error::SourceMismatch);
+            return Err(Error::SourceMismatch);
         }
         let current = input.token();
         if current.generation() != self.token.generation() {
-            return Err(triergon_core::Error::StaleGeneration {
+            return Err(Error::StaleGeneration {
                 expected: self.token.generation(),
                 received: current.generation(),
             });
         }
         if current.request() != self.token.request() {
-            return Err(triergon_core::Error::StaleRequest {
+            return Err(Error::StaleRequest {
                 expected: self.token.request(),
                 received: current.request(),
             });

@@ -501,8 +501,8 @@ impl NativeCatalogueV1 {
             {
                 return Err(Error::Invalid("native catalogue encoded stream mismatch"));
             }
-            if !matches!(stream.stream_type, 0x1b | 0x24)
-                && !(self.selected_carriage_v2
+            if !(matches!(stream.stream_type, 0x1b | 0x24)
+                || self.selected_carriage_v2
                     && matches!(stream.stream_type, 0x0f | 0x11 | 6 | 0x81 | 0x87))
             {
                 return Err(Error::Unsupported(
@@ -530,8 +530,8 @@ impl NativeCatalogueV1 {
                     return Err(Error::Cancelled);
                 }
                 let descriptor = descriptor?;
-                if !matches!(descriptor.tag, 0x0a | 0xee)
-                    && !(self.selected_carriage_v2
+                if !(matches!(descriptor.tag, 0x0a | 0xee)
+                    || self.selected_carriage_v2
                         && matches!(
                             codec,
                             NativeCatalogueCodecV2::Ac3 | NativeCatalogueCodecV2::Eac3

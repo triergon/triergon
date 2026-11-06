@@ -716,7 +716,7 @@ mod bench {
 
     /// Development micro-benchmark.
     #[test]
-    #[ignore]
+    #[ignore = "timing probe; run on demand with --release"]
     fn bench_deblock() {
         let mut pl = Plane::<u8>::new(256, 256, 0);
         let mut seed = 3u32;
