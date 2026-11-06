@@ -1,13 +1,4 @@
-//! In-process desktop playback sessions.
-//!
-//! The session layer owns bounded input queues, decoder lifecycle, timestamps
-//! through reordering, clock-gated publication, generations, flush/seek/stop,
-//! decoded end of stream and bounded shutdown. Decoding itself is delegated to
-//! the pure-Rust codec crates through the [`triergon_codec`] traits (the
-//! `codecs` feature provides [`video_decoder`] and [`audio_decoder`]); output
-//! devices and GPU upload stay with the caller.
-//!
-//! Nothing here spawns a process, links a native library or falls back to one.
+#![doc = include_str!("../README.md")]
 #![forbid(unsafe_code)]
 #![warn(clippy::print_stdout, clippy::print_stderr, clippy::unwrap_used)]
 // Pending: `missing_docs`, `missing_debug_implementations`, `unreachable_pub`, `clippy::expect_used`.

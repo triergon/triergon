@@ -11,6 +11,10 @@ frame at a time and receives planar `f32` in FFmpeg's native channel order.
 ```rust
 use triergon_codec_aac::{AudioFrame, Decoder, adts};
 
+// Two silent mono AAC-LC frames at 48 kHz; any ADTS stream works the same way.
+let silent = [0xff, 0xf1, 0x4c, 0x40, 0x01, 0x7f, 0xfc, 0x00, 0xc8, 0x00, 0x07];
+let stream = [silent, silent].concat();
+
 let mut dec = Decoder::new();
 let mut frame = AudioFrame::default();
 let mut pos = 0;
@@ -18,9 +22,11 @@ while let Some((at, header)) = adts::find_frame(&stream, pos) {
     let au = &stream[at..at + header.frame_length];
     dec.decode(au, &mut frame)?; // replaces `frame`'s contents
     // frame.sample_rate, frame.layout.speakers(), frame.planes[i]
+    assert_eq!((frame.sample_rate, frame.samples_per_channel), (48_000, 1024));
     pos = at + header.frame_length;
 }
 dec.reset(); // after a seek: drops overlap, prediction, PNS, SBR and PS history
+# Ok::<(), triergon_codec_aac::DecodeError>(())
 ```
 
 `examples/decode_aac.rs IN.aac OUT.f32` writes interleaved f32le and prints a JSON summary.

@@ -1,11 +1,4 @@
-//! Triergon: bounded, pure-Rust media parsing.
-//!
-//! This facade is the consumer boundary. It re-exports
-//! the shared core vocabulary, opens a source as an [`AnyReader`] chosen from
-//! its first bytes, and exposes each format crate behind its own Cargo feature.
-//! Generic code (the harness, format tests) keeps using the concrete readers.
-//!
-//! Experimental.
+#![doc = include_str!("../README.md")]
 #![forbid(unsafe_code)]
 #![warn(
     missing_debug_implementations,

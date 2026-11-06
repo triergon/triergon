@@ -1,8 +1,4 @@
-//! H.264 / AVC Annex-B video decoder written from Rec. ITU-T H.264 (08/2024).
-//!
-//! Pure safe Rust, no dependencies. Selected feature matrix: Constrained Baseline, Main and
-//! High profiles, 8-bit 4:2:0 and 4:0:0, frames, field pictures (PAFF) and MBAFF, CAVLC and
-//! CABAC. Development prototype.
+#![doc = include_str!("../README.md")]
 #![forbid(unsafe_code)]
 #![warn(
     missing_debug_implementations,

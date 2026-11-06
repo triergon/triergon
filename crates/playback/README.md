@@ -10,20 +10,40 @@ parse playlists, retry transports, decode media or render.
 ## Usage
 
 ```rust
-let source = SourceOwner::new(ByteSource::new(id, bytes, 64 * 1024)?);
+use std::sync::atomic::AtomicBool;
+use triergon_core::{Budget, Bytes, InputCursor, SourceCapabilities, SourceId, WorkBudget};
+use triergon_mpegts::{PacketFormat, ParseLimits, clock::SourceTimePolicy};
+use triergon_playback::{
+    ByteSource, Engine, Player, PlayerPolicy, Progress, Selection, io::SourceOwner,
+};
+
+# let path = concat!(env!("CARGO_MANIFEST_DIR"), "/tests/fixtures/hls/media-00.ts");
+let pool = Budget::new(64 << 20)?;
+let id = SourceId(1);
+let bytes = Bytes::copy_from_slice(&pool, &std::fs::read(path)?)?;
+let caps = SourceCapabilities { length: Some(bytes.len() as u64), random_access: true };
+let source = SourceOwner::new(ByteSource::new(id, bytes, 64 * 1024)?); // or your own `Source`
 let input = InputCursor::new(&pool, id, caps, 4096)?;
+let (program, policy) = (1, SourceTimePolicy::RelativeEpochZero);
 let engine = Engine::ts(input, PacketFormat::Ts188, program, ParseLimits::default(), policy)?;
 let mut player = Player::new(engine, source, Selection::All, PlayerPolicy::default())?;
+let cancel = AtomicBool::new(false);
+let mut packets = 0;
 loop {
-    match player.advance(&mut WorkBudget::new(4096), &cancel)? {
+    let progress = player.advance(&mut WorkBudget::new(4096), &cancel)?;
+    while let Some(out) = player.pop() {
+        if player.may_deliver(&out) && out.event().track().is_some() {
+            packets += 1; // deliver(out.event())
+        }
+    }
+    match progress {
         Progress::Ended => break,
         Progress::NeedInput(_) | Progress::Yield | Progress::Queued => {}
-        other => handle(other), // Backpressure, Paused, AwaitEntity, ...
-    }
-    while let Some(out) = player.pop() {
-        if player.may_deliver(&out) { deliver(out.event()); }
+        other => return Err(format!("{other:?}").into()), // Backpressure, Paused, AwaitEntity, ...
     }
 }
+assert!(packets > 0);
+# Ok::<(), Box<dyn std::error::Error>>(())
 ```
 
 Implement `Source` for real transports. `ByteSource` serves immutable local

@@ -16,10 +16,13 @@ RGBA in, coded YUV 4:2:0 out (the encoder input of
 use triergon_pixel::{Converter, Geometry, Orientation, Picture};
 
 let geometry = Geometry::new(960, 540)?;           // even, 2..=4094
+let rgba = vec![128u8; geometry.rgba_len()];        // the caller's frame: mid grey
 let mut picture = Picture::new(geometry);
 let mut converter = Converter::new(geometry);       // reusable scratch
 converter.convert(&rgba, Orientation::BottomUp, &mut picture)?;
 // picture.y(), cb(), cr(): coded planes, strides geometry.luma_stride() / chroma_stride()
+assert!(picture.cb().iter().chain(picture.cr()).all(|&c| c == 128)); // grey stays neutral
+# Ok::<(), triergon_pixel::Error>(())
 ```
 
 `rgba_to_yuv420(&rgba, orientation, &mut picture)` is the same conversion with its
@@ -30,11 +33,28 @@ Decoded picture in, letterboxed RGBA out:
 
 ```rust
 use triergon_pixel::letterbox::{CANVAS_BYTES, Scaler, fit};
+use triergon_pixel::{Colour, PictureView, Plane};
 
+// A 64x36 8-bit 4:2:0 picture, lent the way a decoder lends its output.
+let (luma, chroma) = (vec![235u8; 64 * 36], vec![128u8; 32 * 18]);
+let view = PictureView {
+    width: 64,
+    height: 36,
+    bit_depth: 8,
+    planes: [
+        Plane::U8 { data: &luma, stride: 64, offset: 0 },
+        Plane::U8 { data: &chroma, stride: 32, offset: 0 },
+        Plane::U8 { data: &chroma, stride: 32, offset: 0 },
+    ],
+    pts: None,
+    sar: (1, 1),
+    colour: Colour { matrix: 1, full_range: false },
+};
 let mut scaler = Scaler::default();                 // caches per-geometry filter plans
 let mut canvas = vec![0u8; CANVAS_BYTES];
-scaler.letterbox(&view, &mut canvas);               // view: PictureView from a decoder
+scaler.letterbox(&view, &mut canvas);               // writes the whole canvas
 let placed = fit(view.width, view.height);          // Fit { width, height, x, y }
+assert_eq!((placed.width, placed.height, placed.x, placed.y), (1920, 1080, 0, 0));
 ```
 
 ## Supported

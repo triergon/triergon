@@ -1,9 +1,4 @@
-//! MPEG-1 video (ISO/IEC 11172-2) encoder: I and P pictures, half-sample
-//! forward motion compensation, one slice per picture, closed GOPs
-//! with a sequence header before every I picture, and VBV-constrained rate
-//! control. Each `encode` call returns that picture's complete bytes; there
-//! is no reordering delay.
-
+#![doc = include_str!("../README.md")]
 #![forbid(unsafe_code)]
 #![warn(
     missing_debug_implementations,

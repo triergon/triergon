@@ -1,8 +1,4 @@
-//! Independent bounded ISO-derived MOV/MP4 syntax and source sample indexes.
-//!
-//! Experimental seam, not a complete demuxer.
-//! Receives charged metadata bytes and absolute coordinates from the shared core;
-//! owns no I/O, transport tokens, allocator, codec adaptation or presentation clock.
+#![doc = include_str!("../README.md")]
 #![forbid(unsafe_code)]
 #![warn(
     missing_debug_implementations,

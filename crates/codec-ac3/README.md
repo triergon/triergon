@@ -9,23 +9,26 @@ order and exports FFmpeg-compatible downmix metadata. It does not downmix or res
 ## Usage
 
 ```rust
-use triergon_codec_ac3::{AudioFrame, Decoder, access_unit_len};
+use triergon_codec_ac3::{AudioFrame, DecodeError, Decoder, access_unit_len};
 
-let mut dec = Decoder::new(); // DecoderOptions::default(): ffmpeg_compat on
-let mut frame = AudioFrame::default();
-let mut pos = 0;
-while pos < stream.len() {
-    let len = access_unit_len(&stream[pos..])?;
-    frame.clear();
-    let info = dec.decode(&stream[pos..pos + len], &mut frame)?; // appends samples
-    // info.sample_rate, info.layout, info.downmix, info.concealed
-    pos += len;
+fn decode_stream(stream: &[u8]) -> Result<(), DecodeError> {
+    let mut dec = Decoder::new(); // DecoderOptions::default(): Compat::Reference
+    let mut frame = AudioFrame::default();
+    let mut pos = 0;
+    while pos < stream.len() {
+        let len = access_unit_len(&stream[pos..])?;
+        frame.clear();
+        let info = dec.decode(&stream[pos..pos + len], &mut frame)?; // appends samples
+        // info.sample_rate, info.layout, info.downmix, info.concealed
+        pos += len;
+    }
+    Ok(())
 }
 ```
 
-`Decoder::with_options(DecoderOptions { crc, noise, ffmpeg_compat })` selects the CRC
-policy (`CrcPolicy::Report` or `Reject`), the noise mode (`NoiseMode::Normal` or `Off`)
-and FFmpeg compatibility. `examples/decode_ac3.rs` writes interleaved f32le.
+`Decoder::with_options(DecoderOptions { crc, noise, compat })` selects the CRC policy
+(`CrcPolicy::Report` or `Reject`), the noise mode (`NoiseMode::Normal` or `Off`) and the
+output conventions (`Compat::Reference`, the default, or `Compat::Specification`). `examples/decode_ac3.rs` writes interleaved f32le.
 
 ## Supported
 
@@ -49,7 +52,7 @@ Further independent programs are skipped.
 - Planes follow the triergon-codec [channel order](../codec/README.md#channel-order); 7.1 is
   FL FR FC LFE BL BR SL SR.
 - Refused with `Unsupported(Feature)`: bsid > 16, reserved fscod2 and stream type 3, and
-  (with `ffmpeg_compat`) E-AC-3 reduced sample rates. Enhanced coupling conceals the frame
+  (with `Compat::Reference`) E-AC-3 reduced sample rates. Enhanced coupling conceals the frame
   and reports `Feature::EnhancedCoupling` in `FrameInfo::concealed`; FFmpeg does the same.
 - Concealment (A/52 7.10 block repeat): a damaged block repeats the previous block for
   the rest of the frame; a truncated AC-3 frame outputs six copies of the last block; a
@@ -61,34 +64,34 @@ Further independent programs are skipped.
 - Memory: about 80 KB per active substream plus about 30 KB of tables and buffers; no
   steady-state allocation.
 
-### FFmpeg compatibility (`ffmpeg_compat`, default on)
+### FFmpeg compatibility (`Compat::Reference`, the default)
 
-The option reproduces FFmpeg 9.0.2 conventions that A/52 leaves open or that differ from
-the text:
+`Compat::Reference` reproduces FFmpeg 9.0.2 conventions that A/52 leaves open or that
+differ from the text:
 
 - Noise: bap-0 dither, AHT zero-bin fill and SPX blending noise use FFmpeg's seed-zero
   noise stream (additive lagged generator, lags 24 and 55) in the same draw order, so
   dithered output matches sample for sample. AHT zero bins are filled regardless of
-  dithflag; LFE is never dithered. Without compatibility a private xorshift generator is
-  used; `NoiseMode::Off` replaces all noise with zero.
+  dithflag; LFE is never dithered. With `Compat::Specification` a private xorshift
+  generator is used; `NoiseMode::Off` replaces all noise with zero.
 - The first block of a stream that mixes transform lengths rewrites the delay lines as
   FFmpeg does.
 - hebap 4 vector quantization (Table E4.4) decodes index `i` with row `i + 1` and index 31
   as zero.
 - A dependent substream whose rate or block count differs from the core is dropped and
-  the core is output alone (`InvalidData` with compatibility off).
-- Reading past the frame end yields zero bits (an error with compatibility off).
-- E-AC-3 reduced sample rates are refused (decoded with compatibility off).
+  the core is output alone (`InvalidData` with `Compat::Specification`).
+- Reading past the frame end yields zero bits (an error with `Compat::Specification`).
+- E-AC-3 reduced sample rates are refused (decoded with `Compat::Specification`).
 
-Independent of the option: coupling delta bit-allocation offsets count from the first
-coupling band (A/52 5.4.3.51); AC-3 bsid 9/10 shifts sdecay/fdecay right by `bsid − 8` and
-indexes the hearing threshold by `band >> (bsid − 8)`, as FFmpeg does.
+In both modes: coupling delta bit-allocation offsets count from the first coupling band
+(A/52 5.4.3.51); AC-3 bsid 9/10 shifts sdecay/fdecay right by `bsid − 8` and indexes the
+hearing threshold by `band >> (bsid − 8)`, as FFmpeg does.
 
 ## Known gaps
 
 - No oracle coverage: dual mono, 2/3-block E-AC-3 frames, `blkswe`, AHT on coupling and
   LFE channels, dependents without channel map, E-AC-3 reduced sample rates with
-  `ffmpeg_compat` off (its hearing-threshold column is a guess).
+  `Compat::Specification` (its hearing-threshold column is a guess).
 - bsid 9/10 rests on self-authored probe streams and patched content; no encoded stream
   of that kind has been compared.
 - Error concealment on corrupt mono/stereo/2.1 input can differ from FFmpeg in a few

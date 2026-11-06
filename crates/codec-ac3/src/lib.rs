@@ -1,9 +1,4 @@
-//! AC-3 (ATSC A/52:2018 main body, Annex D alternate bsi) and E-AC-3 (A/52:2018 Annex E)
-//! audio decoder. Pure safe Rust, written from the ATSC A/52:2018 specification; FFmpeg is
-//! used only as a black-box oracle for output conventions (channel order, concealment).
-//!
-//! Output is planar `f32` at full scale 1.0, planes ordered as FFmpeg's native decoder
-//! orders them (ascending FFmpeg speaker bit, see [`triergon_codec::layout`]).
+#![doc = include_str!("../README.md")]
 #![forbid(unsafe_code)]
 #![warn(
     missing_debug_implementations,

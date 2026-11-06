@@ -1,9 +1,4 @@
-//! DTS Coherent Acoustics core decoder (ETSI TS 102 114). Pure safe Rust.
-//!
-//! Input: one complete DTS core frame per call (16-bit or 14-bit word packing, big or
-//! little endian), optionally followed by the core-embedded XCh / X96 extensions that
-//! live inside the frame. Output: planar `f32` at full scale 1.0 in FFmpeg's native
-//! channel order for the stream (see [`triergon_codec::layout`]).
+#![doc = include_str!("../README.md")]
 #![forbid(unsafe_code)]
 #![warn(
     missing_debug_implementations,
