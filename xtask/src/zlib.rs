@@ -1,14 +1,41 @@
 //! zlib streams (RFC 1950/1951) byte-identical to the zlib library's output.
 //!
-//! The authored compression fixtures are pinned by hash to what zlib produces
+//! The authored compression fixtures are pinned by hash to what zlib 1.2.12 produces
 //! with `deflateInit2(level, Z_DEFLATED, 15, 8, strategy)` followed by one
 //! `deflate(Z_NO_FLUSH)` and one `deflate(Z_FINISH)` over the whole input. This
-//! module reproduces that output: the level-6 lazy matcher (hash chains, lazy
-//! evaluation, `TOO_FAR`), the block coder (heap-built Huffman trees with zlib's
-//! tie-breaking and length limiting, run-length coded tree descriptions, and the
-//! stored/fixed/dynamic choice) and the level-0 stored-block layout. Only level 0
-//! and level 6 are implemented, and the window is never slid, so inputs are
-//! limited to [`MAX_INPUT`] bytes.
+//! module reproduces that output by following zlib's own algorithms: the level-6
+//! lazy matcher (hash chains, lazy evaluation, `TOO_FAR`), the block coder
+//! (heap-built Huffman trees with zlib's tie-breaking and length limiting,
+//! run-length coded tree descriptions, the stored/fixed/dynamic choice) and the
+//! level-0 stored-block layout. Only level 0 and level 6 are implemented, and the
+//! window is never slid, so inputs are limited to [`MAX_INPUT`] bytes.
+//!
+//! This is tooling only and is never linked into a library crate.
+//!
+//! Altered source: a Rust rendering of the deflate algorithms of zlib's
+//! `deflate.c` and `trees.c`, reduced to the paths above. It is not the original
+//! software. zlib's notice follows.
+
+// Copyright (C) 1995-2022 Jean-loup Gailly and Mark Adler
+//
+// This software is provided 'as-is', without any express or implied
+// warranty.  In no event will the authors be held liable for any damages
+// arising from the use of this software.
+//
+// Permission is granted to anyone to use this software for any purpose,
+// including commercial applications, and to alter it and redistribute it
+// freely, subject to the following restrictions:
+//
+// 1. The origin of this software must not be misrepresented; you must not
+//    claim that you wrote the original software. If you use this software
+//    in a product, an acknowledgment in the product documentation would be
+//    appreciated but is not required.
+// 2. Altered source versions must be plainly marked as such, and must not be
+//    misrepresented as being the original software.
+// 3. This notice may not be removed or altered from any source distribution.
+//
+// Jean-loup Gailly        Mark Adler
+// jloup@gzip.org          madler@alumni.caltech.edu
 
 /// Largest input accepted: the matcher never slides its 32 KiB window pair.
 pub const MAX_INPUT: usize = 65_000;

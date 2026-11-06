@@ -67,3 +67,8 @@ Contributions are dual-licensed under [MIT](LICENSE-MIT) or [Apache-2.0](LICENSE
 Media fixtures and specification texts keep their own terms; record the source,
 licence and hash of any new input, and keep inputs without redistribution rights out
 of the repository.
+
+`xtask` (repository tooling, never linked into a library crate) contains a deflate
+encoder derived from zlib, under the zlib licence, and an MT19937 generator seeded as
+CPython's `random` module does, under the Mersenne Twister BSD licence and the PSF
+licence. See [xtask/THIRD-PARTY.md](xtask/THIRD-PARTY.md).
