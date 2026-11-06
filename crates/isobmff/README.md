@@ -282,6 +282,8 @@ rejects boxes extending past the source.
 - **Edits.** Source edit lists are parsed and mapped at rate one only.
   Non-unit rates and dwell edits are refused. The source view never repeats
   or shifts packets; the FFmpeg-compatible view does.
+  Range playback preserves AAC sample durations from `stts`, including
+  durations longer than one coded frame. Trim counts use the coded frame length.
 - **Seek.** Seek planners select a preceding container sync sample, record
   available and missing preroll, and validate every media range before
   publishing a plan. A sync sample is a container fact, not proof of decoder

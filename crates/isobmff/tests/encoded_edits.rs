@@ -279,6 +279,37 @@ fn range_playback_keeps_quicktime_visual_decode_order_and_signed_clocks() {
 }
 
 #[test]
+fn range_playback_preserves_long_aac_sample_durations_and_coded_trim() {
+    let original = Source::new(ORIGINAL, b"soun");
+    let stts = child(original.table.raw(), b"stts").unwrap();
+    let start = usize::try_from(stts.header().payload_range().unwrap().start).unwrap();
+    let mut raw = ORIGINAL.to_vec();
+    // Extend the second sample and shorten the final sample by the same amount.
+    for (offset, before, after) in [(20, 1016u32, 1272u32), (36, 528, 272)] {
+        let delta = &mut raw[start + offset..start + offset + 4];
+        assert_eq!(delta, &before.to_be_bytes());
+        delta.copy_from_slice(&after.to_be_bytes());
+    }
+
+    let source = Source::new(&raw, b"soun");
+    assert!(matches!(
+        source.plan(1),
+        Err(Error::Unsupported(
+            "encoded AAC source packet clock profile"
+        ))
+    ));
+    let packets = rows(&source, range_plan(&source, *b"isom").unwrap());
+    assert_eq!(packets.len(), 189);
+    assert_eq!(packets[0].1, Some([0xf0, 3, 0, 0, 0, 0, 0, 0, 0, 0]));
+    assert_eq!(packets[1].0.native.pts, Some(16));
+    assert_eq!(packets[1].0.native.duration, 1272);
+    assert_eq!(packets[1].1, None);
+    assert_eq!(packets[2].0.native.dts, Some(1288));
+    assert_eq!(packets[188].0.native.duration, 272);
+    assert_eq!(packets[188].1, Some([0, 0, 0, 0, 0xf0, 2, 0, 0, 0, 0]));
+}
+
+#[test]
 fn range_playback_keeps_dolby_packets_and_reports_the_leading_sample_skip() {
     for raw in [LEADING_AC3, LEADING_EAC3] {
         let source = Source::new(raw, b"soun");
