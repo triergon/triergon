@@ -45,10 +45,3 @@ class ColourParityTests(unittest.TestCase):
                 self.assertEqual(trace['status'],measured['status'])
                 self.assertEqual(measured['data']['digest'],scalar_trace_checksum(trace['data']))
                 self.assertEqual(measured['data']['packets'],len(trace['data']['packets']))
-
-    def test_missing_source_colour_proof_cannot_satisfy_the_gate(self):
-        from .runner import acceptance
-        contract=json.loads((ROOT/'harness/colour-slice.json').read_text())
-        row={'id':'colour-absent','profile':'colour-absent','parity':{'status':'pass','source_timing_status':'pass'}}
-        result=acceptance(contract,[row],{},'aarch64-apple-darwin',[])
-        self.assertTrue(any('complete source/native colour gate' in r for r in result['slice_reasons']))

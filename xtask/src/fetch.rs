@@ -493,6 +493,7 @@ mod tests {
         let target = dir.join("out");
         let status = rsync_command("rsync://example.invalid/x", &target, 1024)
             .env("PATH", path)
+            .stderr(std::process::Stdio::null())
             .status()
             .unwrap();
         let written = fs::metadata(&target).map_or(0, |m| m.len());

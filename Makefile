@@ -24,10 +24,10 @@ fixtures:
 	cargo xtask fixtures
 
 adapters:
-	python3 tools/build_harness.py
+	cargo xtask build-workers
 
 report:
-	python3 tools/test_media.py --fate-cache .research/fate-samples
+	cargo xtask report --fate-cache .research/fate-samples
 
 qualify:
-	python3 tools/test_media.py --benchmark --memory --fate-cache .research/fate-samples --require-acceptance
+	cargo xtask report --benchmark --memory --fate-cache .research/fate-samples --require-acceptance

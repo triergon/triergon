@@ -10,13 +10,17 @@ mod corpus;
 mod ebml;
 mod fate;
 mod fetch;
+mod harness;
 mod json;
 mod prepare;
 mod pyrandom;
 mod sha256;
+mod stats;
+mod toml;
 mod walk;
 mod zlib;
 
+use std::ffi::{OsStr, OsString};
 use std::path::{Path, PathBuf};
 use std::process::{Command, ExitCode};
 
@@ -34,10 +38,28 @@ commands:
                  build the pinned FFmpeg reference into .research/reference[-formats]
   fetch-specs    [--record] cache the specification texts and verify specs/sources.json
   fetch-vectors  cache the required external test vectors and verify their hashes
+  external-vector --output DIR [--pairs N] [--iterations N] [--benchmark] [--memory]
+                 qualify the mandatory external metadata vector through the same gates
+  fate-run       --case NAME [--demux-only]   run one supported upstream FATE case
+  trace-identities --output F [--compare F] [--candidate W]
+                 record the digest of every candidate trace over all recorded cases
+  graph          PACKAGE [FILE]...   print the provenance graph of a workspace package
+  build-workers  build the candidate and reference workers and the memory observers, and
+                 record their identity in target/harness/identity.json
+  report         [--contract F] [--manifest F] [--corpus DIR] [--output DIR] [--fate-cache DIR]
+                 [--additional-report F]... [--require-acceptance] [--require-slice-acceptance]
+                 [--benchmark] [--memory] [--pairs N] [--iterations N] [--seed N]
+                 correctness, paired runtime and memory report of the built workers for one contract
+  compare        --candidate W --reference W --input FILE --output DIR
+                 [--operation plain|seek|colour|catalogue] [--content] [--no-short-reads]
+                 compare one input across a candidate and a reference worker
   fate-inventory --source DIR --output FILE [--configured-list FILE]
                  index FATE definitions as data; nothing is executed";
 
 fn main() -> ExitCode {
+    if let Some(code) = without_cargo_library_path() {
+        return code;
+    }
     let args: Vec<String> = std::env::args().skip(1).collect();
     let root = root();
     let result = match args.first().map(String::as_str) {
@@ -49,6 +71,15 @@ fn main() -> ExitCode {
         Some("fixtures") => fixtures(&root),
         Some("fixture") => fixture(&root, &args[1..]),
         Some("fate-inventory") => fate_inventory(&args[1..]),
+        Some("compare") => compare(&root, &args[1..]),
+        Some("report") => return report(&root, &args[1..]),
+        Some("external-vector") => return external_vector(&root, &args[1..]),
+        Some("fate-run") => return fate_run(&root, &args[1..]),
+        Some("graph") => graph(&root, &args[1..]),
+        Some("trace-identities") => return trace_identities(&root, &args[1..]),
+        Some("build-workers") => {
+            harness::build::build(&root).map(|path| println!("{}", path.display()))
+        }
         Some("prepare-ffmpeg") => prepare_ffmpeg(&root, &args[1..]),
         Some("fetch-specs") => match &args[1..] {
             [] => fetch::specs(&root, false, &fetch::Network).map(|s| println!("{s}")),
@@ -73,6 +104,56 @@ fn main() -> ExitCode {
             eprintln!("{message}");
             ExitCode::FAILURE
         }
+    }
+}
+
+/// `cargo run` (and the rustup proxy in front of it) prepends build and
+/// toolchain library directories to `LD_LIBRARY_PATH`. Workers and the allocator observer must load exactly as
+/// they would from a shell, so run once more without those entries.
+fn without_cargo_library_path() -> Option<ExitCode> {
+    std::env::var_os("CARGO")?;
+    let current = std::env::var_os("LD_LIBRARY_PATH")?;
+    let exe = std::env::current_exe().ok()?;
+    let toolchains =
+        std::env::var_os("RUSTUP_HOME").map(|home| Path::new(&home).join("toolchains"));
+    let kept = shell_library_path(&current, exe.parent()?, toolchains.as_deref());
+    if kept.as_ref() == Some(&current) {
+        return None;
+    }
+    let mut command = Command::new(&exe);
+    command.args(std::env::args_os().skip(1));
+    match kept {
+        Some(value) => command.env("LD_LIBRARY_PATH", value),
+        None => command.env_remove("LD_LIBRARY_PATH"),
+    };
+    Some(match command.status() {
+        Ok(status) => status
+            .code()
+            .and_then(|code| u8::try_from(code).ok())
+            .map_or(ExitCode::FAILURE, ExitCode::from),
+        Err(error) => {
+            eprintln!("{}: {error}", exe.display());
+            ExitCode::FAILURE
+        }
+    })
+}
+
+/// `value` without the entries `cargo run` and rustup add: the running
+/// binary's output directory and everything below it, toolchain
+/// `lib/rustlib/*/lib` directories and anything under rustup's `toolchains`.
+/// `None` when nothing remains.
+fn shell_library_path(value: &OsStr, built: &Path, toolchains: Option<&Path>) -> Option<OsString> {
+    let kept: Vec<PathBuf> = std::env::split_paths(value)
+        .filter(|path| {
+            !path.starts_with(built)
+                && !toolchains.is_some_and(|t| path.starts_with(t))
+                && !path.components().any(|c| c.as_os_str() == "rustlib")
+        })
+        .collect();
+    if kept.is_empty() {
+        None
+    } else {
+        std::env::join_paths(kept).ok()
     }
 }
 
@@ -114,6 +195,205 @@ fn fixtures(root: &Path) -> Task {
     for line in corpus::generate_all(&paths)? {
         println!("{line}");
     }
+    Ok(())
+}
+
+fn exit(result: Result<i32, String>) -> ExitCode {
+    match result {
+        Ok(code) => ExitCode::from(code.clamp(0, 255) as u8),
+        Err(message) => {
+            eprintln!("{message}");
+            ExitCode::from(2)
+        }
+    }
+}
+
+fn external_vector(root: &Path, args: &[String]) -> ExitCode {
+    let mut options = harness::vectors::ExternalOptions {
+        output: PathBuf::new(),
+        pairs: 30,
+        iterations: 50,
+        benchmark: false,
+        memory: false,
+    };
+    let mut rest = args.iter();
+    let parsed = (|| -> Task {
+        while let Some(flag) = rest.next() {
+            let mut value = || {
+                rest.next()
+                    .cloned()
+                    .ok_or_else(|| format!("{flag} needs a value"))
+            };
+            match flag.as_str() {
+                "--output" => options.output = PathBuf::from(value()?),
+                "--pairs" => {
+                    options.pairs = value()?.parse().map_err(|_| "--pairs: not a number")?
+                }
+                "--iterations" => {
+                    options.iterations =
+                        value()?.parse().map_err(|_| "--iterations: not a number")?
+                }
+                "--benchmark" => options.benchmark = true,
+                "--memory" => options.memory = true,
+                _ => return Err(USAGE.to_owned()),
+            }
+        }
+        if options.output.as_os_str().is_empty() {
+            Err("--output is required".into())
+        } else {
+            Ok(())
+        }
+    })();
+    exit(parsed.and_then(|()| harness::vectors::external_vector(root, &options)))
+}
+
+fn fate_run(root: &Path, args: &[String]) -> ExitCode {
+    let (mut case, mut demux_only) = ("fate-matroska-xiph-lacing".to_owned(), false);
+    let mut rest = args.iter();
+    let parsed = (|| -> Task {
+        while let Some(flag) = rest.next() {
+            match flag.as_str() {
+                "--case" => case = rest.next().cloned().ok_or("--case needs a value")?,
+                "--demux-only" => demux_only = true,
+                _ => return Err(USAGE.to_owned()),
+            }
+        }
+        Ok(())
+    })();
+    exit(parsed.and_then(|()| {
+        harness::vectors::fate_run(root, &case, demux_only, &harness::vectors::NativeFate)
+    }))
+}
+
+fn trace_identities(root: &Path, args: &[String]) -> ExitCode {
+    let (mut output, mut compare, mut candidate) =
+        (None, None, root.join("target/release/media-worker"));
+    let mut rest = args.iter();
+    let parsed = (|| -> Task {
+        while let Some(flag) = rest.next() {
+            let value = PathBuf::from(rest.next().ok_or_else(|| format!("{flag} needs a value"))?);
+            match flag.as_str() {
+                "--output" => output = Some(value),
+                "--compare" => compare = Some(value),
+                "--candidate" => candidate = value,
+                _ => return Err(USAGE.to_owned()),
+            }
+        }
+        Ok(())
+    })();
+    exit(parsed.and_then(|()| {
+        let output = output.ok_or("--output is required")?;
+        harness::vectors::trace_identities(root, &candidate, &output, compare.as_deref())
+    }))
+}
+
+fn graph(root: &Path, args: &[String]) -> Task {
+    let (package, files) = args.split_first().ok_or("graph needs a package name")?;
+    let metadata = harness::provenance::cargo_metadata(root)?;
+    let graph = harness::provenance::selected_graph(root, &metadata, package, files)?;
+    println!("{}", json::to_python(&graph, None));
+    Ok(())
+}
+
+fn report(root: &Path, args: &[String]) -> ExitCode {
+    let mut options = harness::report::Options::defaults(root);
+    let mut rest = args.iter();
+    let parsed = (|| -> Task {
+        while let Some(flag) = rest.next() {
+            let mut value = || {
+                rest.next()
+                    .map(PathBuf::from)
+                    .ok_or_else(|| format!("{flag} needs a value"))
+            };
+            match flag.as_str() {
+                "--contract" => options.contract = value()?,
+                "--manifest" => options.manifest = value()?,
+                "--corpus" => options.corpus = value()?,
+                "--output" => options.output = value()?,
+                "--fate-cache" => options.fate_cache = Some(value()?),
+                "--additional-report" => options.additional_reports.push(value()?),
+                "--require-acceptance" => options.require_acceptance = true,
+                "--require-slice-acceptance" => options.require_slice_acceptance = true,
+                "--benchmark" => options.benchmark = true,
+                "--memory" => options.memory = true,
+                "--pairs" | "--iterations" | "--seed" => {
+                    let text = value()?.display().to_string();
+                    let number: u64 = text
+                        .parse()
+                        .map_err(|_| format!("{flag}: not a number: {text}"))?;
+                    match flag.as_str() {
+                        "--pairs" => options.pairs = number as usize,
+                        "--iterations" => {
+                            options.iterations = u32::try_from(number).map_err(|e| e.to_string())?
+                        }
+                        _ => options.seed = number,
+                    }
+                }
+                _ => return Err(USAGE.to_owned()),
+            }
+        }
+        Ok(())
+    })();
+    let result = parsed.and_then(|()| harness::report::run(root, &options));
+    match result {
+        Ok(code) => ExitCode::from(code as u8),
+        Err(message) => {
+            eprintln!("{message}");
+            ExitCode::from(2)
+        }
+    }
+}
+
+fn compare(root: &Path, args: &[String]) -> Task {
+    let mut values = std::collections::BTreeMap::new();
+    let (mut content, mut sequential) = (false, true);
+    let mut rest = args.iter();
+    while let Some(flag) = rest.next() {
+        match flag.as_str() {
+            "--content" => content = true,
+            "--no-short-reads" => sequential = false,
+            "--candidate" | "--reference" | "--input" | "--output" | "--operation" => {
+                values.insert(
+                    flag.clone(),
+                    rest.next()
+                        .ok_or_else(|| format!("{flag} needs a value"))?
+                        .clone(),
+                );
+            }
+            _ => return Err(USAGE.to_owned()),
+        }
+    }
+    let path = |key: &str| {
+        values
+            .get(key)
+            .map(PathBuf::from)
+            .ok_or_else(|| format!("{key} is required"))
+    };
+    let (candidate, reference, input) =
+        (path("--candidate")?, path("--reference")?, path("--input")?);
+    let run = harness::parity::Run {
+        root,
+        candidate: &candidate,
+        reference: &reference,
+        input: &input,
+        raw: path("--output")?,
+    };
+    use harness::parity::{catalogue_parity, colour_parity, parity, seek_parity};
+    let result = match values.get("--operation").map_or("plain", String::as_str) {
+        "plain" => parity(&run, sequential, None, content, "")?,
+        "seek" => seek_parity(&run, sequential, None, content)?,
+        "colour" => colour_parity(&run, sequential, None, content)?,
+        "catalogue" => catalogue_parity(&run, sequential, None, content)?,
+        other => return Err(format!("unknown operation {other}")),
+    };
+    corpus::write_json(&run.raw.join("result.json"), &result)?;
+    println!(
+        "{}",
+        result
+            .get("status")
+            .and_then(json::Value::as_str)
+            .unwrap_or("?")
+    );
     Ok(())
 }
 
@@ -358,4 +638,32 @@ fn check(root: &Path) -> Task {
     run(Command::new("python3")
         .arg("tools/test-core-time.py")
         .current_dir(root))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::shell_library_path;
+    use std::ffi::OsStr;
+    use std::path::Path;
+
+    #[test]
+    fn cargo_library_entries_are_dropped_and_others_kept() {
+        let built = Path::new("/w/target/debug");
+        let toolchains = Some(Path::new("/h/.rustup/toolchains"));
+        let cargo = "/w/target/debug:/w/target/debug/deps:\
+                     /h/.rustup/toolchains/t/lib/rustlib/aarch64-unknown-linux-gnu/lib:\
+                     /h/.rustup/toolchains/t/lib";
+        assert_eq!(
+            shell_library_path(OsStr::new(cargo), built, toolchains),
+            None
+        );
+        let mixed = format!("{cargo}:/opt/lib:/usr/local/lib");
+        assert_eq!(
+            shell_library_path(OsStr::new(&mixed), built, toolchains).unwrap(),
+            OsStr::new("/opt/lib:/usr/local/lib")
+        );
+        let user = OsStr::new("/opt/lib");
+        assert_eq!(shell_library_path(user, built, toolchains).unwrap(), user);
+        assert_eq!(shell_library_path(user, built, None).unwrap(), user);
+    }
 }

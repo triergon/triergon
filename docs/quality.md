@@ -60,8 +60,20 @@ make report          # correctness report against the reference
 make qualify         # correctness, runtime and memory with acceptance
 ```
 
-`harness/runner.py` drives comparisons and timing; `harness/memory.py` collects heap and
-RSS; `tools/fuzz_media.py` runs deterministic, replayable byte mutations against debug,
+`cargo xtask report` runs the correctness comparison of one feature contract
+(`--contract`, `--manifest`, `--corpus`) and grades it; `--benchmark` adds paired
+runtime and `--memory` the heap and RSS measurement under the native observers
+(`harness/allocations*.c`), including the Linux link-closure and active-window guard
+certificates. The report records the build identity, source provenance digest and input
+hashes it was measured with; when a result is cited, its source revision and raw-sample
+SHA-256 go in the [measured revisions](status.md#measured-revisions) table. `cargo xtask compare` compares a single input, `cargo xtask external-vector`
+qualifies the mandatory external vector and `cargo xtask fate-run` runs one supported
+upstream FATE case. `cargo xtask build-workers` builds the workers and records the build
+identity every collection is checked against. `cargo xtask trace-identities` records the
+digest of every candidate trace, so a change can show its traces are byte-identical
+(`--compare` an earlier record). The independent oracles stay in Python
+(`harness/*_oracle.py`, run through `python3 -m harness.oracles`);
+`tools/fuzz_media.py` runs deterministic, replayable byte mutations against debug,
 release and reference workers.
 
 ## Measuring performance
@@ -92,5 +104,7 @@ and edit recipe.
 
 A result names its exact source revision, worker binaries, reference build, corpus and
 input hashes, platform and all per-case outcomes. Summaries and identities are kept
-in the pull request that changes the result and in [status](status.md). Raw samples are
-archived by content hash, outside the repository.
+in the pull request that changes the result and in [status](status.md), whose
+[measured revisions](status.md#measured-revisions) table names the revision and
+raw-sample SHA-256 behind each cited result. Raw samples are archived by content hash,
+outside the repository.

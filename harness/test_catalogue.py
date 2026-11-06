@@ -1,7 +1,7 @@
 """Whole-input catalogue/source parity and complete measured-work checks."""
 import json,unittest,tempfile
 from pathlib import Path
-from .runner import ROOT,execute,differences,catalogue_parity,acceptance
+from .runner import ROOT,execute,differences,catalogue_parity
 from .catalogue_oracle import source_catalogue
 from .test_checksum import scalar_trace_checksum
 
@@ -32,13 +32,3 @@ class CatalogueTests(unittest.TestCase):
             self.assertEqual(result['status'],'pass',result)
             self.assertEqual(result['source_catalogue_status'],'pass');self.assertEqual(result['source_colour_status'],'pass')
 
-    def test_missing_catalogue_source_proof_does_not_pass_a_gate(self):
-        c=json.loads((ROOT/'harness/catalogue-slice.json').read_text());row={'id':'catalogue-empty','profile':'catalogue-empty','parity':{'status':'pass','source_timing_status':'pass'}}
-        result=acceptance(c,[row],{},'aarch64-apple-darwin',[])
-        self.assertTrue(any('complete source/native catalogue gate' in why for why in result['slice_reasons']))
-
-    def test_required_original_vector_cannot_be_missing_or_substituted(self):
-        c=json.loads((ROOT/'harness/catalogue-slice.json').read_text());spec=c['required_additional_vectors'][0]
-        for additional in [[],[{'id':spec['file'],'profile':spec['file'],'input_sha256':'substituted'}]]:
-            verdict=acceptance(c,[],{},'aarch64-apple-darwin',[],additional)
-            self.assertTrue(any('required additional vector missing or changed' in r for r in verdict['slice_reasons']))

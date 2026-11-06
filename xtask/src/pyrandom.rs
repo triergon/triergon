@@ -1,13 +1,14 @@
-//! Python's `random.Random`, for the draws the corpus relies on: the seeded byte
-//! stream of `randrange(256)`.
+//! Python's `random.Random`, for the draws the corpus and harness rely on: seeded
+//! byte streams, `random()`, `choices` and `shuffle`, each bit-identical to CPython.
 //!
 //! This is tooling only and is never linked into a library crate.
 //!
 //! Derived work. The generator is MT19937 with its reference initialisation
 //! (`init_genrand`, `init_by_array`) by Makoto Matsumoto and Takuji Nishimura.
-//! Seeding from an integer (its little-endian 32-bit words as the key) and
-//! bounded draws by rejection from `getrandbits` follow CPython's `random`
-//! module. Changes from CPython: a Rust rendering of only these operations.
+//! Seeding from an integer (its little-endian 32-bit words as the key), bounded
+//! draws by rejection from `getrandbits`, the 53-bit `random()`, `choices` and
+//! `shuffle` follow CPython's `random` module. Changes from CPython: a Rust
+//! rendering of only these operations.
 //!
 //! Copyright (c) 2001 Python Software Foundation; All Rights Reserved. Used
 //! under the Python Software Foundation License Version 2 (see
@@ -51,7 +52,7 @@ pub struct PyRandom {
 }
 
 impl PyRandom {
-    pub fn new(seed: u32) -> Self {
+    pub fn new(seed: u64) -> Self {
         let mut mt = [0u32; 624];
         mt[0] = 19_650_218;
         for i in 1..624 {
@@ -59,7 +60,12 @@ impl PyRandom {
                 .wrapping_mul(mt[i - 1] ^ (mt[i - 1] >> 30))
                 .wrapping_add(i as u32);
         }
-        let key = [seed];
+        // Little-endian 32-bit words of the seed, without high zero words.
+        let key: Vec<u32> = if seed >> 32 == 0 {
+            vec![seed as u32]
+        } else {
+            vec![seed as u32, (seed >> 32) as u32]
+        };
         let (mut i, mut j) = (1usize, 0usize);
         for _ in 0..624.max(key.len()) {
             mt[i] = (mt[i] ^ (mt[i - 1] ^ (mt[i - 1] >> 30)).wrapping_mul(1_664_525))
@@ -108,13 +114,47 @@ impl PyRandom {
         y ^ (y >> 18)
     }
 
+    /// `getrandbits(k)` for `1 <= k <= 32`.
+    fn bits(&mut self, k: u32) -> u32 {
+        self.next_u32() >> (32 - k)
+    }
+
+    /// `_randbelow(n)` for `n >= 1`.
+    pub fn below(&mut self, n: u32) -> u32 {
+        let k = 32 - n.leading_zeros();
+        loop {
+            let r = self.bits(k);
+            if r < n {
+                return r;
+            }
+        }
+    }
+
     /// `randrange(256)`.
     pub fn byte(&mut self) -> u8 {
-        loop {
-            let r = self.next_u32() >> (32 - 9);
-            if r < 256 {
-                return r as u8;
-            }
+        self.below(256) as u8
+    }
+
+    /// `random()`: 53 random bits as a float in [0, 1).
+    pub fn random(&mut self) -> f64 {
+        let a = f64::from(self.next_u32() >> 5);
+        let b = f64::from(self.next_u32() >> 6);
+        (a * 67_108_864.0 + b) * (1.0 / 9_007_199_254_740_992.0)
+    }
+
+    /// `choices(population, k=k)` without weights.
+    pub fn choices<T: Copy>(&mut self, population: &[T], k: usize) -> Vec<T> {
+        let n = population.len() as f64;
+        (0..k)
+            .map(|_| population[(self.random() * n).floor() as usize])
+            .collect()
+    }
+
+    /// `shuffle(items)` in place.
+    pub fn shuffle<T>(&mut self, items: &mut [T]) {
+        for i in (1..items.len()).rev() {
+            let j = self.below(i as u32 + 1) as usize;
+            items.swap(i, j);
         }
     }
 }
@@ -135,4 +175,28 @@ mod tests {
     }
 
     const PYTHON_1951: &str = "47f4b2da9c2f343f";
+
+    #[test]
+    fn shuffles_match_python() {
+        // Six shuffles of [candidate, reference] with Random(280): first names c c r c c c.
+        let mut r = PyRandom::new(280);
+        let firsts: String = (0..6)
+            .map(|_| {
+                let mut order = ['c', 'r'];
+                r.shuffle(&mut order);
+                order[0]
+            })
+            .collect();
+        assert_eq!(firsts, "ccrccc");
+    }
+
+    #[test]
+    fn floats_match_python() {
+        // python3 -c "import random; r=random.Random(5); print([r.random() for _ in range(3)])"
+        let mut r = PyRandom::new(5);
+        assert_eq!(
+            [r.random(), r.random(), r.random()],
+            [0.6229016948897019, 0.7417869892607294, 0.7951935655656966]
+        );
+    }
 }

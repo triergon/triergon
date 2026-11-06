@@ -1,6 +1,7 @@
-"""Shared adapters, canonical comparisons and fail-closed acceptance.
+"""Worker execution, canonical comparisons and timing isolation primitives.
 
-Only Python's standard library is used. Native reference workers stay external.
+The harness tests and the codec and capture timing runners use these; the
+collectors themselves are `cargo xtask report`. Only the standard library is used.
 """
 from __future__ import annotations
 
@@ -18,33 +19,13 @@ import statistics
 import subprocess
 import tempfile
 import time
-from .common import canonical_digest, digest, load, write_json
+from .common import canonical_digest, write_json
 from .spec_oracle import timing_trace
 
 ROOT = Path(__file__).resolve().parents[1]
 PROC_ROOT = Path("/proc")
 LINUX_CPU_KEY = "__linux_cpu__"
 LINUX_MODULE_ROOT = Path("/sys/module")
-
-
-def measurement_cache(report):
-    """Include unvisited measurements retained through an interrupted replay."""
-    rows = [*report.get("cached_cases", []), *report.get("cases", [])]
-    cache = {row["id"]: row for row in rows}
-    if len(cache) != len(rows):
-        raise ValueError("duplicate measurement-cache case identities")
-    return cache
-
-
-def checkpoint_report(base, rows, reusable):
-    # A short isolation window can expire before a later cached case is reached.
-    # Keep that original observation (including a clean failure), but distinguish
-    # it from source comparisons actually rerun in this collection attempt.
-    visited = {row["id"] for row in rows}
-    return {**base, "collection_status": "partial", "cases": list(rows),
-            "cached_cases": [row for name, row in reusable.items() if name not in visited],
-            "acceptance": {"accepted": False, "slice_accepted": False,
-                           "slice_reasons": ["collection incomplete"], "reasons": ["collection incomplete"]}}
 
 
 def execute(argv, timeout=30):
@@ -383,17 +364,6 @@ def competing_builds():
     return active_cpu(before, cpu_snapshot())
 
 
-def benchmark(candidate, reference, path, pairs, iterations, seed, operation=None):
-    rejected = []
-    for attempt in range(3):
-        result = benchmark_once(candidate, reference, path, pairs, iterations, seed + attempt, operation)
-        if result.get("status") != "contaminated":
-            result["rejected_contaminated_attempts"] = rejected
-            return result
-        rejected.append(result)
-    return {"status":"contaminated", "rejected_contaminated_attempts":rejected, "contaminants":result.get("contaminants",[])}
-
-
 def timing_module_state():
     """The external RSS kprobes may not be loaded during timing, even unarmed.
 
@@ -419,224 +389,3 @@ def timing_module_state():
                 "device": loaded.st_dev, "inode": loaded.st_ino}
     except (OSError, ValueError) as error:
         return {"status": "unavailable", "path": str(module), "error": str(error)}
-
-
-def benchmark_once(candidate, reference, path, pairs, iterations, seed, operation=None):
-    if pairs < 2 or iterations < 1:
-        raise ValueError("need at least two pairs and one iteration")
-    prefix, arguments = operation or ("", [])
-    workers = {"candidate": candidate, "reference": reference}
-    rng = random.Random(seed)
-    samples = []
-    contaminants = []
-    module_observations, warmups = [], []
-    def module_rejection(stage):
-        state = timing_module_state()
-        module_observations.append({"stage": stage, "state": state})
-        if state.get("status") in {"module-absent", "not-applicable"}:
-            return None
-        return {"status": "timing-module-loaded" if state.get("status") == "module-loaded" else "timing-environment-invalid",
-                "samples": samples, "warmups": warmups, "timing_module_observations": module_observations,
-                "timing_module_policy": "rss-kernel-module-must-be-absent-v1"}
-    with benchmark_lock():
-        if rejection := module_rejection("before-timing-session"):
-            return rejection
-        if busy := competing_builds():
-            return {"status": "contaminated", "contaminants": busy, "samples": []}
-        worker_hashes = {name: digest(worker) for name, worker in workers.items()}
-        input_sha256 = digest(path)
-        for name, worker in workers.items():
-            if rejection := module_rejection("before-warmup:" + name):
-                return rejection
-            warm = execute([worker, prefix+"bench", path, iterations, *arguments])
-            warmups.append({"worker": name, "result": warm})
-            if rejection := module_rejection("after-warmup:" + name):
-                return rejection
-            if warm["status"] != "ok":
-                return {"status": "warmup-failed", "result": warm}
-        for index in range(pairs):
-            if busy := competing_builds():
-                return {"status": "contaminated", "contaminants": busy, "samples": samples}
-            order = list(workers); rng.shuffle(order)
-            before = cpu_snapshot()
-            row = {"pair": index, "order": order, "load": os.getloadavg(), "cpu_before": before}
-            samples.append(row)
-            for name in order:
-                if rejection := module_rejection("before-pair:" + str(index) + ":" + name):
-                    return rejection
-                row[name] = execute([workers[name], prefix+"bench", path, iterations, *arguments])
-                if rejection := module_rejection("after-pair:" + str(index) + ":" + name):
-                    return rejection
-            after = cpu_snapshot()
-            row["cpu_after"] = after
-            if busy := active_cpu(before, after):
-                return {"status": "contaminated", "contaminants": busy, "samples": samples}
-    values = []
-    for row in samples:
-        if any(row[k]["status"] != "ok" for k in workers):
-            return {"status": "worker-failure", "samples": samples}
-        a, b = (row[k]["data"] for k in workers)
-        if any(a[k] != b[k] for k in ("iterations", "packets", "bytes", "digest")):
-            return {"status": "unequal-work", "samples": samples}
-        values.append((a["elapsed_ns"], b["elapsed_ns"]))
-    if worker_hashes != {name: digest(worker) for name, worker in workers.items()} or input_sha256 != digest(path):
-        return {"status": "worker-or-input-changed", "samples": samples}
-    summary = ratio_interval(values, seed)
-    return {"status": "measured", "worker_hashes": worker_hashes, "input_sha256": input_sha256,
-            "seed": seed, "iterations": iterations, "pairs": pairs,
-            "ratio": summary, "samples": samples, "contaminants": sorted(set(contaminants)),
-            "timing_module_observations": module_observations,
-            "timing_module_policy": "rss-kernel-module-must-be-absent-v1",
-            "per_iteration_ns": {name: {"p50": statistics.median(row[name]["data"]["elapsed_ns"] / iterations for row in samples), "p95": percentile([row[name]["data"]["elapsed_ns"] / iterations for row in samples], .95)} for name in workers}}
-
-
-def memory(candidate, reference, path, pairs, seed, operation=None):
-    from .memory import qualification, measure
-    with benchmark_lock():
-        if busy := competing_builds():
-            return {"status": "contaminated", "contaminants": busy, "samples": []}
-        before = cpu_snapshot()
-        certificate = qualification(candidate, reference)
-        result = measure(candidate, reference, path, pairs, seed, certificate, ratio_interval, operation)
-        after = cpu_snapshot()
-        contaminants = active_cpu(before, after)
-        result = {**result, "cpu_before": before, "cpu_after": after, "contaminants": contaminants}
-        if contaminants:
-            result["measurement_status"] = result["status"]
-            result["status"] = "contaminated"
-        return result
-
-
-def acceptance(contract, rows, identity, target, coverage, additional_cases=()):
-    reasons = []
-    if len({r["id"] for r in rows}) != len(rows):
-        reasons.append("duplicate case identities")
-    if not rows or any(row.get("parity", {}).get("status") != "pass" or row.get("parity", {}).get("source_timing_status") != "pass" for row in rows):
-        reasons.append("selected-feature parity incomplete or failing")
-    profiles = {row.get("profile") for row in rows if row.get("parity", {}).get("status") == "pass"}
-    missing = sorted(set(contract["required_profiles"]) - profiles)
-    if missing:
-        reasons.append("missing required profiles: " + ", ".join(missing))
-    for row in rows:
-        from .comparison import validate_case_evidence
-        try:
-            selected_hashes = validate_case_evidence(row, identity, contract.get("id"))
-        except ValueError as error:
-            reasons.append(row["id"] + ": " + str(error))
-            selected_hashes = {}
-        if contract.get("id") == "K2-bounded-zlib-v1" and row.get("parity", {}).get("source_content_status") != "pass":
-            reasons.append(row["id"] + ": complete source content gate unproven or failed")
-        if contract.get("id") == "K4-colour-hdr-v1":
-            proof=row.get("parity",{})
-            if proof.get("source_colour_status")!="pass" or proof.get("colour_reference_status")!="pass" or proof.get("colour_short_reads") != [{"chunk":n,"status":"pass"} for n in (1,7,4096)]:
-                reasons.append(row["id"] + ": complete source/native colour gate unproven or failed")
-            if row.get("operation",{}).get("view")!="colour-source-and-ffmpeg9-v1":
-                reasons.append(row["id"] + ": colour benchmark operation view unproven")
-        if contract.get("id")=="K5-segment-metadata-v1":
-            proof=row.get("parity",{})
-            if proof.get("source_catalogue_status")!="pass" or proof.get("source_colour_status")!="pass" or proof.get("short_reads")!=[{"chunk":n,"status":"pass"} for n in (1,7,4096)]:
-                reasons.append(row["id"]+": complete source/native catalogue gate unproven or failed")
-            if row.get("operation",{}).get("view")!="catalogue-source-and-native-v1":reasons.append(row["id"]+": catalogue timing view unproven")
-        timing = row.get("timing", {})
-        upper = timing.get("ratio", {}).get("upper_95", math.inf)
-        raw = timing.get("samples", [])
-        iterations = timing.get("iterations")
-        valid_raw = type(timing.get("pairs")) is int and len(raw) == timing["pairs"] and len(raw) >= contract["minimum_pairs"]
-        valid_raw &= type(iterations) is int and iterations > 0
-        valid_raw &= timing.get("worker_hashes") == selected_hashes
-        if row.get("input_sha256"):
-            valid_raw &= timing.get("input_sha256") == row["input_sha256"]
-        if valid_raw:
-            try:
-                paired = []
-                for index, sample in enumerate(raw):
-                    if type(sample.get("pair")) is not int or sample["pair"] != index:
-                        raise ValueError("missing, duplicate or reordered timing pair identity")
-                    if "cpu_before" not in sample or "cpu_after" not in sample or active_cpu(sample["cpu_before"],sample["cpu_after"], require_linux=identity.get("host_platform", {}).get("system") == "Linux" or "linux" in target):
-                        raise ValueError("CPU isolation evidence missing or contaminated")
-                    a, b = (sample[k]["data"] for k in ("candidate", "reference"))
-                    if any(type(work[k]) is not int or work[k] < 0
-                           for work in (a, b) for k in ("iterations", "packets", "bytes", "digest", "elapsed_ns")):
-                        raise ValueError("untyped benchmark work")
-                    if a["iterations"] != iterations or b["iterations"] != iterations:
-                        raise ValueError("raw iterations differ from declared operation count")
-                    if any(sample[k]["status"] != "ok" for k in ("candidate", "reference")) or any(a[k] != b[k] for k in ("iterations", "packets", "bytes", "digest")):
-                        raise ValueError("unequal benchmark work")
-                    paired.append((a["elapsed_ns"], b["elapsed_ns"]))
-                if ratio_interval(paired, timing.get("seed", 0)) != timing.get("ratio"):
-                    valid_raw = False
-            except (KeyError, ValueError, TypeError):
-                valid_raw = False
-        if timing.get("status") != "measured" or not valid_raw or timing.get("contaminants") or not math.isfinite(upper) or upper <= 0 or upper > contract["runtime_ratio_max"]:
-            reasons.append(row["id"] + ": runtime gate unproven or failed")
-        mem = row.get("memory", {})
-        memory_ratios = [mem.get(k, math.inf) for k in ("rss_ratio_upper_95", "heap_ratio_upper_95")]
-        valid_memory = False
-        try:
-            from .memory import evaluate
-            certificate = mem["certificate"]
-            raw_memory = mem["samples"]
-            probe = certificate["probe_heap"]
-            covered = certificate["status"] == "qualified-selected-workers" and not certificate["errors"] and certificate["worker_hashes"] == selected_hashes
-            if identity.get("schema", 1) >= 2:
-                covered &= not mem.get("contaminants") and not active_cpu(mem["cpu_before"], mem["cpu_after"], require_linux=identity.get("host_platform", {}).get("system") == "Linux" or "linux" in target)
-            if row.get("input_sha256"):
-                covered &= mem.get("input_sha256") == row["input_sha256"]
-            instrumentation = identity.get("instrumentation")
-            if instrumentation:
-                covered &= certificate.get("probe_sha256") == instrumentation.get("probe_sha256")
-                covered &= certificate.get("observer_sha256") == instrumentation.get("observer_sha256")
-            covered &= probe["status"] == "measured" and probe["observer"]["heap_peak_bytes"] == probe["work"]["expected_peak_bytes"]
-            covered &= probe["observer"]["heap_live_start"] == probe["observer"]["heap_live_end"]
-            if covered and len(raw_memory) == mem["pairs"] and len(raw_memory) >= contract["minimum_pairs"]:
-                covered &= all(v["instrument_sha256"] == certificate["observer_sha256"] and v["observer"]["status"] == "measured" for sample in raw_memory for v in sample.values())
-                recomputed = evaluate(raw_memory,mem["pairs"],mem.get("seed",280),certificate,ratio_interval)
-                valid_memory = covered and all(recomputed.get(k) == mem.get(k) for k in ("status","rss_ratio_upper_95","heap_ratio_upper_95","rss_bound_ratio","heap_ratio","total_rss_ratio"))
-        except (KeyError, ValueError, TypeError, ZeroDivisionError):
-            pass
-        if not valid_memory or mem.get("status") != "qualified" or any(not math.isfinite(r) or not 0 < r < 1 for r in memory_ratios):
-            reasons.append(row["id"] + ": lower RSS/live allocation gate unproven or failed")
-    # Required intact external vectors use the same selected-feature/numerical gates.
-    # Their redistribution status remains a separate, still-open module requirement.
-    for spec in contract.get("required_additional_vectors",[]):
-        matches=[case for case in additional_cases if case.get("id")==spec["file"] and case.get("profile")==spec["file"]]
-        if len(matches)!=1 or matches[0].get("input_sha256")!=spec["sha256"]:
-            reasons.append("required additional vector missing or changed: "+spec["file"])
-            continue
-        derived={**contract,"required_profiles":[spec["file"]],"required_additional_vectors":[]}
-        extra=acceptance(derived,matches,identity,target,coverage)
-        reasons.extend("additional "+spec["file"]+": "+reason for reason in extra["slice_reasons"])
-    if identity.get("source_revision") is None:
-        reasons.append("FFmpeg source build/configuration is not qualified")
-    if set(contract["required_targets"]) != {target}:
-        reasons.append("required cross-target evidence missing")
-    slice_reasons = list(reasons)
-    if not coverage or any(c["status"] != "pass" for c in coverage):
-        reasons.append("FATE mapping/asset/expected-output coverage pending")
-    if contract.get("pending_module_requirements"):
-        reasons.append("broader module requirements remain pending")
-    return {"accepted": not reasons, "slice_accepted": not slice_reasons, "slice_reasons": slice_reasons, "reasons": reasons, "missing_profiles": missing}
-
-
-def fate_coverage(index, mapping, cache=None):
-    rules = {r["id"]: r for r in mapping["rules"]}
-    rows = []
-    build = ROOT / ".research/reference/build.json"
-    enabled_path = ROOT / ".research/reference/fate-list.txt"
-    enabled = set(enabled_path.read_text().split()) if enabled_path.exists() else set()
-    receipts = {r["case"]:r for path in (ROOT/".research/reference").glob("fate-*.json") if "case" in (r:=load(path))}
-    for case in index["cases"]:
-        rule = rules.get(case["id"])
-        row = {"id": case["id"], "status": "unmapped", "definitions": case["definition_files"], "enabled_in_reference_configuration": case["id"] in enabled}
-        if rule:
-            row.update({"status": rule["status"], "operation": rule["operation"], "sample": rule["sample"]})
-            if cache:
-                path = (cache / rule["sample"]).resolve()
-                if not path.is_relative_to(cache.resolve()):
-                    raise ValueError("sample escapes cache")
-                row["asset"] = {"status": "present-external-rights-unreviewed", "sha256": digest(path)} if path.is_file() else {"status": "missing"}
-            receipt=receipts.get(case["id"],{})
-            if receipt and build.exists() and receipt.get("revision") == load(build)["revision"]:
-                row["upstream_reference_execution"] = receipt
-        rows.append(row)
-    return rows

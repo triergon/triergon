@@ -18,7 +18,6 @@ import time
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
-from harness.provenance import cargo_metadata, selected_graph
 
 
 def sha(path):
@@ -27,9 +26,12 @@ def sha(path):
 
 
 def graph():
-    return selected_graph(ROOT, cargo_metadata(ROOT), 'triergon-core',
-        ['tools/generate-time-oracle.py', 'tools/generate-time-edge-oracle.py',
-         'tools/test-core-time.py', 'harness/provenance.py'])
+    """The provenance graph of triergon-core plus the oracle sources (cargo xtask graph)."""
+    output = subprocess.check_output(
+        ['cargo', 'xtask', 'graph', 'triergon-core', 'tools/generate-time-oracle.py',
+         'tools/generate-time-edge-oracle.py', 'tools/test-core-time.py', 'xtask/src/harness/provenance.rs'],
+        cwd=ROOT, env=dict(os.environ, CARGO_INCREMENTAL='0'), text=True)
+    return json.loads(output)
 
 
 def main():

@@ -5,7 +5,7 @@ description = "Repository checks, corpus generators and the differential harness
 repository.workspace = true
 license.workspace = true
 edition.workspace = true
-rust-version.workspace = true
+rust-version = "1.89"
 publish = false
 
 [lints]
