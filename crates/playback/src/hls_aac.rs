@@ -2,11 +2,11 @@
 //! 0x0f). PES boundaries are transport boundaries, even inside an ADTS header.
 use crate::{TrackKey, TsNativeCarriage, TsNativeConfiguration};
 use std::sync::atomic::{AtomicBool, Ordering};
-use triergon_core::{Budget, BudgetVec, Bytes, Error, Result, Time, WorkBudget};
+use triergon_core::{Budget, BudgetVec, BudgetVecIntoIter, Bytes, Error, Result, Time, WorkBudget};
 use triergon_framing::{AacAdtsHeader, inspect_aac_adts_header};
 use triergon_mpegts::{
     AssemblyStep,
-    compat::pes::{DemuxPacket, DemuxPayloadKind, DemuxTimeView, RegisteredCarriage},
+    compat::pes::{DemuxPacket, DemuxPayloadKind, DemuxSpan, DemuxTimeView, RegisteredCarriage},
 };
 
 const PREFIX_BYTES: usize = 7;
@@ -30,15 +30,16 @@ struct Clock {
 }
 
 struct PendingPes {
-    packet: DemuxPacket,
-    span: usize,
+    spans: BudgetVecIntoIter<DemuxSpan>,
+    current: Option<Bytes>,
     offset: usize,
-    consumed: usize,
+    remaining: usize,
 }
 
 /// One logical AAC byte stream. Create a new reader at a configuration change
-/// or a discontinuity. Retention is one moved PES and one charged frame buffer;
-/// delivered frames own their charge independently of the reader.
+/// or a discontinuity. Retention is one PES span list and one charged frame
+/// buffer. Consumed spans are released as the cursor advances, and delivered
+/// frames own their charge independently of the reader.
 pub struct HlsAac {
     pool: Budget,
     config: TsNativeConfiguration,
@@ -157,10 +158,10 @@ impl HlsAac {
         }
         self.clock_epoch = Some(clock_epoch);
         self.pending = mailbox.take().map(|packet| PendingPes {
-            packet,
-            span: 0,
+            spans: packet.spans.into_iter(),
+            current: None,
             offset: 0,
-            consumed: 0,
+            remaining: packet.payload_len,
         });
         Ok(true)
     }
@@ -222,25 +223,34 @@ impl HlsAac {
                     (true, _) => Err(Error::Truncated),
                 };
             };
-            let Some(span) = input.packet.spans.as_slice().get(input.span) else {
-                if input.consumed != input.packet.payload_len {
-                    return Err(Error::Invalid("HLS AAC PES payload extent"));
+            let span = match &mut input.current {
+                Some(bytes) => bytes,
+                slot @ None => {
+                    let Some(span) = input.spans.next() else {
+                        if input.remaining != 0 {
+                            return Err(Error::Invalid("HLS AAC PES payload extent"));
+                        }
+                        self.pending = None;
+                        continue;
+                    };
+                    let bytes = span.into_bytes();
+                    if !bytes.belongs_to(&self.pool) {
+                        return Err(Error::ForeignPool);
+                    }
+                    // Validate a span's full extent before reading any of it.
+                    input.remaining = input
+                        .remaining
+                        .checked_sub(bytes.len())
+                        .ok_or(Error::Invalid("HLS AAC PES payload extent"))?;
+                    slot.insert(bytes)
                 }
-                self.pending = None;
-                continue;
             };
-            if !span.backing_bytes().belongs_to(&self.pool) {
-                return Err(Error::ForeignPool);
-            }
             let bytes = &span.as_ref()[input.offset..];
-            if bytes.len() > input.packet.payload_len - input.consumed {
-                return Err(Error::Invalid("HLS AAC PES payload extent"));
-            }
             if bytes.is_empty() {
                 if !work.try_charge(1) {
                     return Ok(AssemblyStep::Yield);
                 }
-                input.span += 1;
+                input.current = None;
                 input.offset = 0;
                 continue;
             }
@@ -275,7 +285,6 @@ impl HlsAac {
                 self.prefix_used = end;
             }
             input.offset += count;
-            input.consumed += count;
         }
     }
 
@@ -580,6 +589,80 @@ mod tests {
         assert_eq!(out[1].bytes.as_ref(), F48);
         assert_eq!(out[1].pts, Some(Time::new(2, 1).unwrap()));
         assert_eq!(out[1].dts, None);
+    }
+
+    #[test]
+    fn exhausted_span_releases_its_owner_after_the_boundary_charge() {
+        let mut fixture = PesFixture::new();
+        let mut reader = fixture.reader();
+        let (mut packet, clock) = fixture.chunk(&F48[..8], 90_000, Some(89_000));
+        let (tail, _) = fixture.chunk(&F48[8..], 180_000, None);
+        let mut tail = tail.unwrap();
+        let head = packet.as_mut().unwrap();
+        let first_charge = head.spans.as_slice()[0]
+            .backing_bytes()
+            .retained_storage_bytes();
+        head.payload_len += tail.payload_len;
+        head.spans.try_push(tail.spans.pop().unwrap()).unwrap();
+        drop(tail);
+        assert!(reader.push(&mut packet, clock).unwrap());
+
+        let cancel = AtomicBool::new(false);
+        let mut work = WorkBudget::new(10);
+        assert!(matches!(
+            reader.poll(&mut work, &cancel).unwrap(),
+            AssemblyStep::Yield
+        ));
+        assert_eq!(work.spent(), 10);
+        let before = fixture.pool.used();
+        let mut work = WorkBudget::new(1);
+        assert!(matches!(
+            reader.poll(&mut work, &cancel).unwrap(),
+            AssemblyStep::Yield
+        ));
+        assert_eq!(work.spent(), 1);
+        assert_eq!(fixture.pool.used(), before - first_charge);
+
+        let mut work = WorkBudget::new(3);
+        let AssemblyStep::Output(frame) = reader.poll(&mut work, &cancel).unwrap() else {
+            panic!("expected the frame spanning both carriers");
+        };
+        assert_eq!(work.spent(), 3);
+        assert_eq!(frame.bytes.as_ref(), F48);
+        assert_eq!(frame.pts, Some(Time::new(1, 1).unwrap()));
+        assert_eq!(frame.dts, Some(Time::new(89_000, 90_000).unwrap()));
+    }
+
+    #[test]
+    fn an_invalid_trailing_span_is_checked_after_the_ready_frame() {
+        for (foreign, expected) in [
+            (true, Error::ForeignPool),
+            (false, Error::Invalid("HLS AAC PES payload extent")),
+        ] {
+            let mut fixture = PesFixture::new();
+            let mut reader = fixture.reader();
+            let (mut packet, clock) = fixture.chunk(&F48, 90_000, None);
+            let (tail, _) = if foreign {
+                PesFixture::new().chunk(&F48, 180_000, None)
+            } else {
+                fixture.chunk(&F48, 180_000, None)
+            };
+            let mut tail = tail.unwrap();
+            let head = packet.as_mut().unwrap();
+            if foreign {
+                head.payload_len += tail.payload_len;
+            }
+            head.spans.try_push(tail.spans.pop().unwrap()).unwrap();
+            assert!(reader.push(&mut packet, clock).unwrap());
+
+            let cancel = AtomicBool::new(false);
+            let mut work = WorkBudget::new(64);
+            let AssemblyStep::Output(frame) = reader.poll(&mut work, &cancel).unwrap() else {
+                panic!("expected the frame before the invalid span");
+            };
+            assert_eq!(frame.bytes.as_ref(), F48);
+            assert_eq!(reader.poll(&mut work, &cancel).unwrap_err(), expected);
+        }
     }
 
     #[test]
