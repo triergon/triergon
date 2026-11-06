@@ -18,7 +18,7 @@ Crates depend only on layers below them. Core never depends on a format.
 | Pixels | [`triergon-pixel`](../crates/pixel) | Decoded-picture views, coded YUV 4:2:0 pictures, BT.601 RGBA to YUV, letterbox into 1920×1080 RGBA |
 | Codecs | [`triergon-codec`](../crates/codec); [`triergon-codec-aac`](../crates/codec-aac), [`-ac3`](../crates/codec-ac3), [`-dca`](../crates/codec-dca), [`-h264`](../crates/codec-h264), [`-hevc`](../crates/codec-hevc); [`triergon-codec-mpeg1`](../crates/codec-mpeg1) | Decoder traits and audio vocabulary; software decoders; MPEG-1 video encoder |
 | Composition | [`triergon`](../crates/triergon), [`triergon-playback`](../crates/playback), [`triergon-session`](../crates/session), [`triergon-capture`](../crates/capture) | Consumer facade with `AnyReader`; packet feeds over the readers; decode sessions over the codecs; capture sessions from RGBA to MPEG-TS |
-| Tooling | [`media-worker`](../crates/worker), [`codec-worker`](../crates/codec-worker), [`capture-worker`](../crates/capture-worker), [`harness/`](../harness), [`tools/`](../tools) | Differential and benchmark workers; not part of the library |
+| Tooling | [`media-worker`](../crates/worker), [`codec-worker`](../crates/codec-worker), [`capture-worker`](../crates/capture-worker), [`playback-worker`](../crates/playback-worker), [`harness/`](../harness), [`tools/`](../tools) | Differential and benchmark workers; not part of the library |
 
 The FFmpeg reference workers live in `harness/` as separate processes. They are
 never linked into a library crate.

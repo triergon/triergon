@@ -35,8 +35,8 @@ commands:
   check-safety   owned packages only, no build scripts, no unsafe code
   fixtures       generate the authored Matroska corpus into .research/ and its manifests
   fixture        write one corpus variant (see `cargo xtask fixture --help`)
-  prepare-ffmpeg [--jobs N] [--profile matroska|formats]
-                 build the pinned FFmpeg reference into .research/reference[-formats]
+  prepare-ffmpeg [--jobs N] [--profile matroska|formats|video]
+                 build the pinned FFmpeg reference into .research/reference[-formats|-video]
   fetch-specs    [--record] cache the specification texts and verify specs/sources.json
   fetch-vectors  cache the required external test vectors and verify their hashes
   external-vector --output DIR [--pairs N] [--iterations N] [--benchmark] [--memory]
@@ -367,7 +367,8 @@ fn report(root: &Path, args: &[String]) -> ExitCode {
                     match flag.as_str() {
                         "--pairs" => options.pairs = number as usize,
                         "--iterations" => {
-                            options.iterations = u32::try_from(number).map_err(|e| e.to_string())?
+                            options.iterations =
+                                Some(u32::try_from(number).map_err(|e| e.to_string())?)
                         }
                         _ => options.seed = number,
                     }
@@ -481,6 +482,7 @@ fn prepare_ffmpeg(root: &Path, args: &[String]) -> Task {
             "--jobs" => jobs = value.parse().map_err(|_| "jobs must be 1..8")?,
             "--profile" if value == "matroska" => profile = prepare::Profile::Matroska,
             "--profile" if value == "formats" => profile = prepare::Profile::Formats,
+            "--profile" if value == "video" => profile = prepare::Profile::Video,
             _ => return Err(USAGE.to_owned()),
         }
     }

@@ -181,6 +181,9 @@ done:
     return result;
 }
 static uint64_t now_ns(void){struct timespec t;clock_gettime(CLOCK_MONOTONIC,&t);return(uint64_t)t.tv_sec*1000000000+(uint64_t)t.tv_nsec;}
+#ifdef SAFE_MEDIA_FEED_REFERENCE
+#include "reference_feed.h"
+#endif
 int main(int argc,char **argv){
     av_log_set_level(AV_LOG_ERROR);
     if(argc<3)return 2;
@@ -197,6 +200,9 @@ int main(int argc,char **argv){
     uint8_t *data=malloc((size_t)size+1);if(!data){fclose(file);return 2;}
     if(fread(data,1,(size_t)size,file)!=(size_t)size){free(data);fclose(file);return 2;}fclose(file);
     if(!strcmp(argv[1],"baseline")){printf("{\"input_bytes\":%ld}\n",size);free(data);return 0;}
+#ifdef SAFE_MEDIA_FEED_REFERENCE
+    if(!strncmp(argv[1],"feed-",5)){int result=feed_main(argc,argv,data,size);free(data);return result;}
+#endif
     int metadata=!strncmp(argv[1],"catalogue-",10)?2:!strncmp(argv[1],"metadata-",9);
     int seek_mode=!strncmp(argv[1],"seek-",5);
     int64_t seek_ns=INT64_MIN;

@@ -10,7 +10,7 @@ against FFmpeg 9.0.
 |---|---|---|---|---|---|
 | Core | Charged storage, exact time, input windows, work budgets | 51,235 exact-arithmetic cases against an independent oracle | via dependents | via dependents | 32-bit target runs, fuzzing |
 | Matroska / WebM | Incremental reader: lacing, header removal, bounded zlib, Cues and preroll, colour and static HDR, chapters, tags, attachments, side data | 116 workloads in six feature groups, including an external HDR sample, and four FATE demux comparisons | 1.1558 (116/116 within 1.20) | heap ≤0.627, RSS ≤0.966 | full EBML/Matroska scope |
-| Matroska startup and seek | Startup and seek with lazy scan replay | 44 cases, 1,344 packets | 1.1933 (44/44 within 1.20) | heap ≤0.404, RSS ≤0.735 | — |
+| Matroska startup and seek | Startup and seek with lazy scan replay | 44 cases, 1,344 packets | 1.1920 (44/44 within 1.20) | heap ≤0.404, total RSS ≤0.812 | — |
 | Matroska audio clocks | AAC, AC-3, E-AC-3 startup and forward clocks | 10 inputs | 0.17 | heap 0.07, RSS 0.60 | audio seek |
 | ISO BMFF / MP4 | Regular and fragmented files, edit lists, seek and range plans, QuickTime compatibility, bounded AAC configuration and surplus timing support; AVC, HEVC, AAC, AC-3, E-AC-3, DTS core, AV1, VP9 | 255 inputs, 1,020 operations (944 match with strict timing, 952 with bounded timing) | 1.1922 (32/32 within 1.20, including all eight surplus timing cases) | heap ≤0.293, RSS ≤0.680 on the same 32 cases | 20 unmatched reference successes, full-set measurements |
 | MPEG-TS | PSI, continuity, PES assembly; TS188 and M2TS192 | 272-request set (80 field matches, 23 open) | not measured | not measured | access-unit demux, broader profiles |
@@ -37,7 +37,7 @@ samples are archived, their SHA-256. Update the row in the same change as the re
 | Area | Revision | Raw samples SHA-256 |
 |---|---|---|
 | Matroska / WebM | `cd6ed16d7b37974a8e9d0e13c983965fc6ef7f64` | `ae86dddc2c4ee549c5289429002e145b05fd88fd718a63a413aae909b0af5ddd` |
-| Matroska startup and seek | `f2a45541a1b5e23fa87e8641f2918b8d9d2f7c00` | `0ea82b902ea66e99693143471ffcac873dab28fb41ee3601f48dd05527211b51` |
+| Matroska startup and seek | `fffb4a58ad0789338871d3032599e3116e5cb3d5` | `f449a8af7381be72dad4ffaba5615a99a0884a8bfb3a61b19c35f961f171f17a` |
 | ISO BMFF / MP4 | `68e846208e8e9be5f11c4c384cafc613444d9663` | `2df22635427d266ec17257d5e0a9ec8d1d19fd7038542343e5983c7d219795be` |
 | HLS segments | `763f05cf762dadd293328b33cc4dae54136695d4` | `de885f051789ceeff07556b40fcd3928c9e651d3c6b5ee3b193b8126d82435c1` |
 

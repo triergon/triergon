@@ -22,6 +22,28 @@ pub enum Profile {
     Matroska,
     /// An isolated MOV/TS/subtitle reference; the Matroska build is untouched.
     Formats,
+    /// The Matroska reference plus the H.264 and HEVC decoders, which stream
+    /// discovery uses to learn the B-picture delay; the Matroska build is untouched.
+    Video,
+}
+
+impl Profile {
+    /// The cache directory under the repository root.
+    pub fn cache(self) -> &'static str {
+        match self {
+            Profile::Matroska => ".research/reference",
+            Profile::Formats => ".research/reference-formats",
+            Profile::Video => ".research/reference-video",
+        }
+    }
+
+    pub fn name(self) -> &'static str {
+        match self {
+            Profile::Matroska => "matroska",
+            Profile::Formats => "formats",
+            Profile::Video => "video",
+        }
+    }
 }
 
 pub fn configure_argv(prefix: &Path, profile: Profile) -> Vec<String> {
@@ -59,6 +81,13 @@ pub fn configure_argv(prefix: &Path, profile: Profile) -> Vec<String> {
             .to_owned();
         }
         argv.push("--enable-bsf=h264_mp4toannexb,hevc_mp4toannexb,extract_extradata".into());
+    }
+    if profile == Profile::Video {
+        for flag in &mut argv {
+            if flag == "--enable-decoder=pcm_s16le" {
+                *flag = "--enable-decoder=pcm_s16le,h264,hevc".into();
+            }
+        }
     }
     argv
 }
@@ -122,16 +151,12 @@ pub fn prepare(
     if !(1..=8).contains(&jobs) {
         return Err("jobs must be 1..8".into());
     }
-    let cache = root.join(if profile == Profile::Matroska {
-        ".research/reference"
-    } else {
-        ".research/reference-formats"
-    });
+    let cache = root.join(profile.cache());
     fs::create_dir_all(&cache).map_err(|e| format!("{}: {e}", cache.display()))?;
     let name = format!("{REVISION}.tar.gz");
     let shared = root.join(".research/reference").join(&name);
-    // The formats build reuses the Matroska build's verified download read-only.
-    let archive_path = if profile == Profile::Formats && shared.is_file() {
+    // The other builds reuse the Matroska build's verified download read-only.
+    let archive_path = if profile != Profile::Matroska && shared.is_file() {
         shared
     } else {
         cache.join(&name)
@@ -199,7 +224,7 @@ pub fn prepare(
             ),
         ),
     ];
-    if profile == Profile::Formats {
+    if profile != Profile::Matroska {
         let lib = prefix.join("lib");
         let mut archives = Vec::new();
         let mut entries: Vec<_> = fs::read_dir(&lib)
@@ -218,7 +243,7 @@ pub fn prepare(
                 .to_string();
             archives.push((key, Value::str(sha256::hex(&data))));
         }
-        manifest.push(("profile", Value::str("formats")));
+        manifest.push(("profile", Value::str(profile.name())));
         manifest.push(("reference_archives", Value::object(archives)));
         manifest.push((
             "compiler",
@@ -281,5 +306,25 @@ mod tests {
             "Pinned source was changed: src/a.c"
         );
         fs::remove_dir_all(dir).unwrap();
+    }
+
+    #[test]
+    fn video_profile_adds_only_the_h264_and_hevc_decoders() {
+        let prefix = Path::new("/p");
+        let matroska = configure_argv(prefix, Profile::Matroska);
+        let video = configure_argv(prefix, Profile::Video);
+        let changed: Vec<_> = matroska
+            .iter()
+            .zip(&video)
+            .filter(|(a, b)| a != b)
+            .collect();
+        assert_eq!(matroska.len(), video.len());
+        assert_eq!(
+            changed,
+            [(
+                &"--enable-decoder=pcm_s16le".to_owned(),
+                &"--enable-decoder=pcm_s16le,h264,hevc".to_owned()
+            )]
+        );
     }
 }
