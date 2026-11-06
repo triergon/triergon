@@ -32,6 +32,9 @@ pub struct Options {
     /// Timed iterations per pair member; the contract's `iterations` when unset.
     pub iterations: Option<u32>,
     pub seed: u64,
+    /// Time and measure the candidate against this worker of another build instead
+    /// of the reference. Correctness is still compared with the reference.
+    pub baseline_worker: Option<PathBuf>,
 }
 
 impl Options {
@@ -42,6 +45,7 @@ impl Options {
             contract: root.join("harness/features/matroska-demux/contract.json"),
             output: root.join(".research/harness-report"),
             fate_cache: None,
+            baseline_worker: None,
             additional_reports: Vec::new(),
             require_acceptance: false,
             require_slice_acceptance: false,
@@ -239,6 +243,11 @@ fn object(pairs: Vec<(&str, Value)>) -> Value {
 /// Run the report; returns the process exit code (0 all cases pass, 1 a case
 /// failed, 2 a required acceptance was not reached).
 pub fn run(root: &Path, options: &Options) -> Result<i32, String> {
+    if options.baseline_worker.is_some()
+        && (options.require_acceptance || options.require_slice_acceptance)
+    {
+        return Err("a baseline comparison is not an acceptance run".into());
+    }
     let candidate = root.join("target/release/media-worker");
     let native = root.join("target/harness/ffmpeg-worker");
     let identity = read_json(&root.join("target/harness/identity.json"))?;
@@ -503,6 +512,7 @@ pub fn run(root: &Path, options: &Options) -> Result<i32, String> {
         let passed = s(&parity, "status") == Some("pass");
         row.push(("parity", parity));
         if let (true, Some((reference, input, operation))) = (passed, timed) {
+            let reference = options.baseline_worker.clone().unwrap_or(reference);
             if options.benchmark {
                 let timing = benchmark(
                     &candidate,

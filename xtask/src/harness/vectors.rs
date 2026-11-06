@@ -66,6 +66,9 @@ pub struct ExternalOptions {
     pub iterations: u32,
     pub benchmark: bool,
     pub memory: bool,
+    /// Time and measure against this worker of another build instead of the
+    /// reference. Correctness is still compared with the reference.
+    pub baseline_worker: Option<PathBuf>,
 }
 
 /// Qualify the mandatory external metadata vector; returns the exit code.
@@ -123,12 +126,13 @@ pub fn external_vector(root: &Path, options: &ExternalOptions) -> R<i32> {
         arguments: vec![],
     };
     if s(&result, "status") == Some("pass") {
+        let comparison = options.baseline_worker.as_ref().unwrap_or(&reference);
         if options.benchmark {
             case.push((
                 "timing",
                 benchmark(
                     &candidate,
-                    &reference,
+                    comparison,
                     &path,
                     options.pairs,
                     options.iterations,
@@ -143,7 +147,7 @@ pub fn external_vector(root: &Path, options: &ExternalOptions) -> R<i32> {
                 super::memory::collect(
                     root,
                     &candidate,
-                    &reference,
+                    comparison,
                     &path,
                     options.pairs,
                     280,

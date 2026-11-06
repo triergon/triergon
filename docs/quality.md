@@ -117,6 +117,10 @@ be established. Use built workers you trust.
   another benchmark; the runner rejects contaminated pairs.
 - Allocation tracking and timing are separate runs, because instrumentation changes
   timing.
+- To compare two revisions, build both on the same machine and run `cargo xtask report
+  --benchmark --baseline-worker W` from the changed tree, with `W` the same worker from
+  the base tree. Correctness is still compared with the reference; the pairs and ratios
+  are against `W`. Such a report is never an acceptance run.
 - Qualification runs on native AArch64 Linux. Results on one platform do not establish
   another; 32-bit ARMv7 needs its own runs.
 
