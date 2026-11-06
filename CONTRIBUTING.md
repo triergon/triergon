@@ -72,3 +72,7 @@ of the repository.
 encoder derived from zlib, under the zlib licence, and an MT19937 generator seeded as
 CPython's `random` module does, under the Mersenne Twister BSD licence and the PSF
 licence. See [xtask/THIRD-PARTY.md](xtask/THIRD-PARTY.md).
+
+[`harness/rss-bound/`](harness/rss-bound/README.md) is a Linux kernel module licensed
+GPL-2.0-only, as the GPL-only kernel symbols it uses require. It is measurement tooling,
+never linked into a library crate or shipped.
