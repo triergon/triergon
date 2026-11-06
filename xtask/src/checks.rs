@@ -105,9 +105,9 @@ pub fn design(root: &Path) -> Result<String, Vec<String>> {
     {
         errors.push("a module was marked accepted without implementation evidence".into());
     }
-    let fate = match read_json(&root.join("research/fate-index.json")) {
+    let fate = match read_json(&root.join("harness/fate/index.json")) {
         Ok(fate) => fate,
-        Err(error) => return Err(vec![format!("research/fate-index.json: {error}")]),
+        Err(error) => return Err(vec![format!("harness/fate/index.json: {error}")]),
     };
     let cases = fate
         .get("cases")
@@ -303,11 +303,12 @@ mod tests {
     fn design_reports_invalid_json_and_gate_changes() {
         let root = crate::walk::scratch("design");
         fs::create_dir_all(root.join("research/sub")).unwrap();
+        fs::create_dir_all(root.join("harness/fate")).unwrap();
         let gates = r#"{"owner_requirements": {"runtime_ratio_max": 1.2, "runtime_optimization_ratio_target": 0.8},
                         "modules": [{"accepted": false}, {"accepted": false}]}"#;
         fs::write(root.join("research/module-gates.json"), gates).unwrap();
         fs::write(
-            root.join("research/fate-index.json"),
+            root.join("harness/fate/index.json"),
             r#"{"cases": [{"status": "unmapped", "rights": "unreviewed"}]}"#,
         )
         .unwrap();

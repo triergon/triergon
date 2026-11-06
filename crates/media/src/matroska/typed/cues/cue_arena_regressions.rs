@@ -57,7 +57,7 @@ fn run(points: &[(u8, usize)], live: usize, chunk: u64) -> String {
 fn cue_arena_peak_work_and_pressure_match_the_preimage() {
     let expected = include_str!(concat!(
         env!("CARGO_MANIFEST_DIR"),
-        "/../../research/m1/patch/CUES-PREIMAGE-TRACE.txt"
+        "/../../harness/traces/cues-preimage.txt"
     ));
     let mut big_first = vec![(0_u8, 60_usize)];
     big_first.extend((1..200).map(|t| (t as u8, 1)));

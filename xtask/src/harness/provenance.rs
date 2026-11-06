@@ -18,7 +18,7 @@ pub fn matroska_inputs() -> Vec<String> {
     let mut names: Vec<String> = [
         "Makefile",
         "specs/sources.json",
-        "research/fate-index.json",
+        "harness/fate/index.json",
         "harness/oracles.py",
         "xtask/src/harness/acceptance.rs",
         "xtask/src/harness/build.rs",
@@ -47,7 +47,7 @@ pub fn matroska_inputs() -> Vec<String> {
         "harness/portable-memory-check.c",
         "harness/rss-bound-api.h",
         "harness/comparison-rules.json",
-        "harness/fate-map.json",
+        "harness/fate/map.json",
     ]
     .map(String::from)
     .to_vec();

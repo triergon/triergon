@@ -3,7 +3,7 @@
 
 Runs one required case through the Rust worker (candidate) and the FFmpeg
 reference worker, then applies the predeclared rules of
-research/capture/contract.json `comparison_rules`:
+harness/capture/contract.json `comparison_rules`:
 
   conversion  every Y/U/V sample within +-1 of the reference conversion
   mux         own TS checker on both outputs (sync, continuity, PCR = DTS*300

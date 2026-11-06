@@ -15,7 +15,7 @@
     "--configured-list",
     "/Users/jonasgrosch/projects/safe-media/.research/reference-formats/fate-list.txt",
     "--output",
-    "research/formats-fate-index.json"
+    "harness/fate/formats-index.json"
   ],
   "families": [
     "matroska",

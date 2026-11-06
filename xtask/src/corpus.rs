@@ -15,7 +15,7 @@ use crate::sha256;
 use crate::zlib::{self, Strategy};
 
 /// The recorded reference trace whose packets the fixtures reuse.
-const SOURCE_TRACE: &str = "research/implementation/cases/avc-aac-sub/reference.json";
+const SOURCE_TRACE: &str = "harness/fixtures/avc-aac-sub-reference.json";
 
 const SEGMENT: u32 = 0x18538067;
 const INFO: u32 = 0x1549A966;

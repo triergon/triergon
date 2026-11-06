@@ -3,7 +3,7 @@
 
 Runs `capture-worker convert`, `recon` and `pipeline` over deterministic RGBA
 inputs at the geometry, orientation and bit rate of every case in
-research/capture/cases.json, and records the SHA-256 of each output plus the
+harness/capture/cases.json, and records the SHA-256 of each output plus the
 exit status and stderr. Refactors of the converter, encoder, multiplexer and
 session must reproduce the record exactly. The inputs are generated here in
 pure Python (seeded noise, a scrolled texture, a scene cut and a static screen);
@@ -83,7 +83,7 @@ def main():
     worker = str(ROOT / "target/release/capture-worker")
     record = {}
     with tempfile.TemporaryDirectory() as scratch:
-        for index, case in enumerate(load(ROOT / "research/capture/cases.json")["cases"]):
+        for index, case in enumerate(load(ROOT / "harness/capture/cases.json")["cases"]):
             w, h, flip, rate = case["width"], case["height"], case["flip"], case["bitrate"]
             path = Path(scratch) / f"{case['id']}.rgba"
             path.write_bytes(frames(case["content"], w, h, 280 + index))

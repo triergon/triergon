@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 """D5/O62 capture qualification on native Linux (research tooling).
 
-For every required case in research/capture/cases.json:
+For every required case in harness/capture/cases.json:
   1. generate the RGBA input and record its SHA-256;
   2. correctness: harness/capture/compare.py (conversion, mux, encoder,
-     pipeline rules of research/capture/contract.json);
+     pipeline rules of harness/capture/contract.json);
   3. runtime: paired, randomly ordered worker processes; each sample is the
      median of `--iterations` in-process sessions after one discarded warm-up
      session; the ratio interval is the shared harness's bootstrap of the
@@ -152,7 +152,7 @@ def main():
     ap.add_argument("--reference-streem", help="exact Streem-configuration worker, reported separately")
     ap.add_argument("--oracle-bin", required=True)
     ap.add_argument("--observer", required=True)
-    ap.add_argument("--cases", default=str(ROOT / "research/capture/cases.json"))
+    ap.add_argument("--cases", default=str(ROOT / "harness/capture/cases.json"))
     ap.add_argument("--only", nargs="*")
     ap.add_argument("--inputs", required=True)
     ap.add_argument("--out", required=True)

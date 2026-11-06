@@ -262,8 +262,8 @@ pub fn run(root: &Path, options: &Options) -> Result<i32, String> {
     let target = host_target();
     let coverage = fate_coverage(
         root,
-        &read_json(&root.join("research/fate-index.json"))?,
-        &read_json(&root.join("harness/fate-map.json"))?,
+        &read_json(&root.join("harness/fate/index.json"))?,
+        &read_json(&root.join("harness/fate/map.json"))?,
         options.fate_cache.as_deref(),
     )?;
     let base = vec![
