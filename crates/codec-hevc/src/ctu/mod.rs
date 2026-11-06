@@ -63,6 +63,7 @@ pub struct RefLists<'a, P> {
     pub no_backward_pred: bool,
 }
 
+#[derive(Debug)]
 pub struct Scratch<P> {
     pub coeffs: Vec<i32>,
     pub res: Vec<i32>,

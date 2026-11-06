@@ -16,7 +16,7 @@ pub(super) struct Style {
     pub alpha: u8,
 }
 impl Style {
-    pub fn read(bytes: &[u8]) -> Self {
+    pub(super) fn read(bytes: &[u8]) -> Self {
         Self {
             font: u16::from_be_bytes([bytes[0], bytes[1]]),
             face: bytes[2] & 7,
@@ -26,11 +26,12 @@ impl Style {
         }
     }
 }
+#[derive(Debug)]
 pub(super) struct Font {
     pub id: u16,
     pub name: Range<usize>,
 }
-#[derive(Clone, Copy)]
+#[derive(Debug, Clone, Copy)]
 enum Phase {
     Fixed,
     Fonts,
@@ -40,6 +41,7 @@ enum Phase {
     Ready,
 }
 
+#[derive(Debug)]
 pub(super) struct Configuration {
     pub raw: Option<Bytes>,
     pub style: Style,
@@ -57,7 +59,7 @@ pub(super) struct Configuration {
     writer: Writer,
 }
 impl Configuration {
-    pub fn new(
+    pub(super) fn new(
         pool: &Budget,
         raw: Option<&Bytes>,
         options: Options,
@@ -91,7 +93,7 @@ impl Configuration {
             writer: Writer::new(pool),
         })
     }
-    pub fn font_name(&self, index: usize) -> Result<&[u8]> {
+    pub(super) fn font_name(&self, index: usize) -> Result<&[u8]> {
         let font = self
             .fonts
             .as_slice()
@@ -113,7 +115,7 @@ impl Configuration {
         self.default_font = None;
         self.phase = Phase::Header;
     }
-    pub fn poll(
+    pub(super) fn poll(
         &mut self,
         _pool: &Budget,
         limits: Limits,

@@ -1271,6 +1271,7 @@ pub struct Mov9SyncDiagnostic {
     pub field_end: u64,
     pub strict_error: Error,
 }
+#[derive(Debug)]
 pub struct Mov9RecoverySourceCursor<'a> {
     inner: SampleCursor<'a>,
     unknown_access: bool,
@@ -1290,12 +1291,14 @@ impl Mov9RecoverySourceCursor<'_> {
 }
 /// Native ticks are observations; source_timescale zero means that conversion
 /// to source seconds is invalid, even though the original raw ticks are known.
+#[derive(Debug)]
 pub struct Mov9RecoveryOccurrence {
     pub track_id: u32,
     pub source: Sample,
     pub native: crate::Mov9PacketView,
     pub source_timescale: u32,
 }
+#[derive(Debug)]
 pub struct Mov9RecoveryPacketCursor<'a> {
     inner: crate::Mov9PacketCursor<'a>,
     unknown_access: bool,
@@ -1323,6 +1326,7 @@ impl Mov9RecoveryPacketCursor<'_> {
         })
     }
 }
+#[derive(Debug)]
 pub struct Mov9RecoveryIndexEntry {
     pub ordinal: u64,
     pub position: i64,
@@ -1333,6 +1337,7 @@ pub struct Mov9RecoveryIndexEntry {
     pub source: Sample,
     pub source_timescale: u32,
 }
+#[derive(Debug)]
 pub struct Mov9RecoveryIndexCursor<'a> {
     inner: crate::Mov9NativeIndexCursor<'a>,
     unknown_access: bool,
@@ -1366,9 +1371,10 @@ impl Mov9RecoveryIndexCursor<'_> {
 }
 
 mod recovery_v2;
+pub(crate) use recovery_v2::{Mov9InitialDescriptionDiagnostic, Mov9RecoveryV2PacketCursor};
 pub use recovery_v2::{
-    Mov9InitialDescriptionDiagnostic, Mov9RecoveryV2Association, Mov9RecoveryV2Context,
-    Mov9RecoveryV2PacketCursor, Mov9RecoveryV2Read, PinnedMovD32RegularRecoveryV2,
+    Mov9RecoveryV2Association, Mov9RecoveryV2Context, Mov9RecoveryV2Read,
+    PinnedMovD32RegularRecoveryV2,
 };
 
 mod recovery_v3;

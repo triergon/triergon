@@ -1,7 +1,7 @@
 //! Frame buffers, per-picture motion storage and decoded picture buffer entries.
 
 /// Planar 4:2:0 8-bit frame buffer (luma dimensions are multiples of 16).
-#[derive(Clone, Default)]
+#[derive(Debug, Clone, Default)]
 pub(crate) struct FrameBuf {
     pub y: Vec<u8>,
     pub cb: Vec<u8>,
@@ -32,7 +32,7 @@ impl FrameBuf {
 /// Motion data of one coded picture (frame, or one field). Indexed MB-major:
 /// mv: `mb * 16 + raster4x4` (`mb * 4 + 8x8 index` when `corners`), ref_idx/ref_id:
 /// `mb * 4 + 8x8 index`.
-#[derive(Clone, Default)]
+#[derive(Debug, Clone, Default)]
 pub(crate) struct Motion {
     pub mv: [Vec<[i16; 2]>; 2],
     /// Only the corner 4x4 block of each 8x8 is kept (a stored reference of a frame-only
@@ -130,7 +130,7 @@ pub(crate) struct OutputInfo {
 }
 
 /// A decoded picture buffer entry: a frame or complementary field pair (or a single field).
-#[derive(Default)]
+#[derive(Debug, Default)]
 pub(crate) struct FrameStore {
     /// Shared with output pictures; the decoder writes only into an unshared buffer.
     pub buf: std::sync::Arc<FrameBuf>,

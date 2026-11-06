@@ -143,7 +143,7 @@ pub fn parse_st_rps(
 }
 
 /// Scaling factors (clause 7.4.5) expanded to full block sizes, stored as [y][x] row-major.
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub struct ScalingList {
     /// sizeId 0: 6 matrices of 16.
     pub sl4: [[u8; 16]; 6],
@@ -494,7 +494,7 @@ fn parse_vui(r: &mut BitReader<'_>, max_sub_layers_minus1: u32) -> Result<Vui> {
     Ok(v)
 }
 
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 #[allow(dead_code)] // informative fields kept for diagnostics
 pub struct Sps {
     pub id: u8,
@@ -814,7 +814,7 @@ pub fn parse_sps(rbsp: &[u8]) -> Result<Sps> {
     })
 }
 
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub struct Pps {
     pub id: u8,
     pub sps_id: u8,
@@ -1009,6 +1009,7 @@ pub fn parse_pps(rbsp: &[u8]) -> Result<Pps> {
 /// Picture-level layout derived from an (SPS, PPS) pair: tile scan conversion (6.5.1) and
 /// z-scan order (6.5.2).
 #[allow(dead_code)] // informative fields kept for diagnostics
+#[derive(Debug)]
 pub struct Layout {
     pub ctb_addr_rs_to_ts: Vec<u32>,
     pub ctb_addr_ts_to_rs: Vec<u32>,

@@ -128,13 +128,13 @@ impl Eq for SharedText {}
 #[derive(Debug)]
 pub(crate) struct StorageVec<T>(pub(crate) BudgetVec<T>);
 impl<T> StorageVec<T> {
-    pub fn new(pool: &Budget) -> Self {
+    pub(crate) fn new(pool: &Budget) -> Self {
         Self(BudgetVec::new(pool))
     }
-    pub fn capacity(&self) -> usize {
+    pub(crate) fn capacity(&self) -> usize {
         self.0.capacity()
     }
-    pub fn push(&mut self, value: T) -> Result<()> {
+    pub(crate) fn push(&mut self, value: T) -> Result<()> {
         self.0.try_push(value).map_err(|e| e.error)
     }
 }

@@ -66,13 +66,13 @@ pub(crate) struct ReplayLocation {
     pub cluster_time: Option<u64>,
 }
 impl ReplayLocation {
-    pub fn block_offset(&self) -> u64 {
+    pub(crate) fn block_offset(&self) -> u64 {
         self.position
     }
-    pub fn cluster_offset(&self) -> u64 {
+    pub(crate) fn cluster_offset(&self) -> u64 {
         self.cluster.start
     }
-    pub fn checkpoint(&self) -> &ClusterCheckpoint {
+    pub(crate) fn checkpoint(&self) -> &ClusterCheckpoint {
         &self.checkpoint
     }
 }

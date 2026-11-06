@@ -5,12 +5,13 @@
 //! time and seeking belong to other crates.
 #![forbid(unsafe_code)]
 #![warn(
+    missing_debug_implementations,
     unreachable_pub,
     clippy::print_stdout,
     clippy::print_stderr,
     clippy::unwrap_used
 )]
-// Pending: `missing_docs`, `missing_debug_implementations`, `clippy::expect_used`.
+// Pending: `missing_docs`, `clippy::expect_used`.
 
 pub mod carrier;
 pub mod clock;

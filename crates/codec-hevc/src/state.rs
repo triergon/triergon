@@ -12,7 +12,7 @@ pub const F_PCM: u8 = 8;
 /// The luma transform block covering this 4x4 block has non-zero coefficients.
 pub const F_NZ: u8 = 16;
 
-#[derive(Clone, Copy, Default)]
+#[derive(Debug, Clone, Copy, Default)]
 pub struct BlkInfo {
     pub flags: u8,
     pub depth: u8,
@@ -20,7 +20,7 @@ pub struct BlkInfo {
     pub qp: i8,
 }
 
-#[derive(Clone, Copy, Default)]
+#[derive(Debug, Clone, Copy, Default)]
 pub struct SaoParams {
     pub type_idx: [u8; 3],
     pub band_pos: [u8; 3],
@@ -29,7 +29,7 @@ pub struct SaoParams {
 }
 
 /// Information about a slice segment of the current picture needed after parsing.
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 #[allow(dead_code)] // informative fields kept for diagnostics
 pub struct SliceInfo {
     pub slice_addr_rs: u32,
@@ -43,6 +43,7 @@ pub struct SliceInfo {
     pub ref_lt: [[bool; 16]; 2],
 }
 
+#[derive(Debug)]
 pub struct PicState {
     pub w4: usize,
     pub h4: usize,

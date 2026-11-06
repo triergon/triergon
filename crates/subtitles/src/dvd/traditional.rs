@@ -68,7 +68,7 @@ pub struct TraditionalSubpicture {
     times: ReceiverDisplayTimes,
 }
 
-#[derive(Default)]
+#[derive(Debug, Default)]
 pub struct TraditionalStorage {
     controls: Option<BudgetVec<ControlFacts>>,
     pixels: Option<BytesWriter>,

@@ -331,7 +331,7 @@ pub(crate) struct PacketBatchJob {
 }
 impl PacketBatchJob {
     #[inline(always)]
-    pub fn new(
+    pub(crate) fn new(
         source: SharedBytes,
         simple: bool,
         cluster_ticks: u64,
@@ -418,7 +418,7 @@ impl PacketBatchJob {
             .and_then(|frames| frames.get(index))
             .required("missing frame range")
     }
-    pub fn step(
+    pub(crate) fn step(
         &mut self,
         work: &mut WorkBudget,
         cancel: &AtomicBool,

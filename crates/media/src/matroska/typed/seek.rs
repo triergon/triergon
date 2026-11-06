@@ -70,7 +70,7 @@ impl SeekPlanJob {
     // the observed native cross-Cluster suffix. This is an explicit format replay
     // policy, not a claim about native index internals or a normative tie winner.
     // Equal-Cluster reference ordering remains unchanged and separately unproven.
-    pub fn new(
+    pub(crate) fn new(
         configuration: Configuration,
         track: usize,
         requested: i64,
@@ -112,7 +112,7 @@ impl SeekPlanJob {
             failed: false,
         })
     }
-    pub fn step(
+    pub(crate) fn step(
         &mut self,
         cues: &[Cue],
         work: &mut WorkBudget,

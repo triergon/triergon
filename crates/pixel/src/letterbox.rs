@@ -303,7 +303,7 @@ fn vfixed_into<const ADD: bool>(coef: &[i16], rows: [&[i16]; 4], acc: &mut [i32]
 }
 
 /// A plane resampled row by row through a ring of horizontally scaled rows.
-#[derive(Default)]
+#[derive(Debug, Default)]
 struct Pass {
     horizontal: Filter,
     vertical: Filter,
@@ -368,7 +368,7 @@ impl Pass {
 }
 
 /// Per-geometry state of the separable path.
-#[derive(Default)]
+#[derive(Debug, Default)]
 struct Plan {
     luma: Pass,
     chroma: [Pass; 2],
@@ -432,7 +432,7 @@ const GREY_OY: i32 = -1_304_880;
 
 /// Chroma terms of one output row, one value per pixel (each chroma sample
 /// written to its horizontal pair) so the packing loops vectorise.
-#[derive(Default)]
+#[derive(Debug, Default)]
 struct Terms {
     c: [Vec<i16>; 3],
 }
@@ -627,7 +627,7 @@ impl Wide {
     }
 }
 
-#[derive(Default)]
+#[derive(Debug, Default)]
 pub struct Scaler {
     key: Option<(usize, usize, u8)>,
     plan: Option<Plan>,

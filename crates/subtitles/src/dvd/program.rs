@@ -201,6 +201,7 @@ pub enum DisplayControlStep {
     End,
 }
 
+#[derive(Debug)]
 pub struct DisplayControls<'a> {
     packet: DvdPacket<'a>,
     controls: &'a [ControlFacts],

@@ -94,6 +94,7 @@ impl PacketView {
 /// One complete physical ASS packet, not a transport or a streaming document.
 /// Construction checks every source owner through Extractor; a fabricated Cue
 /// cannot act as an already-validated input. Backpressure and cancel are resumable.
+#[derive(Debug)]
 pub struct AssPacketJob {
     extractor: Extractor,
     source: Option<Cue>,

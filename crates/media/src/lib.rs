@@ -1,7 +1,13 @@
 //! Bounded compressed-media parsing. Experimental.
 #![forbid(unsafe_code)]
-#![warn(clippy::print_stdout, clippy::print_stderr, clippy::unwrap_used)]
-// Pending: `missing_docs`, `missing_debug_implementations`, `unreachable_pub`, `clippy::expect_used`.
+#![warn(
+    missing_debug_implementations,
+    unreachable_pub,
+    clippy::print_stdout,
+    clippy::print_stderr,
+    clippy::unwrap_used
+)]
+// Pending: `missing_docs`, `clippy::expect_used`.
 // Pending: these rewrites change the generated code of measured hot paths and are
 // adopted with an A/B timing run.
 #![allow(

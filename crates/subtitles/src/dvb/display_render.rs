@@ -44,7 +44,7 @@ pub(crate) struct Renderer {
 }
 
 impl Renderer {
-    pub fn new(budget: &Budget) -> Self {
+    pub(super) fn new(budget: &Budget) -> Self {
         Self {
             region: 0,
             entered: false,
@@ -406,7 +406,7 @@ impl Renderer {
         self.offset = 0;
     }
 
-    pub fn step(&mut self, state: &mut State, work: &mut DecodeWork<'_>) -> Result<bool> {
+    pub(super) fn step(&mut self, state: &mut State, work: &mut DecodeWork<'_>) -> Result<bool> {
         if !self.rendered && !self.render_regions(state, work)? {
             return Ok(false);
         }

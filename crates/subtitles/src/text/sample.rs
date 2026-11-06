@@ -21,7 +21,7 @@ pub(crate) struct Tx3g {
 }
 
 impl Tx3g {
-    pub fn new(pool: &Budget, iso_boxes: bool) -> Self {
+    pub(super) fn new(pool: &Budget, iso_boxes: bool) -> Self {
         Self {
             length: [0; 2],
             length_read: 0,
@@ -34,7 +34,7 @@ impl Tx3g {
         }
     }
 
-    pub fn text(
+    pub(super) fn text(
         &mut self,
         bytes: &[u8],
         work: &mut WorkBudget,
@@ -61,7 +61,7 @@ impl Tx3g {
         Ok(Poll::Ready(2..end))
     }
 
-    pub fn boxes(
+    pub(super) fn boxes(
         &mut self,
         bytes: &[u8],
         limits: Limits,
@@ -150,7 +150,7 @@ impl Tx3g {
         }
     }
 
-    pub fn take_modifiers(&mut self, pool: &Budget) -> BudgetVec<Modifier> {
+    pub(super) fn take_modifiers(&mut self, pool: &Budget) -> BudgetVec<Modifier> {
         std::mem::replace(&mut self.modifiers, BudgetVec::new(pool))
     }
 }
@@ -164,7 +164,7 @@ pub(crate) struct Addition {
 }
 
 impl Addition {
-    pub fn new(length: usize) -> Self {
+    pub(super) fn new(length: usize) -> Self {
         Self {
             cursor: Cursor::new(0..length, Encoding::Utf8),
             first: None,
@@ -173,7 +173,7 @@ impl Addition {
         }
     }
 
-    pub fn poll(
+    pub(super) fn poll(
         &mut self,
         bytes: &[u8],
         work: &mut WorkBudget,

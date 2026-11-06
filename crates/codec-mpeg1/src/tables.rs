@@ -8,7 +8,7 @@
 #![allow(clippy::unusual_byte_groupings)]
 
 /// B.1 macroblock_address_increment, index = increment (1..=33).
-pub const ADDRESS_INCREMENT: [(u32, u32); 34] = [
+pub(crate) const ADDRESS_INCREMENT: [(u32, u32); 34] = [
     (0, 0),
     (0b1, 1),
     (0b011, 3),
@@ -46,21 +46,21 @@ pub const ADDRESS_INCREMENT: [(u32, u32); 34] = [
 ];
 
 /// macroblock_escape: adds 33 to the increment.
-pub const ADDRESS_ESCAPE: (u32, u32) = (0b0000_0001_000, 11);
+pub(crate) const ADDRESS_ESCAPE: (u32, u32) = (0b0000_0001_000, 11);
 
 /// B.2a/B.2b macroblock_type codes used by this encoder.
-pub const MB_I_INTRA: (u32, u32) = (0b1, 1);
-pub const MB_I_INTRA_QUANT: (u32, u32) = (0b01, 2);
-pub const MB_P_MC_CODED: (u32, u32) = (0b1, 1);
-pub const MB_P_NOMC_CODED: (u32, u32) = (0b01, 2);
-pub const MB_P_MC_NOT_CODED: (u32, u32) = (0b001, 3);
-pub const MB_P_INTRA: (u32, u32) = (0b0001_1, 5);
-pub const MB_P_MC_CODED_QUANT: (u32, u32) = (0b0001_0, 5);
-pub const MB_P_NOMC_CODED_QUANT: (u32, u32) = (0b0000_1, 5);
-pub const MB_P_INTRA_QUANT: (u32, u32) = (0b0000_01, 6);
+pub(crate) const MB_I_INTRA: (u32, u32) = (0b1, 1);
+pub(crate) const MB_I_INTRA_QUANT: (u32, u32) = (0b01, 2);
+pub(crate) const MB_P_MC_CODED: (u32, u32) = (0b1, 1);
+pub(crate) const MB_P_NOMC_CODED: (u32, u32) = (0b01, 2);
+pub(crate) const MB_P_MC_NOT_CODED: (u32, u32) = (0b001, 3);
+pub(crate) const MB_P_INTRA: (u32, u32) = (0b0001_1, 5);
+pub(crate) const MB_P_MC_CODED_QUANT: (u32, u32) = (0b0001_0, 5);
+pub(crate) const MB_P_NOMC_CODED_QUANT: (u32, u32) = (0b0000_1, 5);
+pub(crate) const MB_P_INTRA_QUANT: (u32, u32) = (0b0000_01, 6);
 
 /// B.3 coded_block_pattern, index = cbp (1..=63; 0 is MPEG-2 only).
-pub const CODED_BLOCK_PATTERN: [(u32, u32); 64] = [
+pub(crate) const CODED_BLOCK_PATTERN: [(u32, u32); 64] = [
     (0b0000_0000_1, 9),
     (0b0101_1, 5),
     (0b0100_1, 5),
@@ -128,7 +128,7 @@ pub const CODED_BLOCK_PATTERN: [(u32, u32); 64] = [
 ];
 
 /// B.4 motion_code magnitude 0..=16, without the trailing sign bit.
-pub const MOTION_CODE: [(u32, u32); 17] = [
+pub(crate) const MOTION_CODE: [(u32, u32); 17] = [
     (0b1, 1),
     (0b01, 2),
     (0b001, 3),
@@ -149,7 +149,7 @@ pub const MOTION_CODE: [(u32, u32); 17] = [
 ];
 
 /// B.5a dct_dc_size_luminance, index = size (0..=8).
-pub const DC_SIZE_LUMA: [(u32, u32); 9] = [
+pub(crate) const DC_SIZE_LUMA: [(u32, u32); 9] = [
     (0b100, 3),
     (0b00, 2),
     (0b01, 2),
@@ -162,7 +162,7 @@ pub const DC_SIZE_LUMA: [(u32, u32); 9] = [
 ];
 
 /// B.5b dct_dc_size_chrominance, index = size (0..=8).
-pub const DC_SIZE_CHROMA: [(u32, u32); 9] = [
+pub(crate) const DC_SIZE_CHROMA: [(u32, u32); 9] = [
     (0b00, 2),
     (0b01, 2),
     (0b10, 2),
@@ -174,8 +174,8 @@ pub const DC_SIZE_CHROMA: [(u32, u32); 9] = [
     (0b1111_1110, 8),
 ];
 
-pub const END_OF_BLOCK: (u32, u32) = (0b10, 2);
-pub const DCT_ESCAPE: (u32, u32) = (0b0000_01, 6);
+pub(crate) const END_OF_BLOCK: (u32, u32) = (0b10, 2);
+pub(crate) const DCT_ESCAPE: (u32, u32) = (0b0000_01, 6);
 
 /// B.5c–f dct_coeff_next as (run, level, code-without-sign, length-without-sign).
 /// Run 0 level 1 is listed with its `dct_coeff_next` form `11`; the first
@@ -302,12 +302,12 @@ const MAX_LEVEL: [u8; 32] = [
 
 /// Dense (run, level) → (code with sign slot, length including sign) lookup.
 /// Entries are packed as `code << 5 | length`; zero means "use escape".
-pub struct CoefficientTable {
+pub(crate) struct CoefficientTable {
     entries: [[u32; 41]; 32],
 }
 
 impl CoefficientTable {
-    pub const fn new() -> CoefficientTable {
+    pub(crate) const fn new() -> CoefficientTable {
         let mut entries = [[0u32; 41]; 32];
         let mut i = 0;
         while i < DCT_COEFFICIENTS.len() {
@@ -320,7 +320,7 @@ impl CoefficientTable {
 
     /// (code, length) with the sign bit clear, or `None` for escape coding.
     #[inline]
-    pub fn lookup(&self, run: usize, level: u32) -> Option<(u32, u32)> {
+    pub(crate) fn lookup(&self, run: usize, level: u32) -> Option<(u32, u32)> {
         if run < 32 && level <= MAX_LEVEL[run] as u32 {
             let e = self.entries[run][level as usize];
             Some((e >> 5, e & 31))
@@ -336,17 +336,17 @@ impl Default for CoefficientTable {
     }
 }
 
-pub static COEFFICIENTS: CoefficientTable = CoefficientTable::new();
+pub(crate) static COEFFICIENTS: CoefficientTable = CoefficientTable::new();
 
 /// Zig-zag scan order (scan index → raster index).
-pub const ZIGZAG: [usize; 64] = [
+pub(crate) const ZIGZAG: [usize; 64] = [
     0, 1, 8, 16, 9, 2, 3, 10, 17, 24, 32, 25, 18, 11, 4, 5, 12, 19, 26, 33, 40, 48, 41, 34, 27, 20,
     13, 6, 7, 14, 21, 28, 35, 42, 49, 56, 57, 50, 43, 36, 29, 22, 15, 23, 30, 37, 44, 51, 58, 59,
     52, 45, 38, 31, 39, 46, 53, 60, 61, 54, 47, 55, 62, 63,
 ];
 
 /// Raster index → zig-zag scan index.
-pub const SCAN_INDEX: [usize; 64] = {
+pub(crate) const SCAN_INDEX: [usize; 64] = {
     let mut inverse = [0usize; 64];
     let mut k = 0;
     while k < 64 {
@@ -357,7 +357,7 @@ pub const SCAN_INDEX: [usize; 64] = {
 };
 
 /// Default intra quantiser matrix, raster order.
-pub const INTRA_MATRIX: [u16; 64] = [
+pub(crate) const INTRA_MATRIX: [u16; 64] = [
     8, 16, 19, 22, 26, 27, 29, 34, //
     16, 16, 22, 24, 27, 29, 34, 37, //
     19, 22, 26, 27, 29, 34, 34, 38, //

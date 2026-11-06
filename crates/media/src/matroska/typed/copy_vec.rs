@@ -17,30 +17,30 @@ pub(crate) struct CopyVec<T: Copy> {
     growth: Option<(BudgetVec<T>, usize)>,
 }
 impl<T: Copy> CopyVec<T> {
-    pub fn new(pool: &Budget) -> Self {
+    pub(crate) fn new(pool: &Budget) -> Self {
         Self {
             data: BudgetVec::new(pool),
             operation: None,
             growth: None,
         }
     }
-    pub fn len(&self) -> usize {
+    pub(crate) fn len(&self) -> usize {
         self.data.len()
     }
-    pub fn as_slice(&self) -> &[T] {
+    pub(crate) fn as_slice(&self) -> &[T] {
         self.data.as_slice()
     }
-    pub fn cancel_pending(&mut self) {
+    pub(crate) fn cancel_pending(&mut self) {
         self.operation = None;
         self.growth = None;
     }
     /// Drops every element and the allocation (and its charge), keeping only
     /// the pool: the same state as a new arena, without another pool handle.
-    pub fn reset(&mut self) {
+    pub(crate) fn reset(&mut self) {
         self.cancel_pending();
         self.data = BudgetVec::new(self.data.budget());
     }
-    pub fn truncate(&mut self, len: usize) -> Result<()> {
+    pub(crate) fn truncate(&mut self, len: usize) -> Result<()> {
         if len > self.data.len() {
             return Err(Error::Invalid("copy arena truncate grows"));
         }
@@ -49,7 +49,7 @@ impl<T: Copy> CopyVec<T> {
         }
         Ok(())
     }
-    pub fn push_precharged(&mut self, value: T) -> Result<()> {
+    pub(crate) fn push_precharged(&mut self, value: T) -> Result<()> {
         if self.operation.is_some()
             || self.growth.is_some()
             || self.data.len() == self.data.capacity()
@@ -58,7 +58,7 @@ impl<T: Copy> CopyVec<T> {
         }
         self.data.try_push(value).map_err(|e| e.error)
     }
-    pub fn reserve(&mut self, additional: usize) -> Result<()> {
+    pub(crate) fn reserve(&mut self, additional: usize) -> Result<()> {
         if self.operation.is_some() {
             return Err(Error::Invalid("copy arena operation already pending"));
         }
@@ -67,20 +67,24 @@ impl<T: Copy> CopyVec<T> {
         ));
         Ok(())
     }
-    pub fn push(&mut self, value: T) -> Result<()> {
+    pub(crate) fn push(&mut self, value: T) -> Result<()> {
         if self.operation.is_some() {
             return Err(Error::Invalid("copy arena operation already pending"));
         }
         self.operation = Some(Operation::Push(value));
         Ok(())
     }
-    pub fn finish(self) -> Result<BudgetVec<T>> {
+    pub(crate) fn finish(self) -> Result<BudgetVec<T>> {
         if self.operation.is_some() || self.growth.is_some() {
             return Err(Error::Invalid("copy arena is incomplete"));
         }
         Ok(self.data)
     }
-    pub fn step(&mut self, work: &mut WorkBudget, cancel: &AtomicBool) -> Result<ParseStep<()>> {
+    pub(crate) fn step(
+        &mut self,
+        work: &mut WorkBudget,
+        cancel: &AtomicBool,
+    ) -> Result<ParseStep<()>> {
         loop {
             check(cancel)?;
             if let Some((replacement, at)) = &mut self.growth {

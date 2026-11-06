@@ -46,6 +46,7 @@ impl Default for MuxConfig {
 }
 
 /// Muxer state. Tables are serialised once; only continuity counters change.
+#[derive(Debug)]
 pub struct Muxer {
     video_pid: u16,
     pat: Vec<u8>,

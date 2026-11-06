@@ -5,6 +5,7 @@
 
 const MAX_M: usize = 32;
 
+#[derive(Debug)]
 pub(crate) struct Dct4 {
     n: usize,
     pre: Vec<(f32, f32)>,

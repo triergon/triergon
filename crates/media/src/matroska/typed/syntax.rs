@@ -25,13 +25,13 @@ pub(crate) struct ChildCursor {
     end: usize,
 }
 impl ChildCursor {
-    pub fn new(range: Range<usize>) -> Self {
+    pub(crate) fn new(range: Range<usize>) -> Self {
         Self {
             at: range.start,
             end: range.end,
         }
     }
-    pub fn step(
+    pub(crate) fn step(
         &mut self,
         raw: &[u8],
         work: &mut WorkBudget,

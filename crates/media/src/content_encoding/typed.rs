@@ -64,7 +64,7 @@ pub(crate) struct EncodingsJob {
     failed: bool,
 }
 impl EncodingsJob {
-    pub fn new(
+    pub(crate) fn new(
         source: SharedBytes,
         range: Range<usize>,
         limit: usize,
@@ -108,7 +108,7 @@ impl EncodingsJob {
             failed: false,
         })
     }
-    pub fn step(
+    pub(crate) fn step(
         &mut self,
         work: &mut WorkBudget,
         cancel: &AtomicBool,

@@ -573,7 +573,7 @@ fn bounded(value: u64, maximum: u64) -> Result<()> {
     }
     Ok(())
 }
-#[derive(Clone, Copy, Default)]
+#[derive(Debug, Clone, Copy, Default)]
 struct State {
     ordinal: u64,
     chunk: u32,
@@ -585,6 +585,7 @@ struct State {
     distance: u64,
     native_started: bool,
 }
+#[derive(Debug)]
 struct Direct<'a> {
     table: &'a Mov9RunRecoveryV3Table,
     source: SampleCursor<'a>,
@@ -732,6 +733,7 @@ impl Direct<'_> {
     }
 }
 
+#[derive(Debug)]
 pub struct Mov9RecoveryV3PacketCursor<'a> {
     legacy: Option<Mov9RecoveryV2PacketCursor<'a>>,
     direct: Option<Direct<'a>>,
@@ -848,6 +850,7 @@ pub struct Mov9RecoveryV3IndexEvent {
     pub source_event: Mov9RecoveryV3Event,
     pub native_entry: Option<Mov9RecoveryV3NativeIndexEntry>,
 }
+#[derive(Debug)]
 pub struct Mov9RecoveryV3IndexCursor<'a> {
     inner: Mov9RecoveryV3PacketCursor<'a>,
     next: u64,

@@ -34,6 +34,7 @@ impl Mov9PrivateConfigurationV8 {
 /// This is an owned metadata operation like V7. It neither reads a live cursor
 /// nor implies that reset invalidates retained source metadata. The caller must
 /// bind the result to the exact source description before publishing a stream.
+#[derive(Debug)]
 pub struct Mov9PrivateConfigurationJobV8 {
     pool: Budget,
     header_job: Option<Mov9SampleEntryHeaderJobV7>,

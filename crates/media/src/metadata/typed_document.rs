@@ -205,7 +205,7 @@ pub(crate) struct DocumentLimits {
     pub attachment_limit: usize,
 }
 impl DocumentJob {
-    pub fn new(
+    pub(crate) fn new(
         kind: u64,
         raw: SharedBytes,
         limits: DocumentLimits,
@@ -265,7 +265,7 @@ impl DocumentJob {
             failed: false,
         })
     }
-    pub fn timestamp_scale(&self) -> Option<u64> {
+    pub(crate) fn timestamp_scale(&self) -> Option<u64> {
         self.timestamp_scale
     }
     fn retained_with_capacity(&self, capacity: usize) -> Result<usize> {
@@ -342,7 +342,7 @@ impl DocumentJob {
         };
         Ok((*lower, *upper, *ordered))
     }
-    pub fn step(
+    pub(crate) fn step(
         &mut self,
         work: &mut WorkBudget,
         cancel: &AtomicBool,
@@ -1012,14 +1012,14 @@ pub(crate) struct CataloguePrepareJob {
     ready: bool,
 }
 impl CataloguePrepareJob {
-    pub fn new() -> Self {
+    pub(crate) fn new() -> Self {
         Self {
             replacement: None,
             at: 0,
             ready: false,
         }
     }
-    pub fn step(
+    pub(crate) fn step(
         &mut self,
         catalogue: &mut Catalogue,
         limits: crate::Limits,
@@ -1114,7 +1114,7 @@ pub(crate) struct CatalogueJob {
     failed: bool,
 }
 impl CatalogueJob {
-    pub fn new(
+    pub(crate) fn new(
         kind: u64,
         raw: SharedBytes,
         structural_limit: usize,
@@ -1142,7 +1142,7 @@ impl CatalogueJob {
             failed: false,
         })
     }
-    pub fn step(
+    pub(crate) fn step(
         &mut self,
         catalogue: &mut Catalogue,
         work: &mut WorkBudget,

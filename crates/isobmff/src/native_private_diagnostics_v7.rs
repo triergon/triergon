@@ -47,7 +47,7 @@ pub struct Mov9PrivateDiagnosticsV7 {
     pub events: BudgetVec<Mov9NativeDiagnosticV7>,
     pub native_open_result: Option<i32>,
 }
-#[derive(Clone, Copy)]
+#[derive(Debug, Clone, Copy)]
 enum EsdsPhase {
     Full(u8),
     Tag(bool),
@@ -60,6 +60,7 @@ enum EsdsPhase {
     Ocr(u8),
     Done,
 }
+#[derive(Debug)]
 struct EsdsDemand {
     span: Bytes,
     at: usize,
@@ -193,6 +194,7 @@ impl EsdsDemand {
         }
     }
 }
+#[derive(Debug)]
 pub struct Mov9PrivateDiagnosticJobV7 {
     pool: Budget,
     parent: BoxView,

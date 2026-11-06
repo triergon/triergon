@@ -131,7 +131,7 @@ pub(crate) struct Parser {
 }
 
 impl Parser {
-    pub fn new(line: &Line, encoding: Encoding, comma: bool) -> Self {
+    pub(super) fn new(line: &Line, encoding: Encoding, comma: bool) -> Self {
         Self {
             cursor: Cursor::new(line.range(), encoding),
             phase: Phase::Start,
@@ -157,7 +157,7 @@ impl Parser {
         })
     }
 
-    pub fn poll(
+    pub(super) fn poll(
         &mut self,
         bytes: &[u8],
         work: &mut WorkBudget,

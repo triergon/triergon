@@ -61,6 +61,7 @@ pub enum NativePesProgress {
 /// One selected service and clock epoch. The caller recreates or resets the
 /// parser on a seek or discontinuity. Within an epoch, a changed known PTS
 /// opens a new group. An incomplete segment can continue across PES calls.
+#[derive(Debug)]
 pub struct NativePesParser {
     pool: Budget,
     last_pts: Option<i128>,
@@ -69,6 +70,7 @@ pub struct NativePesParser {
     input: Option<Pending>,
 }
 
+#[derive(Debug)]
 enum Tail {
     Shared(Bytes),
     Buffered(BudgetVec<u8>),
@@ -83,12 +85,14 @@ impl Tail {
     }
 }
 
+#[derive(Debug)]
 struct Pending {
     pes: Bytes,
     pts: Option<i128>,
     scan: Option<Scan>,
 }
 
+#[derive(Debug)]
 struct Scan {
     start: usize,
     prior_len: usize,
@@ -97,7 +101,7 @@ struct Scan {
     end: Option<ScanEnd>,
 }
 
-#[derive(Clone, Copy)]
+#[derive(Debug, Clone, Copy)]
 struct ScanEnd {
     active: bool,
     complete: usize,

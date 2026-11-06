@@ -8,7 +8,7 @@ use crate::tables::PRED_SFB_MAX;
 const ALPHA: f32 = 0.90625;
 const A: f32 = 0.953125;
 
-#[derive(Clone, Copy)]
+#[derive(Debug, Clone, Copy)]
 struct P {
     r0: f32,
     r1: f32,
@@ -27,6 +27,7 @@ const RESET: P = P {
     var1: 1.0,
 };
 
+#[derive(Debug)]
 pub(crate) struct PredState {
     s: Vec<P>,
 }

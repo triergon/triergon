@@ -15,13 +15,13 @@
 //! is an underflow.
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum Kind {
+pub(crate) enum Kind {
     Intra,
     Predicted,
 }
 
 #[derive(Clone, Copy, Debug)]
-pub struct Plan {
+pub(crate) struct Plan {
     pub q: u32,
     /// Unrounded model quantiser; rows mix its two neighbours.
     pub q_exact: f64,
@@ -35,7 +35,7 @@ pub struct Plan {
 }
 
 #[derive(Debug)]
-pub struct RateControl {
+pub(crate) struct RateControl {
     frame_bits: f64,
     gop: u32,
     vbv_size: f64,
@@ -71,7 +71,13 @@ const TARGET_VBV_SHARE: f64 = 0.96;
 const FIRST_P_RATIO: f64 = 0.75;
 
 impl RateControl {
-    pub fn new(bit_rate: u32, max_rate: u32, vbv_bits: u32, gop: u32, fps: f64) -> RateControl {
+    pub(crate) fn new(
+        bit_rate: u32,
+        max_rate: u32,
+        vbv_bits: u32,
+        gop: u32,
+        fps: f64,
+    ) -> RateControl {
         let b = bit_rate as f64;
         RateControl {
             frame_bits: b / fps,
@@ -102,18 +108,18 @@ impl RateControl {
     }
 
     /// Whether the intra model still needs a probe measurement.
-    pub fn needs_intra_probe(&self) -> bool {
+    pub(crate) fn needs_intra_probe(&self) -> bool {
         self.alpha_i.is_none()
     }
 
     /// Seed α for intra pictures from a sampled trial encode.
-    pub fn seed_intra(&mut self, bits: f64, q: u32, activity: f64) {
+    pub(crate) fn seed_intra(&mut self, bits: f64, q: u32, activity: f64) {
         self.alpha_i = Some(bits * q as f64 / activity.max(1.0));
     }
 
     /// Plan a complete picture, debiting the actual headers already emitted
     /// before applying the learned texture-bit model to the remaining budget.
-    pub fn begin(&mut self, kind: Kind, activity: f64, header_bits: usize) -> Plan {
+    pub(crate) fn begin(&mut self, kind: Kind, activity: f64, header_bits: usize) -> Plan {
         if kind == Kind::Intra {
             self.left_p = self.gop - 1;
         }
@@ -170,7 +176,7 @@ impl RateControl {
     /// bits spent to bits planned for the activity coded so far, rounded, and
     /// kept within -2/+3 of the picture quantiser. Rows therefore mix the
     /// neighbours of a fractional quantiser instead of swinging widely.
-    pub fn row_q(&self, bits_so_far: f64, activity_done: f64) -> u32 {
+    pub(crate) fn row_q(&self, bits_so_far: f64, activity_done: f64) -> u32 {
         let base = self.plan.q_exact;
         if self.plan.texture_target == 0.0 {
             return 31;
@@ -187,14 +193,14 @@ impl RateControl {
     }
 
     /// Record a coded picture: `texture_bits` excludes picture/sequence headers.
-    pub fn end(&mut self, bits: f64, texture_bits: f64, mean_q: f64) {
+    pub(crate) fn end(&mut self, bits: f64, texture_bits: f64, mean_q: f64) {
         self.record_end(bits, texture_bits, mean_q, true);
     }
 
     /// Emergency DC-only/empty-residual coding did not measure the ordinary
     /// quantizer's texture cost. Keep that model unknown or at its last real
     /// observation, while debiting all emitted bytes and physical underflow.
-    pub fn end_censored(&mut self, bits: f64, mean_q: f64) {
+    pub(crate) fn end_censored(&mut self, bits: f64, mean_q: f64) {
         self.record_end(bits, 0.0, mean_q, false);
     }
 

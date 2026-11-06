@@ -21,7 +21,7 @@ pub(super) struct ImmutableSeekIndex {
 }
 
 impl ImmutableSeekIndex {
-    pub fn new(root: Bytes, pool: &Budget, limit: usize) -> Result<Box<Self>> {
+    pub(super) fn new(root: Bytes, pool: &Budget, limit: usize) -> Result<Box<Self>> {
         let charge = pool.reserve(size_of::<Self>())?;
         Ok(Box::new(Self {
             root,
@@ -33,7 +33,7 @@ impl ImmutableSeekIndex {
         }))
     }
 
-    pub fn verify(&self, window: &InputWindow) -> Result<()> {
+    pub(super) fn verify(&self, window: &InputWindow) -> Result<()> {
         let start = usize::try_from(window.offset).map_err(|_| Error::Overflow)?;
         let end = start
             .checked_add(window.bytes().len())
@@ -50,32 +50,37 @@ impl ImmutableSeekIndex {
         Err(Error::SourceMismatch)
     }
 
-    pub fn reset(&mut self, limit: usize) {
+    pub(super) fn reset(&mut self, limit: usize) {
         self.entries = BudgetVec::new(self.entries.budget());
         self.track = None;
         self.limit = limit.min(MAX_ENTRIES);
         self.complete = false;
     }
 
-    pub fn discard(&mut self) {
+    pub(super) fn discard(&mut self) {
         self.reset(0);
     }
 
-    pub fn is_collecting(&self) -> bool {
+    pub(super) fn is_collecting(&self) -> bool {
         self.limit != 0 && !self.complete
     }
 
-    pub fn is_complete(&self) -> bool {
+    pub(super) fn is_complete(&self) -> bool {
         self.complete
     }
 
-    pub fn seal(&mut self, position: u64) {
+    pub(super) fn seal(&mut self, position: u64) {
         if u64::try_from(self.root.len()) == Ok(position) && !self.entries.is_empty() {
             self.complete = true;
         }
     }
 
-    pub fn observe(&mut self, packet: &super::super::Packet, cluster: u64, work: &mut WorkBudget) {
+    pub(super) fn observe(
+        &mut self,
+        packet: &super::super::Packet,
+        cluster: u64,
+        work: &mut WorkBudget,
+    ) {
         let packet = &packet.packet;
         let Some(timestamp_ns) = packet.pts_ns else {
             return;
@@ -127,7 +132,7 @@ impl ImmutableSeekIndex {
         self.track = Some(packet.track);
     }
 
-    pub fn landing(
+    pub(super) fn landing(
         &self,
         track: usize,
         policy: crate::matroska::typed::seek::ScanPlan,

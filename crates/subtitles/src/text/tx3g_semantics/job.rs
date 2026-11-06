@@ -9,7 +9,7 @@ use super::*;
 use std::sync::atomic::AtomicBool;
 use triergon_core::{Budget, Error, Result, WorkBudget};
 
-#[derive(Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum Phase {
     Source,
     Config,
@@ -27,6 +27,7 @@ enum Phase {
 
 /// Composes the existing source/config parsers internally. Public Cue or
 /// Configuration values are never accepted as proof of validated wire facts.
+#[derive(Debug)]
 pub struct SemanticJob {
     pool: Budget,
     limits: SemanticLimits,

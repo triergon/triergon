@@ -88,6 +88,7 @@ pub fn is_sub_layer_non_ref(t: u8) -> bool {
 }
 
 /// Iterate over NAL unit payloads (without start codes) in an Annex B byte stream.
+#[derive(Debug)]
 pub struct AnnexBIter<'a> {
     data: &'a [u8],
     pos: usize,
@@ -173,6 +174,7 @@ pub fn unescape_rbsp(src: &[u8], dst: &mut Vec<u8>) {
 
 /// Splits an Annex B elementary stream into access units (clause 7.4.2.4.4 rules for the
 /// first NAL unit of an access unit, base layer only). Each yielded slice includes start codes.
+#[derive(Debug)]
 pub struct AccessUnitSplitter<'a> {
     data: &'a [u8],
     pos: usize,

@@ -9,6 +9,7 @@ pub(crate) struct LineMark {
     pub source: usize,
 }
 
+#[derive(Debug)]
 pub(crate) struct Decoder {
     pool: Budget,
     little: bool,

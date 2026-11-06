@@ -75,6 +75,7 @@ impl Default for Header {
 }
 
 /// Per-channel SBR data and state.
+#[derive(Debug)]
 pub(crate) struct Chan {
     // grid of the current frame
     frame_class: u8,
@@ -195,6 +196,7 @@ impl Chan {
     }
 }
 
+#[derive(Debug)]
 pub(crate) struct Sbr {
     fs: u32,
     hdr: Header,

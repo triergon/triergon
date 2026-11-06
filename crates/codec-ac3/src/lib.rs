@@ -5,8 +5,13 @@
 //! Output is planar `f32` at full scale 1.0, planes ordered as FFmpeg's native decoder
 //! orders them (ascending FFmpeg speaker bit, see [`triergon_codec::layout`]).
 #![forbid(unsafe_code)]
-#![warn(unreachable_pub, clippy::print_stdout, clippy::print_stderr)]
-// Pending: `missing_docs`, `missing_debug_implementations`, `clippy::unwrap_used`, `clippy::expect_used`.
+#![warn(
+    missing_debug_implementations,
+    unreachable_pub,
+    clippy::print_stdout,
+    clippy::print_stderr
+)]
+// Pending: `missing_docs`, `clippy::unwrap_used`, `clippy::expect_used`.
 // Channel/bin loops are written with explicit indices to mirror the A/52 pseudo code.
 #![allow(clippy::needless_range_loop)]
 // Pending: these rewrites change the generated code of measured hot paths and are
@@ -240,6 +245,7 @@ struct SyncframeRef {
 }
 
 /// AC-3 / E-AC-3 decoder.
+#[derive(Debug)]
 pub struct Decoder {
     opts: DecoderOptions,
     buf: Box<[u8]>,

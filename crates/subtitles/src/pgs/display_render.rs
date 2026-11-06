@@ -57,7 +57,7 @@ pub(crate) struct StoredRenderBuild<A: ArgbStorage> {
 }
 
 impl<A: ArgbStorage> StoredRenderBuild<A> {
-    pub fn new(
+    pub(super) fn new(
         budget: &Budget,
         object: CachedObject,
         reference: CompositionObject,
@@ -103,7 +103,7 @@ impl<A: ArgbStorage> StoredRenderBuild<A> {
         })
     }
 
-    pub fn step(&mut self, work: &mut DisplayWork<'_>) -> Result<bool> {
+    pub(super) fn step(&mut self, work: &mut DisplayWork<'_>) -> Result<bool> {
         loop {
             match self.phase {
                 Phase::ReserveNative => {
@@ -277,7 +277,7 @@ impl<A: ArgbStorage> StoredRenderBuild<A> {
         }
     }
 
-    pub fn take(&mut self) -> Result<StoredDisplayObject<A>> {
+    pub(super) fn take(&mut self) -> Result<StoredDisplayObject<A>> {
         if !matches!(self.phase, Phase::Ready) {
             return Err(Error::Invalid("PGS rendered object not ready"));
         }

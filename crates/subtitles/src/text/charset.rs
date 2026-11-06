@@ -100,6 +100,7 @@ enum Phase {
 /// Two forward passes validate/count, then encode into exact bounded storage.
 /// Cancellation is resumable, matching the existing text source contract.
 /// Retained output pressure never rereads a consumed scalar or guesses a charset.
+#[derive(Debug)]
 pub struct CharsetJob {
     source: Bytes,
     label: Option<Bytes>,

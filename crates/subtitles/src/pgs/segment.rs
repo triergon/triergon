@@ -86,6 +86,7 @@ impl<'a> Iterator for SegmentIter<'a> {
     }
 }
 
+#[derive(Debug)]
 struct Cursor<'a> {
     input: &'a [u8],
     at: usize,
@@ -337,6 +338,7 @@ impl<'a> Composition<'a> {
     }
 }
 
+#[derive(Debug)]
 pub struct CompositionObjects<'a> {
     cursor: Cursor<'a>,
     remaining: u8,

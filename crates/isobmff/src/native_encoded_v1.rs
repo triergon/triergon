@@ -99,7 +99,7 @@ impl Mov9EncodedStreamV1 {
 
 // A bounded owner-relative TLV walk. Each header/prefix byte is inspected once;
 // opaque bodies are only range checked and borrowed, never parsed on a countdown.
-#[derive(Clone, Copy)]
+#[derive(Debug, Clone, Copy)]
 enum DescriptorPhase {
     Tag,
     Length {
@@ -120,7 +120,7 @@ enum DescriptorPhase {
     },
 }
 
-#[derive(Clone, Copy)]
+#[derive(Debug, Clone, Copy)]
 enum EsdsProfile {
     Aac,
     AacDescription,
@@ -128,6 +128,7 @@ enum EsdsProfile {
     ObjectType,
 }
 
+#[derive(Debug)]
 struct EsdsWalk {
     raw: Bytes,
     at: usize,
@@ -363,6 +364,7 @@ pub enum AacConfigurationStep {
 /// Extracts AudioSpecificConfig from an `mp4a` description independently
 /// of its sample table. Supports ISO sound entries and the selected
 /// QuickTime sound layout with a `wave` container.
+#[derive(Debug)]
 pub struct AacConfigurationJob {
     walk: Option<EsdsDescriptionWalk>,
     failed: Option<Error>,
@@ -443,6 +445,7 @@ impl AacConfigurationJob {
     }
 }
 
+#[derive(Debug)]
 struct EsdsDescriptionWalk {
     children: BoxChildren,
     wave: Option<BoxChildren>,
@@ -640,7 +643,7 @@ fn check_configuration_size(raw: &BoxView, limits: Mov9EncodedLimitsV1) -> Resul
     Ok(())
 }
 
-#[derive(Default)]
+#[derive(Debug, Default)]
 struct AacWaveFields {
     format: bool,
     marker: bool,
@@ -682,6 +685,7 @@ impl AacWaveFields {
 }
 
 // One nested, charged-owner-relative wave context; no recursive parser or queue.
+#[derive(Debug)]
 struct WaveV4 {
     raw: BoxView,
     children: Option<BoxChildren>,
@@ -690,7 +694,7 @@ struct WaveV4 {
     terminator: Option<BoxView>,
 }
 
-#[derive(Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum DescriptionView {
     Regular,
     MetadataV4,
@@ -705,6 +709,7 @@ impl DescriptionView {
 
 /// Metadata-only job over the original charged source owners. Source/request
 /// generations, work, cancellation and transport checks use the shared core.
+#[derive(Debug)]
 pub struct Mov9EncodedStreamJobV1<'a> {
     header: &'a TrackHeader,
     entry: SampleDescription,

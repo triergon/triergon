@@ -32,6 +32,7 @@ enum Phase {
     Alt,
     Done,
 }
+#[derive(Debug)]
 pub(super) struct Reader {
     kind: [u8; 4],
     index: usize,

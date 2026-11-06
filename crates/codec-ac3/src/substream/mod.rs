@@ -136,6 +136,7 @@ pub struct FrameFeatures {
     pub overrun: bool,
 }
 
+#[derive(Debug)]
 pub(crate) struct Substream {
     // ---- frame configuration ----
     pub eac3: bool,

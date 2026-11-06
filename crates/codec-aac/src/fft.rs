@@ -23,6 +23,7 @@ impl Cpx {
 
 /// One radix-4 stage: twiddles W^k, W^2k, W^3k of the 4h-point transform, k < h, split
 /// into real and imaginary parts.
+#[derive(Debug)]
 struct Stage {
     h: usize,
     w: [Vec<f32>; 6],
@@ -32,6 +33,7 @@ struct Stage {
 /// arrays: decimation in time on bit-reversed input, a twiddle-free radix-4 first stage,
 /// radix-4 stages and, for odd log2(n), a final radix-2 stage. The split layout keeps every
 /// inner loop contiguous so that it vectorises.
+#[derive(Debug)]
 pub(crate) struct Fft {
     n: usize,
     bitrev: Vec<u16>,
@@ -319,6 +321,7 @@ fn bfly4(r: [f32; 4], i: [f32; 4]) -> ([f32; 4], [f32; 4]) {
 }
 
 /// DCT-IV of even length `m` via an m/2-point complex FFT.
+#[derive(Debug)]
 pub(crate) struct Dct4 {
     m: usize,
     fft: Fft,
@@ -426,6 +429,7 @@ impl Dct4 {
 }
 
 /// IMDCT / MDCT of window length n (= 2 * m coefficients).
+#[derive(Debug)]
 pub(crate) struct Mdct {
     m: usize,
     dct: Dct4,

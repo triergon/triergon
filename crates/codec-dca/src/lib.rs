@@ -6,12 +6,13 @@
 //! channel order for the stream (see [`triergon_codec::layout`]).
 #![forbid(unsafe_code)]
 #![warn(
+    missing_debug_implementations,
     unreachable_pub,
     clippy::print_stdout,
     clippy::print_stderr,
     clippy::unwrap_used
 )]
-// Pending: `missing_docs`, `missing_debug_implementations`, `clippy::expect_used`.
+// Pending: `missing_docs`, `clippy::expect_used`.
 #![allow(clippy::needless_range_loop, clippy::too_many_arguments)]
 // Pending: these rewrites change the generated code of measured hot paths and are
 // adopted with an A/B timing run.
@@ -77,7 +78,7 @@ const QMF_GAIN: f64 = 0.25 * 128.0 * std::f64::consts::SQRT_2;
 /// X96 64-band synthesis gain (black-box calibration).
 const QMF64_GAIN: f64 = 0.25 * 256.0 * std::f64::consts::SQRT_2;
 
-#[derive(Clone, Copy, PartialEq, Eq, Default)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 struct Config {
     amode: u8,
     nch: usize,
@@ -87,6 +88,7 @@ struct Config {
 }
 
 /// DTS core decoder.
+#[derive(Debug)]
 pub struct Decoder {
     scratch: Vec<u8>,
     sub: SubBuf,

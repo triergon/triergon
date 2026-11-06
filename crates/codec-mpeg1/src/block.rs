@@ -11,7 +11,8 @@ use super::tables::{
 const SHIFT: u32 = 20;
 
 /// Per-quantiser reciprocal tables, built once per encoder.
-pub struct Quantizer {
+#[derive(Debug)]
+pub(crate) struct Quantizer {
     /// Intra AC: round(8·2^20 / (q·W)) per raster position.
     intra: [[u32; 64]; 32],
     /// Non-intra: round(2^20 / (2·q)).
@@ -27,7 +28,7 @@ pub struct Quantizer {
 const INTRA_BIAS: u32 = (3 << SHIFT) / 8;
 
 impl Quantizer {
-    pub fn new() -> Box<Quantizer> {
+    pub(crate) fn new() -> Box<Quantizer> {
         let mut q = Box::new(Quantizer {
             intra: [[0; 64]; 32],
             inter: [0; 32],
@@ -45,7 +46,7 @@ impl Quantizer {
     /// Quantise intra AC coefficients (raster order) into `levels`; DC is
     /// handled separately. Returns the raster mask of non-zero AC levels.
     #[inline]
-    pub fn intra(&self, coeffs: &[i32; 64], scale: u32, levels: &mut [i32; 64]) -> u64 {
+    pub(crate) fn intra(&self, coeffs: &[i32; 64], scale: u32, levels: &mut [i32; 64]) -> u64 {
         let table = &self.intra[scale as usize];
         for i in 0..64 {
             let c = coeffs[i];
@@ -76,7 +77,7 @@ impl Quantizer {
     /// Skip only when the actual fixed-DCT bound and this quantizer's rounded
     /// reciprocal prove that every one of its64 output levels is zero.
     #[inline]
-    pub fn inter_is_zero(&self, sum_abs: u32, scale: u32) -> bool {
+    pub(crate) fn inter_is_zero(&self, sum_abs: u32, scale: u32) -> bool {
         u64::from(super::dct::magnitude_bound(sum_abs)) * u64::from(self.inter[scale as usize])
             < (1u64 << SHIFT)
     }
@@ -84,7 +85,7 @@ impl Quantizer {
     /// Quantise non-intra coefficients (raster order). Returns the raster
     /// mask of non-zero levels.
     #[inline]
-    pub fn inter(&self, coeffs: &[i32; 64], scale: u32, levels: &mut [i32; 64]) -> u64 {
+    pub(crate) fn inter(&self, coeffs: &[i32; 64], scale: u32, levels: &mut [i32; 64]) -> u64 {
         let r = self.inter[scale as usize];
         for i in 0..64 {
             let c = coeffs[i];
@@ -183,7 +184,13 @@ fn oddify_saturate(v: i32) -> i32 {
 /// Reconstruct intra coefficients: DC from its 8-bit quantised value, AC by
 /// (2·QF·q·W)/16 truncated toward zero, oddified and saturated.
 #[inline]
-pub fn dequant_intra(levels: &[i32; 64], mask: u64, dc: i32, scale: u32, out: &mut [i32; 64]) {
+pub(crate) fn dequant_intra(
+    levels: &[i32; 64],
+    mask: u64,
+    dc: i32,
+    scale: u32,
+    out: &mut [i32; 64],
+) {
     out.fill(0);
     out[0] = dc * 8;
     for i in bits(mask) {
@@ -194,7 +201,7 @@ pub fn dequant_intra(levels: &[i32; 64], mask: u64, dc: i32, scale: u32, out: &m
 /// Reconstruct non-intra coefficients: ((2·QF + sign)·q·16)/16, oddified and
 /// saturated.
 #[inline]
-pub fn dequant_inter(levels: &[i32; 64], mask: u64, scale: u32, out: &mut [i32; 64]) {
+pub(crate) fn dequant_inter(levels: &[i32; 64], mask: u64, scale: u32, out: &mut [i32; 64]) {
     out.fill(0);
     for i in bits(mask) {
         let l = levels[i];
@@ -204,7 +211,7 @@ pub fn dequant_inter(levels: &[i32; 64], mask: u64, scale: u32, out: &mut [i32; 
 
 /// dct_dc_size and differential bits for an intra DC difference.
 #[inline]
-pub fn write_dc(w: &mut BitWriter, diff: i32, luma: bool) {
+pub(crate) fn write_dc(w: &mut BitWriter, diff: i32, luma: bool) {
     let size = 32 - diff.unsigned_abs().leading_zeros();
     let (code, len) = if luma {
         DC_SIZE_LUMA[size as usize]
@@ -226,7 +233,7 @@ pub fn write_dc(w: &mut BitWriter, diff: i32, luma: bool) {
 /// zig-zag order, followed by end_of_block. Intra blocks start after DC;
 /// non-intra blocks code a leading run-0 level-±1 with dct_coeff_first `1s`.
 #[inline]
-pub fn write_coefficients(w: &mut BitWriter, levels: &[i32; 64], mask: u64, intra: bool) {
+pub(crate) fn write_coefficients(w: &mut BitWriter, levels: &[i32; 64], mask: u64, intra: bool) {
     let mut scan = 0u64;
     for p in bits(mask) {
         scan |= 1 << SCAN_INDEX[p];

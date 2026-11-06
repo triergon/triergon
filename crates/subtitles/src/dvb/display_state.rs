@@ -70,7 +70,7 @@ pub(crate) struct DecodeWork<'a> {
 impl DecodeWork<'_> {
     /// Incremental credit for one small semantic entry. Retry after allocation
     /// backpressure preserves already-paid credit until the entry commits.
-    pub fn pay(&mut self, credit: &mut usize, amount: usize) -> Result<bool> {
+    pub(super) fn pay(&mut self, credit: &mut usize, amount: usize) -> Result<bool> {
         if *credit < amount {
             let count = take_work(
                 self.work,
@@ -116,7 +116,7 @@ pub(crate) struct State {
 }
 
 impl State {
-    pub fn new(
+    pub(super) fn new(
         budget: &Budget,
         service: Service,
         limits: DisplayLimits,
@@ -152,7 +152,7 @@ impl State {
         }
     }
 
-    pub fn page_slot(&self, page: u16) -> Option<usize> {
+    pub(super) fn page_slot(&self, page: u16) -> Option<usize> {
         if page == self.service.composition_page {
             Some(0)
         } else if page == self.service.ancillary_page {
@@ -162,7 +162,7 @@ impl State {
         }
     }
 
-    pub fn new_epoch(&mut self) -> Result<()> {
+    pub(super) fn new_epoch(&mut self) -> Result<()> {
         self.epoch = self.epoch.checked_add(1).ok_or(Error::Overflow)?;
         self.regions = BudgetVec::new(&self.budget);
         self.slots = [None; 256];
@@ -177,7 +177,7 @@ impl State {
         Ok(())
     }
 
-    pub fn family_index(&self, clut: u8) -> Result<Option<usize>> {
+    pub(super) fn family_index(&self, clut: u8) -> Result<Option<usize>> {
         let a = self.clut_slots[0][usize::from(clut)];
         let b = self.clut_slots[1][usize::from(clut)];
         if a.is_some() && b.is_some() {
@@ -188,7 +188,7 @@ impl State {
         Ok(a.or(b))
     }
 
-    pub fn ensure_family(&mut self, page: u16, id: u8) -> Result<usize> {
+    pub(super) fn ensure_family(&mut self, page: u16, id: u8) -> Result<usize> {
         let slot = self
             .page_slot(page)
             .ok_or(Error::Invalid("DVB family page"))?;
@@ -228,7 +228,7 @@ impl State {
         Ok(index)
     }
 
-    pub fn init_family(
+    pub(super) fn init_family(
         &mut self,
         index: usize,
         credit: &mut usize,
@@ -279,7 +279,7 @@ impl State {
         Ok(true)
     }
 
-    pub fn finish_display(&mut self) {
+    pub(super) fn finish_display(&mut self) {
         self.allow_new = false;
         self.requires_full_regions = false;
         if self.object_retention == ObjectRetention::CurrentDisplay {
@@ -337,7 +337,7 @@ pub(crate) struct Segment {
 }
 
 impl Segment {
-    pub fn new(kind: u8, page: u16, original: Bytes) -> Result<Self> {
+    pub(super) fn new(kind: u8, page: u16, original: Bytes) -> Result<Self> {
         let body = original.slice(6..original.len())?;
         Ok(Self {
             kind,
@@ -356,7 +356,11 @@ impl Segment {
         })
     }
 
-    pub fn step(&mut self, state: &mut State, work: &mut DecodeWork<'_>) -> Result<SegmentResult> {
+    pub(super) fn step(
+        &mut self,
+        state: &mut State,
+        work: &mut DecodeWork<'_>,
+    ) -> Result<SegmentResult> {
         cancelled(work.cancel)?;
         let bytes = self.body.clone();
         let b = bytes.as_ref();

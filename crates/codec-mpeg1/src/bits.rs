@@ -1,13 +1,13 @@
 /// MSB-first bit writer over a reusable byte vector.
 #[derive(Debug, Default)]
-pub struct BitWriter {
+pub(crate) struct BitWriter {
     bytes: Vec<u8>,
     acc: u64,
     used: u32,
 }
 
 impl BitWriter {
-    pub fn with_capacity(bytes: usize) -> BitWriter {
+    pub(crate) fn with_capacity(bytes: usize) -> BitWriter {
         BitWriter {
             bytes: Vec::with_capacity(bytes),
             acc: 0,
@@ -17,7 +17,7 @@ impl BitWriter {
 
     /// Append the low `len` bits of `value` (len <= 32).
     #[inline]
-    pub fn put(&mut self, value: u32, len: u32) {
+    pub(crate) fn put(&mut self, value: u32, len: u32) {
         debug_assert!(len <= 32 && (len == 32 || value >> len == 0));
         self.acc = (self.acc << len) | value as u64;
         self.used += len;
@@ -29,12 +29,12 @@ impl BitWriter {
     }
 
     /// Bits written so far, including the unflushed tail.
-    pub fn bit_len(&self) -> usize {
+    pub(crate) fn bit_len(&self) -> usize {
         self.bytes.len() * 8 + self.used as usize
     }
 
     /// Pad with zero bits to the next byte boundary.
-    pub fn align(&mut self) {
+    pub(crate) fn align(&mut self) {
         let pad = (8 - self.used % 8) % 8;
         self.put(0, pad);
         while self.used >= 8 {
@@ -44,13 +44,13 @@ impl BitWriter {
     }
 
     /// Byte-aligned start code `00 00 01 xx`.
-    pub fn start_code(&mut self, code: u8) {
+    pub(crate) fn start_code(&mut self, code: u8) {
         self.align();
         self.put(0x0000_0100 | code as u32, 32);
     }
 
     /// Hand out the aligned bytes and keep the allocation for the next picture.
-    pub fn take_into(&mut self, out: &mut Vec<u8>) {
+    pub(crate) fn take_into(&mut self, out: &mut Vec<u8>) {
         self.align();
         out.clear();
         out.extend_from_slice(&self.bytes);

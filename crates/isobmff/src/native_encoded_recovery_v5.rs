@@ -85,6 +85,7 @@ impl Mov9RecoveryFactsV5 {
         Mov9RecoveryReceiverCauseV5::RollProlNotAppliedByD32OpenIndex
     }
 }
+#[derive(Debug)]
 enum Pending {
     Descriptions {
         source: RecoveryDescriptions,
@@ -110,6 +111,7 @@ fn source_result<T>(
     }
     value
 }
+#[derive(Debug)]
 pub(crate) struct RecoveryWalkV5 {
     children: Option<BoxChildren>,
     pending: Option<Pending>,

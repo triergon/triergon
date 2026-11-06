@@ -172,7 +172,7 @@ fn count(n: u64, max: u64) -> Result<()> {
     }
     Ok(())
 }
-#[derive(Clone, Copy, Default)]
+#[derive(Debug, Clone, Copy, Default)]
 struct DirectState {
     ordinal: u64,
     chunk: u32,
@@ -180,6 +180,7 @@ struct DirectState {
     row: u32,
     byte: u64,
 }
+#[derive(Debug)]
 struct DirectCursor<'a> {
     table: &'a Mov9RunRecoveryTable,
     source: SampleCursor<'a>,
@@ -281,6 +282,7 @@ impl DirectCursor<'_> {
         Ok(Some(row))
     }
 }
+#[derive(Debug)]
 pub struct Mov9RecoveryV2PacketCursor<'a> {
     // Exactly one engine is initialized by these sealed constructors. Keep
     // state inline rather than introduce a profile-switch heap allocation.
@@ -382,10 +384,12 @@ pub struct Mov9RecoveryV2IndexEntry {
     pub association: Mov9RecoveryV2Association,
     pub range_error: Option<Error>,
 }
+#[derive(Debug)]
 enum IndexEngine<'a> {
     Legacy(Mov9RecoveryIndexCursor<'a>),
     Direct(Mov9RecoveryV2PacketCursor<'a>),
 }
+#[derive(Debug)]
 pub struct Mov9RecoveryV2IndexCursor<'a> {
     engine: IndexEngine<'a>,
     next: u64,

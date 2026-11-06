@@ -43,6 +43,7 @@ pub(crate) fn sine_window(n2: usize) -> Vec<f32> {
         .collect()
 }
 
+#[derive(Debug)]
 pub(crate) struct Windows {
     /// [shape][n], rising halves
     pub long: [Vec<f32>; 2],
@@ -99,6 +100,7 @@ impl Windows {
     }
 }
 
+#[derive(Debug)]
 pub(crate) struct Filterbank {
     pub win: Windows,
     imdct_long: Mdct,

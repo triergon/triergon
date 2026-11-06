@@ -420,6 +420,7 @@ impl<T> BudgetVec<T> {
 
 /// Consuming traversal of a charged vector. Its allocation stays charged until
 /// the iterator releases it, including when only part of the vector is visited.
+#[derive(Debug)]
 pub struct BudgetVecIntoIter<T> {
     iter: std::vec::IntoIter<T>,
     _charge: Reservation,

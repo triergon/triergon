@@ -59,6 +59,7 @@ pub struct Element<'a> {
     index: u16,
 }
 
+#[derive(Debug)]
 pub struct Children<'a> {
     doc: &'a Document,
     next: u16,
@@ -405,7 +406,7 @@ impl Default for Catalogue {
     }
 }
 impl Catalogue {
-    pub fn new(pool: &Budget) -> Self {
+    pub(crate) fn new(pool: &Budget) -> Self {
         Self {
             pool: pool.clone(),
             documents: StorageVec::new(pool),
@@ -414,18 +415,18 @@ impl Catalogue {
             attachments: 0,
         }
     }
-    pub fn documents(&self) -> &[SharedDocument] {
+    pub(crate) fn documents(&self) -> &[SharedDocument] {
         &self.documents
     }
-    pub fn retained_bytes(&self) -> usize {
+    pub(crate) fn retained_bytes(&self) -> usize {
         self.retained + self.documents.capacity() * size_of::<SharedDocument>()
     }
-    pub fn attachment_bytes(&self) -> usize {
+    pub(crate) fn attachment_bytes(&self) -> usize {
         self.attachments
     }
     /// Test entry: commit one document through the typed catalogue job.
     #[cfg(test)]
-    pub fn add(
+    pub(crate) fn add(
         &mut self,
         kind: u64,
         raw: Vec<u8>,

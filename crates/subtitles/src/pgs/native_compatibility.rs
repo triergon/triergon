@@ -116,7 +116,7 @@ impl NativeCompatibilityDecoder {
 // A compile-time role, not a flag that disables selected work in a full output.
 // Its only retained product is the native API's first public event.
 #[derive(Debug)]
-pub struct NativeOnly {
+pub(super) struct NativeOnly {
     event: Option<RecoveredEvent>,
 }
 

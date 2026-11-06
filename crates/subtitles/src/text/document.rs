@@ -56,7 +56,7 @@ pub(crate) struct Document {
 }
 
 impl Document {
-    pub fn new(range: Range<usize>, encoding: Encoding, format: Format) -> Self {
+    pub(super) fn new(range: Range<usize>, encoding: Encoding, format: Format) -> Self {
         let comma = format == Format::SubRip;
         Self {
             reader: Reader::new(range, encoding),
@@ -120,7 +120,7 @@ impl Document {
         }))
     }
 
-    pub fn poll(
+    pub(super) fn poll(
         &mut self,
         bytes: &[u8],
         pool: &Budget,

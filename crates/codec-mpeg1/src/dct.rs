@@ -72,7 +72,7 @@ fn idct_1d(x: [i32; 8], shift: u32) -> [i32; 8] {
 }
 
 /// Forward DCT of an 8×8 block of samples or residuals (raster order).
-pub fn fdct(block: &mut [i32; 64]) {
+pub(crate) fn fdct(block: &mut [i32; 64]) {
     for row in block.chunks_exact_mut(8) {
         let out = fdct_1d(row.try_into().unwrap(), BITS - PASS);
         row.copy_from_slice(&out);
@@ -82,7 +82,7 @@ pub fn fdct(block: &mut [i32; 64]) {
 
 /// Inverse DCT of dequantised coefficients (raster order), producing samples
 /// or residuals before clamping.
-pub fn idct(block: &mut [i32; 64]) {
+pub(crate) fn idct(block: &mut [i32; 64]) {
     for row in block.chunks_exact_mut(8) {
         if row[1..].iter().all(|&v| v == 0) {
             let dc = (row[0] * C4 + (1 << (BITS - PASS - 1))) >> (BITS - PASS);

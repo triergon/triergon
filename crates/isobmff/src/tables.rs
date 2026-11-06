@@ -14,13 +14,13 @@ pub(crate) struct Words {
     stride: usize,
 }
 impl Words {
-    pub fn parse(raw: BoxView, stride: usize, limits: Limits) -> Result<Self> {
+    pub(crate) fn parse(raw: BoxView, stride: usize, limits: Limits) -> Result<Self> {
         fields::full_zero(raw.payload())?;
         Self::rows(raw, stride, limits)
     }
     /// Only ctts has the acquired version-1 row interpretation. Other tables
     /// keep their version/flags-zero constructor above.
-    pub fn parse_ctts(raw: BoxView, limits: Limits) -> Result<Self> {
+    pub(crate) fn parse_ctts(raw: BoxView, limits: Limits) -> Result<Self> {
         if raw.header().kind != *b"ctts" {
             return Err(Error::Invalid("not ctts"));
         }
@@ -43,10 +43,10 @@ impl Words {
             stride,
         })
     }
-    pub fn word(&self, row: u32, column: usize) -> Result<u32> {
+    pub(crate) fn word(&self, row: u32, column: usize) -> Result<u32> {
         fields::u32_at(self.raw.payload(), self.position(row, column, 4)?)
     }
-    pub fn wide(&self, row: u32) -> Result<u64> {
+    pub(crate) fn wide(&self, row: u32) -> Result<u64> {
         fields::u64_at(self.raw.payload(), self.position(row, 0, 8)?)
     }
     fn position(&self, row: u32, column: usize, width: usize) -> Result<usize> {
@@ -61,10 +61,10 @@ impl Words {
             .ok_or(Error::Overflow)
     }
     /// Validated sorted 1-based sample numbers, including a present-empty table.
-    pub fn contains(&self, sample: u64) -> Result<bool> {
+    pub(crate) fn contains(&self, sample: u64) -> Result<bool> {
         Ok(self.previous(sample)? == Some(sample))
     }
-    pub fn previous(&self, sample: u64) -> Result<Option<u64>> {
+    pub(crate) fn previous(&self, sample: u64) -> Result<Option<u64>> {
         let mut lo = 0u32;
         let mut hi = self.count;
         while lo < hi {
@@ -91,7 +91,7 @@ pub(crate) struct Sizes {
     width: u8,
 }
 impl Sizes {
-    pub fn parse(raw: BoxView) -> Result<Self> {
+    pub(crate) fn parse(raw: BoxView) -> Result<Self> {
         if raw.header().kind == *b"stz2" {
             return Self::compact(raw);
         }
@@ -141,7 +141,7 @@ impl Sizes {
             width,
         })
     }
-    pub fn get(&self, sample: u64) -> Result<u32> {
+    pub(crate) fn get(&self, sample: u64) -> Result<u32> {
         if sample >= u64::from(self.count) {
             return Err(Error::Invalid("sample size index"));
         }
@@ -177,14 +177,14 @@ pub(crate) struct Offsets {
     pub wide: bool,
 }
 impl Offsets {
-    pub fn parse(raw: BoxView, limits: Limits) -> Result<Self> {
+    pub(crate) fn parse(raw: BoxView, limits: Limits) -> Result<Self> {
         let wide = raw.header().kind == *b"co64";
         Ok(Self {
             table: Words::parse(raw, if wide { 8 } else { 4 }, limits)?,
             wide,
         })
     }
-    pub fn get(&self, chunk: u32) -> Result<u64> {
+    pub(crate) fn get(&self, chunk: u32) -> Result<u64> {
         if self.wide {
             self.table.wide(chunk)
         } else {

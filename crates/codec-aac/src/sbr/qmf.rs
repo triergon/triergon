@@ -29,6 +29,7 @@ fn window(n: usize) -> f64 {
     QMF_WINDOW[639 - n]
 }
 
+#[derive(Debug)]
 pub(crate) struct Analysis {
     /// Input history, newest first: the 320 samples x[0..320] live at x[pos..pos + 320]
     /// of a double-length buffer so no per-slot shifting is needed.
@@ -43,6 +44,7 @@ pub(crate) struct Analysis {
     im: Vec<f32>,
 }
 
+#[derive(Debug)]
 pub(crate) struct Synthesis {
     v: Vec<f32>,
     /// write position of the circular v buffer (in units of 128)

@@ -49,7 +49,7 @@ fn bound(value: u64, maximum: u64) -> Result<()> {
     }
     Ok(())
 }
-#[derive(Clone, Copy)]
+#[derive(Debug, Clone, Copy)]
 struct RunCarry {
     flags: u32,
     source_ordinal: u64,
@@ -102,6 +102,7 @@ impl RunCarry {
 }
 /// One native table stream, keeping a single ready projection. A complete
 /// source is mandatory for the existing explicit absent-tfdt native origin.
+#[derive(Debug)]
 pub struct Mov9NativeIndexCursor<'a> {
     cursor: Mov9PacketCursor<'a>,
     limits: Mov9NativeIndexLimits,
@@ -367,7 +368,7 @@ pub struct Mov9NativeSeekReceipt {
     pub scanned_entries: u64,
     pub used_first_fallback: bool,
 }
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 struct Context<'a> {
     pool: Budget,
     track: Mov9Track<'a>,
@@ -379,6 +380,7 @@ struct Context<'a> {
 type EncodedEdits<'a> = &'a [Option<crate::Mov9EncodedEditPlanV2>];
 /// Native signed ticks are a separately named API argument. No rounding,
 /// source-time wrap or conversion through SourceTime is performed here.
+#[derive(Debug)]
 pub struct Mov9NativeSeekJob<'a> {
     context: Context<'a>,
     index: Mov9NativeIndexCursor<'a>,
@@ -391,6 +393,7 @@ pub struct Mov9NativeSeekJob<'a> {
     ready: bool,
     failed: Option<Error>,
 }
+#[derive(Debug)]
 pub struct Mov9NativeSeekPlan<'a> {
     context: Context<'a>,
     receipt: Mov9NativeSeekReceipt,
@@ -398,6 +401,7 @@ pub struct Mov9NativeSeekPlan<'a> {
 /// Resumes the real native occurrence state by a bounded metadata replay from
 /// original tables. Skipped metadata causes no payload reads or caller output.
 /// This is a production cursor operation, not comparator filtering or PTS sort.
+#[derive(Debug)]
 pub struct Mov9NativeSeekCursor<'a> {
     cursor: Mov9PacketCursor<'a>,
     selected: Mov9NativeIndexEntry,
@@ -680,6 +684,7 @@ impl Mov9NativeSeekCursor<'_> {
 /// Aligns every stream to the selected reference entry's native clock, not the
 /// original request or its physical position. The rescaled profile converts
 /// that anchor to each other track's native base, rounding ties away from zero.
+#[derive(Debug)]
 pub struct Mov9NativeGlobalSeekJob<'a> {
     pool: Budget,
     tracks: BudgetVec<Mov9Track<'a>>,
@@ -697,6 +702,7 @@ pub struct Mov9NativeGlobalSeekJob<'a> {
     ready: bool,
     failed: Option<Error>,
 }
+#[derive(Debug)]
 pub struct Mov9NativeGlobalSeekPlan<'a> {
     pool: Budget,
     tracks: BudgetVec<Mov9Track<'a>>,

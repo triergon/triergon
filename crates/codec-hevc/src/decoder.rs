@@ -32,13 +32,14 @@ pub enum ChromaFormat {
 }
 
 /// Borrowed view of one row of samples.
+#[derive(Debug)]
 pub enum Row<'a> {
     U8(&'a [u8]),
     U16(&'a [u16]),
 }
 
 /// One (cropped) sample plane of an output picture. Shares the decoder's frame buffer.
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub struct Plane {
     pub width: usize,
     pub height: usize,
@@ -95,7 +96,7 @@ impl Plane {
 }
 
 /// A decoded picture in output order.
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub struct Picture {
     pub width: u32,
     pub height: u32,
@@ -159,13 +160,14 @@ impl VideoDecoder for Decoder {
     }
 }
 
-#[derive(Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum RefMark {
     Unused,
     Short,
     Long,
 }
 
+#[derive(Debug)]
 struct OutInfo {
     crop: [u32; 4],
     width: u32,
@@ -175,6 +177,7 @@ struct OutInfo {
     colour: ColourDescription,
 }
 
+#[derive(Debug)]
 struct DpbPic {
     frame: Arc<AnyFrame>,
     col: Arc<ColMotion>,
@@ -186,6 +189,7 @@ struct DpbPic {
     info: Arc<OutInfo>,
 }
 
+#[derive(Debug)]
 struct CurPic {
     frame: AnyFrame,
     poc: i32,
@@ -203,6 +207,7 @@ struct CurPic {
     slices: u16,
 }
 
+#[derive(Debug)]
 pub struct Decoder {
     vps: Vec<Option<ps::Vps>>,
     sps: Vec<Option<Arc<Sps>>>,

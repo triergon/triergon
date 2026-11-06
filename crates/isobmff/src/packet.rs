@@ -31,6 +31,7 @@ pub enum Mov9SampleRead {
     Short(Mov9ShortSample),
 }
 
+#[derive(Debug)]
 pub enum Mov9SampleExtent {
     Finite(Range<u64>),
     Terminal(TerminalMdat),

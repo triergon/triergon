@@ -44,7 +44,7 @@ pub(crate) const CBF_CR_DC: u32 = 1 << 26;
 /// Bits 0..15: luma 4x4 (raster); 16..19 Cb AC (raster 2x2); 20..23 Cr AC.
 pub(crate) const CBF_ALL: u32 = 0x07FF_FFFF;
 
-#[derive(Clone, Copy)]
+#[derive(Debug, Clone, Copy)]
 pub(crate) struct MbInfo {
     /// Slice number + 1 within the picture; 0 = not (yet) decoded.
     pub slice: u16,

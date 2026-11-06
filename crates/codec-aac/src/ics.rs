@@ -27,7 +27,7 @@ pub(crate) const AOT_LTP: u8 = 4;
 
 pub(crate) const MAX_SFB: usize = 64;
 
-#[derive(Clone, Copy)]
+#[derive(Debug, Clone, Copy)]
 pub(crate) struct Ltp {
     pub present: bool,
     pub lag: u16,
@@ -46,7 +46,7 @@ impl Default for Ltp {
     }
 }
 
-#[derive(Clone, Copy)]
+#[derive(Debug, Clone, Copy)]
 pub(crate) struct IcsInfo {
     pub window_sequence: u8,
     pub window_shape: u8,
@@ -82,7 +82,7 @@ impl Default for IcsInfo {
     }
 }
 
-#[derive(Clone, Copy, Default)]
+#[derive(Debug, Clone, Copy, Default)]
 pub(crate) struct TnsFilter {
     pub length: u8,
     pub order: u8,
@@ -90,7 +90,7 @@ pub(crate) struct TnsFilter {
     pub lpc: [f32; 21],
 }
 
-#[derive(Clone, Copy, Default)]
+#[derive(Debug, Clone, Copy, Default)]
 pub(crate) struct Tns {
     pub present: bool,
     pub n_filt: [u8; 8],
@@ -98,6 +98,7 @@ pub(crate) struct Tns {
 }
 
 /// One decoded channel of a syntactic element for the current frame.
+#[derive(Debug)]
 pub(crate) struct ChannelData {
     /// bitmask of codebooks used in this frame (debug statistics)
     pub cb_mask: u32,

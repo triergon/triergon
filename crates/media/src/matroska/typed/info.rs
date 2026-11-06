@@ -19,7 +19,7 @@ pub(crate) struct InfoJob {
     done: bool,
 }
 impl InfoJob {
-    pub fn new(source: SharedBytes) -> Self {
+    pub(crate) fn new(source: SharedBytes) -> Self {
         let end = source.len();
         Self {
             source,
@@ -30,7 +30,7 @@ impl InfoJob {
             done: false,
         }
     }
-    pub fn step(
+    pub(crate) fn step(
         &mut self,
         work: &mut WorkBudget,
         cancel: &AtomicBool,

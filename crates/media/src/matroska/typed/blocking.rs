@@ -49,10 +49,10 @@ pub(crate) struct InputFeeder<R> {
 impl<R: Read> InputFeeder<R> {
     /// The ordinary blocking API begins a source at offset zero. A caller using
     /// an already-positioned seekable reader can use with_position instead.
-    pub fn new(reader: R, maximum: usize) -> Result<Self> {
+    pub(crate) fn new(reader: R, maximum: usize) -> Result<Self> {
         Self::with_position(reader, 0, maximum)
     }
-    pub fn with_position(reader: R, position: u64, maximum: usize) -> Result<Self> {
+    pub(crate) fn with_position(reader: R, position: u64, maximum: usize) -> Result<Self> {
         if maximum == 0 {
             return Err(Error::Invalid("empty blocking input window"));
         }
@@ -64,27 +64,29 @@ impl<R: Read> InputFeeder<R> {
             owned: None,
         })
     }
-    pub fn owned_source(&self) -> Option<&Bytes> {
+    pub(crate) fn owned_source(&self) -> Option<&Bytes> {
         self.owned.as_ref().map(|owned| (owned.root)(&self.reader))
     }
     // Construct only a borrowed graph reference on the hot poll path. The
     // source-root callback runs solely during a real cold pressure walk.
-    pub fn owned_source_storage(&self) -> Option<&dyn crate::matroska::typed::usage::Storage> {
+    pub(crate) fn owned_source_storage(
+        &self,
+    ) -> Option<&dyn crate::matroska::typed::usage::Storage> {
         self.owned
             .as_ref()
             .map(|_| self as &dyn crate::matroska::typed::usage::Storage)
     }
-    pub fn into_inner(self) -> R {
+    pub(crate) fn into_inner(self) -> R {
         let Self {
             reader, pending, ..
         } = self;
         drop(pending);
         reader
     }
-    pub fn has_pending_read(&self) -> bool {
+    pub(crate) fn has_pending_read(&self) -> bool {
         self.pending.is_some()
     }
-    pub fn discard_stale(&mut self, request: &InputRequest) {
+    pub(crate) fn discard_stale(&mut self, request: &InputRequest) {
         if self.pending.as_ref().is_some_and(|pending| {
             pending.request.source != request.source
                 || pending.request.token != request.token
@@ -93,18 +95,18 @@ impl<R: Read> InputFeeder<R> {
             self.pending = None;
         }
     }
-    pub fn retained_buffer_bytes(&self) -> usize {
+    pub(crate) fn retained_buffer_bytes(&self) -> usize {
         self.pending
             .as_ref()
             .and_then(|pending| pending.buffer.as_ref())
             .map_or(0, BudgetVec::capacity)
     }
     #[cfg(test)]
-    pub fn reader_mut(&mut self) -> &mut R {
+    pub(crate) fn reader_mut(&mut self) -> &mut R {
         &mut self.reader
     }
     #[cfg(test)]
-    pub fn feed_sequential(
+    pub(crate) fn feed_sequential(
         &mut self,
         input: &mut InputCursor,
         cancel: &AtomicBool,
@@ -112,7 +114,7 @@ impl<R: Read> InputFeeder<R> {
         self.feed(input, cancel, None, None, false)
     }
     #[cfg(test)]
-    pub fn feed_sequential_request(
+    pub(crate) fn feed_sequential_request(
         &mut self,
         input: &mut InputCursor,
         request: &InputRequest,
@@ -121,7 +123,7 @@ impl<R: Read> InputFeeder<R> {
         self.feed(input, cancel, None, Some(request), false)
     }
     #[inline]
-    pub fn feed_typed_request(
+    pub(crate) fn feed_typed_request(
         &mut self,
         input: &mut InputCursor,
         request: &InputRequest,
@@ -134,7 +136,7 @@ impl<R: Read> InputFeeder<R> {
     /// Bytes the parser discards cannot become a payload owner. An immutable
     /// source supplies them as a view of its charged root, with the exact same
     /// request; any other source takes the ordinary copied body path.
-    pub fn feed_typed_discard_request(
+    pub(crate) fn feed_typed_discard_request(
         &mut self,
         input: &mut InputCursor,
         request: &InputRequest,
@@ -147,7 +149,7 @@ impl<R: Read> InputFeeder<R> {
         }
     }
     /// A bounded widened discard (see `bounded_discard_refill`); immutable only.
-    pub fn feed_typed_discard_refill(
+    pub(crate) fn feed_typed_discard_refill(
         &mut self,
         input: &mut InputCursor,
         plan: &crate::incremental::typed_bridge::HeaderRefillRequest,
@@ -161,7 +163,7 @@ impl<R: Read> InputFeeder<R> {
         }
         self.feed_typed_discard_request(input, plan.expanded(), cancel, reposition)
     }
-    pub fn feed_typed_header_refill(
+    pub(crate) fn feed_typed_header_refill(
         &mut self,
         input: &mut InputCursor,
         plan: &crate::incremental::typed_bridge::HeaderRefillRequest,
@@ -468,7 +470,7 @@ impl<R: Read> crate::matroska::typed::usage::Storage for InputFeeder<R> {
     }
 }
 impl<R: Read + Seek> InputFeeder<R> {
-    pub fn synchronize_seekable_position(
+    pub(crate) fn synchronize_seekable_position(
         &mut self,
         input: &mut InputCursor,
         request: &InputRequest,
@@ -521,7 +523,7 @@ fn read_retry<R: Read>(reader: &mut R, buffer: &mut [u8]) -> io::Result<usize> {
 }
 
 impl InputFeeder<io::Cursor<triergon_core::OwnedInputBytes>> {
-    pub fn from_owned(
+    pub(crate) fn from_owned(
         source: io::Cursor<triergon_core::OwnedInputBytes>,
         maximum: usize,
     ) -> Result<Self> {

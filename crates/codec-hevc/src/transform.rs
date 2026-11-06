@@ -109,6 +109,7 @@ pass_n!(pass16, 16, pass8, 2);
 pass_n!(pass32, 32, pass16, 1);
 
 /// Reusable transform temporaries (no per-block initialization).
+#[derive(Debug)]
 pub struct TransformScratch {
     gt: Vec<i32>,
     out: Vec<i32>,

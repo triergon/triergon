@@ -2,18 +2,19 @@ use super::Funding;
 use std::fmt;
 use triergon_core::{Budget, BudgetVec, Bytes, Error, Result, WorkBudget};
 
+#[derive(Debug)]
 pub(super) struct Fixed<const N: usize> {
     bytes: [u8; N],
     length: usize,
 }
 impl<const N: usize> Fixed<N> {
-    pub fn new() -> Self {
+    pub(super) fn new() -> Self {
         Self {
             bytes: [0; N],
             length: 0,
         }
     }
-    pub fn append(&mut self, bytes: &[u8]) -> Result<()> {
+    pub(super) fn append(&mut self, bytes: &[u8]) -> Result<()> {
         let end = self
             .length
             .checked_add(bytes.len())
@@ -25,7 +26,7 @@ impl<const N: usize> Fixed<N> {
         self.length = end;
         Ok(())
     }
-    pub fn clear(&mut self) {
+    pub(super) fn clear(&mut self) {
         self.length = 0;
     }
 }
@@ -35,6 +36,7 @@ impl<const N: usize> fmt::Write for Fixed<N> {
     }
 }
 
+#[derive(Debug)]
 pub(super) struct Writer {
     pub pending: Fixed<2048>,
     at: usize,
@@ -42,7 +44,7 @@ pub(super) struct Writer {
     pub frozen: Option<Bytes>,
 }
 impl Writer {
-    pub fn new(pool: &Budget) -> Self {
+    pub(super) fn new(pool: &Budget) -> Self {
         Self {
             pending: Fixed::new(),
             at: 0,
@@ -50,7 +52,7 @@ impl Writer {
             frozen: None,
         }
     }
-    pub fn drain(
+    pub(super) fn drain(
         &mut self,
         maximum: usize,
         funding: &mut Funding,
@@ -81,7 +83,11 @@ impl Writer {
         self.pending.clear();
         Ok(true)
     }
-    pub fn freeze(&mut self, funding: &mut Funding, caller: &mut WorkBudget) -> Result<bool> {
+    pub(super) fn freeze(
+        &mut self,
+        funding: &mut Funding,
+        caller: &mut WorkBudget,
+    ) -> Result<bool> {
         if self.frozen.is_some() {
             return Ok(true);
         }
