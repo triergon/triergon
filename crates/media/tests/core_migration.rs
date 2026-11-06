@@ -1,6 +1,6 @@
 //! Authored ownership and incremental-input regressions. No reference code.
 use std::{io::Cursor, sync::atomic::AtomicBool};
-use triergon::{Error, Limits, matroska::Demuxer};
+use triergon::{Error, Limits, typed::BlockingReader as Demuxer};
 use triergon_core::{Budget, Bytes, InputWindow, SourceCapabilities, SourceId, WorkBudget};
 
 fn e(id: u64, bytes: &[u8]) -> Vec<u8> {

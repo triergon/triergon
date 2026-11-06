@@ -802,7 +802,7 @@ impl DocumentJob {
                         nodes: StorageVec(nodes),
                         attachment_bytes: self.attachment_bytes,
                         source_offset: self.source_offset,
-                        pool: self.pool.clone(),
+                        _pool: self.pool.clone(),
                         _owner_charge: charge,
                     };
                     self.result = Some(SharedDocument(Arc::new(document)));

@@ -1,6 +1,6 @@
 //! Matroska Colour and static HDR source facts (RFC 9559 §5.1.4.1.28).
 //! No decoder, display policy or native library belongs in this module.
-use crate::{Error, Result, ebml};
+use crate::{Error, Result};
 
 /// All ten source floats, without rational quantization or filling absent fields.
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
@@ -44,86 +44,6 @@ impl Default for Colour {
             mastering: None,
         }
     }
-}
-
-fn mark(seen: &mut u16, index: u32) -> Result<()> {
-    let bit = 1 << index;
-    if *seen & bit != 0 {
-        return Err(Error::Invalid("duplicate colour metadata"));
-    }
-    *seen |= bit;
-    Ok(())
-}
-
-fn mastering(data: &[u8]) -> Result<MasteringMetadata> {
-    let mut out = MasteringMetadata::default();
-    let mut seen = 0;
-    ebml::children(data, |id, bytes| {
-        if !(0x55d1..=0x55da).contains(&id) {
-            return Ok(());
-        }
-        let index = (id - 0x55d1) as u32;
-        mark(&mut seen, index)?;
-        let value = match bytes.len() {
-            0 => 0.,
-            4 => f64::from(f32::from_be_bytes(
-                bytes
-                    .try_into()
-                    .map_err(|_| Error::Invalid("HDR float width"))?,
-            )),
-            8 => f64::from_be_bytes(
-                bytes
-                    .try_into()
-                    .map_err(|_| Error::Invalid("HDR float width"))?,
-            ),
-            _ => return Err(Error::Invalid("HDR float width")),
-        };
-        if !value.is_finite() || value < 0. || (index < 8 && value > 1.) {
-            return Err(Error::Invalid("HDR float range"));
-        }
-        match index {
-            0..=7 => out.chromaticity[index as usize] = Some(value),
-            8 => out.luminance_max = Some(value),
-            _ => out.luminance_min = Some(value),
-        }
-        Ok(())
-    })?;
-    Ok(out)
-}
-
-pub(crate) fn parse(data: &[u8]) -> Result<Colour> {
-    let mut out = Colour::default();
-    let mut seen = 0;
-    ebml::children(data, |id, bytes| {
-        if id == 0x55d0 {
-            mark(&mut seen, 13)?;
-            out.mastering = Some(mastering(bytes)?);
-            return Ok(());
-        }
-        if !(0x55b1..=0x55bd).contains(&id) {
-            return Ok(());
-        }
-        mark(&mut seen, (id - 0x55b1) as u32)?;
-        let v = if bytes.is_empty() && matches!(id, 0x55b1 | 0x55ba | 0x55bb) {
-            2
-        } else {
-            ebml::uint(bytes)?
-        };
-        match id {
-            0x55b1 => out.matrix_coefficients = v,
-            0x55b2 => out.bits_per_channel = v,
-            0x55b3..=0x55b4 => out.chroma_subsampling[(id - 0x55b3) as usize] = Some(v),
-            0x55b5..=0x55b6 => out.cb_subsampling[(id - 0x55b5) as usize] = Some(v),
-            0x55b7..=0x55b8 => out.chroma_siting[(id - 0x55b7) as usize] = v,
-            0x55b9 => out.range = v,
-            0x55ba => out.transfer_characteristics = v,
-            0x55bb => out.primaries = v,
-            0x55bc => out.max_cll = Some(v),
-            _ => out.max_fall = Some(v),
-        }
-        Ok(())
-    })?;
-    Ok(out)
 }
 
 /// Bounded nonnegative rational for the pinned public numeric view.
@@ -281,6 +201,22 @@ mod tests {
 #[cfg(test)]
 mod source_tests {
     use super::*;
+    use crate::incremental::ParseStep;
+    use std::sync::atomic::AtomicBool;
+    use triergon_core::WorkBudget;
+    /// Run the typed Colour job over one Colour element payload.
+    fn parse(data: &[u8]) -> Result<Colour> {
+        let pool = triergon_core::Budget::new(1 << 20)?;
+        let source = crate::storage::SharedBytes::try_from_vec(&pool, data.to_vec())?;
+        let mut job = crate::matroska::typed::colour::ColourJob::new(source, 0..data.len());
+        loop {
+            match job.step(&mut WorkBudget::new(u64::MAX), &AtomicBool::new(false))? {
+                ParseStep::Event(colour) => return Ok(colour),
+                ParseStep::Yield => continue,
+                other => panic!("unexpected colour step {other:?}"),
+            }
+        }
+    }
     fn e(id: u64, bytes: &[u8]) -> Vec<u8> {
         let mut out: Vec<_> = id
             .to_be_bytes()

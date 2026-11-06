@@ -240,3 +240,37 @@ impl LaceJob {
 }
 
 super::usage::storage!(LaceJob, |s| [s.source]);
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn lace(data: &[u8], mode: u8) -> Result<Vec<Vec<u8>>> {
+        let pool = triergon_core::Budget::new(1 << 16)?;
+        let source = SharedBytes::try_from_vec(&pool, data.to_vec())?;
+        let mut job = LaceJob::new(source, 0..data.len(), mode)?;
+        loop {
+            match job.step(&mut WorkBudget::new(u64::MAX), &AtomicBool::new(false))? {
+                ParseStep::Event(frames) => {
+                    return Ok(frames.ranges().map(|range| data[range].to_vec()).collect());
+                }
+                ParseStep::Yield => continue,
+                other => panic!("unexpected lace step {other:?}"),
+            }
+        }
+    }
+
+    #[test]
+    fn all_lacing_schemes_and_malformed_lengths() {
+        assert_eq!(lace(&[1, 1, 4, 5, 6], 1).unwrap(), [&[4][..], &[5, 6]]);
+        assert_eq!(lace(&[1, 4, 5, 6, 7], 2).unwrap(), [&[4, 5][..], &[6, 7]]);
+        assert_eq!(
+            lace(&[2, 0x81, 0xc0, 4, 5, 6, 7, 8, 9], 3).unwrap(),
+            [&[4][..], &[5, 6], &[7, 8, 9]]
+        );
+        for b in [&[][..], &[0][..], &[1, 255][..], &[2, 0x81, 0x80][..]] {
+            assert!(lace(b, 3).is_err(), "{b:?}");
+        }
+        assert!(lace(&[1, 0, 1, 2], 2).is_err());
+    }
+}

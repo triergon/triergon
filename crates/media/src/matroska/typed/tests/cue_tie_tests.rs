@@ -241,7 +241,7 @@ fn observed_landing(case: &Case, target: i64, playback: bool) -> Landing {
 fn configuration_from_fixture(case: &Case, pool: &Budget) -> configuration::Configuration {
     // Only source tracks are used from the existing blocking parser. Its Cues
     // vector and std unstable tie permutation never enter this expectation.
-    let reader = crate::matroska::Demuxer::open_seekable_in(
+    let reader = crate::typed::BlockingReader::open_seekable_in(
         Cursor::new(case.bytes),
         crate::Limits::default(),
         pool,

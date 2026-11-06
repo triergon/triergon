@@ -208,7 +208,7 @@ fn seed_configuration(pool: &Budget, extra: &[u8]) -> configuration::Configurati
     seed_configuration_tracks(pool, &element(0xae, &track_entry(1, 1, extra)))
 }
 fn seed_configuration_tracks(pool: &Budget, entries: &[u8]) -> configuration::Configuration {
-    use crate::matroska::Demuxer;
+    use crate::typed::BlockingReader as Demuxer;
     let raw = [
         element(0x1a45dfa3, &element(0x4282, b"matroska")),
         element(

@@ -29,7 +29,7 @@ pub struct Document {
     attachment_bytes: usize,
     source_offset: Option<u64>,
     // Reserve the enclosing Arc/object before Arc::new; release children first.
-    pool: Budget,
+    _pool: Budget,
     _owner_charge: Reservation,
 }
 
@@ -270,6 +270,7 @@ impl Document {
             index: i as u16,
         })
     }
+    /// Test oracle entry: build one document through the typed document job.
     #[cfg(test)]
     pub(crate) fn parse(
         kind: u64,
@@ -279,295 +280,30 @@ impl Document {
         storage_limit: usize,
         attachment_limit: usize,
     ) -> Result<Self> {
+        use crate::incremental::ParseStep;
         let capacity = storage_limit
             .checked_mul(3)
             .and_then(|n| n.checked_add(4096))
             .ok_or(Error::Overflow)?;
         let pool = Budget::new(capacity)?;
         let raw = SharedBytes::try_from_vec(&pool, raw)?;
-        Self::parse_in(
-            kind,
-            raw,
+        let limits = typed_document::DocumentLimits {
             node_limit,
             depth_limit,
             storage_limit,
             attachment_limit,
-            &pool,
-        )
-    }
-    fn parse_in(
-        kind: u64,
-        raw: SharedBytes,
-        node_limit: usize,
-        depth_limit: usize,
-        storage_limit: usize,
-        attachment_limit: usize,
-        pool: &Budget,
-    ) -> Result<Self> {
-        if !matches!(kind, INFO | ATTACHMENTS | CHAPTERS | TAGS) {
-            return Err(Error::Invalid("metadata document type"));
-        }
-        u32::try_from(raw.len()).map_err(|_| Error::Limit("metadata offset space"))?;
-        let mut doc = Self {
-            raw,
-            nodes: StorageVec::new(pool),
-            attachment_bytes: 0,
-            source_offset: None,
-            pool: pool.clone(),
-            _owner_charge: pool.reserve(size_of::<Self>() + 2 * size_of::<usize>())?,
         };
-        doc.push(
-            Node {
-                id: kind as u32,
-                header: 0,
-                next: 1,
-                parent: u16::MAX,
-            },
-            node_limit,
-            storage_limit,
-        )?;
-        doc.parse_children(
-            0,
-            0,
-            node_limit,
-            depth_limit,
-            storage_limit,
-            attachment_limit,
-        )?;
-        doc.validate(storage_limit)?;
-        Ok(doc)
-    }
-    fn push(&mut self, node: Node, limit: usize, storage: usize) -> Result<u16> {
-        let limit = limit.min(u16::MAX as usize);
-        if self.nodes.len() >= limit {
-            return Err(Error::Limit("metadata nodes"));
-        }
-        if self.nodes.len() == self.nodes.capacity() {
-            let initial = (self.raw.len() / 2 + 1).min(8);
-            let target = self.nodes.len().saturating_mul(2).max(initial).min(limit);
-            let bytes = target
-                .checked_mul(size_of::<Node>())
-                .and_then(|n| n.checked_add(self.raw.retained_capacity()))
-                .and_then(|n| n.checked_add(size_of::<Self>() + 2 * size_of::<usize>()))
-                .ok_or(Error::Overflow)?;
-            if bytes > storage {
-                return Err(Error::Limit("metadata retained storage"));
+        let mut job = typed_document::DocumentJob::new(kind, raw, limits, None, &pool)?;
+        let cancel = std::sync::atomic::AtomicBool::new(false);
+        let document = loop {
+            match job.step(&mut triergon_core::WorkBudget::new(u64::MAX), &cancel)? {
+                ParseStep::Event(document) => break document,
+                ParseStep::Yield => continue,
+                other => panic!("unexpected document step {other:?}"),
             }
-            self.nodes.try_reserve_exact(target - self.nodes.len())?;
-            if self.retained_bytes() > storage {
-                return Err(Error::Limit("metadata retained storage"));
-            }
-        }
-        let index =
-            u16::try_from(self.nodes.len()).map_err(|_| Error::Limit("metadata index space"))?;
-        self.nodes.push(node)?;
-        Ok(index)
-    }
-    fn parse_children(
-        &mut self,
-        parent: u16,
-        depth: usize,
-        nodes: usize,
-        max_depth: usize,
-        storage: usize,
-        attachments: usize,
-    ) -> Result<()> {
-        if depth > max_depth || depth > 64 {
-            return Err(Error::Limit("metadata nesting"));
-        }
-        let p = Element {
-            doc: self,
-            index: parent,
-        }
-        .range();
-        let mut at = p.start;
-        while at < p.end {
-            let (id, a, _) = ebml::vint(&self.raw[at..p.end], true)?;
-            let (length, b, unknown) = ebml::vint(&self.raw[at + a..p.end], false)?;
-            if unknown {
-                return Err(Error::Invalid("unknown metadata child size"));
-            }
-            let start = at.checked_add(a + b).ok_or(Error::Overflow)?;
-            let end = start
-                .checked_add(usize::try_from(length).map_err(|_| Error::Overflow)?)
-                .ok_or(Error::Overflow)?;
-            if end > p.end {
-                return Err(Error::Truncated);
-            }
-            let index = self.push(
-                Node {
-                    id: id as u32,
-                    header: at as u32,
-                    next: 0,
-                    parent,
-                },
-                nodes,
-                storage,
-            )?;
-            if master(id) {
-                self.parse_children(index, depth + 1, nodes, max_depth, storage, attachments)?;
-            } else {
-                let element = Element { doc: self, index };
-                if unsigned(id) {
-                    let value = element.uint()?;
-                    if boolean(id) && value > 1 {
-                        return Err(Error::Invalid("metadata boolean"));
-                    }
-                    if matches!(id, 0x46ae | 0x73c4 | 0x45bc | 0x6ebc | 0x68ca) && value == 0 {
-                        return Err(Error::Invalid("zero metadata UID/type"));
-                    }
-                    if id == 0x6922 && value > 2 {
-                        return Err(Error::Invalid("chapter process time"));
-                    }
-                }
-                if id == 0x4489 {
-                    let value = element.float()?;
-                    if !value.is_finite() || value <= 0. {
-                        return Err(Error::Invalid("Segment duration range"));
-                    }
-                }
-                if id == 0x4461 && !matches!(element.raw().len(), 0 | 8) {
-                    return Err(Error::Invalid("DateUTC width"));
-                }
-                if utf8(id) || ascii(id) {
-                    element.text()?;
-                }
-                if id == 0x6e67 && element.raw().len() != 16 {
-                    return Err(Error::Invalid("chapter SegmentUUID length"));
-                }
-                if id == 0x465c {
-                    self.attachment_bytes = self
-                        .attachment_bytes
-                        .checked_add(end - start)
-                        .ok_or(Error::Overflow)?;
-                    if self.attachment_bytes > attachments {
-                        return Err(Error::Limit("attachment payload bytes"));
-                    }
-                }
-            }
-            self.nodes[index as usize].next =
-                u16::try_from(self.nodes.len()).map_err(|_| Error::Overflow)?;
-            at = end;
-        }
-        self.nodes[parent as usize].next =
-            u16::try_from(self.nodes.len()).map_err(|_| Error::Overflow)?;
-        Ok(())
-    }
-    fn validate(&self, storage: usize) -> Result<()> {
-        for e in self.elements() {
-            let singles: &[u64] = match e.id() {
-                INFO => &[
-                    0x2ad7b1, 0x4489, 0x4461, 0x7ba9, 0x4d80, 0x5741, 0x73a4, 0x3cb923, 0x3eb923,
-                ],
-                0x61a7 => &[0x46ae, 0x466e, 0x4660, 0x467e, 0x465c],
-                0x45b9 => &[0x45bc, 0x45bd, 0x45db, 0x45dd],
-                0xb6 => &[
-                    0x73c4, 0x5654, 0x91, 0x92, 0x98, 0x4598, 0x6e67, 0x6ebc, 0x63c3, 0x8f,
-                ],
-                0x80 => &[0x85],
-                0x7373 => &[0x63c0],
-                0x63c0 => &[0x68ca, 0x63ca],
-                0x67c8 => &[0x45a3, 0x447a, 0x447b, 0x4484, 0x4487, 0x4485],
-                0x6944 => &[0x6955, 0x450d],
-                0x6911 => &[0x6922, 0x6933],
-                _ => &[],
-            };
-            let mut seen = 0_u64;
-            for child in e.children() {
-                if let Some(bit) = singles.iter().position(|id| *id == child.id()) {
-                    if seen & (1 << bit) != 0 {
-                        return Err(Error::Invalid("duplicate metadata field"));
-                    }
-                    seen |= 1 << bit;
-                }
-            }
-            let require = |ids: &[u64]| -> Result<()> {
-                if ids.iter().any(|id| e.field(*id).is_none()) {
-                    Err(Error::Invalid("missing metadata field"))
-                } else {
-                    Ok(())
-                }
-            };
-            match e.id() {
-                ATTACHMENTS => require(&[0x61a7])?,
-                CHAPTERS => require(&[0x45b9])?,
-                TAGS => require(&[0x7373])?,
-                0x61a7 => require(&[0x46ae, 0x466e, 0x4660, 0x465c])?,
-                0x45b9 => require(&[0xb6])?,
-                0xb6 => {
-                    require(&[0x73c4, 0x91])?;
-                    let start = e.number(0x91)?.ok_or(Error::Invalid("chapter start"))?;
-                    if e.number(0x92)?.is_some_and(|end| end < start) {
-                        return Err(Error::Invalid("chapter time range"));
-                    }
-                    if e.field(0x6ebc).is_some() {
-                        require(&[0x6e67])?;
-                    }
-                    let mut ancestor = e.parent();
-                    let mut edition = None;
-                    while let Some(p) = ancestor {
-                        if p.id() == 0xb6
-                            && (p.number(0x91)?.is_some_and(|v| start < v)
-                                || p.number(0x92)?.is_some_and(|v| start > v))
-                        {
-                            return Err(Error::Invalid("nested chapter time range"));
-                        }
-                        if p.id() == 0x45b9 {
-                            edition = Some(p);
-                            break;
-                        }
-                        ancestor = p.parent();
-                    }
-                    if edition.is_some_and(|p| p.number(0x45dd).ok().flatten() == Some(1))
-                        && e.field(0xb6).is_none()
-                    {
-                        require(&[0x92])?;
-                    }
-                }
-                0x80 => require(&[0x85])?,
-                0x7373 => require(&[0x67c8])?,
-                0x67c8 => {
-                    require(&[0x45a3])?;
-                    if e.field(0x4487).is_some() && e.field(0x4485).is_some() {
-                        return Err(Error::Invalid("text and binary tag"));
-                    }
-                }
-                0x6911 => require(&[0x6922, 0x6933])?,
-                _ => (),
-            }
-        }
-        // Bounded temporary UID storage; documents without UIDs need none.
-        let uid_count = self
-            .elements()
-            .filter(|e| matches!(e.id(), 0x46ae | 0x73c4 | 0x45bc))
-            .count();
-        if uid_count == 0 {
-            return Ok(());
-        }
-        let workspace = uid_count
-            .checked_mul(size_of::<u64>())
-            .ok_or(Error::Overflow)?;
-        if self
-            .retained_bytes()
-            .checked_add(workspace)
-            .ok_or(Error::Overflow)?
-            > storage
-        {
-            return Err(Error::Limit("metadata validation storage"));
-        }
-        let mut uids = StorageVec::<u64>::new(&self.pool);
-        uids.try_reserve_exact(uid_count)?;
-        for kind in [0x46ae, 0x73c4, 0x45bc] {
-            uids.clear();
-            for e in self.elements().filter(|e| e.id() == kind) {
-                uids.push(e.uint()?)?;
-            }
-            uids.sort_unstable();
-            if uids.windows(2).any(|p| p[0] == p[1]) {
-                return Err(Error::Invalid("duplicate metadata UID"));
-            }
-        }
-        Ok(())
+        };
+        drop(job);
+        Arc::try_unwrap(document.0).map_err(|_| Error::Invalid("test document is shared"))
     }
 }
 
@@ -687,26 +423,7 @@ impl Catalogue {
     pub fn attachment_bytes(&self) -> usize {
         self.attachments
     }
-    pub fn prepare(&mut self, limits: crate::Limits) -> Result<usize> {
-        if self.documents.len() >= 256 {
-            return Err(Error::Limit("metadata documents"));
-        }
-        if self.documents.len() == self.documents.capacity() {
-            let pointers = (self.documents.len() + 1)
-                .checked_mul(size_of::<SharedDocument>())
-                .ok_or(Error::Overflow)?;
-            if self.retained.checked_add(pointers).ok_or(Error::Overflow)?
-                > limits.metadata_storage_bytes
-            {
-                return Err(Error::Limit("metadata retained storage"));
-            }
-            self.documents.try_reserve_exact(1)?;
-        }
-        limits
-            .metadata_storage_bytes
-            .checked_sub(self.retained_bytes())
-            .ok_or(Error::Limit("metadata retained storage"))
-    }
+    /// Test entry: commit one document through the typed catalogue job.
     #[cfg(test)]
     pub fn add(
         &mut self,
@@ -716,55 +433,25 @@ impl Catalogue {
         source_offset: Option<u64>,
         limits: crate::Limits,
     ) -> Result<usize> {
+        use crate::incremental::ParseStep;
         let raw = SharedBytes::try_from_vec(&self.pool, raw)?;
-        self.add_shared(kind, raw, structural_limit, source_offset, limits)
-    }
-    pub fn add_shared(
-        &mut self,
-        kind: u64,
-        raw: SharedBytes,
-        structural_limit: usize,
-        source_offset: Option<u64>,
-        limits: crate::Limits,
-    ) -> Result<usize> {
-        if kind == ATTACHMENTS && self.documents.iter().any(|d| d.kind() == ATTACHMENTS) {
-            return Err(Error::Invalid("duplicate Attachments"));
-        }
-        let available = self.prepare(limits)?;
-        let mut doc = Document::parse_in(
+        let pool = self.pool.clone();
+        let mut job = typed_document::CatalogueJob::new(
             kind,
             raw,
-            limits
-                .metadata_nodes
-                .checked_sub(self.nodes)
-                .ok_or(Error::Limit("metadata nodes"))?,
-            limits.metadata_depth,
-            available,
-            limits
-                .attachment_bytes
-                .checked_sub(self.attachments)
-                .ok_or(Error::Limit("attachment payload bytes"))?,
-            &self.pool,
+            structural_limit,
+            source_offset,
+            limits,
+            &pool,
         )?;
-        doc.source_offset = source_offset;
-        let structural = doc.raw.len() - doc.attachment_bytes;
-        if structural > structural_limit {
-            return Err(Error::Limit("metadata"));
+        let cancel = std::sync::atomic::AtomicBool::new(false);
+        loop {
+            match job.step(self, &mut triergon_core::WorkBudget::new(u64::MAX), &cancel)? {
+                ParseStep::Event(commit) => return Ok(commit.structural_bytes),
+                ParseStep::Yield => continue,
+                other => panic!("unexpected catalogue step {other:?}"),
+            }
         }
-        self.nodes = self
-            .nodes
-            .checked_add(doc.node_count())
-            .ok_or(Error::Overflow)?;
-        self.attachments = self
-            .attachments
-            .checked_add(doc.attachment_bytes)
-            .ok_or(Error::Overflow)?;
-        self.retained = self
-            .retained
-            .checked_add(doc.retained_bytes())
-            .ok_or(Error::Overflow)?;
-        self.documents.push(SharedDocument(Arc::new(doc)))?;
-        Ok(structural)
     }
 }
 
