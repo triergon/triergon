@@ -367,9 +367,10 @@ enum Phase {
 }
 
 /// Input is one already externally framed, same-pool immutable record (without
-/// box header). Two resumable grammar walks count then publish exact-capacity
-/// descriptors. A work unit reads at most six fixed bytes or one length+fixed
-/// NAL header; opaque NAL bodies are bounded spans, never copied/scanned.
+/// box header). The first walk validates the record before reserving descriptor
+/// storage. Small views reuse the validated facts if the fill fits in one step.
+/// Other fills walk the record again. A work unit reads at most six fixed bytes
+/// or one length and fixed NAL header. NAL bodies remain bounded spans.
 /// Source delivery chunks belong to the enclosing container/core input job.
 struct AvcParser<S: AvcStorage> {
     raw: Option<Bytes>,
@@ -386,6 +387,7 @@ struct AvcParser<S: AvcStorage> {
     // Taken by the published output and dropped by a latched failure, so no
     // spare pool handle or empty replacement vector is kept for either.
     nals: Option<BudgetVec<S::Nal>>,
+    counted: S::CountCache,
     failure: Option<Error>,
     observed_width_three: bool,
 }
@@ -423,6 +425,7 @@ impl<S: AvcStorage> AvcParser<S> {
             total: 0,
             understood_end: 0,
             nals: Some(BudgetVec::new(pool)),
+            counted: S::CountCache::default(),
             failure: None,
             observed_width_three: false,
         })
@@ -529,6 +532,7 @@ impl<S: AvcStorage> AvcParser<S> {
                             if matches!(self.phase, Phase::Count) {
                                 let count = self.total.checked_add(1).ok_or(Error::Overflow)?;
                                 check_limit(count, self.limits.maximum_nals)?;
+                                S::cache_nal(&mut self.counted, self.total, &payload, kind, header);
                                 self.total = count;
                             } else {
                                 let nal = S::nal(raw, field, payload, kind, header)?;
@@ -548,31 +552,7 @@ impl<S: AvcStorage> AvcParser<S> {
                                     .extension = next.extension;
                                 self.phase = Phase::Reserve;
                             } else {
-                                if end != self.understood_end
-                                    || self.nals.as_ref().map_or(0, BudgetVec::len) != self.total
-                                {
-                                    return Err(Error::Invalid("AVC second walk"));
-                                }
-                                let output = S::finish(AvcBuild {
-                                    raw: self
-                                        .raw
-                                        .take()
-                                        .ok_or(Error::Invalid("missing AVC record"))?,
-                                    source: self.source,
-                                    fields: self
-                                        .fields
-                                        .ok_or(Error::Invalid("missing AVC fields"))?,
-                                    width: self.width.ok_or(Error::Invalid("missing AVC width"))?,
-                                    arrays: self.arrays.clone(),
-                                    array_count: self.array_count,
-                                    nals: self
-                                        .nals
-                                        .take()
-                                        .ok_or(Error::Invalid("missing AVC descriptors"))?,
-                                    understood_end: end,
-                                });
-                                self.phase = Phase::Complete;
-                                return Ok(BuildStep::Ready(output));
+                                return self.publish(end);
                             }
                         }
                         _ => {}
@@ -580,16 +560,55 @@ impl<S: AvcStorage> AvcParser<S> {
                     self.scan = next;
                 }
                 Phase::Reserve => {
-                    self.nals
+                    let nals = self
+                        .nals
                         .as_mut()
-                        .ok_or(Error::Invalid("missing AVC descriptors"))?
-                        .try_reserve_exact(self.total)?;
+                        .ok_or(Error::Invalid("missing AVC descriptors"))?;
+                    nals.try_reserve_exact(self.total)?;
+
+                    // A complete small record can reuse the first walk's facts.
+                    // Charge the group, NAL and end events of the usual fill.
+                    let fill_work = (2 * self.array_count + self.total + 1) as u64;
+                    if work.remaining() >= fill_work
+                        && S::copy_cached(&self.counted, self.total, nals)?
+                    {
+                        work.take(fill_work);
+                        if cancel.load(Ordering::Relaxed) {
+                            return Err(Error::Cancelled);
+                        }
+                        return self.publish(self.understood_end);
+                    }
                     self.scan = Scan::new();
                     self.phase = Phase::Fill;
                 }
                 Phase::Complete => return Ok(BuildStep::Complete),
             }
         }
+    }
+
+    fn publish(&mut self, end: usize) -> Result<BuildStep<S::Output>> {
+        if end != self.understood_end || self.nals.as_ref().map_or(0, BudgetVec::len) != self.total
+        {
+            return Err(Error::Invalid("AVC second walk"));
+        }
+        let output = S::finish(AvcBuild {
+            raw: self
+                .raw
+                .take()
+                .ok_or(Error::Invalid("missing AVC record"))?,
+            source: self.source,
+            fields: self.fields.ok_or(Error::Invalid("missing AVC fields"))?,
+            width: self.width.ok_or(Error::Invalid("missing AVC width"))?,
+            arrays: self.arrays.clone(),
+            array_count: self.array_count,
+            nals: self
+                .nals
+                .take()
+                .ok_or(Error::Invalid("missing AVC descriptors"))?,
+            understood_end: end,
+        });
+        self.phase = Phase::Complete;
+        Ok(BuildStep::Ready(output))
     }
 }
 
@@ -606,6 +625,25 @@ fn check_limit(requested: usize, maximum: usize) -> Result<()> {
 trait AvcStorage {
     type Nal;
     type Output;
+    type CountCache: Default;
+
+    fn cache_nal(
+        _cache: &mut Self::CountCache,
+        _index: usize,
+        _payload: &Range<usize>,
+        _kind: AvcConfigArrayKind,
+        _header: NalHeader,
+    ) {
+    }
+
+    fn copy_cached(
+        _cache: &Self::CountCache,
+        _count: usize,
+        _nals: &mut BudgetVec<Self::Nal>,
+    ) -> Result<bool> {
+        Ok(false)
+    }
+
     fn nal(
         raw: &Bytes,
         field: Range<usize>,
@@ -632,6 +670,7 @@ struct EagerAvc;
 impl AvcStorage for EagerAvc {
     type Nal = AvcConfigNal;
     type Output = AvcConfiguration;
+    type CountCache = ();
     fn nal(
         raw: &Bytes,
         field: Range<usize>,
@@ -695,16 +734,38 @@ impl AvcConfigParser {
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Copy, Debug)]
 struct AvcNalDescriptor {
-    payload: Range<usize>,
+    start: usize,
+    end: usize,
     kind: AvcConfigArrayKind,
     header: NalHeader,
 }
 impl AvcNalDescriptor {
+    const EMPTY: Self = Self {
+        start: 0,
+        end: 0,
+        kind: AvcConfigArrayKind::Sequence,
+        header: NalHeader::Avc {
+            nal_ref_idc: 0,
+            nal_unit_type: 0,
+        },
+    };
+
+    fn payload(&self) -> Range<usize> {
+        self.start..self.end
+    }
+
     fn length_field(&self) -> Range<usize> {
         // The parser checks the two-byte prefix immediately before the payload.
-        self.payload.start - 2..self.payload.start
+        self.start - 2..self.start
+    }
+}
+
+struct AvcCountCache([AvcNalDescriptor; 4]);
+impl Default for AvcCountCache {
+    fn default() -> Self {
+        Self([AvcNalDescriptor::EMPTY; 4])
     }
 }
 
@@ -712,6 +773,37 @@ struct CompactAvc;
 impl AvcStorage for CompactAvc {
     type Nal = AvcNalDescriptor;
     type Output = AvcConfigurationView;
+    type CountCache = AvcCountCache;
+
+    fn cache_nal(
+        cache: &mut Self::CountCache,
+        index: usize,
+        payload: &Range<usize>,
+        kind: AvcConfigArrayKind,
+        header: NalHeader,
+    ) {
+        if let Some(slot) = cache.0.get_mut(index) {
+            *slot = AvcNalDescriptor {
+                start: payload.start,
+                end: payload.end,
+                kind,
+                header,
+            };
+        }
+    }
+
+    fn copy_cached(
+        cache: &Self::CountCache,
+        count: usize,
+        nals: &mut BudgetVec<Self::Nal>,
+    ) -> Result<bool> {
+        let Some(cached) = cache.0.get(..count) else {
+            return Ok(false);
+        };
+        nals.try_extend_from_slice(cached)?;
+        Ok(true)
+    }
+
     fn nal(
         _raw: &Bytes,
         _field: Range<usize>,
@@ -720,7 +812,8 @@ impl AvcStorage for CompactAvc {
         header: NalHeader,
     ) -> Result<Self::Nal> {
         Ok(AvcNalDescriptor {
-            payload,
+            start: payload.start,
+            end: payload.end,
             kind,
             header,
         })
@@ -864,13 +957,13 @@ pub struct AvcConfigNalRef<'a> {
 }
 impl<'a> AvcConfigNalRef<'a> {
     pub fn source_bytes(&self) -> &'a [u8] {
-        &self.raw[self.descriptor.payload.clone()]
+        &self.raw[self.descriptor.payload()]
     }
     pub fn length_field_bytes(&self) -> &'a [u8] {
         &self.raw[self.descriptor.length_field()]
     }
     pub fn source_range(&self) -> Range<usize> {
-        self.descriptor.payload.clone()
+        self.descriptor.payload()
     }
     pub const fn source(&self) -> AvcConfigSource {
         self.source
@@ -886,7 +979,7 @@ impl<'a> AvcConfigNalRef<'a> {
         RetainedAvcConfigNal {
             raw: Bytes::clone(self.raw),
             source: self.source,
-            descriptor: (*self.descriptor).clone(),
+            descriptor: *self.descriptor,
         }
     }
     /// An owning export remains charged to its original pool; no implicit move.
@@ -915,13 +1008,13 @@ impl RetainedAvcConfigNal {
         }
     }
     pub fn source_bytes(&self) -> &[u8] {
-        &self.raw[self.descriptor.payload.clone()]
+        &self.raw[self.descriptor.payload()]
     }
     pub fn length_field_bytes(&self) -> &[u8] {
         &self.raw[self.descriptor.length_field()]
     }
     pub fn source_range(&self) -> Range<usize> {
-        self.descriptor.payload.clone()
+        self.descriptor.payload()
     }
     pub const fn source(&self) -> AvcConfigSource {
         self.source
@@ -1097,7 +1190,7 @@ mod compact_descriptor_guards {
         )
         .unwrap();
         // No physical check is repeated after Scan; the extents are copied.
-        assert_eq!(descriptor.payload, high..usize::MAX);
+        assert_eq!(descriptor.payload(), high..usize::MAX);
         assert_eq!(descriptor.length_field(), high - 2..high);
         // The eager adapter still slices, so an unchecked span fails there.
         assert_eq!(
