@@ -88,6 +88,7 @@ pub struct FrameStep {
     pub state: FrameState,
 }
 
+#[derive(Debug)]
 #[allow(
     clippy::large_enum_variant,
     reason = "keep the literal carrier inline for allocation-free fallback"

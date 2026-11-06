@@ -74,6 +74,7 @@ pub enum FeedContinuation {
 }
 
 /// A validated continuation offered to a feed's native observer.
+#[derive(Debug)]
 pub struct FeedCarrier<'a>(&'a mut FramedCarrier);
 
 impl FeedCarrier<'_> {
@@ -102,6 +103,7 @@ impl FeedCarrier<'_> {
 }
 
 /// An ordinary carrier or a shared-window prefix offered to a progressive feed.
+#[derive(Debug)]
 pub enum FeedItem<'a> {
     Carrier(FeedCarrier<'a>),
     PayloadRun(FeedPayloadRun<'a>),
@@ -111,6 +113,7 @@ pub enum FeedItem<'a> {
 const PAYLOAD_RUN_WORK: u64 = TS188_BYTES as u64 + 2 + (PLAIN_PAYLOAD_BYTES as u64 + 1) + 2 + 1;
 
 /// A same-PID continuation prefix that may be appended to a native observer.
+#[derive(Debug)]
 pub struct FeedPayloadRun<'a> {
     input: &'a mut InputCursor,
     framer: &'a mut TransportFramer,
