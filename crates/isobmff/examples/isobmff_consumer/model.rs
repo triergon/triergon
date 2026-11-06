@@ -624,19 +624,8 @@ impl<'a> Driver<'a> {
         self.native_operation(model, stats, retention, NativeOperation::Open, trace)
     }
 
-    fn comparison_payload(
-        &mut self,
-        sample: Sample,
-        model: &Model,
-    ) -> Result<Option<(Bytes, bool)>> {
-        let Some(declared) = model.truncated_media.as_ref().filter(|extent| {
-            sample.range.end > self.length && sample.require_within((*extent).clone()).is_ok()
-        }) else {
-            return Ok(Some((
-                self.packet(sample, model.media.as_slice())?.payload,
-                false,
-            )));
-        };
+    #[cold]
+    fn terminal_payload(&mut self, sample: Sample, declared: &Range<u64>) -> Result<Option<Bytes>> {
         let maximum = 16 * 1024 * 1024;
         let profile = PinnedMovD32RegularRecoveryV1;
         if sample.range.start >= self.length {
@@ -663,10 +652,8 @@ impl<'a> Driver<'a> {
                 &self.cancel,
             )? {
                 Step::Ready(packet) => {
-                    return Ok(Some((
-                        packet.payload,
-                        packet.bounds.incomplete_at_known_eof,
-                    )));
+                    debug_assert!(packet.bounds.incomplete_at_known_eof);
+                    return Ok(Some(packet.payload));
                 }
                 Step::NeedInput(request) => self.supply(request)?,
                 Step::Yield => {}
@@ -900,11 +887,20 @@ impl<'a> Driver<'a> {
                 .iter()
                 .position(|r| r.header.track_id == item.track_id)
                 .ok_or(Error::Invalid("native occurrence track"))?;
-            let Some((payload, truncated)) = self.comparison_payload(item.source, model)? else {
-                return Ok((reads, true));
+            let terminal = model.truncated_media.as_ref().filter(|extent| {
+                item.source.range.end > self.length
+                    && item.source.require_within((*extent).clone()).is_ok()
+            });
+            let payload = if let Some(declared) = terminal {
+                let Some(payload) = self.terminal_payload(item.source, declared)? else {
+                    return Ok((reads, true));
+                };
+                payload
+            } else {
+                self.packet(item.source, model.media.as_slice())?.payload
             };
             let mut packet = Packet::from_view(index, item.track_id, &item.native, payload)?;
-            if truncated {
+            if terminal.is_some() {
                 packet.flags |= protocol::CORRUPT_PACKET;
             }
             stats.packet(&packet)?;
