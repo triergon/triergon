@@ -304,6 +304,9 @@ fn continuous_mux_exceeds_the_live_budget() {
                 counts[1] += 1;
                 payload_bytes += frame.bytes.len();
             }
+            TsProgressiveStep::NeedInput(request) => {
+                assert_eq!(request.offset, source.read.get() as u64);
+            }
             TsProgressiveStep::End => break,
             other => panic!("unexpected step {other:?}"),
         }
@@ -340,6 +343,9 @@ fn a_pes_at_the_window_boundary_leaves_room_for_the_next_reply() {
         match next(&mut reader, 65536).unwrap() {
             TsProgressiveStep::Unit(TsProgressiveUnit::Video(_)) => counts[0] += 1,
             TsProgressiveStep::Unit(TsProgressiveUnit::Audio { .. }) => counts[1] += 1,
+            TsProgressiveStep::NeedInput(request) => {
+                assert_eq!(request.offset, source.read.get() as u64);
+            }
             TsProgressiveStep::End => break,
             other => panic!("expected to read both windows, got {other:?}"),
         }
