@@ -511,3 +511,34 @@ pub fn seek_parity(
     }
     Ok(result)
 }
+
+/// Feed parity: candidate and reference `feed-fold` both reach the end of file and
+/// both match the case's independently recorded packet count, byte count and fold.
+pub fn feed_parity(run: &Run, expected: &Value) -> Result<Value, String> {
+    let left = run.candidate("feed-fold", &[]);
+    let right = run.exec(run.reference, "feed-fold", &[]);
+    let work = |outcome: &Value| {
+        Value::object(
+            ["packets", "bytes", "digest"]
+                .map(|key| (key, data(outcome).get(key).cloned().unwrap_or(Value::Null))),
+        )
+    };
+    let complete =
+        |outcome: &Value| ok(outcome) && data(outcome).get("eof") == Some(&Value::Bool(true));
+    let (candidate, reference) = (work(&left), work(&right));
+    let pass = complete(&left)
+        && complete(&right)
+        && super::diff::equal(&candidate, expected)
+        && super::diff::equal(&reference, expected);
+    run.write(
+        "feed-fold",
+        &Value::object([("candidate", left), ("reference", right)]),
+    )?;
+    Ok(Value::object([
+        ("status", status_of(pass)),
+        ("source_timing_status", status_of(pass)),
+        ("expected", expected.clone()),
+        ("candidate", candidate),
+        ("reference", reference),
+    ]))
+}

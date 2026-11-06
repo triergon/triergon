@@ -137,15 +137,17 @@ pub fn validate_case_evidence(
             return Err("timed comparison view differs from the approved view".into());
         }
     }
+    // A row measured with a contract's own candidate names it; the hash comes
+    // from the build identity, never from the row.
+    let candidate = match s(case, "candidate_worker") {
+        None => identity.get("binaries").and_then(|b| b.get("candidate")),
+        Some(name) => identity
+            .get("additional_candidates")
+            .and_then(|c| c.get(name))
+            .and_then(|record| record.get("sha256")),
+    };
     Ok(Value::object([
-        (
-            "candidate",
-            identity
-                .get("binaries")
-                .and_then(|b| b.get("candidate"))
-                .cloned()
-                .unwrap_or(Value::Null),
-        ),
+        ("candidate", candidate.cloned().unwrap_or(Value::Null)),
         (
             "reference",
             selected.get("sha256").cloned().unwrap_or(Value::Null),

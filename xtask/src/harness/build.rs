@@ -227,6 +227,30 @@ fn which(program: &str) -> Option<PathBuf> {
         .find(|p| p.is_file())
 }
 
+/// Measurement workers a contract may name as its candidate besides
+/// `media-worker`, with the command that builds each.
+pub const ADDITIONAL_CANDIDATES: [&str; 1] = ["playback-worker"];
+
+fn additional_candidates(root: &Path) -> R<Vec<(&'static str, Vec<String>)>> {
+    let mut built = Vec::new();
+    for name in ADDITIONAL_CANDIDATES {
+        let command: Vec<String> = ["cargo", "build", "-p", name, "--release", "--locked"]
+            .map(String::from)
+            .to_vec();
+        let status = Command::new("cargo")
+            .args(&command[1..])
+            .env("CARGO_INCREMENTAL", "0")
+            .current_dir(root)
+            .status()
+            .map_err(|e| e.to_string())?;
+        if !status.success() {
+            return Err(format!("{name} build failed: {status}"));
+        }
+        built.push((name, command));
+    }
+    Ok(built)
+}
+
 pub fn build(root: &Path) -> R<PathBuf> {
     let linux = cfg!(target_os = "linux");
     let candidate_command: Vec<String> = [
@@ -248,6 +272,7 @@ pub fn build(root: &Path) -> R<PathBuf> {
     if !status.success() {
         return Err(format!("candidate build failed: {status}"));
     }
+    let additional = additional_candidates(root)?;
     let out = root.join("target/harness");
     fs::create_dir_all(&out).map_err(|e| e.to_string())?;
     let pinned = root.join(".research/reference/build.json");
@@ -421,12 +446,24 @@ pub fn build(root: &Path) -> R<PathBuf> {
     let Value::Object(mut identity) = worker_identity(&worker)? else {
         return Err("worker identity is not an object".into());
     };
-    let graph = selected_graph(
-        root,
-        &cargo_metadata(root)?,
-        "media-worker",
-        &matroska_inputs(),
-    )?;
+    let metadata = cargo_metadata(root)?;
+    let graph = selected_graph(root, &metadata, "media-worker", &matroska_inputs())?;
+    let mut candidates = Vec::new();
+    for (name, command) in &additional {
+        let path = format!("target/release/{name}");
+        candidates.push((
+            *name,
+            Value::object([
+                ("path", Value::str(&path)),
+                ("sha256", Value::str(sha(&root.join(&path))?)),
+                ("command", strings(command)),
+                (
+                    "selected_graph",
+                    selected_graph(root, &metadata, name, &matroska_inputs())?,
+                ),
+            ]),
+        ));
+    }
     let pinned_build = if pinned.exists() {
         Some(read_json(&pinned)?)
     } else {
@@ -514,6 +551,7 @@ pub fn build(root: &Path) -> R<PathBuf> {
         ),
         ("candidate_command", strings(&candidate_command)),
         ("selected_graph", graph.clone()),
+        ("additional_candidates", Value::object(candidates)),
         ("build_environment", Value::Object(build_environment)),
         (
             "source_revision",

@@ -29,7 +29,8 @@ pub struct Options {
     pub benchmark: bool,
     pub memory: bool,
     pub pairs: usize,
-    pub iterations: u32,
+    /// Timed iterations per pair member; the contract's `iterations` when unset.
+    pub iterations: Option<u32>,
     pub seed: u64,
 }
 
@@ -47,7 +48,7 @@ impl Options {
             benchmark: false,
             memory: false,
             pairs: 30,
-            iterations: 200,
+            iterations: None,
             seed: 280,
         }
     }
@@ -197,6 +198,34 @@ pub fn fate_coverage(
     Ok(rows)
 }
 
+/// A contract's own candidate worker, bound to the build identity: its hash and
+/// its selected source graph must both still match.
+fn additional_candidate(root: &Path, identity: &Value, name: &str) -> Result<PathBuf, String> {
+    let record = identity
+        .get("additional_candidates")
+        .and_then(|c| c.get(name))
+        .ok_or_else(|| format!("{name} is not in the build identity; rebuild"))?;
+    let path = root.join(format!("target/release/{name}"));
+    if s(record, "sha256") != Some(digest(&path)?.as_str()) {
+        return Err(format!("{name} changed since build identity; rebuild"));
+    }
+    let current = super::provenance::selected_graph(
+        root,
+        &super::provenance::cargo_metadata(root)?,
+        name,
+        &super::provenance::matroska_inputs(),
+    )?;
+    if !record
+        .get("selected_graph")
+        .is_some_and(|g| super::diff::equal(g, &current))
+    {
+        return Err(format!(
+            "{name} sources changed since build identity; rebuild"
+        ));
+    }
+    Ok(path)
+}
+
 fn save_json(path: &Path, value: &Value) -> Result<(), String> {
     let temporary = path.with_extension("tmp");
     write_json(&temporary, value)?;
@@ -244,6 +273,24 @@ pub fn run(root: &Path, options: &Options) -> Result<i32, String> {
         return Err(format!("{error}; rebuild"));
     }
     let contract = read_json(&options.contract)?;
+    let candidate_name = s(&contract, "candidate")
+        .unwrap_or("media-worker")
+        .to_owned();
+    let candidate = if candidate_name == "media-worker" {
+        candidate
+    } else {
+        additional_candidate(root, &identity, &candidate_name)?
+    };
+    let feed = s(&contract, "worker_operation") == Some("feed-");
+    let iterations = options
+        .iterations
+        .or_else(|| {
+            contract
+                .get("iterations")
+                .and_then(Value::as_f64)
+                .map(|n| n as u32)
+        })
+        .unwrap_or(200);
     let contract_sha = digest(&options.contract)?;
     let contract_id = s(&contract, "id").map(str::to_owned);
     let mut additional = Vec::new();
@@ -327,6 +374,35 @@ pub fn run(root: &Path, options: &Options) -> Result<i32, String> {
             Value::object([("status", Value::str("input-hash-mismatch"))])
         } else if s(case, "rights") != Some("authored-synthetic") {
             Value::object([("status", Value::str("rights-unreviewed"))])
+        } else if feed {
+            row.push(("input_sha256", Value::str(sha)));
+            row.push(("candidate_worker", Value::str(&candidate_name)));
+            row.push((
+                "operation",
+                Value::object([
+                    (
+                        "name",
+                        contract.get("operation").cloned().unwrap_or(Value::Null),
+                    ),
+                    ("view", Value::str("playback-feed-fold-v1")),
+                ]),
+            ));
+            let run = Run {
+                root,
+                candidate: &candidate,
+                reference: &reference,
+                input: &path,
+                raw: options.output.join(&id),
+            };
+            timed = Some((
+                reference.clone(),
+                path.clone(),
+                Operation {
+                    prefix: "feed-".into(),
+                    arguments: vec![],
+                },
+            ));
+            parity::feed_parity(&run, case.get("expected").unwrap_or(&Value::Null))?
         } else {
             row.push(("input_sha256", Value::str(sha)));
             let seek = case
@@ -412,7 +488,7 @@ pub fn run(root: &Path, options: &Options) -> Result<i32, String> {
                     &reference,
                     &input,
                     options.pairs,
-                    options.iterations,
+                    iterations,
                     options.seed,
                     &operation,
                 )?;

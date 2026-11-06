@@ -367,7 +367,8 @@ fn report(root: &Path, args: &[String]) -> ExitCode {
                     match flag.as_str() {
                         "--pairs" => options.pairs = number as usize,
                         "--iterations" => {
-                            options.iterations = u32::try_from(number).map_err(|e| e.to_string())?
+                            options.iterations =
+                                Some(u32::try_from(number).map_err(|e| e.to_string())?)
                         }
                         _ => options.seed = number,
                     }
