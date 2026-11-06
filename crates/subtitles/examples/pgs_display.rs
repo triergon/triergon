@@ -111,11 +111,7 @@ fn read_case(path: &Path) -> Result<Case, String> {
 }
 
 fn hex(bytes: &[u8]) {
-    print!("\"");
-    for byte in bytes {
-        print!("{byte:02x}");
-    }
-    print!("\"");
+    print!("\"{}\"", triergon_harness_protocol::hex(bytes));
 }
 fn integer(value: Option<i64>) {
     match value {

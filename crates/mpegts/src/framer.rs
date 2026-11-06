@@ -254,7 +254,7 @@ impl TransportFramer {
             return Ok(None);
         }
         let stride = self.format.bytes();
-        if input.position() % stride as u64 != 0 {
+        if !input.position().is_multiple_of(stride as u64) {
             return Ok(None);
         }
         let prefix = self.format.prefix_bytes();

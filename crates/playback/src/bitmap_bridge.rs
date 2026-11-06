@@ -307,13 +307,12 @@ impl<M> PgsBridge<M> {
         c: &AtomicBool,
     ) -> Result<bool> {
         if c.load(Ordering::Relaxed) {
-            return Err(Error::Cancelled.into());
+            return Err(Error::Cancelled);
         }
         if scope == self.scope {
             return Err(Error::Invalid(
                 "bitmap reset needs a new source generation/configuration fence",
-            )
-            .into());
+            ));
         }
         if !w.try_charge(1) {
             return Ok(false);
@@ -331,7 +330,7 @@ impl<M> PgsBridge<M> {
     }
     pub fn step(&mut self, w: &mut WorkBudget, c: &AtomicBool) -> Result<PgsStep<M>> {
         if c.load(Ordering::Relaxed) {
-            return Err(Error::Cancelled.into());
+            return Err(Error::Cancelled);
         }
         if w.remaining() == 0 {
             return Ok(PgsStep::Yield);
@@ -476,7 +475,7 @@ impl<M> DvdOutput<M> {
             return Ok(None);
         };
         let clock = self.packet.input().clock;
-        Ok(picture.native_presentation_from_ticks(clock.pts, clock.timebase)?)
+        picture.native_presentation_from_ticks(clock.pts, clock.timebase)
     }
 
     /// Match the existing bitmap queue: start at packet PTS, fall back to DTS,
@@ -648,7 +647,7 @@ impl<M> DvdJob<M> {
     ) -> Result<bool> {
         loop {
             if c.load(Ordering::Relaxed) {
-                return Err(Error::Cancelled.into());
+                return Err(Error::Cancelled);
             }
             if w.remaining() == 0 {
                 return Ok(false);
@@ -678,7 +677,7 @@ impl<M> DvdJob<M> {
                     let picture = job.try_finish(c)?;
                     if CONTINUE && w.remaining() != 0 {
                         if c.load(Ordering::Relaxed) {
-                            return Err(Error::Cancelled.into());
+                            return Err(Error::Cancelled);
                         }
                         w.take(1);
                         self.store_picture(picture)?;
@@ -706,8 +705,7 @@ impl<M> DvdJob<M> {
                     if source.units()[self.at].encoding != dvd::SpuEncoding::Traditional {
                         return Err(Error::Unsupported(
                             "HD DVD receiver requires its separate explicit context",
-                        )
-                        .into());
+                        ));
                     }
                     let policy = if self.mode == DvdMode::StrictAllUnits {
                         dvd::ControlPolicy::Strict
@@ -745,7 +743,7 @@ impl<M> DvdJob<M> {
             .ok_or(Error::Invalid("DVD pictures absent"))?;
         if let Err(error) = pictures.try_push(picture) {
             self.phase = DvdJobPhase::Store(Some(error.value));
-            return Err(error.error.into());
+            return Err(error.error);
         }
         self.at += 1;
         self.phase = DvdJobPhase::Select;
@@ -758,7 +756,7 @@ impl<M> DvdJob<M> {
 
     fn take_output(&mut self) -> Result<DvdOutput<M>> {
         if !matches!(self.phase, DvdJobPhase::Ready) {
-            return Err(Error::Invalid("DVD bridge not ready").into());
+            return Err(Error::Invalid("DVD bridge not ready"));
         }
         self.picture_storage = dvd::TraditionalStorage::default();
         Ok(DvdOutput {
@@ -809,7 +807,9 @@ impl<M> DvdReceiver<M> {
 
     fn validate_config(config: DvdBridgeConfig) -> Result<()> {
         if config.mode != DvdMode::ExplicitNativeFirstUnit {
-            return Err(Error::Invalid("DVD receiver requires native first-unit mode").into());
+            return Err(Error::Invalid(
+                "DVD receiver requires native first-unit mode",
+            ));
         }
         Ok(())
     }
@@ -879,10 +879,12 @@ impl<M> DvdReceiver<M> {
         cancel: &AtomicBool,
     ) -> Result<bool> {
         if cancel.load(Ordering::Relaxed) {
-            return Err(Error::Cancelled.into());
+            return Err(Error::Cancelled);
         }
         if scope == self.scope {
-            return Err(Error::Invalid("DVD receiver reset needs a new bitmap scope").into());
+            return Err(Error::Invalid(
+                "DVD receiver reset needs a new bitmap scope",
+            ));
         }
         Self::validate_config(config)?;
         if !work.try_charge(1) {
@@ -905,7 +907,7 @@ impl<M> DvdReceiver<M> {
             self.job.abandon();
             self.storage = DvdStorage::default();
             self.finished = true;
-            return Err(Error::Cancelled.into());
+            return Err(Error::Cancelled);
         }
         if self.job.packet.is_none() {
             return Ok(if self.finished {
@@ -917,10 +919,10 @@ impl<M> DvdReceiver<M> {
         match self.job.poll_stages::<true>(work, cancel) {
             Ok(false) => return Ok(DvdReceiverStep::Yield),
             Ok(true) => {}
-            Err(error @ crate::Error::Core(Error::Backpressure { .. })) => return Err(error),
+            Err(error @ Error::Backpressure { .. }) => return Err(error),
             Err(error) => {
                 self.job.abandon();
-                if matches!(error, crate::Error::Core(Error::Cancelled)) {
+                if matches!(error, Error::Cancelled) {
                     self.finished = true;
                     self.storage = DvdStorage::default();
                 }

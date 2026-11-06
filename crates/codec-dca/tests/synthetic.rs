@@ -144,7 +144,7 @@ fn corruption_never_panics() {
                 let pos = 6 + (rng.next() as usize) % (au.len() - 6);
                 au[pos] ^= 1 << (rng.next() % 8);
             }
-            if rng.next() % 5 == 0 {
+            if rng.next().is_multiple_of(5) {
                 let cut = 6 + (rng.next() as usize) % (au.len() - 6);
                 au.truncate(cut);
             }

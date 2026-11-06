@@ -15,7 +15,7 @@ impl Bw {
         }
     }
     fn align(&mut self) {
-        while self.bits.len() % 8 != 0 {
+        while !self.bits.len().is_multiple_of(8) {
             self.bits.push(0);
         }
     }

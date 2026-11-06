@@ -3,7 +3,6 @@
 The native observer is external tooling. Heap and RSS are separate instrumented
 runs; timing workers never load it. Invalid/unknown coverage remains a non-pass.
 """
-import hashlib
 import json
 import os
 from pathlib import Path
@@ -14,12 +13,15 @@ import stat
 import subprocess
 import tempfile
 
+from .common import canonical_digest, digest_bytes
+
 ROOT = Path(__file__).resolve().parents[1]
 ALLOCATORS = {"malloc", "calloc", "realloc", "free", "aligned_alloc", "posix_memalign"}
 
 
 def sha(path):
-    return hashlib.sha256(path.read_bytes()).hexdigest()
+    # Whole-file read: kernel/sysfs identities are read (and faked in tests) via read_bytes.
+    return digest_bytes(path.read_bytes())
 
 
 def allocator_symbols(listing, system):
@@ -600,9 +602,6 @@ def reusable_memory(measurement, pairs, instrumentation):
 
 
 # Native active-window coverage: certificate evidence stays separate from the raw import audit.
-import json
-from pathlib import Path
-
 GUARD_ORDER = ("mmap", "mmap64", "munmap", "pthread_create", "dlopen", "dlmopen", "dlclose")
 GUARD_POLICY = "invalidate-any-active-attempt-v1"
 SCOPE_ERROR_BIT = 1 << 12
@@ -616,7 +615,7 @@ GUARD_CASES = {
 
 
 def digest(value):
-    return hashlib.sha256(json.dumps(value, sort_keys=True, separators=(",", ":"), allow_nan=False).encode()).hexdigest()
+    return canonical_digest(value, allow_nan=False)
 
 
 def closure_facts(linked):

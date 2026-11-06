@@ -172,11 +172,11 @@ impl<'a, C> NalPacketConfigWriter<'a, C> {
             return Err(e);
         }
         let r = self.advance(work, cancel);
-        if let Err(e) = r {
-            if !matches!(e, Error::Backpressure { .. } | Error::Allocation) {
-                self.failure = Some(e);
-                self.output = None;
-            }
+        if let Err(e) = r
+            && !matches!(e, Error::Backpressure { .. } | Error::Allocation)
+        {
+            self.failure = Some(e);
+            self.output = None;
         }
         r
     }

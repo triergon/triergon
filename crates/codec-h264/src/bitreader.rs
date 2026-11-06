@@ -235,7 +235,7 @@ mod tests {
         bits.push_str(&"0".repeat(30));
         bits.push('1');
         bits.push_str(&"1".repeat(30));
-        while bits.len() % 8 != 0 {
+        while !bits.len().is_multiple_of(8) {
             bits.push('0');
         }
         let mut v: Vec<u8> = (0..bits.len() / 8)

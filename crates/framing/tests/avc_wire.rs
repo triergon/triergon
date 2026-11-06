@@ -5,6 +5,7 @@ use triergon_framing::{
     AvcConfigArrayKind, AvcConfigLimits, AvcConfigParser, AvcConfigSource, AvcConfiguration,
     BuildStep,
 };
+use triergon_harness_protocol::unhex;
 
 fn limits() -> AvcConfigLimits {
     AvcConfigLimits {
@@ -21,17 +22,7 @@ fn source() -> AvcConfigSource {
     }
 }
 fn raw() -> Vec<u8> {
-    hex("0142a528ffe1000267800100026840")
-}
-fn hex(text: &str) -> Vec<u8> {
-    if text == "-" {
-        return Vec::new();
-    }
-    assert_eq!(text.len() % 2, 0);
-    text.as_bytes()
-        .chunks_exact(2)
-        .map(|v| u8::from_str_radix(std::str::from_utf8(v).unwrap(), 16).unwrap())
-        .collect()
+    unhex("0142a528ffe1000267800100026840")
 }
 fn kind(kind: AvcConfigArrayKind) -> usize {
     match kind {
@@ -70,7 +61,7 @@ fn wire_grammar_is_implemented_instead_of_declared_layout_only() {
         .lines()
         .find(|line| line.starts_with("plain-control\t"))
         .expect("frozen plain-control record");
-    let input = hex(line.split('\t').nth(1).expect("frozen record bytes"));
+    let input = unhex(line.split('\t').nth(1).expect("frozen record bytes"));
     let expected = [
         0x01, 0x42, 0xa5, 0x28, 0xff, 0xe1, 0x00, 0x02, 0x67, 0x80, 0x01, 0x00, 0x02, 0x68, 0x40,
     ];
@@ -119,7 +110,7 @@ fn all82_independent_records_and_spans_agree_at_each_work_quantum() {
     {
         let cells: Vec<_> = line.split('\t').collect();
         assert_eq!(cells.len(), 11);
-        let bytes = hex(cells[1]);
+        let bytes = unhex(cells[1]);
         for work in [1, 2, 7, 64] {
             let pool = Budget::new(2_000_000).unwrap();
             let result = parser(&pool, &bytes).and_then(|mut p| drive(&mut p, work));
@@ -138,10 +129,10 @@ fn all82_independent_records_and_spans_agree_at_each_work_quantum() {
                             .raw_extension()
                             .map(|x| x.to_vec())
                             .unwrap_or_default(),
-                        hex(cells[6])
+                        unhex(cells[6])
                     );
                     assert_eq!(v.understood_end().to_string(), cells[7]);
-                    assert_eq!(v.trailing_bytes().unwrap().as_ref(), hex(cells[8]));
+                    assert_eq!(v.trailing_bytes().unwrap().as_ref(), unhex(cells[8]));
                     let arrays: Vec<_> = cells[9].split('|').collect();
                     assert_eq!(arrays.len(), v.arrays().len());
                     for (expected, a) in arrays.iter().zip(v.arrays()) {
@@ -170,7 +161,7 @@ fn all82_independent_records_and_spans_agree_at_each_work_quantum() {
                         let val = |i: usize| c[i].parse::<usize>().unwrap();
                         assert_eq!(kind(n.array_kind()), val(0));
                         assert_eq!(n.source_range(), val(2)..val(3));
-                        assert_eq!(n.source_bytes().as_ref(), hex(c[4]));
+                        assert_eq!(n.source_bytes().as_ref(), unhex(c[4]));
                         assert_eq!(n.length_field_bytes().as_ref(), &bytes[val(1)..val(2)]);
                         assert_eq!(
                             usize::from(u16::from_be_bytes(
@@ -197,11 +188,11 @@ fn all82_independent_records_and_spans_agree_at_each_work_quantum() {
 #[test]
 fn empty_arrays_and_high_extension_presence_are_physical_facts() {
     let pool = Budget::new(65536).unwrap();
-    let base = parse(&pool, &hex("0142a528ffe000")).unwrap();
+    let base = parse(&pool, &unhex("0142a528ffe000")).unwrap();
     assert_eq!(base.arrays().len(), 2);
     assert!(base.nals().is_empty());
     assert_eq!(base.fields().raw_extension(), None);
-    let high = parse(&pool, &hex("0164a528ffe000fdf8f800")).unwrap();
+    let high = parse(&pool, &unhex("0164a528ffe000fdf8f800")).unwrap();
     assert_eq!(high.arrays().len(), 3);
     assert_eq!(high.fields().raw_extension(), Some([0xfd, 0xf8, 0xf8, 0]));
     assert_eq!(high.arrays()[2].source_range(), 7..11);
@@ -210,7 +201,7 @@ fn empty_arrays_and_high_extension_presence_are_physical_facts() {
 #[test]
 fn reserved_and_out_of_range_depth_facts_are_retained_without_repair() {
     let pool = Budget::new(65536).unwrap();
-    let bytes = hex("0164a52803000003070500");
+    let bytes = unhex("0164a52803000003070500");
     let v = parse(&pool, &bytes).unwrap();
     assert_eq!(v.fields().syntax_issues(), 127);
     assert_eq!(v.fields().raw_prefix(), [1, 100, 0xa5, 40, 3, 0]);
@@ -223,12 +214,12 @@ fn reserved_and_out_of_range_depth_facts_are_retained_without_repair() {
 #[test]
 fn selected2010_profile_branch_does_not_guess_newer_profile_extensions() {
     let pool = Budget::new(65536).unwrap();
-    let v = parse(&pool, &hex("01f4a528ffe000fdf8f800")).unwrap();
+    let v = parse(&pool, &unhex("01f4a528ffe000fdf8f800")).unwrap();
     assert_eq!(v.fields().profile_indication(), 244);
     assert_eq!(v.fields().raw_extension(), None);
     assert_eq!(v.trailing_bytes().unwrap().as_ref(), [0xfd, 0xf8, 0xf8, 0]);
     assert!(matches!(
-        parse(&pool, &hex("0164a528ffe000")),
+        parse(&pool, &unhex("0164a528ffe000")),
         Err(Error::Truncated)
     ));
 }
@@ -410,7 +401,7 @@ fn publication_occurs_once_and_source_failure_is_sticky() {
 #[test]
 fn original_length_fields_and_opaque_nal_body_bytes_are_not_rewritten() {
     let pool = Budget::new(65536).unwrap();
-    let bytes = hex("0142a528ffe20005670000030100021f800100036800ffbb00");
+    let bytes = unhex("0142a528ffe20005670000030100021f800100036800ffbb00");
     let v = parse(&pool, &bytes).unwrap();
     assert_eq!(v.nals().len(), 3);
     assert_eq!(v.nals()[0].source_bytes().as_ref(), [0x67, 0, 0, 3, 1]);

@@ -6,19 +6,20 @@ assets/test fixtures, resolved features/edges and explicit harness inputs remain
 bound. Exact executable hashes and numerical evidence checks are still required.
 """
 import copy
-import hashlib
 import json
 import os
 from pathlib import Path
 import subprocess
 import tomllib
 
+from .common import canonical_digest, digest as file_hash
+
 
 def cargo_metadata(root):
     env = dict(os.environ, CARGO_INCREMENTAL='0')
-    compiler = subprocess.check_output(['rustc', '+nightly', '-Vv'], text=True, env=env)
+    compiler = subprocess.check_output(['rustc', '-Vv'], text=True, cwd=root, env=env)
     target = next(line.removeprefix('host: ') for line in compiler.splitlines() if line.startswith('host: '))
-    return json.loads(subprocess.check_output(['cargo', '+nightly', 'metadata', '--format-version', '1',
+    return json.loads(subprocess.check_output(['cargo', 'metadata', '--format-version', '1',
         '--locked', '--offline', '--filter-platform', target], cwd=root, env=env))
 
 
@@ -26,9 +27,9 @@ def matroska_inputs(root):
     # Explicit operation inputs avoid making another format's new harness files
     # implicit dependencies of this worker. Adding a Matroska operation updates
     # this list and therefore requires fresh collection identity/source proofs.
-    names = ['Makefile', 'specs/sources.json', 'tools/build-harness.py', 'tools/test-media.py',
-        'tools/test-catalogue-vector.py', 'tools/run-fate.py', 'research/fate-index.json',
-        'harness/provenance.py', 'harness/runner.py', 'harness/memory.py', 'harness/reuse.py', 'harness/comparison.py',
+    names = ['Makefile', 'specs/sources.json', 'tools/build_harness.py', 'tools/test_media.py',
+        'tools/test_catalogue_vector.py', 'tools/run_fate.py', 'research/fate-index.json',
+        'harness/common.py', 'harness/provenance.py', 'harness/runner.py', 'harness/memory.py', 'harness/reuse.py', 'harness/comparison.py',
         'harness/spec_oracle.py', 'harness/content_oracle.py', 'harness/colour_oracle.py',
         'harness/catalogue_oracle.py', 'harness/reference.c', 'harness/reference_catalogue.h',
         'harness/reference_colour.h', 'harness/reference_content_encoding.h',
@@ -56,11 +57,6 @@ def source_identity_error(root, identity):
         return 'unsupported build identity schema'
     except (KeyError, ValueError, OSError, subprocess.SubprocessError) as error:
         return 'cannot verify source identity: ' + str(error)
-
-
-def file_hash(path):
-    with path.open('rb') as stream:
-        return hashlib.file_digest(stream, 'sha256').hexdigest()
 
 
 def _file(root, path):
@@ -155,5 +151,4 @@ def selected_graph(root, metadata, package_name, extra_files=()):
         shared[name] = digest
     graph = {'schema': 1, 'root_package': package_name, 'workspace_settings': settings,
              'packages': normalized, 'shared_files': dict(sorted(shared.items()))}
-    payload = json.dumps(graph, sort_keys=True, separators=(',', ':')).encode()
-    return {**graph, 'sha256': hashlib.sha256(payload).hexdigest()}
+    return {**graph, 'sha256': canonical_digest(graph)}

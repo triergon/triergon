@@ -20,8 +20,9 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y build-essential pkg-config zlib1g-dev nasm rsync
-          rustup toolchain install nightly --profile minimal --component rustfmt --component clippy
-          rustc +nightly -vV
+          rustup show active-toolchain || rustup toolchain install
+          rustup toolchain install nightly --profile minimal --component clippy
+          rustc -vV
       - name: Prepare pinned reference and fixtures
         run: make prepare-check || make prepare-check
       - name: Verify workspace

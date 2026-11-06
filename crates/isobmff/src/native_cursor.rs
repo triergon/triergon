@@ -22,7 +22,6 @@ use std::{
 };
 use triergon_core::{Budget, BudgetVec, Error, Result, TimeBase, WorkBudget};
 
-#[path = "native_range_seek.rs"]
 mod range_seek;
 use range_seek::Checkpoints;
 pub use range_seek::Mov9RangeSeekJob;
@@ -530,13 +529,12 @@ impl<'a> Mov9PacketCursor<'a> {
                 maximum: limits.max_media_extents,
             });
         }
-        if let Some(tail) = terminal {
-            if media
+        if let Some(tail) = terminal
+            && media
                 .last()
                 .is_some_and(|range| range.end > tail.payload_start())
-            {
-                return Err(Error::Invalid("front terminal overlaps finite media"));
-            }
+        {
+            return Err(Error::Invalid("front terminal overlaps finite media"));
         }
         let mut cursor = Self::new(budget, tracks, media, limits, profile)?;
         cursor.front_source = true;

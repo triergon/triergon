@@ -4,7 +4,7 @@
 use super::{RawVideoConfigTracker, RawVideoConfiguration, RawVideoSource, State as SourceState};
 use crate::{Error, Result, input::Source};
 use std::sync::atomic::{AtomicBool, Ordering};
-use triergon_core::{Error as CoreError, Rounding, SourceLocation, Step, Time, WorkBudget};
+use triergon_core::{Rounding, SourceLocation, Step, Time, WorkBudget};
 use triergon_framing::RawAccessUnit;
 
 /// A caller-supplied cadence is an ordered submission clock for a sink that
@@ -62,7 +62,7 @@ struct Active<S: Source> {
 enum State<S: Source> {
     Active(Active<S>),
     End(SourceLocation),
-    Failed(CoreError),
+    Failed(Error),
 }
 
 pub struct RawVideoFeed<S: Source> {
@@ -81,7 +81,9 @@ impl<S: Source> RawVideoSource<S> {
             return Err(Error::Closed);
         };
         if reader.published_bytes() != 0 {
-            return Err(CoreError::Invalid("raw feed must attach before first access unit").into());
+            return Err(Error::Invalid(
+                "raw feed must attach before first access unit",
+            ));
         }
         let tracker = RawVideoConfigTracker::new(
             reader.budget(),
@@ -95,7 +97,7 @@ impl<S: Source> RawVideoSource<S> {
                 picture_duration,
             } => {
                 if picture_duration.numerator() <= 0 {
-                    return Err(CoreError::Invalid("nonpositive raw submission duration").into());
+                    return Err(Error::Invalid("nonpositive raw submission duration"));
                 }
                 start.to_nanoseconds(Rounding::NearestAway)?;
                 Some(SubmissionClock {
@@ -126,16 +128,11 @@ impl<S: Source> RawVideoFeed<S> {
         let result = match &mut self.state {
             State::Active(active) => active.poll(work, cancel),
             State::End(at) => return Ok(Step::End(*at)),
-            State::Failed(error) => return Err((*error).into()),
+            State::Failed(error) => return Err(*error),
         };
         match &result {
             Ok(Step::End(at)) => self.state = State::End(*at),
-            Err(Error::Core(error))
-                if !matches!(
-                    error,
-                    CoreError::Backpressure { .. } | CoreError::Allocation
-                ) =>
-            {
+            Err(error) if !matches!(error, Error::Backpressure { .. } | Error::Allocation) => {
                 self.state = State::Failed(*error);
             }
             _ => {}
@@ -151,7 +148,7 @@ impl<S: Source> Active<S> {
         cancel: &AtomicBool,
     ) -> Result<Step<RawVideoFeedPacket>> {
         if cancel.load(Ordering::Relaxed) {
-            return Err(CoreError::Cancelled.into());
+            return Err(Error::Cancelled);
         }
         if self.pending.is_none() {
             let unit = match self.source.poll(work, cancel)? {
@@ -170,14 +167,14 @@ impl<S: Source> Active<S> {
         let unit = self
             .pending
             .as_ref()
-            .ok_or(CoreError::Invalid("raw feed unit missing"))?;
+            .ok_or(Error::Invalid("raw feed unit missing"))?;
         let schedule = if unit.has_vcl {
             self.clock
                 .as_ref()
                 .map(|clock| {
                     let nanos = clock.next.to_nanoseconds(Rounding::NearestAway)?;
                     let next = clock.next.checked_add(clock.picture_duration)?;
-                    Ok::<_, CoreError>((clock.next, nanos, next))
+                    Ok::<_, Error>((clock.next, nanos, next))
                 })
                 .transpose()?
         } else {
@@ -188,7 +185,7 @@ impl<S: Source> Active<S> {
         if let Some(configuration) = configuration
             && self.configuration.as_ref() != Some(&configuration)
         {
-            self.revision = self.revision.checked_add(1).ok_or(CoreError::Overflow)?;
+            self.revision = self.revision.checked_add(1).ok_or(Error::Overflow)?;
             self.configuration = Some(configuration);
             changed = true;
         }
@@ -198,7 +195,7 @@ impl<S: Source> Active<S> {
         let unit = self
             .pending
             .take()
-            .ok_or(CoreError::Invalid("raw feed unit missing"))?;
+            .ok_or(Error::Invalid("raw feed unit missing"))?;
         Ok(Step::Ready(RawVideoFeedPacket {
             unit,
             configuration: self.configuration.clone(),
@@ -247,9 +244,9 @@ mod tests {
         };
         assert!(matches!(
             raw.into_feed(4096, RawFeedClock::Unspecified),
-            Err(Error::Core(CoreError::Invalid(
+            Err(Error::Invalid(
                 "raw feed must attach before first access unit"
-            )))
+            ))
         ));
 
         let start = Time::new(3, 2).unwrap();
@@ -270,7 +267,7 @@ mod tests {
         for _ in 0..2 {
             assert!(matches!(
                 feed.poll(&mut WorkBudget::new(1), &cancel),
-                Err(Error::Core(CoreError::Backpressure { .. }))
+                Err(Error::Backpressure { .. })
             ));
         }
         drop(held);

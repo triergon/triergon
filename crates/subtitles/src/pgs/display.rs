@@ -1956,5 +1956,4 @@ mod independent_source6_orphan_regression {
 }
 
 #[cfg(test)]
-#[path = "context_setup_controls.rs"]
 mod context_setup_controls;

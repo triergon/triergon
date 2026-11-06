@@ -116,7 +116,7 @@ fn fate_vectors_frame_counts_layouts_and_coarse_values() {
             frame.clear();
             if let Ok(info) = dec.decode(&data[pos..end], &mut frame) {
                 frames += 1;
-                layout = info.layout.ffmpeg_name();
+                layout = info.layout.layout_name();
                 for i in 0..frame.samples_per_channel {
                     for p in &frame.planes {
                         interleaved.push(p[i]);
@@ -131,7 +131,9 @@ fn fate_vectors_frame_counts_layouts_and_coarse_values() {
         assert_eq!(layout, v.layout, "{}", v.path);
         if let Some(pcm) = v.pcm.and_then(|p| std::fs::read(root.join(p)).ok()) {
             let refs: Vec<f64> = pcm
-                .chunks_exact(2)
+                .as_chunks::<2>()
+                .0
+                .iter()
                 .map(|c| i16::from_le_bytes([c[0], c[1]]) as f64 / 32768.0)
                 .collect();
             assert_eq!(refs.len(), interleaved.len(), "{}", v.path);

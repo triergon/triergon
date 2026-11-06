@@ -466,14 +466,12 @@ impl HdSubpicture {
                 .facts
                 .alpha4_wire
                 .is_some_and(|a| self.facts.contrast.is_none_or(|c| a.start > c.start));
-            if packed_after {
-                if let Some(word) = self.facts.alpha4_word {
-                    alpha[i] = ((word >> (4 * i)) & 15) as u8;
-                    origins[i] = HdAlphaOrigin::Packed {
-                        word,
-                        index: i as u8,
-                    };
-                }
+            if packed_after && let Some(word) = self.facts.alpha4_word {
+                alpha[i] = ((word >> (4 * i)) & 15) as u8;
+                origins[i] = HdAlphaOrigin::Packed {
+                    word,
+                    index: i as u8,
+                };
             }
         }
         let mut classes = [u8::MAX; 16];
@@ -1282,10 +1280,10 @@ impl HdPaletteJob<'_> {
             }
             let i = self.at;
             let mut alpha = self.contrast.get(i).map_or(0, |raw| 255 - *raw);
-            if i < 4 {
-                if let Some(word) = self.alpha4_override {
-                    alpha = ((word >> (4 * i)) & 15) as u8;
-                }
+            if i < 4
+                && let Some(word) = self.alpha4_override
+            {
+                alpha = ((word >> (4 * i)) & 15) as u8;
             }
             self.values[i] = native_hd_argb(
                 [

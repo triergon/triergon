@@ -15,6 +15,7 @@ use triergon_core::{
     Budget, BudgetVec, Bytes, Error, InputCursor, InputRequest, InputWindow, SourceCapabilities,
     SourceFailure, SourceId, Step, Time, TimeBase, WorkBudget,
 };
+use triergon_harness_protocol::write_hex;
 use triergon_isobmff::{
     BoxEvent, BoxReader, BoxStep, BoxView, BuildStatus, EditList, FragmentBuilder, FragmentContext,
     FragmentIndex, ImplicitBase, IndexStep, InterleaveStatus, Limits, Mov9ClockOrigin,
@@ -118,13 +119,6 @@ fn self_contained_table(mdia: &BoxView, budget: &Budget, quantum: u64) -> Result
         }
     }
     Ok(table)
-}
-fn hex<W: Write>(out: &mut W, bytes: &[u8]) -> io::Result<()> {
-    const DIGITS: &[u8; 16] = b"0123456789abcdef";
-    for &byte in bytes {
-        out.write_all(&[DIGITS[(byte >> 4) as usize], DIGITS[(byte & 15) as usize]])?;
-    }
-    Ok(())
 }
 fn time<W: Write>(out: &mut W, value: Option<Time>) -> io::Result<()> {
     match value {
@@ -458,7 +452,7 @@ impl<W: Write> Driver<W> {
             ",\"duration\":{},\"flags\":{},\"side_data\":[],\"payload_hex\":\"",
             packet.duration, packet.flags
         )?;
-        hex(&mut self.out, payload)?;
+        write_hex(&mut self.out, payload)?;
         self.out.write_all(b"\"")?;
         if let Some((sequence, edit, basis)) = occurrence {
             let basis = match basis {
@@ -623,7 +617,7 @@ impl<W: Write> Driver<W> {
                         "{{\"event\":\"header\",\"offset\":{},\"fourcc_hex\":\"",
                         header.start
                     )?;
-                    hex(&mut self.out, &header.kind)?;
+                    write_hex(&mut self.out, &header.kind)?;
                     match header.size {
                         Some(size) => writeln!(self.out, "\",\"size\":{size}}}")?,
                         None => writeln!(self.out, "\",\"size\":null}}")?,
@@ -643,7 +637,7 @@ impl<W: Write> Driver<W> {
                         "{{\"event\":\"raw_metadata\",\"offset\":{},\"raw_hex\":\"",
                         raw.header().start
                     )?;
-                    hex(&mut self.out, raw.bytes().as_ref())?;
+                    write_hex(&mut self.out, raw.bytes().as_ref())?;
                     writeln!(self.out, "\"}}")?;
                     if raw.header().kind == *b"ftyp" {
                         let payload = raw.payload();
@@ -810,7 +804,7 @@ impl<W: Write> Driver<W> {
                         sample.is_container_sync(),
                         sample.partial_sync
                     )?;
-                    hex(&mut self.out, payload.as_ref())?;
+                    write_hex(&mut self.out, payload.as_ref())?;
                     writeln!(self.out, "\"}}")?;
                     samples = samples.checked_add(1).ok_or(Error::Overflow)?;
                 }
@@ -886,7 +880,7 @@ impl<W: Write> Driver<W> {
                     "{{\"event\":\"description\",\"track_id\":{},\"description\":{},\"data_reference\":{},\"raw_hex\":\"",
                     header.track_id, description.index, description.data_reference_index
                 )?;
-                hex(&mut self.out, description.raw().bytes().as_ref())?;
+                write_hex(&mut self.out, description.raw().bytes().as_ref())?;
                 writeln!(self.out, "\"}}")?;
             }
             let has_edits = optional(track, b"edts", &budget)?;
@@ -931,11 +925,11 @@ impl<W: Write> Driver<W> {
                             stream.time_base.numerator(),
                             stream.time_base.denominator()
                         )?;
-                        hex(&mut self.out, stream.extradata.as_ref())?;
+                        write_hex(&mut self.out, stream.extradata.as_ref())?;
                         self.out.write_all(b"\",\"language_hex\":\"")?;
-                        hex(&mut self.out, &stream.language)?;
+                        write_hex(&mut self.out, &stream.language)?;
                         self.out.write_all(b"\",\"handler_name_hex\":\"")?;
-                        hex(&mut self.out, stream.handler_name.as_ref())?;
+                        write_hex(&mut self.out, stream.handler_name.as_ref())?;
                         writeln!(
                             self.out,
                             "\",\"zero_vendor\":{}}}",
@@ -1042,7 +1036,7 @@ impl<W: Write> Driver<W> {
                     sample.is_container_sync(),
                     sample.partial_sync
                 )?;
-                hex(&mut self.out, payload.as_ref())?;
+                write_hex(&mut self.out, payload.as_ref())?;
                 writeln!(self.out, "\"}}")?;
                 sample_total = sample_total.checked_add(1).ok_or(Error::Overflow)?;
             }

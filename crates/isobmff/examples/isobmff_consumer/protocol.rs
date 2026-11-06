@@ -2,6 +2,8 @@
 //! complete ordered trace equality and independent source audits are required.
 use std::fmt::Write as _;
 use triergon_core::{Budget, BudgetVec, Bytes, Error};
+pub use triergon_harness_protocol::digest::{append_words, fold, fold_framed, signed};
+use triergon_harness_protocol::{push_hex, push_quoted};
 use triergon_isobmff::{Mov9PacketView, Mov9StreamView};
 
 pub const MAX_PACKETS: u64 = 1_000_000;
@@ -9,64 +11,9 @@ pub const MAX_DELIVERED_BYTES: u64 = 256 * 1024 * 1024;
 pub const EOF: i64 = -541478725;
 pub const DOMAIN: u64 = 0x4d4f5633;
 
-pub fn fold(h: &mut u64, value: u64) {
-    *h = h.wrapping_mul(31).wrapping_add(value);
-}
-// Compose a fully consumed word stream once its count is known. No entry
-// buffering, reordering or sampled fields; identical to sequential H0 folding.
-pub fn append_words(h: &mut u64, digest: u64, words: u32) {
-    *h = h
-        .wrapping_mul(31u64.wrapping_pow(words))
-        .wrapping_add(digest);
-}
-pub fn signed(value: i64) -> u64 {
-    u64::from_be_bytes(value.to_be_bytes())
-}
-pub fn fold_bytes(h: &mut u64, bytes: &[u8]) {
-    // Same complete ordered polynomial as H0; bounded eight-byte expansion.
-    // No sampled bytes, serialization or cryptographic hash in timed work.
-    let four = |b: &[u8]| {
-        u32::from(b[0]) * 29791 + u32::from(b[1]) * 961 + u32::from(b[2]) * 31 + u32::from(b[3])
-    };
-    let mut groups = bytes.chunks_exact(8);
-    for block in &mut groups {
-        let value = u64::from(four(&block[..4])) * 923521 + u64::from(four(&block[4..]));
-        *h = h.wrapping_mul(852891037441).wrapping_add(value);
-    }
-    for byte in groups.remainder() {
-        fold(h, u64::from(*byte));
-    }
-}
-pub fn framed(h: &mut u64, bytes: &[u8]) -> Result<(), Error> {
-    fold(h, u64::try_from(bytes.len()).map_err(|_| Error::Overflow)?);
-    fold_bytes(h, bytes);
-    Ok(())
-}
-pub fn hex(out: &mut String, bytes: &[u8]) {
-    const D: &[u8; 16] = b"0123456789abcdef";
-    for byte in bytes {
-        out.push(char::from(D[usize::from(byte >> 4)]));
-        out.push(char::from(D[usize::from(byte & 15)]));
-    }
-}
-pub fn quote(out: &mut String, value: &str) {
-    out.push('"');
-    for c in value.chars() {
-        match c {
-            '"' => out.push_str("\\\""),
-            '\\' => out.push_str("\\\\"),
-            '\n' => out.push_str("\\n"),
-            '\r' => out.push_str("\\r"),
-            '\t' => out.push_str("\\t"),
-            c if c < ' ' => write!(out, "\\u{:04x}", u32::from(c)).expect("String write"),
-            c => out.push(c),
-        }
-    }
-    out.push('"');
-}
 pub fn raw_box(out: &mut String, raw: &triergon_isobmff::BoxView) {
     write!(out, "{{\"offset\":{},\"box_hex\":\"", raw.header().start).expect("String write");
-    hex(out, raw.bytes().as_ref());
+    push_hex(out, raw.bytes().as_ref());
     out.push_str("\"}");
 }
 fn time(out: &mut String, t: &triergon_core::Time) {
@@ -275,7 +222,7 @@ impl Packet {
             fold(h, signed(value));
         }
         fold(h, u64::from(self.flags));
-        framed(h, self.payload.as_ref())?;
+        fold_framed(h, self.payload.as_ref());
         // Current production native view exposes no packet-side-data projection.
         // Reference items remain fully consumed; any nonempty result mismatches.
         fold(h, 0);
@@ -297,7 +244,7 @@ impl Packet {
             self.duration, self.position, self.flags
         )
         .expect("String write");
-        hex(out, self.payload.as_ref());
+        push_hex(out, self.payload.as_ref());
         out.push_str("\",\"side_data\":[]}");
     }
 }
@@ -311,22 +258,22 @@ pub fn consume_stream(h: &mut u64, index: usize, stream: &Mov9StreamView) -> Res
             Error::Unsupported("native signed stream ID projection")
         })?)),
     );
-    framed(h, stream.codec.as_bytes())?;
+    fold_framed(h, stream.codec.as_bytes());
     fold(h, u64::from(stream.media_type));
     fold(h, stream.time_base.numerator());
     fold(h, stream.time_base.denominator());
-    framed(h, stream.extradata.as_ref())?;
+    fold_framed(h, stream.extradata.as_ref());
     fold(h, if stream.vendor_id.is_some() { 3 } else { 2 });
     for (key, value) in [
         (b"language".as_slice(), stream.language.as_slice()),
         (b"handler_name".as_slice(), stream.handler_name.as_ref()),
     ] {
-        framed(h, key)?;
-        framed(h, value)?;
+        fold_framed(h, key);
+        fold_framed(h, value);
     }
     if stream.vendor_id.is_some() {
-        framed(h, b"vendor_id")?;
-        framed(h, b"[0][0][0][0]")?;
+        fold_framed(h, b"vendor_id");
+        fold_framed(h, b"[0][0][0][0]");
     }
     Ok(())
 }
@@ -337,7 +284,7 @@ pub fn trace_stream(out: &mut String, index: usize, stream: &Mov9StreamView) {
         stream.track_id
     )
     .expect("String write");
-    quote(out, stream.codec);
+    push_quoted(out, stream.codec);
     write!(
         out,
         ",\"type\":{},\"time_base\":[{},{}],\"extradata\":\"",
@@ -346,7 +293,7 @@ pub fn trace_stream(out: &mut String, index: usize, stream: &Mov9StreamView) {
         stream.time_base.denominator()
     )
     .expect("String write");
-    hex(out, stream.extradata.as_ref());
+    push_hex(out, stream.extradata.as_ref());
     out.push_str("\",\"tags\":[");
     for (i, (key, value)) in [
         (b"language".as_slice(), stream.language.as_slice()),
@@ -359,16 +306,16 @@ pub fn trace_stream(out: &mut String, index: usize, stream: &Mov9StreamView) {
             out.push(',');
         }
         out.push_str("{\"key_hex\":\"");
-        hex(out, key);
+        push_hex(out, key);
         out.push_str("\",\"value_hex\":\"");
-        hex(out, value);
+        push_hex(out, value);
         out.push_str("\"}");
     }
     if stream.vendor_id.is_some() {
         out.push_str(",{\"key_hex\":\"");
-        hex(out, b"vendor_id");
+        push_hex(out, b"vendor_id");
         out.push_str("\",\"value_hex\":\"");
-        hex(out, b"[0][0][0][0]");
+        push_hex(out, b"[0][0][0][0]");
         out.push_str("\"}");
     }
     out.push_str("]}");
@@ -485,28 +432,13 @@ mod tests {
         }
     }
     #[test]
-    fn h0_polynomial_consumes_every_byte_across_block_boundaries() {
-        for count in [0, 1, 7, 8, 31, 32, 255, 256, 257, 4096] {
-            let data: Vec<_> = (0..count)
-                .map(|i| u8::try_from((i * 17 + 3) % 256).unwrap())
-                .collect();
-            let mut wanted = 29;
-            for b in &data {
-                fold(&mut wanted, u64::from(*b));
-            }
-            let mut actual = 29;
-            fold_bytes(&mut actual, &data);
-            assert_eq!(actual, wanted);
-        }
-    }
-    #[test]
     fn byte_fields_are_framed_and_packet_sequence_is_not_sorted() {
         let mut a = 0;
-        framed(&mut a, b"ab").unwrap();
-        framed(&mut a, b"c").unwrap();
+        fold_framed(&mut a, b"ab");
+        fold_framed(&mut a, b"c");
         let mut b = 0;
-        framed(&mut b, b"a").unwrap();
-        framed(&mut b, b"bc").unwrap();
+        fold_framed(&mut b, b"a");
+        fold_framed(&mut b, b"bc");
         assert_ne!(a, b);
         let mut a = 0;
         let mut b = 0;

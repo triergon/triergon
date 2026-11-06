@@ -92,7 +92,7 @@ fn pack(logical: &[u8], packing: P, tail_one: bool, high: u8) -> (Vec<u8>, Vec<u
     } else {
         16
     };
-    while bits.len() % width != 0 {
+    while !bits.len().is_multiple_of(width) {
         bits.push(u8::from(tail_one));
     }
     let mut out = Vec::new();

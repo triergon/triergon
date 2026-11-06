@@ -8,11 +8,9 @@ use std::sync::Arc;
 use triergon_core::{Budget, BudgetVec, Bytes, Error, Result};
 
 #[cfg(test)]
-#[path = "palette_compact_controls.rs"]
 mod compact_storage_controls;
 
 #[cfg(test)]
-#[path = "palette_init_bulk_controls.rs"]
 mod bulk_initialisation_controls;
 
 #[derive(Clone, Copy, Debug)]
@@ -71,7 +69,7 @@ impl PaletteBuild {
         if payload.len() < 2 {
             return Err(Error::Truncated);
         }
-        if (payload.len() - 2) % 5 != 0 {
+        if !(payload.len() - 2).is_multiple_of(5) {
             return Err(Error::Invalid("PGS partial palette entry"));
         }
         if !payload.belongs_to(budget) || previous.as_ref().is_some_and(|p| !p.belongs_to(budget)) {

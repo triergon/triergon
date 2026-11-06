@@ -10,6 +10,8 @@ mod cabac;
 mod cavlc;
 mod deblock;
 mod dpb;
+/// Stream feature inspection for classifying conformance vectors (research tooling).
+#[cfg(feature = "inspect")]
 pub mod inspect;
 mod inter;
 mod intra;
@@ -201,10 +203,9 @@ fn recycle_buf(spare: &mut Vec<std::sync::Arc<FrameBuf>>, w: usize, h: usize) ->
     if let Some(i) = spare
         .iter()
         .position(|b| std::sync::Arc::strong_count(b) == 1 && b.width == w && b.height == h)
+        && let Ok(b) = std::sync::Arc::try_unwrap(spare.swap_remove(i))
     {
-        if let Ok(b) = std::sync::Arc::try_unwrap(spare.swap_remove(i)) {
-            return b;
-        }
+        return b;
     }
     FrameBuf::new(w, h, true)
 }
@@ -661,13 +662,13 @@ impl Decoder {
             sps.profile_idc,
         ) / frame_mbs)
             .clamp(1, 16) as usize;
-        if let Some(v) = &sps.vui {
-            if v.bitstream_restriction {
-                n = (v.max_dec_frame_buffering as usize)
-                    .max(1)
-                    .max(sps.max_num_ref_frames as usize)
-                    .min(16);
-            }
+        if let Some(v) = &sps.vui
+            && v.bitstream_restriction
+        {
+            n = (v.max_dec_frame_buffering as usize)
+                .max(1)
+                .max(sps.max_num_ref_frames as usize)
+                .min(16);
         }
         n.max(sps.max_num_ref_frames as usize)
     }

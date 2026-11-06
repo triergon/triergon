@@ -211,13 +211,13 @@ impl SectionAssembler {
             return Err(error);
         }
         let result = self.poll_inner(work, cancel);
-        if let Err(error) = result.as_ref() {
-            if !matches!(
+        if let Err(error) = result.as_ref()
+            && !matches!(
                 error,
                 Error::Backpressure { .. } | Error::Allocation | Error::Cancelled
-            ) {
-                self.fault = Some(*error);
-            }
+            )
+        {
+            self.fault = Some(*error);
         }
         result
     }
@@ -256,10 +256,10 @@ impl SectionAssembler {
                 self.buffer = Some(BudgetVec::new(&self.budget));
                 self.target = None;
                 self.crc = PsiCrc32::default();
-                if let Some(payload) = self.payload.as_mut() {
-                    if !payload.fresh {
-                        payload.stuffing = true;
-                    }
+                if let Some(payload) = self.payload.as_mut()
+                    && !payload.fresh
+                {
+                    payload.stuffing = true;
                 }
                 return Ok(AssemblyStep::Output(Section {
                     pid: self.pid,

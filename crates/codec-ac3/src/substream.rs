@@ -240,7 +240,7 @@ pub(crate) struct Substream {
     pub delay: [[f32; 256]; NCH],
 
     pub features: FrameFeatures,
-    pub ffmpeg_compat: bool,
+    pub reference_compat: bool,
 }
 
 /// Output routing for one substream: coded channel -> plane index.
@@ -404,7 +404,7 @@ impl Substream {
             coef: [[0.0; 256]; NCH],
             delay: [[0.0; 256]; NCH],
             features: FrameFeatures::default(),
-            ffmpeg_compat: true,
+            reference_compat: true,
         })
     }
 
@@ -868,7 +868,7 @@ impl Substream {
                 // FFmpeg 9.0.2 keeps decoding with zero bits past the frame end; A/52 7.10
                 // leaves error handling to the implementation.
                 self.features.overrun = true;
-                if !self.ffmpeg_compat {
+                if !self.reference_compat {
                     return Err((blk, bad("audio block overruns syncframe")));
                 }
             }
@@ -1762,7 +1762,7 @@ impl Substream {
                     3 => &VQ_HEBAP3[idx],
                     // FFmpeg 9.0.2 compatibility (black-box observation, STATUS.md): FFmpeg
                     // decodes hebap-4 index i with Table E4.4 row i + 1 and index 31 as zero.
-                    4 if self.ffmpeg_compat => VQ_HEBAP4.get(idx + 1).unwrap_or(&[0; 6]),
+                    4 if self.reference_compat => VQ_HEBAP4.get(idx + 1).unwrap_or(&[0; 6]),
                     4 => &VQ_HEBAP4[idx],
                     5 => &VQ_HEBAP5[idx],
                     6 => &VQ_HEBAP6[idx],
@@ -1977,7 +1977,7 @@ impl Substream {
     /// block in which the full-bandwidth channels use different transform lengths
     /// rewrites the overlap delay lines of the coded channels before the inverse
     /// transform as if a previously down-mixed delay had to be up-mixed. A/52 does not
-    /// do this; it is applied only when `DecoderOptions::ffmpeg_compat` is set.
+    /// do this; it is applied only when `DecoderOptions::compat` is `Compat::Reference`.
     fn ffmpeg_first_mixed_transform_quirk(&mut self) {
         let d = &mut self.delay;
         match self.acmod {

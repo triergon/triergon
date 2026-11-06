@@ -78,7 +78,7 @@ fn diagnostic_packet_json(
         p.encoded_header.time_flags(),
         p.source_fault.kind
     )?;
-    source_trace::json_string(output, &format!("{:?}", p.source_fault.error))?;
+    triergon_harness_protocol::write_quoted(output, &format!("{:?}", p.source_fault.error))?;
     output.write_all(b",\"pid\":")?;
     source_trace::optional(output, p.source_fault.pid.map(u64::from))?;
     write!(
@@ -169,7 +169,7 @@ fn diagnostic_packet_json(
         }
         Err(error) => {
             output.write_all(b"{\"error\":")?;
-            source_trace::json_string(output, &error.to_string())?;
+            triergon_harness_protocol::write_quoted(output, &error.to_string())?;
             output.write_all(b"}")?;
         }
     }
@@ -191,10 +191,10 @@ fn rejection_json(output: &mut impl Write, rejection: &RejectedTransport) -> io:
         rejection.source_offset(),
         rejection.bytes().len()
     )?;
-    source_trace::json_string(output, &format!("{:?}", rejection.error()))?;
+    triergon_harness_protocol::write_quoted(output, &format!("{:?}", rejection.error()))?;
     output.write_all(b",\"secondary_error\":")?;
     if let Some(error) = rejection.secondary_error() {
-        source_trace::json_string(output, &format!("{error:?}"))?;
+        triergon_harness_protocol::write_quoted(output, &format!("{error:?}"))?;
     } else {
         output.write_all(b"null")?;
     }
@@ -286,7 +286,7 @@ fn recovered_json(
         )?,
         Err(error) => {
             output.write_all(b"{\"error\":")?;
-            source_trace::json_string(output, &error.to_string())?;
+            triergon_harness_protocol::write_quoted(output, &error.to_string())?;
             output.write_all(b"}")?;
         }
     }
@@ -500,7 +500,7 @@ fn packet_json(
         Ok(view) => time_json(output, view)?,
         Err(error) => {
             output.write_all(b"{\"error\":")?;
-            source_trace::json_string(output, &error.to_string())?;
+            triergon_harness_protocol::write_quoted(output, &error.to_string())?;
             output.write_all(b"}")?;
         }
     }
@@ -799,10 +799,10 @@ impl NativeAdapter {
         cancel: &AtomicBool,
     ) {
         self.observe_inner(event, cause, quarantined, cancel, None);
-        if let (Some(failure), TraceEvent::Diagnostic(fault)) = (self.failure.as_mut(), event) {
-            if failure.rejection.is_none() {
-                failure.rejection = fault.rejected.clone();
-            }
+        if let (Some(failure), TraceEvent::Diagnostic(fault)) = (self.failure.as_mut(), event)
+            && failure.rejection.is_none()
+        {
+            failure.rejection = fault.rejected.clone();
         }
     }
     fn observe_with_input(
@@ -813,23 +813,23 @@ impl NativeAdapter {
         cancel: &AtomicBool,
         input: &InputCursor,
     ) {
-        if let Some(context) = &self.initial_input {
-            if let Err(error) = context.validate_cursor(input) {
-                self.fail(error, cause);
-                return;
-            }
+        if let Some(context) = &self.initial_input
+            && let Err(error) = context.validate_cursor(input)
+        {
+            self.fail(error, cause);
+            return;
         }
-        if let Some(observer) = &self.observer {
-            if let Err(error) = observer.validate_native_input_v1(input) {
-                self.fail(error, cause);
-                return;
-            }
+        if let Some(observer) = &self.observer
+            && let Err(error) = observer.validate_native_input_v1(input)
+        {
+            self.fail(error, cause);
+            return;
         }
         self.observe_inner(event, cause, quarantined, cancel, Some(input));
-        if let (Some(failure), TraceEvent::Diagnostic(fault)) = (self.failure.as_mut(), event) {
-            if failure.rejection.is_none() {
-                failure.rejection = fault.rejected.clone();
-            }
+        if let (Some(failure), TraceEvent::Diagnostic(fault)) = (self.failure.as_mut(), event)
+            && failure.rejection.is_none()
+        {
+            failure.rejection = fault.rejected.clone();
         }
     }
     fn observe_inner(
@@ -926,68 +926,66 @@ impl NativeAdapter {
                 configuration_epoch,
             },
         ) = (self.scope, event)
+            && record.scope.stream_type == 0x1b
+            && map.streams.as_slice().len() == 1
+            && map.streams.as_slice()[0].stream_type == 0x24
         {
-            if record.scope.stream_type == 0x1b
-                && map.streams.as_slice().len() == 1
-                && map.streams.as_slice()[0].stream_type == 0x24
-            {
-                let result = (|| {
-                    if quarantined
-                        || cause.source != record.scope.entity
-                        || *configuration_epoch != cause.epochs.configuration
-                    {
-                        return Err(Error::Unsupported(
-                            "selected PMT source/quarantine context unobserved",
-                        ));
-                    }
-                    if self.scope_update.is_some() {
-                        return Err(Error::Invalid("selected PMT scope update not drained"));
-                    }
-                    let route = self
-                        .pat_route
-                        .ok_or(Error::Invalid("selected PAT route missing"))?;
-                    let ordinal = cause
-                        .ordinal
-                        .ok_or(Error::Invalid("selected PMT source ordinal missing"))?;
-                    let observer = self
-                        .observer
-                        .as_mut()
-                        .ok_or(Error::Invalid("native observer missing"))?;
-                    let mut job = observer.rebind_drained_selected_pmt_v1(
-                        route,
-                        map,
-                        NativeSourceContext {
-                            source_event_ordinal: ordinal,
-                            epochs: cause.epochs,
-                            byte_run_epoch: None,
-                        },
-                    )?;
-                    loop {
-                        match job.poll(&mut WorkBudget::new(4096), cancel)? {
-                            triergon_mpegts::psi::TableStep::Yield => {}
-                            triergon_mpegts::psi::TableStep::Output(binding) => {
-                                return Ok(binding);
-                            }
-                            triergon_mpegts::psi::TableStep::Done => {
-                                return Err(Error::Invalid("selected PMT binding output missing"));
-                            }
+            let result = (|| {
+                if quarantined
+                    || cause.source != record.scope.entity
+                    || *configuration_epoch != cause.epochs.configuration
+                {
+                    return Err(Error::Unsupported(
+                        "selected PMT source/quarantine context unobserved",
+                    ));
+                }
+                if self.scope_update.is_some() {
+                    return Err(Error::Invalid("selected PMT scope update not drained"));
+                }
+                let route = self
+                    .pat_route
+                    .ok_or(Error::Invalid("selected PAT route missing"))?;
+                let ordinal = cause
+                    .ordinal
+                    .ok_or(Error::Invalid("selected PMT source ordinal missing"))?;
+                let observer = self
+                    .observer
+                    .as_mut()
+                    .ok_or(Error::Invalid("native observer missing"))?;
+                let mut job = observer.rebind_drained_selected_pmt_v1(
+                    route,
+                    map,
+                    NativeSourceContext {
+                        source_event_ordinal: ordinal,
+                        epochs: cause.epochs,
+                        byte_run_epoch: None,
+                    },
+                )?;
+                loop {
+                    match job.poll(&mut WorkBudget::new(4096), cancel)? {
+                        triergon_mpegts::psi::TableStep::Yield => {}
+                        triergon_mpegts::psi::TableStep::Output(binding) => {
+                            return Ok(binding);
+                        }
+                        triergon_mpegts::psi::TableStep::Done => {
+                            return Err(Error::Invalid("selected PMT binding output missing"));
                         }
                     }
-                })();
-                match result {
-                    Ok(binding) => {
-                        let mut next = record;
-                        next.scope = binding.scope;
-                        next.pcr_pid = binding.pcr_pid;
-                        next.pmt_version = binding.version;
-                        next.cause = cause;
-                        self.scope_update = Some((record, next));
-                        self.scope = Some(next);
-                    }
-                    Err(error) => self.fail(error, cause),
                 }
-                return;
+            })();
+            match result {
+                Ok(binding) => {
+                    let mut next = record;
+                    next.scope = binding.scope;
+                    next.pcr_pid = binding.pcr_pid;
+                    next.pmt_version = binding.version;
+                    next.cause = cause;
+                    self.scope_update = Some((record, next));
+                    self.scope = Some(next);
+                }
+                Err(error) => self.fail(error, cause),
             }
+            return;
         }
         if let Some(mut record) = self.scope {
             if let TraceEvent::Timeline {
@@ -1314,17 +1312,16 @@ impl NativeAdapter {
                 let Some(record) = self.scope else {
                     if let (Some(completion), Some(ordinal)) =
                         (self.packet_completion.as_ref(), cause.ordinal)
-                    {
-                        if completion.is_control_transport_v1(
+                        && completion.is_control_transport_v1(
                             packet.pid,
                             NativeSourceContext {
                                 source_event_ordinal: ordinal,
                                 epochs: cause.epochs,
                                 byte_run_epoch: None,
                             },
-                        ) {
-                            return;
-                        }
+                        )
+                    {
+                        return;
                     }
                     if packet.pid != 0
                         && packet.pid != 0x1fff
@@ -1491,7 +1488,7 @@ impl NativeAdapter {
                 cause_json(output, record.cause)?;
                 if let Some(audio) = record.audio {
                     output.write_all(b",\"carriage_view\":")?;
-                    source_trace::json_string(output, audio.name())?;
+                    triergon_harness_protocol::write_quoted(output, audio.name())?;
                     output.write_all(b",\"source_namespace_inferred\":false,\"scope_rejected_policy\":\"NoRejectedCarrierV1\"")?;
                 }
                 if let Some(namespace) = record.dvb_namespace {
@@ -1541,7 +1538,7 @@ impl NativeAdapter {
         }
         if let Some(failure) = self.failure.take() {
             output.write_all(b"{\"kind\":\"native_pes_nonpass\",\"operation\":\"ArchivedNativePesPacketsV1\",\"error\":")?;
-            source_trace::json_string(output, &failure.error.to_string())?;
+            triergon_harness_protocol::write_quoted(output, &failure.error.to_string())?;
             output.write_all(b",\"cause\":")?;
             cause_json(output, failure.cause)?;
             if let Some(rejection) = failure.rejection.as_ref() {
@@ -1821,7 +1818,7 @@ impl NativeAdapter {
                 c.epochs.clock,
                 c.epochs.configuration
             )?;
-            source_trace::json_string(output, &format!("{:?}", evidence.kind()))?;
+            triergon_harness_protocol::write_quoted(output, &format!("{:?}", evidence.kind()))?;
             output.write_all(b",\"raw_hex\":")?;
             source_trace::hex(output, p.source.as_ref())?;
             output.write_all(b"}")?;
@@ -2219,7 +2216,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                                     native.object.as_ref().and_then(|o| o.error()).unwrap_or(
                                         Error::Unsupported("native whole object incomplete"),
                                     );
-                                source_trace::json_string(&mut output, &error.to_string())?;
+                                triergon_harness_protocol::write_quoted(
+                                    &mut output,
+                                    &error.to_string(),
+                                )?;
                                 output.write_all(b",\"qualified\":false}\n")?;
                             }
                         }
@@ -2433,7 +2433,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         );
         native.pending_json(&mut output)?;
         output.write_all(b"{\"kind\":\"native_pes_driver_error\",\"error\":")?;
-        source_trace::json_string(&mut output, &error.to_string())?;
+        triergon_harness_protocol::write_quoted(&mut output, &error.to_string())?;
         output.write_all(b",\"cause\":")?;
         cause_json(&mut output, cause)?;
         output.write_all(b",\"qualified\":false}\n")?;

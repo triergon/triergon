@@ -90,16 +90,16 @@ impl HdReceiverContext {
     }
     pub fn alpha(&self, index: u8) -> Result<HdContextAlpha<'_>> {
         let i = usize::from(index);
-        if i < 4 {
-            if let Some(field) = &self.alpha4 {
-                return Ok(HdContextAlpha {
-                    value: ((field.word()? >> (4 * i)) & 15) as u8,
-                    origin: HdContextOrigin::Packed {
-                        owner: &field.owner,
-                        span: field.span,
-                    },
-                });
-            }
+        if i < 4
+            && let Some(field) = &self.alpha4
+        {
+            return Ok(HdContextAlpha {
+                value: ((field.word()? >> (4 * i)) & 15) as u8,
+                origin: HdContextOrigin::Packed {
+                    owner: &field.owner,
+                    span: field.span,
+                },
+            });
         }
         if let Some(field) = &self.contrast {
             let raw = *field.raw()?.get(i).ok_or(Error::Truncated)?;
@@ -152,10 +152,10 @@ impl HdReceiverContext {
             next.contrast = Some(contrast);
             next.alpha4 = None;
         }
-        if let Some(alpha) = alpha {
-            if facts.contrast.is_none_or(|c| alpha.span.start > c.start) {
-                next.alpha4 = Some(alpha);
-            }
+        if let Some(alpha) = alpha
+            && facts.contrast.is_none_or(|c| alpha.span.start > c.start)
+        {
+            next.alpha4 = Some(alpha);
         }
         if let Some(selectors) = selectors {
             next.selectors = Some(selectors);

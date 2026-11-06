@@ -22,10 +22,8 @@ class ColourParityTests(unittest.TestCase):
                 self.assertEqual(differences(source['data'],source_colour(path)),[])
 
     def test_seeded_mastering_rationals_match_the_public_native_representation(self):
-        import importlib.util
         import random
-        spec=importlib.util.spec_from_file_location('colour_generator',ROOT/'tools/generate-colour-corpus.py')
-        fixture=importlib.util.module_from_spec(spec);spec.loader.exec_module(fixture)
+        from tools import generate_colour_corpus as fixture
         rng=random.Random(9559)
         with tempfile.TemporaryDirectory() as directory:
             path=Path(directory)/'mastering.mkv'

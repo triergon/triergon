@@ -51,7 +51,7 @@ impl BitWriter {
         self.bytes.len() * 8 + self.n as usize
     }
     pub fn align(&mut self, n: usize) {
-        while self.bits() % n != 0 {
+        while !self.bits().is_multiple_of(n) {
             self.put(0, 1);
         }
     }
@@ -415,10 +415,10 @@ pub fn write_set_subframe(
             }
         }
     }
-    if let Some(f) = core {
-        if f.dynf {
-            w.put(u32::from(sf.range), 8);
-        }
+    if let Some(f) = core
+        && f.dynf
+    {
+        w.put(u32::from(sf.range), 8);
     }
     if cpf {
         w.put(0, 16);
@@ -429,14 +429,14 @@ pub fn write_set_subframe(
             w.put(u32::from(sf.chans[ch].bands[n].vq), 10);
         }
     }
-    if let Some(f) = core {
-        if f.lff > 0 {
-            assert_eq!(sf.lfe.len(), 2 * f.lff as usize * nssc);
-            for &v in &sf.lfe {
-                w.put_signed(v, 8);
-            }
-            w.put(u32::from(sf.lfe_scale), 8);
+    if let Some(f) = core
+        && f.lff > 0
+    {
+        assert_eq!(sf.lfe.len(), 2 * f.lff as usize * nssc);
+        for &v in &sf.lfe {
+            w.put_signed(v, 8);
         }
+        w.put(u32::from(sf.lfe_scale), 8);
     }
     for ssf in 0..nssc {
         for ch in 0..nch {
@@ -535,12 +535,12 @@ pub fn write_frame(f: &Frame) -> Vec<u8> {
     let mut out = w.finish();
     if !f.ext.is_empty() {
         // Extensions end the frame: pad the core part, then append (32-bit aligned).
-        while out.len() % 4 != 0 || out.len() + f.ext.len() < f.min_size {
+        while !out.len().is_multiple_of(4) || out.len() + f.ext.len() < f.min_size {
             out.push(0);
         }
         out.extend_from_slice(&f.ext);
     }
-    while out.len() < f.min_size || out.len() % 2 != 0 {
+    while out.len() < f.min_size || !out.len().is_multiple_of(2) {
         out.push(0);
     }
     let fsize = (out.len() - 1) as u32;
@@ -845,7 +845,7 @@ pub fn write_x96(x: &X96, nssc: &[usize], aspf: bool, cpf: bool) -> Vec<u8> {
         }
     }
     let mut out = w.finish();
-    while out.len() % 4 != 0 || out.len() < 96 {
+    while !out.len().is_multiple_of(4) || out.len() < 96 {
         out.push(0);
     }
     let size = (out.len() - 1) as u32;

@@ -1,6 +1,7 @@
 import unittest
 from unittest.mock import patch
-from .runner import acceptance, differences, ratio_interval, ROOT, load
+from .common import load
+from .runner import acceptance, differences, ratio_interval, ROOT
 
 
 def matched_gate_fixture():

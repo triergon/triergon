@@ -161,7 +161,7 @@ fn catalogue_required_opener_pressure_keeps_source_alive_and_complete_facts() {
                 let result = open.advance(&mut WorkBudget::new(1), &off());
                 drop(hold);
                 let step = match result {
-                    Err(Error::Core(C::Backpressure { .. })) => {
+                    Err(C::Backpressure { .. }) => {
                         refused += 1;
                         assert_eq!(
                             signals.aborts.load(Ordering::Relaxed),
@@ -477,7 +477,7 @@ fn catalogue_retirement_pressure_returns_candidate_and_keeps_old_output_current(
     for _ in 0..3 {
         assert!(matches!(
             p.replace_mp4_catalogue(&mut next, Selection::All, &mut WorkBudget::new(1), &off()),
-            Err(Error::Core(C::Backpressure { .. }))
+            Err(C::Backpressure { .. })
         ));
         assert!(next.is_some());
         assert!(p.current(&output));
@@ -524,7 +524,7 @@ fn catalogue_workzero_and_attempt_cancel_preserve_both_entities() {
             &mut WorkBudget::new(0),
             &AtomicBool::new(true)
         ),
-        Err(Error::Core(C::Cancelled))
+        Err(C::Cancelled)
     ));
     assert_eq!(
         before,
@@ -568,7 +568,7 @@ fn catalogue_dropped_preparation_and_late_cancellation_are_rollback_only() {
         .unwrap()
         .unwrap();
     cancel.store(true, Ordering::Relaxed);
-    assert!(matches!(tx.commit(), Err(Error::Core(C::Cancelled))));
+    assert!(matches!(tx.commit(), Err(C::Cancelled)));
     assert_eq!(b.used(), before);
     assert_eq!(p.queued(), 2);
     assert!(next.is_some());
@@ -600,7 +600,7 @@ fn catalogue_identity_selection_and_foreign_pool_refusals_are_non_destructive() 
         let (mut next, signals) = candidate(pool, id, &gold::CASES[0], Mp4View::SourcePhysical);
         assert!(
             matches!(p.replace_mp4_catalogue(&mut next, selection, &mut WorkBudget::new(1), &off()),
-            Err(Error::Core(e)) if e == expected)
+            Err(e) if e == expected)
         );
         assert!(p.current(&output));
         assert!(next.is_some());
@@ -624,7 +624,7 @@ fn catalogue_selection_storage_pressure_retries_before_retiring_any_owner() {
     let hold = b.reserve(b.available()).unwrap();
     assert!(matches!(
         p.replace_mp4_catalogue(&mut next, selected, &mut WorkBudget::new(1), &off()),
-        Err(Error::Core(C::Backpressure { .. }))
+        Err(C::Backpressure { .. })
     ));
     untouched(&old);
     untouched(&new);
@@ -781,10 +781,10 @@ fn catalogue_replacement_does_not_reset_cumulative_event_limit() {
     }
     assert!(matches!(
         error,
-        Some(Error::Core(C::Limit {
+        Some(C::Limit {
             requested: 3,
             maximum: 2
-        }))
+        })
     ));
     assert_eq!(retired.queued(), 2);
     once(&old);
@@ -1145,9 +1145,9 @@ fn catalogue_second_inband_movie_stays_refused_without_implicit_replacement() {
     }
     assert!(matches!(
         error,
-        Some(Error::Core(C::Unsupported(
+        Some(C::Unsupported(
             "new movie catalogue requires explicit source discontinuity"
-        )))
+        ))
     ));
     check_outputs_with_roots(
         &packets,
@@ -1280,7 +1280,7 @@ fn catalogue_pump_blocked_and_accepted_owners_must_retire_before_commit() {
     let old_token = pump.pending().unwrap().token().clone();
     assert!(matches!(
         pump.replace_mp4_catalogue(&mut next, Selection::All, &mut WorkBudget::new(1), &off()),
-        Err(Error::Core(C::Backpressure { .. }))
+        Err(C::Backpressure { .. })
     ));
     assert_eq!(pump.pending().unwrap().token(), &old_token);
     untouched(&old);
@@ -1295,7 +1295,7 @@ fn catalogue_pump_blocked_and_accepted_owners_must_retire_before_commit() {
     assert_eq!(pump.in_flight(), 1);
     assert!(matches!(
         pump.replace_mp4_catalogue(&mut next, Selection::All, &mut WorkBudget::new(1), &off()),
-        Err(Error::Core(C::Backpressure { .. }))
+        Err(C::Backpressure { .. })
     ));
     assert!(next.is_some());
     pump.sink_mut()
@@ -1367,7 +1367,7 @@ fn catalogue_pump_sink_preparation_refusal_and_pause_are_transactional() {
     assert_eq!(b.used(), before);
     assert!(matches!(
         pump.replace_mp4_catalogue(&mut next, Selection::All, &mut WorkBudget::new(1), &off()),
-        Err(Error::Core(C::Backpressure { .. }))
+        Err(C::Backpressure { .. })
     ));
     assert_eq!(pump.sink().unwrap().abandoned, 1);
     assert!(!pump.sink().unwrap().prepared);
@@ -1428,7 +1428,7 @@ fn catalogue_pump_cancel_during_sink_preparation_abandons_without_source_swap() 
     );
     assert!(matches!(
         pump.replace_mp4_catalogue(&mut next, Selection::All, &mut WorkBudget::new(1), &cancel),
-        Err(Error::Core(C::Cancelled))
+        Err(C::Cancelled)
     ));
     assert!(next.is_some());
     assert_eq!(
@@ -1468,7 +1468,7 @@ fn catalogue_stale_candidate_constructor_and_cancelled_opener_keep_active_source
     opened.input.reset(0).unwrap();
     assert!(matches!(
         Mp4Catalogue::new(opened, plan, 1 << 20, Mp4CatalogueMode::Indexed),
-        Err(Error::Core(C::StaleGeneration { .. }))
+        Err(C::StaleGeneration { .. })
     ));
     once(&signals);
     assert!(p.current(&retained));
@@ -1479,7 +1479,7 @@ fn catalogue_stale_candidate_constructor_and_cancelled_opener_keep_active_source
         let hold = b.reserve(b.available()).unwrap();
         let result = open.advance(&mut WorkBudget::new(1), &off());
         drop(hold);
-        if matches!(result, Err(Error::Core(C::Backpressure { .. }))) {
+        if matches!(result, Err(C::Backpressure { .. })) {
             refused = true;
             break;
         }
@@ -1488,7 +1488,7 @@ fn catalogue_stale_candidate_constructor_and_cancelled_opener_keep_active_source
     assert!(refused);
     assert!(matches!(
         open.advance(&mut WorkBudget::new(0), &AtomicBool::new(true)),
-        Err(Error::Core(C::Cancelled))
+        Err(C::Cancelled)
     ));
     assert!(matches!(
         open.advance(&mut WorkBudget::new(1), &off()),
@@ -1590,7 +1590,7 @@ fn progressive_range_seek_promotes_the_same_fragmented_entity_through_the_pump()
             &mut WorkBudget::new(1),
             &AtomicBool::new(true),
         ),
-        Err(Error::Core(C::Cancelled))
+        Err(C::Cancelled)
     ));
     assert!(p.current(&old_output));
     untouched(&old);
@@ -1612,7 +1612,7 @@ fn progressive_range_seek_promotes_the_same_fragmented_entity_through_the_pump()
     );
     assert!(matches!(
         pump.apply_mp4_progressive_sync_seek(&mut next, &command, &mut WorkBudget::new(1), &off()),
-        Err(Error::Core(C::Backpressure { .. }))
+        Err(C::Backpressure { .. })
     ));
     assert!(pump.player().unwrap().current(&old_output));
     assert_eq!(
@@ -1640,7 +1640,7 @@ fn progressive_range_seek_promotes_the_same_fragmented_entity_through_the_pump()
     assert_ne!(boundary.input_generation, original_candidate_generation);
     assert!(matches!(
         pump.apply_mp4_progressive_sync_seek(&mut next, &command, &mut WorkBudget::new(1), &off()),
-        Err(Error::Core(C::StaleGeneration { .. }))
+        Err(C::StaleGeneration { .. })
     ));
     assert_eq!(pump.sink().unwrap().seeks.len(), 1);
     assert!(!pump.sink().unwrap().seeks[0].replay_from_start);

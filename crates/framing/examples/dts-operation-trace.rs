@@ -10,10 +10,8 @@ use triergon_framing::{
     DtsFactAssociationJob, DtsOperation, DtsOperationEvent, DtsOperationLimits, DtsOperationStep,
     DtsParserPacket, DtsWordOrder,
 };
+use triergon_harness_protocol::hex;
 
-fn hex(b: &[u8]) -> String {
-    b.iter().map(|x| format!("{x:02x}")).collect()
-}
 fn header(h: triergon_framing::DtsCoreHeader) -> String {
     let values = facts::values(h);
     let mut fields = Vec::new();

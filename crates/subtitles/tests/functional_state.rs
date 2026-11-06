@@ -232,9 +232,16 @@ fn assert_event(case: &Case, actual: &DisplayEvent, expected: &Expected) {
             "{} complete native palette",
             case.id
         );
-        for (rgba, word) in palette.rgba.as_ref().chunks_exact(4).zip(want.native_words) {
+        for (rgba, word) in palette
+            .rgba
+            .as_ref()
+            .as_chunks::<4>()
+            .0
+            .iter()
+            .zip(want.native_words)
+        {
             assert_eq!(
-                rgba,
+                *rgba,
                 [
                     (word >> 16) as u8,
                     (word >> 8) as u8,

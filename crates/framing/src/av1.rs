@@ -352,10 +352,10 @@ impl Av1ObuReader {
             return Err(Error::Cancelled);
         }
         let result = self.step_inner(work, cancel);
-        if let Err(error) = result {
-            if !matches!(error, Error::Backpressure { .. } | Error::Allocation) {
-                self.stop(error);
-            }
+        if let Err(error) = result
+            && !matches!(error, Error::Backpressure { .. } | Error::Allocation)
+        {
+            self.stop(error);
         }
         result
     }

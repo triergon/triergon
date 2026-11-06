@@ -472,10 +472,10 @@ impl Decoder {
     ) -> Result<()> {
         let t = h.nal_unit_type;
         let irap = nal::is_irap(t);
-        if let Some(tool) = pps.range_ext_tool {
-            if sps.profile.profile_idc >= 4 {
-                return Err(DecodeError::Unsupported(tool));
-            }
+        if let Some(tool) = pps.range_ext_tool
+            && sps.profile.profile_idc >= 4
+        {
+            return Err(DecodeError::Unsupported(tool));
         }
         if pps.scc_ext && sps.profile.profile_idc >= 9 {
             return Err(DecodeError::Unsupported("pps_scc_extension (SCC)"));

@@ -95,7 +95,7 @@ pub struct Pump<S: Source, T: Sink> {
 impl<S: Source, T: Sink> Pump<S, T> {
     pub fn new(player: Player<S>, sink: T, maximum_in_flight: usize) -> Result<Self> {
         if maximum_in_flight == 0 || maximum_in_flight > 64 {
-            return Err(Error::Invalid("pump in-flight policy").into());
+            return Err(Error::Invalid("pump in-flight policy"));
         }
         let pool = player.budget();
         // Control identity only: never emitted as a physical source/native field.
@@ -161,7 +161,7 @@ impl<S: Source, T: Sink> Pump<S, T> {
             .pause(paused)
         {
             self.stop();
-            return Err(error.into());
+            return Err(error);
         }
         self.player
             .as_mut()
@@ -180,7 +180,7 @@ impl<S: Source, T: Sink> Pump<S, T> {
     ) -> Result<bool> {
         if c.load(Ordering::Relaxed) {
             self.stop();
-            return Err(Error::Cancelled.into());
+            return Err(Error::Cancelled);
         }
         if self.stopped {
             return Err(crate::Error::Closed);
@@ -202,7 +202,7 @@ impl<S: Source, T: Sink> Pump<S, T> {
             .reset(&intent)
         {
             self.stop();
-            return Err(error.into());
+            return Err(error);
         }
         self.pending = None;
         for credit in self.credits.as_mut_slice() {
@@ -267,7 +267,7 @@ impl<S: Source, T: Sink> Pump<S, T> {
         T: CatalogueSink,
     {
         if c.load(Ordering::Relaxed) {
-            return Err(Error::Cancelled.into());
+            return Err(Error::Cancelled);
         }
         if self.stopped {
             return Err(crate::Error::Closed);
@@ -280,8 +280,7 @@ impl<S: Source, T: Sink> Pump<S, T> {
             return Err(Error::Backpressure {
                 requested: outstanding,
                 available: 0,
-            }
-            .into());
+            });
         }
         // Construct the new callback fence before changing the player or sink.
         let identity = InputCursor::new(
@@ -311,7 +310,7 @@ impl<S: Source, T: Sink> Pump<S, T> {
         let sink = self.sink.as_mut().ok_or(crate::Error::Closed)?;
         if let Err(error) = sink.prepare_catalogue(transaction.next_engine()?) {
             sink.abandon_catalogue();
-            return Err(error.into());
+            return Err(error);
         }
         let (retired, boundary) = match transaction.commit_with_boundary() {
             Ok(result) => result,
@@ -332,7 +331,7 @@ impl<S: Source, T: Sink> Pump<S, T> {
             && let Err(error) = sink.reset(&intent)
         {
             self.stop();
-            return Err(error.into());
+            return Err(error);
         }
         Ok(Some(retired))
     }
@@ -358,7 +357,7 @@ impl<S: Source, T: Sink> Pump<S, T> {
     pub fn step(&mut self, w: &mut WorkBudget, c: &AtomicBool) -> Result<PumpStep> {
         if c.load(Ordering::Relaxed) {
             self.stop();
-            return Err(Error::Cancelled.into());
+            return Err(Error::Cancelled);
         }
         if self.stopped {
             return Ok(PumpStep::Stopped);
@@ -380,7 +379,7 @@ impl<S: Source, T: Sink> Pump<S, T> {
             let player = self.player.as_ref().ok_or(crate::Error::Closed)?;
             if !player.current(&feed.output) {
                 self.pending = None;
-                return Err(Error::Invalid("retired producer output").into());
+                return Err(Error::Invalid("retired producer output"));
             }
             let Some(slot) = self.credits.as_slice().iter().position(Option::is_none) else {
                 return self.complete(w);
@@ -397,7 +396,7 @@ impl<S: Source, T: Sink> Pump<S, T> {
                 }
                 Submission::Accepted(_) => {
                     self.stop();
-                    return Err(Error::Invalid("foreign sink acceptance token").into());
+                    return Err(Error::Invalid("foreign sink acceptance token"));
                 }
                 Submission::Blocked(feed) if feed.token == token => {
                     self.pending = Some(feed);
@@ -405,12 +404,12 @@ impl<S: Source, T: Sink> Pump<S, T> {
                 }
                 Submission::Blocked(_) => {
                     self.stop();
-                    return Err(Error::Invalid("foreign returned sink owner").into());
+                    return Err(Error::Invalid("foreign returned sink owner"));
                 }
                 Submission::Failed { feed, error } => {
                     self.pending = Some(feed);
                     self.stop();
-                    return Err(error.into());
+                    return Err(error);
                 }
             }
         }
@@ -420,7 +419,7 @@ impl<S: Source, T: Sink> Pump<S, T> {
         let player = self.player.as_mut().ok_or(crate::Error::Closed)?;
         if let Some(output) = player.pop() {
             if !w.try_charge(1) {
-                return Err(Error::Invalid("work admission changed after pop").into());
+                return Err(Error::Invalid("work admission changed after pop"));
             }
             self.ordinal = self.ordinal.checked_add(1).ok_or(Error::Overflow)?;
             self.pending = Some(Feed {

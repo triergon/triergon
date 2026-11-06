@@ -31,7 +31,7 @@ It is written from the published standards and measured case by case against FFm
 | Crate | What it gives you |
 |---|---|
 | [`triergon-core`](crates/core) | Budgets, shared byte buffers, exact time, input windows, resumable steps |
-| [`triergon`](crates/media) | Matroska and WebM reader with seeking, chapters, tags, attachments, colour and HDR |
+| [`triergon-matroska`](crates/media) | Matroska and WebM reader with seeking, chapters, tags, attachments, colour and HDR |
 | [`triergon-isobmff`](crates/isobmff) | MP4, MOV and fragmented MP4: sample tables, edit lists, range-based playback |
 | [`triergon-mpegts`](crates/mpegts) | MPEG-TS and M2TS: PSI, PES assembly, timestamps, HLS segments |
 | [`triergon-framing`](crates/framing) | Codec configuration and packet conversion for H.264, HEVC, AV1, VP9, AAC, AC-3, DTS |
@@ -54,7 +54,7 @@ Reading a Matroska file:
 
 ```rust
 use std::{fs::File, sync::atomic::AtomicBool};
-use triergon::{Limits, typed::BlockingReader};
+use triergon_matroska::{Limits, typed::BlockingReader};
 
 let cancel = AtomicBool::new(false);
 let mut reader = BlockingReader::open_seekable(File::open("movie.mkv")?, Limits::default())?;

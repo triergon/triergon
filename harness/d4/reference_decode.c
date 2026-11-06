@@ -8,9 +8,9 @@
  *   audio: aformat=sample_fmts=s16:channel_layouts=stereo  (what -ac 2 to a
  *          pulse/alsa s16 sink negotiates; libavfilter inserts the resampler)
  *
- * usage: reference_decode LANE-CODEC-bench FILE ITERATIONS | LANE-CODEC-memory FILE
- *        | LANE-CODEC-raw FILE OUT   (LANE-CODEC: video-h264 video-hevc audio-ac3
- *        audio-eac3 audio-aac audio-dts); the same protocol as crates/sim d4-worker.
+ * usage: reference_decode KIND-CODEC-bench FILE ITERATIONS | KIND-CODEC-memory FILE
+ *        | KIND-CODEC-raw FILE OUT   (KIND-CODEC: video-h264 video-hevc audio-ac3
+ *        audio-eac3 audio-aac audio-dts); the same protocol as crates/sim codec-worker.
  * The whole operation (parser/decoder/filter setup, decode, convert, teardown)
  * is inside the timed interval; file loading is outside, as in the M1 workers.
  */
@@ -35,7 +35,7 @@ static uint64_t now_ns(void) {
     return (uint64_t)ts.tv_sec * 1000000000u + (uint64_t)ts.tv_nsec;
 }
 
-/* Output digest, identical in crates/sim d4-worker: eight independent lanes, each
+/* Output digest, identical in crates/sim codec-worker: eight independent lanes, each
  * lane_i <- (lane_i ^ le64(word 8k+i)) * K over the concatenated output in 64-byte
  * blocks, a zero-padded final block, then h <- 31*h + lane_i and the byte count.
  * Every output byte enters it, at about 1% of the decode cost (a serial byte
@@ -271,9 +271,9 @@ static void one_pass(const char *codec_name, const AVCodecParameters *par, const
 }
 
 int main(int argc, char **argv) {
-    /* LANE-CODEC-bench FILE ITERATIONS | LANE-CODEC-memory FILE | LANE-CODEC-raw FILE OUT */
+    /* KIND-CODEC-bench FILE ITERATIONS | KIND-CODEC-memory FILE | KIND-CODEC-raw FILE OUT */
     if (argc < 3) {
-        fprintf(stderr, "usage: %s LANE-CODEC-bench FILE ITERATIONS | LANE-CODEC-memory FILE | LANE-CODEC-raw FILE OUT\n", argv[0]);
+        fprintf(stderr, "usage: %s KIND-CODEC-bench FILE ITERATIONS | KIND-CODEC-memory FILE | KIND-CODEC-raw FILE OUT\n", argv[0]);
         return 2;
     }
     av_log_set_level(AV_LOG_ERROR);

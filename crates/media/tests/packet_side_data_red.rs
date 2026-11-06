@@ -1,12 +1,12 @@
 //! First activation uses ONLY today's public API. These authored opaque payloads
 //! establish Matroska wire/transaction behavior, not compressed-codec validity.
 use std::{io::Cursor, sync::atomic::AtomicBool};
-use triergon::{
+use triergon_core::{Budget, Bytes, InputWindow, SourceCapabilities, SourceId, WorkBudget};
+use triergon_matroska::{
     Error, Limits,
     incremental::ParseStep,
     typed::{BlockingReader, Event, Reader},
 };
-use triergon_core::{Budget, Bytes, InputWindow, SourceCapabilities, SourceId, WorkBudget};
 
 fn e(id: u64, bytes: &[u8]) -> Vec<u8> {
     let mut out: Vec<_> = id
@@ -64,7 +64,7 @@ fn more(id: Option<&[u8]>, bytes: &[u8]) -> Vec<u8> {
     raw.extend(e(0xa5, bytes));
     e(0xa6, &raw)
 }
-fn drive(raw: &[u8], known: bool, events: &mut Vec<Event>) -> triergon::Result<()> {
+fn drive(raw: &[u8], known: bool, events: &mut Vec<Event>) -> triergon_matroska::Result<()> {
     let pool = Budget::new(256 * 1024)?;
     let mut reader = Reader::new(
         &pool,

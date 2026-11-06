@@ -865,7 +865,7 @@ pub fn weighted_copy<P: Pixel>(
     weight: i32,
     offset: i32,
 ) -> bool {
-    if w % 8 != 0 {
+    if !w.is_multiple_of(8) {
         return false;
     }
     let (s, off, ss) = source(src, &mut sc.edge, xi, yi, w, h, 0, 0);

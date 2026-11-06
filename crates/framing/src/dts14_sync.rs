@@ -222,7 +222,7 @@ impl Dts14SyncReader {
     }
     pub fn reset(&mut self, offset: u64) -> Result<InputRequest> {
         self.healthy()?;
-        if offset % 2 != 0 {
+        if !offset.is_multiple_of(2) {
             return Err(Error::Unsupported(
                 "DTS14 reset outside the source word grid",
             ));
@@ -273,10 +273,10 @@ impl Dts14SyncReader {
     ) -> Result<Step<Dts14SyncFrame>> {
         self.healthy()?;
         let result = self.advance(work, cancel);
-        if let Err(error) = result {
-            if !matches!(error, Error::Backpressure { .. } | Error::Allocation) {
-                self.record_failure(error);
-            }
+        if let Err(error) = result
+            && !matches!(error, Error::Backpressure { .. } | Error::Allocation)
+        {
+            self.record_failure(error);
         }
         result
     }
@@ -426,7 +426,7 @@ impl Dts14SyncReader {
                         Step::NeedInput(request) => return Ok(Step::NeedInput(request)),
                         Step::Yield => return Ok(Step::Yield),
                         Step::End(end) => {
-                            if self.lookahead_len % 2 != 0 {
+                            if !self.lookahead_len.is_multiple_of(2) {
                                 return Err(Error::Truncated);
                             }
                             self.source_end = Some(end);

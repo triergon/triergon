@@ -44,15 +44,14 @@ fn validate_clock(input: &Input, clock: CallerClock) -> Result<()> {
     {
         return Err(Error::Invalid("caller/source clock disagreement"));
     }
-    if let Some(raw) = input.timing.raw_clock() {
-        if raw.numerator != numerator
+    if let Some(raw) = input.timing.raw_clock()
+        && (raw.numerator != numerator
             || raw.denominator != denominator
             || raw.pts_ticks != clock.pts.map(i128::from)
             || raw.dts_ticks != clock.dts.map(i128::from)
-            || raw.duration_ticks != clock.duration.map(i128::from)
-        {
-            return Err(Error::Invalid("caller changed the original raw clock"));
-        }
+            || raw.duration_ticks != clock.duration.map(i128::from))
+    {
+        return Err(Error::Invalid("caller changed the original raw clock"));
     }
     Ok(())
 }

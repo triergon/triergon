@@ -65,12 +65,12 @@ impl HvcAnnexBWriter {
             return Err(e);
         }
         let result = self.advance(work, cancel);
-        if let Err(e) = result {
-            if !matches!(e, Error::Backpressure { .. } | Error::Allocation) {
-                self.failure = Some(e);
-                self.input = None;
-                self.output = None;
-            }
+        if let Err(e) = result
+            && !matches!(e, Error::Backpressure { .. } | Error::Allocation)
+        {
+            self.failure = Some(e);
+            self.input = None;
+            self.output = None;
         }
         result
     }

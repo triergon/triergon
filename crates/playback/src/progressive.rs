@@ -101,9 +101,9 @@ pub(crate) struct ProgressiveState {
 impl ProgressiveState {
     pub(crate) fn new(plan: &PreparedMp4, limits: ProgressiveLimits) -> Result<Self> {
         if plan.view != Mp4View::SourcePhysical && !plan.native_front {
-            return Err(
-                Error::Unsupported("progressive native MOV context is not established").into(),
-            );
+            return Err(Error::Unsupported(
+                "progressive native MOV context is not established",
+            ));
         }
         if limits.metadata_bytes < 8
             || limits.roots == 0
@@ -111,12 +111,12 @@ impl ProgressiveState {
             || limits.fragments_per_batch > 64
             || limits.samples_per_batch == 0
         {
-            return Err(Error::Invalid("progressive MP4 policy").into());
+            return Err(Error::Invalid("progressive MP4 policy"));
         }
         let crate::mp4_open::MetadataReadScope::FrontMetadataBeforeMdat(h) = plan.read_scope else {
-            return Err(
-                Error::Invalid("progressive attachment needs actual front-MDAT boundary").into(),
-            );
+            return Err(Error::Invalid(
+                "progressive attachment needs actual front-MDAT boundary",
+            ));
         };
         let next_root = h.end()?;
         let terminal = if next_root.is_none() {
@@ -171,7 +171,7 @@ impl ProgressiveState {
         c: &AtomicBool,
     ) -> Result<BackendStep> {
         if c.load(Ordering::Relaxed) {
-            return Err(Error::Cancelled.into());
+            return Err(Error::Cancelled);
         }
         if w.remaining() == 0 {
             return Ok(BackendStep::Yield);
@@ -185,7 +185,7 @@ impl ProgressiveState {
                     .next_root
                     .ok_or(Error::Invalid("terminal MDAT has no following root"))?;
                 if engine.input.position() > next_root {
-                    return Err(Error::Invalid("sample crossed following root").into());
+                    return Err(Error::Invalid("sample crossed following root"));
                 }
                 if engine.input.position() < next_root {
                     let n = usize::try_from(
@@ -195,7 +195,7 @@ impl ProgressiveState {
                     return Ok(match engine.input.read_discard(n, w, c)? {
                         Step::NeedInput(r) => BackendStep::NeedInput(r),
                         Step::Ready(_) | Step::Yield => BackendStep::Yield,
-                        Step::End(_) => return Err(Error::Truncated.into()),
+                        Step::End(_) => return Err(Error::Truncated),
                     });
                 }
                 if !w.try_charge(1) {
@@ -210,9 +210,9 @@ impl ProgressiveState {
             }
             Phase::TerminalDrain => {
                 if self.terminal.is_none() || self.retained != 0 || self.row != self.rows.len() {
-                    return Err(
-                        Error::Invalid("terminal media has unadmitted source samples").into(),
-                    );
+                    return Err(Error::Invalid(
+                        "terminal media has unadmitted source samples",
+                    ));
                 }
                 // A bounded discard request, never a fabricated final range or
                 // a search for box signatures inside opaque media payload.
@@ -250,15 +250,13 @@ impl ProgressiveState {
                                 return Err(Error::Limit {
                                     requested: seen,
                                     maximum,
-                                }
-                                .into());
+                                });
                             }
                             if next_root.is_some() {
                                 let [current] = engine.plan.media.as_mut_slice() else {
                                     return Err(Error::Invalid(
                                         "forward regular live media extent",
-                                    )
-                                    .into());
+                                    ));
                                 };
                                 *current = h.payload_range()?;
                                 self.phase = Phase::Drain;
@@ -330,13 +328,12 @@ impl ProgressiveState {
                     } else {
                         if let Some(row) = engine.plan.row(engine.row) {
                             if h.end()?.is_some_and(|end| row.sample.range.start < end) {
-                                return Err(Error::Invalid("sample outside media extent").into());
+                                return Err(Error::Invalid("sample outside media extent"));
                             }
                             if h.kind == *b"moof" {
                                 return Err(Error::Unsupported(
                                     "fragment before forward regular samples finish",
-                                )
-                                .into());
+                                ));
                             }
                         }
                         // Keep the announced header until allocation succeeds.
@@ -353,7 +350,7 @@ impl ProgressiveState {
                             || self.row != self.rows.len()
                             || self.retained != 0
                         {
-                            return Err(Error::Truncated.into());
+                            return Err(Error::Truncated);
                         }
                         self.finished = true;
                         return Ok(BackendStep::End);
@@ -366,8 +363,7 @@ impl ProgressiveState {
                                     .map_err(|_| Error::Overflow)?,
                                 maximum: usize::try_from(self.limits.roots)
                                     .map_err(|_| Error::Overflow)?,
-                            }
-                            .into());
+                            });
                         }
                         self.header = Some(h);
                     }
@@ -381,8 +377,7 @@ impl ProgressiveState {
                         } else if raw.header().kind == *b"moov" {
                             return Err(Error::Unsupported(
                                 "new movie catalogue requires explicit source discontinuity",
-                            )
-                            .into());
+                            ));
                         }
                         return Ok(BackendStep::Event(RawEvent::Mp4Root(raw)));
                     }
@@ -411,8 +406,7 @@ impl ProgressiveState {
                             return Err(Error::Limit {
                                 requested: self.retained + 1,
                                 maximum: self.limits.fragments_per_batch,
-                            }
-                            .into());
+                            });
                         }
                         // Reserve before publishing either the cursor or its
                         // track ordinal/end. Growth refusal keeps the exact
@@ -420,11 +414,11 @@ impl ProgressiveState {
                         // the source again or skipping any declared sample.
                         if let Err(error) = self.cursors.try_reserve_exact(1) {
                             self.pending_cursor = Some(cursor);
-                            return Err(error.into());
+                            return Err(error);
                         }
                         if let Err(failure) = self.cursors.try_push(Some(cursor)) {
                             self.pending_cursor = failure.value;
-                            return Err(failure.error.into());
+                            return Err(failure.error);
                         }
                         self.cursors.len() - 1
                     };
@@ -459,7 +453,7 @@ impl ProgressiveState {
                     match scan.poll(w)? {
                         BoxStep::Yield => {}
                         BoxStep::End => {
-                            return Err(Error::Invalid("progressive traf missing tfhd").into());
+                            return Err(Error::Invalid("progressive traf missing tfhd"));
                         }
                         BoxStep::Box(raw) => {
                             if raw.header().kind == *b"tfhd" {
@@ -524,8 +518,7 @@ impl ProgressiveState {
                                 return Err(Error::Limit {
                                     requested: self.retained + 1,
                                     maximum: self.limits.fragments_per_batch,
-                                }
-                                .into());
+                                });
                             }
                             self.scan = Some(raw.children(0, self.limits.format)?);
                             self.traf = Some(raw);
@@ -625,14 +618,13 @@ impl ProgressiveState {
                     } else if let Some(terminal) = self.terminal {
                         terminal.require_sample(sample)?;
                     } else {
-                        return Err(Error::Invalid("pending media extent").into());
+                        return Err(Error::Invalid("pending media extent"));
                     }
                     if self.rows.len() >= self.limits.samples_per_batch {
                         return Err(Error::Limit {
                             requested: self.rows.len() + 1,
                             maximum: self.limits.samples_per_batch,
-                        }
-                        .into());
+                        });
                     }
                     let cursor = self.cursors.as_mut_slice()[at]
                         .as_mut()
@@ -668,7 +660,7 @@ impl ProgressiveState {
                         cursor.head = Some(error.value.source);
                         cursor.native = error.value.native;
                         self.best = Some(at);
-                        return Err(error.error.into());
+                        return Err(error.error);
                     }
                     self.native_next[track] = next;
                     self.needs_reorder |= backwards;
@@ -729,7 +721,7 @@ impl ProgressiveState {
                     } else if let Some(terminal) = self.terminal {
                         terminal.require_sample(&row.source.sample)?;
                     } else {
-                        return Err(Error::Invalid("live media extent").into());
+                        return Err(Error::Invalid("live media extent"));
                     }
                     // Reserve both owners before committing either a source row
                     // or the separate native clock. Retry keeps the exact head.
@@ -808,9 +800,9 @@ impl ProgressiveState {
 
     fn finish_merge(&mut self, engine: &Mp4Engine) -> Result<()> {
         if self.blocked_in_extent {
-            return Err(
-                Error::Unsupported("native continuation source ordinal gap or reorder").into(),
-            );
+            return Err(Error::Unsupported(
+                "native continuation source ordinal gap or reorder",
+            ));
         }
         self.phase = if !self.needs_reorder {
             Phase::Admit

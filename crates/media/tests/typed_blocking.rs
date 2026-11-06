@@ -1,14 +1,10 @@
-//! Blocking compatibility for the new retained-job driver, compared with the
-//! project's existing qualified source parser on authored source fixtures.
+//! Blocking adapter: one-byte short reads and whole-buffer reads of the same
+//! authored sources yield identical tracks, metadata, seek receipts and packets.
 use std::{
     io::{self, Cursor, Read},
     sync::atomic::AtomicBool,
 };
-use triergon::{
-    Limits,
-    matroska::{Demuxer, Packet},
-    typed::BlockingReader,
-};
+use triergon_matroska::{Limits, matroska::Packet, typed::BlockingReader};
 fn e(id: u64, data: &[u8]) -> Vec<u8> {
     let mut out: Vec<_> = id
         .to_be_bytes()
@@ -116,7 +112,7 @@ fn sequential_short_reads_restore_private_and_laced_packets_without_a_second_par
             self.0.read(&mut out[..len])
         }
     }
-    let mut old = Demuxer::open(Cursor::new(raw.clone()), Limits::default()).unwrap();
+    let mut old = BlockingReader::open(Cursor::new(raw.clone()), Limits::default()).unwrap();
     let mut new = BlockingReader::open(Short(Cursor::new(raw)), Limits::default()).unwrap();
     let a = &old.tracks()[0];
     let b = &new.tracks()[0];
@@ -203,7 +199,8 @@ fn seekable_adapter_resolves_late_catalogue_and_matches_preroll_receipt_and_repl
     let head = make_head(cues_position as u64, (cues_position + cues.len()) as u64);
     assert_eq!(head.len(), placeholder.len());
     let raw = file(&[head, tracks, first, second, cues, chapters].concat());
-    let mut old = Demuxer::open_seekable(Cursor::new(raw.clone()), Limits::default()).unwrap();
+    let mut old =
+        BlockingReader::open_seekable(Cursor::new(raw.clone()), Limits::default()).unwrap();
     let mut new = BlockingReader::open_seekable(Cursor::new(raw), Limits::default()).unwrap();
     let a: Vec<_> = old
         .opaque_metadata()

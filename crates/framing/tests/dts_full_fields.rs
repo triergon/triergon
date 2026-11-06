@@ -48,7 +48,9 @@ fn authored(cpf: u32, version: u32, rate: u32) -> Vec<u8> {
         .collect();
     assert_eq!(bits.len(), if cpf == 0 { 104 } else { 120 });
     bits.as_bytes()
-        .chunks_exact(8)
+        .as_chunks::<8>()
+        .0
+        .iter()
         .map(|b| u8::from_str_radix(std::str::from_utf8(b).unwrap(), 2).unwrap())
         .collect()
 }
@@ -158,7 +160,9 @@ fn original396_source_inputs_stay_unchanged_and_strict_success_matches_inspectio
         } else {
             parts[1]
                 .as_bytes()
-                .chunks_exact(2)
+                .as_chunks::<2>()
+                .0
+                .iter()
                 .map(|b| u8::from_str_radix(std::str::from_utf8(b).unwrap(), 16).unwrap())
                 .collect()
         };

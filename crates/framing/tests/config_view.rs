@@ -6,6 +6,7 @@ use std::ops::Range;
 use std::sync::atomic::AtomicBool;
 use triergon_core::{Budget, BudgetVec, Bytes, Error, SourceId, WorkBudget};
 use triergon_framing::*;
+use triergon_harness_protocol::unhex;
 
 type Outcome<T> = Result<T, Error>;
 type Trace = Vec<(&'static str, u64)>;
@@ -76,13 +77,6 @@ fn run<P: Drive>(parser: &mut P, quantum: u64) -> (Trace, Outcome<P::Out>) {
         }
     }
     panic!("bounded configuration walk did not finish")
-}
-
-fn hex(text: &str) -> Vec<u8> {
-    text.as_bytes()
-        .chunks_exact(2)
-        .map(|v| u8::from_str_radix(std::str::from_utf8(v).unwrap(), 16).unwrap())
-        .collect()
 }
 
 fn bytes(pool: &Budget, raw: &[u8]) -> Bytes {
@@ -256,7 +250,7 @@ fn avc_fixture_records() -> Vec<(String, Vec<u8>)> {
             let raw = if cells[1] == "-" {
                 Vec::new()
             } else {
-                hex(cells[1])
+                unhex(cells[1])
             };
             (cells[0].to_string(), raw)
         })
@@ -647,7 +641,7 @@ fn g01_mutation_and_truncation_sweeps_match_eager_outcomes() {
 #[test]
 fn g01_literal_record_arithmetic_is_an_independent_oracle() {
     // Plain AVC control: 01 42 a5 28 ff | e1 0002 6780 | 01 0002 6840.
-    let raw = hex("0142a528ffe1000267800100026840");
+    let raw = unhex("0142a528ffe1000267800100026840");
     let pool = Budget::new(65_536).unwrap();
     let mut parser =
         AvcConfigViewParser::new(&pool, avc_source(), bytes(&pool, &raw), avc_limits()).unwrap();

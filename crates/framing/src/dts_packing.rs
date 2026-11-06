@@ -154,7 +154,7 @@ impl Dts14BitUnpacker {
             return Err(Error::ForeignPool);
         }
         check_limit(source.len(), limits.maximum_source_bytes)?;
-        if source.len() % 2 != 0 {
+        if !source.len().is_multiple_of(2) {
             return Err(Error::Truncated);
         }
         let payload_bits = (source.len() / 2).checked_mul(14).ok_or(Error::Overflow)?;
@@ -203,13 +203,13 @@ impl Dts14BitUnpacker {
             return Err(error);
         }
         let result = self.advance(work, cancel);
-        if let Err(error) = result {
-            if !matches!(error, Error::Backpressure { .. } | Error::Allocation) {
-                self.failure = Some(error);
-                self.source = None;
-                self.output = None;
-                self.frozen = None;
-            }
+        if let Err(error) = result
+            && !matches!(error, Error::Backpressure { .. } | Error::Allocation)
+        {
+            self.failure = Some(error);
+            self.source = None;
+            self.output = None;
+            self.frozen = None;
         }
         result
     }

@@ -5,7 +5,6 @@ pub mod colour;
 mod content_encoding;
 mod cues;
 mod ebml;
-mod error;
 pub mod incremental;
 pub mod matroska;
 pub mod metadata;
@@ -15,7 +14,7 @@ pub mod timing;
 pub mod typed;
 pub mod zlib;
 
-pub use error::{Error, Result};
+pub use triergon_core::{Error, Result};
 
 /// Explicit per-reader limits. Input and packets are streamed, never buffered as a file.
 #[derive(Clone, Copy, Debug)]

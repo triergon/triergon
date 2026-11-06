@@ -1,17 +1,20 @@
 [package]
 name = "triergon-playback"
 version = "0.0.0"
-edition = "2024"
-publish = false
+repository.workspace = true
 license.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+
 [dependencies]
 triergon-core = { path = "../core" }
-triergon = { path = "../media" }
+triergon-matroska = { path = "../media" }
 triergon-isobmff = { path = "../isobmff" }
 triergon-mpegts = { path = "../mpegts" }
 triergon-framing = { path = "../framing" }
 triergon-subtitles = { path = "../subtitles" }
 [dev-dependencies]
 triergon-sim = { path = "../sim", features = ["codecs"] }
-[lints.rust]
-unsafe_code = "forbid"
+[lints]
+workspace = true

@@ -53,7 +53,9 @@ impl<'a> Mp4RangeOpen<'a> {
         policy: PlayerPolicy,
     ) -> Result<Mp4RangePlayer<'a, S>> {
         if !input.capabilities().random_access {
-            return Err(Error::Unsupported("native range playback needs random access").into());
+            return Err(Error::Unsupported(
+                "native range playback needs random access",
+            ));
         }
         let (plan, mut cursor, duration_us) = self.index.finish_native_range()?;
         // Leave space for packet/input staging and selection validation.
@@ -137,7 +139,7 @@ impl<'a, S: Source> Mp4RangePlayer<'a, S> {
             || !selected.snapshot.enabled
             || !self.player.selection.includes(TrackKey::Mp4(request.video))
         {
-            return Err(Error::Invalid("native seek requires selected MP4 video").into());
+            return Err(Error::Invalid("native seek requires selected MP4 video"));
         }
         let base = Mov9MediaClock::from_source(selected.snapshot.base.require()?)?.native_base;
         let checked = self.cursor.prepare_checked_range_seek(
@@ -179,17 +181,16 @@ impl<'a, S: Source> Mp4RangePlayer<'a, S> {
     ) -> Result<bool> {
         let scope = &command.scope;
         if !self.player.pool.same_pool(&scope.pool) {
-            return Err(Error::ForeignPool.into());
+            return Err(Error::ForeignPool);
         }
         if self.player.session != scope.session {
-            return Err(Error::SourceMismatch.into());
+            return Err(Error::SourceMismatch);
         }
         if self.player.generation != scope.generation {
             return Err(Error::StaleGeneration {
                 expected: self.player.generation,
                 received: scope.generation,
-            }
-            .into());
+            });
         }
         let replacement = command
             .cursor
@@ -206,7 +207,7 @@ impl<'a, S: Source> Mp4RangePlayer<'a, S> {
             )
         };
         let applied = match apply(work) {
-            Err(crate::Error::Core(Error::Backpressure { .. }))
+            Err(Error::Backpressure { .. })
                 if {
                     // Only the selection/fact allocation can return backpressure,
                     // before the engine starts the seek transaction.
@@ -246,13 +247,13 @@ pub struct Mp4RangeSeekJob<'a> {
 impl<'a> Mp4RangeSeekJob<'a> {
     pub fn poll(&mut self, work: &mut WorkBudget, cancel: &AtomicBool) -> Result<bool> {
         if let Some(error) = self.failure {
-            return Err(error.into());
+            return Err(error);
         }
         let result = self.poll_inner(work, cancel);
         if let Err(error) = result {
             self.failure = Some(error);
         }
-        Ok(result?)
+        result
     }
 
     fn poll_inner(
@@ -300,7 +301,7 @@ impl<'a> Mp4RangeSeekJob<'a> {
 
     pub fn finish(self) -> Result<Mp4RangeSeek<'a>> {
         if let Some(error) = self.failure {
-            return Err(error.into());
+            return Err(error);
         }
         let (cursor, receipt) = self
             .replay

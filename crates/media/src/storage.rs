@@ -28,7 +28,7 @@ impl SharedBytes {
         }
         Bytes::try_from_vec(pool, bytes)
             .map(Self::from_core)
-            .map_err(|e| e.error().into())
+            .map_err(|e| e.error())
     }
     pub fn slice(&self, range: Range<usize>) -> Result<Self> {
         match &self.0 {
@@ -100,16 +100,6 @@ impl SharedText {
             constant: Some(value),
         }
     }
-    pub(crate) fn from_utf8_span(bytes: SharedBytes) -> Result<Self> {
-        std::str::from_utf8(bytes.as_ref()).map_err(|_| Error::Invalid("UTF-8 metadata"))?;
-        if bytes.is_empty() {
-            return Ok(Self::constant(""));
-        }
-        Ok(Self {
-            bytes,
-            constant: None,
-        })
-    }
     pub fn as_str(&self) -> &str {
         self.constant
             .unwrap_or_else(|| std::str::from_utf8(&self.bytes).expect("validated immutable UTF-8"))
@@ -144,37 +134,8 @@ impl<T> StorageVec<T> {
     pub fn capacity(&self) -> usize {
         self.0.capacity()
     }
-    pub fn clear(&mut self) {
-        self.0.clear();
-    }
-    pub fn try_reserve_exact(&mut self, additional: usize) -> Result<()> {
-        Ok(self.0.try_reserve_exact(additional)?)
-    }
-    pub fn try_reserve(&mut self, additional: usize) -> Result<()> {
-        let needed = self.len().checked_add(additional).ok_or(Error::Overflow)?;
-        if needed <= self.capacity() {
-            return Ok(());
-        }
-        let target = needed.max(self.capacity().saturating_mul(2)).max(4);
-        let len = self.len();
-        self.0.try_reserve_exact(target - len).or_else(|error| {
-            if target > needed
-                && matches!(
-                    error,
-                    triergon_core::Error::Backpressure { .. }
-                        | triergon_core::Error::Limit { .. }
-                        | triergon_core::Error::Overflow
-                )
-            {
-                self.0.try_reserve_exact(additional)
-            } else {
-                Err(error)
-            }
-        })?;
-        Ok(())
-    }
     pub fn push(&mut self, value: T) -> Result<()> {
-        self.0.try_push(value).map_err(|e| e.error.into())
+        self.0.try_push(value).map_err(|e| e.error)
     }
 }
 impl<T> Deref for StorageVec<T> {
@@ -203,53 +164,7 @@ impl<'a, T> IntoIterator for &'a mut StorageVec<T> {
         self.iter_mut()
     }
 }
-/// FIFO slots carry their core allocation charge; popping moves values without
-/// creating an uncharged VecDeque. Drained capacity remains charged until drop.
-#[derive(Debug)]
-pub(crate) struct StorageQueue<T> {
-    values: StorageVec<Option<T>>,
-    head: usize,
-}
-impl<T> StorageQueue<T> {
-    pub fn new(pool: &Budget) -> Self {
-        Self {
-            values: StorageVec::new(pool),
-            head: 0,
-        }
-    }
-    pub fn is_empty(&self) -> bool {
-        self.head == self.values.len()
-    }
-    pub fn clear(&mut self) {
-        self.values.clear();
-        self.head = 0;
-    }
-    pub fn try_reserve_exact(&mut self, additional: usize) -> Result<()> {
-        if self.is_empty() {
-            self.clear();
-        }
-        self.values.try_reserve_exact(additional)
-    }
-    pub fn push_back(&mut self, value: T) -> Result<()> {
-        if self.is_empty() {
-            self.clear();
-        }
-        self.values.push(Some(value))
-    }
-    pub fn pop_front(&mut self) -> Option<T> {
-        if self.is_empty() {
-            return None;
-        }
-        let value = self.values[self.head].take();
-        self.head += 1;
-        if self.is_empty() {
-            self.clear();
-        }
-        value
-    }
-}
 
-#[path = "typed/text.rs"]
 pub(crate) mod text_job;
 
 impl crate::matroska::typed::usage::Storage for SharedBytes {

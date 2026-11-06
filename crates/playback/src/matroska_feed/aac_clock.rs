@@ -41,7 +41,7 @@ impl MatroskaTrackFeed {
             return Ok(None);
         }
         if !self.association.configuration.belongs_to(budget) {
-            return Err(Error::ForeignPool.into());
+            return Err(Error::ForeignPool);
         }
         check_limit(maximum_packets, MAX_PREFIX_PACKETS)?;
         Ok(Some(MatroskaAacClockProbe {
@@ -56,12 +56,12 @@ impl MatroskaTrackFeed {
         let (FeedCodec::Aac(params), MatroskaFeedPayload::Aac { raw, .. }) =
             (&self.codec, &packet.payload)
         else {
-            return Err(Error::Invalid("native AAC clock packet codec").into());
+            return Err(Error::Invalid("native AAC clock packet codec"));
         };
         if !self.association.matches(packet.source)
             || !std::ptr::eq(*raw, packet.source.packet.data.as_ref())
         {
-            return Err(Error::Invalid("native AAC clock feed association").into());
+            return Err(Error::Invalid("native AAC clock feed association"));
         }
         check_limit(
             raw.len().checked_add(7).ok_or(Error::Overflow)?,

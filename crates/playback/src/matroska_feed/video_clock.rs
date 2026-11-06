@@ -1,9 +1,9 @@
 //! Packet clock projection shared by the selected AVC and HEVC feeds.
 use super::{Association, FeedCodec, MatroskaFeedPacket, MatroskaFeedPayload, MatroskaTrackFeed};
 use crate::{Result, hls_avc::syntax as avc, raw_video::hevc_syntax as hevc};
-use triergon::typed::Packet;
 use triergon_core::Error;
 use triergon_framing::{AvcAnnexBConfig, Codec, NalHeader};
+use triergon_matroska::typed::Packet;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct MatroskaVideoTiming {
@@ -41,12 +41,12 @@ impl MatroskaAvcClock<'_> {
     /// timing remains available on the supplied packet.
     pub fn observe(&mut self, packet: &MatroskaFeedPacket<'_>) -> Result<MatroskaVideoTiming> {
         let MatroskaFeedPayload::Avc(unit) = &packet.payload else {
-            return Err(Error::Invalid("native AVC clock packet codec").into());
+            return Err(Error::Invalid("native AVC clock packet codec"));
         };
         if !self.association.matches(packet.source)
             || !std::ptr::eq(self.config, unit.configuration())
         {
-            return Err(Error::Invalid("native AVC clock feed association").into());
+            return Err(Error::Invalid("native AVC clock feed association"));
         }
         self.clock
             .observe(packet.source, unit.source_nals(), |_| None)
@@ -81,16 +81,16 @@ impl DecodeClock {
         fallback_duration: impl FnOnce(u64) -> Option<u64>,
     ) -> Result<MatroskaVideoTiming> {
         if !self.valid {
-            return Err(Error::Invalid("native video clock continuity").into());
+            return Err(Error::Invalid("native video clock continuity"));
         }
         let timing = source.packet.timing;
         if timing.frames != 1 {
             self.valid = false;
-            return Err(Error::Unsupported("native video clock laced sample").into());
+            return Err(Error::Unsupported("native video clock laced sample"));
         }
         if let Err(error) = self.validate_picture(nals) {
             self.valid = false;
-            return Err(error.into());
+            return Err(error);
         }
         let native = timing.ffmpeg9()?;
         let pts_ns = native.pts.map(|pts| pts.rounded_ns()).transpose()?;

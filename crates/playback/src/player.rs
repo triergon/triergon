@@ -64,7 +64,9 @@ impl Selection {
                     .iter()
                     .any(|f| f.key == key && f.kind == kind && f.enabled)
             {
-                return Err(Error::Invalid("selected source track missing/disabled/kind").into());
+                return Err(Error::Invalid(
+                    "selected source track missing/disabled/kind",
+                ));
             }
         }
         Ok(())
@@ -175,7 +177,7 @@ impl Output {
 }
 pub(crate) struct MatroskaReplayOutput {
     scope: OutputScope,
-    pub event: triergon::typed::Event,
+    pub event: triergon_matroska::typed::Event,
     delivery: Delivery,
     bytes: usize,
 }
@@ -297,7 +299,7 @@ impl<S: Source> Player<S> {
             || policy.queued_payload_bytes == 0
             || policy.maximum_events == 0
         {
-            return Err(Error::Invalid("player policy").into());
+            return Err(Error::Invalid("player policy"));
         }
         engine.validate_binding()?;
         let pool = engine.pool().clone();
@@ -345,7 +347,7 @@ impl<S: Source> Player<S> {
 
     pub fn set_clock_view(&mut self, clock: ClockChoice) -> Result<()> {
         if self.count != 0 || self.pending.is_some() || self.events != 0 {
-            return Err(Error::Invalid("clock view must be frozen before delivery").into());
+            return Err(Error::Invalid("clock view must be frozen before delivery"));
         }
         self.clock = clock;
         Ok(())
@@ -469,7 +471,7 @@ impl<S: Source> Player<S> {
     ) -> Result<bool> {
         if c.load(Ordering::Relaxed) {
             self.cancel();
-            return Err(Error::Cancelled.into());
+            return Err(Error::Cancelled);
         }
         if !matches!(self.state, State::Running | State::Paused | State::Ended) {
             return Err(crate::Error::Closed);
@@ -485,7 +487,7 @@ impl<S: Source> Player<S> {
             .iter()
             .any(|f| f.key == track && f.kind == TrackKind::Video && f.enabled)
         {
-            return Err(Error::Invalid("seek target must be source video").into());
+            return Err(Error::Invalid("seek target must be source video"));
         }
         let epoch = self.epoch.checked_add(1).ok_or(Error::Overflow)?;
         let intent = SeekIntent {
@@ -554,18 +556,18 @@ impl<S: Source> Player<S> {
         use crate::mp4_plan::MovieSeekOutcome;
         if c.load(Ordering::Relaxed) {
             self.cancel();
-            return Err(Error::Cancelled.into());
+            return Err(Error::Cancelled);
         }
         let Some(Engine::Mp4(engine)) = self.engine.as_ref() else {
-            return Err(Error::Invalid("movie seek requires MP4 source").into());
+            return Err(Error::Invalid("movie seek requires MP4 source"));
         };
         if !self.pool.same_pool(&command.pool) {
-            return Err(Error::ForeignPool.into());
+            return Err(Error::ForeignPool);
         }
         if engine.plan.source != command.source
             || engine.plan.opening_generation != command.generation
         {
-            return Err(Error::SourceMismatch.into());
+            return Err(Error::SourceMismatch);
         }
         match &command.point {
             triergon_isobmff::MoviePoint::Media(point) => {
@@ -601,7 +603,7 @@ impl<S: Source> Player<S> {
     ) -> Result<bool> {
         if c.load(Ordering::Relaxed) {
             self.cancel();
-            return Err(Error::Cancelled.into());
+            return Err(Error::Cancelled);
         }
         if !matches!(self.state, State::Running | State::Paused) {
             return Err(crate::Error::Closed);
@@ -610,7 +612,7 @@ impl<S: Source> Player<S> {
             return Ok(false);
         }
         if next.is_none() {
-            return Err(Error::Invalid("next source owner missing").into());
+            return Err(Error::Invalid("next source owner missing"));
         }
         if !w.try_charge(1) {
             return Ok(false);
@@ -641,7 +643,7 @@ impl<S: Source> Player<S> {
         c: &'a AtomicBool,
     ) -> Result<Option<crate::catalogue::CatalogueCommit<'a, S>>> {
         if c.load(Ordering::Relaxed) {
-            return Err(Error::Cancelled.into());
+            return Err(Error::Cancelled);
         }
         if !matches!(self.state, State::Running | State::Paused | State::Ended) {
             return Err(crate::Error::Closed);
@@ -651,15 +653,15 @@ impl<S: Source> Player<S> {
         }
         let old = self.engine.as_ref().ok_or(crate::Error::Closed)?;
         if !matches!(old, Engine::Mp4(_)) || self.source.is_none() {
-            return Err(Error::Invalid("catalogue replacement needs active MP4").into());
+            return Err(Error::Invalid("catalogue replacement needs active MP4"));
         }
         let candidate = next.as_ref().ok_or(Error::Invalid("replacement missing"))?;
         candidate.engine.validate_binding()?;
         if !candidate.engine.pool().same_pool(&self.pool) {
-            return Err(Error::ForeignPool.into());
+            return Err(Error::ForeignPool);
         }
         if candidate.engine.source() == old.source() {
-            return Err(Error::SourceMismatch.into());
+            return Err(Error::SourceMismatch);
         }
         let epoch = self.epoch.checked_add(1).ok_or(Error::Overflow)?;
         if !w.try_charge(1) {
@@ -694,24 +696,26 @@ impl<S: Source> Player<S> {
         let (Some(Engine::Mp4(old)), engine @ Engine::Mp4(candidate)) =
             (self.engine.as_ref(), &next.engine)
         else {
-            return Err(Error::Invalid("progressive range seek requires MP4 catalogues").into());
+            return Err(Error::Invalid(
+                "progressive range seek requires MP4 catalogues",
+            ));
         };
         if !old.is_progressive()
             || candidate.plan.read_scope != crate::mp4_open::MetadataReadScope::CompleteEntity
             || !candidate.supports_range_replay()
         {
-            return Err(
-                Error::Unsupported("progressive seek requires a complete range index").into(),
-            );
+            return Err(Error::Unsupported(
+                "progressive seek requires a complete range index",
+            ));
         }
         if !self.pool.same_pool(engine.pool()) {
-            return Err(Error::ForeignPool.into());
+            return Err(Error::ForeignPool);
         }
         if old.plan.source != candidate.plan.source
             || matches!((old.plan.source_length, candidate.plan.source_length),
                         (Some(old), Some(new)) if old != new)
         {
-            return Err(Error::SourceMismatch.into());
+            return Err(Error::SourceMismatch);
         }
         engine.validate_binding()?;
         Ok(engine)
@@ -725,7 +729,7 @@ impl<S: Source> Player<S> {
         cancel: &'a AtomicBool,
     ) -> Result<Option<crate::catalogue::CatalogueCommit<'a, S>>> {
         if cancel.load(Ordering::Relaxed) {
-            return Err(Error::Cancelled.into());
+            return Err(Error::Cancelled);
         }
         if !matches!(self.state, State::Running | State::Paused | State::Ended) {
             return Err(crate::Error::Closed);
@@ -734,7 +738,7 @@ impl<S: Source> Player<S> {
             return Ok(None);
         }
         if !self.pool.same_pool(seek.pool) {
-            return Err(Error::ForeignPool.into());
+            return Err(Error::ForeignPool);
         }
         let generation = seek.active_generation.ok_or(Error::Invalid(
             "seek command does not promote a progressive catalogue",
@@ -743,11 +747,10 @@ impl<S: Source> Player<S> {
             return Err(Error::StaleGeneration {
                 expected: self.generation,
                 received: generation,
-            }
-            .into());
+            });
         }
         if self.clock != seek.intent.clock {
-            return Err(Error::Invalid("progressive seek clock changed").into());
+            return Err(Error::Invalid("progressive seek clock changed"));
         }
         let candidate = next.as_ref().ok_or(Error::Invalid("replacement missing"))?;
         let engine = self.progressive_seek_candidate(candidate)?;
@@ -755,8 +758,7 @@ impl<S: Source> Player<S> {
             return Err(Error::StaleGeneration {
                 expected: engine.generation(),
                 received: seek.candidate_generation,
-            }
-            .into());
+            });
         }
         let epoch = self.epoch.checked_add(1).ok_or(Error::Overflow)?;
         if !work.try_charge(1) {
@@ -828,7 +830,7 @@ impl<S: Source> Player<S> {
     pub fn finish_logical_source(&mut self, w: &mut WorkBudget, c: &AtomicBool) -> Result<bool> {
         if c.load(Ordering::Relaxed) {
             self.cancel();
-            return Err(Error::Cancelled.into());
+            return Err(Error::Cancelled);
         }
         if w.remaining() == 0 {
             return Ok(false);
@@ -853,8 +855,7 @@ impl<S: Source> Player<S> {
             return Err(Error::Limit {
                 requested: window.bytes().len(),
                 maximum: r.maximum,
-            }
-            .into());
+            });
         }
         let accepted = self
             .engine
@@ -874,8 +875,7 @@ impl<S: Source> Player<S> {
                         requested: usize::try_from(self.seek_read).map_err(|_| Error::Overflow)?,
                         maximum: usize::try_from(self.policy.seek_input_bytes)
                             .map_err(|_| Error::Overflow)?,
-                    }
-                    .into());
+                    });
                 }
             }
             self.request = None;
@@ -918,7 +918,7 @@ impl<S: Source> Player<S> {
     ) -> Result<Progress> {
         if cancel.load(Ordering::Relaxed) {
             self.cancel();
-            return Err(Error::Cancelled.into());
+            return Err(Error::Cancelled);
         }
         if work.remaining() == 0 {
             return Ok(Progress::Yield);
@@ -962,13 +962,13 @@ impl<S: Source> Player<S> {
     ) -> Result<Progress> {
         if c.load(Ordering::Relaxed) {
             self.cancel();
-            return Err(Error::Cancelled.into());
+            return Err(Error::Cancelled);
         }
         let result = self.inner::<READY>(w, slot, cursor);
-        if let Err(crate::Error::Core(Error::Backpressure {
+        if let Err(Error::Backpressure {
             requested,
             available,
-        })) = result
+        }) = result
         {
             return Ok(Progress::Backpressure {
                 requested,
@@ -1031,7 +1031,7 @@ impl<S: Source> Player<S> {
         let engine = self.engine.as_mut().ok_or(crate::Error::Closed)?;
         let step = if let Engine::Matroska(matroska) = engine {
             match matroska.step(w, &self.cancel)? {
-                triergon::incremental::ParseStep::Event(event) => {
+                triergon_matroska::incremental::ParseStep::Event(event) => {
                     let source = engine.source();
                     return self.accept_event::<READY>(source, RawEvent::Matroska(event), w, slot);
                 }
@@ -1088,7 +1088,7 @@ impl<S: Source> Player<S> {
                     return Ok(self.publish(source, event, bytes, delivery, slot));
                 }
                 Ok(None) => Ok(Progress::Yield),
-                Err(error @ crate::Error::Core(Error::Backpressure { .. })) => Err(error),
+                Err(error @ Error::Backpressure { .. }) => Err(error),
                 Err(error) => return Err(error),
             }
         } else {
@@ -1105,23 +1105,21 @@ impl<S: Source> Player<S> {
             return Err(Error::Limit {
                 requested: bytes,
                 maximum: self.policy.queued_payload_bytes,
-            }
-            .into());
+            });
         }
         let available = self.policy.queued_payload_bytes - self.bytes;
         if bytes > available {
             return Err(Error::Backpressure {
                 requested: bytes,
                 available,
-            }
-            .into());
+            });
         }
         if !w.try_charge(1) {
             return Ok(None);
         }
         if matches!(
             e,
-            RawEvent::Matroska(triergon::typed::Event::Configuration(_))
+            RawEvent::Matroska(triergon_matroska::typed::Event::Configuration(_))
                 | RawEvent::Ts(crate::TsEvent {
                     source: triergon_mpegts::TraceEvent::ProgramMap { active: true, .. },
                     ..
@@ -1154,7 +1152,7 @@ impl<S: Source> Player<S> {
                     (
                         ClockChoice::SourceExact,
                         None,
-                        RawEvent::Matroska(triergon::typed::Event::Packet(packet)),
+                        RawEvent::Matroska(triergon_matroska::typed::Event::Packet(packet)),
                     ) => {
                         if packet.packet.pts_ns.is_some() {
                             Delivery::Present
@@ -1169,7 +1167,7 @@ impl<S: Source> Player<S> {
                             matroska_ceiling_ns: Some(ceiling),
                             ..
                         }),
-                        RawEvent::Matroska(triergon::typed::Event::Packet(packet)),
+                        RawEvent::Matroska(triergon_matroska::typed::Event::Packet(packet)),
                     ) if packet.packet.timing.frames == 1 => match packet.packet.pts_ns {
                         None => Delivery::UnknownTime,
                         Some(pts) if pts < ceiling => Delivery::DecodeOnly {
@@ -1203,8 +1201,7 @@ impl<S: Source> Player<S> {
             return Err(Error::Limit {
                 requested: usize::try_from(maximum + 1).map_err(|_| Error::Overflow)?,
                 maximum: usize::try_from(maximum).map_err(|_| Error::Overflow)?,
-            }
-            .into());
+            });
         }
         Ok(())
     }

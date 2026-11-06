@@ -25,7 +25,7 @@ fn emit(
                 Row::U16(r) => {
                     // Little-endian bytes; the fixed-size chunk loop vectorizes.
                     buf.resize(2 * r.len(), 0);
-                    for (o, v) in buf.chunks_exact_mut(2).zip(r) {
+                    for (o, v) in buf.as_chunks_mut::<2>().0.iter_mut().zip(r) {
                         o.copy_from_slice(&v.to_le_bytes());
                     }
                     out.write_all(buf)?;

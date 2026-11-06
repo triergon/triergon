@@ -1,5 +1,4 @@
 """Native missing-feature supplement: full source facts and explicit capability bounds."""
-import importlib.util
 import json
 import subprocess
 import tempfile
@@ -8,10 +7,7 @@ from pathlib import Path
 from .runner import ROOT
 from .spec_oracle import elements
 from .content_oracle import content_trace, projected_content
-
-spec = importlib.util.spec_from_file_location('reference_fixture', ROOT / 'tools/generate-zlib-corpus.py')
-fixture = importlib.util.module_from_spec(spec)
-spec.loader.exec_module(fixture)
+from tools import generate_zlib_corpus as fixture
 
 
 class ReferenceEncodingTests(unittest.TestCase):

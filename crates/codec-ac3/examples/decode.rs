@@ -78,7 +78,7 @@ fn main() {
                 if first.is_none() {
                     first = Some((
                         info.sample_rate,
-                        info.layout.ffmpeg_name(),
+                        info.layout.layout_name(),
                         info.layout.speakers().iter().map(|s| s.name()).collect(),
                         info.layout.channels(),
                     ));

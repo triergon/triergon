@@ -75,7 +75,7 @@ impl PatReader {
         }
         let header = header(section, 0)?;
         let length = section.bytes().len();
-        if (length - 12) % 4 != 0 {
+        if !(length - 12).is_multiple_of(4) {
             return Err(Error::Invalid("PAT entry alignment"));
         }
         let count = (length - 12) / 4;

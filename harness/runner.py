@@ -6,7 +6,6 @@ from __future__ import annotations
 
 import contextlib
 import fcntl
-import hashlib
 import json
 import math
 import os
@@ -19,21 +18,13 @@ import statistics
 import subprocess
 import tempfile
 import time
+from .common import canonical_digest, digest, load, write_json
 from .spec_oracle import timing_trace
 
 ROOT = Path(__file__).resolve().parents[1]
 PROC_ROOT = Path("/proc")
 LINUX_CPU_KEY = "__linux_cpu__"
 LINUX_MODULE_ROOT = Path("/sys/module")
-
-
-def digest(path: Path) -> str:
-    with path.open("rb") as stream:
-        return hashlib.file_digest(stream, "sha256").hexdigest()
-
-
-def load(path: Path):
-    return json.loads(path.read_text())
 
 
 def measurement_cache(report):
@@ -109,7 +100,7 @@ def differences(actual, expected, path="", maximum=40, *, display_value=None):
 
 def review_native_difference(storage, native, comparison):
     delta = differences(storage, native)
-    actual_sha = hashlib.sha256(json.dumps(native, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
+    actual_sha = canonical_digest(native)
     expected = comparison.get("raw_native_output_sha256")
     reviewed = bool(expected) and actual_sha == expected and [d["path"] for d in delta] == comparison["raw_native_difference_paths"]
     disposition = {"status": "reviewed" if reviewed else "unexpected-native-difference", "rule": comparison["id"]}
@@ -124,14 +115,14 @@ def parity(candidate: Path, reference: Path, path: Path, raw: Path, sequential_r
     right = execute([reference, "codec-trace" if comparison else trace_prefix+"trace", path])
     raw.mkdir(parents=True, exist_ok=True)
     for name, result in (("candidate", left), ("reference", right), ("source-frame-candidate", storage)):
-        (raw / (name + ".json")).write_text(json.dumps(result, indent=2) + "\n")
+        write_json(raw / (name + ".json"), result)
     if any(result["status"] != "ok" for result in (left, right, storage)):
         return {"status": "worker-failure", "candidate": left["status"], "reference": right["status"]}
     diff = differences(left["data"], right["data"])
     raw_native_diff, disposition, raw_native_sha = [], None, None
     if comparison:
         native = execute([native_reference, "trace", path])
-        (raw / "raw-native-reference.json").write_text(json.dumps(native, indent=2) + "\n")
+        write_json(raw / "raw-native-reference.json", native)
         if native["status"] != "ok":
             return {"status": "worker-failure", "reference": "raw native operation failed"}
         raw_native_diff, disposition, raw_native_sha = review_native_difference(storage["data"], native["data"], comparison)
@@ -147,7 +138,7 @@ def parity(candidate: Path, reference: Path, path: Path, raw: Path, sequential_r
         except (ValueError, IndexError, KeyError, StopIteration, zlib.error) as error:
             content_expected = None
             content_status, content_diff = "oracle-error", [{"error": str(error)}]
-        (raw / "source-content-oracle.json").write_text(json.dumps(content_expected, indent=2) + "\n")
+        write_json(raw / "source-content-oracle.json", content_expected)
     source = execute([candidate, "trace-source", path])
     try:
         oracle = timing_trace(path)
@@ -156,8 +147,8 @@ def parity(candidate: Path, reference: Path, path: Path, raw: Path, sequential_r
     except (ValueError, IndexError, KeyError, StopIteration) as error:
         source_status, source_diff = "oracle-error", [{"error": str(error)}]
         oracle = None
-    (raw / "source-candidate.json").write_text(json.dumps(source, indent=2) + "\n")
-    (raw / "source-oracle.json").write_text(json.dumps(oracle, indent=2) + "\n")
+    write_json(raw / "source-candidate.json", source)
+    write_json(raw / "source-oracle.json", oracle)
     streamed = []
     for chunk in ((1, 7, 4096) if sequential_required else ()):
         short = execute([candidate, trace_prefix+"trace-short", path, chunk])
@@ -208,7 +199,7 @@ def catalogue_parity(candidate,reference,path,output,**kwargs):
     except (ValueError,IndexError,KeyError,StopIteration) as error:
         expected=None;colour_expected=None;delta=[{"error":str(error)}];colour_delta=delta;state=colour_state="oracle-error"
     for name,value in [("catalogue-source",actual),("catalogue-oracle",expected),("colour-source",colour),("colour-oracle",colour_expected)]:
-        (output/(name+".json")).write_text(json.dumps(value,indent=2)+"\n")
+        write_json(output/(name+".json"), value)
     result.update({"source_catalogue_status":state,"source_catalogue_differences":delta,"source_colour_status":colour_state,"source_colour_differences":colour_delta})
     if state!="pass" or colour_state!="pass":result["status"]="mismatch"
     return result
@@ -233,7 +224,7 @@ def colour_parity(candidate, reference, path, output, **kwargs):
         actual=execute([candidate,"metadata-trace-short",path,chunk])
         shorts.append({"chunk":chunk,"status":"pass" if actual["status"]=="ok" and not differences(actual.get("data"),left.get("data")) else "mismatch"})
     for name,value in [("colour-candidate",left),("colour-native",right),("colour-source",source),("colour-oracle",oracle)]:
-        (output/(name+".json")).write_text(json.dumps(value,indent=2)+"\n")
+        write_json(output/(name+".json"), value)
     result.update({"source_colour_status":source_status,"source_colour_differences":delta,"colour_reference_status":native_status,"colour_reference_differences":native_delta,"colour_short_reads":shorts})
     if source_status!="pass" or native_status!="pass" or any(s["status"]!="pass" for s in shorts):result["status"]="mismatch"
     return result
@@ -250,7 +241,7 @@ def seek_parity(candidate, reference, path, output, **kwargs):
             status="pass" if left["status"]==right["status"]=="ok" and not delta else "mismatch"
             row={"target_ns":target,"state":"after-eof" if state else "fresh","status":status,"differences":delta,"candidate":left,"reference":right}
             comparisons.append(row)
-    (output/"seek-comparisons.json").write_text(json.dumps(comparisons,indent=2)+"\n")
+    write_json(output/"seek-comparisons.json", comparisons)
     result["playback_seeks"]=[{k:v for k,v in row.items() if k not in ("candidate","reference")} for row in comparisons]
     if any(row["status"]!="pass" for row in comparisons):result["status"]="mismatch"
     return result
@@ -452,8 +443,8 @@ def benchmark_once(candidate, reference, path, pairs, iterations, seed, operatio
             return rejection
         if busy := competing_builds():
             return {"status": "contaminated", "contaminants": busy, "samples": []}
-        worker_hashes = {name: digest(Path(worker)) for name, worker in workers.items()}
-        input_sha256 = digest(Path(path))
+        worker_hashes = {name: digest(worker) for name, worker in workers.items()}
+        input_sha256 = digest(path)
         for name, worker in workers.items():
             if rejection := module_rejection("before-warmup:" + name):
                 return rejection
@@ -488,7 +479,7 @@ def benchmark_once(candidate, reference, path, pairs, iterations, seed, operatio
         if any(a[k] != b[k] for k in ("iterations", "packets", "bytes", "digest")):
             return {"status": "unequal-work", "samples": samples}
         values.append((a["elapsed_ns"], b["elapsed_ns"]))
-    if worker_hashes != {name: digest(Path(worker)) for name, worker in workers.items()} or input_sha256 != digest(Path(path)):
+    if worker_hashes != {name: digest(worker) for name, worker in workers.items()} or input_sha256 != digest(path):
         return {"status": "worker-or-input-changed", "samples": samples}
     summary = ratio_interval(values, seed)
     return {"status": "measured", "worker_hashes": worker_hashes, "input_sha256": input_sha256,

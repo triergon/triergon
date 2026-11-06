@@ -2,12 +2,12 @@
 use super::super::video_clock::{avc_chain, picture_nal};
 use crate::{Output, Result, raw_video::hevc_syntax as hevc};
 use std::sync::atomic::{AtomicBool, Ordering};
-use triergon::{matroska::Track, typed::Packet};
 use triergon_core::{Error, WorkBudget};
 use triergon_framing::{
     AvcConfigLimits, AvcConfigSource, AvcConfigViewParser, BuildStep, Codec, HvcConfigLimits,
     HvcConfigSource, HvcConfigViewParser, LengthSize,
 };
+use triergon_matroska::{matroska::Track, typed::Packet};
 
 #[derive(Clone, Copy)]
 enum TrackProbe {
@@ -75,7 +75,7 @@ impl VideoProbe {
                 }
                 self.setup = match Setup::new(output, packet, track) {
                     Ok(setup) => setup,
-                    Err(error) if propagate(error) => return Err(error.into()),
+                    Err(error) if propagate(error) => return Err(error),
                     Err(_) => None,
                 };
             }
@@ -84,7 +84,7 @@ impl VideoProbe {
                     Ok(BuildStep::Yield) => return Ok(None),
                     Ok(BuildStep::Ready(chain)) => Some(chain),
                     Ok(BuildStep::Complete) => None,
-                    Err(error) if propagate(error) => return Err(error.into()),
+                    Err(error) if propagate(error) => return Err(error),
                     Err(_) => None,
                 }
             } else {
@@ -139,7 +139,7 @@ impl VideoProbe {
                 self.tracks[index] = TrackProbe::Unresolved;
                 false
             }
-            Err(error) if propagate(error) => return Err(error.into()),
+            Err(error) if propagate(error) => return Err(error),
             Err(_) => {
                 self.tracks[index] = TrackProbe::Unresolved;
                 false

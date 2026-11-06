@@ -33,8 +33,7 @@ impl<'track, 'prefix> MatroskaBitmapClockProbe<'track, 'prefix> {
             return Err(Error::Limit {
                 requested: prefix.len(),
                 maximum: maximum_outputs,
-            }
-            .into());
+            });
         }
         Ok(Self {
             track,
@@ -50,7 +49,7 @@ impl<'track, 'prefix> MatroskaBitmapClockProbe<'track, 'prefix> {
     pub fn poll(&mut self, work: &mut WorkBudget, cancel: &AtomicBool) -> Result<bool> {
         loop {
             if cancel.load(Ordering::Relaxed) {
-                return Err(Error::Cancelled.into());
+                return Err(Error::Cancelled);
             }
             let Some(output) = self.prefix.get(self.cursor) else {
                 return Ok(true);
@@ -77,7 +76,7 @@ impl<'track, 'prefix> MatroskaBitmapClockProbe<'track, 'prefix> {
         if self.cursor == self.prefix.len() {
             Ok(())
         } else {
-            Err(Error::Invalid("Matroska bitmap clock probe pending").into())
+            Err(Error::Invalid("Matroska bitmap clock probe pending"))
         }
     }
 

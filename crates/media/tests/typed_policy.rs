@@ -1,13 +1,13 @@
 //! Resource/work and cancellation regressions for retained typed operations.
 use std::sync::atomic::AtomicBool;
-use triergon::{
+use triergon_core::{Budget, Bytes, InputWindow, SourceCapabilities, SourceId, WorkBudget};
+use triergon_matroska::{
     Error, Limits,
     incremental::ParseStep,
     storage::SharedBytes,
     typed::{Event, Reader},
     zlib::{InflateLimits, Inflater},
 };
-use triergon_core::{Budget, Bytes, InputWindow, SourceCapabilities, SourceId, WorkBudget};
 #[derive(Default)]
 struct Bits {
     bytes: Vec<u8>,
@@ -16,7 +16,7 @@ struct Bits {
 impl Bits {
     fn put(&mut self, value: u32, width: usize) {
         for bit in 0..width {
-            if self.used % 8 == 0 {
+            if self.used.is_multiple_of(8) {
                 self.bytes.push(0);
             }
             let index = self.used / 8;
@@ -198,7 +198,7 @@ fn an_atomic_frame_larger_than_its_own_pool_minimum_is_a_permanent_limit_not_an_
                 }
             }
             Ok(ParseStep::Backpressure { .. }) => pressure += 1,
-            Err(Error::Limit(message)) => {
+            Err(Error::Policy(message)) => {
                 limit = Some(message);
                 break;
             }

@@ -30,18 +30,13 @@ use triergon_core::{
     SourceId, WorkBudget,
 };
 
-#[path = "reader_blocking.rs"]
 mod blocking;
-#[path = "reader_resolve.rs"]
 mod resolving;
-#[path = "reader_seek_index.rs"]
 mod seek_index;
-#[path = "reader_seek.rs"]
 mod seeking;
 pub use blocking::BlockingReader;
 use resolving::{Opening, ResolvePurpose, Resolver};
 use seeking::{ReplayPrefix, ScanContext, ScanSimple, ScanState, SeekMode, SubtitleRecovery};
-#[path = "reader_projection.rs"]
 mod projection;
 use projection::{
     LegacyEvent, LegacyProjection, PacketProjection, ScanEvent, ScanProjection, TypedProjection,
@@ -297,7 +292,7 @@ impl Reader {
         maximum_window: usize,
     ) -> Result<Self> {
         if !bytes.belongs_to(pool) {
-            return Err(triergon_core::Error::ForeignPool.into());
+            return Err(triergon_core::Error::ForeignPool);
         }
         let capabilities = SourceCapabilities {
             length: Some(u64::try_from(bytes.len()).map_err(|_| Error::Overflow)?),
@@ -440,10 +435,10 @@ impl Reader {
             } else {
                 match &result {
                     Ok(ParseStep::Event(Event::Packet(packet))) => {
-                        if packet.configuration.tracks()[packet.packet.track].kind == 1 {
-                            if let Some(location) = &self.last_location {
-                                index.observe(packet, location.cluster_offset(), work);
-                            }
+                        if packet.configuration.tracks()[packet.packet.track].kind == 1
+                            && let Some(location) = &self.last_location
+                        {
+                            index.observe(packet, location.cluster_offset(), work);
                         }
                     }
                     Ok(ParseStep::Finished) => index.seal(self.envelope.position()),
@@ -711,7 +706,7 @@ impl Reader {
         if let Some(left) = remaining {
             *left = left
                 .checked_sub(bytes)
-                .ok_or(Error::Limit("operation read bytes"))?;
+                .ok_or(Error::Policy("operation read bytes"))?;
             *total = total.checked_add(bytes).ok_or(Error::Overflow)?;
         }
         Ok(())
@@ -722,7 +717,7 @@ impl Reader {
             .checked_add(structural)
             .ok_or(Error::Overflow)?;
         if total > self.limits.metadata_bytes {
-            return Err(Error::Limit("metadata"));
+            return Err(Error::Policy("metadata"));
         }
         // Admission reserved the slot before reading the source. This final
         // transaction update cannot conceal another vector growth/allocation.
@@ -752,7 +747,7 @@ impl Reader {
             .limits
             .metadata_bytes
             .checked_sub(self.metadata_used)
-            .ok_or(Error::Limit("metadata"))?;
+            .ok_or(Error::Policy("metadata"))?;
         // Keep each large constructor tied to its selected destination arm,
         // avoiding a merged maximum-sized enum result in this path.
         match header.id {
@@ -940,7 +935,7 @@ impl Reader {
             .limits
             .metadata_bytes
             .checked_sub(self.metadata_used)
-            .ok_or(Error::Limit("metadata"))?;
+            .ok_or(Error::Policy("metadata"))?;
         let mut first = true;
         loop {
             if first {
@@ -1086,7 +1081,7 @@ impl Reader {
                                     self.limits
                                         .attachment_bytes
                                         .checked_sub(self.catalogue.attachment_bytes())
-                                        .ok_or(Error::Limit("attachment payload bytes"))?,
+                                        .ok_or(Error::Policy("attachment payload bytes"))?,
                                 )
                                 .ok_or(Error::Overflow)?
                             } else {
@@ -1097,7 +1092,7 @@ impl Reader {
                                 .size
                                 .is_some_and(|size| size > maximum as u64)
                             {
-                                return Err(Error::Limit("element bytes"));
+                                return Err(Error::Policy("element bytes"));
                             }
                             admission.phase = AdmitPhase::Reserve;
                             continue;
@@ -1127,7 +1122,7 @@ impl Reader {
                                     self.limits
                                         .attachment_bytes
                                         .checked_sub(self.catalogue.attachment_bytes())
-                                        .ok_or(Error::Limit("attachment payload bytes"))?,
+                                        .ok_or(Error::Policy("attachment payload bytes"))?,
                                 )
                                 .ok_or(Error::Overflow)?
                             } else {
@@ -1477,15 +1472,12 @@ crate::matroska::typed::usage::storage!(Reader, |s| [
 ]);
 
 #[cfg(test)]
-#[path = "subtitle_recovery_guards.rs"]
 mod subtitle_recovery_guards;
 
 #[cfg(test)]
-#[path = "reader_storage_tests.rs"]
 mod storage_tests;
 
 #[cfg(test)]
-#[path = "inline_input_tests.rs"]
 mod inline_input_tests;
 
 #[cfg(test)]
@@ -1645,19 +1637,15 @@ mod header_refill_canonical_runtime_red {
 }
 
 #[cfg(test)]
-#[path = "shared_bounded_tests.rs"]
 mod shared_bounded_tests;
 
 #[cfg(test)]
-#[path = "shared_bounded_followup_tests.rs"]
 mod shared_bounded_followup_tests;
 
 #[cfg(test)]
-#[path = "inner_guard_regressions.rs"]
 mod inner_guard_regressions;
 
 #[cfg(test)]
-#[path = "simple_direct_regressions.rs"]
 mod simple_direct_regressions;
 
 #[cfg(test)]
@@ -1676,13 +1664,10 @@ impl Reader {
 }
 
 #[cfg(test)]
-#[path = "compact_controller_regressions.rs"]
 mod compact_controller_regressions;
 
 #[cfg(test)]
-#[path = "lazy_pressure_regressions.rs"]
 mod lazy_pressure_regressions;
 
 #[cfg(test)]
-#[path = "demux_slot_regressions.rs"]
 mod demux_slot_regressions;

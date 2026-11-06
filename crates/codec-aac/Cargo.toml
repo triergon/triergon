@@ -7,7 +7,23 @@ edition.workspace = true
 rust-version.workspace = true
 publish.workspace = true
 
+[features]
+# Development aids (per-frame statistics, SBR fill ranges) for the research examples.
+inspect = []
+
 [dependencies]
 
 [lints]
 workspace = true
+
+[[example]]
+name = "sbr_mute"
+required-features = ["inspect"]
+
+[[example]]
+name = "stats"
+required-features = ["inspect"]
+
+[[example]]
+name = "strip_sbr"
+required-features = ["inspect"]

@@ -189,7 +189,9 @@ fn raw_letterbox() {
     ];
     for frame in frames {
         let wide: Vec<u16> = frame
-            .chunks_exact(2)
+            .as_chunks::<2>()
+            .0
+            .iter()
             .take(if bits > 8 { samples } else { 0 })
             .map(|b| u16::from_le_bytes([b[0], b[1]]))
             .collect();

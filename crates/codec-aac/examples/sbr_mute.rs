@@ -22,7 +22,7 @@ fn main() {
         {
             continue;
         }
-        for &(s, e) in dec.debug_sbr_fil_ranges() {
+        for &(s, e) in dec.sbr_fill_ranges() {
             // FIL id (3) + count (4) [+ esc_count (8)] + extension_type (4)
             let get = |p: usize| (au[7 + (p >> 3)] >> (7 - (p & 7))) & 1;
             let count = (0..4).fold(0, |v, i| (v << 1) | get(s + 3 + i) as usize);

@@ -12,7 +12,7 @@ use crate::{
     io::SourceOwner,
 };
 use std::sync::atomic::{AtomicBool, Ordering};
-use triergon_core::{Budget, BudgetVec, Error as CoreError, InputCursor, InputRequest, WorkBudget};
+use triergon_core::{Budget, BudgetVec, InputCursor, InputRequest, WorkBudget};
 use triergon_mpegts::{
     AssemblyStep, FaultKind, ParseLimits, TraceEvent,
     native_pes::{NativePrivateAudioCarriage, NativePrivateAudioDescriptors},
@@ -93,7 +93,7 @@ impl HlsSegment {
     /// matches the application path that fills durations missing from a
     /// parser-only AAC reference using the ADTS header.
     pub fn parser_only_audio_pts_ns(&self, cancel: &AtomicBool) -> Result<BudgetVec<i64>> {
-        Ok(parser_only_aac_pts_ns(&self.audio, cancel)?)
+        parser_only_aac_pts_ns(&self.audio, cancel)
     }
 }
 
@@ -330,7 +330,7 @@ where
             || limits.maximum_feed_bytes == 0
             || limits.maximum_access_units == 0
         {
-            return Err(CoreError::Invalid("HLS segment limits").into());
+            return Err(Error::Invalid("HLS segment limits"));
         }
         if let Some(length) = input.capabilities().length {
             check_extent(length, 0, limits.maximum_source_bytes)?;
@@ -377,9 +377,7 @@ where
         let result = self.player.as_mut().ok_or(Error::Closed)?.provide(reply);
         if matches!(
             result,
-            Err(Error::Core(
-                CoreError::Transport | CoreError::Truncated | CoreError::Cancelled
-            ))
+            Err(Error::Transport | Error::Truncated | Error::Cancelled)
         ) {
             self.fail();
         }
@@ -393,23 +391,23 @@ where
     ) -> Result<HlsSegmentProgress> {
         if cancel.load(Ordering::Relaxed) {
             self.fail();
-            return Err(CoreError::Cancelled.into());
+            return Err(Error::Cancelled);
         }
         match self.step(work, cancel) {
-            Err(Error::Core(CoreError::Backpressure {
+            Err(Error::Backpressure {
                 requested,
                 available,
-            })) => Ok(HlsSegmentProgress::Backpressure {
+            }) => Ok(HlsSegmentProgress::Backpressure {
                 requested,
                 available,
             }),
-            Err(Error::Core(CoreError::Allocation))
+            Err(Error::Allocation)
                 if !self
                     .player
                     .as_ref()
                     .is_some_and(|player| player.state() == State::Failed) =>
             {
-                Err(CoreError::Allocation.into())
+                Err(Error::Allocation)
             }
             Err(error) => {
                 self.fail();
@@ -426,7 +424,7 @@ where
     ) -> Result<Option<AssembledSegment<C, V, A>>> {
         if cancel.load(Ordering::Relaxed) {
             self.fail();
-            return Err(CoreError::Cancelled.into());
+            return Err(Error::Cancelled);
         }
         if self.phase == Phase::Failed {
             return Err(Error::Closed);
@@ -437,13 +435,10 @@ where
         let clocks = match resolve(self) {
             Ok(clocks) => clocks,
             Err(error) => {
-                if !matches!(
-                    error,
-                    CoreError::Backpressure { .. } | CoreError::Allocation
-                ) {
+                if !matches!(error, Error::Backpressure { .. } | Error::Allocation) {
                     self.fail();
                 }
-                return Err(error.into());
+                return Err(error);
             }
         };
         let initial_raster = self.video.as_slice()[0].raster();
@@ -474,7 +469,7 @@ where
                 match player.read_output(&mut slot, work, cancel)? {
                     Progress::Yield => {}
                     Progress::Queued => {
-                        let output = slot.ok_or(CoreError::Invalid("HLS player output"))?;
+                        let output = slot.ok_or(Error::Invalid("HLS player output"))?;
                         self.on_event(output.into_event())?;
                     }
                     Progress::NeedInput(mut request) => {
@@ -495,21 +490,21 @@ where
                         let video = self
                             .video_assembler
                             .as_mut()
-                            .ok_or(CoreError::Invalid("HLS segment has no video configuration"))?;
+                            .ok_or(Error::Invalid("HLS segment has no video configuration"))?;
                         video.finish();
                         if let Some(audio) = &mut self.audio_assembler {
                             audio.finish();
                         }
                         self.phase = Phase::EndVideo;
                     }
-                    _ => return Err(CoreError::Invalid("unexpected HLS player state").into()),
+                    _ => return Err(Error::Invalid("unexpected HLS player state")),
                 }
             }
             Phase::Video | Phase::EndVideo => {
                 let video = self
                     .video_assembler
                     .as_mut()
-                    .ok_or(CoreError::Invalid("HLS video assembler unavailable"))?;
+                    .ok_or(Error::Invalid("HLS video assembler unavailable"))?;
                 match video.poll(work, cancel)? {
                     AssemblyStep::Output(unit) => self.pending = Some(Unit::Video(unit)),
                     AssemblyStep::Yield => {}
@@ -520,7 +515,7 @@ where
                         self.video_assembler = None;
                         self.phase = Phase::EndAudio;
                     }
-                    _ => return Err(CoreError::Invalid("unexpected HLS video state").into()),
+                    _ => return Err(Error::Invalid("unexpected HLS video state")),
                 }
             }
             Phase::Audio | Phase::EndAudio => {
@@ -535,7 +530,7 @@ where
                             self.audio_assembler = None;
                             self.seal()?;
                         }
-                        _ => return Err(CoreError::Invalid("unexpected HLS audio state").into()),
+                        _ => return Err(Error::Invalid("unexpected HLS audio state")),
                     }
                 } else {
                     self.seal()?;
@@ -560,10 +555,7 @@ where
                     configuration_epoch,
                 } => {
                     if self.map.is_some() {
-                        return Err(CoreError::Unsupported(
-                            "HLS segment changes active program map",
-                        )
-                        .into());
+                        return Err(Error::Unsupported("HLS segment changes active program map"));
                     }
                     self.map = Some(select_tracks(
                         &map,
@@ -576,16 +568,16 @@ where
                     if fault.kind == FaultKind::Transport
                         || fault.pid.is_some_and(|pid| self.selected_pid(pid)) =>
                 {
-                    return Err(fault.error.into());
+                    return Err(fault.error);
                 }
                 _ => {}
             },
             RawEvent::NativeTsConfiguration(config) => {
                 let (video, audio, epoch) = self
                     .map
-                    .ok_or(CoreError::Invalid("HLS configuration precedes PMT"))?;
+                    .ok_or(Error::Invalid("HLS configuration precedes PMT"))?;
                 if config.configuration_epoch != epoch {
-                    return Err(CoreError::Invalid("HLS configuration epoch").into());
+                    return Err(Error::Invalid("HLS configuration epoch"));
                 }
                 if config.track == video {
                     self.video_assembler = Some(V::bind(&self.pool, config, self.limits)?);
@@ -594,28 +586,29 @@ where
                 }
             }
             RawEvent::NativeTs { packet, clock } => {
-                let (video, audio, _) = self
-                    .map
-                    .ok_or(CoreError::Invalid("HLS packet precedes PMT"))?;
+                let (video, audio, _) =
+                    self.map.ok_or(Error::Invalid("HLS packet precedes PMT"))?;
                 let track = TrackKey::Ts {
                     program: packet.program,
                     pid: packet.pid,
                 };
                 let mut mailbox = Some(packet);
                 if track == video {
-                    let reader = self.video_assembler.as_mut().ok_or(CoreError::Invalid(
-                        "HLS video packet precedes configuration",
-                    ))?;
+                    let reader = self
+                        .video_assembler
+                        .as_mut()
+                        .ok_or(Error::Invalid("HLS video packet precedes configuration"))?;
                     if !reader.push(&mut mailbox, clock)? {
-                        return Err(CoreError::Invalid("HLS video mailbox still busy").into());
+                        return Err(Error::Invalid("HLS video mailbox still busy"));
                     }
                     self.phase = Phase::Video;
                 } else if Some(track) == audio {
-                    let reader = self.audio_assembler.as_mut().ok_or(CoreError::Invalid(
-                        "HLS audio packet precedes configuration",
-                    ))?;
+                    let reader = self
+                        .audio_assembler
+                        .as_mut()
+                        .ok_or(Error::Invalid("HLS audio packet precedes configuration"))?;
                     if !reader.push(&mut mailbox, clock)? {
-                        return Err(CoreError::Invalid("HLS audio mailbox still busy").into());
+                        return Err(Error::Invalid("HLS audio mailbox still busy"));
                     }
                     self.phase = Phase::Audio;
                 }
@@ -625,7 +618,7 @@ where
                     .map
                     .is_some_and(|(video, audio, _)| track == video || Some(track) == audio) =>
             {
-                return Err(error.into());
+                return Err(error);
             }
             _ => {}
         }
@@ -645,28 +638,24 @@ where
         let unit = self
             .pending
             .as_ref()
-            .ok_or(CoreError::Invalid("HLS pending unit"))?;
+            .ok_or(Error::Invalid("HLS pending unit"))?;
         let (lane, bytes, video_pts) = match unit {
             Unit::Video(unit) => (
                 Lane::Video,
                 V::unit_bytes(unit),
                 Some(
                     unit.pts90()
-                        .ok_or(CoreError::Unsupported("HLS video picture without PTS"))?,
+                        .ok_or(Error::Unsupported("HLS video picture without PTS"))?,
                 ),
             ),
             Unit::Audio(frame) => (Lane::Audio, A::unit_bytes(frame), None),
         };
-        let total = self
-            .feed_bytes
-            .checked_add(bytes)
-            .ok_or(CoreError::Overflow)?;
+        let total = self.feed_bytes.checked_add(bytes).ok_or(Error::Overflow)?;
         if total > self.limits.maximum_feed_bytes {
-            return Err(CoreError::Limit {
+            return Err(Error::Limit {
                 requested: total,
                 maximum: self.limits.maximum_feed_bytes,
-            }
-            .into());
+            });
         }
         reserve_one(&mut self.order, self.limits.maximum_access_units)?;
         match lane {
@@ -676,7 +665,7 @@ where
         match self
             .pending
             .take()
-            .ok_or(CoreError::Invalid("HLS pending unit"))?
+            .ok_or(Error::Invalid("HLS pending unit"))?
         {
             Unit::Video(unit) => self.video.try_push(unit).map_err(|error| error.error)?,
             Unit::Audio(unit) => self.audio.try_push(unit).map_err(|error| error.error)?,
@@ -689,10 +678,12 @@ where
 
     fn seal(&mut self) -> Result<()> {
         if self.video.is_empty() {
-            return Err(CoreError::Invalid("HLS segment produced no video pictures").into());
+            return Err(Error::Invalid("HLS segment produced no video pictures"));
         }
         if self.tracks.requires_audio() && self.audio.is_empty() {
-            return Err(CoreError::Invalid("HLS segment produced no required audio frames").into());
+            return Err(Error::Invalid(
+                "HLS segment produced no required audio frames",
+            ));
         }
         self.phase = Phase::Sealed;
         Ok(())
@@ -721,19 +712,19 @@ fn select_tracks(
             let video = find_track(map, tracks.video_pid, |stream| {
                 Ok(stream.stream_type == 0x1b)
             })?
-            .ok_or(CoreError::Unsupported(
-                "HLS segment has no selected AVC track",
-            ))?;
+            .ok_or(Error::Unsupported("HLS segment has no selected AVC track"))?;
             let find_aac = |pid| find_track(map, pid, |stream| Ok(stream.stream_type == 0x0f));
             let audio = match tracks.audio {
                 HlsSegmentAudio::Disabled => None,
                 HlsSegmentAudio::Optional => find_aac(None)?,
-                HlsSegmentAudio::Required => Some(find_aac(None)?.ok_or(
-                    CoreError::Unsupported("HLS segment has no required AAC track"),
-                )?),
-                HlsSegmentAudio::Pid(pid) => Some(find_aac(Some(pid))?.ok_or(
-                    CoreError::Unsupported("HLS segment has no requested AAC PID"),
-                )?),
+                HlsSegmentAudio::Required => Some(
+                    find_aac(None)?
+                        .ok_or(Error::Unsupported("HLS segment has no required AAC track"))?,
+                ),
+                HlsSegmentAudio::Pid(pid) => Some(
+                    find_aac(Some(pid))?
+                        .ok_or(Error::Unsupported("HLS segment has no requested AAC PID"))?,
+                ),
             };
             (video, audio)
         }
@@ -743,7 +734,7 @@ fn select_tracks(
                 HlsVideoCodec::Hevc => 0x24,
             };
             let video = find_track(map, None, |stream| Ok(stream.stream_type == video_type))?
-                .ok_or(CoreError::Unsupported(
+                .ok_or(Error::Unsupported(
                     "HLS segment has no matching video track",
                 ))?;
             let audio = if let Some(codec) = profile.audio {
@@ -751,7 +742,7 @@ fn select_tracks(
                     find_track(map, None, |stream| {
                         media_audio_matches(map, stream, codec, limits)
                     })?
-                    .ok_or(CoreError::Unsupported(
+                    .ok_or(Error::Unsupported(
                         "HLS segment has no matching audio track",
                     ))?,
                 )
@@ -779,7 +770,7 @@ fn find_track(
             pid: stream.pid,
         };
         if selected.replace(track).is_some() {
-            return Err(CoreError::Unsupported(
+            return Err(Error::Unsupported(
                 "HLS segment requires explicit PID selection",
             ));
         }
@@ -826,9 +817,9 @@ fn media_audio_matches(
 }
 
 fn reserve_one<T>(list: &mut BudgetVec<T>, maximum: usize) -> triergon_core::Result<()> {
-    let needed = list.len().checked_add(1).ok_or(CoreError::Overflow)?;
+    let needed = list.len().checked_add(1).ok_or(Error::Overflow)?;
     if needed > maximum {
-        return Err(CoreError::Limit {
+        return Err(Error::Limit {
             requested: needed,
             maximum,
         });
@@ -836,7 +827,7 @@ fn reserve_one<T>(list: &mut BudgetVec<T>, maximum: usize) -> triergon_core::Res
     if needed > list.capacity() {
         let target = list.capacity().saturating_mul(2).max(4).min(maximum);
         match list.try_reserve_exact(target - list.len()) {
-            Err(CoreError::Backpressure { .. } | CoreError::Allocation) if target > needed => {
+            Err(Error::Backpressure { .. } | Error::Allocation) if target > needed => {
                 list.try_reserve_exact(1)?
             }
             other => other?,
@@ -901,11 +892,9 @@ fn validate_reply(reply: &SourceReply, maximum: usize) -> triergon_core::Result<
 }
 
 fn check_extent(offset: u64, count: usize, maximum: usize) -> triergon_core::Result<()> {
-    let end = offset
-        .checked_add(count as u64)
-        .ok_or(CoreError::Overflow)?;
+    let end = offset.checked_add(count as u64).ok_or(Error::Overflow)?;
     if end > maximum as u64 {
-        return Err(CoreError::Limit {
+        return Err(Error::Limit {
             requested: usize::try_from(end).unwrap_or(usize::MAX),
             maximum,
         });
@@ -953,10 +942,10 @@ mod tests {
                 &mut WorkBudget::new(4096),
                 &AtomicBool::new(false)
             ),
-            Err(Error::Core(CoreError::Limit {
+            Err(Error::Limit {
                 requested: 2,
                 maximum: 1
-            }))
+            })
         ));
         assert!(slot.is_none());
     }

@@ -222,7 +222,7 @@ impl Time {
         let exact_denominator = self.denominator();
         if base.numerator() == 1
             && exact_denominator <= u128::from(u64::MAX)
-            && base.denominator() % (exact_denominator as u64) == 0
+            && base.denominator().is_multiple_of(exact_denominator as u64)
         {
             let magnitude = self
                 .numerator

@@ -267,10 +267,10 @@ impl ElementReader {
         self.input.request()
     }
     pub fn provide(&mut self, window: &InputWindow) -> Result<()> {
-        Ok(self.input.provide(window)?)
+        self.input.provide(window)
     }
     pub fn finish(&mut self, source: SourceId, token: InputToken) -> Result<()> {
-        Ok(self.input.finish(source, token)?)
+        self.input.finish(source, token)
     }
     pub fn fail(
         &mut self,
@@ -278,7 +278,7 @@ impl ElementReader {
         token: InputToken,
         failure: SourceFailure,
     ) -> Result<()> {
-        Ok(self.input.fail(source, token, failure)?)
+        self.input.fail(source, token, failure)
     }
     pub fn cluster_checkpoint(&self) -> Option<ClusterCheckpoint> {
         Some(ClusterCheckpoint {
@@ -293,10 +293,10 @@ impl ElementReader {
     /// supplied range; retained earlier-generation leaf payloads stay charged.
     pub fn reset_to_cluster(&mut self, checkpoint: &ClusterCheckpoint) -> Result<InputRequest> {
         if !checkpoint.pool.same_pool(self.input.budget()) {
-            return Err(triergon_core::Error::ForeignPool.into());
+            return Err(triergon_core::Error::ForeignPool);
         }
         if checkpoint.parser != self.parser || checkpoint.source != self.input.source() {
-            return Err(triergon_core::Error::SourceMismatch.into());
+            return Err(triergon_core::Error::SourceMismatch);
         }
         if !self.input.capabilities().random_access {
             return Err(Error::Unsupported("random-access input"));
@@ -337,10 +337,10 @@ impl ElementReader {
         if end.is_some_and(|end| header.data > end) {
             return Err(Error::Invalid("element exceeds parent"));
         }
-        if let (Some(parent), Some(end)) = (end, header.end()?) {
-            if end > parent {
-                return Err(Error::Invalid("element exceeds parent"));
-            }
+        if let (Some(parent), Some(end)) = (end, header.end()?)
+            && end > parent
+        {
+            return Err(Error::Invalid("element exceeds parent"));
         }
         Ok(())
     }
@@ -355,15 +355,15 @@ impl ElementReader {
             return Err(Error::Unsupported("element after finite Segment"));
         }
         self.check_parent(header, self.segment.and_then(|m| m.end))?;
-        if header.id == CLUSTER || is_level_one(header.id) {
-            if let Some(cluster) = self.cluster {
-                if cluster.end.is_some() {
-                    return Err(Error::Invalid("level-one element in finite Cluster"));
-                }
-                self.cluster = None;
-                self.pending_header = Some(header);
-                return Ok(Some(D::end(cluster.id, header.start, self.generation())));
+        if (header.id == CLUSTER || is_level_one(header.id))
+            && let Some(cluster) = self.cluster
+        {
+            if cluster.end.is_some() {
+                return Err(Error::Invalid("level-one element in finite Cluster"));
             }
+            self.cluster = None;
+            self.pending_header = Some(header);
+            return Ok(Some(D::end(cluster.id, header.start, self.generation())));
         }
         self.check_parent(header, self.cluster.and_then(|m| m.end))?;
         if !self.seen_ebml {
@@ -414,10 +414,10 @@ impl ElementReader {
             _ => (false, usize::MAX),
         };
         if collect && size > maximum as u64 {
-            return Err(Error::Limit("element bytes"));
+            return Err(Error::Policy("element bytes"));
         }
         if size > self.scan_left {
-            return Err(Error::Limit("operation read bytes"));
+            return Err(Error::Policy("operation read bytes"));
         }
         self.phase = Phase::Body(BodyState {
             header,
@@ -508,7 +508,7 @@ impl ElementReader {
         self.elements_left = self
             .elements_left
             .checked_sub(1)
-            .ok_or(Error::Limit("element count"))?;
+            .ok_or(Error::Policy("element count"))?;
         self.phase = Phase::Between;
         self.begin::<D>(header)
     }
@@ -578,17 +578,17 @@ impl ElementReader {
                         }
                         continue;
                     }
-                    if let Some(master) = self.cluster {
-                        if master.end == Some(self.position()) {
-                            self.cluster = None;
-                            return Ok(ParseStep::Event(self.ended::<D>(master)));
-                        }
+                    if let Some(master) = self.cluster
+                        && master.end == Some(self.position())
+                    {
+                        self.cluster = None;
+                        return Ok(ParseStep::Event(self.ended::<D>(master)));
                     }
-                    if let Some(master) = self.segment {
-                        if master.end == Some(self.position()) {
-                            self.segment = None;
-                            return Ok(ParseStep::Event(self.ended::<D>(master)));
-                        }
+                    if let Some(master) = self.segment
+                        && master.end == Some(self.position())
+                    {
+                        self.segment = None;
+                        return Ok(ParseStep::Event(self.ended::<D>(master)));
                     }
                     if let Some(header) = self.take_buffered_header(work, cancel)? {
                         if let Some(event) = self.accept_header::<D>(header)? {
@@ -661,7 +661,7 @@ impl ElementReader {
                             self.scan_left = self
                                 .scan_left
                                 .checked_sub(self.input.position() - old)
-                                .ok_or(Error::Limit("operation read bytes"))?;
+                                .ok_or(Error::Policy("operation read bytes"))?;
                             Self::check_input_cancel(&mut self.input, cancel)?;
                             continue;
                         }
@@ -742,7 +742,7 @@ impl ElementReader {
                             return Ok(ParseStep::Yield);
                         }
                         body.target = usize::try_from(body.remaining)
-                            .map_err(|_| Error::Limit("address space"))?;
+                            .map_err(|_| Error::Policy("address space"))?;
                         // Admit the exact output capacity before requesting data.
                         // A complete input owner of that capacity may become the
                         // leaf directly; partial/hidden owners use the builder.
@@ -815,7 +815,7 @@ impl ElementReader {
                                     Ok(bytes) => bytes,
                                     Err(error) => {
                                         body.buffer = Some(error.buffer);
-                                        return Err(error.error.into());
+                                        return Err(error.error);
                                     }
                                 }
                             };
@@ -855,7 +855,7 @@ impl ElementReader {
                         self.scan_left = self
                             .scan_left
                             .checked_sub(self.input.position() - old)
-                            .ok_or(Error::Limit("operation read bytes"))?;
+                            .ok_or(Error::Policy("operation read bytes"))?;
                         continue;
                     }
                     match self.input.read_span(maximum, work, cancel)? {
@@ -894,7 +894,7 @@ impl ElementReader {
                     self.scan_left = self
                         .scan_left
                         .checked_sub(self.input.position() - old)
-                        .ok_or(Error::Limit("operation read bytes"))?;
+                        .ok_or(Error::Policy("operation read bytes"))?;
                     if body.scan == ScanBody::FirstSpan {
                         body.scan = ScanBody::Prefix;
                     }
@@ -928,25 +928,19 @@ fn is_level_one(id: u64) -> bool {
     )
 }
 
-#[path = "typed/envelope_bridge.rs"]
 pub(crate) mod typed_bridge;
 
 #[cfg(test)]
-#[path = "incremental_discard_guards.rs"]
 mod discard_guards;
 
 #[cfg(test)]
-#[path = "compact_envelope_regressions.rs"]
 mod compact_envelope_regressions;
 
 #[cfg(test)]
-#[path = "lazy_body_regressions.rs"]
 pub(crate) mod lazy_body_regressions;
 
 #[cfg(test)]
-#[path = "header_loop_regressions.rs"]
 mod header_loop_regressions;
 
 #[cfg(test)]
-#[path = "incremental_header_guards.rs"]
 mod header_guards;

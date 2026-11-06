@@ -10,7 +10,7 @@ use triergon_subtitles::text::{self, Extractor, Input, RawClock, Timing};
 )]
 enum Record {
     Mp4(Mp4Packet),
-    Matroska(triergon::typed::Packet),
+    Matroska(triergon_matroska::typed::Packet),
     Document(Input),
 }
 #[derive(Clone, Debug)]
@@ -32,7 +32,7 @@ impl TextSource {
         if !matches!(
             output.event(),
             RawEvent::Mp4(crate::Mp4Event::Packet(_))
-                | RawEvent::Matroska(triergon::typed::Event::Packet(_))
+                | RawEvent::Matroska(triergon_matroska::typed::Event::Packet(_))
         ) {
             return Err(RejectedOutput {
                 output,
@@ -43,7 +43,7 @@ impl TextSource {
         let pool = output.pool().clone();
         let record = match output.into_event() {
             RawEvent::Mp4(crate::Mp4Event::Packet(p)) => Record::Mp4(p),
-            RawEvent::Matroska(triergon::typed::Event::Packet(p)) => Record::Matroska(p),
+            RawEvent::Matroska(triergon_matroska::typed::Event::Packet(p)) => Record::Matroska(p),
             _ => unreachable!(),
         };
         Ok(Self {
@@ -66,7 +66,7 @@ impl TextSource {
             None
         }
     }
-    pub fn matroska(&self) -> Option<&triergon::typed::Packet> {
+    pub fn matroska(&self) -> Option<&triergon_matroska::typed::Packet> {
         if let Record::Matroska(p) = &self.record {
             Some(p)
         } else {
@@ -113,11 +113,8 @@ pub struct TextBridge {
     sequence: u64,
     finishing: bool,
 }
-fn exact_ns(t: triergon::timing::ExactTime) -> Result<Time> {
-    Ok(Time::new(
-        t.numerator(),
-        u128::from(t.denominator()) * 1_000_000_000,
-    )?)
+fn exact_ns(t: triergon_matroska::timing::ExactTime) -> Result<Time> {
+    Time::new(t.numerator(), u128::from(t.denominator()) * 1_000_000_000)
 }
 impl TextBridge {
     pub fn new(
@@ -156,10 +153,10 @@ impl TextBridge {
     }
     fn direct_input(&self, source: &TextSource) -> Result<Option<Input>> {
         if source.source != self.source {
-            return Err(Error::SourceMismatch.into());
+            return Err(Error::SourceMismatch);
         }
         if !source.pool.same_pool(&self.pool) {
-            return Err(Error::ForeignPool.into());
+            return Err(Error::ForeignPool);
         }
         match &source.record {
             Record::Document(input) => Ok(Some(input.clone())),
@@ -170,20 +167,19 @@ impl TextBridge {
                     .get(p.packet.track)
                     .ok_or(Error::Invalid("text track index"))?;
                 if track.number != self.track {
-                    return Err(Error::Invalid("selected text track").into());
+                    return Err(Error::Invalid("selected text track"));
                 }
                 if !matches!(
                     track.codec.as_ref(),
                     "S_TEXT/UTF8" | "S_TEXT/WEBVTT" | "S_TEXT/ASS" | "S_TEXT/SSA"
                 ) {
-                    return Err(Error::Unsupported("source text codec mapping").into());
+                    return Err(Error::Unsupported("source text codec mapping"));
                 }
                 if p.configuration.generation() != self.generation {
                     return Err(Error::StaleGeneration {
                         expected: self.generation,
                         received: p.configuration.generation(),
-                    }
-                    .into());
+                    });
                 }
                 for (n, max) in [
                     (p.packet.data.len(), self.limits.max_input_bytes),
@@ -201,8 +197,7 @@ impl TextBridge {
                         return Err(Error::Limit {
                             requested: n,
                             maximum: max,
-                        }
-                        .into());
+                        });
                     }
                 }
                 Ok(None)
@@ -211,7 +206,7 @@ impl TextBridge {
                 if u64::from(p.configuration.track.track_id) != self.track
                     || p.configuration.description.format != *b"tx3g"
                 {
-                    return Err(Error::Invalid("selected source tx3g track").into());
+                    return Err(Error::Invalid("selected source tx3g track"));
                 }
                 let base = p.configuration.track.base.require()?;
                 let sample = &p.source.sample;
@@ -250,7 +245,7 @@ impl TextBridge {
         if self.pending.is_some() || self.finishing {
             return Err(TextRejection {
                 source,
-                error: Error::Invalid("text packet pending or finished").into(),
+                error: Error::Invalid("text packet pending or finished"),
             });
         }
         let input = match self.direct_input(&source) {
@@ -261,7 +256,7 @@ impl TextBridge {
             if let Err(rejected) = self.extractor.provide(input) {
                 return Err(TextRejection {
                     source,
-                    error: rejected.error.into(),
+                    error: rejected.error,
                 });
             }
         } else {
@@ -283,7 +278,7 @@ impl TextBridge {
             .as_ref()
             .ok_or(Error::Invalid("text copy source"))?;
         let Record::Matroska(p) = &source.record else {
-            return Err(Error::Invalid("text copy kind").into());
+            return Err(Error::Invalid("text copy kind"));
         };
         let stage = self
             .copy
@@ -299,7 +294,7 @@ impl TextBridge {
             {
                 if a.id() == 1 {
                     if stage.addition.is_some() {
-                        return Err(Error::Invalid("duplicate source text BlockAdditional1").into());
+                        return Err(Error::Invalid("duplicate source text BlockAdditional1"));
                     }
                     stage.addition = Some(stage.scan);
                 }
@@ -311,7 +306,7 @@ impl TextBridge {
         }
         if stage.field < 4 {
             if c.load(Ordering::Relaxed) {
-                return Err(Error::Cancelled.into());
+                return Err(Error::Cancelled);
             }
             let bytes: &[u8] = match stage.field {
                 0 => p.packet.data.as_ref(),
@@ -341,8 +336,7 @@ impl TextBridge {
                 return Err(Error::Limit {
                     requested: bytes.len(),
                     maximum,
-                }
-                .into());
+                });
             }
             let buffer = &mut stage.fields[stage.field];
             if buffer.capacity() == 0 && !bytes.is_empty() {
@@ -354,7 +348,7 @@ impl TextBridge {
             }
             while buffer.len() < bytes.len() {
                 if c.load(Ordering::Relaxed) {
-                    return Err(Error::Cancelled.into());
+                    return Err(Error::Cancelled);
                 }
                 if !w.try_charge(1) {
                     return Ok(false);
@@ -369,7 +363,7 @@ impl TextBridge {
                 Ok(b) => b,
                 Err(f) => {
                     *buffer = f.buffer;
-                    return Err(f.error.into());
+                    return Err(f.error);
                 }
             };
             stage.ready[stage.field] = Some(frozen);
@@ -427,7 +421,7 @@ impl TextBridge {
     }
     pub fn step(&mut self, w: &mut WorkBudget, c: &AtomicBool) -> Result<TextStep> {
         if c.load(Ordering::Relaxed) {
-            return Err(Error::Cancelled.into());
+            return Err(Error::Cancelled);
         }
         if w.remaining() == 0 {
             return Ok(TextStep::Yield);

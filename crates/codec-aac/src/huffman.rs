@@ -173,10 +173,10 @@ fn fast_table(codes: &[(u32, u8)], values: &[[i8; 4]], unsigned: bool, n: usize)
             let mut e = total;
             for (i, &vi) in v.iter().enumerate().take(n) {
                 let mut x = vi as i32;
-                if let Some(p) = nz.iter().position(|&j| j == i).filter(|_| unsigned) {
-                    if signs >> (nsign - 1 - p as u32) & 1 == 1 {
-                        x = -x;
-                    }
+                if let Some(p) = nz.iter().position(|&j| j == i).filter(|_| unsigned)
+                    && signs >> (nsign - 1 - p as u32) & 1 == 1
+                {
+                    x = -x;
                 }
                 e |= ((x as u32) & 63) << (8 + 6 * i);
             }

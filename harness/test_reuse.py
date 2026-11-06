@@ -1,6 +1,5 @@
 """Exercise both real collector entry points without starting measurement workers."""
 import contextlib
-import importlib.util
 import io
 import json
 from pathlib import Path
@@ -8,19 +7,16 @@ import tempfile
 import unittest
 from unittest.mock import patch
 
+from tools import test_catalogue_vector, test_media
+from .common import digest
 from .comparison import reference_record, reference_summary
-from .runner import digest
-
-ROOT = Path(__file__).resolve().parents[1]
 
 
 class CollectorReuseTests(unittest.TestCase):
     def collect(self, external, timing, memory, *, pairs=30, iterations=50,
                 previous_instrumentation=None, overwrite_previous=False):
-        name = "test-catalogue-vector.py" if external else "test-media.py"
-        spec = importlib.util.spec_from_file_location("collector_reuse_test", ROOT / "tools" / name)
-        collector = importlib.util.module_from_spec(spec)
-        spec.loader.exec_module(collector)
+        name = "test_catalogue_vector.py" if external else "test_media.py"
+        collector = test_catalogue_vector if external else test_media
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
 

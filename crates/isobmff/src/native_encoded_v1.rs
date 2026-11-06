@@ -1102,10 +1102,10 @@ impl<'a> Mov9EncodedStreamJobV1<'a> {
                                         return Err(e);
                                     }
                                 }
-                                if let Some(r) = &mut self.wave_source_v7 {
-                                    if r.terminator.is_none() {
-                                        r.terminator = Some(raw.clone());
-                                    }
+                                if let Some(r) = &mut self.wave_source_v7
+                                    && r.terminator.is_none()
+                                {
+                                    r.terminator = Some(raw.clone());
                                 }
                                 w.terminator = Some(raw);
                             }
@@ -1218,10 +1218,10 @@ impl<'a> Mov9EncodedStreamJobV1<'a> {
                 }
                 continue;
             }
-            if let Some(esds) = &mut self.esds {
-                if !esds.poll(work)? {
-                    return Ok(Mov9CursorStatus::Yield);
-                }
+            if let Some(esds) = &mut self.esds
+                && !esds.poll(work)?
+            {
+                return Ok(Mov9CursorStatus::Yield);
             }
             if !work.try_charge(1) {
                 return Ok(Mov9CursorStatus::Yield);

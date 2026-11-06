@@ -1,12 +1,12 @@
 //! Audio parameter observations for the admitted Matroska startup profiles.
 use crate::{Output, Result};
 use std::sync::atomic::AtomicBool;
-use triergon::{matroska::Track, typed::Packet};
 use triergon_core::{Error, WorkBudget};
 use triergon_framing::{
     AacAdtsParameters, AacAscParser, AacConfigLimits, AacSource, Ac3Family, Ac3FrameDetails,
     BuildStep, probe_ac3_header,
 };
+use triergon_matroska::{matroska::Track, typed::Packet};
 
 #[derive(Default)]
 pub(super) struct AudioProbe {
@@ -90,7 +90,7 @@ impl AudioProbe {
         ) {
             Ok(parser) => self.aac = Some(parser),
             Err(error @ (Error::ForeignPool | Error::Overflow)) => {
-                return Err(error.into());
+                return Err(error);
             }
             Err(_) => {
                 self.unavailable_aac |= bit;
@@ -121,7 +121,7 @@ impl AudioProbe {
             }
             Ok(BuildStep::Complete) => false,
             Err(error @ (Error::Cancelled | Error::Allocation | Error::Backpressure { .. })) => {
-                return Err(error.into());
+                return Err(error);
             }
             Err(_) => false,
         };

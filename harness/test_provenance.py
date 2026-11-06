@@ -1,8 +1,8 @@
-import importlib.util
 from pathlib import Path
 import tempfile
 import unittest
 from unittest.mock import patch
+from tools import test_media as collector
 from .provenance import matroska_inputs, selected_graph
 
 
@@ -103,10 +103,6 @@ class SelectedGraphTests(unittest.TestCase):
             self.capture()
 
     def test_collector_verifier_rejects_source_drift_in_its_selected_graph(self):
-        source = Path(__file__).resolve().parents[1] / 'tools/test-media.py'
-        spec = importlib.util.spec_from_file_location('test_media_collector', source)
-        collector = importlib.util.module_from_spec(spec)
-        spec.loader.exec_module(collector)
         self.packages[1]['name'] = 'media-worker'
         (self.root / 'harness-rule.json').write_text('{}')
         graph = selected_graph(self.root, self.metadata, 'media-worker', ['harness-rule.json'])

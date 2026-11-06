@@ -91,6 +91,7 @@ impl Decoder {
             return Err(DecodeError::InvalidData("ADTS frame length"));
         }
         let payload = &au[hdr..h.frame_length];
+        #[cfg(feature = "inspect")]
         core.sbr_fil_ranges.clear();
         let mut br = BitReader::new(payload);
         // planes sized for the current layout; a mid-frame layout change restarts collection
@@ -124,22 +125,21 @@ impl Decoder {
         self.core.reset_history();
     }
 
-    #[doc(hidden)]
     /// Development aid: payload bit ranges of the SBR fill elements of the last frame.
-    pub fn debug_sbr_fil_ranges(&self) -> &[(usize, usize)] {
+    #[cfg(feature = "inspect")]
+    pub fn sbr_fill_ranges(&self) -> &[(usize, usize)] {
         &self.core.sbr_fil_ranges
     }
 
-    #[doc(hidden)]
-    /// Development aid: collect `debug_stats` from now on (off by default; it formats text
-    /// per frame).
-    pub fn debug_enable_stats(&mut self) {
+    /// Development aid: collect [`Self::stats`] from now on (it formats text per frame).
+    #[cfg(feature = "inspect")]
+    pub fn enable_stats(&mut self) {
         self.core.stats_enabled = true;
     }
 
-    #[doc(hidden)]
     /// Development statistics of the last decoded block (unstable format).
-    pub fn debug_stats(&self) -> &str {
+    #[cfg(feature = "inspect")]
+    pub fn stats(&self) -> &str {
         &self.core.stats
     }
 

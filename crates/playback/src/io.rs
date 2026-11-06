@@ -46,16 +46,15 @@ impl<S: Source> SourceOwner<S> {
         c: &AtomicBool,
     ) -> Result<SourceReply> {
         if c.load(Ordering::Relaxed) {
-            return Err(Error::Cancelled.into());
+            return Err(Error::Cancelled);
         }
         if w.remaining() == 0 {
             return Ok(SourceReply::Pending);
         }
-        Ok(self
-            .source
+        self.source
             .as_mut()
             .ok_or(Error::Invalid("source closed"))?
-            .poll(r, w, c)?)
+            .poll(r, w, c)
     }
     pub fn abort(&mut self) {
         if !self.aborted {
@@ -97,8 +96,7 @@ pub fn provide(input: &mut InputCursor, reply: &SourceReply) -> Result<bool> {
             Err(match failure {
                 SourceFailure::Transport => Error::Transport,
                 SourceFailure::Cancelled => Error::Cancelled,
-            }
-            .into())
+            })
         }
     }
 }
@@ -154,9 +152,7 @@ impl<S: Source> Probe<S> {
             return Err(crate::Error::Closed);
         }
         let result = self.advance_inner(w, c);
-        if result.is_err()
-            && !matches!(&result, Err(crate::Error::Core(Error::Backpressure { .. })))
-        {
+        if result.is_err() && !matches!(&result, Err(Error::Backpressure { .. })) {
             self.failed = true;
             if let Some(source) = self.source.as_mut() {
                 source.close();
@@ -170,7 +166,7 @@ impl<S: Source> Probe<S> {
                 .as_mut()
                 .ok_or(Error::Invalid("closed probe"))?
                 .close();
-            return Err(Error::Cancelled.into());
+            return Err(Error::Cancelled);
         }
         if let Some(f) = self.chosen {
             return Ok(ProbeProgress::Selected(f));
@@ -204,8 +200,7 @@ impl<S: Source> Probe<S> {
                     return Err(Error::Limit {
                         requested: self.cache.len() + 1,
                         maximum: 581,
-                    }
-                    .into());
+                    });
                 }
                 self.cache
                     .try_push(CachedWindow {
@@ -225,9 +220,9 @@ impl<S: Source> Probe<S> {
             return Ok(ProbeProgress::Selected(f));
         }
         if self.used == self.prefix.len() {
-            return Err(
-                Error::Unsupported("source signatures do not select MKV, MP4 or TS").into(),
-            );
+            return Err(Error::Unsupported(
+                "source signatures do not select MKV, MP4 or TS",
+            ));
         }
         // Four/eight initial bytes can select MKV/MP4 without reading a whole TS probe.
         let end = if self.used < 4 {
@@ -249,8 +244,7 @@ impl<S: Source> Probe<S> {
             Step::Yield => Ok(ProbeProgress::Yield),
             Step::End(_) => Err(Error::Unsupported(
                 "short or unknown source signature; explicit format required",
-            )
-            .into()),
+            )),
         }
     }
     pub fn finish(mut self) -> Result<SelectedInput<ReplaySource<S>>> {
@@ -297,7 +291,7 @@ pub(crate) fn detect_container(p: &[u8]) -> Result<Option<Format>> {
     match (ts, m2) {
         (true, false) => Ok(Some(Format::Ts(triergon_mpegts::PacketFormat::Ts188))),
         (false, true) => Ok(Some(Format::Ts(triergon_mpegts::PacketFormat::M2ts192))),
-        (true, true) => Err(Error::Invalid("ambiguous transport signature").into()),
+        (true, true) => Err(Error::Invalid("ambiguous transport signature")),
         _ => Ok(None),
     }
 }
@@ -351,10 +345,7 @@ impl<S: Source> Source for ReplaySource<S> {
                 )?));
             }
         }
-        self.inner.poll(r, w, c).map_err(|e| match e {
-            crate::Error::Core(c) => c,
-            _ => Error::Invalid("probe upstream error"),
-        })
+        self.inner.poll(r, w, c)
     }
     fn invalidate(&mut self) {
         self.inner.invalidate();

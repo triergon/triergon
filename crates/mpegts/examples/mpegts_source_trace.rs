@@ -21,9 +21,7 @@ use triergon_mpegts::{
 
 pub(crate) fn hex(output: &mut impl Write, bytes: &[u8]) -> io::Result<()> {
     output.write_all(b"\"")?;
-    for byte in bytes {
-        write!(output, "{byte:02x}")?;
-    }
+    triergon_harness_protocol::write_hex(output, bytes)?;
     output.write_all(b"\"")
 }
 pub(crate) fn optional(output: &mut impl Write, value: Option<u64>) -> io::Result<()> {
@@ -144,7 +142,7 @@ fn dvb_signalling(output: &mut impl Write, stream: &ElementaryStream) -> io::Res
         }
         Err(error) => {
             output.write_all(b"{\"unsupported\":")?;
-            json_string(output, &error.to_string())?;
+            triergon_harness_protocol::write_quoted(output, &error.to_string())?;
             output.write_all(b"}")?;
         }
     }
@@ -346,7 +344,7 @@ pub(crate) fn event(
             optional(output, fault.pid.map(u64::from))?;
             output.write_all(b",\"error\":")?;
             let message = format!("{:?}", fault.error);
-            json_string(output, &message)?;
+            triergon_harness_protocol::write_quoted(output, &message)?;
             output.write_all(b"}")?;
         }
         TraceEvent::Finished => {
@@ -356,21 +354,6 @@ pub(crate) fn event(
     }
     output.write_all(b"\n")?;
     Ok(false)
-}
-pub(crate) fn json_string(output: &mut impl Write, text: &str) -> io::Result<()> {
-    output.write_all(b"\"")?;
-    for character in text.chars() {
-        match character {
-            '"' => output.write_all(b"\\\"")?,
-            '\\' => output.write_all(b"\\\\")?,
-            '\n' => output.write_all(b"\\n")?,
-            '\r' => output.write_all(b"\\r")?,
-            '\t' => output.write_all(b"\\t")?,
-            c if c < ' ' => write!(output, "\\u{:04x}", u32::from(c))?,
-            c => write!(output, "{c}")?,
-        }
-    }
-    output.write_all(b"\"")
 }
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {

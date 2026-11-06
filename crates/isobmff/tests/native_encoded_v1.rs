@@ -94,10 +94,10 @@ fn config(data: &Source, kind: &[u8; 4], skip: usize) -> BoxView {
         .children(skip, triergon_isobmff::Limits::default())
         .unwrap();
     loop {
-        if let triergon_isobmff::BoxStep::Box(b) = scan.poll(&mut WorkBudget::new(16)).unwrap() {
-            if b.header().kind == *kind {
-                return b;
-            }
+        if let triergon_isobmff::BoxStep::Box(b) = scan.poll(&mut WorkBudget::new(16)).unwrap()
+            && b.header().kind == *kind
+        {
+            return b;
         }
     }
 }

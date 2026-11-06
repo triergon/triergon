@@ -7,60 +7,37 @@ use std::{
     sync::atomic::AtomicBool,
     time::Instant,
 };
-use triergon::timing::ExactTime;
-use triergon::{Limits, typed::BlockingReader as Demuxer};
+use triergon_harness_protocol::{
+    digest::{fold, fold_bytes},
+    hex, quoted,
+};
+use triergon_matroska::timing::ExactTime;
+use triergon_matroska::{Limits, typed::BlockingReader as Demuxer};
 
 // Explicit private operation binding. Library defaults remain OwnedExact.
-fn open_shared<R: Read>(source: R, limits: Limits) -> triergon::Result<Demuxer<R>> {
+fn open_shared<R: Read>(source: R, limits: Limits) -> triergon_matroska::Result<Demuxer<R>> {
     Demuxer::open_with_payload_ownership(
         source,
         limits,
-        triergon::typed::PayloadOwnership::SharedBounded,
+        triergon_matroska::typed::PayloadOwnership::SharedBounded,
     )
 }
 
 fn open_owned(
     data: Vec<u8>,
     limits: Limits,
-) -> triergon::Result<Demuxer<Cursor<triergon::storage::OwnedInputBytes>>> {
-    let pool = triergon::storage::Budget::new(limits.live_storage_bytes)?;
-    let source = triergon::storage::OwnedInputBytes::try_from_vec(&pool, data)
+) -> triergon_matroska::Result<Demuxer<Cursor<triergon_matroska::storage::OwnedInputBytes>>> {
+    let pool = triergon_matroska::storage::Budget::new(limits.live_storage_bytes)?;
+    let source = triergon_matroska::storage::OwnedInputBytes::try_from_vec(&pool, data)
         .map_err(|error| error.error())?;
     Demuxer::open_owned_seekable_in(
         source,
         limits,
         &pool,
-        triergon::typed::PayloadOwnership::SharedBounded,
+        triergon_matroska::typed::PayloadOwnership::SharedBounded,
     )
 }
 
-fn quote(s: &str) -> String {
-    let mut out = String::from("\"");
-    for c in s.chars() {
-        match c {
-            '"' => out.push_str("\\\""),
-            '\\' => out.push_str("\\\\"),
-            '\n' => out.push_str("\\n"),
-            '\r' => out.push_str("\\r"),
-            '\t' => out.push_str("\\t"),
-            c if c < ' ' => {
-                write!(out, "\\u{:04x}", c as u32).unwrap();
-            }
-            c => out.push(c),
-        }
-    }
-    out.push('"');
-    out
-}
-fn hex(data: &[u8]) -> String {
-    const DIGITS: &[u8] = b"0123456789abcdef";
-    let mut s = String::with_capacity(data.len() * 2);
-    for b in data {
-        s.push(DIGITS[(b >> 4) as usize] as char);
-        s.push(DIGITS[(b & 15) as usize] as char);
-    }
-    s
-}
 fn codec(s: &str) -> &str {
     match s {
         "V_MPEG4/ISO/AVC" => "h264",
@@ -78,59 +55,6 @@ fn codec(s: &str) -> &str {
     }
 }
 
-fn fold(digest: &mut u64, value: u64) {
-    *digest = digest.wrapping_mul(31).wrapping_add(value);
-}
-fn fold_bytes(digest: &mut u64, bytes: &[u8]) {
-    // Exact expansion of eight ordered h <- 31*h + byte steps modulo 2^64.
-    // The native reference uses the identical polynomial and byte order.
-    // Four bytes sum to at most 255 * (31^3 + 31^2 + 31 + 1),
-    // below 2^23. Narrow dot products preserve the exact eight-byte polynomial
-    // while exposing native 32-bit vector arithmetic in both timing workers.
-    let four = |b: &[u8]| {
-        u32::from(b[0]) * 29_791 + u32::from(b[1]) * 961 + u32::from(b[2]) * 31 + u32::from(b[3])
-    };
-    let tail = |b: &[u8]| u64::from(four(&b[..4])) * 923_521 + u64::from(four(&b[4..]));
-    let bytes = if bytes.len() >= 256 {
-        // Four independent recurrences expose instruction-level parallelism.
-        // Recombine their exact polynomial positions, including the incoming
-        // digest. Both timing workers use this algorithm; no byte is sampled.
-        const STEP: u64 = 3_671_467_063_254_694_913; // 31^32 modulo 2^64
-        let mut groups = bytes.chunks_exact(32);
-        let mut exponent = groups.len();
-        let mut power = 1_u64;
-        let mut base = STEP;
-        while exponent != 0 {
-            if exponent & 1 != 0 {
-                power = power.wrapping_mul(base);
-            }
-            base = base.wrapping_mul(base);
-            exponent >>= 1;
-        }
-        let mut lanes = [0_u64; 4];
-        for block in &mut groups {
-            for (lane, b) in lanes.iter_mut().zip(block.chunks_exact(8)) {
-                *lane = lane.wrapping_mul(STEP).wrapping_add(tail(b));
-            }
-        }
-        *digest = digest
-            .wrapping_mul(power)
-            .wrapping_add(lanes[0].wrapping_mul(13_349_005_091_172_011_265))
-            .wrapping_add(lanes[1].wrapping_mul(12_662_688_596_514_954_753))
-            .wrapping_add(lanes[2].wrapping_mul(852_891_037_441))
-            .wrapping_add(lanes[3]);
-        groups.remainder()
-    } else {
-        bytes
-    };
-    let mut groups = bytes.chunks_exact(8);
-    for b in &mut groups {
-        *digest = digest.wrapping_mul(852_891_037_441).wrapping_add(tail(b));
-    }
-    for b in groups.remainder() {
-        fold(digest, u64::from(*b));
-    }
-}
 fn sample_count(ns: u64, rate: f64) -> Result<u64, Box<dyn std::error::Error>> {
     if rate.fract() != 0.0 || !(1.0..=u32::MAX as f64).contains(&rate) {
         return Err("unsupported sample-trim rate".into());
@@ -140,8 +64,8 @@ fn sample_count(ns: u64, rate: f64) -> Result<u64, Box<dyn std::error::Error>> {
     )?)
 }
 fn trims(
-    track: &triergon::matroska::Track,
-    p: &triergon::matroska::Packet,
+    track: &triergon_matroska::matroska::Track,
+    p: &triergon_matroska::matroska::Packet,
     first: bool,
 ) -> Result<(u64, u64), Box<dyn std::error::Error>> {
     let mut start = if first && track.kind == 2 {
@@ -210,7 +134,10 @@ fn trace_source<R: Read>(mut demux: Demuxer<R>) -> Result<(), Box<dyn std::error
 // Optional decoder-input comparison view. The source-frame API and default trace
 // retain every event. Empty PCM without packet trim side data contains no samples;
 // FFmpeg delivers no AVPacket for it. Other codecs and side-only events stay visible.
-fn decoder_packet(track: &triergon::matroska::Track, packet: &triergon::matroska::Packet) -> bool {
+fn decoder_packet(
+    track: &triergon_matroska::matroska::Track,
+    packet: &triergon_matroska::matroska::Packet,
+) -> bool {
     !(track.kind == 2
         && track.codec == "A_PCM/INT/LIT"
         && packet.data.is_empty()
@@ -226,7 +153,7 @@ fn trace_colour_source<R: Read>(d: Demuxer<R>) -> Result<(), Box<dyn std::error:
         write!(
             out,
             "{{\"raw_track\":{},\"colour\":",
-            quote(&hex(&t.source_metadata))
+            quoted(&hex(&t.source_metadata))
         )?;
         if let Some(c) = t.colour {
             let integers = [
@@ -264,7 +191,7 @@ fn trace_colour_source<R: Read>(d: Demuxer<R>) -> Result<(), Box<dyn std::error:
                         out.push(',');
                     }
                     out.push_str(
-                        &v.map_or("null".into(), |v| quote(&format!("{:016x}", v.to_bits()))),
+                        &v.map_or("null".into(), |v| quoted(&format!("{:016x}", v.to_bits()))),
                     );
                 }
                 out.push(']');
@@ -291,7 +218,7 @@ fn trace<R: Read>(
     let mut out = format!(
         "{{\"schema\":{},\"operation\":{},\"tracks\":[",
         if metadata == 2 { 2 } else { 1 },
-        quote(if metadata == 2 {
+        quoted(if metadata == 2 {
             "container-catalogue-demux-v1"
         } else {
             "container-demux-v1"
@@ -304,9 +231,9 @@ fn trace<R: Read>(
         write!(
             out,
             "{{\"codec\":{},\"kind\":{},\"private\":{},\"width\":{},\"height\":{},\"channels\":{},\"sample_rate\":{},\"default\":{},\"forced\":{}",
-            quote(codec(&t.codec)),
+            quoted(codec(&t.codec)),
             t.kind,
-            quote(&hex(&t.codec_private)),
+            quoted(&hex(&t.codec_private)),
             t.width,
             t.height,
             if t.kind == 2 { t.channels } else { 0 },
@@ -318,8 +245,8 @@ fn trace<R: Read>(
             write!(
                 out,
                 ",\"language\":{},\"name\":{}",
-                quote(&t.language),
-                quote(&t.name)
+                quoted(&t.language),
+                quoted(&t.name)
             )?;
         }
         if metadata != 0 {
@@ -365,7 +292,7 @@ fn trace<R: Read>(
             p.keyframe,
             start_trim,
             end_trim,
-            quote(&hex(&p.data))
+            quoted(&hex(&p.data))
         )?;
         if out.len() > 128 * 1024 * 1024 {
             return Err("trace size limit".into());
@@ -616,13 +543,14 @@ fn entry() -> Result<(), Box<dyn std::error::Error>> {
             trace(demux, receipt.replays_from_start, false, 0)?;
         }
         "inflate" => {
-            let limits = triergon::zlib::InflateLimits {
+            let limits = triergon_matroska::zlib::InflateLimits {
                 output_bytes: a.get(3).map_or(Ok(16 * 1024 * 1024), |s| s.parse())?,
                 expansion_ratio: a.get(4).map_or(Ok(1024), |s| s.parse())?,
                 work: a.get(5).map_or(Ok(128 * 1024 * 1024), |s| s.parse())?,
             };
-            let bytes = triergon::zlib::decompress(&data, limits, &AtomicBool::new(false))?;
-            println!("{}", quote(&hex(&bytes)));
+            let bytes =
+                triergon_matroska::zlib::decompress(&data, limits, &AtomicBool::new(false))?;
+            println!("{}", quoted(&hex(&bytes)));
         }
         "seek" => {
             let target: i64 = a.get(3).ok_or("missing seek time")?.parse()?;
@@ -642,7 +570,7 @@ fn entry() -> Result<(), Box<dyn std::error::Error>> {
                 p.track,
                 p.pts_ns.map_or("null".into(), |v| v.to_string()),
                 p.keyframe,
-                quote(&hex(&p.data))
+                quoted(&hex(&p.data))
             );
         }
         _ => return Err("unknown operation".into()),

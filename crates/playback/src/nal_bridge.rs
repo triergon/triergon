@@ -33,10 +33,10 @@ impl AvcBridgeSetup {
         packet_limits: NalPacketLimits,
     ) -> Result<Self> {
         if !matches!(&configuration.description.format, b"avc1" | b"avc3") {
-            return Err(Error::Invalid("source entry is not AVC").into());
+            return Err(Error::Invalid("source entry is not AVC"));
         }
         if !configuration.description.raw().bytes().belongs_to(pool) {
-            return Err(Error::ForeignPool.into());
+            return Err(Error::ForeignPool);
         }
         let children = configuration
             .description
@@ -54,10 +54,10 @@ impl AvcBridgeSetup {
     }
     pub fn poll(&mut self, w: &mut WorkBudget, c: &AtomicBool) -> Result<Option<AvcBridge>> {
         if c.load(std::sync::atomic::Ordering::Relaxed) {
-            return Err(Error::Cancelled.into());
+            return Err(Error::Cancelled);
         }
         if self.done {
-            return Err(Error::Invalid("AVC bridge setup consumed").into());
+            return Err(Error::Invalid("AVC bridge setup consumed"));
         }
         if let Some(parser) = self.parser.as_mut() {
             return match parser.step(w, c)? {
@@ -75,12 +75,12 @@ impl AvcBridgeSetup {
                         configuration_revision: self.configuration.revision,
                     }))
                 }
-                BuildStep::Complete => Err(Error::Invalid("AVC record not retained").into()),
+                BuildStep::Complete => Err(Error::Invalid("AVC record not retained")),
             };
         }
         match self.children.poll(w)? {
             BoxStep::Yield => Ok(None),
-            BoxStep::End => Err(Error::Invalid("AVC sample entry has no avcC").into()),
+            BoxStep::End => Err(Error::Invalid("AVC sample entry has no avcC")),
             BoxStep::Box(raw) => {
                 if raw.header().kind == *b"avcC" {
                     let offset = raw
@@ -110,15 +110,14 @@ impl AvcBridgeSetup {
 impl AvcBridge {
     pub fn packet(&mut self, packet: Mp4Packet) -> Result<NalPacketJob<'_, Mp4Packet>> {
         if packet.source.source != self.source {
-            return Err(Error::SourceMismatch.into());
+            return Err(Error::SourceMismatch);
         }
         if packet.configuration.track.track_id != self.track
             || packet.configuration.revision != self.configuration_revision
         {
             return Err(Error::Invalid(
                 "source configuration changed; configure bridge before packet",
-            )
-            .into());
+            ));
         }
         let source = NalPacket {
             bytes: packet.source.payload.clone(),
@@ -130,7 +129,7 @@ impl AvcBridge {
             fields: packet,
             new_extradata: None,
         };
-        Ok(self.session.packet(source, None)?)
+        self.session.packet(source, None)
     }
     pub fn flush(&mut self) {
         self.session.flush();

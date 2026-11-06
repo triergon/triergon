@@ -1,5 +1,4 @@
 import hashlib
-import importlib.util
 import io
 import json
 import os
@@ -9,10 +8,8 @@ import tempfile
 import unittest
 from unittest.mock import patch
 
-spec = importlib.util.spec_from_file_location(
-    'required_vectors', Path(__file__).resolve().parents[1] / 'tools/fetch-required-vectors.py')
-fetcher = importlib.util.module_from_spec(spec)
-spec.loader.exec_module(fetcher)
+from tools import fetch_required_vectors as fetcher
+from tools import run_fate as fate
 
 
 class RequiredVectorTests(unittest.TestCase):
@@ -110,11 +107,6 @@ class RequiredVectorTests(unittest.TestCase):
 import contextlib
 import sys
 
-fate_spec = importlib.util.spec_from_file_location(
-    'fate_dispatch', Path(__file__).resolve().parents[1] / 'tools/run-fate.py')
-fate = importlib.util.module_from_spec(fate_spec)
-fate_spec.loader.exec_module(fate)
-
 class FateDispatchTests(unittest.TestCase):
     def setUp(self):
         self.temp=tempfile.TemporaryDirectory()
@@ -146,7 +138,7 @@ class FateDispatchTests(unittest.TestCase):
         return candidate,reference
 
     def run_case(self,case='fate-matroska-xiph-lacing',demux=True):
-        argv=['run-fate.py','--case',case]+(['--demux-only'] if demux else [])
+        argv=['run_fate.py','--case',case]+(['--demux-only'] if demux else [])
         with patch.object(sys,'argv',argv),contextlib.redirect_stdout(io.StringIO()),contextlib.redirect_stderr(io.StringIO()):
             return fate.main()
 

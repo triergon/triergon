@@ -7,10 +7,6 @@ use crate::{
     mp4_plan::{Mp4Configuration, PreparedMp4, SourceRow},
 };
 use std::sync::atomic::{AtomicBool, Ordering};
-use triergon::{
-    incremental::ParseStep,
-    typed::{Event as MkvEvent, Reader},
-};
 use triergon_core::{
     Budget, BudgetVec, Error, InputCursor, InputRequest, SourceCapabilities, SourceId,
     SourceLocation, Step, Time, TimeBase, WorkBudget,
@@ -19,6 +15,10 @@ use triergon_isobmff::{
     Mov9CursorStatus, Mov9FrontReadBoundaryV1, Mov9PacketCursor, Mov9PacketOccurrence,
     Mov9SampleExtent, Mov9SampleRead, Mov9ShortSample, PinnedMovD32RegularRecoveryV1, SampleReader,
     SourcePacket,
+};
+use triergon_matroska::{
+    incremental::ParseStep,
+    typed::{Event as MkvEvent, Reader},
 };
 use triergon_mpegts::{
     self as ts, FeedContinuation, TraceEvent, TransportStream,
@@ -335,7 +335,7 @@ impl MkvEngine {
         w: &mut WorkBudget,
         c: &AtomicBool,
     ) -> Result<ParseStep<MkvEvent>> {
-        Ok(self.reader.step(w, c)?)
+        self.reader.step(w, c)
     }
 }
 impl std::ops::Deref for MkvEngine {
@@ -358,7 +358,7 @@ impl Engine {
         pool: &Budget,
         id: SourceId,
         caps: SourceCapabilities,
-        limits: triergon::Limits,
+        limits: triergon_matroska::Limits,
         window: usize,
     ) -> Result<Self> {
         Self::matroska_with_payload_ownership(
@@ -367,7 +367,7 @@ impl Engine {
             caps,
             limits,
             window,
-            triergon::typed::PayloadOwnership::OwnedExact,
+            triergon_matroska::typed::PayloadOwnership::OwnedExact,
         )
     }
 
@@ -377,9 +377,9 @@ impl Engine {
         pool: &Budget,
         id: SourceId,
         caps: SourceCapabilities,
-        limits: triergon::Limits,
+        limits: triergon_matroska::Limits,
         window: usize,
-        ownership: triergon::typed::PayloadOwnership,
+        ownership: triergon_matroska::typed::PayloadOwnership,
     ) -> Result<Self> {
         Ok(Self::Matroska(MkvEngine {
             reader: Reader::new_with_payload_ownership(pool, id, caps, limits, window, ownership)?,
@@ -393,7 +393,7 @@ impl Engine {
         pool: &Budget,
         id: SourceId,
         bytes: triergon_core::Bytes,
-        limits: triergon::Limits,
+        limits: triergon_matroska::Limits,
         window: usize,
     ) -> Result<Self> {
         Ok(Self::Matroska(MkvEngine {
@@ -407,7 +407,7 @@ impl Engine {
         pool: &Budget,
         id: SourceId,
         caps: SourceCapabilities,
-        limits: triergon::Limits,
+        limits: triergon_matroska::Limits,
         window: usize,
     ) -> Result<Self> {
         Ok(Self::Matroska(MkvEngine {
@@ -418,21 +418,19 @@ impl Engine {
     pub fn mp4(input: InputCursor, plan: PreparedMp4, maximum_packet: usize) -> Result<Self> {
         let engine = Self::mp4_unattached(input, plan, maximum_packet)?;
         if matches!(&engine, Self::Mp4(mp4) if mp4.plan.native_front) {
-            return Err(
-                Error::Unsupported("native front plan requires actual source completion").into(),
-            );
+            return Err(Error::Unsupported(
+                "native front plan requires actual source completion",
+            ));
         }
         if matches!(&engine, Self::Mp4(mp4) if mp4.plan.terminal_mdat.is_some()) {
             return Err(Error::Unsupported(
                 "open terminal MDAT needs progressive source completion",
-            )
-            .into());
+            ));
         }
         if matches!(&engine, Self::Mp4(mp4) if mp4.plan.forward_regular_extents.is_some()) {
             return Err(Error::Unsupported(
                 "forward regular MDAT needs progressive source completion",
-            )
-            .into());
+            ));
         }
         Ok(engine)
     }
@@ -442,23 +440,22 @@ impl Engine {
         maximum_packet: usize,
     ) -> Result<Self> {
         if !input.budget().same_pool(&plan.pool) {
-            return Err(Error::ForeignPool.into());
+            return Err(Error::ForeignPool);
         }
         if input.source() != plan.source {
-            return Err(Error::SourceMismatch.into());
+            return Err(Error::SourceMismatch);
         }
         if input.generation() != plan.opening_generation {
             return Err(Error::StaleGeneration {
                 expected: plan.opening_generation,
                 received: input.generation(),
-            }
-            .into());
+            });
         }
         if input.capabilities().length != plan.source_length {
-            return Err(Error::Invalid("plan source extent changed").into());
+            return Err(Error::Invalid("plan source extent changed"));
         }
         if maximum_packet == 0 {
-            return Err(Error::Invalid("zero packet policy").into());
+            return Err(Error::Invalid("zero packet policy"));
         }
         let mut engine = Mp4Engine {
             progressive: None,
@@ -489,9 +486,9 @@ impl Engine {
         limits: crate::progressive::ProgressiveLimits,
     ) -> Result<Self> {
         if plan.native_front {
-            return Err(
-                Error::Unsupported("native front plan needs explicit native attachment").into(),
-            );
+            return Err(Error::Unsupported(
+                "native front plan needs explicit native attachment",
+            ));
         }
         let state = crate::progressive::ProgressiveState::new(&plan, limits)?;
         let mut engine = Self::mp4_unattached(input, plan, maximum_packet)?;
@@ -509,7 +506,7 @@ impl Engine {
         limits: crate::progressive::ProgressiveLimits,
     ) -> Result<Self> {
         if !plan.native_front || input.capabilities().random_access {
-            return Err(Error::Invalid("native front attachment context").into());
+            return Err(Error::Invalid("native front attachment context"));
         }
         let state = crate::progressive::ProgressiveState::new(&plan, limits)?;
         let mut engine = Self::mp4_unattached(input, plan, maximum_packet)?;
@@ -607,7 +604,9 @@ impl Engine {
         selection: TsNativeSelection,
     ) -> Result<Self> {
         if format != ts::PacketFormat::Ts188 {
-            return Err(Error::Unsupported("full native M2TS requires an admitted startup-position context; use source and clock views").into());
+            return Err(Error::Unsupported(
+                "full native M2TS requires an admitted startup-position context; use source and clock views",
+            ));
         }
         Self::ts_with_native(input, format, program, limits, policy, selection.into())
     }
@@ -622,7 +621,7 @@ impl Engine {
         selection: TsNativePrivateAudioSelection,
     ) -> Result<Self> {
         if format != ts::PacketFormat::Ts188 {
-            return Err(Error::Unsupported("native private audio requires TS188").into());
+            return Err(Error::Unsupported("native private audio requires TS188"));
         }
         Self::ts_with_native(
             input,
@@ -681,23 +680,24 @@ impl Engine {
         selections: &[TsNativeTrackSelection],
     ) -> Result<Self> {
         if format != ts::PacketFormat::Ts188 {
-            return Err(Error::Unsupported("multiplexed native playback requires TS188").into());
+            return Err(Error::Unsupported(
+                "multiplexed native playback requires TS188",
+            ));
         }
         if selections.is_empty() {
-            return Err(Error::Invalid("native program selection is empty").into());
+            return Err(Error::Invalid("native program selection is empty"));
         }
         if selections.len() > 64 {
             return Err(Error::Limit {
                 requested: selections.len(),
                 maximum: 64,
-            }
-            .into());
+            });
         }
         if selections
             .iter()
             .any(|selection| !(1..=0x1ffe).contains(&selection.pid))
         {
-            return Err(Error::Invalid("native program selection PID").into());
+            return Err(Error::Invalid("native program selection PID"));
         }
         let mut engine =
             Self::ts_with_namespace(input, format, program, limits, policy, namespace)?;
@@ -720,7 +720,7 @@ impl Engine {
                     .windows(2)
                     .any(|pair| pair[0].pid() == pair[1].pid())
                 {
-                    return Err(Error::Invalid("duplicate native program selection PID").into());
+                    return Err(Error::Invalid("duplicate native program selection PID"));
                 }
                 TsNativeTracks::Multiple(tracks)
             };
@@ -815,14 +815,14 @@ impl Engine {
         discontinuity: bool,
     ) -> Result<()> {
         let Self::Ts(t) = self else {
-            return Err(Error::Invalid("entity continuation requires TS source").into());
+            return Err(Error::Invalid("entity continuation requires TS source"));
         };
         let end = t
             .boundary
             .as_ref()
             .ok_or(Error::Invalid("actual entity End required"))?;
         if source == end.location().source {
-            return Err(Error::SourceMismatch.into());
+            return Err(Error::SourceMismatch);
         }
         if discontinuity {
             t.stream.discontinuity()?;
@@ -834,10 +834,10 @@ impl Engine {
     }
     pub(crate) fn finish_logical_source(&mut self) -> Result<()> {
         let Self::Ts(t) = self else {
-            return Err(Error::Invalid("logical TS End required").into());
+            return Err(Error::Invalid("logical TS End required"));
         };
         if t.boundary.is_none() {
-            return Err(Error::Invalid("actual source entity End required").into());
+            return Err(Error::Invalid("actual source entity End required"));
         }
         t.stream.end_of_source()?;
         t.boundary = None;
@@ -854,20 +854,19 @@ impl Engine {
     pub(crate) fn validate_binding(&self) -> Result<()> {
         if let Self::Mp4(r) = self {
             if !r.input.budget().same_pool(&r.plan.pool) {
-                return Err(Error::ForeignPool.into());
+                return Err(Error::ForeignPool);
             }
             if r.input.source() != r.plan.source {
-                return Err(Error::SourceMismatch.into());
+                return Err(Error::SourceMismatch);
             }
             if r.input.generation() != r.plan.opening_generation {
                 return Err(Error::StaleGeneration {
                     expected: r.plan.opening_generation,
                     received: r.input.generation(),
-                }
-                .into());
+                });
             }
             if r.input.capabilities().length != r.plan.source_length {
-                return Err(Error::Invalid("plan source extent changed").into());
+                return Err(Error::Invalid("plan source extent changed"));
             }
         }
         Ok(())
@@ -916,8 +915,7 @@ impl Engine {
                     Err(match failure {
                         triergon_core::SourceFailure::Transport => Error::Transport,
                         triergon_core::SourceFailure::Cancelled => Error::Cancelled,
-                    }
-                    .into())
+                    })
                 }
             },
         }
@@ -945,7 +943,7 @@ impl Engine {
     ) -> Result<BackendStep> {
         match self {
             Self::Mp4(mp4) => mp4.poll(work, cancel, Some(cursor)),
-            _ => Err(Error::Invalid("native range cursor requires MP4").into()),
+            _ => Err(Error::Invalid("native range cursor requires MP4")),
         }
     }
     pub(crate) fn facts(&self) -> Result<BudgetVec<TrackFact>> {
@@ -956,8 +954,7 @@ impl Engine {
                     return Err(Error::Limit {
                         requested: r.tracks().len(),
                         maximum: 64,
-                    }
-                    .into());
+                    });
                 }
                 for t in r.tracks() {
                     out.try_push(TrackFact {
@@ -1005,7 +1002,7 @@ impl Engine {
         match self {
             Self::Matroska(r) => {
                 let TrackKey::Matroska(number) = intent.track else {
-                    return Err(Error::Invalid("seek track format").into());
+                    return Err(Error::Invalid("seek track format"));
                 };
                 let at = r
                     .tracks()
@@ -1023,21 +1020,20 @@ impl Engine {
                 if r.progressive.is_some() {
                     return Err(Error::Unsupported(
                         "progressive replay requires retained source/index context",
-                    )
-                    .into());
+                    ));
                 }
                 if !r.input.capabilities().random_access {
-                    return Err(Error::Unsupported("MP4 replay needs source ranges").into());
+                    return Err(Error::Unsupported("MP4 replay needs source ranges"));
                 }
                 if r.plan.unavailable_first.is_some() {
-                    return Err(Error::Unsupported("native first sample is unavailable").into());
+                    return Err(Error::Unsupported("native first sample is unavailable"));
                 }
                 let TrackKey::Mp4(id) = intent.track else {
-                    return Err(Error::Invalid("seek track format").into());
+                    return Err(Error::Invalid("seek track format"));
                 };
                 let t = r.plan.track(id)?;
                 if t.snapshot.handler != *b"vide" {
-                    return Err(Error::Invalid("MP4 seek track is not video").into());
+                    return Err(Error::Invalid("MP4 seek track is not video"));
                 }
                 let (row, offset, indexed_sync, native_seek) = match mp4_landing {
                     Some(Mp4RangeLanding::Source(landing)) => {
@@ -1052,7 +1048,7 @@ impl Engine {
                             || sync.track_id != id
                             || !sync.sample.is_container_sync()
                         {
-                            return Err(Error::Invalid("MP4 seek landing").into());
+                            return Err(Error::Invalid("MP4 seek landing"));
                         }
                         let skip_video = (landing.first_row < landing.sync_row)
                             .then_some((id, landing.sync_row));
@@ -1090,27 +1086,26 @@ impl Engine {
             }
             Self::Ts(r) => {
                 if r.segment_discovery.is_some() {
-                    return Err(Error::Unsupported("seek needs a fresh TS segment").into());
+                    return Err(Error::Unsupported("seek needs a fresh TS segment"));
                 }
                 if r.native_context.is_some() {
                     return Err(Error::Unsupported(
                         "bound native startup needs a fresh observed context after seek",
-                    )
-                    .into());
+                    ));
                 }
                 if !r.input.capabilities().random_access {
-                    return Err(Error::Unsupported("TS replay needs source rewind").into());
+                    return Err(Error::Unsupported("TS replay needs source rewind"));
                 }
                 let TrackKey::Ts { program, pid: _ } = intent.track else {
-                    return Err(Error::Invalid("seek track format").into());
+                    return Err(Error::Invalid("seek track format"));
                 };
                 if program != r.program {
-                    return Err(Error::Invalid("seek source program").into());
+                    return Err(Error::Invalid("seek source program"));
                 }
                 if matches!(r.policy, SourceTimePolicy::Unanchored)
                     && intent.clock == crate::ClockChoice::SourceExact
                 {
-                    return Err(Error::Unsupported("unanchored TS source time").into());
+                    return Err(Error::Unsupported("unanchored TS source time"));
                 }
                 r.input.reset(0)?;
                 r.stream = TransportStream::new_with_namespace(
@@ -1177,14 +1172,18 @@ impl Mp4Engine {
 
     pub(crate) fn begin_media_replay(&mut self) -> Result<()> {
         let [extent] = self.plan.media.as_slice() else {
-            return Err(Error::Unsupported("native replay needs a finite media extent").into());
+            return Err(Error::Unsupported(
+                "native replay needs a finite media extent",
+            ));
         };
         if self.input.position() != extent.start || self.input.capabilities().random_access {
-            return Err(Error::Invalid("native replay source position").into());
+            return Err(Error::Invalid("native replay source position"));
         }
         let length = extent.end - extent.start;
         if !(1..=RETAINED_MEDIA_BYTES as u64).contains(&length) {
-            return Err(Error::Unsupported("native replay exceeds media cache bound").into());
+            return Err(Error::Unsupported(
+                "native replay exceeds media cache bound",
+            ));
         }
         let pending = PendingMedia::new(extent.start, length as usize, self.input.budget())?;
         self.plan.media_cache.try_reserve_exact(1)?;
@@ -1275,7 +1274,9 @@ impl Mp4Engine {
             .range
             .start;
         if self.input.position() > start {
-            return Err(Error::Invalid("native first sample starts before physical end").into());
+            return Err(Error::Invalid(
+                "native first sample starts before physical end",
+            ));
         }
         let step = self.poll_progressive(w, c)?;
         if !matches!(step, BackendStep::End) {
@@ -1284,9 +1285,9 @@ impl Mp4Engine {
         match self.input.read_discard(1, w, c)? {
             Step::End(end) => {
                 if end.offset > start {
-                    return Err(
-                        Error::Invalid("native first sample starts before physical end").into(),
-                    );
+                    return Err(Error::Invalid(
+                        "native first sample starts before physical end",
+                    ));
                 }
                 if !w.try_charge(1) {
                     return Ok(BackendStep::Yield);
@@ -1307,7 +1308,7 @@ impl Mp4Engine {
             }
             Step::NeedInput(r) => Ok(BackendStep::NeedInput(r)),
             Step::Yield => Ok(BackendStep::Yield),
-            Step::Ready(_) => Err(Error::Invalid("native first sample requires source end").into()),
+            Step::Ready(_) => Err(Error::Invalid("native first sample requires source end")),
         }
     }
 
@@ -1354,7 +1355,7 @@ impl Mp4Engine {
                 }
                 Step::NeedInput(r) => Ok(BackendStep::NeedInput(r)),
                 Step::Yield => Ok(BackendStep::Yield),
-                Step::End(_) => Err(Error::Truncated.into()),
+                Step::End(_) => Err(Error::Truncated),
             };
         }
         if let Some(reader) = self.packet.as_mut() {
@@ -1407,7 +1408,7 @@ impl Mp4Engine {
                 }
                 Step::NeedInput(r) => Ok(BackendStep::NeedInput(r)),
                 Step::Yield => Ok(BackendStep::Yield),
-                Step::End(_) => Err(Error::Truncated.into()),
+                Step::End(_) => Err(Error::Truncated),
             };
         }
         if let Some(replay) = &mut self.native_seek {
@@ -1420,7 +1421,7 @@ impl Mp4Engine {
         if let Some((video, sync)) = self.indexed_sync {
             while self.row < sync && self.plan.source_rows()[self.row].track_id == video {
                 if c.load(Ordering::Relaxed) {
-                    return Err(Error::Cancelled.into());
+                    return Err(Error::Cancelled);
                 }
                 if !w.try_charge(1) {
                     return Ok(BackendStep::Yield);
@@ -1453,7 +1454,7 @@ impl Mp4Engine {
         };
         if self.plan.forward_regular_extents.is_some() {
             let [extent] = self.plan.media.as_slice() else {
-                return Err(Error::Invalid("forward regular live media extent").into());
+                return Err(Error::Invalid("forward regular live media extent"));
             };
             if row.sample.require_within(extent.clone()).is_err() {
                 if row.sample.range.start >= extent.end {
@@ -1462,7 +1463,7 @@ impl Mp4Engine {
                 if !w.try_charge(1) {
                     return Ok(BackendStep::Yield);
                 }
-                return Err(Error::Invalid("sample outside media extent").into());
+                return Err(Error::Invalid("sample outside media extent"));
             }
         }
         if w.remaining() == 0 {
@@ -1502,7 +1503,7 @@ impl Mp4Engine {
             return match self.input.read_discard(count, w, c)? {
                 Step::Ready(_) | Step::Yield => Ok(BackendStep::Yield),
                 Step::NeedInput(r) => Ok(BackendStep::NeedInput(r)),
-                Step::End(_) => Err(Error::Truncated.into()),
+                Step::End(_) => Err(Error::Truncated),
             };
         }
         w.take(1);
@@ -1513,8 +1514,7 @@ impl Mp4Engine {
                     return Err(Error::Limit {
                         requested: payload.len(),
                         maximum: self.maximum_packet,
-                    }
-                    .into());
+                    });
                 }
                 let source = SourcePacket {
                     sample: row.sample.clone(),
@@ -1524,7 +1524,9 @@ impl Mp4Engine {
                 };
                 return self.emit_packet(&row, source, cursor);
             }
-            return Err(Error::Unsupported("sequential source sample bytes already passed").into());
+            return Err(Error::Unsupported(
+                "sequential source sample bytes already passed",
+            ));
         }
         let extent = self
             .plan
@@ -1538,7 +1540,7 @@ impl Mp4Engine {
         } else if let Some(terminal) = self.plan.terminal_mdat {
             Mov9SampleExtent::Terminal(terminal)
         } else {
-            return Err(Error::Invalid("sample has no source mdat").into());
+            return Err(Error::Invalid("sample has no source mdat"));
         };
         let packet = if self.plan.native_recovery && self.plan.native(self.row).is_some() {
             SampleReader::new_pinned_mov_recovery(
@@ -1876,7 +1878,7 @@ impl TsEngine {
                     Ok(ts::AssemblyStep::Yield) => return Ok(BackendStep::Yield),
                     Ok(ts::AssemblyStep::NeedPayload | ts::AssemblyStep::Finished) => {}
                     Err(error @ (Error::Backpressure { .. } | Error::Cancelled)) => {
-                        return Err(error.into());
+                        return Err(error);
                     }
                     Err(error) => {
                         track.refuse(error);
@@ -1919,7 +1921,7 @@ impl TsEngine {
                     Step::Yield => return Ok(BackendStep::Yield),
                     Step::End(_) => {
                         if self.draining {
-                            return Err(Error::Invalid("TS repeated undrained entity End").into());
+                            return Err(Error::Invalid("TS repeated undrained entity End"));
                         }
                         if self.segmented {
                             if let Some(end) =
@@ -1931,9 +1933,7 @@ impl TsEngine {
                             return Ok(BackendStep::Yield);
                         }
                         if self.segment_discovery.is_some() && self.pcr_pid.is_none() {
-                            return Err(
-                                Error::Invalid("TS segment ended without an active PMT").into()
-                            );
+                            return Err(Error::Invalid("TS segment ended without an active PMT"));
                         }
                         self.stream.end_of_source()?;
                         self.draining = true;
@@ -1983,8 +1983,7 @@ impl TsEngine {
                     return Err(Error::Limit {
                         requested: map.streams.len(),
                         maximum: 64,
-                    }
-                    .into());
+                    });
                 }
                 if self.segment_discovery.is_some() && self.native_map_next == 0 {
                     self.native_tracks = self.discover_tracks(map)?;
@@ -2088,7 +2087,7 @@ impl TsEngine {
                         }
                     }
                     TraceEvent::Pes(_) if self.program == 0 => {
-                        return Err(Error::Invalid("TS PES before program discovery").into());
+                        return Err(Error::Invalid("TS PES before program discovery"));
                     }
                     TraceEvent::Finished => self.ended = true,
                     _ => {}
@@ -2199,11 +2198,7 @@ impl RawEvent {
     }
     pub fn native_pts(&self) -> Result<Option<Time>> {
         match self {
-            Self::NativeTs { clock, .. } => clock
-                .pts90
-                .map(|t| Time::new(t, 90_000))
-                .transpose()
-                .map_err(Into::into),
+            Self::NativeTs { clock, .. } => clock.pts90.map(|t| Time::new(t, 90_000)).transpose(),
             Self::Mp4(Mp4Event::Packet(p)) => p
                 .native
                 .as_ref()
@@ -2214,27 +2209,23 @@ impl RawEvent {
                         .transpose()
                 })
                 .transpose()
-                .map(|x| x.flatten())
-                .map_err(Into::into),
+                .map(|x| x.flatten()),
             Self::Mp4(Mp4Event::NativeShortPacket(p)) => p
                 .native
                 .native
                 .pts
                 .map(|ticks| Time::from_ticks(i128::from(ticks), p.native.media_clock.native_base))
-                .transpose()
-                .map_err(Into::into),
+                .transpose(),
             Self::Ts(e) => e
                 .native_clock
                 .and_then(|n| n.pts90)
                 .map(|t| Time::new(t, 90_000))
-                .transpose()
-                .map_err(Into::into),
+                .transpose(),
             Self::Matroska(MkvEvent::Packet(p)) => p
                 .packet
                 .pts_ns
                 .map(|t| Time::new(i128::from(t), 1_000_000_000))
-                .transpose()
-                .map_err(Into::into),
+                .transpose(),
             _ => Ok(None),
         }
     }
@@ -2242,10 +2233,9 @@ impl RawEvent {
         match self {
             Self::NativeTs { packet, .. } => packet.payload_len,
             Self::Matroska(MkvEvent::Packet(p)) => p.packet.data.len(),
-            Self::Matroska(MkvEvent::Envelope(triergon::incremental::ElementEvent::Leaf {
-                data,
-                ..
-            })) => data.len(),
+            Self::Matroska(MkvEvent::Envelope(
+                triergon_matroska::incremental::ElementEvent::Leaf { data, .. },
+            )) => data.len(),
             Self::Mp4(Mp4Event::Packet(p)) => p.source.payload.len(),
             Self::Mp4(Mp4Event::NativeShortPacket(p)) => p.prefix.payload.len(),
             Self::Mp4Root(raw) => raw.bytes().len(),

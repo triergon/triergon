@@ -122,10 +122,8 @@ fn finite_initial_native_front_plan_cannot_use_unattached_indexed_end() {
     assert_eq!(plan.rows(), 3);
     assert!(matches!(
         triergon_playback::Engine::mp4(opened.input, plan, 1 << 20),
-        Err(triergon_playback::Error::Core(
-            triergon_core::Error::Unsupported(
-                "native front plan requires actual source completion"
-            )
+        Err(triergon_core::Error::Unsupported(
+            "native front plan requires actual source completion"
         ))
     ));
 }

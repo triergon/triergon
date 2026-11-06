@@ -1,6 +1,6 @@
 use std::sync::atomic::AtomicBool;
 use triergon_core::{
-    Budget, Bytes, Error as CoreError, InputCursor, SourceCapabilities, SourceId, Time, WorkBudget,
+    Budget, Bytes, Error, InputCursor, SourceCapabilities, SourceId, Time, WorkBudget,
 };
 use triergon_mpegts::{
     PacketFormat, ParseLimits, TraceEvent,
@@ -11,9 +11,8 @@ use triergon_mpegts::{
     psi::{DescriptorNamespace, DvbNamespaceEvidence},
 };
 use triergon_playback::{
-    ByteSource, ClockChoice, Delivery, Engine, Error, Output, Player, PlayerPolicy, Progress,
-    RawEvent, Selection, TrackKey, TsEvent, TsNativeCarriage, TsNativeTrackSelection,
-    io::SourceOwner,
+    ByteSource, ClockChoice, Delivery, Engine, Output, Player, PlayerPolicy, Progress, RawEvent,
+    Selection, TrackKey, TsEvent, TsNativeCarriage, TsNativeTrackSelection, io::SourceOwner,
 };
 
 const ENTITY: SourceId = SourceId(77);
@@ -187,11 +186,11 @@ fn independent_ts_segment_refuses_multiple_programs_or_missing_pmt() {
     for (raw, expected) in [
         (
             multi.as_slice(),
-            CoreError::Unsupported("segment PAT has multiple media programs"),
+            Error::Unsupported("segment PAT has multiple media programs"),
         ),
         (
             &EOF[..188],
-            CoreError::Invalid("TS segment ended without an active PMT"),
+            Error::Invalid("TS segment ended without an active PMT"),
         ),
     ] {
         let (mut player, _) = segment_player(raw, 23);
@@ -203,7 +202,7 @@ fn independent_ts_segment_refuses_multiple_programs_or_missing_pmt() {
             }
             match progress {
                 Ok(Progress::Ended) => panic!("invalid segment was treated as clean EOF"),
-                Err(Error::Core(actual)) => {
+                Err(actual) => {
                     error = Some(actual);
                     break;
                 }
@@ -516,7 +515,7 @@ fn missing_dvb_context_preserves_private_source_and_later_latm_recovers() {
                 assert_eq!(*track, key(257));
                 assert!(matches!(
                     error,
-                    CoreError::Unsupported("native PMT audio needs explicit DVB context")
+                    Error::Unsupported("native PMT audio needs explicit DVB context")
                 ));
                 audio.push("refusal");
             }
@@ -600,26 +599,24 @@ fn selections_reject_duplicate_and_out_of_scope_pids_and_strides() {
     let b = budget();
     assert!(matches!(
         engine(&b, &[AVC, AVC], PacketFormat::Ts188, NAMESPACE),
-        Err(Error::Core(CoreError::Invalid(
-            "duplicate native program selection PID"
-        )))
+        Err(Error::Invalid("duplicate native program selection PID"))
     ));
     let invalid = TsNativeTrackSelection { pid: 0x1fff, ..AVC };
     assert!(matches!(
         engine(&b, &[invalid], PacketFormat::Ts188, NAMESPACE),
-        Err(Error::Core(CoreError::Invalid(_)))
+        Err(Error::Invalid(_))
     ));
     assert!(matches!(
         engine(&b, &[], PacketFormat::Ts188, NAMESPACE),
-        Err(Error::Core(CoreError::Invalid(_)))
+        Err(Error::Invalid(_))
     ));
     assert!(matches!(
         engine(&b, &[AVC; 65], PacketFormat::Ts188, NAMESPACE),
-        Err(Error::Core(CoreError::Limit { .. }))
+        Err(Error::Limit { .. })
     ));
     assert!(matches!(
         engine(&b, &[AVC, AAC], PacketFormat::M2ts192, NAMESPACE),
-        Err(Error::Core(CoreError::Unsupported(_)))
+        Err(Error::Unsupported(_))
     ));
     assert_eq!(b.used(), Budget::control_storage_bytes());
 }

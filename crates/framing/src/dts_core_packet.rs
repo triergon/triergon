@@ -36,7 +36,7 @@ impl<'a> DtsCorePacket<'a> {
             (u16::from(*high & 3) << 12) | (u16::from(*middle) << 4) | u16::from(*low >> 4)
         } else {
             (46..60).try_fold(0_u16, |value, bit| {
-                Ok((value << 1) | u16::from(packing.bit(source, bit)?))
+                Ok::<_, Error>((value << 1) | u16::from(packing.bit(source, bit)?))
             })?
         };
         let canonical_bytes = usize::from(fsize) + 1;

@@ -1,6 +1,7 @@
 #![forbid(unsafe_code)]
 use std::sync::atomic::{AtomicBool, Ordering};
 use triergon_core::{Budget, Bytes, Error, SourceId, WorkBudget};
+use triergon_harness_protocol::hex;
 use triergon_subtitles::text::charset::{
     Charset, CharsetJob, CharsetStatus, multibyte::MultibyteCharset as M,
 };
@@ -432,9 +433,6 @@ fn take_before_ready_and_repeated_take_are_explicit() {
 }
 #[path = "receiver-mapping-data/cases74.rs"]
 mod native74;
-fn hex(bytes: &[u8]) -> String {
-    bytes.iter().map(|b| format!("{b:02x}")).collect()
-}
 #[test]
 fn original74_literal_native_payloads_and_refusals_keep_physical_geometry() {
     let mut counts = [0; 4];

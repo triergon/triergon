@@ -689,10 +689,10 @@ impl Raster {
             }
         }
         self.initial = None;
-        if let Some(coverage) = self.coverage.as_mut() {
-            if !coverage.prepare(work, &mut self.total_work, self.limits.max_work, cancel)? {
-                return Ok(false);
-            }
+        if let Some(coverage) = self.coverage.as_mut()
+            && !coverage.prepare(work, &mut self.total_work, self.limits.max_work, cancel)?
+        {
+            return Ok(false);
         }
         Ok(true)
     }

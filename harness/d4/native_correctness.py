@@ -5,7 +5,7 @@ Two levels per vector, graded by the frozen research/d4/NUMERIC-RULES.json:
   decoder   our lane example (planar YUV / interleaved f32) against the pinned FFmpeg
             decoder output (-f rawvideo -pix_fmt yuv420p|yuv420p10le, -f f32le): video
             bit-exact per frame, audio per-channel RMS / max |d| and exact counts.
-  output    crates/sim d4-worker against harness/d4/reference_decode (the simulator's
+  output    crates/sim codec-worker against harness/d4/reference_decode (the simulator's
             filter chains): RGBA bit-exact per picture, stereo s16 within 1 LSB.
 Nothing is excluded: refusals, crashes, count mismatches and FFmpeg refusals are
 recorded per vector as they happen. Selection (in-set or not) is applied afterwards
@@ -13,7 +13,7 @@ from the lane matrices, never by skipping inputs here.
 
   manifest --out M.json LANE=DIR[,DIR...] ...      hash every vector (run where they live)
   grade --manifest M.json --root R --bin DIR --ffmpeg FF --ffprobe FP
-        --d4-worker W --reference R2 --out OUT.jsonl [--only SUBSTR,...]
+        --codec-worker W --reference R2 --out OUT.jsonl [--only SUBSTR,...]
 """
 import argparse, hashlib, json, os, subprocess, sys, tempfile, threading
 from pathlib import Path
@@ -223,7 +223,7 @@ def audio_decoder(a, v, path, tmp):
 def output_path(a, v, path, tmp):
     op = OPERATION[v['lane']] + '-raw'
     if v['lane'] in VIDEO_EXT:
-        ours = Frames([str(a.d4_worker), op, path, '{out}'], CANVAS, side=True)
+        ours = Frames([str(a.codec_worker), op, path, '{out}'], CANVAS, side=True)
         ref = Frames([str(a.reference), op, path, '{out}'], CANVAS, side=True)
         n = match = 0
         first = None
@@ -260,7 +260,7 @@ def output_path(a, v, path, tmp):
                     max_abs=worst, first_diff=first, ours_rc=rc_o, reference_rc=rc_r, ours_stderr_tail=err_o[-300:],
                     reference_stderr_tail=err_r[-300:])
     o, r = tmp / 'ours.s16', tmp / 'ref.s16'
-    po = subprocess.run([str(a.d4_worker), op, path, str(o)], capture_output=True, text=True, timeout=900)
+    po = subprocess.run([str(a.codec_worker), op, path, str(o)], capture_output=True, text=True, timeout=900)
     pr = subprocess.run([str(a.reference), op, path, str(r)], capture_output=True, text=True, timeout=900)
     co, cr = (o.read_bytes() if o.exists() else b''), (r.read_bytes() if r.exists() else b'')
     row = dict(samples_ours=len(co) // 4, samples_ref=len(cr) // 4, ours_rc=po.returncode, reference_rc=pr.returncode,
@@ -318,11 +318,11 @@ def main():
     m.add_argument('--out', required=True)
     m.add_argument('lanes', nargs='+')
     g = sub.add_parser('grade')
-    for k in ('manifest', 'root', 'bin', 'ffmpeg', 'ffprobe', 'd4-worker', 'reference', 'out', 'scratch'):
+    for k in ('manifest', 'root', 'bin', 'ffmpeg', 'ffprobe', 'codec-worker', 'reference', 'out', 'scratch'):
         g.add_argument('--' + k, required=k != 'scratch')
     g.add_argument('--only')
     a = p.parse_args()
-    a.d4_worker = Path(getattr(a, 'd4_worker', '') or '.')
+    a.codec_worker = Path(getattr(a, 'codec_worker', '') or '.')
     (manifest if a.cmd == 'manifest' else grade)(a)
 
 

@@ -16,7 +16,6 @@ pub use crate::matroska::typed::{
     },
 };
 use crate::{incremental::ElementEvent, matroska::SeekReceipt, metadata::SharedDocument};
-#[path = "typed/reader.rs"]
 mod reader;
 pub use reader::{BlockingReader, Reader};
 

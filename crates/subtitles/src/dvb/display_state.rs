@@ -445,7 +445,7 @@ impl Segment {
         if self.page != state.service.composition_page {
             return Err(Error::Invalid("DVB ancillary PCS"));
         }
-        if b.len() < 2 || (b.len() - 2) % 6 != 0 {
+        if b.len() < 2 || !(b.len() - 2).is_multiple_of(6) {
             return Err(Error::Invalid("DVB PCS length"));
         }
         if self.phase == 0 {

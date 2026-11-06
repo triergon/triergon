@@ -311,10 +311,10 @@ impl SampleTableBuilder {
             return Err(error);
         }
         let result = self.poll_inner(work);
-        if let Err(error) = result {
-            if !matches!(error, Error::Backpressure { .. }) {
-                self.failed = Some(error);
-            }
+        if let Err(error) = result
+            && !matches!(error, Error::Backpressure { .. })
+        {
+            self.failed = Some(error);
         }
         result
     }
@@ -621,37 +621,37 @@ impl SampleTableBuilder {
                 } else {
                     t.partial.as_ref()
                 };
-                if let Some(source) = source {
-                    if self.row < source.count {
-                        let sample = source.word(self.row, 0)?;
-                        if sample == 0
-                            || sample <= self.previous
-                            || u64::from(sample) > t.sample_count()
-                        {
-                            if !self.recover_runs || self.check != Check::Sync || sample == 0 {
-                                return Err(Error::Invalid("sync sample order/range"));
-                            }
-                            if self.sync_diagnostic.is_none() {
-                                let start = source
-                                    .raw
-                                    .header()
-                                    .start
-                                    .checked_add(u64::from(source.raw.header().header_size))
-                                    .and_then(|v| v.checked_add(8 + u64::from(self.row) * 4))
-                                    .ok_or(Error::Overflow)?;
-                                self.sync_diagnostic = Some(Mov9SyncDiagnostic {
-                                    first_bad_row: self.row,
-                                    source_value: sample,
-                                    field_start: start,
-                                    field_end: start.checked_add(4).ok_or(Error::Overflow)?,
-                                    strict_error: Error::Invalid("sync sample order/range"),
-                                });
-                            }
+                if let Some(source) = source
+                    && self.row < source.count
+                {
+                    let sample = source.word(self.row, 0)?;
+                    if sample == 0
+                        || sample <= self.previous
+                        || u64::from(sample) > t.sample_count()
+                    {
+                        if !self.recover_runs || self.check != Check::Sync || sample == 0 {
+                            return Err(Error::Invalid("sync sample order/range"));
                         }
-                        self.previous = sample;
-                        self.row += 1;
-                        return Ok(());
+                        if self.sync_diagnostic.is_none() {
+                            let start = source
+                                .raw
+                                .header()
+                                .start
+                                .checked_add(u64::from(source.raw.header().header_size))
+                                .and_then(|v| v.checked_add(8 + u64::from(self.row) * 4))
+                                .ok_or(Error::Overflow)?;
+                            self.sync_diagnostic = Some(Mov9SyncDiagnostic {
+                                first_bad_row: self.row,
+                                source_value: sample,
+                                field_start: start,
+                                field_end: start.checked_add(4).ok_or(Error::Overflow)?,
+                                strict_error: Error::Invalid("sync sample order/range"),
+                            });
+                        }
                     }
+                    self.previous = sample;
+                    self.row += 1;
+                    return Ok(());
                 }
                 self.next_check(if self.check == Check::Sync {
                     Check::Partial
@@ -724,7 +724,6 @@ fn sequential_contains(
 }
 
 #[cfg(test)]
-#[path = "advancing_sync_tests.rs"]
 mod advancing_sync_tests;
 
 impl SampleCursor<'_> {
@@ -746,12 +745,12 @@ impl SampleCursor<'_> {
             self.delta = self.table.stts.word(self.stts_run, 4)?;
             self.stts_run = self.stts_run.checked_add(1).ok_or(Error::Overflow)?;
         }
-        if let Some(ctts) = &self.table.ctts {
-            if self.ctts_left == 0 {
-                self.ctts_left = ctts.word(self.ctts_run, 0)?;
-                self.offset = ctts.word(self.ctts_run, 4)?;
-                self.ctts_run = self.ctts_run.checked_add(1).ok_or(Error::Overflow)?;
-            }
+        if let Some(ctts) = &self.table.ctts
+            && self.ctts_left == 0
+        {
+            self.ctts_left = ctts.word(self.ctts_run, 0)?;
+            self.offset = ctts.word(self.ctts_run, 4)?;
+            self.ctts_run = self.ctts_run.checked_add(1).ok_or(Error::Overflow)?;
         }
         if self.chunk_left == 0 {
             let chunk_number = u64::from(self.chunk) + 1;
@@ -1263,7 +1262,6 @@ impl Mov9RecoveryIndexCursor<'_> {
     }
 }
 
-#[path = "native_recovery_v2.rs"]
 mod recovery_v2;
 pub use recovery_v2::{
     Mov9InitialDescriptionDiagnostic, Mov9RecoveryV2Association, Mov9RecoveryV2Context,
@@ -1271,6 +1269,5 @@ pub use recovery_v2::{
     Mov9RecoveryV2PacketCursor, Mov9RecoveryV2Read, PinnedMovD32RegularRecoveryV2,
 };
 
-#[path = "native_recovery_v3.rs"]
 mod recovery_v3;
 pub use recovery_v3::*;

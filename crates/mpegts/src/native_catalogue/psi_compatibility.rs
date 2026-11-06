@@ -207,7 +207,7 @@ fn validate_carrier(
     let raw = &full[prefix..];
     if packet.source_id != Some(source)
         || raw.len() != 188
-        || packet.source_offset % format.bytes() as u64 != 0
+        || !packet.source_offset.is_multiple_of(format.bytes() as u64)
         || context.byte_run_epoch.is_some()
         || raw[0] != 0x47
         || packet.pid != u16::from_be_bytes([raw[1] & 31, raw[2]])
@@ -648,12 +648,12 @@ impl NativeCatalogueV1 {
                 return Err(Error::Invalid("PSI compatibility PAT result missing"));
             }
         };
-        if let Some(identity) = s.pat_identity {
-            if identity != (h.extension, h.version, h.last_section_number) {
-                return Err(Error::Unsupported(
-                    "PSI compatibility partial PAT identity transition unobserved",
-                ));
-            }
+        if let Some(identity) = s.pat_identity
+            && identity != (h.extension, h.version, h.last_section_number)
+        {
+            return Err(Error::Unsupported(
+                "PSI compatibility partial PAT identity transition unobserved",
+            ));
         }
         self.pending_pat = Some((h.extension, h.version));
         let index = self.retain(
@@ -1120,12 +1120,12 @@ impl NativeCatalogueV1 {
                 }
             }
             TraceEvent::ProgramMap { map, .. } => {
-                if let Some(pending) = s.pending_source.as_ref() {
-                    if pending.section.bytes().as_ref() != map.source.as_ref() {
-                        return Err(Error::Invalid(
-                            "PSI compatibility actual map/section mismatch",
-                        ));
-                    }
+                if let Some(pending) = s.pending_source.as_ref()
+                    && pending.section.bytes().as_ref() != map.source.as_ref()
+                {
+                    return Err(Error::Invalid(
+                        "PSI compatibility actual map/section mismatch",
+                    ));
                 }
                 self.observe_inner(event, cancel)?;
                 s.pending_source = None;
@@ -1372,19 +1372,18 @@ impl NativeCatalogueV1 {
                     "PSI compatibility unconfirmed source PMT at end",
                 ));
             }
-            if let Some((tsid, version)) = self.pending_pat {
-                if !state
+            if let Some((tsid, version)) = self.pending_pat
+                && (!state
                     .policies
                     .contains(NativePsiCompatibilityV1::CurrentPatSectionBeforeWholeTableV1)
                     || state
                         .pat_identity
                         .is_none_or(|identity| identity.0 != tsid || identity.1 != version)
-                    || state.pat_seen.iter().all(|v| *v == 0)
-                {
-                    return Err(Error::Unsupported(
-                        "PSI compatibility pending PAT has no actual section coverage",
-                    ));
-                }
+                    || state.pat_seen.iter().all(|v| *v == 0))
+            {
+                return Err(Error::Unsupported(
+                    "PSI compatibility pending PAT has no actual section coverage",
+                ));
             }
             if let Some(assembler) = state.native_pmt.as_mut() {
                 if !assembler.partial_bytes().is_empty() {

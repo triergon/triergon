@@ -1,5 +1,5 @@
 [package]
-name = "triergon"
+name = "triergon-matroska"
 version = "0.0.0"
 repository.workspace = true
 license.workspace = true
@@ -9,6 +9,9 @@ publish.workspace = true
 
 [dependencies]
 triergon-core = { path = "../core" }
+
+[dev-dependencies]
+triergon-harness-protocol = { path = "../harness-protocol" }
 
 [lints]
 workspace = true

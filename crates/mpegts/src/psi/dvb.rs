@@ -90,7 +90,7 @@ impl<'a> Descriptor<'a> {
         if self.tag != 0x59 {
             return Err(Error::Invalid("DVB subtitling descriptor tag"));
         }
-        if self.data.len() > 255 || self.data.len() % 8 != 0 {
+        if self.data.len() > 255 || !self.data.len().is_multiple_of(8) {
             return Err(Error::Invalid("DVB subtitling descriptor length"));
         }
         Ok(DvbSubtitling {

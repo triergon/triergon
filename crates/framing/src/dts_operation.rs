@@ -490,11 +490,10 @@ impl DtsOperation {
             if let (Some(source), Some(parser)) = (self.source_end, self.parser_end) {
                 if let (DtsOperationTerminal::End(a), DtsOperationTerminal::End(b)) =
                     (source, parser)
+                    && a != b
                 {
-                    if a != b {
-                        self.abort(Error::Invalid("DTS operation view source ends differ"));
-                        return self.healthy().map(|()| DtsOperationStep::Yield);
-                    }
+                    self.abort(Error::Invalid("DTS operation view source ends differ"));
+                    return self.healthy().map(|()| DtsOperationStep::Yield);
                 }
                 return Ok(DtsOperationStep::End { source, parser });
             }

@@ -111,7 +111,7 @@ fn irap_types_prepend_only_parameter_sets_in_declaration_order() {
         ]);
         assert_eq!(unit.is_random_access(), random_access);
         assert_eq!(chunks.len(), expected.len() * 2);
-        for (pair, original) in chunks.chunks_exact(2).zip(expected) {
+        for (pair, original) in chunks.as_chunks::<2>().0.iter().zip(expected) {
             assert_eq!(pair[0], START_CODE);
             assert!(std::ptr::eq(pair[1], original));
         }

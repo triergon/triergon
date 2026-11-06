@@ -163,10 +163,10 @@ impl BoxReader {
             return Err(error);
         }
         let result = self.poll_inner(input, work, cancel);
-        if let Err(error) = result {
-            if !matches!(error, Error::Backpressure { .. }) {
-                self.failed = Some(error);
-            }
+        if let Err(error) = result
+            && !matches!(error, Error::Backpressure { .. })
+        {
+            self.failed = Some(error);
         }
         result
     }

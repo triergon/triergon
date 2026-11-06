@@ -211,7 +211,7 @@ impl Dts14CarrierReader {
     }
     pub fn reset(&mut self, offset: u64) -> Result<InputRequest> {
         self.healthy()?;
-        if offset % 2 != 0 {
+        if !offset.is_multiple_of(2) {
             return Err(Error::Unsupported("DTS carrier reset outside word grid"));
         }
         let r = self.cursor_mut()?.reset(offset)?;
@@ -251,10 +251,10 @@ impl Dts14CarrierReader {
     ) -> Result<Step<Dts14CarrierPacket>> {
         self.healthy()?;
         let r = self.advance(work, cancel);
-        if let Err(e) = r {
-            if !matches!(e, Error::Backpressure { .. } | Error::Allocation) {
-                self.abort(e);
-            }
+        if let Err(e) = r
+            && !matches!(e, Error::Backpressure { .. } | Error::Allocation)
+        {
+            self.abort(e);
         }
         r
     }
@@ -344,14 +344,14 @@ impl Dts14CarrierReader {
                                 .try_into()
                                 .map_err(|_| Error::Truncated)?;
                             let bits = crate::dts14_sync::header_payload(&prefix, self.order)?;
-                            if let Ok(header) = probe_dts_core_header(&bits) {
-                                if header.frame_bytes % 7 == 0 {
-                                    self.extent = Some(
-                                        (header.frame_bytes / 7)
-                                            .checked_mul(8)
-                                            .ok_or(Error::Overflow)?,
-                                    );
-                                }
+                            if let Ok(header) = probe_dts_core_header(&bits)
+                                && header.frame_bytes % 7 == 0
+                            {
+                                self.extent = Some(
+                                    (header.frame_bytes / 7)
+                                        .checked_mul(8)
+                                        .ok_or(Error::Overflow)?,
+                                );
                             }
                         }
                     }

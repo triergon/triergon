@@ -398,11 +398,11 @@ impl<'a> Mov9V4RootWalkTransportBuilder<'a> {
             return Err(error);
         }
         let result = self.poll_inner(work, cancel);
-        if let Err(error) = result {
-            if !matches!(error, Error::Backpressure { .. }) {
-                self.failed = Some(error);
-                self.ready = false;
-            }
+        if let Err(error) = result
+            && !matches!(error, Error::Backpressure { .. })
+        {
+            self.failed = Some(error);
+            self.ready = false;
         }
         result
     }

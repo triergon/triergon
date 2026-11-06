@@ -121,9 +121,9 @@ impl ChannelLayout {
         self.count as usize
     }
 
-    /// FFmpeg's layout name for this speaker set (e.g. `5.1(side)`), or `None` when it is
+    /// Conventional name of this speaker set (e.g. `5.1(side)`, as ffprobe prints it), or `None` when it is
     /// not one of the named layouts.
-    pub fn ffmpeg_name(&self) -> Option<&'static str> {
+    pub fn layout_name(&self) -> Option<&'static str> {
         use Speaker::*;
         Some(match self.speakers() {
             [FrontCenter] => "mono",
@@ -484,76 +484,78 @@ impl Decoder {
         }
         let mut nslots = set.nch;
         let mut xch = false;
-        if h.ext_audio && h.ext_audio_id == 0 {
-            if let Some(pos) = find_xch(frame, core_end) {
-                let mut xb = BitReader::new(frame);
-                xb.seek(pos + 32 + 10 + 4);
-                let xset = SetHeader::parse(&mut xb, h.cpf)?;
-                if xset.nch != 1 {
-                    return Err(DecodeError::Unsupported("XCh with more than one channel"));
-                }
-                // History for the XCh slot follows the core's continuity rule.
-                nsubs_all[set.nch] = xset.nsubs[0];
-                if !self.prev_xch {
-                    // The Cs synthesis history starts fresh when XCh (re)appears.
-                    self.qstate[set.nch].reset();
-                    if let Some(q) = self.q64state.get_mut(set.nch) {
-                        q.reset();
-                    }
-                }
-                let xkeep = keep && self.prev_xch;
-                self.sub.start_frame(set.nch..set.nch + 1, h.blocks, xkeep);
-                let mut xt0 = 0;
-                for &nssc in &sf_nssc[..nsubfs] {
-                    let p = SubframeParams {
-                        nssc,
-                        dynf: false,
-                        lff: 0,
-                        ..params_base
-                    };
-                    subframe::decode_subframe(
-                        &mut xb,
-                        &xset,
-                        &mut self.side,
-                        &p,
-                        &mut self.sub,
-                        set.nch,
-                        xt0,
-                        None,
-                        &nsubs_all,
-                    )?;
-                    xt0 += nssc * 8;
-                }
-                nslots += 1;
-                xch = true;
+        if h.ext_audio
+            && h.ext_audio_id == 0
+            && let Some(pos) = find_xch(frame, core_end)
+        {
+            let mut xb = BitReader::new(frame);
+            xb.seek(pos + 32 + 10 + 4);
+            let xset = SetHeader::parse(&mut xb, h.cpf)?;
+            if xset.nch != 1 {
+                return Err(DecodeError::Unsupported("XCh with more than one channel"));
             }
+            // History for the XCh slot follows the core's continuity rule.
+            nsubs_all[set.nch] = xset.nsubs[0];
+            if !self.prev_xch {
+                // The Cs synthesis history starts fresh when XCh (re)appears.
+                self.qstate[set.nch].reset();
+                if let Some(q) = self.q64state.get_mut(set.nch) {
+                    q.reset();
+                }
+            }
+            let xkeep = keep && self.prev_xch;
+            self.sub.start_frame(set.nch..set.nch + 1, h.blocks, xkeep);
+            let mut xt0 = 0;
+            for &nssc in &sf_nssc[..nsubfs] {
+                let p = SubframeParams {
+                    nssc,
+                    dynf: false,
+                    lff: 0,
+                    ..params_base
+                };
+                subframe::decode_subframe(
+                    &mut xb,
+                    &xset,
+                    &mut self.side,
+                    &p,
+                    &mut self.sub,
+                    set.nch,
+                    xt0,
+                    None,
+                    &nsubs_all,
+                )?;
+                xt0 += nssc * 8;
+            }
+            nslots += 1;
+            xch = true;
         }
         self.prev_xch = xch;
         let mut have_x96 = false;
-        if h.ext_audio && h.ext_audio_id == 2 {
-            if let Some(pos) = x96::find(frame, core_end) {
-                let mut xb = BitReader::new(frame);
-                xb.seek(pos + 32);
-                if let Some(xh) = x96::X96Header::parse(&mut xb, set.nch, h.cpf)? {
-                    let buf = self.x96buf.get_or_insert_with(|| SubBuf::new(5, 64));
-                    buf.start_frame(0..set.nch, h.blocks, keep && self.prev_x96);
-                    let mut xt0 = 0;
-                    for &nssc in &sf_nssc[..nsubfs] {
-                        x96::decode_subframe(
-                            &mut xb,
-                            &xh,
-                            &mut self.x96side,
-                            nssc,
-                            h.aspf,
-                            h.cpf,
-                            h.rate == 0x1F,
-                            buf,
-                            xt0,
-                        )?;
-                        xt0 += nssc * 8;
-                    }
-                    have_x96 = true;
+        if h.ext_audio
+            && h.ext_audio_id == 2
+            && let Some(pos) = x96::find(frame, core_end)
+        {
+            let mut xb = BitReader::new(frame);
+            xb.seek(pos + 32);
+            if let Some(xh) = x96::X96Header::parse(&mut xb, set.nch, h.cpf)? {
+                let buf = self.x96buf.get_or_insert_with(|| SubBuf::new(5, 64));
+                buf.start_frame(0..set.nch, h.blocks, keep && self.prev_x96);
+                let mut xt0 = 0;
+                for &nssc in &sf_nssc[..nsubfs] {
+                    x96::decode_subframe(
+                        &mut xb,
+                        &xh,
+                        &mut self.x96side,
+                        nssc,
+                        h.aspf,
+                        h.cpf,
+                        h.rate == 0x1F,
+                        buf,
+                        xt0,
+                    )?;
+                    xt0 += nssc * 8;
                 }
+                have_x96 = true;
             }
         }
         if have_x96 != self.prev_x96 {
@@ -577,10 +579,8 @@ impl Decoder {
 
         // Histories for the next frame are taken before any in-place post-processing.
         self.sub.save_history(0..nslots, blocks);
-        if have_x96 {
-            if let Some(xb) = self.x96buf.as_mut() {
-                xb.save_history(0..set.nch, blocks);
-            }
+        if have_x96 && let Some(xb) = self.x96buf.as_mut() {
+            xb.save_history(0..set.nch, blocks);
         }
 
         // Output plane order (FFmpeg native order) and the plane of every coded slot.

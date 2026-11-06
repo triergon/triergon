@@ -2,8 +2,8 @@
 //! typed errors. The frames are built bit by bit from the A/52:2018 syntax tables.
 
 use triergon_codec_ac3::{
-    AudioFrame, CrcPolicy, DecodeError, Decoder, DecoderOptions, Feature, NoiseMode, Speaker,
-    StreamType, Syntax, access_unit_len, crc16, parse_header,
+    AudioFrame, Compat, CrcPolicy, DecodeError, Decoder, DecoderOptions, Feature, NoiseMode,
+    Speaker, StreamType, Syntax, access_unit_len, crc16, parse_header,
 };
 
 #[derive(Default)]
@@ -169,7 +169,7 @@ fn decodes_silent_mono_frame() {
     assert!(info.concealed.is_none());
     assert_eq!(info.dialnorm, 27);
     assert_eq!(out.layout.speakers(), &[Speaker::FrontCenter]);
-    assert_eq!(out.layout.ffmpeg_name(), "mono");
+    assert_eq!(out.layout.layout_name(), "mono");
     assert_eq!(out.samples_per_channel, 1536);
     assert!(out.planes[0].iter().all(|&v| v == 0.0));
     assert!(info.downmix.is_none());
@@ -203,9 +203,9 @@ fn compatible_reset_replays_the_first_dithered_frame() {
 #[test]
 fn noise_off_keeps_bap_zero_silent_with_either_compatibility_setting() {
     let frame = mono_frame_with_dither(0, true);
-    for ffmpeg_compat in [false, true] {
+    for compat in [Compat::Specification, Compat::Reference] {
         let mut decoder = Decoder::with_options(DecoderOptions {
-            ffmpeg_compat,
+            compat,
             noise: NoiseMode::Off,
             ..Default::default()
         });

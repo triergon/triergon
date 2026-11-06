@@ -6,7 +6,7 @@ SHA-256: EBML (RFC 8794), Matroska (RFC 9559, element schema, codec mappings and
 notes) and zlib/DEFLATE (RFC 1950, RFC 1951).
 
 ```sh
-python3 tools/fetch-specs.py   # download into the ignored .research/specs/ and verify hashes
+python3 tools/fetch_specs.py   # download into the ignored .research/specs/ and verify hashes
 ```
 
 A hash mismatch means the upstream text changed and needs review; it is never updated

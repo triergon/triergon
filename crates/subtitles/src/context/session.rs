@@ -199,11 +199,11 @@ impl Builder {
                     self.pending_attachment = Some(failure.value);
                     return Err(failure.error);
                 }
-            } else if let Some(metadata) = self.pending_metadata.take() {
-                if let Err(failure) = self.metadata.try_push(metadata) {
-                    self.pending_metadata = Some(failure.value);
-                    return Err(failure.error);
-                }
+            } else if let Some(metadata) = self.pending_metadata.take()
+                && let Err(failure) = self.metadata.try_push(metadata)
+            {
+                self.pending_metadata = Some(failure.value);
+                return Err(failure.error);
             }
             self.visible_bytes = total;
             self.pending_bytes = 0;

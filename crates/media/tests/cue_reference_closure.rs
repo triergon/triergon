@@ -5,13 +5,13 @@ use std::{
     path::Path,
     sync::atomic::{AtomicBool, Ordering},
 };
-use triergon::{
+use triergon_core::{
+    Budget, Bytes, InputWindow, SourceCapabilities, SourceFailure, SourceId, WorkBudget,
+};
+use triergon_matroska::{
     Error, Limits,
     incremental::ParseStep,
     typed::{BlockingReader, Event, PayloadOwnership, Reader},
-};
-use triergon_core::{
-    Budget, Bytes, InputWindow, SourceCapabilities, SourceFailure, SourceId, WorkBudget,
 };
 
 fn raw(name: &str) -> Vec<u8> {
@@ -187,7 +187,7 @@ fn drive(
     cap: usize,
     quantum: u64,
     events: &mut Vec<Event>,
-) -> triergon::Result<()> {
+) -> triergon_matroska::Result<()> {
     let cancel = AtomicBool::new(false);
     for _ in 0..2_000_000 {
         let mut work = WorkBudget::new(quantum);

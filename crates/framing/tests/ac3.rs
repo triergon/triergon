@@ -8,6 +8,7 @@ use triergon_framing::{
     Ac3FrameDetails, Ac3FrameHeader, Ac3FrameLimits, Ac3FrameReader, Ac3StreamSelection, BuildStep,
     probe_ac3_header,
 };
+use triergon_harness_protocol::unhex;
 
 fn limits() -> Ac3FrameLimits {
     Ac3FrameLimits {
@@ -23,16 +24,6 @@ fn config_limits() -> Ac3ConfigLimits {
         maximum_independent_substreams: 8,
         maximum_input_window: 3,
     }
-}
-
-fn hex(text: &str) -> Vec<u8> {
-    if text == "~" {
-        return Vec::new();
-    }
-    (0..text.len())
-        .step_by(2)
-        .map(|at| u8::from_str_radix(&text[at..at + 2], 16).unwrap())
-        .collect()
 }
 
 fn class(error: Error) -> &'static str {
@@ -143,7 +134,7 @@ fn authored_header_matrix_matches_primary_tables_and_fraction_duration() {
     {
         let row: Vec<_> = line.split('\t').collect();
         assert_eq!(row.len(), 15);
-        let input = hex(row[1]);
+        let input = unhex(row[1]);
         let result = probe_ac3_header(&input);
         if row[14] != "ok" {
             assert_eq!(class(result.err().unwrap()), row[14], "{}", row[0]);
@@ -204,7 +195,7 @@ fn authored_frames_preserve_all_bytes_with_split_sync_prefix_body_and_crc() {
     let pool = Budget::new(1 << 20).unwrap();
     for line in include_str!("../fixtures/ac3-frame-v1.tsv").lines().skip(1) {
         let row: Vec<_> = line.split('\t').collect();
-        let input = hex(row[1]);
+        let input = unhex(row[1]);
         for chunk in (1..=12).chain([17, 31, 64, 4096]) {
             for units in [1, 2, 17, 4096] {
                 let actual = drive(&pool, &input, chunk, units);
@@ -270,7 +261,7 @@ fn independent_dac3_records_preserve_reserved_fields_and_declared_config() {
     let pool = Budget::new(1 << 20).unwrap();
     for line in include_str!("../fixtures/dac3-v1.tsv").lines().skip(1) {
         let row: Vec<_> = line.split('\t').collect();
-        let input = hex(row[1]);
+        let input = unhex(row[1]);
         for work in [1, 2, 64] {
             let source = Bytes::copy_from_slice(&pool, &input).unwrap();
             let actual = config(&pool, source.clone(), Ac3ConfigKind::Dac3, work);
@@ -313,7 +304,7 @@ fn independent_dec3_records_preserve_all_substreams_presence_and_reserved_tail()
     let pool = Budget::new(1 << 20).unwrap();
     for line in include_str!("../fixtures/dec3-v1.tsv").lines().skip(1) {
         let row: Vec<_> = line.split('\t').collect();
-        let input = hex(row[1]);
+        let input = unhex(row[1]);
         for work in [1, 3, 64] {
             let source = Bytes::copy_from_slice(&pool, &input).unwrap();
             let actual = config(&pool, source.clone(), Ac3ConfigKind::Dec3, work);
@@ -352,7 +343,7 @@ fn independent_dec3_records_preserve_all_substreams_presence_and_reserved_tail()
             assert_eq!(observed.join(";"), row[4]);
             assert_eq!(
                 actual.trailing_reserved_bytes().unwrap().as_ref(),
-                hex(row[5]).as_slice()
+                unhex(row[5]).as_slice()
             );
             assert_eq!(actual.syntax_issues().bits().to_string(), row[6]);
             for (index, descriptor) in actual.substreams().iter().enumerate() {
@@ -436,7 +427,7 @@ fn first_frame_bytes() -> Vec<u8> {
         .lines()
         .nth(1)
         .unwrap();
-    hex(line.split('\t').nth(1).unwrap())
+    unhex(line.split('\t').nth(1).unwrap())
 }
 
 #[test]
@@ -574,7 +565,7 @@ fn audio_owned_output_and_config_views_survive_reader_drop_and_thread_release() 
         .lines()
         .nth(1)
         .unwrap();
-    let source = Bytes::copy_from_slice(&pool, &hex(row.split('\t').nth(1).unwrap())).unwrap();
+    let source = Bytes::copy_from_slice(&pool, &unhex(row.split('\t').nth(1).unwrap())).unwrap();
     let result = config(&pool, source, Ac3ConfigKind::Dec3, 1).unwrap();
     let Ac3Configuration::Dec3(result) = result else {
         panic!("wrong config");
@@ -819,7 +810,7 @@ fn reduced_rate_field_presence_and_dependent_sample_span_are_source_facts() {
             .skip(1)
             .find(|line| line.split('\t').next() == Some(id))
             .unwrap();
-        probe_ac3_header(&hex(row.split('\t').nth(1).unwrap())).unwrap()
+        probe_ac3_header(&unhex(row.split('\t').nth(1).unwrap())).unwrap()
     };
     let reduced = find("eac3-reduced-1");
     assert_eq!(reduced.eac3_fscod2(), Some(1));

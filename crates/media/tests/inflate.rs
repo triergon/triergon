@@ -1,12 +1,12 @@
 //! RFC-authored DEFLATE fixtures. The bit writer is independent of the decoder.
 use std::sync::atomic::AtomicBool;
-use triergon::{
+use triergon_core::{Budget, WorkBudget};
+use triergon_matroska::{
     Error,
     incremental::ParseStep,
     storage::SharedBytes,
     zlib::{InflateLimits, Inflater},
 };
-use triergon_core::{Budget, WorkBudget};
 
 struct Bits {
     data: Vec<u8>,
@@ -21,7 +21,7 @@ impl Bits {
     }
     fn put(&mut self, value: u32, width: usize) {
         for bit in 0..width {
-            if self.used % 8 == 0 {
+            if self.used.is_multiple_of(8) {
                 self.data.push(0);
             }
             if value & (1 << bit) != 0 {
@@ -242,7 +242,7 @@ fn dynamic_distance_alphabet_keeps_fifteen_bit_codes_under_all_work_schedules() 
             if policy == 259 {
                 assert_eq!(outcome.unwrap().unwrap().as_ref(), expected.as_slice());
             } else {
-                assert!(matches!(outcome, Some(Err(Error::Limit("inflate work")))));
+                assert!(matches!(outcome, Some(Err(Error::Policy("inflate work")))));
             }
         }
     }
@@ -346,7 +346,7 @@ fn successive_dynamic_blocks_replace_code_lengths_literals_and_empty_distance_ta
             if policy == 14 {
                 assert_eq!(outcome.unwrap().unwrap().as_ref(), b"aabaab");
             } else {
-                assert!(matches!(outcome, Some(Err(Error::Limit("inflate work")))));
+                assert!(matches!(outcome, Some(Err(Error::Policy("inflate work")))));
             }
         }
     }
@@ -422,7 +422,7 @@ fn mixed_dynamic_fixed_and_stored_blocks_keep_bit_state_across_uneven_yields() {
     bits.fixed(256);
     bits.put(1, 1);
     bits.put(0, 2);
-    while bits.used % 8 != 0 {
+    while !bits.used.is_multiple_of(8) {
         bits.put(0, 1);
     }
     bits.put(4, 16);
@@ -710,7 +710,7 @@ fn corrupt_checksum_cancellation_and_permanent_limits_never_publish_partial_outp
         }
         assert!(
             matches!(error, Some(Error::Invalid("Adler-32 mismatch")))
-                || !corrupt && matches!(error, Some(Error::Limit(_)))
+                || !corrupt && matches!(error, Some(Error::Policy(_)))
         );
     }
     let pool = Budget::new(64 * 1024).unwrap();

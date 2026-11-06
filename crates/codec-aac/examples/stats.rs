@@ -7,7 +7,7 @@ fn main() {
     let to: usize = a.get(3).map_or(usize::MAX, |s| s.parse().unwrap());
     let mut pos = 0;
     let mut dec = Decoder::new();
-    dec.debug_enable_stats();
+    dec.enable_stats();
     let mut f = AudioFrame::default();
     let mut k = 0usize;
     while let Some((off, h)) = adts::find_frame(&data, pos) {
@@ -21,7 +21,7 @@ fn main() {
                 f.sample_rate,
                 f.planes.len(),
                 f.samples_per_channel,
-                dec.debug_stats()
+                dec.stats()
             );
         }
         k += 1;

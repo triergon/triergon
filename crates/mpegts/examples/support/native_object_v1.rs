@@ -588,7 +588,7 @@ impl ObjectAdapter {
                 d.location.offset,
                 d.bytes.len()
             )?;
-            source_trace::json_string(output, &d.error.to_string())?;
+            triergon_harness_protocol::write_quoted(output, &d.error.to_string())?;
             output.write_all(b",\"raw_hex\":")?;
             source_trace::hex(output, d.bytes.as_ref())?;
             output.write_all(b"}")?;
@@ -610,7 +610,10 @@ impl ObjectAdapter {
                 header.last_section_number,
                 header.version
             )?;
-            source_trace::json_string(output, &format!("{:?}", record.source_status()))?;
+            triergon_harness_protocol::write_quoted(
+                output,
+                &format!("{:?}", record.source_status()),
+            )?;
             output.write_all(b",\"section_hex\":")?;
             source_trace::hex(output, record.section_bytes().as_ref())?;
             output.write_all(b",\"source_ranges\":[")?;

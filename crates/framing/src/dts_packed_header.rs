@@ -217,7 +217,7 @@ pub fn inspect_dts_header_bits(storage: &[u8], valid_bits: usize) -> Result<DtsP
     let mut prefix = [0_u8; 15];
     let bytes = position.div_ceil(8);
     prefix[..bytes].copy_from_slice(&storage[..bytes]);
-    if position % 8 != 0 {
+    if !position.is_multiple_of(8) {
         prefix[bytes - 1] &= u8::MAX << (8 - position % 8);
     }
     Ok(DtsPackedHeader {

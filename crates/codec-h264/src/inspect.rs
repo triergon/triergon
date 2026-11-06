@@ -71,11 +71,11 @@ pub fn inspect(data: &[u8]) -> StreamFeatures {
                     f.gaps_allowed |= s.gaps_in_frame_num_allowed;
                     f.lossless |= s.qpprime_y_zero_transform_bypass;
                     f.crop |= s.crop != [0; 4];
-                    if let Some(v) = &s.vui {
-                        if v.bitstream_restriction {
-                            f.bitstream_restriction =
-                                Some((v.max_num_reorder_frames, v.max_dec_frame_buffering));
-                        }
+                    if let Some(v) = &s.vui
+                        && v.bitstream_restriction
+                    {
+                        f.bitstream_restriction =
+                            Some((v.max_num_reorder_frames, v.max_dec_frame_buffering));
                     }
                     let id = s.id as usize;
                     spss[id] = Some(Box::new(s));

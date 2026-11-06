@@ -3,11 +3,10 @@ use std::sync::{
     atomic::{AtomicBool, Ordering},
 };
 use triergon_core::{
-    Budget, Bytes, Error as CoreError, InputRequest, InputWindow, SourceCapabilities, SourceId,
-    WorkBudget,
+    Budget, Bytes, Error, InputRequest, InputWindow, SourceCapabilities, SourceId, WorkBudget,
 };
 use triergon_playback::{
-    Error, Format, Source, SourceReply,
+    Format, Source, SourceReply,
     io::{Probe, ProbeProgress},
 };
 const ID: SourceId = SourceId(9121);
@@ -30,20 +29,20 @@ impl Source for Once {
         c: &AtomicBool,
     ) -> triergon_core::Result<SourceReply> {
         if c.load(Ordering::Relaxed) {
-            return Err(CoreError::Cancelled);
+            return Err(Error::Cancelled);
         }
         if r.source != ID {
-            return Err(CoreError::SourceMismatch);
+            return Err(Error::SourceMismatch);
         }
         if !w.try_charge(1) {
             return Ok(SourceReply::Pending);
         }
         self.calls.lock().unwrap().polls += 1;
-        let bytes = self.bytes.take().ok_or(CoreError::Invalid(
+        let bytes = self.bytes.take().ok_or(Error::Invalid(
             "one-shot producer cannot replay consumed input",
         ))?;
         if r.offset != 0 || bytes.len() > r.maximum {
-            return Err(CoreError::Invalid("original range request changed"));
+            return Err(Error::Invalid("original range request changed"));
         }
         Ok(SourceReply::Data(InputWindow::new(
             ID,
@@ -103,7 +102,7 @@ fn probe_cache_pressure_retains_one_shot_data_without_repoll_or_close() {
     let held = b.reserve(b.available()).unwrap();
     assert!(matches!(
         p.advance(&mut WorkBudget::new(1), &c),
-        Err(Error::Core(CoreError::Backpressure { .. }))
+        Err(Error::Backpressure { .. })
     ));
     {
         let x = calls.lock().unwrap();
@@ -161,7 +160,7 @@ fn replay_foreign_source_requests_refuse_without_aliasing_cache_or_polling_upstr
         assert!(
             matches!(
                 selected.source.poll(&request, &mut work, &c),
-                Err(Error::Core(CoreError::SourceMismatch))
+                Err(Error::SourceMismatch)
             ),
             "foreign public Source request must not receive original cached bytes"
         );

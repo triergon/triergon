@@ -34,10 +34,10 @@ impl AacBridge {
         maximum: usize,
     ) -> Result<Self> {
         if !configuration.source_bytes().belongs_to(pool) {
-            return Err(Error::ForeignPool.into());
+            return Err(Error::ForeignPool);
         }
         if track == 0 || maximum < 7 {
-            return Err(Error::Invalid("AAC bridge policy").into());
+            return Err(Error::Invalid("AAC bridge policy"));
         }
         let parameters = AacAdtsParameters::from_asc(configuration.facts())?;
         Ok(Self {
@@ -55,13 +55,15 @@ impl AacBridge {
     }
     pub fn packet(&self, packet: Mp4Packet) -> Result<AacPacketJob> {
         if packet.source.source != self.source {
-            return Err(Error::SourceMismatch.into());
+            return Err(Error::SourceMismatch);
         }
         if packet.configuration.track.track_id != self.track
             || packet.configuration.revision != self.revision
             || packet.configuration.description.format != *b"mp4a"
         {
-            return Err(Error::Invalid("AAC source configuration association changed").into());
+            return Err(Error::Invalid(
+                "AAC source configuration association changed",
+            ));
         }
         let writer = AacAdtsWriter::new(
             &self.pool,

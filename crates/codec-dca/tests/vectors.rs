@@ -41,7 +41,7 @@ fn ts_dts(b: &[u8]) -> Vec<u8> {
     use std::collections::HashMap;
     let mut pes: HashMap<u16, Vec<u8>> = HashMap::new();
     let mut started: HashMap<u16, bool> = HashMap::new();
-    for pkt in b.chunks_exact(188) {
+    for pkt in b.as_chunks::<188>().0 {
         if pkt[0] != 0x47 {
             continue;
         }

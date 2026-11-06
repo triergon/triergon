@@ -30,13 +30,13 @@ impl PendingPacket {
     fn packet_clock(&self) -> Option<(SourceClock, PacketTiming)> {
         let facts = self.packet.source.as_ref()?;
         let mut timing = facts.timing();
-        if let Some(parsed) = &self.native_pes {
-            if parsed.codec_pts() != parsed.source_pts() {
-                timing.pts = parsed.codec_pts().map(|ticks| ClockValue {
-                    ticks,
-                    origin: ClockOrigin::Inferred,
-                });
-            }
+        if let Some(parsed) = &self.native_pes
+            && parsed.codec_pts() != parsed.source_pts()
+        {
+            timing.pts = parsed.codec_pts().map(|ticks| ClockValue {
+                ticks,
+                origin: ClockOrigin::Inferred,
+            });
         }
         Some((facts.configuration().clock(), timing))
     }
@@ -243,12 +243,12 @@ impl Decoder {
         {
             return Err(Error::Invalid("DVB input packet order"));
         }
-        if let (Some(previous), Some(current)) = (self.last_pts, packet.pts) {
-            if current < previous {
-                return Err(Error::Invalid(
-                    "DVB input PTS order requires discontinuity reset",
-                ));
-            }
+        if let (Some(previous), Some(current)) = (self.last_pts, packet.pts)
+            && current < previous
+        {
+            return Err(Error::Invalid(
+                "DVB input PTS order requires discontinuity reset",
+            ));
         }
         if let Some(source) = &packet.source {
             source.validate(&self.state.budget, packet, self.state.service)?;

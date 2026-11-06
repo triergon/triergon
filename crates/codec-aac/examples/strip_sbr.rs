@@ -22,7 +22,7 @@ fn main() {
         }
         let payload = &au[7..];
         let nbits = payload.len() * 8;
-        let ranges = dec.debug_sbr_fil_ranges().to_vec();
+        let ranges = dec.sbr_fill_ranges().to_vec();
         let mut bits: Vec<u8> = Vec::with_capacity(nbits);
         let mut p = 0;
         for &(s, e) in &ranges {
@@ -39,7 +39,7 @@ fn main() {
         // drop trailing alignment of the old block: find END by re-alignment (the END id and
         // byte alignment are copied as-is; removed fills keep their byte-multiple length so
         // only the alignment padding may need trimming)
-        while bits.len() % 8 != 0 {
+        while !bits.len().is_multiple_of(8) {
             bits.push(0);
         }
         let mut pl = Vec::new();

@@ -1,10 +1,10 @@
 use std::{cell::RefCell, rc::Rc, sync::atomic::AtomicBool};
 use triergon_core::{
-    Budget, Bytes, Error as CoreError, InputRequest, InputWindow, SourceCapabilities,
-    SourceFailure, SourceId, Step, WorkBudget,
+    Budget, Bytes, Error, InputRequest, InputWindow, SourceCapabilities, SourceFailure, SourceId,
+    Step, WorkBudget,
 };
 use triergon_framing::{Codec, RawAnnexBLimits, RawAnnexBReader};
-use triergon_playback::{ByteSource, Error, Source, SourceReply, raw_video::RawVideoSource};
+use triergon_playback::{ByteSource, Source, SourceReply, raw_video::RawVideoSource};
 
 const SOURCE: SourceId = SourceId(72);
 static OFF: AtomicBool = AtomicBool::new(false);
@@ -152,7 +152,7 @@ fn raw_source_distinguishes_empty_reads_from_eof_and_closes_once() {
 
 #[test]
 fn raw_source_transport_failure_and_cancellation_retire_partial_state() {
-    for expected in [CoreError::Transport, CoreError::Cancelled] {
+    for expected in [Error::Transport, Error::Cancelled] {
         let pool = Budget::new(1 << 20).unwrap();
         let calls = Rc::new(RefCell::new(Calls::default()));
         let tail = Rc::new(RefCell::new(Tail::Pending));
@@ -162,11 +162,11 @@ fn raw_source_transport_failure_and_cancellation_retire_partial_state() {
             Step::NeedInput(_)
         ));
         *tail.borrow_mut() = Tail::Failed;
-        let cancel = AtomicBool::new(expected == CoreError::Cancelled);
+        let cancel = AtomicBool::new(expected == Error::Cancelled);
         for _ in 0..2 {
             assert!(matches!(
                 source.poll(&mut WorkBudget::new(512), &cancel),
-                Err(Error::Core(error)) if error == expected
+                Err(error) if error == expected
             ));
         }
         assert_eq!(pool.used(), Budget::control_storage_bytes());
@@ -334,7 +334,7 @@ fn raw_probe_refuses_mixed_evidence_and_uses_explicit_scan_bounds() {
         (
             mixed,
             RawVideoProbeLimits::default(),
-            CoreError::Invalid("ambiguous raw Annex B parameter-set signatures"),
+            Error::Invalid("ambiguous raw Annex B parameter-set signatures"),
         ),
         (
             RAW_FIXTURES[0].1,
@@ -342,7 +342,7 @@ fn raw_probe_refuses_mixed_evidence_and_uses_explicit_scan_bounds() {
                 maximum_bytes: 8,
                 maximum_nals: 32,
             },
-            CoreError::Unsupported("raw video signature absent within probe bound"),
+            Error::Unsupported("raw video signature absent within probe bound"),
         ),
         (
             RAW_FIXTURES[0].1,
@@ -350,7 +350,7 @@ fn raw_probe_refuses_mixed_evidence_and_uses_explicit_scan_bounds() {
                 maximum_bytes: 65536,
                 maximum_nals: 1,
             },
-            CoreError::Limit {
+            Error::Limit {
                 requested: 2,
                 maximum: 1,
             },
@@ -358,7 +358,7 @@ fn raw_probe_refuses_mixed_evidence_and_uses_explicit_scan_bounds() {
         (
             &[0, 0, 1, 0x09, 0x10][..],
             RawVideoProbeLimits::default(),
-            CoreError::Unsupported("raw video signature absent at EOF"),
+            Error::Unsupported("raw video signature absent at EOF"),
         ),
     ] {
         let pool = Budget::new(1 << 20).unwrap();
@@ -378,7 +378,7 @@ fn raw_probe_refuses_mixed_evidence_and_uses_explicit_scan_bounds() {
         .unwrap();
         let error = (0..10_000)
             .find_map(|_| match probe.advance(&mut WorkBudget::new(13), &OFF) {
-                Err(Error::Core(error)) => Some(error),
+                Err(error) => Some(error),
                 Ok(RawVideoProbeStep::NeedInput(_) | RawVideoProbeStep::Yield) => None,
                 other => panic!("unexpected raw probe result {other:?}"),
             })
@@ -552,7 +552,7 @@ fn raw_probe_backpressure_retains_the_delivered_source_window() {
     let held = pool.reserve(pool.limit() - pool.used()).unwrap();
     assert!(matches!(
         probe.advance(&mut WorkBudget::new(8192), &OFF),
-        Err(Error::Core(CoreError::Backpressure { .. }))
+        Err(Error::Backpressure { .. })
     ));
     assert_eq!(reads.borrow().as_slice(), &[(0, 4096)]);
     drop(held);
@@ -782,14 +782,11 @@ fn playback_probe_rejects_conflicting_transport_signatures() {
     )
     .unwrap();
     let err = (0..1000).find_map(|_| match probe.advance(&mut WorkBudget::new(43), &OFF) {
-        Err(Error::Core(error)) => Some(error),
+        Err(error) => Some(error),
         Ok(PlaybackProbeStep::NeedInput(_) | PlaybackProbeStep::Yield) => None,
         other => panic!("unexpected ambiguous probe outcome {other:?}"),
     });
-    assert_eq!(
-        err,
-        Some(CoreError::Invalid("ambiguous transport signature"))
-    );
+    assert_eq!(err, Some(Error::Invalid("ambiguous transport signature")));
     assert!(matches!(
         probe.advance(&mut WorkBudget::new(43), &OFF),
         Err(Error::Closed)
