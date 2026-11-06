@@ -1040,7 +1040,14 @@ impl<S: Source> Player<S> {
         } else if let Some(cursor) = cursor {
             engine.poll_mp4_range(cursor, w, &self.cancel)?
         } else {
-            engine.poll(w, &self.cancel)?
+            let step = engine.poll(w, &self.cancel);
+            let skipped = engine.take_suppressed_events();
+            if skipped != 0 {
+                let events = self.events.checked_add(skipped).ok_or(Error::Overflow)?;
+                Self::check_event_limit(events, self.policy.maximum_events)?;
+                self.events = events;
+            }
+            step?
         };
         match step {
             BackendStep::Event(event) => {
@@ -1187,15 +1194,19 @@ impl<S: Source> Player<S> {
             }
         };
         let events = self.events.checked_add(1).ok_or(Error::Overflow)?;
-        if events > self.policy.maximum_events {
+        Self::check_event_limit(events, self.policy.maximum_events)?;
+        Ok(Some((bytes, delivery)))
+    }
+
+    fn check_event_limit(events: u64, maximum: u64) -> Result<()> {
+        if events > maximum {
             return Err(Error::Limit {
-                requested: usize::try_from(events).map_err(|_| Error::Overflow)?,
-                maximum: usize::try_from(self.policy.maximum_events)
-                    .map_err(|_| Error::Overflow)?,
+                requested: usize::try_from(maximum + 1).map_err(|_| Error::Overflow)?,
+                maximum: usize::try_from(maximum).map_err(|_| Error::Overflow)?,
             }
             .into());
         }
-        Ok(Some((bytes, delivery)))
+        Ok(())
     }
 
     // Keep construction at the destination, including for the caller's slot.

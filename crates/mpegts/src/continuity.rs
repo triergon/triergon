@@ -47,6 +47,11 @@ impl Continuity {
         self.duplicated = false;
     }
 
+    pub(crate) fn expects_payload_counter(&self, counter: u8) -> bool {
+        self.counter
+            .is_some_and(|previous| (previous + 1) & 15 == counter)
+    }
+
     /// A bounded 188-byte operation. The caller charges one packet work unit before
     /// calling and checks cancellation at that boundary; no heap allocation occurs.
     /// PCR observations on Duplicate remain usable; do not re-assemble its payload.
@@ -65,6 +70,7 @@ impl Continuity {
             .payload
             .as_ref()
             .is_some_and(|payload| !payload.is_empty());
+        let ts = packet.ts_bytes();
         let outcome = match self.counter {
             None => ContinuityOutcome::First,
             Some(previous) => {
@@ -74,7 +80,14 @@ impl Continuity {
                 let same_packet = has_payload
                     && self.payload
                     && previous == packet.continuity_counter
-                    && (0..188).all(|index| self.previous[index] == packet.normalized_byte(index));
+                    && match packet.pcr_range.as_ref() {
+                        Some(pcr) => {
+                            self.previous[..pcr.start] == ts[..pcr.start]
+                                && self.previous[pcr.clone()].iter().all(|&byte| byte == 0)
+                                && self.previous[pcr.end..] == ts[pcr.end..]
+                        }
+                        None => self.previous == ts,
+                    };
                 if same_packet {
                     if self.duplicated {
                         return Ok(ContinuityOutcome::ExcessDuplicate);
@@ -95,8 +108,9 @@ impl Continuity {
                 }
             }
         };
-        for (index, byte) in self.previous.iter_mut().enumerate() {
-            *byte = packet.normalized_byte(index);
+        self.previous.copy_from_slice(ts);
+        if let Some(pcr) = packet.pcr_range.as_ref() {
+            self.previous[pcr.clone()].fill(0);
         }
         self.counter = Some(packet.continuity_counter);
         self.payload = has_payload;

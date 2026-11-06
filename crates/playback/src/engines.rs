@@ -31,7 +31,7 @@ use ts::clock::NativeClockProfile;
 use ts::native_pes::{
     NativeDvbSubtitlesDescriptors, NativePesObserver, NativePesPacket, NativePesScope,
     NativePrivateAudioCarriage, NativePrivateAudioDescriptors, NativeRegisteredCarriage,
-    NativeSourceContext,
+    NativeSourceContext, ReadyContinuation,
 };
 use ts::psi::{DescriptorNamespace, ProgramMap};
 #[derive(Clone, Debug)]
@@ -291,12 +291,13 @@ impl TsNativeTracks {
 
 #[derive(Clone, Copy, PartialEq, Eq)]
 enum SegmentDiscovery {
-    Progressive,
     Native,
-    Media,
+    Progressive,
+    AvcAacFeed,
+    MediaFeed,
 }
 
-struct NativeCarrier {
+struct ProgressiveCarrier {
     index: usize,
     packet: ts::TransportPacket,
     context: NativeSourceContext,
@@ -325,11 +326,12 @@ pub struct TsEngine {
     native_pending: Option<NativePesPacket>,
     native_packet_clock: Option<NativePesClockV1>,
     event_ordinal: u64,
+    suppressed_events: u64,
     native_update_at: Option<usize>,
     segment_discovery: Option<SegmentDiscovery>,
     segmented: bool,
     boundary: Option<ts::MediaEntityEndV1>,
-    progressive_carrier: Option<NativeCarrier>,
+    progressive_carrier: Option<ProgressiveCarrier>,
 }
 pub struct MkvEngine {
     reader: Reader,
@@ -597,6 +599,7 @@ impl Engine {
             native_pending: None,
             native_packet_clock: clock()?,
             event_ordinal: 0,
+            suppressed_events: 0,
             native_update_at: None,
             segment_discovery: None,
             segmented: false,
@@ -753,16 +756,31 @@ impl Engine {
         Self::ts_native_segment(input, limits, policy, namespace, SegmentDiscovery::Native)
     }
 
-    pub(crate) fn ts_native_media_segment(
+    pub(crate) fn ts_hls_segment(
         input: InputCursor,
         limits: ts::ParseLimits,
+        media: bool,
     ) -> Result<Self> {
         Self::ts_native_segment(
             input,
             limits,
             SourceTimePolicy::Unanchored,
             DescriptorNamespace::Unspecified,
-            SegmentDiscovery::Media,
+            if media {
+                SegmentDiscovery::MediaFeed
+            } else {
+                SegmentDiscovery::AvcAacFeed
+            },
+        )
+    }
+
+    pub(crate) fn ts_progressive(input: InputCursor, limits: ts::ParseLimits) -> Result<Self> {
+        Self::ts_native_segment(
+            input,
+            limits,
+            SourceTimePolicy::Unanchored,
+            DescriptorNamespace::Unspecified,
+            SegmentDiscovery::Progressive,
         )
     }
 
@@ -773,8 +791,15 @@ impl Engine {
         namespace: DescriptorNamespace,
         discovery: SegmentDiscovery,
     ) -> Result<Self> {
-        let stream =
-            TransportStream::new_single_program_segment(input.budget().clone(), limits, namespace)?;
+        let budget = input.budget().clone();
+        let stream = match discovery {
+            SegmentDiscovery::Native | SegmentDiscovery::Progressive => {
+                TransportStream::new_single_program_segment(budget, limits, namespace)?
+            }
+            SegmentDiscovery::AvcAacFeed | SegmentDiscovery::MediaFeed => {
+                TransportStream::new_single_program_feed(budget, limits, namespace)?
+            }
+        };
         let mut engine = Self::ts_from_stream(
             input,
             ts::PacketFormat::Ts188,
@@ -787,16 +812,6 @@ impl Engine {
             ts.segment_discovery = Some(discovery);
         }
         Ok(engine)
-    }
-
-    pub(crate) fn ts_progressive(input: InputCursor, limits: ts::ParseLimits) -> Result<Self> {
-        Self::ts_native_segment(
-            input,
-            limits,
-            SourceTimePolicy::Unanchored,
-            DescriptorNamespace::Unspecified,
-            SegmentDiscovery::Progressive,
-        )
     }
 
     pub fn ts_segmented(
@@ -931,6 +946,13 @@ impl Engine {
             Self::Matroska(r) => Ok(BackendStep::from_matroska(r.step(w, c)?)),
             Self::Mp4(r) => r.poll(w, c, None),
             Self::Ts(r) => r.poll(w, c),
+        }
+    }
+
+    pub(crate) fn take_suppressed_events(&mut self) -> u64 {
+        match self {
+            Self::Ts(engine) => std::mem::take(&mut engine.suppressed_events),
+            _ => 0,
         }
     }
 
@@ -1574,7 +1596,7 @@ impl TsEngine {
                 0x24 => TsNativeCarriage::Registered(NativeRegisteredCarriage::Hevc),
                 0x0f | 0x11 | 0x81 | 0x87 => TsNativeCarriage::AudioFromPmt,
                 0x06 if (matches!(map.descriptor_namespace, DescriptorNamespace::Dvb(_))
-                    || self.segment_discovery == Some(SegmentDiscovery::Media))
+                    || self.segment_discovery == Some(SegmentDiscovery::MediaFeed))
                     && stream.descriptors().any(|entry| {
                         entry.is_ok_and(|descriptor| matches!(descriptor.tag, 0x6a | 0x7a))
                     }) =>
@@ -1636,7 +1658,7 @@ impl TsEngine {
             program: map.program_descriptors.as_ref(),
             elementary: stream.descriptor_bytes.as_ref(),
         };
-        let hls_audio = self.segment_discovery == Some(SegmentDiscovery::Media);
+        let hls_audio = self.segment_discovery == Some(SegmentDiscovery::MediaFeed);
         let carriage = match spec.carriage {
             TsNativeCarriage::AudioFromPmt => match stream.stream_type {
                 0x0f => TsNativeCarriage::Registered(NativeRegisteredCarriage::AacAdts),
@@ -1713,6 +1735,84 @@ impl TsEngine {
             TsNativeCarriage::AudioFromPmt => Err(mismatch),
         }?;
         Ok((observer, carriage))
+    }
+
+    fn offer_native_transport(
+        &mut self,
+        index: usize,
+        mut packet: ts::TransportPacket,
+        context: NativeSourceContext,
+        ready: Option<(&mut WorkBudget, &AtomicBool)>,
+    ) -> Result<bool> {
+        let track = &mut self.native_tracks.as_mut_slice()[index];
+        if let Some(observer) = track.observer.as_mut() {
+            if let Some((work, cancel)) = ready {
+                match observer.append_ready_continuation(&mut packet, context, work, cancel)? {
+                    ReadyContinuation::Buffered => return Ok(true),
+                    ReadyContinuation::Complete => {
+                        self.native_active = Some(index);
+                        return Ok(false);
+                    }
+                    ReadyContinuation::Unhandled => {}
+                }
+            }
+            let pushed = if self.native_context.is_some() {
+                observer.push_with_input(packet, context, &self.input)
+            } else {
+                observer.push(packet, context)
+            };
+            match pushed {
+                Ok(()) => self.native_active = Some(index),
+                Err(rejected) => {
+                    track.refuse(rejected.error);
+                    self.native_update_at = Some(index);
+                }
+            }
+            return Ok(false);
+        }
+        Ok(true)
+    }
+
+    fn native_source_context(&self) -> NativeSourceContext {
+        NativeSourceContext {
+            source_event_ordinal: self.event_ordinal,
+            epochs: self.stream.source_epochs(),
+            byte_run_epoch: None,
+        }
+    }
+
+    fn route_native_carrier(&mut self, event: &TraceEvent) -> Result<()> {
+        if let Some(carrier) = self.progressive_carrier.take() {
+            let TraceEvent::Continuity { pid, outcome } = event else {
+                return Err(Error::Invalid("progressive TS missing carrier continuity").into());
+            };
+            if *pid != carrier.packet.pid {
+                return Err(Error::Invalid("progressive TS continuity PID mismatch").into());
+            }
+            if matches!(
+                outcome,
+                ts::ContinuityOutcome::First | ts::ContinuityOutcome::Continuous
+            ) {
+                self.offer_native_transport(carrier.index, carrier.packet, carrier.context, None)?;
+            }
+        } else if let TraceEvent::Transport(packet) = event
+            && let Some(index) = self.native_tracks.index(packet.pid)
+            && self.native_tracks.as_slice()[index].observer.is_some()
+        {
+            let context = self.native_source_context();
+            if self.segment_discovery == Some(SegmentDiscovery::Progressive) {
+                // Wait for the source continuity decision so a duplicate
+                // carrier never enters the native PES.
+                self.progressive_carrier = Some(ProgressiveCarrier {
+                    index,
+                    packet: packet.clone(),
+                    context,
+                });
+            } else {
+                self.offer_native_transport(index, packet.clone(), context, None)?;
+            }
+        }
+        Ok(())
     }
 
     // Keep backend-specific polling workspaces out of the shared dispatcher.
@@ -1795,122 +1895,141 @@ impl TsEngine {
             }
             self.native_active = self.draining.then_some(index + 1);
         }
+        let feed_only = matches!(
+            self.segment_discovery,
+            Some(SegmentDiscovery::AvcAacFeed | SegmentDiscovery::MediaFeed)
+        );
         if self.ended {
             return Ok(BackendStep::End);
         }
         if self.boundary.is_some() {
             return Ok(BackendStep::AwaitEntity);
         }
-        if self.pending.is_none() {
-            match self.stream.poll(&mut self.input, w, c)? {
-                Step::Ready(e) => self.pending = Some(e),
-                Step::NeedInput(r) => return Ok(BackendStep::NeedInput(r)),
-                Step::Yield => return Ok(BackendStep::Yield),
-                Step::End(_) => {
-                    if self.draining {
-                        return Err(Error::Invalid("TS repeated undrained entity End").into());
-                    }
-                    if self.segmented {
-                        if let Some(end) = self.stream.media_entity_end_v1(&mut self.input, w, c)? {
-                            self.boundary = Some(end.clone());
-                            return Ok(BackendStep::Event(RawEvent::EntityEnd(end)));
+        loop {
+            if self.pending.is_none() {
+                let step = self.stream.poll(&mut self.input, w, c);
+                if feed_only {
+                    let omitted = self.stream.take_feed_omissions();
+                    self.event_ordinal = self
+                        .event_ordinal
+                        .checked_add(omitted)
+                        .ok_or(Error::Overflow)?;
+                    self.suppressed_events += omitted;
+                }
+                match step? {
+                    Step::Ready(e) => self.pending = Some(e),
+                    Step::NeedInput(r) => return Ok(BackendStep::NeedInput(r)),
+                    Step::Yield => return Ok(BackendStep::Yield),
+                    Step::End(_) => {
+                        if self.draining {
+                            return Err(Error::Invalid("TS repeated undrained entity End").into());
                         }
+                        if self.segmented {
+                            if let Some(end) =
+                                self.stream.media_entity_end_v1(&mut self.input, w, c)?
+                            {
+                                self.boundary = Some(end.clone());
+                                return Ok(BackendStep::Event(RawEvent::EntityEnd(end)));
+                            }
+                            return Ok(BackendStep::Yield);
+                        }
+                        if self.segment_discovery.is_some() && self.pcr_pid.is_none() {
+                            return Err(
+                                Error::Invalid("TS segment ended without an active PMT").into()
+                            );
+                        }
+                        self.stream.end_of_source()?;
+                        self.draining = true;
+                        for track in self.native_tracks.as_mut_slice() {
+                            if let Some(observer) = track.observer.as_mut() {
+                                observer.end_of_source()?;
+                            }
+                        }
+                        self.native_active = Some(0);
                         return Ok(BackendStep::Yield);
                     }
-                    if self.segment_discovery.is_some() && self.pcr_pid.is_none() {
-                        return Err(Error::Invalid("TS segment ended without an active PMT").into());
-                    }
-                    self.stream.end_of_source()?;
-                    self.draining = true;
-                    for track in self.native_tracks.as_mut_slice() {
-                        if let Some(observer) = track.observer.as_mut() {
-                            observer.end_of_source()?;
-                        }
-                    }
-                    self.native_active = Some(0);
-                    return Ok(BackendStep::Yield);
                 }
             }
-        }
-        if !matches!(self.pending, Some(TraceEvent::Pes(_))) && !w.try_charge(1) {
-            return Ok(BackendStep::Yield);
-        }
-        let event = self
-            .pending
-            .as_ref()
-            .ok_or(Error::Invalid("TS event missing"))?;
-        if let TraceEvent::Diagnostic(fault) = event
-            && fault.kind == ts::FaultKind::Transport
-            && matches!(
-                fault.error,
-                Error::Invalid("TS sync byte") | Error::Truncated
-            )
-            && !self.native_prefix_failed
-            && self
-                .native_context
-                .as_ref()
-                .is_some_and(|context| context.is_prefix_v2())
-        {
-            self.native_prefix_failed = true;
-            for track in self.native_tracks.as_mut_slice() {
-                track.refuse(Error::Unsupported("native M2TS carrier grid lost"));
-            }
-            self.native_update_at = Some(0);
-        }
-        if let TraceEvent::ProgramMap {
-            map,
-            active: true,
-            configuration_epoch,
-        } = event
-        {
-            if map.streams.len() > 64 {
-                return Err(Error::Limit {
-                    requested: map.streams.len(),
-                    maximum: 64,
-                }
-                .into());
-            }
-            if self.segment_discovery.is_some() && self.native_map_next == 0 {
-                self.native_tracks = self.discover_tracks(map)?;
-            }
-            if !self.native_prefix_failed
-                && let Some(track) = self.native_tracks.as_slice().get(self.native_map_next)
+            if (feed_only || !matches!(self.pending, Some(TraceEvent::Pes(_)))) && !w.try_charge(1)
             {
-                let observer = self.native_observer(track.selection, map, *configuration_epoch);
-                let track = &mut self.native_tracks.as_mut_slice()[self.native_map_next];
-                match observer {
-                    Ok((mut observer, carriage)) => {
-                        if let Some(context) = self.native_context.as_ref() {
-                            observer.bind_native_input_v1(context, &self.input)?;
-                        }
-                        track.observer = Some(observer);
-                        track.update = (self.segment_discovery.is_some()
-                            || track.selection.carriage == TsNativeCarriage::AudioFromPmt)
-                            .then_some(TsNativeUpdate::Configuration(TsNativeConfiguration {
-                                track: TrackKey::Ts {
-                                    program: self.program,
-                                    pid: track.pid(),
-                                },
-                                configuration_epoch: *configuration_epoch,
-                                carriage,
-                            }));
-                    }
-                    Err(error) => track.refuse(error),
-                }
-                self.native_map_next += 1;
-                if self.native_map_next < self.native_tracks.as_slice().len() {
-                    return Ok(BackendStep::Yield);
-                }
+                return Ok(BackendStep::Yield);
             }
-            self.facts
-                .try_reserve_exact(map.streams.len().saturating_sub(self.facts.len()))?;
-            self.facts.clear();
-            for e in map.streams.as_slice() {
-                let kind = match e.stream_type {
-                    0x1b | 0x24 | 0x02 => TrackKind::Video,
-                    0x0f | 0x11 | 0x03 | 0x04 | 0x81 | 0x87 => TrackKind::Audio,
-                    0x06 => {
-                        self.native_tracks
+            let event = self
+                .pending
+                .as_ref()
+                .ok_or(Error::Invalid("TS event missing"))?;
+            if let TraceEvent::Diagnostic(fault) = event
+                && fault.kind == ts::FaultKind::Transport
+                && matches!(
+                    fault.error,
+                    Error::Invalid("TS sync byte") | Error::Truncated
+                )
+                && !self.native_prefix_failed
+                && self
+                    .native_context
+                    .as_ref()
+                    .is_some_and(|context| context.is_prefix_v2())
+            {
+                self.native_prefix_failed = true;
+                for track in self.native_tracks.as_mut_slice() {
+                    track.refuse(Error::Unsupported("native M2TS carrier grid lost"));
+                }
+                self.native_update_at = Some(0);
+            }
+            if let TraceEvent::ProgramMap {
+                map,
+                active: true,
+                configuration_epoch,
+            } = event
+            {
+                if map.streams.len() > 64 {
+                    return Err(Error::Limit {
+                        requested: map.streams.len(),
+                        maximum: 64,
+                    }
+                    .into());
+                }
+                if self.segment_discovery.is_some() && self.native_map_next == 0 {
+                    self.native_tracks = self.discover_tracks(map)?;
+                }
+                if !self.native_prefix_failed
+                    && let Some(track) = self.native_tracks.as_slice().get(self.native_map_next)
+                {
+                    let observer = self.native_observer(track.selection, map, *configuration_epoch);
+                    let track = &mut self.native_tracks.as_mut_slice()[self.native_map_next];
+                    match observer {
+                        Ok((mut observer, carriage)) => {
+                            if let Some(context) = self.native_context.as_ref() {
+                                observer.bind_native_input_v1(context, &self.input)?;
+                            }
+                            track.observer = Some(observer);
+                            track.update = (self.segment_discovery.is_some()
+                                || track.selection.carriage == TsNativeCarriage::AudioFromPmt)
+                                .then_some(TsNativeUpdate::Configuration(TsNativeConfiguration {
+                                    track: TrackKey::Ts {
+                                        program: self.program,
+                                        pid: track.pid(),
+                                    },
+                                    configuration_epoch: *configuration_epoch,
+                                    carriage,
+                                }));
+                        }
+                        Err(error) => track.refuse(error),
+                    }
+                    self.native_map_next += 1;
+                    if self.native_map_next < self.native_tracks.as_slice().len() {
+                        return Ok(BackendStep::Yield);
+                    }
+                }
+                self.facts
+                    .try_reserve_exact(map.streams.len().saturating_sub(self.facts.len()))?;
+                self.facts.clear();
+                for e in map.streams.as_slice() {
+                    let kind = match e.stream_type {
+                        0x1b | 0x24 | 0x02 => TrackKind::Video,
+                        0x0f | 0x11 | 0x03 | 0x04 | 0x81 | 0x87 => TrackKind::Audio,
+                        0x06 => self
+                            .native_tracks
                             .index(e.pid)
                             .map(|i| &self.native_tracks.as_slice()[i])
                             .filter(|track| track.observer.is_some())
@@ -1919,147 +2038,122 @@ impl TsEngine {
                                 | TsNativeCarriage::AudioFromPmt => TrackKind::Audio,
                                 TsNativeCarriage::DvbSubtitles => TrackKind::Subtitle,
                                 TsNativeCarriage::Registered(_) => TrackKind::Other,
-                            })
+                            }),
+                        _ => TrackKind::Other,
+                    };
+                    self.facts
+                        .try_push(TrackFact {
+                            key: TrackKey::Ts {
+                                program: self.program,
+                                pid: e.pid,
+                            },
+                            kind,
+                            enabled: true,
+                        })
+                        .map_err(|e| e.error)?;
+                }
+                self.native_map_next = 0;
+                self.native_update_at = self
+                    .native_tracks
+                    .as_slice()
+                    .iter()
+                    .position(|track| track.update.is_some());
+                self.pcr_pid = Some(map.pcr_pid);
+            }
+            if let TraceEvent::Pat(table) = event {
+                if self.program == 0 {
+                    let program = self.stream.selected_program();
+                    if !feed_only {
+                        self.native = Some(NativePesClockV1::new(program)?);
                     }
-                    _ => TrackKind::Other,
-                };
-                self.facts
-                    .try_push(TrackFact {
-                        key: TrackKey::Ts {
-                            program: self.program,
-                            pid: e.pid,
-                        },
-                        kind,
-                        enabled: true,
-                    })
-                    .map_err(|e| e.error)?;
+                    self.native_packet_clock = Some(NativePesClockV1::new(program)?);
+                    self.program = program;
+                }
+                self.tsid = Some(table.header.extension);
             }
-            self.native_map_next = 0;
-            self.native_update_at = self
-                .native_tracks
-                .as_slice()
-                .iter()
-                .position(|track| track.update.is_some());
-            self.pcr_pid = Some(map.pcr_pid);
-        }
-        if let TraceEvent::Pat(table) = event {
-            if self.program == 0 {
-                let program = self.stream.selected_program();
-                self.native = Some(NativePesClockV1::new(program)?);
-                self.native_packet_clock = Some(NativePesClockV1::new(program)?);
-                self.program = program;
+            // The HLS feed consumes active maps, faults and native payloads. The
+            // source parser still validates every packet and advances its epochs.
+            if feed_only
+                && !matches!(
+                    event,
+                    TraceEvent::ProgramMap { active: true, .. } | TraceEvent::Diagnostic(_)
+                )
+            {
+                let event = self
+                    .pending
+                    .take()
+                    .ok_or(Error::Invalid("TS event missing"))?;
+                let mut drained = true;
+                match event {
+                    TraceEvent::Transport(packet) => {
+                        if let Some(index) = self.native_tracks.index(packet.pid) {
+                            let context = self.native_source_context();
+                            drained =
+                                self.offer_native_transport(index, packet, context, Some((w, c)))?;
+                        }
+                    }
+                    TraceEvent::Pes(_) if self.program == 0 => {
+                        return Err(Error::Invalid("TS PES before program discovery").into());
+                    }
+                    TraceEvent::Finished => self.ended = true,
+                    _ => {}
+                }
+                self.event_ordinal = self.event_ordinal.checked_add(1).ok_or(Error::Overflow)?;
+                self.suppressed_events += 1;
+                // Return periodically to the player's cancellation and event cap.
+                if !drained || self.ended || w.remaining() == 0 || self.suppressed_events >= 64 {
+                    return Ok(BackendStep::Yield);
+                }
+                continue;
             }
-            self.tsid = Some(table.header.extension);
-        }
-        let key = match (self.tsid, self.pcr_pid) {
-            (Some(tsid), Some(pcr_pid)) => Some(ClockKey {
-                tsid,
-                program: self.program,
-                pcr_pid,
-                epoch: match event {
-                    TraceEvent::Pes(p) => p.epochs.clock,
-                    _ => self.stream.source_epochs().clock,
-                },
-            }),
-            _ => None,
-        };
-        let mut source_pts = None;
-        let mut source_dts = None;
-        let mut native_clock = None;
-        if let TraceEvent::Pes(pes) = event {
-            if let Some(key) = key {
-                source_pts = Some(source_timestamp(pes.header.pts_raw33, key, self.policy)?);
-                source_dts = Some(source_timestamp(pes.header.dts_raw33, key, self.policy)?);
-            }
-            // Native clock work remains separately charged and may yield without taking
-            // the source event. No native time is copied into source fields.
-            let projector = self
-                .native
-                .as_mut()
-                .ok_or(Error::Invalid("TS PES before program discovery"))?;
-            native_clock = projector.project(pes, w, c)?;
-            if native_clock.is_none() {
-                return Ok(BackendStep::Yield);
-            }
-        }
-        let event = self
-            .pending
-            .take()
-            .ok_or(Error::Invalid("TS event missing"))?;
-        self.route_native_carrier(&event)?;
-        self.event_ordinal = self.event_ordinal.checked_add(1).ok_or(Error::Overflow)?;
-        if matches!(event, TraceEvent::Finished) {
-            self.ended = true;
-        }
-        Ok(BackendStep::Event(RawEvent::Ts(TsEvent {
-            source: event,
-            source_pts,
-            source_dts,
-            native_clock,
-            clock_key: key,
-        })))
-    }
-
-    fn route_native_carrier(&mut self, event: &TraceEvent) -> Result<()> {
-        let NativeCarrier {
-            index,
-            packet,
-            context,
-        } = if let Some(carrier) = self.progressive_carrier.take() {
-            let TraceEvent::Continuity { pid, outcome } = event else {
-                return Err(Error::Invalid("progressive TS missing carrier continuity").into());
+            let key = match (self.tsid, self.pcr_pid) {
+                (Some(tsid), Some(pcr_pid)) => Some(ClockKey {
+                    tsid,
+                    program: self.program,
+                    pcr_pid,
+                    epoch: match event {
+                        TraceEvent::Pes(p) => p.epochs.clock,
+                        _ => self.stream.source_epochs().clock,
+                    },
+                }),
+                _ => None,
             };
-            if *pid != carrier.packet.pid {
-                return Err(Error::Invalid("progressive TS continuity PID mismatch").into());
+            let mut source_pts = None;
+            let mut source_dts = None;
+            let mut native_clock = None;
+            if let TraceEvent::Pes(pes) = event {
+                if let Some(key) = key {
+                    source_pts = Some(source_timestamp(pes.header.pts_raw33, key, self.policy)?);
+                    source_dts = Some(source_timestamp(pes.header.dts_raw33, key, self.policy)?);
+                }
+                // Native clock work remains separately charged and may yield without taking
+                // the source event. No native time is copied into source fields.
+                let projector = self
+                    .native
+                    .as_mut()
+                    .ok_or(Error::Invalid("TS PES before program discovery"))?;
+                native_clock = projector.project(pes, w, c)?;
+                if native_clock.is_none() {
+                    return Ok(BackendStep::Yield);
+                }
             }
-            // The source parser drops duplicates and reports faults separately.
-            if !matches!(
-                outcome,
-                ts::ContinuityOutcome::First | ts::ContinuityOutcome::Continuous
-            ) {
-                return Ok(());
+            let event = self
+                .pending
+                .take()
+                .ok_or(Error::Invalid("TS event missing"))?;
+            self.route_native_carrier(&event)?;
+            self.event_ordinal = self.event_ordinal.checked_add(1).ok_or(Error::Overflow)?;
+            if matches!(event, TraceEvent::Finished) {
+                self.ended = true;
             }
-            carrier
-        } else if let TraceEvent::Transport(packet) = event
-            && let Some(index) = self.native_tracks.index(packet.pid)
-            && self.native_tracks.as_slice()[index].observer.is_some()
-        {
-            let carrier = NativeCarrier {
-                index,
-                packet: packet.clone(),
-                context: NativeSourceContext {
-                    source_event_ordinal: self.event_ordinal,
-                    epochs: self.stream.source_epochs(),
-                    byte_run_epoch: None,
-                },
-            };
-            if self.segment_discovery == Some(SegmentDiscovery::Progressive) {
-                self.progressive_carrier = Some(carrier);
-                return Ok(());
-            }
-            carrier
-        } else {
-            return Ok(());
-        };
-
-        let track = &mut self.native_tracks.as_mut_slice()[index];
-        let observer = track
-            .observer
-            .as_mut()
-            .ok_or(Error::Invalid("native TS observer missing for carrier"))?;
-        let pushed = if self.native_context.is_some() {
-            observer.push_with_input(packet, context, &self.input)
-        } else {
-            observer.push(packet, context)
-        };
-        match pushed {
-            Ok(()) => self.native_active = Some(index),
-            Err(rejected) => {
-                track.refuse(rejected.error);
-                self.native_update_at = Some(index);
-            }
+            return Ok(BackendStep::Event(RawEvent::Ts(TsEvent {
+                source: event,
+                source_pts,
+                source_dts,
+                native_clock,
+                clock_key: key,
+            })));
         }
-        Ok(())
     }
 }
 impl RawEvent {

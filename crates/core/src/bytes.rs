@@ -17,6 +17,10 @@ pub struct Bytes {
     range: Range<usize>,
 }
 
+/// A shared allocation's address. It can be reused after the last owner drops.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct ByteStorageAddress(usize);
+
 impl Bytes {
     pub fn copy_from_slice(budget: &Budget, input: &[u8]) -> Result<Self> {
         let size = input
@@ -111,6 +115,10 @@ impl Bytes {
     }
     pub fn shares_storage_with(&self, other: &Self) -> bool {
         Arc::ptr_eq(&self.storage, &other.storage)
+    }
+    /// Compare backing allocations without extending their lifetimes.
+    pub fn storage_address(&self) -> ByteStorageAddress {
+        ByteStorageAddress(Arc::as_ptr(&self.storage).addr())
     }
     pub fn belongs_to(&self, budget: &Budget) -> bool {
         self.storage.charge.budget.same_pool(budget)
@@ -494,5 +502,41 @@ impl BudgetVec<u8> {
         }
         let Self { data, charge } = self;
         Ok(Bytes::from_storage(data, charge))
+    }
+}
+
+/// Length of the leading run of nonzero bytes.
+#[inline]
+pub fn nonzero_prefix_len(bytes: &[u8]) -> usize {
+    let mut words = bytes.chunks_exact(8);
+    for (index, chunk) in words.by_ref().enumerate() {
+        let word = u64::from_le_bytes(chunk.try_into().expect("eight-byte chunk"));
+        let zeroes = word.wrapping_sub(0x0101_0101_0101_0101) & !word & 0x8080_8080_8080_8080;
+        if zeroes != 0 {
+            // Borrow can mark a following byte, so use the lowest marked octet.
+            return index * 8 + zeroes.trailing_zeros() as usize / 8;
+        }
+    }
+    let tail = words.remainder();
+    bytes.len() - tail.len()
+        + tail
+            .iter()
+            .position(|&byte| byte == 0)
+            .unwrap_or(tail.len())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::nonzero_prefix_len;
+
+    #[test]
+    fn nonzero_prefix_stops_at_the_first_zero_in_words_and_tails() {
+        for length in 0..32 {
+            for zero in 0..=length {
+                let mut data = [1; 33];
+                data[zero + 1] = 0;
+                assert_eq!(nonzero_prefix_len(&data[1..length + 1]), zero);
+            }
+        }
     }
 }

@@ -60,6 +60,13 @@ impl PatCollector {
         self.input = None;
         self.building = None;
     }
+    pub(crate) fn active_single_section(&self) -> Option<&Bytes> {
+        let version = self.versions[self.active?].as_ref()?;
+        let [section] = version.sections.as_slice() else {
+            return None;
+        };
+        Some(&section.source)
+    }
     /// Rejection returns the original charged source and metadata allocations.
     /// Allocating a box on this failure path would need a new budget reservation.
     #[allow(

@@ -15,9 +15,8 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use triergon_core::{Budget, BudgetVec, Error as CoreError, InputCursor, InputRequest, WorkBudget};
 use triergon_mpegts::{
     AssemblyStep, FaultKind, ParseLimits, TraceEvent,
-    clock::SourceTimePolicy,
     native_pes::{NativePrivateAudioCarriage, NativePrivateAudioDescriptors},
-    psi::{DescriptorNamespace, ElementaryStream, ProgramMap},
+    psi::{ElementaryStream, ProgramMap},
 };
 
 mod lanes;
@@ -337,15 +336,11 @@ where
             check_extent(length, 0, limits.maximum_source_bytes)?;
         }
         let pool = input.budget().clone();
-        let engine = match tracks {
-            TrackSelection::AvcAac(_) => Engine::ts_native_segment_v1(
-                input,
-                limits.transport,
-                SourceTimePolicy::Unanchored,
-                DescriptorNamespace::Unspecified,
-            )?,
-            TrackSelection::Media(_) => Engine::ts_native_media_segment(input, limits.transport)?,
-        };
+        let engine = Engine::ts_hls_segment(
+            input,
+            limits.transport,
+            matches!(tracks, TrackSelection::Media(_)),
+        )?;
         let mut player = Player::new(
             engine,
             owner,
@@ -475,10 +470,11 @@ where
         match self.phase {
             Phase::Read => {
                 let player = self.player.as_mut().ok_or(Error::Closed)?;
-                match player.advance(work, cancel)? {
+                let mut slot = None;
+                match player.read_output(&mut slot, work, cancel)? {
                     Progress::Yield => {}
                     Progress::Queued => {
-                        let output = player.pop().ok_or(CoreError::Invalid("HLS player queue"))?;
+                        let output = slot.ok_or(CoreError::Invalid("HLS player output"))?;
                         self.on_event(output.into_event())?;
                     }
                     Progress::NeedInput(mut request) => {
@@ -915,4 +911,53 @@ fn check_extent(offset: u64, count: usize, maximum: usize) -> triergon_core::Res
         });
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::ByteSource;
+    use triergon_core::{Bytes, SourceCapabilities, SourceId};
+
+    #[test]
+    fn suppressed_source_events_still_charge_the_player_event_limit() {
+        let fixture = include_bytes!("../tests/fixtures/hls/baseline-stereo.ts");
+        let pool = Budget::new(1024 * 1024).unwrap();
+        let source = SourceId(1);
+        let cursor = InputCursor::new(
+            &pool,
+            source,
+            SourceCapabilities {
+                length: Some(fixture.len() as u64),
+                random_access: false,
+            },
+            4096,
+        )
+        .unwrap();
+        let bytes = Bytes::copy_from_slice(&pool, fixture).unwrap();
+        let engine = Engine::ts_hls_segment(cursor, ParseLimits::default(), false).unwrap();
+        let mut player = Player::new(
+            engine,
+            SourceOwner::new(ByteSource::new(source, bytes, 4096).unwrap()),
+            Selection::All,
+            PlayerPolicy {
+                maximum_events: 1,
+                ..PlayerPolicy::default()
+            },
+        )
+        .unwrap();
+        let mut slot = None;
+        assert!(matches!(
+            player.read_output(
+                &mut slot,
+                &mut WorkBudget::new(4096),
+                &AtomicBool::new(false)
+            ),
+            Err(Error::Core(CoreError::Limit {
+                requested: 2,
+                maximum: 1
+            }))
+        ));
+        assert!(slot.is_none());
+    }
 }
