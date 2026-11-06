@@ -66,7 +66,10 @@ impl<M, S: PacketSegment, C: PacketConfig> PacketJob<'_, M, S, C> {
                 if count == 0 {
                     return Ok(YIELD);
                 }
-                if extra[self.verify..self.verify + count] != raw[self.verify..self.verify + count]
+                // Parsed side data usually retains the same immutable input span.
+                if !std::ptr::eq(extra.as_ref(), raw.as_ref())
+                    && extra[self.verify..self.verify + count]
+                        != raw[self.verify..self.verify + count]
                 {
                     return Err(Error::Invalid("configuration update bytes differ"));
                 }
