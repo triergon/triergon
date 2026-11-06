@@ -434,6 +434,14 @@ impl<T> BudgetVec<T> {
         self.data.extend_from_slice(values);
         Ok(())
     }
+    /// Move elements after reserving destination capacity. Both buffers stay
+    /// charged to their existing pools. A failed reserve leaves both intact.
+    pub fn try_append(&mut self, other: &mut Self) -> Result<()> {
+        self.try_reserve_exact(other.len())?;
+        self.data.append(&mut other.data);
+        Ok(())
+    }
+
     /// Initializes new elements only after reserving their complete capacity.
     /// Shrinking retains the allocation and its existing charge.
     pub fn try_resize(&mut self, new_len: usize, value: T) -> Result<()>
