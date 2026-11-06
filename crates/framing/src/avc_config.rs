@@ -137,7 +137,9 @@ impl AvcConfigNal {
 #[derive(Clone, PartialEq, Eq)]
 pub struct AvcConfigArray {
     kind: AvcConfigArrayKind,
-    range: Range<usize>,
+    // Three groups carry at most 541 NALs, each with a 16-bit length.
+    // Their ranges fit in 32 bits even if the record has trailing bytes.
+    range: Range<u32>,
     first_nal: u16,
     nal_count: u8,
 }
@@ -149,7 +151,7 @@ impl std::fmt::Debug for AvcConfigArray {
         formatter
             .debug_struct("AvcConfigArray")
             .field("kind", &self.kind)
-            .field("range", &self.range)
+            .field("range", &self.source_range())
             .field("nals", &self.nal_indices())
             .field("count_offset", &self.count_offset())
             .finish()
@@ -162,17 +164,18 @@ impl AvcConfigArray {
     /// Includes the actual count byte and every length/payload byte. For the
     /// extension array its preceding three format/depth bytes are also included.
     pub fn source_range(&self) -> Range<usize> {
-        self.range.clone()
+        self.range.start as usize..self.range.end as usize
     }
     pub fn nal_indices(&self) -> Range<usize> {
         let start = usize::from(self.first_nal);
         start..start + usize::from(self.nal_count)
     }
     pub const fn count_offset(&self) -> usize {
-        match self.kind {
+        let offset = match self.kind {
             AvcConfigArrayKind::Sequence | AvcConfigArrayKind::Picture => self.range.start,
             AvcConfigArrayKind::SequenceExtension => self.range.start + 3,
-        }
+        };
+        offset as usize
     }
 }
 
@@ -504,6 +507,7 @@ impl<S: AvcStorage> AvcParser<S> {
                     let event = next.next(raw.as_ref(), self.limits)?;
                     match event {
                         Event::Group { kind, start } if matches!(self.phase, Phase::Count) => {
+                            let start = u32::try_from(start).map_err(|_| Error::Overflow)?;
                             let slot = self
                                 .arrays
                                 .get_mut(self.array_count)
@@ -519,7 +523,7 @@ impl<S: AvcStorage> AvcParser<S> {
                         }
                         Event::GroupEnd(end) if matches!(self.phase, Phase::Count) => {
                             let slot = &mut self.arrays[self.array_count - 1];
-                            slot.range.end = end;
+                            slot.range.end = u32::try_from(end).map_err(|_| Error::Overflow)?;
                             // Each group consumed its literal count (at most255).
                             slot.nal_count = (self.total - usize::from(slot.first_nal)) as u8;
                         }
@@ -1053,7 +1057,7 @@ pub struct AvcConfigArrayRef<'a> {
 }
 impl<'a> AvcConfigArrayRef<'a> {
     pub fn source_bytes(&self) -> &'a [u8] {
-        &self.raw[self.descriptor.range.clone()]
+        &self.raw[self.descriptor.source_range()]
     }
     pub const fn source(&self) -> AvcConfigSource {
         self.source
@@ -1099,7 +1103,7 @@ impl RetainedAvcConfigArray {
         }
     }
     pub fn source_bytes(&self) -> &[u8] {
-        &self.raw[self.descriptor.range.clone()]
+        &self.raw[self.descriptor.source_range()]
     }
     pub const fn source(&self) -> AvcConfigSource {
         self.source
