@@ -833,29 +833,29 @@ impl DemuxObserver {
         let count = bytes.len() / TS188_BYTES;
         debug_assert!(count >= 2 && bytes.len().is_multiple_of(TS188_BYTES));
         debug_assert!(self.spans.len() + count <= self.spans.capacity());
-        for index in 0..count {
+        self.spans.try_extend_with(count, |index| {
             let at = index * TS188_BYTES;
             let offset = start.offset + at as u64;
-            self.spans
-                .try_push(NativePesSpan {
-                    bytes: bytes.slice(at + TS_PAYLOAD_START..at + TS188_BYTES)?,
-                    source: SourceRange {
-                        entity: start.source,
-                        offset: offset + TS_PAYLOAD_START as u64,
-                        bytes: PLAIN_PAYLOAD_BYTES,
-                    },
-                    transport: SourceRange {
-                        entity: start.source,
-                        offset,
-                        bytes: TS188_BYTES,
-                    },
-                    context: NativeSourceContext {
-                        source_event_ordinal: context.source_event_ordinal + 2 * index as u64,
-                        ..context
-                    },
-                })
-                .map_err(|error| error.error)?;
-        }
+            NativePesSpan {
+                bytes: bytes
+                    .slice(at + TS_PAYLOAD_START..at + TS188_BYTES)
+                    .expect("payload range inside complete carrier"),
+                source: SourceRange {
+                    entity: start.source,
+                    offset: offset + TS_PAYLOAD_START as u64,
+                    bytes: PLAIN_PAYLOAD_BYTES,
+                },
+                transport: SourceRange {
+                    entity: start.source,
+                    offset,
+                    bytes: TS188_BYTES,
+                },
+                context: NativeSourceContext {
+                    source_event_ordinal: context.source_event_ordinal + 2 * index as u64,
+                    ..context
+                },
+            }
+        })?;
         let last = (count - 1) as u64;
         self.record_ready_body(
             (

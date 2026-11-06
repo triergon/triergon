@@ -435,6 +435,12 @@ impl<T> BudgetVec<T> {
         self.data.extend_from_slice(values);
         Ok(())
     }
+    /// Reserve space for all new elements before constructing any of them.
+    pub fn try_extend_with(&mut self, count: usize, make: impl FnMut(usize) -> T) -> Result<()> {
+        self.try_reserve_exact(count)?;
+        self.data.extend((0..count).map(make));
+        Ok(())
+    }
     /// Move elements after reserving destination capacity. Both buffers stay
     /// charged to their existing pools. A failed reserve leaves both intact.
     pub fn try_append(&mut self, other: &mut Self) -> Result<()> {
