@@ -1,4 +1,4 @@
-//! The authored Matroska corpus: original synthetic fixtures and their manifests.
+//! Authored media corpora and their manifests.
 //!
 //! Every fixture is built from authored structures, our own synthetic codec
 //! packets (one recorded reference trace) and zlib streams; nothing is
@@ -65,7 +65,91 @@ pub fn generate_all(paths: &Paths) -> Result<Vec<String>, String> {
         colour(paths, &source)?,
         catalogue(paths, &source)?,
         playback_capsules(paths)?,
+        mp4_range(paths)?,
     ])
+}
+
+fn mp4_range(paths: &Paths) -> Result<String, String> {
+    const CONTROL: &str = "regular-avc-aac.mp4";
+    const VARIABLE: &str = "variable-aac-duration.mp4";
+    let output = paths.fixtures("mp4-range-fixtures")?;
+    let seed = paths
+        .root
+        .join("crates/isobmff/tests/fixtures/encoded-edit-v2/original.mp4");
+    let control = fs::read(&seed).map_err(|e| format!("{}: {e}", seed.display()))?;
+    if sha256::hex(&control) != "7f2f92cb0e7a97920828fc9f79daeec2471a58d990572305d7aa08c30fb512fd" {
+        return Err("MP4 range seed changed".into());
+    }
+    let mut variable = control.clone();
+    // The AAC stts has separate runs for the second and last samples.
+    // Move 256 ticks between them, preserving total duration and media bytes.
+    variable[83_729..83_733].copy_from_slice(&1272_u32.to_be_bytes());
+    variable[83_745..83_749].copy_from_slice(&272_u32.to_be_bytes());
+    write(&output.join(CONTROL), &control)?;
+    write(&output.join(VARIABLE), &variable)?;
+    let cases = [
+        (
+            "regular-open",
+            CONTROL,
+            &control,
+            false,
+            237,
+            81_478,
+            994_214_068_017_485_484_u64,
+        ),
+        (
+            "regular-seek",
+            CONTROL,
+            &control,
+            true,
+            185,
+            62_763,
+            15_577_132_028_095_841_482,
+        ),
+        (
+            "variable-open",
+            VARIABLE,
+            &variable,
+            false,
+            237,
+            81_478,
+            1_650_792_575_122_043_820,
+        ),
+        (
+            "variable-seek",
+            VARIABLE,
+            &variable,
+            true,
+            186,
+            62_932,
+            1_562_922_133_773_717_379,
+        ),
+    ]
+    .into_iter()
+    .map(|(id, file, data, seek, packets, bytes, digest)| {
+        authored(
+            id,
+            file,
+            data,
+            vec![
+                ("arguments", Value::strings(seek.then_some("28000"))),
+                (
+                    "expected",
+                    Value::object([
+                        ("packets", Value::int(packets)),
+                        ("bytes", Value::int(bytes)),
+                        ("digest", Value::int(digest)),
+                    ]),
+                ),
+            ],
+        )
+    })
+    .collect();
+    paths.manifest(
+        "features/mp4-range/corpus.json",
+        &Value::object([("schema", Value::int(1)), ("cases", Value::Array(cases))]),
+    )?;
+    Ok("MP4 range corpus: four playback comparisons".into())
 }
 
 /// One manifest row for an authored fixture.
@@ -1837,6 +1921,7 @@ mod tests {
             "features/matroska-cues-preroll/contract.json",
             "features/matroska-colour/corpus.json",
             "features/matroska-segment-metadata/corpus.json",
+            "features/mp4-range/corpus.json",
         ] {
             let ours = fs::read_to_string(out.join("harness").join(name)).unwrap();
             let committed = fs::read_to_string(root.join("harness").join(name)).unwrap();

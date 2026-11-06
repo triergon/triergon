@@ -22,3 +22,16 @@ byte counts and an ordered digest of every selected packet's timing and payload;
 `feed-bench` adds the elapsed time of the timed loop and `feed-memory` brackets the
 operation with the allocation-window markers. The corpus is
 `harness/features/matroska-startup-seek/`.
+
+```text
+playback-worker mp4-range-bench  FILE ITERATIONS [VIDEO_TICKS]
+playback-worker mp4-range-fold   FILE [VIDEO_TICKS]
+playback-worker mp4-range-memory FILE [VIDEO_TICKS]
+```
+
+The range operation reads every AVC and AAC packet of a regular MP4 file. With
+a seek timestamp, it reads one packet, seeks backward from the supplied video
+timestamp and reads through EOF. Its digest includes the packet order, source
+extents, clocks, flags, trim and bytes. `cargo xtask fixtures` writes the
+comparison inputs to `.research/mp4-range-fixtures`. The corpus contract is
+`harness/features/mp4-range/contract.json`.

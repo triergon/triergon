@@ -1,0 +1,29 @@
+{
+  "schema": 1,
+  "id": "mp4-range",
+  "operation": "mp4-range-playback",
+  "candidate": "playback-worker",
+  "worker_operation": "mp4-range-",
+  "reference": "ffmpeg-formats-native",
+  "contract": [
+    "open a preloaded regular MP4 file through 32 KiB random-access input",
+    "read one AVC and one AAC stream through EOF in demux order",
+    "seek cases read one packet, seek backward using the video clock, then read the complete suffix",
+    "compare track ID, PTS, DTS, duration, source extent, flags, trim and payload for every emitted packet",
+    "compare the original AAC timing runs and a variant with an interior duration longer than one coded frame"
+  ],
+  "required_profiles": [
+    "regular-open",
+    "regular-seek",
+    "variable-open",
+    "variable-seek"
+  ],
+  "required_targets": ["aarch64-unknown-linux-gnu"],
+  "iterations": 50,
+  "runtime_ratio_max": 1.2,
+  "memory_ratio_max_exclusive": 1.0,
+  "minimum_pairs": 30,
+  "confidence": 0.95,
+  "runtime_optimization_ratio_target": 0.8,
+  "runtime_policy": "runtime-ceiling-1.20"
+}
