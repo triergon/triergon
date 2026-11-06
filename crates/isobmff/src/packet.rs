@@ -166,7 +166,9 @@ impl SampleReader {
             buffer.try_reserve_exact(length)?;
         }
         // Internal I/O transaction only; core preserves parser generation.
-        if input.position() != sample.range.start || input.capabilities().random_access {
+        if mode == ReadMode::SharedWindow && input.capabilities().random_access {
+            input.request_range_reusing_window(sample.range.start)?;
+        } else if input.position() != sample.range.start || input.capabilities().random_access {
             input.request_range(sample.range.start)?;
         }
         Ok(Self {
