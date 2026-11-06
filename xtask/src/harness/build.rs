@@ -251,6 +251,36 @@ fn additional_candidates(root: &Path) -> R<Vec<(&'static str, Vec<String>)>> {
     Ok(built)
 }
 
+/// A comparison reference built from `harness/reference.c` against another pinned
+/// FFmpeg profile, with only that profile's operations compiled in.
+struct ProfileReference {
+    profile: &'static str,
+    binary: &'static str,
+    define: &'static str,
+    record: &'static str,
+    kind: &'static str,
+    libraries: &'static str,
+}
+
+const PROFILE_REFERENCES: [ProfileReference; 2] = [
+    ProfileReference {
+        profile: ".research/reference-video",
+        binary: "ffmpeg-video-worker",
+        define: "-DSAFE_MEDIA_FEED_REFERENCE=1",
+        record: "ffmpeg-video-native",
+        kind: "pinned FFmpeg with the H.264 and HEVC decoders; feed operations",
+        libraries: "video_reference",
+    },
+    ProfileReference {
+        profile: ".research/reference-formats",
+        binary: "ffmpeg-formats-worker",
+        define: "-DSAFE_MEDIA_HLS_REFERENCE=1",
+        record: "ffmpeg-formats-native",
+        kind: "pinned FFmpeg MOV, TS and subtitle build; HLS segment operations",
+        libraries: "formats_reference",
+    },
+];
+
 pub fn build(root: &Path) -> R<PathBuf> {
     let linux = cfg!(target_os = "linux");
     let candidate_command: Vec<String> = [
@@ -318,12 +348,17 @@ pub fn build(root: &Path) -> R<PathBuf> {
     combined_command.extend(command[1..].iter().cloned());
     *combined_command.last_mut().expect("output path") = combined.display().to_string();
     run(&combined_command)?;
-    // The feed operations need stream discovery's B-picture delay, which the
-    // pinned video profile's H.264 and HEVC decoders supply; built only when that
-    // profile exists, so the other references and their identities are unchanged.
-    let video = out.join("ffmpeg-video-worker");
-    let video_build = root.join(".research/reference-video/build.json");
-    let video_command = if video_build.exists() {
+    // Operations that need another pinned profile get their own build of the same
+    // source, made only when that profile exists, so the other references and
+    // their identity records are unchanged.
+    let mut profile_workers = Vec::new();
+    for reference in PROFILE_REFERENCES {
+        let path = out.join(reference.binary);
+        let build = root.join(reference.profile).join("build.json");
+        if !build.exists() {
+            let _ = fs::remove_file(&path);
+            continue;
+        }
         let flags = output(
             "pkg-config",
             &[
@@ -336,28 +371,26 @@ pub fn build(root: &Path) -> R<PathBuf> {
             ],
             &[(
                 "PKG_CONFIG_LIBDIR",
-                root.join(".research/reference-video/install/lib/pkgconfig")
+                root.join(reference.profile)
+                    .join("install/lib/pkgconfig")
                     .display()
                     .to_string(),
             )],
         )?;
-        let mut video_command: Vec<String> = vec![
+        let mut command: Vec<String> = vec![
             compiler.clone(),
             "-O3".into(),
             "-Wall".into(),
             "-Wextra".into(),
             "-Werror".into(),
-            "-DSAFE_MEDIA_FEED_REFERENCE=1".into(),
+            reference.define.into(),
             root.join("harness/reference.c").display().to_string(),
         ];
-        video_command.extend(shell_words(&flags)?);
-        video_command.extend(["-o".into(), video.display().to_string()]);
-        run(&video_command)?;
-        Some(video_command)
-    } else {
-        let _ = fs::remove_file(&video);
-        None
-    };
+        command.extend(shell_words(&flags)?);
+        command.extend(["-o".into(), path.display().to_string()]);
+        run(&command)?;
+        profile_workers.push((reference, path, build, command));
+    }
     let commands = instrumentation_commands(&compiler, root, &out, linux);
     for compile in &commands {
         run(compile)?;
@@ -392,10 +425,10 @@ pub fn build(root: &Path) -> R<PathBuf> {
             "observer".into(),
             linux::linked_libraries(&observer, interpreter.as_deref())?,
         ));
-        if video_command.is_some() {
+        for (reference, path, _, _) in &profile_workers {
             libraries.push((
-                "video_reference".into(),
-                linux::linked_libraries(&video, None)?,
+                reference.libraries.into(),
+                linux::linked_libraries(path, None)?,
             ));
         }
         let of = |name: &str| {
@@ -585,27 +618,27 @@ pub fn build(root: &Path) -> R<PathBuf> {
             system_libraries("combined_reference", &combined)?,
         ),
     ]);
-    let video_record = match &video_command {
-        Some(command) => Some((
-            "ffmpeg-video-native",
+    let mut profile_records = Vec::new();
+    for (reference, path, build, command) in &profile_workers {
+        profile_records.push((
+            reference.record,
             Value::object([
-                ("path", Value::str("target/harness/ffmpeg-video-worker")),
-                ("sha256", Value::str(sha(&video)?)),
                 (
-                    "kind",
-                    Value::str("pinned FFmpeg with the H.264 and HEVC decoders; feed operations"),
+                    "path",
+                    Value::str(format!("target/harness/{}", reference.binary)),
                 ),
+                ("sha256", Value::str(sha(path)?)),
+                ("kind", Value::str(reference.kind)),
                 ("compiler_command", strings(command)),
-                ("reference_build", read_json(&video_build)?),
-                ("worker_identity", worker_identity(&video)?),
+                ("reference_build", read_json(build)?),
+                ("worker_identity", worker_identity(path)?),
                 (
                     "system_libraries",
-                    system_libraries("video_reference", &video)?,
+                    system_libraries(reference.libraries, path)?,
                 ),
             ]),
-        )),
-        None => None,
-    };
+        ));
+    }
     let updates: Vec<(&str, Value)> = vec![
         ("schema", Value::int(2)),
         (
@@ -647,7 +680,7 @@ pub fn build(root: &Path) -> R<PathBuf> {
                     ("ffmpeg-combined-native", combined_record),
                 ]
                 .into_iter()
-                .chain(video_record)
+                .chain(profile_records)
                 .collect::<Vec<_>>(),
             ),
         ),
