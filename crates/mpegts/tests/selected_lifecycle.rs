@@ -11,7 +11,8 @@ use triergon_mpegts::native_recovery::{
 };
 use triergon_mpegts::psi::{DescriptorNamespace, PatTable, ProgramMap, TableStep};
 use triergon_mpegts::{
-    AssemblyStep, PacketFormat, ParseLimits, SourceEpochs, TraceEvent, TransportStream,
+    AssemblyStep, FeedContinuation, PacketFormat, ParseLimits, SourceEpochs, TraceEvent,
+    TransportStream,
 };
 #[path = "support/selected_lifecycle_fixture.rs"]
 mod fixtures;
@@ -38,7 +39,7 @@ fn collect_entity(case: Case, b: &Budget, entity: SourceId) -> Events {
         fixtures::selected(case),
     )
     .unwrap();
-    collect_stream(&fixtures::bytes(case), b, entity, source, 1).0
+    collect_stream(&fixtures::bytes(case), b, entity, source, 1, None).0
 }
 
 fn collect_stream(
@@ -47,6 +48,7 @@ fn collect_stream(
     entity: SourceId,
     mut source: TransportStream,
     quantum: u64,
+    mut captured: Option<&mut usize>,
 ) -> (Events, Vec<u64>) {
     let mut capacity = Vec::with_capacity(data.len().max(4096));
     capacity.extend_from_slice(data);
@@ -65,13 +67,28 @@ fn collect_stream(
     let mut ordinals = Vec::new();
     let mut ordinal = 0;
     for _ in 0..100_000 {
-        let step = source
-            .poll(
+        let work = &mut WorkBudget::new(quantum);
+        let cancel = &AtomicBool::new(false);
+        let step = if let Some(captured) = captured.as_deref_mut() {
+            source.poll_feed(
                 &mut input,
-                &mut WorkBudget::new(quantum),
-                &AtomicBool::new(false),
+                work,
+                cancel,
+                &mut |packet, omitted, epochs, _| {
+                    out.push((TraceEvent::Transport(packet.clone()), epochs));
+                    ordinals.push(ordinal + omitted);
+                    *captured += 1;
+                    Ok(if *captured % 2 == 0 {
+                        FeedContinuation::Yield
+                    } else {
+                        FeedContinuation::Buffered
+                    })
+                },
             )
-            .unwrap();
+        } else {
+            source.poll(&mut input, work, cancel)
+        }
+        .unwrap();
         ordinal += source.take_feed_omissions();
         match step {
             Step::Ready(e) => {
@@ -123,6 +140,7 @@ fn segment_feed_preserves_source_faults_epochs_and_retained_event_ordinals() {
         include_bytes!("data/cc-loss-mid-pes.ts").as_slice(),
         include_bytes!("data/pcr-timeline-discontinuity.ts").as_slice(),
     ];
+    let mut captured = 0;
     for data in program_changes
         .iter()
         .map(Vec::as_slice)
@@ -133,8 +151,9 @@ fn segment_feed_preserves_source_faults_epochs_and_retained_event_ordinals() {
         let ns = DescriptorNamespace::Unspecified;
         let source = TransportStream::new_single_program_segment(b.clone(), limits, ns).unwrap();
         let feed = TransportStream::new_single_program_feed(b.clone(), limits, ns).unwrap();
-        let (raw, raw_ordinals) = collect_stream(data, &b, SourceId(1), source, 1);
-        let (fed, fed_ordinals) = collect_stream(data, &b, SourceId(1), feed, 4096);
+        let (raw, raw_ordinals) = collect_stream(data, &b, SourceId(1), source, 1, None);
+        let (fed, fed_ordinals) =
+            collect_stream(data, &b, SourceId(1), feed, 4096, Some(&mut captured));
         let key = |(event, epochs): &(TraceEvent, SourceEpochs)| {
             let fault = match event {
                 TraceEvent::Diagnostic(fault) => {
@@ -165,6 +184,7 @@ fn segment_feed_preserves_source_faults_epochs_and_retained_event_ordinals() {
             expected
         );
     }
+    assert!(captured >= 2);
 }
 fn collect(case: Case, b: &Budget) -> Events {
     collect_entity(case, b, SourceId(1))
