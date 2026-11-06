@@ -9,7 +9,7 @@ against FFmpeg 9.0.
 | Area | Implemented | Verified against FFmpeg | Runtime | Memory | Open |
 |---|---|---|---|---|---|
 | Core | Charged storage, exact time, input windows, work budgets | 51,235 exact-arithmetic cases against an independent oracle | via dependents | via dependents | 32-bit target runs, fuzzing |
-| Matroska / WebM | Incremental reader: lacing, header removal, bounded zlib, Cues and preroll, colour and static HDR, chapters, tags, attachments, side data | 116 authored workloads in six feature groups, plus FATE lacing, zlib and zero-length block cases | 1.2411 (114/116 within 1.20) | lower on all 116 | 2 chapter cases above 1.20; full EBML/Matroska scope |
+| Matroska / WebM | Incremental reader: lacing, header removal, bounded zlib, Cues and preroll, colour and static HDR, chapters, tags, attachments, side data | 116 authored workloads in six feature groups, plus FATE lacing, zlib and zero-length block cases | 1.1670 (116/116 within 1.20) | lower on all 116 | full EBML/Matroska scope |
 | Matroska startup and seek | Startup and seek with lazy scan replay | 44 cases, 1,344 packets | 1.1933 (44/44 within 1.20) | heap ≤0.404, RSS ≤0.735 | — |
 | Matroska audio clocks | AAC, AC-3, E-AC-3 startup and forward clocks | 10 inputs | 0.17 | heap 0.07, RSS 0.60 | audio seek |
 | ISO BMFF / MP4 | Regular and fragmented files, edit lists, seek and range plans, QuickTime compatibility; AVC, HEVC, AAC, AC-3, E-AC-3, DTS core, AV1, VP9 | 255 inputs, 1,020 operations (944 match) | diagnostic only: 16 of 24 timed rows within 1.25, worst 1.52 | not measured | timing and memory for the full set |
@@ -28,13 +28,17 @@ against FFmpeg 9.0.
 | Case | Worst upper bound |
 |---|---|
 | Packet framing: 125-case set | 1.2395 |
-| Matroska: nested chapters (`chapters-depth`, `chapters-many`) | 1.2411, 1.2143 |
 
-The Matroska startup and seek measurements use revision `f2a45541a1b5e23fa87e8641f2918b8d9d2f7c00`.
-Raw samples SHA-256 `0ea82b902ea66e99693143471ffcac873dab28fb41ee3601f48dd05527211b51`.
+## Measured revisions
 
-The HLS measurements use revision `763f05cf762dadd293328b33cc4dae54136695d4`.
-Raw samples SHA-256 `de885f051789ceeff07556b40fcd3928c9e651d3c6b5ee3b193b8126d82435c1`.
+Each row names the source revision a result above was measured on and, where the raw
+samples are archived, their SHA-256. Update the row in the same change as the result.
+
+| Area | Revision | Raw samples SHA-256 |
+|---|---|---|
+| Matroska / WebM | `837caea28ed6d018c58668a53d9da978d81efce7` | not archived (same-machine comparison) |
+| Matroska startup and seek | `f2a45541a1b5e23fa87e8641f2918b8d9d2f7c00` | `0ea82b902ea66e99693143471ffcac873dab28fb41ee3601f48dd05527211b51` |
+| HLS segments | `763f05cf762dadd293328b33cc4dae54136695d4` | `de885f051789ceeff07556b40fcd3928c9e651d3c6b5ee3b193b8126d82435c1` |
 
 ## Platforms
 
