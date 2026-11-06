@@ -12,6 +12,7 @@ use triergon_core::{
 
 const MAX_SHARED_INPUT_CAPACITY: usize = 128 * 1024;
 const MAX_PROGRESSIVE_SHARED_CAPACITY: usize = 4 * 1024;
+const MAX_PROGRESSIVE_SHARED_WINDOWS: usize = 4;
 
 /// A validated run of null carriers on the source grid. The shared backing
 /// span includes every opaque M2TS prefix and every byte of null payload.
@@ -125,7 +126,7 @@ pub struct TransportFramer {
     format: PacketFormat,
     buffered_carrier: BufferedCarrier,
     shared_owner: Option<ByteStorageAddress>,
-    progressive_window: Option<Bytes>,
+    progressive_windows: [Option<Bytes>; MAX_PROGRESSIVE_SHARED_WINDOWS],
     carry: Option<BudgetVec<u8>>,
     start: Option<u64>,
     next: Option<u64>,
@@ -146,7 +147,7 @@ impl TransportFramer {
             format,
             buffered_carrier: BufferedCarrier::Carry,
             shared_owner: None,
-            progressive_window: None,
+            progressive_windows: [const { None }; MAX_PROGRESSIVE_SHARED_WINDOWS],
             start: None,
             next: None,
             token: None,
@@ -271,21 +272,36 @@ impl TransportFramer {
         *shared_owner.get_or_insert(address) == address
     }
 
-    fn share_progressive_window(retained: &mut Option<Bytes>, input: &InputCursor) -> bool {
+    fn release_unused_windows(retained: &mut [Option<Bytes>]) {
+        for slot in retained {
+            if slot
+                .as_ref()
+                .is_some_and(|window| !window.has_shared_storage())
+            {
+                *slot = None;
+            }
+        }
+    }
+
+    fn share_progressive_window(retained: &mut [Option<Bytes>], input: &InputCursor) -> bool {
         let Some(window) = input.buffered_owner() else {
             return false;
         };
-        if let Some(previous) = retained {
-            if previous.shares_storage_with(window) {
-                return true;
-            }
-            if previous.has_shared_storage() {
-                return false;
-            }
-            *retained = None;
+        // The most recent window is first, so the next carrier usually
+        // needs only one storage comparison.
+        if let Some(index) = retained.iter().position(|slot| {
+            slot.as_ref()
+                .is_some_and(|previous| previous.shares_storage_with(window))
+        }) {
+            retained.swap(0, index);
+            return true;
         }
-        // Retain at most one tight, small window. Larger or sparse backing
-        // storage can keep the next reply from fitting when a PES crosses it.
+        Self::release_unused_windows(retained);
+        let Some(index) = retained.iter().position(Option::is_none) else {
+            return false;
+        };
+        // Small, tight windows can stay charged while an unfinished PES
+        // retains their carriers. Keep room for the next source reply.
         let capacity = window.retained_capacity();
         let charge = window.retained_storage_bytes();
         if capacity > MAX_PROGRESSIVE_SHARED_CAPACITY
@@ -295,7 +311,8 @@ impl TransportFramer {
         {
             return false;
         }
-        *retained = Some(window.clone());
+        retained[index] = Some(window.clone());
+        retained.swap(0, index);
         true
     }
 
@@ -446,7 +463,7 @@ impl TransportFramer {
                         Self::share_buffered_owner(&mut self.shared_owner, input)
                     }
                     BufferedCarrier::Progressive => {
-                        Self::share_progressive_window(&mut self.progressive_window, input)
+                        Self::share_progressive_window(&mut self.progressive_windows, input)
                     }
                 };
                 if share || self.buffered_carrier == BufferedCarrier::Progressive {
@@ -510,13 +527,7 @@ impl TransportFramer {
                     self.next = Some(input.position());
                 }
                 Step::NeedInput(request) => {
-                    if self
-                        .progressive_window
-                        .as_ref()
-                        .is_some_and(|window| !window.has_shared_storage())
-                    {
-                        self.progressive_window = None;
-                    }
+                    Self::release_unused_windows(&mut self.progressive_windows);
                     return Ok(Step::NeedInput(request));
                 }
                 Step::Yield => return Ok(Step::Yield),
@@ -748,7 +759,7 @@ mod tests {
     }
 
     #[test]
-    fn progressive_carriers_share_again_after_the_previous_window_releases() {
+    fn progressive_carriers_share_only_within_the_window_bound() {
         const WIDTH: usize = 188;
         const WINDOW: usize = 2 * WIDTH;
         let budget = Budget::new(8192).unwrap();
@@ -769,8 +780,9 @@ mod tests {
             carrier[..4].copy_from_slice(&[0x47, 0x1f, 0xff, 0x10]);
         }
         let cancel = AtomicBool::new(false);
-        let mut retained = None;
-        for (index, share) in [true, false, true].into_iter().enumerate() {
+        let mut retained = Vec::new();
+        for index in 0..MAX_PROGRESSIVE_SHARED_WINDOWS + 2 {
+            let share = index != MAX_PROGRESSIVE_SHARED_WINDOWS;
             let window = Bytes::copy_from_slice(&budget, &wire).unwrap();
             let request = input.request();
             input
@@ -796,14 +808,15 @@ mod tests {
                     (index * WINDOW + carrier * WIDTH) as u64
                 );
                 assert_eq!(packet.source.shares_storage_with(&window), share);
-                if index == 0 && carrier == 1 {
-                    retained = Some(packet);
+                if index < MAX_PROGRESSIVE_SHARED_WINDOWS && carrier == 1 {
+                    retained.push(packet);
                 }
             }
-            if index == 1 {
-                assert!(retained.take().is_some());
+            if index == MAX_PROGRESSIVE_SHARED_WINDOWS {
+                drop(retained.swap_remove(0));
             }
         }
+        drop(retained);
         assert!(matches!(
             framer
                 .poll(&mut input, &mut WorkBudget::new(4096), &cancel)
