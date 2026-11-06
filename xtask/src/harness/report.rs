@@ -356,7 +356,13 @@ pub fn run(root: &Path, options: &Options) -> Result<i32, String> {
             ),
         ];
         let rule = rule_for(case, &identity, contract_id.as_deref())?;
-        let selected = reference_record(&identity, rule)?;
+        let selected = match (rule, s(&contract, "reference")) {
+            (None, Some(name)) => {
+                row.push(("reference_worker", Value::str(name)));
+                super::comparison::reference_named(&identity, name)?
+            }
+            _ => reference_record(&identity, rule)?,
+        };
         let reference = root.join(s(&selected, "path").unwrap_or_default());
         row.push(("reference", reference_summary(&selected)));
         let file = s(case, "file").unwrap_or_default();

@@ -318,6 +318,46 @@ pub fn build(root: &Path) -> R<PathBuf> {
     combined_command.extend(command[1..].iter().cloned());
     *combined_command.last_mut().expect("output path") = combined.display().to_string();
     run(&combined_command)?;
+    // The feed operations need stream discovery's B-picture delay, which the
+    // pinned video profile's H.264 and HEVC decoders supply; built only when that
+    // profile exists, so the other references and their identities are unchanged.
+    let video = out.join("ffmpeg-video-worker");
+    let video_build = root.join(".research/reference-video/build.json");
+    let video_command = if video_build.exists() {
+        let flags = output(
+            "pkg-config",
+            &[
+                "--static",
+                "--cflags",
+                "--libs",
+                "libavformat",
+                "libavcodec",
+                "libavutil",
+            ],
+            &[(
+                "PKG_CONFIG_LIBDIR",
+                root.join(".research/reference-video/install/lib/pkgconfig")
+                    .display()
+                    .to_string(),
+            )],
+        )?;
+        let mut video_command: Vec<String> = vec![
+            compiler.clone(),
+            "-O3".into(),
+            "-Wall".into(),
+            "-Wextra".into(),
+            "-Werror".into(),
+            "-DSAFE_MEDIA_FEED_REFERENCE=1".into(),
+            root.join("harness/reference.c").display().to_string(),
+        ];
+        video_command.extend(shell_words(&flags)?);
+        video_command.extend(["-o".into(), video.display().to_string()]);
+        run(&video_command)?;
+        Some(video_command)
+    } else {
+        let _ = fs::remove_file(&video);
+        None
+    };
     let commands = instrumentation_commands(&compiler, root, &out, linux);
     for compile in &commands {
         run(compile)?;
@@ -352,6 +392,12 @@ pub fn build(root: &Path) -> R<PathBuf> {
             "observer".into(),
             linux::linked_libraries(&observer, interpreter.as_deref())?,
         ));
+        if video_command.is_some() {
+            libraries.push((
+                "video_reference".into(),
+                linux::linked_libraries(&video, None)?,
+            ));
+        }
         let of = |name: &str| {
             libraries
                 .iter()
@@ -539,6 +585,27 @@ pub fn build(root: &Path) -> R<PathBuf> {
             system_libraries("combined_reference", &combined)?,
         ),
     ]);
+    let video_record = match &video_command {
+        Some(command) => Some((
+            "ffmpeg-video-native",
+            Value::object([
+                ("path", Value::str("target/harness/ffmpeg-video-worker")),
+                ("sha256", Value::str(sha(&video)?)),
+                (
+                    "kind",
+                    Value::str("pinned FFmpeg with the H.264 and HEVC decoders; feed operations"),
+                ),
+                ("compiler_command", strings(command)),
+                ("reference_build", read_json(&video_build)?),
+                ("worker_identity", worker_identity(&video)?),
+                (
+                    "system_libraries",
+                    system_libraries("video_reference", &video)?,
+                ),
+            ]),
+        )),
+        None => None,
+    };
     let updates: Vec<(&str, Value)> = vec![
         ("schema", Value::int(2)),
         (
@@ -567,17 +634,22 @@ pub fn build(root: &Path) -> R<PathBuf> {
         ),
         (
             "comparison_references",
-            Value::object([
-                (
-                    "ffmpeg-native",
-                    Value::object([
-                        ("path", Value::str("target/harness/ffmpeg-worker")),
-                        ("sha256", Value::str(sha(&worker)?)),
-                        ("kind", Value::str("pinned native FFmpeg")),
-                    ]),
-                ),
-                ("ffmpeg-combined-native", combined_record),
-            ]),
+            Value::object(
+                [
+                    (
+                        "ffmpeg-native",
+                        Value::object([
+                            ("path", Value::str("target/harness/ffmpeg-worker")),
+                            ("sha256", Value::str(sha(&worker)?)),
+                            ("kind", Value::str("pinned native FFmpeg")),
+                        ]),
+                    ),
+                    ("ffmpeg-combined-native", combined_record),
+                ]
+                .into_iter()
+                .chain(video_record)
+                .collect::<Vec<_>>(),
+            ),
         ),
         ("system_libraries", system_libraries("reference", &worker)?),
         ("instrumentation", Value::Object(instrumentation)),

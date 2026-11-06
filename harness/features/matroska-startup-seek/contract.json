@@ -4,6 +4,7 @@
   "operation": "matroska-video-session",
   "candidate": "playback-worker",
   "worker_operation": "feed-",
+  "reference": "ffmpeg-video-native",
   "contract": [
     "Matroska open, stream discovery and first-video-track selection through the playback engine",
     "selected AVC or HEVC packets with native PTS, DTS and duration, through a clean end of file and teardown",

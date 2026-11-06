@@ -59,9 +59,15 @@ pub fn rule_for<'a>(
 
 /// The built reference worker a case uses: `{id, path, sha256, kind, ...}`.
 pub fn reference_record(identity: &Value, rule: Option<&Value>) -> Result<Value, String> {
-    let name = rule
-        .and_then(|r| s(r, "reference"))
-        .unwrap_or("ffmpeg-native");
+    reference_named(
+        identity,
+        rule.and_then(|r| s(r, "reference"))
+            .unwrap_or("ffmpeg-native"),
+    )
+}
+
+/// The built comparison reference recorded under `name` in the identity.
+pub fn reference_named(identity: &Value, name: &str) -> Result<Value, String> {
     let record = identity
         .get("comparison_references")
         .and_then(|r| r.get(name))
@@ -103,7 +109,11 @@ pub fn validate_case_evidence(
     contract_id: Option<&str>,
 ) -> Result<Value, String> {
     let rule = rule_for(case, identity, contract_id)?;
-    let selected = reference_record(identity, rule)?;
+    // A contract without comparison rules may name its own reference.
+    let selected = match (rule, s(case, "reference_worker")) {
+        (None, Some(name)) => reference_named(identity, name)?,
+        _ => reference_record(identity, rule)?,
+    };
     if (rule.is_some() || case.get("reference").is_some())
         && !case
             .get("reference")
