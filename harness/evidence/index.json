@@ -3459,6 +3459,48 @@
    ]
   },
   {
+   "name": "codec-reference-reproduction",
+   "retention": "retained",
+   "reason": "Decode reference reproduction cited by the decode profile",
+   "key": "evidence/codec-reference-reproduction/3ab1f27ffef9a2277c90f9bac7d7ba061d80638efdef8d6936ea3fca018f85b8.tar.gz",
+   "sha256": "3ab1f27ffef9a2277c90f9bac7d7ba061d80638efdef8d6936ea3fca018f85b8",
+   "bytes": 1333883,
+   "files": [
+    {
+     "path": "README.md",
+     "sha256": "77ed7f073fa49807574e012e5497f77083e899152bd8b326351f578a83e1f87d"
+    },
+    {
+     "path": "archived-summary.json",
+     "sha256": "309a5b3315b8fabb8b8e0a057b5ad814869b442f0f3b5a7610dc3cbf197b844e"
+    },
+    {
+     "path": "archived.jsonl",
+     "sha256": "a96435eac1d21a6ffb1a15b203f153b64def7bfc6a604df66249428fc00a00f5"
+    },
+    {
+     "path": "raw-compare.jsonl",
+     "sha256": "082da2c65d78374385662d255659acb56bee1d89dbb06ab6cb9e682eb1666999"
+    },
+    {
+     "path": "rebuilt-decode-build.json",
+     "sha256": "5e2b014503ffcef7b5e3bfc3bd5b524a82e16095c015be636cbd45d140dd887b"
+    },
+    {
+     "path": "rebuilt-decode-worker.json",
+     "sha256": "64e0e864fdfe556c50d14036ea876bcbc2b9d06762eb0f4fb004f5cbe8716147"
+    },
+    {
+     "path": "rebuilt-summary.json",
+     "sha256": "34c7cf0924ce6db2015b2b4475b09411c4b3b9b48349f534f7e5c37bb1caa9e9"
+    },
+    {
+     "path": "rebuilt.jsonl",
+     "sha256": "7b2747fddbb14707d6123969b4c6dabda5ffc01fa7b590bf809ebdfa373550be"
+    }
+   ]
+  },
+  {
    "name": "matroska-audio-linux-arm64",
    "path": "research/qualification/matroska-audio-linux-arm64",
    "retention": "retained",
