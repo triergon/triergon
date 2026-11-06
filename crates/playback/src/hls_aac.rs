@@ -54,6 +54,7 @@ pub struct HlsAac {
     prefix: [u8; PREFIX_BYTES],
     prefix_used: usize,
     header: Option<AacAdtsHeader>,
+    duration: Option<(u32, Time)>,
     frame: BudgetVec<u8>,
     eof: bool,
     failure: Option<Error>,
@@ -84,6 +85,7 @@ impl HlsAac {
             prefix: [0; PREFIX_BYTES],
             prefix_used: 0,
             header: None,
+            duration: None,
             frame: BudgetVec::new(pool),
             eof: false,
             failure: None,
@@ -311,7 +313,14 @@ impl HlsAac {
         let rate = header
             .coded_frequency_hz()
             .ok_or(Error::Invalid("ADTS sampling index"))?;
-        let duration = Time::new(1024, u128::from(rate))?;
+        let duration = match self.duration {
+            Some((cached_rate, duration)) if cached_rate == rate => duration,
+            _ => {
+                let duration = Time::new(1024, u128::from(rate))?;
+                self.duration = Some((rate, duration));
+                duration
+            }
+        };
         let frame = std::mem::replace(&mut self.frame, BudgetVec::new(&self.pool));
         let bytes = match frame.freeze() {
             Ok(bytes) => bytes,
@@ -523,6 +532,8 @@ mod tests {
         assert_eq!(out[3].bytes.as_ref(), F48);
         assert_eq!(out[0].duration, Time::new(1024, 48_000).unwrap());
         assert_eq!(out[1].duration, Time::new(1024, 44_100).unwrap());
+        assert_eq!(out[2].duration, out[0].duration);
+        assert_eq!(out[3].duration, out[2].duration);
         assert_eq!(out[0].pts, Some(Time::new(1, 1).unwrap()));
         assert_eq!(out[0].dts, None);
         assert_eq!((out[1].pts, out[1].dts), (None, None));
