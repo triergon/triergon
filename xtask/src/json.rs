@@ -1,0 +1,464 @@
+//! A small JSON reader for harness data files.
+//!
+//! Objects keep their key order. Numbers keep their source text so integers and
+//! floats can be told apart and written back unchanged. `NaN`, `Infinity` and
+//! `-Infinity` are accepted, as Python's `json` module accepts them.
+
+use std::fmt;
+
+#[derive(Clone, Debug, PartialEq)]
+pub enum Value {
+    Null,
+    Bool(bool),
+    Number(Number),
+    String(String),
+    Array(Vec<Value>),
+    Object(Vec<(String, Value)>),
+}
+
+/// A JSON number as written in the source.
+#[derive(Clone, Debug, PartialEq)]
+pub struct Number(String);
+
+impl Number {
+    pub fn as_f64(&self) -> f64 {
+        match self.0.as_str() {
+            "NaN" => f64::NAN,
+            "Infinity" => f64::INFINITY,
+            "-Infinity" => f64::NEG_INFINITY,
+            text => text.parse().unwrap_or(f64::NAN),
+        }
+    }
+}
+
+impl Value {
+    /// Member `key` of an object; `None` for other values or a missing key.
+    /// A repeated key resolves to its last occurrence, as in Python.
+    pub fn get(&self, key: &str) -> Option<&Value> {
+        match self {
+            Value::Object(members) => members.iter().rev().find(|(k, _)| k == key).map(|(_, v)| v),
+            _ => None,
+        }
+    }
+
+    pub fn as_str(&self) -> Option<&str> {
+        match self {
+            Value::String(s) => Some(s),
+            _ => None,
+        }
+    }
+
+    pub fn as_f64(&self) -> Option<f64> {
+        match self {
+            Value::Number(n) => Some(n.as_f64()),
+            _ => None,
+        }
+    }
+
+    pub fn as_array(&self) -> Option<&[Value]> {
+        match self {
+            Value::Array(items) => Some(items),
+            _ => None,
+        }
+    }
+
+    /// Python truthiness: false, null, zero, and empty strings, arrays and objects
+    /// are false.
+    pub fn truthy(&self) -> bool {
+        match self {
+            Value::Null => false,
+            Value::Bool(b) => *b,
+            Value::Number(n) => n.as_f64() != 0.0,
+            Value::String(s) => !s.is_empty(),
+            Value::Array(items) => !items.is_empty(),
+            Value::Object(members) => !members.is_empty(),
+        }
+    }
+}
+
+#[derive(Debug, PartialEq)]
+pub struct Error {
+    pub message: &'static str,
+    pub line: usize,
+    pub column: usize,
+}
+
+impl fmt::Display for Error {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "{}: line {} column {}",
+            self.message, self.line, self.column
+        )
+    }
+}
+
+/// Parse one JSON document; surrounding whitespace is allowed, trailing data is not.
+pub fn parse(text: &str) -> Result<Value, Error> {
+    let mut parser = Parser {
+        text: text.as_bytes(),
+        pos: 0,
+        depth: 0,
+    };
+    parser.whitespace();
+    let value = parser.value()?;
+    parser.whitespace();
+    if parser.pos != parser.text.len() {
+        return Err(parser.error("Extra data"));
+    }
+    Ok(value)
+}
+
+const MAX_DEPTH: usize = 512;
+
+struct Parser<'a> {
+    text: &'a [u8],
+    pos: usize,
+    depth: usize,
+}
+
+impl Parser<'_> {
+    fn error(&self, message: &'static str) -> Error {
+        let before = &self.text[..self.pos.min(self.text.len())];
+        let line = before.iter().filter(|&&b| b == b'\n').count() + 1;
+        let start = before
+            .iter()
+            .rposition(|&b| b == b'\n')
+            .map_or(0, |i| i + 1);
+        Error {
+            message,
+            line,
+            column: self.pos - start + 1,
+        }
+    }
+
+    fn peek(&self) -> Option<u8> {
+        self.text.get(self.pos).copied()
+    }
+
+    fn whitespace(&mut self) {
+        while matches!(self.peek(), Some(b' ' | b'\t' | b'\n' | b'\r')) {
+            self.pos += 1;
+        }
+    }
+
+    fn literal(&mut self, word: &str) -> bool {
+        if self.text[self.pos..].starts_with(word.as_bytes()) {
+            self.pos += word.len();
+            true
+        } else {
+            false
+        }
+    }
+
+    fn value(&mut self) -> Result<Value, Error> {
+        match self.peek() {
+            Some(b'{') => self.nested(Self::object),
+            Some(b'[') => self.nested(Self::array),
+            Some(b'"') => Ok(Value::String(self.string()?)),
+            Some(b'-' | b'0'..=b'9' | b'N' | b'I') => self.number(),
+            _ if self.literal("true") => Ok(Value::Bool(true)),
+            _ if self.literal("false") => Ok(Value::Bool(false)),
+            _ if self.literal("null") => Ok(Value::Null),
+            _ => Err(self.error("Expecting value")),
+        }
+    }
+
+    fn nested(&mut self, f: fn(&mut Self) -> Result<Value, Error>) -> Result<Value, Error> {
+        if self.depth == MAX_DEPTH {
+            return Err(self.error("Nesting too deep"));
+        }
+        self.depth += 1;
+        let value = f(self);
+        self.depth -= 1;
+        value
+    }
+
+    fn object(&mut self) -> Result<Value, Error> {
+        self.pos += 1;
+        let mut members = Vec::new();
+        self.whitespace();
+        if self.peek() == Some(b'}') {
+            self.pos += 1;
+            return Ok(Value::Object(members));
+        }
+        loop {
+            self.whitespace();
+            if self.peek() != Some(b'"') {
+                return Err(self.error("Expecting property name enclosed in double quotes"));
+            }
+            let key = self.string()?;
+            self.whitespace();
+            if self.peek() != Some(b':') {
+                return Err(self.error("Expecting ':' delimiter"));
+            }
+            self.pos += 1;
+            self.whitespace();
+            members.push((key, self.value()?));
+            self.whitespace();
+            match self.peek() {
+                Some(b',') => self.pos += 1,
+                Some(b'}') => {
+                    self.pos += 1;
+                    return Ok(Value::Object(members));
+                }
+                _ => return Err(self.error("Expecting ',' delimiter")),
+            }
+        }
+    }
+
+    fn array(&mut self) -> Result<Value, Error> {
+        self.pos += 1;
+        let mut items = Vec::new();
+        self.whitespace();
+        if self.peek() == Some(b']') {
+            self.pos += 1;
+            return Ok(Value::Array(items));
+        }
+        loop {
+            self.whitespace();
+            items.push(self.value()?);
+            self.whitespace();
+            match self.peek() {
+                Some(b',') => self.pos += 1,
+                Some(b']') => {
+                    self.pos += 1;
+                    return Ok(Value::Array(items));
+                }
+                _ => return Err(self.error("Expecting ',' delimiter")),
+            }
+        }
+    }
+
+    fn number(&mut self) -> Result<Value, Error> {
+        let start = self.pos;
+        for word in ["NaN", "Infinity", "-Infinity"] {
+            if self.literal(word) {
+                return Ok(Value::Number(Number(word.to_owned())));
+            }
+        }
+        if self.peek() == Some(b'-') {
+            self.pos += 1;
+        }
+        match self.peek() {
+            Some(b'0') => self.pos += 1,
+            Some(b'1'..=b'9') => self.digits(),
+            _ => {
+                self.pos = start;
+                return Err(self.error("Expecting value"));
+            }
+        }
+        if self.peek() == Some(b'.') && self.text.get(self.pos + 1).is_some_and(u8::is_ascii_digit)
+        {
+            self.pos += 1;
+            self.digits();
+        }
+        if matches!(self.peek(), Some(b'e' | b'E')) {
+            let mark = self.pos;
+            self.pos += 1;
+            if matches!(self.peek(), Some(b'+' | b'-')) {
+                self.pos += 1;
+            }
+            if self.peek().is_some_and(|b| b.is_ascii_digit()) {
+                self.digits();
+            } else {
+                self.pos = mark;
+            }
+        }
+        let raw = std::str::from_utf8(&self.text[start..self.pos]).expect("ASCII number");
+        Ok(Value::Number(Number(raw.to_owned())))
+    }
+
+    fn digits(&mut self) {
+        while self.peek().is_some_and(|b| b.is_ascii_digit()) {
+            self.pos += 1;
+        }
+    }
+
+    fn string(&mut self) -> Result<String, Error> {
+        self.pos += 1;
+        let mut out = String::new();
+        loop {
+            let run = self.pos;
+            while self
+                .peek()
+                .is_some_and(|b| b != b'"' && b != b'\\' && b >= 0x20)
+            {
+                self.pos += 1;
+            }
+            // The input is a &str, so any run between ASCII delimiters is valid UTF-8.
+            out.push_str(std::str::from_utf8(&self.text[run..self.pos]).expect("UTF-8 run"));
+            match self.peek() {
+                Some(b'"') => {
+                    self.pos += 1;
+                    return Ok(out);
+                }
+                Some(b'\\') => {
+                    self.pos += 1;
+                    self.escape(&mut out)?;
+                }
+                Some(_) => return Err(self.error("Invalid control character")),
+                None => return Err(self.error("Unterminated string")),
+            }
+        }
+    }
+
+    fn escape(&mut self, out: &mut String) -> Result<(), Error> {
+        let c = match self.peek() {
+            Some(b'"') => '"',
+            Some(b'\\') => '\\',
+            Some(b'/') => '/',
+            Some(b'b') => '\u{8}',
+            Some(b'f') => '\u{c}',
+            Some(b'n') => '\n',
+            Some(b'r') => '\r',
+            Some(b't') => '\t',
+            Some(b'u') => {
+                self.pos += 1;
+                let first = self.hex4()?;
+                let code = if (0xd800..0xdc00).contains(&first)
+                    && self.text[self.pos..].starts_with(b"\\u")
+                {
+                    let mark = self.pos;
+                    self.pos += 2;
+                    let second = self.hex4()?;
+                    if (0xdc00..0xe000).contains(&second) {
+                        0x10000 + ((first - 0xd800) << 10) + (second - 0xdc00)
+                    } else {
+                        self.pos = mark;
+                        first
+                    }
+                } else {
+                    first
+                };
+                // Lone surrogates cannot be held in a Rust string.
+                out.push(char::from_u32(code).ok_or_else(|| self.error("Unpaired surrogate"))?);
+                return Ok(());
+            }
+            _ => return Err(self.error("Invalid \\escape")),
+        };
+        self.pos += 1;
+        out.push(c);
+        Ok(())
+    }
+
+    fn hex4(&mut self) -> Result<u32, Error> {
+        let digits = self
+            .text
+            .get(self.pos..self.pos + 4)
+            .ok_or_else(|| self.error("Invalid \\uXXXX escape"))?;
+        let mut value = 0;
+        for &d in digits {
+            let digit = char::from(d)
+                .to_digit(16)
+                .ok_or_else(|| self.error("Invalid \\uXXXX escape"))?;
+            value = value * 16 + digit;
+        }
+        self.pos += 4;
+        Ok(value)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn num(raw: &str) -> Value {
+        Value::Number(Number(raw.to_owned()))
+    }
+
+    #[test]
+    fn parses_nested_documents_in_order() {
+        let v = parse(r#" {"b": [1, -2.5e3, true, null], "a": {"x": "y"}} "#).unwrap();
+        let Value::Object(members) = &v else { panic!() };
+        assert_eq!(members[0].0, "b");
+        assert_eq!(
+            v.get("b").unwrap(),
+            &Value::Array(vec![
+                num("1"),
+                num("-2.5e3"),
+                Value::Bool(true),
+                Value::Null
+            ])
+        );
+        assert_eq!(v.get("a").unwrap().get("x").unwrap().as_str(), Some("y"));
+        assert_eq!(
+            v.get("b").unwrap().as_array().unwrap()[1].as_f64(),
+            Some(-2500.0)
+        );
+    }
+
+    #[test]
+    fn repeated_keys_resolve_to_the_last() {
+        assert_eq!(
+            parse(r#"{"a": 1, "a": 2}"#).unwrap().get("a"),
+            Some(&num("2"))
+        );
+    }
+
+    #[test]
+    fn decodes_escapes_and_surrogate_pairs() {
+        let v = parse(r#""a\"\\\/\b\f\n\r\t\u00e9\ud83d\ude00""#).unwrap();
+        assert_eq!(v.as_str(), Some("a\"\\/\u{8}\u{c}\n\r\t\u{e9}\u{1f600}"));
+    }
+
+    #[test]
+    fn accepts_python_special_numbers() {
+        assert!(parse("NaN").unwrap().as_f64().unwrap().is_nan());
+        assert_eq!(
+            parse("-Infinity").unwrap().as_f64(),
+            Some(f64::NEG_INFINITY)
+        );
+    }
+
+    #[test]
+    fn rejects_malformed_documents() {
+        for text in [
+            "",
+            "{",
+            "[1,]",
+            "{\"a\" 1}",
+            "{1: 2}",
+            "01",
+            "\"\t\"",
+            "\"\\x\"",
+            "[1] 2",
+            "tru",
+            "-",
+            "\"\\ud800\"",
+        ] {
+            assert!(parse(text).is_err(), "{text:?}");
+        }
+        assert_eq!(
+            parse("[1,\n x]").unwrap_err(),
+            Error {
+                message: "Expecting value",
+                line: 2,
+                column: 2
+            }
+        );
+    }
+
+    #[test]
+    fn bounds_nesting_depth() {
+        assert!(parse(&"[".repeat(MAX_DEPTH + 1)).is_err());
+        let ok = format!("{}{}", "[".repeat(MAX_DEPTH), "]".repeat(MAX_DEPTH));
+        assert!(parse(&ok).is_ok());
+    }
+
+    #[test]
+    fn truthiness_follows_python() {
+        for (text, truth) in [
+            ("0", false),
+            ("0.0", false),
+            ("1", true),
+            ("\"\"", false),
+            ("[]", false),
+            ("{}", false),
+            ("null", false),
+            ("true", true),
+        ] {
+            assert_eq!(parse(text).unwrap().truthy(), truth, "{text}");
+        }
+    }
+}

@@ -11,7 +11,7 @@ and performance work.
 make fixtures                     # generate the authored test corpus into .research/
 cargo test --workspace            # library tests
 make prepare-check                # once: pinned FFmpeg reference, fixtures, workers
-make check                        # everything CI runs
+cargo xtask check                 # everything CI runs
 ```
 
 Set `CARGO_INCREMENTAL=0` for direct cargo commands; the reference builds and
