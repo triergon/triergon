@@ -20,6 +20,7 @@ mod toml;
 mod walk;
 mod zlib;
 
+use std::ffi::{OsStr, OsString};
 use std::path::{Path, PathBuf};
 use std::process::{Command, ExitCode};
 
@@ -56,6 +57,9 @@ commands:
                  index FATE definitions as data; nothing is executed";
 
 fn main() -> ExitCode {
+    if let Some(code) = without_cargo_library_path() {
+        return code;
+    }
     let args: Vec<String> = std::env::args().skip(1).collect();
     let root = root();
     let result = match args.first().map(String::as_str) {
@@ -100,6 +104,56 @@ fn main() -> ExitCode {
             eprintln!("{message}");
             ExitCode::FAILURE
         }
+    }
+}
+
+/// `cargo run` (and the rustup proxy in front of it) prepends build and
+/// toolchain library directories to `LD_LIBRARY_PATH`. Workers and the allocator observer must load exactly as
+/// they would from a shell, so run once more without those entries.
+fn without_cargo_library_path() -> Option<ExitCode> {
+    std::env::var_os("CARGO")?;
+    let current = std::env::var_os("LD_LIBRARY_PATH")?;
+    let exe = std::env::current_exe().ok()?;
+    let toolchains =
+        std::env::var_os("RUSTUP_HOME").map(|home| Path::new(&home).join("toolchains"));
+    let kept = shell_library_path(&current, exe.parent()?, toolchains.as_deref());
+    if kept.as_ref() == Some(&current) {
+        return None;
+    }
+    let mut command = Command::new(&exe);
+    command.args(std::env::args_os().skip(1));
+    match kept {
+        Some(value) => command.env("LD_LIBRARY_PATH", value),
+        None => command.env_remove("LD_LIBRARY_PATH"),
+    };
+    Some(match command.status() {
+        Ok(status) => status
+            .code()
+            .and_then(|code| u8::try_from(code).ok())
+            .map_or(ExitCode::FAILURE, ExitCode::from),
+        Err(error) => {
+            eprintln!("{}: {error}", exe.display());
+            ExitCode::FAILURE
+        }
+    })
+}
+
+/// `value` without the entries `cargo run` and rustup add: the running
+/// binary's output directory and everything below it, toolchain
+/// `lib/rustlib/*/lib` directories and anything under rustup's `toolchains`.
+/// `None` when nothing remains.
+fn shell_library_path(value: &OsStr, built: &Path, toolchains: Option<&Path>) -> Option<OsString> {
+    let kept: Vec<PathBuf> = std::env::split_paths(value)
+        .filter(|path| {
+            !path.starts_with(built)
+                && !toolchains.is_some_and(|t| path.starts_with(t))
+                && !path.components().any(|c| c.as_os_str() == "rustlib")
+        })
+        .collect();
+    if kept.is_empty() {
+        None
+    } else {
+        std::env::join_paths(kept).ok()
     }
 }
 
@@ -584,4 +638,32 @@ fn check(root: &Path) -> Task {
     run(Command::new("python3")
         .arg("tools/test-core-time.py")
         .current_dir(root))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::shell_library_path;
+    use std::ffi::OsStr;
+    use std::path::Path;
+
+    #[test]
+    fn cargo_library_entries_are_dropped_and_others_kept() {
+        let built = Path::new("/w/target/debug");
+        let toolchains = Some(Path::new("/h/.rustup/toolchains"));
+        let cargo = "/w/target/debug:/w/target/debug/deps:\
+                     /h/.rustup/toolchains/t/lib/rustlib/aarch64-unknown-linux-gnu/lib:\
+                     /h/.rustup/toolchains/t/lib";
+        assert_eq!(
+            shell_library_path(OsStr::new(cargo), built, toolchains),
+            None
+        );
+        let mixed = format!("{cargo}:/opt/lib:/usr/local/lib");
+        assert_eq!(
+            shell_library_path(OsStr::new(&mixed), built, toolchains).unwrap(),
+            OsStr::new("/opt/lib:/usr/local/lib")
+        );
+        let user = OsStr::new("/opt/lib");
+        assert_eq!(shell_library_path(user, built, toolchains).unwrap(), user);
+        assert_eq!(shell_library_path(user, built, None).unwrap(), user);
+    }
 }
