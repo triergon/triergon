@@ -5,7 +5,7 @@ export PATH := $(CURDIR)/.research/reference/install/bin:$(PATH)
 prepare-check:
 	$(MAKE) reference
 	$(MAKE) fixtures
-	python3 tools/fetch_required_vectors.py
+	cargo xtask fetch-vectors
 	$(MAKE) adapters
 
 check:
@@ -18,7 +18,7 @@ core-oracle:
 	python3 tools/test-core-time.py
 
 reference:
-	python3 tools/prepare_ffmpeg.py
+	cargo xtask prepare-ffmpeg
 
 fixtures:
 	cargo xtask fixtures
