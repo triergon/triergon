@@ -172,6 +172,7 @@ struct Chunk {
 struct PendingPes {
     spans: BudgetVecIntoIter<DemuxSpan>,
     remaining: usize,
+    may_reserve: bool,
 }
 
 #[derive(Clone, Copy)]
@@ -373,6 +374,7 @@ impl AvcTsReader {
         self.pending_pes = mailbox.take().map(|packet| PendingPes {
             remaining: packet.payload_len,
             spans: packet.spans.into_iter(),
+            may_reserve: true,
         });
         Ok(true)
     }
@@ -473,11 +475,24 @@ impl AvcTsReader {
                     } else {
                         1
                     };
-                append(
-                    &mut self.bytes,
-                    &available[..copy],
-                    self.limits.maximum_access_unit_bytes + LOOKAHEAD,
-                )?;
+                let limit = self.limits.maximum_access_unit_bytes + LOOKAHEAD;
+                append(&mut self.bytes, &available[..copy], limit, |len, growth| {
+                    // Once a slice has started, parameter set processing for
+                    // this picture is complete.
+                    self.nal.as_ref().filter(|nal| matches!(nal.kind, 1 | 5))?;
+                    let pending = self.pending_pes.as_mut().filter(|pes| pes.may_reserve)?;
+                    let extent = len
+                        .checked_add(available.len())?
+                        .checked_add(pending.remaining)?
+                        .checked_add(LOOKAHEAD)?;
+                    // A PES can contain multiple pictures. Limit the hint
+                    // relative to ordinary growth and try it once per PES.
+                    if extent <= growth || extent > limit.min(growth.saturating_mul(4)) {
+                        return None;
+                    }
+                    pending.may_reserve = false;
+                    Some(extent)
+                })?;
                 chunk.offset += copy;
                 work.try_charge(copy as u64);
                 if copy == 1 {
@@ -749,7 +764,12 @@ fn nal_body_prefix_len(bytes: &[u8]) -> usize {
             .unwrap_or_else(|| rest.len() - usize::from(rest.last() == Some(&0)))
 }
 
-fn append(buffer: &mut BudgetVec<u8>, bytes: &[u8], limit: usize) -> Result<()> {
+fn append(
+    buffer: &mut BudgetVec<u8>,
+    bytes: &[u8],
+    limit: usize,
+    reserve_hint: impl FnOnce(usize, usize) -> Option<usize>,
+) -> Result<()> {
     let end = buffer
         .len()
         .checked_add(bytes.len())
@@ -767,7 +787,16 @@ fn append(buffer: &mut BudgetVec<u8>, bytes: &[u8], limit: usize) -> Result<()> 
             .max(64)
             .max(end)
             .min(limit);
-        if let Err(error) = buffer.try_reserve_exact(target - buffer.len()) {
+        let reserved = reserve_hint(buffer.len(), target).is_some_and(|extent| {
+            // Leave room for publication and subsequent input. A refused
+            // hint leaves the builder ready for its ordinary growth.
+            let headroom = buffer
+                .budget()
+                .available()
+                .saturating_sub(Bytes::owner_overhead_bytes() + LOOKAHEAD);
+            extent <= headroom / 2 && buffer.try_reserve_exact(extent - buffer.len()).is_ok()
+        });
+        if !reserved && let Err(error) = buffer.try_reserve_exact(target - buffer.len()) {
             if target == end
                 || !matches!(
                     error,
