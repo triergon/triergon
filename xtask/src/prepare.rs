@@ -31,9 +31,9 @@ pub enum Profile {
     /// The Matroska reference plus the H.264 and HEVC decoders, which stream
     /// discovery uses to learn the B-picture delay; the Matroska build is untouched.
     Video,
-    /// The decoder comparison reference: H.264, HEVC, AAC, AC-3, E-AC-3 and DTS
-    /// decoders with the scaling and resampling filters, linked statically, and
-    /// the `ffmpeg` and `ffprobe` programs the decoder-level comparison runs.
+    /// FFmpeg's default configuration (static libraries, `ffmpeg`, `ffprobe`):
+    /// the decoder comparison reference, and the independent decoder and demuxer
+    /// of the capture comparison.
     Decode,
     /// The gating capture reference: the shared-library component set of the
     /// capture comparison (`mpeg1video`, MPEG-TS, `swscale`).
@@ -41,9 +41,6 @@ pub enum Profile {
     /// The same capture component set built with `--enable-small`, reported
     /// alongside the gating reference.
     CaptureSmall,
-    /// A default configuration with `ffmpeg` and `ffprobe`, used by the capture
-    /// comparison as an independent decoder and demuxer, never timed.
-    Oracle,
 }
 
 /// Which pinned source a profile builds.
@@ -63,16 +60,13 @@ impl Profile {
             Profile::Decode => ".research/reference-decode",
             Profile::Capture => ".research/reference-capture",
             Profile::CaptureSmall => ".research/reference-capture-small",
-            Profile::Oracle => ".research/reference-oracle",
         }
     }
 
     fn source(self) -> Source {
         match self {
             Profile::Matroska | Profile::Formats | Profile::Video => Source::Revision,
-            Profile::Decode | Profile::Capture | Profile::CaptureSmall | Profile::Oracle => {
-                Source::Release
-            }
+            Profile::Decode | Profile::Capture | Profile::CaptureSmall => Source::Release,
         }
     }
 
@@ -84,7 +78,6 @@ impl Profile {
             Profile::Decode,
             Profile::Capture,
             Profile::CaptureSmall,
-            Profile::Oracle,
         ]
         .into_iter()
         .find(|profile| profile.name() == name)
@@ -98,7 +91,6 @@ impl Profile {
             Profile::Decode => "decode",
             Profile::Capture => "capture",
             Profile::CaptureSmall => "capture-small",
-            Profile::Oracle => "oracle",
         }
     }
 }
@@ -129,27 +121,10 @@ const CAPTURE_ARGS: [&str; 22] = [
     "--enable-muxer=mpegts",
 ];
 
-/// The decoder comparison's component set: the six decoders and their parsers and
-/// raw demuxers, the filters of the letterbox and downmix chains (and the ones
-/// the command line inserts), and the raw outputs of the decoder-level check.
-const DECODE_ARGS: [&str; 16] = [
-    "--disable-shared",
-    "--enable-static",
-    "--enable-pic",
-    "--disable-doc",
-    "--disable-debug",
-    "--disable-everything",
-    "--disable-autodetect",
-    "--enable-protocol=file,pipe",
-    "--enable-demuxer=h264,hevc,aac,ac3,eac3,dts",
-    "--enable-parser=h264,hevc,aac,ac3,dca",
-    "--enable-decoder=h264,hevc,aac,ac3,eac3,dca",
-    "--enable-filter=buffer,buffersink,abuffer,abuffersink,scale,pad,format,aformat,aresample,null,anull",
-    "--enable-encoder=rawvideo,pcm_f32le,pcm_s16le",
-    "--enable-muxer=rawvideo,f32le,s16le",
-    "--enable-ffmpeg",
-    "--enable-ffprobe",
-];
+/// The decoder comparison's configuration: FFmpeg's defaults without
+/// documentation and debug symbols, as the comparison's static reference and
+/// its `ffmpeg` and `ffprobe` were built.
+const DECODE_ARGS: [&str; 2] = ["--disable-doc", "--disable-debug"];
 
 pub fn configure_argv(prefix: &Path, profile: Profile) -> Vec<String> {
     let release = |args: &[&str]| -> Vec<String> {
@@ -173,7 +148,6 @@ pub fn configure_argv(prefix: &Path, profile: Profile) -> Vec<String> {
             args.insert(at, "--enable-small");
             return release(&args);
         }
-        Profile::Oracle => return release(&["--disable-doc", "--disable-debug"]),
         Profile::Decode => return release(&DECODE_ARGS),
         Profile::Matroska | Profile::Formats | Profile::Video => {}
     }

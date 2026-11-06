@@ -3441,6 +3441,24 @@
    ]
   },
   {
+   "name": "codec-reference-binary",
+   "retention": "retained",
+   "reason": "Decoder comparison reference worker (codec and decode session status rows)",
+   "key": "evidence/codec-reference-binary/3281b1a64671d50dc6d38b8580c197a7497700983fe72f57343a6ac366f477ea.tar.gz",
+   "sha256": "3281b1a64671d50dc6d38b8580c197a7497700983fe72f57343a6ac366f477ea",
+   "bytes": 25864137,
+   "files": [
+    {
+     "path": "README.md",
+     "sha256": "260bb920a16305a810d9937af9e0dafab14c4442840b852315aeee3bd3536cef"
+    },
+    {
+     "path": "reference_decode",
+     "sha256": "85798460da7235acf177bd76dc3fa6a45188e26a5f8fbffa2912545de5579654"
+    }
+   ]
+  },
+  {
    "name": "matroska-audio-linux-arm64",
    "path": "research/qualification/matroska-audio-linux-arm64",
    "retention": "retained",

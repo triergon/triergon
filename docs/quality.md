@@ -32,10 +32,10 @@ resource limit becomes an explicit, reviewed rule for that case.
   for the container harness, `formats` for MOV, TS, subtitles and the HLS segment
   reference, and `video` (the Matroska build plus the H.264 and HEVC decoders that
   stream discovery needs) for the playback startup and seek reference. Decoders and
-  capture are measured against the FFmpeg 9.0.2 release tarball: `decode` for the codec
-  comparison, `capture` (gating) and `capture-small` for the capture comparison, and
-  `oracle`, a default build whose `ffmpeg` and `ffprobe` decode capture output
-  independently.
+  capture are measured against the FFmpeg 9.0.2 release tarball: `decode` (the default
+  configuration) for the codec comparison, whose `ffmpeg` and `ffprobe` also decode
+  capture output independently, and `capture` (gating) and `capture-small` for the
+  capture comparison.
 - **Authored corpus.** Small canonical streams generated from synthetic signals and
   authored structures, so inputs stay identical across encoder versions
   (`cargo xtask fixtures`, `harness/features/<feature>/{contract,corpus}.json`).
