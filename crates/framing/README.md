@@ -119,6 +119,8 @@ budget covers publishing the descriptors.
 one unit always progresses and zero units consume nothing. Copies are at most
 4096 bytes between cancel checks. Allocation pressure returns retryable
 `Backpressure` at the exact checkpoint; no partial output is published.
+Stateful packet jobs allocate segment storage as needed and share the original
+payload for passthrough packets.
 
 **Codec-specific limits.**
 
