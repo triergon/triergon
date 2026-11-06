@@ -182,3 +182,26 @@ fn eof_publication_retries_after_pressure_and_a_partial_next_nal_fails() {
         Err(Error::Truncated)
     ));
 }
+
+#[test]
+fn nal_body_scan_keeps_possible_prefixes_at_every_input_boundary() {
+    for len in 0..=34 {
+        for first in 0..=len {
+            for second in first..=len {
+                let mut bytes = [1; 35];
+                bytes[first] = 0;
+                bytes[second] = 0;
+                let input = &bytes[..len];
+                let expected = input
+                    .windows(2)
+                    .position(|pair| pair == [0, 0])
+                    .unwrap_or_else(|| len - usize::from(input.last() == Some(&0)));
+                assert_eq!(
+                    nal_body_prefix_len(input),
+                    expected,
+                    "{len}, {first}, {second}"
+                );
+            }
+        }
+    }
+}
