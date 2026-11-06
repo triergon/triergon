@@ -97,14 +97,14 @@ indexes the hearing threshold by `band >> (bsid − 8)`, as FFmpeg does.
 ## Conformance
 
 - Specification: ATSC A/52:2018. Tables are generated from the specification text by
-  `research/d4/ac3/gen_tables.py` (`src/spec_tables.rs`).
+  `harness/codecs/ac3/gen_tables.py` (`src/spec_tables.rs`).
 - Reference: FFmpeg 9.0.2's float decoder on the FATE AC-3/E-AC-3 vectors and on streams
   from FFmpeg's own encoders covering every acmod, rate, coupling and E-AC-3. Every sample
   is compared: exact rate, layout and count; per channel RMS ≤ 8.8e-6 and
-  max |diff| ≤ 6.1035e-5 (`research/d4/NUMERIC-RULES.json`). Dither-free comparisons use
+  max |diff| ≤ 6.1035e-5 (`harness/codecs/numeric-rules.json`). Dither-free comparisons use
   streams rewritten by `examples/strip_dither.rs`.
 - Downmix metadata is compared per frame against `ffprobe -show_frames`.
 - `cargo test -p triergon-codec-ac3` runs table, transform, synthetic-frame, bsid 9/10 and
   corruption tests; FATE checks skip when the corpus is absent.
-- Derivation notes and tools: [research/d4/ac3](../../research/d4/ac3/STATUS.md).
+- Derivation notes and tools: [harness/codecs/ac3](../../harness/codecs/ac3/STATUS.md).
   Project-wide gates: [docs/quality.md](../../docs/quality.md).

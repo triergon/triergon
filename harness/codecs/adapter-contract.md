@@ -1,6 +1,6 @@
 # Session-layer contract for a host adapter
 
-`crates/sim` turns compressed access units into timestamped 1920×1080 RGBA pictures and
+`crates/session` turns compressed access units into timestamped 1920×1080 RGBA pictures and
 interleaved stereo s16 PCM. A host adapter owns the clock, packet framing, output
 devices and GPU upload; nothing in the crate spawns a process or links a native library.
 

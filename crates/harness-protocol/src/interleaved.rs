@@ -1,4 +1,4 @@
-//! Interleaved output digest of the decode workers (`codec-worker`, `harness/d4/reference_decode.c`).
+//! Interleaved output digest of the decode workers (`codec-worker`, `harness/codecs/reference_decode.c`).
 //!
 //! Eight accumulators take the concatenated output in 64-byte blocks: accumulator `i`
 //! takes `a_i <- (a_i ^ le64(word 8k+i)) * K`; a short final block is zero-padded.

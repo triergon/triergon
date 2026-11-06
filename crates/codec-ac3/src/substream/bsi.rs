@@ -362,7 +362,7 @@ impl Substream {
         }
         if transproce {
             // Transient pre-noise processing data: parsed, not applied (FFmpeg 9.0.2 does
-            // not apply it either; see research/d4/ac3/STATUS.md).
+            // not apply it either; see harness/codecs/ac3/STATUS.md).
             self.features.tpnp = true;
             for _ in 0..nfch {
                 if br.bit() {

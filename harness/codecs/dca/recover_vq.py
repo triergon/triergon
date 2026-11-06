@@ -113,7 +113,7 @@ for e in range(nf):
 assert sorted(results) == list(range(count)), len(results)
 assert worst < 0.1 and bad == 0, ('not integral', worst, bad)
 with open(sys.argv[3], 'w') as f:
-    f.write('# %s codebook recovered by research/d4/dca/recover_vq.py; max |v - round(v)| = %.2e\n' % (kind, worst))
+    f.write('# %s codebook recovered by harness/codecs/dca/recover_vq.py; max |v - round(v)| = %.2e\n' % (kind, worst))
     for i in range(count):
         f.write(' '.join(map(str, results[i])) + '\n')
 print(kind, 'entries', count, 'worst fractional deviation %.3e' % worst, 'episodes reaching 2^23:', overflow)

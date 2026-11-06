@@ -1,6 +1,6 @@
-"""Shared helpers for the D4 RGBA black-box probes (research tooling).
+"""Shared helpers for the RGBA black-box probes (research tooling).
 
-run(planes, bits, cs, rng, chain=None) feeds 4:2:0 frames to harness/d4/probe_rgba
+run(planes, bits, cs, rng, chain=None) feeds 4:2:0 frames to harness/codecs/probe_rgba
 (built at target/agent-rgba/probe_rgba) and returns the output frames as numpy arrays.
 """
 import os, subprocess

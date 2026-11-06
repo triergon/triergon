@@ -7,7 +7,7 @@ reference_decode's graph, colorspace/range as the decoder reports them) and (b) 
 (release `raw_letterbox` hook). Prints per-vector exactness. Converter-only: decoder differences
 are excluded by construction.
 usage: validate_rgba.py OUT.json [VECTOR ...]   (default: every h264/hevc vector of
-       research/d4/CORRECTNESS-MANIFEST.json plus the .research/m1d4/d4-inputs workloads)
+       harness/codecs/correctness-manifest.json plus the .research/m1d4/d4-inputs workloads)
 env: MAX_FRAMES (default 40 per vector), CHUNK (default 8)
 """
 import sys, os, json, subprocess, glob
@@ -28,7 +28,7 @@ RANGE = {'tv': 1, 'pc': 2}
 def vectors():
     if len(sys.argv) > 2:
         return sys.argv[2:]
-    m = json.load(open(ROOT / 'research/d4/CORRECTNESS-MANIFEST.json'))
+    m = json.load(open(ROOT / 'harness/codecs/correctness-manifest.json'))
     out = [str(ROOT / v['path']) for v in m['vectors'] if v['lane'] in ('h264', 'hevc')]
     return out + sorted(glob.glob(str(ROOT / '.research/m1d4/d4-inputs/*.h264')) + glob.glob(str(ROOT / '.research/m1d4/d4-inputs/*.hevc')))
 

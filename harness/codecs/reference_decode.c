@@ -1,4 +1,4 @@
-/* D4/O61 native reference worker (research tooling, never production).
+/* Native codec reference worker (research tooling, never production).
  *
  * Reproduces the simulator's external ffmpeg work in-process with the same
  * libraries: an elementary-stream parser splits access units, the decoder

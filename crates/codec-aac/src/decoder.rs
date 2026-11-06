@@ -811,7 +811,7 @@ pub(crate) fn fixed_config_slots(cfg: u8) -> Vec<Slot> {
 }
 
 /// Speaker assignment for a PCE, reproducing FFmpeg 9's observable mapping (probed with
-/// research/d4/aac/tools/probe_layout.py, see STATUS.md). Returns the slots and whether the
+/// harness/codecs/aac/tools/probe_layout.py, see STATUS.md). Returns the slots and whether the
 /// output keeps PCE order (FFmpeg "unknown" layouts) instead of native order.
 pub(crate) fn pce_slots(p: &Pce) -> (Vec<Slot>, bool) {
     use Speaker::*;

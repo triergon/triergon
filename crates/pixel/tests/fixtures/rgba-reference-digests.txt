@@ -1,4 +1,4 @@
-# width height bits matrix full_range seed digest  (harness/d4/rgba_fixtures.py, reference FFmpeg 9.0.2 dev Mac)
+# width height bits matrix full_range seed digest  (harness/codecs/rgba_fixtures.py, reference FFmpeg 9.0.2 dev Mac)
 1280 720 8 1 0 1 6598372178315440986
 352 288 8 5 0 2 4702725114787994865
 416 240 8 5 1 3 16758803030570127190

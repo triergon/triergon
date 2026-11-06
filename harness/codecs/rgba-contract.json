@@ -4,11 +4,11 @@
  "reference": {
   "build": "Homebrew FFmpeg 9.0.2 (libavfilter 12.1.102, libswscale 10.1.102, libavutil 61.1.102); libswscale.10.1.102.dylib sha256 870934397a55bf3a229f1bd3bd66cfa70720b1e11fccad9f27bd98a56c2e20fa",
   "platform": "macOS arm64, Apple M3 Pro (NEON code paths of that build)",
-  "chain": "buffer(colorspace, range from the decoded frame; graph nb_threads = 1) -> scale=1920:1080:force_original_aspect_ratio=decrease,pad=1920:1080:(ow-iw)/2:(oh-ih)/2,format=rgba -> buffersink (exactly harness/d4/reference_decode.c)",
-  "method": "black box only: crafted planes through the public libavfilter API (harness/d4/probe_rgba.c); no FFmpeg/libswscale source was opened or translated",
+  "chain": "buffer(colorspace, range from the decoded frame; graph nb_threads = 1) -> scale=1920:1080:force_original_aspect_ratio=decrease,pad=1920:1080:(ow-iw)/2:(oh-ih)/2,format=rgba -> buffersink (exactly harness/codecs/reference_decode.c)",
+  "method": "black box only: crafted planes through the public libavfilter API (harness/codecs/probe_rgba.c); no FFmpeg/libswscale source was opened or translated",
   "probe_equivalence": "probe_rgba output on FFmpeg-decoded planes equals reference_decode raw output byte for byte (BA1_FT_C.264 prefix, 10 pictures; hevc-main10-1080p prefix, 15 complete pictures; the 16th differs only because the truncated stream decodes differently)"
  },
- "implementation": "crates/sim/src/scale.rs (Scaler::letterbox); numpy twin harness/d4/rgba_full_model.py + rgba_model.py",
+ "implementation": "crates/sim/src/scale.rs (Scaler::letterbox); numpy twin harness/codecs/rgba_full_model.py + rgba_model.py",
  "geometry": {
   "fit": "w = min(round(1080 * iw / ih), 1920), h = min(round(1920 * ih / iw), 1080), round = half up on integers (a*b + c/2) / c",
   "offset": "x = floor((1920 - w) / 2), y = floor((1080 - h) / 2); odd offsets are kept (pad runs on RGBA)",
@@ -28,7 +28,7 @@
  },
  "direct_path": {
   "arithmetic": "per pixel l = (Y - off) * cy + 2^14; per 2x2 block (nearest chroma) r = floor(V' * crv / 2^14) * 2^14, g = floor(-U' * cgu / 2^14) * 2^14 + floor(-V' * cgv / 2^14) * 2^14, b = floor(U' * cbu / 2^14) * 2^14 with U' = U - 128, V' = V - 128; out = clamp((l + term) >> 15, 0, 255). Implemented in 16-bit lanes as ((l >> 14) + term / 2^14) >> 1, identical because every chroma term is a multiple of 2^14.",
-  "constants": "cy = 38156, off = 16 (limited) or cy = 32768, off = 0 (full); [crv, cbu, cgu, cgv] per matrix in research/d4/rgba-coefficients-dev-mac.json (each exact on every pixel of a random 1920x1080 frame)",
+  "constants": "cy = 38156, off = 16 (limited) or cy = 32768, off = 0 (full); [crv, cbu, cgu, cgv] per matrix in harness/codecs/rgba-coefficients-dev-mac.json (each exact on every pixel of a random 1920x1080 frame)",
   "matrices": "1 -> BT.709, 4 -> FCC, 7 -> SMPTE 240M, 9 -> BT.2020 NCL, everything else BT.601"
  },
  "separable_path": {
@@ -113,7 +113,7 @@
      ]
     }
    },
-   "inc_note": "each value is the middle of the fitted range in research/d4/RGBA-TABLES-dev-mac.json; every value in a range yields the identical 256-entry table, so the choice is exact",
+   "inc_note": "each value is the middle of the fitted range in harness/codecs/rgba-tables-dev-mac.json; every value in a range yields the identical 256-entry table, so the choice is exact",
    "grey": "limited: G(i) = clamp(floor((i * 76309 - 1304880) / 2^16), 0, 255) (any oy in [-1305326, -1304435] with cy = 76309 fits); full: G(i) = clamp(i, 0, 255)",
    "observations": "Per matrix and range, 256 chroma values x 64 luma levels for each of V (U = 128) and U (V = 128) on 16x16 constant blocks through a 512 -> 520 rescale, each offset the unique integer explaining all 64 outputs; 4096 random (Y, U, V) triples predicted 100% exactly by the additive form",
    "refused": "matrices 8 (YCgCo), 10 (BT.2020 CL), 11+ make the reference graph fail to configure; the Scaler falls back to BT.601 for them",
@@ -276,7 +276,7 @@
  "exactness": {
   "synthetic_random_frames": "crates/sim/tests/rgba_reference.rs digests (15 cases incl. odd fitted widths 414x236, 210x236 10-bit, 528x4216: 1280x720, 352x288, 416x240, 720x480, 2560x1600, 300x168, 1920x1080 and 1920x800 direct, 3840x2160 / 1920x1080 / 1280x720 / 64x240 10-bit; matrices 1, 2, 4, 5, 6, 7, 9, both ranges): all bit-exact. rgba_full_model.py random frames: 1280x720, 352x288, 416x240, 3840x2160 10-bit, 1920x1080 10-bit, 720x480, 720x576, 832x480, 640x480, 1024x768, 192x128, 300x168, 2560x1600, 64x240, 128x240 10-bit, 4216x528 exact",
   "real_pictures": {
-   "method": "harness/d4/validate_rgba.py, MAX_FRAMES=30: FFmpeg-decoded planes of every h264/hevc vector in research/d4/CORRECTNESS-MANIFEST.json plus the six .research/m1d4/d4-inputs video workloads, converted by the probe (== reference_decode chain) and by the release Scaler; converter-only comparison",
+   "method": "harness/codecs/validate_rgba.py, MAX_FRAMES=30: FFmpeg-decoded planes of every h264/hevc vector in harness/codecs/correctness-manifest.json plus the six .research/m1d4/d4-inputs video workloads, converted by the probe (== reference_decode chain) and by the release Scaler; converter-only comparison",
    "result": "run 3 (after the odd-width stage): 360 of 364 decodable 4:2:0 8/10-bit vectors bit-exact on every compared picture (FFmpeg-CLI-cropped planes; for the two left/top-cropped vectors see reference_crop.verification: both exact against reference_decode itself). Differing: test8b43.264 (960x544, 7 px / 30 pictures, max 1), DELTAQP_A_BRCM_4 (1920x1088, 33 px, max 2), PICSIZE_A_Bossen_1 (1 px, max 1): near-ties; CONFWIN_A_Sony_1 differs only in this CLI-cropped comparison (412 wide instead of the reference's 414). FM1_BT_B.h264 yields no pictures through the FFmpeg CLI; 24 vectors are 4:2:2 / 4:4:4 / 12-bit or unprobeable (out of scope).",
    "workloads": "h264-high-1080p, h264-high-720p, h264-main-1920x800, hevc-main-1080p, hevc-main10-1080p (BT.2020 NCL limited), hevc-main10-2160p: all exact",
    "by_geometry": {
@@ -508,12 +508,12 @@
   }
  },
  "evidence_scripts": {
-  "harness/d4/probe_rgba.c": "reference chain on crafted planes (PROBE_CHAIN override, PROBE_BENCH timing)",
-  "harness/d4/rgba_probe.py": "python driver",
-  "harness/d4/rgba_model.py": "tap generator (exact rationals)",
-  "harness/d4/rgba_full_model.py": "numpy twin of the whole path vs the probe",
-  "harness/d4/rgba_fixtures.py": "digest fixtures for crates/sim/tests/rgba_reference.rs",
-  "harness/d4/validate_rgba.py": "real decoded pictures (FFmpeg-decoded planes) through both converters"
+  "harness/codecs/probe_rgba.c": "reference chain on crafted planes (PROBE_CHAIN override, PROBE_BENCH timing)",
+  "harness/codecs/rgba_probe.py": "python driver",
+  "harness/codecs/rgba_model.py": "tap generator (exact rationals)",
+  "harness/codecs/rgba_full_model.py": "numpy twin of the whole path vs the probe",
+  "harness/codecs/rgba_fixtures.py": "digest fixtures for crates/sim/tests/rgba_reference.rs",
+  "harness/codecs/validate_rgba.py": "real decoded pictures (FFmpeg-decoded planes) through both converters"
  },
  "performance_dev_mac": {
   "harness": "Median of 200 conversions of one picture, reference = probe_rgba PROBE_BENCH (buffersrc add + buffersink get, graph nb_threads 1), ours = release Scaler::letterbox (raw_letterbox hook, --test-threads=1); identical bytes checked; run twice, no competing benchmark of ours (other agents' jobs were present on the machine: load ~3)",

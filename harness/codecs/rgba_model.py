@@ -1,6 +1,6 @@
 """Recovered model of the reference scaler's filter taps (research tooling).
 
-Exact rational arithmetic; see research/d4/RGBA-CONTRACT.json for the observations.
+Exact rational arithmetic; see harness/codecs/rgba-contract.json for the observations.
 taps(n, m) -> list of (start, integer coefficients) for each of the m outputs.
 
 Rules (each recovered from black-box impulse measurements through probe_rgba.c; the Rust

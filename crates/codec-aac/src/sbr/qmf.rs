@@ -2,7 +2,7 @@
 //!
 //! Definitions (ISO/IEC 14496-3 4.6.18.4.1 / 4.6.18.4.2; the ISO text is not available here,
 //! the equations are the implementer's recollection, confirmed exactly against the FFmpeg
-//! 9.0.2 binary with `examples/sbr_mute.rs` + `research/d4/aac/tools/qmffit.py`):
+//! 9.0.2 binary with `examples/sbr_mute.rs` + `harness/codecs/aac/tools/qmffit.py`):
 //!
 //! - analysis: x = 320 input samples, newest first; u\[n\] = sum_{j<5} x\[n + 64j\]
 //!   c\[2(n + 64j)\]; X(k) = sum_{n<64} 2 u\[n\] exp(i pi (k + 1/2)(2n - 1/2) / 64), k < 32;
@@ -23,7 +23,7 @@ use crate::fft::{Cpx, Dct4, Fft};
 /// (so c[0] = 0). The DRM table lists the same 640 magnitudes as ISO/IEC 14496-3 Table
 /// 4.A.89 but in the opposite orientation; the two orientations differ in sign at the four
 /// segment boundaries n = 128, 256, 384, 512 and are not interchangeable. The reversed order
-/// reproduces the FFmpeg 9.0.2 binary's pure-QMF output to 9.5e-8 (research/d4/aac/STATUS.md,
+/// reproduces the FFmpeg 9.0.2 binary's pure-QMF output to 9.5e-8 (harness/codecs/aac/STATUS.md,
 /// "QMF banks"); the forward order with c[0] = 0 is wrong at every odd output position.
 fn window(n: usize) -> f64 {
     QMF_WINDOW[639 - n]

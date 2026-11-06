@@ -98,7 +98,7 @@ pub fn decode_all(frames: &[&[u8]]) -> Decoded {
     d
 }
 
-/// One reference fingerprint (see research/d4/dca/fingerprint.py).
+/// One reference fingerprint (see harness/codecs/dca/fingerprint.py).
 pub struct Fingerprint {
     pub name: String,
     pub channels: usize,

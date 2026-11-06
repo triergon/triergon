@@ -2,7 +2,7 @@
 """Capture reference digests of letterboxed synthetic pictures (research tooling).
 
 Each case is a pseudo-random 4:2:0 picture (the LCG below, mirrored in crates/pixel/tests/rgba_reference.rs)
-converted by the reference chain (harness/d4/probe_rgba.c, full chain including pad). The digest is the
+converted by the reference chain (harness/codecs/probe_rgba.c, full chain including pad). The digest is the
 M1 fold h = h * 31 + byte (mod 2^64) over the whole 1920x1080 RGBA canvas.
 usage: rgba_fixtures.py OUT.txt
 """
@@ -48,7 +48,7 @@ def digest(canvas):
 
 
 if __name__ == '__main__':
-    lines = ['# width height bits matrix full_range seed digest  (harness/d4/rgba_fixtures.py, reference FFmpeg 9.0.2 dev Mac)']
+    lines = ['# width height bits matrix full_range seed digest  (harness/codecs/rgba_fixtures.py, reference FFmpeg 9.0.2 dev Mac)']
     for w, h, bits, cs, r, seed in CASES:
         canvas = run([picture(w, h, bits, seed)], bits=bits, cs=cs, rng=r)[0]
         lines.append(f'{w} {h} {bits} {cs} {int(r == 2)} {seed} {digest(canvas)}')

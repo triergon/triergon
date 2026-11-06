@@ -17,7 +17,7 @@
    "bytes": 2937517,
    "operation": "video-h264",
    "iterations": 1,
-   "origin": "self-generated on the development host from FFmpeg lavfi testsrc2/sine (rights: own); generator commands in research/d4/WORKLOADS.md"
+   "origin": "self-generated on the development host from FFmpeg lavfi testsrc2/sine (rights: own); generator commands in harness/codecs/workloads.md"
   },
   {
    "id": "h264-main-1920x800",
@@ -26,7 +26,7 @@
    "bytes": 2102873,
    "operation": "video-h264",
    "iterations": 1,
-   "origin": "self-generated on the development host from FFmpeg lavfi testsrc2/sine (rights: own); generator commands in research/d4/WORKLOADS.md"
+   "origin": "self-generated on the development host from FFmpeg lavfi testsrc2/sine (rights: own); generator commands in harness/codecs/workloads.md"
   },
   {
    "id": "h264-high-720p",
@@ -35,7 +35,7 @@
    "bytes": 1469100,
    "operation": "video-h264",
    "iterations": 1,
-   "origin": "self-generated on the development host from FFmpeg lavfi testsrc2/sine (rights: own); generator commands in research/d4/WORKLOADS.md"
+   "origin": "self-generated on the development host from FFmpeg lavfi testsrc2/sine (rights: own); generator commands in harness/codecs/workloads.md"
   },
   {
    "id": "hevc-main-1080p",
@@ -44,7 +44,7 @@
    "bytes": 2525973,
    "operation": "video-hevc",
    "iterations": 1,
-   "origin": "self-generated on the development host from FFmpeg lavfi testsrc2/sine (rights: own); generator commands in research/d4/WORKLOADS.md"
+   "origin": "self-generated on the development host from FFmpeg lavfi testsrc2/sine (rights: own); generator commands in harness/codecs/workloads.md"
   },
   {
    "id": "hevc-main10-1080p",
@@ -53,7 +53,7 @@
    "bytes": 2301304,
    "operation": "video-hevc",
    "iterations": 1,
-   "origin": "self-generated on the development host from FFmpeg lavfi testsrc2/sine (rights: own); generator commands in research/d4/WORKLOADS.md"
+   "origin": "self-generated on the development host from FFmpeg lavfi testsrc2/sine (rights: own); generator commands in harness/codecs/workloads.md"
   },
   {
    "id": "hevc-main10-2160p",
@@ -62,7 +62,7 @@
    "bytes": 1884534,
    "operation": "video-hevc",
    "iterations": 1,
-   "origin": "self-generated on the development host from FFmpeg lavfi testsrc2/sine (rights: own); generator commands in research/d4/WORKLOADS.md"
+   "origin": "self-generated on the development host from FFmpeg lavfi testsrc2/sine (rights: own); generator commands in harness/codecs/workloads.md"
   },
   {
    "id": "aac-lc-5.1",
@@ -71,7 +71,7 @@
    "bytes": 484341,
    "operation": "audio-aac",
    "iterations": 4,
-   "origin": "self-generated on the development host from FFmpeg lavfi testsrc2/sine (rights: own); generator commands in research/d4/WORKLOADS.md"
+   "origin": "self-generated on the development host from FFmpeg lavfi testsrc2/sine (rights: own); generator commands in harness/codecs/workloads.md"
   },
   {
    "id": "aac-lc-stereo",
@@ -80,7 +80,7 @@
    "bytes": 163539,
    "operation": "audio-aac",
    "iterations": 8,
-   "origin": "self-generated on the development host from FFmpeg lavfi testsrc2/sine (rights: own); generator commands in research/d4/WORKLOADS.md"
+   "origin": "self-generated on the development host from FFmpeg lavfi testsrc2/sine (rights: own); generator commands in harness/codecs/workloads.md"
   },
   {
    "id": "dts-core-es-6.1",

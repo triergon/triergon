@@ -7,7 +7,7 @@
 #
 # No FFmpeg source is read. Requires the pinned FFmpeg 9.0.2 `ffmpeg` on PATH and Python
 # with numpy (research tooling only, not a production dependency).
-#   usage: research/d4/dca/regenerate_tables.sh [PYTHON]
+#   usage: harness/codecs/dca/regenerate_tables.sh [PYTHON]
 # Exit status 0 means both generated files are identical to the committed ones.
 set -euo pipefail
 R=$(cd "$(dirname "$0")/../../.." && pwd)
@@ -22,10 +22,10 @@ for probe in adpcm_probe hfvq_probe pr_probe; do
   "$SYNTH" "$probe" "$W/$probe.dts"
   ffmpeg -v error -y -f dts -i "$W/$probe.dts" -f f32le -c:a pcm_f32le "$W/$probe.ref.f32"
 done
-"$PY" -I "$R/research/d4/dca/recover_vq.py" "$W/adpcm_probe.dts.meta" "$W/adpcm_probe.ref.f32" "$W/adpcm.txt"
-"$PY" -I "$R/research/d4/dca/recover_vq.py" "$W/hfvq_probe.dts.meta" "$W/hfvq_probe.ref.f32" "$W/hfvq.txt"
-"$PY" -I "$R/research/d4/dca/gen_vq.py" "$W/adpcm.txt" "$W/hfvq.txt" "$W/vq.rs"
-"$PY" -I "$R/research/d4/dca/recover_pr.py" "$W/pr_probe.dts.meta" "$W/pr_probe.ref.f32" \
+"$PY" -I "$R/harness/codecs/dca/recover_vq.py" "$W/adpcm_probe.dts.meta" "$W/adpcm_probe.ref.f32" "$W/adpcm.txt"
+"$PY" -I "$R/harness/codecs/dca/recover_vq.py" "$W/hfvq_probe.dts.meta" "$W/hfvq_probe.ref.f32" "$W/hfvq.txt"
+"$PY" -I "$R/harness/codecs/dca/gen_vq.py" "$W/adpcm.txt" "$W/hfvq.txt" "$W/vq.rs"
+"$PY" -I "$R/harness/codecs/dca/recover_pr.py" "$W/pr_probe.dts.meta" "$W/pr_probe.ref.f32" \
   "$R/crates/codec-dca/src/tables.rs" "$W/pr_table.rs"
 status=0
 for f in vq.rs pr_table.rs; do

@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
-"""D4 native correctness grader (research tooling).
+"""Codec native correctness grader (research tooling).
 
-Two levels per vector, graded by the frozen research/d4/NUMERIC-RULES.json:
+Two levels per vector, graded by the frozen harness/codecs/numeric-rules.json:
   decoder   our lane example (planar YUV / interleaved f32) against the pinned FFmpeg
             decoder output (-f rawvideo -pix_fmt yuv420p|yuv420p10le, -f f32le): video
             bit-exact per frame, audio per-channel RMS / max |d| and exact counts.
-  output    crates/codec-worker against harness/d4/reference_decode (the simulator's
+  output    crates/codec-worker against harness/codecs/reference_decode (the simulator's
             filter chains): RGBA bit-exact per picture, stereo s16 within 1 LSB.
 Nothing is excluded: refusals, crashes, count mismatches and FFmpeg refusals are
 recorded per vector as they happen. Selection (in-set or not) is applied afterwards

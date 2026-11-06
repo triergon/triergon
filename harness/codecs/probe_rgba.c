@@ -1,9 +1,9 @@
-/* D4 RGBA black-box probe (research tooling, never production).
+/* RGBA black-box probe (research tooling, never production).
  *
  * Feeds crafted planar 4:2:0 frames through the exact reference video chain
  *   scale=1920:1080:force_original_aspect_ratio=decrease,
  *   pad=1920:1080:(ow-iw)/2:(oh-ih)/2,format=rgba
- * built the same way as harness/d4/reference_decode.c (buffer source carrying
+ * built the same way as harness/codecs/reference_decode.c (buffer source carrying
  * colorspace and range), using only the public libavfilter API.
  *
  * usage: probe_rgba W H BITS COLORSPACE RANGE < frames > rgba

@@ -1,5 +1,5 @@
 //! Test tooling: print per-syncframe bit positions (JSON lines) used by the bitstream
-//! patching scripts in research/d4/ac3/ (block-switch / dither experiments).
+//! patching scripts in harness/codecs/ac3/ (block-switch / dither experiments).
 //!
 //! usage: trace <in>
 

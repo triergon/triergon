@@ -1,4 +1,4 @@
-# FFmpeg 9.0.2 (Homebrew, macOS) float output of core-only bytes (ffmpeg -bsf:a dca_core -f dts); research/d4/dca/fingerprint.py
+# FFmpeg 9.0.2 (Homebrew, macOS) float output of core-only bytes (ffmpeg -bsf:a dca_core -f dts); harness/codecs/dca/fingerprint.py
 stream core_51_24_48_768_0 6 3072 48000
 blocks 0 4096 2.267491532e+01
 spots 0 5:0.000000000e+00 197:0.000000000e+00 389:0.000000000e+00 581:3.910435975e-09 773:-1.643399264e-05 965:7.738904969e-05 1157:8.410103321e-01 1349:-5.961973071e-01 1541:-7.107690573e-01 1733:7.456899285e-01 1925:6.233471632e-01 2117:-9.073283672e-01 2309:-6.397962570e-01 2501:1.506822109e-01 2693:2.953798473e-01 2885:-6.092627998e-03

@@ -3,7 +3,7 @@
 //!
 //! Output matches FFmpeg's native float AAC decoder conventions (sample rate after implicit
 //! SBR, plane order = FFmpeg native channel order, float full scale 1.0; see
-//! [`triergon_codec::layout`]). Not qualified; see `research/d4/aac/STATUS.md`.
+//! [`triergon_codec::layout`]). Not qualified; see `harness/codecs/aac/STATUS.md`.
 #![forbid(unsafe_code)]
 
 pub mod adts;

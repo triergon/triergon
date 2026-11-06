@@ -1,18 +1,18 @@
 # Decoder timing and memory: equivalent work
 
-Timing (`harness/d4/time_d4.py`) and correctness (`harness/d4/native_correctness.py`)
+Timing (`harness/codecs/time_codecs.py`) and correctness (`harness/codecs/native_correctness.py`)
 compare two workers on the same input, on native Linux ARM64, one run at a time. Pairing,
 seeds, confidence bounds and gate thresholds are defined in
 [docs/quality.md](../../docs/quality.md).
 
 ## Workers
 
-- Reference: `harness/d4/reference_decode.c`, linked statically against the pinned
+- Reference: `harness/codecs/reference_decode.c`, linked statically against the pinned
   FFmpeg 9.0.2 libraries. It runs the same filter chains as the FFmpeg command line:
   video `scale=1920:1080:force_original_aspect_ratio=decrease`, centred `pad`,
   `format=rgba`; audio `aformat` to stereo s16 at the decoder rate. Its output is
   byte-identical to the command line's.
-- Candidate: the `d4-worker` binary of `crates/sim` (feature `codecs`), with the same
+- Candidate: `crates/codec-worker`, with the same
   access-unit split, operations and outputs. It streams access units from the file.
 
 ## Equal work

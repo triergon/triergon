@@ -2,7 +2,7 @@
 """Summarise a native_correctness.py run against the declared lane selection.
 
 A vector is out of set only when our decoder refused it with a typed Unsupported error
-naming a feature the lane matrix (research/d4/STATUS.md and the lane STATUS files)
+naming a feature the lane matrix (harness/codecs/STATUS.md and the lane STATUS files)
 declares refused, or when it carries no stream the selected decoders take (DTS without a
 core substream). Everything else that is not a pass at both levels is a failure and is
 listed with its numbers; known dispositions are attached, never used to drop a row.
@@ -17,14 +17,14 @@ DECLARED_REFUSALS = {
              'cross-component', 'implicit rdpcm', 'explicit rdpcm', 'transform_skip_rotation', 'transform skip context',
              'cabac bypass alignment', 'palette', 'SCC'),
 }
-# Recorded explanations pending owner review; they never change a status.
+# Recorded explanations; they never change a status.
 DISPOSITIONS = {
-    'aac-sce-in-stereo.adts': 'FFmpeg leaves the FR plane of SCE-only frames unwritten (stale pooled buffer); ours is silent there (research/d4/aac/STATUS.md)',
-    'ac3': 'AC-3/E-AC-3 dither and SPX/AHT noise: FFmpeg random generator (owner decision 1 in research/d4/STATUS.md)',
-    'eac3': 'AC-3/E-AC-3 dither and SPX/AHT noise: FFmpeg random generator (owner decision 1 in research/d4/STATUS.md)',
-    'test8b43.264': 'RGBA near-tie in the reference horizontal filter coefficients (research/d4/RGBA-CONTRACT.json)',
-    'DELTAQP_A_BRCM_4.bit': 'RGBA near-tie in the reference horizontal filter coefficients (research/d4/RGBA-CONTRACT.json)',
-    'PICSIZE_A_Bossen_1.bit': 'RGBA near-tie in the odd-width output stage (research/d4/RGBA-CONTRACT.json)',
+    'aac-sce-in-stereo.adts': 'FFmpeg leaves the FR plane of SCE-only frames unwritten (stale pooled buffer); ours is silent there (harness/codecs/aac/STATUS.md)',
+    'ac3': 'AC-3/E-AC-3 dither and SPX/AHT noise: FFmpeg random generator (harness/codecs/STATUS.md)',
+    'eac3': 'AC-3/E-AC-3 dither and SPX/AHT noise: FFmpeg random generator (harness/codecs/STATUS.md)',
+    'test8b43.264': 'RGBA near-tie in the reference horizontal filter coefficients (harness/codecs/rgba-contract.json)',
+    'DELTAQP_A_BRCM_4.bit': 'RGBA near-tie in the reference horizontal filter coefficients (harness/codecs/rgba-contract.json)',
+    'PICSIZE_A_Bossen_1.bit': 'RGBA near-tie in the odd-width output stage (harness/codecs/rgba-contract.json)',
 }
 
 

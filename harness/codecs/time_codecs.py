@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""D4 paired TIME collection (research tooling).
+"""Paired codec timing collection (research tooling).
 
 The frozen H0 primitives (harness/runner.py: execute, cpu_snapshot/active_cpu,
 competing_builds, ratio_interval, benchmark lock, module-absence guard) with the

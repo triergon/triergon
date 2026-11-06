@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Compare interleaved f32le candidate vs reference per the D4 numeric rules.
+"""Compare interleaved f32le candidate vs reference per the codec numeric rules.
 usage: compare.py REF.f32 CAND.f32 CHANNELS [--json]"""
 import sys, json
 import numpy as np

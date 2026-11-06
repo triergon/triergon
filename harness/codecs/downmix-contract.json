@@ -7,7 +7,7 @@
     "ffmpeg_sha256": "a3753a1af481513374d69d4bfc13fdb017e0b29e8d725e96ff3144db6b684072",
     "host": "AWS c8g.xlarge Graviton4, Ubuntu 24.04, kernel 7.0.0-1014-aws, gcc 13.3.0",
     "command": "ffmpeg -f <ac3|eac3|aac|dts> -i pipe:0 -vn -ac 2 -f pulse|alsa  (both muxers default to pcm_s16le)",
-    "observations": ["research/d4/downmix-observations-linux-arm64.json", "research/d4/downmix-rounding-linux-arm64.json"]
+    "observations": ["harness/codecs/downmix-observations-linux-arm64.json", "harness/codecs/downmix-rounding-linux-arm64.json"]
   },
   "matrix": {
     "source": "the resampler's own reported matrix for every multichannel vector (native debug log)",
@@ -37,7 +37,7 @@
   "sample_conversion": {
     "rule": "s16 = clamp(floor(mixed * 32768)), mixing in float32",
     "evidence": "best fit on all 12 observed vectors: mismatch fraction 1e-6 .. 1.3e-3, never more than 1 LSB (round-to-nearest mismatches ~50%)",
-    "tolerance": "per research/d4/NUMERIC-RULES.json audio_device_path: |diff| <= 1 LSB"
+    "tolerance": "per harness/codecs/numeric-rules.json audio_device_path: |diff| <= 1 LSB"
   },
   "rate": "decoder output rate, unchanged (no resampling in the device path; the sound server resamples)",
   "open": ["Dolby (Lt/Rt) is observed on one vector only; dual mono and 2/3-block E-AC-3 untested", "AAC PCE matrix-mixdown metadata is not exported by FFmpeg's decoder as downmix side data (defaults apply)"]

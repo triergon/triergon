@@ -2,7 +2,7 @@
 # Development oracle sweep (macOS, non-evidence): decodes every selected vector and every
 # synthetic scenario with examples/decode and compares against FFmpeg's float output of the
 # same core-only bytes. Scratch lives in target/agent-dca/.
-#   usage: research/d4/dca/run_all.sh [vectors|synth|all]
+#   usage: harness/codecs/dca/run_all.sh [vectors|synth|all]
 set -u
 R=$(cd "$(dirname "$0")/../../.." && pwd)
 T=$R/target/agent-dca
@@ -10,7 +10,7 @@ B=$T/release/examples
 FATE=$R/.research/m1d4/fate-suite/dts
 mode=${1:-all}
 cmp() { # ref out ch
-  python3 -I "$R/research/d4/dca/compare.py" "$1" "$2" "$3"
+  python3 -I "$R/harness/codecs/dca/compare.py" "$1" "$2" "$3"
 }
 row() { # name file
   local name=$1 f=$2 ref=$3

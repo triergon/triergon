@@ -44,7 +44,7 @@ pub enum Syntax {
     /// reduced-sample-rate AC-3 variants (half/quarter rate; RealAudio "dnet"). These are not in
     /// A/52:2018, whose Annex E 2.3.1.6 says to mute on them, but FFmpeg 9.0.2 decodes them with
     /// the bsid 8 syntax, the Table 5.18 frame size in bytes and the sample rate divided by 2/4
-    /// (black-box, research/d4/ac3/STATUS.md).
+    /// (black-box, harness/codecs/ac3/STATUS.md).
     Ac3,
     /// A/52 Annex E (bsid 11..=16).
     Eac3,
