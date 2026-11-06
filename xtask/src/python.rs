@@ -202,6 +202,18 @@ pub fn repr_str(text: &str) -> String {
     out
 }
 
+/// `repr()` of a list of strings.
+pub fn repr_strings<S: AsRef<str>>(items: &[S]) -> String {
+    format!(
+        "[{}]",
+        items
+            .iter()
+            .map(|s| repr_str(s.as_ref()))
+            .collect::<Vec<_>>()
+            .join(", ")
+    )
+}
+
 /// `datetime.now(timezone.utc).isoformat()`.
 pub fn utc_now() -> String {
     let now = SystemTime::now()
@@ -396,6 +408,11 @@ mod tests {
             repr(&crate::json::parse(r#"{"a": [1, 2.5, null, true, "it's"]}"#).unwrap()),
             r#"{'a': [1, 2.5, None, True, "it's"]}"#
         );
+    }
+
+    #[test]
+    fn reprs_string_lists_as_python() {
+        assert_eq!(repr_strings(&["a\\b", "c\td"]), r"['a\\b', 'c\td']");
     }
 
     #[test]

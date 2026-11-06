@@ -1,6 +1,8 @@
-//! `cargo xtask codecs`: correctness grading, its summary and paired timing of the codec crates against the pinned FFmpeg decoders.
+//! `cargo xtask codecs`: correctness grading, its summary, paired timing and
+//! output identities of the codec crates against the pinned FFmpeg decoders.
 
 pub mod correctness;
+pub mod equivalence;
 pub mod summary;
 pub mod timing;
 
@@ -17,7 +19,9 @@ pub const USAGE: &str = "usage: cargo xtask codecs <command>
                  classify a grading run against the declared lane selection
   time --candidate W --reference W --workloads F --root R --ledger F --out DIR --label L
        [--only ID,...] [--recollect-contaminated LABEL]
-                 paired timing of the decoder workloads (30 pairs, seed 280)";
+                 paired timing of the decoder workloads (30 pairs, seed 280)
+  equivalence --output F [--compare F] [--jobs N]
+                 record every decoder output identity; --compare checks an earlier record";
 
 /// `--name value` and `--name=value` options and positional arguments, as
 /// `argparse` accepts them; `switches` take no value.
@@ -76,6 +80,20 @@ impl Args {
     pub fn path(&self, name: &str) -> Result<PathBuf, String> {
         self.required(name).map(PathBuf::from)
     }
+
+    pub fn number(&self, name: &str) -> Result<Option<usize>, String> {
+        self.get(name)
+            .map(|v| {
+                v.parse()
+                    .map_err(|_| format!("--{name}: not a number: {v}"))
+            })
+            .transpose()
+    }
+}
+
+/// Worker threads when `--jobs` is not given: one per CPU.
+pub fn default_jobs() -> usize {
+    std::thread::available_parallelism().map_or(1, std::num::NonZero::get)
 }
 
 /// Run one `codecs` command; the result is the process exit code.
@@ -155,6 +173,15 @@ pub fn main(root: &Path, args: &[String]) -> Result<i32, String> {
                     .filter(|o| !o.is_empty())
                     .map(str::to_owned),
             })?;
+        }
+        "equivalence" => {
+            let a = Args::parse(rest, &["output", "compare", "jobs"], &[])?;
+            return equivalence::run(
+                root,
+                &a.path("output")?,
+                a.get("compare").map(Path::new),
+                a.number("jobs")?.unwrap_or_else(default_jobs),
+            );
         }
         _ => return Err(USAGE.to_owned()),
     }

@@ -73,7 +73,7 @@ commands:
                  compare one input across a candidate and a reference worker
   fate-inventory --source DIR --output FILE [--configured-list FILE]
                  index FATE definitions as data; nothing is executed
-  codecs         manifest|grade|summarize|time   codec crates against the
+  codecs         manifest|grade|summarize|time|equivalence   codec crates against the
                  pinned FFmpeg decoders (see `cargo xtask codecs --help`)";
 
 fn main() -> ExitCode {
