@@ -13,7 +13,7 @@ use crate::matroska::typed::{
 use crate::{
     Error, Limits, Result, ebml,
     incremental::{
-        ClusterCheckpoint, ElementEvent, ElementHeader, ElementReader, ParseStep,
+        Admit, ClusterCheckpoint, ElementEvent, ElementHeader, ElementReader, ParseStep,
         typed_bridge::{
             CompactElementEvent, CompactEnvelopeProgress as EnvelopeProgress, ReplayLocation,
         },
@@ -952,15 +952,16 @@ impl Reader {
                         self.envelope.set_scan_remaining(remaining);
                     }
                     let before = self.envelope.position();
-                    // A collected block needs only the admission work unit.
-                    // Keep the header boundary for seek stops and scan debits.
-                    let ordinary_blocks =
-                        stop.is_none() && !scan_prefix && self.scan_remaining.is_none();
-                    let progress = self.envelope.step_typed_compact_after_input_health(
-                        ordinary_blocks,
-                        work,
-                        cancel,
-                    );
+                    // A scan with a stop offset needs the header boundary to
+                    // check whether the whole block fits before that offset.
+                    let admit = match (stop, scan_prefix, self.scan_remaining) {
+                        (None, true, _) => Admit::ScanSimpleBlocks,
+                        (None, false, None) => Admit::OrdinaryBlocks,
+                        _ => Admit::Pause,
+                    };
+                    let progress = self
+                        .envelope
+                        .step_typed_compact_after_input_health(admit, work, cancel);
                     if let Err(error) = self.record_demux_read(before) {
                         self.envelope.discard_compact_leaf();
                         return Err(error);
@@ -1313,9 +1314,11 @@ impl Reader {
                             self.envelope.set_scan_remaining(remaining);
                         }
                         let before = self.envelope.position();
-                        let progress = self
-                            .envelope
-                            .step_typed_compact_after_input_health(false, work, cancel);
+                        let progress = self.envelope.step_typed_compact_after_input_health(
+                            Admit::Pause,
+                            work,
+                            cancel,
+                        );
                         if let Err(error) = Self::record_demux_bytes(
                             &mut self.scan_remaining,
                             &mut self.demux_read_bytes,
@@ -1349,7 +1352,13 @@ impl Reader {
                         cancel,
                     )? {
                         ParseStep::Event(drain) => {
-                            self.envelope.resolve_scan_prefix(header, drain)?;
+                            if self
+                                .envelope
+                                .resolve_scan_prefix(header, drain, work, cancel)?
+                            {
+                                job.finish();
+                                return Ok(ParseStep::Yield);
+                            }
                             if !drain {
                                 self.state = State::Envelope;
                             }

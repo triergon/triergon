@@ -2,8 +2,8 @@
 //! There is still exactly one core InputCursor, no second buffered I/O layer.
 //! Internal ranges keep generation; the explicit seek transition resets once.
 use super::{
-    CLUSTER, ClusterCheckpoint, EBML, ElementHeader, ElementReader, Master, ParseStep, Phase,
-    SEGMENT, ScanBody, is_level_one,
+    Admit, CLUSTER, ClusterCheckpoint, EBML, ElementHeader, ElementReader, Master, ParseStep,
+    Phase, SEGMENT, ScanBody, is_level_one,
 };
 use crate::matroska::typed::syntax::Required;
 use crate::{Error, Result};
@@ -120,20 +120,15 @@ impl ElementReader {
         cancel: &AtomicBool,
     ) -> Result<CompactEnvelopeProgress> {
         self.healthy_for_job(work, cancel)?;
-        self.step_typed_compact_after_input_health(false, work, cancel)
+        self.step_typed_compact_after_input_health(Admit::Pause, work, cancel)
     }
 
     pub(crate) fn step_typed_compact_after_input_health(
         &mut self,
-        ordinary_blocks: bool,
+        admit: Admit,
         work: &mut WorkBudget,
         cancel: &AtomicBool,
     ) -> Result<CompactEnvelopeProgress> {
-        let admit = if ordinary_blocks {
-            super::Admit::OrdinaryBlocks
-        } else {
-            super::Admit::Pause
-        };
         let step = self.step_after_input_health::<CompactDelivery>(work, cancel, admit)?;
         if matches!(step, ParseStep::Yield)
             && let Some(header) = self.awaiting_typed_admission()
@@ -237,13 +232,29 @@ impl ElementReader {
         Ok(&bytes[..bytes.len().min(11)])
     }
     /// Rejection keeps the exact span/direct/builder decision and all source
-    /// bytes. It never retries the prefix or exposes an early syntax error.
-    pub(crate) fn resolve_scan_prefix(&mut self, header: ElementHeader, drain: bool) -> Result<()> {
+    /// bytes. Acceptance can finish a fully read body with one work unit.
+    pub(crate) fn resolve_scan_prefix(
+        &mut self,
+        header: ElementHeader,
+        drain: bool,
+        work: &mut WorkBudget,
+        cancel: &AtomicBool,
+    ) -> Result<bool> {
         let Phase::Body(body) = &mut self.phase else {
             return Err(Error::Invalid("no pending scan prefix"));
         };
         if body.header != header || body.scan != ScanBody::Prefix {
             return Err(Error::Invalid("scan prefix identity changed"));
+        }
+        if drain && body.remaining == 0 && work.remaining() != 0 {
+            // Dropping the completed body releases its retained input before
+            // cancellation, just as the incremental drain does.
+            self.phase = Phase::Between;
+            Self::check_input_cancel(&mut self.input, cancel)?;
+            let consumed = work.take(1);
+            debug_assert_eq!(consumed, 1);
+            self.scan_left = self.limits.scan_bytes;
+            return Ok(true);
         }
         body.scan = if drain {
             ScanBody::Drain
@@ -258,10 +269,9 @@ impl ElementReader {
             body.buffer = None;
             body.copied = 0;
         }
-        Ok(())
+        Ok(false)
     }
-    /// A distinct, already work-charged private completion. No public event,
-    /// owner, packet or location is fabricated by discarding the opaque body.
+    /// Complete a scan drain after the envelope charges its final work unit.
     pub(crate) fn finish_scanned_leaf(&mut self, header: ElementHeader) -> Result<bool> {
         let Phase::Body(body) = &self.phase else {
             return Err(Error::Invalid("missing scan drain body"));
