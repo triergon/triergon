@@ -8,7 +8,9 @@ use super::{
 use crate::{AvcConfigArrayKind, Codec, NalHeader};
 use std::ops::ControlFlow;
 use std::sync::atomic::{AtomicBool, Ordering};
-use triergon_core::{Budget, Bytes, Error, Result, SourceId, SourceLocation, WorkBudget};
+use triergon_core::{
+    Budget, BudgetVec, Bytes, Error, Result, SourceId, SourceLocation, WorkBudget,
+};
 
 /// Outcome of one phase step.
 type Step = ControlFlow<NalPacketProgress>;
@@ -32,8 +34,8 @@ impl<M, S: PacketSegment, C: PacketConfig> PacketJob<'_, M, S, C> {
             let step = match self.phase {
                 Phase::Verify => self.verify_update(work)?,
                 Phase::Arrays => self.check_arrays(work)?,
-                Phase::Lookahead => self.lookahead(work)?,
-                Phase::Scan => self.scan_nal(work)?,
+                Phase::Lookahead => self.lookahead(work, cancel)?,
+                Phase::Scan => self.scan_nal(work, cancel)?,
                 Phase::Inject => self.inject_configuration(work)?,
                 Phase::Nal => self.append_nal(work)?,
                 Phase::Reserve => self.reserve_output(work)?,
@@ -75,11 +77,13 @@ impl<M, S: PacketSegment, C: PacketConfig> PacketJob<'_, M, S, C> {
                 }
                 work.take(count as u64);
                 self.verify += count;
-                return Ok(NEXT);
+                if self.verify < raw.len() {
+                    return Ok(NEXT);
+                }
             }
         }
         self.update_verified = true;
-        self.phase = Phase::Arrays;
+        self.phase = Phase::Scan;
         Ok(NEXT)
     }
 
@@ -95,7 +99,7 @@ impl<M, S: PacketSegment, C: PacketConfig> PacketJob<'_, M, S, C> {
             self.array += 1;
             return Ok(NEXT);
         }
-        self.phase = if self.codec == Codec::Hevc && self.length_width.is_some() {
+        self.phase = if self.length_width.is_some() {
             Phase::Lookahead
         } else {
             Phase::Scan
@@ -104,7 +108,7 @@ impl<M, S: PacketSegment, C: PacketConfig> PacketJob<'_, M, S, C> {
     }
 
     #[inline]
-    fn lookahead(&mut self, work: &mut WorkBudget) -> Result<Step> {
+    fn lookahead(&mut self, work: &mut WorkBudget, cancel: &AtomicBool) -> Result<Step> {
         let source = self
             .source
             .as_ref()
@@ -141,7 +145,12 @@ impl<M, S: PacketSegment, C: PacketConfig> PacketJob<'_, M, S, C> {
             }
             self.look_offset += count;
             self.look_prefix += count;
-            return Ok(NEXT);
+            if self.look_prefix < width {
+                return Ok(NEXT);
+            }
+            if cancel.load(Ordering::Relaxed) {
+                return Err(Error::Cancelled);
+            }
         }
         if !work.try_charge(1) {
             return Ok(YIELD);
@@ -182,7 +191,7 @@ impl<M, S: PacketSegment, C: PacketConfig> PacketJob<'_, M, S, C> {
     }
 
     #[inline]
-    fn scan_nal(&mut self, work: &mut WorkBudget) -> Result<Step> {
+    fn scan_nal(&mut self, work: &mut WorkBudget, cancel: &AtomicBool) -> Result<Step> {
         let source = self
             .source
             .as_ref()
@@ -228,7 +237,12 @@ impl<M, S: PacketSegment, C: PacketConfig> PacketJob<'_, M, S, C> {
             }
             self.offset += count;
             self.prefix_read += count;
-            return Ok(NEXT);
+            if self.prefix_read < width {
+                return Ok(NEXT);
+            }
+            if cancel.load(Ordering::Relaxed) {
+                return Err(Error::Cancelled);
+            }
         }
         if !work.try_charge(1) {
             return Ok(YIELD);
@@ -354,21 +368,15 @@ impl<M, S: PacketSegment, C: PacketConfig> PacketJob<'_, M, S, C> {
         if !work.try_charge(1) {
             return Ok(YIELD);
         }
-        let next = self.config().config_nal(index).map(|n| {
+        if let Some(n) = self.config().config_nal(index) {
             let selected = match (n.kind, which) {
                 (None, _) => true,
                 (Some(kind), Injection::All) => kind != AvcConfigArrayKind::SequenceExtension,
                 (Some(kind), Injection::Sps) => kind == AvcConfigArrayKind::Sequence,
                 (Some(kind), Injection::Pps) => kind == AvcConfigArrayKind::Picture,
             };
-            (
-                selected,
-                S::configuration(n.owner, index, n.range, self.total),
-            )
-        });
-        if let Some((selected, segment)) = next {
             if selected {
-                self.append(segment)?;
+                self.append(S::configuration(n.owner, index, n.range, self.total))?;
             }
             self.injection = Some((which, index + 1));
         } else {
@@ -418,8 +426,7 @@ impl<M, S: PacketSegment, C: PacketConfig> PacketJob<'_, M, S, C> {
         if !work.try_charge(1) {
             return Ok(YIELD);
         }
-        // A passthrough packet already has its immutable payload
-        // owner. Keep that owner and its charge instead of copying.
+        // A passthrough packet can share its charged payload.
         if self.length_width.is_none() {
             self.phase = Phase::Freeze;
             return Ok(NEXT);
@@ -436,8 +443,7 @@ impl<M, S: PacketSegment, C: PacketConfig> PacketJob<'_, M, S, C> {
             });
         }
         self.output
-            .as_mut()
-            .ok_or(Error::Invalid("missing packet buffer"))?
+            .get_or_insert_with(|| BudgetVec::new(&self.session.pool))
             .try_reserve_exact(self.total)?;
         self.phase = Phase::Copy;
         Ok(NEXT)
@@ -449,17 +455,14 @@ impl<M, S: PacketSegment, C: PacketConfig> PacketJob<'_, M, S, C> {
         // cancellation check precedes every unit after the first, and
         // every yield, charge and error is unchanged. Only the phase
         // dispatch between units is skipped.
-        let parts = self
-            .segments
-            .as_ref()
-            .ok_or(Error::Invalid("missing packet plan"))?;
+        let parts = self.segments.as_ref().map_or(&[][..], BudgetVec::as_slice);
         let mut first = true;
         loop {
             if !first && cancel.load(Ordering::Relaxed) {
                 return Err(Error::Cancelled);
             }
             first = false;
-            let Some(p) = parts.as_slice().get(self.copy_segment) else {
+            let Some(p) = parts.get(self.copy_segment) else {
                 self.phase = Phase::Freeze;
                 break;
             };
@@ -519,18 +522,17 @@ impl<M, S: PacketSegment, C: PacketConfig> PacketJob<'_, M, S, C> {
         if !work.try_charge(1) {
             return Ok(YIELD);
         }
-        let b = self
-            .output
-            .take()
-            .ok_or(Error::Invalid("missing packet buffer"))?;
         let bytes = if self.length_width.is_none() {
-            drop(b);
             self.source
                 .as_ref()
                 .ok_or(Error::Invalid("missing packet source"))?
                 .bytes
                 .clone()
         } else {
+            let b = self
+                .output
+                .take()
+                .ok_or(Error::Invalid("missing packet buffer"))?;
             match b.freeze() {
                 Ok(v) => v,
                 Err(e) => {
@@ -574,7 +576,7 @@ impl<M, S: PacketSegment, C: PacketConfig> PacketJob<'_, M, S, C> {
             segments: self
                 .segments
                 .take()
-                .ok_or(Error::Invalid("missing packet plan"))?,
+                .unwrap_or_else(|| BudgetVec::new(&self.session.pool)),
             receiver_epoch: self.epoch,
             forward_new_extradata,
         }));

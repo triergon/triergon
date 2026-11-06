@@ -614,14 +614,17 @@ impl<C> NalPacketSession<C> {
         } else {
             self.avc
         };
-        // Both vectors are created before the session borrow moves into the job,
-        // so no extra pool handle is cloned per packet.
         let length_width = avc_update
             .as_ref()
             .unwrap_or(&self.configuration)
             .length_width();
-        let segments = BudgetVec::new(&self.pool);
-        let output = BudgetVec::new(&self.pool);
+        let phase = if changes {
+            Phase::Verify
+        } else if codec == Codec::Hevc {
+            Phase::Arrays
+        } else {
+            Phase::Scan
+        };
         Ok(PacketJob {
             session: self,
             source: Some(source),
@@ -630,7 +633,7 @@ impl<C> NalPacketSession<C> {
             length_width,
             avc,
             epoch,
-            phase: Phase::Verify,
+            phase,
             verify: 0,
             update_verified: false,
             array: 0,
@@ -648,8 +651,8 @@ impl<C> NalPacketSession<C> {
             look_nals: 0,
             live_base: None,
             segment_hint: None,
-            segments: Some(segments),
-            output: Some(output),
+            segments: None,
+            output: None,
             total: 0,
             copy_segment: 0,
             copied: 0,
@@ -1190,17 +1193,14 @@ impl<M, S: PacketSegment, C: PacketConfig> PacketJob<'_, M, S, C> {
         Ok(total)
     }
     fn append(&mut self, segment: S) -> Result<()> {
-        let parts = self
-            .segments
-            .as_ref()
-            .ok_or(Error::Invalid("missing packet plan"))?;
-        if parts.len() == self.session.limits.maximum_segments {
+        let parts = self.segments.as_ref().map_or(0, BudgetVec::len);
+        if parts == self.session.limits.maximum_segments {
             return Err(Error::Limit {
-                requested: parts.len().saturating_add(1),
+                requested: parts.saturating_add(1),
                 maximum: self.session.limits.maximum_segments,
             });
         }
-        let count = parts.len().checked_add(1).ok_or(Error::Overflow)?;
+        let count = parts.checked_add(1).ok_or(Error::Overflow)?;
         let total = self
             .total
             .checked_add(usize::from(segment.prefix_bytes()))
@@ -1221,8 +1221,7 @@ impl<M, S: PacketSegment, C: PacketConfig> PacketJob<'_, M, S, C> {
         }
         let parts = self
             .segments
-            .as_mut()
-            .ok_or(Error::Invalid("missing packet plan"))?;
+            .get_or_insert_with(|| BudgetVec::new(&self.session.pool));
         if let Some(planned) = self.segment_hint.take().filter(|_| parts.capacity() == 0) {
             // Exact first allocation instead of the default four slots. Any
             // refusal leaves the vector empty and try_push applies its own
