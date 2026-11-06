@@ -202,7 +202,7 @@ fn main_result(mut args: Vec<String>) -> Result<()> {
     }
     if mode == "identity" {
         println!(
-            "{{\"schema\":33,\"worker\":\"safe-media-isobmff-consumer34\",\"reference_api\":\"n9.0-public-mov\",\"native_seek\":\"bounded-aligned-native-view\",\"source_variant\":\"native37-profile-batch43-v2\",\"source_variant_sha256\":\"49d244ad58a4ea3c575dc5eebdba36edf86f27df1edb68949cd72566dcc479c9\",\"qualification\":false}}"
+            "{{\"schema\":33,\"worker\":\"triergon-isobmff-consumer\",\"reference_api\":\"n9.0-public-mov\",\"native_seek\":\"bounded-aligned-native-view\",\"source_variant\":\"native37-profile-batch43-v2\",\"source_variant_sha256\":\"49d244ad58a4ea3c575dc5eebdba36edf86f27df1edb68949cd72566dcc479c9\",\"qualification\":false}}"
         );
         return Ok(());
     }

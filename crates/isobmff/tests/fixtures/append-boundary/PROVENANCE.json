@@ -1,5 +1,5 @@
 {
-  "schema": "safe-media.m03.original-append-boundary-fixture-provenance.v1",
+  "schema": "triergon.isobmff.append-boundary-fixture-provenance.v1",
   "qualification": false,
   "authorship": "Exact copies of this lane original synthetic fixtures; no native/reference/third-party implementation code.",
   "reference_worker_sha256": "d97ce08126efe876cf92dfaac3655073da87fd8c590793a7d37ffd9e1fbea2d2",

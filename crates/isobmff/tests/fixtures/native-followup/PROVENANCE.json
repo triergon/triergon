@@ -1,5 +1,5 @@
 {
-  "schema": "safe-media.m03.native-followup-regression-fixtures.v1",
+  "schema": "triergon.isobmff.native-followup-regression-fixtures.v1",
   "qualification": false,
   "provenance": "Exact copies of original lane-authored bytes, independent source inspector/Fraction oracles and actual pinned scalar/native packet observations only; no copied implementation code.",
   "generator_sha256": "6a1bd12582d0bcfe868548d19994b840ea17c6d07902f3de847d0499a11057b8",

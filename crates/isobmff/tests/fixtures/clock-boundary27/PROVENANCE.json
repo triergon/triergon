@@ -1,5 +1,5 @@
 {
-  "schema": "safe-media.m03.clock27.regression-provenance.v1",
+  "schema": "triergon.isobmff.clock27-regression-provenance.v1",
   "qualification": false,
   "source": "Exact copies of three existing independently authored inputs; input hashes and all native rows come from preserved actual v9 outputs. Source proof from separate raw parser/integer/Fraction oracle, never candidate expectations.",
   "regression_artifact": ".research/parallel-mp4/implementation/clock-boundary27/existing-actual-v9-refusals.json",

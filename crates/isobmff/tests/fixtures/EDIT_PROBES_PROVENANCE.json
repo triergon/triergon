@@ -1,5 +1,5 @@
 {
-  "schema": "safe-media.m03.edit-fixtures.v1",
+  "schema": "triergon.isobmff.edit-fixtures.v1",
   "qualification": false,
   "request_sha256": "ed20009234746c953b77e6ef3d115b25cae877b00d6bf016171ae7cbf126f194",
   "native_observation_manifest_sha256": "d077d1d1d7d5595c302e6ecbb7ced097463f707f59a47f71a5434f19f59c1d3c",

@@ -1088,9 +1088,9 @@ fn run<W: Write>(
         window,
     )?;
     let schema = if physical_order {
-        "safe-media.m03.physical-source-trace.v1"
+        "triergon.isobmff.physical-source-trace.v1"
     } else {
-        "safe-media.m03.source-trace.v2"
+        "triergon.isobmff.source-trace.v2"
     };
     writeln!(
         out,

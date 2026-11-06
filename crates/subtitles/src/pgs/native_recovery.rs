@@ -12,7 +12,7 @@ use super::{
 use std::sync::atomic::{AtomicBool, Ordering};
 use triergon_core::{Budget, BudgetVec, Bytes, Error, Reservation, Result, WorkBudget};
 
-pub const NATIVE_RECOVERY: &str = "NativeD32-PGS-bounded-packet-recovery-v1";
+pub const NATIVE_RECOVERY: &str = "native-pgs-bounded-packet-recovery-v1";
 
 #[derive(Debug)]
 pub struct RecoveredRect {

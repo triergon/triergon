@@ -9,7 +9,7 @@ use super::{
 use std::sync::atomic::{AtomicBool, Ordering};
 use triergon_core::{Budget, BudgetVec, Bytes, Error, Result, WorkBudget};
 
-pub const NATIVE_PROJECTION: &str = "NativeD32-PGS-public-API-projection-v1";
+pub const NATIVE_PROJECTION: &str = "native-pgs-public-api-projection-v1";
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum NativeRasterOrigin {
