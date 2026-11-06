@@ -175,8 +175,7 @@ pub struct Mp4Engine {
     pub(crate) row: usize,
     indexed_sync: Option<(u32, usize)>,
     native_seek: Option<NativeMp4Replay>,
-    packet: Option<SampleReader>,
-    pending: Option<SourceRow>,
+    packet: Option<(usize, SampleReader)>,
     configs: [Option<CachedDescription>; 64],
     revision: u64,
     pub(crate) maximum_packet: usize,
@@ -521,7 +520,6 @@ impl Engine {
             indexed_sync: None,
             native_seek: None,
             packet: None,
-            pending: None,
             configs: [None; 64],
             revision: 0,
             maximum_packet,
@@ -1075,7 +1073,6 @@ impl Engine {
                 r.indexed_sync = indexed_sync;
                 r.native_seek = native_seek;
                 r.packet = None;
-                r.pending = None;
                 r.native_recovery_end = false;
                 r.configs = [None; 64];
             }
@@ -1187,27 +1184,20 @@ impl Mp4Engine {
         Ok(())
     }
 
-    fn packet_config(&self, row: &SourceRow) -> Result<(usize, Mp4Configuration)> {
-        let at_track = self
-            .plan
-            .tracks
-            .as_slice()
-            .iter()
-            .position(|t| t.snapshot.track_id == row.track_id)
-            .ok_or(Error::Invalid("sample track"))?;
+    fn packet_config(&self, at_track: usize, description: u32) -> Result<Mp4Configuration> {
         let revision = self.configs[at_track]
             .ok_or(Error::Invalid("configuration missing"))?
             .revision;
-        Ok((at_track, self.plan.config(row, revision)?))
+        self.plan.tracks.as_slice()[at_track].configuration(description, revision)
     }
 
     fn emit_packet(
         &mut self,
-        row: &SourceRow,
+        at_track: usize,
         source: SourcePacket,
         cursor: Option<&mut PacketCursor<'_>>,
     ) -> Result<BackendStep> {
-        let (at_track, cfg) = self.packet_config(row)?;
+        let cfg = self.packet_config(at_track, source.sample.description_index)?;
         let native = match cursor {
             Some(cursor) => Some(cursor.take_occurrence()?),
             None => self.plan.native(self.row).cloned(),
@@ -1225,7 +1215,7 @@ impl Mp4Engine {
                 self.plan
                     .native_front_read_boundary_v1()
                     .filter(|boundary| {
-                        boundary.track_id == row.track_id
+                        boundary.track_id == cfg.track.track_id
                             && boundary.source_ordinal == source.sample.ordinal
                             && boundary.source_offset == source.sample.range.start
                     });
@@ -1307,6 +1297,58 @@ impl Mp4Engine {
         }
     }
 
+    fn poll_packet(
+        &mut self,
+        w: &mut WorkBudget,
+        c: &AtomicBool,
+        cursor: Option<&mut Mov9PacketCursor<'_>>,
+    ) -> Result<BackendStep> {
+        let (at_track, reader) = self
+            .packet
+            .as_mut()
+            .ok_or(Error::Invalid("pending sample missing"))?;
+        let at_track = *at_track;
+        let step = if self.plan.native_recovery && self.plan.native(self.row).is_some() {
+            reader.poll_pinned_mov_recovery(&mut self.input, w, c, PinnedMovD32RegularRecoveryV1)?
+        } else {
+            match reader.poll(&mut self.input, w, c)? {
+                Step::Ready(packet) => Step::Ready(Mov9SampleRead::Complete(packet)),
+                Step::NeedInput(r) => Step::NeedInput(r),
+                Step::Yield => Step::Yield,
+                Step::End(at) => Step::End(at),
+            }
+        };
+        match step {
+            Step::Ready(Mov9SampleRead::Complete(source)) => {
+                let event = self.emit_packet(at_track, source, cursor)?;
+                self.packet = None;
+                Ok(event)
+            }
+            Step::Ready(Mov9SampleRead::Short(prefix)) => {
+                let configuration =
+                    self.packet_config(at_track, prefix.declared.description_index)?;
+                let mut native = self
+                    .plan
+                    .native(self.row)
+                    .ok_or(Error::Invalid("short packet needs native occurrence"))?
+                    .clone();
+                native.native.flags |= 2;
+                self.packet = None;
+                self.native_recovery_end = true;
+                Ok(BackendStep::Event(RawEvent::Mp4(
+                    Mp4Event::NativeShortPacket(Mp4NativeShortPacket {
+                        prefix,
+                        configuration,
+                        native,
+                    }),
+                )))
+            }
+            Step::NeedInput(r) => Ok(BackendStep::NeedInput(r)),
+            Step::Yield => Ok(BackendStep::Yield),
+            Step::End(_) => Err(Error::Truncated),
+        }
+    }
+
     // Keep backend-specific polling workspaces out of the shared dispatcher.
     #[inline(never)]
     fn poll(
@@ -1353,53 +1395,8 @@ impl Mp4Engine {
                 Step::End(_) => Err(Error::Truncated),
             };
         }
-        if let Some(reader) = self.packet.as_mut() {
-            let step = if self.plan.native_recovery && self.plan.native(self.row).is_some() {
-                reader.poll_recovery(&mut self.input, w, c, RunRecoveryProfile)?
-            } else {
-                match reader.poll(&mut self.input, w, c)? {
-                    Step::Ready(packet) => Step::Ready(RecoverySampleRead::Complete(packet)),
-                    Step::NeedInput(r) => Step::NeedInput(r),
-                    Step::Yield => Step::Yield,
-                    Step::End(at) => Step::End(at),
-                }
-            };
-            return match step {
-                Step::Ready(RecoverySampleRead::Complete(source)) => {
-                    let row = self
-                        .pending
-                        .take()
-                        .ok_or(Error::Invalid("pending sample missing"))?;
-                    let event = self.emit_packet(&row, source, cursor)?;
-                    self.packet = None;
-                    Ok(event)
-                }
-                Step::Ready(RecoverySampleRead::Short(prefix)) => {
-                    let row = self
-                        .pending
-                        .take()
-                        .ok_or(Error::Invalid("pending sample missing"))?;
-                    let (_, configuration) = self.packet_config(&row)?;
-                    let mut native = self
-                        .plan
-                        .native(self.row)
-                        .ok_or(Error::Invalid("short packet needs native occurrence"))?
-                        .clone();
-                    native.demux.flags |= 2;
-                    self.packet = None;
-                    self.native_recovery_end = true;
-                    Ok(BackendStep::Event(RawEvent::Mp4(
-                        Mp4Event::NativeShortPacket(Mp4NativeShortPacket {
-                            prefix,
-                            configuration,
-                            native,
-                        }),
-                    )))
-                }
-                Step::NeedInput(r) => Ok(BackendStep::NeedInput(r)),
-                Step::Yield => Ok(BackendStep::Yield),
-                Step::End(_) => Err(Error::Truncated),
-            };
+        if self.packet.is_some() {
+            return self.poll_packet(w, c, cursor);
         }
         if let Some(replay) = &mut self.native_seek {
             match replay.poll(self.plan.native_rows(), w, c)? {
@@ -1472,7 +1469,8 @@ impl Mp4Engine {
         if changed {
             w.take(1);
             let revision = self.revision.checked_add(1).ok_or(Error::Overflow)?;
-            let cfg = self.plan.config(&row, revision)?;
+            let cfg = self.plan.tracks.as_slice()[at]
+                .configuration(row.sample.description_index, revision)?;
             self.configs[at] = Some(CachedDescription {
                 track: row.track_id,
                 description: row.sample.description_index,
@@ -1512,7 +1510,7 @@ impl Mp4Engine {
                     source: self.input.source(),
                     token: self.input.token(),
                 };
-                return self.emit_packet(&row, source, cursor);
+                return self.emit_packet(at, source, cursor);
             }
             return Err(Error::Unsupported(
                 "sequential source sample bytes already passed",
@@ -1535,7 +1533,7 @@ impl Mp4Engine {
         let packet = if self.plan.native_recovery && self.plan.native(self.row).is_some() {
             SampleReader::new_recovery(
                 &mut self.input,
-                row.sample.clone(),
+                row.sample,
                 media,
                 self.maximum_packet,
                 RunRecoveryProfile,
@@ -1544,21 +1542,23 @@ impl Mp4Engine {
             match media {
                 RecoverySampleExtent::Finite(extent) => SampleReader::new_with_shared_window(
                     &mut self.input,
-                    row.sample.clone(),
+                    row.sample,
                     extent,
                     self.maximum_packet,
                 )?,
                 RecoverySampleExtent::Terminal(terminal) => SampleReader::new_terminal_mdat(
                     &mut self.input,
-                    row.sample.clone(),
+                    row.sample,
                     terminal,
                     self.maximum_packet,
                 )?,
             }
         };
-        self.packet = Some(packet);
-        self.pending = Some(row);
-        Ok(BackendStep::Yield)
+        self.packet = Some((at, packet));
+        if w.remaining() == 0 {
+            return Ok(BackendStep::Yield);
+        }
+        self.poll_packet(w, c, cursor)
     }
 }
 impl TsEngine {
