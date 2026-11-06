@@ -9,19 +9,23 @@ output order, single-threaded. It does not scale, convert colour or conceal erro
 ## Usage
 
 ```rust
-use triergon_codec_hevc::{AccessUnitSplitter, Decoder, Row};
+use triergon_codec_hevc::{AccessUnitSplitter, DecodeError, Decoder, Row};
 
-let mut dec = Decoder::new();
-for au in AccessUnitSplitter::new(&stream) {
-    dec.send(au, None)?;               // one Annex B access unit, opaque Option<i64> pts
-    while let Some(pic) = dec.receive() {
-        match pic.planes[0].row(0) {   // Row::U8 for 8-bit, Row::U16 for 10-bit
-            Row::U8(r) => { /* ... */ }
-            Row::U16(r) => { /* ... */ }
+fn decode_stream(stream: &[u8]) -> Result<(), DecodeError> {
+    let mut dec = Decoder::new();
+    for au in AccessUnitSplitter::new(stream) {
+        dec.send(au, None)?;               // one Annex B access unit, opaque Option<i64> pts
+        while let Some(pic) = dec.receive() {
+            match pic.planes[0].row(0) {   // Row::U8 for 8-bit, Row::U16 for 10-bit
+                Row::U8(r) => { /* ... */ }
+                Row::U16(r) => { /* ... */ }
+            }
         }
     }
+    dec.flush();                           // end of stream: output the remaining pictures
+    while let Some(pic) = dec.receive() { /* ... */ }
+    Ok(())
 }
-dec.flush();                           // end of stream: output the remaining pictures
 ```
 
 `send_nal` takes one NAL unit without start code; `reset` drops the DPB and any partial

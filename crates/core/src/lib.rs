@@ -1,4 +1,4 @@
-//! Shared media primitives. Experimental.
+#![doc = include_str!("../README.md")]
 #![forbid(unsafe_code)]
 #![warn(
     missing_debug_implementations,

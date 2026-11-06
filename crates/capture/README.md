@@ -13,10 +13,13 @@ caller.
 ```rust
 use triergon_capture::{Session, SessionConfig, pixel::Orientation};
 
-let mut session = Session::open(&SessionConfig::with_rate_rule(960, 540, 2_500_000))?;
+let mut session = Session::open(&SessionConfig::with_rate_rule(320, 180, 500_000))?;
+let rgba = vec![0u8; 320 * 180 * 4];           // one frame from the caller
 let mut out = Vec::new();                       // any `Sink`
 let report = session.encode(&rgba, Orientation::BottomUp, &mut out)?;
 // `out` holds this frame's complete TS bytes; report.picture (EncodedPicture), report.ts_bytes
+assert!(report.picture.key && out.len() == report.ts_bytes && out.len() % 188 == 0);
+# Ok::<(), triergon_capture::CaptureError>(())
 ```
 
 `SessionConfig` holds `width`, `height`, `bit_rate`, `max_rate`, `vbv_bits`, `gop` and

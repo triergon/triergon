@@ -16,14 +16,17 @@ Blocking `std::io` adapter:
 use std::{fs::File, sync::atomic::AtomicBool};
 use triergon_matroska::{Limits, typed::BlockingReader};
 
+# let path = concat!(env!("CARGO_MANIFEST_DIR"), "/tests/fixtures/seek/cues-front.mkv");
 let cancel = AtomicBool::new(false);
 let mut reader = BlockingReader::open_seekable(File::open(path)?, Limits::default())?;
-for track in reader.tracks() { /* codec, codec_private, colour, languages … */ }
-reader.seek_for_playback(video_index, 90_000_000_000, &cancel)?; // SeekReceipt
+for track in reader.tracks() { /* number, kind, codec, codec_private, colour, languages … */ }
+let video = reader.tracks().iter().position(|t| t.kind == 1).ok_or("no video track")?;
+let receipt = reader.seek_for_playback(video, 1_000_000_000, &cancel)?; // SeekReceipt
 while let Some(p) = reader.next_typed_packet(&cancel)? {
     // p.packet: track, pts_ns, duration_ns, keyframe, data, timing
     // p.configuration: active track configuration; p.group: BlockGroup side data
 }
+# Ok::<(), Box<dyn std::error::Error>>(())
 ```
 
 `open`/`open_in` accept any `Read` (sequential, no seeking); `open_seekable*`
@@ -32,23 +35,39 @@ packets alias the input allocation. The `*_in` variants share a caller `Budget`.
 `next_packet` returns the plain `matroska::Packet` and refuses packets that carry
 block additions or CodecState; use `next_typed_packet` for those.
 
+`examples/matroska_packets.rs FILE` prints the tracks and packets of a file.
+
 Push / poll reader (no I/O; the caller supplies bytes):
 
 ```rust
-use triergon_core::{Step, WorkBudget};
+use std::sync::atomic::AtomicBool;
+use triergon_core::{Budget, Bytes, InputWindow, SourceCapabilities, SourceId, Step, WorkBudget};
 use triergon_matroska::{Limits, typed::{Event, Reader}};
 
-let mut reader = Reader::new(&pool, source_id, caps, Limits::default(), 64 * 1024)?;
+# let path = concat!(env!("CARGO_MANIFEST_DIR"), "/tests/fixtures/seek/cues-front.mkv");
+let file = std::fs::read(path)?;                     // any transport; the reader does no I/O
+let pool = Budget::new(Limits::default().live_storage_bytes)?;
+let caps = SourceCapabilities { length: Some(file.len() as u64), random_access: true };
+let mut reader = Reader::new(&pool, SourceId(1), caps, Limits::default(), 64 * 1024)?;
+let cancel = AtomicBool::new(false);
+let mut work = WorkBudget::new(1 << 16);
 loop {
     match reader.step(&mut work, &cancel)? {         // Step<Event, Backpressure>
-        Step::NeedInput(req) => reader.provide(&window_for(req))?, // or reader.finish(..)
-        Step::Yield => work = WorkBudget::new(STEP),
+        Step::NeedInput(req) => match file.get(usize::try_from(req.offset)?..) {
+            Some(rest) if !rest.is_empty() => {
+                let bytes = Bytes::copy_from_slice(&pool, &rest[..rest.len().min(req.maximum)])?;
+                reader.provide(&InputWindow::new(req.source, req.token, req.offset, bytes)?)?;
+            }
+            _ => reader.finish(req.source, req.token)?,
+        },
+        Step::Yield => work = WorkBudget::new(1 << 16),
         Step::Backpressure(_) => { /* release retained packets, retry */ }
-        Step::Ready(Event::Packet(p)) => consume(p),
+        Step::Ready(Event::Packet(p)) => { /* p.packet: track, pts_ns, keyframe, data */ }
         Step::Ready(_) => {} // Envelope, Configuration, Document, Seek
         Step::End(_) => break, // end of the Segment
     }
 }
+# Ok::<(), Box<dyn std::error::Error>>(())
 ```
 
 `Reader::seek_previous` / `seek_for_playback` return the first `InputRequest`;

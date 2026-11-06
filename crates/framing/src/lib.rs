@@ -1,9 +1,4 @@
-//! Bounded NAL/OBU framing, AV1/VP9 records and AC-3/E-AC-3 source facts.
-//!
-//! The fixed NAL reader preserves encoded bytes and source coordinates.
-//! The raw reader groups NALs using access-unit boundary syntax. A separate
-//! pinned native packet view can inject configuration NALs while retaining source.
-//! See `README.md` for the exact configuration and validation boundary.
+#![doc = include_str!("../README.md")]
 #![forbid(unsafe_code)]
 #![warn(
     clippy::print_stdout,

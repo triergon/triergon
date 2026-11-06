@@ -1,8 +1,4 @@
-//! Independently authored, bounded MPEG-TS syntax and assembly.
-//!
-//! Transport packets, PSI sections and PES byte runs are distinct outputs. A PES
-//! is NOT a codec access unit. Access-unit framing, source I/O tokens, exact rational
-//! time and seeking belong to other crates.
+#![doc = include_str!("../README.md")]
 #![forbid(unsafe_code)]
 #![warn(
     missing_debug_implementations,

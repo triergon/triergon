@@ -1,14 +1,4 @@
-//! Pixel formats and conversions shared by the capture and playback sides.
-//!
-//! [`Picture`] is a planar YUV 4:2:0 picture at a macroblock-aligned coded
-//! size. [`convert`] turns caller RGBA into it with ITU-R BT.601 limited-range
-//! coefficients.
-//!
-//! [`PictureView`] borrows a decoder's output picture; [`letterbox`] fits one
-//! into the 1920x1080 RGBA canvas of the desktop session exactly as the
-//! reference scaler chain does.
-//!
-//! Experimental.
+#![doc = include_str!("../README.md")]
 #![forbid(unsafe_code)]
 #![warn(
     missing_debug_implementations,

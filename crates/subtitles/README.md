@@ -17,18 +17,45 @@ work exhaustion (`Yield`) and output pressure (`NeedOutput`) are distinct,
 resumable states. Rejected input is handed back unchanged.
 
 ```rust
-use triergon_subtitles::text::{Event, Extractor, Input, Limits, Status};
+use std::sync::atomic::AtomicBool;
+use triergon_core::{Budget, Bytes, SourceId, Time, WorkBudget};
+use triergon_subtitles::text::{Encoding, Event, Extractor, Format, Input, Limits, Status, Timing};
 
-let mut extractor = Extractor::new(&pool, Limits::default(), generation);
-extractor.provide(input)?;                 // one complete document or sample
+let pool = Budget::new(1 << 20)?;
+let cancel = AtomicBool::new(false);
+let srt = b"1\n00:00:01,000 --> 00:00:02,500\nHello\n\n";
+let input = Input {
+    format: Format::SubRip,
+    encoding: Encoding::Utf8, // stated by the caller, never guessed
+    payload: Bytes::copy_from_slice(&pool, srt)?,
+    codec_id: None,
+    codec_private: None,
+    charset_label: None,
+    addition: None,
+    timing: Timing::unknown(), // a whole document carries its own cue times
+    source_id: SourceId(1),
+    generation: 0,
+    sequence: 0,
+    configuration_epoch: 0,
+    container_position: None,
+};
+let mut extractor = Extractor::new(&pool, Limits::default(), 0);
+extractor.provide(input).map_err(|rejected| rejected.error)?; // one complete document or sample
+extractor.finish_input();
+let mut cues = Vec::new();
 loop {
     match extractor.step(&mut WorkBudget::new(4096), &cancel)? {
-        Status::Event(Event::Cue(cue)) => show(cue.start, cue.end, cue.decoded_utf8),
+        Status::Event(Event::Cue(cue)) => cues.push(cue),
         Status::Event(Event::Metadata(_)) | Status::Yield => {}
-        Status::NeedOutput => release_held_output(),
+        Status::NeedOutput => { /* release held output, then step again */ }
         Status::NeedInput | Status::Finished => break,
     }
 }
+assert_eq!(cues.len(), 1);
+assert_eq!(cues[0].start, Some(Time::new(1, 1)?));
+assert_eq!(cues[0].end, Some(Time::new(5, 2)?));
+assert_eq!(cues[0].decoded_utf8.as_deref(), Some(&b"Hello"[..]));
+# Ok::<(), Box<dyn std::error::Error>>(())
 ```
 
 Bitmap decoders follow the same shape: `pgs::DisplayDecoder::push(packet, clock,

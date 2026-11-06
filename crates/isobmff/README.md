@@ -26,28 +26,93 @@ flag) and returns `Yield`, a result, or `Step::NeedInput` for the shared
 `InputCursor` to satisfy.
 
 ```rust
-use triergon_isobmff::{BoxEvent, BoxReader, BuildStatus, Limits, SampleReader,
-                       SampleStep, SampleTableBuilder};
+use std::sync::atomic::AtomicBool;
+use triergon_core::{
+    Budget, Bytes, Error, InputCursor, InputRequest, InputWindow, SourceCapabilities, SourceId,
+    Step, WorkBudget,
+};
+use triergon_isobmff::{
+    BoxEvent, BoxReader, BoxStep, BoxView, BuildStatus, Limits, SampleReader, SampleStep,
+    SampleTableBuilder,
+};
 
-let mut boxes = BoxReader::new(&input, metadata_limit)?;
-match boxes.poll(&mut input, &mut work, &cancel)? {
-    Step::Ready(BoxEvent::Header(h)) if &h.kind == b"moov" => boxes.read_metadata(&input)?,
-    Step::Ready(BoxEvent::Header(_)) => boxes.skip(&mut input)?,
-    Step::Ready(BoxEvent::Metadata(moov)) => { /* walk with moov.children(..) */ }
-    _ => {}
+# let path = concat!(env!("CARGO_MANIFEST_DIR"), "/tests/fixtures/r-multitrack.mov");
+let file = std::fs::read(path)?; // any transport; the parsers do no I/O
+let pool = Budget::new(64 << 20)?;
+let caps = SourceCapabilities { length: Some(file.len() as u64), random_access: true };
+let mut input = InputCursor::new(&pool, SourceId(1), caps, 64 * 1024)?;
+let cancel = AtomicBool::new(false);
+let mut work = WorkBudget::new(1 << 16);
+let supply = |input: &mut InputCursor, req: InputRequest| -> triergon_core::Result<()> {
+    match file.get(usize::try_from(req.offset).map_err(|_| Error::Overflow)?..) {
+        Some(rest) if !rest.is_empty() => {
+            let bytes = Bytes::copy_from_slice(&pool, &rest[..rest.len().min(req.maximum)])?;
+            input.provide_owned(InputWindow::new(req.source, req.token, req.offset, bytes)?)
+        }
+        _ => input.finish(req.source, req.token),
+    }
+};
+
+// Top-level boxes: retain `moov`, note where `mdat` holds the media.
+let mut boxes = BoxReader::new(&input, 16 << 20)?;
+let (mut moov, mut mdat) = (None, None);
+loop {
+    match boxes.poll(&mut input, &mut work, &cancel)? {
+        Step::Ready(BoxEvent::Header(h)) if &h.kind == b"moov" => boxes.read_metadata(&input)?,
+        Step::Ready(BoxEvent::Header(_)) => boxes.skip(&mut input)?,
+        Step::Ready(BoxEvent::Metadata(raw)) => moov = Some(raw),
+        Step::Ready(BoxEvent::Skipped(h)) if &h.kind == b"mdat" => mdat = Some(h.payload_range()?),
+        Step::Ready(BoxEvent::Skipped(_)) => {}
+        Step::NeedInput(req) => supply(&mut input, req)?,
+        Step::Yield => work = WorkBudget::new(1 << 16),
+        Step::End(_) => break,
+    }
 }
 
-// One track: build a compact index from its `stbl` box.
-let mut builder = SampleTableBuilder::new(stbl, budget.clone(), Limits::default())?;
-while builder.poll(&mut work)? == BuildStatus::Yield {}
+// The first track's `stbl`, indexed without reading any media.
+let child = |parent: &BoxView, kind: &[u8; 4]| -> triergon_core::Result<BoxView> {
+    let mut children = parent.children(0, Limits::default())?;
+    loop {
+        match children.poll(&mut WorkBudget::new(1 << 16))? {
+            BoxStep::Box(b) if &b.header().kind == kind => return Ok(b),
+            BoxStep::Box(_) | BoxStep::Yield => {}
+            BoxStep::End => return Err(Error::Invalid("missing box")),
+        }
+    }
+};
+let trak = child(&moov.ok_or("no moov")?, b"trak")?;
+let stbl = child(&child(&child(&trak, b"mdia")?, b"minf")?, b"stbl")?;
+let mut builder = SampleTableBuilder::new(stbl, pool.clone(), Limits::default())?;
+while builder.poll(&mut work)? == BuildStatus::Yield {
+    work = WorkBudget::new(1 << 16);
+}
 let table = builder.finish()?;
 
+// Every sample: timing from the table, payload read by byte range.
+let mdat = mdat.ok_or("no mdat")?;
 let mut samples = table.cursor();
-while let SampleStep::Sample(sample) = samples.poll(&mut work)? {
-    let mut read = SampleReader::new(&mut input, sample, mdat_payload.clone(), max_packet)?;
-    // read.poll(..) yields a SourcePacket { sample, payload, .. }
+loop {
+    let sample = match samples.poll(&mut work)? {
+        SampleStep::Sample(sample) => sample,
+        SampleStep::Yield => { work = WorkBudget::new(1 << 16); continue }
+        SampleStep::End => break,
+    };
+    let mut read = SampleReader::new(&mut input, sample, mdat.clone(), 1 << 20)?;
+    let packet = loop {
+        match read.poll(&mut input, &mut work, &cancel)? {
+            Step::Ready(packet) => break packet,
+            Step::NeedInput(req) => supply(&mut input, req)?,
+            Step::Yield => work = WorkBudget::new(1 << 16),
+            Step::End(_) => return Err("source ended inside a sample".into()),
+        }
+    };
+    // packet.sample: ordinal, dts_ticks, cts_ticks, is_container_sync(); packet.payload
 }
+# Ok::<(), Box<dyn std::error::Error>>(())
 ```
+
+`examples/isobmff_packets.rs FILE` does this for every track and prints the samples
+of all tracks in file order through `PhysicalSampleCursor`.
 
 | Task | Entry points |
 | --- | --- |

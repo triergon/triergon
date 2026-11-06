@@ -14,27 +14,58 @@ Complete}`; incremental readers return core `Step::{NeedInput, Yield, Ready, End
 and are fed with `provide` and closed with `finish` or `fail`.
 
 ```rust
-use triergon_core::WorkBudget;
-use triergon_framing::{AvcAnnexBConfig, AvcAnnexBJob, AvcConfigSource,
-    AvcConfigViewParser, BuildStep};
+use std::sync::atomic::AtomicBool;
+use triergon_core::{Budget, Bytes, SourceId, WorkBudget};
+use triergon_framing::{
+    AvcAnnexBConfig, AvcAnnexBJob, AvcAnnexBLimits, AvcConfigLimits, AvcConfigSource,
+    AvcConfigViewParser, BuildStep,
+};
 
-// avcC box payload -> checked record view.
-let mut parser = AvcConfigViewParser::new(&pool,
-    AvcConfigSource { source, generation: 0, offset: 0 }, avcc, config_limits)?;
+let pool = Budget::new(1 << 20)?;
+let cancel = AtomicBool::new(false);
+let mut work = WorkBudget::new(4096);
+
+// avcC box payload (4-byte lengths, one SPS, one PPS) -> checked record view.
+let avcc = [
+    1, 0x42, 0x00, 0x1e, 0xff, // version, profile, compatibility, level, lengthSizeMinusOne 3
+    0xe1, 0, 4, 0x67, 0x42, 0x00, 0x1e, // one SPS
+    1, 0, 4, 0x68, 0xce, 0x3c, 0x80, // one PPS
+];
+let source = AvcConfigSource { source: SourceId(1), generation: 0, offset: 0 };
+let limits = AvcConfigLimits { maximum_record_bytes: 4096, maximum_nals: 64, maximum_nal_bytes: 4096 };
+let mut parser = AvcConfigViewParser::new(&pool, source, Bytes::copy_from_slice(&pool, &avcc)?, limits)?;
 let record = loop {
     match parser.step(&mut work, &cancel)? {
         BuildStep::Ready(record) => break record,
         BuildStep::Yield => work = WorkBudget::new(4096),
-        BuildStep::Complete => unreachable!("ready precedes complete"),
+        BuildStep::Complete => return Err("no record".into()),
     }
 };
 let config = AvcAnnexBConfig::new(record)?;
 
-// One length-prefixed MP4/Matroska sample -> Annex-B segments.
-let mut job = AvcAnnexBJob::new(&config, sample, packet_limits)?;
-if let BuildStep::Ready(unit) = job.step(&mut work, &cancel)? {
-    for segment in unit.segments() { decoder_input.extend_from_slice(segment); }
+// One length-prefixed MP4/Matroska sample (an IDR slice) -> Annex-B segments.
+let sample = [0, 0, 0, 3, 0x65, 0x88, 0x84];
+let limits = AvcAnnexBLimits {
+    maximum_packet_bytes: 1 << 20,
+    maximum_output_bytes: 1 << 20,
+    maximum_nals: 256,
+};
+let mut job = AvcAnnexBJob::new(&config, &sample, limits)?;
+let mut decoder_input = Vec::new();
+loop {
+    match job.step(&mut work, &cancel)? {
+        BuildStep::Ready(unit) => unit.segments().for_each(|s| decoder_input.extend_from_slice(s)),
+        BuildStep::Yield => work = WorkBudget::new(4096),
+        BuildStep::Complete => break,
+    }
 }
+// The record's SPS and PPS precede the IDR slice, each after a start code.
+assert_eq!(decoder_input, [
+    0, 0, 0, 1, 0x67, 0x42, 0x00, 0x1e,
+    0, 0, 0, 1, 0x68, 0xce, 0x3c, 0x80,
+    0, 0, 0, 1, 0x65, 0x88, 0x84,
+]);
+# Ok::<(), Box<dyn std::error::Error>>(())
 ```
 
 ## Supported

@@ -16,31 +16,40 @@ use triergon_core::{
     Time, TimeBase, WorkBudget,
 };
 
+// The caller owns the transport; here it is a byte slice.
+let source: &[u8] = &[0x1a, 0x45, 0xdf, 0xa3, 0x01, 0x02];
+
 // One pool charges every live allocation, including caller-retained aliases.
 let pool = Budget::new(64 << 20)?;
-let caps = SourceCapabilities { length: None, random_access: false };
+let caps = SourceCapabilities { length: Some(source.len() as u64), random_access: true };
 let mut cursor = InputCursor::new(&pool, SourceId(1), caps, 64 * 1024)?;
 let cancel = AtomicBool::new(false);
 let mut work = WorkBudget::new(1 << 20);
 
 let mut header = [0u8; 4];
-loop {
-    match cursor.read_into(&mut header, &mut work, &cancel)? {
-        Step::Ready(n) => break,                          // n bytes copied
-        Step::NeedInput(req) => {                         // supply 1..=req.maximum bytes
-            let bytes = Bytes::copy_from_slice(&pool, fetch(req.offset, req.maximum))?;
-            cursor.provide_owned(InputWindow::new(req.source, req.token, req.offset, bytes)?)?;
-            // or cursor.finish(req.source, req.token)? at end of source
-        }
+let mut filled = 0;
+while filled < header.len() {
+    match cursor.read_into(&mut header[filled..], &mut work, &cancel)? {
+        Step::Ready(n) => filled += n,                    // n bytes copied
+        // Supply 1..=req.maximum bytes at req.offset, or finish at end of source.
+        Step::NeedInput(req) => match source.get(usize::try_from(req.offset)?..) {
+            Some(rest) if !rest.is_empty() => {
+                let bytes = Bytes::copy_from_slice(&pool, &rest[..rest.len().min(req.maximum)])?;
+                cursor.provide_owned(InputWindow::new(req.source, req.token, req.offset, bytes)?)?;
+            }
+            _ => cursor.finish(req.source, req.token)?,
+        },
         Step::Yield => work = WorkBudget::new(1 << 20),   // step budget spent; resume later
-        Step::End(_) => break,
+        Step::End(_) => break,                            // source ended first
     }
 }
+assert_eq!(header, [0x1a, 0x45, 0xdf, 0xa3]);
 
 let base = TimeBase::new(1, 90_000)?;
 let pts = Time::from_ticks(183_003, base)?;               // exact, reduced
-let ns = pts.to_nanoseconds(Rounding::NearestAway)?;
-let ms = base.rescale(183_003, TimeBase::new(1, 1000)?, Rounding::Floor)?;
+assert_eq!(pts.to_nanoseconds(Rounding::NearestAway)?, 2_033_366_667);
+assert_eq!(base.rescale(183_003, TimeBase::new(1, 1000)?, Rounding::Floor)?, 2033);
+# Ok::<(), Box<dyn std::error::Error>>(())
 ```
 
 ## Exports

@@ -16,29 +16,37 @@ use triergon::{
     SourceCapabilities, SourceId, Step, TrackInfo, WorkBudget,
 };
 
+# let path = concat!(env!("CARGO_MANIFEST_DIR"), "/../media/tests/fixtures/seek/cues-front.mkv");
+let file = std::fs::read(path)?;                      // any transport; the reader does no I/O
 let pool = Budget::new(64 << 20)?;
-let caps = SourceCapabilities { length: Some(len), random_access: true };
-let mut reader = AnyReader::open(&first_bytes, &pool, SourceId(1), caps)?;
+let caps = SourceCapabilities { length: Some(file.len() as u64), random_access: true };
+let mut reader = AnyReader::open(&file[..file.len().min(64)], &pool, SourceId(1), caps)?;
 let cancel = AtomicBool::new(false);
 loop {
     match reader.step(&mut WorkBudget::new(1 << 16), &cancel)? {
-        Step::Ready(Event::Packet(p)) => { /* p.track(), p.payload(), p.pts(), p.time_base(), p.random_access() */ }
+        Step::Ready(Event::Packet(p)) => {
+            // p.track(), p.payload(), p.pts(), p.dts(), p.time_base(), p.random_access()
+        }
         Step::Ready(Event::Seek(receipt)) => { /* receipt.landing, receipt.discard_until */ }
         Step::Ready(Event::Other(_)) => {}            // configuration, documents, structure
-        Step::NeedInput(req) => {                     // supply 1..=req.maximum bytes at req.offset
-            let bytes = Bytes::copy_from_slice(&pool, fetch(req.offset, req.maximum))?;
-            reader.provide(&InputWindow::new(req.source, req.token, req.offset, bytes)?)?;
-            // or reader.finish(req.source, req.token)? at end of source
-        }
+        // Supply 1..=req.maximum bytes at req.offset, or finish at end of source.
+        Step::NeedInput(req) => match file.get(usize::try_from(req.offset)?..) {
+            Some(rest) if !rest.is_empty() => {
+                let bytes = Bytes::copy_from_slice(&pool, &rest[..rest.len().min(req.maximum)])?;
+                reader.provide(&InputWindow::new(req.source, req.token, req.offset, bytes)?)?;
+            }
+            _ => reader.finish(req.source, req.token)?,
+        },
         Step::Yield => {}                             // step budget spent
         Step::Backpressure(_) => { /* drop retained packets, then step again */ }
         Step::End(_) => break,
     }
 }
 for i in 0..reader.track_count() {
-    let track = reader.track(i).unwrap();             // &dyn TrackInfo
+    let track = reader.track(i).ok_or("no such track")?; // &dyn TrackInfo
     // track.id(), track.kind(), track.codec_tag(), track.configuration(), track.colour()
 }
+# Ok::<(), Box<dyn std::error::Error>>(())
 ```
 
 A seek is `reader.request_seek(SeekRequest { track, target, policy })?`; the reader

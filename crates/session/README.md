@@ -12,20 +12,32 @@ library.
 ## Usage
 
 ```rust
-use triergon_session::{AudioSession, PcmBlock, QueueLimits, VideoSession, audio_decoder, select, video_decoder};
+use triergon_session::{
+    AudioDecoder, AudioSession, FeedError, PcmBlock, QueueLimits, VideoDecoder, VideoSession, audio,
+};
 
-let codecs = select(load_payload);
-let mut video = VideoSession::new(QueueLimits::VIDEO);
-video.load(video_decoder(codecs.video));
-let mut audio = AudioSession::new(QueueLimits::AUDIO);
-audio.load(codecs.audio.map(audio_decoder));
+// With the `codecs` feature the decoders come from `video_decoder(VideoCodec::H264)` and
+// `audio_decoder(AudioCodec::Aac)`; `select(payload)` picks both from a load payload.
+fn play(
+    video_decoder: Box<dyn VideoDecoder>,
+    audio_decoder: Option<Box<dyn AudioDecoder>>,
+    access_unit: &[u8],
+    pts_ns: i64,
+    clock_ns: i64,
+) -> Result<(), FeedError> {
+    let mut video = VideoSession::new(QueueLimits::VIDEO);
+    video.load(video_decoder);
+    let mut audio = AudioSession::new(QueueLimits::AUDIO);
+    audio.load(audio_decoder);
 
-video.feed(&access_unit, Some(pts_ns))?;      // Err(Backpressure): keep and retry
-if video.step(Some(clock_ns)) {
-    let picture = video.latest().unwrap();     // sequence, generation, pts, rgba
+    video.feed(access_unit, Some(pts_ns))?;     // Err(Backpressure): keep and retry
+    if video.step(Some(clock_ns)) {
+        if let Some(picture) = video.latest() { /* sequence, generation, pts, rgba */ }
+    }
+    let mut pcm = PcmBlock::default();
+    audio.pull(Some(clock_ns), audio::lead_ns(None), &mut pcm);
+    Ok(())
 }
-let mut pcm = PcmBlock::default();
-audio.pull(Some(clock_ns), triergon_session::audio::lead_ns(None), &mut pcm);
 ```
 
 `video_decoder` and `audio_decoder` need the `codecs` feature, which adds the five

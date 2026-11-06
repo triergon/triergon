@@ -22,10 +22,13 @@ let mut encoder = Encoder::new(EncoderConfig {
     vbv_bits: b / 7,      // VBV buffer size, bits
     gop: 30,              // intra period, pictures
 })?;
+let input = Picture::new(geometry);              // filled by triergon_pixel::Converter
 let mut es = Vec::new();
-let picture = encoder.encode(&input, &mut es)?;  // input: Picture of the same geometry
+let picture = encoder.encode(&input, &mut es)?;
 // es: this picture's bytes; picture.key, .index, .bits, .qscale_mean
+assert!(picture.key && es.starts_with(&[0, 0, 1, 0xb3])); // sequence header first
 let recon = encoder.reconstruction();             // what a decoder reconstructs
+# Ok::<(), Box<dyn std::error::Error>>(())
 ```
 
 `Encoder::config` returns the configuration and `vbv_underflow_bits` the total VBV

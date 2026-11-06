@@ -11,15 +11,21 @@ pictures in output order. It does not scale, convert colour or conceal damaged s
 ```rust
 use triergon_codec_h264::Decoder;
 
+# let path = concat!(env!("CARGO_MANIFEST_DIR"), "/../playback/tests/fixtures/raw-video/avc-80x48.h264");
+let stream = std::fs::read(path)?;     // an Annex B elementary stream
 let mut dec = Decoder::new();
-for (au, pts) in access_units {
-    dec.send(au, pts)?;                // one Annex B access unit, opaque Option<i64> pts
-    while let Some(pic) = dec.receive() {
-        // pic.width, pic.height, pic.planes[0].row(y), pic.pts, pic.sar, pic.colour
-    }
+let mut pictures = 0;
+dec.send_nals(&stream, None)?;         // or send(au, pts) per access unit, opaque Option<i64> pts
+while let Some(pic) = dec.receive() {
+    // pic.width, pic.height, pic.planes[0].row(y), pic.pts, pic.sar, pic.colour
+    pictures += 1;
 }
 dec.flush();                           // end of stream: output the remaining pictures
-while let Some(pic) = dec.receive() { /* ... */ }
+while let Some(_pic) = dec.receive() {
+    pictures += 1;
+}
+assert!(pictures > 0);
+# Ok::<(), Box<dyn std::error::Error>>(())
 ```
 
 `send_nals` accepts Annex B data without an implied access-unit boundary; `send_nal`

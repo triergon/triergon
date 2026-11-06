@@ -10,15 +10,18 @@ in an extension substream); the caller strips those.
 ## Usage
 
 ```rust
-use triergon_codec_dca::{AudioFrame, Decoder};
+use triergon_codec_dca::{AudioFrame, DecodeError, Decoder};
 
-let mut dec = Decoder::new();
-let mut frame = AudioFrame::default();
-for core_frame in frames {            // one complete core frame per call
-    dec.decode(core_frame, &mut frame)?; // replaces `frame`'s contents
-    // frame.sample_rate, frame.layout.speakers(), frame.planes[i]
+fn decode_frames<'a>(frames: impl IntoIterator<Item = &'a [u8]>) -> Result<(), DecodeError> {
+    let mut dec = Decoder::new();
+    let mut frame = AudioFrame::default();
+    for core_frame in frames {               // one complete core frame per call
+        dec.decode(core_frame, &mut frame)?; // replaces `frame`'s contents
+        // frame.sample_rate, frame.layout.speakers(), frame.planes[i]
+    }
+    dec.reset(); // after a seek: drops ADPCM, LFE and synthesis history
+    Ok(())
 }
-dec.reset(); // after a seek: drops ADPCM, LFE and synthesis history
 ```
 
 `examples/decode_dts.rs IN.dts [OUT.f32]` splits a stream by sync and FSIZE, skips extension

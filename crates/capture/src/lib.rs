@@ -1,10 +1,4 @@
-//! Development-capture session: RGBA in, MPEG-1-in-TS bytes out.
-//!
-//! A thin composition of the BT.601 converter (`triergon-pixel`), the MPEG-1
-//! video encoder (`triergon-codec-mpeg1`) and the single-program TS writer
-//! (`triergon_mpegts::mux`).
-//!
-//! Experimental.
+#![doc = include_str!("../README.md")]
 #![forbid(unsafe_code)]
 #![warn(
     missing_debug_implementations,

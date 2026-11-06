@@ -26,21 +26,48 @@ The crate exposes two views:
 ## Usage
 
 ```rust
+use std::sync::atomic::AtomicBool;
+use triergon_core::{
+    Budget, Bytes, InputCursor, InputWindow, SourceCapabilities, SourceId, Step, WorkBudget,
+};
 use triergon_mpegts::{PacketFormat, ParseLimits, TraceEvent, TransportStream};
 
-let mut ts = TransportStream::new(budget.clone(), PacketFormat::Ts188, ParseLimits::default(), program)?;
+# let path = concat!(env!("CARGO_MANIFEST_DIR"), "/../playback/tests/fixtures/hls/media-00.ts");
+let stream = std::fs::read(path)?; // any transport; the parser does no I/O
+let pool = Budget::new(64 << 20)?;
+let caps = SourceCapabilities { length: Some(stream.len() as u64), random_access: false };
+let mut input = InputCursor::new(&pool, SourceId(1), caps, 64 * 1024)?;
+let program = 1;
+let mut ts = TransportStream::new(pool.clone(), PacketFormat::Ts188, ParseLimits::default(), program)?;
+let cancel = AtomicBool::new(false);
+let mut pes_count = 0;
 loop {
-    match ts.poll(&mut input, &mut work, &cancel)? {
-        Step::Ready(TraceEvent::ProgramMap { map, active: true, .. }) => { /* streams */ }
-        Step::Ready(TraceEvent::Pes(pes)) => { /* pes.header, pes.payload() */ }
+    match ts.poll(&mut input, &mut WorkBudget::new(1 << 16), &cancel)? {
+        Step::Ready(TraceEvent::ProgramMap { map, active: true, .. }) => { /* map.streams */ }
+        Step::Ready(TraceEvent::Pes(pes)) => {
+            // pes.pid, pes.header.pts_raw33, pes.header.dts_raw33, pes.payload()
+            pes_count += 1;
+        }
         Step::Ready(TraceEvent::Diagnostic(fault)) => { /* kind, pid, location, error */ }
         Step::Ready(TraceEvent::Finished) => break,
-        Step::NeedInput(request) => { /* satisfy through the InputCursor */ }
+        Step::Ready(_) => {} // transport packets, sections, PAT, timeline
+        Step::NeedInput(req) => match stream.get(usize::try_from(req.offset)?..) {
+            Some(rest) if !rest.is_empty() => {
+                let bytes = Bytes::copy_from_slice(&pool, &rest[..rest.len().min(req.maximum)])?;
+                input.provide_owned(InputWindow::new(req.source, req.token, req.offset, bytes)?)?;
+            }
+            _ => input.finish(req.source, req.token)?,
+        },
+        Step::Yield => {}
         Step::End(_) => ts.end_of_source()?, // only at logical end of media
-        _ => {}
     }
 }
+assert!(pes_count > 0);
+# Ok::<(), Box<dyn std::error::Error>>(())
 ```
+
+`examples/mpegts_packets.rs FILE [PROGRAM]` prints the streams and PES packets of a
+file.
 
 | Task | Entry points |
 | --- | --- |
@@ -75,8 +102,12 @@ picture:
 ```rust
 use triergon_mpegts::mux::{MuxConfig, Muxer};
 
+let picture: &[u8] = &[0, 0, 1, 0xb3, 1, 2, 3]; // one coded picture
 let mut muxer = Muxer::new(&MuxConfig::default())?;
-muxer.write_picture(&es, pts, dts, key, &mut out); // 90 kHz pts/dts; appends to `out`
+let mut out = Vec::new();
+muxer.write_picture(picture, 3000, 0, true, &mut out); // 90 kHz pts, dts, key; appends to `out`
+assert_eq!(out.len() % 188, 0);
+# Ok::<(), triergon_core::Error>(())
 ```
 
 - Tables: PAT, PMT and a DVB SDT with one service descriptor (ETSI EN 300 468),
@@ -86,6 +117,8 @@ muxer.write_picture(&es, pts, dts, key, &mut out); // 90 kHz pts/dts; appends to
 - PES: stream_id 0xE0, unbounded length, PTS and DTS. The first packet's
   adaptation field carries PCR = DTS·300 and, on key pictures, the
   random_access_indicator. Stuffing goes into the final packet's adaptation field.
+  `TransportStream` does not read this output back: its source view accepts
+  unbounded PES only on AVC (0x1b) and HEVC (0x24) streams.
 - `MuxConfig::default()`: transport_stream_id 1, original_network_id 0xFF01,
   program 1, PMT PID 0x1000, video PID 0x0100, stream type 0x01, provider
   "Triergon", service "Service01".
@@ -111,7 +144,7 @@ pipeline ([triergon-capture](../capture/README.md#conformance)).
 | Continuity | per-PID counters, wrap, one duplicate packet (with the PCR exception), loss, signalled discontinuity |
 | PSI | pointer field, multi-section packets, CRC-32, PAT, PMT, program and ES descriptor loops |
 | Descriptors | registration, ISO 639 language, AVC, HEVC, DVB AC-3 (`0x6a`), E-AC-3 (`0x7a`), DVB subtitling (`0x59`) |
-| PES | split headers, finite and unbounded (video) lengths, PTS/DTS with marker checks, optional fields |
+| PES | split headers, finite lengths, unbounded lengths on AVC (0x1b) and HEVC (0x24) streams, PTS/DTS with marker checks, optional fields |
 | FFmpeg-compatible carriage | AVC, HEVC, AAC ADTS, AAC LATM (`NativeRegisteredCarriage`); AC-3/E-AC-3 by DVB tag or stream type `0x81`/`0x87` (`NativePrivateAudioCarriage`); single-service DVB subtitles |
 
 ## Behaviour and limits

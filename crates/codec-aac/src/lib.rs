@@ -1,9 +1,4 @@
-//! MPEG-4 AAC decoder for ADTS access units: AAC Main / LC / LTP core, HE-AAC (SBR,
-//! implicit signalling) and HE-AAC v2 (Parametric Stereo). Pure safe Rust, no dependencies.
-//!
-//! Output matches FFmpeg's native float AAC decoder conventions (sample rate after implicit
-//! SBR, plane order = FFmpeg native channel order, float full scale 1.0; see
-//! [`triergon_codec::layout`]).
+#![doc = include_str!("../README.md")]
 #![forbid(unsafe_code)]
 #![warn(
     missing_debug_implementations,

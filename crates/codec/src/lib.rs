@@ -1,10 +1,4 @@
-//! Decoder vocabulary shared by the codec crates.
-//!
-//! The codec crates (`triergon-codec-{aac,ac3,dca,h264,hevc}`) implement
-//! [`VideoDecoder`] or [`AudioDecoder`] and emit pictures as
-//! [`triergon_pixel::PictureView`] and audio as [`AudioFrame`] with a
-//! [`ChannelLayout`] of [`Speaker`]s in the documented [channel order](layout).
-//! Sessions and workers drive decoders only through these traits.
+#![doc = include_str!("../README.md")]
 #![forbid(unsafe_code)]
 #![warn(
     missing_debug_implementations,
