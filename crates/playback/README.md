@@ -52,6 +52,8 @@ format is unknown; its `PlaybackInput` holds a `SelectedInput` or a
 `RawVideoSource` that replays the probed prefix and then continues reading.
 MP4 needs an open and index step first: `mp4_open::Mp4Open` →
 `mp4_plan::Mp4IndexJob` → `Engine::mp4`.
+Indexed MP4 packets share immutable track metadata. A complete sample in a
+shared input window can retain that window as its payload.
 
 ## Supported
 

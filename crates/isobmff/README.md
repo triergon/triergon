@@ -25,6 +25,10 @@ All parsers are polled. Each `poll` takes a `WorkBudget` (and usually a cancel
 flag) and returns `Yield`, a result, or `Step::NeedInput` for the shared
 `InputCursor` to satisfy.
 
+`SampleReader::new_with_shared_window` can return a view of a complete sample
+in an existing shared input window. The view retains the window's budget charge.
+Samples split across windows use a bounded packet buffer.
+
 ```rust
 use std::sync::atomic::AtomicBool;
 use triergon_core::{

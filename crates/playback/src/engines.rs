@@ -91,10 +91,6 @@ pub struct TsEvent {
     pub clock_key: Option<ClockKey>,
 }
 #[derive(Debug)]
-#[expect(
-    clippy::large_enum_variant,
-    reason = "one bounded inline event; queue slots and all retained buffers use Budget; a per-event Box would add an untracked allocation"
-)]
 pub enum RawEvent {
     Mp4Root(triergon_isobmff::BoxView),
     EntityEnd(ts::MediaEntityEndV1),
@@ -1552,7 +1548,7 @@ impl Mp4Engine {
             )?
         } else {
             match media {
-                Mov9SampleExtent::Finite(extent) => SampleReader::new(
+                Mov9SampleExtent::Finite(extent) => SampleReader::new_with_shared_window(
                     &mut self.input,
                     row.sample.clone(),
                     extent,

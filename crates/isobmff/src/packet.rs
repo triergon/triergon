@@ -73,8 +73,9 @@ impl TerminalMdat {
     }
 }
 
-/// A bounded range transaction. Construction checks/reserves before changing the
-/// input transaction. A freeze backpressure retry retains all completed bytes.
+/// A bounded range transaction. A freeze backpressure retry retains all
+/// completed bytes. The reserved constructors allocate before changing the
+/// input transaction.
 #[derive(Debug)]
 pub struct SampleReader {
     sample: Sample,
@@ -84,7 +85,16 @@ pub struct SampleReader {
     length: usize,
     buffer: Option<BudgetVec<u8>>,
     failed: Option<Error>,
+    mode: ReadMode,
 }
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum ReadMode {
+    Reserved,
+    RecoverPrefix,
+    SharedWindow,
+}
+
 impl SampleReader {
     pub fn new(
         input: &mut InputCursor,
@@ -93,7 +103,20 @@ impl SampleReader {
         maximum_packet: usize,
     ) -> Result<Self> {
         sample.require_within(media_extent)?;
-        Self::new_checked(input, sample, maximum_packet, false)
+        Self::new_checked(input, sample, maximum_packet, ReadMode::Reserved)
+    }
+    /// Retains an existing shared input window when it contains the complete
+    /// sample and the work budget can consume it. Otherwise reserves a packet
+    /// buffer before consuming any bytes. Retained packets keep the window's
+    /// original allocation charged until the last view is dropped.
+    pub fn new_with_shared_window(
+        input: &mut InputCursor,
+        sample: Sample,
+        media_extent: Range<u64>,
+        maximum_packet: usize,
+    ) -> Result<Self> {
+        sample.require_within(media_extent)?;
+        Self::new_checked(input, sample, maximum_packet, ReadMode::SharedWindow)
     }
     /// Reads the complete declared sample under an open terminal MDAT. No final
     /// media/source length is fabricated; premature physical EOF stays Truncated.
@@ -104,7 +127,7 @@ impl SampleReader {
         maximum_packet: usize,
     ) -> Result<Self> {
         terminal.require_sample(&sample)?;
-        Self::new_checked(input, sample, maximum_packet, false)
+        Self::new_checked(input, sample, maximum_packet, ReadMode::Reserved)
     }
     pub fn new_pinned_mov_recovery(
         input: &mut InputCursor,
@@ -117,16 +140,16 @@ impl SampleReader {
             Mov9SampleExtent::Finite(extent) => sample.require_within(extent)?,
             Mov9SampleExtent::Terminal(terminal) => terminal.require_sample(&sample)?,
         }
-        Self::new_checked(input, sample, maximum_packet, true)
+        Self::new_checked(input, sample, maximum_packet, ReadMode::RecoverPrefix)
     }
     fn new_checked(
         input: &mut InputCursor,
         sample: Sample,
         maximum_packet: usize,
-        allow_short: bool,
+        mode: ReadMode,
     ) -> Result<Self> {
         if input.capabilities().length.is_some_and(|end| {
-            sample.range.end > end && (!allow_short || sample.range.start >= end)
+            sample.range.end > end && (mode != ReadMode::RecoverPrefix || sample.range.start >= end)
         }) {
             return Err(Error::Invalid("sample exceeds source length"));
         }
@@ -139,7 +162,9 @@ impl SampleReader {
             });
         }
         let mut buffer = BudgetVec::new(input.budget());
-        buffer.try_reserve_exact(length)?;
+        if mode != ReadMode::SharedWindow {
+            buffer.try_reserve_exact(length)?;
+        }
         // Internal I/O transaction only; core preserves parser generation.
         if input.position() != sample.range.start || input.capabilities().random_access {
             input.request_range(sample.range.start)?;
@@ -152,6 +177,7 @@ impl SampleReader {
             length,
             buffer: Some(buffer),
             failed: None,
+            mode,
         })
     }
     pub fn poll(
@@ -254,12 +280,26 @@ impl SampleReader {
                 if !work.try_charge(1) {
                     return Ok(Step::Yield);
                 }
-                return Ok(Step::Ready(SourcePacket {
-                    sample: self.sample.clone(),
-                    payload: self.freeze_buffer()?,
-                    source: self.source,
-                    token: self.token.clone(),
-                }));
+                let payload = self.freeze_buffer()?;
+                return Ok(Step::Ready(self.packet(payload)));
+            }
+            if self.mode == ReadMode::SharedWindow && buffer.is_empty() {
+                let available = input.buffered().len();
+                if available >= self.length
+                    && input.buffered_owner().is_some()
+                    && work.remaining() > self.length as u64
+                {
+                    let Step::Ready(payload) = input.read_span(self.length, work, cancel)? else {
+                        return Err(Error::Invalid("buffered sample unavailable"));
+                    };
+                    work.take(1);
+                    self.position = input.position();
+                    self.buffer = None;
+                    return Ok(Step::Ready(self.packet(payload)));
+                }
+                if available != 0 && work.remaining() != 0 {
+                    buffer.try_reserve_exact(self.length)?;
+                }
             }
             let maximum = self.length - buffer.len();
             match input.read_append(buffer, maximum, work, cancel)? {
@@ -270,6 +310,14 @@ impl SampleReader {
                 Step::Yield => return Ok(Step::Yield),
                 Step::End(end) => return Ok(Step::End(end)),
             }
+        }
+    }
+    fn packet(&self, payload: Bytes) -> SourcePacket {
+        SourcePacket {
+            sample: self.sample.clone(),
+            payload,
+            source: self.source,
+            token: self.token.clone(),
         }
     }
     fn freeze_buffer(&mut self) -> Result<Bytes> {
