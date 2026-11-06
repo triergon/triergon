@@ -25,17 +25,41 @@ pub fn links(root: &Path) -> Vec<String> {
                 continue;
             }
             let file = target.split('#').next().unwrap_or_default();
-            if !path
-                .parent()
-                .expect("file has a parent")
-                .join(file)
-                .exists()
-            {
+            if !exists_exactly(path.parent().expect("file has a parent"), Path::new(file)) {
                 errors.push(format!("{}: missing link {target}", rel.display()));
             }
         }
     }
     errors
+}
+
+/// Whether `relative` names an existing entry under `base` with exactly the spelling
+/// of every component, so a link that only resolves on a case-insensitive file system
+/// is reported on every platform.
+fn exists_exactly(base: &Path, relative: &Path) -> bool {
+    use std::path::Component;
+    let mut current = base.to_path_buf();
+    for component in relative.components() {
+        match component {
+            Component::CurDir => {}
+            Component::ParentDir => {
+                if !current.is_dir() || !current.pop() {
+                    return false;
+                }
+            }
+            Component::Normal(name) => {
+                let Ok(entries) = fs::read_dir(&current) else {
+                    return false;
+                };
+                if !entries.flatten().any(|entry| entry.file_name() == name) {
+                    return false;
+                }
+                current.push(name);
+            }
+            Component::RootDir | Component::Prefix(_) => return false,
+        }
+    }
+    current.exists()
 }
 
 /// Targets of `](target)`: the shortest non-empty run up to the next `)`.
@@ -290,6 +314,28 @@ mod tests {
         fs::write(root.join("docs/b.md"), "").unwrap();
         fs::write(root.join("target/t.md"), "[gone](missing.md)").unwrap();
         assert_eq!(links(&root), vec!["docs/a.md: missing link missing.md"]);
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn link_components_must_match_case_exactly() {
+        let root = crate::walk::scratch("links-case");
+        fs::create_dir_all(root.join("docs/Sub")).unwrap();
+        fs::write(root.join("docs/Sub/Note.md"), "").unwrap();
+        fs::write(root.join("README.md"), "").unwrap();
+        fs::write(
+            root.join("docs/a.md"),
+            "[ok](Sub/Note.md) [up](../README.md) [dir](./Sub) [file](sub/Note.md) [name](Sub/note.md) [parent](../readme.md)",
+        )
+        .unwrap();
+        assert_eq!(
+            links(&root),
+            vec![
+                "docs/a.md: missing link sub/Note.md",
+                "docs/a.md: missing link Sub/note.md",
+                "docs/a.md: missing link ../readme.md",
+            ]
+        );
         fs::remove_dir_all(root).unwrap();
     }
 
