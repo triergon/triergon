@@ -45,6 +45,7 @@ dependencies = [
  "triergon-core",
  "triergon-framing",
  "triergon-harness-protocol",
+ "triergon-isobmff",
  "triergon-matroska",
  "triergon-playback",
 ]

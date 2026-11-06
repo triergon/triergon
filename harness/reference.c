@@ -8,7 +8,7 @@
  *                                 (reference_capture.h)
  *   -DTRIERGON_FONT_REFERENCE     font faces and outlines with FreeType (reference_font.h)
  *   otherwise                     the container operations below, with the feed
- *                                 (TRIERGON_FEED_REFERENCE), HLS segment
+ *                                 (TRIERGON_FEED_REFERENCE), HLS segment and MP4 range
  *                                 (TRIERGON_HLS_REFERENCE) and combined-encoding
  *                                 (TRIERGON_COMBINED_REFERENCE) variants. */
 #if defined(TRIERGON_DECODE_REFERENCE)
@@ -205,6 +205,7 @@ static uint64_t now_ns(void){struct timespec t;clock_gettime(CLOCK_MONOTONIC,&t)
 #ifdef TRIERGON_HLS_REFERENCE
 #include "reference_hls.h"
 #include "reference_progressive.h"
+#include "reference_mp4_range.h"
 #endif
 int main(int argc,char **argv){
     av_log_set_level(AV_LOG_ERROR);
@@ -230,6 +231,7 @@ int main(int argc,char **argv){
 #endif
 #ifdef TRIERGON_HLS_REFERENCE
     if(!strncmp(argv[1],"hls-",4)){int result=hls_main(argc,argv,data,size);free(data);return result;}
+    if(!strncmp(argv[1],"mp4-range-",10)){int result=mp4_range_main(argc,argv,data,size);free(data);return result;}
 #endif
     int metadata=!strncmp(argv[1],"catalogue-",10)?2:!strncmp(argv[1],"metadata-",9);
     int seek_mode=!strncmp(argv[1],"seek-",5);

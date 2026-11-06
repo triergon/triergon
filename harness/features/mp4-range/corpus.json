@@ -1,0 +1,61 @@
+{
+  "schema": 1,
+  "cases": [
+    {
+      "id": "regular-open",
+      "profile": "regular-open",
+      "file": "regular-avc-aac.mp4",
+      "sha256": "7f2f92cb0e7a97920828fc9f79daeec2471a58d990572305d7aa08c30fb512fd",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 237,
+        "bytes": 81478,
+        "digest": 994214068017485484
+      }
+    },
+    {
+      "id": "regular-seek",
+      "profile": "regular-seek",
+      "file": "regular-avc-aac.mp4",
+      "sha256": "7f2f92cb0e7a97920828fc9f79daeec2471a58d990572305d7aa08c30fb512fd",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "28000"
+      ],
+      "expected": {
+        "packets": 185,
+        "bytes": 62763,
+        "digest": 15577132028095841482
+      }
+    },
+    {
+      "id": "variable-open",
+      "profile": "variable-open",
+      "file": "variable-aac-duration.mp4",
+      "sha256": "30eea0cf071465639669a0ab87c6e48db0022323a1f169c53f5de901b318c8d1",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "packets": 237,
+        "bytes": 81478,
+        "digest": 1650792575122043820
+      }
+    },
+    {
+      "id": "variable-seek",
+      "profile": "variable-seek",
+      "file": "variable-aac-duration.mp4",
+      "sha256": "30eea0cf071465639669a0ab87c6e48db0022323a1f169c53f5de901b318c8d1",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "28000"
+      ],
+      "expected": {
+        "packets": 186,
+        "bytes": 62932,
+        "digest": 1562922133773717379
+      }
+    }
+  ]
+}

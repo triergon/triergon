@@ -433,7 +433,7 @@ const PROFILE_REFERENCES: [ProfileReference; 8] = [
         source: "harness/reference.c",
         define: Some("-DTRIERGON_HLS_REFERENCE=1"),
         record: "ffmpeg-formats-native",
-        kind: "pinned FFmpeg MOV, TS and subtitle build; HLS segment operations",
+        kind: "pinned FFmpeg MOV, TS and subtitle build for HLS and MP4 range operations",
         libraries: "formats_reference",
         packages: CONTAINER_PACKAGES,
         link_static: true,
