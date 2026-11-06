@@ -1209,7 +1209,84 @@ impl DemuxObserver {
         Ok(())
     }
 
+    /// Read a timestamp-only header from one carrier when its whole validation
+    /// fits. The ordinary staged parser handles incomplete or invalid headers.
+    fn complete_timed_header(
+        &mut self,
+        work: &mut WorkBudget,
+        cancel: &AtomicBool,
+    ) -> Result<bool> {
+        let pending = self
+            .pending
+            .as_ref()
+            .ok_or(Error::Invalid("native PES input missing"))?;
+        let payload = pending
+            .packet
+            .payload
+            .as_ref()
+            .ok_or(Error::Invalid("native PES payload missing"))?;
+        let bytes = &payload[pending.position..];
+        let Some(prefix) = bytes.first_chunk::<9>() else {
+            return Ok(false);
+        };
+        if prefix[..4] != [0, 0, 1, self.scope.stream_id]
+            || !matches!((prefix[7], prefix[8]), (0x80, 5) | (0xc0, 10))
+        {
+            return Ok(false);
+        }
+        let used = 9 + usize::from(prefix[8]);
+        let charge = used as u64 + 3;
+        if bytes.len() < used || used > self.limits.pes_bytes || work.remaining() < charge {
+            return Ok(false);
+        }
+        let length = usize::from(u16::from_be_bytes([prefix[4], prefix[5]]));
+        let declared = (length != 0).then_some(length + 6);
+        if declared.is_some_and(|total| total < used || total > self.limits.pes_bytes)
+            || (declared.is_none() && self.finite_private())
+        {
+            return Ok(false);
+        }
+        let mut raw = [0; HEADER_MAX];
+        raw[..used].copy_from_slice(&bytes[..used]);
+        let Ok(header) = parse_header(&raw, used) else {
+            return Ok(false);
+        };
+        let extent = SourceRange {
+            entity: self.scope.entity,
+            offset: pending
+                .packet
+                .payload_source_offset
+                .checked_add(pending.position as u64)
+                .ok_or(Error::Overflow)?,
+            bytes: used,
+        };
+        extent.end()?;
+        if !self.reserve(Arena::Header, work, cancel)? || !work.try_charge(charge) {
+            return Ok(false);
+        }
+        if cancel.load(Ordering::Relaxed) {
+            return Err(Error::Cancelled);
+        }
+        debug_assert!(self.header_ranges.is_empty());
+        self.header_ranges
+            .try_push(extent)
+            .map_err(|error| error.error)?;
+        self.header_used = used;
+        self.header_target = used;
+        self.declared_total = declared;
+        self.body_limit = declared.map(|total| total - used);
+        self.header = Some(header);
+        self.pending
+            .as_mut()
+            .ok_or(Error::Invalid("native PES input missing"))?
+            .position += used;
+        Ok(true)
+    }
+
     fn poll_header(&mut self, work: &mut WorkBudget, cancel: &AtomicBool) -> Result<bool> {
+        if self.header_used == 0 && self.complete_timed_header(work, cancel)? {
+            return Ok(true);
+        }
         if self.header_used == self.header_target {
             if !work.try_charge(1) {
                 return Ok(false);
