@@ -1,7 +1,6 @@
 //! One capture client session: RGBA in, MPEG-1-in-TS bytes out.
 //!
-//! Mirrors the responsibilities of Streem's `Venc` (contract `session`): a
-//! session starts with SDT/PAT/PMT and a sequence-header I picture, every call
+//! A session starts with SDT/PAT/PMT and a sequence-header I picture, every call
 //! produces that picture's complete TS bytes with advancing PTS/DTS/PCR and
 //! continuity, and a sink failure poisons the session so the caller rebuilds.
 
@@ -35,8 +34,8 @@ pub struct SessionConfig {
 }
 
 impl SessionConfig {
-    /// Streem's rule: maxrate = b·7/5, VBV buffer = b/7, GOP 30.
-    pub fn streem(width: u32, height: u32, bit_rate: u32) -> SessionConfig {
+    /// The capture rate rule: maxrate = b·7/5, VBV buffer = b/7, GOP 30.
+    pub fn with_rate_rule(width: u32, height: u32, bit_rate: u32) -> SessionConfig {
         SessionConfig {
             width,
             height,

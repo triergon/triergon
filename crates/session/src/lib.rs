@@ -1,14 +1,11 @@
-//! In-process desktop-simulator playback sessions (D4 / O61).
+//! In-process desktop playback sessions.
 //!
-//! Streem's simulator pipes video and audio access units to external `ffmpeg`
-//! children (`sim_video.rs`, `sim_audio.rs`). This crate is the replacement's
-//! session layer: it owns bounded input queues, decoder lifecycle, timestamps
+//! The session layer owns bounded input queues, decoder lifecycle, timestamps
 //! through reordering, clock-gated publication, generations, flush/seek/stop,
 //! decoded end of stream and bounded shutdown. Decoding itself is delegated to
 //! the pure-Rust codec crates through the [`triergon_codec`] traits (the
 //! `codecs` feature provides [`video_decoder`] and [`audio_decoder`]); output
-//! devices and GPU upload stay with the consumer adapter (see
-//! `research/d4/ADAPTER-CONTRACT.md`).
+//! devices and GPU upload stay with the caller.
 //!
 //! Nothing here spawns a process, links a native library or falls back to one.
 #![forbid(unsafe_code)]

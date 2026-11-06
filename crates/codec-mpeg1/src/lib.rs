@@ -1,5 +1,5 @@
 //! MPEG-1 video (ISO/IEC 11172-2) encoder: I and P pictures, half-sample
-//! forward motion compensation, one slice per macroblock row, closed GOPs
+//! forward motion compensation, one slice per picture, closed GOPs
 //! with a sequence header before every I picture, and VBV-constrained rate
 //! control. Each `encode` call returns that picture's complete bytes; there
 //! is no reordering delay (contract difference D1).
@@ -23,7 +23,7 @@ use rate::{Kind, RateControl};
 use tables::*;
 use triergon_pixel::{Geometry, Picture};
 
-/// Encoder parameters. `Session` derives them from the Streem rate rule.
+/// Encoder parameters.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct EncoderConfig {
     pub geometry: Geometry,

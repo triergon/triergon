@@ -95,7 +95,7 @@ fn main() -> ExitCode {
             let Some(rgba) = load(&args[6]) else {
                 return fail("input");
             };
-            let cfg = SessionConfig::streem(w, h, 2_500_000);
+            let cfg = SessionConfig::with_rate_rule(w, h, 2_500_000);
             let Ok(mut s) = Session::open(&cfg) else {
                 return fail("open");
             };
@@ -123,7 +123,7 @@ fn main() -> ExitCode {
             let (Some(bitrate), Some(rgba)) = (parse(6), load(&args[7])) else {
                 return fail("input");
             };
-            let Ok(mut s) = Session::open(&SessionConfig::streem(w, h, bitrate)) else {
+            let Ok(mut s) = Session::open(&SessionConfig::with_rate_rule(w, h, bitrate)) else {
                 return fail("open");
             };
             let mut out = Vec::new();
@@ -148,7 +148,7 @@ fn main() -> ExitCode {
             let (Some(bitrate), Some(rgba)) = (parse(6), load(&args[7])) else {
                 return fail("input");
             };
-            let cfg = SessionConfig::streem(w, h, bitrate);
+            let cfg = SessionConfig::with_rate_rule(w, h, bitrate);
             let mut ts: Vec<u8> = Vec::new();
             let underflow = match session(&cfg, orientation, &rgba, count, &mut ts) {
                 Ok(u) => u,
@@ -172,7 +172,7 @@ fn main() -> ExitCode {
             else {
                 return fail("input");
             };
-            let cfg = SessionConfig::streem(w, h, bitrate);
+            let cfg = SessionConfig::with_rate_rule(w, h, bitrate);
             let mut stdout = std::io::stdout().lock();
             for _ in 0..iterations {
                 let mut sink = HashSink::new();
@@ -192,7 +192,7 @@ fn main() -> ExitCode {
             let (Some(bitrate), Some(rgba)) = (parse(6), load(&args[7])) else {
                 return fail("input");
             };
-            let cfg = SessionConfig::streem(w, h, bitrate);
+            let cfg = SessionConfig::with_rate_rule(w, h, bitrate);
             let mut sink = HashSink::new();
             let mut stdout = std::io::stdout();
             if stdout

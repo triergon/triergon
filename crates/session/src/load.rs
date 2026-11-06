@@ -1,8 +1,6 @@
-//! The simulator's codec selection from the literal Load payload.
+//! Codec selection from a literal load payload.
 //!
-//! These are the frozen source rules of `sim_video.rs::load` and
-//! `sim_audio.rs::demuxer_for` (native-jelly-streem personal/main 3d0fca40),
-//! not a payload grammar: video searches the whole lowercased payload for
+//! These are fixed matching rules, not a payload grammar: video searches the whole lowercased payload for
 //! `h265`/`hevc`, everything else is H.264; audio reads the first literal
 //! `"audio":"` value, case-sensitively, and unknown names select no audio.
 use triergon_codec::{AudioCodec, VideoCodec};

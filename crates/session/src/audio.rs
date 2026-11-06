@@ -18,7 +18,7 @@ pub struct PcmBlock {
     pub samples: Vec<i16>,
 }
 
-/// The source default (`STREEM_SIM_AUDIO_LEAD_MS`, 120 ms, clamped 0..=2000).
+/// Audio lead from an optional millisecond override: default 120 ms, clamped to 0..=2000.
 pub fn lead_ns(environment: Option<&str>) -> i64 {
     environment
         .and_then(|v| v.trim().parse::<i64>().ok())

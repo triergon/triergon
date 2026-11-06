@@ -46,7 +46,7 @@ fn pts_dts(ts: &[u8]) -> (i64, i64) {
 
 #[test]
 fn session_starts_with_tables_and_a_sequence_header_and_timing_advances() {
-    let cfg = SessionConfig::streem(64, 48, 2_500_000);
+    let cfg = SessionConfig::with_rate_rule(64, 48, 2_500_000);
     let mut s = Session::open(&cfg).unwrap();
     let mut outputs = Vec::new();
     for k in 0..32 {
@@ -84,9 +84,9 @@ fn session_starts_with_tables_and_a_sequence_header_and_timing_advances() {
 
 #[test]
 fn keepalive_reencodes_with_fresh_timing() {
-    // Streem's idle keepalive re-encodes the last picture; the stream must keep
+    // An idle keepalive re-encodes the last picture; the stream must keep
     // advancing rather than repeat bytes.
-    let mut s = Session::open(&SessionConfig::streem(48, 32, 1_000_000)).unwrap();
+    let mut s = Session::open(&SessionConfig::with_rate_rule(48, 32, 1_000_000)).unwrap();
     let picture = frame(48, 32, 7);
     let (mut a, mut b) = (Vec::new(), Vec::new());
     s.encode(&picture, Orientation::TopDown, &mut a).unwrap();
@@ -109,7 +109,7 @@ impl Sink for Failing {
 
 #[test]
 fn sink_failure_poisons_the_session() {
-    let mut s = Session::open(&SessionConfig::streem(32, 32, 1_000_000)).unwrap();
+    let mut s = Session::open(&SessionConfig::with_rate_rule(32, 32, 1_000_000)).unwrap();
     let mut sink = Failing(1);
     let picture = frame(32, 32, 1);
     assert!(s.encode(&picture, Orientation::TopDown, &mut sink).is_ok());
@@ -133,7 +133,7 @@ fn bottom_up_input_equals_flipped_top_down_input() {
     for row in top.chunks(w * 4).rev() {
         bottom.extend_from_slice(row);
     }
-    let cfg = SessionConfig::streem(w as u32, h as u32, 2_500_000);
+    let cfg = SessionConfig::with_rate_rule(w as u32, h as u32, 2_500_000);
     let (mut a, mut b) = (Vec::new(), Vec::new());
     Session::open(&cfg)
         .unwrap()
@@ -147,10 +147,10 @@ fn bottom_up_input_equals_flipped_top_down_input() {
 }
 
 #[test]
-fn both_streem_geometries_and_rate_extremes_open() {
+fn both_capture_geometries_and_rate_extremes_open() {
     for (w, h) in [(960, 540), (480, 270)] {
         for rate in [100_000, 2_500_000, 25_500_000] {
-            let s = Session::open(&SessionConfig::streem(w, h, rate)).unwrap();
+            let s = Session::open(&SessionConfig::with_rate_rule(w, h, rate)).unwrap();
             assert_eq!(s.geometry().width(), w as usize);
         }
     }
@@ -159,14 +159,14 @@ fn both_streem_geometries_and_rate_extremes_open() {
 #[test]
 fn invalid_requests_are_explicit_errors() {
     assert!(matches!(
-        Session::open(&SessionConfig::streem(63, 48, 1_000_000)),
+        Session::open(&SessionConfig::with_rate_rule(63, 48, 1_000_000)),
         Err(CaptureError::Pixel(pixel::Error::Geometry { .. }))
     ));
     assert!(matches!(
-        Session::open(&SessionConfig::streem(64, 48, 0)),
+        Session::open(&SessionConfig::with_rate_rule(64, 48, 0)),
         Err(CaptureError::Encoder(mpeg1::Error::BitRate(_)))
     ));
-    let mut s = Session::open(&SessionConfig::streem(64, 48, 1_000_000)).unwrap();
+    let mut s = Session::open(&SessionConfig::with_rate_rule(64, 48, 1_000_000)).unwrap();
     assert!(matches!(
         s.encode(&[0; 10], Orientation::TopDown, &mut Vec::new()),
         Err(CaptureError::Pixel(pixel::Error::InputLength { .. }))
@@ -174,7 +174,7 @@ fn invalid_requests_are_explicit_errors() {
 }
 #[test]
 fn session_and_direct_encoder_share_gop_validation() {
-    let mut c = SessionConfig::streem(16, 16, 1_000_000);
+    let mut c = SessionConfig::with_rate_rule(16, 16, 1_000_000);
     c.gop = 0;
     assert!(matches!(
         Session::open(&c),
@@ -183,7 +183,7 @@ fn session_and_direct_encoder_share_gop_validation() {
 }
 #[test]
 fn invalid_session_mux_configuration_is_an_error() {
-    let mut c = SessionConfig::streem(16, 16, 1_000_000);
+    let mut c = SessionConfig::with_rate_rule(16, 16, 1_000_000);
     c.mux.video_pid = c.mux.pmt_pid;
     assert!(matches!(Session::open(&c), Err(CaptureError::Mux(_))));
 }
