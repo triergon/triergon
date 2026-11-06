@@ -1,8 +1,7 @@
 //! Sequential TS188 feed for AVC and ADTS AAC.
 
 use crate::{
-    Engine, Error, Player, PlayerPolicy, Progress, RawEvent, Result, Selection, Source,
-    SourceReply, TrackKey,
+    BackendStep, Engine, Error, RawEvent, Result, Source, SourceReply, TrackKey,
     hls_aac::{HlsAac, HlsAacFrame},
     hls_avc::{AvcTsAccessUnit, AvcTsLimits, AvcTsReader, AvcTsStep},
     io::SourceOwner,
@@ -76,6 +75,94 @@ enum NextAudioTime {
     Exact(Time),
 }
 
+struct Transport<S: Source> {
+    engine: Engine,
+    request: Option<InputRequest>,
+    pending: Option<RawEvent>,
+    source: SourceOwner<S>,
+}
+
+impl<S: Source> Transport<S> {
+    fn provide(&mut self, reply: &SourceReply) -> Result<bool> {
+        let request = self
+            .request
+            .as_ref()
+            .ok_or(Error::Invalid("unsolicited completion"))?;
+        if let SourceReply::Data(window) = reply
+            && window.bytes().len() > request.maximum
+        {
+            return Err(Error::Limit {
+                requested: window.bytes().len(),
+                maximum: request.maximum,
+            });
+        }
+        let accepted = self.engine.provide(reply)?;
+        if accepted {
+            self.request = None;
+        }
+        Ok(accepted)
+    }
+
+    fn poll(
+        &mut self,
+        work: &mut WorkBudget,
+        cancel: &AtomicBool,
+        maximum_payload_bytes: usize,
+    ) -> Result<BackendStep> {
+        while work.remaining() != 0 {
+            if let Some(event) = self.pending.take() {
+                work.try_charge(1);
+                return Ok(BackendStep::Event(event));
+            }
+            if let Some(request) = &self.request {
+                let reply = self.source.poll(request, work, cancel)?;
+                if !self.provide(&reply)? {
+                    let request = self
+                        .request
+                        .clone()
+                        .ok_or(Error::Invalid("missing TS input request"))?;
+                    return Ok(BackendStep::NeedInput(request));
+                }
+                continue;
+            }
+            let before = work.remaining();
+            let step = self.engine.poll(work, cancel);
+            self.engine.take_suppressed_events();
+            match step? {
+                BackendStep::Event(event) => {
+                    let bytes = event.payload_bytes();
+                    if bytes > maximum_payload_bytes {
+                        return Err(Error::Limit {
+                            requested: bytes,
+                            maximum: maximum_payload_bytes,
+                        });
+                    }
+                    if work.try_charge(1) {
+                        return Ok(BackendStep::Event(event));
+                    }
+                    self.pending = Some(event);
+                }
+                BackendStep::NeedInput(request) => {
+                    self.request = Some(request.clone());
+                    if work.remaining() == 0 {
+                        return Ok(BackendStep::NeedInput(request));
+                    }
+                }
+                BackendStep::Yield if work.remaining() < before => {}
+                other => return Ok(other),
+            }
+        }
+        Ok(BackendStep::Yield)
+    }
+}
+
+impl<S: Source> Drop for Transport<S> {
+    fn drop(&mut self) {
+        // Quiesce the transport before dropping its retained windows.
+        self.source.abort();
+    }
+}
+
 /// One sequential stream with a stable PAT/PMT and clock, one unambiguous
 /// AVC track and one unambiguous ADTS AAC track. AVC must start with a
 /// delimited IDR and pictures need PTS. One leading SEI NAL in the first
@@ -91,7 +178,7 @@ enum NextAudioTime {
 /// Open a fresh input and reader to start at another media offset.
 /// The input starts at byte zero and clocks stay on the source timeline.
 pub struct TsProgressiveReader<S: Source> {
-    player: Option<Player<S>>,
+    transport: Option<Transport<S>>,
     limits: TsProgressiveLimits,
     phase: Phase,
     pat: Option<PatBinding>,
@@ -110,22 +197,13 @@ impl<S: Source> TsProgressiveReader<S> {
         if input.position() != 0 || input.capabilities().random_access {
             return Err(Error::Invalid("progressive TS requires a sequential body"));
         }
-        let engine = Engine::ts_progressive(input, limits.transport)?;
-        // The feed applies the raw PES clock to access units. It never uses
-        // the player's packet presentation classification.
-        let player = Player::new_direct(
-            engine,
-            source,
-            Selection::All,
-            PlayerPolicy {
-                slots: 1,
-                queued_payload_bytes: limits.transport.pes_bytes,
-                maximum_events: u64::MAX,
-                ..PlayerPolicy::default()
-            },
-        )?;
         Ok(Self {
-            player: Some(player),
+            transport: Some(Transport {
+                engine: Engine::ts_progressive(input, limits.transport)?,
+                request: None,
+                pending: None,
+                source,
+            }),
             limits,
             phase: Phase::Read,
             pat: None,
@@ -140,7 +218,7 @@ impl<S: Source> TsProgressiveReader<S> {
     /// Supply a reply for the outstanding request. Alternatively the injected
     /// source can supply it when advanced. Stale replies leave the reader live.
     pub fn provide(&mut self, reply: &SourceReply) -> Result<bool> {
-        let result = self.player.as_mut().ok_or(Error::Closed)?.provide(reply);
+        let result = self.transport.as_mut().ok_or(Error::Closed)?.provide(reply);
         if matches!(
             result,
             Err(Error::Transport | Error::Truncated | Error::Cancelled)
@@ -196,17 +274,13 @@ impl<S: Source> TsProgressiveReader<S> {
     fn step(&mut self, work: &mut WorkBudget, cancel: &AtomicBool) -> Result<TsProgressiveStep> {
         match self.phase {
             Phase::Read => {
-                let player = self.player.as_mut().ok_or(Error::Closed)?;
-                let mut output = None;
-                match player.read_output(&mut output, work, cancel)? {
-                    Progress::Queued => {
-                        let event = output.ok_or(Error::Invalid("missing TS player output"))?;
-                        self.on_event(event.into_event())?;
-                    }
-                    Progress::NeedInput(request) => {
+                let transport = self.transport.as_mut().ok_or(Error::Closed)?;
+                match transport.poll(work, cancel, self.limits.transport.pes_bytes)? {
+                    BackendStep::Event(event) => self.on_event(event)?,
+                    BackendStep::NeedInput(request) => {
                         return Ok(TsProgressiveStep::NeedInput(request));
                     }
-                    Progress::Backpressure {
+                    BackendStep::Backpressure {
                         requested,
                         available,
                     } => {
@@ -215,14 +289,16 @@ impl<S: Source> TsProgressiveReader<S> {
                             available,
                         });
                     }
-                    Progress::Ended => {
-                        self.player = None;
+                    BackendStep::End => {
+                        self.transport = None;
                         self.video.as_mut().ok_or(Error::Truncated)?.finish();
                         self.audio.as_mut().ok_or(Error::Truncated)?.finish();
                         self.phase = Phase::DrainVideo;
                     }
-                    Progress::Yield => {}
-                    _ => return Err(Error::Invalid("unexpected TS player state")),
+                    BackendStep::Yield => {}
+                    BackendStep::AwaitEntity => {
+                        return Err(Error::Invalid("unexpected TS entity boundary"));
+                    }
                 }
             }
             Phase::Video | Phase::DrainVideo => {
@@ -292,7 +368,7 @@ impl<S: Source> TsProgressiveReader<S> {
                 if config.configuration_epoch != tracks.epoch {
                     return Err(Error::Invalid("progressive TS configuration epoch"));
                 }
-                let pool = self.player.as_ref().ok_or(Error::Closed)?.budget();
+                let pool = self.transport.as_ref().ok_or(Error::Closed)?.engine.pool();
                 if config.track == tracks.video {
                     self.video = Some(AvcTsReader::new_progressive(pool, config, self.limits.avc)?);
                 } else if config.track == tracks.audio {
@@ -401,7 +477,7 @@ impl<S: Source> TsProgressiveReader<S> {
 
     fn fail(&mut self) {
         self.phase = Phase::Failed;
-        self.player = None;
+        self.transport = None;
         self.video = None;
         self.audio = None;
     }
