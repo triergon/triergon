@@ -1,7 +1,0 @@
-{
-  "source-oracle.json": "27ccc04a3ed138eb76eb882570cb3c72d8ce5bc4017445282a467ca1c3eda0d8",
-  "candidate.json": "47e45edf9e5a86b18b44e529da523488e1f92776f935ff25f3a6bd8a7225424d",
-  "reference.json": "0e12aac202d09349912c3f2a8bce35580d423f97c63b756dcd43ececf095c69b",
-  "source-candidate.json": "e9c235083ecbd4bdbb341bca31fff2555d4887df2e1794dfad079710eca0ce8e",
-  "seek-comparisons.json": "1b09220ae66219e5d0237a20c895e835a4fe323834d60a95432ad8de322088d2"
-}

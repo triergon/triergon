@@ -8,6 +8,7 @@ mod archive;
 mod checks;
 mod corpus;
 mod ebml;
+mod evidence;
 mod fate;
 mod fetch;
 mod fuzz;
@@ -44,6 +45,9 @@ commands:
   fate-run       --case NAME [--demux-only]   run one supported upstream FATE case
   trace-identities --output F [--compare F] [--candidate W]
                  record the digest of every candidate trace over all recorded cases
+  evidence pack DIR OUT       deterministic .tar.gz of DIR; prints its SHA-256
+  evidence fetch SET [DIR]    fetch, verify and unpack an archived evidence set
+                              (harness/evidence/index.json; TRIERGON_EVIDENCE_ARCHIVE)
   fuzz           --manifest F --output DIR [--rounds N] [--seed N] [--maximum-input-bytes N]
                  [--maximum-output-bytes N] [--timeout-seconds S]
                  deterministic, replayable mutation campaign through JSON workers
@@ -81,6 +85,7 @@ fn main() -> ExitCode {
         Some("fate-run") => return fate_run(&root, &args[1..]),
         Some("graph") => graph(&root, &args[1..]),
         Some("fuzz") => return fuzz_campaign(&root, &args[1..]),
+        Some("evidence") => evidence(&root, &args[1..]),
         Some("trace-identities") => return trace_identities(&root, &args[1..]),
         Some("build-workers") => {
             harness::build::build(&root).map(|path| println!("{}", path.display()))
@@ -159,6 +164,24 @@ fn shell_library_path(value: &OsStr, built: &Path, toolchains: Option<&Path>) ->
         None
     } else {
         std::env::join_paths(kept).ok()
+    }
+}
+
+fn evidence(root: &Path, args: &[String]) -> Task {
+    match args {
+        [command, dir, out] if command == "pack" => {
+            println!(
+                "{}",
+                evidence::pack_command(Path::new(dir), Path::new(out))?
+            );
+            Ok(())
+        }
+        [command, set, rest @ ..] if command == "fetch" && rest.len() <= 1 => {
+            let into = rest.first().map(Path::new);
+            println!("{}", evidence::fetch(root, set, into)?);
+            Ok(())
+        }
+        _ => Err("usage: evidence pack DIR OUT | evidence fetch SET [DIR]".into()),
     }
 }
 
