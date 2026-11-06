@@ -925,6 +925,19 @@ impl<'a> PacketCursor<'a> {
                                 slot.fragment_cto_minimum =
                                     slot.fragment_cto_minimum.min(i64::from(signed));
                             }
+                            if let [extent] = self.media
+                                && self.terminal.is_none()
+                                && self.forward_regular.is_none()
+                                && work.try_charge(2)
+                            {
+                                // A single extent needs no search state. Charge the same
+                                // lookup and bounds check as the resumable path.
+                                if sample.range.start < extent.start {
+                                    return Err(Error::Invalid("native sample outside mdat"));
+                                }
+                                sample.require_within(extent.clone())?;
+                                continue;
+                            }
                             self.checking = Some(sample);
                             self.low = 0;
                             self.high = self.media.len();
