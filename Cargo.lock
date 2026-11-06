@@ -30,6 +30,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "playback-worker"
+version = "0.0.0"
+dependencies = [
+ "triergon-core",
+ "triergon-framing",
+ "triergon-harness-protocol",
+ "triergon-matroska",
+ "triergon-playback",
+]
+
+[[package]]
 name = "triergon"
 version = "0.0.0"
 dependencies = [
