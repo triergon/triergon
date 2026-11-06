@@ -103,9 +103,11 @@ pub(crate) struct Core {
     pub configured: bool,
     /// Coupling channel state (one per CCE tag)
     pub cce: Vec<crate::cce::CceState>,
-    /// Debug statistics of the last block: one line per decoded element (only collected
-    /// when `stats_enabled`).
+    /// Development statistics of the last block: one line per decoded element (only
+    /// collected when `stats_enabled`).
+    #[cfg(feature = "inspect")]
     pub stats: String,
+    #[cfg(feature = "inspect")]
     pub stats_enabled: bool,
     /// Output samples (per channel) still to be dropped (FFmpeg skip_samples behaviour).
     pub skip_samples: usize,
@@ -113,7 +115,9 @@ pub(crate) struct Core {
     pub frames_out: u64,
     /// PS may switch a mono output to stereo after the first frame (not FFmpeg behaviour).
     pub ps_upgrade_allowed: bool,
-    /// Debug: bit ranges (relative to the payload) of SBR fill elements of the last frame.
+    /// Development aid: bit ranges (relative to the payload) of SBR fill elements of the
+    /// last frame.
+    #[cfg(feature = "inspect")]
     pub sbr_fil_ranges: Vec<(usize, usize)>,
 }
 
@@ -135,9 +139,12 @@ impl Core {
             unordered: false,
             configured: false,
             cce: Vec::new(),
+            #[cfg(feature = "inspect")]
             stats: String::new(),
+            #[cfg(feature = "inspect")]
             stats_enabled: false,
             skip_samples: 0,
+            #[cfg(feature = "inspect")]
             sbr_fil_ranges: Vec::new(),
             frames_out: 0,
             ps_upgrade_allowed: false,
@@ -375,6 +382,7 @@ impl Core {
                     last_elem = None;
                 }
                 ID_FIL => {
+                    #[cfg(feature = "inspect")]
                     let fil_start = br.position() - 3;
                     let mut count = br.read(4) as usize;
                     if count == 15 {
@@ -406,6 +414,7 @@ impl Core {
                             }
                         }
                         if let (EXT_SBR_DATA | EXT_SBR_DATA_CRC, Some(ei)) = (ext, last_elem) {
+                            #[cfg(feature = "inspect")]
                             self.sbr_fil_ranges.push((fil_start, end));
                             let saved_end = br.end();
                             br.set_end(end);
@@ -561,11 +570,8 @@ impl Core {
         Ok(changed)
     }
 
-    fn finish_frame(&mut self, pending_cce: &[usize]) -> Result<()> {
-        let cfg = CoreCfg {
-            aot: self.aot,
-            sf_index: self.sf_index,
-        };
+    #[cfg(feature = "inspect")]
+    fn record_stats(&mut self) {
         self.stats.clear();
         for e in self.elements.iter().filter(|_| self.stats_enabled) {
             if !e.decoded {
@@ -615,6 +621,15 @@ impl Core {
                     .collect::<Vec<_>>()
             );
         }
+    }
+
+    fn finish_frame(&mut self, pending_cce: &[usize]) -> Result<()> {
+        let cfg = CoreCfg {
+            aot: self.aot,
+            sf_index: self.sf_index,
+        };
+        #[cfg(feature = "inspect")]
+        self.record_stats();
         crate::cce::process_cces(self);
         for ei in 0..self.elements.len() {
             let e = &mut self.elements[ei];

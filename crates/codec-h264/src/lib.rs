@@ -10,6 +10,8 @@ mod cabac;
 mod cavlc;
 mod deblock;
 mod dpb;
+/// Stream feature inspection for classifying conformance vectors (research tooling).
+#[cfg(feature = "inspect")]
 pub mod inspect;
 mod inter;
 mod intra;

@@ -121,9 +121,9 @@ impl ChannelLayout {
         self.count as usize
     }
 
-    /// FFmpeg's layout name for this speaker set (e.g. `5.1(side)`), or `None` when it is
+    /// Conventional name of this speaker set (e.g. `5.1(side)`, as ffprobe prints it), or `None` when it is
     /// not one of the named layouts.
-    pub fn ffmpeg_name(&self) -> Option<&'static str> {
+    pub fn layout_name(&self) -> Option<&'static str> {
         use Speaker::*;
         Some(match self.speakers() {
             [FrontCenter] => "mono",

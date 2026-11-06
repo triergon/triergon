@@ -22,7 +22,7 @@ fn main() {
         }
         let payload = &au[7..];
         let nbits = payload.len() * 8;
-        let ranges = dec.debug_sbr_fil_ranges().to_vec();
+        let ranges = dec.sbr_fill_ranges().to_vec();
         let mut bits: Vec<u8> = Vec::with_capacity(nbits);
         let mut p = 0;
         for &(s, e) in &ranges {

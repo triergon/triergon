@@ -118,8 +118,8 @@ impl ChannelLayout {
         self.speakers().iter().position(|&s| s == speaker)
     }
 
-    /// FFmpeg's name for well-known layouts (as printed by ffprobe), else the speaker list.
-    pub fn ffmpeg_name(&self) -> String {
+    /// Conventional name of a well-known layout (e.g. `5.1(side)`, as ffprobe prints it), else the speaker list.
+    pub fn layout_name(&self) -> String {
         use Speaker::*;
         let known: &[(&[Speaker], &str)] = &[
             (&[FrontCenter], "mono"),

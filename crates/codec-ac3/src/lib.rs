@@ -74,9 +74,21 @@ pub enum CrcPolicy {
 pub struct DecoderOptions {
     pub crc: CrcPolicy,
     pub noise: NoiseMode,
-    /// Reproduce FFmpeg 9.0.2 output conventions, including the seed-zero noise stream.
-    /// Default on because the D4 numeric contract uses FFmpeg output.
-    pub ffmpeg_compat: bool,
+    pub compat: Compat,
+}
+
+/// Output conventions the decoder reproduces where A/52 leaves a choice or the
+/// pinned reference decoder deviates from it.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum Compat {
+    /// The pinned reference decoder (FFmpeg 9.0.2): its seed-zero dither noise
+    /// stream, its E-AC-3 HEBAP-4 VQ table offset and its first-frame conventions;
+    /// E-AC-3 reduced sample rates are refused as it refuses them. Output is compared with the reference decoder,
+    /// so this is the default.
+    #[default]
+    Reference,
+    /// A/52:2018 only; also decodes E-AC-3 reduced sample rates.
+    Specification,
 }
 
 impl Default for DecoderOptions {
@@ -84,7 +96,7 @@ impl Default for DecoderOptions {
         DecoderOptions {
             crc: CrcPolicy::default(),
             noise: NoiseMode::default(),
-            ffmpeg_compat: true,
+            compat: Compat::Reference,
         }
     }
 }
@@ -245,14 +257,16 @@ impl Decoder {
             buf: vec![0u8; MAX_FRAME_BYTES + PAD].into_boxed_slice(),
             imdct: imdct::Imdct::new(),
             groups: Box::new(GroupTables::new()),
-            rng: noise::Rng::new(opts.ffmpeg_compat && opts.noise == NoiseMode::Normal),
+            rng: noise::Rng::new(
+                opts.compat == Compat::Reference && opts.noise == NoiseMode::Normal,
+            ),
             indep: Substream::new(),
             deps,
             last_block: Box::new([[0.0; 256]; MAX_CHANNELS]),
             last_layout: None,
             scratch: Box::new([0.0; 256]),
             trace: Trace::default(),
-            quirk_armed: opts.ffmpeg_compat,
+            quirk_armed: opts.compat == Compat::Reference,
             last_downmix: None,
         }
     }
@@ -268,7 +282,7 @@ impl Decoder {
             b.fill(0.0);
         }
         self.last_layout = None;
-        self.quirk_armed = self.opts.ffmpeg_compat;
+        self.quirk_armed = self.opts.compat == Compat::Reference;
     }
 
     #[doc(hidden)]
@@ -319,7 +333,7 @@ impl Decoder {
                 if off > 0
                     && (h.num_blocks != first.num_blocks || h.sample_rate != first.sample_rate)
                 {
-                    if !self.opts.ffmpeg_compat {
+                    if self.opts.compat != Compat::Reference {
                         return Err(DecodeError::InvalidData(
                             "dependent substream block count/rate mismatch",
                         ));
@@ -345,7 +359,7 @@ impl Decoder {
         }
         // FFmpeg 9.0.2 refuses E-AC-3 reduced sample rates (fscod2) in any substream it would
         // decode and outputs nothing for the access unit (black-box, STATUS.md).
-        if self.opts.ffmpeg_compat
+        if self.opts.compat == Compat::Reference
             && frames[..nframes]
                 .iter()
                 .flatten()
@@ -555,7 +569,7 @@ impl Decoder {
                 let id = h.substream_id as usize;
                 self.deps[id].get_or_insert_with(Substream::new)
             };
-            sub.ffmpeg_compat = self.opts.ffmpeg_compat;
+            sub.reference_compat = self.opts.compat == Compat::Reference;
             let mut sink = BlockSink {
                 planes: &mut out.planes,
                 base,

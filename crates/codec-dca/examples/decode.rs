@@ -132,7 +132,7 @@ fn main() {
                         frame.sample_rate,
                         frame
                             .layout
-                            .ffmpeg_name()
+                            .layout_name()
                             .map(str::to_string)
                             .unwrap_or_else(|| {
                                 let names: Vec<&str> =
