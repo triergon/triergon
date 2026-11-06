@@ -14,7 +14,7 @@ release ([reference pins](quality.md#reference-and-corpus)).
 | Matroska / WebM | Incremental reader: lacing, header removal, bounded zlib, Cues and preroll, colour and static HDR, chapters, tags, attachments, side data | 116 workloads in six feature groups, including an external HDR sample, and four FATE demux comparisons | 1.1558 (116/116 within 1.20) | heap ≤0.627, RSS ≤0.966 | full EBML/Matroska scope |
 | Matroska startup and seek | Startup and seek with lazy scan replay | 44 cases, 1,344 packets | 1.1920 (44/44 within 1.20) | heap ≤0.404, total RSS ≤0.812 | — |
 | Matroska audio clocks | AAC, AC-3, E-AC-3 startup and forward clocks | 10 inputs | 0.17 | heap 0.07, RSS 0.60 | audio seek |
-| ISO BMFF / MP4 | Regular and fragmented files, edit lists, seek and range plans, QuickTime compatibility, bounded AAC configuration and regular table recovery, timing, sync and terminal media prefixes; AVC, HEVC, AAC, AC-3, E-AC-3, DTS core, AV1, VP9 | 255 inputs, 1,020 open and index comparisons (972 matching outputs and 48 matching refusal outcomes with compatibility policies) | 1.1556 (52/52 within 1.20) | heap ≤0.294, total RSS ≤0.725 (52/52) | performance and memory on the remaining workloads |
+| ISO BMFF / MP4 | Regular and fragmented files, edit lists, seek and range plans, QuickTime compatibility, bounded AAC configuration and regular table recovery, timing, sync and terminal media prefixes; AVC, HEVC, AAC, AC-3, E-AC-3, DTS core, AV1, VP9 | 255 inputs, 1,020 open and index comparisons (972 matching outputs and 48 matching refusal outcomes with compatibility policies) | 1.3166 (954/972 within 1.20) | heap ≤0.294, total RSS ≤0.725 (52 measured workloads) | 18 index workloads with one-byte input above 1.20, full-set memory |
 | MPEG-TS | PSI, continuity, PES assembly; TS188 and M2TS192 | 272-request set (80 field matches, 23 open) | not measured | not measured | access-unit demux, broader profiles |
 | HLS segments | Independent TS188 segments: AVC or HEVC with AAC, AC-3 or E-AC-3 | 71 packet comparisons, 10 measured workloads | 1.1914 (10/10 within 1.20) | heap ≤0.022, total RSS ≤0.725 | other profiles |
 | Packet framing | AVC/HEVC configuration and NAL framing, AV1, VP9, AC-3, E-AC-3, DTS core | 125 cases; DTS core byte-exact on 37,125 projections and 1,172 FATE packets | 1.2395 | heap 0.98, RSS 0.99 | above 1.20; full AVC/HEVC/ADTS grammar |
@@ -30,6 +30,7 @@ release ([reference pins](quality.md#reference-and-corpus)).
 | Case | Worst upper bound |
 |---|---|
 | Packet framing: 125-case set | 1.2395 |
+| ISO BMFF index with one-byte input | 1.3166 |
 
 ## Measured revisions
 
@@ -46,6 +47,7 @@ have not been checked against it. Their numbers stay as measured until re-measur
 | Matroska startup and seek | `fffb4a58ad0789338871d3032599e3116e5cb3d5` | `f449a8af7381be72dad4ffaba5615a99a0884a8bfb3a61b19c35f961f171f17a` |
 | ISO BMFF / MP4 | `f958c0b9624a8b7c7bd91b7d2a0c30299ae1dbed` | `fd718807e0ec1e6287bcb690226bf7056b79985796e74eba54f43544a034bc2c` |
 | ISO BMFF comparison | `0a033ec3406aebd09d191298a546659e02c6b76c` | `f56d3fa78b8cc70222f58c7cfa9a17331b0924a9070c7ff6ecc6dc1f213561bc` |
+| ISO BMFF open and index runtime | `f880768ae9acb3906778d16e8c522577c4e0385e` | `bac2ceeb165144a6a232509c33884c4987b4a440eb675f3c04de5a0da4fbc4a7` |
 | HLS segments | `7699c80caff6efdce9be8226d12bfa606dadd7b2` | `e008a7fc75c87deb903038cdd38d4e417cf0efa8d92592f9fc6105faecbba991` |
 | Capture, timing and memory | `e2cb0bea2c2fae823baef8169888ca84cf8b01f0` | `11f0572cf6d9294023340a35970f8fa5c4f6e75abfdab55d8e1fb67f0228f983` |
 | Capture, earlier timing | `1831a2aa54e56d45472e171429a98fe878055449` | `fac200b915c2b9a984e5b91cba29e7a3c016690596f128524f46c8f2cb40b6e6` |
