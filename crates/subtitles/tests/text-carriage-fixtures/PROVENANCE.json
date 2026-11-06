@@ -19,7 +19,7 @@
     },
     {
       "id": "srt-basic--decoder-observation",
-      "profile": "compiled-decoder-control-not-Streem-text-runtime",
+      "profile": "compiled-decoder-control",
       "raw_jsonl": ".research/aws-linux/exports/18.194.177.174/linux-native-features-1793468441758970535/text/srt-basic--decoder-observation.jsonl",
       "sha256": "72750fc77c1e98d47e7a0b9c2c2bd9bfb755432fde83e0de29ceb9fb6be50bda",
       "records": 38
@@ -40,7 +40,7 @@
     },
     {
       "id": "srt-crlf-multiline--decoder-observation",
-      "profile": "compiled-decoder-control-not-Streem-text-runtime",
+      "profile": "compiled-decoder-control",
       "raw_jsonl": ".research/aws-linux/exports/18.194.177.174/linux-native-features-1793468441758970535/text/srt-crlf-multiline--decoder-observation.jsonl",
       "sha256": "f76d901997db2518b8ac33ed21bbe03a348348400451f9820899450de8f20f05",
       "records": 38
@@ -61,7 +61,7 @@
     },
     {
       "id": "srt-unicode-no-normalization--decoder-observation",
-      "profile": "compiled-decoder-control-not-Streem-text-runtime",
+      "profile": "compiled-decoder-control",
       "raw_jsonl": ".research/aws-linux/exports/18.194.177.174/linux-native-features-1793468441758970535/text/srt-unicode-no-normalization--decoder-observation.jsonl",
       "sha256": "8cb5eee4b8788fb5b01e270c05941936b524f9c49de3cbb251f824fd5bceda10",
       "records": 38
@@ -82,7 +82,7 @@
     },
     {
       "id": "srt-overlap-order--decoder-observation",
-      "profile": "compiled-decoder-control-not-Streem-text-runtime",
+      "profile": "compiled-decoder-control",
       "raw_jsonl": ".research/aws-linux/exports/18.194.177.174/linux-native-features-1793468441758970535/text/srt-overlap-order--decoder-observation.jsonl",
       "sha256": "4d5b1b4038fcce2dc19d2b4276a3d9941b0a477449ccb37ee9c980b2c7153d38",
       "records": 46
@@ -103,7 +103,7 @@
     },
     {
       "id": "srt-wide-hours-profile--decoder-observation",
-      "profile": "compiled-decoder-control-not-Streem-text-runtime",
+      "profile": "compiled-decoder-control",
       "raw_jsonl": ".research/aws-linux/exports/18.194.177.174/linux-native-features-1793468441758970535/text/srt-wide-hours-profile--decoder-observation.jsonl",
       "sha256": "5d3f5560b2c2df7f35ed4b746b868154ac344d5f64d67757081ed952cedd8162",
       "records": 38
@@ -124,7 +124,7 @@
     },
     {
       "id": "srt-utf8-bom--decoder-observation",
-      "profile": "compiled-decoder-control-not-Streem-text-runtime",
+      "profile": "compiled-decoder-control",
       "raw_jsonl": ".research/aws-linux/exports/18.194.177.174/linux-native-features-1793468441758970535/text/srt-utf8-bom--decoder-observation.jsonl",
       "sha256": "4450b472ea858fddf873f15df6020cc431ecad815609a2500481d2156eddd412",
       "records": 38
@@ -145,7 +145,7 @@
     },
     {
       "id": "srt-utf16be-bom--decoder-observation",
-      "profile": "compiled-decoder-control-not-Streem-text-runtime",
+      "profile": "compiled-decoder-control",
       "raw_jsonl": ".research/aws-linux/exports/18.194.177.174/linux-native-features-1793468441758970535/text/srt-utf16be-bom--decoder-observation.jsonl",
       "sha256": "424a17eb210d31836d3ce7fa6ef4553338fa36b41f3408188f073c66be47cf34",
       "records": 35
@@ -166,7 +166,7 @@
     },
     {
       "id": "srt-utf16le-bom--decoder-observation",
-      "profile": "compiled-decoder-control-not-Streem-text-runtime",
+      "profile": "compiled-decoder-control",
       "raw_jsonl": ".research/aws-linux/exports/18.194.177.174/linux-native-features-1793468441758970535/text/srt-utf16le-bom--decoder-observation.jsonl",
       "sha256": "00c914cd992ae6061dde95d0d376da2f7d5985acd9039fc4155bad1faf67ca03",
       "records": 38
@@ -187,7 +187,7 @@
     },
     {
       "id": "srt-explicit-utf16be--decoder-observation",
-      "profile": "compiled-decoder-control-not-Streem-text-runtime",
+      "profile": "compiled-decoder-control",
       "raw_jsonl": ".research/aws-linux/exports/18.194.177.174/linux-native-features-1793468441758970535/text/srt-explicit-utf16be--decoder-observation.jsonl",
       "sha256": "3c59844663409590b8bcbcc1b1c85b41f94ffd8611fd1f3f820853072910693f",
       "records": 19
@@ -208,7 +208,7 @@
     },
     {
       "id": "srt-end-before-start--decoder-observation",
-      "profile": "compiled-decoder-control-not-Streem-text-runtime",
+      "profile": "compiled-decoder-control",
       "raw_jsonl": ".research/aws-linux/exports/18.194.177.174/linux-native-features-1793468441758970535/text/srt-end-before-start--decoder-observation.jsonl",
       "sha256": "abc1782f2fdf07b541c220ebab13f56c5c84f37b009bad24c9f9397081ea84c3",
       "records": 38
@@ -229,7 +229,7 @@
     },
     {
       "id": "srt-sequence-missing--decoder-observation",
-      "profile": "compiled-decoder-control-not-Streem-text-runtime",
+      "profile": "compiled-decoder-control",
       "raw_jsonl": ".research/aws-linux/exports/18.194.177.174/linux-native-features-1793468441758970535/text/srt-sequence-missing--decoder-observation.jsonl",
       "sha256": "4d4c4a243dafa123ad1c294e73026a3015dd6ec3de1ceb3069dc7f6f6c87abbd",
       "records": 19
@@ -250,7 +250,7 @@
     },
     {
       "id": "srt-fraction-width--decoder-observation",
-      "profile": "compiled-decoder-control-not-Streem-text-runtime",
+      "profile": "compiled-decoder-control",
       "raw_jsonl": ".research/aws-linux/exports/18.194.177.174/linux-native-features-1793468441758970535/text/srt-fraction-width--decoder-observation.jsonl",
       "sha256": "7a3c55e70b9b6d5ea633605f882e0b8699f37b52413dfa819f0deb34d70f09f7",
       "records": 38
@@ -271,7 +271,7 @@
     },
     {
       "id": "srt-overlong-utf8--decoder-observation",
-      "profile": "compiled-decoder-control-not-Streem-text-runtime",
+      "profile": "compiled-decoder-control",
       "raw_jsonl": ".research/aws-linux/exports/18.194.177.174/linux-native-features-1793468441758970535/text/srt-overlong-utf8--decoder-observation.jsonl",
       "sha256": "c70fd0009e26213e498d186311d97f9688563232c9627fcc221672fc51d6dfc8",
       "records": 35
@@ -292,7 +292,7 @@
     },
     {
       "id": "srt-lone-surrogate--decoder-observation",
-      "profile": "compiled-decoder-control-not-Streem-text-runtime",
+      "profile": "compiled-decoder-control",
       "raw_jsonl": ".research/aws-linux/exports/18.194.177.174/linux-native-features-1793468441758970535/text/srt-lone-surrogate--decoder-observation.jsonl",
       "sha256": "c4916c80a3572e7a9f1df5242e22007031b060ddbef9eab85f21ec044f3626ce",
       "records": 23
@@ -313,7 +313,7 @@
     },
     {
       "id": "vtt-short-timestamps--decoder-observation",
-      "profile": "compiled-decoder-control-not-Streem-text-runtime",
+      "profile": "compiled-decoder-control",
       "raw_jsonl": ".research/aws-linux/exports/18.194.177.174/linux-native-features-1793468441758970535/text/vtt-short-timestamps--decoder-observation.jsonl",
       "sha256": "355b0dbf9ae7e92a9ba48eefbdf86b2cdb002ad65e08aef96bc9da6d7a269f20",
       "records": 38
@@ -334,7 +334,7 @@
     },
     {
       "id": "vtt-id-settings--decoder-observation",
-      "profile": "compiled-decoder-control-not-Streem-text-runtime",
+      "profile": "compiled-decoder-control",
       "raw_jsonl": ".research/aws-linux/exports/18.194.177.174/linux-native-features-1793468441758970535/text/vtt-id-settings--decoder-observation.jsonl",
       "sha256": "a8f038454111dce18cb28c38e9164c7f6b0b907da8cd8eeb8510ed756ae5d8ac",
       "records": 38
@@ -355,7 +355,7 @@
     },
     {
       "id": "vtt-crlf-multiline--decoder-observation",
-      "profile": "compiled-decoder-control-not-Streem-text-runtime",
+      "profile": "compiled-decoder-control",
       "raw_jsonl": ".research/aws-linux/exports/18.194.177.174/linux-native-features-1793468441758970535/text/vtt-crlf-multiline--decoder-observation.jsonl",
       "sha256": "6de7dae531c666e880eb6e741af37f088703bdc9fe0e6713341ac9a72b8dfa18",
       "records": 38
@@ -376,7 +376,7 @@
     },
     {
       "id": "vtt-cr-lines--decoder-observation",
-      "profile": "compiled-decoder-control-not-Streem-text-runtime",
+      "profile": "compiled-decoder-control",
       "raw_jsonl": ".research/aws-linux/exports/18.194.177.174/linux-native-features-1793468441758970535/text/vtt-cr-lines--decoder-observation.jsonl",
       "sha256": "a78791fcbfae521fb7350a184c2f37885d670641bd2b212c35a7e41a5eed200c",
       "records": 23
@@ -397,7 +397,7 @@
     },
     {
       "id": "vtt-utf8-bom--decoder-observation",
-      "profile": "compiled-decoder-control-not-Streem-text-runtime",
+      "profile": "compiled-decoder-control",
       "raw_jsonl": ".research/aws-linux/exports/18.194.177.174/linux-native-features-1793468441758970535/text/vtt-utf8-bom--decoder-observation.jsonl",
       "sha256": "027aa41b45461ef5ed6f14ab2852e0bde498cb9d9b5ec76b5f42d32731964eb8",
       "records": 38
@@ -418,7 +418,7 @@
     },
     {
       "id": "vtt-payload-markup-exact--decoder-observation",
-      "profile": "compiled-decoder-control-not-Streem-text-runtime",
+      "profile": "compiled-decoder-control",
       "raw_jsonl": ".research/aws-linux/exports/18.194.177.174/linux-native-features-1793468441758970535/text/vtt-payload-markup-exact--decoder-observation.jsonl",
       "sha256": "362a22aaa4d90ae1b12c55dc5381bce91bdea3d410e1e47b7d2691fa759d290a",
       "records": 38
@@ -439,7 +439,7 @@
     },
     {
       "id": "vtt-metadata-order--decoder-observation",
-      "profile": "compiled-decoder-control-not-Streem-text-runtime",
+      "profile": "compiled-decoder-control",
       "raw_jsonl": ".research/aws-linux/exports/18.194.177.174/linux-native-features-1793468441758970535/text/vtt-metadata-order--decoder-observation.jsonl",
       "sha256": "868a2b3c014362f01d7cd41bab181b0c5192b23067c1f0448efd420d49dc731f",
       "records": 38
@@ -460,7 +460,7 @@
     },
     {
       "id": "vtt-note-between-cues--decoder-observation",
-      "profile": "compiled-decoder-control-not-Streem-text-runtime",
+      "profile": "compiled-decoder-control",
       "raw_jsonl": ".research/aws-linux/exports/18.194.177.174/linux-native-features-1793468441758970535/text/vtt-note-between-cues--decoder-observation.jsonl",
       "sha256": "9eecf24600c414e4ae65b0e75c2dfe50e8f280cafe988893d082a25ed771271c",
       "records": 46
@@ -481,7 +481,7 @@
     },
     {
       "id": "vtt-tab-separators--decoder-observation",
-      "profile": "compiled-decoder-control-not-Streem-text-runtime",
+      "profile": "compiled-decoder-control",
       "raw_jsonl": ".research/aws-linux/exports/18.194.177.174/linux-native-features-1793468441758970535/text/vtt-tab-separators--decoder-observation.jsonl",
       "sha256": "cfffaffaa57a59053b36f6aa442b0176d04bafbcdd9ba390faf1eac7d36f5b2e",
       "records": 38
@@ -502,7 +502,7 @@
     },
     {
       "id": "vtt-wide-hours--decoder-observation",
-      "profile": "compiled-decoder-control-not-Streem-text-runtime",
+      "profile": "compiled-decoder-control",
       "raw_jsonl": ".research/aws-linux/exports/18.194.177.174/linux-native-features-1793468441758970535/text/vtt-wide-hours--decoder-observation.jsonl",
       "sha256": "f8ece8c09b1dfcab2f5dc08f3a6f8ecfd18d14ae44d79dcfd004ca318b0b18bc",
       "records": 38
@@ -523,7 +523,7 @@
     },
     {
       "id": "vtt-overlap-order--decoder-observation",
-      "profile": "compiled-decoder-control-not-Streem-text-runtime",
+      "profile": "compiled-decoder-control",
       "raw_jsonl": ".research/aws-linux/exports/18.194.177.174/linux-native-features-1793468441758970535/text/vtt-overlap-order--decoder-observation.jsonl",
       "sha256": "489660b8c605042b5023f21f23265aa66c0ee4621910fdff6675d17195442243",
       "records": 46
@@ -544,7 +544,7 @@
     },
     {
       "id": "vtt-header-annotation--decoder-observation",
-      "profile": "compiled-decoder-control-not-Streem-text-runtime",
+      "profile": "compiled-decoder-control",
       "raw_jsonl": ".research/aws-linux/exports/18.194.177.174/linux-native-features-1793468441758970535/text/vtt-header-annotation--decoder-observation.jsonl",
       "sha256": "a28f023522d8b637d4b6ff74bfe43b07ef0f77c13206ec7abfae1b260ff9ac38",
       "records": 38
@@ -565,7 +565,7 @@
     },
     {
       "id": "vtt-empty-document--decoder-observation",
-      "profile": "compiled-decoder-control-not-Streem-text-runtime",
+      "profile": "compiled-decoder-control",
       "raw_jsonl": ".research/aws-linux/exports/18.194.177.174/linux-native-features-1793468441758970535/text/vtt-empty-document--decoder-observation.jsonl",
       "sha256": "8106e7847605aea4ae41cb343f19bbd93d9ae9dec808980dd9603eef9805302a",
       "records": 23
@@ -586,7 +586,7 @@
     },
     {
       "id": "vtt-bad-signature--decoder-observation",
-      "profile": "compiled-decoder-control-not-Streem-text-runtime",
+      "profile": "compiled-decoder-control",
       "raw_jsonl": ".research/aws-linux/exports/18.194.177.174/linux-native-features-1793468441758970535/text/vtt-bad-signature--decoder-observation.jsonl",
       "sha256": "9dc9aacabb241bcf0f283c401e715d2316b542b33aad0d963d15dbea6e4b947c",
       "records": 23
@@ -607,7 +607,7 @@
     },
     {
       "id": "vtt-utf16-refused--decoder-observation",
-      "profile": "compiled-decoder-control-not-Streem-text-runtime",
+      "profile": "compiled-decoder-control",
       "raw_jsonl": ".research/aws-linux/exports/18.194.177.174/linux-native-features-1793468441758970535/text/vtt-utf16-refused--decoder-observation.jsonl",
       "sha256": "d4dce39f1f869c479da3981e176fb1578836965d6ccee1f6b5e7112808a6267d",
       "records": 23
@@ -628,7 +628,7 @@
     },
     {
       "id": "vtt-zero-interval-strict--decoder-observation",
-      "profile": "compiled-decoder-control-not-Streem-text-runtime",
+      "profile": "compiled-decoder-control",
       "raw_jsonl": ".research/aws-linux/exports/18.194.177.174/linux-native-features-1793468441758970535/text/vtt-zero-interval-strict--decoder-observation.jsonl",
       "sha256": "1aa42c857e3ec4307e25f8cbc77bce92b3cb12258013e1f2a1f460ccb7d0704e",
       "records": 38
@@ -649,7 +649,7 @@
     },
     {
       "id": "vtt-surrogate-utf8--decoder-observation",
-      "profile": "compiled-decoder-control-not-Streem-text-runtime",
+      "profile": "compiled-decoder-control",
       "raw_jsonl": ".research/aws-linux/exports/18.194.177.174/linux-native-features-1793468441758970535/text/vtt-surrogate-utf8--decoder-observation.jsonl",
       "sha256": "a715c93186a6f6b0d48fd8f7ed19be245feb3328f30c08f65e44b9fc90f12ba1",
       "records": 35
@@ -670,7 +670,7 @@
     },
     {
       "id": "vtt-missing-fraction--decoder-observation",
-      "profile": "compiled-decoder-control-not-Streem-text-runtime",
+      "profile": "compiled-decoder-control",
       "raw_jsonl": ".research/aws-linux/exports/18.194.177.174/linux-native-features-1793468441758970535/text/vtt-missing-fraction--decoder-observation.jsonl",
       "sha256": "476f2785d896e2329e75e1ffde935145ddd2bd922bfb8f6ec734a1570a5682a8",
       "records": 23
@@ -684,7 +684,7 @@
     },
     {
       "id": "tx3g-basic--observe",
-      "profile": "compiled-decoder-control-not-Streem-text-runtime",
+      "profile": "compiled-decoder-control",
       "raw_jsonl": ".research/aws-linux/exports/18.194.177.174/linux-native-features-1793468441758970535/text/tx3g-basic--observe.jsonl",
       "sha256": "28e2a47181b6241683030fb11712e6239402e804d7e9dd795cdf7f7f0281ed22",
       "records": 25
@@ -698,7 +698,7 @@
     },
     {
       "id": "tx3g-byte-not-character-count--observe",
-      "profile": "compiled-decoder-control-not-Streem-text-runtime",
+      "profile": "compiled-decoder-control",
       "raw_jsonl": ".research/aws-linux/exports/18.194.177.174/linux-native-features-1793468441758970535/text/tx3g-byte-not-character-count--observe.jsonl",
       "sha256": "0e5e012eb1f6be5b5fe5536e0dde7b57da436afc5a205f22af6ab9501f2e72ae",
       "records": 25
@@ -712,7 +712,7 @@
     },
     {
       "id": "tx3g-utf16be-bom--observe",
-      "profile": "compiled-decoder-control-not-Streem-text-runtime",
+      "profile": "compiled-decoder-control",
       "raw_jsonl": ".research/aws-linux/exports/18.194.177.174/linux-native-features-1793468441758970535/text/tx3g-utf16be-bom--observe.jsonl",
       "sha256": "55f48167bc42f0b5244b2cce02c237a4400ec1e377b981c7fbab6b9651d1d2f0",
       "records": 25
@@ -726,7 +726,7 @@
     },
     {
       "id": "tx3g-empty-sample--observe",
-      "profile": "compiled-decoder-control-not-Streem-text-runtime",
+      "profile": "compiled-decoder-control",
       "raw_jsonl": ".research/aws-linux/exports/18.194.177.174/linux-native-features-1793468441758970535/text/tx3g-empty-sample--observe.jsonl",
       "sha256": "6e8d51a25a30afb05eaed729203a52b4192169fbc33b9382f660c6129a306ad4",
       "records": 25
@@ -740,7 +740,7 @@
     },
     {
       "id": "tx3g-embedded-nul--observe",
-      "profile": "compiled-decoder-control-not-Streem-text-runtime",
+      "profile": "compiled-decoder-control",
       "raw_jsonl": ".research/aws-linux/exports/18.194.177.174/linux-native-features-1793468441758970535/text/tx3g-embedded-nul--observe.jsonl",
       "sha256": "ad0f6dd8562211a3dae986b99f44ac627bfb96e76d2a9e41bc3360516b5243ac",
       "records": 25
@@ -754,7 +754,7 @@
     },
     {
       "id": "tx3g-line-codepoints-exact--observe",
-      "profile": "compiled-decoder-control-not-Streem-text-runtime",
+      "profile": "compiled-decoder-control",
       "raw_jsonl": ".research/aws-linux/exports/18.194.177.174/linux-native-features-1793468441758970535/text/tx3g-line-codepoints-exact--observe.jsonl",
       "sha256": "147f16e2ba31a99fb4d9f465753fbf33d301054a74375b6cca87289f2c709616",
       "records": 25
@@ -768,7 +768,7 @@
     },
     {
       "id": "tx3g-style-highlight-raw--observe",
-      "profile": "compiled-decoder-control-not-Streem-text-runtime",
+      "profile": "compiled-decoder-control",
       "raw_jsonl": ".research/aws-linux/exports/18.194.177.174/linux-native-features-1793468441758970535/text/tx3g-style-highlight-raw--observe.jsonl",
       "sha256": "7964cb1f9dd621a35642ddc974865457552a4703ed5fa303a900382efb134b58",
       "records": 25
@@ -782,7 +782,7 @@
     },
     {
       "id": "tx3g-unknown-modifier--observe",
-      "profile": "compiled-decoder-control-not-Streem-text-runtime",
+      "profile": "compiled-decoder-control",
       "raw_jsonl": ".research/aws-linux/exports/18.194.177.174/linux-native-features-1793468441758970535/text/tx3g-unknown-modifier--observe.jsonl",
       "sha256": "6b5891de02d7034e6dc2a78a6dc2de5646fe892e21526e9b197303168b6dfad6",
       "records": 25
@@ -796,7 +796,7 @@
     },
     {
       "id": "tx3g-modifier-order--observe",
-      "profile": "compiled-decoder-control-not-Streem-text-runtime",
+      "profile": "compiled-decoder-control",
       "raw_jsonl": ".research/aws-linux/exports/18.194.177.174/linux-native-features-1793468441758970535/text/tx3g-modifier-order--observe.jsonl",
       "sha256": "053740b70ae1a0392cc0565166963257de5af7022d82b5dd98a7caa18b6dc5b3",
       "records": 25
@@ -810,7 +810,7 @@
     },
     {
       "id": "tx3g-empty-with-modifier--observe",
-      "profile": "compiled-decoder-control-not-Streem-text-runtime",
+      "profile": "compiled-decoder-control",
       "raw_jsonl": ".research/aws-linux/exports/18.194.177.174/linux-native-features-1793468441758970535/text/tx3g-empty-with-modifier--observe.jsonl",
       "sha256": "5942afd4a86334f688227af1b75fb3b914cc9d5021a483df8faca089f5b10b30",
       "records": 25
@@ -824,7 +824,7 @@
     },
     {
       "id": "tx3g-u16-byte-count-boundary--observe",
-      "profile": "compiled-decoder-control-not-Streem-text-runtime",
+      "profile": "compiled-decoder-control",
       "raw_jsonl": ".research/aws-linux/exports/18.194.177.174/linux-native-features-1793468441758970535/text/tx3g-u16-byte-count-boundary--observe.jsonl",
       "sha256": "9281256c9969068dd7633f4e444a2249c4904f89cbc20626a782816ffb84a074",
       "records": 25
@@ -838,7 +838,7 @@
     },
     {
       "id": "tx3g-missing-length--observe",
-      "profile": "compiled-decoder-control-not-Streem-text-runtime",
+      "profile": "compiled-decoder-control",
       "raw_jsonl": ".research/aws-linux/exports/18.194.177.174/linux-native-features-1793468441758970535/text/tx3g-missing-length--observe.jsonl",
       "sha256": "2215e0bccb0bbfc73015a93b6a21bf1269f158ea7c33a2ec2859a1f71719c513",
       "records": 25
@@ -852,7 +852,7 @@
     },
     {
       "id": "tx3g-text-overrun--observe",
-      "profile": "compiled-decoder-control-not-Streem-text-runtime",
+      "profile": "compiled-decoder-control",
       "raw_jsonl": ".research/aws-linux/exports/18.194.177.174/linux-native-features-1793468441758970535/text/tx3g-text-overrun--observe.jsonl",
       "sha256": "d68e1382b2440adb43ac936753d315540f7f0269a106bd11d93858b40f5e9144",
       "records": 25
@@ -866,7 +866,7 @@
     },
     {
       "id": "tx3g-utf16-odd--observe",
-      "profile": "compiled-decoder-control-not-Streem-text-runtime",
+      "profile": "compiled-decoder-control",
       "raw_jsonl": ".research/aws-linux/exports/18.194.177.174/linux-native-features-1793468441758970535/text/tx3g-utf16-odd--observe.jsonl",
       "sha256": "fd36ae190567b630a74411722a98e3506a37cd3d7da680c4982722939d36cca5",
       "records": 25
@@ -880,7 +880,7 @@
     },
     {
       "id": "tx3g-lone-surrogate--observe",
-      "profile": "compiled-decoder-control-not-Streem-text-runtime",
+      "profile": "compiled-decoder-control",
       "raw_jsonl": ".research/aws-linux/exports/18.194.177.174/linux-native-features-1793468441758970535/text/tx3g-lone-surrogate--observe.jsonl",
       "sha256": "3b03d5b1959d24644f153f784a7bfca70b8a32f7b45121e862b2159b1e3ffbe7",
       "records": 25
@@ -894,7 +894,7 @@
     },
     {
       "id": "tx3g-short-box--observe",
-      "profile": "compiled-decoder-control-not-Streem-text-runtime",
+      "profile": "compiled-decoder-control",
       "raw_jsonl": ".research/aws-linux/exports/18.194.177.174/linux-native-features-1793468441758970535/text/tx3g-short-box--observe.jsonl",
       "sha256": "72e4454857b33cea03e6052f51e959e97c5fd6728f8e4d4361062241ea9177bf",
       "records": 25
@@ -908,7 +908,7 @@
     },
     {
       "id": "tx3g-box-overrun--observe",
-      "profile": "compiled-decoder-control-not-Streem-text-runtime",
+      "profile": "compiled-decoder-control",
       "raw_jsonl": ".research/aws-linux/exports/18.194.177.174/linux-native-features-1793468441758970535/text/tx3g-box-overrun--observe.jsonl",
       "sha256": "7692f7cfdc1c41eb48f96d7c8bb35beed2bbc21b070a6a70970d98ee0a22b7ac",
       "records": 25
@@ -922,7 +922,7 @@
     },
     {
       "id": "tx3g-extended-box-gap--observe",
-      "profile": "compiled-decoder-control-not-Streem-text-runtime",
+      "profile": "compiled-decoder-control",
       "raw_jsonl": ".research/aws-linux/exports/18.194.177.174/linux-native-features-1793468441758970535/text/tx3g-extended-box-gap--observe.jsonl",
       "sha256": "755a5aa3f4ff44becbed1bd291644a6ca239a133627861be6c68530dca7b1902",
       "records": 25
@@ -936,7 +936,7 @@
     },
     {
       "id": "utf8-packet-markup--observe",
-      "profile": "compiled-decoder-control-not-Streem-text-runtime",
+      "profile": "compiled-decoder-control",
       "raw_jsonl": ".research/aws-linux/exports/18.194.177.174/linux-native-features-1793468441758970535/text/utf8-packet-markup--observe.jsonl",
       "sha256": "15079c73e8124360fb8d4e3e0856543cca699524f1518cade5e73476c2316837",
       "records": 34
@@ -950,7 +950,7 @@
     },
     {
       "id": "utf8-packet-unknown-time--observe",
-      "profile": "compiled-decoder-control-not-Streem-text-runtime",
+      "profile": "compiled-decoder-control",
       "raw_jsonl": ".research/aws-linux/exports/18.194.177.174/linux-native-features-1793468441758970535/text/utf8-packet-unknown-time--observe.jsonl",
       "sha256": "2f1cfc8a549e573bf86229b3865670aabb8635596e9fc94d958320557e791626",
       "records": 34
@@ -964,7 +964,7 @@
     },
     {
       "id": "utf8-packet-known-zero-duration--observe",
-      "profile": "compiled-decoder-control-not-Streem-text-runtime",
+      "profile": "compiled-decoder-control",
       "raw_jsonl": ".research/aws-linux/exports/18.194.177.174/linux-native-features-1793468441758970535/text/utf8-packet-known-zero-duration--observe.jsonl",
       "sha256": "667320fc3052c65f7b5f4d5283af8ca82e8c80c084e363c44383f8828968ba76",
       "records": 34
@@ -978,7 +978,7 @@
     },
     {
       "id": "utf8-packet-negative-start--observe",
-      "profile": "compiled-decoder-control-not-Streem-text-runtime",
+      "profile": "compiled-decoder-control",
       "raw_jsonl": ".research/aws-linux/exports/18.194.177.174/linux-native-features-1793468441758970535/text/utf8-packet-negative-start--observe.jsonl",
       "sha256": "ee5a5e41c4a92b89049f92f9ca67fd1edd6a9ec6071fd2acf209cf12ba1f79ac",
       "records": 34
@@ -992,7 +992,7 @@
     },
     {
       "id": "utf8-packet-raw-clock--observe",
-      "profile": "compiled-decoder-control-not-Streem-text-runtime",
+      "profile": "compiled-decoder-control",
       "raw_jsonl": ".research/aws-linux/exports/18.194.177.174/linux-native-features-1793468441758970535/text/utf8-packet-raw-clock--observe.jsonl",
       "sha256": "5b87f27671cd25fb0d80588d05ce2498726b7e7a9c5d2613cd70aea5f0615fa3",
       "records": 34
@@ -1006,7 +1006,7 @@
     },
     {
       "id": "utf8-packet-bom-nul-content--observe",
-      "profile": "compiled-decoder-control-not-Streem-text-runtime",
+      "profile": "compiled-decoder-control",
       "raw_jsonl": ".research/aws-linux/exports/18.194.177.174/linux-native-features-1793468441758970535/text/utf8-packet-bom-nul-content--observe.jsonl",
       "sha256": "326f60acb9bf240ba5a6f857383a5515ff25bda55b010ac49305ac8dacff8987",
       "records": 34
@@ -1020,7 +1020,7 @@
     },
     {
       "id": "utf8-packet-too-large-scalar--observe",
-      "profile": "compiled-decoder-control-not-Streem-text-runtime",
+      "profile": "compiled-decoder-control",
       "raw_jsonl": ".research/aws-linux/exports/18.194.177.174/linux-native-features-1793468441758970535/text/utf8-packet-too-large-scalar--observe.jsonl",
       "sha256": "b53e483f0dbf137160228b3a1e25d7907ecf45705fb4a13dcd51af9505676283",
       "records": 32
@@ -1034,7 +1034,7 @@
     },
     {
       "id": "utf8-packet-input-limit--observe",
-      "profile": "compiled-decoder-control-not-Streem-text-runtime",
+      "profile": "compiled-decoder-control",
       "raw_jsonl": ".research/aws-linux/exports/18.194.177.174/linux-native-features-1793468441758970535/text/utf8-packet-input-limit--observe.jsonl",
       "sha256": "c975e9deb66ea7f238a6e65869d46356f1c5237d79b62837ea1d2fc383eff154",
       "records": 34
@@ -1048,7 +1048,7 @@
     },
     {
       "id": "mkv-vtt-no-addition--observe",
-      "profile": "compiled-decoder-control-not-Streem-text-runtime",
+      "profile": "compiled-decoder-control",
       "raw_jsonl": ".research/aws-linux/exports/18.194.177.174/linux-native-features-1793468441758970535/text/mkv-vtt-no-addition--observe.jsonl",
       "sha256": "4195efd4bf9c6bb3e0ceab3c800cb3cb24b641a54f17f03ec95b56944baf4f7c",
       "records": 34
@@ -1062,7 +1062,7 @@
     },
     {
       "id": "mkv-vtt-settings-id-comments--observe",
-      "profile": "compiled-decoder-control-not-Streem-text-runtime",
+      "profile": "compiled-decoder-control",
       "raw_jsonl": ".research/aws-linux/exports/18.194.177.174/linux-native-features-1793468441758970535/text/mkv-vtt-settings-id-comments--observe.jsonl",
       "sha256": "ef41a009db02538528a4a71ac2a760ba82fc7d5254b90d25a6ff779ea540235a",
       "records": 34
@@ -1076,7 +1076,7 @@
     },
     {
       "id": "mkv-vtt-present-empty-fields--observe",
-      "profile": "compiled-decoder-control-not-Streem-text-runtime",
+      "profile": "compiled-decoder-control",
       "raw_jsonl": ".research/aws-linux/exports/18.194.177.174/linux-native-features-1793468441758970535/text/mkv-vtt-present-empty-fields--observe.jsonl",
       "sha256": "708ecba40d0b217fec3fb7163f68870315e2f862845d31ebf78e1b61157e007c",
       "records": 34
@@ -1090,7 +1090,7 @@
     },
     {
       "id": "mkv-vtt-relative-inline-time--observe",
-      "profile": "compiled-decoder-control-not-Streem-text-runtime",
+      "profile": "compiled-decoder-control",
       "raw_jsonl": ".research/aws-linux/exports/18.194.177.174/linux-native-features-1793468441758970535/text/mkv-vtt-relative-inline-time--observe.jsonl",
       "sha256": "8acdd00fc256fd36cec1196189a71aeb7e827e295006042826041781bec49280",
       "records": 34
@@ -1104,7 +1104,7 @@
     },
     {
       "id": "mkv-vtt-unknown-addition-opaque--observe",
-      "profile": "compiled-decoder-control-not-Streem-text-runtime",
+      "profile": "compiled-decoder-control",
       "raw_jsonl": ".research/aws-linux/exports/18.194.177.174/linux-native-features-1793468441758970535/text/mkv-vtt-unknown-addition-opaque--observe.jsonl",
       "sha256": "4fcfc14020a1fa19602477ed8481d77d86b344cfc7b2213fb579c147538e3fa5",
       "records": 34
@@ -1118,7 +1118,7 @@
     },
     {
       "id": "mkv-vtt-truncated-addition--observe",
-      "profile": "compiled-decoder-control-not-Streem-text-runtime",
+      "profile": "compiled-decoder-control",
       "raw_jsonl": ".research/aws-linux/exports/18.194.177.174/linux-native-features-1793468441758970535/text/mkv-vtt-truncated-addition--observe.jsonl",
       "sha256": "9bc5c3b989573fe64b9e082f5a25ca522ed5d67ce9dedcbe12a890369228bccf",
       "records": 34
@@ -1132,7 +1132,7 @@
     },
     {
       "id": "ass-raw-order-overrides--observe",
-      "profile": "compiled-decoder-control-not-Streem-text-runtime",
+      "profile": "compiled-decoder-control",
       "raw_jsonl": ".research/aws-linux/exports/18.194.177.174/linux-native-features-1793468441758970535/text/ass-raw-order-overrides--observe.jsonl",
       "sha256": "86c61a4505a83e4f02a0b747ae4160a665880668905cce8afbfccde16b251aa0",
       "records": 34
@@ -1146,7 +1146,7 @@
     },
     {
       "id": "ass-ssa-empty-layer--observe",
-      "profile": "compiled-decoder-control-not-Streem-text-runtime",
+      "profile": "compiled-decoder-control",
       "raw_jsonl": ".research/aws-linux/exports/18.194.177.174/linux-native-features-1793468441758970535/text/ass-ssa-empty-layer--observe.jsonl",
       "sha256": "9b5b5a795b3b21c6a8d198c0bdd3455913080af515996bbe6c0474ba43bcc31f",
       "records": 34
@@ -1160,7 +1160,7 @@
     },
     {
       "id": "ass-private-verbatim--observe",
-      "profile": "compiled-decoder-control-not-Streem-text-runtime",
+      "profile": "compiled-decoder-control",
       "raw_jsonl": ".research/aws-linux/exports/18.194.177.174/linux-native-features-1793468441758970535/text/ass-private-verbatim--observe.jsonl",
       "sha256": "9ef7f08fd389ee934677ea6c582ff53096be160764aa1cfd3806ae363c9fd960",
       "records": 34
@@ -1174,7 +1174,7 @@
     },
     {
       "id": "ass-unknown-charset-opaque--observe",
-      "profile": "compiled-decoder-control-not-Streem-text-runtime",
+      "profile": "compiled-decoder-control",
       "raw_jsonl": ".research/aws-linux/exports/18.194.177.174/linux-native-features-1793468441758970535/text/ass-unknown-charset-opaque--observe.jsonl",
       "sha256": "7666035ac759ebf9a1537f0fc4531a925fc35a13e63a2dafbca10a005c6db192",
       "records": 32
@@ -1195,7 +1195,7 @@
     },
     {
       "id": "ass-empty-not-clear--observe",
-      "profile": "compiled-decoder-control-not-Streem-text-runtime",
+      "profile": "compiled-decoder-control",
       "raw_jsonl": ".research/aws-linux/exports/18.194.177.174/linux-native-features-1793468441758970535/text/ass-empty-not-clear--observe.jsonl",
       "sha256": "f98466133839c6abadc20d4476b20e985b0399a1fe6ff541b5bb10b0a82889c0",
       "records": 32
@@ -1209,7 +1209,7 @@
     },
     {
       "id": "ass-known-duration-unknown-start--observe",
-      "profile": "compiled-decoder-control-not-Streem-text-runtime",
+      "profile": "compiled-decoder-control",
       "raw_jsonl": ".research/aws-linux/exports/18.194.177.174/linux-native-features-1793468441758970535/text/ass-known-duration-unknown-start--observe.jsonl",
       "sha256": "f0c5e394b5c56cfe65f4cf13a5fc5d32034e64aaf8e1b1a26c954d0dc8366eb5",
       "records": 34
@@ -1223,7 +1223,7 @@
     },
     {
       "id": "ass-private-present-empty--observe",
-      "profile": "compiled-decoder-control-not-Streem-text-runtime",
+      "profile": "compiled-decoder-control",
       "raw_jsonl": ".research/aws-linux/exports/18.194.177.174/linux-native-features-1793468441758970535/text/ass-private-present-empty--observe.jsonl",
       "sha256": "dffe4999e43671be3e8f4e327a442161a575a25b6fba066495276a366bfb7f8e",
       "records": 34
@@ -1237,7 +1237,7 @@
     },
     {
       "id": "ass-invalid-utf8-unvalidated--observe",
-      "profile": "compiled-decoder-control-not-Streem-text-runtime",
+      "profile": "compiled-decoder-control",
       "raw_jsonl": ".research/aws-linux/exports/18.194.177.174/linux-native-features-1793468441758970535/text/ass-invalid-utf8-unvalidated--observe.jsonl",
       "sha256": "03e885b16b1969cc198c01a0fd3095b75821c96c39b520dbbac70f32002df629",
       "records": 32

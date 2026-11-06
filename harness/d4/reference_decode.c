@@ -8,8 +8,8 @@
  *   audio: aformat=sample_fmts=s16:channel_layouts=stereo  (what -ac 2 to a
  *          pulse/alsa s16 sink negotiates; libavfilter inserts the resampler)
  *
- * usage: reference_decode LANE-CODEC-bench FILE ITERATIONS | LANE-CODEC-memory FILE
- *        | LANE-CODEC-raw FILE OUT   (LANE-CODEC: video-h264 video-hevc audio-ac3
+ * usage: reference_decode KIND-CODEC-bench FILE ITERATIONS | KIND-CODEC-memory FILE
+ *        | KIND-CODEC-raw FILE OUT   (KIND-CODEC: video-h264 video-hevc audio-ac3
  *        audio-eac3 audio-aac audio-dts); the same protocol as crates/sim codec-worker.
  * The whole operation (parser/decoder/filter setup, decode, convert, teardown)
  * is inside the timed interval; file loading is outside, as in the M1 workers.
@@ -271,9 +271,9 @@ static void one_pass(const char *codec_name, const AVCodecParameters *par, const
 }
 
 int main(int argc, char **argv) {
-    /* LANE-CODEC-bench FILE ITERATIONS | LANE-CODEC-memory FILE | LANE-CODEC-raw FILE OUT */
+    /* KIND-CODEC-bench FILE ITERATIONS | KIND-CODEC-memory FILE | KIND-CODEC-raw FILE OUT */
     if (argc < 3) {
-        fprintf(stderr, "usage: %s LANE-CODEC-bench FILE ITERATIONS | LANE-CODEC-memory FILE | LANE-CODEC-raw FILE OUT\n", argv[0]);
+        fprintf(stderr, "usage: %s KIND-CODEC-bench FILE ITERATIONS | KIND-CODEC-memory FILE | KIND-CODEC-raw FILE OUT\n", argv[0]);
         return 2;
     }
     av_log_set_level(AV_LOG_ERROR);
