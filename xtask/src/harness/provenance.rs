@@ -50,6 +50,7 @@ pub fn matroska_inputs() -> Vec<String> {
         "harness/features/hls-segments/measured.json",
         "harness/reference_feed.h",
         "harness/reference_hls.h",
+        "harness/reference_mp4_range.h",
     ]
     .map(String::from)
     .to_vec();
