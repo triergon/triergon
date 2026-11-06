@@ -177,8 +177,6 @@ impl BoxReader {
         work: &mut WorkBudget,
         cancel: &AtomicBool,
     ) -> Result<Step<BoxEvent>> {
-        // Delegates even already-buffered cancellation/failure checks to core.
-        input.read_into(&mut [], work, cancel)?;
         loop {
             match self.phase {
                 Phase::Header => {
@@ -208,6 +206,9 @@ impl BoxReader {
                         }
                         continue;
                     }
+                    // Reads check input status; publishing a complete prefix
+                    // can proceed without reading.
+                    input.read_into(&mut [], work, cancel)?;
                     if !work.try_charge(1) {
                         return Ok(Step::Yield);
                     }
@@ -237,6 +238,7 @@ impl BoxReader {
                     }
                 }
                 Phase::Announced => {
+                    input.read_into(&mut [], work, cancel)?;
                     return Err(Error::Invalid("choose metadata or skip after header"));
                 }
                 Phase::Metadata { target } => {
@@ -246,6 +248,7 @@ impl BoxReader {
                         .ok_or(Error::Invalid("missing metadata buffer"))?;
                     let remaining = target - buffer.len();
                     if remaining == 0 {
+                        input.read_into(&mut [], work, cancel)?;
                         if !work.try_charge(1) {
                             return Ok(Step::Yield);
                         }
@@ -315,6 +318,7 @@ impl BoxReader {
                     }
                 }
                 Phase::Skipped => {
+                    input.read_into(&mut [], work, cancel)?;
                     if !work.try_charge(1) {
                         return Ok(Step::Yield);
                     }
