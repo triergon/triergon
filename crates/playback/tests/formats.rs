@@ -2924,21 +2924,22 @@ fn combined_playback_probe_opens_real_sequential_mp4() {
 }
 
 fn observed_mp4_open(bytes: &[u8]) -> (mp4_open::OpenedMp4<Observed>, Calls, Budget) {
-    open_with_timing_policy(bytes, triergon_isobmff::TimingRunPolicy::Strict).unwrap()
+    open_with_timing_policy(bytes, triergon_isobmff::TimingRunPolicy::Strict, true).unwrap()
 }
 
 fn open_with_timing_policy(
     bytes: &[u8],
     policy: triergon_isobmff::TimingRunPolicy,
+    random_access: bool,
 ) -> Result<(mp4_open::OpenedMp4<Observed>, Calls, Budget)> {
     let pool = pool();
-    let (source, calls, _) = observed(&pool, bytes, 23, false);
+    let (source, calls, _) = observed(&pool, bytes, 23, !random_access);
     let input = InputCursor::new(
         &pool,
         ID,
         SourceCapabilities {
             length: Some(bytes.len() as u64),
-            random_access: true,
+            random_access,
         },
         4096,
     )?;
@@ -3149,6 +3150,24 @@ fn next_range_output<S: Source>(player: &mut Mp4RangePlayer<'_, S>) -> Option<Ou
 }
 
 #[test]
+fn bounded_timing_accepts_forward_index_with_finite_media() {
+    use triergon_isobmff::TimingRunPolicy;
+
+    let bytes = include_bytes!("../../isobmff/tests/fixtures/bad-stts-count-mismatch.mov");
+    let (opened, _, _) =
+        open_with_timing_policy(bytes, TimingRunPolicy::BoundedPrefix, false).unwrap();
+    let mut job =
+        Mp4IndexJob::new_native_terminal_v1(&opened.movie, PlanLimits::default()).unwrap();
+    assert!((0..100_000).any(|_| job.poll(&mut WorkBudget::new(1), &off()).unwrap()));
+    let plan = job.finish().unwrap();
+    assert_eq!(plan.native_rows().len(), 6);
+    for (index, row) in plan.native_rows().iter().enumerate() {
+        assert_eq!(row.source.dts_ticks, Some(index as i128 * 1000));
+        assert!(row.source.range.end <= bytes.len() as u64);
+    }
+}
+
+#[test]
 fn bounded_timing_range_playback_preserves_packets_and_seeks() {
     use triergon_isobmff::{TimingRunPolicy, TimingRunSurplus};
 
@@ -3171,11 +3190,11 @@ fn bounded_timing_range_playback_preserves_packets_and_seeks() {
         ),
     ] {
         assert!(matches!(
-            open_with_timing_policy(bytes, TimingRunPolicy::Strict),
+            open_with_timing_policy(bytes, TimingRunPolicy::Strict, true),
             Err(C::Invalid("time run exceeds sample count"))
         ));
         let (opened, calls, pool) =
-            open_with_timing_policy(bytes, TimingRunPolicy::BoundedPrefix).unwrap();
+            open_with_timing_policy(bytes, TimingRunPolicy::BoundedPrefix, true).unwrap();
         let [track] = opened.movie.tracks() else {
             panic!("expected one track");
         };

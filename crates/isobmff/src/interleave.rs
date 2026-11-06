@@ -295,8 +295,27 @@ impl<'a> PhysicalSampleCursor<'a> {
         bounds: ForwardRegularMdatV1,
         limits: PhysicalInterleaveLimits,
     ) -> Result<Self> {
+        Self::new_forward_regular_with_timing_policy(
+            budget,
+            tracks,
+            media,
+            bounds,
+            limits,
+            TimingRunPolicy::Strict,
+        )
+    }
+    /// Apply the selected timing policy to forward media range validation.
+    pub fn new_forward_regular_with_timing_policy(
+        budget: &Budget,
+        tracks: &[SourceTrack<'a>],
+        media: &'a [Range<u64>],
+        bounds: ForwardRegularMdatV1,
+        limits: PhysicalInterleaveLimits,
+        timing_policy: TimingRunPolicy,
+    ) -> Result<Self> {
         bounds.require_initial_extent(media)?;
-        let mut cursor = Self::new_with_media_extents(budget, tracks, media, limits)?;
+        let mut cursor =
+            Self::with_timing_policy(budget, tracks, Some(media), limits, timing_policy)?;
         if tracks.iter().any(|track| !track.fragments.is_empty()) {
             return Err(Error::Unsupported("forward regular media with fragments"));
         }

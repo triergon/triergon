@@ -115,7 +115,8 @@ the bytes and determine the audio object type separately.
   unused counts through `SampleTable::timing_run_surplus`. The source
   seek planners and default physical cursor constructors require exact
   coverage. Compatibility playback can opt into physical range validation
-  for a checked prefix with `PhysicalSampleCursor::with_timing_policy`.
+  for a checked prefix, including forward-only media, through the physical
+  cursor constructors that accept a timing policy.
 - **Payload ranges.** `SampleReader::new` requires the sample to lie inside the
   caller's `mdat` payload extent. `PhysicalSampleCursor::new_with_media_extents`
   checks every track's ranges against the `mdat` extents before emitting

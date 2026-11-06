@@ -451,13 +451,16 @@ impl<'a> Mp4IndexJob<'a> {
         let source = if range_duration.is_some() {
             None
         } else if let Some(bounds) = forward_regular {
-            Some(PhysicalSampleCursor::new_forward_regular_v1(
-                b,
-                sources.as_slice(),
-                movie.media.as_slice(),
-                bounds,
-                interleave_limits,
-            )?)
+            Some(
+                PhysicalSampleCursor::new_forward_regular_with_timing_policy(
+                    b,
+                    sources.as_slice(),
+                    movie.media.as_slice(),
+                    bounds,
+                    interleave_limits,
+                    timing_policy,
+                )?,
+            )
         } else if movie.terminal_mdat.is_some() {
             // Metadata traversal preserves declared source coordinates. Each row
             // is checked against the terminal declaration, then read physically.
