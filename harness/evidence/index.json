@@ -7947,6 +7947,75 @@
    "reason": "MPEG-TS progressive playback status row",
    "key": "evidence/progressive-ts188-linux-arm64/92611382d5e4301e028fb2135ffc1ca5aa3a7c00144defee6d29839a9c13ea48.tar.gz",
    "sha256": "92611382d5e4301e028fb2135ffc1ca5aa3a7c00144defee6d29839a9c13ea48"
+  },
+  {
+   "name": "progressive-ts188-access-units-linux-arm64",
+   "retention": "keep",
+   "reason": "Progressive TS188 access-unit comparison on native AArch64 Linux",
+   "key": "evidence/progressive-ts188-linux-arm64/0b0499f5ce3e33bdb074397caca18984a60bc61fee7ef3e21eced1914fc1a4e3.tar.gz",
+   "sha256": "0b0499f5ce3e33bdb074397caca18984a60bc61fee7ef3e21eced1914fc1a4e3",
+   "files": [
+    {
+     "path": "MEMORY-EXPORT-FIRST.log",
+     "sha256": "afcc2d7651e4c7d0897487e42ec7d26c44c27c2093266e365b233a9e71b5534c"
+    },
+    {
+     "path": "MEMORY-RUNNER.log",
+     "sha256": "afcc2d7651e4c7d0897487e42ec7d26c44c27c2093266e365b233a9e71b5534c"
+    },
+    {
+     "path": "MEMORY.log",
+     "sha256": "b630edf0174c512412e4aeedfdd04f589b1a551c2b41c56c7d18f07ab983ab29"
+    },
+    {
+     "path": "MEMORY.sh",
+     "sha256": "234691aa6e28385fe2236e76d72e160419188f3fc03760ebc39ed086ae7c827e"
+    },
+    {
+     "path": "NATIVE.log",
+     "sha256": "c9506edf541991432ead8486c32021ebf055332b60c73095e9b6a965fd02ae07"
+    },
+    {
+     "path": "NATIVE.sh",
+     "sha256": "f114930ea55f00553a1a9f6a1f51db2d5881ab816066467b7600a4a85cfc65df"
+    },
+    {
+     "path": "REBASED-CLIPPY.log",
+     "sha256": "3a7e93f0ecc5a0aeb16e2bfff1ffb9beb2b25fec4558130a2e156e5b670e3a55"
+    },
+    {
+     "path": "REBASED-TEST.log",
+     "sha256": "6adbf9c5b0ffb9286056b9b9c15349d500602169dca1d2d5ca83e658bae05f44"
+    },
+    {
+     "path": "REV",
+     "sha256": "b8d948aefca3b51ba2526364add12a46c61abb9cffeb613e6a1d145095e692b9"
+    },
+    {
+     "path": "RUNNER.log",
+     "sha256": "49f0c9a66f4b3f463927e60441e13a19eed62040a9691775ad7ce2f5e2a6902e"
+    },
+    {
+     "path": "TREE",
+     "sha256": "ccf3c791a63d51ad6bb67fd2910f890966f8ab569ced3d8fbe51dbdaa121fac7"
+    },
+    {
+     "path": "comparison-inputs.tar.gz",
+     "sha256": "6e39ba4e3e8abed6e82f7ae219225c295e7009a6d0ed3ad050807c75c8783df7"
+    },
+    {
+     "path": "memory-results.tar.gz",
+     "sha256": "9a4878a2b8d8e2036a9c51a9d32a4f68d1d01b54d65f02bbf221ceedc44aea94"
+    },
+    {
+     "path": "native-results.tar.gz",
+     "sha256": "94d2e829f53327b798de4dcf0e9784de5968973a3032df14c4969c157b0dbce0"
+    },
+    {
+     "path": "source.bundle",
+     "sha256": "c8d32b30e76343d57d4b0db5ddb805576f7d6b41c7fcae2fbce9a700aa6242ad"
+    }
+   ]
   }
  ]
 }
