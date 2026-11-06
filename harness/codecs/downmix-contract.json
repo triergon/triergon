@@ -1,5 +1,5 @@
 {
-  "schema": "triergon.d4.downmix-contract.v1",
+  "schema": "triergon.codecs.downmix-contract.v1",
   "frozen_utc": "2026-11-03T01:20:00Z",
   "frozen_before_grading": true,
   "reference": {

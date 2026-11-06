@@ -1,5 +1,5 @@
 {
- "schema": "triergon.d4.correctness-manifest.v1",
+ "schema": "triergon.codecs.correctness-manifest.v1",
  "vectors": [
   {
    "lane": "h264",
