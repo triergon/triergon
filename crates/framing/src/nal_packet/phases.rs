@@ -1,0 +1,583 @@
+//! The packet job state machine: one method per [`Phase`], driven by
+//! [`PacketJob::advance_into`]. Each method is one step of the original
+//! loop; `Step::Continue` re-enters the loop and `Step::Break` returns.
+use super::{
+    AvcState, Injection, NalPacketProgress, NalPacketReceiverErrorKind, PacketConfig, PacketJob,
+    PacketOutput, PacketSegment, PendingNal, Phase,
+};
+use crate::{AvcConfigArrayKind, Codec, NalHeader};
+use std::ops::ControlFlow;
+use std::sync::atomic::{AtomicBool, Ordering};
+use triergon_core::{Budget, Bytes, Error, Result, SourceId, SourceLocation, WorkBudget};
+
+/// Outcome of one phase step.
+type Step = ControlFlow<NalPacketProgress>;
+const NEXT: Step = Step::Continue(());
+const YIELD: Step = Step::Break(NalPacketProgress::Yield);
+
+impl<M, S: PacketSegment, C: PacketConfig> PacketJob<'_, M, S, C> {
+    pub(super) fn advance_into(
+        &mut self,
+        work: &mut WorkBudget,
+        cancel: &AtomicBool,
+        ready: &mut Option<S::Output<M>>,
+    ) -> Result<NalPacketProgress> {
+        loop {
+            if cancel.load(Ordering::Relaxed) {
+                return Err(Error::Cancelled);
+            }
+            if matches!(self.phase, Phase::Complete) {
+                return Ok(NalPacketProgress::Complete);
+            }
+            let step = match self.phase {
+                Phase::Verify => self.verify_update(work)?,
+                Phase::Arrays => self.check_arrays(work)?,
+                Phase::Lookahead => self.lookahead(work)?,
+                Phase::Scan => self.scan_nal(work)?,
+                Phase::Inject => self.inject_configuration(work)?,
+                Phase::Nal => self.append_nal(work)?,
+                Phase::Reserve => self.reserve_output(work)?,
+                Phase::Copy => self.copy_output(work, cancel)?,
+                Phase::Freeze => self.freeze_output(work, ready)?,
+                Phase::Complete => Step::Break(NalPacketProgress::Complete),
+            };
+            if let Step::Break(status) = step {
+                return Ok(status);
+            }
+        }
+    }
+
+    #[inline]
+    fn verify_update(&mut self, work: &mut WorkBudget) -> Result<Step> {
+        if let Some(update) = &self.update {
+            let extra = self
+                .source
+                .as_ref()
+                .and_then(|s| s.new_extradata.as_ref())
+                .ok_or(Error::Invalid("missing source update"))?;
+            let raw = update.raw();
+            if extra.len() != raw.len() {
+                return Err(Error::Invalid("configuration update bytes differ"));
+            }
+            if self.verify < raw.len() {
+                let count = (raw.len() - self.verify)
+                    .min(4096)
+                    .min(usize::try_from(work.remaining()).unwrap_or(usize::MAX));
+                if count == 0 {
+                    return Ok(YIELD);
+                }
+                if extra[self.verify..self.verify + count] != raw[self.verify..self.verify + count]
+                {
+                    return Err(Error::Invalid("configuration update bytes differ"));
+                }
+                work.take(count as u64);
+                self.verify += count;
+                return Ok(NEXT);
+            }
+        }
+        self.update_verified = true;
+        self.phase = Phase::Arrays;
+        Ok(NEXT)
+    }
+
+    #[inline]
+    fn check_arrays(&mut self, work: &mut WorkBudget) -> Result<Step> {
+        if let Some(declared) = self.config().hevc_array_type(self.array) {
+            if !work.try_charge(1) {
+                return Ok(YIELD);
+            }
+            if !matches!(declared, 32 | 33 | 34 | 39 | 40) {
+                return Err(Error::Unsupported("pinned HEVC decoder array type"));
+            }
+            self.array += 1;
+            return Ok(NEXT);
+        }
+        self.phase = if self.config().codec_kind() == Codec::Hevc
+            && self.config().length_width().is_some()
+        {
+            Phase::Lookahead
+        } else {
+            Phase::Scan
+        };
+        Ok(NEXT)
+    }
+
+    #[inline]
+    fn lookahead(&mut self, work: &mut WorkBudget) -> Result<Step> {
+        let source = self
+            .source
+            .as_ref()
+            .ok_or(Error::Invalid("missing packet source"))?;
+        let width = self
+            .config()
+            .length_width()
+            .ok_or(Error::Invalid("missing packet width"))?;
+        if self.look_offset == source.bytes.len() && self.look_prefix == 0 {
+            self.phase = Phase::Scan;
+            return Ok(NEXT);
+        }
+        if self.look_prefix < width {
+            let count = (width - self.look_prefix)
+                .min(usize::try_from(work.remaining()).unwrap_or(usize::MAX))
+                .min(source.bytes.len().saturating_sub(self.look_offset));
+            if count == 0 {
+                // Missing input still consumes the old failed-read
+                // token; exhausted work yields before that refusal.
+                if !work.try_charge(1) {
+                    return Ok(YIELD);
+                }
+                self.receiver_failure = Some(NalPacketReceiverErrorKind::IncompleteLengthPrefix);
+                return Err(Error::Truncated);
+            }
+            work.take(count as u64);
+            // Width is at most four. Every reachable accumulated
+            // prefix fits usize on the supported32/64-bit targets.
+            for &byte in &source.bytes[self.look_offset..self.look_offset + count] {
+                // A prefix is at most four bytes, so each partial value
+                // fits usize on supported32/64-bit targets.
+                self.look_length = (self.look_length << 8) | usize::from(byte);
+            }
+            self.look_offset += count;
+            self.look_prefix += count;
+            return Ok(NEXT);
+        }
+        if !work.try_charge(1) {
+            return Ok(YIELD);
+        }
+        if self.look_length == 0 {
+            self.receiver_failure = Some(NalPacketReceiverErrorKind::EmptyHevcNal);
+            return Err(Error::Invalid("pinned HEVC empty NAL"));
+        }
+        if self.look_nals == self.session.limits.maximum_nals {
+            return Err(Error::Limit {
+                requested: self.look_nals.saturating_add(1),
+                maximum: self.session.limits.maximum_nals,
+            });
+        }
+        let end = self
+            .look_offset
+            .checked_add(self.look_length)
+            .ok_or(Error::Overflow)?;
+        if end > source.bytes.len() {
+            self.receiver_failure = Some(NalPacketReceiverErrorKind::IncompleteNalPayload);
+            return Err(Error::Truncated);
+        }
+        let kind = match NalHeader::parse_compact(Codec::Hevc, &source.bytes[self.look_offset..end])
+        {
+            Ok(h) => h.nal_unit_type(),
+            Err(e) if self.observed_packet => {
+                self.packet_source_refusal.get_or_insert(e);
+                (source.bytes[self.look_offset] >> 1) & 63
+            }
+            Err(e) => return Err(e.error()),
+        };
+        self.has_irap |= (16..=23).contains(&kind);
+        self.look_offset = end;
+        self.look_prefix = 0;
+        self.look_length = 0;
+        self.look_nals += 1;
+        Ok(NEXT)
+    }
+
+    #[inline]
+    fn scan_nal(&mut self, work: &mut WorkBudget) -> Result<Step> {
+        let source = self
+            .source
+            .as_ref()
+            .ok_or(Error::Invalid("missing packet source"))?;
+        let Some(width) = self.config().length_width() else {
+            if !work.try_charge(1) {
+                return Ok(YIELD);
+            }
+            self.segment_hint = Some(1);
+            self.append(S::passthrough(&source.bytes, self.total))?;
+            self.phase = Phase::Reserve;
+            return Ok(NEXT);
+        };
+        if self.offset == 0 && source.bytes.is_empty() && self.config().codec_kind() == Codec::Avc {
+            self.receiver_failure = Some(NalPacketReceiverErrorKind::EmptyAvcPacket);
+            return Err(Error::Invalid("pinned AVC empty packet"));
+        }
+        if self.offset == source.bytes.len() && self.prefix_read == 0 {
+            self.phase = Phase::Reserve;
+            return Ok(NEXT);
+        }
+        if self.prefix_read < width {
+            let count = (width - self.prefix_read)
+                .min(usize::try_from(work.remaining()).unwrap_or(usize::MAX))
+                .min(source.bytes.len().saturating_sub(self.offset));
+            if count == 0 {
+                // Missing input still consumes the old failed-read
+                // token; exhausted work yields before that refusal.
+                if !work.try_charge(1) {
+                    return Ok(YIELD);
+                }
+                self.receiver_failure = Some(NalPacketReceiverErrorKind::IncompleteLengthPrefix);
+                return Err(Error::Truncated);
+            }
+            work.take(count as u64);
+            // Width is at most four. Every reachable accumulated
+            // prefix fits usize on the supported32/64-bit targets.
+            for &byte in &source.bytes[self.offset..self.offset + count] {
+                // A prefix is at most four bytes, so each partial value
+                // fits usize on supported32/64-bit targets.
+                self.length = (self.length << 8) | usize::from(byte);
+            }
+            self.offset += count;
+            self.prefix_read += count;
+            return Ok(NEXT);
+        }
+        if !work.try_charge(1) {
+            return Ok(YIELD);
+        }
+        let end = self
+            .offset
+            .checked_add(self.length)
+            .ok_or(Error::Overflow)?;
+        if end > source.bytes.len() {
+            self.receiver_failure = Some(NalPacketReceiverErrorKind::IncompleteNalPayload);
+            return Err(Error::Truncated);
+        }
+        if self.length == 0 {
+            if self.config().codec_kind() == Codec::Hevc {
+                self.receiver_failure = Some(NalPacketReceiverErrorKind::EmptyHevcNal);
+                return Err(Error::Invalid("pinned HEVC empty NAL"));
+            }
+            self.prefix_read = 0;
+            return Ok(NEXT);
+        }
+        if self.nals == self.session.limits.maximum_nals {
+            return Err(Error::Limit {
+                requested: self.nals.saturating_add(1),
+                maximum: self.session.limits.maximum_nals,
+            });
+        }
+        let codec = self.config().codec_kind();
+        let kind = if codec == Codec::Hevc {
+            // Width-framed HEVC reaches Scan only after Lookahead
+            // accepted every header or retained the first observed
+            // refusal. The exclusively borrowed source is immutable.
+            (source.bytes[self.offset] >> 1) & 63
+        } else {
+            match NalHeader::parse_compact(codec, &source.bytes[self.offset..end]) {
+                Ok(header) => header.nal_unit_type(),
+                Err(e) if self.observed_packet => {
+                    self.packet_source_refusal.get_or_insert(e);
+                    match codec {
+                        Codec::Avc => source.bytes[self.offset] & 31,
+                        Codec::Hevc => (source.bytes[self.offset] >> 1) & 63,
+                    }
+                }
+                Err(e) => return Err(e.error()),
+            }
+        };
+        let mut inject = None;
+        if codec == Codec::Hevc {
+            if self.has_irap && matches!(kind,16..=23|32..=34) && !self.injected_irap {
+                inject = Some(Injection::All);
+            }
+        } else {
+            match kind {
+                7 => {
+                    self.avc.sps = true;
+                    self.avc.new_idr = true;
+                }
+                8 => {
+                    self.avc.pps = true;
+                    self.avc.new_idr = true;
+                    if !self.avc.sps {
+                        inject = Some(Injection::Sps);
+                    }
+                }
+                5 => {
+                    let first = *source
+                        .bytes
+                        .get(self.offset + 1)
+                        .filter(|_| self.length > 1)
+                        .ok_or(Error::Truncated)?
+                        & 128
+                        != 0;
+                    if first {
+                        self.avc.new_idr = true;
+                    }
+                    if self.avc.new_idr && !self.avc.pps {
+                        inject = Some(if self.avc.sps {
+                            Injection::Pps
+                        } else {
+                            Injection::All
+                        });
+                    }
+                    self.avc.new_idr = false;
+                }
+                1 => {
+                    self.avc = AvcState::default();
+                }
+                _ => {}
+            }
+        }
+        self.nal = Some(PendingNal {
+            range: self.offset..end,
+            kind,
+        });
+        self.nals += 1;
+        if self.nals == 1 {
+            let injected = if inject.is_some() || (codec == Codec::Hevc && self.has_irap) {
+                self.config().config_nal_count()
+            } else {
+                0
+            };
+            if codec == Codec::Hevc && self.look_nals > 0 {
+                // Lookahead counted every packet NAL; an IRAP packet
+                // injects the whole configuration exactly once.
+                self.segment_hint = Some(self.look_nals + injected);
+            } else if end == source.bytes.len() {
+                self.segment_hint = Some(1 + injected);
+            }
+        }
+        if let Some(i) = inject {
+            self.injection = Some((i, 0));
+            self.phase = Phase::Inject;
+        } else {
+            self.phase = Phase::Nal;
+        }
+        Ok(NEXT)
+    }
+
+    #[inline]
+    fn inject_configuration(&mut self, work: &mut WorkBudget) -> Result<Step> {
+        let (which, index) = self
+            .injection
+            .ok_or(Error::Invalid("missing injection plan"))?;
+        if !work.try_charge(1) {
+            return Ok(YIELD);
+        }
+        let next = self.config().config_nal(index).map(|n| {
+            let selected = match (n.kind, which) {
+                (None, _) => true,
+                (Some(kind), Injection::All) => kind != AvcConfigArrayKind::SequenceExtension,
+                (Some(kind), Injection::Sps) => kind == AvcConfigArrayKind::Sequence,
+                (Some(kind), Injection::Pps) => kind == AvcConfigArrayKind::Picture,
+            };
+            (
+                selected,
+                S::configuration(n.owner, index, n.range, self.total),
+            )
+        });
+        if let Some((selected, segment)) = next {
+            if selected {
+                self.append(segment)?;
+            }
+            self.injection = Some((which, index + 1));
+        } else {
+            if matches!(which, Injection::Sps) {
+                self.avc.sps = true;
+            }
+            self.injection = None;
+            self.injected_irap = true;
+            self.phase = Phase::Nal;
+        }
+        Ok(NEXT)
+    }
+
+    #[inline]
+    fn append_nal(&mut self, work: &mut WorkBudget) -> Result<Step> {
+        if !work.try_charge(1) {
+            return Ok(YIELD);
+        }
+        let nal = self
+            .nal
+            .as_ref()
+            .ok_or(Error::Invalid("missing source NAL"))?;
+        let prefix = if self.config().codec_kind() == Codec::Hevc
+            || matches!(nal.kind, 7 | 8)
+            || self.total == 0
+        {
+            4
+        } else {
+            3
+        };
+        let range = nal.range.clone();
+        let end = range.end;
+        let source = &self
+            .source
+            .as_ref()
+            .ok_or(Error::Invalid("missing packet"))?
+            .bytes;
+        let segment = S::packet(source, range, prefix, self.total)?;
+        self.append(segment)?;
+        self.offset = end;
+        self.length = 0;
+        self.prefix_read = 0;
+        self.nal = None;
+        self.phase = Phase::Scan;
+        Ok(NEXT)
+    }
+
+    #[inline]
+    fn reserve_output(&mut self, work: &mut WorkBudget) -> Result<Step> {
+        if !work.try_charge(1) {
+            return Ok(YIELD);
+        }
+        // A passthrough packet already has its immutable payload
+        // owner. Keep that owner and its charge instead of copying.
+        if self.config().length_width().is_none() {
+            self.phase = Phase::Freeze;
+            return Ok(NEXT);
+        }
+        let minimum = self
+            .total
+            .checked_add(Bytes::owner_overhead_bytes())
+            .and_then(|v| v.checked_add(Budget::control_storage_bytes()))
+            .ok_or(Error::Overflow)?;
+        if minimum > self.session.pool.limit() {
+            return Err(Error::Limit {
+                requested: minimum,
+                maximum: self.session.pool.limit(),
+            });
+        }
+        self.output
+            .as_mut()
+            .ok_or(Error::Invalid("missing packet buffer"))?
+            .try_reserve_exact(self.total)?;
+        self.phase = Phase::Copy;
+        Ok(NEXT)
+    }
+
+    #[inline]
+    fn copy_output(&mut self, work: &mut WorkBudget, cancel: &AtomicBool) -> Result<Step> {
+        // One unit per pass exactly as the outer loop runs it: the
+        // cancellation check precedes every unit after the first, and
+        // every yield, charge and error is unchanged. Only the phase
+        // dispatch between units is skipped.
+        let parts = self
+            .segments
+            .as_ref()
+            .ok_or(Error::Invalid("missing packet plan"))?;
+        let mut first = true;
+        loop {
+            if !first && cancel.load(Ordering::Relaxed) {
+                return Err(Error::Cancelled);
+            }
+            first = false;
+            let Some(p) = parts.as_slice().get(self.copy_segment) else {
+                self.phase = Phase::Freeze;
+                break;
+            };
+            let prefix = usize::from(p.prefix_bytes());
+            let n = prefix.checked_add(p.len()).ok_or(Error::Overflow)?;
+            if self.copied == n {
+                if !work.try_charge(1) {
+                    return Ok(YIELD);
+                }
+                self.copy_segment += 1;
+                self.copied = 0;
+                continue;
+            }
+            let count = if self.copied < prefix {
+                prefix - self.copied
+            } else {
+                (n - self.copied).min(4096)
+            }
+            .min(usize::try_from(work.remaining()).unwrap_or(usize::MAX));
+            if count == 0 {
+                return Ok(YIELD);
+            }
+            let b = self
+                .output
+                .as_mut()
+                .ok_or(Error::Invalid("missing packet buffer"))?;
+            if self.copied < prefix {
+                let start = 4 - prefix + self.copied;
+                b.try_extend_from_slice(&[0, 0, 0, 1][start..start + count])?;
+            } else {
+                let start = self.copied - prefix;
+                let source = &self
+                    .source
+                    .as_ref()
+                    .ok_or(Error::Invalid("missing packet source"))?
+                    .bytes;
+                let configuration = self
+                    .update
+                    .as_ref()
+                    .unwrap_or(&self.session.configuration)
+                    .raw();
+                let payload = p.payload(source, configuration)?;
+                b.try_extend_from_slice(&payload[start..start + count])?;
+            }
+            work.take(count as u64);
+            self.copied += count;
+        }
+        Ok(NEXT)
+    }
+
+    #[inline]
+    fn freeze_output(
+        &mut self,
+        work: &mut WorkBudget,
+        ready: &mut Option<S::Output<M>>,
+    ) -> Result<Step> {
+        if !work.try_charge(1) {
+            return Ok(YIELD);
+        }
+        let b = self
+            .output
+            .take()
+            .ok_or(Error::Invalid("missing packet buffer"))?;
+        let bytes = if self.config().length_width().is_none() {
+            drop(b);
+            self.source
+                .as_ref()
+                .ok_or(Error::Invalid("missing packet source"))?
+                .bytes
+                .clone()
+        } else {
+            match b.freeze() {
+                Ok(v) => v,
+                Err(e) => {
+                    self.output = Some(e.buffer);
+                    return Err(e.error);
+                }
+            }
+        };
+        let configuration = self.config().raw().clone();
+        let configuration_identity = self.config().identity();
+        let configuration_source_refusal = self.config().refusal();
+        let forward_new_extradata = self.config().codec_kind() == Codec::Hevc
+            || self
+                .source
+                .as_ref()
+                .and_then(|s| s.new_extradata.as_ref())
+                .is_some_and(Bytes::is_empty);
+        if let Some(c) = self.update.take() {
+            self.session.configuration = c;
+        }
+        self.session.avc = self.avc;
+        self.session.receiver_epoch = self.epoch;
+        self.phase = Phase::Complete;
+        *ready = Some(S::finish(PacketOutput {
+            bytes,
+            source: self
+                .source
+                .take()
+                .ok_or(Error::Invalid("missing packet source"))?,
+            configuration,
+            configuration_identity: configuration_identity.unwrap_or((
+                SourceLocation {
+                    source: SourceId(0),
+                    offset: 0,
+                },
+                0,
+            )),
+            has_configuration_identity: configuration_identity.is_some(),
+            configuration_source_refusal,
+            packet_source_refusal: self.packet_source_refusal,
+            segments: self
+                .segments
+                .take()
+                .ok_or(Error::Invalid("missing packet plan"))?,
+            receiver_epoch: self.epoch,
+            forward_new_extradata,
+        }));
+        Ok(Step::Break(NalPacketProgress::Ready))
+    }
+}
