@@ -108,6 +108,25 @@ pub struct PlanTrack {
     pub descriptions: BudgetVec<SampleDescription>,
     pub edits: Option<EditList>,
 }
+impl PlanTrack {
+    pub(crate) fn configuration(
+        &self,
+        description_index: u32,
+        revision: u64,
+    ) -> Result<Mp4Configuration> {
+        let description = self
+            .descriptions
+            .as_slice()
+            .iter()
+            .find(|d| d.index == description_index)
+            .ok_or(Error::Invalid("sample description absent"))?;
+        Ok(Mp4Configuration {
+            track: self.snapshot.clone(),
+            description: description.clone(),
+            revision,
+        })
+    }
+}
 #[derive(Clone, Debug)]
 pub struct SourceRow {
     pub track_id: u32,
@@ -252,18 +271,8 @@ impl PreparedMp4 {
         }
     }
     pub fn config(&self, row: &SourceRow, revision: u64) -> Result<Mp4Configuration> {
-        let t = self.track(row.track_id)?;
-        let d = t
-            .descriptions
-            .as_slice()
-            .iter()
-            .find(|d| d.index == row.sample.description_index)
-            .ok_or(Error::Invalid("sample description absent"))?;
-        Ok(Mp4Configuration {
-            track: t.snapshot.clone(),
-            description: d.clone(),
-            revision,
-        })
+        self.track(row.track_id)?
+            .configuration(row.sample.description_index, revision)
     }
 }
 pub struct Mp4IndexJob<'a> {
