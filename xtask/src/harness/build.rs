@@ -260,9 +260,25 @@ struct ProfileReference {
     record: &'static str,
     kind: &'static str,
     libraries: &'static str,
+    /// pkg-config packages, in link order.
+    packages: &'static [&'static str],
+    /// Static libraries, or the profile's shared libraries found through an rpath.
+    link_static: bool,
+    /// Compiler options before the source file.
+    options: &'static [&'static str],
+    /// Whether the build answers `identity -` (the container builds do; the
+    /// decode and capture builds record their configuration in the profile's
+    /// `build.json` instead).
+    identity: bool,
 }
 
-const PROFILE_REFERENCES: [ProfileReference; 2] = [
+const CONTAINER_PACKAGES: &[&str] = &["libavformat", "libavcodec", "libavutil"];
+const CONTAINER_OPTIONS: &[&str] = &["-O3", "-Wall", "-Wextra", "-Werror"];
+/// The options the decoder and capture comparisons were measured with.
+const RELEASE_OPTIONS: &[&str] = &["-std=c11", "-O2", "-Wall", "-Wextra", "-Werror"];
+const CAPTURE_PACKAGES: &[&str] = &["libavformat", "libavcodec", "libswscale", "libavutil"];
+
+const PROFILE_REFERENCES: [ProfileReference; 5] = [
     ProfileReference {
         profile: ".research/reference-video",
         binary: "ffmpeg-video-worker",
@@ -270,6 +286,10 @@ const PROFILE_REFERENCES: [ProfileReference; 2] = [
         record: "ffmpeg-video-native",
         kind: "pinned FFmpeg with the H.264 and HEVC decoders; feed operations",
         libraries: "video_reference",
+        packages: CONTAINER_PACKAGES,
+        link_static: true,
+        options: CONTAINER_OPTIONS,
+        identity: true,
     },
     ProfileReference {
         profile: ".research/reference-formats",
@@ -278,6 +298,53 @@ const PROFILE_REFERENCES: [ProfileReference; 2] = [
         record: "ffmpeg-formats-native",
         kind: "pinned FFmpeg MOV, TS and subtitle build; HLS segment operations",
         libraries: "formats_reference",
+        packages: CONTAINER_PACKAGES,
+        link_static: true,
+        options: CONTAINER_OPTIONS,
+        identity: true,
+    },
+    ProfileReference {
+        profile: ".research/reference-decode",
+        binary: "ffmpeg-decode-worker",
+        define: "-DTRIERGON_DECODE_REFERENCE=1",
+        record: "ffmpeg-decode-native",
+        kind: "FFmpeg 9.0.2 decoders with the letterbox and downmix filter chains; codec operations",
+        libraries: "decode_reference",
+        packages: &[
+            "libavformat",
+            "libavfilter",
+            "libswscale",
+            "libswresample",
+            "libavcodec",
+            "libavutil",
+        ],
+        link_static: true,
+        options: RELEASE_OPTIONS,
+        identity: false,
+    },
+    ProfileReference {
+        profile: ".research/reference-capture",
+        binary: "ffmpeg-capture-worker",
+        define: "-DTRIERGON_CAPTURE_REFERENCE=1",
+        record: "ffmpeg-capture-native",
+        kind: "FFmpeg 9.0.2 capture component set (gating); RGBA conversion, MPEG-1 encode, MPEG-TS mux",
+        libraries: "capture_reference",
+        packages: CAPTURE_PACKAGES,
+        link_static: false,
+        options: RELEASE_OPTIONS,
+        identity: false,
+    },
+    ProfileReference {
+        profile: ".research/reference-capture-small",
+        binary: "ffmpeg-capture-small-worker",
+        define: "-DTRIERGON_CAPTURE_REFERENCE=1",
+        record: "ffmpeg-capture-small-native",
+        kind: "FFmpeg 9.0.2 capture component set built with --enable-small; reported, not gating",
+        libraries: "capture_small_reference",
+        packages: CAPTURE_PACKAGES,
+        link_static: false,
+        options: RELEASE_OPTIONS,
+        identity: false,
     },
 ];
 
@@ -356,34 +423,29 @@ pub fn build(root: &Path) -> R<PathBuf> {
             let _ = fs::remove_file(&path);
             continue;
         }
+        let pkgconfig = root.join(reference.profile).join("install/lib/pkgconfig");
+        let mut query: Vec<&str> = Vec::new();
+        if reference.link_static {
+            query.push("--static");
+        }
+        query.extend(["--cflags", "--libs"]);
+        query.extend(reference.packages);
         let flags = output(
             "pkg-config",
-            &[
-                "--static",
-                "--cflags",
-                "--libs",
-                "libavformat",
-                "libavcodec",
-                "libavutil",
-            ],
-            &[(
-                "PKG_CONFIG_LIBDIR",
-                root.join(reference.profile)
-                    .join("install/lib/pkgconfig")
-                    .display()
-                    .to_string(),
-            )],
+            &query,
+            &[("PKG_CONFIG_LIBDIR", pkgconfig.display().to_string())],
         )?;
-        let mut command: Vec<String> = vec![
-            compiler.clone(),
-            "-O3".into(),
-            "-Wall".into(),
-            "-Wextra".into(),
-            "-Werror".into(),
+        let mut command: Vec<String> = vec![compiler.clone()];
+        command.extend(reference.options.iter().map(ToString::to_string));
+        command.extend([
             reference.define.into(),
             root.join("harness/reference.c").display().to_string(),
-        ];
+        ]);
         command.extend(shell_words(&flags)?);
+        if !reference.link_static {
+            let lib = root.join(reference.profile).join("install/lib");
+            command.push(format!("-Wl,-rpath,{}", lib.display()));
+        }
         command.extend(["-o".into(), path.display().to_string()]);
         run(&command)?;
         profile_workers.push((reference, path, build, command));
@@ -626,7 +688,14 @@ pub fn build(root: &Path) -> R<PathBuf> {
                 ("kind", Value::str(reference.kind)),
                 ("compiler_command", strings(command)),
                 ("reference_build", read_json(build)?),
-                ("worker_identity", worker_identity(path)?),
+                (
+                    "worker_identity",
+                    if reference.identity {
+                        worker_identity(path)?
+                    } else {
+                        Value::Null
+                    },
+                ),
                 (
                     "system_libraries",
                     system_libraries(reference.libraries, path)?,

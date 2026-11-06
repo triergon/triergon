@@ -25,11 +25,17 @@ resource limit becomes an explicit, reviewed rule for that case.
 
 ## Reference and corpus
 
-- **FFmpeg pin.** `cargo xtask prepare-ffmpeg` builds FFmpeg from a pinned source
-  revision with recorded configure flags, compiler and binary hashes. Each profile is a
-  separate build of the same revision: `matroska` for the container harness, `formats`
-  for MOV, TS, subtitles and the HLS segment reference, and `video` (the Matroska build plus the H.264 and HEVC
-  decoders that stream discovery needs) for the playback startup and seek reference.
+- **FFmpeg pins.** `cargo xtask prepare-ffmpeg --profile P` builds FFmpeg from a pinned,
+  hash-checked source with recorded configure flags, compiler and binary hashes, and
+  `cargo xtask build-workers` builds the reference worker of every prepared profile.
+  Containers are measured against git revision `d32b387f` on the 9.0 branch: `matroska`
+  for the container harness, `formats` for MOV, TS, subtitles and the HLS segment
+  reference, and `video` (the Matroska build plus the H.264 and HEVC decoders that
+  stream discovery needs) for the playback startup and seek reference. Decoders and
+  capture are measured against the FFmpeg 9.0.2 release tarball: `decode` for the codec
+  comparison, `capture` (gating) and `capture-small` for the capture comparison, and
+  `oracle`, a default build whose `ffmpeg` and `ffprobe` decode capture output
+  independently.
 - **Authored corpus.** Small canonical streams generated from synthetic signals and
   authored structures, so inputs stay identical across encoder versions
   (`cargo xtask fixtures`, `harness/features/<feature>/{contract,corpus}.json`).

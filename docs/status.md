@@ -3,8 +3,10 @@
 Everything is experimental. No module has yet passed every gate on its complete scope
 (see [quality](quality.md)). Runtime is the worst per-case upper bound of
 `T_triergon / T_ffmpeg` (ceiling 1.20, target 0.80). Memory is peak heap and total
-resident peak RSS relative to FFmpeg. Unless noted, measurements are native AArch64 Linux
-against FFmpeg 9.0.
+resident peak RSS relative to FFmpeg. Unless noted, measurements are native AArch64 Linux.
+Containers, framing, subtitles and playback are measured against FFmpeg git revision
+`d32b387f` on the 9.0 branch; codecs, decode sessions and capture against the FFmpeg 9.0.2
+release ([reference pins](quality.md#reference-and-corpus)).
 
 | Area | Implemented | Verified against FFmpeg | Runtime | Memory | Open |
 |---|---|---|---|---|---|

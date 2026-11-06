@@ -44,8 +44,10 @@ commands:
   check-safety   owned packages only, no build scripts, no unsafe code
   fixtures       generate the authored Matroska corpus into .research/ and its manifests
   fixture        write one corpus variant (see `cargo xtask fixture --help`)
-  prepare-ffmpeg [--jobs N] [--profile matroska|formats|video]
-                 build the pinned FFmpeg reference into .research/reference[-formats|-video]
+  prepare-ffmpeg [--jobs N] [--profile PROFILE]
+                 build a pinned FFmpeg reference into .research/reference[-PROFILE]:
+                 matroska (default), formats, video (git revision on the 9.0 branch);
+                 decode, capture, capture-small, oracle (the 9.0.2 release)
   fetch-specs    [--record] cache the specification texts and verify specs/sources.json
   fetch-vectors  cache the required external test vectors and verify their hashes
   external-vector --output DIR [--pairs N] [--iterations N] [--benchmark] [--memory]
@@ -549,9 +551,9 @@ fn prepare_ffmpeg(root: &Path, args: &[String]) -> Task {
         let value = rest.next().ok_or_else(|| format!("{flag} needs a value"))?;
         match flag.as_str() {
             "--jobs" => jobs = value.parse().map_err(|_| "jobs must be 1..8")?,
-            "--profile" if value == "matroska" => profile = prepare::Profile::Matroska,
-            "--profile" if value == "formats" => profile = prepare::Profile::Formats,
-            "--profile" if value == "video" => profile = prepare::Profile::Video,
+            "--profile" => {
+                profile = prepare::Profile::parse(value).ok_or_else(|| USAGE.to_owned())?;
+            }
             _ => return Err(USAGE.to_owned()),
         }
     }
