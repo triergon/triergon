@@ -1,5 +1,5 @@
 //! Format-specific <=192-byte carry, not an I/O cursor/token framework.
-use crate::carrier::PlainCarrier;
+use crate::carrier::{PlainCarrier, PlainContinuation};
 use crate::{
     AssemblyStep, PacketFormat, RejectedTransport, TransportInspection, TransportInspector,
     TransportPacket,
@@ -85,6 +85,31 @@ pub enum FrameState {
 pub struct FrameStep {
     pub consumed: usize,
     pub state: FrameState,
+}
+
+#[allow(
+    clippy::large_enum_variant,
+    reason = "keep the literal carrier inline for allocation-free fallback"
+)]
+pub(crate) enum FramedCarrier {
+    Packet(TransportPacket),
+    Plain(PlainContinuation),
+}
+
+impl FramedCarrier {
+    pub(crate) fn pid(&self) -> u16 {
+        match self {
+            Self::Packet(packet) => packet.pid,
+            Self::Plain(packet) => packet.pid(),
+        }
+    }
+
+    pub(crate) fn into_packet(self) -> Result<TransportPacket> {
+        match self {
+            Self::Packet(packet) => Ok(packet),
+            Self::Plain(packet) => packet.into_packet(),
+        }
+    }
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -339,6 +364,23 @@ impl TransportFramer {
         work: &mut WorkBudget,
         cancel: &AtomicBool,
     ) -> Result<Step<TransportPacket>> {
+        match self.poll_carrier::<false>(input, work, cancel)? {
+            Step::Ready(carrier) => Ok(Step::Ready(carrier.into_packet()?)),
+            Step::NeedInput(request) => Ok(Step::NeedInput(request)),
+            Step::Yield => Ok(Step::Yield),
+            Step::End(location) => Ok(Step::End(location)),
+        }
+    }
+
+    pub(crate) fn poll_carrier<const DIRECT: bool>(
+        &mut self,
+        input: &mut InputCursor,
+        work: &mut WorkBudget,
+        cancel: &AtomicBool,
+    ) -> Result<Step<FramedCarrier>> {
+        fn ready(packet: TransportPacket) -> Step<FramedCarrier> {
+            Step::Ready(FramedCarrier::Packet(packet))
+        }
         if !input.budget().same_pool(&self.budget) {
             return Err(Error::ForeignPool);
         }
@@ -376,7 +418,7 @@ impl TransportFramer {
             if self.inspection.is_some() {
                 return self
                     .complete(work, cancel)
-                    .map(|value| value.map_or(Step::Yield, Step::Ready));
+                    .map(|value| value.map_or(Step::Yield, ready));
             }
             if work.remaining() == 0 {
                 return Ok(Step::Yield);
@@ -389,7 +431,7 @@ impl TransportFramer {
             if missing == 0 {
                 return self
                     .complete(work, cancel)
-                    .map(|value| value.map_or(Step::Yield, Step::Ready));
+                    .map(|value| value.map_or(Step::Yield, ready));
             }
             // Complete feed carriers need only the header and padding check
             // for common layouts. Other fields use the full inspector.
@@ -431,11 +473,18 @@ impl TransportFramer {
                         && let Some(carrier) = PlainCarrier::inspect_ts188(&source, work)
                     {
                         self.last_packet_offset = Some(start);
-                        return Ok(Step::Ready(carrier.into_packet(
-                            source,
-                            start,
-                            self.entity,
-                        )?));
+                        if DIRECT
+                            && self.buffered_carrier == BufferedCarrier::Progressive
+                            && carrier.is_plain_continuation()
+                        {
+                            return Ok(Step::Ready(FramedCarrier::Plain(PlainContinuation {
+                                layout: carrier,
+                                source: Some(source),
+                                offset: start,
+                                entity: self.entity,
+                            })));
+                        }
+                        return Ok(ready(carrier.into_packet(source, start, self.entity)?));
                     }
                     self.inspect(source, start)?;
                     continue;
@@ -762,6 +811,146 @@ mod tests {
             Step::NeedInput(_)
         ));
         assert_eq!(budget.used(), Budget::control_storage_bytes());
+    }
+
+    #[test]
+    fn progressive_continuation_moves_charged_payload_storage() {
+        use crate::clock::NativeClockProfile;
+        use crate::native_pes::{
+            NativePesObserver, NativePesScope, NativeSourceContext, ReadyContinuation,
+        };
+        use crate::{ParseLimits, SourceEpochs, SourceRange};
+
+        let pool = Budget::new(8192).unwrap();
+        let entity = SourceId(1);
+        let mut input = InputCursor::new(
+            &pool,
+            entity,
+            SourceCapabilities {
+                length: Some(376),
+                random_access: false,
+            },
+            376,
+        )
+        .unwrap();
+        // One finite PES with 170 bytes in its start and 180 in its
+        // continuation. The second carrier has a plain adaptation field.
+        let mut wire = [0xff; 376];
+        wire[..18].copy_from_slice(&[
+            0x47, 0x41, 0, 0x10, 0, 0, 1, 0xe0, 1, 0x66, 0x80, 0x80, 5, 0x21, 0, 1, 0, 1,
+        ]);
+        wire[18..188].fill(0x11);
+        wire[188..194].copy_from_slice(&[0x47, 1, 0, 0x31, 3, 0x40]);
+        wire[196..].fill(0x22);
+        let backing = Bytes::copy_from_slice(&pool, &wire).unwrap();
+        let request = input.request();
+        input
+            .provide_owned(InputWindow::new(entity, request.token, 0, backing.clone()).unwrap())
+            .unwrap();
+        let mut framer = TransportFramer::new(pool.clone(), PacketFormat::Ts188);
+        framer.compact_progressive_input();
+        let cancel = AtomicBool::new(false);
+        let mut work = WorkBudget::new(4096);
+        let Step::Ready(FramedCarrier::Packet(start)) = framer
+            .poll_carrier::<true>(&mut input, &mut work, &cancel)
+            .unwrap()
+        else {
+            panic!("a PES start needs the ordinary carrier");
+        };
+        let epochs = SourceEpochs {
+            clock: 0,
+            configuration: 2,
+        };
+        let context = |source_event_ordinal| NativeSourceContext {
+            source_event_ordinal,
+            epochs,
+            byte_run_epoch: None,
+        };
+        let mut observer = NativePesObserver::new(
+            NativeClockProfile::ArchivedPesV1,
+            NativePesScope {
+                program: 1,
+                pid: 256,
+                stream_type: 0x1b,
+                stream_id: 0xe0,
+                entity,
+                epochs,
+            },
+            pool.clone(),
+            ParseLimits::default(),
+        )
+        .unwrap();
+        observer.push(start, context(0)).unwrap();
+        assert!(matches!(
+            observer.poll(&mut work, &cancel).unwrap(),
+            AssemblyStep::NeedPayload
+        ));
+        let Step::Ready(FramedCarrier::Plain(mut continuation)) = framer
+            .poll_carrier::<true>(&mut input, &mut work, &cancel)
+            .unwrap()
+        else {
+            panic!("expected a compact continuation");
+        };
+        assert!(
+            continuation
+                .source
+                .as_ref()
+                .unwrap()
+                .shares_storage_with(&backing)
+        );
+        let before = pool.used();
+        for (units, cancelled) in [(1, false), (2, true)] {
+            let mut blocked = WorkBudget::new(units);
+            assert_eq!(
+                observer
+                    .append_plain_continuation(
+                        &mut continuation,
+                        context(2),
+                        &mut blocked,
+                        &AtomicBool::new(cancelled),
+                    )
+                    .unwrap(),
+                ReadyContinuation::Unhandled
+            );
+            assert_eq!(blocked.remaining(), units);
+            assert!(continuation.source.is_some());
+        }
+        let mut append = WorkBudget::new(2);
+        assert_eq!(
+            observer
+                .append_plain_continuation(&mut continuation, context(2), &mut append, &cancel)
+                .unwrap(),
+            ReadyContinuation::Complete
+        );
+        assert_eq!(append.remaining(), 0);
+        assert_eq!(pool.used(), before);
+        assert!(continuation.source.is_none());
+        let AssemblyStep::Output(packet) = observer.poll(&mut work, &cancel).unwrap() else {
+            panic!("expected the finite PES to complete");
+        };
+        let [first, last] = packet.spans.as_slice() else {
+            panic!("expected the two original transport ranges");
+        };
+        assert_eq!(first.as_ref(), &wire[18..188]);
+        assert_eq!(last.as_ref(), &wire[196..]);
+        assert!(last.backing_bytes().shares_storage_with(&backing));
+        assert_eq!(last.context, context(2));
+        assert_eq!(
+            last.source,
+            SourceRange {
+                entity,
+                offset: 196,
+                bytes: 180
+            }
+        );
+        assert_eq!(
+            last.transport,
+            SourceRange {
+                entity,
+                offset: 188,
+                bytes: 188
+            }
+        );
     }
 
     #[test]

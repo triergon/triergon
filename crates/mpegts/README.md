@@ -87,8 +87,10 @@ file.
 
 The sequential feed keeps program tables, clock transitions and diagnostics.
 `TransportStream::poll_feed` can deliver validated PES continuations directly
-in both feed modes. `take_feed_omissions` counts the skipped events so
-consumers can retain positions in the source trace.
+in both feed modes. `poll_feed_carriers` lets a progressive feed move a
+plain continuation's charged payload storage into the native PES observer.
+Fallback uses the original transport event. `take_feed_omissions` counts
+skipped events so consumers can retain positions in the source trace.
 
 `TransportStream::poll_compact` coalesces runs of null packets into one
 `CompactTraceEvent::NullRun`.

@@ -3,6 +3,7 @@
 //! Independently authored from H.222.0 source syntax and recorded public-API
 //! observations. Assembly consumes real input
 //! boundaries; no complete source/demux output is split, repeated or repaired.
+use crate::carrier::PlainContinuation;
 use crate::demux_clock::DemuxProfile;
 use crate::pes::{HEADER_MAX, parse_header};
 use crate::{
@@ -586,10 +587,7 @@ impl DemuxObserver {
             Some(Error::Unsupported(
                 "native PCR clock boundary context unobserved",
             ))
-        } else if self.last_input.is_some_and(|(event, offset)| {
-            context.source_event_ordinal <= event
-                || (!self.entity_first && packet.source_offset <= offset)
-        }) {
+        } else if !self.follows_input(context, packet.source_offset) {
             Some(Error::Invalid("native PES source event order"))
         } else if packet
             .source_offset
@@ -600,6 +598,24 @@ impl DemuxObserver {
         } else {
             Self::transport_bounds(packet).err()
         }
+    }
+
+    fn follows_input(&self, context: NativeSourceContext, offset: u64) -> bool {
+        self.last_input
+            .is_none_or(|(previous_event, previous_offset)| {
+                context.source_event_ordinal > previous_event
+                    && (self.entity_first || offset > previous_offset)
+            })
+    }
+
+    fn ready_body(&self, counter: u8, next: usize) -> bool {
+        self.active
+            && self.header.is_some()
+            && self.spans.len() < self.spans.capacity().min(self.limits.source_spans)
+            && self.body_limit.is_none_or(|limit| next <= limit)
+            && next < DEFAULT_NATIVE_PACKET_CAP
+            && self.header_used + next <= self.limits.pes_bytes
+            && self.previous_counter.map(|value| (value + 1) & 15) == Some(counter)
     }
 
     /// Append an ordinary TS188 continuation when it fits the existing arena.
@@ -620,14 +636,7 @@ impl DemuxObserver {
             || packet.discontinuity_indicator()
             || packet.prefix.is_some()
             || count == 0
-            || !self.active
-            || self.header.is_none()
-            || self.spans.len() >= self.spans.capacity().min(self.limits.source_spans)
-            || self.body_limit.is_some_and(|limit| next > limit)
-            || next >= DEFAULT_PACKET_CAP
-            || self.header_used + next > self.limits.pes_bytes
-            || self.previous_counter.map(|value| (value + 1) & 15)
-                != Some(packet.continuity_counter)
+            || !self.ready_body(packet.continuity_counter, next)
             || self.input_error(packet, context, false, None).is_some()
             || cancel.load(Ordering::Relaxed)
             || !work.try_charge(2)
@@ -638,8 +647,8 @@ impl DemuxObserver {
             .payload
             .take()
             .ok_or(Error::Invalid("native PES payload missing"))?;
-        self.spans
-            .try_push(DemuxSpan {
+        self.append_ready_span(
+            DemuxSpan {
                 bytes,
                 source: SourceRange {
                     entity: self.scope.entity,
@@ -652,11 +661,84 @@ impl DemuxObserver {
                     bytes: packet.source.len(),
                 },
                 context,
-            })
-            .map_err(|error| error.error)?;
-        self.last_input = Some((context.source_event_ordinal, packet.source_offset));
+            },
+            packet.continuity_counter,
+            next,
+        )
+    }
+
+    pub(crate) fn append_plain_continuation(
+        &mut self,
+        packet: &mut PlainContinuation,
+        context: NativeSourceContext,
+        work: &mut WorkBudget,
+        cancel: &AtomicBool,
+    ) -> Result<ReadyContinuation> {
+        let Some(source) = packet.source.as_ref() else {
+            return Ok(ReadyContinuation::Unhandled);
+        };
+        let start = packet.payload_start();
+        let count = source.len() - start;
+        let counter = packet.counter();
+        let next = self.payload_len.checked_add(count).ok_or(Error::Overflow)?;
+        // Framing proved the layout, clear transport and nonempty payload.
+        // The observer still checks its own binding, order and arena capacity.
+        if !self.ready_body(counter, next)
+            || self.validate_native_input(None).is_err()
+            || self.finite_private()
+            || !source.belongs_to(&self.budget)
+            || self.pending.is_some()
+            || self.emission.is_some()
+            || self.ended
+            || self.fault.is_some()
+            || packet.pid() != self.scope.pid
+            || packet.entity != Some(self.scope.entity)
+            || context.epochs != self.scope.epochs
+            || !self.follows_input(context, packet.offset)
+            || packet.offset.checked_add(source.len() as u64).is_none()
+            || cancel.load(Ordering::Relaxed)
+            || !work.try_charge(2)
+        {
+            return Ok(ReadyContinuation::Unhandled);
+        }
+        let width = source.len();
+        // Move the charged storage directly into the payload view.
+        let bytes = packet
+            .source
+            .take()
+            .ok_or(Error::Invalid("missing continuation source"))?
+            .into_slice(start..width)?;
+        self.append_ready_span(
+            NativePesSpan {
+                bytes,
+                source: SourceRange {
+                    entity: self.scope.entity,
+                    offset: packet.offset + start as u64,
+                    bytes: count,
+                },
+                transport: SourceRange {
+                    entity: self.scope.entity,
+                    offset: packet.offset,
+                    bytes: width,
+                },
+                context,
+            },
+            counter,
+            next,
+        )
+    }
+
+    fn append_ready_span(
+        &mut self,
+        span: NativePesSpan,
+        counter: u8,
+        next: usize,
+    ) -> Result<ReadyContinuation> {
+        let position = (span.context.source_event_ordinal, span.transport.offset);
+        self.spans.try_push(span).map_err(|error| error.error)?;
+        self.last_input = Some(position);
         self.entity_first = false;
-        self.previous_counter = Some(packet.continuity_counter);
+        self.previous_counter = Some(counter);
         self.payload_len = next;
         Ok(if self.body_limit == Some(next) {
             ReadyContinuation::Complete
