@@ -3,8 +3,8 @@ use triergon_core::{
     Budget, Error, InputCursor, SourceCapabilities, SourceFailure, SourceId, Step, WorkBudget,
 };
 use triergon_isobmff::{
-    Access, BoxEvent, BoxHeader, BoxReader, Mov9PartialSampleReader, Mov9PayloadBounds,
-    PinnedMovD32RegularRecoveryV1, Sample, SampleReader,
+    Access, BoxEvent, BoxHeader, BoxReader, MediaDataPolicy, Mov9PartialSampleReader,
+    Mov9PayloadBounds, PinnedMovD32RegularRecoveryV1, Sample, SampleReader,
 };
 fn sample(range: Range<u64>) -> Sample {
     Sample {
@@ -51,7 +51,7 @@ fn header(recovery: bool, kind: [u8; 4]) -> Result<BoxHeader, Error> {
     let mut i = input(&p, Some(14));
     let generation = i.generation();
     let mut r = if recovery {
-        BoxReader::new_pinned_mov_recovery(&i, 1024, PinnedMovD32RegularRecoveryV1)?
+        BoxReader::with_media_data_policy(&i, 1024, MediaDataPolicy::PreserveTerminalDeclaration)?
     } else {
         BoxReader::new(&i, 1024)?
     };

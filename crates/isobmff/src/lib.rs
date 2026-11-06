@@ -49,7 +49,7 @@ pub use boxes::{BoxChildren, BoxHeader, BoxStep, BoxView, HeaderRead};
 pub use fragment::{FragmentBuilder, FragmentContext, FragmentIndex, ImplicitBase, Trex};
 pub(crate) use fragment::{FragmentCursor, FragmentLocator};
 pub use fragment_time::FragmentDecodeTime;
-pub use input_boxes::{BoxEvent, BoxReader};
+pub use input_boxes::{BoxEvent, BoxReader, MediaDataPolicy};
 pub use interleave::{
     ForwardRegularMdatV1, InterleaveStatus, PhysicalInterleaveLimits, PhysicalSampleCursor,
     SourceTrack, TrackSampleCursor,

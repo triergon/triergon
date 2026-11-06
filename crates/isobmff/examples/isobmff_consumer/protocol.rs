@@ -10,6 +10,7 @@ pub const MAX_PACKETS: u64 = 1_000_000;
 pub const MAX_DELIVERED_BYTES: u64 = 256 * 1024 * 1024;
 pub const EOF: i64 = -541478725;
 pub const DOMAIN: u64 = 0x4d4f5633;
+pub const CORRUPT_PACKET: u32 = 2;
 
 pub fn raw_box(out: &mut String, raw: &triergon_isobmff::BoxView) {
     write!(out, "{{\"offset\":{},\"box_hex\":\"", raw.header().start).expect("String write");
