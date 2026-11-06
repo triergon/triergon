@@ -116,7 +116,7 @@ remaining tx3g integration is complete container/configuration-to-consumer and
 native/renderer integration. Earlier D2 and multibyte batch contracts retain their
 original batch scope. Complete selected native text compatibility/recovery,
 remaining legacy charset coverage, matched native output ownership and all
-per-case paired95 delivery runtime<=1.25 (optimization target <=0.80) plus lower
+per-case paired95 delivery runtime<=1.20 (optimization target <=0.80) plus lower
 live heap/RSS gates remain required.
 PGS, VobSub/DVD SPU and remaining DVB work are still required. Unavailable Blu-ray/
 DVD normative bitstream sources are not replaced by inferred decoder grammar.

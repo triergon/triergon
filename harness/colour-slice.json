@@ -49,7 +49,7 @@
   "required_targets": [
     "aarch64-unknown-linux-gnu"
   ],
-  "runtime_ratio_max": 1.25,
+  "runtime_ratio_max": 1.2,
   "memory_ratio_max_exclusive": 1.0,
   "minimum_pairs": 30,
   "confidence": 0.95,
@@ -60,5 +60,5 @@
   ],
   "reference_view": "32 exact public FFmpeg colour/side-data integers; complete source IEEE bits/defaults/raw TrackEntry separately mandatory",
   "runtime_optimization_ratio_target": 0.8,
-  "runtime_policy": "initial-delivery-runtime-v1"
+  "runtime_policy": "initial-delivery-runtime-v2"
 }

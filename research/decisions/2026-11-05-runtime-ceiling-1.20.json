@@ -1,0 +1,32 @@
+{
+  "schema": "initial-delivery-runtime-policy-decision-v1",
+  "policy": "initial-delivery-runtime-v2",
+  "supersedes": "initial-delivery-runtime-v1",
+  "authorized_date": "2026-11-05",
+  "owner_choice": "Lower the initial-delivery runtime ceiling from 1.25x to 1.20x FFmpeg time; retain 0.80x as the optimization target",
+  "delivery_runtime_ratio_max": 1.2,
+  "previous_delivery_runtime_ratio_max": 1.25,
+  "optimization_runtime_ratio_target": 0.8,
+  "unchanged": [
+    "full selected-feature parity",
+    "strictly lower live heap",
+    "total resident peak RSS policy (2026-11-03)",
+    "all required inputs and profiles",
+    "equal measured work",
+    "minimum pairs30 and95percent confidence",
+    "all first clean observations and failures"
+  ],
+  "contract_changes": [
+    {"path": "harness/slice.json", "before_sha256": "ead6d286477fda92f836f5cc032ccb937e2f4b6116de0f225ce455b8062c810e", "after_sha256": "fec84c0bde286b6e2f246962c48993e1c3cf064b8ddf6ea1e6776ac473f4588d", "changed_fields": ["runtime_ratio_max", "runtime_policy"]},
+    {"path": "harness/header-slice.json", "before_sha256": "01c301c09e70fb1ad465a37aef71d5cebacbb511e17abaa634a89028ee8ecd7f", "after_sha256": "0dc8c19e849ec2d34f70333cd9a2c9bf7ad24523131385bd4862c4375d845e38", "changed_fields": ["runtime_ratio_max", "runtime_policy"]},
+    {"path": "harness/zlib-slice.json", "before_sha256": "7a55a06f1bc0a63413c42e45045f7018ae39daef6fe1971c243c855720ed0955", "after_sha256": "f836cba40228d135ea79a6c4cad373633f934b4cd1af88d255caf2af748efc01", "changed_fields": ["runtime_ratio_max", "runtime_policy"]},
+    {"path": "harness/seek-slice.json", "before_sha256": "b3a64c801a45bc829f6147ef04ab89acf0faa40e30e5f3cf162e8fc3722fcd81", "after_sha256": "c7df73c36e514e2cd14680efa0d71eb273733b8d407a287c0485762f6342083f", "changed_fields": ["runtime_ratio_max", "runtime_policy"]},
+    {"path": "harness/colour-slice.json", "before_sha256": "8c4b81dda90c8d2f63b1792873caf1e8b3d9c9d1e772268e79fe46ba1f1c792c", "after_sha256": "0a35f722888be52f095f8eb3b12398fefde10b77cba5ba523a2ec39b363eaf55", "changed_fields": ["runtime_ratio_max", "runtime_policy"]},
+    {"path": "harness/catalogue-slice.json", "before_sha256": "dbfd6dbec40bd4f58a906c6008711c7eedbd698009395d3de855a3f77d4e6cb1", "after_sha256": "5f80d7a9178d6977f7a54a5bee31925adeef95cc325353316b958447a6b50a9c", "changed_fields": ["runtime_ratio_max", "runtime_policy"]},
+    {"path": "research/module-gates.json", "before_sha256": "62bee3dc1268cc905f89390b5cd1ee0816bbc6e8607c42091d1bed706a4210ed", "after_sha256": "5737f7960b239fcc293778754116e09ee5e7d02aa9bfd6ddc06b3dfa4b2c14b6", "changed_fields": ["owner_requirements.runtime_ratio_max", "owner_requirements.runtime_interpretation", "owner_requirements.runtime_confidence", "owner_requirements.runtime_policy"]},
+    {"path": "research/offboarding-target.json", "before_sha256": "2a2e14cc35771af6be69779cae1e7469f00bdc7132579d50e2f3545a5fa01c96", "after_sha256": "d4351239275d69d9664e3d475a2c85ca2da711fd7c0046c193f1bf79ce1c7af7", "changed_fields": ["runtime_upper95_max"]}
+  ],
+  "historical_receipts_modified": false,
+  "historical_reference_baselines_modified": false,
+  "existing_measurements_resampled": false
+}

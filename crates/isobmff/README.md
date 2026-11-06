@@ -544,7 +544,7 @@ This source view retains unique decode-order samples and an edit map. It does no
 pretend equivalence to native edit-applied packet repetition or DTS shifting. The
 parent must freeze equal native/candidate work and compatibility views before any
 timing. Serialization, tracing and input hashing are not a demux benchmark. Full
-selected parity, delivery runtime upper paired95 <=1.25 (optimization target <=0.80) and lower live heap/RSS remain required.
+selected parity, delivery runtime upper paired95 <=1.20 (optimization target <=0.80) and lower live heap/RSS remain required.
 
 Regression definitions use original authored fixtures and independent expected
 source facts, including >4 GiB virtual co64 offsets. Rights/provenance and exact

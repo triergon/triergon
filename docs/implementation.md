@@ -176,7 +176,7 @@ speed failure requires a code change before requalification.
 
 `slice_accepted` requires every declared current profile to pass strict packet and
 source-time comparisons, all short-read/seek requirements, a runtime ratio with
-paired 95% upper confidence bound at most 1.25, and lower measured RSS/live allocations.
+paired 95% upper confidence bound at most 1.20 (1.25 before 2026-11-05), and lower measured RSS/live allocations.
 The separately reported optimization target remains a runtime upper bound of 0.80;
 the [delivery policy](../research/decisions/initial-delivery-runtime.md) preserves historical receipts.
 It requires all 30 raw pairs and rejects missing evidence, unequal work, corruption,

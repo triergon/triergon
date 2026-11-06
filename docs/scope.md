@@ -8,9 +8,10 @@ Status: the historical frozen K0–K5 snapshot (116 workloads) passed native Mac
 - Dependencies are exceptions. Each must fit the exact contract (“Cinderella”: fits perfectly), be pure safe Rust through the selected transitive graph, be mature and optimal for the workload, and beat the cost of bootstrapping that bounded component.
 - FFmpeg is the feature and performance reference for each selected module.
 - Full parity is required for the explicitly selected features/modules. “Modern FFmpeg” is the long-term direction, not the v0 completion claim.
-- Initial-delivery runtime ceiling: **`T_rust / T_ffmpeg <= 1.25`**, using the
-  upper paired 95% bound for every required case. The owner subsequently
-  authorized this ceiling in the [runtime decision](../research/decisions/initial-delivery-runtime.md).
+- Initial-delivery runtime ceiling: **`T_rust / T_ffmpeg <= 1.20`**, using the
+  upper paired 95% bound for every required case. The owner authorized 1.25 in the
+  [runtime decision](../research/decisions/initial-delivery-runtime.md) and lowered it
+  to 1.20 in the [2026-11-05 decision](../research/decisions/2026-11-05-runtime-ceiling-1.20.md).
   **20% less execution time**, or a ratio at most **0.80**, remains the optimization
   target; the earlier 80% wording was never an 80% runtime-reduction requirement.
 - Lower memory use is required in addition to speed and correctness. No numerical memory-reduction percentage was specified; see the measurable gate in `testing.md`.

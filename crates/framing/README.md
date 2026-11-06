@@ -101,7 +101,7 @@ All native execution belongs to the parent queue; none ran in this lane.
 The E-AC-3 BSI and DTS feature manifests also retain their historical authored
 checkpoint states. `EAC3-BSI.md`, `DTS-CORE.md` and this README name later actual
 host/reference evidence separately, without rewriting those manifests or receipts.
-Full selected parity, delivery runtime upper paired95 <=1.25 (optimization target <=0.80) and lower live heap/RSS
+Full selected parity, delivery runtime upper paired95 <=1.20 (optimization target <=0.80) and lower live heap/RSS
 remain hard, unqualified gates for these new framing features.
 
 The crate has one owned dependency, `triergon-core`, and forbids unsafe code.
@@ -278,7 +278,7 @@ the earlier pre-execution state and README hash. Compiled sources and fixtures
 were held at that checkpoint. The new batch adds separate files/receipts without
 rewriting those historical artifacts.
 
-Full selected parity, delivery runtime upper paired95 ratio <=1.25 (optimization target <=0.80), lower live heap and
+Full selected parity, delivery runtime upper paired95 ratio <=1.20 (optimization target <=0.80), lower live heap and
 lower attributable RSS remain hard per-case gates on native Linux ARM64. All are
 **unmeasured for this slice**; 32-bit webOS and consumer integration are also open.
 

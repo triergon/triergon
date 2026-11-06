@@ -127,7 +127,7 @@ No packet trimming, field filling, time rounding or exception turns these into
 parity. See `.research/parallel-framing/dca-public-assessment-v1/ASSESSMENT.md`
 for exact case/source evidence, scope matrix and the next bounded operation plan.
 
-Full frozen selected parity, equivalent-work delivery runtime upper paired95 <=1.25 (optimization target <=0.80),
+Full frozen selected parity, equivalent-work delivery runtime upper paired95 <=1.20 (optimization target <=0.80),
 lower live heap and lower attributable RSS remain open hard per-case native
 Linux ARM64 gates. Separate 32-bit/device and consumer integration proof remains
 required. Production and observer source stay HOLD. Parent execution above is

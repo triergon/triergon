@@ -25,7 +25,7 @@
   "required_targets": [
     "aarch64-unknown-linux-gnu"
   ],
-  "runtime_ratio_max": 1.25,
+  "runtime_ratio_max": 1.2,
   "memory_ratio_max_exclusive": 1.0,
   "minimum_pairs": 30,
   "confidence": 0.95,
@@ -35,5 +35,5 @@
     "deferred targets"
   ],
   "runtime_optimization_ratio_target": 0.8,
-  "runtime_policy": "initial-delivery-runtime-v1"
+  "runtime_policy": "initial-delivery-runtime-v2"
 }

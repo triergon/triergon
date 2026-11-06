@@ -15,7 +15,7 @@ for p in (root/'research').rglob('*.json'):
  try:json.loads(p.read_text())
  except (ValueError,UnicodeError) as e:errors.append(f'{p.relative_to(root)}: {e}')
 g=json.loads((root/'research/module-gates.json').read_text())
-if g['owner_requirements']['runtime_ratio_max']!=1.25:errors.append('delivery runtime gate differs from owner authorization')
+if g['owner_requirements']['runtime_ratio_max']!=1.2:errors.append('delivery runtime gate differs from owner authorization')
 if g['owner_requirements'].get('runtime_optimization_ratio_target')!=0.8:errors.append('runtime optimization target differs from owner authorization')
 if any(m['accepted'] for m in g['modules']):errors.append('a module was marked accepted without implementation evidence')
 fate=json.loads((root/'research/fate-index.json').read_text())
