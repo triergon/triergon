@@ -96,13 +96,17 @@ impl BlockTiming {
     }
 
     /// RFC 9559 §§10.3.5, 11.2: delay is subtracted in nanoseconds.
-    pub fn source(self) -> Result<PacketTiming> {
+    #[inline]
+    pub(crate) fn source_base_ns(self) -> Result<i128> {
         self.validate()?;
-        let base = self
-            .timestamp_ticks
+        self.timestamp_ticks
             .checked_mul(i128::from(self.scale_ns))
             .and_then(|n| n.checked_sub(i128::from(self.codec_delay_ns)))
-            .ok_or(Error::Overflow)?;
+            .ok_or(Error::Overflow)
+    }
+
+    pub fn source(self) -> Result<PacketTiming> {
+        let base = self.source_base_ns()?;
         let duration = if let Some(ticks) = self.duration_ticks {
             Some(ExactTime::new(
                 i128::from(ticks)

@@ -28,6 +28,14 @@ pub(crate) struct BlockPrefix {
     pub payload_start: usize,
 }
 pub(crate) fn block_prefix(bytes: &[u8]) -> Result<BlockPrefix> {
+    if let [track @ 0x80..=0xff, high, low, flags, ..] = bytes {
+        return Ok(BlockPrefix {
+            number: u64::from(*track & 0x7f),
+            offset: i16::from_be_bytes([*high, *low]),
+            flags: *flags,
+            payload_start: 4,
+        });
+    }
     let (number, width, _) = ebml::vint(bytes, false)?;
     let header = bytes.get(width..width + 3).ok_or(Error::Truncated)?;
     Ok(BlockPrefix {
@@ -71,14 +79,8 @@ pub(crate) struct ScanPacketFields {
     pub keyframe: bool,
 }
 impl FrameParameters {
-    fn fields(
-        self,
-        index: usize,
-        track: &Track,
-        keyframe: bool,
-        discard: i64,
-    ) -> Result<super::super::PacketFields> {
-        let timing = BlockTiming {
+    fn timing(self, track: &Track) -> BlockTiming {
+        BlockTiming {
             timestamp_ticks: i128::from(self.cluster_ticks) + i128::from(self.offset),
             scale_ns: self.scale,
             codec_delay_ns: track.codec_delay_ns,
@@ -86,8 +88,16 @@ impl FrameParameters {
             duration_ticks: self.duration_ticks,
             frame: self.frame,
             frames: self.frames,
-        };
-        super::super::PacketFields::new(index, timing, keyframe, discard)
+        }
+    }
+    fn fields(
+        self,
+        index: usize,
+        track: &Track,
+        keyframe: bool,
+        discard: i64,
+    ) -> Result<super::super::PacketFields> {
+        super::super::PacketFields::new(index, self.timing(track), keyframe, discard)
     }
     pub(crate) fn scan_fields(
         self,
@@ -95,6 +105,17 @@ impl FrameParameters {
         track: &Track,
         keyframe: bool,
     ) -> Result<ScanPacketFields> {
+        if self.frames == 1 && self.frame == 0 && self.duration_ticks.is_none() {
+            // A single frame starts at the integral block timestamp. Its
+            // optional u64 default duration is already representable in ns.
+            let pts_ns =
+                i64::try_from(self.timing(track).source_base_ns()?).map_err(|_| Error::Overflow)?;
+            return Ok(ScanPacketFields {
+                track: index,
+                pts_ns: Some(pts_ns),
+                keyframe,
+            });
+        }
         let fields = self.fields(index, track, keyframe, 0)?;
         Ok(ScanPacketFields {
             track: fields.track,
