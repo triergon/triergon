@@ -95,6 +95,8 @@ pub struct TsProgressiveReader<S: Source> {
 }
 
 impl<S: Source> TsProgressiveReader<S> {
+    const POLLS_PER_ADVANCE: usize = 8;
+
     pub fn new(input: InputCursor, source: S, limits: TsProgressiveLimits) -> Result<Self> {
         let source = SourceOwner::new(source);
         if input.position() != 0 || input.capabilities().random_access {
@@ -144,27 +146,42 @@ impl<S: Source> TsProgressiveReader<S> {
         work: &mut WorkBudget,
         cancel: &AtomicBool,
     ) -> Result<TsProgressiveStep> {
-        if cancel.load(Ordering::Relaxed) {
-            self.fail();
-            return Err(Error::Cancelled);
-        }
-        match self.step(work, cancel) {
-            Err(Error::Backpressure {
-                requested,
-                available,
-            }) => Ok(TsProgressiveStep::Backpressure {
-                requested,
-                available,
-            }),
-            // The frame assemblers retain state across allocation failure.
-            // A native track refusal while reading is terminal.
-            Err(Error::Allocation) if self.phase != Phase::Read => Err(Error::Allocation),
-            Err(error) => {
+        for _ in 0..Self::POLLS_PER_ADVANCE {
+            if cancel.load(Ordering::Relaxed) {
                 self.fail();
-                Err(error)
+                return Err(Error::Cancelled);
             }
-            result => result,
+            let remaining = work.remaining();
+            let phase = self.phase;
+            match self.step(work, cancel) {
+                Ok(TsProgressiveStep::Yield)
+                    if work.remaining() != 0
+                        && (work.remaining() < remaining || self.phase != phase) =>
+                {
+                    continue;
+                }
+                Err(Error::Backpressure {
+                    requested,
+                    available,
+                }) => {
+                    return Ok(TsProgressiveStep::Backpressure {
+                        requested,
+                        available,
+                    });
+                }
+                // The frame assemblers retain state across allocation failure.
+                // A native track refusal while reading is terminal.
+                Err(Error::Allocation) if self.phase != Phase::Read => {
+                    return Err(Error::Allocation);
+                }
+                Err(error) => {
+                    self.fail();
+                    return Err(error);
+                }
+                result => return result,
+            }
         }
+        Ok(TsProgressiveStep::Yield)
     }
 
     fn step(&mut self, work: &mut WorkBudget, cancel: &AtomicBool) -> Result<TsProgressiveStep> {
