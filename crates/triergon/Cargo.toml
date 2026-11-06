@@ -1,7 +1,7 @@
 [package]
 name = "triergon"
 version = "0.0.0"
-description = "Triergon facade: the neutral container model, AnyReader and the format, codec and composition crates behind one feature each."
+description = "Triergon facade: the neutral container model, AnyReader and each format crate behind its own feature."
 repository.workspace = true
 license.workspace = true
 edition.workspace = true

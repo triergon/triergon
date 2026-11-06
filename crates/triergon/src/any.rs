@@ -21,6 +21,9 @@ use triergon_core::{
     SourceFailure, SourceId, Step, TimeBase, WorkBudget,
 };
 
+/// The largest input window a reader asks for at once.
+const WINDOW: usize = 64 * 1024;
+
 /// What the first bytes of a source look like.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Probe {
@@ -99,7 +102,7 @@ impl AnyReader {
                 source,
                 capabilities,
                 triergon_matroska::Limits::default(),
-                1,
+                WINDOW,
             )?)),
             Probe::Isobmff | Probe::Ts => Err(Error::Unsupported(
                 "ISO BMFF and MPEG-TS readers do not implement ContainerReader yet",

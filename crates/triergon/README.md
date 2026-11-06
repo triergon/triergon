@@ -78,16 +78,15 @@ The meaning of each type is documented in
   directly. Unknown sources, and Matroska without the `matroska` feature, are also
   `Error::Unsupported`.
 - **Matroska defaults.** `open` builds the Matroska reader with
-  `triergon_matroska::Limits::default()` and a one-byte maximum input window, so
-  every `NeedInput` asks for at most one byte. For other limits or larger windows,
-  construct `matroska::typed::Reader` directly and wrap it as `AnyReader::Matroska`.
+  `triergon_matroska::Limits::default()` and asks for at most 64 KiB per
+  `NeedInput`. For other limits or windows, construct `matroska::typed::Reader`
+  directly and wrap it as `AnyReader::Matroska`.
 - **Dispatch.** Forwarding is one `match` per call with no allocation and no
   dynamic dispatch on the packet path. Tracks are returned as `&dyn TrackInfo`.
   `AnyPacket` implements `PacketInfo`; match `AnyPacket::Matroska(p)` for the
   format's own packet type.
-- **Other events.** The wrapper type inside `Event::Other` is not re-exported, so
-  non-packet events can be skipped but not inspected through the facade; read them
-  from the concrete format reader.
+- **Other events.** `Event::Other` carries an `AnyOther`; match
+  `AnyOther::Matroska(event)` for Matroska configuration, documents and structure.
 - **Seeking.** `request_seek` forwards to the format reader. For Matroska the
   `TrackId` is the TrackNumber, the target is floored to nanoseconds, and only
   video tracks can be seek targets.
