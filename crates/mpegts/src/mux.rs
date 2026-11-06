@@ -2,7 +2,7 @@
 //! video elementary stream, plus a DVB SDT (ETSI EN 300 468).
 //!
 //! Cadence and layout follow the frozen contract (`mux` in
-//! research/capture/contract.json): every picture is one PES whose first TS
+//! harness/capture/contract.json): every picture is one PES whose first TS
 //! packet carries a PCR equal to DTS·300 (and the random-access indicator on
 //! key pictures); SDT/PAT/PMT precede a PES when their period elapsed in PCR
 //! time, PAT/PMT also before a key picture following a non-key picture.

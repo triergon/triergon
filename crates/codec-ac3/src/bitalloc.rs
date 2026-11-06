@@ -133,7 +133,7 @@ pub(crate) fn stage_mask(p: &MaskParams<'_>, c: &mut BaCache) -> Result<(), &'st
     let bndpsd = &c.bndpsd;
     // Reduced-rate AC-3 (bsid 9/10): each band spans 1/2 or 1/4 of the frequency range, so the
     // per-band decays are shifted down and hth is read at band >> shift. Not in A/52:2018; this is
-    // FFmpeg 9.0.2's rule, fitted black-box bin for bin (research/d4/ac3/STATUS.md).
+    // FFmpeg 9.0.2's rule, fitted black-box bin for bin (harness/codecs/ac3/STATUS.md).
     let sdecay = SLOWDEC[p.params.sdcycod as usize] >> p.rate_shift;
     let fdecay = FASTDEC[p.params.fdcycod as usize] >> p.rate_shift;
     let sgain = SLOWGAIN[p.params.sgaincod as usize];

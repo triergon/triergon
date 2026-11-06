@@ -2,7 +2,7 @@
 //! ISO/IEC 14496-3 Annex 4.A (AAC spectral / scalefactor), Annex 4.A.6.1 (SBR) and
 //! Annex 8.B (Parametric Stereo) from the implementer's knowledge of the standard.
 //! Every table is checked by unit tests for Kraft equality and the prefix property;
-//! see `research/d4/aac/STATUS.md` for the provenance notes (codebook 1 and some SBR
+//! see `harness/codecs/aac/STATUS.md` for the provenance notes (codebook 1 and some SBR
 //! balance-table tails were reconstructed and then validated against the oracle).
 //! Generated once from a scratch transcription; edit by hand with care.
 

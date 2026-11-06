@@ -1,8 +1,8 @@
 //! AC-3 bsid 9/10 (reduced sample rate) and the E-AC-3 reduced-rate / non-compatible
 //! dependent corner cases. The two frames are self-authored probe frames from
-//! research/d4/ac3/gen_reduced_rate.py (all-zero mantissas, so the output exposes the bit
+//! harness/codecs/ac3/gen_reduced_rate.py (all-zero mantissas, so the output exposes the bit
 //! allocation); the expected samples were captured black-box from FFmpeg 9.0.2's decoder
-//! (`ffmpeg -i k.ac3 -f f32le`), see research/d4/ac3/STATUS.md.
+//! (`ffmpeg -i k.ac3 -f f32le`), see harness/codecs/ac3/STATUS.md.
 
 use triergon_codec_ac3::{
     AudioFrame, Compat, DecodeError, Decoder, DecoderOptions, Feature, Speaker, Syntax,

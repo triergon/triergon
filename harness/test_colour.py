@@ -8,7 +8,7 @@ from .colour_oracle import source_colour
 
 class ColourParityTests(unittest.TestCase):
     def test_every_frozen_colour_profile_matches_native_and_exact_source(self):
-        manifest=json.loads((ROOT/'harness/colour-corpus.json').read_text())
+        manifest=json.loads((ROOT/'harness/features/matroska-colour/corpus.json').read_text())
         for row in manifest['cases']:
             with self.subTest(profile=row['profile']):
                 path=ROOT/'.research/colour-fixtures'/row['file']
@@ -37,7 +37,7 @@ class ColourParityTests(unittest.TestCase):
 
     def test_metadata_benchmarks_consume_every_canonical_field(self):
         from .test_checksum import scalar_trace_checksum
-        for row in json.loads((ROOT/'harness/colour-corpus.json').read_text())['cases']:
+        for row in json.loads((ROOT/'harness/features/matroska-colour/corpus.json').read_text())['cases']:
             path=ROOT/'.research/colour-fixtures'/row['file']
             for worker in [ROOT/'target/release/media-worker',ROOT/'target/harness/ffmpeg-worker']:
                 trace=execute([worker,'metadata-trace',path])

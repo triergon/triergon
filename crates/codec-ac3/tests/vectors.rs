@@ -3,7 +3,7 @@
 //! Frame/sample counts and layouts are FFmpeg 9.0.2's (ffprobe). Sample values are compared
 //! against the FATE `*_v2.pcm` s16 references only coarsely: both decoders inject
 //! non-normative pseudo-random dither/SPX noise, so exact comparison is impossible here
-//! (the exact, dither-stripped comparison lives in research/d4/ac3/, see STATUS.md).
+//! (the exact, dither-stripped comparison lives in harness/codecs/ac3/, see STATUS.md).
 
 use std::path::PathBuf;
 

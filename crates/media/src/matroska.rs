@@ -1,4 +1,4 @@
-//! Initial Matroska packet slice, specified by `harness/slice.json`.
+//! Initial Matroska packet slice, specified by `harness/features/matroska-demux/contract.json`.
 //!
 //! Streaming `Read` is sufficient for demuxing. Seeking additionally requires `Seek`
 //! and supports validated Cues, bounded fallback scans and all-track preroll. A

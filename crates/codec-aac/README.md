@@ -67,7 +67,7 @@ dec.reset(); // after a seek: drops overlap, prediction, PNS, SBR and PS history
   validated by the conformance vectors only; codewords and paths no vector reaches are
   unverified: SBR Huffman table tails, fine-resolution IID, PS mixing B, IPD/OPD in the
   34-band or 5-band configuration. Provenance:
-  [research/d4/aac/STATUS.md](../../research/d4/aac/STATUS.md).
+  [harness/codecs/aac/STATUS.md](../../harness/codecs/aac/STATUS.md).
 
 ## Conformance
 
@@ -77,10 +77,10 @@ dec.reset(); // after a seek: drops overlap, prediction, PNS, SBR and PS history
 - Reference: FFmpeg 9.0.2's float AAC decoder on the FATE `aac/` vectors (MP4/3GP tracks
   remuxed to ADTS). Every sample of every channel is compared with no delay search or gain
   fitting: exact rate, layout and sample count; per channel RMS ≤ 8.8e-6 and
-  max |diff| ≤ 6.1035e-5 (`research/d4/NUMERIC-RULES.json`).
+  max |diff| ≤ 6.1035e-5 (`harness/codecs/numeric-rules.json`).
 - SBR/PS vectors are also checked against the conformance `.s16` references (≤ 1 LSB).
 - `cargo test -p triergon-codec-aac` runs synthetic ADTS tests; `tests/fate_vectors.rs`
   runs the FATE vectors when `.research/m1d4/fate-suite/aac/` is present (set
   `AAC_REF_DIR` for the float comparison) and skips otherwise.
-- Comparison and probe tools: [research/d4/aac/tools](../../research/d4/aac/tools).
+- Comparison and probe tools: [harness/codecs/aac/tools](../../harness/codecs/aac/tools).
   Project-wide gates: [docs/quality.md](../../docs/quality.md).

@@ -18,7 +18,7 @@ pub fn matroska_inputs() -> Vec<String> {
     let mut names: Vec<String> = [
         "Makefile",
         "specs/sources.json",
-        "research/fate-index.json",
+        "harness/fate/index.json",
         "harness/oracles.py",
         "xtask/src/harness/acceptance.rs",
         "xtask/src/harness/build.rs",
@@ -47,13 +47,20 @@ pub fn matroska_inputs() -> Vec<String> {
         "harness/portable-memory-check.c",
         "harness/rss-bound-api.h",
         "harness/comparison-rules.json",
-        "harness/fate-map.json",
+        "harness/fate/map.json",
     ]
     .map(String::from)
     .to_vec();
-    for prefix in ["", "header-", "zlib-", "seek-", "colour-", "catalogue-"] {
-        for suffix in ["slice", "corpus"] {
-            names.push(format!("harness/{prefix}{suffix}.json"));
+    for feature in [
+        "matroska-demux",
+        "matroska-header-removal",
+        "matroska-zlib",
+        "matroska-cues-preroll",
+        "matroska-colour",
+        "matroska-segment-metadata",
+    ] {
+        for file in ["contract", "corpus"] {
+            names.push(format!("harness/features/{feature}/{file}.json"));
         }
     }
     names

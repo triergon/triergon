@@ -11,7 +11,7 @@ publish.workspace = true
 triergon-codec = { path = "../codec" }
 
 [features]
-# Analysis aid for research/d4/ac3 scripts (per-block dumps); never needed in production.
+# Analysis aid for harness/codecs/ac3 scripts (per-block dumps); never needed in production.
 debug-dump = []
 
 [lints]

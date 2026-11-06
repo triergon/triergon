@@ -1,0 +1,36 @@
+{
+  "schema": 2,
+  "policy": "harness/policy.json",
+  "targets": [
+    "aarch64-unknown-linux-gnu",
+    "aarch64-apple-darwin",
+    "x86_64-unknown-linux-gnu",
+    "armv7-unknown-linux-gnueabihf"
+  ],
+  "modules": [
+    {
+      "name": "core",
+      "accepted": false
+    },
+    {
+      "name": "matroska",
+      "accepted": false
+    },
+    {
+      "name": "packet-adapters",
+      "accepted": false
+    },
+    {
+      "name": "isobmff",
+      "accepted": false
+    },
+    {
+      "name": "mpeg-ts",
+      "accepted": false
+    },
+    {
+      "name": "subtitles",
+      "accepted": false
+    }
+  ]
+}

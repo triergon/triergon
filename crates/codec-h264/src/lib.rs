@@ -2,7 +2,7 @@
 //!
 //! Pure safe Rust, no dependencies. Selected feature matrix: Constrained Baseline, Main and
 //! High profiles, 8-bit 4:2:0 and 4:0:0, frames, field pictures (PAFF) and MBAFF, CAVLC and
-//! CABAC. Development prototype; not qualified. See `research/d4/h264/STATUS.md`.
+//! CABAC. Development prototype; not qualified. See `harness/codecs/h264/STATUS.md`.
 #![forbid(unsafe_code)]
 
 mod bitreader;

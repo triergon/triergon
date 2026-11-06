@@ -1,4 +1,4 @@
-# FFmpeg 9.0.2 (Homebrew, macOS) float output of tests/support/scenarios.rs streams; research/d4/dca/fingerprint.py
+# FFmpeg 9.0.2 (Homebrew, macOS) float output of tests/support/scenarios.rs streams; harness/codecs/dca/fingerprint.py
 stream basic 6 6144 48000
 blocks 0 4096 -2.987316745e-04 -1.241112073e-03
 spots 0 5:2.022463619e-08 773:1.648649486e-04 1541:-2.318205661e-04 2309:-4.615571015e-05 3077:-3.413395316e-04 3845:3.874317044e-04 4613:-6.421346916e-05 5381:3.999350884e-04

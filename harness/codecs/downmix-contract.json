@@ -1,0 +1,44 @@
+{
+  "schema": "triergon.d4.downmix-contract.v1",
+  "frozen_utc": "2026-11-03T01:20:00Z",
+  "frozen_before_grading": true,
+  "reference": {
+    "build": "FFmpeg 9.0.2 default configuration (--disable-doc --disable-debug), archive sha256 8c3850283eb25fa026482078a04051e0be17347b09ef81a0849bec15a96e002e",
+    "ffmpeg_sha256": "a3753a1af481513374d69d4bfc13fdb017e0b29e8d725e96ff3144db6b684072",
+    "host": "AWS c8g.xlarge Graviton4, Ubuntu 24.04, kernel 7.0.0-1014-aws, gcc 13.3.0",
+    "command": "ffmpeg -f <ac3|eac3|aac|dts> -i pipe:0 -vn -ac 2 -f pulse|alsa  (both muxers default to pcm_s16le)",
+    "observations": ["harness/codecs/downmix-observations-linux-arm64.json", "harness/codecs/downmix-rounding-linux-arm64.json"]
+  },
+  "matrix": {
+    "source": "the resampler's own reported matrix for every multichannel vector (native debug log)",
+    "rules": {
+      "front pair": "FL->L, FR->R at 1",
+      "front left/right of centre": "FLC->L, FRC->R at 1",
+      "centre": "FC to both at center_level",
+      "lfe": "LFE to both at lfe_level / sqrt(2)",
+      "back centre": "BC to both at surround_level / sqrt(2)",
+      "surround pairs, no encoding": "BL/SL->L, BR/SR->R at surround_level",
+      "surround pairs, Dolby (Lt/Rt)": "every surround: -surround_level/sqrt(2) to L, +surround_level/sqrt(2) to R",
+      "surround pairs, Pro Logic II": "left surround: -sqrt(3/2)*s to L, +sqrt(1/2)*s to R; right surround: -sqrt(1/2)*s to L, +sqrt(3/2)*s to R",
+      "mono": "FC alone at 1/sqrt(2) to both",
+      "normalisation": "each output row divided by its absolute coefficient sum when that sum exceeds 1 (s16 output)"
+    },
+    "levels": "AC-3/E-AC-3 downmix side data (Lo/Ro levels unless the stream prefers Lt/Rt, which selects Lt/Rt levels and Dolby, or Pro Logic II encoding); other codecs: center 1/sqrt(2), surround 1/sqrt(2), lfe 0",
+    "observed": {
+      "monsters_inc_5.1_448_small.ac3": "center 0.707107 surround 0.5 lfe 0: FL .453082 FC .320377 SL .226541",
+      "millers_crossing_4.0.ac3": "center .707107 surround .707107: FL .453082 FC .320377 BC .226541",
+      "csi_miami_5.1_256_spx_small.eac3": "Dolby, lfe 2.238719: FL .233094 FC .164822 LFE .368990 SL/SR -.116547/+.116547",
+      "serenity_english_5.1_1536_small.eac3": "Pro Logic II, lfe 1: FL .264534 FC .187053 LFE .187053 SL -.229093/.132267 SR -.132267/.229093",
+      "the_great_wall_7.1.eac3": "center .594604 surround .5: FL .385415 FC .229169 BL/SL .192708",
+      "dts_es.dts": "defaults: FL .343146 FC .242641 BC .171573 SL .242641",
+      "master_audio_7.1_24bit.dts": "defaults: FL/FLC .292893 FC/BL .207107"
+    }
+  },
+  "sample_conversion": {
+    "rule": "s16 = clamp(floor(mixed * 32768)), mixing in float32",
+    "evidence": "best fit on all 12 observed vectors: mismatch fraction 1e-6 .. 1.3e-3, never more than 1 LSB (round-to-nearest mismatches ~50%)",
+    "tolerance": "per harness/codecs/numeric-rules.json audio_device_path: |diff| <= 1 LSB"
+  },
+  "rate": "decoder output rate, unchanged (no resampling in the device path; the sound server resamples)",
+  "open": ["Dolby (Lt/Rt) is observed on one vector only; dual mono and 2/3-block E-AC-3 untested", "AAC PCE matrix-mixdown metadata is not exported by FFmpeg's decoder as downmix side data (defaults apply)"]
+}

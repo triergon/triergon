@@ -287,14 +287,14 @@ pub fn acceptance(
                 .to_vec(),
         );
         let view = row.get("operation").and_then(|o| s(o, "view"));
-        if contract_id == Some("K2-bounded-zlib-v1")
+        if contract_id == Some("matroska-zlib")
             && s(&proof, "source_content_status") != Some("pass")
         {
             reasons.push(format!(
                 "{id}: complete source content gate unproven or failed"
             ));
         }
-        if contract_id == Some("K4-colour-hdr-v1") {
+        if contract_id == Some("matroska-colour") {
             if s(&proof, "source_colour_status") != Some("pass")
                 || s(&proof, "colour_reference_status") != Some("pass")
                 || !proof
@@ -309,7 +309,7 @@ pub fn acceptance(
                 reasons.push(format!("{id}: colour benchmark operation view unproven"));
             }
         }
-        if contract_id == Some("K5-segment-metadata-v1") {
+        if contract_id == Some("matroska-segment-metadata") {
             if s(&proof, "source_catalogue_status") != Some("pass")
                 || s(&proof, "source_colour_status") != Some("pass")
                 || !proof

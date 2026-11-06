@@ -1,4 +1,4 @@
-//! Per-block analysis dumps for the research/d4/ac3 comparison scripts (feature
+//! Per-block analysis dumps for the harness/codecs/ac3 comparison scripts (feature
 //! `debug-dump`).
 
 use super::{NCH, Substream};
@@ -7,7 +7,7 @@ use crate::tables::spx_band_start;
 impl Substream {
     /// Analysis aid (feature `debug-dump`, never enabled in production builds): writes
     /// per-block coefficients/delay lines to $AC3DUMP and a JSON summary line to stderr
-    /// when $AC3J is set. Used by the research/d4/ac3 comparison scripts.
+    /// when $AC3J is set. Used by the harness/codecs/ac3 comparison scripts.
     pub(super) fn debug_dump_block(&self) {
         if std::env::var_os("AC3J").is_some() {
             let baps: Vec<Vec<u8>> = (0..NCH).map(|c| self.bap[c].to_vec()).collect();

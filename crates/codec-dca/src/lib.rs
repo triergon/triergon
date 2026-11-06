@@ -63,7 +63,7 @@ const MAX_SLOTS: usize = 8;
 const OUT_SCALE: f64 = 1.0 / 8_388_608.0;
 /// Synthesis gain applied to the C.3.6 prototype: the 0.25 of the modulation stage times
 /// 2^7.5. C.3.6 leaves its output `rScale` unspecified; 2^7.5 is the black-box
-/// calibration against FFmpeg's float output (`research/d4/dca/STATUS.md`).
+/// calibration against FFmpeg's float output (`harness/codecs/dca/STATUS.md`).
 const QMF_GAIN: f64 = 0.25 * 128.0 * std::f64::consts::SQRT_2;
 /// X96 64-band synthesis gain (black-box calibration, see STATUS.md).
 const QMF64_GAIN: f64 = 0.25 * 256.0 * std::f64::consts::SQRT_2;

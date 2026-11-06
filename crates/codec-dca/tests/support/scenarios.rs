@@ -1,7 +1,7 @@
 //! Synthetic DTS core stream scenarios (development tooling and tests; not production
 //! code). Each scenario is a deterministic stream used to compare this decoder with the
-//! FFmpeg oracle (`research/d4/dca/run_all.sh`) or to recover codebooks
-//! (`research/d4/dca/recover_vq.py`, `recover_pr.py`).
+//! FFmpeg oracle (`harness/codecs/dca/run_all.sh`) or to recover codebooks
+//! (`harness/codecs/dca/recover_vq.py`, `recover_pr.py`).
 #![allow(dead_code, clippy::needless_range_loop, clippy::too_many_arguments)]
 
 use super::synth::*;

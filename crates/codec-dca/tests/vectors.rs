@@ -3,7 +3,7 @@
 //! are taken from the container (raw DTS / DTS-HD file chunks / MPEG-TS PES) by this
 //! file's own parsing, extension substreams are dropped, and the decoded output is
 //! checked against fingerprints of FFmpeg 9.0.2 decoding the same core-only bytes
-//! (tests/data/vectors.fp, research/d4/dca/make_fingerprints.sh).
+//! (tests/data/vectors.fp, harness/codecs/dca/make_fingerprints.sh).
 
 mod support;
 use std::path::PathBuf;

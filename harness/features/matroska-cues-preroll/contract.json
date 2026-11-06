@@ -1,0 +1,39 @@
+{
+  "schema": 1,
+  "id": "matroska-cues-preroll",
+  "operation": "container-seek-preroll-v1",
+  "contract": [
+    "bounded Cues/SeekHead lookup",
+    "validated CueRelativePosition and CueBlockNumber",
+    "sparse and absent index fallback",
+    "all-track SeekPreRoll and codec delay",
+    "all packets after seek including decode-only preroll",
+    "fresh, repeated and after-EOF seeks",
+    "unknown Cluster lengths",
+    "seek cancellation, I/O failures and malformed indexes"
+  ],
+  "required_profiles": [
+    "cues-end",
+    "cues-relative",
+    "cues-front",
+    "cues-preroll",
+    "cues-delay-preroll",
+    "cues-sparse",
+    "cues-unknown-cluster",
+    "cues-missing"
+  ],
+  "required_targets": [
+    "aarch64-unknown-linux-gnu"
+  ],
+  "runtime_ratio_max": 1.2,
+  "memory_ratio_max_exclusive": 1.0,
+  "minimum_pairs": 30,
+  "confidence": 0.95,
+  "pending_module_requirements": [
+    "remaining container features",
+    "complete applicable FATE coverage",
+    "deferred targets"
+  ],
+  "runtime_optimization_ratio_target": 0.8,
+  "runtime_policy": "runtime-ceiling-1.20"
+}

@@ -1,7 +1,7 @@
 {
   "id": "metadata-late",
   "generator": "tools/generate-catalogue-corpus.py",
-  "corpus": "harness/catalogue-corpus.json",
+  "corpus": "harness/features/matroska-segment-metadata/corpus.json",
   "sha256": "8558e505442a2579cc156b05fa9f6b8819bee5277a70c0456e13dceda5a27e3c",
   "rights": "authored-synthetic",
   "purpose": "Self-contained catalogue seek/retention regression; bytes match the original frozen corpus case."

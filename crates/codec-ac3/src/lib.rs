@@ -5,7 +5,7 @@
 //! Output is planar `f32` at full scale 1.0, planes ordered as FFmpeg's native decoder
 //! orders them (ascending FFmpeg speaker bit, see [`triergon_codec::layout`]).
 //!
-//! Not qualified: see `research/d4/ac3/STATUS.md` for the measured state.
+//! Not qualified: see `harness/codecs/ac3/STATUS.md` for the measured state.
 #![forbid(unsafe_code)]
 // Channel/bin loops are written with explicit indices to mirror the A/52 pseudo code.
 #![allow(clippy::needless_range_loop)]
@@ -183,7 +183,7 @@ const MIX_GAINS: [f64; 8] = [
 ];
 
 /// Derive FFmpeg-compatible downmix info from one syncframe's header fields
-/// (black-box verified, see research/d4/ac3/STATUS.md).
+/// (black-box verified, see harness/codecs/ac3/STATUS.md).
 fn downmix_info(eac3: bool, acmod: u8, c: &DownmixCodes) -> Option<DownmixInfo> {
     if acmod <= 2 {
         return None;

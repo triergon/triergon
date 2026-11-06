@@ -1,5 +1,5 @@
 //! Development timing aid: decode an ADTS file N times in-process (no output) and print the
-//! fastest and median pass in milliseconds. Not evidence; see research/d4/aac/STATUS.md.
+//! fastest and median pass in milliseconds. Not evidence; see harness/codecs/aac/STATUS.md.
 //!
 //! usage: bench IN.aac [PASSES]
 use std::time::Instant;

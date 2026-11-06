@@ -34,7 +34,7 @@ pub fn rule_for<'a>(
         return Err("comparison rule is missing a unique approval".into());
     }
     let rule = matches[0];
-    if contract_id != Some("K2-bounded-zlib-v1") {
+    if contract_id != Some("matroska-zlib") {
         return Err("comparison rule used outside its selected contract".into());
     }
     if identity.get("source_revision") != registry.and_then(|r| r.get("reference_source_revision"))

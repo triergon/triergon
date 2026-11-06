@@ -11,6 +11,9 @@ is complete only when it passes all three gates on every case in its corpus.
 | Runtime | `T_triergon / T_ffmpeg` at most **1.20** per case, using the upper bound of a paired 95% confidence interval. The optimisation target is **0.80**. |
 | Memory | Peak live heap and total resident peak RSS both strictly lower than the reference, each at the upper bound of a paired 95% interval. |
 
+The harness reads these limits from `harness/policy.json`. Each feature's contract and
+corpus manifest live in `harness/features/<feature>/`.
+
 The work being compared must be identical: the same selection, the same packets, the
 same output. A gate is never passed by narrowing the work, dropping slow cases or
 weakening a comparison. A failed result stays recorded against the exact source and
@@ -26,9 +29,9 @@ resource limit becomes an explicit, reviewed rule for that case.
   revision with recorded configure flags, compiler and binary hashes.
 - **Authored corpus.** Small canonical streams generated from synthetic signals and
   authored structures, so inputs stay identical across encoder versions
-  (`cargo xtask fixtures`, `harness/*-corpus.json`, `harness/*-slice.json`).
+  (`cargo xtask fixtures`, `harness/features/<feature>/{contract,corpus}.json`).
 - **FATE.** Upstream regression identities are indexed as data, without running
-  Make (`cargo xtask fate-inventory`, `research/fate-index.json`), and mapped case by
+  Make (`cargo xtask fate-inventory`, `harness/fate/index.json`), and mapped case by
   case. A FATE name is not a test until its input, operation and expected result are
   mapped and run. Samples are fetched into an ignored cache with
   recorded hashes; nothing is redistributed without reviewed rights.

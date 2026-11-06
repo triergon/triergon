@@ -70,7 +70,7 @@ pub struct ExternalOptions {
 
 /// Qualify the mandatory external metadata vector; returns the exit code.
 pub fn external_vector(root: &Path, options: &ExternalOptions) -> R<i32> {
-    let contract_path = root.join("harness/catalogue-slice.json");
+    let contract_path = root.join("harness/features/matroska-segment-metadata/contract.json");
     let contract = read_json(&contract_path)?;
     let contract_sha = sha(&contract_path)?;
     let spec = contract
@@ -439,33 +439,33 @@ pub fn trace_identities(
     use super::parity::Comparison;
     const SLICES: [(&str, &str, &str); 6] = [
         (
-            "harness/corpus.json",
-            "harness/slice.json",
+            "harness/features/matroska-demux/corpus.json",
+            "harness/features/matroska-demux/contract.json",
             ".research/fixtures",
         ),
         (
-            "harness/header-corpus.json",
-            "harness/header-slice.json",
+            "harness/features/matroska-header-removal/corpus.json",
+            "harness/features/matroska-header-removal/contract.json",
             ".research/header-fixtures",
         ),
         (
-            "harness/zlib-corpus.json",
-            "harness/zlib-slice.json",
+            "harness/features/matroska-zlib/corpus.json",
+            "harness/features/matroska-zlib/contract.json",
             ".research/zlib-fixtures",
         ),
         (
-            "harness/seek-corpus.json",
-            "harness/seek-slice.json",
+            "harness/features/matroska-cues-preroll/corpus.json",
+            "harness/features/matroska-cues-preroll/contract.json",
             ".research/seek-fixtures",
         ),
         (
-            "harness/colour-corpus.json",
-            "harness/colour-slice.json",
+            "harness/features/matroska-colour/corpus.json",
+            "harness/features/matroska-colour/contract.json",
             ".research/colour-fixtures",
         ),
         (
-            "harness/catalogue-corpus.json",
-            "harness/catalogue-slice.json",
+            "harness/features/matroska-segment-metadata/corpus.json",
+            "harness/features/matroska-segment-metadata/contract.json",
             ".research/catalogue-fixtures",
         ),
     ];
@@ -504,10 +504,10 @@ pub fn trace_identities(
                     rule,
                     native_reference: &native,
                 });
-                let content = id == "K2-bounded-zlib-v1";
-                let result = if id == "K5-segment-metadata-v1" {
+                let content = id == "matroska-zlib";
+                let result = if id == "matroska-segment-metadata" {
                     parity::catalogue_parity(&run, true, comparison.as_ref(), content)?
-                } else if id == "K4-colour-hdr-v1" {
+                } else if id == "matroska-colour" {
                     parity::colour_parity(&run, true, comparison.as_ref(), content)?
                 } else if case.get("seek_target_ns").is_none_or(|v| *v == Value::Null) {
                     parity::parity(&run, true, comparison.as_ref(), content, "")?
@@ -520,7 +520,8 @@ pub fn trace_identities(
                 ));
             }
         }
-        let contract = read_json(&root.join("harness/catalogue-slice.json"))?;
+        let contract =
+            read_json(&root.join("harness/features/matroska-segment-metadata/contract.json"))?;
         let hdr = contract
             .get("required_additional_vectors")
             .and_then(Value::as_array)
