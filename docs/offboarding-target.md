@@ -213,15 +213,16 @@ have further profiles, qualification or release work.
 For Original playback, the preview routes selected profiles in **two of five
 enabled input families (40%)**, Matroska/WebM and MP4/MOV. MPEG-TS, raw AVC and
 raw HEVC are the other three families. The independent HLS and progressive
-conversion paths contribute TS coverage separately from Original playback.
+conversion paths add TS, giving **three of five families with some coverage
+across all delivery routes (60%)**.
 
 | Area | Remaining implementation or adoption | Verification still due |
 |---|---|---|
-| Original playback (O20, O21, O30, O31, O50) | Route Original TS188/M2TS and the existing raw AVC/HEVC reader through Streem. Cover enabled audio carriage outside the current AAC, AC-3, E-AC-3 and DTS profiles where the platform admits it, including Opus and TrueHD. | Verify selected tracks, timing, seeks, HTTP ranges and teardown across the remaining combinations. |
-| Server conversions and HLS (O31, O50) | Close the progressive transport runtime misses. The progressive TS188 adapter handles negotiated AVC/AAC responses. The mock explicitly supplies TS and the current Jellyfin progressive profile requests MKV. | Verify stock-server selection and G4 playback for the adopted revision. Requalify HLS against the current delivery ceiling. |
+| Original playback (O20, O21, O30, O31, O50) | Route Original TS188/M2TS and the existing raw AVC/HEVC reader through Streem. Carry over the existing Dolby Vision route. Cover enabled audio carriage outside the current AAC, AC-3, E-AC-3 and DTS profiles where the platform admits it, including Opus and TrueHD. | Verify selected tracks, timing, seeks, HTTP ranges and teardown across the remaining combinations. |
+| Server conversions and HLS (O30, O31, O50) | Finish sequential MP4 and wider TS carriage. The progressive TS188 adapter handles negotiated AVC/AAC responses. The mock explicitly supplies TS and the current Jellyfin progressive profile requests MKV. | Close the progressive TS runtime misses. Verify stock-server selection and G4 playback for the adopted revision. Requalify HLS against the current delivery ceiling. |
 | Subtitles (O40) | Finish unresolved DVB receiver, source timing and container cases. Extend the existing text and bitmap paths to the remaining selected variants. | Run independent parity and delivery gates for the full selected matrix and check rendering and lifecycle in the app. |
 | Developer probe (INV14 and INV15) | Replace the local `ffprobe` trigger and its filter availability diagnostic, or record an explicit disposition for the trigger. | Verify bounded local inspection and diagnostics on the development build. |
-| Desktop simulator and native macOS app (O61, O70) | Wire the FFmpeg-free preview into the native macOS app packager (INV40). The opt-in simulator already uses Triergon AVC/HEVC video and selected audio decoders. | Close selected decode and output qualification and verify the shipped platform packages and sinks. |
+| Desktop simulator and native macOS app (O61, O70) | Wire the FFmpeg-free preview into the native macOS app packager (INV40). The opt-in simulator has selectors for all six legacy codec lanes. Selected AVC High 10 and HEVC Range Extension decode cases remain open. | Close selected decode and output qualification and verify the shipped platform packages and sinks. |
 | Capture (O62) | The opt-in build already uses Triergon conversion, MPEG-1 encoding and TS muxing. | Admit the reference to heap and RSS measurement, then verify the development capture session on target. |
 | Release switch (O60, O70) | Make the qualified backend the default after the remaining routes are covered. | Verify a clean install, the packaged files and enabled runtime paths without FFmpeg. |
 
