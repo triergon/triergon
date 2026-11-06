@@ -22,6 +22,7 @@ use triergon_core::{
 };
 
 /// The largest input window a reader asks for at once.
+#[cfg(feature = "matroska")]
 const WINDOW: usize = 64 * 1024;
 
 /// What the first bytes of a source look like.

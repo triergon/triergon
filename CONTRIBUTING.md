@@ -2,8 +2,8 @@
 
 ## Setup
 
-You need Rust (see `rust-version` in `Cargo.toml`; the full check uses nightly for
-formatting and the optional SIMD lane), Python 3, a C compiler, `make`, `pkg-config`
+You need Rust (see `rust-version` in `Cargo.toml`; the full check also installs the
+dated nightly toolchain pinned in xtask for the optional SIMD lane), Python 3, a C compiler, `make`, `pkg-config`
 and zlib headers (NASM on x86). The FFmpeg reference is only needed for differential
 and performance work.
 

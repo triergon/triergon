@@ -30,7 +30,7 @@ const USAGE: &str = "usage: cargo xtask <command>
 
 commands:
   check          everything CI runs: format, tests, lints, builds and the checks below
-  check-simd     clippy and tests of the opt-in nightly HEVC SIMD lane
+  check-simd     clippy and tests of the opt-in HEVC SIMD lane on the pinned nightly
   check-links    every relative link in the Markdown files resolves
   check-design   harness data files parse and recorded gates keep their values
   check-safety   owned packages only, no build scripts, no unsafe code
@@ -633,16 +633,27 @@ fn run(command: &mut Command) -> Task {
     }
 }
 
+/// The nightly toolchain of the opt-in HEVC `std::simd` lane, pinned so that lints
+/// and code generation do not change underneath the checks and measurements.
+const NIGHTLY: &str = "nightly-2026-10-17";
+
 /// The opt-in nightly `std::simd` lane of the HEVC decoder must decode exactly as
 /// the scalar default does (the conformance tests compare both with FFmpeg digests).
-///
-/// The nightly toolchain is not pinned and keeps adding pedantic lints; the stable
-/// clippy run in `check` enforces the pedantic baseline, so this lane checks the rest.
 fn check_simd(root: &Path) -> Task {
+    run(Command::new("rustup").args([
+        "toolchain",
+        "install",
+        NIGHTLY,
+        "--profile",
+        "minimal",
+        "--component",
+        "clippy",
+    ]))?;
+    let toolchain = format!("+{NIGHTLY}");
     let features = "triergon-codec-hevc/simd,codec-worker/simd";
     cargo(
         root,
-        Some("+nightly"),
+        Some(&toolchain),
         &[
             "clippy",
             "-p",
@@ -656,13 +667,11 @@ fn check_simd(root: &Path) -> Task {
             "--",
             "-D",
             "warnings",
-            "-A",
-            "clippy::pedantic",
         ],
     )?;
     cargo(
         root,
-        Some("+nightly"),
+        Some(&toolchain),
         &[
             "test",
             "-p",
