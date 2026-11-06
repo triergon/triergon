@@ -26,7 +26,9 @@ pub use framer::{FrameState, FrameStep, NullCarrierRun, TransportFramer};
 pub use media_entity::MediaEntityEndV1;
 pub use pes::{Pes, PesAssembler, PesHeader, PesSpan};
 pub use psi::SectionAssembler;
-pub use stream::{CompactTraceEvent, FaultKind, TraceEvent, TraceFault, TransportStream};
+pub use stream::{
+    CompactTraceEvent, FaultKind, FeedContinuation, TraceEvent, TraceFault, TransportStream,
+};
 pub use transport::{Adaptation, PacketFormat, Pcr, TransportPacket, parse_transport};
 
 use triergon_core::{BudgetVec, Error, Result, SourceId};
