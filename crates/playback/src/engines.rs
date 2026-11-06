@@ -1855,6 +1855,36 @@ impl TsEngine {
         )
     }
 
+    fn project_pending_packet(
+        &mut self,
+        work: &mut WorkBudget,
+        cancel: &AtomicBool,
+    ) -> Result<BackendStep> {
+        let packet = self
+            .native_pending
+            .as_ref()
+            .ok_or(Error::Invalid("native packet missing"))?;
+        let projector = self
+            .native_packet_clock
+            .as_mut()
+            .ok_or(Error::Invalid("native TS packet before program discovery"))?;
+        let Some(clock) = projector.project_native_header(
+            packet.pid,
+            packet.source_epochs,
+            packet.time_header(),
+            work,
+            cancel,
+        )?
+        else {
+            return Ok(BackendStep::Yield);
+        };
+        let packet = self
+            .native_pending
+            .take()
+            .ok_or(Error::Invalid("native packet missing"))?;
+        Ok(BackendStep::Event(RawEvent::NativeTs { packet, clock }))
+    }
+
     // Keep backend-specific polling workspaces out of the shared dispatcher.
     #[inline(never)]
     fn poll(&mut self, w: &mut WorkBudget, c: &AtomicBool) -> Result<BackendStep> {
@@ -1883,26 +1913,8 @@ impl TsEngine {
             };
             return Ok(BackendStep::Event(event));
         }
-        if let Some(packet) = self.native_pending.as_ref() {
-            let projector = self
-                .native_packet_clock
-                .as_mut()
-                .ok_or(Error::Invalid("native TS packet before program discovery"))?;
-            let clock = projector.project_header(
-                packet.pid,
-                packet.source_epochs,
-                packet.time_header(),
-                w,
-                c,
-            )?;
-            let Some(clock) = clock else {
-                return Ok(BackendStep::Yield);
-            };
-            let packet = self
-                .native_pending
-                .take()
-                .ok_or(Error::Invalid("native packet missing"))?;
-            return Ok(BackendStep::Event(RawEvent::NativeTs { packet, clock }));
+        if self.native_pending.is_some() {
+            return self.project_pending_packet(w, c);
         }
         while let Some(index) = self.native_active {
             let Some(track) = self.native_tracks.as_mut_slice().get_mut(index) else {
@@ -1918,6 +1930,9 @@ impl TsEngine {
                 match result {
                     Ok(ts::AssemblyStep::Output(packet)) => {
                         self.native_pending = Some(packet);
+                        if self.segment_discovery == Some(SegmentDiscovery::Progressive) {
+                            return self.project_pending_packet(w, c);
+                        }
                         return Ok(BackendStep::Yield);
                     }
                     Ok(ts::AssemblyStep::Yield) => return Ok(BackendStep::Yield),
