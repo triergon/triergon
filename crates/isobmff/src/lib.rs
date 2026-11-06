@@ -7,7 +7,7 @@
 
 mod boxes;
 mod dts_description;
-pub use dts_description::DtsCoreDescription;
+pub(crate) use dts_description::DtsCoreDescription;
 mod fields;
 mod fragment;
 mod fragment_time;
@@ -25,38 +25,34 @@ mod native_operation_v5;
 mod native_transport_v3;
 mod native_view;
 pub use native_operation_v5::{
-    Mov9InitialOperationJobV5, Mov9InitialOperationV5, Mov9RejectedPacketSeekV5,
-    PinnedMovD32RejectedPacketSeekV5,
+    Mov9InitialOperationJobV5, Mov9InitialOperationV5, PinnedMovD32RejectedPacketSeekV5,
 };
 pub use native_transport_v3::{
-    Mov9V3EntryRevisit, Mov9V3ModeledInitialRead, Mov9V3ModeledOpenState, Mov9V3TransportBuilder,
-    Mov9V3TransportModel, PinnedMovD32SmallRawVideoTransportV3,
+    Mov9V3EntryRevisit, Mov9V3TransportBuilder, Mov9V3TransportModel,
+    PinnedMovD32SmallRawVideoTransportV3,
 };
+pub(crate) use native_transport_v3::{Mov9V3ModeledInitialRead, Mov9V3ModeledOpenState};
 mod packet;
 mod physical_read_v4;
 mod recovery_payload;
-pub use physical_read_v4::{
-    Mov9PhysicalPayloadV4, Mov9PhysicalReadV4, Mov9PhysicalReaderV4, PinnedMovD32PhysicalReadV4,
-};
+pub use physical_read_v4::{Mov9PhysicalReadV4, Mov9PhysicalReaderV4, PinnedMovD32PhysicalReadV4};
 mod regular;
-pub use recovery_payload::{Mov9PartialSampleReader, Mov9PayloadBounds, Mov9RecoveredPayload};
+pub use recovery_payload::{Mov9PartialSampleReader, Mov9PayloadBounds};
 mod sidx;
 mod sound_v0;
 mod tables;
 pub use sound_v0::{
-    QtPcmEncodingV0, QtPcmLayoutV0, QtPcmSampleReaderV0, QtPcmSourcePacketV0, QtSoundDescriptionV0,
+    QtPcmEncodingV0, QtPcmSampleReaderV0, QtPcmSourcePacketV0, QtSoundDescriptionV0,
 };
 
 pub use boxes::{BoxChildren, BoxHeader, BoxStep, BoxView, HeaderRead};
-pub use fragment::{
-    FragmentBuilder, FragmentContext, FragmentCursor, FragmentIndex, FragmentLocator, ImplicitBase,
-    Trex,
-};
+pub use fragment::{FragmentBuilder, FragmentContext, FragmentIndex, ImplicitBase, Trex};
+pub(crate) use fragment::{FragmentCursor, FragmentLocator};
 pub use fragment_time::FragmentDecodeTime;
 pub use input_boxes::{BoxEvent, BoxReader};
 pub use interleave::{
-    ForwardRegularMdatV1, InterleaveStatus, InterleavedSample, PhysicalInterleaveLimits,
-    PhysicalSampleCursor, SourceTrack, TrackSampleCursor,
+    ForwardRegularMdatV1, InterleaveStatus, PhysicalInterleaveLimits, PhysicalSampleCursor,
+    SourceTrack, TrackSampleCursor,
 };
 pub use metadata::{
     EditEntry, EditList, EntryLayout, Mov9RecoveryTrackHeader, MovieHeader, SampleDescription,
@@ -65,35 +61,29 @@ pub use metadata::{
 pub use native_clock::{
     Mov9ClockField, Mov9MediaClock, Mov9MediaClockCause, Mov9SchedulingClock, SourceTimeBase,
 };
+pub(crate) use native_cursor::Mov9PredecessorClock;
 pub use native_cursor::{
-    Mov9ClockOrigin, Mov9EditIdentity, Mov9PacketCursor, Mov9PacketLimits, Mov9PacketOccurrence,
-    Mov9PredecessorClock, Mov9Profile, Mov9RangeSeekJob, Mov9ResumePoint, Mov9Track,
-    mov9_seekable_head_precedes,
+    Mov9ClockOrigin, Mov9PacketCursor, Mov9PacketLimits, Mov9PacketOccurrence, Mov9Profile,
+    Mov9RangeSeekJob, Mov9ResumePoint, Mov9Track, mov9_seekable_head_precedes,
 };
-pub use native_edits::{
-    Mov9CursorStatus, Mov9DurationBasis, Mov9EditCursor, Mov9EditLimits, Mov9Occurrence,
-};
+pub use native_edits::{Mov9CursorStatus, Mov9DurationBasis, Mov9EditCursor, Mov9EditLimits};
 pub use native_view::{Mov9Edit, Mov9PacketView, Mov9StreamView, Mov9View};
 pub use packet::{
     Mov9SampleExtent, Mov9SampleRead, Mov9ShortSample, SampleReader, SourcePacket, TerminalMdat,
 };
+pub(crate) use regular::Mov9RecoveryV3PacketCursor;
+pub(crate) use regular::SampleLocator;
 pub use regular::{
-    Mov9InitialDescriptionDiagnostic, Mov9RecoveryIndexCursor, Mov9RecoveryIndexEntry,
-    Mov9RecoveryOccurrence, Mov9RecoveryPacketCursor, Mov9RecoverySourceCursor,
-    Mov9RecoveryV2Association, Mov9RecoveryV2Context, Mov9RecoveryV2IndexCursor,
-    Mov9RecoveryV2IndexEntry, Mov9RecoveryV2Occurrence, Mov9RecoveryV2PacketCursor,
-    Mov9RecoveryV2Read, Mov9RunCoverage, Mov9RunKind, Mov9RunRecoveryBuilder, Mov9RunRecoveryTable,
-    Mov9SyncDiagnostic, PinnedMovD32RegularRecoveryV1, PinnedMovD32RegularRecoveryV2, SampleCursor,
-    SampleLocator, SampleTable, SampleTableBuilder,
+    Mov9RecoveryV2Association, Mov9RecoveryV2Context, Mov9RecoveryV2Read, Mov9RunKind,
+    Mov9RunRecoveryBuilder, Mov9RunRecoveryTable, PinnedMovD32RegularRecoveryV1,
+    PinnedMovD32RegularRecoveryV2, SampleCursor, SampleTable, SampleTableBuilder,
 };
 pub use regular::{
-    Mov9RecoveryV3Association, Mov9RecoveryV3Context, Mov9RecoveryV3DescriptionDiagnostic,
-    Mov9RecoveryV3Emission, Mov9RecoveryV3Event, Mov9RecoveryV3IndexCursor,
-    Mov9RecoveryV3IndexEvent, Mov9RecoveryV3NativeIndexEntry, Mov9RecoveryV3PacketCursor,
+    Mov9RecoveryV3Association, Mov9RecoveryV3Context, Mov9RecoveryV3Emission, Mov9RecoveryV3Event,
     Mov9RecoveryV3Read, Mov9RunRecoveryV3Builder, Mov9RunRecoveryV3Table,
     PinnedMovD32RegularRecoveryV3,
 };
-pub use sidx::{IndexStep, SegmentIndex, SegmentIndexCursor, SegmentReference};
+pub use sidx::{IndexStep, SegmentIndex};
 use std::ops::Range;
 use triergon_core::{Error, Result, Time, TimeBase};
 
@@ -240,13 +230,9 @@ pub(crate) fn add_offset(base: u64, delta: i32) -> Result<u64> {
 // Source-only seek/index API. Native views remain independently named above.
 mod source_seek;
 mod tfra;
-pub use source_seek::{
-    SourceSeekLimits, SourceSeekPlan, SourceSeekPlanner, SourceSeekReceipt, SourceSeekRequest,
-    SourceSeekSamples,
-};
+pub use source_seek::{SourceSeekLimits, SourceSeekPlan, SourceSeekPlanner, SourceSeekRequest};
 pub use tfra::{
-    FragmentRandomAccessCursor, FragmentRandomAccessEntry, FragmentRandomAccessStep,
-    MovieFragmentRandomAccessTail, TrackFragmentRandomAccess,
+    FragmentRandomAccessStep, MovieFragmentRandomAccessTail, TrackFragmentRandomAccess,
 };
 
 // Source-only movie targeting/recovery; pinned native views above stay separate.
@@ -258,17 +244,17 @@ pub use movie_seek::{
     MovieSourceSeekPlanner, SourceCompositionLookup,
 };
 pub use recovery::{
-    RecoveryDefinitionOrigin, RecoveryDescription, RecoveryDescriptionLookup, RecoveryDescriptions,
-    RecoveryKind, RecoveryLimits, RecoveryLookup, RecoveryMappingOrigin, RecoveryMappings,
-    RecoveryScope, RecoverySelection, RecoverySyntax,
+    RecoveryDefinitionOrigin, RecoveryDescription, RecoveryDescriptions, RecoveryKind,
+    RecoveryLimits, RecoveryLookup, RecoveryMappingOrigin, RecoveryMappings, RecoveryScope,
+    RecoverySelection, RecoverySyntax,
 };
 
 // Pinned native index/seek view; source clocks/indices remain unchanged.
 mod native_index;
 pub use native_index::{
     Mov9NativeGlobalSeekJob, Mov9NativeGlobalSeekPlan, Mov9NativeIndexCursor, Mov9NativeIndexEntry,
-    Mov9NativeIndexLimits, Mov9NativeSeekCursor, Mov9NativeSeekJob, Mov9NativeSeekLimits,
-    Mov9NativeSeekPlan, Mov9NativeSeekReceipt,
+    Mov9NativeIndexLimits, Mov9NativeSeekJob, Mov9NativeSeekLimits, Mov9NativeSeekPlan,
+    Mov9NativeSeekReceipt,
 };
 
 mod native_transport_v4;
@@ -293,15 +279,13 @@ pub use native_public_receiver_v6::{
 };
 
 mod native_header_v7;
-pub use native_header_v7::{
-    Mov9HeaderCauseV7, Mov9HeaderRejectionV7, Mov9SampleEntryHeaderJobV7, Mov9SampleEntryHeaderV7,
-    PinnedMovD32SampleEntryHeaderV7,
-};
+pub(crate) use native_header_v7::Mov9SampleEntryHeaderV7;
+pub use native_header_v7::{Mov9SampleEntryHeaderJobV7, PinnedMovD32SampleEntryHeaderV7};
 
 mod native_encoded_v1;
 pub use native_encoded_v1::{
     EncodedEntryKindV1, Mov9EncodedLimitsV1, Mov9EncodedStreamJobV1, Mov9EncodedStreamV1,
-    Mp4AacConfig, Mp4AacConfigJob, PinnedMovD32EncodedRegularV1, check_dts_core_description,
+    PinnedMovD32EncodedRegularV1, check_dts_core_description,
 };
 
 mod native_encoded_edits_v2;
@@ -318,9 +302,10 @@ pub use native_encoded_configs_v3::{
 
 mod native_encoded_metadata_v4;
 pub use native_encoded_metadata_v4::{
-    Mov9CreationCauseV4, Mov9DependedOnV4, Mov9DependencyViewV4, Mov9EncodedCreationV4,
-    Mov9EncodedSelectionV4, Mov9EncodedSourceV4, Mov9HandlerV4, Mov9LanguageCauseV4,
-    Mov9LanguageV4, Mov9SoundV1SourceV4, PinnedMovD32EncodedRegularV4,
+    Mov9DependedOnV4, Mov9EncodedCreationV4, Mov9EncodedSelectionV4, PinnedMovD32EncodedRegularV4,
+};
+pub(crate) use native_encoded_metadata_v4::{
+    Mov9DependencyViewV4, Mov9EncodedSourceV4, Mov9SoundV1SourceV4,
 };
 
 mod native_encoded_dependency_v4;
@@ -332,23 +317,20 @@ pub use native_private_catalogue_v8::{
 };
 
 mod native_encoded_recovery_v5;
+pub(crate) use native_encoded_recovery_v5::Mov9RecoveryFactsV5;
 pub use native_encoded_recovery_v5::{
-    Mov9DependencyCauseV5, Mov9DependencyObservationV5, Mov9RecoveryFactsV5, Mov9RecoveryGroupV5,
-    Mov9RecoveryReceiverCauseV5, PinnedMovD32EncodedRecoveryV5,
+    Mov9DependencyCauseV5, Mov9DependencyObservationV5, Mov9RecoveryReceiverCauseV5,
+    PinnedMovD32EncodedRecoveryV5,
 };
 
 mod native_context_reports_v7;
-pub use native_context_reports_v7::{
-    Mov9SourceProfileFaultV7, Mov9WaveObservationV7, PinnedMovD32EncodedContextsV7,
-};
+pub use native_context_reports_v7::PinnedMovD32EncodedContextsV7;
+pub(crate) use native_context_reports_v7::{Mov9SourceProfileFaultV7, Mov9WaveObservationV7};
 
 mod native_recovery_context_v7;
-pub use native_recovery_context_v7::Mov9RecoveryObservationV7;
+pub(crate) use native_recovery_context_v7::Mov9RecoveryObservationV7;
 
 mod native_private_diagnostics_v7;
-pub use native_private_diagnostics_v7::{
-    Mov9DiagnosticKindV7, Mov9NativeDiagnosticV7, Mov9PrivateDiagnosticJobV7,
-    Mov9PrivateDiagnosticsV7,
-};
+pub use native_private_diagnostics_v7::Mov9PrivateDiagnosticJobV7;
 
 pub use fragment::OwnedFragmentCursor;

@@ -332,6 +332,9 @@ impl EsdsWalk {
 }
 
 /// Decoder-specific bytes borrowed from the original AAC sample entry.
+/// Only the unit tests drive the standalone job; shipped callers use the
+/// profile walk directly.
+#[cfg(test)]
 #[derive(Debug)]
 pub struct Mp4AacConfig {
     pub offset: u64,
@@ -351,10 +354,12 @@ pub struct Mp4AacConfigJob {
     inspected_boxes: u32,
     profile: EsdsProfile,
     esds: Option<(u64, EsdsWalk)>,
+    #[cfg(test)]
     failed: Option<Error>,
 }
 
 impl Mp4AacConfigJob {
+    #[cfg(test)]
     pub fn new(entry: &SampleDescription, limits: Mov9EncodedLimitsV1) -> Result<Self> {
         Self::with_profile(entry, limits, EsdsProfile::Aac)
     }
@@ -389,11 +394,13 @@ impl Mp4AacConfigJob {
             inspected_boxes: 0,
             profile,
             esds: None,
+            #[cfg(test)]
             failed: None,
         })
     }
 
     /// Yields when the work budget runs out. A parse error ends this job.
+    #[cfg(test)]
     pub fn poll(
         &mut self,
         work: &mut WorkBudget,
@@ -409,6 +416,7 @@ impl Mp4AacConfigJob {
         result
     }
 
+    #[cfg(test)]
     fn advance(
         &mut self,
         work: &mut WorkBudget,
