@@ -1,11 +1,9 @@
 # AC-3 / E-AC-3 derivation notes
 
-How the FFmpeg-compatible behaviour of
-[crates/codec-ac3](../../../crates/codec-ac3/README.md) was obtained, and the tools in
-this directory. The decoder is written from ATSC A/52:2018 with FFmpeg 9.0.2 as a
-black-box oracle, with one exception: the generator, seeding and draw order of the
-compatible noise stream were taken from FFmpeg n9.0.2's LGPL-2.1 source as a
-description; the Rust implementation is original.
+Notes on the FFmpeg-compatible behaviour of
+[crates/codec-ac3](../../../crates/codec-ac3/README.md), and the tools in this
+directory. The decoder is written from ATSC A/52:2018, with FFmpeg 9.0.2 as the
+compatibility reference.
 
 ## Black-box derivations
 
