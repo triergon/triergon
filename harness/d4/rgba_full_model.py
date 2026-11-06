@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """numpy model of the complete reference RGBA path, checked against the probe (research tooling).
 
-Uses rgba_model.taps for every 1-D pass and the fitted chroma/grey tables (TABLES below, from
-fit_offsets.py). usage: rgba_full_model.py [WxH[:bits[:cs[:range]]] ...]
+Uses rgba_model.taps for every 1-D pass and the fitted chroma/grey tables (TABLES below, fitted to
+constant-field observations through probe_rgba.c). usage: rgba_full_model.py [WxH[:bits[:cs[:range]]] ...]
 """
 import sys, os, functools; sys.path.insert(0, os.path.dirname(__file__))
 import numpy as np

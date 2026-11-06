@@ -19,8 +19,8 @@ compatibility reference.
   R ← L; 3/x: R ← C, C, S, Ls, Rs ← 0).
 - hebap 4 VQ: FFmpeg's index is consistently one row ahead of the printed Table E4.4
   (checked over 748 bins); index 31 decodes as zero.
-- E-AC-3 SPX noise checked in the MDCT domain (`analysis/catcmp.py`, `analysis/noise.py`):
-  the normalised residual is uniform on [−√3, √3] with unit variance.
+- E-AC-3 SPX noise checked in the MDCT domain: the normalised residual is uniform on
+  [−√3, √3] with unit variance.
 - Downmix metadata export rules match `ffprobe -show_frames` on every frame of the FATE
   and synthetic streams (`check_downmix.py`).
 - Transient pre-noise processing is parsed and not applied: FFmpeg output is identical
@@ -31,8 +31,6 @@ compatibility reference.
 | Tool | Purpose |
 |---|---|
 | `run_vectors.sh`, `cmp_f32.py` | FATE vector comparison (as delivered and dither-stripped) |
-| `run_reduced_rate.sh`, `gen_reduced_rate.py`, `patch_bsid.py` | bsid 9/10 probe streams and comparison |
-| `patch_bits.py`, `insert_bits.py` | Bit-level experiments with CRC repair |
+| `gen_reduced_rate.py` | bsid 9/10 probe streams (`crates/codec-ac3/tests/reduced_rate.rs`) |
 | `gen_tables.py` | Regenerates `src/spec_tables.rs` from the A/52 text |
 | `check_downmix.py` | Downmix metadata check |
-| `analysis/*.py` | MDCT-domain, noise and delay analysis (crate feature `debug-dump`) |

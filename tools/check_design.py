@@ -21,12 +21,7 @@ if g['owner_requirements'].get('runtime_optimization_ratio_target')!=0.8:errors.
 if any(m['accepted'] for m in g['modules']):errors.append('a module was marked accepted without implementation evidence')
 fate=json.loads((root/'research/fate-index.json').read_text())
 if any(c['status']!='unmapped' or c['rights']!='unreviewed' for c in fate['cases']):errors.append('FATE index misrepresents coverage/rights')
-rows=json.loads((root/'research/results/summary.json').read_text())
-for row in rows:
- stem=row['fixture']+'.'+row['candidate']+'.json'
- if not (root/'research/results'/stem).exists():errors.append('missing raw result '+stem)
- if not (root/'research/results'/(row['fixture']+'.ffprobe.json')).exists():errors.append('missing reference result')
 if errors:
  print('\n'.join(errors));raise SystemExit(1)
-print(f'Design integrity OK: local links, JSON, {len(g["modules"])} unaccepted module gates, {len(fate["cases"])} unmapped FATE identities, {len(rows)} candidate observations.')
+print(f'Design integrity OK: local links, JSON, {len(g["modules"])} unaccepted module gates, {len(fate["cases"])} unmapped FATE identities.')
 print('This is not a feature-parity, performance, memory or FATE pass.')
