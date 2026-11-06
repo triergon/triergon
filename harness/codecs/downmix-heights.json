@@ -1,9 +1,9 @@
 {
-  "schema": "triergon.d4.downmix-addendum.v1",
+  "schema": "triergon.codecs.downmix-addendum.v1",
   "amends": "harness/codecs/downmix-contract.json (frozen 2026-11-03T01:20Z; not edited)",
   "recorded_utc": "2026-11-03T03:40:00Z",
   "reason": "The first native correctness run (dev4, results-dev/correct-dev4.jsonl on the runner) failed aac al22_chCfg0PCE_44 on the output path by 1795 LSB: its 5.1.2(back) layout carries TFL/TFR, which the frozen contract's rule set did not cover (they were mapped like unpositioned channels). The failure stays recorded; this addendum adds the observed rule.",
-  "reference": "pinned FFmpeg 9.0.2 on the runner (~/d4/ffmpeg/oracle/bin/ffmpeg), -v debug, swresample's reported matrix",
+  "reference": "pinned FFmpeg 9.0.2 default build on the runner (ffmpeg -v debug), swresample's reported matrix",
   "commands": [
     "ffmpeg -v debug -f aac -i al22_chCfg0PCE_44.adts -vn -ac 2 -f s16le /dev/null",
     "ffmpeg -v debug -f lavfi -i anullsrc=channel_layout=<L>:sample_rate=48000 -t 0.01 -ac 2 -f null -   for L in the layouts below"

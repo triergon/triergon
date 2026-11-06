@@ -1,5 +1,5 @@
 {
-  "schema": "d2-multibyte-mapping-lock-v1",
+  "schema": "triergon.subtitles.multibyte-mapping-lock.v1",
   "sources": {
     "CP932.TXT": {
       "url": "https://www.unicode.org/Public/MAPPINGS/VENDORS/MICSFT/WINDOWS/CP932.TXT",

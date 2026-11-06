@@ -463,11 +463,11 @@ fn collect(source: &[u8]) -> Vec<TraceEvent> {
             Step::End(_) => demux.end_of_source().unwrap(),
         }
     }
-    panic!("D0 source failed to progress");
+    panic!("DVB source failed to progress");
 }
 
 #[test]
-fn six_d0_carriers_keep_pes_envelopes_raw33_absent_dts_and_service_epochs() {
+fn six_dvb_carriers_keep_pes_envelopes_raw33_absent_dts_and_service_epochs() {
     let cases: &[(&[u8], &[u8], u8)] = &[
         (
             include_bytes!("data/dvb/dvb2-literals-fields.ts"),

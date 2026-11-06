@@ -1,5 +1,5 @@
 {
- "schema": "triergon.d4.rgba-contract.v1",
+ "schema": "triergon.codecs.rgba-contract.v1",
  "status": "development evidence (dev Mac only); not qualification evidence. The owner's native Linux runner must re-observe every rule before any parity claim.",
  "reference": {
   "build": "Homebrew FFmpeg 9.0.2 (libavfilter 12.1.102, libswscale 10.1.102, libavutil 61.1.102); libswscale.10.1.102.dylib sha256 870934397a55bf3a229f1bd3bd66cfa70720b1e11fccad9f27bd98a56c2e20fa",
@@ -567,7 +567,7 @@
   "pitch": "reference row pitch = coded width in bytes rounded up to 32 (observed 176->192, 352, 416, 528->544, 1056, 1920 8-bit; 3840 bytes for 1920 10-bit); chroma pitch = half",
   "observations": "h264_metadata / hevc_metadata re-cropped streams: 8-bit crop_left 2..48 -> 0, 64 and 96 -> 64, 128 and 160 -> 128; with crop_top 2 or 6 (chroma origin 16-byte aligned) crop_left 64 -> 0, with top 4 or 8 -> 64; 10-bit crop_left 16 -> 0, 32/34/48 -> 32, 64 -> 64, 96 -> 96. Conformance vectors: CVFC1_Sony_C (352x288, crop 26/26/60/60) delivered 326x168; CONFWIN_A_Sony_1 (416x240, crop 2 each side) delivered 414x236",
   "implementation": "scale::reference_crop derives (top, left) from the luma plane layout (offset = top * stride + left over the whole decoded plane, codec::Plane docs) and widens the view by the re-included columns; pitch taken as stride rounded up to 32 bytes (exact for the h264 decoder's stride = coded width and for 8-bit hevc stride = align(width, 32); for 10-bit hevc with both top and left crop the chroma pitch parity can differ from the reference's)",
-  "contract_dependency": "needs the decoders to hand over whole planes with the crop offset. The hevc adapter does (Plane::raw); the h264 adapter passes data starting at the visible origin (codec-h264 Plane::data), so on the native d4-worker path CVFC1_Sony_C stays wrong until codec-h264 exposes the whole plane and crates/sim/src/adapters.rs passes it with offset = crop_y * stride + crop_x (as for hevc)",
+  "contract_dependency": "needs the decoders to hand over whole planes with the crop offset. The hevc adapter does (Plane::raw); the h264 adapter passes data starting at the visible origin (codec-h264 Plane::data), so on the native codec-worker path CVFC1_Sony_C stays wrong until codec-h264 exposes the whole plane and crates/sim/src/adapters.rs passes it with offset = crop_y * stride + crop_x (as for hevc)",
   "verification": "reference_decode raw output vs the Scaler on whole coded planes with the crop offsets: CVFC1_Sony_C 50/50 pictures exact, CONFWIN_A_Sony_1 60/60 exact; these are the only two h264/hevc manifest vectors with a left or top crop"
  }
 }

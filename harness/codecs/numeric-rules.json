@@ -1,8 +1,8 @@
 {
-  "schema": "triergon.d4.numeric-rules.v1",
+  "schema": "triergon.codecs.numeric-rules.v1",
   "frozen_utc": "2026-11-02T23:45:00Z",
   "frozen_before_grading": true,
-  "reference": "FFmpeg 9.0.2 native decoders (exact build pinned separately in the D4 reference receipt); development-only oracle on macOS is Homebrew FFmpeg 9.0.2 and is never qualification evidence",
+  "reference": "FFmpeg 9.0.2 native decoders (exact build pinned separately in the decode reference receipt); development-only oracle on macOS is Homebrew FFmpeg 9.0.2 and is never qualification evidence",
   "audio_decode": {
     "applies_to": ["ac3", "eac3", "aac-lc", "he-aac-sbr", "he-aac-v2-ps", "dts-core"],
     "exact": ["sample_rate", "channel_count", "channel_layout_and_order", "samples_per_frame", "total_sample_count", "frame_count", "first_output_sample_position (codec delay / priming)"],

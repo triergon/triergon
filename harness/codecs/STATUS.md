@@ -50,9 +50,9 @@ manifest SHA-256.
 
 - AC-3/E-AC-3 noise: bap-0 dither, AHT zero-bin fill and SPX blending noise are random.
   A decoder matches FFmpeg's noisy output only by reproducing its noise stream, which
-  `codec-ac3` does under `ffmpeg_compat`. `.research/evidence/codec-comparison/CORRECTNESS-D1-SUMMARY.json` and
-  `.research/evidence/codec-comparison/D2/CORRECTNESS-D2-SUMMARY.json` were collected with a build that used its own
-  generator; they record 10 AC-3/E-AC-3 vectors as failures for this reason. The
-  dither-stripped comparison set is `.research/evidence/codec-comparison/CORRECTNESS-MANIFEST-AC3-NODITHER.json`.
+  `codec-ac3` does under `compat: Compat::Reference`. Both correctness summaries in the
+  `codec-comparison` evidence set were collected with a build that used its own
+  generator; they record 10 AC-3/E-AC-3 vectors as failures for this reason. The set's
+  `CORRECTNESS-MANIFEST-AC3-NODITHER.json` is the dither-stripped comparison set.
 - `aac-sce-in-stereo.adts`: FFmpeg leaves FR unwritten in single-SCE frames; see the
   known differences in [crates/codec-aac](../../crates/codec-aac/README.md).
