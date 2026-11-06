@@ -246,6 +246,16 @@ impl ElementReader {
         if body.header != header || body.scan != ScanBody::Prefix {
             return Err(Error::Invalid("scan prefix identity changed"));
         }
+        if drain && body.remaining == 0 && work.remaining() != 0 {
+            // Dropping the completed body releases its retained input before
+            // cancellation, just as the incremental drain does.
+            self.phase = Phase::Between;
+            Self::check_input_cancel(&mut self.input, cancel)?;
+            let consumed = work.take(1);
+            debug_assert_eq!(consumed, 1);
+            self.scan_left = self.limits.scan_bytes;
+            return Ok(true);
+        }
         body.scan = if drain {
             ScanBody::Drain
         } else {
@@ -258,14 +268,6 @@ impl ElementReader {
             body.transfer = super::BodyTransfer::Copy;
             body.buffer = None;
             body.copied = 0;
-            if body.remaining == 0 {
-                Self::check_input_cancel(&mut self.input, cancel)?;
-                if work.try_charge(1) {
-                    self.scan_left = self.limits.scan_bytes;
-                    self.phase = Phase::Between;
-                    return Ok(true);
-                }
-            }
         }
         Ok(false)
     }
