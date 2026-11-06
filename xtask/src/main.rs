@@ -37,6 +37,8 @@ const USAGE: &str = "usage: cargo xtask <command>
 commands:
   check          everything CI runs: format, tests, lints, builds and the checks below
   check-simd     clippy and tests of the opt-in HEVC SIMD lane on the pinned nightly
+  prepare-check  once before `check`: the pinned FFmpeg reference, the fixtures, the required
+                 vectors and the workers (built with the reference first on PATH)
   check-links    every relative link in the Markdown files resolves
   check-design   harness data files parse and recorded gates keep their values
   check-safety   owned packages only, no build scripts, no unsafe code
@@ -88,6 +90,7 @@ fn main() -> ExitCode {
     let result = match args.first().map(String::as_str) {
         Some("check") => check(&root),
         Some("check-simd") => check_simd(&root),
+        Some("prepare-check") => prepare_check(),
         Some("check-links") => check_links(&root),
         Some("check-design") => check_design(&root),
         Some("check-safety") => check_safety(&root),
@@ -679,6 +682,22 @@ fn run(command: &mut Command) -> Task {
 /// The nightly toolchain of the opt-in HEVC `std::simd` lane, pinned so that lints
 /// and code generation do not change underneath the checks and measurements.
 const NIGHTLY: &str = "nightly-2026-10-17";
+
+/// Everything `check` needs once: each step runs as its own `cargo xtask`
+/// command with the pinned reference first on `PATH`, so the worker build
+/// records that reference.
+fn prepare_check() -> Task {
+    let exe = std::env::current_exe().map_err(|e| e.to_string())?;
+    for step in [
+        "prepare-ffmpeg",
+        "fixtures",
+        "fetch-vectors",
+        "build-workers",
+    ] {
+        run(Command::new(&exe).arg(step))?;
+    }
+    Ok(())
+}
 
 /// The opt-in nightly `std::simd` lane of the HEVC decoder must decode exactly as
 /// the scalar default does (the conformance tests compare both with FFmpeg digests).

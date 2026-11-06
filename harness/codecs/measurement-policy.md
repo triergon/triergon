@@ -1,6 +1,6 @@
 # Decoder timing and memory: equivalent work
 
-Timing (`harness/codecs/time_codecs.py`) and correctness (`harness/codecs/native_correctness.py`)
+Timing (`cargo xtask codecs time`) and correctness (`cargo xtask codecs grade`)
 compare two workers on the same input, on native Linux ARM64, one run at a time. Pairing,
 seeds, confidence bounds and gate thresholds are defined in
 [docs/quality.md](../../docs/quality.md).

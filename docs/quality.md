@@ -60,10 +60,12 @@ compares canonical output. Workers speak one line protocol with `trace`, `bench`
 `memory` modes, framed by begin/end markers and a named digest.
 
 ```sh
-make prepare-check   # build the FFmpeg reference, fixtures and adapters
-cargo xtask check    # format, test, clippy, rustdoc, release build, worker tests, design checks
-make report          # correctness report against the reference
-make qualify         # correctness, runtime and memory with acceptance
+cargo xtask prepare-check   # build the FFmpeg reference, fixtures and workers
+cargo xtask check           # format, test, clippy, rustdoc, release build, worker tests, design checks
+cargo xtask report --fate-cache .research/fate-samples
+                            # correctness report against the reference
+cargo xtask report --benchmark --memory --fate-cache .research/fate-samples --require-acceptance
+                            # correctness, runtime and memory with acceptance
 ```
 
 `cargo xtask report` runs the correctness comparison of one feature contract
@@ -82,7 +84,13 @@ digest of every candidate trace, so a change can show its traces are byte-identi
 (`--compare` an earlier record). `cargo xtask worker-tests` runs the integration tests
 of the built workers: work digests, catalogue, colour, content encoding, seek, timing
 and inflate behaviour against the reference workers and the oracles. The independent
-oracles stay in Python (`harness/*_oracle.py`, run through `python3 -m harness.oracles`).
+oracles stay in Python (`harness/*_oracle.py`, run through `python3 -m harness.oracles`),
+as do the numpy table-recovery chains under `harness/codecs/` and the capture input
+generator `harness/capture/generate_inputs.py`, whose numpy PCG64 and float draws the
+cited capture inputs depend on. `cargo xtask codecs` grades, times and records the
+identities of the codec crates against the pinned FFmpeg decoders
+(`harness/codecs/STATUS.md`); `cargo xtask capture` does the same for the capture
+pipeline (`harness/capture/contract.json`).
 `cargo xtask fuzz` runs a deterministic, replayable byte-mutation campaign against
 debug, release and reference workers from a pinned manifest.
 

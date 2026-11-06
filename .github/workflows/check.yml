@@ -23,6 +23,6 @@ jobs:
           rustup show active-toolchain || rustup toolchain install
           rustc -vV
       - name: Prepare pinned reference and fixtures
-        run: make prepare-check || make prepare-check
+        run: cargo xtask prepare-check || cargo xtask prepare-check
       - name: Verify workspace
         run: cargo xtask check

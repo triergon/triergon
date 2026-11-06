@@ -175,7 +175,7 @@ specification. Verification:
 - Integration tests in `tests/` cover ownership and charge accounting across
   clone, teardown, reset and cross-thread release; stale-token, foreign-pool and
   source-mismatch rejection; inline and owned windows; and clock boundary widths.
-- `make core-oracle` (also part of `make check`) runs an independent Python
+- `python3 tools/test-core-time.py` (also part of `cargo xtask check`) runs an independent Python
   `fractions.Fraction`/integer oracle against `examples/time-oracle.rs` in debug
   and release profiles over a versioned corpus of exact-time and wide-arithmetic
   cases.

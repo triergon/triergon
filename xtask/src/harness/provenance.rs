@@ -16,7 +16,6 @@ use crate::sha256;
 /// operation updates this list and therefore requires a fresh build identity.
 pub fn matroska_inputs() -> Vec<String> {
     let mut names: Vec<String> = [
-        "Makefile",
         "specs/sources.json",
         "harness/fate/index.json",
         "harness/oracles.py",

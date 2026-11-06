@@ -3,14 +3,14 @@
 ## Setup
 
 You need Rust (see `rust-version` in `Cargo.toml`; the full check also installs the
-dated nightly toolchain pinned in xtask for the optional SIMD lane), Python 3, a C compiler, `make`, `pkg-config`
-and zlib headers (NASM on x86). The FFmpeg reference is only needed for differential
-and performance work.
+dated nightly toolchain pinned in xtask for the optional SIMD lane), Python 3, a C compiler,
+`make` (for the FFmpeg build), `pkg-config` and zlib headers (NASM on x86). The FFmpeg
+reference is only needed for differential and performance work.
 
 ```sh
 cargo xtask fixtures              # generate the authored test corpus into .research/
 cargo test --workspace            # library tests
-make prepare-check                # once: pinned FFmpeg reference, fixtures, workers
+cargo xtask prepare-check         # once: pinned FFmpeg reference, fixtures, workers
 cargo xtask check                 # everything CI runs
 ```
 
@@ -38,8 +38,13 @@ benchmarks assume it.
   cause; an `#[allow]` needs a one-line reason.
 - **Bounded by construction.** Input-dependent allocation goes through a `Budget`;
   loops over input run under a `WorkBudget`. Malformed input must never panic or hang.
-- **Rust first in tooling.** Prefer Rust for tools and tests. Python is used where it
-  is clearly the better fit, and C only for workers that link the FFmpeg reference.
+- **Rust first in tooling.** Prefer Rust for tools and tests; the repository tooling is
+  `cargo xtask`. Python is used where it is clearly the better fit: the independent
+  oracles (`harness/*_oracle.py`), the numpy table-recovery chains under
+  `harness/codecs/`, the capture input generator `harness/capture/generate_inputs.py`
+  (numpy's PCG64 generator and float draws; the cited capture inputs must not change)
+  and fixture authoring scripts. C is used only for workers that link the FFmpeg
+  reference.
 
 ## Changing behaviour
 
@@ -47,8 +52,9 @@ benchmarks assume it.
 2. Add or extend the corpus and the comparison in the harness.
 3. Implement it. Keep worker traces byte-identical for everything you did not mean to
    change.
-4. Run `make report`, and `make qualify` on an isolated AArch64 Linux machine when the
-   change touches parsing or decoding hot paths. Put the per-case results in the pull
+4. Run `cargo xtask report --fate-cache .research/fate-samples`, and the same with
+   `--benchmark --memory --require-acceptance` on an isolated AArch64 Linux machine when
+   the change touches parsing or decoding hot paths. Put the per-case results in the pull
    request and update [docs/status.md](docs/status.md).
 
 See [docs/quality.md](docs/quality.md) for the gates and the measurement rules, and
