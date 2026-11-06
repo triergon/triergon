@@ -144,7 +144,7 @@ not been inspected/frozen into a coherent implementation batch. No claim is made
 that its standard is unavailable. AVC/HEVC G01, SPS and AV1 semantic gaps remain
 explicit and unchanged.
 
-Full frozen selected parity, delivery runtime upper paired95 <=1.25 (optimization target <=0.80), lower live heap and
+Full frozen selected parity, delivery runtime upper paired95 <=1.20 (optimization target <=0.80), lower live heap and
 lower attributable RSS remain hard per-case **unqualified/unmeasured** native
 Linux ARM64 gates. 32-bit webOS/device evidence is separate. The crate remains
 experimental; this batch closes neither O21 nor the broader M02 audio family.

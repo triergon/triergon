@@ -148,6 +148,6 @@ compatibility differences are unchanged. A source-semantic operation and native
 mov_text-to-ASS decoding are different interfaces until a concrete full comparison
 contract is satisfied. No reference SDK/interface/options/baseline change is
 activated here. Full native/module/consumer/renderer and target integration, and
-the unchanged runtime1.25/lower-heap/RSS gates, remain open.
+the runtime 1.20/lower-heap/RSS gates, remain open.
 
 Unknown query time produces an unknown dynamic intent only where a positive-duration source event can affect the character. A known noncontinuous description uses charged binary range lookup; continuous or missing description uses the privately derived possible prefix. The continuous flag ignores the start offset, so an empty selected range can hold its prefix during a pause. Empty karaoke headers still obey a supplied, known duration bound.
