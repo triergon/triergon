@@ -30,7 +30,7 @@ use triergon_core::{
     SourceFailure, SourceId, Step, WorkBudget,
 };
 
-mod blocking;
+pub(crate) mod blocking;
 mod resolving;
 mod seek_index;
 mod seeking;
@@ -199,6 +199,23 @@ pub struct Reader {
     webm_vp9_t35: bool,
     epoch_reference: Option<EpochReference>,
 }
+
+/// A [`Reader`] that also admits WebM VP9's implicit ITU-T T.35 addition
+/// (BlockAddID 4 on a track that omits MaxBlockAdditionID). The EBML DocType still
+/// decides applicability. Documented on
+/// [`compat::block_additions`](crate::compat::block_additions).
+pub fn new_reader(
+    pool: &Budget,
+    source: SourceId,
+    capabilities: SourceCapabilities,
+    limits: Limits,
+    maximum_window: usize,
+) -> Result<Reader> {
+    let mut reader = Reader::new(pool, source, capabilities, limits, maximum_window)?;
+    reader.webm_vp9_t35 = true;
+    Ok(reader)
+}
+
 impl Reader {
     #[inline(always)]
     pub fn new(
@@ -250,19 +267,6 @@ impl Reader {
             webm_vp9_t35: false,
             epoch_reference: None,
         })
-    }
-    /// Admit the observed WebM VP9 implicit T.35 addition when the track omits
-    /// MaxBlockAdditionID. The EBML DocType still decides applicability.
-    pub fn new_webm_vp9_t35_v1(
-        pool: &Budget,
-        source: SourceId,
-        capabilities: SourceCapabilities,
-        limits: Limits,
-        maximum_window: usize,
-    ) -> Result<Self> {
-        let mut reader = Self::new(pool, source, capabilities, limits, maximum_window)?;
-        reader.webm_vp9_t35 = true;
-        Ok(reader)
     }
     /// Select an explicit block-payload ownership contract at construction.
     /// Default constructors and top-level metadata leaves retain OwnedExact.

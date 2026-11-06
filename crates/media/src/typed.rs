@@ -1,13 +1,13 @@
 //! Resumable typed Matroska operations over shared core input, storage and time.
 //! Development API. Existing blocking Demuxer compatibility is retained.
 pub use crate::matroska::typed::{
+    block_additions::BlockAdditionContainer,
     configuration::{CodecState, Configuration, Initialization, InitializationOrigin},
     hdr10_plus::{
         Hdr10Plus, Hdr10PlusGeometry, Hdr10PlusPeakGrid, Hdr10PlusPercentile, Hdr10PlusToneCurve,
         Hdr10PlusWindow,
     },
     mapping::{MappingExtension, MappingView, TrackExtensions, TrackExtensionsJob},
-    native_additions::{BlockAdditionContainer, NativeBlockAddition},
     packet::TypedPacket as Packet,
     side_data::{
         AdditionView, BlockGroupSource, ExtensionScope, ExtensionView, Presence, SourcePosition,
@@ -15,7 +15,7 @@ pub use crate::matroska::typed::{
     },
 };
 use crate::{incremental::ElementEvent, matroska::SeekReceipt, metadata::SharedDocument};
-mod reader;
+pub(crate) mod reader;
 pub use reader::{BlockingReader, Reader};
 
 #[derive(Clone, Debug)]

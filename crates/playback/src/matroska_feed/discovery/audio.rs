@@ -38,7 +38,11 @@ impl AudioProbe {
             return Ok(None);
         }
         let payload = packet.packet.data.as_ref();
-        if payload.is_empty() || packet.packet.timing.ffmpeg9()?.pts.is_none() {
+        if payload.is_empty()
+            || triergon_matroska::compat::clock::packet_timing(packet.packet.timing)?
+                .pts
+                .is_none()
+        {
             return Ok(Some(false));
         }
         if let Some(family) = dolby {

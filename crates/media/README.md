@@ -5,8 +5,8 @@ packets with lacing and content encoding, Cues-based seeking, static colour/HDR,
 block additions and segment metadata (Info, chapters, tags, attachments). It is a
 format-layer crate on top of [triergon-core](../core/README.md) and has no other
 dependency; its push reader implements the core `ContainerReader`. It does not
-decode codecs, schedule playback or render metadata; it returns source facts plus
-explicit, separately named FFmpeg-compatible views.
+decode codecs, schedule playback or render metadata; it returns source facts, and
+the `compat` modules reproduce FFmpeg's choices where a consumer needs them.
 
 ## Usage
 
@@ -95,7 +95,7 @@ floors the target to nanoseconds and calls `seek_previous` for
 | EBML | RFC 8794 headers, IDs up to 4 bytes, sizes up to 8 bytes, unknown-size Segment and Cluster; DocType `matroska` or `webm` |
 | Tracks | Number, UID, type, codec ID/private/name, legacy and BCP 47 language, enabled/default/forced and accessibility flags (absence kept distinct from false), DefaultDuration, CodecDelay, SeekPreRoll, video size, audio rate/channels, raw `TrackEntry` bytes |
 | Blocks | SimpleBlock and BlockGroup; Xiph, fixed and EBML lacing (up to 256 frames); BlockDuration, ReferenceBlock, DiscardPadding |
-| Side data | BlockAdditions (raw, with mapping evidence from `BlockAdditionMapping`), CodecState with configuration events before affected packets, HDR10+ (ITU-T T.35, Application 4) via `Hdr10Plus::parse_t35_v1` |
+| Side data | BlockAdditions (raw, with mapping evidence from `BlockAdditionMapping`), CodecState with configuration events before affected packets, HDR10+ (ITU-T T.35, Application 4) via `Hdr10Plus::parse_t35` |
 | Content encoding | Header stripping and zlib, per frame (scope 1), CodecPrivate (scope 2) or both; ordered chains of up to eight stages |
 | Colour | All 13 `Colour` integers and 10 `MasteringMetadata` floats (`colour::Colour`) |
 | Segment metadata | Info (title, apps, scale, IEEE duration, DateUTC), editions and nested chapters with displays, tags with nested SimpleTags and all target UIDs, attachments |
@@ -139,8 +139,8 @@ and attachments; it never scans media to build an index.
 CodecDelay subtracted (RFC 9559 §11.2); later laced frames get a PTS only when a
 duration is known, and fractional lace durations and negative PTS are kept.
 `pts_ns`/`duration_ns` are that value rounded once to the nearest nanosecond.
-`dts_ns` is not derived. `BlockTiming::ffmpeg9()` is an opt-in view in Segment
-ticks that reproduces FFmpeg's packet clock, including its omissions.
+`dts_ns` is not derived. `compat::clock::packet_timing` is an opt-in view in
+Segment ticks that reproduces FFmpeg's packet clock, including its omissions.
 
 **Content encoding.** Encodings apply in descending `ContentEncodingOrder`; each
 laced frame is decoded separately. `zlib::decompress` reads one complete RFC 1950
@@ -165,10 +165,19 @@ caller must seek or `reset` before reading more packets.
 subsampling axes, siting, optional MaxCLL/MaxFALL and each optional mastering
 value as exact `f64`. Zero-length numbers take the schema default. Duplicates,
 bad widths, non-finite values, negative luminance and chromaticity outside [0, 1]
-fail. `Colour::ffmpeg9()` is the opt-in FFmpeg side-data view: signed 32-bit
-rationals from continued fractions, with FFmpeg's omissions (no bit depth,
-incomplete light levels, incomplete/zero primaries); values that cannot fit
-return `Overflow`.
+fail. With the `reference-trace` feature, `Colour::trace_fields()` gives the
+values FFmpeg reports for comparison: signed 32-bit rationals from continued
+fractions, with FFmpeg's omissions (no bit depth, incomplete light levels,
+incomplete/zero primaries); values that cannot fit return `Overflow`.
+
+**Reference compatibility.** The reader follows the specifications. The `compat`
+modules reproduce FFmpeg's Matroska demuxer where a consumer needs its result, and
+each names the FFmpeg revision it reproduces. `compat::clock` gives FFmpeg's packet
+clock. `compat::block_additions` builds readers that admit WebM VP9's implicit
+ITU-T T.35 addition (BlockAddID 4 without a declared MaxBlockAdditionID), and
+projects block additions to the packet side data and HDR10+ events FFmpeg attaches
+to packets. Comparison-only projections (`Colour::trace_fields`) are compiled only
+with the non-default `reference-trace` feature.
 
 **Segment metadata.** Each `metadata::SharedDocument` owns one source buffer
 plus a compact node arena; `Edition`, `Chapter`, `Tag`, `SimpleTag`,

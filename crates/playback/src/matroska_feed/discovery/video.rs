@@ -106,10 +106,7 @@ impl VideoProbe {
         else {
             return Ok(Some(false));
         };
-        let pts = packet
-            .packet
-            .timing
-            .ffmpeg9()?
+        let pts = triergon_matroska::compat::clock::packet_timing(packet.packet.timing)?
             .pts
             .and_then(|pts| i64::try_from(pts.numerator()).ok());
         let Some(pts) = pts.filter(|pts| {

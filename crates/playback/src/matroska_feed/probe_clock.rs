@@ -12,7 +12,7 @@ pub(super) struct NativePacketTiming {
 
 impl NativePacketTiming {
     pub fn demux(packet: &Packet) -> Result<Self> {
-        let timing = packet.packet.timing.ffmpeg9()?;
+        let timing = triergon_matroska::compat::clock::packet_timing(packet.packet.timing)?;
         Ok(Self {
             pts: timing
                 .pts

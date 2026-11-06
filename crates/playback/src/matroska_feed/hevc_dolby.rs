@@ -248,7 +248,7 @@ impl MatroskaHevcDolbyPacket<'_> {
     /// keeps its original container timing.
     pub fn native_duration_ns(&self) -> Result<Option<u64>> {
         let timing = self.source.packet.timing;
-        if let Some(declared) = timing.ffmpeg9()?.duration {
+        if let Some(declared) = triergon_matroska::compat::clock::packet_timing(timing)?.duration {
             return Ok(Some(declared.rounded_duration_ns()?));
         }
         let MatroskaHevcDolbyPayload::Dolby { family, raw } = self.payload else {
