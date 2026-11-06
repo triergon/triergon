@@ -866,9 +866,7 @@ mod header_refill_feeder_tests {
 }
 
 #[cfg(test)]
-#[path = "owned_header_windows.rs"]
 mod owned_header_windows;
 
 #[cfg(test)]
-#[path = "owned_window_work_traces.rs"]
 mod owned_window_work_traces;

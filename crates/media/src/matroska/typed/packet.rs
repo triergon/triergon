@@ -104,7 +104,6 @@ impl FrameParameters {
     }
 }
 
-#[path = "simple_packet.rs"]
 mod simple;
 pub(crate) use simple::{SimplePacketJob, SimpleProgress};
 

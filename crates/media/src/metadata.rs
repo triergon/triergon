@@ -768,13 +768,10 @@ impl Catalogue {
     }
 }
 
-#[path = "metadata_views.rs"]
 mod views;
 pub use views::{Chapter, ChapterDisplay, Edition, SegmentInfo, SimpleTag, Tag, Targets};
 
 #[cfg(test)]
-#[path = "metadata_tests.rs"]
 mod tests;
 
-#[path = "typed/document.rs"]
 pub(crate) mod typed_document;

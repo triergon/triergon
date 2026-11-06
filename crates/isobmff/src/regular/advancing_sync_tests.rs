@@ -3,7 +3,10 @@ use triergon_core::Bytes;
 
 #[test]
 fn sample_error_after_membership_does_not_commit_either_row() {
-    let fixture = include_bytes!("../tests/fixtures/r-front-stco.mov");
+    let fixture = include_bytes!(concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/tests/fixtures/r-front-stco.mov"
+    ));
     let at = fixture.windows(4).position(|word| word == b"stbl").unwrap() - 4;
     let length = u32::from_be_bytes(fixture[at..at + 4].try_into().unwrap()) as usize;
     let budget = Budget::new(1024 * 1024).unwrap();

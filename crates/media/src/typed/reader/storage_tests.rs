@@ -423,5 +423,4 @@ fn performance_blocking_supply_preserves_canonical_exact_read_requests() {
     );
 }
 
-#[path = "reader_ready_reset_tests.rs"]
 mod reader_ready_reset_tests;

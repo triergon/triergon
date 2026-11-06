@@ -5,8 +5,14 @@ use crate::Limits;
 use crate::typed::BlockingReader;
 use std::io::Cursor;
 
-const INPUT: &[u8] = include_bytes!("../../tests/fixtures/seek-subtitle-recovery/observed-11.mkv");
-const NATIVE: &str = include_str!("../../tests/fixtures/seek-subtitle-recovery/native-11.tsv");
+const INPUT: &[u8] = include_bytes!(concat!(
+    env!("CARGO_MANIFEST_DIR"),
+    "/tests/fixtures/seek-subtitle-recovery/observed-11.mkv"
+));
+const NATIVE: &str = include_str!(concat!(
+    env!("CARGO_MANIFEST_DIR"),
+    "/tests/fixtures/seek-subtitle-recovery/native-11.tsv"
+));
 
 fn reader() -> BlockingReader<Cursor<&'static [u8]>> {
     BlockingReader::open_seekable(Cursor::new(INPUT), Limits::default()).unwrap()

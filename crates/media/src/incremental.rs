@@ -928,25 +928,19 @@ fn is_level_one(id: u64) -> bool {
     )
 }
 
-#[path = "typed/envelope_bridge.rs"]
 pub(crate) mod typed_bridge;
 
 #[cfg(test)]
-#[path = "incremental_discard_guards.rs"]
 mod discard_guards;
 
 #[cfg(test)]
-#[path = "compact_envelope_regressions.rs"]
 mod compact_envelope_regressions;
 
 #[cfg(test)]
-#[path = "lazy_body_regressions.rs"]
 pub(crate) mod lazy_body_regressions;
 
 #[cfg(test)]
-#[path = "header_loop_regressions.rs"]
 mod header_loop_regressions;
 
 #[cfg(test)]
-#[path = "incremental_header_guards.rs"]
 mod header_guards;

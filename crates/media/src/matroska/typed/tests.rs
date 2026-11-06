@@ -1,7 +1,5 @@
 //! Authored format-job regressions behind the additive typed reader.
-#[path = "cue_reference_tests.rs"]
 mod cue_reference_closure;
-#[path = "side_data_tests.rs"]
 mod packet_side_data;
 use super::*;
 use crate::{incremental::ParseStep, storage::SharedBytes};
@@ -1746,32 +1744,22 @@ fn typed_catalogue_keeps_cumulative_node_limits_and_prior_document_after_rejecte
     }
 }
 
-#[path = "cue_tie_tests.rs"]
 mod cue_tie_tests;
 
-#[path = "profiled_resource_tests.rs"]
 mod profiled_resource_tests;
 
-#[path = "packet_layout_tests.rs"]
 mod packet_layout_tests;
 
-#[path = "seek_optimization_tests.rs"]
 mod seek_optimization;
 
-#[path = "packet_handoff_tests.rs"]
 mod packet_handoff_tests;
 
-#[path = "publication_move_tests.rs"]
 mod publication_move_tests;
 
-#[path = "text_vector_tests.rs"]
 mod text_vector_tests;
 
-#[path = "chapter_walk_tests.rs"]
 mod chapter_walk_tests;
 
-#[path = "seek_subtitle_recovery_tests.rs"]
 mod seek_subtitle_recovery_tests;
 
-#[path = "ready_slot_tests.rs"]
 mod ready_slot_tests;

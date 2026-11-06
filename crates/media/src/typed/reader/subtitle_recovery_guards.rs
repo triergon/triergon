@@ -4,7 +4,10 @@ use crate::{Error, Limits, typed::BlockingReader};
 use std::{io::Cursor, sync::atomic::AtomicBool};
 use triergon_core::{Budget, InputCursor, SourceCapabilities, SourceFailure, SourceId, WorkBudget};
 
-const INPUT: &[u8] = include_bytes!("../../tests/fixtures/seek-subtitle-recovery/observed-11.mkv");
+const INPUT: &[u8] = include_bytes!(concat!(
+    env!("CARGO_MANIFEST_DIR"),
+    "/tests/fixtures/seek-subtitle-recovery/observed-11.mkv"
+));
 
 struct Driver {
     reader: Reader,
@@ -381,27 +384,30 @@ fn known_default_duration_recovery(input: &[u8], duration: u64) {
 #[test]
 fn subtitle_recovery_known_end_before_cut_remains_source_packet_not_visibility_inference() {
     known_default_duration_recovery(
-        include_bytes!(
-            "../../tests/fixtures/seek-subtitle-recovery/native-controls/ended-before-cut.mkv"
-        ),
+        include_bytes!(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/tests/fixtures/seek-subtitle-recovery/native-controls/ended-before-cut.mkv"
+        )),
         200_000_000,
     );
 }
 #[test]
 fn subtitle_recovery_known_end_equal_cut_preserves_default_and_absent_block_duration() {
     known_default_duration_recovery(
-        include_bytes!(
-            "../../tests/fixtures/seek-subtitle-recovery/native-controls/end-equals-cut.mkv"
-        ),
+        include_bytes!(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/tests/fixtures/seek-subtitle-recovery/native-controls/end-equals-cut.mkv"
+        )),
         785_000_000,
     );
 }
 #[test]
 fn subtitle_recovery_known_end_after_cut_preserves_default_and_absent_block_duration() {
     known_default_duration_recovery(
-        include_bytes!(
-            "../../tests/fixtures/seek-subtitle-recovery/native-controls/overlaps-cut.mkv"
-        ),
+        include_bytes!(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/tests/fixtures/seek-subtitle-recovery/native-controls/overlaps-cut.mkv"
+        )),
         800_000_000,
     );
 }

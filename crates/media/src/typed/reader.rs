@@ -30,18 +30,13 @@ use triergon_core::{
     SourceId, WorkBudget,
 };
 
-#[path = "reader_blocking.rs"]
 mod blocking;
-#[path = "reader_resolve.rs"]
 mod resolving;
-#[path = "reader_seek_index.rs"]
 mod seek_index;
-#[path = "reader_seek.rs"]
 mod seeking;
 pub use blocking::BlockingReader;
 use resolving::{Opening, ResolvePurpose, Resolver};
 use seeking::{ReplayPrefix, ScanContext, ScanSimple, ScanState, SeekMode, SubtitleRecovery};
-#[path = "reader_projection.rs"]
 mod projection;
 use projection::{
     LegacyEvent, LegacyProjection, PacketProjection, ScanEvent, ScanProjection, TypedProjection,
@@ -1477,15 +1472,12 @@ crate::matroska::typed::usage::storage!(Reader, |s| [
 ]);
 
 #[cfg(test)]
-#[path = "subtitle_recovery_guards.rs"]
 mod subtitle_recovery_guards;
 
 #[cfg(test)]
-#[path = "reader_storage_tests.rs"]
 mod storage_tests;
 
 #[cfg(test)]
-#[path = "inline_input_tests.rs"]
 mod inline_input_tests;
 
 #[cfg(test)]
@@ -1645,19 +1637,15 @@ mod header_refill_canonical_runtime_red {
 }
 
 #[cfg(test)]
-#[path = "shared_bounded_tests.rs"]
 mod shared_bounded_tests;
 
 #[cfg(test)]
-#[path = "shared_bounded_followup_tests.rs"]
 mod shared_bounded_followup_tests;
 
 #[cfg(test)]
-#[path = "inner_guard_regressions.rs"]
 mod inner_guard_regressions;
 
 #[cfg(test)]
-#[path = "simple_direct_regressions.rs"]
 mod simple_direct_regressions;
 
 #[cfg(test)]
@@ -1676,13 +1664,10 @@ impl Reader {
 }
 
 #[cfg(test)]
-#[path = "compact_controller_regressions.rs"]
 mod compact_controller_regressions;
 
 #[cfg(test)]
-#[path = "lazy_pressure_regressions.rs"]
 mod lazy_pressure_regressions;
 
 #[cfg(test)]
-#[path = "demux_slot_regressions.rs"]
 mod demux_slot_regressions;

@@ -951,9 +951,14 @@ fn scan_prefix_control_declared_block_and_overall_scan_limits_stay_permanent() {
 
 #[test]
 fn scan_prefix_control_real_subtitle_recovery_prefix_preserves_all_native_suffix_rows() {
-    const RAW: &[u8] =
-        include_bytes!("../../tests/fixtures/seek-subtitle-recovery/observed-11.mkv");
-    const NATIVE: &str = include_str!("../../tests/fixtures/seek-subtitle-recovery/native-11.tsv");
+    const RAW: &[u8] = include_bytes!(concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/tests/fixtures/seek-subtitle-recovery/observed-11.mkv"
+    ));
+    const NATIVE: &str = include_str!(concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/tests/fixtures/seek-subtitle-recovery/native-11.tsv"
+    ));
     let a = run(RAW, 512, 8192, false, 8_000_000_000);
     let b = run(RAW, 1, 1, false, 8_000_000_000);
     assert_eq!(a.receipt, b.receipt);

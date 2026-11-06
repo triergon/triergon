@@ -114,7 +114,10 @@ fn scan_projection_public_work_trace_and_held_alias_survive_seek() {
 
 #[test]
 fn scan_projection_group_fallback_keeps_typed_facts_and_owner_lifetimes() {
-    let raw = include_bytes!("scan_projection_video_group_v3.mkv");
+    let raw = include_bytes!(concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/tests/fixtures/scan_projection_video_group_v3.mkv"
+    ));
     for policy in policy_cases() {
         for chunk in [1, 7, 8192] {
             let pool = Budget::new(4 * 1024 * 1024).unwrap();

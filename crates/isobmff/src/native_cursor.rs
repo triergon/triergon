@@ -22,7 +22,6 @@ use std::{
 };
 use triergon_core::{Budget, BudgetVec, Error, Result, TimeBase, WorkBudget};
 
-#[path = "native_range_seek.rs"]
 mod range_seek;
 use range_seek::Checkpoints;
 pub use range_seek::Mov9RangeSeekJob;

@@ -1194,17 +1194,13 @@ impl Decoder<FullRecovery<IndexedArgb>> {
 }
 
 #[cfg(test)]
-#[path = "index_sharing_controls.rs"]
 mod index_sharing_controls;
 
 #[cfg(test)]
-#[path = "receiver_palette_sharing_controls.rs"]
 mod receiver_palette_sharing_controls;
 
 #[cfg(test)]
-#[path = "minimal_work_controls.rs"]
 mod minimal_work_controls;
 
 #[cfg(test)]
-#[path = "palette_entry_read_controls.rs"]
 mod palette_entry_read_controls;

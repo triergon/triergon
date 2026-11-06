@@ -1022,5 +1022,4 @@ impl Reader {
 }
 
 #[cfg(test)]
-#[path = "scan_prefix_regressions.rs"]
 mod scan_prefix_regressions;

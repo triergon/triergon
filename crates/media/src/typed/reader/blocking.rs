@@ -694,25 +694,19 @@ mod header_refill_runtime_red {
 }
 
 #[cfg(test)]
-#[path = "legacy_projection_regressions.rs"]
 mod legacy_projection_regressions;
 
 #[cfg(test)]
-#[path = "seek_window_regressions.rs"]
 mod seek_window_regressions;
 
 #[cfg(test)]
-#[path = "seek_window_independent_helpers.rs"]
 mod seek_window_independent_helpers;
 
 #[cfg(test)]
-#[path = "scan_projection_regressions.rs"]
 mod scan_projection_regressions;
 
 #[cfg(test)]
-#[path = "owned_blocking_source.rs"]
 mod owned_blocking_source;
 
 #[cfg(test)]
-#[path = "owned_epoch_prefix_tests.rs"]
 mod owned_epoch_prefix_tests;

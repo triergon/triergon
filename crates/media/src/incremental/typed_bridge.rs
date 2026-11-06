@@ -906,5 +906,4 @@ mod header_refill_bounds_tests {
 }
 
 #[cfg(test)]
-#[path = "replay_refresh_regressions.rs"]
 mod replay_refresh_regressions;

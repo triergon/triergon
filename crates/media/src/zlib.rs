@@ -3,7 +3,6 @@
 use crate::{Error, Result};
 use std::sync::atomic::{AtomicBool, Ordering};
 
-#[path = "inflate.rs"]
 mod incremental;
 pub use incremental::Inflater;
 
@@ -568,5 +567,4 @@ mod tests {
     }
 }
 
-#[path = "typed/restore.rs"]
 pub(crate) mod typed_restore;

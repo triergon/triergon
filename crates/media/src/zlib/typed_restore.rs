@@ -569,5 +569,4 @@ mod layout_tests {
 }
 
 #[cfg(test)]
-#[path = "lazy_workspace_tests.rs"]
 mod lazy_workspace_tests;

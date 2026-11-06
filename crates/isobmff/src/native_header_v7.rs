@@ -235,5 +235,4 @@ impl Mov9SampleEntryHeaderJobV7 {
 }
 
 #[cfg(test)]
-#[path = "native_header_v7_tests.rs"]
 mod tests;

@@ -724,7 +724,6 @@ fn sequential_contains(
 }
 
 #[cfg(test)]
-#[path = "advancing_sync_tests.rs"]
 mod advancing_sync_tests;
 
 impl SampleCursor<'_> {
@@ -1263,7 +1262,6 @@ impl Mov9RecoveryIndexCursor<'_> {
     }
 }
 
-#[path = "native_recovery_v2.rs"]
 mod recovery_v2;
 pub use recovery_v2::{
     Mov9InitialDescriptionDiagnostic, Mov9RecoveryV2Association, Mov9RecoveryV2Context,
@@ -1271,6 +1269,5 @@ pub use recovery_v2::{
     Mov9RecoveryV2PacketCursor, Mov9RecoveryV2Read, PinnedMovD32RegularRecoveryV2,
 };
 
-#[path = "native_recovery_v3.rs"]
 mod recovery_v3;
 pub use recovery_v3::*;

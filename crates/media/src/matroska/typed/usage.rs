@@ -326,5 +326,4 @@ impl Storage for WithSource<'_> {
 }
 
 #[cfg(test)]
-#[path = "owned_source_pressure.rs"]
 mod owned_source_pressure;

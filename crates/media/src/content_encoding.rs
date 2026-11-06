@@ -199,7 +199,6 @@ pub(crate) fn parse(bytes: &[u8], limit: usize, pool: &Budget) -> Result<Encodin
     Ok(out)
 }
 
-#[path = "typed/encodings.rs"]
 pub(crate) mod typed;
 
 impl crate::matroska::typed::usage::Storage for Decoder {

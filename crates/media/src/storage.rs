@@ -249,7 +249,6 @@ impl<T> StorageQueue<T> {
     }
 }
 
-#[path = "typed/text.rs"]
 pub(crate) mod text_job;
 
 impl crate::matroska::typed::usage::Storage for SharedBytes {

@@ -293,5 +293,4 @@ impl CuesJob {
 super::usage::storage!(CuesJob, |s| [s.source, s.positions, s.output]);
 
 #[cfg(test)]
-#[path = "cue_arena_regressions.rs"]
 mod cue_arena_regressions;

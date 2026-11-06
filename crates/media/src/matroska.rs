@@ -1679,7 +1679,6 @@ fn lace(data: &[u8], mode: u8) -> Result<Lace<'_>> {
 }
 
 #[cfg(test)]
-#[path = "matroska_lace_tests.rs"]
 mod lace_storage_tests;
 
 #[cfg(test)]
@@ -1706,5 +1705,4 @@ mod tests {
     }
 }
 
-#[path = "typed/jobs.rs"]
 pub(crate) mod typed;

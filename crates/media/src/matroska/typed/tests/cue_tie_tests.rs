@@ -15,125 +15,165 @@ struct Case {
 const CASES: &[Case] = &[
     Case {
         name: "ties-03-physical-preroll-0",
-        bytes: include_bytes!("../../tests/fixtures/cue-ties/ties-03-physical-preroll-0.mkv"),
+        bytes: include_bytes!(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/tests/fixtures/cue-ties/ties-03-physical-preroll-0.mkv"
+        )),
         ties: 3,
         roll: 0,
     },
     Case {
         name: "ties-03-physical-preroll-500000000",
-        bytes: include_bytes!(
-            "../../tests/fixtures/cue-ties/ties-03-physical-preroll-500000000.mkv"
-        ),
+        bytes: include_bytes!(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/tests/fixtures/cue-ties/ties-03-physical-preroll-500000000.mkv"
+        )),
         ties: 3,
         roll: 500000000,
     },
     Case {
         name: "ties-03-reverse-ties-preroll-0",
-        bytes: include_bytes!("../../tests/fixtures/cue-ties/ties-03-reverse-ties-preroll-0.mkv"),
+        bytes: include_bytes!(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/tests/fixtures/cue-ties/ties-03-reverse-ties-preroll-0.mkv"
+        )),
         ties: 3,
         roll: 0,
     },
     Case {
         name: "ties-03-reverse-ties-preroll-500000000",
-        bytes: include_bytes!(
-            "../../tests/fixtures/cue-ties/ties-03-reverse-ties-preroll-500000000.mkv"
-        ),
+        bytes: include_bytes!(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/tests/fixtures/cue-ties/ties-03-reverse-ties-preroll-500000000.mkv"
+        )),
         ties: 3,
         roll: 500000000,
     },
     Case {
         name: "ties-03-rotate-ties-preroll-0",
-        bytes: include_bytes!("../../tests/fixtures/cue-ties/ties-03-rotate-ties-preroll-0.mkv"),
+        bytes: include_bytes!(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/tests/fixtures/cue-ties/ties-03-rotate-ties-preroll-0.mkv"
+        )),
         ties: 3,
         roll: 0,
     },
     Case {
         name: "ties-03-rotate-ties-preroll-500000000",
-        bytes: include_bytes!(
-            "../../tests/fixtures/cue-ties/ties-03-rotate-ties-preroll-500000000.mkv"
-        ),
+        bytes: include_bytes!(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/tests/fixtures/cue-ties/ties-03-rotate-ties-preroll-500000000.mkv"
+        )),
         ties: 3,
         roll: 500000000,
     },
     Case {
         name: "ties-03-audio-position-first-preroll-0",
-        bytes: include_bytes!(
-            "../../tests/fixtures/cue-ties/ties-03-audio-position-first-preroll-0.mkv"
-        ),
+        bytes: include_bytes!(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/tests/fixtures/cue-ties/ties-03-audio-position-first-preroll-0.mkv"
+        )),
         ties: 3,
         roll: 0,
     },
     Case {
         name: "ties-03-audio-position-first-preroll-500000000",
-        bytes: include_bytes!(
-            "../../tests/fixtures/cue-ties/ties-03-audio-position-first-preroll-500000000.mkv"
-        ),
+        bytes: include_bytes!(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/tests/fixtures/cue-ties/ties-03-audio-position-first-preroll-500000000.mkv"
+        )),
         ties: 3,
         roll: 500000000,
     },
     Case {
         name: "ties-24-physical-preroll-0",
-        bytes: include_bytes!("../../tests/fixtures/cue-ties/ties-24-physical-preroll-0.mkv"),
+        bytes: include_bytes!(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/tests/fixtures/cue-ties/ties-24-physical-preroll-0.mkv"
+        )),
         ties: 24,
         roll: 0,
     },
     Case {
         name: "ties-24-physical-preroll-500000000",
-        bytes: include_bytes!(
-            "../../tests/fixtures/cue-ties/ties-24-physical-preroll-500000000.mkv"
-        ),
+        bytes: include_bytes!(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/tests/fixtures/cue-ties/ties-24-physical-preroll-500000000.mkv"
+        )),
         ties: 24,
         roll: 500000000,
     },
     Case {
         name: "ties-24-reverse-ties-preroll-0",
-        bytes: include_bytes!("../../tests/fixtures/cue-ties/ties-24-reverse-ties-preroll-0.mkv"),
+        bytes: include_bytes!(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/tests/fixtures/cue-ties/ties-24-reverse-ties-preroll-0.mkv"
+        )),
         ties: 24,
         roll: 0,
     },
     Case {
         name: "ties-24-reverse-ties-preroll-500000000",
-        bytes: include_bytes!(
-            "../../tests/fixtures/cue-ties/ties-24-reverse-ties-preroll-500000000.mkv"
-        ),
+        bytes: include_bytes!(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/tests/fixtures/cue-ties/ties-24-reverse-ties-preroll-500000000.mkv"
+        )),
         ties: 24,
         roll: 500000000,
     },
     Case {
         name: "ties-24-rotate-ties-preroll-0",
-        bytes: include_bytes!("../../tests/fixtures/cue-ties/ties-24-rotate-ties-preroll-0.mkv"),
+        bytes: include_bytes!(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/tests/fixtures/cue-ties/ties-24-rotate-ties-preroll-0.mkv"
+        )),
         ties: 24,
         roll: 0,
     },
     Case {
         name: "ties-24-rotate-ties-preroll-500000000",
-        bytes: include_bytes!(
-            "../../tests/fixtures/cue-ties/ties-24-rotate-ties-preroll-500000000.mkv"
-        ),
+        bytes: include_bytes!(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/tests/fixtures/cue-ties/ties-24-rotate-ties-preroll-500000000.mkv"
+        )),
         ties: 24,
         roll: 500000000,
     },
     Case {
         name: "ties-24-audio-position-first-preroll-0",
-        bytes: include_bytes!(
-            "../../tests/fixtures/cue-ties/ties-24-audio-position-first-preroll-0.mkv"
-        ),
+        bytes: include_bytes!(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/tests/fixtures/cue-ties/ties-24-audio-position-first-preroll-0.mkv"
+        )),
         ties: 24,
         roll: 0,
     },
     Case {
         name: "ties-24-audio-position-first-preroll-500000000",
-        bytes: include_bytes!(
-            "../../tests/fixtures/cue-ties/ties-24-audio-position-first-preroll-500000000.mkv"
-        ),
+        bytes: include_bytes!(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/tests/fixtures/cue-ties/ties-24-audio-position-first-preroll-500000000.mkv"
+        )),
         ties: 24,
         roll: 500000000,
     },
 ];
-const POINTS: &str = include_str!("../../tests/fixtures/cue-ties/wire-cues.tsv");
-const LANDINGS: &str = include_str!("../../tests/fixtures/cue-ties/native-landings.tsv");
-const VIDEO: &[u8] = include_bytes!("../../tests/fixtures/cue-ties/avc-packet.bin");
-const AUDIO: &[u8] = include_bytes!("../../tests/fixtures/cue-ties/aac-packet.bin");
+const POINTS: &str = include_str!(concat!(
+    env!("CARGO_MANIFEST_DIR"),
+    "/tests/fixtures/cue-ties/wire-cues.tsv"
+));
+const LANDINGS: &str = include_str!(concat!(
+    env!("CARGO_MANIFEST_DIR"),
+    "/tests/fixtures/cue-ties/native-landings.tsv"
+));
+const VIDEO: &[u8] = include_bytes!(concat!(
+    env!("CARGO_MANIFEST_DIR"),
+    "/tests/fixtures/cue-ties/avc-packet.bin"
+));
+const AUDIO: &[u8] = include_bytes!(concat!(
+    env!("CARGO_MANIFEST_DIR"),
+    "/tests/fixtures/cue-ties/aac-packet.bin"
+));
 const TARGETS: [i64; 7] = [
     0,
     250_000_000,

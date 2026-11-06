@@ -1046,7 +1046,6 @@ impl State {
 }
 
 #[cfg(test)]
-#[path = "inflate_prefix_tests.rs"]
 mod tests;
 
 crate::matroska::typed::usage::storage!(Inflater, |s| [

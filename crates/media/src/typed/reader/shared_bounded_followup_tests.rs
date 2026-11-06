@@ -4,7 +4,10 @@ use crate::storage::PayloadOwnership;
 use std::io::Cursor;
 use triergon_core::Bytes;
 
-const RAW: &[u8] = include_bytes!("../../tests/shared_bounded/hevc-aac.mkv");
+const RAW: &[u8] = include_bytes!(concat!(
+    env!("CARGO_MANIFEST_DIR"),
+    "/tests/shared_bounded/hevc-aac.mkv"
+));
 fn data_owner(packet: &crate::matroska::Packet) -> Bytes {
     use crate::matroska::typed::usage::{Owner, Packets, Storage};
     let slot = Some(packet.clone());
