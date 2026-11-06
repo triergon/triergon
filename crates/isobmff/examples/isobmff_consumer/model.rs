@@ -444,6 +444,22 @@ fn index_fragments(
     Ok(indexes)
 }
 
+fn check_signed_decode_runs(fragments: &[FragmentIndex]) -> Result<()> {
+    let maximum = i128::from(i64::MAX);
+    for fragment in fragments {
+        // The pinned comparison bounds duration accumulation from a
+        // nonnegative signed start. The source index sums all run durations.
+        if fragment
+            .decode_time()
+            .is_some_and(|start| i128::from(start.ticks()) <= maximum)
+            && fragment.decode_end().is_some_and(|end| end > maximum)
+        {
+            return Err(Error::Invalid("native signed decode run overflow").into());
+        }
+    }
+    Ok(())
+}
+
 pub trait Transport: Read + Seek {}
 impl<T: Read + Seek> Transport for T {}
 pub struct Driver<'a> {
@@ -988,6 +1004,9 @@ impl<'a> Driver<'a> {
     ) -> Result<()> {
         if matches!(operation, NativeOperation::Seek(_)) && model.truncated_media.is_some() {
             return Err(Error::Truncated.into());
+        }
+        if matches!(operation, NativeOperation::Open | NativeOperation::Index) {
+            check_signed_decode_runs(model.fragments.as_slice())?;
         }
         let mut tracks = BudgetVec::new(&self.budget);
         let mut streams = BudgetVec::new(&self.budget);
@@ -1995,6 +2014,88 @@ mod refill_transcript42 {
                 ));
             }
             assert_eq!(short.events, [(b'S', 0, 0), (b'R', 0, maximum)]);
+        }
+    }
+}
+
+#[cfg(test)]
+mod signed_decode_comparison {
+    use super::*;
+    use std::io::Cursor;
+
+    fn check(bytes: &[u8], decode_end: Option<i128>, admitted: bool) {
+        for (window, quantum) in [(65536, 4096), (1, 3)] {
+            for operation in [NativeOperation::Open, NativeOperation::Index] {
+                let mut input = Cursor::new(bytes);
+                let mut driver = Driver::new(
+                    &mut input,
+                    u64::try_from(bytes.len()).unwrap(),
+                    window,
+                    quantum,
+                )
+                .unwrap();
+                let model = driver.open().unwrap();
+                if let Some(end) = decode_end {
+                    let [fragment] = model.fragments.as_slice() else {
+                        panic!("expected one fragment");
+                    };
+                    assert_eq!(fragment.decode_end(), Some(end));
+                }
+                let mut stats = Stats::default();
+                let mut retention = Retention::new(&driver.budget, 0).unwrap();
+                let mut trace = String::new();
+                let result = driver.native_operation(
+                    &model,
+                    &mut stats,
+                    &mut retention,
+                    operation,
+                    Some(&mut trace),
+                );
+                if admitted {
+                    result.unwrap();
+                    assert_eq!(stats.packets, 6);
+                    assert!(trace.contains("\"confirmed_eof\":true"));
+                } else {
+                    assert!(matches!(
+                        result,
+                        Err(Failure::Core(Error::Invalid(
+                            "native signed decode run overflow"
+                        )))
+                    ));
+                    assert!(trace.is_empty());
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn signed_comparison_accepts_an_exact_end_and_rejects_one_tick_beyond() {
+        let original = include_bytes!("../../tests/fixtures/native-clock28/clock27-i63-step12.mp4");
+        let header = b"\x00\x00\x00\x14tfdt\x01\x00\x00\x00";
+        let at = original
+            .windows(header.len())
+            .position(|window| window == header)
+            .unwrap()
+            + header.len();
+        let mut bytes = original.to_vec();
+        // The six sample durations sum to nine, including the final sample.
+        for (distance, admitted) in [(9, true), (8, false)] {
+            let start = i64::MAX.unsigned_abs() - distance;
+            bytes[at..at + 8].copy_from_slice(&start.to_be_bytes());
+            check(&bytes, Some(i128::from(start) + 9), admitted);
+        }
+    }
+
+    #[test]
+    fn signed_comparison_preserves_large_legacy_and_modern_starts() {
+        for bytes in [
+            include_bytes!("../../tests/fixtures/clock-boundary27/f-tfdt-above-i64.mp4").as_slice(),
+            include_bytes!("../../tests/fixtures/clock-boundary27/modern-iso6-tfdt-above-i64.mp4")
+                .as_slice(),
+            include_bytes!("../../tests/fixtures/native-clock28/clock27-u64-minus1-step12.mp4")
+                .as_slice(),
+        ] {
+            check(bytes, None, true);
         }
     }
 }
