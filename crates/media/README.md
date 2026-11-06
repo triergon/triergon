@@ -4,8 +4,9 @@ Package `triergon-matroska`. A bounded Matroska and WebM demuxer: EBML parsing, 
 packets with lacing and content encoding, Cues-based seeking, static colour/HDR,
 block additions and segment metadata (Info, chapters, tags, attachments). It is a
 format-layer crate on top of [triergon-core](../core/README.md) and has no other
-dependency. It does not decode codecs, schedule playback or render metadata; it
-returns source facts plus explicit, separately named FFmpeg-compatible views.
+dependency; its push reader implements the core `ContainerReader`. It does not
+decode codecs, schedule playback or render metadata; it returns source facts plus
+explicit, separately named FFmpeg-compatible views.
 
 ## Usage
 
@@ -34,23 +35,39 @@ block additions or CodecState; use `next_typed_packet` for those.
 Push / poll reader (no I/O; the caller supplies bytes):
 
 ```rust
-use triergon_matroska::{incremental::ParseStep, typed::{Event, Reader}};
+use triergon_core::{Step, WorkBudget};
+use triergon_matroska::{Limits, typed::{Event, Reader}};
 
 let mut reader = Reader::new(&pool, source_id, caps, Limits::default(), 64 * 1024)?;
 loop {
-    match reader.step(&mut work, &cancel)? {
-        ParseStep::NeedInput(req) => reader.provide(&window_for(req))?, // or reader.finish(..)
-        ParseStep::Yield => work = WorkBudget::new(STEP),
-        ParseStep::Backpressure { .. } => { /* release retained packets, retry */ }
-        ParseStep::Event(Event::Packet(p)) => consume(p),
-        ParseStep::Event(_) => {} // Envelope, Configuration, Document, Seek
-        ParseStep::Finished => break,
+    match reader.step(&mut work, &cancel)? {         // Step<Event, Backpressure>
+        Step::NeedInput(req) => reader.provide(&window_for(req))?, // or reader.finish(..)
+        Step::Yield => work = WorkBudget::new(STEP),
+        Step::Backpressure(_) => { /* release retained packets, retry */ }
+        Step::Ready(Event::Packet(p)) => consume(p),
+        Step::Ready(_) => {} // Envelope, Configuration, Document, Seek
+        Step::End(_) => break, // end of the Segment
     }
 }
 ```
 
 `Reader::seek_previous` / `seek_for_playback` return the first `InputRequest`;
 the seek completes with `Event::Seek(SeekReceipt)` before any packet.
+
+`typed::Reader` also implements `triergon_core::container::ContainerReader`, so it
+works in generic code and inside `triergon::AnyReader`:
+
+| Neutral view | Matroska source |
+|---|---|
+| `PacketInfo` | `typed::Packet`: time base nanoseconds (TimestampScale applied), `pts`/`duration` from the packet, `dts` `None`, `RandomAccess` from the Block keyframe flag, `Trim::end` from DiscardPadding |
+| `TrackInfo` | `matroska::Track`: `TrackId` = TrackNumber, `codec_tag` = CodecID, `configuration` = CodecPrivate, effective language, default and forced flags, `colour` as a `ColourDescription` with `Origin::SpecificationDefault` for omitted Colour children |
+| `Event::Seek` | `matroska::SeekReceipt::neutral()`: method `Index` or `BoundedScan`; Cue and preroll detail stay on the Matroska receipt |
+| `Event::Other` | the other `typed::Event`s (Envelope, Configuration, Document) |
+
+`request_seek` maps the `TrackId` to a track index (`Error::Invalid` when absent),
+floors the target to nanoseconds and calls `seek_previous` for
+`SeekPolicy::PreviousRandomAccess` or `seek_for_playback` for
+`SeekPolicy::PlaybackPreroll`.
 
 ## Supported
 
@@ -90,8 +107,8 @@ and seeking on a non-video track.
 | `decompression_ratio` / `decompression_work` | 1024 / 128 Mi | expansion vs. input; work units per encoding |
 
 Exceeding a policy is `Error::Limit`; output that fits once the caller drops
-retained packets is `Error::Backpressure` (`ParseStep::Backpressure`) and is
-retryable. `PayloadOwnership::OwnedExact` (default) gives each block payload
+retained packets is `Step::Backpressure` from `Reader::step` (`Error::Backpressure`
+from `BlockingReader`) and is retryable. `PayloadOwnership::OwnedExact` (default) gives each block payload
 storage of exactly its size; `SharedBounded` lets payloads alias their parent
 input allocation and reports that parent's full capacity as retained.
 
@@ -149,7 +166,8 @@ chapters/tags/attachments), RFC 1950/1951 (zlib/DEFLATE) and ITU-T T.35
 HDR10+ Application 4 carriage.
 
 Verified by unit and integration tests (malformed input, limits, cancellation,
-ownership, seek edge cases); independent Python oracles for EBML structure, exact
+ownership, seek edge cases; `tests/container.rs` reads packets and tracks through
+the neutral views only); independent Python oracles for EBML structure, exact
 source time, zlib content, colour and metadata; and a native FFmpeg comparison
 worker over the authored corpora in `harness/` plus the upstream FATE vectors
 `matroska-xiph-lacing`, `matroska-zlib-decompression` and
