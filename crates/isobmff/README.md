@@ -62,7 +62,7 @@ while let SampleStep::Sample(sample) = samples.poll(&mut work)? {
 | Seek | `SourceSeekPlanner`, `MovieSourceSeekPlanner`, `SourceCompositionLookup` |
 | Segment/fragment indexes | `SegmentIndex` (`sidx`), `TrackFragmentRandomAccess` (`tfra`), `MovieFragmentRandomAccessTail` (`mfro`) |
 | Recovery groups | `RecoveryDescriptions` (`sgpd`), `RecoveryMappings` (`sbgp`), `RecoveryLookup` |
-| Codec configuration | `SampleDescription::extensions`, `Mp4AacConfigJob`, `check_dts_core_description`, `QtSoundDescriptionV0` |
+| Codec configuration | `SampleDescription::extensions`, `AacConfigurationJob`, `check_dts_core_description`, `QtSoundDescriptionV0` |
 | FFmpeg-compatible packets | `Mov9PacketCursor`, `Mov9EditCursor`, `Mov9StreamView` |
 | FFmpeg-compatible seek | `Mov9NativeIndexCursor`, `Mov9NativeSeekJob`, `Mov9NativeGlobalSeekJob` |
 
@@ -70,6 +70,11 @@ while let SampleStep::Sample(sample) = samples.poll(&mut work)? {
 prints JSON lines (`isobmff_source_trace INPUT [WINDOW<=4096] [WORK_QUANTUM]
 [physical]`). `examples/isobmff_consumer_worker.rs` drives the
 FFmpeg-compatible operations for comparison runs.
+
+`AacConfigurationJob` reads AudioSpecificConfig from one `mp4a` sample
+description, including the supported QuickTime `wave` layout. It returns
+the source offset and shared bytes under `ConfigurationLimits` and a
+`WorkBudget`. Callers can validate the codec configuration separately.
 
 ## Supported
 

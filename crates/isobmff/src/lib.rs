@@ -284,6 +284,7 @@ pub use native_header_v7::{Mov9SampleEntryHeaderJobV7, PinnedMovD32SampleEntryHe
 
 mod native_encoded_v1;
 pub use native_encoded_v1::{
+    AacConfiguration, AacConfigurationJob, AacConfigurationStep, ConfigurationLimits,
     EncodedEntryKindV1, Mov9EncodedLimitsV1, Mov9EncodedStreamJobV1, Mov9EncodedStreamV1,
     PinnedMovD32EncodedRegularV1, check_dts_core_description,
 };
