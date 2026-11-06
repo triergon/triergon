@@ -357,6 +357,32 @@ fn transport_cut_short_length_and_partial_carrier_refuse_without_eof_flush() {
     }
 }
 
+#[test]
+fn corrupt_selected_carriers_retire_the_feed() {
+    for (index, mask, expected) in [
+        (1, 0x80, "TS transport error indicator"),
+        (3, 0x04, "TS continuity loss"),
+    ] {
+        let mut raw = BASELINE.to_vec();
+        let carrier = &mut raw[26 * 188..27 * 188];
+        assert_eq!(carrier[..4], [0x47, 0x01, 0x01, 0x11]);
+        carrier[index] ^= mask;
+        let pool = Budget::new(64 * 1024).unwrap();
+        let (mut reader, source) = reader(&pool, &raw, None, 301);
+        source.available.set(raw.len());
+        source.completion.set(Some(Completion::End));
+        loop {
+            match next(&mut reader, 4096) {
+                Ok(TsProgressiveStep::Unit(_) | TsProgressiveStep::NeedInput(_)) => {}
+                Err(Error::Core(CoreError::Invalid(actual))) if actual == expected => break,
+                other => panic!("expected {expected}, got {other:?}"),
+            }
+        }
+        assert!(matches!(next(&mut reader, 4096), Err(Error::Closed)));
+        closed(&pool, &source);
+    }
+}
+
 fn drain_to_request(reader: &mut TsProgressiveReader<Body<'_>>) -> InputRequest {
     loop {
         match next(reader, 4096).unwrap() {

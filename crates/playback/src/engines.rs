@@ -297,12 +297,6 @@ enum SegmentDiscovery {
     MediaFeed,
 }
 
-struct ProgressiveCarrier {
-    index: usize,
-    packet: ts::TransportPacket,
-    context: NativeSourceContext,
-}
-
 pub struct TsEngine {
     native_context: Option<ts::native_input::NativeInputContext>,
     native_prefix_failed: bool,
@@ -331,7 +325,6 @@ pub struct TsEngine {
     segment_discovery: Option<SegmentDiscovery>,
     segmented: bool,
     boundary: Option<ts::MediaEntityEndV1>,
-    progressive_carrier: Option<ProgressiveCarrier>,
 }
 pub struct MkvEngine {
     reader: Reader,
@@ -604,7 +597,6 @@ impl Engine {
             segment_discovery: None,
             segmented: false,
             boundary: None,
-            progressive_carrier: None,
         }))
     }
     pub fn ts_native(
@@ -793,8 +785,11 @@ impl Engine {
     ) -> Result<Self> {
         let budget = input.budget().clone();
         let stream = match discovery {
-            SegmentDiscovery::Native | SegmentDiscovery::Progressive => {
+            SegmentDiscovery::Native => {
                 TransportStream::new_single_program_segment(budget, limits, namespace)?
+            }
+            SegmentDiscovery::Progressive => {
+                TransportStream::new_single_program_progressive_feed(budget, limits, namespace)?
             }
             SegmentDiscovery::AvcAacFeed | SegmentDiscovery::MediaFeed => {
                 TransportStream::new_single_program_feed(budget, limits, namespace)?
@@ -1781,40 +1776,6 @@ impl TsEngine {
         }
     }
 
-    fn route_native_carrier(&mut self, event: &TraceEvent) -> Result<()> {
-        if let Some(carrier) = self.progressive_carrier.take() {
-            let TraceEvent::Continuity { pid, outcome } = event else {
-                return Err(Error::Invalid("progressive TS missing carrier continuity").into());
-            };
-            if *pid != carrier.packet.pid {
-                return Err(Error::Invalid("progressive TS continuity PID mismatch").into());
-            }
-            if matches!(
-                outcome,
-                ts::ContinuityOutcome::First | ts::ContinuityOutcome::Continuous
-            ) {
-                self.offer_native_transport(carrier.index, carrier.packet, carrier.context, None)?;
-            }
-        } else if let TraceEvent::Transport(packet) = event
-            && let Some(index) = self.native_tracks.index(packet.pid)
-            && self.native_tracks.as_slice()[index].observer.is_some()
-        {
-            let context = self.native_source_context();
-            if self.segment_discovery == Some(SegmentDiscovery::Progressive) {
-                // Wait for the source continuity decision so a duplicate
-                // carrier never enters the native PES.
-                self.progressive_carrier = Some(ProgressiveCarrier {
-                    index,
-                    packet: packet.clone(),
-                    context,
-                });
-            } else {
-                self.offer_native_transport(index, packet.clone(), context, None)?;
-            }
-        }
-        Ok(())
-    }
-
     // Keep backend-specific polling workspaces out of the shared dispatcher.
     #[inline(never)]
     fn poll(&mut self, w: &mut WorkBudget, c: &AtomicBool) -> Result<BackendStep> {
@@ -1895,9 +1856,14 @@ impl TsEngine {
             }
             self.native_active = self.draining.then_some(index + 1);
         }
+        let progressive = self.segment_discovery == Some(SegmentDiscovery::Progressive);
         let feed_only = matches!(
             self.segment_discovery,
-            Some(SegmentDiscovery::AvcAacFeed | SegmentDiscovery::MediaFeed)
+            Some(
+                SegmentDiscovery::Progressive
+                    | SegmentDiscovery::AvcAacFeed
+                    | SegmentDiscovery::MediaFeed
+            )
         );
         if self.ended {
             return Ok(BackendStep::End);
@@ -2071,13 +2037,20 @@ impl TsEngine {
                 }
                 self.tsid = Some(table.header.extension);
             }
-            // The HLS feed consumes active maps, faults and native payloads. The
-            // source parser still validates every packet and advances its epochs.
+            // Feeds consume native payloads and the source facts needed for
+            // admission. The source parser still validates every carrier.
             if feed_only
                 && !matches!(
                     event,
                     TraceEvent::ProgramMap { active: true, .. } | TraceEvent::Diagnostic(_)
                 )
+                && !(progressive
+                    && matches!(
+                        event,
+                        TraceEvent::Pat(_)
+                            | TraceEvent::Continuity { .. }
+                            | TraceEvent::Timeline { .. }
+                    ))
             {
                 let event = self
                     .pending
@@ -2141,7 +2114,12 @@ impl TsEngine {
                 .pending
                 .take()
                 .ok_or(Error::Invalid("TS event missing"))?;
-            self.route_native_carrier(&event)?;
+            if let TraceEvent::Transport(packet) = &event
+                && let Some(index) = self.native_tracks.index(packet.pid)
+            {
+                let context = self.native_source_context();
+                self.offer_native_transport(index, packet.clone(), context, None)?;
+            }
             self.event_ordinal = self.event_ordinal.checked_add(1).ok_or(Error::Overflow)?;
             if matches!(event, TraceEvent::Finished) {
                 self.ended = true;

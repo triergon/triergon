@@ -135,6 +135,7 @@ pub struct TransportStream {
     program: u16,
     discover_program: bool,
     feed_omissions: Option<u64>,
+    feed_validated_carriers: bool,
     deferred_feed_events: u64,
     descriptor_namespace: DescriptorNamespace,
     framer: TransportFramer,
@@ -237,6 +238,18 @@ impl TransportStream {
         Ok(stream)
     }
 
+    /// A sequential feed publishes PES carriers after continuity validation.
+    /// PAT, PMT, continuity breaks, clock transitions and faults remain visible.
+    pub fn new_single_program_progressive_feed(
+        budget: Budget,
+        limits: ParseLimits,
+        descriptor_namespace: DescriptorNamespace,
+    ) -> Result<Self> {
+        let mut stream = Self::new_single_program_feed(budget, limits, descriptor_namespace)?;
+        stream.feed_validated_carriers = true;
+        Ok(stream)
+    }
+
     /// Count source events suppressed since the last call, for consumers
     /// that track positions in the full source trace.
     pub fn take_feed_omissions(&mut self) -> u64 {
@@ -271,6 +284,7 @@ impl TransportStream {
             program: program.unwrap_or_default(),
             discover_program: program.is_none(),
             feed_omissions: None,
+            feed_validated_carriers: false,
             deferred_feed_events: 0,
             descriptor_namespace,
             pmt: None,
@@ -1257,7 +1271,35 @@ impl TransportStream {
                         if !self.observe(work)? {
                             return Ok(Step::Yield);
                         }
-                        if let Some(outcome) = self.outcome.take() {
+                        let outcome = self.outcome.take();
+                        if self.feed_validated_carriers {
+                            let packet = self
+                                .packet
+                                .as_ref()
+                                .ok_or(Error::Invalid("TS packet missing"))?;
+                            match outcome {
+                                Some(ContinuityOutcome::First | ContinuityOutcome::Continuous)
+                                    if matches!(self.route, Route::Pes(_)) && self.phase == 2 =>
+                                {
+                                    // Count the hidden continuity event after the
+                                    // carrier so its full-trace ordinal is retained.
+                                    self.deferred_feed_events = 1;
+                                    return Ok(ready(TraceEvent::Transport(packet.clone())));
+                                }
+                                Some(ContinuityOutcome::SignalledDiscontinuity) => {
+                                    let pid = packet.pid;
+                                    self.omit_feed_events(1)?;
+                                    return Ok(ready(TraceEvent::Continuity {
+                                        pid,
+                                        outcome: ContinuityOutcome::SignalledDiscontinuity,
+                                    }));
+                                }
+                                Some(_) => self.omit_feed_events(2)?,
+                                None => self.omit_feed_events(1)?,
+                            }
+                            continue;
+                        }
+                        if let Some(outcome) = outcome {
                             if self.feed_omissions.is_some() {
                                 self.omit_feed_events(1)?;
                                 continue;
@@ -1315,6 +1357,10 @@ impl TransportStream {
                         return Ok(ready(TraceEvent::Transport(packet)));
                     }
                     self.phase = 1;
+                    if self.feed_validated_carriers {
+                        self.packet = Some(packet);
+                        continue;
+                    }
                     let event = TraceEvent::Transport(packet.clone());
                     self.packet = Some(packet);
                     return Ok(ready(event));
