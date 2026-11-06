@@ -1736,14 +1736,24 @@ pub fn certificate_current(root: &Path, certificate: &Value) -> bool {
             .get("runtime_guard_required")
             .is_some_and(Value::truthy)
     {
-        let artifacts_ok = roles.iter().all(|(_, data)| {
+        let artifacts_ok = roles.iter().all(|(role, data)| {
+            let expected = match role.as_str() {
+                "candidate" | "reference" => certificate
+                    .get("worker_hashes")
+                    .and_then(|hashes| s(hashes, role)),
+                "probe" => probe,
+                "observer" => observer,
+                _ => None,
+            };
             data.get("inspected_artifact")
                 .filter(|a| a.truthy())
                 .is_some_and(|a| {
-                    file_sha(Path::new(s(a, "path").unwrap_or_default()))
-                        .ok()
-                        .as_deref()
-                        == s(a, "sha256")
+                    expected.is_some()
+                        && s(a, "sha256") == expected
+                        && file_sha(Path::new(s(a, "path").unwrap_or_default()))
+                            .ok()
+                            .as_deref()
+                            == expected
                 })
         });
         if !is_true(certificate.get("runtime_guard_required"))

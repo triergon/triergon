@@ -55,6 +55,9 @@ commands:
   graph          PACKAGE [FILE]...   print the provenance graph of a workspace package
   build-workers  build the candidate and reference workers and the memory observers, and
                  record their identity in target/harness/identity.json
+  memory-admission CANDIDATE REFERENCE
+                 check the native AArch64 memory observer for two built workers
+                 and print the certificate
   worker-tests   [FILTER]   integration tests of the built workers against the reference
                  workers and the independent oracles (tests whose name contains FILTER)
   report         [--contract F] [--manifest F] [--corpus DIR] [--output DIR] [--fate-cache DIR]
@@ -93,6 +96,12 @@ fn main() -> ExitCode {
         Some("build-workers") => {
             harness::build::build(&root).map(|path| println!("{}", path.display()))
         }
+        Some("memory-admission") => match &args[1..] {
+            [candidate, reference] => {
+                harness::memory::admission(&root, Path::new(candidate), Path::new(reference))
+            }
+            _ => Err("usage: cargo xtask memory-admission CANDIDATE REFERENCE".into()),
+        },
         Some("worker-tests") => match &args[1..] {
             [] => worker_tests::run(&root, None),
             [filter] => worker_tests::run(&root, Some(filter)),

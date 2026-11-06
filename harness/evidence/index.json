@@ -7687,6 +7687,13 @@
    "reason": "ISO BMFF / MP4 status row",
    "key": "evidence/isobmff-regular-table-recovery-linux-arm64/fd718807e0ec1e6287bcb690226bf7056b79985796e74eba54f43544a034bc2c.tar.gz",
    "sha256": "fd718807e0ec1e6287bcb690226bf7056b79985796e74eba54f43544a034bc2c"
+  },
+  {
+   "name": "capture-pipeline-linux-arm64",
+   "retention": "retained",
+   "reason": "Capture status row",
+   "key": "evidence/capture-pipeline-linux-arm64/fac200b915c2b9a984e5b91cba29e7a3c016690596f128524f46c8f2cb40b6e6.tar.gz",
+   "sha256": "fac200b915c2b9a984e5b91cba29e7a3c016690596f128524f46c8f2cb40b6e6"
   }
  ]
 }
