@@ -1,4 +1,4 @@
-//! FATE-suite vector checks. Vectors live outside git under `.research/m1d4/fate-suite/aac/`;
+//! FATE-suite vector checks. Vectors live outside git under `.research/fate-samples/aac/`;
 //! each test prints a note and returns when its input is absent.
 //!
 //! Without references only structure is checked (format, sample counts, error counts as
@@ -9,7 +9,7 @@ use std::path::PathBuf;
 use triergon_codec_aac::{AudioFrame, Decoder, adts};
 
 fn suite() -> PathBuf {
-    PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../.research/m1d4/fate-suite/aac")
+    PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../.research/fate-samples/aac")
 }
 
 struct Decoded {

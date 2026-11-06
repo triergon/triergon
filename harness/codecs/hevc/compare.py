@@ -10,7 +10,7 @@ usage: python3 -I compare.py [vector-name-substring | /abs/path ...]
 import hashlib, json, os, subprocess, sys
 
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..', '..'))
-VEC = os.path.join(ROOT, '.research/m1d4/fate-suite/hevc-conformance')
+VEC = os.path.join(ROOT, '.research/fate-samples/hevc-conformance')
 SCR = os.path.join(ROOT, 'target/agent-hevc/ref')
 DEC = os.path.join(ROOT, 'target/agent-hevc/release/examples/decode')
 FF = '/opt/homebrew/bin/ffmpeg'

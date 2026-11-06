@@ -50,8 +50,7 @@ const OUT_OF_SET: &[&str] = &[
 ];
 
 fn vector_dir() -> PathBuf {
-    PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-        .join("../../.research/m1d4/fate-suite/hevc-conformance")
+    PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../.research/fate-samples/hevc-conformance")
 }
 
 fn decode_all(data: &[u8]) -> (Vec<u8>, Vec<DecodeError>) {

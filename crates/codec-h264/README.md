@@ -67,6 +67,6 @@ takes one NAL unit without start code. `reset` drops the DPB and keeps parameter
   bit-exact, with identical count and order; out-of-set vectors must be refused.
 - `cargo test -p triergon-codec-h264` runs unit tests; `tests/conformance.rs` checks all
   vectors against `tests/ffmpeg_framemd5_digests.txt` when
-  `.research/m1d4/fate-suite/h264-conformance/` is present (`H264_VECTOR` selects one)
+  `.research/fate-samples/h264-conformance/` is present (`H264_VECTOR` selects one)
   and skips otherwise. `examples/fuzz.rs` mutates the vectors to check for panics.
 - Project-wide gates: [docs/quality.md](../../docs/quality.md).

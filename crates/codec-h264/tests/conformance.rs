@@ -1,5 +1,5 @@
 //! JVT conformance vectors from the FFmpeg FATE suite (downloaded under the gitignored
-//! `.research/m1d4/fate-suite/h264-conformance/`). Each in-set vector must reproduce the
+//! `.research/fate-samples/h264-conformance/`). Each in-set vector must reproduce the
 //! FFmpeg 9.0.2 per-frame MD5 digests bit-exactly (development oracle, see
 //! `ffmpeg_framemd5_digests.txt`); out-of-set vectors must be refused with
 //! `DecodeError::Unsupported`. Skips cleanly when the vectors are absent.
@@ -8,8 +8,7 @@ use std::path::PathBuf;
 use triergon_codec_h264::{AnnexBNalIter, DecodeError, Decoder, Picture};
 
 fn vectors_dir() -> PathBuf {
-    PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-        .join("../../.research/m1d4/fate-suite/h264-conformance")
+    PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../.research/fate-samples/h264-conformance")
 }
 
 /// Vectors outside the selected feature matrix and the feature that refuses them.

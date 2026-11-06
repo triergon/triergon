@@ -82,7 +82,7 @@ code, which produces identical output.
   the scalar build are checked.
 - `cargo test -p triergon-codec-hevc` runs unit tests (CABAC, transforms against the
   direct matrix product, scans); `tests/conformance.rs` compares MD5s against
-  `tests/ffmpeg_ref_md5.txt` when `.research/m1d4/fate-suite/hevc-conformance/` is
+  `tests/ffmpeg_ref_md5.txt` when `.research/fate-samples/hevc-conformance/` is
   present (a subset by default, all with `HEVC_CONFORMANCE_FULL=1`) and skips otherwise.
 - Comparison scripts: [harness/codecs/hevc](../../harness/codecs/hevc/STATUS.md).
   Project-wide gates: [docs/quality.md](../../docs/quality.md).

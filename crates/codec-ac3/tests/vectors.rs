@@ -10,7 +10,7 @@ use std::path::PathBuf;
 use triergon_codec_ac3::{AudioFrame, Decoder, access_unit_len};
 
 fn suite() -> PathBuf {
-    PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../.research/m1d4/fate-suite")
+    PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../.research/fate-samples")
 }
 
 struct Expect {

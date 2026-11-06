@@ -80,7 +80,7 @@ dec.reset(); // after a seek: drops overlap, prediction, PNS, SBR and PS history
   max |diff| ≤ 6.1035e-5 (`harness/codecs/numeric-rules.json`).
 - SBR/PS vectors are also checked against the conformance `.s16` references (≤ 1 LSB).
 - `cargo test -p triergon-codec-aac` runs synthetic ADTS tests; `tests/fate_vectors.rs`
-  runs the FATE vectors when `.research/m1d4/fate-suite/aac/` is present (set
+  runs the FATE vectors when `.research/fate-samples/aac/` is present (set
   `AAC_REF_DIR` for the float comparison) and skips otherwise.
 - Comparison and probe tools: [harness/codecs/aac/tools](../../harness/codecs/aac/tools).
   Project-wide gates: [docs/quality.md](../../docs/quality.md).

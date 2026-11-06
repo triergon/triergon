@@ -7,7 +7,7 @@ set -u
 R=$(cd "$(dirname "$0")/../../.." && pwd)
 T=$R/target/agent-dca
 B=$T/release/examples
-FATE=$R/.research/m1d4/fate-suite/dts
+FATE=$R/.research/fate-samples/dts
 mode=${1:-all}
 cmp() { # ref out ch
   python3 -I "$R/harness/codecs/dca/compare.py" "$1" "$2" "$3"
