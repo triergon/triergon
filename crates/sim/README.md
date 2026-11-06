@@ -1,22 +1,86 @@
-# Desktop playback sessions
+# triergon-sim
 
-`triergon-sim` accepts AVC/HEVC Annex B access units and AC-3, E-AC-3, ADTS AAC
-or DTS core audio. Enable its `codecs` feature for the in-process Rust
-decoders. Video publishes timestamped 1920×1080 RGBA pictures. Audio delivers
-interleaved stereo s16 PCM at the decoder's output rate. The caller owns the
-clock, packet framing, output devices and generation changes.
+A decode-session layer for desktop playback. It takes AVC/HEVC Annex B access
+units and AC-3, E-AC-3, ADTS AAC or DTS core frames, drives the pure-Rust codec
+crates through small traits, and publishes clock-gated 1920×1080 RGBA pictures
+and interleaved stereo s16 PCM. The caller owns the clock, packet framing,
+output devices and GPU upload. Nothing here spawns a process or links a native
+library.
 
-The [playback crate](../playback/README.md) has a host test that reads an AVC/AAC
-MP4, converts the source packets through the existing framing adapters and
-feeds both sessions. It verifies two pictures, 2,048 stereo sample frames,
-output at the expected clock positions, identical replay after a seek to
-start, and teardown. The seek resets AAC perceptual-noise state with the
-rest of the decoder's signal history.
+## Usage
 
-The standalone D4 v3 receipt records 417 of 417 comparable outcomes and
-delivery timing, peak live heap and total peak RSS passes on all 17 native
-Linux ARM64 workloads. It retains the other 37 original dispositions. See
-`.research/d4-v3-numerical-activation-plan-v1/D4-V3-SELECTED-QUALIFICATION.json`
-at the repository root. That receipt applies to the pinned standalone
-workers. The combined workspace and the seek reset have local functional
-evidence. Application integration and target verification remain open.
+```rust
+use triergon_sim::{AudioSession, PcmBlock, QueueLimits, VideoSession, adapters, select};
+
+let codecs = select(load_payload);
+let mut video = VideoSession::new(QueueLimits::VIDEO);
+video.load(adapters::video_decoder(codecs.video));
+let mut audio = AudioSession::new(QueueLimits::AUDIO);
+audio.load(codecs.audio.map(adapters::audio_decoder));
+
+video.feed(&access_unit, Some(pts_ns))?;      // Err(Backpressure): keep and retry
+if video.step(Some(clock_ns)) {
+    let picture = video.latest().unwrap();     // sequence, generation, pts, rgba
+}
+let mut pcm = PcmBlock::default();
+audio.pull(Some(clock_ns), triergon_sim::audio::lead_ns(None), &mut pcm);
+```
+
+`adapters` needs the `codecs` feature. Without it, implement
+`codec::VideoDecode` and `codec::AudioDecode` yourself (the tests use scripted
+decoders).
+
+## Supported
+
+| Stream | Input | Output |
+|---|---|---|
+| Video | H.264, HEVC Annex B access units with optional PTS | 1920×1080 RGBA, letterboxed, 8- and 10-bit 4:2:0 sources |
+| Audio | AC-3, E-AC-3, AAC (ADTS), DTS core | interleaved stereo s16 at the decoder's rate |
+
+Supporting modules: `scale` (letterbox and YUV→RGBA), `mix` (stereo downmix
+and s16 conversion), `queue` (bounded input), `load` (codec selection from a
+load payload).
+
+## Behaviour and limits
+
+- **Queues.** `QueueLimits::VIDEO` holds 120 units / 32 MiB (16 MiB per unit);
+  `QueueLimits::AUDIO` 256 units / 4 MiB (1 MiB per unit). A full queue
+  returns `FeedError::Backpressure` and the caller keeps the unit. Empty or
+  oversized units are `FeedError::Invalid`; feeding with no decoder or after
+  a failure is `FeedError::Idle`.
+- **Video timing.** Each picture keeps the PTS its access unit carried through
+  decoder reordering. The session holds at most one converted picture ahead
+  of the clock and publishes it when `clock_ns >= pts` (or immediately when
+  either is unknown). `Published::sequence` increases across generations so a
+  texture cache never confuses streams.
+- **Audio timing.** `pull` decodes queued units whose PTS minus `lead_ns` has
+  been reached. `audio::lead_ns` parses a millisecond override, defaulting to
+  120 ms and clamped to 0–2000 ms. A sample-rate change ends the current block.
+- **Lifecycle.** `load` starts a new stream; video `flush` restarts the timeline
+  but keeps the last picture; `stop` clears everything. Each of these advances
+  `generation()`. `end_of_stream` drains the decoder; the state then becomes
+  `SessionState::Ended`. A decoder error is `SessionState::Failed` until the
+  next load, flush or stop.
+- **Letterbox.** Aspect-preserving fit rounded to nearest, centred with the
+  offset rounded down, opaque black padding. The arithmetic reproduces
+  FFmpeg's `scale=…:force_original_aspect_ratio=decrease,pad,format=rgba`
+  chain, including how its decoder keeps part of a left crop for alignment.
+- **Downmix.** Front pair at unity, centre and surrounds at −3 dB, LFE dropped,
+  normalised so no output exceeds full scale; AC-3/E-AC-3 stream mix levels are
+  honoured.
+- **Codec selection.** `load::select` picks HEVC when the lowercased payload
+  contains `h265` or `hevc`, otherwise H.264. Audio comes from the first
+  literal `"audio":"…"` value: `AC3`, `AC3 PLUS`, `AAC` or `DTS`; anything else
+  selects no audio.
+
+## Conformance
+
+The letterbox and downmix rules are native observations of FFmpeg 9.0.2,
+recorded as `RGBA-CONTRACT.json` and `DOWNMIX-CONTRACT.json` in the research
+tree; `scale.rs` and `mix.rs` implement them and their unit tests pin them. `tests/rgba_reference.rs` checks the
+letterbox against digests of the reference chain; `tests/sessions.rs` covers
+timing, flush, stop, backpressure, failure, rate changes and downmix with
+scripted decoders. A host test in `triergon-playback` (`tests/continuation.rs`)
+reads an AVC/AAC MP4, feeds both sessions through the framing adapters, and
+checks output positions, seek-to-start replay and teardown. Codec conformance
+lives in the codec crates. Gates: [docs/quality.md](../../docs/quality.md).
