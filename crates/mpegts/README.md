@@ -16,7 +16,8 @@ The crate exposes two views:
   Unknown DTS stays unknown.
 - **FFmpeg-compatible view** (`Native*` types in `native_pes`,
   `native_recovery`, `native_input`, `native_catalogue`,
-  `native_packet_completion`, and `clock::NativePesClockV1`). It reproduces
+  `native_packet_completion` with the `reference-trace` feature, and
+  `clock::NativePesClockV1`). It reproduces
   the packets, positions, flags and timestamps of the pinned FFmpeg MPEG-TS
   demuxer (`clock::NativeClockProfile::ArchivedPesV1`), including its
   handling of damaged and headerless PES. It is fed from the same transport
@@ -63,8 +64,8 @@ events so consumers can retain positions in the source trace.
 `CompactTraceEvent::NullRun`. `examples/mpegts_source_trace.rs` prints the
 source view as JSON lines (`mpegts_source_trace 188|192 PROGRAM [--dvb]
 [--native-clock-v1] [--media-entities-v1] [--compact] FILE...
-[--discontinuity FILE...]`); `examples/mpegts_native_pes_trace.rs` adds the
-FFmpeg-compatible PES rows.
+[--discontinuity FILE...]`); `examples/mpegts_native_pes_trace.rs` (feature
+`reference-trace`) adds the FFmpeg-compatible PES rows.
 
 ### Writing TS
 

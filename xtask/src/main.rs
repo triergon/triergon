@@ -329,6 +329,18 @@ fn check(root: &Path) -> Task {
         root,
         None,
         &[
+            "test",
+            "-p",
+            "triergon-mpegts",
+            "--features",
+            "reference-trace",
+            "--locked",
+        ],
+    )?;
+    cargo(
+        root,
+        None,
+        &[
             "clippy",
             "--workspace",
             "--all-targets",
@@ -347,6 +359,22 @@ fn check(root: &Path) -> Task {
         root,
         None,
         &["build", "--workspace", "--release", "--locked"],
+    )?;
+    cargo(
+        root,
+        None,
+        &[
+            "clippy",
+            "-p",
+            "triergon-mpegts",
+            "--features",
+            "reference-trace",
+            "--all-targets",
+            "--locked",
+            "--",
+            "-D",
+            "warnings",
+        ],
     )?;
     check_simd(root)?;
     run(Command::new("python3")
