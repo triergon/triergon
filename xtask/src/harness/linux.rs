@@ -69,7 +69,7 @@ const KERNEL_RSS_ROLES: [&str; 8] = [
     "observer_binary",
     "probe_binary",
 ];
-const KERNEL_NOTE: &str = "/sys/module/safe_media_rss_bound/notes/.note.gnu.build-id";
+const KERNEL_NOTE: &str = "/sys/module/triergon_rss_bound/notes/.note.gnu.build-id";
 const KERNEL_RUNTIME_FILES: [&str; 3] = [
     "/sys/kernel/notes",
     "/proc/sys/kernel/random/boot_id",
@@ -1567,7 +1567,7 @@ pub fn kernel_profile_current(
         };
         for (path, expected) in live {
             let allowed = KERNEL_RUNTIME_FILES.contains(&path.as_str())
-                || path == "/sys/module/safe_media_rss_bound/srcversion";
+                || path == "/sys/module/triergon_rss_bound/srcversion";
             if !allowed || file_sha(Path::new(path)).ok().as_deref() != expected.as_str() {
                 return Some(false);
             }

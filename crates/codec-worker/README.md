@@ -33,7 +33,7 @@ audio frame. `packets` counts pictures or audio frames.
 | Mode | stdout |
 |---|---|
 | `bench` | `{"schema":1, "iterations", "elapsed_ns", "packets", "bytes", "digest"}`; reading the file is outside the timed interval |
-| `memory` | `SAFE_MEDIA_BEGIN_V1` and `SAFE_MEDIA_END_V1` around one run, then `{"packets", "bytes"}`; the digest goes to stderr |
+| `memory` | `TRIERGON_BEGIN_V1` and `TRIERGON_END_V1` around one run, then `{"packets", "bytes"}`; the digest goes to stderr |
 | `raw` | writes the converted output to `OUT`, then `{"packets", "bytes", "digest"}` |
 
 `digest` is `triergon_harness_protocol::interleaved::InterleavedDigest` over the

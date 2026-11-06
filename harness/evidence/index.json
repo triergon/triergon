@@ -21,6 +21,26 @@
    "research/qualification/k0-mac-arm64": "matroska-demux-mac-arm64",
    "research/qualification/capture85-linux-arm64": "capture-linux-arm64",
    "research/d4/evidence": "codec-comparison"
+  },
+  "identifiers": {
+   "SAFE_MEDIA_BEGIN_V1": "TRIERGON_BEGIN_V1",
+   "SAFE_MEDIA_END_V1": "TRIERGON_END_V1",
+   "SAFE_MEDIA_ALLOCATION_REPORT": "TRIERGON_ALLOCATION_REPORT",
+   "SAFE_MEDIA_MEMORY_MODE": "TRIERGON_MEMORY_MODE",
+   "SAFE_MEDIA_RSS_KERNEL_BOUND": "TRIERGON_RSS_KERNEL_BOUND",
+   "SAFE_MEDIA_RSS_KERNEL_PROOF": "TRIERGON_RSS_KERNEL_PROOF",
+   "SAFE_MEDIA_RSS_END": "TRIERGON_RSS_END",
+   "SAFE_MEDIA_LINUX_OBSERVER_SELFTEST": "TRIERGON_LINUX_OBSERVER_SELFTEST",
+   "SAFE_MEDIA_TS_LIFECYCLE_EXPORT": "TRIERGON_TS_LIFECYCLE_EXPORT",
+   "SAFE_MEDIA_COMBINED_REFERENCE": "TRIERGON_COMBINED_REFERENCE",
+   "SAFE_MEDIA_FEED_REFERENCE": "TRIERGON_FEED_REFERENCE",
+   "SAFE_MEDIA_HLS_REFERENCE": "TRIERGON_HLS_REFERENCE",
+   "SAFE_MEDIA_DECODE_REFERENCE": "TRIERGON_DECODE_REFERENCE",
+   "SAFE_MEDIA_CAPTURE_REFERENCE": "TRIERGON_CAPTURE_REFERENCE",
+   "safe_media_rss_bound": "triergon_rss_bound",
+   "harness/rss-bound/safe_media_rss_bound.c": "harness/rss-bound/triergon_rss_bound.c",
+   "/dev/safe_media_rss_bound": "/dev/triergon_rss_bound",
+   "safe-media-bench.lock": "triergon-bench.lock"
   }
  },
  "sets": [

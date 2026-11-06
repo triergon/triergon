@@ -9,7 +9,7 @@
     "archive": "https://ffmpeg.org/releases/ffmpeg-9.0.2.tar.xz",
     "archive_sha256": "8c3850283eb25fa026482078a04051e0be17347b09ef81a0849bec15a96e002e",
     "configuration": "the application's development component set with --enable-small, and the same set without it as the gating build; built natively on the qualification host, exact argv recorded in the reference build receipt",
-    "worker": "harness/reference.c, capture build (SAFE_MEDIA_CAPTURE_REFERENCE); tooling only"
+    "worker": "harness/reference.c, capture build (TRIERGON_CAPTURE_REFERENCE); tooling only"
   },
   "input": {
     "pixel_format": "RGBA, 8 bits per channel, byte order R,G,B,A, tightly packed rows (stride = 4*width)",

@@ -197,7 +197,7 @@ fn main() -> ExitCode {
             let mut sink = HashSink::new();
             let mut stdout = std::io::stdout();
             if stdout
-                .write_all(b"SAFE_MEDIA_BEGIN_V1\n")
+                .write_all(b"TRIERGON_BEGIN_V1\n")
                 .and_then(|()| stdout.flush())
                 .is_err()
             {
@@ -207,7 +207,7 @@ fn main() -> ExitCode {
                 return fail(&e);
             }
             if stdout
-                .write_all(b"SAFE_MEDIA_END_V1\n")
+                .write_all(b"TRIERGON_END_V1\n")
                 .and_then(|()| stdout.flush())
                 .is_err()
             {

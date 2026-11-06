@@ -245,14 +245,14 @@ fn main_result() -> Result<()> {
         }
         "open-memory" | "open-memory-baseline" | "native-index-memory" | "seek-memory" => {
             // Always close the observed window, including operation failure.
-            io::stdout().write_all(b"SAFE_MEDIA_BEGIN_V1\n")?;
+            io::stdout().write_all(b"TRIERGON_BEGIN_V1\n")?;
             io::stdout().flush()?;
             let result = if mode == "open-memory-baseline" {
                 input.rewind().map(|()| Stats::default())
             } else {
                 operation(&mut input, o, op, policy, None)
             };
-            io::stdout().write_all(b"SAFE_MEDIA_END_V1\n")?;
+            io::stdout().write_all(b"TRIERGON_END_V1\n")?;
             io::stdout().flush()?;
             output_stats(&result?, 1, 0)?;
         }

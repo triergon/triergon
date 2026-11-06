@@ -248,7 +248,7 @@ def ratio_interval(pairs, seed=0, resamples=4000):
 @contextlib.contextmanager
 def benchmark_lock():
     # Same host-wide name for all worktrees, not one lock per checkout.
-    path = Path(tempfile.gettempdir()) / "safe-media-bench.lock"
+    path = Path(tempfile.gettempdir()) / "triergon-bench.lock"
     with path.open("a+") as lock:
         fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
         lock.seek(0); lock.truncate(); lock.write(str(os.getpid())); lock.flush()
@@ -372,7 +372,7 @@ def timing_module_state():
     """
     if platform.system() != "Linux":
         return {"status": "not-applicable", "platform": platform.system()}
-    module = LINUX_MODULE_ROOT / "safe_media_rss_bound"
+    module = LINUX_MODULE_ROOT / "triergon_rss_bound"
     try:
         root = LINUX_MODULE_ROOT.stat()
         if not stat.S_ISDIR(root.st_mode):

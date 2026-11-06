@@ -3,20 +3,20 @@
  *
  * One source, built once per pinned FFmpeg profile; each build compiles only that
  * profile's operations:
- *   -DSAFE_MEDIA_DECODE_REFERENCE   decode, letterbox and downmix (reference_decode.h)
- *   -DSAFE_MEDIA_CAPTURE_REFERENCE  RGBA conversion, MPEG-1 encode, MPEG-TS mux
+ *   -DTRIERGON_DECODE_REFERENCE   decode, letterbox and downmix (reference_decode.h)
+ *   -DTRIERGON_CAPTURE_REFERENCE  RGBA conversion, MPEG-1 encode, MPEG-TS mux
  *                                   (reference_capture.h)
  *   otherwise                       the container operations below, with the feed
- *                                   (SAFE_MEDIA_FEED_REFERENCE), HLS segment
- *                                   (SAFE_MEDIA_HLS_REFERENCE) and combined-encoding
- *                                   (SAFE_MEDIA_COMBINED_REFERENCE) variants. */
-#if defined(SAFE_MEDIA_DECODE_REFERENCE)
+ *                                   (TRIERGON_FEED_REFERENCE), HLS segment
+ *                                   (TRIERGON_HLS_REFERENCE) and combined-encoding
+ *                                   (TRIERGON_COMBINED_REFERENCE) variants. */
+#if defined(TRIERGON_DECODE_REFERENCE)
 #include "reference_decode.h"
-#elif defined(SAFE_MEDIA_CAPTURE_REFERENCE)
+#elif defined(TRIERGON_CAPTURE_REFERENCE)
 #include "reference_capture.h"
 #else
 #include <libavformat/avformat.h>
-#ifdef SAFE_MEDIA_COMBINED_REFERENCE
+#ifdef TRIERGON_COMBINED_REFERENCE
 #include "reference_content_encoding.h"
 #endif
 #include <libavutil/intreadwrite.h>
@@ -84,7 +84,7 @@ static void fold_bytes(uint64_t *digest,const uint8_t *bytes,size_t n){
 static int64_t ns(int64_t value,AVRational tb){return value==AV_NOPTS_VALUE?INT64_MIN:av_rescale_q(value,tb,(AVRational){1,1000000000});}
 static int demux(const uint8_t *data,size_t len,int trace,int64_t seek_ns,int after_eof,int metadata,uint64_t *packets,uint64_t *bytes,uint64_t *digest) {
     int result=0;Source source={data,len,0};
-#ifdef SAFE_MEDIA_COMBINED_REFERENCE
+#ifdef TRIERGON_COMBINED_REFERENCE
     SpecPlan inline_plan;SpecPlan *plans=NULL;
 #endif
     AVFormatContext *f=avformat_alloc_context();
@@ -95,7 +95,7 @@ static int demux(const uint8_t *data,size_t len,int trace,int64_t seek_ns,int af
     f->pb=io;f->flags|=AVFMT_FLAG_CUSTOM_IO|AVFMT_FLAG_NOPARSE|AVFMT_FLAG_NOFILLIN;
     result=avformat_open_input(&f,NULL,av_find_input_format("matroska,webm"),NULL);
     if(result<0)goto done;
-#ifdef SAFE_MEDIA_COMBINED_REFERENCE
+#ifdef TRIERGON_COMBINED_REFERENCE
     if(f->nb_streams==1)plans=&inline_plan;
     else if(f->nb_streams && f->nb_streams<=64)plans=calloc(f->nb_streams,sizeof(*plans));
     if(!plans||spec_plans(data,len,plans,f->nb_streams)){result=AVERROR(EINVAL);goto done;}
@@ -165,7 +165,7 @@ static int demux(const uint8_t *data,size_t len,int trace,int64_t seek_ns,int af
     }
     p=av_packet_alloc();if(!p){result=AVERROR(ENOMEM);goto done;}int first=1;
     while((result=av_read_frame(f,p))>=0){
-#ifdef SAFE_MEDIA_COMBINED_REFERENCE
+#ifdef TRIERGON_COMBINED_REFERENCE
         if(p->stream_index<0||(unsigned)p->stream_index>=f->nb_streams||spec_restore(&plans[p->stream_index],p)){result=AVERROR(EINVAL);goto done;}
 #endif
         if(p->stream_index<0||(unsigned)p->stream_index>=f->nb_streams){result=AVERROR(EINVAL);goto done;}
@@ -188,7 +188,7 @@ static int demux(const uint8_t *data,size_t len,int trace,int64_t seek_ns,int af
     }
     if(result==AVERROR_EOF){result=0;if(trace)putchar(']');if(metadata==2)result=catalogue_output(f,trace,digest);if(result>=0&&trace)printf("}\n");}
 done:
-#ifdef SAFE_MEDIA_COMBINED_REFERENCE
+#ifdef TRIERGON_COMBINED_REFERENCE
     if(plans && plans!=&inline_plan)free(plans);
 #endif
     av_packet_free(&p);avformat_close_input(&f);
@@ -196,17 +196,17 @@ done:
     return result;
 }
 static uint64_t now_ns(void){struct timespec t;clock_gettime(CLOCK_MONOTONIC,&t);return(uint64_t)t.tv_sec*1000000000+(uint64_t)t.tv_nsec;}
-#ifdef SAFE_MEDIA_FEED_REFERENCE
+#ifdef TRIERGON_FEED_REFERENCE
 #include "reference_feed.h"
 #endif
-#ifdef SAFE_MEDIA_HLS_REFERENCE
+#ifdef TRIERGON_HLS_REFERENCE
 #include "reference_hls.h"
 #endif
 int main(int argc,char **argv){
     av_log_set_level(AV_LOG_ERROR);
     if(argc<3)return 2;
     if(!strcmp(argv[1],"identity")){printf("{\"version\":\"%s\",\"configuration\":",av_version_info());quote(avformat_configuration());
-#ifdef SAFE_MEDIA_COMBINED_REFERENCE
+#ifdef TRIERGON_COMBINED_REFERENCE
         printf(",\"adapter\":\"ffmpeg-plus-native-combined-encoding\"");
 #else
         printf(",\"adapter\":\"native-ffmpeg-packets\"");
@@ -218,10 +218,10 @@ int main(int argc,char **argv){
     uint8_t *data=malloc((size_t)size+1);if(!data){fclose(file);return 2;}
     if(fread(data,1,(size_t)size,file)!=(size_t)size){free(data);fclose(file);return 2;}fclose(file);
     if(!strcmp(argv[1],"baseline")){printf("{\"input_bytes\":%ld}\n",size);free(data);return 0;}
-#ifdef SAFE_MEDIA_FEED_REFERENCE
+#ifdef TRIERGON_FEED_REFERENCE
     if(!strncmp(argv[1],"feed-",5)){int result=feed_main(argc,argv,data,size);free(data);return result;}
 #endif
-#ifdef SAFE_MEDIA_HLS_REFERENCE
+#ifdef TRIERGON_HLS_REFERENCE
     if(!strncmp(argv[1],"hls-",4)){int result=hls_main(argc,argv,data,size);free(data);return result;}
 #endif
     int metadata=!strncmp(argv[1],"catalogue-",10)?2:!strncmp(argv[1],"metadata-",9);
@@ -229,10 +229,10 @@ int main(int argc,char **argv){
     int64_t seek_ns=INT64_MIN;
     if(seek_mode){char *end=NULL;int index=!strcmp(argv[1],"seek-bench")?4:3;if(argc<=index){free(data);return 2;}seek_ns=strtoll(argv[index],&end,10);if(*end||seek_ns==INT64_MIN){free(data);return 2;}}
     if(!strcmp(argv[1],"memory")||!strcmp(argv[1],"memory-baseline")||!strcmp(argv[1],"seek-memory")||!strcmp(argv[1],"codec-memory")||!strcmp(argv[1],"metadata-memory")||!strcmp(argv[1],"catalogue-memory")){
-        if(write(STDOUT_FILENO,"SAFE_MEDIA_BEGIN_V1\n",20)!=20){free(data);return 2;}
+        if(write(STDOUT_FILENO,"TRIERGON_BEGIN_V1\n",18)!=18){free(data);return 2;}
         uint64_t packets=0,bytes=0,digest=0;int result=0;
         if(strcmp(argv[1],"memory-baseline"))result=demux(data,(size_t)size,0,seek_ns,0,metadata,&packets,&bytes,&digest);
-        if(write(STDOUT_FILENO,"SAFE_MEDIA_END_V1\n",18)!=18){free(data);return 2;}
+        if(write(STDOUT_FILENO,"TRIERGON_END_V1\n",16)!=16){free(data);return 2;}
         printf("{\"packets\":%" PRIu64 ",\"bytes\":%" PRIu64 ",\"digest\":%" PRIu64 "}\n",packets,bytes,digest);
         free(data);return result<0?1:0;
     }

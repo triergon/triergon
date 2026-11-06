@@ -309,9 +309,9 @@ int main(int argc, char **argv) {
                (unsigned long long)fold_finish(o.digest));
     } else if (!strcmp(kind, "memory")) {
         /* write(2) directly: the observer interposes write, which glibc stdio bypasses. */
-        if (write(STDOUT_FILENO, "SAFE_MEDIA_BEGIN_V1\n", 20) != 20) return 2;
+        if (write(STDOUT_FILENO, "TRIERGON_BEGIN_V1\n", 18) != 18) return 2;
         one_pass(name, par, data, (size_t)size, video, &o);
-        if (write(STDOUT_FILENO, "SAFE_MEDIA_END_V1\n", 18) != 18) return 2;
+        if (write(STDOUT_FILENO, "TRIERGON_END_V1\n", 16) != 16) return 2;
         /* Equal memory work is equal units and bytes; the digest goes to stderr because
          * audio output may differ within the graded 1 LSB (see native_correctness.py). */
         printf("{\"packets\":%llu,\"bytes\":%llu}\n", (unsigned long long)o.frames, (unsigned long long)o.bytes);

@@ -83,7 +83,7 @@ def runtime(cand, ref, case, path, pairs, iterations, seed):
 
 
 def observe(worker, case, path, observer, mode, receipt):
-    env = dict(os.environ, LD_PRELOAD=observer, SAFE_MEDIA_ALLOCATION_REPORT=receipt, SAFE_MEDIA_MEMORY_MODE=mode)
+    env = dict(os.environ, LD_PRELOAD=observer, TRIERGON_ALLOCATION_REPORT=receipt, TRIERGON_MEMORY_MODE=mode)
     args = [worker, "memory", str(case["width"]), str(case["height"]), str(case["flip"]), str(case["frames"]),
             str(case["bitrate"]), path]
     r = subprocess.run(args, env=env, capture_output=True, text=True)

@@ -266,7 +266,7 @@ const PROFILE_REFERENCES: [ProfileReference; 2] = [
     ProfileReference {
         profile: ".research/reference-video",
         binary: "ffmpeg-video-worker",
-        define: "-DSAFE_MEDIA_FEED_REFERENCE=1",
+        define: "-DTRIERGON_FEED_REFERENCE=1",
         record: "ffmpeg-video-native",
         kind: "pinned FFmpeg with the H.264 and HEVC decoders; feed operations",
         libraries: "video_reference",
@@ -274,7 +274,7 @@ const PROFILE_REFERENCES: [ProfileReference; 2] = [
     ProfileReference {
         profile: ".research/reference-formats",
         binary: "ffmpeg-formats-worker",
-        define: "-DSAFE_MEDIA_HLS_REFERENCE=1",
+        define: "-DTRIERGON_HLS_REFERENCE=1",
         record: "ffmpeg-formats-native",
         kind: "pinned FFmpeg MOV, TS and subtitle build; HLS segment operations",
         libraries: "formats_reference",
@@ -341,10 +341,7 @@ pub fn build(root: &Path) -> R<PathBuf> {
     command.extend(shell_words(&flags)?);
     command.extend(["-o".into(), worker.display().to_string()]);
     run(&command)?;
-    let mut combined_command = vec![
-        command[0].clone(),
-        "-DSAFE_MEDIA_COMBINED_REFERENCE=1".into(),
-    ];
+    let mut combined_command = vec![command[0].clone(), "-DTRIERGON_COMBINED_REFERENCE=1".into()];
     combined_command.extend(command[1..].iter().cloned());
     *combined_command.last_mut().expect("output path") = combined.display().to_string();
     run(&combined_command)?;
@@ -471,7 +468,7 @@ pub fn build(root: &Path) -> R<PathBuf> {
             ),
             ("source_hashes".into(), sources),
         ]);
-        if let Ok(proof_path) = std::env::var("SAFE_MEDIA_RSS_KERNEL_PROOF") {
+        if let Ok(proof_path) = std::env::var("TRIERGON_RSS_KERNEL_PROOF") {
             let proof_file = root.join(&proof_path);
             let profile = Value::object([
                 ("proof_path", Value::str(&proof_path)),

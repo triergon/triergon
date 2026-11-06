@@ -58,7 +58,7 @@ build oracle --disable-doc --disable-debug
 
 for name in speed small; do
   P="$BASE/ffmpeg/$name"
-  cc -std=c11 -O2 -Wall -Wextra -Werror -DSAFE_MEDIA_CAPTURE_REFERENCE -o "$BASE/bin/reference-capture-$name" \
+  cc -std=c11 -O2 -Wall -Wextra -Werror -DTRIERGON_CAPTURE_REFERENCE -o "$BASE/bin/reference-capture-$name" \
     "$SRC/harness/reference.c" -I"$P/include" -L"$P/lib" \
     -Wl,-rpath,"$P/lib" -lavformat -lavcodec -lswscale -lavutil
 done

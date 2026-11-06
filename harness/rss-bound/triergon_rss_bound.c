@@ -28,7 +28,7 @@ struct session {
     atomic64_t positive, events;
     atomic_t errors;
     bool running;
-    struct safe_media_rss_bound result;
+    struct triergon_rss_bound result;
 };
 static DEFINE_MUTEX(session_lock);
 static bool session_busy;
@@ -113,7 +113,7 @@ static int end_stopped(void *data)
         check_add_overflow(s->initial, bytes, &upper)) {
         atomic_or(2, &s->errors); upper = 0;
     }
-    s->result = (struct safe_media_rss_bound) {
+    s->result = (struct triergon_rss_bound) {
         .abi = 1, .initial_bytes = s->initial, .positive_pages = positive,
         .upper_bytes = upper, .events = (u64)atomic64_read(&s->events),
         .missed = missed, .errors = atomic_read(&s->errors), .page_size = PAGE_SIZE
@@ -147,7 +147,7 @@ static long bound_ioctl(struct file *file, unsigned int command, unsigned long v
 {
     struct session *s = file->private_data;
     int result;
-    if (command != SAFE_MEDIA_RSS_END) return -ENOTTY;
+    if (command != TRIERGON_RSS_END) return -ENOTTY;
     if (!s || current->pid != s->owner || current->mm != s->mm) return -EPERM;
     if (s->running) {
         result = stop_machine(end_stopped, s, NULL);
@@ -173,7 +173,7 @@ static const struct file_operations bound_ops = {
     .unlocked_ioctl = bound_ioctl
 };
 static struct miscdevice bound_device = {
-    .minor = MISC_DYNAMIC_MINOR, .name = "safe_media_rss_bound",
+    .minor = MISC_DYNAMIC_MINOR, .name = "triergon_rss_bound",
     .fops = &bound_ops, .mode = 0600
 };
 static int __init bound_init(void)
@@ -216,5 +216,5 @@ static void __exit bound_exit(void)
 module_init(bound_init);
 module_exit(bound_exit);
 MODULE_LICENSE("GPL");
-MODULE_DESCRIPTION("Isolated safe-media RSS positive-delta bound experiment");
+MODULE_DESCRIPTION("Isolated triergon RSS positive-delta bound experiment");
 MODULE_VERSION("2");

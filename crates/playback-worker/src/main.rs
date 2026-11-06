@@ -340,7 +340,7 @@ fn work() -> Result<(), Box<dyn std::error::Error>> {
     drop(bytes);
     let mut stdout = io::stdout().lock();
     if memory {
-        stdout.write_all(b"SAFE_MEDIA_BEGIN_V1\n")?;
+        stdout.write_all(b"TRIERGON_BEGIN_V1\n")?;
         stdout.flush()?;
     }
     let start = Instant::now();
@@ -354,7 +354,7 @@ fn work() -> Result<(), Box<dyn std::error::Error>> {
         0
     };
     if memory {
-        stdout.write_all(b"SAFE_MEDIA_END_V1\n")?;
+        stdout.write_all(b"TRIERGON_END_V1\n")?;
         stdout.flush()?;
     }
     writeln!(

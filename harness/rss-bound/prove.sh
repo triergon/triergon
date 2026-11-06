@@ -1,7 +1,7 @@
 #!/bin/sh
 # Build the kernel RSS bound module for the running kernel, attest a fresh
 # registration and write the proof that `cargo xtask build-workers` and
-# `cargo xtask report --memory` accept with SAFE_MEDIA_RSS_KERNEL_PROOF.
+# `cargo xtask report --memory` accept with TRIERGON_RSS_KERNEL_PROOF.
 #
 #   usage: harness/rss-bound/prove.sh REVIEW OUT
 #
@@ -9,17 +9,17 @@
 # for insmod, rmmod, chown and reading debugfs, after `cargo xtask build-workers`
 # has built the observer and probe. REVIEW is the source review of this module
 # source for this kernel release. The module stays loaded and owned by the
-# measurement user on success; unload it with `sudo rmmod safe_media_rss_bound`
+# measurement user on success; unload it with `sudo rmmod triergon_rss_bound`
 # before any timing run.
 set -eu
 review=$1
 out=$2
 build=target/rss-bound
-module=$build/safe_media_rss_bound.ko
+module=$build/triergon_rss_bound.ko
 sha() { sha256sum "$1" | cut -d' ' -f1; }
 release=$(uname -r)
 
-grep -q "\"module_source_sha256\": \"$(sha harness/rss-bound/safe_media_rss_bound.c)\"" "$review" ||
+grep -q "\"module_source_sha256\": \"$(sha harness/rss-bound/triergon_rss_bound.c)\"" "$review" ||
     { echo "review does not cover this module source" >&2; exit 1; }
 grep -q "\"kernel_release\": \"$release\"" "$review" ||
     { echo "review does not cover kernel $release" >&2; exit 1; }
@@ -28,13 +28,13 @@ grep -q '"status": "reviewed-conditional-upper-bound"' "$review" ||
 for binary in target/harness/allocations.so target/harness/memory-check; do
     [ -f "$binary" ] || { echo "$binary missing: run cargo xtask build-workers" >&2; exit 1; }
 done
-[ ! -e /sys/module/safe_media_rss_bound ] || { echo "module already loaded" >&2; exit 1; }
+[ ! -e /sys/module/triergon_rss_bound ] || { echo "module already loaded" >&2; exit 1; }
 
 # The module and the check include the API as rss_bound.h; both copy the one
 # tracked header, so module_api and observer_api are the same file.
 rm -rf "$build"
 mkdir -p "$build" "$out"
-cp harness/rss-bound/safe_media_rss_bound.c harness/rss-bound/Makefile "$build/"
+cp harness/rss-bound/triergon_rss_bound.c harness/rss-bound/Makefile "$build/"
 cp harness/rss-bound-api.h "$build/rss_bound.h"
 make -s -C "/lib/modules/$release/build" M="$PWD/$build" modules
 cc -O2 -Wall -Wextra -Werror -I "$build" harness/rss-bound/check.c -o "$build/kernel-check"
@@ -47,24 +47,24 @@ status=0
 sudo -n "$build/kernel-check" invalidate > "$out/negative-invalidate.stdout" || status=$?
 [ "$status" = 1 ]
 grep -q '"missed":0,"errors":8,' "$out/negative-invalidate.stdout"
-sudo -n /sbin/rmmod safe_media_rss_bound
+sudo -n /sbin/rmmod triergon_rss_bound
 
 # Fresh registration for the measurements, owned by the measurement user.
 sudo -n /sbin/insmod "$module"
-sudo -n chown "$(id -u):$(id -g)" /dev/safe_media_rss_bound
+sudo -n chown "$(id -u):$(id -g)" /dev/triergon_rss_bound
 sudo -n cat /sys/kernel/debug/kprobes/enabled > "$out/fresh-armed.stdout"
 [ "$(cat "$out/fresh-armed.stdout")" = 1 ]
 "$build/kernel-check" > "$out/positive.stdout"
 
 pin() { printf '"%s": {"path": "%s", "sha256": "%s"}' "$1" "$2" "$(sha "$2")"; }
-note=/sys/module/safe_media_rss_bound/notes/.note.gnu.build-id
+note=/sys/module/triergon_rss_bound/notes/.note.gnu.build-id
 {
     printf '{\n  "schema": "linux-rss-kernel-bound-proof-v1",\n'
     printf '  "status": "reviewed-conditional-upper-bound",\n  "abi": 1,\n'
     printf '  "kernel_release": "%s",\n  "architecture": "%s",\n  "page_size": %s,\n' \
         "$release" "$(uname -m)" "$(getconf PAGESIZE)"
     printf '  "files": {\n'
-    printf '    %s,\n' "$(pin module_source harness/rss-bound/safe_media_rss_bound.c)"
+    printf '    %s,\n' "$(pin module_source harness/rss-bound/triergon_rss_bound.c)"
     printf '    %s,\n' "$(pin module_api harness/rss-bound-api.h)"
     printf '    %s,\n' "$(pin module_binary "$module")"
     printf '    %s,\n' "$(pin observer_source harness/allocations-linux.c)"

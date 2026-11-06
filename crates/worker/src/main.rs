@@ -501,7 +501,7 @@ fn entry() -> Result<(), Box<dyn std::error::Error>> {
         | "catalogue-memory" => {
             use std::io::Write;
             let mut output = io::stdout().lock();
-            output.write_all(b"SAFE_MEDIA_BEGIN_V1\n")?;
+            output.write_all(b"TRIERGON_BEGIN_V1\n")?;
             output.flush()?;
             let result = if mode == "memory"
                 || mode == "seek-memory"
@@ -528,7 +528,7 @@ fn entry() -> Result<(), Box<dyn std::error::Error>> {
             } else {
                 (0, 0, 0)
             };
-            output.write_all(b"SAFE_MEDIA_END_V1\n")?;
+            output.write_all(b"TRIERGON_END_V1\n")?;
             output.flush()?;
             writeln!(
                 output,
