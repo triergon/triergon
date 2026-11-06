@@ -7646,6 +7646,13 @@
    "reason": "HLS segments status row",
    "key": "evidence/hls-segments-reproduction-linux-arm64/e008a7fc75c87deb903038cdd38d4e417cf0efa8d92592f9fc6105faecbba991.tar.gz",
    "sha256": "e008a7fc75c87deb903038cdd38d4e417cf0efa8d92592f9fc6105faecbba991"
+  },
+  {
+   "name": "isobmff-terminal-media-linux-arm64",
+   "retention": "retained",
+   "reason": "ISO BMFF / MP4 status row",
+   "key": "evidence/isobmff-terminal-media-linux-arm64/8bb3e3c6ddf1f20cdd0601d8ff182199ddd20fe1bc160ae9b03817f7ce66384e.tar.gz",
+   "sha256": "8bb3e3c6ddf1f20cdd0601d8ff182199ddd20fe1bc160ae9b03817f7ce66384e"
   }
  ]
 }
