@@ -40,6 +40,16 @@ fn push_span(reader: &mut AvcTsReader, bytes: &[u8]) {
     });
 }
 
+fn push_pes_span(reader: &mut AvcTsReader, bytes: &[u8]) {
+    assert!(reader.pending_pes.is_none());
+    push_span(reader, bytes);
+    reader.pending_pes = Some(PendingPes {
+        spans: BudgetVec::new(&reader.pool).into_iter(),
+        remaining: 0,
+        may_reserve: true,
+    });
+}
+
 fn drain(reader: &mut AvcTsReader, out: &mut Vec<AvcTsAccessUnit>) {
     loop {
         match reader
@@ -181,6 +191,63 @@ fn eof_publication_retries_after_pressure_and_a_partial_next_nal_fails() {
         reader.step(&mut WorkBudget::new(64), &AtomicBool::new(false)),
         Err(Error::Truncated)
     ));
+}
+
+#[test]
+fn pes_extent_hint_preserves_packed_and_split_units_under_pressure() {
+    let headers = [DELIMITER, PREFIX, SPS, PREFIX, PPS, IDR].concat();
+    let first = [headers.as_slice(), &[0x55; 40]].concat();
+    let second = [DELIMITER, IDR, &[0x66; 70]].concat();
+    let (start, tail) = second.split_at(second.len() / 2);
+    let packed = [first.as_slice(), start].concat();
+    let cancel = AtomicBool::new(false);
+    let ordinary_growth = 128;
+    let publication = LOOKAHEAD + Bytes::owner_overhead_bytes();
+
+    for headroom in [None, Some(ordinary_growth + publication), Some(0)] {
+        let (pool, mut reader) = fixture();
+        reader.pes = Some(Anchor {
+            serial: 1,
+            clock: clock(9000),
+        });
+        push_pes_span(&mut reader, &packed);
+        // Stop after the first slice header. The IDR fixture ends with two
+        // payload bytes and the four NAL transitions cost one unit each.
+        let mut prefix_work = WorkBudget::new((headers.len() - 2 + 4) as u64);
+        assert!(matches!(
+            reader.step(&mut prefix_work, &cancel).unwrap(),
+            AvcTsStep::Yield
+        ));
+        let mut pressure = headroom.map(|free| pool.reserve(pool.available() - free).unwrap());
+        if headroom == Some(0) {
+            let mut retry_work = WorkBudget::new(4096);
+            assert!(matches!(
+                reader.step(&mut retry_work, &cancel),
+                Err(Error::Backpressure { .. })
+            ));
+            assert_eq!(retry_work.spent(), 0);
+            drop(pressure.take());
+        }
+        let AvcTsStep::Ready(unit) = reader.step(&mut WorkBudget::new(4096), &cancel).unwrap()
+        else {
+            panic!("the first picture should be ready");
+        };
+        assert_eq!(unit.source_bytes().as_ref(), first);
+        assert_eq!(unit.clock, Some(clock(9000)));
+        let capacity = headroom.map_or(packed.len() + LOOKAHEAD, |_| ordinary_growth);
+        assert_eq!(unit.source_bytes().retained_capacity(), capacity);
+        drop(pressure);
+
+        let mut units = vec![unit];
+        drain(&mut reader, &mut units);
+        push_pes_span(&mut reader, tail);
+        reader.finish();
+        drain(&mut reader, &mut units);
+        assert_eq!(units.len(), 2);
+        assert_eq!(units[0].source_bytes().as_ref(), first);
+        assert_eq!(units[1].source_bytes().as_ref(), second);
+        assert_eq!(units[1].clock, None);
+    }
 }
 
 #[test]
