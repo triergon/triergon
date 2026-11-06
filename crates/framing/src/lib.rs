@@ -8,12 +8,11 @@
 )]
 // Pending: `missing_docs`, `missing_debug_implementations`, `unreachable_pub`.
 
+pub mod compat;
+#[cfg(feature = "reference-trace")]
 mod dts_operation;
-pub use dts_operation::{
-    DtsD32ClockDisposition, DtsD32ClockProjection, DtsFactAssociation, DtsFactAssociationJob,
-    DtsOperation, DtsOperationContext, DtsOperationEvent, DtsOperationLane, DtsOperationLimits,
-    DtsOperationStep, DtsOperationTerminal, DtsParserPacket,
-};
+#[cfg(feature = "reference-trace")]
+pub mod reference_trace;
 
 mod nal_packet;
 pub use nal_packet::{
@@ -124,10 +123,8 @@ pub use dts14_carrier::{
     Dts14CarrierBoundary, Dts14CarrierLimits, Dts14CarrierPacket, Dts14CarrierProvision,
     Dts14CarrierReader, Dts14CarrierSyntax,
 };
+#[cfg(feature = "reference-trace")]
 mod dts14_parser_view;
-pub use dts14_parser_view::{
-    DTS14_D32_POSITION_PROFILE, Dts14D32ParserHints, Dts14ParserHintOrigin,
-};
 
 mod hevc_access_unit;
 pub use hevc_access_unit::{
@@ -181,11 +178,7 @@ pub use nal_packet_config::{
     NalPacketConfigOutput, NalPacketConfigRejection, NalPacketConfigWriter,
 };
 
-mod nal_observed_config;
-pub use nal_observed_config::{
-    NalAvcUpdateRejection, NalObservedAvcConfigParser, NalObservedAvcConfiguration,
-    NalObservedHevcConfigParser, NalObservedHevcConfiguration,
-};
+mod nal_receiver_config;
 
 // Compact configuration inspection and retained exports.
 pub use avc_config::{
@@ -195,10 +188,6 @@ pub use avc_config::{
 pub use hevc_config::{
     HvcConfigArrayRef, HvcConfigNalRef, HvcConfigViewParser, HvcConfigurationView,
     RetainedHvcConfigArray, RetainedHvcConfigNal,
-};
-pub use nal_observed_config::{
-    NalObservedAvcConfigViewParser, NalObservedAvcConfigurationView,
-    NalObservedHevcConfigViewParser, NalObservedHevcConfigurationView,
 };
 
 pub use raw_annex_b::{RawAccessUnit, RawAnnexBLimits, RawAnnexBReader};

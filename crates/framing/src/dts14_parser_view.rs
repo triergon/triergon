@@ -1,23 +1,26 @@
 //! Separately named observed parser-position view, never physical source facts.
-//! Pinned default-flags D32 public parser operation; no FF implementation used.
+//! Default-flags public parser operation of the reference named on
+//! [`crate::reference_trace::dts`]; no FF implementation used.
 //! The explicit-flush hint is an observed signed parser hint, not a source end,
 //! syntax validation, a generated timestamp, or a generic DTS/FFmpeg promise.
 use crate::{Dts14CarrierBoundary, Dts14CarrierPacket};
 use triergon_core::{Error, Result};
-pub const DTS14_D32_POSITION_PROFILE: &str = "d32b387-default-raw14-parser-positions-v1";
+/// Identifies this parser-position model. The value is stable and does not follow
+/// the item's name.
+pub const PARSER_HINT_PROFILE: &str = "d32b387-default-raw14-parser-positions-v1";
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum Dts14ParserHintOrigin {
+pub enum ParserHintOrigin {
     FollowingSync,
     ExplicitFlushLookbehind,
 }
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub struct Dts14D32ParserHints {
+pub struct ParserHints {
     pub frame_offset: i64,
     pub consumed_offset: i64,
     pub opaque_next_offset: i64,
-    pub origin: Dts14ParserHintOrigin,
+    pub origin: ParserHintOrigin,
 }
-impl Dts14D32ParserHints {
+impl ParserHints {
     /// Explicit opt-in to this observed operation. The source packet's physical
     /// identity/range/boundary remain unchanged. No validated-scope token exists.
     /// Fresh native context at source0 and contiguous default-flags input windows
@@ -43,14 +46,14 @@ impl Dts14D32ParserHints {
                 (
                     end.max(p.last_window_start),
                     i64::try_from(end).map_err(|_| Error::Overflow)?,
-                    Dts14ParserHintOrigin::FollowingSync,
+                    ParserHintOrigin::FollowingSync,
                 )
             }
             Dts14CarrierBoundary::ExplicitSourceEnd => {
                 if p.consumed_through != end {
                     return Err(Error::Invalid("DTS parser hint explicit-flush evidence"));
                 }
-                // Observed opaque D32 EOF hint; varying-geometry probes are mandatory. Signed:
+                // Observed opaque reference EOF hint; varying-geometry probes are mandatory. Signed:
                 // small sources produce negative values. Never a SourceLocation.
                 (
                     end,
@@ -58,7 +61,7 @@ impl Dts14D32ParserHints {
                         .map_err(|_| Error::Overflow)?
                         .checked_sub(100)
                         .ok_or(Error::Overflow)?,
-                    Dts14ParserHintOrigin::ExplicitFlushLookbehind,
+                    ParserHintOrigin::ExplicitFlushLookbehind,
                 )
             }
         };

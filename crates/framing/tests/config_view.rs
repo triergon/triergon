@@ -5,6 +5,7 @@
 use std::ops::Range;
 use std::sync::atomic::AtomicBool;
 use triergon_core::{Budget, BudgetVec, Bytes, Error, SourceId, WorkBudget};
+use triergon_framing::compat::nal::*;
 use triergon_framing::*;
 use triergon_harness_protocol::unhex;
 
@@ -38,10 +39,10 @@ drive!(
     AvcConfigViewParser => AvcConfigurationView,
     HvcConfigParser => HvcConfiguration,
     HvcConfigViewParser => HvcConfigurationView,
-    NalObservedAvcConfigParser => NalObservedAvcConfiguration,
-    NalObservedAvcConfigViewParser => NalObservedAvcConfigurationView,
-    NalObservedHevcConfigParser => NalObservedHevcConfiguration,
-    NalObservedHevcConfigViewParser => NalObservedHevcConfigurationView,
+    ReceiverAvcConfigParser => ReceiverAvcConfiguration,
+    ReceiverAvcConfigViewParser => ReceiverAvcConfigurationView,
+    ReceiverHevcConfigParser => ReceiverHevcConfiguration,
+    ReceiverHevcConfigViewParser => ReceiverHevcConfigurationView,
 );
 
 static NO: AtomicBool = AtomicBool::new(false);
@@ -1446,9 +1447,9 @@ fn g11_strict_and_observed_views_keep_distinct_typed_refusals() {
     // Explicit observed views accept the same bytes with the refusal attached.
     for quantum in [1, 7, 4096] {
         let mut eager =
-            NalObservedAvcConfigParser::new(&pool, avc_source(), bytes(&pool, &avc3), avc_limits())
+            ReceiverAvcConfigParser::new(&pool, avc_source(), bytes(&pool, &avc3), avc_limits())
                 .unwrap();
-        let mut view = NalObservedAvcConfigViewParser::new(
+        let mut view = ReceiverAvcConfigViewParser::new(
             &pool,
             avc_source(),
             bytes(&pool, &avc3),
@@ -1474,14 +1475,10 @@ fn g11_strict_and_observed_views_keep_distinct_typed_refusals() {
         assert_eq!(v.nal_count(), e.nals().len());
         assert_eq!(v.trailing_bytes(), [0xaa, 0xbb]);
 
-        let mut eager = NalObservedHevcConfigParser::new(
-            &pool,
-            hvc_source(),
-            bytes(&pool, &hvc3),
-            hvc_limits(),
-        )
-        .unwrap();
-        let mut view = NalObservedHevcConfigViewParser::new(
+        let mut eager =
+            ReceiverHevcConfigParser::new(&pool, hvc_source(), bytes(&pool, &hvc3), hvc_limits())
+                .unwrap();
+        let mut view = ReceiverHevcConfigViewParser::new(
             &pool,
             hvc_source(),
             bytes(&pool, &hvc3),
@@ -1512,20 +1509,24 @@ fn g11_strict_and_observed_views_keep_distinct_typed_refusals() {
     }
     assert_eq!(pool.used(), baseline);
 
-    // Short-update rejection receipts are identical, including refusals.
+    // Short-update rejections are identical, including refusals.
     let mut records: Vec<Vec<u8>> = (1..7).map(|n| avc3[..n].to_vec()).collect();
     records.extend((1..7).map(|n| avc_rich()[..n].to_vec()));
     records.push(vec![2, 66, 0, 10, 0xff]);
     records.push(avc_rich());
-    type Receipt = (Vec<u8>, AvcConfigSource, Error, Option<Error>, i32);
-    fn receipt(r: Option<NalAvcUpdateRejection>) -> Option<Receipt> {
+    type Rejected = (Vec<u8>, AvcConfigSource, Error, Option<Error>, Option<i32>);
+    fn rejected(r: Option<ReceiverAvcUpdateRejection>) -> Option<Rejected> {
         r.map(|r| {
+            #[cfg(feature = "reference-trace")]
+            let native = Some(r.native_receive_result());
+            #[cfg(not(feature = "reference-trace"))]
+            let native = None;
             (
                 r.source_bytes().to_vec(),
                 r.source(),
                 r.source_error(),
                 r.strict_source_refusal(),
-                r.native_receive_result(),
+                native,
             )
         })
     }
@@ -1533,14 +1534,14 @@ fn g11_strict_and_observed_views_keep_distinct_typed_refusals() {
         for update in [false, true] {
             let (mut eager, mut view) = if update {
                 (
-                    NalObservedAvcConfigParser::new_update(
+                    ReceiverAvcConfigParser::new_update(
                         &pool,
                         avc_source(),
                         bytes(&pool, &raw),
                         avc_limits(),
                     )
                     .unwrap(),
-                    NalObservedAvcConfigViewParser::new_update(
+                    ReceiverAvcConfigViewParser::new_update(
                         &pool,
                         avc_source(),
                         bytes(&pool, &raw),
@@ -1550,14 +1551,14 @@ fn g11_strict_and_observed_views_keep_distinct_typed_refusals() {
                 )
             } else {
                 (
-                    NalObservedAvcConfigParser::new(
+                    ReceiverAvcConfigParser::new(
                         &pool,
                         avc_source(),
                         bytes(&pool, &raw),
                         avc_limits(),
                     )
                     .unwrap(),
-                    NalObservedAvcConfigViewParser::new(
+                    ReceiverAvcConfigViewParser::new(
                         &pool,
                         avc_source(),
                         bytes(&pool, &raw),
@@ -1572,11 +1573,11 @@ fn g11_strict_and_observed_views_keep_distinct_typed_refusals() {
             let (vt, v) = run(&mut view, 1);
             assert_eq!(et, vt);
             assert_eq!(e.err(), v.err());
-            let er = receipt(eager.take_update_rejection());
-            let vr = receipt(view.take_update_rejection());
+            let er = rejected(eager.take_update_rejection());
+            let vr = rejected(view.take_update_rejection());
             assert_eq!(er, vr, "{raw:?} update{update}");
             assert_eq!(er.is_some(), update && raw.len() < 7 && raw[0] == 1);
-            // A receipt is produced at most once.
+            // A rejection is produced at most once.
             assert!(view.take_update_rejection().is_none());
         }
     }

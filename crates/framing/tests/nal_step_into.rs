@@ -1,6 +1,7 @@
 #![forbid(unsafe_code)]
 use std::sync::atomic::{AtomicBool, Ordering};
 use triergon_core::{Budget, Bytes, Error, SourceId, SourceLocation, WorkBudget};
+use triergon_framing::compat::nal::*;
 use triergon_framing::*;
 
 fn limits() -> NalPacketLimits {
@@ -43,7 +44,7 @@ fn configuration(pool: &Budget, framed: bool) -> NalPacketConfiguration {
             raw: Bytes::copy_from_slice(pool, &[]).unwrap(),
         };
     }
-    let mut parser = NalObservedAvcConfigParser::new(
+    let mut parser = ReceiverAvcConfigParser::new(
         pool,
         AvcConfigSource {
             source: SourceId(11),
@@ -63,7 +64,7 @@ fn configuration(pool: &Budget, framed: bool) -> NalPacketConfiguration {
             .step(&mut WorkBudget::new(4096), &AtomicBool::new(false))
             .unwrap()
         {
-            BuildStep::Ready(value) => return NalPacketConfiguration::ObservedAvc(value),
+            BuildStep::Ready(value) => return NalPacketConfiguration::ReceiverAvc(value),
             BuildStep::Yield => (),
             BuildStep::Complete => panic!("missing configuration"),
         }
@@ -101,7 +102,7 @@ fn trace(framed: bool, raw: &[u8], plan: &[u64], direct: bool) -> Vec<String> {
         .map_err(|e| e.error())
         .unwrap();
     let mut job = session
-        .packet_observed(input(owner.slice(32..32 + raw.len()).unwrap()), None)
+        .receiver_packet(input(owner.slice(32..32 + raw.len()).unwrap()), None)
         .unwrap();
     let cancel = AtomicBool::new(false);
     let mut ready = None;
@@ -206,7 +207,7 @@ fn direct_and_compatibility_paths_keep_literal_work_owner_and_failure_traces() {
 fn passthrough_output(pool: &Budget) -> NalPacketOutput {
     let mut session = NalPacketSession::new(pool, configuration(pool, false), limits()).unwrap();
     let mut job = session
-        .packet_observed(input(Bytes::copy_from_slice(pool, &[0x65]).unwrap()), None)
+        .receiver_packet(input(Bytes::copy_from_slice(pool, &[0x65]).unwrap()), None)
         .unwrap();
     let mut ready = None;
     assert_eq!(
@@ -227,7 +228,7 @@ fn occupied_sink_is_preserved_without_work_job_or_cancel_side_effects() {
     let owner = ready.as_ref().unwrap().bytes().clone();
     let mut session = NalPacketSession::new(&pool, configuration(&pool, false), limits()).unwrap();
     let mut job = session
-        .packet_observed(
+        .receiver_packet(
             input(Bytes::copy_from_slice(&pool, &[0x61, 9]).unwrap()),
             None,
         )
@@ -258,7 +259,7 @@ fn zero_work_never_publishes_and_cancellation_is_sticky() {
     let pool = Budget::new(16384).unwrap();
     let mut session = NalPacketSession::new(&pool, configuration(&pool, true), limits()).unwrap();
     let mut job = session
-        .packet_observed(
+        .receiver_packet(
             input(Bytes::copy_from_slice(&pool, &[0, 0, 0, 1, 0x61]).unwrap()),
             None,
         )
@@ -293,7 +294,7 @@ fn recoverable_pressure_keeps_sink_empty_and_retry_keeps_all_source_facts() {
     let baseline = pool.used();
     let mut session = NalPacketSession::new(&pool, configuration(&pool, true), limits()).unwrap();
     let mut job = session
-        .packet_observed(
+        .receiver_packet(
             input(Bytes::copy_from_slice(&pool, &[0, 0, 0, 1, 0x61]).unwrap()),
             None,
         )
@@ -350,7 +351,7 @@ fn non_copy_caller_metadata_moves_once_and_outlives_the_job_and_session() {
         new_extradata: source.new_extradata,
     };
     let mut session = NalPacketSession::new(&pool, configuration(&pool, false), limits()).unwrap();
-    let mut job = session.packet_observed(packet, None).unwrap();
+    let mut job = session.receiver_packet(packet, None).unwrap();
     let mut ready = None;
     assert_eq!(
         job.step_into(

@@ -1,6 +1,7 @@
 #![forbid(unsafe_code)]
 use std::sync::atomic::{AtomicBool, Ordering};
 use triergon_core::{Budget, Bytes, Error, SourceId, SourceLocation, WorkBudget};
+use triergon_framing::compat::nal::*;
 use triergon_framing::*;
 
 fn configuration(pool: &Budget, codec: Codec, width: u8) -> NalPacketConfiguration {
@@ -8,7 +9,7 @@ fn configuration(pool: &Budget, codec: Codec, width: u8) -> NalPacketConfigurati
     match codec {
         Codec::Avc => {
             let raw = [1, 66, 0, 10, 0xfc | (width - 1), 224, 0];
-            let mut parser = NalObservedAvcConfigParser::new(
+            let mut parser = ReceiverAvcConfigParser::new(
                 pool,
                 AvcConfigSource {
                     source: SourceId(11),
@@ -27,7 +28,7 @@ fn configuration(pool: &Budget, codec: Codec, width: u8) -> NalPacketConfigurati
                 if let BuildStep::Ready(value) =
                     parser.step(&mut WorkBudget::new(4096), &cancel).unwrap()
                 {
-                    return NalPacketConfiguration::ObservedAvc(value);
+                    return NalPacketConfiguration::ReceiverAvc(value);
                 }
             }
         }
@@ -57,7 +58,7 @@ fn configuration(pool: &Budget, codec: Codec, width: u8) -> NalPacketConfigurati
                 0x0c | (width - 1),
                 0,
             ];
-            let mut parser = NalObservedHevcConfigParser::new(
+            let mut parser = ReceiverHevcConfigParser::new(
                 pool,
                 HvcConfigSource {
                     source: SourceId(11),
@@ -77,7 +78,7 @@ fn configuration(pool: &Budget, codec: Codec, width: u8) -> NalPacketConfigurati
                 if let BuildStep::Ready(value) =
                     parser.step(&mut WorkBudget::new(4096), &cancel).unwrap()
                 {
-                    return NalPacketConfiguration::ObservedHevc(value);
+                    return NalPacketConfiguration::ReceiverHevc(value);
                 }
             }
         }
@@ -136,7 +137,7 @@ fn trace(codec: Codec, width: u8, raw: &[u8], plan: &[u64]) {
         NalPacketSession::new(&pool, configuration(&pool, codec, width), limits()).unwrap();
     let input = source(&pool, raw);
     let fields = input.fields;
-    let mut job = session.packet_observed(input, None).unwrap();
+    let mut job = session.receiver_packet(input, None).unwrap();
     let mut events = Vec::new();
     let cancel = AtomicBool::new(false);
     let mut done = false;
@@ -165,11 +166,15 @@ fn trace(codec: Codec, width: u8, raw: &[u8], plan: &[u64]) {
                     assert_eq!(r.source().fields, fields);
                     assert_eq!(r.source().bytes.as_ref(), raw);
                     assert!(r.source().bytes.retained_capacity() >= 1024);
+                    #[cfg(feature = "reference-trace")]
+                    let native = r.native_receive_result();
+                    #[cfg(not(feature = "reference-trace"))]
+                    let native = "-";
                     format!(
                         "{:?}:{:?}:{}:{}:{:?}",
                         r.kind(),
                         r.source_error(),
-                        r.native_receive_result(),
+                        native,
                         r.receiver_epoch(),
                         r.packet_source_refusal()
                     )
@@ -253,7 +258,7 @@ fn missing_prefix_byte_spends_one_failed_read_token_after_zero_work_yield() {
         let mut session =
             NalPacketSession::new(&pool, configuration(&pool, codec, 4), limits()).unwrap();
         let mut job = session
-            .packet_observed(source(&pool, &[0, 0]), None)
+            .receiver_packet(source(&pool, &[0, 0]), None)
             .unwrap();
         for units in [2, 0] {
             let mut work = WorkBudget::new(units);
@@ -286,7 +291,7 @@ fn cancellation_between_partial_prefix_polls_precedes_more_input_or_work() {
         let mut session =
             NalPacketSession::new(&pool, configuration(&pool, codec, 4), limits()).unwrap();
         let mut job = session
-            .packet_observed(source(&pool, &[0, 0, 0, 3, 2, 1, 128]), None)
+            .receiver_packet(source(&pool, &[0, 0, 0, 3, 2, 1, 128]), None)
             .unwrap();
         let cancel = AtomicBool::new(false);
         let mut work = WorkBudget::new(2);
@@ -316,7 +321,7 @@ fn maximum_u32_prefix_preserves_end_overflow_and_failed_payload_priority() {
         let mut session =
             NalPacketSession::new(&pool, configuration(&pool, codec, 4), limits()).unwrap();
         let mut job = session
-            .packet_observed(source(&pool, &[255; 4]), None)
+            .receiver_packet(source(&pool, &[255; 4]), None)
             .unwrap();
         let mut prefix = WorkBudget::new(4);
         assert!(matches!(
@@ -379,7 +384,7 @@ fn every_one_and_two_byte_hevc_header_keeps_strict_and_observed_facts() {
                 let input = source(&pool, &bytes);
                 let fields = input.fields;
                 let mut job = if observed {
-                    session.packet_observed(input, None).unwrap()
+                    session.receiver_packet(input, None).unwrap()
                 } else {
                     session.packet(input, None).unwrap()
                 };
@@ -446,7 +451,7 @@ fn hevc_first_refusal_and_strict_failure_precede_scan_for_both_orders() {
                         .unwrap();
                 let input = source(&pool, &bytes);
                 let mut job = if observed {
-                    session.packet_observed(input, None).unwrap()
+                    session.receiver_packet(input, None).unwrap()
                 } else {
                     session.packet(input, None).unwrap()
                 };

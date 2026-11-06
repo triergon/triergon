@@ -748,21 +748,26 @@ fn check_simd(root: &Path) -> Task {
     )
 }
 
+/// Crates whose comparison-only projections sit behind the `reference-trace` feature.
+const REFERENCE_TRACE_CRATES: [&str; 2] = ["triergon-framing", "triergon-mpegts"];
+
 fn check(root: &Path) -> Task {
     cargo(root, None, &["fmt", "--all", "--check"])?;
     cargo(root, None, &["test", "--workspace", "--locked"])?;
-    cargo(
-        root,
-        None,
-        &[
-            "test",
-            "-p",
-            "triergon-mpegts",
-            "--features",
-            "reference-trace",
-            "--locked",
-        ],
-    )?;
+    for package in REFERENCE_TRACE_CRATES {
+        cargo(
+            root,
+            None,
+            &[
+                "test",
+                "-p",
+                package,
+                "--features",
+                "reference-trace",
+                "--locked",
+            ],
+        )?;
+    }
     cargo(
         root,
         None,
@@ -791,22 +796,37 @@ fn check(root: &Path) -> Task {
         None,
         &["build", "--workspace", "--release", "--locked"],
     )?;
-    cargo(
-        root,
-        None,
-        &[
-            "clippy",
-            "-p",
-            "triergon-mpegts",
-            "--features",
-            "reference-trace",
-            "--all-targets",
-            "--locked",
-            "--",
-            "-D",
-            "warnings",
-        ],
-    )?;
+    for package in REFERENCE_TRACE_CRATES {
+        cargo(
+            root,
+            None,
+            &[
+                "clippy",
+                "-p",
+                package,
+                "--features",
+                "reference-trace",
+                "--all-targets",
+                "--locked",
+                "--",
+                "-D",
+                "warnings",
+            ],
+        )?;
+        run(Command::new("cargo")
+            .args([
+                "doc",
+                "-p",
+                package,
+                "--features",
+                "reference-trace",
+                "--no-deps",
+                "--locked",
+            ])
+            .env("CARGO_INCREMENTAL", "0")
+            .env("RUSTDOCFLAGS", "-D warnings")
+            .current_dir(root))?;
+    }
     check_simd(root)?;
     println!("$ cargo xtask worker-tests");
     worker_tests::run(root, None)?;

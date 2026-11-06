@@ -1,15 +1,15 @@
 //! Operation guards.
 use std::sync::atomic::{AtomicBool, Ordering};
 use triergon_core::{Budget, Bytes, Error, InputWindow, SourceCapabilities, SourceId, WorkBudget};
-use triergon_framing::{
-    Dts14CarrierLimits, Dts14SyncLimits, DtsD32ClockDisposition, DtsFactAssociationJob,
-    DtsOperation, DtsOperationEvent, DtsOperationLane, DtsOperationLimits, DtsOperationStep,
-    DtsOperationTerminal, DtsWordOrder,
+use triergon_framing::reference_trace::dts::{
+    FactAssociationJob, ParserClockDisposition, ParserOperation, ParserOperationEvent,
+    ParserOperationLane, ParserOperationLimits, ParserOperationStep, ParserOperationTerminal,
 };
+use triergon_framing::{Dts14CarrierLimits, Dts14SyncLimits, DtsWordOrder};
 
 const VARIABLE: &[u8] = include_bytes!("../fixtures/dts-native-v1/variable-big.bin");
-fn limits() -> DtsOperationLimits {
-    DtsOperationLimits {
+fn limits() -> ParserOperationLimits {
+    ParserOperationLimits {
         source: Dts14SyncLimits {
             maximum_physical_frame_bytes: 8192,
             maximum_canonical_frame_bytes: 7168,
@@ -23,8 +23,8 @@ fn limits() -> DtsOperationLimits {
         },
     }
 }
-fn new(pool: &Budget) -> DtsOperation {
-    DtsOperation::new(
+fn new(pool: &Budget) -> ParserOperation {
+    ParserOperation::new(
         pool,
         SourceId(35248),
         SourceCapabilities {
@@ -41,7 +41,7 @@ fn collect(
     bytes: &[u8],
     chunk: usize,
     quantum: u64,
-) -> (Vec<DtsOperationEvent>, DtsOperation) {
+) -> (Vec<ParserOperationEvent>, ParserOperation) {
     let mut job = new(pool);
     let mut events = Vec::new();
     for _ in 0..1_000_000 {
@@ -49,8 +49,8 @@ fn collect(
             .step(&mut WorkBudget::new(quantum), &AtomicBool::new(false))
             .unwrap()
         {
-            DtsOperationStep::Yield => {}
-            DtsOperationStep::NeedInput { lane, request } => {
+            ParserOperationStep::Yield => {}
+            ParserOperationStep::NeedInput { lane, request } => {
                 let at = request.offset as usize;
                 assert!(at <= bytes.len());
                 if at == bytes.len() {
@@ -67,11 +67,11 @@ fn collect(
                     job.provide(lane, &window).unwrap();
                 }
             }
-            DtsOperationStep::Event => events.push(job.take_event().unwrap()),
-            DtsOperationStep::End { source, parser } => {
+            ParserOperationStep::Event => events.push(job.take_event().unwrap()),
+            ParserOperationStep::End { source, parser } => {
                 assert_eq!(
                     source,
-                    DtsOperationTerminal::End(triergon_core::SourceLocation {
+                    ParserOperationTerminal::End(triergon_core::SourceLocation {
                         source: SourceId(35248),
                         offset: bytes.len() as u64
                     })
@@ -93,7 +93,7 @@ fn full_source_facts_are_not_discarded_when_native_packet_is_opaque() {
             let frames: Vec<_> = events
                 .iter()
                 .filter_map(|e| {
-                    if let DtsOperationEvent::SourceFrame(f) = e {
+                    if let ParserOperationEvent::SourceFrame(f) = e {
                         Some(f)
                     } else {
                         None
@@ -103,7 +103,7 @@ fn full_source_facts_are_not_discarded_when_native_packet_is_opaque() {
             let packets: Vec<_> = events
                 .iter()
                 .filter_map(|e| {
-                    if let DtsOperationEvent::ParserPacket(p) = e {
+                    if let ParserOperationEvent::ParserPacket(p) = e {
                         Some(p)
                     } else {
                         None
@@ -139,22 +139,22 @@ fn full_source_facts_are_not_discarded_when_native_packet_is_opaque() {
 fn zero_work_has_no_request_progress_or_allocation() {
     let pool = Budget::new(2_000_000).unwrap();
     let mut job = new(&pool);
-    let a = job.request(DtsOperationLane::Source).unwrap();
-    let b = job.request(DtsOperationLane::ParserProjection).unwrap();
+    let a = job.request(ParserOperationLane::Source).unwrap();
+    let b = job.request(ParserOperationLane::ParserProjection).unwrap();
     let used = pool.used();
     for _ in 0..8 {
         assert!(matches!(
             job.step(&mut WorkBudget::new(0), &AtomicBool::new(false))
                 .unwrap(),
-            DtsOperationStep::Yield
+            ParserOperationStep::Yield
         ));
     }
     assert_eq!(
-        job.request(DtsOperationLane::Source).unwrap().offset,
+        job.request(ParserOperationLane::Source).unwrap().offset,
         a.offset
     );
     assert_eq!(
-        job.request(DtsOperationLane::ParserProjection)
+        job.request(ParserOperationLane::ParserProjection)
             .unwrap()
             .token,
         b.token
@@ -166,7 +166,10 @@ fn zero_work_has_no_request_progress_or_allocation() {
 fn cancel_drops_both_admitted_windows_and_is_sticky() {
     let pool = Budget::new(2_000_000).unwrap();
     let mut job = new(&pool);
-    for lane in [DtsOperationLane::Source, DtsOperationLane::ParserProjection] {
+    for lane in [
+        ParserOperationLane::Source,
+        ParserOperationLane::ParserProjection,
+    ] {
         let q = job.request(lane).unwrap();
         let bytes = Bytes::copy_from_slice(&pool, &VARIABLE[..31]).unwrap();
         job.provide(
@@ -193,7 +196,7 @@ fn foreign_response_and_wrong_lane_token_do_not_mutate_requests() {
     let pool = Budget::new(2_000_000).unwrap();
     let foreign = Budget::new(1024).unwrap();
     let mut job = new(&pool);
-    let q = job.request(DtsOperationLane::Source).unwrap();
+    let q = job.request(ParserOperationLane::Source).unwrap();
     let bad = InputWindow::new(
         q.source,
         q.token.clone(),
@@ -202,7 +205,7 @@ fn foreign_response_and_wrong_lane_token_do_not_mutate_requests() {
     )
     .unwrap();
     assert_eq!(
-        job.provide(DtsOperationLane::Source, &bad),
+        job.provide(ParserOperationLane::Source, &bad),
         Err(Error::ForeignPool)
     );
     let wrong = InputWindow::new(
@@ -213,11 +216,11 @@ fn foreign_response_and_wrong_lane_token_do_not_mutate_requests() {
     )
     .unwrap();
     assert!(
-        job.provide(DtsOperationLane::ParserProjection, &wrong)
+        job.provide(ParserOperationLane::ParserProjection, &wrong)
             .is_err()
     );
     assert_eq!(
-        job.request(DtsOperationLane::Source).unwrap().token,
+        job.request(ParserOperationLane::Source).unwrap().token,
         q.token
     );
 }
@@ -229,7 +232,7 @@ fn every_source_frame_has_a_byte_proved_association_without_filling_native_heade
     let packet = events
         .iter()
         .find_map(|e| {
-            if let DtsOperationEvent::ParserPacket(p) = e {
+            if let ParserOperationEvent::ParserPacket(p) = e {
                 Some(p)
             } else {
                 None
@@ -237,13 +240,13 @@ fn every_source_frame_has_a_byte_proved_association_without_filling_native_heade
         })
         .unwrap();
     for frame in events.iter().filter_map(|e| {
-        if let DtsOperationEvent::SourceFrame(f) = e {
+        if let ParserOperationEvent::SourceFrame(f) = e {
             Some(f)
         } else {
             None
         }
     }) {
-        let mut proof = DtsFactAssociationJob::new(&pool, job.context(), frame, packet).unwrap();
+        let mut proof = FactAssociationJob::new(&pool, job.context(), frame, packet).unwrap();
         assert!(matches!(
             proof
                 .step(&mut WorkBudget::new(0), &AtomicBool::new(false))
@@ -266,12 +269,12 @@ fn every_source_frame_has_a_byte_proved_association_without_filling_native_heade
         );
         assert_eq!(association.packet_range(), 0..400);
         assert!(association.parser_packet().source_header().is_none());
-        let clock = association.parser_packet().native_clock().unwrap();
+        let clock = association.parser_packet().clock().unwrap();
         assert_eq!(
             (clock.duration, clock.codec_sample_rate, clock.profile),
             (0, 0, -99)
         );
-        assert_eq!(clock.disposition, DtsD32ClockDisposition::OpaqueOrShort);
+        assert_eq!(clock.disposition, ParserClockDisposition::OpaqueOrShort);
         drop(proof);
         assert_eq!(
             association.source_frame().physical_bytes().as_ref(),
@@ -289,7 +292,7 @@ fn association_rejects_cross_generation_and_foreign_pool() {
     let source = events
         .iter()
         .find_map(|e| {
-            if let DtsOperationEvent::SourceFrame(f) = e {
+            if let ParserOperationEvent::SourceFrame(f) = e {
                 Some(f)
             } else {
                 None
@@ -299,7 +302,7 @@ fn association_rejects_cross_generation_and_foreign_pool() {
     let packet = events
         .iter()
         .find_map(|e| {
-            if let DtsOperationEvent::ParserPacket(p) = e {
+            if let ParserOperationEvent::ParserPacket(p) = e {
                 Some(p)
             } else {
                 None
@@ -307,11 +310,11 @@ fn association_rejects_cross_generation_and_foreign_pool() {
         })
         .unwrap();
     assert!(matches!(
-        DtsFactAssociationJob::new(&other, job.context(), source, packet),
+        FactAssociationJob::new(&other, job.context(), source, packet),
         Err(Error::ForeignPool)
     ));
     assert!(matches!(
-        DtsFactAssociationJob::new(&pool, later.context(), source, packet),
+        FactAssociationJob::new(&pool, later.context(), source, packet),
         Err(Error::Invalid(_))
     ));
 }
@@ -323,7 +326,7 @@ fn association_cancellation_is_sticky_and_keeps_external_owners() {
     let source = events
         .iter()
         .find_map(|e| {
-            if let DtsOperationEvent::SourceFrame(f) = e {
+            if let ParserOperationEvent::SourceFrame(f) = e {
                 Some(f)
             } else {
                 None
@@ -333,7 +336,7 @@ fn association_cancellation_is_sticky_and_keeps_external_owners() {
     let packet = events
         .iter()
         .find_map(|e| {
-            if let DtsOperationEvent::ParserPacket(p) = e {
+            if let ParserOperationEvent::ParserPacket(p) = e {
                 Some(p)
             } else {
                 None
@@ -341,7 +344,7 @@ fn association_cancellation_is_sticky_and_keeps_external_owners() {
         })
         .unwrap();
     let baseline = pool.used();
-    let mut proof = DtsFactAssociationJob::new(&pool, job.context(), source, packet).unwrap();
+    let mut proof = FactAssociationJob::new(&pool, job.context(), source, packet).unwrap();
     let cancel = AtomicBool::new(true);
     assert!(matches!(
         proof.step(&mut WorkBudget::new(1), &cancel),
@@ -360,9 +363,9 @@ fn association_cancellation_is_sticky_and_keeps_external_owners() {
 fn transport_failure_never_flushes_the_other_lane_as_eof() {
     let pool = Budget::new(2_000_000).unwrap();
     let mut job = new(&pool);
-    let q = job.request(DtsOperationLane::Source).unwrap();
+    let q = job.request(ParserOperationLane::Source).unwrap();
     job.fail(
-        DtsOperationLane::Source,
+        ParserOperationLane::Source,
         q.source,
         q.token,
         triergon_core::SourceFailure::Transport,
@@ -372,14 +375,14 @@ fn transport_failure_never_flushes_the_other_lane_as_eof() {
         job.step(&mut WorkBudget::new(4096), &AtomicBool::new(false)),
         Err(Error::Transport)
     ));
-    assert!(job.request(DtsOperationLane::ParserProjection).is_err());
+    assert!(job.request(ParserOperationLane::ParserProjection).is_err());
     assert_eq!(pool.used(), Budget::control_storage_bytes());
 }
 
 #[test]
-fn known_length_is_not_an_explicit_eof_receipt() {
+fn known_length_is_not_an_explicit_eof() {
     let pool = Budget::new(2_000_000).unwrap();
-    let mut job = DtsOperation::new(
+    let mut job = ParserOperation::new(
         &pool,
         SourceId(35248),
         SourceCapabilities {
@@ -396,10 +399,10 @@ fn known_length_is_not_an_explicit_eof_receipt() {
             .step(&mut WorkBudget::new(4096), &AtomicBool::new(false))
             .unwrap()
         {
-            DtsOperationStep::NeedInput { lane, request } => {
+            ParserOperationStep::NeedInput { lane, request } => {
                 let at = request.offset as usize;
                 if at == VARIABLE.len() {
-                    waiting[usize::from(lane == DtsOperationLane::ParserProjection)] = true;
+                    waiting[usize::from(lane == ParserOperationLane::ParserProjection)] = true;
                     if waiting == [true, true] {
                         return;
                     }
@@ -418,11 +421,11 @@ fn known_length_is_not_an_explicit_eof_receipt() {
                     .unwrap();
                 }
             }
-            DtsOperationStep::Event => {
+            ParserOperationStep::Event => {
                 let _ = job.take_event().unwrap();
             }
-            DtsOperationStep::Yield => {}
-            DtsOperationStep::End { .. } => panic!("length silently completed a source"),
+            ParserOperationStep::Yield => {}
+            ParserOperationStep::End { .. } => panic!("length silently completed a source"),
         }
     }
     panic!("bounded source did not request explicit EOF on both views")
@@ -439,7 +442,7 @@ fn malformed_source_refusal_is_an_event_and_other_view_is_not_removed() {
             .step(&mut WorkBudget::new(7), &AtomicBool::new(false))
             .unwrap()
         {
-            DtsOperationStep::NeedInput { lane, request } => {
+            ParserOperationStep::NeedInput { lane, request } => {
                 if request.offset == 0 {
                     job.provide(
                         lane,
@@ -456,31 +459,31 @@ fn malformed_source_refusal_is_an_event_and_other_view_is_not_removed() {
                     job.finish(lane, request.source, request.token).unwrap();
                 }
             }
-            DtsOperationStep::Event => match job.take_event().unwrap() {
-                DtsOperationEvent::ViewRefusal {
-                    lane: DtsOperationLane::Source,
+            ParserOperationStep::Event => match job.take_event().unwrap() {
+                ParserOperationEvent::ViewRefusal {
+                    lane: ParserOperationLane::Source,
                     error: Error::Truncated,
                     ..
                 } => refused = true,
-                DtsOperationEvent::ParserPacket(p) => {
+                ParserOperationEvent::ParserPacket(p) => {
                     assert_eq!(p.source_bytes().as_ref(), b"bad");
                     opaque = true;
                 }
                 other => panic!("unexpected real event {other:?}"),
             },
-            DtsOperationStep::End {
+            ParserOperationStep::End {
                 source:
-                    DtsOperationTerminal::Refused {
+                    ParserOperationTerminal::Refused {
                         error: Error::Truncated,
                         ..
                     },
-                parser: DtsOperationTerminal::End(_),
+                parser: ParserOperationTerminal::End(_),
             } => {
                 assert!(refused && opaque);
                 return;
             }
-            DtsOperationStep::Yield => {}
-            other @ DtsOperationStep::End { .. } => {
+            ParserOperationStep::Yield => {}
+            other @ ParserOperationStep::End { .. } => {
                 panic!("unexpected real failure outcome {other:?}")
             }
         }
@@ -501,7 +504,7 @@ fn parser_clock_is_an_explicit_prefix_fact_not_source_completeness() {
                 .step(&mut WorkBudget::new(1), &AtomicBool::new(false))
                 .unwrap()
             {
-                DtsOperationStep::NeedInput { lane, request } => {
+                ParserOperationStep::NeedInput { lane, request } => {
                     let at = request.offset as usize;
                     if at == length {
                         job.finish(lane, request.source, request.token).unwrap();
@@ -520,13 +523,13 @@ fn parser_clock_is_an_explicit_prefix_fact_not_source_completeness() {
                         .unwrap();
                     }
                 }
-                DtsOperationStep::Event => {
-                    if let DtsOperationEvent::ParserPacket(p) = job.take_event().unwrap() {
-                        result = Some(p.native_clock().unwrap());
+                ParserOperationStep::Event => {
+                    if let ParserOperationEvent::ParserPacket(p) = job.take_event().unwrap() {
+                        result = Some(p.clock().unwrap());
                     }
                 }
-                DtsOperationStep::End { .. } => break,
-                DtsOperationStep::Yield => {}
+                ParserOperationStep::End { .. } => break,
+                ParserOperationStep::Yield => {}
             }
         }
         let clock = result.unwrap();
@@ -546,7 +549,7 @@ fn native_clock_and_source_window_are_distinct_and_owners_outlive_operation() {
     let packet = events
         .iter()
         .find_map(|e| {
-            if let DtsOperationEvent::ParserPacket(p) = e {
+            if let ParserOperationEvent::ParserPacket(p) = e {
                 Some(p)
             } else {
                 None
@@ -554,7 +557,7 @@ fn native_clock_and_source_window_are_distinct_and_owners_outlive_operation() {
         })
         .unwrap()
         .clone();
-    let clock = packet.native_clock().unwrap();
+    let clock = packet.clock().unwrap();
     assert_eq!(
         (clock.duration, clock.codec_sample_rate, clock.profile),
         (1024, 44100, 20)
@@ -562,7 +565,7 @@ fn native_clock_and_source_window_are_distinct_and_owners_outlive_operation() {
     drop(job);
     drop(events);
     assert_eq!(packet.source_bytes().len(), 4096);
-    assert_eq!(packet.native_clock().unwrap(), clock);
+    assert_eq!(packet.clock().unwrap(), clock);
     drop(packet);
     assert_eq!(pool.used(), Budget::control_storage_bytes());
 }
@@ -575,8 +578,8 @@ fn native_clock_latches_initial_rate_with_nearest_rounding_and_keeps_source_time
     let clocks: Vec<_> = events
         .iter()
         .filter_map(|e| {
-            if let DtsOperationEvent::ParserPacket(p) = e {
-                Some(p.native_clock().unwrap())
+            if let ParserOperationEvent::ParserPacket(p) = e {
+                Some(p.clock().unwrap())
             } else {
                 None
             }
@@ -592,7 +595,7 @@ fn native_clock_latches_initial_rate_with_nearest_rounding_and_keeps_source_time
     let facts: Vec<_> = events
         .iter()
         .filter_map(|e| {
-            if let DtsOperationEvent::SourceFrame(f) = e {
+            if let ParserOperationEvent::SourceFrame(f) = e {
                 Some(f.facts())
             } else {
                 None
@@ -625,24 +628,24 @@ fn a_later_clock_never_rewrites_the_first_source_or_projection() {
         let packets: Vec<_> = events
             .iter()
             .filter_map(|e| {
-                if let DtsOperationEvent::ParserPacket(p) = e {
+                if let ParserOperationEvent::ParserPacket(p) = e {
                     Some(p)
                 } else {
                     None
                 }
             })
             .collect();
-        let initial = packets[0].native_clock().unwrap();
+        let initial = packets[0].clock().unwrap();
         assert!(
             packets
                 .iter()
-                .all(|p| p.native_clock().unwrap().codec_sample_rate == initial.codec_sample_rate)
+                .all(|p| p.clock().unwrap().codec_sample_rate == initial.codec_sample_rate)
         );
         if packets.len() == 4 {
             assert_eq!(
                 packets
                     .iter()
-                    .map(|p| p.native_clock().unwrap().duration)
+                    .map(|p| p.clock().unwrap().duration)
                     .collect::<Vec<_>>(),
                 vec![256, 1115, 768, 256]
             );
@@ -650,13 +653,13 @@ fn a_later_clock_never_rewrites_the_first_source_or_projection() {
             assert_eq!(
                 (
                     initial.codec_sample_rate,
-                    packets[1].native_clock().unwrap().duration
+                    packets[1].clock().unwrap().duration
                 ),
                 (44100, 470)
             );
         }
         drop(job);
-        assert_eq!(packets[0].native_clock().unwrap(), initial);
+        assert_eq!(packets[0].clock().unwrap(), initial);
     }
 }
 
@@ -673,8 +676,8 @@ fn association_requires_literal_source_bytes_not_header_or_gold_agreement() {
             .step(&mut WorkBudget::new(4096), &AtomicBool::new(false))
             .unwrap()
         {
-            DtsOperationStep::NeedInput { lane, request } => {
-                let data = if lane == DtsOperationLane::Source {
+            ParserOperationStep::NeedInput { lane, request } => {
+                let data = if lane == ParserOperationLane::Source {
                     VARIABLE
                 } else {
                     altered.as_slice()
@@ -697,17 +700,17 @@ fn association_requires_literal_source_bytes_not_header_or_gold_agreement() {
                     .unwrap();
                 }
             }
-            DtsOperationStep::Event => match op.take_event().unwrap() {
-                DtsOperationEvent::SourceFrame(f) => frames.push(f),
-                DtsOperationEvent::ParserPacket(p) => packets.push(p),
-                DtsOperationEvent::ViewRefusal { .. } => {}
+            ParserOperationStep::Event => match op.take_event().unwrap() {
+                ParserOperationEvent::SourceFrame(f) => frames.push(f),
+                ParserOperationEvent::ParserPacket(p) => packets.push(p),
+                ParserOperationEvent::ViewRefusal { .. } => {}
             },
-            DtsOperationStep::End { .. } => break,
-            DtsOperationStep::Yield => {}
+            ParserOperationStep::End { .. } => break,
+            ParserOperationStep::Yield => {}
         }
     }
     let mut association =
-        DtsFactAssociationJob::new(&pool, op.context(), &frames[0], &packets[0]).unwrap();
+        FactAssociationJob::new(&pool, op.context(), &frames[0], &packets[0]).unwrap();
     assert!(matches!(
         association.step(&mut WorkBudget::new(4096), &AtomicBool::new(false)),
         Err(Error::Invalid("DTS associated source bytes differ"))
@@ -722,14 +725,14 @@ fn association_requires_literal_source_bytes_not_header_or_gold_agreement() {
     );
 }
 
-fn reach_ready(pool: &Budget, op: &mut DtsOperation) {
+fn reach_ready(pool: &Budget, op: &mut ParserOperation) {
     for _ in 0..100_000 {
         match op
             .step(&mut WorkBudget::new(4096), &AtomicBool::new(false))
             .unwrap()
         {
-            DtsOperationStep::Event => return,
-            DtsOperationStep::NeedInput { lane, request } => {
+            ParserOperationStep::Event => return,
+            ParserOperationStep::NeedInput { lane, request } => {
                 let at = request.offset as usize;
                 if at == VARIABLE.len() {
                     op.finish(lane, request.source, request.token).unwrap();
@@ -748,8 +751,8 @@ fn reach_ready(pool: &Budget, op: &mut DtsOperation) {
                     .unwrap();
                 }
             }
-            DtsOperationStep::Yield => {}
-            other @ DtsOperationStep::End { .. } => {
+            ParserOperationStep::Yield => {}
+            other @ ParserOperationStep::End { .. } => {
                 panic!("unexpected readiness outcome {other:?}")
             }
         }
@@ -768,23 +771,23 @@ fn ready_slot_repeated_poll_is_idempotent_without_work_or_allocation() {
     reach_ready(&pool, &mut op);
     let before = pool.used();
     let context = op.context();
-    let a = op.request(DtsOperationLane::Source).unwrap();
-    let b = op.request(DtsOperationLane::ParserProjection).unwrap();
+    let a = op.request(ParserOperationLane::Source).unwrap();
+    let b = op.request(ParserOperationLane::ParserProjection).unwrap();
     for quantum in [0, 1, 4096, 0] {
         let mut work = WorkBudget::new(quantum);
         assert!(matches!(
             op.step(&mut work, &AtomicBool::new(false)).unwrap(),
-            DtsOperationStep::Event
+            ParserOperationStep::Event
         ));
         assert_eq!(work.remaining(), quantum);
         assert_eq!(pool.used(), before);
         assert_eq!(op.context(), context);
         assert_eq!(
-            op.request(DtsOperationLane::Source).unwrap().offset,
+            op.request(ParserOperationLane::Source).unwrap().offset,
             a.offset
         );
         assert_eq!(
-            op.request(DtsOperationLane::ParserProjection)
+            op.request(ParserOperationLane::ParserProjection)
                 .unwrap()
                 .token,
             b.token
@@ -796,7 +799,7 @@ fn ready_slot_repeated_poll_is_idempotent_without_work_or_allocation() {
         Err(Error::Invalid("DTS event slot empty"))
     ));
     drop(op);
-    if let DtsOperationEvent::SourceFrame(f) = event {
+    if let ParserOperationEvent::SourceFrame(f) = event {
         assert_eq!(f.physical_bytes().as_ref(), &VARIABLE[..112]);
     } else {
         panic!("first complete Source frame must remain owned");

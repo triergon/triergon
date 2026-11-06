@@ -73,8 +73,25 @@ All readers follow the same semantic rules, and the harness checks them:
 FFmpeg is the behavioural reference. Where the specification leaves room and
 consumers depend on FFmpeg's choice (malformed-MOV recovery, edit-list clocks,
 transport-stream PES completion, subtitle timing), the format crates implement that
-choice deliberately and document it. Comparison-only projections used by the harness
-are not part of the consumer API.
+choice deliberately and document it. A crate keeps three kinds of API apart:
+
+- **Specification behaviour** lives at the crate root.
+- **Compatibility policies** reproduce FFmpeg where a consumer may choose its
+  result. They live in `compat::<family>` (for example
+  `triergon_framing::compat::nal`) and are named for what they do. A version, revision or
+  history marker (a revision hash, `Pinned…`, `…V1`) is never part of an
+  identifier: each family's module documentation names the FFmpeg revision it
+  reproduces, once.
+- **Comparison-only projections** are anything a consumer cannot use outside a
+  comparison with FFmpeg, such as FFmpeg return codes, parser byte positions or a
+  whole parser model (`triergon_framing::reference_trace::dts`). They are compiled only with the crate's non-default
+  `reference-trace` feature: types under `reference_trace::<family>`, accessors on
+  other types behind `#[cfg(feature = "reference-trace")]`. Examples and tests that
+  use them declare `required-features = ["reference-trace"]` or gate the individual
+  assertion; workers enable the feature on their dependency.
+
+A rename keeps every value that reaches a trace (profile strings, error texts)
+unchanged, so worker traces stay byte-identical.
 
 ## Dispatch and errors
 
@@ -94,10 +111,10 @@ performance gates where it touches hot code.
 2. **Formats.** ISO BMFF and MPEG-TS implement `ContainerReader` and become
    `AnyReader` variants. Box walking and track classification move out of playback
    into the readers.
-3. **Reference compatibility.** Reference-compatible behaviour moves into named
-   `compat` policies. The MPEG-TS packet-completion projection sits behind the
-   non-default `reference-trace` feature; the remaining comparison projections
-   follow it.
+3. **Reference compatibility.** `triergon-framing` follows the convention in
+   [reference-compatible behaviour](#reference-compatible-behaviour). Matroska,
+   subtitles, MPEG-TS (whose packet-completion projection is already behind
+   `reference-trace`), ISO BMFF and playback move to it one crate at a time.
 4. **Codecs.** Codecs allocate through core budgets.
 5. **Composition.** Playback runs over `AnyReader`; HLS and codec bridges become
    separate crates.

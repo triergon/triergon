@@ -78,7 +78,7 @@ assert_eq!(decoder_input, [
 | hvcC | `HvcConfigParser`, `HvcConfigViewParser`, `inspect_hvc_config_prefix` | Version 1: 23-byte fixed prefix, all NAL arrays in order (unknown/duplicate/empty arrays kept) |
 | Sample to Annex-B | `AvcAnnexBJob`, `HevcAnnexBJob` | Four-byte start codes; prepends record SPS/PPS (VPS/SPS/PPS) before IDR/IRAP; zero-copy segments |
 | Record to Annex-B | `HvcAnnexBWriter`, `HvcDecoderConfigWriter`, `AnnexBWriter` | All hvcC NALs in order, or the decoder subset (types 32–34, 39, 40); single NAL with `00 00 00 01` |
-| FFmpeg-compatible BSF | `NalPacketSession`, `NalPacketConfigWriter`, `NalObserved*ConfigParser` | Stateful `h264_mp4toannexb`/`hevc_mp4toannexb` packet behaviour, including in-band parameter-set tracking and AVC `NEW_EXTRADATA` |
+| FFmpeg-compatible BSF | `NalPacketSession`, `NalPacketConfigWriter`, `compat::nal` | Stateful `h264_mp4toannexb`/`hevc_mp4toannexb` packet behaviour, including in-band parameter-set tracking and AVC `NEW_EXTRADATA` |
 | Other config inputs | `AnnexBConfigParser`, `DeclaredConfigParser`, `Configuration::declared_record` | Annex-B extradata framing; caller-declared array/NAL layouts; opaque record retention |
 | AV1 | `Av1ObuReader`, `Av1ConfigParser`, `Av1TemporalUnitJob` | Low-overhead or single-OBU framing with exact LEB128; av1C v1 fields and config OBUs; container sample to decoder temporal unit |
 | VP9 | `Vp9ConfigParser` | vpcC v1 fields (profile, level, bit depth, chroma, range, CICP) |
@@ -86,9 +86,18 @@ assert_eq!(decoder_input, [
 | ADTS | `inspect_aac_adts_header`, `AacAdtsParser`, `AacAdtsWriter`, `AacAdtsStreamReader`, `AacAdtsCarrierReader` | 56-bit header facts; single-block AAC-LC frames; ADTS wrapping of raw access units (`AacAdtsParameters::from_asc`); aligned ADTS streams |
 | AC-3 / E-AC-3 | `probe_ac3_header`, `Ac3FrameReader`, `Ac3ConfigParser`, `Eac3BsiParser` | Header facts (bsid 0–8, 11–16), aligned syncframe reader, dac3/dec3 records, complete E-AC-3 BSI |
 | DTS core | `probe_dts_core_header`, `DtsCoreFrameReader`, `DtsCorePacket`, `DtsHeaderInspector` | Normal core header (all fields, optional HCRC), FSIZE+1 frame acquisition, container-packet core extraction |
-| DTS packings | `Dts14BitUnpacker`, `DtsPackedPayloadJob`, `Dts14FrameReader`, `Dts14CarrierReader`, `DtsNormalSourceReader`, `DtsOperation` | 16-bit LE and 14-bit BE/LE word packings; experimental 14-bit stream acquisition and FFmpeg-parser comparison views |
+| DTS packings | `Dts14BitUnpacker`, `DtsPackedPayloadJob`, `Dts14FrameReader`, `Dts14CarrierReader`, `DtsNormalSourceReader` | 16-bit LE and 14-bit BE/LE word packings; experimental 14-bit stream acquisition |
+| DTS parser comparison | `reference_trace::dts::ParserOperation` (`reference-trace` feature) | Raw 14-bit source frames alongside the packets, clock and byte positions of FFmpeg's `dca` parser |
 
 ## Behaviour and limits
+
+**Reference compatibility.** The crate-root types follow the specifications.
+`compat::nal` reproduces FFmpeg where a consumer needs FFmpeg's result: it accepts
+configuration records as the `mp4toannexb` packet receiver does, and names the
+FFmpeg revision it reproduces. Comparison-only projections are compiled only with
+the non-default `reference-trace` feature: the reference's return codes, and under
+`reference_trace::dts` the packets, clock and byte positions of FFmpeg's `dca`
+parser over raw 14-bit DTS.
 
 **Input model.** Incremental readers own a core `InputCursor` and accept same-pool
 windows of any size with the exact token, source and offset. An empty window is
@@ -115,8 +124,8 @@ one unit always progresses and zero units consume nothing. Copies are at most
   check. Annex-B termination follows H.264 B.2 / H.265 B.3; the leading `zero_byte`
   rule is not enforced. `AnnexBWriter` never edits emulation prevention.
 - avcC/hvcC parsers refuse `lengthSizeMinusOne = 2` (three-byte lengths) and
-  unknown versions. The FFmpeg-compatible `NalObserved*` parsers accept them for
-  the packet session only.
+  unknown versions. The `compat::nal` receiver parsers accept them for the packet
+  session only.
 - `RawAnnexBReader` refuses data-partitioned, redundant-picture and extended AVC
   profiles. It adds no timestamps.
 - AV1: LEB128 up to 8 bytes and `u32::MAX`. `OneObu` needs an external length;
@@ -164,7 +173,8 @@ Verification:
   raw H.264/HEVC demuxers produce for the paired streams.
 - The `examples/` trace programs (`nal_packet_receiver_trace`,
   `dts-operation-trace`, `dts-source-observer`) emit JSON records that the
-  harness compares with FFmpeg's BSF and DCA parser output.
+  harness compares with FFmpeg's BSF and DCA parser output. The first two need
+  `--features reference-trace`.
 
 Per-module parity, runtime and memory results are in
 [docs/status.md](../../docs/status.md); the gates and harness are described in

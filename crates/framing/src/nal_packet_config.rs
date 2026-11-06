@@ -42,6 +42,9 @@ impl NalPacketConfigRejection {
     pub fn strict_source_refusal(&self) -> Option<Error> {
         self.source_refusal.error()
     }
+    /// The reference filter's `AVERROR_INVALIDDATA`, not an executed native call.
+    /// Comparison-only.
+    #[cfg(feature = "reference-trace")]
     pub fn native_initialize_result(&self) -> i32 {
         -1_094_995_529
     }

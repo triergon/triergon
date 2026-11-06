@@ -2,6 +2,7 @@
 //! remain present.
 use std::sync::atomic::AtomicBool;
 use triergon_core::{Budget, BudgetVec, Bytes, Error, SourceId, SourceLocation, WorkBudget};
+use triergon_framing::compat::nal::*;
 use triergon_framing::*;
 use triergon_harness_protocol::hex;
 fn error(e: Error, at: i64) {
@@ -45,7 +46,7 @@ fn avc(
     offset: u64,
     q: u64,
     update_at: Option<i64>,
-) -> Result<NalObservedAvcConfiguration, Error> {
+) -> Result<ReceiverAvcConfiguration, Error> {
     let source = AvcConfigSource {
         source: SourceId(1),
         generation: 1,
@@ -57,9 +58,9 @@ fn avc(
         maximum_nal_bytes: 65535,
     };
     let mut parser = if update_at.is_some() {
-        NalObservedAvcConfigParser::new_update(pool, source, b, limits)?
+        ReceiverAvcConfigParser::new_update(pool, source, b, limits)?
     } else {
-        NalObservedAvcConfigParser::new(pool, source, b, limits)?
+        ReceiverAvcConfigParser::new(pool, source, b, limits)?
     };
     for _ in 0..1_000_000 {
         match parser.step(&mut WorkBudget::new(q), &AtomicBool::new(false)) {
@@ -78,13 +79,8 @@ fn avc(
     }
     Err(Error::Invalid("config stalled"))
 }
-fn hevc(
-    pool: &Budget,
-    b: Bytes,
-    offset: u64,
-    q: u64,
-) -> Result<NalObservedHevcConfiguration, Error> {
-    let mut parser = NalObservedHevcConfigParser::new(
+fn hevc(pool: &Budget, b: Bytes, offset: u64, q: u64) -> Result<ReceiverHevcConfiguration, Error> {
+    let mut parser = ReceiverHevcConfigParser::new(
         pool,
         HvcConfigSource {
             source: SourceId(1),
@@ -145,10 +141,10 @@ fn main() -> Result<(), Error> {
     } else {
         match codec {
             Codec::Avc => {
-                avc(&pool, config.clone(), off, q, None).map(NalPacketConfiguration::ObservedAvc)
+                avc(&pool, config.clone(), off, q, None).map(NalPacketConfiguration::ReceiverAvc)
             }
             Codec::Hevc => {
-                hevc(&pool, config.clone(), off, q).map(NalPacketConfiguration::ObservedHevc)
+                hevc(&pool, config.clone(), off, q).map(NalPacketConfiguration::ReceiverHevc)
             }
         }
     };
@@ -282,7 +278,7 @@ fn main() -> Result<(), Error> {
             generation: 1,
             new_extradata: extra,
         };
-        let mut job = match session.packet_observed(packet, update) {
+        let mut job = match session.receiver_packet(packet, update) {
             Ok(v) => v,
             Err(e) => {
                 error(e, i as i64);

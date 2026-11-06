@@ -13,5 +13,22 @@ triergon-core = { path = "../core" }
 [dev-dependencies]
 triergon-harness-protocol = { path = "../harness-protocol" }
 
+[features]
+# Comparison-only projections the harness compares against the reference; not
+# shipped behaviour.
+reference-trace = []
+
+[[example]]
+name = "nal_packet_receiver_trace"
+required-features = ["reference-trace"]
+
+[[example]]
+name = "dts-operation-trace"
+required-features = ["reference-trace"]
+
+[[test]]
+name = "dts_operation"
+required-features = ["reference-trace"]
+
 [lints]
 workspace = true

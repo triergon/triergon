@@ -1,4 +1,5 @@
-//! Complete-packet, source-preserving projection of the pinned d32 public BSFs.
+//! Complete-packet, source-preserving projection of the reference public BSFs
+//! named on [`crate::compat::nal`].
 //! NAL bodies stay opaque; this does not establish access-unit/decoder validity.
 mod phases;
 
@@ -35,9 +36,9 @@ pub struct NalPacket<M = NalPacketFields> {
 pub enum NalPacketConfiguration {
     Avc(AvcConfiguration),
     Hevc(HvcConfiguration),
-    /// Explicit observed framing; any strict ISO refusal remains attached.
-    ObservedAvc(crate::NalObservedAvcConfiguration),
-    ObservedHevc(crate::NalObservedHevcConfiguration),
+    /// Receiver acceptance ([`crate::compat::nal`]); any strict ISO refusal remains attached.
+    ReceiverAvc(crate::compat::nal::ReceiverAvcConfiguration),
+    ReceiverHevc(crate::compat::nal::ReceiverHevcConfiguration),
     /// Explicit native passthrough mode. This is not Annex-B validation.
     Passthrough {
         codec: Codec,
@@ -49,15 +50,15 @@ impl NalPacketConfiguration {
         match self {
             Self::Avc(v) => v.source_bytes(),
             Self::Hevc(v) => v.source_bytes(),
-            Self::ObservedAvc(v) => v.source_bytes(),
-            Self::ObservedHevc(v) => v.source_bytes(),
+            Self::ReceiverAvc(v) => v.source_bytes(),
+            Self::ReceiverHevc(v) => v.source_bytes(),
             Self::Passthrough { raw, .. } => raw,
         }
     }
     pub fn codec(&self) -> Codec {
         match self {
-            Self::Avc(_) | Self::ObservedAvc(_) => Codec::Avc,
-            Self::Hevc(_) | Self::ObservedHevc(_) => Codec::Hevc,
+            Self::Avc(_) | Self::ReceiverAvc(_) => Codec::Avc,
+            Self::Hevc(_) | Self::ReceiverHevc(_) => Codec::Hevc,
             Self::Passthrough { codec, .. } => *codec,
         }
     }
@@ -66,10 +67,10 @@ impl NalPacketConfiguration {
     }
     pub(crate) fn compact_source_refusal(&self) -> NalConfigurationRefusal {
         match self {
-            Self::ObservedAvc(v) if v.fields().length_size_minus_one() == 2 => {
+            Self::ReceiverAvc(v) if v.fields().length_size_minus_one() == 2 => {
                 NalConfigurationRefusal::AvcWidthThree
             }
-            Self::ObservedHevc(v) if v.fields().length_size_minus_one() == 2 => {
+            Self::ReceiverHevc(v) if v.fields().length_size_minus_one() == 2 => {
                 NalConfigurationRefusal::HevcWidthThree
             }
             _ => NalConfigurationRefusal::None,
@@ -78,14 +79,14 @@ impl NalPacketConfiguration {
     pub(crate) fn avc_record(&self) -> Option<&AvcConfiguration> {
         match self {
             Self::Avc(v) => Some(v),
-            Self::ObservedAvc(v) => Some(v.record()),
+            Self::ReceiverAvc(v) => Some(v.record()),
             _ => None,
         }
     }
     pub(crate) fn hevc_record(&self) -> Option<&HvcConfiguration> {
         match self {
             Self::Hevc(v) => Some(v),
-            Self::ObservedHevc(v) => Some(v.record()),
+            Self::ReceiverHevc(v) => Some(v.record()),
             _ => None,
         }
     }
@@ -168,9 +169,9 @@ impl NalConfigurationRefusal {
 pub enum NalPacketViewConfiguration {
     Avc(crate::AvcConfigurationView),
     Hevc(crate::HvcConfigurationView),
-    /// Explicit observed framing; any strict ISO refusal remains attached.
-    ObservedAvc(crate::NalObservedAvcConfigurationView),
-    ObservedHevc(crate::NalObservedHevcConfigurationView),
+    /// Receiver acceptance ([`crate::compat::nal`]); any strict ISO refusal remains attached.
+    ReceiverAvc(crate::compat::nal::ReceiverAvcConfigurationView),
+    ReceiverHevc(crate::compat::nal::ReceiverHevcConfigurationView),
     /// Explicit native passthrough mode. This is not Annex-B validation.
     Passthrough {
         codec: Codec,
@@ -194,14 +195,14 @@ impl NalPacketViewConfiguration {
     fn avc_view(&self) -> Option<&crate::AvcConfigurationView> {
         match self {
             Self::Avc(v) => Some(v),
-            Self::ObservedAvc(v) => Some(v.view()),
+            Self::ReceiverAvc(v) => Some(v.view()),
             _ => None,
         }
     }
     fn hevc_view(&self) -> Option<&crate::HvcConfigurationView> {
         match self {
             Self::Hevc(v) => Some(v),
-            Self::ObservedHevc(v) => Some(v.view()),
+            Self::ReceiverHevc(v) => Some(v.view()),
             _ => None,
         }
     }
@@ -305,15 +306,15 @@ impl PacketConfig for NalPacketViewConfiguration {
         match self {
             Self::Avc(v) => v.source_bytes(),
             Self::Hevc(v) => v.source_bytes(),
-            Self::ObservedAvc(v) => v.source_bytes(),
-            Self::ObservedHevc(v) => v.source_bytes(),
+            Self::ReceiverAvc(v) => v.source_bytes(),
+            Self::ReceiverHevc(v) => v.source_bytes(),
             Self::Passthrough { raw, .. } => raw,
         }
     }
     fn codec_kind(&self) -> Codec {
         match self {
-            Self::Avc(_) | Self::ObservedAvc(_) => Codec::Avc,
-            Self::Hevc(_) | Self::ObservedHevc(_) => Codec::Hevc,
+            Self::Avc(_) | Self::ReceiverAvc(_) => Codec::Avc,
+            Self::Hevc(_) | Self::ReceiverHevc(_) => Codec::Hevc,
             Self::Passthrough { codec, .. } => *codec,
         }
     }
@@ -327,10 +328,10 @@ impl PacketConfig for NalPacketViewConfiguration {
     }
     fn refusal(&self) -> NalConfigurationRefusal {
         match self {
-            Self::ObservedAvc(v) if v.fields().length_size_minus_one() == 2 => {
+            Self::ReceiverAvc(v) if v.fields().length_size_minus_one() == 2 => {
                 NalConfigurationRefusal::AvcWidthThree
             }
-            Self::ObservedHevc(v) if v.fields().length_size_minus_one() == 2 => {
+            Self::ReceiverHevc(v) if v.fields().length_size_minus_one() == 2 => {
                 NalConfigurationRefusal::HevcWidthThree
             }
             _ => NalConfigurationRefusal::None,
@@ -459,15 +460,15 @@ impl NalPacketSession<NalPacketViewConfiguration> {
         Self::with_configuration(pool, configuration, limits)
     }
     /// Observed receiver view with compact descriptors; the packet job is the
-    /// same state engine as [`NalPacketSession::packet_observed_compact`].
-    pub fn packet_observed_view<M>(
+    /// same state engine as [`NalPacketSession::receiver_packet_compact`].
+    pub fn receiver_packet_view<M>(
         &mut self,
         source: NalPacket<M>,
-        update: Option<crate::NalObservedAvcConfigurationView>,
+        update: Option<crate::compat::nal::ReceiverAvcConfigurationView>,
     ) -> Result<NalPacketViewJob<'_, M>> {
         self.begin_packet(
             source,
-            update.map(NalPacketViewConfiguration::ObservedAvc),
+            update.map(NalPacketViewConfiguration::ReceiverAvc),
             true,
         )
         .map(|inner| NalPacketViewJob { inner })
@@ -523,16 +524,18 @@ impl NalPacketSession {
         self.begin_packet(source, avc_update.map(NalPacketConfiguration::Avc), false)
             .map(|inner| NalPacketJob { inner })
     }
-    /// Separately typed native-framing side-data view. The source record error
-    /// stays in the observed configuration and in every output/rejection.
-    pub fn packet_observed<M>(
+    /// Frames a packet with the receiver's acceptance ([`crate::compat::nal`]):
+    /// a NAL header the strict path refuses is framed and its refusal recorded.
+    /// The source record error stays in the receiver configuration and in every
+    /// output/rejection.
+    pub fn receiver_packet<M>(
         &mut self,
         source: NalPacket<M>,
-        update: Option<crate::NalObservedAvcConfiguration>,
+        update: Option<crate::compat::nal::ReceiverAvcConfiguration>,
     ) -> Result<NalPacketJob<'_, M>> {
         self.begin_packet(
             source,
-            update.map(NalPacketConfiguration::ObservedAvc),
+            update.map(NalPacketConfiguration::ReceiverAvc),
             true,
         )
         .map(|inner| NalPacketJob { inner })
@@ -550,14 +553,14 @@ impl NalPacketSession {
     }
     /// Observed receiver view with compact descriptors, preserving both source
     /// refusals and the independently retained raw configuration facts.
-    pub fn packet_observed_compact<M>(
+    pub fn receiver_packet_compact<M>(
         &mut self,
         source: NalPacket<M>,
-        update: Option<crate::NalObservedAvcConfiguration>,
+        update: Option<crate::compat::nal::ReceiverAvcConfiguration>,
     ) -> Result<NalPacketCompactJob<'_, M>> {
         self.begin_packet(
             source,
-            update.map(NalPacketConfiguration::ObservedAvc),
+            update.map(NalPacketConfiguration::ReceiverAvc),
             true,
         )
         .map(|inner| NalPacketCompactJob { inner })
@@ -777,7 +780,7 @@ struct PacketOutput<M, S> {
     forward_new_extradata: bool,
 }
 
-/// A physical complete-packet rejection observed at the pinned d32 receive
+/// A physical complete-packet rejection observed at the reference receive
 /// boundary. Resource, cancellation and strict fixed-header refusals are not
 /// codec errors and do not map to one of these kinds.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -808,7 +811,9 @@ impl<M> NalPacketRejection<M> {
     pub fn source_error(&self) -> Error {
         self.error
     }
-    /// Pinned public BSF AVERROR_INVALIDDATA, not an executed native call.
+    /// The reference filter's `AVERROR_INVALIDDATA`, not an executed native call.
+    /// Comparison-only.
+    #[cfg(feature = "reference-trace")]
     pub fn native_receive_result(&self) -> i32 {
         -1_094_995_529
     }
