@@ -1,5 +1,5 @@
 {
-  "schema": "safe-media.m03.authored-derived-discard-fixture.v1",
+  "schema": "triergon.isobmff.authored-derived-discard-fixture.v1",
   "qualification": false,
   "authorship": "Original lane synthetic generator; no external implementation copying or translation.",
   "source_path": ".research/parallel-mp4/implementation/selected-native-probes18/origin18-three-backward-then-absent.mp4",

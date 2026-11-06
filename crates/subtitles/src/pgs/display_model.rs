@@ -98,8 +98,8 @@ impl NativeMatrix {
     }
     pub fn identifier(self) -> &'static str {
         match self {
-            Self::Sd601 => "NativeD32-PGS-SD601-quantized10-v1",
-            Self::Hd709 => "NativeD32-PGS-HD709-quantized10-v1",
+            Self::Sd601 => "native-pgs-sd601-quantized10-v1",
+            Self::Hd709 => "native-pgs-hd709-quantized10-v1",
         }
     }
 

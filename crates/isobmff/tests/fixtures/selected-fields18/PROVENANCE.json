@@ -1,5 +1,5 @@
 {
-  "schema": "safe-media.m03.selected-fields-fixture-provenance.v1",
+  "schema": "triergon.isobmff.selected-fields-fixture-provenance.v1",
   "qualification": false,
   "source_proof": ".research/parallel-mp4/implementation/selected-fields-vectors18/source-proof.json",
   "source_proof_sha256": "f98c44b6b67349fdcbbe84d5576c30a9c0318d6242614a87ce208e65ac9d6e05",

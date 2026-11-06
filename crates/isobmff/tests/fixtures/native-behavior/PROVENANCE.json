@@ -1,5 +1,5 @@
 {
-  "schema": "safe-media.m03.native-behavior-regression-fixtures.v1",
+  "schema": "triergon.isobmff.native-behavior-regression-fixtures.v1",
   "qualification": false,
   "production_change": false,
   "Rust_tests_executed": false,

@@ -1,5 +1,5 @@
 {
-  "schema": "safe-media.isobmff.original-fixtures.v1",
+  "schema": "triergon.isobmff.original-fixtures.v1",
   "source": "independently authored under .research/parallel-mp4, not third-party media",
   "cases": [
     {
