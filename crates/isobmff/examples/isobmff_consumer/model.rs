@@ -221,27 +221,33 @@ fn children(raw: &BoxView, skip: usize, budget: &Budget) -> Result<BudgetVec<Box
         }
     }
 }
-fn optional(raw: &BoxView, kind: &[u8; 4], budget: &Budget) -> Result<Option<BoxView>> {
+fn optional(raw: &BoxView, kind: &[u8; 4]) -> Result<Option<BoxView>> {
+    let mut cursor = raw.children(0, Limits::default())?;
     let mut found = None;
-    for child in children(raw, 0, budget)?.as_slice() {
-        if child.header().kind == *kind {
-            if found.is_some() {
-                return Err(Error::Invalid("duplicate required child").into());
+    let mut duplicate = false;
+    loop {
+        match cursor.poll(&mut WorkBudget::new(4096))? {
+            BoxStep::Box(child) if child.header().kind == *kind => {
+                duplicate |= found.replace(child).is_some();
             }
-            found = Some(child.clone());
+            BoxStep::End => break,
+            BoxStep::Box(_) | BoxStep::Yield => {}
         }
+    }
+    if duplicate {
+        return Err(Error::Invalid("duplicate required child").into());
     }
     Ok(found)
 }
-fn child(raw: &BoxView, kind: &[u8; 4], budget: &Budget) -> Result<BoxView> {
-    optional(raw, kind, budget)?.ok_or(Failure::Core(Error::Invalid("missing required child")))
+fn child(raw: &BoxView, kind: &[u8; 4]) -> Result<BoxView> {
+    optional(raw, kind)?.ok_or(Failure::Core(Error::Invalid("missing required child")))
 }
-fn track_header(track: &BoxView, budget: &Budget) -> Result<(TrackHeader, BoxView)> {
-    let mdia = child(track, b"mdia", budget)?;
+fn track_header(track: &BoxView) -> Result<(TrackHeader, BoxView)> {
+    let mdia = child(track, b"mdia")?;
     let header = TrackHeader::parse(
-        &child(track, b"tkhd", budget)?,
-        &child(&mdia, b"mdhd", budget)?,
-        &child(&mdia, b"hdlr", budget)?,
+        &child(track, b"tkhd")?,
+        &child(&mdia, b"mdhd")?,
+        &child(&mdia, b"hdlr")?,
     )?;
     Ok((header, mdia))
 }
@@ -251,10 +257,10 @@ fn self_contained_table(
     quantum: u64,
     table_policy: SampleTablePolicy,
 ) -> Result<SampleTable> {
-    let minf = child(mdia, b"minf", budget)?;
+    let minf = child(mdia, b"minf")?;
     let refs = data_references(&minf, budget)?;
     let mut builder = SampleTableBuilder::with_policy(
-        child(&minf, b"stbl", budget)?,
+        child(&minf, b"stbl")?,
         budget.clone(),
         Limits::default(),
         table_policy,
@@ -266,7 +272,7 @@ fn self_contained_table(
 }
 
 fn data_references(minf: &BoxView, budget: &Budget) -> Result<BudgetVec<BoxView>> {
-    let dref = child(&child(minf, b"dinf", budget)?, b"dref", budget)?;
+    let dref = child(&child(minf, b"dinf")?, b"dref")?;
     if word(dref.payload(), 0)? != 0 {
         return Err(Error::Unsupported("data reference version/flags").into());
     }
@@ -311,7 +317,7 @@ fn index_fragments(
     if moofs.is_empty() {
         return Ok(indexes);
     }
-    let extends = child(movie, b"mvex", budget)?;
+    let extends = child(movie, b"mvex")?;
     let mut defaults = BudgetVec::new(budget);
     for raw in children(&extends, 0, budget)?.as_slice() {
         if raw.header().kind != *b"trex" {
@@ -333,12 +339,7 @@ fn index_fragments(
         .iter()
         .filter(|b| b.header().kind == *b"trak")
     {
-        let media = child(track, b"mdia", budget)?;
-        let header = TrackHeader::parse(
-            &child(track, b"tkhd", budget)?,
-            &child(&media, b"mdhd", budget)?,
-            &child(&media, b"hdlr", budget)?,
-        )?;
+        let (header, media) = track_header(track)?;
         if tracks.len() >= 64 {
             return Err(Error::Limit {
                 requested: tracks.len() + 1,
@@ -353,8 +354,8 @@ fn index_fragments(
         {
             return Err(Error::Invalid("duplicate fragment track ID").into());
         }
-        let stbl = child(&child(&media, b"minf", budget)?, b"stbl", budget)?;
-        let descriptions = word(child(&stbl, b"stsd", budget)?.payload(), 4)?;
+        let stbl = child(&child(&media, b"minf")?, b"stbl")?;
+        let descriptions = word(child(&stbl, b"stsd")?.payload(), 4)?;
         if descriptions > Limits::default().max_descriptions {
             return Err(Error::Limit {
                 requested: usize::try_from(descriptions).map_err(|_| Error::Overflow)?,
@@ -365,10 +366,7 @@ fn index_fragments(
         }
         // Both selected size layouts carry sample_count at payload offset8.
         // The real SampleTableBuilder below validates their full wire grammar.
-        let sizes = match (
-            optional(&stbl, b"stsz", budget)?,
-            optional(&stbl, b"stz2", budget)?,
-        ) {
+        let sizes = match (optional(&stbl, b"stsz")?, optional(&stbl, b"stz2")?) {
             (Some(_), Some(_)) => return Err(Error::Invalid("both stsz and stz2").into()),
             (Some(raw), None) | (None, Some(raw)) => raw,
             (None, None) => return Err(Error::Invalid("missing sample size table").into()),
@@ -391,7 +389,7 @@ fn index_fragments(
         )?;
     }
     for moof in moofs {
-        let mfhd = child(moof, b"mfhd", budget)?;
+        let mfhd = child(moof, b"mfhd")?;
         if mfhd.payload().len() != 8 || word(mfhd.payload(), 0)? != 0 {
             return Err(Error::Unsupported("mfhd version/flags/layout").into());
         }
@@ -401,7 +399,7 @@ fn index_fragments(
             .iter()
             .filter(|b| b.header().kind == *b"traf")
         {
-            let tfhd = child(traf, b"tfhd", budget)?;
+            let tfhd = child(traf, b"tfhd")?;
             let id = word(tfhd.payload(), 4)?;
             let state = tracks
                 .as_mut_slice()
@@ -712,7 +710,7 @@ impl<'a> Driver<'a> {
 
     pub fn open_with_policy(&mut self, policy: OpenPolicy) -> Result<Model> {
         let scanned = self.scan(policy.media_data, None)?;
-        let movie = MovieHeader::parse(&child(&scanned.movie, b"mvhd", &self.budget)?)?;
+        let movie = MovieHeader::parse(&child(&scanned.movie, b"mvhd")?)?;
         let fragments = index_fragments(
             &scanned.movie,
             scanned.moofs.as_slice(),
@@ -725,7 +723,7 @@ impl<'a> Driver<'a> {
             .iter()
             .filter(|b| b.header().kind == *b"trak")
         {
-            let (header, mdia) = track_header(track, &self.budget)?;
+            let (header, mdia) = track_header(track)?;
             if records.len() >= 64 {
                 return Err(Error::Limit {
                     requested: records.len() + 1,
@@ -741,9 +739,9 @@ impl<'a> Driver<'a> {
                 return Err(Error::Invalid("duplicate track ID").into());
             }
             let table = self_contained_table(&mdia, &self.budget, self.quantum, policy.tables)?;
-            let edits = optional(track, b"edts", &self.budget)?
+            let edits = optional(track, b"edts")?
                 .map(|raw| {
-                    child(&raw, b"elst", &self.budget).and_then(|raw| {
+                    child(&raw, b"elst").and_then(|raw| {
                         EditList::parse(raw, Limits::default()).map_err(Failure::Core)
                     })
                 })
@@ -822,25 +820,25 @@ impl<'a> Driver<'a> {
         if tracks.next().is_some()
             || !scanned.moofs.is_empty()
             || scanned.media.len() != 1
-            || optional(track, b"edts", &self.budget)?.is_some()
+            || optional(track, b"edts")?.is_some()
         {
             return Err(
                 Error::Unsupported("regular recovery needs one unedited regular track").into(),
             );
         }
-        MovieHeader::parse(&child(&scanned.movie, b"mvhd", &self.budget)?)?;
-        let mdia = child(track, b"mdia", &self.budget)?;
+        MovieHeader::parse(&child(&scanned.movie, b"mvhd")?)?;
+        let mdia = child(track, b"mdia")?;
         let header = Mov9RecoveryTrackHeader::parse(
-            &child(track, b"tkhd", &self.budget)?,
-            &child(&mdia, b"mdhd", &self.budget)?,
-            &child(&mdia, b"hdlr", &self.budget)?,
+            &child(track, b"tkhd")?,
+            &child(&mdia, b"mdhd")?,
+            &child(&mdia, b"hdlr")?,
             PinnedMovD32RegularRecoveryV1,
         )?;
-        let minf = child(&mdia, b"minf", &self.budget)?;
+        let minf = child(&mdia, b"minf")?;
         let refs = data_references(&minf, &self.budget)?;
         let profile = PinnedMovD32RegularRecoveryV3;
         let mut builder = Mov9RunRecoveryV3Builder::new(
-            child(&minf, b"stbl", &self.budget)?,
+            child(&minf, b"stbl")?,
             self.budget.clone(),
             Limits::default(),
             profile,
@@ -1829,6 +1827,29 @@ impl Driver<'_> {
 mod refill_transcript42 {
     use super::*;
     use std::io::Cursor;
+
+    #[test]
+    fn child_lookup_validates_the_entire_parent() {
+        let budget = Budget::new(4096).unwrap();
+        let parent = |wire: &[u8]| {
+            BoxView::new(Bytes::copy_from_slice(&budget, wire).unwrap(), 100).unwrap()
+        };
+        let valid = parent(b"\0\0\0\x18moov\0\0\0\x08trak\0\0\0\x08free");
+        assert_eq!(child(&valid, b"trak").unwrap().header().start, 108);
+        assert!(optional(&valid, b"mvhd").unwrap().is_none());
+
+        let duplicate = parent(b"\0\0\0\x18moov\0\0\0\x08trak\0\0\0\x08trak");
+        assert!(matches!(
+            child(&duplicate, b"trak"),
+            Err(Failure::Core(Error::Invalid("duplicate required child")))
+        ));
+
+        let trailing = parent(b"\0\0\0\x19moov\0\0\0\x08trak\0\0\0\x08trak\0");
+        assert!(matches!(
+            child(&trailing, b"trak"),
+            Err(Failure::Core(Error::Truncated))
+        ));
+    }
 
     struct TraceIo<'a> {
         input: Cursor<&'a [u8]>,
