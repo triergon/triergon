@@ -5,7 +5,7 @@ use std::{io::Read, sync::atomic::AtomicBool};
 use triergon_core::{
     Budget, Bytes, Error, InputWindow, SourceCapabilities, SourceId, Step, WorkBudget,
 };
-use triergon_framing::compat::dts::{
+use triergon_framing::reference_trace::dts::{
     FactAssociationJob, ParserOperation, ParserOperationEvent, ParserOperationLimits,
     ParserOperationStep, ParserPacket,
 };

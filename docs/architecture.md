@@ -77,14 +77,14 @@ choice deliberately and document it. A crate keeps three kinds of API apart:
 
 - **Specification behaviour** lives at the crate root.
 - **Compatibility policies** reproduce FFmpeg where a consumer may choose its
-  result. They live in `compat::<family>` (for example `triergon_framing::compat::nal`
-  and `compat::dts`) and are named for what they do. A version, revision or
+  result. They live in `compat::<family>` (for example
+  `triergon_framing::compat::nal`) and are named for what they do. A version, revision or
   history marker (a revision hash, `Pinned…`, `…V1`) is never part of an
   identifier: each family's module documentation names the FFmpeg revision it
   reproduces, once.
-- **Comparison-only projections** are values that only the harness, workers, tests
-  and examples read to compare with FFmpeg, such as FFmpeg return codes or parser
-  byte positions. They are compiled only with the crate's non-default
+- **Comparison-only projections** are anything a consumer cannot use outside a
+  comparison with FFmpeg, such as FFmpeg return codes, parser byte positions or a
+  whole parser model (`triergon_framing::reference_trace::dts`). They are compiled only with the crate's non-default
   `reference-trace` feature: types under `reference_trace::<family>`, accessors on
   other types behind `#[cfg(feature = "reference-trace")]`. Examples and tests that
   use them declare `required-features = ["reference-trace"]` or gate the individual

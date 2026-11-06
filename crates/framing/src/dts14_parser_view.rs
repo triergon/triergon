@@ -1,6 +1,6 @@
 //! Separately named observed parser-position view, never physical source facts.
 //! Default-flags public parser operation of the reference named on
-//! [`crate::compat::dts`]; no FF implementation used.
+//! [`crate::reference_trace::dts`]; no FF implementation used.
 //! The explicit-flush hint is an observed signed parser hint, not a source end,
 //! syntax validation, a generated timestamp, or a generic DTS/FFmpeg promise.
 use crate::{Dts14CarrierBoundary, Dts14CarrierPacket};

@@ -26,5 +26,9 @@ required-features = ["reference-trace"]
 name = "dts-operation-trace"
 required-features = ["reference-trace"]
 
+[[test]]
+name = "dts_operation"
+required-features = ["reference-trace"]
+
 [lints]
 workspace = true

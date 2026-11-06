@@ -36,25 +36,3 @@ pub mod nal {
         ReceiverHevcConfigViewParser, ReceiverHevcConfiguration, ReceiverHevcConfigurationView,
     };
 }
-
-/// The raw 14-bit DTS parser's packets and clock.
-///
-/// [`ParserOperation`](dts::ParserOperation) reads one raw 14-bit DTS entity
-/// through two cursors fed from the same bytes: the complete source frames
-/// ([`Dts14FrameReader`](crate::Dts14FrameReader)) and the packets FFmpeg's `dca`
-/// parser cuts ([`Dts14CarrierReader`](crate::Dts14CarrierReader)). Each
-/// [`ParserPacket`](dts::ParserPacket) carries the parser's clock
-/// ([`ParserClock`](dts::ParserClock)): the first accepted core sample rate is
-/// latched and later coding windows are rounded in it. That clock is not a source
-/// duration. [`FactAssociationJob`](dts::FactAssociationJob) relates a source frame
-/// to the parser packet that contains it.
-///
-/// Reference: the `dca` parser with default flags at FFmpeg git revision
-/// `d32b387f` on the 9.0 branch.
-pub mod dts {
-    pub use crate::dts_operation::{
-        FactAssociation, FactAssociationJob, ParserClock, ParserClockDisposition, ParserOperation,
-        ParserOperationContext, ParserOperationEvent, ParserOperationLane, ParserOperationLimits,
-        ParserOperationStep, ParserOperationTerminal, ParserPacket,
-    };
-}

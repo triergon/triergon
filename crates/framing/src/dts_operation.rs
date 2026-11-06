@@ -4,8 +4,7 @@
 //! both from the same declared entity; no Source frame boundaries are supplied to
 //! the parser view. These are two operations, with both costs exposed, rather than
 //! a replacement of the original Strict/native comparison or automatic DTS probing.
-//! The reference revision is recorded once, on [`crate::compat::dts`].
-#[cfg(feature = "reference-trace")]
+//! The reference revision is recorded once, on [`crate::reference_trace::dts`].
 use crate::dts14_parser_view::ParserHints;
 use crate::{
     Dts14CarrierLimits, Dts14CarrierPacket, Dts14CarrierReader, Dts14CarrierSyntax, Dts14Frame,
@@ -38,8 +37,6 @@ pub struct ParserOperationContext {
     source: SourceId,
     source_generation: u64,
     parser_generation: u64,
-    // Read only by the parser-position projection.
-    #[cfg_attr(not(feature = "reference-trace"), allow(dead_code))]
     fresh_zero_origin: bool,
 }
 impl ParserOperationContext {
@@ -161,7 +158,6 @@ pub struct ParserPacket {
     packet: Dts14CarrierPacket,
     context: ParserOperationContext,
     range: Range<u64>,
-    #[cfg(feature = "reference-trace")]
     hints: Result<ParserHints>,
     clock: Result<ParserClock>,
 }
@@ -182,7 +178,6 @@ impl ParserPacket {
             .checked_add(u64::try_from(packet.source_bytes().len()).map_err(|_| Error::Overflow)?)
             .ok_or(Error::Overflow)?;
         let range = packet.identity.offset..end;
-        #[cfg(feature = "reference-trace")]
         let hints = if context.fresh_zero_origin {
             ParserHints::observe(&packet)
         } else {
@@ -192,7 +187,6 @@ impl ParserPacket {
             packet,
             context,
             range,
-            #[cfg(feature = "reference-trace")]
             hints,
             clock,
         })
@@ -229,8 +223,6 @@ impl ParserPacket {
         self.packet.syntax
     }
     /// Modelled parser positions, not a fresh native I/O observation or Source end.
-    /// Comparison-only; see [`crate::reference_trace::dts`].
-    #[cfg(feature = "reference-trace")]
     pub fn parser_hints(&self) -> Result<ParserHints> {
         self.hints
     }

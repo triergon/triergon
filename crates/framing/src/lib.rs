@@ -9,6 +9,7 @@
 // Pending: `missing_docs`, `missing_debug_implementations`, `unreachable_pub`.
 
 pub mod compat;
+#[cfg(feature = "reference-trace")]
 mod dts_operation;
 #[cfg(feature = "reference-trace")]
 pub mod reference_trace;

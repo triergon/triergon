@@ -1,7 +1,7 @@
 //! Operation guards.
 use std::sync::atomic::{AtomicBool, Ordering};
 use triergon_core::{Budget, Bytes, Error, InputWindow, SourceCapabilities, SourceId, WorkBudget};
-use triergon_framing::compat::dts::{
+use triergon_framing::reference_trace::dts::{
     FactAssociationJob, ParserClockDisposition, ParserOperation, ParserOperationEvent,
     ParserOperationLane, ParserOperationLimits, ParserOperationStep, ParserOperationTerminal,
 };
