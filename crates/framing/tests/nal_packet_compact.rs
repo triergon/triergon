@@ -3,6 +3,7 @@ use std::mem::{needs_drop, size_of};
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use triergon_core::{Budget, Bytes, Error, SourceId, SourceLocation, WorkBudget};
+use triergon_framing::compat::nal::*;
 use triergon_framing::*;
 
 // Original independently authored AVC/HEVC packet fixtures, not decoder code.
@@ -547,11 +548,11 @@ fn observed_packet_keeps_source_refusal_without_changing_compatibility_bytes_or_
         let source = packet(hidden(&pool, &[0, 0, 0, 1, 0x81]));
         let cancel = AtomicBool::new(false);
         let (polls, facts) = if compact {
-            let mut job = session.packet_observed_compact(source, None).unwrap();
+            let mut job = session.receiver_packet_compact(source, None).unwrap();
             let (polls, ready) = drive(&[0, 1, 7], |w, out| job.step_into(w, &cancel, out));
             (polls, compact_facts(&ready.unwrap()))
         } else {
-            let mut job = session.packet_observed(source, None).unwrap();
+            let mut job = session.receiver_packet(source, None).unwrap();
             let (polls, ready) = drive(&[0, 1, 7], |w, out| job.step_into(w, &cancel, out));
             (polls, owned_facts(&ready.unwrap()))
         };
@@ -574,7 +575,7 @@ fn physical_rejection_retains_verified_update_and_original_source_with_no_partia
     )
     .unwrap();
     let new_raw = hidden(&pool, &avcc(129));
-    let mut parser = NalObservedAvcConfigParser::new_update(
+    let mut parser = ReceiverAvcConfigParser::new_update(
         &pool,
         AvcConfigSource {
             source: SourceId(12),
@@ -603,7 +604,7 @@ fn physical_rejection_retains_verified_update_and_original_source_with_no_partia
     let mut source = packet(hidden(&pool, &[0, 0]));
     source.new_extradata = Some(new_raw);
     let mut job = session
-        .packet_observed_compact(source, Some(update))
+        .receiver_packet_compact(source, Some(update))
         .unwrap();
     let (polls, ready) = drive(&[0, 1, 7], |w, out| {
         job.step_into(w, &AtomicBool::new(false), out)

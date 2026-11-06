@@ -410,8 +410,9 @@ fn late_carrier_sync_does_not_guess_a_new_fsize_domain() {
 }
 
 #[test]
+#[cfg(feature = "reference-trace")]
 fn consumption_view_uses_actual_admitted_windows_not_physical_boundary_alias() {
-    use triergon_framing::Dts14D32ParserHints;
+    use triergon_framing::reference_trace::dts::ParserHints;
     let (_, one) = acquire(GOOD, DtsWordOrder::BigEndian, 1, 1);
     let (_, wide) = acquire(GOOD, DtsWordOrder::BigEndian, 31, 31);
     assert_eq!(
@@ -430,50 +431,39 @@ fn consumption_view_uses_actual_admitted_windows_not_physical_boundary_alias() {
         ),
         (93, 124, 118)
     );
-    assert_eq!(
-        Dts14D32ParserHints::observe(&one[0])
-            .unwrap()
-            .consumed_offset,
-        117
-    );
-    assert_eq!(
-        Dts14D32ParserHints::observe(&wide[0])
-            .unwrap()
-            .consumed_offset,
-        112
-    );
+    assert_eq!(ParserHints::observe(&one[0]).unwrap().consumed_offset, 117);
+    assert_eq!(ParserHints::observe(&wide[0]).unwrap().consumed_offset, 112);
     for p in [&one[0], &wide[0]] {
         assert_eq!(p.identity.offset, 0);
         assert_eq!(p.source_bytes().len(), 112);
-        assert_eq!(
-            Dts14D32ParserHints::observe(p).unwrap().opaque_next_offset,
-            112
-        );
+        assert_eq!(ParserHints::observe(p).unwrap().opaque_next_offset, 112);
     }
 }
 #[test]
+#[cfg(feature = "reference-trace")]
 fn explicit_flush_hint_is_signed_and_never_replaces_source_end() {
-    use triergon_framing::{Dts14D32ParserHints, Dts14ParserHintOrigin};
+    use triergon_framing::reference_trace::dts::{ParserHintOrigin, ParserHints};
     let (_, p) = acquire(&[0x55; 7], DtsWordOrder::BigEndian, 1, 1);
-    let h = Dts14D32ParserHints::observe(&p[0]).unwrap();
+    let h = ParserHints::observe(&p[0]).unwrap();
     assert_eq!(
         (h.frame_offset, h.consumed_offset, h.opaque_next_offset),
         (0, 7, -93)
     );
-    assert_eq!(h.origin, Dts14ParserHintOrigin::ExplicitFlushLookbehind);
+    assert_eq!(h.origin, ParserHintOrigin::ExplicitFlushLookbehind);
     assert_eq!(p[0].provision.consumed_through, 7);
     assert_eq!(p[0].boundary, Dts14CarrierBoundary::ExplicitSourceEnd);
 }
 #[test]
+#[cfg(feature = "reference-trace")]
 fn parser_hint_refuses_inconsistent_provision_evidence() {
-    use triergon_framing::Dts14D32ParserHints;
+    use triergon_framing::reference_trace::dts::ParserHints;
     let (_, p) = acquire(GOOD, DtsWordOrder::BigEndian, 31, 1);
     let mut q = p[0].clone();
     q.provision.consumed_through -= 1;
-    assert!(Dts14D32ParserHints::observe(&q).is_err());
+    assert!(ParserHints::observe(&q).is_err());
     let mut q = p[0].clone();
     q.provision.last_window_start = q.provision.last_window_end + 1;
-    assert!(Dts14D32ParserHints::observe(&q).is_err());
+    assert!(ParserHints::observe(&q).is_err());
 }
 #[test]
 fn known_source_length_still_requires_real_finish_before_opaque_publication() {

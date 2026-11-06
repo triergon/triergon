@@ -5,6 +5,7 @@
 //! match, while the view never holds more pool charge at any step.
 use std::sync::atomic::AtomicBool;
 use triergon_core::{Budget, Bytes, SourceId, SourceLocation, WorkBudget};
+use triergon_framing::compat::nal::*;
 use triergon_framing::*;
 
 static NO: AtomicBool = AtomicBool::new(false);
@@ -169,7 +170,7 @@ macro_rules! receiver {
                         let r = p.step(&mut w, &NO);
                         step_fact(&mut run, &pool, "avc", &w, &r);
                         match r {
-                            Ok(BuildStep::Ready(v)) => break $config::ObservedAvc(v),
+                            Ok(BuildStep::Ready(v)) => break $config::ReceiverAvc(v),
                             Ok(BuildStep::Yield) => (),
                             _ => return run,
                         }
@@ -182,7 +183,7 @@ macro_rules! receiver {
                         let r = p.step(&mut w, &NO);
                         step_fact(&mut run, &pool, "hevc", &w, &r);
                         match r {
-                            Ok(BuildStep::Ready(v)) => break $config::ObservedHevc(v),
+                            Ok(BuildStep::Ready(v)) => break $config::ReceiverHevc(v),
                             Ok(BuildStep::Yield) => (),
                             _ => return run,
                         }
@@ -224,46 +225,50 @@ macro_rules! receiver {
                     .extra
                     .as_ref()
                     .map(|e| Bytes::copy_from_slice(&pool, e).unwrap());
-                let update = match (codec, &extra) {
-                    (Codec::Avc, Some(e)) if !e.is_empty() => {
-                        let mut p = $avc_parser::new_update(
-                            &pool,
-                            avc_source(900),
-                            e.clone(),
-                            avc_limits(),
-                        )
-                        .unwrap();
-                        let mut parsed = None;
-                        loop {
-                            let mut w = WorkBudget::new(q);
-                            let r = p.step(&mut w, &NO);
-                            step_fact(&mut run, &pool, "update", &w, &r);
-                            match r {
-                                Ok(BuildStep::Ready(v)) => {
-                                    parsed = Some(v);
-                                    break;
-                                }
-                                Ok(BuildStep::Yield) => (),
-                                _ => {
-                                    let r = p.take_update_rejection();
-                                    run.events.push(format!(
-                                        "update-rejection {:?}",
-                                        r.map(|r| (
-                                            r.native_receive_result(),
-                                            r.source_bytes().to_vec()
-                                        ))
-                                    ));
-                                    break;
+                let update =
+                    match (codec, &extra) {
+                        (Codec::Avc, Some(e)) if !e.is_empty() => {
+                            let mut p = $avc_parser::new_update(
+                                &pool,
+                                avc_source(900),
+                                e.clone(),
+                                avc_limits(),
+                            )
+                            .unwrap();
+                            let mut parsed = None;
+                            loop {
+                                let mut w = WorkBudget::new(q);
+                                let r = p.step(&mut w, &NO);
+                                step_fact(&mut run, &pool, "update", &w, &r);
+                                match r {
+                                    Ok(BuildStep::Ready(v)) => {
+                                        parsed = Some(v);
+                                        break;
+                                    }
+                                    Ok(BuildStep::Yield) => (),
+                                    _ => {
+                                        let r = p.take_update_rejection();
+                                        run.events.push(format!(
+                                            "update-rejection {:?}",
+                                            r.map(|r| {
+                                                #[cfg(feature = "reference-trace")]
+                                                let native = Some(r.native_receive_result());
+                                                #[cfg(not(feature = "reference-trace"))]
+                                                                    let native: Option<i32> = None;
+                                                (native, r.source_bytes().to_vec())
+                                            })
+                                        ));
+                                        break;
+                                    }
                                 }
                             }
+                            match parsed {
+                                Some(v) => Some(v),
+                                None => continue,
+                            }
                         }
-                        match parsed {
-                            Some(v) => Some(v),
-                            None => continue,
-                        }
-                    }
-                    _ => None,
-                };
+                        _ => None,
+                    };
                 let source = NalPacket {
                     bytes: Bytes::copy_from_slice(&pool, &packet.bytes).unwrap(),
                     location: SourceLocation {
@@ -334,21 +339,21 @@ macro_rules! receiver {
 }
 receiver!(
     legacy,
-    NalObservedAvcConfigParser,
-    NalObservedHevcConfigParser,
+    ReceiverAvcConfigParser,
+    ReceiverHevcConfigParser,
     NalPacketConfiguration,
     NalPacketSession::new,
     NalPacketConfigWriter::new,
-    packet_observed_compact
+    receiver_packet_compact
 );
 receiver!(
     view,
-    NalObservedAvcConfigViewParser,
-    NalObservedHevcConfigViewParser,
+    ReceiverAvcConfigViewParser,
+    ReceiverHevcConfigViewParser,
     NalPacketViewConfiguration,
     NalPacketSession::new_view,
     NalPacketConfigWriter::new_view,
-    packet_observed_view
+    receiver_packet_view
 );
 
 fn assert_same(codec: Codec, record: &[u8], packets: &[Packet], label: &str) {

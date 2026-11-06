@@ -5,10 +5,13 @@ use std::{io::Read, sync::atomic::AtomicBool};
 use triergon_core::{
     Budget, Bytes, Error, InputWindow, SourceCapabilities, SourceId, Step, WorkBudget,
 };
+use triergon_framing::compat::dts::{
+    FactAssociationJob, ParserOperation, ParserOperationEvent, ParserOperationLimits,
+    ParserOperationStep, ParserPacket,
+};
 use triergon_framing::{
     Dts14BoundaryEvidence, Dts14CarrierBoundary, Dts14CarrierLimits, Dts14Frame, Dts14SyncLimits,
-    DtsFactAssociationJob, DtsOperation, DtsOperationEvent, DtsOperationLimits, DtsOperationStep,
-    DtsParserPacket, DtsWordOrder,
+    DtsWordOrder,
 };
 use triergon_harness_protocol::hex;
 
@@ -57,7 +60,7 @@ fn source_record(f: &Dts14Frame) -> String {
         header(a.header)
     )
 }
-fn parser_record(p: &DtsParserPacket) -> String {
+fn parser_record(p: &ParserPacket) -> String {
     let range = p.physical_range();
     let boundary = match p.packet().boundary {
         Dts14CarrierBoundary::FollowingCarrierSync { offset } => {
@@ -71,7 +74,7 @@ fn parser_record(p: &DtsParserPacket) -> String {
         .canonical_bytes()
         .map_or_else(|| "null".to_owned(), |b| format!("\"{}\"", hex(b.as_ref())));
     let source_header = p.source_header().map_or_else(|| "null".to_owned(), header);
-    let clock = match p.native_clock() {
+    let clock = match p.clock() {
         Ok(c) => format!(
             "{{\"duration\":{},\"sample_rate\":{},\"profile\":{},\"disposition\":\"{:?}\"}}",
             c.duration, c.codec_sample_rate, c.profile, c.disposition
@@ -131,7 +134,7 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
     }
     let pool = Budget::new(32 * 1024 * 1024)?;
     let baseline = Budget::control_storage_bytes();
-    let limits = DtsOperationLimits {
+    let limits = ParserOperationLimits {
         source: Dts14SyncLimits {
             maximum_physical_frame_bytes: 60000,
             maximum_canonical_frame_bytes: 60000,
@@ -144,7 +147,7 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
             maximum_input_window: 4096,
         },
     };
-    let mut op = DtsOperation::new(
+    let mut op = ParserOperation::new(
         &pool,
         SourceId(21186),
         SourceCapabilities {
@@ -157,7 +160,7 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
     let context = op.context();
     let cancel = AtomicBool::new(false);
     let mut source_held: Vec<(Dts14Frame, String)> = Vec::new();
-    let mut parser_held: Vec<(DtsParserPacket, String)> = Vec::new();
+    let mut parser_held: Vec<(ParserPacket, String)> = Vec::new();
     let mut counts = [0usize; 4];
     let mut ended = false;
     println!(
@@ -169,8 +172,8 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
     );
     for _ in 0..20_000_000 {
         match op.step(&mut WorkBudget::new(quantum), &cancel)? {
-            DtsOperationStep::Yield => {}
-            DtsOperationStep::NeedInput { lane, request } => {
+            ParserOperationStep::Yield => {}
+            ParserOperationStep::NeedInput { lane, request } => {
                 let at = usize::try_from(request.offset)?;
                 if at > raw.len() {
                     return Err("request beyond source".into());
@@ -189,8 +192,8 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
                     op.provide(lane, &window)?;
                 }
             }
-            DtsOperationStep::Event => match op.take_event()? {
-                DtsOperationEvent::SourceFrame(f) => {
+            ParserOperationStep::Event => match op.take_event()? {
+                ParserOperationEvent::SourceFrame(f) => {
                     let record = source_record(&f);
                     println!("{record}");
                     if !all {
@@ -199,7 +202,7 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
                     source_held.push((f, record));
                     counts[0] += 1;
                 }
-                DtsOperationEvent::ParserPacket(p) => {
+                ParserOperationEvent::ParserPacket(p) => {
                     let record = parser_record(&p);
                     println!("{record}");
                     if !all {
@@ -208,7 +211,7 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
                     parser_held.push((p, record));
                     counts[1] += 1;
                 }
-                DtsOperationEvent::ViewRefusal {
+                ParserOperationEvent::ViewRefusal {
                     lane,
                     error,
                     request,
@@ -221,7 +224,7 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
                     );
                 }
             },
-            DtsOperationStep::End { source, parser } => {
+            ParserOperationStep::End { source, parser } => {
                 println!(
                     "{{\"event\":\"ends\",\"source\":{:?},\"parser\":{:?}}}",
                     format!("{source:?}"),
@@ -254,7 +257,7 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
             let a = f.facts().identity.offset;
             let b = a + f.physical_bytes().len() as u64;
             if a >= r.start && b <= r.end {
-                let mut job = DtsFactAssociationJob::new(&pool, context, f, p)?;
+                let mut job = FactAssociationJob::new(&pool, context, f, p)?;
                 loop {
                     match job.step(&mut WorkBudget::new(quantum), &cancel)? {
                         Step::Ready(a) => {

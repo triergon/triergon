@@ -48,7 +48,7 @@ fn run(pool: &Budget, codec: Codec, root: &Bytes, length: usize, quantum: u64) -
     .unwrap();
     let extra = (codec == Codec::Hevc).then(|| root.slice(70..73).unwrap());
     let packet = input(root.slice(32..32 + length).unwrap(), extra);
-    let mut job = session.packet_observed(packet, None).unwrap();
+    let mut job = session.receiver_packet(packet, None).unwrap();
     let cancel = AtomicBool::new(false);
     let output = loop {
         match job.step(&mut WorkBudget::new(quantum), &cancel).unwrap() {
@@ -128,7 +128,7 @@ fn passthrough_aliasing_still_obeys_work_cancellation_and_logical_output_limits(
         .unwrap();
         let cancel = AtomicBool::new(false);
         let mut job = session
-            .packet_observed(input(root.slice(32..40).unwrap(), None), None)
+            .receiver_packet(input(root.slice(32..40).unwrap(), None), None)
             .unwrap();
         let before = pool.used();
         assert!(matches!(
@@ -149,7 +149,7 @@ fn passthrough_aliasing_still_obeys_work_cancellation_and_logical_output_limits(
         drop(job);
         for quantum in [1, 4096] {
             let mut job = session
-                .packet_observed(input(root.slice(32..40).unwrap(), None), None)
+                .receiver_packet(input(root.slice(32..40).unwrap(), None), None)
                 .unwrap();
             loop {
                 match job.step(&mut WorkBudget::new(quantum), &cancel) {

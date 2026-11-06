@@ -1,6 +1,7 @@
-//! Explicit observed d32 framing views. The ordinary ISO source parsers stay
-//! strict. In particular a three-byte declaration remains a source refusal;
-//! its unchanged wire bytes can still drive this separately typed receiver.
+//! The packet receiver's configuration acceptance ([`crate::compat::nal`]).
+//! The ordinary ISO source parsers stay strict. In particular a three-byte
+//! declaration remains a source refusal; its unchanged wire bytes can still drive
+//! this separately typed receiver.
 use crate::{
     AvcConfigArrayRef, AvcConfigFields, AvcConfigLimits, AvcConfigNal, AvcConfigNalRef,
     AvcConfigParser, AvcConfigSource, AvcConfigViewParser, AvcConfiguration, AvcConfigurationView,
@@ -11,10 +12,10 @@ use crate::{
 use std::sync::atomic::AtomicBool;
 use triergon_core::{Budget, Bytes, Error, Result, WorkBudget};
 
-pub struct NalObservedAvcConfiguration {
+pub struct ReceiverAvcConfiguration {
     inner: AvcConfiguration,
 }
-impl NalObservedAvcConfiguration {
+impl ReceiverAvcConfiguration {
     pub fn source_bytes(&self) -> &Bytes {
         self.inner.source_bytes()
     }
@@ -39,10 +40,10 @@ impl NalObservedAvcConfiguration {
     }
 }
 
-pub struct NalObservedHevcConfiguration {
+pub struct ReceiverHevcConfiguration {
     inner: HvcConfiguration,
 }
-impl NalObservedHevcConfiguration {
+impl ReceiverHevcConfiguration {
     pub fn source_bytes(&self) -> &Bytes {
         self.inner.source_bytes()
     }
@@ -72,13 +73,13 @@ impl NalObservedHevcConfiguration {
 
 /// A malformed nonempty version-one AVC update header. Only a completed
 /// short-header failure in the explicit update parser can create this rejection.
-pub struct NalAvcUpdateRejection {
+pub struct ReceiverAvcUpdateRejection {
     raw: Bytes,
     source: AvcConfigSource,
     error: Error,
     strict_source_refusal: Option<Error>,
 }
-impl NalAvcUpdateRejection {
+impl ReceiverAvcUpdateRejection {
     pub fn source_bytes(&self) -> &Bytes {
         &self.raw
     }
@@ -94,12 +95,14 @@ impl NalAvcUpdateRejection {
         self.strict_source_refusal
     }
     /// Observed public receive result; this is not an executed native call.
+    /// Comparison-only.
+    #[cfg(feature = "reference-trace")]
     pub fn native_receive_result(&self) -> i32 {
         -1_094_995_529
     }
 }
 
-pub struct NalObservedAvcConfigParser {
+pub struct ReceiverAvcConfigParser {
     inner: AvcConfigParser,
     raw: Bytes,
     source: AvcConfigSource,
@@ -107,7 +110,7 @@ pub struct NalObservedAvcConfigParser {
     update_role: bool,
     rejection_taken: bool,
 }
-impl NalObservedAvcConfigParser {
+impl ReceiverAvcConfigParser {
     pub fn new(
         pool: &Budget,
         source: AvcConfigSource,
@@ -147,12 +150,10 @@ impl NalObservedAvcConfigParser {
         &mut self,
         work: &mut WorkBudget,
         cancel: &AtomicBool,
-    ) -> Result<BuildStep<NalObservedAvcConfiguration>> {
+    ) -> Result<BuildStep<ReceiverAvcConfiguration>> {
         let result = self.inner.step(work, cancel);
         match result {
-            Ok(BuildStep::Ready(inner)) => {
-                Ok(BuildStep::Ready(NalObservedAvcConfiguration { inner }))
-            }
+            Ok(BuildStep::Ready(inner)) => Ok(BuildStep::Ready(ReceiverAvcConfiguration { inner })),
             Ok(BuildStep::Yield) => Ok(BuildStep::Yield),
             Ok(BuildStep::Complete) => Ok(BuildStep::Complete),
             Err(error) => {
@@ -163,7 +164,7 @@ impl NalObservedAvcConfigParser {
             }
         }
     }
-    pub fn take_update_rejection(&mut self) -> Option<NalAvcUpdateRejection> {
+    pub fn take_update_rejection(&mut self) -> Option<ReceiverAvcUpdateRejection> {
         // A complete AVC record requires the six-byte prefix and a PPS count.
         // No native result is inferred for other strict syntax/version errors,
         // cancellation, resource refusals or failures after that header.
@@ -175,7 +176,7 @@ impl NalObservedAvcConfigParser {
             return None;
         }
         self.rejection_taken = true;
-        Some(NalAvcUpdateRejection {
+        Some(ReceiverAvcUpdateRejection {
             raw: self.raw.clone(),
             source: self.source,
             error,
@@ -184,10 +185,10 @@ impl NalObservedAvcConfigParser {
     }
 }
 
-pub struct NalObservedHevcConfigParser {
+pub struct ReceiverHevcConfigParser {
     inner: HvcConfigParser,
 }
-impl NalObservedHevcConfigParser {
+impl ReceiverHevcConfigParser {
     pub fn new(
         pool: &Budget,
         source: HvcConfigSource,
@@ -202,9 +203,9 @@ impl NalObservedHevcConfigParser {
         &mut self,
         work: &mut WorkBudget,
         cancel: &AtomicBool,
-    ) -> Result<BuildStep<NalObservedHevcConfiguration>> {
+    ) -> Result<BuildStep<ReceiverHevcConfiguration>> {
         match self.inner.step(work, cancel)? {
-            BuildStep::Ready(inner) => Ok(BuildStep::Ready(NalObservedHevcConfiguration { inner })),
+            BuildStep::Ready(inner) => Ok(BuildStep::Ready(ReceiverHevcConfiguration { inner })),
             BuildStep::Yield => Ok(BuildStep::Yield),
             BuildStep::Complete => Ok(BuildStep::Complete),
         }
@@ -214,10 +215,10 @@ impl NalObservedHevcConfigParser {
 // Observed compact views. The AVC wrapper retains the same fixed
 // per-record raw handle required for source queries and short-update rejections;
 // it creates no eager NAL/array aliases and leaves the existing wrappers intact.
-pub struct NalObservedAvcConfigurationView {
+pub struct ReceiverAvcConfigurationView {
     inner: AvcConfigurationView,
 }
-impl NalObservedAvcConfigurationView {
+impl ReceiverAvcConfigurationView {
     pub(crate) fn view(&self) -> &AvcConfigurationView {
         &self.inner
     }
@@ -277,10 +278,10 @@ impl NalObservedAvcConfigurationView {
     }
 }
 
-pub struct NalObservedHevcConfigurationView {
+pub struct ReceiverHevcConfigurationView {
     inner: HvcConfigurationView,
 }
-impl NalObservedHevcConfigurationView {
+impl ReceiverHevcConfigurationView {
     pub(crate) fn view(&self) -> &HvcConfigurationView {
         &self.inner
     }
@@ -343,7 +344,7 @@ impl NalObservedHevcConfigurationView {
     }
 }
 
-pub struct NalObservedAvcConfigViewParser {
+pub struct ReceiverAvcConfigViewParser {
     inner: AvcConfigViewParser,
     raw: Bytes,
     source: AvcConfigSource,
@@ -351,7 +352,7 @@ pub struct NalObservedAvcConfigViewParser {
     update_role: bool,
     rejection_taken: bool,
 }
-impl NalObservedAvcConfigViewParser {
+impl ReceiverAvcConfigViewParser {
     pub fn new(
         pool: &Budget,
         source: AvcConfigSource,
@@ -391,11 +392,11 @@ impl NalObservedAvcConfigViewParser {
         &mut self,
         work: &mut WorkBudget,
         cancel: &AtomicBool,
-    ) -> Result<BuildStep<NalObservedAvcConfigurationView>> {
+    ) -> Result<BuildStep<ReceiverAvcConfigurationView>> {
         let result = self.inner.step(work, cancel);
         match result {
             Ok(BuildStep::Ready(inner)) => {
-                Ok(BuildStep::Ready(NalObservedAvcConfigurationView { inner }))
+                Ok(BuildStep::Ready(ReceiverAvcConfigurationView { inner }))
             }
             Ok(BuildStep::Yield) => Ok(BuildStep::Yield),
             Ok(BuildStep::Complete) => Ok(BuildStep::Complete),
@@ -407,7 +408,7 @@ impl NalObservedAvcConfigViewParser {
             }
         }
     }
-    pub fn take_update_rejection(&mut self) -> Option<NalAvcUpdateRejection> {
+    pub fn take_update_rejection(&mut self) -> Option<ReceiverAvcUpdateRejection> {
         // A complete AVC record requires the six-byte prefix and a PPS count.
         // No native result is inferred for other strict syntax/version errors,
         // cancellation, resource refusals or failures after that header.
@@ -419,7 +420,7 @@ impl NalObservedAvcConfigViewParser {
             return None;
         }
         self.rejection_taken = true;
-        Some(NalAvcUpdateRejection {
+        Some(ReceiverAvcUpdateRejection {
             raw: self.raw.clone(),
             source: self.source,
             error,
@@ -428,10 +429,10 @@ impl NalObservedAvcConfigViewParser {
     }
 }
 
-pub struct NalObservedHevcConfigViewParser {
+pub struct ReceiverHevcConfigViewParser {
     inner: HvcConfigViewParser,
 }
-impl NalObservedHevcConfigViewParser {
+impl ReceiverHevcConfigViewParser {
     pub fn new(
         pool: &Budget,
         source: HvcConfigSource,
@@ -446,10 +447,10 @@ impl NalObservedHevcConfigViewParser {
         &mut self,
         work: &mut WorkBudget,
         cancel: &AtomicBool,
-    ) -> Result<BuildStep<NalObservedHevcConfigurationView>> {
+    ) -> Result<BuildStep<ReceiverHevcConfigurationView>> {
         match self.inner.step(work, cancel)? {
             BuildStep::Ready(inner) => {
-                Ok(BuildStep::Ready(NalObservedHevcConfigurationView { inner }))
+                Ok(BuildStep::Ready(ReceiverHevcConfigurationView { inner }))
             }
             BuildStep::Yield => Ok(BuildStep::Yield),
             BuildStep::Complete => Ok(BuildStep::Complete),
