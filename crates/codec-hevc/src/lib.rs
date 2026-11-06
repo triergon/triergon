@@ -4,8 +4,13 @@
 //! Range extension, screen content coding and multi-layer tools are refused with
 //! [`DecodeError::Unsupported`] naming the tool; NAL units with nuh_layer_id > 0 are skipped.
 #![forbid(unsafe_code)]
-#![warn(clippy::print_stdout, clippy::print_stderr, clippy::expect_used)]
-// Pending: `missing_docs`, `missing_debug_implementations`, `unreachable_pub`, `clippy::unwrap_used`.
+#![warn(
+    missing_debug_implementations,
+    clippy::print_stdout,
+    clippy::print_stderr,
+    clippy::expect_used
+)]
+// Pending: `missing_docs`, `unreachable_pub`, `clippy::unwrap_used`.
 #![cfg_attr(feature = "simd", feature(portable_simd))]
 // Pending: these rewrites change the generated code of measured hot paths and are
 // adopted with an A/B timing run.

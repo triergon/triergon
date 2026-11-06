@@ -46,7 +46,7 @@ impl Pixel for u16 {
     }
 }
 
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub struct Plane<P> {
     pub data: Vec<P>,
     pub stride: usize,
@@ -66,7 +66,7 @@ impl<P: Pixel> Plane<P> {
     }
 }
 
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub struct Frame<P> {
     pub planes: [Plane<P>; 3],
 }
@@ -87,6 +87,7 @@ impl<P: Pixel> Frame<P> {
 }
 
 /// A decoded frame of either sample type.
+#[derive(Debug)]
 pub enum AnyFrame {
     U8(Frame<u8>),
     U16(Frame<u16>),
@@ -151,7 +152,7 @@ impl PuMotion {
 }
 
 /// Collocated motion (16x16 granularity) kept with a reference picture for TMVP.
-#[derive(Clone, Copy, Default)]
+#[derive(Debug, Clone, Copy, Default)]
 pub struct ColMv {
     pub mv: [Mv; 2],
     pub ref_poc: [i32; 2],
@@ -160,6 +161,7 @@ pub struct ColMv {
 }
 
 #[allow(dead_code)]
+#[derive(Debug)]
 pub struct ColMotion {
     pub w16: usize,
     pub h16: usize,

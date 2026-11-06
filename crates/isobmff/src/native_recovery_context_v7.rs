@@ -32,6 +32,7 @@ impl Mov9RecoveryObservationV7 {
         }
     }
 }
+#[derive(Debug)]
 pub(crate) struct RecoveryReceiverV7 {
     raw: BoxView,
     scan: Option<BoxChildren>,

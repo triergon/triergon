@@ -51,7 +51,7 @@ pub(crate) struct CuesJob {
     failed: bool,
 }
 impl CuesJob {
-    pub fn new(
+    pub(crate) fn new(
         source: SharedBytes,
         segment: u64,
         segment_end: Option<u64>,
@@ -79,7 +79,7 @@ impl CuesJob {
             failed: false,
         })
     }
-    pub fn step(
+    pub(crate) fn step(
         &mut self,
         work: &mut WorkBudget,
         cancel: &AtomicBool,

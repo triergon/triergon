@@ -880,6 +880,7 @@ impl FragmentLocator<'_> {
 
 /// An owned iterator over one immutable fragment index. Reborrows the same source
 /// cursor on each poll; no self-reference, alternate parser or retained-state injection.
+#[derive(Debug)]
 pub struct OwnedFragmentCursor {
     index: FragmentIndex,
     run: usize,

@@ -55,6 +55,7 @@ pub struct FrameReport {
     pub ts_bytes: usize,
 }
 
+#[derive(Debug)]
 pub struct Session {
     converter: Converter,
     input: Picture,

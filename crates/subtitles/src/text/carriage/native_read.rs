@@ -68,7 +68,7 @@ impl Snapshot {
     }
 }
 
-#[derive(Clone, Copy)]
+#[derive(Debug, Clone, Copy)]
 pub(crate) struct LineRead {
     next: usize,
     end: usize,

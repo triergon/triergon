@@ -14,10 +14,10 @@ pub(crate) struct Frames {
     count: usize,
 }
 impl Frames {
-    pub fn len(&self) -> usize {
+    pub(crate) fn len(&self) -> usize {
         self.count
     }
-    pub fn get(&self, index: usize) -> Option<Range<usize>> {
+    pub(crate) fn get(&self, index: usize) -> Option<Range<usize>> {
         let end = *self.ends.get(index).filter(|_| index < self.count)?;
         let start = if index == 0 {
             self.base
@@ -27,7 +27,7 @@ impl Frames {
         Some(start..end)
     }
     #[cfg(test)]
-    pub fn ranges(&self) -> impl Iterator<Item = Range<usize>> + '_ {
+    pub(crate) fn ranges(&self) -> impl Iterator<Item = Range<usize>> + '_ {
         self.ends[..self.count]
             .iter()
             .enumerate()
@@ -63,7 +63,7 @@ pub(crate) struct LaceJob {
     failed: bool,
 }
 impl LaceJob {
-    pub fn new(source: SharedBytes, range: Range<usize>, mode: u8) -> Result<Self> {
+    pub(crate) fn new(source: SharedBytes, range: Range<usize>, mode: u8) -> Result<Self> {
         if range.start > range.end || range.end > source.len() {
             return Err(Error::Truncated);
         }
@@ -85,7 +85,7 @@ impl LaceJob {
             failed: false,
         })
     }
-    pub fn step_descriptors(
+    pub(crate) fn step_descriptors(
         &mut self,
         work: &mut WorkBudget,
         cancel: &AtomicBool,
@@ -101,11 +101,11 @@ impl LaceJob {
     }
     /// Borrow the one retained descriptor arena only after validation completes.
     /// Packet batches keep this job until all restored frames are staged.
-    pub fn frames(&self) -> Option<&Frames> {
+    pub(crate) fn frames(&self) -> Option<&Frames> {
         matches!(self.phase, Phase::Done).then_some(&self.frames)
     }
     #[cfg(test)]
-    pub fn step(
+    pub(crate) fn step(
         &mut self,
         work: &mut WorkBudget,
         cancel: &AtomicBool,

@@ -238,6 +238,7 @@ fn bind(
     }
     Ok(())
 }
+#[derive(Debug)]
 struct Group {
     count: u32,
     consumed: u32,
@@ -251,6 +252,7 @@ struct Group {
 /// Each original source sample is validated; packet requests use the initial
 /// native frame layout independently. Legitimate payload range requests do not
 /// reset this metadata cursor; a source generation change always invalidates it.
+#[derive(Debug)]
 pub struct Mov9PcmCursorV1<'a> {
     header: &'a TrackHeader,
     table: &'a SampleTable,

@@ -21,7 +21,7 @@ fn add_clip(v: U8x16, off: I8x16) -> U8x16 {
 /// SAO edge offset (8.7.3.2) on n samples: cur / a / b are the sample and its two
 /// neighbours along the edge class; t = SaoOffsetVal[1..=4].
 #[inline(always)]
-pub fn sao_eo(cur: &[u8], a: &[u8], b: &[u8], dst: &mut [u8], t: &[i16; 4]) -> usize {
+pub(super) fn sao_eo(cur: &[u8], a: &[u8], b: &[u8], dst: &mut [u8], t: &[i16; 4]) -> usize {
     let len = cur.len().min(a.len()).min(b.len()).min(dst.len());
     if len < 16 {
         return 0;
@@ -57,7 +57,7 @@ pub fn sao_eo(cur: &[u8], a: &[u8], b: &[u8], dst: &mut [u8], t: &[i16; 4]) -> u
 
 /// SAO band offset (8.7.3.3) for 8-bit samples: bandTable lookup of (v >> 3) - band_pos.
 #[inline(always)]
-pub fn sao_bo(src: &[u8], dst: &mut [u8], band_pos: u8, o: &[i16; 4]) -> usize {
+pub(super) fn sao_bo(src: &[u8], dst: &mut [u8], band_pos: u8, o: &[i16; 4]) -> usize {
     let n = src.len().min(dst.len()) & !15;
     let mut tab = [0u8; 16];
     for k in 0..4 {
@@ -184,7 +184,7 @@ fn luma_core(s: &[I16x16; 8], prm: &LumaLanes, max: i16) -> Option<[I16x16; 6]> 
 
 /// Horizontal luma edge, 16 consecutive columns starting at `pos` (q0 row).
 #[inline(always)]
-pub fn luma_h16_u8(d: &mut [u8], pos: usize, stride: usize, prm: &LumaLanes) {
+pub(super) fn luma_h16_u8(d: &mut [u8], pos: usize, stride: usize, prm: &LumaLanes) {
     let base = pos - 4 * stride;
     let s: [I16x16; 8] = core::array::from_fn(|i| {
         let o = base + i * stride;
@@ -200,7 +200,7 @@ pub fn luma_h16_u8(d: &mut [u8], pos: usize, stride: usize, prm: &LumaLanes) {
 
 /// Horizontal luma edge for >8-bit samples.
 #[inline(always)]
-pub fn luma_h16_u16(d: &mut [u16], pos: usize, stride: usize, prm: &LumaLanes, max: i16) {
+pub(super) fn luma_h16_u16(d: &mut [u16], pos: usize, stride: usize, prm: &LumaLanes, max: i16) {
     let base = pos - 4 * stride;
     let s: [I16x16; 8] = core::array::from_fn(|i| {
         let o = base + i * stride;
@@ -405,7 +405,7 @@ fn transpose_8x16<T: SimdElement>(c: &[Simd<T, 16>; 8]) -> [Simd<T, 8>; 16] {
 
 /// Vertical luma edge over 16 rows; `pos` is q0 of the first row.
 #[inline(always)]
-pub fn luma_v16_u8(d: &mut [u8], pos: usize, stride: usize, prm: &LumaLanes) {
+pub(super) fn luma_v16_u8(d: &mut [u8], pos: usize, stride: usize, prm: &LumaLanes) {
     let rows: [Simd<u8, 8>; 16] = core::array::from_fn(|r| {
         let o = pos + r * stride - 4;
         Simd::<u8, 8>::from_slice(&d[o..o + 8])
@@ -426,7 +426,7 @@ pub fn luma_v16_u8(d: &mut [u8], pos: usize, stride: usize, prm: &LumaLanes) {
 
 /// Vertical luma edge for >8-bit samples.
 #[inline(always)]
-pub fn luma_v16_u16(d: &mut [u16], pos: usize, stride: usize, prm: &LumaLanes, max: i16) {
+pub(super) fn luma_v16_u16(d: &mut [u16], pos: usize, stride: usize, prm: &LumaLanes, max: i16) {
     let rows: [Simd<u16, 8>; 16] = core::array::from_fn(|r| {
         let o = pos + r * stride - 4;
         Simd::<u16, 8>::from_slice(&d[o..o + 8])
@@ -470,7 +470,7 @@ fn chroma_core(s: [I16x16; 4], prm: &LumaLanes, max: i16) -> [I16x16; 2] {
 
 /// Horizontal chroma edge over 16 columns starting at `pos` (q0 row).
 #[inline(always)]
-pub fn chroma_h16_u8(d: &mut [u8], pos: usize, stride: usize, prm: &LumaLanes) {
+pub(super) fn chroma_h16_u8(d: &mut [u8], pos: usize, stride: usize, prm: &LumaLanes) {
     let base = pos - 2 * stride;
     let s: [I16x16; 4] = core::array::from_fn(|i| {
         let o = base + i * stride;
@@ -484,7 +484,7 @@ pub fn chroma_h16_u8(d: &mut [u8], pos: usize, stride: usize, prm: &LumaLanes) {
 }
 
 #[inline(always)]
-pub fn chroma_h16_u16(d: &mut [u16], pos: usize, stride: usize, prm: &LumaLanes, max: i16) {
+pub(super) fn chroma_h16_u16(d: &mut [u16], pos: usize, stride: usize, prm: &LumaLanes, max: i16) {
     let base = pos - 2 * stride;
     let s: [I16x16; 4] = core::array::from_fn(|i| {
         let o = base + i * stride;
@@ -500,7 +500,7 @@ pub fn chroma_h16_u16(d: &mut [u16], pos: usize, stride: usize, prm: &LumaLanes,
 /// Vertical chroma edge over 16 rows; `pos` is q0 of the first row (8 samples p3..q3 of
 /// each row are transposed; only p0 / q0 change).
 #[inline(always)]
-pub fn chroma_v16_u8(d: &mut [u8], pos: usize, stride: usize, prm: &LumaLanes) {
+pub(super) fn chroma_v16_u8(d: &mut [u8], pos: usize, stride: usize, prm: &LumaLanes) {
     let rows: [Simd<u8, 8>; 16] = core::array::from_fn(|r| {
         let o = pos + r * stride - 4;
         Simd::<u8, 8>::from_slice(&d[o..o + 8])
@@ -518,7 +518,7 @@ pub fn chroma_v16_u8(d: &mut [u8], pos: usize, stride: usize, prm: &LumaLanes) {
 }
 
 #[inline(always)]
-pub fn chroma_v16_u16(d: &mut [u16], pos: usize, stride: usize, prm: &LumaLanes, max: i16) {
+pub(super) fn chroma_v16_u16(d: &mut [u16], pos: usize, stride: usize, prm: &LumaLanes, max: i16) {
     let rows: [Simd<u16, 8>; 16] = core::array::from_fn(|r| {
         let o = pos + r * stride - 4;
         Simd::<u16, 8>::from_slice(&d[o..o + 8])
@@ -552,7 +552,7 @@ fn pick4(idx: I16x16, t: &[i16; 4]) -> I16x16 {
 
 /// SAO edge offset for >8-bit samples (see `sao_eo`); max = (1 << bitDepth) - 1.
 #[inline(always)]
-pub fn sao_eo_u16(
+pub(super) fn sao_eo_u16(
     cur: &[u16],
     a: &[u16],
     b: &[u16],
@@ -593,7 +593,7 @@ pub fn sao_eo_u16(
 
 /// SAO band offset for >8-bit samples: bandTable lookup of (v >> shift) - band_pos.
 #[inline(always)]
-pub fn sao_bo_u16(
+pub(super) fn sao_bo_u16(
     src: &[u16],
     dst: &mut [u16],
     shift: u32,

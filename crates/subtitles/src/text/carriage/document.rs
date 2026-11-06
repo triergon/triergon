@@ -32,7 +32,7 @@ enum State {
     Skip,
 }
 
-#[derive(Clone, Copy)]
+#[derive(Debug, Clone, Copy)]
 struct Cue {
     start: i64,
     duration: i64,
@@ -44,6 +44,7 @@ struct Cue {
     lines: usize,
 }
 
+#[derive(Debug)]
 pub(crate) struct Document {
     pool: Budget,
     limits: Limits,

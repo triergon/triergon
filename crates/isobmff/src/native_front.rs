@@ -13,6 +13,7 @@ use triergon_core::{Error, Result, TimeBase, WorkBudget};
 /// One independently owned fragment; the preliminary signed-CTO scan is resumable
 /// and visits only its declared samples. Source times and raw CTO stay literal.
 /// The immutable metadata backing remains charged by its original owner.
+#[derive(Debug)]
 pub struct Mov9FrontFragmentV1 {
     cursor: OwnedFragmentCursor,
     scanning: bool,

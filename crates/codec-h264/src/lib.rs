@@ -4,8 +4,13 @@
 //! High profiles, 8-bit 4:2:0 and 4:0:0, frames, field pictures (PAFF) and MBAFF, CAVLC and
 //! CABAC. Development prototype.
 #![forbid(unsafe_code)]
-#![warn(clippy::print_stdout, clippy::print_stderr, clippy::expect_used)]
-// Pending: `missing_docs`, `missing_debug_implementations`, `unreachable_pub`, `clippy::unwrap_used`.
+#![warn(
+    missing_debug_implementations,
+    clippy::print_stdout,
+    clippy::print_stderr,
+    clippy::expect_used
+)]
+// Pending: `missing_docs`, `unreachable_pub`, `clippy::unwrap_used`.
 // Pending: these rewrites change the generated code of measured hot paths and are
 // adopted with an A/B timing run.
 #![allow(
@@ -161,6 +166,7 @@ pub struct Picture {
     pub interlaced: bool,
 }
 
+#[derive(Debug)]
 struct ActivePic {
     pic: CurPic,
     sps: Sps,
@@ -184,6 +190,7 @@ struct ActivePic {
 }
 
 /// H.264 decoder.
+#[derive(Debug)]
 pub struct Decoder {
     spss: Vec<Option<Box<Sps>>>,
     ppss: Vec<Option<Box<Pps>>>,

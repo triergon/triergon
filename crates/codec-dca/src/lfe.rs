@@ -3,6 +3,7 @@
 
 use crate::tables::{LFE_FIR_64, LFE_FIR_128};
 
+#[derive(Debug)]
 pub(crate) struct LfeFir {
     c64: Vec<f32>,
     c128: Vec<f32>,
@@ -19,7 +20,7 @@ impl LfeFir {
 }
 
 /// Decimated-sample history (most recent last).
-#[derive(Clone, Copy, Default)]
+#[derive(Debug, Clone, Copy, Default)]
 pub(crate) struct LfeState {
     hist: [f32; 8],
 }
@@ -76,7 +77,7 @@ impl LfeState {
 /// `z[2n+1] = 0.25 x[n-1] + 0.75 x[n]` (least-squares fit of its output on the
 /// x96_51_24_96_1509 vector: residual 6e-8). This decoder follows the reference and
 /// deviates from Table 6-11.
-#[derive(Clone, Copy, Default)]
+#[derive(Debug, Clone, Copy, Default)]
 pub(crate) struct Lfe2x {
     x1: f32,
 }

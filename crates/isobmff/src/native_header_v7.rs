@@ -48,6 +48,7 @@ impl Mov9SampleEntryHeaderV7 {
 /// This job consumes an already owned metadata snapshot, not a live I/O cursor.
 /// It cannot seek, consume input, acknowledge failure or change a source token.
 /// Resetting an unrelated/live cursor cannot invalidate retained source bytes.
+#[derive(Debug)]
 pub struct Mov9SampleEntryHeaderJobV7 {
     description: Option<SampleDescription>,
     children: Option<BoxChildren>,

@@ -2,17 +2,17 @@
 use super::{CHAPTERS, Document, Element, INFO, TAGS};
 use crate::{Error, Result};
 /// Chapter/edition views preserve nesting; they do not execute ordered editions or menus.
-#[derive(Clone, Copy)]
+#[derive(Debug, Clone, Copy)]
 pub struct Edition<'a>(pub Element<'a>);
-#[derive(Clone, Copy)]
+#[derive(Debug, Clone, Copy)]
 pub struct Chapter<'a>(pub Element<'a>);
-#[derive(Clone, Copy)]
+#[derive(Debug, Clone, Copy)]
 pub struct ChapterDisplay<'a>(pub Element<'a>);
-#[derive(Clone, Copy)]
+#[derive(Debug, Clone, Copy)]
 pub struct Tag<'a>(pub Element<'a>);
-#[derive(Clone, Copy)]
+#[derive(Debug, Clone, Copy)]
 pub struct Targets<'a>(pub Element<'a>);
-#[derive(Clone, Copy)]
+#[derive(Debug, Clone, Copy)]
 pub struct SimpleTag<'a>(pub Element<'a>);
 impl Document {
     pub fn editions(&self) -> impl Iterator<Item = Edition<'_>> {
@@ -137,7 +137,7 @@ impl<'a> SimpleTag<'a> {
 }
 
 /// Segment Info source values. DateUTC remains signed nanoseconds since 2001-01-01.
-#[derive(Clone, Copy)]
+#[derive(Debug, Clone, Copy)]
 pub struct SegmentInfo<'a>(pub Element<'a>);
 impl Document {
     pub fn info(&self) -> Option<SegmentInfo<'_>> {

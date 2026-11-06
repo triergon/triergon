@@ -5,6 +5,7 @@ use crate::text::{Format, Input};
 use std::sync::atomic::{AtomicBool, Ordering};
 use triergon_core::{Budget, BudgetVec, Error, Result, Time, TimeBase, WorkBudget};
 
+#[derive(Debug)]
 pub struct Session {
     pool: Budget,
     limits: Limits,

@@ -70,7 +70,7 @@ pub(crate) struct CueTarget {
 }
 impl CueValidationJob {
     #[inline(always)]
-    pub fn new(
+    pub(crate) fn new(
         target: CueTarget,
         configuration: Configuration,
         limits: Limits,
@@ -146,7 +146,7 @@ impl CueValidationJob {
         }
         Ok(step)
     }
-    pub fn step(
+    pub(crate) fn step(
         &mut self,
         reader: &mut ElementReader,
         work: &mut WorkBudget,

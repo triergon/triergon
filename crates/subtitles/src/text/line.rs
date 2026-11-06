@@ -21,23 +21,23 @@ pub(crate) struct Line {
 }
 
 impl Line {
-    pub fn empty(&self) -> bool {
+    pub(super) fn empty(&self) -> bool {
         self.characters == 0
     }
-    pub fn range(&self) -> Range<usize> {
+    pub(super) fn range(&self) -> Range<usize> {
         self.start..self.end
     }
-    pub fn signature(&self) -> bool {
+    pub(super) fn signature(&self) -> bool {
         self.prefix[..6] == *b"WEBVTT"
             && (self.characters == 6 || matches!(self.prefix[6], b' ' | b'\t'))
     }
-    pub fn keyword(&self, word: &[u8]) -> bool {
+    pub(super) fn keyword(&self, word: &[u8]) -> bool {
         word.len() <= self.prefix.len()
             && self.characters >= word.len()
             && &self.prefix[..word.len()] == word
             && self.last_nonspace == word.len()
     }
-    pub fn note(&self) -> bool {
+    pub(super) fn note(&self) -> bool {
         self.characters >= 4
             && self.prefix[..4] == *b"NOTE"
             && (self.characters == 4 || matches!(self.prefix[4], b' ' | b'\t'))
@@ -63,7 +63,7 @@ pub(crate) struct Reader {
 }
 
 impl Reader {
-    pub fn new(range: Range<usize>, encoding: Encoding) -> Self {
+    pub(super) fn new(range: Range<usize>, encoding: Encoding) -> Self {
         Self {
             cursor: Cursor::new(range.clone(), encoding),
             range_end: range.end,
@@ -113,7 +113,7 @@ impl Reader {
         line
     }
 
-    pub fn poll(
+    pub(super) fn poll(
         &mut self,
         bytes: &[u8],
         maximum: usize,

@@ -42,7 +42,7 @@ pub(crate) struct MaskParams<'a> {
 /// Per-channel intermediate results, so that a block which only changes SNR offsets
 /// re-runs only the final stage (7.2.2.7), and one that only changes parameters re-runs
 /// only the masking stages (7.2.2.4-6).
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub(crate) struct BaCache {
     psd: [i32; 256],
     bndpsd: [i32; 50],

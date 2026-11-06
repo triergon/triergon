@@ -271,6 +271,7 @@ pub struct ValidationContext {
 pub(super) struct FontPage {
     entries: [u16; 256],
 }
+#[derive(Debug)]
 pub(super) struct FontIndex {
     pages: BudgetVec<FontPage>,
     mapping: [Option<u8>; 256],
@@ -291,6 +292,7 @@ impl FontIndex {
 
 /// Complete source sample, description and derived semantic views. All vectors
 /// are charged and exposed read-only; a public Cue is never a validation token.
+#[derive(Debug)]
 pub struct Semantics {
     source: Cue,
     description: Option<Configuration>,

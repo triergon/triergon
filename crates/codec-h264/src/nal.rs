@@ -4,6 +4,7 @@ use crate::bitreader::RBSP_PAD;
 
 /// Iterate over NAL unit payloads (without start code prefixes) in an Annex B byte stream chunk.
 /// Trailing zero bytes (trailing_zero_8bits / next start code's leading zero) are stripped.
+#[derive(Debug)]
 pub struct NalIter<'a> {
     data: &'a [u8],
     pos: usize,

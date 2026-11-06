@@ -74,7 +74,7 @@ pub(super) struct ScanSimple {
     phase: SimplePhase,
 }
 impl ScanSimple {
-    pub fn new(header: ElementHeader, context: &ScanContext<'_>) -> Self {
+    pub(super) fn new(header: ElementHeader, context: &ScanContext<'_>) -> Self {
         Self {
             header,
             source: context.source,
@@ -87,10 +87,10 @@ impl ScanSimple {
             phase: SimplePhase::Header,
         }
     }
-    pub fn header(&self) -> ElementHeader {
+    pub(super) fn header(&self) -> ElementHeader {
         self.header
     }
-    pub fn context_matches(&self, context: &ScanContext<'_>) -> bool {
+    pub(super) fn context_matches(&self, context: &ScanContext<'_>) -> bool {
         self.source == context.source
             && self.header.generation == context.generation
             && self.cluster_ticks == context.cluster_ticks
@@ -102,21 +102,21 @@ impl ScanSimple {
                     && configuration.belongs_to(context.pool)
             })
     }
-    pub fn draining(&self) -> bool {
+    pub(super) fn draining(&self) -> bool {
         self.phase == SimplePhase::Drain
     }
-    pub fn completed_fields(&self) -> Option<ScanPacketFields> {
+    pub(super) fn completed_fields(&self) -> Option<ScanPacketFields> {
         if self.phase == SimplePhase::Complete {
             self.fields
         } else {
             None
         }
     }
-    pub fn finish(&mut self) {
+    pub(super) fn finish(&mut self) {
         self.phase = SimplePhase::Complete;
     }
     /// False means resume the unchanged full body, never an early packet error.
-    pub fn step_prefix(
+    pub(super) fn step_prefix(
         &mut self,
         bytes: &[u8],
         context: &ScanContext<'_>,

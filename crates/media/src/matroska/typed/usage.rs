@@ -187,7 +187,7 @@ pub(crate) struct Pressure {
     total: usize,
 }
 impl Pressure {
-    pub fn new(requested: usize) -> Self {
+    pub(crate) fn new(requested: usize) -> Self {
         Self {
             requested,
             index: 0,
@@ -196,7 +196,7 @@ impl Pressure {
             total: Budget::control_storage_bytes(),
         }
     }
-    pub fn step(
+    pub(crate) fn step(
         &mut self,
         graph: &dyn Storage,
         pool: &Budget,

@@ -51,6 +51,7 @@ pub struct FontRecord {
     pub id: u16,
     pub name_range: Range<usize>,
 }
+#[derive(Debug)]
 pub struct Configuration {
     pub raw: Bytes,
     pub layout: ConfigLayout,
@@ -76,6 +77,7 @@ enum Phase {
     Taken,
 }
 
+#[derive(Debug)]
 pub struct ConfigJob {
     raw: Bytes,
     layout: ConfigLayout,

@@ -8,6 +8,7 @@ use crate::{
 };
 use triergon_core::{Error, Result, WorkBudget};
 
+#[derive(Debug)]
 pub(crate) struct EmptyRecoveryWalkV4 {
     children: Option<BoxChildren>,
     pending: Option<MappingRows>,
@@ -15,6 +16,7 @@ pub(crate) struct EmptyRecoveryWalkV4 {
     samples: u64,
     limits: RecoveryLimits,
 }
+#[derive(Debug)]
 struct MappingRows {
     source: RecoveryMappings,
     row: u32,

@@ -237,6 +237,7 @@ pub enum Mov9EncodedConfigStepV3 {
     Yield,
     Ready(Option<Bytes>),
 }
+#[derive(Debug)]
 pub struct Mov9EncodedConfigSequenceV3<'a> {
     configs: &'a [Mov9EncodedStreamV1],
     pool: Budget,

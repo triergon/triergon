@@ -9,7 +9,7 @@ pub(crate) struct DisplayWork<'a> {
 }
 
 impl DisplayWork<'_> {
-    pub fn pay(&mut self, credit: &mut usize, cost: usize) -> Result<bool> {
+    pub(super) fn pay(&mut self, credit: &mut usize, cost: usize) -> Result<bool> {
         if self.cancel.load(Ordering::Relaxed) {
             return Err(Error::Cancelled);
         }
@@ -43,7 +43,10 @@ impl DisplayWork<'_> {
         Ok(*credit == cost)
     }
 
-    pub fn child<T>(&mut self, action: impl FnOnce(&mut WorkBudget) -> Result<T>) -> Result<T> {
+    pub(super) fn child<T>(
+        &mut self,
+        action: impl FnOnce(&mut WorkBudget) -> Result<T>,
+    ) -> Result<T> {
         if self.cancel.load(Ordering::Relaxed) {
             return Err(Error::Cancelled);
         }

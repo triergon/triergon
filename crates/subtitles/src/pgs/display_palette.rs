@@ -57,7 +57,7 @@ pub(crate) struct PaletteBuild {
 }
 
 impl PaletteBuild {
-    pub fn new(
+    pub(super) fn new(
         budget: &Budget,
         payload: Bytes,
         epoch: u64,
@@ -103,7 +103,7 @@ impl PaletteBuild {
         })
     }
 
-    pub fn step(&mut self, work: &mut DisplayWork<'_>) -> Result<bool> {
+    pub(super) fn step(&mut self, work: &mut DisplayWork<'_>) -> Result<bool> {
         if work.cancel.load(std::sync::atomic::Ordering::Relaxed) {
             return Err(Error::Cancelled);
         }
@@ -375,7 +375,7 @@ impl PaletteBuild {
         }
     }
 
-    pub fn take(&mut self) -> Result<PaletteSnapshot> {
+    pub(super) fn take(&mut self) -> Result<PaletteSnapshot> {
         self.result
             .take()
             .ok_or(Error::Invalid("PGS palette not ready"))

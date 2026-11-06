@@ -18,7 +18,7 @@ const CC_SCALE: [f64; 4] = [
     2.0,
 ];
 
-#[derive(Clone, Copy, Default)]
+#[derive(Debug, Clone, Copy, Default)]
 pub(crate) struct Target {
     pub is_cpe: bool,
     pub tag: u8,
@@ -26,6 +26,7 @@ pub(crate) struct Target {
     pub r: bool,
 }
 
+#[derive(Debug)]
 pub(crate) struct CceState {
     pub tag: u8,
     pub ind_sw: bool,

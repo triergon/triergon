@@ -16,7 +16,7 @@ pub(super) struct Coverage {
 }
 
 impl Coverage {
-    pub fn new(budget: &Budget, size: Size) -> Result<Self> {
+    pub(super) fn new(budget: &Budget, size: Size) -> Result<Self> {
         let area = u64::from(size.width)
             .checked_mul(u64::from(size.height))
             .ok_or(Error::Overflow)?;
@@ -27,7 +27,7 @@ impl Coverage {
         Ok(Self { bits, length })
     }
 
-    pub fn prepare(
+    pub(super) fn prepare(
         &mut self,
         work: &mut WorkBudget,
         total: &mut usize,
@@ -53,7 +53,7 @@ impl Coverage {
     /// Pixel work is charged by the enclosing raster before claiming this span.
     /// Transparent/nonmodifying codes occupy source coordinates too; cropping
     /// cannot hide an overlap or turn this into visible-pixel-only validation.
-    pub fn claim(&mut self, first: usize, count: usize) -> Result<()> {
+    pub(super) fn claim(&mut self, first: usize, count: usize) -> Result<()> {
         let end = first.checked_add(count).ok_or(Error::Overflow)?;
         for pixel in first..end {
             let byte = self

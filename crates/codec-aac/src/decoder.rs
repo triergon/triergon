@@ -25,6 +25,7 @@ const EXT_SBR_DATA_CRC: u32 = 14;
 const PNS_INITIAL_STATE: u32 = 0x1f2e3d4c;
 
 /// Persistent per-channel state.
+#[derive(Debug)]
 pub(crate) struct ChannelState {
     pub overlap: Vec<f32>,
     pub prev_shape: u8,
@@ -62,6 +63,7 @@ pub(crate) struct Slot {
 }
 
 /// Element instance state (channels + SBR).
+#[derive(Debug)]
 pub(crate) struct ElementState {
     pub kind: u8,
     pub tag: u8,
@@ -82,6 +84,7 @@ pub(crate) struct ElementState {
     pub ch_decoded: [bool; 2],
 }
 
+#[derive(Debug)]
 pub(crate) struct Core {
     pub aot: u8,
     pub sf_index: usize,

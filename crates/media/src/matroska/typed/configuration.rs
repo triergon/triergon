@@ -165,7 +165,7 @@ impl ConfigurationJob {
     /// Internal seam, not a public raw-Track admission API. The future Tracks
     /// builder must create this vector in pool and complete all source validation
     /// before calling it. No untracked Vec is adopted here.
-    pub fn from_validated_vec(
+    pub(crate) fn from_validated_vec(
         tracks: BudgetVec<Track>,
         pool: &Budget,
         generation: u64,
@@ -192,7 +192,7 @@ impl ConfigurationJob {
         self.webm_vp9_t35 = enabled;
         self
     }
-    pub fn step(
+    pub(crate) fn step(
         &mut self,
         work: &mut WorkBudget,
         cancel: &AtomicBool,

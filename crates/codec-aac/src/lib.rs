@@ -5,8 +5,13 @@
 //! SBR, plane order = FFmpeg native channel order, float full scale 1.0; see
 //! [`triergon_codec::layout`]).
 #![forbid(unsafe_code)]
-#![warn(unreachable_pub, clippy::print_stdout, clippy::print_stderr)]
-// Pending: `missing_docs`, `missing_debug_implementations`, `clippy::unwrap_used`, `clippy::expect_used`.
+#![warn(
+    missing_debug_implementations,
+    unreachable_pub,
+    clippy::print_stdout,
+    clippy::print_stderr
+)]
+// Pending: `missing_docs`, `clippy::unwrap_used`, `clippy::expect_used`.
 // Pending: these rewrites change the generated code of measured hot paths and are
 // adopted with an A/B timing run.
 #![allow(
@@ -41,6 +46,7 @@ use bits::BitReader;
 use triergon_codec::{AudioDecoder, DecodeFailure, DownmixLevels};
 
 /// ADTS AAC decoder.
+#[derive(Debug)]
 pub struct Decoder {
     core: decoder::Core,
 }

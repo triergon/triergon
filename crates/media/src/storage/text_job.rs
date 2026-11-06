@@ -33,7 +33,7 @@ pub(crate) struct TextJob {
     failed: bool,
 }
 impl TextJob {
-    pub fn new(source: SharedBytes, range: Range<usize>, ascii: bool) -> Result<Self> {
+    pub(crate) fn new(source: SharedBytes, range: Range<usize>, ascii: bool) -> Result<Self> {
         if range.start > range.end || range.end > source.len() {
             return Err(Error::Truncated);
         }
@@ -53,7 +53,7 @@ impl TextJob {
             failed: false,
         })
     }
-    pub fn step(
+    pub(crate) fn step(
         &mut self,
         work: &mut WorkBudget,
         cancel: &AtomicBool,

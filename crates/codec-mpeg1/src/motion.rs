@@ -13,24 +13,24 @@
 use triergon_pixel::Geometry;
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
-pub struct Mv {
+pub(crate) struct Mv {
     pub x: i32,
     pub y: i32,
 }
 
 impl Mv {
-    pub const ZERO: Mv = Mv { x: 0, y: 0 };
+    pub(crate) const ZERO: Mv = Mv { x: 0, y: 0 };
 }
 
 /// MPEG-1 chroma vector: luma vector halved, truncating toward zero.
 #[inline]
-pub fn chroma(v: i32) -> i32 {
+pub(crate) fn chroma(v: i32) -> i32 {
     v / 2
 }
 
 /// Reference-picture bounds for one macroblock position, in half-samples.
 #[derive(Clone, Copy)]
-pub struct Bounds {
+pub(crate) struct Bounds {
     lo_x: i32,
     hi_x: i32,
     lo_y: i32,
@@ -39,7 +39,7 @@ pub struct Bounds {
 
 impl Bounds {
     /// `range` caps |component| (half-samples) to what the f_code can code.
-    pub fn new(g: &Geometry, mb_x: usize, mb_y: usize, range: i32) -> Bounds {
+    pub(crate) fn new(g: &Geometry, mb_x: usize, mb_y: usize, range: i32) -> Bounds {
         let (w, h) = (
             (g.macroblock_width() * 16) as i32,
             (g.macroblock_height() * 16) as i32,
@@ -55,7 +55,7 @@ impl Bounds {
 
     /// Whether `mv` stays inside the coded picture for luma and chroma.
     #[inline]
-    pub fn contains(&self, mv: Mv) -> bool {
+    pub(crate) fn contains(&self, mv: Mv) -> bool {
         if mv.x < self.lo_x || mv.x > self.hi_x || mv.y < self.lo_y || mv.y > self.hi_y {
             return false;
         }
@@ -66,7 +66,7 @@ impl Bounds {
 }
 
 /// 4×4-averaged copy of a coded luma plane (one sample per 4×4 block).
-pub fn decimate4(plane: &[u8], stride: usize, rows: usize, out: &mut Vec<u8>) {
+pub(crate) fn decimate4(plane: &[u8], stride: usize, rows: usize, out: &mut Vec<u8>) {
     let (w, h) = (stride / 4, rows / 4);
     out.resize(w * h, 0);
     for (src, dst) in plane[..h * 4 * stride]
@@ -93,7 +93,7 @@ fn byte_pairs(bytes: &[u8]) -> u32 {
 
 /// SAD of two 16×16 blocks; per-lane accumulation keeps it vectorisable.
 #[inline(never)]
-pub fn sad16(cur: &[u8], cur_stride: usize, reference: &[u8], ref_stride: usize) -> u32 {
+pub(crate) fn sad16(cur: &[u8], cur_stride: usize, reference: &[u8], ref_stride: usize) -> u32 {
     let mut acc = [0u16; 16];
     for row in 0..16 {
         let a: &[u8; 16] = cur[row * cur_stride..row * cur_stride + 16]
@@ -112,7 +112,7 @@ pub fn sad16(cur: &[u8], cur_stride: usize, reference: &[u8], ref_stride: usize)
 /// SAD of two 16×16 blocks, abandoned once it reaches `limit`: the result is
 /// exact when below `limit` and otherwise only guaranteed to be >= `limit`.
 #[inline]
-pub fn sad16_within(
+pub(crate) fn sad16_within(
     cur: &[u8],
     cur_stride: usize,
     reference: &[u8],
@@ -146,7 +146,13 @@ pub fn sad16_within(
 /// sample-to-the-right rows are separate overlapping 16-byte loads, which keeps
 /// every operand a plain vector.
 #[inline]
-pub fn sad16_half(cur: &[u8], reference: &[u8], stride: usize, half_x: bool, half_y: bool) -> u32 {
+pub(crate) fn sad16_half(
+    cur: &[u8],
+    reference: &[u8],
+    stride: usize,
+    half_x: bool,
+    half_y: bool,
+) -> u32 {
     let cur = &cur[..15 * stride + 16];
     let reference = &reference[..15 * stride + 16 + half_y as usize * stride + half_x as usize];
     let mut acc = [0u16; 16];
@@ -201,7 +207,7 @@ fn half_row(
 
 /// Sum of squared differences of two 16×16 blocks.
 #[inline]
-pub fn sse16(cur: &[u8], cur_stride: usize, reference: &[u8], ref_stride: usize) -> u32 {
+pub(crate) fn sse16(cur: &[u8], cur_stride: usize, reference: &[u8], ref_stride: usize) -> u32 {
     let mut acc = [0u32; 16];
     for row in 0..16 {
         let a: &[u8; 16] = cur[row * cur_stride..row * cur_stride + 16]
@@ -222,7 +228,7 @@ pub fn sse16(cur: &[u8], cur_stride: usize, reference: &[u8], ref_stride: usize)
 /// sample position `(x, y)` of `plane`. Averages round half up (MPEG-1).
 #[inline]
 #[allow(clippy::too_many_arguments)]
-pub fn predict<const N: usize>(
+pub(crate) fn predict<const N: usize>(
     plane: &[u8],
     stride: usize,
     x: usize,
@@ -278,7 +284,7 @@ pub fn predict<const N: usize>(
 /// Predict the 16×16 luma of a macroblock straight into its four 8×8
 /// blocks (raster order Y0..Y3), with the same rounding as [`predict`].
 #[inline]
-pub fn predict_luma_blocks(
+pub(crate) fn predict_luma_blocks(
     plane: &[u8],
     stride: usize,
     x: usize,
@@ -326,7 +332,7 @@ pub fn predict_luma_blocks(
 
 /// Bits to code one vector component difference with forward f_code `f_code`.
 #[inline]
-pub fn component_bits(delta: i32, f_code: u32) -> u32 {
+pub(crate) fn component_bits(delta: i32, f_code: u32) -> u32 {
     let r_size = f_code - 1;
     if delta == 0 {
         return 1;
@@ -336,14 +342,14 @@ pub fn component_bits(delta: i32, f_code: u32) -> u32 {
 }
 
 /// Coarse-level inputs: decimated current and reference luma.
-pub struct Coarse<'a> {
+pub(crate) struct Coarse<'a> {
     pub cur: &'a [u8],
     pub reference: &'a [u8],
     pub width: usize,
 }
 
 /// Searches one 16×16 luma block of `cur` against `reference`.
-pub struct Search<'a> {
+pub(crate) struct Search<'a> {
     pub cur: &'a [u8],
     pub reference: &'a [u8],
     pub stride: usize,
@@ -402,7 +408,7 @@ impl Search<'_> {
     /// SAD of an already searched neighbouring macroblock (u32::MAX if none):
     /// predictors that do about as well as the neighbour make the coarse
     /// search unnecessary.
-    pub fn run(
+    pub(crate) fn run(
         &self,
         predictors: &[Mv],
         coarse: &Coarse<'_>,

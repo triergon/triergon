@@ -17,6 +17,7 @@ pub const PRED_OFFSET: i32 = 8192;
 pub const EDGE_STRIDE: usize = 80;
 pub const EDGE_SIZE: usize = EDGE_STRIDE * 72;
 
+#[derive(Debug)]
 pub struct McScratch<P> {
     pub edge: Vec<P>,
     pub tmp: Vec<i16>,

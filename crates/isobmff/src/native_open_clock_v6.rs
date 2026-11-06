@@ -30,6 +30,7 @@ impl Mov9FragmentClockResultV6 {
 /// Source cursor syntax work plus one work unit for each native duration fold.
 /// One pending source sample allows Work1 progress without repeating parsing.
 /// No payload read, source seek, copied workspace or native receipt is invented.
+#[derive(Debug)]
 pub struct Mov9FragmentClockJobV6<'a> {
     index: &'a FragmentIndex,
     cursor: Option<FragmentCursor<'a>>,

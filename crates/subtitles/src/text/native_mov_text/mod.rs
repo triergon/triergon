@@ -107,6 +107,7 @@ pub enum Status {
 /// Fresh native-compatible context with a bounded incremental open phase.
 /// Extradata must be the caller's AVCodec extradata, not an assumed SampleEntry.
 /// All caller-owned inputs rejected by provide are returned intact.
+#[derive(Debug)]
 pub struct NativeMovText {
     pool: Budget,
     limits: Limits,
@@ -303,6 +304,7 @@ impl NativeMovText {
 
 /// Funding stays attached to the current atomic transition until it commits.
 /// A funded allocation that encounters pressure is not charged again on retry.
+#[derive(Debug)]
 struct Funding {
     credit: usize,
     spent: usize,

@@ -47,11 +47,11 @@ pub(crate) struct RangeLeafJob {
     read_left: Option<u64>,
 }
 impl RangeLeafJob {
-    pub fn needs_header_input(&self) -> bool {
+    pub(crate) fn needs_header_input(&self) -> bool {
         matches!(self.phase, Phase::Header) && self.have < self.target
     }
 
-    pub fn begin(
+    pub(crate) fn begin(
         input: &mut InputCursor,
         offset: u64,
         expected: u64,
@@ -88,7 +88,7 @@ impl RangeLeafJob {
             read_left: None,
         })
     }
-    pub fn begin_header_only(
+    pub(crate) fn begin_header_only(
         input: &mut InputCursor,
         offset: u64,
         expected: u64,
@@ -98,7 +98,7 @@ impl RangeLeafJob {
         job.header_only = true;
         Ok(job)
     }
-    pub fn set_read_limit(&mut self, remaining: u64) {
+    pub(crate) fn set_read_limit(&mut self, remaining: u64) {
         self.read_left = Some(remaining);
     }
     fn identity(&self, input: &InputCursor) -> Result<()> {
@@ -123,7 +123,7 @@ impl RangeLeafJob {
         }
         Ok(())
     }
-    pub fn step(
+    pub(crate) fn step(
         &mut self,
         input: &mut InputCursor,
         work: &mut WorkBudget,

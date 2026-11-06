@@ -5,8 +5,13 @@
 //! is no reordering delay.
 
 #![forbid(unsafe_code)]
-#![warn(clippy::print_stdout, clippy::print_stderr)]
-// Pending: `missing_docs`, `missing_debug_implementations`, `unreachable_pub`, `clippy::unwrap_used`, `clippy::expect_used`.
+#![warn(
+    missing_debug_implementations,
+    unreachable_pub,
+    clippy::print_stdout,
+    clippy::print_stderr
+)]
+// Pending: `missing_docs`, `clippy::unwrap_used`, `clippy::expect_used`.
 
 mod bits;
 mod block;
@@ -58,13 +63,14 @@ pub struct EncodedPicture {
     pub qscale_mean: u32,
 }
 
-#[derive(Clone, Copy, Default)]
+#[derive(Debug, Clone, Copy, Default)]
 struct Analysis {
     mv: Mv,
     sad: u32,
     intra: bool,
 }
 
+#[derive(Debug)]
 pub struct Encoder {
     cfg: EncoderConfig,
     reference: Picture,

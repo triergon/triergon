@@ -16,7 +16,7 @@ pub(crate) struct EbmlJob {
     done: bool,
 }
 impl EbmlJob {
-    pub fn new(source: SharedBytes) -> Self {
+    pub(crate) fn new(source: SharedBytes) -> Self {
         let end = source.len();
         Self {
             source,
@@ -25,7 +25,7 @@ impl EbmlJob {
             done: false,
         }
     }
-    pub fn step(
+    pub(crate) fn step(
         &mut self,
         work: &mut WorkBudget,
         cancel: &AtomicBool,
@@ -95,7 +95,7 @@ pub(crate) struct SeekHeadJob {
     phase: Phase,
 }
 impl SeekHeadJob {
-    pub fn new(source: SharedBytes, segment: u64, old_count: usize, pool: &Budget) -> Self {
+    pub(crate) fn new(source: SharedBytes, segment: u64, old_count: usize, pool: &Budget) -> Self {
         let end = source.len();
         Self {
             source,
@@ -109,7 +109,7 @@ impl SeekHeadJob {
             phase: Phase::Root,
         }
     }
-    pub fn step(
+    pub(crate) fn step(
         &mut self,
         work: &mut WorkBudget,
         cancel: &AtomicBool,

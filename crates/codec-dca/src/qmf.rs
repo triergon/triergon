@@ -12,6 +12,7 @@
 
 use crate::dct::Dct4;
 
+#[derive(Debug)]
 pub(crate) struct Qmf {
     n: usize,
     /// Sign-modified prototype regrouped as 16 taps x n, gain folded in.
@@ -20,6 +21,7 @@ pub(crate) struct Qmf {
 }
 
 /// Per-channel synthesis history: 16 slots of `[U | W]` vectors (2 n floats each).
+#[derive(Debug)]
 pub(crate) struct QmfState {
     n: usize,
     ring: Vec<f32>,

@@ -22,7 +22,7 @@ pub(crate) struct ColourJob {
     failed: bool,
 }
 impl ColourJob {
-    pub fn new(source: SharedBytes, range: Range<usize>) -> Self {
+    pub(crate) fn new(source: SharedBytes, range: Range<usize>) -> Self {
         Self {
             source,
             cursor: ChildCursor::new(range),
@@ -34,7 +34,7 @@ impl ColourJob {
             failed: false,
         }
     }
-    pub fn step(
+    pub(crate) fn step(
         &mut self,
         work: &mut WorkBudget,
         cancel: &AtomicBool,

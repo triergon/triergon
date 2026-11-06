@@ -63,6 +63,7 @@ pub enum TraceEvent {
 }
 
 /// Disposition of a validated PES body carrier offered directly to a feed.
+#[derive(Debug)]
 pub enum FeedContinuation {
     Emit,
     Buffered,

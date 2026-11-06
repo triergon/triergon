@@ -21,7 +21,7 @@ pub(crate) struct Times {
 }
 
 impl Times {
-    pub fn sample(input: &Input) -> Result<Self> {
+    pub(super) fn sample(input: &Input) -> Result<Self> {
         let start = input.timing.start();
         let duration = input.timing.duration();
         let end = match (start, duration) {
@@ -66,7 +66,7 @@ pub(crate) struct Emitter {
 }
 
 impl Emitter {
-    pub fn new(plan: Plan, pool: &Budget) -> Self {
+    pub(super) fn new(plan: Plan, pool: &Budget) -> Self {
         let transcode = matches!(
             plan.span.encoding,
             Encoding::Utf16Be
@@ -90,7 +90,7 @@ impl Emitter {
         }
     }
 
-    pub fn poll(
+    pub(super) fn poll(
         &mut self,
         input: &Input,
         limits: Limits,

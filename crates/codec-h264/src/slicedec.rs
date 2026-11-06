@@ -54,6 +54,7 @@ pub(crate) struct ColInfo {
 }
 
 /// The picture being decoded.
+#[derive(Debug)]
 pub(crate) struct CurPic {
     pub store: usize,
     pub buf: FrameBuf,

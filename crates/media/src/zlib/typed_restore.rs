@@ -21,14 +21,14 @@ pub(crate) struct RestorePlan {
     borrow_stored: bool,
 }
 impl RestorePlan {
-    pub fn from_decoder(decoder: &Decoder) -> Self {
+    pub(crate) fn from_decoder(decoder: &Decoder) -> Self {
         Self {
             steps: decoder.steps.clone(),
             count: decoder.count,
             borrow_stored: false,
         }
     }
-    pub fn header(prefix: SharedBytes) -> Self {
+    pub(crate) fn header(prefix: SharedBytes) -> Self {
         let mut steps = std::array::from_fn(|_| None);
         steps[0] = Some(DecodeStep::Header(prefix));
         Self {
@@ -38,7 +38,7 @@ impl RestorePlan {
         }
     }
     #[cfg(test)]
-    pub fn identity() -> Self {
+    pub(crate) fn identity() -> Self {
         Self {
             steps: std::array::from_fn(|_| None),
             count: 0,
@@ -46,7 +46,7 @@ impl RestorePlan {
         }
     }
     #[cfg(test)]
-    pub fn zlib() -> Self {
+    pub(crate) fn zlib() -> Self {
         let mut steps = std::array::from_fn(|_| None);
         steps[0] = Some(DecodeStep::Zlib);
         Self {
@@ -55,7 +55,7 @@ impl RestorePlan {
             borrow_stored: false,
         }
     }
-    pub fn borrow_single_stored(mut self, borrow: bool) -> Self {
+    pub(crate) fn borrow_single_stored(mut self, borrow: bool) -> Self {
         self.borrow_stored =
             borrow && self.count == 1 && matches!(self.steps[0], Some(DecodeStep::Zlib));
         self
@@ -399,7 +399,7 @@ pub(crate) struct RestoreJob {
 }
 impl RestoreJob {
     #[inline(always)]
-    pub fn new(
+    pub(crate) fn new(
         source: SharedBytes,
         plan: RestorePlan,
         limits: Limits,
@@ -423,7 +423,7 @@ impl RestoreJob {
             failed: false,
         })
     }
-    pub fn step(
+    pub(crate) fn step(
         &mut self,
         work: &mut WorkBudget,
         cancel: &AtomicBool,

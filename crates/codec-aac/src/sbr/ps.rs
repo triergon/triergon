@@ -255,6 +255,7 @@ fn tables() -> &'static Tables {
     })
 }
 
+#[derive(Debug)]
 pub(crate) struct Ps {
     // header state
     enable_iid: bool,

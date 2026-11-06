@@ -214,13 +214,14 @@ impl<'a> Mov9PacketCursor<'a> {
     }
 }
 
-#[derive(Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum Search {
     Forward,
     PreviousSync,
     Ready,
 }
 
+#[derive(Debug)]
 struct TrackSeek<'a> {
     target: i64,
     next: u64,
@@ -327,6 +328,7 @@ impl<'a> TrackSeek<'a> {
 }
 
 /// Source-bound seek over the sparse regular-track restarts from range open.
+#[derive(Debug)]
 pub struct Mov9RangeSeekJob<'a> {
     index: Arc<Checkpoints<'a>>,
     slots: BudgetVec<Slot<'a>>,

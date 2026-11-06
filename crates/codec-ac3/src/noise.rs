@@ -16,6 +16,7 @@ const SEED_ZERO: [u32; 64] = [
     0xddcb3ae2, 0x95b866ea, 0x1eb13c9a, 0x346646c2, 0x8ba48526, 0xb325e9bf, 0x29f07d49, 0xc986cf38,
 ];
 
+#[derive(Debug)]
 struct LaggedNoise {
     words: [u32; 64],
     head: usize,
@@ -40,6 +41,7 @@ impl LaggedNoise {
     }
 }
 
+#[derive(Debug)]
 pub(crate) struct Rng {
     legacy: u32,
     lagged: Option<LaggedNoise>,

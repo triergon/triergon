@@ -57,7 +57,7 @@ struct BsCtx<'a> {
 
 /// Motion of an inter MB whose 16 blocks share one reference picture and motion vector per
 /// list (`rid[0] == i32::MIN`: not uniform, intra or not yet known).
-#[derive(Clone, Copy)]
+#[derive(Debug, Clone, Copy)]
 struct Uni {
     rid: [i32; 2],
     mv: [[i16; 2]; 2],
@@ -519,6 +519,7 @@ fn filter_chroma(l: &mut Lanes, pr: &LineParams, _n: usize) {
 /// filtering a row only touches that row and the bottom lines of the row above, and the row
 /// below has then already read the unfiltered samples it predicts from. The result equals
 /// filtering the whole picture after decoding (8.7), with the samples still in cache.
+#[derive(Debug)]
 pub(crate) struct Progress {
     /// Macroblocks still to be decoded per row.
     left: Vec<u32>,

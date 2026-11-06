@@ -18,6 +18,7 @@ pub(crate) const MAX_T: usize = 128;
 /// `HIST` floats of a row hold the ADPCM history (the previous frame's last samples).
 /// Rows are sized for the longest frame and the most slots seen so far (most streams use
 /// 16 samples per band, a small fraction of the 128 the syntax allows).
+#[derive(Debug)]
 pub(crate) struct SubBuf {
     data: Vec<f32>,
     bands: usize,
@@ -105,6 +106,7 @@ pub(crate) fn sat24(v: f32) -> f32 {
 }
 
 /// Per-subframe side information of a channel set.
+#[derive(Debug)]
 pub(crate) struct SideInfo {
     pub pmode: [[bool; 32]; MAX_SET_CH],
     pub pvq: [[u16; 32]; MAX_SET_CH],

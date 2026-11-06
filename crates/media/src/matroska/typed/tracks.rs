@@ -524,14 +524,14 @@ pub(crate) struct TracksJob {
     webm_vp9_t35: bool,
 }
 impl TracksJob {
-    pub fn metadata_bytes(&self) -> Result<usize> {
+    pub(crate) fn metadata_bytes(&self) -> Result<usize> {
         self.source
             .len()
             .checked_add(self.private_bytes)
             .ok_or(Error::Overflow)
     }
     #[inline(always)]
-    pub fn new(
+    pub(crate) fn new(
         source: SharedBytes,
         previous: Option<Configuration>,
         limits: Limits,
@@ -575,7 +575,7 @@ impl TracksJob {
         self.webm_vp9_t35 = enabled;
         self
     }
-    pub fn step(
+    pub(crate) fn step(
         &mut self,
         work: &mut WorkBudget,
         cancel: &AtomicBool,

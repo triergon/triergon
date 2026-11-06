@@ -57,6 +57,7 @@ pub fn probe(bytes: &[u8]) -> Probe {
 }
 
 /// Every reader the facade can open, one variant per enabled format.
+#[derive(Debug)]
 pub enum AnyReader {
     #[cfg(feature = "matroska")]
     Matroska(triergon_matroska::typed::Reader),

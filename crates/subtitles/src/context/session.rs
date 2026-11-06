@@ -6,6 +6,7 @@ use triergon_core::{
     Budget, BudgetVec, Bytes, Error, Result, SourceId, SourceLocation, WorkBudget,
 };
 
+#[derive(Debug)]
 pub struct Builder {
     pool: Budget,
     limits: Limits,

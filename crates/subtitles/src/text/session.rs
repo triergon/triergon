@@ -54,7 +54,7 @@ pub(crate) struct Session {
 }
 
 impl Session {
-    pub fn new(input: &Input, pool: &Budget, iso_tx3g: bool) -> Self {
+    pub(super) fn new(input: &Input, pool: &Budget, iso_tx3g: bool) -> Self {
         Self {
             phase: Phase::Init,
             text_range: 0..input.payload.len(),
@@ -124,7 +124,7 @@ impl Session {
         Ok(())
     }
 
-    pub fn step(
+    pub(super) fn step(
         &mut self,
         input: &Input,
         pool: &Budget,

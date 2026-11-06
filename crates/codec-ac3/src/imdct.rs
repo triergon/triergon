@@ -6,6 +6,7 @@ use crate::tables::kbd_window;
 use core::f64::consts::PI;
 
 /// In-place complex inverse FFT (z[n] = sum Z[k] e^{+j 2 pi k n / N}) for a fixed size.
+#[derive(Debug)]
 struct Fft<const N: usize> {
     bitrev: [u8; N],
     /// Twiddles for every stage, stage with half-size h at [h..2h].
@@ -87,6 +88,7 @@ impl<const N: usize> Fft<N> {
     }
 }
 
+#[derive(Debug)]
 pub(crate) struct Imdct {
     fft128: Fft<128>,
     fft64: Fft<64>,

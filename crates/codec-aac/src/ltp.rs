@@ -9,6 +9,7 @@ use crate::filterbank::Filterbank;
 use crate::ics::{ChannelData, CoreCfg, EIGHT_SHORT, TNS_ANALYSIS};
 use crate::tables::{LTP_COEF, MAX_LTP_LONG_SFB};
 
+#[derive(Debug)]
 pub(crate) struct LtpState {
     hist: Vec<f32>,
     time: Vec<f32>,

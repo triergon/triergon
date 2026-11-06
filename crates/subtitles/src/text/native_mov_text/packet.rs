@@ -9,13 +9,13 @@ use std::{fmt::Write, sync::atomic::AtomicBool};
 use triergon_core::{Budget, BudgetVec, Error, Result, Rounding, TimeBase, WorkBudget};
 
 const INVALID_DATA: i32 = -1094995529;
-#[derive(Clone, Copy)]
+#[derive(Debug, Clone, Copy)]
 struct Span {
     start: u16,
     end: u16,
     style: Style,
 }
-#[derive(Clone, Copy)]
+#[derive(Debug, Clone, Copy)]
 enum Phase {
     Begin,
     BoxHeader,
@@ -29,6 +29,7 @@ enum Phase {
     Ready,
 }
 
+#[derive(Debug)]
 pub(super) struct PacketJob {
     input: Input,
     clock: Clock,
@@ -56,7 +57,7 @@ pub(super) struct PacketJob {
     writer: Writer,
 }
 impl PacketJob {
-    pub fn new(input: Input, clock: Clock, pool: &Budget) -> Self {
+    pub(super) fn new(input: Input, clock: Clock, pool: &Budget) -> Self {
         Self {
             input,
             clock,
@@ -84,10 +85,10 @@ impl PacketJob {
             writer: Writer::new(pool),
         }
     }
-    pub fn ready(&self) -> bool {
+    pub(super) fn ready(&self) -> bool {
         matches!(self.phase, Phase::Ready)
     }
-    pub fn advances_read_order(&self) -> bool {
+    pub(super) fn advances_read_order(&self) -> bool {
         self.advance
     }
     fn bytes(&self) -> &[u8] {
@@ -108,7 +109,7 @@ impl PacketJob {
         clippy::too_many_arguments,
         reason = "Explicit immutable context and caller funding avoid hidden global state."
     )]
-    pub fn poll(
+    pub(super) fn poll(
         &mut self,
         config: &Configuration,
         _options: Options,
@@ -535,7 +536,7 @@ impl PacketJob {
         funding.commit();
         Ok(true)
     }
-    pub fn take_output(mut self, options: Options) -> Result<Output> {
+    pub(super) fn take_output(mut self, options: Options) -> Result<Output> {
         let subtitle = if self.returned > 0 && self.advance {
             let pts = self
                 .clock

@@ -23,6 +23,7 @@ pub(crate) fn sym_level_q23(levels: i32, code: i32) -> i32 {
 }
 
 /// Grouped / ungrouped symmetric mantissa tables (7.3.5), Q23.
+#[derive(Debug)]
 pub(crate) struct GroupTables {
     pub g1: [[i32; 3]; 32],
     pub g2: [[i32; 3]; 128],

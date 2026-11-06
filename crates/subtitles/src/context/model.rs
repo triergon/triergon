@@ -65,6 +65,7 @@ impl Default for Limits {
 
 /// Immutable owner after the producer closes. Payload/configuration owners are
 /// shared without copying, while both record arrays remain charged.
+#[derive(Debug)]
 pub struct Context {
     pub(crate) header: Header,
     pub(crate) attachments: BudgetVec<Attachment>,
@@ -109,6 +110,7 @@ impl Context {
 }
 
 /// Aborting consumes no allocation and preserves committed and pending owners.
+#[derive(Debug)]
 pub struct Recovery {
     pub header: Option<Header>,
     pub attachments: BudgetVec<Attachment>,

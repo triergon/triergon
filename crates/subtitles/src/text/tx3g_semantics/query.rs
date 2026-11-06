@@ -3,7 +3,7 @@ use super::*;
 use std::sync::atomic::AtomicBool;
 use triergon_core::{Error, Result, WorkBudget};
 
-#[derive(Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum Phase {
     Run,
     Event,
@@ -13,6 +13,7 @@ enum Phase {
 }
 /// Resumable logarithmic lookup. Relative ticks are supplied explicitly in the
 /// same track units as the sample. None means unknown, never zero milliseconds.
+#[derive(Debug)]
 pub struct PointQuery<'a> {
     semantic: &'a Semantics,
     character: usize,

@@ -29,6 +29,7 @@ impl Default for Mov9EncodedEditLimitsV2 {
         }
     }
 }
+#[derive(Debug)]
 pub struct Mov9EncodedEditContextV2<'a> {
     pub table: &'a SampleTable,
     pub edits: &'a EditList,
@@ -210,6 +211,7 @@ impl Mov9EncodedEditPlanV2 {
         Ok(Some(bytes))
     }
 }
+#[allow(missing_debug_implementations)] // Holds a framing parser that has no `Debug`.
 pub struct Mov9EncodedEditJobV2<'a> {
     context: Mov9EncodedEditContextV2<'a>,
     cursor: SampleCursor<'a>,

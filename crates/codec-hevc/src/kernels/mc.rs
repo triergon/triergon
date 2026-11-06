@@ -66,7 +66,7 @@ fn put16(v: I16x8, x: usize, mode: u8, pred: &mut [i16], dst: &mut [u8], other: 
 }
 
 #[inline(always)]
-pub fn taps8_row(
+pub(super) fn taps8_row(
     r: [&[u8]; 8],
     c: &[i8; 8],
     w: usize,
@@ -87,7 +87,7 @@ pub fn taps8_row(
 }
 
 #[inline(always)]
-pub fn taps4_row(
+pub(super) fn taps4_row(
     r: [&[u8]; 4],
     c: &[i8; 4],
     w: usize,
@@ -108,7 +108,7 @@ pub fn taps4_row(
 }
 
 #[inline(always)]
-pub fn hpass8_row(r: [&[u8]; 8], c: &[i8; 8], w: usize, t: &mut [i16]) -> usize {
+pub(super) fn hpass8_row(r: [&[u8]; 8], c: &[i8; 8], w: usize, t: &mut [i16]) -> usize {
     let n = w & !7;
     let m = mag8(c);
     let mut x = 0;
@@ -120,7 +120,7 @@ pub fn hpass8_row(r: [&[u8]; 8], c: &[i8; 8], w: usize, t: &mut [i16]) -> usize 
 }
 
 #[inline(always)]
-pub fn hpass4_row(r: [&[u8]; 4], c: &[i8; 4], w: usize, t: &mut [i16]) -> usize {
+pub(super) fn hpass4_row(r: [&[u8]; 4], c: &[i8; 4], w: usize, t: &mut [i16]) -> usize {
     let n = w & !7;
     let m = mag4(c);
     let mut x = 0;
@@ -132,7 +132,7 @@ pub fn hpass4_row(r: [&[u8]; 4], c: &[i8; 4], w: usize, t: &mut [i16]) -> usize 
 }
 
 #[inline(always)]
-pub fn vpass8_row(
+pub(super) fn vpass8_row(
     r: [&[i16]; 8],
     c: &[i8; 8],
     w: usize,
@@ -156,7 +156,7 @@ pub fn vpass8_row(
 }
 
 #[inline(always)]
-pub fn vpass4_row(
+pub(super) fn vpass4_row(
     r: [&[i16]; 4],
     c: &[i8; 4],
     w: usize,
@@ -188,7 +188,7 @@ pub fn vpass4_row(
 use std::simd::simd_swizzle;
 
 /// Output destination for a block: (pred buffer, stride 64), (dst, offset, stride), other.
-pub struct BlockOut<'a> {
+pub(super) struct BlockOut<'a> {
     pub pred: &'a mut [i16],
     pub dst: &'a mut [u8],
     pub dst_off: usize,
@@ -297,7 +297,7 @@ fn ldb(r: &[u8], x: usize) -> U8x8 {
 /// Requires w % 8 == 0 and 16-sample loads to stay inside `src` (callers guarantee the
 /// 7 / 3 extra columns of filter support plus slack exist, see `inter::source`).
 #[allow(clippy::too_many_arguments)]
-pub fn luma_block(
+pub(super) fn luma_block(
     src: &[u8],
     off: usize,
     ss: usize,
@@ -362,7 +362,7 @@ pub fn luma_block(
 }
 
 #[allow(clippy::too_many_arguments)]
-pub fn chroma_block(
+pub(super) fn chroma_block(
     src: &[u8],
     off: usize,
     ss: usize,
@@ -422,7 +422,7 @@ pub fn chroma_block(
 
 /// Integer-position prediction (v = p << 6) for 8-bit with output stage `mode` (0 or 2;
 /// mode 1 is a plain copy handled by the caller). w % 8 == 0.
-pub fn int_block(
+pub(super) fn int_block(
     src: &[u8],
     off: usize,
     ss: usize,
@@ -541,7 +541,7 @@ fn sum4w(w: &[U32x8; 4], m: &[U32x8; 4]) -> I32x8 {
     ((w[1] * m[1] + w[2] * m[2]) - (w[0] * m[0] + w[3] * m[3])).cast()
 }
 
-pub struct BlockOut16<'a> {
+pub(super) struct BlockOut16<'a> {
     pub pred: &'a mut [i16],
     pub dst: &'a mut [u16],
     pub dst_off: usize,
@@ -602,7 +602,7 @@ fn put_hi(v: I32x8, x: usize, y: usize, mode: u8, o: &mut BlockOut16<'_>, k: &Hi
 
 /// Fractional or integer MC for u16 samples (w % 8 == 0). `ntap` is 8 (luma) or 4 (chroma).
 #[allow(clippy::too_many_arguments)]
-pub fn block_hi(
+pub(super) fn block_hi(
     src: &[u16],
     off: usize,
     ss: usize,
@@ -735,7 +735,7 @@ pub fn block_hi(
 /// -PRED_OFFSET). Generic over the output sample type via `store`. w % 8 == 0.
 #[allow(clippy::too_many_arguments)]
 #[inline(always)]
-pub fn wuni<T>(
+pub(super) fn wuni<T>(
     dst: &mut [T],
     doff: usize,
     ds: usize,
@@ -772,7 +772,7 @@ pub fn wuni<T>(
 /// Explicit weighted bi-prediction (8-277).
 #[allow(clippy::too_many_arguments)]
 #[inline(always)]
-pub fn wbi<T>(
+pub(super) fn wbi<T>(
     dst: &mut [T],
     doff: usize,
     ds: usize,
@@ -810,13 +810,13 @@ pub fn wbi<T>(
 }
 
 #[inline(always)]
-pub fn store_u8(p: I32x8, d: &mut [u8]) {
+pub(super) fn store_u8(p: I32x8, d: &mut [u8]) {
     let b: U8x8 = p.cast();
     b.copy_to_slice(d);
 }
 
 #[inline(always)]
-pub fn store_u16(p: I32x8, d: &mut [u16]) {
+pub(super) fn store_u16(p: I32x8, d: &mut [u16]) {
     let b: Simd<u16, 8> = p.cast();
     b.copy_to_slice(d);
 }
@@ -824,7 +824,7 @@ pub fn store_u16(p: I32x8, d: &mut [u16]) {
 /// Fused integer-position explicit weighted uni-prediction: v = p << shift3, then 8-275.
 #[allow(clippy::too_many_arguments)]
 #[inline(always)]
-pub fn wcopy<T: Copy>(
+pub(super) fn wcopy<T: Copy>(
     dst: &mut [T],
     doff: usize,
     ds: usize,
@@ -863,11 +863,11 @@ pub fn wcopy<T: Copy>(
 }
 
 #[inline(always)]
-pub fn load_u8(s: &[u8]) -> I32x8 {
+pub(super) fn load_u8(s: &[u8]) -> I32x8 {
     U8x8::from_slice(s).cast()
 }
 
 #[inline(always)]
-pub fn load_u16(s: &[u16]) -> I32x8 {
+pub(super) fn load_u16(s: &[u16]) -> I32x8 {
     Simd::<u16, 8>::from_slice(s).cast()
 }

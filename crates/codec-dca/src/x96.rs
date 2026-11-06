@@ -127,6 +127,7 @@ impl X96Header {
     }
 }
 
+#[derive(Debug)]
 pub(crate) struct X96Side {
     pmode: [[bool; 64]; MAX_CH],
     pvq: [[u16; 64]; MAX_CH],

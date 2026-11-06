@@ -49,7 +49,7 @@ pub(crate) struct Cursor {
 }
 
 impl Cursor {
-    pub fn new(range: Range<usize>, encoding: Encoding) -> Self {
+    pub(super) fn new(range: Range<usize>, encoding: Encoding) -> Self {
         Self {
             at: range.start,
             end: range.end,
@@ -70,7 +70,7 @@ impl Cursor {
         }
     }
 
-    pub fn decoded_len(&self) -> usize {
+    pub(super) fn decoded_len(&self) -> usize {
         self.decoded
     }
 
@@ -121,7 +121,7 @@ impl Cursor {
         }
     }
 
-    pub fn poll(
+    pub(super) fn poll(
         &mut self,
         bytes: &[u8],
         work: &mut WorkBudget,
@@ -245,7 +245,7 @@ pub(crate) struct Probe {
 }
 
 impl Probe {
-    pub fn new(range: Range<usize>, requested: Encoding) -> Self {
+    pub(super) fn new(range: Range<usize>, requested: Encoding) -> Self {
         Self {
             range,
             requested,
@@ -253,7 +253,7 @@ impl Probe {
             read: 0,
         }
     }
-    pub fn poll(
+    pub(super) fn poll(
         &mut self,
         bytes: &[u8],
         work: &mut WorkBudget,
