@@ -10,7 +10,14 @@
 #   bin/reference-capture-{speed,small}  harness/reference.c, capture build
 #   bin/allocations.so   shared observer harness/allocations-linux.c
 #   bin/capture-worker   candidate (cargo +nightly --release --locked)
-# and records every hash/argv in $BASE/setup-receipt.json.
+# and records every hash/argv in $BASE/setup-receipt.json. The qualification run
+# then uses them:
+#   cargo xtask capture qualify --candidate $BASE/bin/capture-worker \
+#     --reference $BASE/bin/reference-capture-speed \
+#     --reference-small $BASE/bin/reference-capture-small \
+#     --oracle-bin $BASE/ffmpeg/oracle/bin --observer $BASE/bin/allocations.so \
+#     --inputs DIR --out DIR
+# with TRIERGON_PYTHON naming a Python with numpy for the input generator.
 set -euo pipefail
 SRC=$(cd "$(dirname "$0")/../.." && pwd)
 BASE=${BASE:-$HOME/capture-reference}

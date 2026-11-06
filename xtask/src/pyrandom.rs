@@ -135,6 +135,21 @@ impl PyRandom {
         self.below(256) as u8
     }
 
+    /// `randbytes(n)`: little-endian 32-bit outputs, the last one shifted down
+    /// to the bits still needed.
+    pub fn bytes(&mut self, n: usize) -> Vec<u8> {
+        let mut out = Vec::with_capacity(n + 4);
+        while out.len() + 4 <= n {
+            out.extend_from_slice(&self.next_u32().to_le_bytes());
+        }
+        let left = n - out.len();
+        if left > 0 {
+            let word = self.next_u32() >> (32 - 8 * left as u32);
+            out.extend_from_slice(&word.to_le_bytes()[..left]);
+        }
+        out
+    }
+
     /// `random()`: 53 random bits as a float in [0, 1).
     pub fn random(&mut self) -> f64 {
         let a = f64::from(self.next_u32() >> 5);
@@ -188,6 +203,16 @@ mod tests {
             })
             .collect();
         assert_eq!(firsts, "ccrccc");
+    }
+
+    #[test]
+    fn bytes_match_python() {
+        // python3 -c "import random; print(random.Random(7).randbytes(10).hex())"
+        let bytes = PyRandom::new(7).bytes(10);
+        assert_eq!(
+            bytes.iter().map(|b| format!("{b:02x}")).collect::<String>(),
+            "38b4e652e44da7f29e26"
+        );
     }
 
     #[test]

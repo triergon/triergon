@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# Stays Python: numpy's PCG64 generator and float draws define the cited capture inputs, which must not change.
 """Deterministic RGBA capture inputs for the required capture cases.
 
 All content is authored here from seeded arithmetic: no third-party media and

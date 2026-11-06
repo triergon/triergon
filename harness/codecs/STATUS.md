@@ -3,13 +3,14 @@
 Inputs, rules and tools used to compare the codec crates (`crates/codec-aac`,
 `codec-ac3`, `codec-dca`, `codec-h264`, `codec-hevc`) and the session crate
 (`crates/session`) with FFmpeg 9.0.2. What each decoder supports and refuses is in its crate
-README. The comparison harness is `harness/codecs` (the decode build of `harness/reference.c`,
-`native_correctness.py`, `time_codecs.py`). Gate definitions:
+README. The comparison harness is the decode build of `harness/reference.c` with
+`cargo xtask codecs` (`manifest`, `grade`, `summarize`, `time`, `equivalence`; see
+`cargo xtask codecs --help`). Gate definitions:
 [docs/quality.md](../../docs/quality.md).
 
 | Path | Content |
 |---|---|
-| `numeric-rules.json` | Comparison rules: audio per channel RMS ≤ 8.8e-6 and max ≤ 6.1035e-5 with exact rate, layout and counts; video bit-exact; RGBA output bit-exact; stereo s16 output ≤ 1 LSB |
+| `numeric-rules.json` | Comparison rules `cargo xtask codecs grade` applies: audio per channel RMS ≤ 8.8e-6 and max ≤ 6.1035e-5 with exact rate, layout and counts; video bit-exact; RGBA output bit-exact; stereo s16 output ≤ 1 LSB |
 | `correctness-manifest.json` | The 454 correctness vectors |
 | `workloads.json`, [workloads.md](workloads.md) | The 17 timing and memory workloads and how they are generated |
 | [measurement-policy.md](measurement-policy.md) | What counts as equivalent work in timing and memory runs |

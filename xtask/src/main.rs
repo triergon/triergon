@@ -5,7 +5,9 @@
 #![forbid(unsafe_code)]
 
 mod archive;
+mod capture;
 mod checks;
+mod codecs;
 mod corpus;
 mod ebml;
 mod evidence;
@@ -14,8 +16,11 @@ mod fetch;
 mod fuzz;
 mod harness;
 mod json;
+mod numpy;
 mod prepare;
+mod process;
 mod pyrandom;
+mod python;
 mod sha256;
 mod stats;
 mod toml;
@@ -32,6 +37,8 @@ const USAGE: &str = "usage: cargo xtask <command>
 commands:
   check          everything CI runs: format, tests, lints, builds and the checks below
   check-simd     clippy and tests of the opt-in HEVC SIMD lane on the pinned nightly
+  prepare-check  once before `check`: the pinned FFmpeg reference, the fixtures, the required
+                 vectors and the workers (built with the reference first on PATH)
   check-links    every relative link in the Markdown files resolves
   check-design   harness data files parse and recorded gates keep their values
   check-safety   owned packages only, no build scripts, no unsafe code
@@ -68,7 +75,11 @@ commands:
                  [--operation plain|seek|colour|catalogue] [--content] [--no-short-reads]
                  compare one input across a candidate and a reference worker
   fate-inventory --source DIR --output FILE [--configured-list FILE]
-                 index FATE definitions as data; nothing is executed";
+                 index FATE definitions as data; nothing is executed
+  codecs         manifest|grade|summarize|time|equivalence   codec crates against the
+                 pinned FFmpeg decoders (see `cargo xtask codecs --help`)
+  capture        compare|qualify|summarize|equivalence   capture pipeline against the
+                 FFmpeg capture reference (see `cargo xtask capture --help`)";
 
 fn main() -> ExitCode {
     if let Some(code) = without_cargo_library_path() {
@@ -79,6 +90,7 @@ fn main() -> ExitCode {
     let result = match args.first().map(String::as_str) {
         Some("check") => check(&root),
         Some("check-simd") => check_simd(&root),
+        Some("prepare-check") => prepare_check(),
         Some("check-links") => check_links(&root),
         Some("check-design") => check_design(&root),
         Some("check-safety") => check_safety(&root),
@@ -93,6 +105,8 @@ fn main() -> ExitCode {
         Some("fuzz") => return fuzz_campaign(&root, &args[1..]),
         Some("evidence") => evidence(&root, &args[1..]),
         Some("trace-identities") => return trace_identities(&root, &args[1..]),
+        Some("codecs") => return failing(codecs::main(&root, &args[1..]), codecs::USAGE),
+        Some("capture") => return failing(capture::main(&root, &args[1..]), capture::USAGE),
         Some("build-workers") => {
             harness::build::build(&root).map(|path| println!("{}", path.display()))
         }
@@ -249,6 +263,21 @@ fn exit(result: Result<i32, String>) -> ExitCode {
         Err(message) => {
             eprintln!("{message}");
             ExitCode::from(2)
+        }
+    }
+}
+
+/// A runner's exit code; an error is printed and exits 1, `--help` prints `usage`.
+fn failing(result: Result<i32, String>, usage: &str) -> ExitCode {
+    match result {
+        Ok(code) => ExitCode::from(code.clamp(0, 255) as u8),
+        Err(message) if message == usage => {
+            println!("{usage}");
+            ExitCode::from(2)
+        }
+        Err(message) => {
+            eprintln!("{message}");
+            ExitCode::FAILURE
         }
     }
 }
@@ -653,6 +682,22 @@ fn run(command: &mut Command) -> Task {
 /// The nightly toolchain of the opt-in HEVC `std::simd` lane, pinned so that lints
 /// and code generation do not change underneath the checks and measurements.
 const NIGHTLY: &str = "nightly-2026-10-17";
+
+/// Everything `check` needs once: each step runs as its own `cargo xtask`
+/// command with the pinned reference first on `PATH`, so the worker build
+/// records that reference.
+fn prepare_check() -> Task {
+    let exe = std::env::current_exe().map_err(|e| e.to_string())?;
+    for step in [
+        "prepare-ffmpeg",
+        "fixtures",
+        "fetch-vectors",
+        "build-workers",
+    ] {
+        run(Command::new(&exe).arg(step))?;
+    }
+    Ok(())
+}
 
 /// The opt-in nightly `std::simd` lane of the HEVC decoder must decode exactly as
 /// the scalar default does (the conformance tests compare both with FFmpeg digests).
