@@ -3,7 +3,7 @@
 Exact rational arithmetic; see research/d4/RGBA-CONTRACT.json for the observations.
 taps(n, m) -> list of (start, integer coefficients) for each of the m outputs.
 
-Rules (each recovered from black-box tap measurements, harness/d4/measure_all.py; the Rust
+Rules (each recovered from black-box impulse measurements through probe_rgba.c; the Rust
 implementation is crates/sim/src/scale.rs Filter::new):
 - step inc = round(n * 65536 / m); output x has centre c = (x * inc + (inc - 65536) / 2) / 65536.
 - kernel Keys cubic a = -0.6 evaluated at d / s with s = max(n / m, 1) (exact ratio, not inc);
@@ -15,7 +15,7 @@ implementation is crates/sim/src/scale.rs Filter::new):
 - taps outside the source fold onto the nearest edge sample; normalise to `one`; quantise
   left to right with error diffusion (floor(v + 1/2), carry the remainder).
 - horizontal (14-bit) passes round each kernel value to a multiple of 2^-30 first; vertical
-  (12-bit) passes use it exactly. Only near-ties depend on this (near_ties.py); one measured
+  (12-bit) passes use it exactly. Only near-ties depend on this; one measured
   row (1056 -> 135, x = 121) still differs.
 """
 from fractions import Fraction as Fr

@@ -33,5 +33,4 @@ binary.
 
 Confirmed black-box: PNS noise LCG (1664525, 1013904223, seed `0x1f2e3d4c`), PCE speaker
 mapping (`tools/probe_layout.py`), the libfaac fill-element skip, the implicit PS stereo
-upgrade, six SBR patches. Other tools: `run_all.sh` + `summarize.py` (vector table),
-`s16cmp.py`, `ffbench.sh`, `frameerr.py`, `errspec.py`, `lagscan.py`, `bitdiff.py`.
+upgrade, six SBR patches.
