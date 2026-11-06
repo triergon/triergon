@@ -324,7 +324,11 @@ impl InputCursor {
             bytes.len(),
             self.maximum_window.min(Self::INLINE_CAPACITY),
         )?;
-        self.inline[..bytes.len()].copy_from_slice(bytes);
+        if let [byte] = bytes {
+            self.inline[0] = *byte;
+        } else {
+            self.inline[..bytes.len()].copy_from_slice(bytes);
+        }
         self.inline_len = bytes.len();
         Ok(())
     }
@@ -404,6 +408,16 @@ impl InputCursor {
         if output.is_empty() {
             return Ok(Step::Ready(0));
         }
+        if self.inline_len == 1 {
+            if !work.try_charge(1) {
+                return Ok(Step::Yield);
+            }
+            output[0] = self.inline[0];
+            // The offered window already checked the end of this byte.
+            self.position += 1;
+            self.inline_len = 0;
+            return Ok(Step::Ready(1));
+        }
         let buffered = self.buffered();
         if buffered.is_empty() {
             return Ok(self.wait());
@@ -461,6 +475,16 @@ impl InputCursor {
         self.check_cancel(cancel)?;
         if maximum == 0 {
             return Ok(Step::Ready(0));
+        }
+        if self.inline_len == 1 {
+            if work.remaining() == 0 {
+                return Ok(Step::Yield);
+            }
+            output.try_extend_from_slice(&self.inline[..1])?;
+            work.take(1);
+            self.position += 1;
+            self.inline_len = 0;
+            return Ok(Step::Ready(1));
         }
         let buffered = self.buffered();
         if buffered.is_empty() {

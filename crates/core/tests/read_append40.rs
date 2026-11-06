@@ -106,6 +106,40 @@ fn destination_pressure_preserves_source_work_bytes_capacity_and_allows_retry() 
     assert_eq!(output.as_slice(), b"preabc");
 }
 #[test]
+fn a_single_inline_byte_is_charged_only_after_append_succeeds() {
+    let pool = Budget::new(4096).unwrap();
+    let mut input = cursor(&pool, Some(1), false);
+    let mut output = BudgetVec::new(&pool);
+    inline(&mut input, b"z");
+    input.finish(input.source(), input.token()).unwrap();
+    let cancel = AtomicBool::new(false);
+    assert!(matches!(
+        input.read_append(&mut output, 1, &mut WorkBudget::new(0), &cancel),
+        Ok(Step::Yield)
+    ));
+    let blocker = pool.reserve(pool.available()).unwrap();
+    let mut work = WorkBudget::new(1);
+    assert!(matches!(
+        input.read_append(&mut output, 1, &mut work, &cancel),
+        Err(Error::Backpressure { .. })
+    ));
+    assert_eq!(work.spent(), 0);
+    assert_eq!(input.position(), 0);
+    assert_eq!(input.buffered(), b"z");
+    drop(blocker);
+    assert!(matches!(
+        input.read_append(&mut output, 1, &mut work, &cancel),
+        Ok(Step::Ready(1))
+    ));
+    assert_eq!(work.spent(), 1);
+    assert_eq!(output.as_slice(), b"z");
+    assert!(matches!(
+        input.read_append(&mut output, 1, &mut work, &cancel),
+        Ok(Step::End(at)) if at.offset == 1
+    ));
+}
+
+#[test]
 fn append_may_copy_to_a_different_budget_without_foreign_pool_policy() {
     let source_pool = Budget::new(4096).unwrap();
     let target_pool = Budget::new(4096).unwrap();
