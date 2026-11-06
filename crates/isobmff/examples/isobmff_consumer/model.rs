@@ -17,13 +17,16 @@ use triergon_isobmff::{
     BoxEvent, BoxReader, BoxStep, BoxView, BuildStatus, EditList, FragmentBuilder, FragmentContext,
     FragmentIndex, ImplicitBase, Limits, MediaDataPolicy, Mov9CursorStatus,
     Mov9NativeGlobalSeekJob, Mov9NativeIndexCursor, Mov9NativeIndexLimits, Mov9NativeSeekLimits,
-    Mov9PacketCursor, Mov9PacketLimits, Mov9PartialSampleReader, Mov9Profile, Mov9StreamView,
-    Mov9Track, MovieHeader, MovieSeekClocks, MovieSeekLimits, MovieSourceSeekContext,
-    MovieSourceSeekPlanner, PinnedMovD32RegularRecoveryV1, RecoveryDescriptions, RecoveryKind,
-    RecoveryMappings, RecoveryScope, RecoverySyntax, Sample, SampleReader, SampleStep, SampleTable,
-    SampleTableBuilder, SampleTablePolicy, SourcePacket, SourceTrack, TrackHeader,
-    TrackSampleCursor, Trex,
+    Mov9PacketCursor, Mov9PacketLimits, Mov9PartialSampleReader, Mov9PayloadBounds, Mov9Profile,
+    Mov9StreamView, Mov9Track, MovieHeader, MovieSeekClocks, MovieSeekLimits,
+    MovieSourceSeekContext, MovieSourceSeekPlanner, PinnedMovD32RegularRecoveryV1,
+    RecoveryDescriptions, RecoveryKind, RecoveryMappings, RecoveryScope, RecoverySyntax, Sample,
+    SampleReader, SampleStep, SampleTable, SampleTableBuilder, SampleTablePolicy, SourcePacket,
+    SourceTrack, TrackHeader, TrackSampleCursor, Trex,
 };
+
+const MAX_SAMPLE_BYTES: usize = 16 * 1024 * 1024;
+
 #[derive(Debug)]
 pub enum Failure {
     Core(Error),
@@ -600,7 +603,7 @@ impl<'a> Driver<'a> {
             .find(|r| sample.require_within((*r).clone()).is_ok())
             .cloned()
             .ok_or(Error::Invalid("consumer sample outside media extents"))?;
-        let mut reader = SampleReader::new(&mut self.input, sample, extent, 16 * 1024 * 1024)?;
+        let mut reader = SampleReader::new(&mut self.input, sample, extent, MAX_SAMPLE_BYTES)?;
         loop {
             match reader.poll(
                 &mut self.input,
@@ -626,13 +629,12 @@ impl<'a> Driver<'a> {
 
     #[cold]
     fn terminal_payload(&mut self, sample: Sample, declared: &Range<u64>) -> Result<Bytes> {
-        let maximum = 16 * 1024 * 1024;
         let profile = PinnedMovD32RegularRecoveryV1;
         let mut reader = Mov9PartialSampleReader::new(
             &mut self.input,
             sample,
             declared.clone(),
-            maximum,
+            MAX_SAMPLE_BYTES,
             profile,
         )?;
         loop {
@@ -859,6 +861,7 @@ impl<'a> Driver<'a> {
         mut trace: Option<&mut String>,
     ) -> Result<(u64, bool)> {
         let (mut reads, mut first) = (0u64, true);
+        let mut short_end = None;
         while limit.is_none_or(|maximum| stats.packets < u64::from(maximum)) {
             if limit.is_some() {
                 reads = reads.checked_add(1).ok_or(Error::Overflow)?;
@@ -882,8 +885,24 @@ impl<'a> Driver<'a> {
                     && item.source.require_within((*extent).clone()).is_ok()
             });
             let payload = if let Some(declared) = terminal {
-                self.terminal_payload(item.source, declared)?
+                // A positive short read can be followed by the adjacent
+                // declared sample at EOF. Validate its full declared size.
+                if short_end == Some(item.source.range.start) && !item.source.range.is_empty() {
+                    Mov9PayloadBounds::from_source(
+                        &item.source,
+                        declared.clone(),
+                        self.length,
+                        MAX_SAMPLE_BYTES,
+                        PinnedMovD32RegularRecoveryV1,
+                    )?;
+                    return Ok((reads, true));
+                }
+                let end = item.source.range.end;
+                let payload = self.terminal_payload(item.source, declared)?;
+                short_end = Some(end);
+                payload
             } else {
+                short_end = None;
                 self.packet(item.source, model.media.as_slice())?.payload
             };
             let mut packet = Packet::from_view(index, item.track_id, &item.native, payload)?;
