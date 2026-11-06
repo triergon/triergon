@@ -87,6 +87,45 @@ fn packet_tiny_windows_preserve_source_and_retained_backing() {
 }
 
 #[test]
+fn complete_shared_window_needs_no_packet_allocation() {
+    let budget = Budget::new(4096).unwrap();
+    let mut input = input(&budget, Some(16));
+    let source = sample(8..11);
+    let mut reader =
+        SampleReader::new_with_shared_window(&mut input, source.clone(), 8..16, 4).unwrap();
+    let request = input.request();
+    let bytes = common::bytes(&budget, &[8, 9, 10, 11]);
+    input
+        .provide(
+            &InputWindow::new(
+                request.source,
+                request.token.clone(),
+                request.offset,
+                bytes.clone(),
+            )
+            .unwrap(),
+        )
+        .unwrap();
+    let hold = budget.reserve(budget.available()).unwrap();
+    let mut work = WorkBudget::new(4);
+    let Step::Ready(packet) = reader
+        .poll(&mut input, &mut work, &AtomicBool::new(false))
+        .unwrap()
+    else {
+        panic!("complete shared sample must be ready");
+    };
+    assert_eq!(packet.sample, source);
+    assert_eq!(packet.token, request.token);
+    assert_eq!(packet.payload.as_ref(), &[8, 9, 10]);
+    assert!(packet.payload.shares_storage_with(&bytes));
+    assert_eq!(work.spent(), 4);
+    assert_eq!(input.position(), 11);
+    assert_eq!(input.buffered(), &[11]);
+    assert_eq!(budget.used(), budget.limit());
+    drop(hold);
+}
+
+#[test]
 fn packet_range_and_limit_rejection_leave_input_transaction_untouched() {
     let budget = Budget::new(4096).unwrap();
     let mut input = input(&budget, Some(16));
