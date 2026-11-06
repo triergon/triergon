@@ -1484,8 +1484,14 @@ impl TransportStream {
                 self.entity_end = None;
                 return Ok(Step::Ready(CompactTraceEvent::NullRun(run)));
             }
+            // Reading carriers advances the cursor within the same source
+            // request. The feed callback never receives the cursor.
+            self.framer.bind_input(input)?;
             loop {
-                match self.framer.poll_carrier::<DIRECT>(input, work, cancel) {
+                match self
+                    .framer
+                    .poll_bound_carrier::<DIRECT>(input, work, cancel)
+                {
                     Ok(Step::Ready(mut carrier)) => {
                         self.entity_end = None;
                         self.route = self.find_route(carrier.pid());

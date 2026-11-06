@@ -395,9 +395,11 @@ impl TransportFramer {
         work: &mut WorkBudget,
         cancel: &AtomicBool,
     ) -> Result<Step<FramedCarrier>> {
-        fn ready(packet: TransportPacket) -> Step<FramedCarrier> {
-            Step::Ready(FramedCarrier::Packet(packet))
-        }
+        self.bind_input(input)?;
+        self.poll_bound_carrier::<DIRECT>(input, work, cancel)
+    }
+
+    pub(crate) fn bind_input(&mut self, input: &InputCursor) -> Result<()> {
         if !input.budget().same_pool(&self.budget) {
             return Err(Error::ForeignPool);
         }
@@ -425,6 +427,21 @@ impl TransportFramer {
         }
         self.token = Some(token);
         self.entity = Some(input.source());
+        Ok(())
+    }
+
+    /// The caller has bound this cursor and kept exclusive access since then.
+    pub(crate) fn poll_bound_carrier<const DIRECT: bool>(
+        &mut self,
+        input: &mut InputCursor,
+        work: &mut WorkBudget,
+        cancel: &AtomicBool,
+    ) -> Result<Step<FramedCarrier>> {
+        fn ready(packet: TransportPacket) -> Step<FramedCarrier> {
+            Step::Ready(FramedCarrier::Packet(packet))
+        }
+        debug_assert_eq!(self.token.as_ref(), Some(&input.token()));
+        debug_assert_eq!(self.entity, Some(input.source()));
         loop {
             if cancel.load(Ordering::Relaxed) {
                 return Err(Error::Cancelled);
