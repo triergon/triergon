@@ -381,11 +381,6 @@ impl<'a> Mp4IndexJob<'a> {
         let mut native = BudgetVec::new(b);
         let mut zero_scale_clock = None;
         for t in movie.tracks.as_slice() {
-            if view == Mp4View::SourcePhysical
-                && t.table.timing_run_surplus() != iso::TimingRunSurplus::default()
-            {
-                return Err(Error::Invalid("source view requires exact timing coverage"));
-            }
             let media_base = if t.header.timescale == 0 && movie.native_recovery {
                 if !movie.trex.is_empty()
                     || !t.fragments.is_empty()
@@ -428,6 +423,11 @@ impl<'a> Mp4IndexJob<'a> {
             max_tracks: limits.tracks,
             max_samples: limits.samples,
         };
+        let timing_policy = if view == Mp4View::SourcePhysical {
+            iso::TimingRunPolicy::Strict
+        } else {
+            iso::TimingRunPolicy::BoundedPrefix
+        };
         let forward_regular = match movie.read_scope {
             crate::mp4_open::MetadataReadScope::FrontMetadataBeforeMdat(h)
                 if movie.terminal_mdat.is_none()
@@ -461,17 +461,20 @@ impl<'a> Mp4IndexJob<'a> {
         } else if movie.terminal_mdat.is_some() {
             // Metadata traversal preserves declared source coordinates. Each row
             // is checked against the terminal declaration, then read physically.
-            Some(PhysicalSampleCursor::new(
+            Some(PhysicalSampleCursor::with_timing_policy(
                 b,
                 sources.as_slice(),
+                None,
                 interleave_limits,
+                timing_policy,
             )?)
         } else {
-            Some(PhysicalSampleCursor::new_with_media_extents(
+            Some(PhysicalSampleCursor::with_timing_policy(
                 b,
                 sources.as_slice(),
-                movie.media.as_slice(),
+                Some(movie.media.as_slice()),
                 interleave_limits,
+                timing_policy,
             )?)
         };
         let native = if view == Mp4View::PinnedMov9NoParseNoFillin {

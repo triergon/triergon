@@ -3189,6 +3189,14 @@ fn bounded_timing_range_playback_preserves_packets_and_seeks() {
             ),
             Err(C::Invalid("source view requires exact timing coverage"))
         ));
+        assert!(
+            Mp4IndexJob::new(
+                &opened.movie,
+                Mp4View::PinnedMov9NoParseNoFillin,
+                PlanLimits::default(),
+            )
+            .is_ok()
+        );
 
         let mut job = Mp4RangeOpen::new(&opened.movie, None, PlanLimits::default()).unwrap();
         assert!((0..100_000).any(|_| job.poll(&mut WorkBudget::new(3), &off()).unwrap()));

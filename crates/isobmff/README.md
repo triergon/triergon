@@ -112,8 +112,10 @@ the bytes and determine the audio object type separately.
   interpretation of overlong timing runs. The last decode run may cross
   the sample count if it starts within it. Positive composition runs may
   extend beyond it. The sample table retains all raw runs and reports the
-  unused counts through `SampleTable::timing_run_surplus`. The default
-  policy requires exact coverage.
+  unused counts through `SampleTable::timing_run_surplus`. The source
+  seek planners and default physical cursor constructors require exact
+  coverage. Compatibility playback can opt into physical range validation
+  for a checked prefix with `PhysicalSampleCursor::with_timing_policy`.
 - **Payload ranges.** `SampleReader::new` requires the sample to lie inside the
   caller's `mdat` payload extent. `PhysicalSampleCursor::new_with_media_extents`
   checks every track's ranges against the `mdat` extents before emitting
