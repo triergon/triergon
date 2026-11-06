@@ -7940,6 +7940,13 @@
      "sha256": "0f3d82dfe8ab49e0eb85c32e4b9adc6579cc70590c89b8f09d4842550c8348c5"
     }
    ]
+  },
+  {
+   "name": "progressive-ts188-linux-arm64",
+   "retention": "retained",
+   "reason": "MPEG-TS progressive playback status row",
+   "key": "evidence/progressive-ts188-linux-arm64/92611382d5e4301e028fb2135ffc1ca5aa3a7c00144defee6d29839a9c13ea48.tar.gz",
+   "sha256": "92611382d5e4301e028fb2135ffc1ca5aa3a7c00144defee6d29839a9c13ea48"
   }
  ]
 }
