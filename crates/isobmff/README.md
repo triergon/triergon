@@ -19,6 +19,10 @@ The crate exposes two views of the same file:
   (`Mov9Profile::PinnedNoParseNoFillin`). It is a separate projection and
   never rewrites source facts.
 
+After packet traversal reaches the end, `replay_track` can build an index for a
+selected track using the sample extents and clock facts already checked during
+that traversal. Each replay has its own entry limit.
+
 ## Usage
 
 All parsers are polled. Each `poll` takes a `WorkBudget` (and usually a cancel
