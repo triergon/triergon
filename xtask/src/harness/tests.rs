@@ -99,7 +99,7 @@ fn matched_gate_fixture() -> (Value, Vec<Value>, Value) {
             ])
         })
         .collect();
-    let memory = super::memory::evaluate(root(), &samples, 30, 0, &certificate);
+    let memory = super::memory::evaluate(root(), &samples, 30, 0, &certificate, None);
     let timing = Value::object([
         ("status", Value::str("measured")),
         ("worker_hashes", hashes.clone()),

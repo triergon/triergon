@@ -840,6 +840,7 @@ pub fn evaluate(
     pairs: i128,
     seed: u64,
     certificate: &Value,
+    expected_outputs: Option<&Value>,
 ) -> Value {
     let linux = s(certificate, "platform") == Some("Linux");
     let failed = |status: &str| {
@@ -930,13 +931,21 @@ pub fn evaluate(
         {
             return failed("measurement-failed");
         }
-        let Some(expected) = row.get("reference_heap").and_then(|h| h.get("work")) else {
+        let reference_output = row.get("reference_heap").and_then(|h| h.get("work"));
+        if expected_outputs.is_none() && reference_output.is_none() {
             return failed("invalid-memory-observation");
-        };
-        if entries
-            .iter()
-            .any(|(_, v)| !v.get("work").is_some_and(|w| equal(w, expected)))
-        {
+        }
+        let work_matches = entries.iter().all(|(key, sample)| {
+            let expected = match expected_outputs {
+                Some(outputs) => key.split_once('_').and_then(|(role, _)| outputs.get(role)),
+                None => reference_output,
+            };
+            sample
+                .get("work")
+                .zip(expected)
+                .is_some_and(|(a, b)| equal(a, b))
+        });
+        if !work_matches {
             return failed("unequal-memory-work");
         }
         let (Some(a), Some(b)) = (
@@ -1016,6 +1025,14 @@ pub fn evaluate(
         ),
         ("total_rss_ratio", total),
         ("heap_ratio", heap),
+        (
+            "heap_lower_in_each_pair",
+            Value::Bool(
+                heaps
+                    .iter()
+                    .all(|(candidate, reference)| candidate < reference),
+            ),
+        ),
         ("rss_growth_ratio", growth),
         ("pairs", Value::int(pairs)),
         ("samples", Value::Array(samples.to_vec())),
@@ -1032,18 +1049,24 @@ pub fn evaluate(
     obj(fields)
 }
 
+struct Invocation<'a> {
+    operation: Option<&'a str>,
+    input: &'a Path,
+    arguments: &'a [String],
+    expected_outputs: Option<&'a Value>,
+}
+
 /// Measure `pairs` randomly ordered sets of the four observer runs.
 #[allow(clippy::too_many_arguments)] // The measured operation is fully described by these inputs.
-pub fn measure(
+fn measure(
     host: &dyn Host,
     root: &Path,
     candidate: &Path,
     reference: &Path,
-    input: &Path,
     pairs: usize,
     seed: u64,
     certificate: &Value,
-    operation: &Operation,
+    invocation: Invocation<'_>,
 ) -> R<Value> {
     if s(certificate, "status") != Some("qualified-selected-workers") {
         return Ok(obj(vec![
@@ -1058,16 +1081,11 @@ pub fn measure(
             ("certificate", certificate.clone()),
         ]));
     }
-    let input_sha = file_sha(input)?;
+    let input_sha = file_sha(invocation.input)?;
     let mut rng = PyRandom::new(seed);
     let kernel = certificate
         .get("kernel_rss_required")
         .is_some_and(Value::truthy);
-    let arguments: Vec<String> = operation
-        .arguments
-        .iter()
-        .map(|a| a.to_string_lossy().into_owned())
-        .collect();
     let mut samples = Vec::new();
     for _ in 0..pairs {
         let mut jobs = [
@@ -1084,22 +1102,28 @@ pub fn measure(
             } else {
                 reference
             };
-            let op = format!("{}memory", operation.prefix);
             let observed = host.observe(
                 worker,
-                Some(&op),
-                Some(input),
+                invocation.operation,
+                Some(invocation.input),
                 mode,
-                &arguments,
+                invocation.arguments,
                 kernel && mode == "rss",
             );
             row.push((format!("{name}_{mode}"), observed));
         }
         samples.push(Value::Object(row));
     }
-    let mut result = evaluate(root, &samples, pairs as i128, seed, certificate);
+    let mut result = evaluate(
+        root,
+        &samples,
+        pairs as i128,
+        seed,
+        certificate,
+        invocation.expected_outputs,
+    );
     push(&mut result, "input_sha256", Value::str(&input_sha));
-    if file_sha(input)? != input_sha {
+    if file_sha(invocation.input)? != input_sha {
         push(&mut result, "status", Value::str("input-changed"));
     }
     if linux && !linux::certificate_current(root, certificate) {
@@ -1152,6 +1176,62 @@ pub fn collect(
     seed: u64,
     operation: &Operation,
 ) -> R<Value> {
+    let name = format!("{}memory", operation.prefix);
+    let arguments: Vec<String> = operation
+        .arguments
+        .iter()
+        .map(|arg| arg.to_string_lossy().into_owned())
+        .collect();
+    collect_invocation(
+        root,
+        candidate,
+        reference,
+        pairs,
+        seed,
+        Invocation {
+            operation: Some(&name),
+            input,
+            arguments: &arguments,
+            expected_outputs: None,
+        },
+    )
+}
+
+/// Observe workers with explicit arguments and a correctness-checked output per role.
+#[allow(clippy::too_many_arguments)] // The command, input and paired measurement settings.
+pub(crate) fn collect_command(
+    root: &Path,
+    candidate: &Path,
+    reference: &Path,
+    input: &Path,
+    pairs: usize,
+    seed: u64,
+    arguments: &[String],
+    expected_outputs: &Value,
+) -> R<Value> {
+    collect_invocation(
+        root,
+        candidate,
+        reference,
+        pairs,
+        seed,
+        Invocation {
+            operation: None,
+            input,
+            arguments,
+            expected_outputs: Some(expected_outputs),
+        },
+    )
+}
+
+fn collect_invocation(
+    root: &Path,
+    candidate: &Path,
+    reference: &Path,
+    pairs: usize,
+    seed: u64,
+    invocation: Invocation<'_>,
+) -> R<Value> {
     let _lock = lock()?;
     let busy = competing_builds()?;
     if !busy.is_empty() {
@@ -1169,11 +1249,10 @@ pub fn collect(
         root,
         candidate,
         reference,
-        input,
         pairs,
         seed,
         &certificate,
-        operation,
+        invocation,
     )?;
     let after = cpu_snapshot()?;
     let contaminants = active_cpu(&before, &after, false);
@@ -1252,7 +1331,7 @@ pub fn evidence_valid(
             }
         }
         let seed = py_int(memory.get("seed")).unwrap_or(280) as u64;
-        let recomputed = evaluate(root, raw, pairs, seed, certificate);
+        let recomputed = evaluate(root, raw, pairs, seed, certificate, None);
         let same = [
             "status",
             "total_rss_ratio_upper_95",

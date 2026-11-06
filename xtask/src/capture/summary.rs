@@ -5,7 +5,7 @@ use std::path::{Path, PathBuf};
 use crate::json::Value;
 use crate::python;
 
-const HEADER: &str = "| Case | Conversion | Mux | Encoder (mode, bits vs FFmpeg, PSNR-Y ours/FFmpeg) | Runtime ratio median / upper95 | vs --enable-small build (median) | Heap peak MB (diagnostic) | RSS growth bound upper95 (diagnostic) | Memory qualification |";
+const HEADER: &str = "| Case | Conversion | Mux | Encoder (mode, bits vs FFmpeg, PSNR-Y ours/FFmpeg) | Runtime ratio median / upper95 | vs --enable-small build (median) | Peak heap upper95 or diagnostic MB | RSS growth upper95 (diagnostic) | Total resident peak upper95 | Memory qualification |";
 
 fn get<'a>(value: &'a Value, key: &str) -> Result<&'a Value, String> {
     value
@@ -49,8 +49,9 @@ fn row(r: &Value) -> Result<String, String> {
     let rt = get(r, "runtime")?;
     let m = get(r, "memory")?;
     let heap = m.get("heap_peak_bytes").filter(|h| h.truthy());
-    let heap_cell = match heap {
-        Some(heap) => {
+    let heap_cell = match (m.get("heap_ratio_upper_95"), heap) {
+        (Some(ratio), _) => format!("{}×", fixed(float(ratio)?, 3)),
+        (None, Some(heap)) => {
             let candidate = numbers(get(heap, "candidate")?)?;
             let reference = numbers(get(heap, "reference")?)?;
             format!(
@@ -62,9 +63,16 @@ fn row(r: &Value) -> Result<String, String> {
                 )
             )
         }
-        None => "invalid".into(),
+        (None, None) => "n/a".into(),
     };
-    let rss = m.get("rss_bound_ratio").filter(|x| x.truthy());
+    let growth = m
+        .get("rss_growth_ratio")
+        .or_else(|| m.get("rss_bound_ratio"));
+    let growth = growth.and_then(|ratio| ratio.get("upper_95"));
+    let total = m.get("total_rss_ratio_upper_95");
+    let upper = |value: Option<&Value>| {
+        value.map_or_else(|| Ok("n/a".into()), |v| float(v).map(|v| fixed(v, 3)))
+    };
     let small = r
         .get("runtime_vs_small_config")
         .and_then(|s| s.get("ratio"))
@@ -83,8 +91,18 @@ fn row(r: &Value) -> Result<String, String> {
     };
     let pr = float(psnr.get(1).ok_or("psnr_y has one value")?)?;
     let ratio = get(rt, "ratio")?;
+    let verdict = get(r, "verdict")?;
+    let memory = if truthy(verdict, "heap_gate") && truthy(verdict, "rss_gate") {
+        "pass"
+    } else {
+        match optional(verdict, "memory_status").as_str() {
+            Some("qualified") => "FAIL",
+            Some(status) => status,
+            None => "unresolved",
+        }
+    };
     Ok(format!(
-        "| {} | {} (±{}, {}% exact) | {} | {} ({}, {}×, {}/{} dB) | {} / **{}**{} | {} | {} | {} | unresolved |",
+        "| {} | {} (±{}, {}% exact) | {} | {} ({}, {}×, {}/{} dB) | {} / **{}**{} | {} | {} | {} | {} | {} |",
         python::str(get(get(r, "case")?, "id")?),
         pass(c, "conversion"),
         python::str(optional(c, "conversion_max_abs")),
@@ -107,10 +125,9 @@ fn row(r: &Value) -> Result<String, String> {
             None => "–".into(),
         },
         heap_cell,
-        match rss {
-            Some(x) => fixed(float(get(x, "upper_95")?)?, 3),
-            None => "n/a".into(),
-        },
+        upper(growth)?,
+        upper(total)?,
+        memory,
     ))
 }
 
@@ -127,7 +144,7 @@ pub fn run(run: &Path) -> Result<(), String> {
         .unwrap_or_default();
     results.sort();
     println!("{HEADER}");
-    println!("|---|---|---|---|---|---|---|---|---|");
+    println!("|---|---|---|---|---|---|---|---|---|---|");
     for path in results {
         let text =
             std::fs::read_to_string(&path).map_err(|e| format!("{}: {e}", path.display()))?;

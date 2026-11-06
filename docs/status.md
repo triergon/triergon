@@ -23,7 +23,7 @@ release ([reference pins](quality.md#reference-and-corpus)).
 | Playback | Matroska, MP4, TS and raw AVC/HEVC feeds; seeking; end-of-file continuation | 120/120 continuation observations; 746 of 998 matrix rows | Matroska AVC/AAC feed within 1.25 | lower | most profiles unmeasured |
 | Codecs | H.264 8-bit 4:2:0; HEVC Main and Main10; AAC LC, HE, HEv2; AC-3 and E-AC-3; DTS core with XCh and X96 | 417/417 comparable conformance and FATE vectors | 1.10 | heap 0.92, RSS 0.82 | error concealment, unverified tool paths |
 | Decode sessions | Bounded queues, clock-gated output, flush and seek, RGBA letterbox, stereo mix | with the codecs | 1.10 | with the codecs | — |
-| Capture | RGBA to YUV 4:2:0, MPEG-1 video, MPEG-TS mux | 15/15 quality cases against FFmpeg 9.0.2 | 1.1101 (15/15 within 1.20) | observer unqualified | coverage of reference allocator calls |
+| Capture | RGBA to YUV 4:2:0, MPEG-1 video, MPEG-TS mux | 15/15 quality cases against FFmpeg 9.0.2 | 1.1101 (15/15 within 1.20) | pending admitted measurements | coverage of shared reference allocator calls and full memory measurements |
 
 ## Above the 1.20 ceiling
 

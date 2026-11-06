@@ -77,7 +77,8 @@ and [triergon-codec-mpeg1](../codec-mpeg1/README.md#conformance). For the multip
 an independent re-demux (FFmpeg and an own TS walker) must find the same PIDs and
 tables (subject to the documented differences), PES payloads equal to the
 elementary stream, identical per-frame PTS, DTS and PCR, valid continuity and the
-table cadence.
+table cadence. The harness measures peak live heap and total resident peak RSS
+with the same input and checked output for each worker.
 
 `tests/session.rs` covers the start sequence and timing, keepalive, sink failure,
 bottom-up input, geometry and rate extremes, and error mapping.
