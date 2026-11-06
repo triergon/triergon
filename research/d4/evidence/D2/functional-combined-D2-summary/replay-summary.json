@@ -1,0 +1,10 @@
+{
+  "operations": 1973,
+  "equal": 1973,
+  "failures": [],
+  "by_group": {
+    "parity116": 1671,
+    "cue224": 224,
+    "fixed78": 78
+  }
+}

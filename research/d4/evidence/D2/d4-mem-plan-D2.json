@@ -1,0 +1,401 @@
+{
+ "schema": "triergon.d4.mem-plan.v1",
+ "rows": {
+  "trial": [
+   {
+    "family": "d4",
+    "id": "h264-high-1080p",
+    "input_path": ".research/m1d4/d4-inputs/h264-high-1080p.h264",
+    "input_sha256": "4d7abd5fa936096028cab705dc513f5c30c829020c783164ec666a6ed6a0ac64",
+    "input_bytes": 2937517,
+    "contract_path": "WORKLOADS.json",
+    "contract_id": "h264-high-1080p",
+    "contract_sha256": "22ca45b8d9b4136cc812a6e65bee92ec224ae50320addcad19670d5655a2a219",
+    "operation": {
+     "name": "video-h264"
+    },
+    "benchmark_operation": [
+     "video-h264-",
+     []
+    ],
+    "reference": {
+     "id": "d4-reference-decode",
+     "sha256": "85798460da7235acf177bd76dc3fa6a45188e26a5f8fbffa2912545de5579654",
+     "kind": "pinned native FFmpeg 9.0.2 libraries"
+    },
+    "reference_path": "/home/ubuntu/d4/bin/reference_decode"
+   },
+   {
+    "family": "d4",
+    "id": "h264-main-1920x800",
+    "input_path": ".research/m1d4/d4-inputs/h264-main-1920x800.h264",
+    "input_sha256": "3cb5324d42b8d35219208da7620c3dc71d8c08fdf93660e67d5cbcd2a4443f89",
+    "input_bytes": 2102873,
+    "contract_path": "WORKLOADS.json",
+    "contract_id": "h264-main-1920x800",
+    "contract_sha256": "22ca45b8d9b4136cc812a6e65bee92ec224ae50320addcad19670d5655a2a219",
+    "operation": {
+     "name": "video-h264"
+    },
+    "benchmark_operation": [
+     "video-h264-",
+     []
+    ],
+    "reference": {
+     "id": "d4-reference-decode",
+     "sha256": "85798460da7235acf177bd76dc3fa6a45188e26a5f8fbffa2912545de5579654",
+     "kind": "pinned native FFmpeg 9.0.2 libraries"
+    },
+    "reference_path": "/home/ubuntu/d4/bin/reference_decode"
+   },
+   {
+    "family": "d4",
+    "id": "h264-high-720p",
+    "input_path": ".research/m1d4/d4-inputs/h264-high-720p.h264",
+    "input_sha256": "f3b75499bd3a7d300d70110f5c640beb59788f7cc61143810a576a93317fd701",
+    "input_bytes": 1469100,
+    "contract_path": "WORKLOADS.json",
+    "contract_id": "h264-high-720p",
+    "contract_sha256": "22ca45b8d9b4136cc812a6e65bee92ec224ae50320addcad19670d5655a2a219",
+    "operation": {
+     "name": "video-h264"
+    },
+    "benchmark_operation": [
+     "video-h264-",
+     []
+    ],
+    "reference": {
+     "id": "d4-reference-decode",
+     "sha256": "85798460da7235acf177bd76dc3fa6a45188e26a5f8fbffa2912545de5579654",
+     "kind": "pinned native FFmpeg 9.0.2 libraries"
+    },
+    "reference_path": "/home/ubuntu/d4/bin/reference_decode"
+   },
+   {
+    "family": "d4",
+    "id": "hevc-main-1080p",
+    "input_path": ".research/m1d4/d4-inputs/hevc-main-1080p.hevc",
+    "input_sha256": "d72d53118fcf832485201682dcb80c7bbaeabd392b5fe493ba5e4b1cb25f1421",
+    "input_bytes": 2525973,
+    "contract_path": "WORKLOADS.json",
+    "contract_id": "hevc-main-1080p",
+    "contract_sha256": "22ca45b8d9b4136cc812a6e65bee92ec224ae50320addcad19670d5655a2a219",
+    "operation": {
+     "name": "video-hevc"
+    },
+    "benchmark_operation": [
+     "video-hevc-",
+     []
+    ],
+    "reference": {
+     "id": "d4-reference-decode",
+     "sha256": "85798460da7235acf177bd76dc3fa6a45188e26a5f8fbffa2912545de5579654",
+     "kind": "pinned native FFmpeg 9.0.2 libraries"
+    },
+    "reference_path": "/home/ubuntu/d4/bin/reference_decode"
+   },
+   {
+    "family": "d4",
+    "id": "hevc-main10-1080p",
+    "input_path": ".research/m1d4/d4-inputs/hevc-main10-1080p.hevc",
+    "input_sha256": "d00f2cabfd5a079d94d594c0f98c24d4fa474cf63d1ceef645949611ad23fcd9",
+    "input_bytes": 2301304,
+    "contract_path": "WORKLOADS.json",
+    "contract_id": "hevc-main10-1080p",
+    "contract_sha256": "22ca45b8d9b4136cc812a6e65bee92ec224ae50320addcad19670d5655a2a219",
+    "operation": {
+     "name": "video-hevc"
+    },
+    "benchmark_operation": [
+     "video-hevc-",
+     []
+    ],
+    "reference": {
+     "id": "d4-reference-decode",
+     "sha256": "85798460da7235acf177bd76dc3fa6a45188e26a5f8fbffa2912545de5579654",
+     "kind": "pinned native FFmpeg 9.0.2 libraries"
+    },
+    "reference_path": "/home/ubuntu/d4/bin/reference_decode"
+   },
+   {
+    "family": "d4",
+    "id": "hevc-main10-2160p",
+    "input_path": ".research/m1d4/d4-inputs/hevc-main10-2160p.hevc",
+    "input_sha256": "5fcd4a7ad7c95c5bb17e7cf6302b02b97fb547433460e4bff716ef565781f681",
+    "input_bytes": 1884534,
+    "contract_path": "WORKLOADS.json",
+    "contract_id": "hevc-main10-2160p",
+    "contract_sha256": "22ca45b8d9b4136cc812a6e65bee92ec224ae50320addcad19670d5655a2a219",
+    "operation": {
+     "name": "video-hevc"
+    },
+    "benchmark_operation": [
+     "video-hevc-",
+     []
+    ],
+    "reference": {
+     "id": "d4-reference-decode",
+     "sha256": "85798460da7235acf177bd76dc3fa6a45188e26a5f8fbffa2912545de5579654",
+     "kind": "pinned native FFmpeg 9.0.2 libraries"
+    },
+    "reference_path": "/home/ubuntu/d4/bin/reference_decode"
+   },
+   {
+    "family": "d4",
+    "id": "aac-lc-5.1",
+    "input_path": ".research/m1d4/d4-inputs/aac-lc-5.1.aac",
+    "input_sha256": "266795d0d249358e1773ea2ff575d1c49730ae2a6f7f5b7b93129323cdfe8839",
+    "input_bytes": 484341,
+    "contract_path": "WORKLOADS.json",
+    "contract_id": "aac-lc-5.1",
+    "contract_sha256": "22ca45b8d9b4136cc812a6e65bee92ec224ae50320addcad19670d5655a2a219",
+    "operation": {
+     "name": "audio-aac"
+    },
+    "benchmark_operation": [
+     "audio-aac-",
+     []
+    ],
+    "reference": {
+     "id": "d4-reference-decode",
+     "sha256": "85798460da7235acf177bd76dc3fa6a45188e26a5f8fbffa2912545de5579654",
+     "kind": "pinned native FFmpeg 9.0.2 libraries"
+    },
+    "reference_path": "/home/ubuntu/d4/bin/reference_decode"
+   },
+   {
+    "family": "d4",
+    "id": "aac-lc-stereo",
+    "input_path": ".research/m1d4/d4-inputs/aac-lc-stereo.aac",
+    "input_sha256": "8211fabe2b5d6448420e31cae63839be4f876ad9a54a70a2a53bf31620e74537",
+    "input_bytes": 163539,
+    "contract_path": "WORKLOADS.json",
+    "contract_id": "aac-lc-stereo",
+    "contract_sha256": "22ca45b8d9b4136cc812a6e65bee92ec224ae50320addcad19670d5655a2a219",
+    "operation": {
+     "name": "audio-aac"
+    },
+    "benchmark_operation": [
+     "audio-aac-",
+     []
+    ],
+    "reference": {
+     "id": "d4-reference-decode",
+     "sha256": "85798460da7235acf177bd76dc3fa6a45188e26a5f8fbffa2912545de5579654",
+     "kind": "pinned native FFmpeg 9.0.2 libraries"
+    },
+    "reference_path": "/home/ubuntu/d4/bin/reference_decode"
+   },
+   {
+    "family": "d4",
+    "id": "dts-core-es-6.1",
+    "input_path": ".research/m1d4/d4-inputs/core-dts_es.dts",
+    "input_sha256": "2e2530d220d51b914d1e7acb63badb5b2dae1578f3274116206fa1aa5e597638",
+    "input_bytes": 503000,
+    "contract_path": "WORKLOADS.json",
+    "contract_id": "dts-core-es-6.1",
+    "contract_sha256": "22ca45b8d9b4136cc812a6e65bee92ec224ae50320addcad19670d5655a2a219",
+    "operation": {
+     "name": "audio-dts"
+    },
+    "benchmark_operation": [
+     "audio-dts-",
+     []
+    ],
+    "reference": {
+     "id": "d4-reference-decode",
+     "sha256": "85798460da7235acf177bd76dc3fa6a45188e26a5f8fbffa2912545de5579654",
+     "kind": "pinned native FFmpeg 9.0.2 libraries"
+    },
+    "reference_path": "/home/ubuntu/d4/bin/reference_decode"
+   },
+   {
+    "family": "d4",
+    "id": "dts-core-7.1-master",
+    "input_path": ".research/m1d4/d4-inputs/core-master_audio_7.1_24bit.dts",
+    "input_sha256": "fd230401e49b41fbc892246cf22d7b04419104e02978215b50dcba3751c8de5f",
+    "input_bytes": 2358064,
+    "contract_path": "WORKLOADS.json",
+    "contract_id": "dts-core-7.1-master",
+    "contract_sha256": "22ca45b8d9b4136cc812a6e65bee92ec224ae50320addcad19670d5655a2a219",
+    "operation": {
+     "name": "audio-dts"
+    },
+    "benchmark_operation": [
+     "audio-dts-",
+     []
+    ],
+    "reference": {
+     "id": "d4-reference-decode",
+     "sha256": "85798460da7235acf177bd76dc3fa6a45188e26a5f8fbffa2912545de5579654",
+     "kind": "pinned native FFmpeg 9.0.2 libraries"
+    },
+    "reference_path": "/home/ubuntu/d4/bin/reference_decode"
+   },
+   {
+    "family": "d4",
+    "id": "ac3-5.1-448",
+    "input_path": ".research/m1d4/fate-suite/ac3/monsters_inc_5.1_448_small.ac3",
+    "input_sha256": "74fefeef070f663378a0864beb064cf88ee1186152f7ac320984af15be2f22db",
+    "input_bytes": 100000,
+    "contract_path": "WORKLOADS.json",
+    "contract_id": "ac3-5.1-448",
+    "contract_sha256": "22ca45b8d9b4136cc812a6e65bee92ec224ae50320addcad19670d5655a2a219",
+    "operation": {
+     "name": "audio-ac3"
+    },
+    "benchmark_operation": [
+     "audio-ac3-",
+     []
+    ],
+    "reference": {
+     "id": "d4-reference-decode",
+     "sha256": "85798460da7235acf177bd76dc3fa6a45188e26a5f8fbffa2912545de5579654",
+     "kind": "pinned native FFmpeg 9.0.2 libraries"
+    },
+    "reference_path": "/home/ubuntu/d4/bin/reference_decode"
+   },
+   {
+    "family": "d4",
+    "id": "ac3-2.0-192",
+    "input_path": ".research/m1d4/fate-suite/ac3/monsters_inc_2.0_192_small.ac3",
+    "input_sha256": "4df071457c23d1a39fe52322892bc9333921ad6dfc8f87ffa0797bdfb5101bae",
+    "input_bytes": 100000,
+    "contract_path": "WORKLOADS.json",
+    "contract_id": "ac3-2.0-192",
+    "contract_sha256": "22ca45b8d9b4136cc812a6e65bee92ec224ae50320addcad19670d5655a2a219",
+    "operation": {
+     "name": "audio-ac3"
+    },
+    "benchmark_operation": [
+     "audio-ac3-",
+     []
+    ],
+    "reference": {
+     "id": "d4-reference-decode",
+     "sha256": "85798460da7235acf177bd76dc3fa6a45188e26a5f8fbffa2912545de5579654",
+     "kind": "pinned native FFmpeg 9.0.2 libraries"
+    },
+    "reference_path": "/home/ubuntu/d4/bin/reference_decode"
+   },
+   {
+    "family": "d4",
+    "id": "ac3-4.0",
+    "input_path": ".research/m1d4/fate-suite/ac3/millers_crossing_4.0.ac3",
+    "input_sha256": "faa06c7b1ccbc5cf3c7897afb50004dd3d49feaa19d26bdeb03dc9bb4ec20802",
+    "input_bytes": 95232,
+    "contract_path": "WORKLOADS.json",
+    "contract_id": "ac3-4.0",
+    "contract_sha256": "22ca45b8d9b4136cc812a6e65bee92ec224ae50320addcad19670d5655a2a219",
+    "operation": {
+     "name": "audio-ac3"
+    },
+    "benchmark_operation": [
+     "audio-ac3-",
+     []
+    ],
+    "reference": {
+     "id": "d4-reference-decode",
+     "sha256": "85798460da7235acf177bd76dc3fa6a45188e26a5f8fbffa2912545de5579654",
+     "kind": "pinned native FFmpeg 9.0.2 libraries"
+    },
+    "reference_path": "/home/ubuntu/d4/bin/reference_decode"
+   },
+   {
+    "family": "d4",
+    "id": "eac3-7.1",
+    "input_path": ".research/m1d4/fate-suite/eac3/the_great_wall_7.1.eac3",
+    "input_sha256": "d698981ddc1c10e65d234dd6a02ff2b0f4c88787595c9d3e5adf7f097f2c9e50",
+    "input_bytes": 723456,
+    "contract_path": "WORKLOADS.json",
+    "contract_id": "eac3-7.1",
+    "contract_sha256": "22ca45b8d9b4136cc812a6e65bee92ec224ae50320addcad19670d5655a2a219",
+    "operation": {
+     "name": "audio-eac3"
+    },
+    "benchmark_operation": [
+     "audio-eac3-",
+     []
+    ],
+    "reference": {
+     "id": "d4-reference-decode",
+     "sha256": "85798460da7235acf177bd76dc3fa6a45188e26a5f8fbffa2912545de5579654",
+     "kind": "pinned native FFmpeg 9.0.2 libraries"
+    },
+    "reference_path": "/home/ubuntu/d4/bin/reference_decode"
+   },
+   {
+    "family": "d4",
+    "id": "eac3-5.1-spx",
+    "input_path": ".research/m1d4/fate-suite/eac3/csi_miami_5.1_256_spx_small.eac3",
+    "input_sha256": "84f50317a49a98509bf174ace814b39860e6ab2a1d61bdbd10ada9081f2bb2b3",
+    "input_bytes": 48128,
+    "contract_path": "WORKLOADS.json",
+    "contract_id": "eac3-5.1-spx",
+    "contract_sha256": "22ca45b8d9b4136cc812a6e65bee92ec224ae50320addcad19670d5655a2a219",
+    "operation": {
+     "name": "audio-eac3"
+    },
+    "benchmark_operation": [
+     "audio-eac3-",
+     []
+    ],
+    "reference": {
+     "id": "d4-reference-decode",
+     "sha256": "85798460da7235acf177bd76dc3fa6a45188e26a5f8fbffa2912545de5579654",
+     "kind": "pinned native FFmpeg 9.0.2 libraries"
+    },
+    "reference_path": "/home/ubuntu/d4/bin/reference_decode"
+   },
+   {
+    "family": "d4",
+    "id": "eac3-stereo-spx",
+    "input_path": ".research/m1d4/fate-suite/eac3/csi_miami_stereo_128_spx.eac3",
+    "input_sha256": "f96b45fa4d249522cd83dea009cd528ce552ec9d947e03cdecab44652bc86ecb",
+    "input_bytes": 333664,
+    "contract_path": "WORKLOADS.json",
+    "contract_id": "eac3-stereo-spx",
+    "contract_sha256": "22ca45b8d9b4136cc812a6e65bee92ec224ae50320addcad19670d5655a2a219",
+    "operation": {
+     "name": "audio-eac3"
+    },
+    "benchmark_operation": [
+     "audio-eac3-",
+     []
+    ],
+    "reference": {
+     "id": "d4-reference-decode",
+     "sha256": "85798460da7235acf177bd76dc3fa6a45188e26a5f8fbffa2912545de5579654",
+     "kind": "pinned native FFmpeg 9.0.2 libraries"
+    },
+    "reference_path": "/home/ubuntu/d4/bin/reference_decode"
+   },
+   {
+    "family": "d4",
+    "id": "eac3-5.1-1536",
+    "input_path": ".research/m1d4/fate-suite/eac3/serenity_english_5.1_1536_small.eac3",
+    "input_sha256": "3d81c22610a2602b7799ec5e59c2677e8ab23e03e4abc03c2a16b683aa3d5f0a",
+    "input_bytes": 99328,
+    "contract_path": "WORKLOADS.json",
+    "contract_id": "eac3-5.1-1536",
+    "contract_sha256": "22ca45b8d9b4136cc812a6e65bee92ec224ae50320addcad19670d5655a2a219",
+    "operation": {
+     "name": "audio-eac3"
+    },
+    "benchmark_operation": [
+     "audio-eac3-",
+     []
+    ],
+    "reference": {
+     "id": "d4-reference-decode",
+     "sha256": "85798460da7235acf177bd76dc3fa6a45188e26a5f8fbffa2912545de5579654",
+     "kind": "pinned native FFmpeg 9.0.2 libraries"
+    },
+    "reference_path": "/home/ubuntu/d4/bin/reference_decode"
+   }
+  ]
+ },
+ "first14": {
+  "selection": []
+ }
+}

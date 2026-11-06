@@ -1,0 +1,31 @@
+{
+  "schema": "triergon.d4.numeric-rules.v1",
+  "frozen_utc": "2026-11-02T23:45:00Z",
+  "frozen_before_grading": true,
+  "reference": "FFmpeg 9.0.2 native decoders (exact build pinned separately in the D4 reference receipt); development-only oracle on macOS is Homebrew FFmpeg 9.0.2 and is never qualification evidence",
+  "audio_decode": {
+    "applies_to": ["ac3", "eac3", "aac-lc", "he-aac-sbr", "he-aac-v2-ps", "dts-core"],
+    "exact": ["sample_rate", "channel_count", "channel_layout_and_order", "samples_per_frame", "total_sample_count", "frame_count", "first_output_sample_position (codec delay / priming)"],
+    "float_tolerance_basis": "ISO/IEC 14496-4 / 13818-4 'full accuracy' 16-bit decoder criterion applied to candidate-minus-reference planar float output, full scale = 1.0",
+    "per_channel_rms_max": 8.8e-06,
+    "per_sample_abs_max": 6.1035e-05,
+    "rms_formula": "sqrt(mean((candidate - reference)^2)) over every sample of the channel in the stream; 2^-15/sqrt(12) = 8.809e-06",
+    "abs_formula": "max |candidate - reference|; 2^-14 = 6.1035e-05",
+    "no_exclusions": "every decoded sample of every channel is compared; no normalization, delay search or gain fitting"
+  },
+  "audio_device_path": {
+    "contract": "ffmpeg -f <demuxer> -i pipe:0 -vn -ac 2 -f pulse|alsa: decoder output -> swresample default stereo rematrix -> pcm_s16le interleaved at the decoder sample rate",
+    "exact": ["sample_rate", "2 channels", "s16 interleaved", "sample count"],
+    "per_sample_abs_max_lsb": 1,
+    "basis": "float criterion above propagated through round-to-nearest s16 conversion can flip at most one rounding step"
+  },
+  "video_decode": {
+    "applies_to": ["h264", "hevc"],
+    "exact": ["every output picture's complete Y/Cb/Cr samples at native bit depth", "output order and count", "coded/cropped dimensions", "sample aspect ratio", "colour description", "pts association"],
+    "tolerance": "none: bit-exact (ITU-T H.264/H.265 decoding processes are integer-exact)"
+  },
+  "video_output_path": {
+    "contract": "scale=1920:1080:force_original_aspect_ratio=decrease,pad=1920:1080:(ow-iw)/2:(oh-ih)/2,format=rgba, -fps_mode passthrough, rawvideo rgba",
+    "tolerance": "none pre-approved: bit-exact RGBA required; any deviation is recorded as a failure pending a reviewed disposition"
+  }
+}

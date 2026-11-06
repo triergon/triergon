@@ -1,0 +1,321 @@
+{
+  "compiler": {
+    "argv": [
+      "rustc",
+      "+nightly-2026-10-30",
+      "-vV"
+    ],
+    "returncode": 0,
+    "log_sha256": "5bcb90aa6b735501af2f51f578888c5c41404b2c6d3c3d3828772236bf53e2b8"
+  },
+  "fmt-check": {
+    "argv": [
+      "cargo",
+      "+nightly-2026-10-30",
+      "fmt",
+      "--all",
+      "--check"
+    ],
+    "returncode": 0,
+    "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "test-debug": {
+    "argv": [
+      "cargo",
+      "+nightly-2026-10-30",
+      "test",
+      "--offline",
+      "--locked",
+      "--workspace",
+      "--all-targets"
+    ],
+    "returncode": 0,
+    "log_sha256": "291793866a60968e922552fbff0d7510ef8bd15e1ec272a5b248d43f28be1761"
+  },
+  "doc-test-debug": {
+    "argv": [
+      "cargo",
+      "+nightly-2026-10-30",
+      "test",
+      "--offline",
+      "--locked",
+      "--workspace",
+      "--doc"
+    ],
+    "returncode": 0,
+    "log_sha256": "176acd5d6f17e2970747d934bc45e3c00a8c32b8984974528aee34f62f28785f"
+  },
+  "test-release": {
+    "argv": [
+      "cargo",
+      "+nightly-2026-10-30",
+      "test",
+      "--offline",
+      "--locked",
+      "--release",
+      "--workspace",
+      "--all-targets"
+    ],
+    "returncode": 0,
+    "log_sha256": "88d52ec1cb268cbe43f61c3dc4d4d87dcdefcdff29e1bedeb7315333baad5eac"
+  },
+  "doc-test-release": {
+    "argv": [
+      "cargo",
+      "+nightly-2026-10-30",
+      "test",
+      "--offline",
+      "--locked",
+      "--release",
+      "--workspace",
+      "--doc"
+    ],
+    "returncode": 0,
+    "log_sha256": "4dc4762a1040ca7fccb7fde179b251d59d5f70e1241c827db45e0e2be4842c81"
+  },
+  "clippy": {
+    "argv": [
+      "cargo",
+      "+nightly-2026-10-30",
+      "clippy",
+      "--offline",
+      "--locked",
+      "--workspace",
+      "--all-targets",
+      "--",
+      "-D",
+      "warnings"
+    ],
+    "returncode": 0,
+    "log_sha256": "5c8608656de9cb3c15afb548e069d26ca23c676c998f89ea5b131e33ac23ebfd"
+  },
+  "shipping": {
+    "argv": [
+      "cargo",
+      "+nightly-2026-10-30",
+      "check",
+      "--offline",
+      "--locked",
+      "--workspace",
+      "--no-default-features"
+    ],
+    "returncode": 0,
+    "log_sha256": "ff8d8ee4f0d55c8aa2090c21a577511254c3dc6ec2b5c623cec6ef265a8d45ba"
+  },
+  "arm32-shipping": {
+    "argv": [
+      "cargo",
+      "+nightly-2026-10-30",
+      "check",
+      "--offline",
+      "--locked",
+      "--target",
+      "armv7-unknown-linux-gnueabihf",
+      "--no-default-features",
+      "-p",
+      "triergon-core",
+      "-p",
+      "triergon",
+      "--lib"
+    ],
+    "returncode": 0,
+    "log_sha256": "23343a014280bf38402735b05ae10ace3e04eb35dca283cd956b51794fab0535"
+  },
+  "scan-projection-guards": {
+    "argv": [
+      "cargo",
+      "+nightly-2026-10-30",
+      "test",
+      "--offline",
+      "--locked",
+      "-p",
+      "triergon",
+      "--lib",
+      "scan_projection",
+      "--",
+      "--nocapture",
+      "--test-threads=1"
+    ],
+    "returncode": 0,
+    "log_sha256": "8d0ad5d1819a953c20b98701ca1032d3c4c4bb7e4c717dce420d0af1e0136a10"
+  },
+  "scan-projection-guards-release": {
+    "argv": [
+      "cargo",
+      "+nightly-2026-10-30",
+      "test",
+      "--offline",
+      "--locked",
+      "--release",
+      "-p",
+      "triergon",
+      "--lib",
+      "scan_projection",
+      "--",
+      "--nocapture",
+      "--test-threads=1"
+    ],
+    "returncode": 0,
+    "log_sha256": "6313b6b5921dd9cef7328e1072e4e673af1b6b94ba7cff9789baa964ae87b2c0"
+  },
+  "header-loop-guards": {
+    "argv": [
+      "cargo",
+      "+nightly-2026-10-30",
+      "test",
+      "--offline",
+      "--locked",
+      "-p",
+      "triergon",
+      "--lib",
+      "header_loop",
+      "--",
+      "--nocapture",
+      "--test-threads=1"
+    ],
+    "returncode": 0,
+    "log_sha256": "53effe0023c47d3e60a3538ae564ffaac200296dcc1311c39ad172c943d66c5a"
+  },
+  "header-loop-guards-release": {
+    "argv": [
+      "cargo",
+      "+nightly-2026-10-30",
+      "test",
+      "--offline",
+      "--locked",
+      "--release",
+      "-p",
+      "triergon",
+      "--lib",
+      "header_loop",
+      "--",
+      "--nocapture",
+      "--test-threads=1"
+    ],
+    "returncode": 0,
+    "log_sha256": "2df973d10398278021f02f86f41386cbfb6cbae33e7cad487e4f12e9d0605285"
+  },
+  "demux-traces": {
+    "argv": [
+      "cargo",
+      "+nightly-2026-10-30",
+      "test",
+      "--offline",
+      "--locked",
+      "-p",
+      "triergon",
+      "--lib",
+      "demux_slot",
+      "--",
+      "--nocapture",
+      "--test-threads=1"
+    ],
+    "returncode": 0,
+    "log_sha256": "9917dca544f8eb6e0d24eedf5731ed6b70a9b2483de5b9848bcace3b64db88e3"
+  },
+  "demux-traces-release": {
+    "argv": [
+      "cargo",
+      "+nightly-2026-10-30",
+      "test",
+      "--offline",
+      "--locked",
+      "--release",
+      "-p",
+      "triergon",
+      "--lib",
+      "demux_slot",
+      "--",
+      "--nocapture",
+      "--test-threads=1"
+    ],
+    "returncode": 0,
+    "log_sha256": "23241d57e3efa1a5eaee8662c57c9235b9929de66f053662c4abe28df55f3a05"
+  },
+  "natural-pressure": {
+    "argv": [
+      "cargo",
+      "+nightly-2026-10-30",
+      "test",
+      "--offline",
+      "--locked",
+      "-p",
+      "triergon",
+      "--lib",
+      "lazy_pressure",
+      "--",
+      "--nocapture",
+      "--test-threads=1"
+    ],
+    "returncode": 0,
+    "log_sha256": "8ba79dbd266be2f19c7e39253b2c94e35d6020b1c15b5f1a15829f7f031aa789"
+  },
+  "direct-traces": {
+    "argv": [
+      "cargo",
+      "+nightly-2026-10-30",
+      "test",
+      "--offline",
+      "--locked",
+      "-p",
+      "triergon",
+      "--lib",
+      "simple_direct",
+      "--",
+      "--nocapture",
+      "--test-threads=1"
+    ],
+    "returncode": 0,
+    "log_sha256": "6f3a44431bbec331abe5e990f756694c29490155751681a77f62d54a82e8e017"
+  },
+  "inner-traces": {
+    "argv": [
+      "cargo",
+      "+nightly-2026-10-30",
+      "test",
+      "--offline",
+      "--locked",
+      "-p",
+      "triergon",
+      "--lib",
+      "inner_guard",
+      "--",
+      "--nocapture",
+      "--test-threads=1"
+    ],
+    "returncode": 0,
+    "log_sha256": "85fb20a276a458fe98200441cace067449e02e439efc4c6a379fcd2be8151891"
+  },
+  "scan-traces": {
+    "argv": [
+      "cargo",
+      "+nightly-2026-10-30",
+      "test",
+      "--offline",
+      "--locked",
+      "-p",
+      "triergon",
+      "--lib",
+      "scan_inplace_guard",
+      "--",
+      "--nocapture",
+      "--test-threads=1"
+    ],
+    "returncode": 0,
+    "log_sha256": "4d740bc503c3721632836777aa1e5ec81f46ebb8589c012afc93f854d128060b"
+  },
+  "worker-release": {
+    "argv": [
+      "cargo",
+      "+nightly-2026-10-30",
+      "build",
+      "--offline",
+      "--locked",
+      "--release",
+      "-p",
+      "media-worker"
+    ],
+    "returncode": 0,
+    "log_sha256": "1e46268ee42ef489a17fd6ccbb4e846293d5f9775b669b98c533dbfad4b219e3"
+  }
+}
