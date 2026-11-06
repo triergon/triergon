@@ -1,13 +1,13 @@
 use std::sync::atomic::AtomicBool;
-use triergon::{
-    incremental::ElementEvent,
-    typed::{Configuration, Event},
-};
 use triergon_core::{
     Budget, Bytes, Error as CoreError, SourceCapabilities, SourceId, Time, WorkBudget,
 };
 use triergon_framing::{
     AacConfigLimits, Ac3Family, AvcAnnexBLimits, AvcConfigLimits, BuildStep, HvcConfigLimits,
+};
+use triergon_matroska::{
+    incremental::ElementEvent,
+    typed::{Configuration, Event},
 };
 use triergon_playback::{
     ByteSource, Delivery, Engine, Error, Output, Player, PlayerPolicy, Progress, RawEvent,
@@ -59,7 +59,7 @@ fn player_with_policy(
         input,
         quantum,
         policy,
-        triergon::typed::PayloadOwnership::OwnedExact,
+        triergon_matroska::typed::PayloadOwnership::OwnedExact,
     )
 }
 
@@ -67,7 +67,7 @@ fn player_with_ownership(
     input: &[u8],
     quantum: usize,
     policy: PlayerPolicy,
-    ownership: triergon::typed::PayloadOwnership,
+    ownership: triergon_matroska::typed::PayloadOwnership,
 ) -> (Player<ByteSource>, Budget) {
     let (engine, source, pool) = matroska_source(input, quantum, ownership);
     (
@@ -79,7 +79,7 @@ fn player_with_ownership(
 fn matroska_source(
     input: &[u8],
     quantum: usize,
-    ownership: triergon::typed::PayloadOwnership,
+    ownership: triergon_matroska::typed::PayloadOwnership,
 ) -> (Engine, SourceOwner<ByteSource>, Budget) {
     let pool = Budget::new(2 << 20).unwrap();
     let engine = Engine::matroska_with_payload_ownership(
@@ -89,7 +89,7 @@ fn matroska_source(
             length: Some(input.len() as u64),
             random_access: true,
         },
-        triergon::Limits::default(),
+        triergon_matroska::Limits::default(),
         4096,
         ownership,
     )
@@ -796,7 +796,7 @@ fn shared_source_blocks_preserve_the_feed_and_keep_the_full_owner_charged() {
             INPUT,
             quantum,
             PlayerPolicy::default(),
-            triergon::typed::PayloadOwnership::SharedBounded,
+            triergon_matroska::typed::PayloadOwnership::SharedBounded,
         );
         let outputs = collect_with_work(&mut shared, 8192);
         assert_eq!(outputs.iter().map(event_key).collect::<Vec<_>>(), expected);
@@ -831,8 +831,11 @@ fn shared_source_blocks_preserve_the_feed_and_keep_the_full_owner_charged() {
 #[test]
 fn direct_player_defers_queue_storage_and_retries_fifo_pressure() {
     let (mut eager, eager_pool) = player(4096);
-    let (engine, source, pool) =
-        matroska_source(INPUT, 4096, triergon::typed::PayloadOwnership::OwnedExact);
+    let (engine, source, pool) = matroska_source(
+        INPUT,
+        4096,
+        triergon_matroska::typed::PayloadOwnership::OwnedExact,
+    );
     let policy = PlayerPolicy::default();
     let mut direct = Player::new_direct(engine, source, Selection::All, policy).unwrap();
     let queue_charge = policy.slots * std::mem::size_of::<Option<Output>>();
@@ -923,7 +926,13 @@ fn compact_discovery_replays_every_output_and_reduces_prefix_storage() {
 
     let fixture = include_bytes!("fixtures/mkv-feed/hevc-no-default-duration-discovery.mkv");
     let cancel = AtomicBool::new(false);
-    let make_source = || matroska_source(fixture, 7, triergon::typed::PayloadOwnership::OwnedExact);
+    let make_source = || {
+        matroska_source(
+            fixture,
+            7,
+            triergon_matroska::typed::PayloadOwnership::OwnedExact,
+        )
+    };
     let tail = |player: &mut Player<MatroskaStartupSource<ByteSource>>| {
         let mut keys = Vec::new();
         let mut slot = None;
@@ -1003,8 +1012,11 @@ fn av_discovery_hands_off_before_pgs_and_delivers_every_late_packet() {
     };
 
     let fixture = include_bytes!("fixtures/matroska-subtitle-probe/known-anchor.mkv");
-    let (engine, source, _) =
-        matroska_source(fixture, 7, triergon::typed::PayloadOwnership::OwnedExact);
+    let (engine, source, _) = matroska_source(
+        fixture,
+        7,
+        triergon_matroska::typed::PayloadOwnership::OwnedExact,
+    );
     let cancel = AtomicBool::new(false);
     let mut discovery = MatroskaCompactDiscovery::for_av_feed(
         engine,

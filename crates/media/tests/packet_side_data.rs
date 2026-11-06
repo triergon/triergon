@@ -1,12 +1,12 @@
 //! Additional typed-API feature guards, activated only with the private overlay.
 //! Opaque payloads establish wire/ownership behavior, not coded-frame decoding.
 use std::{io::Cursor, sync::atomic::AtomicBool};
-use triergon::{
+use triergon_core::{Budget, Bytes, InputWindow, SourceCapabilities, SourceId, WorkBudget};
+use triergon_matroska::{
     Error, Limits,
     incremental::ParseStep,
     typed::{BlockingReader, Event, Reader},
 };
-use triergon_core::{Budget, Bytes, InputWindow, SourceCapabilities, SourceId, WorkBudget};
 
 fn e(id: u64, bytes: &[u8]) -> Vec<u8> {
     let mut out: Vec<_> = id
@@ -64,7 +64,7 @@ fn more(id: Option<&[u8]>, bytes: &[u8]) -> Vec<u8> {
     raw.extend(e(0xa5, bytes));
     e(0xa6, &raw)
 }
-fn drive(raw: &[u8], known: bool, events: &mut Vec<Event>) -> triergon::Result<()> {
+fn drive(raw: &[u8], known: bool, events: &mut Vec<Event>) -> triergon_matroska::Result<()> {
     let pool = Budget::new(256 * 1024)?;
     let mut reader = Reader::new(
         &pool,
@@ -108,7 +108,7 @@ fn drive(raw: &[u8], known: bool, events: &mut Vec<Event>) -> triergon::Result<(
 }
 #[test]
 fn laces_share_complete_addition_sources_and_mapping_fields_survive_reader_drop() {
-    use triergon::typed::{ExtensionScope, Presence};
+    use triergon_matroska::typed::{ExtensionScope, Presence};
     let pool = Budget::new(256 * 1024).unwrap();
     let baseline = pool.used();
     let mapping = e(
@@ -177,7 +177,7 @@ fn laces_share_complete_addition_sources_and_mapping_fields_survive_reader_drop(
         extensions.unknown_mapping_fields().next().unwrap().data(),
         b"unknown-map"
     );
-    use triergon::typed::{BlockAdditionContainer::Matroska, NativeBlockAddition};
+    use triergon_matroska::typed::{BlockAdditionContainer::Matroska, NativeBlockAddition};
     let before_projection = pool.used();
     for packet in [&a, &b] {
         assert!(matches!(
@@ -238,7 +238,7 @@ fn laces_share_complete_addition_sources_and_mapping_fields_survive_reader_drop(
 
 #[test]
 fn native_projection_keeps_lcevc_and_rejects_foreign_mapping_context() {
-    use triergon::typed::{BlockAdditionContainer::Matroska, NativeBlockAddition};
+    use triergon_matroska::typed::{BlockAdditionContainer::Matroska, NativeBlockAddition};
 
     let mapped = e(0x41e4, &[u(0x41f0, 4), u(0x41e7, 4)].concat());
     let config = [u(0x55ee, 4), mapped].concat();
@@ -308,7 +308,7 @@ fn native_projection_keeps_lcevc_and_rejects_foreign_mapping_context() {
 
 #[test]
 fn codec_state_has_exact_owned_bytes_and_preserves_initial_track_evidence() {
-    use triergon::typed::InitializationOrigin;
+    use triergon_matroska::typed::InitializationOrigin;
     let pool = Budget::new(2 * 1024 * 1024).unwrap();
     let baseline = pool.used();
     let body = [block(), e(0xec, &vec![0; 128 * 1024]), e(0xa4, b"new")].concat();
@@ -493,8 +493,8 @@ fn state_revisions_are_track_local_and_do_not_change_parser_generation_or_clocks
 }
 
 fn finish_mapping(
-    mut job: triergon::typed::TrackExtensionsJob,
-) -> triergon::typed::TrackExtensions {
+    mut job: triergon_matroska::typed::TrackExtensionsJob,
+) -> triergon_matroska::typed::TrackExtensions {
     for _ in 0..100_000 {
         let mut work = WorkBudget::new(1);
         let result = job.step(&mut work, &AtomicBool::new(false)).unwrap();
@@ -734,7 +734,7 @@ fn malformed_mapping_name_rejects_the_entire_initial_configuration_transaction()
 
 #[test]
 fn unknown_more_children_preserve_scope_and_cannot_become_a_group_codec_state() {
-    use triergon::typed::ExtensionScope;
+    use triergon_matroska::typed::ExtensionScope;
     let nested = e(
         0xa6,
         &[e(0xa4, b"opaque-nested-state"), e(0xa5, b"one")].concat(),
@@ -1000,7 +1000,7 @@ const HDR10_PLUS: &[u8] = &[
 
 #[test]
 fn hdr10_plus_preserves_wire_values_and_borrowed_grid() {
-    use triergon::typed::Hdr10Plus;
+    use triergon_matroska::typed::Hdr10Plus;
     let cancel = AtomicBool::new(false);
     assert!(matches!(
         Hdr10Plus::parse_t35_v1(HDR10_PLUS, &mut WorkBudget::new(0), &cancel).unwrap(),
@@ -1048,8 +1048,8 @@ fn hdr10_plus_preserves_wire_values_and_borrowed_grid() {
 
 #[test]
 fn implicit_vp9_hdr10_plus_admission_is_bound_to_the_webm_track() {
-    use triergon::typed::{BlockAdditionContainer::WebM, PayloadOwnership};
     use triergon_core::OwnedInputBytes;
+    use triergon_matroska::typed::{BlockAdditionContainer::WebM, PayloadOwnership};
     let cancel = AtomicBool::new(false);
     for (doctype, codec, maximum, profile, admitted) in [
         (b"webm".as_slice(), b"V_VP9".as_slice(), None, true, true),

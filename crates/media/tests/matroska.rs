@@ -6,7 +6,7 @@ use std::{
         atomic::{AtomicBool, Ordering},
     },
 };
-use triergon::{Error, Limits, typed::BlockingReader as Demuxer};
+use triergon_matroska::{Error, Limits, typed::BlockingReader as Demuxer};
 
 fn size(n: usize) -> Vec<u8> {
     let width = (1..=8)
@@ -57,7 +57,10 @@ fn fixture_with_duration(clusters: Vec<u8>, unknown_segment: bool, with_duration
         [header, element(0x18538067, &body)].concat()
     }
 }
-fn collect(bytes: &[u8], limits: Limits) -> triergon::Result<Vec<triergon::matroska::Packet>> {
+fn collect(
+    bytes: &[u8],
+    limits: Limits,
+) -> triergon_matroska::Result<Vec<triergon_matroska::matroska::Packet>> {
     let mut d = Demuxer::open(Cursor::new(bytes), limits)?;
     let mut out = Vec::new();
     while let Some(p) = d.next_packet(&AtomicBool::new(false))? {

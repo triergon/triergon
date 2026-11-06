@@ -1,7 +1,7 @@
 //! Authored ownership and incremental-input regressions. No reference code.
 use std::{io::Cursor, sync::atomic::AtomicBool};
-use triergon::{Error, Limits, typed::BlockingReader as Demuxer};
 use triergon_core::{Budget, Bytes, InputWindow, SourceCapabilities, SourceId, WorkBudget};
+use triergon_matroska::{Error, Limits, typed::BlockingReader as Demuxer};
 
 fn e(id: u64, bytes: &[u8]) -> Vec<u8> {
     let mut out: Vec<_> = id
@@ -112,7 +112,7 @@ fn packet_output_backpressure_retries_the_same_event_without_reading_ahead() {
 
 #[test]
 fn one_byte_windows_and_one_unit_work_preserve_incremental_envelopes() {
-    use triergon::incremental::{ElementEvent, ElementReader, ParseStep};
+    use triergon_matroska::incremental::{ElementEvent, ElementReader, ParseStep};
     let bytes = fixture();
     let pool = Budget::new(1024 * 1024).unwrap();
     let mut reader = ElementReader::new(
@@ -185,8 +185,8 @@ fn earlier_packets_remain_charged_through_seek_and_cross_thread_release() {
 
 #[test]
 fn incremental_starvation_transport_failure_and_explicit_completion_are_distinct() {
-    use triergon::incremental::{ElementReader, ParseStep};
     use triergon_core::{Error as CoreError, SourceFailure};
+    use triergon_matroska::incremental::{ElementReader, ParseStep};
     let pool = Budget::new(4096).unwrap();
     let mut reader = ElementReader::new(
         &pool,
@@ -234,7 +234,7 @@ fn incremental_starvation_transport_failure_and_explicit_completion_are_distinct
 
 #[test]
 fn cluster_range_reset_invalidates_old_input_but_preserves_earlier_leaf_storage() {
-    use triergon::incremental::{ElementEvent, ElementReader, ParseStep};
+    use triergon_matroska::incremental::{ElementEvent, ElementReader, ParseStep};
     let bytes = fixture();
     let pool = Budget::new(64 * 1024).unwrap();
     let mut reader = ElementReader::new(
@@ -322,7 +322,7 @@ fn cluster_range_reset_invalidates_old_input_but_preserves_earlier_leaf_storage(
 
 #[test]
 fn skipped_block_outside_cluster_does_not_reset_scan_policy() {
-    use triergon::incremental::{ElementReader, ParseStep};
+    use triergon_matroska::incremental::{ElementReader, ParseStep};
     // These elements are skipped at Segment level. Their Block ID alone must
     // not let an irrelevant scan repeatedly replenish its operation budget.
     let outside = e(0xa3, &[0x81, 0, 0, 0x80, 1]).repeat(32);
@@ -378,7 +378,7 @@ fn skipped_block_outside_cluster_does_not_reset_scan_policy() {
 
 #[test]
 fn completed_leaf_survives_freeze_backpressure_without_consuming_more_input() {
-    use triergon::incremental::{ElementEvent, ElementReader, ParseStep};
+    use triergon_matroska::incremental::{ElementEvent, ElementReader, ParseStep};
     let bytes = fixture();
     let pool = Budget::new(64 * 1024).unwrap();
     let source = Bytes::copy_from_slice(&pool, &bytes).unwrap();
@@ -545,7 +545,7 @@ fn opaque_document_handles_keep_the_charge_through_cross_thread_last_release() {
         assert_eq!(pool.used(), used, "aliases share one charged document");
         drop(demux);
         assert!(pool.used() > baseline);
-        assert_eq!(alias.kind(), triergon::metadata::ATTACHMENTS);
+        assert_eq!(alias.kind(), triergon_matroska::metadata::ATTACHMENTS);
         assert_eq!(
             alias.attachments().next().unwrap().data().unwrap(),
             b"opaque"

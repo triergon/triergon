@@ -1,12 +1,12 @@
 //! Audio parameter observations for the admitted Matroska startup profiles.
 use crate::{Output, Result};
 use std::sync::atomic::AtomicBool;
-use triergon::{matroska::Track, typed::Packet};
 use triergon_core::{Error, WorkBudget};
 use triergon_framing::{
     AacAdtsParameters, AacAscParser, AacConfigLimits, AacSource, Ac3Family, Ac3FrameDetails,
     BuildStep, probe_ac3_header,
 };
+use triergon_matroska::{matroska::Track, typed::Packet};
 
 #[derive(Default)]
 pub(super) struct AudioProbe {

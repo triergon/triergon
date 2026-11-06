@@ -7,10 +7,6 @@ use crate::{
     mp4_plan::{Mp4Configuration, PreparedMp4, SourceRow},
 };
 use std::sync::atomic::{AtomicBool, Ordering};
-use triergon::{
-    incremental::ParseStep,
-    typed::{Event as MkvEvent, Reader},
-};
 use triergon_core::{
     Budget, BudgetVec, Error, InputCursor, InputRequest, SourceCapabilities, SourceId,
     SourceLocation, Step, Time, TimeBase, WorkBudget,
@@ -19,6 +15,10 @@ use triergon_isobmff::{
     Mov9CursorStatus, Mov9FrontReadBoundaryV1, Mov9PacketCursor, Mov9PacketOccurrence,
     Mov9SampleExtent, Mov9SampleRead, Mov9ShortSample, PinnedMovD32RegularRecoveryV1, SampleReader,
     SourcePacket,
+};
+use triergon_matroska::{
+    incremental::ParseStep,
+    typed::{Event as MkvEvent, Reader},
 };
 use triergon_mpegts::{
     self as ts, FeedContinuation, TraceEvent, TransportStream,
@@ -358,7 +358,7 @@ impl Engine {
         pool: &Budget,
         id: SourceId,
         caps: SourceCapabilities,
-        limits: triergon::Limits,
+        limits: triergon_matroska::Limits,
         window: usize,
     ) -> Result<Self> {
         Self::matroska_with_payload_ownership(
@@ -367,7 +367,7 @@ impl Engine {
             caps,
             limits,
             window,
-            triergon::typed::PayloadOwnership::OwnedExact,
+            triergon_matroska::typed::PayloadOwnership::OwnedExact,
         )
     }
 
@@ -377,9 +377,9 @@ impl Engine {
         pool: &Budget,
         id: SourceId,
         caps: SourceCapabilities,
-        limits: triergon::Limits,
+        limits: triergon_matroska::Limits,
         window: usize,
-        ownership: triergon::typed::PayloadOwnership,
+        ownership: triergon_matroska::typed::PayloadOwnership,
     ) -> Result<Self> {
         Ok(Self::Matroska(MkvEngine {
             reader: Reader::new_with_payload_ownership(pool, id, caps, limits, window, ownership)?,
@@ -393,7 +393,7 @@ impl Engine {
         pool: &Budget,
         id: SourceId,
         bytes: triergon_core::Bytes,
-        limits: triergon::Limits,
+        limits: triergon_matroska::Limits,
         window: usize,
     ) -> Result<Self> {
         Ok(Self::Matroska(MkvEngine {
@@ -407,7 +407,7 @@ impl Engine {
         pool: &Budget,
         id: SourceId,
         caps: SourceCapabilities,
-        limits: triergon::Limits,
+        limits: triergon_matroska::Limits,
         window: usize,
     ) -> Result<Self> {
         Ok(Self::Matroska(MkvEngine {
@@ -2242,10 +2242,9 @@ impl RawEvent {
         match self {
             Self::NativeTs { packet, .. } => packet.payload_len,
             Self::Matroska(MkvEvent::Packet(p)) => p.packet.data.len(),
-            Self::Matroska(MkvEvent::Envelope(triergon::incremental::ElementEvent::Leaf {
-                data,
-                ..
-            })) => data.len(),
+            Self::Matroska(MkvEvent::Envelope(
+                triergon_matroska::incremental::ElementEvent::Leaf { data, .. },
+            )) => data.len(),
             Self::Mp4(Mp4Event::Packet(p)) => p.source.payload.len(),
             Self::Mp4(Mp4Event::NativeShortPacket(p)) => p.prefix.payload.len(),
             Self::Mp4Root(raw) => raw.bytes().len(),

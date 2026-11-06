@@ -1,13 +1,13 @@
 //! Resource/work and cancellation regressions for retained typed operations.
 use std::sync::atomic::AtomicBool;
-use triergon::{
+use triergon_core::{Budget, Bytes, InputWindow, SourceCapabilities, SourceId, WorkBudget};
+use triergon_matroska::{
     Error, Limits,
     incremental::ParseStep,
     storage::SharedBytes,
     typed::{Event, Reader},
     zlib::{InflateLimits, Inflater},
 };
-use triergon_core::{Budget, Bytes, InputWindow, SourceCapabilities, SourceId, WorkBudget};
 #[derive(Default)]
 struct Bits {
     bytes: Vec<u8>,

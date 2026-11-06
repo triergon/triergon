@@ -4,7 +4,7 @@ use std::{
     io::{self, Cursor, Read},
     sync::atomic::AtomicBool,
 };
-use triergon::{Limits, matroska::Packet, typed::BlockingReader};
+use triergon_matroska::{Limits, matroska::Packet, typed::BlockingReader};
 fn e(id: u64, data: &[u8]) -> Vec<u8> {
     let mut out: Vec<_> = id
         .to_be_bytes()

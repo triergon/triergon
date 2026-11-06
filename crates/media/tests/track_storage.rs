@@ -1,7 +1,7 @@
 //! Regression against the existing API: cloning a library track must share its
 //! immutable allocations, including source bytes and non-static strings.
 use std::io::Cursor;
-use triergon::{Limits, typed::BlockingReader as Demuxer};
+use triergon_matroska::{Limits, typed::BlockingReader as Demuxer};
 
 fn e(id: u64, bytes: &[u8]) -> Vec<u8> {
     let mut out: Vec<_> = id
@@ -37,7 +37,10 @@ fn fixture() -> Vec<u8> {
     ]
     .concat()
 }
-fn tracks() -> (triergon::matroska::Track, triergon::matroska::Track) {
+fn tracks() -> (
+    triergon_matroska::matroska::Track,
+    triergon_matroska::matroska::Track,
+) {
     let reader = Demuxer::open(Cursor::new(fixture()), Limits::default()).unwrap();
     let a = reader.tracks()[0].clone();
     let b = a.clone();

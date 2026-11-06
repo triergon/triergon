@@ -28,13 +28,13 @@ pub use hevc_dolby::{
     MatroskaHevcDolbySetup,
 };
 use std::sync::atomic::{AtomicBool, Ordering};
-use triergon::typed::{Configuration, Event, Packet};
 use triergon_core::{Budget, Bytes, Error, SourceId, WorkBudget};
 use triergon_framing::{
     AacAdtsParameters, AacAscParser, AacConfigLimits, AacSource, AvcAnnexBAccessUnit,
     AvcAnnexBConfig, AvcAnnexBJob, AvcAnnexBLimits, AvcConfigLimits, AvcConfigSource,
     AvcConfigViewParser, BuildStep,
 };
+use triergon_matroska::typed::{Configuration, Event, Packet};
 pub use video_clock::{MatroskaAvcClock, MatroskaVideoTiming};
 pub use video_seek::MatroskaVideoSeekGate;
 

@@ -1,9 +1,9 @@
 //! Packet clock projection shared by the selected AVC and HEVC feeds.
 use super::{Association, FeedCodec, MatroskaFeedPacket, MatroskaFeedPayload, MatroskaTrackFeed};
 use crate::{Result, hls_avc::syntax as avc, raw_video::hevc_syntax as hevc};
-use triergon::typed::Packet;
 use triergon_core::Error;
 use triergon_framing::{AvcAnnexBConfig, Codec, NalHeader};
+use triergon_matroska::typed::Packet;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct MatroskaVideoTiming {

@@ -1,7 +1,7 @@
 //! Shared native initial-packet timing over a bounded probe prefix.
 use crate::Result;
-use triergon::typed::Packet;
 use triergon_core::Error;
+use triergon_matroska::typed::Packet;
 
 #[derive(Clone, Copy)]
 pub(super) struct NativePacketTiming {

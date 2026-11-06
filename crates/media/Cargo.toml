@@ -1,5 +1,5 @@
 [package]
-name = "triergon"
+name = "triergon-matroska"
 version = "0.0.0"
 repository.workspace = true
 license.workspace = true

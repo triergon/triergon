@@ -30,7 +30,7 @@ pub enum Format {
 #[derive(Debug)]
 pub enum Error {
     Core(CoreError),
-    Matroska(triergon::Error),
+    Matroska(triergon_matroska::Error),
     Closed,
 }
 pub type Result<T> = std::result::Result<T, Error>;
@@ -39,10 +39,10 @@ impl From<CoreError> for Error {
         Self::Core(e)
     }
 }
-impl From<triergon::Error> for Error {
-    fn from(e: triergon::Error) -> Self {
+impl From<triergon_matroska::Error> for Error {
+    fn from(e: triergon_matroska::Error) -> Self {
         match e {
-            triergon::Error::Core(c) => Self::Core(c),
+            triergon_matroska::Error::Core(c) => Self::Core(c),
             other => Self::Matroska(other),
         }
     }

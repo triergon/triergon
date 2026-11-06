@@ -10,13 +10,13 @@ pub use dolby_clock::{
 use super::{Association, check_limit, probe_clock::syncframe_duration_ns};
 use crate::{Output, Result};
 use std::sync::atomic::{AtomicBool, Ordering};
-use triergon::typed::{Configuration, Packet};
 use triergon_core::{Budget, Bytes, Error, SourceId, WorkBudget};
 use triergon_framing::{
     Ac3Family, Ac3FrameDetails, Ac3FrameHeader, BuildStep, HevcAnnexBAccessUnit, HevcAnnexBConfig,
     HevcAnnexBJob, HevcAnnexBLimits, HvcConfigLimits, HvcConfigSource, HvcConfigViewParser,
     probe_ac3_header,
 };
+use triergon_matroska::typed::{Configuration, Packet};
 
 #[derive(Clone, Copy, Debug)]
 pub struct MatroskaHevcDolbyLimits {

@@ -1291,7 +1291,7 @@ fn matroska_utf8_text_bridge_runs_real_reader_without_core_or_native_field_repai
             length: Some(raw.len() as u64),
             random_access: true,
         },
-        triergon::Limits::default(),
+        triergon_matroska::Limits::default(),
         4096,
     )
     .unwrap();
@@ -1303,7 +1303,7 @@ fn matroska_utf8_text_bridge_runs_real_reader_without_core_or_native_field_repai
     )
     .unwrap();
     let out = collect(&mut p).unwrap();
-    let output=out.into_iter().find(|o|matches!(o.event(),RawEvent::Matroska(triergon::typed::Event::Packet(p))if p.configuration.tracks()[p.packet.track].codec.as_ref()=="S_TEXT/UTF8")).unwrap();
+    let output=out.into_iter().find(|o|matches!(o.event(),RawEvent::Matroska(triergon_matroska::typed::Event::Packet(p))if p.configuration.tracks()[p.packet.track].codec.as_ref()=="S_TEXT/UTF8")).unwrap();
     assert_eq!(output.source_id(), ID);
     let source = TextSource::from_output(output).unwrap_or_else(|e| panic!("{:?}", e.error));
     let packet = source.matroska().unwrap();
@@ -2266,7 +2266,7 @@ fn dvd_native_presentation_preserves_precise_pts_and_explicit_clear() {
 fn matroska_bitmap_tracks_feed_native_receivers_without_copying_frames() {
     use bitmap_bridge::*;
     use matroska_feed::{MatroskaBitmapClockProbe, MatroskaBitmapCodec, MatroskaBitmapTrack};
-    use triergon::typed::Event;
+    use triergon_matroska::typed::Event;
     use triergon_subtitles::{dvb, dvd, pgs};
 
     fn element(id: &[u8], data: &[u8]) -> Vec<u8> {
@@ -2396,7 +2396,7 @@ fn matroska_bitmap_tracks_feed_native_receivers_without_copying_frames() {
             length: Some(data.len() as u64),
             random_access: true,
         },
-        triergon::Limits::default(),
+        triergon_matroska::Limits::default(),
         4096,
     )
     .unwrap();
@@ -2681,7 +2681,7 @@ fn matroska_bitmap_tracks_feed_native_receivers_without_copying_frames() {
 fn matroska_bitmap_probe_matches_ffmpeg_startup_clocks() {
     use bitmap_bridge::{PgsBridge, PgsMode, PgsQueueAction, PgsStep};
     use matroska_feed::{MatroskaBitmapClockProbe, MatroskaBitmapTrack};
-    use triergon::typed::Event;
+    use triergon_matroska::typed::Event;
     use triergon_subtitles::pgs;
 
     type Timing = (Option<i64>, Option<u64>);
@@ -2773,7 +2773,7 @@ fn matroska_bitmap_probe_matches_ffmpeg_startup_clocks() {
                 length: Some(fixture.len() as u64),
                 random_access: true,
             },
-            triergon::Limits::default(),
+            triergon_matroska::Limits::default(),
             4096,
         )
         .unwrap();
@@ -2909,7 +2909,7 @@ fn matroska_discovery_stops_on_canvas_or_limits_and_replays_the_same_source() {
         MatroskaBitmapClockProbe, MatroskaBitmapTrack, MatroskaDiscovered, MatroskaDiscovery,
         MatroskaDiscoveryCutoff, MatroskaDiscoveryLimits, MatroskaDiscoveryStep,
     };
-    use triergon::typed::Event;
+    use triergon_matroska::typed::Event;
 
     struct Counted {
         inner: ByteSource,
@@ -3014,7 +3014,7 @@ fn matroska_discovery_stops_on_canvas_or_limits_and_replays_the_same_source() {
                 length: Some(fixture.len() as u64),
                 random_access: true,
             },
-            triergon::Limits::default(),
+            triergon_matroska::Limits::default(),
             4096,
         )
         .unwrap();
@@ -3159,7 +3159,7 @@ fn matroska_discovery_observes_timed_audio_without_caller_confirmation() {
     use matroska_feed::{
         MatroskaDiscovery, MatroskaDiscoveryCutoff, MatroskaDiscoveryLimits, MatroskaDiscoveryStep,
     };
-    use triergon::typed::Event;
+    use triergon_matroska::typed::Event;
 
     let cases: [(&[u8], &[usize], usize); 2] = [
         (
@@ -3182,7 +3182,7 @@ fn matroska_discovery_observes_timed_audio_without_caller_confirmation() {
                 length: Some(fixture.len() as u64),
                 random_access: true,
             },
-            triergon::Limits::default(),
+            triergon_matroska::Limits::default(),
             4096,
         )
         .unwrap();
@@ -3228,7 +3228,7 @@ fn matroska_discovery_observes_video_and_keeps_decode_order() {
     use matroska_feed::{
         MatroskaDiscovery, MatroskaDiscoveryCutoff, MatroskaDiscoveryLimits, MatroskaDiscoveryStep,
     };
-    use triergon::typed::Event;
+    use triergon_matroska::typed::Event;
 
     use MatroskaDiscoveryCutoff::{SourceEnd, StreamsReady};
 
@@ -3270,7 +3270,7 @@ fn matroska_discovery_observes_video_and_keeps_decode_order() {
                 length: Some(fixture.len() as u64),
                 random_access: true,
             },
-            triergon::Limits::default(),
+            triergon_matroska::Limits::default(),
             4096,
         )
         .unwrap();

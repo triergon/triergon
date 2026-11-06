@@ -7,9 +7,9 @@ use crate::{
     Result,
     matroska_feed::probe_clock::{NativePacketTiming, PacketClock, ProbeTimeline, Timeline},
 };
-use triergon::typed::Packet;
 use triergon_core::{Budget, BudgetVec, Error};
 use triergon_framing::Ac3Family;
+use triergon_matroska::typed::Packet;
 
 const MAX_PREFIX_PACKETS: usize = 4096;
 

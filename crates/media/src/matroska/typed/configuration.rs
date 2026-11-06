@@ -18,7 +18,7 @@ struct Data {
 /// Opaque charged snapshot. The private Arc cannot be weakened by callers.
 ///
 /// ```compile_fail
-/// fn weaken(snapshot: &triergon::typed::Configuration) {
+/// fn weaken(snapshot: &triergon_matroska::typed::Configuration) {
 ///     let _ = std::sync::Arc::downgrade(snapshot);
 /// }
 /// ```

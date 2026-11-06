@@ -7,8 +7,8 @@ use crate::{
     SourceReply, State, io::SourceOwner, player::MatroskaReplayOutput,
 };
 use std::sync::atomic::{AtomicBool, Ordering};
-use triergon::typed::{Configuration, Event, Packet};
 use triergon_core::{BudgetVec, Error, InputRequest, WorkBudget};
+use triergon_matroska::typed::{Configuration, Event, Packet};
 use triergon_subtitles::pgs::{Composition, Envelope, SegmentIter};
 
 #[derive(Clone, Copy, Debug)]

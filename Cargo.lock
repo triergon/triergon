@@ -6,16 +6,8 @@ version = 4
 name = "media-worker"
 version = "0.0.0"
 dependencies = [
- "triergon",
  "triergon-harness-protocol",
-]
-
-[[package]]
-name = "triergon"
-version = "0.0.0"
-dependencies = [
- "triergon-core",
- "triergon-harness-protocol",
+ "triergon-matroska",
 ]
 
 [[package]]
@@ -74,6 +66,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "triergon-matroska"
+version = "0.0.0"
+dependencies = [
+ "triergon-core",
+ "triergon-harness-protocol",
+]
+
+[[package]]
 name = "triergon-mpegts"
 version = "0.0.0"
 dependencies = [
@@ -85,10 +85,10 @@ dependencies = [
 name = "triergon-playback"
 version = "0.0.0"
 dependencies = [
- "triergon",
  "triergon-core",
  "triergon-framing",
  "triergon-isobmff",
+ "triergon-matroska",
  "triergon-mpegts",
  "triergon-sim",
  "triergon-subtitles",

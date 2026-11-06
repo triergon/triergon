@@ -1,10 +1,10 @@
 //! Independent source-fact serialization. No serialization work enters timing.
 use std::{fmt::Write as _, io::Read, sync::atomic::AtomicBool};
-use triergon::{metadata::Document, typed::BlockingReader as Demuxer};
 use triergon_harness_protocol::{
     digest::{fold, fold_bytes},
     hex, quoted,
 };
+use triergon_matroska::{metadata::Document, typed::BlockingReader as Demuxer};
 
 fn unsigned(id: u64) -> bool {
     matches!(
@@ -145,7 +145,7 @@ pub fn source<R: Read>(mut d: Demuxer<R>) -> Result<(), Box<dyn std::error::Erro
 }
 
 use std::borrow::Cow;
-use triergon::metadata::{self, Chapter, Element, SimpleTag};
+use triergon_matroska::metadata::{self, Chapter, Element, SimpleTag};
 type Error = Box<dyn std::error::Error>;
 type Pair<'a> = (Cow<'a, str>, Cow<'a, str>);
 
@@ -548,7 +548,7 @@ impl<'a> CatalogueView<'a> {
 mod tests {
     use super::*;
     use std::io::Cursor;
-    use triergon::Limits;
+    use triergon_matroska::Limits;
 
     fn check_language(input: &[u8], legacy: &str, bcp47: Option<&str>, expected: &str) {
         let mut demux = Demuxer::open_seekable(Cursor::new(input), Limits::default()).unwrap();

@@ -1,13 +1,13 @@
 //! Runtime contracts for the additive typed reader. The first checkpoint keeps
 //! the existing envelope bridge so the missing typed operations fail at runtime.
 use std::sync::atomic::AtomicBool;
-use triergon::{
+use triergon_core::{
+    Budget, Bytes, InputWindow, SourceCapabilities, SourceFailure, SourceId, WorkBudget,
+};
+use triergon_matroska::{
     Error, Limits,
     incremental::ParseStep,
     typed::{Event, Reader},
-};
-use triergon_core::{
-    Budget, Bytes, InputWindow, SourceCapabilities, SourceFailure, SourceId, WorkBudget,
 };
 
 fn element(id: u64, data: &[u8]) -> Vec<u8> {
@@ -98,7 +98,11 @@ fn reader(raw: &[u8], known: bool, limits: Limits, pool: &Budget) -> Reader {
     )
     .unwrap()
 }
-fn drive(reader: &mut Reader, raw: &[u8], mut event: impl FnMut(Event)) -> triergon::Result<()> {
+fn drive(
+    reader: &mut Reader,
+    raw: &[u8],
+    mut event: impl FnMut(Event),
+) -> triergon_matroska::Result<()> {
     let cancel = AtomicBool::new(false);
     for _ in 0..200_000 {
         let mut work = WorkBudget::new(1);

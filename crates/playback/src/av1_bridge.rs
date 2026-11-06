@@ -1,13 +1,13 @@
 //! Typed AV1 packet delivery with an explicit container configuration binding.
 use crate::{Error as PlaybackError, Mp4Packet, Result, mp4_plan::Mp4Configuration};
 use std::sync::atomic::{AtomicBool, Ordering};
-use triergon::typed::{Configuration, Packet as MatroskaPacket};
 use triergon_core::{Budget, Bytes, Error, SourceId, WorkBudget};
 use triergon_framing::{
     Av1ConfigLimits, Av1ConfigParser, Av1Configuration, Av1TemporalUnitConfig, Av1TemporalUnitJob,
     Av1TemporalUnitLimits, BuildStep,
 };
 use triergon_isobmff::{Access, BoxChildren, BoxStep, EntryLayout, Limits};
+use triergon_matroska::typed::{Configuration, Packet as MatroskaPacket};
 
 /// The player or sink keeps the original packet (and its clock) for the lifetime
 /// of the receiver view. Bind a new bridge after a source configuration changes.
@@ -19,7 +19,7 @@ pub enum Av1Input<'a> {
 
 enum Binding {
     Matroska {
-        configuration: triergon::typed::Configuration,
+        configuration: triergon_matroska::typed::Configuration,
         track: usize,
     },
     Mp4 {

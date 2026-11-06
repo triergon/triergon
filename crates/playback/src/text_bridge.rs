@@ -10,7 +10,7 @@ use triergon_subtitles::text::{self, Extractor, Input, RawClock, Timing};
 )]
 enum Record {
     Mp4(Mp4Packet),
-    Matroska(triergon::typed::Packet),
+    Matroska(triergon_matroska::typed::Packet),
     Document(Input),
 }
 #[derive(Clone, Debug)]
@@ -32,7 +32,7 @@ impl TextSource {
         if !matches!(
             output.event(),
             RawEvent::Mp4(crate::Mp4Event::Packet(_))
-                | RawEvent::Matroska(triergon::typed::Event::Packet(_))
+                | RawEvent::Matroska(triergon_matroska::typed::Event::Packet(_))
         ) {
             return Err(RejectedOutput {
                 output,
@@ -43,7 +43,7 @@ impl TextSource {
         let pool = output.pool().clone();
         let record = match output.into_event() {
             RawEvent::Mp4(crate::Mp4Event::Packet(p)) => Record::Mp4(p),
-            RawEvent::Matroska(triergon::typed::Event::Packet(p)) => Record::Matroska(p),
+            RawEvent::Matroska(triergon_matroska::typed::Event::Packet(p)) => Record::Matroska(p),
             _ => unreachable!(),
         };
         Ok(Self {
@@ -66,7 +66,7 @@ impl TextSource {
             None
         }
     }
-    pub fn matroska(&self) -> Option<&triergon::typed::Packet> {
+    pub fn matroska(&self) -> Option<&triergon_matroska::typed::Packet> {
         if let Record::Matroska(p) = &self.record {
             Some(p)
         } else {
@@ -113,7 +113,7 @@ pub struct TextBridge {
     sequence: u64,
     finishing: bool,
 }
-fn exact_ns(t: triergon::timing::ExactTime) -> Result<Time> {
+fn exact_ns(t: triergon_matroska::timing::ExactTime) -> Result<Time> {
     Ok(Time::new(
         t.numerator(),
         u128::from(t.denominator()) * 1_000_000_000,

@@ -175,7 +175,7 @@ impl Output {
 }
 pub(crate) struct MatroskaReplayOutput {
     scope: OutputScope,
-    pub event: triergon::typed::Event,
+    pub event: triergon_matroska::typed::Event,
     delivery: Delivery,
     bytes: usize,
 }
@@ -1031,7 +1031,7 @@ impl<S: Source> Player<S> {
         let engine = self.engine.as_mut().ok_or(crate::Error::Closed)?;
         let step = if let Engine::Matroska(matroska) = engine {
             match matroska.step(w, &self.cancel)? {
-                triergon::incremental::ParseStep::Event(event) => {
+                triergon_matroska::incremental::ParseStep::Event(event) => {
                     let source = engine.source();
                     return self.accept_event::<READY>(source, RawEvent::Matroska(event), w, slot);
                 }
@@ -1121,7 +1121,7 @@ impl<S: Source> Player<S> {
         }
         if matches!(
             e,
-            RawEvent::Matroska(triergon::typed::Event::Configuration(_))
+            RawEvent::Matroska(triergon_matroska::typed::Event::Configuration(_))
                 | RawEvent::Ts(crate::TsEvent {
                     source: triergon_mpegts::TraceEvent::ProgramMap { active: true, .. },
                     ..
@@ -1154,7 +1154,7 @@ impl<S: Source> Player<S> {
                     (
                         ClockChoice::SourceExact,
                         None,
-                        RawEvent::Matroska(triergon::typed::Event::Packet(packet)),
+                        RawEvent::Matroska(triergon_matroska::typed::Event::Packet(packet)),
                     ) => {
                         if packet.packet.pts_ns.is_some() {
                             Delivery::Present
@@ -1169,7 +1169,7 @@ impl<S: Source> Player<S> {
                             matroska_ceiling_ns: Some(ceiling),
                             ..
                         }),
-                        RawEvent::Matroska(triergon::typed::Event::Packet(packet)),
+                        RawEvent::Matroska(triergon_matroska::typed::Event::Packet(packet)),
                     ) if packet.packet.timing.frames == 1 => match packet.packet.pts_ns {
                         None => Delivery::UnknownTime,
                         Some(pts) if pts < ceiling => Delivery::DecodeOnly {

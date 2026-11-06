@@ -7,34 +7,34 @@ use std::{
     sync::atomic::AtomicBool,
     time::Instant,
 };
-use triergon::timing::ExactTime;
-use triergon::{Limits, typed::BlockingReader as Demuxer};
 use triergon_harness_protocol::{
     digest::{fold, fold_bytes},
     hex, quoted,
 };
+use triergon_matroska::timing::ExactTime;
+use triergon_matroska::{Limits, typed::BlockingReader as Demuxer};
 
 // Explicit private operation binding. Library defaults remain OwnedExact.
-fn open_shared<R: Read>(source: R, limits: Limits) -> triergon::Result<Demuxer<R>> {
+fn open_shared<R: Read>(source: R, limits: Limits) -> triergon_matroska::Result<Demuxer<R>> {
     Demuxer::open_with_payload_ownership(
         source,
         limits,
-        triergon::typed::PayloadOwnership::SharedBounded,
+        triergon_matroska::typed::PayloadOwnership::SharedBounded,
     )
 }
 
 fn open_owned(
     data: Vec<u8>,
     limits: Limits,
-) -> triergon::Result<Demuxer<Cursor<triergon::storage::OwnedInputBytes>>> {
-    let pool = triergon::storage::Budget::new(limits.live_storage_bytes)?;
-    let source = triergon::storage::OwnedInputBytes::try_from_vec(&pool, data)
+) -> triergon_matroska::Result<Demuxer<Cursor<triergon_matroska::storage::OwnedInputBytes>>> {
+    let pool = triergon_matroska::storage::Budget::new(limits.live_storage_bytes)?;
+    let source = triergon_matroska::storage::OwnedInputBytes::try_from_vec(&pool, data)
         .map_err(|error| error.error())?;
     Demuxer::open_owned_seekable_in(
         source,
         limits,
         &pool,
-        triergon::typed::PayloadOwnership::SharedBounded,
+        triergon_matroska::typed::PayloadOwnership::SharedBounded,
     )
 }
 
@@ -64,8 +64,8 @@ fn sample_count(ns: u64, rate: f64) -> Result<u64, Box<dyn std::error::Error>> {
     )?)
 }
 fn trims(
-    track: &triergon::matroska::Track,
-    p: &triergon::matroska::Packet,
+    track: &triergon_matroska::matroska::Track,
+    p: &triergon_matroska::matroska::Packet,
     first: bool,
 ) -> Result<(u64, u64), Box<dyn std::error::Error>> {
     let mut start = if first && track.kind == 2 {
@@ -134,7 +134,10 @@ fn trace_source<R: Read>(mut demux: Demuxer<R>) -> Result<(), Box<dyn std::error
 // Optional decoder-input comparison view. The source-frame API and default trace
 // retain every event. Empty PCM without packet trim side data contains no samples;
 // FFmpeg delivers no AVPacket for it. Other codecs and side-only events stay visible.
-fn decoder_packet(track: &triergon::matroska::Track, packet: &triergon::matroska::Packet) -> bool {
+fn decoder_packet(
+    track: &triergon_matroska::matroska::Track,
+    packet: &triergon_matroska::matroska::Packet,
+) -> bool {
     !(track.kind == 2
         && track.codec == "A_PCM/INT/LIT"
         && packet.data.is_empty()
@@ -540,12 +543,13 @@ fn entry() -> Result<(), Box<dyn std::error::Error>> {
             trace(demux, receipt.replays_from_start, false, 0)?;
         }
         "inflate" => {
-            let limits = triergon::zlib::InflateLimits {
+            let limits = triergon_matroska::zlib::InflateLimits {
                 output_bytes: a.get(3).map_or(Ok(16 * 1024 * 1024), |s| s.parse())?,
                 expansion_ratio: a.get(4).map_or(Ok(1024), |s| s.parse())?,
                 work: a.get(5).map_or(Ok(128 * 1024 * 1024), |s| s.parse())?,
             };
-            let bytes = triergon::zlib::decompress(&data, limits, &AtomicBool::new(false))?;
+            let bytes =
+                triergon_matroska::zlib::decompress(&data, limits, &AtomicBool::new(false))?;
             println!("{}", quoted(&hex(&bytes)));
         }
         "seek" => {

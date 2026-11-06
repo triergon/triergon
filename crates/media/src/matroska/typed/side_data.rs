@@ -118,7 +118,7 @@ struct Data {
 /// An opaque owner: clones share the complete charged source and descriptor arenas.
 ///
 /// ```compile_fail
-/// fn weaken(value: &triergon::typed::BlockGroupSource) {
+/// fn weaken(value: &triergon_matroska::typed::BlockGroupSource) {
 ///     let _ = std::sync::Arc::downgrade(value);
 /// }
 /// ```

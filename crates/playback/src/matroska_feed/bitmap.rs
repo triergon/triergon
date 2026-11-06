@@ -5,8 +5,8 @@ use crate::{
     bitmap_bridge::{BitmapInput, BitmapScope},
     dvb_ts::DvbQueueAction,
 };
-use triergon::typed::{Event, Packet};
 use triergon_core::{Budget, Bytes, Error, SourceLocation, TimeBase};
+use triergon_matroska::typed::{Event, Packet};
 use triergon_subtitles::{dvb, dvd, pgs::PacketClock};
 
 const NS_PER_SECOND: u64 = 1_000_000_000;

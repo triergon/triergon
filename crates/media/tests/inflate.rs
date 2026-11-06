@@ -1,12 +1,12 @@
 //! RFC-authored DEFLATE fixtures. The bit writer is independent of the decoder.
 use std::sync::atomic::AtomicBool;
-use triergon::{
+use triergon_core::{Budget, WorkBudget};
+use triergon_matroska::{
     Error,
     incremental::ParseStep,
     storage::SharedBytes,
     zlib::{InflateLimits, Inflater},
 };
-use triergon_core::{Budget, WorkBudget};
 
 struct Bits {
     data: Vec<u8>,
