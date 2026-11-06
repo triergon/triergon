@@ -1,8 +1,9 @@
 # triergon-codec-dca
 
 DTS Coherent Acoustics core decoder (ETSI TS 102 114), including the XCh and X96
-extensions carried inside the core frame. It is a codec-layer crate with no dependencies
-beyond `std`. It decodes one core frame at a time to planar `f32` in FFmpeg's native
+extensions carried inside the core frame. It is a codec-layer crate whose only dependency
+is [triergon-codec](../codec/README.md) (`AudioDecoder`, `AudioFrame`, `ChannelLayout`,
+`Speaker`). It decodes one core frame at a time to planar `f32` in FFmpeg's native
 channel order. It does not decode DTS-HD extension substreams (XBR, XLL, LBR, or XXCh/X96
 in an extension substream); the caller strips those.
 
@@ -38,9 +39,9 @@ substreams and writes interleaved f32le.
 ## Behaviour and limits
 
 - Output layout: AMODE 0 → FC; 1–4 → FL FR; 5 → 3.0; 6 → 3.0(back); 7 → 4.0;
-  8 → quad(side); 9 → 5.0(side). The LFF field adds LFE; XCh adds BC. Planes are in ascending
-  FFmpeg channel-bit order, e.g. 5.1(side) is FL FR FC LFE SL SR and 6.1 is
-  FL FR FC LFE BC SL SR. `ChannelLayout::ffmpeg_name()` gives FFmpeg's layout name.
+  8 → quad(side); 9 → 5.0(side). The LFF field adds LFE; XCh adds BC. Planes follow the
+  triergon-codec [channel order](../codec/README.md#channel-order), e.g. 5.1(side) is FL FR FC LFE SL SR and 6.1 is
+  FL FR FC LFE BC SL SR. `layout_name(&layout)` gives FFmpeg's layout name.
 - 14-bit packings are normalized to 16-bit big endian; FSIZE counts bytes of the 16-bit
   equivalent stream, as in FFmpeg.
 - Errors are typed: `Unsupported(&str)`, `InvalidData(&str)`, `ResourceLimit(&str)`.
