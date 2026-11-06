@@ -7,7 +7,7 @@
 /// and `offset = crop_top * stride + crop_left` (chroma: both halved), so the
 /// samples left of the crop window stay reachable. The letterbox needs them:
 /// the reference decoder applies a left crop only as far as its buffer
-/// alignment allows (the letterbox scaler reproduces that rule from the
+/// alignment allows ([`crate::letterbox::Scaler`] reproduces that rule from the
 /// offset). A view whose `data` starts at the visible origin (`offset < stride`)
 /// is still valid but is treated as uncropped on the left.
 #[derive(Clone, Copy, Debug)]

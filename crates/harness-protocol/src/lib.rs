@@ -5,10 +5,12 @@
 //! with the ordered work digest in [`digest`]: `h <- 31*h + v (mod 2^64)` over
 //! every field and payload byte, never sampled. `harness/reference.c` and
 //! `harness/container_reference.c` implement the same polynomial; the golden
-//! vectors below pin it.
+//! vectors below pin it. The D4 decode workers fingerprint their output with
+//! the [`lanes`] digest instead.
 #![forbid(unsafe_code)]
 
 pub mod digest;
+pub mod lanes;
 pub mod md5;
 
 use std::{fmt::Write as _, io};

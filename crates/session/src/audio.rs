@@ -6,9 +6,9 @@
 //! their stereo samples for the consumer's device writer. A paused clock
 //! therefore yields nothing, and flush/stop discard everything queued.
 use crate::SessionState;
-use crate::codec::{AudioDecode, AudioView};
-use crate::mix::{MixLevels, StereoMatrix, mix_into};
+use crate::mix::Downmix;
 use crate::queue::{FeedError, QueueLimits, UnitQueue};
+use triergon_codec::{AudioDecoder, AudioFrame};
 
 /// Interleaved stereo s16 at `sample_rate`; `pts` is the first unit's caller PTS.
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
@@ -28,9 +28,10 @@ pub fn lead_ns(environment: Option<&str>) -> i64 {
 }
 
 pub struct AudioSession {
-    decoder: Option<Box<dyn AudioDecode>>,
+    decoder: Option<Box<dyn AudioDecoder>>,
     queue: UnitQueue,
-    matrix: Option<(Vec<crate::codec::Speaker>, MixLevels, StereoMatrix)>,
+    frame: AudioFrame,
+    downmix: Downmix,
     // Samples decoded at a new rate while the caller's block held another.
     carry: Option<PcmBlock>,
     generation: u64,
@@ -43,7 +44,8 @@ impl AudioSession {
         Self {
             decoder: None,
             queue: UnitQueue::new(limits),
-            matrix: None,
+            frame: AudioFrame::default(),
+            downmix: Downmix::default(),
             carry: None,
             generation: 0,
             ended: false,
@@ -51,7 +53,7 @@ impl AudioSession {
         }
     }
     /// A Load naming no supported audio lane plays nothing (`None`).
-    pub fn load(&mut self, decoder: Option<Box<dyn AudioDecode>>) {
+    pub fn load(&mut self, decoder: Option<Box<dyn AudioDecoder>>) {
         self.reset();
         self.decoder = decoder;
     }
@@ -112,39 +114,28 @@ impl AudioSession {
                 break;
             }
             let unit = self.queue.pop().expect("front unit");
-            let (matrix, carry) = (&mut self.matrix, &mut self.carry);
-            let result = decoder.decode(&unit.data, &mut |view: AudioView<'_>| {
-                let target = if out.samples.is_empty() || out.sample_rate == view.sample_rate {
-                    &mut *out
-                } else {
-                    carry.get_or_insert_with(PcmBlock::default)
-                };
-                if target.samples.is_empty() {
-                    target.sample_rate = view.sample_rate;
-                    target.pts = unit.pts;
-                }
-                let levels = view.levels.unwrap_or_default();
-                let current = match matrix {
-                    Some((speakers, cached, m))
-                        if speakers.as_slice() == view.speakers && *cached == levels =>
-                    {
-                        m
-                    }
-                    _ => {
-                        *matrix = Some((
-                            view.speakers.to_vec(),
-                            levels,
-                            StereoMatrix::with_levels(view.speakers, levels),
-                        ));
-                        &matrix.as_ref().expect("matrix").2
-                    }
-                };
-                mix_into(current, view.planes, view.samples, &mut target.samples);
-            });
+            let result = decoder.decode(&unit.data, &mut self.frame);
             consumed += 1;
-            if let Err(error) = result {
-                self.failure = Some(error.0);
-                self.queue.clear();
+            match result {
+                Err(error) => {
+                    self.failure = Some(error.0);
+                    self.queue.clear();
+                }
+                Ok(_) if self.frame.samples_per_channel == 0 => {}
+                Ok(levels) => {
+                    let target =
+                        if out.samples.is_empty() || out.sample_rate == self.frame.sample_rate {
+                            &mut *out
+                        } else {
+                            self.carry.get_or_insert_with(PcmBlock::default)
+                        };
+                    if target.samples.is_empty() {
+                        target.sample_rate = self.frame.sample_rate;
+                        target.pts = unit.pts;
+                    }
+                    let levels = levels.unwrap_or_default();
+                    self.downmix.mix(&self.frame, levels, &mut target.samples);
+                }
             }
         }
         consumed

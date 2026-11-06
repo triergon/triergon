@@ -1,4 +1,4 @@
-# triergon-sim
+# triergon-session
 
 A decode-session layer for desktop playback. It takes AVC/HEVC Annex B access
 units and AC-3, E-AC-3, ADTS AAC or DTS core frames, drives the pure-Rust codec
@@ -10,24 +10,24 @@ library.
 ## Usage
 
 ```rust
-use triergon_sim::{AudioSession, PcmBlock, QueueLimits, VideoSession, adapters, select};
+use triergon_session::{AudioSession, PcmBlock, QueueLimits, VideoSession, audio_decoder, select, video_decoder};
 
 let codecs = select(load_payload);
 let mut video = VideoSession::new(QueueLimits::VIDEO);
-video.load(adapters::video_decoder(codecs.video));
+video.load(video_decoder(codecs.video));
 let mut audio = AudioSession::new(QueueLimits::AUDIO);
-audio.load(codecs.audio.map(adapters::audio_decoder));
+audio.load(codecs.audio.map(audio_decoder));
 
 video.feed(&access_unit, Some(pts_ns))?;      // Err(Backpressure): keep and retry
 if video.step(Some(clock_ns)) {
     let picture = video.latest().unwrap();     // sequence, generation, pts, rgba
 }
 let mut pcm = PcmBlock::default();
-audio.pull(Some(clock_ns), triergon_sim::audio::lead_ns(None), &mut pcm);
+audio.pull(Some(clock_ns), triergon_session::audio::lead_ns(None), &mut pcm);
 ```
 
-`adapters` needs the `codecs` feature. Without it, implement
-`codec::VideoDecode` and `codec::AudioDecode` yourself (the tests use scripted
+`video_decoder` and `audio_decoder` need the `codecs` feature. Without it, implement
+`triergon_codec::VideoDecoder` and `AudioDecoder` yourself (the tests use scripted
 decoders).
 
 ## Supported
@@ -37,7 +37,7 @@ decoders).
 | Video | H.264, HEVC Annex B access units with optional PTS | 1920×1080 RGBA, letterboxed, 8- and 10-bit 4:2:0 sources |
 | Audio | AC-3, E-AC-3, AAC (ADTS), DTS core | interleaved stereo s16 at the decoder's rate |
 
-Supporting modules: `scale` (letterbox and YUV→RGBA), `mix` (stereo downmix
+The letterbox and YUV→RGBA conversion live in `triergon_pixel::letterbox`. Supporting modules: `mix` (stereo downmix
 and s16 conversion), `queue` (bounded input), `load` (codec selection from a
 load payload).
 
@@ -77,7 +77,7 @@ load payload).
 
 The letterbox and downmix rules are native observations of FFmpeg 9.0.2,
 recorded as `RGBA-CONTRACT.json` and `DOWNMIX-CONTRACT.json` in the research
-tree; `scale.rs` and `mix.rs` implement them and their unit tests pin them. `tests/rgba_reference.rs` checks the
+tree; `triergon_pixel::letterbox` and `mix.rs` implement them and their unit tests pin them. `triergon-pixel`'s `tests/rgba_reference.rs` checks the
 letterbox against digests of the reference chain; `tests/sessions.rs` covers
 timing, flush, stop, backpressure, failure, rate changes and downmix with
 scripted decoders. A host test in `triergon-playback` (`tests/continuation.rs`)

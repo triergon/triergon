@@ -1,79 +1,32 @@
 //! Decoder measurement worker for the harness: the same operations as
-//! `harness/d4/reference_decode.c`, through the session-layer decoders.
+//! `harness/d4/reference_decode.c`, through the session decoders.
 //!
 //! usage: codec-worker KIND-CODEC-bench FILE ITERATIONS | KIND-CODEC-memory FILE |
 //! KIND-CODEC-raw FILE OUT, KIND-CODEC one of video-h264, video-hevc, audio-ac3,
 //! audio-eac3, audio-aac, audio-dts. Bench prints {iterations, elapsed_ns, packets, bytes, digest} where
-//! packets counts output pictures/audio blocks and the digest (see [`Digest`]) covers the exact
-//! converted output (RGBA or interleaved stereo s16le). File loading and
-//! process start are outside the timed interval.
+//! packets counts output pictures/audio blocks and the digest
+//! ([`triergon_harness_protocol::lanes`]) covers the exact converted output (RGBA or
+//! interleaved stereo s16le). File loading and process start are outside the timed
+//! interval.
+//!
+//! The elementary-stream splitting below mirrors the reference worker's own parser
+//! (`harness/d4/reference_decode.c`, not in this repository; ADR-0004 owner decision
+//! 3) so both decode the same units. It is measurement framing, not product framing:
+//! playback frames access units through `triergon-framing`.
 #![forbid(unsafe_code)]
 use std::io::Write;
 use std::time::Instant;
-use triergon_sim::adapters::{audio_decoder, video_decoder};
-use triergon_sim::codec::{AudioCodec, AudioView, PictureView, VideoCodec};
-use triergon_sim::mix::{StereoMatrix, mix_into};
-use triergon_sim::scale::{CANVAS_BYTES, Scaler};
-
-/// Output digest, identical in `harness/d4/reference_decode.c`: eight independent
-/// lanes, each `lane_i <- (lane_i ^ le64(word 8k+i)) * K` over the concatenated output
-/// in 64-byte blocks, a zero-padded final block, then `h <- 31*h + lane_i` and the byte
-/// count. Every output byte enters it at about 1% of the decode cost.
-#[derive(Default)]
-struct Digest {
-    lanes: [u64; 8],
-    total: u64,
-    pending: Vec<u8>,
-}
-
-impl Digest {
-    const K: u64 = 0x9E37_79B9_7F4A_7C15;
-
-    fn block(lanes: &mut [u64; 8], block: &[u8]) {
-        for (lane, word) in lanes.iter_mut().zip(block.chunks_exact(8)) {
-            *lane = (*lane ^ u64::from_le_bytes(word.try_into().expect("8 bytes")))
-                .wrapping_mul(Self::K);
-        }
-    }
-
-    fn update(&mut self, mut bytes: &[u8]) {
-        self.total += bytes.len() as u64;
-        if !self.pending.is_empty() {
-            let take = (64 - self.pending.len()).min(bytes.len());
-            self.pending.extend_from_slice(&bytes[..take]);
-            bytes = &bytes[take..];
-            if self.pending.len() < 64 {
-                return;
-            }
-            Self::block(&mut self.lanes, &self.pending);
-            self.pending.clear();
-        }
-        let blocks = bytes.chunks_exact(64);
-        self.pending.extend_from_slice(blocks.remainder());
-        for block in blocks {
-            Self::block(&mut self.lanes, block);
-        }
-    }
-
-    fn finish(&self) -> u64 {
-        let mut lanes = self.lanes;
-        if !self.pending.is_empty() {
-            let mut last = [0_u8; 64];
-            last[..self.pending.len()].copy_from_slice(&self.pending);
-            Self::block(&mut lanes, &last);
-        }
-        let h = lanes
-            .iter()
-            .fold(0_u64, |h, &lane| h.wrapping_mul(31).wrapping_add(lane));
-        h.wrapping_mul(31).wrapping_add(self.total)
-    }
-}
+use triergon_codec::{AudioCodec, AudioFrame, VideoCodec};
+use triergon_harness_protocol::lanes::LaneDigest;
+use triergon_pixel::letterbox::{CANVAS_BYTES, Scaler};
+use triergon_session::mix::Downmix;
+use triergon_session::{audio_decoder, video_decoder};
 
 #[derive(Default)]
 struct Output {
     frames: u64,
     bytes: u64,
-    digest: Digest,
+    digest: LaneDigest,
     raw: Option<std::io::BufWriter<std::fs::File>>,
 }
 impl Output {
@@ -144,22 +97,25 @@ fn video(codec: VideoCodec, data: &[u8], out: &mut Output) {
     let mut decoder = video_decoder(codec);
     let mut scaler = Scaler::default();
     let mut rgba = vec![0_u8; CANVAS_BYTES];
-    let mut sink = |view: PictureView<'_>, out: &mut Output| {
-        scaler.letterbox(&view, &mut rgba);
-        out.emit(&rgba);
-    };
     let mut n = 0;
     access_units(data, codec == VideoCodec::Hevc, |unit| {
         if let Err(error) = decoder.send(unit, Some(n)) {
             eprintln!("decode error: {}", error.0);
         }
         n += 1;
-        while decoder.receive(&mut |view| sink(view, out)) {}
+        while let Some(view) = decoder.receive() {
+            scaler.letterbox(&view, &mut rgba);
+            out.emit(&rgba);
+        }
     });
     decoder.flush();
-    while decoder.receive(&mut |view| sink(view, out)) {}
+    while let Some(view) = decoder.receive() {
+        scaler.letterbox(&view, &mut rgba);
+        out.emit(&rgba);
+    }
 }
 
+/// DTS core frame length from its header, as the reference parser reads it.
 fn dts_frame_len(data: &[u8]) -> Option<usize> {
     // 16-bit big-endian core sync (the selected simulator feed); FSIZE+1 bytes.
     if data.len() < 10 || data[..4] != [0x7f, 0xfe, 0x80, 0x01] {
@@ -199,36 +155,20 @@ fn audio_units<'a>(codec: AudioCodec, data: &'a [u8], mut each: impl FnMut(&'a [
 
 fn audio(codec: AudioCodec, data: &[u8], out: &mut Output) {
     let mut decoder = audio_decoder(codec);
+    let mut frame = AudioFrame::default();
+    let mut downmix = Downmix::default();
     let mut pcm = Vec::new();
     let mut bytes = Vec::new();
-    let mut matrix: Option<(Vec<_>, triergon_sim::mix::MixLevels, StereoMatrix)> = None;
-    audio_units(codec, data, |unit| {
-        let result = decoder.decode(unit, &mut |view: AudioView<'_>| {
-            let levels = view.levels.unwrap_or_default();
-            if !matrix
-                .as_ref()
-                .is_some_and(|(s, l, _)| s.as_slice() == view.speakers && *l == levels)
-            {
-                matrix = Some((
-                    view.speakers.to_vec(),
-                    levels,
-                    StereoMatrix::with_levels(view.speakers, levels),
-                ));
-            }
+    audio_units(codec, data, |unit| match decoder.decode(unit, &mut frame) {
+        Ok(_) if frame.samples_per_channel == 0 => {}
+        Ok(levels) => {
             pcm.clear();
-            mix_into(
-                &matrix.as_ref().expect("matrix").2,
-                view.planes,
-                view.samples,
-                &mut pcm,
-            );
+            downmix.mix(&frame, levels.unwrap_or_default(), &mut pcm);
             bytes.clear();
             bytes.extend(pcm.iter().flat_map(|s| s.to_le_bytes()));
             out.emit(&bytes);
-        });
-        if let Err(error) = result {
-            eprintln!("decode error: {}", error.0);
         }
+        Err(error) => eprintln!("decode error: {}", error.0),
     });
 }
 

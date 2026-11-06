@@ -15,6 +15,6 @@ triergon-mpegts = { path = "../mpegts" }
 triergon-framing = { path = "../framing" }
 triergon-subtitles = { path = "../subtitles" }
 [dev-dependencies]
-triergon-sim = { path = "../sim", features = ["codecs"] }
+triergon-session = { path = "../session", features = ["codecs"] }
 [lints]
 workspace = true

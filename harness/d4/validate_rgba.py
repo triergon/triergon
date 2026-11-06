@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Validate crates/sim scale::Scaler on real decoded pictures (research tooling, dev Mac).
+"""Validate triergon_pixel::letterbox::Scaler on real decoded pictures (research tooling, dev Mac).
 
 For each video vector, FFmpeg decodes to raw planes (the same pictures the reference decoder hands
 its filter graph); chunks of pictures go through (a) the reference chain (probe_rgba, identical to
@@ -18,7 +18,7 @@ from rgba_probe import PROBE, ROOT, fit
 MAX = int(os.environ.get('MAX_FRAMES', '40')); CHUNK = int(os.environ.get('CHUNK', '8'))
 work = ROOT / 'target/agent-rgba/val'; work.mkdir(parents=True, exist_ok=True)
 env = dict(os.environ, CARGO_INCREMENTAL='0', CARGO_TARGET_DIR=str(ROOT / 'target/agent-rgba'))
-build = subprocess.run(['cargo', 'test', '--release', '-p', 'triergon-sim', '--test', 'rgba_reference', '--no-run', '--message-format=json'],
+build = subprocess.run(['cargo', 'test', '--release', '-p', 'triergon-pixel', '--test', 'rgba_reference', '--no-run', '--message-format=json'],
                        env=env, cwd=ROOT, capture_output=True, text=True, check=True)
 binary = [json.loads(l)['executable'] for l in build.stdout.splitlines() if '"executable":"' in l][0]
 CS = {'bt709': 1, 'fcc': 4, 'bt470bg': 5, 'smpte170m': 6, 'smpte240m': 7, 'bt2020nc': 9, 'bt2020c': 10, 'gbr': 0}

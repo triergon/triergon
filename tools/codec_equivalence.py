@@ -45,8 +45,8 @@ def main():
     parser.add_argument("--jobs", type=int, default=os.cpu_count())
     args = parser.parse_args()
     env = dict(os.environ, CARGO_INCREMENTAL="0")
-    subprocess.run(["cargo", "build", "--release", "--locked", "-p", "triergon-sim",
-                    "--features", "codecs", "--bin", "codec-worker"], cwd=ROOT, env=env, check=True)
+    subprocess.run(["cargo", "build", "--release", "--locked", "-p", "codec-worker"],
+                   cwd=ROOT, env=env, check=True)
     examples = ROOT / "target/release/examples"
     jobs = []
     with tempfile.TemporaryDirectory() as scratch:

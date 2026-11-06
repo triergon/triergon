@@ -6,10 +6,10 @@
 //! lane holds at most one converted picture ahead of the clock, like the
 //! source's blocking reader, and publishes it once the clock reaches its PTS.
 use crate::SessionState;
-use crate::codec::{PictureView, VideoDecode};
 use crate::queue::{FeedError, QueueLimits, UnitQueue};
-use crate::scale::{CANVAS_BYTES, Scaler};
 use std::sync::Arc;
+use triergon_codec::VideoDecoder;
+use triergon_pixel::letterbox::{CANVAS_BYTES, Scaler};
 
 /// The current picture for the compositor. `sequence` increases for every
 /// publication of this session object, across generations, so a texture cache
@@ -29,7 +29,7 @@ struct Ahead {
 }
 
 pub struct VideoSession {
-    decoder: Option<Box<dyn VideoDecode>>,
+    decoder: Option<Box<dyn VideoDecoder>>,
     queue: UnitQueue,
     scaler: Scaler,
     ahead: Option<Ahead>,
@@ -59,7 +59,7 @@ impl VideoSession {
         }
     }
     /// A new stream (the source's Load): old input, decoder state and picture go.
-    pub fn load(&mut self, decoder: Box<dyn VideoDecode>) {
+    pub fn load(&mut self, decoder: Box<dyn VideoDecoder>) {
         self.reset(true);
         self.decoder = Some(decoder);
     }
@@ -139,20 +139,15 @@ impl VideoSession {
         let Some(decoder) = self.decoder.as_mut() else {
             return;
         };
-        let (spare, scaler) = (&mut self.spare, &mut self.scaler);
         while self.ahead.is_none() && self.failure.is_none() {
-            let mut picture = None;
-            let got = decoder.receive(&mut |view: PictureView<'_>| {
-                let mut rgba = spare.take().unwrap_or_default();
+            if let Some(view) = decoder.receive() {
+                let mut rgba = self.spare.take().unwrap_or_default();
                 rgba.resize(CANVAS_BYTES, 0);
-                scaler.letterbox(&view, &mut rgba);
-                picture = Some(Ahead {
+                self.scaler.letterbox(&view, &mut rgba);
+                self.ahead = Some(Ahead {
                     pts: view.pts,
                     rgba,
                 });
-            });
-            if got {
-                self.ahead = picture;
                 continue;
             }
             match self.queue.pop() {

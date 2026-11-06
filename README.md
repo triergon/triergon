@@ -39,7 +39,7 @@ It is written from the published standards and measured case by case against FFm
 | [`triergon-codec-h264`](crates/codec-h264), [`-hevc`](crates/codec-hevc) | Software video decoders |
 | [`triergon-codec-aac`](crates/codec-aac), [`-ac3`](crates/codec-ac3), [`-dca`](crates/codec-dca) | Software audio decoders |
 | [`triergon-playback`](crates/playback) | Container-independent packet feeds with seeking |
-| [`triergon-sim`](crates/sim) | Decode sessions: queues, clocks and output over the decoders |
+| [`triergon-session`](crates/session) | Decode sessions: queues, clocks and output over the decoders |
 | [`triergon-capture`](crates/capture) | RGBA to YUV, MPEG-1 video encoding and MPEG-TS muxing |
 
 ## Getting started

@@ -27,7 +27,7 @@ def run(frames, bits=8, cs=2, rng=1, chain=None, out_shape=None, out_bpp=4):
 
 
 def fit(w, h):
-    """Fitted size and offset (crates/sim scale::fit)."""
+    """Fitted size and offset (triergon_pixel::letterbox::fit)."""
     fw = min((1080 * w + h // 2) // h, 1920)
     fh = min((1920 * h + w // 2) // w, 1080)
     return fw, fh, (1920 - fw) // 2, (1080 - fh) // 2

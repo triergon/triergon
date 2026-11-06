@@ -1,10 +1,13 @@
 //! Lifecycle tests for both simulator lanes with scripted decoders.
 use std::collections::VecDeque;
-use triergon_sim::codec::{
-    AudioDecode, AudioView, Colour, DecodeFailure, PictureView, Plane, Speaker, VideoDecode,
+use triergon_codec::{
+    AudioDecoder, AudioFrame, ChannelLayout, Colour, DecodeFailure, DownmixLevels, PictureView,
+    Plane, Speaker, VideoDecoder,
 };
-use triergon_sim::scale::CANVAS_BYTES;
-use triergon_sim::{AudioSession, FeedError, PcmBlock, QueueLimits, SessionState, VideoSession};
+use triergon_pixel::letterbox::CANVAS_BYTES;
+use triergon_session::{
+    AudioSession, FeedError, PcmBlock, QueueLimits, SessionState, VideoSession,
+};
 
 /// A reordering decoder: access unit `[luma, display_order]`, delay of two.
 #[derive(Default)]
@@ -12,8 +15,9 @@ struct Script {
     held: Vec<(u8, u8, Option<i64>)>,
     out: VecDeque<(u8, Option<i64>)>,
     flushed: bool,
+    picture: (Vec<u8>, Vec<u8>),
 }
-impl VideoDecode for Script {
+impl VideoDecoder for Script {
     fn send(&mut self, au: &[u8], pts: Option<i64>) -> Result<(), DecodeFailure> {
         if au[0] == 0xff {
             return Err(DecodeFailure("not an H.264 Annex-B access unit".into()));
@@ -26,29 +30,27 @@ impl VideoDecode for Script {
         }
         Ok(())
     }
-    fn receive(&mut self, sink: &mut dyn FnMut(PictureView<'_>)) -> bool {
-        let Some((luma, pts)) = self.out.pop_front() else {
-            return false;
-        };
-        let y = vec![luma; 4 * 2];
-        let c = vec![128_u8; 2];
-        sink(PictureView {
+    fn receive(&mut self) -> Option<PictureView<'_>> {
+        let (luma, pts) = self.out.pop_front()?;
+        self.picture = (vec![luma; 4 * 2], vec![128_u8; 2]);
+        let (y, c) = &self.picture;
+        Some(PictureView {
             width: 4,
             height: 2,
             bit_depth: 8,
             planes: [
                 Plane::U8 {
-                    data: &y,
+                    data: y,
                     stride: 4,
                     offset: 0,
                 },
                 Plane::U8 {
-                    data: &c,
+                    data: c,
                     stride: 2,
                     offset: 0,
                 },
                 Plane::U8 {
-                    data: &c,
+                    data: c,
                     stride: 2,
                     offset: 0,
                 },
@@ -59,8 +61,7 @@ impl VideoDecode for Script {
                 matrix: 1,
                 full_range: true,
             },
-        });
-        true
+        })
     }
     fn flush(&mut self) {
         self.flushed = true;
@@ -170,30 +171,30 @@ fn decoder_failure_is_explicit_and_backpressure_bounds_input() {
 
 /// Each unit decodes to `[rate_khz, value]` -> `value` samples at value/100.
 struct Tones {
-    speakers: Vec<Speaker>,
+    layout: ChannelLayout,
 }
-impl AudioDecode for Tones {
+impl Tones {
+    fn new(speakers: impl IntoIterator<Item = Speaker>) -> Box<Self> {
+        Box::new(Tones {
+            layout: ChannelLayout::new(speakers).unwrap(),
+        })
+    }
+}
+impl AudioDecoder for Tones {
     fn decode(
         &mut self,
         au: &[u8],
-        sink: &mut dyn FnMut(AudioView<'_>),
-    ) -> Result<(), DecodeFailure> {
+        out: &mut AudioFrame,
+    ) -> Result<Option<DownmixLevels>, DecodeFailure> {
+        out.clear();
         if au[0] == 0 {
             return Err(DecodeFailure("bad sync".into()));
         }
-        let planes: Vec<Vec<f32>> = self
-            .speakers
-            .iter()
-            .map(|_| vec![f32::from(au[1]) / 100.0; 4])
-            .collect();
-        sink(AudioView {
-            sample_rate: u32::from(au[0]) * 1000,
-            speakers: &self.speakers,
-            planes: &planes,
-            samples: 4,
-            levels: None,
-        });
-        Ok(())
+        out.sample_rate = u32::from(au[0]) * 1000;
+        out.layout = self.layout;
+        out.samples_per_channel = 4;
+        out.planes = vec![vec![f32::from(au[1]) / 100.0; 4]; self.layout.channels()];
+        Ok(None)
     }
     fn reset(&mut self) {}
 }
@@ -201,15 +202,13 @@ impl AudioDecode for Tones {
 #[test]
 fn audio_is_paced_by_clock_minus_lead_and_flush_discards_it() {
     let mut audio = AudioSession::new(QueueLimits::AUDIO);
-    audio.load(Some(Box::new(Tones {
-        speakers: vec![Speaker::FrontLeft, Speaker::FrontRight],
-    })));
+    audio.load(Some(Tones::new([Speaker::FrontLeft, Speaker::FrontRight])));
     for (i, pts) in [0_i64, 100, 200].into_iter().enumerate() {
         audio
             .feed(&[48, 10 + i as u8], Some(pts * 1_000_000))
             .unwrap();
     }
-    let lead = triergon_sim::audio::lead_ns(None);
+    let lead = triergon_session::audio::lead_ns(None);
     assert_eq!(lead, 120_000_000);
     let mut block = PcmBlock::default();
     assert_eq!(
@@ -246,16 +245,14 @@ fn audio_is_paced_by_clock_minus_lead_and_flush_discards_it() {
 fn a_sample_rate_change_starts_a_new_block_and_surround_is_downmixed() {
     let mut audio = AudioSession::new(QueueLimits::AUDIO);
     use Speaker::*;
-    audio.load(Some(Box::new(Tones {
-        speakers: vec![
-            FrontLeft,
-            FrontRight,
-            FrontCenter,
-            LowFrequency,
-            SideLeft,
-            SideRight,
-        ],
-    })));
+    audio.load(Some(Tones::new([
+        FrontLeft,
+        FrontRight,
+        FrontCenter,
+        LowFrequency,
+        SideLeft,
+        SideRight,
+    ])));
     audio.feed(&[48, 50], None).unwrap();
     audio.feed(&[44, 50], None).unwrap();
     let mut first = PcmBlock::default();

@@ -5,7 +5,7 @@
 //! not a payload grammar: video searches the whole lowercased payload for
 //! `h265`/`hevc`, everything else is H.264; audio reads the first literal
 //! `"audio":"` value, case-sensitively, and unknown names select no audio.
-use crate::codec::{AudioCodec, VideoCodec};
+use triergon_codec::{AudioCodec, VideoCodec};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct LoadSelection {

@@ -29,7 +29,7 @@
 //!
 //! Tap weights use the fixed-point bicubic stages of the selected receiver
 //! profile. The tap and complete picture comparisons are separate checks.
-use crate::codec::{Colour, PictureView, Plane};
+use crate::view::{Colour, PictureView, Plane};
 
 pub const CANVAS_WIDTH: usize = 1920;
 pub const CANVAS_HEIGHT: usize = 1080;

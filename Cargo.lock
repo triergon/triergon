@@ -10,6 +10,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "codec-worker"
+version = "0.0.0"
+dependencies = [
+ "triergon-codec",
+ "triergon-codec-aac",
+ "triergon-codec-ac3",
+ "triergon-harness-protocol",
+ "triergon-pixel",
+ "triergon-session",
+]
+
+[[package]]
 name = "media-worker"
 version = "0.0.0"
 dependencies = [
@@ -132,19 +144,21 @@ dependencies = [
  "triergon-isobmff",
  "triergon-matroska",
  "triergon-mpegts",
- "triergon-sim",
+ "triergon-session",
  "triergon-subtitles",
 ]
 
 [[package]]
-name = "triergon-sim"
+name = "triergon-session"
 version = "0.0.0"
 dependencies = [
+ "triergon-codec",
  "triergon-codec-aac",
  "triergon-codec-ac3",
  "triergon-codec-dca",
  "triergon-codec-h264",
  "triergon-codec-hevc",
+ "triergon-pixel",
 ]
 
 [[package]]

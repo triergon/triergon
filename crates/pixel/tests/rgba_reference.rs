@@ -1,8 +1,8 @@
 //! Letterbox output against digests captured from the reference converter
 //! (`harness/d4/rgba_fixtures.py`: the same pseudo-random pictures through
 //! FFmpeg 9.0.2's `scale,pad,format=rgba` chain on the dev Mac).
-use triergon_sim::codec::{Colour, PictureView, Plane};
-use triergon_sim::scale::{CANVAS_BYTES, Scaler};
+use triergon_pixel::letterbox::{CANVAS_BYTES, Scaler};
+use triergon_pixel::{Colour, PictureView, Plane};
 
 const FIXTURES: &str = include_str!("fixtures/rgba-reference-digests.txt");
 

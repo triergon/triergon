@@ -16,7 +16,7 @@ Crates depend only on layers below them. Core never depends on a format.
 | Framing | [`triergon-framing`](../crates/framing) | Codec configuration and packet-format adapters (Annex-B, ADTS, AC-3, DTS core, AV1, VP9) |
 | Subtitles | [`triergon-subtitles`](../crates/subtitles) | Text cue extraction and bitmap subtitle decoding |
 | Codecs | [`triergon-codec-aac`](../crates/codec-aac), [`-ac3`](../crates/codec-ac3), [`-dca`](../crates/codec-dca), [`-h264`](../crates/codec-h264), [`-hevc`](../crates/codec-hevc) | Software decoders |
-| Composition | [`triergon-playback`](../crates/playback), [`triergon-sim`](../crates/sim) | Packet feeds over the readers; decode sessions over the codecs |
+| Composition | [`triergon-playback`](../crates/playback), [`triergon-session`](../crates/session) | Packet feeds over the readers; decode sessions over the codecs |
 | Encoding | [`triergon-capture`](../crates/capture) | RGBA to YUV conversion, MPEG-1 video encoding, MPEG-TS muxing |
 | Tooling | [`media-worker`](../crates/worker), [`harness/`](../harness), [`tools/`](../tools) | Differential and benchmark workers; not part of the library |
 

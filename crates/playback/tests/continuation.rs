@@ -1042,9 +1042,9 @@ fn mp4_playback_feeds_real_simulator_decoders_across_clock_and_seek() {
     use triergon_framing::{
         AacAscParser, AacConfigLimits, AacSource, AvcConfigLimits, BuildStep, NalPacketLimits,
     };
-    use triergon_sim::{
+    use triergon_session::{
         AudioCodec, AudioSession, PcmBlock, QueueLimits, SessionState, VideoCodec, VideoSession,
-        adapters::{audio_decoder, video_decoder},
+        audio_decoder, video_decoder,
     };
 
     let (mut player, pool, asc, offset) = aac_fixture_player();

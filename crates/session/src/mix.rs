@@ -6,38 +6,9 @@
 //! reference behaviour (matrix, normalisation and float-to-s16 rounding) is a
 //! native observation frozen in `research/d4/DOWNMIX-CONTRACT.json`; this
 //! module implements that contract and its tests pin it.
-use crate::codec::Speaker;
+use triergon_codec::{AudioFrame, ChannelLayout, DownmixLevels, Speaker, SurroundEncoding};
 
 const SQRT_HALF: f32 = std::f32::consts::FRAC_1_SQRT_2;
-
-/// Downmix parameters: the decoder's stream metadata where it carries them
-/// (AC-3/E-AC-3 centre/surround/LFE mix levels, Dolby/Pro Logic II surround
-/// encoding), otherwise the conventional -3 dB defaults with LFE omitted.
-#[derive(Clone, Copy, Debug, PartialEq)]
-pub struct MixLevels {
-    pub center: f32,
-    pub surround: f32,
-    pub lfe: f32,
-    pub encoding: SurroundEncoding,
-}
-
-impl Default for MixLevels {
-    fn default() -> Self {
-        Self {
-            center: SQRT_HALF,
-            surround: SQRT_HALF,
-            lfe: 0.0,
-            encoding: SurroundEncoding::None,
-        }
-    }
-}
-
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum SurroundEncoding {
-    None,
-    Dolby,
-    ProLogicII,
-}
 
 /// Left/right gains for every input plane.
 #[derive(Clone, Debug, PartialEq)]
@@ -47,7 +18,7 @@ pub struct StereoMatrix {
 
 impl StereoMatrix {
     pub fn for_layout(speakers: &[Speaker]) -> Self {
-        Self::with_levels(speakers, MixLevels::default())
+        Self::with_levels(speakers, DownmixLevels::default())
     }
     /// Unity front pair; centre at `center`; back centre at `surround`/sqrt(2)
     /// to each side; back/side pairs at `surround` to their side (Pro Logic II:
@@ -56,8 +27,8 @@ impl StereoMatrix {
     /// LFE (and LFE2) at `lfe`/sqrt(2); top front pair at sqrt(1/2) to its side, every
     /// other height/wide channel dropped (`research/d4/DOWNMIX-ADDENDUM-heights.json`).
     /// Rows are normalised to an absolute sum of at most one.
-    pub fn with_levels(speakers: &[Speaker], levels: MixLevels) -> Self {
-        let MixLevels {
+    pub fn with_levels(speakers: &[Speaker], levels: DownmixLevels) -> Self {
+        let DownmixLevels {
             center,
             surround: s,
             lfe,
@@ -89,7 +60,20 @@ impl StereoMatrix {
                 Speaker::LowFrequency | Speaker::LowFrequency2 => {
                     [lfe * SQRT_HALF, lfe * SQRT_HALF]
                 }
-                Speaker::Other(_) => [0.0, 0.0],
+                Speaker::TopCenter
+                | Speaker::TopFrontCenter
+                | Speaker::TopBackLeft
+                | Speaker::TopBackCenter
+                | Speaker::TopBackRight
+                | Speaker::WideLeft
+                | Speaker::WideRight
+                | Speaker::SurroundDirectLeft
+                | Speaker::SurroundDirectRight
+                | Speaker::TopSideLeft
+                | Speaker::TopSideRight
+                | Speaker::BottomFrontCenter
+                | Speaker::BottomFrontLeft
+                | Speaker::BottomFrontRight => [0.0, 0.0],
                 Speaker::BackCenter => [s * SQRT_HALF, s * SQRT_HALF],
                 Speaker::BackLeft | Speaker::SideLeft => surround_pair(true),
                 Speaker::BackRight | Speaker::SideRight => surround_pair(false),
@@ -108,6 +92,29 @@ impl StereoMatrix {
     }
     pub fn is_identity_stereo(&self) -> bool {
         self.gains == [[1.0, 0.0], [0.0, 1.0]]
+    }
+}
+
+/// Stereo downmix of decoded frames; the matrix is rebuilt only when the layout or
+/// the stream's levels change.
+#[derive(Default)]
+pub struct Downmix {
+    cached: Option<(ChannelLayout, DownmixLevels, StereoMatrix)>,
+}
+
+impl Downmix {
+    /// Append `frame` to `out` as interleaved stereo s16.
+    pub fn mix(&mut self, frame: &AudioFrame, levels: DownmixLevels, out: &mut Vec<i16>) {
+        if !self
+            .cached
+            .as_ref()
+            .is_some_and(|(layout, cached, _)| *layout == frame.layout && *cached == levels)
+        {
+            let matrix = StereoMatrix::with_levels(frame.layout.speakers(), levels);
+            self.cached = Some((frame.layout, levels, matrix));
+        }
+        let (_, _, matrix) = self.cached.as_ref().expect("matrix");
+        mix_into(matrix, &frame.planes, frame.samples_per_channel, out);
     }
 }
 
@@ -173,7 +180,7 @@ mod tests {
                 TopFrontLeft,
                 TopFrontRight,
             ],
-            MixLevels::default(),
+            DownmixLevels::default(),
         );
         close(
             &m,
@@ -183,14 +190,14 @@ mod tests {
             &[
                 FrontLeft,
                 FrontRight,
-                Other(11),
-                Other(13),
-                Other(16),
-                Other(31),
-                Other(36),
+                TopCenter,
+                TopFrontCenter,
+                TopBackCenter,
+                WideLeft,
+                TopSideLeft,
                 LowFrequency2,
             ],
-            MixLevels::default(),
+            DownmixLevels::default(),
         );
         close(&m, &[1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]);
     }
@@ -199,7 +206,7 @@ mod tests {
     // (development observation; the native freeze is DOWNMIX-CONTRACT.json).
     #[test]
     fn matches_observed_reference_matrices() {
-        let ac3_51 = MixLevels {
+        let ac3_51 = DownmixLevels {
             center: SQRT_HALF,
             surround: 0.5,
             lfe: 0.0,
@@ -223,7 +230,7 @@ mod tests {
             &StereoMatrix::for_layout(&[FrontLeft, FrontRight, FrontCenter, BackCenter]),
             &[0.453082, 0.0, 0.320377, 0.226541],
         );
-        let seven = MixLevels {
+        let seven = DownmixLevels {
             center: 0.594604,
             surround: 0.5,
             lfe: 0.0,
@@ -245,7 +252,7 @@ mod tests {
             ),
             &[0.385415, 0.0, 0.229169, 0.0, 0.192708, 0.0, 0.192708, 0.0],
         );
-        let dpl2 = MixLevels {
+        let dpl2 = DownmixLevels {
             center: SQRT_HALF,
             surround: SQRT_HALF,
             lfe: 1.0,
