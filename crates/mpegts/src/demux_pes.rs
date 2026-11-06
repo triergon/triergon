@@ -1464,6 +1464,25 @@ impl DemuxObserver {
         Ok(true)
     }
 
+    fn reserve_finite_body_hint(&mut self, work: &mut WorkBudget) {
+        let Some(length) = self.body_limit else {
+            return;
+        };
+        // Even full carriers need this many spans. Only prepay a small
+        // reservation when the work and pool have room for it.
+        let spans = length.div_ceil(PLAIN_PAYLOAD_BYTES);
+        if !(5..=self.limits.source_spans.min(32)).contains(&spans) {
+            return;
+        }
+        let bytes = spans * size_of::<NativePesSpan>();
+        if work.remaining() >= bytes as u64
+            && self.budget.available() >= 2 * bytes
+            && self.spans.try_reserve_exact(spans).is_ok()
+        {
+            work.take(bytes as u64);
+        }
+    }
+
     fn poll_body(&mut self, work: &mut WorkBudget, cancel: &AtomicBool) -> Result<bool> {
         let pending = self
             .pending
@@ -1508,6 +1527,9 @@ impl DemuxObserver {
         }
         if next >= DEFAULT_PACKET_CAP {
             return Err(Error::Unsupported("native packet-cap boundary unobserved"));
+        }
+        if self.spans.capacity() == 0 && self.growth.is_none() {
+            self.reserve_finite_body_hint(work);
         }
         if !self.reserve(Arena::Payload, work, cancel)? || !work.try_charge(1) {
             return Ok(false);
