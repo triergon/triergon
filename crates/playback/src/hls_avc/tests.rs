@@ -54,6 +54,59 @@ fn drain(reader: &mut AvcTsReader, out: &mut Vec<AvcTsAccessUnit>) {
 }
 
 #[test]
+fn progressive_keeps_startup_sei_and_requires_the_delimiter_in_that_pes() {
+    let (pool, mut strict) = fixture();
+    let leading_sei = [
+        0, 0, 1, SEI, 5, 16, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 0x80,
+    ];
+    let delimited_idr = [DELIMITER, PREFIX, SPS, PREFIX, PPS, IDR].concat();
+    let first = [leading_sei.as_slice(), &delimited_idr].concat();
+    let anchor = Anchor {
+        serial: 1,
+        clock: clock(9000),
+    };
+    let mut progressive =
+        AvcTsReader::new_progressive(&pool, strict.config, strict.limits).unwrap();
+    strict.pes = Some(anchor);
+    push_span(&mut strict, &first);
+    assert!(matches!(
+        strict.step(&mut WorkBudget::new(1024), &AtomicBool::new(false)),
+        Err(Error::Unsupported(
+            "AVC TS access unit has no initial delimiter"
+        ))
+    ));
+
+    progressive.pes = Some(anchor);
+    let mut units = Vec::new();
+    for bytes in first.chunks(3) {
+        push_span(&mut progressive, bytes);
+        drain(&mut progressive, &mut units);
+    }
+    assert!(units.is_empty());
+    progressive.finish();
+    drain(&mut progressive, &mut units);
+    assert_eq!(units.len(), 1);
+    assert_eq!(units[0].clock, Some(anchor.clock));
+    assert_eq!(units[0].source_bytes().as_ref(), first);
+
+    let mut split = AvcTsReader::new_progressive(&pool, strict.config, strict.limits).unwrap();
+    split.pes = Some(anchor);
+    push_span(&mut split, &leading_sei);
+    drain(&mut split, &mut Vec::new());
+    split.pes = Some(Anchor {
+        serial: 2,
+        clock: clock(12000),
+    });
+    push_span(&mut split, &delimited_idr);
+    assert!(matches!(
+        split.step(&mut WorkBudget::new(1024), &AtomicBool::new(false)),
+        Err(Error::Invalid(
+            "AVC TS startup SEI without a delimiter in its PES"
+        ))
+    ));
+}
+
+#[test]
 fn split_delimiter_keeps_first_byte_clock_and_cached_parameter_sets() {
     let (pool, mut reader) = fixture();
     let first = [DELIMITER, PREFIX, SPS, PREFIX, PPS, IDR].concat();

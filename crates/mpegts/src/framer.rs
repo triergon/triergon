@@ -11,6 +11,7 @@ use triergon_core::{
 };
 
 const MAX_SHARED_INPUT_CAPACITY: usize = 128 * 1024;
+const MAX_PROGRESSIVE_SHARED_CAPACITY: usize = 4 * 1024;
 
 /// A validated run of null carriers on the source grid. The shared backing
 /// span includes every opaque M2TS prefix and every byte of null payload.
@@ -86,12 +87,20 @@ pub struct FrameStep {
     pub state: FrameState,
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum BufferedCarrier {
+    Carry,
+    Shared,
+    Progressive,
+}
+
 #[derive(Debug)]
 pub struct TransportFramer {
     budget: Budget,
     format: PacketFormat,
-    share_input: bool,
+    buffered_carrier: BufferedCarrier,
     shared_owner: Option<ByteStorageAddress>,
+    progressive_window: Option<Bytes>,
     carry: Option<BudgetVec<u8>>,
     start: Option<u64>,
     next: Option<u64>,
@@ -110,8 +119,9 @@ impl TransportFramer {
             carry: Some(BudgetVec::new(&budget)),
             budget,
             format,
-            share_input: false,
+            buffered_carrier: BufferedCarrier::Carry,
             shared_owner: None,
+            progressive_window: None,
             start: None,
             next: None,
             token: None,
@@ -124,7 +134,11 @@ impl TransportFramer {
         }
     }
     pub(crate) fn share_input(&mut self) {
-        self.share_input = true;
+        self.buffered_carrier = BufferedCarrier::Shared;
+    }
+
+    pub(crate) fn compact_progressive_input(&mut self) {
+        self.buffered_carrier = BufferedCarrier::Progressive;
     }
 
     pub fn discard(&mut self) {
@@ -230,6 +244,34 @@ impl TransportFramer {
         // Address reuse requires the former allocation and all its views to
         // have dropped. At most one shared backing allocation can be live.
         *shared_owner.get_or_insert(address) == address
+    }
+
+    fn share_progressive_window(retained: &mut Option<Bytes>, input: &InputCursor) -> bool {
+        let Some(window) = input.buffered_owner() else {
+            return false;
+        };
+        if let Some(previous) = retained {
+            if previous.shares_storage_with(window) {
+                return true;
+            }
+            if previous.has_shared_storage() {
+                return false;
+            }
+            *retained = None;
+        }
+        // Retain at most one tight, small window. Larger or sparse backing
+        // storage can keep the next reply from fitting when a PES crosses it.
+        let capacity = window.retained_capacity();
+        let charge = window.retained_storage_bytes();
+        if capacity > MAX_PROGRESSIVE_SHARED_CAPACITY
+            || capacity > window.len()
+            || window.len() < 2 * PacketFormat::Ts188.bytes()
+            || input.budget().available() < input.request().maximum.saturating_add(2 * charge)
+        {
+            return false;
+        }
+        *retained = Some(window.clone());
+        true
     }
 
     pub(crate) fn try_null_run(
@@ -349,36 +391,62 @@ impl TransportFramer {
                     .complete(work, cancel)
                     .map(|value| value.map_or(Step::Yield, Step::Ready));
             }
-            // Share complete carriers. The common layouts need only the
-            // header and padding check. Other fields use the full inspector.
-            if self.share_input
+            // Complete feed carriers need only the header and padding check
+            // for common layouts. Other fields use the full inspector.
+            if self.buffered_carrier != BufferedCarrier::Carry
                 && carry.is_empty()
                 && input.buffered().len() >= missing
                 && work.remaining() >= missing as u64
-                && Self::share_buffered_owner(&mut self.shared_owner, input)
             {
-                let start = input.position();
-                let Step::Ready(source) = input.read_span(missing, work, cancel)? else {
-                    return Err(Error::Invalid("buffered carrier span missing"));
+                let share = match self.buffered_carrier {
+                    BufferedCarrier::Carry => false,
+                    BufferedCarrier::Shared => {
+                        Self::share_buffered_owner(&mut self.shared_owner, input)
+                    }
+                    BufferedCarrier::Progressive => {
+                        Self::share_progressive_window(&mut self.progressive_window, input)
+                    }
                 };
-                self.next = Some(input.position());
-                if self.format == PacketFormat::Ts188
-                    && !cancel.load(Ordering::Relaxed)
-                    && let Some(carrier) = PlainCarrier::inspect_ts188(&source, work)
-                {
-                    self.last_packet_offset = Some(start);
-                    return Ok(Step::Ready(carrier.into_packet(
-                        source,
-                        start,
-                        self.entity,
-                    )?));
+                if share || self.buffered_carrier == BufferedCarrier::Progressive {
+                    let start = input.position();
+                    let source = if share {
+                        let Step::Ready(source) = input.read_span(missing, work, cancel)? else {
+                            return Err(Error::Invalid("buffered carrier span missing"));
+                        };
+                        source
+                    } else {
+                        // Preserve only the tight carrier if a shared window
+                        // cannot be replaced. Allocate before advancing input.
+                        let source =
+                            Bytes::copy_from_slice(&self.budget, &input.buffered()[..missing])?;
+                        if !matches!(input.read_discard(missing, work, cancel)?, Step::Ready(read) if read == missing)
+                        {
+                            return Err(Error::Invalid("buffered carrier extent changed"));
+                        }
+                        source
+                    };
+                    self.next = Some(input.position());
+                    if self.format == PacketFormat::Ts188
+                        && !cancel.load(Ordering::Relaxed)
+                        && let Some(carrier) = PlainCarrier::inspect_ts188(&source, work)
+                    {
+                        self.last_packet_offset = Some(start);
+                        return Ok(Step::Ready(carrier.into_packet(
+                            source,
+                            start,
+                            self.entity,
+                        )?));
+                    }
+                    self.inspect(source, start)?;
+                    continue;
                 }
-                self.inspect(source, start)?;
-                continue;
             }
             // Reserve before advancing the shared cursor; a failed allocation has
             // consumed no source bytes. A complete carry survives failed freeze.
-            if carry.capacity() < carry.len() + missing {
+            if carry.capacity() < carry.len() + missing
+                && (self.buffered_carrier != BufferedCarrier::Progressive
+                    || !input.buffered().is_empty())
+            {
                 if !work.try_charge(1) {
                     return Ok(Step::Yield);
                 }
@@ -392,7 +460,16 @@ impl TransportFramer {
                     }
                     self.next = Some(input.position());
                 }
-                Step::NeedInput(request) => return Ok(Step::NeedInput(request)),
+                Step::NeedInput(request) => {
+                    if self
+                        .progressive_window
+                        .as_ref()
+                        .is_some_and(|window| !window.has_shared_storage())
+                    {
+                        self.progressive_window = None;
+                    }
+                    return Ok(Step::NeedInput(request));
+                }
                 Step::Yield => return Ok(Step::Yield),
                 Step::End(location) => {
                     if !carry.is_empty() {
@@ -619,6 +696,72 @@ mod tests {
             assert_eq!(packet.source.shares_storage_with(&owner), share);
             owners.push(owner);
         }
+    }
+
+    #[test]
+    fn progressive_carriers_share_again_after_the_previous_window_releases() {
+        const WIDTH: usize = 188;
+        const WINDOW: usize = 2 * WIDTH;
+        let budget = Budget::new(8192).unwrap();
+        let mut input = InputCursor::new(
+            &budget,
+            SourceId(1),
+            SourceCapabilities {
+                length: None,
+                random_access: false,
+            },
+            WINDOW,
+        )
+        .unwrap();
+        let mut framer = TransportFramer::new(budget.clone(), PacketFormat::Ts188);
+        framer.compact_progressive_input();
+        let mut wire = [0xff; WINDOW];
+        for carrier in wire.chunks_exact_mut(WIDTH) {
+            carrier[..4].copy_from_slice(&[0x47, 0x1f, 0xff, 0x10]);
+        }
+        let cancel = AtomicBool::new(false);
+        let mut retained = None;
+        for (index, share) in [true, false, true].into_iter().enumerate() {
+            let window = Bytes::copy_from_slice(&budget, &wire).unwrap();
+            let request = input.request();
+            input
+                .provide_owned(
+                    InputWindow::new(
+                        request.source,
+                        request.token,
+                        request.offset,
+                        window.clone(),
+                    )
+                    .unwrap(),
+                )
+                .unwrap();
+            for carrier in 0..2 {
+                let Step::Ready(packet) = framer
+                    .poll(&mut input, &mut WorkBudget::new(4096), &cancel)
+                    .unwrap()
+                else {
+                    panic!("expected a complete carrier");
+                };
+                assert_eq!(
+                    packet.source_offset,
+                    (index * WINDOW + carrier * WIDTH) as u64
+                );
+                assert_eq!(packet.source.shares_storage_with(&window), share);
+                if index == 0 && carrier == 1 {
+                    retained = Some(packet);
+                }
+            }
+            if index == 1 {
+                assert!(retained.take().is_some());
+            }
+        }
+        assert!(matches!(
+            framer
+                .poll(&mut input, &mut WorkBudget::new(4096), &cancel)
+                .unwrap(),
+            Step::NeedInput(_)
+        ));
+        assert_eq!(budget.used(), Budget::control_storage_bytes());
     }
 
     #[test]

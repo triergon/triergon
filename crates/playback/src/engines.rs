@@ -292,6 +292,7 @@ impl TsNativeTracks {
 #[derive(Clone, Copy, PartialEq, Eq)]
 enum SegmentDiscovery {
     Native,
+    Progressive,
     AvcAacFeed,
     MediaFeed,
 }
@@ -724,6 +725,16 @@ impl Engine {
         )
     }
 
+    pub(crate) fn ts_progressive(input: InputCursor, limits: ts::ParseLimits) -> Result<Self> {
+        Self::ts_native_segment(
+            input,
+            limits,
+            SourceTimePolicy::Unanchored,
+            DescriptorNamespace::Unspecified,
+            SegmentDiscovery::Progressive,
+        )
+    }
+
     fn ts_native_segment(
         input: InputCursor,
         limits: ts::ParseLimits,
@@ -735,6 +746,9 @@ impl Engine {
         let stream = match discovery {
             SegmentDiscovery::Native => {
                 TransportStream::new_single_program_segment(budget, limits, namespace)?
+            }
+            SegmentDiscovery::Progressive => {
+                TransportStream::new_single_program_progressive_feed(budget, limits, namespace)?
             }
             SegmentDiscovery::AvcAacFeed | SegmentDiscovery::MediaFeed => {
                 TransportStream::new_single_program_feed(budget, limits, namespace)?
@@ -1678,15 +1692,11 @@ impl TsEngine {
         &mut self,
         index: usize,
         mut packet: ts::TransportPacket,
+        context: NativeSourceContext,
         ready: Option<(&mut WorkBudget, &AtomicBool)>,
     ) -> Result<bool> {
         let track = &mut self.native_tracks.as_mut_slice()[index];
         if let Some(observer) = track.observer.as_mut() {
-            let context = SourceContext {
-                source_event_ordinal: self.event_ordinal,
-                epochs: self.stream.source_epochs(),
-                byte_run_epoch: None,
-            };
             if let Some((work, cancel)) = ready {
                 match observer.append_ready_continuation(&mut packet, context, work, cancel)? {
                     ReadyContinuation::Buffered => return Ok(true),
@@ -1714,6 +1724,14 @@ impl TsEngine {
         Ok(true)
     }
 
+    fn native_source_context(&self) -> NativeSourceContext {
+        NativeSourceContext {
+            source_event_ordinal: self.event_ordinal,
+            epochs: self.stream.source_epochs(),
+            byte_run_epoch: None,
+        }
+    }
+
     const FEED_EVENT_QUANTUM: u64 = 64;
 
     fn poll_feed_stream(
@@ -1730,7 +1748,7 @@ impl TsEngine {
             work,
             cancel,
             &mut |packet, omitted, epochs, work| {
-                // Leave one unit for consuming the event after appending its payload.
+                // Leave one unit for event consumption in addition to native append.
                 if work.remaining() < 3 {
                     return Ok(FeedContinuation::Emit);
                 }
@@ -1844,9 +1862,14 @@ impl TsEngine {
             }
             self.native_active = self.draining.then_some(index + 1);
         }
+        let progressive = self.segment_discovery == Some(SegmentDiscovery::Progressive);
         let feed_only = matches!(
             self.segment_discovery,
-            Some(SegmentDiscovery::AvcAacFeed | SegmentDiscovery::MediaFeed)
+            Some(
+                SegmentDiscovery::Progressive
+                    | SegmentDiscovery::AvcAacFeed
+                    | SegmentDiscovery::MediaFeed
+            )
         );
         if self.ended {
             return Ok(BackendStep::End);
@@ -2021,13 +2044,20 @@ impl TsEngine {
                 }
                 self.tsid = Some(table.header.extension);
             }
-            // The HLS feed consumes active maps, faults and native payloads. The
-            // source parser still validates every packet and advances its epochs.
+            // Feeds consume native payloads and the source facts needed for
+            // admission. The source parser still validates every carrier.
             if feed_only
                 && !matches!(
                     event,
                     TraceEvent::ProgramMap { active: true, .. } | TraceEvent::Diagnostic(_)
                 )
+                && !(progressive
+                    && matches!(
+                        event,
+                        TraceEvent::Pat(_)
+                            | TraceEvent::Continuity { .. }
+                            | TraceEvent::Timeline { .. }
+                    ))
             {
                 let event = self
                     .pending
@@ -2037,7 +2067,9 @@ impl TsEngine {
                 match event {
                     TraceEvent::Transport(packet) => {
                         if let Some(index) = self.native_tracks.index(packet.pid) {
-                            drained = self.offer_native_transport(index, packet, Some((w, c)))?;
+                            let context = self.native_source_context();
+                            drained =
+                                self.offer_native_transport(index, packet, context, Some((w, c)))?;
                         }
                     }
                     TraceEvent::Pes(_) if self.program == 0 => {
@@ -2096,7 +2128,8 @@ impl TsEngine {
             if let TraceEvent::Transport(packet) = &event
                 && let Some(index) = self.native_tracks.index(packet.pid)
             {
-                self.offer_native_transport(index, packet.clone(), None)?;
+                let context = self.native_source_context();
+                self.offer_native_transport(index, packet.clone(), context, None)?;
             }
             self.event_ordinal = self.event_ordinal.checked_add(1).ok_or(Error::Overflow)?;
             if matches!(event, TraceEvent::Finished) {

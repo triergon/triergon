@@ -66,6 +66,7 @@ MP4 needs an open and index step first: `mp4_open::Mp4Open` →
 | MP4 seek | `Player::prepare_mp4_sync_seek` / `apply_mp4_sync_seek`, `prepare_mp4_native_seek` / `apply_mp4_native_seek`, progressive variants, `PreparedMp4::movie_seek` |
 | MP4 catalogue replacement | `catalogue::Mp4Catalogue`, `Player::prepare_mp4_catalogue` / `replace_mp4_catalogue` |
 | TS / M2TS | `Engine::ts`, `ts_with_namespace`, `ts_segmented`, `ts_native`, `ts_native_private_audio_v1`, `ts_native_program_v1`, `ts_native_segment_v1`; `native_startup::NativeStartup` |
+| Progressive TS188 | `ts_progressive::TsProgressiveReader` (AVC + ADTS AAC) |
 | HLS media segments | `hls_segment::HlsSegmentReader` (AVC + AAC), `HlsMediaSegmentReader` (AVC/HEVC + AAC/AC-3/E-AC-3) |
 | Raw Annex B | `raw_video::RawVideoProbe`, `RawVideoSource`, `RawVideoConfigTracker`, `RawVideoFeed` |
 | Packet bridges | `aac_bridge::AacBridge`, `av1_bridge::Av1Bridge`; MP4 AVC and HEVC samples frame through `triergon_framing::NalPacketSession` |
@@ -127,6 +128,13 @@ admission. M2TS prefix startup (`NativeStartup::new_m2ts_prefix_v2`) needs an
 remains valid while a caller retains an output after closing the player.
 Delivery without a seek uses the presence of the projected presentation
 timestamp directly.
+
+**Progressive TS188.** One sequential input with a stable PAT, PMT and clock,
+one AVC track and one ADTS AAC track. AVC starts on a timed IDR with an
+access-unit delimiter. AAC needs an initial PES timestamp, then advances
+by the exact ADTS duration when an anchor is absent. Source timestamps stay
+available alongside the playback clocks. Completed units can be delivered
+before the end of input. Start a new reader to begin at another offset.
 
 **HLS segments.** One independent TS188 segment with in-band PAT and PMT.
 The feed consumes validated PES continuations directly and preserves source
