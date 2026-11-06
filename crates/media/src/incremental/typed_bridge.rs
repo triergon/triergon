@@ -252,6 +252,12 @@ impl ElementReader {
             ScanBody::Off
         };
         if drain {
+            body.collect = false;
+            body.span = None;
+            body.direct = None;
+            body.transfer = super::BodyTransfer::Copy;
+            body.buffer = None;
+            body.copied = 0;
             if body.remaining == 0 {
                 Self::check_input_cancel(&mut self.input, cancel)?;
                 if work.try_charge(1) {
@@ -260,12 +266,6 @@ impl ElementReader {
                     return Ok(true);
                 }
             }
-            body.collect = false;
-            body.span = None;
-            body.direct = None;
-            body.transfer = super::BodyTransfer::Copy;
-            body.buffer = None;
-            body.copied = 0;
         }
         Ok(false)
     }

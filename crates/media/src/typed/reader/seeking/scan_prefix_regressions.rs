@@ -847,6 +847,53 @@ fn scan_prefix_control_complete_first_span_keeps_zero_and_one_work_boundaries() 
 }
 
 #[test]
+fn scan_prefix_cancellation_releases_the_complete_span() {
+    let fixture = repeated(1, 128);
+    let pool = Budget::new(128 * 1024).unwrap();
+    let mut reader = new_reader(&pool, &fixture.raw, Limits::default());
+    let mut feed = Feed::new(&fixture.raw, 8192);
+    open(&mut reader, &mut feed).unwrap();
+    reader.seek_for_playback(0, 0).unwrap();
+    let body_size = 132;
+    let body_start = (fixture.raw.len() - body_size) as u64;
+    let cancel = AtomicBool::new(false);
+    for _ in 0..100_000 {
+        match reader.step(&mut WorkBudget::new(1), &cancel).unwrap() {
+            ParseStep::NeedInput(request) => {
+                feed.hold = request.offset == body_start;
+                feed.supply(&mut reader, request).unwrap();
+                if feed.hold {
+                    break;
+                }
+            }
+            ParseStep::Yield | ParseStep::Event(Event::Envelope(_)) => (),
+            other => panic!("expected the block input request, got {other:?}"),
+        }
+    }
+    let charge = feed.alias.take().unwrap().retained_storage_bytes();
+    assert!(matches!(
+        reader
+            .step(&mut WorkBudget::new(body_size as u64), &cancel)
+            .unwrap(),
+        ParseStep::Yield
+    ));
+    assert_eq!(reader.position(), fixture.raw.len() as u64);
+    let header = reader.envelope.scan_prefix_header().unwrap();
+    let retained = pool.used();
+
+    // Cancel between accepting the prefix and charging the drain completion.
+    let mut work = WorkBudget::new(1);
+    assert_eq!(
+        reader
+            .envelope
+            .resolve_scan_prefix(header, true, &mut work, &AtomicBool::new(true)),
+        Err(Error::Cancelled)
+    );
+    assert_eq!(work.spent(), 0);
+    assert_eq!(pool.used(), retained - charge);
+}
+
+#[test]
 fn scan_prefix_control_caller_pressure_can_be_released_without_losing_seek_progress() {
     let fixture = repeated(1, 4096);
     let expected = run(&fixture.raw, 64, 8192, false, 0);
