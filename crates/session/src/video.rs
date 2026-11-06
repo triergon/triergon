@@ -1,10 +1,8 @@
 //! Video lane: Annex-B access units in, one clock-gated 1920x1080 RGBA picture out.
 //!
-//! Replaces `sim_video.rs`'s external decoder. Each picture keeps the
-//! timestamp its access unit carried through the decoder's reordering, rather
-//! than the source's "n-th output takes the n-th smallest fed PTS" heap. The
-//! lane holds at most one converted picture ahead of the clock, like the
-//! source's blocking reader, and publishes it once the clock reaches its PTS.
+//! Each picture keeps the timestamp its access unit carried through the
+//! decoder's reordering. The lane holds at most one converted picture ahead of
+//! the clock and publishes it once the clock reaches its PTS.
 use crate::SessionState;
 use crate::queue::{FeedError, QueueLimits, UnitQueue};
 use std::sync::Arc;

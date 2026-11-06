@@ -1,12 +1,11 @@
-//! Worker trace protocol for the differential harness (layer L3, never shipped).
+//! Worker trace protocol for the differential harness (never shipped).
 //!
 //! Workers print one JSON document per operation. Strings use [`push_quoted`],
 //! byte fields lower-case hex ([`push_hex`]). Timed operations prove equal work
 //! with the ordered work digest in [`digest`]: `h <- 31*h + v (mod 2^64)` over
-//! every field and payload byte, never sampled. `harness/reference.c` and
-//! `harness/container_reference.c` implement the same polynomial; the golden
-//! vectors below pin it. The D4 decode workers fingerprint their output with
-//! the [`lanes`] digest instead.
+//! every field and payload byte, never sampled. `harness/reference.c`
+//! implements the same polynomial; the golden vectors below pin it. The decode
+//! workers fingerprint their output with the [`lanes`] digest instead.
 #![forbid(unsafe_code)]
 
 pub mod digest;

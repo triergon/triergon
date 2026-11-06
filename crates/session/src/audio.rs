@@ -1,9 +1,8 @@
 //! Audio lane: compressed frames in, clock-paced stereo s16 PCM out.
 //!
-//! Replaces `sim_audio.rs`'s external decoder/output child. The source held
-//! each access unit until the sink clock was within `lead` of its PTS and then
-//! wrote it to the device; here `pull` decodes exactly those units and returns
-//! their stereo samples for the consumer's device writer. A paused clock
+//! Each access unit is held until the sink clock is within `lead` of its PTS;
+//! `pull` then decodes exactly those units and returns their stereo samples for
+//! the caller's device writer. A paused clock
 //! therefore yields nothing, and flush/stop discard everything queued.
 use crate::SessionState;
 use crate::mix::Downmix;

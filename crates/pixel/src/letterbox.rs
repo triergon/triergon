@@ -1,13 +1,11 @@
-//! Letterbox one decoded 4:2:0 picture into the simulator's 1920x1080 RGBA
+//! Letterbox one decoded 4:2:0 picture into the 1920x1080 RGBA
 //! canvas, reproducing the reference chain `scale=1920:1080:
 //! force_original_aspect_ratio=decrease,pad=1920:1080:(ow-iw)/2:(oh-ih)/2,
 //! format=rgba` bit for bit.
 //!
 //! Every rule below was recovered by black-box observation of the reference
 //! build (crafted impulses, ramps and constant fields through its public filter
-//! API); the observations, brackets and per-case exactness are recorded in
-//! `research/d4/RGBA-CONTRACT.json` and reproduced by the scripts named there
-//! (`harness/d4/probe_rgba.c`, `rgba_model.py`, `measure_all.py`, ...).
+//! API).
 //!
 //! * Geometry: the fitted size is the display size scaled to fit, rounded to
 //!   nearest; the padding offset is `(canvas - fitted) / 2` rounded down (odd
@@ -383,7 +381,7 @@ struct Plan {
 /// `floor(c * inc / 2^16) - floor(128 * inc / 2^16)` for chroma code `c`, and
 /// the grey ramp `clamp(floor((i * cy + oy) / 2^16), 0, 255)` applied to luma
 /// plus offset. The 16.16 increments are fitted to exhaustive constant-field
-/// observations (`harness/d4/fit_offsets.py`); any value in each fitted range
+/// observations; any value in each fitted range
 /// yields the same tables, the middle one is used.
 #[derive(Clone, Copy)]
 struct Conversion {
@@ -558,8 +556,8 @@ fn pack<const FULL: bool>(acc: &[i32], [r, g, b]: &[Vec<i16>; 3], out: &mut [u8]
     }
 }
 
-/// The reference's output stage for an odd fitted width (observed with
-/// `harness/d4/odd_width_fit.py`): chroma is resampled to the full width, the
+/// The reference's output stage for an odd fitted width (observed black-box):
+/// chroma is resampled to the full width, the
 /// vertical sums keep 9 fractional bits, `v = (A + 2^9) >> 10` (A as before
 /// the `>> 19`), and `out = clamp(wrap32(y' * cy + chroma terms + 2^21) >> 22)`
 /// with `y' = v_y - 16 * 2^9` (limited) or `v_y`, `u' = v_u - 128 * 2^9`,
@@ -718,8 +716,8 @@ fn shifted<'a>(plane: Plane<'a>, by: usize) -> Plane<'a> {
 /// The picture the reference's filter graph actually receives. With its
 /// default `apply_cropping`, the reference decoder applies a left crop only as
 /// far as the plane pointers stay 32-byte aligned (`AVCodecContext.
-/// apply_cropping` docs; the exact rule below is fitted to crafted streams,
-/// `harness/d4/probe_crop.c`): with per-plane byte offsets `o_p` of the
+/// apply_cropping` docs; the exact rule below is fitted to crafted streams):
+/// with per-plane byte offsets `o_p` of the
 /// cropped origin and `m = min ctz(o_p)`, a left crop `l` with `m < 5` becomes
 /// `l & !((1 << (5 + ctz(l) - m)) - 1)`. The remaining columns of the left
 /// border stay in the picture. Top, right and bottom crops are applied in
@@ -825,8 +823,7 @@ const SHIFT: u32 = 15;
 /// The same-size 8-bit converter: luma at 15 fractional bits, each chroma
 /// product floored to half an output step (14 bits) before a single
 /// round-to-nearest, chroma shared by each 2x2 block. Constants per H.273
-/// MatrixCoefficients and range, recovered exactly from random full frames
-/// (`research/d4/rgba-coefficients-dev-mac.json`).
+/// MatrixCoefficients and range, recovered exactly from random full frames.
 struct Direct {
     cy: i32,
     offset: i32,
@@ -970,7 +967,7 @@ mod tests {
 
     #[test]
     fn taps_match_reference_measurements() {
-        // Measured with harness/d4/measure_all.py (impulses through the reference).
+        // Measured with impulses through the reference.
         let f = Filter::new(176, 1320, 16384);
         assert_eq!(f.len, 4);
         assert_eq!(row(&f, 4), (0, vec![15218, 1254, -88, 0]));
@@ -1028,7 +1025,7 @@ mod tests {
     #[test]
     fn left_crop_follows_the_reference_alignment_rule() {
         // (coded width, bits, crop left, crop top) -> left crop the reference keeps,
-        // observed with harness/d4/probe_crop.c on crafted and conformance streams.
+        // observed on crafted and conformance streams.
         let cases = [
             (352, 8, 26, 60, 0), // CVFC1_Sony_C
             (416, 8, 2, 2, 0),   // CONFWIN_A_Sony_1

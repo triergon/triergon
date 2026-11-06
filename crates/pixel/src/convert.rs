@@ -1,6 +1,6 @@
 //! RGBA → YUV 4:2:0, ITU-R BT.601 matrix, limited ("studio") range.
 //!
-//! Contract (research/capture/contract.json `conversion`): alpha is ignored;
+//! Contract: alpha is ignored;
 //! chroma is the mean of each horizontal pixel pair, then decimated vertically
 //! with center-sited taps 1/8, 3/8, 3/8, 1/8 over rows 2k-1..2k+2 with the edge
 //! rows replicated. The conversion is linear, so chroma is formed from the

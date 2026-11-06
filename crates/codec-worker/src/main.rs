@@ -10,8 +10,8 @@
 //! interval.
 //!
 //! The elementary-stream splitting below mirrors the reference worker's own parser
-//! (`harness/d4/reference_decode.c`, not in this repository; ADR-0004 owner decision
-//! 3) so both decode the same units. It is measurement framing, not product framing:
+//! (`harness/d4/reference_decode.c`, not in this repository) so both decode the same
+//! units. It is measurement framing, not product framing:
 //! playback frames access units through `triergon-framing`.
 #![forbid(unsafe_code)]
 use std::io::Write;
@@ -117,7 +117,7 @@ fn video(codec: VideoCodec, data: &[u8], out: &mut Output) {
 
 /// DTS core frame length from its header, as the reference parser reads it.
 fn dts_frame_len(data: &[u8]) -> Option<usize> {
-    // 16-bit big-endian core sync (the selected simulator feed); FSIZE+1 bytes.
+    // 16-bit big-endian core sync (the selected feed); FSIZE+1 bytes.
     if data.len() < 10 || data[..4] != [0x7f, 0xfe, 0x80, 0x01] {
         return None;
     }
@@ -218,7 +218,7 @@ fn main() {
             );
         }
         "memory" => {
-            // Same observer protocol as the M1 workers: one whole operation between markers.
+            // Same observer protocol as the container workers: one whole operation between markers.
             let mut stdout = std::io::stdout().lock();
             stdout.write_all(b"SAFE_MEDIA_BEGIN_V1\n").expect("stdout");
             stdout.flush().expect("stdout");

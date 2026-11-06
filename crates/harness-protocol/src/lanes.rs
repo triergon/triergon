@@ -1,4 +1,4 @@
-//! Eight-lane output digest of the D4 workers (`codec-worker`, `harness/d4/reference_decode.c`).
+//! Eight-lane output digest of the decode workers (`codec-worker`, `harness/d4/reference_decode.c`).
 //!
 //! Over the concatenated output in 64-byte blocks, lane `i` takes
 //! `lane_i <- (lane_i ^ le64(word 8k+i)) * K`; a short final block is zero-padded.
@@ -72,7 +72,7 @@ mod tests {
 
     #[test]
     fn golden_vectors() {
-        // Pinned from the codec-worker implementation the D4 receipts recorded.
+        // Pinned from the codec-worker implementation.
         let data: Vec<u8> = (0..1000_u32).map(|i| (i * 7 + i / 13) as u8).collect();
         assert_eq!(digest(&[]), GOLDEN[0]);
         assert_eq!(digest(&[b"triergon"]), GOLDEN[1]);

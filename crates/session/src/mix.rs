@@ -4,8 +4,7 @@
 //! surrounds at -3 dB, LFE omitted) normalised so no output row can exceed
 //! full scale, which is what a fixed-point device format needs. The exact
 //! reference behaviour (matrix, normalisation and float-to-s16 rounding) is a
-//! native observation frozen in `research/d4/DOWNMIX-CONTRACT.json`; this
-//! module implements that contract and its tests pin it.
+//! native observation; this module implements it and its tests pin it.
 use triergon_codec::{AudioFrame, ChannelLayout, DownmixLevels, Speaker, SurroundEncoding};
 
 const SQRT_HALF: f32 = std::f32::consts::FRAC_1_SQRT_2;
@@ -25,7 +24,7 @@ impl StereoMatrix {
     /// -sqrt(3/2)/-sqrt(1/2) and +sqrt(1/2)/+sqrt(3/2) times `surround`, Dolby:
     /// -/+ sqrt(1/2) times `surround`); front-centre pair at unity to its side;
     /// LFE (and LFE2) at `lfe`/sqrt(2); top front pair at sqrt(1/2) to its side, every
-    /// other height/wide channel dropped (`research/d4/DOWNMIX-ADDENDUM-heights.json`).
+    /// other height/wide channel dropped.
     /// Rows are normalised to an absolute sum of at most one.
     pub fn with_levels(speakers: &[Speaker], levels: DownmixLevels) -> Self {
         let DownmixLevels {
@@ -147,8 +146,7 @@ pub fn mix_into(matrix: &StereoMatrix, planes: &[Vec<f32>], samples: usize, out:
 }
 
 /// Full scale 1.0 maps to 32768, rounded toward negative infinity and
-/// saturated: the reference device path's observed conversion
-/// (`research/d4/DOWNMIX-CONTRACT.json`).
+/// saturated: the reference device path's observed conversion.
 #[inline]
 pub fn to_s16(sample: f32) -> i16 {
     (sample * 32768.0).floor().clamp(-32768.0, 32767.0) as i16

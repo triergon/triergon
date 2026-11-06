@@ -2,10 +2,9 @@
 //!
 //! A thin composition of the BT.601 converter (`triergon-pixel`), the MPEG-1
 //! video encoder (`triergon-codec-mpeg1`) and the single-program TS writer
-//! (`triergon_mpegts::mux`). The frozen contract lives in
-//! `research/capture/contract.json`.
+//! (`triergon_mpegts::mux`).
 //!
-//! Experimental; this crate is not qualified. A passing slice is not O62.
+//! Experimental.
 #![forbid(unsafe_code)]
 
 mod error;

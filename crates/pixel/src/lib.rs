@@ -2,13 +2,13 @@
 //!
 //! [`Picture`] is a planar YUV 4:2:0 picture at a macroblock-aligned coded
 //! size. [`convert`] turns caller RGBA into it with ITU-R BT.601 limited-range
-//! coefficients (the capture contract in `research/capture/contract.json`).
+//! coefficients.
 //!
 //! [`PictureView`] borrows a decoder's output picture; [`letterbox`] fits one
 //! into the 1920x1080 RGBA canvas of the desktop session exactly as the
-//! reference scaler chain does (`research/d4/RGBA-CONTRACT.json`).
+//! reference scaler chain does.
 //!
-//! Experimental; nothing here is qualified on its own.
+//! Experimental.
 #![forbid(unsafe_code)]
 
 pub mod convert;

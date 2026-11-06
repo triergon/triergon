@@ -1,4 +1,4 @@
-//! Lifecycle tests for both simulator lanes with scripted decoders.
+//! Lifecycle tests for both session lanes with scripted decoders.
 use std::collections::VecDeque;
 use triergon_codec::{
     AudioDecoder, AudioFrame, ChannelLayout, Colour, DecodeFailure, DownmixLevels, PictureView,
