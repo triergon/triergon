@@ -142,7 +142,7 @@ impl FeedPayloadRun<'_> {
         if context.epochs != self.epochs || context.byte_run_epoch.is_some() {
             return Ok(false);
         }
-        let Some(owner) = self.input.buffered_owner() else {
+        let Some(carrier) = self.input.buffered_owner() else {
             return Ok(false);
         };
         let start = SourceLocation {
@@ -150,7 +150,7 @@ impl FeedPayloadRun<'_> {
             offset: self.input.position(),
         };
         let (slots, growth) =
-            observer.payload_run_capacity(owner, self.pid, self.counter, start, context);
+            observer.payload_run_capacity(carrier, self.pid, self.counter, start, context);
         let growth_work = growth.as_ref().map_or(0, |plan| plan.remaining);
         let work_limit = work
             .remaining()
