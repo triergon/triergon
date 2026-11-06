@@ -1,6 +1,6 @@
 use super::*;
 use crate::clock::NativeClockProfile;
-use crate::native_pes::{NativePesScope, NativeRegisteredCarriage};
+use crate::native_pes::{NativePesScope, NativePesSpan, NativeRegisteredCarriage};
 use triergon_core::{InputWindow, SourceCapabilities};
 
 const PID: u16 = 256;
@@ -243,6 +243,105 @@ fn payload_run_preserves_work_boundary_and_span_provenance() {
                 .shares_storage_with(run.spans.as_slice()[0].backing_bytes())
         );
     }
+}
+
+const TWO_AFTER_GROWTH: u64 = (4 + 8) * size_of::<NativePesSpan>() as u64 + 2 * PAYLOAD_RUN_WORK;
+
+fn full_payload_arena() -> PayloadFeed {
+    let mut start = carrier(0, true);
+    start[11..23].copy_from_slice(&[0xc0, 10, 0x31, 0, 1, 0, 7, 0x11, 0, 1, 0, 3]);
+    let wire = [
+        start,
+        carrier(1, false),
+        carrier(2, false),
+        carrier(3, false),
+        carrier(4, false),
+        carrier(5, false),
+    ]
+    .concat();
+    let mut feed = PayloadFeed::new(&wire);
+    let mut work = WorkBudget::new(3 * PAYLOAD_RUN_WORK + 1);
+    assert!(feed.try_run(&mut work, &AtomicBool::new(false)).unwrap());
+    assert_eq!(feed.input.position(), (4 * TS188_BYTES) as u64);
+    feed
+}
+
+#[test]
+fn payload_run_pays_for_full_arena_growth_and_keeps_span_provenance() {
+    let mut serial = full_payload_arena();
+    let cancel = AtomicBool::new(false);
+    let mut work = WorkBudget::new(TWO_AFTER_GROWTH + 1);
+    for ordinal in [8, 10] {
+        let Step::Ready(TraceEvent::Transport(packet)) = serial.ordinary(&mut work) else {
+            panic!("expected a continuation");
+        };
+        assert!(work.try_charge(1));
+        serial
+            .observer
+            .push(packet, context(ordinal, serial.stream.source_epochs()))
+            .unwrap();
+        assert!(matches!(
+            serial.observer.poll(&mut work, &cancel).unwrap(),
+            AssemblyStep::NeedPayload
+        ));
+    }
+    assert_eq!(work.remaining(), 1);
+
+    let mut batched = full_payload_arena();
+    let mut work = WorkBudget::new(TWO_AFTER_GROWTH + 1);
+    assert!(batched.try_run(&mut work, &cancel).unwrap());
+    assert_eq!(work.remaining(), 1);
+    assert_eq!(batched.stream.take_feed_omissions(), 10);
+    assert_eq!(batched.input.position(), serial.input.position());
+    assert_eq!(batched.input.budget().used(), serial.input.budget().used());
+
+    let serial = serial.finish_native();
+    let batched = batched.finish_native();
+    assert_eq!(batched.payload_len, serial.payload_len);
+    for packet in [&serial, &batched] {
+        let header = packet.time_header().unwrap();
+        assert_eq!(header.pts_raw33, Some(3));
+        assert_eq!(header.dts_raw33, Some(1));
+    }
+    assert_eq!(batched.spans.len(), 6);
+    assert_eq!(batched.spans.capacity(), serial.spans.capacity());
+    for (span, expected) in batched.spans.as_slice().iter().zip(serial.spans.as_slice()) {
+        assert_eq!(span.as_ref(), expected.as_ref());
+        assert_eq!(span.source, expected.source);
+        assert_eq!(span.transport, expected.transport);
+        assert_eq!(span.context, expected.context);
+    }
+}
+
+#[test]
+fn payload_run_growth_leaves_input_intact_when_work_or_memory_is_tight() {
+    let mut feed = full_payload_arena();
+    let position = feed.input.position();
+    let pool = feed.input.budget().clone();
+    let before = pool.used();
+    let cancel = AtomicBool::new(false);
+    let mut tight = WorkBudget::new(TWO_AFTER_GROWTH);
+    assert!(!feed.try_run(&mut tight, &cancel).unwrap());
+    assert_eq!(tight.spent(), 0);
+
+    let mut work = WorkBudget::new(TWO_AFTER_GROWTH + 1);
+    let hold = pool.reserve(pool.available()).unwrap();
+    assert!(!feed.try_run(&mut work, &cancel).unwrap());
+    drop(hold);
+    assert_eq!(work.spent(), 0);
+    assert_eq!(pool.used(), before);
+    assert_eq!(feed.input.position(), position);
+    assert_eq!(feed.stream.feed_omissions, Some(6));
+
+    assert_eq!(
+        feed.try_run(&mut work, &AtomicBool::new(true)),
+        Err(Error::Cancelled)
+    );
+    assert_eq!(pool.used(), before);
+    assert_eq!(work.spent(), 0);
+    assert_eq!(feed.input.position(), position);
+    assert!(feed.try_run(&mut work, &cancel).unwrap());
+    assert_eq!(work.remaining(), 1);
 }
 
 #[test]
