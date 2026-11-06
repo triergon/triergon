@@ -30,6 +30,9 @@ fn class(error: Error) -> &'static str {
         Error::SourceMismatch => "source-mismatch",
         Error::StaleGeneration { .. } => "stale-generation",
         Error::StaleRequest { .. } => "stale-request",
+        Error::Policy(_) => "policy",
+        Error::Io(_) => "io",
+        Error::Closed => "closed",
     }
 }
 

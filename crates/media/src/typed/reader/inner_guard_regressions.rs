@@ -47,7 +47,7 @@ fn inner_guard_cancel_is_sticky_releases_input_but_preserves_alias() {
     assert_ne!(next.token.generation(), request.token.generation());
     assert!(matches!(
         r.provide(&InputWindow::new(request.source, request.token, 0, alias).unwrap()),
-        Err(Error::Core(triergon_core::Error::StaleGeneration { .. }))
+        Err(triergon_core::Error::StaleGeneration { .. })
     ));
     drop((r, parent));
     assert_eq!(pool.used(), base);
@@ -75,10 +75,7 @@ fn inner_guard_prior_transport_and_short_finish_win_over_cancel_and_metadata() {
             if short_finish {
                 assert!(matches!(result, Err(Error::Truncated)));
             } else {
-                assert!(matches!(
-                    result,
-                    Err(Error::Core(triergon_core::Error::Transport))
-                ));
+                assert!(matches!(result, Err(triergon_core::Error::Transport)));
             }
             assert_eq!((r.position(), work.spent()), (0, 0));
         }
@@ -104,7 +101,7 @@ fn inner_guard_entry_cancel_precedes_metadata_failure_and_survives_flag_clear() 
     r.metadata_used = r.limits.metadata_bytes + 1;
     assert!(matches!(
         r.step_demux_mode(&mut work, &no_cancel(), None, false),
-        Err(Error::Limit("metadata"))
+        Err(Error::Policy("metadata"))
     ));
 }
 
@@ -297,10 +294,7 @@ fn trace(quantum: u64, chunk: usize, shared: bool, tail: Option<bool>) {
             }
             Err(error) => {
                 match tail {
-                    Some(true) => assert!(matches!(
-                        error,
-                        Error::Core(triergon_core::Error::Transport)
-                    )),
+                    Some(true) => assert!(matches!(error, triergon_core::Error::Transport)),
                     Some(false) => assert!(matches!(error, Error::Truncated)),
                     None => panic!("unexpected: {error:?}"),
                 }

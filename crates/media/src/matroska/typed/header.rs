@@ -167,7 +167,7 @@ impl SeekHeadJob {
                                 .ok_or(Error::Overflow)?
                                 >= 256
                             {
-                                return Err(Error::Limit("metadata seek targets"));
+                                return Err(Error::Policy("metadata seek targets"));
                             }
                             output.push((
                                 id,

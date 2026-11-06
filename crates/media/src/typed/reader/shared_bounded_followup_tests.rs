@@ -132,7 +132,7 @@ fn shared_bounded_real_typed_owner_graph_deduplicates_input_and_packet_parent() 
                     done = true;
                     break;
                 }
-                Err(Error::Limit("operation retained storage")) => {
+                Err(Error::Policy("operation retained storage")) => {
                     assert_eq!(extra, 1, "double-counted shared parent");
                     done = true;
                     break;
@@ -280,7 +280,7 @@ fn shared_bounded_partial_commit_transport_stays_before_cancel_and_final_unit() 
         reader
             .envelope
             .step(&mut WorkBudget::new(1), &AtomicBool::new(true)),
-        Err(Error::Core(triergon_core::Error::Transport))
+        Err(triergon_core::Error::Transport)
     ));
     assert_eq!(root.as_ref(), b"pre\x81\0\0\x80abctail");
     drop((reader, root));

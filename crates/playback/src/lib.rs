@@ -20,33 +20,13 @@ pub use player::{
     Mp4SyncSeekJob, Mp4SyncSeekRequest, Output, Player, PlayerPolicy, Progress, SeekIntent,
     Selection, State, TrackKey, TrackKind,
 };
-use triergon_core::Error as CoreError;
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Format {
     Matroska,
     Mp4,
     Ts(triergon_mpegts::PacketFormat),
 }
-#[derive(Debug)]
-pub enum Error {
-    Core(CoreError),
-    Matroska(triergon_matroska::Error),
-    Closed,
-}
-pub type Result<T> = std::result::Result<T, Error>;
-impl From<CoreError> for Error {
-    fn from(e: CoreError) -> Self {
-        Self::Core(e)
-    }
-}
-impl From<triergon_matroska::Error> for Error {
-    fn from(e: triergon_matroska::Error) -> Self {
-        match e {
-            triergon_matroska::Error::Core(c) => Self::Core(c),
-            other => Self::Matroska(other),
-        }
-    }
-}
+pub use triergon_core::{Error, Result};
 
 pub mod progressive;
 pub mod pump;

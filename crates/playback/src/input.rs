@@ -1,8 +1,7 @@
 //! Caller-owned source protocol and immutable local bytes. HTTP/auth/retry stay outside.
 use std::sync::atomic::{AtomicBool, Ordering};
 use triergon_core::{
-    Bytes, Error as CoreError, InputRequest, InputToken, InputWindow, SourceFailure, SourceId,
-    WorkBudget,
+    Bytes, Error, InputRequest, InputToken, InputWindow, SourceFailure, SourceId, WorkBudget,
 };
 /// A source must return promptly. It performs no blocking wait inside poll.
 /// Source implementations charge their own bounded poll work before I/O.
@@ -47,7 +46,7 @@ pub struct ByteSource {
 impl ByteSource {
     pub fn new(source: SourceId, bytes: Bytes, quantum: usize) -> triergon_core::Result<Self> {
         if quantum == 0 {
-            return Err(CoreError::Invalid("zero read quantum"));
+            return Err(Error::Invalid("zero read quantum"));
         }
         Ok(Self {
             source,
@@ -65,20 +64,20 @@ impl Source for ByteSource {
         cancel: &AtomicBool,
     ) -> triergon_core::Result<SourceReply> {
         if cancel.load(Ordering::Relaxed) {
-            return Err(CoreError::Cancelled);
+            return Err(Error::Cancelled);
         }
         if self.closed {
-            return Err(CoreError::Invalid("closed source"));
+            return Err(Error::Invalid("closed source"));
         }
         if r.source != self.source {
-            return Err(CoreError::SourceMismatch);
+            return Err(Error::SourceMismatch);
         }
         if !work.try_charge(1) {
             return Ok(SourceReply::Pending);
         }
-        let at = usize::try_from(r.offset).map_err(|_| CoreError::Overflow)?;
+        let at = usize::try_from(r.offset).map_err(|_| Error::Overflow)?;
         if at > self.bytes.len() {
-            return Err(CoreError::Invalid("range beyond source"));
+            return Err(Error::Invalid("range beyond source"));
         }
         if at == self.bytes.len() {
             return Ok(SourceReply::End {

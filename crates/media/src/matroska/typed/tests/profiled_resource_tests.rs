@@ -335,7 +335,7 @@ fn profiled_complete_leaf_waits_for_work_accounts_its_owner_and_observes_cancel(
                     done = true;
                     break;
                 }
-                Err(Error::Limit("operation retained storage")) => {
+                Err(Error::Policy("operation retained storage")) => {
                     assert!(permanent);
                     done = true;
                     break;

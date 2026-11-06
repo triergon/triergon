@@ -374,7 +374,7 @@ fn compact_envelope_transport_at_ready_precedes_cancel_and_reset_changes_generat
         .unwrap();
     assert!(matches!(
         reader.step_typed_compact(&mut WorkBudget::new(0), &AtomicBool::new(true)),
-        Err(Error::Core(triergon_core::Error::Transport))
+        Err(triergon_core::Error::Transport)
     ));
     assert_eq!(pool.used(), held);
     let next = reader.reset().unwrap();

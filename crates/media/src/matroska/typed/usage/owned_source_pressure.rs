@@ -26,7 +26,7 @@ fn a_source_only_owner_is_an_unavoidable_limit_not_caller_backpressure() {
     }
     assert!(matches!(
         result,
-        Err(Error::Limit("operation retained storage"))
+        Err(Error::Policy("operation retained storage"))
     ));
 }
 

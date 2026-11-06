@@ -69,7 +69,7 @@ fn seek_window_extra_scan_limit_keeps_refusal_and_retained_output() {
                 .seek_for_playback(0, 7_500_000_000, &cancel)
                 .unwrap_err();
             assert!(
-                matches!(error, Error::Limit(_)),
+                matches!(error, Error::Policy(_)),
                 "{policy:?}/{chunk}: {error:?}"
             );
             let calls = log.lock().unwrap().clone();

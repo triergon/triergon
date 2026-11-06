@@ -319,10 +319,7 @@ fn simple_direct_ready_cancel_transport_reset_and_retained_parent() {
         let mut work = WorkBudget::new(0);
         let answer = r.step(&mut work, &AtomicBool::new(true));
         if transport {
-            assert!(matches!(
-                answer,
-                Err(Error::Core(triergon_core::Error::Transport))
-            ));
+            assert!(matches!(answer, Err(triergon_core::Error::Transport)));
         } else {
             assert!(matches!(answer, Err(Error::Cancelled)));
         }

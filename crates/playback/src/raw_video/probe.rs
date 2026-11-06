@@ -8,8 +8,8 @@ use crate::{
 };
 use std::sync::atomic::{AtomicBool, Ordering};
 use triergon_core::{
-    Budget, BudgetVec, Bytes, Error as CoreError, InputCursor, InputRequest, InputWindow,
-    SourceCapabilities, SourceId, Step, WorkBudget,
+    Budget, BudgetVec, Bytes, InputCursor, InputRequest, InputWindow, SourceCapabilities, SourceId,
+    Step, WorkBudget,
 };
 use triergon_framing::{Codec, NalHeader, RawAnnexBLimits, RawAnnexBReader};
 
@@ -79,7 +79,7 @@ impl<S: Source> RawVideoProbe<S> {
                 RawVideoProbeStep::Detected(codec)
             }
             PlaybackProbeStep::Detected(PlaybackInputKind::Container(_)) => {
-                return Err(CoreError::Invalid("raw probe selected a container").into());
+                return Err(Error::Invalid("raw probe selected a container"));
             }
         })
     }
@@ -87,7 +87,7 @@ impl<S: Source> RawVideoProbe<S> {
     /// Allocation pressure leaves the retained prefix and source retryable.
     pub fn finish(&mut self) -> Result<RawVideoSource<RawVideoReplay<S>>> {
         let Some(PlaybackInputKind::RawVideo(codec)) = self.driver.detected else {
-            return Err(CoreError::Invalid("raw video probe not ready").into());
+            return Err(Error::Invalid("raw video probe not ready"));
         };
         self.driver.finish_raw(codec, self.reader_limits)
     }
@@ -150,7 +150,7 @@ impl<S: Source> PlaybackProbe<S> {
         let selection = self
             .driver
             .detected
-            .ok_or(CoreError::Invalid("playback probe not ready"))?;
+            .ok_or(Error::Invalid("playback probe not ready"))?;
         match selection {
             PlaybackInputKind::Container(format) => {
                 let driver = &mut self.driver;
@@ -207,13 +207,13 @@ impl<S: Source> ProbeDriver<S> {
     ) -> Result<Self> {
         let source = SourceOwner::new(source);
         if limits.maximum_bytes == 0 || limits.maximum_nals == 0 {
-            return Err(CoreError::Invalid("zero raw video probe limit").into());
+            return Err(Error::Invalid("zero raw video probe limit"));
         }
         let container_pending = mode == ProbeMode::Playback;
         if container_pending && limits.maximum_bytes < CONTAINER_SIGNATURE_BYTES {
-            return Err(
-                CoreError::Invalid("playback probe byte bound below container signature").into(),
-            );
+            return Err(Error::Invalid(
+                "playback probe byte bound below container signature",
+            ));
         }
         Ok(Self {
             source: Some(source),
@@ -235,13 +235,7 @@ impl<S: Source> ProbeDriver<S> {
             return Err(Error::Closed);
         }
         let result = self.read(work, cancel);
-        if result.is_err()
-            && !matches!(
-                result,
-                Err(Error::Core(
-                    CoreError::Backpressure { .. } | CoreError::Allocation
-                ))
-            )
+        if result.is_err() && !matches!(result, Err(Error::Backpressure { .. } | Error::Allocation))
         {
             self.failed = true;
             self.prefix = BudgetVec::new(self.input.budget());
@@ -253,7 +247,7 @@ impl<S: Source> ProbeDriver<S> {
     fn read(&mut self, work: &mut WorkBudget, cancel: &AtomicBool) -> Result<PlaybackProbeStep> {
         loop {
             if cancel.load(Ordering::Relaxed) {
-                return Err(CoreError::Cancelled.into());
+                return Err(Error::Cancelled);
             }
             if let Some(kind) = self.detected {
                 return Ok(PlaybackProbeStep::Detected(kind));
@@ -273,9 +267,7 @@ impl<S: Source> ProbeDriver<S> {
                     Step::Ready(_) if self.input.buffered().is_empty() => continue,
                     Step::Ready(_) | Step::Yield => return Ok(PlaybackProbeStep::Yield),
                     Step::NeedInput(_) | Step::End(_) => {
-                        return Err(
-                            CoreError::Invalid("raw video probe lost buffered input").into()
-                        );
+                        return Err(Error::Invalid("raw video probe lost buffered input"));
                     }
                 }
             }
@@ -301,14 +293,13 @@ impl<S: Source> ProbeDriver<S> {
                 continue;
             }
             if self.end.is_some() {
-                return Err(CoreError::Unsupported("raw video signature absent at EOF").into());
+                return Err(Error::Unsupported("raw video signature absent at EOF"));
             }
             let left = self.limits.maximum_bytes - self.prefix.len();
             if left == 0 {
-                return Err(CoreError::Unsupported(
+                return Err(Error::Unsupported(
                     "raw video signature absent within probe bound",
-                )
-                .into());
+                ));
             }
             let mut request = self.input.request();
             request.maximum = request.maximum.min(left);
@@ -328,7 +319,7 @@ impl<S: Source> ProbeDriver<S> {
             if let SourceReply::Data(window) = &reply
                 && window.bytes().len() > request.maximum
             {
-                return Err(CoreError::Invalid("raw video probe reply exceeds request").into());
+                return Err(Error::Invalid("raw video probe reply exceeds request"));
             }
             let ended = matches!(reply, SourceReply::End { .. });
             if !provide(&mut self.input, &reply)? {
@@ -336,7 +327,7 @@ impl<S: Source> ProbeDriver<S> {
             }
             if ended {
                 if !self.container_pending {
-                    return Err(CoreError::Unsupported("raw video signature absent at EOF").into());
+                    return Err(Error::Unsupported("raw video signature absent at EOF"));
                 }
                 self.end = Some(self.input.position());
             }
@@ -348,7 +339,7 @@ impl<S: Source> ProbeDriver<S> {
             .prefix
             .len()
             .checked_add(count)
-            .ok_or(CoreError::Overflow)?;
+            .ok_or(Error::Overflow)?;
         if needed <= self.prefix.capacity() {
             return Ok(());
         }
@@ -363,10 +354,7 @@ impl<S: Source> ProbeDriver<S> {
             .try_reserve_exact(target - len)
             .or_else(|error| {
                 if target != needed
-                    && matches!(
-                        error,
-                        CoreError::Backpressure { .. } | CoreError::Limit { .. }
-                    )
+                    && matches!(error, Error::Backpressure { .. } | Error::Limit { .. })
                 {
                     self.prefix.try_reserve_exact(needed - len)
                 } else {
@@ -402,7 +390,7 @@ impl<S: Source> ProbeDriver<S> {
             Ok(prefix) => prefix,
             Err(rejected) => {
                 self.prefix = rejected.buffer;
-                return Err(rejected.error.into());
+                return Err(rejected.error);
             }
         };
         Ok(ProbeReplay {
@@ -432,10 +420,10 @@ impl<S: Source> Source for ProbeReplay<S> {
         cancel: &AtomicBool,
     ) -> triergon_core::Result<SourceReply> {
         if cancel.load(Ordering::Relaxed) {
-            return Err(CoreError::Cancelled);
+            return Err(Error::Cancelled);
         }
         if request.source != self.id {
-            return Err(CoreError::SourceMismatch);
+            return Err(Error::SourceMismatch);
         }
         if let Some(prefix) = &self.prefix
             && request.offset < prefix.len() as u64
@@ -462,12 +450,7 @@ impl<S: Source> Source for ProbeReplay<S> {
                 token: request.token.clone(),
             });
         }
-        self.source
-            .poll(request, work, cancel)
-            .map_err(|error| match error {
-                Error::Core(error) => error,
-                _ => CoreError::Invalid("raw video probe upstream error"),
-            })
+        self.source.poll(request, work, cancel)
     }
 
     fn invalidate(&mut self) {
@@ -494,7 +477,7 @@ impl Head {
         if let Some(next) = self.prefix.get_mut(self.len) {
             *next = byte;
         }
-        self.len = self.len.checked_add(1).ok_or(CoreError::Overflow)?;
+        self.len = self.len.checked_add(1).ok_or(Error::Overflow)?;
         Ok(())
     }
 
@@ -530,7 +513,7 @@ struct Signatures {
 impl Signatures {
     fn push(&mut self, byte: u8, maximum_nals: usize) -> triergon_core::Result<Option<Codec>> {
         if byte == 0 {
-            self.zeros = self.zeros.checked_add(1).ok_or(CoreError::Overflow)?;
+            self.zeros = self.zeros.checked_add(1).ok_or(Error::Overflow)?;
             return Ok(None);
         }
         let zeros = std::mem::take(&mut self.zeros);
@@ -538,9 +521,9 @@ impl Signatures {
             if let Some(head) = self.head.take() {
                 self.complete(&head)?;
             }
-            self.count = self.count.checked_add(1).ok_or(CoreError::Overflow)?;
+            self.count = self.count.checked_add(1).ok_or(Error::Overflow)?;
             if self.count > maximum_nals {
-                return Err(CoreError::Limit {
+                return Err(Error::Limit {
                     requested: self.count,
                     maximum: maximum_nals,
                 });
@@ -549,12 +532,12 @@ impl Signatures {
             return Ok(None);
         }
         let Some(head) = &mut self.head else {
-            return Err(CoreError::Unsupported(
+            return Err(Error::Unsupported(
                 "raw video probe needs a leading Annex B start code",
             ));
         };
         if zeros >= 3 {
-            return Err(CoreError::Invalid(
+            return Err(Error::Invalid(
                 "nonzero raw probe byte after Annex B padding",
             ));
         }
@@ -588,7 +571,7 @@ impl Signatures {
 
     fn complete(&mut self, head: &Head) -> triergon_core::Result<()> {
         if head.len == 0 {
-            return Err(CoreError::Invalid("empty raw probe NAL"));
+            return Err(Error::Invalid("empty raw probe NAL"));
         }
         if let Some(NalHeader::Avc {
             nal_ref_idc: 1..=3,
@@ -612,7 +595,7 @@ impl Signatures {
             _ => {}
         }
         if self.avc_pps && self.hevc_pps {
-            return Err(CoreError::Invalid(
+            return Err(Error::Invalid(
                 "ambiguous raw Annex B parameter-set signatures",
             ));
         }

@@ -360,10 +360,10 @@ impl GroupJob {
         pool: &Budget,
     ) -> Result<Self> {
         if !raw.belongs_to(pool) {
-            return Err(triergon_core::Error::ForeignPool.into());
+            return Err(triergon_core::Error::ForeignPool);
         }
         if raw.len() > limits.block_bytes {
-            return Err(Error::Limit("element bytes"));
+            return Err(Error::Policy("element bytes"));
         }
         if let Some(location) = location {
             location.validate(raw.len())?;
@@ -424,7 +424,7 @@ impl GroupJob {
             .and_then(|n| n.checked_add(self.references.len()))
             .ok_or(Error::Overflow)?;
         if count >= self.limit {
-            return Err(Error::Limit("packet source descriptors"));
+            return Err(Error::Policy("packet source descriptors"));
         }
         self.pending = Some(pending);
         self.queued = false;
@@ -433,7 +433,7 @@ impl GroupJob {
     }
     fn push_frame(&mut self, scope: Scope, span: Span) -> Result<()> {
         if self.depth == self.frames.len() {
-            return Err(Error::Limit("packet source nesting"));
+            return Err(Error::Policy("packet source nesting"));
         }
         self.frames[self.depth] = Some(Frame {
             scope,
@@ -722,7 +722,7 @@ impl GroupJob {
                     }
                     self.ids
                         .try_push(self.additions.as_slice()[self.at].id)
-                        .map_err(|e| Error::from(e.error))?;
+                        .map_err(|e| e.error)?;
                     self.at += 1;
                 }
                 Phase::IdSort => {

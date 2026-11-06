@@ -147,7 +147,7 @@ fn exact_floor(reader: &Reader, adapter: usize) {
                     done = true;
                     break;
                 }
-                Err(Error::Limit("operation retained storage")) => {
+                Err(Error::Policy("operation retained storage")) => {
                     assert!(
                         permanent,
                         "owner counted more than once (adapter capacity {adapter})"

@@ -173,7 +173,7 @@ fn previous_transport_failure_wins_over_new_cancellation() {
             &AtomicBool::new(true),
             Some(seek)
         ),
-        Err(Error::Core(triergon_core::Error::Transport))
+        Err(triergon_core::Error::Transport)
     ));
     assert_eq!(feeder.reader_mut().position(), 0);
 }

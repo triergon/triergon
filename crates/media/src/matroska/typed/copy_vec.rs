@@ -56,7 +56,7 @@ impl<T: Copy> CopyVec<T> {
         {
             return Err(Error::Invalid("copy arena admission missing"));
         }
-        self.data.try_push(value).map_err(|e| Error::from(e.error))
+        self.data.try_push(value).map_err(|e| e.error)
     }
     pub fn reserve(&mut self, additional: usize) -> Result<()> {
         if self.operation.is_some() {
@@ -131,7 +131,7 @@ impl<T: Copy> CopyVec<T> {
                 && let Err(error) = self.data.try_push(value)
             {
                 self.operation = Some(Operation::Push(error.value));
-                return Err(error.error.into());
+                return Err(error.error);
             }
             return Ok(ParseStep::Event(()));
         }

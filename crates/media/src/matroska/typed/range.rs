@@ -103,25 +103,23 @@ impl RangeLeafJob {
     }
     fn identity(&self, input: &InputCursor) -> Result<()> {
         if !self.pool.same_pool(input.budget()) {
-            return Err(triergon_core::Error::ForeignPool.into());
+            return Err(triergon_core::Error::ForeignPool);
         }
         if self.source != input.source() {
-            return Err(triergon_core::Error::SourceMismatch.into());
+            return Err(triergon_core::Error::SourceMismatch);
         }
         let current = input.token();
         if current.generation() != self.token.generation() {
             return Err(triergon_core::Error::StaleGeneration {
                 expected: self.token.generation(),
                 received: current.generation(),
-            }
-            .into());
+            });
         }
         if current.request() != self.token.request() {
             return Err(triergon_core::Error::StaleRequest {
                 expected: self.token.request(),
                 received: current.request(),
-            }
-            .into());
+            });
         }
         Ok(())
     }
@@ -168,7 +166,7 @@ impl RangeLeafJob {
                                 .min(usize::try_from(left).unwrap_or(usize::MAX))
                         });
                         if maximum == 0 {
-                            return Err(Error::Limit("operation read bytes"));
+                            return Err(Error::Policy("operation read bytes"));
                         }
                         match input.read_into(
                             &mut self.bytes[self.have..self.have + maximum],
@@ -254,7 +252,7 @@ impl RangeLeafJob {
                     }
                     self.size = usize::try_from(size).map_err(|_| Error::Overflow)?;
                     if self.size > self.limit {
-                        return Err(Error::Limit("element bytes"));
+                        return Err(Error::Policy("element bytes"));
                     }
                     self.header.id = id;
                     self.header.size = Some(size);
@@ -297,7 +295,7 @@ impl RangeLeafJob {
                         (self.size - have).min(usize::try_from(left).unwrap_or(usize::MAX))
                     });
                     if maximum == 0 {
-                        return Err(Error::Limit("operation read bytes"));
+                        return Err(Error::Policy("operation read bytes"));
                     }
                     match input.read_span(maximum, work, cancel)? {
                         Step::Ready(span) => {
@@ -327,7 +325,7 @@ impl RangeLeafJob {
                         }
                         Err(error) => {
                             self.buffer = Some(error.buffer);
-                            return Err(error.error.into());
+                            return Err(error.error);
                         }
                     }
                 }

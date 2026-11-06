@@ -194,10 +194,10 @@ pub struct TrackExtensionsJob {
 impl TrackExtensionsJob {
     pub(crate) fn new(raw: SharedBytes, limits: Limits, pool: &Budget) -> Result<Self> {
         if !raw.belongs_to(pool) {
-            return Err(triergon_core::Error::ForeignPool.into());
+            return Err(triergon_core::Error::ForeignPool);
         }
         if raw.len() > limits.metadata_bytes {
-            return Err(Error::Limit("track extension bytes"));
+            return Err(Error::Policy("track extension bytes"));
         }
         let length = raw.len();
         Ok(Self {
@@ -286,7 +286,7 @@ impl TrackExtensionsJob {
                             }
                             0x41e4 => {
                                 if self.mappings.len() >= self.limit {
-                                    return Err(Error::Limit("track mapping descriptors"));
+                                    return Err(Error::Policy("track mapping descriptors"));
                                 }
                                 self.record = Some(Mapping {
                                     span,
@@ -359,7 +359,7 @@ impl TrackExtensionsJob {
                                     .checked_add(self.unknown.len())
                                     .ok_or(Error::Overflow)?;
                                 if count >= self.limit {
-                                    return Err(Error::Limit("track mapping descriptors"));
+                                    return Err(Error::Policy("track mapping descriptors"));
                                 }
                                 self.pending = Some(Unknown {
                                     mapping: self.mappings.len(),

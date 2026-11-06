@@ -71,7 +71,7 @@ impl EncodingsJob {
         pool: &Budget,
     ) -> Result<Self> {
         if !source.belongs_to(pool) {
-            return Err(triergon_core::Error::ForeignPool.into());
+            return Err(triergon_core::Error::ForeignPool);
         }
         if range.start > range.end || range.end > source.len() {
             return Err(Error::Truncated);
@@ -153,7 +153,7 @@ impl EncodingsJob {
                     ParseStep::Event(Some(child)) => {
                         if child.id == 0x6240 {
                             if self.count == 8 {
-                                return Err(Error::Limit("content encoding count"));
+                                return Err(Error::Policy("content encoding count"));
                             }
                             self.order = 0;
                             self.scope = 1;
@@ -309,7 +309,7 @@ impl EncodingsJob {
                         .as_ref()
                         .required("missing encoding entry")?;
                     if e.settings.len() > self.limit {
-                        return Err(Error::Limit("content encoding settings"));
+                        return Err(Error::Policy("content encoding settings"));
                     }
                     self.header = SharedBytes::default();
                     if e.algorithm == 3
@@ -382,7 +382,7 @@ impl EncodingsJob {
                             .checked_add(e.settings.len())
                             .ok_or(Error::Overflow)?;
                         if self.prefix_size > self.limit {
-                            return Err(Error::Limit("restored header bytes"));
+                            return Err(Error::Policy("restored header bytes"));
                         }
                     }
                     self.prefix_entry += 1;
@@ -442,7 +442,7 @@ impl EncodingsJob {
                         }
                         Err(error) => {
                             self.prefix = Some(error.buffer);
-                            return Err(error.error.into());
+                            return Err(error.error);
                         }
                     }
                 }

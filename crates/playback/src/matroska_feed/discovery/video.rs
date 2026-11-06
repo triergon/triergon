@@ -75,7 +75,7 @@ impl VideoProbe {
                 }
                 self.setup = match Setup::new(output, packet, track) {
                     Ok(setup) => setup,
-                    Err(error) if propagate(error) => return Err(error.into()),
+                    Err(error) if propagate(error) => return Err(error),
                     Err(_) => None,
                 };
             }
@@ -84,7 +84,7 @@ impl VideoProbe {
                     Ok(BuildStep::Yield) => return Ok(None),
                     Ok(BuildStep::Ready(chain)) => Some(chain),
                     Ok(BuildStep::Complete) => None,
-                    Err(error) if propagate(error) => return Err(error.into()),
+                    Err(error) if propagate(error) => return Err(error),
                     Err(_) => None,
                 }
             } else {
@@ -139,7 +139,7 @@ impl VideoProbe {
                 self.tracks[index] = TrackProbe::Unresolved;
                 false
             }
-            Err(error) if propagate(error) => return Err(error.into()),
+            Err(error) if propagate(error) => return Err(error),
             Err(_) => {
                 self.tracks[index] = TrackProbe::Unresolved;
                 false

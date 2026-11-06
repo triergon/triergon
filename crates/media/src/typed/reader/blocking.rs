@@ -410,7 +410,7 @@ impl BlockingReader<std::io::Cursor<triergon_core::OwnedInputBytes>> {
         webm_vp9_t35: bool,
     ) -> Result<Self> {
         if !source.as_bytes().belongs_to(pool) {
-            return Err(triergon_core::Error::ForeignPool.into());
+            return Err(triergon_core::Error::ForeignPool);
         }
         let capabilities = SourceCapabilities {
             length: None,

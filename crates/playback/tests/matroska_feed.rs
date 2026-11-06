@@ -1,7 +1,5 @@
 use std::sync::atomic::AtomicBool;
-use triergon_core::{
-    Budget, Bytes, Error as CoreError, SourceCapabilities, SourceId, Time, WorkBudget,
-};
+use triergon_core::{Budget, Bytes, Error, SourceCapabilities, SourceId, Time, WorkBudget};
 use triergon_framing::{
     AacConfigLimits, Ac3Family, AvcAnnexBLimits, AvcConfigLimits, BuildStep, HvcConfigLimits,
 };
@@ -10,8 +8,8 @@ use triergon_matroska::{
     typed::{Configuration, Event},
 };
 use triergon_playback::{
-    ByteSource, Delivery, Engine, Error, Output, Player, PlayerPolicy, Progress, RawEvent,
-    Selection, TrackKey,
+    ByteSource, Delivery, Engine, Output, Player, PlayerPolicy, Progress, RawEvent, Selection,
+    TrackKey,
     io::SourceOwner,
     matroska_feed::{
         MatroskaDolbyLimits, MatroskaFeedLimits, MatroskaFeedPacket, MatroskaFeedPayload,
@@ -273,10 +271,7 @@ fn matroska_seek_and_audio_switch_fence_old_feed_bindings() {
             }
             selected[packet.packet.track] += 1;
             if packet.packet.track == 0 {
-                assert!(matches!(
-                    old.packet(event),
-                    Err(Error::Core(CoreError::Invalid(_)))
-                ));
+                assert!(matches!(old.packet(event), Err(Error::Invalid(_))));
             }
             let fresh = setup(&pool, &packet.configuration, packet.packet.track);
             assert!(frame(&fresh, event).payload.byte_len() > 0);
@@ -629,9 +624,7 @@ fn matroska_hevc_seek_and_eac3_selection_reject_stale_configuration() {
         };
         assert!(matches!(
             old.packet(event),
-            Err(Error::Core(CoreError::Invalid(
-                "Matroska feed configuration changed"
-            )))
+            Err(Error::Invalid("Matroska feed configuration changed"))
         ));
         let fresh = feeds.get_or_insert_with(|| {
             [0, 2].map(|i| hevc_dolby_setup(&pool, &packet.configuration, i))

@@ -1,5 +1,5 @@
 //! Typed AV1 packet delivery with an explicit container configuration binding.
-use crate::{Error as PlaybackError, Mp4Packet, Result, mp4_plan::Mp4Configuration};
+use crate::{Mp4Packet, Result, mp4_plan::Mp4Configuration};
 use std::sync::atomic::{AtomicBool, Ordering};
 use triergon_core::{Budget, Bytes, Error, SourceId, WorkBudget};
 use triergon_framing::{
@@ -67,7 +67,7 @@ impl Av1BridgeSetup {
             ),
             Av1Input::Mp4(packet) => {
                 if packet.source.source != source {
-                    return Err(Error::SourceMismatch.into());
+                    return Err(Error::SourceMismatch);
                 }
                 Self::for_mp4(
                     pool,
@@ -90,10 +90,10 @@ impl Av1BridgeSetup {
         packet_limits: Av1TemporalUnitLimits,
     ) -> Result<Self> {
         if !configuration.belongs_to(pool) {
-            return Err(Error::ForeignPool.into());
+            return Err(Error::ForeignPool);
         }
         if configuration.tracks().get(track).map(|t| t.codec.as_str()) != Some("V_AV1") {
-            return Err(Error::Invalid("source track is not AV1").into());
+            return Err(Error::Invalid("source track is not AV1"));
         }
         let init = configuration
             .initialization(track)
@@ -102,8 +102,7 @@ impl Av1BridgeSetup {
             return Err(Error::Limit {
                 requested: init.data.len(),
                 maximum: config_limits.maximum_record_bytes,
-            }
-            .into());
+            });
         }
         Ok(Self {
             pool: pool.clone(),
@@ -129,11 +128,11 @@ impl Av1BridgeSetup {
         packet_limits: Av1TemporalUnitLimits,
     ) -> Result<Self> {
         if configuration.description.format != *b"av01" {
-            return Err(Error::Invalid("source entry is not AV1").into());
+            return Err(Error::Invalid("source entry is not AV1"));
         }
         let entry = configuration.description.raw().bytes();
         if !entry.belongs_to(pool) {
-            return Err(Error::ForeignPool.into());
+            return Err(Error::ForeignPool);
         }
         let children = configuration
             .description
@@ -162,10 +161,7 @@ impl Av1BridgeSetup {
     ) -> Result<BuildStep<Av1Bridge>> {
         let result = self.advance(work, cancel);
         if let Err(error) = &result
-            && !matches!(
-                error,
-                PlaybackError::Core(Error::Backpressure { .. } | Error::Allocation)
-            )
+            && !matches!(error, Error::Backpressure { .. } | Error::Allocation)
         {
             self.binding = None;
             self.entry = None;
@@ -184,7 +180,7 @@ impl Av1BridgeSetup {
             return Ok(BuildStep::Complete);
         }
         if cancel.load(Ordering::Relaxed) {
-            return Err(Error::Cancelled.into());
+            return Err(Error::Cancelled);
         }
         if let Some(entry) = &mut self.entry {
             match entry.poll(work)? {
@@ -192,13 +188,13 @@ impl Av1BridgeSetup {
                 BoxStep::End => {
                     self.entry = None;
                     if self.record.is_none() {
-                        return Err(Error::Invalid("AV1 sample entry has no av1C").into());
+                        return Err(Error::Invalid("AV1 sample entry has no av1C"));
                     }
                 }
                 BoxStep::Box(boxed) => {
                     if boxed.header().kind == *b"av1C" {
                         if self.record.is_some() {
-                            return Err(Error::Invalid("duplicate av1C").into());
+                            return Err(Error::Invalid("duplicate av1C"));
                         }
                         let bytes = boxed.bytes();
                         self.record = Some(
@@ -226,7 +222,7 @@ impl Av1BridgeSetup {
                     Some(config)
                 }
                 BuildStep::Complete => {
-                    return Err(Error::Invalid("AV1 configuration already consumed").into());
+                    return Err(Error::Invalid("AV1 configuration already consumed"));
                 }
             },
             None => None,
@@ -283,8 +279,7 @@ impl Av1Bridge {
             _ => {
                 return Err(Error::Invalid(
                     "source configuration changed; configure AV1 bridge before packet",
-                )
-                .into());
+                ));
             }
         };
         let configuration = if random_access {
@@ -295,11 +290,6 @@ impl Av1Bridge {
         } else {
             None
         };
-        Ok(Av1TemporalUnitJob::new(
-            bytes,
-            configuration,
-            random_access,
-            self.limits,
-        )?)
+        Av1TemporalUnitJob::new(bytes, configuration, random_access, self.limits)
     }
 }

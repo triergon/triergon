@@ -148,7 +148,7 @@ fn assert_all_packet_owners_visible(job: &packet::PacketBatchJob, pool: &Budget)
         assert!(work.spent() <= 1);
         match step {
             Ok(ParseStep::Yield) => (),
-            Err(Error::Limit("operation retained storage")) => return,
+            Err(Error::Policy("operation retained storage")) => return,
             other => panic!("an owned allocation escaped the graph: {other:?}"),
         }
     }

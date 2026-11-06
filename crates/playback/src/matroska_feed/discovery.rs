@@ -111,8 +111,7 @@ impl Readiness {
             return Err(Error::Limit {
                 requested: tracks.len(),
                 maximum: 64,
-            }
-            .into());
+            });
         }
         let mut waiting = 0;
         let mut pgs = 0;
@@ -154,7 +153,7 @@ impl Readiness {
             || !std::ptr::eq(packet.configuration.tracks(), self.configuration.tracks())
             || packet.packet.track >= self.configuration.tracks().len()
         {
-            return Err(Error::Invalid("Matroska discovery packet configuration").into());
+            return Err(Error::Invalid("Matroska discovery packet configuration"));
         }
         let bit = 1_u64 << packet.packet.track;
         if self.waiting & bit == 0 {
@@ -359,8 +358,7 @@ impl<S: Source> MatroskaDiscovery<S> {
         {
             return Err(Error::Invalid(
                 "Matroska discovery needs a fresh reader and positive limits",
-            )
-            .into());
+            ));
         }
         let source = source.map(|source| MatroskaStartupSource {
             source,
@@ -408,7 +406,9 @@ impl<S: Source> MatroskaDiscovery<S> {
             .ok_or(Error::Invalid("Matroska discovery track number"))?;
         let bit = 1_u64 << index;
         if state.pgs & bit != 0 {
-            return Err(Error::Invalid("Matroska PGS readiness comes from its packet").into());
+            return Err(Error::Invalid(
+                "Matroska PGS readiness comes from its packet",
+            ));
         }
         state.waiting &= !bit;
         Ok(())
@@ -424,7 +424,7 @@ impl<S: Source> MatroskaDiscovery<S> {
             self.outputs.clear();
             self.pending = None;
             self.cutoff = None;
-            return Err(Error::Cancelled.into());
+            return Err(Error::Cancelled);
         }
         if matches!(
             self.player.state(),
@@ -518,7 +518,7 @@ impl<S: Source> MatroskaDiscovery<S> {
             ReplayBuffer::Full(outputs) => {
                 if let Err(failure) = outputs.try_push(output) {
                     self.pending = Some(failure.value);
-                    return Err(failure.error.into());
+                    return Err(failure.error);
                 }
             }
             ReplayBuffer::Matroska(outputs) => {
@@ -527,7 +527,7 @@ impl<S: Source> MatroskaDiscovery<S> {
                 ))?;
                 if let Err(failure) = outputs.try_push(output) {
                     self.pending = Some(failure.value.into_output());
-                    return Err(failure.error.into());
+                    return Err(failure.error);
                 }
             }
         }

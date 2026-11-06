@@ -573,7 +573,7 @@ fn scan_prefix_control_invalid_or_valid_prefix_keeps_late_source_error_priority(
         ));
         assert!(matches!(
             seek_error(&fixture, Some((cut, true)), 64),
-            Error::Core(triergon_core::Error::Transport)
+            triergon_core::Error::Transport
         ));
     }
 }
@@ -610,7 +610,7 @@ fn scan_prefix_control_bad_prefix_and_clock_errors_are_not_silently_accepted() {
     ));
     assert!(matches!(
         seek_error(&overflow, Some((cut, true)), 64),
-        Error::Core(triergon_core::Error::Transport)
+        triergon_core::Error::Transport
     ));
 }
 
@@ -920,7 +920,7 @@ fn scan_prefix_control_short_prefix_and_missing_timestamp_keep_body_error_order(
     ));
     assert!(matches!(
         seek_error(&fixture, Some((cut, true)), 64),
-        Error::Core(triergon_core::Error::Transport)
+        triergon_core::Error::Transport
     ));
 }
 
@@ -944,7 +944,7 @@ fn scan_prefix_control_declared_block_and_overall_scan_limits_stay_permanent() {
         reader.seek_for_playback(0, 0).unwrap();
         assert!(matches!(
             seek(&mut reader, &mut feed, 8192),
-            Err(Error::Limit(_))
+            Err(Error::Policy(_))
         ));
     }
 }
@@ -1224,7 +1224,7 @@ fn scan_inplace_guard_layout_and_late_fault_priority() {
     for chunk in [1, 64] {
         assert!(matches!(
             seek_error(&fixture, Some((end, true)), chunk),
-            Error::Core(triergon_core::Error::Transport)
+            triergon_core::Error::Transport
         ));
         assert!(matches!(
             seek_error(&fixture, Some((end, false)), chunk),
@@ -1319,7 +1319,7 @@ fn immutable_seek_index_rejects_foreign_owner_and_wrong_offset_views() {
             InputWindow::new(request.source, request.token.clone(), request.offset, bytes).unwrap();
         assert!(matches!(
             reader.provide(&window),
-            Err(Error::Core(triergon_core::Error::SourceMismatch))
+            Err(triergon_core::Error::SourceMismatch)
         ));
     }
     open(&mut reader, &mut feed).unwrap();

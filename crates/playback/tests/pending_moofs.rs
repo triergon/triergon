@@ -3,8 +3,7 @@ use std::sync::{
     atomic::{AtomicBool, AtomicUsize, Ordering},
 };
 use triergon_core::{
-    Budget, Bytes, Error as CoreError, InputCursor, InputRequest, SourceCapabilities, SourceId,
-    Time, WorkBudget,
+    Budget, Bytes, Error, InputCursor, InputRequest, SourceCapabilities, SourceId, Time, WorkBudget,
 };
 use triergon_playback::{
     io::{SelectedInput, SourceOwner},
@@ -205,10 +204,10 @@ fn pending_moofs_limit_is_explicit_and_retained_prefix_remains_readable() {
     }
     assert!(matches!(
         failure,
-        Some(Error::Core(CoreError::Limit {
+        Some(Error::Limit {
             requested: 2,
             maximum: 1
-        }))
+        })
     ));
     assert_eq!(packets(&out).len(), 3);
     assert_eq!(packets(&out)[0].source.payload.len(), 12);
@@ -270,7 +269,7 @@ fn pending_moofs_cancel_retires_parser_owners_but_keeps_caller_packets() {
     let c = AtomicBool::new(true);
     assert!(matches!(
         p.advance(&mut WorkBudget::new(1), &c),
-        Err(Error::Core(CoreError::Cancelled))
+        Err(Error::Cancelled)
     ));
     drop(p);
     assert_eq!(
@@ -307,9 +306,7 @@ fn pending_moofs_budget_pressure_retries_without_losing_any_sample() {
         let r = p.advance(&mut WorkBudget::new(1), &off());
         drop(held);
         let mut r = match r {
-            Err(Error::Core(CoreError::Backpressure { .. })) => {
-                p.advance(&mut WorkBudget::new(1), &off()).unwrap()
-            }
+            Err(Error::Backpressure { .. }) => p.advance(&mut WorkBudget::new(1), &off()).unwrap(),
             v => v.unwrap(),
         };
         if matches!(r, Progress::Backpressure { .. }) {
@@ -348,7 +345,7 @@ fn pending_moofs_truncated_media_preserves_complete_prefix_and_reports_error() {
             }
         }
     }
-    assert!(matches!(failure, Some(Error::Core(CoreError::Truncated))));
+    assert!(matches!(failure, Some(Error::Truncated)));
     assert_eq!(packets(&out).len(), 8);
     drop(p);
     assert_eq!(packets(&out)[0].source.payload.len(), 12);

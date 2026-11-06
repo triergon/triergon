@@ -17,7 +17,7 @@ use triergon_isobmff::{
     SampleDescription, SampleStep, SourceTimeBase, SourceTrack,
 };
 fn push<T>(v: &mut BudgetVec<T>, x: T) -> Result<()> {
-    v.try_push(x).map_err(|e| e.error.into())
+    v.try_push(x).map_err(|e| e.error)
 }
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Mp4View {
@@ -214,7 +214,7 @@ impl PreparedMp4 {
             .as_slice()
             .iter()
             .find(|t| t.snapshot.track_id == id)
-            .ok_or_else(|| Error::Invalid("unknown plan track").into())
+            .ok_or(Error::Invalid("unknown plan track"))
     }
     pub fn native(&self, at: usize) -> Option<&Mov9PacketOccurrence> {
         if self.view == Mp4View::PinnedMov9NoParseNoFillin {
@@ -273,9 +273,9 @@ impl<'a> Mp4IndexJob<'a> {
             movie.read_scope,
             crate::mp4_open::MetadataReadScope::FrontMetadataBeforeMdat(_)
         ) {
-            return Err(
-                Error::Invalid("native front operation needs actual front metadata").into(),
-            );
+            return Err(Error::Invalid(
+                "native front operation needs actual front metadata",
+            ));
         }
         Self::new_inner(
             movie,
@@ -299,9 +299,9 @@ impl<'a> Mp4IndexJob<'a> {
         if movie.native_recovery
             || movie.read_scope != crate::mp4_open::MetadataReadScope::CompleteEntity
         {
-            return Err(
-                Error::Unsupported("encoded edits require a complete native range source").into(),
-            );
+            return Err(Error::Unsupported(
+                "encoded edits require a complete native range source",
+            ));
         }
         Self::new_inner(
             movie,
@@ -321,9 +321,9 @@ impl<'a> Mp4IndexJob<'a> {
         if movie.native_recovery
             || movie.read_scope != crate::mp4_open::MetadataReadScope::CompleteEntity
         {
-            return Err(
-                Error::Unsupported("native range playback requires a complete source").into(),
-            );
+            return Err(Error::Unsupported(
+                "native range playback requires a complete source",
+            ));
         }
         let header = movie.header();
         let micros = Time::from_ticks(i128::from(header.duration), header.time_base()?)?
@@ -350,19 +350,20 @@ impl<'a> Mp4IndexJob<'a> {
         range_duration: Option<RangeDuration>,
     ) -> Result<Self> {
         if movie.native_recovery && view == Mp4View::SourcePhysical {
-            return Err(Error::Invalid("native recovery open requires native packet view").into());
+            return Err(Error::Invalid(
+                "native recovery open requires native packet view",
+            ));
         }
         if limits.tracks == 0 || limits.tracks > 64 || movie.tracks.len() > limits.tracks {
             return Err(Error::Limit {
                 requested: movie.tracks.len(),
                 maximum: limits.tracks.min(64),
-            }
-            .into());
+            });
         }
         if movie.terminal_mdat.is_some() && view != Mp4View::SourcePhysical && !native_front {
-            return Err(
-                Error::Unsupported("native terminal MDAT context is not established").into(),
-            );
+            return Err(Error::Unsupported(
+                "native terminal MDAT context is not established",
+            ));
         }
         let media_count = movie
             .media
@@ -373,8 +374,7 @@ impl<'a> Mp4IndexJob<'a> {
             return Err(Error::Limit {
                 requested: media_count,
                 maximum: limits.media_extents,
-            }
-            .into());
+            });
         }
         let b = &movie.pool;
         let mut sources = BudgetVec::new(b);
@@ -389,7 +389,7 @@ impl<'a> Mp4IndexJob<'a> {
                     || t.header.handler != *b"vide"
                     || !matches!(t.table.descriptions(), [entry] if entry.format == *b"raw ")
                 {
-                    return Err(Error::Unsupported("zero-scale native track context").into());
+                    return Err(Error::Unsupported("zero-scale native track context"));
                 }
                 let clock =
                     Mov9MediaClock::for_pinned_zero_scale(iso::PinnedMovD32RegularRecoveryV1)?;
@@ -586,7 +586,7 @@ impl<'a> Mp4IndexJob<'a> {
     }
     pub fn poll(&mut self, w: &mut WorkBudget, c: &AtomicBool) -> Result<bool> {
         if c.load(Ordering::Relaxed) {
-            return Err(Error::Cancelled.into());
+            return Err(Error::Cancelled);
         }
         if self.ready {
             return Ok(true);
@@ -739,7 +739,7 @@ impl<'a> Mp4IndexJob<'a> {
                             self.ready = true;
                             return Ok(true);
                         }
-                        _ => return Err((*refusal).into()),
+                        _ => return Err(*refusal),
                     }
                 }
                 if let Some(sort) = self.source_sort.as_mut() {
@@ -759,14 +759,13 @@ impl<'a> Mp4IndexJob<'a> {
                         return Err(Error::Limit {
                             requested: p.source_rows.len() + 1,
                             maximum: self.limits.samples as usize,
-                        }
-                        .into());
+                        });
                     }
                     match p.source_rows.try_push(row) {
                         Ok(()) => {}
                         Err(e) => {
                             self.pending_source = Some(e.value);
-                            return Err(e.error.into());
+                            return Err(e.error);
                         }
                     }
                     return Ok(false);
@@ -791,10 +790,10 @@ impl<'a> Mp4IndexJob<'a> {
                         && self.movie.trex.is_empty() =>
                     {
                         let [track] = self.movie.tracks.as_slice() else {
-                            return Err(error.into());
+                            return Err(error);
                         };
                         if !track.fragments.is_empty() || track.edits.is_some() {
-                            return Err(error.into());
+                            return Err(error);
                         }
                         // Probe the first decode occurrence only after a layout refusal.
                         // The engine still needs the actual physical end before reporting it.
@@ -889,7 +888,7 @@ impl<'a> Mp4IndexJob<'a> {
                                 } else {
                                     "native front source occurrence order is not physical"
                                 };
-                                return Err(Error::Unsupported(reason).into());
+                                return Err(Error::Unsupported(reason));
                             }
                         }
                     }
@@ -897,8 +896,7 @@ impl<'a> Mp4IndexJob<'a> {
                         return Err(Error::Limit {
                             requested: p.native_rows.len() + 1,
                             maximum: self.limits.occurrences as usize,
-                        }
-                        .into());
+                        });
                     }
                     let duration = if row.source.range.is_empty() {
                         None
@@ -912,7 +910,7 @@ impl<'a> Mp4IndexJob<'a> {
                         }
                         Err(e) => {
                             self.pending_native = Some(e.value);
-                            return Err(e.error.into());
+                            return Err(e.error);
                         }
                     }
                     return Ok(false);
@@ -957,11 +955,9 @@ impl<'a> Mp4IndexJob<'a> {
     }
     pub fn finish(mut self) -> Result<PreparedMp4> {
         if !self.ready {
-            return Err(Error::Invalid("playback plan not ready").into());
+            return Err(Error::Invalid("playback plan not ready"));
         }
-        self.plan
-            .take()
-            .ok_or_else(|| Error::Invalid("plan consumed").into())
+        self.plan.take().ok_or(Error::Invalid("plan consumed"))
     }
 
     pub(crate) fn finish_native_range(

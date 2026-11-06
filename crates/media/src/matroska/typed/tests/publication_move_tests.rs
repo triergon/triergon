@@ -134,7 +134,7 @@ fn constructor_keeps_foreign_pool_rejection_and_pending_publication_cancel_owner
     let source = SharedBytes::copy_from_slice(&foreign, &[0x81, 0, 0, 0x80, b'V']).unwrap();
     assert!(matches!(
         packet::PacketBatchJob::new(source, true, 0, 1_000_000, config, Limits::default(), &pool),
-        Err(Error::Core(triergon_core::Error::ForeignPool))
+        Err(triergon_core::Error::ForeignPool)
     ));
     assert_eq!(pool.used(), baseline);
     let config = seed_configuration(&pool, &[]);

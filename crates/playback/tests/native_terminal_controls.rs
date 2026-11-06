@@ -3,8 +3,8 @@ use std::sync::{
     atomic::{AtomicBool, AtomicU64, AtomicUsize, Ordering},
 };
 use triergon_core::{
-    Budget, Bytes, Error as CoreError, InputCursor, InputRequest, SourceCapabilities,
-    SourceFailure, SourceId, WorkBudget,
+    Budget, Bytes, Error, InputCursor, InputRequest, SourceCapabilities, SourceFailure, SourceId,
+    WorkBudget,
 };
 use triergon_isobmff::Mov9ClockOrigin;
 use triergon_playback::{
@@ -43,7 +43,7 @@ impl Source for SourceWithEnd {
         c: &AtomicBool,
     ) -> triergon_core::Result<SourceReply> {
         if c.load(Ordering::Relaxed) {
-            return Err(CoreError::Cancelled);
+            return Err(Error::Cancelled);
         }
         if w.remaining() == 0 {
             return Ok(SourceReply::Pending);
@@ -371,7 +371,7 @@ fn native_terminal_failure_never_advertises_eof() {
     let (mut p, _b, s) = make(c.raw, false, 7, 1, false);
     s.fail.store(true, Ordering::Relaxed);
     let error = collect(&mut p, 1).unwrap_err();
-    assert!(matches!(error, Error::Core(CoreError::Transport)));
+    assert!(matches!(error, Error::Transport));
     assert_eq!(s.ends.load(Ordering::Relaxed), 0);
 }
 #[test]
@@ -423,7 +423,7 @@ fn native_terminal_cancel_is_sticky_and_releases_owned_state() {
     let error = p
         .advance(&mut WorkBudget::new(1), &AtomicBool::new(true))
         .unwrap_err();
-    assert!(matches!(error, Error::Core(CoreError::Cancelled)));
+    assert!(matches!(error, Error::Cancelled));
     assert!(matches!(
         p.advance(&mut WorkBudget::new(4096), &off()).unwrap(),
         Progress::Stopped
@@ -438,10 +438,7 @@ fn native_terminal_truncated_sample_is_not_a_clean_end() {
         .find(|c| c.name == "open-ended--pending-terminal")
         .unwrap();
     let (mut p, _b, _s) = make(&c.raw[..c.raw.len() - 1], false, 1, 1, true);
-    assert!(matches!(
-        collect(&mut p, 1),
-        Err(Error::Core(CoreError::Truncated))
-    ));
+    assert!(matches!(collect(&mut p, 1), Err(Error::Truncated)));
 }
 #[test]
 fn ordinary_progressive_native_context_stays_refused() {
@@ -555,7 +552,7 @@ fn native_terminal_allocation_pressure_retries_complete_source_and_native_views(
         let step = p.advance(&mut WorkBudget::new(1), &off());
         drop(hold);
         let mut step = match step {
-            Err(Error::Core(CoreError::Backpressure { .. })) => {
+            Err(Error::Backpressure { .. }) => {
                 refusals += 1;
                 p.advance(&mut WorkBudget::new(1), &off()).unwrap()
             }
@@ -605,7 +602,7 @@ fn native_terminal_foreign_end_source_pool_and_stale_request_cannot_finish() {
             source: SourceId(98),
             token: request.token.clone()
         }),
-        Err(Error::Core(CoreError::SourceMismatch))
+        Err(Error::SourceMismatch)
     ));
     let foreign = Budget::new(4096).unwrap();
     let cursor = InputCursor::new(
@@ -623,7 +620,7 @@ fn native_terminal_foreign_end_source_pool_and_stale_request_cannot_finish() {
             source: ID,
             token: cursor.token()
         }),
-        Err(Error::Core(CoreError::ForeignPool))
+        Err(Error::ForeignPool)
     ));
     assert!(p.pending_request().is_some());
     assert_eq!(s.ends.load(Ordering::Relaxed), 0);
@@ -708,9 +705,9 @@ fn native_seekable_header_rejects_zero_size_fragment_samples() {
                         TestView::NativeRecovery,
                         true
                     ),
-                    Err(Error::Core(CoreError::Invalid(
+                    Err(Error::Invalid(
                         "zero-size fragment sample in native MOV header"
-                    )))
+                    ))
                 ));
                 let (mut source, _, _) =
                     try_make_source_mode(raw, true, chunk, work, true, TestView::Source, true)
@@ -765,9 +762,9 @@ fn native_header_rejects_explicit_and_default_zero_size_before_first_media() {
         }
         assert!(matches!(
             try_make_source_mode(&changed, false, 7, 1, true, TestView::NativeRecovery, false),
-            Err(Error::Core(CoreError::Invalid(
+            Err(Error::Invalid(
                 "zero-size fragment sample in native MOV header"
-            )))
+            ))
         ));
         let (mut source, _, _) = make_mode(&changed, false, 7, 1, true, false);
         let output = collect(&mut source, 1).unwrap();
@@ -856,9 +853,9 @@ fn native_missing_first_sample_does_not_infer_end_from_starvation_or_layout() {
     .unwrap();
     assert!(matches!(
         collect(&mut native, 1),
-        Err(Error::Core(CoreError::Invalid(
+        Err(Error::Invalid(
             "native first sample starts before physical end"
-        )))
+        ))
     ));
 }
 
@@ -911,9 +908,7 @@ fn native_zero_timescale_keeps_the_declared_source_clock_unavailable() {
                 assert!(signals.ends.load(Ordering::Relaxed) >= 1);
                 assert!(matches!(
                     try_make_source_mode(raw, known, chunk, work, true, TestView::Source, random),
-                    Err(Error::Core(CoreError::Invalid(
-                        "zero media/movie timescale"
-                    )))
+                    Err(Error::Invalid("zero media/movie timescale"))
                 ));
                 drop(native);
                 drop(out);
@@ -1011,10 +1006,7 @@ fn native_short_packet_distinguishes_pending_failure_and_empty_eof() {
     assert_eq!(native.pending_request().unwrap().offset, raw.len() as u64);
     assert_eq!(signals.ends.load(Ordering::Relaxed), 0);
     signals.fail.store(true, Ordering::Relaxed);
-    assert!(matches!(
-        collect(&mut native, 1),
-        Err(Error::Core(CoreError::Transport))
-    ));
+    assert!(matches!(collect(&mut native, 1), Err(Error::Transport)));
 
     let (mut empty, _, _) = try_make_source_mode(
         &raw[..735],
@@ -1026,10 +1018,7 @@ fn native_short_packet_distinguishes_pending_failure_and_empty_eof() {
         false,
     )
     .unwrap();
-    assert!(matches!(
-        collect(&mut empty, 1),
-        Err(Error::Core(CoreError::Truncated))
-    ));
+    assert!(matches!(collect(&mut empty, 1), Err(Error::Truncated)));
 }
 
 #[test]
@@ -1321,16 +1310,13 @@ fn reversed_forward_fragments_require_a_complete_bounded_extent() {
     let (mut native, _, _) = make(&oversized, true, 7, 13, true);
     assert!(matches!(
         collect(&mut native, 13),
-        Err(Error::Core(CoreError::Unsupported(
+        Err(Error::Unsupported(
             "native replay exceeds media cache bound"
-        )))
+        ))
     ));
 
     let (mut native, pool, signals) = make(&c.raw[..c.raw.len() - 1], false, 7, 13, true);
-    assert!(matches!(
-        collect(&mut native, 13),
-        Err(Error::Core(CoreError::Truncated))
-    ));
+    assert!(matches!(collect(&mut native, 13), Err(Error::Truncated)));
     assert_eq!(signals.ends.load(Ordering::Relaxed), 1);
     drop(native);
     assert_eq!(pool.used(), Budget::control_storage_bytes());
@@ -1488,17 +1474,14 @@ fn forward_native_edit_replay_requires_a_complete_extent_within_the_cache_limit(
     oversized.resize(735 + length as usize, 0);
     assert!(matches!(
         try_make_mode(&oversized, true, 64, 4096, true, true),
-        Err(Error::Core(CoreError::Unsupported(
+        Err(Error::Unsupported(
             "native front source occurrence order is not physical"
-        )))
+        ))
     ));
 
     let truncated = &case.raw[..case.raw.len() - 1];
     let (mut player, pool, signals) = make(truncated, false, 7, 13, true);
-    assert!(matches!(
-        collect(&mut player, 13),
-        Err(Error::Core(CoreError::Truncated))
-    ));
+    assert!(matches!(collect(&mut player, 13), Err(Error::Truncated)));
     assert_eq!(signals.ends.load(Ordering::Relaxed), 1);
     drop(player);
     assert_eq!(pool.used(), Budget::control_storage_bytes());
@@ -1556,10 +1539,8 @@ fn forward_tail_moov_retains_only_whole_media_extents_within_the_cache_limit() {
         } else {
             assert!(matches!(
                 result,
-                Err(triergon_playback::Error::Core(
-                    triergon_core::Error::Unsupported(
-                        "sequential source sample bytes already passed"
-                    )
+                Err(triergon_core::Error::Unsupported(
+                    "sequential source sample bytes already passed"
                 ))
             ));
         }
@@ -1670,17 +1651,12 @@ fn regular_forward_terminal_mdat_rejects_header_offsets_and_truncated_payloads()
         let (mut p, _, signals) = make_mode(&header_offset, false, 1, 1, true, native);
         assert!(matches!(
             collect(&mut p, 1),
-            Err(Error::Core(CoreError::Invalid(
-                "sample outside terminal MDAT declaration"
-            )))
+            Err(Error::Invalid("sample outside terminal MDAT declaration"))
         ));
         assert_eq!(signals.ends.load(Ordering::Relaxed), 0);
         let truncated = &terminal[..terminal.len() - 1];
         let (mut p, _, signals) = make_mode(truncated, false, 1, 1, true, native);
-        assert!(matches!(
-            collect(&mut p, 1),
-            Err(Error::Core(CoreError::Truncated))
-        ));
+        assert!(matches!(collect(&mut p, 1), Err(Error::Truncated)));
         assert_eq!(signals.ends.load(Ordering::Relaxed), 1);
     }
 }
@@ -1728,10 +1704,7 @@ fn regular_multiple_finite_mdats_pending_and_transport_keep_the_prefix() {
         assert_eq!(signals.ends.load(Ordering::Relaxed), 0);
         if fail {
             signals.fail.store(true, Ordering::Relaxed);
-            assert!(matches!(
-                collect(&mut player, 1),
-                Err(Error::Core(CoreError::Transport))
-            ));
+            assert!(matches!(collect(&mut player, 1), Err(Error::Transport)));
             assert_eq!(signals.ends.load(Ordering::Relaxed), 0);
         } else {
             signals.pause_at.store(0, Ordering::Relaxed);
@@ -1770,7 +1743,7 @@ fn regular_multiple_finite_mdats_reject_nonmedia_and_crossing_ranges() {
             let mut refused = false;
             for _ in 0..20_000 {
                 match player.advance(&mut WorkBudget::new(1), &off()) {
-                    Err(Error::Core(CoreError::Invalid("sample outside media extent"))) => {
+                    Err(Error::Invalid("sample outside media extent")) => {
                         refused = true;
                         break;
                     }
@@ -1794,7 +1767,7 @@ fn regular_multiple_finite_mdats_missing_extents_never_end_cleanly() {
         for native in [false, true] {
             let (mut player, _, signals) = make_mode(&case.raw[..end], false, 1, 1, true, native);
             let error = collect(&mut player, 1).unwrap_err();
-            assert!(matches!(error, Error::Core(CoreError::Truncated)));
+            assert!(matches!(error, Error::Truncated));
             assert_eq!(signals.ends.load(Ordering::Relaxed), 1);
         }
     }
@@ -1817,9 +1790,9 @@ fn regular_multiple_finite_mdats_refuse_backward_layout_without_claiming_malform
     raw[stsc + 40..stsc + 44].copy_from_slice(&1u32.to_be_bytes());
     for native in [false, true] {
         match try_make_mode(&raw, true, 7, 1, true, native) {
-            Err(Error::Core(CoreError::Unsupported(
+            Err(Error::Unsupported(
                 "physical merge needs nondecreasing per-track source offsets",
-            ))) => {}
+            )) => {}
             Err(error) => panic!("unexpected refusal: {error:?}"),
             Ok(_) => panic!("backward chunk order must be refused"),
         }
@@ -1838,8 +1811,7 @@ fn regular_multiple_finite_mdats_retry_pressure_and_preserve_held_packets() {
         let step = player.advance(&mut WorkBudget::new(1), &off());
         drop(hold);
         let step = match step {
-            Err(Error::Core(CoreError::Backpressure { .. }))
-            | Ok(Progress::Backpressure { .. }) => {
+            Err(Error::Backpressure { .. }) | Ok(Progress::Backpressure { .. }) => {
                 refusals += 1;
                 player.advance(&mut WorkBudget::new(1), &off()).unwrap()
             }

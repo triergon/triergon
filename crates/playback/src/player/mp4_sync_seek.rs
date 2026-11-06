@@ -90,7 +90,7 @@ impl<S: Source> Player<S> {
         selection: Selection,
     ) -> Result<Mp4SyncSeekJob<'_>> {
         let Some(engine @ Engine::Mp4(_)) = self.engine.as_ref() else {
-            return Err(Error::Invalid("indexed seek requires MP4").into());
+            return Err(Error::Invalid("indexed seek requires MP4"));
         };
         self.check_sync_seek_clock()?;
         Mp4SyncSeekJob::new(engine, request, selection, None)
@@ -148,7 +148,9 @@ impl<S: Source> Player<S> {
 
     fn check_sync_seek_clock(&self) -> Result<()> {
         if self.clock != ClockChoice::SourceExact {
-            return Err(Error::Unsupported("indexed seek needs exact range-backed MP4").into());
+            return Err(Error::Unsupported(
+                "indexed seek needs exact range-backed MP4",
+            ));
         }
         Ok(())
     }
@@ -160,17 +162,18 @@ impl<S: Source> Player<S> {
         cancel: &AtomicBool,
     ) -> Result<bool> {
         if command.progressive_generation.is_some() {
-            return Err(Error::Invalid("progressive seek needs its candidate catalogue").into());
+            return Err(Error::Invalid(
+                "progressive seek needs its candidate catalogue",
+            ));
         }
         if !self.pool.same_pool(&command.pool) {
-            return Err(Error::ForeignPool.into());
+            return Err(Error::ForeignPool);
         }
         if self.generation != command.generation {
             return Err(Error::StaleGeneration {
                 expected: self.generation,
                 received: command.generation,
-            }
-            .into());
+            });
         }
         self.apply_seek(
             TrackKey::Mp4(command.request.video),
@@ -191,21 +194,23 @@ impl<'a> Mp4SyncSeekJob<'a> {
         progressive_generation: Option<u64>,
     ) -> Result<Self> {
         let Engine::Mp4(mp4) = engine else {
-            return Err(Error::Invalid("indexed seek requires MP4").into());
+            return Err(Error::Invalid("indexed seek requires MP4"));
         };
         if mp4.plan.view != Mp4View::SourcePhysical || !mp4.supports_range_replay() {
-            return Err(Error::Unsupported("indexed seek needs exact range-backed MP4").into());
+            return Err(Error::Unsupported(
+                "indexed seek needs exact range-backed MP4",
+            ));
         }
         if request.audio_preroll.numerator() < 0 || request.maximum_scanned_rows == 0 {
-            return Err(Error::Invalid("indexed seek policy").into());
+            return Err(Error::Invalid("indexed seek policy"));
         }
         selection.validate(engine)?;
         if !selection.includes(TrackKey::Mp4(request.video)) {
-            return Err(Error::Invalid("indexed seek needs the selected video").into());
+            return Err(Error::Invalid("indexed seek needs the selected video"));
         }
         let track = mp4.plan.track(request.video)?;
         if track.snapshot.handler != *b"vide" || !track.snapshot.enabled {
-            return Err(Error::Invalid("indexed seek track is not enabled video").into());
+            return Err(Error::Invalid("indexed seek track is not enabled video"));
         }
         let video_base = track.snapshot.base.require()?;
         Ok(Self {
@@ -233,13 +238,13 @@ impl Mp4SyncSeekJob<'_> {
     /// cannot publish a command.
     pub fn poll(&mut self, work: &mut WorkBudget, cancel: &AtomicBool) -> Result<bool> {
         if let Some(error) = self.failure {
-            return Err(error.into());
+            return Err(error);
         }
         let result = self.scan(work, cancel);
         if let Err(error) = result {
             self.failure = Some(error);
         }
-        result.map_err(Into::into)
+        result
     }
 
     fn scan(&mut self, work: &mut WorkBudget, cancel: &AtomicBool) -> triergon_core::Result<bool> {
@@ -369,10 +374,10 @@ impl Mp4SyncSeekJob<'_> {
 
     pub fn finish(self) -> Result<Mp4SyncSeekCommand> {
         if let Some(error) = self.failure {
-            return Err(error.into());
+            return Err(error);
         }
         let Phase::Ready(landing) = self.phase else {
-            return Err(Error::Invalid("MP4 indexed seek still pending").into());
+            return Err(Error::Invalid("MP4 indexed seek still pending"));
         };
         let rows = self.plan.source_rows();
         Ok(Mp4SyncSeekCommand {

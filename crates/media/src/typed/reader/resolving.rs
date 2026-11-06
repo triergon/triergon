@@ -233,13 +233,13 @@ impl Reader {
                             .limits
                             .metadata_bytes
                             .checked_sub(self.metadata_used)
-                            .ok_or(Error::Limit("metadata"))?;
+                            .ok_or(Error::Policy("metadata"))?;
                         resolver.maximum = if id == crate::metadata::ATTACHMENTS {
                             left.checked_add(
                                 self.limits
                                     .attachment_bytes
                                     .checked_sub(self.catalogue.attachment_bytes())
-                                    .ok_or(Error::Limit("attachment payload bytes"))?,
+                                    .ok_or(Error::Policy("attachment payload bytes"))?,
                             )
                             .ok_or(Error::Overflow)?
                         } else {
@@ -295,7 +295,7 @@ impl Reader {
                         .limits
                         .scan_bytes
                         .checked_sub(resolver.scanned)
-                        .ok_or(Error::Limit("operation read bytes"))?;
+                        .ok_or(Error::Policy("operation read bytes"))?;
                     let range = resolver
                         .range
                         .as_mut()

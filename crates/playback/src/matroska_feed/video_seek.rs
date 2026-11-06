@@ -17,17 +17,17 @@ impl MatroskaVideoSeekGate {
     /// Bind the seek intent and matching Matroska receipt from the player.
     pub fn new(intent: &Output, receipt: &Output) -> Result<Self> {
         let RawEvent::Seek(seek) = intent.event() else {
-            return Err(Error::Invalid("Matroska video seek intent").into());
+            return Err(Error::Invalid("Matroska video seek intent"));
         };
         let TrackKey::Matroska(_) = seek.track else {
-            return Err(Error::Invalid("Matroska video seek track").into());
+            return Err(Error::Invalid("Matroska video seek track"));
         };
         let RawEvent::Matroska(Event::Seek(landing)) = receipt.event() else {
-            return Err(Error::Invalid("Matroska video seek receipt").into());
+            return Err(Error::Invalid("Matroska video seek receipt"));
         };
         let scope = receipt.scope();
         if !scope.matches(intent) {
-            return Err(Error::Invalid("Matroska video seek scope").into());
+            return Err(Error::Invalid("Matroska video seek scope"));
         }
         Ok(Self {
             scope,
@@ -41,7 +41,7 @@ impl MatroskaVideoSeekGate {
     /// An admitted packet can still be decode-only until the requested time.
     pub fn admits(&mut self, output: &Output) -> Result<bool> {
         if !self.scope.matches(output) {
-            return Err(Error::Invalid("Matroska video seek packet scope").into());
+            return Err(Error::Invalid("Matroska video seek packet scope"));
         }
         if output.delivery() == Delivery::Unselected || output.event().track() != Some(self.track) {
             return Ok(false);

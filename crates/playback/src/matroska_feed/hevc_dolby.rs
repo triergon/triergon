@@ -74,7 +74,7 @@ impl MatroskaHevcDolbySetup {
         limits: MatroskaHevcDolbyLimits,
     ) -> Result<Self> {
         if !configuration.belongs_to(pool) {
-            return Err(Error::ForeignPool.into());
+            return Err(Error::ForeignPool);
         }
         let descriptor = configuration
             .tracks()
@@ -105,7 +105,7 @@ impl MatroskaHevcDolbySetup {
             (2, "A_AC3/BSID9") => SetupCodec::Dolby(DolbyCodec::Ac3Bsid(9)),
             (2, "A_AC3/BSID10") => SetupCodec::Dolby(DolbyCodec::Ac3Bsid(10)),
             (2, "A_EAC3") => SetupCodec::Dolby(DolbyCodec::Eac3),
-            _ => return Err(Error::Unsupported("Matroska HEVC/Dolby feed codec").into()),
+            _ => return Err(Error::Unsupported("Matroska HEVC/Dolby feed codec")),
         };
         Ok(Self {
             association: Some(Association {
@@ -142,7 +142,7 @@ impl MatroskaHevcDolbySetup {
                 if !matches!(error, Error::Backpressure { .. } | Error::Allocation) {
                     self.association = None;
                 }
-                Err(error.into())
+                Err(error)
             }
         }
     }

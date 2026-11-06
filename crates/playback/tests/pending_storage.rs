@@ -3,8 +3,7 @@ use std::sync::{
     atomic::{AtomicBool, AtomicUsize, Ordering},
 };
 use triergon_core::{
-    Budget, Bytes, Error as CoreError, InputCursor, InputRequest, SourceCapabilities, SourceId,
-    WorkBudget,
+    Budget, Bytes, Error, InputCursor, InputRequest, SourceCapabilities, SourceId, WorkBudget,
 };
 use triergon_playback::{
     io::{SelectedInput, SourceOwner},
@@ -48,10 +47,10 @@ impl Source for Transport {
         c: &AtomicBool,
     ) -> triergon_core::Result<SourceReply> {
         if c.load(Ordering::Relaxed) {
-            return Err(CoreError::Cancelled);
+            return Err(Error::Cancelled);
         }
         if r.source != ID {
-            return Err(CoreError::SourceMismatch);
+            return Err(Error::SourceMismatch);
         }
         if w.remaining() == 0 {
             return Ok(SourceReply::Pending);
@@ -253,7 +252,7 @@ fn pending_storage_growth_refusal_retries_without_ordinal_commit() {
             let step = p.advance(&mut WorkBudget::new(1), &off());
             drop(hold);
             let mut step = match step {
-                Err(Error::Core(CoreError::Backpressure { .. })) => {
+                Err(Error::Backpressure { .. }) => {
                     pressure += 1;
                     p.advance(&mut WorkBudget::new(1), &off()).unwrap()
                 }
@@ -318,10 +317,10 @@ fn pending_storage_limit_keeps_prefix_and_caller_packet_owner() {
     let mut out = Vec::new();
     assert!(matches!(
         read(&mut p, &mut out),
-        Err(Error::Core(CoreError::Limit {
+        Err(Error::Limit {
             requested: 2,
             maximum: 1
-        }))
+        })
     ));
     assert_eq!(packets(&out).len(), 3);
     drop(p);
@@ -377,7 +376,7 @@ fn pending_storage_cancel_retires_source_once_and_keeps_outputs() {
     let (mut p, b, signals, out) = parked();
     assert!(matches!(
         p.advance(&mut WorkBudget::new(0), &AtomicBool::new(true)),
-        Err(Error::Core(CoreError::Cancelled))
+        Err(Error::Cancelled)
     ));
     drop(p);
     assert_eq!(signals.aborts.load(Ordering::Relaxed), 1);

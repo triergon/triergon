@@ -16,7 +16,7 @@ pub fn decompress_in(
     pool: &triergon_core::Budget,
 ) -> Result<crate::storage::SharedBytes> {
     if !source.belongs_to(pool) {
-        return Err(triergon_core::Error::ForeignPool.into());
+        return Err(triergon_core::Error::ForeignPool);
     }
     if let Some(range) = stored_range(source, limits, cancel)? {
         // Stored length is known and validated. Speculative capacity here can
@@ -29,7 +29,7 @@ pub fn decompress_in(
         let mut output = triergon_core::BudgetVec::new(pool);
         output.try_reserve_exact(range.len())?;
         output.try_extend_from_slice(&source[range])?;
-        let bytes = output.freeze().map_err(|error| Error::from(error.error))?;
+        let bytes = output.freeze().map_err(|error| error.error)?;
         return Ok(crate::storage::SharedBytes::from_core(bytes));
     }
     let mut decoder = Inflater::new(source.clone(), limits, pool)?;
@@ -268,7 +268,7 @@ fn fixed() -> &'static (Huffman, Huffman) {
 fn reserve(out: &mut Vec<u8>, extra: usize, limit: usize, initial: usize) -> Result<()> {
     let total = out.len().checked_add(extra).ok_or(Error::Overflow)?;
     if total > limit {
-        return Err(Error::Limit("inflated output bytes or expansion ratio"));
+        return Err(Error::Policy("inflated output bytes or expansion ratio"));
     }
     if total > out.capacity() {
         let target = total
@@ -276,7 +276,7 @@ fn reserve(out: &mut Vec<u8>, extra: usize, limit: usize, initial: usize) -> Res
             .max(if out.capacity() == 0 { initial } else { 0 })
             .min(limit);
         out.try_reserve_exact(target - out.len())
-            .map_err(|_| Error::Limit("inflate allocation"))?;
+            .map_err(|_| Error::Policy("inflate allocation"))?;
     }
     Ok(())
 }
@@ -374,10 +374,10 @@ pub(crate) fn stored_range(
             .output_bytes
             .min(data.len().saturating_mul(limits.expansion_ratio))
     {
-        return Err(Error::Limit("inflated output bytes or expansion ratio"));
+        return Err(Error::Policy("inflated output bytes or expansion ratio"));
     }
     if length as u64 + 1 > limits.work {
-        return Err(Error::Limit("inflate work"));
+        return Err(Error::Policy("inflate work"));
     }
     let range = 7..7 + length;
     let expected = u32::from_be_bytes(data[range.end..].try_into().expect("four checksum bytes"));
@@ -393,7 +393,7 @@ pub fn decompress(data: &[u8], limits: InflateLimits, cancel: &AtomicBool) -> Re
     if let Some(range) = stored_range(data, limits, cancel)? {
         let mut out = Vec::new();
         out.try_reserve_exact(range.len())
-            .map_err(|_| Error::Limit("inflate allocation"))?;
+            .map_err(|_| Error::Policy("inflate allocation"))?;
         out.extend_from_slice(&data[range]);
         return Ok(out);
     }
@@ -414,7 +414,7 @@ pub fn decompress(data: &[u8], limits: InflateLimits, cancel: &AtomicBool) -> Re
         if cancel.load(Ordering::Relaxed) {
             return Err(Error::Cancelled);
         }
-        work = work.checked_sub(1).ok_or(Error::Limit("inflate work"))?;
+        work = work.checked_sub(1).ok_or(Error::Policy("inflate work"))?;
         let last = bits.take(1)? != 0;
         let kind = bits.take(2)?;
         if kind == 0 {
@@ -425,7 +425,7 @@ pub fn decompress(data: &[u8], limits: InflateLimits, cancel: &AtomicBool) -> Re
             }
             work = work
                 .checked_sub(length as u64)
-                .ok_or(Error::Limit("inflate work"))?;
+                .ok_or(Error::Policy("inflate work"))?;
             reserve(&mut out, length, limit, initial)?;
             let start = bits.position();
             let end = start.checked_add(length).ok_or(Error::Overflow)?;
@@ -444,7 +444,7 @@ pub fn decompress(data: &[u8], limits: InflateLimits, cancel: &AtomicBool) -> Re
                 if cancel.load(Ordering::Relaxed) {
                     return Err(Error::Cancelled);
                 }
-                work = work.checked_sub(1).ok_or(Error::Limit("inflate work"))?;
+                work = work.checked_sub(1).ok_or(Error::Policy("inflate work"))?;
                 let symbol = literals.symbol(&mut bits)?;
                 if symbol < 256 {
                     reserve(&mut out, 1, limit, initial)?;
@@ -479,7 +479,7 @@ pub fn decompress(data: &[u8], limits: InflateLimits, cancel: &AtomicBool) -> Re
                     }
                     work = work
                         .checked_sub(length as u64)
-                        .ok_or(Error::Limit("inflate work"))?;
+                        .ok_or(Error::Policy("inflate work"))?;
                     reserve(&mut out, length, limit, initial)?;
                     let end = out.len() + length;
                     if distance == 1 {

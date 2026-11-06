@@ -30,7 +30,7 @@ fn failure_position(scan: u64) -> Option<u64> {
                     )
                     .unwrap();
             }
-            Err(Error::Limit("operation read bytes")) => return Some(reader.position()),
+            Err(Error::Policy("operation read bytes")) => return Some(reader.position()),
             Err(other) => panic!("unexpected {other:?}"),
             Ok(_) => (),
         }

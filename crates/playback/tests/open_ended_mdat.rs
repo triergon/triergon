@@ -3,7 +3,7 @@ use std::sync::{
     atomic::{AtomicBool, AtomicUsize, Ordering},
 };
 use triergon_core::{
-    Budget, Bytes, Error as CoreError, InputCursor, InputRequest, InputWindow, SourceCapabilities,
+    Budget, Bytes, Error, InputCursor, InputRequest, InputWindow, SourceCapabilities,
     SourceFailure, SourceId, Time, WorkBudget,
 };
 use triergon_playback::{
@@ -49,10 +49,10 @@ impl Source for FiniteSource {
         c: &AtomicBool,
     ) -> triergon_core::Result<SourceReply> {
         if c.load(Ordering::Relaxed) {
-            return Err(CoreError::Cancelled);
+            return Err(Error::Cancelled);
         }
         if r.source != ID {
-            return Err(CoreError::SourceMismatch);
+            return Err(Error::SourceMismatch);
         }
         if w.remaining() == 0 {
             return Ok(SourceReply::Pending);
@@ -287,7 +287,7 @@ fn open_ended_required_header_pressure_keeps_same_producer_and_header() {
     let mut pressure = false;
     for _ in 0..2000 {
         match open.advance(&mut WorkBudget::new(1), &off()) {
-            Err(Error::Core(CoreError::Backpressure { .. })) => {
+            Err(Error::Backpressure { .. }) => {
                 pressure = true;
                 break;
             }
@@ -362,10 +362,7 @@ fn open_ended_starvation_empty_data_pause_and_workzero_are_not_eof() {
 fn open_ended_short_sample_keeps_complete_prefix_and_truncation() {
     let (mut p, b, _) = make(&REGULAR[..REGULAR.len() - 4], None, true);
     let mut out = Vec::new();
-    assert!(matches!(
-        read(&mut p, &mut out),
-        Err(Error::Core(CoreError::Truncated))
-    ));
+    assert!(matches!(read(&mut p, &mut out), Err(Error::Truncated)));
     assert_eq!(packets(&out).len(), 5);
     drop(p);
     assert_eq!(packets(&out)[0].source.payload.len(), 12);
@@ -376,10 +373,7 @@ fn open_ended_short_sample_keeps_complete_prefix_and_truncation() {
 fn open_ended_promised_longer_entity_end_remains_truncated() {
     let (mut p, _, _) = make(REGULAR, Some(REGULAR.len() as u64 + 4), true);
     let mut out = Vec::new();
-    assert!(matches!(
-        read(&mut p, &mut out),
-        Err(Error::Core(CoreError::Truncated))
-    ));
+    assert!(matches!(read(&mut p, &mut out), Err(Error::Truncated)));
     assert_eq!(packets(&out).len(), 6);
 }
 #[test]
@@ -391,7 +385,7 @@ fn open_ended_borrowed_end_requires_current_source_and_pool() {
             source: SourceId(999),
             token: r.token.clone()
         }),
-        Err(Error::Core(CoreError::SourceMismatch))
+        Err(Error::SourceMismatch)
     ));
     let foreign_budget = Budget::new(4096).unwrap();
     let foreign = InputCursor::new(
@@ -409,7 +403,7 @@ fn open_ended_borrowed_end_requires_current_source_and_pool() {
             source: ID,
             token: foreign.token()
         }),
-        Err(Error::Core(CoreError::ForeignPool))
+        Err(Error::ForeignPool)
     ));
     assert!(p.pending_request().is_some());
     let end = SourceReply::End {
@@ -430,7 +424,7 @@ fn open_ended_cancel_at_end_keeps_outputs_and_closes_once() {
     let (mut p, b, signals, out) = parked();
     assert!(matches!(
         p.advance(&mut WorkBudget::new(0), &AtomicBool::new(true)),
-        Err(Error::Core(CoreError::Cancelled))
+        Err(Error::Cancelled)
     ));
     drop(p);
     assert_eq!(signals.aborts.load(Ordering::Relaxed), 1);
@@ -444,10 +438,7 @@ fn open_ended_transport_failure_is_not_normal_source_end() {
     let (mut p, b, signals, mut out) = parked();
     signals.fail_end.store(true, Ordering::Relaxed);
     signals.allow_end.store(true, Ordering::Relaxed);
-    assert!(matches!(
-        read(&mut p, &mut out),
-        Err(Error::Core(CoreError::Transport))
-    ));
+    assert!(matches!(read(&mut p, &mut out), Err(Error::Transport)));
     check_regular(&out);
     assert_eq!(signals.ends.load(Ordering::Relaxed), 0);
     drop(p);
@@ -477,9 +468,7 @@ fn open_ended_packet_pressure_retries_all_declared_samples() {
         let step = p.advance(&mut WorkBudget::new(1), &off());
         drop(hold);
         let mut step = match step {
-            Err(Error::Core(CoreError::Backpressure { .. })) => {
-                p.advance(&mut WorkBudget::new(1), &off()).unwrap()
-            }
+            Err(Error::Backpressure { .. }) => p.advance(&mut WorkBudget::new(1), &off()).unwrap(),
             value => value.unwrap(),
         };
         if matches!(step, Progress::Backpressure { .. }) {
@@ -558,7 +547,7 @@ fn open_ended_unproven_native_and_unattached_completion_are_refused() {
             Mp4View::PinnedMov9NoParseNoFillin,
             PlanLimits::default()
         ),
-        Err(Error::Core(CoreError::Unsupported(_)))
+        Err(Error::Unsupported(_))
     ));
     let mut index = Mp4IndexJob::new(
         &opened.movie,
@@ -570,7 +559,7 @@ fn open_ended_unproven_native_and_unattached_completion_are_refused() {
     let plan = index.finish().unwrap();
     assert!(matches!(
         Engine::mp4(opened.input, plan, 1 << 20),
-        Err(Error::Core(CoreError::Unsupported(_)))
+        Err(Error::Unsupported(_))
     ));
 }
 #[test]

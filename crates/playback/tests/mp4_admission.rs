@@ -1,9 +1,7 @@
 use std::{ops::Range, sync::atomic::AtomicBool};
-use triergon_core::{
-    Budget, Bytes, Error as CoreError, InputCursor, SourceCapabilities, SourceId, WorkBudget,
-};
+use triergon_core::{Budget, Bytes, Error, InputCursor, SourceCapabilities, SourceId, WorkBudget};
 use triergon_playback::{
-    ByteSource, Error, Format, Result,
+    ByteSource, Format, Result,
     io::{SelectedInput, SourceOwner},
     mp4_open::{MetadataReadScope, Movie, Mp4Open, OpenLimits, OpenProgress},
 };
@@ -96,10 +94,7 @@ fn with_minf_atoms(fixture: &[u8], added: &[u8], after_dinf: bool) -> Vec<u8> {
 fn assert_refused(raw: &[u8], case: &str) {
     let result = open(raw, false).map(|_| ());
     assert!(
-        matches!(
-            result,
-            Err(Error::Core(CoreError::Invalid(_) | CoreError::Truncated))
-        ),
+        matches!(result, Err(Error::Invalid(_) | Error::Truncated)),
         "{case}: {result:?}"
     );
 }
@@ -156,9 +151,7 @@ fn quicktime_rejects_malformed_minf_data_handler() {
     assert!(
         matches!(
             result,
-            Err(Error::Core(CoreError::Unsupported(
-                "QuickTime data handler reference type"
-            )))
+            Err(Error::Unsupported("QuickTime data handler reference type"))
         ),
         "unsupported alias data handler: {result:?}"
     );

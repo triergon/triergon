@@ -396,7 +396,7 @@ fn demux_slot_pending_transport_cancel_and_eof_owners_are_empty() {
             .unwrap();
         assert!(matches!(
             call(&mut reader, &mut zero, &AtomicBool::new(true)),
-            Err(Error::Core(triergon_core::Error::Transport))
+            Err(triergon_core::Error::Transport)
         ));
         reader.reset().unwrap();
         assert!(matches!(

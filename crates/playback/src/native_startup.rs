@@ -40,10 +40,10 @@ pub struct PreparedNative<S: Source> {
 impl<S: Source> NativeStartup<S> {
     pub fn new(selected: SelectedInput<S>) -> Result<Self> {
         let Format::Ts(format) = selected.format else {
-            return Err(Error::Invalid("native startup requires TS selection").into());
+            return Err(Error::Invalid("native startup requires TS selection"));
         };
         if selected.input.position() != 0 {
-            return Err(Error::Invalid("native startup not at initial cursor").into());
+            return Err(Error::Invalid("native startup not at initial cursor"));
         }
         Ok(Self {
             input: Some(selected.input),
@@ -63,9 +63,9 @@ impl<S: Source> NativeStartup<S> {
             || !selected.input.buffered().is_empty()
             || selected.input.request().maximum < NativeInputBootstrap::M2TS_PREFIX_BYTES_V2
         {
-            return Err(
-                Error::Unsupported("native M2TS prefix needs a fresh 8192-byte window").into(),
-            );
+            return Err(Error::Unsupported(
+                "native M2TS prefix needs a fresh 8192-byte window",
+            ));
         }
         let bytes = BudgetVec::new(selected.input.budget());
         let mut startup = Self::new(selected)?;
@@ -82,12 +82,7 @@ impl<S: Source> NativeStartup<S> {
         }
         let result = self.inner(w, c);
         let retry = self.prefix.is_some()
-            && matches!(
-                &result,
-                Err(crate::Error::Core(
-                    Error::Backpressure { .. } | Error::Allocation
-                ))
-            );
+            && matches!(&result, Err(Error::Backpressure { .. } | Error::Allocation));
         if result.is_err() && !retry {
             self.failed = true;
             if let Some(source) = self.source.as_mut() {
@@ -98,7 +93,7 @@ impl<S: Source> NativeStartup<S> {
     }
     fn inner(&mut self, w: &mut WorkBudget, c: &AtomicBool) -> Result<StartupStep> {
         if c.load(Ordering::Relaxed) {
-            return Err(Error::Cancelled.into());
+            return Err(Error::Cancelled);
         }
         if w.remaining() == 0 {
             return Ok(StartupStep::Yield);
@@ -128,12 +123,11 @@ impl<S: Source> NativeStartup<S> {
                     return Err(match failure {
                         triergon_core::SourceFailure::Cancelled => Error::Cancelled,
                         triergon_core::SourceFailure::Transport => Error::Transport,
-                    }
-                    .into());
+                    });
                 }
                 SourceReply::End { source, token } => {
                     input.finish(source, token)?;
-                    return Err(Error::Unsupported("empty native startup entity").into());
+                    return Err(Error::Unsupported("empty native startup entity"));
                 }
                 SourceReply::Data(window) => {
                     if window.bytes().is_empty() {
@@ -144,7 +138,9 @@ impl<S: Source> NativeStartup<S> {
                         .length
                         .is_some_and(|n| n != window.bytes().len() as u64)
                     {
-                        return Err(Error::Unsupported("native finite startup requires one actual complete initial window; short reads stay source-only").into());
+                        return Err(Error::Unsupported(
+                            "native finite startup requires one actual complete initial window; short reads stay source-only",
+                        ));
                     }
                     input.provide(&window)?;
                     let bootstrap = NativeInputBootstrap::new(input, &window, self.format)?;
@@ -169,29 +165,27 @@ impl<S: Source> NativeStartup<S> {
                     return Err(match failure {
                         triergon_core::SourceFailure::Cancelled => Error::Cancelled,
                         triergon_core::SourceFailure::Transport => Error::Transport,
-                    }
-                    .into());
+                    });
                 }
                 SourceReply::Data(window) => {
                     if window.source != input.source() {
-                        return Err(Error::SourceMismatch.into());
+                        return Err(Error::SourceMismatch);
                     }
                     if window.token != input.token() {
-                        return Err(Error::Invalid("stale EOF-probe reply").into());
+                        return Err(Error::Invalid("stale EOF-probe reply"));
                     }
                     if !window.bytes().belongs_to(input.budget()) {
-                        return Err(Error::ForeignPool.into());
+                        return Err(Error::ForeignPool);
                     }
                     if window.offset != request.offset || window.bytes().len() > request.maximum {
-                        return Err(Error::Invalid("EOF-probe range").into());
+                        return Err(Error::Invalid("EOF-probe range"));
                     }
                     if window.bytes().is_empty() {
                         return Ok(StartupStep::NeedEof);
                     }
                     return Err(Error::Unsupported(
                         "positive-size read found more entity data; finite startup unproven",
-                    )
-                    .into());
+                    ));
                 }
                 SourceReply::End { source, token } => {
                     self.bootstrap
@@ -261,35 +255,33 @@ impl PrefixRead {
                     return Err(match failure {
                         SourceFailure::Cancelled => Error::Cancelled,
                         SourceFailure::Transport => Error::Transport,
-                    }
-                    .into());
+                    });
                 }
                 SourceReply::End { source, token } => {
                     if source != request.source {
-                        return Err(Error::SourceMismatch.into());
+                        return Err(Error::SourceMismatch);
                     }
                     if token != request.token {
-                        return Err(Error::Invalid("stale M2TS prefix End").into());
+                        return Err(Error::Invalid("stale M2TS prefix End"));
                     }
                     return Err(if input.capabilities().length.is_some() {
                         Error::Truncated
                     } else {
                         Error::Unsupported("short source for native M2TS prefix")
-                    }
-                    .into());
+                    });
                 }
                 SourceReply::Data(window) => {
                     if window.source != request.source {
-                        return Err(Error::SourceMismatch.into());
+                        return Err(Error::SourceMismatch);
                     }
                     if window.token != request.token
                         || window.offset != request.offset
                         || window.bytes().len() > request.maximum
                     {
-                        return Err(Error::Invalid("native M2TS prefix reply range").into());
+                        return Err(Error::Invalid("native M2TS prefix reply range"));
                     }
                     if !window.bytes().belongs_to(input.budget()) {
-                        return Err(Error::ForeignPool.into());
+                        return Err(Error::ForeignPool);
                     }
                     if window.bytes().is_empty() {
                         return Ok(None);
@@ -328,7 +320,7 @@ impl PrefixRead {
             Ok(bytes) => bytes,
             Err(rejected) => {
                 self.bytes = rejected.buffer;
-                return Err(rejected.error.into());
+                return Err(rejected.error);
             }
         };
         let window = InputWindow::new(input.source(), input.token(), 0, bytes)?;

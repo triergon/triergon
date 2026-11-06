@@ -166,7 +166,7 @@ fn restored_header_is_bounded_by_the_decoded_packet_limit() {
     .unwrap();
     assert!(matches!(
         demux.next_packet(&AtomicBool::new(false)),
-        Err(Error::Limit(_))
+        Err(Error::Policy(_))
     ));
 }
 
@@ -311,7 +311,7 @@ fn resource_limits_reject_before_allocating_large_elements() {
             ..Limits::default()
         },
     ] {
-        assert!(matches!(collect(&bytes, limits), Err(Error::Limit(_))));
+        assert!(matches!(collect(&bytes, limits), Err(Error::Policy(_))));
     }
 }
 
@@ -389,7 +389,7 @@ fn transport_failure_is_not_eof() {
             Err(error) => break error,
         }
     };
-    assert!(matches!(error, Error::Io(e) if e.kind() == io::ErrorKind::ConnectionReset));
+    assert!(matches!(error, Error::Io(io::ErrorKind::ConnectionReset)));
 }
 
 #[test]
@@ -614,7 +614,7 @@ fn forged_cue_targets_and_index_limits_are_rejected_without_stale_packets() {
     .unwrap();
     assert!(matches!(
         reader.seek_previous(0, 7_500_000_000, &AtomicBool::new(false)),
-        Err(Error::Limit(_))
+        Err(Error::Policy(_))
     ));
     // Corrupt the final CueClusterPosition to point at Segment metadata.
     let at = bytes.windows(2).rposition(|b| b == [0xf1, 0x88]).unwrap();
@@ -715,7 +715,7 @@ fn compressed_private_data_is_charged_to_the_shared_metadata_budget() {
                 ..Limits::default()
             }
         ),
-        Err(Error::Limit(_))
+        Err(Error::Policy(_))
     ));
 }
 
@@ -790,7 +790,7 @@ fn laced_decompression_shares_one_decoded_block_budget() {
                 ..Limits::default()
             }
         ),
-        Err(Error::Limit(_))
+        Err(Error::Policy(_))
     ));
 }
 
@@ -881,7 +881,7 @@ fn colour_metadata_obeys_byte_and_track_budgets_and_retains_source_after_drop() 
     ] {
         assert!(matches!(
             Demuxer::open(Cursor::new(&bytes), limits),
-            Err(Error::Limit(_))
+            Err(Error::Policy(_))
         ));
     }
 }

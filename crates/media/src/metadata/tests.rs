@@ -116,11 +116,11 @@ fn structural_attachment_node_and_depth_limits_are_independent() {
             16 * 1024 * 1024,
             1023
         ),
-        Err(Error::Limit(_))
+        Err(Error::Policy(_))
     ));
     assert!(matches!(
         Document::parse(ATTACHMENTS, payload.clone(), 2, 32, 16 * 1024 * 1024, 1024),
-        Err(Error::Limit(_))
+        Err(Error::Policy(_))
     ));
     assert!(matches!(
         Document::parse(
@@ -131,11 +131,11 @@ fn structural_attachment_node_and_depth_limits_are_independent() {
             16 * 1024 * 1024,
             1024
         ),
-        Err(Error::Limit(_))
+        Err(Error::Policy(_))
     ));
     assert!(matches!(
         Document::parse(ATTACHMENTS, payload.clone(), 4096, 32, 1024, 1024),
-        Err(Error::Limit(_))
+        Err(Error::Policy(_))
     ));
     let mut c = Catalogue::default();
     let limits = crate::Limits::default();
@@ -296,7 +296,7 @@ fn cumulative_arena_limits_and_absolute_depth_remain_bounded() {
         .unwrap();
     assert!(matches!(
         catalogue.add(TAGS, tag, 1024, None, limits),
-        Err(Error::Limit(_))
+        Err(Error::Policy(_))
     ));
     assert_eq!(catalogue.documents().len(), 1);
     let mut nested = e(0x67c8, &e(0x45a3, b"LEAF"));
@@ -312,7 +312,7 @@ fn cumulative_arena_limits_and_absolute_depth_remain_bounded() {
             16 * 1024 * 1024,
             8 * 1024 * 1024
         ),
-        Err(Error::Limit("metadata nesting"))
+        Err(Error::Policy("metadata nesting"))
     ));
 }
 

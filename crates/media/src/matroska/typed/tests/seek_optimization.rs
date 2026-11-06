@@ -430,7 +430,7 @@ fn seek_optimization_foreign_pool_configuration_is_rejected_before_range_io() {
             crate::Limits::default(),
             &pool
         ),
-        Err(crate::Error::Core(triergon_core::Error::ForeignPool))
+        Err(triergon_core::Error::ForeignPool)
     ));
 }
 
@@ -458,6 +458,6 @@ fn seek_optimization_skipped_payload_keeps_the_full_remaining_scan_limit() {
     }
     assert!(matches!(
         error,
-        Some(crate::Error::Limit("operation read bytes"))
+        Some(crate::Error::Policy("operation read bytes"))
     ));
 }

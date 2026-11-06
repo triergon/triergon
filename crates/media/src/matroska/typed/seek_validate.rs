@@ -84,7 +84,7 @@ impl CueValidationJob {
             whole_cluster,
         } = target;
         if !configuration.belongs_to(pool) {
-            return Err(triergon_core::Error::ForeignPool.into());
+            return Err(triergon_core::Error::ForeignPool);
         }
         if configuration
             .tracks()
@@ -158,14 +158,13 @@ impl CueValidationJob {
             ));
         }
         if !self.pool.same_pool(reader.budget()) {
-            return Err(triergon_core::Error::ForeignPool.into());
+            return Err(triergon_core::Error::ForeignPool);
         }
         if self.configuration.generation != reader.generation() {
             return Err(triergon_core::Error::StaleGeneration {
                 expected: reader.generation(),
                 received: self.configuration.generation,
-            }
-            .into());
+            });
         }
         let result = (|| {
             reader.healthy_for_job(work, cancel)?;

@@ -242,7 +242,7 @@ fn dynamic_distance_alphabet_keeps_fifteen_bit_codes_under_all_work_schedules() 
             if policy == 259 {
                 assert_eq!(outcome.unwrap().unwrap().as_ref(), expected.as_slice());
             } else {
-                assert!(matches!(outcome, Some(Err(Error::Limit("inflate work")))));
+                assert!(matches!(outcome, Some(Err(Error::Policy("inflate work")))));
             }
         }
     }
@@ -346,7 +346,7 @@ fn successive_dynamic_blocks_replace_code_lengths_literals_and_empty_distance_ta
             if policy == 14 {
                 assert_eq!(outcome.unwrap().unwrap().as_ref(), b"aabaab");
             } else {
-                assert!(matches!(outcome, Some(Err(Error::Limit("inflate work")))));
+                assert!(matches!(outcome, Some(Err(Error::Policy("inflate work")))));
             }
         }
     }
@@ -710,7 +710,7 @@ fn corrupt_checksum_cancellation_and_permanent_limits_never_publish_partial_outp
         }
         assert!(
             matches!(error, Some(Error::Invalid("Adler-32 mismatch")))
-                || !corrupt && matches!(error, Some(Error::Limit(_)))
+                || !corrupt && matches!(error, Some(Error::Policy(_)))
         );
     }
     let pool = Budget::new(64 * 1024).unwrap();

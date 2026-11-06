@@ -211,7 +211,7 @@ fn group_own_storage_is_a_permanent_limit_not_an_infinite_backpressure_facade() 
                 requested = Some(amount);
                 break;
             }
-            Err(crate::Error::Limit(_)) => return,
+            Err(crate::Error::Policy(_)) => return,
             other => panic!("tight owned pool must fail, got {other:?}"),
         }
     }
@@ -219,7 +219,7 @@ fn group_own_storage_is_a_permanent_limit_not_an_infinite_backpressure_facade() 
         Pressure::new(requested.expect("tight owned job must reach its allocation boundary"));
     for _ in 0..100_000 {
         match proof.step(&job, &pool, &mut WorkBudget::new(1), &cancel) {
-            Err(crate::Error::Limit("operation retained storage")) => return,
+            Err(crate::Error::Policy("operation retained storage")) => return,
             Ok(ParseStep::Yield) => (),
             other => panic!("operation-owned shortage is permanent: {other:?}"),
         }

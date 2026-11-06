@@ -76,7 +76,7 @@ impl Association {
             return Ok(None);
         };
         if !self.matches(packet) {
-            return Err(Error::Invalid("Matroska feed configuration changed").into());
+            return Err(Error::Invalid("Matroska feed configuration changed"));
         }
         Ok(Some(packet))
     }
@@ -114,7 +114,7 @@ impl MatroskaFeedSetup {
         limits: MatroskaFeedLimits,
     ) -> Result<Self> {
         if !configuration.belongs_to(pool) {
-            return Err(Error::ForeignPool.into());
+            return Err(Error::ForeignPool);
         }
         let descriptor = configuration
             .tracks()
@@ -124,7 +124,7 @@ impl MatroskaFeedSetup {
         let maximum_record_bytes = match (descriptor.kind, codec) {
             (1, "V_MPEG4/ISO/AVC") => limits.avc_config.maximum_record_bytes,
             (2, "A_AAC") => limits.aac_config.maximum_record_bytes,
-            _ => return Err(Error::Unsupported("Matroska feed codec").into()),
+            _ => return Err(Error::Unsupported("Matroska feed codec")),
         };
         let init = configuration
             .initialization(track)
@@ -133,8 +133,7 @@ impl MatroskaFeedSetup {
             return Err(Error::Limit {
                 requested: init.data.len(),
                 maximum: maximum_record_bytes,
-            }
-            .into());
+            });
         }
         let record = match configuration.initialization_bytes(track) {
             Some(record) => record,
@@ -153,7 +152,7 @@ impl MatroskaFeedSetup {
             )?)
         } else {
             if limits.aac_output_bytes < 7 {
-                return Err(Error::Invalid("Matroska AAC output limit").into());
+                return Err(Error::Invalid("Matroska AAC output limit"));
             }
             Parser::Aac(AacAscParser::new(
                 pool,
@@ -200,14 +199,12 @@ impl MatroskaFeedSetup {
                     limits: self.limits,
                 }))
             }
-            Ok(BuildStep::Complete) => {
-                Err(Error::Invalid("AVC/AAC setup lost its configuration").into())
-            }
+            Ok(BuildStep::Complete) => Err(Error::Invalid("AVC/AAC setup lost its configuration")),
             Err(error) => {
                 if !matches!(error, Error::Backpressure { .. } | Error::Allocation) {
                     self.pending = None;
                 }
-                Err(error.into())
+                Err(error)
             }
         }
     }
@@ -262,7 +259,7 @@ impl MatroskaTrackFeed {
             }
             FeedCodec::Aac(params) => {
                 if payload.is_empty() {
-                    return Err(Error::Invalid("empty AAC access unit").into());
+                    return Err(Error::Invalid("empty AAC access unit"));
                 }
                 let total = payload.len().checked_add(7).ok_or(Error::Overflow)?;
                 let maximum = self.limits.aac_output_bytes;
@@ -270,8 +267,7 @@ impl MatroskaTrackFeed {
                     return Err(Error::Limit {
                         requested: total,
                         maximum,
-                    }
-                    .into());
+                    });
                 }
                 PacketJob::Aac(Some(params.header_for_payload(payload.len())?))
             }
@@ -313,7 +309,7 @@ impl<'a> MatroskaFeedJob<'a> {
                 }
                 if self.cancelled || cancel.load(Ordering::Relaxed) {
                     self.cancelled = true;
-                    return Err(Error::Cancelled.into());
+                    return Err(Error::Cancelled);
                 }
                 if !work.try_charge(1) {
                     return Ok(BuildStep::Yield);

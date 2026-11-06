@@ -170,7 +170,7 @@ fn replay_refresh_foreign_slot_and_reset_keep_source_fences() {
     assert!(foreign.checkpoint.pool.same_pool(&first_pool));
     assert!(matches!(
         reader.restore_internal_block(&foreign),
-        Err(Error::Core(triergon_core::Error::ForeignPool))
+        Err(triergon_core::Error::ForeignPool)
     ));
     let old = slot.clone().unwrap();
     reader.reset().unwrap();
@@ -190,7 +190,7 @@ fn replay_refresh_foreign_slot_and_reset_keep_source_fences() {
     assert_ne!(slot.as_ref().unwrap().generation, old.generation);
     assert!(matches!(
         reader.restore_internal_block(&old),
-        Err(Error::Core(triergon_core::Error::StaleGeneration { .. }))
+        Err(triergon_core::Error::StaleGeneration { .. })
     ));
     assert_eq!(
         reader
@@ -220,7 +220,7 @@ fn replay_refresh_does_not_hoist_a_late_source_fault_or_advance_input() {
     let mut work = WorkBudget::new(0);
     assert!(matches!(
         reader.healthy_for_job(&mut work, &AtomicBool::new(false)),
-        Err(Error::Core(triergon_core::Error::Transport))
+        Err(triergon_core::Error::Transport)
     ));
     assert_eq!(
         (reader.position(), work.spent(), pool.used()),

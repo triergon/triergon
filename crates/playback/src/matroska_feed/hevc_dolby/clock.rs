@@ -45,12 +45,12 @@ impl MatroskaHevcClock<'_> {
     /// unsupported sample ends this clock's continuity.
     pub fn observe(&mut self, packet: &MatroskaHevcDolbyPacket<'_>) -> Result<MatroskaVideoTiming> {
         let MatroskaHevcDolbyPayload::Hevc(unit) = &packet.payload else {
-            return Err(Error::Invalid("native HEVC clock packet codec").into());
+            return Err(Error::Invalid("native HEVC clock packet codec"));
         };
         if !self.association.matches(packet.source)
             || !std::ptr::eq(self.config, unit.configuration())
         {
-            return Err(Error::Invalid("native HEVC clock feed association").into());
+            return Err(Error::Invalid("native HEVC clock feed association"));
         }
         self.clock
             .observe(packet.source, unit.source_nals(), |tick_ns| {

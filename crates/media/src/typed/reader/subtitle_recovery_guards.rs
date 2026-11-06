@@ -303,7 +303,7 @@ fn subtitle_recovery_whole_operation_limit_is_not_refilled_for_the_extra_scan() 
                 | ParseStep::Event(Event::Envelope(_))
                 | ParseStep::Event(Event::Configuration(_)),
             ) => (),
-            Err(Error::Limit("operation read bytes")) => {
+            Err(Error::Policy("operation read bytes")) => {
                 rejected = true;
                 break;
             }
@@ -333,11 +333,11 @@ fn subtitle_recovery_transport_failure_stays_failure_before_any_receipt_or_packe
                     .unwrap();
                 assert!(matches!(
                     driver.step(false),
-                    Err(Error::Core(triergon_core::Error::Transport))
+                    Err(triergon_core::Error::Transport)
                 ));
                 assert!(matches!(
                     driver.step(false),
-                    Err(Error::Core(triergon_core::Error::Transport))
+                    Err(triergon_core::Error::Transport)
                 ));
                 failed = true;
                 break;

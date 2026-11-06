@@ -90,7 +90,7 @@ impl AudioProbe {
         ) {
             Ok(parser) => self.aac = Some(parser),
             Err(error @ (Error::ForeignPool | Error::Overflow)) => {
-                return Err(error.into());
+                return Err(error);
             }
             Err(_) => {
                 self.unavailable_aac |= bit;
@@ -121,7 +121,7 @@ impl AudioProbe {
             }
             Ok(BuildStep::Complete) => false,
             Err(error @ (Error::Cancelled | Error::Allocation | Error::Backpressure { .. })) => {
-                return Err(error.into());
+                return Err(error);
             }
             Err(_) => false,
         };

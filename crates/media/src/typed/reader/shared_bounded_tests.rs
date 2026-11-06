@@ -288,7 +288,7 @@ fn transport_still_precedes_cancel_zero_work_and_any_publication() {
         reader
             .envelope
             .step(&mut WorkBudget::new(0), &AtomicBool::new(true)),
-        Err(Error::Core(triergon_core::Error::Transport))
+        Err(triergon_core::Error::Transport)
     ));
     assert_eq!(reader.position(), position);
     assert_eq!(root.as_ref(), [b"pre".as_slice(), &BLOCK, b"tail"].concat());

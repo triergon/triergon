@@ -1,12 +1,12 @@
 //! Typed Annex B input over the same source ownership protocol as playback.
 
 use crate::{
-    Error, Result,
+    Result,
     input::{Source, SourceReply},
     io::SourceOwner,
 };
 use std::sync::atomic::AtomicBool;
-use triergon_core::{Error as CoreError, SourceFailure, SourceLocation, Step, WorkBudget};
+use triergon_core::{Error, SourceFailure, SourceLocation, Step, WorkBudget};
 use triergon_framing::{RawAccessUnit, RawAnnexBReader};
 
 mod config;
@@ -30,7 +30,7 @@ enum State<S: Source> {
         source: SourceOwner<S>,
     },
     End(SourceLocation),
-    Failed(CoreError),
+    Failed(Error),
 }
 
 /// Owns one explicitly identified raw video source. Container timestamps are
@@ -59,16 +59,11 @@ impl<S: Source> RawVideoSource<S> {
         let result = match &mut self.state {
             State::Active { reader, source } => poll_source(reader, source, work, cancel),
             State::End(at) => return Ok(Step::End(*at)),
-            State::Failed(error) => return Err((*error).into()),
+            State::Failed(error) => return Err(*error),
         };
         match &result {
             Ok(Step::End(at)) => self.state = State::End(*at),
-            Err(Error::Core(error))
-                if !matches!(
-                    error,
-                    CoreError::Backpressure { .. } | CoreError::Allocation
-                ) =>
-            {
+            Err(error) if !matches!(error, Error::Backpressure { .. } | Error::Allocation) => {
                 self.state = State::Failed(*error);
             }
             _ => {}
@@ -104,10 +99,9 @@ fn poll_source<S: Source>(
             } => {
                 reader.fail(source, token, failure)?;
                 return Err(match failure {
-                    SourceFailure::Transport => CoreError::Transport,
-                    SourceFailure::Cancelled => CoreError::Cancelled,
-                }
-                .into());
+                    SourceFailure::Transport => Error::Transport,
+                    SourceFailure::Cancelled => Error::Cancelled,
+                });
             }
         }
     }

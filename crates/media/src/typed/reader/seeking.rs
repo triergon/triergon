@@ -241,14 +241,13 @@ struct ScanBoundary {
 impl ScanBoundary {
     fn validate(&self, reader: &Reader, location: &ReplayLocation) -> Result<()> {
         if !self.configuration.belongs_to(&reader.pool) {
-            return Err(triergon_core::Error::ForeignPool.into());
+            return Err(triergon_core::Error::ForeignPool);
         }
         if self.configuration.generation() != reader.generation() {
             return Err(triergon_core::Error::StaleGeneration {
                 expected: reader.generation(),
                 received: self.configuration.generation(),
-            }
-            .into());
+            });
         }
         if self.source != reader.envelope.request().source
             || self.cluster != location.cluster_offset()
@@ -423,7 +422,7 @@ impl Reader {
         self.limits
             .scan_bytes
             .checked_sub(used)
-            .ok_or(Error::Limit("operation read bytes"))?;
+            .ok_or(Error::Policy("operation read bytes"))?;
         self.subtitle_recovery = Some(SubtitleRecovery {
             actual_ns: completion.actual_ns,
             destination_block: completion.location.block_offset(),
@@ -559,7 +558,7 @@ impl Reader {
                 .limits
                 .scan_bytes
                 .checked_sub(scanned_bytes)
-                .ok_or(Error::Limit("operation read bytes"))?;
+                .ok_or(Error::Policy("operation read bytes"))?;
             self.state = State::Epoch(EpochRestoreJob::new(
                 self.configuration
                     .clone()
@@ -872,7 +871,7 @@ impl Reader {
                                 .checked_add(self.seek_metadata_bytes)
                                 .ok_or(Error::Overflow)?,
                         )
-                        .ok_or(Error::Limit("operation read bytes"))?
+                        .ok_or(Error::Policy("operation read bytes"))?
                 } else {
                     self.limits.scan_bytes
                 });

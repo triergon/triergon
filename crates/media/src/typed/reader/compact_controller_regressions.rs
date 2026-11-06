@@ -76,7 +76,7 @@ fn compact_controller_read_limit_keeps_unpublished_body_owner_until_reset() {
     reader.scan_remaining = Some(0);
     assert!(matches!(
         reader.step(&mut WorkBudget::new(8192), &AtomicBool::new(false)),
-        Err(Error::Limit("operation read bytes"))
+        Err(Error::Policy("operation read bytes"))
     ));
     assert_eq!(reader.position(), 8);
     assert!(pool.used() > baseline);

@@ -215,7 +215,7 @@ impl Pressure {
                 .checked_add(self.requested)
                 .is_none_or(|total| total > pool.limit())
             {
-                return Err(Error::Limit("operation retained storage"));
+                return Err(Error::Policy("operation retained storage"));
             }
             if self.index == graph.storage_slots()? {
                 let available = pool.available();

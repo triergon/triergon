@@ -374,7 +374,7 @@ impl<R: Read> InputFeeder<R> {
             Ok(bytes) => bytes,
             Err(error) => {
                 pending.buffer = Some(error.buffer);
-                return Err(error.error.into());
+                return Err(error.error);
             }
         };
         let window = InputWindow::new(
@@ -395,7 +395,7 @@ impl<R: Read> InputFeeder<R> {
     ) -> Result<FeedStep> {
         let owned = self.owned.as_ref().required("missing immutable source")?;
         if !(owned.root)(&self.reader).belongs_to(input.budget()) {
-            return Err(triergon_core::Error::ForeignPool.into());
+            return Err(triergon_core::Error::ForeignPool);
         }
         let maximum = request.maximum.min(self.maximum);
         let Some(bytes) = (owned.read)(&mut self.reader, maximum)? else {

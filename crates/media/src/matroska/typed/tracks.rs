@@ -71,7 +71,7 @@ impl TrackJob {
         pool: &Budget,
     ) -> Result<Self> {
         if !source.belongs_to(pool) {
-            return Err(triergon_core::Error::ForeignPool.into());
+            return Err(triergon_core::Error::ForeignPool);
         }
         let end = source.len();
         let out = Track {
@@ -471,7 +471,7 @@ impl TrackJob {
                         0
                     };
                     if private_bytes > self.private_budget {
-                        return Err(Error::Limit("decoded private metadata capacity"));
+                        return Err(Error::Policy("decoded private metadata capacity"));
                     }
                     let track = self.out.take().required("missing completed TrackEntry")?;
                     self.phase = TrackPhase::Done;
@@ -541,10 +541,10 @@ impl TracksJob {
         revision: u64,
     ) -> Result<Self> {
         if !source.belongs_to(pool) || previous.as_ref().is_some_and(|old| !old.belongs_to(pool)) {
-            return Err(triergon_core::Error::ForeignPool.into());
+            return Err(triergon_core::Error::ForeignPool);
         }
         if source.len() > limits.metadata_bytes {
-            return Err(Error::Limit("metadata"));
+            return Err(Error::Policy("metadata"));
         }
         let end = source.len();
         Ok(Self {
@@ -652,7 +652,7 @@ impl TracksJob {
                         .as_mut()
                         .required("missing Tracks arena")?
                         .try_push(old[self.old].clone())
-                        .map_err(|error| Error::from(error.error))?;
+                        .map_err(|error| error.error)?;
                     self.old += 1;
                 }
                 Phase::Root => match self.cursor.step(&self.source, work, cancel)? {
@@ -676,13 +676,13 @@ impl TracksJob {
                             if self.tracks.as_ref().required("missing Tracks arena")?.len()
                                 >= self.limits.tracks
                             {
-                                return Err(Error::Limit("track count"));
+                                return Err(Error::Policy("track count"));
                             }
                             let available = self
                                 .metadata_left
                                 .checked_sub(self.source.len())
                                 .and_then(|n| n.checked_sub(self.private_bytes))
-                                .ok_or(Error::Limit("decoded private metadata"))?;
+                                .ok_or(Error::Policy("decoded private metadata"))?;
                             self.entry = Some(TrackJob::new(
                                 self.source.slice(child.payload)?,
                                 self.limits,
@@ -760,7 +760,7 @@ impl TracksJob {
                                 track: error.value,
                                 private_bytes: bytes,
                             });
-                            return Err(error.error.into());
+                            return Err(error.error);
                         }
                     }
                 }

@@ -28,7 +28,7 @@ impl Decoder {
             count: 0,
         });
         if decoder.count == decoder.steps.len() {
-            return Err(Error::Limit("content encoding count"));
+            return Err(Error::Policy("content encoding count"));
         }
         decoder.steps[decoder.count] = Some(step);
         decoder.count += 1;

@@ -221,7 +221,7 @@ fn incremental_starvation_transport_failure_and_explicit_completion_are_distinct
         .unwrap();
     assert!(matches!(
         reader.step(&mut WorkBudget::new(1), &AtomicBool::new(false)),
-        Err(Error::Core(CoreError::Transport))
+        Err(CoreError::Transport)
     ));
     reader.reset().unwrap();
     let request = reader.request();
@@ -371,7 +371,7 @@ fn skipped_block_outside_cluster_does_not_reset_scan_policy() {
         }
     }
     assert!(
-        matches!(outcome, Some(Error::Limit("operation read bytes"))),
+        matches!(outcome, Some(Error::Policy("operation read bytes"))),
         "a skipped Block must not replenish a bounded scan: {outcome:?}"
     );
 }

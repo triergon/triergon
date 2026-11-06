@@ -188,7 +188,7 @@ impl ElementReader {
             return Err(Error::Invalid("pending leaf admission identity changed"));
         }
         if maximum.is_some_and(|limit| body.remaining > limit as u64) {
-            return Err(Error::Limit("element bytes"));
+            return Err(Error::Policy("element bytes"));
         }
         if skip {
             body.collect = false;
@@ -294,10 +294,10 @@ impl ElementReader {
     }
     fn check_anchor(&self, anchor: &ClusterCheckpoint, offset: u64) -> Result<()> {
         if !anchor.pool.same_pool(self.input.budget()) {
-            return Err(triergon_core::Error::ForeignPool.into());
+            return Err(triergon_core::Error::ForeignPool);
         }
         if anchor.parser != self.parser || anchor.source != self.input.source() {
-            return Err(triergon_core::Error::SourceMismatch.into());
+            return Err(triergon_core::Error::SourceMismatch);
         }
         if !self.input.capabilities().random_access {
             return Err(Error::Unsupported("random-access input"));
@@ -406,8 +406,7 @@ impl ElementReader {
             return Err(triergon_core::Error::StaleGeneration {
                 expected: self.generation(),
                 received: location.generation,
-            }
-            .into());
+            });
         }
         let request = self.input.request_range(location.position)?;
         self.phase = Phase::Between;
@@ -440,7 +439,7 @@ impl ElementReader {
             .required("range changed inside envelope step")?;
         let Some(left) = remaining.checked_sub(consumed) else {
             self.failed = true;
-            return Err(Error::Limit("operation read bytes"));
+            return Err(Error::Policy("operation read bytes"));
         };
         *remaining = left;
         self.scan_left = left;
@@ -754,7 +753,7 @@ impl ElementReader {
             .required("range changed inside envelope step")?;
         let Some(left) = remaining.checked_sub(consumed) else {
             self.failed = true;
-            return Err(Error::Limit("operation read bytes"));
+            return Err(Error::Policy("operation read bytes"));
         };
         *remaining = left;
         self.scan_left = left;

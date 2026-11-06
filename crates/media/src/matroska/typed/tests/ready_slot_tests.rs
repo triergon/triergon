@@ -19,7 +19,7 @@ fn assert_owner_visible(job: &packet::PacketBatchJob, pool: &Budget) {
         let mut work = WorkBudget::new(1);
         match proof.step(job, pool, &mut work, &AtomicBool::new(false)) {
             Ok(ParseStep::Yield) => (),
-            Err(crate::Error::Limit("operation retained storage")) => return,
+            Err(crate::Error::Policy("operation retained storage")) => return,
             other => panic!("ready slot lost its retained owner: {other:?}"),
         }
         assert!(work.spent() <= 1);

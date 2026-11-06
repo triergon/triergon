@@ -92,7 +92,7 @@ impl<S: Source> Player<S> {
         selection: Selection,
     ) -> Result<Mp4NativeSeekJob<'a>> {
         let Some(engine @ Engine::Mp4(_)) = self.engine.as_ref() else {
-            return Err(Error::Invalid("native seek requires MP4").into());
+            return Err(Error::Invalid("native seek requires MP4"));
         };
         self.check_native_seek_clock()?;
         Mp4NativeSeekJob::new(engine, movie, request, selection, None)
@@ -148,7 +148,9 @@ impl<S: Source> Player<S> {
 
     fn check_native_seek_clock(&self) -> Result<()> {
         if self.clock != ClockChoice::ExplicitNativeProjection {
-            return Err(Error::Unsupported("native seek needs complete native range MP4").into());
+            return Err(Error::Unsupported(
+                "native seek needs complete native range MP4",
+            ));
         }
         Ok(())
     }
@@ -160,20 +162,21 @@ impl<S: Source> Player<S> {
         cancel: &AtomicBool,
     ) -> Result<bool> {
         if command.progressive_generation.is_some() {
-            return Err(Error::Invalid("progressive seek needs its candidate catalogue").into());
+            return Err(Error::Invalid(
+                "progressive seek needs its candidate catalogue",
+            ));
         }
         if !self.pool.same_pool(&command.pool) {
-            return Err(Error::ForeignPool.into());
+            return Err(Error::ForeignPool);
         }
         if self.generation != command.generation {
             return Err(Error::StaleGeneration {
                 expected: self.generation,
                 received: command.generation,
-            }
-            .into());
+            });
         }
         if self.clock != ClockChoice::ExplicitNativeProjection {
-            return Err(Error::Invalid("native seek clock changed").into());
+            return Err(Error::Invalid("native seek clock changed"));
         }
         self.apply_seek(
             TrackKey::Mp4(command.video),
@@ -195,7 +198,7 @@ impl<'a> Mp4NativeSeekJob<'a> {
         progressive_generation: Option<u64>,
     ) -> Result<Self> {
         let Engine::Mp4(mp4) = engine else {
-            return Err(Error::Invalid("native seek requires MP4").into());
+            return Err(Error::Invalid("native seek requires MP4"));
         };
         let plan = &mp4.plan;
         if plan.view != Mp4View::PinnedMov9NoParseNoFillin
@@ -203,16 +206,18 @@ impl<'a> Mp4NativeSeekJob<'a> {
             || plan.native_recovery
             || !mp4.supports_range_replay()
         {
-            return Err(Error::Unsupported("native seek needs complete native range MP4").into());
+            return Err(Error::Unsupported(
+                "native seek needs complete native range MP4",
+            ));
         }
         if !movie.pool.same_pool(&plan.pool) {
-            return Err(Error::ForeignPool.into());
+            return Err(Error::ForeignPool);
         }
         if movie.source != plan.source
             || movie.generation != plan.opening_generation
             || movie.read_scope != plan.read_scope
         {
-            return Err(Error::SourceMismatch.into());
+            return Err(Error::SourceMismatch);
         }
         selection.validate(engine)?;
         let selected = plan.track(request.video)?;
@@ -220,7 +225,7 @@ impl<'a> Mp4NativeSeekJob<'a> {
             || !selected.snapshot.enabled
             || !selection.includes(TrackKey::Mp4(request.video))
         {
-            return Err(Error::Invalid("native seek requires selected MP4 video").into());
+            return Err(Error::Invalid("native seek requires selected MP4 video"));
         }
         let base = Mov9MediaClock::from_source(selected.snapshot.base.require()?)?.native_base;
         let target = Time::from_ticks(i128::from(request.timestamp), base)?;
@@ -259,8 +264,7 @@ pub(super) fn native_global_seek<'a>(
         return Err(Error::Limit {
             requested: tracks.len(),
             maximum,
-        }
-        .into());
+        });
     }
     let mut native = BudgetVec::new(&movie.pool);
     native.try_reserve_exact(tracks.len())?;
@@ -301,14 +305,14 @@ pub(super) fn native_global_seek<'a>(
 impl Mp4NativeSeekJob<'_> {
     pub fn poll(&mut self, work: &mut WorkBudget, cancel: &AtomicBool) -> Result<bool> {
         if let Some(error) = self.failure {
-            return Err(error.into());
+            return Err(error);
         }
         let result = self.scan(work, cancel);
         if let Err(error) = result {
             self.failure = Some(error);
             self.global = None;
         }
-        result.map_err(Into::into)
+        result
     }
 
     fn scan(&mut self, work: &mut WorkBudget, cancel: &AtomicBool) -> triergon_core::Result<bool> {
@@ -406,7 +410,7 @@ impl Mp4NativeSeekJob<'_> {
 
     pub fn finish(self) -> Result<Mp4NativeSeekCommand> {
         if let Some(error) = self.failure {
-            return Err(error.into());
+            return Err(error);
         }
         let replay = self
             .replay

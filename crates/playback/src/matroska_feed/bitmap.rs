@@ -40,8 +40,7 @@ impl MatroskaDvbPacket {
             return Err(Error::StaleGeneration {
                 expected: self.packet.generation,
                 received: event.generation,
-            }
-            .into());
+            });
         }
         let publication = event
             .native_publication
@@ -52,7 +51,7 @@ impl MatroskaDvbPacket {
                     && std::ptr::eq(packet.payload.as_ref(), self.packet.payload.as_ref())
             })
         {
-            return Err(Error::SourceMismatch.into());
+            return Err(Error::SourceMismatch);
         }
         if matches!(
             self.source.delivery,
@@ -60,7 +59,7 @@ impl MatroskaDvbPacket {
         ) {
             return Ok(None);
         }
-        Ok(DvbQueueAction::from_native_publication(event, publication)?)
+        DvbQueueAction::from_native_publication(event, publication)
     }
 }
 
@@ -86,7 +85,7 @@ impl MatroskaBitmapTrack {
         let configuration = match output.event() {
             RawEvent::Matroska(Event::Configuration(configuration)) => configuration,
             RawEvent::Matroska(Event::Packet(packet)) => &packet.configuration,
-            _ => return Err(Error::Invalid("Matroska bitmap configuration required").into()),
+            _ => return Err(Error::Invalid("Matroska bitmap configuration required")),
         };
         let (index, descriptor) = configuration
             .tracks()
@@ -109,7 +108,7 @@ impl MatroskaBitmapTrack {
                     dvb::SourceClock::new(1, NS_PER_SECOND)?,
                 )?)
             }
-            _ => return Err(Error::Unsupported("Matroska bitmap subtitle codec").into()),
+            _ => return Err(Error::Unsupported("Matroska bitmap subtitle codec")),
         };
         Ok(Self {
             association: Association {
@@ -148,14 +147,16 @@ impl MatroskaBitmapTrack {
     /// budget. The job owns a shared view of the original configuration.
     pub fn vobsub_configuration(&self, limits: dvd::ConfigLimits) -> Result<dvd::ConfigJob> {
         if !matches!(self.codec, Codec::VobSub) {
-            return Err(Error::Invalid("VobSub configuration requires a VobSub track").into());
+            return Err(Error::Invalid(
+                "VobSub configuration requires a VobSub track",
+            ));
         }
         let raw = self
             .association
             .configuration
             .initialization_bytes(self.association.track)
             .ok_or(Error::Invalid("missing Matroska VobSub initialization"))?;
-        Ok(dvd::ConfigJob::new(raw, &self.pool, limits)?)
+        dvd::ConfigJob::new(raw, &self.pool, limits)
     }
 
     /// The selected service and the original five-byte CodecPrivate. Pass this
@@ -178,7 +179,7 @@ impl MatroskaBitmapTrack {
 
     pub(super) fn check_dvb(&self) -> Result<&dvb::SourceConfiguration> {
         self.dvb_configuration()
-            .ok_or(Error::Invalid("DVB packet requires a DVB track").into())
+            .ok_or(Error::Invalid("DVB packet requires a DVB track"))
     }
 
     pub(super) fn bind_dvb(
@@ -253,20 +254,19 @@ impl MatroskaBitmapTrack {
             return Ok(None);
         };
         if output.source_id() != self.scope.source {
-            return Err(Error::SourceMismatch.into());
+            return Err(Error::SourceMismatch);
         }
         if !output.belongs_to(&self.pool) {
-            return Err(Error::ForeignPool.into());
+            return Err(Error::ForeignPool);
         }
         if output.generation() != self.scope.generation {
             return Err(Error::StaleGeneration {
                 expected: self.scope.generation,
                 received: output.generation(),
-            }
-            .into());
+            });
         }
         if output.epoch() != self.epoch || !self.association.matches(packet) {
-            return Err(Error::Invalid("Matroska bitmap configuration changed").into());
+            return Err(Error::Invalid("Matroska bitmap configuration changed"));
         }
         Ok(Some(packet))
     }

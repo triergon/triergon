@@ -168,7 +168,7 @@ impl<S: Source> CatalogueCommit<'_, S> {
 
     pub(crate) fn commit_with_boundary(self) -> Result<(RetiredCatalogue, CatalogueBoundary)> {
         if self.cancel.load(Ordering::Relaxed) {
-            return Err(Error::Cancelled.into());
+            return Err(Error::Cancelled);
         }
         let next = self
             .next

@@ -15,7 +15,7 @@ use triergon_isobmff::{
     SampleTableBuilder, TrackHeader, Trex,
 };
 fn push<T>(v: &mut BudgetVec<T>, x: T) -> Result<()> {
-    v.try_push(x).map_err(|e| e.error.into())
+    v.try_push(x).map_err(|e| e.error)
 }
 pub(crate) fn box_reader(
     input: &InputCursor,
@@ -33,11 +33,11 @@ pub(crate) fn box_reader(
     }
 }
 fn required<T>(v: Option<T>, s: &'static str) -> Result<T> {
-    v.ok_or_else(|| Error::Invalid(s).into())
+    v.ok_or(Error::Invalid(s))
 }
 fn unique(slot: &mut Option<BoxView>, raw: BoxView) -> Result<()> {
     if slot.is_some() {
-        return Err(Error::Invalid("duplicate structural movie box").into());
+        return Err(Error::Invalid("duplicate structural movie box"));
     }
     *slot = Some(raw);
     Ok(())
@@ -51,11 +51,11 @@ fn validate_quicktime_data_handler(raw: &BoxView) -> Result<()> {
         || fields[12..24] != [0; 12]
         || name.len() != usize::from(name_length)
     {
-        return Err(Error::Invalid("QuickTime data handler").into());
+        return Err(Error::Invalid("QuickTime data handler"));
     }
     // Only self-contained URL data references are supported by this opener.
     if fields[8..12] != *b"url " {
-        return Err(Error::Unsupported("QuickTime data handler reference type").into());
+        return Err(Error::Unsupported("QuickTime data handler reference type"));
     }
     Ok(())
 }
@@ -145,7 +145,7 @@ impl Walk {
     }
     fn poll(&mut self, w: &mut WorkBudget, c: &AtomicBool, l: OpenLimits) -> Result<bool> {
         if c.load(Ordering::Relaxed) {
-            return Err(Error::Cancelled.into());
+            return Err(Error::Cancelled);
         }
         if self.depth == 0 {
             return Ok(true);
@@ -183,8 +183,7 @@ impl Walk {
                     return Err(Error::Limit {
                         requested: self.seen as usize,
                         maximum: l.format.max_boxes as usize,
-                    }
-                    .into());
+                    });
                 }
                 self.pending = Some((raw, track));
                 Ok(false)
@@ -198,8 +197,7 @@ impl Walk {
                 return Err(Error::Limit {
                     requested: self.parts.len() + 1,
                     maximum: l.tracks,
-                }
-                .into());
+                });
             }
             let index = self.parts.len();
             self.parts.try_reserve_exact(1)?;
@@ -217,7 +215,7 @@ impl Walk {
             }
         } else if kind == *b"mvhd" {
             if self.movie.is_some() {
-                return Err(Error::Invalid("duplicate movie header").into());
+                return Err(Error::Invalid("duplicate movie header"));
             }
             self.movie = Some(MovieHeader::parse(&raw)?);
         } else if kind == *b"trex" {
@@ -225,8 +223,7 @@ impl Walk {
                 return Err(Error::Limit {
                     requested: self.trex.len() + 1,
                     maximum: l.tracks,
-                }
-                .into());
+                });
             }
             push(&mut self.trex, Trex::parse(&raw)?)?;
         } else if let Some(t) = track {
@@ -248,7 +245,7 @@ impl Walk {
                         ) =>
                 {
                     if p.data_handler_seen {
-                        return Err(Error::Invalid("duplicate QuickTime data handler").into());
+                        return Err(Error::Invalid("duplicate QuickTime data handler"));
                     }
                     if parent.data_info_seen
                         || !p
@@ -256,12 +253,12 @@ impl Walk {
                             .as_ref()
                             .is_some_and(|handler| handler.payload().get(4..8) == Some(b"mhlr"))
                     {
-                        return Err(Error::Invalid("QuickTime data handler placement").into());
+                        return Err(Error::Invalid("QuickTime data handler placement"));
                     }
                     validate_quicktime_data_handler(&raw)?;
                     p.data_handler_seen = true;
                 }
-                b"hdlr" => return Err(Error::Invalid("unexpected track handler box").into()),
+                b"hdlr" => return Err(Error::Invalid("unexpected track handler box")),
                 b"stbl" => unique(&mut p.stbl, raw)?,
                 b"elst" => unique(&mut p.elst, raw)?,
                 b"dref" => unique(&mut p.dref, raw)?,
@@ -275,8 +272,7 @@ impl Walk {
             return Err(Error::Limit {
                 requested: self.depth + 1,
                 maximum: l.depth,
-            }
-            .into());
+            });
         }
         self.frames.as_mut_slice()[self.depth] = Some(Frame {
             children: raw.children(0, l.format)?,
@@ -354,7 +350,7 @@ impl PendingMedia {
             })),
             Err(failure) => {
                 self.buffer = failure.buffer;
-                Err(failure.error.into())
+                Err(failure.error)
             }
         }
     }
@@ -494,7 +490,7 @@ impl<S: Source> Mp4Open<S> {
         prefer_front: bool,
     ) -> Result<Self> {
         if selected.format != Format::Mp4 {
-            return Err(Error::Invalid("not selected MP4").into());
+            return Err(Error::Invalid("not selected MP4"));
         }
         if limits.tracks == 0
             || limits.tracks > 64
@@ -502,7 +498,7 @@ impl<S: Source> Mp4Open<S> {
             || limits.depth > 32
             || limits.roots == 0
         {
-            return Err(Error::Invalid("MP4 adapter open limits").into());
+            return Err(Error::Invalid("MP4 adapter open limits"));
         }
         let pool = selected.input.budget().clone();
         let reader = box_reader(&selected.input, limits.metadata_bytes, native_recovery)?;
@@ -555,9 +551,7 @@ impl<S: Source> Mp4Open<S> {
             return Err(crate::Error::Closed);
         }
         let result = self.advance_inner(w, c);
-        if result.is_err()
-            && !matches!(&result, Err(crate::Error::Core(Error::Backpressure { .. })))
-        {
+        if result.is_err() && !matches!(&result, Err(Error::Backpressure { .. })) {
             self.failed = true;
             if let Some(source) = self.source.as_mut() {
                 source.close();
@@ -571,7 +565,7 @@ impl<S: Source> Mp4Open<S> {
                 .as_mut()
                 .ok_or(Error::Invalid("opener closed"))?
                 .close();
-            return Err(Error::Cancelled.into());
+            return Err(Error::Cancelled);
         }
         if self.ready {
             return Ok(OpenProgress::Ready);
@@ -616,7 +610,7 @@ impl<S: Source> Mp4Open<S> {
                     Ok(OpenProgress::NeedInput(r))
                 }
                 Step::Yield => Ok(OpenProgress::Yield),
-                Step::End(_) => Err(Error::Truncated.into()),
+                Step::End(_) => Err(Error::Truncated),
             };
         }
         if !self.scan_done {
@@ -646,8 +640,7 @@ impl<S: Source> Mp4Open<S> {
                         return Err(Error::Limit {
                             requested: self.top_count,
                             maximum: self.limits.roots,
-                        }
-                        .into());
+                        });
                     }
                     self.pending_header = Some(h);
                     Ok(OpenProgress::Yield)
@@ -706,7 +699,7 @@ impl<S: Source> Mp4Open<S> {
                 .as_ref()
                 .ok_or(Error::Invalid("missing source data references"))?;
             if word(dref.payload(), 0)? != 0 {
-                return Err(Error::Unsupported("data reference flags").into());
+                return Err(Error::Unsupported("data reference flags"));
             }
             self.refs = Some(dref.children(8, self.limits.format)?);
             self.builder = Some(builder);
@@ -728,8 +721,7 @@ impl<S: Source> Mp4Open<S> {
                         return Err(Error::Limit {
                             requested: self.references.len() + 1,
                             maximum: self.limits.format.max_descriptions as usize,
-                        }
-                        .into());
+                        });
                     }
                     self.pending_reference =
                         Some(raw.header().kind == *b"url " && raw.payload() == [0, 0, 0, 1]);
@@ -738,7 +730,7 @@ impl<S: Source> Mp4Open<S> {
                 BoxStep::End => {
                     let dref = p.dref.as_ref().ok_or(Error::Invalid("missing dref"))?;
                     if word(dref.payload(), 4)? as usize != self.references.len() {
-                        return Err(Error::Invalid("data reference count").into());
+                        return Err(Error::Invalid("data reference count"));
                     }
                     self.refs = None;
                 }
@@ -769,9 +761,9 @@ impl<S: Source> Mp4Open<S> {
             match self.references.as_slice().get(at) {
                 Some(true) => {}
                 Some(false) => {
-                    return Err(Error::Unsupported("external source data reference").into());
+                    return Err(Error::Unsupported("external source data reference"));
                 }
-                None => return Err(Error::Invalid("dangling source data reference").into()),
+                None => return Err(Error::Invalid("dangling source data reference")),
             }
             self.description_at += 1;
             return Ok(OpenProgress::Yield);
@@ -799,7 +791,7 @@ impl<S: Source> Mp4Open<S> {
             .iter()
             .any(|t| t.header.track_id == header.track_id)
         {
-            return Err(Error::Invalid("duplicate source track ID").into());
+            return Err(Error::Invalid("duplicate source track ID"));
         }
         let edits = p
             .elst
@@ -839,20 +831,18 @@ impl<S: Source> Mp4Open<S> {
             return Err(Error::Limit {
                 requested: self.roots.len() + 1,
                 maximum: self.limits.roots,
-            }
-            .into());
+            });
         }
         let brand = match &raw.header().kind {
             b"moov" if self.moov.is_some() => {
-                return Err(Error::Invalid("duplicate structural movie box").into());
+                return Err(Error::Invalid("duplicate structural movie box"));
             }
             b"moof" => {
                 if self.moofs.len() >= self.limits.fragments {
                     return Err(Error::Limit {
                         requested: self.moofs.len() + 1,
                         maximum: self.limits.fragments,
-                    }
-                    .into());
+                    });
                 }
                 self.moofs.try_reserve_exact(1)?;
                 None
@@ -891,11 +881,10 @@ impl<S: Source> Mp4Open<S> {
                 return Err(Error::Limit {
                     requested: self.media.len() + 1,
                     maximum: self.limits.roots,
-                }
-                .into());
+                });
             }
             if self.prefer_front && self.moov.is_none() {
-                return Err(Error::Unsupported("progressive MP4 needs front metadata").into());
+                return Err(Error::Unsupported("progressive MP4 needs front metadata"));
             }
             let front =
                 (self.prefer_front || !input.capabilities().random_access) && self.moov.is_some();
@@ -913,8 +902,7 @@ impl<S: Source> Mp4Open<S> {
                 if !front || !self.media.is_empty() {
                     return Err(Error::Unsupported(
                         "open MDAT startup needs front movie before media",
-                    )
-                    .into());
+                    ));
                 }
                 Some(iso::TerminalMdat::new(h)?)
             } else {
@@ -1059,7 +1047,7 @@ impl<S: Source> Mp4Open<S> {
                     return Ok(OpenProgress::Yield);
                 }
                 BoxStep::Box(_) => return Ok(OpenProgress::Yield),
-                BoxStep::End => return Err(Error::Invalid("traf missing tfhd").into()),
+                BoxStep::End => return Err(Error::Invalid("traf missing tfhd")),
             }
         }
         if self.fragment_children.is_none() {
@@ -1090,7 +1078,7 @@ impl<S: Source> Mp4Open<S> {
             return Err(crate::Error::Closed);
         }
         if !self.ready {
-            return Err(Error::Invalid("movie not ready").into());
+            return Err(Error::Invalid("movie not ready"));
         }
         let walk = self.walk.take().ok_or(Error::Invalid("walk missing"))?;
         Ok(OpenedMp4 {

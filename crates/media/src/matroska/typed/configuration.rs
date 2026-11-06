@@ -228,7 +228,7 @@ impl ConfigurationJob {
             }
             Err(error) => {
                 self.failed = true;
-                return Err(error.into());
+                return Err(error);
             }
         };
         let tracks = self.tracks.take().required("missing validated tracks")?;
@@ -408,7 +408,7 @@ impl StateChangeJob {
                 .as_ref()
                 .is_some_and(|state| !state.data.belongs_to(pool))
         {
-            return Err(triergon_core::Error::ForeignPool.into());
+            return Err(triergon_core::Error::ForeignPool);
         }
         if track >= base.tracks().len() {
             return Err(Error::Invalid("unknown state track"));
@@ -484,7 +484,7 @@ impl StateChangeJob {
                     .as_mut()
                     .required("missing state arena")?
                     .try_push(state)
-                    .map_err(|error| Error::from(error.error))?;
+                    .map_err(|error| error.error)?;
                 self.at += 1;
                 continue;
             }

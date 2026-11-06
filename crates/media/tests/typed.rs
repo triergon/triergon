@@ -416,6 +416,6 @@ fn known_length_starvation_and_transport_failure_stay_distinct_from_end() {
     assert!(at_boundary);
     assert!(matches!(
         reader.step(&mut WorkBudget::new(1000), &cancel),
-        Err(Error::Core(triergon_core::Error::Transport))
+        Err(triergon_core::Error::Transport)
     ));
 }

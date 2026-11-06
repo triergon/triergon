@@ -198,7 +198,7 @@ fn an_atomic_frame_larger_than_its_own_pool_minimum_is_a_permanent_limit_not_an_
                 }
             }
             Ok(ParseStep::Backpressure { .. }) => pressure += 1,
-            Err(Error::Limit(message)) => {
+            Err(Error::Policy(message)) => {
                 limit = Some(message);
                 break;
             }

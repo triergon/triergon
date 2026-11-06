@@ -267,10 +267,10 @@ impl ElementReader {
         self.input.request()
     }
     pub fn provide(&mut self, window: &InputWindow) -> Result<()> {
-        Ok(self.input.provide(window)?)
+        self.input.provide(window)
     }
     pub fn finish(&mut self, source: SourceId, token: InputToken) -> Result<()> {
-        Ok(self.input.finish(source, token)?)
+        self.input.finish(source, token)
     }
     pub fn fail(
         &mut self,
@@ -278,7 +278,7 @@ impl ElementReader {
         token: InputToken,
         failure: SourceFailure,
     ) -> Result<()> {
-        Ok(self.input.fail(source, token, failure)?)
+        self.input.fail(source, token, failure)
     }
     pub fn cluster_checkpoint(&self) -> Option<ClusterCheckpoint> {
         Some(ClusterCheckpoint {
@@ -293,10 +293,10 @@ impl ElementReader {
     /// supplied range; retained earlier-generation leaf payloads stay charged.
     pub fn reset_to_cluster(&mut self, checkpoint: &ClusterCheckpoint) -> Result<InputRequest> {
         if !checkpoint.pool.same_pool(self.input.budget()) {
-            return Err(triergon_core::Error::ForeignPool.into());
+            return Err(triergon_core::Error::ForeignPool);
         }
         if checkpoint.parser != self.parser || checkpoint.source != self.input.source() {
-            return Err(triergon_core::Error::SourceMismatch.into());
+            return Err(triergon_core::Error::SourceMismatch);
         }
         if !self.input.capabilities().random_access {
             return Err(Error::Unsupported("random-access input"));
@@ -414,10 +414,10 @@ impl ElementReader {
             _ => (false, usize::MAX),
         };
         if collect && size > maximum as u64 {
-            return Err(Error::Limit("element bytes"));
+            return Err(Error::Policy("element bytes"));
         }
         if size > self.scan_left {
-            return Err(Error::Limit("operation read bytes"));
+            return Err(Error::Policy("operation read bytes"));
         }
         self.phase = Phase::Body(BodyState {
             header,
@@ -508,7 +508,7 @@ impl ElementReader {
         self.elements_left = self
             .elements_left
             .checked_sub(1)
-            .ok_or(Error::Limit("element count"))?;
+            .ok_or(Error::Policy("element count"))?;
         self.phase = Phase::Between;
         self.begin::<D>(header)
     }
@@ -661,7 +661,7 @@ impl ElementReader {
                             self.scan_left = self
                                 .scan_left
                                 .checked_sub(self.input.position() - old)
-                                .ok_or(Error::Limit("operation read bytes"))?;
+                                .ok_or(Error::Policy("operation read bytes"))?;
                             Self::check_input_cancel(&mut self.input, cancel)?;
                             continue;
                         }
@@ -742,7 +742,7 @@ impl ElementReader {
                             return Ok(ParseStep::Yield);
                         }
                         body.target = usize::try_from(body.remaining)
-                            .map_err(|_| Error::Limit("address space"))?;
+                            .map_err(|_| Error::Policy("address space"))?;
                         // Admit the exact output capacity before requesting data.
                         // A complete input owner of that capacity may become the
                         // leaf directly; partial/hidden owners use the builder.
@@ -815,7 +815,7 @@ impl ElementReader {
                                     Ok(bytes) => bytes,
                                     Err(error) => {
                                         body.buffer = Some(error.buffer);
-                                        return Err(error.error.into());
+                                        return Err(error.error);
                                     }
                                 }
                             };
@@ -855,7 +855,7 @@ impl ElementReader {
                         self.scan_left = self
                             .scan_left
                             .checked_sub(self.input.position() - old)
-                            .ok_or(Error::Limit("operation read bytes"))?;
+                            .ok_or(Error::Policy("operation read bytes"))?;
                         continue;
                     }
                     match self.input.read_span(maximum, work, cancel)? {
@@ -894,7 +894,7 @@ impl ElementReader {
                     self.scan_left = self
                         .scan_left
                         .checked_sub(self.input.position() - old)
-                        .ok_or(Error::Limit("operation read bytes"))?;
+                        .ok_or(Error::Policy("operation read bytes"))?;
                     if body.scan == ScanBody::FirstSpan {
                         body.scan = ScanBody::Prefix;
                     }

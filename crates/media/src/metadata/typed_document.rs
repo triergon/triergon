@@ -175,9 +175,9 @@ impl DocumentJob {
             return Err(Error::Invalid("metadata document type"));
         }
         if !raw.belongs_to(pool) {
-            return Err(triergon_core::Error::ForeignPool.into());
+            return Err(triergon_core::Error::ForeignPool);
         }
-        u32::try_from(raw.len()).map_err(|_| Error::Limit("metadata offset space"))?;
+        u32::try_from(raw.len()).map_err(|_| Error::Policy("metadata offset space"))?;
         let end = raw.len();
         Ok(Self {
             raw,
@@ -348,7 +348,7 @@ impl DocumentJob {
                         return Ok(ParseStep::Yield);
                     }
                     if self.nodes.len() >= self.node_limit {
-                        return Err(Error::Limit("metadata nodes"));
+                        return Err(Error::Policy("metadata nodes"));
                     }
                     if self.nodes.len() < self.nodes.capacity() {
                         self.phase = Phase::NodeAppend;
@@ -367,12 +367,12 @@ impl DocumentJob {
                         .and_then(|n| n.checked_add(size_of::<Document>() + 2 * size_of::<usize>()))
                         .ok_or(Error::Overflow)?;
                     if lower > self.storage_limit {
-                        return Err(Error::Limit("metadata retained storage"));
+                        return Err(Error::Policy("metadata retained storage"));
                     }
                     let mut replacement = BudgetVec::new(&self.pool);
                     replacement.try_reserve_exact(target)?;
                     if self.retained_with_capacity(replacement.capacity())? > self.storage_limit {
-                        return Err(Error::Limit("metadata retained storage"));
+                        return Err(Error::Policy("metadata retained storage"));
                     }
                     self.growth = Some((replacement, 0));
                     self.phase = Phase::NodeCopy;
@@ -409,10 +409,10 @@ impl DocumentJob {
                         .take()
                         .required("missing metadata node admission")?;
                     self.pending_index = u16::try_from(self.nodes.len())
-                        .map_err(|_| Error::Limit("metadata index space"))?;
+                        .map_err(|_| Error::Policy("metadata index space"))?;
                     if let Err(error) = self.nodes.try_push(node) {
                         self.pending = Some(error.value);
-                        return Err(error.error.into());
+                        return Err(error.error);
                     }
                     self.phase = Phase::NodeKind;
                 }
@@ -434,7 +434,7 @@ impl DocumentJob {
                             usize::from(*depth) + 1
                         };
                         if depth > self.depth_limit {
-                            return Err(Error::Limit("metadata nesting"));
+                            return Err(Error::Policy("metadata nesting"));
                         }
                         self.stack[self.stack_len] = Some(Frame::Parse {
                             node: self.pending_index,
@@ -510,7 +510,7 @@ impl DocumentJob {
                             .checked_add(raw.len())
                             .ok_or(Error::Overflow)?;
                         if self.attachment_bytes > self.attachment_limit {
-                            return Err(Error::Limit("attachment payload bytes"));
+                            return Err(Error::Policy("attachment payload bytes"));
                         }
                     }
                     if utf8(id) || ascii(id) {
@@ -711,7 +711,7 @@ impl DocumentJob {
                         )
                     };
                     if self.stack_len == self.stack.len() {
-                        return Err(Error::Limit("metadata nesting"));
+                        return Err(Error::Policy("metadata nesting"));
                     }
                     self.stack[self.stack_len] = Some(Frame::Validate {
                         end: node.next,
@@ -736,7 +736,7 @@ impl DocumentJob {
                         .ok_or(Error::Overflow)?
                         > self.storage_limit
                     {
-                        return Err(Error::Limit("metadata validation storage"));
+                        return Err(Error::Policy("metadata validation storage"));
                     }
                     self.uids.try_reserve_exact(self.uid_count)?;
                     // The completed count proves which independent UID namespaces
@@ -761,9 +761,7 @@ impl DocumentJob {
                         }
                         if u64::from(self.nodes.as_slice()[self.uid_at].id) == kind {
                             let value = self.uint(self.uid_at)?;
-                            self.uids
-                                .try_push(value)
-                                .map_err(|e| Error::from(e.error))?;
+                            self.uids.try_push(value).map_err(|e| e.error)?;
                         }
                         self.uid_at += 1;
                     }
@@ -990,7 +988,7 @@ impl CataloguePrepareJob {
                     limits
                         .metadata_storage_bytes
                         .checked_sub(catalogue.retained_bytes())
-                        .ok_or(Error::Limit("metadata retained storage"))?,
+                        .ok_or(Error::Policy("metadata retained storage"))?,
                 ));
             }
             if let Some(replacement) = &mut self.replacement {
@@ -1008,7 +1006,7 @@ impl CataloguePrepareJob {
                 }
                 replacement
                     .try_push(catalogue.documents[self.at].clone())
-                    .map_err(|e| Error::from(e.error))?;
+                    .map_err(|e| e.error)?;
                 self.at += 1;
                 continue;
             }
@@ -1016,7 +1014,7 @@ impl CataloguePrepareJob {
                 return Ok(ParseStep::Yield);
             }
             if catalogue.documents.len() >= 256 {
-                return Err(Error::Limit("metadata documents"));
+                return Err(Error::Policy("metadata documents"));
             }
             if catalogue.documents.len() < catalogue.documents.capacity() {
                 self.ready = true;
@@ -1036,7 +1034,7 @@ impl CataloguePrepareJob {
                 .ok_or(Error::Overflow)?
                 > limits.metadata_storage_bytes
             {
-                return Err(Error::Limit("metadata retained storage"));
+                return Err(Error::Policy("metadata retained storage"));
             }
             let mut replacement = BudgetVec::new(&catalogue.pool);
             replacement.try_reserve_exact(target)?;
@@ -1080,7 +1078,7 @@ impl CatalogueJob {
         pool: &Budget,
     ) -> Result<Self> {
         if !raw.belongs_to(pool) {
-            return Err(triergon_core::Error::ForeignPool.into());
+            return Err(triergon_core::Error::ForeignPool);
         }
         Ok(Self {
             kind,
@@ -1111,7 +1109,7 @@ impl CatalogueJob {
             ));
         }
         if !catalogue.pool.same_pool(&self.pool) {
-            return Err(triergon_core::Error::ForeignPool.into());
+            return Err(triergon_core::Error::ForeignPool);
         }
         let result = self.advance(catalogue, work, cancel);
         match result {
@@ -1158,7 +1156,7 @@ impl CatalogueJob {
                         return Ok(ParseStep::Yield);
                     }
                     if catalogue.documents.len() >= 256 {
-                        return Err(Error::Limit("metadata documents"));
+                        return Err(Error::Policy("metadata documents"));
                     }
                     if catalogue.documents.len() == catalogue.documents.capacity() {
                         let target = catalogue
@@ -1175,7 +1173,7 @@ impl CatalogueJob {
                             .ok_or(Error::Overflow)?
                             > self.limits.metadata_storage_bytes
                         {
-                            return Err(Error::Limit("metadata retained storage"));
+                            return Err(Error::Policy("metadata retained storage"));
                         }
                         let mut replacement = BudgetVec::new(&self.pool);
                         replacement.try_reserve_exact(target)?;
@@ -1206,7 +1204,7 @@ impl CatalogueJob {
                         .as_mut()
                         .required("missing catalogue growth")?
                         .try_push(catalogue.documents[self.at].clone())
-                        .map_err(|e| Error::from(e.error))?;
+                        .map_err(|e| e.error)?;
                     self.at += 1;
                 }
                 CommitPhase::Parse => match self
@@ -1241,7 +1239,7 @@ impl CatalogueJob {
                         .checked_sub(document.attachment_bytes)
                         .ok_or(Error::Overflow)?;
                     if structural_bytes > self.structural_limit {
-                        return Err(Error::Limit("metadata"));
+                        return Err(Error::Policy("metadata"));
                     }
                     let nodes = catalogue
                         .nodes
@@ -1285,17 +1283,17 @@ impl CatalogueJob {
             .limits
             .metadata_storage_bytes
             .checked_sub(catalogue.retained_bytes())
-            .ok_or(Error::Limit("metadata retained storage"))?;
+            .ok_or(Error::Policy("metadata retained storage"))?;
         let nodes = self
             .limits
             .metadata_nodes
             .checked_sub(catalogue.nodes)
-            .ok_or(Error::Limit("metadata nodes"))?;
+            .ok_or(Error::Policy("metadata nodes"))?;
         let attachments = self
             .limits
             .attachment_bytes
             .checked_sub(catalogue.attachments)
-            .ok_or(Error::Limit("attachment payload bytes"))?;
+            .ok_or(Error::Policy("attachment payload bytes"))?;
         self.job = Some(DocumentJob::new(
             self.kind,
             self.raw.clone(),

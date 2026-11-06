@@ -292,7 +292,7 @@ impl Reader {
         maximum_window: usize,
     ) -> Result<Self> {
         if !bytes.belongs_to(pool) {
-            return Err(triergon_core::Error::ForeignPool.into());
+            return Err(triergon_core::Error::ForeignPool);
         }
         let capabilities = SourceCapabilities {
             length: Some(u64::try_from(bytes.len()).map_err(|_| Error::Overflow)?),
@@ -706,7 +706,7 @@ impl Reader {
         if let Some(left) = remaining {
             *left = left
                 .checked_sub(bytes)
-                .ok_or(Error::Limit("operation read bytes"))?;
+                .ok_or(Error::Policy("operation read bytes"))?;
             *total = total.checked_add(bytes).ok_or(Error::Overflow)?;
         }
         Ok(())
@@ -717,7 +717,7 @@ impl Reader {
             .checked_add(structural)
             .ok_or(Error::Overflow)?;
         if total > self.limits.metadata_bytes {
-            return Err(Error::Limit("metadata"));
+            return Err(Error::Policy("metadata"));
         }
         // Admission reserved the slot before reading the source. This final
         // transaction update cannot conceal another vector growth/allocation.
@@ -747,7 +747,7 @@ impl Reader {
             .limits
             .metadata_bytes
             .checked_sub(self.metadata_used)
-            .ok_or(Error::Limit("metadata"))?;
+            .ok_or(Error::Policy("metadata"))?;
         // Keep each large constructor tied to its selected destination arm,
         // avoiding a merged maximum-sized enum result in this path.
         match header.id {
@@ -935,7 +935,7 @@ impl Reader {
             .limits
             .metadata_bytes
             .checked_sub(self.metadata_used)
-            .ok_or(Error::Limit("metadata"))?;
+            .ok_or(Error::Policy("metadata"))?;
         let mut first = true;
         loop {
             if first {
@@ -1081,7 +1081,7 @@ impl Reader {
                                     self.limits
                                         .attachment_bytes
                                         .checked_sub(self.catalogue.attachment_bytes())
-                                        .ok_or(Error::Limit("attachment payload bytes"))?,
+                                        .ok_or(Error::Policy("attachment payload bytes"))?,
                                 )
                                 .ok_or(Error::Overflow)?
                             } else {
@@ -1092,7 +1092,7 @@ impl Reader {
                                 .size
                                 .is_some_and(|size| size > maximum as u64)
                             {
-                                return Err(Error::Limit("element bytes"));
+                                return Err(Error::Policy("element bytes"));
                             }
                             admission.phase = AdmitPhase::Reserve;
                             continue;
@@ -1122,7 +1122,7 @@ impl Reader {
                                     self.limits
                                         .attachment_bytes
                                         .checked_sub(self.catalogue.attachment_bytes())
-                                        .ok_or(Error::Limit("attachment payload bytes"))?,
+                                        .ok_or(Error::Policy("attachment payload bytes"))?,
                                 )
                                 .ok_or(Error::Overflow)?
                             } else {

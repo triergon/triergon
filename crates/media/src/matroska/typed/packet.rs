@@ -115,10 +115,10 @@ fn validate_batch_input(
     pool: &Budget,
 ) -> Result<()> {
     if !source.belongs_to(pool) || !configuration.belongs_to(pool) {
-        return Err(triergon_core::Error::ForeignPool.into());
+        return Err(triergon_core::Error::ForeignPool);
     }
     if source.len() > limits.block_bytes {
-        return Err(Error::Limit("element bytes"));
+        return Err(Error::Policy("element bytes"));
     }
     if scale == 0 {
         return Err(Error::Invalid("zero TimestampScale"));
@@ -133,7 +133,7 @@ fn validate_track_lacing(flags: u8, track: &Track) -> Result<()> {
 }
 fn validate_decoded_capacity(capacity: usize, maximum: usize) -> Result<()> {
     if capacity > maximum {
-        return Err(Error::Limit("decoded laced block capacity"));
+        return Err(Error::Policy("decoded laced block capacity"));
     }
     Ok(())
 }
@@ -157,10 +157,10 @@ impl TypedPacket {
             .source()?
             .pts
             .map(|value| {
-                Ok(Time::new(
+                Time::new(
                     value.numerator(),
                     u128::from(value.denominator()) * 1_000_000_000,
-                )?)
+                )
             })
             .transpose()
     }
@@ -235,7 +235,7 @@ impl Staged {
                 Ok(()) => Ok(()),
                 Err(error) => {
                     *packet = error.value;
-                    Err(Error::from(error.error))
+                    Err(error.error)
                 }
             },
         }
@@ -636,7 +636,7 @@ impl PacketBatchJob {
                         self.limits
                             .block_bytes
                             .checked_sub(self.decoded_capacity)
-                            .ok_or(Error::Limit("decoded laced block bytes"))?
+                            .ok_or(Error::Policy("decoded laced block bytes"))?
                     } else {
                         self.limits.block_bytes
                     };

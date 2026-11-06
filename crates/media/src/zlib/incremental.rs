@@ -407,7 +407,7 @@ impl Inflater {
     #[inline(always)]
     pub fn new(source: SharedBytes, limits: InflateLimits, pool: &Budget) -> Result<Self> {
         if !source.belongs_to(pool) {
-            return Err(triergon_core::Error::ForeignPool.into());
+            return Err(triergon_core::Error::ForeignPool);
         }
         let limit = limits
             .output_bytes
@@ -466,7 +466,7 @@ impl State {
     #[inline(always)]
     fn policy(&mut self, units: u64) -> Result<()> {
         let Some(left) = self.policy_left.checked_sub(units) else {
-            return Err(Error::Limit("inflate work"));
+            return Err(Error::Policy("inflate work"));
         };
         self.policy_left = left;
         Ok(())
@@ -480,7 +480,7 @@ impl State {
             return Err(Error::Overflow);
         };
         if needed > self.limit {
-            return Err(Error::Limit("inflated output bytes or expansion ratio"));
+            return Err(Error::Policy("inflated output bytes or expansion ratio"));
         }
         if needed > output.capacity() {
             return self.grow_output(needed);
@@ -567,9 +567,7 @@ impl State {
         let Some(output) = self.output.as_mut() else {
             return Err(Error::Invalid("missing inflate output"));
         };
-        output
-            .try_push(value)
-            .map_err(|error| Error::from(error.error))?;
+        output.try_push(value).map_err(|error| error.error)?;
         Ok(true)
     }
     // A fused successor consumes exactly the unit its dispatched phase would
@@ -1035,7 +1033,7 @@ impl State {
                         }
                         Err(error) => {
                             self.output = Some(error.buffer);
-                            return Err(error.error.into());
+                            return Err(error.error);
                         }
                     }
                 }

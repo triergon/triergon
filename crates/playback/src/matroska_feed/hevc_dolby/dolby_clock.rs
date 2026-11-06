@@ -42,7 +42,7 @@ impl MatroskaHevcDolbyFeed {
             return Ok(None);
         }
         if !self.association.configuration.belongs_to(budget) {
-            return Err(Error::ForeignPool.into());
+            return Err(Error::ForeignPool);
         }
         check_limit(maximum_packets, MAX_PREFIX_PACKETS)?;
         Ok(Some(MatroskaDolbyClockProbe {
@@ -57,20 +57,20 @@ impl MatroskaHevcDolbyFeed {
         let (FeedCodec::Dolby(codec), MatroskaHevcDolbyPayload::Dolby { family, raw }) =
             (&self.codec, &packet.payload)
         else {
-            return Err(Error::Invalid("native Dolby clock packet codec").into());
+            return Err(Error::Invalid("native Dolby clock packet codec"));
         };
         if *family != codec.family() || !std::ptr::eq(*raw, packet.source.packet.data.as_ref()) {
-            return Err(Error::Invalid("native Dolby clock feed association").into());
+            return Err(Error::Invalid("native Dolby clock feed association"));
         }
         self.dolby_source_timing(packet.source)
     }
 
     fn dolby_source_timing(&self, packet: &Packet) -> Result<NativePacketTiming> {
         let FeedCodec::Dolby(codec) = &self.codec else {
-            return Err(Error::Invalid("native Dolby clock packet codec").into());
+            return Err(Error::Invalid("native Dolby clock packet codec"));
         };
         if !self.association.matches(packet) {
-            return Err(Error::Invalid("native Dolby clock feed association").into());
+            return Err(Error::Invalid("native Dolby clock feed association"));
         }
         let raw = packet.packet.data.as_ref();
         check_limit(raw.len(), self.limits.dolby_packet.maximum_packet_bytes)?;

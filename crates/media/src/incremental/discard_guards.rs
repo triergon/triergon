@@ -198,7 +198,7 @@ fn ignored_body_transport_precedes_cancel_and_empty_work_without_advancing() {
     let mut work = WorkBudget::new(0);
     assert!(matches!(
         reader.step(&mut work, &AtomicBool::new(true)),
-        Err(Error::Core(triergon_core::Error::Transport))
+        Err(triergon_core::Error::Transport)
     ));
     assert_eq!(reader.position(), 12);
     assert_eq!(work.spent(), 0);
@@ -264,7 +264,7 @@ fn skipped_block_outside_cluster_does_not_refill_scan_budget() {
     let mut work = WorkBudget::new(5);
     assert!(matches!(
         reader.step(&mut work, &AtomicBool::new(false)),
-        Err(Error::Limit("operation read bytes"))
+        Err(Error::Policy("operation read bytes"))
     ));
     assert_eq!(reader.position(), 16);
     assert_eq!(work.spent(), 1);

@@ -286,7 +286,7 @@ fn progressive_truncated_future_media_retains_completed_source_prefix() {
     for _ in 0..100_000 {
         match p.advance(&mut WorkBudget::new(1), &off()) {
             Ok(_) => {}
-            Err(Error::Core(C::Truncated)) => {
+            Err(C::Truncated) => {
                 failed = true;
                 break;
             }
@@ -314,10 +314,10 @@ fn progressive_root_limit_is_explicit_and_source_owners_release() {
     let mut limit = false;
     for _ in 0..100_000 {
         match p.advance(&mut WorkBudget::new(1), &off()) {
-            Err(Error::Core(C::Limit {
+            Err(C::Limit {
                 requested: 2,
                 maximum: 1,
-            })) => {
+            }) => {
                 limit = true;
                 break;
             }
@@ -339,7 +339,7 @@ fn progressive_cancel_quiesces_before_source_close_without_false_eof() {
     );
     assert!(matches!(
         p.advance(&mut WorkBudget::new(0), &AtomicBool::new(true)),
-        Err(Error::Core(C::Cancelled))
+        Err(C::Cancelled)
     ));
     drop(p);
     let calls = calls.lock().unwrap();
@@ -553,7 +553,7 @@ fn pump_sink_failure_stops_source_before_return_and_does_not_become_eof() {
     let mut failed = false;
     for _ in 0..100_000 {
         match p.step(&mut WorkBudget::new(1), &off()) {
-            Err(Error::Core(C::Transport)) => {
+            Err(C::Transport) => {
                 failed = true;
                 break;
             }
@@ -733,7 +733,7 @@ fn native_startup_short_read_is_refusal_and_not_quantum_as_eof() {
         let mut refused = false;
         for _ in 0..100 {
             match s.advance(&mut WorkBudget::new(1), &off()) {
-                Err(Error::Core(C::Unsupported(_))) => {
+                Err(C::Unsupported(_)) => {
                     refused = true;
                     break;
                 }
@@ -761,7 +761,7 @@ fn native_startup_work_zero_and_cancel_do_not_perform_source_reads() {
     assert_eq!(b.used(), before);
     assert!(matches!(
         s.advance(&mut WorkBudget::new(0), &AtomicBool::new(true)),
-        Err(Error::Core(C::Cancelled))
+        Err(C::Cancelled)
     ));
     drop(s);
     assert_eq!(b.used(), Budget::control_storage_bytes());
@@ -801,7 +801,7 @@ fn native_m2ts_seek_requires_new_context_and_keeps_old_output_scope() {
             &mut WorkBudget::new(1),
             &off()
         ),
-        Err(Error::Core(C::Unsupported(_)))
+        Err(C::Unsupported(_))
     ));
     assert!(p.current(&old));
 }
@@ -1033,7 +1033,7 @@ fn aac_bridge_refuses_configuration_change_before_packet_conversion() {
     let bridge =
         aac_bridge::AacBridge::new(&b, ID, cfg.track.track_id, cfg.revision, record, 8191).unwrap();
     p.configuration.revision += 1;
-    assert!(matches!(bridge.packet(p), Err(Error::Core(C::Invalid(_)))));
+    assert!(matches!(bridge.packet(p), Err(C::Invalid(_))));
 }
 
 #[test]
@@ -1809,10 +1809,10 @@ fn dvd_bridge_unit_limit_remains_error_with_whole_input_owner_retained() {
     let mut limit = false;
     for _ in 0..100_000 {
         match job.poll(&mut WorkBudget::new(1), &off()) {
-            Err(Error::Core(C::Limit {
+            Err(C::Limit {
                 requested: 2,
                 maximum: 1,
-            })) => {
+            }) => {
                 limit = true;
                 break;
             }
@@ -1851,7 +1851,7 @@ fn text_document_foreign_pool_returns_original_source_and_generation_fence() {
         .provide(TextSource::document(&b, input))
         .err()
         .unwrap();
-    assert!(matches!(error.error, Error::Core(C::ForeignPool)));
+    assert!(matches!(error.error, C::ForeignPool));
     drop(error);
     drop(payload);
     assert_eq!(foreign.used(), Budget::control_storage_bytes());
@@ -1890,7 +1890,7 @@ fn pause_lifecycle_failed_sink_control_quiesces_source() {
     let (mut p, _, calls) = pump();
     until_feed(&mut p);
     p.sink_mut().unwrap().fail_pause = true;
-    assert!(matches!(p.pause(true), Err(Error::Core(C::Transport))));
+    assert!(matches!(p.pause(true), Err(C::Transport)));
     assert_eq!(
         p.player().unwrap().state(),
         State::Stopped,
@@ -2092,7 +2092,7 @@ fn native_m2ts_prefix_pressure_keeps_the_completed_reply() {
     let lease = budget.reserve(budget.available() - 32).unwrap();
     assert!(matches!(
         startup.advance(&mut WorkBudget::new(31), &off()),
-        Err(Error::Core(C::Backpressure { .. }))
+        Err(C::Backpressure { .. })
     ));
     assert_eq!(next.load(Ordering::Relaxed), 13);
     drop(lease);
@@ -2126,7 +2126,7 @@ fn native_m2ts_prefix_requires_the_actual_complete_unambiguous_window() {
                 _ => panic!("unproven prefix became ready"),
             }
         };
-        assert!(matches!(failure, Error::Core(C::Unsupported(error)) if error == message));
+        assert!(matches!(failure, C::Unsupported(error) if error == message));
         drop(startup);
         assert_eq!(budget.used(), Budget::control_storage_bytes());
     }
@@ -2422,7 +2422,7 @@ fn matroska_bitmap_tracks_feed_native_receivers_without_copying_frames() {
     assert!(MatroskaBitmapTrack::new(configuration, 1).is_err());
     assert!(matches!(
         MatroskaBitmapTrack::new(configuration, 9),
-        Err(triergon_playback::Error::Core(C::Truncated))
+        Err(C::Truncated)
     ));
     assert!(
         pgs_track
@@ -2653,7 +2653,7 @@ fn matroska_bitmap_tracks_feed_native_receivers_without_copying_frames() {
         .unwrap();
     assert!(matches!(
         dvd_track.packet(next_dvd, 3),
-        Err(triergon_playback::Error::Core(C::StaleGeneration { .. }))
+        Err(C::StaleGeneration { .. })
     ));
     let next_track = MatroskaBitmapTrack::new(next_dvd, 7).unwrap();
     let old_dvd = outputs
@@ -2662,7 +2662,7 @@ fn matroska_bitmap_tracks_feed_native_receivers_without_copying_frames() {
         .unwrap();
     assert!(matches!(
         next_track.packet(old_dvd, 3),
-        Err(triergon_playback::Error::Core(C::StaleGeneration { .. }))
+        Err(C::StaleGeneration { .. })
     ));
     let next_input = next_track.packet(next_dvd, 3).unwrap().unwrap();
     assert_eq!(next_input.clock.pts, Some(9_000_000));
@@ -2795,19 +2795,19 @@ fn matroska_bitmap_probe_matches_ffmpeg_startup_clocks() {
         let target = Some(TrackKey::Matroska(3));
         assert!(matches!(
             MatroskaBitmapClockProbe::new(&track, &outputs, outputs.len() - 1),
-            Err(triergon_playback::Error::Core(C::Limit { .. }))
+            Err(C::Limit { .. })
         ));
         let mut probe = MatroskaBitmapClockProbe::new(&track, &outputs, outputs.len()).unwrap();
         assert!(!probe.poll(&mut WorkBudget::new(0), &off()).unwrap());
         assert!(probe.packet(0, 0).is_err());
         assert!(matches!(
             probe.poll(&mut WorkBudget::new(128), &AtomicBool::new(true)),
-            Err(triergon_playback::Error::Core(C::Cancelled))
+            Err(C::Cancelled)
         ));
         let pressure = pool.reserve(pool.limit() - pool.used()).unwrap();
         assert!(matches!(
             probe.poll(&mut WorkBudget::new(4096), &off()),
-            Err(triergon_playback::Error::Core(C::Backpressure { .. }))
+            Err(C::Backpressure { .. })
         ));
         drop(pressure);
         while !probe.poll(&mut WorkBudget::new(1), &off()).unwrap() {}
@@ -3378,10 +3378,7 @@ fn dvd_receiver_commits_controls_across_packets_and_fences_reset() {
     drop(rejected);
 
     let pressure = b.reserve(b.available()).unwrap();
-    assert!(matches!(
-        next(&mut receiver),
-        Err(Error::Core(C::Backpressure { .. }))
-    ));
+    assert!(matches!(next(&mut receiver), Err(C::Backpressure { .. })));
     drop(pressure);
     let first = next(&mut receiver).unwrap();
     assert_eq!(
@@ -3400,7 +3397,7 @@ fn dvd_receiver_commits_controls_across_packets_and_fences_reset() {
         .unwrap_or_else(|error| panic!("{:?}", error.error));
     assert!(matches!(
         next(&mut receiver),
-        Err(Error::Core(C::Invalid("DVD control offset")))
+        Err(C::Invalid("DVD control offset"))
     ));
 
     let mut second = bitmap_input(&b, &inherited);

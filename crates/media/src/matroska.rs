@@ -74,7 +74,6 @@ impl PacketData {
             .as_core()
             .map(|storage| storage.slice(self.range.clone()))
             .transpose()
-            .map_err(Into::into)
     }
 
     pub fn retained_capacity(&self) -> usize {

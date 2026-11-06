@@ -59,7 +59,7 @@ impl CuesJob {
         pool: &Budget,
     ) -> Result<Self> {
         if !source.belongs_to(pool) {
-            return Err(triergon_core::Error::ForeignPool.into());
+            return Err(triergon_core::Error::ForeignPool);
         }
         let len = source.len();
         Ok(Self {
@@ -167,7 +167,7 @@ impl CuesJob {
                                 .ok_or(Error::Overflow)?
                                 >= self.limit
                             {
-                                return Err(Error::Limit("cue entries"));
+                                return Err(Error::Policy("cue entries"));
                             }
                             self.fields = [None; 5];
                             self.position = Some(ChildCursor::new(child.payload));

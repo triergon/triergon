@@ -567,7 +567,7 @@ fn raw_tracks_job_keeps_late_duplicate_and_decoded_private_limits_atomic() {
         // The frozen private decoder may reject its output cap before the final
         // retained-capacity check; both are explicit permanent policy failures.
         if message == "decoded private metadata" {
-            assert!(matches!(error, Some(crate::Error::Limit(_))));
+            assert!(matches!(error, Some(crate::Error::Policy(_))));
         } else {
             assert!(matches!(error,Some(crate::Error::Invalid(value)) if value==message));
         }
@@ -1364,9 +1364,7 @@ fn range_job_rejects_stale_generation_and_a_transport_failure_even_at_its_pendin
     input.reset(0).unwrap();
     assert!(matches!(
         stale.step(&mut input, &mut WorkBudget::new(1), &AtomicBool::new(false)),
-        Err(crate::Error::Core(
-            triergon_core::Error::StaleGeneration { .. }
-        ))
+        Err(triergon_core::Error::StaleGeneration { .. })
     ));
     drop(stale);
     let mut job = range::RangeLeafJob::begin(&mut input, 0, 0x1c53bb6b, None, 1024).unwrap();
@@ -1417,7 +1415,7 @@ fn range_job_rejects_stale_generation_and_a_transport_failure_even_at_its_pendin
             &mut WorkBudget::new(1000),
             &AtomicBool::new(false)
         ),
-        Err(crate::Error::Core(triergon_core::Error::Transport))
+        Err(triergon_core::Error::Transport)
     ));
 }
 
@@ -1730,7 +1728,7 @@ fn typed_catalogue_keeps_cumulative_node_limits_and_prior_document_after_rejecte
                     accepted = true;
                     break;
                 }
-                Err(crate::Error::Limit("metadata nodes")) => {
+                Err(crate::Error::Policy("metadata nodes")) => {
                     rejected = true;
                     break;
                 }

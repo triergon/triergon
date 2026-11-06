@@ -774,7 +774,7 @@ fn probe_work_zero_and_cancellation_have_no_source_io_or_false_selection() {
     assert_eq!(b.used(), before);
     assert!(matches!(
         p.advance(&mut WorkBudget::new(0), &AtomicBool::new(true)),
-        Err(Error::Core(C::Cancelled))
+        Err(C::Cancelled)
     ));
     drop(p);
     assert_eq!(
@@ -868,7 +868,7 @@ fn transport_failure_is_terminal_distinct_from_native_and_source_eof() {
     fail.store(true, Ordering::Relaxed);
     let mut failed = false;
     for _ in 0..20 {
-        if let Err(Error::Core(C::Transport)) = p.advance(&mut WorkBudget::new(7), &off()) {
+        if let Err(C::Transport) = p.advance(&mut WorkBudget::new(7), &off()) {
             failed = true;
             break;
         }
@@ -923,10 +923,7 @@ fn stale_foreign_source_and_foreign_pool_windows_preserve_live_request() {
         )
         .unwrap(),
     );
-    assert!(matches!(
-        p.provide(&wrong),
-        Err(Error::Core(C::ForeignPool))
-    ));
+    assert!(matches!(p.provide(&wrong), Err(C::ForeignPool)));
     let wrong = SourceReply::Data(
         InputWindow::new(
             SourceId(900),
@@ -936,10 +933,7 @@ fn stale_foreign_source_and_foreign_pool_windows_preserve_live_request() {
         )
         .unwrap(),
     );
-    assert!(matches!(
-        p.provide(&wrong),
-        Err(Error::Core(C::SourceMismatch))
-    ));
+    assert!(matches!(p.provide(&wrong), Err(C::SourceMismatch)));
     assert!(p.pending_request().is_some());
     assert_eq!(pes(&collect(&mut p, 1).unwrap()).len(), 1);
 }
@@ -1162,10 +1156,7 @@ fn late_preseek_range_reply_is_rejected_before_current_source_advance() {
         )
         .unwrap(),
     );
-    assert!(matches!(
-        p.provide(&bad),
-        Err(Error::Core(C::StaleGeneration { .. }))
-    ));
+    assert!(matches!(p.provide(&bad), Err(C::StaleGeneration { .. })));
     assert_eq!(pes(&collect(&mut p, 1).unwrap()).len(), 1);
 }
 #[test]
@@ -1218,7 +1209,7 @@ fn cancellation_while_paused_pending_is_quiescent_before_close_once() {
     p.pause(true).unwrap();
     assert!(matches!(
         p.advance(&mut WorkBudget::new(0), &AtomicBool::new(true)),
-        Err(Error::Core(C::Cancelled))
+        Err(C::Cancelled)
     ));
     p.cancel();
     p.stop();
@@ -1377,7 +1368,7 @@ fn cancelled_opener_and_probe_cannot_later_publish_ready() {
     .unwrap();
     assert!(matches!(
         job.advance(&mut WorkBudget::new(0), &AtomicBool::new(true)),
-        Err(Error::Core(C::Cancelled))
+        Err(C::Cancelled)
     ));
     assert!(matches!(
         job.advance(&mut WorkBudget::new(100), &off()),
@@ -1433,7 +1424,7 @@ fn mp4_plan_cannot_attach_to_another_entity_or_generation() {
     .unwrap();
     assert!(matches!(
         Engine::mp4(other, plan, 1 << 20),
-        Err(Error::Core(C::SourceMismatch))
+        Err(C::SourceMismatch)
     ));
     let mut job = Mp4IndexJob::new(
         &opened.movie,
@@ -1455,7 +1446,7 @@ fn mp4_plan_cannot_attach_to_another_entity_or_generation() {
     .unwrap();
     assert!(matches!(
         Engine::mp4(other, plan, 1 << 20),
-        Err(Error::Core(C::StaleGeneration { .. }))
+        Err(C::StaleGeneration { .. })
     ));
 }
 #[test]
@@ -1475,7 +1466,7 @@ fn actual_bounded_source_index_refuses_resource_exhaustion_and_releases_owners()
     let mut refused = false;
     for _ in 0..10_000 {
         match job.poll(&mut WorkBudget::new(1), &off()) {
-            Err(Error::Core(C::Limit { .. })) => {
+            Err(C::Limit { .. }) => {
                 refused = true;
                 break;
             }
@@ -1508,7 +1499,7 @@ fn finite_prefix_ambiguity_is_rejected_from_bytes_not_corpus_identity() {
     let mut refused = false;
     for _ in 0..5000 {
         match probe.advance(&mut WorkBudget::new(11), &off()) {
-            Err(Error::Core(C::Invalid("ambiguous transport signature"))) => {
+            Err(C::Invalid("ambiguous transport signature")) => {
                 refused = true;
                 break;
             }
@@ -1696,7 +1687,7 @@ fn full_native_m2ts_position_is_refused_without_inventing_startup_evidence() {
                 carriage: triergon_mpegts::native_pes::NativeRegisteredCarriage::Avc
             }
         ),
-        Err(Error::Core(C::Unsupported(_)))
+        Err(C::Unsupported(_))
     ));
     let (mut p, _) = ts(
         include_bytes!("fixtures/ts/m2ts192-opaque-prefix.m2ts"),
@@ -1807,7 +1798,7 @@ fn movie_seek_command_cannot_cross_source_owner_pools() {
     let command = job.finish().unwrap();
     assert!(matches!(
         b.apply_movie_seek(&command, Selection::All, &mut WorkBudget::new(1), &off()),
-        Err(Error::Core(C::ForeignPool))
+        Err(C::ForeignPool)
     ));
     assert_eq!(b.state(), State::Running);
 }
@@ -2291,7 +2282,7 @@ fn private_audio_does_not_admit_m2ts_by_construction() {
                 carriage: Carriage::DvbAc3Tag
             },
         ),
-        Err(Error::Core(C::Unsupported(_)))
+        Err(C::Unsupported(_))
     ));
 }
 
@@ -2448,13 +2439,13 @@ fn av1_bridge_matches_delimiter_framing_from_real_mp4_and_webm_packets() {
                     stale.configuration.revision += 1;
                     assert!(matches!(
                         bound.packet(Av1Input::Mp4(&stale)),
-                        Err(Error::Core(C::Invalid(_)))
+                        Err(C::Invalid(_))
                     ));
                     stale.configuration.revision = packet.configuration.revision;
                     stale.source.source = SourceId(ID.0 + 1);
                     assert!(matches!(
                         bound.packet(Av1Input::Mp4(&stale)),
-                        Err(Error::Core(C::Invalid(_)))
+                        Err(C::Invalid(_))
                     ));
                 }
                 let mut job = bound.packet(packet).unwrap();
@@ -2497,10 +2488,7 @@ fn av1_bridge_matches_delimiter_framing_from_real_mp4_and_webm_packets() {
                     panic!("seek did not return an AV1 packet");
                 };
                 let packet = Av1Input::Matroska(packet);
-                assert!(matches!(
-                    bridge.unwrap().packet(packet),
-                    Err(Error::Core(C::Invalid(_)))
-                ));
+                assert!(matches!(bridge.unwrap().packet(packet), Err(C::Invalid(_))));
                 let mut setup =
                     Av1BridgeSetup::new(pool, ID, packet, config_limits, packet_limits).unwrap();
                 let BuildStep::Ready(bound) =
@@ -2535,9 +2523,7 @@ fn indexed_mp4_seek_starts_at_late_sync_and_republishes_its_configuration() {
         .unwrap();
     assert!(matches!(
         unsafe_transition.poll(&mut WorkBudget::new(64), &off()),
-        Err(Error::Core(C::Unsupported(
-            "no MP4 sync in target configuration"
-        )))
+        Err(C::Unsupported("no MP4 sync in target configuration"))
     ));
     assert!(p.current(&old));
     let request = indexed_seek_request(target);
@@ -2559,7 +2545,7 @@ fn indexed_mp4_seek_starts_at_late_sync_and_republishes_its_configuration() {
     assert!(!p.current(&old));
     assert!(matches!(
         p.apply_mp4_sync_seek(&command, &mut WorkBudget::new(1), &off()),
-        Err(Error::Core(C::StaleGeneration { .. }))
+        Err(C::StaleGeneration { .. })
     ));
     let events = collect(&mut p, 1).unwrap();
     let packets = mp4_packets(&events);
@@ -2645,10 +2631,7 @@ fn indexed_mp4_seek_budget_covers_preroll_and_stops_at_the_target() {
         );
         let output = collect(&mut player, 64);
         if seek_input_bytes == 34 {
-            assert!(matches!(
-                output,
-                Err(Error::Core(C::Limit { maximum: 34, .. }))
-            ));
+            assert!(matches!(output, Err(C::Limit { maximum: 34, .. })));
         } else {
             let output = output.unwrap();
             let deliveries: Vec<_> = output
@@ -2691,9 +2674,9 @@ fn indexed_mp4_seek_keeps_selected_subtitle_prefix_and_only_late_video() {
     let mut cancelled = p.prepare_mp4_sync_seek(request, selection).unwrap();
     assert!(matches!(
         cancelled.poll(&mut WorkBudget::new(1), &AtomicBool::new(true)),
-        Err(Error::Core(C::Cancelled))
+        Err(C::Cancelled)
     ));
-    assert!(matches!(cancelled.finish(), Err(Error::Core(C::Cancelled))));
+    assert!(matches!(cancelled.finish(), Err(C::Cancelled)));
 
     let mut limited = p
         .prepare_mp4_sync_seek(
@@ -2706,15 +2689,12 @@ fn indexed_mp4_seek_keeps_selected_subtitle_prefix_and_only_late_video() {
         .unwrap();
     assert!(matches!(
         limited.poll(&mut WorkBudget::new(3), &off()),
-        Err(Error::Core(C::Limit {
+        Err(C::Limit {
             requested: 3,
             maximum: 2
-        }))
+        })
     ));
-    assert!(matches!(
-        limited.finish(),
-        Err(Error::Core(C::Limit { .. }))
-    ));
+    assert!(matches!(limited.finish(), Err(C::Limit { .. })));
     assert!(p.current(before.last().unwrap()));
     let mut job = p.prepare_mp4_sync_seek(request, selection).unwrap();
     while !job.poll(&mut WorkBudget::new(1), &off()).unwrap() {}
@@ -3067,7 +3047,7 @@ fn native_range_seek_matches_ffprobe_packet_order_bytes_and_clocks() {
         assert!(!player.current(&old));
         assert!(matches!(
             player.apply_mp4_native_seek(&command, &mut WorkBudget::new(1), &off()),
-            Err(Error::Core(C::StaleGeneration { .. }))
+            Err(C::StaleGeneration { .. })
         ));
 
         let events = collect(&mut player, 1).unwrap();
@@ -3227,7 +3207,7 @@ fn native_range_cursor_matches_ffprobe_and_preserves_seek_lifecycle() {
         assert!(!player.current(&old));
         assert!(matches!(
             player.apply_seek(&mut command, &mut WorkBudget::new(1), &off()),
-            Err(Error::Core(C::StaleGeneration { .. }))
+            Err(C::StaleGeneration { .. })
         ));
         assert!(matches!(
             player
@@ -3276,10 +3256,7 @@ fn native_range_cursor_checks_all_extents_and_replays_after_duration_scan() {
         Ok(false) => None,
         result => Some(result),
     });
-    assert!(matches!(
-        refusal,
-        Some(Err(Error::Core(C::Limit { maximum: 1, .. })))
-    ));
+    assert!(matches!(refusal, Some(Err(C::Limit { maximum: 1, .. }))));
     drop(limited);
     let mut job = Mp4RangeOpen::new(&opened.movie, None, PlanLimits::default()).unwrap();
     while !job.poll(&mut WorkBudget::new(4096), &off()).unwrap() {}
@@ -3341,9 +3318,9 @@ fn native_range_open_refuses_late_unprojectable_metadata_before_playback() {
     });
     assert!(matches!(
         result,
-        Some(Err(Error::Core(C::Unsupported(
+        Some(Err(C::Unsupported(
             "native dependency/recovery flag profile not frozen"
-        ))))
+        )))
     ));
     assert!(calls.lock().unwrap().is_empty());
 }
@@ -3819,9 +3796,7 @@ fn native_range_seek_refusals_leave_the_current_player_untouched() {
         .unwrap();
     assert!(matches!(
         job.poll(&mut WorkBudget::new(10_000), &off()),
-        Err(Error::Core(C::Unsupported(
-            "native seek overlapping index clock query"
-        )))
+        Err(C::Unsupported("native seek overlapping index clock query"))
     ));
     drop(job);
     assert!(player.current(&current));

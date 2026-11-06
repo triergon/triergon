@@ -88,14 +88,14 @@ impl CopyJob {
         pool: &Budget,
     ) -> Result<Self> {
         if !prefix.belongs_to(pool) || !input.belongs_to(pool) {
-            return Err(triergon_core::Error::ForeignPool.into());
+            return Err(triergon_core::Error::ForeignPool);
         }
         let size = prefix
             .len()
             .checked_add(input.len())
             .ok_or(Error::Overflow)?;
         if size > limit {
-            return Err(Error::Limit("restored content bytes"));
+            return Err(Error::Policy("restored content bytes"));
         }
         Ok(Self {
             prefix,
@@ -172,7 +172,7 @@ impl CopyJob {
                         }
                         Err(error) => {
                             self.buffer = Some(error.buffer);
-                            return Err(error.error.into());
+                            return Err(error.error);
                         }
                     }
                 }
@@ -260,10 +260,10 @@ impl StoredJob {
                                 .saturating_mul(self.limits.expansion_ratio),
                         )
                     {
-                        return Err(Error::Limit("inflated output bytes or expansion ratio"));
+                        return Err(Error::Policy("inflated output bytes or expansion ratio"));
                     }
                     if length as u64 + 1 > self.limits.work {
-                        return Err(Error::Limit("inflate work"));
+                        return Err(Error::Policy("inflate work"));
                     }
                     self.range = 7..7 + length;
                     self.at = 7;
@@ -352,7 +352,7 @@ impl InflateSlot {
         let mut jobs = BudgetVec::new(pool);
         jobs.try_reserve_exact(1)?;
         jobs.try_push(Inflater::new(source, limits, pool)?)
-            .map_err(|error| crate::Error::from(error.error))?;
+            .map_err(|error| error.error)?;
         Ok(Self { jobs })
     }
     fn step(
@@ -407,10 +407,10 @@ impl RestoreJob {
         pool: &Budget,
     ) -> Result<Self> {
         if !source.belongs_to(pool) {
-            return Err(triergon_core::Error::ForeignPool.into());
+            return Err(triergon_core::Error::ForeignPool);
         }
         if plan.count > plan.steps.len() {
-            return Err(Error::Limit("content encoding count"));
+            return Err(Error::Policy("content encoding count"));
         }
         Ok(Self {
             current: source,

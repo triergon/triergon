@@ -1,11 +1,11 @@
 use std::{cell::Cell, rc::Rc, sync::atomic::AtomicBool};
 
 use triergon_core::{
-    Budget, Bytes, Error as CoreError, InputCursor, InputRequest, InputWindow, SourceCapabilities,
+    Budget, Bytes, Error, InputCursor, InputRequest, InputWindow, SourceCapabilities,
     SourceFailure, SourceId, WorkBudget,
 };
 use triergon_playback::{
-    ByteSource, Error, Source, SourceReply,
+    ByteSource, Source, SourceReply,
     hls_segment::{
         HlsFeedUnit, HlsSegmentAudio, HlsSegmentLimits, HlsSegmentProgress, HlsSegmentReader,
         HlsSegmentTracks,
@@ -143,10 +143,7 @@ fn transport_failure_discards_partial_feed_and_retry_rejects_the_old_reply() {
         .unwrap(),
     );
     assert!(first.take(&cancel).unwrap().is_none());
-    assert!(matches!(
-        ready(&mut first),
-        Err(Error::Core(CoreError::Transport))
-    ));
+    assert!(matches!(ready(&mut first), Err(Error::Transport)));
     assert!(failed_trace.starved.get());
     assert_closed(&failed_trace);
     assert!(matches!(first.take(&cancel), Err(Error::Closed)));
@@ -159,7 +156,7 @@ fn transport_failure_discards_partial_feed_and_retry_rejects_the_old_reply() {
     request(&mut retry);
     let stale = retry.provide(&late);
     assert!(
-        matches!(stale, Err(Error::Core(CoreError::StaleGeneration { .. }))),
+        matches!(stale, Err(Error::StaleGeneration { .. })),
         "{stale:?}"
     );
     drop(late);
@@ -181,13 +178,8 @@ fn partial_entity_and_source_feed_limits_cannot_publish_a_segment() {
     let pool = Budget::new(8 * 1024 * 1024).unwrap();
     let default = HlsSegmentLimits::default();
     for (data, length, limits, expected) in [
-        (
-            RAW,
-            Some(RAW.len() as u64 + 188),
-            default,
-            CoreError::Truncated,
-        ),
-        (&RAW[..RAW.len() - 1], None, default, CoreError::Truncated),
+        (RAW, Some(RAW.len() as u64 + 188), default, Error::Truncated),
+        (&RAW[..RAW.len() - 1], None, default, Error::Truncated),
         (
             RAW,
             None,
@@ -195,7 +187,7 @@ fn partial_entity_and_source_feed_limits_cannot_publish_a_segment() {
                 maximum_source_bytes: RAW.len() - 1,
                 ..default
             },
-            CoreError::Limit {
+            Error::Limit {
                 requested: RAW.len(),
                 maximum: RAW.len() - 1,
             },
@@ -207,7 +199,7 @@ fn partial_entity_and_source_feed_limits_cannot_publish_a_segment() {
                 maximum_access_units: 4,
                 ..default
             },
-            CoreError::Limit {
+            Error::Limit {
                 requested: 5,
                 maximum: 4,
             },
@@ -219,7 +211,7 @@ fn partial_entity_and_source_feed_limits_cannot_publish_a_segment() {
                 maximum_feed_bytes: 1000,
                 ..default
             },
-            CoreError::Limit {
+            Error::Limit {
                 requested: 1916,
                 maximum: 1000,
             },
@@ -228,7 +220,7 @@ fn partial_entity_and_source_feed_limits_cannot_publish_a_segment() {
         let (cursor, source, trace) = input(&pool, SourceId(43), data, length, None);
         let mut reader =
             HlsSegmentReader::new(cursor, source, HlsSegmentTracks::default(), limits).unwrap();
-        assert!(matches!(ready(&mut reader), Err(Error::Core(actual)) if actual == expected));
+        assert!(matches!(ready(&mut reader), Err(actual) if actual == expected));
         assert!(matches!(
             reader.take(&AtomicBool::new(false)),
             Err(Error::Closed)
@@ -299,7 +291,7 @@ fn cancellation_and_pool_pressure_keep_segment_publication_atomic() {
     request(&mut reader);
     assert!(matches!(
         reader.advance(&mut WorkBudget::new(1), &AtomicBool::new(true)),
-        Err(Error::Core(CoreError::Cancelled))
+        Err(Error::Cancelled)
     ));
     assert_closed(&trace);
     drop(reader);
@@ -319,7 +311,7 @@ fn cancellation_and_pool_pressure_keep_segment_publication_atomic() {
     let cancel = AtomicBool::new(false);
     assert!(matches!(
         reader.take(&cancel),
-        Err(Error::Core(CoreError::Backpressure { .. }))
+        Err(Error::Backpressure { .. })
     ));
     drop(reserve);
     assert_eq!(
@@ -349,7 +341,7 @@ fn parser_only_output_uses_the_queue_clock_and_preserves_the_pes_facts() {
     let reserve = pool.reserve(pool.available()).unwrap();
     assert!(matches!(
         reader.take_parser_only(&cancel),
-        Err(Error::Core(CoreError::Backpressure { .. }))
+        Err(Error::Backpressure { .. })
     ));
     drop(reserve);
     let output = reader.take_parser_only(&cancel).unwrap().unwrap();
@@ -400,9 +392,7 @@ fn explicit_aac_pid_and_disabled_audio_apply_before_delivery() {
         } else {
             assert!(matches!(
                 ready(&mut reader),
-                Err(Error::Core(CoreError::Unsupported(
-                    "HLS segment has no requested AAC PID"
-                )))
+                Err(Error::Unsupported("HLS segment has no requested AAC PID"))
             ));
         }
         assert_closed(&trace);

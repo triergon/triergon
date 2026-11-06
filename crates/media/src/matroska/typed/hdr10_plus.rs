@@ -244,7 +244,7 @@ impl<'a> Hdr10Plus<'a> {
             .strip_prefix(&T35_HEADER)
             .ok_or(Error::Invalid("HDR10+ terminal code"))?;
         if body.len() > MAX_BODY {
-            return Err(Error::Limit("HDR10+ payload"));
+            return Err(Error::Policy("HDR10+ payload"));
         }
         Ok((raw.len() as u64) * 8)
     }
