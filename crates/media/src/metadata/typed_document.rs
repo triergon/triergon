@@ -37,12 +37,12 @@ enum Frame {
 #[derive(Debug, Clone, Copy, Default)]
 struct Fields {
     presence: u64,
-    singles: u64,
     start: Option<u64>,
     end: Option<u64>,
     ordered: Option<u64>,
 }
-fn bit(id: u64) -> u64 {
+
+const fn bit(id: u64) -> u64 {
     let index = match id {
         0x61a7 => 0,
         0x45b9 => 1,
@@ -64,27 +64,74 @@ fn bit(id: u64) -> u64 {
         0x4485 => 17,
         0x6922 => 18,
         0x6933 => 19,
+        0x2ad7b1 => 20,
+        0x4489 => 21,
+        0x4461 => 22,
+        0x7ba9 => 23,
+        0x4d80 => 24,
+        0x5741 => 25,
+        0x73a4 => 26,
+        0x3cb923 => 27,
+        0x3eb923 => 28,
+        0x467e => 29,
+        0x45bc => 30,
+        0x45bd => 31,
+        0x45db => 32,
+        0x45dd => 33,
+        0x5654 => 34,
+        0x98 => 35,
+        0x4598 => 36,
+        0x63c3 => 37,
+        0x8f => 38,
+        0x63c0 => 39,
+        0x68ca => 40,
+        0x63ca => 41,
+        0x447a => 42,
+        0x447b => 43,
+        0x4484 => 44,
+        0x6955 => 45,
+        0x450d => 46,
         _ => return 0,
     };
     1 << index
 }
-fn singles(id: u64) -> &'static [u64] {
+
+const fn field_mask(mut ids: &[u64]) -> u64 {
+    let mut mask = 0;
+    while let [id, rest @ ..] = ids {
+        let field = bit(*id);
+        assert!(field != 0 && mask & field == 0);
+        mask |= field;
+        ids = rest;
+    }
+    mask
+}
+
+fn singleton_mask(id: u64) -> u64 {
     match id {
-        INFO => &[
-            0x2ad7b1, 0x4489, 0x4461, 0x7ba9, 0x4d80, 0x5741, 0x73a4, 0x3cb923, 0x3eb923,
-        ],
-        0x61a7 => &[0x46ae, 0x466e, 0x4660, 0x467e, 0x465c],
-        0x45b9 => &[0x45bc, 0x45bd, 0x45db, 0x45dd],
-        0xb6 => &[
-            0x73c4, 0x5654, 0x91, 0x92, 0x98, 0x4598, 0x6e67, 0x6ebc, 0x63c3, 0x8f,
-        ],
-        0x80 => &[0x85],
-        0x7373 => &[0x63c0],
-        0x63c0 => &[0x68ca, 0x63ca],
-        0x67c8 => &[0x45a3, 0x447a, 0x447b, 0x4484, 0x4487, 0x4485],
-        0x6944 => &[0x6955, 0x450d],
-        0x6911 => &[0x6922, 0x6933],
-        _ => &[],
+        INFO => {
+            const {
+                field_mask(&[
+                    0x2ad7b1, 0x4489, 0x4461, 0x7ba9, 0x4d80, 0x5741, 0x73a4, 0x3cb923, 0x3eb923,
+                ])
+            }
+        }
+        0x61a7 => const { field_mask(&[0x46ae, 0x466e, 0x4660, 0x467e, 0x465c]) },
+        0x45b9 => const { field_mask(&[0x45bc, 0x45bd, 0x45db, 0x45dd]) },
+        0xb6 => {
+            const {
+                field_mask(&[
+                    0x73c4, 0x5654, 0x91, 0x92, 0x98, 0x4598, 0x6e67, 0x6ebc, 0x63c3, 0x8f,
+                ])
+            }
+        }
+        0x80 => const { field_mask(&[0x85]) },
+        0x7373 => const { field_mask(&[0x63c0]) },
+        0x63c0 => const { field_mask(&[0x68ca, 0x63ca]) },
+        0x67c8 => const { field_mask(&[0x45a3, 0x447a, 0x447b, 0x4484, 0x4487, 0x4485]) },
+        0x6944 => const { field_mask(&[0x6955, 0x450d]) },
+        0x6911 => const { field_mask(&[0x6922, 0x6933]) },
+        _ => 0,
     }
 }
 fn require(fields: Fields, ids: &[u64]) -> Result<()> {
@@ -261,17 +308,13 @@ impl DocumentJob {
             ebml::uint(raw)
         }
     }
-    fn collect(&self, parent: usize, child: usize, fields: &mut Fields) -> Result<()> {
+    fn collect(&self, singletons: u64, child: usize, fields: &mut Fields) -> Result<()> {
         let id = u64::from(self.nodes.as_slice()[child].id);
-        let unique = singles(u64::from(self.nodes.as_slice()[parent].id));
-        if let Some(bit) = unique.iter().position(|value| *value == id) {
-            let mask = 1 << bit;
-            if fields.singles & mask != 0 {
-                return Err(Error::Invalid("duplicate metadata field"));
-            }
-            fields.singles |= mask;
+        let field = bit(id);
+        if fields.presence & singletons & field != 0 {
+            return Err(Error::Invalid("duplicate metadata field"));
         }
-        fields.presence |= bit(id);
+        fields.presence |= field;
         match id {
             0x91 => fields.start = Some(self.uint(child)?),
             0x92 => fields.end = Some(self.uint(child)?),
@@ -624,6 +667,8 @@ impl DocumentJob {
                     // One charged visit and one cancellation check per child, as
                     // one outer iteration per child would do, without re-dispatch.
                     let mut fields = self.fields;
+                    let singletons =
+                        singleton_mask(u64::from(self.nodes.as_slice()[self.validate].id));
                     let mut first = true;
                     while self.child < self.child_end {
                         if !first {
@@ -634,7 +679,7 @@ impl DocumentJob {
                             self.fields = fields;
                             return Ok(ParseStep::Yield);
                         }
-                        let result = self.collect(self.validate, self.child, &mut fields);
+                        let result = self.collect(singletons, self.child, &mut fields);
                         self.fields = fields;
                         result?;
                         self.child = usize::from(self.nodes.as_slice()[self.child].next);

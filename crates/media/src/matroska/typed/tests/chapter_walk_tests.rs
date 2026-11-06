@@ -104,6 +104,43 @@ fn uid_namespaces_keep_full_u64_values_and_reject_only_same_kind_duplicates() {
 }
 
 #[test]
+fn chapter_displays_repeat_and_the_enabled_flag_is_unique() {
+    let mut fields = [
+        uint(0x73c4, 1),
+        uint(0x91, 0),
+        uint(0x4598, 1),
+        element(0x80, &element(0x85, b"First title")),
+        element(0x80, &element(0x85, b"Second title")),
+    ]
+    .concat();
+    let valid = element(0x45b9, &element(0xb6, &fields));
+    fields.extend(uint(0x4598, 0));
+    let duplicate = element(0x45b9, &element(0xb6, &fields));
+
+    for quantum in [1, 7, 8192] {
+        let (document, _) = parse(&valid, quantum).unwrap();
+        let chapter = document
+            .editions()
+            .next()
+            .unwrap()
+            .chapters()
+            .next()
+            .unwrap();
+        assert!(chapter.enabled().unwrap());
+        assert!(
+            chapter
+                .displays()
+                .map(|display| display.title().unwrap())
+                .eq(["First title", "Second title"])
+        );
+        assert!(matches!(
+            parse(&duplicate, quantum),
+            Err(Error::Invalid("duplicate metadata field"))
+        ));
+    }
+}
+
+#[test]
 fn typed_chapter_ranges_keep_nested_unknown_payloads_and_final_empty_children_exact() {
     let opaque = element(0x4abc, &[0x73, 0xc4, 0x81, 1, 0xb6, 0x80]);
     let display = element(0x80, &element(0x85, &[]));
