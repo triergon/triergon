@@ -1,8 +1,8 @@
 //! Sequential TS188 feed for AVC and ADTS AAC.
 
 use crate::{
-    ClockChoice, Engine, Error, Player, PlayerPolicy, Progress, RawEvent, Result, Selection,
-    Source, SourceReply, TrackKey,
+    Engine, Error, Player, PlayerPolicy, Progress, RawEvent, Result, Selection, Source,
+    SourceReply, TrackKey,
     hls_aac::{HlsAac, HlsAacFrame},
     hls_avc::{AvcTsAccessUnit, AvcTsLimits, AvcTsReader, AvcTsStep},
     io::SourceOwner,
@@ -111,7 +111,9 @@ impl<S: Source> TsProgressiveReader<S> {
             return Err(Error::Invalid("progressive TS requires a sequential body"));
         }
         let engine = Engine::ts_progressive(input, limits.transport)?;
-        let mut player = Player::new_direct(
+        // The feed applies the raw PES clock to access units. It never uses
+        // the player's packet presentation classification.
+        let player = Player::new_direct(
             engine,
             source,
             Selection::All,
@@ -122,7 +124,6 @@ impl<S: Source> TsProgressiveReader<S> {
                 ..PlayerPolicy::default()
             },
         )?;
-        player.set_clock_view(ClockChoice::ExplicitNativeProjection)?;
         Ok(Self {
             player: Some(player),
             limits,
