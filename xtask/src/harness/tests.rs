@@ -219,7 +219,7 @@ fn non_finite_or_incomplete_measurements_never_satisfy_a_gate() {
         let row = v(&format!(
             r#"{{"id": "bad", "profile": "avc-aac-sub", "parity": {{"status": "pass"}},
             "timing": {{"status": "measured", "pairs": 30, "ratio": {{"upper_95": {ratio}}}}},
-            "memory": {{"status": "qualified", "rss_ratio_upper_95": {ratio}, "heap_ratio_upper_95": {ratio}}}}}"#
+            "memory": {{"status": "qualified", "total_rss_ratio_upper_95": {ratio}, "heap_ratio_upper_95": {ratio}}}}}"#
         ));
         let result = acceptance(
             root(),

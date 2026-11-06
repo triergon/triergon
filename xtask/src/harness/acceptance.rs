@@ -338,7 +338,8 @@ pub fn acceptance(
             reasons.push(format!("{id}: runtime gate unproven or failed"));
         }
         let memory = row.get("memory").cloned().unwrap_or(Value::Object(vec![]));
-        let ratios = ["rss_ratio_upper_95", "heap_ratio_upper_95"]
+        // Graded as harness/policy.json states; RSS growth is reported only.
+        let ratios = ["total_rss_ratio_upper_95", "heap_ratio_upper_95"]
             .map(|k| float(memory.get(k)).unwrap_or(f64::INFINITY));
         let memory_ok = super::memory::evidence_valid(
             root,

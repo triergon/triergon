@@ -695,16 +695,20 @@ fn the_resident_bound_uses_the_declared_ceiling_and_observed_reference_growth() 
         result.get("status").and_then(Value::as_str),
         Some("qualified")
     );
-    assert_eq!(
-        result.get("rss_ratio_upper_95").and_then(Value::as_f64),
-        Some(1_008_192.0 / 3_991_808.0)
-    );
+    // Graded: the candidate's peak ceiling plus two pages against the
+    // reference's observed peak minus two pages.
     assert_eq!(
         result
-            .get("total_rss_ratio")
-            .and_then(|t| t.get("median"))
+            .get("total_rss_ratio_upper_95")
             .and_then(Value::as_f64),
-        Some(2_000_000.0 / 5_000_000.0)
+        Some(2_008_192.0 / 4_991_808.0)
+    );
+    // Diagnostic: growth from the starting resident set, with the same margins.
+    assert_eq!(
+        result
+            .get("rss_growth_ratio_upper_95")
+            .and_then(Value::as_f64),
+        Some(1_008_192.0 / 3_991_808.0)
     );
 }
 

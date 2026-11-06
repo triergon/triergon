@@ -948,7 +948,7 @@ pub fn evaluate(
             return failed("invalid-memory-observation");
         };
         let field = |o: &Value, k: &str| n(o, k);
-        let values = (|| -> Option<(i128, i128, i128, i128, i128)> {
+        let values = (|| -> Option<(i128, i128, i128, i128)> {
             let candidate_peak = if linux {
                 field(a, "rss_peak_upper_bound_bytes")?
             } else {
@@ -963,11 +963,18 @@ pub fn evaluate(
             } else {
                 field(b, "hwm_end")?.max(field(b, "rss_peak_observed")?)
             };
-            Some((candidate_peak, upper, lower, reference_total, 0))
+            // The policy's total resident peak: the candidate's ceiling plus two
+            // pages against the reference's observed peak minus two pages.
+            let total_upper = candidate_peak + 2 * field(a, "page_size")?;
+            let total_lower = reference_total - 2 * field(b, "page_size")?;
+            Some((upper, lower, total_upper, total_lower))
         })();
-        let Some((candidate_peak, upper, lower, reference_total, _)) = values else {
+        let Some((upper, lower, total_upper, total_lower)) = values else {
             return failed("invalid-memory-observation");
         };
+        if total_lower <= 0 || total_upper <= 0 {
+            return failed("total-rss-attribution-unresolved");
+        }
         if lower <= 0 || upper <= 0 {
             return failed("rss-attribution-unresolved");
         }
@@ -981,7 +988,7 @@ pub fn evaluate(
             return failed("invalid-memory-observation");
         };
         heaps.push((ch, rh));
-        totals.push((candidate_peak, reference_total));
+        totals.push((total_upper, total_lower));
     }
     let interval = |values: &[(i128, i128)]| -> R<Value> {
         let pairs: Vec<(f64, f64)> = values.iter().map(|&(a, b)| (a as f64, b as f64)).collect();
@@ -998,14 +1005,21 @@ pub fn evaluate(
     };
     let mut fields = vec![
         ("status", Value::str("qualified")),
-        ("rss_ratio_upper_95", rss.get("upper_95").cloned().unwrap()),
+        (
+            "total_rss_ratio_upper_95",
+            total.get("upper_95").cloned().unwrap(),
+        ),
         (
             "heap_ratio_upper_95",
             heap.get("upper_95").cloned().unwrap(),
         ),
-        ("rss_bound_ratio", rss),
-        ("heap_ratio", heap),
+        (
+            "rss_growth_ratio_upper_95",
+            rss.get("upper_95").cloned().unwrap(),
+        ),
         ("total_rss_ratio", total),
+        ("heap_ratio", heap),
+        ("rss_growth_ratio", rss),
         ("pairs", Value::int(pairs)),
         ("samples", Value::Array(samples.to_vec())),
         ("certificate", certificate.clone()),
@@ -1013,8 +1027,8 @@ pub fn evaluate(
     ];
     if linux {
         fields.extend([
-            ("rss_bound_basis", Value::str("candidate declared resident ceiling / reference observed smaps resident lower bound; +2/-2 pages")),
-            ("total_rss_basis", Value::str("candidate resident ceiling / reference observed resident lower bound; not a VM ratio")),
+            ("total_rss_basis", Value::str("graded: candidate resident peak ceiling plus two pages / reference observed resident peak minus two pages; not a VM ratio")),
+            ("rss_growth_basis", Value::str("diagnostic: candidate resident ceiling growth plus two pages / reference observed resident growth minus two pages")),
             ("rss_exact_peak_status", Value::str("unresolved")),
         ]);
     }
@@ -1211,11 +1225,12 @@ pub fn evidence_valid(
         let recomputed = evaluate(root, raw, pairs, seed, certificate);
         let same = [
             "status",
-            "rss_ratio_upper_95",
+            "total_rss_ratio_upper_95",
             "heap_ratio_upper_95",
-            "rss_bound_ratio",
-            "heap_ratio",
+            "rss_growth_ratio_upper_95",
             "total_rss_ratio",
+            "heap_ratio",
+            "rss_growth_ratio",
         ]
         .iter()
         .all(|k| match (recomputed.get(k), memory.get(k)) {
