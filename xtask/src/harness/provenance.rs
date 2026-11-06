@@ -18,17 +18,21 @@ pub fn matroska_inputs() -> Vec<String> {
     let mut names: Vec<String> = [
         "Makefile",
         "specs/sources.json",
-        "tools/build_harness.py",
-        "tools/test_media.py",
-        "tools/test_catalogue_vector.py",
-        "tools/run_fate.py",
         "research/fate-index.json",
-        "harness/common.py",
-        "harness/provenance.py",
-        "harness/runner.py",
-        "harness/memory.py",
-        "harness/reuse.py",
-        "harness/comparison.py",
+        "harness/oracles.py",
+        "xtask/src/harness/acceptance.rs",
+        "xtask/src/harness/build.rs",
+        "xtask/src/harness/comparison.rs",
+        "xtask/src/harness/diff.rs",
+        "xtask/src/harness/linux.rs",
+        "xtask/src/harness/memory.rs",
+        "xtask/src/harness/oracle.rs",
+        "xtask/src/harness/parity.rs",
+        "xtask/src/harness/provenance.rs",
+        "xtask/src/harness/report.rs",
+        "xtask/src/harness/timing.rs",
+        "xtask/src/harness/vectors.rs",
+        "xtask/src/harness/worker.rs",
         "harness/spec_oracle.py",
         "harness/content_oracle.py",
         "harness/colour_oracle.py",
@@ -460,7 +464,10 @@ mod tests {
                 .any(|p| p.get("name").and_then(Value::as_str) == Some("media-worker"))
         );
         let shared = graph.get("shared_files").unwrap();
-        assert!(shared.get("Cargo.toml").is_none() && shared.get("harness/runner.py").is_some());
+        assert!(
+            shared.get("Cargo.toml").is_none()
+                && shared.get("xtask/src/harness/parity.rs").is_some()
+        );
         assert_eq!(
             graph.get("sha256").and_then(Value::as_str).map(str::len),
             Some(64)

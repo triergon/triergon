@@ -3,6 +3,7 @@
 //! results against the feature contract. Failures are recorded, never dropped.
 
 pub mod acceptance;
+pub mod build;
 pub mod comparison;
 pub mod diff;
 pub mod linux;
@@ -16,4 +17,5 @@ pub mod report;
 #[cfg(test)]
 mod tests;
 pub mod timing;
+pub mod vectors;
 pub mod worker;

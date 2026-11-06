@@ -37,6 +37,14 @@ commands:
                  build the pinned FFmpeg reference into .research/reference[-formats]
   fetch-specs    [--record] cache the specification texts and verify specs/sources.json
   fetch-vectors  cache the required external test vectors and verify their hashes
+  external-vector --output DIR [--reuse-report F] [--pairs N] [--iterations N] [--benchmark] [--memory]
+                 qualify the mandatory external metadata vector through the same gates
+  fate-run       --case NAME [--demux-only]   run one supported upstream FATE case
+  trace-identities --output F [--compare F] [--candidate W]
+                 record the digest of every candidate trace over all recorded cases
+  graph          PACKAGE [FILE]...   print the provenance graph of a workspace package
+  build-workers  build the candidate and reference workers and the memory observers, and
+                 record their identity in target/harness/identity.json
   report         [--contract F] [--manifest F] [--corpus DIR] [--output DIR] [--fate-cache DIR]
                  [--additional-report F]... [--require-acceptance] [--require-slice-acceptance]
                  [--benchmark] [--memory] [--pairs N] [--iterations N] [--seed N] [--reuse-report F]
@@ -61,6 +69,13 @@ fn main() -> ExitCode {
         Some("fate-inventory") => fate_inventory(&args[1..]),
         Some("compare") => compare(&root, &args[1..]),
         Some("report") => return report(&root, &args[1..]),
+        Some("external-vector") => return external_vector(&root, &args[1..]),
+        Some("fate-run") => return fate_run(&root, &args[1..]),
+        Some("graph") => graph(&root, &args[1..]),
+        Some("trace-identities") => return trace_identities(&root, &args[1..]),
+        Some("build-workers") => {
+            harness::build::build(&root).map(|path| println!("{}", path.display()))
+        }
         Some("prepare-ffmpeg") => prepare_ffmpeg(&root, &args[1..]),
         Some("fetch-specs") => match &args[1..] {
             [] => fetch::specs(&root, false, &fetch::Network).map(|s| println!("{s}")),
@@ -126,6 +141,105 @@ fn fixtures(root: &Path) -> Task {
     for line in corpus::generate_all(&paths)? {
         println!("{line}");
     }
+    Ok(())
+}
+
+fn exit(result: Result<i32, String>) -> ExitCode {
+    match result {
+        Ok(code) => ExitCode::from(code.clamp(0, 255) as u8),
+        Err(message) => {
+            eprintln!("{message}");
+            ExitCode::from(2)
+        }
+    }
+}
+
+fn external_vector(root: &Path, args: &[String]) -> ExitCode {
+    let mut options = harness::vectors::ExternalOptions {
+        output: PathBuf::new(),
+        reuse_report: None,
+        pairs: 30,
+        iterations: 50,
+        benchmark: false,
+        memory: false,
+    };
+    let mut rest = args.iter();
+    let parsed = (|| -> Task {
+        while let Some(flag) = rest.next() {
+            let mut value = || {
+                rest.next()
+                    .cloned()
+                    .ok_or_else(|| format!("{flag} needs a value"))
+            };
+            match flag.as_str() {
+                "--output" => options.output = PathBuf::from(value()?),
+                "--reuse-report" => options.reuse_report = Some(PathBuf::from(value()?)),
+                "--pairs" => {
+                    options.pairs = value()?.parse().map_err(|_| "--pairs: not a number")?
+                }
+                "--iterations" => {
+                    options.iterations =
+                        value()?.parse().map_err(|_| "--iterations: not a number")?
+                }
+                "--benchmark" => options.benchmark = true,
+                "--memory" => options.memory = true,
+                _ => return Err(USAGE.to_owned()),
+            }
+        }
+        if options.output.as_os_str().is_empty() {
+            Err("--output is required".into())
+        } else {
+            Ok(())
+        }
+    })();
+    exit(parsed.and_then(|()| harness::vectors::external_vector(root, &options)))
+}
+
+fn fate_run(root: &Path, args: &[String]) -> ExitCode {
+    let (mut case, mut demux_only) = ("fate-matroska-xiph-lacing".to_owned(), false);
+    let mut rest = args.iter();
+    let parsed = (|| -> Task {
+        while let Some(flag) = rest.next() {
+            match flag.as_str() {
+                "--case" => case = rest.next().cloned().ok_or("--case needs a value")?,
+                "--demux-only" => demux_only = true,
+                _ => return Err(USAGE.to_owned()),
+            }
+        }
+        Ok(())
+    })();
+    exit(parsed.and_then(|()| {
+        harness::vectors::fate_run(root, &case, demux_only, &harness::vectors::NativeFate)
+    }))
+}
+
+fn trace_identities(root: &Path, args: &[String]) -> ExitCode {
+    let (mut output, mut compare, mut candidate) =
+        (None, None, root.join("target/release/media-worker"));
+    let mut rest = args.iter();
+    let parsed = (|| -> Task {
+        while let Some(flag) = rest.next() {
+            let value = PathBuf::from(rest.next().ok_or_else(|| format!("{flag} needs a value"))?);
+            match flag.as_str() {
+                "--output" => output = Some(value),
+                "--compare" => compare = Some(value),
+                "--candidate" => candidate = value,
+                _ => return Err(USAGE.to_owned()),
+            }
+        }
+        Ok(())
+    })();
+    exit(parsed.and_then(|()| {
+        let output = output.ok_or("--output is required")?;
+        harness::vectors::trace_identities(root, &candidate, &output, compare.as_deref())
+    }))
+}
+
+fn graph(root: &Path, args: &[String]) -> Task {
+    let (package, files) = args.split_first().ok_or("graph needs a package name")?;
+    let metadata = harness::provenance::cargo_metadata(root)?;
+    let graph = harness::provenance::selected_graph(root, &metadata, package, files)?;
+    println!("{}", json::to_python(&graph, None));
     Ok(())
 }
 

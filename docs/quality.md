@@ -64,8 +64,13 @@ make qualify         # correctness, runtime and memory with acceptance
 (`--contract`, `--manifest`, `--corpus`) and grades it; `--benchmark` adds paired
 runtime and `--memory` the heap and RSS measurement under the native observers
 (`harness/allocations*.c`), including the Linux link-closure and active-window guard
-certificates. `cargo xtask compare` compares a single input. The independent oracles stay
-in Python (`harness/*_oracle.py`, run through `python3 -m harness.oracles`);
+certificates. `cargo xtask compare` compares a single input, `cargo xtask external-vector`
+qualifies the mandatory external vector and `cargo xtask fate-run` runs one supported
+upstream FATE case. `cargo xtask build-workers` builds the workers and records the build
+identity every collection is checked against. `cargo xtask trace-identities` records the
+digest of every candidate trace, so a change can show its traces are byte-identical
+(`--compare` an earlier record). The independent oracles stay in Python
+(`harness/*_oracle.py`, run through `python3 -m harness.oracles`);
 `tools/fuzz_media.py` runs deterministic, replayable byte mutations against debug,
 release and reference workers.
 

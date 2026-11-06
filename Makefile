@@ -24,7 +24,7 @@ fixtures:
 	cargo xtask fixtures
 
 adapters:
-	python3 tools/build_harness.py
+	cargo xtask build-workers
 
 report:
 	cargo xtask report --fate-cache .research/fate-samples

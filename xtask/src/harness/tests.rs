@@ -553,3 +553,161 @@ fn interrupted_runs_keep_unvisited_measurements_and_reject_ambiguous_ids() {
         .is_err()
     );
 }
+
+fn reasons(result: &Value, key: &str) -> Vec<String> {
+    result
+        .get(key)
+        .and_then(Value::as_array)
+        .unwrap()
+        .iter()
+        .filter_map(|r| r.as_str().map(str::to_owned))
+        .collect()
+}
+
+#[test]
+fn missing_colour_or_catalogue_source_proof_cannot_satisfy_the_gate() {
+    let colour = acceptance(
+        root(),
+        &load("harness/colour-slice.json"),
+        &[v(
+            r#"{"id": "colour-absent", "profile": "colour-absent", "parity": {"status": "pass", "source_timing_status": "pass"}}"#,
+        )],
+        &v("{}"),
+        "aarch64-apple-darwin",
+        &[],
+        &[],
+    );
+    assert!(
+        reasons(&colour, "slice_reasons")
+            .iter()
+            .any(|r| r.contains("complete source/native colour gate"))
+    );
+    let catalogue = acceptance(
+        root(),
+        &load("harness/catalogue-slice.json"),
+        &[v(
+            r#"{"id": "catalogue-empty", "profile": "catalogue-empty", "parity": {"status": "pass", "source_timing_status": "pass"}}"#,
+        )],
+        &v("{}"),
+        "aarch64-apple-darwin",
+        &[],
+        &[],
+    );
+    assert!(
+        reasons(&catalogue, "slice_reasons")
+            .iter()
+            .any(|r| r.contains("complete source/native catalogue gate"))
+    );
+}
+
+#[test]
+fn the_required_external_vector_cannot_be_missing_or_substituted() {
+    let contract = load("harness/catalogue-slice.json");
+    let file = contract
+        .get("required_additional_vectors")
+        .and_then(Value::as_array)
+        .unwrap()[0]
+        .get("file")
+        .cloned()
+        .unwrap();
+    let substituted = Value::object([
+        ("id", file.clone()),
+        ("profile", file),
+        ("input_sha256", Value::str("substituted")),
+    ]);
+    for additional in [vec![], vec![substituted]] {
+        let verdict = acceptance(
+            root(),
+            &contract,
+            &[],
+            &v("{}"),
+            "aarch64-apple-darwin",
+            &[],
+            &additional,
+        );
+        assert!(
+            reasons(&verdict, "slice_reasons")
+                .iter()
+                .any(|r| r.contains("required additional vector missing or changed"))
+        );
+    }
+}
+
+#[test]
+fn every_contract_keeps_the_delivery_ceiling_and_optimisation_target() {
+    for prefix in ["", "header-", "zlib-", "seek-", "colour-", "catalogue-"] {
+        let contract = load(&format!("harness/{prefix}slice.json"));
+        assert_eq!(
+            contract.get("runtime_ratio_max").and_then(Value::as_f64),
+            Some(1.2),
+            "{prefix}"
+        );
+        assert_eq!(
+            contract
+                .get("runtime_optimization_ratio_target")
+                .and_then(Value::as_f64),
+            Some(0.8),
+            "{prefix}"
+        );
+        assert_eq!(
+            contract.get("runtime_policy").and_then(Value::as_str),
+            Some("initial-delivery-runtime-v2"),
+            "{prefix}"
+        );
+    }
+}
+
+#[test]
+fn the_delivery_ceiling_is_inclusive_and_does_not_replace_correctness_or_memory() {
+    let set_elapsed = |rows: &mut Vec<Value>, elapsed: i64| {
+        let Some(Value::Array(samples)) = rows[0]
+            .get("timing")
+            .and_then(|t| t.get("samples"))
+            .cloned()
+        else {
+            panic!()
+        };
+        let samples: Vec<Value> = samples
+            .into_iter()
+            .map(|mut s| {
+                put(
+                    &mut s,
+                    &["candidate", "data"],
+                    "elapsed_ns",
+                    Value::int(elapsed),
+                );
+                s
+            })
+            .collect();
+        put(&mut rows[0], &["timing"], "samples", Value::Array(samples));
+        put(
+            &mut rows[0],
+            &["timing"],
+            "ratio",
+            interval(&[(elapsed as f64, 100.0); 30]),
+        );
+    };
+    let (mut contract, mut rows, identity) = matched_gate_fixture();
+    put(&mut contract, &[], "runtime_ratio_max", Value::float(1.2));
+    for (elapsed, passes) in [(119, true), (121, false)] {
+        set_elapsed(&mut rows, elapsed);
+        assert_eq!(verdict(&contract, &rows, &identity).1, passes, "{elapsed}");
+    }
+    set_elapsed(&mut rows, 119);
+    let mut strict = contract.clone();
+    put(&mut strict, &[], "runtime_ratio_max", Value::float(0.8));
+    assert!(
+        !verdict(&strict, &rows, &identity).1,
+        "the optimisation target is stricter"
+    );
+    put(&mut rows[0], &["parity"], "status", Value::str("mismatch"));
+    assert!(!verdict(&contract, &rows, &identity).1);
+    put(&mut rows[0], &["parity"], "status", Value::str("pass"));
+    put(
+        &mut rows[0],
+        &["memory"],
+        "heap_ratio_upper_95",
+        Value::float(1.0),
+    );
+    assert!(!verdict(&contract, &rows, &identity).1);
+}

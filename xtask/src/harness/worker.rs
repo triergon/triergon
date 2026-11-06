@@ -29,8 +29,21 @@ pub fn run(
     env: &[(String, Option<String>)],
     timeout: Duration,
 ) -> Result<Option<Finished>, String> {
+    run_in(argv, env, None, timeout)
+}
+
+/// [`run`] in the working directory `cwd`.
+pub fn run_in(
+    argv: &[OsString],
+    env: &[(String, Option<String>)],
+    cwd: Option<&std::path::Path>,
+    timeout: Duration,
+) -> Result<Option<Finished>, String> {
     let started = Instant::now();
     let mut command = Command::new(&argv[0]);
+    if let Some(cwd) = cwd {
+        command.current_dir(cwd);
+    }
     command
         .args(&argv[1..])
         .stdin(Stdio::null())
@@ -80,9 +93,84 @@ pub fn run(
     }))
 }
 
+/// Candidate invocations recorded for trace identities: the worker whose calls
+/// are recorded, and each call's arguments, exit code and stdout digest.
+static RECORDER: std::sync::Mutex<Option<(std::path::PathBuf, Vec<Value>)>> =
+    std::sync::Mutex::new(None);
+
+/// Record every later invocation of `worker` until [`stop_recording`].
+pub fn record_calls(worker: &std::path::Path) {
+    if let Ok(mut slot) = RECORDER.lock() {
+        *slot = Some((worker.to_path_buf(), Vec::new()));
+    }
+}
+
+pub fn stop_recording() -> Vec<Value> {
+    RECORDER
+        .lock()
+        .ok()
+        .and_then(|mut slot| slot.take())
+        .map(|(_, calls)| calls)
+        .unwrap_or_default()
+}
+
+/// A recorded candidate run: no timeout, and only status, exit code and output.
+fn recorded(argv: &[OsString]) -> Option<Value> {
+    let mut slot = RECORDER.lock().ok()?;
+    let (worker, calls) = slot.as_mut()?;
+    if std::fs::canonicalize(&argv[0]).ok().as_deref() != Some(worker.as_path()) {
+        return None;
+    }
+    let finished = match run(argv, &[], Duration::from_secs(u64::MAX / 4)) {
+        Ok(Some(finished)) => finished,
+        Ok(None) => return None,
+        Err(error) => panic!("cannot start worker: {error}"),
+    };
+    let shown = argv[1..].iter().enumerate().map(|(i, a)| {
+        if i == 1 {
+            std::path::Path::new(a).file_name().map_or_else(
+                || a.to_string_lossy().into_owned(),
+                |n| n.to_string_lossy().into_owned(),
+            )
+        } else {
+            a.to_string_lossy().into_owned()
+        }
+    });
+    calls.push(Value::object([
+        ("argv", Value::strings(shown)),
+        ("exit", Value::int(finished.code)),
+        (
+            "stdout_sha256",
+            Value::str(crate::sha256::hex(&finished.stdout)),
+        ),
+    ]));
+    if finished.code != 0 {
+        return Some(Value::object([
+            ("status", Value::str("worker-error")),
+            ("exit_code", Value::int(finished.code)),
+        ]));
+    }
+    Some(
+        match std::str::from_utf8(&finished.stdout)
+            .ok()
+            .and_then(|t| json::parse(t).ok())
+        {
+            Some(data) => Value::object([
+                ("status", Value::str("ok")),
+                ("data", data),
+                ("process_elapsed_ns", Value::int(0)),
+            ]),
+            None => Value::object([("status", Value::str("invalid-worker-output"))]),
+        },
+    )
+}
+
 /// Run `argv` and classify the result as `ok` (a JSON object on stdout),
 /// `timeout`, `worker-error` or `invalid-worker-output`.
 pub fn execute(argv: &[OsString], timeout: Duration) -> Value {
+    if let Some(result) = recorded(argv) {
+        return result;
+    }
     let started = Instant::now();
     let finished = match run(argv, &[], timeout) {
         Ok(finished) => finished,

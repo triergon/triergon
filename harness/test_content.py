@@ -4,6 +4,7 @@ from pathlib import Path
 from .runner import ROOT
 from .spec_oracle import elements,variable
 from .common import zlib_fixture
+from .content_oracle import content_trace, projected_content
 
 class ContentTests(unittest.TestCase):
     def test_ordered_chain_empty_and_private_bytes_against_independent_oracle(self):
@@ -56,3 +57,23 @@ class ContentTests(unittest.TestCase):
             path.write_bytes(zlib_fixture(empty=True).replace(b'A_PCM/INT/LIT',b'A_PCM/INT/BIG'))
             opaque=json.loads(subprocess.check_output([worker,'codec-trace',path],text=True))
             self.assertEqual(len(opaque['packets']),1)
+
+
+class SourceOracleTests(unittest.TestCase):
+    def test_all_selected_compression_bytes_match_an_independent_source_oracle(self):
+        worker = ROOT / 'target/release/media-worker'
+        for case in json.loads((ROOT / 'harness/zlib-corpus.json').read_text())['cases']:
+            path = ROOT / '.research/zlib-fixtures' / case['file']
+            trace = json.loads(subprocess.check_output([worker, 'trace', path]))
+            self.assertEqual(projected_content(trace), content_trace(path), case['id'])
+
+    def test_same_difference_paths_do_not_allow_changed_native_values(self):
+        import hashlib
+        from .runner import review_native_difference
+        source = {'packets': [{'payload': '02'}]}
+        native = {'packets': [{'payload': '01'}]}
+        rule = {'id': 'test', 'raw_native_difference_paths': ['/packets/0/payload'],
+                'raw_native_output_sha256': hashlib.sha256(json.dumps(native, sort_keys=True, separators=(',', ':')).encode()).hexdigest()}
+        self.assertEqual(review_native_difference(source, native, rule)[1]['status'], 'reviewed')
+        altered = {'packets': [{'payload': '03'}]}
+        self.assertEqual(review_native_difference(source, altered, rule)[1]['status'], 'unexpected-native-difference')

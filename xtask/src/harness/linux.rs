@@ -618,6 +618,43 @@ pub fn linked_libraries(worker: &Path, interpreter: Option<&str>) -> R<Value> {
     ]))
 }
 
+/// The content identity of a closure (files and environment), without loader
+/// addresses.
+pub fn library_identity(data: &Value) -> Value {
+    let keys = [
+        "status",
+        "interpreter",
+        "interpreter_sha256",
+        "libraries",
+        "inspected_artifact",
+        "virtual_kernel_libraries",
+        "kernel_release",
+        "binding_environment",
+    ];
+    let mut fields: Vec<(String, Value)> = keys
+        .iter()
+        .filter_map(|k| data.get(k).map(|v| (k.to_string(), v.clone())))
+        .collect();
+    let inspection = data
+        .get("main_elf_inspection")
+        .filter(|v| **v != Value::Null)
+        .or_else(|| {
+            data.get("anonymous_main_mapping")
+                .filter(|v| **v != Value::Null)
+        });
+    if let Some(inspection) = inspection {
+        let main = [
+            "inspected_class",
+            "inspected_type",
+            "first_LOAD_vaddr",
+            "needed_closure",
+        ]
+        .map(|k| (k, inspection.get(k).cloned().unwrap_or(Value::Null)));
+        fields.push(("inspected_main_ELF".into(), Value::object(main)));
+    }
+    Value::Object(fields)
+}
+
 pub fn linked_hashes(linked: &Value) -> Value {
     let Value::Object(roles) = linked else {
         return Value::Object(vec![]);
