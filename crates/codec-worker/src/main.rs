@@ -5,7 +5,7 @@
 //! KIND-CODEC-raw FILE OUT, KIND-CODEC one of video-h264, video-hevc, audio-ac3,
 //! audio-eac3, audio-aac, audio-dts. Bench prints {iterations, elapsed_ns, packets, bytes, digest} where
 //! packets counts output pictures/audio blocks and the digest
-//! ([`triergon_harness_protocol::lanes`]) covers the exact converted output (RGBA or
+//! ([`triergon_harness_protocol::interleaved`]) covers the exact converted output (RGBA or
 //! interleaved stereo s16le). File loading and process start are outside the timed
 //! interval.
 //!

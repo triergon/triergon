@@ -1,4 +1,4 @@
-//! Decoder vocabulary shared by the codec crates (layer L1).
+//! Decoder vocabulary shared by the codec crates.
 //!
 //! The codec crates (`triergon-codec-{aac,ac3,dca,h264,hevc}`) implement
 //! [`VideoDecoder`] or [`AudioDecoder`] and emit pictures as

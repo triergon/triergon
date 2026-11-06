@@ -10,8 +10,7 @@ mod bits;
 mod block;
 mod dct;
 mod error;
-#[doc(hidden)]
-pub mod motion;
+mod motion;
 mod rate;
 mod tables;
 

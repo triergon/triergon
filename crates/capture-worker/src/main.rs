@@ -3,6 +3,7 @@
 //!
 //! ```text
 //!   capture-worker convert  <w> <h> <flip> <frames> <in.rgba> <out.yuv>
+//!   capture-worker recon    <w> <h> <flip> <frames> <bitrate> <in.rgba> <out.yuv>
 //!   capture-worker pipeline <w> <h> <flip> <frames> <bitrate> <in.rgba> <out.ts>
 //!   capture-worker time     <w> <h> <flip> <frames> <bitrate> <in.rgba> <iterations>
 //!   capture-worker memory   <w> <h> <flip> <frames> <bitrate> <in.rgba>
