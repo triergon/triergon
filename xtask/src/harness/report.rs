@@ -281,7 +281,9 @@ pub fn run(root: &Path, options: &Options) -> Result<i32, String> {
     } else {
         additional_candidate(root, &identity, &candidate_name)?
     };
-    let feed = s(&contract, "worker_operation") == Some("feed-");
+    // Workers that take one input per operation and print one fold: the contract
+    // names the mode prefix, and each case may add arguments after the input.
+    let worker_operation = s(&contract, "worker_operation").map(str::to_owned);
     let iterations = options
         .iterations
         .or_else(|| {
@@ -380,7 +382,15 @@ pub fn run(root: &Path, options: &Options) -> Result<i32, String> {
             Value::object([("status", Value::str("input-hash-mismatch"))])
         } else if s(case, "rights") != Some("authored-synthetic") {
             Value::object([("status", Value::str("rights-unreviewed"))])
-        } else if feed {
+        } else if let Some(prefix) = &worker_operation {
+            let arguments: Vec<std::ffi::OsString> = case
+                .get("arguments")
+                .and_then(Value::as_array)
+                .unwrap_or_default()
+                .iter()
+                .filter_map(Value::as_str)
+                .map(Into::into)
+                .collect();
             row.push(("input_sha256", Value::str(sha)));
             row.push(("candidate_worker", Value::str(&candidate_name)));
             row.push((
@@ -390,7 +400,7 @@ pub fn run(root: &Path, options: &Options) -> Result<i32, String> {
                         "name",
                         contract.get("operation").cloned().unwrap_or(Value::Null),
                     ),
-                    ("view", Value::str("playback-feed-fold-v1")),
+                    ("view", Value::str(format!("playback-{prefix}fold-v1"))),
                 ]),
             ));
             let run = Run {
@@ -404,11 +414,16 @@ pub fn run(root: &Path, options: &Options) -> Result<i32, String> {
                 reference.clone(),
                 path.clone(),
                 Operation {
-                    prefix: "feed-".into(),
-                    arguments: vec![],
+                    prefix: prefix.clone(),
+                    arguments: arguments.clone(),
                 },
             ));
-            parity::feed_parity(&run, case.get("expected").unwrap_or(&Value::Null))?
+            parity::feed_parity(
+                &run,
+                prefix,
+                &arguments,
+                case.get("expected").unwrap_or(&Value::Null),
+            )?
         } else {
             row.push(("input_sha256", Value::str(sha)));
             let seek = case

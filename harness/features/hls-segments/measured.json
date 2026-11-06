@@ -1,0 +1,175 @@
+{
+  "schema": 1,
+  "cases": [
+    {
+      "id": "replay-avc-aac-06",
+      "profile": "replay-avc-aac-06",
+      "file": "replay-avc-aac-06.ts",
+      "sha256": "f9a0ce0958458bb3b824250fb99593efd35f65c9cff89a72b08a719c61389593",
+      "rights": "authored-synthetic",
+      "source": "vod",
+      "arguments": [
+        "avc",
+        "aac"
+      ],
+      "expected": {
+        "packets": 118,
+        "bytes": 25139,
+        "digest": 2372455777873827908
+      }
+    },
+    {
+      "id": "replay-hevc-aac-06",
+      "profile": "replay-hevc-aac-06",
+      "file": "replay-hevc-aac-06.ts",
+      "sha256": "c728a3d55a0e51bdf268f9a7c95eab534643b66afd42e35c7a29747d53a1e35a",
+      "rights": "authored-synthetic",
+      "source": "vod",
+      "arguments": [
+        "hevc",
+        "aac"
+      ],
+      "expected": {
+        "packets": 118,
+        "bytes": 27593,
+        "digest": 283660632068351118
+      }
+    },
+    {
+      "id": "replay-avc-ac3-06",
+      "profile": "replay-avc-ac3-06",
+      "file": "replay-avc-ac3-06.ts",
+      "sha256": "c104d0222a2e24fde97121ea059339ea3cb6c57544135b1c06a9135c53688083",
+      "rights": "authored-synthetic",
+      "source": "vod",
+      "arguments": [
+        "avc",
+        "ac3"
+      ],
+      "expected": {
+        "packets": 86,
+        "bytes": 24286,
+        "digest": 1417266235822592614
+      }
+    },
+    {
+      "id": "replay-hevc-ac3-06",
+      "profile": "replay-hevc-ac3-06",
+      "file": "replay-hevc-ac3-06.ts",
+      "sha256": "bd7538bf89cab17962940cb4ce2829dac069720b2093bca6d2c816da5a86e50a",
+      "rights": "authored-synthetic",
+      "source": "vod",
+      "arguments": [
+        "hevc",
+        "ac3"
+      ],
+      "expected": {
+        "packets": 86,
+        "bytes": 26740,
+        "digest": 17108860113934212060
+      }
+    },
+    {
+      "id": "replay-avc-eac3-06",
+      "profile": "replay-avc-eac3-06",
+      "file": "replay-avc-eac3-06.ts",
+      "sha256": "779bad5ce8bbb80bd007f1b4542fdd2177e50b74075727a4a2c517661aaa3136",
+      "rights": "authored-synthetic",
+      "source": "vod",
+      "arguments": [
+        "avc",
+        "eac3"
+      ],
+      "expected": {
+        "packets": 86,
+        "bytes": 24286,
+        "digest": 11574456588146292539
+      }
+    },
+    {
+      "id": "replay-hevc-eac3-06",
+      "profile": "replay-hevc-eac3-06",
+      "file": "replay-hevc-eac3-06.ts",
+      "sha256": "415b1ae0f88e987f2c9cc3af5cf175c52814627b7679ed00f850e54d92643c84",
+      "rights": "authored-synthetic",
+      "source": "vod",
+      "arguments": [
+        "hevc",
+        "eac3"
+      ],
+      "expected": {
+        "packets": 86,
+        "bytes": 26740,
+        "digest": 8819306392548360369
+      }
+    },
+    {
+      "id": "dvb-avc-ac3-44100",
+      "profile": "dvb-avc-ac3-44100",
+      "file": "dvb-avc-ac3-44100.ts",
+      "sha256": "f37c2680e8165f3e594e43d8f76f5e529e83610b4b3fa189e6d2e26d69fcbd26",
+      "rights": "authored-synthetic",
+      "source": "system-b",
+      "arguments": [
+        "avc",
+        "ac3"
+      ],
+      "expected": {
+        "packets": 82,
+        "bytes": 70193,
+        "digest": 17546479066080768940
+      }
+    },
+    {
+      "id": "dvb-hevc-eac3-32000",
+      "profile": "dvb-hevc-eac3-32000",
+      "file": "dvb-hevc-eac3-32000.ts",
+      "sha256": "67fbe16dea5d0466b122b69d4d03c46f2740080c5fa176fb4a0c3e4709e87969",
+      "rights": "authored-synthetic",
+      "source": "system-b",
+      "arguments": [
+        "hevc",
+        "eac3"
+      ],
+      "expected": {
+        "packets": 66,
+        "bytes": 64208,
+        "digest": 16150054342404706829
+      }
+    },
+    {
+      "id": "entry-hevc-aac-44100-01",
+      "profile": "entry-hevc-aac-44100-01",
+      "file": "entry-hevc-aac-44100-01.ts",
+      "sha256": "b617cac2231d7d9527e8023f97ffebbe6ab05dc0c620d8787b8d3a955b06901b",
+      "rights": "authored-synthetic",
+      "source": "closed-gop-vod",
+      "arguments": [
+        "hevc",
+        "aac"
+      ],
+      "expected": {
+        "packets": 63,
+        "bytes": 32667,
+        "digest": 13139999492156630353
+      }
+    },
+    {
+      "id": "entry-avc-eac3-32000-01",
+      "profile": "entry-avc-eac3-32000-01",
+      "file": "entry-avc-eac3-32000-01.ts",
+      "sha256": "9493659b9bb78aa042218199bf60d76d550b6ffc4ce29b8d7c2ca7b9c73e4f1b",
+      "rights": "authored-synthetic",
+      "source": "closed-gop-vod",
+      "arguments": [
+        "avc",
+        "eac3"
+      ],
+      "expected": {
+        "packets": 36,
+        "bytes": 25433,
+        "digest": 2336582844409355054
+      }
+    }
+  ]
+}
