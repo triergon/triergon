@@ -5,14 +5,14 @@ use super::boundary::{ClockOrigin, ClockValue, PacketTiming, SourceClock, Source
 use super::display_model::*;
 use super::display_render::Renderer;
 use super::display_state::{DecodeWork, Segment, SegmentResult, State, limit};
-use super::pes_parser::NativePesPacket;
+use super::pes_parser::PesPacket;
 use std::sync::atomic::AtomicBool;
 use triergon_core::{Budget, BudgetVec, Bytes, Error, Result, Time, WorkBudget};
 
 #[derive(Debug)]
 struct PendingPacket {
     packet: DvbPacket,
-    native_pes: Option<NativePesPacket>,
+    native_pes: Option<PesPacket>,
     effective_pts: Option<Time>,
     offset: usize,
     end: usize,
@@ -24,7 +24,7 @@ impl PendingPacket {
     fn bytes(&self) -> &Bytes {
         self.native_pes
             .as_ref()
-            .map_or(&self.packet.payload, NativePesPacket::codec)
+            .map_or(&self.packet.payload, PesPacket::codec)
     }
 
     fn packet_clock(&self) -> Option<(SourceClock, PacketTiming)> {
@@ -63,7 +63,8 @@ pub struct Decoder {
     total_work: usize,
     input_finished: bool,
     failed: Option<Error>,
-    native_failure: Option<super::NativeFailure>,
+    #[cfg(feature = "reference-trace")]
+    receiver_failure: Option<super::ReceiverFailure>,
     native_fallback: bool,
 }
 
@@ -115,7 +116,8 @@ impl Decoder {
             total_work: 0,
             input_finished: false,
             failed: None,
-            native_failure: None,
+            #[cfg(feature = "reference-trace")]
+            receiver_failure: None,
             native_fallback: false,
         })
     }
@@ -161,7 +163,7 @@ impl Decoder {
         Ok(decoder)
     }
 
-    /// The named native view is opt-in; `new_configured` stays source-only.
+    /// The receiver view is opt-in; `new_configured` stays source-only.
     pub fn new_configured_with_receiver_view(
         budget: &Budget,
         configuration: &SourceConfiguration,
@@ -174,14 +176,15 @@ impl Decoder {
         decoder.state.receiver_view = view;
         Ok(decoder)
     }
-    /// Native projection. Both other constructors retain strict
-    /// bounds validation, including empty regions. No source packet is trimmed.
-    pub fn new_configured_with_native_geometry_policy(
+    /// Receiver view with the selected [`GeometryPolicy`](crate::compat::dvb::GeometryPolicy).
+    /// Both other constructors retain strict bounds validation, including empty
+    /// regions. No source packet is trimmed.
+    pub fn new_configured_with_geometry_policy(
         budget: &Budget,
         configuration: &SourceConfiguration,
         generation: u64,
         limits: DisplayLimits,
-        policy: super::NativeGeometryPolicy,
+        policy: super::GeometryPolicy,
         cancel: &AtomicBool,
     ) -> Result<Self> {
         let mut decoder = Self::new_configured_with_receiver_view(
@@ -189,15 +192,18 @@ impl Decoder {
             configuration,
             generation,
             limits,
-            super::ReceiverView::NativeD32,
+            super::ReceiverView::Receiver,
             cancel,
         )?;
-        decoder.state.native_geometry_policy = policy;
+        decoder.state.geometry_policy = policy;
         Ok(decoder)
     }
 
-    pub fn native_failure(&self) -> Option<super::NativeFailure> {
-        self.native_failure
+    /// The receiver's refusal of the last truncated packet, until reset.
+    /// Comparison-only.
+    #[cfg(feature = "reference-trace")]
+    pub fn receiver_failure(&self) -> Option<super::ReceiverFailure> {
+        self.receiver_failure
     }
 
     /// Caller keeps its immutable packet on rejection. Whole codec packets are
@@ -206,18 +212,15 @@ impl Decoder {
         self.admit(packet, None)
     }
 
-    /// Decode the explicit native codec packet while retaining the original PES
-    /// and its source declaration. A pass-through keeps the same decoder syntax
-    /// validation as any other codec packet.
-    pub fn provide_native_pes(
-        &mut self,
-        packet: &DvbPacket,
-        parsed: &NativePesPacket,
-    ) -> Result<()> {
+    /// Decode the codec packet a [`PesParser`](crate::compat::dvb::PesParser)
+    /// projected, retaining the original PES and its source declaration. A
+    /// pass-through keeps the same decoder syntax validation as any other codec
+    /// packet.
+    pub fn provide_pes(&mut self, packet: &DvbPacket, parsed: &PesPacket) -> Result<()> {
         self.admit(packet, Some(parsed))
     }
 
-    fn admit(&mut self, packet: &DvbPacket, parsed: Option<&NativePesPacket>) -> Result<()> {
+    fn admit(&mut self, packet: &DvbPacket, parsed: Option<&PesPacket>) -> Result<()> {
         if let Some(error) = self.failed {
             return Err(error);
         }
@@ -264,7 +267,7 @@ impl Decoder {
         }
         limit(packet.payload.len(), self.state.limits.packet_bytes)?;
         let (offset, end, effective_pts) = if let Some(parsed) = parsed {
-            if self.state.receiver_view != super::ReceiverView::NativeD32
+            if self.state.receiver_view != super::ReceiverView::Receiver
                 || packet.envelope != PacketEnvelope::PesDataField
             {
                 return Err(Error::Unsupported("DVB native PES decoder boundary"));
@@ -354,7 +357,7 @@ impl Decoder {
             self.state.object_retention,
         );
         state.receiver_view = self.state.receiver_view;
-        state.native_geometry_policy = self.state.native_geometry_policy;
+        state.geometry_policy = self.state.geometry_policy;
         self.state = state;
         self.generation = generation;
         self.sequence = 0;
@@ -371,7 +374,10 @@ impl Decoder {
         self.total_work = 0;
         self.input_finished = false;
         self.failed = None;
-        self.native_failure = None;
+        #[cfg(feature = "reference-trace")]
+        {
+            self.receiver_failure = None;
+        }
         self.native_fallback = false;
         Ok(())
     }
@@ -398,7 +404,7 @@ impl Decoder {
             cancel,
         )?;
         next.state.receiver_view = self.state.receiver_view;
-        next.state.native_geometry_policy = self.state.native_geometry_policy;
+        next.state.geometry_policy = self.state.geometry_policy;
         *self = next;
         Ok(())
     }
@@ -410,7 +416,7 @@ impl Decoder {
         self.renderer = None;
         self.packets = BudgetVec::new(&self.state.budget);
         let view = self.state.receiver_view;
-        let geometry = self.state.native_geometry_policy;
+        let geometry = self.state.geometry_policy;
         self.state = State::new(
             &self.state.budget,
             self.state.service,
@@ -418,7 +424,7 @@ impl Decoder {
             self.state.object_retention,
         );
         self.state.receiver_view = view;
-        self.state.native_geometry_policy = geometry;
+        self.state.geometry_policy = geometry;
     }
 
     fn progress(status: DecodeStatus) -> DisplayProgress {
@@ -460,7 +466,7 @@ impl Decoder {
             .checked_sub(packet.offset)
             .ok_or(Error::Overflow)?;
         if remaining < 6 {
-            if self.state.receiver_view == super::ReceiverView::NativeD32 {
+            if self.state.receiver_view == super::ReceiverView::Receiver {
                 if self.display_started && self.state.acquired {
                     // Native observations establish publication of the
                     // complete source prefix before the original tail error.
@@ -469,12 +475,15 @@ impl Decoder {
                     self.renderer = Some(Renderer::new(&self.state.budget));
                     return Ok(true);
                 }
-                self.native_failure = Some(super::NativeFailure {
-                    packet_sequence: packet.packet.sequence,
-                    packet_offset: packet.offset,
-                    unconsumed_bytes: remaining,
-                    code: -1094995529, // observed/public AVERROR_INVALIDDATA
-                });
+                #[cfg(feature = "reference-trace")]
+                {
+                    self.receiver_failure = Some(super::ReceiverFailure {
+                        packet_sequence: packet.packet.sequence,
+                        packet_offset: packet.offset,
+                        unconsumed_bytes: remaining,
+                        code: -1094995529, // observed/public AVERROR_INVALIDDATA
+                    });
+                }
             }
             return Err(Error::Truncated);
         }
@@ -528,7 +537,7 @@ impl Decoder {
             .as_mut()
             .ok_or(Error::Invalid("DVB packet absent"))?;
         packet.offset = end;
-        if selected && self.state.receiver_view == super::ReceiverView::NativeD32 {
+        if selected && self.state.receiver_view == super::ReceiverView::Receiver {
             packet.canvas_segments |= match kind {
                 0x10 => 0b001,
                 0x11 => 0b010,
@@ -550,7 +559,7 @@ impl Decoder {
             .transpose()?;
         let has_visible = match self.state.receiver_view {
             super::ReceiverView::Source => !self.state.visible.is_empty(),
-            super::ReceiverView::NativeD32 => !renderer.output.is_empty(),
+            super::ReceiverView::Receiver => !renderer.output.is_empty(),
         };
         let action = if !has_visible {
             DisplayAction::Clear
@@ -562,10 +571,8 @@ impl Decoder {
         self.state.had_visible = has_visible;
         let packets = std::mem::replace(&mut self.packets, BudgetVec::new(&self.state.budget));
         let opaque = std::mem::replace(&mut self.state.opaque, BudgetVec::new(&self.state.budget));
-        let native_publication = if self.state.receiver_view == super::ReceiverView::NativeD32 {
-            self.packet.as_ref().map(|packet| super::NativePublication {
-                identifier: super::D32_VIEW,
-                source_pin: super::D32_PIN,
+        let receiver_publication = if self.state.receiver_view == super::ReceiverView::Receiver {
+            self.packet.as_ref().map(|packet| super::Publication {
                 packet_sequence: packet.packet.sequence,
                 consumed_prefix_bytes: packet.offset,
                 reason: if self.native_fallback {
@@ -575,7 +582,7 @@ impl Decoder {
                 },
                 packet_clock: packet.packet_clock(),
                 context_canvas: self.state.native_canvas,
-                exact_pts_microseconds: super::native_view::exact_microseconds(self.pts),
+                exact_pts_microseconds: super::receiver::exact_microseconds(self.pts),
                 start_display_ms: 0,
                 end_display_ms: u32::from(self.state.timeout) * 1000,
             })
@@ -584,12 +591,12 @@ impl Decoder {
         };
         let event = DisplayEvent {
             receiver_view: self.state.receiver_view,
-            native_publication,
+            receiver_publication,
             native_pes: self
                 .packet
                 .as_ref()
                 .and_then(|packet| packet.native_pes.clone()),
-            native_geometry_policy: self.state.native_geometry_policy,
+            geometry_policy: self.state.geometry_policy,
             omitted_regions: renderer.omitted,
             service: self.state.service,
             object_retention: self.state.object_retention,
@@ -684,7 +691,7 @@ impl Decoder {
             }
             if self.packet.as_ref().is_some_and(|p| p.offset == p.end) {
                 self.establish_default_native_canvas();
-                if self.state.receiver_view == super::ReceiverView::NativeD32
+                if self.state.receiver_view == super::ReceiverView::Receiver
                     && self.display_started
                     && self.state.acquired
                 {

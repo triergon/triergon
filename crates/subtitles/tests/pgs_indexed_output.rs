@@ -1,10 +1,12 @@
 //! Public indexed output controls.
 use std::sync::atomic::{AtomicBool, Ordering};
 use triergon_core::{Budget, Bytes, Error, TimeBase, WorkBudget};
+use triergon_subtitles::compat::pgs::{
+    ArgbView, ColourOrigin, IndexedRecoveryDecoder, RecoveryDecoder,
+};
 use triergon_subtitles::pgs::{
     DisplayConfig, DisplayDecoder, DisplayLimits, DisplaySet, DisplayStatus, Envelope,
-    IndexedDisplayDecoder, IndexedDisplaySet, IndexedNativeRecoveryDecoder, IndexedRecoveredPacket,
-    NativeArgbView, NativeColourOrigin, NativeRecoveryDecoder, PacketClock, RecoveredPacket,
+    IndexedDisplayDecoder, IndexedDisplaySet, IndexedRecoveredPacket, PacketClock, RecoveredPacket,
     RecoveryStatus,
 };
 
@@ -128,7 +130,7 @@ fn materialized(budget: &Budget, raw: &[u8], config: DisplayConfig) -> DisplaySe
     panic!("materialized decoder progress bound");
 }
 
-fn all_bytes(view: NativeArgbView, quantum: u64, target_length: usize) -> Vec<u8> {
+fn all_bytes(view: ArgbView, quantum: u64, target_length: usize) -> Vec<u8> {
     let length = view.len();
     let mut writer = view.writer(length);
     let mut output = Vec::new();
@@ -162,9 +164,9 @@ fn all_source_facts_and_materialized_argb_remain_literal() {
     assert_eq!(new.epoch, old.epoch);
     assert_eq!(new.presentation, old.presentation);
     assert_eq!(new.end_stamp, old.end_stamp);
-    assert_eq!(new.native_pts_microseconds, old.native_pts_microseconds);
-    assert_eq!(new.native_time_error, old.native_time_error);
-    assert_eq!(new.native_clock_source, old.native_clock_source);
+    assert_eq!(new.receiver_pts_microseconds, old.receiver_pts_microseconds);
+    assert_eq!(new.receiver_time_error, old.receiver_time_error);
+    assert_eq!(new.receiver_clock_source, old.receiver_clock_source);
     assert_eq!(new.source_end, old.source_end);
     assert_eq!(new.objects().len(), old.objects().len());
     assert_eq!(new.segments().len(), old.segments().len());
@@ -183,25 +185,28 @@ fn all_source_facts_and_materialized_argb_remain_literal() {
         assert_eq!(new.object_last_stamp, old.object_last_stamp);
         assert_eq!(new.visible, old.visible);
         assert_eq!(new.visibility_window_known, old.visibility_window_known);
-        assert_eq!(new.native_x, old.native_x);
-        assert_eq!(new.native_y, old.native_y);
+        assert_eq!(new.receiver_x, old.receiver_x);
+        assert_eq!(new.receiver_y, old.receiver_y);
         assert_eq!(
-            new.native_forced_only_suppressed,
-            old.native_forced_only_suppressed
+            new.receiver_forced_only_suppressed,
+            old.receiver_forced_only_suppressed
         );
         assert_eq!(new.pixels().as_ref(), old.pixels().as_ref());
         assert_eq!(new.visible_pixels().as_ref(), old.visible_pixels().as_ref());
         for i in 0..=255 {
             assert_eq!(new.palette().source(i), old.palette().source(i));
-            assert_eq!(new.palette().native_argb(i), old.palette().native_argb(i));
             assert_eq!(
-                new.palette().native_origin(i),
-                old.palette().native_origin(i)
+                new.palette().receiver_argb(i),
+                old.palette().receiver_argb(i)
+            );
+            assert_eq!(
+                new.palette().receiver_origin(i),
+                old.palette().receiver_origin(i)
             );
         }
         assert_eq!(
-            all_bytes(new.native_argb_view().unwrap(), 7, 257),
-            old.native_argb_pixels().as_ref()
+            all_bytes(new.receiver_argb_view().unwrap(), 7, 257),
+            old.receiver_argb_pixels().as_ref()
         );
     }
 }
@@ -216,11 +221,11 @@ fn every_index_channel_and_partial_pixel_matches_old_plane_at_all_quanta() {
         for target_length in [1, 3, 7, 256, 321] {
             assert_eq!(
                 all_bytes(
-                    new.objects()[0].native_argb_view().unwrap(),
+                    new.objects()[0].receiver_argb_view().unwrap(),
                     quantum,
                     target_length
                 ),
-                old.objects()[0].native_argb_pixels().as_ref()
+                old.objects()[0].receiver_argb_pixels().as_ref()
             );
         }
     }
@@ -237,9 +242,9 @@ fn run16383_owned_indexed_output_fits_below_old_argb_plane_alone() {
         4096,
     );
     assert_eq!(new.objects()[0].pixels().len(), 16383);
-    let view = new.objects()[0].native_argb_view().unwrap();
+    let view = new.objects()[0].receiver_argb_view().unwrap();
     assert_eq!(view.len(), 65532);
-    let word = new.objects()[0].native_argb(177).to_be_bytes();
+    let word = new.objects()[0].receiver_argb(177).to_be_bytes();
     let mut writer = view.writer(65532);
     let mut count = 0;
     for _ in 0..1000 {
@@ -275,7 +280,7 @@ fn zero_work_and_empty_target_do_not_mutate_or_allocate() {
         1,
     );
     let used = budget.used();
-    let mut writer = new.objects()[0].native_argb_view().unwrap().writer(12);
+    let mut writer = new.objects()[0].receiver_argb_view().unwrap().writer(12);
     let mut target = [0xa5; 20];
     for _ in 0..4 {
         let step = writer
@@ -312,8 +317,8 @@ fn one_work_unit_writes_one_byte_without_hidden_prefill() {
         DisplayConfig::default(),
         1,
     );
-    let expected = all_bytes(new.objects()[0].native_argb_view().unwrap(), 4096, 256);
-    let mut writer = new.objects()[0].native_argb_view().unwrap().writer(8);
+    let expected = all_bytes(new.objects()[0].receiver_argb_view().unwrap(), 4096, 256);
+    let mut writer = new.objects()[0].receiver_argb_view().unwrap().writer(8);
     for byte in expected {
         let mut target = [0xf9; 4];
         let step = writer
@@ -348,7 +353,7 @@ fn cumulative_work_limit_is_exact_sticky_and_precedes_writes() {
         DisplayConfig::default(),
         1,
     );
-    let mut writer = new.objects()[0].native_argb_view().unwrap().writer(3);
+    let mut writer = new.objects()[0].receiver_argb_view().unwrap().writer(3);
     assert_eq!(
         writer
             .write(
@@ -390,7 +395,7 @@ fn cancellation_is_sticky_even_at_zero_work_and_releases_its_owners() {
         DisplayConfig::default(),
         1,
     );
-    let mut writer = new.objects()[0].native_argb_view().unwrap().writer(8);
+    let mut writer = new.objects()[0].receiver_argb_view().unwrap().writer(8);
     drop(new);
     assert!(budget.used() > baseline);
     let cancel = AtomicBool::new(true);
@@ -418,7 +423,7 @@ fn retained_view_survives_output_drop_and_sibling_cancel() {
         DisplayConfig::default(),
         1,
     );
-    let view = new.objects()[0].native_argb_view().unwrap();
+    let view = new.objects()[0].receiver_argb_view().unwrap();
     let expected = all_bytes(view.clone(), 1, 3);
     let mut cancelled = view.clone().writer(8);
     drop(new);
@@ -437,15 +442,18 @@ fn retained_view_survives_output_drop_and_sibling_cancel() {
 fn forced_receiver_zero_preserves_all_literal_source_colours() {
     let budget = Budget::new(4 * 1024 * 1024).unwrap();
     let config = DisplayConfig {
-        native_forced_only: true,
+        receiver_forced_only: true,
     };
     let new = indexed(&budget, &packet(&[1, 2], true, true), config, 1);
     let object = &new.objects()[0];
-    assert!(object.native_forced_only_suppressed);
+    assert!(object.receiver_forced_only_suppressed);
     assert!(object.palette().source(1).is_some());
-    assert_ne!(object.palette().native_argb(1), 0);
+    assert_ne!(object.palette().receiver_argb(1), 0);
     assert_eq!(object.pixels().as_ref(), [1, 2]);
-    assert_eq!(all_bytes(object.native_argb_view().unwrap(), 1, 7), [0; 8]);
+    assert_eq!(
+        all_bytes(object.receiver_argb_view().unwrap(), 1, 7),
+        [0; 8]
+    );
 }
 
 #[test]
@@ -512,7 +520,7 @@ fn decoder_pressure_retry_and_zero_work_keep_real_ownership_and_work() {
 }
 
 fn try_recover_indexed(
-    decoder: &mut IndexedNativeRecoveryDecoder,
+    decoder: &mut IndexedRecoveryDecoder,
     budget: &Budget,
     raw: &[u8],
 ) -> Result<IndexedRecoveredPacket, Error> {
@@ -530,8 +538,7 @@ fn try_recover_indexed(
 fn recover_default(budget: &Budget, raw: &[u8]) -> Result<RecoveredPacket, Error> {
     let cancel = AtomicBool::new(false);
     let mut decoder =
-        NativeRecoveryDecoder::new(budget, DisplayLimits::default(), DisplayConfig::default())
-            .unwrap();
+        RecoveryDecoder::new(budget, DisplayLimits::default(), DisplayConfig::default()).unwrap();
     let mut owner = Some(Bytes::copy_from_slice(budget, raw).unwrap());
     decoder.push(&mut owner, clock(), &cancel)?;
     for _ in 0..1_000_000 {
@@ -543,7 +550,7 @@ fn recover_default(budget: &Budget, raw: &[u8]) -> Result<RecoveredPacket, Error
 }
 
 fn recover_indexed(
-    decoder: &mut IndexedNativeRecoveryDecoder,
+    decoder: &mut IndexedRecoveryDecoder,
     budget: &Budget,
     raw: &[u8],
 ) -> IndexedRecoveredPacket {
@@ -565,7 +572,7 @@ fn receiver_full_events_and_source_failures_are_unchanged_on_negative_grammar() 
     for raw in [missing_end, unknown, tail, good] {
         let budget = Budget::new(4 * 1024 * 1024).unwrap();
         let old = recover_default(&budget, &raw);
-        let mut decoder = IndexedNativeRecoveryDecoder::new(
+        let mut decoder = IndexedRecoveryDecoder::new(
             &budget,
             DisplayLimits::default(),
             DisplayConfig::default(),
@@ -594,11 +601,11 @@ fn receiver_full_events_and_source_failures_are_unchanged_on_negative_grammar() 
             assert_eq!(new_set.presentation, old_set.presentation);
             assert_eq!(new_set.end_stamp, old_set.end_stamp);
             assert_eq!(
-                new_set.native_pts_microseconds,
-                old_set.native_pts_microseconds
+                new_set.receiver_pts_microseconds,
+                old_set.receiver_pts_microseconds
             );
-            assert_eq!(new_set.native_time_error, old_set.native_time_error);
-            assert_eq!(new_set.native_clock_source, old_set.native_clock_source);
+            assert_eq!(new_set.receiver_time_error, old_set.receiver_time_error);
+            assert_eq!(new_set.receiver_clock_source, old_set.receiver_clock_source);
             assert_eq!(new_set.source_end, old_set.source_end);
             assert_eq!(new_set.segments().len(), old_set.segments().len());
             for (new, old) in new_set.segments().iter().zip(old_set.segments()) {
@@ -618,25 +625,28 @@ fn receiver_full_events_and_source_failures_are_unchanged_on_negative_grammar() 
                 assert_eq!(new.object_last_stamp, old.object_last_stamp);
                 assert_eq!(new.visible, old.visible);
                 assert_eq!(new.visibility_window_known, old.visibility_window_known);
-                assert_eq!(new.native_x, old.native_x);
-                assert_eq!(new.native_y, old.native_y);
+                assert_eq!(new.receiver_x, old.receiver_x);
+                assert_eq!(new.receiver_y, old.receiver_y);
                 assert_eq!(
-                    new.native_forced_only_suppressed,
-                    old.native_forced_only_suppressed
+                    new.receiver_forced_only_suppressed,
+                    old.receiver_forced_only_suppressed
                 );
                 assert_eq!(new.pixels().as_ref(), old.pixels().as_ref());
                 assert_eq!(new.visible_pixels().as_ref(), old.visible_pixels().as_ref());
                 for i in 0..=255 {
                     assert_eq!(new.palette().source(i), old.palette().source(i));
                     assert_eq!(
-                        new.palette().native_origin(i),
-                        old.palette().native_origin(i)
+                        new.palette().receiver_origin(i),
+                        old.palette().receiver_origin(i)
                     );
-                    assert_eq!(new.palette().native_argb(i), old.palette().native_argb(i));
+                    assert_eq!(
+                        new.palette().receiver_argb(i),
+                        old.palette().receiver_argb(i)
+                    );
                 }
                 assert_eq!(
-                    all_bytes(new.native_argb_view().unwrap(), 1, 7),
-                    old.native_argb_pixels().as_ref()
+                    all_bytes(new.receiver_argb_view().unwrap(), 1, 7),
+                    old.receiver_argb_pixels().as_ref()
                 );
             }
         }
@@ -672,25 +682,22 @@ fn receiver_full_events_and_source_failures_are_unchanged_on_negative_grammar() 
 #[test]
 fn receiver_epoch_carry_never_promotes_missing_source_colour() {
     let budget = Budget::new(4 * 1024 * 1024).unwrap();
-    let mut decoder = IndexedNativeRecoveryDecoder::new(
-        &budget,
-        DisplayLimits::default(),
-        DisplayConfig::default(),
-    )
-    .unwrap();
+    let mut decoder =
+        IndexedRecoveryDecoder::new(&budget, DisplayLimits::default(), DisplayConfig::default())
+            .unwrap();
     let old = recover_indexed(&mut decoder, &budget, &packet(&[1, 2], true, true));
     let old_view = old.source_sets()[0].objects()[0]
-        .native_argb_view()
+        .receiver_argb_view()
         .unwrap();
     let fresh = recover_indexed(&mut decoder, &budget, &packet(&[1, 2], false, true));
     let object = &fresh.source_sets()[0].objects()[0];
     assert_eq!(object.palette().source(1), None);
     assert_eq!(
-        object.palette().native_origin(1),
-        NativeColourOrigin::PreviousEpochSlot
+        object.palette().receiver_origin(1),
+        ColourOrigin::PreviousEpochSlot
     );
     assert_eq!(
-        all_bytes(object.native_argb_view().unwrap(), 3, 7),
+        all_bytes(object.receiver_argb_view().unwrap(), 3, 7),
         all_bytes(old_view, 1, 3)
     );
     assert_eq!(object.object_first_stamp.packet_sequence, 1);
@@ -706,16 +713,13 @@ fn receiver_epoch_carry_never_promotes_missing_source_colour() {
 fn retained_indexed_source_generations_survive_cancel_reset() {
     let budget = Budget::new(4 * 1024 * 1024).unwrap();
     let cancel = AtomicBool::new(false);
-    let mut decoder = IndexedNativeRecoveryDecoder::new(
-        &budget,
-        DisplayLimits::default(),
-        DisplayConfig::default(),
-    )
-    .unwrap();
+    let mut decoder =
+        IndexedRecoveryDecoder::new(&budget, DisplayLimits::default(), DisplayConfig::default())
+            .unwrap();
     let old = recover_indexed(&mut decoder, &budget, &packet(&[1, 2], true, true));
     let expected = all_bytes(
         old.source_sets()[0].objects()[0]
-            .native_argb_view()
+            .receiver_argb_view()
             .unwrap(),
         1,
         7,
@@ -735,7 +739,7 @@ fn retained_indexed_source_generations_survive_cancel_reset() {
     assert_eq!(
         all_bytes(
             old.source_sets()[0].objects()[0]
-                .native_argb_view()
+                .receiver_argb_view()
                 .unwrap(),
             3,
             7
@@ -751,15 +755,12 @@ fn retained_indexed_source_generations_survive_cancel_reset() {
 #[test]
 fn operation_writer_charges_decoder_and_caller_exactly_once_per_byte() {
     let budget = Budget::new(4 * 1024 * 1024).unwrap();
-    let mut decoder = IndexedNativeRecoveryDecoder::new(
-        &budget,
-        DisplayLimits::default(),
-        DisplayConfig::default(),
-    )
-    .unwrap();
+    let mut decoder =
+        IndexedRecoveryDecoder::new(&budget, DisplayLimits::default(), DisplayConfig::default())
+            .unwrap();
     let out = recover_indexed(&mut decoder, &budget, &packet(&[1, 2], true, true));
     let mut writer = out.source_sets()[0].objects()[0]
-        .native_argb_view()
+        .receiver_argb_view()
         .unwrap()
         .writer(8);
     let before = decoder.work_spent();
@@ -794,17 +795,14 @@ fn operation_writer_charges_decoder_and_caller_exactly_once_per_byte() {
 fn full_operation_work_limit_includes_source_argb_and_stops_before_next_write() {
     let budget = Budget::new(4 * 1024 * 1024).unwrap();
     let raw = packet(&[1, 2], true, true);
-    let mut calibration = IndexedNativeRecoveryDecoder::new(
-        &budget,
-        DisplayLimits::default(),
-        DisplayConfig::default(),
-    )
-    .unwrap();
+    let mut calibration =
+        IndexedRecoveryDecoder::new(&budget, DisplayLimits::default(), DisplayConfig::default())
+            .unwrap();
     let first = recover_indexed(&mut calibration, &budget, &raw);
     let parse_work = calibration.work_spent();
     drop(first);
     drop(calibration);
-    let mut decoder = IndexedNativeRecoveryDecoder::new(
+    let mut decoder = IndexedRecoveryDecoder::new(
         &budget,
         DisplayLimits {
             max_work: parse_work + 3,
@@ -816,7 +814,7 @@ fn full_operation_work_limit_includes_source_argb_and_stops_before_next_write() 
     let out = recover_indexed(&mut decoder, &budget, &raw);
     assert_eq!(decoder.work_spent(), parse_work);
     let mut writer = out.source_sets()[0].objects()[0]
-        .native_argb_view()
+        .receiver_argb_view()
         .unwrap()
         .writer(8);
     let mut work = WorkBudget::new(8);
@@ -863,9 +861,9 @@ fn foreign_operation_writer_is_refused_without_consuming_target_or_work() {
         DisplayConfig::default(),
         1,
     );
-    let mut writer = out.objects()[0].native_argb_view().unwrap().writer(8);
+    let mut writer = out.objects()[0].receiver_argb_view().unwrap().writer(8);
     let mut decoder =
-        IndexedNativeRecoveryDecoder::new(&own, DisplayLimits::default(), DisplayConfig::default())
+        IndexedRecoveryDecoder::new(&own, DisplayLimits::default(), DisplayConfig::default())
             .unwrap();
     let mut target = [0xa5; 8];
     let mut work = WorkBudget::new(8);

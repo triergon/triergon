@@ -8,16 +8,16 @@ use triergon_core::{Budget, BudgetVec, Bytes, Error, Result, WorkBudget};
 const MAX_GROUP_BYTES: usize = 65_536;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum NativePesFraming {
+pub enum PesFraming {
     Passthrough,
     CompleteSegments,
 }
 
 #[derive(Clone, Debug)]
-pub struct NativePesPacket {
+pub struct PesPacket {
     pes: Bytes,
     codec: Bytes,
-    framing: NativePesFraming,
+    framing: PesFraming,
     /// PTS on admission and the separately projected codec timestamp.
     source_pts: Option<i128>,
     codec_pts: Option<i128>,
@@ -25,7 +25,7 @@ pub struct NativePesPacket {
     prior_tail: Option<Bytes>,
 }
 
-impl NativePesPacket {
+impl PesPacket {
     pub fn pes(&self) -> &Bytes {
         &self.pes
     }
@@ -34,7 +34,7 @@ impl NativePesPacket {
         &self.codec
     }
 
-    pub fn framing(&self) -> NativePesFraming {
+    pub fn framing(&self) -> PesFraming {
         self.framing
     }
 
@@ -52,17 +52,17 @@ impl NativePesPacket {
 }
 
 #[derive(Debug)]
-pub enum NativePesProgress {
+pub enum PesProgress {
     NeedPacket,
     Yield,
-    Packet(NativePesPacket),
+    Packet(PesPacket),
 }
 
 /// One selected service and clock epoch. The caller recreates or resets the
 /// parser on a seek or discontinuity. Within an epoch, a changed known PTS
 /// opens a new group. An incomplete segment can continue across PES calls.
 #[derive(Debug)]
-pub struct NativePesParser {
+pub struct PesParser {
     pool: Budget,
     last_pts: Option<i128>,
     active: bool,
@@ -108,7 +108,7 @@ struct ScanEnd {
     len: usize,
 }
 
-impl NativePesParser {
+impl PesParser {
     pub fn new(pool: &Budget) -> Self {
         Self {
             pool: pool.clone(),
@@ -141,20 +141,16 @@ impl NativePesParser {
         Ok(())
     }
 
-    pub fn step(
-        &mut self,
-        work: &mut WorkBudget,
-        cancel: &AtomicBool,
-    ) -> Result<NativePesProgress> {
+    pub fn step(&mut self, work: &mut WorkBudget, cancel: &AtomicBool) -> Result<PesProgress> {
         if let Err(error) = cancelled(cancel) {
             self.reset();
             return Err(error);
         }
         let Some(pending) = self.input.as_mut() else {
-            return Ok(NativePesProgress::NeedPacket);
+            return Ok(PesProgress::NeedPacket);
         };
         if work.remaining() == 0 {
-            return Ok(NativePesProgress::Yield);
+            return Ok(PesProgress::Yield);
         }
 
         if pending.scan.is_none() {
@@ -198,7 +194,7 @@ impl NativePesParser {
                     _ => None,
                 };
                 if !scan.collect(&self.pool, prior, &pending.pes[scan.start..], work)? {
-                    return Ok(NativePesProgress::Yield);
+                    return Ok(PesProgress::Yield);
                 }
             }
             let body = scan
@@ -212,7 +208,7 @@ impl NativePesParser {
                     return Err(error);
                 }
                 if !work.try_charge(1) {
-                    return Ok(NativePesProgress::Yield);
+                    return Ok(PesProgress::Yield);
                 }
                 let rest = &body[scan.at..];
                 if rest[0] != 0x0f {
@@ -237,7 +233,7 @@ impl NativePesParser {
         let end = scan.end.expect("completed DVB scan");
         let joined = if end.complete != 0 && scan.copy.is_some() {
             if !work.try_charge(1) {
-                return Ok(NativePesProgress::Yield);
+                return Ok(PesProgress::Yield);
             }
             let copy = scan.copy.take().expect("assembled DVB segments");
             match copy.freeze() {
@@ -253,23 +249,23 @@ impl NativePesParser {
         self.complete(end, joined)
     }
 
-    fn passthrough(&mut self) -> Result<NativePesProgress> {
+    fn passthrough(&mut self) -> Result<PesProgress> {
         let pending = self
             .input
             .take()
             .ok_or(Error::Invalid("DVB PES parser input absent"))?;
         self.last_pts = pending.pts.or(self.last_pts);
-        Ok(NativePesProgress::Packet(NativePesPacket {
+        Ok(PesProgress::Packet(PesPacket {
             codec: pending.pes.clone(),
             pes: pending.pes,
-            framing: NativePesFraming::Passthrough,
+            framing: PesFraming::Passthrough,
             source_pts: pending.pts,
             codec_pts: pending.pts,
             prior_tail: None,
         }))
     }
 
-    fn complete(&mut self, end: ScanEnd, joined: Option<Bytes>) -> Result<NativePesProgress> {
+    fn complete(&mut self, end: ScanEnd, joined: Option<Bytes>) -> Result<PesProgress> {
         let pending = self
             .input
             .take()
@@ -285,9 +281,9 @@ impl NativePesParser {
             } else {
                 Some(codec.slice(0..scan.prior_len)?)
             };
-            (codec, NativePesFraming::CompleteSegments, prior_tail)
+            (codec, PesFraming::CompleteSegments, prior_tail)
         } else {
-            (pending.pes.clone(), NativePesFraming::Passthrough, None)
+            (pending.pes.clone(), PesFraming::Passthrough, None)
         };
         self.tail = if end.active && end.complete < end.len {
             if let Some(copy) = scan.copy {
@@ -305,7 +301,7 @@ impl NativePesParser {
         };
         self.active = end.active;
         self.last_pts = pending.pts.or(self.last_pts);
-        Ok(NativePesProgress::Packet(NativePesPacket {
+        Ok(PesProgress::Packet(PesPacket {
             pes: pending.pes,
             codec,
             framing,

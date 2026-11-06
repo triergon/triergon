@@ -66,20 +66,34 @@ Envelope::Packet, &cancel)` then `poll`/`take_output` for each `DisplaySet`;
 
 | Module | Entry points |
 | --- | --- |
-| `text` | `Extractor`, `charset::CharsetJob`, `tx3g_config::ConfigJob`, `tx3g_semantics::SemanticJob`, `carriage::Session`, `native_mov_text::NativeMovText`, `native_charset::AssPacketJob` |
-| `dvb` | `Decoder`, `SourceConfiguration`, `Raster`, `NativePesParser` |
-| `pgs` | `DisplayDecoder`, `IndexedDisplayDecoder`, `NativeRecoveryDecoder`, `NativeCompatibilityDecoder`, `SegmentIter`, `RasterJob` |
-| `dvd` | `SpuAssembly`, `ConfigJob`, `TraditionalSpuJob`, `ProgramJob`, `DvdRasterJob`, `NativeProjectionJob`, `HdSpuJob`, `HdReceiverJob`, `HdFragmentJob` |
+| `text` | `Extractor`, `charset::CharsetJob`, `tx3g_config::ConfigJob`, `tx3g_semantics::SemanticJob` |
+| `dvb` | `Decoder`, `SourceConfiguration`, `Raster` |
+| `pgs` | `DisplayDecoder`, `IndexedDisplayDecoder`, `SegmentIter`, `RasterJob` |
+| `dvd` | `SpuAssembly`, `ConfigJob`, `TraditionalSpuJob`, `ProgramJob`, `DvdRasterJob`, `HdSpuJob`, `HdReceiverJob`, `HdFragmentJob` |
 | `context` | `Builder`: track header, metadata and attachment bytes handed to a renderer |
+| `compat::dvb` | `PesParser`, `Publication`, `Palette`, `GeometryPolicy` (receiver view of `dvb::Decoder`) |
+| `compat::pgs` | `RecoveryDecoder`, `IndexedRecoveryDecoder`, `ReceiverDecoder`, `ColourMatrix`, `ArgbView` |
+| `compat::dvd` | `CropJob`, `CroppedView`, `resolve_palette`, `Presentation`, `hd_argb` |
+| `compat::charset` | `AssPacketJob`, `receiver_charset` |
+| `compat::mov_text` | `Decoder`: tx3g sample to ASS event |
 
 ## Supported
 
-**Source and native views.** Each format has a default *source* operation that
-follows the specification strictly and keeps every original byte, clock and
-palette fact. Types and constructors named `Native*` (or `ReceiverView::NativeD32`,
-`NativeView::D32`) select an opt-in view that reproduces the output of the pinned
-FFmpeg reference build, including its tolerances. The two never share or rewrite
-each other's output.
+**Source and receiver views.** Each format has a default *source* operation
+that follows the specification strictly and keeps every original byte, clock and
+palette fact. The `compat` modules, and the `Receiver` selectors that enable them
+(`dvb::ReceiverView::Receiver`, `dvd::ControlPolicy::Receiver`,
+`dvd::HdPolicy::Receiver`), reproduce the *receiver*: the output of the pinned
+FFmpeg build (git `d32b387f` on the 9.0 branch), including its tolerances. Fields
+and accessors named `receiver_*` on the source types carry that view beside the
+source facts. The two never share or rewrite each other's output.
+
+**Comparison-only projections.** The non-default `reference-trace` feature adds
+`reference_trace`: the receiver's profile labels and the reference revision, the
+DVB receiver's packet refusal (`dvb::Decoder::receiver_failure`), the PGS
+`Projector` of strict display sets onto FFmpeg's API rectangles, and the text
+`carriage` session that reproduces FFmpeg's demuxer packets. They exist to compare
+traces with FFmpeg and are absent from default builds.
 
 ### Text
 
@@ -96,7 +110,7 @@ tx3g has three additional operations. `tx3g_config::ConfigJob` parses the
 sample-description defaults and font table. `tx3g_semantics::SemanticJob`
 resolves all defined sample modifiers into style runs, highlight, karaoke,
 hyperlink, blink, wrap, scroll and disparity intents; see
-[TX3G-SEMANTICS.md](src/text/TX3G-SEMANTICS.md). `native_mov_text::NativeMovText`
+[TX3G-SEMANTICS.md](src/text/TX3G-SEMANTICS.md). `compat::mov_text::Decoder`
 converts a sample to the ASS event and header FFmpeg's mov_text decoder emits.
 
 **Charsets.** Selected explicitly with `text::Encoding` or a label resolver;
@@ -107,7 +121,7 @@ there is no detection from content, language or file name.
 | Unicode | UTF-8, UTF-16 with BOM, UTF-16BE, UTF-16LE, tx3g in-band (UTF-8 or FEFF UTF-16BE) |
 | Single-byte | ASCII, ISO-8859-1, Windows-1251, Windows-1252 (`Charset::from_label`) |
 | Multibyte | GBK/CP936, Big5, Shift-JIS, EUC-KR, Windows-932/949/950 (`MultibyteCharset::from_label`) |
-| FFmpeg/glibc labels | `native_charset::receiver_charset` and `receiver_charset_v2` map ASS charset labels to the repertoire the reference build accepts |
+| FFmpeg/glibc labels | `compat::charset::receiver_charset` and `receiver_charset_with_glibc_euc_kr` map ASS charset labels to the repertoire the reference build accepts |
 
 Mapping tables, sources and licences are listed in
 [MULTIBYTE-CONTRACT.md](src/text/MULTIBYTE-CONTRACT.md). Undefined or unmapped
@@ -126,7 +140,7 @@ bytes are errors; nothing is replaced with U+FFFD.
 
 - **Input.** Text operations take one complete document or demuxed sample per
   `provide`. Bitmap decoders take complete packets; PES/TS reassembly is upstream
-  (`dvb::NativePesParser` is an optional FFmpeg-compatible PES-to-segment step).
+  (`compat::dvb::PesParser` is an optional FFmpeg-compatible PES-to-segment step).
   An empty packet is an event, not end of stream; only `finish_input` ends input.
 - **Bounds.** Every operation takes a finite `Limits` struct (input bytes, cues,
   modifiers, planes, objects, palettes). Exceeding one returns `Error::Limit`;
@@ -146,7 +160,7 @@ bytes are errors; nothing is replaced with U+FFFD.
   overwritten by them.
 - **DVB objects.** `ObjectRetention::CurrentDisplay` (default) uses ODS from the
   current display set; `EpochExtension` also replays earlier objects in the
-  epoch. The `NativeD32` view adds the reference's region ordering, automatic
+  epoch. The receiver view adds the reference's region ordering, automatic
   palettes without a CDS, non-modifying-colour handling and EOD tolerance.
 - **Not handled.** DVB character-coded and progressive objects, depth-reduction
   modes and disparity; DVD colour-change commands (retained as raw bytes);
@@ -170,8 +184,10 @@ The implementation is original safe Rust. Tests use independently authored
 fixtures whose expected index planes, RGBA and cue values were specified from
 the standards, not produced by this code: `tests/text-fixtures/` (with a
 separate Python oracle), `tests/fixtures/`, `tests/state-fixtures/` and the
-DVB regression sets. Native views are checked against recorded output of the
+DVB regression sets. Receiver views are checked against recorded output of the
 pinned FFmpeg build. Every operation is also exercised at several work quanta,
-under allocation pressure and with cancellation. Gates and the reference build
+under allocation pressure and with cancellation. The PGS trace examples
+(`pgs_display`, `pgs_native_compat`, `pgs_native_recovery`) print receiver
+profile labels and need `--features reference-trace`. Gates and the reference build
 are described in [docs/quality.md](../../docs/quality.md); current results are
 in [docs/status.md](../../docs/status.md).

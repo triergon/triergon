@@ -1,18 +1,19 @@
 //! Bounded PGS wire, object raster and display-set decoding.
 //!
-//! Owned source facts and cache/update/reset state stay distinct from explicit
-//! native ARGB and placement projections.
+//! Owned source facts and cache/update/reset state stay distinct from the
+//! receiver's ARGB and placement projections ([`crate::compat::pgs`]).
 mod display;
-mod display_model;
+pub(crate) mod display_model;
 mod display_palette;
 mod display_render;
 mod display_work;
-mod indexed_argb;
-mod native_compatibility;
-mod native_projection;
-mod native_recovery;
+pub(crate) mod indexed_argb;
 mod object;
+#[cfg(feature = "reference-trace")]
+pub(crate) mod projector;
 mod raster;
+pub(crate) mod receiver_decoder;
+pub(crate) mod recovery;
 mod recovery_role;
 mod segment;
 
@@ -20,28 +21,21 @@ pub use display::{
     DisplayConfig, DisplayDecoder, DisplayLimits, DisplayPushError, DisplayStatus,
     IndexedDisplayDecoder,
 };
+pub(crate) use display_model::ColourMatrix;
 pub use display_model::{
     CompositionState, DisplayObject, DisplaySet, IndexedDisplayObject, IndexedDisplaySet,
-    NativeClockSource, NativeColourOrigin, NativeMatrix, PacketClock, PaletteSnapshot,
-    PresentationFacts, SegmentFact, SegmentStamp, SourceColour, VisibleGeometry,
+    PacketClock, PaletteSnapshot, PresentationFacts, SegmentFact, SegmentStamp, SourceColour,
+    VisibleGeometry,
 };
-pub use indexed_argb::{ArgbStorage, ArgbWrite, ArgbWriter, IndexedArgb, NativeArgbView};
-pub use native_projection::{
-    NATIVE_PROJECTION, NativeCanvas, NativeDisplay, NativeEof, NativeEofBehavior, NativePacket,
-    NativeProjector, NativeRasterOrigin, NativeRect, ProjectionStatus,
-};
-pub use native_recovery::{
-    IndexedNativeRecoveryDecoder, IndexedRecoveredPacket, NATIVE_RECOVERY, NativeRecoveryDecoder,
-    ReceiverObservations, RecoveredEvent, RecoveredPacket, RecoveredRect, RecoveryStatus,
-};
+pub use indexed_argb::{ArgbStorage, ArgbWrite, ArgbWriter, IndexedArgb};
 pub use object::{AssemblyLimits, AssemblyStatus, EncodedObject, ObjectAssembly, ObjectPushError};
 pub use raster::{IndexedObject, RasterJob, RasterLimits, RasterStatus};
+pub(crate) use recovery::{EofBehavior, RecoveryEof};
+pub use recovery::{
+    IndexedRecoveredPacket, ReceiverObservations, RecoveredEvent, RecoveredPacket, RecoveredRect,
+    RecoveryStatus,
+};
 pub use segment::{
     Composition, CompositionObject, CompositionObjects, Crop, Envelope, ObjectFragment,
     ObjectStart, Palette, PaletteEntry, Segment, SegmentIter, SupClock, Window, Windows,
-};
-
-pub use native_compatibility::{
-    NATIVE_COMPATIBILITY, NativeCompatibilityDecoder, NativeCompatibilityEof,
-    NativeCompatibilityPacket,
 };

@@ -57,7 +57,7 @@ fn validate_clock(input: &Input, clock: CallerClock) -> Result<()> {
 }
 
 fn sample_codec(format: Format) -> Result<(i32, &'static str)> {
-    // Pinned public enum values/descriptor names from the observed d32 ABI.
+    // Pinned public enum values/descriptor names from the observed reference ABI.
     // No decoder registry is consulted and no source codec-tag is rewritten.
     match format {
         Format::Tx3g => Ok((94213, "mov_text")),
@@ -196,7 +196,7 @@ impl Session {
                     stream: Some(stream),
                     packets,
                     progress: BudgetVec::new(&self.pool),
-                    native_error: None,
+                    error_code: None,
                 }
             }
             Operation::Document {
@@ -239,7 +239,7 @@ impl Session {
             stream: parts.stream,
             packets: parts.packets,
             progress: parts.progress,
-            native_error: parts.native_error,
+            error_code: parts.error_code,
         });
         Ok(Status::Ready)
     }

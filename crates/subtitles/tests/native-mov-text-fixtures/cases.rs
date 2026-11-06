@@ -1,4 +1,4 @@
-// Generated from immutable D32 public API observations, never from Rust output.
+// Generated from immutable reference public API observations, never from Rust output.
 #[derive(Debug)]
 pub struct Sub {
     pub format: u16,

@@ -1,30 +1,23 @@
 use std::sync::atomic::{AtomicBool, Ordering};
 use triergon_core::{Budget, Bytes, Error, WorkBudget};
-use triergon_subtitles::dvb::{
-    NativePesFraming, NativePesPacket, NativePesParser, NativePesProgress,
-};
+use triergon_subtitles::compat::dvb::{PesFraming, PesPacket, PesParser, PesProgress};
 
-fn project(
-    parser: &mut NativePesParser,
-    raw: &Bytes,
-    pts: Option<i128>,
-    quantum: u64,
-) -> NativePesPacket {
+fn project(parser: &mut PesParser, raw: &Bytes, pts: Option<i128>, quantum: u64) -> PesPacket {
     let cancel = AtomicBool::new(false);
     parser.provide(raw, pts).unwrap();
     assert!(matches!(
         parser.step(&mut WorkBudget::new(0), &cancel).unwrap(),
-        NativePesProgress::Yield
+        PesProgress::Yield
     ));
     for _ in 0..200_000 {
         match parser.step(&mut WorkBudget::new(quantum), &cancel).unwrap() {
-            NativePesProgress::Yield => {}
-            NativePesProgress::Packet(packet) => {
+            PesProgress::Yield => {}
+            PesProgress::Packet(packet) => {
                 assert!(packet.pes().shares_storage_with(raw));
                 assert_eq!(packet.source_pts(), pts);
                 return packet;
             }
-            NativePesProgress::NeedPacket => panic!("pending DVB packet disappeared"),
+            PesProgress::NeedPacket => panic!("pending DVB packet disappeared"),
         }
     }
     panic!("DVB parser stalled");
@@ -38,17 +31,17 @@ fn pinned_ts_payloads_project_complete_segments_and_keep_original_bytes() {
     for quantum in [1, 7, 4096] {
         let pool = Budget::new(4096).unwrap();
         let raw = Bytes::copy_from_slice(&pool, ordinary).unwrap();
-        let mut parser = NativePesParser::new(&pool);
+        let mut parser = PesParser::new(&pool);
         let unknown = project(&mut parser, &raw, None, quantum);
-        assert_eq!(unknown.framing(), NativePesFraming::Passthrough);
+        assert_eq!(unknown.framing(), PesFraming::Passthrough);
         assert_eq!(&**unknown.codec(), ordinary);
         assert_eq!(unknown.codec_pts(), None);
         let first = project(&mut parser, &raw, Some(90_000), quantum);
-        assert_eq!(first.framing(), NativePesFraming::CompleteSegments);
+        assert_eq!(first.framing(), PesFraming::CompleteSegments);
         assert_eq!(&**first.codec(), &ordinary[2..ordinary.len() - 1]);
         assert!(first.codec().shares_storage_with(&raw));
         let repeat = project(&mut parser, &raw, Some(90_000), quantum);
-        assert_eq!(repeat.framing(), NativePesFraming::Passthrough);
+        assert_eq!(repeat.framing(), PesFraming::Passthrough);
         assert_eq!(&**repeat.codec(), ordinary);
         let raw = Bytes::copy_from_slice(&pool, truncated).unwrap();
         let partial = project(&mut parser, &raw, Some(180_000), quantum);
@@ -58,7 +51,7 @@ fn pinned_ts_payloads_project_complete_segments_and_keep_original_bytes() {
         parser.reset();
         assert_eq!(
             project(&mut parser, &raw, Some(180_000), quantum).framing(),
-            NativePesFraming::CompleteSegments,
+            PesFraming::CompleteSegments,
         );
     }
 }
@@ -66,14 +59,14 @@ fn pinned_ts_payloads_project_complete_segments_and_keep_original_bytes() {
 #[test]
 fn split_segment_reassembles_with_bounded_work_and_inherits_timestamp() {
     let pool = Budget::new(4096).unwrap();
-    let mut parser = NativePesParser::new(&pool);
+    let mut parser = PesParser::new(&pool);
     let first = Bytes::copy_from_slice(&pool, &[0x20, 0, 0x0f, 0x13, 0, 1, 0, 3, 0xa1]).unwrap();
     let next = Bytes::copy_from_slice(&pool, &[0xa2, 0xa3, 0xff]).unwrap();
     let a = project(&mut parser, &first, Some(7), 1);
-    assert_eq!(a.framing(), NativePesFraming::Passthrough);
+    assert_eq!(a.framing(), PesFraming::Passthrough);
     assert_eq!(&**a.codec(), &*first);
     let b = project(&mut parser, &next, None, 1);
-    assert_eq!(b.framing(), NativePesFraming::CompleteSegments);
+    assert_eq!(b.framing(), PesFraming::CompleteSegments);
     assert_eq!(&**b.codec(), &[0x0f, 0x13, 0, 1, 0, 3, 0xa1, 0xa2, 0xa3]);
     assert_eq!(b.codec_pts(), Some(7));
     assert!(b.prior_tail().unwrap().shares_storage_with(&first));
@@ -86,7 +79,7 @@ fn split_segment_reassembles_with_bounded_work_and_inherits_timestamp() {
 #[test]
 fn restart_disposes_prior_tail_and_allocation_pressure_preserves_the_pending_join() {
     let pool = Budget::new(1024).unwrap();
-    let mut parser = NativePesParser::new(&pool);
+    let mut parser = PesParser::new(&pool);
     let first = Bytes::copy_from_slice(&pool, &[0x20, 0, 0x0f, 0x13, 0, 1, 0, 3, 0xa1]).unwrap();
     let next = Bytes::copy_from_slice(&pool, &[0xa2, 0xa3, 0xff]).unwrap();
     project(&mut parser, &first, Some(7), 1);
@@ -99,8 +92,7 @@ fn restart_disposes_prior_tail_and_allocation_pressure_preserves_the_pending_joi
     ));
     assert!(parser.provide(&next, Some(8)).is_err());
     drop(pressure);
-    let NativePesProgress::Packet(output) =
-        parser.step(&mut WorkBudget::new(100), &cancel).unwrap()
+    let PesProgress::Packet(output) = parser.step(&mut WorkBudget::new(100), &cancel).unwrap()
     else {
         panic!("the pending join did not resume");
     };
@@ -117,7 +109,7 @@ fn restart_disposes_prior_tail_and_allocation_pressure_preserves_the_pending_joi
     cancel.store(false, Ordering::Relaxed);
     assert_eq!(
         project(&mut parser, &next, None, 1).framing(),
-        NativePesFraming::Passthrough
+        PesFraming::Passthrough
     );
 }
 
@@ -130,7 +122,7 @@ fn pinned_parser_split_controls_cover_headers_bodies_and_timestamp_continuation(
             let pool = Budget::new(4096).unwrap();
             let first = Bytes::copy_from_slice(&pool, &pes[..cut]).unwrap();
             let next = Bytes::copy_from_slice(&pool, &pes[cut..]).unwrap();
-            let mut parser = NativePesParser::new(&pool);
+            let mut parser = PesParser::new(&pool);
             let a = project(&mut parser, &first, Some(90_000), 1);
             let expected = if complete == 0 {
                 &pes[..cut]
@@ -149,29 +141,29 @@ fn pinned_parser_split_controls_cover_headers_bodies_and_timestamp_continuation(
 #[test]
 fn native_group_ceiling_preserves_oversized_pes_and_allows_next_stamp() {
     let pool = Budget::new(256 * 1024).unwrap();
-    let mut parser = NativePesParser::new(&pool);
+    let mut parser = PesParser::new(&pool);
     let mut data = vec![0x20, 0, 0x0f, 0x13, 0, 1, 0xff, 0xfa];
     data.resize(2 + 65_536, 0x5a);
     let exact = Bytes::copy_from_slice(&pool, &data).unwrap();
     let output = project(&mut parser, &exact, Some(1), 1);
     assert_eq!(output.codec().len(), 65_536);
-    assert_eq!(output.framing(), NativePesFraming::CompleteSegments);
+    assert_eq!(output.framing(), PesFraming::CompleteSegments);
     assert!(output.codec().shares_storage_with(&exact));
     data.push(0xff);
     let over = Bytes::copy_from_slice(&pool, &data).unwrap();
     let output = project(&mut parser, &over, Some(2), 1);
-    assert_eq!(output.framing(), NativePesFraming::Passthrough);
+    assert_eq!(output.framing(), PesFraming::Passthrough);
     assert_eq!(output.codec().as_ref(), data);
     assert_eq!(
         project(&mut parser, &exact, Some(3), 1).framing(),
-        NativePesFraming::CompleteSegments
+        PesFraming::CompleteSegments
     );
 }
 
 #[test]
 fn byte_fragmented_segment_copies_each_input_byte_once() {
     let pool = Budget::new(64 * 1024).unwrap();
-    let mut parser = NativePesParser::new(&pool);
+    let mut parser = PesParser::new(&pool);
     let header = Bytes::copy_from_slice(&pool, &[0x20, 0, 0x0f, 0x13, 0, 1, 0x10, 0]).unwrap();
     let body_byte = Bytes::copy_from_slice(&pool, &[0x6a]).unwrap();
     let cancel = AtomicBool::new(false);
@@ -181,7 +173,7 @@ fn byte_fragmented_segment_copies_each_input_byte_once() {
     for index in 0..4096 {
         parser.provide(&body_byte, None).unwrap();
         let mut work = WorkBudget::new(65_536);
-        let NativePesProgress::Packet(packet) = parser.step(&mut work, &cancel).unwrap() else {
+        let PesProgress::Packet(packet) = parser.step(&mut work, &cancel).unwrap() else {
             panic!("funded DVB fragment stalled");
         };
         charged += 65_536 - work.remaining();
@@ -190,13 +182,13 @@ fn byte_fragmented_segment_copies_each_input_byte_once() {
             "DVB continuation recopy grew with the accumulated prefix"
         );
         if index == 4095 {
-            assert_eq!(packet.framing(), NativePesFraming::CompleteSegments);
+            assert_eq!(packet.framing(), PesFraming::CompleteSegments);
             assert_eq!(&packet.codec()[..6], &header[2..]);
             assert_eq!(packet.codec()[6..], vec![0x6a; 4096]);
             assert_eq!(packet.codec_pts(), Some(9));
             assert_eq!(packet.prior_tail().unwrap().len(), 4101);
         } else {
-            assert_eq!(packet.framing(), NativePesFraming::Passthrough);
+            assert_eq!(packet.framing(), PesFraming::Passthrough);
             assert!(packet.codec().shares_storage_with(&body_byte));
         }
     }
@@ -205,7 +197,7 @@ fn byte_fragmented_segment_copies_each_input_byte_once() {
 #[test]
 fn fragmented_group_growth_respects_the_group_capacity() {
     let pool = Budget::new(100_000).unwrap();
-    let mut parser = NativePesParser::new(&pool);
+    let mut parser = PesParser::new(&pool);
     let header = Bytes::copy_from_slice(&pool, &[0x20, 0, 0x0f, 0x13, 0, 1, 0xff, 0xfa]).unwrap();
     let fragment = Bytes::copy_from_slice(&pool, &[0x6a; 512]).unwrap();
     project(&mut parser, &header, Some(9), 4096);
@@ -213,7 +205,7 @@ fn fragmented_group_growth_respects_the_group_capacity() {
     let mut remaining = 65_530;
     while remaining > fragment.len() {
         let output = project(&mut parser, &fragment, None, 4096);
-        assert_eq!(output.framing(), NativePesFraming::Passthrough);
+        assert_eq!(output.framing(), PesFraming::Passthrough);
         remaining -= fragment.len();
     }
     let last = fragment.slice(0..remaining).unwrap();

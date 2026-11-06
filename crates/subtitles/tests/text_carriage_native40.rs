@@ -1,7 +1,7 @@
 #![forbid(unsafe_code)]
 use std::sync::atomic::AtomicBool;
 use triergon_core::{Budget, Bytes, SourceId, WorkBudget};
-use triergon_subtitles::text::carriage::{
+use triergon_subtitles::reference_trace::carriage::{
     CallerClock, Discovery, Limits, Operation, ProgressKind, Session, Status,
 };
 use triergon_subtitles::text::{Encoding, Format, Input, Timing};
@@ -98,7 +98,7 @@ fn run_case(index: usize) {
         assert_eq!(result.input.generation, 7);
         assert_eq!(result.input.sequence, 53);
         assert_eq!(result.input.configuration_epoch, 11);
-        assert!(result.native_error.is_none());
+        assert!(result.error_code.is_none());
         let stream = result.stream.as_ref().unwrap();
         assert_eq!(stream.index, 0);
         assert_eq!(stream.codec_type, 3);

@@ -1,9 +1,9 @@
 //! Public-API regression for recovery reset after cancellation.
 use std::sync::atomic::{AtomicBool, Ordering};
 use triergon_core::{Budget, Bytes, Error, TimeBase, WorkBudget};
+use triergon_subtitles::compat::pgs::RecoveryDecoder;
 use triergon_subtitles::pgs::{
-    DisplayConfig, DisplayLimits, NativeRecoveryDecoder, PacketClock, RecoveredPacket,
-    RecoveryStatus,
+    DisplayConfig, DisplayLimits, PacketClock, RecoveredPacket, RecoveryStatus,
 };
 
 fn packet() -> Vec<u8> {
@@ -28,11 +28,7 @@ fn packet() -> Vec<u8> {
     }
     out
 }
-fn decode(
-    decoder: &mut NativeRecoveryDecoder,
-    budget: &Budget,
-    cancel: &AtomicBool,
-) -> RecoveredPacket {
+fn decode(decoder: &mut RecoveryDecoder, budget: &Budget, cancel: &AtomicBool) -> RecoveredPacket {
     let mut input = Some(Bytes::copy_from_slice(budget, &packet()).unwrap());
     let clock = PacketClock {
         pts: Some(90_000),
@@ -52,8 +48,7 @@ fn reset_after_cancel_advances_source_generation_while_old_output_remains_valid(
     let budget = Budget::new(4 * 1024 * 1024).unwrap();
     let cancel = AtomicBool::new(false);
     let mut decoder =
-        NativeRecoveryDecoder::new(&budget, DisplayLimits::default(), DisplayConfig::default())
-            .unwrap();
+        RecoveryDecoder::new(&budget, DisplayLimits::default(), DisplayConfig::default()).unwrap();
     let old = decode(&mut decoder, &budget, &cancel);
     assert_eq!(old.source_error(), None);
     let old_generation = old.source_sets()[0].generation;
@@ -79,8 +74,7 @@ fn repeated_cancel_reset_preserves_all_retained_source_generations_and_storage()
     let budget = Budget::new(4 * 1024 * 1024).unwrap();
     let cancel = AtomicBool::new(false);
     let mut decoder =
-        NativeRecoveryDecoder::new(&budget, DisplayLimits::default(), DisplayConfig::default())
-            .unwrap();
+        RecoveryDecoder::new(&budget, DisplayLimits::default(), DisplayConfig::default()).unwrap();
     let mut held = Vec::new();
     for generation in 0..8 {
         let output = decode(&mut decoder, &budget, &cancel);
@@ -137,8 +131,7 @@ fn cancelled_push_and_cancelled_take_do_not_recreate_source_identity() {
     let budget = Budget::new(4 * 1024 * 1024).unwrap();
     let cancel = AtomicBool::new(false);
     let mut decoder =
-        NativeRecoveryDecoder::new(&budget, DisplayLimits::default(), DisplayConfig::default())
-            .unwrap();
+        RecoveryDecoder::new(&budget, DisplayLimits::default(), DisplayConfig::default()).unwrap();
     let old = decode(&mut decoder, &budget, &cancel);
     cancel.store(true, Ordering::Relaxed);
     let mut input = Some(Bytes::copy_from_slice(&budget, &packet()).unwrap());
@@ -175,8 +168,7 @@ fn cancel_before_first_packet_and_empty_resets_each_advance_exactly_once() {
     let budget = Budget::new(4 * 1024 * 1024).unwrap();
     let cancel = AtomicBool::new(true);
     let mut decoder =
-        NativeRecoveryDecoder::new(&budget, DisplayLimits::default(), DisplayConfig::default())
-            .unwrap();
+        RecoveryDecoder::new(&budget, DisplayLimits::default(), DisplayConfig::default()).unwrap();
     for _ in 0..3 {
         assert_eq!(decoder.reset(&cancel), Err(Error::Cancelled));
     }
@@ -196,8 +188,7 @@ fn work_limit_poison_releases_graph_without_reusing_zero_generation() {
         max_work: 1,
         ..DisplayLimits::default()
     };
-    let mut decoder =
-        NativeRecoveryDecoder::new(&budget, limits, DisplayConfig::default()).unwrap();
+    let mut decoder = RecoveryDecoder::new(&budget, limits, DisplayConfig::default()).unwrap();
     for _ in 0..3 {
         let mut input = Some(Bytes::copy_from_slice(&budget, &packet()).unwrap());
         decoder

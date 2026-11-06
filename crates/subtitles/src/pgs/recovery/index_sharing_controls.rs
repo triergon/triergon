@@ -1,5 +1,5 @@
 use super::*;
-use crate::pgs::{IndexedNativeRecoveryDecoder, RasterLimits};
+use crate::pgs::RasterLimits;
 use triergon_core::TimeBase;
 
 fn packet() -> Vec<u8> {
@@ -28,10 +28,9 @@ fn packet() -> Vec<u8> {
     out
 }
 
-fn compare(b: &Budget) -> IndexedNativeRecoveryDecoder {
+fn compare(b: &Budget) -> IndexedRecoveryDecoder {
     let mut d =
-        IndexedNativeRecoveryDecoder::new(b, DisplayLimits::default(), DisplayConfig::default())
-            .unwrap();
+        IndexedRecoveryDecoder::new(b, DisplayLimits::default(), DisplayConfig::default()).unwrap();
     let mut raw = Some(Bytes::copy_from_slice(b, &packet()).unwrap());
     d.push(
         &mut raw,

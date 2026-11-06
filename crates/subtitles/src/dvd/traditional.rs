@@ -1,10 +1,9 @@
 //! Cooperative traditional-SPU receiver operation composed from owned jobs.
 use super::projection::project_traditional_raster;
 use super::{
-    ControlFacts, ControlPolicy, ControlProgram, ControlState, DvdBitmap, DvdRasterLimits,
-    DvdRasterStatus, NativeCropMode, NativeDvdView, NativePalette, NativeProjectionJob, ProgramJob,
-    ProgramLimits, ProgramStatus, ProjectedBitmap, ProjectionLimits, ProjectionStatus,
-    native_d32_palette, raster::RasterDecode,
+    ControlFacts, ControlPolicy, ControlProgram, ControlState, CropJob, CropMode, CroppedView,
+    DvdBitmap, DvdRasterLimits, DvdRasterStatus, Palette, ProgramJob, ProgramLimits, ProgramStatus,
+    ProjectedBitmap, ProjectionLimits, ProjectionStatus, raster::RasterDecode, resolve_palette,
 };
 use std::sync::atomic::{AtomicBool, Ordering};
 use triergon_core::{
@@ -49,8 +48,8 @@ pub struct DvdDisplayBoundary {
 }
 
 #[derive(Clone, Copy, Debug)]
-pub struct DvdNativePresentation<'a> {
-    pub bitmap: NativeDvdView<'a, 4>,
+pub struct Presentation<'a> {
+    pub bitmap: CroppedView<'a, 4>,
     pub show: DvdDisplayBoundary,
     pub clear: Option<DvdDisplayBoundary>,
     pub forced: bool,
@@ -61,7 +60,7 @@ pub struct DvdNativePresentation<'a> {
 pub struct TraditionalSubpicture {
     program: ControlProgram,
     bitmap: Option<ProjectedBitmap<4>>,
-    palette: Option<NativePalette>,
+    palette: Option<Palette>,
     selected_control: Option<usize>,
     forced: bool,
     menu: bool,
@@ -97,7 +96,7 @@ impl TraditionalSubpicture {
     pub fn bitmap(&self) -> Option<&ProjectedBitmap<4>> {
         self.bitmap.as_ref()
     }
-    pub fn palette(&self) -> Option<&NativePalette> {
+    pub fn palette(&self) -> Option<&Palette> {
         self.palette.as_ref()
     }
     pub fn selected_control(&self) -> Option<usize> {
@@ -115,10 +114,10 @@ impl TraditionalSubpicture {
     /// Position the native receiver's bitmap on a caller-provided timeline.
     /// A missing stop has no clear boundary. Without PTS, absolute times stay
     /// unknown and the receiver's millisecond offsets remain available.
-    pub fn native_presentation(
+    pub fn receiver_presentation(
         &self,
         packet_pts: Option<Time>,
-    ) -> Result<Option<DvdNativePresentation<'_>>> {
+    ) -> Result<Option<Presentation<'_>>> {
         self.present(|milliseconds| {
             packet_pts
                 .map(|pts| pts.checked_add(Time::new(i128::from(milliseconds), 1_000)?))
@@ -127,24 +126,24 @@ impl TraditionalSubpicture {
     }
 
     /// Position the receiver boundaries directly from the exact packet clock.
-    pub fn native_presentation_from_ticks(
+    pub fn receiver_presentation_from_ticks(
         &self,
         pts: Option<i64>,
         base: TimeBase,
-    ) -> Result<Option<DvdNativePresentation<'_>>> {
+    ) -> Result<Option<Presentation<'_>>> {
         self.present(|ms| pts.map(|pts| offset_ticks(pts, base, ms)).transpose())
     }
 
     fn present(
         &self,
         absolute: impl Fn(u32) -> Result<Option<Time>>,
-    ) -> Result<Option<DvdNativePresentation<'_>>> {
-        if self.program.policy() != ControlPolicy::NativeD32 {
+    ) -> Result<Option<Presentation<'_>>> {
+        if self.program.policy() != ControlPolicy::Receiver {
             return Err(Error::Invalid(
                 "DVD presentation requires native receiver mode",
             ));
         }
-        let Some(bitmap) = self.bitmap().and_then(ProjectedBitmap::native_view) else {
+        let Some(bitmap) = self.bitmap().and_then(ProjectedBitmap::cropped_view) else {
             return Ok(None);
         };
         let boundary = |milliseconds| -> Result<DvdDisplayBoundary> {
@@ -153,7 +152,7 @@ impl TraditionalSubpicture {
                 at: absolute(milliseconds)?,
             })
         };
-        Ok(Some(DvdNativePresentation {
+        Ok(Some(Presentation {
             bitmap,
             show: boundary(self.times.start_ms)?,
             clear: self
@@ -169,7 +168,7 @@ impl TraditionalSubpicture {
     pub fn receiver_emits_bitmap(&self) -> bool {
         self.bitmap
             .as_ref()
-            .is_some_and(|bitmap| bitmap.native_view().is_some())
+            .is_some_and(|bitmap| bitmap.cropped_view().is_some())
     }
 }
 
@@ -211,7 +210,7 @@ enum Phase {
     Program(ProgramJob),
     Select,
     Raster(RasterDecode),
-    Project(NativeProjectionJob<4>),
+    Project(CropJob<4>),
     Ready,
     Finished,
 }
@@ -221,7 +220,7 @@ enum Phase {
 /// Validated intermediate rasters are released before the next is allocated.
 ///
 /// Ordinary commands0..6 and END are supported. The default constructor retains
-/// strict link validation and refuses opaque controls. The explicit NativeD32
+/// strict link validation and refuses opaque controls. The explicit Receiver
 /// policy also exposes receiver termination and no-event recovery while keeping
 /// every raw byte, original link and truncated-command position observable.
 /// Extended commands remain separate work.
@@ -234,7 +233,7 @@ pub struct TraditionalSpuJob {
     program: Option<ControlProgram>,
     pixel_storage: Option<BytesWriter>,
     candidate: Option<DvdBitmap>,
-    palette: Option<NativePalette>,
+    palette: Option<Palette>,
     bitmap: Option<ProjectedBitmap<4>>,
     next_control: usize,
     selected_control: Option<usize>,
@@ -430,9 +429,9 @@ impl TraditionalSpuJob {
                     if self.next_control == program.controls().len() {
                         if let Some(candidate) = self.candidate.take() {
                             let mode = if program.has_forced_start() {
-                                NativeCropMode::Menu
+                                CropMode::Menu
                             } else {
-                                NativeCropMode::Ordinary
+                                CropMode::Ordinary
                             };
                             let palette = self
                                 .palette
@@ -450,7 +449,7 @@ impl TraditionalSpuJob {
                                     self.bitmap = Some(bitmap);
                                     Phase::Ready
                                 }
-                                Err(candidate) => Phase::Project(NativeProjectionJob::new(
+                                Err(candidate) => Phase::Project(CropJob::new(
                                     candidate,
                                     palette,
                                     mode,
@@ -507,7 +506,7 @@ impl TraditionalSpuJob {
                         });
                     }
                     self.candidate = None;
-                    self.palette = Some(native_d32_palette(
+                    self.palette = Some(resolve_palette(
                         self.receiver_rgb.as_ref(),
                         fact.state_after.palette_word.unwrap_or(0),
                         fact.state_after.alpha_word.unwrap_or(0),

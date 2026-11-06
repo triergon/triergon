@@ -2,10 +2,10 @@
 #![forbid(unsafe_code)]
 use std::sync::atomic::{AtomicBool, Ordering};
 use triergon_core::{Budget, Bytes, Error, Time, WorkBudget};
+use triergon_subtitles::compat::dvb::GeometryPolicy;
 use triergon_subtitles::dvb::{
     ClockOrigin, ClockValue, DecodeStatus, Decoder, DisplayAction, DisplayEvent, DisplayLimits,
-    DvbPacket, NativeGeometryPolicy, PacketIdentity, PacketTiming, ReceiverView, SourceClock,
-    SourceConfiguration,
+    DvbPacket, PacketIdentity, PacketTiming, ReceiverView, SourceClock, SourceConfiguration,
 };
 
 const EMPTY: &[u8] = &[
@@ -50,12 +50,12 @@ fn packet(
         .unwrap()
 }
 fn native(pool: &Budget, config: &SourceConfiguration, generation: u64) -> Decoder {
-    Decoder::new_configured_with_native_geometry_policy(
+    Decoder::new_configured_with_geometry_policy(
         pool,
         config,
         generation,
         DisplayLimits::default(),
-        NativeGeometryPolicy::OmitUnrendered,
+        GeometryPolicy::OmitUnrendered,
         &AtomicBool::new(false),
     )
     .unwrap()
@@ -104,12 +104,15 @@ fn empty_clear_retains_each_invalid_source_geometry_and_owner() {
             decoder.provide(&packet).unwrap();
             let output = event(&mut decoder, q).unwrap();
             assert_eq!(output.action, DisplayAction::Clear);
-            assert!(output.native_publication.unwrap().context_canvas.is_none());
-            assert!(output.regions().is_empty());
-            assert_eq!(
-                output.native_geometry_policy,
-                NativeGeometryPolicy::OmitUnrendered
+            assert!(
+                output
+                    .receiver_publication
+                    .unwrap()
+                    .context_canvas
+                    .is_none()
             );
+            assert!(output.regions().is_empty());
+            assert_eq!(output.geometry_policy, GeometryPolicy::OmitUnrendered);
             assert_eq!(output.omitted_regions().len(), 1);
             let omitted = &output.omitted_regions()[0];
             assert_eq!(omitted.id, 1);
@@ -133,7 +136,7 @@ fn empty_clear_retains_each_invalid_source_geometry_and_owner() {
                     .shares_storage_with(&owner)
             );
             assert_eq!(output.pts, Some(Time::new(1, 1).unwrap()));
-            let publication = output.native_publication.unwrap();
+            let publication = output.receiver_publication.unwrap();
             assert_eq!(publication.exact_pts_microseconds, Some(1_000_000));
             assert_eq!(
                 [publication.start_display_ms, publication.end_display_ms],
@@ -161,7 +164,7 @@ fn empty_clear_retains_each_invalid_source_geometry_and_owner() {
 
 #[test]
 fn both_legacy_receiver_views_keep_source_bounds_refusals() {
-    for view in [ReceiverView::Source, ReceiverView::NativeD32] {
+    for view in [ReceiverView::Source, ReceiverView::Receiver] {
         for (x, y) in [(719, 0), (0, 575)] {
             let pool = Budget::new(4 << 20).unwrap();
             let config = config(&pool);
@@ -201,7 +204,7 @@ fn valid_unrendered_region_does_not_invent_a_source_error() {
     assert!(output.pts.is_none());
     assert!(
         output
-            .native_publication
+            .receiver_publication
             .unwrap()
             .exact_pts_microseconds
             .is_none()
@@ -324,10 +327,7 @@ fn reset_preserves_policy_and_old_output_without_carrying_regions() {
     let next = event(&mut decoder, 7).unwrap();
     assert_eq!(old.generation, 13);
     assert_eq!(next.generation, 14);
-    assert_eq!(
-        next.native_geometry_policy,
-        NativeGeometryPolicy::OmitUnrendered
-    );
+    assert_eq!(next.geometry_policy, GeometryPolicy::OmitUnrendered);
     assert_eq!(next.omitted_regions().len(), 1);
     drop(decoder);
     drop(config);

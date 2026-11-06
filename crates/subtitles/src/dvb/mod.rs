@@ -12,12 +12,12 @@ mod display_model;
 mod display_render;
 mod display_state;
 mod model;
-mod native_palette;
-mod native_palette_buffer;
-mod native_view;
-mod pes_parser;
+pub(crate) mod pes_parser;
 mod pixel;
 mod raster;
+pub(crate) mod receiver;
+mod receiver_palette;
+mod receiver_palette_buffer;
 
 pub use boundary::{
     ClockOrigin, ClockValue, ConfigurationSource, PacketIdentity, PacketSourceFacts, PacketTiming,
@@ -39,9 +39,8 @@ pub use model::{
 };
 pub use raster::Raster;
 
-pub use native_view::{
-    D32_PIN, D32_VIEW, NativeFailure, NativeGeometryPolicy, NativeOmittedRegion, NativePalette,
-    NativePublication, PublicationReason, ReceiverView,
-};
-
-pub use pes_parser::{NativePesFraming, NativePesPacket, NativePesParser, NativePesProgress};
+pub(crate) use pes_parser::PesPacket;
+#[cfg(feature = "reference-trace")]
+pub(crate) use receiver::ReceiverFailure;
+pub use receiver::ReceiverView;
+pub(crate) use receiver::{GeometryPolicy, OmittedRegion, Palette, Publication, PublicationReason};

@@ -36,12 +36,12 @@ pub struct ControlState {
 }
 
 /// Strict source validation is the default. The explicit receiver profile
-/// retains malformed source evidence while exposing the pinned d32 outcome.
+/// retains malformed source evidence while exposing the pinned receiver's outcome.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub enum ControlPolicy {
     #[default]
     Strict,
-    NativeD32,
+    Receiver,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -236,7 +236,7 @@ impl DisplayControls<'_> {
             let at = usize::from(fact.raw_start);
             let control = match self.policy {
                 ControlPolicy::Strict => self.packet.control_at(at, fact.command_count)?,
-                ControlPolicy::NativeD32 => {
+                ControlPolicy::Receiver => {
                     self.packet.receiver_control_at(at, fact.command_count)?
                 }
             };
@@ -275,7 +275,7 @@ enum Phase {
     Finished,
 }
 
-/// Strict validates links; NativeD32 records bounded receiver traversal and
+/// Strict validates links; Receiver records bounded receiver traversal and
 /// termination while retaining the original links. Each command is charged once.
 /// Every original byte remains, including END tails and unsupported operands.
 /// Ordered commands can be reconstructed from raw spans without a command Vec.
@@ -417,7 +417,7 @@ impl ProgramJob {
         let packet = DvdPacket::with_control_offset(raw, self.first_control);
         match self.policy {
             ControlPolicy::Strict => packet.control_at(at, self.limits.max_commands_per_control),
-            ControlPolicy::NativeD32 => {
+            ControlPolicy::Receiver => {
                 packet.receiver_control_at(at, self.limits.max_commands_per_control)
             }
         }
@@ -493,7 +493,7 @@ impl ProgramJob {
                 .ok_or(Error::Invalid("DVD command cursor ended"))?
             {
                 Ok(command) => command,
-                Err(Error::Truncated) if self.policy == ControlPolicy::NativeD32 => {
+                Err(Error::Truncated) if self.policy == ControlPolicy::Receiver => {
                     let command_offset = start.checked_add(at).ok_or(Error::Overflow)?;
                     self.truncated = Some(TruncatedControl {
                         control_offset: fact.raw_start,
@@ -635,7 +635,7 @@ impl ProgramJob {
                         .current
                         .ok_or(Error::Invalid("DVD current control absent"))?;
                     fact.state_after = self.state;
-                    let receiver_stop = self.policy == ControlPolicy::NativeD32
+                    let receiver_stop = self.policy == ControlPolicy::Receiver
                         && (fact.next_offset < fact.raw_start
                             || usize::from(fact.next_offset)
                                 .checked_add(5)

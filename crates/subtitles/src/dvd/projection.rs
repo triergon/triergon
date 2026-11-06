@@ -1,4 +1,4 @@
-//! Explicit native-D32 bitmap selection and transparent-border projection.
+//! The receiver's bitmap selection and transparent-border crop.
 //! Full source indices remain owned and unchanged; cropped rows are borrowed.
 use super::{DvdArea, DvdBitmap};
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -22,20 +22,20 @@ impl Default for ProjectionLimits {
 /// Native menu handling bypasses transparent-border removal. This is separate
 /// from individual control/rectangle forced flags and source validity.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum NativeCropMode {
+pub enum CropMode {
     Ordinary,
     Menu,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum NativeSelection {
+pub enum CropSelection {
     Rendered,
     ReceiverOneRowOmission,
     ReceiverTransparentOmission,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub struct NativeCrop {
+pub struct Crop {
     pub area: DvdArea,
     pub width: u16,
     pub height: u16,
@@ -47,8 +47,8 @@ pub struct NativeCrop {
 pub struct ProjectedBitmap<const N: usize> {
     source: DvdBitmap,
     palette: [u32; N],
-    selection: NativeSelection,
-    crop: Option<NativeCrop>,
+    selection: CropSelection,
+    crop: Option<Crop>,
 }
 
 impl<const N: usize> ProjectedBitmap<N> {
@@ -62,11 +62,11 @@ impl<const N: usize> ProjectedBitmap<N> {
     pub fn palette(&self) -> &[u32; N] {
         &self.palette
     }
-    pub fn selection(&self) -> NativeSelection {
+    pub fn selection(&self) -> CropSelection {
         self.selection
     }
-    pub fn native_view(&self) -> Option<NativeDvdView<'_, N>> {
-        self.crop.map(|crop| NativeDvdView {
+    pub fn cropped_view(&self) -> Option<CroppedView<'_, N>> {
+        self.crop.map(|crop| CroppedView {
             source: &self.source,
             palette: &self.palette,
             crop,
@@ -79,7 +79,7 @@ impl<const N: usize> ProjectedBitmap<N> {
 pub(super) fn project_traditional_raster(
     source: DvdBitmap,
     palette: [u32; 4],
-    mode: NativeCropMode,
+    mode: CropMode,
     limits: ProjectionLimits,
     work: &mut WorkBudget,
 ) -> std::result::Result<ProjectedBitmap<4>, DvdBitmap> {
@@ -88,18 +88,18 @@ pub(super) fn project_traditional_raster(
         return Err(source);
     }
     let (selection, visible, units) = if source.height == 1 {
-        (NativeSelection::ReceiverOneRowOmission, false, 1)
-    } else if mode == NativeCropMode::Menu {
-        (NativeSelection::Rendered, true, 1)
+        (CropSelection::ReceiverOneRowOmission, false, 1)
+    } else if mode == CropMode::Menu {
+        (CropSelection::Rendered, true, 1)
     } else {
         let opaque = palette[0] >> 24 != 0;
         if !palette.iter().all(|color| (*color >> 24 != 0) == opaque) {
             return Err(source);
         }
         let selection = if opaque {
-            NativeSelection::Rendered
+            CropSelection::Rendered
         } else {
-            NativeSelection::ReceiverTransparentOmission
+            CropSelection::ReceiverTransparentOmission
         };
         // A traditional raster fits within the dimensions encoded on the wire.
         (selection, opaque, count + 1)
@@ -107,7 +107,7 @@ pub(super) fn project_traditional_raster(
     if units > limits.max_work || !work.try_charge(units as u64) {
         return Err(source);
     }
-    let crop = visible.then_some(NativeCrop {
+    let crop = visible.then_some(Crop {
         area: source.area,
         width: source.width,
         height: source.height,
@@ -123,14 +123,14 @@ pub(super) fn project_traditional_raster(
 }
 
 #[derive(Clone, Copy, Debug)]
-pub struct NativeDvdView<'a, const N: usize> {
+pub struct CroppedView<'a, const N: usize> {
     source: &'a DvdBitmap,
     palette: &'a [u32; N],
-    crop: NativeCrop,
+    crop: Crop,
 }
 
-impl<'a, const N: usize> NativeDvdView<'a, N> {
-    pub fn crop(self) -> NativeCrop {
+impl<'a, const N: usize> CroppedView<'a, N> {
+    pub fn crop(self) -> Crop {
         self.crop
     }
     pub fn palette(self) -> &'a [u32; N] {
@@ -180,10 +180,10 @@ pub enum ProjectionStatus {
 /// supplied, geometry-checked plane. Supplied narrow-palette indices are checked
 /// cooperatively before a view or receiver omission can be published.
 #[derive(Debug)]
-pub struct NativeProjectionJob<const N: usize> {
+pub struct CropJob<const N: usize> {
     source: Option<DvdBitmap>,
     palette: [u32; N],
-    mode: NativeCropMode,
+    mode: CropMode,
     validate_indices: bool,
     uniform_alpha: bool,
     limits: ProjectionLimits,
@@ -195,18 +195,18 @@ pub struct NativeProjectionJob<const N: usize> {
     bottom: usize,
     setup: bool,
     work: usize,
-    selection: NativeSelection,
-    crop: Option<NativeCrop>,
+    selection: CropSelection,
+    crop: Option<Crop>,
     ready: bool,
     finished: bool,
     failed: Option<Error>,
 }
 
-impl<const N: usize> NativeProjectionJob<N> {
+impl<const N: usize> CropJob<N> {
     pub fn new(
         source: DvdBitmap,
         palette: [u32; N],
-        mode: NativeCropMode,
+        mode: CropMode,
         budget: &Budget,
         limits: ProjectionLimits,
     ) -> Result<Self> {
@@ -253,7 +253,7 @@ impl<const N: usize> NativeProjectionJob<N> {
             bottom: 0,
             setup: false,
             work: 0,
-            selection: NativeSelection::Rendered,
+            selection: CropSelection::Rendered,
             crop: None,
             ready: false,
             finished: false,
@@ -316,7 +316,7 @@ impl<const N: usize> NativeProjectionJob<N> {
                     .ok_or(Error::Invalid("DVD zero native height"))?,
             )
             .ok_or(Error::Overflow)?;
-        self.crop = Some(NativeCrop {
+        self.crop = Some(Crop {
             area: DvdArea {
                 left,
                 right,
@@ -369,11 +369,11 @@ impl<const N: usize> NativeProjectionJob<N> {
                     .as_ref()
                     .ok_or(Error::Invalid("DVD projection source absent"))?;
                 if source.height == 1 && !self.validate_indices {
-                    self.selection = NativeSelection::ReceiverOneRowOmission;
+                    self.selection = CropSelection::ReceiverOneRowOmission;
                     self.ready = true;
                     continue;
                 }
-                if self.mode == NativeCropMode::Menu && !self.validate_indices {
+                if self.mode == CropMode::Menu && !self.validate_indices {
                     self.set_crop(0, 0, usize::from(source.width), usize::from(source.height))?;
                     continue;
                 }
@@ -390,12 +390,12 @@ impl<const N: usize> NativeProjectionJob<N> {
                     .as_ref()
                     .ok_or(Error::Invalid("DVD projection source absent"))?;
                 if source.height == 1 {
-                    self.selection = NativeSelection::ReceiverOneRowOmission;
+                    self.selection = CropSelection::ReceiverOneRowOmission;
                     self.ready = true;
-                } else if self.mode == NativeCropMode::Menu {
+                } else if self.mode == CropMode::Menu {
                     self.set_crop(0, 0, usize::from(source.width), usize::from(source.height))?;
                 } else if self.right == 0 || self.bottom == 0 {
-                    self.selection = NativeSelection::ReceiverTransparentOmission;
+                    self.selection = CropSelection::ReceiverTransparentOmission;
                     self.ready = true;
                 } else {
                     self.set_crop(

@@ -2,9 +2,10 @@
 //! four-pixel block boundary. No timing threshold or output waiver.
 use std::sync::atomic::AtomicBool;
 use triergon_core::{Budget, Bytes, Error, TimeBase, WorkBudget};
+use triergon_subtitles::compat::pgs::ArgbView;
 use triergon_subtitles::pgs::{
     DisplayConfig, DisplayDecoder, DisplayLimits, DisplayStatus, Envelope, IndexedDisplayDecoder,
-    NativeArgbView, PacketClock,
+    PacketClock,
 };
 
 fn segment(raw: &mut Vec<u8>, kind: u8, body: &[u8]) {
@@ -48,9 +49,9 @@ fn packet() -> Vec<u8> {
     raw
 }
 
-fn views(b: &Budget, suppressed: bool) -> (NativeArgbView, Vec<u8>) {
+fn views(b: &Budget, suppressed: bool) -> (ArgbView, Vec<u8>) {
     let config = DisplayConfig {
-        native_forced_only: suppressed,
+        receiver_forced_only: suppressed,
     };
     let clock = PacketClock {
         pts: None,
@@ -78,11 +79,11 @@ fn views(b: &Budget, suppressed: bool) -> (NativeArgbView, Vec<u8>) {
         }
         if eager_ready && indexed_ready {
             let expected = eager.take_output(&cancel).unwrap().objects()[0]
-                .native_argb_pixels()
+                .receiver_argb_pixels()
                 .as_ref()
                 .to_vec();
             let source = indexed.take_output(&cancel).unwrap();
-            let view = source.objects()[0].native_argb_view().unwrap();
+            let view = source.objects()[0].receiver_argb_view().unwrap();
             assert_eq!(view.len(), 1024);
             assert!(view.palette().source(0).is_some());
             assert!(view.palette().source(255).is_some());

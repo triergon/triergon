@@ -72,7 +72,7 @@ impl DisplayLimits {
 
 #[derive(Clone, Copy, Debug, Default)]
 pub struct DisplayConfig {
-    pub native_forced_only: bool,
+    pub receiver_forced_only: bool,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -604,13 +604,13 @@ fn stamp_time(stamp: SegmentStamp) -> Result<Option<i64>> {
             dts: Some(i64::from(raw.dts)),
             timebase: triergon_core::TimeBase::new(1, 90000)?,
         }
-        .native_microseconds()
+        .receiver_microseconds()
     } else if stamp.packet_clock.pts == Some(i64::MIN) {
         Err(Error::Unsupported(
             "PGS PTS equals native no-timestamp sentinel",
         ))
     } else {
-        stamp.packet_clock.native_microseconds()
+        stamp.packet_clock.receiver_microseconds()
     }
 }
 

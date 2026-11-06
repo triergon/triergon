@@ -18,17 +18,17 @@ or `Encoding::Multibyte`; no label or content is guessed.
 
 Other aliases, padded labels, HKSCS, GB18030 and ISO-2022 are refused.
 
-## FFmpeg/glibc profiles (`native_charset::receiver_charset`)
+## FFmpeg/glibc profiles (`compat::charset::receiver_charset`)
 
 These match the label set and repertoire the pinned FFmpeg build accepts through
-glibc iconv when converting ASS packets (`native_charset::AssPacketJob`).
+glibc iconv when converting ASS packets (`compat::charset::AssPacketJob`).
 
 | Profile | Labels | Mapping data |
 | --- | --- | --- |
 | `GbkCp936`, `ShiftJisUnicode`, `Windows949`, `Windows950` | gbk, cp936, windows-936, shift_jis, shift-jis, sjis, cp949, cp950 | As above. |
 | `ReceiverBig5Glibc239` | big5, big-5 | GNU Big5 charmap 0.92 from glibc 2.39 (14,040 records). |
 | `ReceiverEucKrC1` | euc-kr | `EucKr` plus the 32 C1 controls. |
-| `ReceiverEucKrGlibc239` | euc-kr (`receiver_charset_v2` only) | `ReceiverEucKrC1` plus A2E8 → U+327E; equals the glibc 2.39 EUC-KR charmap. |
+| `ReceiverEucKrGlibc239` | euc-kr (`receiver_charset_with_glibc_euc_kr` only) | `ReceiverEucKrC1` plus A2E8 → U+327E; equals the glibc 2.39 EUC-KR charmap. |
 | `ReceiverWindows932Pua` | cp932 | CP932 plus the 1,880 user-defined codes F040–F9FC → U+E000–U+E757. |
 
 `euc_kr` and `windows-932/949/950` are unavailable in this view.

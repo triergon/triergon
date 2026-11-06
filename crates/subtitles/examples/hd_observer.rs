@@ -3,9 +3,10 @@
 use std::{fmt::Write as _, io::Read, sync::atomic::AtomicBool};
 use triergon_core::{Budget, Bytes, Rounding, Time, TimeBase, WorkBudget};
 use triergon_harness_protocol::hex;
+use triergon_subtitles::compat::dvd::{CropJob, CropMode};
 use triergon_subtitles::dvd::{
     ConfigJob, ConfigLimits, ConfigStatus, HdFacts, HdLimits, HdSpan, HdSpuJob, HdStatus,
-    NativeCropMode, NativeProjectionJob, ProjectionLimits, ProjectionStatus,
+    ProjectionLimits, ProjectionStatus,
 };
 type Result<T> = std::result::Result<T, String>;
 const MAX_INPUT: usize = 16 * 1024 * 1024;
@@ -203,13 +204,13 @@ fn run(raw: &[u8], quantum: u64) -> Result<String> {
             }
         };
         let (_raw, bitmap, _facts) = picture.into_parts();
-        let mut projection = NativeProjectionJob::new(
+        let mut projection = CropJob::new(
             bitmap,
             palette,
             if facts.menu {
-                NativeCropMode::Menu
+                CropMode::Menu
             } else {
-                NativeCropMode::Ordinary
+                CropMode::Ordinary
             },
             &pool,
             ProjectionLimits::default(),
@@ -223,7 +224,7 @@ fn run(raw: &[u8], quantum: u64) -> Result<String> {
         let projection = projection
             .try_finish(&cancel)
             .map_err(|e| format!("{e:?}"))?;
-        let Some(view) = projection.native_view() else {
+        let Some(view) = projection.cropped_view() else {
             continue;
         };
         let crop = view.crop();

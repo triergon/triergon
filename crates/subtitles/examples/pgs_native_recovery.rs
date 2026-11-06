@@ -4,10 +4,11 @@ use std::io::{BufReader, Read};
 use std::path::Path;
 use std::sync::atomic::AtomicBool;
 use triergon_core::{Budget, Bytes, TimeBase, WorkBudget};
+use triergon_subtitles::compat::pgs::{ColourOrigin, RecoveryDecoder};
 use triergon_subtitles::pgs::{
-    DisplayConfig, DisplayLimits, DisplaySet, NATIVE_RECOVERY, NativeColourOrigin,
-    NativeRecoveryDecoder, PacketClock, RecoveredEvent, RecoveryStatus,
+    DisplayConfig, DisplayLimits, DisplaySet, PacketClock, RecoveredEvent, RecoveryStatus,
 };
+use triergon_subtitles::reference_trace::pgs::RECOVERY_PROFILE;
 
 const MAX_INPUT: usize = 16 * 1024 * 1024;
 
@@ -138,7 +139,7 @@ fn emit_source(display: &DisplaySet, packet: usize, consumed: usize) {
     print!(
         "{{\"kind\":\"source-subtitle\",\"packet\":{packet},\"packet_offset\":0,\"consumed\":{consumed},\"flush\":false,\"format\":0,\"pts_microseconds\":"
     );
-    integer(display.native_pts_microseconds);
+    integer(display.receiver_pts_microseconds);
     print!(
         ",\"start_display_ms\":0,\"end_display_ms\":4294967295,\"context_canvas\":[{},{}],\"rectangles\":[",
         display.presentation.width, display.presentation.height
@@ -149,8 +150,8 @@ fn emit_source(display: &DisplaySet, packet: usize, consumed: usize) {
         }
         print!(
             "{{\"order\":{order},\"x\":{},\"y\":{},\"width\":{},\"height\":{},\"flags\":{},\"native_stride\":{},\"indices_hex\":",
-            object.native_x,
-            object.native_y,
+            object.receiver_x,
+            object.receiver_y,
             object.object_width,
             object.object_height,
             u8::from(object.composition.forced()),
@@ -159,7 +160,7 @@ fn emit_source(display: &DisplaySet, packet: usize, consumed: usize) {
         hex(object.pixels());
         print!(",\"palette_entries\":256,\"raw_native_palette_hex\":\"");
         for index in 0..=u8::MAX {
-            for b in object.native_argb(index).to_ne_bytes() {
+            for b in object.receiver_argb(index).to_ne_bytes() {
                 print!("{b:02x}");
             }
         }
@@ -168,10 +169,10 @@ fn emit_source(display: &DisplaySet, packet: usize, consumed: usize) {
             if index != 0 {
                 print!(",");
             }
-            print!("{}", object.native_argb(index));
+            print!("{}", object.receiver_argb(index));
         }
         print!("],\"argb_hex\":");
-        hex(object.native_argb_pixels());
+        hex(object.receiver_argb_pixels());
         print!(
             ",\"source\":{{\"object_id\":{},\"object_version\":{},\"x\":{},\"y\":{},\"window_id\":{},\"window_known\":{},\"flags\":{},\"crop\":",
             object.composition.id,
@@ -238,10 +239,10 @@ fn emit_source(display: &DisplaySet, packet: usize, consumed: usize) {
             if index != 0 {
                 print!(",");
             }
-            string(match object.palette().native_origin(index) {
-                NativeColourOrigin::ExplicitSource => "explicit-source",
-                NativeColourOrigin::PreviousEpochSlot => "previous-epoch-physical-slot",
-                NativeColourOrigin::ReceiverZeroInitialization => "receiver-zero-initialization",
+            string(match object.palette().receiver_origin(index) {
+                ColourOrigin::ExplicitSource => "explicit-source",
+                ColourOrigin::PreviousEpochSlot => "previous-epoch-physical-slot",
+                ColourOrigin::ReceiverZeroInitialization => "receiver-zero-initialization",
             });
         }
         print!("]}}}}");
@@ -254,7 +255,7 @@ fn emit_source(display: &DisplaySet, packet: usize, consumed: usize) {
         display.presentation.raw_state,
         display.presentation.palette_update_flags
     );
-    match display.native_time_error {
+    match display.receiver_time_error {
         None => print!("null"),
         Some(error) => string(&error.to_string()),
     }
@@ -342,7 +343,7 @@ fn emit_recovered(event: &RecoveredEvent, canvas: [u16; 2], packet: usize, consu
         print!("\"}}");
     }
     print!("],\"projection\":");
-    string(NATIVE_RECOVERY);
+    string(RECOVERY_PROFILE);
     println!("}}");
 }
 fn run(path: &Path, quantum: u64) -> Result<(), String> {
@@ -352,11 +353,11 @@ fn run(path: &Path, quantum: u64) -> Result<(), String> {
     let case = read_case(path)?;
     let b = Budget::new(256 * 1024 * 1024).map_err(|e| e.to_string())?;
     let c = AtomicBool::new(false);
-    let mut decoder = NativeRecoveryDecoder::new(
+    let mut decoder = RecoveryDecoder::new(
         &b,
         DisplayLimits::default(),
         DisplayConfig {
-            native_forced_only: case.forced_only,
+            receiver_forced_only: case.forced_only,
         },
     )
     .map_err(|e| e.to_string())?;

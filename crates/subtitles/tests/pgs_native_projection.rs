@@ -1,10 +1,13 @@
 //! Original receiver compatibility guards. Strict source facts remain intact.
 use std::sync::atomic::{AtomicBool, Ordering};
 use triergon_core::{Budget, BudgetVec, Bytes, Error, TimeBase, WorkBudget};
+use triergon_subtitles::compat::pgs::{EofBehavior, RecoveryEof};
 use triergon_subtitles::pgs::{
-    DisplayConfig, DisplayDecoder, DisplayLimits, DisplaySet, DisplayStatus, Envelope,
-    NativeCanvas, NativeDisplay, NativeEof, NativeEofBehavior, NativePacket, NativeProjector,
-    NativeRasterOrigin, PacketClock, ProjectionStatus, SegmentIter, SegmentStamp,
+    DisplayConfig, DisplayDecoder, DisplayLimits, DisplaySet, DisplayStatus, Envelope, PacketClock,
+    SegmentIter, SegmentStamp,
+};
+use triergon_subtitles::reference_trace::pgs::{
+    Canvas, ProjectedDisplay, ProjectedPacket, ProjectionStatus, Projector, RasterOrigin,
 };
 
 fn seg(kind: u8, payload: &[u8]) -> Vec<u8> {
@@ -86,7 +89,7 @@ fn decoder(b: &Budget) -> DisplayDecoder {
 fn take_source(d: &mut DisplayDecoder, b: &Budget, p: &[u8]) -> DisplaySet {
     source(d, b, p, clock(Some(90001))).remove(0)
 }
-fn boundary(p: &mut NativeProjector, q: u64, c: &AtomicBool) -> Result<ProjectionStatus, Error> {
+fn boundary(p: &mut Projector, q: u64, c: &AtomicBool) -> Result<ProjectionStatus, Error> {
     for _ in 0..100_000 {
         let before = p.work_spent();
         let mut w = WorkBudget::new(q);
@@ -99,7 +102,7 @@ fn boundary(p: &mut NativeProjector, q: u64, c: &AtomicBool) -> Result<Projectio
     }
     panic!("projection stalled")
 }
-fn project(p: &mut NativeProjector, set: DisplaySet, q: u64) -> NativeDisplay {
+fn project(p: &mut Projector, set: DisplaySet, q: u64) -> ProjectedDisplay {
     let c = AtomicBool::new(false);
     let mut set = Some(set);
     p.push(&mut set, &c).unwrap();
@@ -115,7 +118,7 @@ fn pool() -> Budget {
 fn empty_first_has_empty_receiver_and_retains_complete_source_raster() {
     let b = pool();
     let mut d = decoder(&b);
-    let mut p = NativeProjector::new(&b, usize::MAX);
+    let mut p = Projector::new(&b, usize::MAX);
     let output = project(
         &mut p,
         take_source(&mut d, &b, &frame(0x80, 1, Some(0), [1, 2])),
@@ -125,7 +128,7 @@ fn empty_first_has_empty_receiver_and_retains_complete_source_raster() {
     assert_eq!((r.width, r.height, r.stride), (0, 0, 0));
     assert!(r.pixels().is_empty());
     assert!(r.argb_pixels().is_empty());
-    assert_eq!(r.origin, NativeRasterOrigin::EmptyAfterRejectedFirst);
+    assert_eq!(r.origin, RasterOrigin::EmptyAfterRejectedFirst);
     assert_eq!(output.source().objects()[0].pixels().as_ref(), &[1, 2]);
     assert_eq!(output.source().objects()[0].object_width, 2);
 }
@@ -136,7 +139,7 @@ fn every_nonempty_fragment_split_has_complete_literal_receiver_pixels() {
         for q in [1, 2, 3, 7, 65, 4096] {
             let b = pool();
             let mut d = decoder(&b);
-            let mut p = NativeProjector::new(&b, usize::MAX);
+            let mut p = Projector::new(&b, usize::MAX);
             let output = project(
                 &mut p,
                 take_source(&mut d, &b, &frame(0x80, 1, Some(split), [1, 2])),
@@ -147,10 +150,7 @@ fn every_nonempty_fragment_split_has_complete_literal_receiver_pixels() {
                 output.rectangles()[0].argb_pixels().as_ref(),
                 &[255, 0, 0, 0, 255, 255, 255, 255]
             );
-            assert_eq!(
-                output.rectangles()[0].origin,
-                NativeRasterOrigin::SourceRaster
-            );
+            assert_eq!(output.rectangles()[0].origin, RasterOrigin::SourceRaster);
         }
     }
 }
@@ -159,7 +159,7 @@ fn every_nonempty_fragment_split_has_complete_literal_receiver_pixels() {
 fn rejected_replacement_retains_old_receiver_image_and_new_source_image() {
     let b = pool();
     let mut d = decoder(&b);
-    let mut p = NativeProjector::new(&b, usize::MAX);
+    let mut p = Projector::new(&b, usize::MAX);
     let old = project(
         &mut p,
         take_source(&mut d, &b, &frame(0x80, 1, None, [1, 2])),
@@ -174,7 +174,7 @@ fn rejected_replacement_retains_old_receiver_image_and_new_source_image() {
     assert_eq!(new.rectangles()[0].pixels().as_ref(), &[1, 2]);
     assert_eq!(
         new.rectangles()[0].origin,
-        NativeRasterOrigin::RetainedBeforeRejectedFirst
+        RasterOrigin::RetainedBeforeRejectedFirst
     );
     assert_eq!(
         new.rectangles()[0].argb_pixels().as_ref(),
@@ -190,7 +190,7 @@ fn rejected_replacement_retains_old_receiver_image_and_new_source_image() {
 fn epoch_discards_previous_receiver_image_before_rejected_first() {
     let b = pool();
     let mut d = decoder(&b);
-    let mut p = NativeProjector::new(&b, usize::MAX);
+    let mut p = Projector::new(&b, usize::MAX);
     let old = project(
         &mut p,
         take_source(&mut d, &b, &frame(0x80, 1, None, [1, 2])),
@@ -203,7 +203,7 @@ fn epoch_discards_previous_receiver_image_before_rejected_first() {
     );
     assert_eq!(
         new.rectangles()[0].origin,
-        NativeRasterOrigin::EmptyAfterRejectedFirst
+        RasterOrigin::EmptyAfterRejectedFirst
     );
     assert!(new.rectangles()[0].pixels().is_empty());
     assert_eq!(old.rectangles()[0].pixels().as_ref(), &[1, 2]);
@@ -213,7 +213,7 @@ fn epoch_discards_previous_receiver_image_before_rejected_first() {
 fn hard_source_generation_change_discards_receiver_history() {
     let b = pool();
     let mut d = decoder(&b);
-    let mut p = NativeProjector::new(&b, usize::MAX);
+    let mut p = Projector::new(&b, usize::MAX);
     let old = project(
         &mut p,
         take_source(&mut d, &b, &frame(0x80, 1, None, [1, 2])),
@@ -228,7 +228,7 @@ fn hard_source_generation_change_discards_receiver_history() {
     assert_ne!(old.source().generation, new.source().generation);
     assert_eq!(
         new.rectangles()[0].origin,
-        NativeRasterOrigin::EmptyAfterRejectedFirst
+        RasterOrigin::EmptyAfterRejectedFirst
     );
 }
 
@@ -236,7 +236,7 @@ fn hard_source_generation_change_discards_receiver_history() {
 fn unused_preloaded_object_history_survives_clear_then_reference() {
     let b = pool();
     let mut d = decoder(&b);
-    let mut p = NativeProjector::new(&b, usize::MAX);
+    let mut p = Projector::new(&b, usize::MAX);
     let mut preload = pcs(0x80, 1, &[]);
     preload.extend(pds(1, 16));
     preload.extend(ods(7, 1, 0xc0, 4, &[1, 2, 0, 0]));
@@ -247,17 +247,14 @@ fn unused_preloaded_object_history_survives_clear_then_reference() {
     later.extend(seg(0x80, &[]));
     let later = project(&mut p, take_source(&mut d, &b, &later), 1);
     assert_eq!(later.rectangles()[0].pixels().as_ref(), &[1, 2]);
-    assert_eq!(
-        later.rectangles()[0].origin,
-        NativeRasterOrigin::SourceRaster
-    );
+    assert_eq!(later.rectangles()[0].origin, RasterOrigin::SourceRaster);
 }
 
 #[test]
 fn two_reference_receiver_limit_preserves_all_three_source_objects() {
     let b = pool();
     let mut d = decoder(&b);
-    let mut p = NativeProjector::new(&b, usize::MAX);
+    let mut p = Projector::new(&b, usize::MAX);
     let mut packet = pcs(0x80, 1, &[7, 8, 9]);
     packet.extend(pds(1, 16));
     for id in [7, 8, 9] {
@@ -283,7 +280,7 @@ fn two_reference_receiver_limit_preserves_all_three_source_objects() {
 fn one_native_packet_output_retains_all_source_sets() {
     let b = pool();
     let mut d = decoder(&b);
-    let mut p = NativeProjector::new(&b, usize::MAX);
+    let mut p = Projector::new(&b, usize::MAX);
     let mut packet = frame(0x80, 1, None, [1, 2]);
     packet.extend(frame(0, 2, None, [2, 1]));
     let sets = source(&mut d, &b, &packet, clock(None));
@@ -292,7 +289,7 @@ fn one_native_packet_output_retains_all_source_sets() {
     for set in sets {
         native.try_push(project(&mut p, set, 1)).unwrap();
     }
-    let packet = NativePacket::from_sets(native, None);
+    let packet = ProjectedPacket::from_sets(native, None);
     assert_eq!(packet.omitted_receiver_events(), 1);
     assert_eq!(
         packet.receiver_output().unwrap().rectangles()[0]
@@ -313,7 +310,7 @@ fn one_native_packet_output_retains_all_source_sets() {
 fn final_packet_canvas_comes_from_actual_trailing_pcs_and_preserves_stamp() {
     let b = pool();
     let mut d = decoder(&b);
-    let mut p = NativeProjector::new(&b, usize::MAX);
+    let mut p = Projector::new(&b, usize::MAX);
     let set = take_source(&mut d, &b, &frame(0x80, 1, None, [1, 2]));
     let mut raw = pcs(0, 2, &[]);
     raw[3..7].copy_from_slice(&[1, 64, 0, 96]);
@@ -328,10 +325,10 @@ fn final_packet_canvas_comes_from_actual_trailing_pcs_and_preserves_stamp() {
         sup_clock: None,
         envelope: Envelope::Packet,
     };
-    let canvas = NativeCanvas::parse(segment, stamp).unwrap();
+    let canvas = Canvas::parse(segment, stamp).unwrap();
     let mut sets = BudgetVec::new(&b);
     sets.try_push(project(&mut p, set, 1)).unwrap();
-    let packet = NativePacket::from_sets(sets, Some(canvas));
+    let packet = ProjectedPacket::from_sets(sets, Some(canvas));
     assert_eq!(packet.context_canvas(), Some([320, 96]));
     assert_eq!(packet.context().unwrap().stamp, stamp);
     assert_eq!(
@@ -349,7 +346,7 @@ fn final_packet_canvas_comes_from_actual_trailing_pcs_and_preserves_stamp() {
 fn native_clock_sentinel_preserves_exact_source_tick_and_diagnostic() {
     let b = pool();
     let mut d = decoder(&b);
-    let mut p = NativeProjector::new(&b, usize::MAX);
+    let mut p = Projector::new(&b, usize::MAX);
     let set = source(
         &mut d,
         &b,
@@ -359,7 +356,7 @@ fn native_clock_sentinel_preserves_exact_source_tick_and_diagnostic() {
     .remove(0);
     let output = project(&mut p, set, 1);
     assert_eq!(output.pts_microseconds, None);
-    assert!(output.source().native_time_error.is_some());
+    assert!(output.source().receiver_time_error.is_some());
     assert_eq!(
         output.source().presentation.stamp.packet_clock.pts,
         Some(i64::MIN)
@@ -370,7 +367,7 @@ fn native_clock_sentinel_preserves_exact_source_tick_and_diagnostic() {
 fn native_clock_overflow_preserves_source_timebase_and_value() {
     let b = pool();
     let mut d = decoder(&b);
-    let mut p = NativeProjector::new(&b, usize::MAX);
+    let mut p = Projector::new(&b, usize::MAX);
     let clock = PacketClock {
         pts: Some(i64::MAX),
         dts: Some(-1),
@@ -379,7 +376,7 @@ fn native_clock_overflow_preserves_source_timebase_and_value() {
     let set = source(&mut d, &b, &frame(0x80, 1, None, [1, 2]), clock).remove(0);
     let output = project(&mut p, set, 1);
     assert_eq!(output.pts_microseconds, None);
-    assert_eq!(output.source().native_time_error, Some(Error::Overflow));
+    assert_eq!(output.source().receiver_time_error, Some(Error::Overflow));
     assert_eq!(output.source().presentation.stamp.packet_clock, clock);
 }
 
@@ -404,10 +401,10 @@ fn eof_has_no_delayed_output_but_keeps_strict_missing_end_error() {
         }
     };
     assert_eq!(error, Error::Truncated);
-    let eof = NativeEof::from_source_finalization(Some(error));
+    let eof = RecoveryEof::from_source_finalization(Some(error));
     assert_eq!(eof.source_error, Some(Error::Truncated));
     assert_eq!(eof.receiver_error, None);
-    assert_eq!(eof.behavior, NativeEofBehavior::NoDelayedSubtitle);
+    assert_eq!(eof.behavior, EofBehavior::NoDelayedSubtitle);
 }
 
 #[test]
@@ -422,12 +419,15 @@ fn eof_projection_never_masks_cancellation_limits_or_packet_failures() {
         },
         Error::Invalid("source packet failure"),
     ] {
-        let eof = NativeEof::from_source_finalization(Some(error));
+        let eof = RecoveryEof::from_source_finalization(Some(error));
         assert_eq!(eof.source_error, Some(error));
         assert_eq!(eof.receiver_error, Some(error));
-        assert_eq!(eof.behavior, NativeEofBehavior::UnsupportedSourceFailure);
+        assert_eq!(eof.behavior, EofBehavior::UnsupportedSourceFailure);
     }
-    assert_eq!(NativeEof::from_source_finalization(None).source_error, None);
+    assert_eq!(
+        RecoveryEof::from_source_finalization(None).source_error,
+        None
+    );
 }
 
 #[test]
@@ -435,7 +435,7 @@ fn zero_work_never_allocates_or_consumes_source_work() {
     let b = pool();
     let mut d = decoder(&b);
     let set = take_source(&mut d, &b, &frame(0x80, 1, None, [1, 2]));
-    let mut p = NativeProjector::new(&b, usize::MAX);
+    let mut p = Projector::new(&b, usize::MAX);
     let mut set = Some(set);
     p.push(&mut set, &AtomicBool::new(false)).unwrap();
     let before = (b.used(), p.work_spent());
@@ -454,7 +454,7 @@ fn pressure_at_allocations_and_freeze_is_retryable_without_work_recharge() {
     let b = pool();
     let mut d = decoder(&b);
     let set = take_source(&mut d, &b, &frame(0x80, 1, None, [1, 2]));
-    let mut p = NativeProjector::new(&b, usize::MAX);
+    let mut p = Projector::new(&b, usize::MAX);
     let c = AtomicBool::new(false);
     let mut set = Some(set);
     p.push(&mut set, &c).unwrap();
@@ -503,7 +503,7 @@ fn busy_push_retains_exact_caller_source_owner() {
     let first = take_source(&mut d, &b, &frame(0x80, 1, None, [1, 2]));
     let second = take_source(&mut d, &b, &frame(0, 2, None, [2, 1]));
     let pointer = second.objects()[0].pixels().as_ptr();
-    let mut p = NativeProjector::new(&b, usize::MAX);
+    let mut p = Projector::new(&b, usize::MAX);
     let c = AtomicBool::new(false);
     p.push(&mut Some(first), &c).unwrap();
     let mut second = Some(second);
@@ -530,7 +530,7 @@ fn foreign_source_is_retained_and_failure_is_sticky() {
     let set = take_source(&mut d, &foreign, &frame(0x80, 1, None, [1, 2]));
     let ptr = set.objects()[0].pixels().as_ptr();
     let mut set = Some(set);
-    let mut p = NativeProjector::new(&b, usize::MAX);
+    let mut p = Projector::new(&b, usize::MAX);
     let c = AtomicBool::new(false);
     assert_eq!(p.push(&mut set, &c), Err(Error::ForeignPool));
     assert_eq!(set.as_ref().unwrap().objects()[0].pixels().as_ptr(), ptr);
@@ -543,7 +543,7 @@ fn cancellation_is_sticky_at_many_phases_and_retained_outputs_survive() {
     for steps in [0, 1, 2, 64, 65, 66, 100, 150, 200, 240, 260, 350] {
         let b = pool();
         let mut d = decoder(&b);
-        let mut p = NativeProjector::new(&b, usize::MAX);
+        let mut p = Projector::new(&b, usize::MAX);
         let retained = project(
             &mut p,
             take_source(&mut d, &b, &frame(0x80, 1, None, [1, 2])),
@@ -576,7 +576,7 @@ fn work_is_quantum_invariant_and_exact_total_limit_is_enforced() {
     for q in [1, 2, 3, 7, 65, 4096] {
         let b = pool();
         let mut d = decoder(&b);
-        let mut p = NativeProjector::new(&b, usize::MAX);
+        let mut p = Projector::new(&b, usize::MAX);
         let output = project(
             &mut p,
             take_source(&mut d, &b, &frame(0x80, 1, None, [1, 2])),
@@ -589,7 +589,7 @@ fn work_is_quantum_invariant_and_exact_total_limit_is_enforced() {
     for maximum in [totals[0] - 1, totals[0]] {
         let b = pool();
         let mut d = decoder(&b);
-        let mut p = NativeProjector::new(&b, maximum);
+        let mut p = Projector::new(&b, maximum);
         let mut set = Some(take_source(&mut d, &b, &frame(0x80, 1, None, [1, 2])));
         let c = AtomicBool::new(false);
         p.push(&mut set, &c).unwrap();
@@ -607,7 +607,7 @@ fn work_is_quantum_invariant_and_exact_total_limit_is_enforced() {
 fn explicit_reset_releases_private_history_and_restarts_after_sticky_cancel() {
     let b = pool();
     let mut d = decoder(&b);
-    let mut p = NativeProjector::new(&b, usize::MAX);
+    let mut p = Projector::new(&b, usize::MAX);
     let retained = project(
         &mut p,
         take_source(&mut d, &b, &frame(0x80, 1, None, [1, 2])),
@@ -636,7 +636,7 @@ fn explicit_reset_releases_private_history_and_restarts_after_sticky_cancel() {
 fn hidden_third_reference_keeps_native_image_for_later_rejected_first() {
     let b = pool();
     let mut d = decoder(&b);
-    let mut p = NativeProjector::new(&b, usize::MAX);
+    let mut p = Projector::new(&b, usize::MAX);
     let mut packet = pcs(0x80, 1, &[8, 9, 7]);
     packet.extend(pds(1, 16));
     for id in [8, 9, 7] {
@@ -655,7 +655,7 @@ fn hidden_third_reference_keeps_native_image_for_later_rejected_first() {
     assert_eq!(later.rectangles()[0].pixels().as_ref(), &[1, 2]);
     assert_eq!(
         later.rectangles()[0].origin,
-        NativeRasterOrigin::RetainedBeforeRejectedFirst
+        RasterOrigin::RetainedBeforeRejectedFirst
     );
 }
 
@@ -663,7 +663,7 @@ fn hidden_third_reference_keeps_native_image_for_later_rejected_first() {
 fn unreferenced_preload_keeps_native_image_for_later_rejected_first() {
     let b = pool();
     let mut d = decoder(&b);
-    let mut p = NativeProjector::new(&b, usize::MAX);
+    let mut p = Projector::new(&b, usize::MAX);
     let mut packet = pcs(0x80, 1, &[]);
     packet.extend(pds(1, 16));
     packet.extend(ods(7, 1, 0xc0, 4, &[1, 2, 0, 0]));
@@ -682,7 +682,7 @@ fn unreferenced_preload_keeps_native_image_for_later_rejected_first() {
     assert_eq!(later.rectangles()[0].pixels().as_ref(), &[1, 2]);
     assert_eq!(
         later.rectangles()[0].origin,
-        NativeRasterOrigin::RetainedBeforeRejectedFirst
+        RasterOrigin::RetainedBeforeRejectedFirst
     );
 }
 
@@ -692,7 +692,7 @@ fn fragmented_unreferenced_preloads_are_quantum_invariant_across_clear_sets() {
     for q in [1, 2, 3, 7, 65, 4096] {
         let b = pool();
         let mut d = decoder(&b);
-        let mut p = NativeProjector::new(&b, usize::MAX);
+        let mut p = Projector::new(&b, usize::MAX);
         let mut first = pcs(0x80, 1, &[]);
         first.extend(pds(1, 16));
         first.extend(ods(7, 1, 0x80, 4, &[1]));
@@ -726,7 +726,7 @@ fn fragmented_unreferenced_preloads_are_quantum_invariant_across_clear_sets() {
 fn unreferenced_assembly_raster_pressure_and_freeze_restore_every_owner() {
     let b = pool();
     let mut d = decoder(&b);
-    let mut p = NativeProjector::new(&b, usize::MAX);
+    let mut p = Projector::new(&b, usize::MAX);
     let mut packet = pcs(0x80, 1, &[]);
     packet.extend(pds(1, 16));
     packet.extend(ods(7, 1, 0x80, 4, &[1]));
@@ -785,7 +785,7 @@ fn cancellation_during_unreferenced_assembly_and_raster_releases_pending_owners(
     for steps in [64, 65, 128, 192, 256, 260, 270, 280, 300, 400, 500] {
         let b = pool();
         let mut d = decoder(&b);
-        let mut p = NativeProjector::new(&b, usize::MAX);
+        let mut p = Projector::new(&b, usize::MAX);
         let mut packet = pcs(0x80, 1, &[]);
         packet.extend(pds(1, 16));
         packet.extend(ods(7, 1, 0x80, 4, &[1]));

@@ -35,7 +35,7 @@ fn finish(
         Bytes::copy_from_slice(budget, &bytes)?,
         sequence,
         stamp(sequence),
-        NativeMatrix::for_canvas(if sequence.is_multiple_of(2) {
+        ColourMatrix::for_canvas(if sequence.is_multiple_of(2) {
             480
         } else {
             1080
@@ -65,10 +65,10 @@ fn empty_palette_fits_pool_for_words_without_absent_source_storage() {
     let palette = finish(&budget, &[], None, false, 0, 1).unwrap();
     for index in 0..=255 {
         assert_eq!(palette.source(index), None);
-        assert_eq!(palette.native_argb(index), 0);
+        assert_eq!(palette.receiver_argb(index), 0);
         assert_eq!(
-            palette.native_origin(index),
-            NativeColourOrigin::ReceiverZeroInitialization
+            palette.receiver_origin(index),
+            ColourOrigin::ReceiverZeroInitialization
         );
     }
     drop(palette);
@@ -116,13 +116,10 @@ fn full256_palette_fits_bounded_pool_and_keeps_every_literal_entry() {
             entries[index as usize][1..]
         );
         assert_eq!(source.stamp, stamp(0));
+        assert_eq!(palette.receiver_origin(index), ColourOrigin::ExplicitSource);
         assert_eq!(
-            palette.native_origin(index),
-            NativeColourOrigin::ExplicitSource
-        );
-        assert_eq!(
-            palette.native_argb(index),
-            NativeMatrix::for_canvas(480).argb(index, index ^ 0x5a, index ^ 0xa5, index)
+            palette.receiver_argb(index),
+            ColourMatrix::for_canvas(480).argb(index, index ^ 0x5a, index ^ 0xa5, index)
         );
     }
     drop(palette);
@@ -181,7 +178,7 @@ fn empty_palette_has_no_source_column_or_provenance_spill_capacity() {
     assert_eq!(palette.0.colours.capacity(), 0);
     assert_eq!(palette.0.other_owners.capacity(), 0);
     assert!(palette.0.first_owner.is_none());
-    assert_eq!(palette.native_words().len(), 256);
+    assert_eq!(palette.receiver_words().len(), 256);
     owner_invariants(&palette);
 }
 
@@ -212,11 +209,11 @@ fn partial_carry_clones_distinct_owner_once_and_preserves_clock_and_matrix() {
     assert_eq!(b.source(7).unwrap().stamp, stamp(1));
     assert_eq!(
         b.source(7).unwrap().receiver_matrix,
-        NativeMatrix::for_canvas(1080)
+        ColourMatrix::for_canvas(1080)
     );
     assert_eq!(
         b.source(8).unwrap().receiver_matrix,
-        NativeMatrix::for_canvas(480)
+        ColourMatrix::for_canvas(480)
     );
     owner_invariants(&a);
     owner_invariants(&b);
@@ -329,13 +326,13 @@ fn epoch_carry_clears_source_and_owners_but_preserves_receiver_words_and_origin(
     assert!(b.0.first_owner.is_none());
     for i in 0..=255 {
         assert_eq!(b.source(i), None);
-        assert_eq!(b.native_argb(i), a.native_argb(i));
+        assert_eq!(b.receiver_argb(i), a.receiver_argb(i));
         assert_eq!(
-            b.native_origin(i),
+            b.receiver_origin(i),
             if i == 63 {
-                NativeColourOrigin::PreviousEpochSlot
+                ColourOrigin::PreviousEpochSlot
             } else {
-                NativeColourOrigin::ReceiverZeroInitialization
+                ColourOrigin::ReceiverZeroInitialization
             }
         );
     }
@@ -356,8 +353,8 @@ fn carried_receiver_word_does_not_become_source_when_one_new_entry_is_written() 
     )
     .unwrap();
     assert_eq!(b.source(63), None);
-    assert_eq!(b.native_argb(63), a.native_argb(63));
-    assert_eq!(b.native_origin(63), NativeColourOrigin::PreviousEpochSlot);
+    assert_eq!(b.receiver_argb(63), a.receiver_argb(63));
+    assert_eq!(b.receiver_origin(63), ColourOrigin::PreviousEpochSlot);
     assert_eq!(b.source(64).unwrap().stamp, stamp(1));
     owner_invariants(&b);
 }
@@ -387,7 +384,7 @@ fn all_small_quanta_and_bulk_boundary_quanta_keep_full_literal_palette() {
         let p = finish(&budget, &entries, None, false, 7, q).unwrap();
         for i in 0..=255 {
             assert_eq!(p.source(i), expected.source(i));
-            assert_eq!(p.native_argb(i), expected.native_argb(i));
+            assert_eq!(p.receiver_argb(i), expected.receiver_argb(i));
         }
         owner_invariants(&p);
     }
@@ -399,7 +396,7 @@ fn one_entry_job(budget: &Budget) -> PaletteBuild {
         Bytes::copy_from_slice(budget, &[3, 1, 7, 16, 128, 128, 255]).unwrap(),
         1,
         stamp(1),
-        NativeMatrix::for_canvas(480),
+        ColourMatrix::for_canvas(480),
         None,
         false,
     )
@@ -474,7 +471,7 @@ fn malformed_palette_is_refused_before_any_owner_allocation_under_pressure() {
             raw,
             0,
             stamp(0),
-            NativeMatrix::for_canvas(480),
+            ColourMatrix::for_canvas(480),
             None,
             false
         ),
@@ -495,7 +492,7 @@ fn foreign_previous_snapshot_remains_foreign_even_for_empty_source() {
             Bytes::copy_from_slice(&b, &[3, 1]).unwrap(),
             0,
             stamp(0),
-            NativeMatrix::for_canvas(480),
+            ColourMatrix::for_canvas(480),
             Some(held),
             true
         ),
@@ -524,7 +521,7 @@ fn spill_growth_pressure_preserves_old_colour_counts_and_funded_zero_work_retry(
         raw,
         1,
         stamp(1),
-        NativeMatrix::for_canvas(1080),
+        ColourMatrix::for_canvas(1080),
         Some(held.clone()),
         true,
     )

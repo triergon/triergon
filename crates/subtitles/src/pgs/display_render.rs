@@ -43,8 +43,8 @@ pub(crate) struct StoredRenderBuild<A: ArgbStorage> {
     window: Option<Window>,
     palette: PaletteSnapshot,
     visible: VisibleGeometry,
-    native_x: u16,
-    native_y: u16,
+    receiver_x: u16,
+    receiver_y: u16,
     suppressed: bool,
     native: Option<BudgetVec<u8>>,
     native_frozen: Option<Bytes>,
@@ -70,7 +70,7 @@ impl<A: ArgbStorage> StoredRenderBuild<A> {
             return Err(Error::ForeignPool);
         }
         let visible = geometry(reference, window, (object.width, object.height), canvas)?;
-        let (native_x, native_y) = if reference.x > canvas.0 || reference.y > canvas.1 {
+        let (receiver_x, receiver_y) = if reference.x > canvas.0 || reference.y > canvas.1 {
             (0, 0)
         } else {
             (reference.x, reference.y)
@@ -85,8 +85,8 @@ impl<A: ArgbStorage> StoredRenderBuild<A> {
             window,
             palette,
             visible,
-            native_x,
-            native_y,
+            receiver_x,
+            receiver_y,
             suppressed: forced_only && !reference.forced(),
             native: A::MATERIALIZE.then(|| BudgetVec::new(budget)),
             native_frozen: None,
@@ -153,7 +153,7 @@ impl<A: ArgbStorage> StoredRenderBuild<A> {
                         let word = if self.suppressed {
                             0
                         } else {
-                            self.palette.native_argb(self.object.pixels[at / 4])
+                            self.palette.receiver_argb(self.object.pixels[at / 4])
                         }
                         .to_be_bytes();
                         let take = (4 - offset).min(count - written);
@@ -291,15 +291,15 @@ impl<A: ArgbStorage> StoredRenderBuild<A> {
             object_last_stamp: self.object.last,
             visible: self.visible,
             visibility_window_known: self.window.is_some(),
-            native_x: self.native_x,
-            native_y: self.native_y,
-            native_forced_only_suppressed: self.suppressed,
+            receiver_x: self.receiver_x,
+            receiver_y: self.receiver_y,
+            receiver_forced_only_suppressed: self.suppressed,
             pixels: self.object.pixels.clone(),
             visible_pixels: self
                 .visible_frozen
                 .take()
                 .ok_or(Error::Invalid("PGS visible output absent"))?,
-            native_argb_pixels: A::finish(self.native_frozen.take())?,
+            receiver_argb_pixels: A::finish(self.native_frozen.take())?,
             palette: self.palette.clone(),
         })
     }

@@ -46,8 +46,8 @@ fn clock() -> PacketClock {
     }
 }
 
-fn seeded(b: &Budget, data: &[u8], limits: DisplayLimits) -> (IndexedNativeRecoveryDecoder, Bytes) {
-    let mut d = IndexedNativeRecoveryDecoder::new(b, limits, DisplayConfig::default()).unwrap();
+fn seeded(b: &Budget, data: &[u8], limits: DisplayLimits) -> (IndexedRecoveryDecoder, Bytes) {
+    let mut d = IndexedRecoveryDecoder::new(b, limits, DisplayConfig::default()).unwrap();
     let held = Bytes::copy_from_slice(b, data).unwrap();
     let mut input = Some(held.clone());
     d.push(&mut input, clock(), &AtomicBool::new(false))
@@ -56,7 +56,7 @@ fn seeded(b: &Budget, data: &[u8], limits: DisplayLimits) -> (IndexedNativeRecov
     (d, held)
 }
 
-fn reach_dispatch(d: &mut IndexedNativeRecoveryDecoder) {
+fn reach_dispatch(d: &mut IndexedRecoveryDecoder) {
     for _ in 0..100_000 {
         if d.phase == Phase::Segment && d.at == 0 {
             return;
@@ -69,12 +69,12 @@ fn reach_dispatch(d: &mut IndexedNativeRecoveryDecoder) {
     panic!("bounded first receiver dispatch");
 }
 
-fn first_cost(d: &IndexedNativeRecoveryDecoder) -> usize {
+fn first_cost(d: &IndexedRecoveryDecoder) -> usize {
     let raw = d.packet.as_ref().unwrap();
     3 + usize::from(u16::from_be_bytes([raw[1], raw[2]])) + d.objects.len() + d.palettes.len() + 256
 }
 
-fn finish(d: &mut IndexedNativeRecoveryDecoder, quantum: u64) -> IndexedRecoveredPacket {
+fn finish(d: &mut IndexedRecoveryDecoder, quantum: u64) -> IndexedRecoveredPacket {
     for _ in 0..100_000 {
         if d.poll(&mut WorkBudget::new(quantum), &AtomicBool::new(false))
             .unwrap()
@@ -272,9 +272,8 @@ fn cancellation_precedes_work0_and_keeps_external_raw_bytes_alive() {
 fn foreign_push_under_pressure_returns_the_exact_caller_owner() {
     let b = Budget::new(65536).unwrap();
     let foreign = Budget::new(65536).unwrap();
-    let mut d =
-        IndexedNativeRecoveryDecoder::new(&b, DisplayLimits::default(), DisplayConfig::default())
-            .unwrap();
+    let mut d = IndexedRecoveryDecoder::new(&b, DisplayLimits::default(), DisplayConfig::default())
+        .unwrap();
     let data = clear_packet();
     let mut input = Some(Bytes::copy_from_slice(&foreign, &data).unwrap());
     let pointer = input.as_ref().unwrap().as_ptr();

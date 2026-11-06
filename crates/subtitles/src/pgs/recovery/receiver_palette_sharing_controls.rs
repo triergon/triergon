@@ -37,13 +37,13 @@ fn clock() -> PacketClock {
     }
 }
 
-fn push(d: &mut IndexedNativeRecoveryDecoder, b: &Budget, bytes: &[u8]) {
+fn push(d: &mut IndexedRecoveryDecoder, b: &Budget, bytes: &[u8]) {
     let mut raw = Some(Bytes::copy_from_slice(b, bytes).unwrap());
     d.push(&mut raw, clock(), &AtomicBool::new(false)).unwrap();
     assert!(raw.is_none());
 }
 
-fn finish(d: &mut IndexedNativeRecoveryDecoder, quantum: u64) -> IndexedRecoveredPacket {
+fn finish(d: &mut IndexedRecoveryDecoder, quantum: u64) -> IndexedRecoveredPacket {
     for _ in 0..100_000 {
         if d.poll(&mut WorkBudget::new(quantum), &AtomicBool::new(false))
             .unwrap()
@@ -55,10 +55,9 @@ fn finish(d: &mut IndexedNativeRecoveryDecoder, quantum: u64) -> IndexedRecovere
     panic!("bounded receiver palette completion");
 }
 
-fn store(b: &Budget, malformed: bool) -> IndexedNativeRecoveryDecoder {
+fn store(b: &Budget, malformed: bool) -> IndexedRecoveryDecoder {
     let mut d =
-        IndexedNativeRecoveryDecoder::new(b, DisplayLimits::default(), DisplayConfig::default())
-            .unwrap();
+        IndexedRecoveryDecoder::new(b, DisplayLimits::default(), DisplayConfig::default()).unwrap();
     let good = [1, 0, 0];
     let short = [1, 0, 0, 42];
     push(
@@ -89,9 +88,9 @@ fn complete_literal_palette_reuses_the_actual_source_owner_without_an_inline_kib
     let rect = &out.receiver_sets()[0].rectangles()[0];
     assert!(std::ptr::eq(
         rect.palette().as_ptr(),
-        source.native_words().as_ptr()
+        source.receiver_words().as_ptr()
     ));
-    assert_eq!(rect.palette().as_slice(), source.native_words());
+    assert_eq!(rect.palette().as_slice(), source.receiver_words());
     assert!(size_of::<RecoveredRect>() < 256);
     assert_eq!(&rect.pixels()[..], &[1]);
 }
@@ -111,7 +110,7 @@ fn retained_palette_is_immutable_after_later_pds_reset_and_producer_drop() {
         rect.palette().as_ptr(),
         second.source_sets()[0].objects()[0]
             .palette()
-            .native_words()
+            .receiver_words()
             .as_ptr()
     ));
     d.reset(&AtomicBool::new(false)).unwrap();
@@ -134,9 +133,8 @@ fn retained_palette_is_immutable_after_later_pds_reset_and_producer_drop() {
 #[test]
 fn unused_word255_difference_prevents_sharing_with_a_later_source_snapshot() {
     let b = Budget::new(4 * 1024 * 1024).unwrap();
-    let mut d =
-        IndexedNativeRecoveryDecoder::new(&b, DisplayLimits::default(), DisplayConfig::default())
-            .unwrap();
+    let mut d = IndexedRecoveryDecoder::new(&b, DisplayLimits::default(), DisplayConfig::default())
+        .unwrap();
     let mut raw = packet(0x80, &[1, 235, 128, 128, 255], Some(&[1, 0, 0]));
     raw.extend(packet(0, &[255, 235, 128, 128, 255], None));
     push(&mut d, &b, &raw);
@@ -146,15 +144,15 @@ fn unused_word255_difference_prevents_sharing_with_a_later_source_snapshot() {
     let first = &out.receiver_sets()[0].rectangles()[0];
     let last = out.source_sets()[1].objects()[0].palette();
     assert_eq!(first.palette()[255], 0);
-    assert_ne!(last.native_argb(255), 0);
+    assert_ne!(last.receiver_argb(255), 0);
     assert!(!std::ptr::eq(
         first.palette().as_ptr(),
-        last.native_words().as_ptr()
+        last.receiver_words().as_ptr()
     ));
-    assert_eq!(first.palette()[1], last.native_argb(1));
+    assert_eq!(first.palette()[1], last.receiver_argb(1));
     assert!(std::ptr::eq(
         out.receiver_sets()[1].rectangles()[0].palette().as_ptr(),
-        last.native_words().as_ptr()
+        last.receiver_words().as_ptr()
     ));
 }
 
@@ -171,13 +169,13 @@ fn equal_epoch_carried_words_never_promote_missing_source_colours() {
     assert!(source.source(1).is_none());
     assert!(source.source(255).is_none());
     assert_eq!(
-        source.native_origin(1),
-        super::super::NativeColourOrigin::PreviousEpochSlot
+        source.receiver_origin(1),
+        crate::compat::pgs::ColourOrigin::PreviousEpochSlot
     );
     assert_eq!(rect.palette()[1], white);
     assert!(std::ptr::eq(
         rect.palette().as_ptr(),
-        source.native_words().as_ptr()
+        source.receiver_words().as_ptr()
     ));
 }
 
@@ -191,7 +189,7 @@ fn malformed_strict_rle_keeps_literal_receiver_words_and_an_independent_source_r
     let rect = &out.receiver_sets()[0].rectangles()[0];
     assert_eq!(
         rect.palette()[1],
-        NativeMatrix::Sd601.argb(235, 128, 128, 255)
+        ColourMatrix::Sd601.argb(235, 128, 128, 255)
     );
     assert_eq!(rect.palette()[255], 0);
     assert_eq!(
@@ -203,11 +201,11 @@ fn malformed_strict_rle_keeps_literal_receiver_words_and_an_independent_source_r
 #[test]
 fn forced_only_zero_projection_cannot_alias_a_nonzero_source_palette() {
     let b = Budget::new(4 * 1024 * 1024).unwrap();
-    let mut d = IndexedNativeRecoveryDecoder::new(
+    let mut d = IndexedRecoveryDecoder::new(
         &b,
         DisplayLimits::default(),
         DisplayConfig {
-            native_forced_only: true,
+            receiver_forced_only: true,
         },
     )
     .unwrap();
@@ -220,10 +218,10 @@ fn forced_only_zero_projection_cannot_alias_a_nonzero_source_palette() {
     let source = out.source_sets()[0].objects()[0].palette();
     let rect = &out.receiver_sets()[0].rectangles()[0];
     assert!(rect.palette().iter().all(|word| *word == 0));
-    assert_ne!(source.native_argb(1), 0);
+    assert_ne!(source.receiver_argb(1), 0);
     assert!(!std::ptr::eq(
         rect.palette().as_ptr(),
-        source.native_words().as_ptr()
+        source.receiver_words().as_ptr()
     ));
     assert!(source.source(1).is_some());
 }
@@ -297,9 +295,8 @@ fn fallback_pressure_retry_preserves_paid_credit_and_its_actual_retained_charge(
 fn foreign_packet_and_cancel_preserve_caller_bytes_and_held_palette_owners() {
     let b = Budget::new(4 * 1024 * 1024).unwrap();
     let foreign = Budget::new(4096).unwrap();
-    let mut d =
-        IndexedNativeRecoveryDecoder::new(&b, DisplayLimits::default(), DisplayConfig::default())
-            .unwrap();
+    let mut d = IndexedRecoveryDecoder::new(&b, DisplayLimits::default(), DisplayConfig::default())
+        .unwrap();
     let bytes = packet(0x80, &[1, 235, 128, 128, 255], Some(&[1, 0, 0]));
     let mut raw = Some(Bytes::copy_from_slice(&foreign, &bytes).unwrap());
     assert_eq!(

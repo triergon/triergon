@@ -2,9 +2,10 @@
 //! the separately named native projection are asserted independently.
 use std::sync::atomic::{AtomicBool, Ordering};
 use triergon_core::{Budget, Bytes, Error, Time, TimeBase, WorkBudget};
+use triergon_subtitles::compat::pgs::{ClockSource, ColourMatrix, ColourOrigin};
 use triergon_subtitles::pgs::{
     CompositionState, DisplayConfig, DisplayDecoder, DisplayLimits, DisplaySet, DisplayStatus,
-    Envelope, NativeClockSource, NativeColourOrigin, NativeMatrix, PacketClock,
+    Envelope, PacketClock,
 };
 
 fn segment(kind: u8, body: &[u8]) -> Vec<u8> {
@@ -185,12 +186,12 @@ fn complete_display_has_literal_source_indices_colour_clocks_and_native_argb_pix
     );
     assert_eq!(f.presentation.stamp.packet_clock, clock(Some(90001)));
     assert_eq!(f.presentation.stamp.packet_clock.pts, Some(90001));
-    assert_eq!(f.native_pts_microseconds, Some(1_000_011));
+    assert_eq!(f.receiver_pts_microseconds, Some(1_000_011));
     assert_eq!(f.source_end, None);
     assert_eq!(o.pixels().as_ref(), &[1, 2]);
     assert_eq!(o.visible_pixels().as_ref(), &[1, 2]);
     assert_eq!(
-        o.native_argb_pixels().as_ref(),
+        o.receiver_argb_pixels().as_ref(),
         &[255, 0, 0, 0, 255, 255, 255, 255]
     );
     let s = o.palette().source(1).unwrap();
@@ -200,8 +201,8 @@ fn complete_display_has_literal_source_indices_colour_clocks_and_native_argb_pix
     );
     assert_eq!(o.palette().source(0), None);
     assert_eq!(
-        o.palette().native_origin(0),
-        NativeColourOrigin::ReceiverZeroInitialization
+        o.palette().receiver_origin(0),
+        ColourOrigin::ReceiverZeroInitialization
     );
     assert_eq!(f.segments().len(), 5);
     assert_eq!((d.cached_objects(), d.cached_palettes()), (1, 1));
@@ -273,12 +274,12 @@ fn epoch_and_acquisition_invalidate_source_caches_without_fabricating_missing_co
         assert_eq!((d.cached_objects(), d.cached_palettes()), (1, 1));
         assert_eq!(o.palette().source(2), None);
         assert_eq!(
-            o.palette().native_argb(2),
-            old[0].objects()[0].palette().native_argb(2)
+            o.palette().receiver_argb(2),
+            old[0].objects()[0].palette().receiver_argb(2)
         );
         assert_eq!(
-            o.palette().native_origin(2),
-            NativeColourOrigin::PreviousEpochSlot
+            o.palette().receiver_origin(2),
+            ColourOrigin::PreviousEpochSlot
         );
         assert_eq!(o.window, None);
         assert!(!o.visibility_window_known);
@@ -351,7 +352,7 @@ fn interleaved_fragmented_objects_and_every_split_survive_all_work_quanta() {
             assert_eq!(out[0].objects()[0].object_last_stamp.packet_sequence, 3);
             assert_eq!(out[0].presentation.stamp.packet_clock.pts, Some(3));
             assert_eq!(out[0].end_stamp.packet_clock.pts, Some(9));
-            assert_eq!(out[0].native_pts_microseconds, Some(33));
+            assert_eq!(out[0].receiver_pts_microseconds, Some(33));
         }
     }
 }
@@ -387,8 +388,8 @@ fn crop_and_window_intersection_materializes_literal_noncontiguous_source_rows()
     );
     assert!(o.composition.forced());
     assert_eq!(o.composition.crop.unwrap().x, 1);
-    assert_eq!((o.native_x, o.native_y), (5, 6));
-    assert_eq!(o.native_argb_pixels().len(), pixels.len() * 4);
+    assert_eq!((o.receiver_x, o.receiver_y), (5, 6));
+    assert_eq!(o.receiver_argb_pixels().len(), pixels.len() * 4);
 }
 
 #[test]
@@ -443,7 +444,7 @@ fn transparent_rgb_and_forced_only_native_suppression_never_change_source_colour
         &b,
         limits(),
         DisplayConfig {
-            native_forced_only: true,
+            receiver_forced_only: true,
         },
     )
     .unwrap();
@@ -462,19 +463,19 @@ fn transparent_rgb_and_forced_only_native_suppression_never_change_source_colour
     let out = submit(&mut d, &b, &p, clock(None), 1).unwrap();
     let a = &out[0].objects()[0];
     let z = &out[0].objects()[1];
-    assert!(a.native_forced_only_suppressed);
-    assert_eq!(a.native_argb_pixels().as_ref(), &[0; 4]);
-    assert!(!z.native_forced_only_suppressed);
-    assert_eq!(z.native_argb_pixels().as_ref(), &[0, 255, 255, 255]);
+    assert!(a.receiver_forced_only_suppressed);
+    assert_eq!(a.receiver_argb_pixels().as_ref(), &[0; 4]);
+    assert!(!z.receiver_forced_only_suppressed);
+    assert_eq!(z.receiver_argb_pixels().as_ref(), &[0, 255, 255, 255]);
     assert_eq!(a.palette().source(3).unwrap().alpha, 0);
-    assert_eq!(a.palette().native_argb(3), 0x00ff_ffff);
+    assert_eq!(a.palette().receiver_argb(3), 0x00ff_ffff);
 }
 
 #[test]
 fn matrix_choice_is_a_receiver_fact_at_palette_update_not_invented_source_metadata() {
-    assert_eq!(NativeMatrix::Sd601.argb(16, 128, 128, 127), 0x7f00_0000);
-    assert_eq!(NativeMatrix::Hd709.argb(235, 128, 128, 255), u32::MAX);
-    assert_eq!(NativeMatrix::Hd709.argb(235, 128, 128, 0), 0x00ff_ffff);
+    assert_eq!(ColourMatrix::Sd601.argb(16, 128, 128, 127), 0x7f00_0000);
+    assert_eq!(ColourMatrix::Hd709.argb(235, 128, 128, 255), u32::MAX);
+    assert_eq!(ColourMatrix::Hd709.argb(235, 128, 128, 0), 0x00ff_ffff);
     let b = Budget::new(2 * 1024 * 1024).unwrap();
     let mut d = DisplayDecoder::new(&b, limits(), DisplayConfig::default()).unwrap();
     let old = submit(&mut d, &b, &frame(0x80, 1, true), clock(None), 7).unwrap();
@@ -484,7 +485,7 @@ fn matrix_choice_is_a_receiver_fact_at_palette_update_not_invented_source_metada
             .source(4)
             .unwrap()
             .receiver_matrix,
-        NativeMatrix::Sd601
+        ColourMatrix::Sd601
     );
     let mut p = pcs(0, 2, 0, &[(7, 0, 0, 0, 0, None)]);
     p[5..7].copy_from_slice(&1080u16.to_be_bytes());
@@ -497,7 +498,7 @@ fn matrix_choice_is_a_receiver_fact_at_palette_update_not_invented_source_metada
             .source(1)
             .unwrap()
             .receiver_matrix,
-        NativeMatrix::Hd709
+        ColourMatrix::Hd709
     );
     assert_eq!(
         z[0].objects()[0]
@@ -505,11 +506,11 @@ fn matrix_choice_is_a_receiver_fact_at_palette_update_not_invented_source_metada
             .source(4)
             .unwrap()
             .receiver_matrix,
-        NativeMatrix::Sd601
+        ColourMatrix::Sd601
     );
     assert_eq!(
-        z[0].objects()[0].palette().native_argb(4),
-        old[0].objects()[0].palette().native_argb(4)
+        z[0].objects()[0].palette().receiver_argb(4),
+        old[0].objects()[0].palette().receiver_argb(4)
     );
 }
 
@@ -534,10 +535,10 @@ fn exact_negative_large_and_prime_packet_clocks_are_retained_before_native_round
             Some(Time::from_ticks(i128::from(ticks), time.timebase).unwrap())
         );
         assert_eq!(
-            out[0].native_pts_microseconds,
-            time.native_microseconds().unwrap()
+            out[0].receiver_pts_microseconds,
+            time.receiver_microseconds().unwrap()
         );
-        assert_eq!(out[0].native_clock_source, NativeClockSource::Presentation);
+        assert_eq!(out[0].receiver_clock_source, ClockSource::Presentation);
     }
 }
 
@@ -553,8 +554,8 @@ fn end_fallback_is_labelled_and_never_fills_a_missing_source_presentation_timest
             .is_empty()
     );
     let out = submit(&mut d, &b, &segment(0x80, &[]), clock(Some(90000)), 1).unwrap();
-    assert_eq!(out[0].native_pts_microseconds, Some(1_000_000));
-    assert_eq!(out[0].native_clock_source, NativeClockSource::EndFallback);
+    assert_eq!(out[0].receiver_pts_microseconds, Some(1_000_000));
+    assert_eq!(out[0].receiver_clock_source, ClockSource::EndFallback);
     assert_eq!(out[0].presentation.stamp.packet_clock.pts, None);
     assert_eq!(out[0].end_stamp.packet_clock.pts, Some(90000));
     assert_eq!(out[0].source_end, None);
@@ -578,8 +579,8 @@ fn native_unrepresentable_clocks_remain_explicit_while_source_pixels_and_clock_s
         let mut d = DisplayDecoder::new(&b, limits(), DisplayConfig::default()).unwrap();
         let out = submit(&mut d, &b, &frame(0x80, 1, true), time, 4096).unwrap();
         assert_eq!(out[0].presentation.stamp.packet_clock, time);
-        assert_eq!(out[0].native_pts_microseconds, None);
-        assert!(out[0].native_time_error.is_some());
+        assert_eq!(out[0].receiver_pts_microseconds, None);
+        assert!(out[0].receiver_time_error.is_some());
         assert_eq!(out[0].objects()[0].pixels().as_ref(), &[1, 2]);
     }
 }
@@ -702,7 +703,7 @@ fn every_work_quantum_has_equal_literal_output_and_exact_total_work() {
         let out = submit(&mut d, &b, &frame(0x80, 1, true), clock(Some(1)), q).unwrap();
         assert_eq!(out[0].objects()[0].pixels().as_ref(), &[1, 2]);
         assert_eq!(
-            out[0].objects()[0].native_argb_pixels().as_ref(),
+            out[0].objects()[0].receiver_argb_pixels().as_ref(),
             &[255, 0, 0, 0, 255, 255, 255, 255]
         );
         match expected {
@@ -816,7 +817,7 @@ fn pressure_at_every_allocation_and_freeze_restores_state_and_does_not_repeat_wo
     let out = output.unwrap();
     assert_eq!(out.objects()[0].pixels().as_ref(), &[1, 2]);
     assert_eq!(
-        out.objects()[0].native_argb_pixels().as_ref(),
+        out.objects()[0].receiver_argb_pixels().as_ref(),
         &[255, 0, 0, 0, 255, 255, 255, 255]
     );
 }
@@ -859,7 +860,7 @@ fn caller_retained_old_display_causes_real_pool_pressure_and_release_allows_exac
     assert!(matches!(error, Error::Backpressure { .. }));
     assert_eq!(held[0].objects()[0].pixels().as_ref(), pixels);
     assert_eq!(
-        held[0].objects()[0].native_argb_pixels()[0..4],
+        held[0].objects()[0].receiver_argb_pixels()[0..4],
         [255, 0, 0, 0]
     );
     let before = d.work_spent();
@@ -875,7 +876,7 @@ fn caller_retained_old_display_causes_real_pool_pressure_and_release_allows_exac
     );
     let out = d.take_output(&c).unwrap();
     assert_eq!(
-        out.objects()[0].native_argb_pixels()[0..4],
+        out.objects()[0].receiver_argb_pixels()[0..4],
         [255, 255, 255, 255]
     );
 }
@@ -1164,8 +1165,8 @@ fn explicit_eof_finishes_after_the_last_output_without_inventing_a_final_clear_o
     d.finish_input(&c).unwrap();
     assert_eq!(boundary(&mut d, 1, &c).unwrap(), DisplayStatus::Ended);
     assert_eq!(out.len(), 1);
-    assert_eq!(out[0].native_pts_microseconds, None);
-    assert_eq!(out[0].native_clock_source, NativeClockSource::Unknown);
+    assert_eq!(out[0].receiver_pts_microseconds, None);
+    assert_eq!(out[0].receiver_clock_source, ClockSource::Unknown);
     assert_eq!(out[0].source_end, None);
     assert!(!out[0].is_clear());
 }

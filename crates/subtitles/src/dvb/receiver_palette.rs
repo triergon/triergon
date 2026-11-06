@@ -1,9 +1,9 @@
-//! Original NativeD32 default/automatic palette construction from pinned public
+//! Receiver-view default/automatic palette construction from pinned public
 //! observations. Source facts/projections are never changed by this local view.
 use super::colour::{ColourProjection, ColourSource, PaletteEntry, palette_size};
 use super::display_state::DecodeWork;
-use super::native_palette_buffer::{NativePaletteBuffer, RgbaStorage};
-use super::{Depth, NativePalette};
+use super::receiver_palette_buffer::{ReceiverPaletteBuffer, RgbaStorage};
+use super::{Depth, Palette};
 use triergon_core::{Budget, BudgetVec, Bytes, Error, Result};
 
 #[derive(Debug)]
@@ -64,7 +64,7 @@ impl Census {
 }
 
 #[derive(Debug)]
-pub(super) struct NativePalettePlan {
+pub(super) struct ReceiverPalettePlan {
     budget: Budget,
     depth: Depth,
     count: usize,
@@ -73,13 +73,13 @@ pub(super) struct NativePalettePlan {
     needs_owned_rgba: bool,
     census: Option<Census>,
     pixels: Option<Bytes>,
-    buffer: Option<NativePaletteBuffer>,
+    buffer: Option<ReceiverPaletteBuffer>,
     at: usize,
     rank: u32,
     credit: usize,
 }
 
-impl NativePalettePlan {
+impl ReceiverPalettePlan {
     pub(super) fn new(
         budget: &Budget,
         depth: Depth,
@@ -147,7 +147,11 @@ impl NativePalettePlan {
             } else {
                 RgbaStorage::AliasStudioUnrepaired
             };
-            self.buffer = Some(NativePaletteBuffer::new(&self.budget, self.count, storage)?);
+            self.buffer = Some(ReceiverPaletteBuffer::new(
+                &self.budget,
+                self.count,
+                storage,
+            )?);
         }
         if self.automatic {
             if self.census.is_none() {
@@ -225,7 +229,7 @@ impl NativePalettePlan {
         &mut self,
         studio: &Bytes,
         all_entries_explicit: bool,
-    ) -> Result<NativePalette> {
+    ) -> Result<Palette> {
         if self.at != self.count {
             return Err(Error::Invalid("DVB native palette incomplete"));
         }
@@ -240,7 +244,7 @@ impl NativePalettePlan {
     }
 }
 
-/// Observed D32 encoded-colour view: the primary studio inverse quantized to
+/// Observed receiver encoded-colour view: the primary studio inverse quantized to
 /// 10 fractional bits, matching the public-API raw palettes on all 16,777,216
 /// full Y/Cr/Cb triples. This is neither normative rounding nor a change to source views.
 fn encoded_rgba(source: ColourSource) -> Result<[u8; 4]> {

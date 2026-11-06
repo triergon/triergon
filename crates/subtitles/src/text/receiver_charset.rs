@@ -1,4 +1,4 @@
-//! Explicit receiver view for the pinned D32/Linux charset observations.
+//! Explicit receiver view for the pinned reference's Linux charset observations.
 //!
 //! Source remains OpaqueAss and retains every byte. This opt-in operation does
 //! not render ASS, reproduce decoder return codes, or claim a universal alias.
@@ -41,7 +41,7 @@ pub fn receiver_charset(label: &[u8]) -> Result<Charset> {
 }
 /// Explicit receiver v2 adds the observed GNU EUC-KR A2E8 mapping. The
 /// v1 resolver and constructor keep their repertoire/refusals.
-pub fn receiver_charset_v2(label: &[u8]) -> Result<Charset> {
+pub fn receiver_charset_with_glibc_euc_kr(label: &[u8]) -> Result<Charset> {
     if label.eq_ignore_ascii_case(b"euc-kr") {
         Ok(Charset::Multibyte(M::ReceiverEucKrGlibc239))
     } else {
@@ -103,7 +103,7 @@ pub struct AssPacketJob {
     converter: Option<CharsetJob>,
     converted: Option<ConvertedText>,
     setup: bool,
-    receiver_v2: bool,
+    glibc_euc_kr: bool,
     at: usize,
     commas: u8,
     text_at: Option<usize>,
@@ -126,7 +126,7 @@ impl AssPacketJob {
             converter: None,
             converted: None,
             setup: false,
-            receiver_v2: false,
+            glibc_euc_kr: false,
             at: 0,
             commas: 0,
             text_at: None,
@@ -136,9 +136,14 @@ impl AssPacketJob {
         })
     }
     /// Opt-in version2; no implicit upgrade of the original receiver operation.
-    pub fn new_v2(input: Input, pool: &Budget, limits: Limits, generation: u64) -> Result<Self> {
+    pub fn new_with_glibc_euc_kr(
+        input: Input,
+        pool: &Budget,
+        limits: Limits,
+        generation: u64,
+    ) -> Result<Self> {
         let mut result = Self::new(input, pool, limits, generation)?;
-        result.receiver_v2 = true;
+        result.glibc_euc_kr = true;
         Ok(result)
     }
     pub fn poll(&mut self, work: &mut WorkBudget, cancel: &AtomicBool) -> Result<PacketStatus> {
@@ -169,8 +174,8 @@ impl AssPacketJob {
                 .ok_or(Error::Invalid("missing source cue"))?;
             let charset = match source.input.charset_label.as_ref() {
                 Some(label) => {
-                    if self.receiver_v2 {
-                        receiver_charset_v2(label.as_ref())
+                    if self.glibc_euc_kr {
+                        receiver_charset_with_glibc_euc_kr(label.as_ref())
                     } else {
                         receiver_charset(label.as_ref())
                     }

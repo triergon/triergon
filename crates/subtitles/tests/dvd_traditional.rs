@@ -101,7 +101,7 @@ fn whole_spu_output_and_work_are_independent_of_poll_quantum() {
         );
         assert!(!result.receiver_menu());
         assert!(!result.receiver_forced_flag());
-        let view = result.bitmap().unwrap().native_view().unwrap();
+        let view = result.bitmap().unwrap().cropped_view().unwrap();
         assert_eq!(
             view.crop().area,
             DvdArea {
@@ -128,7 +128,7 @@ fn last_eligible_raster_replaces_pixels_but_later_palette_only_words_stay_source
     ]);
     let (result, _) = run(&raw, ControlState::default(), Some(rgb()), 1);
     assert_eq!(result.selected_control(), Some(1));
-    let view = result.bitmap().unwrap().native_view().unwrap();
+    let view = result.bitmap().unwrap().cropped_view().unwrap();
     assert_eq!(
         view.crop().area,
         DvdArea {
@@ -168,7 +168,7 @@ fn late_forced_command_changes_menu_selection_without_relabelling_earlier_rectan
         result
             .bitmap()
             .unwrap()
-            .native_view()
+            .cropped_view()
             .unwrap()
             .argb_at(0, 0)
             .unwrap(),
@@ -267,7 +267,7 @@ fn a_receiver_omitted_one_row_does_not_replace_an_earlier_eligible_bitmap() {
         later
             .bitmap()
             .unwrap()
-            .native_view()
+            .cropped_view()
             .unwrap()
             .indices_row(0)
             .unwrap(),
@@ -423,7 +423,7 @@ fn repeated_allocation_pressure_does_not_recharge_work_or_lose_source_state() {
         result
             .bitmap()
             .unwrap()
-            .native_view()
+            .cropped_view()
             .unwrap()
             .indices_row(1)
             .unwrap(),
@@ -470,7 +470,7 @@ fn explicit_cross_packet_palette_carry_preserves_old_outputs_and_local_geometry_
         second
             .bitmap()
             .unwrap()
-            .native_view()
+            .cropped_view()
             .unwrap()
             .indices_row(0)
             .unwrap(),
@@ -480,7 +480,7 @@ fn explicit_cross_packet_palette_carry_preserves_old_outputs_and_local_geometry_
         first
             .bitmap()
             .unwrap()
-            .native_view()
+            .cropped_view()
             .unwrap()
             .indices_row(0)
             .unwrap(),

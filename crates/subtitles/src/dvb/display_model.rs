@@ -79,7 +79,7 @@ pub enum DisplayAction {
 #[derive(Debug)]
 pub struct PaletteSnapshot {
     pub depth: Depth,
-    pub native_d32: Option<super::NativePalette>,
+    pub receiver: Option<super::Palette>,
     pub projection: &'static str,
     pub rgba: Bytes,
     /// Separately charged explicit projection, never substituted for raw facts
@@ -126,9 +126,9 @@ pub struct OpaqueSegment {
 #[derive(Debug)]
 pub struct DisplayEvent {
     pub receiver_view: super::ReceiverView,
-    pub native_publication: Option<super::NativePublication>,
-    pub native_geometry_policy: super::NativeGeometryPolicy,
-    pub(crate) omitted_regions: BudgetVec<super::NativeOmittedRegion>,
+    pub receiver_publication: Option<super::Publication>,
+    pub geometry_policy: super::GeometryPolicy,
+    pub(crate) omitted_regions: BudgetVec<super::OmittedRegion>,
     pub service: Service,
     pub object_retention: ObjectRetention,
     pub generation: u64,
@@ -142,14 +142,14 @@ pub struct DisplayEvent {
     pub page_composition: Option<Bytes>,
     pub page_version: Option<u8>,
     pub page_state: Option<u8>,
-    pub(crate) native_pes: Option<super::NativePesPacket>,
+    pub(crate) native_pes: Option<super::PesPacket>,
     pub(crate) regions: BudgetVec<DisplayRegion>,
     pub(crate) packets: BudgetVec<DvbPacket>,
     pub(crate) opaque: BudgetVec<OpaqueSegment>,
 }
 
 impl DisplayEvent {
-    pub fn omitted_regions(&self) -> &[super::NativeOmittedRegion] {
+    pub fn omitted_regions(&self) -> &[super::OmittedRegion] {
         self.omitted_regions.as_slice()
     }
     pub fn regions(&self) -> &[DisplayRegion] {
@@ -158,7 +158,7 @@ impl DisplayEvent {
     pub fn source_packets(&self) -> &[DvbPacket] {
         self.packets.as_slice()
     }
-    pub fn native_pes_packet(&self) -> Option<&super::NativePesPacket> {
+    pub fn pes_packet(&self) -> Option<&super::PesPacket> {
         self.native_pes.as_ref()
     }
     pub fn opaque_segments(&self) -> &[OpaqueSegment] {

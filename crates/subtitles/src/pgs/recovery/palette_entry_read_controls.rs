@@ -53,7 +53,7 @@ fn clock() -> PacketClock {
     }
 }
 
-fn push(d: &mut IndexedNativeRecoveryDecoder, b: &Budget, data: &[u8]) -> Bytes {
+fn push(d: &mut IndexedRecoveryDecoder, b: &Budget, data: &[u8]) -> Bytes {
     let held = Bytes::copy_from_slice(b, data).unwrap();
     let mut input = Some(held.clone());
     d.push(&mut input, clock(), &AtomicBool::new(false))
@@ -62,12 +62,11 @@ fn push(d: &mut IndexedNativeRecoveryDecoder, b: &Budget, data: &[u8]) -> Bytes 
     held
 }
 
-fn decoder(b: &Budget) -> IndexedNativeRecoveryDecoder {
-    IndexedNativeRecoveryDecoder::new(b, DisplayLimits::default(), DisplayConfig::default())
-        .unwrap()
+fn decoder(b: &Budget) -> IndexedRecoveryDecoder {
+    IndexedRecoveryDecoder::new(b, DisplayLimits::default(), DisplayConfig::default()).unwrap()
 }
 
-fn finish(d: &mut IndexedNativeRecoveryDecoder, quantum: u64) -> IndexedRecoveredPacket {
+fn finish(d: &mut IndexedRecoveryDecoder, quantum: u64) -> IndexedRecoveredPacket {
     for _ in 0..200_000 {
         if d.poll(&mut WorkBudget::new(quantum), &AtomicBool::new(false))
             .unwrap()
@@ -79,7 +78,7 @@ fn finish(d: &mut IndexedNativeRecoveryDecoder, quantum: u64) -> IndexedRecovere
     panic!("bounded palette completion");
 }
 
-fn reach_palette(d: &mut IndexedNativeRecoveryDecoder) {
+fn reach_palette(d: &mut IndexedRecoveryDecoder) {
     for _ in 0..200_000 {
         if d.phase == Phase::Palette && d.palette_at < d.palette_end {
             return;
@@ -123,9 +122,9 @@ fn complete_256_entry_palette_keeps_every_literal_source_and_receiver_fact() {
         );
         assert_eq!(colour.palette_version, 9);
         assert_eq!(colour.epoch, 1);
-        assert_eq!(colour.receiver_matrix, NativeMatrix::Sd601);
+        assert_eq!(colour.receiver_matrix, ColourMatrix::Sd601);
         assert_eq!(colour.stamp.packet_clock, clock());
-        assert_eq!(source.native_argb(index), literal_word(index, false));
+        assert_eq!(source.receiver_argb(index), literal_word(index, false));
         assert_eq!(receiver[usize::from(index)], literal_word(index, false));
     }
     assert_eq!(out.receiver_observations.palette_cross_segment_bytes, 0);
@@ -182,8 +181,8 @@ fn partial_entry_tails_keep_literal_cross_segment_and_api_padding_facts() {
 #[test]
 fn duplicate_entries_keep_wire_order_and_each_canvas_matrix() {
     for (height, matrix, expected) in [
-        (32, NativeMatrix::Sd601, 0xfffe_0000),
-        (577, NativeMatrix::Hd709, 0xffff_1800),
+        (32, ColourMatrix::Sd601, 0xfffe_0000),
+        (577, ColourMatrix::Hd709, 0xffff_1800),
     ] {
         let b = Budget::new(4 * 1024 * 1024).unwrap();
         let mut d = decoder(&b);
@@ -199,7 +198,7 @@ fn duplicate_entries_keep_wire_order_and_each_canvas_matrix() {
             (81, 240, 90, 255)
         );
         assert_eq!(colour.receiver_matrix, matrix);
-        assert_eq!(source.native_argb(7), expected);
+        assert_eq!(source.receiver_argb(7), expected);
         assert_eq!(
             out.receiver_sets()[0].rectangles()[0].palette()[7],
             expected
@@ -327,7 +326,7 @@ fn dense_clear_then_image_keeps_the_unfolded_receiver_event_and_source_set() {
         assert_eq!(
             out.source_sets()[1].objects()[0]
                 .palette()
-                .native_argb(index),
+                .receiver_argb(index),
             literal_word(index, true)
         );
         assert_eq!(
@@ -371,13 +370,13 @@ fn full_palette_work_and_retained_snapshots_survive_later_updates_reset_and_drop
             assert_eq!(
                 first.source_sets()[0].objects()[0]
                     .palette()
-                    .native_argb(index),
+                    .receiver_argb(index),
                 literal_word(index, false)
             );
             assert_eq!(
                 second.source_sets()[0].objects()[0]
                     .palette()
-                    .native_argb(index),
+                    .receiver_argb(index),
                 literal_word(index, true)
             );
         }

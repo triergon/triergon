@@ -535,7 +535,7 @@ impl<A: ArgbStorage> StoredDisplayDecoder<A> {
         let slot = self.slot;
         let found = self.palettes.as_slice()[slot].id == Some(payload[0]);
         let previous = self.palettes.as_slice()[slot].image.clone();
-        let matrix = NativeMatrix::for_canvas(
+        let matrix = ColourMatrix::for_canvas(
             self.frame
                 .as_ref()
                 .ok_or(Error::Invalid("PGS frame absent"))?
@@ -955,7 +955,7 @@ impl<A: ArgbStorage> StoredDisplayDecoder<A> {
             window,
             palette,
             canvas,
-            self.config.native_forced_only,
+            self.config.receiver_forced_only,
         )?);
         self.frame
             .as_mut()
@@ -1015,17 +1015,17 @@ impl<A: ArgbStorage> StoredDisplayDecoder<A> {
             .frame
             .take()
             .ok_or(Error::Invalid("PGS frame absent"))?;
-        let (native_time, native_clock_source) = if stamp_known(frame.presentation.stamp) {
+        let (native_time, receiver_clock_source) = if stamp_known(frame.presentation.stamp) {
             (
                 stamp_time(frame.presentation.stamp),
-                NativeClockSource::Presentation,
+                ClockSource::Presentation,
             )
         } else if stamp_known(end_stamp) {
-            (stamp_time(end_stamp), NativeClockSource::EndFallback)
+            (stamp_time(end_stamp), ClockSource::EndFallback)
         } else {
-            (Ok(None), NativeClockSource::Unknown)
+            (Ok(None), ClockSource::Unknown)
         };
-        let (native_pts_microseconds, native_time_error) = match native_time {
+        let (receiver_pts_microseconds, receiver_time_error) = match native_time {
             Ok(value) => (value, None),
             Err(error) => (None, Some(error)),
         };
@@ -1034,9 +1034,9 @@ impl<A: ArgbStorage> StoredDisplayDecoder<A> {
             epoch: self.epoch,
             presentation: frame.presentation,
             end_stamp,
-            native_pts_microseconds,
-            native_time_error,
-            native_clock_source,
+            receiver_pts_microseconds,
+            receiver_time_error,
+            receiver_clock_source,
             source_end: None,
             objects: frame.objects,
             segments: frame.segments,

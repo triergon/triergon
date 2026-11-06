@@ -18,7 +18,7 @@ struct Frame {
     body: Vec<u8>,
     source_rgba: Vec<u8>,
     plane: Vec<u8>,
-    native_words: Vec<u32>,
+    receiver_words: Vec<u32>,
 }
 
 fn bytes<const N: usize>(input: &mut Cursor<&[u8]>) -> [u8; N] {
@@ -47,14 +47,14 @@ fn first_frame(data: &[u8]) -> Frame {
     let source_rgba = vector(&mut input, 256 * 4);
     let _studio_rgba = vector(&mut input, 256 * 4);
     let plane = vector(&mut input, 256 * 2);
-    let native_words = (0..256)
+    let receiver_words = (0..256)
         .map(|_| u32::from_be_bytes(bytes(&mut input)))
         .collect();
     Frame {
         body,
         source_rgba,
         plane,
-        native_words,
+        receiver_words,
     }
 }
 
@@ -206,21 +206,21 @@ fn assert_output(event: &DisplayEvent, input: Input<'_>, view: ReceiverView) {
     assert_eq!(region.palette.rgba.as_ref(), input.frame.source_rgba);
     match view {
         ReceiverView::Source => {
-            assert!(region.palette.native_d32.is_none());
-            assert!(event.native_publication.is_none());
+            assert!(region.palette.receiver.is_none());
+            assert!(event.receiver_publication.is_none());
         }
-        ReceiverView::NativeD32 => {
-            let native = region.palette.native_d32.as_ref().unwrap();
-            assert_eq!(native.words.as_slice(), input.frame.native_words);
+        ReceiverView::Receiver => {
+            let native = region.palette.receiver.as_ref().unwrap();
+            assert_eq!(native.words.as_slice(), input.frame.receiver_words);
             let rgba: Vec<u8> = input
                 .frame
-                .native_words
+                .receiver_words
                 .iter()
                 .flat_map(|w| [(w >> 16) as u8, (w >> 8) as u8, *w as u8, (w >> 24) as u8])
                 .collect();
             assert_eq!(native.rgba.as_ref(), rgba);
             assert_eq!(
-                event.native_publication.unwrap().exact_pts_microseconds,
+                event.receiver_publication.unwrap().exact_pts_microseconds,
                 Some(1_000_000)
             );
         }
@@ -257,7 +257,7 @@ fn poison_decoder(
 fn native_transition(kind: ResetKind, fatal_before_reset: bool) {
     let old = first_frame(OLD);
     let fresh = first_frame(FRESH);
-    assert_ne!(old.native_words.last(), fresh.native_words.last());
+    assert_ne!(old.receiver_words.last(), fresh.receiver_words.last());
     for quantum in [1, 7, 4096] {
         let pool = Budget::new(4 << 20).unwrap();
         let baseline = pool.used();
@@ -271,7 +271,7 @@ fn native_transition(kind: ResetKind, fatal_before_reset: bool) {
             &first,
             GENERATION,
             limits(&old, &fresh),
-            ReceiverView::NativeD32,
+            ReceiverView::Receiver,
             &cancel,
         )
         .unwrap();
@@ -286,7 +286,7 @@ fn native_transition(kind: ResetKind, fatal_before_reset: bool) {
             generation: GENERATION + 1,
         };
         let (retained, _) = feed(&pool, &mut decoder, before, quantum, &cancel);
-        assert_output(&retained, before, ReceiverView::NativeD32);
+        assert_output(&retained, before, ReceiverView::Receiver);
         if fatal_before_reset {
             poison_decoder(&pool, &mut decoder, &first, &cancel);
         }
@@ -301,19 +301,19 @@ fn native_transition(kind: ResetKind, fatal_before_reset: bool) {
         );
         drop(stale);
         let (output, work) = feed(&pool, &mut decoder, after, quantum, &cancel);
-        assert_output(&output, after, ReceiverView::NativeD32);
-        assert_output(&retained, before, ReceiverView::NativeD32);
+        assert_output(&output, after, ReceiverView::Receiver);
+        assert_output(&retained, before, ReceiverView::Receiver);
         let mut cold = Decoder::new_configured_with_receiver_view(
             &pool,
             &next,
             GENERATION + 1,
             limits(&old, &fresh),
-            ReceiverView::NativeD32,
+            ReceiverView::Receiver,
             &cancel,
         )
         .unwrap();
         let (cold_output, cold_work) = feed(&pool, &mut cold, after, quantum, &cancel);
-        assert_output(&cold_output, after, ReceiverView::NativeD32);
+        assert_output(&cold_output, after, ReceiverView::Receiver);
         assert_eq!(
             work, cold_work,
             "reset must not reuse stale effective CLUT work/state"
@@ -327,12 +327,12 @@ fn native_transition(kind: ResetKind, fatal_before_reset: bool) {
         drop(private);
         let alias = retained.regions()[0]
             .palette
-            .native_d32
+            .receiver
             .as_ref()
             .unwrap()
             .rgba
             .clone();
-        assert_eq!(retained.receiver_view, ReceiverView::NativeD32);
+        assert_eq!(retained.receiver_view, ReceiverView::Receiver);
         drop(retained);
         drop(output);
         assert!(pool.used() > baseline);
@@ -379,7 +379,7 @@ fn reset_methods_release_old_effective_state_before_reacquisition() {
                 &first,
                 GENERATION,
                 limits(&old, &fresh),
-                ReceiverView::NativeD32,
+                ReceiverView::Receiver,
                 &cancel,
             )
             .unwrap();
@@ -495,7 +495,7 @@ fn rejected_resets_do_not_change_native_policy_or_ownership() {
             &configuration,
             GENERATION,
             limits(&old, &fresh),
-            ReceiverView::NativeD32,
+            ReceiverView::Receiver,
             &cancel,
         )
         .unwrap();
@@ -545,7 +545,7 @@ fn rejected_resets_do_not_change_native_policy_or_ownership() {
             Error::ForeignPool
         );
         assert_eq!(pool.used(), used);
-        assert_output(&retained, before, ReceiverView::NativeD32);
+        assert_output(&retained, before, ReceiverView::Receiver);
     }
     assert_eq!(pool.used(), baseline);
 }

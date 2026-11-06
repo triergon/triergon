@@ -6,7 +6,7 @@ pub(super) const CASES: [Case; 3] = [
         payload: include_bytes!("../native-defaults-fixtures/dvb-default-clut2.dvb"),
         indices: include_bytes!("../native-defaults-fixtures/dvb-default-clut2.indices"),
         native_rgba: include_bytes!("../native-defaults-fixtures/dvb-default-clut2.native-rgba"),
-        native_words: &[0, 2134867775, 4286578559, 0],
+        receiver_words: &[0, 2134867775, 4286578559, 0],
         explicit: &[],
         source_overrides: &[
             (0, [0, 0, 0, 0]),
@@ -23,7 +23,7 @@ pub(super) const CASES: [Case; 3] = [
         payload: include_bytes!("../native-defaults-fixtures/dvb4-literals-fields.dvb"),
         indices: include_bytes!("../native-defaults-fixtures/dvb4-literals-fields.indices"),
         native_rgba: include_bytes!("../native-defaults-fixtures/dvb4-literals-fields.native-rgba"),
-        native_words: &[
+        receiver_words: &[
             34816, 4294967295, 4278190080, 4294967295, 4294967295, 4278190080, 4294967295,
             4294967295, 4294967295, 4294967295, 4294967295, 4294967295, 4294967295, 4294967295,
             4278222719, 4286545791,
@@ -70,7 +70,7 @@ pub(super) const CASES: [Case; 3] = [
         payload: include_bytes!("../native-defaults-fixtures/dvb8-literals-fields.dvb"),
         indices: include_bytes!("../native-defaults-fixtures/dvb8-literals-fields.indices"),
         native_rgba: include_bytes!("../native-defaults-fixtures/dvb8-literals-fields.native-rgba"),
-        native_words: &[
+        receiver_words: &[
             34816, 4294967295, 4278190080, 4294967295, 4294967295, 4278190080, 4294967295,
             4294967295, 4294967295, 4294967295, 4294967295, 4294967295, 4294967295, 4294967295,
             2130728277, 2136298837, 4289331200, 4294967295, 4289352960, 4294923520, 4289331285,

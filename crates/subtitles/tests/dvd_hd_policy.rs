@@ -30,7 +30,7 @@ fn four_entry_rle_under_wide_headers_preserves_exact_source_plane_and_words() {
         assert_eq!(p.facts().palette4_word, Some(0x3210));
         assert_eq!(p.facts().alpha4_word, Some(0xffff));
         assert_eq!(
-            p.native_four_palette(None).unwrap().argb,
+            p.receiver_four_palette(None).unwrap().argb,
             [0xff000000, 0xff545454, 0xffa9a9a9, 0xfffefefe]
         );
     }
@@ -42,7 +42,7 @@ fn source_alpha_nibbles_and_contrast_bytes_have_explicit_order_and_origin() {
         HdPolicy::Strict,
         1,
     );
-    let palette = p.native_four_palette(None).unwrap();
+    let palette = p.receiver_four_palette(None).unwrap();
     assert_eq!(palette.effective_alpha, [2, 4, 8, 15]);
     assert_eq!(palette.argb.map(|v| v >> 24), [34, 68, 136, 255]);
     assert!(
@@ -57,7 +57,7 @@ fn source_alpha_nibbles_and_contrast_bytes_have_explicit_order_and_origin() {
         HdPolicy::Strict,
         1,
     );
-    let palette = p.native_four_palette(None).unwrap();
+    let palette = p.receiver_four_palette(None).unwrap();
     assert_eq!(palette.effective_alpha, [0, 16, 30, 255]);
     assert_eq!(palette.argb.map(|v| v >> 24), [0, 16, 254, 239]);
     assert!(
@@ -81,7 +81,7 @@ fn eight_entry_overrides_use_raw_nibbles_and_later_contrast_resets_all_entries()
         ),
     ] {
         let p = decode(raw, HdPolicy::Strict, 1);
-        let mut job = p.native_palette_job().unwrap();
+        let mut job = p.receiver_palette_job().unwrap();
         while job.poll(&mut WorkBudget::new(1), &c).unwrap() != HdStatus::Ready {}
         let words = job.try_finish(&c).unwrap();
         assert_eq!(
@@ -103,7 +103,7 @@ fn absent_contrast_is_never_fabricated_into_source_facts() {
     assert!(p.facts().contrast.is_none());
     assert!(matches!(p.palette_job(), Err(Error::Unsupported(_))));
     let c = AtomicBool::new(false);
-    let mut receiver = p.native_palette_job().unwrap();
+    let mut receiver = p.receiver_palette_job().unwrap();
     while receiver.poll(&mut WorkBudget::new(7), &c).unwrap() != HdStatus::Ready {}
     let words = receiver.try_finish(&c).unwrap();
     assert!(words.iter().all(|v| v >> 24 == 0));
@@ -132,7 +132,7 @@ fn forced_date_and_ordinary_start_date_remain_separate() {
 #[test]
 fn native_opaque_prefix_retains_exact_tail_and_original_bytes() {
     let raw = include_bytes!("hd-source-fixtures/hd8-unknown-07-after-fields.spu");
-    let p = decode(raw, HdPolicy::NativeD32, 1);
+    let p = decode(raw, HdPolicy::Receiver, 1);
     let span = p.facts().last_opaque_tail.unwrap();
     assert_eq!(span.get(p.packet()).unwrap()[0], 7);
     assert_eq!(p.packet().as_ref(), raw);
@@ -154,7 +154,7 @@ fn native_opaque_prefix_retains_exact_tail_and_original_bytes() {
 #[test]
 fn native_stop_at_bad_link_does_not_invent_a_repaired_source_offset() {
     let raw = include_bytes!("hd-policy-fixtures/invalid-next-link-after-fields.spu");
-    let p = decode(raw, HdPolicy::NativeD32, 1);
+    let p = decode(raw, HdPolicy::Receiver, 1);
     let span = p.facts().stopped_at_link.unwrap();
     assert_eq!(span.get(p.packet()).unwrap(), [255; 4]);
     assert!(p.facts().stop_date.is_none());

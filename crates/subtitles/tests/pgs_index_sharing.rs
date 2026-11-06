@@ -2,9 +2,9 @@
 //! expected-input lookup is used.
 use std::sync::atomic::{AtomicBool, Ordering};
 use triergon_core::{Budget, Bytes, Error, TimeBase, WorkBudget};
+use triergon_subtitles::compat::pgs::{ColourOrigin, IndexedRecoveryDecoder};
 use triergon_subtitles::pgs::{
-    DisplayConfig, DisplayLimits, IndexedNativeRecoveryDecoder, IndexedRecoveredPacket,
-    NativeColourOrigin, PacketClock, RecoveryStatus,
+    DisplayConfig, DisplayLimits, IndexedRecoveredPacket, PacketClock, RecoveryStatus,
 };
 
 fn segment(out: &mut Vec<u8>, kind: u8, body: &[u8]) {
@@ -52,19 +52,19 @@ fn clock() -> PacketClock {
     }
 }
 
-fn decoder(b: &Budget, forced: bool) -> IndexedNativeRecoveryDecoder {
-    IndexedNativeRecoveryDecoder::new(
+fn decoder(b: &Budget, forced: bool) -> IndexedRecoveryDecoder {
+    IndexedRecoveryDecoder::new(
         b,
         DisplayLimits::default(),
         DisplayConfig {
-            native_forced_only: forced,
+            receiver_forced_only: forced,
         },
     )
     .unwrap()
 }
 
 fn read(
-    d: &mut IndexedNativeRecoveryDecoder,
+    d: &mut IndexedRecoveryDecoder,
     b: &Budget,
     raw: &[u8],
     quantum: u64,
@@ -194,8 +194,8 @@ fn epoch_and_palette_changes_never_promote_source_missingness() {
     let object = &new.source_sets()[0].objects()[0];
     assert_eq!(object.palette().source(1), None);
     assert_eq!(
-        object.palette().native_origin(1),
-        NativeColourOrigin::PreviousEpochSlot
+        object.palette().receiver_origin(1),
+        ColourOrigin::PreviousEpochSlot
     );
     assert_eq!(
         object.pixels().as_ptr(),
@@ -250,7 +250,7 @@ fn every_original_argb_byte_is_still_written_with_one_unit_quanta() {
     let out = read(&mut d, &b, &frame(4096, 1, 0x80, true, false), 1);
     let object = &out.source_sets()[0].objects()[0];
     assert!(object.palette().source(1).is_some());
-    let mut writer = object.native_argb_view().unwrap().writer(16384);
+    let mut writer = object.receiver_argb_view().unwrap().writer(16384);
     for _ in 0..16384 {
         let mut target = [0xaa; 4];
         let before = d.work_spent();
