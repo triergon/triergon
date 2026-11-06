@@ -7,7 +7,7 @@ from .test_checksum import scalar_trace_checksum
 
 class CatalogueTests(unittest.TestCase):
     def cases(self):
-        return [ROOT/'.research/catalogue-fixtures'/c['file'] for c in json.loads((ROOT/'harness/catalogue-corpus.json').read_text())['cases']]
+        return [ROOT/'.research/catalogue-fixtures'/c['file'] for c in json.loads((ROOT/'harness/features/matroska-segment-metadata/corpus.json').read_text())['cases']]
 
     def test_native_catalogue_exact_source_and_all_checksum_work(self):
         for path in self.cases():

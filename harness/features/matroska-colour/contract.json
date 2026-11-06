@@ -1,6 +1,6 @@
 {
   "schema": 1,
-  "id": "K4-colour-hdr-v1",
+  "id": "matroska-colour",
   "operation": "container-colour-demux-v1",
   "contract": [
     "All Matroska Colour integer elements with schema defaults; preserve unknown numeric codes and absent optional values",
@@ -54,11 +54,11 @@
   "minimum_pairs": 30,
   "confidence": 0.95,
   "pending_module_requirements": [
-    "remaining M01/M02 features including dynamic codec side data",
+    "remaining container features including dynamic codec side data",
     "complete applicable FATE coverage",
     "deferred targets"
   ],
   "reference_view": "32 exact public FFmpeg colour/side-data integers; complete source IEEE bits/defaults/raw TrackEntry separately mandatory",
   "runtime_optimization_ratio_target": 0.8,
-  "runtime_policy": "initial-delivery-runtime-v2"
+  "runtime_policy": "runtime-ceiling-1.20"
 }

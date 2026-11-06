@@ -62,7 +62,7 @@ class ContentTests(unittest.TestCase):
 class SourceOracleTests(unittest.TestCase):
     def test_all_selected_compression_bytes_match_an_independent_source_oracle(self):
         worker = ROOT / 'target/release/media-worker'
-        for case in json.loads((ROOT / 'harness/zlib-corpus.json').read_text())['cases']:
+        for case in json.loads((ROOT / 'harness/features/matroska-zlib/corpus.json').read_text())['cases']:
             path = ROOT / '.research/zlib-fixtures' / case['file']
             trace = json.loads(subprocess.check_output([worker, 'trace', path]))
             self.assertEqual(projected_content(trace), content_trace(path), case['id'])

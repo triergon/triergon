@@ -1,6 +1,6 @@
 {
   "schema": 1,
-  "id": "K2-bounded-zlib-v1",
+  "id": "matroska-zlib",
   "operation": "container-demux-v1",
   "contract": [
     "RFC 1950 checksum and wrapper",
@@ -31,10 +31,10 @@
   "minimum_pairs": 30,
   "confidence": 0.95,
   "pending_module_requirements": [
-    "remaining M01/M02 features",
+    "remaining container features",
     "complete applicable FATE coverage",
     "deferred targets"
   ],
   "runtime_optimization_ratio_target": 0.8,
-  "runtime_policy": "initial-delivery-runtime-v2"
+  "runtime_policy": "runtime-ceiling-1.20"
 }

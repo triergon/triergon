@@ -149,7 +149,7 @@ fn verdict(contract: &Value, rows: &[Value], identity: &Value) -> (bool, bool) {
 fn empty_or_missing_evidence_cannot_pass() {
     let result = acceptance(
         root(),
-        &load("harness/slice.json"),
+        &load("harness/features/matroska-demux/contract.json"),
         &[],
         &v("{}"),
         "aarch64-apple-darwin",
@@ -177,7 +177,7 @@ fn a_fast_run_does_not_override_correctness() {
     )];
     let result = acceptance(
         root(),
-        &load("harness/slice.json"),
+        &load("harness/features/matroska-demux/contract.json"),
         &rows,
         &v("{}"),
         "aarch64-apple-darwin",
@@ -223,7 +223,7 @@ fn non_finite_or_incomplete_measurements_never_satisfy_a_gate() {
         ));
         let result = acceptance(
             root(),
-            &load("harness/slice.json"),
+            &load("harness/features/matroska-demux/contract.json"),
             &[row],
             &v(r#"{"source_revision": "pin"}"#),
             "aarch64-apple-darwin",
@@ -384,7 +384,7 @@ fn comparison_identity() -> Value {
 }
 
 fn mixed_case() -> Value {
-    load("harness/zlib-corpus.json")
+    load("harness/features/matroska-zlib/corpus.json")
         .get("cases")
         .and_then(Value::as_array)
         .unwrap()
@@ -394,7 +394,7 @@ fn mixed_case() -> Value {
         .unwrap()
 }
 
-const ZLIB: Option<&str> = Some("K2-bounded-zlib-v1");
+const ZLIB: Option<&str> = Some("matroska-zlib");
 
 #[test]
 fn a_comparison_rule_is_bound_to_approval_source_input_profile_and_contract() {
@@ -417,7 +417,7 @@ fn a_comparison_rule_is_bound_to_approval_source_input_profile_and_contract() {
         put(&mut changed, &[], field, value);
         assert!(rule_for(&changed, &identity, ZLIB).is_err(), "{field}");
     }
-    for contract in [None, Some("K3-cues-preroll-v1")] {
+    for contract in [None, Some("matroska-cues-preroll")] {
         assert!(rule_for(&case, &identity, contract).is_err());
     }
     put(
@@ -506,7 +506,7 @@ fn reasons(result: &Value, key: &str) -> Vec<String> {
 fn missing_colour_or_catalogue_source_proof_cannot_satisfy_the_gate() {
     let colour = acceptance(
         root(),
-        &load("harness/colour-slice.json"),
+        &load("harness/features/matroska-colour/contract.json"),
         &[v(
             r#"{"id": "colour-absent", "profile": "colour-absent", "parity": {"status": "pass", "source_timing_status": "pass"}}"#,
         )],
@@ -522,7 +522,7 @@ fn missing_colour_or_catalogue_source_proof_cannot_satisfy_the_gate() {
     );
     let catalogue = acceptance(
         root(),
-        &load("harness/catalogue-slice.json"),
+        &load("harness/features/matroska-segment-metadata/contract.json"),
         &[v(
             r#"{"id": "catalogue-empty", "profile": "catalogue-empty", "parity": {"status": "pass", "source_timing_status": "pass"}}"#,
         )],
@@ -540,7 +540,7 @@ fn missing_colour_or_catalogue_source_proof_cannot_satisfy_the_gate() {
 
 #[test]
 fn the_required_external_vector_cannot_be_missing_or_substituted() {
-    let contract = load("harness/catalogue-slice.json");
+    let contract = load("harness/features/matroska-segment-metadata/contract.json");
     let file = contract
         .get("required_additional_vectors")
         .and_then(Value::as_array)
@@ -573,8 +573,15 @@ fn the_required_external_vector_cannot_be_missing_or_substituted() {
 
 #[test]
 fn every_contract_keeps_the_delivery_ceiling_and_optimisation_target() {
-    for prefix in ["", "header-", "zlib-", "seek-", "colour-", "catalogue-"] {
-        let contract = load(&format!("harness/{prefix}slice.json"));
+    for prefix in [
+        "matroska-demux",
+        "matroska-header-removal",
+        "matroska-zlib",
+        "matroska-cues-preroll",
+        "matroska-colour",
+        "matroska-segment-metadata",
+    ] {
+        let contract = load(&format!("harness/features/{prefix}/contract.json"));
         assert_eq!(
             contract.get("runtime_ratio_max").and_then(Value::as_f64),
             Some(1.2),
@@ -589,7 +596,7 @@ fn every_contract_keeps_the_delivery_ceiling_and_optimisation_target() {
         );
         assert_eq!(
             contract.get("runtime_policy").and_then(Value::as_str),
-            Some("initial-delivery-runtime-v2"),
+            Some("runtime-ceiling-1.20"),
             "{prefix}"
         );
     }

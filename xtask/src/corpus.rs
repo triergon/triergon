@@ -288,7 +288,7 @@ fn base(paths: &Paths) -> Result<String, String> {
         ("generator", Value::str("tools/generate-corpus.py")),
         ("cases", Value::Array(rows)),
     ]);
-    let path = paths.manifest("corpus.json", &manifest)?;
+    let path = paths.manifest("features/matroska-demux/corpus.json", &manifest)?;
     Ok(format!(
         "Materialized {} cases: {}",
         cases.len(),
@@ -380,7 +380,7 @@ fn header_removal(paths: &Paths, source: &Source) -> Result<String, String> {
     }
     let count = rows.len();
     paths.manifest(
-        "header-corpus.json",
+        "features/matroska-header-removal/corpus.json",
         &Value::object([("schema", Value::int(1)), ("cases", Value::Array(rows))]),
     )?;
     Ok(format!("Generated {count} header-removal cases"))
@@ -520,13 +520,13 @@ fn delivery_contract(id: &str, operation: &str, contract: &[&str], profiles: Vec
         (
             "pending_module_requirements",
             Value::strings([
-                "remaining M01/M02 features",
+                "remaining container features",
                 "complete applicable FATE coverage",
                 "deferred targets",
             ]),
         ),
         ("runtime_optimization_ratio_target", Value::float(0.8)),
-        ("runtime_policy", Value::str("initial-delivery-runtime-v2")),
+        ("runtime_policy", Value::str("runtime-ceiling-1.20")),
     ])
 }
 
@@ -578,7 +578,7 @@ fn zlib_matrix(paths: &Paths, source: &Source) -> Result<String, String> {
         rows.push(authored(&name, &file, &data, vec![]));
     }
     let contract = delivery_contract(
-        "K2-bounded-zlib-v1",
+        "matroska-zlib",
         "container-demux-v1",
         &[
             "RFC 1950 checksum and wrapper",
@@ -593,10 +593,10 @@ fn zlib_matrix(paths: &Paths, source: &Source) -> Result<String, String> {
     );
     let count = rows.len();
     paths.manifest(
-        "zlib-corpus.json",
+        "features/matroska-zlib/corpus.json",
         &Value::object([("schema", Value::int(1)), ("cases", Value::Array(rows))]),
     )?;
-    paths.manifest("zlib-slice.json", &contract)?;
+    paths.manifest("features/matroska-zlib/contract.json", &contract)?;
     Ok(format!("Generated {count} zlib cases"))
 }
 
@@ -792,7 +792,7 @@ fn seek(paths: &Paths, source: &Source) -> Result<String, String> {
         ));
     }
     let contract = delivery_contract(
-        "K3-cues-preroll-v1",
+        "matroska-cues-preroll",
         "container-seek-preroll-v1",
         &[
             "bounded Cues/SeekHead lookup",
@@ -808,10 +808,10 @@ fn seek(paths: &Paths, source: &Source) -> Result<String, String> {
     );
     let count = rows.len();
     paths.manifest(
-        "seek-corpus.json",
+        "features/matroska-cues-preroll/corpus.json",
         &Value::object([("schema", Value::int(1)), ("cases", Value::Array(rows))]),
     )?;
-    paths.manifest("seek-slice.json", &contract)?;
+    paths.manifest("features/matroska-cues-preroll/contract.json", &contract)?;
     Ok(format!("Generated {count} seek cases"))
 }
 
@@ -1095,7 +1095,7 @@ fn colour(paths: &Paths, source: &Source) -> Result<String, String> {
     }
     let count = rows.len();
     paths.manifest(
-        "colour-corpus.json",
+        "features/matroska-colour/corpus.json",
         &Value::object([("schema", Value::int(1)), ("cases", Value::Array(rows))]),
     )?;
     Ok(format!("Generated {count} colour/HDR profiles"))
@@ -1714,7 +1714,7 @@ fn catalogue(paths: &Paths, source: &Source) -> Result<String, String> {
     }
     let count = rows.len();
     paths.manifest(
-        "catalogue-corpus.json",
+        "features/matroska-segment-metadata/corpus.json",
         &Value::object([("schema", Value::int(1)), ("cases", Value::Array(rows))]),
     )?;
     Ok(format!("Generated {count} catalogue profiles"))
@@ -1739,14 +1739,14 @@ mod tests {
         })
         .unwrap();
         for name in [
-            "corpus.json",
-            "header-corpus.json",
-            "zlib-corpus.json",
-            "zlib-slice.json",
-            "seek-corpus.json",
-            "seek-slice.json",
-            "colour-corpus.json",
-            "catalogue-corpus.json",
+            "features/matroska-demux/corpus.json",
+            "features/matroska-header-removal/corpus.json",
+            "features/matroska-zlib/corpus.json",
+            "features/matroska-zlib/contract.json",
+            "features/matroska-cues-preroll/corpus.json",
+            "features/matroska-cues-preroll/contract.json",
+            "features/matroska-colour/corpus.json",
+            "features/matroska-segment-metadata/corpus.json",
         ] {
             let ours = fs::read_to_string(out.join("harness").join(name)).unwrap();
             let committed = fs::read_to_string(root.join("harness").join(name)).unwrap();

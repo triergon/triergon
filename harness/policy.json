@@ -1,0 +1,22 @@
+{
+  "schema": 1,
+  "runtime": {
+    "id": "runtime-ceiling-1.20",
+    "ratio_max": 1.2,
+    "bound": "per-case upper bound of the paired 95% bootstrap interval of candidate/reference time",
+    "optimisation_target": 0.8,
+    "minimum_pairs": 30,
+    "confidence": 0.95
+  },
+  "memory": {
+    "id": "total-resident-rss-v2",
+    "peak_live_heap_ratio_max_exclusive": 1.0,
+    "total_resident_peak_rss_ratio_max_exclusive": 1.0,
+    "bound": "per-case upper bound of the paired 95% bootstrap interval",
+    "rss_numerator": "candidate proven resident peak ceiling plus two pages",
+    "rss_denominator": "reference observed resident peak minus two pages",
+    "implementation": "harness/delivery_memory_v2.py"
+  },
+  "parity": "full selected-feature parity on every required case and profile; equal measured work",
+  "qualification_target": "aarch64-unknown-linux-gnu"
+}

@@ -26,7 +26,7 @@ resource limit becomes an explicit, reviewed rule for that case.
   revision with recorded configure flags, compiler and binary hashes.
 - **Authored corpus.** Small canonical streams generated from synthetic signals and
   authored structures, so inputs stay identical across encoder versions
-  (`cargo xtask fixtures`, `harness/*-corpus.json`, `harness/*-slice.json`).
+  (`cargo xtask fixtures`, `harness/features/<feature>/{contract,corpus}.json`).
 - **FATE.** Upstream regression identities are indexed as data, without running
   Make (`cargo xtask fate-inventory`, `harness/fate/index.json`), and mapped case by
   case. A FATE name is not a test until its input, operation and expected result are

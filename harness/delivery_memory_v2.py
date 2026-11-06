@@ -1,4 +1,4 @@
-"""Owner-approved total-resident-peak RSS arithmetic for initial delivery.
+"""Total-resident-peak RSS arithmetic of the memory policy (harness/policy.json).
 
 This module does not admit measurements. Callers must first validate complete
 work, all observer receipts, calibration, provenance and isolation as before.
@@ -9,7 +9,7 @@ import math
 
 from .runner import ratio_interval
 
-POLICY = "initial-delivery-total-resident-rss-v2"
+POLICY = "total-resident-rss-v2"
 
 
 @dataclass(frozen=True)

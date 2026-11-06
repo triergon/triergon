@@ -1,6 +1,6 @@
 {
   "schema": 1,
-  "id": "K5-segment-metadata-v1",
+  "id": "matroska-segment-metadata",
   "operation": "container-catalogue-demux-v1",
   "contract": [
     "Bounded complete chapter edition/nested atom trees, exact unsigned nanosecond source times, display languages and source extensions",
@@ -79,11 +79,11 @@
     }
   ],
   "pending_module_requirements": [
-    "remaining M01/M02 including dynamic codec side data and resumable input/work/retained budgets",
+    "remaining container features including dynamic codec side data and resumable input/work/retained budgets",
     "complete applicable FATE coverage and external sample rights review",
-    "deferred targets and actual Streem integration"
+    "deferred targets"
   ],
   "reference_view": "schema2: media tracks/packets plus public global/track/chapter/attachment dictionaries and static attachments; names/languages occur once in dictionaries; exact source originals/trees/target lists independently mandatory",
   "runtime_optimization_ratio_target": 0.8,
-  "runtime_policy": "initial-delivery-runtime-v2"
+  "runtime_policy": "runtime-ceiling-1.20"
 }

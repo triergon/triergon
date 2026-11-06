@@ -1,7 +1,7 @@
 {
   "schema": 1,
-  "id": "K0-container-demux-v1",
-  "status": "experimental; broader M01/M02 requirements remain required and pending",
+  "id": "matroska-demux",
+  "status": "experimental; broader container requirements remain required and pending",
   "operation": "container-demux-v1",
   "reference_flags": [
     "CUSTOM_IO",
@@ -43,7 +43,7 @@
     "x86_64-unknown-linux-gnu",
     "armv7-linux-webos-32"
   ],
-  "target_scope_authorization": "2026-10-31: owner moved qualification to native Linux ARM64; runtime policy is separately authorized by initial-delivery-runtime-v1",
+  "target_scope": "qualification runs on native Linux ARM64; runtime and memory gates follow harness/policy.json",
   "runtime_ratio_max": 1.2,
   "memory_ratio_max_exclusive": 1.0,
   "minimum_pairs": 30,
@@ -67,5 +67,5 @@
     "live-allocation instrumentation"
   ],
   "runtime_optimization_ratio_target": 0.8,
-  "runtime_policy": "initial-delivery-runtime-v2"
+  "runtime_policy": "runtime-ceiling-1.20"
 }

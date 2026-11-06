@@ -76,24 +76,28 @@ pub fn design(root: &Path) -> Result<String, Vec<String>> {
             errors.push(format!("{}: {error}", rel.display()));
         }
     }
-    let gates = match read_json(&root.join("research/module-gates.json")) {
-        Ok(gates) => gates,
-        Err(error) => return Err(vec![format!("research/module-gates.json: {error}")]),
+    let (policy, gates) = match (
+        read_json(&root.join("harness/policy.json")),
+        read_json(&root.join("harness/module-gates.json")),
+    ) {
+        (Ok(policy), Ok(gates)) => (policy, gates),
+        (Err(error), _) => return Err(vec![format!("harness/policy.json: {error}")]),
+        (_, Err(error)) => return Err(vec![format!("harness/module-gates.json: {error}")]),
     };
-    let requirements = gates.get("owner_requirements");
-    if requirements
-        .and_then(|r| r.get("runtime_ratio_max"))
+    let runtime = policy.get("runtime");
+    if runtime
+        .and_then(|r| r.get("ratio_max"))
         .and_then(Value::as_f64)
         != Some(1.2)
     {
-        errors.push("delivery runtime gate differs from the policy (1.20)".into());
+        errors.push("runtime ceiling differs from the policy (1.20)".into());
     }
-    if requirements
-        .and_then(|r| r.get("runtime_optimization_ratio_target"))
+    if runtime
+        .and_then(|r| r.get("optimisation_target"))
         .and_then(Value::as_f64)
         != Some(0.8)
     {
-        errors.push("runtime optimization target differs from the policy (0.80)".into());
+        errors.push("runtime optimisation target differs from the policy (0.80)".into());
     }
     let modules = gates
         .get("modules")
@@ -304,9 +308,10 @@ mod tests {
         let root = crate::walk::scratch("design");
         fs::create_dir_all(root.join("research/sub")).unwrap();
         fs::create_dir_all(root.join("harness/fate")).unwrap();
-        let gates = r#"{"owner_requirements": {"runtime_ratio_max": 1.2, "runtime_optimization_ratio_target": 0.8},
-                        "modules": [{"accepted": false}, {"accepted": false}]}"#;
-        fs::write(root.join("research/module-gates.json"), gates).unwrap();
+        let policy = r#"{"runtime": {"ratio_max": 1.2, "optimisation_target": 0.8}}"#;
+        let gates = r#"{"modules": [{"accepted": false}, {"accepted": false}]}"#;
+        fs::write(root.join("harness/policy.json"), policy).unwrap();
+        fs::write(root.join("harness/module-gates.json"), gates).unwrap();
         fs::write(
             root.join("harness/fate/index.json"),
             r#"{"cases": [{"status": "unmapped", "rights": "unreviewed"}]}"#,
@@ -318,8 +323,13 @@ mod tests {
         ));
         fs::write(root.join("research/sub/bad.json"), "{").unwrap();
         fs::write(
-            root.join("research/module-gates.json"),
-            gates.replace("1.2", "1.25").replace("false}]", "true}]"),
+            root.join("harness/policy.json"),
+            policy.replace("1.2", "1.25"),
+        )
+        .unwrap();
+        fs::write(
+            root.join("harness/module-gates.json"),
+            gates.replace("false}]", "true}]"),
         )
         .unwrap();
         let errors = design(&root).unwrap_err();

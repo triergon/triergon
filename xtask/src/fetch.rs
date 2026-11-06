@@ -258,7 +258,7 @@ fn today() -> String {
 // Required external vectors.
 
 pub const VECTOR_LIMIT: usize = 8 * 1024 * 1024;
-const VECTOR_CONTRACT: &str = "harness/catalogue-slice.json";
+const VECTOR_CONTRACT: &str = "harness/features/matroska-segment-metadata/contract.json";
 
 /// Fetch every required vector named by the metadata contract into
 /// `.research/fate-samples/`, verifying cached copies; returns their paths.
@@ -371,7 +371,7 @@ mod tests {
     }
 
     fn contract(root: &Path, file: &str, content: &[u8]) {
-        fs::create_dir_all(root.join("harness")).unwrap();
+        fs::create_dir_all(root.join(VECTOR_CONTRACT).parent().unwrap()).unwrap();
         let text = format!(
             r#"{{"required_additional_vectors": [{{"file": "{file}", "sha256": "{}"}}]}}"#,
             sha256::hex(content)

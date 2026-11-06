@@ -51,9 +51,16 @@ pub fn matroska_inputs() -> Vec<String> {
     ]
     .map(String::from)
     .to_vec();
-    for prefix in ["", "header-", "zlib-", "seek-", "colour-", "catalogue-"] {
-        for suffix in ["slice", "corpus"] {
-            names.push(format!("harness/{prefix}{suffix}.json"));
+    for feature in [
+        "matroska-demux",
+        "matroska-header-removal",
+        "matroska-zlib",
+        "matroska-cues-preroll",
+        "matroska-colour",
+        "matroska-segment-metadata",
+    ] {
+        for file in ["contract", "corpus"] {
+            names.push(format!("harness/features/{feature}/{file}.json"));
         }
     }
     names

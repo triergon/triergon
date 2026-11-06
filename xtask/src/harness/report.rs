@@ -37,8 +37,8 @@ impl Options {
     pub fn defaults(root: &Path) -> Self {
         Options {
             corpus: root.join(".research/fixtures"),
-            manifest: root.join("harness/corpus.json"),
-            contract: root.join("harness/slice.json"),
+            manifest: root.join("harness/features/matroska-demux/corpus.json"),
+            contract: root.join("harness/features/matroska-demux/contract.json"),
             output: root.join(".research/harness-report"),
             fate_cache: None,
             additional_reports: Vec::new(),
@@ -333,8 +333,8 @@ pub fn run(root: &Path, options: &Options) -> Result<i32, String> {
                 .get("seek_target_ns")
                 .filter(|v| **v != Value::Null)
                 .cloned();
-            let catalogue = contract_id.as_deref() == Some("K5-segment-metadata-v1");
-            let colour = contract_id.as_deref() == Some("K4-colour-hdr-v1");
+            let catalogue = contract_id.as_deref() == Some("matroska-segment-metadata");
+            let colour = contract_id.as_deref() == Some("matroska-colour");
             let view = if catalogue {
                 Value::str("catalogue-source-and-native-v1")
             } else if colour {
@@ -368,7 +368,7 @@ pub fn run(root: &Path, options: &Options) -> Result<i32, String> {
                 rule,
                 native_reference: &native,
             });
-            let content = contract_id.as_deref() == Some("K2-bounded-zlib-v1");
+            let content = contract_id.as_deref() == Some("matroska-zlib");
             let prefix = if catalogue {
                 "catalogue-"
             } else if colour {
