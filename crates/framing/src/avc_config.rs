@@ -737,14 +737,14 @@ impl AvcConfigParser {
 #[derive(Clone, Copy, Debug)]
 struct AvcNalDescriptor {
     start: usize,
-    end: usize,
+    length: u16,
     kind: AvcConfigArrayKind,
     header: NalHeader,
 }
 impl AvcNalDescriptor {
     const EMPTY: Self = Self {
         start: 0,
-        end: 0,
+        length: 0,
         kind: AvcConfigArrayKind::Sequence,
         header: NalHeader::Avc {
             nal_ref_idc: 0,
@@ -752,8 +752,20 @@ impl AvcNalDescriptor {
         },
     };
 
+    fn new(payload: &Range<usize>, kind: AvcConfigArrayKind, header: NalHeader) -> Self {
+        // The scan checked the end using the original two-byte length.
+        let length = payload.len();
+        debug_assert!(u16::try_from(length).is_ok());
+        Self {
+            start: payload.start,
+            length: length as u16,
+            kind,
+            header,
+        }
+    }
+
     fn payload(&self) -> Range<usize> {
-        self.start..self.end
+        self.start..self.start + usize::from(self.length)
     }
 
     fn length_field(&self) -> Range<usize> {
@@ -783,12 +795,7 @@ impl AvcStorage for CompactAvc {
         header: NalHeader,
     ) {
         if let Some(slot) = cache.0.get_mut(index) {
-            *slot = AvcNalDescriptor {
-                start: payload.start,
-                end: payload.end,
-                kind,
-                header,
-            };
+            *slot = AvcNalDescriptor::new(payload, kind, header);
         }
     }
 
@@ -811,12 +818,7 @@ impl AvcStorage for CompactAvc {
         kind: AvcConfigArrayKind,
         header: NalHeader,
     ) -> Result<Self::Nal> {
-        Ok(AvcNalDescriptor {
-            start: payload.start,
-            end: payload.end,
-            kind,
-            header,
-        })
+        Ok(AvcNalDescriptor::new(&payload, kind, header))
     }
     fn finish(data: AvcBuild<Self::Nal>) -> Self::Output {
         AvcConfigurationView { data }
