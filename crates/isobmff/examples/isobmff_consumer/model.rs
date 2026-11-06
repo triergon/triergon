@@ -547,15 +547,22 @@ impl<'a> Driver<'a> {
         } else if maximum <= InputCursor::INLINE_CAPACITY {
             self.supply_buffer::<{ InputCursor::INLINE_CAPACITY }>(request, maximum)
         } else if maximum <= 4096 {
-            self.supply_buffer::<4096>(request, maximum)
+            self.supply_large_buffer::<4096>(request, maximum)
         } else {
-            self.supply_buffer::<65536>(request, maximum)
+            self.supply_large_buffer::<65536>(request, maximum)
         }
     }
-    // Keep the 64 KiB initialization/frame outside the small-request path.
-    // Each monomorph remains initialized safe stack storage; the I/O and core
-    // handoff below are shared, with no per-refill heap/cache or work change.
+    // Keep large scratch frames out of the small-request path.
     #[inline(never)]
+    fn supply_large_buffer<const CAPACITY: usize>(
+        &mut self,
+        request: InputRequest,
+        maximum: usize,
+    ) -> Result<()> {
+        self.supply_buffer::<CAPACITY>(request, maximum)
+    }
+
+    #[inline(always)]
     fn supply_buffer<const CAPACITY: usize>(
         &mut self,
         request: InputRequest,
