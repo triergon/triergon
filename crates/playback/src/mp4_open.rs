@@ -12,7 +12,7 @@ use triergon_core::{Budget, BudgetVec, Bytes, Error, InputCursor, Step, WorkBudg
 use triergon_isobmff::{
     self as iso, BoxChildren, BoxEvent, BoxReader, BoxStep, BoxView, BuildStatus, EditList,
     FragmentBuilder, FragmentContext, FragmentIndex, ImplicitBase, MovieHeader, SampleTable,
-    SampleTableBuilder, TrackHeader, Trex,
+    SampleTableBuilder, TimingRunPolicy, TrackHeader, Trex,
 };
 fn push<T>(v: &mut BudgetVec<T>, x: T) -> Result<()> {
     v.try_push(x).map_err(|e| e.error)
@@ -428,6 +428,7 @@ pub struct Mp4Open<S: Source> {
     source: Option<SourceOwner<S>>,
     reader: BoxReader,
     native_recovery: bool,
+    timing_policy: TimingRunPolicy,
     prefer_front: bool,
     limits: OpenLimits,
     pool: Budget,
@@ -471,6 +472,18 @@ impl<S: Source> Mp4Open<S> {
         Self::new_inner(selected, limits, false, false)
     }
 
+    /// Choose how the opener validates surplus sample timing.
+    /// Inspect each track's sample table for the declared surplus counts.
+    pub fn with_timing_policy(
+        selected: SelectedInput<S>,
+        limits: OpenLimits,
+        policy: TimingRunPolicy,
+    ) -> Result<Self> {
+        let mut opener = Self::new(selected, limits)?;
+        opener.timing_policy = policy;
+        Ok(opener)
+    }
+
     /// Stop at the first media header after a front movie, even when the
     /// transport offers ranges. The progressive engine parses later fragments.
     pub fn new_progressive(selected: SelectedInput<S>, limits: OpenLimits) -> Result<Self> {
@@ -507,6 +520,7 @@ impl<S: Source> Mp4Open<S> {
             source: Some(selected.source),
             reader,
             native_recovery,
+            timing_policy: TimingRunPolicy::Strict,
             prefer_front,
             limits,
             pool: pool.clone(),
@@ -693,7 +707,12 @@ impl<S: Source> Mp4Open<S> {
                 return Ok(OpenProgress::Yield);
             }
             let raw = required(p.stbl.clone(), "missing sample table")?;
-            let builder = SampleTableBuilder::new(raw, self.pool.clone(), self.limits.format)?;
+            let builder = SampleTableBuilder::with_timing_policy(
+                raw,
+                self.pool.clone(),
+                self.limits.format,
+                self.timing_policy,
+            )?;
             let dref = p
                 .dref
                 .as_ref()

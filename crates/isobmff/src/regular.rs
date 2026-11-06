@@ -7,6 +7,22 @@ use crate::{
 };
 use triergon_core::{Budget, BudgetVec, Error, Result, WorkBudget};
 
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum TimingRunPolicy {
+    #[default]
+    Strict,
+    /// Use the timing prefix covered by the sample sizes. The final decode
+    /// run and positive composition runs may extend past that prefix.
+    BoundedPrefix,
+}
+
+/// Declared timing occurrences beyond the number of samples with sizes.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct TimingRunSurplus {
+    pub decode_samples: u64,
+    pub composition_samples: u64,
+}
+
 #[derive(Debug)]
 pub struct SampleTable {
     raw: BoxView,
@@ -19,6 +35,7 @@ pub struct SampleTable {
     sync: Option<Words>,
     partial: Option<Words>,
     dependency: Option<BoxView>,
+    timing_run_surplus: TimingRunSurplus,
 }
 
 struct SamplePosition {
@@ -39,6 +56,10 @@ impl SampleTable {
     }
     pub fn sample_count(&self) -> u64 {
         u64::from(self.sizes.count)
+    }
+    /// The raw table retains the original run counts.
+    pub fn timing_run_surplus(&self) -> TimingRunSurplus {
+        self.timing_run_surplus
     }
     /// None is absent; Some(0) is explicitly present-empty, not all-sync.
     pub fn sync_entry_count(&self) -> Option<u32> {
@@ -261,7 +282,8 @@ pub struct SampleTableBuilder {
     total: u64,
     previous: u32,
     failed: Option<Error>,
-    recover_runs: bool,
+    timing_policy: TimingRunPolicy,
+    recover_sync: bool,
     recover_initial_description: bool,
     recover_v3_descriptions: bool,
     initial_description: Option<Mov9InitialDescriptionDiagnostic>,
@@ -270,6 +292,17 @@ pub struct SampleTableBuilder {
 }
 impl SampleTableBuilder {
     pub fn new(raw: BoxView, budget: Budget, limits: Limits) -> Result<Self> {
+        Self::with_timing_policy(raw, budget, limits, TimingRunPolicy::Strict)
+    }
+
+    /// Select how timing counts are checked against the sample sizes.
+    /// All other table fields use strict validation.
+    pub fn with_timing_policy(
+        raw: BoxView,
+        budget: Budget,
+        limits: Limits,
+        timing_policy: TimingRunPolicy,
+    ) -> Result<Self> {
         if raw.header().kind != *b"stbl" {
             return Err(Error::Invalid("not stbl"));
         }
@@ -295,7 +328,8 @@ impl SampleTableBuilder {
             total: 0,
             previous: 0,
             failed: None,
-            recover_runs: false,
+            timing_policy,
+            recover_sync: false,
             recover_initial_description: false,
             recover_v3_descriptions: false,
             initial_description: None,
@@ -451,6 +485,7 @@ impl SampleTableBuilder {
                                 sync,
                                 partial,
                                 dependency: self.parts.dependency.clone(),
+                                timing_run_surplus: TimingRunSurplus::default(),
                             });
                             self.stage = Stage::Validate;
                         }
@@ -495,10 +530,8 @@ impl SampleTableBuilder {
                             .checked_add(u64::from(count))
                             .ok_or(Error::Overflow)?;
                         if total > t.sample_count() {
-                            // This is an explicit pinned observation, never the Strict
-                            // constructor. Every raw row remains owned and validated.
                             let decode = self.check == Check::Decode;
-                            if !self.recover_runs
+                            if self.timing_policy == TimingRunPolicy::Strict
                                 || t.sample_count() == 0
                                 || (decode
                                     && (self.row + 1 != source.count
@@ -539,7 +572,8 @@ impl SampleTableBuilder {
                         return Ok(());
                     }
                     if self.total != t.sample_count()
-                        && !(self.recover_runs && self.total > t.sample_count())
+                        && !(self.timing_policy == TimingRunPolicy::BoundedPrefix
+                            && self.total > t.sample_count())
                     {
                         return Err(Error::Invalid("time table sample count mismatch"));
                     }
@@ -629,7 +663,7 @@ impl SampleTableBuilder {
                         || sample <= self.previous
                         || u64::from(sample) > t.sample_count()
                     {
-                        if !self.recover_runs || self.check != Check::Sync || sample == 0 {
+                        if !self.recover_sync || self.check != Check::Sync || sample == 0 {
                             return Err(Error::Invalid("sync sample order/range"));
                         }
                         if self.sync_diagnostic.is_none() {
@@ -664,7 +698,7 @@ impl SampleTableBuilder {
         Ok(())
     }
     pub fn finish(mut self) -> Result<SampleTable> {
-        if self.recover_runs {
+        if self.recover_sync {
             return Err(Error::Invalid(
                 "recovered table cannot become a Strict sample table",
             ));
@@ -675,9 +709,18 @@ impl SampleTableBuilder {
         if self.stage != Stage::Ready {
             return Err(Error::Invalid("sample table builder not ready"));
         }
-        self.table
+        let mut table = self
+            .table
             .take()
-            .ok_or(Error::Invalid("missing completed index"))
+            .ok_or(Error::Invalid("missing completed index"))?;
+        if self.timing_policy == TimingRunPolicy::BoundedPrefix {
+            let [decode, composition] = self.coverage;
+            table.timing_run_surplus = TimingRunSurplus {
+                decode_samples: decode.map_or(0, |run| run.surplus_samples),
+                composition_samples: composition.map_or(0, |run| run.surplus_samples),
+            };
+        }
+        Ok(table)
     }
 }
 
@@ -995,8 +1038,13 @@ impl Mov9RunRecoveryBuilder {
         limits: Limits,
         _profile: PinnedMovD32RegularRecoveryV1,
     ) -> Result<Self> {
-        let mut inner = SampleTableBuilder::new(raw, budget, limits)?;
-        inner.recover_runs = true;
+        let mut inner = SampleTableBuilder::with_timing_policy(
+            raw,
+            budget,
+            limits,
+            TimingRunPolicy::BoundedPrefix,
+        )?;
+        inner.recover_sync = true;
         Ok(Self { inner })
     }
     pub fn poll(

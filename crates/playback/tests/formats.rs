@@ -2924,6 +2924,13 @@ fn combined_playback_probe_opens_real_sequential_mp4() {
 }
 
 fn observed_mp4_open(bytes: &[u8]) -> (mp4_open::OpenedMp4<Observed>, Calls, Budget) {
+    open_with_timing_policy(bytes, triergon_isobmff::TimingRunPolicy::Strict).unwrap()
+}
+
+fn open_with_timing_policy(
+    bytes: &[u8],
+    policy: triergon_isobmff::TimingRunPolicy,
+) -> Result<(mp4_open::OpenedMp4<Observed>, Calls, Budget)> {
     let pool = pool();
     let (source, calls, _) = observed(&pool, bytes, 23, false);
     let input = InputCursor::new(
@@ -2934,22 +2941,25 @@ fn observed_mp4_open(bytes: &[u8]) -> (mp4_open::OpenedMp4<Observed>, Calls, Bud
             random_access: true,
         },
         4096,
-    )
-    .unwrap();
-    let mut opener = Mp4Open::new(
+    )?;
+    let mut opener = Mp4Open::with_timing_policy(
         SelectedInput {
             input,
             source: SourceOwner::new(source),
             format: Format::Mp4,
         },
         OpenLimits::default(),
-    )
-    .unwrap();
-    assert!((0..100_000).any(|_| matches!(
-        opener.advance(&mut WorkBudget::new(17), &off()).unwrap(),
-        OpenProgress::Ready
-    )));
-    (opener.finish().unwrap(), calls, pool)
+        policy,
+    )?;
+    for _ in 0..100_000 {
+        if matches!(
+            opener.advance(&mut WorkBudget::new(17), &off())?,
+            OpenProgress::Ready
+        ) {
+            return Ok((opener.finish()?, calls, pool));
+        }
+    }
+    panic!("MP4 opener stalled");
 }
 
 fn native_range_player(bytes: &[u8]) -> (Player<Observed>, mp4_open::Movie, Calls, Budget) {
@@ -3136,6 +3146,107 @@ fn next_range_output<S: Source>(player: &mut Mp4RangePlayer<'_, S>) -> Option<Ou
         }
     }
     panic!("native range output stalled");
+}
+
+#[test]
+fn bounded_timing_range_playback_preserves_packets_and_seeks() {
+    use triergon_isobmff::{TimingRunPolicy, TimingRunSurplus};
+
+    for (bytes, offset, surplus) in [
+        (
+            include_bytes!("../../isobmff/tests/fixtures/bad-stts-count-mismatch.mov").as_slice(),
+            0,
+            TimingRunSurplus {
+                decode_samples: 1,
+                composition_samples: 0,
+            },
+        ),
+        (
+            include_bytes!("../../isobmff/tests/fixtures/bad-ctts-count-mismatch.mov").as_slice(),
+            1,
+            TimingRunSurplus {
+                decode_samples: 0,
+                composition_samples: 6,
+            },
+        ),
+    ] {
+        assert!(matches!(
+            open_with_timing_policy(bytes, TimingRunPolicy::Strict),
+            Err(C::Invalid("time run exceeds sample count"))
+        ));
+        let (opened, calls, pool) =
+            open_with_timing_policy(bytes, TimingRunPolicy::BoundedPrefix).unwrap();
+        let [track] = opened.movie.tracks() else {
+            panic!("expected one track");
+        };
+        assert_eq!(track.table().sample_count(), 6);
+        assert_eq!(track.table().timing_run_surplus(), surplus);
+        assert!(matches!(
+            Mp4IndexJob::new(
+                &opened.movie,
+                Mp4View::SourcePhysical,
+                PlanLimits::default()
+            ),
+            Err(C::Invalid("source view requires exact timing coverage"))
+        ));
+
+        let mut job = Mp4RangeOpen::new(&opened.movie, None, PlanLimits::default()).unwrap();
+        assert!((0..100_000).any(|_| job.poll(&mut WorkBudget::new(3), &off()).unwrap()));
+        let mut player = job
+            .finish(
+                opened.input,
+                opened.source,
+                1 << 20,
+                Selection::All,
+                PlayerPolicy::default(),
+            )
+            .unwrap();
+        let events: Vec<_> = std::iter::from_fn(|| next_range_output(&mut player)).collect();
+        let packets = mp4_packets(&events);
+        assert_eq!(packets.len(), 6);
+        for (index, packet) in packets.into_iter().enumerate() {
+            let dts = index as i64 * 1000;
+            let native = &packet.native.as_ref().unwrap().native;
+            assert_eq!((native.dts, native.pts), (Some(dts), Some(dts + offset)));
+            let range = &packet.source.sample.range;
+            assert_eq!(range.end - range.start, 12);
+            assert_eq!(
+                packet.source.payload.as_ref(),
+                &bytes[range.start as usize..range.end as usize]
+            );
+        }
+
+        calls.lock().unwrap().clear();
+        let mut seek = player
+            .prepare_seek(Mp4NativeSeekRequest {
+                video: track.header().track_id,
+                timestamp: 3000,
+                limits: Default::default(),
+            })
+            .unwrap();
+        assert!((0..100_000).any(|_| seek.poll(&mut WorkBudget::new(3), &off()).unwrap()));
+        let mut seek = seek.finish().unwrap();
+        assert!(calls.lock().unwrap().is_empty());
+        assert!(
+            player
+                .apply_seek(&mut seek, &mut WorkBudget::new(1), &off())
+                .unwrap()
+        );
+        let resumed: Vec<_> = std::iter::from_fn(|| next_range_output(&mut player)).collect();
+        let packets = mp4_packets(&resumed);
+        assert_eq!(packets.len(), 3);
+        assert_eq!(packets[0].native.as_ref().unwrap().native.dts, Some(3000));
+        assert!(
+            calls
+                .lock()
+                .unwrap()
+                .contains(&Call::Poll(seek.start_offset()))
+        );
+        drop(packets);
+        drop((resumed, seek, events, player));
+        drop(opened.movie);
+        assert_eq!(pool.used(), Budget::control_storage_bytes());
+    }
 }
 
 #[test]

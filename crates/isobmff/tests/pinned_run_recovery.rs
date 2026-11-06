@@ -4,7 +4,7 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use triergon_core::{Budget, Error, WorkBudget};
 use triergon_isobmff::{
     BoxView, BuildStatus, Limits, Mov9RunKind, Mov9RunRecoveryBuilder, Mov9RunRecoveryTable,
-    PinnedMovD32RegularRecoveryV1, SampleStep,
+    PinnedMovD32RegularRecoveryV1, SampleStep, SampleTableBuilder, TimingRunPolicy,
 };
 const STTS: &[u8] = include_bytes!("fixtures/bad-stts-count-mismatch.mov");
 const CTTS: &[u8] = include_bytes!("fixtures/bad-ctts-count-mismatch.mov");
@@ -63,6 +63,42 @@ fn strict_stts_and_ctts_errors_remain_exact() {
             common::table(stbl(bytes, &p), &p, 1).unwrap_err(),
             Error::Invalid("time run exceeds sample count")
         );
+    }
+}
+#[test]
+fn bounded_timing_keeps_short_runs_and_invalid_sync_entries_strict() {
+    let pool = Budget::new(1 << 20).unwrap();
+    for (bytes, expected) in [
+        (
+            include_bytes!("fixtures/pinned-run-recovery/run57-04-r-front-stco-lastcount5.mov")
+                .as_slice(),
+            Error::Invalid("time table sample count mismatch"),
+        ),
+        (
+            include_bytes!("fixtures/pinned-run-recovery/run57-05-r-front-stco-lastcount0.mov")
+                .as_slice(),
+            Error::Invalid("zero sample count in time run"),
+        ),
+        (
+            include_bytes!("fixtures/bad-stss-out-of-range.mov").as_slice(),
+            Error::Invalid("sync sample order/range"),
+        ),
+    ] {
+        let mut builder = SampleTableBuilder::with_timing_policy(
+            stbl(bytes, &pool),
+            pool.clone(),
+            Limits::default(),
+            TimingRunPolicy::BoundedPrefix,
+        )
+        .unwrap();
+        let error = (0..100_000)
+            .find_map(|_| match builder.poll(&mut WorkBudget::new(1)) {
+                Ok(BuildStatus::Yield) => None,
+                Ok(BuildStatus::Ready) => panic!("invalid table admitted"),
+                Err(error) => Some(error),
+            })
+            .expect("table validation stalled");
+        assert_eq!(error, expected);
     }
 }
 #[test]

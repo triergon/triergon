@@ -76,7 +76,8 @@ pub(crate) use regular::SampleLocator;
 pub use regular::{
     Mov9RecoveryV2Association, Mov9RecoveryV2Context, Mov9RecoveryV2Read, Mov9RunKind,
     Mov9RunRecoveryBuilder, Mov9RunRecoveryTable, PinnedMovD32RegularRecoveryV1,
-    PinnedMovD32RegularRecoveryV2, SampleCursor, SampleTable, SampleTableBuilder,
+    PinnedMovD32RegularRecoveryV2, SampleCursor, SampleTable, SampleTableBuilder, TimingRunPolicy,
+    TimingRunSurplus,
 };
 pub use regular::{
     Mov9RecoveryV3Association, Mov9RecoveryV3Context, Mov9RecoveryV3Emission, Mov9RecoveryV3Event,

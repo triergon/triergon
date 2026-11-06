@@ -381,6 +381,11 @@ impl<'a> Mp4IndexJob<'a> {
         let mut native = BudgetVec::new(b);
         let mut zero_scale_clock = None;
         for t in movie.tracks.as_slice() {
+            if view == Mp4View::SourcePhysical
+                && t.table.timing_run_surplus() != iso::TimingRunSurplus::default()
+            {
+                return Err(Error::Invalid("source view requires exact timing coverage"));
+            }
             let media_base = if t.header.timescale == 0 && movie.native_recovery {
                 if !movie.trex.is_empty()
                     || !t.fragments.is_empty()
