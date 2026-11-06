@@ -17,14 +17,8 @@ pub struct PcmBlock {
     pub samples: Vec<i16>,
 }
 
-/// Audio lead from an optional millisecond override: default 120 ms, clamped to 0..=2000.
-pub fn lead_ns(environment: Option<&str>) -> i64 {
-    environment
-        .and_then(|v| v.trim().parse::<i64>().ok())
-        .unwrap_or(120)
-        .clamp(0, 2000)
-        * 1_000_000
-}
+/// The usual audio lead for [`AudioSession::pull`]: 120 ms.
+pub const DEFAULT_LEAD_NS: i64 = 120_000_000;
 
 pub struct AudioSession {
     decoder: Option<Box<dyn AudioDecoder>>,
@@ -51,7 +45,7 @@ impl AudioSession {
             failure: None,
         }
     }
-    /// A Load naming no supported audio lane plays nothing (`None`).
+    /// A new stream; `None` plays no audio.
     pub fn load(&mut self, decoder: Option<Box<dyn AudioDecoder>>) {
         self.reset();
         self.decoder = decoder;
@@ -90,6 +84,7 @@ impl AudioSession {
     /// Decode every queued unit that is due at `clock_ns` (PTS minus `lead_ns`
     /// reached, or unknown PTS) into `out`. A sample-rate change ends the block
     /// early so one block never mixes rates. Returns the units consumed.
+    /// `lead_ns` applies as given; see [`DEFAULT_LEAD_NS`].
     pub fn pull(&mut self, clock_ns: Option<i64>, lead_ns: i64, out: &mut PcmBlock) -> usize {
         let Some(decoder) = self.decoder.as_mut() else {
             return 0;

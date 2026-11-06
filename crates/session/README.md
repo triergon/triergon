@@ -17,7 +17,7 @@ use triergon_session::{
 };
 
 // With the `codecs` feature the decoders come from `video_decoder(VideoCodec::H264)` and
-// `audio_decoder(AudioCodec::Aac)`; `select(payload)` picks both from a load payload.
+// `audio_decoder(AudioCodec::Aac)`; `StreamSelection::load` starts both sessions with them.
 fn play(
     video_decoder: Box<dyn VideoDecoder>,
     audio_decoder: Option<Box<dyn AudioDecoder>>,
@@ -35,15 +35,16 @@ fn play(
         if let Some(picture) = video.latest() { /* sequence, generation, pts, rgba */ }
     }
     let mut pcm = PcmBlock::default();
-    audio.pull(Some(clock_ns), audio::lead_ns(None), &mut pcm);
+    audio.pull(Some(clock_ns), audio::DEFAULT_LEAD_NS, &mut pcm);
     Ok(())
 }
 ```
 
-`video_decoder` and `audio_decoder` need the `codecs` feature, which adds the five
-decoder crates. Without it, implement `VideoDecoder` and `AudioDecoder` (re-exported
-from triergon-codec) yourself; the tests use scripted decoders. The `simd` feature
-forwards to the HEVC decoder's nightly-only SIMD kernels.
+`video_decoder`, `audio_decoder` and `StreamSelection::load` need the `codecs`
+feature, which adds the five decoder crates. Without it, implement `VideoDecoder`
+and `AudioDecoder` (re-exported from triergon-codec) yourself; the tests use
+scripted decoders. The `simd` feature forwards to the HEVC decoder's nightly-only
+SIMD kernels.
 
 ## Supported
 
@@ -53,7 +54,7 @@ forwards to the HEVC decoder's nightly-only SIMD kernels.
 | Audio | AC-3, E-AC-3, AAC (ADTS), DTS core | interleaved stereo s16 at the decoder's rate |
 
 Supporting modules: `mix` (stereo downmix and s16 conversion), `queue` (bounded
-input), `load` (codec selection from a load payload).
+input).
 
 ## Behaviour and limits
 
@@ -68,8 +69,8 @@ input), `load` (codec selection from a load payload).
   either is unknown). `Published::sequence` increases across generations so a
   texture cache never confuses streams.
 - **Audio timing.** `pull` decodes queued units whose PTS minus `lead_ns` has
-  been reached. `audio::lead_ns` parses a millisecond override, defaulting to
-  120 ms and clamped to 0–2000 ms. A sample-rate change ends the current block.
+  been reached. The caller passes the lead; `audio::DEFAULT_LEAD_NS` is 120 ms.
+  A sample-rate change ends the current block.
 - **Lifecycle.** `load` starts a new stream; video `flush` restarts the timeline
   but keeps the last picture; `stop` clears everything. Each of these advances
   `generation()`. `end_of_stream` drains the decoder; the state then becomes
@@ -82,10 +83,9 @@ input), `load` (codec selection from a load payload).
   LFE dropped, normalised so no output exceeds full scale; mono goes to both sides
   at −3 dB. The `DownmixLevels` an AC-3/E-AC-3 stream carries (mix levels, Dolby or
   Pro Logic II surround encoding) are honoured.
-- **Codec selection.** `load::select` picks HEVC when the lowercased payload
-  contains `h265` or `hevc`, otherwise H.264. Audio comes from the first
-  literal `"audio":"…"` value: `AC3`, `AC3 PLUS`, `AAC` or `DTS`; anything else
-  selects no audio.
+- **Stream selection.** `StreamSelection` names a stream's video codec and its
+  audio codec, if any. `StreamSelection::load` starts both sessions with the
+  matching decoders; with `audio: None` the audio session stays `Idle`.
 
 ## Conformance
 

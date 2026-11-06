@@ -1043,16 +1043,19 @@ fn mp4_playback_feeds_real_simulator_decoders_across_clock_and_seek() {
         AacAscParser, AacConfigLimits, AacSource, AvcConfigLimits, BuildStep, NalPacketLimits,
     };
     use triergon_session::{
-        AudioCodec, AudioSession, PcmBlock, QueueLimits, SessionState, VideoCodec, VideoSession,
-        audio_decoder, video_decoder,
+        AudioCodec, AudioSession, PcmBlock, QueueLimits, SessionState, StreamSelection, VideoCodec,
+        VideoSession,
     };
 
     let (mut player, pool, asc, offset) = aac_fixture_player();
     let cancel = off();
     let mut video = VideoSession::new(QueueLimits::VIDEO);
     let mut audio = AudioSession::new(QueueLimits::AUDIO);
-    video.load(video_decoder(VideoCodec::H264));
-    audio.load(Some(audio_decoder(AudioCodec::Aac)));
+    let selection = StreamSelection {
+        video: VideoCodec::H264,
+        audio: Some(AudioCodec::Aac),
+    };
+    selection.load(&mut video, &mut audio);
     let mut reference = None;
 
     fn finish<T>(mut step: impl FnMut(&mut WorkBudget) -> BuildStep<T>) -> T {

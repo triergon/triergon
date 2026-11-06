@@ -209,7 +209,7 @@ fn audio_is_paced_by_clock_minus_lead_and_flush_discards_it() {
             .feed(&[48, 10 + i as u8], Some(pts * 1_000_000))
             .unwrap();
     }
-    let lead = triergon_session::audio::lead_ns(None);
+    let lead = triergon_session::audio::DEFAULT_LEAD_NS;
     assert_eq!(lead, 120_000_000);
     let mut block = PcmBlock::default();
     assert_eq!(
@@ -240,6 +240,30 @@ fn audio_is_paced_by_clock_minus_lead_and_flush_discards_it() {
     );
     audio.end_of_stream();
     assert_eq!(audio.state(), SessionState::Ended);
+}
+
+#[cfg(feature = "codecs")]
+#[test]
+fn a_selection_starts_the_lanes_it_names() {
+    use triergon_session::{AudioCodec, StreamSelection, VideoCodec};
+
+    let mut video = VideoSession::new(QueueLimits::VIDEO);
+    let mut audio = AudioSession::new(QueueLimits::AUDIO);
+    let selection = StreamSelection {
+        video: VideoCodec::Hevc,
+        audio: Some(AudioCodec::Dts),
+    };
+    selection.load(&mut video, &mut audio);
+    assert_eq!(video.state(), SessionState::Starved);
+    assert_eq!(audio.state(), SessionState::Starved);
+    let silent = StreamSelection {
+        audio: None,
+        ..selection
+    };
+    silent.load(&mut video, &mut audio);
+    assert_eq!(video.state(), SessionState::Starved);
+    assert_eq!(audio.state(), SessionState::Idle);
+    assert_eq!(audio.feed(&[1], None), Err(FeedError::Idle));
 }
 
 #[test]

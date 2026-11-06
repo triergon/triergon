@@ -1,5 +1,5 @@
-//! Bounded access-unit queue. The source used an unbounded channel; here a
-//! full queue refuses the access unit and the feeder keeps it (backpressure).
+//! Bounded access-unit queue. A full queue refuses the access unit and the
+//! feeder keeps it (backpressure).
 use std::collections::VecDeque;
 
 /// Capacity of one lane's pending input.
