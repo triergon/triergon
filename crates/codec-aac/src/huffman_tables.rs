@@ -2,8 +2,8 @@
 //! ISO/IEC 14496-3 Annex 4.A (AAC spectral / scalefactor), Annex 4.A.6.1 (SBR) and
 //! Annex 8.B (Parametric Stereo) from the implementer's knowledge of the standard.
 //! Every table is checked by unit tests for Kraft equality and the prefix property;
-//! see `harness/codecs/aac/STATUS.md` for the provenance notes (codebook 1 and some SBR
-//! balance-table tails were reconstructed and then validated against the oracle).
+//! codebook 1 and some SBR balance-table tails were reconstructed and then validated
+//! against the oracle.
 //! Generated once from a scratch transcription; edit by hand with care.
 
 /// ISO/IEC 14496-3 Table 4.A.1 - scalefactor Huffman codebook (index = dpcm + 60).
@@ -1937,8 +1937,8 @@ pub(crate) static SBR_T_ENVBAL30: [(u32, u8); 25] = [
 
 /// SBR 3 dB frequency balance. The nine central deltas are interleaved
 /// with a frequency-only escape branch for magnitudes five through twelve.
-/// Codeword evidence: the independently represented FAAD2 and FFmpeg trees
-/// agree on all 25 (delta, word, length) triples; see the D4 AAC provenance.
+/// The independently represented FAAD2 and FFmpeg trees agree on all 25
+/// (delta, word, length) triples.
 pub(crate) static SBR_F_ENVBAL30: [(u32, u8); 25] = [
     (0x1ff7, 13),
     (0x1ff8, 13),

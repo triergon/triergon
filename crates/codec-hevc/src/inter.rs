@@ -991,7 +991,7 @@ pub fn put_weighted_bi<P: Pixel>(
 mod bench {
     use super::*;
 
-    /// Development micro-benchmark (not evidence).
+    /// Development micro-benchmark.
     #[test]
     #[ignore]
     fn bench_mc() {

@@ -114,7 +114,7 @@ pub struct DownmixCodes {
     pub lfemixlevcod: Option<u8>,
 }
 
-/// Coding tools used by a syncframe (diagnostics / STATUS reporting).
+/// Coding tools used by a syncframe (diagnostics).
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct FrameFeatures {
     pub coupling: bool,

@@ -1,4 +1,4 @@
-//! H.265 / HEVC Annex-B video decoder (ITU-T H.265). Pure safe Rust. Not yet qualified.
+//! H.265 / HEVC Annex-B video decoder (ITU-T H.265). Pure safe Rust.
 //!
 //! Selected feature set: Main, Main 10 and Main Still Picture profiles (4:2:0, 8/10-bit).
 //! Range extension, screen content coding and multi-layer tools are refused with

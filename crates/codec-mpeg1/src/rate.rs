@@ -240,9 +240,7 @@ impl RateControl {
 mod header_budget_tests {
     use super::*;
 
-    // Baseline driver: the old encoder has already emitted these headers but
-    // its real begin() API accepts no header count. Call that real API once.
-    // Candidate driver passes the same actual count to the new private API.
+    // Passes the actual header bit count to begin().
     fn after_headers(rc: &mut RateControl, kind: Kind, activity: f64, header_bits: usize) -> Plan {
         rc.begin(kind, activity, header_bits)
     }

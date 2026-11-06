@@ -3,7 +3,7 @@
 //!
 //! Without references only structure is checked (format, sample counts, error counts as
 //! observed from FFmpeg 9.0.2). With `AAC_REF_DIR` pointing at FFmpeg float references
-//! (`<name>.f32`, made by `ffmpeg -f aac -i X -f f32le -c:a pcm_f32le`) the frozen numeric
+//! (`<name>.f32`, made by `ffmpeg -f aac -i X -f f32le -c:a pcm_f32le`) the numeric
 //! rules are applied to the vectors listed in `NUMERIC` (core, SBR and PS).
 use std::path::PathBuf;
 use triergon_codec_aac::{AudioFrame, Decoder, adts};

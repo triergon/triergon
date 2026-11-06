@@ -2,7 +2,7 @@
 //! forward motion compensation, one slice per picture, closed GOPs
 //! with a sequence header before every I picture, and VBV-constrained rate
 //! control. Each `encode` call returns that picture's complete bytes; there
-//! is no reordering delay (contract difference D1).
+//! is no reordering delay.
 
 #![forbid(unsafe_code)]
 

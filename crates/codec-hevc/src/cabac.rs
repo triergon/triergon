@@ -517,7 +517,7 @@ mod tests {
 mod bench {
     use super::*;
 
-    /// Development micro-benchmark (not evidence).
+    /// Development micro-benchmark.
     #[test]
     #[ignore]
     fn bench_cabac() {

@@ -383,7 +383,7 @@ mod tests {
 mod bench {
     use super::*;
 
-    /// Development micro-benchmark (not evidence): cargo test --release -- --ignored --nocapture bench_idct
+    /// Development micro-benchmark: cargo test --release -- --ignored --nocapture bench_idct
     #[test]
     #[ignore]
     fn bench_idct() {

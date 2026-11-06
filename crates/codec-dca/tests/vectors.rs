@@ -209,7 +209,7 @@ vector!(
     "dcadec-suite/xxch_71_24_48_2046.dtshd"
 );
 
-/// XLL-only stream: no core substream, nothing to decode (outside the D4 core contract).
+/// XLL-only stream: no core substream, nothing to decode (outside the core contract).
 #[test]
 fn xll_without_core_has_no_core_frames() {
     let Some(bytes) = core_stream("dcadec-suite/xll_51_24_48_none.dtshd") else {

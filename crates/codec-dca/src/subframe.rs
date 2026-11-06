@@ -96,9 +96,9 @@ impl SubBuf {
 
 /// Saturate a reconstructed subband sample to the 24-bit range.
 ///
-/// Not specified by ETSI TS 102 114; FFmpeg (the D4 reference) saturates dequantized and
+/// Not specified by ETSI TS 102 114; FFmpeg (the reference) saturates dequantized and
 /// ADPCM-reconstructed subband samples at [-2^23, 2^23 - 1] (observed with the
-/// `scalehigh` and `adpcm_ovf` synthetic streams, STATUS.md).
+/// `scalehigh` and `adpcm_ovf` synthetic streams).
 #[inline]
 pub(crate) fn sat24(v: f32) -> f32 {
     v.clamp(-8_388_608.0, 8_388_607.0)
@@ -327,7 +327,7 @@ pub(crate) fn decode_subframe(
         let s = SCALE_7BIT[si] as f32 * 0.035;
         for k in 0..count {
             // Decimated LFE samples saturate to the 24-bit PCM range (observed FFmpeg
-            // behaviour; see STATUS.md "LFE saturation").
+            // behaviour).
             lfe[k] = (q[k] as f32 * s).clamp(-8_388_608.0, 8_388_607.0);
         }
     }

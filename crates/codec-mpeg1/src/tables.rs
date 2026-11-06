@@ -1,7 +1,7 @@
 //! Normative ISO/IEC 11172-2 Annex B variable-length codes, written as
 //! (code, length) pairs. The same tables appear in ITU-T H.262 Annex B
 //! (B.1, B.3, B.4, B.12, B.13, B.14), which is the freely available text used
-//! as evidence. `tests` checks prefix-freedom and the Kraft sums.
+//! as the source. `tests` checks prefix-freedom and the Kraft sums.
 //!
 //! Binary literals are grouped in fours from the most significant bit, as the
 //! standard prints the codes, so they can be checked against the tables.

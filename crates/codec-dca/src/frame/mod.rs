@@ -121,7 +121,7 @@ impl Decoder {
         }
         // FFmpeg (reference) loses the ADPCM and LFE histories whenever a frame needs more
         // subband samples than any frame since the last reset (observed with the
-        // `lfe_mixed` / `size_changes_adpcm` synthetic streams; STATUS.md).
+        // `lfe_mixed` / `size_changes_adpcm` synthetic streams).
         let grows = h.blocks > self.max_blocks;
         if grows {
             self.max_blocks = h.blocks;

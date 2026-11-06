@@ -1,4 +1,4 @@
-//! Development timing aid (not qualification evidence): decode an elementary stream
+//! Development timing aid: decode an elementary stream
 //! `reps` times in-process and report wall time per pass.
 //!
 //! usage: bench <input> [reps]

@@ -1,4 +1,4 @@
-//! DTS Coherent Acoustics core decoder (ETSI TS 102 114). Pure safe Rust. Not yet qualified.
+//! DTS Coherent Acoustics core decoder (ETSI TS 102 114). Pure safe Rust.
 //!
 //! Input: one complete DTS core frame per call (16-bit or 14-bit word packing, big or
 //! little endian), optionally followed by the core-embedded XCh / X96 extensions that
@@ -63,9 +63,9 @@ const MAX_SLOTS: usize = 8;
 const OUT_SCALE: f64 = 1.0 / 8_388_608.0;
 /// Synthesis gain applied to the C.3.6 prototype: the 0.25 of the modulation stage times
 /// 2^7.5. C.3.6 leaves its output `rScale` unspecified; 2^7.5 is the black-box
-/// calibration against FFmpeg's float output (`harness/codecs/dca/STATUS.md`).
+/// calibration against FFmpeg's float output.
 const QMF_GAIN: f64 = 0.25 * 128.0 * std::f64::consts::SQRT_2;
-/// X96 64-band synthesis gain (black-box calibration, see STATUS.md).
+/// X96 64-band synthesis gain (black-box calibration).
 const QMF64_GAIN: f64 = 0.25 * 256.0 * std::f64::consts::SQRT_2;
 
 #[derive(Clone, Copy, PartialEq, Eq, Default)]
@@ -163,7 +163,7 @@ impl Decoder {
         self.scratch = scratch;
         // A failed frame is dropped without touching the synthesis, LFE or ADPCM history,
         // so the next frame continues as if the failed one were absent (FFmpeg's
-        // behaviour; synthetic `bad_dsync5` check in STATUS.md).
+        // behaviour; checked with the synthetic `bad_dsync5` stream).
         res
     }
 }

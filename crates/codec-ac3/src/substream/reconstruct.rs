@@ -173,7 +173,7 @@ impl Substream {
         }
     }
 
-    /// FFmpeg 9.0.2 compatibility (observed black-box, see STATUS.md): the first audio
+    /// FFmpeg 9.0.2 compatibility (observed black-box): the first audio
     /// block in which the full-bandwidth channels use different transform lengths
     /// rewrites the overlap delay lines of the coded channels before the inverse
     /// transform as if a previously down-mixed delay had to be up-mixed. A/52 does not

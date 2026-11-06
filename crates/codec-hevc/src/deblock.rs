@@ -714,7 +714,7 @@ mod bench {
     use super::*;
     use crate::picture::Plane;
 
-    /// Development micro-benchmark (not evidence).
+    /// Development micro-benchmark.
     #[test]
     #[ignore]
     fn bench_deblock() {
