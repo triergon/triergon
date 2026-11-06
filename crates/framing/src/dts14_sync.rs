@@ -10,9 +10,6 @@ use triergon_core::{
     SourceCapabilities, SourceFailure, SourceId, SourceLocation, Step, WorkBudget,
 };
 
-/// Guard-only RED overlay uses this exact diagnostic; candidate never emits it.
-pub const DTS14_SYNC_PENDING: &str = "DTS14 source-sync envelope pending parent runtime RED";
-
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Dts14SyncLimits {
     pub maximum_physical_frame_bytes: usize,

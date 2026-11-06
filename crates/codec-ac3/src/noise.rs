@@ -3,7 +3,7 @@
 const LEGACY_SEED: u32 = 0x2545_f491;
 const SIGNED_UNIT: f32 = 1.0 / 2_147_483_648.0;
 
-/// FFmpeg 9.0.2 seed-zero state, generated as data by generate_seed.py.
+/// FFmpeg 9.0.2 seed-zero state.
 /// The first eight slots are overwritten before they can be read.
 const SEED_ZERO: [u32; 64] = [
     0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000,

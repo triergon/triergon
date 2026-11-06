@@ -5,8 +5,7 @@ use triergon_core::{
     SourceId, Step, WorkBudget,
 };
 use triergon_framing::{
-    DTS14_SYNC_PENDING, Dts14BoundaryEvidence, Dts14SyncFrame, Dts14SyncLimits, Dts14SyncReader,
-    DtsWordOrder,
+    Dts14BoundaryEvidence, Dts14SyncFrame, Dts14SyncLimits, Dts14SyncReader, DtsWordOrder,
 };
 use triergon_harness_protocol::unhex;
 
@@ -125,9 +124,6 @@ fn collect(
 fn class(error: Option<Error>) -> &'static str {
     match error {
         None => "end",
-        Some(Error::Unsupported(reason)) if reason == DTS14_SYNC_PENDING => {
-            panic!("parent RED guard observed: {reason}")
-        }
         Some(Error::Unsupported(_)) => "unsupported",
         Some(Error::Truncated) => "truncated",
         Some(other) => panic!("unexpected source-case error: {other:?}"),

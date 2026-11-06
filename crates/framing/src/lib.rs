@@ -95,8 +95,7 @@ pub use vp9_config::{
 
 mod dts14_sync;
 pub use dts14_sync::{
-    DTS14_SYNC_PENDING, Dts14BoundaryEvidence, Dts14SyncFacts, Dts14SyncFrame, Dts14SyncLimits,
-    Dts14SyncReader,
+    Dts14BoundaryEvidence, Dts14SyncFacts, Dts14SyncFrame, Dts14SyncLimits, Dts14SyncReader,
 };
 
 mod dts_normal;
@@ -104,8 +103,8 @@ mod dts_packed;
 mod dts_packed_header;
 
 pub use dts_normal::{
-    DTS_NORMAL_PENDING, DtsCarrierTail, DtsExtentRelation, DtsNormalBoundary, DtsNormalFacts,
-    DtsNormalLimits, DtsNormalSourceFrame, DtsNormalSourceReader,
+    DtsCarrierTail, DtsExtentRelation, DtsNormalBoundary, DtsNormalFacts, DtsNormalLimits,
+    DtsNormalSourceFrame, DtsNormalSourceReader,
 };
 pub use dts_packed::{DtsPackedLimits, DtsPackedPayload, DtsPackedPayloadJob, DtsPacking};
 pub use dts_packed_header::{DtsPackedHeader, inspect_dts_header_bits};
