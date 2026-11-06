@@ -14514,6 +14514,13 @@
    "key": "evidence/progressive-current-gate-build/fb8a3a3b1f7f3d687254a3f4c1849dede7a78bc3c62dbc7905b09a45f675709d.tar.gz",
    "sha256": "fb8a3a3b1f7f3d687254a3f4c1849dede7a78bc3c62dbc7905b09a45f675709d",
    "source_revision": "5ec7c1f8a7816b1427631f22a8ca77ba74abeeee"
+  },
+  {
+   "name": "mp4-range-playback-linux-arm64",
+   "retention": "retained",
+   "reason": "MP4 range playback status row",
+   "key": "evidence/mp4-range-playback-linux-arm64/475345439338ad74a057e89ffaf8837a508c5f4e6e110916de12a1ec5048646d.tar.gz",
+   "sha256": "475345439338ad74a057e89ffaf8837a508c5f4e6e110916de12a1ec5048646d"
   }
  ]
 }
