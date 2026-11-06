@@ -1,0 +1,15 @@
+[package]
+name = "triergon-codec"
+version = "0.0.0"
+description = "Decoder vocabulary shared by the codec crates: traits, audio frames and channel layouts"
+repository.workspace = true
+license.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+
+[dependencies]
+triergon-pixel = { path = "../pixel" }
+
+[lints]
+workspace = true

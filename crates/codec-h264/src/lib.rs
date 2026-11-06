@@ -39,6 +39,7 @@ use slice::{SliceHeader, SliceType};
 use slicedec::{ColInfo, CurPic, Refs, SliceCtx, SliceDecoder, Wp};
 use std::collections::VecDeque;
 use tables::*;
+use triergon_codec::{Colour, DecodeFailure, PictureView, VideoDecoder};
 
 pub use nal::NalIter as AnnexBNalIter;
 
@@ -176,6 +177,8 @@ pub struct Decoder {
     dpb: Vec<FrameStore>,
     active: Option<ActivePic>,
     out: VecDeque<Picture>,
+    /// The picture the last [`VideoDecoder::receive`] view borrows.
+    held: Option<Picture>,
     poc_state: PocState,
     max_lt_idx: Option<u32>,
     uid: u32,
@@ -257,6 +260,7 @@ impl Decoder {
             dpb: Vec::new(),
             active: None,
             out: VecDeque::new(),
+            held: None,
             poc_state: PocState::default(),
             max_lt_idx: None,
             uid: 0,
@@ -1182,5 +1186,50 @@ impl Decoder {
     /// Number of NAL units that failed to decode so far (diagnostics).
     pub fn error_count(&self) -> u64 {
         self.errors
+    }
+}
+
+/// The session view of the decoder. A received picture is held until the next call, so
+/// its frame buffer returns to the spare pool exactly when the inherent API's would.
+impl VideoDecoder for Decoder {
+    fn send(&mut self, au: &[u8], pts: Option<i64>) -> Result<(), DecodeFailure> {
+        self.held = None;
+        Decoder::send(self, au, pts).map_err(DecodeFailure::from_error)
+    }
+    fn receive(&mut self) -> Option<PictureView<'_>> {
+        self.held = self.out.pop_front();
+        let picture = self.held.as_ref()?;
+        fn plane(p: &Plane) -> triergon_codec::Plane<'_> {
+            let (data, stride, offset) = p.raw();
+            triergon_codec::Plane::U8 {
+                data,
+                stride,
+                offset,
+            }
+        }
+        Some(PictureView {
+            width: picture.width,
+            height: picture.height,
+            bit_depth: picture.bit_depth as u8,
+            planes: [
+                plane(&picture.planes[0]),
+                plane(&picture.planes[1]),
+                plane(&picture.planes[2]),
+            ],
+            pts: picture.pts,
+            sar: picture.sar,
+            colour: Colour {
+                matrix: picture.colour.matrix,
+                full_range: picture.colour.full_range,
+            },
+        })
+    }
+    fn flush(&mut self) {
+        self.held = None;
+        Decoder::flush(self);
+    }
+    fn reset(&mut self) {
+        self.held = None;
+        Decoder::reset(self);
     }
 }

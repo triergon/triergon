@@ -116,7 +116,7 @@ fn fate_vectors_frame_counts_layouts_and_coarse_values() {
             frame.clear();
             if let Ok(info) = dec.decode(&data[pos..end], &mut frame) {
                 frames += 1;
-                layout = info.layout.layout_name();
+                layout = triergon_codec_ac3::layout_name(&info.layout);
                 for i in 0..frame.samples_per_channel {
                     for p in &frame.planes {
                         interleaved.push(p[i]);

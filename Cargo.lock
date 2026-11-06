@@ -28,21 +28,38 @@ dependencies = [
 ]
 
 [[package]]
+name = "triergon-codec"
+version = "0.0.0"
+dependencies = [
+ "triergon-pixel",
+]
+
+[[package]]
 name = "triergon-codec-aac"
 version = "0.0.0"
+dependencies = [
+ "triergon-codec",
+]
 
 [[package]]
 name = "triergon-codec-ac3"
 version = "0.0.0"
+dependencies = [
+ "triergon-codec",
+]
 
 [[package]]
 name = "triergon-codec-dca"
 version = "0.0.0"
+dependencies = [
+ "triergon-codec",
+]
 
 [[package]]
 name = "triergon-codec-h264"
 version = "0.0.0"
 dependencies = [
+ "triergon-codec",
  "triergon-harness-protocol",
 ]
 
@@ -50,6 +67,7 @@ dependencies = [
 name = "triergon-codec-hevc"
 version = "0.0.0"
 dependencies = [
+ "triergon-codec",
  "triergon-harness-protocol",
 ]
 

@@ -4,13 +4,17 @@
 //! size. [`convert`] turns caller RGBA into it with ITU-R BT.601 limited-range
 //! coefficients (the capture contract in `research/capture/contract.json`).
 //!
+//! [`PictureView`] borrows a decoder's output picture.
+//!
 //! Experimental; nothing here is qualified on its own.
 #![forbid(unsafe_code)]
 
 pub mod convert;
 mod error;
 mod picture;
+mod view;
 
 pub use convert::{Converter, Orientation, rgba_to_yuv420};
 pub use error::{Error, Result};
 pub use picture::{Geometry, Picture};
+pub use view::{Colour, PictureView, Plane};

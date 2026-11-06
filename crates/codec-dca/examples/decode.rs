@@ -130,9 +130,7 @@ fn main() {
                 if first.is_none() {
                     first = Some((
                         frame.sample_rate,
-                        frame
-                            .layout
-                            .layout_name()
+                        triergon_codec_dca::layout_name(&frame.layout)
                             .map(str::to_string)
                             .unwrap_or_else(|| {
                                 let names: Vec<&str> =

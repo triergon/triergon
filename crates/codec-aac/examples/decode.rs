@@ -3,7 +3,7 @@
 //!
 //! usage: decode IN.aac OUT.f32
 use std::io::Write;
-use triergon_codec_aac::{AudioFrame, Decoder, adts};
+use triergon_codec_aac::{AudioFrame, Decoder, adts, layout_name};
 
 fn main() {
     let args: Vec<String> = std::env::args().collect();
@@ -38,7 +38,7 @@ fn main() {
                 frames += 1;
                 let key = (
                     frame.sample_rate,
-                    frame.layout.describe(),
+                    layout_name(&frame.layout),
                     frame.planes.len(),
                 );
                 if last.as_ref() != Some(&key) {

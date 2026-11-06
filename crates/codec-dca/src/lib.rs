@@ -3,7 +3,7 @@
 //! Input: one complete DTS core frame per call (16-bit or 14-bit word packing, big or
 //! little endian), optionally followed by the core-embedded XCh / X96 extensions that
 //! live inside the frame. Output: planar `f32` at full scale 1.0 in FFmpeg's native
-//! channel order for the stream (see [`Speaker`] and [`ChannelLayout`]).
+//! channel order for the stream (see [`triergon_codec::layout`]).
 #![forbid(unsafe_code)]
 #![allow(clippy::needless_range_loop, clippy::too_many_arguments)]
 
@@ -27,10 +27,12 @@ pub mod vq;
 mod x96;
 
 pub use pack::Packing;
+pub use triergon_codec::{AudioFrame, ChannelLayout, Speaker};
 
 use lfe::{Lfe2x, LfeFir, LfeState};
 use qmf::{Qmf, QmfState};
 use subframe::{SideInfo, SubBuf};
+use triergon_codec::{AudioDecoder, DecodeFailure, DownmixLevels};
 
 /// Typed decode failure. The decoder never panics on malformed input.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -54,126 +56,6 @@ impl core::fmt::Display for DecodeError {
 }
 
 impl std::error::Error for DecodeError {}
-
-/// Loudspeaker position of an output plane. The discriminant is FFmpeg's channel bit
-/// index (`AV_CHAN_*`), and planes are emitted in ascending discriminant order, which is
-/// FFmpeg's native order for the layouts this decoder produces.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
-#[repr(u8)]
-pub enum Speaker {
-    FrontLeft = 0,
-    FrontRight = 1,
-    FrontCenter = 2,
-    LowFrequency = 3,
-    BackLeft = 4,
-    BackRight = 5,
-    FrontLeftOfCenter = 6,
-    FrontRightOfCenter = 7,
-    BackCenter = 8,
-    SideLeft = 9,
-    SideRight = 10,
-}
-
-impl Speaker {
-    /// FFmpeg's short channel name.
-    pub fn name(self) -> &'static str {
-        match self {
-            Speaker::FrontLeft => "FL",
-            Speaker::FrontRight => "FR",
-            Speaker::FrontCenter => "FC",
-            Speaker::LowFrequency => "LFE",
-            Speaker::BackLeft => "BL",
-            Speaker::BackRight => "BR",
-            Speaker::FrontLeftOfCenter => "FLC",
-            Speaker::FrontRightOfCenter => "FRC",
-            Speaker::BackCenter => "BC",
-            Speaker::SideLeft => "SL",
-            Speaker::SideRight => "SR",
-        }
-    }
-}
-
-/// Speaker position of each output plane, in plane order.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub struct ChannelLayout {
-    speakers: [Speaker; 8],
-    count: u8,
-}
-
-impl Default for ChannelLayout {
-    fn default() -> Self {
-        Self {
-            speakers: [Speaker::FrontCenter; 8],
-            count: 0,
-        }
-    }
-}
-
-impl ChannelLayout {
-    /// Speakers in plane order.
-    pub fn speakers(&self) -> &[Speaker] {
-        &self.speakers[..self.count as usize]
-    }
-
-    /// Number of planes.
-    pub fn channels(&self) -> usize {
-        self.count as usize
-    }
-
-    /// Conventional name of this speaker set (e.g. `5.1(side)`, as ffprobe prints it), or `None` when it is
-    /// not one of the named layouts.
-    pub fn layout_name(&self) -> Option<&'static str> {
-        use Speaker::*;
-        Some(match self.speakers() {
-            [FrontCenter] => "mono",
-            [FrontLeft, FrontRight] => "stereo",
-            [FrontLeft, FrontRight, LowFrequency] => "2.1",
-            [FrontLeft, FrontRight, FrontCenter] => "3.0",
-            [FrontLeft, FrontRight, BackCenter] => "3.0(back)",
-            [FrontLeft, FrontRight, FrontCenter, BackCenter] => "4.0",
-            [FrontLeft, FrontRight, FrontCenter, LowFrequency, BackCenter] => "4.1",
-            [FrontLeft, FrontRight, SideLeft, SideRight] => "quad(side)",
-            [FrontLeft, FrontRight, FrontCenter, LowFrequency] => "3.1",
-            [FrontLeft, FrontRight, FrontCenter, SideLeft, SideRight] => "5.0(side)",
-            [
-                FrontLeft,
-                FrontRight,
-                FrontCenter,
-                LowFrequency,
-                SideLeft,
-                SideRight,
-            ] => "5.1(side)",
-            [
-                FrontLeft,
-                FrontRight,
-                FrontCenter,
-                LowFrequency,
-                BackCenter,
-                SideLeft,
-                SideRight,
-            ] => "6.1",
-            [
-                FrontLeft,
-                FrontRight,
-                FrontCenter,
-                BackCenter,
-                SideLeft,
-                SideRight,
-            ] => "6.0",
-            _ => return None,
-        })
-    }
-}
-
-/// Decoded audio of one frame.
-#[derive(Clone, Debug, Default)]
-pub struct AudioFrame {
-    pub sample_rate: u32,
-    pub layout: ChannelLayout,
-    pub samples_per_channel: usize,
-    /// One plane per channel in `layout` order; each holds `samples_per_channel` samples.
-    pub planes: Vec<Vec<f32>>,
-}
 
 /// Maximum coded primary channels (core 5 + extension channels).
 const MAX_SLOTS: usize = 8;
@@ -284,4 +166,63 @@ impl Decoder {
         // behaviour; synthetic `bad_dsync5` check in STATUS.md).
         res
     }
+}
+
+impl AudioDecoder for Decoder {
+    fn decode(
+        &mut self,
+        au: &[u8],
+        out: &mut AudioFrame,
+    ) -> Result<Option<DownmixLevels>, DecodeFailure> {
+        out.clear();
+        Decoder::decode(self, au, out).map_err(DecodeFailure::from_error)?;
+        Ok(None)
+    }
+    fn reset(&mut self) {
+        Decoder::reset(self);
+    }
+}
+
+/// Conventional name of this speaker set (e.g. `5.1(side)`, as ffprobe prints it), or
+/// `None` when it is not one of the named layouts.
+pub fn layout_name(layout: &ChannelLayout) -> Option<&'static str> {
+    use Speaker::*;
+    Some(match layout.speakers() {
+        [FrontCenter] => "mono",
+        [FrontLeft, FrontRight] => "stereo",
+        [FrontLeft, FrontRight, LowFrequency] => "2.1",
+        [FrontLeft, FrontRight, FrontCenter] => "3.0",
+        [FrontLeft, FrontRight, BackCenter] => "3.0(back)",
+        [FrontLeft, FrontRight, FrontCenter, BackCenter] => "4.0",
+        [FrontLeft, FrontRight, FrontCenter, LowFrequency, BackCenter] => "4.1",
+        [FrontLeft, FrontRight, SideLeft, SideRight] => "quad(side)",
+        [FrontLeft, FrontRight, FrontCenter, LowFrequency] => "3.1",
+        [FrontLeft, FrontRight, FrontCenter, SideLeft, SideRight] => "5.0(side)",
+        [
+            FrontLeft,
+            FrontRight,
+            FrontCenter,
+            LowFrequency,
+            SideLeft,
+            SideRight,
+        ] => "5.1(side)",
+        [
+            FrontLeft,
+            FrontRight,
+            FrontCenter,
+            LowFrequency,
+            BackCenter,
+            SideLeft,
+            SideRight,
+        ] => "6.1",
+        [
+            FrontLeft,
+            FrontRight,
+            FrontCenter,
+            BackCenter,
+            SideLeft,
+            SideRight,
+        ] => "6.0",
+        _ => return None,
+    })
 }

@@ -6,10 +6,10 @@ use crate::bits::BitReader;
 use crate::error::{DecodeError, Feature, Result};
 use crate::filterbank::Filterbank;
 use crate::ics::*;
-use crate::layout::{ChannelLayout, Speaker};
 use crate::pce::{Pce, parse_pce};
 use crate::tables::SAMPLE_RATES;
 use crate::{ltp, pred, sbr};
+use triergon_codec::{ChannelLayout, Speaker};
 
 pub(crate) const ID_SCE: u8 = 0;
 pub(crate) const ID_CPE: u8 = 1;
@@ -234,12 +234,11 @@ impl Core {
             entries.sort_by_key(|e| e.0);
         }
         self.plane_of = vec![[usize::MAX; 2]; self.slots.len()];
-        let mut sp = Vec::new();
         for (p, e) in entries.iter().enumerate() {
             self.plane_of[e.1][e.2] = p;
-            sp.push(e.0);
         }
-        self.layout = ChannelLayout::from_speakers(&sp);
+        // A PCE yields one slot per listed element: at most CAPACITY planes.
+        self.layout = ChannelLayout::new(entries.iter().map(|e| e.0)).expect("PCE channel bound");
     }
 
     fn element_index(&mut self, kind: u8, tag: u8, occurrence: usize) -> Option<usize> {
