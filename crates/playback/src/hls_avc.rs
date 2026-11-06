@@ -8,7 +8,6 @@ use crate::{TrackKey, TsNativeCarriage, TsNativeConfiguration};
 use std::sync::atomic::{AtomicBool, Ordering};
 use triergon_core::{
     Budget, BudgetVec, BudgetVecIntoIter, Bytes, Error, Result, SourceId, WorkBudget,
-    nonzero_prefix_len,
 };
 use triergon_framing::{Codec, NalHeader};
 use triergon_mpegts::compat::pes::{
@@ -465,12 +464,12 @@ impl AvcTsReader {
                     return Ok(AvcTsStep::Yield);
                 }
                 let first = available[0];
-                // Between prefix candidates, append a whole nonzero run. All
-                // possible cross-span prefixes are still handled bytewise.
+                // Within a NAL, isolated zeros followed by data cannot
+                // begin a start code. Leave possible split prefixes for accept.
                 let copy =
                     if first != 0 && self.prefix.is_none() && self.zeroes < 2 && self.nal.is_some()
                     {
-                        nonzero_prefix_len(&available[..count])
+                        nal_body_prefix_len(&available[..count])
                     } else {
                         1
                     };
@@ -726,6 +725,28 @@ impl AvcTsReader {
             idr: picture.idr,
         })
     }
+}
+
+fn nal_body_prefix_len(bytes: &[u8]) -> usize {
+    let mut rest = bytes;
+    while let Some((chunk, tail)) = rest.split_first_chunk::<8>()
+        && let Some(&next) = tail.first()
+    {
+        let word = u64::from_le_bytes(*chunk);
+        let adjacent = word | (word >> 8) | (u64::from(next) << 56);
+        let zero_pairs =
+            adjacent.wrapping_sub(0x0101_0101_0101_0101) & !adjacent & 0x8080_8080_8080_8080;
+        if zero_pairs != 0 {
+            // Borrow can mark a later byte. The first mark always starts a zero pair.
+            return bytes.len() - rest.len() + zero_pairs.trailing_zeros() as usize / 8;
+        }
+        rest = tail;
+    }
+    bytes.len() - rest.len()
+        + rest
+            .windows(2)
+            .position(|pair| pair == [0, 0])
+            .unwrap_or_else(|| rest.len() - usize::from(rest.last() == Some(&0)))
 }
 
 fn append(buffer: &mut BudgetVec<u8>, bytes: &[u8], limit: usize) -> Result<()> {
