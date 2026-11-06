@@ -190,6 +190,10 @@ rejects boxes extending past the source.
   the MOV comparison worker's open and native-index operations require the
   accumulated decode end to be at most `i64::MAX`. Source indexes retain the
   unsigned origin and exact end. Higher starts use the native clock projection.
+- **Comparison sample entries.** The MOV comparison worker checks configuration
+  boxes in raw visual entries before publishing streams. A nonempty Opus
+  configuration shorter than 11 payload bytes fails the comparison operation.
+  Source inspection retains the original entry and its child boxes.
 - **Surplus timing entries.** `SampleTableBuilder::with_timing_policy`
   accepts `TimingRunPolicy::BoundedPrefix` for the QuickTime-compatible
   interpretation of overlong timing runs. The last decode run may cross
