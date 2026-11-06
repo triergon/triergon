@@ -14,6 +14,8 @@ use triergon_mpegts::{
     psi::{PatTable, ProgramMap},
 };
 
+const TS_CLOCK_RATE: u32 = 90_000;
+
 #[derive(Clone, Copy, Debug, Default)]
 pub struct TsProgressiveLimits {
     pub transport: ParseLimits,
@@ -68,6 +70,12 @@ struct Tracks {
     epoch: u64,
 }
 
+#[derive(Clone, Copy)]
+enum NextAudioTime {
+    Ticks90(i64),
+    Exact(Time),
+}
+
 /// One sequential stream with a stable PAT/PMT and clock, one unambiguous
 /// AVC track and one unambiguous ADTS AAC track. AVC must start with a
 /// delimited IDR and pictures need PTS. One leading SEI NAL in the first
@@ -91,7 +99,7 @@ pub struct TsProgressiveReader<S: Source> {
     video: Option<AvcTsReader>,
     audio: Option<HlsAac>,
     saw_video: bool,
-    audio_times: Option<(Time, Time)>,
+    audio_times: Option<(Time, NextAudioTime)>,
 }
 
 impl<S: Source> TsProgressiveReader<S> {
@@ -241,7 +249,11 @@ impl<S: Source> TsProgressiveReader<S> {
                 let audio = self.audio.as_mut().ok_or(Error::Closed)?;
                 match audio.poll(work, cancel)? {
                     AssemblyStep::Output(frame) => {
-                        let presentation = self.audio_presentation(&frame)?;
+                        let presentation = audio_presentation(
+                            &mut self.audio_times,
+                            frame.pts.or(frame.dts),
+                            frame.duration,
+                        )?;
                         return Ok(TsProgressiveStep::Unit(TsProgressiveUnit::Audio {
                             frame,
                             presentation,
@@ -386,30 +398,55 @@ impl<S: Source> TsProgressiveReader<S> {
             })
     }
 
-    fn audio_presentation(&mut self, frame: &HlsAacFrame) -> Result<Time> {
-        let presentation = frame
-            .pts
-            .or(frame.dts)
-            .or(self.audio_times.map(|(_, next)| next))
-            .ok_or(Error::Unsupported(
-                "progressive AAC starts without PES time",
-            ))?;
-        if self
-            .audio_times
-            .is_some_and(|(previous, _)| presentation < previous)
-        {
-            return Err(Error::Invalid("progressive AAC timestamps move backwards"));
-        }
-        self.audio_times = Some((presentation, presentation.checked_add(frame.duration)?));
-        Ok(presentation)
-    }
-
     fn fail(&mut self) {
         self.phase = Phase::Failed;
         self.player = None;
         self.video = None;
         self.audio = None;
     }
+}
+
+fn audio_presentation(
+    times: &mut Option<(Time, NextAudioTime)>,
+    anchor: Option<Time>,
+    duration: Time,
+) -> Result<Time> {
+    let (presentation, ticks) = if let Some(anchor) = anchor {
+        if times.is_some_and(|(previous, _)| anchor < previous) {
+            return Err(Error::Invalid("progressive AAC timestamps move backwards"));
+        }
+        (anchor, exact_ticks90(anchor))
+    } else {
+        // The positive ADTS duration already makes the carried time monotone.
+        match times.map(|(_, next)| next) {
+            Some(NextAudioTime::Ticks90(ticks)) => (
+                Time::new(i128::from(ticks), u128::from(TS_CLOCK_RATE))?,
+                Some(ticks),
+            ),
+            Some(NextAudioTime::Exact(next)) => (next, None),
+            None => {
+                return Err(Error::Unsupported(
+                    "progressive AAC starts without PES time",
+                ));
+            }
+        }
+    };
+    let next = match ticks.and_then(|ticks| ticks.checked_add(exact_ticks90(duration)?)) {
+        Some(next) => NextAudioTime::Ticks90(next),
+        None => NextAudioTime::Exact(presentation.checked_add(duration)?),
+    };
+    *times = Some((presentation, next));
+    Ok(presentation)
+}
+
+fn exact_ticks90(time: Time) -> Option<i64> {
+    let denominator = u32::try_from(time.denominator()).ok()?;
+    if !TS_CLOCK_RATE.is_multiple_of(denominator) {
+        return None;
+    }
+    i64::try_from(time.numerator())
+        .ok()?
+        .checked_mul(i64::from(TS_CLOCK_RATE / denominator))
 }
 
 fn pat_binding(table: &PatTable) -> triergon_core::Result<PatBinding> {
@@ -443,4 +480,62 @@ fn select_track(map: &ProgramMap, stream_type: u8) -> triergon_core::Result<Trac
         program: map.header.extension,
         pid: stream.pid,
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn integral_audio_ticks_match_exact_time_and_accept_a_fresh_anchor() {
+        let start = Time::new(-7, 90_000).unwrap();
+        let duration = Time::new(1024, 48_000).unwrap();
+        let mut times = None;
+        let mut expected = start;
+        for frame in 0..128 {
+            let anchor = (frame == 0).then_some(start);
+            assert_eq!(
+                audio_presentation(&mut times, anchor, duration),
+                Ok(expected)
+            );
+            expected = expected.checked_add(duration).unwrap();
+            assert!(matches!(times, Some((_, NextAudioTime::Ticks90(_)))));
+        }
+
+        let previous = times.unwrap().0;
+        assert_eq!(
+            audio_presentation(&mut times, Some(previous), duration),
+            Ok(previous)
+        );
+        assert_eq!(
+            audio_presentation(&mut times, Some(start), duration),
+            Err(Error::Invalid("progressive AAC timestamps move backwards"))
+        );
+    }
+
+    #[test]
+    fn fractional_durations_and_tick_overflow_keep_exact_time() {
+        let start = Time::new(13, 90_000).unwrap();
+        let integral = Time::new(1024, 48_000).unwrap();
+        let fractional = Time::new(1024, 44_100).unwrap();
+        let mut times = None;
+        assert_eq!(
+            audio_presentation(&mut times, Some(start), integral),
+            Ok(start)
+        );
+        let next = start.checked_add(integral).unwrap();
+        assert_eq!(audio_presentation(&mut times, None, fractional), Ok(next));
+        let expected = next.checked_add(fractional).unwrap();
+        assert!(matches!(times, Some((_, NextAudioTime::Exact(next))) if next == expected));
+        assert_eq!(audio_presentation(&mut times, None, integral), Ok(expected));
+
+        let start = Time::new(i128::from(i64::MAX), 90_000).unwrap();
+        assert_eq!(
+            audio_presentation(&mut times, Some(start), integral),
+            Ok(start)
+        );
+        let expected = start.checked_add(integral).unwrap();
+        assert!(matches!(times, Some((_, NextAudioTime::Exact(next))) if next == expected));
+        assert_eq!(audio_presentation(&mut times, None, integral), Ok(expected));
+    }
 }
