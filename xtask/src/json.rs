@@ -35,22 +35,17 @@ impl Number {
         }
     }
 
-    /// Python's `==` between numbers: integers exactly, an integer and a float
-    /// only when the float is integral and equal.
+    /// Numeric equality as Python's `==` on ints, floats and `Decimal`s: exact
+    /// decimal values, so `48000 == 48000.0` and `1.50 == 1.5`, while an integer
+    /// beyond binary64 never equals a nearby float.
     pub fn equals(&self, other: &Number) -> bool {
-        match (self.is_integer(), other.is_integer()) {
-            (true, true) => self.0 == other.0,
-            (false, false) => self.as_f64() == other.as_f64(),
-            (true, false) => Self::int_float(&self.0, other.as_f64()),
-            (false, true) => Self::int_float(&other.0, self.as_f64()),
+        match (decimal(&self.0), decimal(&other.0)) {
+            (Some(a), Some(b)) => a == b,
+            _ => match (self.0.as_str(), other.0.as_str()) {
+                ("NaN", _) | (_, "NaN") => false,
+                (a, b) => a == b,
+            },
         }
-    }
-
-    fn int_float(int: &str, float: f64) -> bool {
-        if !float.is_finite() || float.fract() != 0.0 || float.abs() >= 1.7e38 {
-            return false;
-        }
-        int.parse::<i128>().is_ok_and(|i| i == float as i128)
     }
 
     pub fn text(&self) -> &str {
@@ -133,6 +128,86 @@ impl Value {
     pub fn strings<S: Into<String>>(items: impl IntoIterator<Item = S>) -> Value {
         Value::Array(items.into_iter().map(|s| Value::String(s.into())).collect())
     }
+}
+
+/// A finite JSON number as (negative, significant digits, exponent), normalised
+/// so equal values compare equal; `None` for `NaN` and infinities.
+fn decimal(text: &str) -> Option<(bool, String, i64)> {
+    let (negative, body) = text
+        .strip_prefix('-')
+        .map_or((false, text), |rest| (true, rest));
+    let (mantissa, exponent) = match body.find(['e', 'E']) {
+        Some(at) => (&body[..at], body[at + 1..].parse::<i64>().ok()?),
+        None => (body, 0),
+    };
+    let (whole, fraction) = mantissa.split_once('.').unwrap_or((mantissa, ""));
+    if whole.is_empty()
+        || !whole
+            .bytes()
+            .chain(fraction.bytes())
+            .all(|b| b.is_ascii_digit())
+    {
+        return None;
+    }
+    let digits = format!("{whole}{fraction}");
+    let mut exponent = exponent - fraction.len() as i64;
+    let digits = digits.trim_start_matches('0');
+    let trimmed = digits.trim_end_matches('0');
+    exponent += (digits.len() - trimmed.len()) as i64;
+    if trimmed.is_empty() {
+        return Some((false, String::new(), 0));
+    }
+    Some((negative, trimmed.to_owned(), exponent))
+}
+
+/// Python's `str(Decimal(text))` for a JSON number's text.
+pub fn decimal_text(text: &str) -> String {
+    let (negative, body) = text
+        .strip_prefix('-')
+        .map_or((false, text), |rest| (true, rest));
+    let (mantissa, exponent) = match body.find(['e', 'E']) {
+        Some(at) => (&body[..at], body[at + 1..].parse::<i64>().unwrap_or(0)),
+        None => (body, 0),
+    };
+    let (whole, fraction) = mantissa.split_once('.').unwrap_or((mantissa, ""));
+    let raw = format!("{whole}{fraction}");
+    let coefficient = raw.trim_start_matches('0');
+    let coefficient = if coefficient.is_empty() {
+        "0"
+    } else {
+        coefficient
+    };
+    let exponent = exponent - fraction.len() as i64;
+    let adjusted = exponent + coefficient.len() as i64 - 1;
+    let sign = if negative { "-" } else { "" };
+    let text = if exponent <= 0 && adjusted >= -6 {
+        if exponent == 0 {
+            coefficient.to_owned()
+        } else {
+            let point = coefficient.len() as i64 + exponent;
+            if point > 0 {
+                format!(
+                    "{}.{}",
+                    &coefficient[..point as usize],
+                    &coefficient[point as usize..]
+                )
+            } else {
+                format!("0.{}{coefficient}", "0".repeat((-point) as usize))
+            }
+        }
+    } else {
+        let (first, rest) = coefficient.split_at(1);
+        let fraction = if rest.is_empty() {
+            String::new()
+        } else {
+            format!(".{rest}")
+        };
+        format!(
+            "{first}{fraction}E{}{adjusted}",
+            if adjusted >= 0 { "+" } else { "" }
+        )
+    };
+    format!("{sign}{text}")
 }
 
 /// The text Python writes back for a JSON number it read.
@@ -309,27 +384,44 @@ fn write_string(out: &mut String, s: &str) {
 
 #[derive(Debug, PartialEq)]
 pub struct Error {
-    pub message: &'static str,
+    pub message: String,
     pub line: usize,
     pub column: usize,
+    /// Character offset, as Python reports it.
+    pub offset: usize,
 }
 
 impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        if self.offset == usize::MAX {
+            // A protocol rule, not a syntax position.
+            return f.write_str(&self.message);
+        }
         write!(
             f,
-            "{}: line {} column {}",
-            self.message, self.line, self.column
+            "{}: line {} column {} (char {})",
+            self.message, self.line, self.column, self.offset
         )
     }
 }
 
 /// Parse one JSON document; surrounding whitespace is allowed, trailing data is not.
 pub fn parse(text: &str) -> Result<Value, Error> {
+    parse_with(text, false)
+}
+
+/// Strict protocol parsing: duplicate keys, `NaN` and `Infinity` and floats
+/// beyond binary64 are errors, and floats keep their exact decimal text.
+pub fn parse_strict(text: &str) -> Result<Value, Error> {
+    parse_with(text, true)
+}
+
+fn parse_with(text: &str, strict: bool) -> Result<Value, Error> {
     let mut parser = Parser {
         text: text.as_bytes(),
         pos: 0,
         depth: 0,
+        strict,
     };
     parser.whitespace();
     let value = parser.value()?;
@@ -346,20 +438,24 @@ struct Parser<'a> {
     text: &'a [u8],
     pos: usize,
     depth: usize,
+    strict: bool,
 }
 
 impl Parser<'_> {
-    fn error(&self, message: &'static str) -> Error {
+    fn error(&self, message: impl Into<String>) -> Error {
         let before = &self.text[..self.pos.min(self.text.len())];
         let line = before.iter().filter(|&&b| b == b'\n').count() + 1;
         let start = before
             .iter()
             .rposition(|&b| b == b'\n')
             .map_or(0, |i| i + 1);
+        // Python counts characters, not bytes.
+        let chars = |bytes: &[u8]| bytes.iter().filter(|&&b| b & 0xc0 != 0x80).count();
         Error {
-            message,
+            message: message.into(),
             line,
-            column: self.pos - start + 1,
+            column: chars(&before[start..]) + 1,
+            offset: chars(before),
         }
     }
 
@@ -425,6 +521,14 @@ impl Parser<'_> {
             }
             self.pos += 1;
             self.whitespace();
+            if self.strict && members.iter().any(|(k, _)| *k == key) {
+                return Err(Error {
+                    message: format!("duplicate JSON field: {key}"),
+                    line: 0,
+                    column: 0,
+                    offset: usize::MAX,
+                });
+            }
             members.push((key, self.value()?));
             self.whitespace();
             match self.peek() {
@@ -465,6 +569,14 @@ impl Parser<'_> {
         let start = self.pos;
         for word in ["NaN", "Infinity", "-Infinity"] {
             if self.literal(word) {
+                if self.strict {
+                    return Err(Error {
+                        message: format!("non-finite JSON constant: {word}"),
+                        line: 0,
+                        column: 0,
+                        offset: usize::MAX,
+                    });
+                }
                 return Ok(Value::Number(Number(word.to_owned())));
             }
         }
@@ -497,6 +609,18 @@ impl Parser<'_> {
             }
         }
         let raw = std::str::from_utf8(&self.text[start..self.pos]).expect("ASCII number");
+        if self.strict {
+            let float = raw.contains(['.', 'e', 'E']);
+            if float && !raw.parse::<f64>().is_ok_and(f64::is_finite) {
+                return Err(Error {
+                    message: "JSON number exceeds the finite binary64 protocol range".into(),
+                    line: 0,
+                    column: 0,
+                    offset: usize::MAX,
+                });
+            }
+            return Ok(Value::Number(Number(raw.to_owned())));
+        }
         Ok(Value::Number(Number(canonical_number(raw))))
     }
 
@@ -641,6 +765,40 @@ mod tests {
     }
 
     #[test]
+    fn decimals_print_and_compare_like_python_decimal() {
+        for (text, shown) in [
+            ("1.50", "1.50"),
+            ("0.05", "0.05"),
+            ("1e3", "1E+3"),
+            ("-0.0", "-0.0"),
+            ("1.0", "1.0"),
+            ("0.0000001", "1E-7"),
+            ("123.456e2", "12345.6"),
+            ("0", "0"),
+            ("-12", "-12"),
+        ] {
+            assert_eq!(decimal_text(text), shown, "{text}");
+        }
+        let n = |t: &str| match parse_strict(t).unwrap() {
+            Value::Number(n) => n,
+            _ => unreachable!(),
+        };
+        assert!(
+            n("1.50").equals(&n("1.5")) && n("0").equals(&n("-0.0")) && n("1e3").equals(&n("1000"))
+        );
+        assert!(!n("0.1000000000000000055511151231257827").equals(&n("0.1")));
+        assert!(
+            parse_strict(r#"{"a": 1, "a": 2}"#).is_err()
+                && parse_strict("NaN").is_err()
+                && parse_strict("1e400").is_err()
+        );
+        assert_eq!(
+            parse_strict("[1.50]").unwrap(),
+            Value::Array(vec![Value::Number(Number("1.50".into()))])
+        );
+    }
+
+    #[test]
     fn repeated_keys_resolve_to_the_last() {
         assert_eq!(
             parse(r#"{"a": 1, "a": 2}"#).unwrap().get("a"),
@@ -684,9 +842,10 @@ mod tests {
         assert_eq!(
             parse("[1,\n x]").unwrap_err(),
             Error {
-                message: "Expecting value",
+                message: "Expecting value".into(),
                 line: 2,
-                column: 2
+                column: 2,
+                offset: 5
             }
         );
     }
