@@ -1,0 +1,274 @@
+{
+ "2f7fd980d25bf10c1255174ca938c8fd0409a67fd48c498256b539c151fa709e": {
+  "delivery": true,
+  "digest_equal": false,
+  "id": "dts-core-7.1-master",
+  "label": "D1",
+  "ratio": {
+   "lower_95": 1.0001883757188068,
+   "median": 1.0010648760311693,
+   "upper_95": 1.0017344570016542
+  },
+  "raw": "results/time-D1/dts-core-7.1-master.json",
+  "raw_sha256": "69a73fc0d3ea94047ff9993b3015cd59f57f5a70ff16d1ac4c8b2319f9e8d2e4",
+  "seed": 280,
+  "status": "measured",
+  "utc": "2026-11-03T05:13:34.813531+00:00"
+ },
+ "3011e2b9b5d485769a4de439934f55af86b63b8e5c3c3dc7670889a8c48bb76c": {
+  "delivery": true,
+  "digest_equal": true,
+  "id": "hevc-main10-2160p",
+  "label": "D1",
+  "ratio": {
+   "lower_95": 0.8474538802223442,
+   "median": 0.8489008532996094,
+   "upper_95": 0.8496370720944452
+  },
+  "raw": "results/time-D1/hevc-main10-2160p.json",
+  "raw_sha256": "8d23096fb17dc186725b7be7661f85056c02b137071b2c85cde4a3137fe4d2c4",
+  "seed": 280,
+  "status": "measured",
+  "utc": "2026-11-03T05:12:12.020150+00:00"
+ },
+ "321cf521e18266b462b0b49d9e276e7950055193b6018cde6c42d6ff64892ce4": {
+  "delivery": true,
+  "digest_equal": true,
+  "id": "h264-high-1080p",
+  "label": "D1",
+  "ratio": {
+   "lower_95": 0.8168762804744831,
+   "median": 0.8183333514394546,
+   "upper_95": 0.8199400507214698
+  },
+  "raw": "results/time-D1/h264-high-1080p.json",
+  "raw_sha256": "94c135c49af46843e3c7cb5a810f9a1f5c28917f707cbbab0d036828a3024fe9",
+  "seed": 280,
+  "status": "measured",
+  "utc": "2026-11-03T05:07:15.417157+00:00"
+ },
+ "36565ba8ad14743f454cab01e370389a607e59441151742efb6469689bb21151": {
+  "delivery": true,
+  "digest_equal": false,
+  "id": "ac3-2.0-192",
+  "label": "D1",
+  "ratio": {
+   "lower_95": 0.9476067175766392,
+   "median": 0.9483914525794405,
+   "upper_95": 0.948711825280727
+  },
+  "raw": "results/time-D1/ac3-2.0-192.json",
+  "raw_sha256": "464be1974c30edbfbe02d11ed4f60c298e2a4b3d814e8d5209b6952cd6cdff72",
+  "seed": 280,
+  "status": "measured",
+  "utc": "2026-11-03T05:13:46.897421+00:00"
+ },
+ "3c747e14daf70646ba2b2f5512491f5a2cc9f6e7b540b13fe2ea929b04ba98fb": {
+  "delivery": true,
+  "digest_equal": false,
+  "id": "eac3-stereo-spx",
+  "label": "D1",
+  "ratio": {
+   "lower_95": 0.9710930015401837,
+   "median": 0.971676250302671,
+   "upper_95": 0.9723822868190864
+  },
+  "raw": "results/time-D1/eac3-stereo-spx.json",
+  "raw_sha256": "2fb9a23e7be748b3d74f213be53dac3fd56d313639344d8abaf7c7017a8db055",
+  "seed": 280,
+  "status": "measured",
+  "utc": "2026-11-03T05:14:04.294073+00:00"
+ },
+ "65b782799e7152cddef0f303b40fa97a1934b98766e517645e3bfa3477b29f94": {
+  "delivery": true,
+  "digest_equal": true,
+  "id": "hevc-main10-1080p",
+  "label": "D1",
+  "ratio": {
+   "lower_95": 0.5156773418178712,
+   "median": 0.5162061510188638,
+   "upper_95": 0.5173499148845022
+  },
+  "raw": "results/time-D1/hevc-main10-1080p.json",
+  "raw_sha256": "6001abfb23df9cb7f171d34832a21d696a17f2a8ba87f37e2131cea2d68bde7b",
+  "seed": 280,
+  "status": "measured",
+  "utc": "2026-11-03T05:10:43.563996+00:00"
+ },
+ "7d7340ad8b50861679fbad224e594ddc33322648b3b7b43c692573669ec98ed4": {
+  "delivery": true,
+  "digest_equal": false,
+  "id": "eac3-7.1",
+  "label": "D1",
+  "ratio": {
+   "lower_95": 1.0202434846859179,
+   "median": 1.020995396545672,
+   "upper_95": 1.0216598625990563
+  },
+  "raw": "results/time-D1/eac3-7.1.json",
+  "raw_sha256": "4590ee6fc58ea705f7c5d5aff6828e59652d635b28d63fdb3189cb039fd7403e",
+  "seed": 280,
+  "status": "measured",
+  "utc": "2026-11-03T05:13:53.394927+00:00"
+ },
+ "8dac0c778f4ad1f58722badc4db99fff23518cad1252e999047bc8f5950f5784": {
+  "delivery": true,
+  "digest_equal": false,
+  "id": "aac-lc-5.1",
+  "label": "D1",
+  "ratio": {
+   "lower_95": 0.9290251721727932,
+   "median": 0.9297916120141423,
+   "upper_95": 0.9308300714147824
+  },
+  "raw": "results/time-D1/aac-lc-5.1.json",
+  "raw_sha256": "babe6e15917271798a0e7193a6c4100bf7d1f8780b1ec13ee81d213fb052bf9c",
+  "seed": 280,
+  "status": "measured",
+  "utc": "2026-11-03T05:13:22.239753+00:00"
+ },
+ "91ae820be724f7fb2c286f80002e266491fd367287c5c7df06c1767bb7a406de": {
+  "delivery": true,
+  "digest_equal": false,
+  "id": "aac-lc-stereo",
+  "label": "D1",
+  "ratio": {
+   "lower_95": 0.7831573326163943,
+   "median": 0.7838908963467592,
+   "upper_95": 0.7843777280381959
+  },
+  "raw": "results/time-D1/aac-lc-stereo.json",
+  "raw_sha256": "d72e64e4f6fd703591a1568ff856dd056c70804638e23925171b8ad64fb772f9",
+  "seed": 280,
+  "status": "measured",
+  "utc": "2026-11-03T05:13:27.021941+00:00"
+ },
+ "91ff234323379201333201b3eb8a797ede2b64a6819c2c35dc7457132bcbf703": {
+  "delivery": true,
+  "digest_equal": false,
+  "id": "ac3-5.1-448",
+  "label": "D1",
+  "ratio": {
+   "lower_95": 1.0418539301209857,
+   "median": 1.0428942982920457,
+   "upper_95": 1.0442225927576851
+  },
+  "raw": "results/time-D1/ac3-5.1-448.json",
+  "raw_sha256": "9acd9fc1fb8432bae4caff70efda47bbc9165d46765c2d20565b00868be93460",
+  "seed": 280,
+  "status": "measured",
+  "utc": "2026-11-03T05:13:43.391139+00:00"
+ },
+ "a1c135d3eb3a065c0890f00e9536661ce6bf8a5e055afeafc5f73f27b8ed12f1": {
+  "delivery": true,
+  "digest_equal": false,
+  "id": "ac3-4.0",
+  "label": "D1",
+  "ratio": {
+   "lower_95": 0.823990162170418,
+   "median": 0.8248231032926032,
+   "upper_95": 0.8254051873707993
+  },
+  "raw": "results/time-D1/ac3-4.0.json",
+  "raw_sha256": "4ceae14556bf9d25b1086c1aa9e4b6172375e2fcc8eb0fe60cbbaa2f33e1d002",
+  "seed": 280,
+  "status": "measured",
+  "utc": "2026-11-03T05:13:49.934307+00:00"
+ },
+ "af72202987b8325ef932bbd501828db1aae5d464a0b734916f93ad6125c281e9": {
+  "delivery": true,
+  "digest_equal": false,
+  "id": "eac3-5.1-spx",
+  "label": "D1",
+  "ratio": {
+   "lower_95": 0.935837310395933,
+   "median": 0.9362662217624984,
+   "upper_95": 0.9374392605488251
+  },
+  "raw": "results/time-D1/eac3-5.1-spx.json",
+  "raw_sha256": "1df8d569f493d29f317bc3db5ab460e3c82ab1cbed57854c68bf3ff5bc88de20",
+  "seed": 280,
+  "status": "measured",
+  "utc": "2026-11-03T05:14:01.006011+00:00"
+ },
+ "ce9e1376234b8f3fcfd2f7141cba1bee261f5a7b141d5e4f66cdac7d99d4a9f4": {
+  "delivery": true,
+  "digest_equal": false,
+  "id": "dts-core-es-6.1",
+  "label": "D1",
+  "ratio": {
+   "lower_95": 0.8834664551467811,
+   "median": 0.8843932149243904,
+   "upper_95": 0.8850166712188418
+  },
+  "raw": "results/time-D1/dts-core-es-6.1.json",
+  "raw_sha256": "304ed39d9a44c444dfb5546146cca2bcf49061c705a0d241f67f308e786849d3",
+  "seed": 280,
+  "status": "measured",
+  "utc": "2026-11-03T05:13:30.363555+00:00"
+ },
+ "e71535ef40c25e89364daea9f2630e6f8f7829da809a8826c24910b6afd6232d": {
+  "delivery": true,
+  "digest_equal": true,
+  "id": "h264-high-720p",
+  "label": "D1",
+  "ratio": {
+   "lower_95": 0.5559367499438661,
+   "median": 0.5565367391428773,
+   "upper_95": 0.5572574098628382
+  },
+  "raw": "results/time-D1/h264-high-720p.json",
+  "raw_sha256": "44442db38bd792d1bc50b244251abedac47770b3ab214fd6ccf11fd86383f033",
+  "seed": 280,
+  "status": "measured",
+  "utc": "2026-11-03T05:08:44.094876+00:00"
+ },
+ "ed3efd65b42fccbb51823e339d75c64068c03f329cdc62a8b9e45ab2dcfd0287": {
+  "delivery": true,
+  "digest_equal": true,
+  "id": "h264-main-1920x800",
+  "label": "D1",
+  "ratio": {
+   "lower_95": 0.7315125110163507,
+   "median": 0.7336248375055053,
+   "upper_95": 0.7356558795400207
+  },
+  "raw": "results/time-D1/h264-main-1920x800.json",
+  "raw_sha256": "b97ce2bdfea19268771cf52964e625bca249ef7d1e972bff9850e77b449b7cd9",
+  "seed": 280,
+  "status": "measured",
+  "utc": "2026-11-03T05:08:04.992812+00:00"
+ },
+ "fc23d5daecfe47861eb5dec98a1a5a4fc9dd5742348b3ad11e12ff1199dd7abd": {
+  "delivery": true,
+  "digest_equal": false,
+  "id": "eac3-5.1-1536",
+  "label": "D1",
+  "ratio": {
+   "lower_95": 0.83288130588545,
+   "median": 0.8340594081625485,
+   "upper_95": 0.834713094300368
+  },
+  "raw": "results/time-D1/eac3-5.1-1536.json",
+  "raw_sha256": "5fa5f741a96138e21447265b2185cb904cacb30eab5519f9a18f2d32c91da10b",
+  "seed": 280,
+  "status": "measured",
+  "utc": "2026-11-03T05:14:08.019552+00:00"
+ },
+ "feb680be684d696fc913fceb44c40c234f970bb9e4e99d499468761715e3d37e": {
+  "delivery": true,
+  "digest_equal": true,
+  "id": "hevc-main-1080p",
+  "label": "D1",
+  "ratio": {
+   "lower_95": 0.6831935382758172,
+   "median": 0.6844103503323493,
+   "upper_95": 0.6852812316262766
+  },
+  "raw": "results/time-D1/hevc-main-1080p.json",
+  "raw_sha256": "98aac2d37a975ea8715098c87424a13c11b4dad6ce414553a2a37ed0fefaba92",
+  "seed": 280,
+  "status": "measured",
+  "utc": "2026-11-03T05:09:53.371343+00:00"
+ }
+}

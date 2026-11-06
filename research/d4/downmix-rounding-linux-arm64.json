@@ -1,0 +1,146 @@
+[
+ {
+  "vector": "millers_crossing_4.0.ac3",
+  "samples": 95232,
+  "mismatch_fraction": {
+   "round": 0.49975323420698925,
+   "floor": 0.00015225974462365591,
+   "trunc": 0.501029065860215,
+   "floor+0.5": 0.49975848454301075
+  },
+  "best": "floor",
+  "max_abs_lsb": 1
+ },
+ {
+  "vector": "monsters_inc_2.0_192_small.ac3",
+  "samples": 201216,
+  "mismatch_fraction": {
+   "round": 0.49842706345419846,
+   "floor": 7.70316475826972e-05,
+   "trunc": 0.4887185909669211,
+   "floor+0.5": 0.49842706345419846
+  },
+  "best": "floor",
+  "max_abs_lsb": 1
+ },
+ {
+  "vector": "monsters_inc_5.1_448_small.ac3",
+  "samples": 86016,
+  "mismatch_fraction": {
+   "round": 0.5300990513392857,
+   "floor": 0.00012788318452380953,
+   "trunc": 0.6935570126488095,
+   "floor+0.5": 0.5300990513392857
+  },
+  "best": "floor",
+  "max_abs_lsb": 1
+ },
+ {
+  "vector": "csi_miami_5.1_256_spx_small.eac3",
+  "samples": 72192,
+  "mismatch_fraction": {
+   "round": 0.5020639406028369,
+   "floor": 0.00024240913120567376,
+   "trunc": 0.5055546320921985,
+   "floor+0.5": 0.5020777925531915
+  },
+  "best": "floor",
+  "max_abs_lsb": 1
+ },
+ {
+  "vector": "csi_miami_stereo_128_spx.eac3",
+  "samples": 999936,
+  "mismatch_fraction": {
+   "round": 0.4997849862391193,
+   "floor": 5.000320020481311e-07,
+   "trunc": 0.4991409450204813,
+   "floor+0.5": 0.499802487359191
+  },
+  "best": "floor",
+  "max_abs_lsb": 1
+ },
+ {
+  "vector": "csi_miami_stereo_128_spx_small.eac3",
+  "samples": 749568,
+  "mismatch_fraction": {
+   "round": 0.5002841636782787,
+   "floor": 6.670508879781421e-07,
+   "trunc": 0.499115490522541,
+   "floor+0.5": 0.50030350815403
+  },
+  "best": "floor",
+  "max_abs_lsb": 1
+ },
+ {
+  "vector": "matrix2_commentary1_stereo_192_small.eac3",
+  "samples": 199680,
+  "mismatch_fraction": {
+   "round": 0.49954927884615385,
+   "floor": 1.2520032051282051e-05,
+   "trunc": 0.513789563301282,
+   "floor+0.5": 0.4995643028846154
+  },
+  "best": "floor",
+  "max_abs_lsb": 1
+ },
+ {
+  "vector": "serenity_english_5.1_1536_small.eac3",
+  "samples": 24832,
+  "mismatch_fraction": {
+   "round": 0.48858327963917525,
+   "floor": 0.00042284149484536084,
+   "trunc": 0.48836179123711343,
+   "floor+0.5": 0.48858327963917525
+  },
+  "best": "floor",
+  "max_abs_lsb": 1
+ },
+ {
+  "vector": "the_great_wall_7.1.eac3",
+  "samples": 241152,
+  "mismatch_fraction": {
+   "round": 0.4987725583864119,
+   "floor": 0.0005390790870488323,
+   "trunc": 0.5065041965233545,
+   "floor+0.5": 0.4987912188163482
+  },
+  "best": "floor",
+  "max_abs_lsb": 1
+ },
+ {
+  "vector": "dts_es.dts",
+  "samples": 128000,
+  "mismatch_fraction": {
+   "round": 0.49929296875,
+   "floor": 0.0012890625,
+   "trunc": 0.4958984375,
+   "floor+0.5": 0.49932421875
+  },
+  "best": "floor",
+  "max_abs_lsb": 1
+ },
+ {
+  "vector": "dtsx_7.1.4_24bit.dts",
+  "samples": 1024,
+  "mismatch_fraction": {
+   "round": 0.49658203125,
+   "floor": 0.00048828125,
+   "trunc": 0.5458984375,
+   "floor+0.5": 0.49658203125
+  },
+  "best": "floor",
+  "max_abs_lsb": 1
+ },
+ {
+  "vector": "master_audio_7.1_24bit.dts",
+  "samples": 600064,
+  "mismatch_fraction": {
+   "round": 0.5585929167555461,
+   "floor": 5.916035622866894e-05,
+   "trunc": 0.5630407756505973,
+   "floor+0.5": 0.5585945832444539
+  },
+  "best": "floor",
+  "max_abs_lsb": 1
+ }
+]

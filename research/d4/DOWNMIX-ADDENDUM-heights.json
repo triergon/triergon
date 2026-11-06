@@ -1,0 +1,24 @@
+{
+  "schema": "triergon.d4.downmix-addendum.v1",
+  "amends": "research/d4/DOWNMIX-CONTRACT.json (frozen 2026-11-03T01:20Z; not edited)",
+  "recorded_utc": "2026-11-03T03:40:00Z",
+  "reason": "The first native correctness run (dev4, results-dev/correct-dev4.jsonl on the runner) failed aac al22_chCfg0PCE_44 on the output path by 1795 LSB: its 5.1.2(back) layout carries TFL/TFR, which the frozen contract's rule set did not cover (they were mapped like unpositioned channels). The failure stays recorded; this addendum adds the observed rule.",
+  "reference": "pinned FFmpeg 9.0.2 on the runner (~/d4/ffmpeg/oracle/bin/ffmpeg), -v debug, swresample's reported matrix",
+  "commands": [
+    "ffmpeg -v debug -f aac -i al22_chCfg0PCE_44.adts -vn -ac 2 -f s16le /dev/null",
+    "ffmpeg -v debug -f lavfi -i anullsrc=channel_layout=<L>:sample_rate=48000 -t 0.01 -ac 2 -f null -   for L in the layouts below"
+  ],
+  "observations": {
+    "al22 5.1.2(back) FL row": "FL:0.320377 FC:0.226541 LFE:0 BL:0.226541 TFL:0.226541 (FR row mirrored)",
+    "FL+FR+FC+LFE+BL+BR+FLC+FRC+BC+SL+SR+TC+TFL+TFC+TFR+TBL+TBC+TBR+WL+WR+LFE2+TSL+TSR+BFC+BFL+BFR FL row": "FL:0.187673 FC:0.132705 BL:0.132705 FLC:0.187673 BC:0.093836 SL:0.132705 TFL:0.132705, every other id 0",
+    "FL+FR+TFL+TFR": "FL:0.585786 TFL:0.414214",
+    "FL+FR+TC / +TFC / +TBL+TBR+TBC / +TSL+TSR / +BFL+BFR+BFC / +LFE2 / +WL+WR": "FL:1 FR:1, the added ids 0",
+    "FL+FR+FC+LFE+BL+BR+SL+SR+TFL+TFR+TBL+TBR FL row": "FL:0.261204 FC:0.184699 BL:0.184699 SL:0.184699 TFL:0.184699 TBL:0"
+  },
+  "rules_added": {
+    "top front pair": "TFL->L, TFR->R at sqrt(1/2) before row normalisation",
+    "dropped": "TC, TFC, TBL, TBC, TBR, TSL, TSR, BFL, BFC, BFR, WL, WR: coefficient 0",
+    "LFE2": "observed 0 with the default lfe_mix_level 0; implemented like LFE (lfe_level/sqrt(2))"
+  },
+  "limits": "Observed only with the default mix levels (centre and surround sqrt(1/2), LFE 0). Height channels come only from the AAC lane (PCE height elements), which never carries downmix levels, so whether the top-front weight tracks the surround or the centre level is not determined and not needed for the selected decoders. Ids 18..30 and 33..34 are not emitted by any lane and were not observed."
+}
