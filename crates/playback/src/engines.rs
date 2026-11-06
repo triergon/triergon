@@ -1787,7 +1787,7 @@ impl TsEngine {
         let active = &mut self.native_active;
         let ordinal = self.event_ordinal;
         let suppressed = self.suppressed_events;
-        self.stream.poll_feed(
+        self.stream.poll_feed_carriers(
             &mut self.input,
             work,
             cancel,
@@ -1796,7 +1796,7 @@ impl TsEngine {
                 if work.remaining() < 3 {
                     return Ok(FeedContinuation::Emit);
                 }
-                if let Some(index) = tracks.index(packet.pid)
+                if let Some(index) = tracks.index(packet.pid())
                     && let Some(observer) = tracks.as_mut_slice()[index].observer.as_mut()
                 {
                     let context = SourceContext {
@@ -1806,7 +1806,7 @@ impl TsEngine {
                         epochs,
                         byte_run_epoch: None,
                     };
-                    match observer.append_ready_continuation(packet, context, work, cancel)? {
+                    match packet.append_ready_continuation(observer, context, work, cancel)? {
                         ReadyContinuation::Unhandled => return Ok(FeedContinuation::Emit),
                         ReadyContinuation::Buffered => {}
                         ReadyContinuation::Complete => *active = Some(index),

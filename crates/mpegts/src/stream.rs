@@ -1,4 +1,6 @@
 //! Composed selected-program TS -> PSI -> PES source operation. No codec AU work.
+use crate::framer::FramedCarrier;
+use crate::native_pes::{NativePesObserver, NativeSourceContext, ReadyContinuation};
 use crate::psi::{
     DescriptorNamespace, PatCollector, PatReader, PatTable, PmtReader, ProgramMap, Section,
     TableStep,
@@ -68,6 +70,34 @@ pub enum FeedContinuation {
     Emit,
     Buffered,
     Yield,
+}
+
+/// A validated continuation offered to a feed's native observer.
+pub struct FeedCarrier<'a>(&'a mut FramedCarrier);
+
+impl FeedCarrier<'_> {
+    pub fn pid(&self) -> u16 {
+        self.0.pid()
+    }
+
+    /// Transfer the payload when the observer can append it without allocation.
+    /// An unhandled carrier remains available for ordinary delivery.
+    pub fn append_ready_continuation(
+        self,
+        observer: &mut NativePesObserver,
+        context: NativeSourceContext,
+        work: &mut WorkBudget,
+        cancel: &AtomicBool,
+    ) -> Result<ReadyContinuation> {
+        match self.0 {
+            FramedCarrier::Packet(packet) => {
+                observer.append_ready_continuation(packet, context, work, cancel)
+            }
+            FramedCarrier::Plain(packet) => {
+                observer.append_plain_continuation(packet, context, work, cancel)
+            }
+        }
+    }
 }
 
 const FEED_FALLBACK_PHASE: u8 = 8;
@@ -878,43 +908,60 @@ impl TransportStream {
 
     fn validate_feed_continuation(
         &mut self,
-        packet: &TransportPacket,
+        carrier: &FramedCarrier,
         work: &mut WorkBudget,
     ) -> Result<bool> {
-        if self.feed_omissions.is_none()
-            || packet.payload_unit_start
-            || packet.discontinuity_indicator()
-            || packet.transport_error
-            || packet.scrambling != 0
-            || (self.pcr_pid == Some(packet.pid)
-                && (self.clock_pending
-                    || packet.adaptation.as_ref().is_some_and(|a| a.pcr.is_some())))
-        {
+        let pid = carrier.pid();
+        if self.feed_omissions.is_none() || (self.pcr_pid == Some(pid) && self.clock_pending) {
             return Ok(false);
         }
         let Route::Pes(index) = self.route else {
             return Ok(false);
         };
-        let Some(payload) = packet.payload.as_ref() else {
-            return Ok(false);
+        let (counter, payload_len) = match carrier {
+            FramedCarrier::Packet(packet) => {
+                if packet.payload_unit_start
+                    || packet.discontinuity_indicator()
+                    || packet.transport_error
+                    || packet.scrambling != 0
+                    || (self.pcr_pid == Some(pid)
+                        && packet.adaptation.as_ref().is_some_and(|a| a.pcr.is_some()))
+                {
+                    return Ok(false);
+                }
+                let Some(payload) = packet.payload.as_ref() else {
+                    return Ok(false);
+                };
+                (packet.continuity_counter, payload.len())
+            }
+            FramedCarrier::Plain(packet) => (packet.counter(), 188 - packet.payload_start()),
         };
         let route = &mut self.routes.as_mut_slice()[index];
         let continuity = route
             .continuity
             .as_mut()
             .ok_or(Error::Invalid("PES continuity missing"))?;
-        if payload.is_empty() || !continuity.expects_payload_counter(packet.continuity_counter) {
+        if payload_len == 0 || !continuity.expects_payload_counter(counter) {
             return Ok(false);
         }
         let assembler = route
             .assembler
             .as_mut()
             .ok_or(Error::Invalid("PES route missing"))?;
-        let Some(completed) = assembler.validate_body_carrier(payload.len(), work)? else {
+        let Some(completed) = assembler.validate_body_carrier(payload_len, work)? else {
             return Ok(false);
         };
-        continuity.record_continuation(packet);
-        if self.pcr_pid == Some(packet.pid) {
+        match carrier {
+            FramedCarrier::Packet(packet) => continuity.record_continuation(packet),
+            FramedCarrier::Plain(packet) => {
+                let source = packet
+                    .source
+                    .as_ref()
+                    .ok_or(Error::Invalid("missing continuation source"))?;
+                continuity.record_plain_continuation(source.as_ref(), counter);
+            }
+        }
+        if self.pcr_pid == Some(pid) {
             self.clock_signal = false;
         }
         // Transport is observed first in the full trace. Count continuity
@@ -1242,7 +1289,48 @@ impl TransportStream {
             &mut WorkBudget,
         ) -> Result<FeedContinuation>,
     ) -> Result<Step<TraceEvent>> {
-        match self.poll_inner::<false>(input, work, cancel, consume)? {
+        self.poll_feed_inner::<false>(input, work, cancel, |carrier, omitted, epochs, work| {
+            match carrier.0 {
+                FramedCarrier::Packet(packet) => consume(packet, omitted, epochs, work),
+                FramedCarrier::Plain(_) => unreachable!("literal carrier delivery"),
+            }
+        })
+    }
+
+    /// Like poll_feed, with compact carriers for ordinary progressive TS188
+    /// continuations. Emit and errors retain the full transport event.
+    pub fn poll_feed_carriers(
+        &mut self,
+        input: &mut InputCursor,
+        work: &mut WorkBudget,
+        cancel: &AtomicBool,
+        consume: &mut impl FnMut(
+            FeedCarrier<'_>,
+            u64,
+            SourceEpochs,
+            &mut WorkBudget,
+        ) -> Result<FeedContinuation>,
+    ) -> Result<Step<TraceEvent>> {
+        if self.feed_validated_carriers {
+            self.poll_feed_inner::<true>(input, work, cancel, consume)
+        } else {
+            self.poll_feed_inner::<false>(input, work, cancel, consume)
+        }
+    }
+
+    fn poll_feed_inner<const DIRECT: bool>(
+        &mut self,
+        input: &mut InputCursor,
+        work: &mut WorkBudget,
+        cancel: &AtomicBool,
+        consume: impl FnMut(
+            FeedCarrier<'_>,
+            u64,
+            SourceEpochs,
+            &mut WorkBudget,
+        ) -> Result<FeedContinuation>,
+    ) -> Result<Step<TraceEvent>> {
+        match self.poll_inner::<false, DIRECT>(input, work, cancel, consume)? {
             Step::Ready(CompactTraceEvent::Event(event)) => Ok(Step::Ready(event)),
             Step::Ready(CompactTraceEvent::NullRun(_)) => unreachable!("literal source mode"),
             Step::NeedInput(request) => Ok(Step::NeedInput(request)),
@@ -1257,16 +1345,16 @@ impl TransportStream {
         work: &mut WorkBudget,
         cancel: &AtomicBool,
     ) -> Result<Step<CompactTraceEvent>> {
-        self.poll_inner::<true>(input, work, cancel, |_, _, _, _| Ok(FeedContinuation::Emit))
+        self.poll_inner::<true, false>(input, work, cancel, |_, _, _, _| Ok(FeedContinuation::Emit))
     }
 
-    fn poll_inner<const COMPACT: bool>(
+    fn poll_inner<const COMPACT: bool, const DIRECT: bool>(
         &mut self,
         input: &mut InputCursor,
         work: &mut WorkBudget,
         cancel: &AtomicBool,
         mut consume: impl FnMut(
-            &mut TransportPacket,
+            FeedCarrier<'_>,
             u64,
             SourceEpochs,
             &mut WorkBudget,
@@ -1397,13 +1485,13 @@ impl TransportStream {
                 return Ok(Step::Ready(CompactTraceEvent::NullRun(run)));
             }
             loop {
-                match self.framer.poll(input, work, cancel) {
-                    Ok(Step::Ready(mut packet)) => {
+                match self.framer.poll_carrier::<DIRECT>(input, work, cancel) {
+                    Ok(Step::Ready(mut carrier)) => {
                         self.entity_end = None;
-                        self.route = self.find_route(packet.pid);
-                        if self.validate_feed_continuation(&packet, work)? {
+                        self.route = self.find_route(carrier.pid());
+                        if self.validate_feed_continuation(&carrier, work)? {
                             match consume(
-                                &mut packet,
+                                FeedCarrier(&mut carrier),
                                 self.feed_omissions.unwrap_or(0),
                                 self.source_epochs(),
                                 work,
@@ -1428,13 +1516,14 @@ impl TransportStream {
                                     return Ok(Step::Yield);
                                 }
                                 Err(error) => {
-                                    self.packet = Some(packet);
+                                    self.packet = Some(carrier.into_packet()?);
                                     self.phase = FEED_FALLBACK_PHASE;
                                     return Err(error);
                                 }
                             }
-                            return Ok(ready(TraceEvent::Transport(packet)));
+                            return Ok(ready(TraceEvent::Transport(carrier.into_packet()?)));
                         }
+                        let packet = carrier.into_packet()?;
                         self.phase = 1;
                         if self.feed_validated_carriers {
                             self.packet = Some(packet);

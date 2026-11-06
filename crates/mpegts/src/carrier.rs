@@ -73,6 +73,13 @@ impl PlainCarrier {
         })
     }
 
+    pub(crate) fn is_plain_continuation(&self) -> bool {
+        !self.header.pusi
+            && !self.header.tei
+            && self.header.scrambling == 0
+            && self.flags.unwrap_or(0) & 0x80 == 0
+    }
+
     pub(crate) fn into_packet(
         self,
         source: Bytes,
@@ -114,6 +121,37 @@ impl PlainCarrier {
             sync: 0,
             pcr_range: None,
         })
+    }
+}
+
+/// A complete plain TS188 continuation with its charged backing storage.
+pub(crate) struct PlainContinuation {
+    pub(crate) layout: PlainCarrier,
+    pub(crate) source: Option<Bytes>,
+    pub(crate) offset: u64,
+    pub(crate) entity: Option<SourceId>,
+}
+
+impl PlainContinuation {
+    pub(crate) fn pid(&self) -> u16 {
+        self.layout.header.pid
+    }
+
+    pub(crate) fn counter(&self) -> u8 {
+        self.layout.header.cc
+    }
+
+    pub(crate) fn payload_start(&self) -> usize {
+        self.layout.payload_start
+    }
+
+    pub(crate) fn into_packet(self) -> Result<TransportPacket> {
+        self.layout.into_packet(
+            self.source
+                .ok_or(Error::Invalid("missing continuation source"))?,
+            self.offset,
+            self.entity,
+        )
     }
 }
 
