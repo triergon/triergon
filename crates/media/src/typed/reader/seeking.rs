@@ -133,61 +133,68 @@ impl ScanSimple {
         let configuration = context
             .configuration
             .required("missing scan configuration")?;
-        loop {
-            match self.phase {
-                SimplePhase::Header => {
-                    let Ok(prefix) = block_prefix(bytes) else {
-                        return Ok(ParseStep::Event(false));
-                    };
-                    if (prefix.flags >> 1) & 3 != 0 {
-                        return Ok(ParseStep::Event(false));
-                    }
-                    self.prefix = Some(prefix);
-                    self.phase = SimplePhase::Track;
-                }
-                SimplePhase::Track => {
-                    let prefix = self.prefix.required("missing scan block prefix")?;
-                    match block_track(configuration, self.track, prefix.number) {
-                        Ok(Some(track)) if scan_track_is_plain(track) => {
-                            self.phase = SimplePhase::Clock;
-                        }
-                        Ok(None) => self.track += 1,
-                        _ => return Ok(ParseStep::Event(false)),
-                    }
-                }
-                SimplePhase::Clock => {
-                    let track = configuration
-                        .tracks()
-                        .get(self.track)
-                        .required("missing scan track")?;
-                    let prefix = self.prefix.required("missing scan block prefix")?;
-                    let fields = FrameParameters {
-                        cluster_ticks: context
-                            .cluster_ticks
-                            .required("missing scan Cluster timestamp")?,
-                        offset: prefix.offset,
-                        scale: context.scale,
-                        duration_ticks: None,
-                        frame: 0,
-                        frames: 1,
-                    }
-                    .scan_fields(self.track, track, prefix.flags & 0x80 != 0);
-                    let Ok(fields) = fields else {
-                        return Ok(ParseStep::Event(false));
-                    };
-                    self.fields = Some(fields);
-                    self.phase = SimplePhase::Drain;
-                    return Ok(ParseStep::Event(true));
-                }
-                SimplePhase::Drain | SimplePhase::Complete => {
-                    return Err(Error::Invalid("scan prefix already resolved"));
-                }
+        if self.phase == SimplePhase::Header {
+            let Ok(prefix) = block_prefix(bytes) else {
+                return Ok(ParseStep::Event(false));
+            };
+            if (prefix.flags >> 1) & 3 != 0 {
+                return Ok(ParseStep::Event(false));
             }
+            self.prefix = Some(prefix);
+            self.phase = SimplePhase::Track;
             check(cancel)?;
             if !work.try_charge(1) {
                 return Ok(ParseStep::Yield);
             }
         }
+        let track = match self.phase {
+            SimplePhase::Track => {
+                let prefix = self.prefix.required("missing scan block prefix")?;
+                loop {
+                    let found = match block_track(configuration, self.track, prefix.number) {
+                        Ok(Some(track)) if scan_track_is_plain(track) => {
+                            self.phase = SimplePhase::Clock;
+                            Some(track)
+                        }
+                        Ok(None) => {
+                            self.track += 1;
+                            None
+                        }
+                        _ => return Ok(ParseStep::Event(false)),
+                    };
+                    check(cancel)?;
+                    if !work.try_charge(1) {
+                        return Ok(ParseStep::Yield);
+                    }
+                    if let Some(track) = found {
+                        break track;
+                    }
+                }
+            }
+            SimplePhase::Clock => configuration
+                .tracks()
+                .get(self.track)
+                .required("missing scan track")?,
+            _ => return Err(Error::Invalid("scan prefix already resolved")),
+        };
+        let prefix = self.prefix.required("missing scan block prefix")?;
+        let fields = FrameParameters {
+            cluster_ticks: context
+                .cluster_ticks
+                .required("missing scan Cluster timestamp")?,
+            offset: prefix.offset,
+            scale: context.scale,
+            duration_ticks: None,
+            frame: 0,
+            frames: 1,
+        }
+        .scan_fields(self.track, track, prefix.flags & 0x80 != 0);
+        let Ok(fields) = fields else {
+            return Ok(ParseStep::Event(false));
+        };
+        self.fields = Some(fields);
+        self.phase = SimplePhase::Drain;
+        Ok(ParseStep::Event(true))
     }
 }
 
@@ -929,22 +936,10 @@ impl Reader {
             if let State::ScanSimple(job) = &self.state
                 && let Some(fields) = job.completed_fields()
             {
-                let context = ScanContext {
-                    configuration: self.configuration.as_ref(),
-                    pool: &self.pool,
-                    source: self.envelope.request().source,
-                    generation: self.generation(),
-                    cluster_ticks: self.cluster_time,
-                    scale: self.scale,
-                };
-                if !job.context_matches(&context) {
-                    return Err(Error::Invalid("completed scan source context changed"));
-                }
+                // The drain checked the source context and completed in this
+                // call. Retain a replay location only if it improves the landing.
                 let header = job.header();
                 self.state = State::Envelope;
-                // The envelope has already admitted and drained this
-                // complete SimpleBlock. Retain a replay location only if
-                // it improves the landing.
                 self.consider_scan_packet(scan, header.start, fields, || {
                     self.envelope
                         .block_replay_location(header, self.cluster_time)
