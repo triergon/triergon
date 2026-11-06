@@ -3768,8 +3768,21 @@ fn native_range_cursor_keeps_edited_av1_and_vp9_description_transitions() {
 
 #[test]
 fn native_range_cursor_keeps_encoded_source_clocks_and_trim() {
-    let fixtures: [&[u8]; 3] = [
-        include_bytes!("../../isobmff/tests/fixtures/encoded-edit-v2/original.mp4"),
+    let original = include_bytes!("../../isobmff/tests/fixtures/encoded-edit-v2/original.mp4");
+    let mut variable = original.to_vec();
+    let audio_timing = variable
+        .windows(4)
+        .rposition(|kind| kind == b"stts")
+        .unwrap()
+        + 4;
+    for (offset, before, after) in [(20, 1016u32, 1272u32), (36, 528, 272)] {
+        let duration = &mut variable[audio_timing + offset..audio_timing + offset + 4];
+        assert_eq!(duration, &before.to_be_bytes());
+        duration.copy_from_slice(&after.to_be_bytes());
+    }
+    let fixtures: [&[u8]; 4] = [
+        original,
+        &variable,
         include_bytes!("../../isobmff/tests/fixtures/range-encoded-edits/leading-ac3.mp4"),
         include_bytes!("../../isobmff/tests/fixtures/range-encoded-edits/leading-eac3.mp4"),
     ];
