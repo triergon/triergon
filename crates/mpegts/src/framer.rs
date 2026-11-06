@@ -327,7 +327,7 @@ impl TransportFramer {
             && self.inspection.is_none()
             && self.rejection.is_none()
             && self.push_ack.is_none()
-            && self.carry.as_ref().is_some_and(|carry| carry.is_empty())
+            && self.carry.as_ref().is_some_and(BudgetVec::is_empty)
             && self.progressive_windows[0]
                 .as_ref()
                 .zip(input.buffered_owner())

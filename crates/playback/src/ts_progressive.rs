@@ -449,7 +449,7 @@ fn exact_ticks90(time: Time) -> Option<i64> {
         .checked_mul(i64::from(TS_CLOCK_RATE / denominator))
 }
 
-fn pat_binding(table: &PatTable) -> triergon_core::Result<PatBinding> {
+fn pat_binding(table: &PatTable) -> Result<PatBinding> {
     // The transport engine has already enforced one media program.
     let entry = table
         .programs
@@ -464,7 +464,7 @@ fn pat_binding(table: &PatTable) -> triergon_core::Result<PatBinding> {
     })
 }
 
-fn select_track(map: &ProgramMap, stream_type: u8) -> triergon_core::Result<TrackKey> {
+fn select_track(map: &ProgramMap, stream_type: u8) -> Result<TrackKey> {
     let mut streams = map
         .streams
         .as_slice()
