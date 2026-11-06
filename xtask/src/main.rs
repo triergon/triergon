@@ -39,8 +39,8 @@ commands:
   fetch-vectors  cache the required external test vectors and verify their hashes
   report         [--contract F] [--manifest F] [--corpus DIR] [--output DIR] [--fate-cache DIR]
                  [--additional-report F]... [--require-acceptance] [--require-slice-acceptance]
-                 [--benchmark [--pairs N] [--iterations N] [--seed N] [--reuse-report F]]
-                 correctness (and paired runtime) report of the built workers for one contract
+                 [--benchmark] [--memory] [--pairs N] [--iterations N] [--seed N] [--reuse-report F]
+                 correctness, paired runtime and memory report of the built workers for one contract
   compare        --candidate W --reference W --input FILE --output DIR
                  [--operation plain|seek|colour|catalogue] [--content] [--no-short-reads]
                  compare one input across a candidate and a reference worker
@@ -149,6 +149,7 @@ fn report(root: &Path, args: &[String]) -> ExitCode {
                 "--require-acceptance" => options.require_acceptance = true,
                 "--require-slice-acceptance" => options.require_slice_acceptance = true,
                 "--benchmark" => options.benchmark = true,
+                "--memory" => options.memory = true,
                 "--reuse-report" => options.reuse_report = Some(value()?),
                 "--pairs" | "--iterations" | "--seed" => {
                     let text = value()?.display().to_string();

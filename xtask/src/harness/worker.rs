@@ -15,24 +15,36 @@ pub fn arg(value: impl ToString) -> OsString {
     OsString::from(value.to_string())
 }
 
-/// Run `argv` and classify the result as `ok` (a JSON object on stdout),
-/// `timeout`, `worker-error` or `invalid-worker-output`.
-pub fn execute(argv: &[OsString], timeout: Duration) -> Value {
+/// The exit code (negative signal number when killed), stdout and stderr of a
+/// finished process; `None` when it outlived `timeout` and was killed.
+pub struct Finished {
+    pub code: i64,
+    pub stdout: Vec<u8>,
+    pub stderr: Vec<u8>,
+}
+
+/// Run `argv` with extra environment changes; a missing executable is an error.
+pub fn run(
+    argv: &[OsString],
+    env: &[(String, Option<String>)],
+    timeout: Duration,
+) -> Result<Option<Finished>, String> {
     let started = Instant::now();
-    let shown = || Value::strings(argv.iter().map(|a| a.to_string_lossy().into_owned()));
-    let mut child = match Command::new(&argv[0])
+    let mut command = Command::new(&argv[0]);
+    command
         .args(&argv[1..])
         .stdin(Stdio::null())
         .stdout(Stdio::piped())
-        .stderr(Stdio::piped())
+        .stderr(Stdio::piped());
+    for (key, value) in env {
+        match value {
+            Some(value) => command.env(key, value),
+            None => command.env_remove(key),
+        };
+    }
+    let mut child = command
         .spawn()
-    {
-        Ok(child) => child,
-        Err(error) => {
-            // Python's subprocess raises here; a missing worker is a hard error.
-            panic!("cannot start worker {:?}: {error}", argv[0]);
-        }
-    };
+        .map_err(|e| format!("{}: {e}", argv[0].to_string_lossy()))?;
     let mut stdout = child.stdout.take().expect("piped stdout");
     let mut stderr = child.stderr.take().expect("piped stderr");
     let out = std::thread::spawn(move || {
@@ -57,14 +69,32 @@ pub fn execute(argv: &[OsString], timeout: Duration) -> Value {
             Err(_) => break None,
         }
     };
-    let stdout = out.join().unwrap_or_default();
-    let stderr = err.join().unwrap_or_default();
-    let Some(status) = status else {
-        return Value::object([("status", Value::str("timeout")), ("argv", shown())]);
+    let (stdout, stderr) = (
+        out.join().unwrap_or_default(),
+        err.join().unwrap_or_default(),
+    );
+    Ok(status.map(|status| Finished {
+        code: status.code().map_or_else(|| -signal(&status), i64::from),
+        stdout,
+        stderr,
+    }))
+}
+
+/// Run `argv` and classify the result as `ok` (a JSON object on stdout),
+/// `timeout`, `worker-error` or `invalid-worker-output`.
+pub fn execute(argv: &[OsString], timeout: Duration) -> Value {
+    let started = Instant::now();
+    let finished = match run(argv, &[], timeout) {
+        Ok(finished) => finished,
+        // Python's subprocess raises here; a missing worker is a hard error.
+        Err(error) => panic!("cannot start worker: {error}"),
     };
-    if !status.success() {
-        let code = status.code().map_or_else(|| -signal(&status), i64::from);
-        let text = String::from_utf8_lossy(&stderr);
+    let Some(finished) = finished else {
+        let shown = Value::strings(argv.iter().map(|a| a.to_string_lossy().into_owned()));
+        return Value::object([("status", Value::str("timeout")), ("argv", shown)]);
+    };
+    if finished.code != 0 {
+        let text = String::from_utf8_lossy(&finished.stderr);
         let tail: String = text
             .chars()
             .rev()
@@ -75,11 +105,11 @@ pub fn execute(argv: &[OsString], timeout: Duration) -> Value {
             .collect();
         return Value::object([
             ("status", Value::str("worker-error")),
-            ("exit_code", Value::int(code)),
+            ("exit_code", Value::int(finished.code)),
             ("stderr", Value::str(tail)),
         ]);
     }
-    let data = std::str::from_utf8(&stdout)
+    let data = std::str::from_utf8(&finished.stdout)
         .ok()
         .and_then(|text| json::parse(text).ok());
     match data {

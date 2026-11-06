@@ -30,4 +30,4 @@ report:
 	cargo xtask report --fate-cache .research/fate-samples
 
 qualify:
-	python3 tools/test_media.py --benchmark --memory --fate-cache .research/fate-samples --require-acceptance
+	cargo xtask report --benchmark --memory --fate-cache .research/fate-samples --require-acceptance

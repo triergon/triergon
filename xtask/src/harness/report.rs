@@ -27,6 +27,7 @@ pub struct Options {
     pub require_acceptance: bool,
     pub require_slice_acceptance: bool,
     pub benchmark: bool,
+    pub memory: bool,
     pub pairs: usize,
     pub iterations: u32,
     pub seed: u64,
@@ -45,6 +46,7 @@ impl Options {
             require_acceptance: false,
             require_slice_acceptance: false,
             benchmark: false,
+            memory: false,
             pairs: 30,
             iterations: 200,
             seed: 280,
@@ -318,7 +320,7 @@ pub fn run(root: &Path, options: &Options) -> Result<i32, String> {
         }
         additional.push(receipt.get("case").cloned().unwrap_or(Value::Null));
     }
-    let (mut reusable, mut previous_sha) = (Vec::new(), None);
+    let (mut reusable, mut previous_sha, mut previous_instrumentation) = (Vec::new(), None, None);
     if let Some(reuse) = &options.reuse_report {
         let previous = read_json(reuse)?;
         let output = fs::canonicalize(&options.output).unwrap_or_else(|_| options.output.clone());
@@ -338,6 +340,7 @@ pub fn run(root: &Path, options: &Options) -> Result<i32, String> {
             return Err("measurement reuse requires identical workers and feature contract".into());
         }
         reusable = measurement_cache(&previous)?;
+        previous_instrumentation = old.get("instrumentation").cloned();
         previous_sha = Some(digest(reuse)?);
     }
     fs::create_dir_all(&options.output).map_err(|e| e.to_string())?;
@@ -521,6 +524,33 @@ pub fn run(root: &Path, options: &Options) -> Result<i32, String> {
                     };
                 row.push(("timing", timing));
             }
+            if options.memory {
+                let minimum = match contract.get("minimum_pairs") {
+                    Some(Value::Number(n)) => n.as_i128().unwrap_or(i128::MAX),
+                    _ => i128::MAX,
+                };
+                let earlier = old.get("memory").cloned().unwrap_or(Value::Object(vec![]));
+                let kept = super::memory::retained_memory(
+                    &earlier,
+                    options.pairs,
+                    minimum,
+                    previous_instrumentation.as_ref(),
+                    identity.get("instrumentation"),
+                )?;
+                let memory = match kept {
+                    Some(kept) => kept,
+                    None => super::memory::collect(
+                        root,
+                        &candidate,
+                        &reference,
+                        &input,
+                        options.pairs,
+                        options.seed,
+                        &operation,
+                    )?,
+                };
+                row.push(("memory", memory));
+            }
             if old.truthy()
                 && let (Some(sha), Some(reuse)) = (&previous_sha, &options.reuse_report)
             {
@@ -562,7 +592,15 @@ pub fn run(root: &Path, options: &Options) -> Result<i32, String> {
         ]);
         save_json(&options.output.join("partial.json"), &object(partial))?;
     }
-    let mut verdict = acceptance(&contract, &rows, &identity, &target, &coverage, &additional);
+    let mut verdict = acceptance(
+        root,
+        &contract,
+        &rows,
+        &identity,
+        &target,
+        &coverage,
+        &additional,
+    );
     if let Some(error) = source_identity_error(root, &identity)
         && let Value::Object(fields) = &mut verdict
     {

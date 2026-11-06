@@ -61,10 +61,11 @@ make qualify         # correctness, runtime and memory with acceptance
 ```
 
 `cargo xtask report` runs the correctness comparison of one feature contract
-(`--contract`, `--manifest`, `--corpus`) and grades it; with `--benchmark` it also
-collects paired runtime. `cargo xtask compare` compares a single input. The independent
-oracles stay in Python (`harness/*_oracle.py`, run through `python3 -m harness.oracles`).
-Memory collection runs from `harness/runner.py` and `harness/memory.py`;
+(`--contract`, `--manifest`, `--corpus`) and grades it; `--benchmark` adds paired
+runtime and `--memory` the heap and RSS measurement under the native observers
+(`harness/allocations*.c`), including the Linux link-closure and active-window guard
+certificates. `cargo xtask compare` compares a single input. The independent oracles stay
+in Python (`harness/*_oracle.py`, run through `python3 -m harness.oracles`);
 `tools/fuzz_media.py` runs deterministic, replayable byte mutations against debug,
 release and reference workers.
 

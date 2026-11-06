@@ -5,6 +5,9 @@
 pub mod acceptance;
 pub mod comparison;
 pub mod diff;
+pub mod linux;
+#[cfg(test)]
+mod linux_tests;
 pub mod memory;
 pub mod oracle;
 pub mod parity;

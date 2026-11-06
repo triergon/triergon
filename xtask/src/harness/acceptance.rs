@@ -223,6 +223,7 @@ fn timing_valid(row: &Value, contract: &Value, selected: &Value, require_linux: 
 /// The verdict: `accepted` needs the whole module gate, `slice_accepted` the
 /// selected cases of this contract.
 pub fn acceptance(
+    root: &std::path::Path,
     contract: &Value,
     rows: &[Value],
     identity: &Value,
@@ -340,6 +341,7 @@ pub fn acceptance(
         let ratios = ["rss_ratio_upper_95", "heap_ratio_upper_95"]
             .map(|k| float(memory.get(k)).unwrap_or(f64::INFINITY));
         let memory_ok = super::memory::evidence_valid(
+            root,
             row,
             &memory,
             contract,
@@ -382,6 +384,7 @@ pub fn acceptance(
             }
         }
         let extra = acceptance(
+            root,
             &Value::Object(derived),
             &[matches[0].clone()],
             identity,

@@ -98,15 +98,7 @@ fn matched_gate_fixture() -> (Value, Vec<Value>, Value) {
             ])
         })
         .collect();
-    let mut memory = super::memory::evaluate(&samples, 0, &certificate).unwrap();
-    for (key, value) in [
-        ("pairs", Value::int(30)),
-        ("samples", Value::Array(samples)),
-        ("certificate", certificate),
-        ("seed", Value::int(0)),
-    ] {
-        put(&mut memory, &[], key, value);
-    }
+    let memory = super::memory::evaluate(root(), &samples, 30, 0, &certificate);
     let timing = Value::object([
         ("status", Value::str("measured")),
         ("worker_hashes", hashes.clone()),
@@ -139,6 +131,7 @@ fn matched_gate_fixture() -> (Value, Vec<Value>, Value) {
 
 fn verdict(contract: &Value, rows: &[Value], identity: &Value) -> (bool, bool) {
     let result = acceptance(
+        root(),
         contract,
         rows,
         identity,
@@ -155,6 +148,7 @@ fn verdict(contract: &Value, rows: &[Value], identity: &Value) -> (bool, bool) {
 #[test]
 fn empty_or_missing_evidence_cannot_pass() {
     let result = acceptance(
+        root(),
         &load("harness/slice.json"),
         &[],
         &v("{}"),
@@ -182,6 +176,7 @@ fn a_fast_run_does_not_override_correctness() {
                      "timing": {"status": "measured", "pairs": 30, "ratio": {"upper_95": 0.1}, "contaminants": []}}"#,
     )];
     let result = acceptance(
+        root(),
         &load("harness/slice.json"),
         &rows,
         &v("{}"),
@@ -227,6 +222,7 @@ fn non_finite_or_incomplete_measurements_never_satisfy_a_gate() {
             "memory": {{"status": "qualified", "rss_ratio_upper_95": {ratio}, "heap_ratio_upper_95": {ratio}}}}}"#
         ));
         let result = acceptance(
+            root(),
             &load("harness/slice.json"),
             &[row],
             &v(r#"{"source_revision": "pin"}"#),
