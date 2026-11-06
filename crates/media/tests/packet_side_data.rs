@@ -1,6 +1,7 @@
 //! Additional typed-API feature guards, activated only with the private overlay.
 //! Opaque payloads establish wire/ownership behavior, not coded-frame decoding.
 use std::{io::Cursor, sync::atomic::AtomicBool};
+use triergon_core::Step;
 use triergon_core::{Budget, Bytes, InputWindow, SourceCapabilities, SourceId, WorkBudget};
 use triergon_matroska::{
     Error, Limits,
@@ -82,10 +83,10 @@ fn drive(raw: &[u8], known: bool, events: &mut Vec<Event>) -> triergon_matroska:
         let step = reader.step(&mut work, &cancel)?;
         assert!(work.spent() <= 1);
         match step {
-            ParseStep::Yield => (),
-            ParseStep::Event(event) => events.push(event),
-            ParseStep::Finished => return Ok(()),
-            ParseStep::NeedInput(request) => {
+            Step::Yield => (),
+            Step::Ready(event) => events.push(event),
+            Step::End(_) => return Ok(()),
+            Step::NeedInput(request) => {
                 let at = usize::try_from(request.offset).unwrap();
                 assert!(at <= raw.len());
                 if at == raw.len() {

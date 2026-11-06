@@ -1265,7 +1265,6 @@ impl Mov9RecoveryIndexCursor<'_> {
 mod recovery_v2;
 pub use recovery_v2::{
     Mov9InitialDescriptionDiagnostic, Mov9RecoveryV2Association, Mov9RecoveryV2Context,
-    Mov9RecoveryV2IndexCursor, Mov9RecoveryV2IndexEntry, Mov9RecoveryV2Occurrence,
     Mov9RecoveryV2PacketCursor, Mov9RecoveryV2Read, PinnedMovD32RegularRecoveryV2,
 };
 

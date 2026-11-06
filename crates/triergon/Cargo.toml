@@ -1,0 +1,28 @@
+[package]
+name = "triergon"
+version = "0.0.0"
+description = "Triergon facade: the neutral container model, AnyReader and each format crate behind its own feature."
+repository.workspace = true
+license.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+
+[dependencies]
+triergon-core = { path = "../core" }
+triergon-matroska = { path = "../media", optional = true }
+triergon-isobmff = { path = "../isobmff", optional = true }
+triergon-mpegts = { path = "../mpegts", optional = true }
+triergon-framing = { path = "../framing", optional = true }
+triergon-subtitles = { path = "../subtitles", optional = true }
+
+[features]
+default = ["matroska"]
+matroska = ["dep:triergon-matroska"]
+isobmff = ["dep:triergon-isobmff"]
+mpegts = ["dep:triergon-mpegts"]
+framing = ["dep:triergon-framing"]
+subtitles = ["dep:triergon-subtitles"]
+
+[lints]
+workspace = true

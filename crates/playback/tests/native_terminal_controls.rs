@@ -1371,8 +1371,6 @@ fn native_from_start_origin_never_claims_complete_entity_or_source_clock() {
         assert_eq!(p.source.sample.dts_ticks, None);
         assert_eq!(p.source.sample.cts_ticks, None);
     }
-    // String equality lets this same guard produce a runtime RED on the prior
-    // revision, whose public origin falsely claimed complete-source context.
     assert_eq!(
         format!("{:?}", samples[0].native.as_ref().unwrap().clock_origin),
         "FrontSourceMediaStartV1"

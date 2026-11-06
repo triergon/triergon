@@ -154,7 +154,7 @@ fn run(raw: &[u8], quantum: u64, chunk: usize, shared: bool) -> (Vec<Vec<u8>>, O
             assert_eq!(r.position(), before);
         }
         let event = match &step {
-            Ok(ParseStep::Event(Event::Packet(p))) => format!(
+            Ok(Step::Ready(Event::Packet(p))) => format!(
                 "packet:{}/{:?}/{:?}/{}/{:?}/{:?}/{:?}/{:?}",
                 p.packet.track,
                 p.packet.pts_ns,
@@ -165,28 +165,28 @@ fn run(raw: &[u8], quantum: u64, chunk: usize, shared: bool) -> (Vec<Vec<u8>>, O
                 p.group.as_ref().map(|g| g.raw_body().to_vec()),
                 p.packet.timing
             ),
-            Ok(ParseStep::Event(Event::Envelope(ElementEvent::Start(h)))) => {
+            Ok(Step::Ready(Event::Envelope(ElementEvent::Start(h)))) => {
                 format!("start:{}", h.id)
             }
-            Ok(ParseStep::Event(Event::Envelope(ElementEvent::End { id, offset, .. }))) => {
+            Ok(Step::Ready(Event::Envelope(ElementEvent::End { id, offset, .. }))) => {
                 format!("end:{id}/{offset}")
             }
-            Ok(ParseStep::Event(Event::Envelope(ElementEvent::Leaf { header, .. }))) => {
+            Ok(Step::Ready(Event::Envelope(ElementEvent::Leaf { header, .. }))) => {
                 format!("leaf:{}", header.id)
             }
-            Ok(ParseStep::Event(Event::Envelope(ElementEvent::Skipped(h)))) => {
+            Ok(Step::Ready(Event::Envelope(ElementEvent::Skipped(h)))) => {
                 format!("skip:{}", h.id)
             }
-            Ok(ParseStep::Event(Event::Configuration(c))) => format!("config:{}", c.revision()),
-            Ok(ParseStep::Event(Event::Document(_))) => "document".into(),
-            Ok(ParseStep::Event(Event::Seek(_))) => panic!("unexpected seek"),
-            Ok(ParseStep::NeedInput(q)) => format!("need:{}/{}", q.offset, q.maximum),
-            Ok(ParseStep::Yield) => "yield".into(),
-            Ok(ParseStep::Finished) => "finished".into(),
-            Ok(ParseStep::Backpressure {
+            Ok(Step::Ready(Event::Configuration(c))) => format!("config:{}", c.revision()),
+            Ok(Step::Ready(Event::Document(_))) => "document".into(),
+            Ok(Step::Ready(Event::Seek(_))) => panic!("unexpected seek"),
+            Ok(Step::NeedInput(q)) => format!("need:{}/{}", q.offset, q.maximum),
+            Ok(Step::Yield) => "yield".into(),
+            Ok(Step::End(_)) => "finished".into(),
+            Ok(Step::Backpressure(triergon_core::Backpressure {
                 requested,
                 available,
-            }) => format!("pressure:{requested}/{available}"),
+            })) => format!("pressure:{requested}/{available}"),
             Err(error) => format!("error:{error:?}"),
         };
         rows.push(format!(
@@ -198,9 +198,9 @@ fn run(raw: &[u8], quantum: u64, chunk: usize, shared: bool) -> (Vec<Vec<u8>>, O
             event
         ));
         match step {
-            Ok(ParseStep::NeedInput(q)) => supply(&mut r, q, raw, chunk, &mut aliases),
-            Ok(ParseStep::Event(Event::Packet(p))) => packets.push(p),
-            Ok(ParseStep::Finished) => {
+            Ok(Step::NeedInput(q)) => supply(&mut r, q, raw, chunk, &mut aliases),
+            Ok(Step::Ready(Event::Packet(p))) => packets.push(p),
+            Ok(Step::End(_)) => {
                 done = true;
                 break;
             }
@@ -209,7 +209,7 @@ fn run(raw: &[u8], quantum: u64, chunk: usize, shared: bool) -> (Vec<Vec<u8>>, O
                 done = true;
                 break;
             }
-            Ok(ParseStep::Backpressure { .. }) => panic!("small authored input has ample pool"),
+            Ok(Step::Backpressure(_)) => panic!("small authored input has ample pool"),
             Ok(_) => (),
         }
     }
@@ -280,7 +280,7 @@ fn simple_direct_ready_cancel_transport_reset_and_retained_parent() {
                 break;
             }
             match r
-                .step(&mut WorkBudget::new(1), &AtomicBool::new(false))
+                .step_parse(&mut WorkBudget::new(1), &AtomicBool::new(false))
                 .unwrap()
             {
                 ParseStep::NeedInput(q) => supply(&mut r, q, &raw, 7, &mut aliases),
@@ -343,7 +343,7 @@ fn simple_direct_empty_payload_owner_survives_reset_and_reader_drop() {
         let mut output = None;
         for _ in 0..100_000 {
             match r
-                .step(&mut WorkBudget::new(1), &AtomicBool::new(false))
+                .step_parse(&mut WorkBudget::new(1), &AtomicBool::new(false))
                 .unwrap()
             {
                 ParseStep::NeedInput(q) => supply(&mut r, q, &raw, 1, &mut aliases),

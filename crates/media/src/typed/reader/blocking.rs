@@ -509,7 +509,10 @@ mod header_refill_blocking_tests {
         let (mut expected_calls, mut canonical_packets) = (Vec::new(), Vec::new());
         let mut finished = false;
         for _ in 0..100_000 {
-            match canonical.step(&mut WorkBudget::new(8192), &cancel).unwrap() {
+            match canonical
+                .step_parse(&mut WorkBudget::new(8192), &cancel)
+                .unwrap()
+            {
                 ParseStep::NeedInput(request) => {
                     let maximum = request.maximum.min(8192);
                     expected_calls.push((request.offset, maximum.max(1)));

@@ -55,11 +55,11 @@ fn pressure_trace(original_workspace: bool) -> Vec<String> {
         let mut work = WorkBudget::new(1);
         let step = reader.step(&mut work, &AtomicBool::new(false)).unwrap();
         let (label, done) = match step {
-            ParseStep::Yield => ("yield".to_owned(), false),
-            ParseStep::Backpressure {
+            Step::Yield => ("yield".to_owned(), false),
+            Step::Backpressure(triergon_core::Backpressure {
                 requested,
                 available,
-            } => {
+            }) => {
                 assert!(requested > 0);
                 assert_eq!(available, 0);
                 (format!("pressure {requested} {available}"), true)

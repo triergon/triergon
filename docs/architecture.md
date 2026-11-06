@@ -11,13 +11,13 @@ Crates depend only on layers below them. Core never depends on a format.
 
 | Layer | Crates | Role |
 |---|---|---|
-| Foundation | [`triergon-core`](../crates/core) | Budgets, shared byte storage, exact time, input windows, resumable steps, errors |
+| Foundation | [`triergon-core`](../crates/core) | Budgets, shared byte storage, exact time, input windows, resumable steps, errors, the neutral container model (`ContainerReader`) |
 | Formats | [`triergon-matroska`](../crates/media) (Matroska/WebM), [`triergon-isobmff`](../crates/isobmff), [`triergon-mpegts`](../crates/mpegts) | Container readers: tracks, packets, metadata, seeking |
 | Framing | [`triergon-framing`](../crates/framing) | Codec configuration and packet-format adapters (Annex-B, ADTS, AC-3, DTS core, AV1, VP9) |
 | Subtitles | [`triergon-subtitles`](../crates/subtitles) | Text cue extraction and bitmap subtitle decoding |
 | Pixels | [`triergon-pixel`](../crates/pixel) | Decoded-picture views, coded YUV 4:2:0 pictures, BT.601 RGBA to YUV, letterbox into 1920×1080 RGBA |
 | Codecs | [`triergon-codec`](../crates/codec); [`triergon-codec-aac`](../crates/codec-aac), [`-ac3`](../crates/codec-ac3), [`-dca`](../crates/codec-dca), [`-h264`](../crates/codec-h264), [`-hevc`](../crates/codec-hevc); [`triergon-codec-mpeg1`](../crates/codec-mpeg1) | Decoder traits and audio vocabulary; software decoders; MPEG-1 video encoder |
-| Composition | [`triergon-playback`](../crates/playback), [`triergon-session`](../crates/session), [`triergon-capture`](../crates/capture) | Packet feeds over the readers; decode sessions over the codecs; capture sessions from RGBA to MPEG-TS |
+| Composition | [`triergon`](../crates/triergon), [`triergon-playback`](../crates/playback), [`triergon-session`](../crates/session), [`triergon-capture`](../crates/capture) | Consumer facade with `AnyReader`; packet feeds over the readers; decode sessions over the codecs; capture sessions from RGBA to MPEG-TS |
 | Tooling | [`media-worker`](../crates/worker), [`codec-worker`](../crates/codec-worker), [`capture-worker`](../crates/capture-worker), [`harness/`](../harness), [`tools/`](../tools) | Differential and benchmark workers; not part of the library |
 
 The FFmpeg reference workers live in `harness/` as separate processes. They are
@@ -28,8 +28,11 @@ never linked into a library crate.
 Parsers never perform I/O. The caller owns the transport and feeds bounded windows:
 
 - `InputWindow` carries bytes at a known source offset. A parser answers with a
-  `Step` that yields an event, asks for more bytes or a specific byte range, reports
-  the end of a source entity, or finishes. A missing length is not end of file.
+  `Step`: an event (`Ready`), a request for more bytes or a specific byte range
+  (`NeedInput`), a pause because the work budget is spent (`Yield`), backpressure
+  (`Backpressure`), or the end of a source entity (`End`). The backpressure payload
+  is a type parameter: steps that retain no output use an uninhabited type and
+  cannot report it. A missing length is not end of file.
 - Each step runs under a `WorkBudget` and a cancellation flag, so a slow or hostile
   input cannot stall the caller.
 - Parser state survives across windows. Zero bytes of new input is never permission to
@@ -75,34 +78,26 @@ are not part of the consumer API.
 
 ## Dispatch and errors
 
-Readers are concrete types used through generics. A consumer that accepts several
-formats uses one closed enum. There is no global registry and no dynamic dispatch on
-the per-packet path. Errors are typed and keep their detail (for example the
-requested and maximum size of a limit violation).
+Readers are concrete types implementing `ContainerReader`, used through generics. A
+consumer that accepts several formats uses the closed enum `triergon::AnyReader`.
+There is no global registry and no dynamic dispatch on the per-packet path. Errors
+are typed and keep their detail (for example the requested and maximum size of a
+limit violation).
 
 ## Direction
 
-The workspace is being reorganised without behaviour changes. Each step keeps worker
-traces byte-identical and re-runs the performance gates where it touches hot code.
+Open structural work. Each step keeps worker traces byte-identical and re-runs the
+performance gates where it touches hot code.
 
-1. **Foundation.** One `Step` type crossing crate boundaries, extended with
-   backpressure. A neutral container vocabulary in core: `Track`, `Packet` (timing as
-   ticks in the track time base, `RandomAccess::{Sync, NotSync, Unknown}`, trim,
-   configuration and clock epochs), `SeekRequest`, `SeekReceipt` and a neutral colour
-   description (ITU-T H.273 codes). One error type with typed detail. A shared
-   `triergon-bitstream` crate for bit reading, exp-Golomb, RBSP unescaping, CABAC
-   and CRCs.
-2. **Formats.** Matroska, ISO BMFF
-   and MPEG-TS implement one `ContainerReader` trait
-   (`provide`/`step`/`request_seek`/`tracks`), with one generic blocking adapter.
-   Box walking and track classification move out of playback into the readers.
-   Reference-compatible behaviour moves into named `compat` policies; comparison
-   projections move behind a non-default `reference-trace` feature.
-3. **Codecs.** A `triergon-codec` crate with `VideoDecoder` and `AudioDecoder`
-   traits, shared `Picture`, `AudioFrame` and a documented channel order. Codecs
-   allocate through core budgets. Large decoder files split by stage.
-4. **Composition.** A `triergon` facade with an `AnyReader` enum and one Cargo
-   feature per format and codec. Playback runs over `AnyReader`; HLS and codec
-   bridges become separate crates. Decode sessions join playback; the capture
-   encoder splits into a muxer in `triergon-mpegts`, an MPEG-1 encoder crate and a
-   shared pixel-conversion crate.
+1. **Bitstream.** A shared `triergon-bitstream` crate for bit reading, exp-Golomb,
+   RBSP unescaping, CABAC and CRCs.
+2. **Formats.** ISO BMFF and MPEG-TS implement `ContainerReader` and become
+   `AnyReader` variants. Box walking and track classification move out of playback
+   into the readers.
+3. **Reference compatibility.** Reference-compatible behaviour moves into named
+   `compat` policies. The MPEG-TS packet-completion projection sits behind the
+   non-default `reference-trace` feature; the remaining comparison projections
+   follow it.
+4. **Codecs.** Codecs allocate through core budgets.
+5. **Composition.** Playback runs over `AnyReader`; HLS and codec bridges become
+   separate crates.

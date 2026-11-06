@@ -11,7 +11,7 @@ use crate::{
 use std::sync::atomic::{AtomicBool, Ordering};
 use triergon_core::{
     Budget, BudgetVec, Bytes, InputCursor, InputRequest, InputToken, InputWindow,
-    SourceCapabilities, SourceFailure, SourceId, Step, WorkBudget,
+    SourceCapabilities, SourceFailure, SourceId, SourceLocation, Step, WorkBudget,
 };
 
 const SEGMENT: u64 = 0x18538067;
@@ -266,6 +266,12 @@ impl ElementReader {
     }
     pub fn request(&self) -> InputRequest {
         self.input.request()
+    }
+    pub fn location(&self) -> SourceLocation {
+        SourceLocation {
+            source: self.input.source(),
+            offset: self.input.position(),
+        }
     }
     pub fn provide(&mut self, window: &InputWindow) -> Result<()> {
         self.input.provide(window)

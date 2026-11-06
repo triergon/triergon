@@ -13,5 +13,18 @@ triergon-core = { path = "../core" }
 [dev-dependencies]
 triergon-harness-protocol = { path = "../harness-protocol" }
 
+[features]
+# Trace-only projections the harness compares against the reference; not
+# shipped behaviour.
+reference-trace = []
+
+[[example]]
+name = "mpegts_native_pes_trace"
+required-features = ["reference-trace"]
+
+[[test]]
+name = "selected_native_carriage_v2"
+required-features = ["reference-trace"]
+
 [lints]
 workspace = true

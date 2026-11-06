@@ -1,11 +1,11 @@
 # triergon-core
 
 Shared vocabulary for every Triergon format and codec crate: exact rational
-time, capacity-accounted byte storage, a poll-based input cursor, per-step work
-budgets and one error type. It is the bottom layer of the workspace and depends
-only on `std`. It performs no I/O, owns no threads and knows nothing about any
-container: packet boundaries, codec configuration and clock epochs belong to the
-format crates built on it.
+time, capacity-accounted byte storage, a poll-based input cursor, resumable
+steps, per-step work budgets, one error type and the format-neutral container
+model. It is the bottom layer of the workspace and depends only on `std`. It
+performs no I/O, owns no threads and implements no format: packet boundaries,
+codec configuration and clock epochs belong to the format crates built on it.
 
 ## Usage
 
@@ -49,8 +49,10 @@ let ms = base.rescale(183_003, TimeBase::new(1, 1000)?, Rounding::Floor)?;
 |---|---|
 | Time | `Time` (reduced `i128`/`u128` seconds), `TimeBase` (reduced positive `u64` ratio), `Rounding` |
 | Storage | `Budget`, `Reservation`, `Bytes`, `BytesWriter`, `BudgetVec<T>`, `BudgetVecIntoIter`, `OwnedInputBytes`, `ByteStorageAddress`, `nonzero_prefix_len` |
-| Input | `InputCursor`, `InputRequest`, `InputWindow`, `InputToken`, `SourceId`, `SourceCapabilities`, `SourceLocation`, `SourceFailure`, `Step<T>` |
+| Input | `InputCursor`, `InputRequest`, `InputWindow`, `InputToken`, `SourceId`, `SourceCapabilities`, `SourceLocation`, `SourceFailure` |
+| Steps | `Step<T, B>`, `Backpressure` |
 | Work | `WorkBudget` |
+| Container model | module `container`: `ContainerReader`, `ReaderStep`, `Event`, `PacketInfo`, `TrackInfo`, `TrackId`, `MediaKind`, `RandomAccess`, `Trim`, seek and colour types |
 | Errors | `Error`, `Result`, `FreezeError`, `PushError<T>`, `TransferError` |
 
 ## Behaviour and limits
@@ -78,7 +80,8 @@ requested capacity, not RSS or allocator overhead.
 
 Two capacity errors are distinct. `Error::Limit` means the request can never fit
 the policy. `Error::Backpressure` means it fits once the caller releases retained
-output; the operation can be retried without losing state.
+output; the operation can be retried without losing state. Readers that own output
+storage report the same condition as `Step::Backpressure` (see below).
 
 **Input cursor.** `InputCursor` holds at most one supplied window at a time
 (at most `maximum_window` bytes, or 12 inline bytes via `provide_inline`
@@ -109,6 +112,49 @@ doing it; an exhausted budget returns `Step::Yield` (or the format's equivalent)
 at a resumable point. Cancellation is an `&AtomicBool` checked at every read;
 once observed it is sticky until `reset`.
 
+**Steps.** `Step<T, B = Infallible>` is the outcome of one bounded unit of
+resumable work: `Ready(T)`, `NeedInput(InputRequest)`, `Yield` (work budget
+spent), `Backpressure(B)` or `End(SourceLocation)` (end of this source entity; a
+playlist or transport parser decides whether it is also the logical end). `B` is
+the backpressure payload. Operations that retain no output storage, such as cursor
+reads and most framers, keep the uninhabited default, so callers match without a
+backpressure arm. Readers that own output storage return `Step<T, Backpressure>`;
+`Backpressure { requested, available }` says how much retained output must be
+released before stepping again.
+
+## Container model
+
+`triergon_core::container` is the vocabulary every container reader shares.
+Readers keep their own rich packet and track types and expose them through views,
+so nothing is converted or copied per packet and format detail stays on the format
+type.
+
+| Item | Meaning |
+|---|---|
+| `ContainerReader` | The resumable reader interface: `provide`, `finish`, `fail`, `reset`, `step`, `request_seek`, `track_count`, `track`, `capabilities`. Associated types `Packet: PacketInfo`, `Track: TrackInfo + ?Sized`, `Other` |
+| `ReaderStep<R>` | What `step` returns: `Step<Event<R::Packet, R::Other>, Backpressure>` |
+| `Event<P, X>` | `Packet(P)`, `Seek(SeekReceipt)` or `Other(X)` (configuration, documents, structure) |
+| `PacketInfo` | `track`, `payload`, `time_base`, `pts`, `dts`, `duration` (ticks in `time_base`), `random_access`, `trim`, and `pts_time` as exact `Time` |
+| `TrackInfo` | `id`, `kind`, `codec_tag` (the container's own identifier, unnormalised), `configuration` (codec configuration bytes), `language`, `default_track`, `forced`, `colour` |
+| `TrackId` | Matroska TrackNumber, ISO BMFF track_ID or MPEG-TS elementary PID |
+| `MediaKind`, `RandomAccess`, `Trim` | `Video`/`Audio`/`Subtitle`/`Data`/`Unknown`; `Sync`/`NotSync`/`Unknown`; samples to discard at start and end |
+| `SeekRequest`, `SeekPolicy` | track, target `Time`, `PreviousRandomAccess` or `PlaybackPreroll` |
+| `SeekReceipt`, `SeekMethod` | `requested`, `landing`, `discard_until`, `scanned_bytes`, `replays_from_start`; `Index`, `BoundedScan` or `Restart` |
+| `ColourDescription` | ITU-T H.273 primaries, transfer, matrix and `ColourRange`, chroma siting, `MasteringDisplay` (SMPTE ST 2086), `ContentLight` (CTA-861.3) |
+| `Sourced<T>`, `Origin` | a value with its provenance: `Container`, `Bitstream` or `SpecificationDefault` |
+
+Every implementation follows the same rules: no fabricated values (`None` or
+`RandomAccess::Unknown` unless the source or a documented rule supplies them), no
+sentinels, and specification defaults only with `Origin::SpecificationDefault`.
+`dts` is `None` where the container carries no decode time. H.273 codes stay
+numeric, and a conflict between container and bitstream colour is reported as two
+descriptions, never resolved. Readers are concrete types used through generics or
+one closed enum; there is no registry and no dynamic dispatch on the packet path
+(`Track` may be `dyn TrackInfo` for a closed enum). Implementations:
+`triergon_matroska::typed::Reader` and the facade's `triergon::AnyReader`. The
+semantic contract is described in
+[docs/architecture.md](../../docs/architecture.md#container-contract).
+
 ## Conformance
 
 The arithmetic follows exact rational semantics; there is no external
@@ -123,6 +169,9 @@ specification. Verification:
   cases.
 - Two `compile_fail` doctests on `OwnedInputBytes` prove produced storage
   cannot be turned back into caller input.
+- Container-model unit tests check exact packet time without fabricated values and
+  that the neutral value types stay small on 32-bit targets; the format crates test
+  their implementations.
 
 The crate forbids `unsafe` code and has no dependencies. Project-wide gates and
 the FFmpeg comparison harness are described in [docs/quality.md](../../docs/quality.md).

@@ -45,7 +45,7 @@ fn seek_window_extra_truncated_seek_keeps_error_and_old_output_owner() {
 fn seek_window_extra_scan_limit_keeps_refusal_and_retained_output() {
     let raw = include_bytes!(concat!(
         env!("CARGO_MANIFEST_DIR"),
-        "/../../.research/seek-fixtures/cues-front.mkv"
+        "/tests/fixtures/seek/cues-front.mkv"
     ));
     for policy in policy_cases() {
         for chunk in [7, 8192] {

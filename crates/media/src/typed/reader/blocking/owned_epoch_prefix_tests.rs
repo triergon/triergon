@@ -9,35 +9,35 @@ use triergon_core::{Budget, OwnedInputBytes};
 const FIXTURES: [&[u8]; 8] = [
     include_bytes!(concat!(
         env!("CARGO_MANIFEST_DIR"),
-        "/../../.research/seek-fixtures/cues-end.mkv"
+        "/tests/fixtures/seek/cues-end.mkv"
     )),
     include_bytes!(concat!(
         env!("CARGO_MANIFEST_DIR"),
-        "/../../.research/seek-fixtures/cues-relative.mkv"
+        "/tests/fixtures/seek/cues-relative.mkv"
     )),
     include_bytes!(concat!(
         env!("CARGO_MANIFEST_DIR"),
-        "/../../.research/seek-fixtures/cues-front.mkv"
+        "/tests/fixtures/seek/cues-front.mkv"
     )),
     include_bytes!(concat!(
         env!("CARGO_MANIFEST_DIR"),
-        "/../../.research/seek-fixtures/cues-preroll.mkv"
+        "/tests/fixtures/seek/cues-preroll.mkv"
     )),
     include_bytes!(concat!(
         env!("CARGO_MANIFEST_DIR"),
-        "/../../.research/seek-fixtures/cues-delay-preroll.mkv"
+        "/tests/fixtures/seek/cues-delay-preroll.mkv"
     )),
     include_bytes!(concat!(
         env!("CARGO_MANIFEST_DIR"),
-        "/../../.research/seek-fixtures/cues-sparse.mkv"
+        "/tests/fixtures/seek/cues-sparse.mkv"
     )),
     include_bytes!(concat!(
         env!("CARGO_MANIFEST_DIR"),
-        "/../../.research/seek-fixtures/cues-unknown-cluster.mkv"
+        "/tests/fixtures/seek/cues-unknown-cluster.mkv"
     )),
     include_bytes!(concat!(
         env!("CARGO_MANIFEST_DIR"),
-        "/../../.research/seek-fixtures/cues-missing.mkv"
+        "/tests/fixtures/seek/cues-missing.mkv"
     )),
 ];
 

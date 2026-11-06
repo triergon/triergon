@@ -30,7 +30,8 @@ It is written from the published standards and measured case by case against FFm
 
 | Crate | What it gives you |
 |---|---|
-| [`triergon-core`](crates/core) | Budgets, shared byte buffers, exact time, input windows, resumable steps |
+| [`triergon`](crates/triergon) | Facade: core vocabulary, container model, `AnyReader` and one Cargo feature per format |
+| [`triergon-core`](crates/core) | Budgets, shared byte buffers, exact time, input windows, resumable steps, the neutral container model |
 | [`triergon-matroska`](crates/media) | Matroska and WebM reader with seeking, chapters, tags, attachments, colour and HDR |
 | [`triergon-isobmff`](crates/isobmff) | MP4, MOV and fragmented MP4: sample tables, edit lists, range-based playback |
 | [`triergon-mpegts`](crates/mpegts) | MPEG-TS and M2TS: PSI, PES assembly, timestamps, HLS segments |

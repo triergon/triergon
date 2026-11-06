@@ -13,6 +13,8 @@ mod media_entity;
 pub mod mux;
 pub mod native_catalogue;
 pub mod native_input;
+/// Packet-completion trace projection, used only by the reference trace tooling.
+#[cfg(feature = "reference-trace")]
 pub mod native_packet_completion;
 pub mod native_pes;
 pub mod native_recovery;

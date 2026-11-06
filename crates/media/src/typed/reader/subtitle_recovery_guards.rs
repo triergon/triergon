@@ -72,7 +72,7 @@ impl Driver {
     fn step(&mut self, cancel: bool) -> crate::Result<ParseStep<Event>> {
         let before = self.reader.request();
         let mut work = WorkBudget::new(1);
-        let result = self.reader.step(&mut work, &AtomicBool::new(cancel));
+        let result = self.reader.step_parse(&mut work, &AtomicBool::new(cancel));
         assert!(work.spent() <= 1);
         let after = self.reader.request();
         if before.token.request() == after.token.request()
@@ -168,7 +168,7 @@ fn subtitle_recovery_work_zero_cancel_and_reset_keep_real_cursor_and_source_iden
     assert!(matches!(
         driver
             .reader
-            .step(&mut zero, &AtomicBool::new(false))
+            .step_parse(&mut zero, &AtomicBool::new(false))
             .unwrap(),
         ParseStep::Yield | ParseStep::NeedInput(_)
     ));
@@ -221,7 +221,7 @@ fn subtitle_recovery_external_pressure_retries_without_consuming_pending_input_o
     assert!(matches!(
         driver
             .reader
-            .step(&mut zero, &AtomicBool::new(false))
+            .step_parse(&mut zero, &AtomicBool::new(false))
             .unwrap(),
         ParseStep::Yield | ParseStep::Backpressure { .. }
     ));

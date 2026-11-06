@@ -379,7 +379,7 @@ fn seek_window_whole_core_response_reduces_physical_callback_bounces() {
 fn seek_window_epoch_certificate_keeps_public_hint_and_stops_before_replay() {
     let raw = include_bytes!(concat!(
         env!("CARGO_MANIFEST_DIR"),
-        "/../../.research/seek-fixtures/cues-end.mkv"
+        "/tests/fixtures/seek/cues-end.mkv"
     ));
     let pool = Budget::new(512 * 1024).unwrap();
     let base = pool.used();
@@ -403,7 +403,10 @@ fn seek_window_epoch_certificate_keeps_public_hint_and_stops_before_replay() {
             reader.seek_for_playback(0, 7_500_000_000).unwrap();
             sought = true;
         }
-        match reader.step(&mut WorkBudget::new(8192), &cancel).unwrap() {
+        match reader
+            .step_parse(&mut WorkBudget::new(8192), &cancel)
+            .unwrap()
+        {
             ParseStep::NeedInput(request) => {
                 if sought
                     && matches!(reader.seek_mode, SeekMode::Epoch)

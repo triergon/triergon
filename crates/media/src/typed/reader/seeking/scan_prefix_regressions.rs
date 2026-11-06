@@ -237,7 +237,7 @@ fn open(reader: &mut Reader, feed: &mut Feed<'_>) -> Result<()> {
         if reader.is_ready() {
             return Ok(());
         }
-        match reader.step(&mut WorkBudget::new(8192), &AtomicBool::new(false))? {
+        match reader.step_parse(&mut WorkBudget::new(8192), &AtomicBool::new(false))? {
             ParseStep::NeedInput(request) => feed.supply(reader, request)?,
             ParseStep::Yield | ParseStep::Event(_) => (),
             other => panic!("opening must be bounded: {other:?}"),
@@ -252,10 +252,10 @@ fn drain(reader: &mut Reader, feed: &mut Feed<'_>, quantum: u64) -> Result<Vec<P
         let step = reader.step(&mut work, &AtomicBool::new(false))?;
         assert!(work.spent() <= quantum);
         match step {
-            ParseStep::NeedInput(request) => feed.supply(reader, request)?,
-            ParseStep::Event(Event::Packet(value)) => packets.push(view(value)),
-            ParseStep::Yield | ParseStep::Event(_) => (),
-            ParseStep::Finished => return Ok(packets),
+            Step::NeedInput(request) => feed.supply(reader, request)?,
+            Step::Ready(Event::Packet(value)) => packets.push(view(value)),
+            Step::Yield | Step::Ready(_) => (),
+            Step::End(_) => return Ok(packets),
             other => panic!("ample-pool replay stalled: {other:?}"),
         }
     }
@@ -269,12 +269,12 @@ fn seek(reader: &mut Reader, feed: &mut Feed<'_>, quantum: u64) -> Result<(Recei
         assert!(work.spent() <= quantum);
         spent += work.spent();
         match step? {
-            ParseStep::NeedInput(request) => feed.supply(reader, request)?,
-            ParseStep::Event(Event::Seek(receipt)) => return Ok((receipt.into(), spent)),
-            ParseStep::Event(Event::Packet(_)) => {
+            Step::NeedInput(request) => feed.supply(reader, request)?,
+            Step::Ready(Event::Seek(receipt)) => return Ok((receipt.into(), spent)),
+            Step::Ready(Event::Packet(_)) => {
                 panic!("no packet before a completed seek receipt")
             }
-            ParseStep::Yield | ParseStep::Event(_) => (),
+            Step::Yield | Step::Ready(_) => (),
             other => panic!("seek must finish or report its real error: {other:?}"),
         }
     }
@@ -746,7 +746,7 @@ fn scan_prefix_control_zero_work_cancel_reset_and_hidden_owner_lifetime() {
         let step = reader
             .step(&mut WorkBudget::new(32), &AtomicBool::new(false))
             .unwrap();
-        if let ParseStep::NeedInput(request) = step {
+        if let Step::NeedInput(request) = step {
             feed.supply(&mut reader, request).unwrap();
         }
         if reader.position() >= body_start as u64 + 16
@@ -761,7 +761,9 @@ fn scan_prefix_control_zero_work_cancel_reset_and_hidden_owner_lifetime() {
     let used = pool.used();
     let mut zero = WorkBudget::new(0);
     assert!(matches!(
-        reader.step(&mut zero, &AtomicBool::new(false)).unwrap(),
+        reader
+            .step_parse(&mut zero, &AtomicBool::new(false))
+            .unwrap(),
         ParseStep::Yield
     ));
     assert_eq!(
@@ -803,7 +805,7 @@ fn scan_prefix_control_complete_first_span_keeps_zero_and_one_work_boundaries() 
     let mut supplied_body = false;
     for _ in 0..100_000 {
         match reader
-            .step(&mut WorkBudget::new(1), &AtomicBool::new(false))
+            .step_parse(&mut WorkBudget::new(1), &AtomicBool::new(false))
             .unwrap()
         {
             ParseStep::NeedInput(request) => {
@@ -822,7 +824,7 @@ fn scan_prefix_control_complete_first_span_keeps_zero_and_one_work_boundaries() 
     let mut first_span_work = WorkBudget::new(11);
     assert!(matches!(
         reader
-            .step(&mut first_span_work, &AtomicBool::new(false))
+            .step_parse(&mut first_span_work, &AtomicBool::new(false))
             .unwrap(),
         ParseStep::Yield
     ));
@@ -832,7 +834,9 @@ fn scan_prefix_control_complete_first_span_keeps_zero_and_one_work_boundaries() 
     let used = pool.used();
     let mut zero = WorkBudget::new(0);
     assert!(matches!(
-        reader.step(&mut zero, &AtomicBool::new(false)).unwrap(),
+        reader
+            .step_parse(&mut zero, &AtomicBool::new(false))
+            .unwrap(),
         ParseStep::Yield
     ));
     assert_eq!(
@@ -859,14 +863,14 @@ fn scan_prefix_cancellation_releases_the_complete_span() {
     let cancel = AtomicBool::new(false);
     for _ in 0..100_000 {
         match reader.step(&mut WorkBudget::new(1), &cancel).unwrap() {
-            ParseStep::NeedInput(request) => {
+            Step::NeedInput(request) => {
                 feed.hold = request.offset == body_start;
                 feed.supply(&mut reader, request).unwrap();
                 if feed.hold {
                     break;
                 }
             }
-            ParseStep::Yield | ParseStep::Event(Event::Envelope(_)) => (),
+            Step::Yield | Step::Ready(Event::Envelope(_)) => (),
             other => panic!("expected the block input request, got {other:?}"),
         }
     }
@@ -875,7 +879,7 @@ fn scan_prefix_cancellation_releases_the_complete_span() {
         reader
             .step(&mut WorkBudget::new(body_size as u64), &cancel)
             .unwrap(),
-        ParseStep::Yield
+        Step::Yield
     ));
     assert_eq!(reader.position(), fixture.raw.len() as u64);
     let header = reader.envelope.scan_prefix_header().unwrap();
@@ -910,7 +914,10 @@ fn scan_prefix_control_caller_pressure_can_be_released_without_losing_seek_progr
     let mut receipt = None;
     for _ in 0..200_000 {
         let mut work = WorkBudget::new(8192);
-        match reader.step(&mut work, &AtomicBool::new(false)).unwrap() {
+        match reader
+            .step_parse(&mut work, &AtomicBool::new(false))
+            .unwrap()
+        {
             ParseStep::NeedInput(request) => feed.supply(&mut reader, request).unwrap(),
             ParseStep::Backpressure { .. } => {
                 assert!(
@@ -920,7 +927,9 @@ fn scan_prefix_control_caller_pressure_can_be_released_without_losing_seek_progr
                 let position = reader.position();
                 let mut zero = WorkBudget::new(0);
                 assert!(matches!(
-                    reader.step(&mut zero, &AtomicBool::new(false)).unwrap(),
+                    reader
+                        .step_parse(&mut zero, &AtomicBool::new(false))
+                        .unwrap(),
                     ParseStep::Yield | ParseStep::Backpressure { .. }
                 ));
                 assert_eq!((reader.position(), zero.spent()), (position, 0));
@@ -1056,9 +1065,9 @@ fn scan_prefix_control_real_subtitle_recovery_prefix_preserves_all_native_suffix
 
 // Additional semantic guards for keeping the same seek job in its Reader slot.
 // Original guards above remain byte-for-byte unchanged.
-fn inplace_trace_step(step: &ParseStep<Event>) -> String {
+fn inplace_trace_step(step: &Step<Event, triergon_core::Backpressure>) -> String {
     match step {
-        ParseStep::NeedInput(r) => format!(
+        Step::NeedInput(r) => format!(
             "input:{}:{}:{}:{}:{}",
             r.source.0,
             r.token.generation(),
@@ -1066,14 +1075,14 @@ fn inplace_trace_step(step: &ParseStep<Event>) -> String {
             r.offset,
             r.maximum
         ),
-        ParseStep::Yield => "yield".to_owned(),
-        ParseStep::Finished => "finished".to_owned(),
-        ParseStep::Backpressure {
+        Step::Yield => "yield".to_owned(),
+        Step::End(_) => "finished".to_owned(),
+        Step::Backpressure(triergon_core::Backpressure {
             requested,
             available,
-        } => format!("pressure:{requested}:{available}"),
-        ParseStep::Event(Event::Packet(p)) => format!("packet:{:?}", view(p.clone())),
-        ParseStep::Event(Event::Configuration(c)) => format!(
+        }) => format!("pressure:{requested}:{available}"),
+        Step::Ready(Event::Packet(p)) => format!("packet:{:?}", view(p.clone())),
+        Step::Ready(Event::Configuration(c)) => format!(
             "configuration:{}:{}:{:?}",
             c.generation(),
             c.revision(),
@@ -1082,12 +1091,12 @@ fn inplace_trace_step(step: &ParseStep<Event>) -> String {
                 .map(|t| (t.number, t.kind, t.codec_private.to_vec()))
                 .collect::<Vec<_>>()
         ),
-        ParseStep::Event(Event::Seek(r)) => format!("seek:{:?}", Receipt::from(*r)),
-        ParseStep::Event(Event::Document(d)) => format!("document:{}:{:?}", d.kind(), d.raw()),
-        ParseStep::Event(Event::Envelope(ElementEvent::Leaf { header, data })) => {
+        Step::Ready(Event::Seek(r)) => format!("seek:{:?}", Receipt::from(*r)),
+        Step::Ready(Event::Document(d)) => format!("document:{}:{:?}", d.kind(), d.raw()),
+        Step::Ready(Event::Envelope(ElementEvent::Leaf { header, data })) => {
             format!("leaf:{header:?}:{:?}", data.as_ref())
         }
-        ParseStep::Event(Event::Envelope(e)) => format!("envelope:{e:?}"),
+        Step::Ready(Event::Envelope(e)) => format!("envelope:{e:?}"),
     }
 }
 fn inplace_trace_seek(
@@ -1108,10 +1117,10 @@ fn inplace_trace_seek(
             inplace_trace_step(&step)
         ));
         match step {
-            ParseStep::NeedInput(request) => feed.supply(reader, request).unwrap(),
-            ParseStep::Event(Event::Seek(receipt)) => return (receipt.into(), trace),
-            ParseStep::Event(Event::Packet(_)) => panic!("packet before seek receipt"),
-            ParseStep::Yield | ParseStep::Event(_) => (),
+            Step::NeedInput(request) => feed.supply(reader, request).unwrap(),
+            Step::Ready(Event::Seek(receipt)) => return (receipt.into(), trace),
+            Step::Ready(Event::Packet(_)) => panic!("packet before seek receipt"),
+            Step::Yield | Step::Ready(_) => (),
             other => panic!("seek trace did not finish: {other:?}"),
         }
     }
@@ -1214,7 +1223,7 @@ fn scan_inplace_guard_pending_best_cancel_reset_retained_alias() {
         let step = reader
             .step(&mut WorkBudget::new(1), &AtomicBool::new(false))
             .unwrap();
-        if let ParseStep::NeedInput(r) = step {
+        if let Step::NeedInput(r) = step {
             feed.supply(&mut reader, r).unwrap();
         }
         if reader

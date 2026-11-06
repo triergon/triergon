@@ -85,11 +85,25 @@ pub enum SourceFailure {
     Cancelled,
 }
 
+/// Retained output storage is exhausted: release output, then step again.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct Backpressure {
+    pub requested: usize,
+    pub available: usize,
+}
+
+/// The outcome of one bounded unit of resumable work.
+///
+/// `B` is the backpressure payload. Operations that retain no output storage
+/// (input cursors, most framers) use the default uninhabited `Infallible`, so
+/// their callers match without a backpressure arm; readers that own output
+/// storage return `Step<T, Backpressure>`.
 #[derive(Debug)]
-pub enum Step<T> {
+pub enum Step<T, B = std::convert::Infallible> {
     Ready(T),
     NeedInput(InputRequest),
     Yield,
+    Backpressure(B),
     /// End of this source entity. A playlist/transport parser decides whether
     /// this is also its logical EOF; an entity boundary need not flush a PES.
     End(SourceLocation),
