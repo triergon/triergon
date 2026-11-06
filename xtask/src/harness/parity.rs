@@ -68,7 +68,7 @@ fn set(result: &mut Value, key: &str, value: Value) {
 }
 
 /// The packet view of the content oracle: codec private data and frame payloads.
-fn projected_content(trace: &Value) -> Option<Value> {
+pub fn projected_content(trace: &Value) -> Option<Value> {
     let private = trace
         .get("tracks")?
         .as_array()?
@@ -94,7 +94,7 @@ fn projected_content(trace: &Value) -> Option<Value> {
 
 /// The raw native output and the candidate's storage view may differ only on
 /// the reviewed paths, and the native output must be the reviewed one.
-fn review_native_difference(
+pub(super) fn review_native_difference(
     storage: &Value,
     native: &Value,
     rule: &Value,

@@ -1,5 +1,5 @@
 //! The independent Python oracles (exact source timing, zlib content, colour
-//! and catalogue), run as `python3 -m harness.oracles KIND FILE`.
+//! and catalogue), run as `python3 -m harness.oracles KIND [FILE]`.
 
 use std::path::Path;
 use std::process::Command;
@@ -10,8 +10,13 @@ use crate::json::{self, Value};
 pub enum Kind {
     Timing,
     Content,
+    /// The first track's private data and single frame, decoded through its
+    /// content encoding chain.
+    Chain,
     Colour,
     Catalogue,
+    /// zlib streams and the outputs Python's zlib decodes from them; reads no file.
+    Inflate,
 }
 
 impl Kind {
@@ -19,8 +24,10 @@ impl Kind {
         match self {
             Kind::Timing => "timing",
             Kind::Content => "content",
+            Kind::Chain => "chain",
             Kind::Colour => "colour",
             Kind::Catalogue => "catalogue",
+            Kind::Inflate => "inflate",
         }
     }
 }
@@ -28,9 +35,18 @@ impl Kind {
 /// The oracle's expectation for `file`, or the message of the malformed-input
 /// error it raised. An oracle that fails any other way aborts the run.
 pub fn run(root: &Path, kind: Kind, file: &Path) -> Result<Result<Value, String>, String> {
+    invoke(root, kind, Some(file))
+}
+
+/// The expectation of an oracle that reads no input file.
+pub fn generate(root: &Path, kind: Kind) -> Result<Result<Value, String>, String> {
+    invoke(root, kind, None)
+}
+
+fn invoke(root: &Path, kind: Kind, file: Option<&Path>) -> Result<Result<Value, String>, String> {
     let output = Command::new("python3")
         .args(["-m", "harness.oracles", kind.name()])
-        .arg(file)
+        .args(file)
         .current_dir(root)
         .output()
         .map_err(|e| format!("cannot run the {} oracle: {e}", kind.name()))?;
@@ -38,7 +54,7 @@ pub fn run(root: &Path, kind: Kind, file: &Path) -> Result<Result<Value, String>
         return Err(format!(
             "{} oracle failed on {}: {}",
             kind.name(),
-            file.display(),
+            file.map_or("no input".into(), |f| f.display().to_string()),
             String::from_utf8_lossy(&output.stderr)
         ));
     }

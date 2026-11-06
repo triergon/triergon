@@ -3,6 +3,7 @@
 use super::acceptance::{acceptance, active_cpu};
 use super::comparison::{reference_record, reference_summary, rule_for, validate_case_evidence};
 use super::diff::differences;
+use super::parity::review_native_difference;
 use crate::json::{Value, parse};
 
 fn root() -> &'static std::path::Path {
@@ -655,4 +656,29 @@ fn the_delivery_ceiling_is_inclusive_and_does_not_replace_correctness_or_memory(
         Value::float(1.0),
     );
     assert!(!verdict(&contract, &rows, &identity).1);
+}
+
+#[test]
+fn same_difference_paths_do_not_allow_changed_native_values() {
+    let source = v(r#"{"packets": [{"payload": "02"}]}"#);
+    // SHA-256 of the compact key-sorted JSON of the reviewed native output,
+    // {"packets":[{"payload":"01"}]}, as Python's hashlib and json write it.
+    let rule = v(
+        r#"{"id": "test", "raw_native_difference_paths": ["/packets/0/payload"],
+        "raw_native_output_sha256": "84100540687d0b5ca39405399357d4ea135b7e847c99739cdaff664a93038807"}"#,
+    );
+    let status = |native: &Value| {
+        let (_, disposition, _) = review_native_difference(&source, native, &rule);
+        disposition
+            .get("status")
+            .and_then(Value::as_str)
+            .map(str::to_owned)
+    };
+    let native = v(r#"{"packets": [{"payload": "01"}]}"#);
+    assert_eq!(status(&native).as_deref(), Some("reviewed"));
+    let altered = v(r#"{"packets": [{"payload": "03"}]}"#);
+    assert_eq!(
+        status(&altered).as_deref(),
+        Some("unexpected-native-difference")
+    );
 }
