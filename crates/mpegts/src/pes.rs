@@ -356,6 +356,52 @@ impl PesAssembler {
         self.payload_len = 0;
         Ok(AssemblyStep::Output(result))
     }
+    fn complete_timed_header(
+        &mut self,
+        work: &mut WorkBudget,
+        cancel: &AtomicBool,
+    ) -> Result<bool> {
+        let pending = self
+            .payload
+            .as_ref()
+            .ok_or(Error::Invalid("PES payload missing"))?;
+        let bytes = &pending.bytes.as_ref()[pending.position..];
+        let Some((header, total)) = parse_timed_header(bytes, self.limits.pes_bytes, work) else {
+            return Ok(false);
+        };
+        let id = header.stream_id;
+        if !(id == 0xbd || (0xc0..=0xef).contains(&id))
+            || (total.is_none() && !(self.video && (0xe0..=0xef).contains(&id)))
+        {
+            return Ok(false);
+        }
+        let used = header.as_bytes().len();
+        let extent = SourceRange {
+            entity: pending.entity,
+            offset: pending
+                .offset
+                .checked_add(pending.position as u64)
+                .ok_or(Error::Overflow)?,
+            bytes: used,
+        };
+        let merge = prepare_range(&mut self.header_ranges, extent, self.limits.source_spans)?;
+        if cancel.load(Ordering::Relaxed) {
+            return Err(Error::Cancelled);
+        }
+        commit_range(&mut self.header_ranges, extent, merge)?;
+        work.take(used as u64 + 3);
+        self.header_used = used;
+        self.header_target = used;
+        self.seen = used;
+        self.total = total;
+        self.header = Some(header);
+        self.payload
+            .as_mut()
+            .ok_or(Error::Invalid("PES payload missing"))?
+            .position += used;
+        Ok(true)
+    }
+
     fn poll_inner<const RETAIN: bool>(
         &mut self,
         work: &mut WorkBudget,
@@ -473,6 +519,13 @@ impl PesAssembler {
                 continue;
             }
             if self.header.is_none() {
+                if !RETAIN && self.header_used == 0 && self.complete_timed_header(work, cancel)? {
+                    continue;
+                }
+                let pending = self
+                    .payload
+                    .as_ref()
+                    .ok_or(Error::Invalid("PES payload missing"))?;
                 if !work.try_charge(1) {
                     return Ok(AssemblyStep::Yield);
                 }
@@ -604,6 +657,33 @@ fn timestamp(bytes: &[u8], prefix: u8) -> Result<u64> {
         | (u64::from(bytes[2] & 0xfe) << 14)
         | (u64::from(bytes[3]) << 7)
         | u64::from(bytes[4] >> 1))
+}
+
+/// Parse a complete timestamp-only header without stepping its three stages.
+/// Refusal leaves the caller free to use the ordinary parser and diagnostics.
+pub(crate) fn parse_timed_header(
+    bytes: &[u8],
+    maximum: usize,
+    work: &WorkBudget,
+) -> Option<(PesHeader, Option<usize>)> {
+    let prefix = bytes.first_chunk::<9>()?;
+    if prefix[..3] != [0, 0, 1] || !matches!((prefix[7], prefix[8]), (0x80, 5) | (0xc0, 10)) {
+        return None;
+    }
+    let used = 9 + usize::from(prefix[8]);
+    if used > maximum || work.remaining() < used as u64 + 3 {
+        return None;
+    }
+    let length = usize::from(u16::from_be_bytes([prefix[4], prefix[5]]));
+    let declared = (length != 0).then_some(length + 6);
+    if declared.is_some_and(|total| total < used || total > maximum) {
+        return None;
+    }
+    let mut raw = [0; HEADER_MAX];
+    raw[..used].copy_from_slice(bytes.get(..used)?);
+    parse_header(&raw, used)
+        .ok()
+        .map(|header| (header, declared))
 }
 
 pub(crate) fn parse_header(raw: &[u8; HEADER_MAX], used: usize) -> Result<PesHeader> {

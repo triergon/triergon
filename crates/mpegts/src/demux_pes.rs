@@ -5,7 +5,7 @@
 //! boundaries; no complete source/demux output is split, repeated or repaired.
 use crate::carrier::{PLAIN_PAYLOAD_BYTES, PlainContinuation, TS_PAYLOAD_START, TS188_BYTES};
 use crate::demux_clock::DemuxProfile;
-use crate::pes::{HEADER_MAX, parse_header};
+use crate::pes::{HEADER_MAX, parse_header, parse_timed_header};
 use crate::{
     AssemblyStep, ParseLimits, PesHeader, SourceEpochs, SourceRange, TransportPacket, checked_pid,
     commit_range, limit, prepare_range,
@@ -1148,14 +1148,15 @@ impl DemuxObserver {
         let emission = self
             .emission
             .ok_or(Error::Invalid("native PES emission missing"))?;
-        let header = self
-            .header
-            .as_ref()
-            .ok_or(Error::Invalid("native PES causal header missing"))?
-            .clone();
         let origin = self
             .origin
             .ok_or(Error::Invalid("native PES origin missing"))?;
+        let header = if emission.continue_without_header {
+            self.header.clone()
+        } else {
+            self.header.take()
+        }
+        .ok_or(Error::Invalid("native PES causal header missing"))?;
         let packet = DemuxPacket {
             profile: self.profile,
             program: self.scope.program,
@@ -1226,31 +1227,16 @@ impl DemuxObserver {
             .as_ref()
             .ok_or(Error::Invalid("native PES payload missing"))?;
         let bytes = &payload[pending.position..];
-        let Some(prefix) = bytes.first_chunk::<9>() else {
+        let Some((header, declared)) = parse_timed_header(bytes, self.limits.pes_bytes, work)
+        else {
             return Ok(false);
         };
-        if prefix[..4] != [0, 0, 1, self.scope.stream_id]
-            || !matches!((prefix[7], prefix[8]), (0x80, 5) | (0xc0, 10))
+        if header.stream_id != self.scope.stream_id || (declared.is_none() && self.finite_private())
         {
             return Ok(false);
         }
-        let used = 9 + usize::from(prefix[8]);
+        let used = header.as_bytes().len();
         let charge = used as u64 + 3;
-        if bytes.len() < used || used > self.limits.pes_bytes || work.remaining() < charge {
-            return Ok(false);
-        }
-        let length = usize::from(u16::from_be_bytes([prefix[4], prefix[5]]));
-        let declared = (length != 0).then_some(length + 6);
-        if declared.is_some_and(|total| total < used || total > self.limits.pes_bytes)
-            || (declared.is_none() && self.finite_private())
-        {
-            return Ok(false);
-        }
-        let mut raw = [0; HEADER_MAX];
-        raw[..used].copy_from_slice(&bytes[..used]);
-        let Ok(header) = parse_header(&raw, used) else {
-            return Ok(false);
-        };
         let extent = SourceRange {
             entity: self.scope.entity,
             offset: pending
