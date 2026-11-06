@@ -1,15 +1,15 @@
-//! Original primary/source and fresh d32 public-API fault regressions.
-//! Source acceptance, raw33 and unknowns never come from native observations.
+//! Original primary/source and public-API fault regressions.
+//! Source acceptance, raw33 and unknowns never come from demux observations.
 use std::sync::atomic::AtomicBool;
 use triergon_core::{
     Budget, Bytes, Error, InputCursor, InputWindow, SourceCapabilities, SourceId, SourceLocation,
     Step, WorkBudget,
 };
-use triergon_mpegts::clock::{NativeClockProfile, NativePesClockV1};
-use triergon_mpegts::native_pes::{NativePesScope, NativeRegisteredCarriage, NativeSourceContext};
-use triergon_mpegts::native_recovery::{
-    NativeDiagnosticPesPacket, NativePesObservation, NativePesRecoveryObserver,
-    NativeRejectedPolicy, NativeSelectedFault,
+use triergon_mpegts::compat::pes::{
+    DemuxClock, DemuxProfile, DemuxScope, RegisteredCarriage, SourceContext,
+};
+use triergon_mpegts::reference_trace::recovery::{
+    DemuxObservation, DiagnosticPacket, RecoveryObserver, RejectedPolicy, SelectedFault,
 };
 use triergon_mpegts::{
     AssemblyStep, PacketFormat, ParseLimits, SourceEpochs, TraceEvent, TraceFault,
@@ -50,8 +50,8 @@ fn bytes(id: &str) -> &'static [u8] {
         _ => panic!("unknown authored input"),
     }
 }
-fn scope() -> NativePesScope {
-    NativePesScope {
+fn scope() -> DemuxScope {
+    DemuxScope {
         program: 1,
         pid: 256,
         stream_type: 0x1b,
@@ -60,16 +60,16 @@ fn scope() -> NativePesScope {
         epochs: EPOCHS,
     }
 }
-fn context(n: u64) -> NativeSourceContext {
-    NativeSourceContext {
+fn context(n: u64) -> SourceContext {
+    SourceContext {
         source_event_ordinal: n,
         epochs: EPOCHS,
         byte_run_epoch: None,
     }
 }
-fn observer(b: &Budget) -> NativePesRecoveryObserver {
-    NativePesRecoveryObserver::new_selected_avc_faults_v1(
-        NativeClockProfile::ArchivedPesV1,
+fn observer(b: &Budget) -> RecoveryObserver {
+    RecoveryObserver::new_selected_avc_faults(
+        DemuxProfile::PesPackets,
         scope(),
         b.clone(),
         ParseLimits::default(),
@@ -77,7 +77,7 @@ fn observer(b: &Budget) -> NativePesRecoveryObserver {
     .expect("selected AVC source-diagnostic operation not implemented: intended runtime RED")
 }
 fn collect(data: &[u8], b: &Budget) -> Vec<(TraceEvent, SourceEpochs)> {
-    let owner = Bytes::copy_from_slice(b, data).unwrap();
+    let backing = Bytes::copy_from_slice(b, data).unwrap();
     let mut input = InputCursor::new(
         b,
         SourceId(1),
@@ -116,7 +116,7 @@ fn collect(data: &[u8], b: &Budget) -> Vec<(TraceEvent, SourceEpochs)> {
                                 r.source,
                                 r.token,
                                 r.offset,
-                                owner.slice(start..end).unwrap(),
+                                backing.slice(start..end).unwrap(),
                             )
                             .unwrap(),
                         )
@@ -128,11 +128,11 @@ fn collect(data: &[u8], b: &Budget) -> Vec<(TraceEvent, SourceEpochs)> {
     }
     panic!("bounded source failed to finish");
 }
-fn feed(o: &mut NativePesRecoveryObserver, event: &TraceEvent, c: NativeSourceContext) {
+fn feed(o: &mut RecoveryObserver, event: &TraceEvent, c: SourceContext) {
     match event {
         TraceEvent::Transport(p) if p.pid == 256 => o.push_accepted(p.clone(), c).unwrap(),
         TraceEvent::Diagnostic(f) if f.rejected.is_some() => {
-            o.push_diagnostic_rejection_v1(f.clone(), c).unwrap();
+            o.push_diagnostic_rejection(f.clone(), c).unwrap();
         }
         TraceEvent::Diagnostic(f)
             if f.pid == Some(256)
@@ -145,13 +145,13 @@ fn feed(o: &mut NativePesRecoveryObserver, event: &TraceEvent, c: NativeSourceCo
                     ) | Error::Unsupported("scrambled TS payload")
                 ) =>
         {
-            o.confirm_source_fault_v1(f, c).unwrap();
+            o.confirm_source_fault(f, c).unwrap();
         }
-        TraceEvent::Timeline { .. } => o.commit_source_timeline_v1(c).unwrap(),
+        TraceEvent::Timeline { .. } => o.commit_source_timeline(c).unwrap(),
         _ => {}
     }
 }
-fn drain(o: &mut NativePesRecoveryObserver) -> Vec<NativePesObservation> {
+fn drain(o: &mut RecoveryObserver) -> Vec<DemuxObservation> {
     let mut results = Vec::new();
     for _ in 0..2048 {
         let mut w = WorkBudget::new(1);
@@ -166,7 +166,7 @@ fn drain(o: &mut NativePesRecoveryObserver) -> Vec<NativePesObservation> {
     }
     panic!("bounded native assembly failed to progress");
 }
-fn diagnostic(id: &str, expected: NativeSelectedFault, raw: Option<u64>) {
+fn diagnostic(id: &str, expected: SelectedFault, raw: Option<u64>) {
     let b = Budget::new(1 << 20).unwrap();
     let mut o = observer(&b);
     let events = collect(bytes(id), &b);
@@ -175,7 +175,7 @@ fn diagnostic(id: &str, expected: NativeSelectedFault, raw: Option<u64>) {
         feed(
             &mut o,
             event,
-            NativeSourceContext {
+            SourceContext {
                 source_event_ordinal: n as u64,
                 epochs: *epochs,
                 byte_run_epoch: None,
@@ -184,7 +184,7 @@ fn diagnostic(id: &str, expected: NativeSelectedFault, raw: Option<u64>) {
         outputs.extend(drain(&mut o));
     }
     assert_eq!(outputs.len(), 1);
-    let NativePesObservation::FromSelectedDiagnostic(p) = outputs.pop().unwrap() else {
+    let DemuxObservation::FromSelectedDiagnostic(p) = outputs.pop().unwrap() else {
         panic!("source rejection needs distinct neutral header observation")
     };
     assert_eq!(p.selected_fault, expected);
@@ -200,10 +200,10 @@ fn diagnostic(id: &str, expected: NativeSelectedFault, raw: Option<u64>) {
     assert_eq!(p.source_epochs, EPOCHS);
     assert_eq!(p.program, 1);
     assert_eq!(p.pid, 256);
-    assert_eq!(p.native_stream_id, 0xe0);
-    assert_eq!(p.native_position, 376);
-    assert_eq!(p.native_flags, 0);
-    assert_eq!(p.native_duration90_raw, 0);
+    assert_eq!(p.stream_id, 0xe0);
+    assert_eq!(p.position, 376);
+    assert_eq!(p.flags, 0);
+    assert_eq!(p.duration90_raw, 0);
     let wanted = if id.ends_with("original") {
         ORIGINAL
     } else {
@@ -214,7 +214,7 @@ fn diagnostic(id: &str, expected: NativeSelectedFault, raw: Option<u64>) {
     assert_eq!(p.encoded_header.encoded_pts_raw33(), raw);
     assert_eq!(
         p.encoded_header.time_flags(),
-        if expected == NativeSelectedFault::ForbiddenTimeFlags {
+        if expected == SelectedFault::ForbiddenTimeFlags {
             1
         } else {
             2
@@ -222,13 +222,13 @@ fn diagnostic(id: &str, expected: NativeSelectedFault, raw: Option<u64>) {
     );
     assert_eq!(
         p.encoded_header.markers_valid(),
-        expected != NativeSelectedFault::TimestampMarkers && raw.is_some()
+        expected != SelectedFault::TimestampMarkers && raw.is_some()
     );
     let input_n = 8;
     assert_eq!(p.input_context, context(input_n));
     assert_eq!(
         p.diagnostic_context,
-        context(if expected == NativeSelectedFault::PcrEncoding {
+        context(if expected == SelectedFault::PcrEncoding {
             8
         } else {
             10
@@ -251,10 +251,10 @@ fn diagnostic(id: &str, expected: NativeSelectedFault, raw: Option<u64>) {
         span.source.offset,
         p.header_source_ranges.as_slice()[0].offset + p.encoded_header.as_bytes().len() as u64
     );
-    let mut clock = NativePesClockV1::new(1).unwrap();
+    let mut clock = DemuxClock::new(1).unwrap();
     assert!(
         clock
-            .project_diagnostic_header_v1(
+            .project_diagnostic_header(
                 256,
                 &p.encoded_header,
                 &mut WorkBudget::new(0),
@@ -264,7 +264,7 @@ fn diagnostic(id: &str, expected: NativeSelectedFault, raw: Option<u64>) {
             .is_none()
     );
     assert_eq!(
-        clock.project_diagnostic_header_v1(
+        clock.project_diagnostic_header(
             256,
             &p.encoded_header,
             &mut WorkBudget::new(1),
@@ -273,7 +273,7 @@ fn diagnostic(id: &str, expected: NativeSelectedFault, raw: Option<u64>) {
         Err(Error::Cancelled)
     );
     let t = clock
-        .project_diagnostic_header_v1(
+        .project_diagnostic_header(
             256,
             &p.encoded_header,
             &mut WorkBudget::new(1),
@@ -298,96 +298,81 @@ macro_rules! diag {
     ($name:ident,$id:literal,$kind:ident,$raw:expr) => {
         #[test]
         fn $name() {
-            diagnostic($id, NativeSelectedFault::$kind, $raw);
+            diagnostic($id, SelectedFault::$kind, $raw);
         }
     };
 }
 diag!(
-    native_original_invalid_pcr,
+    demux_original_invalid_pcr,
     "pcr-original",
     PcrEncoding,
     Some(90000)
 );
 diag!(
-    native_original_tei,
+    demux_original_tei,
     "tei-original",
     TransportError,
     Some(90000)
 );
 diag!(
-    native_original_scrambled,
+    demux_original_scrambled,
     "scrambled-original",
     Scrambling,
     Some(90000)
 );
 diag!(
-    native_original_marker,
+    demux_original_marker,
     "marker-original",
     TimestampMarkers,
     Some(90000)
 );
 diag!(
-    native_original_forbidden_unknown,
+    demux_original_forbidden_unknown,
     "forbidden-original",
     ForbiddenTimeFlags,
     None
 );
+diag!(demux_pcr_extension_300, "pcr300", PcrEncoding, Some(180000));
+diag!(demux_pcr_extension_511, "pcr511", PcrEncoding, Some(180000));
 diag!(
-    native_pcr_extension_300,
-    "pcr300",
-    PcrEncoding,
-    Some(180000)
-);
-diag!(
-    native_pcr_extension_511,
-    "pcr511",
-    PcrEncoding,
-    Some(180000)
-);
-diag!(
-    native_pcr_reserved_bits,
+    demux_pcr_reserved_bits,
     "pcrreserved",
     PcrEncoding,
     Some(180000)
 );
 diag!(
-    native_marker_first,
+    demux_marker_first,
     "marker0",
     TimestampMarkers,
     Some(180000)
 );
 diag!(
-    native_marker_middle,
+    demux_marker_middle,
     "marker2",
     TimestampMarkers,
     Some(180000)
 );
+diag!(demux_marker_last, "marker4", TimestampMarkers, Some(180000));
 diag!(
-    native_marker_last,
-    "marker4",
-    TimestampMarkers,
-    Some(180000)
-);
-diag!(
-    native_marker_all,
+    demux_marker_all,
     "markerall",
     TimestampMarkers,
     Some(180000)
 );
 diag!(
-    native_scrambling_reserved_stays_opaque,
+    demux_scrambling_reserved_stays_opaque,
     "scramble1",
     Scrambling,
     Some(180000)
 );
 diag!(
-    native_scrambling_three_stays_opaque,
+    demux_scrambling_three_stays_opaque,
     "scramble3",
     Scrambling,
     Some(180000)
 );
 diag!(
-    native_forbidden_zero_header_unknown,
+    demux_forbidden_zero_header_unknown,
     "forbiddenzero",
     ForbiddenTimeFlags,
     None
@@ -402,7 +387,7 @@ fn timeline(id: &str, times: &[u64]) {
         feed(
             &mut o,
             event,
-            NativeSourceContext {
+            SourceContext {
                 source_event_ordinal: n as u64,
                 epochs: *epochs,
                 byte_run_epoch: None,
@@ -412,12 +397,12 @@ fn timeline(id: &str, times: &[u64]) {
     }
     assert_eq!(got.len(), times.len());
     for (p, t) in got.iter().zip(times) {
-        let NativePesObservation::Accepted(p) = p else {
+        let DemuxObservation::Accepted(p) = p else {
             panic!("valid boundary must preserve accepted header")
         };
         assert_eq!(p.source_header.pts_raw33, Some(*t));
         assert_eq!(p.source_header.dts_raw33, None);
-        assert_eq!(p.native_flags, 0);
+        assert_eq!(p.flags, 0);
     }
     assert!(
         source
@@ -426,7 +411,7 @@ fn timeline(id: &str, times: &[u64]) {
     );
     assert_eq!(o.scope().epochs.clock, 1);
     let last = got.last().unwrap();
-    let NativePesObservation::Accepted(last) = last else {
+    let DemuxObservation::Accepted(last) = last else {
         unreachable!()
     };
     assert_eq!(
@@ -436,15 +421,15 @@ fn timeline(id: &str, times: &[u64]) {
     );
 }
 #[test]
-fn native_original_pcr_timeline() {
+fn demux_original_pcr_timeline() {
     timeline("timeline-original", &[90000, 10]);
 }
 #[test]
-fn native_following_clock_epoch_uses_real_source_context() {
+fn demux_following_clock_epoch_uses_real_source_context() {
     timeline("timeline-three", &[90000, 10, 90010]);
 }
 
-fn staged(b: &Budget) -> (NativePesRecoveryObserver, TraceFault) {
+fn staged(b: &Budget) -> (RecoveryObserver, TraceFault) {
     let mut o = observer(b);
     let events = collect(bytes("tei-original"), b);
     let TraceEvent::Transport(p) = &events[8].0 else {
@@ -456,10 +441,10 @@ fn staged(b: &Budget) -> (NativePesRecoveryObserver, TraceFault) {
     };
     (o, f.clone())
 }
-fn one(o: &mut NativePesRecoveryObserver) -> NativeDiagnosticPesPacket {
+fn one(o: &mut RecoveryObserver) -> DiagnosticPacket {
     let mut p = drain(o);
     assert_eq!(p.len(), 1);
-    let NativePesObservation::FromSelectedDiagnostic(p) = p.pop().unwrap() else {
+    let DemuxObservation::FromSelectedDiagnostic(p) = p.pop().unwrap() else {
         panic!("distinct rejected source operation")
     };
     p
@@ -484,15 +469,15 @@ fn staged_work_cancel_and_actual_diagnostic() {
         drain(&mut o).is_empty(),
         "no native packet before the actual strict diagnostic"
     );
-    o.confirm_source_fault_v1(&f, context(10)).unwrap();
+    o.confirm_source_fault(&f, context(10)).unwrap();
     let p = one(&mut o);
     assert_eq!(p.source_fault.error, f.error);
 }
 #[test]
-fn pressure_retry_keeps_original_owner_and_cause() {
+fn pressure_retry_keeps_original_backing_and_cause() {
     let b = Budget::new(1 << 20).unwrap();
     let (mut o, f) = staged(&b);
-    o.confirm_source_fault_v1(&f, context(10)).unwrap();
+    o.confirm_source_fault(&f, context(10)).unwrap();
     let blocker = b.reserve(b.available()).unwrap();
     let mut pressured = false;
     for _ in 0..32 {
@@ -512,15 +497,15 @@ fn pressure_retry_keeps_original_owner_and_cause() {
     assert_eq!(p.payload().flatten().copied().collect::<Vec<_>>(), ORIGINAL);
 }
 #[test]
-fn hidden_owner_deduplicates_and_output_outlives_parser() {
+fn hidden_backing_deduplicates_and_output_outlives_parser() {
     let b = Budget::new(1 << 20).unwrap();
     let initial = b.used();
     let mut data = Vec::with_capacity(4096);
     data.extend_from_slice(bytes("tei-original"));
-    let owner = Bytes::try_from_vec(&b, data).unwrap();
-    let retained = owner.retained_storage_bytes();
+    let backing = Bytes::try_from_vec(&b, data).unwrap();
+    let retained = backing.retained_storage_bytes();
     let mut inspector = TransportInspector::new(
-        owner.slice(376..564).unwrap(),
+        backing.slice(376..564).unwrap(),
         PacketFormat::Ts188,
         SourceLocation {
             source: SourceId(1),
@@ -551,17 +536,17 @@ fn hidden_owner_deduplicates_and_output_outlives_parser() {
         error: Error::Invalid("TS transport error indicator"),
         rejected: None,
     };
-    o.confirm_source_fault_v1(&f, context(10)).unwrap();
+    o.confirm_source_fault(&f, context(10)).unwrap();
     let p = one(&mut o);
-    assert!(p.carrier.backing_bytes().shares_storage_with(&owner));
+    assert!(p.carrier.backing_bytes().shares_storage_with(&backing));
     assert!(
         p.spans.as_slice()[0]
             .backing_bytes()
-            .shares_storage_with(&owner)
+            .shares_storage_with(&backing)
     );
     drop(o);
     drop(inspector);
-    drop(owner);
+    drop(backing);
     assert!(b.used() >= initial + retained);
     drop(p);
     assert_eq!(b.used(), initial);
@@ -572,12 +557,12 @@ fn stale_diagnostic_retry_does_not_replace_mailbox() {
     let (mut o, f) = staged(&b);
     let mut wrong = f.clone();
     wrong.location.offset += 188;
-    assert!(o.confirm_source_fault_v1(&wrong, context(10)).is_err());
+    assert!(o.confirm_source_fault(&wrong, context(10)).is_err());
     let mut c = context(10);
     c.epochs.configuration += 1;
-    assert!(o.confirm_source_fault_v1(&f, c).is_err());
-    assert!(o.confirm_source_fault_v1(&f, context(8)).is_err());
-    o.confirm_source_fault_v1(&f, context(10)).unwrap();
+    assert!(o.confirm_source_fault(&f, c).is_err());
+    assert!(o.confirm_source_fault(&f, context(8)).is_err());
+    o.confirm_source_fault(&f, context(10)).unwrap();
     assert_eq!(one(&mut o).diagnostic_context, context(10));
 }
 #[test]
@@ -591,7 +576,7 @@ fn foreign_stale_input_and_second_mailbox_are_recoverable() {
     };
     let e = o.push_accepted(p.clone(), context(11)).unwrap_err();
     assert!(e.value.source.shares_storage_with(&p.source));
-    assert!(o.commit_source_timeline_v1(context(13)).is_err());
+    assert!(o.commit_source_timeline(context(13)).is_err());
 }
 fn refuse(id: &str) {
     let b = Budget::new(1 << 20).unwrap();
@@ -599,7 +584,7 @@ fn refuse(id: &str) {
     let source = collect(bytes(id), &b);
     let mut refused = false;
     for (n, (e, epochs)) in source.iter().enumerate() {
-        let c = NativeSourceContext {
+        let c = SourceContext {
             source_event_ordinal: n as u64,
             epochs: *epochs,
             byte_run_epoch: None,
@@ -609,9 +594,9 @@ fn refuse(id: &str) {
                 o.push_accepted(p.clone(), c).map_err(|e| e.error)
             }
             TraceEvent::Diagnostic(f) if f.rejected.is_some() => o
-                .push_diagnostic_rejection_v1(f.clone(), c)
+                .push_diagnostic_rejection(f.clone(), c)
                 .map_err(|e| e.error),
-            TraceEvent::Diagnostic(f) if f.pid == Some(256) => o.confirm_source_fault_v1(f, c),
+            TraceEvent::Diagnostic(f) if f.pid == Some(256) => o.confirm_source_fault(f, c),
             _ => Ok(()),
         };
         if r.is_err() {
@@ -644,7 +629,7 @@ fn tei_does_not_hide_second_header_fault() {
     refuse("teisecond");
 }
 #[test]
-fn incomplete_finite_native_corrupt2_remains_unsupported() {
+fn incomplete_finite_demux_corrupt2_remains_unsupported() {
     refuse("incomplete");
 }
 #[test]
@@ -781,17 +766,17 @@ fn strict_valid_timeline_keeps_raw_and_dts_unknown() {
     assert_eq!(p[1].epochs.clock, 1);
 }
 #[test]
-fn legacy_observer_still_refuses_damaged_transport() {
+fn plain_observer_still_refuses_damaged_transport() {
     let b = Budget::new(1 << 20).unwrap();
     let e = collect(bytes("tei-original"), &b);
     let TraceEvent::Transport(p) = &e[8].0 else {
         panic!()
     };
-    let mut o = NativePesRecoveryObserver::new(
-        NativeClockProfile::ArchivedPesV1,
+    let mut o = RecoveryObserver::new(
+        DemuxProfile::PesPackets,
         scope(),
-        NativeRegisteredCarriage::Avc,
-        NativeRejectedPolicy::OpcrWithoutPcrV1,
+        RegisteredCarriage::Avc,
+        RejectedPolicy::OpcrWithoutPcr,
         b,
         ParseLimits::default(),
     )
@@ -805,5 +790,5 @@ fn old_hypothesis_and_actual_corrupt_flag_have_separate_status() {
     let declared = u16::from_be_bytes([data[start + 4], data[start + 5]]) as usize + 6;
     assert_eq!(declared, data.len() - start + 1);
     assert_eq!(data[377] & 128, 128);
-    assert_eq!(data.len(), 564); /* native observed flags2 is not a source length repair */
+    assert_eq!(data.len(), 564); /* demux observed flags2 is not a source length repair */
 }

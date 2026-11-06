@@ -2,10 +2,9 @@
 //! finite opaque payloads establish PES carriage, never codec AU conformance.
 use std::sync::atomic::{AtomicBool, Ordering};
 use triergon_core::{Budget, Bytes, Error, SourceId, WorkBudget};
-use triergon_mpegts::clock::{NativeClockProfile, NativePesClockV1, NativeTimestampOrigin};
-use triergon_mpegts::native_pes::{
-    NativePesBoundary, NativePesObserver, NativePesPacket, NativePesPayloadKind, NativePesScope,
-    NativeRegisteredCarriage, NativeSourceContext,
+use triergon_mpegts::compat::pes::{
+    DemuxBoundary, DemuxClock, DemuxObserver, DemuxPacket, DemuxPayloadKind, DemuxProfile,
+    DemuxScope, RegisteredCarriage, SourceContext, TimestampOrigin,
 };
 use triergon_mpegts::{
     AssemblyStep, PacketFormat, ParseLimits, SourceEpochs, SourceRange, TransportPacket,
@@ -22,35 +21,35 @@ const OPCR_VALID: &[u8] = include_bytes!("data/continuity-v1/opcr-change-is-not-
 
 #[derive(Clone, Copy, Debug)]
 struct Case {
-    carriage: NativeRegisteredCarriage,
+    carriage: RegisteredCarriage,
     stream_type: u8,
     stream_id: u8,
     pid: u16,
     bytes: &'static [u8],
 }
 const AVC: Case = Case {
-    carriage: NativeRegisteredCarriage::Avc,
+    carriage: RegisteredCarriage::Avc,
     stream_type: 0x1b,
     stream_id: 0xe0,
     pid: 256,
     bytes: include_bytes!("data/ts188-basic.ts"),
 };
 const HEVC: Case = Case {
-    carriage: NativeRegisteredCarriage::Hevc,
+    carriage: RegisteredCarriage::Hevc,
     stream_type: 0x24,
     stream_id: 0xe0,
     pid: 257,
     bytes: include_bytes!("data/carriage-hevc-direct.ts"),
 };
 const ADTS: Case = Case {
-    carriage: NativeRegisteredCarriage::AacAdts,
+    carriage: RegisteredCarriage::AacAdts,
     stream_type: 0x0f,
     stream_id: 0xc0,
     pid: 257,
     bytes: include_bytes!("data/carriage-aac-adts-direct.ts"),
 };
 const LATM: Case = Case {
-    carriage: NativeRegisteredCarriage::AacLatm,
+    carriage: RegisteredCarriage::AacLatm,
     stream_type: 0x11,
     stream_id: 0xc0,
     pid: 257,
@@ -59,8 +58,8 @@ const LATM: Case = Case {
 const NEW_CASES: [Case; 3] = [HEVC, ADTS, LATM];
 const ALL_CASES: [Case; 4] = [AVC, HEVC, ADTS, LATM];
 
-fn scope(case: Case) -> NativePesScope {
-    NativePesScope {
+fn scope(case: Case) -> DemuxScope {
+    DemuxScope {
         program: 1,
         pid: case.pid,
         stream_type: case.stream_type,
@@ -69,18 +68,18 @@ fn scope(case: Case) -> NativePesScope {
         epochs: EPOCHS,
     }
 }
-fn context() -> NativeSourceContext {
+fn context() -> SourceContext {
     // The ordinary traces contain PAT/PMT facts before transport event8.
     // This ordinal is neither packet index2 nor a core generation/range token.
-    NativeSourceContext {
+    SourceContext {
         source_event_ordinal: 8,
         epochs: EPOCHS,
         byte_run_epoch: None,
     }
 }
-fn observer(case: Case, budget: &Budget) -> NativePesObserver {
-    NativePesObserver::new_registered(
-        NativeClockProfile::ArchivedPesV1,
+fn observer(case: Case, budget: &Budget) -> DemuxObserver {
+    DemuxObserver::new_registered(
+        DemuxProfile::PesPackets,
         scope(case),
         case.carriage,
         budget.clone(),
@@ -101,7 +100,7 @@ fn carrier(case: Case, budget: &Budget) -> TransportPacket {
     assert_eq!(packet.pid, case.pid);
     packet
 }
-fn drain_one(observer: &mut NativePesObserver) -> NativePesPacket {
+fn drain_one(observer: &mut DemuxObserver) -> DemuxPacket {
     let mut result = None;
     for _ in 0..8192 {
         let mut work = WorkBudget::new(1);
@@ -121,18 +120,18 @@ fn drain_one(observer: &mut NativePesObserver) -> NativePesPacket {
     }
     panic!("bounded one-carrier work did not make progress");
 }
-fn check_packet(packet: &NativePesPacket, case: Case) {
+fn check_packet(packet: &DemuxPacket, case: Case) {
     assert_eq!(packet.pid, case.pid);
     assert_eq!(packet.program, 1);
     assert_eq!(packet.source_epochs, EPOCHS);
     assert_eq!(packet.source_origin.source, SourceId(1));
     assert_eq!(packet.source_origin.offset, 376);
-    assert_eq!(packet.native_position, 376);
-    assert_eq!(packet.native_flags, 0);
-    assert_eq!(packet.native_duration90_raw, 0);
-    assert_eq!(packet.native_stream_id, case.stream_id);
-    assert_eq!(packet.boundary, NativePesBoundary::FiniteLength);
-    assert_eq!(packet.payload_kind, NativePesPayloadKind::DeclaredComplete);
+    assert_eq!(packet.position, 376);
+    assert_eq!(packet.flags, 0);
+    assert_eq!(packet.duration90_raw, 0);
+    assert_eq!(packet.stream_id, case.stream_id);
+    assert_eq!(packet.boundary, DemuxBoundary::FiniteLength);
+    assert_eq!(packet.payload_kind, DemuxPayloadKind::DeclaredComplete);
     assert_eq!(packet.payload_len, 27);
     assert!(
         packet
@@ -174,9 +173,9 @@ fn check_packet(packet: &NativePesPacket, case: Case) {
     assert_eq!(spans[0].context, context());
     assert_eq!(spans[0].as_ref(), PAYLOAD);
     assert!(spans[0].backing_bytes().retained_capacity() >= 188);
-    let time = NativePesClockV1::new(1)
+    let time = DemuxClock::new(1)
         .unwrap()
-        .project_native_header(
+        .project_header(
             case.pid,
             EPOCHS,
             packet.time_header(),
@@ -189,7 +188,7 @@ fn check_packet(packet: &NativePesPacket, case: Case) {
     assert_eq!(time.source_dts_raw33, None);
     assert_eq!(time.pts90, Some(90000));
     assert_eq!(time.dts90, Some(90000));
-    assert_eq!(time.dts_origin, NativeTimestampOrigin::PtsOnlyCompatibility);
+    assert_eq!(time.dts_origin, TimestampOrigin::PtsOnlyCompatibility);
 }
 fn finite(case: Case) {
     let budget = Budget::new(16384).unwrap();
@@ -208,7 +207,8 @@ fn constructor(case: Case) {
     let before = budget.used();
     let admitted = observer(case, &budget);
     assert_eq!(admitted.scope(), scope(case));
-    assert_eq!(admitted.profile(), NativeClockProfile::ArchivedPesV1);
+    #[cfg(feature = "reference-trace")]
+    assert_eq!(admitted.profile(), DemuxProfile::PesPackets);
     assert_eq!(
         budget.used(),
         before,
@@ -311,15 +311,15 @@ fn registered_latm_constructor_is_an_explicit_admission() {
     constructor(LATM);
 }
 #[test]
-fn registered_hevc_real_finite_carrier_matches_archived_packet() {
+fn registered_hevc_real_finite_carrier_matches_demux_packet() {
     finite(HEVC);
 }
 #[test]
-fn registered_adts_real_finite_carrier_matches_archived_packet() {
+fn registered_adts_real_finite_carrier_matches_demux_packet() {
     finite(ADTS);
 }
 #[test]
-fn registered_latm_real_finite_carrier_matches_archived_packet() {
+fn registered_latm_real_finite_carrier_matches_demux_packet() {
     finite(LATM);
 }
 #[test]
@@ -333,8 +333,8 @@ fn registered_wrong_kind_is_rejected_without_charging() {
         let before = budget.used();
         let mut wrong = scope(case);
         wrong.stream_type ^= 1;
-        let error = NativePesObserver::new_registered(
-            NativeClockProfile::ArchivedPesV1,
+        let error = DemuxObserver::new_registered(
+            DemuxProfile::PesPackets,
             wrong,
             case.carriage,
             budget.clone(),
@@ -356,8 +356,8 @@ fn registered_unobserved_stream_id_is_not_silently_substituted() {
         let before = budget.used();
         let mut wrong = scope(case);
         wrong.stream_id ^= 1;
-        let error = NativePesObserver::new_registered(
-            NativeClockProfile::ArchivedPesV1,
+        let error = DemuxObserver::new_registered(
+            DemuxProfile::PesPackets,
             wrong,
             case.carriage,
             budget.clone(),
@@ -379,8 +379,8 @@ fn registered_invalid_program_and_null_pid_are_rejected_before_feature_stub() {
         let before = budget.used();
         let mut wrong = scope(case);
         wrong.program = 0;
-        let error = NativePesObserver::new_registered(
-            NativeClockProfile::ArchivedPesV1,
+        let error = DemuxObserver::new_registered(
+            DemuxProfile::PesPackets,
             wrong,
             case.carriage,
             budget.clone(),
@@ -390,8 +390,8 @@ fn registered_invalid_program_and_null_pid_are_rejected_before_feature_stub() {
         assert_eq!(error, Error::Invalid("native PES selected program"));
         wrong = scope(case);
         wrong.pid = 0x1fff;
-        let error = NativePesObserver::new_registered(
-            NativeClockProfile::ArchivedPesV1,
+        let error = DemuxObserver::new_registered(
+            DemuxProfile::PesPackets,
             wrong,
             case.carriage,
             budget.clone(),
@@ -411,8 +411,8 @@ fn registered_bad_limits_do_not_hide_behind_missing_feature() {
             pes_bytes: 5,
             ..ParseLimits::default()
         };
-        let error = NativePesObserver::new_registered(
-            NativeClockProfile::ArchivedPesV1,
+        let error = DemuxObserver::new_registered(
+            DemuxProfile::PesPackets,
             scope(case),
             case.carriage,
             budget.clone(),

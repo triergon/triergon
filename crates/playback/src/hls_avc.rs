@@ -11,9 +11,8 @@ use triergon_core::{
     nonzero_prefix_len,
 };
 use triergon_framing::{Codec, NalHeader};
-use triergon_mpegts::{
-    clock::NativePesTimeView,
-    native_pes::{NativePesPacket, NativePesPayloadKind, NativePesSpan, NativeRegisteredCarriage},
+use triergon_mpegts::compat::pes::{
+    DemuxPacket, DemuxPayloadKind, DemuxSpan, DemuxTimeView, RegisteredCarriage,
 };
 
 pub use syntax::AvcRaster;
@@ -55,10 +54,10 @@ pub struct AvcTsClock {
     pub dts90: Option<i64>,
 }
 
-impl TryFrom<NativePesTimeView> for AvcTsClock {
+impl TryFrom<DemuxTimeView> for AvcTsClock {
     type Error = Error;
 
-    fn try_from(clock: NativePesTimeView) -> Result<Self> {
+    fn try_from(clock: DemuxTimeView) -> Result<Self> {
         let narrow = |value: Option<i128>| {
             value
                 .map(i64::try_from)
@@ -130,7 +129,7 @@ struct Chunk {
 }
 
 struct PendingPes {
-    spans: BudgetVecIntoIter<NativePesSpan>,
+    spans: BudgetVecIntoIter<DemuxSpan>,
     remaining: usize,
 }
 
@@ -223,7 +222,7 @@ pub struct AvcTsReader {
 
 impl AvcTsReader {
     pub fn new(pool: &Budget, config: TsNativeConfiguration, limits: AvcTsLimits) -> Result<Self> {
-        if config.carriage != TsNativeCarriage::Registered(NativeRegisteredCarriage::Avc) {
+        if config.carriage != TsNativeCarriage::Registered(RegisteredCarriage::Avc) {
             return Err(Error::Unsupported("HLS AVC needs selected AVC carriage"));
         }
         if !matches!(config.track, TrackKey::Ts { program, pid } if program != 0 && (1..0x1fff).contains(&pid))
@@ -265,8 +264,8 @@ impl AvcTsReader {
     /// Moves a PES only on acceptance. Drain to NeedInput before offering another.
     pub fn push(
         &mut self,
-        mailbox: &mut Option<NativePesPacket>,
-        clock: NativePesTimeView,
+        mailbox: &mut Option<DemuxPacket>,
+        clock: DemuxTimeView,
     ) -> Result<bool> {
         if let Some(error) = self.failure {
             return Err(error);
@@ -290,8 +289,8 @@ impl AvcTsReader {
         {
             return Err(Error::Invalid("AVC TS PES track or configuration"));
         }
-        if packet.native_flags & 2 != 0
-            || packet.payload_kind == NativePesPayloadKind::DeclaredIncomplete
+        if packet.flags & 2 != 0
+            || packet.payload_kind == DemuxPayloadKind::DeclaredIncomplete
             || packet.spans.is_empty()
             || packet.payload_len == 0
         {

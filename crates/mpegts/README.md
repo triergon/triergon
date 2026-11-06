@@ -14,14 +14,15 @@ The crate exposes two views:
 - **Source view** (`TransportStream` and its parts). Every value is a wire
   fact: raw 33-bit PTS/DTS, raw PCR, descriptor bytes, source byte ranges.
   Unknown DTS stays unknown.
-- **FFmpeg-compatible view** (`Native*` types in `native_pes`,
-  `native_recovery`, `native_input`, `native_catalogue`,
-  `native_packet_completion` with the `reference-trace` feature, and
-  `clock::NativePesClockV1`). It reproduces
-  the packets, positions, flags and timestamps of the pinned FFmpeg MPEG-TS
-  demuxer (`clock::NativeClockProfile::ArchivedPesV1`), including its
-  handling of damaged and headerless PES. It is fed from the same transport
-  packets and never rewrites source facts.
+- **FFmpeg-compatible view** (`compat::pes`, `compat::input`). It reproduces
+  the packets, positions, flags and timestamps of FFmpeg's MPEG-TS demuxer,
+  including its handling of damaged and headerless PES. It is fed from the same
+  transport packets and never rewrites source facts.
+
+The non-default `reference-trace` feature adds `reference_trace`, the projections
+that exist only to compare traces with FFmpeg: `recovery` (packets from rejected
+carriers), `catalogue` (programs and streams), `packet_completion` (inputs without
+media), `dvb` and `input`.
 
 ## Usage
 
@@ -79,9 +80,9 @@ file.
 | Descriptors | `psi::Descriptor::{registration, languages, avc_video, hevc_video, dvb_ac3, dvb_eac3, dvb_subtitling}` |
 | PES | `PesAssembler` → `Pes`, `PesHeader::{raw_pts_time, raw_dts_time}` |
 | Timestamps | `clock::source_timestamp` with `clock::SourceTimePolicy` |
-| FFmpeg-compatible PES | `native_pes::NativePesObserver::{new_registered, new_private_audio_v1, new_hls_private_audio_v1, new_dvb_subtitles_v1}` |
-| FFmpeg-compatible damaged input | `native_recovery::NativePesRecoveryObserver` |
-| FFmpeg-compatible start position | `native_input::NativeInputBootstrap` |
+| FFmpeg-compatible PES | `compat::pes::DemuxObserver::{new_registered, new_private_audio, new_hls_private_audio, new_dvb_subtitles}` |
+| FFmpeg-compatible clock | `compat::pes::DemuxClock` |
+| FFmpeg-compatible start position | `compat::input::InputBootstrap` |
 
 `TransportStream::poll_feed` can deliver validated PES continuations directly
 to a consumer in segment feed mode. `take_feed_omissions` counts the skipped
@@ -91,8 +92,8 @@ events so consumers can retain positions in the source trace.
 `CompactTraceEvent::NullRun`. `examples/mpegts_source_trace.rs` prints the
 source view as JSON lines (`mpegts_source_trace 188|192 PROGRAM [--dvb]
 [--native-clock-v1] [--media-entities-v1] [--compact] FILE...
-[--discontinuity FILE...]`); `examples/mpegts_native_pes_trace.rs` (feature
-`reference-trace`) adds the FFmpeg-compatible PES rows.
+[--discontinuity FILE...]`); `examples/mpegts_native_pes_trace.rs` adds the
+FFmpeg-compatible PES rows. Both need the `reference-trace` feature.
 
 ### Writing TS
 
@@ -145,7 +146,7 @@ pipeline ([triergon-capture](../capture/README.md#conformance)).
 | PSI | pointer field, multi-section packets, CRC-32, PAT, PMT, program and ES descriptor loops |
 | Descriptors | registration, ISO 639 language, AVC, HEVC, DVB AC-3 (`0x6a`), E-AC-3 (`0x7a`), DVB subtitling (`0x59`) |
 | PES | split headers, finite lengths, unbounded lengths on AVC (0x1b) and HEVC (0x24) streams, PTS/DTS with marker checks, optional fields |
-| FFmpeg-compatible carriage | AVC, HEVC, AAC ADTS, AAC LATM (`NativeRegisteredCarriage`); AC-3/E-AC-3 by DVB tag or stream type `0x81`/`0x87` (`NativePrivateAudioCarriage`); single-service DVB subtitles |
+| FFmpeg-compatible carriage | AVC, HEVC, AAC ADTS, AAC LATM (`RegisteredCarriage`); AC-3/E-AC-3 by DVB tag or stream type `0x81`/`0x87` (`PrivateAudioCarriage`); single-service DVB subtitles |
 
 ## Behaviour and limits
 
@@ -181,13 +182,13 @@ pipeline ([triergon-capture](../capture/README.md#conformance)).
   by a new PCR starts a new clock epoch (`TraceEvent::Timeline`) and drops
   partial PES. A caller `discontinuity()` (for example an HLS discontinuity
   tag between segments) advances both clock and configuration epochs and
-  resets PSI state. Ending one source entity (`media_entity_end_v1`) does not
+  resets PSI state. Ending one source entity (`media_entity_end`) does not
   flush a PES; only `end_of_source()` at logical end of media does.
 - **Descriptor namespace.** Private descriptor tags are interpreted as DVB
   only under `psi::DescriptorNamespace::Dvb`, supplied by the caller through
   `new_with_namespace`. The default is `Unspecified`.
 - **FFmpeg-compatible view.** Each observer is bound to one program, PID,
-  stream type and stream ID (`NativePesScope`). Contexts outside the observed
+  stream type and stream ID (`DemuxScope`). Contexts outside the observed
   profile return `Error::Unsupported`.
 - **Not handled.** SI tables beyond PAT/PMT (their packets are still reported),
   ATSC/Blu-ray signalling, descrambling, seeking, multi-program PES output.
@@ -210,8 +211,7 @@ Verification:
 - The source view is compared field by field with an independent oracle over
   the corpus. The FFmpeg-compatible view is compared packet by packet
   (payload bytes, timestamps, flags, positions, stream-ID side data) with the
-  pinned FFmpeg reference; nonmatching cases are kept as failures, not
-  normalised.
+  FFmpeg reference; nonmatching cases are kept as failures, not normalised.
 
 Gates, harness and current results: [docs/quality.md](../../docs/quality.md)
 and [docs/status.md](../../docs/status.md).

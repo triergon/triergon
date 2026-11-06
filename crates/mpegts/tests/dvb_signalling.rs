@@ -1,12 +1,14 @@
-//! EN 300 468 6.2.41 regressions. D0 fixture bodies remain opaque subtitle input.
+//! EN 300 468 6.2.41 regressions. Fixture bodies remain opaque subtitle input.
 use std::sync::atomic::{AtomicBool, Ordering};
 use triergon_core::{
     Budget, Bytes, Error, InputCursor, InputWindow, SourceCapabilities, SourceId, Step, WorkBudget,
 };
 use triergon_mpegts::psi::{
     CodecIdentification, Descriptor, DescriptorNamespace, Descriptors, DvbNamespaceEvidence,
-    DvbNativeViewProfile, PmtReader, ProgramMap, Section, SectionAssembler, TableStep,
+    PmtReader, ProgramMap, Section, SectionAssembler, TableStep,
 };
+#[cfg(feature = "reference-trace")]
+use triergon_mpegts::reference_trace::dvb::DvbViewProfile;
 use triergon_mpegts::{AssemblyStep, PacketFormat, ParseLimits, TraceEvent, TransportStream};
 
 const DVB: DescriptorNamespace =
@@ -194,9 +196,10 @@ fn unknown_namespace_keeps_even_malformed_private_tag_bodies_opaque() {
     assert_eq!(stream.descriptor_bytes.as_ref(), raw);
     assert_eq!(stream.dvb_subtitling_signalling(), None);
     assert_eq!(stream.codec_identification(), CodecIdentification::Unknown);
+    #[cfg(feature = "reference-trace")]
     assert!(
         stream
-            .native_dvb_single_service_view(DvbNativeViewProfile::D0SingleServiceV1)
+            .dvb_single_service_view(DvbViewProfile::SingleService)
             .is_err()
     );
 }
@@ -249,20 +252,22 @@ fn registration_or_private_specifier_does_not_infer_a_dvb_namespace() {
         stream.codec_identification(),
         CodecIdentification::DvbSubtitles
     );
+    #[cfg(feature = "reference-trace")]
     assert!(
         stream
-            .native_dvb_single_service_view(DvbNativeViewProfile::D0SingleServiceV1)
+            .dvb_single_service_view(DvbViewProfile::SingleService)
             .is_err()
     );
     // Source context TLVs stay in order; no global private-tag interpretation.
 }
 
+#[cfg(feature = "reference-trace")]
 #[test]
-fn named_single_service_native_view_keeps_its_source_and_explicit_pin() {
+fn named_single_service_demux_view_keeps_its_source_and_explicit_revision() {
     let parsed = map(&[], 6, &SINGLE, DVB);
     let stream = &parsed.streams.as_slice()[0];
     let view = stream
-        .native_dvb_single_service_view(DvbNativeViewProfile::D0SingleServiceV1)
+        .dvb_single_service_view(DvbViewProfile::SingleService)
         .unwrap();
     assert_eq!(view.bytes, [0x12, 0x34, 0xab, 0xcd, 0x14]);
     assert_eq!(view.source.language_code, *b"eng");
@@ -271,15 +276,16 @@ fn named_single_service_native_view_keeps_its_source_and_explicit_pin() {
         stream.descriptor_bytes.as_ref()[2..].as_ptr()
     );
     assert_eq!(
-        view.profile.source_pin(),
+        view.profile.reference_revision(),
         "d32b387f2b0a484599d4587d651891f0c63c4238"
     );
     let mut no_ancillary = SINGLE;
     no_ancillary[8..].copy_from_slice(&[0x12, 0x34]);
     let parsed = map(&[], 6, &no_ancillary, DVB);
+    #[cfg(feature = "reference-trace")]
     assert_eq!(
         parsed.streams.as_slice()[0]
-            .native_dvb_single_service_view(DvbNativeViewProfile::D0SingleServiceV1)
+            .dvb_single_service_view(DvbViewProfile::SingleService)
             .unwrap()
             .bytes,
         [0x12, 0x34, 0x12, 0x34, 0x14]
@@ -287,7 +293,7 @@ fn named_single_service_native_view_keeps_its_source_and_explicit_pin() {
 }
 
 #[test]
-fn multi_service_and_repeated_tlvs_never_select_a_first_native_service() {
+fn multi_service_and_repeated_tlvs_never_select_a_first_demux_service() {
     let mut multiple = vec![0x59, 16];
     multiple.extend_from_slice(&SINGLE[2..]);
     multiple.extend_from_slice(&SINGLE[2..]);
@@ -305,9 +311,10 @@ fn multi_service_and_repeated_tlvs_never_select_a_first_native_service() {
             (summary.descriptors, summary.services),
             (descriptors, services)
         );
+        #[cfg(feature = "reference-trace")]
         assert!(
             stream
-                .native_dvb_single_service_view(DvbNativeViewProfile::D0SingleServiceV1)
+                .dvb_single_service_view(DvbViewProfile::SingleService)
                 .is_err()
         );
     }
@@ -326,9 +333,10 @@ fn conflicting_dvb_audio_signals_do_not_silently_win_or_disappear() {
         );
         assert!(stream.dvb_subtitling_signalling().unwrap().audio_conflict);
         assert_eq!(stream.descriptor_bytes.as_ref(), raw);
+        #[cfg(feature = "reference-trace")]
         assert!(
             stream
-                .native_dvb_single_service_view(DvbNativeViewProfile::D0SingleServiceV1)
+                .dvb_single_service_view(DvbViewProfile::SingleService)
                 .is_err()
         );
     }
@@ -383,10 +391,10 @@ fn pmt_dvb_summary_is_work_bounded_cancellable_charged_and_owned() {
     drop(source);
     assert!(pool.used() > baseline);
     let retained = pool.used();
-    let stream = &parsed.streams.as_slice()[0];
+    #[cfg(feature = "reference-trace")]
     assert_eq!(
-        stream
-            .native_dvb_single_service_view(DvbNativeViewProfile::D0SingleServiceV1)
+        parsed.streams.as_slice()[0]
+            .dvb_single_service_view(DvbViewProfile::SingleService)
             .unwrap()
             .bytes,
         [0x12, 0x34, 0xab, 0xcd, 0x14]
@@ -501,6 +509,8 @@ fn six_dvb_carriers_keep_pes_envelopes_raw33_absent_dts_and_service_epochs() {
         ),
     ];
     for (source, original_pes, kind) in cases {
+        #[cfg(not(feature = "reference-trace"))]
+        let _ = kind;
         let events = collect(source);
         assert!(
             !events
@@ -524,11 +534,14 @@ fn six_dvb_carriers_keep_pes_envelopes_raw33_absent_dts_and_service_epochs() {
             stream.codec_identification(),
             CodecIdentification::DvbSubtitles
         );
-        let view = stream
-            .native_dvb_single_service_view(DvbNativeViewProfile::D0SingleServiceV1)
-            .unwrap();
-        assert_eq!(view.bytes, [0, 1, 0, 2, *kind]);
-        assert_eq!(view.source.language_code, *b"eng");
+        #[cfg(feature = "reference-trace")]
+        {
+            let view = stream
+                .dvb_single_service_view(DvbViewProfile::SingleService)
+                .unwrap();
+            assert_eq!(view.bytes, [0, 1, 0, 2, *kind]);
+            assert_eq!(view.source.language_code, *b"eng");
+        }
         let packets: Vec<_> = events
             .iter()
             .filter_map(|e| match e {

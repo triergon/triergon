@@ -285,7 +285,7 @@ fn contiguous_source_entity_end_carries_the_selected_pes() {
 }
 
 #[test]
-fn raw_header_timestamp_and_optional_dts_remain_independent_of_native_inference() {
+fn raw_header_timestamp_and_optional_dts_remain_independent_of_demux_inference() {
     let events = collect(
         &[include_bytes!("data/pts-dts-common-epoch.ts")],
         PacketFormat::Ts188,

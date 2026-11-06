@@ -117,23 +117,26 @@ pub struct DvbSubtitlingSignalling {
     pub audio_conflict: bool,
 }
 
-/// A development native view, not a complete container/decoder operation.
+/// A partial demux view, not a complete container/decoder operation.
 /// Multi-service behaviour is unknown.
+#[cfg(feature = "reference-trace")]
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum DvbNativeViewProfile {
-    D0SingleServiceV1,
+pub enum DvbViewProfile {
+    SingleService,
 }
-impl DvbNativeViewProfile {
-    pub fn source_pin(self) -> &'static str {
+#[cfg(feature = "reference-trace")]
+impl DvbViewProfile {
+    pub fn reference_revision(self) -> &'static str {
         match self {
-            Self::D0SingleServiceV1 => "d32b387f2b0a484599d4587d651891f0c63c4238",
+            Self::SingleService => "d32b387f2b0a484599d4587d651891f0c63c4238",
         }
     }
 }
 
+#[cfg(feature = "reference-trace")]
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub struct NativeDvbSingleServiceView<'a> {
-    pub profile: DvbNativeViewProfile,
+pub struct DvbSingleServiceView<'a> {
+    pub profile: DvbViewProfile,
     pub source: DvbSubtitlingService<'a>,
     /// compID_be, ancillaryID_be, type. Raw language stays in `source`.
     pub bytes: [u8; 5],
@@ -196,14 +199,15 @@ impl ElementaryStream {
             CodecIdentification::DvbSubtitles
         }
     }
-    /// Explicit single-descriptor/single-service D0 codecpar view. Additional ES
-    /// context TLVs are unprobed and unsupported by this view. No first-service
+    /// Explicit single-descriptor/single-service codec parameters view. Additional
+    /// ES context TLVs are unprobed and unsupported by this view. No first-service
     /// fallback, language conversion, PES envelope stripping or DTS inference.
-    /// Wider native field values are unverified; only six D0 inputs were probed.
-    pub fn native_dvb_single_service_view(
+    /// Wider field values are unverified; only six inputs were probed.
+    #[cfg(feature = "reference-trace")]
+    pub fn dvb_single_service_view(
         &self,
-        profile: DvbNativeViewProfile,
-    ) -> Result<NativeDvbSingleServiceView<'_>> {
+        profile: DvbViewProfile,
+    ) -> Result<DvbSingleServiceView<'_>> {
         if self.codec_identification() != CodecIdentification::DvbSubtitles
             || self.dvb.descriptors != 1
             || self.dvb.services != 1
@@ -224,7 +228,7 @@ impl ElementaryStream {
             .get(start..end)
             .ok_or(Error::Invalid("DVB service extent"))?;
         let source = DvbSubtitlingService::read(raw).ok_or(Error::Invalid("DVB service extent"))?;
-        Ok(NativeDvbSingleServiceView {
+        Ok(DvbSingleServiceView {
             profile,
             source,
             bytes: [raw[4], raw[5], raw[6], raw[7], raw[3]],

@@ -1512,8 +1512,8 @@ fn finite_prefix_ambiguity_is_rejected_from_bytes_not_corpus_identity() {
 }
 #[test]
 fn full_native_ts_packets_are_distinct_from_source_pes_and_keep_literal_fields() {
-    use triergon_mpegts::native_pes::{
-        NativePesBoundary, NativePesPayloadKind, NativeRegisteredCarriage as Carriage,
+    use triergon_mpegts::compat::pes::{
+        DemuxBoundary, DemuxPayloadKind, RegisteredCarriage as Carriage,
     };
     for (raw, pid, carriage, stream_id) in [
         (
@@ -1593,12 +1593,12 @@ fn full_native_ts_packets_are_distinct_from_source_pes_and_keep_literal_fields()
         assert_eq!(native.len(), 1);
         let (packet, clock) = native[0];
         assert_eq!(packet.pid, pid);
-        assert_eq!(packet.native_position, 376);
-        assert_eq!(packet.native_flags, 0);
-        assert_eq!(packet.native_duration90_raw, 0);
-        assert_eq!(packet.native_stream_id, stream_id);
-        assert_eq!(packet.boundary, NativePesBoundary::FiniteLength);
-        assert_eq!(packet.payload_kind, NativePesPayloadKind::DeclaredComplete);
+        assert_eq!(packet.position, 376);
+        assert_eq!(packet.flags, 0);
+        assert_eq!(packet.duration90_raw, 0);
+        assert_eq!(packet.stream_id, stream_id);
+        assert_eq!(packet.boundary, DemuxBoundary::FiniteLength);
+        assert_eq!(packet.payload_kind, DemuxPayloadKind::DeclaredComplete);
         assert_eq!(
             packet.payload().flatten().copied().collect::<Vec<_>>(),
             b"lane-ts-original-payload\x00\x47\xff"
@@ -1616,7 +1616,7 @@ fn full_native_ts_packets_are_distinct_from_source_pes_and_keep_literal_fields()
 }
 #[test]
 fn native_carriage_refusal_keeps_source_and_is_not_a_native_codec_error() {
-    use triergon_mpegts::native_pes::NativeRegisteredCarriage;
+    use triergon_mpegts::compat::pes::RegisteredCarriage;
     let raw = include_bytes!("fixtures/ts/ts188-basic.ts");
     let b = pool();
     let input = InputCursor::new(
@@ -1637,7 +1637,7 @@ fn native_carriage_refusal_keeps_source_and_is_not_a_native_codec_error() {
         SourceTimePolicy::RelativeEpochZero,
         TsNativeSelection {
             pid: 256,
-            carriage: NativeRegisteredCarriage::Hevc,
+            carriage: RegisteredCarriage::Hevc,
         },
     )
     .unwrap();
@@ -1684,7 +1684,7 @@ fn full_native_m2ts_position_is_refused_without_inventing_startup_evidence() {
             SourceTimePolicy::Unanchored,
             TsNativeSelection {
                 pid: 256,
-                carriage: triergon_mpegts::native_pes::NativeRegisteredCarriage::Avc
+                carriage: triergon_mpegts::compat::pes::RegisteredCarriage::Avc
             }
         ),
         Err(C::Unsupported(_))
@@ -1979,7 +1979,7 @@ fn real_ts_entity_transition_preserves_partial_pes_and_requires_explicit_logical
 
 #[test]
 fn native_ts_projection_only_replaces_source_pes_for_its_selected_pid() {
-    use triergon_mpegts::native_pes::NativeRegisteredCarriage;
+    use triergon_mpegts::compat::pes::RegisteredCarriage;
 
     let video = include_bytes!("fixtures/ts/ts188-basic.ts");
     let audio = include_bytes!("fixtures/ts/carriage-aac-adts-direct.ts");
@@ -2024,7 +2024,7 @@ fn native_ts_projection_only_replaces_source_pes_for_its_selected_pid() {
         SourceTimePolicy::RelativeEpochZero,
         TsNativeSelection {
             pid: 256,
-            carriage: NativeRegisteredCarriage::Avc,
+            carriage: RegisteredCarriage::Avc,
         },
     )
     .unwrap();
@@ -2093,7 +2093,7 @@ fn assert_source_pes_match(left: &[Output], right: &[Output]) {
 
 fn private_audio_player(
     raw: &[u8],
-    carriage: triergon_mpegts::native_pes::NativePrivateAudioCarriage,
+    carriage: triergon_mpegts::compat::pes::PrivateAudioCarriage,
     selection: Selection,
     quantum: usize,
 ) -> (Player<ByteSource>, Budget) {
@@ -2126,8 +2126,8 @@ fn private_audio_player(
 
 #[test]
 fn private_audio_playback_matches_all_four_archived_packet_controls() {
-    use triergon_mpegts::native_pes::{
-        NativePesBoundary, NativePesPayloadKind, NativePrivateAudioCarriage as Carriage,
+    use triergon_mpegts::compat::pes::{
+        DemuxBoundary, DemuxPayloadKind, PrivateAudioCarriage as Carriage,
     };
 
     for (raw, carriage) in [
@@ -2189,17 +2189,13 @@ fn private_audio_playback_matches_all_four_archived_packet_controls() {
             let (packet, clock) = native.next().expect("admitted private audio");
             assert!(native.next().is_none());
             assert_eq!((packet.program, packet.pid), (1, 257));
-            assert_eq!(packet.native_stream_id, 0xbd);
+            assert_eq!(packet.stream_id, 0xbd);
             assert_eq!(
-                (
-                    packet.native_position,
-                    packet.native_duration90_raw,
-                    packet.native_flags
-                ),
+                (packet.position, packet.duration90_raw, packet.flags),
                 (376, 0, 0)
             );
-            assert_eq!(packet.boundary, NativePesBoundary::FiniteLength);
-            assert_eq!(packet.payload_kind, NativePesPayloadKind::DeclaredComplete);
+            assert_eq!(packet.boundary, DemuxBoundary::FiniteLength);
+            assert_eq!(packet.payload_kind, DemuxPayloadKind::DeclaredComplete);
             assert_eq!(packet.source_header.as_bytes(), &raw[523..537]);
             assert_eq!(packet.source_header.pts_raw33, Some(90_000));
             assert_eq!(packet.source_header.dts_raw33, None);
@@ -2222,7 +2218,7 @@ fn private_audio_playback_matches_all_four_archived_packet_controls() {
 
 #[test]
 fn private_audio_mismatch_reports_refusal_and_retains_source_packet() {
-    use triergon_mpegts::native_pes::NativePrivateAudioCarriage as Carriage;
+    use triergon_mpegts::compat::pes::PrivateAudioCarriage as Carriage;
     let raw = include_bytes!("../../mpegts/tests/data/carriage-ac3-dvb.ts");
     let (mut p, _) = private_audio_player(raw, Carriage::DvbEac3Tag, Selection::All, 7);
     let out = collect(&mut p, 1).unwrap();
@@ -2258,7 +2254,7 @@ fn private_audio_mismatch_reports_refusal_and_retains_source_packet() {
 
 #[test]
 fn private_audio_does_not_admit_m2ts_by_construction() {
-    use triergon_mpegts::native_pes::NativePrivateAudioCarriage as Carriage;
+    use triergon_mpegts::compat::pes::PrivateAudioCarriage as Carriage;
     let budget = pool();
     let input = InputCursor::new(
         &budget,
@@ -2288,7 +2284,7 @@ fn private_audio_does_not_admit_m2ts_by_construction() {
 
 #[test]
 fn native_pressure_retries_instead_of_disabling_the_observer() {
-    use triergon_mpegts::native_pes::NativePrivateAudioCarriage as Carriage;
+    use triergon_mpegts::compat::pes::PrivateAudioCarriage as Carriage;
     let raw = include_bytes!("../../mpegts/tests/data/carriage-ac3-dvb.ts");
     let (mut player, budget) = private_audio_player(raw, Carriage::DvbAc3Tag, Selection::All, 7);
     for _ in 0..4096 {

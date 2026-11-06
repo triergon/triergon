@@ -421,12 +421,12 @@ impl TransportStream {
     }
     /// Seal the actual core End after this source operation has drained. Pending
     /// PSI/PES may remain: an entity End is not a logical EOF or discontinuity.
-    pub fn media_entity_end_v1(
+    pub fn media_entity_end(
         &self,
         input: &mut InputCursor,
         work: &mut WorkBudget,
         cancel: &AtomicBool,
-    ) -> Result<Option<crate::MediaEntityEndV1>> {
+    ) -> Result<Option<crate::MediaEntityEnd>> {
         if cancel.load(Ordering::Relaxed) {
             return Err(Error::Cancelled);
         }
@@ -453,7 +453,7 @@ impl TransportStream {
             return Ok(None);
         }
         match input.read_into(&mut [0_u8; 1], work, cancel)? {
-            Step::End(actual) if actual == location => Ok(Some(crate::MediaEntityEndV1 {
+            Step::End(actual) if actual == location => Ok(Some(crate::MediaEntityEnd {
                 location,
                 token: input.token(),
                 epochs: self.source_epochs(),

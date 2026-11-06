@@ -11,26 +11,31 @@
 
 pub mod carrier;
 pub mod clock;
+pub mod compat;
 mod continuity;
+#[cfg(feature = "reference-trace")]
+mod demux_catalogue;
+mod demux_clock;
+mod demux_input;
+mod demux_pes;
+#[cfg(feature = "reference-trace")]
+mod demux_recovery;
 mod framer;
 mod media_entity;
 pub mod mux;
-pub mod native_catalogue;
-pub mod native_input;
-/// Packet-completion trace projection, used only by the reference trace tooling.
 #[cfg(feature = "reference-trace")]
-pub mod native_packet_completion;
-pub mod native_pes;
-pub mod native_recovery;
+mod packet_completion;
 pub mod pes;
 pub mod psi;
+#[cfg(feature = "reference-trace")]
+pub mod reference_trace;
 mod stream;
 mod transport;
 
 pub use carrier::{RejectedTransport, TransportInspection, TransportInspector};
 pub use continuity::{Continuity, ContinuityOutcome};
 pub use framer::{FrameState, FrameStep, NullCarrierRun, TransportFramer};
-pub use media_entity::MediaEntityEndV1;
+pub use media_entity::MediaEntityEnd;
 pub use pes::{Pes, PesAssembler, PesHeader, PesSpan};
 pub use psi::SectionAssembler;
 pub use stream::{

@@ -20,7 +20,7 @@ fn cursor(pool: &Budget, length: Option<u64>) -> InputCursor {
 }
 
 #[test]
-fn reserved_inline_carriers_need_no_temporary_owner_and_retry_freeze_pressure() {
+fn reserved_inline_carriers_need_no_temporary_backing_and_retry_freeze_pressure() {
     for (format, fixture) in [
         (
             PacketFormat::Ts188,

@@ -1,6 +1,6 @@
 use triergon_core::{Error, Result};
 
-/// Borrowed source view. Its owner is the charged section/descriptor Bytes.
+/// Borrowed source view. Its storage is the charged section/descriptor Bytes.
 #[derive(Clone, Copy, Debug)]
 pub struct Descriptor<'a> {
     pub tag: u8,

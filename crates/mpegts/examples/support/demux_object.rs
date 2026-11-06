@@ -1,10 +1,10 @@
-//! Full native object rendering; packet assembly stays in the existing observer.
+//! Full demux object rendering; packet assembly stays in the existing observer.
 use super::*;
 use triergon_core::BudgetVec;
-use triergon_mpegts::native_catalogue::NativeCatalogueV1;
+use triergon_mpegts::reference_trace::catalogue::Catalogue;
 
 struct Captured {
-    packet: NativePesPacket,
+    packet: DemuxPacket,
     pts: Option<i128>,
     dts: Option<i128>,
 }
@@ -15,7 +15,7 @@ struct Discard {
     error: Error,
 }
 pub(super) struct ObjectAdapter {
-    catalogue: NativeCatalogueV1,
+    catalogue: Catalogue,
     budget: Budget,
     program: u16,
     packets: BudgetVec<Captured>,
@@ -31,7 +31,7 @@ pub(super) struct ObjectAdapter {
 impl ObjectAdapter {
     pub(super) fn new(budget: Budget, program: u16) -> triergon_core::Result<Self> {
         Ok(Self {
-            catalogue: NativeCatalogueV1::new(budget.clone(), ParseLimits::default(), program)?,
+            catalogue: Catalogue::new(budget.clone(), ParseLimits::default(), program)?,
             packets: BudgetVec::new(&budget),
             discards: BudgetVec::new(&budget),
             budget,
@@ -45,35 +45,31 @@ impl ObjectAdapter {
             psi_compatibility: false,
         })
     }
-    pub(super) fn new_psi_compatibility_v1(
+    pub(super) fn new_psi_compatibility(
         budget: Budget,
         program: u16,
-        policies: triergon_mpegts::native_catalogue::NativePsiCompatibilityPoliciesV1,
+        policies: triergon_mpegts::reference_trace::catalogue::PsiCompatibilityPolicies,
     ) -> triergon_core::Result<Self> {
         let mut object = Self::new(budget, program)?;
-        object.catalogue.enable_psi_compatibility_v1(policies)?;
+        object.catalogue.enable_psi_compatibility(policies)?;
         object.psi_compatibility = true;
         Ok(object)
     }
-    pub(super) fn new_selected_carriage_v2(
+    pub(super) fn new_selected_carriage(
         budget: Budget,
         program: u16,
         format: PacketFormat,
     ) -> triergon_core::Result<Self> {
         let mut object = Self::new(budget.clone(), program)?;
-        object.catalogue = NativeCatalogueV1::new_selected_carriage_v2(
-            budget,
-            ParseLimits::default(),
-            program,
-            format,
-        )?;
-        object.catalogue.enable_psi_compatibility_v1(
-            triergon_mpegts::native_catalogue::NativePsiCompatibilityPoliciesV1::ALL_OBSERVED,
+        object.catalogue =
+            Catalogue::new_selected_carriage(budget, ParseLimits::default(), program, format)?;
+        object.catalogue.enable_psi_compatibility(
+            triergon_mpegts::reference_trace::catalogue::PsiCompatibilityPolicies::ALL_OBSERVED,
         )?;
         object.psi_compatibility = true;
         Ok(object)
     }
-    pub(super) fn packet_completion_ready_v1(&self) -> triergon_core::Result<()> {
+    pub(super) fn packet_completion_ready(&self) -> triergon_core::Result<()> {
         if let Some(error) = self.error() {
             return Err(error);
         }
@@ -84,33 +80,33 @@ impl ObjectAdapter {
         }
         Ok(())
     }
-    pub(super) fn uses_psi_compatibility_v1(&self) -> bool {
+    pub(super) fn uses_psi_compatibility(&self) -> bool {
         self.psi_compatibility
     }
-    pub(super) fn missing_psi_source_context_v1(&mut self) {
+    pub(super) fn missing_psi_source_context(&mut self) {
         self.fault = Some(Error::Invalid(
             "PSI compatibility actual source ordinal missing",
         ));
     }
 
-    pub(super) fn observe_psi_context_v1(
+    pub(super) fn observe_psi_context(
         &mut self,
         event: &TraceEvent,
         idle: bool,
         source: SourceId,
-        context: NativeSourceContext,
+        context: SourceContext,
         cancel: &AtomicBool,
     ) -> bool {
-        self.observe_bound_v1(event, idle, Some((source, context)), cancel)
+        self.observe_bound(event, idle, Some((source, context)), cancel)
     }
     pub(super) fn observe(&mut self, event: &TraceEvent, idle: bool, cancel: &AtomicBool) -> bool {
-        self.observe_bound_v1(event, idle, None, cancel)
+        self.observe_bound(event, idle, None, cancel)
     }
-    fn observe_bound_v1(
+    fn observe_bound(
         &mut self,
         event: &TraceEvent,
         idle: bool,
-        source: Option<(SourceId, NativeSourceContext)>,
+        source: Option<(SourceId, SourceContext)>,
         cancel: &AtomicBool,
     ) -> bool {
         if self.fault.is_some() {
@@ -151,15 +147,15 @@ impl ObjectAdapter {
         &mut self,
         event: &TraceEvent,
         idle: bool,
-        source: Option<(SourceId, NativeSourceContext)>,
+        source: Option<(SourceId, SourceContext)>,
         cancel: &AtomicBool,
     ) -> triergon_core::Result<bool> {
         if !self.catalogue.is_ended() && self.psi_compatibility {
             let (source, context) = source.ok_or(Error::Invalid(
                 "PSI compatibility actual source context missing",
             ))?;
-            let cost = self.catalogue.required_psi_compatibility_work_v1(event)?;
-            if !self.catalogue.observe_psi_compatibility_v1(
+            let cost = self.catalogue.required_psi_compatibility_work(event)?;
+            if !self.catalogue.observe_psi_compatibility(
                 event,
                 source,
                 context,
@@ -171,7 +167,7 @@ impl ObjectAdapter {
                 ));
             }
         } else if !self.catalogue.is_ended() {
-            let cost = NativeCatalogueV1::required_work(event)?;
+            let cost = Catalogue::required_work(event)?;
             if !self
                 .catalogue
                 .observe(event, &mut WorkBudget::new(cost), cancel)?
@@ -193,7 +189,7 @@ impl ObjectAdapter {
                 let Some(body) = p.payload.as_ref() else {
                     return Ok(false);
                 };
-                // The native worker's object includes every native program. A
+                // The demux worker's object includes every demux program. A
                 // selected-source map cannot stand in for another program or SI.
                 if p.pid != 0
                     && p.pid < 0x20
@@ -225,7 +221,7 @@ impl ObjectAdapter {
                     ));
                 }
                 if self.catalogue.has_pending_current_pat()
-                    && !self.catalogue.has_psi_compatibility_route_v1(p.pid)
+                    && !self.catalogue.has_psi_compatibility_route(p.pid)
                     && p.pid != 0
                     && p.payload_unit_start
                 {
@@ -380,7 +376,7 @@ impl ObjectAdapter {
                     && f.error == Error::Invalid("TS continuity loss") =>
             {
                 // Strict still reports a lost counter because its rejected carrier
-                // had no source header. The separate native finite-PUSI view is
+                // had no source header. The separate demux finite-PUSI view is
                 // admitted only by the real encoded counter and following bytes.
                 if self.counter_consequence.is_some_and(|(at, pid)| {
                     f.pid == Some(pid)
@@ -408,22 +404,22 @@ impl ObjectAdapter {
     }
     pub(super) fn end(
         &mut self,
-        end: &triergon_mpegts::MediaEntityEndV1,
+        end: &triergon_mpegts::MediaEntityEnd,
         input: &InputCursor,
     ) -> triergon_core::Result<()> {
-        self.end_bound_v1(end, input, None)
+        self.end_bound(end, input, None)
     }
-    pub(super) fn end_psi_with_cancel_v1(
+    pub(super) fn end_psi_with_cancel(
         &mut self,
-        end: &triergon_mpegts::MediaEntityEndV1,
+        end: &triergon_mpegts::MediaEntityEnd,
         input: &InputCursor,
         cancel: &AtomicBool,
     ) -> triergon_core::Result<()> {
-        self.end_bound_v1(end, input, Some(cancel))
+        self.end_bound(end, input, Some(cancel))
     }
-    fn end_bound_v1(
+    fn end_bound(
         &mut self,
-        end: &triergon_mpegts::MediaEntityEndV1,
+        end: &triergon_mpegts::MediaEntityEnd,
         input: &InputCursor,
         cancel: Option<&AtomicBool>,
     ) -> triergon_core::Result<()> {
@@ -447,9 +443,9 @@ impl ObjectAdapter {
             let cancel = cancel.ok_or(Error::Invalid(
                 "PSI compatibility terminal cancellation context missing",
             ))?;
-            let cost = self.catalogue.required_psi_compatibility_finish_work_v1()?;
+            let cost = self.catalogue.required_psi_compatibility_finish_work()?;
             self.catalogue
-                .finish_psi_compatibility_v1(end, input, &mut WorkBudget::new(cost), cancel)
+                .finish_psi_compatibility(end, input, &mut WorkBudget::new(cost), cancel)
                 .and_then(|done| {
                     if done {
                         Ok(())
@@ -465,7 +461,7 @@ impl ObjectAdapter {
         }
         result
     }
-    pub(super) fn capture(&mut self, packet: NativePesPacket, time: &NativePesTimeView) {
+    pub(super) fn capture(&mut self, packet: DemuxPacket, time: &DemuxTimeView) {
         if time.pts90.is_some_and(|t| i64::try_from(t).is_err())
             || time.dts90.is_some_and(|t| i64::try_from(t).is_err())
         {
@@ -524,7 +520,7 @@ impl ObjectAdapter {
             write!(
                 output,
                 ",\"duration\":{},\"position\":{},\"flags\":{},\"payload\":\"",
-                p.native_duration90_raw, p.native_position, p.native_flags
+                p.duration90_raw, p.position, p.flags
             )?;
             for span in p.payload() {
                 for b in span {
@@ -534,7 +530,7 @@ impl ObjectAdapter {
             write!(
                 output,
                 "\",\"side_data\":[{{\"type\":19,\"bytes\":\"{:02x}\"}}]}}",
-                p.native_stream_id
+                p.stream_id
             )?;
         }
         output.write_all(b"],\"streams\":[")?;
@@ -542,7 +538,7 @@ impl ObjectAdapter {
             if i != 0 {
                 output.write_all(b",")?;
             }
-            let codec = s.native_codec_v2();
+            let codec = s.codec();
             write!(
                 output,
                 "{{\"stream\":{i},\"pid\":{},\"codec\":\"{}\",\"type\":{},\"time_base\":[1,90000],\"extradata\":\"\",\"tags\":[",
@@ -565,7 +561,7 @@ impl ObjectAdapter {
             write!(
                 output,
                 "{{\"id\":{},\"program\":{},\"pmt_pid\":{},\"pcr_pid\":{},\"tags\":[]}}",
-                p.program, p.program, p.pmt_pid, p.native_pcr_pid
+                p.program, p.program, p.pmt_pid, p.pcr_pid
             )?;
         }
         output.write_all(b"],\"read_result\":-541478725,\"confirmed_eof\":true}")?;
@@ -596,16 +592,16 @@ impl ObjectAdapter {
         output.write_all(b"],\"trailing_source_offset\":")?;
         source_trace::optional(output, self.trailing.map(|t| t.offset))?;
         output.write_all(b",\"source_acceptance_unchanged\":true,\"qualified\":false}\n")?;
-        for record in self.catalogue.psi_compatibility_evidence_v1() {
-            let receipt = record.receipt();
+        for record in self.catalogue.psi_compatibility_evidence() {
+            let entry = record.record();
             let header = record.wire_header();
             write!(
                 output,
-                "{{\"kind\":\"native_psi_compatibility\",\"policy\":\"{:?}\",\"source_event_ordinal\":{},\"source_clock_epoch\":{},\"source_configuration_epoch\":{},\"wire_section_number\":{},\"wire_last_section_number\":{},\"wire_version\":{},\"source_status\":",
-                receipt.policy,
-                receipt.context.source_event_ordinal,
-                receipt.context.epochs.clock,
-                receipt.context.epochs.configuration,
+                "{{\"kind\":\"native_psi_compatibility\",\"policy\":\"{}\",\"source_event_ordinal\":{},\"source_clock_epoch\":{},\"source_configuration_epoch\":{},\"wire_section_number\":{},\"wire_last_section_number\":{},\"wire_version\":{},\"source_status\":",
+                entry.policy.label(),
+                entry.context.source_event_ordinal,
+                entry.context.epochs.clock,
+                entry.context.epochs.configuration,
                 header.section_number,
                 header.last_section_number,
                 header.version

@@ -1,41 +1,51 @@
-//! Explicit d32/flags48 PSI compatibility. No Source PatTable, active ProgramMap
+//! Explicit flags48 PSI compatibility. No Source PatTable, active ProgramMap
 //! event, source diagnostic or epoch is synthesized by this optional operation.
 use super::*;
-use crate::native_pes::{NativePesObserver, NativeSourceContext};
+use crate::demux_pes::{DemuxObserver, SourceContext};
 use crate::psi::{
     Descriptors, PatReader, PmtReader, Section, SectionAssembler, SectionHeader, TableStep,
 };
 use crate::{AssemblyStep, FaultKind, NullCarrierRun, TraceFault, TransportPacket};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum NativePsiCompatibilityV1 {
-    CurrentPatSectionBeforeWholeTableV1,
-    PmtDescriptorStopsAfterStreamIdentityV1,
-    PmtNonzeroSectionV1,
+pub enum PsiCompatibility {
+    CurrentPatSectionBeforeWholeTable,
+    PmtDescriptorStopsAfterStreamIdentity,
+    PmtNonzeroSection,
 }
-impl NativePsiCompatibilityV1 {
+impl PsiCompatibility {
+    /// The policy's name in reference traces.
+    pub fn label(self) -> &'static str {
+        match self {
+            Self::CurrentPatSectionBeforeWholeTable => "CurrentPatSectionBeforeWholeTableV1",
+            Self::PmtDescriptorStopsAfterStreamIdentity => {
+                "PmtDescriptorStopsAfterStreamIdentityV1"
+            }
+            Self::PmtNonzeroSection => "PmtNonzeroSectionV1",
+        }
+    }
     fn bit(self) -> u8 {
         match self {
-            Self::CurrentPatSectionBeforeWholeTableV1 => 1,
-            Self::PmtDescriptorStopsAfterStreamIdentityV1 => 2,
-            Self::PmtNonzeroSectionV1 => 4,
+            Self::CurrentPatSectionBeforeWholeTable => 1,
+            Self::PmtDescriptorStopsAfterStreamIdentity => 2,
+            Self::PmtNonzeroSection => 4,
         }
     }
 }
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub struct NativePsiCompatibilityPoliciesV1(u8);
-impl NativePsiCompatibilityPoliciesV1 {
+pub struct PsiCompatibilityPolicies(u8);
+impl PsiCompatibilityPolicies {
     pub const NONE: Self = Self(0);
     pub const ALL_OBSERVED: Self = Self(7);
-    pub fn one(policy: NativePsiCompatibilityV1) -> Self {
+    pub fn one(policy: PsiCompatibility) -> Self {
         Self(policy.bit())
     }
-    pub fn contains(self, policy: NativePsiCompatibilityV1) -> bool {
+    pub fn contains(self, policy: PsiCompatibility) -> bool {
         self.0 & policy.bit() != 0
     }
 }
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum NativePsiCompatibilitySourceStatusV1 {
+pub enum PsiCompatibilitySourceStatus {
     IncompleteCurrentPat {
         section_number: u8,
         last_section_number: u8,
@@ -53,25 +63,25 @@ pub enum NativePsiCompatibilitySourceStatusV1 {
     },
 }
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub struct NativePsiCompatibilityReceiptV1 {
+pub struct PsiCompatibilityRecord {
     pub evidence_index: usize,
     pub catalogue_evidence_index: usize,
-    pub policy: NativePsiCompatibilityV1,
-    pub context: NativeSourceContext,
+    pub policy: PsiCompatibility,
+    pub context: SourceContext,
 }
 #[derive(Debug)]
-pub struct NativePsiCompatibilityEvidenceV1 {
-    receipt: NativePsiCompatibilityReceiptV1,
-    source_status: NativePsiCompatibilitySourceStatusV1,
+pub struct PsiCompatibilityEvidence {
+    record: PsiCompatibilityRecord,
+    source_status: PsiCompatibilitySourceStatus,
     header: SectionHeader,
-    input: SectionInputV1,
+    input: SectionInput,
     descriptor_stop: Option<usize>,
 }
-impl NativePsiCompatibilityEvidenceV1 {
-    pub fn receipt(&self) -> NativePsiCompatibilityReceiptV1 {
-        self.receipt
+impl PsiCompatibilityEvidence {
+    pub fn record(&self) -> PsiCompatibilityRecord {
+        self.record
     }
-    pub fn source_status(&self) -> NativePsiCompatibilitySourceStatusV1 {
+    pub fn source_status(&self) -> PsiCompatibilitySourceStatus {
         self.source_status
     }
     pub fn wire_header(&self) -> SectionHeader {
@@ -89,7 +99,7 @@ impl NativePsiCompatibilityEvidenceV1 {
     pub fn carrier_count(&self) -> usize {
         self.input.carriers.len()
     }
-    pub fn carrier(&self, index: usize) -> Option<(&TransportPacket, NativeSourceContext)> {
+    pub fn carrier(&self, index: usize) -> Option<(&TransportPacket, SourceContext)> {
         self.input
             .carriers
             .as_slice()
@@ -98,40 +108,40 @@ impl NativePsiCompatibilityEvidenceV1 {
     }
 }
 #[derive(Clone, Debug)]
-struct CarrierV1 {
+struct Carrier {
     packet: TransportPacket,
-    context: NativeSourceContext,
+    context: SourceContext,
 }
 #[derive(Debug)]
-struct SectionInputV1 {
+struct SectionInput {
     section: Section,
-    carriers: BudgetVec<CarrierV1>,
-    context: NativeSourceContext,
+    carriers: BudgetVec<Carrier>,
+    context: SourceContext,
 }
 #[derive(Clone, Copy, Debug)]
-struct PartialPatRouteV1 {
+struct PartialPatRoute {
     entity: SourceId,
     tsid: u16,
     version: u8,
     last_section: u8,
     program: u16,
     pmt_pid: u16,
-    context: NativeSourceContext,
+    context: SourceContext,
 }
 #[derive(Debug)]
-pub(super) struct CompatibilityStateV1 {
-    policies: NativePsiCompatibilityPoliciesV1,
-    history: BudgetVec<CarrierV1>,
-    evidence: BudgetVec<NativePsiCompatibilityEvidenceV1>,
-    pending_source: Option<SectionInputV1>,
-    route: Option<PartialPatRouteV1>,
+pub(super) struct CompatibilityState {
+    policies: PsiCompatibilityPolicies,
+    history: BudgetVec<Carrier>,
+    evidence: BudgetVec<PsiCompatibilityEvidence>,
+    pending_source: Option<SectionInput>,
+    route: Option<PartialPatRoute>,
     pat_identity: Option<(u16, u8, u8)>,
     pat_seen: [u64; 4],
-    native_pmt: Option<SectionAssembler>,
-    last_event: Option<(SourceId, NativeSourceContext)>,
+    demux_pmt: Option<SectionAssembler>,
+    last_event: Option<(SourceId, SourceContext)>,
 }
-impl CompatibilityStateV1 {
-    fn new(budget: &Budget, policies: NativePsiCompatibilityPoliciesV1) -> Self {
+impl CompatibilityState {
+    fn new(budget: &Budget, policies: PsiCompatibilityPolicies) -> Self {
         Self {
             policies,
             history: BudgetVec::new(budget),
@@ -140,11 +150,11 @@ impl CompatibilityStateV1 {
             route: None,
             pat_identity: None,
             pat_seen: [0; 4],
-            native_pmt: None,
+            demux_pmt: None,
             last_event: None,
         }
     }
-    fn require(&self, policy: NativePsiCompatibilityV1) -> Result<()> {
+    fn require(&self, policy: PsiCompatibility) -> Result<()> {
         if !self.policies.contains(policy) {
             return Err(Error::Unsupported("PSI compatibility policy not enabled"));
         }
@@ -188,7 +198,7 @@ fn common_header(section: &Section, id: u8, budget: &Budget) -> Result<SectionHe
 }
 fn validate_carrier(
     packet: &TransportPacket,
-    context: NativeSourceContext,
+    context: SourceContext,
     source: SourceId,
     budget: &Budget,
     format: PacketFormat,
@@ -196,7 +206,7 @@ fn validate_carrier(
     if !packet.source.belongs_to(budget) {
         return Err(Error::ForeignPool);
     }
-    NativePesObserver::transport_bounds(packet)?;
+    DemuxObserver::transport_bounds(packet)?;
     let full = packet.source.as_ref();
     let prefix = format.prefix_bytes();
     if full.len() != format.bytes()
@@ -255,12 +265,12 @@ fn validate_carrier(
     }
     Ok(())
 }
-impl SectionInputV1 {
+impl SectionInput {
     fn capture(
         section: &Section,
-        context: NativeSourceContext,
-        history: &[CarrierV1],
-        native_only: bool,
+        context: SourceContext,
+        history: &[Carrier],
+        demux_only: bool,
         budget: &Budget,
         cancel: &AtomicBool,
     ) -> Result<Self> {
@@ -345,33 +355,33 @@ impl SectionInputV1 {
             .as_slice()
             .last()
             .ok_or(Error::Invalid("PSI compatibility carrier proof empty"))?;
-        if (native_only && last.context.source_event_ordinal != context.source_event_ordinal)
-            || (!native_only && last.context.source_event_ordinal >= context.source_event_ordinal)
+        if (demux_only && last.context.source_event_ordinal != context.source_event_ordinal)
+            || (!demux_only && last.context.source_event_ordinal >= context.source_event_ordinal)
         {
             return Err(Error::Invalid(
                 "PSI compatibility source ordinal provenance",
             ));
         }
         Ok(Self {
-            section: section.try_clone_charged_v1(budget)?,
+            section: section.try_clone_charged(budget)?,
             carriers,
             context,
         })
     }
 }
-struct DecodedPmtV1 {
+struct DecodedPmt {
     header: SectionHeader,
     pcr_pid: u16,
-    streams: BudgetVec<NativeStreamV1>,
+    streams: BudgetVec<Stream>,
     descriptor_stop: Option<usize>,
 }
 fn decode_rejected_pmt(
-    input: &SectionInputV1,
-    policy: NativePsiCompatibilityV1,
+    input: &SectionInput,
+    policy: PsiCompatibility,
     budget: &Budget,
     limits: ParseLimits,
     cancel: &AtomicBool,
-) -> Result<DecodedPmtV1> {
+) -> Result<DecodedPmt> {
     let h = common_header(&input.section, 2, budget)?;
     if !h.current_next || h.extension == 0 {
         return Err(Error::Unsupported(
@@ -391,9 +401,9 @@ fn decode_rejected_pmt(
         ));
     }
     match policy {
-        NativePsiCompatibilityV1::PmtNonzeroSectionV1
+        PsiCompatibility::PmtNonzeroSection
             if h.section_number != 0 || h.last_section_number != 0 => {}
-        NativePsiCompatibilityV1::PmtDescriptorStopsAfterStreamIdentityV1
+        PsiCompatibility::PmtDescriptorStopsAfterStreamIdentity
             if h.section_number == 0 && h.last_section_number == 0 => {}
         _ => {
             return Err(Error::Invalid(
@@ -425,10 +435,7 @@ fn decode_rejected_pmt(
                 "PSI compatibility ES identity/extent outside observed profile",
             ));
         }
-        if streams
-            .as_slice()
-            .iter()
-            .any(|s: &NativeStreamV1| s.pid == pid)
+        if streams.as_slice().iter().any(|s: &Stream| s.pid == pid)
             || streams.len() >= limits.streams
         {
             return Err(Error::Invalid("PSI compatibility duplicate/excess ES"));
@@ -445,8 +452,7 @@ fn decode_rejected_pmt(
             let d = match item {
                 Ok(d) => d,
                 Err(Error::Invalid("descriptor length"))
-                    if policy
-                        == NativePsiCompatibilityV1::PmtDescriptorStopsAfterStreamIdentityV1
+                    if policy == PsiCompatibility::PmtDescriptorStopsAfterStreamIdentity
                         && stop.is_none() =>
                 {
                     stop = Some(at + 5 + walked);
@@ -481,13 +487,13 @@ fn decode_rejected_pmt(
             walked = walked.checked_add(d.source.len()).ok_or(Error::Overflow)?;
         }
         streams
-            .try_push(NativeStreamV1 {
+            .try_push(Stream {
                 pid,
                 stream_type: head[0],
-                native_codec: if head[0] == 0x1b {
-                    NativeCatalogueCodecV2::Avc
+                codec: if head[0] == 0x1b {
+                    CatalogueCodec::Avc
                 } else {
-                    NativeCatalogueCodecV2::Hevc
+                    CatalogueCodec::Hevc
                 },
                 language,
                 evidence: 0,
@@ -496,26 +502,22 @@ fn decode_rejected_pmt(
         at = end;
     }
     if at != raw.len() - 4
-        || (policy == NativePsiCompatibilityV1::PmtDescriptorStopsAfterStreamIdentityV1
-            && stop.is_none())
+        || (policy == PsiCompatibility::PmtDescriptorStopsAfterStreamIdentity && stop.is_none())
     {
         return Err(Error::Invalid(
             "PSI compatibility actual descriptor rejection not present",
         ));
     }
-    Ok(DecodedPmtV1 {
+    Ok(DecodedPmt {
         header: h,
         pcr_pid: u16::from_be_bytes([raw[8], raw[9]]) & 0x1fff,
         streams,
         descriptor_stop: stop,
     })
 }
-impl NativeCatalogueV1 {
+impl Catalogue {
     /// Opt-in only. Existing observe()/finish() retain their strict-source rules.
-    pub fn enable_psi_compatibility_v1(
-        &mut self,
-        policies: NativePsiCompatibilityPoliciesV1,
-    ) -> Result<()> {
+    pub fn enable_psi_compatibility(&mut self, policies: PsiCompatibilityPolicies) -> Result<()> {
         if self.compatibility.is_some()
             || self.entity.is_some()
             || !self.evidence.is_empty()
@@ -526,20 +528,20 @@ impl NativeCatalogueV1 {
         {
             return Err(Error::Invalid("PSI compatibility enable after observation"));
         }
-        if policies == NativePsiCompatibilityPoliciesV1::NONE {
+        if policies == PsiCompatibilityPolicies::NONE {
             return Err(Error::Invalid(
                 "PSI compatibility requires explicit policies",
             ));
         }
-        self.compatibility = Some(CompatibilityStateV1::new(&self.budget, policies));
+        self.compatibility = Some(CompatibilityState::new(&self.budget, policies));
         Ok(())
     }
-    pub fn psi_compatibility_evidence_v1(&self) -> &[NativePsiCompatibilityEvidenceV1] {
+    pub fn psi_compatibility_evidence(&self) -> &[PsiCompatibilityEvidence] {
         self.compatibility
             .as_ref()
             .map_or(&[], |s| s.evidence.as_slice())
     }
-    pub fn has_psi_compatibility_route_v1(&self, pid: u16) -> bool {
+    pub fn has_psi_compatibility_route(&self, pid: u16) -> bool {
         self.compatibility
             .as_ref()
             .and_then(|s| s.route)
@@ -549,13 +551,13 @@ impl NativeCatalogueV1 {
                     && self.pending_pat == Some((route.tsid, route.version))
             })
     }
-    /// Includes bounded ownership/provenance scans and possible pending PSI bytes.
-    pub fn required_psi_compatibility_work_v1(&self, event: &TraceEvent) -> Result<u64> {
+    /// Includes bounded storage/provenance scans and possible pending PSI bytes.
+    pub fn required_psi_compatibility_work(&self, event: &TraceEvent) -> Result<u64> {
         let s = self
             .compatibility
             .as_ref()
             .ok_or(Error::Invalid("PSI compatibility not enabled"))?;
-        let pending = s.native_pmt.as_ref().map_or(0, |a| a.partial_bytes().len());
+        let pending = s.demux_pmt.as_ref().map_or(0, |a| a.partial_bytes().len());
         let n = match event {
             TraceEvent::Transport(p) => p.source.len(),
             TraceEvent::Section(s) => s.bytes().len(),
@@ -576,15 +578,15 @@ impl NativeCatalogueV1 {
     )]
     fn store_compat_evidence(
         &mut self,
-        s: &mut CompatibilityStateV1,
-        input: SectionInputV1,
-        policy: NativePsiCompatibilityV1,
-        status: NativePsiCompatibilitySourceStatusV1,
+        s: &mut CompatibilityState,
+        input: SectionInput,
+        policy: PsiCompatibility,
+        status: PsiCompatibilitySourceStatus,
         header: SectionHeader,
         descriptor_stop: Option<usize>,
         catalogue_index: usize,
-        context: NativeSourceContext,
-    ) -> Result<NativePsiCompatibilityReceiptV1> {
+        context: SourceContext,
+    ) -> Result<PsiCompatibilityRecord> {
         if s.evidence.len() >= self.limits.source_spans {
             return Err(Error::Unsupported("PSI compatibility evidence limit"));
         }
@@ -592,39 +594,39 @@ impl NativeCatalogueV1 {
             let old_offset = previous.input.section.source_ranges()[0].offset;
             let new_offset = input.section.source_ranges()[0].offset;
             if (context.source_event_ordinal, new_offset)
-                <= (previous.receipt.context.source_event_ordinal, old_offset)
+                <= (previous.record.context.source_event_ordinal, old_offset)
             {
                 return Err(Error::Invalid(
                     "PSI compatibility duplicate or reversed admission",
                 ));
             }
         }
-        let receipt = NativePsiCompatibilityReceiptV1 {
+        let record = PsiCompatibilityRecord {
             evidence_index: s.evidence.len(),
             catalogue_evidence_index: catalogue_index,
             policy,
             context,
         };
         s.evidence
-            .try_push(NativePsiCompatibilityEvidenceV1 {
-                receipt,
+            .try_push(PsiCompatibilityEvidence {
+                record,
                 source_status: status,
                 header,
                 input,
                 descriptor_stop,
             })
             .map_err(|e| e.error)?;
-        Ok(receipt)
+        Ok(record)
     }
     fn commit_current_pat_section(
         &mut self,
-        s: &mut CompatibilityStateV1,
+        s: &mut CompatibilityState,
         section: &Section,
-        context: NativeSourceContext,
+        context: SourceContext,
         inner: &mut WorkBudget,
         cancel: &AtomicBool,
-    ) -> Result<NativePsiCompatibilityReceiptV1> {
-        let policy = NativePsiCompatibilityV1::CurrentPatSectionBeforeWholeTableV1;
+    ) -> Result<PsiCompatibilityRecord> {
+        let policy = PsiCompatibility::CurrentPatSectionBeforeWholeTable;
         s.require(policy)?;
         let h = common_header(section, 0, &self.budget)?;
         if section.pid() != 0 || !h.current_next || h.last_section_number == 0 {
@@ -632,7 +634,7 @@ impl NativeCatalogueV1 {
                 "PSI compatibility requires actual incomplete current PAT section",
             ));
         }
-        let input = SectionInputV1::capture(
+        let input = SectionInput::capture(
             section,
             context,
             s.history.as_slice(),
@@ -682,17 +684,17 @@ impl NativeCatalogueV1 {
                     return Err(Error::Unsupported("PSI compatibility program limit"));
                 }
                 self.programs
-                    .try_push(NativeProgramV1 {
+                    .try_push(Program {
                         program: entry.program_number,
                         pmt_pid: entry.pid,
-                        native_pcr_pid: 0,
+                        pcr_pid: 0,
                         evidence: index,
                     })
                     .map_err(|e| e.error)?;
             }
             if entry.program_number == self.program {
                 let entity = section.source_ranges()[0].entity;
-                s.route = Some(PartialPatRouteV1 {
+                s.route = Some(PartialPatRoute {
                     entity,
                     tsid: h.extension,
                     version: h.version,
@@ -701,8 +703,8 @@ impl NativeCatalogueV1 {
                     pmt_pid: entry.pid,
                     context,
                 });
-                if s.native_pmt.is_none() {
-                    s.native_pmt = Some(SectionAssembler::new(
+                if s.demux_pmt.is_none() {
+                    s.demux_pmt = Some(SectionAssembler::new(
                         entry.pid,
                         self.budget.clone(),
                         self.limits,
@@ -717,7 +719,7 @@ impl NativeCatalogueV1 {
             s,
             input,
             policy,
-            NativePsiCompatibilitySourceStatusV1::IncompleteCurrentPat {
+            PsiCompatibilitySourceStatus::IncompleteCurrentPat {
                 section_number: h.section_number,
                 last_section_number: h.last_section_number,
             },
@@ -729,22 +731,22 @@ impl NativeCatalogueV1 {
     }
     fn commit_rejected_pmt(
         &mut self,
-        s: &mut CompatibilityStateV1,
-        input: &SectionInputV1,
+        s: &mut CompatibilityState,
+        input: &SectionInput,
         diagnostic: &TraceFault,
-        context: NativeSourceContext,
-        policy: NativePsiCompatibilityV1,
+        context: SourceContext,
+        policy: PsiCompatibility,
         cancel: &AtomicBool,
-    ) -> Result<NativePsiCompatibilityReceiptV1> {
+    ) -> Result<PsiCompatibilityRecord> {
         s.require(policy)?;
         let expected = match policy {
-            NativePsiCompatibilityV1::PmtDescriptorStopsAfterStreamIdentityV1 => {
+            PsiCompatibility::PmtDescriptorStopsAfterStreamIdentity => {
                 Error::Invalid("descriptor length")
             }
-            NativePsiCompatibilityV1::PmtNonzeroSectionV1 => {
+            PsiCompatibility::PmtNonzeroSection => {
                 Error::Invalid("PMT single-section program identity")
             }
-            NativePsiCompatibilityV1::CurrentPatSectionBeforeWholeTableV1 => {
+            PsiCompatibility::CurrentPatSectionBeforeWholeTable => {
                 return Err(Error::Invalid(
                     "PSI compatibility rejection policy is not PMT",
                 ));
@@ -784,7 +786,7 @@ impl NativeCatalogueV1 {
                 "PSI compatibility rejected PMT has no actual PAT route",
             ));
         }
-        let kept = SectionInputV1::capture(
+        let kept = SectionInput::capture(
             &input.section,
             input.context,
             s.history.as_slice(),
@@ -808,7 +810,7 @@ impl NativeCatalogueV1 {
                 .find(|p| p.pid == stream.0)
             {
                 old.stream_type = stream.1;
-                old.native_codec = decoded.native_codec;
+                old.codec = decoded.codec;
                 old.language = language;
                 old.evidence = index;
             } else {
@@ -816,10 +818,10 @@ impl NativeCatalogueV1 {
                     return Err(Error::Unsupported("PSI compatibility stream limit"));
                 }
                 self.streams
-                    .try_push(NativeStreamV1 {
+                    .try_push(Stream {
                         pid: stream.0,
                         stream_type: stream.1,
-                        native_codec: decoded.native_codec,
+                        codec: decoded.codec,
                         language,
                         evidence: index,
                     })
@@ -832,20 +834,20 @@ impl NativeCatalogueV1 {
             .iter_mut()
             .find(|p| p.program == selected_program)
             .ok_or(Error::Invalid("PSI compatibility program disappeared"))?
-            .native_pcr_pid = parsed.pcr_pid;
+            .pcr_pid = parsed.pcr_pid;
         if self.pending_pmt != Some((parsed.header.extension, parsed.header.version)) {
             return Err(Error::Invalid(
                 "PSI compatibility source PMT pending identity mismatch",
             ));
         }
-        // This resolves only the optional native catalogue. The actual Strict
+        // This resolves only the optional demux catalogue. The actual Strict
         // error stays in source_status and the caller's unchanged source trace.
         self.pending_pmt = None;
         self.store_compat_evidence(
             s,
             kept,
             policy,
-            NativePsiCompatibilitySourceStatusV1::RejectedPmt {
+            PsiCompatibilitySourceStatus::RejectedPmt {
                 kind: diagnostic.kind,
                 error: diagnostic.error,
                 location: diagnostic.location,
@@ -859,11 +861,11 @@ impl NativeCatalogueV1 {
             context,
         )
     }
-    fn commit_native_routed_pmt(
+    fn commit_demux_routed_pmt(
         &mut self,
-        s: &mut CompatibilityStateV1,
+        s: &mut CompatibilityState,
         section: &Section,
-        context: NativeSourceContext,
+        context: SourceContext,
         inner: &mut WorkBudget,
         cancel: &AtomicBool,
     ) -> Result<()> {
@@ -878,7 +880,7 @@ impl NativeCatalogueV1 {
                 "PSI compatibility native route context mismatch",
             ));
         }
-        let input = SectionInputV1::capture(
+        let input = SectionInput::capture(
             section,
             context,
             s.history.as_slice(),
@@ -911,7 +913,7 @@ impl NativeCatalogueV1 {
         }
         let header = map.header;
         self.pmt(&map, cancel)?;
-        // The PMT's actual owner is the most recent retained evidence record.
+        // The PMT's actual storage is the most recent retained evidence record.
         let metadata_index = self
             .evidence
             .len()
@@ -920,8 +922,8 @@ impl NativeCatalogueV1 {
         self.store_compat_evidence(
             s,
             input,
-            NativePsiCompatibilityV1::CurrentPatSectionBeforeWholeTableV1,
-            NativePsiCompatibilitySourceStatusV1::NotRoutedByStrictIncompletePat {
+            PsiCompatibility::CurrentPatSectionBeforeWholeTable,
+            PsiCompatibilitySourceStatus::NotRoutedByStrictIncompletePat {
                 pat_source_event_ordinal: route.context.source_event_ordinal,
             },
             header,
@@ -933,10 +935,10 @@ impl NativeCatalogueV1 {
     }
     fn observe_psi_inner(
         &mut self,
-        s: &mut CompatibilityStateV1,
+        s: &mut CompatibilityState,
         event: &TraceEvent,
         source: SourceId,
-        context: NativeSourceContext,
+        context: SourceContext,
         inner: &mut WorkBudget,
         cancel: &AtomicBool,
     ) -> Result<()> {
@@ -974,7 +976,7 @@ impl NativeCatalogueV1 {
                     ));
                 }
                 s.history
-                    .try_push(CarrierV1 {
+                    .try_push(Carrier {
                         packet: packet.clone(),
                         context,
                     })
@@ -987,7 +989,7 @@ impl NativeCatalogueV1 {
                         return Err(Error::SourceMismatch);
                     }
                     if let Some(body) = packet.payload.as_ref() {
-                        s.native_pmt
+                        s.demux_pmt
                             .as_mut()
                             .ok_or(Error::Invalid("PSI compatibility assembler missing"))?
                             .push(
@@ -999,14 +1001,13 @@ impl NativeCatalogueV1 {
                             .map_err(|e| e.error)?;
                         loop {
                             let step = s
-                                .native_pmt
+                                .demux_pmt
                                 .as_mut()
                                 .ok_or(Error::Invalid("PSI compatibility assembler lost"))?
                                 .poll(inner, cancel)?;
                             match step {
-                                AssemblyStep::Output(section) => self.commit_native_routed_pmt(
-                                    s, &section, context, inner, cancel,
-                                )?,
+                                AssemblyStep::Output(section) => self
+                                    .commit_demux_routed_pmt(s, &section, context, inner, cancel)?,
                                 AssemblyStep::NeedPayload => break,
                                 AssemblyStep::Yield => {
                                     return Err(Error::Invalid(
@@ -1033,7 +1034,7 @@ impl NativeCatalogueV1 {
                 // the previously validated complete table as that proof. A
                 // different body/version or an already pending table never
                 // takes this path; physical source provenance is still checked.
-                if self.selected_carriage_v2
+                if self.selected_carriage
                     && prior_pending_pat.is_none()
                     && section.pid() == 0
                     && raw.len() >= 12
@@ -1052,7 +1053,7 @@ impl NativeCatalogueV1 {
                             e.bytes.len() == 1 && e.bytes.as_slice()[0].as_ref() == raw
                         })
                 {
-                    let checked = SectionInputV1::capture(
+                    let checked = SectionInput::capture(
                         section,
                         context,
                         s.history.as_slice(),
@@ -1082,7 +1083,7 @@ impl NativeCatalogueV1 {
                     if s.pending_source.is_some() {
                         return Err(Error::Invalid("PSI compatibility undrained source section"));
                     }
-                    s.pending_source = Some(SectionInputV1::capture(
+                    s.pending_source = Some(SectionInput::capture(
                         section,
                         context,
                         s.history.as_slice(),
@@ -1097,10 +1098,10 @@ impl NativeCatalogueV1 {
             {
                 let policy = match fault.error {
                     Error::Invalid("descriptor length") => {
-                        NativePsiCompatibilityV1::PmtDescriptorStopsAfterStreamIdentityV1
+                        PsiCompatibility::PmtDescriptorStopsAfterStreamIdentity
                     }
                     Error::Invalid("PMT single-section program identity") => {
-                        NativePsiCompatibilityV1::PmtNonzeroSectionV1
+                        PsiCompatibility::PmtNonzeroSection
                     }
                     _ => {
                         return Err(Error::Unsupported(
@@ -1137,11 +1138,11 @@ impl NativeCatalogueV1 {
     }
     /// Named opt-in event entry point. None of this runs through observe(). A
     /// false return means the exact input event is still unconsumed.
-    pub fn observe_psi_compatibility_v1(
+    pub fn observe_psi_compatibility(
         &mut self,
         event: &TraceEvent,
         source: SourceId,
-        context: NativeSourceContext,
+        context: SourceContext,
         work: &mut WorkBudget,
         cancel: &AtomicBool,
     ) -> Result<bool> {
@@ -1152,7 +1153,7 @@ impl NativeCatalogueV1 {
         if self.ended {
             return Err(Error::Invalid("PSI compatibility after logical end"));
         }
-        let cost = self.required_psi_compatibility_work_v1(event)?;
+        let cost = self.required_psi_compatibility_work(event)?;
         if !work.try_charge(cost) {
             return Ok(false);
         }
@@ -1179,7 +1180,7 @@ impl NativeCatalogueV1 {
     pub fn observe_psi_null_run(
         &mut self,
         run: &NullCarrierRun,
-        context: NativeSourceContext,
+        context: SourceContext,
         work: &mut WorkBudget,
         cancel: &AtomicBool,
     ) -> Result<bool> {
@@ -1219,7 +1220,7 @@ impl NativeCatalogueV1 {
                 .ok_or(Error::Overflow)?;
             state.last_event = Some((
                 source,
-                NativeSourceContext {
+                SourceContext {
                     source_event_ordinal,
                     ..context
                 },
@@ -1233,13 +1234,13 @@ impl NativeCatalogueV1 {
         Ok(true)
     }
     /// Direct named source-section API; incompleteness has no fabricated error.
-    pub fn observe_current_pat_section_v1(
+    pub fn observe_current_pat_section(
         &mut self,
         section: &Section,
-        context: NativeSourceContext,
+        context: SourceContext,
         work: &mut WorkBudget,
         cancel: &AtomicBool,
-    ) -> Result<Option<NativePsiCompatibilityReceiptV1>> {
+    ) -> Result<Option<PsiCompatibilityRecord>> {
         cancelled(cancel)?;
         if let Some(e) = self.fault {
             return Err(e);
@@ -1247,7 +1248,7 @@ impl NativeCatalogueV1 {
         if self.ended {
             return Err(Error::Invalid("PSI compatibility after logical end"));
         }
-        let cost = self.required_psi_compatibility_work_v1(&TraceEvent::Finished)?;
+        let cost = self.required_psi_compatibility_work(&TraceEvent::Finished)?;
         if !work.try_charge(cost) {
             return Ok(None);
         }
@@ -1264,7 +1265,7 @@ impl NativeCatalogueV1 {
         );
         self.compatibility = Some(state);
         match result {
-            Ok(receipt) => Ok(Some(receipt)),
+            Ok(record) => Ok(Some(record)),
             Err(e) => {
                 self.fault = Some(e);
                 Err(e)
@@ -1277,16 +1278,16 @@ impl NativeCatalogueV1 {
         clippy::too_many_arguments,
         reason = "explicit independent source and diagnostic contexts are required"
     )]
-    pub fn observe_rejected_psi_v1(
+    pub fn observe_rejected_psi(
         &mut self,
         section: &Section,
-        section_context: NativeSourceContext,
+        section_context: SourceContext,
         diagnostic: &TraceFault,
-        context: NativeSourceContext,
-        policy: NativePsiCompatibilityV1,
+        context: SourceContext,
+        policy: PsiCompatibility,
         work: &mut WorkBudget,
         cancel: &AtomicBool,
-    ) -> Result<Option<NativePsiCompatibilityReceiptV1>> {
+    ) -> Result<Option<PsiCompatibilityRecord>> {
         cancelled(cancel)?;
         if let Some(e) = self.fault {
             return Err(e);
@@ -1294,7 +1295,7 @@ impl NativeCatalogueV1 {
         if self.ended {
             return Err(Error::Invalid("PSI compatibility after logical end"));
         }
-        let cost = self.required_psi_compatibility_work_v1(&TraceEvent::Finished)?;
+        let cost = self.required_psi_compatibility_work(&TraceEvent::Finished)?;
         if !work.try_charge(cost) {
             return Ok(None);
         }
@@ -1303,7 +1304,7 @@ impl NativeCatalogueV1 {
             .take()
             .ok_or(Error::Invalid("PSI compatibility not enabled"))?;
         let result = (|| {
-            let input = SectionInputV1::capture(
+            let input = SectionInput::capture(
                 section,
                 section_context,
                 state.history.as_slice(),
@@ -1311,7 +1312,7 @@ impl NativeCatalogueV1 {
                 &self.budget,
                 cancel,
             )?;
-            let receipt =
+            let record =
                 self.commit_rejected_pmt(&mut state, &input, diagnostic, context, policy, cancel)?;
             if state.pending_source.as_ref().is_some_and(|pending| {
                 pending.context == section_context
@@ -1319,18 +1320,18 @@ impl NativeCatalogueV1 {
             }) {
                 state.pending_source = None;
             }
-            Ok(receipt)
+            Ok(record)
         })();
         self.compatibility = Some(state);
         match result {
-            Ok(receipt) => Ok(Some(receipt)),
+            Ok(record) => Ok(Some(record)),
             Err(e) => {
                 self.fault = Some(e);
                 Err(e)
             }
         }
     }
-    pub fn required_psi_compatibility_finish_work_v1(&self) -> Result<u64> {
+    pub fn required_psi_compatibility_finish_work(&self) -> Result<u64> {
         let state = self
             .compatibility
             .as_ref()
@@ -1348,17 +1349,17 @@ impl NativeCatalogueV1 {
         .map_err(|_| Error::Overflow)
     }
     /// Real EOF is separately witnessed. It does not make a pending Strict PAT
-    /// complete; the explicit native per-section coverage is retained instead.
-    pub fn finish_psi_compatibility_v1(
+    /// complete; the explicit demux per-section coverage is retained instead.
+    pub fn finish_psi_compatibility(
         &mut self,
-        end: &MediaEntityEndV1,
+        end: &MediaEntityEnd,
         input: &InputCursor,
         work: &mut WorkBudget,
         cancel: &AtomicBool,
     ) -> Result<bool> {
         cancelled(cancel)?;
-        self.validate_terminal_witness_v1(end, input)?;
-        let cost = self.required_psi_compatibility_finish_work_v1()?;
+        self.validate_terminal_witness(end, input)?;
+        let cost = self.required_psi_compatibility_finish_work()?;
         if !work.try_charge(cost) {
             return Ok(false);
         }
@@ -1375,7 +1376,7 @@ impl NativeCatalogueV1 {
             if let Some((tsid, version)) = self.pending_pat
                 && (!state
                     .policies
-                    .contains(NativePsiCompatibilityV1::CurrentPatSectionBeforeWholeTableV1)
+                    .contains(PsiCompatibility::CurrentPatSectionBeforeWholeTable)
                     || state
                         .pat_identity
                         .is_none_or(|identity| identity.0 != tsid || identity.1 != version)
@@ -1385,7 +1386,7 @@ impl NativeCatalogueV1 {
                     "PSI compatibility pending PAT has no actual section coverage",
                 ));
             }
-            if let Some(assembler) = state.native_pmt.as_mut() {
+            if let Some(assembler) = state.demux_pmt.as_mut() {
                 if !assembler.partial_bytes().is_empty() {
                     return Err(Error::Unsupported(
                         "PSI compatibility truncated native-routed PMT",
@@ -1444,11 +1445,11 @@ mod guards {
     const PARTIAL_PAT: &[u8] = include_bytes!("../../tests/data/pat-incomplete-version.ts");
     struct Item {
         event: TraceEvent,
-        context: NativeSourceContext,
+        context: SourceContext,
     }
     struct SourceRun {
         items: Vec<Item>,
-        end: MediaEntityEndV1,
+        end: MediaEntityEnd,
         input: InputCursor,
     }
     fn source(data: &[u8], budget: &Budget) -> SourceRun {
@@ -1478,7 +1479,7 @@ mod guards {
                 .unwrap()
             {
                 Step::Ready(event) => {
-                    let context = NativeSourceContext {
+                    let context = SourceContext {
                         source_event_ordinal: items.len() as u64,
                         epochs: stream.source_epochs(),
                         byte_run_epoch: None,
@@ -1515,7 +1516,7 @@ mod guards {
                 }
                 Step::End(_) => {
                     end = stream
-                        .media_entity_end_v1(&mut input, &mut WorkBudget::new(1), &cancel)
+                        .media_entity_end(&mut input, &mut WorkBudget::new(1), &cancel)
                         .unwrap();
                     stream.end_of_source().unwrap();
                 }
@@ -1523,14 +1524,14 @@ mod guards {
         }
         panic!("source guard fixture did not terminate")
     }
-    fn view(budget: &Budget, policies: NativePsiCompatibilityPoliciesV1) -> NativeCatalogueV1 {
-        let mut v = NativeCatalogueV1::new(budget.clone(), ParseLimits::default(), 1).unwrap();
-        v.enable_psi_compatibility_v1(policies).unwrap();
+    fn view(budget: &Budget, policies: PsiCompatibilityPolicies) -> Catalogue {
+        let mut v = Catalogue::new(budget.clone(), ParseLimits::default(), 1).unwrap();
+        v.enable_psi_compatibility(policies).unwrap();
         v
     }
-    fn feed(v: &mut NativeCatalogueV1, item: &Item) -> Result<bool> {
-        let cost = v.required_psi_compatibility_work_v1(&item.event)?;
-        v.observe_psi_compatibility_v1(
+    fn feed(v: &mut Catalogue, item: &Item) -> Result<bool> {
+        let cost = v.required_psi_compatibility_work(&item.event)?;
+        v.observe_psi_compatibility(
             &item.event,
             SourceId(1),
             item.context,
@@ -1538,7 +1539,7 @@ mod guards {
             &AtomicBool::new(false),
         )
     }
-    fn before_rejection(v: &mut NativeCatalogueV1, run: &SourceRun) -> usize {
+    fn before_rejection(v: &mut Catalogue, run: &SourceRun) -> usize {
         let index = run
             .items
             .iter()
@@ -1552,25 +1553,24 @@ mod guards {
     #[test]
     fn no_policy_cannot_activate_the_operation() {
         let b = Budget::new(1024 * 1024).unwrap();
-        let mut v = NativeCatalogueV1::new(b, ParseLimits::default(), 1).unwrap();
+        let mut v = Catalogue::new(b, ParseLimits::default(), 1).unwrap();
         assert!(
-            v.enable_psi_compatibility_v1(NativePsiCompatibilityPoliciesV1::NONE)
+            v.enable_psi_compatibility(PsiCompatibilityPolicies::NONE)
                 .is_err()
         );
     }
     #[test]
     fn policies_are_explicit_and_independent() {
-        let only =
-            NativePsiCompatibilityPoliciesV1::one(NativePsiCompatibilityV1::PmtNonzeroSectionV1);
-        assert!(only.contains(NativePsiCompatibilityV1::PmtNonzeroSectionV1));
-        assert!(!only.contains(NativePsiCompatibilityV1::PmtDescriptorStopsAfterStreamIdentityV1));
-        assert!(!only.contains(NativePsiCompatibilityV1::CurrentPatSectionBeforeWholeTableV1));
+        let only = PsiCompatibilityPolicies::one(PsiCompatibility::PmtNonzeroSection);
+        assert!(only.contains(PsiCompatibility::PmtNonzeroSection));
+        assert!(!only.contains(PsiCompatibility::PmtDescriptorStopsAfterStreamIdentity));
+        assert!(!only.contains(PsiCompatibility::CurrentPatSectionBeforeWholeTable));
     }
     #[test]
     fn default_observe_still_refuses_the_rejected_pmt() {
         let b = Budget::new(8 * 1024 * 1024).unwrap();
         let run = source(BAD_DESC, &b);
-        let mut v = NativeCatalogueV1::new(b, ParseLimits::default(), 1).unwrap();
+        let mut v = Catalogue::new(b, ParseLimits::default(), 1).unwrap();
         let mut error = None;
         for item in &run.items {
             if let Err(e) = v.observe(
@@ -1593,7 +1593,7 @@ mod guards {
     fn enabling_does_not_change_the_default_entry_point() {
         let b = Budget::new(8 * 1024 * 1024).unwrap();
         let run = source(BAD_DESC, &b);
-        let mut v = view(&b, NativePsiCompatibilityPoliciesV1::ALL_OBSERVED);
+        let mut v = view(&b, PsiCompatibilityPolicies::ALL_OBSERVED);
         let mut error = None;
         for item in &run.items {
             if let Err(e) = v.observe(
@@ -1606,16 +1606,16 @@ mod guards {
             }
         }
         assert!(error.is_some());
-        assert!(v.psi_compatibility_evidence_v1().is_empty());
+        assert!(v.psi_compatibility_evidence().is_empty());
     }
     #[test]
     fn zero_work_does_not_consume_a_source_event() {
         let b = Budget::new(8 * 1024 * 1024).unwrap();
         let run = source(PARTIAL_PAT, &b);
-        let mut v = view(&b, NativePsiCompatibilityPoliciesV1::ALL_OBSERVED);
+        let mut v = view(&b, PsiCompatibilityPolicies::ALL_OBSERVED);
         let item = &run.items[0];
         assert!(
-            !v.observe_psi_compatibility_v1(
+            !v.observe_psi_compatibility(
                 &item.event,
                 SourceId(1),
                 item.context,
@@ -1631,10 +1631,10 @@ mod guards {
     fn cancelled_event_does_not_consume_source_or_allocate_evidence() {
         let b = Budget::new(8 * 1024 * 1024).unwrap();
         let run = source(PARTIAL_PAT, &b);
-        let mut v = view(&b, NativePsiCompatibilityPoliciesV1::ALL_OBSERVED);
+        let mut v = view(&b, PsiCompatibilityPolicies::ALL_OBSERVED);
         let item = &run.items[0];
         assert_eq!(
-            v.observe_psi_compatibility_v1(
+            v.observe_psi_compatibility(
                 &item.event,
                 SourceId(1),
                 item.context,
@@ -1644,7 +1644,7 @@ mod guards {
             Err(Error::Cancelled)
         );
         assert!(v.compatibility.as_ref().unwrap().history.is_empty());
-        assert!(v.psi_compatibility_evidence_v1().is_empty());
+        assert!(v.psi_compatibility_evidence().is_empty());
         assert!(feed(&mut v, item).unwrap());
     }
     #[test]
@@ -1652,7 +1652,7 @@ mod guards {
         let a = Budget::new(8 * 1024 * 1024).unwrap();
         let run = source(PARTIAL_PAT, &a);
         let b = Budget::new(8 * 1024 * 1024).unwrap();
-        let mut v = view(&b, NativePsiCompatibilityPoliciesV1::ALL_OBSERVED);
+        let mut v = view(&b, PsiCompatibilityPolicies::ALL_OBSERVED);
         assert_eq!(feed(&mut v, &run.items[0]), Err(Error::ForeignPool));
         assert!(v.fault().is_some());
     }
@@ -1660,7 +1660,7 @@ mod guards {
     fn repeated_source_ordinal_is_sticky() {
         let b = Budget::new(8 * 1024 * 1024).unwrap();
         let run = source(PARTIAL_PAT, &b);
-        let mut v = view(&b, NativePsiCompatibilityPoliciesV1::ALL_OBSERVED);
+        let mut v = view(&b, PsiCompatibilityPolicies::ALL_OBSERVED);
         assert!(feed(&mut v, &run.items[0]).unwrap());
         assert!(feed(&mut v, &run.items[0]).is_err());
         assert!(v.fault().is_some());
@@ -1669,10 +1669,10 @@ mod guards {
     fn changed_entity_cannot_reuse_a_source_context() {
         let b = Budget::new(8 * 1024 * 1024).unwrap();
         let run = source(PARTIAL_PAT, &b);
-        let mut v = view(&b, NativePsiCompatibilityPoliciesV1::ALL_OBSERVED);
+        let mut v = view(&b, PsiCompatibilityPolicies::ALL_OBSERVED);
         let item = &run.items[0];
         assert!(
-            v.observe_psi_compatibility_v1(
+            v.observe_psi_compatibility(
                 &item.event,
                 SourceId(2),
                 item.context,
@@ -1686,7 +1686,7 @@ mod guards {
     fn actual_raw_carrier_cannot_have_its_decoded_pid_replaced() {
         let b = Budget::new(8 * 1024 * 1024).unwrap();
         let run = source(PARTIAL_PAT, &b);
-        let mut v = view(&b, NativePsiCompatibilityPoliciesV1::ALL_OBSERVED);
+        let mut v = view(&b, PsiCompatibilityPolicies::ALL_OBSERVED);
         let TraceEvent::Transport(original) = &run.items[0].event else {
             panic!("carrier fixture")
         };
@@ -1694,7 +1694,7 @@ mod guards {
         changed.pid = 4096;
         let event = TraceEvent::Transport(changed);
         assert!(
-            v.observe_psi_compatibility_v1(
+            v.observe_psi_compatibility(
                 &event,
                 SourceId(1),
                 run.items[0].context,
@@ -1708,7 +1708,7 @@ mod guards {
     fn a_different_real_source_error_is_not_the_enabled_policy() {
         let b = Budget::new(8 * 1024 * 1024).unwrap();
         let run = source(BAD_DESC, &b);
-        let mut v = view(&b, NativePsiCompatibilityPoliciesV1::ALL_OBSERVED);
+        let mut v = view(&b, PsiCompatibilityPolicies::ALL_OBSERVED);
         let index = before_rejection(&mut v, &run);
         let TraceEvent::Diagnostic(f) = &run.items[index].event else {
             panic!("diagnostic")
@@ -1717,7 +1717,7 @@ mod guards {
         different.error = Error::Invalid("descriptor header");
         let event = TraceEvent::Diagnostic(different);
         assert!(
-            v.observe_psi_compatibility_v1(
+            v.observe_psi_compatibility(
                 &event,
                 SourceId(1),
                 run.items[index].context,
@@ -1726,13 +1726,13 @@ mod guards {
             )
             .is_err()
         );
-        assert!(v.psi_compatibility_evidence_v1().is_empty());
+        assert!(v.psi_compatibility_evidence().is_empty());
     }
     #[test]
     fn a_rejection_from_another_carrier_is_not_accepted() {
         let b = Budget::new(8 * 1024 * 1024).unwrap();
         let run = source(BAD_DESC, &b);
-        let mut v = view(&b, NativePsiCompatibilityPoliciesV1::ALL_OBSERVED);
+        let mut v = view(&b, PsiCompatibilityPolicies::ALL_OBSERVED);
         let index = before_rejection(&mut v, &run);
         let TraceEvent::Diagnostic(f) = &run.items[index].event else {
             panic!("diagnostic")
@@ -1741,7 +1741,7 @@ mod guards {
         changed.location.offset = 0;
         let event = TraceEvent::Diagnostic(changed);
         assert!(
-            v.observe_psi_compatibility_v1(
+            v.observe_psi_compatibility(
                 &event,
                 SourceId(1),
                 run.items[index].context,
@@ -1755,7 +1755,7 @@ mod guards {
     fn epoch_change_does_not_relabel_the_rejected_source_section() {
         let b = Budget::new(8 * 1024 * 1024).unwrap();
         let run = source(BAD_DESC, &b);
-        let mut v = view(&b, NativePsiCompatibilityPoliciesV1::ALL_OBSERVED);
+        let mut v = view(&b, PsiCompatibilityPolicies::ALL_OBSERVED);
         let index = before_rejection(&mut v, &run);
         let mut changed = run.items[index].context;
         changed.epochs = SourceEpochs {
@@ -1763,7 +1763,7 @@ mod guards {
             configuration: changed.epochs.configuration,
         };
         assert!(
-            v.observe_psi_compatibility_v1(
+            v.observe_psi_compatibility(
                 &run.items[index].event,
                 SourceId(1),
                 changed,
@@ -1777,12 +1777,12 @@ mod guards {
     fn future_diagnostic_ordinal_is_not_an_actual_consecutive_rejection() {
         let b = Budget::new(8 * 1024 * 1024).unwrap();
         let run = source(BAD_DESC, &b);
-        let mut v = view(&b, NativePsiCompatibilityPoliciesV1::ALL_OBSERVED);
+        let mut v = view(&b, PsiCompatibilityPolicies::ALL_OBSERVED);
         let index = before_rejection(&mut v, &run);
         let mut changed = run.items[index].context;
         changed.source_event_ordinal += 10;
         assert!(
-            v.observe_psi_compatibility_v1(
+            v.observe_psi_compatibility(
                 &run.items[index].event,
                 SourceId(1),
                 changed,
@@ -1798,17 +1798,17 @@ mod guards {
         let run = source(BAD_DESC, &b);
         let mut v = view(
             &b,
-            NativePsiCompatibilityPoliciesV1::one(NativePsiCompatibilityV1::PmtNonzeroSectionV1),
+            PsiCompatibilityPolicies::one(PsiCompatibility::PmtNonzeroSection),
         );
         let index = before_rejection(&mut v, &run);
         assert!(feed(&mut v, &run.items[index]).is_err());
-        assert!(v.psi_compatibility_evidence_v1().is_empty());
+        assert!(v.psi_compatibility_evidence().is_empty());
     }
     #[test]
     fn a_source_section_without_its_real_transports_cannot_be_admitted() {
         let b = Budget::new(8 * 1024 * 1024).unwrap();
         let run = source(PARTIAL_PAT, &b);
-        let mut v = view(&b, NativePsiCompatibilityPoliciesV1::ALL_OBSERVED);
+        let mut v = view(&b, PsiCompatibilityPolicies::ALL_OBSERVED);
         let item = run
             .items
             .iter()
@@ -1818,28 +1818,28 @@ mod guards {
         assert!(v.programs().is_empty());
     }
     #[test]
-    fn partial_pat_retains_source_incompleteness_and_real_native_metadata() {
+    fn partial_pat_retains_source_incompleteness_and_real_demux_metadata() {
         let b = Budget::new(8 * 1024 * 1024).unwrap();
         let run = source(PARTIAL_PAT, &b);
-        let mut v = view(&b, NativePsiCompatibilityPoliciesV1::ALL_OBSERVED);
+        let mut v = view(&b, PsiCompatibilityPolicies::ALL_OBSERVED);
         for item in &run.items {
             if !matches!(item.event, TraceEvent::Finished) {
                 assert!(feed(&mut v, item).unwrap());
             }
         }
         assert!(v.has_pending_current_pat());
-        assert_eq!(v.programs()[0].native_pcr_pid, 256);
+        assert_eq!(v.programs()[0].pcr_pid, 256);
         assert_eq!(v.streams()[0].pid, 256);
-        assert!(v.psi_compatibility_evidence_v1().iter().any(|e| matches!(
+        assert!(v.psi_compatibility_evidence().iter().any(|e| matches!(
             e.source_status(),
-            NativePsiCompatibilitySourceStatusV1::IncompleteCurrentPat {
+            PsiCompatibilitySourceStatus::IncompleteCurrentPat {
                 last_section_number: 1,
                 ..
             }
         )));
-        let cost = v.required_psi_compatibility_finish_work_v1().unwrap();
+        let cost = v.required_psi_compatibility_finish_work().unwrap();
         assert!(
-            v.finish_psi_compatibility_v1(
+            v.finish_psi_compatibility(
                 &run.end,
                 &run.input,
                 &mut WorkBudget::new(cost),
@@ -1856,13 +1856,13 @@ mod guards {
     fn original_nonzero_section_numbers_are_not_rewritten() {
         let b = Budget::new(8 * 1024 * 1024).unwrap();
         let run = source(BAD_NUMBER, &b);
-        let mut v = view(&b, NativePsiCompatibilityPoliciesV1::ALL_OBSERVED);
+        let mut v = view(&b, PsiCompatibilityPolicies::ALL_OBSERVED);
         for item in &run.items {
             if !matches!(item.event, TraceEvent::Finished) {
                 assert!(feed(&mut v, item).unwrap());
             }
         }
-        let e = &v.psi_compatibility_evidence_v1()[0];
+        let e = &v.psi_compatibility_evidence()[0];
         assert_eq!(
             (
                 e.wire_header().section_number,
@@ -1872,7 +1872,7 @@ mod guards {
         );
         assert!(matches!(
             e.source_status(),
-            NativePsiCompatibilitySourceStatusV1::RejectedPmt {
+            PsiCompatibilitySourceStatus::RejectedPmt {
                 error: Error::Invalid("PMT single-section program identity"),
                 ..
             }
@@ -1882,13 +1882,13 @@ mod guards {
     fn original_descriptor_tail_and_actual_error_location_are_retained() {
         let b = Budget::new(8 * 1024 * 1024).unwrap();
         let run = source(BAD_DESC, &b);
-        let mut v = view(&b, NativePsiCompatibilityPoliciesV1::ALL_OBSERVED);
+        let mut v = view(&b, PsiCompatibilityPolicies::ALL_OBSERVED);
         for item in &run.items {
             if !matches!(item.event, TraceEvent::Finished) {
                 assert!(feed(&mut v, item).unwrap());
             }
         }
-        let e = &v.psi_compatibility_evidence_v1()[0];
+        let e = &v.psi_compatibility_evidence()[0];
         assert_eq!(e.descriptor_stop_offset(), Some(17));
         assert_eq!(
             &e.section_bytes().as_ref()[17..23],
@@ -1896,7 +1896,7 @@ mod guards {
         );
         assert!(matches!(
             e.source_status(),
-            NativePsiCompatibilitySourceStatusV1::RejectedPmt {
+            PsiCompatibilitySourceStatus::RejectedPmt {
                 location: triergon_core::SourceLocation { offset: 188, .. },
                 ..
             }
@@ -1906,11 +1906,11 @@ mod guards {
     fn end_with_unconfirmed_actual_source_diagnostic_is_not_eof() {
         let b = Budget::new(8 * 1024 * 1024).unwrap();
         let run = source(BAD_DESC, &b);
-        let mut v = view(&b, NativePsiCompatibilityPoliciesV1::ALL_OBSERVED);
+        let mut v = view(&b, PsiCompatibilityPolicies::ALL_OBSERVED);
         let _ = before_rejection(&mut v, &run);
-        let cost = v.required_psi_compatibility_finish_work_v1().unwrap();
+        let cost = v.required_psi_compatibility_finish_work().unwrap();
         assert!(
-            v.finish_psi_compatibility_v1(
+            v.finish_psi_compatibility(
                 &run.end,
                 &run.input,
                 &mut WorkBudget::new(cost),
@@ -1924,14 +1924,14 @@ mod guards {
     fn cancelled_end_cannot_publish_a_successful_object() {
         let b = Budget::new(8 * 1024 * 1024).unwrap();
         let run = source(BAD_DESC, &b);
-        let mut v = view(&b, NativePsiCompatibilityPoliciesV1::ALL_OBSERVED);
+        let mut v = view(&b, PsiCompatibilityPolicies::ALL_OBSERVED);
         for item in &run.items {
             if !matches!(item.event, TraceEvent::Finished) {
                 assert!(feed(&mut v, item).unwrap());
             }
         }
         assert_eq!(
-            v.finish_psi_compatibility_v1(
+            v.finish_psi_compatibility(
                 &run.end,
                 &run.input,
                 &mut WorkBudget::new(1_000_000),
@@ -1942,10 +1942,10 @@ mod guards {
         assert!(!v.is_ended());
     }
     #[test]
-    fn wrong_core_cursor_cannot_supply_the_native_terminal_witness() {
+    fn wrong_core_cursor_cannot_supply_the_demux_terminal_witness() {
         let b = Budget::new(8 * 1024 * 1024).unwrap();
         let run = source(BAD_DESC, &b);
-        let mut v = view(&b, NativePsiCompatibilityPoliciesV1::ALL_OBSERVED);
+        let mut v = view(&b, PsiCompatibilityPolicies::ALL_OBSERVED);
         for item in &run.items {
             if !matches!(item.event, TraceEvent::Finished) {
                 assert!(feed(&mut v, item).unwrap());
@@ -1962,7 +1962,7 @@ mod guards {
         )
         .unwrap();
         assert!(
-            v.finish_psi_compatibility_v1(
+            v.finish_psi_compatibility(
                 &run.end,
                 &wrong,
                 &mut WorkBudget::new(1_000_000),
@@ -1973,7 +1973,7 @@ mod guards {
         assert!(!v.is_ended());
     }
     #[test]
-    fn exhausted_retained_history_is_explicit_and_releases_its_owners() {
+    fn exhausted_retained_history_is_explicit_and_releases_its_backings() {
         let b = Budget::new(8 * 1024 * 1024).unwrap();
         let run = source(BAD_DESC, &b);
         let before = b.used();
@@ -1981,8 +1981,8 @@ mod guards {
             source_spans: 1,
             ..ParseLimits::default()
         };
-        let mut v = NativeCatalogueV1::new(b.clone(), limits, 1).unwrap();
-        v.enable_psi_compatibility_v1(NativePsiCompatibilityPoliciesV1::ALL_OBSERVED)
+        let mut v = Catalogue::new(b.clone(), limits, 1).unwrap();
+        v.enable_psi_compatibility(PsiCompatibilityPolicies::ALL_OBSERVED)
             .unwrap();
         let mut rejected = false;
         for item in &run.items {
@@ -2002,13 +2002,13 @@ mod guards {
         *bytes.last_mut().unwrap() ^= 1;
         let b = Budget::new(8 * 1024 * 1024).unwrap();
         let run = source(&bytes, &b);
-        let mut v = view(&b, NativePsiCompatibilityPoliciesV1::ALL_OBSERVED);
+        let mut v = view(&b, PsiCompatibilityPolicies::ALL_OBSERVED);
         for item in &run.items {
             if !matches!(item.event, TraceEvent::Finished) {
                 assert!(feed(&mut v, item).unwrap());
             }
         }
-        assert!(v.psi_compatibility_evidence_v1().is_empty());
+        assert!(v.psi_compatibility_evidence().is_empty());
         assert!(v.streams().is_empty());
         assert!(run.items.iter().any(|item| matches!(&item.event, TraceEvent::Diagnostic(f) if f.error == Error::Invalid("PSI table identity/CRC"))));
     }
@@ -2016,14 +2016,14 @@ mod guards {
     fn zero_terminal_work_keeps_the_witness_retryable() {
         let b = Budget::new(8 * 1024 * 1024).unwrap();
         let run = source(PARTIAL_PAT, &b);
-        let mut v = view(&b, NativePsiCompatibilityPoliciesV1::ALL_OBSERVED);
+        let mut v = view(&b, PsiCompatibilityPolicies::ALL_OBSERVED);
         for item in &run.items {
             if !matches!(item.event, TraceEvent::Finished) {
                 assert!(feed(&mut v, item).unwrap());
             }
         }
         assert!(
-            !v.finish_psi_compatibility_v1(
+            !v.finish_psi_compatibility(
                 &run.end,
                 &run.input,
                 &mut WorkBudget::new(0),
@@ -2032,9 +2032,9 @@ mod guards {
             .unwrap()
         );
         assert!(!v.is_ended());
-        let cost = v.required_psi_compatibility_finish_work_v1().unwrap();
+        let cost = v.required_psi_compatibility_finish_work().unwrap();
         assert!(
-            v.finish_psi_compatibility_v1(
+            v.finish_psi_compatibility(
                 &run.end,
                 &run.input,
                 &mut WorkBudget::new(cost),
@@ -2047,7 +2047,7 @@ mod guards {
     fn compatibility_cannot_be_enabled_after_a_source_fact() {
         let b = Budget::new(8 * 1024 * 1024).unwrap();
         let run = source(PARTIAL_PAT, &b);
-        let mut v = NativeCatalogueV1::new(b, ParseLimits::default(), 1).unwrap();
+        let mut v = Catalogue::new(b, ParseLimits::default(), 1).unwrap();
         let section = run
             .items
             .iter()
@@ -2062,7 +2062,7 @@ mod guards {
             .unwrap()
         );
         assert!(
-            v.enable_psi_compatibility_v1(NativePsiCompatibilityPoliciesV1::ALL_OBSERVED)
+            v.enable_psi_compatibility(PsiCompatibilityPolicies::ALL_OBSERVED)
                 .is_err()
         );
     }

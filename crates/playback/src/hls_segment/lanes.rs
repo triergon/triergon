@@ -10,8 +10,7 @@ use std::sync::atomic::AtomicBool;
 use triergon_core::{Budget, Bytes, Error, Result, Time, WorkBudget};
 use triergon_mpegts::{
     AssemblyStep,
-    clock::NativePesTimeView,
-    native_pes::{NativePesPacket, NativeRegisteredCarriage},
+    compat::pes::{DemuxPacket, DemuxTimeView, RegisteredCarriage},
 };
 
 /// The legacy AVC/AAC reader uses concrete lanes. Only the codec-negotiated
@@ -21,11 +20,7 @@ pub(super) trait LaneAssembler: Sized {
 
     fn bind(pool: &Budget, config: TsNativeConfiguration, limits: HlsSegmentLimits)
     -> Result<Self>;
-    fn push(
-        &mut self,
-        packet: &mut Option<NativePesPacket>,
-        clock: NativePesTimeView,
-    ) -> Result<bool>;
+    fn push(&mut self, packet: &mut Option<DemuxPacket>, clock: DemuxTimeView) -> Result<bool>;
     fn finish(&mut self);
     fn poll(
         &mut self,
@@ -61,11 +56,7 @@ impl LaneAssembler for AvcTsReader {
         Self::new(pool, config, limits.avc)
     }
 
-    fn push(
-        &mut self,
-        packet: &mut Option<NativePesPacket>,
-        clock: NativePesTimeView,
-    ) -> Result<bool> {
+    fn push(&mut self, packet: &mut Option<DemuxPacket>, clock: DemuxTimeView) -> Result<bool> {
         Self::push(self, packet, clock)
     }
 
@@ -98,11 +89,7 @@ impl LaneAssembler for HlsAac {
         Self::new(pool, config, 8191)
     }
 
-    fn push(
-        &mut self,
-        packet: &mut Option<NativePesPacket>,
-        clock: NativePesTimeView,
-    ) -> Result<bool> {
+    fn push(&mut self, packet: &mut Option<DemuxPacket>, clock: DemuxTimeView) -> Result<bool> {
         Self::push(self, packet, clock)
     }
 
@@ -184,21 +171,17 @@ impl LaneAssembler for VideoAssembler {
         limits: HlsSegmentLimits,
     ) -> Result<Self> {
         match config.carriage {
-            TsNativeCarriage::Registered(NativeRegisteredCarriage::Avc) => {
+            TsNativeCarriage::Registered(RegisteredCarriage::Avc) => {
                 AvcTsReader::bind(pool, config, limits).map(Self::Avc)
             }
-            TsNativeCarriage::Registered(NativeRegisteredCarriage::Hevc) => {
+            TsNativeCarriage::Registered(RegisteredCarriage::Hevc) => {
                 HlsHevc::new(pool, config, limits.avc).map(Self::Hevc)
             }
             _ => Err(Error::Unsupported("HLS video carriage")),
         }
     }
 
-    fn push(
-        &mut self,
-        packet: &mut Option<NativePesPacket>,
-        clock: NativePesTimeView,
-    ) -> Result<bool> {
+    fn push(&mut self, packet: &mut Option<DemuxPacket>, clock: DemuxTimeView) -> Result<bool> {
         match self {
             Self::Avc(reader) => reader.push(packet, clock),
             Self::Hevc(reader) => reader.push(packet, clock),
@@ -283,7 +266,7 @@ impl LaneAssembler for AudioAssembler {
         limits: HlsSegmentLimits,
     ) -> Result<Self> {
         match config.carriage {
-            TsNativeCarriage::Registered(NativeRegisteredCarriage::AacAdts) => {
+            TsNativeCarriage::Registered(RegisteredCarriage::AacAdts) => {
                 HlsAac::bind(pool, config, limits).map(Self::Aac)
             }
             TsNativeCarriage::PrivateAudio(_) => HlsDolby::new(pool, config).map(Self::Dolby),
@@ -291,11 +274,7 @@ impl LaneAssembler for AudioAssembler {
         }
     }
 
-    fn push(
-        &mut self,
-        packet: &mut Option<NativePesPacket>,
-        clock: NativePesTimeView,
-    ) -> Result<bool> {
+    fn push(&mut self, packet: &mut Option<DemuxPacket>, clock: DemuxTimeView) -> Result<bool> {
         match self {
             Self::Aac(reader) => reader.push(packet, clock),
             Self::Dolby(reader) => reader.push(packet, clock),

@@ -5,7 +5,7 @@ use triergon_core::{Budget, Error, InputCursor, InputToken, Result, SourceLocati
 /// Witness of a real, fully drained source entity, not logical media EOF.
 /// Only the composed source operation can create this value.
 #[derive(Clone, Debug)]
-pub struct MediaEntityEndV1 {
+pub struct MediaEntityEnd {
     pub(crate) location: SourceLocation,
     pub(crate) token: InputToken,
     pub(crate) epochs: SourceEpochs,
@@ -13,7 +13,7 @@ pub struct MediaEntityEndV1 {
     pub(crate) format: PacketFormat,
     pub(crate) budget: Budget,
 }
-impl MediaEntityEndV1 {
+impl MediaEntityEnd {
     pub fn location(&self) -> SourceLocation {
         self.location
     }

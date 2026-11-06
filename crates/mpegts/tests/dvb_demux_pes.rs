@@ -3,16 +3,16 @@
 use std::sync::atomic::{AtomicBool, Ordering};
 use triergon_core::{Budget, Bytes, Error, SourceId, WorkBudget};
 use triergon_core::{InputCursor, InputWindow, SourceCapabilities, Step};
-use triergon_mpegts::clock::{NativeClockProfile, NativePesClockV1};
-use triergon_mpegts::native_pes::{
-    NativeDvbSubtitlesDescriptors, NativePesBoundary, NativePesObserver, NativePesPacket,
-    NativePesPayloadKind, NativePesScope, NativeSourceContext,
-};
-use triergon_mpegts::native_recovery::{
-    NativePesObservation, NativePesRecoveryObserver, NativeRejectedPolicy,
+use triergon_mpegts::compat::pes::{
+    DemuxBoundary, DemuxClock, DemuxObserver, DemuxPacket, DemuxPayloadKind, DemuxProfile,
+    DemuxScope, DvbSubtitlesDescriptors, SourceContext,
 };
 use triergon_mpegts::psi::{
     CodecIdentification, DescriptorNamespace, Descriptors, DvbNamespaceEvidence,
+};
+#[cfg(feature = "reference-trace")]
+use triergon_mpegts::reference_trace::recovery::{
+    DemuxObservation, RecoveryObserver, RejectedPolicy,
 };
 use triergon_mpegts::{
     AssemblyStep, PacketFormat, ParseLimits, SourceEpochs, TraceEvent, TransportPacket,
@@ -29,8 +29,8 @@ const DS: &[u8] = &[0x59, 8, b'e', b'n', b'g', 0x14, 0, 1, 0, 2];
 const BODY: &[u8] = &[0x20, 0, 0x0f, 0x80, 0, 1, 0, 0, 0xff];
 const RAW: &[u8] = include_bytes!("data/dvb/dvb2-literals-fields.ts");
 
-fn scope() -> NativePesScope {
-    NativePesScope {
+fn scope() -> DemuxScope {
+    DemuxScope {
         program: 1,
         pid: 256,
         stream_type: 6,
@@ -39,22 +39,22 @@ fn scope() -> NativePesScope {
         epochs: EPOCH,
     }
 }
-fn desc(raw: &[u8]) -> NativeDvbSubtitlesDescriptors<'_> {
-    NativeDvbSubtitlesDescriptors {
+fn desc(raw: &[u8]) -> DvbSubtitlesDescriptors<'_> {
+    DvbSubtitlesDescriptors {
         program: &[],
         elementary: raw,
     }
 }
-fn context(n: u64) -> NativeSourceContext {
-    NativeSourceContext {
+fn context(n: u64) -> SourceContext {
+    SourceContext {
         source_event_ordinal: n,
         epochs: EPOCH,
         byte_run_epoch: None,
     }
 }
-fn make(b: &Budget, limits: ParseLimits) -> NativePesObserver {
-    NativePesObserver::new_dvb_subtitles_v1(
-        NativeClockProfile::ArchivedPesV1,
+fn make(b: &Budget, limits: ParseLimits) -> DemuxObserver {
+    DemuxObserver::new_dvb_subtitles(
+        DemuxProfile::PesPackets,
         scope(),
         NS,
         desc(DS),
@@ -123,7 +123,7 @@ fn ts(payload: &[u8], start: bool, cc: u8) -> [u8; 188] {
     p[5 + n..].copy_from_slice(payload);
     p
 }
-fn drain(o: &mut NativePesObserver) -> Vec<NativePesPacket> {
+fn drain(o: &mut DemuxObserver) -> Vec<DemuxPacket> {
     let mut out = Vec::new();
     for _ in 0..16384 {
         let mut w = WorkBudget::new(1);
@@ -137,17 +137,17 @@ fn drain(o: &mut NativePesObserver) -> Vec<NativePesPacket> {
     }
     panic!("bounded field work stalled")
 }
-fn check(p: &NativePesPacket, body: &[u8], offset: u64, pts: Option<u64>, dts: Option<u64>) {
-    assert_eq!((p.program, p.pid, p.native_stream_id), (1, 256, 0xbd));
+fn check(p: &DemuxPacket, body: &[u8], offset: u64, pts: Option<u64>, dts: Option<u64>) {
+    assert_eq!((p.program, p.pid, p.stream_id), (1, 256, 0xbd));
     assert_eq!(p.source_epochs, EPOCH);
     assert_eq!(
-        (p.native_position, p.native_flags, p.native_duration90_raw),
+        (p.position, p.flags, p.duration90_raw),
         (offset as i64, 0, 0)
     );
     assert_eq!(p.source_origin.source, SourceId(1));
     assert_eq!(p.source_origin.offset, offset);
-    assert_eq!(p.boundary, NativePesBoundary::FiniteLength);
-    assert_eq!(p.payload_kind, NativePesPayloadKind::DeclaredComplete);
+    assert_eq!(p.boundary, DemuxBoundary::FiniteLength);
+    assert_eq!(p.payload_kind, DemuxPayloadKind::DeclaredComplete);
     assert_eq!(p.payload_len, body.len());
     assert!(p.payload().flatten().copied().eq(body.iter().copied()));
     assert_eq!(
@@ -168,9 +168,9 @@ fn check(p: &NativePesPacket, body: &[u8], offset: u64, pts: Option<u64>, dts: O
         assert!(s.backing_bytes().retained_capacity() >= 188);
         assert!(s.backing_bytes().retained_storage_bytes() > s.backing_bytes().retained_capacity());
     }
-    let mut c = NativePesClockV1::new(1).unwrap();
+    let mut c = DemuxClock::new(1).unwrap();
     let t = c
-        .project_native_header(
+        .project_header(
             256,
             EPOCH,
             p.time_header(),
@@ -187,15 +187,15 @@ fn check(p: &NativePesPacket, body: &[u8], offset: u64, pts: Option<u64>, dts: O
 }
 fn original(raw: &[u8], body: &[u8], descriptor: &[u8]) {
     let b = Budget::new(32768).unwrap();
-    let mut o = NativePesObserver::new_dvb_subtitles_v1(
-        NativeClockProfile::ArchivedPesV1,
+    let mut o = DemuxObserver::new_dvb_subtitles(
+        DemuxProfile::PesPackets,
         scope(),
         NS,
         desc(descriptor),
         b.clone(),
         ParseLimits::default(),
     )
-    .expect("actual original D0 feature stub");
+    .expect("actual original feature stub");
     let mut output = Vec::new();
     for (index, bytes) in raw.as_chunks::<188>().0.iter().enumerate() {
         let p = packet(&b, bytes, (index * 188) as u64);
@@ -248,8 +248,8 @@ fn dvb_namespace_scope_preflight_before_stub() {
     let b = Budget::new(8192).unwrap();
     let n = b.used();
     assert_eq!(
-        NativePesObserver::new_dvb_subtitles_v1(
-            NativeClockProfile::ArchivedPesV1,
+        DemuxObserver::new_dvb_subtitles(
+            DemuxProfile::PesPackets,
             scope(),
             DescriptorNamespace::Unspecified,
             desc(DS),
@@ -260,22 +260,22 @@ fn dvb_namespace_scope_preflight_before_stub() {
         Error::Unsupported("native DVB namespace not declared")
     );
     for s in [
-        NativePesScope {
+        DemuxScope {
             program: 0,
             ..scope()
         },
-        NativePesScope {
+        DemuxScope {
             stream_type: 0x1b,
             ..scope()
         },
-        NativePesScope {
+        DemuxScope {
             stream_id: 0xe0,
             ..scope()
         },
     ] {
         assert!(
-            NativePesObserver::new_dvb_subtitles_v1(
-                NativeClockProfile::ArchivedPesV1,
+            DemuxObserver::new_dvb_subtitles(
+                DemuxProfile::PesPackets,
                 s,
                 NS,
                 desc(DS),
@@ -292,8 +292,8 @@ fn dvb_malformed_tlv_primary_error() {
     let b = Budget::new(8192).unwrap();
     for raw in [&[0x59, 8, 1][..], &[0x59, 1, 0][..]] {
         assert!(matches!(
-            NativePesObserver::new_dvb_subtitles_v1(
-                NativeClockProfile::ArchivedPesV1,
+            DemuxObserver::new_dvb_subtitles(
+                DemuxProfile::PesPackets,
                 scope(),
                 NS,
                 desc(raw),
@@ -314,8 +314,8 @@ fn dvb_multiplicity_no_first_service_fallback() {
     dup.extend_from_slice(DS);
     for raw in [&[0x59, 0][..], &two, &dup] {
         assert!(matches!(
-            NativePesObserver::new_dvb_subtitles_v1(
-                NativeClockProfile::ArchivedPesV1,
+            DemuxObserver::new_dvb_subtitles(
+                DemuxProfile::PesPackets,
                 scope(),
                 NS,
                 desc(raw),
@@ -332,15 +332,15 @@ fn dvb_program_and_extra_context_are_nonpasses() {
     let mut extra = DS.to_vec();
     extra.extend_from_slice(&[0x6a, 1, 0]);
     for d in [
-        NativeDvbSubtitlesDescriptors {
+        DvbSubtitlesDescriptors {
             program: &[0x05, 4, b'T', b'E', b'S', b'T'],
             elementary: DS,
         },
         desc(&extra),
     ] {
         assert!(matches!(
-            NativePesObserver::new_dvb_subtitles_v1(
-                NativeClockProfile::ArchivedPesV1,
+            DemuxObserver::new_dvb_subtitles(
+                DemuxProfile::PesPackets,
                 scope(),
                 NS,
                 d,
@@ -359,8 +359,8 @@ fn dvb_real_descriptor_limit_before_feature() {
         ..ParseLimits::default()
     };
     assert_eq!(
-        NativePesObserver::new_dvb_subtitles_v1(
-            NativeClockProfile::ArchivedPesV1,
+        DemuxObserver::new_dvb_subtitles(
+            DemuxProfile::PesPackets,
             scope(),
             NS,
             desc(DS),
@@ -536,16 +536,16 @@ fn dvb_pressure_retry_and_owned_teardown() {
     assert_eq!(b.used(), before);
 }
 #[test]
-fn dvb_hidden_owner_zero_copy_spans() {
+fn dvb_hidden_backing_zero_copy_spans() {
     let b = Budget::new(16384).unwrap();
     let before = b.used();
     let raw = ts(&pes(BODY, Some(90000), None), true, 0);
     let mut bytes = vec![0xaa; 13];
     bytes.extend_from_slice(&raw);
     bytes.extend_from_slice(&[0xbb; 37]);
-    let owner = Bytes::copy_from_slice(&b, &bytes).unwrap();
-    let cap = owner.retained_capacity();
-    let mut p = parse_transport(owner.slice(13..201).unwrap(), PacketFormat::Ts188, 376).unwrap();
+    let backing = Bytes::copy_from_slice(&b, &bytes).unwrap();
+    let cap = backing.retained_capacity();
+    let mut p = parse_transport(backing.slice(13..201).unwrap(), PacketFormat::Ts188, 376).unwrap();
     p.source_id = Some(SourceId(1));
     let mut o = make(&b, ParseLimits::default());
     o.push(p, context(8)).unwrap();
@@ -553,13 +553,13 @@ fn dvb_hidden_owner_zero_copy_spans() {
     assert!(
         v[0].spans.as_slice()[0]
             .backing_bytes()
-            .shares_storage_with(&owner)
+            .shares_storage_with(&backing)
     );
     assert_eq!(
         v[0].spans.as_slice()[0].backing_bytes().retained_capacity(),
         cap
     );
-    drop((owner, o));
+    drop((backing, o));
     check(&v[0], BODY, 376, Some(90000), None);
     drop(v);
     assert_eq!(b.used(), before);
@@ -652,7 +652,7 @@ fn dvb_foreign_entity_config_changes_return_owned_input() {
     o.push(packet(&b, &raw, 376), context(8)).unwrap();
     assert_eq!(drain(&mut o).len(), 1);
 }
-fn failure(o: &mut NativePesObserver) -> Error {
+fn failure(o: &mut DemuxObserver) -> Error {
     for _ in 0..16384 {
         match o.poll(&mut WorkBudget::new(1), &AtomicBool::new(false)) {
             Err(e) => return e,
@@ -743,11 +743,12 @@ fn dvb_incomplete_overrun_counter_damage_not_repaired() {
         assert!(matches!(failure(&mut o), Error::Unsupported(_)));
     }
 }
+#[cfg(feature = "reference-trace")]
 #[test]
 fn dvb_wrapper_accepted_real_carriers_uses_no_rejected_policy() {
     let b = Budget::new(32768).unwrap();
-    let mut o = NativePesRecoveryObserver::new_dvb_subtitles_v1(
-        NativeClockProfile::ArchivedPesV1,
+    let mut o = RecoveryObserver::new_dvb_subtitles(
+        DemuxProfile::PesPackets,
         scope(),
         NS,
         desc(DS),
@@ -755,7 +756,7 @@ fn dvb_wrapper_accepted_real_carriers_uses_no_rejected_policy() {
         ParseLimits::default(),
     )
     .expect("DVB wrapper actual feature stub");
-    assert_eq!(o.policy(), NativeRejectedPolicy::NoRejectedCarrierV1);
+    assert_eq!(o.policy(), RejectedPolicy::NoRejectedCarrier);
     o.push_accepted(
         packet(&b, &ts(&pes(BODY, Some(90000), None), true, 0), 376),
         context(8),
@@ -766,7 +767,7 @@ fn dvb_wrapper_accepted_real_carriers_uses_no_rejected_policy() {
             .poll(&mut WorkBudget::new(1), &AtomicBool::new(false))
             .unwrap()
         {
-            AssemblyStep::Output(NativePesObservation::Accepted(p)) => {
+            AssemblyStep::Output(DemuxObservation::Accepted(p)) => {
                 check(&p, BODY, 376, Some(90000), None);
                 return;
             }

@@ -18,8 +18,8 @@ const INACTIVE: &[u8] = include_bytes!(concat!(
     reason = "test recorder retains the original inline owned source event; no extra boxed allocation"
 )]
 enum Item {
-    Event(TraceEvent, NativeSourceContext),
-    End(MediaEntityEndV1),
+    Event(TraceEvent, SourceContext),
+    End(MediaEntityEnd),
 }
 struct Run {
     items: Vec<Item>,
@@ -53,7 +53,7 @@ fn source(data: &[u8], budget: &Budget) -> Run {
         {
             Step::Ready(event) => {
                 let finished = matches!(event, TraceEvent::Finished);
-                let context = NativeSourceContext {
+                let context = SourceContext {
                     source_event_ordinal: ordinal,
                     epochs: stream.source_epochs(),
                     byte_run_epoch: None,
@@ -86,7 +86,7 @@ fn source(data: &[u8], budget: &Budget) -> Run {
             }
             Step::End(_) => {
                 let end = stream
-                    .media_entity_end_v1(&mut input, &mut WorkBudget::new(1), &cancel)
+                    .media_entity_end(&mut input, &mut WorkBudget::new(1), &cancel)
                     .unwrap()
                     .unwrap();
                 items.push(Item::End(end));
@@ -96,36 +96,36 @@ fn source(data: &[u8], budget: &Budget) -> Run {
     }
     panic!("bounded source guard did not finish")
 }
-fn view(b: &Budget) -> NativePacketCompletionV1 {
-    NativePacketCompletionV1::new(b.clone(), ParseLimits::default(), 1).unwrap()
+fn view(b: &Budget) -> PacketCompletion {
+    PacketCompletion::new(b.clone(), ParseLimits::default(), 1).unwrap()
 }
-fn feed(v: &mut NativePacketCompletionV1, item: &Item, input: &mut InputCursor) -> Result<bool> {
+fn feed(v: &mut PacketCompletion, item: &Item, input: &mut InputCursor) -> Result<bool> {
     let cancel = AtomicBool::new(false);
     match item {
         Item::Event(e, c) => {
-            let work = v.required_work_v1(e)?;
-            v.observe_v1(e, SourceId(1), *c, &mut WorkBudget::new(work), &cancel)
+            let work = v.required_work(e)?;
+            v.observe(e, SourceId(1), *c, &mut WorkBudget::new(work), &cancel)
         }
         Item::End(end) => {
-            let work = v.required_end_work_v1()?;
-            v.seal_physical_end_v1(end, input, &mut WorkBudget::new(work), &cancel)
+            let work = v.required_end_work()?;
+            v.seal_physical_end(end, input, &mut WorkBudget::new(work), &cancel)
         }
     }
 }
-fn all(v: &mut NativePacketCompletionV1, run: &mut Run) -> Result<()> {
+fn all(v: &mut PacketCompletion, run: &mut Run) -> Result<()> {
     for item in &run.items {
         assert!(feed(v, item, &mut run.input)?);
     }
     Ok(())
 }
 fn finish(
-    v: &mut NativePacketCompletionV1,
+    v: &mut PacketCompletion,
     input: &mut InputCursor,
-) -> Result<Option<NativeNoMediaReceiptV1>> {
-    let work = v.required_end_work_v1()?;
-    v.confirm_no_media_v1(input, &mut WorkBudget::new(work), &AtomicBool::new(false))
+) -> Result<Option<NoMediaConfirmation>> {
+    let work = v.required_end_work()?;
+    v.confirm_no_media(input, &mut WorkBudget::new(work), &AtomicBool::new(false))
 }
-fn first(run: &Run) -> (&TransportPacket, NativeSourceContext) {
+fn first(run: &Run) -> (&TransportPacket, SourceContext) {
     match &run.items[0] {
         Item::Event(TraceEvent::Transport(p), c) => (p, *c),
         _ => panic!("first carrier fixture"),
@@ -175,7 +175,7 @@ fn compact_null_runs_keep_physical_bytes_order_and_completion() {
                 .unwrap()
             {
                 Step::Ready(CompactTraceEvent::Event(event)) => {
-                    let context = NativeSourceContext {
+                    let context = SourceContext {
                         source_event_ordinal: ordinal,
                         epochs: stream.source_epochs(),
                         byte_run_epoch: None,
@@ -197,7 +197,7 @@ fn compact_null_runs_keep_physical_bytes_order_and_completion() {
                     }
                 }
                 Step::Ready(CompactTraceEvent::NullRun(run)) => {
-                    let context = NativeSourceContext {
+                    let context = SourceContext {
                         source_event_ordinal: ordinal,
                         epochs: stream.source_epochs(),
                         byte_run_epoch: None,
@@ -248,7 +248,7 @@ fn compact_null_runs_keep_physical_bytes_order_and_completion() {
                 }
                 Step::End(_) => {
                     let end = stream
-                        .media_entity_end_v1(&mut input, &mut WorkBudget::new(1), &cancel)
+                        .media_entity_end(&mut input, &mut WorkBudget::new(1), &cancel)
                         .unwrap()
                         .unwrap();
                     assert!(feed(&mut completion, &Item::End(end), &mut input).unwrap());
@@ -257,9 +257,9 @@ fn compact_null_runs_keep_physical_bytes_order_and_completion() {
                 Step::Yield => {}
             }
         }
-        let receipt = finish(&mut completion, &mut input).unwrap().unwrap();
+        let confirmation = finish(&mut completion, &mut input).unwrap().unwrap();
         assert!(expected.next().is_none());
-        assert_eq!(receipt.physical_carriers(), data.len() / 188);
+        assert_eq!(confirmation.physical_carriers(), data.len() / 188);
         assert_eq!(completion.physical_null_runs().is_empty(), window < 188);
     }
 }
@@ -324,9 +324,9 @@ fn original_control_only_bytes_complete_without_a_pes_scope() {
         let mut run = source(data, &b);
         let mut v = view(&b);
         all(&mut v, &mut run).unwrap();
-        let receipt = finish(&mut v, &mut run.input).unwrap().unwrap();
-        assert_eq!(receipt.source_bytes(), data.len() as u64);
-        assert_eq!(receipt.physical_carriers(), data.len() / 188);
+        let confirmation = finish(&mut v, &mut run.input).unwrap().unwrap();
+        assert_eq!(confirmation.source_bytes(), data.len() as u64);
+        assert_eq!(confirmation.physical_carriers(), data.len() / 188);
         for evidence in v.physical_carriers() {
             let p = evidence.packet();
             assert_eq!(
@@ -335,7 +335,7 @@ fn original_control_only_bytes_complete_without_a_pes_scope() {
             );
             assert_ne!(
                 evidence.kind(),
-                NativeControlCarrierKindV1::RequiresScopedPacketObserver
+                ControlCarrierKind::RequiresScopedPacketObserver
             );
         }
     }
@@ -350,7 +350,7 @@ fn inactive_pat_association_stays_inactive_and_raw() {
     assert!(!v.raw_pat_facts()[0].section().header.current_next);
     assert_eq!(
         v.physical_carriers()[1].kind(),
-        NativeControlCarrierKindV1::PmtSection { association: 0 }
+        ControlCarrierKind::PmtSection { association: 0 }
     );
     assert_eq!(
         v.raw_pat_facts()[0].section().source.as_ref(),
@@ -366,7 +366,7 @@ fn zero_event_work_is_unconsumed_and_retryable() {
         panic!("carrier")
     };
     assert!(
-        !v.observe_v1(
+        !v.observe(
             e,
             SourceId(1),
             *c,
@@ -376,9 +376,9 @@ fn zero_event_work_is_unconsumed_and_retryable() {
         .unwrap()
     );
     assert!(v.physical_carriers().is_empty());
-    let cost = v.required_work_v1(e).unwrap();
+    let cost = v.required_work(e).unwrap();
     assert!(
-        v.observe_v1(
+        v.observe(
             e,
             SourceId(1),
             *c,
@@ -398,7 +398,7 @@ fn cancellation_before_event_cannot_allocate_or_consume() {
     };
     let before = b.used();
     assert_eq!(
-        v.observe_v1(
+        v.observe(
             e,
             SourceId(1),
             *c,
@@ -420,7 +420,7 @@ fn foreign_pool_carrier_cannot_be_a_source_witness() {
         panic!("carrier")
     };
     assert_eq!(
-        v.observe_v1(
+        v.observe(
             e,
             SourceId(1),
             *c,
@@ -439,7 +439,7 @@ fn decoded_pid_cannot_replace_actual_wire_pid() {
     p.pid = 4096;
     let mut v = view(&b);
     assert!(
-        v.observe_v1(
+        v.observe(
             &TraceEvent::Transport(p),
             SourceId(1),
             c,
@@ -458,7 +458,7 @@ fn decoded_payload_cannot_replace_physical_bytes() {
     p.payload = Some(Bytes::copy_from_slice(&b, b"different").unwrap());
     let mut v = view(&b);
     assert!(
-        v.observe_v1(
+        v.observe(
             &TraceEvent::Transport(p),
             SourceId(1),
             c,
@@ -486,7 +486,7 @@ fn foreign_entity_is_not_the_original_source() {
         panic!("carrier")
     };
     assert!(
-        v.observe_v1(
+        v.observe(
             e,
             SourceId(2),
             *c,
@@ -505,7 +505,7 @@ fn missing_physical_carrier_cannot_be_empty_completion() {
     let mut shifted = p.clone();
     shifted.source_offset += 188;
     shifted.payload_source_offset += 188;
-    v.observe_v1(
+    v.observe(
         &TraceEvent::Transport(shifted),
         SourceId(1),
         c,
@@ -519,7 +519,7 @@ fn missing_physical_carrier_cannot_be_empty_completion() {
         }
     }
     assert!(finish(&mut v, &mut run.input).is_err());
-    assert!(v.receipt().is_none());
+    assert!(v.confirmation().is_none());
 }
 #[test]
 fn actual_nonempty_source_pes_requires_real_scoped_observer() {
@@ -576,7 +576,7 @@ fn pes_signature_on_control_pid_is_an_explicit_refusal() {
     let mut run = source(data, &b);
     let mut v = view(&b);
     assert!(all(&mut v, &mut run).is_err());
-    assert!(v.receipt().is_none());
+    assert!(v.confirmation().is_none());
 }
 #[test]
 fn pmt_continuation_requires_its_actual_start() {
@@ -624,7 +624,7 @@ fn rejected_unreadable_transport_is_not_control_only() {
     let mut v = view(&b);
     let admission = all(&mut v, &mut run);
     assert!(admission.is_err() || finish(&mut v, &mut run.input).is_err());
-    assert!(v.receipt().is_none());
+    assert!(v.confirmation().is_none());
 }
 #[test]
 fn later_transport_failure_with_same_eof_token_remains_failure() {
@@ -640,23 +640,23 @@ fn later_transport_failure_with_same_eof_token_remains_failure() {
     assert_eq!(run.input.token(), token);
     assert_eq!(run.input.position(), position);
     assert_eq!(finish(&mut v, &mut run.input), Err(Error::Transport));
-    assert!(v.receipt().is_none());
+    assert!(v.confirmation().is_none());
 }
 #[test]
-fn cancellation_after_end_does_not_publish_a_receipt() {
+fn cancellation_after_end_does_not_publish_a_confirmation() {
     let b = Budget::new(8 * 1024 * 1024).unwrap();
     let mut run = source(BAD_CRC, &b);
     let mut v = view(&b);
     all(&mut v, &mut run).unwrap();
     assert_eq!(
-        v.confirm_no_media_v1(
+        v.confirm_no_media(
             &mut run.input,
             &mut WorkBudget::new(1_000_000),
             &AtomicBool::new(true)
         ),
         Err(Error::Cancelled)
     );
-    assert!(v.receipt().is_none());
+    assert!(v.confirmation().is_none());
     assert!(finish(&mut v, &mut run.input).unwrap().is_some());
 }
 #[test]
@@ -720,14 +720,14 @@ fn advertised_length_and_drained_bytes_are_not_eof() {
                 .unwrap()
             {
                 Step::Ready(event) => {
-                    let c = NativeSourceContext {
+                    let c = SourceContext {
                         source_event_ordinal: ordinal,
                         epochs: stream.source_epochs(),
                         byte_run_epoch: None,
                     };
                     ordinal += 1;
-                    let cost = v.required_work_v1(&event).unwrap();
-                    v.observe_v1(
+                    let cost = v.required_work(&event).unwrap();
+                    v.observe(
                         &event,
                         SourceId(1),
                         c,
@@ -762,7 +762,7 @@ fn advertised_length_and_drained_bytes_are_not_eof() {
         }
         assert!(waiting);
         assert!(finish(&mut v, &mut input).is_err());
-        assert!(v.receipt().is_none());
+        assert!(v.confirmation().is_none());
     }
 }
 #[test]
@@ -786,7 +786,7 @@ fn zero_end_and_terminal_work_is_retryable() {
     for item in &run.items {
         if let Item::End(end) = item {
             assert!(
-                !v.seal_physical_end_v1(
+                !v.seal_physical_end(
                     end,
                     &mut run.input,
                     &mut WorkBudget::new(0),
@@ -799,7 +799,7 @@ fn zero_end_and_terminal_work_is_retryable() {
         feed(&mut v, item, &mut run.input).unwrap();
     }
     assert!(
-        v.confirm_no_media_v1(
+        v.confirm_no_media(
             &mut run.input,
             &mut WorkBudget::new(0),
             &AtomicBool::new(false)
@@ -807,11 +807,11 @@ fn zero_end_and_terminal_work_is_retryable() {
         .unwrap()
         .is_none()
     );
-    assert!(v.receipt().is_none());
+    assert!(v.confirmation().is_none());
     assert!(finish(&mut v, &mut run.input).unwrap().is_some());
 }
 #[test]
-fn duplicate_end_and_receipt_cannot_replay_completion() {
+fn duplicate_end_and_confirmation_cannot_replay_completion() {
     let b = Budget::new(8 * 1024 * 1024).unwrap();
     let mut run = source(BAD_CRC, &b);
     let mut v = view(&b);
@@ -822,7 +822,7 @@ fn duplicate_end_and_receipt_cannot_replay_completion() {
         .find_map(|i| if let Item::End(e) = i { Some(e) } else { None })
         .unwrap();
     assert!(
-        v.seal_physical_end_v1(
+        v.seal_physical_end(
             end,
             &mut run.input,
             &mut WorkBudget::new(1_000_000),
@@ -834,11 +834,11 @@ fn duplicate_end_and_receipt_cannot_replay_completion() {
     assert!(finish(&mut v, &mut run.input).is_err());
 }
 #[test]
-fn bounded_retained_history_releases_all_new_owners() {
+fn bounded_retained_history_releases_all_new_backings() {
     let b = Budget::new(8 * 1024 * 1024).unwrap();
     let mut run = source(INACTIVE, &b);
     let before = b.used();
-    let mut v = NativePacketCompletionV1::new(
+    let mut v = PacketCompletion::new(
         b.clone(),
         ParseLimits {
             source_spans: 1,
@@ -861,7 +861,7 @@ fn foreign_epoch_context_cannot_relabel_real_end() {
         configuration: 9,
     };
     let mut v = view(&b);
-    v.observe_v1(
+    v.observe(
         &TraceEvent::Transport(p.clone()),
         SourceId(1),
         c,
@@ -875,7 +875,7 @@ fn foreign_epoch_context_cannot_relabel_real_end() {
         .find_map(|i| if let Item::End(e) = i { Some(e) } else { None })
         .unwrap();
     assert!(
-        v.seal_physical_end_v1(
+        v.seal_physical_end(
             end,
             &mut run.input,
             &mut WorkBudget::new(1_000_000),
@@ -913,14 +913,14 @@ fn real_transport_failure_before_core_end_is_not_eof() {
             .unwrap()
         {
             Step::Ready(event) => {
-                let c = NativeSourceContext {
+                let c = SourceContext {
                     source_event_ordinal: ordinal,
                     epochs: stream.source_epochs(),
                     byte_run_epoch: None,
                 };
                 ordinal += 1;
-                let cost = v.required_work_v1(&event).unwrap();
-                v.observe_v1(
+                let cost = v.required_work(&event).unwrap();
+                v.observe(
                     &event,
                     SourceId(1),
                     c,
@@ -964,10 +964,10 @@ fn real_transport_failure_before_core_end_is_not_eof() {
         Err(Error::Transport)
     ));
     assert!(finish(&mut v, &mut input).is_err());
-    assert!(v.receipt().is_none());
+    assert!(v.confirmation().is_none());
 }
 #[test]
-fn rejected_carrier_from_foreign_pool_cannot_escape_ownership() {
+fn rejected_carrier_from_foreign_pool_cannot_escape_backing() {
     let a = Budget::new(8 * 1024 * 1024).unwrap();
     let run = source(
         include_bytes!(concat!(
@@ -987,7 +987,7 @@ fn rejected_carrier_from_foreign_pool_cannot_escape_ownership() {
         panic!("actual rejection")
     };
     assert_eq!(
-        v.observe_v1(
+        v.observe(
             event,
             SourceId(1),
             *context,

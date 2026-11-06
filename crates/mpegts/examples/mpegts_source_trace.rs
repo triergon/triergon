@@ -1,5 +1,5 @@
-//! Source trace with explicit development views. JSON/CLI/I/O are outside timing.
-//! No native library is linked here.
+//! Source trace with explicit demux views. JSON/CLI/I/O are outside timing.
+//! No reference library is linked here.
 #![forbid(unsafe_code)]
 use std::{
     env,
@@ -11,10 +11,9 @@ use triergon_core::{
     Budget, Bytes, InputCursor, InputWindow, SourceCapabilities, SourceFailure, SourceId, Step,
     WorkBudget,
 };
-use triergon_mpegts::clock::NativePesClockV1;
-use triergon_mpegts::psi::{
-    DescriptorNamespace, DvbNamespaceEvidence, DvbNativeViewProfile, ElementaryStream,
-};
+use triergon_mpegts::compat::pes::DemuxClock;
+use triergon_mpegts::psi::{DescriptorNamespace, DvbNamespaceEvidence, ElementaryStream};
+use triergon_mpegts::reference_trace::dvb::DvbViewProfile;
 use triergon_mpegts::{
     CompactTraceEvent, PacketFormat, ParseLimits, Pes, TraceEvent, TransportStream,
 };
@@ -36,9 +35,9 @@ pub(crate) fn signed_optional(output: &mut impl Write, value: Option<i128>) -> i
         None => output.write_all(b"null"),
     }
 }
-fn native_clock_view(
+fn demux_clock_view(
     output: &mut impl Write,
-    clock: &mut NativePesClockV1,
+    clock: &mut DemuxClock,
     source: &Pes,
     quarantined: bool,
     cancel: &AtomicBool,
@@ -49,10 +48,10 @@ fn native_clock_view(
         .ok_or_else(|| io::Error::other("native clock view yielded with its fixed work grant"))?;
     write!(
         output,
-        ",\"native_clock_v1\":{{\"profile\":\"{:?}\",\"operation\":\"{}\",\"source_pin\":\"{}\",\"worker_sha256\":\"{}\",\"flags\":{},\"correct_ts_overflow\":{},\"find_stream_info\":{},\"program\":{},\"pid\":{},\"source_clock_epoch\":{},\"source_configuration_epoch\":{},\"source_clock_quarantined\":{quarantined},\"source_pts_raw33\":",
-        view.profile,
+        ",\"native_clock_v1\":{{\"profile\":\"{}\",\"operation\":\"{}\",\"source_pin\":\"{}\",\"worker_sha256\":\"{}\",\"flags\":{},\"correct_ts_overflow\":{},\"find_stream_info\":{},\"program\":{},\"pid\":{},\"source_clock_epoch\":{},\"source_configuration_epoch\":{},\"source_clock_quarantined\":{quarantined},\"source_pts_raw33\":",
+        view.profile.label(),
         view.profile.operation(),
-        view.profile.source_pin(),
+        view.profile.reference_revision(),
         view.profile.worker_sha256(),
         view.profile.flags(),
         view.profile.default_overflow_correction(),
@@ -130,12 +129,12 @@ fn dvb_signalling(output: &mut impl Write, stream: &ElementaryStream) -> io::Res
         output.write_all(b"]}")?;
     }
     output.write_all(b"],\"native_d0_single_service_v1\":")?;
-    match stream.native_dvb_single_service_view(DvbNativeViewProfile::D0SingleServiceV1) {
+    match stream.dvb_single_service_view(DvbViewProfile::SingleService) {
         Ok(view) => {
             write!(
                 output,
                 "{{\"source_pin\":\"{}\",\"codecpar_hex\":",
-                view.profile.source_pin()
+                view.profile.reference_revision()
             )?;
             hex(output, &view.bytes)?;
             output.write_all(b",\"qualified\":false}")?;
@@ -151,7 +150,7 @@ fn dvb_signalling(output: &mut impl Write, stream: &ElementaryStream) -> io::Res
 pub(crate) fn event(
     output: &mut impl Write,
     event: TraceEvent,
-    native_clock: Option<&mut NativePesClockV1>,
+    demux_clock: Option<&mut DemuxClock>,
     quarantined: bool,
     cancel: &AtomicBool,
 ) -> io::Result<bool> {
@@ -259,7 +258,7 @@ pub(crate) fn event(
                     stream.pid, stream.stream_type
                 )?;
                 hex(output, stream.descriptor_bytes.as_ref())?;
-                // Preserve the original default trace schema. Extra source/native
+                // Preserve the original default trace schema. Extra source/demux
                 // fields belong only to the explicit DVB diagnostic operation.
                 if matches!(map.descriptor_namespace, DescriptorNamespace::Dvb(_)) {
                     dvb_signalling(output, stream)?;
@@ -316,8 +315,8 @@ pub(crate) fn event(
                 )?;
             }
             write!(output, "],\"byte_run_epoch\":{}", pes.byte_run_epoch)?;
-            if let Some(clock) = native_clock {
-                native_clock_view(output, clock, &pes, quarantined, cancel)?;
+            if let Some(clock) = demux_clock {
+                demux_clock_view(output, clock, &pes, quarantined, cancel)?;
             }
             output.write_all(b"}")?;
         }
@@ -373,7 +372,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .ok_or("missing selected program")?
         .parse()?;
     let mut descriptor_namespace = DescriptorNamespace::Unspecified;
-    let mut native_clock_enabled = false;
+    let mut demux_clock_enabled = false;
     let mut media_entities_enabled = false;
     let mut compact = false;
     let mut path = loop {
@@ -383,14 +382,14 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 descriptor_namespace =
                     DescriptorNamespace::Dvb(DvbNamespaceEvidence::CallerDeclaredTransportProfile);
             }
-            "--native-clock-v1" => native_clock_enabled = true,
+            "--native-clock-v1" => demux_clock_enabled = true,
             "--media-entities-v1" => media_entities_enabled = true,
             "--compact" => compact = true,
             _ => break argument,
         }
     };
-    let mut native_clock = if native_clock_enabled {
-        Some(NativePesClockV1::new(program)?)
+    let mut demux_clock = if demux_clock_enabled {
+        Some(DemuxClock::new(program)?)
     } else {
         None
     };
@@ -431,7 +430,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     event(
                         &mut output,
                         TraceEvent::Transport(run.packet(index)?),
-                        native_clock.as_mut(),
+                        demux_clock.as_mut(),
                         demux.clock_is_quarantined(),
                         &cancel,
                     )?;
@@ -441,7 +440,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 if event(
                     &mut output,
                     value,
-                    native_clock.as_mut(),
+                    demux_clock.as_mut(),
                     demux.clock_is_quarantined(),
                     &cancel,
                 )? {
@@ -480,8 +479,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     };
                     if discontinuity {
                         demux.discontinuity()?;
-                        if media_entities_enabled && native_clock_enabled {
-                            native_clock = Some(NativePesClockV1::new(program)?);
+                        if media_entities_enabled && demux_clock_enabled {
+                            demux_clock = Some(DemuxClock::new(program)?);
                         }
                     }
                     file = File::open(&path)?;

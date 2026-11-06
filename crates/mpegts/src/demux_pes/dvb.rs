@@ -1,22 +1,22 @@
 //! Original explicit DVB-signalled finite-PES admission. No inner decoder/AU
-//! parsing or source namespace inference. The native packet keeps the complete
+//! parsing or source namespace inference. The demux packet keeps the complete
 //! PES data field, including identifier/stream ID/tail bytes and opaque faults.
-use super::{NativePesObserver, NativePesScope};
-use crate::clock::NativeClockProfile;
+use super::{DemuxObserver, DemuxScope};
+use crate::demux_clock::DemuxProfile;
 use crate::psi::{DescriptorNamespace, Descriptors};
 use crate::{ParseLimits, checked_pid, limit};
 use triergon_core::{Budget, Error, Result};
 
 #[derive(Clone, Copy, Debug, Default)]
-pub struct NativeDvbSubtitlesDescriptors<'a> {
+pub struct DvbSubtitlesDescriptors<'a> {
     pub program: &'a [u8],
     pub elementary: &'a [u8],
 }
 
 fn preflight(
-    scope: NativePesScope,
+    scope: DemuxScope,
     namespace: DescriptorNamespace,
-    source: NativeDvbSubtitlesDescriptors<'_>,
+    source: DvbSubtitlesDescriptors<'_>,
     limits: ParseLimits,
 ) -> Result<()> {
     if scope.program == 0 {
@@ -76,12 +76,12 @@ fn preflight(
     Ok(())
 }
 
-impl NativePesObserver {
-    pub fn new_dvb_subtitles_v1(
-        profile: NativeClockProfile,
-        scope: NativePesScope,
+impl DemuxObserver {
+    pub fn new_dvb_subtitles(
+        profile: DemuxProfile,
+        scope: DemuxScope,
         namespace: DescriptorNamespace,
-        descriptors: NativeDvbSubtitlesDescriptors<'_>,
+        descriptors: DvbSubtitlesDescriptors<'_>,
         budget: Budget,
         limits: ParseLimits,
     ) -> Result<Self> {

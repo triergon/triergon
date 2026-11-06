@@ -1,14 +1,15 @@
 //! Clock regressions.
-//! Source facts and archived native expectations are asserted separately.
+//! Source facts and recorded demux expectations are asserted separately.
 use std::sync::atomic::{AtomicBool, Ordering};
 use triergon_core::{
     Budget, Bytes, Error, InputCursor, InputWindow, SourceCapabilities, SourceId, Step, Time,
     WorkBudget,
 };
 use triergon_mpegts::clock::{
-    ClockKey, NativeClockProfile, NativePesClockV1, NativeTimestampOrigin, SourceClockAnchor,
-    SourceClockSample, SourceTimePolicy, SourceTimeStatus, source_timestamp,
+    ClockKey, SourceClockAnchor, SourceClockSample, SourceTimePolicy, SourceTimeStatus,
+    source_timestamp,
 };
+use triergon_mpegts::compat::pes::{DemuxClock, DemuxProfile, TimestampOrigin};
 use triergon_mpegts::{
     AssemblyStep, PacketFormat, ParseLimits, Pes, PesAssembler, SourceEpochs, TraceEvent,
     TransportStream,
@@ -85,30 +86,33 @@ fn packets(events: &[TraceEvent]) -> Vec<&Pes> {
         .collect()
 }
 
-fn check_native(
+fn check_demux(
     source: &[u8],
     raw_pts: &[Option<u64>],
     raw_dts: &[Option<u64>],
-    native_pts: &[Option<i128>],
-    native_dts: &[Option<i128>],
+    demux_pts: &[Option<i128>],
+    demux_dts: &[Option<i128>],
 ) {
     let events = collect(source);
     let pes = packets(&events);
     assert_eq!(pes.len(), raw_pts.len());
-    let mut context = NativePesClockV1::new(1).unwrap();
-    let profile = NativeClockProfile::ArchivedPesV1;
-    assert_eq!(
-        profile.source_pin(),
-        "d32b387f2b0a484599d4587d651891f0c63c4238"
-    );
-    assert_eq!(
-        profile.worker_sha256(),
-        "19c06e53c62852b409eec9771cb11d9d7f5164b4618545a449d7e993f99346df"
-    );
-    assert_eq!(profile.operation(), "mpegts-native-pes-observation-v1");
-    assert_eq!(profile.flags(), 48);
-    assert!(profile.default_overflow_correction());
-    assert!(!profile.find_stream_info());
+    let mut context = DemuxClock::new(1).unwrap();
+    let profile = DemuxProfile::PesPackets;
+    #[cfg(feature = "reference-trace")]
+    {
+        assert_eq!(
+            profile.reference_revision(),
+            "d32b387f2b0a484599d4587d651891f0c63c4238"
+        );
+        assert_eq!(
+            profile.worker_sha256(),
+            "19c06e53c62852b409eec9771cb11d9d7f5164b4618545a449d7e993f99346df"
+        );
+        assert_eq!(profile.operation(), "mpegts-native-pes-observation-v1");
+        assert_eq!(profile.flags(), 48);
+        assert!(profile.default_overflow_correction());
+        assert!(!profile.find_stream_info());
+    }
     for (index, source) in pes.iter().enumerate() {
         let header = source.header.as_bytes().to_vec();
         let payload = source.payload().flatten().copied().collect::<Vec<_>>();
@@ -124,24 +128,24 @@ fn check_native(
         assert_eq!(view.source_epochs, source.epochs);
         assert_eq!(view.source_pts_raw33, raw_pts[index]);
         assert_eq!(view.source_dts_raw33, raw_dts[index]);
-        assert_eq!(view.pts90, native_pts[index]);
-        assert_eq!(view.dts90, native_dts[index]);
+        assert_eq!(view.pts90, demux_pts[index]);
+        assert_eq!(view.dts90, demux_dts[index]);
         assert_eq!(
             view.pts_origin,
             if raw_pts[index].is_some() {
-                NativeTimestampOrigin::SourcePts
+                TimestampOrigin::SourcePts
             } else {
-                NativeTimestampOrigin::Absent
+                TimestampOrigin::Absent
             }
         );
         assert_eq!(
             view.dts_origin,
             if raw_dts[index].is_some() {
-                NativeTimestampOrigin::SourceDts
+                TimestampOrigin::SourceDts
             } else if raw_pts[index].is_some() {
-                NativeTimestampOrigin::PtsOnlyCompatibility
+                TimestampOrigin::PtsOnlyCompatibility
             } else {
-                NativeTimestampOrigin::Absent
+                TimestampOrigin::Absent
             }
         );
         assert_eq!(source.header.pts_raw33, raw_pts[index]);
@@ -155,7 +159,7 @@ fn check_native(
 }
 
 #[test]
-fn source_absence_and_missing_anchor_are_not_zero_or_native_inference() {
+fn source_absence_and_missing_anchor_are_not_zero_or_demux_inference() {
     let absent = source_timestamp(None, KEY, SourceTimePolicy::Unanchored).unwrap();
     assert_eq!(absent.status, SourceTimeStatus::Absent);
     assert_eq!(absent.ticks90, None);
@@ -180,7 +184,7 @@ fn source_period_zero_is_an_explicit_relative_choice() {
 }
 
 #[test]
-fn source_forward_wrap_uses_an_admitted_source_anchor_not_native_minus_seven() {
+fn source_forward_wrap_uses_an_admitted_source_anchor_not_demux_minus_seven() {
     let view = source_timestamp(Some(4), KEY, anchored(SourceClockSample::Pts90(M - 7))).unwrap();
     assert_eq!(view.raw33, Some(4));
     assert_eq!(view.ticks90, Some(M + 4));
@@ -214,7 +218,7 @@ fn source_pair_uses_resolved_dts_as_same_pes_pts_anchor_without_changing_raw33()
 }
 
 #[test]
-fn source_negative_pts_and_native_positive_pts_are_distinct_interpretations() {
+fn source_negative_pts_and_demux_positive_pts_are_distinct_interpretations() {
     let view = source_timestamp(
         Some((M - 2) as u64),
         KEY,
@@ -319,10 +323,10 @@ fn out_of_range_raw33_is_rejected_instead_of_masked() {
     );
 }
 
-// Exact native values.
+// Exact demux values.
 #[test]
-fn archived_native_forward_wrap_keeps_source_pts_raw_and_dts_absent() {
-    check_native(
+fn demux_forward_wrap_keeps_source_pts_raw_and_dts_absent() {
+    check_demux(
         include_bytes!("data/pts-wrap-forward.ts"),
         &[Some((M - 7) as u64), Some(4)],
         &[None, None],
@@ -332,8 +336,8 @@ fn archived_native_forward_wrap_keeps_source_pts_raw_and_dts_absent() {
 }
 
 #[test]
-fn archived_native_common_epoch_pair_is_not_a_raw33_rewrite() {
-    check_native(
+fn demux_common_epoch_pair_is_not_a_raw33_rewrite() {
+    check_demux(
         include_bytes!("data/pts-dts-common-epoch.ts"),
         &[Some(2), Some(7)],
         &[Some((M - 6) as u64), Some(3)],
@@ -343,8 +347,8 @@ fn archived_native_common_epoch_pair_is_not_a_raw33_rewrite() {
 }
 
 #[test]
-fn archived_native_small_dts_does_not_sign_extend_near_end_pts() {
-    check_native(
+fn demux_small_dts_does_not_sign_extend_near_end_pts() {
+    check_demux(
         include_bytes!("data/pts-negative-against-dts.ts"),
         &[Some((M - 2) as u64)],
         &[Some(3)],
@@ -354,8 +358,8 @@ fn archived_native_small_dts_does_not_sign_extend_near_end_pts() {
 }
 
 #[test]
-fn archived_native_half_period_value_does_not_resolve_source_ambiguity() {
-    check_native(
+fn demux_half_period_value_does_not_resolve_source_ambiguity() {
+    check_demux(
         include_bytes!("data/pts-half-wrap-ambiguous.ts"),
         &[Some(0), Some((M / 2) as u64)],
         &[None, None],
@@ -365,12 +369,12 @@ fn archived_native_half_period_value_does_not_resolve_source_ambiguity() {
 }
 
 #[test]
-fn archived_native_pcr_discontinuity_keeps_source_epoch_and_native_context_separate() {
+fn demux_pcr_discontinuity_keeps_source_epoch_and_demux_context_separate() {
     let source = include_bytes!("data/pcr-timeline-discontinuity.ts");
     let events = collect(source);
     let pes = packets(&events);
     assert_eq!((pes[0].epochs.clock, pes[1].epochs.clock), (0, 1));
-    check_native(
+    check_demux(
         source,
         &[Some(90000), Some(10)],
         &[None, None],
@@ -415,11 +419,11 @@ fn no_timestamps() -> Pes {
 }
 
 #[test]
-fn missing_timestamp_packet_does_not_choose_native_initial_wrap_origin() {
+fn missing_timestamp_packet_does_not_choose_demux_initial_wrap_origin() {
     let missing = no_timestamps();
     let events = collect(include_bytes!("data/pts-wrap-forward.ts"));
     let pes = packets(&events);
-    let mut context = NativePesClockV1::new(1).unwrap();
+    let mut context = DemuxClock::new(1).unwrap();
     let empty = context
         .project(&missing, &mut WorkBudget::new(1), &AtomicBool::new(false))
         .unwrap()
@@ -427,7 +431,7 @@ fn missing_timestamp_packet_does_not_choose_native_initial_wrap_origin() {
     assert_eq!((empty.pts90, empty.dts90), (None, None));
     assert_eq!(
         (empty.pts_origin, empty.dts_origin),
-        (NativeTimestampOrigin::Absent, NativeTimestampOrigin::Absent)
+        (TimestampOrigin::Absent, TimestampOrigin::Absent)
     );
     let first = context
         .project(pes[0], &mut WorkBudget::new(1), &AtomicBool::new(false))
@@ -438,10 +442,10 @@ fn missing_timestamp_packet_does_not_choose_native_initial_wrap_origin() {
 }
 
 #[test]
-fn native_view_yield_and_cancel_do_not_seed_history_or_mutate_source() {
+fn demux_view_yield_and_cancel_do_not_seed_history_or_mutate_source() {
     let events = collect(include_bytes!("data/pts-wrap-forward.ts"));
     let pes = packets(&events);
-    let mut context = NativePesClockV1::new(1).unwrap();
+    let mut context = DemuxClock::new(1).unwrap();
     let cancel = AtomicBool::new(false);
     assert!(
         context
@@ -465,7 +469,7 @@ fn native_view_yield_and_cancel_do_not_seed_history_or_mutate_source() {
 }
 
 // Source signal fixtures below are authored from H.222.0 2.4.3.5. They are
-// original test inputs, not native observations and not decoder/AU fixtures.
+// original test inputs, not demux observations and not decoder/AU fixtures.
 fn adaptation(pid: u16, signalled: bool, pcr: Option<u64>) -> Vec<u8> {
     let mut packet = vec![0xff; 188];
     packet[..6].copy_from_slice(&[

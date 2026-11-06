@@ -6,8 +6,7 @@ use triergon_core::{Budget, BudgetVec, Bytes, Error, Result, Time, WorkBudget};
 use triergon_framing::{AacAdtsHeader, inspect_aac_adts_header};
 use triergon_mpegts::{
     AssemblyStep,
-    clock::NativePesTimeView,
-    native_pes::{NativePesPacket, NativePesPayloadKind, NativeRegisteredCarriage},
+    compat::pes::{DemuxPacket, DemuxPayloadKind, DemuxTimeView, RegisteredCarriage},
 };
 
 const PREFIX_BYTES: usize = 7;
@@ -31,7 +30,7 @@ struct Clock {
 }
 
 struct PendingPes {
-    packet: NativePesPacket,
+    packet: DemuxPacket,
     span: usize,
     offset: usize,
     consumed: usize,
@@ -62,7 +61,7 @@ impl HlsAac {
         config: TsNativeConfiguration,
         maximum_frame_bytes: usize,
     ) -> Result<Self> {
-        if config.carriage != TsNativeCarriage::Registered(NativeRegisteredCarriage::AacAdts) {
+        if config.carriage != TsNativeCarriage::Registered(RegisteredCarriage::AacAdts) {
             return Err(Error::Unsupported("HLS AAC needs selected ADTS carriage"));
         }
         if !matches!(config.track, TrackKey::Ts { program, pid } if program != 0 && pid <= 0x1ffe)
@@ -91,8 +90,8 @@ impl HlsAac {
     /// offering another chunk. False leaves the mailbox unchanged.
     pub fn push(
         &mut self,
-        mailbox: &mut Option<NativePesPacket>,
-        clock: NativePesTimeView,
+        mailbox: &mut Option<DemuxPacket>,
+        clock: DemuxTimeView,
     ) -> Result<bool> {
         if let Some(error) = self.failure {
             return Err(error);
@@ -112,13 +111,13 @@ impl HlsAac {
                 pid: packet.pid,
             })
             || packet.source_epochs.configuration != self.config.configuration_epoch
-            || packet.native_stream_id != 0xc0
-            || packet.source_header.stream_id != packet.native_stream_id
+            || packet.stream_id != 0xc0
+            || packet.source_header.stream_id != packet.stream_id
         {
             return Err(Error::Invalid("HLS AAC PES track or configuration"));
         }
-        if packet.native_flags & PES_CORRUPT != 0
-            || packet.payload_kind == NativePesPayloadKind::DeclaredIncomplete
+        if packet.flags & PES_CORRUPT != 0
+            || packet.payload_kind == DemuxPayloadKind::DeclaredIncomplete
             || packet.payload_len == 0
             || packet.spans.is_empty()
         {
@@ -350,8 +349,7 @@ mod tests {
     use triergon_core::SourceId;
     use triergon_mpegts::{
         PacketFormat, ParseLimits, SourceEpochs,
-        clock::{NativeClockProfile, NativePesClockV1},
-        native_pes::{NativePesObserver, NativePesScope, NativeSourceContext},
+        compat::pes::{DemuxClock, DemuxObserver, DemuxProfile, DemuxScope, SourceContext},
         parse_transport,
     };
 
@@ -362,7 +360,7 @@ mod tests {
     const CONFIG: TsNativeConfiguration = TsNativeConfiguration {
         track: TRACK,
         configuration_epoch: 2,
-        carriage: TsNativeCarriage::Registered(NativeRegisteredCarriage::AacAdts),
+        carriage: TsNativeCarriage::Registered(RegisteredCarriage::AacAdts),
     };
     const EPOCHS: SourceEpochs = SourceEpochs {
         clock: 0,
@@ -372,17 +370,17 @@ mod tests {
 
     struct PesFixture {
         pool: Budget,
-        pes: NativePesObserver,
-        clock: NativePesClockV1,
+        pes: DemuxObserver,
+        clock: DemuxClock,
         carrier: u8,
     }
 
     impl PesFixture {
         fn new() -> Self {
             let pool = Budget::new(16 * 1024).unwrap();
-            let pes = NativePesObserver::new_registered(
-                NativeClockProfile::ArchivedPesV1,
-                NativePesScope {
+            let pes = DemuxObserver::new_registered(
+                DemuxProfile::PesPackets,
+                DemuxScope {
                     program: 1,
                     pid: 257,
                     stream_type: 0x0f,
@@ -390,7 +388,7 @@ mod tests {
                     entity: SOURCE,
                     epochs: EPOCHS,
                 },
-                NativeRegisteredCarriage::AacAdts,
+                RegisteredCarriage::AacAdts,
                 pool.clone(),
                 ParseLimits::default(),
             )
@@ -398,7 +396,7 @@ mod tests {
             Self {
                 pool,
                 pes,
-                clock: NativePesClockV1::new(1).unwrap(),
+                clock: DemuxClock::new(1).unwrap(),
                 carrier: 0,
             }
         }
@@ -408,7 +406,7 @@ mod tests {
             bytes: &[u8],
             pts: u32,
             dts: Option<u32>,
-        ) -> (Option<NativePesPacket>, NativePesTimeView) {
+        ) -> (Option<DemuxPacket>, DemuxTimeView) {
             // Authored finite PES, carried in one TS packet with adaptation
             // padding. The real native observer supplies the charged spans.
             let optional = if dts.is_some() { 10 } else { 5 };
@@ -444,7 +442,7 @@ mod tests {
             self.pes
                 .push(
                     carrier,
-                    NativeSourceContext {
+                    SourceContext {
                         source_event_ordinal: u64::from(self.carrier),
                         epochs: EPOCHS,
                         byte_run_epoch: None,
@@ -459,7 +457,7 @@ mod tests {
             };
             let clock = self
                 .clock
-                .project_native_header(257, EPOCHS, packet.time_header(), &mut work, &cancel)
+                .project_header(257, EPOCHS, packet.time_header(), &mut work, &cancel)
                 .unwrap()
                 .unwrap();
             (Some(packet), clock)
@@ -560,10 +558,10 @@ mod tests {
         let (mut packet, _) = fixture.chunk(&F48, 270_000, None);
         let headerless = packet.as_mut().unwrap();
         headerless.time_header_applies = false;
-        headerless.payload_kind = NativePesPayloadKind::HeaderlessContinuation;
+        headerless.payload_kind = DemuxPayloadKind::HeaderlessContinuation;
         let absent = fixture
             .clock
-            .project_native_header(
+            .project_header(
                 257,
                 EPOCHS,
                 None,

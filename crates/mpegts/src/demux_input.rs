@@ -1,5 +1,5 @@
-//! Pin-bound input startup evidence. This is not transport validation or
-//! the normative source position. No native implementation body was consulted.
+//! The demuxer's input startup. This is not transport validation or the
+//! normative source position. No reference source was consulted.
 use crate::{PacketFormat, TransportPacket};
 use std::sync::atomic::{AtomicBool, Ordering};
 use triergon_core::{
@@ -8,8 +8,12 @@ use triergon_core::{
 
 /// Explicit result of the observed default-callback, finite aligned operation.
 /// Other delivery, mixed stride, damaged sync and ambiguous grids are unproven.
+#[cfg_attr(
+    not(feature = "reference-trace"),
+    allow(unreachable_pub, reason = "exported only with reference-trace")
+)]
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum NativePositionBasis {
+pub enum PositionBasis {
     SyncStart,
     CarrierStart,
 }
@@ -29,28 +33,29 @@ impl Extent {
 }
 
 #[derive(Clone, Debug)]
-pub struct NativeInputContext {
+pub struct InputContext {
     source: SourceId,
     token: InputToken,
     format: PacketFormat,
-    owner: Bytes,
+    backing: Bytes,
     extent: Extent,
-    basis: NativePositionBasis,
+    basis: PositionBasis,
     inspected_bytes: usize,
 }
-impl NativeInputContext {
-    pub fn basis(&self) -> NativePositionBasis {
+impl InputContext {
+    #[cfg(feature = "reference-trace")]
+    pub fn basis(&self) -> PositionBasis {
         self.basis
     }
     /// The startup probe establishes a carrier grid, with Source reads still open.
-    pub fn is_prefix_v2(&self) -> bool {
+    pub fn is_prefix(&self) -> bool {
         matches!(self.extent, Extent::Prefix(_))
     }
     pub fn inspected_bytes(&self) -> usize {
         self.inspected_bytes
     }
     pub fn backing_bytes(&self) -> &Bytes {
-        &self.owner
+        &self.backing
     }
     /// Sequential consumption retains the request token. A range/reset/entity
     /// transaction invalidates it independently of clock/configuration epochs.
@@ -61,7 +66,7 @@ impl NativeInputContext {
         if input.token() != self.token {
             return Err(Error::Invalid("stale native startup request"));
         }
-        if !self.owner.belongs_to(input.budget()) {
+        if !self.backing.belongs_to(input.budget()) {
             return Err(Error::ForeignPool);
         }
         if !self.extent.permits(input.position()) {
@@ -69,8 +74,8 @@ impl NativeInputContext {
         }
         Ok(())
     }
-    pub(crate) fn binding(&self) -> NativeInputBinding {
-        NativeInputBinding {
+    pub(crate) fn binding(&self) -> InputBinding {
+        InputBinding {
             source: self.source,
             token: self.token.clone(),
             format: self.format,
@@ -83,17 +88,17 @@ impl NativeInputContext {
 /// Sealed scalar facts retained by assembly. No input allocation is kept alive
 /// after startup inspection merely to remember its position interpretation.
 #[derive(Clone, Debug)]
-pub(crate) struct NativeInputBinding {
+pub(crate) struct InputBinding {
     source: SourceId,
     token: InputToken,
     format: PacketFormat,
     extent: Extent,
-    basis: NativePositionBasis,
+    basis: PositionBasis,
 }
-impl NativeInputBinding {
-    pub(crate) fn continued_media_entity_v1(
+impl InputBinding {
+    pub(crate) fn continued_media_entity(
         &self,
-        end: &crate::MediaEntityEndV1,
+        end: &crate::MediaEntityEnd,
         input: &InputCursor,
     ) -> Result<Self> {
         if self.source != end.location.source
@@ -138,7 +143,7 @@ impl NativeInputBinding {
         if !self.extent.permits(end) || packet.source.len() != self.format.bytes() {
             return Err(Error::Invalid("native startup packet range/format"));
         }
-        let prefix = if self.basis == NativePositionBasis::SyncStart {
+        let prefix = if self.basis == PositionBasis::SyncStart {
             packet.prefix.as_ref().map_or(0, Bytes::len)
         } else {
             0
@@ -154,21 +159,21 @@ impl NativeInputBinding {
 }
 
 #[derive(Debug)]
-pub enum NativeInputStep {
+pub enum InputStep {
     NeedEntityEof,
     Yield,
-    Ready(NativeInputContext),
+    Ready(InputContext),
 }
 
 /// One borrowed, already core-validated initial window. No allocation/copy,
 /// second cursor, byte consumption, source reset or retained output queue.
 /// The prefix profile can use a caller-assembled initial window.
 #[derive(Debug)]
-pub struct NativeInputBootstrap {
+pub struct InputBootstrap {
     source: SourceId,
     token: InputToken,
     format: PacketFormat,
-    owner: Bytes,
+    backing: Bytes,
     eof: bool,
     extent: Extent,
     inspected: usize,
@@ -176,11 +181,11 @@ pub struct NativeInputBootstrap {
     scores192: [u16; 192],
     scores204: [u16; 204],
     bad_sync: bool,
-    ready: Option<NativeInputContext>,
+    ready: Option<InputContext>,
 }
-impl NativeInputBootstrap {
+impl InputBootstrap {
     pub const MAX_BORROWED_BYTES: usize = 16 * 1024;
-    pub const M2TS_PREFIX_BYTES_V2: usize = 8192;
+    pub const M2TS_PREFIX_BYTES: usize = 8192;
 
     pub fn new(input: &InputCursor, window: &InputWindow, format: PacketFormat) -> Result<Self> {
         Self::with_extent(
@@ -193,8 +198,8 @@ impl NativeInputBootstrap {
 
     /// Inspect a complete initial M2TS probe window already provided to the
     /// actual cursor. The selected grid must be decisive within that window.
-    pub fn new_m2ts_prefix_v2(input: &InputCursor, window: &InputWindow) -> Result<Self> {
-        if window.bytes().len() != Self::M2TS_PREFIX_BYTES_V2 {
+    pub fn new_m2ts_prefix(input: &InputCursor, window: &InputWindow) -> Result<Self> {
+        if window.bytes().len() != Self::M2TS_PREFIX_BYTES {
             return Err(Error::Invalid("native M2TS prefix window length"));
         }
         Self::with_extent(
@@ -242,7 +247,7 @@ impl NativeInputBootstrap {
             source: window.source,
             token: window.token.clone(),
             format,
-            owner: window.bytes().clone(),
+            backing: window.bytes().clone(),
             eof: false,
             extent,
             inspected: 0,
@@ -295,44 +300,44 @@ impl NativeInputBootstrap {
         input: &InputCursor,
         work: &mut WorkBudget,
         cancel: &AtomicBool,
-    ) -> Result<NativeInputStep> {
+    ) -> Result<InputStep> {
         if cancel.load(Ordering::Relaxed) {
             return Err(Error::Cancelled);
         }
         self.validate(input)?;
         if let Some(context) = &self.ready {
-            return Ok(NativeInputStep::Ready(context.clone()));
+            return Ok(InputStep::Ready(context.clone()));
         }
         let finite = matches!(self.extent, Extent::Finite(_));
         if finite && !self.eof {
-            return Ok(NativeInputStep::NeedEntityEof);
+            return Ok(InputStep::NeedEntityEof);
         }
         let width = self.format.bytes();
-        if finite && (self.owner.is_empty() || !self.owner.len().is_multiple_of(width)) {
+        if finite && (self.backing.is_empty() || !self.backing.len().is_multiple_of(width)) {
             return Err(Error::Unsupported(
                 "native startup incomplete aligned finite entity",
             ));
         }
         let sync = width - 188;
-        while self.inspected < self.owner.len() {
+        while self.inspected < self.backing.len() {
             if cancel.load(Ordering::Relaxed) {
                 return Err(Error::Cancelled);
             }
-            let count = work.take((self.owner.len() - self.inspected).min(64) as u64) as usize;
+            let count = work.take((self.backing.len() - self.inspected).min(64) as u64) as usize;
             if count == 0 {
-                return Ok(NativeInputStep::Yield);
+                return Ok(InputStep::Yield);
             }
             let start = self.inspected;
             let end = start + count;
             let mut next_sync = start + (sync + width - start % width) % width;
-            for (offset, &byte) in self.owner.as_ref()[start..end].iter().enumerate() {
+            for (offset, &byte) in self.backing.as_ref()[start..end].iter().enumerate() {
                 let i = start + offset;
                 if i == next_sync {
                     self.bad_sync |= byte != 0x47;
                     next_sync += width;
                 }
                 // Score only sync bytes with a complete transport header.
-                if byte == 0x47 && i + 4 <= self.owner.len() {
+                if byte == 0x47 && i + 4 <= self.backing.len() {
                     self.scores188[i % 188] += 1;
                     self.scores192[i % 192] += 1;
                     self.scores204[i % 204] += 1;
@@ -350,12 +355,12 @@ impl NativeInputBootstrap {
         let s204 = self.scores204.iter().copied().max().unwrap_or(0);
         let basis = if finite {
             match self.format {
-                PacketFormat::Ts188 if s192 < 7 && s204 < 7 => NativePositionBasis::CarrierStart,
+                PacketFormat::Ts188 if s192 < 7 && s204 < 7 => PositionBasis::CarrierStart,
                 PacketFormat::M2ts192 if s188 < 7 && s204 < 7 => {
                     if s192 >= 7 {
-                        NativePositionBasis::CarrierStart
+                        PositionBasis::CarrierStart
                     } else {
-                        NativePositionBasis::SyncStart
+                        PositionBasis::SyncStart
                     }
                 }
                 _ => return Err(Error::Unsupported("native startup competing raw sync grid")),
@@ -367,18 +372,18 @@ impl NativeInputBootstrap {
             if s192 < 7 || s188 >= 6 || s204 >= 6 || markers > 10 * u32::from(s192) {
                 return Err(Error::Unsupported("native M2TS prefix grid is ambiguous"));
             }
-            NativePositionBasis::CarrierStart
+            PositionBasis::CarrierStart
         };
-        let context = NativeInputContext {
+        let context = InputContext {
             source: self.source,
             token: self.token.clone(),
             format: self.format,
-            owner: self.owner.clone(),
+            backing: self.backing.clone(),
             extent: self.extent,
             basis,
             inspected_bytes: self.inspected,
         };
         self.ready = Some(context.clone());
-        Ok(NativeInputStep::Ready(context))
+        Ok(InputStep::Ready(context))
     }
 }

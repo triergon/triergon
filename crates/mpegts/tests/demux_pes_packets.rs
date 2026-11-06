@@ -1,11 +1,11 @@
-//! Distinct native packet operation, bound to archived native data.
-//! Physical input assignments are independent of the output. No native
+//! Distinct demux packet operation, bound to recorded demux data.
+//! Physical input assignments are independent of the output. No demux
 //! worker/comparator executes here; strict source regressions remain separate.
 use std::sync::atomic::{AtomicBool, Ordering};
 use triergon_core::{Budget, Bytes, Error, SourceId, WorkBudget};
-use triergon_mpegts::clock::{NativeClockProfile, NativePesClockV1, NativeTimestampOrigin};
-use triergon_mpegts::native_pes::{
-    NativePesObserver, NativePesPacket, NativePesScope, NativeSourceContext,
+use triergon_mpegts::compat::pes::{
+    DemuxClock, DemuxObserver, DemuxPacket, DemuxProfile, DemuxScope, SourceContext,
+    TimestampOrigin,
 };
 use triergon_mpegts::{
     AssemblyStep, PacketFormat, ParseLimits, SourceEpochs, TransportPacket, parse_transport,
@@ -16,8 +16,8 @@ const EPOCHS: SourceEpochs = SourceEpochs {
     configuration: 2,
 };
 
-fn scope() -> NativePesScope {
-    NativePesScope {
+fn scope() -> DemuxScope {
+    DemuxScope {
         program: 1,
         pid: 256,
         stream_type: 0x1b,
@@ -27,8 +27,8 @@ fn scope() -> NativePesScope {
     }
 }
 
-fn context(ordinal: usize) -> NativeSourceContext {
-    NativeSourceContext {
+fn context(ordinal: usize) -> SourceContext {
+    SourceContext {
         source_event_ordinal: ordinal as u64,
         epochs: EPOCHS,
         byte_run_epoch: None,
@@ -49,9 +49,9 @@ fn input(source: &[u8], format: PacketFormat, budget: &Budget) -> Vec<TransportP
         .collect()
 }
 
-fn observer(budget: &Budget) -> NativePesObserver {
-    NativePesObserver::new(
-        NativeClockProfile::ArchivedPesV1,
+fn observer(budget: &Budget) -> DemuxObserver {
+    DemuxObserver::new(
+        DemuxProfile::PesPackets,
         scope(),
         budget.clone(),
         ParseLimits::default(),
@@ -59,7 +59,7 @@ fn observer(budget: &Budget) -> NativePesObserver {
     .unwrap()
 }
 
-fn drain(observer: &mut NativePesObserver, ended: bool) -> Vec<NativePesPacket> {
+fn drain(observer: &mut DemuxObserver, ended: bool) -> Vec<DemuxPacket> {
     let cancel = AtomicBool::new(false);
     let mut output = Vec::new();
     for _ in 0..100_000 {
@@ -89,7 +89,7 @@ struct Expected {
     origin: usize,
     flags: u32,
     header_applies: bool,
-    native_time: Option<i128>,
+    demux_time: Option<i128>,
 }
 
 fn complete(part: usize) -> Expected {
@@ -99,7 +99,7 @@ fn complete(part: usize) -> Expected {
         origin: part,
         flags: 0,
         header_applies: true,
-        native_time: Some(90000),
+        demux_time: Some(90000),
     }
 }
 
@@ -109,7 +109,7 @@ fn expected(
     origin: usize,
     flags: u32,
     header_applies: bool,
-    native_time: Option<i128>,
+    demux_time: Option<i128>,
 ) -> Expected {
     Expected {
         parts,
@@ -117,7 +117,7 @@ fn expected(
         origin,
         flags,
         header_applies,
-        native_time,
+        demux_time,
     }
 }
 
@@ -197,10 +197,10 @@ fn check(source: &[u8], format: PacketFormat, specs: &[Expected]) {
         specs.len(),
         "exact native packet count/order; no coalescing"
     );
-    let mut clock = NativePesClockV1::new(1).unwrap();
+    let mut clock = DemuxClock::new(1).unwrap();
     for (packet, spec) in output.iter().zip(specs) {
         let physical = physical(&packets, spec);
-        assert_eq!(packet.profile, NativeClockProfile::ArchivedPesV1);
+        assert_eq!(packet.profile, DemuxProfile::PesPackets);
         assert_eq!(packet.program, 1);
         assert_eq!(packet.pid, 256);
         assert_eq!(packet.source_origin.source, SourceId(1));
@@ -210,12 +210,12 @@ fn check(source: &[u8], format: PacketFormat, specs: &[Expected]) {
         );
         assert_eq!(packet.source_epochs, EPOCHS);
         assert_eq!(
-            packet.native_position,
+            packet.position,
             (packets[spec.origin].source_offset + format.prefix_bytes() as u64) as i64
         );
-        assert_eq!(packet.native_flags, spec.flags);
-        assert_eq!(packet.native_duration90_raw, 0);
-        assert_eq!(packet.native_stream_id, 0xe0);
+        assert_eq!(packet.flags, spec.flags);
+        assert_eq!(packet.duration90_raw, 0);
+        assert_eq!(packet.stream_id, 0xe0);
         assert_eq!(packet.payload_len, physical.payload.len());
         assert_eq!(
             packet.payload().flatten().copied().collect::<Vec<_>>(),
@@ -267,15 +267,15 @@ fn check(source: &[u8], format: PacketFormat, specs: &[Expected]) {
         assert_eq!(actual_header_ranges, header_ranges);
         assert_eq!(packet.source_header.dts_raw33, None);
         assert_eq!(packet.time_header_applies, spec.header_applies);
-        // A headerless native continuation still retains causal raw PTS90000.
-        let raw_pts = if spec.native_time == Some(93000) {
+        // A headerless demux continuation still retains causal raw PTS90000.
+        let raw_pts = if spec.demux_time == Some(93000) {
             93000
         } else {
             90000
         };
         assert_eq!(packet.source_header.pts_raw33, Some(raw_pts));
         let time = clock
-            .project_native_header(
+            .project_header(
                 packet.pid,
                 packet.source_epochs,
                 packet.time_header(),
@@ -284,8 +284,8 @@ fn check(source: &[u8], format: PacketFormat, specs: &[Expected]) {
             )
             .expect("red until the separately named raw-header clock entrypoint is implemented")
             .unwrap();
-        assert_eq!(time.pts90, spec.native_time);
-        assert_eq!(time.dts90, spec.native_time);
+        assert_eq!(time.pts90, spec.demux_time);
+        assert_eq!(time.dts90, spec.demux_time);
         assert_eq!(time.source_dts_raw33, None);
         assert_eq!(
             time.source_pts_raw33,
@@ -294,9 +294,9 @@ fn check(source: &[u8], format: PacketFormat, specs: &[Expected]) {
         assert_eq!(
             time.dts_origin,
             if spec.header_applies {
-                NativeTimestampOrigin::PtsOnlyCompatibility
+                TimestampOrigin::PtsOnlyCompatibility
             } else {
-                NativeTimestampOrigin::Absent
+                TimestampOrigin::Absent
             }
         );
     }
@@ -306,7 +306,7 @@ fn check(source: &[u8], format: PacketFormat, specs: &[Expected]) {
 }
 
 #[test]
-fn archived_one_duplicate_emits_two_distinct_input_packets() {
+fn demux_one_duplicate_emits_two_distinct_input_packets() {
     check(
         include_bytes!("data/cc-one-duplicate.ts"),
         PacketFormat::Ts188,
@@ -314,7 +314,7 @@ fn archived_one_duplicate_emits_two_distinct_input_packets() {
     );
 }
 #[test]
-fn archived_third_copy_is_not_a_source_validity_waiver() {
+fn demux_third_copy_is_not_a_source_validity_waiver() {
     check(
         include_bytes!("data/cc-third-copy.ts"),
         PacketFormat::Ts188,
@@ -322,7 +322,7 @@ fn archived_third_copy_is_not_a_source_validity_waiver() {
     );
 }
 #[test]
-fn archived_duplicate_pcr_emits_both_pes_without_changing_source_clocks() {
+fn demux_duplicate_pcr_emits_both_pes_without_changing_source_clocks() {
     check(
         include_bytes!("data/cc-duplicate-pcr-update.ts"),
         PacketFormat::Ts188,
@@ -330,7 +330,7 @@ fn archived_duplicate_pcr_emits_both_pes_without_changing_source_clocks() {
     );
 }
 #[test]
-fn archived_loss_mid_pes_emits_exact_corrupt_prefix_at_eof() {
+fn demux_loss_mid_pes_emits_exact_corrupt_prefix_at_eof() {
     check(
         include_bytes!("data/cc-loss-mid-pes.ts"),
         PacketFormat::Ts188,
@@ -338,7 +338,7 @@ fn archived_loss_mid_pes_emits_exact_corrupt_prefix_at_eof() {
     );
 }
 #[test]
-fn observed_continuous_payload_flag_keeps_one_native_packet() {
+fn observed_continuous_payload_flag_keeps_one_demux_packet() {
     check(
         include_bytes!("data/continuity-v1/di-continuous-pes-payload.ts"),
         PacketFormat::Ts188,
@@ -354,7 +354,7 @@ fn observed_continuous_header_flag_retains_split_header_facts() {
     );
 }
 #[test]
-fn observed_adaptation_only_flag_does_not_mark_native_corrupt() {
+fn observed_adaptation_only_flag_does_not_mark_demux_corrupt() {
     check(
         include_bytes!("data/continuity-v1/di-continuous-adaptation-only.ts"),
         PacketFormat::Ts188,
@@ -381,7 +381,7 @@ fn observed_flagged_start_repeat_flushes_prefix_and_restarts_at_new_input() {
     );
 }
 #[test]
-fn observed_split_pat_context_preserves_native_packet_position() {
+fn observed_split_pat_context_preserves_demux_packet_position() {
     check(
         include_bytes!("data/continuity-v1/di-continuous-pat.ts"),
         PacketFormat::Ts188,
@@ -389,7 +389,7 @@ fn observed_split_pat_context_preserves_native_packet_position() {
     );
 }
 #[test]
-fn observed_split_pmt_context_preserves_native_packet_position() {
+fn observed_split_pmt_context_preserves_demux_packet_position() {
     check(
         include_bytes!("data/continuity-v1/di-continuous-pmt.ts"),
         PacketFormat::Ts188,
@@ -419,7 +419,7 @@ fn observed_middle_repeat_keeps_354_and_342_without_after_output_splitting() {
     );
 }
 #[test]
-fn observed_other_pid_interleaving_keeps_two_native_packet_positions() {
+fn observed_other_pid_interleaving_keeps_two_demux_packet_positions() {
     check(
         include_bytes!("data/continuity-v1/interleaved-other-pid-duplicate.ts"),
         PacketFormat::Ts188,
@@ -427,7 +427,7 @@ fn observed_other_pid_interleaving_keeps_two_native_packet_positions() {
     );
 }
 #[test]
-fn observed_m2ts_native_position_is_sync_offset_not_source_prefix_offset() {
+fn observed_m2ts_demux_position_is_sync_offset_not_source_prefix_offset() {
     check(
         include_bytes!("data/continuity-v1/m2ts-prefix-only-duplicate.m2ts"),
         PacketFormat::M2ts192,
@@ -435,7 +435,7 @@ fn observed_m2ts_native_position_is_sync_offset_not_source_prefix_offset() {
     );
 }
 #[test]
-fn observed_incremented_identical_content_is_two_native_pes_packets() {
+fn observed_incremented_identical_content_is_two_demux_pes_packets() {
     check(
         include_bytes!("data/continuity-v1/same-content-new-counters.ts"),
         PacketFormat::Ts188,
@@ -443,7 +443,7 @@ fn observed_incremented_identical_content_is_two_native_pes_packets() {
     );
 }
 #[test]
-fn observed_counter_gap_retains_bytes_but_marks_only_affected_native_packet() {
+fn observed_counter_gap_retains_bytes_but_marks_only_affected_demux_packet() {
     check(
         include_bytes!("data/continuity-v1/loss-then-clean-pusi.ts"),
         PacketFormat::Ts188,
@@ -465,7 +465,7 @@ fn observed_new_pusi_flushes_corrupt_prefix_before_clean_packet() {
     );
 }
 #[test]
-fn observed_opcr_unequal_packet_still_has_two_unflagged_native_outputs() {
+fn observed_opcr_unequal_packet_still_has_two_unflagged_demux_outputs() {
     check(
         include_bytes!("data/continuity-v1/opcr-change-is-not-duplicate.ts"),
         PacketFormat::Ts188,
@@ -473,7 +473,7 @@ fn observed_opcr_unequal_packet_still_has_two_unflagged_native_outputs() {
     );
 }
 #[test]
-fn observed_third_middle_copy_keeps_all_three_native_outputs_and_unknowns() {
+fn observed_third_middle_copy_keeps_all_three_demux_outputs_and_unknowns() {
     check(
         include_bytes!("data/continuity-v1/third-middle-copy-then-clean.ts"),
         PacketFormat::Ts188,
@@ -484,6 +484,7 @@ fn observed_third_middle_copy_keeps_all_three_native_outputs_and_unknowns() {
         ],
     );
 }
+#[cfg(feature = "reference-trace")]
 #[test]
 fn observed_invalid_opcr_draft_is_retained_without_source_acceptance() {
     check_rejected_original(include_bytes!(
@@ -492,10 +493,10 @@ fn observed_invalid_opcr_draft_is_retained_without_source_acceptance() {
 }
 
 #[test]
-fn native_headerless_time_is_unknown_and_does_not_seed_a_clock() {
-    let mut clock = NativePesClockV1::new(1).unwrap();
+fn demux_headerless_time_is_unknown_and_does_not_seed_a_clock() {
+    let mut clock = DemuxClock::new(1).unwrap();
     let view = clock
-        .project_native_header(
+        .project_header(
             256,
             EPOCHS,
             None,
@@ -565,7 +566,7 @@ fn retained_output_keeps_shared_charge_after_observer_and_inputs_drop() {
 }
 
 #[test]
-fn configured_payload_limit_is_not_bypassed_by_native_view() {
+fn configured_payload_limit_is_not_bypassed_by_demux_view() {
     let budget = Budget::new(16384).unwrap();
     let packets = input(
         include_bytes!("data/continuity-v1/partial-start-duplicate.ts"),
@@ -576,13 +577,8 @@ fn configured_payload_limit_is_not_bypassed_by_native_view() {
         pes_bytes: 100,
         ..ParseLimits::default()
     };
-    let mut observer = NativePesObserver::new(
-        NativeClockProfile::ArchivedPesV1,
-        scope(),
-        budget.clone(),
-        limits,
-    )
-    .unwrap();
+    let mut observer =
+        DemuxObserver::new(DemuxProfile::PesPackets, scope(), budget.clone(), limits).unwrap();
     observer.push(packets[2].clone(), context(2)).unwrap();
     let mut found = false;
     for _ in 0..1000 {
@@ -674,8 +670,8 @@ fn unproven_stream_profile_is_an_explicit_nonpass() {
     let mut unproven = scope();
     unproven.stream_type = 0x24;
     assert!(matches!(
-        NativePesObserver::new(
-            NativeClockProfile::ArchivedPesV1,
+        DemuxObserver::new(
+            DemuxProfile::PesPackets,
             unproven,
             budget,
             ParseLimits::default()
@@ -684,8 +680,9 @@ fn unproven_stream_profile_is_an_explicit_nonpass() {
     ));
 }
 
+#[cfg(feature = "reference-trace")]
 #[test]
-fn native_profile_keeps_exact_original_reference_contract() {
+fn demux_profile_keeps_exact_original_reference_contract() {
     let budget = Budget::new(4096).unwrap();
     let observer = observer(&budget);
     let profile = observer.profile();
@@ -694,7 +691,7 @@ fn native_profile_keeps_exact_original_reference_contract() {
         "19c06e53c62852b409eec9771cb11d9d7f5164b4618545a449d7e993f99346df"
     );
     assert_eq!(
-        profile.source_pin(),
+        profile.reference_revision(),
         "d32b387f2b0a484599d4587d651891f0c63c4238"
     );
     assert_eq!(profile.flags(), 48);
@@ -707,30 +704,31 @@ fn native_profile_keeps_exact_original_reference_contract() {
     );
 }
 
-// Access path for the invalid fixture: source rejection and native
+// Access path for the invalid fixture: source rejection and demux
 // encoded-header evidence are distinct.
+#[cfg(feature = "reference-trace")]
 fn check_rejected_original(source: &[u8]) {
-    use triergon_mpegts::native_pes::NativeRegisteredCarriage;
-    use triergon_mpegts::native_recovery::{
-        NativePesObservation, NativePesRecoveryObserver, NativeRejectedPolicy,
+    use triergon_mpegts::compat::pes::RegisteredCarriage;
+    use triergon_mpegts::reference_trace::recovery::{
+        DemuxObservation, RecoveryObserver, RejectedPolicy,
     };
     use triergon_mpegts::{TransportInspection, TransportInspector};
     let budget = Budget::new(1 << 20).unwrap();
-    let owner = Bytes::copy_from_slice(&budget, source).unwrap();
-    let mut observer = NativePesRecoveryObserver::new(
-        NativeClockProfile::ArchivedPesV1,
+    let backing = Bytes::copy_from_slice(&budget, source).unwrap();
+    let mut observer = RecoveryObserver::new(
+        DemuxProfile::PesPackets,
         scope(),
-        NativeRegisteredCarriage::Avc,
-        NativeRejectedPolicy::OpcrWithoutPcrV1,
+        RegisteredCarriage::Avc,
+        RejectedPolicy::OpcrWithoutPcr,
         budget.clone(),
         ParseLimits::default(),
     )
     .unwrap();
-    let mut clock = NativePesClockV1::new(1).unwrap();
+    let mut clock = DemuxClock::new(1).unwrap();
     let mut count = 0;
     for (index, offset) in [376_usize, 564].into_iter().enumerate() {
         let mut inspect = TransportInspector::new(
-            owner.slice(offset..offset + 188).unwrap(),
+            backing.slice(offset..offset + 188).unwrap(),
             PacketFormat::Ts188,
             triergon_core::SourceLocation {
                 source: SourceId(1),
@@ -750,8 +748,8 @@ fn check_rejected_original(source: &[u8]) {
             }
         };
         assert_eq!(rejection.error(), Error::Invalid("OPCR without PCR"));
-        assert!(rejection.backing_bytes().shares_storage_with(&owner));
-        let ctx = NativeSourceContext {
+        assert!(rejection.backing_bytes().shares_storage_with(&backing));
+        let ctx = SourceContext {
             source_event_ordinal: 8 + index as u64,
             epochs: EPOCHS,
             byte_run_epoch: None,
@@ -764,24 +762,20 @@ fn check_rejected_original(source: &[u8]) {
                 .unwrap()
             {
                 AssemblyStep::Yield => {}
-                AssemblyStep::Output(NativePesObservation::FromRejectedCarrier(packet)) => {
+                AssemblyStep::Output(DemuxObservation::FromRejectedCarrier(packet)) => {
                     assert!(!emitted);
                     emitted = true;
                     count += 1;
                     let raw = &source[offset..offset + 188];
                     let start = 5 + usize::from(raw[4]);
-                    assert_eq!(packet.profile, NativeClockProfile::ArchivedPesV1);
+                    assert_eq!(packet.profile, DemuxProfile::PesPackets);
                     assert_eq!((packet.program, packet.pid), (1, 256));
                     assert_eq!(packet.source_epochs, EPOCHS);
                     assert_eq!(packet.source_origin.source, SourceId(1));
                     assert_eq!(packet.source_origin.offset, offset as u64);
-                    assert_eq!(packet.native_position, offset as i64);
+                    assert_eq!(packet.position, offset as i64);
                     assert_eq!(
-                        (
-                            packet.native_flags,
-                            packet.native_duration90_raw,
-                            packet.native_stream_id
-                        ),
+                        (packet.flags, packet.duration90_raw, packet.stream_id),
                         (0, 0, 0xe0)
                     );
                     assert!(
@@ -845,5 +839,5 @@ fn check_rejected_original(source: &[u8]) {
         Ok(AssemblyStep::Finished)
     ));
     assert_eq!(count, 2);
-    assert_eq!(owner.as_ref(), source);
+    assert_eq!(backing.as_ref(), source);
 }

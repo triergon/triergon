@@ -1,5 +1,5 @@
 //! Deterministic fixture bytes.
-//! H.222.0 section/CRC/PES grammar, no production/native parser import.
+//! H.222.0 section/CRC/PES grammar, no production/demux parser import.
 #[derive(Clone, Copy, Debug)]
 pub enum Case {
     MultiOne,

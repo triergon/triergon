@@ -5,9 +5,7 @@ use triergon_core::{
 use triergon_mpegts::{
     PacketFormat, ParseLimits, TraceEvent,
     clock::SourceTimePolicy,
-    native_pes::{
-        NativePesBoundary, NativePesPacket, NativePrivateAudioCarriage, NativeRegisteredCarriage,
-    },
+    compat::pes::{DemuxBoundary, DemuxPacket, PrivateAudioCarriage, RegisteredCarriage},
     psi::{DescriptorNamespace, DvbNamespaceEvidence},
 };
 use triergon_playback::{
@@ -23,15 +21,15 @@ const RETYPE: &[u8] = include_bytes!("fixtures/ts/program-pmt-retype.ts");
 const EOF: &[u8] = include_bytes!("fixtures/ts/program-eof-avc-aac.ts");
 const AVC: TsNativeTrackSelection = TsNativeTrackSelection {
     pid: 256,
-    carriage: TsNativeCarriage::Registered(NativeRegisteredCarriage::Avc),
+    carriage: TsNativeCarriage::Registered(RegisteredCarriage::Avc),
 };
 const AAC: TsNativeTrackSelection = TsNativeTrackSelection {
     pid: 257,
-    carriage: TsNativeCarriage::Registered(NativeRegisteredCarriage::AacAdts),
+    carriage: TsNativeCarriage::Registered(RegisteredCarriage::AacAdts),
 };
 const AC3: TsNativeTrackSelection = TsNativeTrackSelection {
     pid: 257,
-    carriage: TsNativeCarriage::PrivateAudio(NativePrivateAudioCarriage::DvbAc3Tag),
+    carriage: TsNativeCarriage::PrivateAudio(PrivateAudioCarriage::DvbAc3Tag),
 };
 const FOLLOW_AUDIO: TsNativeTrackSelection = TsNativeTrackSelection {
     pid: 257,
@@ -128,7 +126,7 @@ fn collect(player: &mut Player<ByteSource>, work: u64) -> Vec<Output> {
 const AV_PAYLOAD: u64 = 0xd3fd_4412_38d4_6078;
 const DVB_PAYLOAD: u64 = 0xa551_170f_0aa9_5055;
 
-fn digest(packet: &NativePesPacket) -> u64 {
+fn digest(packet: &DemuxPacket) -> u64 {
     packet
         .payload()
         .flatten()
@@ -222,9 +220,7 @@ fn independent_ts_segments_discover_tracks_and_emit_configuration_before_packets
                 RETYPE,
                 [
                     Some(AC3.carriage),
-                    Some(TsNativeCarriage::Registered(
-                        NativeRegisteredCarriage::AacLatm,
-                    )),
+                    Some(TsNativeCarriage::Registered(RegisteredCarriage::AacLatm)),
                 ],
             ),
         ] {
@@ -323,15 +319,15 @@ fn mixed_avc_ac3_dvb_keep_carrier_order_and_a_common_clock() {
                     );
                     packets.push((
                         packet.pid,
-                        packet.native_stream_id,
-                        packet.native_position,
+                        packet.stream_id,
+                        packet.position,
                         clock.pts90,
                         clock.dts90,
                         packet.payload_len,
                         digest(packet),
                     ));
                     assert_eq!(packet.source_header.dts_raw33, None);
-                    assert_eq!(packet.boundary, NativePesBoundary::FiniteLength);
+                    assert_eq!(packet.boundary, DemuxBoundary::FiniteLength);
                 }
                 RawEvent::Ts(TsEvent {
                     source: TraceEvent::Pes(p),
@@ -375,9 +371,9 @@ fn unbounded_packets_drain_by_pid_only_after_logical_eof() {
         .iter()
         .filter_map(|item| match item.event() {
             RawEvent::NativeTs { packet, .. } => {
-                assert_eq!(packet.boundary, NativePesBoundary::LogicalEof);
+                assert_eq!(packet.boundary, DemuxBoundary::LogicalEof);
                 assert_eq!((packet.payload_len, digest(packet)), (27, AV_PAYLOAD));
-                Some((packet.pid, packet.native_position))
+                Some((packet.pid, packet.position))
             }
             RawEvent::NativeRefusal { error, .. } => panic!("unexpected refusal {error:?}"),
             _ => None,
@@ -452,8 +448,8 @@ fn selected_audio_follows_pmt_and_matches_native_carrier_order() {
                     }
                     packets.push((
                         packet.pid,
-                        packet.native_stream_id,
-                        packet.native_position,
+                        packet.stream_id,
+                        packet.position,
                         clock.pts90,
                         clock.dts90,
                         packet.payload_len,
@@ -475,7 +471,7 @@ fn selected_audio_follows_pmt_and_matches_native_carrier_order() {
             configurations,
             [
                 AC3.carriage,
-                TsNativeCarriage::Registered(NativeRegisteredCarriage::AacLatm)
+                TsNativeCarriage::Registered(RegisteredCarriage::AacLatm)
             ]
         );
         assert_eq!(
@@ -529,12 +525,12 @@ fn missing_dvb_context_preserves_private_source_and_later_latm_recovers() {
             RawEvent::NativeTsConfiguration(config) => {
                 assert_eq!(
                     config.carriage,
-                    TsNativeCarriage::Registered(NativeRegisteredCarriage::AacLatm)
+                    TsNativeCarriage::Registered(RegisteredCarriage::AacLatm)
                 );
                 audio.push("latm configuration");
             }
             RawEvent::NativeTs { packet, .. } if packet.pid == 257 => {
-                assert_eq!(packet.native_stream_id, 0xc0);
+                assert_eq!(packet.stream_id, 0xc0);
                 audio.push("latm native");
             }
             _ => {}
@@ -589,7 +585,7 @@ fn seeking_replays_the_current_audio_configurations_in_a_new_generation() {
         carriages,
         [
             AC3.carriage,
-            TsNativeCarriage::Registered(NativeRegisteredCarriage::AacLatm)
+            TsNativeCarriage::Registered(RegisteredCarriage::AacLatm)
         ]
     );
 }
