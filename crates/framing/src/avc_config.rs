@@ -229,7 +229,7 @@ struct Scan {
     phase: ScanPhase,
     after_group: ScanPhase,
     position: usize,
-    remaining: usize,
+    remaining: u8,
     kind: AvcConfigArrayKind,
     extension: Option<[u8; 4]>,
 }
@@ -270,12 +270,12 @@ impl Scan {
                 AvcConfigArrayKind::Sequence,
                 5,
                 5,
-                usize::from(raw[5] & 31),
+                raw[5] & 31,
                 ScanPhase::Picture,
             ),
             ScanPhase::Picture => {
                 let count_offset = self.position;
-                let count = usize::from(*raw.get(self.position).ok_or(Error::Truncated)?);
+                let count = *raw.get(self.position).ok_or(Error::Truncated)?;
                 self.position = self.position.checked_add(1).ok_or(Error::Overflow)?;
                 self.group(
                     AvcConfigArrayKind::Picture,
@@ -305,7 +305,7 @@ impl Scan {
                     AvcConfigArrayKind::SequenceExtension,
                     start,
                     end - 1,
-                    usize::from(bytes[3]),
+                    bytes[3],
                     ScanPhase::End,
                 )
             }
@@ -346,7 +346,7 @@ impl Scan {
         kind: AvcConfigArrayKind,
         start: usize,
         count_offset: usize,
-        count: usize,
+        count: u8,
         after: ScanPhase,
     ) -> Result<Event> {
         self.kind = kind;
