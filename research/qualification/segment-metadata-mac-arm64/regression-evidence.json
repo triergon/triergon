@@ -1,8 +1,0 @@
-{
-  "known_pre_feature_failures": {
-    ".research/catalogue-invalid-lace-before.json": "f8e3183d9079758f74f667f9c08499573f525f11a70f80b3f7107019782e60ef",
-    ".research/catalogue-duplicate-uid-before.json": "030fc3878daaa0471dd27944f0a46e1b1dfa4fcdbdf97fd885c66ce2cf574619",
-    ".research/catalogue-open-before.json": "c7298dce9045c25da4281c98954c9283e5a2390ec87aa13b998cc44dfdfcee0c"
-  },
-  "previous_whole_file_hdr_refusal": "../colour-hdr-mac-arm64/additional-hdr-input.json"
-}

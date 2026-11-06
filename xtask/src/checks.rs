@@ -9,14 +9,10 @@ use crate::json::{self, Value};
 use crate::walk;
 
 /// Every relative link target in a tracked-style Markdown file must exist.
-/// Archived evidence snapshots are skipped: they keep the links of their time.
 pub fn links(root: &Path) -> Vec<String> {
     let mut errors = Vec::new();
     for path in walk::files(root, &|rel| rel.extension().is_some_and(|e| e == "md")) {
         let rel = path.strip_prefix(root).expect("walked under root");
-        if is_archived(rel) {
-            continue;
-        }
         let text = match fs::read_to_string(&path) {
             Ok(text) => text,
             Err(error) => {
@@ -40,10 +36,6 @@ pub fn links(root: &Path) -> Vec<String> {
         }
     }
     errors
-}
-
-fn is_archived(rel: &Path) -> bool {
-    rel.starts_with("research/qualification") || rel.starts_with("research/review")
 }
 
 /// Targets of `](target)`: the shortest non-empty run up to the next `)`.
@@ -286,10 +278,9 @@ mod tests {
     }
 
     #[test]
-    fn reports_missing_links_and_skips_archives() {
+    fn reports_missing_links_outside_build_output() {
         let root = crate::walk::scratch("links");
         fs::create_dir_all(root.join("docs")).unwrap();
-        fs::create_dir_all(root.join("research/review")).unwrap();
         fs::create_dir_all(root.join("target")).unwrap();
         fs::write(
             root.join("docs/a.md"),
@@ -297,7 +288,6 @@ mod tests {
         )
         .unwrap();
         fs::write(root.join("docs/b.md"), "").unwrap();
-        fs::write(root.join("research/review/old.md"), "[gone](missing.md)").unwrap();
         fs::write(root.join("target/t.md"), "[gone](missing.md)").unwrap();
         assert_eq!(links(&root), vec!["docs/a.md: missing link missing.md"]);
         fs::remove_dir_all(root).unwrap();

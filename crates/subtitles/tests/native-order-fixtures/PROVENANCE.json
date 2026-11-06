@@ -1,7 +1,8 @@
 {
+  "evidence": {"set": "subtitle-fixture-provenance", "sha256": "acebf0b39b33b7f05ed20c5dba1b6cc42ed0c95839caf1ac40cb6659d484deaf"},
   "schema": "m05-actual-order4-regression-facts-v1",
   "raw_review": {
-    "path": ".research/aws-linux-extended1/exports/63.183.208.230/order-observed-parent-1793494688875492982/review/summary.json",
+    "path": ".research/evidence/subtitle-fixture-provenance/aws-linux-extended1/exports/63.183.208.230/order-observed-parent-1793494688875492982/review/summary.json",
     "sha256": "b6d9ba59b87dd31723c514b2b72a7f7e65e51dac9e3c8f18216a4bf37bc4a05a"
   },
   "all_four_usable": true,
@@ -21,7 +22,7 @@
       },
       "source_classification": "selected ordered PCS/RCS control",
       "raw_log": {
-        "path": ".research/aws-linux-extended1/exports/63.183.208.230/order-observed-parent-1793494688875492982/original-pcs12-rcs12.jsonl",
+        "path": ".research/evidence/subtitle-fixture-provenance/aws-linux-extended1/exports/63.183.208.230/order-observed-parent-1793494688875492982/original-pcs12-rcs12.jsonl",
         "sha256": "30c1fd02857e17c403e17483770ad23d920d894644b1d80219123dc4b8d40a6f"
       },
       "raw_codec_inputs": [
@@ -136,7 +137,7 @@
       },
       "source_classification": "selected ordered PCS/RCS control",
       "raw_log": {
-        "path": ".research/aws-linux-extended1/exports/63.183.208.230/order-observed-parent-1793494688875492982/same-pcs12-swapped-rcs21.jsonl",
+        "path": ".research/evidence/subtitle-fixture-provenance/aws-linux-extended1/exports/63.183.208.230/order-observed-parent-1793494688875492982/same-pcs12-swapped-rcs21.jsonl",
         "sha256": "cf07d9b4a38069ea2a0a868b1f329ebe7b345f9779ce8d2e1e0223b8e17d984b"
       },
       "raw_codec_inputs": [
@@ -251,7 +252,7 @@
       },
       "source_classification": "selected ordered PCS/RCS control",
       "raw_log": {
-        "path": ".research/aws-linux-extended1/exports/63.183.208.230/order-observed-parent-1793494688875492982/renamed-pcs92-rcs92.jsonl",
+        "path": ".research/evidence/subtitle-fixture-provenance/aws-linux-extended1/exports/63.183.208.230/order-observed-parent-1793494688875492982/renamed-pcs92-rcs92.jsonl",
         "sha256": "5c9fd48913635e0c681dba56fcb630091e6a8a34f1894673eb0418d4fc52ea76"
       },
       "raw_codec_inputs": [
@@ -366,7 +367,7 @@
       },
       "source_classification": "deliberately nonconforming PCS order; receiver causality only, strict source rejection remains",
       "raw_log": {
-        "path": ".research/aws-linux-extended1/exports/63.183.208.230/order-observed-parent-1793494688875492982/reversed-pcs21-rcs12.jsonl",
+        "path": ".research/evidence/subtitle-fixture-provenance/aws-linux-extended1/exports/63.183.208.230/order-observed-parent-1793494688875492982/reversed-pcs21-rcs12.jsonl",
         "sha256": "4752ffbdb0941385a04d073334b2d245dd5df59074f037f42eddc815310b91ed"
       },
       "raw_codec_inputs": [

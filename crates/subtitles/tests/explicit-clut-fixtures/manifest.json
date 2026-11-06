@@ -1,11 +1,12 @@
 {
+  "evidence": {"set": "subtitle-fixture-provenance", "sha256": "acebf0b39b33b7f05ed20c5dba1b6cc42ed0c95839caf1ac40cb6659d484deaf"},
   "schema": "m05-explicit-clut-unchanged-runtime-red-art-v1",
   "cases": [
     {
       "id": "full-rgb",
       "path": ".research/parallel-subtitles/dvb-native-closure-1/explicit-clut-1/guard-art/full-rgb.case",
       "sha256": "0ca828293a8d1d4f46c1987bc5bb9bff75475a27c6dea1b7505ca02af34965fb",
-      "raw_native": ".research/aws-linux-extended1/exports/3.76.29.106/native-v1/full-lattice.stdout",
+      "raw_native": ".research/evidence/subtitle-fixture-provenance/aws-linux-extended1/exports/3.76.29.106/native-v1/full-lattice.stdout",
       "raw_native_sha256": "f6f10940a7c2dbe27c41558f87df09ed711490c533437ea492add1769b245cbb",
       "original_packet_ordinals": [
         1
@@ -16,7 +17,7 @@
       "id": "full-alpha",
       "path": ".research/parallel-subtitles/dvb-native-closure-1/explicit-clut-1/guard-art/full-alpha.case",
       "sha256": "c06786094a83ea2805f6261369053df80865adcf337b1e783470fe617e27b870",
-      "raw_native": ".research/aws-linux-extended1/exports/3.76.29.106/native-v1/full-alpha-neutral.stdout",
+      "raw_native": ".research/evidence/subtitle-fixture-provenance/aws-linux-extended1/exports/3.76.29.106/native-v1/full-alpha-neutral.stdout",
       "raw_native_sha256": "14d258481e5a2f4fd54395698bb8a5d53dce36229215899a97d24511c0fcdbd9",
       "original_packet_ordinals": [
         127
@@ -27,7 +28,7 @@
       "id": "unused-full",
       "path": ".research/parallel-subtitles/dvb-native-closure-1/explicit-clut-1/guard-art/unused-full.case",
       "sha256": "dc53c65c32665f637ec58738c2e0dd42540ccf50f0d0e608410f9aafb2b9b030",
-      "raw_native": ".research/aws-linux-extended1/exports/3.76.29.106/native-v1/unused-full.stdout",
+      "raw_native": ".research/evidence/subtitle-fixture-provenance/aws-linux-extended1/exports/3.76.29.106/native-v1/unused-full.stdout",
       "raw_native_sha256": "55cf529bd0d2ea878ca56337563dc339250de2ef061be8bc15470391b87db345",
       "original_packet_ordinals": [
         0
@@ -38,7 +39,7 @@
       "id": "full-depth2",
       "path": ".research/parallel-subtitles/dvb-native-closure-1/explicit-clut-1/guard-art/full-depth2.case",
       "sha256": "522e2575a705f650772e946a18ef61aa1c9ef3ec1787d0cd20672f987c522a50",
-      "raw_native": ".research/aws-linux-extended1/exports/3.76.29.106/native-v1/depth2-full.stdout",
+      "raw_native": ".research/evidence/subtitle-fixture-provenance/aws-linux-extended1/exports/3.76.29.106/native-v1/depth2-full.stdout",
       "raw_native_sha256": "62658415ae93906b7c10e3d06632abeb1c115b3de7811d65702d11f4b8012a97",
       "original_packet_ordinals": [
         30
@@ -49,7 +50,7 @@
       "id": "full-depth4",
       "path": ".research/parallel-subtitles/dvb-native-closure-1/explicit-clut-1/guard-art/full-depth4.case",
       "sha256": "b0b5e9c69c944a92b05a1540a38fc4c11e72e5399d457f3b39aad7f111566441",
-      "raw_native": ".research/aws-linux-extended1/exports/3.76.29.106/native-v1/depth4-full.stdout",
+      "raw_native": ".research/evidence/subtitle-fixture-provenance/aws-linux-extended1/exports/3.76.29.106/native-v1/depth4-full.stdout",
       "raw_native_sha256": "98eb665a10a82a298f89b3a493033c90efb7d3777b9d93ed6780708def03d239",
       "original_packet_ordinals": [
         10
@@ -60,7 +61,7 @@
       "id": "reduced-final-fresh",
       "path": ".research/parallel-subtitles/dvb-native-closure-1/explicit-clut-1/guard-art/reduced-final-fresh.case",
       "sha256": "4fe611d6b39805cd1945b30065a25016a3e8b375691e59d4b3a2edf1cc7c317b",
-      "raw_native": ".research/aws-linux-extended1/exports/3.76.29.106/native-v1/reduced-exhaustive.stdout",
+      "raw_native": ".research/evidence/subtitle-fixture-provenance/aws-linux-extended1/exports/3.76.29.106/native-v1/reduced-exhaustive.stdout",
       "raw_native_sha256": "18be8919e72d7da3788738788b3fe28ef028e19d7df38bc400150662c2f721a4",
       "original_packet_ordinals": [
         128
@@ -71,7 +72,7 @@
       "id": "transparent-companions",
       "path": ".research/parallel-subtitles/dvb-native-closure-1/explicit-clut-1/guard-art/transparent-companions.case",
       "sha256": "e270fef605b250ce75e19a0e5d6c5b09f65584dc7b04d836c01f883629d04c05",
-      "raw_native": ".research/aws-linux-extended1/exports/3.76.29.106/native-v1/full-lattice.stdout",
+      "raw_native": ".research/evidence/subtitle-fixture-provenance/aws-linux-extended1/exports/3.76.29.106/native-v1/full-lattice.stdout",
       "raw_native_sha256": "f6f10940a7c2dbe27c41558f87df09ed711490c533437ea492add1769b245cbb",
       "original_packet_ordinals": [
         0
@@ -82,7 +83,7 @@
       "id": "reduced-nonfinal",
       "path": ".research/parallel-subtitles/dvb-native-closure-1/explicit-clut-1/guard-art/reduced-nonfinal.case",
       "sha256": "7896c67d4e849993ad6ea58cb05c8da177e481e9adf87ca43f3739766d52aa5f",
-      "raw_native": ".research/aws-linux-extended1/exports/3.76.29.106/native-v2/reduced-final-full-sentinel.jsonl.gz",
+      "raw_native": ".research/evidence/subtitle-fixture-provenance/aws-linux-extended1/exports/3.76.29.106/native-v2/reduced-final-full-sentinel.jsonl.gz",
       "raw_native_sha256": "26dd8c11c09e4c44cff586443382ff6c2596b8584ffd0f125e93efa4df8d8da7",
       "original_packet_ordinals": [
         128
@@ -93,7 +94,7 @@
       "id": "reduced-tail2",
       "path": ".research/parallel-subtitles/dvb-native-closure-1/explicit-clut-1/guard-art/reduced-tail2.case",
       "sha256": "b1e4a4f52940f244bd6c33ee389b8f24cd371f289cd7315e80c08725583487cd",
-      "raw_native": ".research/aws-linux-extended1/exports/3.76.29.106/native-v2/reduced-tail-depth2.jsonl.gz",
+      "raw_native": ".research/evidence/subtitle-fixture-provenance/aws-linux-extended1/exports/3.76.29.106/native-v2/reduced-tail-depth2.jsonl.gz",
       "raw_native_sha256": "7fe9b4456b70f5ee5d3996849054a39d8459a020e8fa549cb6eecbe44320d51b",
       "original_packet_ordinals": [
         0,
@@ -106,7 +107,7 @@
       "id": "reduced-tail4",
       "path": ".research/parallel-subtitles/dvb-native-closure-1/explicit-clut-1/guard-art/reduced-tail4.case",
       "sha256": "c05b4c1a1ada7d21f5ff759c320038762f8734ea464d73e0514ad3fe29cb2b05",
-      "raw_native": ".research/aws-linux-extended1/exports/3.76.29.106/native-v2/reduced-tail-depth4.jsonl.gz",
+      "raw_native": ".research/evidence/subtitle-fixture-provenance/aws-linux-extended1/exports/3.76.29.106/native-v2/reduced-tail-depth4.jsonl.gz",
       "raw_native_sha256": "85fb465c35dd7067faae6ba753a1811efccd1d604b6b88405634aa5e9c6db08c",
       "original_packet_ordinals": [
         0,
@@ -119,7 +120,7 @@
       "id": "reduced-tail8",
       "path": ".research/parallel-subtitles/dvb-native-closure-1/explicit-clut-1/guard-art/reduced-tail8.case",
       "sha256": "dcb483735a5e19e4fbf72a687a8b9ae285b1a564d4e71892ccbca30d524e7492",
-      "raw_native": ".research/aws-linux-extended1/exports/3.76.29.106/native-v2/reduced-tail-depth8.jsonl.gz",
+      "raw_native": ".research/evidence/subtitle-fixture-provenance/aws-linux-extended1/exports/3.76.29.106/native-v2/reduced-tail-depth8.jsonl.gz",
       "raw_native_sha256": "5cf8bd45ddd3cef98c1ecd621adf2731b5f02c0f54701db1532ac6073d67ec07",
       "original_packet_ordinals": [
         0,

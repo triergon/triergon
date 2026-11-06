@@ -4,8 +4,8 @@
   "content": "Original testsrc2 video and sine audio, with the authored caption stream. These small canonical encodings preserve the frozen corpus hashes across encoder versions.",
   "original_encoder": "ffmpeg version 9.0.2 Copyright (c) 2000-2026 the FFmpeg developers",
   "original_generation_recipes": [
-    "research/qualification/shared-core-mac-arm64/source/tools/generate-fixtures.py",
-    "research/qualification/shared-core-mac-arm64/source/tools/generate-corpus.py"
+    ".research/evidence/shared-core-mac-arm64/source/tools/generate-fixtures.py",
+    ".research/evidence/shared-core-mac-arm64/source/tools/generate-corpus.py"
   ],
   "cases": [
     {
@@ -38,7 +38,7 @@
     }
   ],
   "recipe_sha256": {
-    "research/qualification/shared-core-mac-arm64/source/tools/generate-fixtures.py": "bc3b6589f068ea01565250d3979cfe8c551963b9c306b159ec6bd4376b058e92",
-    "research/qualification/shared-core-mac-arm64/source/tools/generate-corpus.py": "8791b4c1572ce4e604f5eb7af01dc98aa3a5fef380e03767c0b132d3e0879c96"
+    ".research/evidence/shared-core-mac-arm64/source/tools/generate-fixtures.py": "bc3b6589f068ea01565250d3979cfe8c551963b9c306b159ec6bd4376b058e92",
+    ".research/evidence/shared-core-mac-arm64/source/tools/generate-corpus.py": "8791b4c1572ce4e604f5eb7af01dc98aa3a5fef380e03767c0b132d3e0879c96"
   }
 }

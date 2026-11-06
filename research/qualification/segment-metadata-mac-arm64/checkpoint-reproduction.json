@@ -1,9 +1,0 @@
-{
-  "same_workers": true,
-  "same_contract": true,
-  "case": "attachments-large",
-  "original_clean_timing_status": "measured",
-  "original_clean_upper_ratio": 0.7264960823763555,
-  "checkpoint_timing_status": "contaminated",
-  "regression": true
-}
