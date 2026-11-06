@@ -2,6 +2,7 @@
 #![forbid(unsafe_code)]
 
 pub mod colour;
+mod container;
 mod content_encoding;
 mod cues;
 mod ebml;

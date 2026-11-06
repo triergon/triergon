@@ -22,6 +22,15 @@ pub struct TimeBase {
 }
 
 impl TimeBase {
+    /// One nanosecond, the Matroska packet clock after TimestampScale.
+    pub const NANOSECONDS: Self = Self {
+        numerator: NonZeroU64::MIN,
+        denominator: match NonZeroU64::new(1_000_000_000) {
+            Some(value) => value,
+            None => unreachable!(),
+        },
+    };
+
     pub fn new(numerator: u64, denominator: u64) -> Result<Self> {
         if numerator == 0 || denominator == 0 {
             return Err(Error::Invalid("zero timebase"));
