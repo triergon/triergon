@@ -231,8 +231,11 @@ impl ContainerReader for Reader {
             SeekPolicy::PlaybackPreroll => self.seek_for_playback(track, requested_ns),
         }
     }
-    fn tracks(&self) -> &[Track] {
-        Reader::tracks(self)
+    fn track_count(&self) -> usize {
+        Reader::tracks(self).len()
+    }
+    fn track(&self, index: usize) -> Option<&Track> {
+        Reader::tracks(self).get(index)
     }
     fn capabilities(&self) -> SourceCapabilities {
         Reader::capabilities(self)

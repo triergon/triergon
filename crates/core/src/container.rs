@@ -208,7 +208,9 @@ pub type ReaderStep<R> =
 /// and no dynamic dispatch on the packet path.
 pub trait ContainerReader {
     type Packet: PacketInfo;
-    type Track: TrackInfo;
+    /// `dyn TrackInfo` for a closed enum over several formats: track metadata
+    /// may use dynamic dispatch, the packet path never does.
+    type Track: TrackInfo + ?Sized;
     type Other;
 
     fn provide(&mut self, window: &InputWindow) -> Result<()>;
@@ -219,7 +221,8 @@ pub trait ContainerReader {
     fn step(&mut self, work: &mut WorkBudget, cancel: &AtomicBool) -> Result<ReaderStep<Self>>;
     /// Start a seek; the returned request names the input the reader needs next.
     fn request_seek(&mut self, request: SeekRequest) -> Result<InputRequest>;
-    fn tracks(&self) -> &[Self::Track];
+    fn track_count(&self) -> usize;
+    fn track(&self, index: usize) -> Option<&Self::Track>;
     fn capabilities(&self) -> SourceCapabilities;
 }
 

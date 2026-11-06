@@ -30,6 +30,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "triergon"
+version = "0.0.0"
+dependencies = [
+ "triergon-core",
+ "triergon-framing",
+ "triergon-isobmff",
+ "triergon-matroska",
+ "triergon-mpegts",
+ "triergon-subtitles",
+]
+
+[[package]]
 name = "triergon-capture"
 version = "0.0.0"
 dependencies = [

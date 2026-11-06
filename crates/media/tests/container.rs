@@ -118,7 +118,8 @@ fn matroska_packets_and_tracks_through_the_neutral_views() {
             ),
         ]
     );
-    let track = &ContainerReader::tracks(&reader)[0];
+    assert_eq!(reader.track_count(), 1);
+    let track = ContainerReader::track(&reader, 0).unwrap();
     assert_eq!((track.id(), track.kind()), (TrackId(7), MediaKind::Video));
     assert_eq!(
         (track.codec_tag(), track.configuration()),
