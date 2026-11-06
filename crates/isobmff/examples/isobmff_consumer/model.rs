@@ -17,12 +17,12 @@ use triergon_isobmff::{
     BoxEvent, BoxReader, BoxStep, BoxView, BuildStatus, EditList, FragmentBuilder, FragmentContext,
     FragmentIndex, ImplicitBase, Limits, MediaDataPolicy, Mov9CursorStatus,
     Mov9NativeGlobalSeekJob, Mov9NativeIndexCursor, Mov9NativeIndexLimits, Mov9NativeSeekLimits,
-    Mov9PacketCursor, Mov9PacketLimits, Mov9PartialSampleReader, Mov9PayloadBounds, Mov9Profile,
-    Mov9StreamView, Mov9Track, MovieHeader, MovieSeekClocks, MovieSeekLimits,
-    MovieSourceSeekContext, MovieSourceSeekPlanner, PinnedMovD32RegularRecoveryV1,
-    RecoveryDescriptions, RecoveryKind, RecoveryMappings, RecoveryScope, RecoverySyntax, Sample,
-    SampleReader, SampleStep, SampleTable, SampleTableBuilder, SampleTablePolicy, SourcePacket,
-    SourceTrack, TrackHeader, TrackSampleCursor, Trex,
+    Mov9PacketCursor, Mov9PacketLimits, Mov9PartialSampleReader, Mov9Profile, Mov9StreamView,
+    Mov9Track, MovieHeader, MovieSeekClocks, MovieSeekLimits, MovieSourceSeekContext,
+    MovieSourceSeekPlanner, PinnedMovD32RegularRecoveryV1, RecoveryDescriptions, RecoveryKind,
+    RecoveryMappings, RecoveryScope, RecoverySyntax, Sample, SampleReader, SampleStep, SampleTable,
+    SampleTableBuilder, SampleTablePolicy, SourcePacket, SourceTrack, TrackHeader,
+    TrackSampleCursor, Trex,
 };
 #[derive(Debug)]
 pub enum Failure {
@@ -625,19 +625,9 @@ impl<'a> Driver<'a> {
     }
 
     #[cold]
-    fn terminal_payload(&mut self, sample: Sample, declared: &Range<u64>) -> Result<Option<Bytes>> {
+    fn terminal_payload(&mut self, sample: Sample, declared: &Range<u64>) -> Result<Bytes> {
         let maximum = 16 * 1024 * 1024;
         let profile = PinnedMovD32RegularRecoveryV1;
-        if sample.range.start >= self.length {
-            Mov9PayloadBounds::from_source(
-                &sample,
-                declared.clone(),
-                self.length,
-                maximum,
-                profile,
-            )?;
-            return Ok(None);
-        }
         let mut reader = Mov9PartialSampleReader::new(
             &mut self.input,
             sample,
@@ -653,7 +643,7 @@ impl<'a> Driver<'a> {
             )? {
                 Step::Ready(packet) => {
                     debug_assert!(packet.bounds.incomplete_at_known_eof);
-                    return Ok(Some(packet.payload));
+                    return Ok(packet.payload);
                 }
                 Step::NeedInput(request) => self.supply(request)?,
                 Step::Yield => {}
@@ -892,10 +882,7 @@ impl<'a> Driver<'a> {
                     && item.source.require_within((*extent).clone()).is_ok()
             });
             let payload = if let Some(declared) = terminal {
-                let Some(payload) = self.terminal_payload(item.source, declared)? else {
-                    return Ok((reads, true));
-                };
-                payload
+                self.terminal_payload(item.source, declared)?
             } else {
                 self.packet(item.source, model.media.as_slice())?.payload
             };
