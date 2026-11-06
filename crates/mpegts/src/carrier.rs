@@ -9,6 +9,21 @@ use triergon_core::{
 };
 
 const STUFFING: [u8; 182] = [0xff; 182];
+pub(crate) const TS188_BYTES: usize = 188;
+pub(crate) const TS_PAYLOAD_START: usize = 4;
+pub(crate) const PLAIN_PAYLOAD_BYTES: usize = TS188_BYTES - TS_PAYLOAD_START;
+
+/// Header of a clear, payload-only continuation in a complete TS188 carrier.
+pub(crate) fn payload_only_continuation(ts: &[u8]) -> Option<(u16, u8)> {
+    let [0x47, high, low, control, ..] = ts else {
+        return None;
+    };
+    if high & 0xc0 != 0 || control & 0xf0 != 0x10 {
+        return None;
+    }
+    let pid = (u16::from(high & 31) << 8) | u16::from(*low);
+    Some((pid, control & 15))
+}
 
 struct CarrierHeader {
     pid: u16,

@@ -3,7 +3,7 @@
 //! Independently authored from H.222.0 source syntax and recorded public-API
 //! observations. Assembly consumes real input
 //! boundaries; no complete source/demux output is split, repeated or repaired.
-use crate::carrier::PlainContinuation;
+use crate::carrier::{PLAIN_PAYLOAD_BYTES, PlainContinuation, TS_PAYLOAD_START, TS188_BYTES};
 use crate::demux_clock::DemuxProfile;
 use crate::pes::{HEADER_MAX, parse_header};
 use crate::{
@@ -667,6 +667,27 @@ impl DemuxObserver {
         )
     }
 
+    fn accepts_plain_source(
+        &self,
+        source: &Bytes,
+        pid: u16,
+        entity: Option<SourceId>,
+        offset: u64,
+        context: NativeSourceContext,
+    ) -> bool {
+        self.validate_native_input(None).is_ok()
+            && !self.finite_private()
+            && source.belongs_to(&self.budget)
+            && self.pending.is_none()
+            && self.emission.is_none()
+            && !self.ended
+            && self.fault.is_none()
+            && pid == self.scope.pid
+            && entity == Some(self.scope.entity)
+            && context.epochs == self.scope.epochs
+            && self.follows_input(context, offset)
+    }
+
     pub(crate) fn append_plain_continuation(
         &mut self,
         packet: &mut PlainContinuation,
@@ -684,17 +705,13 @@ impl DemuxObserver {
         // Framing proved the layout, clear transport and nonempty payload.
         // The observer still checks its own binding, order and arena capacity.
         if !self.ready_body(counter, next)
-            || self.validate_native_input(None).is_err()
-            || self.finite_private()
-            || !source.belongs_to(&self.budget)
-            || self.pending.is_some()
-            || self.emission.is_some()
-            || self.ended
-            || self.fault.is_some()
-            || packet.pid() != self.scope.pid
-            || packet.entity != Some(self.scope.entity)
-            || context.epochs != self.scope.epochs
-            || !self.follows_input(context, packet.offset)
+            || !self.accepts_plain_source(
+                source,
+                packet.pid(),
+                packet.entity,
+                packet.offset,
+                context,
+            )
             || packet.offset.checked_add(source.len() as u64).is_none()
             || cancel.load(Ordering::Relaxed)
             || !work.try_charge(2)
@@ -728,6 +745,78 @@ impl DemuxObserver {
         )
     }
 
+    /// A run stops before a completion or arena growth. The ordinary observer
+    /// owns publication and any resumable reservation.
+    pub(crate) fn payload_run_capacity(
+        &self,
+        source: &Bytes,
+        pid: u16,
+        counter: u8,
+        start: SourceLocation,
+        context: NativeSourceContext,
+    ) -> usize {
+        if !self.ready_body(counter, self.payload_len + PLAIN_PAYLOAD_BYTES)
+            || !self.accepts_plain_source(source, pid, Some(start.source), start.offset, context)
+        {
+            return 0;
+        }
+        let limit = self
+            .body_limit
+            .map_or(DEFAULT_NATIVE_PACKET_CAP - 1, |end| {
+                end.saturating_sub(1).min(DEFAULT_NATIVE_PACKET_CAP - 1)
+            })
+            .min(self.limits.pes_bytes - self.header_used);
+        let slots = self.spans.capacity().min(self.limits.source_spans) - self.spans.len();
+        (limit.saturating_sub(self.payload_len) / PLAIN_PAYLOAD_BYTES).min(slots)
+    }
+
+    /// Commit preflighted carriers from one shared window. The arena already
+    /// has room for every span and the caller has checked the final ordinal.
+    pub(crate) fn append_payload_run(
+        &mut self,
+        bytes: &Bytes,
+        start: SourceLocation,
+        context: NativeSourceContext,
+        first_counter: u8,
+    ) -> Result<()> {
+        let count = bytes.len() / TS188_BYTES;
+        debug_assert!(count >= 2 && bytes.len().is_multiple_of(TS188_BYTES));
+        debug_assert!(self.spans.len() + count <= self.spans.capacity());
+        for index in 0..count {
+            let at = index * TS188_BYTES;
+            let offset = start.offset + at as u64;
+            self.spans
+                .try_push(NativePesSpan {
+                    bytes: bytes.slice(at + TS_PAYLOAD_START..at + TS188_BYTES)?,
+                    source: SourceRange {
+                        entity: start.source,
+                        offset: offset + TS_PAYLOAD_START as u64,
+                        bytes: PLAIN_PAYLOAD_BYTES,
+                    },
+                    transport: SourceRange {
+                        entity: start.source,
+                        offset,
+                        bytes: TS188_BYTES,
+                    },
+                    context: NativeSourceContext {
+                        source_event_ordinal: context.source_event_ordinal + 2 * index as u64,
+                        ..context
+                    },
+                })
+                .map_err(|error| error.error)?;
+        }
+        let last = (count - 1) as u64;
+        self.record_ready_body(
+            (
+                context.source_event_ordinal + 2 * last,
+                start.offset + last * TS188_BYTES as u64,
+            ),
+            first_counter.wrapping_add(last as u8) & 15,
+            self.payload_len + count * PLAIN_PAYLOAD_BYTES,
+        );
+        Ok(())
+    }
+
     fn append_ready_span(
         &mut self,
         span: NativePesSpan,
@@ -736,15 +825,19 @@ impl DemuxObserver {
     ) -> Result<ReadyContinuation> {
         let position = (span.context.source_event_ordinal, span.transport.offset);
         self.spans.try_push(span).map_err(|error| error.error)?;
-        self.last_input = Some(position);
-        self.entity_first = false;
-        self.previous_counter = Some(counter);
-        self.payload_len = next;
+        self.record_ready_body(position, counter, next);
         Ok(if self.body_limit == Some(next) {
             ReadyContinuation::Complete
         } else {
             ReadyContinuation::Buffered
         })
+    }
+
+    fn record_ready_body(&mut self, position: (u64, u64), counter: u8, next: usize) {
+        self.last_input = Some(position);
+        self.entity_first = false;
+        self.previous_counter = Some(counter);
+        self.payload_len = next;
     }
     pub(crate) fn transport_bounds(packet: &TransportPacket) -> Result<()> {
         let prefix = packet.prefix.as_ref().map_or(0, Bytes::len);

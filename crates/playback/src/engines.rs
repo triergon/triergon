@@ -24,7 +24,7 @@ use triergon_matroska::{
     typed::{Event as MkvEvent, Reader},
 };
 use triergon_mpegts::{
-    self as ts, FeedContinuation, TraceEvent, TransportStream,
+    self as ts, FeedContinuation, FeedItem, TraceEvent, TransportStream,
     clock::{ClockKey, SourceTimePolicy, SourceTimestamp, source_timestamp},
 };
 use ts::compat::pes::{
@@ -1743,11 +1743,40 @@ impl TsEngine {
         let active = &mut self.native_active;
         let ordinal = self.event_ordinal;
         let suppressed = self.suppressed_events;
-        self.stream.poll_feed_carriers(
+        self.stream.poll_feed_with_payload_runs(
             &mut self.input,
             work,
             cancel,
-            &mut |packet, omitted, epochs, work| {
+            &mut |item, omitted, epochs, work| {
+                let packet = match item {
+                    FeedItem::Carrier(packet) => packet,
+                    FeedItem::PayloadRun(run) => {
+                        // Leave the carrier that triggers a yield to the
+                        // ordinary path, including its deferred continuity event.
+                        let maximum = (Self::FEED_EVENT_QUANTUM - 1)
+                            .saturating_sub(suppressed.saturating_add(omitted))
+                            .div_ceil(2) as usize;
+                        if maximum >= 2
+                            && active.is_none()
+                            && let Some(source_event_ordinal) = ordinal.checked_add(omitted)
+                            && let Some(index) = tracks.index(run.pid())
+                            && let Some(observer) = tracks.as_mut_slice()[index].observer.as_mut()
+                            && run.append_ready(
+                                observer,
+                                NativeSourceContext {
+                                    source_event_ordinal,
+                                    epochs,
+                                    byte_run_epoch: None,
+                                },
+                                maximum,
+                                work,
+                            )?
+                        {
+                            return Ok(FeedContinuation::Buffered);
+                        }
+                        return Ok(FeedContinuation::Emit);
+                    }
+                };
                 // Leave one unit for event consumption in addition to native append.
                 if work.remaining() < 3 {
                     return Ok(FeedContinuation::Emit);
