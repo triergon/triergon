@@ -1,5 +1,4 @@
-//! Additional independent retention/control draft. Not part of the frozen
-//! 111-test runtime-red checkpoint; parent queues it separately when released.
+//! Additional independent retention/control tests.
 #![forbid(unsafe_code)]
 use std::sync::atomic::AtomicBool;
 use triergon_core::{Budget, Bytes, Error, SourceId, Time, WorkBudget};

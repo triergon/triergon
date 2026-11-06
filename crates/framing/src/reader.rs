@@ -150,8 +150,7 @@ enum Phase {
 ///
 /// Length-prefixed NALs reserve their declared length once. Annex-B NALs reserve
 /// `maximum_nal_bytes` once because their length is not known in advance. This
-/// deliberate first-slice tradeoff prevents hidden vector-growth copies and is
-/// not a memory/performance qualification. Output clones retain that capacity.
+/// deliberate tradeoff prevents hidden vector-growth copies. Output clones retain that capacity.
 pub struct NalReader {
     cursor: InputCursor,
     codec: Codec,

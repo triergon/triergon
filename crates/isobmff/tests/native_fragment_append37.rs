@@ -1,5 +1,4 @@
-//! Literal v36 C34 index tuples and independent original source facts.
-//! All12 existing inputs/oracles and all143 older assertions remain unchanged.
+//! Literal native index tuples and independent source facts.
 mod common;
 #[path = "support/native34.rs"]
 mod support;

@@ -1,5 +1,4 @@
-//! Runtime contracts for the additive typed reader. The first checkpoint keeps
-//! the existing envelope bridge so the missing typed operations fail at runtime.
+//! Runtime contracts for the typed reader.
 use std::sync::atomic::AtomicBool;
 use triergon_core::Step;
 use triergon_core::{

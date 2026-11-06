@@ -1035,7 +1035,7 @@ impl RetainedAvcConfigArray {
     }
 }
 
-/// Additive compact output from the exact same checked Count/Reserve/Fill walk.
+/// Compact output from the exact same checked Count/Reserve/Fill walk.
 pub struct AvcConfigViewParser {
     inner: AvcParser<CompactAvc>,
 }

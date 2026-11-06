@@ -279,7 +279,7 @@ fn run(raw: &[u8], quantum: u64) -> Result<String> {
         format!("{{\"packet\":{packet},\"reset_before\":{},\"known\":{},\"pts_raw\":{},\"payload_hex\":\"{}\"}}", record.reset, record.known != 0, record.pts, hex(record.bytes))
     }).collect::<Vec<_>>();
     if input_refusal {
-        // C3 rejects this outer input before opening a decoder. Preserve source
+        // The input policy rejects this outer input before opening a decoder. Preserve source
         // facts, but do not receive packets, finish input, or fabricate a drain.
         return Ok(format!(
             "{{\"private_hex\":\"{}\",\"timebase\":[{},{}],\"source_packets\":[{}],\"events\":[],\"extended_source\":[],\"decode_calls\":[],\"drain_calls\":[],\"fragment_dispositions\":[],\"incomplete_at_end\":null,\"source_rejections\":[],\"source_program_complete\":false,\"modeled_protocol_input_refusal\":true,\"errors\":[],\"C3_reference_adoption_pending\":true,\"full_decoder_qualification\":false}}",

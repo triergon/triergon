@@ -1,4 +1,4 @@
-//! Original isolated semantic view, frozen before Linux793. No C layout/FFI.
+//! Isolated semantic view. No C layout/FFI.
 use std::io::{self, Write};
 use triergon_framing::{DtsCoreField as F, DtsCoreHeader, DtsInspection};
 

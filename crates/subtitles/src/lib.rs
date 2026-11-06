@@ -1,9 +1,8 @@
-//! Independent bounded subtitle primitives. Experimental and unqualified.
+//! Independent bounded subtitle primitives. Experimental.
 //!
 //! DVB interlaced rasterization, selected method-0 display state and explicit
 //! source-colour projections, plus bounded strict text source-ingestion profiles.
-//! Full subtitle parity and presentation scheduling remain outside these
-//! unqualified slices.
+//! Full subtitle parity and presentation scheduling are out of scope.
 #![forbid(unsafe_code)]
 
 pub mod dvb;

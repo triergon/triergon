@@ -1,5 +1,5 @@
 //! Original resumable document carriage. Raw source Input stays untouched.
-//! Native compatibility is checked against actual frozen rows, never by a
+//! Native compatibility is checked against native reference rows, never by a
 //! post-output text/time/colour normalization step.
 use super::clock::{Flavor, timing};
 use super::native_read::LineRead;

@@ -1,5 +1,5 @@
-//! Private retained jobs behind the additive typed Matroska reader.
-//! Intended as a child of matroska. All transport/storage/time use shared core.
+//! Private retained jobs behind the typed Matroska reader.
+//! All transport/storage/time use shared core.
 pub(crate) mod blocking;
 pub(crate) mod colour;
 pub(crate) mod configuration;

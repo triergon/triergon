@@ -1,8 +1,6 @@
-// Independent additive public-API controls. Append inside the seek-window test
-// module, which owns fixture/source/facts/policy_cases. No new production API.
-// Expected classes follow the existing finite-file and scan-limit contracts;
-// actual baseline execution is still required. Do not treat an authoring or
-// setup failure as production RED, and preserve every original failure.
+// Independent public-API controls, included inside the seek-window test module,
+// which owns fixture/source/facts/policy_cases. Expected classes follow the
+// existing finite-file and scan-limit contracts.
 
 #[test]
 fn seek_window_extra_truncated_seek_keeps_error_and_old_output_owner() {
@@ -53,7 +51,7 @@ fn seek_window_extra_scan_limit_keeps_refusal_and_retained_output() {
             let base = pool.used();
             let cancel = Arc::new(AtomicBool::new(false));
             let (input, log, _mode) = source(raw.to_vec(), chunk, &pool, &cancel);
-            // This frozen fixture opens within 4KiB; reaching the selected later
+            // This fixture opens within 4KiB; reaching the selected later
             // replay boundary requires more than 4KiB of seek validation/state.
             let limits = Limits {
                 scan_bytes: 4096,

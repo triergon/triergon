@@ -1,5 +1,3 @@
-// Original regression definitions authored before the interleave implementation.
-// Publication and execution are parent-queue controlled.
 mod common;
 use common::{child, fixtures::CASES};
 use std::sync::atomic::{AtomicBool, Ordering};

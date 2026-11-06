@@ -1,4 +1,4 @@
-//! Bounded MP4 diagnostic consumer; full release qualification remains open.
+//! Bounded MP4 diagnostic consumer.
 //! Existing core owns input, resource charges, ranges and exact clocks.
 #![forbid(unsafe_code)]
 #[path = "isobmff_consumer/model.rs"]

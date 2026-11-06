@@ -1,5 +1,4 @@
 //! Bounded NAL/OBU framing, AV1/VP9 records and AC-3/E-AC-3 source facts.
-//! These development slices are not qualified O21.
 //!
 //! The fixed NAL reader preserves encoded bytes and source coordinates.
 //! The raw reader groups NALs using access-unit boundary syntax. A separate
@@ -186,7 +185,7 @@ pub use nal_observed_config::{
     NalObservedHevcConfigParser, NalObservedHevcConfiguration,
 };
 
-// Additive product-facing compact configuration inspection and retained exports.
+// Compact configuration inspection and retained exports.
 pub use avc_config::{
     AvcConfigArrayRef, AvcConfigNalRef, AvcConfigViewParser, AvcConfigurationView,
     RetainedAvcConfigArray, RetainedAvcConfigNal,

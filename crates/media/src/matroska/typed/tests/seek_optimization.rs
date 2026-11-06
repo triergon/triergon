@@ -1,4 +1,4 @@
-//! Original runtime guards. Baseline-compatible: no new optimization API used.
+//! Runtime guards that use no optimization-specific API.
 use super::*;
 use crate::incremental::{ElementEvent, ElementReader};
 use crate::matroska::typed::epoch::{EpochRestoreJob, EpochTarget};

@@ -1,5 +1,5 @@
-//! Original source assertions precede the native-index seam. Native tuples are
-//! literal C34 observations from v35; no fixture or existing gold was changed.
+//! Source assertions precede the native-index seam. Native tuples are
+//! literal native observations.
 mod common;
 #[path = "support/native34.rs"]
 mod support;

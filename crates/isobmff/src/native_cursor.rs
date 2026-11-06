@@ -2,11 +2,10 @@
 //!
 //! Source grammar/clocks come from the independent source indexes. Selection,
 //! regular raw32 clock projection and fragment bit4 are separate observation
-//! rules, challenged by the original, first42 and follow-up39 native captures.
-//! The cp18 native30 controls additionally challenge signed-raw fragment CTO
+//! rules, checked against native captures, including signed-raw fragment CTO
 //! compensation and explicit complete-source/predecessor origin derivation.
-//! The native4 plus run-partition discriminator refute the lifetime-maximum
-//! extrapolation: bit4 uses the previous run's tail, frozen while appending a run.
+//! bit4 uses the previous run's tail, not a lifetime maximum, frozen while
+//! appending a run.
 //! No native implementation code, expanded sample array, I/O or payload storage.
 use crate::{
     EditList, FragmentIndex, Mov9CursorStatus, Mov9DurationBasis, Mov9EditCursor, Mov9EditLimits,

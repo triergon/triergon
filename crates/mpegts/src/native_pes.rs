@@ -1,7 +1,7 @@
 //! Explicit archived-native packet operation, separate from strict source PES.
 //!
 //! Independently authored from H.222.0 source syntax and archived public-API
-//! observations, after parent-observed runtime red. Assembly consumes real input
+//! observations. Assembly consumes real input
 //! boundaries; no complete source/native output is split, repeated or repaired.
 use crate::clock::NativeClockProfile;
 use crate::pes::{HEADER_MAX, parse_header};
@@ -223,7 +223,7 @@ pub struct NativePesObserver {
     fault: Option<Error>,
 }
 impl NativePesObserver {
-    /// Explicit registered carriage, implemented after parent-observed runtime RED.
+    /// Explicit registered carriage.
     /// All selected kinds share the existing bounded charged assembly.
     /// Preflight is allocation-free; no source bytes, times or epochs are altered.
     pub fn new_registered(

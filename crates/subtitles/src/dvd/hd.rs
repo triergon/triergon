@@ -339,7 +339,7 @@ pub struct HdFacts {
 }
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub enum HdPolicy {
-    /// Frozen-v4 constructor profile, retained for callers of `new`.
+    /// Default constructor profile, used by `new`.
     #[default]
     StrictEightBit,
     /// Strict source decoding with either the four-entry or eight-bit grammar.
@@ -555,7 +555,7 @@ enum Phase {
     Finished,
 }
 /// Owned source decoding with explicit strict/fresh-native profiles. `new`
-/// retains the frozen eight-bit profile. Strict accepts either pixel grammar;
+/// uses the strict eight-bit profile. Strict accepts either pixel grammar;
 /// NativeD32 validates every eligible multi-row raster in control order and
 /// keeps the last native candidate. Original source bytes and errors survive.
 #[derive(Debug)]

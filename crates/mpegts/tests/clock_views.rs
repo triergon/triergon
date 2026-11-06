@@ -1,4 +1,4 @@
-//! Red-first clock regressions. Parent executes before any clock implementation.
+//! Clock regressions.
 //! Source facts and archived native expectations are asserted separately.
 use std::sync::atomic::{AtomicBool, Ordering};
 use triergon_core::{
@@ -319,7 +319,7 @@ fn out_of_range_raw33_is_rejected_instead_of_masked() {
     );
 }
 
-// Exact original native values: source/stdout identities are in the lane receipt.
+// Exact native values.
 #[test]
 fn archived_native_forward_wrap_keeps_source_pts_raw_and_dts_absent() {
     check_native(

@@ -1,4 +1,4 @@
-//! Original source/native state regressions, authored before the receiver fix.
+//! Source/native state regressions.
 #![forbid(unsafe_code)]
 use std::sync::atomic::AtomicBool;
 use triergon_core::{Budget, Bytes, Time, WorkBudget};

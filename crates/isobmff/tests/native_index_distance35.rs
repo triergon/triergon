@@ -1,5 +1,4 @@
-//! Literal native34 C34 index observations, with independent source assertions.
-//! The existing fixtures and all native34 gold remain unchanged.
+//! Literal native index observations, with independent source assertions.
 mod common;
 #[path = "support/native34.rs"]
 mod support;
@@ -80,7 +79,7 @@ fn one_trun_counts_each_nonkey_after_the_key_without_a_flag_presence_lag() {
                 12
             );
         }
-        // C34 actual native-index/105-{ordinary,tiny}-reference.stdout.
+        // Native reference output native-index/105-{ordinary,tiny}.
         let actual: Vec<_> = rows.iter().map(|row| row.min_distance).collect();
         assert_eq!(actual, [0, 1, 2, 0, 1, 2]);
     }
@@ -113,7 +112,7 @@ fn one_trun_distance_is_independent_for_each_track_and_native_null_clock() {
                 assert_eq!(rows[0].occurrence.native.dts, None);
                 assert_eq!(rows[0].occurrence.native.dts_field.signed_ticks(), i64::MIN);
             }
-            // C34 actual native-index/223-{ordinary,tiny}-reference.stdout.
+            // Native reference output native-index/223-{ordinary,tiny}.
             let actual: Vec<_> = rows.iter().map(|row| row.min_distance).collect();
             assert_eq!(actual, [0, 1, 2, 0, 1, 2]);
         }
@@ -138,7 +137,7 @@ fn one_trun_distance_keeps_unsigned_source_dts_and_signed_cts_at_native_sentinel
         assert_eq!(rows[0].occurrence.native.dts, None);
         assert_eq!(rows[0].occurrence.native.pts, Some(i64::MIN + 1));
         assert_eq!(rows[0].timestamp, i64::MIN);
-        // C34 actual native-index/220-{ordinary,tiny}-reference.stdout.
+        // Native reference output native-index/220-{ordinary,tiny}.
         let actual: Vec<_> = rows.iter().map(|row| row.min_distance).collect();
         assert_eq!(actual, [0, 1, 2, 0, 1, 2]);
     }
@@ -173,7 +172,7 @@ fn split_trun_append_keeps_original_distance_and_unknown_source_clock_gold() {
                     ));
                 }
             }
-            // Existing native34 gold and actual native-index/026-reference.
+            // Native reference output native-index/026.
             let actual: Vec<_> = rows.iter().map(|row| row.min_distance).collect();
             assert_eq!(actual, [0, 0, 1, 0, 0, 1]);
         }

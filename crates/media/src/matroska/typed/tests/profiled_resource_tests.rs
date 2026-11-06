@@ -1,5 +1,4 @@
-//! Resource/progress guards for the observed d288 performance failures.
-//! This file is private/unexecuted until the parent publishes tests alone.
+//! Resource/progress guards for observed performance failures.
 use super::*;
 use crate::{
     Error, Limits,

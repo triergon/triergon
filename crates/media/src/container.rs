@@ -1,4 +1,4 @@
-//! The Matroska reader through the neutral container model (ADR-0003).
+//! The Matroska reader through the neutral container model.
 //!
 //! Packet times are nanoseconds (Matroska's TimestampScale is already applied),
 //! DTS stays `None` because Matroska carries none, and random access follows

@@ -240,10 +240,9 @@ impl NativePalettePlan {
     }
 }
 
-/// Original observed D32 encoded-colour view. Independently quantizing the
-/// primary studio inverse to10 fractional bits supplied this candidate; all
-/// 16,777,216 fullY/Cr/Cb triples were then compared with frozen public-API raw
-/// palettes. This is neither normative rounding nor a change to source views.
+/// Observed D32 encoded-colour view: the primary studio inverse quantized to
+/// 10 fractional bits, matching the public-API raw palettes on all 16,777,216
+/// full Y/Cr/Cb triples. This is neither normative rounding nor a change to source views.
 fn encoded_rgba(source: ColourSource) -> Result<[u8; 4]> {
     let ColourSource::YCrCbT {
         y,

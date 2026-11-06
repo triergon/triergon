@@ -1,4 +1,4 @@
-//! Version1 hvcC source-wire facts under the owner's licensed-inference contract.
+//! Version1 hvcC source-wire facts.
 //! Raw syntax, fixed NAL headers and bounded extents; no RBSP/decoder certificate.
 use crate::{BuildStep, Codec, LengthSize, NalHeader};
 use std::{
@@ -1180,7 +1180,7 @@ impl RetainedHvcConfigArray {
     }
 }
 
-/// Additive view output using the unchanged hvcC Scan/Event transitions.
+/// View output using the same hvcC Scan/Event transitions.
 pub struct HvcConfigViewParser {
     inner: HvcParser<CompactHvc>,
 }

@@ -300,8 +300,7 @@ impl Mov9DependencyViewV4 {
     }
     /// Only the separate V4 edit-plan view uses this hint after checking its
     /// source/group context. It does not reinterpret source leading/key facts.
-    /// The frozen V4 corpus retains 128 actual native control observations;
-    /// source reserved values remain refused by V4 and distinct in V5.
+    /// Source reserved values remain refused by V4 and distinct in V5.
     pub fn native_disposable_hint(self) -> bool {
         self.depended_on == Mov9DependedOnV4::Unreferenced
     }

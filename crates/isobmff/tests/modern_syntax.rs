@@ -1,7 +1,6 @@
-// Original tiny wire fixtures and hand-authored facts, checked by an independent
-// Python wire oracle before production changes. Provenance and exact hashes:
-// .research/parallel-mp4/implementation/modern-syntax-vectors/manifest.json
-// Full brand/codec/presentation conformance and native parity remain unqualified.
+// Tiny wire fixtures and hand-authored facts, checked by an independent
+// Python wire oracle. Full brand/codec/presentation conformance and native
+// parity are not covered here.
 mod common;
 use triergon_core::{Budget, Error, WorkBudget};
 use triergon_isobmff::{

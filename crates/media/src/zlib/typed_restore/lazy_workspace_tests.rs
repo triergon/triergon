@@ -1,4 +1,4 @@
-//! Parent-executed resource/progress guards; no native or compiler ran here.
+//! Resource/progress guards.
 use super::*;
 use crate::matroska::typed::usage::{Owner, Storage};
 

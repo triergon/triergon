@@ -156,7 +156,7 @@ impl SeekPlanJob {
                     }
                 }
                 Phase::Clock => {
-                    // Preserve the frozen checked i64 target view. Exact rescale
+                    // Preserve the checked i64 target view. Exact rescale
                     // itself uses core Time/TimeBase, including negative floor.
                     self.target = i64::try_from(i128::from(self.requested) - i128::from(self.roll))
                         .map_err(|_| Error::Overflow)?;

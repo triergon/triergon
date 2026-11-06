@@ -1,6 +1,6 @@
 //! Independent bounded ISO-derived MOV/MP4 syntax and source sample indexes.
 //!
-//! Experimental seam, not a complete demuxer or a qualified M03 implementation.
+//! Experimental seam, not a complete demuxer.
 //! Receives charged metadata bytes and absolute coordinates from the shared core;
 //! owns no I/O, transport tokens, allocator, codec adaptation or presentation clock.
 #![forbid(unsafe_code)]

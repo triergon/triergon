@@ -1,6 +1,6 @@
 //! Primary-source colour facts and an explicitly named integer projection.
 //! EN300743 7.2.4/10.1-10.3; BT.601-7 studio coding. No reference-code port.
-//! General native equality is unqualified; source facts remain independent.
+//! General native equality is unverified; source facts remain independent.
 use super::Depth;
 use triergon_core::{Bytes, Error, Result};
 

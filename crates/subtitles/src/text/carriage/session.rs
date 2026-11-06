@@ -1,5 +1,4 @@
-//! Original bounded carriage candidate. The runtime-red src/session.rs remains
-//! active until the parent records its failures against the frozen tests.
+//! Bounded carriage session.
 use super::document::Document;
 use super::{CallerClock, Limits, Operation, Packet, Snapshot, Status, Stream};
 use crate::text::{Format, Input};

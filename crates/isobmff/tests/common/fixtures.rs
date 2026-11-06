@@ -1,5 +1,5 @@
-// Original authored inputs and independent Fraction-oracle expectations.
-// Generated as test data before production syntax/index code; not executed by a build script.
+// Authored inputs and independent Fraction-oracle expectations.
+// Test data; not executed by a build script.
 #[derive(Debug)]
 pub struct Expected {
     pub track: u32,

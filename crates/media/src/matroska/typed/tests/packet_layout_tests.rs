@@ -1,4 +1,4 @@
-//! Parent-executed packet-layout guards; authored before the private changes.
+//! Packet-layout guards.
 use super::*;
 use crate::{Error, Limits};
 use std::mem::size_of;

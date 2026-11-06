@@ -1,5 +1,5 @@
-//! Public-API guards compile against v3: pointer/budget sharing must be actual
-//! runtime RED there. No new validation API or expected-input lookup is used.
+//! Public-API guards for pointer/budget sharing. No validation API or
+//! expected-input lookup is used.
 use std::sync::atomic::{AtomicBool, Ordering};
 use triergon_core::{Budget, Bytes, Error, TimeBase, WorkBudget};
 use triergon_subtitles::pgs::{

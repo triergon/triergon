@@ -101,7 +101,7 @@ impl PacketProjection for LegacyProjection {
             Event::Document(document) => LegacyEvent::Document(document),
             Event::Seek(receipt) => LegacyEvent::Seek(receipt),
             // Keep the complete fallback publication alive through Reader's
-            // successful coverage commit. The old legacy refusal stays at the
+            // successful coverage commit. The legacy refusal stays at the
             // blocking boundary, after that commit, with the same owners.
             Event::Packet(packet) => LegacyEvent::FullPacket(packet),
         })
@@ -203,7 +203,7 @@ impl PacketProjection for ScanProjection {
         limits: Limits,
         pool: &Budget,
     ) -> Result<SimplePacketJob> {
-        // This is the former typed validation/snapshot path, including rare
+        // This is the typed validation/snapshot path, including rare
         // encoded/group promotion. Do not substitute legacy refusal semantics.
         TypedProjection::simple(source, cluster_ticks, scale, configuration, limits, pool)
     }

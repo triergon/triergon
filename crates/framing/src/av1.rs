@@ -1,4 +1,4 @@
-//! AV1 v1.0.0 Errata 1 framing facts, independently authored from the approved
+//! AV1 v1.0.0 Errata 1 framing facts, independently written from the
 //! specification. OBU payloads remain opaque; no operating-point filtering,
 //! trailing-bit removal, frame assembly, decoding or decoder-validity claim.
 use std::sync::atomic::{AtomicBool, Ordering};

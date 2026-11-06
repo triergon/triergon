@@ -80,8 +80,6 @@ fn sourced_absolute_base_fragments_match_independent_source_facts() {
 #[test]
 fn selected_draft_signed_trun_preserves_frozen_source_and_raw_bits() {
     // Experimental field support from FDAM3 and MPEG contribution Original.
-    // Final normative acquisition remains open. Preserve the frozen authored
-    // bytes/expectations and the earlier actual unsupported receipts.
     let case = CASES.iter().find(|c| c.name == "f-ctts-v1").unwrap();
     let budget = Budget::new(1024 * 1024).unwrap();
     let top = common::roots(&budget, case.bytes).unwrap();
@@ -154,8 +152,6 @@ fn selected_draft_signed_trun_preserves_frozen_source_and_raw_bits() {
 
 #[test]
 fn required_moof_relative_fragment_preserves_frozen_source_ranges_and_tfdt() {
-    // Retain original f-explicit bytes and independently authored expectations.
-    // Parent observed the old tfhd flag refusal before the production fix.
     // This tests extracted fragment syntax, not whole-file brand conformance.
     let case = CASES.iter().find(|c| c.name == "f-explicit").unwrap();
     for quantum in [1, 4096] {

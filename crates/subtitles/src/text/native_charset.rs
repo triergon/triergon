@@ -39,8 +39,8 @@ pub fn receiver_charset(label: &[u8]) -> Result<Charset> {
     }
     Err(Error::Unsupported("captured receiver charset label"))
 }
-/// Explicit receiver v2 adds the evidenced GNU EUC-KR A2E8 mapping. The
-/// original resolver and constructor retain their v1 repertoire/refusals.
+/// Explicit receiver v2 adds the observed GNU EUC-KR A2E8 mapping. The
+/// v1 resolver and constructor keep their repertoire/refusals.
 pub fn receiver_charset_v2(label: &[u8]) -> Result<Charset> {
     if label.eq_ignore_ascii_case(b"euc-kr") {
         Ok(Charset::Multibyte(M::ReceiverEucKrGlibc239))

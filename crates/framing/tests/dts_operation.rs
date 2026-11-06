@@ -1,4 +1,4 @@
-//! Additive operation guards. Baseline compilation RED must be collected on Linux.
+//! Operation guards.
 use std::sync::atomic::{AtomicBool, Ordering};
 use triergon_core::{Budget, Bytes, Error, InputWindow, SourceCapabilities, SourceId, WorkBudget};
 use triergon_framing::{

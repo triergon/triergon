@@ -1,4 +1,4 @@
-//! Authored format-job regressions behind the additive typed reader.
+//! Format-job regressions behind the typed reader.
 mod cue_reference_closure;
 mod packet_side_data;
 use super::*;
@@ -202,8 +202,8 @@ fn encoding(scope: u64) -> Vec<u8> {
         ),
     )
 }
-// Only this fixture seed uses the frozen blocking parser. Packet-job tests must
-// not rely on the new raw Tracks builder to provide their independent oracle.
+// Only this fixture seed uses the blocking parser. Packet-job tests must
+// not rely on the raw Tracks builder to provide their independent oracle.
 fn seed_configuration(pool: &Budget, extra: &[u8]) -> configuration::Configuration {
     seed_configuration_tracks(pool, &element(0xae, &track_entry(1, 1, extra)))
 }
@@ -564,7 +564,7 @@ fn raw_tracks_job_keeps_late_duplicate_and_decoded_private_limits_atomic() {
                 other => panic!("invalid Tracks published: {other:?}"),
             }
         }
-        // The frozen private decoder may reject its output cap before the final
+        // The private decoder may reject its output cap before the final
         // retained-capacity check; both are explicit permanent policy failures.
         if message == "decoded private metadata" {
             assert!(matches!(error, Some(crate::Error::Policy(_))));

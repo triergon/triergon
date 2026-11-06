@@ -106,8 +106,8 @@ pub struct ConfigJob {
     failed: Option<Error>,
 }
 impl ConfigJob {
-    /// Additive timed-text string grammar: UTF8 or FEFF-prefixed UTF16BE fonts.
-    /// The original constructor retains its UTF8-only font-name contract.
+    /// Timed-text string grammar: UTF8 or FEFF-prefixed UTF16BE fonts.
+    /// The default constructor keeps its UTF8-only font-name contract.
     pub fn new_unicode_fonts(
         raw: &Bytes,
         layout: ConfigLayout,

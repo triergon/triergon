@@ -1,4 +1,4 @@
-//! First activation uses ONLY today's public API. These authored opaque payloads
+//! Uses only the public API. These authored opaque payloads
 //! establish Matroska wire/transaction behavior, not compressed-codec validity.
 use std::{io::Cursor, sync::atomic::AtomicBool};
 use triergon_core::Step;

@@ -1,4 +1,4 @@
-//! Original source-window contracts, authored before the implementation.
+//! Source-window contracts.
 use super::*;
 use std::{io::Cursor, sync::atomic::Ordering};
 use triergon_core::{Budget, OwnedInputBytes, SourceCapabilities, SourceId};

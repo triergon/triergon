@@ -1,4 +1,3 @@
-//! Tests authored before the raster implementation. Execution belongs to the parent.
 //! Expected planes are copied from an independent original source-art oracle.
 #![forbid(unsafe_code)]
 

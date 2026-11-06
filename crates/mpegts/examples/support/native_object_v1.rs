@@ -193,7 +193,7 @@ impl ObjectAdapter {
                 let Some(body) = p.payload.as_ref() else {
                     return Ok(false);
                 };
-                // The frozen worker's object includes every native program. A
+                // The native worker's object includes every native program. A
                 // selected-source map cannot stand in for another program or SI.
                 if p.pid != 0
                     && p.pid < 0x20

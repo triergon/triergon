@@ -1,11 +1,11 @@
 //! Single-program MPEG-TS writer (ITU-T H.222.0 | ISO/IEC 13818-1) for one
 //! video elementary stream, plus a DVB SDT (ETSI EN 300 468).
 //!
-//! Cadence and layout follow the frozen contract (`mux` in
-//! harness/capture/contract.json): every picture is one PES whose first TS
-//! packet carries a PCR equal to DTS·300 (and the random-access indicator on
-//! key pictures); SDT/PAT/PMT precede a PES when their period elapsed in PCR
-//! time, PAT/PMT also before a key picture following a non-key picture.
+//! Cadence and layout follow the `mux` contract in `harness/capture/contract.json`:
+//! every picture is one PES whose first TS packet carries a PCR equal to DTS·300
+//! (and the random-access indicator on key pictures); SDT/PAT/PMT precede a PES
+//! when their period elapsed in PCR time, PAT/PMT also before a key picture
+//! following a non-key picture.
 
 use crate::psi::PsiCrc32;
 use triergon_core::{Error, Result};
@@ -273,8 +273,8 @@ mod tests {
     }
 
     /// Section bytes (after the pointer field) observed from the FFmpeg 9.0.2
-    /// reference (contract.json):
-    /// identical apart from the declared stream_type (D2) and names (D3).
+    /// reference:
+    /// identical apart from the declared stream_type and names.
     #[test]
     fn tables_match_observed_layout() {
         let ffmpeg = MuxConfig {

@@ -1,5 +1,4 @@
-//! Original EN 300 468 6.2.41 regressions, authored before this batch's code.
-//! Parent owns all execution. D0 fixture bodies remain opaque M05 input.
+//! EN 300 468 6.2.41 regressions. D0 fixture bodies remain opaque subtitle input.
 use std::sync::atomic::{AtomicBool, Ordering};
 use triergon_core::{
     Budget, Bytes, Error, InputCursor, InputWindow, SourceCapabilities, SourceId, Step, WorkBudget,
@@ -563,6 +562,7 @@ fn six_d0_carriers_keep_pes_envelopes_raw33_absent_dts_and_service_epochs() {
                 &source[range.offset as usize..range.offset as usize + range.bytes]
             );
         }
-        // Even malformed inner segments are opaque here: M05 owns their diagnosis.
+        // Even malformed inner segments are opaque here: the subtitle decoder
+        // owns their diagnosis.
     }
 }

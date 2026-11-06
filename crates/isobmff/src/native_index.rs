@@ -78,7 +78,7 @@ impl RunCarry {
                 if current_native <= previous_native {
                     return false;
                 }
-                // Native27 missing-tfdt entries retain unknown source times.
+                // Missing-tfdt entries retain unknown source times.
                 // Accept only the existing explicit predecessor witness, tied
                 // to this exact previous sample/duration and representable clocks.
                 match current.clock_origin {
@@ -224,7 +224,7 @@ impl<'a> Mov9NativeIndexCursor<'a> {
                 }
                 let key = occurrence.native.flags & 1 != 0;
                 let run = source_run.map(|(fragment, run, _)| (fragment, run));
-                // Actual v36 C34 controls reset the distance at the first
+                // Native controls reset the distance at the first
                 // entry of a following traf, including non-key/discard rows
                 // after rollback or an explicit native predecessor origin.
                 // Source ordinal continuity and forward supplied-index order
@@ -244,7 +244,7 @@ impl<'a> Mov9NativeIndexCursor<'a> {
                     }
                     _ => false,
                 };
-                // Actual native27 f-multitrack has consecutive [1,2] truns
+                // The f-multitrack input has consecutive [1,2] truns
                 // within each traf. Its second run starts non-key and carries
                 // the last distance at the append boundary: 0,0,1. This does not
                 // establish cross-fragment, mixed-layout or unwitnessed-clock carry.
@@ -274,7 +274,7 @@ impl<'a> Mov9NativeIndexCursor<'a> {
                         "native index no-key append distance carry",
                     ));
                 }
-                // Actual C34 partition controls distinguish within-run counting
+                // Native partition controls distinguish within-run counting
                 // from append initialization: [3] gives 0,1,2; [1,2] gives
                 // 0,0,1. Keep the last emitted distance, carry it once at an
                 // accepted append boundary, then increment inside that run.

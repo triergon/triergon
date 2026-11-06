@@ -1,5 +1,5 @@
-//! Original source/API/resource controls for the existing legacy projection.
-//! The control is the exact former next_packet consumer, not a second parser.
+//! Source/API/resource controls for the legacy projection.
+//! The control is the exact legacy next_packet consumer, not a second parser.
 use super::*;
 use crate::matroska::typed::usage::{Owner, Storage};
 use std::{

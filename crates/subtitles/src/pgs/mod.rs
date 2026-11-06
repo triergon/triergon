@@ -1,8 +1,7 @@
 //! Bounded PGS wire, object raster and display-set decoding.
 //!
 //! Owned source facts and cache/update/reset state stay distinct from explicit
-//! native ARGB and placement projections. Complete parity and numerical
-//! qualification remain open.
+//! native ARGB and placement projections.
 mod display;
 mod display_model;
 mod display_palette;

@@ -254,7 +254,7 @@ impl Mov9View {
         self.project_inner(source, None, Some(shift), None, None)
     }
     /// Pinned fragment-only clock view, independently of source knownness.
-    /// Actual cp18 controls support raw32 signed CTO in either wire version and
+    /// Native controls support raw32 signed CTO in either wire version and
     /// compensation by the whole track's negative minimum. Not source semantics.
     pub(crate) fn project_fragment(
         &self,

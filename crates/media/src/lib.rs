@@ -1,4 +1,4 @@
-//! Bounded compressed-media parsing. Experimental; no module is release-qualified.
+//! Bounded compressed-media parsing. Experimental.
 #![forbid(unsafe_code)]
 
 pub mod colour;

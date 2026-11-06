@@ -31,7 +31,7 @@ impl NativeView {
         }
         let resume = match (self, utf16) {
             (Self::D32, true) => {
-                // Actual40 shows this observable entry transition on each UTF16
+                // The native reference shows this observable entry transition on each UTF16
                 // SubRip body line: emit the first converted byte, then resume at
                 // the next scalar. No byte value (including0x85) is special.
                 // This is not a claim about the native implementation's internals.

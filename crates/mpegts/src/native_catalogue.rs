@@ -116,7 +116,7 @@ impl NativeCatalogueV1 {
             selected_carriage_v2: false,
         })
     }
-    /// Explicit additive TS188/M2TS192 audio/video native view. The original
+    /// Explicit TS188/M2TS192 audio/video native view. The default
     /// constructor remains the TS188/video profile; source semantics are untouched.
     pub fn new_selected_carriage_v2(
         budget: Budget,

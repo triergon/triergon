@@ -3,7 +3,7 @@
 //! Named profiles: SubRipStrict1, WebVttSourceStrict1, Tx3gCarriage1,
 //! Utf8Packet1, MatroskaWebVttCarriage1 and OpaqueAss1. Their limits and
 //! source/semantic boundaries are documented in this module's README.md.
-//! These profiles do not establish full native compatibility or M05 acceptance.
+//! These profiles do not establish full native compatibility.
 #![forbid(unsafe_code)]
 
 pub mod carriage;
@@ -69,7 +69,7 @@ pub struct Extractor {
 }
 
 impl Extractor {
-    /// Additive ISO-box tx3g profile; original constructor stays unchanged.
+    /// ISO-box tx3g profile.
     pub fn tx3g_iso_boxes(pool: &Budget, limits: Limits, generation: u64) -> Self {
         let mut result = Self::new(pool, limits, generation);
         result.iso_tx3g = true;

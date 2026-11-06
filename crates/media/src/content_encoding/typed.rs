@@ -1,5 +1,5 @@
-//! Intended child of content_encoding. Reuses Decoder/DecodeStep/Encodings.
-//! Eight entries are the frozen policy, not a new unbounded recursive model.
+//! Child of content_encoding. Reuses Decoder/DecodeStep/Encodings.
+//! Eight entries are the fixed policy, not an unbounded recursive model.
 use super::{DecodeStep, Decoder, Encodings};
 use crate::matroska::typed::syntax::Required;
 use crate::matroska::typed::syntax::{ChildCursor, check};

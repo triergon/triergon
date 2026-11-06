@@ -55,7 +55,7 @@ fn source() -> Vec<u8> {
     .concat()
 }
 
-/// Generic over any container reader: what a consumer adapter sees.
+/// Generic over any container reader: what a generic caller sees.
 fn packets<C: ContainerReader>(
     reader: &mut C,
     raw: &[u8],

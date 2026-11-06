@@ -1,4 +1,4 @@
-//! Original scalar serialization of actual frozen typed header facts.
+//! Scalar serialization of typed header facts.
 use triergon_framing::DtsCoreHeader;
 #[derive(Clone, Copy)]
 pub struct Scalar {

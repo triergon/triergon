@@ -1,4 +1,4 @@
-//! Additional actual27 boundaries. Frozen first8 regressions remain unchanged.
+//! Additional native global-seek boundaries.
 mod common;
 #[path = "support/native34.rs"]
 mod support;

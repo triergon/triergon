@@ -1,4 +1,4 @@
-//! Original composed-operation regressions. Parent runs these; no local Cargo.
+//! Composed-operation regressions.
 use std::sync::atomic::AtomicBool;
 use triergon_core::{
     Budget, Bytes, Error, InputCursor, InputWindow, SourceCapabilities, SourceId, Step, WorkBudget,

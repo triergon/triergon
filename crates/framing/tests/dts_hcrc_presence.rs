@@ -1,4 +1,4 @@
-//! Parent-approved source-presence clarification, independent of native validity.
+//! Source-presence clarification, independent of native validity.
 use std::sync::atomic::AtomicBool;
 use triergon_core::{Budget, Bytes, Error, SourceId, Step, WorkBudget};
 use triergon_framing::{

@@ -1,6 +1,5 @@
 //! Resumable typed Matroska operations over shared core input, storage and time.
-//! Development API: later sources and this operation need fresh parity and
-//! numerical qualification. Existing blocking Demuxer compatibility is retained.
+//! Development API. Existing blocking Demuxer compatibility is retained.
 pub use crate::matroska::typed::{
     configuration::{CodecState, Configuration, Initialization, InitializationOrigin},
     hdr10_plus::{

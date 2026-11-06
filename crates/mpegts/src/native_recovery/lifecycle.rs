@@ -1,5 +1,4 @@
-//! Independent source-bound lifecycle draft. Activate only after the parent
-//! observes the frozen intended runtime RED; no execution is claimed here.
+//! Independent source-bound lifecycle.
 use super::*;
 use crate::psi::{PatTable, ProgramMap, TableStep};
 use triergon_core::SourceId;

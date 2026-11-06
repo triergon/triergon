@@ -559,8 +559,8 @@ fn explicit_cp1251_matches_complete_native_ass_bytes_while_native_stop_stays_pre
     for q in [1, 7, 4096] {
         assert_eq!(converted(raw, Charset::Windows1251, q), expected);
     }
-    // Original observer ends with -22 after preserving this subtitle. That
-    // process outcome remains in the frozen177 audit, not converted to success.
+    // The native observer ends with -22 after preserving this subtitle; that
+    // outcome is not converted to success.
 }
 #[test]
 fn tx3g_config_backpressure_retry_keeps_exact_font_record_and_raw_owner() {

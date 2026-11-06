@@ -1,4 +1,4 @@
-//! Product API guards plus every frozen native transcript, without new native calls.
+//! Public API guards plus every recorded native transcript, without native calls.
 #![forbid(unsafe_code)]
 use std::sync::atomic::{AtomicBool, Ordering};
 use triergon_core::{Budget, Bytes, Error, TimeBase, WorkBudget};
@@ -487,7 +487,7 @@ fn unknown_pts_retains_raw_dts_without_inventing_native_presentation_time() {
     assert_eq!(out.receiver_output().unwrap().pts_microseconds, None);
 }
 
-// This is functional transcript reproduction, not a benchmark adapter. Frozen
+// This is functional transcript reproduction, not a benchmark adapter. Recorded
 // input/native expected bytes are read only by tests, never by production code.
 fn frozen_case(case: &wire::Case, quantum: u64) -> (wire::Sink, bool) {
     let b = Budget::new(256 * 1024 * 1024).unwrap();

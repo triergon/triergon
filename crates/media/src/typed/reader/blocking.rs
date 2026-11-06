@@ -606,8 +606,6 @@ mod header_refill_blocking_tests {
     }
 }
 
-// This guard uses only pre-existing APIs. Parent can append it to the baseline
-// reader_blocking.rs and observe the default header read still requesting1 byte.
 #[cfg(test)]
 mod header_refill_runtime_red {
     use super::*;

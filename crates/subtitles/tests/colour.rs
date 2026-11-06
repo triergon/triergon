@@ -1,4 +1,4 @@
-//! Original primary-derived Fraction oracle vectors; parent executes Rust tests.
+//! Primary-derived Fraction oracle vectors.
 #![forbid(unsafe_code)]
 use triergon_subtitles::dvb::{ColourProjection, ColourSource};
 

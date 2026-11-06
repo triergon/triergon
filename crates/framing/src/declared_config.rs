@@ -143,7 +143,7 @@ enum Phase {
 /// validation, length byte and descriptor publication consumes bounded work.
 /// Descriptor capacity is reserved while empty, never by copying a growing
 /// prefix inside one work unit. Backpressure/allocation errors are retryable.
-/// This draft does not expose incremental external input/generation or certify
+/// This parser does not expose incremental external input/generation or certify
 /// record versions, reserved-bit values, ISO grammar or SPS/RBSP semantics.
 pub struct DeclaredConfigParser<'a> {
     pool: Budget,

@@ -1,4 +1,4 @@
-//! Public-API regression for the frozen5-path payload; not executed by reviewer.
+//! Public-API regression for recovery reset after cancellation.
 use std::sync::atomic::{AtomicBool, Ordering};
 use triergon_core::{Budget, Bytes, Error, TimeBase, WorkBudget};
 use triergon_subtitles::pgs::{

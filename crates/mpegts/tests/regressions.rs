@@ -1,4 +1,3 @@
-//! Authored before the implementation. No Cargo execution is authorised in this lane.
 //! All byte vectors are original; no reference implementation or media is imported.
 use std::sync::atomic::{AtomicBool, Ordering};
 use triergon_core::{
