@@ -274,8 +274,7 @@ impl ElementReader {
         }
         Ok(false)
     }
-    /// A distinct, already work-charged private completion. No public event,
-    /// owner, packet or location is fabricated by discarding the opaque body.
+    /// Complete a scan drain after the envelope charges its final work unit.
     pub(crate) fn finish_scanned_leaf(&mut self, header: ElementHeader) -> Result<bool> {
         let Phase::Body(body) = &self.phase else {
             return Err(Error::Invalid("missing scan drain body"));
