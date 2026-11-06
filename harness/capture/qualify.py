@@ -117,9 +117,6 @@ def memory(cand, ref, case, path, observer, pairs, out, seed):
         r = [p["reference"]["receipt"]["heap_peak_bytes"] for p in result["heap"]]
         result["heap_peak_bytes"] = {"candidate": c, "reference": r}
         result["heap_ratio"] = ratio_interval(list(zip(c, r)))
-        result["heap_gate_pass"] = all(a < b for a, b in zip(c, r)) and result["heap_ratio"]["upper_95"] < 1.0
-    else:
-        result["heap_gate_pass"] = False
     if rss_ok:
         pairs_bound, pairs_observed = [], []
         for p in result["rss"]:
@@ -133,13 +130,9 @@ def memory(cand, ref, case, path, observer, pairs, out, seed):
         result["rss_observed_growth_pairs"] = pairs_observed
         if all(a > 0 and b > 0 for a, b in pairs_bound):
             result["rss_bound_ratio"] = ratio_interval(pairs_bound)
-            result["rss_gate_pass"] = result["rss_bound_ratio"]["upper_95"] < 1.0
         else:
             result["rss_bound_ratio"] = None
-            result["rss_gate_pass"] = False
         result["rss_observed_ratio"] = ratio_interval(pairs_observed)
-    else:
-        result["rss_gate_pass"] = False
     return result
 
 
@@ -204,10 +197,9 @@ def main():
             "conversion": bool(c.get("conversion")), "mux": bool(c.get("mux")), "encoder": bool(c.get("encoder")),
             "pipeline_parity": bool(c.get("pipeline")),
             "runtime_gate": record["runtime"]["gate_pass"], "runtime_target_0_80": record["runtime"]["target_pass"],
-            "heap_gate": record["memory"]["heap_gate_pass"], "rss_gate": record["memory"]["rss_gate_pass"],
+            "heap_gate": False, "rss_gate": False, "memory_status": "diagnostic-only",
+            "all_gates": False,
         }
-        record["verdict"]["memory_status"] = "diagnostic-only"
-        record["verdict"]["all_gates"] = False
         (cdir / "result.json").write_text(json.dumps(record, indent=1))
         line = {"id": case["id"], **record["verdict"], "runtime_upper95": round(record["runtime"]["ratio"]["upper_95"], 4),
                 "correctness": c}

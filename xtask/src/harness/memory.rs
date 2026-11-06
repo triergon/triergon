@@ -1127,15 +1127,19 @@ pub fn admission(root: &Path, candidate: &Path, reference: &Path) -> R<()> {
         fs::canonicalize(candidate).map_err(|e| format!("{}: {e}", candidate.display()))?;
     let reference =
         fs::canonicalize(reference).map_err(|e| format!("{}: {e}", reference.display()))?;
-    let certificate = qualification(&Native { root }, root, &candidate, &reference);
+    let mut certificate = qualification(&Native { root }, root, &candidate, &reference);
+    let result = if s(&certificate, "status") != Some("qualified-selected-workers") {
+        Err("memory observer refused admission".into())
+    } else if !linux::certificate_current(root, &certificate) {
+        let reason = "memory observer admission became stale";
+        push(&mut certificate, "status", Value::str("unqualified"));
+        push(&mut certificate, "errors", Value::strings([reason]));
+        Err(reason.into())
+    } else {
+        Ok(())
+    };
     println!("{}", json::canonical(&certificate));
-    if s(&certificate, "status") != Some("qualified-selected-workers") {
-        return Err("memory observer refused admission".into());
-    }
-    if !linux::certificate_current(root, &certificate) {
-        return Err("memory observer admission became stale".into());
-    }
-    Ok(())
+    result
 }
 
 /// One memory collection under the measurement lock, rejected (but kept) when
