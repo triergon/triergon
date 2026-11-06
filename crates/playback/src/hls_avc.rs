@@ -412,6 +412,33 @@ impl AvcTsReader {
                 }
                 continue;
             }
+            if self.input.is_none()
+                && let Some(pending) = &mut self.pending_pes
+            {
+                if pending.spans.len() != 0 {
+                    if !work.try_charge(1) {
+                        return Ok(AvcTsStep::Yield);
+                    }
+                    let bytes = pending
+                        .spans
+                        .next()
+                        .ok_or(Error::Invalid("AVC TS missing PES span"))?
+                        .into_bytes();
+                    if !bytes.belongs_to(&self.pool) {
+                        return Err(Error::ForeignPool);
+                    }
+                    pending.remaining = pending
+                        .remaining
+                        .checked_sub(bytes.len())
+                        .ok_or(Error::Invalid("AVC TS PES payload extent"))?;
+                    self.input = Some(Chunk { bytes, offset: 0 });
+                } else {
+                    if pending.remaining != 0 {
+                        return Err(Error::Invalid("AVC TS PES payload extent"));
+                    }
+                    self.pending_pes = None;
+                }
+            }
             if let Some(chunk) = &mut self.input {
                 if chunk.offset == chunk.bytes.len() {
                     self.input = None;
@@ -451,38 +478,15 @@ impl AvcTsReader {
                     Some(extent)
                 })?;
                 chunk.offset += copy;
+                if chunk.offset == chunk.bytes.len() {
+                    self.input = None;
+                }
                 work.try_charge(copy as u64);
                 if copy == 1 {
                     self.accept(first)?;
                 } else {
                     self.zeroes = 0;
                     self.nal_data_end = self.bytes.len();
-                }
-                continue;
-            }
-            if let Some(pending) = &mut self.pending_pes {
-                if pending.spans.len() != 0 {
-                    if !work.try_charge(1) {
-                        return Ok(AvcTsStep::Yield);
-                    }
-                    let bytes = pending
-                        .spans
-                        .next()
-                        .ok_or(Error::Invalid("AVC TS missing PES span"))?
-                        .into_bytes();
-                    if !bytes.belongs_to(&self.pool) {
-                        return Err(Error::ForeignPool);
-                    }
-                    pending.remaining = pending
-                        .remaining
-                        .checked_sub(bytes.len())
-                        .ok_or(Error::Invalid("AVC TS PES payload extent"))?;
-                    self.input = Some(Chunk { bytes, offset: 0 });
-                } else {
-                    if pending.remaining != 0 {
-                        return Err(Error::Invalid("AVC TS PES payload extent"));
-                    }
-                    self.pending_pes = None;
                 }
                 continue;
             }
@@ -698,13 +702,14 @@ impl AvcTsReader {
 
 fn nal_body_prefix_len(bytes: &[u8]) -> usize {
     let mut rest = bytes;
-    while let Some((chunk, tail)) = rest.split_first_chunk::<8>()
+    while let Some((chunk, tail)) = rest.split_first_chunk::<16>()
         && let Some(&next) = tail.first()
     {
-        let word = u64::from_le_bytes(*chunk);
-        let adjacent = word | (word >> 8) | (u64::from(next) << 56);
-        let zero_pairs =
-            adjacent.wrapping_sub(0x0101_0101_0101_0101) & !adjacent & 0x8080_8080_8080_8080;
+        let word = u128::from_le_bytes(*chunk);
+        let adjacent = word | (word >> 8) | (u128::from(next) << 120);
+        let zero_pairs = adjacent.wrapping_sub(0x0101_0101_0101_0101_0101_0101_0101_0101)
+            & !adjacent
+            & 0x8080_8080_8080_8080_8080_8080_8080_8080;
         if zero_pairs != 0 {
             // Borrow can mark a later byte. The first mark always starts a zero pair.
             return bytes.len() - rest.len() + zero_pairs.trailing_zeros() as usize / 8;
