@@ -16,7 +16,7 @@ pub enum BoxEvent {
 enum Phase {
     Header,
     Announced,
-    Metadata,
+    Metadata { target: usize },
     Skipping,
     Skipped,
 }
@@ -126,7 +126,7 @@ impl BoxReader {
         buffer.try_reserve_exact(length)?;
         buffer.try_extend_from_slice(&self.prefix[..self.filled])?;
         self.metadata = Some(buffer);
-        self.phase = Phase::Metadata;
+        self.phase = Phase::Metadata { target: length };
         Ok(())
     }
     pub fn skip(&mut self, input: &mut InputCursor) -> Result<()> {
@@ -239,17 +239,13 @@ impl BoxReader {
                 Phase::Announced => {
                     return Err(Error::Invalid("choose metadata or skip after header"));
                 }
-                Phase::Metadata => {
-                    let header = self.header.ok_or(Error::Invalid("missing header"))?;
-                    let target =
-                        usize::try_from(header.size.ok_or(Error::Invalid("metadata bound"))?)
-                            .map_err(|_| Error::Overflow)?;
-                    let filled = self
+                Phase::Metadata { target } => {
+                    let buffer = self
                         .metadata
-                        .as_ref()
-                        .ok_or(Error::Invalid("missing metadata buffer"))?
-                        .len();
-                    if filled == target {
+                        .as_mut()
+                        .ok_or(Error::Invalid("missing metadata buffer"))?;
+                    let remaining = target - buffer.len();
+                    if remaining == 0 {
                         if !work.try_charge(1) {
                             return Ok(Step::Yield);
                         }
@@ -264,18 +260,14 @@ impl BoxReader {
                                 return Err(rejected.error);
                             }
                         };
-                        let raw = BoxView::new(bytes, header.start)?;
+                        let raw = BoxView::new(bytes, self.start)?;
                         self.next_header(input);
                         return Ok(Step::Ready(BoxEvent::Metadata(raw)));
                     }
-                    let buffer = self
-                        .metadata
-                        .as_mut()
-                        .ok_or(Error::Invalid("missing metadata buffer"))?;
-                    match input.read_append(buffer, target - filled, work, cancel)? {
+                    match input.read_append(buffer, remaining, work, cancel)? {
                         Step::Ready(count) => {
                             self.position = input.position();
-                            if count < target - filled
+                            if count < remaining
                                 && let Some(request) = input.pending_request()
                             {
                                 return Ok(Step::NeedInput(request));
