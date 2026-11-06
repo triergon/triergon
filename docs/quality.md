@@ -61,7 +61,7 @@ compares canonical output. Workers speak one line protocol with `trace`, `bench`
 
 ```sh
 make prepare-check   # build the FFmpeg reference, fixtures and adapters
-cargo xtask check    # format, test, clippy, rustdoc, release build, harness tests, design checks
+cargo xtask check    # format, test, clippy, rustdoc, release build, worker tests, design checks
 make report          # correctness report against the reference
 make qualify         # correctness, runtime and memory with acceptance
 ```
@@ -79,8 +79,10 @@ qualifies the mandatory external vector and `cargo xtask fate-run` runs one supp
 upstream FATE case. `cargo xtask build-workers` builds the workers and records the build
 identity every collection is checked against. `cargo xtask trace-identities` records the
 digest of every candidate trace, so a change can show its traces are byte-identical
-(`--compare` an earlier record). The independent oracles stay in Python
-(`harness/*_oracle.py`, run through `python3 -m harness.oracles`).
+(`--compare` an earlier record). `cargo xtask worker-tests` runs the integration tests
+of the built workers: work digests, catalogue, colour, content encoding, seek, timing
+and inflate behaviour against the reference workers and the oracles. The independent
+oracles stay in Python (`harness/*_oracle.py`, run through `python3 -m harness.oracles`).
 `cargo xtask fuzz` runs a deterministic, replayable byte-mutation campaign against
 debug, release and reference workers from a pinned manifest.
 

@@ -1,7 +1,7 @@
 """Worker execution, canonical comparisons and timing isolation primitives.
 
-The harness tests and the codec and capture timing runners use these; the
-collectors themselves are `cargo xtask report`. Only the standard library is used.
+The codec and capture timing runners use these; the collectors themselves are
+`cargo xtask report`. Only the standard library is used.
 """
 from __future__ import annotations
 

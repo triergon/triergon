@@ -162,3 +162,37 @@ def content_trace(path):
 def projected_content(trace):
     return {'private': [track['private'] for track in trace['tracks']],
             'frames': [{'track': packet['track'], 'payload': packet['payload']} for packet in trace['packets']]}
+
+
+def encoding_chain(path):
+    """CodecPrivate and the single frame of the first track, each decoded through
+    the track's ContentEncodings in descending order with Python's zlib.
+
+    Covers the authored zlib and header-stripping chains (`cargo xtask fixture zlib`),
+    whose one Cluster holds one SimpleBlock without lacing."""
+    data = path.read_bytes()
+    _, start, stop, _ = next(x for x in elements(data, 0, len(data)) if x[0] == 0x18538067)
+    top = list(elements(data, start, stop)); encodings = []; private = b''
+    _, a, b, _ = next(x for x in top if x[0] == 0x1654ae6b)
+    _, a, b, _ = next(x for x in elements(data, a, b) if x[0] == 0xae)
+    for key, x, y, _ in elements(data, a, b):
+        if key == 0x63a2: private = data[x:y]
+        if key != 0x6d80: continue
+        for _, c, d, _ in elements(data, x, y):
+            order, scope, algorithm, header = 0, 1, 0, b''
+            for key, c, d, _ in elements(data, c, d):
+                if key == 0x5031: order = int.from_bytes(data[c:d], 'big')
+                if key == 0x5032: scope = int.from_bytes(data[c:d], 'big')
+                if key == 0x5034:
+                    for key, c, d, _ in elements(data, c, d):
+                        if key == 0x4254: algorithm = int.from_bytes(data[c:d], 'big')
+                        if key == 0x4255: header = data[c:d]
+            encodings.append((order, scope, algorithm, header))
+    _, a, b, _ = next(x for x in top if x[0] == 0x1f43b675)
+    _, a, b, _ = next(x for x in elements(data, a, b) if x[0] == 0xa3)
+    _, header, _ = variable(data, a); frame = data[header + 3:b]
+    for _, scope, algorithm, prefix in sorted(encodings, reverse=True):
+        decode = lambda encoded: zlib.decompress(encoded) if algorithm == 0 else prefix + encoded
+        if scope & 1: frame = decode(frame)
+        if scope & 2: private = decode(private)
+    return {'private': private.hex(), 'frames': [frame.hex()]}

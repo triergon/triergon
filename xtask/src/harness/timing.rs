@@ -51,17 +51,25 @@ fn is_linux() -> bool {
     cfg!(target_os = "linux")
 }
 
+/// The process listing; a `ps` that cannot start or exits non-zero is an error.
 fn ps() -> Result<String, String> {
     let output = Command::new("ps")
         .args(["-A", "-o", "pid=,time=,state=,comm="])
         .output()
         .map_err(|e| e.to_string())?;
+    if !output.status.success() {
+        return Err(format!("ps: {}", output.status));
+    }
     Ok(String::from_utf8_lossy(&output.stdout).into_owned())
 }
 
 /// Darwin: tracked build processes and their CPU time from `ps`.
 fn darwin_snapshot() -> Result<Value, String> {
-    let listing = ps()?;
+    darwin_processes(&ps()?)
+}
+
+/// The tracked processes of a Darwin `ps` listing.
+fn darwin_processes(listing: &str) -> Result<Value, String> {
     let mut result = Vec::new();
     for line in listing.lines() {
         let Some([pid, clock, state, command]) = split4(line) else {
@@ -152,15 +160,37 @@ fn tracked_on_linux(name: &str) -> bool {
 /// Linux: tracked processes plus aggregate CPU accounting (steal time), boot
 /// identity and clock rate, all with their raw sources.
 fn linux_snapshot() -> Value {
+    linux_snapshot_in(Path::new("/proc"), ps, clock_ticks)
+}
+
+/// The system clock rate (`getconf CLK_TCK`).
+fn clock_ticks() -> Result<i64, String> {
+    let output = Command::new("getconf")
+        .arg("CLK_TCK")
+        .output()
+        .map_err(|e| e.to_string())?;
+    String::from_utf8_lossy(&output.stdout)
+        .trim()
+        .parse()
+        .map_err(|_| "missing boot/tick identity".to_owned())
+}
+
+/// [`linux_snapshot`] with `proc` mounted at the given root and the process
+/// listing and clock rate from the given sources.
+fn linux_snapshot_in(
+    proc: &Path,
+    ps: impl FnOnce() -> Result<String, String>,
+    clock_ticks: impl FnOnce() -> Result<i64, String>,
+) -> Value {
     let mut evidence = vec![
         ("status".to_owned(), Value::str("unavailable")),
         ("platform".to_owned(), Value::str("Linux")),
     ];
     let mut processes = Vec::new();
-    let mut collect = || -> Result<(), String> {
+    let collect = || -> Result<(), String> {
         let commands = ps()?;
         evidence.push(("ps_raw".into(), Value::str(&commands)));
-        let raw = fs::read_to_string("/proc/stat").map_err(|e| e.to_string())?;
+        let raw = fs::read_to_string(proc.join("stat")).map_err(|e| e.to_string())?;
         evidence.push(("proc_stat_raw".into(), Value::str(&raw)));
         let aggregate: Vec<Vec<&str>> = raw
             .lines()
@@ -194,20 +224,11 @@ fn linux_snapshot() -> Value {
         if cpus.is_empty() || unique.len() != cpus.len() {
             return Err("missing or duplicate per-CPU accounting".into());
         }
-        let boot = fs::read_to_string("/proc/sys/kernel/random/boot_id")
+        let boot = fs::read_to_string(proc.join("sys/kernel/random/boot_id"))
             .map_err(|e| e.to_string())?
             .trim()
             .to_owned();
-        let ticks: i64 = String::from_utf8_lossy(
-            &Command::new("getconf")
-                .arg("CLK_TCK")
-                .output()
-                .map_err(|e| e.to_string())?
-                .stdout,
-        )
-        .trim()
-        .parse()
-        .map_err(|_| "missing boot/tick identity")?;
+        let ticks = clock_ticks()?;
         if boot.is_empty() || ticks <= 0 {
             return Err("missing boot/tick identity".into());
         }
@@ -232,7 +253,7 @@ fn linux_snapshot() -> Value {
                 continue;
             }
             let process_raw =
-                fs::read_to_string(format!("/proc/{pid}/stat")).map_err(|e| e.to_string())?;
+                fs::read_to_string(proc.join(pid).join("stat")).map_err(|e| e.to_string())?;
             let (head, tail) = process_raw
                 .rsplit_once(')')
                 .ok_or_else(|| format!("unparsed Linux process stat: {pid}"))?;
@@ -688,6 +709,182 @@ mod tests {
         assert_eq!(
             timing_module_state().get("status").and_then(Value::as_str),
             Some("not-applicable")
+        );
+    }
+
+    /// An authored `/proc` with one tracked process (pid 123) and its own
+    /// aggregate and per-CPU counters; nothing native is read.
+    struct Proc(PathBuf);
+
+    /// A Linux `ps` record whose clock has a days field.
+    const CLANG: &str = "123 1-02:03:04 S clang\n";
+    const STAT: &str = "cpu 10 0 20 100 0 0 0 5 2 1\ncpu0 10 0 20 100 0 0 0 5 2 1\n";
+
+    /// `/proc/123/stat` with `utime` `cpu`, `stime` 2 and start time `start`.
+    fn proc_stat(cpu: i64, start: i64) -> String {
+        let mut fields = vec!["0".to_owned(); 21];
+        fields[0] = "S".into();
+        fields[11] = cpu.to_string();
+        fields[12] = "2".into();
+        fields[19] = start.to_string();
+        format!("123 (clang test) {}", fields.join(" "))
+    }
+
+    impl Proc {
+        fn new() -> Self {
+            static NEXT: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
+            let n = NEXT.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+            let root =
+                std::env::temp_dir().join(format!("triergon-proc-{}-{n}", std::process::id()));
+            let _ = fs::remove_dir_all(&root);
+            fs::create_dir_all(root.join("123")).unwrap();
+            fs::create_dir_all(root.join("sys/kernel/random")).unwrap();
+            let proc = Proc(root);
+            proc.write("123/stat", &proc_stat(10, 100));
+            proc.write("sys/kernel/random/boot_id", "authored-boot-id\n");
+            proc.write("stat", STAT);
+            proc
+        }
+
+        fn write(&self, path: &str, text: &str) {
+            fs::write(self.0.join(path), text).unwrap();
+        }
+
+        fn remove(&self, path: &str) {
+            fs::remove_file(self.0.join(path)).unwrap();
+        }
+
+        fn snapshot(&self, listing: &str) -> Value {
+            linux_snapshot_in(&self.0, || Ok(listing.to_owned()), || Ok(100))
+        }
+    }
+
+    impl Drop for Proc {
+        fn drop(&mut self) {
+            let _ = fs::remove_dir_all(&self.0);
+        }
+    }
+
+    fn linux(snapshot: &Value) -> &Value {
+        snapshot.get(LINUX_CPU_KEY).unwrap()
+    }
+
+    fn steal(snapshot: &Value) -> &Value {
+        &linux(snapshot).get("counters").unwrap().as_array().unwrap()[7]
+    }
+
+    fn findings(before: &Value, after: &Value) -> Vec<String> {
+        active_cpu(before, after, false)
+    }
+
+    /// Replace `key` of the Linux accounting record.
+    fn with_linux(snapshot: &Value, key: &str, value: Value) -> Value {
+        let mut changed = snapshot.clone();
+        let Value::Object(members) = &mut changed else {
+            unreachable!()
+        };
+        let (_, record) = members
+            .iter_mut()
+            .find(|(k, _)| k == LINUX_CPU_KEY)
+            .unwrap();
+        let Value::Object(fields) = record else {
+            unreachable!()
+        };
+        fields.iter_mut().find(|(k, _)| k == key).unwrap().1 = value;
+        changed
+    }
+
+    #[test]
+    fn linux_ps_days_clock_does_not_replace_native_process_ticks() {
+        let proc = Proc::new();
+        let snapshot = proc.snapshot(CLANG);
+        let process = snapshot.get("123").unwrap();
+        assert_eq!(process.get("cpu_ticks"), Some(&Value::int(12)));
+        assert_eq!(
+            process.get("ps_clock_raw").and_then(Value::as_str),
+            Some("1-02:03:04")
+        );
+        assert_eq!(
+            linux(&snapshot).get("status").and_then(Value::as_str),
+            Some("recorded")
+        );
+        assert_eq!(steal(&snapshot), &Value::int(5));
+    }
+
+    #[test]
+    fn process_tick_advance_and_pid_reuse_are_contaminants() {
+        let proc = Proc::new();
+        let before = proc.snapshot(CLANG);
+        for text in [proc_stat(11, 100), proc_stat(10, 101)] {
+            proc.write("123/stat", &text);
+            assert!(findings(&before, &proc.snapshot(CLANG)).contains(&"clang".to_owned()));
+        }
+    }
+
+    #[test]
+    fn cpu_steal_is_rejected_without_deleting_raw_counters() {
+        let proc = Proc::new();
+        let before = proc.snapshot("");
+        proc.write("stat", &STAT.replace(" 5 2 1", " 6 2 1"));
+        let after = proc.snapshot("");
+        assert!(findings(&before, &after).contains(&"linux-cpu-steal".to_owned()));
+        assert_eq!(steal(&after), &Value::int(6));
+    }
+
+    #[test]
+    fn missing_proc_or_failed_ps_is_unavailable_never_idle() {
+        let proc = Proc::new();
+        let before = proc.snapshot("");
+        proc.remove("stat");
+        let unavailable = "linux-cpu-evidence-unavailable".to_owned();
+        assert!(findings(&before, &proc.snapshot("")).contains(&unavailable));
+        let failed =
+            linux_snapshot_in(&proc.0, || Err("ps: exit status: 1".to_owned()), || Ok(100));
+        assert!(findings(&before, &failed).contains(&unavailable));
+    }
+
+    #[test]
+    fn missing_process_stat_and_missing_steal_counter_are_not_idle() {
+        let proc = Proc::new();
+        let before = proc.snapshot(CLANG);
+        proc.remove("123/stat");
+        let unavailable = "linux-cpu-evidence-unavailable".to_owned();
+        assert!(findings(&before, &proc.snapshot(CLANG)).contains(&unavailable));
+        proc.write("stat", "cpu 10 0 20 100\n");
+        assert!(findings(&before, &proc.snapshot("")).contains(&unavailable));
+    }
+
+    #[test]
+    fn counter_regression_boot_change_and_missing_linux_marker_fail_closed() {
+        let proc = Proc::new();
+        let before = proc.snapshot("");
+        let regressed = {
+            let mut counters = linux(&before).get("counters").unwrap().clone();
+            let Value::Array(items) = &mut counters else {
+                unreachable!()
+            };
+            items[7] = Value::int(4);
+            with_linux(&before, "counters", counters)
+        };
+        let rebooted = with_linux(&before, "boot_id", Value::str("another-boot"));
+        for after in [regressed, rebooted] {
+            assert!(findings(&before, &after).contains(&"linux-cpu-evidence-invalid".to_owned()));
+        }
+        let empty = Value::Object(Vec::new());
+        assert!(
+            active_cpu(&empty, &empty, true).contains(&"linux-cpu-evidence-missing".to_owned())
+        );
+    }
+
+    #[test]
+    fn darwin_process_snapshot_shape_and_fractional_clock_are_unchanged() {
+        let snapshot = darwin_processes("123 1:02.34 S /usr/bin/clang\n").unwrap();
+        let expected =
+            crate::json::parse(r#"{"123": {"name": "clang", "cpu_ticks": 6234, "state": "S"}}"#)
+                .unwrap();
+        assert!(
+            super::super::diff::equal(&snapshot, &expected),
+            "{snapshot:?}"
         );
     }
 }

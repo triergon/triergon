@@ -20,6 +20,7 @@ mod sha256;
 mod stats;
 mod toml;
 mod walk;
+mod worker_tests;
 mod zlib;
 
 use std::ffi::{OsStr, OsString};
@@ -54,6 +55,8 @@ commands:
   graph          PACKAGE [FILE]...   print the provenance graph of a workspace package
   build-workers  build the candidate and reference workers and the memory observers, and
                  record their identity in target/harness/identity.json
+  worker-tests   [FILTER]   integration tests of the built workers against the reference
+                 workers and the independent oracles (tests whose name contains FILTER)
   report         [--contract F] [--manifest F] [--corpus DIR] [--output DIR] [--fate-cache DIR]
                  [--additional-report F]... [--require-acceptance] [--require-slice-acceptance]
                  [--benchmark] [--memory] [--pairs N] [--iterations N] [--seed N]
@@ -90,6 +93,11 @@ fn main() -> ExitCode {
         Some("build-workers") => {
             harness::build::build(&root).map(|path| println!("{}", path.display()))
         }
+        Some("worker-tests") => match &args[1..] {
+            [] => worker_tests::run(&root, None),
+            [filter] => worker_tests::run(&root, Some(filter)),
+            _ => Err(USAGE.to_owned()),
+        },
         Some("prepare-ffmpeg") => prepare_ffmpeg(&root, &args[1..]),
         Some("fetch-specs") => match &args[1..] {
             [] => fetch::specs(&root, false, &fetch::Network).map(|s| println!("{s}")),
@@ -735,9 +743,8 @@ fn check(root: &Path) -> Task {
         ],
     )?;
     check_simd(root)?;
-    run(Command::new("python3")
-        .args(["-m", "unittest", "discover", "-s", "harness", "-t", "."])
-        .current_dir(root))?;
+    println!("$ cargo xtask worker-tests");
+    worker_tests::run(root, None)?;
     check_safety(root)?;
     check_design(root)?;
     check_links(root)?;
