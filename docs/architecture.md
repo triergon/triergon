@@ -12,7 +12,7 @@ Crates depend only on layers below them. Core never depends on a format.
 | Layer | Crates | Role |
 |---|---|---|
 | Foundation | [`triergon-core`](../crates/core) | Budgets, shared byte storage, exact time, input windows, resumable steps, errors |
-| Formats | [`triergon`](../crates/media) (Matroska/WebM), [`triergon-isobmff`](../crates/isobmff), [`triergon-mpegts`](../crates/mpegts) | Container readers: tracks, packets, metadata, seeking |
+| Formats | [`triergon-matroska`](../crates/media) (Matroska/WebM), [`triergon-isobmff`](../crates/isobmff), [`triergon-mpegts`](../crates/mpegts) | Container readers: tracks, packets, metadata, seeking |
 | Framing | [`triergon-framing`](../crates/framing) | Codec configuration and packet-format adapters (Annex-B, ADTS, AC-3, DTS core, AV1, VP9) |
 | Subtitles | [`triergon-subtitles`](../crates/subtitles) | Text cue extraction and bitmap subtitle decoding |
 | Codecs | [`triergon-codec-aac`](../crates/codec-aac), [`-ac3`](../crates/codec-ac3), [`-dca`](../crates/codec-dca), [`-h264`](../crates/codec-h264), [`-hevc`](../crates/codec-hevc) | Software decoders |
@@ -92,7 +92,7 @@ traces byte-identical and re-runs the performance gates where it touches hot cod
    description (ITU-T H.273 codes). One error type with typed detail. A shared
    `triergon-bitstream` crate for bit reading, exp-Golomb, RBSP unescaping, CABAC
    and CRCs.
-2. **Formats.** The Matroska package becomes `triergon-matroska`. Matroska, ISO BMFF
+2. **Formats.** Matroska, ISO BMFF
    and MPEG-TS implement one `ContainerReader` trait
    (`provide`/`step`/`request_seek`/`tracks`), with one generic blocking adapter.
    Box walking and track classification move out of playback into the readers.

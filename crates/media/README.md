@@ -1,6 +1,6 @@
-# Matroska / WebM reader (triergon)
+# Matroska / WebM reader (triergon-matroska)
 
-Package `triergon`. A bounded Matroska and WebM demuxer: EBML parsing, tracks,
+Package `triergon-matroska`. A bounded Matroska and WebM demuxer: EBML parsing, tracks,
 packets with lacing and content encoding, Cues-based seeking, static colour/HDR,
 block additions and segment metadata (Info, chapters, tags, attachments). It is a
 format-layer crate on top of [triergon-core](../core/README.md) and has no other
@@ -13,7 +13,7 @@ Blocking `std::io` adapter:
 
 ```rust
 use std::{fs::File, sync::atomic::AtomicBool};
-use triergon::{Limits, typed::BlockingReader};
+use triergon_matroska::{Limits, typed::BlockingReader};
 
 let cancel = AtomicBool::new(false);
 let mut reader = BlockingReader::open_seekable(File::open(path)?, Limits::default())?;
@@ -34,7 +34,7 @@ block additions or CodecState; use `next_typed_packet` for those.
 Push / poll reader (no I/O; the caller supplies bytes):
 
 ```rust
-use triergon::{incremental::ParseStep, typed::{Event, Reader}};
+use triergon_matroska::{incremental::ParseStep, typed::{Event, Reader}};
 
 let mut reader = Reader::new(&pool, source_id, caps, Limits::default(), 64 * 1024)?;
 loop {
@@ -51,7 +51,6 @@ loop {
 
 `Reader::seek_previous` / `seek_for_playback` return the first `InputRequest`;
 the seek completes with `Event::Seek(SeekReceipt)` before any packet.
-`matroska::Demuxer` is the older blocking API with the same semantics.
 
 ## Supported
 

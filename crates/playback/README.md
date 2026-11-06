@@ -3,7 +3,7 @@
 Composes the Matroska, MP4 and MPEG-TS readers into a player-facing packet
 feed: caller-owned sources, format probing, bounded container events, track
 selection, seeking, packet and subtitle bridges, and a producer/sink pump. It
-sits above `triergon` (Matroska), `triergon-isobmff`, `triergon-mpegts`,
+sits above `triergon-matroska`, `triergon-isobmff`, `triergon-mpegts`,
 `triergon-framing` and `triergon-subtitles`. It does not fetch over HTTP,
 parse playlists, retry transports, decode media or render.
 
