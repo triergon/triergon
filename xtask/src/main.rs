@@ -6,6 +6,7 @@
 
 mod archive;
 mod checks;
+mod codecs;
 mod corpus;
 mod ebml;
 mod evidence;
@@ -14,8 +15,11 @@ mod fetch;
 mod fuzz;
 mod harness;
 mod json;
+mod numpy;
 mod prepare;
+mod process;
 mod pyrandom;
+mod python;
 mod sha256;
 mod stats;
 mod toml;
@@ -68,7 +72,9 @@ commands:
                  [--operation plain|seek|colour|catalogue] [--content] [--no-short-reads]
                  compare one input across a candidate and a reference worker
   fate-inventory --source DIR --output FILE [--configured-list FILE]
-                 index FATE definitions as data; nothing is executed";
+                 index FATE definitions as data; nothing is executed
+  codecs         manifest|grade|summarize   codec crates against the
+                 pinned FFmpeg decoders (see `cargo xtask codecs --help`)";
 
 fn main() -> ExitCode {
     if let Some(code) = without_cargo_library_path() {
@@ -93,6 +99,7 @@ fn main() -> ExitCode {
         Some("fuzz") => return fuzz_campaign(&root, &args[1..]),
         Some("evidence") => evidence(&root, &args[1..]),
         Some("trace-identities") => return trace_identities(&root, &args[1..]),
+        Some("codecs") => return failing(codecs::main(&root, &args[1..]), codecs::USAGE),
         Some("build-workers") => {
             harness::build::build(&root).map(|path| println!("{}", path.display()))
         }
@@ -249,6 +256,21 @@ fn exit(result: Result<i32, String>) -> ExitCode {
         Err(message) => {
             eprintln!("{message}");
             ExitCode::from(2)
+        }
+    }
+}
+
+/// A runner's exit code; an error is printed and exits 1, `--help` prints `usage`.
+fn failing(result: Result<i32, String>, usage: &str) -> ExitCode {
+    match result {
+        Ok(code) => ExitCode::from(code.clamp(0, 255) as u8),
+        Err(message) if message == usage => {
+            println!("{usage}");
+            ExitCode::from(2)
+        }
+        Err(message) => {
+            eprintln!("{message}");
+            ExitCode::FAILURE
         }
     }
 }

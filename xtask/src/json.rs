@@ -231,7 +231,15 @@ fn python_float(value: f64) -> String {
     if value.is_infinite() {
         return if value > 0.0 { "Infinity" } else { "-Infinity" }.into();
     }
-    let scientific = format!("{:e}", value.abs());
+    let mut scientific = format!("{:e}", value.abs());
+    // The shortest digits that round-trip; where two such strings are equally
+    // close (an exact tie), Python takes the correctly rounded (half-even) one.
+    let length =
+        scientific.find('e').expect("exponent form") - usize::from(scientific.contains('.'));
+    let rounded = format!("{:.*e}", length - 1, value.abs());
+    if rounded.parse::<f64>() == Ok(value.abs()) {
+        scientific = rounded;
+    }
     let (mantissa, exponent) = scientific.split_once('e').expect("exponent form");
     let exponent: i32 = exponent.parse().expect("integer exponent");
     let digits: String = mantissa.chars().filter(|c| *c != '.').collect();
@@ -895,6 +903,8 @@ mod tests {
             (-0.5, "-0.5"),
             (0.0, "0.0"),
             (2.5e-300, "2.5e-300"),
+            // python3 -c "print(repr(17 * 2.0 ** -23))": a tie between two 17-digit strings.
+            (17.0 * 2f64.powi(-23), "2.0265579223632812e-06"),
             (f64::INFINITY, "Infinity"),
         ] {
             assert_eq!(python_float(value), text);
