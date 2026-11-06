@@ -4,10 +4,14 @@
 //! and generators stay a separate implementation from the code they test.
 #![forbid(unsafe_code)]
 
+mod archive;
 mod checks;
 mod corpus;
 mod ebml;
+mod fate;
+mod fetch;
 mod json;
+mod prepare;
 mod pyrandom;
 mod sha256;
 mod walk;
@@ -25,7 +29,13 @@ commands:
   check-design   harness data files parse and recorded gates keep their values
   check-safety   owned packages only, no build scripts, no unsafe code
   fixtures       generate the authored Matroska corpus into .research/ and its manifests
-  fixture        write one corpus variant (see `cargo xtask fixture --help`)";
+  fixture        write one corpus variant (see `cargo xtask fixture --help`)
+  prepare-ffmpeg [--jobs N] [--profile matroska|formats]
+                 build the pinned FFmpeg reference into .research/reference[-formats]
+  fetch-specs    [--record] cache the specification texts and verify specs/sources.json
+  fetch-vectors  cache the required external test vectors and verify their hashes
+  fate-inventory --source DIR --output FILE [--configured-list FILE]
+                 index FATE definitions as data; nothing is executed";
 
 fn main() -> ExitCode {
     let args: Vec<String> = std::env::args().skip(1).collect();
@@ -38,6 +48,19 @@ fn main() -> ExitCode {
         Some("check-safety") => check_safety(&root),
         Some("fixtures") => fixtures(&root),
         Some("fixture") => fixture(&root, &args[1..]),
+        Some("fate-inventory") => fate_inventory(&args[1..]),
+        Some("prepare-ffmpeg") => prepare_ffmpeg(&root, &args[1..]),
+        Some("fetch-specs") => match &args[1..] {
+            [] => fetch::specs(&root, false, &fetch::Network).map(|s| println!("{s}")),
+            [flag] if flag == "--record" => {
+                fetch::specs(&root, true, &fetch::Network).map(|s| println!("{s}"))
+            }
+            _ => Err(USAGE.to_owned()),
+        },
+        Some("fetch-vectors") => {
+            fetch::required_vectors(&root, &fetch::Network, fetch::VECTOR_LIMIT)
+                .map(|verified| println!("Verified required vectors: {}", verified.join(", ")))
+        }
         Some("-h" | "--help" | "help") => {
             println!("{USAGE}");
             Ok(())
@@ -91,6 +114,57 @@ fn fixtures(root: &Path) -> Task {
     for line in corpus::generate_all(&paths)? {
         println!("{line}");
     }
+    Ok(())
+}
+
+fn fate_inventory(args: &[String]) -> Task {
+    let (mut source, mut output, mut configured) = (None, None, None);
+    let mut rest = args.iter();
+    while let Some(flag) = rest.next() {
+        let value = PathBuf::from(rest.next().ok_or_else(|| format!("{flag} needs a value"))?);
+        match flag.as_str() {
+            "--source" => source = Some(value),
+            "--output" => output = Some(value),
+            "--configured-list" => configured = Some(value),
+            _ => return Err(USAGE.to_owned()),
+        }
+    }
+    let (source, output) = (
+        source.ok_or("--source is required")?,
+        output.ok_or("--output is required")?,
+    );
+    let mut report = fate::inventory(&source)?;
+    if let Some(list) = configured {
+        fate::annotate(
+            &mut report,
+            &std::fs::read(&list).map_err(|e| format!("{}: {e}", list.display()))?,
+        )?;
+    }
+    corpus::write_json(&output, &report)?;
+    let count = report
+        .get("cases")
+        .and_then(json::Value::as_array)
+        .map_or(0, <[_]>::len);
+    println!("Indexed {count} identities; none executed or accepted.");
+    Ok(())
+}
+
+fn prepare_ffmpeg(root: &Path, args: &[String]) -> Task {
+    let (mut jobs, mut profile) = (2, prepare::Profile::Matroska);
+    let mut rest = args.iter();
+    while let Some(flag) = rest.next() {
+        let value = rest.next().ok_or_else(|| format!("{flag} needs a value"))?;
+        match flag.as_str() {
+            "--jobs" => jobs = value.parse().map_err(|_| "jobs must be 1..8")?,
+            "--profile" if value == "matroska" => profile = prepare::Profile::Matroska,
+            "--profile" if value == "formats" => profile = prepare::Profile::Formats,
+            _ => return Err(USAGE.to_owned()),
+        }
+    }
+    println!(
+        "{}",
+        prepare::prepare(root, jobs, profile, &fetch::Network)?
+    );
     Ok(())
 }
 

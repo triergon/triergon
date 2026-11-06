@@ -24,3 +24,7 @@ chunks_exact_to_as_chunks = "allow"
 lto = "fat"
 codegen-units = 1
 
+
+# Repository tasks hash and unpack large inputs; optimise them even in dev builds.
+[profile.dev.package.xtask]
+opt-level = 3

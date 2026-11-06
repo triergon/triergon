@@ -1,106 +1,12 @@
 import hashlib
 import io
 import json
-import os
 from pathlib import Path
-import subprocess
 import tempfile
 import unittest
 from unittest.mock import patch
 
-from tools import fetch_required_vectors as fetcher
 from tools import run_fate as fate
-
-
-class RequiredVectorTests(unittest.TestCase):
-    def contract(self, root, filename='mkv/required.mkv', content=b'original vector'):
-        (root / 'harness').mkdir()
-        (root / 'harness/catalogue-slice.json').write_text(json.dumps({
-            'required_additional_vectors': [{
-                'file': filename, 'sha256': hashlib.sha256(content).hexdigest()}]}))
-
-    def test_cached_original_is_verified_without_network(self):
-        with tempfile.TemporaryDirectory() as directory:
-            root = Path(directory)
-            self.contract(root)
-            path = root / '.research/fate-samples/mkv/required.mkv'
-            path.parent.mkdir(parents=True)
-            path.write_bytes(b'original vector')
-            with patch.object(fetcher.urllib.request, 'urlopen', side_effect=AssertionError('no fetch')):
-                self.assertEqual(fetcher.fetch_required(root), ['mkv/required.mkv'])
-
-    def test_changed_cache_is_preserved_and_refused(self):
-        with tempfile.TemporaryDirectory() as directory:
-            root = Path(directory)
-            self.contract(root)
-            path = root / '.research/fate-samples/mkv/required.mkv'
-            path.parent.mkdir(parents=True)
-            path.write_bytes(b'changed')
-            with self.assertRaisesRegex(ValueError, 'cached required vector changed'):
-                fetcher.fetch_required(root)
-            self.assertEqual(path.read_bytes(), b'changed')
-
-    def test_wrong_download_is_not_published_as_a_cached_vector(self):
-        with tempfile.TemporaryDirectory() as directory:
-            root = Path(directory)
-            self.contract(root)
-            with patch.object(fetcher.urllib.request, 'urlopen', return_value=io.BytesIO(b'wrong')):
-                with self.assertRaisesRegex(ValueError, 'download hash mismatch'):
-                    fetcher.fetch_required(root)
-            self.assertFalse((root / '.research/fate-samples/mkv/required.mkv').exists())
-
-    def rsync_vector(self, content):
-        def transfer(args, **kwargs):
-            self.assertEqual(args[-2], 'rsync://fate-suite.ffmpeg.org/fate-suite/mkv/required.mkv')
-            self.assertTrue(kwargs['check'])
-            Path(args[-1]).write_bytes(content)
-
-        return patch.object(subprocess, 'run', side_effect=transfer)
-
-    def test_https_timeout_fetches_the_exact_vector_over_rsync(self):
-        with tempfile.TemporaryDirectory() as directory:
-            root = Path(directory)
-            self.contract(root)
-            with patch.object(fetcher.urllib.request, 'urlopen', side_effect=TimeoutError), \
-                 self.rsync_vector(b'original vector'):
-                self.assertEqual(fetcher.fetch_required(root), ['mkv/required.mkv'])
-            self.assertEqual((root / '.research/fate-samples/mkv/required.mkv').read_bytes(),
-                             b'original vector')
-
-    def test_wrong_rsync_download_is_not_published(self):
-        with tempfile.TemporaryDirectory() as directory:
-            root = Path(directory)
-            self.contract(root)
-            with patch.object(fetcher.urllib.request, 'urlopen', side_effect=TimeoutError), \
-                 self.rsync_vector(b'wrong'):
-                with self.assertRaisesRegex(ValueError, 'download hash mismatch'):
-                    fetcher.fetch_required(root)
-            self.assertFalse((root / '.research/fate-samples/mkv/required.mkv').exists())
-
-    @unittest.skipUnless(os.name == 'posix', 'rsync staging uses a POSIX file-size limit')
-    def test_rsync_cannot_write_past_the_staging_limit(self):
-        with tempfile.TemporaryDirectory() as directory:
-            root = Path(directory)
-            self.contract(root)
-            receiver = root / 'rsync'
-            receiver.write_text('#!/usr/bin/env python3\n'
-                                'import sys\n'
-                                'with open(sys.argv[-1], "wb", buffering=0) as file:\n'
-                                '    sys.exit(0 if file.write(bytes(2048)) == 2048 else 1)\n')
-            receiver.chmod(0o700)
-            with patch.dict(os.environ, PATH=f'{root}{os.pathsep}{os.environ["PATH"]}'), \
-                 patch.object(fetcher, 'MAXIMUM_BYTES', 1024), \
-                 patch.object(fetcher.urllib.request, 'urlopen', side_effect=TimeoutError):
-                with self.assertRaisesRegex(RuntimeError, 'could not fetch required vector'):
-                    fetcher.fetch_required(root)
-            self.assertFalse((root / '.research/fate-samples/mkv/required.mkv').exists())
-
-    def test_contract_path_cannot_escape_the_cache(self):
-        with tempfile.TemporaryDirectory() as directory:
-            root = Path(directory)
-            self.contract(root, '../outside.mkv')
-            with self.assertRaisesRegex(ValueError, 'invalid required vector path'):
-                fetcher.fetch_required(root)
 
 
 # Exercise FATE dispatch with isolated fixtures; no upstream result is fabricated.
