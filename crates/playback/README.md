@@ -66,6 +66,7 @@ MP4 needs an open and index step first: `mp4_open::Mp4Open` →
 | MP4 seek | `Player::prepare_mp4_sync_seek` / `apply_mp4_sync_seek`, `prepare_mp4_native_seek` / `apply_mp4_native_seek`, progressive variants, `PreparedMp4::movie_seek` |
 | MP4 catalogue replacement | `catalogue::Mp4Catalogue`, `Player::prepare_mp4_catalogue` / `replace_mp4_catalogue` |
 | TS / M2TS | `Engine::ts`, `ts_with_namespace`, `ts_segmented`, `ts_native`, `ts_native_private_audio_v1`, `ts_native_program_v1`, `ts_native_segment_v1`; `native_startup::NativeStartup` |
+| Progressive TS188 | `ts_progressive::TsProgressiveReader` (AVC + ADTS AAC) |
 | HLS media segments | `hls_segment::HlsSegmentReader` (AVC + AAC), `HlsMediaSegmentReader` (AVC/HEVC + AAC/AC-3/E-AC-3) |
 | Raw Annex B | `raw_video::RawVideoProbe`, `RawVideoSource`, `RawVideoConfigTracker`, `RawVideoFeed` |
 | Packet bridges | `nal_bridge::AvcBridge`, `hevc_bridge::HevcBridge`, `aac_bridge::AacBridge`, `av1_bridge::Av1Bridge` |
@@ -123,6 +124,13 @@ Private stream type `0x06` is audio only after explicit AC-3/E-AC-3 or DVB
 admission. M2TS prefix startup (`NativeStartup::new_m2ts_prefix_v2`) needs an
 8 KiB input window. The DVB native PES parser caps a continued segment at
 65,536 bytes.
+
+**Progressive TS188.** One sequential input with a stable PAT, PMT and clock,
+one AVC track and one ADTS AAC track. AVC starts on a timed IDR with an
+access-unit delimiter. AAC needs an initial PES timestamp, then advances
+by the exact ADTS duration when an anchor is absent. Source timestamps stay
+available alongside the playback clocks. Completed units can be delivered
+before the end of input. Start a new reader to begin at another offset.
 
 **HLS segments.** One independent TS188 segment with in-band PAT and PMT.
 The feed consumes validated PES continuations directly and preserves source

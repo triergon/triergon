@@ -55,3 +55,4 @@ pub mod hls_clock;
 mod hls_dolby;
 mod hls_hevc;
 pub mod hls_segment;
+pub mod ts_progressive;

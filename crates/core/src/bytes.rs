@@ -116,6 +116,10 @@ impl Bytes {
     pub fn shares_storage_with(&self, other: &Self) -> bool {
         Arc::ptr_eq(&self.storage, &other.storage)
     }
+    /// Whether another live view retains this allocation.
+    pub fn has_shared_storage(&self) -> bool {
+        Arc::strong_count(&self.storage) != 1
+    }
     /// Compare backing allocations without extending their lifetimes.
     pub fn storage_address(&self) -> ByteStorageAddress {
         ByteStorageAddress(Arc::as_ptr(&self.storage).addr())
