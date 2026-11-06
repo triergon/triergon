@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""D5/O62 capture qualification on native Linux (research tooling).
+"""Capture qualification on native Linux (tooling).
 
 For every required case in harness/capture/cases.json:
   1. generate the RGBA input and record its SHA-256;
@@ -149,7 +149,7 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--candidate", required=True)
     ap.add_argument("--reference", required=True, help="gating reference worker (best allowed FFmpeg build)")
-    ap.add_argument("--reference-streem", help="exact Streem-configuration worker, reported separately")
+    ap.add_argument("--reference-small", help="worker linked against the --enable-small build, reported separately")
     ap.add_argument("--oracle-bin", required=True)
     ap.add_argument("--observer", required=True)
     ap.add_argument("--cases", default=str(ROOT / "harness/capture/cases.json"))
@@ -176,7 +176,7 @@ def main():
     source_digest = digest_bytes(json.dumps(manifest, sort_keys=True).encode())
     identity = {"source_digest": source_digest, "source_manifest": manifest,
                 "candidate_sha256": sha256(a.candidate), "reference_sha256": sha256(a.reference),
-                "reference_streem_sha256": sha256(a.reference_streem) if a.reference_streem else None,
+                "reference_small_sha256": sha256(a.reference_small) if a.reference_small else None,
                 "observer_sha256": sha256(a.observer), "cases_sha256": sha256(a.cases),
                 "host": platform.uname()._asdict(), "utc": time.time()}
     (out / "identity.json").write_text(json.dumps(identity, indent=1))
@@ -195,8 +195,8 @@ def main():
         record["correctness_exit"] = cmp.returncode
         record["correctness_summary"] = json.loads(cmp.stdout) if cmp.returncode == 0 else {"error": cmp.stderr[-2000:]}
         record["runtime"] = runtime(a.candidate, a.reference, case, str(path), a.pairs, a.iterations, a.seed)
-        if a.reference_streem:
-            record["runtime_vs_streem_config"] = runtime(a.candidate, a.reference_streem, case, str(path),
+        if a.reference_small:
+            record["runtime_vs_small_config"] = runtime(a.candidate, a.reference_small, case, str(path),
                                                          max(10, a.pairs // 3), a.iterations, a.seed + 1)
         mdir = cdir / "memory"
         mdir.mkdir(exist_ok=True)

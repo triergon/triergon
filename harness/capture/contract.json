@@ -1,41 +1,15 @@
 {
   "schema": 1,
-  "id": "D5/O62 capture contract v1",
+  "id": "capture contract v1",
   "frozen_utc": "2026-11-02",
-  "status": "frozen v1 contract with encoder comparison rule v2 (see comparison_rules.encoder_revision_reason). Native Linux ARM64 re-observation (run v2, pinned FFmpeg 9.0.2 gating build): conversion within \u00b11 with the same exact-match fractions as the macOS exploration, PAT bytes equal, PMT equal apart from D2, SDT apart from D3, per-frame PTS/DTS/PCR and table cadence as stated, and the one-frame output delay of D1 (89 reference pictures for 90 inputs) in all 15 cases.",
-  "streem_source": {
-    "repository": "GLinnik21/plx-native (remote 'upstream' of the local streem-webos object store)",
-    "inspected_revision": "3bc30f4edd3b392724968f9945dbef002cd646f2",
-    "inspected_commit_utc": "2026-11-02T19:59:56Z",
-    "inspection": "read-only `git show <rev>:<path>`; no checkout, branch or file of Streem modified",
-    "historical_inventory_revision": "9c7c0fb5f7316c92ab8086beb19db03d5855dd6e (research/streem-inventory.json); capture code moved from rust-modules/src/ff.rs to rust-modules/media/src/ff.rs since then",
-    "also_compared": {
-      "personal/main": "3d0fca404b69e3e13f261a4cbc71a6e8db57f934 (rust-modules/src/ff/venc.rs) carries the same option set and call order"
-    },
-    "files_sha256": {
-      "rust-modules/media/src/ff.rs": "4405923f13634cf9e7166b590437af8d0827d8f41681b0e69f7ec389f4547a2a",
-      "rust-modules/src/capture.rs": "8d4f176567073c76e6e4088a21e539d36dbc7f0767dc74d15d27b0f1478333e0",
-      "rust-modules/base/src/devtrig.rs": "ba4da1113babb4311c2e0196245aaafcd98641f23c60a96df3fff72d9aebfc2d",
-      "ci/build-ffmpeg.sh": "2530a8500af23bc43b5257fd64f71506035d7b10aef0b1c2e5a45b649d5b461a",
-      "ci/dependencies.json": "3d2b761b7d4639638010772a332aaca8f66fbc0f30dec85a26b45a8276485fba"
-    },
-    "call_sites": {
-      "constants": "rust-modules/media/src/ff.rs:998-999 (SWS_BILINEAR, VENC_TB 1/30)",
-      "open": "rust-modules/media/src/ff.rs:1078-1290 (encoder options 1149-1157, sws 1211-1225, mpegts 1229-1285, AVIO 32768 1240-1255)",
-      "encode": "rust-modules/media/src/ff.rs:1295-1392 (negative stride flip, NV12->YUV420P split, pts++, send/receive, rescale, av_write_frame, avio_flush 1373)",
-      "teardown": "rust-modules/media/src/ff.rs:1394+ (no trailer)",
-      "hello": "rust-modules/src/capture.rs:363-382 (PXR2 kind 1, rate byte * 100 kbps, 0 -> 2.5 Mbps, width >= 720 or 0 -> 960x540 else 480x270)",
-      "session_rebuild": "rust-modules/src/capture.rs:705-740 (rebuild on geometry change or >1500 ms tick gap; failure latches mpeg off)",
-      "keepalive": "rust-modules/src/capture.rs:786-812 (IDLE_MS 1000 re-encodes the last picture; never replays bytes)",
-      "ffmpeg_pin": "ci/dependencies.json: ffmpeg 9.0.2, sha256 8c3850283eb25fa026482078a04051e0be17347b09ef81a0849bec15a96e002e; dev build adds --enable-encoder=mpeg1video --enable-muxer=mpegts and keeps swscale (ci/build-ffmpeg.sh:221-240)"
-    }
-  },
+  "status": "frozen v1 contract with encoder comparison rule v2 (see comparison_rules.encoder_revision_reason). Native Linux ARM64 re-observation (run v2, pinned FFmpeg 9.0.2 gating build): conversion within ±1 with the same exact-match fractions as the macOS exploration, PAT bytes equal, PMT equal apart from the stream_type decision, SDT apart from the SDT decision, per-frame PTS/DTS/PCR and table cadence as stated, and the reference's one-frame output delay (89 reference pictures for 90 inputs) in all 15 cases.",
+  "operation_source": "The capture call sequence of an application that streams its interface as MPEG-1 video in MPEG-TS: RGBA converted to NV12 by swscale (SWS_BILINEAR, negative stride for bottom-up rows), NV12 split into YUV420P planes, mpeg1video with time base 1/30, GOP 30, no B-pictures and fastint DCT, frame pts 0, 1, 2, ..., mpegts muxed through a 32,768-byte custom AVIO, av_write_frame and avio_flush per frame, no trailer. A rate byte times 100 kbps selects the bit rate (0 selects 2.5 Mbps); a width of at least 720 (or 0) selects 960x540, otherwise 480x270. harness/reference_capture.h reproduces this sequence.",
   "reference": {
     "ffmpeg_release": "9.0.2",
     "archive": "https://ffmpeg.org/releases/ffmpeg-9.0.2.tar.xz",
     "archive_sha256": "8c3850283eb25fa026482078a04051e0be17347b09ef81a0849bec15a96e002e",
-    "configuration": "Streem development component set (ci/build-ffmpeg.sh host branch, RELEASE unset) built natively on the qualification host; exact argv recorded in the reference build receipt",
-    "worker": "harness/capture/reference_capture.c (reproduces the Streem call sequence; tooling only)"
+    "configuration": "the application's development component set with --enable-small, and the same set without it as the gating build; built natively on the qualification host, exact argv recorded in the reference build receipt",
+    "worker": "harness/reference.c, capture build (SAFE_MEDIA_CAPTURE_REFERENCE); tooling only"
   },
   "input": {
     "pixel_format": "RGBA, 8 bits per channel, byte order R,G,B,A, tightly packed rows (stride = 4*width)",
@@ -43,7 +17,7 @@
       "960x540",
       "480x270"
     ],
-    "orientation": "top-down or bottom-up (Streem `flip`); bottom-up is read with a negative stride, no CPU flip pass",
+    "orientation": "top-down or bottom-up (the application's `flip`); bottom-up is read with a negative stride, no CPU flip pass",
     "alpha": "ignored (observed: alpha 0 and 255 give identical YUV)",
     "frame_cadence": "<= 30 fps, jittery; timestamps are frame counts, not capture times"
   },
@@ -55,7 +29,7 @@
     "chroma_vertical": "center-sited 2:1 decimation, taps 1/8,3/8,3/8,1/8 on source rows 2k-1..2k+2, edge rows replicated (observed SWS_BILINEAR kernel)",
     "rounding": "not specified normatively; comparison rule bounds the difference",
     "observed_on": "macOS ARM64 Homebrew FFmpeg 9.0.2 (exploratory); to be re-observed on pinned Linux ARM64",
-    "known_platform_divergence": "Streem's 32-bit ARM TV build selects swscale's arm rgbx_to_nv12 NEON converter, whose chroma/rounding may differ from the AArch64 general path. The Linux ARM64 qualification reference is the general path; TV equivalence is an O60 question."
+    "known_platform_divergence": "A 32-bit ARM build selects swscale's arm rgbx_to_nv12 NEON converter, whose chroma/rounding may differ from the AArch64 general path. The Linux ARM64 qualification reference is the general path; 32-bit ARM equivalence is not covered here."
   },
   "encoder": {
     "standard": "ISO/IEC 11172-2 (MPEG-1 video); normative syntax evidence from freely available ITU-T H.262 (MPEG-1 compatibility) plus public descriptions; no specification purchased",
@@ -71,7 +45,7 @@
     "motion": "full-pel and half-pel forward motion vectors; search algorithm is an implementation choice measured by the quality gate",
     "dct": "fastint is FFmpeg's DCT implementation selector; any IEEE-1180-accurate forward DCT is acceptable for the quality gate",
     "quantisation": "default MPEG-1 intra matrix, flat 16 non-intra matrix, qscale 2..31",
-    "latency": "FFmpeg 9.0.2 emits frame k's bytes only when frame k+1 is sent (observed: 1 frame -> 0 bytes, 2 frames -> 1 packet) and never emits the last frame (no drain, no trailer). The replacement emits frame k at call k. Declared deliberate difference D1 (lower latency, same per-frame timestamps); requires owner review.",
+    "latency": "FFmpeg 9.0.2 emits frame k's bytes only when frame k+1 is sent (observed: 1 frame -> 0 bytes, 2 frames -> 1 packet) and never emits the last frame (no drain, no trailer). The replacement emits frame k at call k. A deliberate difference (lower latency, same per-frame timestamps), approved under decisions.",
     "constrained_parameters_flag": "0 for both geometries (960x540 and 480x270 exceed 11172-2 constrained parameter limits)"
   },
   "timestamps": {
@@ -92,8 +66,8 @@
     "transport_stream_id": 1,
     "original_network_id": "0xff01",
     "program_number": 1,
-    "stream_type": "observed 0x02 (FFmpeg maps MPEG-1 video to H.262 type). H.222.0 Table 2-34 assigns 0x01 to ISO/IEC 11172-2 video and limits 0x02's 11172-2 use to constrained-parameter streams, which these are not. Replacement default 0x01; 0x02 selectable. Declared disagreement D2; requires owner review.",
-    "sdt": "service descriptor, service_type 0x01, provider/service names: FFmpeg writes 'FFmpeg'/'Service01'. Replacement default provider 'Triergon', service 'Service01', both selectable. Declared metadata difference D3; requires owner review.",
+    "stream_type": "observed 0x02 (FFmpeg maps MPEG-1 video to H.262 type). H.222.0 Table 2-34 assigns 0x01 to ISO/IEC 11172-2 video and limits 0x02's 11172-2 use to constrained-parameter streams, which these are not. Replacement default 0x01; 0x02 selectable. A deliberate difference, approved under decisions.",
+    "sdt": "service descriptor, service_type 0x01, provider/service names: FFmpeg writes 'FFmpeg'/'Service01'. Replacement default provider 'Triergon', service 'Service01', both selectable. A deliberate metadata difference, approved under decisions.",
     "table_cadence": "SDT on the first packet and when PCR advanced >= 500 ms since the last SDT; PAT+PMT on the first packet, when PCR advanced >= 100 ms since the last PAT, and before a key-frame PES whose predecessor was not a key frame; order SDT, PAT, PMT, then the PES",
     "pes": "stream_id 0xE0, PES_packet_length 0, '10' marker, no data alignment flag, PTS+DTS (both always present because PTS != DTS), header_data_length 10, one PES per encoded picture",
     "adaptation": "first TS packet of each PES carries an adaptation field with PCR; random_access_indicator set on key-frame PES; stuffing in the adaptation field of the final packet",
@@ -110,7 +84,7 @@
   },
   "comparison_rules": {
     "conversion": "per required RGBA input: identical plane geometry; every Y/U/V sample within +-1 of the reference; exact-match fraction reported",
-    "mux": "independent re-demux (FFmpeg demuxer and an own TS checker) of both outputs: same PIDs, stream type (subject to D2), PSI contents (subject to D3), PES payload bytes equal to the elementary stream, identical per-frame PTS/DTS/PCR, valid continuity, table cadence equal to the rule above; byte identity of the complete TS is checked when both get identical elementary streams",
+    "mux": "independent re-demux (FFmpeg demuxer and an own TS checker) of both outputs: same PIDs, stream type (subject to the stream_type decision), PSI contents (subject to the SDT decision), PES payload bytes equal to the elementary stream, identical per-frame PTS/DTS/PCR, valid continuity, table cadence equal to the rule above; byte identity of the complete TS is checked when both get identical elementary streams",
     "encoder": "v2 (revised 2026-11-02 before any native gate run): error-free independent FFmpeg decode of every frame; identical picture-type sequence; VBV underflow (H.262 Annex C variable-rate model, both streams simulated identically) no worse than the reference; and PSNR-Y over the common frames >= reference - 0.25 dB, judged (a) directly when the Rust stream uses <= 1.03x the reference bits, (b) directly when it uses more than that but <= 1.03x the requested budget (bit_rate x frames / 30), or (c) when the reference spent more than 1.03x the Rust bits, at equal bits: the Rust encoder is re-run at requested rates 1.25/1.6/2.0/2.6/3.4/4.5 x b until it reaches the reference's bits and its PSNR-Y is interpolated log-linearly at exactly the reference's bits; unreachable reference bits fail. Every report keeps the v1 verdict, the mode used and all points.",
     "encoder_rate_factors": [
       1.25,
@@ -124,19 +98,17 @@
     "runtime": "paired, randomized-order, isolated native Linux ARM64; per case upper 95% bound of Rust/FFmpeg time ratio <= 1.25 (target 0.80)",
     "memory": "per case, strictly lower peak live heap and strictly lower attributable RSS (harness/allocations-linux.c observer, separate runs)",
     "encoder_v1_superseded": "independent FFmpeg decode of every frame succeeds with no decode errors; picture type sequence identical (I every 30, P otherwise); per case, PSNR-Y of the Rust output >= reference PSNR-Y - 0.25 dB at Rust bytes <= 1.03 * reference bytes over the same frame count, and VBV (maxrate, bufsize) never underflows under the H.262 Annex C model",
-    "encoder_revision_reason": "Exploratory local runs showed FFmpeg's short-session rate control lands far from the requested rate in both directions (content-limited UI pictures at qmin underspend; motion at 0.1-1 Mbps overspends up to 1.2x; noise exceeds the VBV by 26 Mbit), so v1's fixed '<= 1.03x reference bytes' made quality comparisons at unequal rates. v2 compares at equal bits where the reference overspent and permits spending within the client's requested budget where the reference underspent; clause (b) is a policy choice flagged for owner review, and results under it are labelled 'within-requested-budget'."
+    "encoder_revision_reason": "Exploratory local runs showed FFmpeg's short-session rate control lands far from the requested rate in both directions (content-limited UI pictures at qmin underspend; motion at 0.1-1 Mbps overspends up to 1.2x; noise exceeds the VBV by 26 Mbit), so v1's fixed '<= 1.03x reference bytes' made quality comparisons at unequal rates. v2 compares at equal bits where the reference overspent and permits spending within the client's requested budget where the reference underspent; clause (b) is a policy choice, approved under decisions, and results under it are labelled 'within-requested-budget'."
   },
   "required_cases": "harness/capture/cases.json",
-  "owner_review": {
+  "decisions": {
     "date_utc": "2026-11-02",
-    "decision": "approved",
+    "status": "approved",
     "scope": [
-      "D1 latency",
-      "D2 stream_type 0x01",
-      "D3 SDT provider name",
-      "R2 encoder rule v2 including clause (b) within-requested-budget"
-    ],
-    "owner_words": "I'm fine with all of your decision.",
-    "context": "Given in the D5/O62 session after the plain-language explanation of D1-D3 and R2; applies to these four items only."
+      "latency: one frame of encoder delay and no final flush, as the reference",
+      "stream_type 0x01 for MPEG-1 video",
+      "SDT provider name",
+      "encoder rule v2, including clause (b) within the requested budget"
+    ]
   }
 }
