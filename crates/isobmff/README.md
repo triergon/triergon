@@ -74,7 +74,8 @@ FFmpeg-compatible operations for comparison runs.
 `AacConfigurationJob` reads AudioSpecificConfig from one `mp4a` sample
 description, including the supported QuickTime `wave` layout. It returns
 the source offset and shared bytes under `ConfigurationLimits` and a
-`WorkBudget`. Callers can validate the codec configuration separately.
+`WorkBudget`. The descriptor identifies MPEG-4 Audio. Callers validate
+the bytes and determine the audio object type separately.
 
 ## Supported
 
@@ -133,6 +134,7 @@ Specification basis:
 - Apple QuickTime File Format; Adobe F4V 10.1 §§1.3, 2.4–2.16 (boxes, tables,
   fragments, `tfra`/`mfro`).
 - ETSI TS 126 244 V18.0.0 §13.4 (`sidx`) and §13.5 (`tfdt`).
+- ISO/IEC 14496-14:2020 §6.7 (sample entries and elementary stream descriptors).
 - ISO/IEC 14496-12:2008/Amd1:2009 §§8.6.1.3.1–.3 (signed `ctts`);
   14496-12:2008/FDAmd2 §8.8.7.1 (moof-relative base).
 - MPEG m76694 Table 9 and FDAM3 draft text for `stz2`, signed `trun` and

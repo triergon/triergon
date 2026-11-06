@@ -123,6 +123,7 @@ enum DescriptorPhase {
 #[derive(Clone, Copy)]
 enum EsdsProfile {
     Aac,
+    AacDescription,
     RangeAudio,
     ObjectType,
 }
@@ -200,6 +201,13 @@ impl EsdsWalk {
                         });
                     }
                     let tag = self.byte()?;
+                    // ISO/IEC 14496-14 §6.7.2 gives esds one ES descriptor.
+                    if self.depth == 0
+                        && (tag != 3 || self.rows != 1)
+                        && matches!(self.profile, EsdsProfile::AacDescription)
+                    {
+                        return Err(Error::Invalid("AAC elementary stream descriptor root"));
+                    }
                     self.phase = DescriptorPhase::Length {
                         tag,
                         value: 0,
@@ -262,7 +270,7 @@ impl EsdsWalk {
                     let done = if tag == 4 {
                         if index == 0 {
                             let allowed = match self.profile {
-                                EsdsProfile::Aac => b == 0x40,
+                                EsdsProfile::Aac | EsdsProfile::AacDescription => b == 0x40,
                                 EsdsProfile::RangeAudio => b == 0x40 || dts_object_type(b)?,
                                 EsdsProfile::ObjectType => true,
                             };
@@ -334,7 +342,8 @@ impl EsdsWalk {
     }
 }
 
-/// AudioSpecificConfig stored in the original AAC sample entry.
+/// AudioSpecificConfig from an MPEG-4 Audio sample entry.
+/// Validate the bytes to identify the audio object type before decoding.
 #[derive(Debug)]
 pub struct AacConfiguration {
     /// Absolute source offset of the first configuration byte.
@@ -370,7 +379,7 @@ impl AacConfigurationJob {
             walk: Some(EsdsDescriptionWalk::with_profile(
                 entry,
                 limits,
-                EsdsProfile::Aac,
+                EsdsProfile::AacDescription,
             )?),
             failed: None,
         })
@@ -411,6 +420,9 @@ impl AacConfigurationJob {
         }
         if !walk.scan_configuration(work)? {
             return Ok(AacConfigurationStep::Yield);
+        }
+        if cancel.load(std::sync::atomic::Ordering::Relaxed) {
+            return Err(Error::Cancelled);
         }
         let (base, walker) = walk
             .esds
@@ -1636,6 +1648,21 @@ mod aac_entry_tests {
         assert_eq!(
             job.poll(&mut WorkBudget::new(1024), &cancel).unwrap_err(),
             Error::Cancelled
+        );
+    }
+
+    #[test]
+    fn refuses_a_second_top_level_elementary_stream_descriptor() {
+        let mut children = esds(&ASC);
+        children.extend([3, 3, 0, 2, 0]);
+        let size = u32::try_from(children.len()).unwrap();
+        children[..4].copy_from_slice(&size.to_be_bytes());
+        let (entry, _) = description(&children, false);
+        let mut job = AacConfigurationJob::new(&entry, ConfigurationLimits::default()).unwrap();
+        assert_eq!(
+            job.poll(&mut WorkBudget::new(1024), &AtomicBool::new(false))
+                .unwrap_err(),
+            Error::Invalid("AAC elementary stream descriptor root")
         );
     }
 
