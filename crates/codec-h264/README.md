@@ -1,7 +1,8 @@
 # triergon-codec-h264
 
 H.264/AVC decoder for Annex B byte streams, written from Rec. ITU-T H.264 (08/2024). It
-is a codec-layer crate with no dependencies beyond `std` and builds on stable Rust. It
+is a codec-layer crate whose only dependency is [triergon-codec](../codec/README.md)
+(it implements `VideoDecoder`) and builds on stable Rust. It
 decodes 8-bit 4:2:0 (and 4:0:0) Constrained Baseline, Main and High streams to cropped
 pictures in output order. It does not scale, convert colour or conceal damaged slices.
 
@@ -23,7 +24,7 @@ while let Some(pic) = dec.receive() { /* ... */ }
 
 `send_nals` accepts Annex B data without an implied access-unit boundary; `send_nal`
 takes one NAL unit without start code. `reset` drops the DPB and keeps parameter sets.
-`examples/decode.rs IN.264 OUT.yuv` writes raw yuv420p and one JSON line per picture.
+`examples/decode_h264.rs IN.264 OUT.yuv` writes raw yuv420p and one JSON line per picture.
 
 ## Supported
 

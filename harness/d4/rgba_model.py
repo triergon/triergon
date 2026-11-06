@@ -4,7 +4,7 @@ Exact rational arithmetic; see research/d4/RGBA-CONTRACT.json for the observatio
 taps(n, m) -> list of (start, integer coefficients) for each of the m outputs.
 
 Rules (each recovered from black-box impulse measurements through probe_rgba.c; the Rust
-implementation is crates/sim/src/scale.rs Filter::new):
+implementation is crates/pixel/src/letterbox.rs Filter::new):
 - step inc = round(n * 65536 / m); output x has centre c = (x * inc + (inc - 65536) / 2) / 65536.
 - kernel Keys cubic a = -0.6 evaluated at d / s with s = max(n / m, 1) (exact ratio, not inc);
   window size = 4 (upscale) or ceil(4 s) taps, starting at floor(c - (size - 1) / 2 + 1 / 2);

@@ -1,8 +1,9 @@
 # triergon-codec-ac3
 
 AC-3 and E-AC-3 decoder written from ATSC A/52:2018 (main body, Annex D alternate bit
-stream information, Annex E). It is a codec-layer crate with no dependencies beyond
-`std`. It decodes one access unit at a time to planar `f32` in FFmpeg's native channel
+stream information, Annex E). It is a codec-layer crate whose only dependency is
+[triergon-codec](../codec/README.md) (`AudioDecoder`, `AudioFrame`, `ChannelLayout`,
+`Speaker`, `DownmixLevels`). It decodes one access unit at a time to planar `f32` in FFmpeg's native channel
 order and exports FFmpeg-compatible downmix metadata. It does not downmix or resample.
 
 ## Usage
@@ -24,7 +25,7 @@ while pos < stream.len() {
 
 `Decoder::with_options(DecoderOptions { crc, noise, ffmpeg_compat })` selects the CRC
 policy (`CrcPolicy::Report` or `Reject`), the noise mode (`NoiseMode::Normal` or `Off`)
-and FFmpeg compatibility. `examples/decode.rs` writes interleaved f32le.
+and FFmpeg compatibility. `examples/decode_ac3.rs` writes interleaved f32le.
 
 ## Supported
 
@@ -45,7 +46,7 @@ Further independent programs are skipped.
 - `decode` appends to `out`, which must be empty or hold the same rate and layout
   (`OutputLayoutMismatch` otherwise). `reset` drops delay lines, concealment history and
   noise state.
-- Planes are ordered by ascending FFmpeg speaker bit (`Speaker`); 7.1 is
+- Planes follow the triergon-codec [channel order](../codec/README.md#channel-order); 7.1 is
   FL FR FC LFE BL BR SL SR.
 - Refused with `Unsupported(Feature)`: bsid > 16, reserved fscod2 and stream type 3, and
   (with `ffmpeg_compat`) E-AC-3 reduced sample rates. Enhanced coupling conceals the frame

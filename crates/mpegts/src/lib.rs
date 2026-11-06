@@ -10,6 +10,7 @@ pub mod clock;
 mod continuity;
 mod framer;
 mod media_entity;
+pub mod mux;
 pub mod native_catalogue;
 pub mod native_input;
 pub mod native_packet_completion;

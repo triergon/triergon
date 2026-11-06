@@ -288,7 +288,7 @@ fn run(command: &mut Command) -> Task {
 /// The opt-in nightly `std::simd` lane of the HEVC decoder must decode exactly as
 /// the scalar default does (the conformance tests compare both with FFmpeg digests).
 fn check_simd(root: &Path) -> Task {
-    let features = "triergon-codec-hevc/simd,triergon-sim/codecs";
+    let features = "triergon-codec-hevc/simd,codec-worker/simd";
     cargo(
         root,
         Some("+nightly"),
@@ -297,7 +297,7 @@ fn check_simd(root: &Path) -> Task {
             "-p",
             "triergon-codec-hevc",
             "-p",
-            "triergon-sim",
+            "codec-worker",
             "--features",
             features,
             "--all-targets",

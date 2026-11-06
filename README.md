@@ -36,11 +36,14 @@ It is written from the published standards and measured case by case against FFm
 | [`triergon-mpegts`](crates/mpegts) | MPEG-TS and M2TS: PSI, PES assembly, timestamps, HLS segments |
 | [`triergon-framing`](crates/framing) | Codec configuration and packet conversion for H.264, HEVC, AV1, VP9, AAC, AC-3, DTS |
 | [`triergon-subtitles`](crates/subtitles) | SRT, WebVTT, ASS, mov_text and tx3g; PGS, DVB and DVD bitmap subtitles |
+| [`triergon-pixel`](crates/pixel) | Decoded-picture views, BT.601 RGBA to YUV 4:2:0, letterboxing into a 1920×1080 RGBA canvas |
+| [`triergon-codec`](crates/codec) | Decoder traits, audio frames, channel layouts and the shared channel order |
 | [`triergon-codec-h264`](crates/codec-h264), [`-hevc`](crates/codec-hevc) | Software video decoders |
 | [`triergon-codec-aac`](crates/codec-aac), [`-ac3`](crates/codec-ac3), [`-dca`](crates/codec-dca) | Software audio decoders |
+| [`triergon-codec-mpeg1`](crates/codec-mpeg1) | MPEG-1 video encoder with I and P pictures |
 | [`triergon-playback`](crates/playback) | Container-independent packet feeds with seeking |
-| [`triergon-sim`](crates/sim) | Decode sessions: queues, clocks and output over the decoders |
-| [`triergon-capture`](crates/capture) | RGBA to YUV, MPEG-1 video encoding and MPEG-TS muxing |
+| [`triergon-session`](crates/session) | Decode sessions: queues, clocks and output over the decoders |
+| [`triergon-capture`](crates/capture) | Capture session: RGBA frames in, MPEG-1 video in MPEG-TS out |
 
 ## Getting started
 

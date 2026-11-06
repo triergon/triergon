@@ -13,6 +13,7 @@ use crate::ps::{self, Layout, Pps, Sps};
 use crate::slice::{self, SLICE_B, SLICE_I, SliceHeader};
 use crate::state::{PicState, SliceInfo};
 use crate::{deblock, sao};
+use triergon_codec::{Colour, DecodeFailure, PictureView, VideoDecoder};
 
 /// Colour description from the VUI (Annex E). Values 2 mean "unspecified".
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -107,6 +108,57 @@ pub struct Picture {
     pub colour: ColourDescription,
 }
 
+/// The session view of the decoder. A received picture is held until the next call, so
+/// its frame returns to the pool exactly when the inherent API's would.
+impl VideoDecoder for Decoder {
+    fn send(&mut self, au: &[u8], pts: Option<i64>) -> core::result::Result<(), DecodeFailure> {
+        self.held = None;
+        Decoder::send(self, au, pts).map_err(DecodeFailure::from_error)
+    }
+    fn receive(&mut self) -> Option<PictureView<'_>> {
+        self.held = self.out.pop_front();
+        let picture = self.held.as_ref()?;
+        fn plane(p: &Plane) -> triergon_codec::Plane<'_> {
+            match p.raw() {
+                (Row::U8(data), stride, offset) => triergon_codec::Plane::U8 {
+                    data,
+                    stride,
+                    offset,
+                },
+                (Row::U16(data), stride, offset) => triergon_codec::Plane::U16 {
+                    data,
+                    stride,
+                    offset,
+                },
+            }
+        }
+        Some(PictureView {
+            width: picture.width as usize,
+            height: picture.height as usize,
+            bit_depth: picture.bit_depth as u8,
+            planes: [
+                plane(&picture.planes[0]),
+                plane(&picture.planes[1]),
+                plane(&picture.planes[2]),
+            ],
+            pts: picture.pts,
+            sar: picture.sar,
+            colour: Colour {
+                matrix: picture.colour.matrix,
+                full_range: picture.colour.full_range,
+            },
+        })
+    }
+    fn flush(&mut self) {
+        self.held = None;
+        Decoder::flush(self);
+    }
+    fn reset(&mut self) {
+        self.held = None;
+        Decoder::reset(self);
+    }
+}
+
 #[derive(Clone, Copy, PartialEq, Eq)]
 enum RefMark {
     Unused,
@@ -159,6 +211,8 @@ pub struct Decoder {
     layout_cache: Option<(Arc<Sps>, Arc<Pps>, Arc<Layout>)>,
     dpb: Vec<DpbPic>,
     out: VecDeque<Picture>,
+    /// The picture the last [`VideoDecoder::receive`] view borrows.
+    held: Option<Picture>,
     cur: Option<CurPic>,
     st: PicState,
     scratch8: Scratch<u8>,
@@ -192,6 +246,7 @@ impl Decoder {
             layout_cache: None,
             dpb: Vec::new(),
             out: VecDeque::new(),
+            held: None,
             cur: None,
             st: PicState::new(),
             scratch8: Scratch::new(),

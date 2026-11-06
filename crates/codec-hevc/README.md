@@ -1,7 +1,8 @@
 # triergon-codec-hevc
 
 H.265/HEVC decoder for Annex B byte streams, written from Rec. ITU-T H.265 (V11, 01/2026).
-It is a codec-layer crate with no dependencies beyond `std`. It decodes the Main,
+It is a codec-layer crate whose only dependency is [triergon-codec](../codec/README.md)
+(it implements `VideoDecoder`). It decodes the Main,
 Main 10 and Main Still Picture profiles (4:2:0, 8 and 10 bit) to cropped pictures in
 output order, single-threaded. It does not scale, convert colour or conceal errors.
 
@@ -25,7 +26,7 @@ dec.flush();                           // end of stream: output the remaining pi
 
 `send_nal` takes one NAL unit without start code; `reset` drops the DPB and any partial
 picture. `Plane::raw()` gives zero-copy access to the backing plane and `write_raw`
-appends u8 or little-endian u16 samples. `examples/decode.rs IN.hevc OUT.yuv|-|null`
+appends u8 or little-endian u16 samples. `examples/decode_hevc.rs IN.hevc OUT.yuv|-|null`
 writes planar YUV and one JSON line per picture.
 
 ## Features

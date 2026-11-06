@@ -169,7 +169,7 @@ fn decodes_silent_mono_frame() {
     assert!(info.concealed.is_none());
     assert_eq!(info.dialnorm, 27);
     assert_eq!(out.layout.speakers(), &[Speaker::FrontCenter]);
-    assert_eq!(out.layout.layout_name(), "mono");
+    assert_eq!(triergon_codec_ac3::layout_name(&out.layout), "mono");
     assert_eq!(out.samples_per_channel, 1536);
     assert!(out.planes[0].iter().all(|&v| v == 0.0));
     assert!(info.downmix.is_none());
@@ -360,11 +360,8 @@ fn output_layout_mismatch_is_refused() {
     let mut dec = Decoder::new();
     let mut out = AudioFrame::default();
     dec.decode(&mono_frame(0), &mut out).unwrap();
-    out.layout = triergon_codec_ac3::ChannelLayout::from_speakers(&[
-        Speaker::FrontLeft,
-        Speaker::FrontRight,
-    ])
-    .unwrap();
+    out.layout =
+        triergon_codec_ac3::ChannelLayout::new([Speaker::FrontLeft, Speaker::FrontRight]).unwrap();
     assert_eq!(
         dec.decode(&mono_frame(0), &mut out).err(),
         Some(DecodeError::OutputLayoutMismatch)

@@ -2,8 +2,8 @@
 //! implicit signalling) and HE-AAC v2 (Parametric Stereo). Pure safe Rust, no dependencies.
 //!
 //! Output matches FFmpeg's native float AAC decoder conventions (sample rate after implicit
-//! SBR, plane order = FFmpeg native channel order, float full scale 1.0). Not qualified;
-//! see `research/d4/aac/STATUS.md`.
+//! SBR, plane order = FFmpeg native channel order, float full scale 1.0; see
+//! [`triergon_codec::layout`]). Not qualified; see `research/d4/aac/STATUS.md`.
 #![forbid(unsafe_code)]
 
 pub mod adts;
@@ -16,7 +16,6 @@ mod filterbank;
 mod huffman;
 mod huffman_tables;
 mod ics;
-pub mod layout;
 mod ltp;
 mod pce;
 mod pred;
@@ -25,19 +24,10 @@ mod tables;
 
 pub use adts::AdtsHeader;
 pub use error::{DecodeError, Feature};
-pub use layout::{ChannelLayout, Speaker};
+pub use triergon_codec::{AudioFrame, ChannelLayout, Speaker};
 
 use bits::BitReader;
-
-/// Decoded PCM for one access unit, planar float (full scale 1.0).
-#[derive(Clone, Debug, Default)]
-pub struct AudioFrame {
-    pub sample_rate: u32,
-    pub layout: ChannelLayout,
-    pub samples_per_channel: usize,
-    /// One plane per channel, in `layout` order (FFmpeg native order).
-    pub planes: Vec<Vec<f32>>,
-}
+use triergon_codec::{AudioDecoder, DecodeFailure, DownmixLevels};
 
 /// ADTS AAC decoder.
 pub struct Decoder {
@@ -115,7 +105,7 @@ impl Decoder {
         core.frames_out += 1;
         out.planes = planes;
         out.sample_rate = core.output_rate();
-        out.layout = core.layout.clone();
+        out.layout = core.layout;
         out.samples_per_channel = out.planes.first().map_or(0, |p| p.len());
         Ok(())
     }
@@ -151,4 +141,48 @@ impl Decoder {
             0
         }
     }
+}
+
+impl AudioDecoder for Decoder {
+    fn decode(
+        &mut self,
+        au: &[u8],
+        out: &mut AudioFrame,
+    ) -> Result<Option<DownmixLevels>, DecodeFailure> {
+        Decoder::decode(self, au, out).map_err(DecodeFailure::from_error)?;
+        Ok(None)
+    }
+    fn reset(&mut self) {
+        Decoder::reset(self);
+    }
+}
+
+/// FFmpeg's name for `layout` where one exists, else `"N channels (A+B+...)"` as
+/// ffprobe prints it.
+pub fn layout_name(layout: &ChannelLayout) -> String {
+    const NAMED: &[(u64, &str)] = &[
+        (0x4, "mono"),
+        (0x3, "stereo"),
+        (0x7, "3.0"),
+        (0x107, "4.0"),
+        (0x37, "5.0(back)"),
+        (0x607, "5.0"),
+        (0x3f, "5.1(back)"),
+        (0x60f, "5.1"),
+        (0xff, "7.1(wide)"),
+        (0x63f, "7.1"),
+        (0x503f, "5.1.2(back)"),
+        (0x13, "3.0(back)"),
+        (0x33, "quad"),
+        (0x603, "quad(side)"),
+        (0xb, "2.1"),
+        (0x70f, "6.1"),
+        (0x13f, "6.1(back)"),
+    ];
+    let mask = layout.mask();
+    if let Some((_, name)) = NAMED.iter().find(|(named, _)| *named == mask) {
+        return (*name).to_string();
+    }
+    let names: Vec<&str> = layout.speakers().iter().map(|s| s.name()).collect();
+    format!("{} channels ({})", names.len(), names.join("+"))
 }

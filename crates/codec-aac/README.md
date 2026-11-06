@@ -1,8 +1,9 @@
 # triergon-codec-aac
 
 MPEG-4 AAC decoder for ADTS access units: AAC Main, LC and LTP, HE-AAC (SBR) and
-HE-AAC v2 (Parametric Stereo). It is a codec-layer crate with no dependencies beyond
-`std`. It does not split streams, resample or downmix: the caller hands it one ADTS
+HE-AAC v2 (Parametric Stereo). It is a codec-layer crate whose only dependency is
+[triergon-codec](../codec/README.md), whose `AudioDecoder` trait it implements and
+whose `AudioFrame`, `ChannelLayout` and `Speaker` it re-exports. It does not split streams, resample or downmix: the caller hands it one ADTS
 frame at a time and receives planar `f32` in FFmpeg's native channel order.
 
 ## Usage
@@ -22,7 +23,7 @@ while let Some((at, header)) = adts::find_frame(&stream, pos) {
 dec.reset(); // after a seek: drops overlap, prediction, PNS, SBR and PS history
 ```
 
-`examples/decode.rs IN.aac OUT.f32` writes interleaved f32le and prints a JSON summary.
+`examples/decode_aac.rs IN.aac OUT.f32` writes interleaved f32le and prints a JSON summary.
 
 ## Supported
 
@@ -48,9 +49,9 @@ dec.reset(); // after a seek: drops overlap, prediction, PNS, SBR and PS history
 - Refused: SSR (`Feature::SsrGainControl`) and reserved sampling-frequency indices 13–15.
   ER, LD, ELD, USAC and 960-sample frames cannot be carried in ADTS; LATM/LOAS is not
   accepted.
-- `ChannelLayout::speakers()` names each plane's position. The `Speaker` discriminant is
-  FFmpeg's channel id, and planes are in ascending order of it, so plane `i` is FFmpeg
-  output channel `i`. Configurations 5, 6 and 7 map to 5.0(side), 5.1(side) and 7.1.
+- `ChannelLayout::speakers()` names each plane's position, in the
+  [channel order](../codec/README.md#channel-order) of triergon-codec: plane `i` is
+  FFmpeg output channel `i`. Configurations 5, 6 and 7 map to 5.0(side), 5.1(side) and 7.1.
   PCE layouts that FFmpeg reports as unnamed keep PCE element order.
 - Dynamic range control data is parsed and not applied, as FFmpeg does by default.
 - FFmpeg-compatible behaviour: the PNS noise generator (LCG, seed `0x1f2e3d4c`); two SCEs

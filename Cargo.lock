@@ -3,6 +3,25 @@
 version = 4
 
 [[package]]
+name = "capture-worker"
+version = "0.0.0"
+dependencies = [
+ "triergon-capture",
+]
+
+[[package]]
+name = "codec-worker"
+version = "0.0.0"
+dependencies = [
+ "triergon-codec",
+ "triergon-codec-aac",
+ "triergon-codec-ac3",
+ "triergon-harness-protocol",
+ "triergon-pixel",
+ "triergon-session",
+]
+
+[[package]]
 name = "media-worker"
 version = "0.0.0"
 dependencies = [
@@ -13,23 +32,46 @@ dependencies = [
 [[package]]
 name = "triergon-capture"
 version = "0.0.0"
+dependencies = [
+ "triergon-codec-mpeg1",
+ "triergon-core",
+ "triergon-mpegts",
+ "triergon-pixel",
+]
+
+[[package]]
+name = "triergon-codec"
+version = "0.0.0"
+dependencies = [
+ "triergon-pixel",
+]
 
 [[package]]
 name = "triergon-codec-aac"
 version = "0.0.0"
+dependencies = [
+ "triergon-codec",
+]
 
 [[package]]
 name = "triergon-codec-ac3"
 version = "0.0.0"
+dependencies = [
+ "triergon-codec",
+]
 
 [[package]]
 name = "triergon-codec-dca"
 version = "0.0.0"
+dependencies = [
+ "triergon-codec",
+]
 
 [[package]]
 name = "triergon-codec-h264"
 version = "0.0.0"
 dependencies = [
+ "triergon-codec",
  "triergon-harness-protocol",
 ]
 
@@ -37,7 +79,15 @@ dependencies = [
 name = "triergon-codec-hevc"
 version = "0.0.0"
 dependencies = [
+ "triergon-codec",
  "triergon-harness-protocol",
+]
+
+[[package]]
+name = "triergon-codec-mpeg1"
+version = "0.0.0"
+dependencies = [
+ "triergon-pixel",
 ]
 
 [[package]]
@@ -82,6 +132,10 @@ dependencies = [
 ]
 
 [[package]]
+name = "triergon-pixel"
+version = "0.0.0"
+
+[[package]]
 name = "triergon-playback"
 version = "0.0.0"
 dependencies = [
@@ -90,19 +144,21 @@ dependencies = [
  "triergon-isobmff",
  "triergon-matroska",
  "triergon-mpegts",
- "triergon-sim",
+ "triergon-session",
  "triergon-subtitles",
 ]
 
 [[package]]
-name = "triergon-sim"
+name = "triergon-session"
 version = "0.0.0"
 dependencies = [
+ "triergon-codec",
  "triergon-codec-aac",
  "triergon-codec-ac3",
  "triergon-codec-dca",
  "triergon-codec-h264",
  "triergon-codec-hevc",
+ "triergon-pixel",
 ]
 
 [[package]]

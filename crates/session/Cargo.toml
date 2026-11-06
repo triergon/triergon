@@ -1,0 +1,27 @@
+[package]
+name = "triergon-session"
+version = "0.0.0"
+description = "Desktop playback sessions: bounded queues, decoder lifecycle and clock-gated output"
+repository.workspace = true
+license.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+
+[dependencies]
+triergon-codec = { path = "../codec" }
+triergon-pixel = { path = "../pixel" }
+triergon-codec-ac3 = { path = "../codec-ac3", optional = true }
+triergon-codec-aac = { path = "../codec-aac", optional = true }
+triergon-codec-dca = { path = "../codec-dca", optional = true }
+triergon-codec-h264 = { path = "../codec-h264", optional = true }
+triergon-codec-hevc = { path = "../codec-hevc", optional = true }
+
+[features]
+# The pure-Rust decoders behind `video_decoder` and `audio_decoder`.
+codecs = ["dep:triergon-codec-ac3", "dep:triergon-codec-aac", "dep:triergon-codec-dca", "dep:triergon-codec-h264", "dep:triergon-codec-hevc"]
+# Nightly-only explicit SIMD kernels in the HEVC decoder; output is identical.
+simd = ["triergon-codec-hevc?/simd"]
+
+[lints]
+workspace = true

@@ -67,7 +67,7 @@ cc -std=c11 -O2 -Wall -Wextra -Werror -fPIC -shared -fno-builtin -Wl,-z,now \
 
 cd "$SRC"
 . "$HOME/.cargo/env"
-CARGO_INCREMENTAL=0 cargo +nightly build --release --locked -p triergon-capture > "$BASE/logs/cargo-build.log" 2>&1
+CARGO_INCREMENTAL=0 cargo +nightly build --release --locked -p capture-worker > "$BASE/logs/cargo-build.log" 2>&1
 cp target/release/capture-worker "$BASE/bin/capture-worker"
 
 python3 - "$BASE" "$SRC" <<'PY'

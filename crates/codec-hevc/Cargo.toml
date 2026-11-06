@@ -14,6 +14,7 @@ default = []
 simd = []
 
 [dependencies]
+triergon-codec = { path = "../codec" }
 
 [dev-dependencies]
 triergon-harness-protocol = { path = "../harness-protocol" }

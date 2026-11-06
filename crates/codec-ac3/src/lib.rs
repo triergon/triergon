@@ -3,7 +3,7 @@
 //! used only as a black-box oracle for output conventions (channel order, concealment).
 //!
 //! Output is planar `f32` at full scale 1.0, planes ordered as FFmpeg's native decoder
-//! orders them (ascending FFmpeg speaker bit, see [`Speaker`]).
+//! orders them (ascending FFmpeg speaker bit, see [`triergon_codec::layout`]).
 //!
 //! Not qualified: see `research/d4/ac3/STATUS.md` for the measured state.
 #![forbid(unsafe_code)]
@@ -25,39 +25,21 @@ mod tables;
 pub use bits::crc16;
 pub use error::{DecodeError, Feature};
 pub use header::{FrameHeader, StreamType, Syntax, access_unit_len, parse_header};
-pub use layout::{ChannelLayout, MAX_CHANNELS, Speaker};
+pub use layout::{MAX_CHANNELS, layout_name};
 #[doc(hidden)]
 pub use substream::{BlockTrace, FrameTrace, Trace};
 pub use substream::{DownmixCodes, FrameFeatures, NoiseMode};
+pub use triergon_codec::{AudioFrame, ChannelLayout, Speaker};
 
 use bits::PAD;
 use quant::GroupTables;
 use substream::{BlockSink, LFE, NCH, PlaneMap, Substream, acmod_channels};
+use triergon_codec::{AudioDecoder, DecodeFailure, DownmixLevels, SurroundEncoding};
 
 /// Largest syncframe: 2048 16-bit words (E-AC-3 frmsiz) / 1920 words (AC-3 32 kHz 640 kbps).
 const MAX_FRAME_BYTES: usize = 4096;
 /// Maximum syncframes per access unit (independent + 8 dependents + other programs).
 const MAX_FRAMES_PER_AU: usize = 64;
-
-/// Planar decoded audio.
-#[derive(Clone, Debug, Default)]
-pub struct AudioFrame {
-    pub sample_rate: u32,
-    pub layout: ChannelLayout,
-    pub samples_per_channel: usize,
-    /// One plane per channel of `layout`, `samples_per_channel` samples each.
-    pub planes: Vec<Vec<f32>>,
-}
-
-impl AudioFrame {
-    /// Drop all samples (keeps allocations).
-    pub fn clear(&mut self) {
-        for p in self.planes.iter_mut() {
-            p.clear();
-        }
-        self.samples_per_channel = 0;
-    }
-}
 
 /// What to do with syncframes whose CRC does not check.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Default)]
@@ -113,6 +95,8 @@ pub struct FrameInfo {
     /// Samples per channel appended to the output frame.
     pub samples: usize,
     pub layout: ChannelLayout,
+    /// A 1+1 (dual mono) program: plane 0 is Ch1, plane 1 is Ch2.
+    pub dual_mono: bool,
     /// Number of syncframes decoded (independent substream 0 plus its dependents).
     pub substreams: usize,
     /// False if any decoded syncframe failed its CRC check.
@@ -150,6 +134,38 @@ pub struct DownmixInfo {
     pub surround_mix_level: Option<f64>,
     pub surround_mix_level_ltrt: Option<f64>,
     pub lfe_mix_level: Option<f64>,
+}
+
+impl DownmixInfo {
+    /// The stereo downmix FFmpeg's resampler applies: the Lt/Rt levels and surround
+    /// encoding when the stream prefers an Lt/Rt (or Pro Logic II) downmix, else the
+    /// Lo/Ro levels; absent levels keep the defaults.
+    pub fn levels(&self) -> DownmixLevels {
+        let default = DownmixLevels::default();
+        let (center, surround, encoding) = match self.preferred_downmix_type {
+            Some(DownmixType::LtRt) => (
+                self.center_mix_level_ltrt,
+                self.surround_mix_level_ltrt,
+                SurroundEncoding::Dolby,
+            ),
+            Some(DownmixType::DplII) => (
+                self.center_mix_level_ltrt,
+                self.surround_mix_level_ltrt,
+                SurroundEncoding::ProLogicII,
+            ),
+            _ => (
+                self.center_mix_level,
+                self.surround_mix_level,
+                SurroundEncoding::None,
+            ),
+        };
+        DownmixLevels {
+            center: center.map_or(default.center, |v| v as f32),
+            surround: surround.map_or(default.surround, |v| v as f32),
+            lfe: self.lfe_mix_level.map_or(default.lfe, |v| v as f32),
+            encoding,
+        }
+    }
 }
 
 /// Annex D Tables D2.3-D2.6 gains for the 3-bit mix level codes (+3 dB .. -6 dB, -inf),
@@ -231,7 +247,8 @@ pub struct Decoder {
     indep: Box<Substream>,
     deps: Vec<Option<Box<Substream>>>,
     last_block: Box<[[f32; 256]; MAX_CHANNELS]>,
-    last_layout: Option<ChannelLayout>,
+    /// Layout and dual-mono flag of the last decoded block, for concealment.
+    last_layout: Option<(ChannelLayout, bool)>,
     scratch: Box<[f32; 256]>,
     trace: Trace,
     quirk_armed: bool,
@@ -460,8 +477,10 @@ impl Decoder {
                 }
             }
         }
-        let mut layout = ChannelLayout::from_speakers(&speakers[..nsp]).expect("unique speakers");
-        layout.dual_mono = first.acmod == 0;
+        // Native order; the speakers are unique by construction.
+        speakers[..nsp].sort_unstable();
+        let layout = ChannelLayout::new(speakers[..nsp].iter().copied()).expect("16 speakers");
+        let dual_mono = first.acmod == 0;
         // Planes: a speaker written by a later substream replaces the earlier one.
         for i in 0..nframes {
             for c in 0..NCH {
@@ -496,7 +515,7 @@ impl Decoder {
             }
             // AC-3: repeat the last decoded block (FFmpeg-compatible concealment).
             prepare_output(out, &layout, out_rate, base + samples);
-            let same = self.last_layout == Some(layout);
+            let same = self.last_layout == Some((layout, dual_mono));
             for p in 0..layout.channels() {
                 for blk in 0..first.num_blocks {
                     let dst = &mut out.planes[p][base + blk * 256..base + blk * 256 + 256];
@@ -516,6 +535,7 @@ impl Decoder {
                 sample_rate: out_rate,
                 samples,
                 layout,
+                dual_mono,
                 substreams: 0,
                 crc_ok: false,
                 concealed: Some(DecodeError::Truncated {
@@ -613,7 +633,7 @@ impl Decoder {
                     for b in blk..h.num_blocks {
                         let dst = base + b * 256;
                         if b == 0 {
-                            let src = if self.last_layout == Some(layout) {
+                            let src = if self.last_layout == Some((layout, dual_mono)) {
                                 self.last_block[p]
                             } else {
                                 [0.0; 256]
@@ -631,7 +651,7 @@ impl Decoder {
         for p in 0..layout.channels() {
             self.last_block[p].copy_from_slice(&out.planes[p][last..last + 256]);
         }
-        self.last_layout = Some(layout);
+        self.last_layout = Some((layout, dual_mono));
         self.last_downmix = downmix;
         Ok(FrameInfo {
             syntax: first.syntax,
@@ -642,6 +662,7 @@ impl Decoder {
             sample_rate: out_rate,
             samples,
             layout,
+            dual_mono,
             substreams: decoded,
             crc_ok,
             concealed,
@@ -649,6 +670,21 @@ impl Decoder {
             downmix_codes,
             downmix,
         })
+    }
+}
+
+impl AudioDecoder for Decoder {
+    fn decode(
+        &mut self,
+        au: &[u8],
+        out: &mut AudioFrame,
+    ) -> Result<Option<DownmixLevels>, DecodeFailure> {
+        out.clear();
+        let info = Decoder::decode(self, au, out).map_err(DecodeFailure::from_error)?;
+        Ok(info.downmix.map(|info| info.levels()))
+    }
+    fn reset(&mut self) {
+        Decoder::reset(self);
     }
 }
 

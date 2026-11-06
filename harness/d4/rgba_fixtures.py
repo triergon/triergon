@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Capture reference digests of letterboxed synthetic pictures (research tooling).
 
-Each case is a pseudo-random 4:2:0 picture (the LCG below, mirrored in crates/sim/tests/rgba_reference.rs)
+Each case is a pseudo-random 4:2:0 picture (the LCG below, mirrored in crates/pixel/tests/rgba_reference.rs)
 converted by the reference chain (harness/d4/probe_rgba.c, full chain including pad). The digest is the
 M1 fold h = h * 31 + byte (mod 2^64) over the whole 1920x1080 RGBA canvas.
 usage: rgba_fixtures.py OUT.txt

@@ -5,7 +5,10 @@
 use super::CoreFrame;
 use crate::qmf::{Qmf, QmfState};
 use crate::subframe::{self, HIST, SubBuf};
-use crate::{AudioFrame, DecodeError, Decoder, MAX_SLOTS, OUT_SCALE, QMF64_GAIN, Speaker, tables};
+use crate::{
+    AudioFrame, ChannelLayout, DecodeError, Decoder, MAX_SLOTS, OUT_SCALE, QMF64_GAIN, Speaker,
+    tables,
+};
 
 impl Decoder {
     /// Resets filter bank histories on an output rate change, allocates the 64-band
@@ -251,10 +254,9 @@ pub(super) fn output_layout(
         h.sample_rate
     };
     out.samples_per_channel = nsamples;
-    out.layout.count = n as u8;
+    out.layout = ChannelLayout::new(order.iter().map(|e| e.0)).expect("at most 9 planes");
     out.planes.resize_with(n, Vec::new);
-    for (i, &(sp, src)) in order.iter().enumerate() {
-        out.layout.speakers[i] = sp;
+    for (i, &(_, src)) in order.iter().enumerate() {
         out.planes[i].resize(nsamples, 0.0);
         if src == LFE_SRC {
             lfe_plane = Some(i);

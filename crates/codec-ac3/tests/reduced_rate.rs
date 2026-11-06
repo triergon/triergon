@@ -119,7 +119,7 @@ fn reduced_rate_headers_divide_the_sample_rate_and_keep_the_frame_size() {
             assert_eq!((h.frame_bytes, h.num_blocks), (h8.frame_bytes, 6));
         }
     }
-    // Framing (used by crates/sim): one bsid 9/10 syncframe is one access unit.
+    // Framing (used by codec-worker): one bsid 9/10 syncframe is one access unit.
     for f in [k9(), k10()] {
         let two = [f.clone(), f.clone()].concat();
         assert_eq!(access_unit_len(&two).unwrap(), f.len());
@@ -173,7 +173,7 @@ fn bsid10_coupled_stereo_matches_ffmpeg() {
         (10, 8000, 1536)
     );
     assert!(info.crc_ok && info.concealed.is_none());
-    assert_eq!(out.layout.layout_name(), "2.1");
+    assert_eq!(triergon_codec_ac3::layout_name(&out.layout), "2.1");
     for (p, want) in K10_FFMPEG.iter().enumerate() {
         for (&i, &w) in IDX.iter().zip(want) {
             let got = out.planes[p][i] as f64;

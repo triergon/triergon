@@ -6,7 +6,8 @@ Bounded, incremental MPEG-2 transport stream reader for 188-byte TS and
 continuity, assembles PSI sections and PAT/PMT tables, and assembles PES
 packets with their raw timestamps. A PES is a byte run, not a codec access
 unit: access-unit framing belongs to `triergon-framing`, decoding to the codec
-crates. The crate does no I/O and does not seek.
+crates. The crate does no I/O and does not seek. The `mux` module writes a
+single-program stream for one video elementary stream ([Writing TS](#writing-ts)).
 
 The crate exposes two views:
 
@@ -64,6 +65,42 @@ source view as JSON lines (`mpegts_source_trace 188|192 PROGRAM [--dvb]
 [--native-clock-v1] [--media-entities-v1] [--compact] FILE...
 [--discontinuity FILE...]`); `examples/mpegts_native_pes_trace.rs` adds the
 FFmpeg-compatible PES rows.
+
+### Writing TS
+
+`mux::Muxer` writes 188-byte packets for one video elementary stream, one PES per
+picture:
+
+```rust
+use triergon_mpegts::mux::{MuxConfig, Muxer};
+
+let mut muxer = Muxer::new(&MuxConfig::default())?;
+muxer.write_picture(&es, pts, dts, key, &mut out); // 90 kHz pts/dts; appends to `out`
+```
+
+- Tables: PAT, PMT and a DVB SDT with one service descriptor (ETSI EN 300 468),
+  version 0, serialised once at `Muxer::new`. The SDT is repeated every 500 ms and
+  PAT/PMT every 100 ms of PCR time; PAT/PMT also precede a key picture that follows
+  a non-key picture.
+- PES: stream_id 0xE0, unbounded length, PTS and DTS. The first packet's
+  adaptation field carries PCR = DTS·300 and, on key pictures, the
+  random_access_indicator. Stuffing goes into the final packet's adaptation field.
+- `MuxConfig::default()`: transport_stream_id 1, original_network_id 0xFF01,
+  program 1, PMT PID 0x1000, video PID 0x0100, stream type 0x01, provider
+  "Triergon", service "Service01".
+- `Muxer::new` returns `Error::Unsupported` for names that are not printable ASCII
+  or do not fit one SDT packet together (158 bytes), program number 0, a PMT or
+  video PID outside 0x0020–0x1FFE, equal PMT and video PIDs, and stream types other
+  than 0x01 and 0x02.
+
+| Item | FFmpeg 9.0.2 | `mux` | Reason |
+|---|---|---|---|
+| PMT stream type | 0x02 | 0x01 by default, 0x02 selectable | H.222.0 Table 2-34 reserves 0x02 for constrained-parameter 11172-2 video |
+| SDT provider | "FFmpeg" | "Triergon" by default, selectable | do not claim another implementation's identity |
+
+`tests/mux.rs` checks SDT size limits and CRC, name encoding, PID and program
+validation. The written stream is compared with FFmpeg's through the capture
+pipeline ([triergon-capture](../capture/README.md#conformance)).
 
 ## Supported
 

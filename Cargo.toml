@@ -1,5 +1,5 @@
 [workspace]
-members = ["crates/core", "crates/media", "crates/worker", "crates/isobmff", "crates/mpegts", "crates/subtitles", "crates/framing", "crates/playback", "crates/capture", "crates/codec-aac", "crates/codec-ac3", "crates/codec-dca", "crates/codec-h264", "crates/codec-hevc", "crates/sim", "crates/harness-protocol", "xtask"]
+members = ["crates/core", "crates/media", "crates/worker", "crates/isobmff", "crates/mpegts", "crates/subtitles", "crates/framing", "crates/playback", "crates/capture", "crates/capture-worker", "crates/pixel", "crates/codec-mpeg1", "crates/codec-aac", "crates/codec-ac3", "crates/codec-dca", "crates/codec-h264", "crates/codec-hevc", "crates/codec", "crates/session", "crates/codec-worker", "crates/harness-protocol", "xtask"]
 resolver = "3"
 
 [workspace.package]

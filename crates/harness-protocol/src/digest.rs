@@ -43,7 +43,7 @@ pub fn fold_framed(h: &mut u64, bytes: &[u8]) {
 ///
 /// Timing-sensitive: both timing workers spend part of every measured operation
 /// here. This exact loop form vectorises the four 32-byte-strided lanes; an
-/// `as_chunks` rewrite measured about 10% slower on the AAC-heavy Matroska workloads,
+/// `as_chunks` rewrite measured about 10% slower on AAC-heavy workloads,
 /// so the slice-chunk form is kept deliberately.
 #[allow(clippy::chunks_exact_to_as_chunks)]
 pub fn fold_bytes(digest: &mut u64, bytes: &[u8]) {

@@ -15,10 +15,10 @@ Crates depend only on layers below them. Core never depends on a format.
 | Formats | [`triergon-matroska`](../crates/media) (Matroska/WebM), [`triergon-isobmff`](../crates/isobmff), [`triergon-mpegts`](../crates/mpegts) | Container readers: tracks, packets, metadata, seeking |
 | Framing | [`triergon-framing`](../crates/framing) | Codec configuration and packet-format adapters (Annex-B, ADTS, AC-3, DTS core, AV1, VP9) |
 | Subtitles | [`triergon-subtitles`](../crates/subtitles) | Text cue extraction and bitmap subtitle decoding |
-| Codecs | [`triergon-codec-aac`](../crates/codec-aac), [`-ac3`](../crates/codec-ac3), [`-dca`](../crates/codec-dca), [`-h264`](../crates/codec-h264), [`-hevc`](../crates/codec-hevc) | Software decoders |
-| Composition | [`triergon-playback`](../crates/playback), [`triergon-sim`](../crates/sim) | Packet feeds over the readers; decode sessions over the codecs |
-| Encoding | [`triergon-capture`](../crates/capture) | RGBA to YUV conversion, MPEG-1 video encoding, MPEG-TS muxing |
-| Tooling | [`media-worker`](../crates/worker), [`harness/`](../harness), [`tools/`](../tools) | Differential and benchmark workers; not part of the library |
+| Pixels | [`triergon-pixel`](../crates/pixel) | Decoded-picture views, coded YUV 4:2:0 pictures, BT.601 RGBA to YUV, letterbox into 1920×1080 RGBA |
+| Codecs | [`triergon-codec`](../crates/codec); [`triergon-codec-aac`](../crates/codec-aac), [`-ac3`](../crates/codec-ac3), [`-dca`](../crates/codec-dca), [`-h264`](../crates/codec-h264), [`-hevc`](../crates/codec-hevc); [`triergon-codec-mpeg1`](../crates/codec-mpeg1) | Decoder traits and audio vocabulary; software decoders; MPEG-1 video encoder |
+| Composition | [`triergon-playback`](../crates/playback), [`triergon-session`](../crates/session), [`triergon-capture`](../crates/capture) | Packet feeds over the readers; decode sessions over the codecs; capture sessions from RGBA to MPEG-TS |
+| Tooling | [`media-worker`](../crates/worker), [`codec-worker`](../crates/codec-worker), [`capture-worker`](../crates/capture-worker), [`harness/`](../harness), [`tools/`](../tools) | Differential and benchmark workers; not part of the library |
 
 The FFmpeg reference workers live in `harness/` as separate processes. They are
 never linked into a library crate.

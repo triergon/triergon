@@ -1,0 +1,24 @@
+[package]
+name = "codec-worker"
+version = "0.0.0"
+description = "Decoder measurement worker: decode, letterbox and downmix through the session decoders"
+repository.workspace = true
+license.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+
+[dependencies]
+triergon-codec = { path = "../codec" }
+triergon-codec-aac = { path = "../codec-aac" }
+triergon-codec-ac3 = { path = "../codec-ac3" }
+triergon-harness-protocol = { path = "../harness-protocol" }
+triergon-pixel = { path = "../pixel" }
+triergon-session = { path = "../session", features = ["codecs"] }
+
+[features]
+# Nightly-only explicit SIMD kernels in the HEVC decoder; output is identical.
+simd = ["triergon-session/simd"]
+
+[lints]
+workspace = true
