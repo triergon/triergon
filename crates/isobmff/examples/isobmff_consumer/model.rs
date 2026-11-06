@@ -1146,6 +1146,7 @@ impl<'a> Driver<'a> {
             }
             out.push_str(",\"packets\":[");
         }
+        let mut completed_packets = None;
         let (reads, eof) = if let Some(plan) = &plan {
             let mut cursor = plan.cursor()?;
             self.deliver_rows(
@@ -1164,18 +1165,28 @@ impl<'a> Driver<'a> {
                 Mov9PacketLimits::default(),
                 Mov9Profile::PinnedNoParseNoFillin,
             )?;
-            self.deliver_rows(
+            let result = self.deliver_rows(
                 model,
                 &mut cursor,
                 None,
                 stats,
                 retention,
                 trace.as_deref_mut(),
-            )?
+            )?;
+            if matches!(operation, NativeOperation::Index) && result.1 {
+                completed_packets = Some(cursor);
+            }
+            result
         };
         native_catalogue(streams.as_slice(), stats, trace.as_deref_mut())?;
         if matches!(operation, NativeOperation::Index) {
-            self.native_indexes(model, tracks.as_slice(), stats, trace.as_deref_mut())?;
+            self.native_indexes(
+                model,
+                tracks.as_slice(),
+                completed_packets.as_ref(),
+                stats,
+                trace.as_deref_mut(),
+            )?;
         }
         native_result(eof, stats, trace.as_deref_mut());
         if let (Some(out), Some(r)) = (trace, seek) {
@@ -1258,10 +1269,11 @@ impl<'a> Driver<'a> {
         }
         Ok((reads, false))
     }
-    fn native_indexes(
+    fn native_indexes<'model>(
         &self,
-        model: &Model,
-        tracks: &[Mov9Track<'_>],
+        model: &'model Model,
+        tracks: &[Mov9Track<'model>],
+        completed_packets: Option<&Mov9PacketCursor<'model>>,
         stats: &mut Stats,
         mut trace: Option<&mut String>,
     ) -> Result<()> {
@@ -1274,13 +1286,18 @@ impl<'a> Driver<'a> {
             out.push_str(",\"native_indexes\":[");
         }
         for (i, track) in tracks.iter().enumerate() {
-            let mut index = Mov9NativeIndexCursor::new_complete_source(
-                &self.budget,
-                *track,
-                model.media.as_slice(),
-                Mov9NativeIndexLimits::default(),
-                Mov9Profile::PinnedNoParseNoFillin,
-            )?;
+            let limits = Mov9NativeIndexLimits::default();
+            let mut index = if let Some(cursor) = completed_packets {
+                Mov9NativeIndexCursor::replay_track(cursor, track.track_id, limits.max_entries)?
+            } else {
+                Mov9NativeIndexCursor::new_complete_source(
+                    &self.budget,
+                    *track,
+                    model.media.as_slice(),
+                    limits,
+                    Mov9Profile::PinnedNoParseNoFillin,
+                )?
+            };
             native_index_stream(i, track.track_id, stats, trace.as_deref_mut(), || {
                 loop {
                     match index.poll(&mut WorkBudget::new(self.quantum), &self.cancel)? {
