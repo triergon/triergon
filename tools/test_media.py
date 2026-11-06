@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 """Run shared compatibility/benchmark workers; acceptance is always explicit."""
 import argparse
-import json
 import os
 from pathlib import Path
 import platform
@@ -9,16 +8,11 @@ import sys
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
+from harness.common import digest, load, save_json
 from harness.reuse import retained_memory, retained_timing
 from harness.comparison import rule_for, reference_record, reference_summary
-from harness.runner import acceptance, benchmark, digest, fate_coverage, load, memory, parity, seek_parity, colour_parity, catalogue_parity, measurement_cache, checkpoint_report
+from harness.runner import acceptance, benchmark, fate_coverage, memory, parity, seek_parity, colour_parity, catalogue_parity, measurement_cache, checkpoint_report
 from harness.provenance import source_identity_error as provenance_source_error
-
-
-def save_report(path, report):
-    temporary=path.with_suffix(".tmp")
-    temporary.write_text(json.dumps(report,indent=2)+"\n")
-    temporary.replace(path)
 
 
 def source_identity_error(identity):
@@ -126,14 +120,14 @@ def main():
         rows.append(row)
         # Keep completed cases even if the authorized isolation window expires.
         # A checkpoint is never an acceptance receipt.
-        save_report(a.output/"partial.json",checkpoint_report(report_base,rows,reusable))
+        save_json(a.output/"partial.json",checkpoint_report(report_base,rows,reusable))
     verdict=acceptance(contract,rows,identity,target,coverage,additional)
     if error := source_identity_error(identity):
         verdict["accepted"] = verdict["slice_accepted"] = False
         verdict["reasons"].append(error)
         verdict["slice_reasons"].append(error)
     report={**report_base,"collection_status":"complete","cases":rows,"acceptance":verdict}
-    save_report(a.output/"report.json",report)
+    save_json(a.output/"report.json",report)
     print("ACCEPTED" if verdict["accepted"] else "NOT ACCEPTED: " + "; ".join(verdict["reasons"]))
     print(contract["id"]+" SLICE ACCEPTED" if verdict["slice_accepted"] else contract["id"]+" SLICE NOT ACCEPTED: " + "; ".join(verdict["slice_reasons"]))
     if a.require_slice_acceptance and not verdict["slice_accepted"]:

@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 """Build isolated adapters and record exact installed-reference provenance."""
 import ctypes
-import hashlib
 import json
 import os
 import platform
@@ -13,12 +12,9 @@ import sys
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
+from harness.common import digest as sha, load, write_json
 from harness.provenance import cargo_metadata, matroska_inputs, selected_graph
 from harness.memory import linux_linked_libraries, linux_library_identity, linked_hashes, kernel_profile_current
-
-
-def sha(path):
-    return hashlib.sha256(Path(path).read_bytes()).hexdigest()
 
 
 def system_libraries(worker):
@@ -80,7 +76,7 @@ def main():
         if proof_path:
             proof_file = ROOT / proof_path
             profile = {"proof_path": proof_path, "proof_sha256": sha(proof_file),
-                       "proof": json.loads(proof_file.read_text())}
+                       "proof": load(proof_file)}
             if not kernel_profile_current(profile, instrumentation["observer_sha256"], instrumentation["probe_sha256"]):
                 raise ValueError("requested kernel RSS proof is unavailable or stale")
             instrumentation["rss_kernel_bound"] = {key: profile[key] for key in ("proof_path", "proof_sha256")}
@@ -91,8 +87,8 @@ def main():
         "candidate_command": candidate_command,
         "selected_graph": graph,
         "build_environment": {key: value for key, value in os.environ.items() if key in ("RUSTFLAGS", "CARGO_ENCODED_RUSTFLAGS", "RUSTC", "RUSTC_WRAPPER", "CARGO_BUILD_TARGET") or key.startswith(("CARGO_PROFILE_", "CARGO_TARGET_"))},
-        "source_revision": json.loads(pinned.read_text())["revision"] if pinned.exists() else None, "compiler_command": command,
-        "comparison_rules": json.loads((ROOT / "harness/comparison-rules.json").read_text()),
+        "source_revision": load(pinned)["revision"] if pinned.exists() else None, "compiler_command": command,
+        "comparison_rules": load(ROOT / "harness/comparison-rules.json"),
         "comparison_references": {
             "ffmpeg-native": {"path": "target/harness/ffmpeg-worker", "sha256": sha(out / "ffmpeg-worker"), "kind": "pinned native FFmpeg"},
             "ffmpeg-combined-native": {"path": "target/harness/ffmpeg-combined-worker", "sha256": sha(out / "ffmpeg-combined-worker"), "kind": "pinned FFmpeg plus native scope-1 combined-encoding restoration", "compiler_command": combined_command,
@@ -108,7 +104,7 @@ def main():
         "build_input_hashes": graph["shared_files"],
         "workspace_provenance": {"manifest_sha256": sha(ROOT / "Cargo.toml"), "lock_sha256": sha(ROOT / "Cargo.lock")},
         "reference_archives": {p.name:sha(p) for p in sorted((ROOT/".research/reference/install/lib").glob("*.a"))} if pinned.exists() else {},
-        "reference_build": json.loads(pinned.read_text()) if pinned.exists() else None,
+        "reference_build": load(pinned) if pinned.exists() else None,
         "reference_source_sha256": sha(ROOT / "harness/reference.c"),
         "lock_sha256": sha(ROOT / "Cargo.lock"),
         "ffprobe_sha256": sha(shutil.which("ffprobe")),
@@ -129,10 +125,10 @@ def main():
         bindings = {name: linux_library_identity(data) for name, data in libraries.items() if name in {"candidate", "reference", "combined_reference"}}
         for record in identity["comparison_references"].values():
             record["linked_library_bindings"] = bindings
-    (out / "identity.json").write_text(json.dumps(identity, indent=2) + "\n")
+    write_json(out / "identity.json", identity)
     if system == "Linux":
-        (out / "linux-loader-observations.json").write_text(json.dumps({
-            "identity_sha256": sha(out / "identity.json"), "raw_loader_observations": libraries}, indent=2) + "\n")
+        write_json(out / "linux-loader-observations.json", {
+            "identity_sha256": sha(out / "identity.json"), "raw_loader_observations": libraries})
     print(out / "identity.json")
 
 

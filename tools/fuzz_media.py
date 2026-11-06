@@ -3,7 +3,6 @@
 from collections import Counter
 from pathlib import Path
 import argparse
-import hashlib
 import json
 import platform
 import random
@@ -13,11 +12,8 @@ import sys
 
 ROOT=Path(__file__).resolve().parents[1]
 sys.path.insert(0,str(ROOT))
-from harness.fuzz import compare, json_decimal, mutation, observe, sha_bytes, strict_json
-
-
-def sha(path):
-    with Path(path).open('rb') as stream:return hashlib.file_digest(stream,'sha256').hexdigest()
+from harness.common import digest as sha, digest_bytes, save_json
+from harness.fuzz import compare, json_decimal, mutation, observe, strict_json
 
 
 def resolve(path):
@@ -26,9 +22,7 @@ def resolve(path):
 
 
 def write(path,data):
-    temporary=path.with_suffix('.tmp')
-    temporary.write_text(json.dumps(data,indent=2,default=json_decimal,allow_nan=False)+'\n')
-    temporary.replace(path)
+    save_json(path,data,default=json_decimal,allow_nan=False)
 
 
 def label(value):
@@ -64,7 +58,7 @@ def main():
     if not output.is_relative_to(ROOT/'.research') or output.exists():
         parser.error('output must be a new directory under .research')
     manifest_bytes=args.manifest.read_bytes()
-    manifest_digest=sha_bytes(manifest_bytes)
+    manifest_digest=digest_bytes(manifest_bytes)
     manifest=strict_json(manifest_bytes)
     if not isinstance(manifest,dict) or type(manifest.get('schema')) is not int or manifest['schema']!=1:
         parser.error('unknown mutation manifest schema')
@@ -87,7 +81,7 @@ def main():
     seed_bytes={}
     for row in seeds:
         data=resolve(row['path']).read_bytes()
-        if sha_bytes(data)!=row['sha256'] or len(data)>args.maximum_input_bytes:
+        if digest_bytes(data)!=row['sha256'] or len(data)>args.maximum_input_bytes:
             parser.error('seed hash or input-size mismatch: '+row['id'])
         if not row.get('rights'):parser.error('seed rights/provenance must be recorded: '+row['id'])
         expected=row.get('baseline_statuses',{})
@@ -108,7 +102,7 @@ def main():
     output.mkdir(parents=True)
     (output/'manifest.json').write_bytes(manifest_bytes)
     controller={str(p.relative_to(ROOT)):sha(p) for p in
-                [Path(__file__).resolve(),ROOT/'harness/fuzz.py',ROOT/'harness/runner.py']}
+                [Path(__file__).resolve(),ROOT/'harness/common.py',ROOT/'harness/fuzz.py',ROOT/'harness/runner.py']}
     for relative,digest in controller.items():
         source=ROOT/relative
         destination=output/'controller-source'/relative
@@ -136,7 +130,7 @@ def main():
             path=case/'input.bin';path.write_bytes(data)
             (case/'initial-input.bin').write_bytes(data)
             result={'ordinal':cases,'seed_id':row['id'],'seed_sha256':row['sha256'],'rights':row['rights'],
-                    'round':round_number,'input_sha256':sha_bytes(data),'recipe':recipe,'operations':[],'qualification':False}
+                    'round':round_number,'input_sha256':digest_bytes(data),'recipe':recipe,'operations':[],'qualification':False}
             for operation in operations:
                 observed={}
                 directory=case/operation['id']
@@ -152,7 +146,7 @@ def main():
                     else:
                         stdout,stderr=b'',b''
                         record={'status':'input-identity-changed','returncode':None,'command':command,
-                                'stdout_sha256':sha_bytes(stdout),'stderr_sha256':sha_bytes(stderr),'skipped':True}
+                                'stdout_sha256':digest_bytes(stdout),'stderr_sha256':digest_bytes(stderr),'skipped':True}
                     after=input_identity(path,result['input_sha256'],len(data),args.maximum_input_bytes)
                     record['input_before'],record['input_after']=before,after
                     if not before['matches'] or not after['matches']:

@@ -4,7 +4,6 @@ These helpers never grant feature, speed, memory or complete-module acceptance.
 """
 from __future__ import annotations
 
-import hashlib
 from decimal import Decimal, InvalidOperation
 import math
 import json
@@ -16,11 +15,8 @@ import signal
 import subprocess
 import time
 
+from .common import digest_bytes
 from .runner import differences
-
-
-def sha_bytes(data):
-    return hashlib.sha256(data).hexdigest()
 
 
 MAX_JSON_DEPTH = 256
@@ -98,7 +94,7 @@ def strict_json(data):
 
 
 def replay(seed, recipe, maximum_bytes):
-    if type(recipe.get("schema")) is not int or recipe["schema"] != 1 or recipe.get("seed_sha256") != sha_bytes(seed):
+    if type(recipe.get("schema")) is not int or recipe["schema"] != 1 or recipe.get("seed_sha256") != digest_bytes(seed):
         raise ValueError("mutation recipe does not bind this seed")
     if type(maximum_bytes) is not int or maximum_bytes < len(seed) or maximum_bytes < 1:
         raise ValueError("invalid mutation input bound")
@@ -120,7 +116,7 @@ def replay(seed, recipe, maximum_bytes):
         if len(result) - remove + len(encoded) // 2 > maximum_bytes:
             raise ValueError("mutation exceeds its declared input bound")
         result = result[:offset] + bytes.fromhex(encoded) + result[offset + remove:]
-    if recipe.get("result_sha256") != sha_bytes(result):
+    if recipe.get("result_sha256") != digest_bytes(result):
         raise ValueError("mutation result hash disagrees with its recipe")
     return result
 
@@ -172,8 +168,8 @@ def mutation(seed, rng: random.Random, maximum_bytes, maximum_edits=4):
             apply(0, 1, bytes([data[0] ^ 1]))
         else:
             apply(0, 0, b"\x80")
-    recipe = {"schema": 1, "seed_sha256": sha_bytes(seed), "edits": edits,
-              "result_sha256": sha_bytes(data)}
+    recipe = {"schema": 1, "seed_sha256": digest_bytes(seed), "edits": edits,
+              "result_sha256": digest_bytes(data)}
     if replay(seed, recipe, maximum_bytes) != data:
         raise AssertionError("generated mutation is not reproducible")
     return data, recipe
@@ -245,7 +241,7 @@ def observe(command, timeout_seconds, maximum_output_bytes):
             process.wait()
     stdout, stderr = bytes(buffers["stdout"]), bytes(buffers["stderr"])
     result = {"status": state, "returncode": code, "command": list(map(str, command)),
-              "stdout_sha256": sha_bytes(stdout), "stderr_sha256": sha_bytes(stderr),
+              "stdout_sha256": digest_bytes(stdout), "stderr_sha256": digest_bytes(stderr),
               "output_truncated": truncated, "output_bytes_seen": seen,
               "elapsed_seconds": time.monotonic() - started}
     if state == "completed":

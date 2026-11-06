@@ -23,7 +23,7 @@ resource limit becomes an explicit, reviewed rule for that case.
 ## Reference and corpus
 
 - **FFmpeg pin.** `make reference` builds FFmpeg from a pinned source revision with
-  recorded configure flags, compiler and binary hashes (`tools/prepare-ffmpeg.py`).
+  recorded configure flags, compiler and binary hashes (`tools/prepare_ffmpeg.py`).
 - **Authored corpus.** Small canonical streams generated from synthetic signals and
   authored structures, so inputs stay identical across encoder versions
   (`make fixtures`, `harness/*-corpus.json`, `harness/*-slice.json`).
@@ -32,7 +32,7 @@ resource limit becomes an explicit, reviewed rule for that case.
   expected result are mapped and run. Samples are fetched into an ignored cache with
   recorded hashes; nothing is redistributed without reviewed rights.
 - **Required vectors.** Larger external vectors are fetched and hash-verified by
-  `tools/fetch-required-vectors.py` and kept outside version control.
+  `tools/fetch_required_vectors.py` and kept outside version control.
 
 ## Correctness by module family
 
@@ -60,7 +60,7 @@ make qualify         # correctness, runtime and memory with acceptance
 ```
 
 `harness/runner.py` drives comparisons and timing; `harness/memory.py` collects heap and
-RSS; `tools/fuzz-media.py` runs deterministic, replayable byte mutations against debug,
+RSS; `tools/fuzz_media.py` runs deterministic, replayable byte mutations against debug,
 release and reference workers.
 
 ## Measuring performance

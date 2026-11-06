@@ -1,11 +1,12 @@
 #!/usr/bin/env python3
 """Authored complete-document metadata fixtures, specified independently of Rust."""
-import hashlib,importlib.util,json,sys,struct,zlib
+import sys,struct,zlib
 from pathlib import Path
 ROOT=Path(__file__).resolve().parents[1];sys.path.insert(0,str(ROOT))
+from harness.common import write_json
 from harness.spec_oracle import elements
-spec=importlib.util.spec_from_file_location('colour_generator',ROOT/'tools/generate-colour-corpus.py')
-base=importlib.util.module_from_spec(spec);spec.loader.exec_module(base)
+from tools import generate_colour_corpus as base
+from tools.generate_corpus import authored
 e,u=base.e,base.u
 
 def display(name,language=b'eng',ietf=None):
@@ -115,8 +116,8 @@ def main():
     output=ROOT/'.research/catalogue-fixtures';output.mkdir(parents=True,exist_ok=True);rows=[]
     for name,*args in profiles():
         data=make(*args);(output/(name+'.mkv')).write_bytes(data)
-        rows.append({'id':name,'profile':name,'file':name+'.mkv','sha256':hashlib.sha256(data).hexdigest(),'rights':'authored-synthetic'})
-    (ROOT/'harness/catalogue-corpus.json').write_text(json.dumps({'schema':1,'cases':rows},indent=2)+'\n')
+        rows.append(authored(name,name+'.mkv',data))
+    write_json(ROOT/'harness/catalogue-corpus.json', {'schema':1,'cases':rows})
     print('Generated',len(rows),'catalogue profiles')
 
 if __name__=='__main__':main()

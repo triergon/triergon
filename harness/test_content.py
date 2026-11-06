@@ -1,10 +1,9 @@
 """Independent Python/zlib content semantics, including reference disagreements."""
-import importlib.util,json,subprocess,tempfile,unittest,zlib
+import json,subprocess,tempfile,unittest,zlib
 from pathlib import Path
 from .runner import ROOT
 from .spec_oracle import elements,variable
-spec=importlib.util.spec_from_file_location('zlib_generator',ROOT/'tools/generate-zlib-corpus.py')
-fixture=importlib.util.module_from_spec(spec);spec.loader.exec_module(fixture)
+from tools import generate_zlib_corpus as fixture
 
 class ContentTests(unittest.TestCase):
     def test_ordered_chain_empty_and_private_bytes_against_independent_oracle(self):

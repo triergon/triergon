@@ -1,8 +1,6 @@
 #!/usr/bin/env python3
 """Cache hash-pinned required test vectors locally; never vendor their bytes."""
-import hashlib
 from http.client import HTTPException
-import json
 from pathlib import Path, PurePosixPath
 import subprocess
 import sys
@@ -10,6 +8,8 @@ import tempfile
 import urllib.request
 
 ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT))
+from harness.common import digest_bytes, load
 MAXIMUM_BYTES = 8 * 1024 * 1024
 
 
@@ -52,7 +52,7 @@ def download(relative):
 
 def fetch_required(root=ROOT):
     cache = (root / '.research/fate-samples').resolve()
-    contract = json.loads((root / 'harness/catalogue-slice.json').read_text())
+    contract = load(root / 'harness/catalogue-slice.json')
     verified = []
     for vector in contract['required_additional_vectors']:
         relative = PurePosixPath(vector['file'])
@@ -67,14 +67,14 @@ def fetch_required(root=ROOT):
                 data = cached.read(MAXIMUM_BYTES + 1)
             if len(data) > MAXIMUM_BYTES:
                 raise ValueError('cached required vector exceeds download bound')
-            if hashlib.sha256(data).hexdigest() != expected:
+            if digest_bytes(data) != expected:
                 raise ValueError('cached required vector changed: ' + str(relative))
         else:
             path.parent.mkdir(parents=True, exist_ok=True)
             data = download(relative)
             if len(data) > MAXIMUM_BYTES:
                 raise ValueError('required vector exceeds download bound')
-            if hashlib.sha256(data).hexdigest() != expected:
+            if digest_bytes(data) != expected:
                 raise ValueError('required vector download hash mismatch: ' + str(relative))
             temporary_path = None
             try:

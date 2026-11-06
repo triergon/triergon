@@ -23,28 +23,23 @@ research/capture/contract.json `comparison_rules`:
 Outputs one JSON report; every observation is kept, failures included.
 """
 import argparse
-import hashlib
 import json
 import math
 import os
+from pathlib import Path
 import subprocess
 import sys
 
 import numpy as np
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
+from harness.common import digest as sha256  # noqa: E402
 
 PACKET = 188
 
 
 def run(cmd, **kw):
     return subprocess.run(cmd, check=True, capture_output=True, text=True, **kw)
-
-
-def sha256(path):
-    h = hashlib.sha256()
-    with open(path, "rb") as f:
-        for chunk in iter(lambda: f.read(1 << 20), b""):
-            h.update(chunk)
-    return h.hexdigest()
 
 
 def planes(data, w, h, frames):

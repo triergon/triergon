@@ -1,14 +1,13 @@
 #!/usr/bin/env python3
 """Authored Matroska Colour/MasteringMetadata vectors, without downloaded media."""
-import hashlib
-import importlib.util
-import json
 from pathlib import Path
 import struct
+import sys
 
 ROOT = Path(__file__).resolve().parents[1]
-spec = importlib.util.spec_from_file_location('base', ROOT / 'tools/generate-corpus.py')
-base = importlib.util.module_from_spec(spec); spec.loader.exec_module(base)
+sys.path.insert(0, str(ROOT))
+from harness.common import load, write_json
+from tools import generate_corpus as base
 e, u = base.element, base.uint
 
 
@@ -50,7 +49,7 @@ def profiles():
 
 
 def make(fields, extra=b'', tracks=1):
-    source = json.loads((ROOT/'research/implementation/cases/avc-aac-sub/reference.json').read_text())['data']
+    source = load(ROOT/'research/implementation/cases/avc-aac-sub/reference.json')['data']
     video = next(t for t in source['tracks'] if t['kind'] == 1)
     packet = bytes.fromhex(next(p['payload'] for p in source['packets'] if p['track'] == 0))
     colour = b'' if fields is None else e(0x55B0, b''.join(u(k,v) for k,v in fields.items()) + extra)
@@ -63,16 +62,15 @@ def make(fields, extra=b'', tracks=1):
         for at in range(4):
             block=base.vint(n)+int(at*40).to_bytes(2,'big',signed=True)+b'\x80'+packet
             blocks.append(e(0xA3,block))
-    header=e(0x1A45DFA3,u(0x4286,1)+u(0x42F7,1)+u(0x42F2,4)+u(0x42F3,8)+e(0x4282,b'matroska')+u(0x4287,4)+u(0x4285,2))
-    return header+e(0x18538067,e(0x1549A966,u(0x2AD7B1,1_000_000))+e(0x1654AE6B,b''.join(entries))+e(0x1F43B675,u(0xE7,0)+b''.join(blocks)))
+    return base.EBML_HEADER+e(0x18538067,e(0x1549A966,u(0x2AD7B1,1_000_000))+e(0x1654AE6B,b''.join(entries))+e(0x1F43B675,u(0xE7,0)+b''.join(blocks)))
 
 
 def main():
     out=ROOT/'.research/colour-fixtures';out.mkdir(parents=True,exist_ok=True);cases=[]
     for name,fields,extra,tracks in profiles():
         data=make(fields,extra,tracks);filename=name+'.mkv';(out/filename).write_bytes(data)
-        cases.append({'id':name,'profile':name,'file':filename,'sha256':hashlib.sha256(data).hexdigest(),'rights':'authored-synthetic'})
-    (ROOT/'harness/colour-corpus.json').write_text(json.dumps({'schema':1,'cases':cases},indent=2)+'\n')
+        cases.append(base.authored(name,filename,data))
+    write_json(ROOT/'harness/colour-corpus.json', {'schema':1,'cases':cases})
     print('Generated',len(cases),'colour/HDR profiles')
 
 

@@ -1,6 +1,5 @@
 """Linux harness controls using authored files/mocks; no native process starts."""
 import copy
-import importlib.util
 import json
 from pathlib import Path
 import subprocess
@@ -9,6 +8,7 @@ from types import SimpleNamespace
 import unittest
 from unittest.mock import patch
 
+from tools import build_harness
 from . import memory, runner
 
 
@@ -375,10 +375,7 @@ class LinuxIsolationTests(unittest.TestCase):
 
 
 class LinuxBuildTests(unittest.TestCase):
-    def setUp(self):
-        path = runner.ROOT / "tools/build-harness.py"
-        spec = importlib.util.spec_from_file_location("build_harness_linux_test", path)
-        self.build = importlib.util.module_from_spec(spec); spec.loader.exec_module(self.build)
+    build = build_harness
 
     def test_Linux_build_commands_use_Hegel_sources_so_and_public_link_flags(self):
         commands = self.build.instrumentation_commands("cc", Path("out"), "Linux")

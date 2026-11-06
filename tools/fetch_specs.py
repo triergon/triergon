@@ -2,12 +2,13 @@
 """Cache authoritative specification texts and verify the recorded content hashes."""
 import argparse
 from datetime import date
-import hashlib
-import json
 from pathlib import Path
+import sys
 import urllib.request
 
 ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT))
+from harness.common import digest_bytes, load, write_json
 SOURCES = [
     ("rfc8794", "https://www.rfc-editor.org/rfc/rfc8794.txt", "EBML normative publication"),
     ("rfc9559", "https://www.rfc-editor.org/rfc/rfc9559.txt", "Matroska normative publication; updates RFC 8794"),
@@ -26,7 +27,7 @@ def main():
     cache = ROOT / ".research/specs"
     cache.mkdir(parents=True, exist_ok=True)
     manifest = ROOT / "specs/sources.json"
-    expected = {} if a.record else {r["id"]: r for r in json.loads(manifest.read_text())["sources"]}
+    expected = {} if a.record else {r["id"]: r for r in load(manifest)["sources"]}
     if not a.record and set(expected) != {entry[0] for entry in SOURCES}:
         raise ValueError("specification manifest and fetch catalog differ")
     rows = []
@@ -40,13 +41,13 @@ def main():
                 raise ValueError("specification size limit")
             path.write_bytes(data)
         data = path.read_bytes()
-        sha = hashlib.sha256(data).hexdigest()
+        sha = digest_bytes(data)
         if not a.record and expected[name]["sha256"] != sha:
             raise ValueError(name + ": specification drift; review before updating pin")
         rows.append({"id": name, "url": url, "sha256": sha, "bytes": len(data), "role": role, "cached_path": ".research/specs/" + name})
     if a.record:
         manifest.parent.mkdir(parents=True, exist_ok=True)
-        manifest.write_text(json.dumps({"schema": 1, "recorded": date.today().isoformat(), "sources": rows}, indent=2) + "\n")
+        write_json(manifest, {"schema": 1, "recorded": date.today().isoformat(), "sources": rows})
     print(f"Verified {len(rows)} specification snapshots")
 
 

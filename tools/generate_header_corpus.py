@@ -1,14 +1,12 @@
 #!/usr/bin/env python3
 """Original container-level header-removal fixtures; no downloaded media."""
-import hashlib
-import importlib.util
-import json
 from pathlib import Path
 import struct
+import sys
 
-ROOT=Path(__file__).resolve().parents[1]
-spec=importlib.util.spec_from_file_location("fixture_generator",ROOT/"tools/generate-corpus.py")
-base=importlib.util.module_from_spec(spec);spec.loader.exec_module(base)
+ROOT=Path(__file__).resolve().parents[1];sys.path.insert(0,str(ROOT))
+from harness.common import load, write_json
+from tools import generate_corpus as base
 e,u=base.element,base.uint
 
 
@@ -20,15 +18,14 @@ def make(scope,lace=False,aac=False):
     track+=e(0x63a2,raw_private)+u(0x23e383,1_000_000)+e(0xe1,u(0x9f,1)+u(0x6264,16)+e(0xb5,struct.pack('>d',48000 if aac else 8000)))+encoding
     if aac:
         # Reuse one packet from our own synthetic tone, preserving its bytes.
-        source=json.loads((ROOT/'research/implementation/cases/avc-aac-sub/reference.json').read_text())['data']
+        source=load(ROOT/'research/implementation/cases/avc-aac-sub/reference.json')['data']
         data=bytes.fromhex(next(p['payload'] for p in source['packets'] if p['track']==1))
         block=b'\x81\x00\x00\x80'+data
     elif lace:
         block=b'\x81\x00\x00\x84\x01\x00\x01\x02\x03'
     else:
         block=b'\x81\x00\x00\x80'
-    ebml=e(0x1a45dfa3,u(0x4286,1)+u(0x42f7,1)+u(0x42f2,4)+u(0x42f3,8)+e(0x4282,b'matroska')+u(0x4287,4)+u(0x4285,2))
-    return ebml+e(0x18538067,e(0x1549a966,u(0x2ad7b1,1_000_000))+e(0x1654ae6b,e(0xae,track))+e(0x1f43b675,u(0xe7,0)+e(0xa3,block)))
+    return base.EBML_HEADER+e(0x18538067,e(0x1549a966,u(0x2ad7b1,1_000_000))+e(0x1654ae6b,e(0xae,track))+e(0x1f43b675,u(0xe7,0)+e(0xa3,block)))
 
 
 def main():
@@ -36,8 +33,8 @@ def main():
     cases=[]
     for name,scope,lace,aac in [('header-empty',1,False,False),('header-lace',1,True,False),('header-private',2,False,True),('header-both',3,False,False)]:
         data=make(scope,lace,aac);file=name+'.mkv';(output/file).write_bytes(data)
-        cases.append({'id':name,'profile':name,'file':file,'sha256':hashlib.sha256(data).hexdigest(),'rights':'authored-synthetic'})
-    (ROOT/'harness/header-corpus.json').write_text(json.dumps({'schema':1,'cases':cases},indent=2)+'\n')
+        cases.append(base.authored(name,file,data))
+    write_json(ROOT/'harness/header-corpus.json', {'schema':1,'cases':cases})
     print('Generated',len(cases),'header-removal cases')
 
 

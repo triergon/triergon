@@ -1,12 +1,13 @@
 #!/usr/bin/env python3
 """Materialize and hash original structural fixtures plus synthetic encoded streams."""
 import argparse
-import hashlib
-import json
 from pathlib import Path
 import shutil
+import sys
 
 ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT))
+from harness.common import digest, digest_bytes, load, write_json
 
 
 def vint(value, width=None):
@@ -23,8 +24,15 @@ def uint(identifier, value):
     return element(identifier, value.to_bytes(max(1, (value.bit_length() + 7) // 8), "big"))
 
 
+EBML_HEADER = element(0x1A45DFA3, uint(0x4286, 1) + uint(0x42F7, 1) + uint(0x42F2, 4) + uint(0x42F3, 8) + element(0x4282, b"matroska") + uint(0x4287, 4) + uint(0x4285, 2))
+
+
+def authored(name, file, data, **extra):
+    """One manifest row for an original synthetic fixture."""
+    return {"id": name, "profile": name, "file": file, "sha256": digest_bytes(data), "rights": "authored-synthetic", **extra}
+
+
 def structural(profile):
-    ebml = element(0x1A45DFA3, uint(0x4286, 1) + uint(0x42F7, 1) + uint(0x42F2, 4) + uint(0x42F3, 8) + element(0x4282, b"matroska") + uint(0x4287, 4) + uint(0x4285, 2))
     track = uint(0xD7, 1) + uint(0x73C5, 1) + uint(0x83, 2) + element(0x86, b"A_PCM/INT/LIT")
     track += uint(0x23E383, 1_000_000) + element(0xE1, uint(0x9F, 1) + uint(0x6264, 16) + element(0xB5, bytes.fromhex("40bf400000000000")))
     if profile == "codec-delay":
@@ -55,7 +63,7 @@ def structural(profile):
         cluster += element(0x1F43B675, uint(0xE7, 10) + element(0xA3, block))
     else:
         cluster = element(0x1F43B675, payload)
-    return ebml + bytes.fromhex("1853806701ffffffffffffff") + element(0x1549A966, uint(0x2AD7B1, 1_000_000)) + tracks + cluster
+    return EBML_HEADER + bytes.fromhex("1853806701ffffffffffffff") + element(0x1549A966, uint(0x2AD7B1, 1_000_000)) + tracks + cluster
 
 
 def main():
@@ -65,18 +73,18 @@ def main():
     a = p.parse_args()
     a.output.mkdir(parents=True, exist_ok=True)
     seeds = ROOT / "harness/fixtures/encoded"
-    canonical = json.loads((seeds / "manifest.json").read_text())
+    canonical = load(seeds / "manifest.json")
     cases = []
     for case in canonical["cases"]:
         name = case["file"]
         if Path(name).name != name:
             raise ValueError("invalid canonical fixture name")
         seed = seeds / name
-        if hashlib.sha256(seed.read_bytes()).hexdigest() != case["sha256"]:
+        if digest(seed) != case["sha256"]:
             raise ValueError("canonical fixture changed: " + name)
         path = a.output / name
         if path.exists():
-            if hashlib.sha256(path.read_bytes()).hexdigest() != case["sha256"]:
+            if digest(path) != case["sha256"]:
                 raise ValueError("cached fixture changed: " + name)
         else:
             shutil.copyfile(seed, path)
@@ -85,11 +93,11 @@ def main():
         name = profile + ".mkv"
         (a.output / name).write_bytes(structural(profile))
         cases.append((profile, name))
-    manifest = {"schema": 1, "status": "original synthetic corpus, not upstream FATE execution", "generator": "tools/generate-corpus.py", "cases": [
-        {"id": profile, "profile": profile, "file": name, "sha256": hashlib.sha256((a.output / name).read_bytes()).hexdigest(), "rights": "authored-synthetic"}
-        for profile, name in cases]}
+    # The generator label is recorded corpus data; keep it so harness/corpus.json stays byte-identical.
+    manifest = {"schema": 1, "status": "original synthetic corpus, not upstream FATE execution", "generator": "tools/generate-corpus.py",
+                "cases": [authored(profile, name, (a.output / name).read_bytes()) for profile, name in cases]}
     a.manifest.parent.mkdir(parents=True, exist_ok=True)
-    a.manifest.write_text(json.dumps(manifest, indent=2) + "\n")
+    write_json(a.manifest, manifest)
     print(f"Materialized {len(cases)} cases: {a.manifest}")
 
 

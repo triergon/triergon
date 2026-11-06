@@ -144,7 +144,6 @@ class NativeSchemaGuardTests(unittest.TestCase):
 """Mocked full-qualification controls; no native process/library executes."""
 import copy
 import hashlib
-import importlib.util
 import json
 from pathlib import Path
 import tempfile

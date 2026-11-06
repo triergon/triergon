@@ -5,8 +5,6 @@ entry point with authored inputs, a mocked mutation generator and mocked workers
 """
 import contextlib
 from decimal import Decimal
-import hashlib
-import importlib.util
 import io
 import json
 import os
@@ -19,12 +17,10 @@ from types import SimpleNamespace
 import unittest
 from unittest.mock import Mock, patch
 
+from tools import fuzz_media
 from . import fuzz
+from .common import digest_bytes
 from .runner import ROOT
-
-
-def digest_bytes(data):
-    return hashlib.sha256(data).hexdigest()
 
 
 def ok(data):
@@ -285,10 +281,6 @@ class CliIntegrityTests(unittest.TestCase):
         private.mkdir(parents=True, exist_ok=True)
         with tempfile.TemporaryDirectory(prefix="mocked-cli-", dir=private) as temporary:
             directory = Path(temporary)
-            spec = importlib.util.spec_from_file_location(
-                "fuzz_integrity_cli", ROOT / "tools/fuzz-media.py")
-            cli = importlib.util.module_from_spec(spec)
-            spec.loader.exec_module(cli)
             seed = directory / "seed.bin"
             seed.write_bytes(b"original")
             source = directory / "source-pin.txt"
@@ -310,7 +302,7 @@ class CliIntegrityTests(unittest.TestCase):
             manifest_path = directory / "manifest.json"
             initial = (json.dumps(manifest, indent=2) + "\n").encode()
             manifest_path.write_bytes(initial)
-            fixture = SimpleNamespace(cli=cli, root=directory, output=directory / "output",
+            fixture = SimpleNamespace(cli=fuzz_media, root=directory, output=directory / "output",
                                       source=source, seed=seed, manifest=manifest,
                                       manifest_path=manifest_path, initial_manifest=initial,
                                       calls=[], payload=b'{"length":8}')
@@ -356,7 +348,7 @@ class CliIntegrityTests(unittest.TestCase):
                 path.write_bytes(b"tampered")
             return result, raw, b""
 
-        argv = ["fuzz-media.py", "--manifest", str(fixture.manifest_path),
+        argv = ["fuzz_media.py", "--manifest", str(fixture.manifest_path),
                 "--output", str(fixture.output), "--rounds", "1",
                 "--maximum-output-bytes", "16384"]
         with contextlib.ExitStack() as stack:

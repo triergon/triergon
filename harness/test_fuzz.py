@@ -1,5 +1,4 @@
 import copy
-import hashlib
 import json
 from pathlib import Path
 import random
@@ -8,7 +7,8 @@ import sys
 import tempfile
 import unittest
 
-from .fuzz import compare, mutation, observe, replay, sha_bytes, strict_json
+from .common import digest, digest_bytes
+from .fuzz import compare, mutation, observe, replay, strict_json
 from .runner import ROOT
 
 
@@ -16,7 +16,7 @@ class MutationTests(unittest.TestCase):
     def test_replay_binds_seed_result_and_edit_order(self):
         seed=b'\0\xffabc'
         expected=b'\0Zbc!'
-        recipe={'schema':1,'seed_sha256':sha_bytes(seed),'result_sha256':sha_bytes(expected),
+        recipe={'schema':1,'seed_sha256':digest_bytes(seed),'result_sha256':digest_bytes(expected),
                 'edits':[{'offset':1,'remove':2,'insert_hex':'5a'},
                          {'offset':4,'remove':0,'insert_hex':'21'}]}
         self.assertEqual(replay(seed,recipe,64),expected)
@@ -28,7 +28,7 @@ class MutationTests(unittest.TestCase):
 
     def test_invalid_or_unbounded_edits_never_use_python_negative_slicing(self):
         seed=b'abcd'
-        base={'schema':1,'seed_sha256':sha_bytes(seed),'result_sha256':sha_bytes(seed),
+        base={'schema':1,'seed_sha256':digest_bytes(seed),'result_sha256':digest_bytes(seed),
               'edits':[{'offset':0,'remove':0,'insert_hex':''}]}
         for edit in [{'offset':-1,'remove':0,'insert_hex':''},
                      {'offset':True,'remove':0,'insert_hex':''},
@@ -104,7 +104,6 @@ class MutationTests(unittest.TestCase):
             left.write_text('import json,pathlib,sys;print(json.dumps({"bytes":len(pathlib.Path(sys.argv[1]).read_bytes())}))\n')
             right.write_text('import json,pathlib,sys;print(json.dumps({"bytes":len(pathlib.Path(sys.argv[1]).read_bytes())+1}))\n')
             seed=directory/'seed.bin';seed.write_bytes(b'\0\xfftest')
-            digest=lambda p:hashlib.sha256(Path(p).read_bytes()).hexdigest()
             roles={role:{'path':sys.executable,'sha256':digest(sys.executable)} for role in ('candidate','debug','reference')}
             operation={'id':'trace','roles':{'candidate':[str(left),'{input}'],'debug':[str(left),'{input}'],
                                             'reference':[str(right),'{input}']}}
@@ -113,7 +112,7 @@ class MutationTests(unittest.TestCase):
                         'rights':'authored-synthetic','baseline_statuses':{'trace':dict.fromkeys(roles,'ok')}}]}
             source=directory/'manifest.json';source.write_text(json.dumps(manifest))
             output=directory/'output'
-            done=subprocess.run([sys.executable,str(ROOT/'tools/fuzz-media.py'),'--manifest',str(source),
+            done=subprocess.run([sys.executable,str(ROOT/'tools/fuzz_media.py'),'--manifest',str(source),
                                  '--output',str(output),'--rounds','1'],capture_output=True,timeout=15)
             self.assertEqual(done.returncode,1,done.stderr.decode())
             report=json.loads((output/'report.json').read_text())
@@ -139,7 +138,7 @@ class MutationTests(unittest.TestCase):
             manifest={'schema':1,'workers':{'candidate':{},'../../escape':{}},
                       'operations':[{'id':'trace'}],'seeds':[{'id':'seed'}]}
             path=directory/'manifest.json';path.write_text(json.dumps(manifest))
-            done=subprocess.run([sys.executable,str(ROOT/'tools/fuzz-media.py'),'--manifest',str(path),
+            done=subprocess.run([sys.executable,str(ROOT/'tools/fuzz_media.py'),'--manifest',str(path),
                 '--output',str(directory/'output')],capture_output=True,timeout=5)
             self.assertEqual(done.returncode,2)
             self.assertIn(b'safe role labels',done.stderr)

@@ -6,10 +6,12 @@ recorded, but Make functions, generated targets and conditionals are not evaluat
 Unresolved paths cannot become acquired inputs or executed-test claims.
 """
 import argparse
-import hashlib
-import json
 from pathlib import Path
 import re
+import sys
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+from harness.common import digest_bytes, write_json
 
 
 CASE = r'fate-[a-zA-Z0-9][a-zA-Z0-9_.-]*'
@@ -17,16 +19,12 @@ ASSIGNMENT = re.compile(r'^(' + CASE + r')\s*:\s*(CMD|SRC)\s*=\s*(.*)$')
 SAMPLE = re.compile(r'\$\(TARGET_SAMPLES\)/([^\s"\']+)')
 
 
-def digest(data):
-    return hashlib.sha256(data).hexdigest()
-
-
 def inventory(source):
     cases, definitions = {}, {}
     for path in sorted((source / 'tests/fate').glob('*.mak')):
         data = path.read_bytes()
         relative = str(path.relative_to(source))
-        definitions[relative] = digest(data)
+        definitions[relative] = digest_bytes(data)
         text = data.decode()
         for number, line in enumerate(text.splitlines(), 1):
             if line.lstrip().startswith('#'):
@@ -47,7 +45,7 @@ def inventory(source):
         sources = [value for key, value in assignments if key == 'SRC']
         for key, value in assignments:
             if key == 'CMD':
-                row['command_sha256'].append(digest(value.encode()))
+                row['command_sha256'].append(digest_bytes(value.encode()))
                 texts = [value.replace('$(SRC)', source) for source in sources] or [value]
             else:
                 texts = [value]
@@ -74,12 +72,12 @@ def main():
     if args.configured_list:
         data = args.configured_list.read_bytes()
         enabled = set(data.decode().split())
-        report['configured_list'] = {'sha256': digest(data), 'identities': len(enabled),
+        report['configured_list'] = {'sha256': digest_bytes(data), 'identities': len(enabled),
                                      'executed': False}
         for row in report['cases']:
             row['configured'] = row['id'] in enabled
     args.output.parent.mkdir(parents=True, exist_ok=True)
-    args.output.write_text(json.dumps(report, indent=2) + '\n')
+    write_json(args.output, report)
     print(f"Indexed {len(report['cases'])} identities; none executed or accepted.")
 
 

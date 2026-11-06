@@ -21,7 +21,6 @@ timing/memory batch (harness.runner.competing_builds) and contaminated
 batches are retried, never silently used. Every raw observation is written.
 """
 import argparse
-import hashlib
 import json
 import os
 import platform
@@ -34,18 +33,11 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT))
+from harness.common import digest as sha256, digest_bytes  # noqa: E402
 from harness.runner import competing_builds, ratio_interval  # noqa: E402
 
 RUNTIME_GATE = 1.2
 RUNTIME_TARGET = 0.80
-
-
-def sha256(path):
-    h = hashlib.sha256()
-    with open(path, "rb") as f:
-        for chunk in iter(lambda: f.read(1 << 20), b""):
-            h.update(chunk)
-    return h.hexdigest()
 
 
 def wait_idle(log):
@@ -179,9 +171,9 @@ def main():
         for f in sorted((ROOT / top).rglob("*")):
             if f.is_file() and "__pycache__" not in f.parts:
                 manifest[str(f.relative_to(ROOT))] = sha256(f)
-    for f in ("Cargo.toml", "Cargo.lock", "harness/runner.py", "harness/allocations-linux.c", "harness/rss-bound-api.h"):
+    for f in ("Cargo.toml", "Cargo.lock", "harness/common.py", "harness/runner.py", "harness/allocations-linux.c", "harness/rss-bound-api.h"):
         manifest[f] = sha256(ROOT / f)
-    source_digest = hashlib.sha256(json.dumps(manifest, sort_keys=True).encode()).hexdigest()
+    source_digest = digest_bytes(json.dumps(manifest, sort_keys=True).encode())
     identity = {"source_digest": source_digest, "source_manifest": manifest,
                 "candidate_sha256": sha256(a.candidate), "reference_sha256": sha256(a.reference),
                 "reference_streem_sha256": sha256(a.reference_streem) if a.reference_streem else None,

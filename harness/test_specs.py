@@ -1,18 +1,14 @@
 """Reproduction must verify every frozen normative source, including zlib RFCs."""
 import contextlib
-import hashlib
-import importlib.util
 import io
 import json
 from pathlib import Path
 import tempfile
 import unittest
 from unittest.mock import patch
-from .runner import ROOT, load
-
-spec = importlib.util.spec_from_file_location('spec_fetcher', ROOT / 'tools/fetch-specs.py')
-fetcher = importlib.util.module_from_spec(spec)
-spec.loader.exec_module(fetcher)
+from tools import fetch_specs as fetcher
+from .common import digest_bytes, load
+from .runner import ROOT
 
 
 class SpecificationTests(unittest.TestCase):
@@ -31,10 +27,10 @@ class SpecificationTests(unittest.TestCase):
                 for source in load(ROOT / 'specs/sources.json')['sources']:
                     data = source['id'].encode()
                     (cache / source['id']).write_bytes(data)
-                    rows.append({**source, 'sha256': hashlib.sha256(data).hexdigest()})
+                    rows.append({**source, 'sha256': digest_bytes(data)})
                 (root / 'specs/sources.json').write_text(json.dumps({'sources': rows}))
                 (cache / damaged).write_bytes(b'corrupt')
-                with patch.object(fetcher, 'ROOT', root), patch('sys.argv', ['fetch-specs.py']), patch('urllib.request.urlopen', side_effect=AssertionError('cached verification must not fetch')), contextlib.redirect_stdout(io.StringIO()):
+                with patch.object(fetcher, 'ROOT', root), patch('sys.argv', ['fetch_specs.py']), patch('urllib.request.urlopen', side_effect=AssertionError('cached verification must not fetch')), contextlib.redirect_stdout(io.StringIO()):
                     with self.assertRaisesRegex(ValueError, damaged):
                         fetcher.main()
 
@@ -49,7 +45,7 @@ class FateInventoryTests(unittest.TestCase):
             (source / 'tests/fate').mkdir(parents=True)
             (source / 'tests/fate/authored.mak').write_text(definition)
             output = root / 'inventory.json'
-            subprocess.run([sys.executable, str(ROOT / 'tools/inventory-fate.py'),
+            subprocess.run([sys.executable, str(ROOT / 'tools/inventory_fate.py'),
                             '--source', str(source), '--output', str(output)],
                            check=True, capture_output=True, text=True)
             return json.loads(output.read_text())

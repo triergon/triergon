@@ -3,7 +3,8 @@ import copy
 import json
 import subprocess
 import unittest
-from .runner import ROOT, load
+from .common import load
+from .runner import ROOT
 from .comparison import rule_for, reference_record, reference_summary, validate_case_evidence
 from .content_oracle import content_trace, projected_content
 

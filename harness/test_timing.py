@@ -1,5 +1,4 @@
 """Timing boundary differential regressions, requiring built worker identities."""
-import importlib.util
 import json
 from pathlib import Path
 import subprocess
@@ -8,10 +7,7 @@ import unittest
 
 from .runner import ROOT, differences
 from .spec_oracle import timing_trace
-
-spec = importlib.util.spec_from_file_location("fixture_generator", ROOT / "tools/generate-corpus.py")
-fixture = importlib.util.module_from_spec(spec)
-spec.loader.exec_module(fixture)
+from tools import generate_corpus as fixture
 
 
 def document(scale, duration, delay, group_ticks, frames, relative=0):

@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
 """Qualify the intact mandatory external HDR vector locally; never vendor its bytes."""
-import argparse,json,platform,sys
+import argparse,platform,sys
 from pathlib import Path
 ROOT=Path(__file__).resolve().parents[1];sys.path.insert(0,str(ROOT))
-from harness.runner import load,digest,catalogue_parity,benchmark,memory,acceptance
+from harness.common import digest,load,save_json
+from harness.runner import catalogue_parity,benchmark,memory,acceptance
 from harness.reuse import retained_memory,retained_timing
 from harness.comparison import reference_record,reference_summary
 from harness.provenance import source_identity_error
@@ -40,7 +41,7 @@ def main():
         verdict['accepted']=verdict['slice_accepted']=False
         verdict['reasons'].append(error);verdict['slice_reasons'].append(error)
     receipt={'schema':1,'identity':identity,'contract_sha256':digest(contract),'case':case,'acceptance':verdict,'target':target,'input_path':str(path),'origin':'https://fate-suite.ffmpeg.org/'+spec['file'],'redistribution_qualified':False}
-    tmp=a.output/'report.tmp';tmp.write_text(json.dumps(receipt,indent=2)+'\n');tmp.replace(a.output/'report.json')
+    save_json(a.output/'report.json',receipt)
     print(case['id'],case['parity']['status'],'numeric gates',verdict['slice_accepted'])
     return 0 if case['parity']['status']=='pass' else 1
 if __name__=='__main__':raise SystemExit(main())

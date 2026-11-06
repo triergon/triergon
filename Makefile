@@ -5,7 +5,7 @@ export PATH := $(CURDIR)/.research/reference/install/bin:$(PATH)
 prepare-check:
 	$(MAKE) reference
 	$(MAKE) fixtures
-	python3 tools/fetch-required-vectors.py
+	python3 tools/fetch_required_vectors.py
 	$(MAKE) adapters
 
 check:
@@ -14,30 +14,30 @@ check:
 	CARGO_INCREMENTAL=0 cargo +nightly clippy --workspace --all-targets --locked -- -D warnings
 	CARGO_INCREMENTAL=0 cargo +nightly check --workspace --no-default-features --locked
 	CARGO_INCREMENTAL=0 cargo +nightly build --workspace --release --locked
-	python3 -m unittest harness.test_runner harness.test_timing harness.test_header harness.test_zlib harness.test_content harness.test_seek harness.test_checksum harness.test_comparison harness.test_reference_encodings harness.test_specs harness.test_colour harness.test_catalogue harness.test_provenance harness.test_fuzz harness.test_fuzz_integrity harness.test_reuse harness.test_linux_port harness.test_linux_guard harness.test_linux_kernel_bound harness.test_delivery_policy harness.test_delivery_memory_v2 harness.test_capture_contract harness.test_required_vectors
-	python3 tools/check-safety.py
-	python3 tools/check-design.py
+	python3 -m unittest discover -s harness -t .
+	python3 tools/check_safety.py
+	python3 tools/check_design.py
 	python3 tools/test-core-time.py
 
 core-oracle:
 	python3 tools/test-core-time.py
 
 reference:
-	python3 tools/prepare-ffmpeg.py
+	python3 tools/prepare_ffmpeg.py
 
 fixtures:
-	python3 tools/generate-corpus.py
-	python3 tools/generate-header-corpus.py
-	python3 tools/generate-zlib-corpus.py
-	python3 tools/generate-seek-corpus.py
-	python3 tools/generate-colour-corpus.py
-	python3 tools/generate-catalogue-corpus.py
+	python3 tools/generate_corpus.py
+	python3 tools/generate_header_corpus.py
+	python3 tools/generate_zlib_corpus.py
+	python3 tools/generate_seek_corpus.py
+	python3 tools/generate_colour_corpus.py
+	python3 tools/generate_catalogue_corpus.py
 
 adapters:
-	python3 tools/build-harness.py
+	python3 tools/build_harness.py
 
 report:
-	python3 tools/test-media.py --fate-cache .research/fate-samples
+	python3 tools/test_media.py --fate-cache .research/fate-samples
 
 qualify:
-	python3 tools/test-media.py --benchmark --memory --fate-cache .research/fate-samples --require-acceptance
+	python3 tools/test_media.py --benchmark --memory --fate-cache .research/fate-samples --require-acceptance

@@ -1,13 +1,14 @@
 #!/usr/bin/env python3
 """Authored Cues/SeekHead/preroll workload, codec bytes from our synthetic signals."""
-import importlib.util,struct,json,hashlib
+import struct,sys
 from pathlib import Path
-ROOT=Path(__file__).resolve().parents[1]
-spec=importlib.util.spec_from_file_location('base',ROOT/'tools/generate-corpus.py');base=importlib.util.module_from_spec(spec);spec.loader.exec_module(base)
+ROOT=Path(__file__).resolve().parents[1];sys.path.insert(0,str(ROOT))
+from harness.common import load, write_json
+from tools import generate_corpus as base
 e,u=base.element,base.uint
 
 def make(preroll=0,delay=0,relative=False,missing=False,sparse=False,unknown=False,front=False):
-    own=json.loads((ROOT/'research/implementation/cases/avc-aac-sub/reference.json').read_text())['data']
+    own=load(ROOT/'research/implementation/cases/avc-aac-sub/reference.json')['data']
     packet=bytes.fromhex(next(p['payload'] for p in own['packets'] if p['track']==0 and p['key']))
     private=bytes.fromhex(own['tracks'][0]['private'])
     video=u(0xd7,1)+u(0x73c5,1)+u(0x83,1)+e(0x86,b'V_MPEG4/ISO/AVC')+e(0x63a2,private)+u(0x23e383,500_000_000)+e(0xe0,u(0xb0,160)+u(0xba,90))
@@ -36,16 +37,15 @@ def make(preroll=0,delay=0,relative=False,missing=False,sparse=False,unknown=Fal
         first=cues(len(metadata));index=cues(len(metadata)+len(first));assert len(first)==len(index)
         body=metadata+index+b''.join(clusters)
     else:body=info+tracks+head(len(metadata)+sum(map(len,clusters)))+b''.join(clusters)+cues(len(metadata))
-    header=e(0x1a45dfa3,u(0x4286,1)+u(0x42f7,1)+u(0x42f2,4)+u(0x42f3,8)+e(0x4282,b'matroska')+u(0x4287,4)+u(0x4285,2))
-    return header+e(0x18538067,body)
+    return base.EBML_HEADER+e(0x18538067,body)
 
 def main():
     out=ROOT/'.research/seek-fixtures';out.mkdir(parents=True,exist_ok=True);rows=[]
     cases=[('cues-end',{}),('cues-relative',dict(relative=True)),('cues-front',dict(front=True)),('cues-preroll',dict(preroll=3_000_000_000)),('cues-delay-preroll',dict(preroll=80_000_000,delay=50_000_000)),('cues-sparse',dict(sparse=True,preroll=3_000_000_000)),('cues-unknown-cluster',dict(unknown=True,preroll=3_000_000_000)),('cues-missing',dict(missing=True,preroll=3_000_000_000))]
     for name,options in cases:
         data=make(**options);file=name+'.mkv';(out/file).write_bytes(data)
-        rows.append({'id':name,'profile':name,'file':file,'sha256':hashlib.sha256(data).hexdigest(),'rights':'authored-synthetic','seek_target_ns':7_500_000_000})
-    (ROOT/'harness/seek-corpus.json').write_text(json.dumps({'schema':1,'cases':rows},indent=2)+'\n')
+        rows.append(base.authored(name,file,data,seek_target_ns=7_500_000_000))
+    write_json(ROOT/'harness/seek-corpus.json', {'schema':1,'cases':rows})
     contract={'schema':1,'id':'K3-cues-preroll-v1','operation':'container-seek-preroll-v1','contract':['bounded Cues/SeekHead lookup','validated CueRelativePosition and CueBlockNumber','sparse and absent index fallback','all-track SeekPreRoll and codec delay','all packets after seek including decode-only preroll','fresh, repeated and after-EOF seeks','unknown Cluster lengths','seek cancellation, I/O failures and malformed indexes'],'required_profiles':[r['profile'] for r in rows],'required_targets':['aarch64-unknown-linux-gnu'],'runtime_ratio_max':1.2,'memory_ratio_max_exclusive':1.0,'minimum_pairs':30,'confidence':0.95,'pending_module_requirements':['remaining M01/M02 features','complete applicable FATE coverage','deferred targets'],'runtime_optimization_ratio_target':0.8,'runtime_policy':'initial-delivery-runtime-v2'}
-    (ROOT/'harness/seek-slice.json').write_text(json.dumps(contract,indent=2)+'\n');print('Generated',len(rows),'seek cases')
+    write_json(ROOT/'harness/seek-slice.json',contract);print('Generated',len(rows),'seek cases')
 if __name__=='__main__':main()
