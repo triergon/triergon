@@ -621,17 +621,28 @@ impl DocumentJob {
                     self.phase = Phase::ValidateChildren;
                 }
                 Phase::ValidateChildren => {
-                    if self.child >= self.child_end {
-                        self.phase = Phase::ValidateRules;
-                        continue;
-                    }
-                    if !work.try_charge(1) {
-                        return Ok(ParseStep::Yield);
-                    }
+                    // One charged visit and one cancellation check per child, as
+                    // one outer iteration per child would do, without re-dispatch.
                     let mut fields = self.fields;
-                    self.collect(self.validate, self.child, &mut fields)?;
-                    self.fields = fields;
-                    self.child = usize::from(self.nodes.as_slice()[self.child].next);
+                    let mut first = true;
+                    while self.child < self.child_end {
+                        if !first {
+                            check(cancel)?;
+                        }
+                        first = false;
+                        if !work.try_charge(1) {
+                            self.fields = fields;
+                            return Ok(ParseStep::Yield);
+                        }
+                        let result = self.collect(self.validate, self.child, &mut fields);
+                        self.fields = fields;
+                        result?;
+                        self.child = usize::from(self.nodes.as_slice()[self.child].next);
+                    }
+                    if !first {
+                        check(cancel)?;
+                    }
+                    self.phase = Phase::ValidateRules;
                 }
                 Phase::ValidateRules => {
                     if !work.try_charge(1) {
@@ -736,22 +747,31 @@ impl DocumentJob {
                     self.phase = Phase::UidFill;
                 }
                 Phase::UidFill => {
-                    if self.uid_at == self.nodes.len() {
-                        self.heap = Some(Heap::new(self.uids.len()));
-                        self.phase = Phase::UidSort;
-                        continue;
-                    }
-                    if !work.try_charge(1) {
-                        return Ok(ParseStep::Yield);
-                    }
+                    // One charged visit and one cancellation check per node, as
+                    // one outer iteration per node would do, without re-dispatch.
                     let kind = [0x46ae, 0x73c4, 0x45bc][self.uid_kind];
-                    if u64::from(self.nodes.as_slice()[self.uid_at].id) == kind {
-                        let value = self.uint(self.uid_at)?;
-                        self.uids
-                            .try_push(value)
-                            .map_err(|e| Error::from(e.error))?;
+                    let mut first = true;
+                    while self.uid_at < self.nodes.len() {
+                        if !first {
+                            check(cancel)?;
+                        }
+                        first = false;
+                        if !work.try_charge(1) {
+                            return Ok(ParseStep::Yield);
+                        }
+                        if u64::from(self.nodes.as_slice()[self.uid_at].id) == kind {
+                            let value = self.uint(self.uid_at)?;
+                            self.uids
+                                .try_push(value)
+                                .map_err(|e| Error::from(e.error))?;
+                        }
+                        self.uid_at += 1;
                     }
-                    self.uid_at += 1;
+                    if !first {
+                        check(cancel)?;
+                    }
+                    self.heap = Some(Heap::new(self.uids.len()));
+                    self.phase = Phase::UidSort;
                 }
                 Phase::UidSort => {
                     if !self.heap.as_mut().required("missing UID sort job")?.step(
