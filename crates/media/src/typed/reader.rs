@@ -1349,7 +1349,13 @@ impl Reader {
                         cancel,
                     )? {
                         ParseStep::Event(drain) => {
-                            self.envelope.resolve_scan_prefix(header, drain)?;
+                            if self
+                                .envelope
+                                .resolve_scan_prefix(header, drain, work, cancel)?
+                            {
+                                job.finish();
+                                return Ok(ParseStep::Yield);
+                            }
                             if !drain {
                                 self.state = State::Envelope;
                             }

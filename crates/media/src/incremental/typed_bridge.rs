@@ -237,8 +237,14 @@ impl ElementReader {
         Ok(&bytes[..bytes.len().min(11)])
     }
     /// Rejection keeps the exact span/direct/builder decision and all source
-    /// bytes. It never retries the prefix or exposes an early syntax error.
-    pub(crate) fn resolve_scan_prefix(&mut self, header: ElementHeader, drain: bool) -> Result<()> {
+    /// bytes. Acceptance can finish a fully read body with one work unit.
+    pub(crate) fn resolve_scan_prefix(
+        &mut self,
+        header: ElementHeader,
+        drain: bool,
+        work: &mut WorkBudget,
+        cancel: &AtomicBool,
+    ) -> Result<bool> {
         let Phase::Body(body) = &mut self.phase else {
             return Err(Error::Invalid("no pending scan prefix"));
         };
@@ -251,6 +257,14 @@ impl ElementReader {
             ScanBody::Off
         };
         if drain {
+            if body.remaining == 0 {
+                Self::check_input_cancel(&mut self.input, cancel)?;
+                if work.try_charge(1) {
+                    self.scan_left = self.limits.scan_bytes;
+                    self.phase = Phase::Between;
+                    return Ok(true);
+                }
+            }
             body.collect = false;
             body.span = None;
             body.direct = None;
@@ -258,7 +272,7 @@ impl ElementReader {
             body.buffer = None;
             body.copied = 0;
         }
-        Ok(())
+        Ok(false)
     }
     /// A distinct, already work-charged private completion. No public event,
     /// owner, packet or location is fabricated by discarding the opaque body.
