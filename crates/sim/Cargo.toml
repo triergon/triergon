@@ -17,6 +17,8 @@ triergon-codec-hevc = { path = "../codec-hevc", optional = true }
 [features]
 # The pure-Rust decoders behind the session traits.
 codecs = ["dep:triergon-codec-ac3", "dep:triergon-codec-aac", "dep:triergon-codec-dca", "dep:triergon-codec-h264", "dep:triergon-codec-hevc"]
+# Nightly-only explicit SIMD kernels in the HEVC decoder; output is identical.
+simd = ["triergon-codec-hevc?/simd"]
 
 [lints]
 workspace = true

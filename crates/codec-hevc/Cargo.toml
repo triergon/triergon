@@ -10,7 +10,7 @@ publish.workspace = true
 [features]
 # Explicit std::simd kernels (requires a nightly toolchain); the generic code is the
 # scalar equivalent used without this feature.
-default = ["simd"]
+default = []
 simd = []
 
 [dependencies]

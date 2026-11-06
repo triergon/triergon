@@ -474,7 +474,12 @@ fn int_block16<const MODE: u8, const W: usize>(
         let srow = &src[off + y * ss..off + y * ss + w];
         if MODE == 0 {
             let prow = &mut o.pred[y * 64..y * 64 + w];
-            for (s, p) in srow.chunks_exact(16).zip(prow.chunks_exact_mut(16)) {
+            for (s, p) in srow
+                .as_chunks::<16>()
+                .0
+                .iter()
+                .zip(prow.as_chunks_mut::<16>().0)
+            {
                 let v = U8x16::from_slice(s).cast::<i16>() << six;
                 (v - I16x16::splat(PRED_OFFSET as i16)).copy_to_slice(p);
             }
@@ -483,9 +488,11 @@ fn int_block16<const MODE: u8, const W: usize>(
             let d0 = o.dst_off + y * o.dst_stride;
             let drow = &mut o.dst[d0..d0 + w];
             for ((s, ot), d) in srow
-                .chunks_exact(16)
-                .zip(orow.chunks_exact(16))
-                .zip(drow.chunks_exact_mut(16))
+                .as_chunks::<16>()
+                .0
+                .iter()
+                .zip(orow.as_chunks::<16>().0)
+                .zip(drow.as_chunks_mut::<16>().0)
             {
                 let v = U8x16::from_slice(s).cast::<i16>() << six;
                 let t = (v + I16x16::splat(PRED_OFFSET as i16 + 64))

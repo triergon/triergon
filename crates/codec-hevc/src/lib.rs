@@ -12,12 +12,9 @@ mod ctu;
 mod deblock;
 mod decoder;
 mod error;
-#[cfg(feature = "simd")]
-mod filter_simd;
 mod inter;
 mod intra;
-#[cfg(feature = "simd")]
-mod mc_simd;
+mod kernels;
 pub mod nal;
 mod picture;
 mod ps;
