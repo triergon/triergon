@@ -5,11 +5,11 @@
  * profile's operations:
  *   -DTRIERGON_DECODE_REFERENCE   decode, letterbox and downmix (reference_decode.h)
  *   -DTRIERGON_CAPTURE_REFERENCE  RGBA conversion, MPEG-1 encode, MPEG-TS mux
- *                                   (reference_capture.h)
- *   otherwise                       the container operations below, with the feed
- *                                   (TRIERGON_FEED_REFERENCE), HLS segment
- *                                   (TRIERGON_HLS_REFERENCE) and combined-encoding
- *                                   (TRIERGON_COMBINED_REFERENCE) variants. */
+ *                                 (reference_capture.h)
+ *   otherwise                     the container operations below, with the feed
+ *                                 (TRIERGON_FEED_REFERENCE), HLS segment
+ *                                 (TRIERGON_HLS_REFERENCE) and combined-encoding
+ *                                 (TRIERGON_COMBINED_REFERENCE) variants. */
 #if defined(TRIERGON_DECODE_REFERENCE)
 #include "reference_decode.h"
 #elif defined(TRIERGON_CAPTURE_REFERENCE)

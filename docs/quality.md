@@ -25,11 +25,17 @@ resource limit becomes an explicit, reviewed rule for that case.
 
 ## Reference and corpus
 
-- **FFmpeg pin.** `cargo xtask prepare-ffmpeg` builds FFmpeg from a pinned source
-  revision with recorded configure flags, compiler and binary hashes. Each profile is a
-  separate build of the same revision: `matroska` for the container harness, `formats`
-  for MOV, TS, subtitles and the HLS segment reference, and `video` (the Matroska build plus the H.264 and HEVC
-  decoders that stream discovery needs) for the playback startup and seek reference.
+- **FFmpeg pins.** `cargo xtask prepare-ffmpeg --profile P` builds FFmpeg from a pinned,
+  hash-checked source with recorded configure flags, compiler and binary hashes, and
+  `cargo xtask build-workers` builds the reference worker of every prepared profile.
+  Containers are measured against git revision `d32b387f` on the 9.0 branch: `matroska`
+  for the container harness, `formats` for MOV, TS, subtitles and the HLS segment
+  reference, and `video` (the Matroska build plus the H.264 and HEVC decoders that
+  stream discovery needs) for the playback startup and seek reference. Decoders and
+  capture are measured against the FFmpeg 9.0.2 release tarball: `decode` (the default
+  configuration) for the codec comparison, whose `ffmpeg` and `ffprobe` also decode
+  capture output independently, and `capture` (gating) and `capture-small` for the
+  capture comparison.
 - **Authored corpus.** Small canonical streams generated from synthetic signals and
   authored structures, so inputs stay identical across encoder versions
   (`cargo xtask fixtures`, `harness/features/<feature>/{contract,corpus}.json`).
@@ -90,7 +96,7 @@ generator `harness/capture/generate_inputs.py`, whose numpy PCG64 and float draw
 cited capture inputs depend on. `cargo xtask codecs` grades, times and records the
 identities of the codec crates against the pinned FFmpeg decoders
 (`harness/codecs/STATUS.md`); `cargo xtask capture` does the same for the capture
-pipeline (`harness/capture/contract.json`).
+pipeline ([harness/capture](../harness/capture/README.md)).
 `cargo xtask fuzz` runs a deterministic, replayable byte-mutation campaign against
 debug, release and reference workers from a pinned manifest.
 

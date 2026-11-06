@@ -1,9 +1,13 @@
-//! The pinned FFmpeg reference: download, verify, configure, build and list the
-//! configure-expanded FATE cases. No sample is downloaded and no upstream test
-//! is executed.
+//! The pinned FFmpeg references: download, verify, configure, build and, for the
+//! container profiles, list the configure-expanded FATE cases. No sample is
+//! downloaded and no upstream test is executed.
+//!
+//! Two sources are pinned. The container profiles build git revision
+//! [`REVISION`] on the 9.0 branch; the decoder and capture profiles build the
+//! FFmpeg [`RELEASE`] release tarball, which those comparisons were measured with.
 
 use std::fs;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::process::Command;
 
 use crate::fetch::{self, Transport};
@@ -13,6 +17,8 @@ use crate::sha256;
 pub const REVISION: &str = "d32b387f2b0a484599d4587d651891f0c63c4238";
 pub const ARCHIVE_SHA256: &str = "8a830a34bfaf98514b5d45cf6c01b1fe78b38d5e4c10eab0de2531b783c15f90";
 const ARCHIVE_LIMIT: usize = 64 * 1024 * 1024;
+pub const RELEASE: &str = "9.0.2";
+pub const RELEASE_SHA256: &str = "8c3850283eb25fa026482078a04051e0be17347b09ef81a0849bec15a96e002e";
 /// Bound on the unpacked source tree read back for verification.
 const SOURCE_LIMIT: usize = 1024 * 1024 * 1024;
 
@@ -25,6 +31,23 @@ pub enum Profile {
     /// The Matroska reference plus the H.264 and HEVC decoders, which stream
     /// discovery uses to learn the B-picture delay; the Matroska build is untouched.
     Video,
+    /// FFmpeg's default configuration (static libraries, `ffmpeg`, `ffprobe`):
+    /// the decoder comparison reference, and the independent decoder and demuxer
+    /// of the capture comparison.
+    Decode,
+    /// The gating capture reference: the shared-library component set of the
+    /// capture comparison (`mpeg1video`, MPEG-TS, `swscale`).
+    Capture,
+    /// The same capture component set built with `--enable-small`, reported
+    /// alongside the gating reference.
+    CaptureSmall,
+}
+
+/// Which pinned source a profile builds.
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum Source {
+    Revision,
+    Release,
 }
 
 impl Profile {
@@ -34,7 +57,30 @@ impl Profile {
             Profile::Matroska => ".research/reference",
             Profile::Formats => ".research/reference-formats",
             Profile::Video => ".research/reference-video",
+            Profile::Decode => ".research/reference-decode",
+            Profile::Capture => ".research/reference-capture",
+            Profile::CaptureSmall => ".research/reference-capture-small",
         }
+    }
+
+    fn source(self) -> Source {
+        match self {
+            Profile::Matroska | Profile::Formats | Profile::Video => Source::Revision,
+            Profile::Decode | Profile::Capture | Profile::CaptureSmall => Source::Release,
+        }
+    }
+
+    pub fn parse(name: &str) -> Option<Self> {
+        [
+            Profile::Matroska,
+            Profile::Formats,
+            Profile::Video,
+            Profile::Decode,
+            Profile::Capture,
+            Profile::CaptureSmall,
+        ]
+        .into_iter()
+        .find(|profile| profile.name() == name)
     }
 
     pub fn name(self) -> &'static str {
@@ -42,11 +88,69 @@ impl Profile {
             Profile::Matroska => "matroska",
             Profile::Formats => "formats",
             Profile::Video => "video",
+            Profile::Decode => "decode",
+            Profile::Capture => "capture",
+            Profile::CaptureSmall => "capture-small",
         }
     }
 }
 
+/// The capture comparison's component set (shared libraries, no programs).
+const CAPTURE_ARGS: [&str; 22] = [
+    "--enable-shared",
+    "--disable-static",
+    "--enable-pic",
+    "--extra-cflags=-Dstatic_assert=_Static_assert",
+    "--disable-programs",
+    "--disable-doc",
+    "--disable-avdevice",
+    "--disable-avfilter",
+    "--disable-network",
+    "--disable-swresample",
+    "--disable-debug",
+    "--disable-everything",
+    "--disable-autodetect",
+    "--enable-zlib",
+    "--enable-demuxer=matroska,mov,mpegts,h264,hevc",
+    "--enable-parser=h264,hevc,aac,ac3,flac,dvdsub,dvbsub",
+    "--enable-bsf=h264_mp4toannexb,hevc_mp4toannexb,extract_extradata",
+    "--enable-decoder=pgssub,dvdsub,dvbsub,ass,srt,subrip,text,mov_text,webvtt",
+    "--enable-decoder=aac,ac3,eac3,dca,mp3,mp2,flac,opus,vorbis,truehd,mlp,alac,pcm_s16le,pcm_s24le,pcm_s16be,pcm_s24be,pcm_s32le,pcm_s32be",
+    "--enable-protocol=file",
+    "--enable-encoder=mpeg1video",
+    "--enable-muxer=mpegts",
+];
+
+/// The decoder comparison's configuration: FFmpeg's defaults without
+/// documentation and debug symbols, as the comparison's static reference and
+/// its `ffmpeg` and `ffprobe` were built.
+const DECODE_ARGS: [&str; 2] = ["--disable-doc", "--disable-debug"];
+
 pub fn configure_argv(prefix: &Path, profile: Profile) -> Vec<String> {
+    let release = |args: &[&str]| -> Vec<String> {
+        [
+            "./configure".to_owned(),
+            format!("--prefix={}", prefix.display()),
+        ]
+        .into_iter()
+        .chain(args.iter().map(ToString::to_string))
+        .collect()
+    };
+    match profile {
+        Profile::Capture => return release(&CAPTURE_ARGS),
+        Profile::CaptureSmall => {
+            let mut args = CAPTURE_ARGS.to_vec();
+            let at = args
+                .iter()
+                .position(|a| *a == "--disable-debug")
+                .expect("listed")
+                + 1;
+            args.insert(at, "--enable-small");
+            return release(&args);
+        }
+        Profile::Decode => return release(&DECODE_ARGS),
+        Profile::Matroska | Profile::Formats | Profile::Video => {}
+    }
     let mut argv: Vec<String> = [
         "./configure",
         &format!("--prefix={}", prefix.display()),
@@ -153,37 +257,10 @@ pub fn prepare(
     }
     let cache = root.join(profile.cache());
     fs::create_dir_all(&cache).map_err(|e| format!("{}: {e}", cache.display()))?;
-    let name = format!("{REVISION}.tar.gz");
-    let shared = root.join(".research/reference").join(&name);
-    // The other builds reuse the Matroska build's verified download read-only.
-    let archive_path = if profile != Profile::Matroska && shared.is_file() {
-        shared
-    } else {
-        cache.join(&name)
+    let (source, archive_sha) = match profile.source() {
+        Source::Revision => revision_source(root, &cache, profile, net)?,
+        Source::Release => release_source(root, &cache, net)?,
     };
-    if !archive_path.exists() {
-        let url = format!("https://codeload.github.com/FFmpeg/FFmpeg/tar.gz/{REVISION}");
-        let data = net.https(&url, "triergon-reference-builder", ARCHIVE_LIMIT)?;
-        if data.len() > ARCHIVE_LIMIT {
-            return Err("source archive size limit".into());
-        }
-        fetch::publish(&archive_path, &data)?;
-    }
-    let archive = fetch::read_bounded(&archive_path, ARCHIVE_LIMIT)?;
-    let archive_sha = sha256::hex(&archive);
-    if archive_sha != ARCHIVE_SHA256 {
-        return Err("Pinned source archive hash mismatch".into());
-    }
-    let source = cache.join(format!("FFmpeg-{REVISION}"));
-    if !source.exists() {
-        run(Command::new("tar")
-            .arg("-xzf")
-            .arg(&archive_path)
-            .arg("-C")
-            .arg(&cache))?;
-    }
-    verify_tree(&archive, &cache)?;
-
     let prefix = cache.join("install");
     let argv = configure_argv(&prefix, profile);
     let record = cache.join("configure-argv.json");
@@ -198,6 +275,9 @@ pub fn prepare(
         .arg(format!("-j{jobs}"))
         .current_dir(&source))?;
     run(Command::new("make").arg("install").current_dir(&source))?;
+    if profile.source() == Source::Release {
+        return release_manifest(&cache, &prefix, profile, &archive_sha, wanted);
+    }
     let samples = root.join(".research/fate-samples");
     let listing = output(
         Command::new("make")
@@ -252,6 +332,155 @@ pub fn prepare(
     }
     let path = cache.join("build.json");
     crate::corpus::write_json(&path, &Value::object(manifest))?;
+    Ok(path.display().to_string())
+}
+
+/// Download (once), hash-check and unpack the pinned git revision; the unpacked
+/// tree is verified against the archive on every run.
+fn revision_source(
+    root: &Path,
+    cache: &Path,
+    profile: Profile,
+    net: &dyn Transport,
+) -> Result<(PathBuf, String), String> {
+    let name = format!("{REVISION}.tar.gz");
+    let shared = root.join(".research/reference").join(&name);
+    // The other builds reuse the Matroska build's verified download read-only.
+    let archive_path = if profile != Profile::Matroska && shared.is_file() {
+        shared
+    } else {
+        cache.join(&name)
+    };
+    if !archive_path.exists() {
+        let url = format!("https://codeload.github.com/FFmpeg/FFmpeg/tar.gz/{REVISION}");
+        let data = net.https(&url, "triergon-reference-builder", ARCHIVE_LIMIT)?;
+        if data.len() > ARCHIVE_LIMIT {
+            return Err("source archive size limit".into());
+        }
+        fetch::publish(&archive_path, &data)?;
+    }
+    let archive = fetch::read_bounded(&archive_path, ARCHIVE_LIMIT)?;
+    let archive_sha = sha256::hex(&archive);
+    if archive_sha != ARCHIVE_SHA256 {
+        return Err("Pinned source archive hash mismatch".into());
+    }
+    let source = cache.join(format!("FFmpeg-{REVISION}"));
+    if !source.exists() {
+        run(Command::new("tar")
+            .arg("-xzf")
+            .arg(&archive_path)
+            .arg("-C")
+            .arg(cache))?;
+    }
+    verify_tree(&archive, cache)?;
+    Ok((source, archive_sha))
+}
+
+/// Download (once), hash-check and unpack the pinned release tarball. It is
+/// xz-compressed, which xtask does not decode itself, so the unpacked tree is
+/// verified by comparing the concatenated contents of every regular file in
+/// archive order (as `tar` streams them) with the same files on disk.
+fn release_source(
+    root: &Path,
+    cache: &Path,
+    net: &dyn Transport,
+) -> Result<(PathBuf, String), String> {
+    let archive_path = root
+        .join(".research/ffmpeg-release")
+        .join(format!("ffmpeg-{RELEASE}.tar.xz"));
+    if !archive_path.exists() {
+        let url = format!("https://ffmpeg.org/releases/ffmpeg-{RELEASE}.tar.xz");
+        let data = net.https(&url, "triergon-reference-builder", ARCHIVE_LIMIT)?;
+        if data.len() > ARCHIVE_LIMIT {
+            return Err("release archive size limit".into());
+        }
+        let parent = archive_path.parent().expect("archive has a parent");
+        fs::create_dir_all(parent).map_err(|e| format!("{}: {e}", parent.display()))?;
+        fetch::publish(&archive_path, &data)?;
+    }
+    let archive = fetch::read_bounded(&archive_path, ARCHIVE_LIMIT)?;
+    let archive_sha = sha256::hex(&archive);
+    if archive_sha != RELEASE_SHA256 {
+        return Err("Pinned release archive hash mismatch".into());
+    }
+    let source = cache.join(format!("ffmpeg-{RELEASE}"));
+    if !source.exists() {
+        run(Command::new("tar")
+            .arg("-xJf")
+            .arg(&archive_path)
+            .arg("-C")
+            .arg(cache))?;
+    }
+    let listing = output(Command::new("tar").arg("-tvJf").arg(&archive_path))?;
+    let streamed = Command::new("tar")
+        .arg("-xJOf")
+        .arg(&archive_path)
+        .output()
+        .map_err(|e| format!("tar: {e}"))?;
+    if !streamed.status.success() {
+        return Err(format!("tar -xJOf: {}", streamed.status));
+    }
+    let mut unpacked = Vec::with_capacity(streamed.stdout.len());
+    for line in listing.lines().filter(|line| line.starts_with('-')) {
+        let name = line
+            .split_whitespace()
+            .last()
+            .ok_or_else(|| format!("unreadable listing line: {line}"))?;
+        let path = cache.join(name);
+        let data =
+            fs::read(&path).map_err(|e| format!("Pinned release was changed: {name}: {e}"))?;
+        unpacked.extend(data);
+    }
+    if sha256::hex(&unpacked) != sha256::hex(&streamed.stdout) {
+        return Err("Pinned release tree was changed".into());
+    }
+    Ok((source, archive_sha))
+}
+
+/// The identity of a release profile build: archive, configure line, the
+/// installed libraries and programs, and the compiler.
+fn release_manifest(
+    cache: &Path,
+    prefix: &Path,
+    profile: Profile,
+    archive_sha: &str,
+    configure: Value,
+) -> Result<String, String> {
+    let mut installed = Vec::new();
+    for directory in ["lib", "bin"] {
+        let Ok(entries) = fs::read_dir(prefix.join(directory)) else {
+            continue;
+        };
+        let mut paths: Vec<_> = entries
+            .filter_map(Result::ok)
+            .map(|e| e.path())
+            .filter(|p| p.is_file() && !p.is_symlink())
+            .collect();
+        paths.sort();
+        for path in paths {
+            let data = fs::read(&path).map_err(|e| format!("{}: {e}", path.display()))?;
+            let key = path
+                .strip_prefix(cache)
+                .expect("installed under the cache")
+                .display()
+                .to_string();
+            installed.push((key, Value::str(sha256::hex(&data))));
+        }
+    }
+    let manifest = Value::object(vec![
+        ("schema", Value::int(1)),
+        ("release", Value::str(RELEASE)),
+        ("archive_sha256", Value::str(archive_sha)),
+        ("configure_argv", configure),
+        ("profile", Value::str(profile.name())),
+        ("installed", Value::object(installed)),
+        (
+            "compiler",
+            Value::str(output(Command::new("cc").arg("--version"))?),
+        ),
+    ]);
+    let path = cache.join("build.json");
+    crate::corpus::write_json(&path, &manifest)?;
     Ok(path.display().to_string())
 }
 
