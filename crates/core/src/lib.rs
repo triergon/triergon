@@ -1,4 +1,4 @@
-//! Shared media primitives. Experimental; the new core is not qualified yet.
+//! Shared media primitives. Experimental.
 #![forbid(unsafe_code)]
 
 mod budget;

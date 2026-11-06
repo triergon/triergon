@@ -1,11 +1,11 @@
 //! Triergon: bounded, pure-Rust media parsing.
 //!
-//! This facade is the consumer boundary (ADR-0003, ADR-0004 D1). It re-exports
+//! This facade is the consumer boundary. It re-exports
 //! the shared core vocabulary, opens a source as an [`AnyReader`] chosen from
 //! its first bytes, and exposes each format crate behind its own Cargo feature.
 //! Generic code (the harness, format tests) keeps using the concrete readers.
 //!
-//! Experimental; no module is release-qualified.
+//! Experimental.
 #![forbid(unsafe_code)]
 
 mod any;

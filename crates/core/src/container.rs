@@ -1,9 +1,9 @@
-//! Format-neutral container vocabulary (ADR-0003).
+//! Format-neutral container vocabulary.
 //!
 //! Readers keep their own rich packet and track types; consumers see them
 //! through the [`PacketInfo`] and [`TrackInfo`] views, so nothing is converted
 //! or copied per packet and format detail is never reduced to a common
-//! denominator. The semantic rules of ADR-0003 hold for every implementation:
+//! denominator. These semantic rules hold for every implementation:
 //! no fabricated values (`None`/[`RandomAccess::Unknown`] unless the source or a
 //! documented rule supplies them), no sentinels, and specification defaults only
 //! with an [`Origin`].

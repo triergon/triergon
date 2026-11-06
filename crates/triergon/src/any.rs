@@ -1,10 +1,10 @@
 //! One closed reader enum at the consumer boundary.
 //!
-//! Streem receives Matroska directly and TS/fMP4 through HLS, so the reader is
-//! chosen at open time from probed bytes. Each variant sits behind its format
+//! A player may receive Matroska directly and TS or fragmented MP4 through HLS,
+//! so the reader is chosen at open time from probed bytes. Each variant sits behind its format
 //! feature; forwarding is one predictable `match` per step with no allocation
 //! and no dynamic dispatch on the packet path. ISO BMFF and MPEG-TS join once
-//! their readers implement [`ContainerReader`] (ADR-0004 B3); until then
+//! their readers implement [`ContainerReader`]; until then
 //! [`probe`] reports them and [`AnyReader::open`] refuses them explicitly.
 // With no format feature the enums are empty and their forwarding is dead code.
 #![cfg_attr(

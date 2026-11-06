@@ -1,5 +1,5 @@
 //! Typed playback composition over source-owned container, packet and subtitle jobs.
-//! Experimental; no HTTP, platform sink, device or numerical qualification.
+//! Experimental; no HTTP, platform sink or device support.
 #![forbid(unsafe_code)]
 mod engines;
 pub mod io;

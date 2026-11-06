@@ -1,4 +1,4 @@
-//! Additive correctness guard, not a bug RED or performance test.
+//! Correctness guard, not a performance test.
 //! Literal answers use M=2^64-1, P=M*(M+1)=2^128-2^64:
 //! 1/M+1/(M+1)=(2*M+1)/P and 1/M-1/(M+1)=1/P.
 use triergon_core::Time;
