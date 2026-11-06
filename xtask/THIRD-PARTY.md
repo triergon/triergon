@@ -37,8 +37,8 @@ jloup@gzip.org          madler@alumni.caltech.edu
 
 MT19937 with its reference initialisation, seeded and drawn from as CPython's
 `random` module does, used to reproduce the seeded byte stream of an authored
-fixture and the bootstrap resampling and pair order of recorded measurements. Changes from CPython: a Rust rendering of only these
-operations.
+fixture and the bootstrap resampling and pair order of recorded measurements.
+Changes from CPython: a Rust rendering of only these operations.
 
 ```
 Copyright (C) 1997 - 2002, Makoto Matsumoto and Takuji Nishimura,
