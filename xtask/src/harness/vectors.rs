@@ -11,7 +11,7 @@ use super::acceptance::acceptance;
 use super::comparison::{reference_record, reference_summary};
 use super::parity::{self, Run};
 use super::provenance::source_identity_error;
-use super::report::{host_target, retained_timing};
+use super::report::host_target;
 use super::timing::{Operation, benchmark};
 use crate::checks::read_json;
 use crate::corpus::write_json;
@@ -62,7 +62,6 @@ fn workers(root: &Path) -> R<(PathBuf, PathBuf, Value)> {
 
 pub struct ExternalOptions {
     pub output: PathBuf,
-    pub reuse_report: Option<PathBuf>,
     pub pairs: usize,
     pub iterations: u32,
     pub benchmark: bool,
@@ -92,31 +91,6 @@ pub fn external_vector(root: &Path, options: &ExternalOptions) -> R<i32> {
     if !path.is_file() || Some(sha(&path)?.as_str()) != s(&spec, "sha256") {
         return Err("required original external vector missing or changed".into());
     }
-    let old = match &options.reuse_report {
-        Some(report) => read_json(report)?,
-        None => Value::Object(vec![]),
-    };
-    let mut row = old.get("case").cloned().unwrap_or(Value::Object(vec![]));
-    if let Some(report) = &options.reuse_report {
-        let output = fs::canonicalize(&options.output).unwrap_or_else(|_| options.output.clone());
-        if report
-            .parent()
-            .and_then(|p| fs::canonicalize(p).ok())
-            .as_ref()
-            == Some(&output)
-        {
-            return Err("measurement reuse needs a different output directory to preserve the previous report and raw observations".into());
-        }
-        let old_identity = old.get("identity").cloned().unwrap_or(Value::Null);
-        if !same(old_identity.get("binaries"), identity.get("binaries"))
-            || s(&old, "contract_sha256") != Some(contract_sha.as_str())
-        {
-            return Err("external reuse requires identical workers, contract and input".into());
-        }
-    }
-    if row.get("input_sha256") != spec.get("sha256") {
-        row = Value::Object(vec![]);
-    }
     fs::create_dir_all(&options.output).map_err(|e| e.to_string())?;
     let operation = Value::object([
         ("name", Value::str("container-demux-v1")),
@@ -144,45 +118,29 @@ pub fn external_vector(root: &Path, options: &ExternalOptions) -> R<i32> {
         ("operation", operation.clone()),
         ("parity", result.clone()),
     ];
-    if !same(row.get("operation"), Some(&operation)) || !same(row.get("reference"), Some(&summary))
-    {
-        row = Value::Object(vec![]);
-    }
-    let minimum = super::linux::py_int(contract.get("minimum_pairs")).unwrap_or(i128::MAX);
     let timed = Operation {
         prefix: "catalogue-".into(),
         arguments: vec![],
     };
     if s(&result, "status") == Some("pass") {
         if options.benchmark {
-            let earlier = row.get("timing").cloned().unwrap_or(Value::Object(vec![]));
-            let timing =
-                match retained_timing(&earlier, options.pairs, options.iterations, minimum)? {
-                    Some(kept) => kept,
-                    None => benchmark(
-                        &candidate,
-                        &reference,
-                        &path,
-                        options.pairs,
-                        options.iterations,
-                        280,
-                        &timed,
-                    )?,
-                };
-            case.push(("timing", timing));
+            case.push((
+                "timing",
+                benchmark(
+                    &candidate,
+                    &reference,
+                    &path,
+                    options.pairs,
+                    options.iterations,
+                    280,
+                    &timed,
+                )?,
+            ));
         }
         if options.memory {
-            let earlier = row.get("memory").cloned().unwrap_or(Value::Object(vec![]));
-            let previous = old.get("identity").and_then(|i| i.get("instrumentation"));
-            let memory = match super::memory::retained_memory(
-                &earlier,
-                options.pairs,
-                minimum,
-                previous,
-                identity.get("instrumentation"),
-            )? {
-                Some(kept) => kept,
-                None => super::memory::collect(
+            case.push((
+                "memory",
+                super::memory::collect(
                     root,
                     &candidate,
                     &reference,
@@ -191,22 +149,6 @@ pub fn external_vector(root: &Path, options: &ExternalOptions) -> R<i32> {
                     280,
                     &timed,
                 )?,
-            };
-            case.push(("memory", memory));
-        }
-        if row.truthy()
-            && let Some(report) = &options.reuse_report
-        {
-            let shown = fs::canonicalize(report)
-                .unwrap_or_else(|_| report.clone())
-                .display()
-                .to_string();
-            case.push((
-                "previous_measurement_report",
-                Value::object([
-                    ("path", Value::str(shown)),
-                    ("sha256", Value::str(sha(report)?)),
-                ]),
             ));
         }
     }

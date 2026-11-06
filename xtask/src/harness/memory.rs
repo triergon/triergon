@@ -1148,48 +1148,6 @@ pub fn collect(
     Ok(result)
 }
 
-/// A first clean or terminal earlier memory measurement, unless the probe or
-/// observer was rebuilt; `None` permits a new observation.
-pub fn retained_memory(
-    measurement: &Value,
-    pairs: usize,
-    minimum_pairs: i128,
-    previous: Option<&Value>,
-    current: Option<&Value>,
-) -> R<Option<Value>> {
-    if !measurement.truthy() || s(measurement, "status") == Some("contaminated") {
-        return Ok(None);
-    }
-    if let (Some(old), Some(new)) = (
-        previous.filter(|v| v.truthy()),
-        current.filter(|v| v.truthy()),
-    ) {
-        let keys = ["probe_sha256", "observer_sha256"];
-        let both = keys.iter().all(|k| {
-            old.get(k).is_some_and(Value::truthy) && new.get(k).is_some_and(Value::truthy)
-        });
-        if both
-            && keys
-                .iter()
-                .any(|k| !equal(old.get(k).unwrap(), new.get(k).unwrap()))
-        {
-            return Ok(None);
-        }
-    }
-    if s(measurement, "status") != Some("qualified") {
-        return Ok(Some(measurement.clone()));
-    }
-    let old_pairs = py_int(measurement.get("pairs"));
-    if old_pairs == Some(pairs as i128) {
-        return Ok(Some(measurement.clone()));
-    }
-    if old_pairs.is_some_and(|old| 0 < old && old < minimum_pairs && minimum_pairs <= pairs as i128)
-    {
-        return Ok(None);
-    }
-    Err("completed clean measurement cannot be replaced by changing collection settings; change the workers before requalification".into())
-}
-
 /// Whether a row's recorded memory evidence is complete, bound to the selected
 /// workers and instrumentation, and reproduces its recorded ratios.
 pub fn evidence_valid(

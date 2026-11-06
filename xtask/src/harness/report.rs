@@ -31,7 +31,6 @@ pub struct Options {
     pub pairs: usize,
     pub iterations: u32,
     pub seed: u64,
-    pub reuse_report: Option<PathBuf>,
 }
 
 impl Options {
@@ -50,7 +49,6 @@ impl Options {
             pairs: 30,
             iterations: 200,
             seed: 280,
-            reuse_report: None,
         }
     }
 }
@@ -199,66 +197,6 @@ pub fn fate_coverage(
     Ok(rows)
 }
 
-/// Earlier rows by case, including unvisited rows an interrupted run kept.
-pub fn measurement_cache(report: &Value) -> Result<Vec<(String, Value)>, String> {
-    let mut cache: Vec<(String, Value)> = Vec::new();
-    for key in ["cached_cases", "cases"] {
-        for row in report
-            .get(key)
-            .and_then(Value::as_array)
-            .unwrap_or_default()
-        {
-            let id = s(row, "id").unwrap_or_default().to_owned();
-            if cache.iter().any(|(k, _)| *k == id) {
-                return Err("duplicate measurement-cache case identities".into());
-            }
-            cache.push((id, row.clone()));
-        }
-    }
-    Ok(cache)
-}
-
-/// A first clean or terminal earlier measurement of an unchanged operation, if
-/// it may be kept; `None` permits a new observation.
-pub fn retained_timing(
-    measurement: &Value,
-    pairs: usize,
-    iterations: u32,
-    minimum_pairs: i128,
-) -> Result<Option<Value>, String> {
-    if !measurement.truthy() || s(measurement, "status") == Some("contaminated") {
-        return Ok(None);
-    }
-    if s(measurement, "status") != Some("measured") {
-        return Ok(Some(measurement.clone()));
-    }
-    let old_pairs = match measurement.get("pairs") {
-        Some(Value::Number(n)) => n.as_i128(),
-        _ => None,
-    };
-    let same = old_pairs == Some(pairs as i128)
-        && measurement
-            .get("iterations")
-            .is_some_and(|i| super::diff::equal(i, &Value::int(iterations)));
-    if same {
-        return Ok(Some(measurement.clone()));
-    }
-    if old_pairs.is_some_and(|old| 0 < old && old < minimum_pairs && minimum_pairs <= pairs as i128)
-    {
-        // A short diagnostic screen is not a complete gate run.
-        return Ok(None);
-    }
-    Err("completed clean measurement cannot be replaced by changing collection settings; change the workers before requalification".into())
-}
-
-fn same_field(a: &Value, b: &Value, key: &str) -> bool {
-    match (a.get(key), b.get(key)) {
-        (Some(x), Some(y)) => super::diff::equal(x, y),
-        (None, None) => true,
-        _ => false,
-    }
-}
-
 fn save_json(path: &Path, value: &Value) -> Result<(), String> {
     let temporary = path.with_extension("tmp");
     write_json(&temporary, value)?;
@@ -319,29 +257,6 @@ pub fn run(root: &Path, options: &Options) -> Result<i32, String> {
             return Err("additional vector receipt has stale source/contract identity".into());
         }
         additional.push(receipt.get("case").cloned().unwrap_or(Value::Null));
-    }
-    let (mut reusable, mut previous_sha, mut previous_instrumentation) = (Vec::new(), None, None);
-    if let Some(reuse) = &options.reuse_report {
-        let previous = read_json(reuse)?;
-        let output = fs::canonicalize(&options.output).unwrap_or_else(|_| options.output.clone());
-        if reuse
-            .parent()
-            .and_then(|p| fs::canonicalize(p).ok())
-            .as_ref()
-            == Some(&output)
-        {
-            return Err("measurement reuse needs a different output directory to preserve the previous report and raw observations".into());
-        }
-        let old = previous.get("identity").cloned().unwrap_or(Value::Null);
-        let same = same_field(&old, &identity, "binaries")
-            && s(&previous, "contract_sha256") == Some(contract_sha.as_str())
-            && same_field(&old, &identity, "comparison_references");
-        if !same {
-            return Err("measurement reuse requires identical workers and feature contract".into());
-        }
-        reusable = measurement_cache(&previous)?;
-        previous_instrumentation = old.get("instrumentation").cloned();
-        previous_sha = Some(digest(reuse)?);
     }
     fs::create_dir_all(&options.output).map_err(|e| e.to_string())?;
     let target = host_target();
@@ -491,78 +406,29 @@ pub fn run(root: &Path, options: &Options) -> Result<i32, String> {
         let passed = s(&parity, "status") == Some("pass");
         row.push(("parity", parity));
         if let (true, Some((reference, input, operation))) = (passed, timed) {
-            let current = object(row.clone());
-            let mut old = reusable
-                .iter()
-                .find(|(k, _)| *k == id)
-                .map(|(_, v)| v.clone())
-                .unwrap_or(Value::Object(vec![]));
-            if !["input_sha256", "operation", "reference"]
-                .iter()
-                .all(|k| same_field(&old, &current, k))
-            {
-                old = Value::Object(vec![]);
-            }
             if options.benchmark {
-                let minimum = match contract.get("minimum_pairs") {
-                    Some(Value::Number(n)) => n.as_i128().unwrap_or(i128::MAX),
-                    _ => i128::MAX,
-                };
-                let earlier = old.get("timing").cloned().unwrap_or(Value::Object(vec![]));
-                let timing =
-                    match retained_timing(&earlier, options.pairs, options.iterations, minimum)? {
-                        Some(kept) => kept,
-                        None => benchmark(
-                            &candidate,
-                            &reference,
-                            &input,
-                            options.pairs,
-                            options.iterations,
-                            options.seed,
-                            &operation,
-                        )?,
-                    };
+                let timing = benchmark(
+                    &candidate,
+                    &reference,
+                    &input,
+                    options.pairs,
+                    options.iterations,
+                    options.seed,
+                    &operation,
+                )?;
                 row.push(("timing", timing));
             }
             if options.memory {
-                let minimum = match contract.get("minimum_pairs") {
-                    Some(Value::Number(n)) => n.as_i128().unwrap_or(i128::MAX),
-                    _ => i128::MAX,
-                };
-                let earlier = old.get("memory").cloned().unwrap_or(Value::Object(vec![]));
-                let kept = super::memory::retained_memory(
-                    &earlier,
+                let memory = super::memory::collect(
+                    root,
+                    &candidate,
+                    &reference,
+                    &input,
                     options.pairs,
-                    minimum,
-                    previous_instrumentation.as_ref(),
-                    identity.get("instrumentation"),
+                    options.seed,
+                    &operation,
                 )?;
-                let memory = match kept {
-                    Some(kept) => kept,
-                    None => super::memory::collect(
-                        root,
-                        &candidate,
-                        &reference,
-                        &input,
-                        options.pairs,
-                        options.seed,
-                        &operation,
-                    )?,
-                };
                 row.push(("memory", memory));
-            }
-            if old.truthy()
-                && let (Some(sha), Some(reuse)) = (&previous_sha, &options.reuse_report)
-            {
-                let path = fs::canonicalize(reuse)
-                    .unwrap_or_else(|_| reuse.clone())
-                    .display()
-                    .to_string();
-                row.push(("reused_evidence_sha256", Value::str(sha)));
-                row.push((
-                    "previous_measurement_report",
-                    Value::object([("path", Value::str(path)), ("sha256", Value::str(sha))]),
-                ));
             }
         }
         rows.push(object(row));
@@ -570,16 +436,6 @@ pub fn run(root: &Path, options: &Options) -> Result<i32, String> {
         partial.extend([
             ("collection_status", Value::str("partial")),
             ("cases", Value::Array(rows.clone())),
-            (
-                "cached_cases",
-                Value::Array(
-                    reusable
-                        .iter()
-                        .filter(|(k, _)| !rows.iter().any(|r| s(r, "id") == Some(k.as_str())))
-                        .map(|(_, v)| v.clone())
-                        .collect(),
-                ),
-            ),
             (
                 "acceptance",
                 Value::object([

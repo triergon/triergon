@@ -37,7 +37,7 @@ commands:
                  build the pinned FFmpeg reference into .research/reference[-formats]
   fetch-specs    [--record] cache the specification texts and verify specs/sources.json
   fetch-vectors  cache the required external test vectors and verify their hashes
-  external-vector --output DIR [--reuse-report F] [--pairs N] [--iterations N] [--benchmark] [--memory]
+  external-vector --output DIR [--pairs N] [--iterations N] [--benchmark] [--memory]
                  qualify the mandatory external metadata vector through the same gates
   fate-run       --case NAME [--demux-only]   run one supported upstream FATE case
   trace-identities --output F [--compare F] [--candidate W]
@@ -47,7 +47,7 @@ commands:
                  record their identity in target/harness/identity.json
   report         [--contract F] [--manifest F] [--corpus DIR] [--output DIR] [--fate-cache DIR]
                  [--additional-report F]... [--require-acceptance] [--require-slice-acceptance]
-                 [--benchmark] [--memory] [--pairs N] [--iterations N] [--seed N] [--reuse-report F]
+                 [--benchmark] [--memory] [--pairs N] [--iterations N] [--seed N]
                  correctness, paired runtime and memory report of the built workers for one contract
   compare        --candidate W --reference W --input FILE --output DIR
                  [--operation plain|seek|colour|catalogue] [--content] [--no-short-reads]
@@ -157,7 +157,6 @@ fn exit(result: Result<i32, String>) -> ExitCode {
 fn external_vector(root: &Path, args: &[String]) -> ExitCode {
     let mut options = harness::vectors::ExternalOptions {
         output: PathBuf::new(),
-        reuse_report: None,
         pairs: 30,
         iterations: 50,
         benchmark: false,
@@ -173,7 +172,6 @@ fn external_vector(root: &Path, args: &[String]) -> ExitCode {
             };
             match flag.as_str() {
                 "--output" => options.output = PathBuf::from(value()?),
-                "--reuse-report" => options.reuse_report = Some(PathBuf::from(value()?)),
                 "--pairs" => {
                     options.pairs = value()?.parse().map_err(|_| "--pairs: not a number")?
                 }
@@ -264,7 +262,6 @@ fn report(root: &Path, args: &[String]) -> ExitCode {
                 "--require-slice-acceptance" => options.require_slice_acceptance = true,
                 "--benchmark" => options.benchmark = true,
                 "--memory" => options.memory = true,
-                "--reuse-report" => options.reuse_report = Some(value()?),
                 "--pairs" | "--iterations" | "--seed" => {
                     let text = value()?.display().to_string();
                     let number: u64 = text
