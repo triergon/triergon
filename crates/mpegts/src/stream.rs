@@ -245,7 +245,9 @@ impl TransportStream {
         limits: ParseLimits,
         descriptor_namespace: DescriptorNamespace,
     ) -> Result<Self> {
-        let mut stream = Self::new_single_program_feed(budget, limits, descriptor_namespace)?;
+        let mut stream = Self::new_single_program_segment(budget, limits, descriptor_namespace)?;
+        stream.framer.copy_complete_input();
+        stream.feed_omissions = Some(0);
         stream.feed_validated_carriers = true;
         Ok(stream)
     }

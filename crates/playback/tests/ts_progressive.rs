@@ -318,6 +318,38 @@ fn continuous_mux_exceeds_the_live_budget() {
 }
 
 #[test]
+fn a_pes_at_the_window_boundary_leaves_room_for_the_next_reply() {
+    const CARRIER: usize = 188;
+    const WINDOW: usize = 512 * CARRIER;
+    let mut null = [0xff; CARRIER];
+    null[..4].copy_from_slice(&[0x47, 0x1f, 0xff, 0x10]);
+    // The first video PES starts in the fixture's fourth carrier.
+    // Make that carrier the last one in a full input window.
+    let mut raw = null.repeat(508);
+    raw.extend_from_slice(BASELINE);
+    while raw.len() < WINDOW * 2 {
+        raw.extend_from_slice(&null);
+    }
+    let pool = Budget::new(160 * 1024).unwrap();
+    assert!(raw.len() > pool.limit());
+    let (mut reader, source) = reader(&pool, &raw, None, WINDOW);
+    source.available.set(raw.len());
+    source.completion.set(Some(Completion::End));
+    let mut counts = [0, 0];
+    loop {
+        match next(&mut reader, 65536).unwrap() {
+            TsProgressiveStep::Unit(TsProgressiveUnit::Video(_)) => counts[0] += 1,
+            TsProgressiveStep::Unit(TsProgressiveUnit::Audio { .. }) => counts[1] += 1,
+            TsProgressiveStep::End => break,
+            other => panic!("expected to read both windows, got {other:?}"),
+        }
+    }
+    assert_eq!(counts, [12, 24]);
+    assert_eq!(source.read.get(), raw.len());
+    closed(&pool, &source);
+}
+
+#[test]
 fn transport_cut_short_length_and_partial_carrier_refuse_without_eof_flush() {
     for (prefix, length, completion, error) in [
         (BASELINE_PREFIX, None, Completion::Cut, CoreError::Transport),

@@ -86,11 +86,18 @@ pub struct FrameStep {
     pub state: FrameState,
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum BufferedCarrier {
+    Carry,
+    Shared,
+    Copied,
+}
+
 #[derive(Debug)]
 pub struct TransportFramer {
     budget: Budget,
     format: PacketFormat,
-    share_input: bool,
+    buffered_carrier: BufferedCarrier,
     shared_owner: Option<ByteStorageAddress>,
     carry: Option<BudgetVec<u8>>,
     start: Option<u64>,
@@ -110,7 +117,7 @@ impl TransportFramer {
             carry: Some(BudgetVec::new(&budget)),
             budget,
             format,
-            share_input: false,
+            buffered_carrier: BufferedCarrier::Carry,
             shared_owner: None,
             start: None,
             next: None,
@@ -124,7 +131,11 @@ impl TransportFramer {
         }
     }
     pub(crate) fn share_input(&mut self) {
-        self.share_input = true;
+        self.buffered_carrier = BufferedCarrier::Shared;
+    }
+
+    pub(crate) fn copy_complete_input(&mut self) {
+        self.buffered_carrier = BufferedCarrier::Copied;
     }
 
     pub fn discard(&mut self) {
@@ -349,32 +360,49 @@ impl TransportFramer {
                     .complete(work, cancel)
                     .map(|value| value.map_or(Step::Yield, Step::Ready));
             }
-            // Share complete carriers. The common layouts need only the
-            // header and padding check. Other fields use the full inspector.
-            if self.share_input
+            // Complete feed carriers need only the header and padding check
+            // for common layouts. Other fields use the full inspector.
+            if self.buffered_carrier != BufferedCarrier::Carry
                 && carry.is_empty()
                 && input.buffered().len() >= missing
                 && work.remaining() >= missing as u64
-                && Self::share_buffered_owner(&mut self.shared_owner, input)
             {
-                let start = input.position();
-                let Step::Ready(source) = input.read_span(missing, work, cancel)? else {
-                    return Err(Error::Invalid("buffered carrier span missing"));
-                };
-                self.next = Some(input.position());
-                if self.format == PacketFormat::Ts188
-                    && !cancel.load(Ordering::Relaxed)
-                    && let Some(carrier) = PlainCarrier::inspect_ts188(&source, work)
-                {
-                    self.last_packet_offset = Some(start);
-                    return Ok(Step::Ready(carrier.into_packet(
-                        source,
-                        start,
-                        self.entity,
-                    )?));
+                let share = self.buffered_carrier == BufferedCarrier::Shared
+                    && Self::share_buffered_owner(&mut self.shared_owner, input);
+                if share || self.buffered_carrier == BufferedCarrier::Copied {
+                    let start = input.position();
+                    let source = if share {
+                        let Step::Ready(source) = input.read_span(missing, work, cancel)? else {
+                            return Err(Error::Invalid("buffered carrier span missing"));
+                        };
+                        source
+                    } else {
+                        // A PES can span several source windows. Keep a tight
+                        // carrier so the next reply does not need two windows
+                        // of charged capacity. Allocate before advancing input.
+                        let source =
+                            Bytes::copy_from_slice(&self.budget, &input.buffered()[..missing])?;
+                        if !matches!(input.read_discard(missing, work, cancel)?, Step::Ready(read) if read == missing)
+                        {
+                            return Err(Error::Invalid("buffered carrier extent changed"));
+                        }
+                        source
+                    };
+                    self.next = Some(input.position());
+                    if self.format == PacketFormat::Ts188
+                        && !cancel.load(Ordering::Relaxed)
+                        && let Some(carrier) = PlainCarrier::inspect_ts188(&source, work)
+                    {
+                        self.last_packet_offset = Some(start);
+                        return Ok(Step::Ready(carrier.into_packet(
+                            source,
+                            start,
+                            self.entity,
+                        )?));
+                    }
+                    self.inspect(source, start)?;
+                    continue;
                 }
-                self.inspect(source, start)?;
-                continue;
             }
             // Reserve before advancing the shared cursor; a failed allocation has
             // consumed no source bytes. A complete carry survives failed freeze.
