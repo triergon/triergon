@@ -2,7 +2,7 @@
 """Record exact decoder-output identities for the codec crates.
 
 Runs each codec's `decode` example over the local conformance vectors and the
-`d4-worker` raw operation over the frozen decoder workloads. It records the SHA-256 of
+`codec-worker` raw operation over the frozen decoder workloads. It records the SHA-256 of
 every output file plus the exit status and stderr. Refactors of decoders, bit
 readers and sessions must reproduce the record exactly; this is equivalence
 evidence only, never parity with or performance against FFmpeg.
@@ -46,7 +46,7 @@ def main():
     args = parser.parse_args()
     env = dict(os.environ, CARGO_INCREMENTAL="0")
     subprocess.run(["cargo", "build", "--release", "--locked", "-p", "triergon-sim",
-                    "--features", "codecs", "--bin", "d4-worker"], cwd=ROOT, env=env, check=True)
+                    "--features", "codecs", "--bin", "codec-worker"], cwd=ROOT, env=env, check=True)
     examples = ROOT / "target/release/examples"
     jobs = []
     with tempfile.TemporaryDirectory() as scratch:
@@ -67,8 +67,8 @@ def main():
                         name = f"{codec}/{vector.relative_to(SUITE)}"
                         jobs.append((name, [str(copy), str(vector), str(out), *(["--quiet"] if codec == "hevc" else [])], str(out)))
         for workload in load(WORKLOADS)["workloads"]:
-            out = Path(scratch) / f"d4-{workload['id']}.out"
-            jobs.append(("d4/" + workload["id"], [str(ROOT / "target/release/d4-worker"),
+            out = Path(scratch) / f"worker-{workload['id']}.out"
+            jobs.append(("worker/" + workload["id"], [str(ROOT / "target/release/codec-worker"),
                          workload["operation"] + "-raw", str(ROOT / workload["path"]), str(out)], str(out)))
         with ThreadPoolExecutor(args.jobs) as pool:
             record = dict(sorted(pool.map(run, jobs)))

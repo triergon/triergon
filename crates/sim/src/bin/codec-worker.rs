@@ -1,7 +1,7 @@
-//! D4 measurement adapter (harness use): the same operations as
+//! Decoder measurement worker for the harness: the same operations as
 //! `harness/d4/reference_decode.c`, through the session-layer decoders.
 //!
-//! usage: d4-worker LANE-CODEC-bench FILE ITERATIONS | LANE-CODEC-memory FILE |
+//! usage: codec-worker LANE-CODEC-bench FILE ITERATIONS | LANE-CODEC-memory FILE |
 //! LANE-CODEC-raw FILE OUT, LANE-CODEC one of video-h264, video-hevc, audio-ac3,
 //! audio-eac3, audio-aac, audio-dts. Bench prints {iterations, elapsed_ns, packets, bytes, digest} where
 //! packets counts output pictures/audio blocks and the digest (see [`Digest`]) covers the exact
@@ -252,7 +252,7 @@ fn main() {
     let args: Vec<String> = std::env::args().collect();
     let Some((op, kind)) = args.get(1).and_then(|a| a.rsplit_once('-')) else {
         eprintln!(
-            "usage: d4-worker LANE-CODEC-bench FILE ITERATIONS | LANE-CODEC-memory FILE | LANE-CODEC-raw FILE OUT"
+            "usage: codec-worker LANE-CODEC-bench FILE ITERATIONS | LANE-CODEC-memory FILE | LANE-CODEC-raw FILE OUT"
         );
         std::process::exit(2);
     };
