@@ -1,31 +1,13 @@
 """The owner's initial-delivery ceiling does not replace the optimization goal."""
 import copy
-from pathlib import Path
-import shutil
-import tempfile
 import unittest
-from unittest.mock import patch
 
-from tools import generate_seek_corpus, generate_zlib_corpus
 from .common import load
 from .runner import ROOT, acceptance, ratio_interval
 from .test_runner import matched_gate_fixture
 
 
 class DeliveryPolicyTests(unittest.TestCase):
-    def test_regeneration_preserves_contract_policy_and_selected_inputs(self):
-        for name, module in (("zlib", generate_zlib_corpus), ("seek", generate_seek_corpus)):
-            with self.subTest(generator=name), tempfile.TemporaryDirectory() as directory, \
-                    patch.object(module, "ROOT", Path(directory)):
-                (module.ROOT / "harness").mkdir()
-                fixture = Path("research/implementation/cases/avc-aac-sub/reference.json")
-                (module.ROOT / fixture).parent.mkdir(parents=True)
-                shutil.copy2(ROOT / fixture, module.ROOT / fixture)
-                module.main()
-                for suffix in ("slice", "corpus"):
-                    relative = Path("harness") / (name + "-" + suffix + ".json")
-                    self.assertEqual(load(module.ROOT / relative), load(ROOT / relative))
-
     def test_each_working_slice_keeps_both_explicit_targets(self):
         for prefix in ("", "header-", "zlib-", "seek-", "colour-", "catalogue-"):
             with self.subTest(prefix=prefix):

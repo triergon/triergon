@@ -7,11 +7,11 @@ import unittest
 
 from .runner import ROOT, differences
 from .spec_oracle import timing_trace
-from tools import generate_corpus as fixture
+from .common import element, uint
 
 
 def document(scale, duration, delay, group_ticks, frames, relative=0):
-    e, u = fixture.element, fixture.uint
+    e, u = element, uint
     header = e(0x1A45DFA3, u(0x4286, 1) + u(0x42F7, 1) + u(0x42F2, 4) + u(0x42F3, 8) + e(0x4282, b"matroska") + u(0x4287, 4) + u(0x4285, 2))
     track = u(0xD7, 1) + u(0x73C5, 1) + u(0x83, 2) + e(0x86, b"A_PCM/INT/LIT") + u(0x56AA, delay)
     if duration is not None:

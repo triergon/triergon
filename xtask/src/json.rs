@@ -76,6 +76,149 @@ impl Value {
     }
 }
 
+impl Value {
+    pub fn int(value: impl Into<i128>) -> Value {
+        Value::Number(Number(value.into().to_string()))
+    }
+
+    /// A float written as Python's `repr` writes it (`1.0`, `0.95`, `1e-05`).
+    pub fn float(value: f64) -> Value {
+        Value::Number(Number(python_float(value)))
+    }
+
+    pub fn str(value: impl Into<String>) -> Value {
+        Value::String(value.into())
+    }
+
+    pub fn object<K: Into<String>>(members: impl IntoIterator<Item = (K, Value)>) -> Value {
+        Value::Object(members.into_iter().map(|(k, v)| (k.into(), v)).collect())
+    }
+
+    pub fn strings<S: Into<String>>(items: impl IntoIterator<Item = S>) -> Value {
+        Value::Array(items.into_iter().map(|s| Value::String(s.into())).collect())
+    }
+}
+
+/// Python's shortest round-trip float `repr`.
+fn python_float(value: f64) -> String {
+    if value.is_nan() {
+        return "NaN".into();
+    }
+    if value.is_infinite() {
+        return if value > 0.0 { "Infinity" } else { "-Infinity" }.into();
+    }
+    let scientific = format!("{:e}", value.abs());
+    let (mantissa, exponent) = scientific.split_once('e').expect("exponent form");
+    let exponent: i32 = exponent.parse().expect("integer exponent");
+    let digits: String = mantissa.chars().filter(|c| *c != '.').collect();
+    let sign = if value.is_sign_negative() { "-" } else { "" };
+    if (-4..16).contains(&exponent) {
+        let point = exponent + 1;
+        let text = if point <= 0 {
+            format!("0.{}{digits}", "0".repeat((-point) as usize))
+        } else if point as usize >= digits.len() {
+            format!("{digits}{}.0", "0".repeat(point as usize - digits.len()))
+        } else {
+            format!(
+                "{}.{}",
+                &digits[..point as usize],
+                &digits[point as usize..]
+            )
+        };
+        format!("{sign}{text}")
+    } else {
+        let (first, rest) = digits.split_at(1);
+        let fraction = if rest.is_empty() {
+            String::new()
+        } else {
+            format!(".{rest}")
+        };
+        let exp_sign = if exponent < 0 { '-' } else { '+' };
+        format!("{sign}{first}{fraction}e{exp_sign}{:02}", exponent.abs())
+    }
+}
+
+/// `json.dumps(value, indent=indent)` as Python writes it, ASCII-only.
+pub fn to_python(value: &Value, indent: Option<usize>) -> String {
+    let mut out = String::new();
+    write_value(&mut out, value, indent, 0);
+    out
+}
+
+fn write_value(out: &mut String, value: &Value, indent: Option<usize>, level: usize) {
+    match value {
+        Value::Null => out.push_str("null"),
+        Value::Bool(b) => out.push_str(if *b { "true" } else { "false" }),
+        Value::Number(Number(raw)) => out.push_str(raw),
+        Value::String(s) => write_string(out, s),
+        Value::Array(items) if items.is_empty() => out.push_str("[]"),
+        Value::Object(members) if members.is_empty() => out.push_str("{}"),
+        Value::Array(items) => {
+            out.push('[');
+            for (i, item) in items.iter().enumerate() {
+                separator(out, indent, level + 1, i == 0);
+                write_value(out, item, indent, level + 1);
+            }
+            close(out, indent, level, ']');
+        }
+        Value::Object(members) => {
+            out.push('{');
+            for (i, (key, item)) in members.iter().enumerate() {
+                separator(out, indent, level + 1, i == 0);
+                write_string(out, key);
+                out.push_str(": ");
+                write_value(out, item, indent, level + 1);
+            }
+            close(out, indent, level, '}');
+        }
+    }
+}
+
+fn separator(out: &mut String, indent: Option<usize>, level: usize, first: bool) {
+    match indent {
+        Some(width) => {
+            if !first {
+                out.push(',');
+            }
+            out.push('\n');
+            out.push_str(&" ".repeat(width * level));
+        }
+        None if !first => out.push_str(", "),
+        None => {}
+    }
+}
+
+fn close(out: &mut String, indent: Option<usize>, level: usize, bracket: char) {
+    if let Some(width) = indent {
+        out.push('\n');
+        out.push_str(&" ".repeat(width * level));
+    }
+    out.push(bracket);
+}
+
+fn write_string(out: &mut String, s: &str) {
+    out.push('"');
+    for c in s.chars() {
+        match c {
+            '"' => out.push_str("\\\""),
+            '\\' => out.push_str("\\\\"),
+            '\n' => out.push_str("\\n"),
+            '\r' => out.push_str("\\r"),
+            '\t' => out.push_str("\\t"),
+            '\u{8}' => out.push_str("\\b"),
+            '\u{c}' => out.push_str("\\f"),
+            ' '..='~' => out.push(c),
+            _ => {
+                let mut units = [0u16; 2];
+                for unit in c.encode_utf16(&mut units) {
+                    out.push_str(&format!("\\u{unit:04x}"));
+                }
+            }
+        }
+    }
+    out.push('"');
+}
+
 #[derive(Debug, PartialEq)]
 pub struct Error {
     pub message: &'static str,
@@ -460,5 +603,49 @@ mod tests {
         ] {
             assert_eq!(parse(text).unwrap().truthy(), truth, "{text}");
         }
+    }
+
+    #[test]
+    fn writes_floats_like_python_repr() {
+        for (value, text) in [
+            (1.2, "1.2"),
+            (1.0, "1.0"),
+            (0.95, "0.95"),
+            (0.8, "0.8"),
+            (1e-5, "1e-05"),
+            (0.0001, "0.0001"),
+            (1e16, "1e+16"),
+            (1.5e16, "1.5e+16"),
+            (123456789012345.0, "123456789012345.0"),
+            (-0.5, "-0.5"),
+            (0.0, "0.0"),
+            (2.5e-300, "2.5e-300"),
+            (f64::INFINITY, "Infinity"),
+        ] {
+            assert_eq!(python_float(value), text);
+        }
+    }
+
+    #[test]
+    fn writes_documents_like_python_json_dumps() {
+        let v = Value::object([
+            ("a", Value::int(1)),
+            ("b", Value::Array(vec![])),
+            ("c", Value::object(Vec::<(String, Value)>::new())),
+            ("d", Value::strings(["x\u{e9}\u{1f600}\"\n\u{1}"])),
+            (
+                "e",
+                Value::Array(vec![Value::Null, Value::Bool(true), Value::float(0.5)]),
+            ),
+        ]);
+        assert_eq!(
+            to_python(&v, Some(2)),
+            "{\n  \"a\": 1,\n  \"b\": [],\n  \"c\": {},\n  \"d\": [\n    \"x\\u00e9\\ud83d\\ude00\\\"\\n\\u0001\"\n  ],\n  \"e\": [\n    null,\n    true,\n    0.5\n  ]\n}"
+        );
+        assert_eq!(
+            to_python(&v, None),
+            "{\"a\": 1, \"b\": [], \"c\": {}, \"d\": [\"x\\u00e9\\ud83d\\ude00\\\"\\n\\u0001\"], \"e\": [null, true, 0.5]}"
+        );
+        assert_eq!(parse(&to_python(&v, Some(2))).unwrap(), v);
     }
 }

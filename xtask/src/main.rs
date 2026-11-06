@@ -5,8 +5,13 @@
 #![forbid(unsafe_code)]
 
 mod checks;
+mod corpus;
+mod ebml;
 mod json;
+mod pyrandom;
+mod sha256;
 mod walk;
+mod zlib;
 
 use std::path::{Path, PathBuf};
 use std::process::{Command, ExitCode};
@@ -18,7 +23,9 @@ commands:
   check-simd     clippy and tests of the opt-in nightly HEVC SIMD lane
   check-links    every relative link in the Markdown files resolves
   check-design   harness data files parse and recorded gates keep their values
-  check-safety   owned packages only, no build scripts, no unsafe code";
+  check-safety   owned packages only, no build scripts, no unsafe code
+  fixtures       generate the authored Matroska corpus into .research/ and its manifests
+  fixture        write one corpus variant (see `cargo xtask fixture --help`)";
 
 fn main() -> ExitCode {
     let args: Vec<String> = std::env::args().skip(1).collect();
@@ -29,6 +36,8 @@ fn main() -> ExitCode {
         Some("check-links") => check_links(&root),
         Some("check-design") => check_design(&root),
         Some("check-safety") => check_safety(&root),
+        Some("fixtures") => fixtures(&root),
+        Some("fixture") => fixture(&root, &args[1..]),
         Some("-h" | "--help" | "help") => {
             println!("{USAGE}");
             Ok(())
@@ -72,6 +81,102 @@ fn check_design(root: &Path) -> Task {
 fn check_safety(root: &Path) -> Task {
     println!("{}", checks::safety(root)?);
     Ok(())
+}
+
+fn fixtures(root: &Path) -> Task {
+    let paths = corpus::Paths {
+        root: root.to_path_buf(),
+        out: root.to_path_buf(),
+    };
+    for line in corpus::generate_all(&paths)? {
+        println!("{line}");
+    }
+    Ok(())
+}
+
+const FIXTURE_USAGE: &str = "usage: cargo xtask fixture <family> [options] --output FILE
+
+families and options:
+  zlib     [--kind stored|fixed|dynamic] [--scope N] [--lace 0-3] [--aac] [--mixed] [--empty]
+  header   [--scope N] [--lace] [--aac]
+  colour   --mastering-width 4|8 --values V0,...,V9   (empty Colour with one MasteringMetadata)";
+
+/// One corpus variant, for harness tests that need cases beyond the manifests.
+fn fixture(root: &Path, args: &[String]) -> Task {
+    let family = args.first().map(String::as_str).ok_or(FIXTURE_USAGE)?;
+    let mut options = std::collections::BTreeMap::new();
+    let mut rest = args[1..].iter();
+    while let Some(flag) = rest.next() {
+        let name = flag
+            .strip_prefix("--")
+            .ok_or_else(|| format!("unexpected argument {flag}\n{FIXTURE_USAGE}"))?;
+        if name == "help" {
+            return Err(FIXTURE_USAGE.to_owned());
+        }
+        let switch = matches!(
+            (family, name),
+            ("zlib", "aac" | "mixed" | "empty") | ("header", "lace" | "aac")
+        );
+        let value = if switch {
+            String::new()
+        } else {
+            rest.next()
+                .ok_or_else(|| format!("--{name} needs a value"))?
+                .clone()
+        };
+        options.insert(name.to_owned(), value);
+    }
+    let number = |key: &str, default: u64| -> Result<u64, String> {
+        options.get(key).map_or(Ok(default), |v| {
+            v.parse().map_err(|_| format!("--{key}: not a number: {v}"))
+        })
+    };
+    let flag = |key: &str| options.contains_key(key);
+    let output = PathBuf::from(options.get("output").ok_or("--output is required")?);
+    let source = corpus::Source::load(root)?;
+    let data = match family {
+        "zlib" => {
+            let kind = match options.get("kind").map_or("dynamic", String::as_str) {
+                "stored" => corpus::Kind::Stored,
+                "fixed" => corpus::Kind::Fixed,
+                "dynamic" => corpus::Kind::Dynamic,
+                other => return Err(format!("unknown zlib kind {other}")),
+            };
+            let case = corpus::ZlibCase {
+                kind,
+                scope: number("scope", 1)?,
+                lace: u8::try_from(number("lace", 0)?).map_err(|e| e.to_string())?,
+                aac: flag("aac"),
+                mixed: flag("mixed"),
+                empty: flag("empty"),
+            };
+            corpus::zlib_case(&source, case)?
+        }
+        "header" => {
+            corpus::header_removal_case(&source, number("scope", 1)?, flag("lace"), flag("aac"))?
+        }
+        "colour" => {
+            let width = number("mastering-width", 8)? as usize;
+            let values = options
+                .get("values")
+                .ok_or("--values is required")?
+                .split(',')
+                .map(|v| {
+                    v.trim()
+                        .parse::<f64>()
+                        .map_err(|_| format!("--values: not a number: {v}"))
+                })
+                .collect::<Result<Vec<_>, _>>()?;
+            corpus::colour_case(
+                &source,
+                Some(&Vec::new()),
+                &corpus::mastering(width, false, &values),
+                1,
+            )?
+        }
+        _ => return Err(FIXTURE_USAGE.to_owned()),
+    };
+    std::fs::write(&output, data).map_err(|e| format!("{}: {e}", output.display()))
 }
 
 fn cargo(root: &Path, toolchain: Option<&str>, args: &[&str]) -> Task {

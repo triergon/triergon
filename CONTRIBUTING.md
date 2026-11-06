@@ -8,7 +8,7 @@ and zlib headers (NASM on x86). The FFmpeg reference is only needed for differen
 and performance work.
 
 ```sh
-make fixtures                     # generate the authored test corpus into .research/
+cargo xtask fixtures              # generate the authored test corpus into .research/
 cargo test --workspace            # library tests
 make prepare-check                # once: pinned FFmpeg reference, fixtures, workers
 cargo xtask check                 # everything CI runs
