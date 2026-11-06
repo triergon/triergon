@@ -1,5 +1,6 @@
 //! Playback measurement worker; serialization and startup are outside the timed loop.
 #![forbid(unsafe_code)]
+mod hls;
 use std::{
     io::{self, Write},
     process::ExitCode,
@@ -315,7 +316,11 @@ fn main() -> ExitCode {
 }
 
 fn work() -> Result<(), Box<dyn std::error::Error>> {
-    let mut args = std::env::args().skip(1);
+    let all: Vec<String> = std::env::args().skip(1).collect();
+    if all.first().is_some_and(|mode| mode.starts_with("hls-")) {
+        return hls::run(&all);
+    }
+    let mut args = all.into_iter();
     let usage = "usage: playback-worker feed-bench CAPSULE ITERATIONS | feed-fold CAPSULE | feed-memory CAPSULE";
     let mode = args.next().ok_or(usage)?;
     let path = args.next().ok_or(usage)?;
