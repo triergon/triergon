@@ -1,18 +1,51 @@
 //! Shared bounded PGS receiver operation. Full recovery independently preserves
-//! strict Source outputs/errors; native compatibility owns only native output.
+//! strict Source outputs/errors; the receiver decoder keeps only receiver output.
 //! Receiver recovery never publishes guessed source pixels, colours or clocks.
 use super::display_model::{PaletteSnapshot, StoredDisplaySet};
 use super::display_work::DisplayWork;
 use super::indexed_argb::{ArgbStorage, ArgbWrite, ArgbWriter, IndexedArgb};
 use super::recovery_role::{FullRecovery, RecoveryRole};
 use super::{
-    Composition, CompositionObject, DisplayConfig, DisplayLimits, NativeMatrix, PacketClock,
+    ColourMatrix, Composition, CompositionObject, DisplayConfig, DisplayLimits, PacketClock,
     RasterJob, RasterLimits, RasterStatus, Segment,
 };
 use std::sync::atomic::{AtomicBool, Ordering};
 use triergon_core::{Budget, BudgetVec, Bytes, Error, Reservation, Result, WorkBudget};
 
-pub const NATIVE_RECOVERY: &str = "native-pgs-bounded-packet-recovery-v1";
+/// Comparison label of the recovery decoder's output.
+#[cfg(feature = "reference-trace")]
+pub const RECOVERY_PROFILE: &str = "native-pgs-bounded-packet-recovery-v1";
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum EofBehavior {
+    NoDelayedSubtitle,
+    UnsupportedSourceFailure,
+}
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct RecoveryEof {
+    pub source_error: Option<Error>,
+    pub receiver_error: Option<Error>,
+    pub behavior: EofBehavior,
+}
+impl RecoveryEof {
+    /// Applies only to finalization after all packets, never packet parsing.
+    /// Missing END/unused partial source objects remain source truncations;
+    /// the receiver's drain emits no fabricated clear or extra bitmap.
+    pub fn from_source_finalization(source_error: Option<Error>) -> Self {
+        match source_error {
+            None | Some(Error::Truncated) => Self {
+                source_error,
+                receiver_error: None,
+                behavior: EofBehavior::NoDelayedSubtitle,
+            },
+            Some(error) => Self {
+                source_error,
+                receiver_error: Some(error),
+                behavior: EofBehavior::UnsupportedSourceFailure,
+            },
+        }
+    }
+}
 
 #[derive(Debug)]
 pub struct RecoveredRect {
@@ -52,7 +85,7 @@ impl RecoveredRect {
     pub fn palette(&self) -> &[u32; 256] {
         match &self.palette {
             ReceiverPalette::Shared(source) => source
-                .native_words()
+                .receiver_words()
                 .try_into()
                 .expect("PGS immutable palette has256 words"),
             ReceiverPalette::Owned { words, .. } => words,
@@ -166,10 +199,10 @@ pub enum Phase {
 /// An explicitly selected receiver, never a replacement for DisplayDecoder.
 /// One physical packet is active at a time. Retained packets/strict sets/receiver
 /// outputs keep their actual capacities charged to the supplied shared budget.
-pub type NativeRecoveryDecoder = Decoder<FullRecovery<Bytes>>;
+pub type RecoveryDecoder = Decoder<FullRecovery<Bytes>>;
 /// Explicit indexed storage selection. Receiver recovery is unchanged and
 /// never supplies missing strict Source pixels, palette facts or clocks.
-pub type IndexedNativeRecoveryDecoder = Decoder<FullRecovery<IndexedArgb>>;
+pub type IndexedRecoveryDecoder = Decoder<FullRecovery<IndexedArgb>>;
 
 #[derive(Debug)]
 pub struct Decoder<S: RecoveryRole> {
@@ -666,7 +699,7 @@ impl<S: RecoveryRole> Decoder<S> {
                     // outside the physical packet are the public API's zero padding,
                     // never source bytes or a source palette declaration.
                     let index = usize::from(entry[0]);
-                    let word = NativeMatrix::for_canvas(self.canvas[1])
+                    let word = ColourMatrix::for_canvas(self.canvas[1])
                         .argb(entry[1], entry[2], entry[3], entry[4]);
                     self.palettes.as_mut_slice()[self.palette_index].words[index] = word;
                     self.observations.palette_cross_segment_bytes += crosses;
@@ -962,7 +995,7 @@ impl<S: RecoveryRole> Decoder<S> {
                         Some(0)
                     } else {
                         clock
-                            .and_then(|c| c.native_microseconds().ok().flatten())
+                            .and_then(|c| c.receiver_microseconds().ok().flatten())
                             .filter(|v| *v != i64::MIN)
                     };
                     let rectangles = self
@@ -1053,7 +1086,7 @@ impl<S: RecoveryRole> Decoder<S> {
                     if !source.belongs_to(&self.budget) {
                         return Err(Error::ForeignPool);
                     }
-                    if source.native_words() == words.as_slice() {
+                    if source.receiver_words() == words.as_slice() {
                         Some(source.clone())
                     } else {
                         None
@@ -1085,7 +1118,7 @@ impl<S: RecoveryRole> Decoder<S> {
     }
 
     fn rect_words(&self, rect: &RecoveredRect) -> &[u32; 256] {
-        if self.config.native_forced_only && !rect.forced {
+        if self.config.receiver_forced_only && !rect.forced {
             &[0; 256]
         } else {
             &self.palettes.as_slice()[self.palette_index].words

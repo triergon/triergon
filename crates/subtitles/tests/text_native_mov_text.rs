@@ -1,8 +1,6 @@
 use std::sync::atomic::{AtomicBool, Ordering};
 use triergon_core::{Budget, Bytes, Error, SourceId, TimeBase, WorkBudget};
-use triergon_subtitles::text::native_mov_text::{
-    Clock, Limits, NativeMovText, Options, Output, Status,
-};
+use triergon_subtitles::compat::mov_text::{Clock, Decoder, Limits, Options, Output, Status};
 use triergon_subtitles::text::{Encoding, Format, Input, Timing};
 
 fn input(pool: &Budget, bytes: &[u8]) -> Input {
@@ -22,10 +20,10 @@ fn input(pool: &Budget, bytes: &[u8]) -> Input {
         container_position: None,
     }
 }
-fn context(pool: &Budget) -> NativeMovText {
-    NativeMovText::new(pool, None, Options::default(), Limits::default(), 6).unwrap()
+fn context(pool: &Budget) -> Decoder {
+    Decoder::new(pool, None, Options::default(), Limits::default(), 6).unwrap()
 }
-fn finish(decoder: &mut NativeMovText, quantum: u64) -> Output {
+fn finish(decoder: &mut Decoder, quantum: u64) -> Output {
     let cancel = AtomicBool::new(false);
     for _ in 0..2_000_000 {
         match decoder
@@ -211,7 +209,7 @@ fn known_clock_uses_nearest_away_and_explicit_native_duration_wrapping() {
         packet_timebase: Some(TimeBase::new(1, 2000).unwrap()),
         ..Options::default()
     };
-    let mut d = NativeMovText::new(&pool, None, options, Limits::default(), 6).unwrap();
+    let mut d = Decoder::new(&pool, None, options, Limits::default(), 6).unwrap();
     d.provide(
         input(&pool, &sample(b"a", &[])),
         Clock {
@@ -346,7 +344,7 @@ fn core_limits_are_distinct_from_native_data_refusal_and_remain_sticky() {
         maximum_ass_bytes: 4,
         ..Limits::default()
     };
-    let mut d = NativeMovText::new(&pool, None, Options::default(), limits, 6).unwrap();
+    let mut d = Decoder::new(&pool, None, Options::default(), limits, 6).unwrap();
     d.provide(input(&pool, &sample(b"a", &[])), Clock::default())
         .unwrap();
     let cancel = AtomicBool::new(false);
@@ -408,7 +406,7 @@ fn configuration_backing_and_header_remain_owned_after_decoder_drop() {
     let backing = Bytes::copy_from_slice(&pool, &backing).unwrap();
     let extra = backing.slice(100..100 + raw.len()).unwrap();
     drop(backing);
-    let mut d = NativeMovText::new(
+    let mut d = Decoder::new(
         &pool,
         Some(&extra),
         Options::default(),
@@ -445,7 +443,7 @@ fn native_configuration_and_style_count_limits_are_explicit_core_errors() {
         maximum_fonts: 0,
         ..Limits::default()
     };
-    let mut d = NativeMovText::new(&pool, Some(&config), Options::default(), limits, 6).unwrap();
+    let mut d = Decoder::new(&pool, Some(&config), Options::default(), limits, 6).unwrap();
     assert!(matches!(
         d.poll(&mut WorkBudget::new(4096), &AtomicBool::new(false)),
         Err(Error::Limit { maximum: 0, .. })
@@ -454,7 +452,7 @@ fn native_configuration_and_style_count_limits_are_explicit_core_errors() {
         maximum_styles: 0,
         ..Limits::default()
     };
-    let mut d = NativeMovText::new(&pool, None, Options::default(), limits, 6).unwrap();
+    let mut d = Decoder::new(&pool, None, Options::default(), limits, 6).unwrap();
     let body = [0, 1, 0, 0, 0, 1, 0, 0, 1, 0, 0, 0, 0, 0];
     d.provide(
         input(&pool, &sample(b"x", &box_bytes(b"styl", &body))),
@@ -483,7 +481,7 @@ fn cancelling_after_configuration_prefix_keeps_exact_font_source_and_header() {
         frame_height: c.dimensions.1,
         ..Options::default()
     };
-    let mut d = NativeMovText::new(&pool, Some(&extra), options, Limits::default(), 6).unwrap();
+    let mut d = Decoder::new(&pool, Some(&extra), options, Limits::default(), 6).unwrap();
     let cancel = AtomicBool::new(false);
     assert_eq!(
         d.poll(&mut WorkBudget::new(40), &cancel).unwrap(),
@@ -563,8 +561,7 @@ fn check_native_capture(c: &captured::Case) {
             frame_width: c.dimensions.0,
             frame_height: c.dimensions.1,
         };
-        let mut d =
-            NativeMovText::new(&pool, extra.as_ref(), options, Limits::default(), 6).unwrap();
+        let mut d = Decoder::new(&pool, extra.as_ref(), options, Limits::default(), 6).unwrap();
         let cancel = AtomicBool::new(false);
         loop {
             match d.poll(&mut WorkBudget::new(q), &cancel).unwrap() {

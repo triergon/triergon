@@ -1,6 +1,7 @@
 use std::sync::atomic::{AtomicBool, Ordering};
 use triergon_core::{Budget, Bytes, Error, WorkBudget};
-use triergon_subtitles::dvd::{HdCommand, HdLimits, HdPacket, HdSpuJob, HdStatus, native_hd_argb};
+use triergon_subtitles::compat::dvd::hd_argb;
+use triergon_subtitles::dvd::{HdCommand, HdLimits, HdPacket, HdSpuJob, HdStatus};
 const RAW: &[u8] = include_bytes!("hd-source-fixtures/hd8-all-256-indices.spu");
 fn ready(job: &mut HdSpuJob, q: u64, cancel: &AtomicBool) {
     for _ in 0..100000 {
@@ -352,10 +353,10 @@ fn palette_cancel_is_sticky_at_partial_and_ready() {
 }
 #[test]
 fn contrast_alpha_endpoints_and_neutral_luma_are_separate_source_math() {
-    assert_eq!(native_hd_argb([16, 128, 128], 255), 0);
-    assert_eq!(native_hd_argb([235, 128, 128], 0), 0xffff_ffff);
-    assert_eq!(native_hd_argb([0, 128, 128], 0), 0xff00_0000);
-    assert_eq!(native_hd_argb([255, 128, 128], 0), 0xffff_ffff);
+    assert_eq!(hd_argb([16, 128, 128], 255), 0);
+    assert_eq!(hd_argb([235, 128, 128], 0), 0xffff_ffff);
+    assert_eq!(hd_argb([0, 128, 128], 0), 0xff00_0000);
+    assert_eq!(hd_argb([255, 128, 128], 0), 0xffff_ffff);
 }
 #[test]
 fn wide_header_does_not_imply_eight_bit_mode() {

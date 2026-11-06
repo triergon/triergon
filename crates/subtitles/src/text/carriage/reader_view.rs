@@ -4,15 +4,18 @@ use super::Snapshot;
 use std::ops::Range;
 use triergon_core::{Error, Result};
 
+/// The packet reader whose byte, clock and position behaviour a snapshot
+/// reproduces. `Reference` is FFmpeg's text demuxer reader at the revision
+/// [`revision`](Self::revision) names.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum NativeView {
-    D32,
+pub enum ReaderView {
+    Reference,
 }
 
-impl NativeView {
-    pub const fn source_pin(self) -> &'static str {
+impl ReaderView {
+    pub const fn revision(self) -> &'static str {
         match self {
-            Self::D32 => "d32b387f2b0a484599d4587d651891f0c63c4238",
+            Self::Reference => "d32b387f2b0a484599d4587d651891f0c63c4238",
         }
     }
 
@@ -30,7 +33,7 @@ impl NativeView {
             return Err(Error::Invalid("empty native line read"));
         }
         let resume = match (self, utf16) {
-            (Self::D32, true) => {
+            (Self::Reference, true) => {
                 // The native reference shows this observable entry transition on each UTF16
                 // SubRip body line: emit the first converted byte, then resume at
                 // the next scalar. No byte value (including0x85) is special.
@@ -49,7 +52,7 @@ impl NativeView {
                     .map_err(|_| Error::Invalid("converted Unicode scalar"))?;
                 Some(range.start.checked_add(width).ok_or(Error::Overflow)?)
             }
-            (Self::D32, false) => None,
+            (Self::Reference, false) => None,
         };
         Ok(LineRead {
             next: range.start,
@@ -63,8 +66,8 @@ impl NativeView {
 impl Snapshot {
     /// The opaque byte/clock/position view is explicitly pinned. Original
     /// source Unicode/Time/configuration remains independently available.
-    pub const fn native_view(&self) -> NativeView {
-        NativeView::D32
+    pub const fn reader_view(&self) -> ReaderView {
+        ReaderView::Reference
     }
 }
 
@@ -107,7 +110,7 @@ impl LineRead {
 mod tests {
     use super::*;
     fn read(source: &[u8], utf16: bool) -> Vec<u8> {
-        let mut cursor = NativeView::D32
+        let mut cursor = ReaderView::Reference
             .line_read(source, utf16, 0..source.len(), false)
             .unwrap();
         let mut result = Vec::new();
@@ -132,7 +135,7 @@ mod tests {
             assert_eq!(read(source, false), source);
         }
         assert_eq!(
-            NativeView::D32.source_pin(),
+            ReaderView::Reference.revision(),
             "d32b387f2b0a484599d4587d651891f0c63c4238"
         );
     }
@@ -147,11 +150,19 @@ mod tests {
     fn only_converted_unicode_uses_scalar_entry_checks() {
         assert_eq!(read(b"\xc3", false), b"\xc3");
         assert!(
-            NativeView::D32
+            ReaderView::Reference
                 .line_read(b"\xc3", true, 0..1, false)
                 .is_err()
         );
-        assert!(NativeView::D32.line_read(b"A", true, 0..2, false).is_err());
-        assert!(NativeView::D32.line_read(b"", true, 0..0, false).is_err());
+        assert!(
+            ReaderView::Reference
+                .line_read(b"A", true, 0..2, false)
+                .is_err()
+        );
+        assert!(
+            ReaderView::Reference
+                .line_read(b"", true, 0..0, false)
+                .is_err()
+        );
     }
 }

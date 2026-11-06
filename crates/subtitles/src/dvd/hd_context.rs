@@ -3,7 +3,7 @@
 //! charged original owner and span; no palette bytes are silently synthesized.
 use super::{
     HdAlphaOrigin, HdFacts, HdFourPalette, HdLimits, HdReceiverJob, HdReceiverOutput,
-    HdReceiverStatus, HdSpan, HdStatus, HdSubpicture, native_hd_argb,
+    HdReceiverStatus, HdSpan, HdStatus, HdSubpicture, hd_argb,
 };
 use std::sync::atomic::{AtomicBool, Ordering};
 use triergon_core::{Budget, Bytes, Error, Result, WorkBudget};
@@ -439,7 +439,7 @@ impl HdContextPaletteJob<'_> {
             }
             let i = self.at;
             let alpha = self.context.alpha(i as u8)?.value;
-            self.values[i] = native_hd_argb(
+            self.values[i] = hd_argb(
                 [self.yuv[3 * i], self.yuv[3 * i + 1], self.yuv[3 * i + 2]],
                 255 - alpha,
             );

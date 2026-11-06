@@ -455,7 +455,7 @@ fn native_rectangle_forced_aggregation_keeps_selected_local_source_flag_false() 
         let picture = out[0].frame.as_ref().unwrap().source().picture().unwrap();
         assert!(!picture.facts().forced);
         assert!(picture.facts().menu);
-        assert!(picture.native_forced());
+        assert!(picture.receiver_forced());
     }
 }
 #[test]

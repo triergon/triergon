@@ -47,7 +47,7 @@ struct Field {
     maps: MapTables,
     // Logical source position includes every decoded code.
     column: u32,
-    // NativeD32 suppressed codes omit destination advance only.
+    // The receiver view's suppressed codes omit destination advance only.
     destination_column: u32,
     line: u32,
     line_open: bool,
@@ -273,12 +273,12 @@ impl Field {
                                 .map(code.depth, spec.depth, index)
                                 .map_err(Stop::Error)?;
                             // Source retains its mapped-CLUT1 policy. The
-                            // observed NativeD32 receiver tests encoded
+                            // observed receiver-view tests encoded
                             // code1, before mapping to the output index.
                             let non_modifying = spec.non_modifying
                                 && match receiver_view {
                                     ReceiverView::Source => mapped_index == 1,
-                                    ReceiverView::NativeD32 => index == 1,
+                                    ReceiverView::Receiver => index == 1,
                                 };
                             self.stage = Stage::Run {
                                 code,

@@ -1,6 +1,6 @@
 //! Original bounded native palette storage, separate from observed colour policy.
 //! Owns per-snapshot output; no cross-display native palette cache is introduced.
-use super::{D32_PIN, D32_VIEW, NativePalette};
+use super::Palette;
 use triergon_core::{Budget, BudgetVec, Bytes, Error, Result};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -13,7 +13,7 @@ pub(super) enum RgbaStorage {
 }
 
 #[derive(Debug)]
-pub(super) struct NativePaletteBuffer {
+pub(super) struct ReceiverPaletteBuffer {
     budget: Budget,
     storage: RgbaStorage,
     count: usize,
@@ -24,7 +24,7 @@ pub(super) struct NativePaletteBuffer {
     finished: bool,
 }
 
-impl NativePaletteBuffer {
+impl ReceiverPaletteBuffer {
     pub(super) fn new(budget: &Budget, count: usize, storage: RgbaStorage) -> Result<Self> {
         if !matches!(count, 4 | 16 | 256) {
             return Err(Error::Invalid("DVB native palette size"));
@@ -104,7 +104,7 @@ impl NativePaletteBuffer {
         &mut self,
         studio_unrepaired: &Bytes,
         all_entries_explicit: bool,
-    ) -> Result<NativePalette> {
+    ) -> Result<Palette> {
         if self.finished || self.at != self.count {
             return Err(Error::Invalid("DVB native palette incomplete"));
         }
@@ -142,9 +142,7 @@ impl NativePaletteBuffer {
             .take()
             .ok_or(Error::Invalid("DVB native RGBA absent"))?;
         self.finished = true;
-        Ok(NativePalette {
-            identifier: D32_VIEW,
-            source_pin: D32_PIN,
+        Ok(Palette {
             rgba,
             words,
             all_entries_explicit,

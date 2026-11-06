@@ -47,14 +47,14 @@ pub struct IndexedArgb;
 /// Owned, immutable projection into canonical A,R,G,B bytes. Cloning retains
 /// the actual source index and palette owners; it never clones a pixel plane.
 #[derive(Clone, Debug)]
-pub struct NativeArgbView {
+pub struct ArgbView {
     indices: Bytes,
     palette: PaletteSnapshot,
     suppressed: bool,
     byte_len: usize,
 }
 
-impl NativeArgbView {
+impl ArgbView {
     pub(crate) fn new(indices: Bytes, palette: PaletteSnapshot, suppressed: bool) -> Result<Self> {
         if !indices.belongs_to(&palette.0.budget) {
             return Err(Error::ForeignPool);
@@ -114,7 +114,10 @@ impl NativeArgbView {
             (4 - skip).min(output.len())
         };
         if prefix != 0 {
-            let word = self.palette.native_argb(self.indices[pixel]).to_be_bytes();
+            let word = self
+                .palette
+                .receiver_argb(self.indices[pixel])
+                .to_be_bytes();
             output[..prefix].copy_from_slice(&word[skip..skip + prefix]);
             pixel += 1;
         }
@@ -125,7 +128,7 @@ impl NativeArgbView {
         // Carry that invariant into this loop so each byte index is in range.
         let words: &[u32; 256] = self
             .palette
-            .native_words()
+            .receiver_words()
             .try_into()
             .expect("published PGS palette has all 256 entries");
         let block_pixels = whole / 4 * 4;
@@ -146,7 +149,7 @@ impl NativeArgbView {
         if !tail.is_empty() {
             let word = self
                 .palette
-                .native_argb(self.indices[pixel + whole])
+                .receiver_argb(self.indices[pixel + whole])
                 .to_be_bytes();
             tail.copy_from_slice(&word[..tail.len()]);
         }
@@ -165,7 +168,7 @@ pub struct ArgbWrite {
 /// overflow/limits are sticky and release the writer's retained source owners.
 #[derive(Debug)]
 pub struct ArgbWriter {
-    view: Option<NativeArgbView>,
+    view: Option<ArgbView>,
     length: usize,
     offset: usize,
     spent: usize,

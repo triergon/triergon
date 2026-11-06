@@ -1,29 +1,28 @@
-//! A native-compatible application route with no strict Source decoder.
+//! The receiver's application route, with no strict Source decoder.
 use super::display_model::PaletteSnapshot;
 use super::display_work::DisplayWork;
-use super::native_recovery::{
-    Decoder, Phase, ReceiverObservations, RecoveredEvent, RecoveryStatus,
-};
+use super::recovery::{Decoder, Phase, ReceiverObservations, RecoveredEvent, RecoveryStatus};
 use super::recovery_role::RecoveryRole;
 use super::{DisplayConfig, DisplayLimits, PacketClock};
 use std::sync::atomic::AtomicBool;
 use triergon_core::{Budget, Bytes, Error, Result, WorkBudget};
 
-/// Versioned packet/first-event compatibility with the pinned native PGS API.
+/// Comparison label of the receiver decoder's packet and first-event contract.
 /// This names a receiver contract, not complete PGS compatibility.
-pub const NATIVE_COMPATIBILITY: &str = "native-pgs-first-event-compatibility-v1";
+#[cfg(feature = "reference-trace")]
+pub const RECEIVER_DECODER_PROFILE: &str = "native-pgs-first-event-compatibility-v1";
 
-/// Owned native application output, distinct from the full Source+Receiver API.
+/// Owned receiver output, distinct from the full Source+Receiver API.
 /// Later segments still update the decoder's cache and final context canvas.
 /// No Source validity, Source error or omitted Source output is represented here.
 ///
 /// ```compile_fail
-/// fn inspect(packet: &triergon_subtitles::pgs::NativeCompatibilityPacket) {
+/// fn inspect(packet: &triergon_subtitles::compat::pgs::ReceiverPacket) {
 ///     let _ = packet.source_sets();
 /// }
 /// ```
 #[derive(Debug)]
-pub struct NativeCompatibilityPacket {
+pub struct ReceiverPacket {
     raw: Bytes,
     pub clock: PacketClock,
     event: Option<RecoveredEvent>,
@@ -31,7 +30,7 @@ pub struct NativeCompatibilityPacket {
     pub receiver_observations: ReceiverObservations,
 }
 
-impl NativeCompatibilityPacket {
+impl ReceiverPacket {
     pub fn raw_packet(&self) -> &Bytes {
         &self.raw
     }
@@ -40,14 +39,14 @@ impl NativeCompatibilityPacket {
     }
 }
 
-/// The native API has no delayed subtitle to publish on an empty drain call.
+/// The receiver has no delayed subtitle to publish on an empty drain call.
 /// This result makes no statement about strict Source finalization.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum NativeCompatibilityEof {
+pub enum ReceiverEof {
     NoDelayedSubtitle,
 }
 
-/// Explicit native-compatible PGS entry point for a native event consumer.
+/// PGS entry point for a consumer of the receiver's events.
 ///
 /// The default full-recovery decoders remain separate. This decoder never builds
 /// their strict Source graph, exports Source ARGB or invents Source fields.
@@ -56,7 +55,7 @@ pub enum NativeCompatibilityEof {
 ///
 /// ```compile_fail
 /// fn export_source(
-///     decoder: &mut triergon_subtitles::pgs::NativeCompatibilityDecoder,
+///     decoder: &mut triergon_subtitles::compat::pgs::ReceiverDecoder,
 ///     writer: &mut triergon_subtitles::pgs::ArgbWriter,
 ///     target: &mut [u8],
 ///     work: &mut triergon_core::WorkBudget,
@@ -66,11 +65,11 @@ pub enum NativeCompatibilityEof {
 /// }
 /// ```
 #[derive(Debug)]
-pub struct NativeCompatibilityDecoder {
+pub struct ReceiverDecoder {
     inner: Decoder<NativeOnly>,
 }
 
-impl NativeCompatibilityDecoder {
+impl ReceiverDecoder {
     pub fn new(budget: &Budget, limits: DisplayLimits, config: DisplayConfig) -> Result<Self> {
         Ok(Self {
             inner: Decoder::new(budget, limits, config)?,
@@ -91,7 +90,7 @@ impl NativeCompatibilityDecoder {
         self.inner.poll(work, cancel)
     }
 
-    pub fn take_output(&mut self, cancel: &AtomicBool) -> Result<NativeCompatibilityPacket> {
+    pub fn take_output(&mut self, cancel: &AtomicBool) -> Result<ReceiverPacket> {
         self.inner.take_output(cancel)
     }
 
@@ -99,7 +98,7 @@ impl NativeCompatibilityDecoder {
         self.inner.finish_input(cancel)
     }
 
-    pub fn eof_report(&self) -> Option<NativeCompatibilityEof> {
+    pub fn eof_report(&self) -> Option<ReceiverEof> {
         self.inner.eof_report()
     }
     pub fn work_spent(&self) -> usize {
@@ -121,8 +120,8 @@ pub(super) struct NativeOnly {
 }
 
 impl RecoveryRole for NativeOnly {
-    type Packet = NativeCompatibilityPacket;
-    type Eof = NativeCompatibilityEof;
+    type Packet = ReceiverPacket;
+    type Eof = ReceiverEof;
 
     fn new(_budget: &Budget, limits: DisplayLimits, _config: DisplayConfig) -> Result<Self> {
         limits.validate()?;
@@ -186,7 +185,7 @@ impl RecoveryRole for NativeOnly {
         context_canvas: [u16; 2],
         receiver_observations: ReceiverObservations,
     ) -> Result<Self::Packet> {
-        Ok(NativeCompatibilityPacket {
+        Ok(ReceiverPacket {
             raw,
             clock,
             event: self.event.take(),
@@ -215,6 +214,6 @@ impl RecoveryRole for NativeOnly {
         {
             return Ok(None);
         }
-        Ok(Some(NativeCompatibilityEof::NoDelayedSubtitle))
+        Ok(Some(ReceiverEof::NoDelayedSubtitle))
     }
 }

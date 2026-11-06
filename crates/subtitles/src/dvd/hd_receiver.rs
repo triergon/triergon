@@ -174,7 +174,7 @@ impl HdReceiverJob {
             let create = if self.allow_prefix {
                 HdSpuJob::with_native_prefix(raw, &self.budget, inner_limits)
             } else {
-                HdSpuJob::with_policy(raw, &self.budget, inner_limits, HdPolicy::NativeD32)
+                HdSpuJob::with_policy(raw, &self.budget, inner_limits, HdPolicy::Receiver)
             };
             match create {
                 Ok(job) => self.inner = Some(job),

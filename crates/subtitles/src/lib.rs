@@ -8,6 +8,10 @@
 )]
 // Pending: `missing_docs`, `clippy::unwrap_used`, `clippy::expect_used`.
 
+pub mod compat;
+#[cfg(feature = "reference-trace")]
+pub mod reference_trace;
+
 pub mod dvb;
 pub mod text;
 

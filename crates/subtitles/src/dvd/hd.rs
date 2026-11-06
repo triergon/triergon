@@ -107,7 +107,7 @@ impl<'a> HdPacket<'a> {
         } else {
             if next <= start || next.checked_add(3 + width).ok_or(Error::Overflow)? > self.raw.len()
             {
-                if policy != HdPolicy::NativeD32 {
+                if policy != HdPolicy::Receiver {
                     return Err(Error::Invalid(
                         "HD backward, overlapping or out-of-range link",
                     ));
@@ -344,8 +344,8 @@ pub enum HdPolicy {
     StrictEightBit,
     /// Strict source decoding with either the four-entry or eight-bit grammar.
     Strict,
-    /// Explicit fresh-context d32 control-prefix behaviour; source stays raw.
-    NativeD32,
+    /// Explicit fresh-context receiver control-prefix behaviour; source stays raw.
+    Receiver,
 }
 #[derive(Clone, Copy, Debug)]
 pub struct HdLimits {
@@ -375,15 +375,15 @@ pub enum HdStatus {
 }
 #[derive(Debug)]
 pub struct HdSubpicture {
-    native_forced: bool,
+    receiver_forced: bool,
     packet: Bytes,
     bitmap: DvdBitmap,
     facts: HdFacts,
 }
 impl HdSubpicture {
     /// Pinned rectangle flag projection, distinct from the selected local source flag.
-    pub fn native_forced(&self) -> bool {
-        self.native_forced
+    pub fn receiver_forced(&self) -> bool {
+        self.receiver_forced
     }
     pub fn packet(&self) -> &Bytes {
         &self.packet
@@ -424,7 +424,7 @@ impl HdSubpicture {
         })
     }
     /// Explicit receiver-reset defaults, never supplied source contrast.
-    pub fn native_palette_job(&self) -> Result<HdPaletteJob<'_>> {
+    pub fn receiver_palette_job(&self) -> Result<HdPaletteJob<'_>> {
         let mut job = HdPaletteJob {
             ycrcb: self
                 .ycrcb()
@@ -445,7 +445,7 @@ impl HdSubpicture {
         });
         Ok(job)
     }
-    pub fn native_four_palette(&self, source_rgb: Option<&[u32; 16]>) -> Result<HdFourPalette> {
+    pub fn receiver_four_palette(&self, source_rgb: Option<&[u32; 16]>) -> Result<HdFourPalette> {
         if self.facts.eight_bit {
             return Err(Error::Unsupported("HD four-entry view of eight-bit raster"));
         }
@@ -556,7 +556,7 @@ enum Phase {
 }
 /// Owned source decoding with explicit strict/fresh-native profiles. `new`
 /// uses the strict eight-bit profile. Strict accepts either pixel grammar;
-/// NativeD32 validates every eligible multi-row raster in control order and
+/// Receiver validates every eligible multi-row raster in control order and
 /// keeps the last native candidate. Original source bytes and errors survive.
 #[derive(Debug)]
 pub struct HdSpuJob {
@@ -595,7 +595,7 @@ pub struct HdSpuJob {
     nibble_word: u16,
     nibbles: u8,
     native_have_decoded: bool,
-    native_forced: bool,
+    receiver_forced: bool,
     allow_prefix: bool,
     resume_scan: bool,
 }
@@ -616,7 +616,7 @@ impl HdSpuJob {
         budget: &Budget,
         limits: HdLimits,
     ) -> Result<Self> {
-        Self::with_extent(packet, budget, limits, HdPolicy::NativeD32, true)
+        Self::with_extent(packet, budget, limits, HdPolicy::Receiver, true)
     }
     fn with_extent(
         packet: Bytes,
@@ -672,7 +672,7 @@ impl HdSpuJob {
             nibble_word: 0,
             nibbles: 0,
             native_have_decoded: false,
-            native_forced: false,
+            receiver_forced: false,
             allow_prefix,
             resume_scan: false,
         })
@@ -782,13 +782,13 @@ impl HdSpuJob {
                     });
                 }
                 if b.local_area && b.local_fields {
-                    if self.selected.is_some() && self.policy != HdPolicy::NativeD32 {
+                    if self.selected.is_some() && self.policy != HdPolicy::Receiver {
                         return Err(Error::Unsupported("HD multiple locally eligible rasters"));
                     }
                     let mut facts = self.facts;
                     facts.forced = b.forced;
                     facts.selected_control = Some(b.offset);
-                    if self.policy == HdPolicy::NativeD32 {
+                    if self.policy == HdPolicy::Receiver {
                         let (_, height) = facts
                             .area
                             .ok_or(Error::Invalid("HD source area absent"))?
@@ -851,7 +851,7 @@ impl HdSpuJob {
             }
             self.bit_at[i] = offset.checked_mul(8).ok_or(Error::Overflow)?;
         }
-        self.native_forced |= f.forced;
+        self.receiver_forced |= f.forced;
         self.selected = Some(f);
         self.reset_token();
         self.phase = Phase::Reserve;
@@ -879,7 +879,7 @@ impl HdSpuJob {
                 if !f.eight_bit && self.policy == HdPolicy::StrictEightBit {
                     return Err(Error::Unsupported("HD two-bit source raster"));
                 }
-                if self.policy == HdPolicy::NativeD32 && self.native_have_decoded {
+                if self.policy == HdPolicy::Receiver && self.native_have_decoded {
                     self.selected = Some(f);
                     self.phase = Phase::Ready;
                     return Ok(true);
@@ -958,7 +958,7 @@ impl HdSpuJob {
         let opcode = self.raw()?[at];
         let length = match operand_len(opcode) {
             Some(length) => length,
-            None if self.policy == HdPolicy::NativeD32 => {
+            None if self.policy == HdPolicy::Receiver => {
                 let end = self
                     .block
                     .ok_or(Error::Invalid("HD command block absent"))?
@@ -1223,7 +1223,7 @@ impl HdSpuJob {
             .ok_or(Error::Invalid("HD source absent"))?;
         self.phase = Phase::Finished;
         Ok(HdSubpicture {
-            native_forced: self.native_forced,
+            receiver_forced: self.receiver_forced,
             packet,
             bitmap,
             facts,
@@ -1233,7 +1233,7 @@ impl HdSpuJob {
 
 /// Mathematical pinned-receiver projection of one supplied Y/Cr/Cb triple and
 /// raw contrast byte. It establishes no source RGB/colour-space declaration.
-pub fn native_hd_argb(ycrcb: [u8; 3], contrast: u8) -> u32 {
+pub fn hd_argb(ycrcb: [u8; 3], contrast: u8) -> u32 {
     let luma = (i32::from(ycrcb[0]) - 16) * 1192;
     let cr = i32::from(ycrcb[1]) - 128;
     let cb = i32::from(ycrcb[2]) - 128;
@@ -1285,7 +1285,7 @@ impl HdPaletteJob<'_> {
             {
                 alpha = ((word >> (4 * i)) & 15) as u8;
             }
-            self.values[i] = native_hd_argb(
+            self.values[i] = hd_argb(
                 [
                     self.ycrcb[3 * i],
                     self.ycrcb[3 * i + 1],

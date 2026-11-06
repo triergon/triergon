@@ -43,7 +43,7 @@ impl MatroskaDvbPacket {
             });
         }
         let publication = event
-            .native_publication
+            .receiver_publication
             .ok_or(Error::Unsupported("DVB queue requires native publication"))?;
         if publication.packet_sequence != self.packet.sequence
             || !event.source_packets().iter().any(|packet| {

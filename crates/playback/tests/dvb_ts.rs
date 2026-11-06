@@ -10,9 +10,9 @@ use triergon_playback::{
     dvb_ts::{DvbQueueAction, DvbServiceSelection, DvbTsBridge},
     io::SourceOwner,
 };
+use triergon_subtitles::compat::dvb::PublicationReason;
 use triergon_subtitles::dvb::{
-    ClockOrigin, ClockValue, DecodeStatus, DisplayAction, DisplayLimits, PublicationReason,
-    ReceiverView, Size,
+    ClockOrigin, ClockValue, DecodeStatus, DisplayAction, DisplayLimits, ReceiverView, Size,
 };
 
 #[test]
@@ -78,25 +78,25 @@ fn selected_ts_service_reaches_the_dvb_renderer_with_source_bytes_and_clocks() {
     for ((source, spans, read, policy, time, service), view, expected_pes, expected_codec) in cases
         .into_iter()
         .flat_map(|case| {
-            [ReceiverView::Source, ReceiverView::NativeD32]
+            [ReceiverView::Source, ReceiverView::Receiver]
                 .map(|view| (case, view, pes.as_slice(), None))
         })
         .chain([
             (
                 clear_case,
-                ReceiverView::NativeD32,
+                ReceiverView::Receiver,
                 empty_page.as_slice(),
                 None,
             ),
             (
                 cases[0],
-                ReceiverView::NativeD32,
+                ReceiverView::Receiver,
                 pes.as_slice(),
                 Some(&pes[2..pes.len() - 1]),
             ),
             (
                 truncated_case,
-                ReceiverView::NativeD32,
+                ReceiverView::Receiver,
                 truncated_pes.as_slice(),
                 Some(truncated_codec.as_slice()),
             ),
@@ -240,12 +240,12 @@ fn selected_ts_service_reaches_the_dvb_renderer_with_source_bytes_and_clocks() {
                     );
                     assert!(facts.timing().dts.is_none());
                     if let Some(codec) = expected_codec {
-                        let parsed = event.native_pes_packet().unwrap();
+                        let parsed = event.pes_packet().unwrap();
                         assert_eq!(parsed.codec().as_ref(), codec);
                         assert!(parsed.pes().shares_storage_with(&packet.payload));
                         assert!(parsed.codec().shares_storage_with(&packet.payload));
                         assert_eq!(parsed.codec_pts(), Some(90_000));
-                        let publication = event.native_publication.unwrap();
+                        let publication = event.receiver_publication.unwrap();
                         assert_eq!(publication.consumed_prefix_bytes, codec.len());
                         if expected_pes == truncated_pes {
                             assert_eq!(publication.reason, PublicationReason::CompletePrefix);
@@ -260,7 +260,7 @@ fn selected_ts_service_reaches_the_dvb_renderer_with_source_bytes_and_clocks() {
                             continue;
                         }
                     } else {
-                        assert!(event.native_pes_packet().is_none());
+                        assert!(event.pes_packet().is_none());
                     }
                     if expected_pes == empty_page {
                         assert_eq!(event.action, DisplayAction::Clear);
@@ -276,7 +276,7 @@ fn selected_ts_service_reaches_the_dvb_renderer_with_source_bytes_and_clocks() {
                     }
                     assert_eq!(event.action, DisplayAction::Present);
                     assert_eq!(event.regions()[0].plane.pixels.as_ref(), indices);
-                    if view == ReceiverView::NativeD32 {
+                    if view == ReceiverView::Receiver {
                         let Some(DvbQueueAction::Show(picture)) =
                             bridge.packet_clock_action(&event).unwrap()
                         else {
@@ -293,9 +293,9 @@ fn selected_ts_service_reaches_the_dvb_renderer_with_source_bytes_and_clocks() {
                         let region = picture.rectangles().next().unwrap();
                         assert!(std::ptr::eq(region, &raw const event.regions()[0]));
                         assert_eq!(region.plane.pixels.as_ref(), indices);
-                        assert!(region.palette.native_d32.is_some());
+                        assert!(region.palette.receiver.is_some());
                         let (_, timing) = event
-                            .native_publication
+                            .receiver_publication
                             .as_mut()
                             .unwrap()
                             .packet_clock
@@ -500,7 +500,7 @@ fn native_ts_decoder_accepts_a_continuation_after_a_rejected_or_partial_pes() {
                         DecodeStatus::Event => {
                             assert_eq!(index, 1);
                             let event = next.event.unwrap();
-                            let parsed = event.native_pes_packet().unwrap();
+                            let parsed = event.pes_packet().unwrap();
                             assert_eq!(parsed.source_pts(), None);
                             assert_eq!(parsed.codec_pts(), Some(90_000));
                             assert_eq!(parsed.pes().as_ref(), &pes[cut..]);

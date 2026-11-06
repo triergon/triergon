@@ -62,7 +62,7 @@ fn opaque_receiver_stop_retains_every_operand_and_does_not_invent_commands() {
             Err(Error::Unsupported(_))
         ));
         for quantum in [1, 4096] {
-            let picture = decode(&raw, ControlPolicy::NativeD32, quantum).unwrap();
+            let picture = decode(&raw, ControlPolicy::Receiver, quantum).unwrap();
             assert!(picture.receiver_emits_bitmap());
             assert_eq!(picture.program().raw().as_ref(), raw);
             assert_eq!(picture.receiver_display_times().end_ms, 0);
@@ -87,7 +87,7 @@ fn truncated_receiver_operands_drop_the_event_but_keep_partial_source_state() {
             Err(Error::Truncated)
         ));
         for quantum in [1, 4096] {
-            let picture = decode(&raw, ControlPolicy::NativeD32, quantum).unwrap();
+            let picture = decode(&raw, ControlPolicy::Receiver, quantum).unwrap();
             assert!(!picture.receiver_emits_bitmap());
             assert_eq!(picture.program().raw().as_ref(), raw);
             assert_eq!(picture.program().controls().len(), 2);
@@ -111,7 +111,7 @@ fn invalid_link_recovery_preserves_the_original_link_and_valid_prefix_clock() {
             Err(Error::Invalid(_))
         ));
         for quantum in [1, 4096] {
-            let picture = decode(&raw, ControlPolicy::NativeD32, quantum).unwrap();
+            let picture = decode(&raw, ControlPolicy::Receiver, quantum).unwrap();
             assert!(picture.receiver_emits_bitmap());
             assert_eq!(picture.receiver_display_times().end_ms, 1024);
             let last = picture.program().controls().last().unwrap();
@@ -126,7 +126,7 @@ fn invalid_link_recovery_preserves_the_original_link_and_valid_prefix_clock() {
 fn explicit_receiver_profile_preserves_valid_strict_output() {
     let raw = packet(&[COMPLETE, &[2, 0xff]]);
     let strict = decode(&raw, ControlPolicy::Strict, 1).unwrap();
-    let native = decode(&raw, ControlPolicy::NativeD32, 4096).unwrap();
+    let native = decode(&raw, ControlPolicy::Receiver, 4096).unwrap();
     assert_eq!(
         strict.receiver_display_times(),
         native.receiver_display_times()
@@ -135,8 +135,8 @@ fn explicit_receiver_profile_preserves_valid_strict_output() {
         strict.program().state_after(),
         native.program().state_after()
     );
-    let a = strict.bitmap().unwrap().native_view().unwrap();
-    let b = native.bitmap().unwrap().native_view().unwrap();
+    let a = strict.bitmap().unwrap().cropped_view().unwrap();
+    let b = native.bitmap().unwrap().cropped_view().unwrap();
     assert_eq!(a.crop(), b.crop());
     assert_eq!(a.palette(), b.palette());
     for row in 0..a.crop().height {
@@ -155,7 +155,7 @@ fn explicit_receiver_profile_preserves_valid_strict_output() {
 #[test]
 fn absent_end_is_an_explicit_source_fault_even_when_receiver_has_no_event() {
     let raw = packet(&[&COMPLETE[..COMPLETE.len() - 1]]);
-    let picture = decode(&raw, ControlPolicy::NativeD32, 1).unwrap();
+    let picture = decode(&raw, ControlPolicy::Receiver, 1).unwrap();
     let fault = picture.program().truncated_control().unwrap();
     assert_eq!(usize::from(fault.command_offset), raw.len());
     assert_eq!(fault.opcode, None);
@@ -170,7 +170,7 @@ fn extended_receiver_controls_cannot_be_misreported_as_four_colour_output() {
         commands.push(opcode);
         let raw = packet(&[&commands]);
         assert_eq!(
-            decode(&raw, ControlPolicy::NativeD32, 1).unwrap_err(),
+            decode(&raw, ControlPolicy::Receiver, 1).unwrap_err(),
             Error::Unsupported("DVD extended receiver control")
         );
     }
@@ -193,7 +193,7 @@ fn recovery_cannot_bypass_control_count_or_work_limits() {
             None,
             &budget,
             limits,
-            ControlPolicy::NativeD32,
+            ControlPolicy::Receiver,
         )
         .unwrap();
         assert!(matches!(
@@ -213,7 +213,7 @@ fn receiver_zero_work_and_cancellation_preserve_accounting_and_are_sticky() {
         None,
         &budget,
         TraditionalLimits::default(),
-        ControlPolicy::NativeD32,
+        ControlPolicy::Receiver,
     )
     .unwrap();
     let cancel = AtomicBool::new(false);

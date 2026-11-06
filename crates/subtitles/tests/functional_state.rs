@@ -14,7 +14,7 @@ struct SourcePacket {
 struct Rect {
     geometry: [u32; 4],
     indices: &'static [u8],
-    native_words: &'static [u32],
+    receiver_words: &'static [u32],
 }
 struct Expected {
     pts_us: i64,
@@ -50,7 +50,7 @@ fn run(index: usize) {
             &config,
             71,
             DisplayLimits::default(),
-            ReceiverView::NativeD32,
+            ReceiverView::Receiver,
             &cancel,
         )
         .unwrap();
@@ -178,7 +178,7 @@ fn run(index: usize) {
 }
 
 fn assert_event(case: &Case, actual: &DisplayEvent, expected: &Expected) {
-    assert_eq!(actual.receiver_view, ReceiverView::NativeD32);
+    assert_eq!(actual.receiver_view, ReceiverView::Receiver);
     assert_eq!(
         [actual.definition.size.width, actual.definition.size.height],
         expected.canvas
@@ -198,7 +198,7 @@ fn assert_event(case: &Case, actual: &DisplayEvent, expected: &Expected) {
                 .unwrap()
         )
     );
-    let native = actual.native_publication.unwrap();
+    let native = actual.receiver_publication.unwrap();
     assert_eq!(native.exact_pts_microseconds, Some(expected.pts_us));
     assert_eq!(
         [native.start_display_ms, native.end_display_ms],
@@ -225,10 +225,10 @@ fn assert_event(case: &Case, actual: &DisplayEvent, expected: &Expected) {
             usize::try_from(want.geometry[2]).unwrap()
         );
         assert_eq!(region.plane.pixels.as_ref(), want.indices);
-        let palette = region.palette.native_d32.as_ref().unwrap();
+        let palette = region.palette.receiver.as_ref().unwrap();
         assert_eq!(
             palette.words.as_slice(),
-            want.native_words,
+            want.receiver_words,
             "{} complete native palette",
             case.id
         );
@@ -238,7 +238,7 @@ fn assert_event(case: &Case, actual: &DisplayEvent, expected: &Expected) {
             .as_chunks::<4>()
             .0
             .iter()
-            .zip(want.native_words)
+            .zip(want.receiver_words)
         {
             assert_eq!(
                 *rgba,

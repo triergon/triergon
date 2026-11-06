@@ -4,10 +4,9 @@ use super::display::StoredDisplayDecoder;
 use super::display_model::{PaletteSnapshot, StoredDisplaySet};
 use super::display_work::DisplayWork;
 use super::indexed_argb::ArgbStorage;
-use super::native_recovery::{Phase, ReceiverObservations, RecoveredEvent, StoredRecoveredPacket};
+use super::recovery::{Phase, ReceiverObservations, RecoveredEvent, StoredRecoveredPacket};
 use super::{
-    DisplayConfig, DisplayLimits, DisplayStatus, Envelope, NativeEof, NativeEofBehavior,
-    PacketClock,
+    DisplayConfig, DisplayLimits, DisplayStatus, Envelope, EofBehavior, PacketClock, RecoveryEof,
 };
 use std::fmt::Debug;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -86,7 +85,7 @@ impl<A: ArgbStorage> FullRecovery<A> {
 
 impl<A: ArgbStorage> RecoveryRole for FullRecovery<A> {
     type Packet = StoredRecoveredPacket<A>;
-    type Eof = NativeEof;
+    type Eof = RecoveryEof;
 
     fn new(budget: &Budget, limits: DisplayLimits, config: DisplayConfig) -> Result<Self> {
         Ok(Self {
@@ -353,10 +352,10 @@ impl<A: ArgbStorage> RecoveryRole for FullRecovery<A> {
         };
         let work = &mut ledger;
         if self.source_error.is_some() {
-            return Ok(Some(NativeEof {
+            return Ok(Some(RecoveryEof {
                 source_error: self.source_error,
                 receiver_error: None,
-                behavior: NativeEofBehavior::NoDelayedSubtitle,
+                behavior: EofBehavior::NoDelayedSubtitle,
             }));
         }
         let cancel = work.cancel;
@@ -368,13 +367,13 @@ impl<A: ArgbStorage> RecoveryRole for FullRecovery<A> {
         });
         match result {
             Ok(DisplayStatus::Yield) => Ok(None),
-            Ok(DisplayStatus::Ended) => Ok(Some(NativeEof::from_source_finalization(None))),
+            Ok(DisplayStatus::Ended) => Ok(Some(RecoveryEof::from_source_finalization(None))),
             Err(error @ (Error::Truncated | Error::Invalid(_) | Error::Unsupported(_))) => {
                 self.source_error = Some(error);
-                Ok(Some(NativeEof {
+                Ok(Some(RecoveryEof {
                     source_error: Some(error),
                     receiver_error: None,
-                    behavior: NativeEofBehavior::NoDelayedSubtitle,
+                    behavior: EofBehavior::NoDelayedSubtitle,
                 }))
             }
             Err(error) => Err(error),

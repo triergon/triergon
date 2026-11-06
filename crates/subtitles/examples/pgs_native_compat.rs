@@ -4,10 +4,13 @@ use std::io::{BufReader, Read};
 use std::path::Path;
 use std::sync::atomic::AtomicBool;
 use triergon_core::{Budget, BudgetVec, Bytes, Error, TimeBase, WorkBudget};
+use triergon_subtitles::compat::pgs::{ColourMatrix, ColourOrigin, RecoveryEof};
 use triergon_subtitles::pgs::{
-    DisplayConfig, DisplayDecoder, DisplayLimits, DisplaySet, DisplayStatus, Envelope,
-    NATIVE_PROJECTION, NativeCanvas, NativeColourOrigin, NativeDisplay, NativeEof, NativeMatrix,
-    NativePacket, NativeProjector, PacketClock, ProjectionStatus, SegmentIter, SegmentStamp,
+    DisplayConfig, DisplayDecoder, DisplayLimits, DisplaySet, DisplayStatus, Envelope, PacketClock,
+    SegmentIter, SegmentStamp,
+};
+use triergon_subtitles::reference_trace::pgs::{
+    Canvas, PROJECTION_PROFILE, ProjectedDisplay, ProjectedPacket, ProjectionStatus, Projector,
 };
 
 const MAX_INPUT: usize = 16 * 1024 * 1024;
@@ -139,7 +142,7 @@ fn emit_source(display: &DisplaySet, packet: usize, consumed: usize) {
     print!(
         "{{\"kind\":\"source-subtitle\",\"packet\":{packet},\"packet_offset\":0,\"consumed\":{consumed},\"flush\":false,\"format\":0,\"pts_microseconds\":"
     );
-    integer(display.native_pts_microseconds);
+    integer(display.receiver_pts_microseconds);
     print!(
         ",\"start_display_ms\":0,\"end_display_ms\":4294967295,\"context_canvas\":[{},{}],\"rectangles\":[",
         display.presentation.width, display.presentation.height
@@ -150,8 +153,8 @@ fn emit_source(display: &DisplaySet, packet: usize, consumed: usize) {
         }
         print!(
             "{{\"order\":{order},\"x\":{},\"y\":{},\"width\":{},\"height\":{},\"flags\":{},\"native_stride\":{},\"indices_hex\":",
-            object.native_x,
-            object.native_y,
+            object.receiver_x,
+            object.receiver_y,
             object.object_width,
             object.object_height,
             u8::from(object.composition.forced()),
@@ -160,7 +163,7 @@ fn emit_source(display: &DisplaySet, packet: usize, consumed: usize) {
         hex(object.pixels());
         print!(",\"palette_entries\":256,\"raw_native_palette_hex\":\"");
         for index in 0..=u8::MAX {
-            for b in object.native_argb(index).to_ne_bytes() {
+            for b in object.receiver_argb(index).to_ne_bytes() {
                 print!("{b:02x}");
             }
         }
@@ -169,10 +172,10 @@ fn emit_source(display: &DisplaySet, packet: usize, consumed: usize) {
             if index != 0 {
                 print!(",");
             }
-            print!("{}", object.native_argb(index));
+            print!("{}", object.receiver_argb(index));
         }
         print!("],\"argb_hex\":");
-        hex(object.native_argb_pixels());
+        hex(object.receiver_argb_pixels());
         print!(
             ",\"source\":{{\"object_id\":{},\"object_version\":{},\"x\":{},\"y\":{},\"window_id\":{},\"window_known\":{},\"flags\":{},\"crop\":",
             object.composition.id,
@@ -239,10 +242,10 @@ fn emit_source(display: &DisplaySet, packet: usize, consumed: usize) {
             if index != 0 {
                 print!(",");
             }
-            string(match object.palette().native_origin(index) {
-                NativeColourOrigin::ExplicitSource => "explicit-source",
-                NativeColourOrigin::PreviousEpochSlot => "previous-epoch-physical-slot",
-                NativeColourOrigin::ReceiverZeroInitialization => "receiver-zero-initialization",
+            string(match object.palette().receiver_origin(index) {
+                ColourOrigin::ExplicitSource => "explicit-source",
+                ColourOrigin::PreviousEpochSlot => "previous-epoch-physical-slot",
+                ColourOrigin::ReceiverZeroInitialization => "receiver-zero-initialization",
             });
         }
         print!("]}}}}");
@@ -255,7 +258,7 @@ fn emit_source(display: &DisplaySet, packet: usize, consumed: usize) {
         display.presentation.raw_state,
         display.presentation.palette_update_flags
     );
-    match display.native_time_error {
+    match display.receiver_time_error {
         None => print!("null"),
         Some(error) => string(&error.to_string()),
     }
@@ -299,7 +302,7 @@ fn emit_source(display: &DisplaySet, packet: usize, consumed: usize) {
 }
 
 fn emit_receiver(
-    display: &NativeDisplay,
+    display: &ProjectedDisplay,
     canvas: Option<[u16; 2]>,
     packet: usize,
     consumed: usize,
@@ -332,7 +335,7 @@ fn emit_receiver(
         hex(rect.pixels());
         print!(",\"palette_entries\":256,\"raw_native_palette_hex\":\"");
         for index in 0..=u8::MAX {
-            for byte in rect.native_argb(index).to_ne_bytes() {
+            for byte in rect.receiver_argb(index).to_ne_bytes() {
                 print!("{byte:02x}");
             }
         }
@@ -341,7 +344,7 @@ fn emit_receiver(
             if index != 0 {
                 print!(",");
             }
-            print!("{}", rect.native_argb(index));
+            print!("{}", rect.receiver_argb(index));
         }
         print!("],\"argb_hex\":");
         hex(rect.argb_pixels());
@@ -353,7 +356,7 @@ fn emit_receiver(
         print!("}}");
     }
     print!("],\"projection\":");
-    string(NATIVE_PROJECTION);
+    string(PROJECTION_PROFILE);
     println!(
         ",\"source_objects_retained\":{},\"omitted_receiver_references\":{}}}",
         display.source().objects().len(),
@@ -362,10 +365,10 @@ fn emit_receiver(
 }
 
 fn project(
-    projector: &mut NativeProjector,
+    projector: &mut Projector,
     output: DisplaySet,
     quantum: u64,
-) -> Result<NativeDisplay, Error> {
+) -> Result<ProjectedDisplay, Error> {
     let cancel = AtomicBool::new(false);
     let mut source = Some(output);
     projector.push(&mut source, &cancel)?;
@@ -386,8 +389,8 @@ fn project(
 
 fn drain(
     decoder: &mut DisplayDecoder,
-    projector: &mut NativeProjector,
-    sets: &mut BudgetVec<NativeDisplay>,
+    projector: &mut Projector,
+    sets: &mut BudgetVec<ProjectedDisplay>,
     packet: usize,
     length: usize,
     quantum: u64,
@@ -414,7 +417,7 @@ fn drain(
     })
 }
 
-fn grid(path: &Path, matrix: NativeMatrix) -> Result<(), String> {
+fn grid(path: &Path, matrix: ColourMatrix) -> Result<(), String> {
     let mut input = BufReader::new(File::open(path).map_err(|e| e.to_string())?);
     let mut wrong = 0u64;
     let mut compared = 0u64;
@@ -455,8 +458,8 @@ fn main() {
     let args = std::env::args().skip(1).collect::<Vec<_>>();
     if args.len() == 3 && args[0] == "--palette-grid" {
         let matrix = match args[2].as_str() {
-            "sd" => NativeMatrix::Sd601,
-            "hd" => NativeMatrix::Hd709,
+            "sd" => ColourMatrix::Sd601,
+            "hd" => ColourMatrix::Hd709,
             _ => {
                 eprintln!("matrix sd|hd required");
                 std::process::exit(2)
@@ -484,12 +487,12 @@ fn main() {
         &budget,
         DisplayLimits::default(),
         DisplayConfig {
-            native_forced_only: case.forced_only,
+            receiver_forced_only: case.forced_only,
         },
     )
     .unwrap();
     let cancel = AtomicBool::new(false);
-    let mut projector = NativeProjector::new(&budget, usize::MAX);
+    let mut projector = Projector::new(&budget, usize::MAX);
     let mut context = None;
     let mut sequence = 0u64;
     let quantum = 4096;
@@ -529,7 +532,7 @@ fn main() {
                                     sup_clock: segment.clock,
                                     envelope: Envelope::Packet,
                                 };
-                                if let Ok(value) = NativeCanvas::parse(segment, stamp) {
+                                if let Ok(value) = Canvas::parse(segment, stamp) {
                                     context = Some(value);
                                 }
                             }
@@ -539,7 +542,7 @@ fn main() {
                         match decoder.push(packet,clock,Envelope::Packet,&cancel) {
                             Err(e)=>Err(e.error),
                             Ok(())=>drain(&mut decoder,&mut projector,&mut sets,index,last_length,quantum,false).map(|()|{
-                                let native=NativePacket::from_sets(sets,context);
+                                let native=ProjectedPacket::from_sets(sets,context);
                                 if let Some(first)=native.receiver_output(){emit_receiver(first,native.context_canvas(),index,last_length);}
                                 println!("{{\"kind\":\"packet-projection\",\"packet\":{index},\"source_sets\":{},\"omitted_receiver_events\":{}}}",native.source_sets().len(),native.omitted_receiver_events());
                             }),
@@ -570,7 +573,7 @@ fn main() {
             )
         })
         .err();
-    let eof = NativeEof::from_source_finalization(source_error);
+    let eof = RecoveryEof::from_source_finalization(source_error);
     print!("{{\"kind\":\"source-finalization\",\"source_error\":");
     match eof.source_error {
         None => print!("null"),

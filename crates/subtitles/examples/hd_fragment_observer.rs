@@ -3,10 +3,11 @@
 use std::{fmt::Write as _, io::Read, sync::atomic::AtomicBool};
 use triergon_core::{Budget, Bytes, Rounding, Time, TimeBase, WorkBudget};
 use triergon_harness_protocol::hex;
+use triergon_subtitles::compat::dvd::{CropJob, CropMode};
 use triergon_subtitles::dvd::{
     ConfigJob, ConfigLimits, ConfigStatus, DvdBitmap, HdFacts, HdFragmentIntegrity,
     HdFragmentLimits, HdFragmentState, HdFragmentStatus, HdPacketClock, HdPhysicalPacket, HdReset,
-    HdSpan, HdStatus, NativeCropMode, NativeProjectionJob, ProjectionLimits, ProjectionStatus,
+    HdSpan, HdStatus, ProjectionLimits, ProjectionStatus,
 };
 type Result<T> = std::result::Result<T, String>;
 const MAX_INPUT: usize = 16 * 1024 * 1024;
@@ -134,13 +135,13 @@ fn render<const N: usize>(
     clock: Option<i64>,
     canvas: [u32; 2],
 ) -> Result<(Option<String>, usize)> {
-    let mut projection = NativeProjectionJob::new(
+    let mut projection = CropJob::new(
         bitmap,
         palette,
         if facts.menu {
-            NativeCropMode::Menu
+            CropMode::Menu
         } else {
-            NativeCropMode::Ordinary
+            CropMode::Ordinary
         },
         pool,
         ProjectionLimits::default(),
@@ -154,7 +155,7 @@ fn render<const N: usize>(
     let projection = projection
         .try_finish(cancel)
         .map_err(|e| format!("{e:?}"))?;
-    let Some(view) = projection.native_view() else {
+    let Some(view) = projection.cropped_view() else {
         return Ok((None, 0));
     };
     let crop = view.crop();
@@ -393,7 +394,7 @@ fn run(raw: &[u8], quantum: u64) -> Result<String> {
                 let picture = picture.ok_or("picture absent")?;
                 let clock = microseconds(known != 0, pts, tb);
                 let mut native_facts = f;
-                native_facts.forced = picture.native_forced();
+                native_facts.forced = picture.receiver_forced();
                 if f.eight_bit {
                     if picture.ycrcb().is_some() {
                         let mut palette = image_state

@@ -68,7 +68,7 @@ fn native_resize_cannot_bypass_aggregate_pixel_limit_or_invalidate_retained_outp
                 aggregate_region_pixels: 12,
                 ..DisplayLimits::default()
             },
-            ReceiverView::NativeD32,
+            ReceiverView::Receiver,
             &AtomicBool::new(false),
         )
         .unwrap();
@@ -123,7 +123,7 @@ fn native_resize_cannot_bypass_aggregate_pixel_limit_or_invalidate_retained_outp
         assert_eq!(
             output.regions()[0]
                 .palette
-                .native_d32
+                .receiver
                 .as_ref()
                 .unwrap()
                 .words

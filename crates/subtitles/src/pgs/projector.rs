@@ -1,5 +1,6 @@
-//! Explicit pinned-receiver projection. Source sets remain complete and
-//! unchanged, including objects/sets the receiver API cannot emit together.
+//! Receiver projection of strict source display sets. Source sets remain
+//! complete and unchanged, including objects/sets the receiver API cannot emit
+//! together.
 mod phases;
 
 use super::display_work::DisplayWork;
@@ -9,17 +10,17 @@ use super::{
 use std::sync::atomic::{AtomicBool, Ordering};
 use triergon_core::{Budget, BudgetVec, Bytes, Error, Result, WorkBudget};
 
-pub const NATIVE_PROJECTION: &str = "native-pgs-public-api-projection-v1";
+pub const PROJECTION_PROFILE: &str = "native-pgs-public-api-projection-v1";
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum NativeRasterOrigin {
+pub enum RasterOrigin {
     SourceRaster,
     RetainedBeforeRejectedFirst,
     EmptyAfterRejectedFirst,
 }
 
 #[derive(Debug)]
-pub struct NativeRect {
+pub struct ProjectedRect {
     pub source_object_index: usize,
     pub x: u16,
     pub y: u16,
@@ -27,24 +28,24 @@ pub struct NativeRect {
     pub height: u16,
     pub stride: u16,
     pub forced: bool,
-    pub origin: NativeRasterOrigin,
+    pub origin: RasterOrigin,
     pub(crate) pixels: Bytes,
     pub(crate) argb: Bytes,
     pub(crate) palette: PaletteSnapshot,
     pub(crate) suppressed: bool,
 }
-impl NativeRect {
+impl ProjectedRect {
     pub fn pixels(&self) -> &Bytes {
         &self.pixels
     }
     pub fn argb_pixels(&self) -> &Bytes {
         &self.argb
     }
-    pub fn native_argb(&self, index: u8) -> u32 {
+    pub fn receiver_argb(&self, index: u8) -> u32 {
         if self.suppressed {
             0
         } else {
-            self.palette.native_argb(index)
+            self.palette.receiver_argb(index)
         }
     }
     pub fn palette(&self) -> &PaletteSnapshot {
@@ -53,19 +54,19 @@ impl NativeRect {
 }
 
 #[derive(Debug)]
-pub struct NativeDisplay {
+pub struct ProjectedDisplay {
     source: DisplaySet,
-    rectangles: BudgetVec<NativeRect>,
+    rectangles: BudgetVec<ProjectedRect>,
     /// Source native-time diagnostics remain on `source()`. The receiver
     /// representation uses its no-timestamp marker, exposed here as None.
     pub pts_microseconds: Option<i64>,
     pub omitted_source_references: usize,
 }
-impl NativeDisplay {
+impl ProjectedDisplay {
     pub fn source(&self) -> &DisplaySet {
         &self.source
     }
-    pub fn rectangles(&self) -> &[NativeRect] {
+    pub fn rectangles(&self) -> &[ProjectedRect] {
         self.rectangles.as_slice()
     }
 }
@@ -73,12 +74,12 @@ impl NativeDisplay {
 /// Literal context dimensions from an actual PCS, including a trailing PCS
 /// that has not yet produced an END. Its source stamp remains available.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub struct NativeCanvas {
+pub struct Canvas {
     pub width: u16,
     pub height: u16,
     pub stamp: SegmentStamp,
 }
-impl NativeCanvas {
+impl Canvas {
     pub fn parse(segment: Segment<'_>, stamp: SegmentStamp) -> Result<Self> {
         let composition = Composition::parse(segment)?;
         Ok(Self {
@@ -92,21 +93,21 @@ impl NativeCanvas {
 /// One native API call can report one subtitle. All strict source sets remain
 /// owned here. The final PCS context is distinct from the first subtitle.
 #[derive(Debug)]
-pub struct NativePacket {
-    sets: BudgetVec<NativeDisplay>,
-    context: Option<NativeCanvas>,
+pub struct ProjectedPacket {
+    sets: BudgetVec<ProjectedDisplay>,
+    context: Option<Canvas>,
 }
-impl NativePacket {
-    pub fn from_sets(sets: BudgetVec<NativeDisplay>, context: Option<NativeCanvas>) -> Self {
+impl ProjectedPacket {
+    pub fn from_sets(sets: BudgetVec<ProjectedDisplay>, context: Option<Canvas>) -> Self {
         Self { sets, context }
     }
-    pub fn source_sets(&self) -> &[NativeDisplay] {
+    pub fn source_sets(&self) -> &[ProjectedDisplay] {
         self.sets.as_slice()
     }
-    pub fn receiver_output(&self) -> Option<&NativeDisplay> {
+    pub fn receiver_output(&self) -> Option<&ProjectedDisplay> {
         self.sets.as_slice().first()
     }
-    pub fn context(&self) -> Option<NativeCanvas> {
+    pub fn context(&self) -> Option<Canvas> {
         self.context
     }
     pub fn context_canvas(&self) -> Option<[u16; 2]> {
@@ -114,37 +115,6 @@ impl NativePacket {
     }
     pub fn omitted_receiver_events(&self) -> usize {
         self.sets.len().saturating_sub(1)
-    }
-}
-
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum NativeEofBehavior {
-    NoDelayedSubtitle,
-    UnsupportedSourceFailure,
-}
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub struct NativeEof {
-    pub source_error: Option<Error>,
-    pub receiver_error: Option<Error>,
-    pub behavior: NativeEofBehavior,
-}
-impl NativeEof {
-    /// Applies only to finalization after all packets, never packet parsing.
-    /// Missing END/unused partial source objects remain source truncations;
-    /// the pinned receiver's drain emits no fabricated clear or extra bitmap.
-    pub fn from_source_finalization(source_error: Option<Error>) -> Self {
-        match source_error {
-            None | Some(Error::Truncated) => Self {
-                source_error,
-                receiver_error: None,
-                behavior: NativeEofBehavior::NoDelayedSubtitle,
-            },
-            Some(error) => Self {
-                source_error,
-                receiver_error: Some(error),
-                behavior: NativeEofBehavior::UnsupportedSourceFailure,
-            },
-        }
     }
 }
 
@@ -194,12 +164,12 @@ enum Phase {
 }
 
 #[derive(Debug)]
-pub struct NativeProjector {
+pub struct Projector {
     budget: Budget,
     slots: BudgetVec<Slot>,
     source: Option<DisplaySet>,
-    rectangles: Option<BudgetVec<NativeRect>>,
-    output: Option<NativeDisplay>,
+    rectangles: Option<BudgetVec<ProjectedRect>>,
+    output: Option<ProjectedDisplay>,
     phase: Phase,
     credit: usize,
     index: usize,
@@ -210,7 +180,7 @@ pub struct NativeProjector {
     raster: Option<RasterJob>,
     generation: Option<u64>,
     image: Option<Image>,
-    origin: NativeRasterOrigin,
+    origin: RasterOrigin,
     argb: Option<BudgetVec<u8>>,
     frozen_argb: Option<Bytes>,
     at: usize,
@@ -219,7 +189,7 @@ pub struct NativeProjector {
     failed: Option<Error>,
 }
 
-impl NativeProjector {
+impl Projector {
     pub fn new(budget: &Budget, max_work: usize) -> Self {
         Self {
             budget: budget.clone(),
@@ -237,7 +207,7 @@ impl NativeProjector {
             raster: None,
             generation: None,
             image: None,
-            origin: NativeRasterOrigin::SourceRaster,
+            origin: RasterOrigin::SourceRaster,
             argb: None,
             frozen_argb: None,
             at: 0,
@@ -297,7 +267,7 @@ impl NativeProjector {
         }
         Ok(())
     }
-    pub fn take_output(&mut self, cancel: &AtomicBool) -> Result<NativeDisplay> {
+    pub fn take_output(&mut self, cancel: &AtomicBool) -> Result<ProjectedDisplay> {
         if let Some(error) = self.failed {
             return Err(error);
         }

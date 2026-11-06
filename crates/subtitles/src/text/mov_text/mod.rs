@@ -1,4 +1,4 @@
-//! Explicit, bounded D32 native mov_text packet-to-ASS consumer.
+//! Explicit, bounded mov_text packet-to-ASS conversion as the receiver does it.
 //!
 //! This is a separate receiver view. Raw Input, source timing and configuration
 //! are retained; neither Extractor nor the strict SemanticJob is changed.
@@ -11,8 +11,6 @@ use config::Configuration;
 use packet::PacketJob;
 use std::sync::atomic::AtomicBool;
 use triergon_core::{Budget, Bytes, Error, Result, TimeBase, WorkBudget};
-
-pub const NATIVE_MOV_TEXT: &str = "NativeD32MovTextAss1";
 
 #[derive(Clone, Copy, Debug, Default)]
 pub struct Options {
@@ -108,7 +106,7 @@ pub enum Status {
 /// Extradata must be the caller's AVCodec extradata, not an assumed SampleEntry.
 /// All caller-owned inputs rejected by provide are returned intact.
 #[derive(Debug)]
-pub struct NativeMovText {
+pub struct Decoder {
     pool: Budget,
     limits: Limits,
     options: Options,
@@ -121,7 +119,7 @@ pub struct NativeMovText {
     failed: Option<Error>,
 }
 
-impl NativeMovText {
+impl Decoder {
     pub fn new(
         pool: &Budget,
         extradata: Option<&Bytes>,

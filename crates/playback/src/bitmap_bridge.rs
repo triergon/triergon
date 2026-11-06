@@ -8,7 +8,7 @@ use std::sync::{
 use triergon_core::{
     Budget, BudgetVec, Bytes, Error, Reservation, Rounding, SourceId, TimeBase, WorkBudget,
 };
-use triergon_subtitles::{dvd, pgs};
+use triergon_subtitles::{compat, dvd, pgs};
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct BitmapScope {
     pub source: SourceId,
@@ -148,8 +148,8 @@ pub enum PgsMode {
 )]
 enum PgsDecoder {
     Source(pgs::DisplayDecoder),
-    Native(pgs::NativeRecoveryDecoder),
-    Compatibility(pgs::NativeCompatibilityDecoder),
+    Native(compat::pgs::RecoveryDecoder),
+    Compatibility(compat::pgs::ReceiverDecoder),
 }
 pub struct PgsBridge<M> {
     pool: Budget,
@@ -170,7 +170,7 @@ pub struct PgsNativeOutput<M> {
 }
 pub struct PgsCompatibilityOutput<M> {
     pub packet: BitmapOwner<M>,
-    pub observations: pgs::NativeCompatibilityPacket,
+    pub observations: compat::pgs::ReceiverPacket,
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -249,11 +249,11 @@ impl<M> PgsBridge<M> {
                 PgsDecoder::Source(pgs::DisplayDecoder::new(pool, limits, config)?)
             }
             PgsMode::ExplicitNativeD32 => {
-                PgsDecoder::Native(pgs::NativeRecoveryDecoder::new(pool, limits, config)?)
+                PgsDecoder::Native(compat::pgs::RecoveryDecoder::new(pool, limits, config)?)
             }
-            PgsMode::NativeCompatibility => PgsDecoder::Compatibility(
-                pgs::NativeCompatibilityDecoder::new(pool, limits, config)?,
-            ),
+            PgsMode::NativeCompatibility => {
+                PgsDecoder::Compatibility(compat::pgs::ReceiverDecoder::new(pool, limits, config)?)
+            }
         };
         Ok(Self {
             pool: pool.clone(),
@@ -454,24 +454,25 @@ pub struct DvdOutput<M> {
     pub source: dvd::SpuPacket,
     pub pictures: BudgetVec<dvd::TraditionalSubpicture>,
 }
-pub use dvd::{DvdDisplayBoundary, DvdNativePresentation};
+pub use compat::dvd::Presentation as DvdPresentation;
+pub use dvd::DvdDisplayBoundary;
 
 /// A native DVD picture ready for a packet-clock indexed subtitle queue.
 #[derive(Clone, Copy, Debug)]
 pub struct DvdQueuePicture<'a> {
     pub start_ns: i64,
     pub canvas: Option<dvd::Canvas>,
-    pub bitmap: dvd::NativeDvdView<'a, 4>,
+    pub bitmap: compat::dvd::CroppedView<'a, 4>,
 }
 
 impl<M> DvdOutput<M> {
     /// Combine the explicit first-unit receiver view with the packet's PTS.
-    pub fn native_presentation(&self) -> Result<Option<DvdNativePresentation<'_>>> {
+    pub fn native_presentation(&self) -> Result<Option<DvdPresentation<'_>>> {
         let Some(picture) = self.pictures.as_slice().first() else {
             return Ok(None);
         };
         let clock = self.packet.input().clock;
-        picture.native_presentation_from_ticks(clock.pts, clock.timebase)
+        picture.receiver_presentation_from_ticks(clock.pts, clock.timebase)
     }
 
     /// Match the existing bitmap queue: start at packet PTS, fall back to DTS,
@@ -485,7 +486,7 @@ impl<M> DvdOutput<M> {
         let Some(picture) = self.pictures.as_slice().first() else {
             return Ok(None);
         };
-        let Some(presentation) = picture.native_presentation(None)? else {
+        let Some(presentation) = picture.receiver_presentation(None)? else {
             return Ok(None);
         };
         Ok(Some(DvdQueuePicture {
@@ -706,7 +707,7 @@ impl<M> DvdJob<M> {
                     let policy = if self.mode == DvdMode::StrictAllUnits {
                         dvd::ControlPolicy::Strict
                     } else {
-                        dvd::ControlPolicy::NativeD32
+                        dvd::ControlPolicy::Receiver
                     };
                     let raw = source.unit(self.at)?;
                     let storage = std::mem::take(&mut self.picture_storage);

@@ -2,10 +2,10 @@
 //! Native compatibility is checked against native reference rows, never by a
 //! post-output text/time/colour normalization step.
 use super::clock::{Flavor, timing};
-use super::native_read::LineRead;
+use super::reader_view::LineRead;
 use super::utf16::{Decoder, LineMark};
 use super::{
-    Discovery, FormatFacts, Limits, NativeView, Packet, Progress, ProgressKind, SideData, Stream,
+    Discovery, FormatFacts, Limits, Packet, Progress, ProgressKind, ReaderView, SideData, Stream,
 };
 use crate::text::Input;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -19,7 +19,7 @@ pub(crate) struct Parts {
     pub stream: Option<Stream>,
     pub packets: BudgetVec<Packet>,
     pub progress: BudgetVec<Progress>,
-    pub native_error: Option<i32>,
+    pub error_code: Option<i32>,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -210,7 +210,7 @@ impl Document {
                     }
                     cue.text_end = end;
                     if self.flavor == Flavor::SubRip {
-                        self.copying = Some(NativeView::D32.line_read(
+                        self.copying = Some(ReaderView::Reference.line_read(
                             source,
                             self.decoded.is_some(),
                             start..end,
@@ -292,11 +292,11 @@ impl Document {
             usize::from(cue.identifier.is_some()) + usize::from(cue.settings.is_some()),
         )?;
         if self.flavor == Flavor::WebVtt {
-            for (native_type, range) in [(16, cue.identifier), (17, cue.settings)] {
+            for (side_data_type, range) in [(16, cue.identifier), (17, cue.settings)] {
                 if let Some((start, end)) = range {
                     side_data
                         .try_push(SideData {
-                            native_type,
+                            side_data_type,
                             bytes: source.slice(start..end)?,
                         })
                         .map_err(|error| error.error)?;
@@ -550,7 +550,7 @@ impl Document {
             stream,
             packets: self.packets,
             progress: self.progress,
-            native_error: if self.open_failed {
+            error_code: if self.open_failed {
                 Some(INVALID_DATA)
             } else {
                 None

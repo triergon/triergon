@@ -1,9 +1,8 @@
 //! The receiver projection state machine: one method per [`Phase`], driven
-//! by [`NativeProjector::inner`]. Each method is one step of the original
+//! by [`Projector::inner`]. Each method is one step of the original
 //! loop; `Step::Continue` re-enters the loop and `Step::Break` returns.
 use super::{
-    Image, NativeDisplay, NativeProjector, NativeRasterOrigin, NativeRect, Phase, ProjectionStatus,
-    Slot,
+    Image, Phase, ProjectedDisplay, ProjectedRect, ProjectionStatus, Projector, RasterOrigin, Slot,
 };
 use crate::pgs::display_work::DisplayWork;
 use crate::pgs::{
@@ -19,7 +18,7 @@ type Step = ControlFlow<ProjectionStatus>;
 const NEXT: Step = Step::Continue(());
 const YIELD: Step = Step::Break(ProjectionStatus::Yield);
 
-impl NativeProjector {
+impl Projector {
     pub(super) fn inner(
         &mut self,
         work: &mut WorkBudget,
@@ -436,12 +435,12 @@ impl NativeProjector {
                 height: object.object_height,
                 pixels: object.pixels().clone(),
             });
-            self.origin = NativeRasterOrigin::SourceRaster;
+            self.origin = RasterOrigin::SourceRaster;
         } else {
             self.origin = if slot.image.is_some() {
-                NativeRasterOrigin::RetainedBeforeRejectedFirst
+                RasterOrigin::RetainedBeforeRejectedFirst
             } else {
-                NativeRasterOrigin::EmptyAfterRejectedFirst
+                RasterOrigin::EmptyAfterRejectedFirst
             };
         }
         self.image = Some(slot.image.clone().unwrap_or(Image {
@@ -495,7 +494,7 @@ impl NativeProjector {
             .source
             .as_ref()
             .ok_or(Error::Invalid("PGS receiver source absent"))?;
-        let word = source.objects()[self.object_index].native_argb(index);
+        let word = source.objects()[self.object_index].receiver_argb(index);
         self.argb
             .as_mut()
             .ok_or(Error::Invalid("PGS receiver ARGB absent"))?
@@ -542,10 +541,10 @@ impl NativeProjector {
             .image
             .take()
             .ok_or(Error::Invalid("PGS receiver image absent"))?;
-        let rectangle = NativeRect {
+        let rectangle = ProjectedRect {
             source_object_index: self.object_index,
-            x: object.native_x,
-            y: object.native_y,
+            x: object.receiver_x,
+            y: object.receiver_y,
             width: image.width,
             height: image.height,
             stride: image.width,
@@ -557,7 +556,7 @@ impl NativeProjector {
                 .take()
                 .ok_or(Error::Invalid("PGS receiver ARGB not frozen"))?,
             palette: object.palette().clone(),
-            suppressed: object.native_forced_only_suppressed,
+            suppressed: object.receiver_forced_only_suppressed,
         };
         self.rectangles
             .as_mut()
@@ -578,9 +577,9 @@ impl NativeProjector {
             .source
             .take()
             .ok_or(Error::Invalid("PGS receiver source absent"))?;
-        let pts = source.native_pts_microseconds;
+        let pts = source.receiver_pts_microseconds;
         let omitted = source.objects().len().saturating_sub(2);
-        self.output = Some(NativeDisplay {
+        self.output = Some(ProjectedDisplay {
             source,
             rectangles: self
                 .rectangles

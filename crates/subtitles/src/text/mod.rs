@@ -3,13 +3,15 @@
 //! Named profiles: SubRipStrict1, WebVttSourceStrict1, Tx3gCarriage1,
 //! Utf8Packet1, MatroskaWebVttCarriage1 and OpaqueAss1. Their limits and
 //! source/semantic boundaries are documented in this module's README.md.
-//! These profiles do not establish full native compatibility.
+//! These profiles do not establish FFmpeg compatibility; the FFmpeg-compatible
+//! conversions are in [`crate::compat::charset`] and [`crate::compat::mov_text`].
 #![forbid(unsafe_code)]
 
-pub mod carriage;
+#[cfg(feature = "reference-trace")]
+pub(crate) mod carriage;
 pub mod charset;
-pub mod native_charset;
-pub mod native_mov_text;
+pub(crate) mod mov_text;
+pub(crate) mod receiver_charset;
 pub mod tx3g_config;
 pub mod tx3g_semantics;
 

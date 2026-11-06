@@ -1,6 +1,6 @@
 //! Source facts and retained PGS display results. Native views are explicitly
 //! receiver projections; missing source colour or clocks remain missing.
-use super::indexed_argb::{ArgbStorage, IndexedArgb, NativeArgbView};
+use super::indexed_argb::{ArgbStorage, ArgbView, IndexedArgb};
 use super::{CompositionObject, Crop, Envelope, SupClock, Window};
 use std::num::NonZeroU16;
 use std::sync::Arc;
@@ -22,7 +22,7 @@ impl PacketClock {
             .transpose()
     }
 
-    pub fn native_microseconds(self) -> Result<Option<i64>> {
+    pub fn receiver_microseconds(self) -> Result<Option<i64>> {
         self.pts_time()?
             .map(|time| time.to_i64_ticks(TimeBase::new(1, 1_000_000)?, Rounding::NearestAway))
             .transpose()
@@ -83,12 +83,12 @@ pub struct PresentationFacts {
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum NativeMatrix {
+pub enum ColourMatrix {
     Sd601,
     Hd709,
 }
 
-impl NativeMatrix {
+impl ColourMatrix {
     pub fn for_canvas(height: u16) -> Self {
         if height != 0 && height <= 576 {
             Self::Sd601
@@ -96,6 +96,8 @@ impl NativeMatrix {
             Self::Hd709
         }
     }
+    /// Comparison label of this matrix's receiver quantisation.
+    #[cfg(feature = "reference-trace")]
     pub fn identifier(self) -> &'static str {
         match self {
             Self::Sd601 => "native-pgs-sd601-quantized10-v1",
@@ -146,11 +148,11 @@ pub struct SourceColour {
     pub palette_version: u8,
     pub epoch: u64,
     pub stamp: SegmentStamp,
-    pub receiver_matrix: NativeMatrix,
+    pub receiver_matrix: ColourMatrix,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum NativeColourOrigin {
+pub enum ColourOrigin {
     ExplicitSource,
     /// Source cache was invalidated. Only the explicitly named receiver
     /// projection carries its prior physical palette slot; source stays None.
@@ -163,7 +165,7 @@ pub(crate) struct ColourProvenance {
     pub palette_version: u8,
     pub epoch: u64,
     pub stamp: SegmentStamp,
-    pub receiver_matrix: NativeMatrix,
+    pub receiver_matrix: ColourMatrix,
     pub _owner_charge: Reservation,
 }
 
@@ -191,7 +193,7 @@ pub(crate) struct PaletteStorage {
     pub epoch: u64,
     pub colours: BudgetVec<StoredSourceColour>,
     pub words: BudgetVec<u32>,
-    pub origins: BudgetVec<NativeColourOrigin>,
+    pub origins: BudgetVec<ColourOrigin>,
     pub first_owner: Option<PaletteProvenanceOwner>,
     pub other_owners: BudgetVec<Option<PaletteProvenanceOwner>>,
     pub _owner_charge: Reservation,
@@ -240,13 +242,13 @@ impl PaletteSnapshot {
             receiver_matrix: provenance.receiver_matrix,
         })
     }
-    pub fn native_argb(&self, index: u8) -> u32 {
+    pub fn receiver_argb(&self, index: u8) -> u32 {
         self.0.words.as_slice()[usize::from(index)]
     }
-    pub fn native_words(&self) -> &[u32] {
+    pub fn receiver_words(&self) -> &[u32] {
         self.0.words.as_slice()
     }
-    pub fn native_origin(&self, index: u8) -> NativeColourOrigin {
+    pub fn receiver_origin(&self, index: u8) -> ColourOrigin {
         self.0.origins.as_slice()[usize::from(index)]
     }
     pub fn belongs_to(&self, budget: &Budget) -> bool {
@@ -279,12 +281,12 @@ pub struct StoredDisplayObject<A: ArgbStorage> {
     pub object_last_stamp: SegmentStamp,
     pub visible: VisibleGeometry,
     pub visibility_window_known: bool,
-    pub native_x: u16,
-    pub native_y: u16,
-    pub native_forced_only_suppressed: bool,
+    pub receiver_x: u16,
+    pub receiver_y: u16,
+    pub receiver_forced_only_suppressed: bool,
     pub(crate) pixels: Bytes,
     pub(crate) visible_pixels: Bytes,
-    pub(crate) native_argb_pixels: A,
+    pub(crate) receiver_argb_pixels: A,
     pub(crate) palette: PaletteSnapshot,
 }
 
@@ -297,21 +299,21 @@ impl<A: ArgbStorage> StoredDisplayObject<A> {
     }
     /// Owned index/palette view. Missing source colour remains missing in
     /// palette(); this writer projects only the explicitly named native words.
-    pub fn native_argb_view(&self) -> Result<NativeArgbView> {
-        NativeArgbView::new(
+    pub fn receiver_argb_view(&self) -> Result<ArgbView> {
+        ArgbView::new(
             self.pixels.clone(),
             self.palette.clone(),
-            self.native_forced_only_suppressed,
+            self.receiver_forced_only_suppressed,
         )
     }
     pub fn palette(&self) -> &PaletteSnapshot {
         &self.palette
     }
-    pub fn native_argb(&self, index: u8) -> u32 {
-        if self.native_forced_only_suppressed {
+    pub fn receiver_argb(&self, index: u8) -> u32 {
+        if self.receiver_forced_only_suppressed {
             0
         } else {
-            self.palette.native_argb(index)
+            self.palette.receiver_argb(index)
         }
     }
 }
@@ -319,13 +321,13 @@ impl<A: ArgbStorage> StoredDisplayObject<A> {
 impl StoredDisplayObject<Bytes> {
     /// Existing materialized canonical A,R,G,B bytes. The default decoder
     /// retains this complete plane exactly as before.
-    pub fn native_argb_pixels(&self) -> &Bytes {
-        &self.native_argb_pixels
+    pub fn receiver_argb_pixels(&self) -> &Bytes {
+        &self.receiver_argb_pixels
     }
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum NativeClockSource {
+pub enum ClockSource {
     Presentation,
     EndFallback,
     Unknown,
@@ -341,9 +343,9 @@ pub struct StoredDisplaySet<A: ArgbStorage> {
     pub epoch: u64,
     pub presentation: PresentationFacts,
     pub end_stamp: SegmentStamp,
-    pub native_pts_microseconds: Option<i64>,
-    pub native_time_error: Option<Error>,
-    pub native_clock_source: NativeClockSource,
+    pub receiver_pts_microseconds: Option<i64>,
+    pub receiver_time_error: Option<Error>,
+    pub receiver_clock_source: ClockSource,
     /// No source end/duration is encoded. The native API UINT32_MAX marker
     /// is a separate receiver convention, never an invented source duration.
     pub source_end: Option<Time>,

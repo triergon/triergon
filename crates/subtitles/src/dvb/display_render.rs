@@ -2,7 +2,7 @@
 use super::colour::{ColourProjection, palette_offset, palette_size};
 use super::display_model::*;
 use super::display_state::{DecodeWork, Object, State};
-use super::native_palette::NativePalettePlan;
+use super::receiver_palette::ReceiverPalettePlan;
 use super::{
     FieldParity, FieldSpec, InitialPlane, PaletteFacts, Point, Raster, RasterLimits, RasterSpec,
     SourceFacts, Status,
@@ -30,13 +30,13 @@ pub(crate) struct Renderer {
     palette_entries: Option<BudgetVec<super::colour::PaletteEntry>>,
     palette_rgba: Option<BudgetVec<u8>>,
     palette_unrepaired_rgba: Option<BudgetVec<u8>>,
-    native_palette: Option<NativePalettePlan>,
+    receiver_palette: Option<ReceiverPalettePlan>,
     all_entries_explicit: bool,
     frozen_rgba: Option<Bytes>,
     frozen_unrepaired_rgba: Option<Bytes>,
     pending_region: Option<DisplayRegion>,
     pub output: BudgetVec<DisplayRegion>,
-    pub omitted: BudgetVec<super::NativeOmittedRegion>,
+    pub omitted: BudgetVec<super::OmittedRegion>,
     rendered: bool,
     cleanup_region: usize,
     cleanup_family: usize,
@@ -65,7 +65,7 @@ impl Renderer {
             palette_entries: None,
             palette_rgba: None,
             palette_unrepaired_rgba: None,
-            native_palette: None,
+            receiver_palette: None,
             all_entries_explicit: true,
             frozen_rgba: None,
             frozen_unrepaired_rgba: None,
@@ -290,7 +290,7 @@ impl Renderer {
                         self.lookup += 1;
                         self.credit = 0;
                     }
-                    if self.found.is_none() && state.receiver_view == super::ReceiverView::NativeD32
+                    if self.found.is_none() && state.receiver_view == super::ReceiverView::Receiver
                     {
                         // Source controls establish that an unavailable
                         // ODS is not an instruction to replay old compressed
@@ -369,7 +369,7 @@ impl Renderer {
                     self.found = None;
                 }
             }
-            if state.receiver_view == super::ReceiverView::NativeD32
+            if state.receiver_view == super::ReceiverView::Receiver
                 && state.regions.as_slice()[self.region].plane.is_none()
                 && !self.drew_object
             {
@@ -419,7 +419,7 @@ impl Renderer {
                         self.family = None;
                         self.palette_at = 0;
                         self.all_entries_explicit = true;
-                        self.native_palette = None;
+                        self.receiver_palette = None;
                         self.credit = 0;
                     }
                     Err(error) => {
@@ -434,27 +434,27 @@ impl Renderer {
             // Construct in that order; never reorder a completed output.
             let snapshot_index = match state.receiver_view {
                 super::ReceiverView::Source => self.snapshot,
-                super::ReceiverView::NativeD32 => state.visible.len() - 1 - self.snapshot,
+                super::ReceiverView::Receiver => state.visible.len() - 1 - self.snapshot,
             };
             let visible = state.visible.as_slice()[snapshot_index];
             let index = state.slots[usize::from(visible.id)]
                 .ok_or(Error::Invalid("DVB missing visible region"))?;
             let region = &state.regions.as_slice()[index];
-            if state.receiver_view == super::ReceiverView::NativeD32 && region.plane.is_none() {
+            if state.receiver_view == super::ReceiverView::Receiver && region.plane.is_none() {
                 let source_error = Self::region_position(state, visible.address, region.size).err();
-                if let (super::NativeGeometryPolicy::ValidateSource, Some(error)) =
-                    (state.native_geometry_policy, source_error)
+                if let (super::GeometryPolicy::ValidateSource, Some(error)) =
+                    (state.geometry_policy, source_error)
                 {
                     return Err(error);
                 }
                 if !work.pay(&mut self.credit, 1)? {
                     return Ok(false);
                 }
-                if state.native_geometry_policy == super::NativeGeometryPolicy::OmitUnrendered {
+                if state.geometry_policy == super::GeometryPolicy::OmitUnrendered {
                     // Retain the strict Source failure and original RCS owner.
                     // No raster, address, clock or packet is repaired or clipped.
                     self.omitted
-                        .try_push(super::NativeOmittedRegion {
+                        .try_push(super::OmittedRegion {
                             id: region.id,
                             source_address: visible.address,
                             source_size: region.size,
@@ -474,7 +474,7 @@ impl Renderer {
             }
             let region = &state.regions.as_slice()[index];
             let position = Self::region_position(state, visible.address, region.size)?;
-            if state.receiver_view == super::ReceiverView::NativeD32 {
+            if state.receiver_view == super::ReceiverView::Receiver {
                 // Native source PCS order may be nonascending. Check actual
                 // vertical intersections without assuming emission order. The
                 // cursor pays for each pair once and survives yield/pressure.
@@ -523,16 +523,16 @@ impl Renderer {
                 self.palette_unrepaired_rgba = Some(rgba);
             }
             let family = self.family.ok_or(Error::Invalid("DVB snapshot family"))?;
-            if state.receiver_view == super::ReceiverView::NativeD32 {
+            if state.receiver_view == super::ReceiverView::Receiver {
                 let source_family = &state.families.as_slice()[family];
-                if self.native_palette.is_none() {
+                if self.receiver_palette.is_none() {
                     let pixels = region
                         .plane
                         .as_ref()
                         .ok_or(Error::Invalid("DVB native region plane absent"))?
                         .pixels
                         .clone();
-                    self.native_palette = Some(NativePalettePlan::new(
+                    self.receiver_palette = Some(ReceiverPalettePlan::new(
                         &state.budget,
                         region.depth,
                         source_family.latest.is_none(),
@@ -545,7 +545,7 @@ impl Renderer {
                     .as_ref()
                     .ok_or(Error::Invalid("DVB native CLUT state absent"))?;
                 if !self
-                    .native_palette
+                    .receiver_palette
                     .as_mut()
                     .ok_or(Error::Invalid("DVB native palette plan absent"))?
                     .prepare(
@@ -558,7 +558,11 @@ impl Renderer {
                 }
             }
             while self.palette_at < count {
-                let entry_work = if self.native_palette.is_some() { 12 } else { 8 };
+                let entry_work = if self.receiver_palette.is_some() {
+                    12
+                } else {
+                    8
+                };
                 if !work.pay(&mut self.credit, entry_work)? {
                     return Ok(false);
                 }
@@ -567,7 +571,7 @@ impl Renderer {
                     .clone();
                 let rgba = cell.source.rgba_source_nearest()?;
                 let unrepaired = cell.source.rgba(ColourProjection::StudioUnrepaired8)?;
-                if let Some(native) = self.native_palette.as_mut() {
+                if let Some(native) = self.receiver_palette.as_mut() {
                     let source = state.families.as_slice()[family]
                         .native_entries
                         .as_ref()
@@ -618,7 +622,7 @@ impl Renderer {
                     }
                 }
             }
-            let native_d32 = if let Some(native) = self.native_palette.as_mut() {
+            let receiver = if let Some(native) = self.receiver_palette.as_mut() {
                 Some(
                     native.try_finish(
                         self.frozen_unrepaired_rgba
@@ -631,7 +635,7 @@ impl Renderer {
                 None
             };
             let palette = PaletteSnapshot {
-                native_d32,
+                receiver,
                 depth: region.depth,
                 projection: PaletteSnapshot::projection(),
                 rgba: self

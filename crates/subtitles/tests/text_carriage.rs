@@ -1,7 +1,7 @@
 #![forbid(unsafe_code)]
 use std::sync::atomic::AtomicBool;
 use triergon_core::{Budget, Bytes, Error, SourceId, SourceLocation, Time, WorkBudget};
-use triergon_subtitles::text::carriage::{
+use triergon_subtitles::reference_trace::carriage::{
     CallerClock, Discovery, FormatFacts, Limits, Operation, Packet, Progress, ProgressKind,
     Session, SideData, Snapshot, Status, Stream,
 };
@@ -146,7 +146,7 @@ fn source(actual: &Input, expected: &Input) {
 fn side(actual: &[SideData], expected: &[ExpectedSide]) {
     assert_eq!(actual.len(), expected.len());
     for (actual, expected) in actual.iter().zip(expected) {
-        assert_eq!(actual.native_type, expected.native_type);
+        assert_eq!(actual.side_data_type, expected.native_type);
         assert_eq!(actual.bytes.as_ref(), expected.bytes);
     }
 }
@@ -184,7 +184,7 @@ fn packet(actual: &Packet, expected: &ExpectedPacket) {
 fn snapshot(actual: &Snapshot, original: &Input, case: &Case) {
     source(&actual.input, original);
     assert_eq!(actual.format, case.native_format);
-    assert_eq!(actual.native_error, case.native_error);
+    assert_eq!(actual.error_code, case.native_error);
     match (&actual.stream, &case.stream) {
         (None, None) => {}
         (Some(a), Some(b)) => stream(a, b),

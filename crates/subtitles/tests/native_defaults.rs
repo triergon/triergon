@@ -13,7 +13,7 @@ struct Case {
     payload: &'static [u8],
     indices: &'static [u8],
     native_rgba: &'static [u8],
-    native_words: &'static [u32],
+    receiver_words: &'static [u32],
     explicit: &'static [(u8, [u8; 4])],
     source_overrides: &'static [(u8, [u8; 4])],
     canvas: [u32; 2],
@@ -261,7 +261,7 @@ fn whole_source_no_cds_and_partial_cds_keep_every_unredefined_entry() {
             let events = decode(&pool, case, ReceiverView::Source, quantum);
             assert_eq!(events.len(), 1);
             source_facts(&events[0], case);
-            assert!(events[0].regions()[0].palette.native_d32.is_none());
+            assert!(events[0].regions()[0].palette.receiver.is_none());
             drop(events);
             assert_eq!(pool.used(), baseline);
         }
@@ -273,21 +273,21 @@ fn native_case(at: usize) {
     for quantum in [1, 7, 4096] {
         let pool = Budget::new(4 << 20).unwrap();
         let baseline = pool.used();
-        let events = decode(&pool, case, ReceiverView::NativeD32, quantum);
+        let events = decode(&pool, case, ReceiverView::Receiver, quantum);
         assert_eq!(events.len(), 1);
         source_facts(&events[0], case);
-        let publication = events[0].native_publication.unwrap();
+        let publication = events[0].receiver_publication.unwrap();
         assert_eq!(
             publication.exact_pts_microseconds,
             Some(case.pts_microseconds)
         );
         assert_eq!(publication.start_display_ms, 0);
         assert_eq!(publication.end_display_ms, 2000);
-        let palette = events[0].regions()[0].palette.native_d32.as_ref().unwrap();
+        let palette = events[0].regions()[0].palette.receiver.as_ref().unwrap();
         assert!(!palette.all_entries_explicit);
         assert_eq!(
             palette.words.as_slice(),
-            case.native_words,
+            case.receiver_words,
             "{} entire literal raw native words",
             case.id
         );
@@ -322,11 +322,11 @@ fn default_palette_and_original_owners_remain_charged_after_decoder_teardown() {
     for case in &cases::CASES {
         let pool = Budget::new(4 << 20).unwrap();
         let baseline = pool.used();
-        let mut events = decode(&pool, case, ReceiverView::NativeD32, 1);
+        let mut events = decode(&pool, case, ReceiverView::Receiver, 1);
         let event = events.pop().unwrap();
         drop(events);
         let region = &event.regions()[0];
-        let native = region.palette.native_d32.as_ref().unwrap();
+        let native = region.palette.receiver.as_ref().unwrap();
         let expected = native.rgba.as_ref().to_vec();
         let held = [
             native.rgba.clone(),

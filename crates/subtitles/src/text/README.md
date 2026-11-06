@@ -51,9 +51,10 @@ PTS are distinct.
 
 ## Carriage session
 
-`carriage::Session` publishes an immutable `Snapshot` per input with the
-FFmpeg-compatible packet view (`Snapshot::native_view()` returns
-`NativeView::D32`): millisecond document timing
+`reference_trace::carriage::Session` (with the `reference-trace` feature)
+publishes an immutable `Snapshot` per input with the FFmpeg-compatible packet
+view (`Snapshot::reader_view()` returns `ReaderView::Reference`): millisecond
+document timing
 that keeps zero or negative intervals, and the reference's UTF-16 SubRip
 line-entry byte behaviour. `recover_pending` returns inputs after cancellation
 or a resource failure.

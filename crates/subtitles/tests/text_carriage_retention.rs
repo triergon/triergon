@@ -2,7 +2,9 @@
 #![forbid(unsafe_code)]
 use std::sync::atomic::AtomicBool;
 use triergon_core::{Budget, Bytes, Error, SourceId, Time, WorkBudget};
-use triergon_subtitles::text::carriage::{CallerClock, Limits, Operation, Session, Status};
+use triergon_subtitles::reference_trace::carriage::{
+    CallerClock, Limits, Operation, Session, Status,
+};
 use triergon_subtitles::text::{Encoding, Format, Input, RawClock, Timing};
 
 fn input(pool: &Budget) -> Input {
@@ -33,7 +35,7 @@ fn clock() -> CallerClock {
         duration: None,
     }
 }
-fn output(session: &mut Session) -> triergon_subtitles::text::carriage::Snapshot {
+fn output(session: &mut Session) -> triergon_subtitles::reference_trace::carriage::Snapshot {
     for _ in 0..32 {
         match session
             .poll(&mut WorkBudget::new(4096), &AtomicBool::new(false))

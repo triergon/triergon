@@ -2,11 +2,9 @@
 use std::sync::atomic::{AtomicBool, Ordering};
 use triergon_core::{Budget, Bytes, Error, SourceId, WorkBudget};
 use triergon_harness_protocol::hex;
+use triergon_subtitles::compat::charset::{AssPacketJob, Outcome, PacketStatus, receiver_charset};
 use triergon_subtitles::text::charset::{
     Charset, CharsetJob, CharsetStatus, multibyte::MultibyteCharset as M,
-};
-use triergon_subtitles::text::native_charset::{
-    AssPacketJob, Outcome, PacketStatus, receiver_charset,
 };
 use triergon_subtitles::text::{Encoding, Format, Input, Limits, Timing};
 const PREFIX: &[u8] = b"2,0,Default,,0,0,0,,";
@@ -28,7 +26,7 @@ fn input(p: &Budget, label: &[u8], suffix: &[u8]) -> Input {
         container_position: None,
     }
 }
-fn run(p: &Budget, i: Input, q: u64) -> triergon_subtitles::text::native_charset::PacketView {
+fn run(p: &Budget, i: Input, q: u64) -> triergon_subtitles::compat::charset::PacketView {
     let mut j = AssPacketJob::new(i, p, Limits::default(), 7).unwrap();
     let c = AtomicBool::new(false);
     for _ in 0..100000 {
@@ -536,8 +534,8 @@ fn absent_receiver_declaration_remains_unknown_while_source_is_retained() {
     assert!(v.converted().is_none());
 }
 
-fn run_v2(p: &Budget, i: Input, q: u64) -> triergon_subtitles::text::native_charset::PacketView {
-    let mut j = AssPacketJob::new_v2(i, p, Limits::default(), 7).unwrap();
+fn run_v2(p: &Budget, i: Input, q: u64) -> triergon_subtitles::compat::charset::PacketView {
+    let mut j = AssPacketJob::new_with_glibc_euc_kr(i, p, Limits::default(), 7).unwrap();
     let c = AtomicBool::new(false);
     for _ in 0..100000 {
         if j.poll(&mut WorkBudget::new(q), &c).unwrap() == PacketStatus::Ready {
@@ -548,7 +546,7 @@ fn run_v2(p: &Budget, i: Input, q: u64) -> triergon_subtitles::text::native_char
 }
 #[test]
 fn receiver_v2_adds_primary_a2e8_without_upgrading_strict_or_v1() {
-    use triergon_subtitles::text::native_charset::receiver_charset_v2;
+    use triergon_subtitles::compat::charset::receiver_charset_with_glibc_euc_kr;
     let p = Budget::new(1 << 20).unwrap();
     assert_eq!(
         decode(&p, &[0xa2, 0xe8], M::ReceiverEucKrGlibc239).unwrap(),
@@ -561,7 +559,7 @@ fn receiver_v2_adds_primary_a2e8_without_upgrading_strict_or_v1() {
         Charset::Multibyte(M::ReceiverEucKrC1)
     );
     assert_eq!(
-        receiver_charset_v2(b"EUC-KR").unwrap(),
+        receiver_charset_with_glibc_euc_kr(b"EUC-KR").unwrap(),
         Charset::Multibyte(M::ReceiverEucKrGlibc239)
     );
     for label in [
@@ -570,7 +568,7 @@ fn receiver_v2_adds_primary_a2e8_without_upgrading_strict_or_v1() {
         b" euc-kr",
         b"euc-kr\0",
     ] {
-        assert!(receiver_charset_v2(label).is_err());
+        assert!(receiver_charset_with_glibc_euc_kr(label).is_err());
     }
 }
 #[test]
@@ -622,7 +620,7 @@ fn receiver_v2_truncated_tail_work_zero_and_cancel_do_not_hide_source() {
     let p = Budget::new(1 << 20).unwrap();
     let i = input(&p, b"euc-kr", &[0xa2, 0xe8, 0xa2]);
     let original = i.payload.clone();
-    let mut j = AssPacketJob::new_v2(i, &p, Limits::default(), 7).unwrap();
+    let mut j = AssPacketJob::new_with_glibc_euc_kr(i, &p, Limits::default(), 7).unwrap();
     let c = AtomicBool::new(false);
     let used = p.used();
     assert_eq!(

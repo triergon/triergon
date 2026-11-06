@@ -1451,7 +1451,7 @@ fn pgs_bitmap_bridge_keeps_source_plane_and_unknown_clock_after_teardown() {
     assert_eq!(retained.packet.input().clock.pts, None);
     assert_eq!(retained.display.objects().len(), 1);
     assert_eq!(retained.display.objects()[0].pixels().as_ref(), &[1, 2]);
-    assert_eq!(retained.display.native_pts_microseconds, None);
+    assert_eq!(retained.display.receiver_pts_microseconds, None);
     assert_eq!(
         retained.display.objects()[0].palette().source(1).unwrap().y,
         235
@@ -2550,7 +2550,7 @@ fn matroska_bitmap_tracks_feed_native_receivers_without_copying_frames() {
         config,
         dvb_track.scope().generation,
         dvb::DisplayLimits::default(),
-        dvb::ReceiverView::NativeD32,
+        dvb::ReceiverView::Receiver,
         &off(),
     )
     .unwrap();
@@ -2616,7 +2616,7 @@ fn matroska_bitmap_tracks_feed_native_receivers_without_copying_frames() {
                             Some(dvb_ts::DvbQueueAction::Clear { at_ns: 94_000_000 })
                         ));
                     }
-                    assert!(event.native_publication.is_some());
+                    assert!(event.receiver_publication.is_some());
                     dvb_actions.push(event.action);
                 }
                 dvb::DecodeStatus::NeedPacket => break,

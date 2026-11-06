@@ -1,8 +1,9 @@
 use std::sync::atomic::{AtomicBool, Ordering};
 use triergon_core::{Budget, Bytes, Error, TimeBase, WorkBudget};
+use triergon_subtitles::compat::pgs::{ColourMatrix, RecoveryDecoder};
 use triergon_subtitles::pgs::{
-    DisplayConfig, DisplayDecoder, DisplayLimits, DisplayStatus, Envelope, NativeMatrix,
-    NativeRecoveryDecoder, PacketClock, RecoveredPacket, RecoveryStatus,
+    DisplayConfig, DisplayDecoder, DisplayLimits, DisplayStatus, Envelope, PacketClock,
+    RecoveredPacket, RecoveryStatus,
 };
 
 fn stamp() -> PacketClock {
@@ -65,7 +66,7 @@ fn packet_with(data: &[u8], flags: u8, declared: u8, end: &[u8], crop: bool) -> 
     ]
     .concat()
 }
-fn ready(decoder: &mut NativeRecoveryDecoder, quantum: u64) -> RecoveredPacket {
+fn ready(decoder: &mut RecoveryDecoder, quantum: u64) -> RecoveredPacket {
     let cancel = AtomicBool::new(false);
     for _ in 0..1_000_000 {
         let mut work = WorkBudget::new(quantum);
@@ -80,7 +81,7 @@ fn ready(decoder: &mut NativeRecoveryDecoder, quantum: u64) -> RecoveredPacket {
 fn run(raw: &[u8], quantum: u64) -> RecoveredPacket {
     let b = Budget::new(4 * 1024 * 1024).unwrap();
     let mut d =
-        NativeRecoveryDecoder::new(&b, DisplayLimits::default(), DisplayConfig::default()).unwrap();
+        RecoveryDecoder::new(&b, DisplayLimits::default(), DisplayConfig::default()).unwrap();
     let mut bytes = Some(Bytes::copy_from_slice(&b, raw).unwrap());
     d.push(&mut bytes, stamp(), &AtomicBool::new(false))
         .unwrap();
@@ -233,7 +234,7 @@ fn partial_receiver_palette_reads_physical_following_bytes_without_source_colour
     assert!(out.source_sets().is_empty());
     assert!(out.source_error().is_some());
     let rect = &out.receiver_output().unwrap().rectangles()[0];
-    assert_eq!(rect.palette()[1], NativeMatrix::Sd601.argb(128, 0, 0, 0));
+    assert_eq!(rect.palette()[1], ColourMatrix::Sd601.argb(128, 0, 0, 0));
     assert_eq!((rect.width, rect.height), (0, 0));
     assert_eq!(out.raw_packet().as_ref(), raw);
 }
@@ -242,7 +243,7 @@ fn reset_missing_definitions_suppresses_receiver_event_but_retains_strict_failur
     let b = Budget::new(4 * 1024 * 1024).unwrap();
     let c = AtomicBool::new(false);
     let mut d =
-        NativeRecoveryDecoder::new(&b, DisplayLimits::default(), DisplayConfig::default()).unwrap();
+        RecoveryDecoder::new(&b, DisplayLimits::default(), DisplayConfig::default()).unwrap();
     let first = packet_with(&[1, 2, 0, 0], 0xc0, 8, &[], false);
     let mut bytes = Some(Bytes::copy_from_slice(&b, &first).unwrap());
     d.push(&mut bytes, stamp(), &c).unwrap();
@@ -284,7 +285,7 @@ fn cancellation_is_sticky_and_busy_foreign_rejections_preserve_owners() {
     let foreign = Budget::new(4096).unwrap();
     let c = AtomicBool::new(false);
     let mut d =
-        NativeRecoveryDecoder::new(&b, DisplayLimits::default(), DisplayConfig::default()).unwrap();
+        RecoveryDecoder::new(&b, DisplayLimits::default(), DisplayConfig::default()).unwrap();
     let mut wrong = Some(Bytes::copy_from_slice(&foreign, &[0x80, 0, 0]).unwrap());
     assert_eq!(d.push(&mut wrong, stamp(), &c), Err(Error::ForeignPool));
     assert!(wrong.is_some());
@@ -307,8 +308,7 @@ fn work_zero_preserves_every_observed_allocation_boundary_for_valid_and_recovery
         let b = Budget::new(4 * 1024 * 1024).unwrap();
         let c = AtomicBool::new(false);
         let mut d =
-            NativeRecoveryDecoder::new(&b, DisplayLimits::default(), DisplayConfig::default())
-                .unwrap();
+            RecoveryDecoder::new(&b, DisplayLimits::default(), DisplayConfig::default()).unwrap();
         let mut bytes = Some(
             Bytes::copy_from_slice(&b, &packet_with(&[1, 2, 0, 0], 0xc0, 8, end, false)).unwrap(),
         );
@@ -334,7 +334,7 @@ fn allocation_pressure_retry_retains_paid_work_and_complete_source_owners() {
     let b = Budget::new(4 * 1024 * 1024).unwrap();
     let c = AtomicBool::new(false);
     let mut d =
-        NativeRecoveryDecoder::new(&b, DisplayLimits::default(), DisplayConfig::default()).unwrap();
+        RecoveryDecoder::new(&b, DisplayLimits::default(), DisplayConfig::default()).unwrap();
     let raw = packet_with(&[1, 2, 0, 0], 0xc0, 8, &[1], false);
     let owner = Bytes::copy_from_slice(&b, &raw).unwrap();
     let ptr = owner.as_ptr();
@@ -388,8 +388,7 @@ fn cancellation_before_during_and_after_ready_releases_private_graph_and_is_stic
         let b = Budget::new(4 * 1024 * 1024).unwrap();
         let c = AtomicBool::new(false);
         let mut d =
-            NativeRecoveryDecoder::new(&b, DisplayLimits::default(), DisplayConfig::default())
-                .unwrap();
+            RecoveryDecoder::new(&b, DisplayLimits::default(), DisplayConfig::default()).unwrap();
         let raw = packet_with(&[1, 2, 0, 0], 0xc0, 8, &[1], false);
         let mut bytes = Some(Bytes::copy_from_slice(&b, &raw).unwrap());
         d.push(&mut bytes, stamp(), &c).unwrap();
@@ -426,7 +425,7 @@ fn receiver_limits_are_never_reclassified_as_recoverable_source_syntax() {
     ] {
         let b = Budget::new(4 * 1024 * 1024).unwrap();
         let c = AtomicBool::new(false);
-        let mut d = NativeRecoveryDecoder::new(&b, limits, DisplayConfig::default()).unwrap();
+        let mut d = RecoveryDecoder::new(&b, limits, DisplayConfig::default()).unwrap();
         let mut bytes = Some(
             Bytes::copy_from_slice(&b, &packet_with(&[1, 2, 0, 0], 0xc0, 8, &[1], false)).unwrap(),
         );
@@ -447,7 +446,7 @@ fn receiver_limits_are_never_reclassified_as_recoverable_source_syntax() {
 fn packet_byte_limits_and_empty_input_reject_without_consuming_the_callers_owner() {
     let b = Budget::new(4096).unwrap();
     let c = AtomicBool::new(false);
-    let mut d = NativeRecoveryDecoder::new(
+    let mut d = RecoveryDecoder::new(
         &b,
         DisplayLimits {
             max_packet_bytes: 2,
@@ -479,8 +478,7 @@ fn one_and_two_byte_physical_headers_are_receiver_errors_not_successful_empty_pa
         let b = Budget::new(4 * 1024 * 1024).unwrap();
         let c = AtomicBool::new(false);
         let mut d =
-            NativeRecoveryDecoder::new(&b, DisplayLimits::default(), DisplayConfig::default())
-                .unwrap();
+            RecoveryDecoder::new(&b, DisplayLimits::default(), DisplayConfig::default()).unwrap();
         let retained = Bytes::copy_from_slice(&b, raw).unwrap();
         let mut bytes = Some(retained.clone());
         d.push(&mut bytes, stamp(), &c).unwrap();
@@ -504,7 +502,7 @@ fn retained_source_pixels_raw_palette_and_receiver_output_survive_decoder_teardo
     let b = Budget::new(4 * 1024 * 1024).unwrap();
     let c = AtomicBool::new(false);
     let mut d =
-        NativeRecoveryDecoder::new(&b, DisplayLimits::default(), DisplayConfig::default()).unwrap();
+        RecoveryDecoder::new(&b, DisplayLimits::default(), DisplayConfig::default()).unwrap();
     let mut bytes =
         Some(Bytes::copy_from_slice(&b, &packet_with(&[1, 2, 0, 0], 0xc0, 8, &[], false)).unwrap());
     d.push(&mut bytes, stamp(), &c).unwrap();
@@ -532,7 +530,7 @@ fn explicit_eof_reports_source_truncation_without_fabricating_a_receiver_display
     let b = Budget::new(4 * 1024 * 1024).unwrap();
     let c = AtomicBool::new(false);
     let mut d =
-        NativeRecoveryDecoder::new(&b, DisplayLimits::default(), DisplayConfig::default()).unwrap();
+        RecoveryDecoder::new(&b, DisplayLimits::default(), DisplayConfig::default()).unwrap();
     let mut bytes = Some(Bytes::copy_from_slice(&b, &pcs(0x80, false)).unwrap());
     d.push(&mut bytes, stamp(), &c).unwrap();
     assert!(ready(&mut d, 1).receiver_output().is_none());
@@ -555,7 +553,7 @@ fn hard_reset_preserves_actual_strict_generation_and_old_outputs() {
     let b = Budget::new(4 * 1024 * 1024).unwrap();
     let c = AtomicBool::new(false);
     let mut d =
-        NativeRecoveryDecoder::new(&b, DisplayLimits::default(), DisplayConfig::default()).unwrap();
+        RecoveryDecoder::new(&b, DisplayLimits::default(), DisplayConfig::default()).unwrap();
     let mut retained = Vec::new();
     for generation in 0..3 {
         if generation != 0 {
@@ -584,8 +582,7 @@ fn raw_unknown_and_native_sentinel_source_clocks_are_never_relabelled_known_zero
         let b = Budget::new(4 * 1024 * 1024).unwrap();
         let c = AtomicBool::new(false);
         let mut d =
-            NativeRecoveryDecoder::new(&b, DisplayLimits::default(), DisplayConfig::default())
-                .unwrap();
+            RecoveryDecoder::new(&b, DisplayLimits::default(), DisplayConfig::default()).unwrap();
         let mut bytes = Some(
             Bytes::copy_from_slice(&b, &packet_with(&[1, 2, 0, 0], 0xc0, 8, &[], false)).unwrap(),
         );
@@ -598,7 +595,7 @@ fn raw_unknown_and_native_sentinel_source_clocks_are_never_relabelled_known_zero
             pts
         );
         if pts == Some(i64::MIN) {
-            assert!(out.source_sets()[0].native_time_error.is_some());
+            assert!(out.source_sets()[0].receiver_time_error.is_some());
             assert_eq!(out.receiver_output().unwrap().pts_microseconds, None);
         }
     }
@@ -653,7 +650,7 @@ fn combined_work_and_outputs_are_invariant_across_quanta_for_valid_and_recovered
             let b = Budget::new(4 * 1024 * 1024).unwrap();
             let c = AtomicBool::new(false);
             let mut d =
-                NativeRecoveryDecoder::new(&b, DisplayLimits::default(), DisplayConfig::default())
+                RecoveryDecoder::new(&b, DisplayLimits::default(), DisplayConfig::default())
                     .unwrap();
             let mut bytes = Some(
                 Bytes::copy_from_slice(&b, &packet_with(&[1, 2, 0, 0], 0xc0, 8, end, false))
@@ -696,7 +693,7 @@ fn source_refusal_does_not_disable_subsequent_receiver_pixel_reference_or_fragme
     ] {
         let b = Budget::new(4 * 1024 * 1024).unwrap();
         let c = AtomicBool::new(false);
-        let mut d = NativeRecoveryDecoder::new(&b, limits, DisplayConfig::default()).unwrap();
+        let mut d = RecoveryDecoder::new(&b, limits, DisplayConfig::default()).unwrap();
         let mut bytes = Some(Bytes::copy_from_slice(&b, &segment(0x80, &[])).unwrap());
         d.push(&mut bytes, stamp(), &c).unwrap();
         let first = ready(&mut d, 1);

@@ -6,11 +6,11 @@ use triergon_core::{
     WorkBudget,
 };
 use triergon_mpegts::{Pes, TraceEvent, clock::SourceTimestamp, psi::CodecIdentification};
+use triergon_subtitles::compat::dvb::{PesPacket, PesParser, PesProgress};
 use triergon_subtitles::dvb::{
     ClockOrigin, ClockValue, DecodeStatus, Decoder, DisplayAction, DisplayEvent, DisplayLimits,
-    DisplayProgress, DisplayRegion, NativePesPacket, NativePesParser, NativePesProgress,
-    PacketEnvelope, PacketIdentity, PacketTiming, ReceiverView, Size, SourceClock,
-    SourceConfiguration,
+    DisplayProgress, DisplayRegion, PacketEnvelope, PacketIdentity, PacketTiming, ReceiverView,
+    Size, SourceClock, SourceConfiguration,
 };
 
 /// One selected service from one active PMT. A new playback generation, PMT
@@ -24,8 +24,8 @@ pub struct DvbTsBridge {
     clock_epoch: Option<u64>,
     configuration: SourceConfiguration,
     decoder: Decoder,
-    parser: Option<NativePesParser>,
-    rejected_native_pes: Option<NativePesPacket>,
+    parser: Option<PesParser>,
+    rejected_native_pes: Option<PesPacket>,
     packet_limit: usize,
     pending: Option<Pending>,
     sequence: u64,
@@ -41,7 +41,7 @@ struct Pending {
     offset: usize,
     bytes: Option<Bytes>,
     parser_input: bool,
-    native_pes: Option<NativePesPacket>,
+    native_pes: Option<PesPacket>,
 }
 
 /// A service in the active elementary stream's descriptor loop, in wire order.
@@ -62,7 +62,7 @@ pub enum DvbQueueAction<'a> {
 impl<'a> DvbQueueAction<'a> {
     pub(crate) fn from_native_publication(
         event: &'a DisplayEvent,
-        publication: triergon_subtitles::dvb::NativePublication,
+        publication: triergon_subtitles::compat::dvb::Publication,
     ) -> Result<Option<Self>> {
         let (clock, timing) = publication
             .packet_clock
@@ -119,7 +119,7 @@ impl<'a> DvbQueuePicture<'a> {
                     .checked_mul(height - 1)
                     .and_then(|offset| offset.checked_add(width))
                     .is_some_and(|end| end <= plane.pixels.len())
-                && region.palette.native_d32.is_some()
+                && region.palette.receiver.is_some()
         })
     }
 }
@@ -159,15 +159,9 @@ impl DvbTsBridge {
         limits: DisplayLimits,
         cancel: &AtomicBool,
     ) -> Result<Self> {
-        let mut bridge = Self::with_service(
-            output,
-            pid,
-            service,
-            limits,
-            ReceiverView::NativeD32,
-            cancel,
-        )?;
-        bridge.parser = Some(NativePesParser::new(&bridge.pool));
+        let mut bridge =
+            Self::with_service(output, pid, service, limits, ReceiverView::Receiver, cancel)?;
+        bridge.parser = Some(PesParser::new(&bridge.pool));
         Ok(bridge)
     }
 
@@ -342,7 +336,7 @@ impl DvbTsBridge {
 
     /// Recover the original PES and projected bytes from a native packet
     /// rejected before decoder admission. The next rejection replaces it.
-    pub fn take_rejected_native_pes(&mut self) -> Option<NativePesPacket> {
+    pub fn take_rejected_native_pes(&mut self) -> Option<PesPacket> {
         self.rejected_native_pes.take()
     }
 
@@ -390,7 +384,7 @@ impl DvbTsBridge {
             return Err(Error::Invalid("DVB queue event configuration"));
         }
         let publication = event
-            .native_publication
+            .receiver_publication
             .ok_or(Error::Unsupported("DVB queue requires native publication"))?;
         DvbQueueAction::from_native_publication(event, publication)
     }
@@ -447,7 +441,7 @@ impl DvbTsBridge {
                 },
             )?;
             if let Some(parsed) = pending.native_pes.take() {
-                if let Err(error) = self.decoder.provide_native_pes(&packet, &parsed) {
+                if let Err(error) = self.decoder.provide_pes(&packet, &parsed) {
                     self.rejected_native_pes = Some(parsed);
                     self.pending = None;
                     self.accepting = true;
@@ -497,7 +491,7 @@ fn subtitling_descriptor(
 impl Pending {
     fn project(
         &mut self,
-        parser: &mut NativePesParser,
+        parser: &mut PesParser,
         work: &mut WorkBudget,
         cancel: &AtomicBool,
     ) -> Result<bool> {
@@ -513,12 +507,12 @@ impl Pending {
             self.parser_input = true;
         }
         match parser.step(work, cancel)? {
-            NativePesProgress::Yield => Ok(false),
-            NativePesProgress::Packet(packet) => {
+            PesProgress::Yield => Ok(false),
+            PesProgress::Packet(packet) => {
                 self.native_pes = Some(packet);
                 Ok(true)
             }
-            NativePesProgress::NeedPacket => Err(Error::Invalid("DVB parser input disappeared")),
+            PesProgress::NeedPacket => Err(Error::Invalid("DVB parser input disappeared")),
         }
     }
 

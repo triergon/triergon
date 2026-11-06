@@ -15,7 +15,7 @@ pub(super) static CASES: &[Case] = &[
         native_palette: include_bytes!(
             "../native-nonmodifying-fixtures/dvb2-literal-flag0.native-rgba"
         ),
-        native_words: &[34816, 4294967295, 4294967295, 4278190080],
+        receiver_words: &[34816, 4294967295, 4294967295, 4278190080],
         non_modifying: false,
         depth: 2,
         pts_raw: 1000000,
@@ -35,7 +35,7 @@ pub(super) static CASES: &[Case] = &[
         native_palette: include_bytes!(
             "../native-nonmodifying-fixtures/dvb2-literal-flag1.native-rgba"
         ),
-        native_words: &[34816, 4294967295, 4294967295, 4278190080],
+        receiver_words: &[34816, 4294967295, 4294967295, 4278190080],
         non_modifying: true,
         depth: 2,
         pts_raw: 1000000,
@@ -55,7 +55,7 @@ pub(super) static CASES: &[Case] = &[
         native_palette: include_bytes!(
             "../native-nonmodifying-fixtures/dvb2-run-flag0.native-rgba"
         ),
-        native_words: &[34816, 4294967295, 4294967295, 4278190080],
+        receiver_words: &[34816, 4294967295, 4294967295, 4278190080],
         non_modifying: false,
         depth: 2,
         pts_raw: 1000000,
@@ -75,7 +75,7 @@ pub(super) static CASES: &[Case] = &[
         native_palette: include_bytes!(
             "../native-nonmodifying-fixtures/dvb2-run-flag1.native-rgba"
         ),
-        native_words: &[34816, 4294967295, 4294967295, 4278190080],
+        receiver_words: &[34816, 4294967295, 4294967295, 4278190080],
         non_modifying: true,
         depth: 2,
         pts_raw: 1000000,
@@ -95,7 +95,7 @@ pub(super) static CASES: &[Case] = &[
         native_palette: include_bytes!(
             "../native-nonmodifying-fixtures/dvb4-literal-flag0.native-rgba"
         ),
-        native_words: &[
+        receiver_words: &[
             34816, 4294967295, 4294967295, 4278190080, 4278190080, 4278190080, 4278190080,
             4278190080, 4278190080, 4278190080, 4278190080, 4278190080, 4278190080, 4278190080,
             4278190080, 4278190080,
@@ -119,7 +119,7 @@ pub(super) static CASES: &[Case] = &[
         native_palette: include_bytes!(
             "../native-nonmodifying-fixtures/dvb4-literal-flag1.native-rgba"
         ),
-        native_words: &[
+        receiver_words: &[
             34816, 4294967295, 4294967295, 4278190080, 4278190080, 4278190080, 4278190080,
             4278190080, 4278190080, 4278190080, 4278190080, 4278190080, 4278190080, 4278190080,
             4278190080, 4278190080,
@@ -143,7 +143,7 @@ pub(super) static CASES: &[Case] = &[
         native_palette: include_bytes!(
             "../native-nonmodifying-fixtures/dvb4-run-flag0.native-rgba"
         ),
-        native_words: &[
+        receiver_words: &[
             34816, 4294967295, 4294967295, 4278190080, 4278190080, 4278190080, 4278190080,
             4278190080, 4278190080, 4278190080, 4278190080, 4278190080, 4278190080, 4278190080,
             4278190080, 4278190080,
@@ -167,7 +167,7 @@ pub(super) static CASES: &[Case] = &[
         native_palette: include_bytes!(
             "../native-nonmodifying-fixtures/dvb4-run-flag1.native-rgba"
         ),
-        native_words: &[
+        receiver_words: &[
             34816, 4294967295, 4294967295, 4278190080, 4278190080, 4278190080, 4278190080,
             4278190080, 4278190080, 4278190080, 4278190080, 4278190080, 4278190080, 4278190080,
             4278190080, 4278190080,
@@ -191,7 +191,7 @@ pub(super) static CASES: &[Case] = &[
         native_palette: include_bytes!(
             "../native-nonmodifying-fixtures/dvb8-literal-flag0.native-rgba"
         ),
-        native_words: &[
+        receiver_words: &[
             34816, 4294967295, 4294967295, 4278190080, 4278190080, 4278190080, 4278190080,
             4278190080, 4278190080, 4278190080, 4278190080, 4278190080, 4278190080, 4278190080,
             4278190080, 4278190080, 4278190080, 4278190080, 4278190080, 4278190080, 4278190080,
@@ -249,7 +249,7 @@ pub(super) static CASES: &[Case] = &[
         native_palette: include_bytes!(
             "../native-nonmodifying-fixtures/dvb8-literal-flag1.native-rgba"
         ),
-        native_words: &[
+        receiver_words: &[
             34816, 4294967295, 4294967295, 4278190080, 4278190080, 4278190080, 4278190080,
             4278190080, 4278190080, 4278190080, 4278190080, 4278190080, 4278190080, 4278190080,
             4278190080, 4278190080, 4278190080, 4278190080, 4278190080, 4278190080, 4278190080,
@@ -307,7 +307,7 @@ pub(super) static CASES: &[Case] = &[
         native_palette: include_bytes!(
             "../native-nonmodifying-fixtures/dvb8-run-flag0.native-rgba"
         ),
-        native_words: &[
+        receiver_words: &[
             34816, 4294967295, 4294967295, 4278190080, 4278190080, 4278190080, 4278190080,
             4278190080, 4278190080, 4278190080, 4278190080, 4278190080, 4278190080, 4278190080,
             4278190080, 4278190080, 4278190080, 4278190080, 4278190080, 4278190080, 4278190080,
@@ -365,7 +365,7 @@ pub(super) static CASES: &[Case] = &[
         native_palette: include_bytes!(
             "../native-nonmodifying-fixtures/dvb8-run-flag1.native-rgba"
         ),
-        native_words: &[
+        receiver_words: &[
             34816, 4294967295, 4294967295, 4278190080, 4278190080, 4278190080, 4278190080,
             4278190080, 4278190080, 4278190080, 4278190080, 4278190080, 4278190080, 4278190080,
             4278190080, 4278190080, 4278190080, 4278190080, 4278190080, 4278190080, 4278190080,

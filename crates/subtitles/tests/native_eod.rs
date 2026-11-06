@@ -1,10 +1,14 @@
 #![forbid(unsafe_code)]
 use std::sync::atomic::AtomicBool;
 use triergon_core::{Budget, Bytes, Error, Time, WorkBudget};
+use triergon_subtitles::compat::dvb::PublicationReason;
 use triergon_subtitles::dvb::{
-    ClockOrigin, ClockValue, ColourSource, D32_PIN, D32_VIEW, DecodeStatus, Decoder, DisplayEvent,
-    DisplayLimits, NativeFailure, PacketIdentity, PacketTiming, PublicationReason, ReceiverView,
-    Size, SourceClock, SourceConfiguration,
+    ClockOrigin, ClockValue, ColourSource, DecodeStatus, Decoder, DisplayEvent, DisplayLimits,
+    PacketIdentity, PacketTiming, ReceiverView, Size, SourceClock, SourceConfiguration,
+};
+#[cfg(feature = "reference-trace")]
+use triergon_subtitles::reference_trace::dvb::{
+    RECEIVER_VIEW_PROFILE, REFERENCE_REVISION, ReceiverFailure,
 };
 
 struct Case {
@@ -25,7 +29,8 @@ mod cases;
 struct ResultView {
     events: Vec<DisplayEvent>,
     error: Option<Error>,
-    native_error: Option<NativeFailure>,
+    #[cfg(feature = "reference-trace")]
+    receiver_failure: Option<ReceiverFailure>,
 }
 
 fn decode(pool: &Budget, bytes: &[u8], view: ReceiverView, quantum: u64) -> ResultView {
@@ -76,7 +81,8 @@ fn decode(pool: &Budget, bytes: &[u8], view: ReceiverView, quantum: u64) -> Resu
     let mut result = ResultView {
         events: Vec::new(),
         error: None,
-        native_error: None,
+        #[cfg(feature = "reference-trace")]
+        receiver_failure: None,
     };
     let mut ended = false;
     for _ in 0..1_000_000 {
@@ -84,7 +90,10 @@ fn decode(pool: &Budget, bytes: &[u8], view: ReceiverView, quantum: u64) -> Resu
             Ok(p) => p,
             Err(e) => {
                 result.error = Some(e);
-                result.native_error = decoder.native_failure();
+                #[cfg(feature = "reference-trace")]
+                {
+                    result.receiver_failure = decoder.receiver_failure();
+                }
                 return result;
             }
         };
@@ -107,16 +116,19 @@ fn check(index: usize) {
     for quantum in [1, 7, 4096] {
         let pool = Budget::new(4 << 20).unwrap();
         let baseline = pool.used();
-        let observed = decode(&pool, case.payload, ReceiverView::NativeD32, quantum);
+        let observed = decode(&pool, case.payload, ReceiverView::Receiver, quantum);
         assert_eq!(observed.error, None, "{} quantum={quantum}", case.id);
         assert_eq!(observed.events.len(), 1);
-        assert!(observed.native_error.is_none());
+        #[cfg(feature = "reference-trace")]
+        assert!(observed.receiver_failure.is_none());
         let event = &observed.events[0];
-        assert_eq!(event.receiver_view, ReceiverView::NativeD32);
+        assert_eq!(event.receiver_view, ReceiverView::Receiver);
         assert_eq!(event.pts, Some(Time::new(1, 1).unwrap()));
-        let publication = event.native_publication.unwrap();
-        assert_eq!(publication.source_pin, D32_PIN);
-        assert_eq!(publication.identifier, D32_VIEW);
+        let publication = event.receiver_publication.unwrap();
+        #[cfg(feature = "reference-trace")]
+        assert_eq!(publication.reference_revision(), REFERENCE_REVISION);
+        #[cfg(feature = "reference-trace")]
+        assert_eq!(publication.view_profile(), RECEIVER_VIEW_PROFILE);
         assert_eq!(publication.consumed_prefix_bytes, case.consumed);
         assert_eq!(publication.packet_sequence, 0);
         assert_eq!(publication.reason, PublicationReason::EndOfDisplay);
@@ -155,7 +167,7 @@ fn check(index: usize) {
             case.geometry
         );
         assert_eq!(region.plane.pixels.as_ref(), case.indices);
-        let native = region.palette.native_d32.as_ref().unwrap();
+        let native = region.palette.receiver.as_ref().unwrap();
         assert!(native.all_entries_explicit);
         assert_eq!(
             native.rgba.as_ref(),
@@ -163,8 +175,10 @@ fn check(index: usize) {
             "entire native palette including unused transparent RGB"
         );
         assert_eq!(native.words.as_slice(), case.words);
-        assert_eq!(native.source_pin, D32_PIN);
-        assert_eq!(native.identifier, D32_VIEW);
+        #[cfg(feature = "reference-trace")]
+        assert_eq!(native.reference_revision(), REFERENCE_REVISION);
+        #[cfg(feature = "reference-trace")]
+        assert_eq!(native.view_profile(), RECEIVER_VIEW_PROFILE);
         assert_eq!(native.rgba.len(), case.words.len() * 4);
         // The source projection and every encoded CLUT component remain distinct.
         assert_eq!(&region.palette.rgba.as_ref()[..4], &[0, 0, 0, 0]);
@@ -216,8 +230,8 @@ fn source_profile_keeps_all_five_old_expectations_and_raw_colour() {
         );
         for event in observed.events {
             assert_eq!(event.receiver_view, ReceiverView::Source);
-            assert!(event.native_publication.is_none());
-            assert!(event.regions()[0].palette.native_d32.is_none());
+            assert!(event.receiver_publication.is_none());
+            assert!(event.regions()[0].palette.receiver.is_none());
             assert_eq!(
                 &event.regions()[0].palette.rgba.as_ref()[..4],
                 &[0, 0, 0, 0]
@@ -230,17 +244,20 @@ fn native_original106_keeps_prefix_event_then_exact_unconsumed_five_byte_error()
     for quantum in [1, 7, 4096] {
         let pool = Budget::new(4 << 20).unwrap();
         let bytes = include_bytes!("native-dvb-fixtures/input/tail106.dvb");
-        let observed = decode(&pool, bytes, ReceiverView::NativeD32, quantum);
+        let observed = decode(&pool, bytes, ReceiverView::Receiver, quantum);
         assert_eq!(observed.events.len(), 1);
         assert_eq!(observed.error, Some(Error::Truncated));
-        let publication = observed.events[0].native_publication.unwrap();
+        let publication = observed.events[0].receiver_publication.unwrap();
         assert_eq!(publication.reason, PublicationReason::CompletePrefix);
         assert_eq!(publication.consumed_prefix_bytes, 101);
-        let error = observed.native_error.unwrap();
-        assert_eq!(error.packet_offset, 101);
-        assert_eq!(error.unconsumed_bytes, 5);
-        assert_eq!(error.code, -1094995529);
-        assert_eq!(error.packet_sequence, 0);
+        #[cfg(feature = "reference-trace")]
+        {
+            let error = observed.receiver_failure.unwrap();
+            assert_eq!(error.packet_offset, 101);
+            assert_eq!(error.unconsumed_bytes, 5);
+            assert_eq!(error.code, -1094995529);
+            assert_eq!(error.packet_sequence, 0);
+        }
         assert_eq!(
             observed.events[0].source_packets()[0].payload.as_ref(),
             bytes
@@ -253,11 +270,12 @@ fn native_actual_ts101_prefix_needs_no_invented_eod_or_error() {
     for quantum in [1, 7, 4096] {
         let pool = Budget::new(4 << 20).unwrap();
         let bytes = include_bytes!("native-dvb-fixtures/input/prefix101.dvb");
-        let observed = decode(&pool, bytes, ReceiverView::NativeD32, quantum);
+        let observed = decode(&pool, bytes, ReceiverView::Receiver, quantum);
         assert_eq!(observed.error, None);
         assert_eq!(observed.events.len(), 1);
-        assert!(observed.native_error.is_none());
-        let publication = observed.events[0].native_publication.unwrap();
+        #[cfg(feature = "reference-trace")]
+        assert!(observed.receiver_failure.is_none());
+        let publication = observed.events[0].receiver_publication.unwrap();
         assert_eq!(publication.reason, PublicationReason::CompletePrefix);
         assert_eq!(publication.consumed_prefix_bytes, 101);
         assert_eq!(
@@ -276,17 +294,18 @@ fn source_tail_and_prefix_stay_truncated_without_publication() {
         let observed = decode(&pool, bytes, ReceiverView::Source, 7);
         assert_eq!(observed.error, Some(Error::Truncated));
         assert!(observed.events.is_empty());
-        assert!(observed.native_error.is_none());
+        #[cfg(feature = "reference-trace")]
+        assert!(observed.receiver_failure.is_none());
     }
 }
 #[test]
 fn native_palette_owner_alone_survives_decoder_event_and_configuration_drop() {
     let pool = Budget::new(4 << 20).unwrap();
     let baseline = pool.used();
-    let observed = decode(&pool, cases::CASES[0].payload, ReceiverView::NativeD32, 1);
+    let observed = decode(&pool, cases::CASES[0].payload, ReceiverView::Receiver, 1);
     let rgba = observed.events[0].regions()[0]
         .palette
-        .native_d32
+        .receiver
         .as_ref()
         .unwrap()
         .rgba
@@ -303,7 +322,7 @@ fn native_default_clut_adaptation_gap_remains_visible() {
     let observed = decode(
         &pool,
         include_bytes!("native-dvb-fixtures/input/default-clut2.dvb"),
-        ReceiverView::NativeD32,
+        ReceiverView::Receiver,
         7,
     );
     assert_eq!(observed.error, None);
@@ -311,7 +330,7 @@ fn native_default_clut_adaptation_gap_remains_visible() {
     assert!(
         !observed.events[0].regions()[0]
             .palette
-            .native_d32
+            .receiver
             .as_ref()
             .unwrap()
             .all_entries_explicit
@@ -327,12 +346,15 @@ fn native_canvas_uses_first_definition_or_complete_packet_default() {
     let without = decode(
         &pool,
         &original[definition_end..],
-        ReceiverView::NativeD32,
+        ReceiverView::Receiver,
         1,
     );
     assert_eq!(without.error, None);
     assert_eq!(
-        without.events[0].native_publication.unwrap().context_canvas,
+        without.events[0]
+            .receiver_publication
+            .unwrap()
+            .context_canvas,
         Some(Size {
             width: 720,
             height: 576
@@ -345,7 +367,7 @@ fn native_canvas_uses_first_definition_or_complete_packet_default() {
     let mut packet = original[..definition_end].to_vec();
     packet.extend_from_slice(&changed);
     packet.extend_from_slice(&original[definition_end..]);
-    let later = decode(&pool, &packet, ReceiverView::NativeD32, 7);
+    let later = decode(&pool, &packet, ReceiverView::Receiver, 7);
     assert_eq!(later.error, None);
     assert_eq!(
         later.events[0].definition.size,
@@ -355,7 +377,7 @@ fn native_canvas_uses_first_definition_or_complete_packet_default() {
         }
     );
     assert_eq!(
-        later.events[0].native_publication.unwrap().context_canvas,
+        later.events[0].receiver_publication.unwrap().context_canvas,
         Some(Size {
             width: cases::CASES[0].canvas[0],
             height: cases::CASES[0].canvas[1]

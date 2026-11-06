@@ -1,9 +1,9 @@
 use std::sync::atomic::{AtomicBool, Ordering};
 use triergon_core::{Budget, Bytes, Error, WorkBudget};
+use triergon_subtitles::compat::dvd::{CropJob, CropMode, CropSelection};
 use triergon_subtitles::dvd::{
     DvdArea, DvdBitmap, DvdRasterJob, DvdRasterLimits, DvdRasterStatus, FieldOffsets,
-    NativeCropMode, NativeProjectionJob, NativeSelection, ProjectedBitmap, ProjectionLimits,
-    ProjectionStatus,
+    ProjectedBitmap, ProjectionLimits, ProjectionStatus,
 };
 
 // Authored ARGB words, including nonzero RGB under zero alpha. These tests
@@ -29,7 +29,7 @@ fn image(budget: &Budget, width: u16, height: u16, pixels: &[u8]) -> DvdBitmap {
     .unwrap()
 }
 
-fn ready<const N: usize>(job: &mut NativeProjectionJob<N>, quantum: u64) {
+fn ready<const N: usize>(job: &mut CropJob<N>, quantum: u64) {
     let cancel = AtomicBool::new(false);
     for _ in 0..100_000 {
         let mut work = WorkBudget::new(quantum);
@@ -45,13 +45,11 @@ fn ready<const N: usize>(job: &mut NativeProjectionJob<N>, quantum: u64) {
 fn run<const N: usize>(
     source: DvdBitmap,
     palette: [u32; N],
-    mode: NativeCropMode,
+    mode: CropMode,
     budget: &Budget,
     quantum: u64,
 ) -> (ProjectedBitmap<N>, usize, usize) {
-    let mut job =
-        NativeProjectionJob::new(source, palette, mode, budget, ProjectionLimits::default())
-            .unwrap();
+    let mut job = CropJob::new(source, palette, mode, budget, ProjectionLimits::default()).unwrap();
     ready(&mut job, quantum);
     let spent = job.work_spent();
     let scanned = job.pixels_scanned();
@@ -73,13 +71,12 @@ fn transparent_leading_column_is_a_borrowed_crop_without_source_loss() {
         let source = image(&budget, 18, 2, &plane);
         let address = source.pixels().as_ptr();
         let charge = budget.used();
-        let (result, spent, scanned) =
-            run(source, PALETTE, NativeCropMode::Ordinary, &budget, quantum);
+        let (result, spent, scanned) = run(source, PALETTE, CropMode::Ordinary, &budget, quantum);
         assert_eq!((spent, scanned), (37, 36));
         assert_eq!(result.source().pixels().as_ref(), plane.as_slice());
         assert_eq!(result.source().pixels().as_ptr(), address);
         assert_eq!(budget.used(), charge);
-        let view = result.native_view().unwrap();
+        let view = result.cropped_view().unwrap();
         assert_eq!(
             (view.crop().area, view.crop().width, view.crop().height),
             (
@@ -113,12 +110,12 @@ fn all_four_borders_crop_but_transparent_interior_pixels_remain() {
     let (result, spent, _) = run(
         image(&budget, 5, 4, &plane),
         PALETTE,
-        NativeCropMode::Ordinary,
+        CropMode::Ordinary,
         &budget,
         1,
     );
     assert_eq!(spent, 21);
-    let view = result.native_view().unwrap();
+    let view = result.cropped_view().unwrap();
     assert_eq!(
         view.crop().area,
         DvdArea {
@@ -141,11 +138,11 @@ fn any_nonzero_alpha_keeps_the_pixel_regardless_of_rgb() {
     let (result, _, _) = run(
         image(&budget, 3, 3, &[0, 0, 0, 0, 2, 0, 0, 0, 0]),
         PALETTE,
-        NativeCropMode::Ordinary,
+        CropMode::Ordinary,
         &budget,
         1,
     );
-    let view = result.native_view().unwrap();
+    let view = result.cropped_view().unwrap();
     assert_eq!((view.crop().width, view.crop().height), (1, 1));
     assert_eq!(
         view.crop().area,
@@ -157,7 +154,7 @@ fn any_nonzero_alpha_keeps_the_pixel_regardless_of_rgb() {
         }
     );
     assert_eq!(view.argb_at(0, 0).unwrap(), PALETTE[2]);
-    assert_eq!(result.selection(), NativeSelection::Rendered);
+    assert_eq!(result.selection(), CropSelection::Rendered);
 }
 
 #[test]
@@ -167,16 +164,16 @@ fn fully_transparent_ordinary_omission_retains_the_entire_source() {
     let (result, spent, scanned) = run(
         image(&budget, 3, 2, &plane),
         PALETTE,
-        NativeCropMode::Ordinary,
+        CropMode::Ordinary,
         &budget,
         2,
     );
     assert_eq!((spent, scanned), (7, 6));
     assert_eq!(
         result.selection(),
-        NativeSelection::ReceiverTransparentOmission
+        CropSelection::ReceiverTransparentOmission
     );
-    assert!(result.native_view().is_none());
+    assert!(result.cropped_view().is_none());
     assert_eq!(result.source().pixels().as_ref(), plane);
     assert_eq!(result.palette(), &PALETTE);
 }
@@ -187,11 +184,8 @@ fn uniform_alpha_charges_all_pixels_of_a_validated_raster() {
     let cancel = AtomicBool::new(false);
     let raw = [0, 11, 0, 6, 0x11, 0x12, 0, 0, 0, 6, 0xff];
     for (palette, expected) in [
-        ([0xff12_3456; 4], NativeSelection::Rendered),
-        (
-            [0x0012_3456; 4],
-            NativeSelection::ReceiverTransparentOmission,
-        ),
+        ([0xff12_3456; 4], CropSelection::Rendered),
+        ([0x0012_3456; 4], CropSelection::ReceiverTransparentOmission),
     ] {
         let mut raster = DvdRasterJob::new(
             Bytes::copy_from_slice(&budget, &raw).unwrap(),
@@ -205,10 +199,10 @@ fn uniform_alpha_charges_all_pixels_of_a_validated_raster() {
             raster.poll(&mut WorkBudget::new(128), &cancel).unwrap(),
             DvdRasterStatus::Ready
         );
-        let mut job = NativeProjectionJob::new(
+        let mut job = CropJob::new(
             raster.try_finish(&cancel).unwrap(),
             palette,
-            NativeCropMode::Ordinary,
+            CropMode::Ordinary,
             &budget,
             ProjectionLimits::default(),
         )
@@ -223,7 +217,7 @@ fn uniform_alpha_charges_all_pixels_of_a_validated_raster() {
         let out = job.try_finish(&cancel).unwrap();
         assert_eq!(out.selection(), expected);
         assert_eq!(out.source().pixels().as_ref(), &[1, 1, 1, 1, 2, 2, 2, 2]);
-        if let Some(view) = out.native_view() {
+        if let Some(view) = out.cropped_view() {
             assert_eq!(view.crop().area, area(4, 2));
         }
     }
@@ -237,28 +231,28 @@ fn menu_bypasses_cropping_and_keeps_transparent_rgb() {
     let (result, spent, scanned) = run(
         image(&budget, 3, 2, &plane),
         PALETTE,
-        NativeCropMode::Menu,
+        CropMode::Menu,
         &budget,
         1,
     );
     // Supplied indices need validation even though menu selection needs no crop.
     assert_eq!((spent, scanned), (7, 6));
-    let view = result.native_view().unwrap();
+    let view = result.cropped_view().unwrap();
     assert_eq!(view.crop().area, area(3, 2));
     assert_eq!(view.argb_at(0, 0).unwrap(), PALETTE[0]);
     assert_eq!(view.argb_at(1, 0).unwrap(), PALETTE[3]);
-    assert_eq!(result.selection(), NativeSelection::Rendered);
+    assert_eq!(result.selection(), CropSelection::Rendered);
 }
 
 #[test]
 fn receiver_one_row_omission_does_not_reject_or_erase_source_pixels() {
-    for mode in [NativeCropMode::Ordinary, NativeCropMode::Menu] {
+    for mode in [CropMode::Ordinary, CropMode::Menu] {
         let budget = Budget::new(4096).unwrap();
         let plane = [1, 2, 1];
         let (result, spent, scanned) = run(image(&budget, 3, 1, &plane), PALETTE, mode, &budget, 1);
         assert_eq!((spent, scanned), (4, 3));
-        assert_eq!(result.selection(), NativeSelection::ReceiverOneRowOmission);
-        assert!(result.native_view().is_none());
+        assert_eq!(result.selection(), CropSelection::ReceiverOneRowOmission);
+        assert!(result.cropped_view().is_none());
         assert_eq!(result.source().pixels().as_ref(), plane);
     }
 }
@@ -273,12 +267,12 @@ fn full_byte_palette_validates_all_indices_without_narrowing() {
     let (result, spent, scanned) = run(
         image(&budget, 3, 2, &plane),
         palette,
-        NativeCropMode::Ordinary,
+        CropMode::Ordinary,
         &budget,
         1,
     );
     assert_eq!((spent, scanned), (7, 6));
-    let view = result.native_view().unwrap();
+    let view = result.cropped_view().unwrap();
     assert_eq!(
         view.crop().area,
         DvdArea {
@@ -301,11 +295,11 @@ fn a_complete_byte_palette_menu_needs_only_setup_work() {
     let plane = [0, 255, 0, 255, 0, 255];
     let source = image(&budget, 3, 2, &plane);
     let charge = budget.used();
-    let (result, spent, scanned) = run(source, palette, NativeCropMode::Menu, &budget, 1);
+    let (result, spent, scanned) = run(source, palette, CropMode::Menu, &budget, 1);
     assert_eq!((spent, scanned), (1, 0));
     assert_eq!(budget.used(), charge);
     assert_eq!(
-        result.native_view().unwrap().indices_row(0).unwrap(),
+        result.cropped_view().unwrap().indices_row(0).unwrap(),
         &[0, 255, 0]
     );
 }
@@ -313,10 +307,10 @@ fn a_complete_byte_palette_menu_needs_only_setup_work() {
 #[test]
 fn out_of_range_index_is_rejected_even_for_menu_or_one_row() {
     for (mode, height) in [
-        (NativeCropMode::Ordinary, 2),
-        (NativeCropMode::Menu, 2),
-        (NativeCropMode::Ordinary, 1),
-        (NativeCropMode::Menu, 1),
+        (CropMode::Ordinary, 2),
+        (CropMode::Menu, 2),
+        (CropMode::Ordinary, 1),
+        (CropMode::Menu, 1),
     ] {
         let budget = Budget::new(4096).unwrap();
         let cancel = AtomicBool::new(false);
@@ -325,7 +319,7 @@ fn out_of_range_index_is_rejected_even_for_menu_or_one_row() {
         } else {
             &[1, 2, 3, 255][..]
         };
-        let mut job = NativeProjectionJob::new(
+        let mut job = CropJob::new(
             image(&budget, 2, height, pixels),
             PALETTE,
             mode,
@@ -357,10 +351,10 @@ fn actual_two_bit_raster_menu_uses_its_proven_index_range() {
     while raster.poll(&mut WorkBudget::new(1), &cancel).unwrap() != DvdRasterStatus::Ready {}
     let source = raster.try_finish(&cancel).unwrap();
     assert_eq!(source.pixels().as_ref(), &[0, 1, 2, 3, 3, 2, 1, 0]);
-    let (result, spent, scanned) = run(source, PALETTE, NativeCropMode::Menu, &budget, 1);
+    let (result, spent, scanned) = run(source, PALETTE, CropMode::Menu, &budget, 1);
     assert_eq!((spent, scanned), (1, 0));
     assert_eq!(
-        result.native_view().unwrap().indices_row(1).unwrap(),
+        result.cropped_view().unwrap().indices_row(1).unwrap(),
         &[3, 2, 1, 0]
     );
 }
@@ -369,10 +363,10 @@ fn actual_two_bit_raster_menu_uses_its_proven_index_range() {
 fn zero_work_does_not_scan_allocate_or_change_storage() {
     let budget = Budget::new(4096).unwrap();
     let cancel = AtomicBool::new(false);
-    let mut job = NativeProjectionJob::new(
+    let mut job = CropJob::new(
         image(&budget, 2, 2, &[1, 2, 3, 0]),
         PALETTE,
-        NativeCropMode::Ordinary,
+        CropMode::Ordinary,
         &budget,
         ProjectionLimits::default(),
     )
@@ -411,10 +405,10 @@ fn work_limit_is_exact_sticky_and_releases_private_storage() {
         max_work: 4,
         ..ProjectionLimits::default()
     };
-    let mut job = NativeProjectionJob::new(
+    let mut job = CropJob::new(
         image(&budget, 2, 2, &[1, 2, 3, 0]),
         PALETTE,
-        NativeCropMode::Ordinary,
+        CropMode::Ordinary,
         &budget,
         limits,
     )
@@ -433,10 +427,10 @@ fn work_limit_is_exact_sticky_and_releases_private_storage() {
         error
     );
     assert_eq!(budget.used(), Budget::control_storage_bytes());
-    let mut exact = NativeProjectionJob::new(
+    let mut exact = CropJob::new(
         image(&budget, 2, 2, &[1, 2, 3, 0]),
         PALETTE,
-        NativeCropMode::Ordinary,
+        CropMode::Ordinary,
         &budget,
         ProjectionLimits {
             max_work: 5,
@@ -446,7 +440,7 @@ fn work_limit_is_exact_sticky_and_releases_private_storage() {
     .unwrap();
     ready(&mut exact, 1);
     assert_eq!(exact.work_spent(), 5);
-    assert!(exact.try_finish(&cancel).unwrap().native_view().is_some());
+    assert!(exact.try_finish(&cancel).unwrap().cropped_view().is_some());
 }
 
 #[test]
@@ -454,10 +448,10 @@ fn cancellation_before_during_and_after_ready_is_sticky() {
     for stage in 0..3 {
         let budget = Budget::new(4096).unwrap();
         let cancel = AtomicBool::new(false);
-        let mut job = NativeProjectionJob::new(
+        let mut job = CropJob::new(
             image(&budget, 2, 2, &[1, 2, 3, 0]),
             PALETTE,
-            NativeCropMode::Ordinary,
+            CropMode::Ordinary,
             &budget,
             ProjectionLimits::default(),
         )
@@ -486,10 +480,10 @@ fn returned_source_and_borrowed_rows_outlive_the_job_without_extra_charge() {
     let source = image(&budget, 2, 2, &[0, 1, 0, 2]);
     let charge = budget.used();
     let retained = source.pixels().clone();
-    let mut job = NativeProjectionJob::new(
+    let mut job = CropJob::new(
         source,
         PALETTE,
-        NativeCropMode::Ordinary,
+        CropMode::Ordinary,
         &budget,
         ProjectionLimits::default(),
     )
@@ -498,7 +492,7 @@ fn returned_source_and_borrowed_rows_outlive_the_job_without_extra_charge() {
     let result = job.try_finish(&cancel).unwrap();
     drop(job);
     assert_eq!(budget.used(), charge);
-    assert_eq!(result.native_view().unwrap().indices_row(1).unwrap(), &[2]);
+    assert_eq!(result.cropped_view().unwrap().indices_row(1).unwrap(), &[2]);
     drop(result);
     assert_eq!(budget.used(), charge);
     assert_eq!(retained.as_ref(), &[0, 1, 0, 2]);
@@ -556,10 +550,10 @@ fn supplied_geometry_length_pool_and_pixel_ceiling_are_checked() {
         Error::Invalid("DVD reversed or overflowing display area")
     );
     assert_eq!(
-        NativeProjectionJob::new(
+        CropJob::new(
             image(&budget, 2, 2, &[0; 4]),
             PALETTE,
-            NativeCropMode::Menu,
+            CropMode::Menu,
             &other,
             ProjectionLimits::default()
         )
@@ -567,10 +561,10 @@ fn supplied_geometry_length_pool_and_pixel_ceiling_are_checked() {
         Error::ForeignPool
     );
     assert_eq!(
-        NativeProjectionJob::new(
+        CropJob::new(
             image(&budget, 2, 2, &[0; 4]),
             PALETTE,
-            NativeCropMode::Menu,
+            CropMode::Menu,
             &budget,
             ProjectionLimits {
                 max_pixels: 3,
@@ -584,10 +578,10 @@ fn supplied_geometry_length_pool_and_pixel_ceiling_are_checked() {
         }
     );
     assert_eq!(
-        NativeProjectionJob::new(
+        CropJob::new(
             image(&budget, 2, 2, &[0; 4]),
             [0; 16],
-            NativeCropMode::Menu,
+            CropMode::Menu,
             &budget,
             ProjectionLimits::default()
         )
@@ -597,10 +591,10 @@ fn supplied_geometry_length_pool_and_pixel_ceiling_are_checked() {
     let mut changed = image(&budget, 2, 2, &[0; 4]);
     changed.width = 1;
     assert_eq!(
-        NativeProjectionJob::new(
+        CropJob::new(
             changed,
             PALETTE,
-            NativeCropMode::Menu,
+            CropMode::Menu,
             &budget,
             ProjectionLimits::default()
         )
@@ -615,11 +609,11 @@ fn native_view_bounds_are_explicit_and_do_not_change_the_projection() {
     let (result, _, _) = run(
         image(&budget, 2, 2, &[0, 1, 0, 2]),
         PALETTE,
-        NativeCropMode::Ordinary,
+        CropMode::Ordinary,
         &budget,
         1,
     );
-    let view = result.native_view().unwrap();
+    let view = result.cropped_view().unwrap();
     assert_eq!(
         view.indices_row(2).unwrap_err(),
         Error::Invalid("DVD native row index")
@@ -640,10 +634,10 @@ fn native_view_bounds_are_explicit_and_do_not_change_the_projection() {
 fn ready_poll_is_free_but_finish_and_post_finish_are_single_use() {
     let budget = Budget::new(4096).unwrap();
     let cancel = AtomicBool::new(false);
-    let mut job = NativeProjectionJob::new(
+    let mut job = CropJob::new(
         image(&budget, 2, 2, &[1; 4]),
         PALETTE,
-        NativeCropMode::Ordinary,
+        CropMode::Ordinary,
         &budget,
         ProjectionLimits::default(),
     )
@@ -665,7 +659,7 @@ fn ready_poll_is_free_but_finish_and_post_finish_are_single_use() {
         error
     );
     assert_eq!(
-        result.native_view().unwrap().argb_at(0, 0).unwrap(),
+        result.cropped_view().unwrap().argb_at(0, 0).unwrap(),
         PALETTE[1]
     );
 }
@@ -674,10 +668,10 @@ fn ready_poll_is_free_but_finish_and_post_finish_are_single_use() {
 fn premature_finish_is_sticky_and_releases_the_unpublished_plane() {
     let budget = Budget::new(4096).unwrap();
     let cancel = AtomicBool::new(false);
-    let mut job = NativeProjectionJob::new(
+    let mut job = CropJob::new(
         image(&budget, 2, 2, &[1; 4]),
         PALETTE,
-        NativeCropMode::Ordinary,
+        CropMode::Ordinary,
         &budget,
         ProjectionLimits::default(),
     )

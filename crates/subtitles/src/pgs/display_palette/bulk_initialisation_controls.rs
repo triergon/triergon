@@ -30,7 +30,7 @@ fn job(
             packet_offset: 13,
             envelope: Envelope::Packet,
         },
-        NativeMatrix::for_canvas(if sequence == 0 { 480 } else { 1080 }),
+        ColourMatrix::for_canvas(if sequence == 0 { 480 } else { 1080 }),
         previous,
         preserve,
     )
@@ -90,12 +90,12 @@ fn fresh_and_source_palettes_keep_exact_work_for_small_and_large_quanta() {
         let baseline = budget.used();
         let (empty, empty_work) = finish(job(&budget, &[], None, false, 0), 0, quantum);
         assert_eq!(empty_work, 4 + 256 + 1);
-        assert_eq!(empty.native_words(), &[0; 256]);
+        assert_eq!(empty.receiver_words(), &[0; 256]);
         for index in 0..=255 {
             assert_eq!(empty.source(index), None);
             assert_eq!(
-                empty.native_origin(index),
-                NativeColourOrigin::ReceiverZeroInitialization
+                empty.receiver_origin(index),
+                ColourOrigin::ReceiverZeroInitialization
             );
         }
         drop(empty);
@@ -106,7 +106,7 @@ fn fresh_and_source_palettes_keep_exact_work_for_small_and_large_quanta() {
         );
         assert_eq!(source_work, 4 + 256 + 8 + 1);
         assert_eq!(source.source(7).unwrap().palette_version, 0);
-        assert_eq!(source.native_origin(7), NativeColourOrigin::ExplicitSource);
+        assert_eq!(source.receiver_origin(7), ColourOrigin::ExplicitSource);
         drop(source);
         assert_eq!(budget.used(), baseline);
     }
@@ -276,22 +276,20 @@ fn partial_and_epoch_carries_keep_all_literal_source_and_receiver_facts() {
                 quantum,
             );
             assert_eq!(work, 4 + 256 + 2);
-            assert_eq!(copy.native_words(), held.native_words());
+            assert_eq!(copy.receiver_words(), held.receiver_words());
             for index in 0..=255 {
                 assert_eq!(
                     copy.source(index),
                     if preserve { held.source(index) } else { None }
                 );
                 let expected = if preserve {
-                    held.native_origin(index)
-                } else if held.native_origin(index)
-                    == NativeColourOrigin::ReceiverZeroInitialization
-                {
-                    NativeColourOrigin::ReceiverZeroInitialization
+                    held.receiver_origin(index)
+                } else if held.receiver_origin(index) == ColourOrigin::ReceiverZeroInitialization {
+                    ColourOrigin::ReceiverZeroInitialization
                 } else {
-                    NativeColourOrigin::PreviousEpochSlot
+                    ColourOrigin::PreviousEpochSlot
                 };
-                assert_eq!(copy.native_origin(index), expected);
+                assert_eq!(copy.receiver_origin(index), expected);
             }
         }
     }

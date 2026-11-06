@@ -315,8 +315,8 @@ fn full_palette_and_empty_version_carry_preserve_all_source_components() {
         for i in 0..=255u8 {
             assert_eq!(next.source(i), held.source(i));
             assert_eq!(next.source(i).unwrap().palette_version, 7);
-            assert_eq!(next.native_argb(i), held.native_argb(i));
-            assert_eq!(next.native_origin(i), NativeColourOrigin::ExplicitSource);
+            assert_eq!(next.receiver_argb(i), held.receiver_argb(i));
+            assert_eq!(next.receiver_origin(i), ColourOrigin::ExplicitSource);
         }
         drop(fresh);
         drop(out);

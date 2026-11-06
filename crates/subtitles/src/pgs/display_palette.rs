@@ -1,5 +1,5 @@
 use super::display_model::{
-    ColourProvenance, NativeColourOrigin, NativeMatrix, PaletteProvenanceOwner, PaletteSnapshot,
+    ColourMatrix, ColourOrigin, ColourProvenance, PaletteProvenanceOwner, PaletteSnapshot,
     PaletteStorage, SegmentStamp, StoredSourceColour,
 };
 use super::display_work::DisplayWork;
@@ -38,12 +38,12 @@ pub(crate) struct PaletteBuild {
     version: u8,
     epoch: u64,
     stamp: SegmentStamp,
-    matrix: NativeMatrix,
+    matrix: ColourMatrix,
     previous: Option<PaletteSnapshot>,
     preserve_source: bool,
     colours: BudgetVec<StoredSourceColour>,
     words: BudgetVec<u32>,
-    origins: BudgetVec<NativeColourOrigin>,
+    origins: BudgetVec<ColourOrigin>,
     has_source: bool,
     first_owner: Option<PaletteProvenanceOwner>,
     other_owners: BudgetVec<Option<PaletteProvenanceOwner>>,
@@ -62,7 +62,7 @@ impl PaletteBuild {
         payload: Bytes,
         epoch: u64,
         stamp: SegmentStamp,
-        matrix: NativeMatrix,
+        matrix: ColourMatrix,
         previous: Option<PaletteSnapshot>,
         preserve_source: bool,
     ) -> Result<Self> {
@@ -193,11 +193,11 @@ impl PaletteBuild {
                             self.origins
                                 .try_extend_from_slice(&p.0.origins.as_slice()[..256])?;
                         } else {
-                            let mut origins = [NativeColourOrigin::ReceiverZeroInitialization; 256];
+                            let mut origins = [ColourOrigin::ReceiverZeroInitialization; 256];
                             for (new, old) in origins.iter_mut().zip(&p.0.origins.as_slice()[..256])
                             {
-                                if *old != NativeColourOrigin::ReceiverZeroInitialization {
-                                    *new = NativeColourOrigin::PreviousEpochSlot;
+                                if *old != ColourOrigin::ReceiverZeroInitialization {
+                                    *new = ColourOrigin::PreviousEpochSlot;
                                 }
                             }
                             self.origins.try_extend_from_slice(&origins)?;
@@ -205,7 +205,7 @@ impl PaletteBuild {
                     } else {
                         self.words.try_resize(256, 0)?;
                         self.origins
-                            .try_resize(256, NativeColourOrigin::ReceiverZeroInitialization)?;
+                            .try_resize(256, ColourOrigin::ReceiverZeroInitialization)?;
                     }
                     // The same funded cell range carries each live provenance
                     // owner once. Colour cells themselves contain no Arc/drop.
@@ -333,7 +333,7 @@ impl PaletteBuild {
                         provenance: self.incoming_owner,
                     };
                     self.words.as_mut_slice()[index] = self.matrix.argb(b[1], b[2], b[3], b[4]);
-                    self.origins.as_mut_slice()[index] = NativeColourOrigin::ExplicitSource;
+                    self.origins.as_mut_slice()[index] = ColourOrigin::ExplicitSource;
                     self.entry += 1;
                     self.credit = 0;
                 }
@@ -442,7 +442,7 @@ mod storage_tests {
             Bytes::copy_from_slice(budget, &payload(version, entries)).unwrap(),
             sequence + 7,
             stamp(sequence),
-            NativeMatrix::for_canvas(if sequence == 0 { 480 } else { 1080 }),
+            ColourMatrix::for_canvas(if sequence == 0 { 480 } else { 1080 }),
             previous,
             preserve,
         )
@@ -493,11 +493,11 @@ mod storage_tests {
                 (source.palette_version, source.epoch, source.stamp),
                 (9, 7, stamp(0))
             );
-            assert_eq!(source.receiver_matrix, NativeMatrix::for_canvas(480));
+            assert_eq!(source.receiver_matrix, ColourMatrix::for_canvas(480));
             assert_eq!(p.source(0), None);
             assert_eq!(
-                p.native_origin(0),
-                NativeColourOrigin::ReceiverZeroInitialization
+                p.receiver_origin(0),
+                ColourOrigin::ReceiverZeroInitialization
             );
             drop(p);
             assert_eq!(budget.used(), baseline);
@@ -527,7 +527,7 @@ mod storage_tests {
             1,
         );
         assert_eq!(b.source(8), old);
-        assert_eq!(b.native_argb(8), a.native_argb(8));
+        assert_eq!(b.receiver_argb(8), a.receiver_argb(8));
         assert!(Arc::ptr_eq(
             a.0.source_provenance(8).unwrap(),
             b.0.source_provenance(8).unwrap(),
@@ -535,7 +535,7 @@ mod storage_tests {
         assert_eq!(b.source(7).unwrap().stamp, stamp(11));
         assert_eq!(
             b.source(7).unwrap().receiver_matrix,
-            NativeMatrix::for_canvas(1080)
+            ColourMatrix::for_canvas(1080)
         );
         assert_eq!(a.source(7).unwrap().stamp, stamp(0));
         let mut copy = b.source(8).unwrap();
@@ -549,11 +549,11 @@ mod storage_tests {
         let a = build(&budget, 4, 0, &[[7, 16, 128, 128, 255]], None, false, 1);
         let b = build(&budget, 5, 1, &[], Some(a.clone()), false, 1);
         assert_eq!(b.source(7), None);
-        assert_eq!(b.native_argb(7), a.native_argb(7));
-        assert_eq!(b.native_origin(7), NativeColourOrigin::PreviousEpochSlot);
+        assert_eq!(b.receiver_argb(7), a.receiver_argb(7));
+        assert_eq!(b.receiver_origin(7), ColourOrigin::PreviousEpochSlot);
         assert_eq!(
-            b.native_origin(8),
-            NativeColourOrigin::ReceiverZeroInitialization
+            b.receiver_origin(8),
+            ColourOrigin::ReceiverZeroInitialization
         );
     }
 
@@ -589,7 +589,7 @@ mod storage_tests {
             Bytes::copy_from_slice(&budget, &payload(1, &[[7, 16, 128, 128, 255]])).unwrap(),
             1,
             stamp(0),
-            NativeMatrix::for_canvas(480),
+            ColourMatrix::for_canvas(480),
             None,
             false,
         )
@@ -630,7 +630,7 @@ mod storage_tests {
             Bytes::copy_from_slice(&budget, &payload(1, &[[7, 16, 128, 128, 255]])).unwrap(),
             1,
             stamp(0),
-            NativeMatrix::for_canvas(480),
+            ColourMatrix::for_canvas(480),
             None,
             false,
         )

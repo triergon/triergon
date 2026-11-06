@@ -191,7 +191,7 @@ fn missing_colour_stays_unknown_beside_a_real_decoded_source_plane() {
     assert!(o.source_error().is_none());
     let p = o.picture().unwrap();
     assert!(p.ycrcb().is_none());
-    assert!(p.native_palette_job().is_err());
+    assert!(p.receiver_palette_job().is_err());
     assert_eq!(p.bitmap().pixels().len(), 36);
 }
 #[test]
@@ -293,7 +293,7 @@ fn later_eligible_raster_and_palette_snapshot_remain_distinct_from_later_metadat
         let o = j.try_finish(&c).unwrap();
         let p = o.picture().unwrap();
         assert_eq!(p.bitmap().pixels().as_ref(), [index; 8]);
-        let mut palette = p.native_palette_job().unwrap();
+        let mut palette = p.receiver_palette_job().unwrap();
         while palette.poll(&mut WorkBudget::new(1), &c).unwrap()
             != triergon_subtitles::dvd::HdStatus::Ready
         {}

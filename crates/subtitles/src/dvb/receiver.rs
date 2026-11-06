@@ -1,19 +1,25 @@
-//! Original versioned receiver facts, independent of the source-only view.
+//! Receiver view of a DVB display set, kept apart from the source facts.
 use triergon_core::{BudgetVec, Bytes, Rounding, Time, TimeBase};
 
-pub const D32_PIN: &str = "d32b387f2b0a484599d4587d651891f0c63c4238";
-pub const D32_VIEW: &str = "d32-default-explicit-CLUT-DVB-receiver-v1";
+/// Comparison label of the receiver view; see [`crate::reference_trace::dvb`].
+#[cfg(feature = "reference-trace")]
+pub const RECEIVER_VIEW_PROFILE: &str = "d32-default-explicit-CLUT-DVB-receiver-v1";
+/// The FFmpeg revision the receiver view reproduces.
+#[cfg(feature = "reference-trace")]
+pub const REFERENCE_REVISION: &str = "d32b387f2b0a484599d4587d651891f0c63c4238";
 
+/// Which view a [`Decoder`](super::Decoder) publishes. `Source` is the default;
+/// `Receiver` adds the [`compat::dvb`](crate::compat::dvb) presentation.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum ReceiverView {
     Source,
-    NativeD32,
+    Receiver,
 }
 
 /// Source validation stays the default. Omission is only an explicit native
 /// projection of a region with no raster, never geometry repair or clipping.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum NativeGeometryPolicy {
+pub enum GeometryPolicy {
     ValidateSource,
     OmitUnrendered,
 }
@@ -21,7 +27,7 @@ pub enum NativeGeometryPolicy {
 /// Native emits no rectangle. The original source geometry and any strict
 /// validation error are retained rather than relabelled as a conforming region.
 #[derive(Debug)]
-pub struct NativeOmittedRegion {
+pub struct OmittedRegion {
     pub id: u8,
     pub source_address: super::Point,
     pub source_size: super::Size,
@@ -30,14 +36,25 @@ pub struct NativeOmittedRegion {
 }
 
 #[derive(Debug)]
-pub struct NativePalette {
-    pub identifier: &'static str,
-    pub source_pin: &'static str,
+pub struct Palette {
     pub rgba: Bytes,
     pub words: BudgetVec<u32>,
     /// Source provenance only. Native defaults/automatic colours are a separate
     /// constructed view; this flag never certifies general native equality.
     pub all_entries_explicit: bool,
+}
+
+/// Comparison labels. Every receiver palette carries the same two values.
+#[cfg(feature = "reference-trace")]
+impl Palette {
+    /// The receiver view's profile label, [`RECEIVER_VIEW_PROFILE`].
+    pub fn view_profile(&self) -> &'static str {
+        RECEIVER_VIEW_PROFILE
+    }
+    /// The reproduced FFmpeg revision, [`REFERENCE_REVISION`].
+    pub fn reference_revision(&self) -> &'static str {
+        REFERENCE_REVISION
+    }
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -47,9 +64,7 @@ pub enum PublicationReason {
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub struct NativePublication {
-    pub identifier: &'static str,
-    pub source_pin: &'static str,
+pub struct Publication {
     pub packet_sequence: u64,
     /// Relative to the codec packet when a native PES projection is attached
     /// to the event, or to the declared decoder input otherwise.
@@ -66,8 +81,25 @@ pub struct NativePublication {
     pub end_display_ms: u32,
 }
 
+/// Comparison labels. Every publication carries the same two values.
+#[cfg(feature = "reference-trace")]
+impl Publication {
+    /// The receiver view's profile label, [`RECEIVER_VIEW_PROFILE`].
+    pub fn view_profile(&self) -> &'static str {
+        RECEIVER_VIEW_PROFILE
+    }
+    /// The reproduced FFmpeg revision, [`REFERENCE_REVISION`].
+    pub fn reference_revision(&self) -> &'static str {
+        REFERENCE_REVISION
+    }
+}
+
+/// The receiver's refusal of a packet whose remaining bytes are too few for a
+/// segment header: the packet, the offset and length of the unread tail, and
+/// FFmpeg's `AVERROR_INVALIDDATA`.
+#[cfg(feature = "reference-trace")]
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub struct NativeFailure {
+pub struct ReceiverFailure {
     pub packet_sequence: u64,
     pub packet_offset: usize,
     pub code: i32,

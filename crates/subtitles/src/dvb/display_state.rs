@@ -92,7 +92,7 @@ pub(crate) struct State {
     pub limits: DisplayLimits,
     pub object_retention: ObjectRetention,
     pub receiver_view: super::ReceiverView,
-    pub native_geometry_policy: super::NativeGeometryPolicy,
+    pub geometry_policy: super::GeometryPolicy,
     pub definition: DisplayDefinition,
     pub native_canvas: Option<Size>,
     pub regions: BudgetVec<Region>,
@@ -128,7 +128,7 @@ impl State {
             limits,
             object_retention,
             receiver_view: super::ReceiverView::Source,
-            native_geometry_policy: super::NativeGeometryPolicy::ValidateSource,
+            geometry_policy: super::GeometryPolicy::ValidateSource,
             definition: DisplayDefinition::default(),
             native_canvas: None,
             regions: BudgetVec::new(budget),
@@ -205,7 +205,7 @@ impl State {
         self.families.try_reserve_exact(1)?;
         let mut entries = BudgetVec::new(&self.budget);
         entries.try_reserve_exact(276)?;
-        let native_entries = if self.receiver_view == super::ReceiverView::NativeD32 {
+        let native_entries = if self.receiver_view == super::ReceiverView::Receiver {
             let mut values = BudgetVec::new(&self.budget);
             values.try_reserve_exact(276)?;
             Some(values)
@@ -410,7 +410,7 @@ impl Segment {
                     version: Some(flags >> 4),
                     original: Some(self.original.clone()),
                 };
-                if state.receiver_view == super::ReceiverView::NativeD32 {
+                if state.receiver_view == super::ReceiverView::Receiver {
                     state.native_canvas.get_or_insert(Size { width, height });
                 }
                 Ok(SegmentResult::Complete)

@@ -220,11 +220,11 @@ fn assert_source(events: &[DisplayEvent], case: &Case) {
 fn assert_native(events: &[DisplayEvent], case: &Case) {
     assert_source(events, case);
     for (event, frame) in events.iter().zip(&case.frames) {
-        let publication = event.native_publication.unwrap();
+        let publication = event.receiver_publication.unwrap();
         assert_eq!(publication.exact_pts_microseconds, Some(frame.pts * 1000));
         assert_eq!(publication.start_display_ms, 0);
         assert_eq!(publication.end_display_ms, 2000);
-        let native = event.regions()[0].palette.native_d32.as_ref().unwrap();
+        let native = event.regions()[0].palette.receiver.as_ref().unwrap();
         assert!(
             native.all_entries_explicit,
             "raw CDS provenance, not an equality certificate"
@@ -252,7 +252,7 @@ fn native_guard(data: &[u8]) {
     for quantum in [1, 7, 4096] {
         let pool = Budget::new(4 << 20).unwrap();
         let baseline = pool.used();
-        let (events, work) = decode(&pool, &case, ReceiverView::NativeD32, quantum, false).unwrap();
+        let (events, work) = decode(&pool, &case, ReceiverView::Receiver, quantum, false).unwrap();
         assert_native(&events, &case);
         if let Some(previous) = previous_work {
             assert_eq!(work, previous);
@@ -330,7 +330,7 @@ fn source_views_and_every_original_component_are_unchanged() {
             assert!(
                 events
                     .iter()
-                    .all(|e| e.regions()[0].palette.native_d32.is_none())
+                    .all(|e| e.regions()[0].palette.receiver.is_none())
             );
             drop(events);
             assert_eq!(pool.used(), baseline);
@@ -359,10 +359,10 @@ fn pressure_preserves_actual_work_output_and_retained_owners() {
         let pool = Budget::new(4 << 20).unwrap();
         let baseline = pool.used();
         let (plain, plain_work) =
-            decode(&pool, &case, ReceiverView::NativeD32, quantum, false).unwrap();
+            decode(&pool, &case, ReceiverView::Receiver, quantum, false).unwrap();
         assert_native(&plain, &case);
         let (pressured, work) =
-            decode(&pool, &case, ReceiverView::NativeD32, quantum, true).unwrap();
+            decode(&pool, &case, ReceiverView::Receiver, quantum, true).unwrap();
         assert_native(&pressured, &case);
         assert_eq!(plain_work, work);
         drop(plain);
@@ -387,7 +387,7 @@ fn cancellation_keeps_partial_native_ownership_bounded() {
                 &configuration,
                 17,
                 DisplayLimits::default(),
-                ReceiverView::NativeD32,
+                ReceiverView::Receiver,
                 &cancel,
             )
             .unwrap();

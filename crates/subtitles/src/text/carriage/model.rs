@@ -41,7 +41,7 @@ impl Default for Limits {
 
 #[derive(Debug)]
 pub struct SideData {
-    pub native_type: i32,
+    pub side_data_type: i32,
     pub bytes: Bytes,
 }
 
@@ -51,7 +51,7 @@ pub struct Metadata {
     pub value: Bytes,
 }
 
-/// Versioned public-API carriage view for the d32 reference. Raw source codec
+/// Public-API carriage view of the reference. Raw source codec
 /// tag/charset/addition facts remain in Snapshot.input, never guessed into these
 /// fields. The first native sample operation supplies no side-data/metadata.
 #[derive(Debug)]
@@ -94,7 +94,7 @@ pub struct Snapshot {
     pub stream: Option<Stream>,
     pub packets: BudgetVec<Packet>,
     pub progress: BudgetVec<Progress>,
-    pub native_error: Option<i32>,
+    pub error_code: Option<i32>,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]

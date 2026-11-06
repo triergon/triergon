@@ -2,9 +2,11 @@
 use std::sync::atomic::AtomicBool;
 use triergon_core::{Budget, Bytes, Error, Time, WorkBudget};
 use triergon_subtitles::dvb::{
-    ClockOrigin, ClockValue, D32_PIN, D32_VIEW, DecodeStatus, Decoder, Depth, DisplayEvent,
-    DisplayLimits, PacketIdentity, PacketTiming, ReceiverView, SourceClock, SourceConfiguration,
+    ClockOrigin, ClockValue, DecodeStatus, Decoder, Depth, DisplayEvent, DisplayLimits,
+    PacketIdentity, PacketTiming, ReceiverView, SourceClock, SourceConfiguration,
 };
+#[cfg(feature = "reference-trace")]
+use triergon_subtitles::reference_trace::dvb::{RECEIVER_VIEW_PROFILE, REFERENCE_REVISION};
 
 struct Case {
     id: &'static str,
@@ -13,7 +15,7 @@ struct Case {
     source_palette: &'static [u8],
     native_indices: &'static [u8],
     native_palette: &'static [u8],
-    native_words: &'static [u32],
+    receiver_words: &'static [u32],
     non_modifying: bool,
     depth: u8,
     pts_raw: i64,
@@ -101,11 +103,11 @@ fn check_native(index: usize) {
     for quantum in [1, 7, 4096] {
         let pool = Budget::new(4 << 20).unwrap();
         let baseline = pool.used();
-        let observed = decode(&pool, case.payload, ReceiverView::NativeD32, quantum);
+        let observed = decode(&pool, case.payload, ReceiverView::Receiver, quantum);
         assert_eq!(observed.error, None, "{} work={quantum}", case.id);
         assert_eq!(observed.events.len(), 1);
         let event = &observed.events[0];
-        assert_eq!(event.receiver_view, ReceiverView::NativeD32);
+        assert_eq!(event.receiver_view, ReceiverView::Receiver);
         assert_eq!(event.pts, Some(Time::new(1, 1).unwrap()));
         assert_eq!(
             [event.definition.size.width, event.definition.size.height],
@@ -113,9 +115,11 @@ fn check_native(index: usize) {
         );
         assert_eq!(event.source_packets().len(), 1);
         assert_eq!(event.source_packets()[0].payload.as_ref(), case.payload);
-        let native = event.native_publication.unwrap();
-        assert_eq!(native.identifier, D32_VIEW);
-        assert_eq!(native.source_pin, D32_PIN);
+        let native = event.receiver_publication.unwrap();
+        #[cfg(feature = "reference-trace")]
+        assert_eq!(native.view_profile(), RECEIVER_VIEW_PROFILE);
+        #[cfg(feature = "reference-trace")]
+        assert_eq!(native.reference_revision(), REFERENCE_REVISION);
         assert_eq!(native.exact_pts_microseconds, Some(case.pts_raw));
         assert_eq!(native.start_display_ms, 0);
         assert_eq!(native.end_display_ms, 2000);
@@ -141,14 +145,14 @@ fn check_native(index: usize) {
                 _ => panic!("fixture depth"),
             }
         );
-        let palette = region.palette.native_d32.as_ref().unwrap();
+        let palette = region.palette.receiver.as_ref().unwrap();
         assert!(palette.all_entries_explicit);
         assert_eq!(
             palette.rgba.as_ref(),
             case.native_palette,
             "entire literal native palette"
         );
-        assert_eq!(palette.words.as_slice(), case.native_words);
+        assert_eq!(palette.words.as_slice(), case.receiver_words);
         assert_eq!(palette.words.len(), 1_usize << case.depth);
         assert_eq!(
             region.palette.rgba.as_ref(),
@@ -178,10 +182,10 @@ fn original_twelve_source_planes_and_palettes_are_unchanged() {
             assert_eq!(observed.error, None);
             assert_eq!(observed.events.len(), 1);
             let event = &observed.events[0];
-            assert!(event.native_publication.is_none());
+            assert!(event.receiver_publication.is_none());
             assert_eq!(event.source_packets()[0].payload.as_ref(), case.payload);
             let region = &event.regions()[0];
-            assert!(region.palette.native_d32.is_none());
+            assert!(region.palette.receiver.is_none());
             assert_eq!(region.plane.pixels.as_ref(), case.source_indices);
             assert_eq!(region.palette.rgba.as_ref(), case.source_palette);
             drop(observed);
@@ -230,7 +234,7 @@ fn source_mapping_rule_and_all_original_map_bytes_are_preserved() {
 }
 #[test]
 fn native_compaction_must_not_hide_logical_source_row_overrun() {
-    for view in [ReceiverView::Source, ReceiverView::NativeD32] {
+    for view in [ReceiverView::Source, ReceiverView::Receiver] {
         for quantum in [1, 7, 4096] {
             let pool = Budget::new(4 << 20).unwrap();
             let baseline = pool.used();

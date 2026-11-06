@@ -2,9 +2,11 @@
 use std::sync::atomic::AtomicBool;
 use triergon_core::{Budget, Bytes, Error, Time, WorkBudget};
 use triergon_subtitles::dvb::{
-    ClockOrigin, ClockValue, D32_PIN, D32_VIEW, DecodeStatus, Decoder, DisplayEvent, DisplayLimits,
-    PacketIdentity, PacketTiming, ReceiverView, SourceClock, SourceConfiguration,
+    ClockOrigin, ClockValue, DecodeStatus, Decoder, DisplayEvent, DisplayLimits, PacketIdentity,
+    PacketTiming, ReceiverView, SourceClock, SourceConfiguration,
 };
+#[cfg(feature = "reference-trace")]
+use triergon_subtitles::reference_trace::dvb::{RECEIVER_VIEW_PROFILE, REFERENCE_REVISION};
 
 struct ExpectedRect {
     source_id: u8,
@@ -109,11 +111,11 @@ fn check_native(index: usize) {
     for quantum in [1, 7, 4096] {
         let pool = Budget::new(4 << 20).unwrap();
         let baseline = pool.used();
-        let result = decode(&pool, case.payload, ReceiverView::NativeD32, quantum);
+        let result = decode(&pool, case.payload, ReceiverView::Receiver, quantum);
         assert_eq!(result.error, None, "{} work={quantum}", case.id);
         assert_eq!(result.events.len(), 1);
         let event = &result.events[0];
-        assert_eq!(event.receiver_view, ReceiverView::NativeD32);
+        assert_eq!(event.receiver_view, ReceiverView::Receiver);
         assert_eq!(event.pts, Some(Time::new(1, 1).unwrap()));
         assert_eq!(
             [event.definition.size.width, event.definition.size.height],
@@ -128,9 +130,11 @@ fn check_native(index: usize) {
         let timing = event.source_packets()[0].source.as_ref().unwrap().timing();
         assert_eq!(timing.pts.unwrap().ticks, 1000);
         assert_eq!(timing.duration.unwrap().ticks, 2000);
-        let publication = event.native_publication.unwrap();
-        assert_eq!(publication.source_pin, D32_PIN);
-        assert_eq!(publication.identifier, D32_VIEW);
+        let publication = event.receiver_publication.unwrap();
+        #[cfg(feature = "reference-trace")]
+        assert_eq!(publication.reference_revision(), REFERENCE_REVISION);
+        #[cfg(feature = "reference-trace")]
+        assert_eq!(publication.view_profile(), RECEIVER_VIEW_PROFILE);
         assert_eq!(publication.exact_pts_microseconds, Some(case.pts_raw));
         assert_eq!(publication.start_display_ms, case.start_ms);
         assert_eq!(publication.end_display_ms, case.end_ms);
@@ -155,7 +159,7 @@ fn check_native(index: usize) {
             );
             assert_eq!(region.plane.geometry.stride, expected.stride);
             assert_eq!(region.plane.pixels.as_ref(), expected.indices);
-            let native = region.palette.native_d32.as_ref().unwrap();
+            let native = region.palette.receiver.as_ref().unwrap();
             assert!(native.all_entries_explicit);
             assert_eq!(native.rgba.as_ref(), expected.rgba);
             assert_eq!(native.words.as_slice(), expected.words);
@@ -175,7 +179,7 @@ fn check_source(index: usize) {
             assert_eq!(result.error, None);
             assert_eq!(result.events.len(), 1);
             let event = &result.events[0];
-            assert!(event.native_publication.is_none());
+            assert!(event.receiver_publication.is_none());
             assert_eq!(
                 event.page_composition.as_ref().unwrap().as_ref(),
                 case.original_pcs
@@ -189,7 +193,7 @@ fn check_source(index: usize) {
                 case.source_ids
             );
             for region in event.regions() {
-                assert!(region.palette.native_d32.is_none());
+                assert!(region.palette.receiver.is_none());
                 assert_eq!(&region.palette.rgba.as_ref()[..4], &[0, 0, 0, 0]);
             }
         } else {
@@ -239,7 +243,7 @@ fn source_nonascending_pcs_remains_rejected() {
 
 #[test]
 fn nonoverlap_validation_is_not_lost_when_native_emission_order_changes() {
-    for view in [ReceiverView::Source, ReceiverView::NativeD32] {
+    for view in [ReceiverView::Source, ReceiverView::Receiver] {
         for quantum in [1, 7, 4096] {
             let pool = Budget::new(4 << 20).unwrap();
             let baseline = pool.used();
@@ -261,7 +265,7 @@ fn nonoverlap_validation_is_not_lost_when_native_emission_order_changes() {
 }
 #[test]
 fn window_bounds_still_fail_without_partial_event_in_either_order() {
-    for view in [ReceiverView::Source, ReceiverView::NativeD32] {
+    for view in [ReceiverView::Source, ReceiverView::Receiver] {
         for quantum in [1, 7, 4096] {
             let pool = Budget::new(4 << 20).unwrap();
             let baseline = pool.used();
@@ -294,7 +298,7 @@ fn empty_native_regions_still_validate_display_bounds() {
         let mut payload = EMPTY_REGION.to_vec();
         payload[10..12].copy_from_slice(&x.to_be_bytes());
         payload[12..14].copy_from_slice(&y.to_be_bytes());
-        for view in [ReceiverView::Source, ReceiverView::NativeD32] {
+        for view in [ReceiverView::Source, ReceiverView::Receiver] {
             for quantum in [1, 7, 4096] {
                 let pool = Budget::new(4 << 20).unwrap();
                 let baseline = pool.used();

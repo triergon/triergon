@@ -2,10 +2,10 @@
 #![forbid(unsafe_code)]
 use std::sync::atomic::{AtomicBool, Ordering};
 use triergon_core::{Budget, Bytes, Error, TimeBase, WorkBudget};
-use triergon_subtitles::pgs::{
-    DisplayConfig, DisplayLimits, IndexedNativeRecoveryDecoder, NativeCompatibilityDecoder,
-    NativeCompatibilityEof, NativeCompatibilityPacket, PacketClock, RecoveryStatus,
+use triergon_subtitles::compat::pgs::{
+    IndexedRecoveryDecoder, ReceiverDecoder, ReceiverEof, ReceiverPacket,
 };
+use triergon_subtitles::pgs::{DisplayConfig, DisplayLimits, PacketClock, RecoveryStatus};
 
 type Result<T> = std::result::Result<T, String>;
 #[path = "native-compatibility-gold/cases.rs"]
@@ -57,25 +57,25 @@ fn clock() -> PacketClock {
     }
 }
 
-fn decoder(b: &Budget, forced: bool) -> NativeCompatibilityDecoder {
-    NativeCompatibilityDecoder::new(
+fn decoder(b: &Budget, forced: bool) -> ReceiverDecoder {
+    ReceiverDecoder::new(
         b,
         DisplayLimits::default(),
         DisplayConfig {
-            native_forced_only: forced,
+            receiver_forced_only: forced,
         },
     )
     .unwrap()
 }
 
-fn push(d: &mut NativeCompatibilityDecoder, b: &Budget, raw: &[u8]) {
+fn push(d: &mut ReceiverDecoder, b: &Budget, raw: &[u8]) {
     let mut owned = Some(Bytes::copy_from_slice(b, raw).unwrap());
     d.push(&mut owned, clock(), &AtomicBool::new(false))
         .unwrap();
     assert!(owned.is_none());
 }
 
-fn ready(d: &mut NativeCompatibilityDecoder, quantum: u64) -> NativeCompatibilityPacket {
+fn ready(d: &mut ReceiverDecoder, quantum: u64) -> ReceiverPacket {
     let cancel = AtomicBool::new(false);
     for _ in 0..1_000_000 {
         let mut work = WorkBudget::new(quantum);
@@ -89,7 +89,7 @@ fn ready(d: &mut NativeCompatibilityDecoder, quantum: u64) -> NativeCompatibilit
     panic!("native compatibility did not finish bounded input");
 }
 
-fn assert_picture(out: &NativeCompatibilityPacket, forced: bool) {
+fn assert_picture(out: &ReceiverPacket, forced: bool) {
     assert_eq!(out.context_canvas, [16, 1]);
     assert_eq!(out.clock, clock());
     let event = out.receiver_output().unwrap();
@@ -156,7 +156,7 @@ fn native_constructor_preserves_finite_policy_caps_without_strict_source_setup()
         },
     ] {
         assert!(matches!(
-            NativeCompatibilityDecoder::new(&b, limits, DisplayConfig::default()),
+            ReceiverDecoder::new(&b, limits, DisplayConfig::default()),
             Err(Error::Limit { .. })
         ));
         assert_eq!(b.used(), baseline);
@@ -193,7 +193,7 @@ fn full_api_still_retains_both_source_sets_and_additional_receiver_event() {
     let b = Budget::new(4 * 1024 * 1024).unwrap();
     let c = AtomicBool::new(false);
     let mut full =
-        IndexedNativeRecoveryDecoder::new(&b, DisplayLimits::default(), DisplayConfig::default())
+        IndexedRecoveryDecoder::new(&b, DisplayLimits::default(), DisplayConfig::default())
             .unwrap();
     let mut raw = pcs(16, 1, 0x80, &[]);
     segment(&mut raw, 0x80, &[]);
@@ -301,7 +301,7 @@ fn rejected_foreign_busy_and_oversized_input_preserve_the_exact_caller_owner() {
     ));
     assert!(owned.as_ref().unwrap().shares_storage_with(&held));
     drop(ready(&mut d, 4096));
-    let mut limited = NativeCompatibilityDecoder::new(
+    let mut limited = ReceiverDecoder::new(
         &b,
         DisplayLimits {
             max_packet_bytes: 1,
@@ -378,7 +378,7 @@ fn cumulative_work_limit_poison_cannot_be_bypassed_by_small_quanta_or_reset_retr
     for quantum in [1, 4096] {
         let b = Budget::new(4 * 1024 * 1024).unwrap();
         let baseline = b.used();
-        let mut d = NativeCompatibilityDecoder::new(
+        let mut d = ReceiverDecoder::new(
             &b,
             DisplayLimits {
                 max_work: 1,
@@ -460,10 +460,7 @@ fn native_eof_does_not_validate_pending_strict_source_state_or_fabricate_output(
     assert_eq!(d.poll(&mut zero, &c).unwrap(), RecoveryStatus::Ended);
     assert_eq!(zero.spent(), 0);
     assert_eq!(d.work_spent(), before + 1);
-    assert_eq!(
-        d.eof_report(),
-        Some(NativeCompatibilityEof::NoDelayedSubtitle)
-    );
+    assert_eq!(d.eof_report(), Some(ReceiverEof::NoDelayedSubtitle));
     assert!(d.take_output(&c).is_err());
     let mut next = Some(Bytes::copy_from_slice(&b, &picture()).unwrap());
     let held = next.as_ref().unwrap().clone();
@@ -503,16 +500,16 @@ fn frozen_case(case: &wire::Case, quantum: u64) -> (wire::Sink, bool) {
             return Err("unexpected private configuration".into());
         }
         let config = DisplayConfig {
-            native_forced_only: case.flags & 1 != 0,
+            receiver_forced_only: case.flags & 1 != 0,
         };
-        let mut d = NativeCompatibilityDecoder::new(&b, DisplayLimits::default(), config)
+        let mut d = ReceiverDecoder::new(&b, DisplayLimits::default(), config)
             .map_err(|e| e.to_string())?;
         let base = TimeBase::new(u64::from(case.numerator), u64::from(case.denominator))
             .map_err(|e| e.to_string())?;
         for (index, record) in case.records.iter().enumerate() {
             if record.reset != 0 {
                 drop(d);
-                d = NativeCompatibilityDecoder::new(&b, DisplayLimits::default(), config)
+                d = ReceiverDecoder::new(&b, DisplayLimits::default(), config)
                     .map_err(|e| e.to_string())?;
                 continue;
             }
