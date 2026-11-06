@@ -1,5 +1,8 @@
 # First implementation backlog
 
+The [current Streem coverage and adoption backlog](offboarding-target.md#preview-coverage-and-remaining-work)
+tracks preview implementation, open profile coverage and delivery evidence.
+
 This is the original work sequence. H01–H07 and K01 now have experimental implementations. The frozen K0–K5 slices
 pass native Mac ARM64 gates, including bounded zlib, Cues/preroll, static colour/HDR
 and source segment metadata. K02 still

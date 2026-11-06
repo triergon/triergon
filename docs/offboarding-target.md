@@ -190,6 +190,59 @@ qualification remain open.
 | O62 | Development capture | Capture85 passed quality and delivery timing on all 15 selected MPEG-1/TS operations. Peak live heap, total peak RSS and target execution remain open. [Capture evidence](../research/qualification/capture85-linux-arm64/README.md) |
 | O70 | Runtime/package removal | No enabled application-runtime FFmpeg imports, dynamic loads, subprocesses, staged libraries or unresolved call sites; clean install and end-to-end verification without an installed FFmpeg fallback |
 
+### Preview coverage and remaining work
+
+The 2026-11-06 snapshot reviews the opt-in Streem preview at
+`f73227a57a74c2d181a6c6513435d24e11b7dea1` against the
+[42-row O00 inventory](../research/offboarding/streem-source-inventory/scope-matrix.md).
+The tally excludes 11 rows for retained Rust or platform responsibilities and
+external reference tooling (INV16–21, INV25, INV33, INV36, INV41 and INV42).
+A row counts when the preview has an FFmpeg-free implementation for at least
+one of its profiles. Every row has equal weight. This gives **27 of 31
+responsibilities with some preview coverage (87%)**. Some of those rows
+have further profiles, qualification or release work.
+
+| Surface | O00 rows | With preview coverage |
+|---|---|---:|
+| Input, demux, metadata and probing | INV03–15 | 10/13 |
+| Subtitle carriage and decode | INV22–24 | 3/3 |
+| Simulator sinks and decoding | INV26–30 | 5/5 |
+| Development capture | INV31, INV32, INV34, INV35 | 4/4 |
+| Runtime and packaging | INV01, INV02, INV37–40 | 5/6 |
+
+For Original playback, the preview routes selected profiles in **two of five
+enabled input families (40%)**, Matroska/WebM and MP4/MOV. MPEG-TS, raw AVC and
+raw HEVC are the other three families. The independent HLS and progressive
+conversion paths add TS, giving **three of five families with some coverage
+across all delivery routes (60%)**.
+
+| Area | Remaining implementation or adoption | Verification still due |
+|---|---|---|
+| Original playback (O20, O21, O30, O31, O50) | Route Original TS188/M2TS and the existing raw AVC/HEVC reader through Streem. Carry over the existing Dolby Vision route. Cover enabled audio carriage outside the current AAC, AC-3, E-AC-3 and DTS profiles where the platform admits it, including Opus and TrueHD. | Verify selected tracks, timing, seeks, HTTP ranges and teardown across the remaining combinations. |
+| Server conversions and HLS (O30, O31, O50) | Finish sequential MP4 and wider TS carriage. The progressive TS188 adapter handles negotiated AVC/AAC responses. The mock explicitly supplies TS and the current Jellyfin progressive profile requests MKV. | Close the progressive TS runtime misses. Verify stock-server selection and G4 playback for the adopted revision. Requalify HLS against the current delivery ceiling. |
+| Subtitles (O40) | Finish unresolved DVB receiver, source timing and container cases. Extend the existing text and bitmap paths to the remaining selected variants. | Run independent parity and delivery gates for the full selected matrix and check rendering and lifecycle in the app. |
+| Developer probe (INV14 and INV15) | Replace the local `ffprobe` trigger and its filter availability diagnostic, or record an explicit disposition for the trigger. | Verify bounded local inspection and diagnostics on the development build. |
+| Desktop simulator and native macOS app (O61, O70) | Wire the FFmpeg-free preview into the native macOS app packager (INV40). The opt-in simulator has selectors for all six legacy codec lanes. Selected AVC High 10 and HEVC Range Extension decode cases remain open. | Close selected decode and output qualification and verify the shipped platform packages and sinks. |
+| Capture (O62) | The opt-in build already uses Triergon conversion, MPEG-1 encoding and TS muxing. | Admit the reference to heap and RSS measurement, then verify the development capture session on target. |
+| Release switch (O60, O70) | Make the qualified backend the default after the remaining routes are covered. | Verify a clean install, the packaged files and enabled runtime paths without FFmpeg. |
+
+The table below applies the [1.20× v2 cutoff](../research/decisions/2026-11-05-runtime-ceiling-1.20.md)
+to retained runtime bounds for selected operations. The original v1 measurements
+and verdicts stay in their receipts.
+
+| Selected native operation | Parity or quality | Runtime at or below 1.20× | Lower heap and total peak RSS |
+|---|---:|---:|---:|
+| [Independent HLS](../research/qualification/hls-av-family-linux-arm64/optimization.md) | 71/71 literals | 9/10 | 10/10 |
+| [Matroska video startup and seek](../research/qualification/matroska-video-linux-arm64/scan-replay-location/input-health-results.json) | 44/44 cases | 43/44 | 44/44 |
+| [Matroska forward audio clock](../research/qualification/matroska-audio-linux-arm64/README.md) | 10/10 cases | 10/10 | 10/10 |
+| [Progressive AVC/AAC TS188](https://github.com/triergon/triergon/pull/27), `84ad176` | 3/3 cases | 1/3 | 3/3 |
+| [Capture85](../research/qualification/capture85-linux-arm64/README.md) | 15/15 quality cases | 15/15 | 0/15 admitted |
+
+The 0.80× optimization target remains separate. Framing44 still has an open
+RSS gate and a retained runtime bound of 1.2395×. The preview's eight simulator
+replays and FFmpeg-free ARM debug package cover the pinned app revision.
+G4 playback and release adoption for that pin remain open.
+
 The frozen O00 source inventory records Streem revision
 `9c7c0fb5f7316c92ab8086beb19db03d5855dd6e`. The historical K0–K5 receipt qualifies selected packet/header/zlib/Cues/static-colour
 and bounded segment-metadata slices. O00's source review is complete for that
