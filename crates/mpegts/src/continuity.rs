@@ -52,6 +52,12 @@ impl Continuity {
             .is_some_and(|previous| (previous + 1) & 15 == counter)
     }
 
+    pub(crate) fn record_continuation(&mut self, packet: &TransportPacket) {
+        debug_assert_eq!(packet.pid, self.pid);
+        debug_assert!(self.expects_payload_counter(packet.continuity_counter));
+        self.record_packet(packet, packet.ts_bytes(), true);
+    }
+
     /// A bounded 188-byte operation. The caller charges one packet work unit before
     /// calling and checks cancellation at that boundary; no heap allocation occurs.
     /// PCR observations on Duplicate remain usable; do not re-assemble its payload.
@@ -108,6 +114,11 @@ impl Continuity {
                 }
             }
         };
+        self.record_packet(packet, ts, has_payload);
+        Ok(outcome)
+    }
+
+    fn record_packet(&mut self, packet: &TransportPacket, ts: &[u8], has_payload: bool) {
         self.previous.copy_from_slice(ts);
         if let Some(pcr) = packet.pcr_range.as_ref() {
             self.previous[pcr.clone()].fill(0);
@@ -115,6 +126,5 @@ impl Continuity {
         self.counter = Some(packet.continuity_counter);
         self.payload = has_payload;
         self.duplicated = false;
-        Ok(outcome)
     }
 }

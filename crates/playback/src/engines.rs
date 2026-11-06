@@ -21,7 +21,7 @@ use triergon_isobmff::{
     SourcePacket,
 };
 use triergon_mpegts::{
-    self as ts, TraceEvent, TransportStream,
+    self as ts, FeedContinuation, TraceEvent, TransportStream,
     clock::{
         ClockKey, NativePesClockV1, NativePesTimeView, SourceTimePolicy, SourceTimestamp,
         source_timestamp,
@@ -1758,6 +1758,56 @@ impl TsEngine {
         Ok(true)
     }
 
+    const FEED_EVENT_QUANTUM: u64 = 64;
+
+    fn poll_feed_stream(
+        &mut self,
+        work: &mut WorkBudget,
+        cancel: &AtomicBool,
+    ) -> triergon_core::Result<Step<TraceEvent>> {
+        let tracks = &mut self.native_tracks;
+        let active = &mut self.native_active;
+        let ordinal = self.event_ordinal;
+        let suppressed = self.suppressed_events;
+        self.stream.poll_feed(
+            &mut self.input,
+            work,
+            cancel,
+            &mut |packet, omitted, epochs, work| {
+                // Leave one unit for consuming the event after appending its payload.
+                if work.remaining() < 3 {
+                    return Ok(FeedContinuation::Emit);
+                }
+                if let Some(index) = tracks.index(packet.pid)
+                    && let Some(observer) = tracks.as_mut_slice()[index].observer.as_mut()
+                {
+                    let context = NativeSourceContext {
+                        source_event_ordinal: ordinal
+                            .checked_add(omitted)
+                            .ok_or(Error::Overflow)?,
+                        epochs,
+                        byte_run_epoch: None,
+                    };
+                    match observer.append_ready_continuation(packet, context, work, cancel)? {
+                        ReadyContinuation::Unhandled => return Ok(FeedContinuation::Emit),
+                        ReadyContinuation::Buffered => {}
+                        ReadyContinuation::Complete => *active = Some(index),
+                    }
+                }
+                let charged = work.try_charge(1);
+                debug_assert!(charged);
+                if active.is_some()
+                    || work.remaining() == 0
+                    || suppressed.saturating_add(omitted) >= Self::FEED_EVENT_QUANTUM - 1
+                {
+                    Ok(FeedContinuation::Yield)
+                } else {
+                    Ok(FeedContinuation::Buffered)
+                }
+            },
+        )
+    }
+
     // Keep backend-specific polling workspaces out of the shared dispatcher.
     #[inline(never)]
     fn poll(&mut self, w: &mut WorkBudget, c: &AtomicBool) -> Result<BackendStep> {
@@ -1850,7 +1900,11 @@ impl TsEngine {
         }
         loop {
             if self.pending.is_none() {
-                let step = self.stream.poll(&mut self.input, w, c);
+                let step = if feed_only {
+                    self.poll_feed_stream(w, c)
+                } else {
+                    self.stream.poll(&mut self.input, w, c)
+                };
                 if feed_only {
                     let omitted = self.stream.take_feed_omissions();
                     self.event_ordinal = self
@@ -2042,7 +2096,11 @@ impl TsEngine {
                 self.event_ordinal = self.event_ordinal.checked_add(1).ok_or(Error::Overflow)?;
                 self.suppressed_events += 1;
                 // Return periodically to the player's cancellation and event cap.
-                if !drained || self.ended || w.remaining() == 0 || self.suppressed_events >= 64 {
+                if !drained
+                    || self.ended
+                    || w.remaining() == 0
+                    || self.suppressed_events >= Self::FEED_EVENT_QUANTUM
+                {
                     return Ok(BackendStep::Yield);
                 }
                 continue;

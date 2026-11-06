@@ -62,6 +62,15 @@ pub enum TraceEvent {
     Finished,
 }
 
+/// Disposition of a validated PES body carrier offered directly to a feed.
+pub enum FeedContinuation {
+    Emit,
+    Buffered,
+    Yield,
+}
+
+const FEED_FALLBACK_PHASE: u8 = 8;
+
 #[derive(Debug)]
 struct PsiRoute {
     pid: u16,
@@ -888,8 +897,7 @@ impl TransportStream {
         let Some(completed) = assembler.validate_body_carrier(payload.len(), work)? else {
             return Ok(false);
         };
-        let outcome = continuity.observe(packet)?;
-        debug_assert_eq!(outcome, ContinuityOutcome::Continuous);
+        continuity.record_continuation(packet);
         if self.pcr_pid == Some(packet.pid) {
             self.clock_signal = false;
         }
@@ -1198,7 +1206,30 @@ impl TransportStream {
         work: &mut WorkBudget,
         cancel: &AtomicBool,
     ) -> Result<Step<TraceEvent>> {
-        match self.poll_inner::<false>(input, work, cancel)? {
+        self.poll_feed(input, work, cancel, &mut |_, _, _, _| {
+            Ok(FeedContinuation::Emit)
+        })
+    }
+
+    /// Offer stable PES continuations to a feed before publishing a trace event.
+    /// The callback receives the number of preceding events omitted in this poll
+    /// window and the current source epochs. Buffered consumes the carrier,
+    /// and Yield consumes it and returns control to the feed. Both advance
+    /// the omitted count. Emit and errors must leave the carrier unchanged.
+    /// After an error, the carrier is retained for ordinary transport delivery.
+    pub fn poll_feed(
+        &mut self,
+        input: &mut InputCursor,
+        work: &mut WorkBudget,
+        cancel: &AtomicBool,
+        consume: &mut impl FnMut(
+            &mut TransportPacket,
+            u64,
+            SourceEpochs,
+            &mut WorkBudget,
+        ) -> Result<FeedContinuation>,
+    ) -> Result<Step<TraceEvent>> {
+        match self.poll_inner::<false>(input, work, cancel, consume)? {
             Step::Ready(CompactTraceEvent::Event(event)) => Ok(Step::Ready(event)),
             Step::Ready(CompactTraceEvent::NullRun(_)) => unreachable!("literal source mode"),
             Step::NeedInput(request) => Ok(Step::NeedInput(request)),
@@ -1213,7 +1244,7 @@ impl TransportStream {
         work: &mut WorkBudget,
         cancel: &AtomicBool,
     ) -> Result<Step<CompactTraceEvent>> {
-        self.poll_inner::<true>(input, work, cancel)
+        self.poll_inner::<true>(input, work, cancel, |_, _, _, _| Ok(FeedContinuation::Emit))
     }
 
     fn poll_inner<const COMPACT: bool>(
@@ -1221,6 +1252,12 @@ impl TransportStream {
         input: &mut InputCursor,
         work: &mut WorkBudget,
         cancel: &AtomicBool,
+        mut consume: impl FnMut(
+            &mut TransportPacket,
+            u64,
+            SourceEpochs,
+            &mut WorkBudget,
+        ) -> Result<FeedContinuation>,
     ) -> Result<Step<CompactTraceEvent>> {
         fn ready(event: TraceEvent) -> Step<CompactTraceEvent> {
             Step::Ready(CompactTraceEvent::Event(event))
@@ -1233,6 +1270,17 @@ impl TransportStream {
                 return Err(Error::Cancelled);
             }
             if self.deferred_feed_events != 0 {
+                if self.phase == FEED_FALLBACK_PHASE {
+                    if work.remaining() == 0 {
+                        return Ok(Step::Yield);
+                    }
+                    let packet = self
+                        .packet
+                        .take()
+                        .ok_or(Error::Invalid("TS packet missing"))?;
+                    self.phase = 0;
+                    return Ok(ready(TraceEvent::Transport(packet)));
+                }
                 self.omit_feed_events(self.deferred_feed_events)?;
                 self.deferred_feed_events = 0;
             }
@@ -1308,10 +1356,31 @@ impl TransportStream {
                 return Ok(Step::Ready(CompactTraceEvent::NullRun(run)));
             }
             match self.framer.poll(input, work, cancel) {
-                Ok(Step::Ready(packet)) => {
+                Ok(Step::Ready(mut packet)) => {
                     self.entity_end = None;
                     self.route = self.find_route(packet.pid);
                     if self.validate_feed_continuation(&packet, work)? {
+                        match consume(
+                            &mut packet,
+                            self.feed_omissions.unwrap_or(0),
+                            self.source_epochs(),
+                            work,
+                        ) {
+                            Ok(FeedContinuation::Emit) => {}
+                            Ok(FeedContinuation::Buffered) => {
+                                self.omit_feed_events(1)?;
+                                continue;
+                            }
+                            Ok(FeedContinuation::Yield) => {
+                                self.omit_feed_events(1)?;
+                                return Ok(Step::Yield);
+                            }
+                            Err(error) => {
+                                self.packet = Some(packet);
+                                self.phase = FEED_FALLBACK_PHASE;
+                                return Err(error);
+                            }
+                        }
                         return Ok(ready(TraceEvent::Transport(packet)));
                     }
                     self.phase = 1;

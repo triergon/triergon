@@ -11,13 +11,21 @@ use triergon_mpegts::native_recovery::{
 };
 use triergon_mpegts::psi::{DescriptorNamespace, PatTable, ProgramMap, TableStep};
 use triergon_mpegts::{
-    AssemblyStep, PacketFormat, ParseLimits, SourceEpochs, TraceEvent, TransportStream,
+    AssemblyStep, FeedContinuation, PacketFormat, ParseLimits, SourceEpochs, TraceEvent,
+    TransportStream,
 };
 #[path = "support/selected_lifecycle_fixture.rs"]
 mod fixtures;
 use fixtures::Case;
 
 type Events = Vec<(TraceEvent, SourceEpochs)>;
+
+#[derive(Default)]
+struct FeedCapture {
+    count: usize,
+    reject_next: bool,
+}
+
 fn context(n: usize, e: SourceEpochs) -> NativeSourceContext {
     NativeSourceContext {
         source_event_ordinal: n as u64,
@@ -38,7 +46,7 @@ fn collect_entity(case: Case, b: &Budget, entity: SourceId) -> Events {
         fixtures::selected(case),
     )
     .unwrap();
-    collect_stream(&fixtures::bytes(case), b, entity, source, 1).0
+    collect_stream(&fixtures::bytes(case), b, entity, source, 1, None).0
 }
 
 fn collect_stream(
@@ -47,6 +55,7 @@ fn collect_stream(
     entity: SourceId,
     mut source: TransportStream,
     quantum: u64,
+    mut captured: Option<&mut FeedCapture>,
 ) -> (Events, Vec<u64>) {
     let mut capacity = Vec::with_capacity(data.len().max(4096));
     capacity.extend_from_slice(data);
@@ -64,15 +73,51 @@ fn collect_stream(
     let mut out = Vec::new();
     let mut ordinals = Vec::new();
     let mut ordinal = 0;
+    let mut retry_offset = None;
     for _ in 0..100_000 {
-        let step = source
-            .poll(
+        let work = &mut WorkBudget::new(quantum);
+        let cancel = &AtomicBool::new(false);
+        let step = if let Some(captured) = captured.as_deref_mut() {
+            source.poll_feed(
                 &mut input,
-                &mut WorkBudget::new(quantum),
-                &AtomicBool::new(false),
+                work,
+                cancel,
+                &mut |packet, omitted, epochs, _| {
+                    if std::mem::take(&mut captured.reject_next) {
+                        retry_offset = Some(packet.source_offset);
+                        return Err(Error::Backpressure {
+                            requested: 1,
+                            available: 0,
+                        });
+                    }
+                    out.push((TraceEvent::Transport(packet.clone()), epochs));
+                    ordinals.push(ordinal + omitted);
+                    captured.count += 1;
+                    Ok(if captured.count % 2 == 0 {
+                        FeedContinuation::Yield
+                    } else {
+                        FeedContinuation::Buffered
+                    })
+                },
             )
-            .unwrap();
+        } else {
+            source.poll(&mut input, work, cancel)
+        };
         ordinal += source.take_feed_omissions();
+        let step = match step {
+            Err(Error::Backpressure {
+                requested: 1,
+                available: 0,
+            }) if retry_offset.is_some() => {
+                continue;
+            }
+            step => step.unwrap(),
+        };
+        if let Some(offset) = retry_offset.take() {
+            assert!(
+                matches!(&step, Step::Ready(TraceEvent::Transport(packet)) if packet.source_offset == offset)
+            );
+        }
         match step {
             Step::Ready(e) => {
                 let done = matches!(e, TraceEvent::Finished);
@@ -123,18 +168,24 @@ fn segment_feed_preserves_source_faults_epochs_and_retained_event_ordinals() {
         include_bytes!("data/cc-loss-mid-pes.ts").as_slice(),
         include_bytes!("data/pcr-timeline-discontinuity.ts").as_slice(),
     ];
-    for data in program_changes
+    let mut captured = FeedCapture::default();
+    for (data, reject_next) in program_changes
         .iter()
         .map(Vec::as_slice)
         .chain(carrier_cases)
+        .map(|data| (data, false))
+        .chain([(carrier_cases[0], true)])
     {
         let b = Budget::new(1 << 20).unwrap();
         let limits = ParseLimits::default();
         let ns = DescriptorNamespace::Unspecified;
         let source = TransportStream::new_single_program_segment(b.clone(), limits, ns).unwrap();
         let feed = TransportStream::new_single_program_feed(b.clone(), limits, ns).unwrap();
-        let (raw, raw_ordinals) = collect_stream(data, &b, SourceId(1), source, 1);
-        let (fed, fed_ordinals) = collect_stream(data, &b, SourceId(1), feed, 4096);
+        let (raw, raw_ordinals) = collect_stream(data, &b, SourceId(1), source, 1, None);
+        captured.reject_next = reject_next;
+        let (fed, fed_ordinals) =
+            collect_stream(data, &b, SourceId(1), feed, 4096, Some(&mut captured));
+        assert!(!captured.reject_next);
         let key = |(event, epochs): &(TraceEvent, SourceEpochs)| {
             let fault = match event {
                 TraceEvent::Diagnostic(fault) => {
@@ -165,6 +216,7 @@ fn segment_feed_preserves_source_faults_epochs_and_retained_event_ordinals() {
             expected
         );
     }
+    assert!(captured.count >= 2);
 }
 fn collect(case: Case, b: &Budget) -> Events {
     collect_entity(case, b, SourceId(1))

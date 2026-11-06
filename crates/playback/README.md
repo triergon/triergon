@@ -101,6 +101,8 @@ admission. M2TS prefix startup (`NativeStartup::new_m2ts_prefix_v2`) needs an
 65,536 bytes.
 
 **HLS segments.** One independent TS188 segment with in-band PAT and PMT.
+The feed consumes validated PES continuations directly and preserves source
+event positions.
 Units are released only after EOF and both the video and audio assemblers drain. Defaults: 64 MiB
 source, 64 MiB feed, 8,192 access units. A failed reader releases its source;
 retry with a new reader.

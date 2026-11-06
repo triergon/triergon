@@ -54,6 +54,10 @@ loop {
 | FFmpeg-compatible damaged input | `native_recovery::NativePesRecoveryObserver` |
 | FFmpeg-compatible start position | `native_input::NativeInputBootstrap` |
 
+`TransportStream::poll_feed` can deliver validated PES continuations directly
+to a consumer in segment feed mode. `take_feed_omissions` counts the skipped
+events so consumers can retain positions in the source trace.
+
 `TransportStream::poll_compact` coalesces runs of null packets into one
 `CompactTraceEvent::NullRun`. `examples/mpegts_source_trace.rs` prints the
 source view as JSON lines (`mpegts_source_trace 188|192 PROGRAM [--dvb]
