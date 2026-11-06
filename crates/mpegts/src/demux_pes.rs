@@ -826,10 +826,9 @@ impl DemuxObserver {
         first_counter: u8,
         replacement: Option<BudgetVec<NativePesSpan>>,
     ) -> Result<()> {
-        if let Some(replacement) = replacement {
-            for span in std::mem::replace(&mut self.spans, replacement) {
-                self.spans.try_push(span).map_err(|error| error.error)?;
-            }
+        if let Some(mut replacement) = replacement {
+            replacement.try_append(&mut self.spans)?;
+            self.spans = replacement;
         }
         let count = bytes.len() / TS188_BYTES;
         debug_assert!(count >= 2 && bytes.len().is_multiple_of(TS188_BYTES));

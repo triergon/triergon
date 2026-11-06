@@ -112,6 +112,13 @@ pub enum FeedItem<'a> {
 // Per carrier: input, header inspection, source PES, native append and event.
 const PAYLOAD_RUN_WORK: u64 = TS188_BYTES as u64 + 2 + (PLAIN_PAYLOAD_BYTES as u64 + 1) + 2 + 1;
 
+fn matches_payload_header(ts: &[u8], pid: u16, counter: u8) -> bool {
+    let expected = 0x4700_0010 | (u32::from(pid) << 8) | u32::from(counter);
+    // Transport priority is the only bit ignored by the continuation check.
+    ts.first_chunk::<4>()
+        .is_some_and(|header| u32::from_be_bytes(*header) & !0x0020_0000 == expected)
+}
+
 /// A same-PID continuation prefix that may be appended to a native observer.
 #[derive(Debug)]
 pub struct FeedPayloadRun<'a> {
@@ -182,7 +189,7 @@ impl FeedPayloadRun<'_> {
                 return Err(Error::Cancelled);
             }
             let expected = self.counter.wrapping_add(carriers as u8) & 15;
-            if payload_only_continuation(ts) != Some((self.pid, expected)) {
+            if !matches_payload_header(ts, self.pid, expected) {
                 break;
             }
             carriers += 1;
@@ -1117,9 +1124,11 @@ impl TransportStream {
         let Some((pid, counter)) = payload_only_continuation(&buffered[..TS188_BYTES]) else {
             return Ok(false);
         };
-        if payload_only_continuation(&buffered[TS188_BYTES..2 * TS188_BYTES])
-            != Some((pid, (counter + 1) & 15))
-            || (self.pcr_pid == Some(pid) && self.clock_pending)
+        if !matches_payload_header(
+            &buffered[TS188_BYTES..2 * TS188_BYTES],
+            pid,
+            (counter + 1) & 15,
+        ) || (self.pcr_pid == Some(pid) && self.clock_pending)
         {
             return Ok(false);
         }
