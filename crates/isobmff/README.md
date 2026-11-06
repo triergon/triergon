@@ -77,6 +77,12 @@ the source offset and shared bytes under `ConfigurationLimits` and a
 `WorkBudget`. The descriptor identifies MPEG-4 Audio. Callers validate
 the bytes and determine the audio object type separately.
 
+`BoxReader::with_media_data_policy` can preserve a terminal `mdat`'s
+declared extent when the source length is known and the media ends early.
+This lets a compatibility consumer validate sample ranges against the
+declaration and read only the available prefix. `BoxReader::new` still
+rejects boxes extending past the source.
+
 ## Supported
 
 | Area | Coverage |

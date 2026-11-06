@@ -6,7 +6,8 @@ mod model;
 #[path = "isobmff_consumer/protocol.rs"]
 mod protocol;
 use model::{
-    Driver, Failure, NativeOperation, NativeSeekRequest, Result, SourceRequest, Transport,
+    Driver, Failure, NativeOperation, NativeSeekRequest, OpenPolicy, Result, SourceRequest,
+    Transport,
 };
 use protocol::{Retention, Stats};
 use std::{
@@ -18,7 +19,7 @@ use std::{
 };
 use triergon_core::{Error, Time};
 use triergon_isobmff::{
-    RecoveryKind, RecoverySyntax, SampleTablePolicy, SyncSamplePolicy, TimingRunPolicy,
+    MediaDataPolicy, RecoveryKind, RecoverySyntax, SyncSamplePolicy, TimingRunPolicy,
 };
 
 #[derive(Clone, Copy)]
@@ -118,7 +119,7 @@ fn operation(
     input: &mut Input,
     o: Options,
     op: NativeOperation,
-    table_policy: SampleTablePolicy,
+    policy: OpenPolicy,
     mut trace: Option<&mut String>,
 ) -> Result<Stats> {
     let (transport, length) = input.transport();
@@ -127,7 +128,7 @@ fn operation(
     let mut driver = Driver::new(transport, length, o.window, o.quantum)?;
     let pool = driver.budget.clone();
     let mut retained = Retention::new(&pool, o.retain)?;
-    let model = driver.open_with_table_policy(table_policy)?;
+    let model = driver.open_with_policy(policy)?;
     if matches!(op, NativeOperation::Open) {
         driver.native_open(&model, &mut stats, &mut retained, trace.as_deref_mut())?;
     } else {
@@ -158,12 +159,15 @@ fn output_stats(stats: &Stats, iterations: u64, elapsed: u128) -> Result<()> {
 }
 fn main_result() -> Result<()> {
     let mut args: Vec<_> = env::args().collect();
-    let mut table_policy = SampleTablePolicy::default();
+    let mut policy = OpenPolicy::default();
     loop {
         match args.get(1).map(String::as_str) {
-            Some("--bounded-timing") => table_policy.timing_runs = TimingRunPolicy::BoundedPrefix,
+            Some("--bounded-timing") => policy.tables.timing_runs = TimingRunPolicy::BoundedPrefix,
             Some("--bounded-sync") => {
-                table_policy.sync_samples = SyncSamplePolicy::BoundedPrefix;
+                policy.tables.sync_samples = SyncSamplePolicy::BoundedPrefix;
+            }
+            Some("--terminal-media-prefix") => {
+                policy.media_data = MediaDataPolicy::PreserveTerminalDeclaration;
             }
             _ => break,
         }
@@ -222,7 +226,7 @@ fn main_result() -> Result<()> {
         }
         "open-trace" | "native-index-trace" | "seek-trace" => {
             let mut trace = String::new();
-            operation(&mut input, o, op, table_policy, Some(&mut trace))?;
+            operation(&mut input, o, op, policy, Some(&mut trace))?;
             println!("{trace}");
         }
         "open-bench" | "native-index-bench" | "seek-bench" => {
@@ -233,7 +237,7 @@ fn main_result() -> Result<()> {
             let mut total = Stats::default();
             let start = Instant::now();
             for _ in 0..n {
-                total.add(operation(&mut input, o, op, table_policy, None)?)?;
+                total.add(operation(&mut input, o, op, policy, None)?)?;
             }
             let elapsed = start.elapsed().as_nanos();
             std::hint::black_box(&total);
@@ -246,18 +250,21 @@ fn main_result() -> Result<()> {
             let result = if mode == "open-memory-baseline" {
                 input.rewind().map(|()| Stats::default())
             } else {
-                operation(&mut input, o, op, table_policy, None)
+                operation(&mut input, o, op, policy, None)
             };
             io::stdout().write_all(b"SAFE_MEDIA_END_V1\n")?;
             io::stdout().flush()?;
             output_stats(&result?, 1, 0)?;
         }
         "index-trace" | "source-seek-trace" => {
-            if table_policy.timing_runs != TimingRunPolicy::Strict {
+            if policy.tables.timing_runs != TimingRunPolicy::Strict {
                 return Err(Error::Invalid("source audit requires exact timing coverage").into());
             }
-            if table_policy.sync_samples != SyncSamplePolicy::Strict {
+            if policy.tables.sync_samples != SyncSamplePolicy::Strict {
                 return Err(Error::Invalid("source audit requires in-range sync samples").into());
+            }
+            if policy.media_data != MediaDataPolicy::Strict {
+                return Err(Error::Invalid("source audit requires complete media").into());
             }
             if o.retain != 0 {
                 return Err(Error::Invalid(

@@ -15,14 +15,18 @@ use triergon_core::{
 };
 use triergon_isobmff::{
     BoxEvent, BoxReader, BoxStep, BoxView, BuildStatus, EditList, FragmentBuilder, FragmentContext,
-    FragmentIndex, ImplicitBase, Limits, Mov9CursorStatus, Mov9NativeGlobalSeekJob,
-    Mov9NativeIndexCursor, Mov9NativeIndexLimits, Mov9NativeSeekLimits, Mov9PacketCursor,
-    Mov9PacketLimits, Mov9Profile, Mov9StreamView, Mov9Track, MovieHeader, MovieSeekClocks,
-    MovieSeekLimits, MovieSourceSeekContext, MovieSourceSeekPlanner, RecoveryDescriptions,
-    RecoveryKind, RecoveryMappings, RecoveryScope, RecoverySyntax, Sample, SampleReader,
-    SampleStep, SampleTable, SampleTableBuilder, SampleTablePolicy, SourcePacket, SourceTrack,
-    TrackHeader, TrackSampleCursor, Trex,
+    FragmentIndex, ImplicitBase, Limits, MediaDataPolicy, Mov9CursorStatus,
+    Mov9NativeGlobalSeekJob, Mov9NativeIndexCursor, Mov9NativeIndexLimits, Mov9NativeSeekLimits,
+    Mov9PacketCursor, Mov9PacketLimits, Mov9PartialSampleReader, Mov9PayloadBounds, Mov9Profile,
+    Mov9StreamView, Mov9Track, MovieHeader, MovieSeekClocks, MovieSeekLimits,
+    MovieSourceSeekContext, MovieSourceSeekPlanner, PinnedMovD32RegularRecoveryV1,
+    RecoveryDescriptions, RecoveryKind, RecoveryMappings, RecoveryScope, RecoverySyntax, Sample,
+    SampleReader, SampleStep, SampleTable, SampleTableBuilder, SampleTablePolicy, SourcePacket,
+    SourceTrack, TrackHeader, TrackSampleCursor, Trex,
 };
+
+const MAX_SAMPLE_BYTES: usize = 16 * 1024 * 1024;
+
 #[derive(Debug)]
 pub enum Failure {
     Core(Error),
@@ -331,6 +335,7 @@ pub struct Driver<'a> {
 struct Scanned {
     movie: BoxView,
     media: BudgetVec<Range<u64>>,
+    truncated_media: Option<Range<u64>>,
     moofs: BudgetVec<BoxView>,
     indexes: BudgetVec<BoxView>,
     brand: Option<[u8; 4]>,
@@ -344,10 +349,17 @@ pub struct Model {
     pub records: BudgetVec<Record>,
     pub fragments: BudgetVec<FragmentIndex>,
     pub media: BudgetVec<Range<u64>>,
+    truncated_media: Option<Range<u64>>,
     pub movie: MovieHeader,
     raw_movie: BoxView,
     indexes: BudgetVec<BoxView>,
     brand: Option<[u8; 4]>,
+}
+
+#[derive(Clone, Copy, Default)]
+pub struct OpenPolicy {
+    pub tables: SampleTablePolicy,
+    pub media_data: MediaDataPolicy,
 }
 impl<'a> Driver<'a> {
     pub fn new(
@@ -443,10 +455,12 @@ impl<'a> Driver<'a> {
         }
         Ok(())
     }
-    fn scan(&mut self) -> Result<Scanned> {
-        let mut reader = BoxReader::new(&self.input, 16 * 1024 * 1024)?;
+    fn scan(&mut self, media_data: MediaDataPolicy) -> Result<Scanned> {
+        let mut reader =
+            BoxReader::with_media_data_policy(&self.input, 16 * 1024 * 1024, media_data)?;
         let (mut movie, mut brand) = (None, None);
         let mut media = BudgetVec::new(&self.budget);
+        let mut truncated_media = None;
         let mut moofs = BudgetVec::new(&self.budget);
         let mut indexes = BudgetVec::new(&self.budget);
         loop {
@@ -459,6 +473,13 @@ impl<'a> Driver<'a> {
                 Step::Yield => {}
                 Step::End(_) => break,
                 Step::Ready(BoxEvent::Header(header)) => {
+                    if header.kind == *b"mdat" && header.end()?.is_some_and(|end| end > self.length)
+                    {
+                        let declared = header.payload_range()?;
+                        append(&mut media, declared.clone())?;
+                        truncated_media = Some(declared);
+                        break;
+                    }
                     if matches!(
                         &header.kind,
                         b"ftyp" | b"moov" | b"moof" | b"sidx" | b"mfra"
@@ -508,17 +529,18 @@ impl<'a> Driver<'a> {
         Ok(Scanned {
             movie: movie.ok_or(Error::Invalid("missing movie"))?,
             media,
+            truncated_media,
             moofs,
             indexes,
             brand,
         })
     }
     pub fn open(&mut self) -> Result<Model> {
-        self.open_with_table_policy(SampleTablePolicy::default())
+        self.open_with_policy(OpenPolicy::default())
     }
 
-    pub fn open_with_table_policy(&mut self, table_policy: SampleTablePolicy) -> Result<Model> {
-        let scanned = self.scan()?;
+    pub fn open_with_policy(&mut self, policy: OpenPolicy) -> Result<Model> {
+        let scanned = self.scan(policy.media_data)?;
         let movie = MovieHeader::parse(&child(&scanned.movie, b"mvhd", &self.budget)?)?;
         let fragments = index_fragments(
             &scanned.movie,
@@ -547,7 +569,7 @@ impl<'a> Driver<'a> {
             {
                 return Err(Error::Invalid("duplicate track ID").into());
             }
-            let table = self_contained_table(&mdia, &self.budget, self.quantum, table_policy)?;
+            let table = self_contained_table(&mdia, &self.budget, self.quantum, policy.tables)?;
             let edits = optional(track, b"edts", &self.budget)?
                 .map(|raw| {
                     child(&raw, b"elst", &self.budget).and_then(|raw| {
@@ -568,6 +590,7 @@ impl<'a> Driver<'a> {
             records,
             fragments,
             media: scanned.media,
+            truncated_media: scanned.truncated_media,
             movie,
             raw_movie: scanned.movie,
             indexes: scanned.indexes,
@@ -580,7 +603,7 @@ impl<'a> Driver<'a> {
             .find(|r| sample.require_within((*r).clone()).is_ok())
             .cloned()
             .ok_or(Error::Invalid("consumer sample outside media extents"))?;
-        let mut reader = SampleReader::new(&mut self.input, sample, extent, 16 * 1024 * 1024)?;
+        let mut reader = SampleReader::new(&mut self.input, sample, extent, MAX_SAMPLE_BYTES)?;
         loop {
             match reader.poll(
                 &mut self.input,
@@ -603,6 +626,34 @@ impl<'a> Driver<'a> {
     ) -> Result<()> {
         self.native_operation(model, stats, retention, NativeOperation::Open, trace)
     }
+
+    #[cold]
+    fn terminal_payload(&mut self, sample: Sample, declared: &Range<u64>) -> Result<Bytes> {
+        let profile = PinnedMovD32RegularRecoveryV1;
+        let mut reader = Mov9PartialSampleReader::new(
+            &mut self.input,
+            sample,
+            declared.clone(),
+            MAX_SAMPLE_BYTES,
+            profile,
+        )?;
+        loop {
+            match reader.poll(
+                &mut self.input,
+                &mut WorkBudget::new(self.quantum),
+                &self.cancel,
+            )? {
+                Step::Ready(packet) => {
+                    debug_assert!(packet.bounds.incomplete_at_known_eof);
+                    return Ok(packet.payload);
+                }
+                Step::NeedInput(request) => self.supply(request)?,
+                Step::Yield => {}
+                Step::End(_) => return Err(Error::Truncated.into()),
+            }
+        }
+    }
+
     pub fn native_operation(
         &mut self,
         model: &Model,
@@ -611,6 +662,9 @@ impl<'a> Driver<'a> {
         operation: NativeOperation,
         mut trace: Option<&mut String>,
     ) -> Result<()> {
+        if matches!(operation, NativeOperation::Seek(_)) && model.truncated_media.is_some() {
+            return Err(Error::Truncated.into());
+        }
         let mut tracks = BudgetVec::new(&self.budget);
         let mut streams = BudgetVec::new(&self.budget);
         let movie_base = model.movie.time_base()?;
@@ -807,6 +861,7 @@ impl<'a> Driver<'a> {
         mut trace: Option<&mut String>,
     ) -> Result<(u64, bool)> {
         let (mut reads, mut first) = (0u64, true);
+        let mut short_end = None;
         while limit.is_none_or(|maximum| stats.packets < u64::from(maximum)) {
             if limit.is_some() {
                 reads = reads.checked_add(1).ok_or(Error::Overflow)?;
@@ -825,8 +880,35 @@ impl<'a> Driver<'a> {
                 .iter()
                 .position(|r| r.header.track_id == item.track_id)
                 .ok_or(Error::Invalid("native occurrence track"))?;
-            let payload = self.packet(item.source, model.media.as_slice())?.payload;
-            let packet = Packet::from_view(index, item.track_id, &item.native, payload)?;
+            let terminal = model.truncated_media.as_ref().filter(|extent| {
+                item.source.range.end > self.length
+                    && item.source.require_within((*extent).clone()).is_ok()
+            });
+            let payload = if let Some(declared) = terminal {
+                // A positive short read can be followed by the adjacent
+                // declared sample at EOF. Validate its full declared size.
+                if short_end == Some(item.source.range.start) && !item.source.range.is_empty() {
+                    Mov9PayloadBounds::from_source(
+                        &item.source,
+                        declared.clone(),
+                        self.length,
+                        MAX_SAMPLE_BYTES,
+                        PinnedMovD32RegularRecoveryV1,
+                    )?;
+                    return Ok((reads, true));
+                }
+                let end = item.source.range.end;
+                let payload = self.terminal_payload(item.source, declared)?;
+                short_end = Some(end);
+                payload
+            } else {
+                short_end = None;
+                self.packet(item.source, model.media.as_slice())?.payload
+            };
+            let mut packet = Packet::from_view(index, item.track_id, &item.native, payload)?;
+            if terminal.is_some() {
+                packet.flags |= protocol::CORRUPT_PACKET;
+            }
             stats.packet(&packet)?;
             if let Some(out) = trace.as_deref_mut() {
                 if !first {

@@ -12,6 +12,16 @@ pub enum BoxEvent {
     Metadata(BoxView),
     Skipped(BoxHeader),
 }
+
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum MediaDataPolicy {
+    #[default]
+    Strict,
+    /// Report a terminal media box's declared extent even if it crosses the
+    /// known end of the source. The caller must bound reads to the available
+    /// bytes and stop scanning at the physical end.
+    PreserveTerminalDeclaration,
+}
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum Phase {
     Header,
@@ -38,10 +48,18 @@ pub struct BoxReader {
     metadata_limit: usize,
     metadata: Option<BudgetVec<u8>>,
     failed: Option<Error>,
-    recovery_terminal_mdat: bool,
+    media_data_policy: MediaDataPolicy,
 }
 impl BoxReader {
     pub fn new(input: &InputCursor, metadata_limit: usize) -> Result<Self> {
+        Self::with_media_data_policy(input, metadata_limit, MediaDataPolicy::Strict)
+    }
+
+    pub fn with_media_data_policy(
+        input: &InputCursor,
+        metadata_limit: usize,
+        media_data_policy: MediaDataPolicy,
+    ) -> Result<Self> {
         if metadata_limit < 8 {
             return Err(Error::Invalid("metadata policy smaller than box header"));
         }
@@ -58,7 +76,7 @@ impl BoxReader {
             metadata_limit,
             metadata: None,
             failed: None,
-            recovery_terminal_mdat: false,
+            media_data_policy,
         })
     }
     /// Exposes a terminal MDAT declaration separately from the physical source
@@ -70,9 +88,11 @@ impl BoxReader {
         metadata_limit: usize,
         _profile: crate::PinnedMovD32RegularRecoveryV1,
     ) -> Result<Self> {
-        let mut reader = Self::new(input, metadata_limit)?;
-        reader.recovery_terminal_mdat = true;
-        Ok(reader)
+        Self::with_media_data_policy(
+            input,
+            metadata_limit,
+            MediaDataPolicy::PreserveTerminalDeclaration,
+        )
     }
     pub fn source(&self) -> SourceId {
         self.source
@@ -212,7 +232,8 @@ impl BoxReader {
                     if !work.try_charge(1) {
                         return Ok(Step::Yield);
                     }
-                    let declared_mdat = self.recovery_terminal_mdat
+                    let declared_mdat = self.media_data_policy
+                        == MediaDataPolicy::PreserveTerminalDeclaration
                         && input.capabilities().length.is_some()
                         && self.prefix.get(4..8) == Some(b"mdat".as_slice())
                         && self.prefix[..4] != [0; 4];
