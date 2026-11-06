@@ -21,7 +21,7 @@ against FFmpeg 9.0.
 | Playback | Matroska, MP4, TS and raw AVC/HEVC feeds; seeking; end-of-file continuation | 120/120 continuation observations; 746 of 998 matrix rows | Matroska AVC/AAC feed within 1.25 | lower | most profiles unmeasured |
 | Codecs | H.264 8-bit 4:2:0; HEVC Main and Main10; AAC LC, HE, HEv2; AC-3 and E-AC-3; DTS core with XCh and X96 | 417/417 comparable conformance and FATE vectors | 1.10 | heap 0.92, RSS 0.82 | error concealment, unverified tool paths |
 | Decode sessions | Bounded queues, clock-gated output, flush and seek, RGBA letterbox, stereo mix | with the codecs | 1.10 | with the codecs | — |
-| Capture | RGBA to YUV 4:2:0, MPEG-1 video, MPEG-TS mux | 15 quality cases | 1.11 | not measured | memory |
+| Capture | RGBA to YUV 4:2:0, MPEG-1 video, MPEG-TS mux | 15/15 quality cases against FFmpeg 9.0.2 | 1.1101 (15/15 within 1.20) | observer unqualified | coverage of reference allocator calls |
 
 ## Above the 1.20 ceiling
 
@@ -40,7 +40,7 @@ samples are archived, their SHA-256. Update the row in the same change as the re
 | Matroska startup and seek | `fffb4a58ad0789338871d3032599e3116e5cb3d5` | `f449a8af7381be72dad4ffaba5615a99a0884a8bfb3a61b19c35f961f171f17a` |
 | ISO BMFF / MP4 | `f958c0b9624a8b7c7bd91b7d2a0c30299ae1dbed` | `fd718807e0ec1e6287bcb690226bf7056b79985796e74eba54f43544a034bc2c` |
 | HLS segments | `7699c80caff6efdce9be8226d12bfa606dadd7b2` | `e008a7fc75c87deb903038cdd38d4e417cf0efa8d92592f9fc6105faecbba991` |
-| Capture | `3f7547922e7be74ab21baf12f92851a161388c33` | raw samples not archived (receipt in the `capture-linux-arm64` evidence set) |
+| Capture | `1831a2aa54e56d45472e171429a98fe878055449` | `fac200b915c2b9a984e5b91cba29e7a3c016690596f128524f46c8f2cb40b6e6` |
 
 ## Platforms
 

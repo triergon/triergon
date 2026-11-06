@@ -1109,6 +1109,35 @@ pub fn measure(
     Ok(result)
 }
 
+/// Check the exact worker closure and emit the observer's calibration results.
+pub fn admission(root: &Path, candidate: &Path, reference: &Path) -> R<()> {
+    if !cfg!(all(
+        target_arch = "aarch64",
+        target_os = "linux",
+        target_env = "gnu"
+    )) {
+        return Err("memory admission requires native AArch64 Linux with glibc".into());
+    }
+    let _lock = lock()?;
+    let busy = competing_builds()?;
+    if !busy.is_empty() {
+        return Err(format!("competing processes: {}", busy.join(", ")));
+    }
+    let candidate =
+        fs::canonicalize(candidate).map_err(|e| format!("{}: {e}", candidate.display()))?;
+    let reference =
+        fs::canonicalize(reference).map_err(|e| format!("{}: {e}", reference.display()))?;
+    let certificate = qualification(&Native { root }, root, &candidate, &reference);
+    println!("{}", json::canonical(&certificate));
+    if s(&certificate, "status") != Some("qualified-selected-workers") {
+        return Err("memory observer refused admission".into());
+    }
+    if !linux::certificate_current(root, &certificate) {
+        return Err("memory observer admission became stale".into());
+    }
+    Ok(())
+}
+
 /// One memory collection under the measurement lock, rejected (but kept) when
 /// tracked processes used CPU meanwhile.
 pub fn collect(

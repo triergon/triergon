@@ -86,6 +86,11 @@ oracles stay in Python (`harness/*_oracle.py`, run through `python3 -m harness.o
 `cargo xtask fuzz` runs a deterministic, replayable byte-mutation campaign against
 debug, release and reference workers from a pinned manifest.
 
+On native AArch64 Linux, `cargo xtask memory-admission CANDIDATE REFERENCE`
+checks the worker libraries using the probe and observer in `target/harness`.
+It prints the calibration certificate and exits nonzero if coverage cannot
+be established. Use built workers you trust.
+
 ## Measuring performance
 
 - Time optimised builds doing equivalent work. For demuxing, the timed operation is

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Capture qualification on native Linux (tooling).
+"""Capture diagnostics on native Linux.
 
 For every required case in harness/capture/cases.json:
   1. generate the RGBA input and record its SHA-256;
@@ -10,11 +10,9 @@ For every required case in harness/capture/cases.json:
      session; the ratio interval is the shared harness's bootstrap of the
      median paired ratio (harness.runner.ratio_interval). Gate: upper 95%
      bound <= 1.20 (target 0.80);
-  4. memory: the shared glibc observer (harness/allocations-linux.c) in heap
-     and rss mode, separate runs, alternating order. Gates: candidate heap
-     peak strictly below the reference in every pair, and the approved
-     conservative RSS formula (candidate VmPeak ceiling vs reference observed
-     peak) with upper 95% ratio strictly below 1.0.
+  4. memory: the glibc observer in separate heap and RSS runs. The RSS
+     diagnostic reports growth during the operation. Capture qualification
+     requires observer admission and total resident peak RSS.
 
 The machine must be otherwise idle; a CPU-contention check runs before every
 timing/memory batch (harness.runner.competing_builds) and contaminated
@@ -208,8 +206,8 @@ def main():
             "runtime_gate": record["runtime"]["gate_pass"], "runtime_target_0_80": record["runtime"]["target_pass"],
             "heap_gate": record["memory"]["heap_gate_pass"], "rss_gate": record["memory"]["rss_gate_pass"],
         }
-        record["verdict"]["all_gates"] = all(record["verdict"][k] for k in
-                                             ("pipeline_parity", "runtime_gate", "heap_gate", "rss_gate"))
+        record["verdict"]["memory_status"] = "diagnostic-only"
+        record["verdict"]["all_gates"] = False
         (cdir / "result.json").write_text(json.dumps(record, indent=1))
         line = {"id": case["id"], **record["verdict"], "runtime_upper95": round(record["runtime"]["ratio"]["upper_95"], 4),
                 "correctness": c}
