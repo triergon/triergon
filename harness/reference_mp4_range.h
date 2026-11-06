@@ -123,10 +123,8 @@ static int mp4_range_main(int argc, char **argv, const uint8_t *data, size_t siz
         if (argc != next + 1 || errno || end == argv[next] || *end)
             return 2;
     }
-    if (memory) {
-        puts("TRIERGON_BEGIN_V1");
-        fflush(stdout);
-    }
+    if (memory && write(STDOUT_FILENO, "TRIERGON_BEGIN_V1\n", 18) != 18)
+        return 2;
     Mp4RangeWork total = {0};
     uint64_t start = now_ns();
     for (uint64_t i = 0; i < iterations; ++i) {
@@ -141,10 +139,8 @@ static int mp4_range_main(int argc, char **argv, const uint8_t *data, size_t siz
         fold(&total.digest, work.digest);
     }
     uint64_t elapsed = bench ? now_ns() - start : 0;
-    if (memory) {
-        puts("TRIERGON_END_V1");
-        fflush(stdout);
-    }
+    if (memory && write(STDOUT_FILENO, "TRIERGON_END_V1\n", 16) != 16)
+        return 2;
     printf("{\"schema\":1,\"operation\":\"mp4-range-playback\",\"iterations\":%" PRIu64
            ",\"packets\":%" PRIu64 ",\"bytes\":%" PRIu64 ",\"digest\":%" PRIu64
            ",\"elapsed_ns\":%" PRIu64 ",\"eof\":true}\n",
