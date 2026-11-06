@@ -163,6 +163,31 @@ fn failure_is_sticky_even_at_known_end_and_cancellation_needs_explicit_recovery(
 }
 
 #[test]
+fn pending_refill_observes_cancellation_after_a_partial_read() {
+    let pool = Budget::new(8192).unwrap();
+    let mut input = cursor(&pool, None, false);
+    let cancel = AtomicBool::new(false);
+    input.provide(&window(&input, b"a")).unwrap();
+    assert!(input.pending_request(&cancel).unwrap().is_none());
+    let mut out = [0; 2];
+    assert!(matches!(
+        input
+            .read_into(&mut out, &mut WorkBudget::new(2), &cancel)
+            .unwrap(),
+        Step::Ready(1)
+    ));
+    assert_eq!(input.pending_request(&cancel).unwrap().unwrap().offset, 1);
+    assert_eq!(
+        input.pending_request(&AtomicBool::new(true)).unwrap_err(),
+        Error::Cancelled
+    );
+    assert_eq!(
+        input.pending_request(&cancel).unwrap_err(),
+        Error::Cancelled
+    );
+}
+
+#[test]
 fn invalid_windows_and_truncation_are_checked_before_committing() {
     let pool = Budget::new(8192).unwrap();
     let foreign = Budget::new(8192).unwrap();

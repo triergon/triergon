@@ -192,7 +192,7 @@ impl BoxReader {
                                 self.filled += count;
                                 self.position = input.position();
                                 if self.filled < self.needed
-                                    && let Some(request) = input.pending_request()
+                                    && let Some(request) = input.pending_request(cancel)?
                                 {
                                     return Ok(Step::NeedInput(request));
                                 }
@@ -268,7 +268,7 @@ impl BoxReader {
                         Step::Ready(count) => {
                             self.position = input.position();
                             if count < remaining
-                                && let Some(request) = input.pending_request()
+                                && let Some(request) = input.pending_request(cancel)?
                             {
                                 return Ok(Step::NeedInput(request));
                             }

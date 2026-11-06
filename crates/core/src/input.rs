@@ -205,14 +205,15 @@ impl InputCursor {
         }
     }
     /// Returns the next request if the cursor has consumed its buffered input
-    /// and the source has neither finished nor failed.
+    /// and the source is still active. Checks for cancellation and sticky
+    /// failure before requesting bytes.
     #[inline]
-    pub fn pending_request(&self) -> Option<InputRequest> {
-        (self.inline_len == 0
-            && self.window.is_none()
-            && self.end.is_none()
-            && self.failure.is_none())
-        .then(|| self.request())
+    pub fn pending_request(&mut self, cancel: &AtomicBool) -> Result<Option<InputRequest>> {
+        if self.inline_len != 0 || self.window.is_some() || self.end.is_some() {
+            return Ok(None);
+        }
+        self.check_cancel(cancel)?;
+        Ok(Some(self.request()))
     }
     fn verify(&self, source: SourceId, token: &InputToken) -> Result<()> {
         if self.pool.identity() != token.pool {
