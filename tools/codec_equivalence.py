@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Record exact decoder-output identities for the codec crates.
 
-Runs each codec's `decode` example over the local conformance vectors and the
+Runs each codec's `decode_<codec>` example over the local conformance vectors and the
 `codec-worker` raw operation over the frozen decoder workloads. It records the SHA-256 of
 every output file plus the exit status and stderr. Refactors of decoders, bit
 readers and sessions must reproduce the record exactly; this is equivalence
@@ -51,15 +51,11 @@ def main():
     jobs = []
     with tempfile.TemporaryDirectory() as scratch:
         for codec, folders in DECODERS.items():
-            binary = examples / "decode"
-            # One example name per package: cargo overwrites target/release/examples/decode,
-            # so build each package's example into its own copy first.
+            example = "decode_" + ("dts" if codec == "dca" else codec)
             subprocess.run(["cargo", "build", "--release", "--locked", "--example",
-                            "decode", "-p", f"triergon-codec-{codec}"], cwd=ROOT, env=env, check=True,
+                            example, "-p", f"triergon-codec-{codec}"], cwd=ROOT, env=env, check=True,
                            capture_output=True)
-            copy = Path(scratch) / f"decode-{codec}"
-            copy.write_bytes(binary.read_bytes())
-            copy.chmod(0o755)
+            copy = examples / example
             for folder in folders:
                 for vector in sorted((SUITE / folder).rglob("*")):
                     if vector.is_file():

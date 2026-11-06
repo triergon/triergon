@@ -22,7 +22,7 @@ while let Some((at, header)) = adts::find_frame(&stream, pos) {
 dec.reset(); // after a seek: drops overlap, prediction, PNS, SBR and PS history
 ```
 
-`examples/decode.rs IN.aac OUT.f32` writes interleaved f32le and prints a JSON summary.
+`examples/decode_aac.rs IN.aac OUT.f32` writes interleaved f32le and prints a JSON summary.
 
 ## Supported
 

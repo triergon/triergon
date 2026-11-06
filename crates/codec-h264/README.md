@@ -23,7 +23,7 @@ while let Some(pic) = dec.receive() { /* ... */ }
 
 `send_nals` accepts Annex B data without an implied access-unit boundary; `send_nal`
 takes one NAL unit without start code. `reset` drops the DPB and keeps parameter sets.
-`examples/decode.rs IN.264 OUT.yuv` writes raw yuv420p and one JSON line per picture.
+`examples/decode_h264.rs IN.264 OUT.yuv` writes raw yuv420p and one JSON line per picture.
 
 ## Supported
 

@@ -20,7 +20,7 @@ for core_frame in frames {            // one complete core frame per call
 dec.reset(); // after a seek: drops ADPCM, LFE and synthesis history
 ```
 
-`examples/decode.rs IN.dts [OUT.f32]` splits a stream by sync and FSIZE, skips extension
+`examples/decode_dts.rs IN.dts [OUT.f32]` splits a stream by sync and FSIZE, skips extension
 substreams and writes interleaved f32le.
 
 ## Supported

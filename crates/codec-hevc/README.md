@@ -25,7 +25,7 @@ dec.flush();                           // end of stream: output the remaining pi
 
 `send_nal` takes one NAL unit without start code; `reset` drops the DPB and any partial
 picture. `Plane::raw()` gives zero-copy access to the backing plane and `write_raw`
-appends u8 or little-endian u16 samples. `examples/decode.rs IN.hevc OUT.yuv|-|null`
+appends u8 or little-endian u16 samples. `examples/decode_hevc.rs IN.hevc OUT.yuv|-|null`
 writes planar YUV and one JSON line per picture.
 
 ## Features

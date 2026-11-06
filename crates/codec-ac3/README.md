@@ -24,7 +24,7 @@ while pos < stream.len() {
 
 `Decoder::with_options(DecoderOptions { crc, noise, ffmpeg_compat })` selects the CRC
 policy (`CrcPolicy::Report` or `Reject`), the noise mode (`NoiseMode::Normal` or `Off`)
-and FFmpeg compatibility. `examples/decode.rs` writes interleaved f32le.
+and FFmpeg compatibility. `examples/decode_ac3.rs` writes interleaved f32le.
 
 ## Supported
 
