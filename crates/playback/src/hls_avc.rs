@@ -700,27 +700,35 @@ impl AvcTsReader {
     }
 }
 
+fn adjacent_zero_bytes(chunk: &[u8; 16], next: u8) -> u128 {
+    let word = u128::from_le_bytes(*chunk);
+    let adjacent = word | (word >> 8) | (u128::from(next) << 120);
+    // Borrow can mark a later byte. The first mark always starts a zero pair.
+    adjacent.wrapping_sub(0x0101_0101_0101_0101_0101_0101_0101_0101)
+        & !adjacent
+        & 0x8080_8080_8080_8080_8080_8080_8080_8080
+}
+
 fn nal_body_prefix_len(bytes: &[u8]) -> usize {
     let mut rest = bytes;
     while let Some((chunk, tail)) = rest.split_first_chunk::<16>()
         && let Some(&next) = tail.first()
     {
-        let word = u128::from_le_bytes(*chunk);
-        let adjacent = word | (word >> 8) | (u128::from(next) << 120);
-        let zero_pairs = adjacent.wrapping_sub(0x0101_0101_0101_0101_0101_0101_0101_0101)
-            & !adjacent
-            & 0x8080_8080_8080_8080_8080_8080_8080_8080;
+        let zero_pairs = adjacent_zero_bytes(chunk, next);
         if zero_pairs != 0 {
-            // Borrow can mark a later byte. The first mark always starts a zero pair.
             return bytes.len() - rest.len() + zero_pairs.trailing_zeros() as usize / 8;
         }
         rest = tail;
     }
-    bytes.len() - rest.len()
-        + rest
-            .windows(2)
-            .position(|pair| pair == [0, 0])
-            .unwrap_or_else(|| rest.len() - usize::from(rest.last() == Some(&0)))
+    if let Some((head, tail)) = bytes.split_last_chunk::<16>() {
+        // The overlap has already been checked. Treat a trailing zero as a
+        // possible prefix for the next input span.
+        return head.len() + adjacent_zero_bytes(tail, 0).trailing_zeros() as usize / 8;
+    }
+    bytes
+        .windows(2)
+        .position(|pair| pair == [0, 0])
+        .unwrap_or_else(|| bytes.len() - usize::from(bytes.last() == Some(&0)))
 }
 
 fn append(
