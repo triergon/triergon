@@ -40,6 +40,7 @@ samples are archived, their SHA-256. Update the row in the same change as the re
 | Matroska startup and seek | `fffb4a58ad0789338871d3032599e3116e5cb3d5` | `f449a8af7381be72dad4ffaba5615a99a0884a8bfb3a61b19c35f961f171f17a` |
 | ISO BMFF / MP4 | `68e846208e8e9be5f11c4c384cafc613444d9663` | `2df22635427d266ec17257d5e0a9ec8d1d19fd7038542343e5983c7d219795be` |
 | HLS segments | `763f05cf762dadd293328b33cc4dae54136695d4` | `de885f051789ceeff07556b40fcd3928c9e651d3c6b5ee3b193b8126d82435c1` |
+| Capture | `3f7547922e7be74ab21baf12f92851a161388c33` | raw samples not archived (receipt in the `capture-linux-arm64` evidence set) |
 
 ## Platforms
 
