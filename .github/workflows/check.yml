@@ -26,4 +26,4 @@ jobs:
       - name: Prepare pinned reference and fixtures
         run: make prepare-check || make prepare-check
       - name: Verify workspace
-        run: make check
+        run: cargo xtask check

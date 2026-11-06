@@ -112,3 +112,7 @@ dependencies = [
  "triergon-core",
  "triergon-harness-protocol",
 ]
+
+[[package]]
+name = "xtask"
+version = "0.0.0"
