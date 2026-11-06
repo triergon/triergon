@@ -325,7 +325,9 @@ fn complete_segment_preserves_ffmpeg_cross_track_feed_order() {
                         break;
                     }
                     HlsSegmentProgress::Yield | HlsSegmentProgress::NeedInput(_) => {}
-                    other => panic!("unexpected segment progress {other:?}"),
+                    other @ HlsSegmentProgress::Backpressure { .. } => {
+                        panic!("unexpected segment progress {other:?}")
+                    }
                 }
             }
             assert!(ready, "whole segment reader stalled");

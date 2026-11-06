@@ -38,12 +38,12 @@ pub fn source_sample(out: &mut String, s: &triergon_isobmff::Sample) {
     match s.dts_ticks {
         Some(v) => write!(out, "{v}").expect("String write"),
         None => out.push_str("null"),
-    };
+    }
     out.push_str(",\"cts\":");
     match s.cts_ticks {
         Some(v) => write!(out, "{v}").expect("String write"),
         None => out.push_str("null"),
-    };
+    }
     match s.composition_offset {
         Some(v) => write!(
             out,
@@ -53,7 +53,7 @@ pub fn source_sample(out: &mut String, s: &triergon_isobmff::Sample) {
         )
         .expect("String write"),
         None => out.push_str(",\"offset_version\":null,\"offset_bits\":null"),
-    };
+    }
     write!(
         out,
         ",\"access\":\"{:?}\",\"partial_sync\":{},\"dependency\":",
@@ -63,12 +63,12 @@ pub fn source_sample(out: &mut String, s: &triergon_isobmff::Sample) {
     match s.dependency {
         Some(v) => write!(out, "{v}").expect("String write"),
         None => out.push_str("null"),
-    };
+    }
     out.push_str(",\"fragment_flags\":");
     match s.fragment_flags {
         Some(v) => write!(out, "{v}").expect("String write"),
         None => out.push_str("null"),
-    };
+    }
     out.push('}');
 }
 pub fn source_receipts(out: &mut String, r: &triergon_isobmff::MovieSeekResult<'_>) {
@@ -91,7 +91,7 @@ pub fn source_receipts(out: &mut String, r: &triergon_isobmff::MovieSeekResult<'
         match p.edit_ordinal {
             Some(v) => write!(out, "{v}").expect("String write"),
             None => out.push_str("null"),
-        };
+        }
         out.push_str(",\"raw_edit_fields\":");
         if let Some(e) = &p.edit_entry {
             edit(out, e);
@@ -132,15 +132,15 @@ pub fn source_receipts(out: &mut String, r: &triergon_isobmff::MovieSeekResult<'
         match s.raw_mapping_index {
             Some(v) => write!(out, "{v}").expect("String write"),
             None => out.push_str("null"),
-        };
+        }
         out.push_str(",\"definition_origin\":");
         match s.definition_origin {
             Some(RecoveryDefinitionOrigin::Track) => out.push_str("{\"kind\":\"track\"}"),
             Some(RecoveryDefinitionOrigin::Fragment(v)) => {
-                write!(out, "{{\"kind\":\"fragment\",\"ordinal\":{v}}}").expect("String write")
+                write!(out, "{{\"kind\":\"fragment\",\"ordinal\":{v}}}").expect("String write");
             }
             None => out.push_str("null"),
-        };
+        }
         out.push_str(",\"description\":");
         if let Some(d) = &s.description {
             write!(

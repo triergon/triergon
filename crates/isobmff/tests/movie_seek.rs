@@ -53,11 +53,11 @@ fn composition(
     }
     panic!("composition lookup stalled within fixed poll bound");
 }
-fn target<'a>(
-    context: MovieSourceSeekContext<'a>,
+fn target(
+    context: MovieSourceSeekContext<'_>,
     at: Time,
     quantum: u64,
-) -> Result<MovieSeekResult<'a>, Error> {
+) -> Result<MovieSeekResult<'_>, Error> {
     let mut planner = MovieSourceSeekPlanner::new(context, at, MovieSeekLimits::default())?;
     for _ in 0..2048 {
         if planner.poll(&mut WorkBudget::new(quantum), &AtomicBool::new(false))?

@@ -711,9 +711,9 @@ fn opaque_bytes_are_never_recoded_trimmed_or_nul_terminated() {
 }
 #[test]
 fn physical_inline_state_has_explicit_ceilings() {
-    assert!(std::mem::size_of::<Header>() <= 512);
-    assert!(std::mem::size_of::<Attachment>() <= 256);
-    assert!(std::mem::size_of::<Metadata>() <= 128);
-    assert!(std::mem::size_of::<Context>() <= 768);
-    assert!(std::mem::size_of::<Builder>() <= 2048);
+    assert!(size_of::<Header>() <= 512);
+    assert!(size_of::<Attachment>() <= 256);
+    assert!(size_of::<Metadata>() <= 128);
+    assert!(size_of::<Context>() <= 768);
+    assert!(size_of::<Builder>() <= 2048);
 }

@@ -130,13 +130,14 @@ fn main() {
                 if first.is_none() {
                     first = Some((
                         frame.sample_rate,
-                        triergon_codec_dca::layout_name(&frame.layout)
-                            .map(str::to_string)
-                            .unwrap_or_else(|| {
+                        triergon_codec_dca::layout_name(&frame.layout).map_or_else(
+                            || {
                                 let names: Vec<&str> =
                                     frame.layout.speakers().iter().map(|s| s.name()).collect();
                                 format!("{} channels ({})", names.len(), names.join("+"))
-                            }),
+                            },
+                            str::to_string,
+                        ),
                         frame
                             .layout
                             .speakers()

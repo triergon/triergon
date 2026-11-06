@@ -331,7 +331,7 @@ fn drive(
     let mut reader = match made {
         Ok(reader) => reader,
         Err(error) => {
-            output.terminal = class(error).to_owned();
+            class(error).clone_into(&mut output.terminal);
             output.error = Some(error);
             return output;
         }
@@ -352,12 +352,12 @@ fn drive(
             Ok(Step::NeedInput(needed)) => respond(&mut reader, needed, &source, chunk),
             Ok(Step::End(end)) => {
                 assert_eq!(end.source, SOURCE);
-                output.terminal = "end".to_owned();
+                "end".clone_into(&mut output.terminal);
                 output.end_offset = Some(end.offset);
                 return output;
             }
             Err(error) => {
-                output.terminal = class(error).to_owned();
+                class(error).clone_into(&mut output.terminal);
                 output.error = Some(error);
                 if !matches!(error, Error::Backpressure { .. } | Error::Allocation) {
                     assert_eq!(

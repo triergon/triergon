@@ -61,7 +61,7 @@ impl Vlc {
 
     /// Returns the symbol, or `None` for an invalid codeword.
     #[inline(always)]
-    pub(crate) fn read(&self, r: &mut BitReader) -> Option<u16> {
+    pub(crate) fn read(&self, r: &mut BitReader<'_>) -> Option<u16> {
         let (s, l) = self.table[r.peek(self.bits) as usize];
         if l > 0 {
             r.skip(l as u32);
@@ -121,7 +121,7 @@ pub(crate) fn tables() -> &'static CavlcTables {
 
 /// run_before (Table 9-10): small direct table for zerosLeft <= 6, closed form for > 6.
 #[inline(always)]
-fn read_run_before(r: &mut BitReader, zeros_left: i32) -> i32 {
+fn read_run_before(r: &mut BitReader<'_>, zeros_left: i32) -> i32 {
     // [zerosLeft - 1][next 3 bits] -> (run_before, length)
     const T: [[(u8, u8); 8]; 6] = [
         [
@@ -208,7 +208,7 @@ fn read_run_before(r: &mut BitReader, zeros_left: i32) -> i32 {
 #[inline]
 #[allow(clippy::too_many_arguments)]
 pub(crate) fn residual_block(
-    r: &mut BitReader,
+    r: &mut BitReader<'_>,
     t: &CavlcTables,
     nc: i32,
     dst: &mut [i32],
@@ -228,7 +228,7 @@ pub(crate) fn residual_block(
 #[allow(clippy::too_many_arguments)]
 #[allow(clippy::needless_range_loop)] // indexed form over parallel fixed-size arrays (mirrors the spec loops, keeps the hot loop vectorisable)
 fn residual_block_inner(
-    r: &mut BitReader,
+    r: &mut BitReader<'_>,
     t: &CavlcTables,
     nc: i32,
     dst: &mut [i32],
@@ -416,7 +416,7 @@ mod tests {
                 .collect()
         })
         .collect();
-        for codes in all.iter() {
+        for codes in &all {
             assert!(kraft(codes) <= 1.0 + 1e-12);
             let vlc = Vlc::build(codes, 8);
             for &(code, len, sym) in codes {

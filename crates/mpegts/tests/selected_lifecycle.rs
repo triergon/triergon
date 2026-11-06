@@ -321,7 +321,7 @@ fn bind(events: &Events, b: &Budget) -> (NativePesRecoveryObserver, NativePatRou
                     done = true;
                     break;
                 }
-                other => panic!("unexpected {other:?}"),
+                other @ TableStep::Done => panic!("unexpected {other:?}"),
             }
         }
         assert!(done);
@@ -375,7 +375,7 @@ fn rebind(o: &mut NativePesRecoveryObserver, r: NativePatRoute, e: &Events) -> N
         {
             TableStep::Yield => assert!(w.spent() <= 1),
             TableStep::Output(v) => return v,
-            other => panic!("unexpected {other:?}"),
+            other @ TableStep::Done => panic!("unexpected {other:?}"),
         }
     }
     panic!("rebind did not finish");
@@ -549,7 +549,7 @@ fn source_network_entry_is_not_a_track() {
                 assert_eq!(v, None);
                 break;
             }
-            other => panic!("unexpected {other:?}"),
+            other @ TableStep::Done => panic!("unexpected {other:?}"),
         }
     }
 }
@@ -814,14 +814,14 @@ fn feature_rebind_work_zero_one_cancel_retry_and_scope_commit() {
             {
                 TableStep::Yield => {
                     assert!(w.spent() <= 1);
-                    assert_eq!(j.current_scope(), old)
+                    assert_eq!(j.current_scope(), old);
                 }
                 TableStep::Output(v) => {
                     assert_eq!(v.scope.epochs.configuration, 3);
                     committed = true;
                     break;
                 }
-                other => panic!("unexpected {other:?}"),
+                other @ TableStep::Done => panic!("unexpected {other:?}"),
             }
         }
         assert!(committed);

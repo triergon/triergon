@@ -76,6 +76,7 @@ impl UnitQueue {
         self.bytes -= unit.data.len();
         Some(unit)
     }
+    #[allow(clippy::option_option)] // `None`: empty queue; `Some(None)`: unit without a timestamp.
     pub fn front_pts(&self) -> Option<Option<i64>> {
         self.units.front().map(|unit| unit.pts)
     }

@@ -36,7 +36,7 @@ impl Source for Transport {
         request: &InputRequest,
         work: &mut WorkBudget,
         cancel: &AtomicBool,
-    ) -> triergon_core::Result<SourceReply> {
+    ) -> Result<SourceReply> {
         if work.remaining() != 0 && !cancel.load(Ordering::Relaxed) {
             self.signals.polls.fetch_add(1, Ordering::Relaxed);
         }
@@ -1163,7 +1163,7 @@ fn catalogue_second_inband_movie_stays_refused_without_implicit_replacement() {
 fn catalogue_existing_seek_intent_is_retained_but_not_applied_to_new_source_clock() {
     let b = Budget::new(64 << 20).unwrap();
     let (mut p, old) = player(&b, SourceId(9801), &gold::CASES[0], PlayerPolicy::default());
-    let target = triergon_core::Time::new(4, 1).unwrap();
+    let target = Time::new(4, 1).unwrap();
     assert!(
         p.seek_and_select(
             TrackKey::Mp4(1),
@@ -1219,11 +1219,11 @@ impl pump::Sink for Consumer {
     fn completion(&mut self) -> Option<pump::FeedToken> {
         self.completions.pop_front()
     }
-    fn pause(&mut self, paused: bool) -> triergon_core::Result<()> {
+    fn pause(&mut self, paused: bool) -> Result<()> {
         self.paused = paused;
         Ok(())
     }
-    fn reset(&mut self, seek: &SeekIntent) -> triergon_core::Result<()> {
+    fn reset(&mut self, seek: &SeekIntent) -> Result<()> {
         self.seeks.push(*seek);
         Ok(())
     }
@@ -1232,7 +1232,7 @@ impl pump::Sink for Consumer {
     }
 }
 impl pump::CatalogueSink for Consumer {
-    fn prepare_catalogue(&mut self, next: &Engine) -> triergon_core::Result<()> {
+    fn prepare_catalogue(&mut self, next: &Engine) -> Result<()> {
         assert!(matches!(next, Engine::Mp4(_)));
         if self.refuse {
             return Err(C::Backpressure {

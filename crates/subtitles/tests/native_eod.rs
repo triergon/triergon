@@ -185,23 +185,23 @@ fn check(index: usize) {
 }
 #[test]
 fn native_shared_ancillary_end() {
-    check(0)
+    check(0);
 }
 #[test]
 fn native_nonempty_ancillary_end_tolerance() {
-    check(1)
+    check(1);
 }
 #[test]
 fn native_composition_end_control() {
-    check(2)
+    check(2);
 }
 #[test]
 fn native_shared_composition_end_tolerance() {
-    check(3)
+    check(3);
 }
 #[test]
 fn native_foreign_end_filter_control() {
-    check(4)
+    check(4);
 }
 
 #[test]

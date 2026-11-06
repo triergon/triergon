@@ -136,7 +136,7 @@ fn sample_work_ok(sample: &Value, iterations: i128) -> Result<(f64, f64), ()> {
     let keys = ["iterations", "packets", "bytes", "digest", "elapsed_ns"];
     for work in [a, b] {
         for key in keys {
-            if !int(work.get(key)).is_some_and(|v| v >= 0)
+            if int(work.get(key)).is_none_or(|v| v < 0)
                 || matches!(work.get(key), Some(Value::Bool(_)))
             {
                 return Err(());

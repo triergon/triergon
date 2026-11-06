@@ -306,7 +306,7 @@ impl EsdsWalk {
                                 skip = 1;
                             }
                         }
-                        next >= 3 && skip == 0 && es_flags & 96 == 0
+                        next >= 3 && skip == 0 && es_flags & 0x60 == 0
                     };
                     if done {
                         if self.depth == 2 {

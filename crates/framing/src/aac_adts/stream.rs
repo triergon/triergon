@@ -175,7 +175,7 @@ impl AacAdtsStreamReader {
             self.capabilities = c.capabilities();
         }
         if matches!(result, Err(Error::Truncated)) {
-            self.stop(Error::Truncated)
+            self.stop(Error::Truncated);
         }
         result
     }
@@ -285,7 +285,7 @@ impl AacAdtsStreamReader {
         if let Err(e) = result
             && !matches!(e, Error::Backpressure { .. } | Error::Allocation)
         {
-            self.stop(e)
+            self.stop(e);
         }
         result
     }

@@ -140,7 +140,7 @@ pub(crate) struct SubframeParams {
 }
 
 #[inline]
-fn read_scale_index(br: &mut BitReader, shuff: u8, sum: &mut i32) -> i32 {
+fn read_scale_index(br: &mut BitReader<'_>, shuff: u8, sum: &mut i32) -> i32 {
     match shuff {
         0..=4 => {
             *sum += br.huff(books::SCALE_BOOKS[shuff as usize]);
@@ -171,7 +171,7 @@ fn scale_value(shuff: u8, idx: i32) -> Result<f32, DecodeError> {
 /// `t0 .. t0 + nssc * 8` (relative to the row's sample area).
 #[allow(clippy::too_many_arguments)]
 pub(crate) fn decode_subframe(
-    br: &mut BitReader,
+    br: &mut BitReader<'_>,
     hdr: &SetHeader,
     side: &mut SideInfo,
     p: &SubframeParams,
@@ -353,7 +353,7 @@ pub(crate) fn decode_subframe(
                     if abits <= 10 && sel < nh {
                         let book = books::sample_book(abits, sel)
                             .ok_or(DecodeError::InvalidData("sample codebook"))?;
-                        for v in q.iter_mut() {
+                        for v in &mut q {
                             *v = br.huff(book);
                         }
                         adj = hdr.adj[ch][abits as usize - 1];
@@ -372,7 +372,7 @@ pub(crate) fn decode_subframe(
                         }
                     } else {
                         let bits = abits - 3;
-                        for v in q.iter_mut() {
+                        for v in &mut q {
                             *v = br.read_signed(bits);
                         }
                     }

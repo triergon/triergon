@@ -129,9 +129,9 @@ fn review_native_difference(
 }
 
 pub fn parity(
-    run: &Run,
+    run: &Run<'_>,
     sequential_required: bool,
-    comparison: Option<&Comparison>,
+    comparison: Option<&Comparison<'_>>,
     source_content: bool,
     prefix: &str,
 ) -> Result<Value, String> {
@@ -346,9 +346,9 @@ pub fn parity(
 }
 
 pub fn catalogue_parity(
-    run: &Run,
+    run: &Run<'_>,
     sequential_required: bool,
-    comparison: Option<&Comparison>,
+    comparison: Option<&Comparison<'_>>,
     content: bool,
 ) -> Result<Value, String> {
     let mut result = parity(run, sequential_required, comparison, content, "catalogue-")?;
@@ -399,9 +399,9 @@ pub fn catalogue_parity(
 }
 
 pub fn colour_parity(
-    run: &Run,
+    run: &Run<'_>,
     sequential_required: bool,
-    comparison: Option<&Comparison>,
+    comparison: Option<&Comparison<'_>>,
     content: bool,
 ) -> Result<Value, String> {
     let mut result = parity(run, sequential_required, comparison, content, "")?;
@@ -452,9 +452,9 @@ pub fn colour_parity(
 }
 
 pub fn seek_parity(
-    run: &Run,
+    run: &Run<'_>,
     sequential_required: bool,
-    comparison: Option<&Comparison>,
+    comparison: Option<&Comparison<'_>>,
     content: bool,
 ) -> Result<Value, String> {
     let mut result = parity(run, sequential_required, comparison, content, "")?;
@@ -515,7 +515,7 @@ pub fn seek_parity(
 /// Fold parity: candidate and reference `{prefix}fold` both reach the end of input and
 /// both match the case's independently recorded packet count, byte count and fold.
 pub fn feed_parity(
-    run: &Run,
+    run: &Run<'_>,
     prefix: &str,
     arguments: &[OsString],
     expected: &Value,

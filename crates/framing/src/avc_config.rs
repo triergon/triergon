@@ -99,6 +99,8 @@ pub struct AvcConfigNal {
     header: NalHeader,
 }
 
+// Shows the derived ranges and counts instead of their stored parts.
+#[allow(clippy::missing_fields_in_debug)]
 impl std::fmt::Debug for AvcConfigNal {
     fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         formatter
@@ -141,6 +143,8 @@ pub struct AvcConfigArray {
     count_offset: usize,
 }
 
+// Shows the derived ranges and counts instead of their stored parts.
+#[allow(clippy::missing_fields_in_debug)]
 impl std::fmt::Debug for AvcConfigArray {
     fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         formatter

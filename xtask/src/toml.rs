@@ -100,12 +100,11 @@ fn entry<'a>(
     key: &str,
     new: impl FnOnce() -> Value,
 ) -> &'a mut Value {
-    let index = match members.iter().position(|(k, _)| k == key) {
-        Some(index) => index,
-        None => {
-            members.push((key.to_owned(), new()));
-            members.len() - 1
-        }
+    let index = if let Some(index) = members.iter().position(|(k, _)| k == key) {
+        index
+    } else {
+        members.push((key.to_owned(), new()));
+        members.len() - 1
     };
     &mut members[index].1
 }

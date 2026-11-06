@@ -206,11 +206,11 @@ fn every_ga_flag_delay_and_selected_extension_is_retained() {
                 b.put(u32::from(short), 1);
                 b.put(u32::from(delay.is_some()), 1);
                 if let Some(n) = delay {
-                    b.put(n, 14)
+                    b.put(n, 14);
                 }
                 b.put(u32::from(ext), 1);
                 if ext {
-                    b.put(0, 1)
+                    b.put(0, 1);
                 }
                 let f = parse(&b).unwrap().facts();
                 assert_eq!(f.ga.frame_length_flag, short);
@@ -459,9 +459,10 @@ fn pce_reservation_retries_without_repeating_consumed_setup_or_losing_input() {
     blocker.try_reserve_exact(pool.available() - 1).unwrap();
     let mut p =
         AacAscParser::with_bit_length(&pool, source(), raw.clone(), b.len, limits()).unwrap();
-    let e = match p.step(&mut WorkBudget::new(1000), &AtomicBool::new(false)) {
-        Err(e @ Error::Backpressure { .. }) => e,
-        _ => panic!("no actual descriptor pressure"),
+    let Err(e @ Error::Backpressure { .. }) =
+        p.step(&mut WorkBudget::new(1000), &AtomicBool::new(false))
+    else {
+        panic!("no actual descriptor pressure")
     };
     let charged = pool.used();
     for _ in 0..5 {
@@ -478,7 +479,7 @@ fn pce_reservation_retries_without_repeating_consumed_setup_or_losing_input() {
         {
             BuildStep::Ready(o) => break o,
             BuildStep::Yield => {}
-            _ => panic!(),
+            BuildStep::Complete => panic!(),
         }
     };
     assert_eq!(o.source_bytes().as_ref(), b.bytes);
@@ -493,7 +494,7 @@ fn impossible_live_set_is_limit_rather_than_permanent_backpressure() {
     )
     .unwrap();
     let baseline = pool.used();
-    assert!(70 * std::mem::size_of::<AacPceElement>() > pool.limit());
+    assert!(70 * size_of::<AacPceElement>() > pool.limit());
     assert!(matches!(
         run(
             &pool,
@@ -544,12 +545,11 @@ fn physical_padding_and_opaque_suffix_are_retained_under_explicit_bit_bounds() {
     assert_eq!(o.source_bytes().as_ref(), b.bytes);
     assert_eq!(o.opaque_suffix_bits().bit_count, 0);
     let mut p = AacAscParser::new(&pool, source(), raw.clone(), limits()).unwrap();
-    let o = match p
+    let BuildStep::Ready(o) = p
         .step(&mut WorkBudget::new(1000), &AtomicBool::new(false))
         .unwrap()
-    {
-        BuildStep::Ready(o) => o,
-        _ => panic!(),
+    else {
+        panic!()
     };
     assert_eq!(o.opaque_suffix_bits().bit_count, 24);
     assert_eq!(o.source_bytes().as_ref(), b.bytes);

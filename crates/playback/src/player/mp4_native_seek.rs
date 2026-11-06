@@ -315,7 +315,7 @@ impl Mp4NativeSeekJob<'_> {
         result
     }
 
-    fn scan(&mut self, work: &mut WorkBudget, cancel: &AtomicBool) -> triergon_core::Result<bool> {
+    fn scan(&mut self, work: &mut WorkBudget, cancel: &AtomicBool) -> Result<bool> {
         if cancel.load(Ordering::Relaxed) {
             return Err(Error::Cancelled);
         }

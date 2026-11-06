@@ -126,7 +126,7 @@ fn drive(
                     )?)?;
                 }
             }
-            other => panic!("ample-pool source must progress: {other:?}"),
+            other @ Step::Backpressure(_) => panic!("ample-pool source must progress: {other:?}"),
         }
     }
     panic!("typed operation did not complete under work-one scheduling")
@@ -415,6 +415,6 @@ fn known_length_starvation_and_transport_failure_stay_distinct_from_end() {
     assert!(at_boundary);
     assert!(matches!(
         reader.step(&mut WorkBudget::new(1000), &cancel),
-        Err(triergon_core::Error::Transport)
+        Err(Error::Transport)
     ));
 }

@@ -10,7 +10,7 @@ use crate::tables::{
 };
 use crate::transform;
 
-impl<'a, P: Pixel> SliceDecoder<'a, P> {
+impl<P: Pixel> SliceDecoder<'_, P> {
     pub(super) fn residual(
         &mut self,
         cu: &Cu,

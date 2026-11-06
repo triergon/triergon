@@ -189,7 +189,7 @@ impl AssPacketJob {
                         charset,
                         &self.pool,
                         self.limits,
-                    )?)
+                    )?);
                 }
             }
             self.setup = true;
@@ -232,7 +232,7 @@ impl AssPacketJob {
             if b == b',' && self.commas < 8 {
                 self.commas += 1;
                 if self.commas == 8 {
-                    self.text_at = Some(self.at + 1)
+                    self.text_at = Some(self.at + 1);
                 }
             }
             self.at += 1;

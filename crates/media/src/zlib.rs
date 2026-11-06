@@ -16,7 +16,7 @@ pub fn decompress_in(
     pool: &triergon_core::Budget,
 ) -> Result<crate::storage::SharedBytes> {
     if !source.belongs_to(pool) {
-        return Err(triergon_core::Error::ForeignPool);
+        return Err(Error::ForeignPool);
     }
     if let Some(range) = stored_range(source, limits, cancel)? {
         // Stored length is known and validated. Speculative capacity here can

@@ -483,11 +483,10 @@ impl PacketJob {
                     .highlight
                     .is_some_and(|(start, _)| usize::from(start) == self.character)
                 {
-                    if let Some(c) = self.highlight_color {
+                    if let Some([c_0, c_1, c_2, ..]) = self.highlight_color {
                         write!(
                             self.writer.pending,
-                            "{{\\2c&H{:02x}{:02x}{:02x}&}}",
-                            c[2], c[1], c[0]
+                            "{{\\2c&H{c_2:02x}{c_1:02x}{c_0:02x}&}}"
                         )
                         .map_err(|_| Error::Overflow)?;
                     } else {

@@ -13,12 +13,11 @@ fn fate(rel: &str) -> Option<Vec<u8>> {
     let p = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
         .join("../../.research/fate-samples/dts")
         .join(rel);
-    match std::fs::read(&p) {
-        Ok(b) => Some(b),
-        Err(_) => {
-            eprintln!("note: vector {} absent, skipped", p.display());
-            None
-        }
+    if let Ok(b) = std::fs::read(&p) {
+        Some(b)
+    } else {
+        eprintln!("note: vector {} absent, skipped", p.display());
+        None
     }
 }
 
@@ -78,13 +77,21 @@ fn ts_dts(b: &[u8]) -> Vec<u8> {
 
 fn core_stream(rel: &str) -> Option<Vec<u8>> {
     let b = fate(rel)?;
-    Some(if rel.ends_with(".dtshd") {
-        dtshd_stream(&b)
-    } else if rel.ends_with(".ts") {
-        ts_dts(&b)
-    } else {
-        b
-    })
+    Some(
+        if std::path::Path::new(rel)
+            .extension()
+            .is_some_and(|ext| ext.eq_ignore_ascii_case("dtshd"))
+        {
+            dtshd_stream(&b)
+        } else if std::path::Path::new(rel)
+            .extension()
+            .is_some_and(|ext| ext.eq_ignore_ascii_case("ts"))
+        {
+            ts_dts(&b)
+        } else {
+            b
+        },
+    )
 }
 
 fn run(name: &str, rel: &str) {

@@ -119,7 +119,7 @@ impl SelectedPending {
     pub(super) fn rejection(&self) -> Option<&RejectedTransport> {
         match &self.carrier {
             NativeDiagnosticCarrier::Rejected(r) => Some(r),
-            _ => None,
+            NativeDiagnosticCarrier::Transport(_) => None,
         }
     }
     fn counter(&self) -> u8 {

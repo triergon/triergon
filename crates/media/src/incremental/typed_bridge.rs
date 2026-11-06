@@ -105,7 +105,7 @@ impl ElementReader {
         work: &mut WorkBudget,
         cancel: &AtomicBool,
     ) -> Result<EnvelopeProgress> {
-        let admit = admission.map_or(super::Admit::Pause, super::Admit::Epoch);
+        let admit = admission.map_or(Admit::Pause, Admit::Epoch);
         let step = self.step_mode::<super::PublicDelivery>(work, cancel, admit)?;
         if let Some(header) = self.awaiting_typed_admission() {
             Ok(EnvelopeProgress::Header(header))
@@ -304,10 +304,10 @@ impl ElementReader {
     }
     fn check_anchor(&self, anchor: &ClusterCheckpoint, offset: u64) -> Result<()> {
         if !anchor.pool.same_pool(self.input.budget()) {
-            return Err(triergon_core::Error::ForeignPool);
+            return Err(Error::ForeignPool);
         }
         if anchor.parser != self.parser || anchor.source != self.input.source() {
-            return Err(triergon_core::Error::SourceMismatch);
+            return Err(Error::SourceMismatch);
         }
         if !self.input.capabilities().random_access {
             return Err(Error::Unsupported("random-access input"));
@@ -413,7 +413,7 @@ impl ElementReader {
     ) -> Result<InputRequest> {
         self.check_anchor(&location.checkpoint, location.position)?;
         if location.generation != self.generation() {
-            return Err(triergon_core::Error::StaleGeneration {
+            return Err(Error::StaleGeneration {
                 expected: self.generation(),
                 received: location.generation,
             });

@@ -6,7 +6,7 @@ use crate::inter;
 use crate::picture::{Frame, Pixel, PuMotion};
 use crate::slice::SLICE_P;
 
-impl<'a, P: Pixel> SliceDecoder<'a, P> {
+impl<P: Pixel> SliceDecoder<'_, P> {
     #[inline(never)]
     pub(super) fn motion_compensate(
         &mut self,

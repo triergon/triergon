@@ -296,7 +296,7 @@ fn receipt_mutations_are_rejected() {
                 &["observed", "receipt"],
                 "error_bits",
                 Value::int(64),
-            )
+            );
         }),
         Box::new(move |f| {
             let i = startup(f, "heap");
@@ -305,7 +305,7 @@ fn receipt_mutations_are_rejected() {
                 &["observed", "observer"],
                 "heap_peak_bytes",
                 Value::int(8193),
-            )
+            );
         }),
         Box::new(move |f| {
             let i = startup(f, "heap");
@@ -314,7 +314,7 @@ fn receipt_mutations_are_rejected() {
                 &["observed", "observer"],
                 "heap_live_end",
                 Value::int(129),
-            )
+            );
         }),
         Box::new(move |f| {
             let i = startup(f, "rss");
@@ -323,7 +323,7 @@ fn receipt_mutations_are_rejected() {
                 &["observed", "observer"],
                 "rss_peak_observed",
                 Value::int(4096),
-            )
+            );
         }),
         Box::new(|f| {
             for record in f
@@ -351,7 +351,7 @@ fn receipt_mutations_are_rejected() {
                 &["observed", "observer"],
                 "unknown_window_releases",
                 Value::int(1),
-            )
+            );
         }),
         Box::new(|f| {
             set(
@@ -359,7 +359,7 @@ fn receipt_mutations_are_rejected() {
                 &["observed", "observer", "guard_window_calls"],
                 "0",
                 Value::Bool(false),
-            )
+            );
         }),
         Box::new(|f| {
             set(
@@ -367,7 +367,7 @@ fn receipt_mutations_are_rejected() {
                 &[],
                 "observed",
                 v(r#"{"status": "observer-failed", "exit_code": 126}"#),
-            )
+            );
         }),
         Box::new(|f| {
             set(
@@ -375,7 +375,7 @@ fn receipt_mutations_are_rejected() {
                 &["observed", "work"],
                 "required_guard_window_calls",
                 Value::Array(vec![Value::int(0); 7]),
-            )
+            );
         }),
         Box::new(|f| {
             let extra = "\n_dl_allocate_tls@@GLIBC_PRIVATE T 100 20";
@@ -942,7 +942,7 @@ fn full_qualification_runs_every_control_and_refuses_a_missing_one() {
         root: harness.clone(),
         records: fixture().records,
         linked,
-        calls: Default::default(),
+        calls: std::cell::RefCell::default(),
         corrupt: false,
     };
     super::memory::clear_caches();

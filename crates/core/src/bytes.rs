@@ -367,14 +367,11 @@ impl<T> BudgetVec<T> {
     }
     pub fn try_push(&mut self, value: T) -> std::result::Result<(), PushError<T>> {
         if self.len() == self.capacity() {
-            let needed = match self.len().checked_add(1) {
-                Some(value) => value,
-                None => {
-                    return Err(PushError {
-                        error: Error::Overflow,
-                        value,
-                    });
-                }
+            let Some(needed) = self.len().checked_add(1) else {
+                return Err(PushError {
+                    error: Error::Overflow,
+                    value,
+                });
             };
             let target = needed.max(self.capacity().saturating_mul(2).max(4));
             let result = self.grow_to(target).or_else(|error| {

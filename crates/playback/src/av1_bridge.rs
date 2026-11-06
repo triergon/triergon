@@ -19,7 +19,7 @@ pub enum Av1Input<'a> {
 
 enum Binding {
     Matroska {
-        configuration: triergon_matroska::typed::Configuration,
+        configuration: Configuration,
         track: usize,
     },
     Mp4 {

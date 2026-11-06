@@ -236,4 +236,4 @@ pub enum Event {
 
 // Backing allocations stay charged by Bytes/BudgetVec. This guards only the
 // complete inline value, on every target, and requires review if it grows.
-const _: () = assert!(std::mem::size_of::<Event>() <= 672);
+const _: () = assert!(size_of::<Event>() <= 672);

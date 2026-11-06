@@ -144,7 +144,7 @@ impl TraditionalSubpicture {
                 "DVD presentation requires native receiver mode",
             ));
         }
-        let Some(bitmap) = self.bitmap().and_then(|bitmap| bitmap.native_view()) else {
+        let Some(bitmap) = self.bitmap().and_then(ProjectedBitmap::native_view) else {
             return Ok(None);
         };
         let boundary = |milliseconds| -> Result<DvdDisplayBoundary> {

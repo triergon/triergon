@@ -251,7 +251,7 @@ impl Kernels for u8 {
         prm: &crate::deblock::LumaLanes,
         _max: i32,
     ) {
-        filter::luma_h16_u8(d, pos, stride, prm)
+        filter::luma_h16_u8(d, pos, stride, prm);
     }
     #[inline(always)]
     fn simd_luma_v16(
@@ -261,7 +261,7 @@ impl Kernels for u8 {
         prm: &crate::deblock::LumaLanes,
         _max: i32,
     ) {
-        filter::luma_v16_u8(d, pos, stride, prm)
+        filter::luma_v16_u8(d, pos, stride, prm);
     }
     #[inline(always)]
     fn simd_chroma16(
@@ -273,9 +273,9 @@ impl Kernels for u8 {
         _max: i32,
     ) {
         if vert {
-            filter::chroma_v16_u8(d, pos, stride, prm)
+            filter::chroma_v16_u8(d, pos, stride, prm);
         } else {
-            filter::chroma_h16_u8(d, pos, stride, prm)
+            filter::chroma_h16_u8(d, pos, stride, prm);
         }
     }
     #[inline(always)]
@@ -524,7 +524,7 @@ impl Kernels for u16 {
         prm: &crate::deblock::LumaLanes,
         max: i32,
     ) {
-        filter::luma_h16_u16(d, pos, stride, prm, max as i16)
+        filter::luma_h16_u16(d, pos, stride, prm, max as i16);
     }
     #[inline(always)]
     fn simd_luma_v16(
@@ -534,7 +534,7 @@ impl Kernels for u16 {
         prm: &crate::deblock::LumaLanes,
         max: i32,
     ) {
-        filter::luma_v16_u16(d, pos, stride, prm, max as i16)
+        filter::luma_v16_u16(d, pos, stride, prm, max as i16);
     }
     #[inline(always)]
     fn simd_sao_eo_hi(
@@ -568,9 +568,9 @@ impl Kernels for u16 {
         max: i32,
     ) {
         if vert {
-            filter::chroma_v16_u16(d, pos, stride, prm, max as i16)
+            filter::chroma_v16_u16(d, pos, stride, prm, max as i16);
         } else {
-            filter::chroma_h16_u16(d, pos, stride, prm, max as i16)
+            filter::chroma_h16_u16(d, pos, stride, prm, max as i16);
         }
     }
     #[inline(always)]

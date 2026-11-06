@@ -62,7 +62,7 @@ fn adts(profile: u32, sfi: u32, chcfg: u32, blocks: &[Vec<u8>], crc: bool) -> Ve
     if crc {
         extra = 2 * (nblk - 1) + 2 + if nblk > 1 { 2 * nblk } else { 0 };
     }
-    let payload_len: usize = blocks.iter().map(|b| b.len()).sum();
+    let payload_len: usize = blocks.iter().map(Vec::len).sum();
     let len = 7 + extra + payload_len;
     let mut h = Bw::new();
     h.put(0xfff, 12);

@@ -26,9 +26,9 @@ impl<S: Source> SourceOwner<S> {
     }
     pub(crate) fn map<T: Source>(mut self, map: impl FnOnce(S) -> T) -> Result<SourceOwner<T>> {
         if self.aborted {
-            return Err(crate::Error::Closed);
+            return Err(Error::Closed);
         }
-        let source = self.source.take().ok_or(crate::Error::Closed)?;
+        let source = self.source.take().ok_or(Error::Closed)?;
         Ok(SourceOwner::new(map(source)))
     }
     pub(crate) fn source_mut(&mut self) -> Option<&mut S> {
@@ -149,7 +149,7 @@ impl<S: Source> Probe<S> {
     }
     pub fn advance(&mut self, w: &mut WorkBudget, c: &AtomicBool) -> Result<ProbeProgress> {
         if self.failed {
-            return Err(crate::Error::Closed);
+            return Err(Error::Closed);
         }
         let result = self.advance_inner(w, c);
         if result.is_err() && !matches!(&result, Err(Error::Backpressure { .. })) {
@@ -249,7 +249,7 @@ impl<S: Source> Probe<S> {
     }
     pub fn finish(mut self) -> Result<SelectedInput<ReplaySource<S>>> {
         if self.failed {
-            return Err(crate::Error::Closed);
+            return Err(Error::Closed);
         }
         let format = self.chosen.ok_or(Error::Invalid("format not selected"))?;
         let old = self.input.take().ok_or(Error::Invalid("probe consumed"))?;
@@ -313,7 +313,7 @@ impl<S: Source> Source for ReplaySource<S> {
         r: &InputRequest,
         w: &mut WorkBudget,
         c: &AtomicBool,
-    ) -> triergon_core::Result<SourceReply> {
+    ) -> Result<SourceReply> {
         if c.load(Ordering::Relaxed) {
             return Err(Error::Cancelled);
         }

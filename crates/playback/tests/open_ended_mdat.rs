@@ -47,7 +47,7 @@ impl Source for FiniteSource {
         r: &InputRequest,
         w: &mut WorkBudget,
         c: &AtomicBool,
-    ) -> triergon_core::Result<SourceReply> {
+    ) -> Result<SourceReply> {
         if c.load(Ordering::Relaxed) {
             return Err(Error::Cancelled);
         }

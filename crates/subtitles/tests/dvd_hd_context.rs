@@ -130,7 +130,7 @@ fn full_contrast_replaces_earlier_packed_override_for_later_packets() {
         assert_eq!(a.value, 255 - ((3 * u16::from(i) + 17) & 255) as u8);
         match a.origin {
             HdContextOrigin::Contrast { owner, .. } => {
-                assert!(owner.shares_storage_with(out[1].source().packet()))
+                assert!(owner.shares_storage_with(out[1].source().packet()));
             }
             _ => panic!("full contrast did not replace packed"),
         }
@@ -149,7 +149,7 @@ fn four_entry_selectors_and_alpha_keep_original_owner_and_unknown_source_rgb() {
     assert!(p.source_rgb.is_none());
     match second.picture_state().selectors_origin() {
         HdContextOrigin::Packed { owner, .. } => {
-            assert!(owner.shares_storage_with(out[0].source().packet()))
+            assert!(owner.shares_storage_with(out[0].source().packet()));
         }
         _ => panic!("selector source missing"),
     }
@@ -197,7 +197,7 @@ fn rejected_rle_retains_error_and_commits_only_the_parsed_context_prefix() {
     assert_eq!(out[1].picture_state().alpha(1).unwrap().value, 235);
     match out[1].picture_state().alpha(99).unwrap().origin {
         HdContextOrigin::Contrast { owner, .. } => {
-            assert!(owner.shares_storage_with(out[0].source().packet()))
+            assert!(owner.shares_storage_with(out[0].source().packet()));
         }
         _ => panic!("rejected prefix source absent"),
     }

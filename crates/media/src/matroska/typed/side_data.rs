@@ -113,7 +113,7 @@ struct Data {
     highest: u64,
     location: Option<GroupLocation>,
     pool: Budget,
-    _charge: Reservation,
+    charge: Reservation,
 }
 /// An opaque owner: clones share the complete charged source and descriptor arenas.
 ///
@@ -205,7 +205,7 @@ impl BlockGroupSource {
             .and_then(|n| {
                 n.checked_add(self.0.references.capacity().checked_mul(size_of::<i64>())?)
             })
-            .and_then(|n| n.checked_add(self.0._charge.bytes()))
+            .and_then(|n| n.checked_add(self.0.charge.bytes()))
             .ok_or(Error::Overflow)
     }
 }
@@ -360,7 +360,7 @@ impl GroupJob {
         pool: &Budget,
     ) -> Result<Self> {
         if !raw.belongs_to(pool) {
-            return Err(triergon_core::Error::ForeignPool);
+            return Err(Error::ForeignPool);
         }
         if raw.len() > limits.block_bytes {
             return Err(Error::Policy("element bytes"));
@@ -780,7 +780,7 @@ impl GroupJob {
                         highest: self.highest,
                         location: self.location,
                         pool: self.pool.clone(),
-                        _charge: charge,
+                        charge,
                     })));
                     self.phase = Phase::Done;
                 }

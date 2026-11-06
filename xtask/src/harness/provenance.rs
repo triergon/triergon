@@ -180,7 +180,7 @@ fn package_files(root: &Path, dir: &Path, out: &mut Vec<(String, Value)>) -> Res
         .map_err(|e| format!("{}: {e}", dir.display()))?
         .filter_map(Result::ok)
         .collect();
-    entries.sort_by_key(|e| e.file_name());
+    entries.sort_by_key(fs::DirEntry::file_name);
     for entry in entries {
         let name = entry.file_name();
         if matches!(

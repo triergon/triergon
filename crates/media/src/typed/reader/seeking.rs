@@ -248,10 +248,10 @@ struct ScanBoundary {
 impl ScanBoundary {
     fn validate(&self, reader: &Reader, location: &ReplayLocation) -> Result<()> {
         if !self.configuration.belongs_to(&reader.pool) {
-            return Err(triergon_core::Error::ForeignPool);
+            return Err(Error::ForeignPool);
         }
         if self.configuration.generation() != reader.generation() {
-            return Err(triergon_core::Error::StaleGeneration {
+            return Err(Error::StaleGeneration {
                 expected: reader.generation(),
                 received: self.configuration.generation(),
             });

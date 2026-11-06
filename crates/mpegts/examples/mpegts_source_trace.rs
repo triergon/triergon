@@ -381,7 +381,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         match argument.as_str() {
             "--dvb" => {
                 descriptor_namespace =
-                    DescriptorNamespace::Dvb(DvbNamespaceEvidence::CallerDeclaredTransportProfile)
+                    DescriptorNamespace::Dvb(DvbNamespaceEvidence::CallerDeclaredTransportProfile);
             }
             "--native-clock-v1" => native_clock_enabled = true,
             "--media-entities-v1" => media_entities_enabled = true,

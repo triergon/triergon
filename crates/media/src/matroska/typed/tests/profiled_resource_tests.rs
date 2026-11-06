@@ -18,7 +18,7 @@ fn chapter(uid: u64, start: u64, end: Option<u64>, nested: &[u8]) -> Vec<u8> {
     payload.extend(nested);
     element(0xb6, &payload)
 }
-fn parse_chapters(raw: &[u8], quantum: u64) -> crate::Result<(SharedDocument, u64)> {
+fn parse_chapters(raw: &[u8], quantum: u64) -> Result<(SharedDocument, u64)> {
     let pool = Budget::new(2 * 1024 * 1024)?;
     let source = SharedBytes::copy_from_slice(&pool, raw)?;
     let mut job = DocumentJob::new(

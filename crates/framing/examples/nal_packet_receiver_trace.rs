@@ -255,8 +255,7 @@ fn main() -> Result<(), Error> {
             fields.stream_index,
             extra
                 .as_ref()
-                .map(|b| format!("\"{}\"", hex(b)))
-                .unwrap_or_else(|| "null".to_string())
+                .map_or_else(|| "null".to_string(), |b| format!("\"{}\"", hex(b)))
         );
         let update = if codec == Codec::Avc {
             if let Some(b) = extra.as_ref().filter(|b| !b.is_empty()) {
@@ -358,8 +357,7 @@ fn main() -> Result<(), Error> {
                         v.source()
                             .new_extradata
                             .as_ref()
-                            .map(|b| format!("\"{}\"", hex(b)))
-                            .unwrap_or_else(|| "null".to_string())
+                            .map_or_else(|| "null".to_string(), |b| format!("\"{}\"", hex(b)))
                     );
                     kept.try_push(v).map_err(|e| e.error)?;
                     break;

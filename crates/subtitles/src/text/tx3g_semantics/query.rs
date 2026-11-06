@@ -111,7 +111,12 @@ impl<'a> PointQuery<'a> {
                     }
                 }
                 Phase::Possible => {
-                    if self.semantic.globals.display.map(|d| d.continuous_karaoke) != Some(false) {
+                    if self
+                        .semantic
+                        .globals
+                        .display
+                        .is_none_or(|d| d.continuous_karaoke)
+                    {
                         self.possible = self
                             .semantic
                             .possible_karaoke_end

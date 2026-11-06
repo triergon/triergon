@@ -237,8 +237,8 @@ impl PaletteBuild {
                     if !work.pay(&mut self.credit, 8)? {
                         return Ok(false);
                     }
-                    let bytes = std::mem::size_of::<ColourProvenance>()
-                        .checked_add(2 * std::mem::size_of::<usize>())
+                    let bytes = size_of::<ColourProvenance>()
+                        .checked_add(2 * size_of::<usize>())
                         .ok_or(Error::Overflow)?;
                     let charge = self.budget.reserve(bytes)?;
                     self.provenance = Some(Arc::new(ColourProvenance {
@@ -302,8 +302,7 @@ impl PaletteBuild {
                             let owner = PaletteProvenanceOwner {
                                 provenance: self
                                     .provenance
-                                    .as_ref()
-                                    .cloned()
+                                    .clone()
                                     .ok_or(Error::Invalid("PGS palette provenance"))?,
                                 entries: 0,
                             };
@@ -347,8 +346,8 @@ impl PaletteBuild {
                     if !work.pay(&mut self.credit, 1 + retired)? {
                         return Ok(false);
                     }
-                    let bytes = std::mem::size_of::<PaletteStorage>()
-                        .checked_add(2 * std::mem::size_of::<usize>())
+                    let bytes = size_of::<PaletteStorage>()
+                        .checked_add(2 * size_of::<usize>())
                         .ok_or(Error::Overflow)?;
                     let charge = self.budget.reserve(bytes)?;
                     let storage = PaletteStorage {

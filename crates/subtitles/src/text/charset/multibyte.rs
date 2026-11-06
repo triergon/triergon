@@ -170,9 +170,9 @@ pub struct MultibyteDecoder {
 }
 
 // Fixed inline state on both 64-bit development and 32-bit source targets.
-const _: () = assert!(std::mem::size_of::<MultibyteDecoder>() <= 64);
-const _: () = assert!(std::mem::size_of::<DecodedScalar>() <= 32);
-const _: () = assert!(std::mem::size_of::<DecodeStep>() <= 48);
+const _: () = assert!(size_of::<MultibyteDecoder>() <= 64);
+const _: () = assert!(size_of::<DecodedScalar>() <= 32);
+const _: () = assert!(size_of::<DecodeStep>() <= 48);
 
 impl MultibyteDecoder {
     pub fn new(profile: MultibyteCharset) -> Self {

@@ -8,7 +8,7 @@ use crate::intra::{self, MAX_REF};
 use crate::picture::Pixel;
 use crate::state::*;
 
-impl<'a, P: Pixel> SliceDecoder<'a, P> {
+impl<P: Pixel> SliceDecoder<'_, P> {
     #[allow(clippy::too_many_arguments)]
     pub(super) fn transform_tree(
         &mut self,

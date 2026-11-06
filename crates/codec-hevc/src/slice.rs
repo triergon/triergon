@@ -110,7 +110,7 @@ pub fn peek_pps_id(rbsp: &[u8], nal_unit_type: u8) -> Result<(bool, u8)> {
     Ok((first, id))
 }
 
-fn parse_pwt(r: &mut BitReader, sh: &SliceHeader) -> Result<PredWeightTable> {
+fn parse_pwt(r: &mut BitReader<'_>, sh: &SliceHeader) -> Result<PredWeightTable> {
     let luma_log2_denom = r.ue_max(7, "luma_log2_weight_denom")?;
     let dc = r.se()?;
     let chroma_log2_denom = luma_log2_denom as i32 + dc;

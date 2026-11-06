@@ -1015,7 +1015,7 @@ fn late_catalogue_metadata_and_attachments_survive_eof_repeated_seeks_and_faults
     let owned: Vec<_> = d
         .metadata_documents()
         .iter()
-        .flat_map(|doc| doc.attachments())
+        .flat_map(triergon_matroska::metadata::SharedDocument::attachments)
         .collect();
     assert_eq!(owned.len(), 1);
     while d.next_packet(&AtomicBool::new(false)).unwrap().is_some() {}

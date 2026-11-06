@@ -47,7 +47,7 @@ fn inner_guard_cancel_is_sticky_releases_input_but_preserves_alias() {
     assert_ne!(next.token.generation(), request.token.generation());
     assert!(matches!(
         r.provide(&InputWindow::new(request.source, request.token, 0, alias).unwrap()),
-        Err(triergon_core::Error::StaleGeneration { .. })
+        Err(Error::StaleGeneration { .. })
     ));
     drop((r, parent));
     assert_eq!(pool.used(), base);
@@ -75,7 +75,7 @@ fn inner_guard_prior_transport_and_short_finish_win_over_cancel_and_metadata() {
             if short_finish {
                 assert!(matches!(result, Err(Error::Truncated)));
             } else {
-                assert!(matches!(result, Err(triergon_core::Error::Transport)));
+                assert!(matches!(result, Err(Error::Transport)));
             }
             assert_eq!((r.position(), work.spent()), (0, 0));
         }
@@ -167,30 +167,30 @@ fn fixture() -> Vec<u8> {
     .concat()
 }
 
-fn event(step: &triergon_core::Step<Event, triergon_core::Backpressure>) -> String {
+fn event(step: &Step<Event, Backpressure>) -> String {
     match step {
-        triergon_core::Step::NeedInput(req) => format!(
+        Step::NeedInput(req) => format!(
             "need:{}/{}/{}",
             req.offset,
             req.maximum,
             req.token.request()
         ),
-        triergon_core::Step::Yield => "yield".into(),
-        triergon_core::Step::Backpressure(triergon_core::Backpressure {
+        Step::Yield => "yield".into(),
+        Step::Backpressure(Backpressure {
             requested,
             available,
         }) => format!("pressure:{requested}/{available}"),
-        triergon_core::Step::End(_) => "end".into(),
-        triergon_core::Step::Ready(Event::Envelope(ElementEvent::Start(h))) => {
+        Step::End(_) => "end".into(),
+        Step::Ready(Event::Envelope(ElementEvent::Start(h))) => {
             format!("start:{}/{}/{}", h.id, h.start, h.data)
         }
-        triergon_core::Step::Ready(Event::Envelope(ElementEvent::End { id, offset, .. })) => {
+        Step::Ready(Event::Envelope(ElementEvent::End { id, offset, .. })) => {
             format!("close:{id}/{offset}")
         }
-        triergon_core::Step::Ready(Event::Envelope(ElementEvent::Skipped(h))) => {
+        Step::Ready(Event::Envelope(ElementEvent::Skipped(h))) => {
             format!("skip:{}/{}", h.id, h.start)
         }
-        triergon_core::Step::Ready(Event::Envelope(ElementEvent::Leaf { header, data })) => {
+        Step::Ready(Event::Envelope(ElementEvent::Leaf { header, data })) => {
             format!(
                 "leaf:{}/{}/{:?}",
                 header.id,
@@ -198,17 +198,17 @@ fn event(step: &triergon_core::Step<Event, triergon_core::Backpressure>) -> Stri
                 data.as_ref()
             )
         }
-        triergon_core::Step::Ready(Event::Configuration(c)) => {
+        Step::Ready(Event::Configuration(c)) => {
             format!("configuration:{}/{}", c.tracks().len(), c.revision())
         }
-        triergon_core::Step::Ready(Event::Document(_)) => "document".into(),
-        triergon_core::Step::Ready(Event::Packet(p)) => format!(
+        Step::Ready(Event::Document(_)) => "document".into(),
+        Step::Ready(Event::Packet(p)) => format!(
             "packet:{:?}/{}/{:?}",
             p.packet.pts_ns,
             p.packet.data.retained_capacity(),
             p.packet.data.as_ref()
         ),
-        triergon_core::Step::Ready(Event::Seek(_)) => panic!("sequential fixture must not seek"),
+        Step::Ready(Event::Seek(_)) => panic!("sequential fixture must not seek"),
     }
 }
 fn trace(quantum: u64, chunk: usize, shared: bool, tail: Option<bool>) {
@@ -296,7 +296,7 @@ fn trace(quantum: u64, chunk: usize, shared: bool, tail: Option<bool>) {
             }
             Err(error) => {
                 match tail {
-                    Some(true) => assert!(matches!(error, triergon_core::Error::Transport)),
+                    Some(true) => assert!(matches!(error, Error::Transport)),
                     Some(false) => assert!(matches!(error, Error::Truncated)),
                     None => panic!("unexpected: {error:?}"),
                 }

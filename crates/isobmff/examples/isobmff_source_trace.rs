@@ -1131,12 +1131,9 @@ fn main() {
             .map(|v| v.unwrap_or(default))
     };
     let parameters = parse(2, 4096).and_then(|w| parse(3, 4096).map(|q| (w, q)));
-    let (window, quantum) = match parameters {
-        Ok(v) => v,
-        Err(_) => {
-            eprintln!("invalid numeric argument");
-            std::process::exit(2);
-        }
+    let Ok((window, quantum)) = parameters else {
+        eprintln!("invalid numeric argument");
+        std::process::exit(2);
     };
     let mut out = BufWriter::new(io::stdout().lock());
     let result = usize::try_from(window)

@@ -660,7 +660,7 @@ impl NativePesObserver {
         })
     }
     pub(crate) fn transport_bounds(packet: &TransportPacket) -> Result<()> {
-        let prefix = packet.prefix.as_ref().map_or(0, |bytes| bytes.len());
+        let prefix = packet.prefix.as_ref().map_or(0, Bytes::len);
         if (prefix != 0 && prefix != 4) || packet.source.len() != 188 + prefix {
             return Err(Error::Invalid("native TS packet layout"));
         }
@@ -819,11 +819,7 @@ impl NativePesObserver {
         let local_position = if let Some(context) = &self.native_input {
             context.position(&pending.packet)?
         } else {
-            let prefix = pending
-                .packet
-                .prefix
-                .as_ref()
-                .map_or(0, |bytes| bytes.len());
+            let prefix = pending.packet.prefix.as_ref().map_or(0, Bytes::len);
             i64::try_from(
                 pending
                     .packet

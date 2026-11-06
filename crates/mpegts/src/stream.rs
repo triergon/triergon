@@ -526,9 +526,8 @@ impl TransportStream {
         work: &mut WorkBudget,
         cancel: &AtomicBool,
     ) -> Result<Option<TraceEvent>> {
-        let build = match self.map_build.as_mut() {
-            Some(build) => build,
-            None => return Ok(None),
+        let Some(build) = self.map_build.as_mut() else {
+            return Ok(None);
         };
         while build.position < build.map.streams.len() {
             if cancel.load(Ordering::Relaxed) {
@@ -682,7 +681,7 @@ impl TransportStream {
                         location: self.location(),
                         error,
                         rejected: None,
-                    })
+                    });
                 }
             }
             let section = self
@@ -974,12 +973,9 @@ impl TransportStream {
             .packet
             .as_ref()
             .ok_or(Error::Invalid("TS packet missing"))?;
-        let payload = match packet.payload.as_ref() {
-            Some(payload) => payload,
-            None => {
-                self.phase = 7;
-                return Ok(());
-            }
+        let Some(payload) = packet.payload.as_ref() else {
+            self.phase = 7;
+            return Ok(());
         };
         let entity = packet.source_id.ok_or(Error::SourceMismatch)?;
         let pid = packet.pid;

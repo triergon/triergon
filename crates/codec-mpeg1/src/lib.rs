@@ -5,6 +5,8 @@
 //! is no reordering delay.
 
 #![forbid(unsafe_code)]
+#![warn(clippy::print_stdout, clippy::print_stderr)]
+// Pending: `missing_docs`, `missing_debug_implementations`, `unreachable_pub`, `clippy::unwrap_used`, `clippy::expect_used`.
 
 mod bits;
 mod block;

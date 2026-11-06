@@ -60,7 +60,7 @@ impl<S: Source> Source for MatroskaStartupSource<S> {
         request: &InputRequest,
         work: &mut WorkBudget,
         cancel: &AtomicBool,
-    ) -> triergon_core::Result<SourceReply> {
+    ) -> Result<SourceReply> {
         let Some(remaining) = self.remaining else {
             return self.source.poll(request, work, cancel);
         };
@@ -430,7 +430,7 @@ impl<S: Source> MatroskaDiscovery<S> {
             self.player.state(),
             State::Failed | State::Stopped | State::Cancelled
         ) {
-            return Err(crate::Error::Closed);
+            return Err(Error::Closed);
         }
         if let Some(cutoff) = self.cutoff {
             return Ok(MatroskaDiscoveryStep::Ready(cutoff));
@@ -546,10 +546,7 @@ impl<S: Source> MatroskaDiscovery<S> {
         let cutoff = self
             .cutoff
             .ok_or(Error::Invalid("Matroska discovery still running"))?;
-        self.player
-            .source_mut()
-            .ok_or(crate::Error::Closed)?
-            .remaining = None;
+        self.player.source_mut().ok_or(Error::Closed)?.remaining = None;
         Ok(cutoff)
     }
 

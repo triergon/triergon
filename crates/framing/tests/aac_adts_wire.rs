@@ -63,7 +63,7 @@ fn literal(
         for bit in byte {
             value = (value << 1) | u8::from(*bit);
         }
-        out.push(value)
+        out.push(value);
     }
     if let Some(word) = crc {
         out.extend_from_slice(&word.to_be_bytes());
@@ -347,12 +347,11 @@ fn reserve_and_freeze_retry_preserve_real_copied_output_and_zero_work() {
     ));
     assert_eq!(pool.used(), charged);
     drop(blocker);
-    let out = match w
+    let BuildStep::Ready(out) = w
         .step(&mut WorkBudget::new(1), &AtomicBool::new(false))
         .unwrap()
-    {
-        BuildStep::Ready(out) => out,
-        _ => panic!("completed copy must not repeat on freeze retry"),
+    else {
+        panic!("completed copy must not repeat on freeze retry")
     };
     assert_eq!(out.payload_bytes().unwrap().as_ref(), [0xa5; 64]);
     drop(out);
@@ -365,12 +364,11 @@ fn reserve_and_freeze_retry_preserve_real_copied_output_and_zero_work() {
         Err(Error::Backpressure { .. })
     ));
     drop(blocker);
-    let out = match w
+    let BuildStep::Ready(out) = w
         .step(&mut WorkBudget::new(1000), &AtomicBool::new(false))
         .unwrap()
-    {
-        BuildStep::Ready(out) => out,
-        _ => panic!(),
+    else {
+        panic!()
     };
     assert_eq!(out.payload_bytes().unwrap().as_ref(), raw.as_ref());
 }
@@ -420,9 +418,8 @@ fn parser_writer_zero_work_cancel_and_fatal_errors_are_sticky_and_release_scratc
         8191,
     )
     .unwrap();
-    let e = match p.step(&mut WorkBudget::new(100), &AtomicBool::new(false)) {
-        Err(e) => e,
-        _ => panic!(),
+    let Err(e) = p.step(&mut WorkBudget::new(100), &AtomicBool::new(false)) else {
+        panic!()
     };
     assert!(
         matches!(p.step(&mut WorkBudget::new(0),&AtomicBool::new(false)),Err(other) if other==e)
@@ -445,12 +442,11 @@ fn original_asc_core_parameters_do_not_substitute_render_rate_or_inferred_stereo
             },
         )
         .unwrap();
-        let asc = match p
+        let BuildStep::Ready(asc) = p
             .step(&mut WorkBudget::new(100), &AtomicBool::new(false))
             .unwrap()
-        {
-            BuildStep::Ready(o) => o,
-            _ => panic!(),
+        else {
+            panic!()
         };
         let params = AacAdtsParameters::from_asc(asc.facts()).unwrap();
         assert_eq!(

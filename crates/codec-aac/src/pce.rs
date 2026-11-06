@@ -26,7 +26,7 @@ pub(crate) struct Pce {
     pub cc: Vec<(bool, u8)>,
 }
 
-fn read_elements(br: &mut BitReader, n: usize, with_cpe: bool) -> Vec<PceElement> {
+fn read_elements(br: &mut BitReader<'_>, n: usize, with_cpe: bool) -> Vec<PceElement> {
     (0..n)
         .map(|_| {
             let is_cpe = if with_cpe { br.bit() } else { false };
@@ -40,7 +40,7 @@ fn read_elements(br: &mut BitReader, n: usize, with_cpe: bool) -> Vec<PceElement
 }
 
 /// Parse a PCE. `align_base` is the bit position that byte_alignment() refers to.
-pub(crate) fn parse_pce(br: &mut BitReader, align_base: usize) -> Result<Pce> {
+pub(crate) fn parse_pce(br: &mut BitReader<'_>, align_base: usize) -> Result<Pce> {
     let mut p = Pce {
         tag: br.read(4) as u8,
         object_type: br.read(2) as u8,

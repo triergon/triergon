@@ -193,7 +193,7 @@ fn rows(
                 out.push((c.take_occurrence().unwrap(), side));
             }
             Mov9CursorStatus::End => return out,
-        };
+        }
         assert!(w.spent() <= 1);
     }
     panic!("occurrence progress")
@@ -226,7 +226,12 @@ fn range_config(
 
 fn range_plan(p: &Source, major: [u8; 4]) -> Result<Mov9EncodedEditPlanV2, Error> {
     let mut input = p.input();
-    let configs = [range_config(p, major, &mut input, Default::default())?];
+    let configs = [range_config(
+        p,
+        major,
+        &mut input,
+        triergon_isobmff::ConfigurationLimits::default(),
+    )?];
     let mut edit = Mov9EncodedEditJobV2::new_range_playback(
         Mov9EncodedEditContextV2 {
             table: &p.table,
@@ -237,7 +242,7 @@ fn range_plan(p: &Source, major: [u8; 4]) -> Result<Mov9EncodedEditPlanV2, Error
         },
         &configs,
         &input,
-        Default::default(),
+        Mov9EncodedEditLimitsV2::default(),
     )?;
     complete(&mut edit, &mut input, 1)
 }
@@ -407,12 +412,20 @@ fn dts_core_descriptions_agree_with_range_admission() {
             b"soun",
         );
         let description = &source.table.descriptions()[0];
-        let checked = check_dts_core_description(description, Default::default())
-            .unwrap()
-            .unwrap();
+        let checked = check_dts_core_description(
+            description,
+            triergon_isobmff::ConfigurationLimits::default(),
+        )
+        .unwrap()
+        .unwrap();
         assert_eq!(checked.sample_entry_rate_hz(), 48_000);
-        let stream =
-            range_config(&source, *major, &mut source.input(), Default::default()).unwrap();
+        let stream = range_config(
+            &source,
+            *major,
+            &mut source.input(),
+            triergon_isobmff::ConfigurationLimits::default(),
+        )
+        .unwrap();
         assert_eq!(stream.kind(), EncodedEntryKindV1::Dts);
         assert_eq!(stream.native().codec, "dts");
         assert!(stream.native().extradata.is_empty());
@@ -426,7 +439,10 @@ fn dts_core_descriptions_agree_with_range_admission() {
 
     let aac = Source::new(AUDIO0, b"soun");
     assert_eq!(
-        check_dts_core_description(&aac.table.descriptions()[0], Default::default()),
+        check_dts_core_description(
+            &aac.table.descriptions()[0],
+            triergon_isobmff::ConfigurationLimits::default()
+        ),
         Ok(None)
     );
 }
@@ -494,10 +510,21 @@ fn dts_core_description_refusals_and_limits_precede_publication() {
             b"soun",
         );
         assert!(
-            check_dts_core_description(&source.table.descriptions()[0], Default::default())
-                .is_err()
+            check_dts_core_description(
+                &source.table.descriptions()[0],
+                triergon_isobmff::ConfigurationLimits::default()
+            )
+            .is_err()
         );
-        assert!(range_config(&source, *b"isom", &mut source.input(), Default::default()).is_err());
+        assert!(
+            range_config(
+                &source,
+                *b"isom",
+                &mut source.input(),
+                triergon_isobmff::ConfigurationLimits::default()
+            )
+            .is_err()
+        );
     }
     for (tag, config, limits) in [
         (
@@ -574,6 +601,7 @@ fn pinned_encoded_views_refuse_caller_supplied_dts_range_configurations() {
         movie_base: source.movie_base,
     };
     let limits = Mov9EncodedEditLimitsV2::default();
+    #[allow(clippy::large_stack_arrays)] // A handful of jobs in a test.
     for admission in [
         Mov9EncodedEditJobV2::new(context(), &input, limits, PinnedMovD32EncodedEditsV2),
         Mov9EncodedEditJobV2::new_v3(
@@ -663,7 +691,7 @@ fn range_dts_edit_and_seek_use_media_ticks_and_sample_entry_trim_units() {
         &source.pool,
         &tracks,
         &source.media,
-        Default::default(),
+        Mov9PacketLimits::default(),
         &plans,
         PinnedMovD32EncodedEditsV2,
     )
@@ -681,7 +709,11 @@ fn range_dts_edit_and_seek_use_media_ticks_and_sample_entry_trim_units() {
     cursor.rewind_at_end().unwrap();
     let request = (source.header.track_id, 1750);
     let mut checked = cursor
-        .prepare_checked_range_seek(request.0, request.1, Default::default())
+        .prepare_checked_range_seek(
+            request.0,
+            request.1,
+            triergon_isobmff::Mov9NativeSeekLimits::default(),
+        )
         .unwrap()
         .unwrap();
     while checked.poll(&mut WorkBudget::new(1), &cancel).unwrap() == BuildStatus::Yield {}
@@ -702,7 +734,7 @@ fn range_dts_edit_and_seek_use_media_ticks_and_sample_entry_trim_units() {
         &tracks,
         &source.media,
         request,
-        Default::default(),
+        triergon_isobmff::Mov9NativeSeekLimits::default(),
         &plans,
     )
     .unwrap();
@@ -1243,7 +1275,7 @@ fn v4_without_sdtp_keeps_existing_aac_roll_observation() {
         &configs,
         &input,
         Mov9EncodedEditLimitsV2::default(),
-        triergon_isobmff::PinnedMovD32EncodedRegularV4,
+        PinnedMovD32EncodedRegularV4,
     )
     .unwrap();
     let actual = rows(&p, complete(&mut job, &mut input, 1).unwrap());

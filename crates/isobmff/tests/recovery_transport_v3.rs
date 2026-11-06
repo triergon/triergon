@@ -242,7 +242,7 @@ fn index_keeps_every_raw_entry_after_the_first_modeled_packet_eof() {
         {
             Mov9CursorStatus::Yield => {}
             Mov9CursorStatus::Ready => {
-                positions.push(index.take_event().unwrap().native_entry.unwrap().position)
+                positions.push(index.take_event().unwrap().native_entry.unwrap().position);
             }
             Mov9CursorStatus::End => break,
         }

@@ -145,10 +145,10 @@ fn plane_raw_matches_rows() {
                 for y in 0..pl.height {
                     match (pl.row(y), &all) {
                         (Row::U8(r), Row::U8(a)) => {
-                            assert_eq!(r, &a[off + y * stride..off + y * stride + pl.width])
+                            assert_eq!(r, &a[off + y * stride..off + y * stride + pl.width]);
                         }
                         (Row::U16(r), Row::U16(a)) => {
-                            assert_eq!(r, &a[off + y * stride..off + y * stride + pl.width])
+                            assert_eq!(r, &a[off + y * stride..off + y * stride + pl.width]);
                         }
                         _ => panic!("sample type mismatch"),
                     }

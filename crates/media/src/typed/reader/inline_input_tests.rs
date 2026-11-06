@@ -282,11 +282,11 @@ fn inline_header_transport_failure_never_becomes_eof() {
     ));
     assert!(matches!(
         input.read_into(&mut [0], &mut WorkBudget::new(1), &cancel),
-        Err(triergon_core::Error::Transport)
+        Err(Error::Transport)
     ));
     assert!(matches!(
         input.finish(request.source, request.token),
-        Err(triergon_core::Error::Transport)
+        Err(Error::Transport)
     ));
     assert!(input.retained_window().is_none());
     assert_eq!(pool.peak(), baseline);

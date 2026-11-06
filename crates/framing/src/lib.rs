@@ -5,6 +5,13 @@
 //! pinned native packet view can inject configuration NALs while retaining source.
 //! See `README.md` for the exact configuration and validation boundary.
 #![forbid(unsafe_code)]
+#![warn(
+    clippy::print_stdout,
+    clippy::print_stderr,
+    clippy::unwrap_used,
+    clippy::expect_used
+)]
+// Pending: `missing_docs`, `missing_debug_implementations`, `unreachable_pub`.
 
 mod dts_operation;
 pub use dts_operation::{

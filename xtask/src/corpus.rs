@@ -1531,7 +1531,7 @@ fn catalogue_profiles() -> Result<Vec<CatalogueProfile>, String> {
             extra: vec![],
             late: false,
             info,
-        })
+        });
     };
     info(
         "info-title",

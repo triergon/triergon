@@ -135,10 +135,10 @@ impl ColourJob {
                         0x55b1 => self.out.matrix_coefficients = v,
                         0x55b2 => self.out.bits_per_channel = v,
                         0x55b3..=0x55b4 => {
-                            self.out.chroma_subsampling[(child.id - 0x55b3) as usize] = Some(v)
+                            self.out.chroma_subsampling[(child.id - 0x55b3) as usize] = Some(v);
                         }
                         0x55b5..=0x55b6 => {
-                            self.out.cb_subsampling[(child.id - 0x55b5) as usize] = Some(v)
+                            self.out.cb_subsampling[(child.id - 0x55b5) as usize] = Some(v);
                         }
                         0x55b7..=0x55b8 => self.out.chroma_siting[(child.id - 0x55b7) as usize] = v,
                         0x55b9 => self.out.range = v,

@@ -12,7 +12,7 @@ use crate::picture::{Pixel, PuMotion};
 use crate::slice::SLICE_I;
 use crate::state::*;
 
-impl<'a, P: Pixel> SliceDecoder<'a, P> {
+impl<P: Pixel> SliceDecoder<'_, P> {
     #[inline(never)]
     pub(super) fn sao_syntax(&mut self, rx: u32, ry: u32) -> Result<()> {
         let pic_w_ctb = self.sps.pic_w_ctb;
@@ -72,7 +72,7 @@ impl<'a, P: Pixel> SliceDecoder<'a, P> {
                 let bd = if c_idx == 0 { self.bd_y } else { self.bd_c };
                 let cmax = (1u32 << (bd.min(10) - 5)) - 1;
                 let mut abs = [0i16; 4];
-                for a in abs.iter_mut() {
+                for a in &mut abs {
                     let mut v = 0;
                     while v < cmax && self.cabac.bypass() == 1 {
                         v += 1;
@@ -80,7 +80,7 @@ impl<'a, P: Pixel> SliceDecoder<'a, P> {
                     *a = v as i16;
                 }
                 if t == 1 {
-                    for a in abs.iter_mut() {
+                    for a in &mut abs {
                         if *a != 0 && self.cabac.bypass() == 1 {
                             *a = -*a;
                         }
@@ -421,7 +421,7 @@ impl<'a, P: Pixel> SliceDecoder<'a, P> {
             }
         }
         let nc = n / 2;
-        for pl in self.frame.planes[1..].iter_mut() {
+        for pl in &mut self.frame.planes[1..] {
             let stride = pl.stride;
             for j in 0..nc {
                 for i in 0..nc {
@@ -472,6 +472,8 @@ impl<'a, P: Pixel> SliceDecoder<'a, P> {
                 [cand_a, cand_b, third]
             };
             let mode = if prev[i] {
+                // Each call reads the next bypass bin (truncated unary, 9.3.3.2).
+                #[allow(clippy::same_functions_in_if_condition)]
                 let idx = if self.cabac.bypass() == 0 {
                     0
                 } else if self.cabac.bypass() == 0 {
@@ -491,7 +493,7 @@ impl<'a, P: Pixel> SliceDecoder<'a, P> {
                 if list[1] > list[2] {
                     list.swap(1, 2);
                 }
-                for &c in list.iter() {
+                for &c in &list {
                     if m >= c {
                         m += 1;
                     }

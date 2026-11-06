@@ -300,10 +300,10 @@ impl ElementReader {
     /// supplied range; retained earlier-generation leaf payloads stay charged.
     pub fn reset_to_cluster(&mut self, checkpoint: &ClusterCheckpoint) -> Result<InputRequest> {
         if !checkpoint.pool.same_pool(self.input.budget()) {
-            return Err(triergon_core::Error::ForeignPool);
+            return Err(Error::ForeignPool);
         }
         if checkpoint.parser != self.parser || checkpoint.source != self.input.source() {
-            return Err(triergon_core::Error::SourceMismatch);
+            return Err(Error::SourceMismatch);
         }
         if !self.input.capabilities().random_access {
             return Err(Error::Unsupported("random-access input"));

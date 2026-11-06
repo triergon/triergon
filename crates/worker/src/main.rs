@@ -1,5 +1,8 @@
 //! Isolated harness adapter. Serialization and process startup are outside timed work.
 #![forbid(unsafe_code)]
+// Pending: these rewrites change the generated code of measured hot paths and are
+// adopted with an A/B timing run.
+#![allow(clippy::redundant_closure_for_method_calls)]
 mod catalogue;
 use std::{
     fmt::Write as _,
@@ -422,10 +425,10 @@ fn entry() -> Result<(), Box<dyn std::error::Error>> {
             },
         )?,
         "catalogue-source" => {
-            catalogue::source(open_owned(std::mem::take(&mut data), Limits::default())?)?
+            catalogue::source(open_owned(std::mem::take(&mut data), Limits::default())?)?;
         }
         "metadata-source" => {
-            trace_colour_source(open_owned(std::mem::take(&mut data), Limits::default())?)?
+            trace_colour_source(open_owned(std::mem::take(&mut data), Limits::default())?)?;
         }
         "trace-source" => trace_source(open_owned(std::mem::take(&mut data), Limits::default())?)?,
         "trace-source-short" => {
@@ -497,7 +500,7 @@ fn entry() -> Result<(), Box<dyn std::error::Error>> {
         "memory" | "memory-baseline" | "seek-memory" | "codec-memory" | "metadata-memory"
         | "catalogue-memory" => {
             use std::io::Write;
-            let mut output = std::io::stdout().lock();
+            let mut output = io::stdout().lock();
             output.write_all(b"SAFE_MEDIA_BEGIN_V1\n")?;
             output.flush()?;
             let result = if mode == "memory"

@@ -334,7 +334,7 @@ impl<S: Source> ProbeDriver<S> {
         }
     }
 
-    fn reserve_window(&mut self, count: usize) -> triergon_core::Result<()> {
+    fn reserve_window(&mut self, count: usize) -> Result<()> {
         let needed = self
             .prefix
             .len()
@@ -418,7 +418,7 @@ impl<S: Source> Source for ProbeReplay<S> {
         request: &InputRequest,
         work: &mut WorkBudget,
         cancel: &AtomicBool,
-    ) -> triergon_core::Result<SourceReply> {
+    ) -> Result<SourceReply> {
         if cancel.load(Ordering::Relaxed) {
             return Err(Error::Cancelled);
         }
@@ -473,7 +473,7 @@ struct Head {
 }
 
 impl Head {
-    fn push(&mut self, byte: u8) -> triergon_core::Result<()> {
+    fn push(&mut self, byte: u8) -> Result<()> {
         if let Some(next) = self.prefix.get_mut(self.len) {
             *next = byte;
         }
@@ -511,7 +511,7 @@ struct Signatures {
 }
 
 impl Signatures {
-    fn push(&mut self, byte: u8, maximum_nals: usize) -> triergon_core::Result<Option<Codec>> {
+    fn push(&mut self, byte: u8, maximum_nals: usize) -> Result<Option<Codec>> {
         if byte == 0 {
             self.zeros = self.zeros.checked_add(1).ok_or(Error::Overflow)?;
             return Ok(None);
@@ -569,7 +569,7 @@ impl Signatures {
         Ok(None)
     }
 
-    fn complete(&mut self, head: &Head) -> triergon_core::Result<()> {
+    fn complete(&mut self, head: &Head) -> Result<()> {
         if head.len == 0 {
             return Err(Error::Invalid("empty raw probe NAL"));
         }

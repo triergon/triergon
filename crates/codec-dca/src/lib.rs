@@ -5,8 +5,17 @@
 //! live inside the frame. Output: planar `f32` at full scale 1.0 in FFmpeg's native
 //! channel order for the stream (see [`triergon_codec::layout`]).
 #![forbid(unsafe_code)]
+#![warn(
+    unreachable_pub,
+    clippy::print_stdout,
+    clippy::print_stderr,
+    clippy::unwrap_used
+)]
+// Pending: `missing_docs`, `missing_debug_implementations`, `clippy::expect_used`.
 #![allow(clippy::needless_range_loop, clippy::too_many_arguments)]
-
+// Pending: these rewrites change the generated code of measured hot paths and are
+// adopted with an A/B timing run.
+#![allow(clippy::needless_for_each)]
 mod bits;
 mod books;
 mod dct;
@@ -186,7 +195,9 @@ impl AudioDecoder for Decoder {
 /// Conventional name of this speaker set (e.g. `5.1(side)`, as ffprobe prints it), or
 /// `None` when it is not one of the named layouts.
 pub fn layout_name(layout: &ChannelLayout) -> Option<&'static str> {
-    use Speaker::*;
+    use Speaker::{
+        BackCenter, FrontCenter, FrontLeft, FrontRight, LowFrequency, SideLeft, SideRight,
+    };
     Some(match layout.speakers() {
         [FrontCenter] => "mono",
         [FrontLeft, FrontRight] => "stereo",

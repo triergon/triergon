@@ -102,7 +102,9 @@ fn drive(raw: &[u8], known: bool, events: &mut Vec<Event>) -> triergon_matroska:
                     )?)?;
                 }
             }
-            other => panic!("ample-pool work-one job must progress: {other:?}"),
+            other @ Step::Backpressure(_) => {
+                panic!("ample-pool work-one job must progress: {other:?}")
+            }
         }
     }
     panic!("work-one job did not finish")
@@ -146,7 +148,7 @@ fn laces_share_complete_addition_sources_and_mapping_fields_survive_reader_drop(
     assert_eq!(
         source
             .additions()
-            .map(|value| value.id())
+            .map(triergon_matroska::typed::AdditionView::id)
             .collect::<Vec<_>>(),
         [1, 4]
     );
@@ -759,7 +761,10 @@ fn unknown_more_children_preserve_scope_and_cannot_become_a_group_codec_state() 
     let source = packet.group.as_ref().unwrap();
     assert!(source.codec_state().is_none());
     assert!(packet.configuration.codec_state(0).is_none());
-    let scopes: Vec<_> = source.extensions().map(|field| field.scope()).collect();
+    let scopes: Vec<_> = source
+        .extensions()
+        .map(triergon_matroska::typed::ExtensionView::scope)
+        .collect();
     assert_eq!(
         scopes,
         [

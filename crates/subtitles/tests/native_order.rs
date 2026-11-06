@@ -206,35 +206,35 @@ fn check_source(index: usize) {
 
 #[test]
 fn native_original_is_reverse_pcs() {
-    check_native(0)
+    check_native(0);
 }
 #[test]
 fn native_rcs_arrival_swap_does_not_change_reverse_pcs() {
-    check_native(1)
+    check_native(1);
 }
 #[test]
 fn native_renamed_ids_do_not_sort_the_output() {
-    check_native(2)
+    check_native(2);
 }
 #[test]
 fn native_nonascending_pcs_tolerance_keeps_literal_reverse() {
-    check_native(3)
+    check_native(3);
 }
 #[test]
 fn source_original_order_is_unchanged() {
-    check_source(0)
+    check_source(0);
 }
 #[test]
 fn source_rcs_arrival_swap_is_unchanged() {
-    check_source(1)
+    check_source(1);
 }
 #[test]
 fn source_renamed_ids_are_unchanged() {
-    check_source(2)
+    check_source(2);
 }
 #[test]
 fn source_nonascending_pcs_remains_rejected() {
-    check_source(3)
+    check_source(3);
 }
 
 #[test]

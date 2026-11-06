@@ -393,7 +393,7 @@ impl Ac3ConfigParser {
                     .ok_or(Error::Invalid("missing audio record cursor"))?;
                 match cursor.read_into(&mut self.scratch[self.used..self.need], work, cancel)? {
                     Step::Ready(count) => {
-                        self.used = self.used.checked_add(count).ok_or(Error::Overflow)?
+                        self.used = self.used.checked_add(count).ok_or(Error::Overflow)?;
                     }
                     Step::Yield => return Ok(BuildStep::Yield),
                     Step::End(_) => return Err(Error::Truncated),

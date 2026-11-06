@@ -234,56 +234,54 @@ fn run_case(index: usize) {
                 ..Limits::default()
             };
             let mut parser = Extractor::new(&pool, limits, input.generation);
-            match parser.provide(input) {
-                Err(rejected) => {
-                    check_error(rejected.error, case.error, case.id);
-                    same_input(&rejected.input, &original);
-                    assert!(case.events.is_empty());
-                }
-                Ok(()) => {
-                    parser.finish_input();
-                    let mut output = Vec::new();
-                    let mut failed = false;
-                    let bound = (case.payload.len() + 1024 * 1024) * 8 + 256;
-                    let mut finished = false;
-                    for _ in 0..bound {
-                        let mut work = WorkBudget::new(units);
-                        let status = parser.step(&mut work, &AtomicBool::new(false));
-                        assert!(work.spent() <= units);
-                        match status {
-                            Ok(Status::Yield) => assert!(work.spent() != 0),
-                            Ok(Status::Event(event)) => {
-                                let expected = case.events.get(output.len()).unwrap_or_else(|| {
-                                    panic!("{}: unexpected prefix event", case.id)
-                                });
-                                check_event(&event, expected, &original);
-                                if let Event::Cue(cue) = &event
-                                    && let Some(decoded) = &cue.decoded_utf8
-                                {
-                                    assert!(decoded.belongs_to(&pool));
-                                }
-                                output.push(event);
+            if let Err(rejected) = parser.provide(input) {
+                check_error(rejected.error, case.error, case.id);
+                same_input(&rejected.input, &original);
+                assert!(case.events.is_empty());
+            } else {
+                parser.finish_input();
+                let mut output = Vec::new();
+                let mut failed = false;
+                let bound = (case.payload.len() + 1024 * 1024) * 8 + 256;
+                let mut finished = false;
+                for _ in 0..bound {
+                    let mut work = WorkBudget::new(units);
+                    let status = parser.step(&mut work, &AtomicBool::new(false));
+                    assert!(work.spent() <= units);
+                    match status {
+                        Ok(Status::Yield) => assert!(work.spent() != 0),
+                        Ok(Status::Event(event)) => {
+                            let expected = case
+                                .events
+                                .get(output.len())
+                                .unwrap_or_else(|| panic!("{}: unexpected prefix event", case.id));
+                            check_event(&event, expected, &original);
+                            if let Event::Cue(cue) = &event
+                                && let Some(decoded) = &cue.decoded_utf8
+                            {
+                                assert!(decoded.belongs_to(&pool));
                             }
-                            Ok(Status::Finished) => {
-                                finished = true;
-                                break;
-                            }
-                            Ok(other) => panic!("{}: unexpected {other:?}", case.id),
-                            Err(error) => {
-                                check_error(error, case.error, case.id);
-                                failed = true;
-                                break;
-                            }
+                            output.push(event);
+                        }
+                        Ok(Status::Finished) => {
+                            finished = true;
+                            break;
+                        }
+                        Ok(other) => panic!("{}: unexpected {other:?}", case.id),
+                        Err(error) => {
+                            check_error(error, case.error, case.id);
+                            failed = true;
+                            break;
                         }
                     }
-                    assert!(
-                        failed || finished,
-                        "{}: finite source made no terminal progress",
-                        case.id
-                    );
-                    assert_eq!(failed, case.error.is_some(), "{}", case.id);
-                    assert_eq!(output.len(), case.events.len(), "{}", case.id);
                 }
+                assert!(
+                    failed || finished,
+                    "{}: finite source made no terminal progress",
+                    case.id
+                );
+                assert_eq!(failed, case.error.is_some(), "{}", case.id);
+                assert_eq!(output.len(), case.events.len(), "{}", case.id);
             }
         }
         assert_eq!(pool.used(), baseline, "{} retained allocation", case.id);
@@ -437,7 +435,7 @@ fn every_source_owner_must_belong_to_the_same_pool() {
                 input.addition = Some(Addition {
                     id: 1,
                     bytes: other,
-                })
+                });
             }
         }
         let original = input.clone();

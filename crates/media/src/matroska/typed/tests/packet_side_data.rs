@@ -52,10 +52,10 @@ fn group_alias_graph_equals_actual_charges_and_can_outlive_source_and_reader_sta
         &'a SharedBytes,
     );
     impl Storage for Graph<'_> {
-        fn storage_slots(&self) -> crate::Result<usize> {
+        fn storage_slots(&self) -> Result<usize> {
             usage::slots(&[self.0, self.1, self.2])
         }
-        fn storage_owner(&self, at: usize) -> crate::Result<Option<usage::Owner>> {
+        fn storage_owner(&self, at: usize) -> Result<Option<usage::Owner>> {
             usage::owner(&[self.0, self.1, self.2], at)
         }
     }
@@ -125,7 +125,7 @@ fn group_and_state_batch_work_zero_is_inert_and_cancellation_precedes_publicatio
     cancel.store(true, std::sync::atomic::Ordering::Relaxed);
     assert!(matches!(
         batch.step(&mut work, &cancel),
-        Err(crate::Error::Cancelled)
+        Err(Error::Cancelled)
     ));
     assert!(batch.take_configuration_change().is_none());
 }
@@ -211,7 +211,7 @@ fn group_own_storage_is_a_permanent_limit_not_an_infinite_backpressure_facade() 
                 requested = Some(amount);
                 break;
             }
-            Err(crate::Error::Policy(_)) => return,
+            Err(Error::Policy(_)) => return,
             other => panic!("tight owned pool must fail, got {other:?}"),
         }
     }
@@ -219,7 +219,7 @@ fn group_own_storage_is_a_permanent_limit_not_an_infinite_backpressure_facade() 
         Pressure::new(requested.expect("tight owned job must reach its allocation boundary"));
     for _ in 0..100_000 {
         match proof.step(&job, &pool, &mut WorkBudget::new(1), &cancel) {
-            Err(crate::Error::Policy("operation retained storage")) => return,
+            Err(Error::Policy("operation retained storage")) => return,
             Ok(ParseStep::Yield) => (),
             other => panic!("operation-owned shortage is permanent: {other:?}"),
         }

@@ -156,7 +156,7 @@ fn decode_exponents(
             return Err(bad("grouped exponent > 124"));
         }
         let d = [gexp / 25, (gexp % 25) / 5, gexp % 5];
-        for &m in d.iter() {
+        for &m in &d {
             prev += m as i32 - 2;
             if !(0..=24).contains(&prev) {
                 return Err(bad("exponent out of range"));

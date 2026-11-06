@@ -361,8 +361,7 @@ fn descriptor_backpressure_retries_the_same_complete_record() {
     let pool = Budget::new(10_000).unwrap();
     let raw = example();
     let data = Bytes::copy_from_slice(&pool, &raw).unwrap();
-    let needed =
-        4 * std::mem::size_of::<HvcConfigArray>() + 4 * std::mem::size_of::<HvcConfigNal>();
+    let needed = 4 * size_of::<HvcConfigArray>() + 4 * size_of::<HvcConfigNal>();
     let mut blocker = BudgetVec::<u8>::new(&pool);
     blocker
         .try_reserve_exact(pool.available() - needed / 2)
@@ -380,7 +379,7 @@ fn descriptor_backpressure_retries_the_same_complete_record() {
         {
             BuildStep::Ready(o) => break o,
             BuildStep::Yield => {}
-            _ => panic!(),
+            BuildStep::Complete => panic!(),
         }
     };
     assert_eq!(o.source_bytes().as_ref(), raw);
@@ -530,9 +529,10 @@ fn impossible_required_live_set_is_limit_and_drops_private_input() {
         limits(),
     )
     .unwrap();
-    let error = match parser.step(&mut WorkBudget::new(1000), &AtomicBool::new(false)) {
-        Err(error @ Error::Limit { .. }) => error,
-        _ => panic!("an intrinsically impossible live-set must not wait for caller release"),
+    let Err(error @ Error::Limit { .. }) =
+        parser.step(&mut WorkBudget::new(1000), &AtomicBool::new(false))
+    else {
+        panic!("an intrinsically impossible live-set must not wait for caller release")
     };
     assert_eq!(pool.used(), baseline);
     assert!(
@@ -549,9 +549,8 @@ fn each_reservation_retry_is_stable_and_late_cancel_releases_all_scratch() {
     retained.try_reserve_exact(pool.available() - 1).unwrap();
     let mut parser = HvcConfigParser::new(&pool, source(), data.clone(), limits()).unwrap();
     let first = parser.step(&mut WorkBudget::new(1000), &AtomicBool::new(false));
-    let error = match first {
-        Err(e @ Error::Backpressure { .. }) => e,
-        _ => panic!("reservation not exercised"),
+    let Err(error @ Error::Backpressure { .. }) = first else {
+        panic!("reservation not exercised")
     };
     let charged = pool.used();
     for _ in 0..4 {
@@ -590,12 +589,11 @@ fn complete_output_is_single_publication_even_after_cancel_and_zero_work() {
         limits(),
     )
     .unwrap();
-    let output = match parser
+    let BuildStep::Ready(output) = parser
         .step(&mut WorkBudget::new(1000), &AtomicBool::new(false))
         .unwrap()
-    {
-        BuildStep::Ready(output) => output,
-        _ => panic!("small fully bounded configuration must finish"),
+    else {
+        panic!("small fully bounded configuration must finish")
     };
     for _ in 0..3 {
         assert!(matches!(

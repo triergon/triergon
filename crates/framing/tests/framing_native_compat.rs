@@ -71,7 +71,7 @@ fn config(pool: &Budget, raw: &[u8]) -> HvcConfiguration {
         {
             BuildStep::Ready(o) => return o,
             BuildStep::Yield => {}
-            _ => panic!(),
+            BuildStep::Complete => panic!(),
         }
     }
     panic!()
@@ -85,7 +85,7 @@ fn convert(pool: &Budget, raw: &[u8], work: u64) -> HvcDecoderConfigOutput {
         {
             BuildStep::Ready(o) => return o,
             BuildStep::Yield => {}
-            _ => panic!(),
+            BuildStep::Complete => panic!(),
         }
     }
     panic!()
@@ -515,7 +515,7 @@ fn dual_scope_keeps_all_truncated_declared_bits_and_parses_real_physical_bytes()
                     break;
                 }
                 BuildStep::Yield => {}
-                _ => panic!(),
+                BuildStep::Complete => panic!(),
             }
         }
     }
@@ -543,7 +543,7 @@ fn equal_scope_does_not_duplicate_pce_or_invent_an_unknown_bit_extent() {
                 break;
             }
             BuildStep::Yield => {}
-            _ => panic!(),
+            BuildStep::Complete => panic!(),
         }
     }
     assert!(matches!(
@@ -584,7 +584,7 @@ fn decoder_channel_choice_keeps_signalled_mono_and_raw_bytes_unchanged() {
                 break;
             }
             BuildStep::Yield => {}
-            _ => panic!(),
+            BuildStep::Complete => panic!(),
         }
     }
 }
@@ -714,7 +714,7 @@ fn parse_asc(pool: &Budget, raw: &[u8]) -> triergon_framing::AacAudioSpecificCon
         {
             BuildStep::Ready(o) => return o,
             BuildStep::Yield => {}
-            _ => panic!(),
+            BuildStep::Complete => panic!(),
         }
     }
 }
@@ -805,7 +805,7 @@ fn two_scope_pce_live_set_that_cannot_fit_is_limit_not_permanent_backpressure() 
     let mut raw = include_bytes!("aac-fixtures/compat-pce-93.bin").to_vec();
     let bits = raw.len() * 8;
     raw.push(0);
-    let metadata = 70 * std::mem::size_of::<triergon_framing::AacPceElement>();
+    let metadata = 70 * size_of::<triergon_framing::AacPceElement>();
     let maximum =
         Budget::control_storage_bytes() + Bytes::owner_overhead_bytes() + raw.len() + 2 * metadata
             - 1;
@@ -969,7 +969,7 @@ fn parser_packet_count_limit_preserves_the_published_prefix() {
         match r.step(&mut WorkBudget::new(1), &AtomicBool::new(false)) {
             Ok(Step::Ready(o)) => {
                 assert_eq!(o.source_bytes().as_ref(), &raw[..5]);
-                prefix = Some(o)
+                prefix = Some(o);
             }
             Ok(Step::Yield) => {}
             Err(Error::Limit {

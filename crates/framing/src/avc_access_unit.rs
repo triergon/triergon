@@ -128,13 +128,12 @@ impl<'a> Iterator for AnnexBSegments<'a> {
         if let Some(payload) = self.pending_payload.take() {
             return Some(payload);
         }
-        let payload = match self.next_parameter_set() {
-            Some(nal) => nal,
-            None => {
-                let (nal, tail) = next_nal(self.sample, self.length_width).ok()?;
-                self.sample = tail;
-                nal
-            }
+        let payload = if let Some(nal) = self.next_parameter_set() {
+            nal
+        } else {
+            let (nal, tail) = next_nal(self.sample, self.length_width).ok()?;
+            self.sample = tail;
+            nal
         };
         self.pending_payload = Some(payload);
         Some(START_CODE)

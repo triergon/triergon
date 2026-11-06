@@ -213,7 +213,7 @@ fn drive(
                     )?)?;
                 }
             }
-            other => panic!("bounded ample-pool drive failed: {other:?}"),
+            other @ Step::Backpressure(_) => panic!("bounded ample-pool drive failed: {other:?}"),
         }
     }
     panic!("bounded Cue operation stalled");

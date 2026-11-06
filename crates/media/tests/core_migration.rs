@@ -267,7 +267,7 @@ fn cluster_range_reset_invalidates_old_input_but_preserves_earlier_leaf_storage(
             .unwrap()
         {
             ParseStep::Event(ElementEvent::Start(header)) if header.id == 0x1f43b675 => {
-                checkpoint = reader.cluster_checkpoint()
+                checkpoint = reader.cluster_checkpoint();
             }
             ParseStep::Event(ElementEvent::Leaf { header, data }) if header.id == 0xa3 => {
                 earlier = Some(data);
@@ -359,9 +359,9 @@ fn skipped_block_outside_cluster_does_not_reset_scan_policy() {
     for _ in 0..10_000 {
         match reader.step(&mut WorkBudget::new(3), &AtomicBool::new(false)) {
             Ok(ParseStep::NeedInput(request)) => {
-                reader.finish(request.source, request.token).unwrap()
+                reader.finish(request.source, request.token).unwrap();
             }
-            Ok(ParseStep::Event(_)) | Ok(ParseStep::Yield) => (),
+            Ok(ParseStep::Event(_) | ParseStep::Yield) => (),
             Ok(ParseStep::Finished) => break,
             Ok(ParseStep::Backpressure { .. }) => panic!("ample pool"),
             Err(error) => {

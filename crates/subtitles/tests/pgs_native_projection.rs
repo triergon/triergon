@@ -75,7 +75,7 @@ fn source(d: &mut DisplayDecoder, b: &Budget, p: &[u8], time: PacketClock) -> Ve
             DisplayStatus::Yield => {}
             DisplayStatus::OutputReady => out.push(d.take_output(&c).unwrap()),
             DisplayStatus::NeedPacket => return out,
-            other => panic!("{other:?}"),
+            other @ DisplayStatus::Ended => panic!("{other:?}"),
         }
     }
     panic!("source stalled")

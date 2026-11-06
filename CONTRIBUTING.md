@@ -31,8 +31,11 @@ benchmarks assume it.
   other implementation. Tables the specification declares normative but does not
   print may be recovered from reference output, provided the recovery is scripted and
   reproducible (see `crates/codec-dca`).
-- **Lints are policy.** Clippy runs with `-D warnings`. Fix the cause; an `#[allow]`
-  needs a one-line reason.
+- **Lints are policy.** Clippy (`all` and `pedantic`) and rustdoc run with
+  `-D warnings`. The workspace `[lints]` table states the pedantic lints the code does
+  not follow and why; each library's `lib.rs` enables the documentation, visibility,
+  console and `unwrap` lints it already passes and lists those still pending. Fix the
+  cause; an `#[allow]` needs a one-line reason.
 - **Bounded by construction.** Input-dependent allocation goes through a `Budget`;
   loops over input run under a `WorkBudget`. Malformed input must never panic or hang.
 - **Rust first in tooling.** Prefer Rust for tools and tests. Python is used where it

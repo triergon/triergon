@@ -66,7 +66,7 @@ pub fn configure_argv(prefix: &Path, profile: Profile) -> Vec<String> {
         "--enable-zlib",
     ]
     .iter()
-    .map(|s| s.to_string())
+    .map(ToString::to_string)
     .collect();
     if profile == Profile::Formats {
         for flag in &mut argv {

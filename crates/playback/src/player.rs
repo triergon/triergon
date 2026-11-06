@@ -387,7 +387,7 @@ impl<S: Source> Player<S> {
     }
     pub fn pause(&mut self, paused: bool) -> Result<()> {
         if !matches!(self.state, State::Running | State::Paused) {
-            return Err(crate::Error::Closed);
+            return Err(Error::Closed);
         }
         self.state = if paused {
             State::Paused
@@ -474,12 +474,12 @@ impl<S: Source> Player<S> {
             return Err(Error::Cancelled);
         }
         if !matches!(self.state, State::Running | State::Paused | State::Ended) {
-            return Err(crate::Error::Closed);
+            return Err(Error::Closed);
         }
         if w.remaining() == 0 {
             return Ok(false);
         }
-        let engine = self.engine.as_mut().ok_or(crate::Error::Closed)?;
+        let engine = self.engine.as_mut().ok_or(Error::Closed)?;
         selection.validate(engine)?;
         if !engine
             .facts()?
@@ -508,10 +508,7 @@ impl<S: Source> Player<S> {
             }
             return Err(e);
         }
-        self.source
-            .as_mut()
-            .ok_or(crate::Error::Closed)?
-            .invalidate();
+        self.source.as_mut().ok_or(Error::Closed)?.invalidate();
         self.drain();
         self.epoch = epoch;
         self.generation = after;
@@ -606,7 +603,7 @@ impl<S: Source> Player<S> {
             return Err(Error::Cancelled);
         }
         if !matches!(self.state, State::Running | State::Paused) {
-            return Err(crate::Error::Closed);
+            return Err(Error::Closed);
         }
         if w.remaining() == 0 {
             return Ok(false);
@@ -619,7 +616,7 @@ impl<S: Source> Player<S> {
         }
         self.engine
             .as_mut()
-            .ok_or(crate::Error::Closed)?
+            .ok_or(Error::Closed)?
             .continue_entity(id, caps, discontinuity)?;
         if let Some(mut old) = self.source.take() {
             old.close();
@@ -646,12 +643,12 @@ impl<S: Source> Player<S> {
             return Err(Error::Cancelled);
         }
         if !matches!(self.state, State::Running | State::Paused | State::Ended) {
-            return Err(crate::Error::Closed);
+            return Err(Error::Closed);
         }
         if w.remaining() == 0 {
             return Ok(None);
         }
-        let old = self.engine.as_ref().ok_or(crate::Error::Closed)?;
+        let old = self.engine.as_ref().ok_or(Error::Closed)?;
         if !matches!(old, Engine::Mp4(_)) || self.source.is_none() {
             return Err(Error::Invalid("catalogue replacement needs active MP4"));
         }
@@ -732,7 +729,7 @@ impl<S: Source> Player<S> {
             return Err(Error::Cancelled);
         }
         if !matches!(self.state, State::Running | State::Paused | State::Ended) {
-            return Err(crate::Error::Closed);
+            return Err(Error::Closed);
         }
         if work.remaining() == 0 {
             return Ok(None);
@@ -840,7 +837,7 @@ impl<S: Source> Player<S> {
         }
         self.engine
             .as_mut()
-            .ok_or(crate::Error::Closed)?
+            .ok_or(Error::Closed)?
             .finish_logical_source()?;
         Ok(true)
     }
@@ -857,11 +854,7 @@ impl<S: Source> Player<S> {
                 maximum: r.maximum,
             });
         }
-        let accepted = self
-            .engine
-            .as_mut()
-            .ok_or(crate::Error::Closed)?
-            .provide(reply)?;
+        let accepted = self.engine.as_mut().ok_or(Error::Closed)?.provide(reply)?;
         if accepted {
             if self.seek.is_some_and(|seek| !seek.reached_target)
                 && let SourceReply::Data(window) = reply
@@ -990,7 +983,7 @@ impl<S: Source> Player<S> {
             State::Paused => return Ok(Progress::Paused),
             State::Ended => return Ok(Progress::Ended),
             State::Stopped | State::Cancelled => return Ok(Progress::Stopped),
-            State::Failed => return Err(crate::Error::Closed),
+            State::Failed => return Err(Error::Closed),
             State::Running => {}
         }
         if w.remaining() == 0 {
@@ -1020,15 +1013,15 @@ impl<S: Source> Player<S> {
             return Ok(self.publish(source, event, bytes, delivery, slot));
         }
         if let Some(r) = self.request.clone() {
-            let reply =
-                self.source
-                    .as_mut()
-                    .ok_or(crate::Error::Closed)?
-                    .poll(&r, w, &self.cancel)?;
+            let reply = self
+                .source
+                .as_mut()
+                .ok_or(Error::Closed)?
+                .poll(&r, w, &self.cancel)?;
             self.provide(&reply)?;
             return Ok(Progress::Yield);
         }
-        let engine = self.engine.as_mut().ok_or(crate::Error::Closed)?;
+        let engine = self.engine.as_mut().ok_or(Error::Closed)?;
         let step = if let Engine::Matroska(matroska) = engine {
             match matroska.step(w, &self.cancel)? {
                 triergon_matroska::incremental::ParseStep::Event(event) => {
@@ -1126,7 +1119,7 @@ impl<S: Source> Player<S> {
                 })
         ) {
             self.selection
-                .validate(self.engine.as_ref().ok_or(crate::Error::Closed)?)?;
+                .validate(self.engine.as_ref().ok_or(Error::Closed)?)?;
         }
         let facts_only = (self.clock == ClockChoice::SourceExact
             && matches!(e, RawEvent::NativeTs { .. }))

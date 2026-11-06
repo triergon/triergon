@@ -192,7 +192,7 @@ impl MatroskaBitmapTrack {
             .packet
             .group
             .as_ref()
-            .map(|group| group.position())
+            .map(triergon_matroska::typed::BlockGroupSource::position)
             .transpose()?
             .flatten();
         let clock = |ticks| dvb::ClockValue {

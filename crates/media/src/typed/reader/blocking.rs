@@ -356,7 +356,7 @@ impl<R: Read + Seek> BlockingReader<R> {
             limits,
             pool,
             true,
-            Some(|reader, offset| std::io::Seek::seek(reader, std::io::SeekFrom::Start(offset))),
+            Some(|reader, offset| Seek::seek(reader, std::io::SeekFrom::Start(offset))),
             Some(|feed, cursor, request, cancel| {
                 feed.synchronize_seekable_position(cursor, request, cancel)
             }),
@@ -369,7 +369,7 @@ impl<R: Read + Seek> BlockingReader<R> {
             limits,
             pool,
             true,
-            Some(|reader, offset| std::io::Seek::seek(reader, std::io::SeekFrom::Start(offset))),
+            Some(|reader, offset| Seek::seek(reader, std::io::SeekFrom::Start(offset))),
             Some(|feed, cursor, request, cancel| {
                 feed.synchronize_seekable_position(cursor, request, cancel)
             }),
@@ -410,7 +410,7 @@ impl BlockingReader<std::io::Cursor<triergon_core::OwnedInputBytes>> {
         webm_vp9_t35: bool,
     ) -> Result<Self> {
         if !source.as_bytes().belongs_to(pool) {
-            return Err(triergon_core::Error::ForeignPool);
+            return Err(Error::ForeignPool);
         }
         let capabilities = SourceCapabilities {
             length: None,

@@ -27,7 +27,7 @@ fn avcc(width: u8) -> Vec<u8> {
         66,
         0,
         10,
-        252 | (width - 1),
+        0xfc | (width - 1),
         225,
         0,
         5,
@@ -68,7 +68,7 @@ fn hvcc(width: u8, unknown: bool) -> Vec<u8> {
         248,
         0,
         0,
-        12 | (width - 1),
+        0x0c | (width - 1),
         3,
     ];
     for k in [32, 33, 34] {

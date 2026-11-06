@@ -25,7 +25,7 @@ fn dequant4(coef: &[i32; 16], ls: &[i32; 16], qp: i32) -> [i32; 16] {
     d
 }
 
-impl<'a> SliceDecoder<'a> {
+impl SliceDecoder<'_> {
     #[inline]
     fn intra_avail(&self, n: usize) -> bool {
         n == self.cur || !(self.s.constrained_intra && !self.pic.mbs[n].kind.is_intra())

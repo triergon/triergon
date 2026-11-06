@@ -71,7 +71,7 @@ fn any_reader_reads_matroska_through_the_neutral_model() {
     loop {
         match reader.step(&mut WorkBudget::new(4096), &cancel).unwrap() {
             Step::Ready(Event::Packet(p)) => {
-                packets.push((p.track(), p.payload().to_vec(), p.pts()))
+                packets.push((p.track(), p.payload().to_vec(), p.pts()));
             }
             Step::Ready(_) | Step::Yield => {}
             Step::NeedInput(r) => {

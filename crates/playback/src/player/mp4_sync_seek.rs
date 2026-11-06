@@ -247,7 +247,7 @@ impl Mp4SyncSeekJob<'_> {
         result
     }
 
-    fn scan(&mut self, work: &mut WorkBudget, cancel: &AtomicBool) -> triergon_core::Result<bool> {
+    fn scan(&mut self, work: &mut WorkBudget, cancel: &AtomicBool) -> Result<bool> {
         loop {
             if cancel.load(Ordering::Relaxed) {
                 return Err(Error::Cancelled);
@@ -304,7 +304,7 @@ impl Mp4SyncSeekJob<'_> {
         }
     }
 
-    fn charge_row(&mut self, work: &mut WorkBudget) -> triergon_core::Result<bool> {
+    fn charge_row(&mut self, work: &mut WorkBudget) -> Result<bool> {
         if !work.try_charge(1) {
             return Ok(false);
         }
@@ -318,7 +318,7 @@ impl Mp4SyncSeekJob<'_> {
         Ok(true)
     }
 
-    fn observe_video(&mut self, row: &SourceRow) -> triergon_core::Result<()> {
+    fn observe_video(&mut self, row: &SourceRow) -> Result<()> {
         let sample = &row.sample;
         if self.previous_video_ordinal.checked_add(1) != Some(sample.ordinal) {
             return Err(Error::Unsupported(
@@ -342,7 +342,7 @@ impl Mp4SyncSeekJob<'_> {
         Ok(())
     }
 
-    fn keep_prefix(&self, row: &SourceRow, audio_from: Time) -> triergon_core::Result<bool> {
+    fn keep_prefix(&self, row: &SourceRow, audio_from: Time) -> Result<bool> {
         if row.track_id == self.request.video
             || !self.selection.includes(TrackKey::Mp4(row.track_id))
         {

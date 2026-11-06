@@ -400,12 +400,11 @@ fn freeze_pressure_retries_do_not_repeat_paid_completion_work() {
     let mut reader =
         Mov9PhysicalReaderV4::new(&mut input, event, plan, 4096, PinnedMovD32PhysicalReadV4)
             .unwrap();
-    let request = match reader
+    let Step::NeedInput(request) = reader
         .poll(&mut input, &mut WorkBudget::new(1), &AtomicBool::new(false))
         .unwrap()
-    {
-        Step::NeedInput(r) => r,
-        _ => panic!("physical source request missing"),
+    else {
+        panic!("physical source request missing")
     };
     feed(&mut input, request, &bytes);
     assert!(matches!(
@@ -421,7 +420,7 @@ fn freeze_pressure_retries_do_not_repeat_paid_completion_work() {
             reader.poll(&mut input, &mut work, &AtomicBool::new(false)),
             Err(Error::Backpressure { .. })
         ));
-        assert_eq!(work.spent(), if attempt == 0 { 1 } else { 0 });
+        assert_eq!(work.spent(), u64::from(attempt == 0));
     }
     drop(blocker);
     assert!(matches!(
@@ -431,12 +430,11 @@ fn freeze_pressure_retries_do_not_repeat_paid_completion_work() {
         Step::Yield
     ));
     let mut work = WorkBudget::new(1);
-    let output = match reader
+    let Step::Ready(output) = reader
         .poll(&mut input, &mut work, &AtomicBool::new(false))
         .unwrap()
-    {
-        Step::Ready(output) => output,
-        _ => panic!("retained prefix lost under pressure"),
+    else {
+        panic!("retained prefix lost under pressure")
     };
     assert_eq!(work.spent(), 0);
     assert_eq!(output.payload.as_ref(), [0x7f]);
@@ -466,7 +464,7 @@ fn native_index_keeps_original_sizes_and_all_six_entries_after_short_read() {
             Mov9CursorStatus::Yield => {}
             Mov9CursorStatus::End => break,
             Mov9CursorStatus::Ready => {
-                entries.push(index.take_event().unwrap().native_entry.unwrap())
+                entries.push(index.take_event().unwrap().native_entry.unwrap());
             }
         }
     }

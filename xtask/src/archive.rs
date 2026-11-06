@@ -109,7 +109,7 @@ impl Huffman {
         Ok(Huffman { counts, symbols })
     }
 
-    fn decode(&self, input: &mut BitReader) -> Result<usize, String> {
+    fn decode(&self, input: &mut BitReader<'_>) -> Result<usize, String> {
         let (mut code, mut first, mut index) = (0i32, 0i32, 0i32);
         for len in 1..16 {
             code |= input.bits(1)? as i32;
@@ -233,7 +233,7 @@ fn push(out: &mut Vec<u8>, bytes: &[u8], limit: usize) -> Result<(), String> {
 }
 
 fn codes(
-    input: &mut BitReader,
+    input: &mut BitReader<'_>,
     out: &mut Vec<u8>,
     lit: &Huffman,
     dist: &Huffman,

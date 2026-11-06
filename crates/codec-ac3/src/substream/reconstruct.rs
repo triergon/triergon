@@ -203,7 +203,7 @@ impl Substream {
 
     pub(super) fn synthesize(&mut self, blk: usize, imdct: &mut Imdct, sink: &mut BlockSink<'_>) {
         let chans: [usize; 6] = [0, 1, 2, 3, 4, LFE];
-        for &ch in chans.iter() {
+        for &ch in &chans {
             if (ch == LFE && !self.lfeon) || (ch != LFE && ch >= self.nfchans) {
                 continue;
             }

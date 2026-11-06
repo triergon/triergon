@@ -107,8 +107,8 @@ fn check(bytes: &[u8], positions: [i64; 6], distances: [i32; 6]) {
             assert_eq!(row.position, positions[i]);
             assert_eq!(row.timestamp, i64::try_from(i).unwrap() * 1000);
             assert_eq!(row.size, 12);
-            assert_eq!(row.flags, if i % 3 == 0 { 1 } else { 0 });
-            assert_eq!(row.raw_flag_bits, if i % 3 == 0 { 1 } else { 0 });
+            assert_eq!(row.flags, i32::from(i % 3 == 0));
+            assert_eq!(row.raw_flag_bits, u8::from(i % 3 == 0));
             assert_eq!(row.min_distance, distances[i]);
         }
         drop(cursor);

@@ -54,7 +54,7 @@ fn stable(pvq: usize) -> bool {
 }
 
 fn post_adpcm(f: &mut Frame, rng: &mut Rng) {
-    for sf in f.subframes.iter_mut() {
+    for sf in &mut f.subframes {
         for (ch, cs) in sf.chans.iter_mut().enumerate() {
             let nsubs = f.chans[ch].nvqsub as usize;
             for b in cs.bands.iter_mut().take(nsubs) {
@@ -68,7 +68,7 @@ fn post_adpcm(f: &mut Frame, rng: &mut Rng) {
                         }
                     }
                     // keep the predicted level modest
-                    for sc in b.scale.iter_mut() {
+                    for sc in &mut b.scale {
                         *sc = (*sc - 12).max(1);
                     }
                 }
@@ -83,7 +83,7 @@ fn post_hfvq(f: &mut Frame, rng: &mut Rng) {
         let c = &mut f.chans[ch];
         c.nvqsub = c.nsubs - rng.range(1, 8) as u8;
     }
-    for sf in f.subframes.iter_mut() {
+    for sf in &mut f.subframes {
         for ch in 0..nch {
             let (nv, ns, shuff) = (
                 f.chans[ch].nvqsub as usize,
@@ -119,11 +119,11 @@ fn post_joint(f: &mut Frame, rng: &mut Rng) {
         f.chans[ch].nvqsub = n;
         f.chans[ch].joinx = src as u8 + 1;
     }
-    for sf in f.subframes.iter_mut() {
+    for sf in &mut f.subframes {
         for &(ch, src) in pairs {
             sf.chans[ch].join_shuff = rng.range(0, 4) as u8;
             let _ = src;
-            for b in sf.chans[ch].bands.iter_mut() {
+            for b in &mut sf.chans[ch].bands {
                 b.jscale = rng.range(-20, 20);
             }
         }
@@ -138,12 +138,12 @@ fn post_joint(f: &mut Frame, rng: &mut Rng) {
                 if b.abits == 0 {
                     b.abits = 3;
                     b.scale[0] = 60;
-                    for v in b.q.iter_mut() {
+                    for v in &mut b.q {
                         *v = rng.range(-3, 3);
                     }
                 }
             };
-            for b in sf.chans[src].bands.iter_mut() {
+            for b in &mut sf.chans[src].bands {
                 fill(b);
             }
             for b in sf.chans[ch].bands.iter_mut().take(nj) {
@@ -179,7 +179,7 @@ fn random_frame(o: &Opts, rng: &mut Rng) -> Frame {
     f.lff = o.lff;
     f.filts = o.filts;
     f.aspf = o.aspf;
-    for c in f.chans.iter_mut() {
+    for c in &mut f.chans {
         if o.huff {
             c.bhuff = rng.range(0, 4) as u8;
             c.shuff = rng.range(0, 4) as u8;
@@ -249,12 +249,12 @@ fn random_frame(o: &Opts, rng: &mut Rng) -> Frame {
                     (1 << (a - 4)) - 1
                 };
                 let maxq = if a >= 11 { maxq.min(1 << 12) } else { maxq };
-                for v in b.q.iter_mut() {
+                for v in &mut b.q {
                     *v = rng.range(-maxq, maxq);
                 }
             }
         }
-        for v in sf.lfe.iter_mut() {
+        for v in &mut sf.lfe {
             *v = rng.range(-120, 120);
         }
         sf.lfe_scale = rng.range(40, 100) as u8;
@@ -262,12 +262,12 @@ fn random_frame(o: &Opts, rng: &mut Rng) -> Frame {
     }
     (o.post)(&mut f, rng);
     // Scale magnitudes: keep large-ABITS amplitudes moderate.
-    for sf in f.subframes.iter_mut() {
+    for sf in &mut f.subframes {
         for (ch, cs) in sf.chans.iter_mut().enumerate() {
             let shuff = f.chans[ch].shuff;
-            for b in cs.bands.iter_mut() {
+            for b in &mut cs.bands {
                 if b.abits >= 11 {
-                    for s in b.scale.iter_mut() {
+                    for s in &mut b.scale {
                         *s = (*s - if shuff == 6 { 30 } else { 15 }).max(1);
                     }
                 }
@@ -435,7 +435,7 @@ fn silent(amode: u8, blocks: usize, nssc: usize, lff: u8) -> Frame {
     let nch = amode_channels(amode).min(5);
     let mut f = Frame::new(amode, nch, blocks);
     f.lff = lff;
-    for c in f.chans.iter_mut() {
+    for c in &mut f.chans {
         c.nsubs = 32;
         c.nvqsub = 32;
     }
@@ -503,7 +503,7 @@ fn probe_stream(
     meta.push_str(&format!(
         "kind={kind}\nframe_samples={}\nfirst_cal={first_cal}\nfirst_test={first_test}\nepisode={episode}\nper_frame={per_frame}\ncount={count}\nbands={}\nscale7={PROBE_SCALE}\nabits={PROBE_ABITS}\nq={q}\nsamples={}\n",
         blocks * 32,
-        bands.iter().map(|b| b.to_string()).collect::<Vec<_>>().join(","),
+        bands.iter().map(ToString::to_string).collect::<Vec<_>>().join(","),
         nssc * 8,
     ));
     stream(&frames)
@@ -552,7 +552,7 @@ fn hfvq_probe(meta: &mut String) -> Vec<u8> {
         1024,
         PROBE_Q,
         |f, start| {
-            for c in f.chans.iter_mut() {
+            for c in &mut f.chans {
                 c.nvqsub = VQ_BANDS[0] as u8;
             }
             for ch in 0..5 {
@@ -652,7 +652,7 @@ pub fn scenarios(name: &str, meta: &mut String) -> Option<Vec<u8>> {
         "size_changes_adpcm" => {
             let mut rng = Rng(99);
             let mut frames = Vec::new();
-            for &(blocks, nssc) in [
+            for &(blocks, nssc) in &[
                 (16, &[2usize][..]),
                 (8, &[1][..]),
                 (8, &[1][..]),
@@ -662,9 +662,7 @@ pub fn scenarios(name: &str, meta: &mut String) -> Option<Vec<u8>> {
                 (16, &[1, 1][..]),
                 (48, &[4, 2][..]),
                 (16, &[2][..]),
-            ]
-            .iter()
-            {
+            ] {
                 frames.push(random_frame(
                     &Opts {
                         blocks,
@@ -681,9 +679,9 @@ pub fn scenarios(name: &str, meta: &mut String) -> Option<Vec<u8>> {
         "x96_loud" => x96_stream(
             Opts {
                 post: |f, _| {
-                    for sf in f.subframes.iter_mut() {
-                        for cs in sf.chans.iter_mut() {
-                            for b in cs.bands.iter_mut() {
+                    for sf in &mut f.subframes {
+                        for cs in &mut sf.chans {
+                            for b in &mut cs.bands {
                                 b.scale[0] = (b.scale[0] + 20).min(124);
                                 b.scale[1] = (b.scale[1] + 20).min(124);
                             }
@@ -702,9 +700,9 @@ pub fn scenarios(name: &str, meta: &mut String) -> Option<Vec<u8>> {
         "x96_loudcore" => x96_stream(
             Opts {
                 post: |f, _| {
-                    for sf in f.subframes.iter_mut() {
-                        for cs in sf.chans.iter_mut() {
-                            for b in cs.bands.iter_mut() {
+                    for sf in &mut f.subframes {
+                        for cs in &mut sf.chans {
+                            for b in &mut cs.bands {
                                 b.scale[0] = (b.scale[0] + 20).min(124);
                                 b.scale[1] = (b.scale[1] + 20).min(124);
                             }
@@ -1023,10 +1021,10 @@ pub fn scenarios(name: &str, meta: &mut String) -> Option<Vec<u8>> {
             Opts {
                 post: |f, r| {
                     post_hfvq(f, r);
-                    for sf in f.subframes.iter_mut() {
+                    for sf in &mut f.subframes {
                         for (ch, cs) in sf.chans.iter_mut().enumerate() {
                             let _ = ch;
-                            for b in cs.bands.iter_mut() {
+                            for b in &mut cs.bands {
                                 if b.vq != 0 {
                                     b.scale[0] = r.range(110, 124);
                                 }
@@ -1069,7 +1067,7 @@ pub fn scenarios(name: &str, meta: &mut String) -> Option<Vec<u8>> {
             Opts {
                 post: |f, r| {
                     post_joint(f, r);
-                    for c in f.chans.iter_mut() {
+                    for c in &mut f.chans {
                         c.sel = [1, 3, 3, 3, 3, 7, 7, 7, 7, 7];
                     }
                 },
@@ -1082,7 +1080,7 @@ pub fn scenarios(name: &str, meta: &mut String) -> Option<Vec<u8>> {
             Opts {
                 post: |f, r| {
                     post_joint(f, r);
-                    for c in f.chans.iter_mut() {
+                    for c in &mut f.chans {
                         c.bhuff = 6;
                     }
                 },
@@ -1095,7 +1093,7 @@ pub fn scenarios(name: &str, meta: &mut String) -> Option<Vec<u8>> {
             Opts {
                 post: |f, r| {
                     post_joint(f, r);
-                    for c in f.chans.iter_mut() {
+                    for c in &mut f.chans {
                         c.shuff = 6;
                     }
                 },
@@ -1108,12 +1106,12 @@ pub fn scenarios(name: &str, meta: &mut String) -> Option<Vec<u8>> {
             Opts {
                 post: |f, r| {
                     post_joint(f, r);
-                    for c in f.chans.iter_mut() {
+                    for c in &mut f.chans {
                         c.shuff = 2;
                     }
-                    for sf in f.subframes.iter_mut() {
-                        for cs in sf.chans.iter_mut() {
-                            for b in cs.bands.iter_mut() {
+                    for sf in &mut f.subframes {
+                        for cs in &mut sf.chans {
+                            for b in &mut cs.bands {
                                 b.scale[0] /= 2;
                                 b.scale[1] /= 2;
                             }
@@ -1128,12 +1126,12 @@ pub fn scenarios(name: &str, meta: &mut String) -> Option<Vec<u8>> {
             Opts {
                 post: |f, r| {
                     post_joint(f, r);
-                    for c in f.chans.iter_mut() {
+                    for c in &mut f.chans {
                         c.shuff = 5;
                     }
-                    for sf in f.subframes.iter_mut() {
-                        for cs in sf.chans.iter_mut() {
-                            for b in cs.bands.iter_mut() {
+                    for sf in &mut f.subframes {
+                        for cs in &mut sf.chans {
+                            for b in &mut cs.bands {
                                 b.scale[0] /= 2;
                                 b.scale[1] /= 2;
                             }
@@ -1148,10 +1146,10 @@ pub fn scenarios(name: &str, meta: &mut String) -> Option<Vec<u8>> {
             Opts {
                 post: |f, r| {
                     post_joint(f, r);
-                    for sf in f.subframes.iter_mut() {
-                        for cs in sf.chans.iter_mut() {
+                    for sf in &mut f.subframes {
+                        for cs in &mut sf.chans {
                             cs.join_shuff = 5;
-                            for b in cs.bands.iter_mut() {
+                            for b in &mut cs.bands {
                                 b.jscale = r.range(0, 20);
                             }
                         }
@@ -1217,7 +1215,7 @@ pub fn scenarios(name: &str, meta: &mut String) -> Option<Vec<u8>> {
             let mut frames = Vec::new();
             for book in [0u8, 5] {
                 let mut f = silent(9, 16, 2, 0);
-                for c in f.chans.iter_mut() {
+                for c in &mut f.chans {
                     c.shuff = book;
                 }
                 for ch in 0..5 {
@@ -1247,7 +1245,7 @@ pub fn scenarios(name: &str, meta: &mut String) -> Option<Vec<u8>> {
                 let mut pos = 0;
                 while pos < walk.len() {
                     let mut f = silent(9, 16, 2, 0);
-                    for c in f.chans.iter_mut() {
+                    for c in &mut f.chans {
                         c.shuff = book;
                     }
                     for ch in 0..5 {
@@ -1292,7 +1290,7 @@ pub fn scenarios(name: &str, meta: &mut String) -> Option<Vec<u8>> {
             Opts {
                 post: |f, r| {
                     f.dynf = true;
-                    for sf in f.subframes.iter_mut() {
+                    for sf in &mut f.subframes {
                         sf.range = r.range(0, 255) as u8;
                     }
                 },
@@ -1412,7 +1410,7 @@ pub fn scenarios(name: &str, meta: &mut String) -> Option<Vec<u8>> {
                     frames.push(f);
                     frames.push(silent(0, 16, 2, 0));
                 }
-                for fr in frames.iter_mut() {
+                for fr in &mut frames {
                     fr.filts = true;
                 }
                 meta.push_str(
@@ -1434,7 +1432,7 @@ pub fn scenarios(name: &str, meta: &mut String) -> Option<Vec<u8>> {
                 frames.push(f);
                 frames.push(silent(0, 16, 2, 0));
                 frames.push(silent(0, 16, 2, 0));
-                for fr in frames.iter_mut() {
+                for fr in &mut frames {
                     fr.filts = filts;
                 }
                 return Some(stream(&frames));

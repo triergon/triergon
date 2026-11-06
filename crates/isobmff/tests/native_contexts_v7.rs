@@ -475,7 +475,7 @@ fn later_real_esds_fault_is_not_hidden_by_earlier_allowed_wave_fault() {
     }
     assert!(matches!(
         error,
-        Some(Error::Unsupported(_)) | Some(Error::Invalid(_))
+        Some(Error::Unsupported(_) | Error::Invalid(_))
     ));
 }
 #[test]

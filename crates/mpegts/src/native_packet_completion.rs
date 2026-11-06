@@ -494,13 +494,10 @@ impl NativePacketCompletionV1 {
             return Err(Error::Unsupported("packet completion PAT-fact limit"));
         }
         let mut reader = PatReader::new(section, &self.budget, self.limits)?;
-        let decoded = match reader.poll(work, cancel)? {
-            TableStep::Output(p) => p,
-            _ => {
-                return Err(Error::Invalid(
-                    "packet completion reserved PAT work exhausted",
-                ));
-            }
+        let TableStep::Output(decoded) = reader.poll(work, cancel)? else {
+            return Err(Error::Invalid(
+                "packet completion reserved PAT work exhausted",
+            ));
         };
         let association = self.pats.len();
         for entry in decoded.programs.as_slice() {

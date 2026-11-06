@@ -46,10 +46,10 @@ pub trait Sink {
     /// independently until its actual callback/native borrow has retired.
     fn submit(&mut self, feed: Feed) -> Submission;
     fn completion(&mut self) -> Option<FeedToken>;
-    fn pause(&mut self, paused: bool) -> triergon_core::Result<()>;
+    fn pause(&mut self, paused: bool) -> Result<()>;
     /// Scope changes fence callbacks. This must not free a still-borrowed native
     /// buffer; those owners remain in the sink's callback/retirement registry.
-    fn reset(&mut self, intent: &SeekIntent) -> triergon_core::Result<()>;
+    fn reset(&mut self, intent: &SeekIntent) -> Result<()>;
     fn stop(&mut self);
 }
 /// Optional two-phase catalogue boundary for a sink with no outstanding feeds.
@@ -59,7 +59,7 @@ pub trait Sink {
 /// pause state; platform scheduling and
 /// native lifetime proof remain the caller's implementation responsibility.
 pub trait CatalogueSink: Sink {
-    fn prepare_catalogue(&mut self, next: &crate::Engine) -> triergon_core::Result<()>;
+    fn prepare_catalogue(&mut self, next: &crate::Engine) -> Result<()>;
     fn abandon_catalogue(&mut self);
     fn commit_catalogue(&mut self, boundary: crate::catalogue::CatalogueBoundary);
 }
@@ -146,27 +146,19 @@ impl<S: Source, T: Sink> Pump<S, T> {
     }
     pub fn pause(&mut self, paused: bool) -> Result<()> {
         if self.stopped {
-            return Err(crate::Error::Closed);
+            return Err(Error::Closed);
         }
         if !matches!(
-            self.player.as_ref().ok_or(crate::Error::Closed)?.state(),
+            self.player.as_ref().ok_or(Error::Closed)?.state(),
             crate::State::Running | crate::State::Paused
         ) {
-            return Err(crate::Error::Closed);
+            return Err(Error::Closed);
         }
-        if let Err(error) = self
-            .sink
-            .as_mut()
-            .ok_or(crate::Error::Closed)?
-            .pause(paused)
-        {
+        if let Err(error) = self.sink.as_mut().ok_or(Error::Closed)?.pause(paused) {
             self.stop();
             return Err(error);
         }
-        self.player
-            .as_mut()
-            .ok_or(crate::Error::Closed)?
-            .pause(paused)?;
+        self.player.as_mut().ok_or(Error::Closed)?.pause(paused)?;
         self.paused = paused;
         Ok(())
     }
@@ -183,9 +175,9 @@ impl<S: Source, T: Sink> Pump<S, T> {
             return Err(Error::Cancelled);
         }
         if self.stopped {
-            return Err(crate::Error::Closed);
+            return Err(Error::Closed);
         }
-        let player = self.player.as_mut().ok_or(crate::Error::Closed)?;
+        let player = self.player.as_mut().ok_or(Error::Closed)?;
         if !player.seek_and_select(track, target, selection, w, c)? {
             return Ok(false);
         }
@@ -195,12 +187,7 @@ impl<S: Source, T: Sink> Pump<S, T> {
             .ok_or(Error::Invalid("missing accepted seek intent"))?;
         // Source player owns its exact selected clock. This intent is a sink
         // control request, not replacement source timing or a native seek receipt.
-        if let Err(error) = self
-            .sink
-            .as_mut()
-            .ok_or(crate::Error::Closed)?
-            .reset(&intent)
-        {
+        if let Err(error) = self.sink.as_mut().ok_or(Error::Closed)?.reset(&intent) {
             self.stop();
             return Err(error);
         }
@@ -270,7 +257,7 @@ impl<S: Source, T: Sink> Pump<S, T> {
             return Err(Error::Cancelled);
         }
         if self.stopped {
-            return Err(crate::Error::Closed);
+            return Err(Error::Closed);
         }
         if w.remaining() == 0 {
             return Ok(None);
@@ -284,7 +271,7 @@ impl<S: Source, T: Sink> Pump<S, T> {
         }
         // Construct the new callback fence before changing the player or sink.
         let identity = InputCursor::new(
-            self.player.as_ref().ok_or(crate::Error::Closed)?.budget(),
+            self.player.as_ref().ok_or(Error::Closed)?.budget(),
             SourceId(0),
             SourceCapabilities {
                 length: Some(0),
@@ -292,7 +279,7 @@ impl<S: Source, T: Sink> Pump<S, T> {
             },
             1,
         )?;
-        let player = self.player.as_mut().ok_or(crate::Error::Closed)?;
+        let player = self.player.as_mut().ok_or(Error::Closed)?;
         let transaction = match change {
             CatalogueChange::Replace(selection) => {
                 player.prepare_mp4_catalogue(next, selection, w, c)?
@@ -307,7 +294,7 @@ impl<S: Source, T: Sink> Pump<S, T> {
         let Some(transaction) = transaction else {
             return Ok(None);
         };
-        let sink = self.sink.as_mut().ok_or(crate::Error::Closed)?;
+        let sink = self.sink.as_mut().ok_or(Error::Closed)?;
         if let Err(error) = sink.prepare_catalogue(transaction.next_engine()?) {
             sink.abandon_catalogue();
             return Err(error);
@@ -339,7 +326,7 @@ impl<S: Source, T: Sink> Pump<S, T> {
         if !w.try_charge(1) {
             return Ok(PumpStep::Yield);
         }
-        let Some(token) = self.sink.as_mut().ok_or(crate::Error::Closed)?.completion() else {
+        let Some(token) = self.sink.as_mut().ok_or(Error::Closed)?.completion() else {
             return Ok(PumpStep::InFlightFull);
         };
         if let Some(slot) = self
@@ -376,7 +363,7 @@ impl<S: Source, T: Sink> Pump<S, T> {
             };
         }
         if let Some(feed) = self.pending.as_ref() {
-            let player = self.player.as_ref().ok_or(crate::Error::Closed)?;
+            let player = self.player.as_ref().ok_or(Error::Closed)?;
             if !player.current(&feed.output) {
                 self.pending = None;
                 return Err(Error::Invalid("retired producer output"));
@@ -388,8 +375,8 @@ impl<S: Source, T: Sink> Pump<S, T> {
                 return Ok(PumpStep::Yield);
             }
             let token = feed.token.clone();
-            let feed = self.pending.take().ok_or(crate::Error::Closed)?;
-            match self.sink.as_mut().ok_or(crate::Error::Closed)?.submit(feed) {
+            let feed = self.pending.take().ok_or(Error::Closed)?;
+            match self.sink.as_mut().ok_or(Error::Closed)?.submit(feed) {
                 Submission::Accepted(receipt) if receipt == token => {
                     self.credits.as_mut_slice()[slot] = Some(token);
                     return Ok(PumpStep::Fed);
@@ -416,7 +403,7 @@ impl<S: Source, T: Sink> Pump<S, T> {
         if self.in_flight() == self.credits.len() {
             return self.complete(w);
         }
-        let player = self.player.as_mut().ok_or(crate::Error::Closed)?;
+        let player = self.player.as_mut().ok_or(Error::Closed)?;
         if let Some(output) = player.pop() {
             if !w.try_charge(1) {
                 return Err(Error::Invalid("work admission changed after pop"));
@@ -468,7 +455,7 @@ impl<S: Source, T: Sink> Pump<S, T> {
     pub fn into_sink(mut self) -> Result<T> {
         self.stop();
         self.player = None;
-        self.sink.take().ok_or(crate::Error::Closed)
+        self.sink.take().ok_or(Error::Closed)
     }
 }
 impl<S: Source, T: Sink> Drop for Pump<S, T> {

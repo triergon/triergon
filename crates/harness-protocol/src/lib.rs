@@ -7,6 +7,15 @@
 //! implements the same polynomial; the golden vectors below pin it. The decode
 //! workers fingerprint their output with the [`interleaved`] digest instead.
 #![forbid(unsafe_code)]
+#![warn(
+    missing_docs,
+    missing_debug_implementations,
+    unreachable_pub,
+    clippy::print_stdout,
+    clippy::print_stderr,
+    clippy::unwrap_used
+)]
+// Pending: `clippy::expect_used`.
 
 pub mod digest;
 pub mod interleaved;

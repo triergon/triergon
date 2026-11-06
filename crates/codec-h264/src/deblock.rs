@@ -665,7 +665,7 @@ fn motion_bs(rp: [i32; 2], mp: [[i16; 2]; 2], rq: [i32; 2], mq: [[i16; 2]; 2], l
 
 /// Internal edge strengths of a non-intra MB: [vertical edge e][row], [horizontal edge e][column].
 #[inline(never)]
-fn internal_bs(ctx: &BsCtx, q: usize) -> ([[u8; 4]; 4], [[u8; 4]; 4]) {
+fn internal_bs(ctx: &BsCtx<'_>, q: usize) -> ([[u8; 4]; 4], [[u8; 4]; 4]) {
     let mq = &ctx.mbs[q];
     let nz = mq.nzmask as u32;
     let m = ctx.motion;

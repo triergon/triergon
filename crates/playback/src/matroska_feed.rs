@@ -46,7 +46,7 @@ pub struct MatroskaFeedLimits {
     pub aac_output_bytes: usize,
 }
 
-fn check_limit(requested: usize, maximum: usize) -> triergon_core::Result<()> {
+fn check_limit(requested: usize, maximum: usize) -> Result<()> {
     if requested > maximum {
         return Err(Error::Limit { requested, maximum });
     }
@@ -214,7 +214,7 @@ fn parse(
     parser: &mut Parser,
     work: &mut WorkBudget,
     cancel: &AtomicBool,
-) -> triergon_core::Result<BuildStep<FeedCodec>> {
+) -> Result<BuildStep<FeedCodec>> {
     match parser {
         Parser::Avc(parser) => Ok(match parser.step(work, cancel)? {
             BuildStep::Ready(record) => {

@@ -426,10 +426,7 @@ fn legacy_projection_switch_during_real_pressure_does_not_change_walk_graph_befo
     let mut reader = paused_plain::<LegacyProjection>();
     let pool = reader.budget().clone();
     let blocker = pool.reserve(pool.available()).unwrap();
-    assert!(matches!(
-        pool.reserve(1),
-        Err(triergon_core::Error::Backpressure { .. })
-    ));
+    assert!(matches!(pool.reserve(1), Err(Error::Backpressure { .. })));
     reader.reader.allocation_blocked(1);
     for units in [0, 1, 1, 1, 7, 8192] {
         let step = quantum::<TypedProjection>(&mut reader, units).unwrap();

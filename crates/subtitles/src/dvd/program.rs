@@ -371,7 +371,7 @@ impl ProgramJob {
         self.commands
     }
     pub fn controls_processed(&self) -> usize {
-        self.records.as_ref().map_or(0, |r| r.len())
+        self.records.as_ref().map_or(0, BudgetVec::len)
     }
 
     fn poison(&mut self, error: Error) -> Error {
@@ -634,12 +634,11 @@ impl ProgramJob {
                         .current
                         .ok_or(Error::Invalid("DVD current control absent"))?;
                     fact.state_after = self.state;
-                    let receiver_stop =
-                        self.policy == ControlPolicy::NativeD32
-                            && (fact.next_offset < fact.raw_start
-                                || usize::from(fact.next_offset).checked_add(5).is_none_or(
-                                    |end| end > self.raw.as_ref().map_or(0, |raw| raw.len()),
-                                ));
+                    let receiver_stop = self.policy == ControlPolicy::NativeD32
+                        && (fact.next_offset < fact.raw_start
+                            || usize::from(fact.next_offset)
+                                .checked_add(5)
+                                .is_none_or(|end| end > self.raw.as_ref().map_or(0, Bytes::len)));
                     fact.receiver_stopped_at_link = receiver_stop;
                     self.records
                         .as_mut()

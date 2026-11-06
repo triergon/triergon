@@ -232,9 +232,8 @@ impl ArgbWriter {
         }
         let available = self.maximum_work.saturating_sub(self.spent);
         if available == 0 {
-            let requested = match self.spent.checked_add(1) {
-                Some(value) => value,
-                None => return Err(self.poison(Error::Overflow)),
+            let Some(requested) = self.spent.checked_add(1) else {
+                return Err(self.poison(Error::Overflow));
             };
             return Err(self.poison(Error::Limit {
                 requested,

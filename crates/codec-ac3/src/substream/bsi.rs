@@ -223,7 +223,7 @@ impl Substream {
     ) {
         let key = (acmod as u32) | (lfeon as u32) << 3 | (fscod as u32) << 4 | rate_shift << 6;
         if key != self.config_key {
-            for d in self.delay.iter_mut() {
+            for d in &mut self.delay {
                 d.fill(0.0);
             }
             self.config_key = key;

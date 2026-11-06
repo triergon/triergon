@@ -203,7 +203,7 @@ fn all30_source_cases_preserve_bytes_offsets_boundaries_across_chunk_work_and_eo
                                 );
                             }
                             Dts14BoundaryEvidence::ExplicitSourceEnd => {
-                                assert_eq!(boundaries[i], "eof")
+                                assert_eq!(boundaries[i], "eof");
                             }
                         }
                     }

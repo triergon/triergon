@@ -11,7 +11,7 @@ use crate::picture::{ColMotion, Mv, Pixel, PuMotion};
 use crate::slice::{SLICE_B, SLICE_P};
 use crate::state::*;
 
-impl<'a, P: Pixel> SliceDecoder<'a, P> {
+impl<P: Pixel> SliceDecoder<'_, P> {
     /// Parses a prediction unit, derives its motion, stores it and performs motion
     /// compensation. Returns merge_flag.
     #[allow(clippy::too_many_arguments)]

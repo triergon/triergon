@@ -25,7 +25,7 @@ pub struct Mov9DependencyObservationV5 {
 }
 impl Mov9DependencyObservationV5 {
     pub fn from_source(raw: u8, _profile: PinnedMovD32EncodedRecoveryV5) -> Self {
-        let cause = match raw & 12 {
+        let cause = match raw & 0x0c {
             0 => Mov9DependencyCauseV5::SourceUnspecified,
             4 => Mov9DependencyCauseV5::SourceReferenced,
             8 => Mov9DependencyCauseV5::SourceUnreferenced,
@@ -259,7 +259,7 @@ impl RecoveryWalkV5 {
                     .ok_or(Error::Invalid("recovery pending invariant"))?
                 {
                     Pending::Descriptions { source, slot, .. } => {
-                        self.facts.groups[slot].descriptions = Some(source)
+                        self.facts.groups[slot].descriptions = Some(source);
                     }
                     Pending::Mappings {
                         source,

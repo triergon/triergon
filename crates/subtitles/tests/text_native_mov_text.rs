@@ -588,7 +588,7 @@ fn check_native_capture(c: &captured::Case) {
                     subtitle,
                 } => {
                     let mut i = input(&pool, raw);
-                    i.codec_private = extra.clone();
+                    i.codec_private.clone_from(&extra);
                     let clock = Clock {
                         pts: c.pts,
                         dts: None,

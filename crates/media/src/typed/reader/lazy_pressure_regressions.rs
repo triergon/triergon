@@ -56,7 +56,7 @@ fn pressure_trace(original_workspace: bool) -> Vec<String> {
         let step = reader.step(&mut work, &AtomicBool::new(false)).unwrap();
         let (label, done) = match step {
             Step::Yield => ("yield".to_owned(), false),
-            Step::Backpressure(triergon_core::Backpressure {
+            Step::Backpressure(Backpressure {
                 requested,
                 available,
             }) => {

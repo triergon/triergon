@@ -14,11 +14,14 @@ impl NativePacketTiming {
     pub fn demux(packet: &Packet) -> Result<Self> {
         let timing = packet.packet.timing.ffmpeg9()?;
         Ok(Self {
-            pts: timing.pts.map(|time| time.rounded_ns()).transpose()?,
+            pts: timing
+                .pts
+                .map(triergon_matroska::timing::ExactTime::rounded_ns)
+                .transpose()?,
             dts: None,
             duration_ns: timing
                 .duration
-                .map(|time| time.rounded_duration_ns())
+                .map(triergon_matroska::timing::ExactTime::rounded_duration_ns)
                 .transpose()?,
         })
     }
@@ -31,7 +34,7 @@ enum Stamp {
 }
 
 impl Stamp {
-    fn offset(self, delta: i128) -> triergon_core::Result<Self> {
+    fn offset(self, delta: i128) -> Result<Self> {
         Ok(match self {
             Self::Relative(value) => {
                 Self::Relative(value.checked_add(delta).ok_or(Error::Overflow)?)
@@ -50,7 +53,7 @@ pub(super) struct PacketClock {
 }
 
 impl PacketClock {
-    fn resolve(self, shift: Option<i128>) -> triergon_core::Result<NativePacketTiming> {
+    fn resolve(self, shift: Option<i128>) -> Result<NativePacketTiming> {
         let pts = match self.stamp {
             None => None,
             Some(Stamp::Absolute(value)) => Some(value),
@@ -79,7 +82,7 @@ pub(super) struct Timeline {
 }
 
 impl Timeline {
-    pub fn push(&mut self, timing: NativePacketTiming) -> triergon_core::Result<PacketClock> {
+    pub fn push(&mut self, timing: NativePacketTiming) -> Result<PacketClock> {
         let stamp = if let Some(pts) = timing.pts {
             let pts = i128::from(pts);
             if self.shift.is_none() {
@@ -108,7 +111,7 @@ impl Timeline {
         })
     }
 
-    pub fn resolve(self, clock: PacketClock) -> triergon_core::Result<NativePacketTiming> {
+    pub fn resolve(self, clock: PacketClock) -> Result<NativePacketTiming> {
         clock.resolve(self.shift)
     }
 }
@@ -121,13 +124,13 @@ struct InitialDuration {
 }
 
 impl InitialDuration {
-    fn offset(self, index: usize) -> triergon_core::Result<i128> {
+    fn offset(self, index: usize) -> Result<i128> {
         i128::from(self.duration_ns)
             .checked_mul(index as i128)
             .ok_or(Error::Overflow)
     }
 
-    fn clock(self, index: usize) -> triergon_core::Result<PacketClock> {
+    fn clock(self, index: usize) -> Result<PacketClock> {
         Ok(PacketClock {
             stamp: Some(self.first.offset(self.offset(index)?)?),
             duration_ns: Some(self.duration_ns),
@@ -145,11 +148,7 @@ pub(super) struct ProbeTimeline {
 }
 
 impl ProbeTimeline {
-    pub fn push(
-        &mut self,
-        count: usize,
-        timing: NativePacketTiming,
-    ) -> triergon_core::Result<PacketClock> {
+    pub fn push(&mut self, count: usize, timing: NativePacketTiming) -> Result<PacketClock> {
         if !self.seen_duration {
             if let Some(duration_ns) = timing.duration_ns {
                 self.seen_duration = true;
@@ -197,11 +196,7 @@ impl ProbeTimeline {
         self.timeline.push(timing)
     }
 
-    pub fn resolve(
-        self,
-        index: usize,
-        original: PacketClock,
-    ) -> triergon_core::Result<NativePacketTiming> {
+    pub fn resolve(self, index: usize, original: PacketClock) -> Result<NativePacketTiming> {
         let clock = match self.fill.filter(|fill| index < fill.packets) {
             Some(fill) => fill.clock(index)?,
             None => original,

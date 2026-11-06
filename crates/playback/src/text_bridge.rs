@@ -91,7 +91,7 @@ pub enum TextStep {
 #[derive(Debug)]
 pub struct TextRejection {
     pub source: TextSource,
-    pub error: crate::Error,
+    pub error: Error,
 }
 struct CopyStage {
     fields: [BudgetVec<u8>; 4],

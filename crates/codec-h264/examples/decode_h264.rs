@@ -38,7 +38,7 @@ fn write_pic(out: &mut Option<std::io::BufWriter<std::fs::File>>, p: &Picture, n
         n,
         p.width,
         p.height,
-        p.pts.map(|v| v.to_string()).unwrap_or("null".into()),
+        p.pts.map_or("null".into(), |v| v.to_string()),
         p.poc,
         p.sar.0,
         p.sar.1

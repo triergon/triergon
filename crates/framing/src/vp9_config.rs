@@ -235,7 +235,7 @@ impl Vp9ConfigParser {
                 .ok_or(Error::Invalid("missing VP9 record cursor"))?;
             match cursor.read_into(&mut self.header[self.used..], work, cancel)? {
                 Step::Ready(count) => {
-                    self.used = self.used.checked_add(count).ok_or(Error::Overflow)?
+                    self.used = self.used.checked_add(count).ok_or(Error::Overflow)?;
                 }
                 Step::Yield => return Ok(BuildStep::Yield),
                 Step::End(_) => return Err(Error::Truncated),

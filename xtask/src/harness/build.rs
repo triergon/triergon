@@ -120,7 +120,7 @@ fn instrumentation_commands(
     linux: bool,
 ) -> Vec<Vec<String>> {
     let p = |path: PathBuf| path.display().to_string();
-    let owned = |items: &[&str]| items.iter().map(|s| s.to_string()).collect::<Vec<_>>();
+    let owned = |items: &[&str]| items.iter().map(ToString::to_string).collect::<Vec<_>>();
     if linux {
         let mut observer = owned(&[
             compiler,
@@ -435,8 +435,7 @@ pub fn build(root: &Path) -> R<PathBuf> {
             libraries
                 .iter()
                 .find(|(k, _)| k == name)
-                .map(|(_, v)| v.clone())
-                .unwrap_or(Value::Null)
+                .map_or(Value::Null, |(_, v)| v.clone())
         };
         let selected = Value::object([("observer", of("observer")), ("probe", of("probe"))]);
         let sources = Value::object(
@@ -507,8 +506,7 @@ pub fn build(root: &Path) -> R<PathBuf> {
                 libraries
                     .iter()
                     .find(|(k, _)| k == name)
-                    .map(|(_, v)| v)
-                    .unwrap_or(&Value::Null),
+                    .map_or(&Value::Null, |(_, v)| v),
             ))
         } else {
             darwin_libraries(path)

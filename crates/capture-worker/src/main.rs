@@ -198,7 +198,7 @@ fn main() -> ExitCode {
             let mut stdout = std::io::stdout();
             if stdout
                 .write_all(b"SAFE_MEDIA_BEGIN_V1\n")
-                .and_then(|_| stdout.flush())
+                .and_then(|()| stdout.flush())
                 .is_err()
             {
                 return fail("marker");
@@ -208,7 +208,7 @@ fn main() -> ExitCode {
             }
             if stdout
                 .write_all(b"SAFE_MEDIA_END_V1\n")
-                .and_then(|_| stdout.flush())
+                .and_then(|()| stdout.flush())
                 .is_err()
             {
                 return fail("marker");

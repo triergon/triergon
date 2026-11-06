@@ -231,7 +231,7 @@ pub fn write_coefficients(w: &mut BitWriter, levels: &[i32; 64], mask: u64, intr
     for p in bits(mask) {
         scan |= 1 << SCAN_INDEX[p];
     }
-    let mut next = if intra { 1 } else { 0 };
+    let mut next = usize::from(intra);
     let mut first = !intra;
     for k in bits(scan) {
         let run = k - next;
@@ -301,7 +301,7 @@ mod tests {
         let bits: String = out.iter().map(|b| format!("{b:08b}")).collect();
         let want = "000001".to_owned()
             + "000000"
-            + &format!("{:016b}", 0x8000 | 56)
+            + &format!("{:016b}", 0x8000 | 0x38)
             + "000001"
             + "000000"
             + &format!("{:016b}", 130)

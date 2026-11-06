@@ -42,7 +42,7 @@ fn config(pool: &Budget, bytes: Bytes) -> HvcConfiguration {
         {
             BuildStep::Ready(o) => return o,
             BuildStep::Yield => {}
-            _ => panic!(),
+            BuildStep::Complete => panic!(),
         }
     }
 }
@@ -51,7 +51,7 @@ fn finish(w: &mut HvcAnnexBWriter, work: u64) -> Result<HvcAnnexBOutput, Error> 
         match w.step(&mut WorkBudget::new(work), &AtomicBool::new(false))? {
             BuildStep::Ready(o) => return Ok(o),
             BuildStep::Yield => {}
-            _ => panic!(),
+            BuildStep::Complete => panic!(),
         }
     }
     panic!("bounded whole conversion did not finish")
@@ -73,7 +73,7 @@ fn whole_ordered_conversion_preserves_every_array_duplicate_unknown_mismatch_and
             o.configuration().opaque_suffix().unwrap().as_ref(),
             [0xa5, 0xff]
         );
-        assert_ne!(o.configuration().syntax_issues() & 192, 0);
+        assert_ne!(o.configuration().syntax_issues() & 0xc0, 0);
         assert_eq!(o.configuration().source().offset, 71);
         assert!(matches!(
             w.step(&mut WorkBudget::new(0), &AtomicBool::new(true)),
@@ -137,12 +137,11 @@ fn reserve_and_freeze_retries_do_not_repeat_complete_conversion() {
     ));
     assert_eq!(pool.used(), used);
     drop(retained);
-    let o = match w
+    let BuildStep::Ready(o) = w
         .step(&mut WorkBudget::new(1), &AtomicBool::new(false))
         .unwrap()
-    {
-        BuildStep::Ready(o) => o,
-        _ => panic!("copied NAL bytes must survive freeze retry"),
+    else {
+        panic!("copied NAL bytes must survive freeze retry")
     };
     assert_eq!(o.bytes().as_ref(), expected());
     assert_eq!(o.configuration().source_bytes().as_ref(), raw());
@@ -184,8 +183,8 @@ fn intrinsically_impossible_retained_source_plus_output_is_limit() {
     let size = Budget::control_storage_bytes()
         + Bytes::owner_overhead_bytes()
         + bytes.len()
-        + 3 * std::mem::size_of::<HvcConfigArray>()
-        + 4 * std::mem::size_of::<HvcConfigNal>()
+        + 3 * size_of::<HvcConfigArray>()
+        + 4 * size_of::<HvcConfigNal>()
         + 1;
     let pool = Budget::new(size).unwrap();
     let c = config(&pool, Bytes::copy_from_slice(&pool, &bytes).unwrap());

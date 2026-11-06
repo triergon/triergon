@@ -86,7 +86,7 @@ fn set_intra_type(mb: &mut MbData, t: u32) -> Result<(), DecodeError> {
     Ok(())
 }
 
-impl<'a> SliceDecoder<'a> {
+impl SliceDecoder<'_> {
     fn field_mb(&self) -> bool {
         self.pic.mbs[self.cur].field
     }
@@ -1060,7 +1060,7 @@ impl<'a> SliceDecoder<'a> {
             c.reinit_at(pos + n);
         } else {
             self.br.align();
-            for v in samples[..n].iter_mut() {
+            for v in &mut samples[..n] {
                 *v = self.br.u(8) as u8;
             }
         }

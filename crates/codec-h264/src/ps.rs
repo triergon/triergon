@@ -128,7 +128,7 @@ type ScalingFallback<'a> = (&'a [[u8; 16]; 6], &'a [[u8; 64]; 6]);
 
 /// scaling_list() syntax, clause 7.3.2.1.1.1. Returns true when useDefaultScalingMatrixFlag.
 #[allow(clippy::needless_range_loop)] // indexed form over parallel fixed-size arrays (mirrors the spec loops, keeps the hot loop vectorisable)
-fn scaling_list(r: &mut BitReader, list: &mut [u8]) -> R<bool> {
+fn scaling_list(r: &mut BitReader<'_>, list: &mut [u8]) -> R<bool> {
     let mut last = 8i32;
     let mut next = 8i32;
     for j in 0..list.len() {
@@ -151,11 +151,11 @@ fn scaling_list(r: &mut BitReader, list: &mut [u8]) -> R<bool> {
 /// Parse the scaling matrix lists with fall-back rule A (SPS, `fallback = None`) or B (PPS,
 /// `fallback = Some(sps lists)`), Table 7-2.
 fn parse_scaling_matrix(
-    r: &mut BitReader,
+    r: &mut BitReader<'_>,
     n_lists: usize,
     s4: &mut [[u8; 16]; 6],
     s8: &mut [[u8; 64]; 6],
-    fallback: Option<ScalingFallback>,
+    fallback: Option<ScalingFallback<'_>>,
 ) -> R<()> {
     for i in 0..n_lists {
         let present = r.flag();
@@ -205,7 +205,7 @@ fn parse_scaling_matrix(
     Ok(())
 }
 
-fn hrd(r: &mut BitReader, v: &mut Vui) -> R<()> {
+fn hrd(r: &mut BitReader<'_>, v: &mut Vui) -> R<()> {
     let cpb_cnt = r.ue() + 1;
     if cpb_cnt > 32 {
         return Err(inval("cpb_cnt_minus1"));
@@ -224,7 +224,7 @@ fn hrd(r: &mut BitReader, v: &mut Vui) -> R<()> {
     Ok(())
 }
 
-fn parse_vui(r: &mut BitReader) -> R<Vui> {
+fn parse_vui(r: &mut BitReader<'_>) -> R<Vui> {
     let mut v = Vui::default();
     if r.flag() {
         let idc = r.u(8);
@@ -296,7 +296,7 @@ fn parse_vui(r: &mut BitReader) -> R<Vui> {
     Ok(v)
 }
 
-pub(crate) fn parse_sps(r: &mut BitReader) -> R<Sps> {
+pub(crate) fn parse_sps(r: &mut BitReader<'_>) -> R<Sps> {
     let profile_idc = r.u(8) as u8;
     let constraint_flags = r.u(8) as u8;
     let level_idc = r.u(8) as u8;
@@ -401,7 +401,7 @@ pub(crate) fn parse_sps(r: &mut BitReader) -> R<Sps> {
     }
     sps.direct_8x8_inference = r.flag();
     if r.flag() {
-        for c in sps.crop.iter_mut() {
+        for c in &mut sps.crop {
             *c = r.ue();
         }
     }
@@ -414,7 +414,7 @@ pub(crate) fn parse_sps(r: &mut BitReader) -> R<Sps> {
     Ok(sps)
 }
 
-pub(crate) fn parse_pps(r: &mut BitReader, spss: &[Option<Box<Sps>>]) -> R<Pps> {
+pub(crate) fn parse_pps(r: &mut BitReader<'_>, spss: &[Option<Box<Sps>>]) -> R<Pps> {
     let id = r.ue();
     if id > 255 {
         return Err(inval("pic_parameter_set_id"));

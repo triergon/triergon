@@ -150,7 +150,7 @@ fn cancellation_before_supply_does_not_move_source_or_publish_view() {
     cancelled.store(false, Ordering::Relaxed);
     assert!(matches!(
         input.read_into(&mut [0], &mut WorkBudget::new(1), &cancelled),
-        Err(triergon_core::Error::Cancelled)
+        Err(Error::Cancelled)
     ));
 }
 
@@ -173,7 +173,7 @@ fn previous_transport_failure_wins_over_new_cancellation() {
             &AtomicBool::new(true),
             Some(seek)
         ),
-        Err(triergon_core::Error::Transport)
+        Err(Error::Transport)
     ));
     assert_eq!(feeder.reader_mut().position(), 0);
 }

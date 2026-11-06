@@ -466,7 +466,7 @@ fn all_native_index_declarations_survive_even_when_initial_packet_is_eof() {
             Mov9CursorStatus::Yield => {}
             Mov9CursorStatus::End => break,
             Mov9CursorStatus::Ready => {
-                entries.push(index.take_event().unwrap().native_entry.unwrap())
+                entries.push(index.take_event().unwrap().native_entry.unwrap());
             }
         }
     }

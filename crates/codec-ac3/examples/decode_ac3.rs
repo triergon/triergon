@@ -44,14 +44,11 @@ fn main() {
     let mut last_err: Option<DecodeError> = None;
     let mut third_downmix = None;
     while pos + 8 <= data.len() {
-        let len = match access_unit_len(&data[pos..]) {
-            Ok(l) => l,
-            Err(_) => {
-                // Resynchronise on the next syncword.
-                pos += 1;
-                skipped += 1;
-                continue;
-            }
+        let Ok(len) = access_unit_len(&data[pos..]) else {
+            // Resynchronise on the next syncword.
+            pos += 1;
+            skipped += 1;
+            continue;
         };
         let end = (pos + len).min(data.len());
         frame.clear();
@@ -115,7 +112,7 @@ fn main() {
 
 fn fmt_downmix(d: Option<triergon_codec_ac3::DownmixInfo>) -> String {
     let Some(d) = d else { return "none".into() };
-    let f = |v: Option<f64>| v.map(|x| format!("{x:.6}")).unwrap_or_else(|| "-".into());
+    let f = |v: Option<f64>| v.map_or_else(|| "-".into(), |x| format!("{x:.6}"));
     format!(
         "pref={:?} center={} center_ltrt={} surround={} surround_ltrt={} lfe={}",
         d.preferred_downmix_type

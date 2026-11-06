@@ -346,13 +346,11 @@ impl NativePesRecoveryObserver {
                 self.inner.push_clock_boundary_v1(packet, context)?;
             }
             self.pending_timeline = Some((context.source_event_ordinal, context.epochs));
+        } else if let Some(input) = input {
+            self.inner
+                .push_input_boundary(packet, context, false, input)?;
         } else {
-            if let Some(input) = input {
-                self.inner
-                    .push_input_boundary(packet, context, false, input)?;
-            } else {
-                self.inner.push(packet, context)?;
-            }
+            self.inner.push(packet, context)?;
         }
         self.last = Some((context.source_event_ordinal, offset));
         self.entity_first = false;

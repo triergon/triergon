@@ -176,9 +176,8 @@ impl PatCollector {
                 build.copied = false;
                 continue;
             }
-            let section = match self.input.as_ref() {
-                Some(section) => section,
-                None => return Ok(TableStep::Done),
+            let Some(section) = self.input.as_ref() else {
+                return Ok(TableStep::Done);
             };
             if !work.try_charge(1) {
                 return Ok(TableStep::Yield);
@@ -204,21 +203,20 @@ impl PatCollector {
                     _ => {}
                 }
             }
-            let slot = match slot {
-                Some(slot) => slot,
-                None => {
-                    let index = self
-                        .versions
-                        .iter()
-                        .position(Option::is_none)
-                        .ok_or(limit(3, 2))?;
-                    self.versions[index] = Some(Version {
-                        header: identity,
-                        sections: BudgetVec::new(&self.budget),
-                        program_count: 0,
-                    });
-                    index
-                }
+            let slot = if let Some(slot) = slot {
+                slot
+            } else {
+                let index = self
+                    .versions
+                    .iter()
+                    .position(Option::is_none)
+                    .ok_or(limit(3, 2))?;
+                self.versions[index] = Some(Version {
+                    header: identity,
+                    sections: BudgetVec::new(&self.budget),
+                    program_count: 0,
+                });
+                index
             };
             let version = self.versions[slot]
                 .as_mut()

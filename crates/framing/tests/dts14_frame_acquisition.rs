@@ -53,7 +53,7 @@ fn next(
                 let at = r.offset as usize;
                 assert!(at <= input.len());
                 if at == input.len() {
-                    job.finish(r.source, r.token)?
+                    job.finish(r.source, r.token)?;
                 } else {
                     let end = (at + chunk.min(r.maximum)).min(input.len());
                     let b = Bytes::copy_from_slice(pool, &input[at..end])?;
@@ -117,11 +117,11 @@ fn assert_variable(input: &[u8], order: DtsWordOrder) {
 }
 #[test]
 fn varying_normal_frames_big_endian() {
-    assert_variable(BE, DtsWordOrder::BigEndian)
+    assert_variable(BE, DtsWordOrder::BigEndian);
 }
 #[test]
 fn varying_normal_frames_little_endian() {
-    assert_variable(LE, DtsWordOrder::LittleEndian)
+    assert_variable(LE, DtsWordOrder::LittleEndian);
 }
 #[test]
 fn real_prefix_retains_all_four_exact_source_spans() {

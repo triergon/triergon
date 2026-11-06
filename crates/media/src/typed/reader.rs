@@ -291,7 +291,7 @@ impl Reader {
         maximum_window: usize,
     ) -> Result<Self> {
         if !bytes.belongs_to(pool) {
-            return Err(triergon_core::Error::ForeignPool);
+            return Err(Error::ForeignPool);
         }
         let capabilities = SourceCapabilities {
             length: Some(u64::try_from(bytes.len()).map_err(|_| Error::Overflow)?),
@@ -1045,7 +1045,7 @@ impl Reader {
                                 phase: AdmitPhase::Lookup,
                                 maximum: None,
                                 prepare: None,
-                            })
+                            });
                         }
                         EnvelopeProgress::Step(ParseStep::Event(event)) => match event {
                             CompactElementEvent::Start(header) => {

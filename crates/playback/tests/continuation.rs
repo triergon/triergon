@@ -32,7 +32,7 @@ impl Source for Observed {
         r: &triergon_core::InputRequest,
         w: &mut WorkBudget,
         c: &AtomicBool,
-    ) -> triergon_core::Result<SourceReply> {
+    ) -> Result<SourceReply> {
         if w.remaining() == 0 {
             return Ok(SourceReply::Pending);
         }
@@ -291,7 +291,7 @@ fn progressive_truncated_future_media_retains_completed_source_prefix() {
                 break;
             }
             Err(e) => panic!("wrong source failure {e:?}"),
-        };
+        }
         while let Some(x) = p.pop() {
             out.push(x);
         }
@@ -323,7 +323,7 @@ fn progressive_root_limit_is_explicit_and_source_owners_release() {
             }
             Ok(_) => {}
             Err(e) => panic!("wrong limit {e:?}"),
-        };
+        }
         while p.pop().is_some() {}
     }
     assert!(limit);
@@ -380,14 +380,14 @@ impl Sink for RetainingSink {
             Some(self.completed.remove(0))
         }
     }
-    fn pause(&mut self, p: bool) -> triergon_core::Result<()> {
+    fn pause(&mut self, p: bool) -> Result<()> {
         self.pauses.push(p);
         if self.fail_pause {
             return Err(C::Transport);
         }
         Ok(())
     }
-    fn reset(&mut self, i: &SeekIntent) -> triergon_core::Result<()> {
+    fn reset(&mut self, i: &SeekIntent) -> Result<()> {
         self.resets.push(*i);
         Ok(())
     }
@@ -582,7 +582,7 @@ impl Source for StartupSource {
         r: &triergon_core::InputRequest,
         w: &mut WorkBudget,
         c: &AtomicBool,
-    ) -> triergon_core::Result<SourceReply> {
+    ) -> Result<SourceReply> {
         if w.remaining() == 0 {
             return Ok(SourceReply::Pending);
         }
@@ -1553,7 +1553,7 @@ fn pgs_compatibility_bridge_keeps_the_first_event_and_fences_packet_owners() {
     assert_eq!(picture.start_ns, 100_000_000);
     assert_eq!(picture.canvas, None);
     let rectangle = picture.rectangles().next().unwrap();
-    assert!(std::ptr::eq(rectangle, &event.rectangles()[0]));
+    assert!(std::ptr::eq(rectangle, &raw const event.rectangles()[0]));
     assert!(matches!(
         bridge.step(&mut WorkBudget::new(1), &cancel).unwrap(),
         PgsStep::NeedPacket
@@ -1952,7 +1952,7 @@ impl Source for SequentialStartup {
         request: &triergon_core::InputRequest,
         work: &mut WorkBudget,
         cancel: &AtomicBool,
-    ) -> triergon_core::Result<SourceReply> {
+    ) -> Result<SourceReply> {
         let at = self.next.load(Ordering::Relaxed);
         assert_eq!(
             request.offset, at as u64,
@@ -2602,7 +2602,7 @@ fn matroska_bitmap_tracks_feed_native_receivers_without_copying_frames() {
                         assert_eq!(picture.start_ns, 19_000_000);
                         assert!(std::ptr::eq(
                             picture.rectangles().next().unwrap(),
-                            &event.regions()[0],
+                            &raw const event.regions()[0],
                         ));
                         input.source.delivery = Delivery::DecodeOnly {
                             until: Time::new(20, 1000).unwrap(),
@@ -2922,7 +2922,7 @@ fn matroska_discovery_stops_on_canvas_or_limits_and_replays_the_same_source() {
             request: &triergon_core::InputRequest,
             work: &mut WorkBudget,
             cancel: &AtomicBool,
-        ) -> triergon_core::Result<SourceReply> {
+        ) -> Result<SourceReply> {
             if !self.ready.load(Ordering::Relaxed) {
                 return Ok(SourceReply::Pending);
             }
@@ -3340,9 +3340,7 @@ fn dvd_stop_only_packet_produces_no_packet_clock_picture() {
 fn dvd_receiver_commits_controls_across_packets_and_fences_reset() {
     use bitmap_bridge::*;
 
-    fn next(
-        receiver: &mut DvdReceiver<&'static str>,
-    ) -> triergon_playback::Result<DvdOutput<&'static str>> {
+    fn next(receiver: &mut DvdReceiver<&'static str>) -> Result<DvdOutput<&'static str>> {
         for _ in 0..100_000 {
             match receiver.step(&mut WorkBudget::new(1), &off())? {
                 DvdReceiverStep::Yield => {}
@@ -3424,7 +3422,7 @@ fn dvd_receiver_commits_controls_across_packets_and_fences_reset() {
     );
     assert_eq!(
         second.native_presentation().unwrap().unwrap().show.at,
-        Some(triergon_core::Time::new(1193, 1000).unwrap())
+        Some(Time::new(1193, 1000).unwrap())
     );
     assert!(matches!(
         receiver.step(&mut WorkBudget::new(1), &off()).unwrap(),

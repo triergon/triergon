@@ -440,7 +440,7 @@ fn run(path: &Path, quantum: u64) -> Result<(), String> {
         match report.source_error {
             Some(e) => string(&e.to_string()),
             None => print!("null"),
-        };
+        }
         println!(",\"native_delayed_events\":0}}");
     }
     println!("{{\"kind\":\"complete\",\"qualification_accepted\":false}}");

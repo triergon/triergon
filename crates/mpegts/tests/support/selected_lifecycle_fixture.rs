@@ -109,11 +109,11 @@ fn pmt(program: u16, pid: u16, kind: u8, version: u8, current: bool) -> Vec<u8> 
 fn time5(t: u64) -> [u8; 5] {
     assert!(t < 1 << 33);
     [
-        0x21 | ((t >> 29) as u8 & 14),
+        0x21 | ((t >> 29) as u8 & 0x0e),
         (t >> 22) as u8,
-        1 | ((t >> 14) as u8 & 254),
+        1 | ((t >> 14) as u8 & 0xfe),
         (t >> 7) as u8,
-        1 | ((t << 1) as u8 & 254),
+        1 | ((t << 1) as u8 & 0xfe),
     ]
 }
 fn pes(t: u64, body: &[u8], unbounded: bool) -> Vec<u8> {
@@ -164,7 +164,7 @@ pub fn bytes(case: Case) -> Vec<u8> {
         Case::MultiOne => packets.push(psi(0, 0, pat(&[(2, 4097), (1, 4096)], 0, 0, true))),
         Case::MultiTwo => packets.push(psi(0, 0, pat(&[(1, 4096), (2, 4097)], 0, 0, true))),
         Case::MultiNetwork => {
-            packets.push(psi(0, 0, pat(&[(0, 16), (2, 4097), (1, 4096)], 0, 0, true)))
+            packets.push(psi(0, 0, pat(&[(0, 16), (2, 4097), (1, 4096)], 0, 0, true)));
         }
         Case::MultiSections => {
             packets.push(psi(0, 0, pat(&[(2, 4097)], 1, 1, true)));

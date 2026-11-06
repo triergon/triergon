@@ -420,7 +420,7 @@ where
     fn take_with<C>(
         &mut self,
         cancel: &AtomicBool,
-        resolve: impl FnOnce(&Self) -> triergon_core::Result<BudgetVec<C>>,
+        resolve: impl FnOnce(&Self) -> Result<BudgetVec<C>>,
     ) -> Result<Option<AssembledSegment<C, V, A>>> {
         if cancel.load(Ordering::Relaxed) {
             self.fail();
@@ -524,7 +524,7 @@ where
                         AssemblyStep::Output(unit) => self.pending = Some(Unit::Audio(unit)),
                         AssemblyStep::Yield => {}
                         AssemblyStep::NeedPayload if self.phase == Phase::Audio => {
-                            self.phase = Phase::Read
+                            self.phase = Phase::Read;
                         }
                         AssemblyStep::Finished if self.phase == Phase::EndAudio => {
                             self.audio_assembler = None;
@@ -706,7 +706,7 @@ fn select_tracks(
     selection: TrackSelection,
     epoch: u64,
     limits: ParseLimits,
-) -> triergon_core::Result<(TrackKey, Option<TrackKey>, u64)> {
+) -> Result<(TrackKey, Option<TrackKey>, u64)> {
     let (video, audio) = match selection {
         TrackSelection::AvcAac(tracks) => {
             let video = find_track(map, tracks.video_pid, |stream| {
@@ -758,8 +758,8 @@ fn select_tracks(
 fn find_track(
     map: &ProgramMap,
     pid: Option<u16>,
-    accepts: impl Fn(&ElementaryStream) -> triergon_core::Result<bool>,
-) -> triergon_core::Result<Option<TrackKey>> {
+    accepts: impl Fn(&ElementaryStream) -> Result<bool>,
+) -> Result<Option<TrackKey>> {
     let mut selected = None;
     for stream in map.streams.as_slice() {
         if pid.is_some_and(|pid| stream.pid != pid) || !accepts(stream)? {
@@ -783,7 +783,7 @@ fn media_audio_matches(
     stream: &ElementaryStream,
     codec: HlsAudioCodec,
     limits: ParseLimits,
-) -> triergon_core::Result<bool> {
+) -> Result<bool> {
     use NativePrivateAudioCarriage as Dolby;
     if codec == HlsAudioCodec::Aac {
         return Ok(stream.stream_type == 0x0f);
@@ -816,7 +816,7 @@ fn media_audio_matches(
     ))
 }
 
-fn reserve_one<T>(list: &mut BudgetVec<T>, maximum: usize) -> triergon_core::Result<()> {
+fn reserve_one<T>(list: &mut BudgetVec<T>, maximum: usize) -> Result<()> {
     let needed = list.len().checked_add(1).ok_or(Error::Overflow)?;
     if needed > maximum {
         return Err(Error::Limit {
@@ -828,7 +828,7 @@ fn reserve_one<T>(list: &mut BudgetVec<T>, maximum: usize) -> triergon_core::Res
         let target = list.capacity().saturating_mul(2).max(4).min(maximum);
         match list.try_reserve_exact(target - list.len()) {
             Err(Error::Backpressure { .. } | Error::Allocation) if target > needed => {
-                list.try_reserve_exact(1)?
+                list.try_reserve_exact(1)?;
             }
             other => other?,
         }
@@ -847,7 +847,7 @@ impl<S: Source> Source for LimitedSource<S> {
         request: &InputRequest,
         work: &mut WorkBudget,
         cancel: &AtomicBool,
-    ) -> triergon_core::Result<SourceReply> {
+    ) -> Result<SourceReply> {
         check_extent(request.offset, 0, self.maximum)?;
         let mut bounded;
         let request = if request.maximum > (self.maximum - request.offset as usize).max(1) {
@@ -875,7 +875,7 @@ impl<S: Source> Source for LimitedSource<S> {
     }
 }
 
-fn limit_request(request: &mut InputRequest, maximum: usize) -> triergon_core::Result<()> {
+fn limit_request(request: &mut InputRequest, maximum: usize) -> Result<()> {
     check_extent(request.offset, 0, maximum)?;
     // At the bound, one byte distinguishes definitive EOF from excess input.
     request.maximum = request
@@ -884,14 +884,14 @@ fn limit_request(request: &mut InputRequest, maximum: usize) -> triergon_core::R
     Ok(())
 }
 
-fn validate_reply(reply: &SourceReply, maximum: usize) -> triergon_core::Result<()> {
+fn validate_reply(reply: &SourceReply, maximum: usize) -> Result<()> {
     if let SourceReply::Data(window) = reply {
         check_extent(window.offset, window.bytes().len(), maximum)?;
     }
     Ok(())
 }
 
-fn check_extent(offset: u64, count: usize, maximum: usize) -> triergon_core::Result<()> {
+fn check_extent(offset: u64, count: usize, maximum: usize) -> Result<()> {
     let end = offset.checked_add(count as u64).ok_or(Error::Overflow)?;
     if end > maximum as u64 {
         return Err(Error::Limit {

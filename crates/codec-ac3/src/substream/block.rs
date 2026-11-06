@@ -54,7 +54,7 @@ impl Substream {
             self.features.skip_fields = true;
         }
 
-        for d in self.ba_dirty.iter_mut() {
+        for d in &mut self.ba_dirty {
             *d = (*d).max(all_dirty);
         }
         self.run_bit_allocation(cplinu)?;

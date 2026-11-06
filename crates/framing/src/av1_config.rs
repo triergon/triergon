@@ -253,7 +253,7 @@ impl Av1ConfigParser {
                 match cursor.read_into(&mut self.header[self.header_used..], work, cancel)? {
                     Step::Ready(count) => {
                         self.header_used =
-                            self.header_used.checked_add(count).ok_or(Error::Overflow)?
+                            self.header_used.checked_add(count).ok_or(Error::Overflow)?;
                     }
                     Step::Yield => return Ok(BuildStep::Yield),
                     Step::End(_) => return Err(Error::Truncated),

@@ -32,7 +32,7 @@ fn prime_scale_edit_mapping_keeps_the_independent_fraction_exact() {
         match locate.poll(&mut WorkBudget::new(1)).unwrap() {
             SampleStep::Sample(s) => break s,
             SampleStep::Yield => {}
-            _ => panic!(),
+            SampleStep::End => panic!(),
         }
     };
     let times = sample.source_times(header.time_base().unwrap()).unwrap();

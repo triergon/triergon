@@ -323,8 +323,7 @@ impl<R: Read> InputFeeder<R> {
             let fallback = pending.inline_fallback.is_some()
                 && (matches!(
                     &reserve,
-                    Err(triergon_core::Error::Backpressure { .. }
-                        | triergon_core::Error::Allocation)
+                    Err(Error::Backpressure { .. } | Error::Allocation)
                 ) || reserve.is_ok()
                     && input.budget().available() < Bytes::owner_overhead_bytes());
             if fallback {
@@ -395,7 +394,7 @@ impl<R: Read> InputFeeder<R> {
     ) -> Result<FeedStep> {
         let owned = self.owned.as_ref().required("missing immutable source")?;
         if !(owned.root)(&self.reader).belongs_to(input.budget()) {
-            return Err(triergon_core::Error::ForeignPool);
+            return Err(Error::ForeignPool);
         }
         let maximum = request.maximum.min(self.maximum);
         let Some(bytes) = (owned.read)(&mut self.reader, maximum)? else {
@@ -521,9 +520,9 @@ fn read_retry<R: Read>(reader: &mut R, buffer: &mut [u8]) -> io::Result<usize> {
     }
 }
 
-impl InputFeeder<std::io::Cursor<triergon_core::OwnedInputBytes>> {
+impl InputFeeder<io::Cursor<triergon_core::OwnedInputBytes>> {
     pub fn from_owned(
-        source: std::io::Cursor<triergon_core::OwnedInputBytes>,
+        source: io::Cursor<triergon_core::OwnedInputBytes>,
         maximum: usize,
     ) -> Result<Self> {
         let mut result = Self::new(source, maximum)?;
@@ -795,7 +794,7 @@ mod header_refill_feeder_tests {
                 &mut WorkBudget::new(1),
                 &AtomicBool::new(false)
             ),
-            Err(triergon_core::Error::Transport)
+            Err(Error::Transport)
         ));
         assert!(
             feeder

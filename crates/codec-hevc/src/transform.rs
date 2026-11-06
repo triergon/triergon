@@ -315,7 +315,7 @@ mod tests {
             let n = 1usize << log2;
             for _ in 0..20 {
                 let mut coef = vec![0i32; n * n];
-                for c in coef.iter_mut() {
+                for c in &mut coef {
                     seed = seed.wrapping_mul(1103515245).wrapping_add(12345);
                     *c = ((seed >> 16) as i32 % 2001) - 1000;
                 }
@@ -385,13 +385,13 @@ mod bench {
 
     /// Development micro-benchmark: cargo test --release -- --ignored --nocapture bench_idct
     #[test]
-    #[ignore]
+    #[ignore = "timing probe; run on demand with --release"]
     fn bench_idct() {
         let mut seed = 1u32;
         for log2 in 2..=5u32 {
             let n = 1usize << log2;
             let mut coef = vec![0i32; n * n];
-            for c in coef.iter_mut() {
+            for c in &mut coef {
                 seed = seed.wrapping_mul(1103515245).wrapping_add(12345);
                 *c = ((seed >> 16) as i32 % 201) - 100;
             }

@@ -137,7 +137,7 @@ pub struct Progress {
 
 // Inline values are bounded separately from the charged immutable allocations.
 // These are physical-size ceilings, not measured heap/RSS claims.
-const _: () = assert!(std::mem::size_of::<Snapshot>() <= 2048);
+const _: () = assert!(size_of::<Snapshot>() <= 2048);
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Status {

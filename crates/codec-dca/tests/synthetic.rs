@@ -74,7 +74,7 @@ fn layouts_follow_ffmpeg_native_order() {
 fn silence_decodes_to_zero() {
     let mut f = synth::Frame::new(9, 5, 16);
     f.lff = 2;
-    for c in f.chans.iter_mut() {
+    for c in &mut f.chans {
         c.nsubs = 32;
         c.nvqsub = 32;
     }

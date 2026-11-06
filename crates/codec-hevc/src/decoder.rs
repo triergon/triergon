@@ -454,17 +454,17 @@ impl Decoder {
                     } else {
                         (&cur.st_after, &cur.st_before)
                     };
-                    for &i in a.iter() {
+                    for &i in a {
                         if temp.len() < n {
                             temp.push((i, false));
                         }
                     }
-                    for &i in b.iter() {
+                    for &i in b {
                         if temp.len() < n {
                             temp.push((i, false));
                         }
                     }
-                    for &i in cur.lt_curr.iter() {
+                    for &i in &cur.lt_curr {
                         if temp.len() < n {
                             temp.push((i, true));
                         }
@@ -577,7 +577,7 @@ impl Decoder {
         }
         // RPS (8.3.2)
         if irap && self.no_rasl_output {
-            for p in self.dpb.iter_mut() {
+            for p in &mut self.dpb {
                 p.mark = RefMark::Unused;
             }
         }
@@ -864,12 +864,12 @@ impl Decoder {
             match f {
                 AnyFrame::U8(f) => {
                     if self.pool8.is_empty() {
-                        self.pool8.push(f)
+                        self.pool8.push(f);
                     }
                 }
                 AnyFrame::U16(f) => {
                     if self.pool16.is_empty() {
-                        self.pool16.push(f)
+                        self.pool16.push(f);
                     }
                 }
             }
@@ -906,11 +906,11 @@ impl Decoder {
         match &mut cur.frame {
             AnyFrame::U8(f) => {
                 let Scratch { band, saved, .. } = &mut self.scratch8;
-                filter_ready(f, &mut self.st, &sps, &pps, &cur.layout, band, saved, true)
+                filter_ready(f, &mut self.st, &sps, &pps, &cur.layout, band, saved, true);
             }
             AnyFrame::U16(f) => {
                 let Scratch { band, saved, .. } = &mut self.scratch16;
-                filter_ready(f, &mut self.st, &sps, &pps, &cur.layout, band, saved, true)
+                filter_ready(f, &mut self.st, &sps, &pps, &cur.layout, band, saved, true);
             }
         }
         // Collocated motion storage (16x16 granularity).
@@ -952,7 +952,7 @@ impl Decoder {
         // C.5.2.3: marking and additional bumping.
         let highest = sps.max_sub_layers_minus1 as usize;
         if cur.output {
-            for p in self.dpb.iter_mut() {
+            for p in &mut self.dpb {
                 if p.needed_for_output && p.poc > cur.poc {
                     p.latency += 1;
                 }

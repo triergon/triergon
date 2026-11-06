@@ -80,9 +80,9 @@ fn calendar_bounded(seconds: u64, minimum_year: u64) -> Result<[u8; 27]> {
     while lo + 1 < hi {
         let mid = lo + (hi - lo) / 2;
         if prior(mid) - origin <= days {
-            lo = mid
+            lo = mid;
         } else {
-            hi = mid
+            hi = mid;
         }
     }
     let year = lo;

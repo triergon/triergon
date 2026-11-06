@@ -49,5 +49,5 @@ fn main() {
         first_bad.map_or("null".to_string(), |f| f.to_string()),
         parts.join(",")
     );
-    std::process::exit(if ok { 0 } else { 1 });
+    std::process::exit(i32::from(!ok));
 }

@@ -8,8 +8,8 @@ fn packet_ready_layout() {
         size_of::<crate::typed::Reader>(),
         size_of::<packet::PacketBatchJob>(),
         size_of::<crate::typed::Event>(),
-        size_of::<crate::Result<ParseStep<packet::TypedPacket>>>(),
-        size_of::<crate::Result<ParseStep<()>>>()
+        size_of::<Result<ParseStep<packet::TypedPacket>>>(),
+        size_of::<Result<ParseStep<()>>>()
     );
 }
 
@@ -19,7 +19,7 @@ fn assert_owner_visible(job: &packet::PacketBatchJob, pool: &Budget) {
         let mut work = WorkBudget::new(1);
         match proof.step(job, pool, &mut work, &AtomicBool::new(false)) {
             Ok(ParseStep::Yield) => (),
-            Err(crate::Error::Policy("operation retained storage")) => return,
+            Err(Error::Policy("operation retained storage")) => return,
             other => panic!("ready slot lost its retained owner: {other:?}"),
         }
         assert!(work.spent() <= 1);
@@ -131,11 +131,11 @@ fn cancellation_observed_by_ready_poll_poisoning_cannot_be_bypassed_by_take() {
     ));
     assert!(matches!(
         job.step_ready(None, &mut WorkBudget::new(0), &AtomicBool::new(true)),
-        Err(crate::Error::Cancelled)
+        Err(Error::Cancelled)
     ));
     assert!(matches!(
         job.take_ready(),
-        Err(crate::Error::Invalid(
+        Err(Error::Invalid(
             "packet batch requires replacement after error"
         ))
     ));
@@ -164,12 +164,12 @@ fn premature_take_poisoning_preserves_the_exact_source_until_drop() {
     let used = pool.used();
     assert!(matches!(
         job.take_ready(),
-        Err(crate::Error::Invalid("packet is not ready"))
+        Err(Error::Invalid("packet is not ready"))
     ));
     assert_eq!(pool.used(), used);
     assert!(matches!(
         job.step_ready(None, &mut WorkBudget::new(7), &AtomicBool::new(false)),
-        Err(crate::Error::Invalid(
+        Err(Error::Invalid(
             "packet batch requires replacement after error"
         ))
     ));

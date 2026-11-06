@@ -157,7 +157,7 @@ fn owner_invariants(palette: &PaletteSnapshot) {
 #[test]
 fn compact_cells_have_no_per_colour_destructor_or_shared_owner() {
     assert!(!std::mem::needs_drop::<StoredSourceColour>());
-    assert!(std::mem::size_of::<StoredSourceColour>() <= 8);
+    assert!(size_of::<StoredSourceColour>() <= 8);
 }
 
 #[test]

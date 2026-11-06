@@ -478,9 +478,8 @@ fn obu_reserve_and_freeze_pressure_preserve_exact_prefix_and_payload() {
     ));
     assert_eq!(reader.position(), 4);
     drop(blocker);
-    let output = match reader.step(&mut WorkBudget::new(1), &cancel).unwrap() {
-        Step::Ready(obu) => obu,
-        _ => panic!("completed OBU was not retained for freeze retry"),
+    let Step::Ready(output) = reader.step(&mut WorkBudget::new(1), &cancel).unwrap() else {
+        panic!("completed OBU was not retained for freeze retry")
     };
     assert_eq!(output.wire_bytes().as_ref(), &[0x2a, 2, 0x12, 0x80]);
     assert_eq!(output.payload_bytes().unwrap().as_ref(), &[0x12, 0x80]);
@@ -755,12 +754,11 @@ fn obu_count_failure_preserves_prior_owned_output() {
             .unwrap(),
         )
         .unwrap();
-    let first = match reader
+    let Step::Ready(first) = reader
         .step(&mut WorkBudget::new(100), &AtomicBool::new(false))
         .unwrap()
-    {
-        Step::Ready(obu) => obu,
-        _ => panic!("first OBU omitted"),
+    else {
+        panic!("first OBU omitted")
     };
     assert!(matches!(
         reader.step(&mut WorkBudget::new(100), &AtomicBool::new(false)),
@@ -899,8 +897,14 @@ fn temporal_unit_borrows_the_complete_sample_and_in_band_configuration() {
     assert_eq!(segments.concat(), unhex("12000a01b12a02c1803202d1e2"));
     assert_eq!(segments.concat().len(), output.byte_len());
     assert!(std::ptr::eq(output.source(), frame.as_slice()));
-    assert!(std::ptr::eq(segments[1], &record.raw_record()[4..7]));
-    assert!(std::ptr::eq(segments[2], &record.raw_record()[7..11]));
+    assert!(std::ptr::eq(
+        segments[1],
+        &raw const record.raw_record()[4..7]
+    ));
+    assert!(std::ptr::eq(
+        segments[2],
+        &raw const record.raw_record()[7..11]
+    ));
     assert!(std::ptr::eq(segments[3], frame.as_slice()));
 
     for units in [1, 3, 64] {
@@ -915,7 +919,7 @@ fn temporal_unit_borrows_the_complete_sample_and_in_band_configuration() {
         assert_eq!(output.segments().collect::<Vec<_>>().concat(), source);
         assert!(std::ptr::eq(
             output.segments().next().unwrap(),
-            &source[..3]
+            &raw const source[..3]
         ));
     }
 }
@@ -936,7 +940,7 @@ fn temporal_unit_sizes_only_the_final_unbounded_obu() {
         ]
     );
     assert_eq!(output.byte_len(), source.len() + 4);
-    assert!(std::ptr::eq(segments[3], &source[6..]));
+    assert!(std::ptr::eq(segments[3], &raw const source[6..]));
 
     let source = unhex("12003099");
     let output = temporal_unit(&source, None, false, 1).unwrap();

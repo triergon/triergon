@@ -444,6 +444,7 @@ struct Parser<'a> {
 impl Parser<'_> {
     fn error(&self, message: impl Into<String>) -> Error {
         let before = &self.text[..self.pos.min(self.text.len())];
+        #[allow(clippy::naive_bytecount)] // Error path only.
         let line = before.iter().filter(|&&b| b == b'\n').count() + 1;
         let start = before
             .iter()

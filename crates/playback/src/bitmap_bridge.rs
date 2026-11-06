@@ -25,7 +25,7 @@ pub struct BitmapInput<M> {
 }
 struct Data<M> {
     input: Option<BitmapInput<M>>,
-    _charge: Reservation,
+    charge: Reservation,
 }
 pub struct BitmapOwner<M>(Arc<Data<M>>);
 impl<M> Clone for BitmapOwner<M> {
@@ -39,7 +39,7 @@ impl<M> BitmapOwner<M> {
     }
 
     fn into_storage(mut self, pool: &Budget) -> Option<Arc<Data<M>>> {
-        if self.0._charge.bytes() > 4096 || !self.input().raw.belongs_to(pool) {
+        if self.0.charge.bytes() > 4096 || !self.input().raw.belongs_to(pool) {
             return None;
         }
         let data = Arc::get_mut(&mut self.0)?;
@@ -51,11 +51,7 @@ pub struct BitmapRejection<M> {
     pub input: BitmapInput<M>,
     pub error: Error,
 }
-fn check<M>(
-    pool: &Budget,
-    scope: BitmapScope,
-    input: &BitmapInput<M>,
-) -> triergon_core::Result<()> {
+fn check<M>(pool: &Budget, scope: BitmapScope, input: &BitmapInput<M>) -> Result<()> {
     if input.scope.source != scope.source {
         return Err(Error::SourceMismatch);
     }
@@ -136,7 +132,7 @@ fn allocate_owner<M>(
     };
     Ok(BitmapOwner(Arc::new(Data {
         input: Some(input),
-        _charge: charge,
+        charge,
     })))
 }
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -321,7 +317,7 @@ impl<M> PgsBridge<M> {
             PgsDecoder::Source(d) => d.reset(c)?,
             PgsDecoder::Native(d) => d.reset(c)?,
             PgsDecoder::Compatibility(d) => d.reset(c)?,
-        };
+        }
         self.pending = None;
         self.pushed = false;
         self.finished = false;
@@ -366,7 +362,7 @@ impl<M> PgsBridge<M> {
                     PgsDecoder::Source(d) => d.finish_input(c)?,
                     PgsDecoder::Native(d) => d.finish_input(c)?,
                     PgsDecoder::Compatibility(d) => d.finish_input(c)?,
-                };
+                }
                 self.pushed = true;
             }
         } else {
@@ -974,7 +970,7 @@ mod arc_layout_regression {
             clock: pgs::PacketClock {
                 pts: None,
                 dts: None,
-                timebase: triergon_core::TimeBase::new(1, 90_000).unwrap(),
+                timebase: TimeBase::new(1, 90_000).unwrap(),
             },
             metadata: AlignedMetadata(17),
         }
@@ -987,9 +983,8 @@ mod arc_layout_regression {
         let input = fixture(&pool, raw.clone());
         let scope = input.scope;
         let before = pool.used();
-        let value = match owner(&pool, scope, input) {
-            Ok(value) => value,
-            Err(_) => panic!("sufficient policy refused valid aligned metadata"),
+        let Ok(value) = owner(&pool, scope, input) else {
+            panic!("sufficient policy refused valid aligned metadata")
         };
         let required = size_of::<ArcStorageWitness<Data<AlignedMetadata>>>();
         let actual = pool.used() - before;

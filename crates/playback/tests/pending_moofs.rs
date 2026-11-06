@@ -30,7 +30,7 @@ impl Source for Transport {
         r: &InputRequest,
         w: &mut WorkBudget,
         c: &AtomicBool,
-    ) -> triergon_core::Result<SourceReply> {
+    ) -> Result<SourceReply> {
         if w.remaining() == 0 {
             return Ok(SourceReply::Pending);
         }
@@ -121,7 +121,7 @@ fn read(p: &mut Player<Transport>) -> Result<Vec<Output>> {
     for _ in 0..200000 {
         let r = p.advance(&mut WorkBudget::new(1), &off())?;
         while let Some(o) = p.pop() {
-            out.push(o)
+            out.push(o);
         }
         if matches!(r, Progress::Ended) {
             return Ok(out);
@@ -193,7 +193,7 @@ fn pending_moofs_limit_is_explicit_and_retained_prefix_remains_readable() {
         match p.advance(&mut WorkBudget::new(1), &off()) {
             Ok(_) => {
                 while let Some(o) = p.pop() {
-                    out.push(o)
+                    out.push(o);
                 }
             }
             Err(e) => {
@@ -230,7 +230,7 @@ fn parked() -> (
         let r = p.advance(&mut WorkBudget::new(1), &off()).unwrap();
         assert!(!matches!(r, Progress::Ended));
         while let Some(o) = p.pop() {
-            out.push(o)
+            out.push(o);
         }
         if p.pending_request().is_some_and(|r| r.offset >= 1095) {
             break;
@@ -313,7 +313,7 @@ fn pending_moofs_budget_pressure_retries_without_losing_any_sample() {
             r = p.advance(&mut WorkBudget::new(1), &off()).unwrap();
         }
         while let Some(o) = p.pop() {
-            out.push(o)
+            out.push(o);
         }
         if matches!(r, Progress::Ended) {
             done = true;
@@ -336,7 +336,7 @@ fn pending_moofs_truncated_media_preserves_complete_prefix_and_reports_error() {
         match p.advance(&mut WorkBudget::new(1), &off()) {
             Ok(_) => {
                 while let Some(o) = p.pop() {
-                    out.push(o)
+                    out.push(o);
                 }
             }
             Err(e) => {
