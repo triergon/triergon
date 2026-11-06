@@ -33,7 +33,7 @@ writes planar YUV and one JSON line per picture.
 
 | Feature | Default | Effect |
 |---|---|---|
-| `simd` | on | `std::simd` kernels for motion compensation, deblocking and SAO. Requires a nightly toolchain (`portable_simd`). |
+| `simd` | on | `std::simd` kernels for motion compensation, deblocking and SAO. Requires a nightly toolchain (`portable_simd`); `cargo xtask check-simd` uses the pinned one. |
 
 Without `simd` (`--no-default-features`) the crate builds on stable and uses the scalar
 code, which produces identical output.
