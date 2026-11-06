@@ -37,7 +37,10 @@ fn reader(pool: &Budget) -> Reader {
 fn packet(reader: &mut Reader, root: &Bytes) -> crate::typed::Packet {
     let cancel = AtomicBool::new(false);
     for _ in 0..1_000_000 {
-        match reader.step(&mut WorkBudget::new(8192), &cancel).unwrap() {
+        match reader
+            .step_parse(&mut WorkBudget::new(8192), &cancel)
+            .unwrap()
+        {
             ParseStep::NeedInput(request) => {
                 let at = request.offset as usize;
                 if at == RAW.len() {

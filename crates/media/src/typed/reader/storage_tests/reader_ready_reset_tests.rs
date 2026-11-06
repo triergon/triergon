@@ -24,7 +24,7 @@ fn reader_reset_drops_unpublished_ready_packet_and_all_configuration_owners() {
             break;
         }
         match reader
-            .step(&mut WorkBudget::new(1), &AtomicBool::new(false))
+            .step_parse(&mut WorkBudget::new(1), &AtomicBool::new(false))
             .unwrap()
         {
             ParseStep::NeedInput(request) => supply(&mut reader, request, &raw, false),

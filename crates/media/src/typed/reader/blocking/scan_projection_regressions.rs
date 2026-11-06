@@ -32,7 +32,7 @@ fn scan_projection_public_work_trace_and_held_alias_survive_seek() {
                 let step = reader.step(&mut work, &cancel).unwrap();
                 assert!(work.spent() <= allowance);
                 let item = match step {
-                    ParseStep::NeedInput(request) => {
+                    Step::NeedInput(request) => {
                         let core = reader.request();
                         assert_eq!(request.source, core.source);
                         assert_eq!(request.token, core.token);
@@ -52,7 +52,7 @@ fn scan_projection_public_work_trace_and_held_alias_survive_seek() {
                         }
                         format!("N:{request:?}")
                     }
-                    ParseStep::Event(Event::Packet(packet)) => {
+                    Step::Ready(Event::Packet(packet)) => {
                         if !sought {
                             assert_eq!(packet.packet.pts_ns, Some(0));
                         }
@@ -69,17 +69,17 @@ fn scan_projection_public_work_trace_and_held_alias_survive_seek() {
                         }
                         result
                     }
-                    ParseStep::Event(Event::Seek(value)) => {
+                    Step::Ready(Event::Seek(value)) => {
                         assert!(sought && !receipt);
                         assert_eq!(value.requested_ns, 40_000_000);
                         assert_eq!(value.actual_ns, 40_000_000);
                         receipt = true;
                         format!("R:{value:?}")
                     }
-                    ParseStep::Event(event) => format!("E:{event:?}"),
-                    ParseStep::Yield => "Y".to_owned(),
-                    ParseStep::Backpressure { .. } => panic!("ample authored pool"),
-                    ParseStep::Finished => {
+                    Step::Ready(event) => format!("E:{event:?}"),
+                    Step::Yield => "Y".to_owned(),
+                    Step::Backpressure(_) => panic!("ample authored pool"),
+                    Step::End(_) => {
                         tape.push(format!(
                             "F:{before}:{}:{}:{}",
                             reader.envelope.position(),

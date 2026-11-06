@@ -1,12 +1,12 @@
 //! Runtime contracts for the additive typed reader. The first checkpoint keeps
 //! the existing envelope bridge so the missing typed operations fail at runtime.
 use std::sync::atomic::AtomicBool;
+use triergon_core::Step;
 use triergon_core::{
     Budget, Bytes, InputWindow, SourceCapabilities, SourceFailure, SourceId, WorkBudget,
 };
 use triergon_matroska::{
     Error, Limits,
-    incremental::ParseStep,
     typed::{Event, Reader},
 };
 
@@ -109,10 +109,10 @@ fn drive(
         let step = reader.step(&mut work, &cancel)?;
         assert!(work.spent() <= 1);
         match step {
-            ParseStep::Yield => (),
-            ParseStep::Event(value) => event(value),
-            ParseStep::Finished => return Ok(()),
-            ParseStep::NeedInput(request) => {
+            Step::Yield => (),
+            Step::Ready(value) => event(value),
+            Step::End(_) => return Ok(()),
+            Step::NeedInput(request) => {
                 let at = usize::try_from(request.offset).unwrap();
                 assert!(at <= raw.len());
                 if at == raw.len() {
@@ -391,8 +391,8 @@ fn known_length_starvation_and_transport_failure_stay_distinct_from_end() {
     let mut at_boundary = false;
     for _ in 0..200_000 {
         match reader.step(&mut WorkBudget::new(1), &cancel).unwrap() {
-            ParseStep::Yield | ParseStep::Event(_) => (),
-            ParseStep::NeedInput(request) => {
+            Step::Yield | Step::Ready(_) => (),
+            Step::NeedInput(request) => {
                 let at = request.offset as usize;
                 if at == raw.len() {
                     assert_eq!(request.maximum, 0);

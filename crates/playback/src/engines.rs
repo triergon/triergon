@@ -335,7 +335,7 @@ impl MkvEngine {
         w: &mut WorkBudget,
         c: &AtomicBool,
     ) -> Result<ParseStep<MkvEvent>> {
-        self.reader.step(w, c)
+        self.reader.step_parse(w, c)
     }
 }
 impl std::ops::Deref for MkvEngine {

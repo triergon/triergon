@@ -167,46 +167,48 @@ fn fixture() -> Vec<u8> {
     .concat()
 }
 
-fn event(step: &ParseStep<Event>) -> String {
+fn event(step: &triergon_core::Step<Event, triergon_core::Backpressure>) -> String {
     match step {
-        ParseStep::NeedInput(req) => format!(
+        triergon_core::Step::NeedInput(req) => format!(
             "need:{}/{}/{}",
             req.offset,
             req.maximum,
             req.token.request()
         ),
-        ParseStep::Yield => "yield".into(),
-        ParseStep::Backpressure {
+        triergon_core::Step::Yield => "yield".into(),
+        triergon_core::Step::Backpressure(triergon_core::Backpressure {
             requested,
             available,
-        } => format!("pressure:{requested}/{available}"),
-        ParseStep::Finished => "end".into(),
-        ParseStep::Event(Event::Envelope(ElementEvent::Start(h))) => {
+        }) => format!("pressure:{requested}/{available}"),
+        triergon_core::Step::End(_) => "end".into(),
+        triergon_core::Step::Ready(Event::Envelope(ElementEvent::Start(h))) => {
             format!("start:{}/{}/{}", h.id, h.start, h.data)
         }
-        ParseStep::Event(Event::Envelope(ElementEvent::End { id, offset, .. })) => {
+        triergon_core::Step::Ready(Event::Envelope(ElementEvent::End { id, offset, .. })) => {
             format!("close:{id}/{offset}")
         }
-        ParseStep::Event(Event::Envelope(ElementEvent::Skipped(h))) => {
+        triergon_core::Step::Ready(Event::Envelope(ElementEvent::Skipped(h))) => {
             format!("skip:{}/{}", h.id, h.start)
         }
-        ParseStep::Event(Event::Envelope(ElementEvent::Leaf { header, data })) => format!(
-            "leaf:{}/{}/{:?}",
-            header.id,
-            data.retained_capacity(),
-            data.as_ref()
-        ),
-        ParseStep::Event(Event::Configuration(c)) => {
+        triergon_core::Step::Ready(Event::Envelope(ElementEvent::Leaf { header, data })) => {
+            format!(
+                "leaf:{}/{}/{:?}",
+                header.id,
+                data.retained_capacity(),
+                data.as_ref()
+            )
+        }
+        triergon_core::Step::Ready(Event::Configuration(c)) => {
             format!("configuration:{}/{}", c.tracks().len(), c.revision())
         }
-        ParseStep::Event(Event::Document(_)) => "document".into(),
-        ParseStep::Event(Event::Packet(p)) => format!(
+        triergon_core::Step::Ready(Event::Document(_)) => "document".into(),
+        triergon_core::Step::Ready(Event::Packet(p)) => format!(
             "packet:{:?}/{}/{:?}",
             p.packet.pts_ns,
             p.packet.data.retained_capacity(),
             p.packet.data.as_ref()
         ),
-        ParseStep::Event(Event::Seek(_)) => panic!("sequential fixture must not seek"),
+        triergon_core::Step::Ready(Event::Seek(_)) => panic!("sequential fixture must not seek"),
     }
 }
 fn trace(quantum: u64, chunk: usize, shared: bool, tail: Option<bool>) {
@@ -260,7 +262,7 @@ fn trace(quantum: u64, chunk: usize, shared: bool, tail: Option<bool>) {
             text
         ));
         match step {
-            Ok(ParseStep::NeedInput(req)) => {
+            Ok(Step::NeedInput(req)) => {
                 let at = req.offset as usize;
                 if at == stop {
                     if tail == Some(true) {
@@ -286,8 +288,8 @@ fn trace(quantum: u64, chunk: usize, shared: bool, tail: Option<bool>) {
                         .unwrap();
                 }
             }
-            Ok(ParseStep::Event(Event::Packet(packet))) => packets.push(packet),
-            Ok(ParseStep::Finished) => {
+            Ok(Step::Ready(Event::Packet(packet))) => packets.push(packet),
+            Ok(Step::End(_)) => {
                 assert!(tail.is_none());
                 done = true;
                 break;
@@ -301,7 +303,7 @@ fn trace(quantum: u64, chunk: usize, shared: bool, tail: Option<bool>) {
                 done = true;
                 break;
             }
-            Ok(ParseStep::Backpressure { .. }) => panic!("bounded small fixture has ample pool"),
+            Ok(Step::Backpressure(_)) => panic!("bounded small fixture has ample pool"),
             Ok(_) => (),
         }
     }

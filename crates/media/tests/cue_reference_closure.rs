@@ -5,12 +5,12 @@ use std::{
     path::Path,
     sync::atomic::{AtomicBool, Ordering},
 };
+use triergon_core::Step;
 use triergon_core::{
     Budget, Bytes, InputWindow, SourceCapabilities, SourceFailure, SourceId, WorkBudget,
 };
 use triergon_matroska::{
     Error, Limits,
-    incremental::ParseStep,
     typed::{BlockingReader, Event, PayloadOwnership, Reader},
 };
 
@@ -194,10 +194,10 @@ fn drive(
         let step = r.step(&mut work, &cancel)?;
         assert!(work.spent() <= quantum);
         match step {
-            ParseStep::Yield => (),
-            ParseStep::Finished => return Ok(()),
-            ParseStep::Event(e) => events.push(e),
-            ParseStep::NeedInput(request) => {
+            Step::Yield => (),
+            Step::End(_) => return Ok(()),
+            Step::Ready(e) => events.push(e),
+            Step::NeedInput(request) => {
                 let at = usize::try_from(request.offset).unwrap();
                 assert!(at <= source.len());
                 if at == source.len() {
@@ -245,10 +245,7 @@ fn work_zero_then_work_one_has_the_same_literal_landing_and_packets() {
         r.seek_previous(0, 1_000_000_000).unwrap();
         let before = r.position();
         let mut zero = WorkBudget::new(0);
-        assert!(matches!(
-            r.step(&mut zero, &cancel).unwrap(),
-            ParseStep::Yield
-        ));
+        assert!(matches!(r.step(&mut zero, &cancel).unwrap(), Step::Yield));
         assert_eq!(r.position(), before);
         assert_eq!(zero.spent(), 0);
         drive(&mut r, &bytes, cap, quantum, &mut events).unwrap();
@@ -283,15 +280,15 @@ fn an_earlier_invalid_lace_is_still_validated_before_the_referenced_rap() {
     for _ in 0..200_000 {
         let mut work = WorkBudget::new(7);
         match r.step(&mut work, &cancel).unwrap() {
-            ParseStep::NeedInput(req) => {
+            Step::NeedInput(req) => {
                 let at = req.offset as usize;
                 let end = (at + 17.min(req.maximum)).min(bytes.len());
                 let b = Bytes::copy_from_slice(&pool, &bytes[at..end]).unwrap();
                 r.provide(&InputWindow::new(req.source, req.token, req.offset, b).unwrap())
                     .unwrap();
             }
-            ParseStep::Event(Event::Packet(_)) => break,
-            ParseStep::Yield | ParseStep::Event(_) => (),
+            Step::Ready(Event::Packet(_)) => break,
+            Step::Yield | Step::Ready(_) => (),
             other => panic!("opening {other:?}"),
         }
     }

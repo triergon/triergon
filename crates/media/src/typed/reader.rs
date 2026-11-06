@@ -26,8 +26,8 @@ use crate::{
 };
 use std::sync::atomic::AtomicBool;
 use triergon_core::{
-    Budget, BudgetVec, InputRequest, InputToken, InputWindow, SourceCapabilities, SourceFailure,
-    SourceId, WorkBudget,
+    Backpressure, Budget, BudgetVec, InputRequest, InputToken, InputWindow, SourceCapabilities,
+    SourceFailure, SourceId, Step, WorkBudget,
 };
 
 mod blocking;
@@ -423,8 +423,37 @@ impl Reader {
         self.demux_read_bytes = 0;
         Ok(request)
     }
+    /// One bounded unit of work. `End` is the end of the Segment at the
+    /// reader's current input position.
     #[inline]
-    pub fn step(&mut self, work: &mut WorkBudget, cancel: &AtomicBool) -> Result<ParseStep<Event>> {
+    pub fn step(
+        &mut self,
+        work: &mut WorkBudget,
+        cancel: &AtomicBool,
+    ) -> Result<Step<Event, Backpressure>> {
+        Ok(match self.step_parse(work, cancel)? {
+            ParseStep::Event(event) => Step::Ready(event),
+            ParseStep::NeedInput(request) => Step::NeedInput(request),
+            ParseStep::Yield => Step::Yield,
+            ParseStep::Backpressure {
+                requested,
+                available,
+            } => Step::Backpressure(Backpressure {
+                requested,
+                available,
+            }),
+            ParseStep::Finished => Step::End(self.envelope.location()),
+        })
+    }
+    /// [`step`](Self::step) without the mapping to the core [`Step`]: the
+    /// reader's own [`ParseStep`]. Feeds that forward every Matroska event use
+    /// it on their per-packet path.
+    #[inline]
+    pub fn step_parse(
+        &mut self,
+        work: &mut WorkBudget,
+        cancel: &AtomicBool,
+    ) -> Result<ParseStep<Event>> {
         let result = self.step_projected::<TypedProjection>(work, cancel);
         if self.state_coverage_contiguous
             && let Some(index) = &mut self.seek_index
@@ -1510,7 +1539,7 @@ mod header_refill_route_tests {
     fn header_refill_is_canonical_and_disabled_for_resolver_opening_seek_and_scan() {
         let mut reader = reader();
         let request = match reader
-            .step(&mut WorkBudget::new(64), &AtomicBool::new(false))
+            .step_parse(&mut WorkBudget::new(64), &AtomicBool::new(false))
             .unwrap()
         {
             ParseStep::NeedInput(request) => request,
@@ -1580,7 +1609,10 @@ mod header_refill_route_tests {
     fn header_refill_canonical_short_prefix_observes_actual_zero_one_work_and_cancel() {
         let mut reader = reader();
         let cancel = AtomicBool::new(false);
-        let request = match reader.step(&mut WorkBudget::new(64), &cancel).unwrap() {
+        let request = match reader
+            .step_parse(&mut WorkBudget::new(64), &cancel)
+            .unwrap()
+        {
             ParseStep::NeedInput(request) => request,
             other => panic!("initial header: {other:?}"),
         };
@@ -1593,13 +1625,13 @@ mod header_refill_route_tests {
             .unwrap();
         let mut zero = WorkBudget::new(0);
         assert!(matches!(
-            reader.step(&mut zero, &cancel).unwrap(),
+            reader.step_parse(&mut zero, &cancel).unwrap(),
             ParseStep::Yield
         ));
         assert_eq!((reader.position(), zero.spent()), (0, 0));
         let mut one = WorkBudget::new(1);
         assert!(matches!(
-            reader.step(&mut one, &cancel).unwrap(),
+            reader.step_parse(&mut one, &cancel).unwrap(),
             ParseStep::NeedInput(_) | ParseStep::Yield
         ));
         assert_eq!((reader.position(), one.spent()), (1, 1));
@@ -1632,7 +1664,10 @@ mod header_refill_canonical_runtime_red {
         )
         .unwrap();
         let mut work = WorkBudget::new(64);
-        let request = match reader.step(&mut work, &AtomicBool::new(false)).unwrap() {
+        let request = match reader
+            .step_parse(&mut work, &AtomicBool::new(false))
+            .unwrap()
+        {
             ParseStep::NeedInput(request) => request,
             other => panic!("initial canonical header request: {other:?}"),
         };

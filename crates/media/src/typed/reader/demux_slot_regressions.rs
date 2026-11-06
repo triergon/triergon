@@ -235,8 +235,8 @@ fn trace(kind: u8, quantum: u64, seek: bool) -> Vec<String> {
         let result = reader.step(&mut work, &AtomicBool::new(false));
         assert!(work.spent() <= q);
         let facts = match &result {
-            Ok(ParseStep::Event(e)) => event_facts(e),
-            Ok(ParseStep::NeedInput(r)) => format!(
+            Ok(Step::Ready(e)) => event_facts(e),
+            Ok(Step::NeedInput(r)) => format!(
                 "need:{}:{}:{}:{}:{}",
                 r.source.0,
                 r.token.generation(),
@@ -256,7 +256,7 @@ fn trace(kind: u8, quantum: u64, seek: bool) -> Vec<String> {
             reader.replay_prefix.is_some()
         ));
         match result.unwrap() {
-            ParseStep::NeedInput(request) => {
+            Step::NeedInput(request) => {
                 if sought && !restarted && kind != 3 {
                     let stale = request.clone();
                     let new = reader.seek_for_playback(0, 0).unwrap();
@@ -273,14 +273,14 @@ fn trace(kind: u8, quantum: u64, seek: bool) -> Vec<String> {
                     supply(&mut reader, request, &bytes);
                 }
             }
-            ParseStep::Event(Event::Configuration(config)) => configurations.push(config),
-            ParseStep::Event(Event::Packet(packet)) => {
+            Step::Ready(Event::Configuration(config)) => configurations.push(config),
+            Step::Ready(Event::Packet(packet)) => {
                 packets += 1;
                 if held.is_none() {
                     held = Some(packet);
                 }
             }
-            ParseStep::Finished => {
+            Step::End(_) => {
                 finished = true;
                 break;
             }

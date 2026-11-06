@@ -185,18 +185,18 @@ fn own_storage_proof_matches_live_charges_through_typed_jobs_and_hidden_input_pa
         let result = reader.step(&mut work, &cancel).unwrap();
         assert!(work.spent() <= 1);
         match result {
-            ParseStep::NeedInput(request) => supply(&mut reader, request, &raw, true),
-            ParseStep::Event(Event::Packet(packet)) => {
+            Step::NeedInput(request) => supply(&mut reader, request, &raw, true),
+            Step::Ready(Event::Packet(packet)) => {
                 assert_eq!(packet.packet.data.as_ref(), b"Pabc");
                 packets += 1;
             }
-            ParseStep::Event(Event::Document(document)) => {
+            Step::Ready(Event::Document(document)) => {
                 documents += 1;
                 drop(document);
             }
-            ParseStep::Event(event) => drop(event),
-            ParseStep::Yield => (),
-            ParseStep::Finished => finished = true,
+            Step::Ready(event) => drop(event),
+            Step::Yield => (),
+            Step::End(_) => finished = true,
             other => panic!("ample pool must finish: {other:?}"),
         }
         exact_floor(&reader, 0);
@@ -233,28 +233,28 @@ fn caller_storage_pressure_preserves_the_pending_batch_and_resumes_after_release
         let result = reader.step(&mut work, &cancel).unwrap();
         assert!(work.spent() <= 1);
         match result {
-            ParseStep::NeedInput(request) => supply(&mut reader, request, &raw, false),
-            ParseStep::Event(Event::Envelope(ElementEvent::Start(header)))
+            Step::NeedInput(request) => supply(&mut reader, request, &raw, false),
+            Step::Ready(Event::Envelope(ElementEvent::Start(header)))
                 if header.id == CLUSTER && !armed =>
             {
                 let remaining = 2 * size_of::<Option<crate::matroska::Packet>>() - 1;
                 held = Some(pool.reserve(pool.available() - remaining).unwrap());
                 armed = true;
             }
-            ParseStep::Backpressure { .. } => {
+            Step::Backpressure(_) => {
                 assert!(!blocked, "release must permit progress");
                 assert!(held.is_some());
                 blocked = true;
                 held = None;
             }
-            ParseStep::Event(Event::Packet(packet)) => {
+            Step::Ready(Event::Packet(packet)) => {
                 assert!(blocked);
                 assert_eq!(packet.packet.data.as_ref(), b"Pabc");
                 packets += 1;
             }
-            ParseStep::Event(event) => drop(event),
-            ParseStep::Yield => (),
-            ParseStep::Finished => {
+            Step::Ready(event) => drop(event),
+            Step::Yield => (),
+            Step::End(_) => {
                 finished = true;
                 break;
             }
@@ -365,7 +365,10 @@ fn performance_blocking_supply_preserves_canonical_exact_read_requests() {
     let mut canonical_packets = 0;
     let mut finished = false;
     for _ in 0..100_000 {
-        match canonical.step(&mut WorkBudget::new(8192), &cancel).unwrap() {
+        match canonical
+            .step_parse(&mut WorkBudget::new(8192), &cancel)
+            .unwrap()
+        {
             ParseStep::NeedInput(request) => {
                 let maximum = request.maximum.min(8192);
                 expected.push((request.offset, maximum.max(1)));

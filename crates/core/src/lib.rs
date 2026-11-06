@@ -16,8 +16,8 @@ pub use bytes::{
 };
 pub use error::{Error, Result};
 pub use input::{
-    InputCursor, InputRequest, InputToken, InputWindow, SourceCapabilities, SourceFailure,
-    SourceId, SourceLocation, Step,
+    Backpressure, InputCursor, InputRequest, InputToken, InputWindow, SourceCapabilities,
+    SourceFailure, SourceId, SourceLocation, Step,
 };
 pub use time::{Rounding, Time, TimeBase};
 pub use work::WorkBudget;

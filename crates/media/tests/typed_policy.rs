@@ -1,5 +1,6 @@
 //! Resource/work and cancellation regressions for retained typed operations.
 use std::sync::atomic::AtomicBool;
+use triergon_core::Step;
 use triergon_core::{Budget, Bytes, InputWindow, SourceCapabilities, SourceId, WorkBudget};
 use triergon_matroska::{
     Error, Limits,
@@ -178,12 +179,12 @@ fn an_atomic_frame_larger_than_its_own_pool_minimum_is_a_permanent_limit_not_an_
     for _ in 0..20_000 {
         let mut work = WorkBudget::new(64);
         match reader.step(&mut work, &cancel) {
-            Ok(ParseStep::Yield) => (),
-            Ok(ParseStep::Event(Event::Packet(_))) => {
+            Ok(Step::Yield) => (),
+            Ok(Step::Ready(Event::Packet(_))) => {
                 panic!("the complete decoded frame cannot fit this pool")
             }
-            Ok(ParseStep::Event(_)) => (),
-            Ok(ParseStep::NeedInput(request)) => {
+            Ok(Step::Ready(_)) => (),
+            Ok(Step::NeedInput(request)) => {
                 let at = request.offset as usize;
                 if at == raw.len() {
                     reader.finish(request.source, request.token).unwrap();
@@ -197,7 +198,7 @@ fn an_atomic_frame_larger_than_its_own_pool_minimum_is_a_permanent_limit_not_an_
                         .unwrap();
                 }
             }
-            Ok(ParseStep::Backpressure { .. }) => pressure += 1,
+            Ok(Step::Backpressure(_)) => pressure += 1,
             Err(Error::Policy(message)) => {
                 limit = Some(message);
                 break;
