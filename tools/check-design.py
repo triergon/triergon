@@ -6,6 +6,7 @@ errors=[]
 for p in root.rglob('*.md'):
  relative_parts=p.relative_to(root).parts
  if '.research' in relative_parts or 'target' in relative_parts:continue
+ if relative_parts[:2] in (('research','qualification'),('research','review')):continue  # archived evidence snapshots
  for target in re.findall(r'\]\(([^)]+)\)',p.read_text()):
   if '://' in target or target.startswith('#'):continue
   f=(p.parent/target.split('#',1)[0]).resolve()

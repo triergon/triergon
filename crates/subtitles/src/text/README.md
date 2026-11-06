@@ -1,124 +1,65 @@
-# Named text source-ingestion contracts, version 1
+# Text ingestion profiles
 
-`triergon_subtitles::text` provides bounded source extraction and opaque
-carriage. The original private implementation passed all96 unchanged regressions
-and all-target Clippy with `-D warnings` at
-`.research/subtitles-text-host-v2-1793455830972317000/`. Promotion changes module
-namespace/import paths and documentation. The parent subsequently passed the
-public161-test combination, all-target Clippy with `-D warnings` and the release
-library build at `.research/subtitles-text-promoted-host1-1793458809112021000/`,
-with source before/after unchanged. The private and public receipts are distinct
-source identities; no documentation-build result was supplied in the latter.
-No full native compatibility, source-conformance certificate or M05 numerical
-acceptance is claimed.
+Exact rules for `triergon_subtitles::text`. The crate overview is in
+[../../README.md](../../README.md).
 
-| Contract | `Format` | Explicit source-ingestion boundary |
+## Profiles
+
+| Profile | `Format` | Rules |
 | --- | --- | --- |
-| `SubRipStrict1` | `SubRip` | Numeric sequence identifier, two-or-more-digit hours, exact `hh:mm:ss,mmm --> hh:mm:ss,mmm`, multiline text, CRLF/LF/CR framing. This declared profile is not a universal SRT standard. |
-| `WebVttSourceStrict1` | `WebVtt` | UTF-8 file/BOM marker, exact cue times and original identifier/settings/payload/NOTE/STYLE/REGION order. Strict malformed-input/interval errors; no claim of the complete browser recovery, CSS, DOM or semantic text view. |
-| `Tx3gCarriage1` | `Tx3g` | u16 big-endian text-byte length, UTF-8 or FEFF-prefixed UTF-16BE, original modifier boxes/ranges/order. The 2048-byte recommendation is not treated as the syntax maximum. Modifier semantics and extended box forms use the separately named operations below. |
-| `Utf8Packet1` | `Utf8Packet` | Strict UTF-8 packet validation with an immutable alias of the original payload and exact caller timing; no invented document framing. |
-| `MatroskaWebVttCarriage1` | `MatroskaWebVtt` | Raw stored cue text and opaque CodecPrivate; ID1 BlockAdditional settings/identifier/comments, unknown additions retained unchanged. Inline timestamps remain block-relative as stored. This is not WebM carriage. |
-| `OpaqueAss1` | `OpaqueAss` | Exact ASS/SSA packet, configuration, declared charset label, source identity and raw clock carriage. No ASS syntax validation, charset-truth assertion, Dialogue reconstruction, reordering or renderer-clear inference. |
+| `SubRipStrict1` | `SubRip` | Numeric cue number; `hh:mm:ss,mmm --> hh:mm:ss,mmm` with two or more hour digits; multi-line text; CRLF, LF or CR line ends. A declared strict profile, not a universal SRT grammar. |
+| `WebVttSourceStrict1` | `WebVtt` | UTF-8 with optional BOM; exact cue times; identifier, settings, payload, NOTE, STYLE and REGION kept in source order. Malformed input and zero or negative intervals are errors (no browser-style recovery). |
+| `Tx3gCarriage1` | `Tx3g` | Big-endian u16 text length (the 2048-byte recommendation is not enforced); UTF-8 or FEFF-prefixed UTF-16BE; modifier boxes kept whole and in order. Byte-reversed UTF-16 is rejected. |
+| ISO-box tx3g | `Tx3g` | Selected with `Extractor::tx3g_iso_boxes`: additionally reads ISO size-0 (to end of sample), size-1 (64-bit) and `uuid` modifier boxes. `Extractor::new` reports them as unsupported. |
+| `Utf8Packet1` | `Utf8Packet` | Strict UTF-8; the payload is aliased, not copied; no document framing. |
+| `MatroskaWebVttCarriage1` | `MatroskaWebVtt` | Raw cue text; BlockAddition ID 1 split into settings, identifier and comments; other additions and `CodecPrivate` kept opaque. Inline timestamps stay block-relative. Not WebM carriage. |
+| `OpaqueAss1` | `OpaqueAss` | Packet, configuration, charset label and timing carried unchanged. No ASS validation and no charset assertion. |
 
-The additive tx3g ISO-box, explicit legacy-charset and typed configuration APIs are documented in [D2-CONTRACT.md](D2-CONTRACT.md). They preserve the original profiles and native selector.
-The separately named [multibyte profiles](MULTIBYTE-CONTRACT.md) add strict
-conversion and explicit SubRip ingestion without changing the original label
-resolver, source ownership, default formats or native reference history.
-The additive [tx3g semantic operation](TX3G-SEMANTICS.md) resolves defined
-modifier ranges, description/style authority and timed effect intents while
-retaining the entire original source Cue. It does not implement glyph rendering.
+Every `Cue` keeps its complete `Input`, the raw and text byte ranges, and
+`decoded_utf8` when the encoding is known. Already published records survive a
+later framing error. Whole-input character validation happens before the first
+cue is published.
 
-The opt-in [native mov_text receiver](native_mov_text/README.md) emits the
-selected native packet-to-ASS output. Its standalone functional run matched
-82 selected cases at each of three work quanta in both profiles. The original
-source and semantic operations remain separately tested, including all 79
-tx3g semantic guards. The retained Streem revision handles mov_text through
-its existing packet-text path. Rendering and a change to that consumer route
-remain separate work.
+## Encodings
 
-The byte-pinned primary register is
-`tests/text-fixtures/SOURCE-LOCK.json`, relative to the subtitles crate. It
-preserves version-qualified ETSI TS126245 V18.0.0, RFC3629/2781/9559, the dated
-W3C WebVTT Candidate Recommendation Draft and Matroska codec-21 Internet-Draft,
-plus the explicitly mutable primary explanatory snapshot. Drafts are not
-represented as final standards. URLs, original cache paths and SHA-256 identities
-are preserved; normative PDF/HTML cache bytes remain in the ignored research
-lane rather than being redistributed as production data.
+`Encoding::Utf8` rejects overlong forms, surrogates and values above U+10FFFF.
+`Utf16Bom` requires a BOM; `Utf16Be`/`Utf16Le` treat a leading FEFF as content.
+`Ascii`, `Latin1`, `Windows1251`, `Windows1252` and `Multibyte(_)` are accepted
+by SubRip only; WebVTT and `Utf8Packet` require UTF-8. Unknown document
+encodings return `Error::Unsupported`.
 
-## Source facts and progress
+`charset::CharsetJob` converts a whole byte stream with an explicit `Charset`.
+It validates and counts the input first, then writes into exactly sized storage.
+Single-byte tables come from the Unicode/Microsoft mapping files; multibyte
+profiles are in [MULTIBYTE-CONTRACT.md](MULTIBYTE-CONTRACT.md).
 
-`Input` contains one complete immutable document or demuxed sample, same-pool
-owners for payload/configuration/codec/charset/additions, configuration epoch,
-core SourceId/SourceLocation and caller generation/sequence. `provide` returns
-the exact Input on rejection. `step` uses core WorkBudget and an AtomicBool;
-NeedInput, Yield, Event, NeedOutput, Finished and typed errors remain distinct.
-`finish_input` marks sequence completion; an empty packet is an event, not EOF.
-Reset drops private state and changes generation; old output owners remain valid.
+## tx3g configuration
 
-Unicode bytes, surrogate state, line boundaries and timestamp tokens retain real
-forward cursors across yields and cancellation. Whole-input Unicode validation
-precedes document publication. A separate forward framing pass preserves raw
-byte ranges; timestamp tokens are parsed once per timing line. Already published
-source records survive a later framing error. Cancellation leaves pending source
-state resumable. Fatal errors free private construction and persist until reset.
+`tx3g_config::ConfigJob::new` parses an explicitly identified layout
+(`ConfigLayout`): a full `SampleEntry` body or the 30-byte defaults record.
+It keeps flags, signed justification and box geometry, RGBA, the default style
+record and the font table as charged ranges; unknown child boxes stay raw.
+`ConfigJob::new_unicode_fonts` also accepts FEFF-prefixed UTF-16BE font names.
+Absent values stay absent; no default font, style or geometry is invented.
 
-`decoded_utf8` is strict character decoding only. It performs no Unicode,
-line-ending, whitespace, entity, markup, ASS or clock normalization. Internal
-CR/LF codepoints stay exact. UTF-8 document BOM framing differs from a BOM in a
-demuxed UTF-8 packet, which remains text content. Explicit UTF16BE/LE differs
-from the BOM-required profile; tx3g does not silently adopt byte-reversed UTF16.
-Unknown declared document encodings are explicit Unsupported outcomes; opaque
-ASS may preserve such bytes without asserting renderability.
+## Timing
 
-`Timing::from_ticks` retains original clock numerator/denominator and optional
-PTS/DTS/duration ticks while computing exact core rational Time values. Unknown
-time, known zero duration and negative PTS remain distinct. End is computed only
-from known start and duration. No next-packet inference or microsecond rounding
-occurs. Raw configuration remains the upstream opaque owner; its preservation
-does not prove that a complete ISO sample entry equals native AVCodec extradata.
+`Timing::from_ticks(RawClock)` keeps the clock ratio and optional PTS, DTS and
+duration ticks and derives exact rational `Time` values. End time exists only
+when start and duration are both known. Unknown time, zero duration and negative
+PTS are distinct.
 
-## Ownership and policy
+## Carriage session
 
-UTF-8 output aliases its validated original owner. UTF-16 output reserves the
-exact byte count gathered during parsing, writes incrementally into BudgetVec,
-and freezes without copying. Output pressure retains pending scalar/builder/
-freeze state. Input/configuration/addition aliases and decoded output keep full
-backing capacities charged until their final owners drop. There is no uncharged
-Box on publication or rejection.
+`carriage::Session` publishes an immutable `Snapshot` per input with the
+FFmpeg-compatible packet view (`Snapshot::native_view()` returns
+`NativeView::D32`): millisecond document timing
+that keeps zero or negative intervals, and the reference's UTF-16 SubRip
+line-entry byte behaviour. `recover_pending` returns inputs after cancellation
+or a resource failure.
 
-Five approved declaration-scoped Clippy expectations preserve exclusive inline
-states and recoverable inline rejection. Compile-time physical ceilings guard
-Item272, Event672, Action688, Status672 and ProvideError432 bytes, plus bounded
-Result envelopes. The layout-specific Item/Event expectations apply on64bit;
-all size guards compile on every target. These are per-value layout ceilings,
-not aggregate stack, heap or RSS measurements or a numerical-gate waiver.
+## Default limits
 
-Default caller policy: input4MiB; config/addition1MiB each; labels256 bytes;
-source line64KiB; cues4096/document; modifiers4096/sample; decoded output4MiB/cue.
-Limits are explicit policy, not syntax redefinitions or accepted exclusions of
-required sources. One-unit work, output pause, cancellation and retained lifetime
-are covered by the unchanged original tests. No core API or dependency was added.
-
-## Corpus and remaining scope
-
-`tests/text.rs` is the same96-test body with three import/path substitutions.
-`tests/text-fixtures/fixtures/` preserves the complete original72-case source,
-expected bytes, generated Rust cases and identity manifest. The enclosing bundle
-also preserves author.py, an independently written source oracle, primary pins,
-resource cases and the original private contract snapshot. Private originals
-remain intact. No native output supplied these golden expectations.
-
-The additive [Tx3gSourceSemantics1](TX3G-SEMANTICS.md) operation implements the
-defined sample-modifier grammar, source-level precedence and timed effect intents;
-the original carriage profiles keep their separate source-only boundary. The
-remaining tx3g integration is complete container/configuration-to-consumer and
-native/renderer integration. Earlier D2 and multibyte batch contracts retain their
-original batch scope. Complete selected native text compatibility/recovery,
-remaining legacy charset coverage, matched native output ownership and all
-per-case paired95 delivery runtime<=1.20 (optimization target <=0.80) plus lower
-live heap/RSS gates remain required.
-PGS, VobSub/DVD SPU and remaining DVB work are still required. Unavailable Blu-ray/
-DVD normative bitstream sources are not replaced by inferred decoder grammar.
-The original DVB source/native palette, order, tail and source-legality/tolerance
-differences and unknown mandatory cached-ODS replay requirement remain unchanged.
+`Limits::default()`: input 4 MiB; configuration and BlockAddition 1 MiB each;
+labels 256 bytes; source line 64 KiB; 4096 cues per document; 4096 modifiers per
+sample; decoded output 4 MiB per cue. Limits are caller policy, not syntax.

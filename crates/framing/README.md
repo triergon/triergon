@@ -1,329 +1,140 @@
-# Packet framing development slices
+# triergon-framing
 
-Root3477 retains the compact `AvcConfigViewParser` and
-`HvcConfigViewParser` alongside the eager and strict source entry points.
-The packed HEVC descriptor stores a full-width payload start and the wire
-u16 length. The scanner checks the endpoint before descriptor creation.
-Borrowed and retained NAL views preserve exact source spans and owner
-lifetimes. On ARM64 the compact descriptor uses 16 bytes per NAL, down
-from 24 in Framing44. The two new guards check layout and exact pool
-occupancy with a maximum-length NAL and a later full-width range.
+Packet framing and codec-configuration parsing for the format layer: H.264/HEVC
+NAL units and records, AV1 OBUs, VP9 records, AAC, AC-3/E-AC-3 and DTS core.
+Containers hand it record bytes and complete samples; it returns source-preserving
+views, decoder-ready Annex-B/ADTS/temporal-unit output and typed refusals. It
+depends only on `triergon-core`, does no I/O and does not decode audio or video.
 
-The standalone packed-framing gates passed 539 ordinary tests and nine
-doctests per profile, including both new guards. Root3477 adds those guards
-to the 35 names from the earlier Framing44 overlay. Framing44's separate RSS
-campaign did not pass its delivery gate. The separate packed-worker timing
-run passed all 125 selected cases at the 1.25× delivery ceiling, with a
-worst paired upper bound of 1.2395×. Five reached the 0.80× optimization
-target. The same packed worker used less live heap and total peak RSS
-on all 125 cases under the approved tight kernel observer. The worst upper
-bounds were 0.9842× for heap and 0.9876× for RSS. The older operation-growth
-diagnostic remains unresolved on all 125. This qualification applies to the
-exact standalone worker and selected operation. The integrated root result
-is functional evidence.
+## Usage
 
-## Historical checkpoints
+Every operation takes a core `Budget` pool, a `WorkBudget` and a cancel flag, and
+is driven by `step`. Record and packet jobs return `BuildStep::{Yield, Ready,
+Complete}`; incremental readers return core `Step::{NeedInput, Yield, Ready, End}`
+and are fed with `provide` and closed with `finish` or `fail`.
 
-The combined selected AVC/HCRC checkpoint passes165 debug/release framing
-regressions, all-target Clippy with warnings denied, no-default release checks
-and release examples on native Linux ARM64. All148 DTS predecessors and82
-independent AVC records are retained. `AvcConfigParser` implements the acquired
-ISO14496-15:2010/incorporated2006FRExt wire grammar; later profiles/corrigenda,
-SPS/RBSP and decoder consistency, hvcC and complete AAC/ADTS were open at that checkpoint.
-The CPF=0 HCRC clarification preserves unknown CPF as `NotReached` and actual
-missing/partial/present CRC bits. Its4152-call unchanged-input replay changes
-only14 authorized HCRC presence annotations;4138 stdout records and all stderr
-remain byte-identical. Raw/numeric fields, ranges and native24 views are intact.
-Exact manifests and host/source evidence are in
-`.research/parallel-framing/avc-wire162-adoption-v1/` and
-`.research/parallel-framing/dts-hcrc-adoption165-v1/`.
-Original793/71/224,784 range,320 capacity, cycle-high24, lifetime90 and EOF90
-obligations remain required. Complete selected parity, equivalent native work,
-runtime, strictly lower heap/RSS and target qualification remain open.
-The older test counts below describe their own historical snapshots.
+```rust
+use triergon_core::WorkBudget;
+use triergon_framing::{AvcAnnexBConfig, AvcAnnexBJob, AvcConfigSource,
+    AvcConfigViewParser, BuildStep};
 
-These are original bounded O21/M02 slices against owned core. The parent's
-recorded host snapshot (private local receipt: `../../.research/dts-core-host-1793454330158626000/0.log`)
-passes **all 62 framing tests: 13 NAL, 13 AV1/VP9, 13 AC-3/E-AC-3, 11 E-AC-3 BSI
-and 12 DTS core**, including all 188 DTS header sources and 17 streams / 544
-chunk/work/known-length variants after the test-only TSV quoting correction.
-All-target Clippy with warnings denied and the release-library build also return
-0. The receipt records identical 61-file source maps before/after that run.
-Its canonical implementation bodies and original fixtures remain preserved;
-later core/export additions and status prose have separate source identities.
-The current checkpoint is described above. The earlier prose-change receipt is in
-`.research/parallel-framing/dca-public-assessment-v1/`. Earlier 50-test and
-26/39-test snapshots and both DTS red runs remain preserved separately.
+// avcC box payload -> checked record view.
+let mut parser = AvcConfigViewParser::new(&pool,
+    AvcConfigSource { source, generation: 0, offset: 0 }, avcc, config_limits)?;
+let record = loop {
+    match parser.step(&mut work, &cancel)? {
+        BuildStep::Ready(record) => break record,
+        BuildStep::Yield => work = WorkBudget::new(4096),
+        BuildStep::Complete => unreachable!("ready precedes complete"),
+    }
+};
+let config = AvcAnnexBConfig::new(record)?;
 
-The [DTS core implementation](DTS-CORE.md) supplies bounded normal canonical
-headers and complete pool-owned frames with unchanged source bytes, explicit
-source/generation, work, cancel and retry semantics. The original staged
-0/12 red and the first implementation 10/2 red remain evidence; the latter
-exposed test-only TSV transport quoting, not a proven production field defect.
-The original 188/17 fixture rows and independent expected values are unchanged.
-`DTS-CORE-RED.md` and the red feature manifest retain historical staging claims;
-`feature-manifest-dts-core-v1.json` is the authored implementation manifest.
-
-The parent also built a separate DCA-only reference and executed all 256 native
-observation runs (private local receipt: `../../.research/dca-public-observer-native-v1/observations.json`).
-Every run has rc0, a complete-observation summary and zero JSONL protocol errors.
-The retained watchdog invalid-json statuses are the known single-JSON/NDJSON
-adapter mismatch, not native failures. Independent light Python review verifies
-all raw JSONL sequences/hashes and preserves those original statuses. Native
-parity outcomes remain **unassigned**: 24/68 stream packet vectors equal the
-strict source frame oracle and 44 differ; header-field visibility and rate/clock
-identity remain incomplete. Packing, termination, HD assets, coded-audio validity
-and full native/numerical qualification stay open. That historical observer proposal was held pending review; later source
-adoptions have their own exact-source receipts. No prototype/full-module or
-performance acceptance follows from these host tests or observations.
-
-The [E-AC-3 BSI/evidence batch](EAC3-BSI.md) contributes the 11 passing regressions,
-with separate complete-BSI/carriage, SID/type/map and tail-boundary controls.
-The first red run is preserved separately: its literal-zero teardown assertion
-was corrected to require exact equality with the pool's initial control charge,
-captured before any frame. Production, fixtures and numerical gates were unchanged.
-The batch's selected scope is in `feature-manifest-eac3-bsi-v1.json`.
-Flexible mixing definition 3 remains unsupported. No BSID 9/10 support or G01
-AVC/hvcC parser is inferred from a native observation or an unacquired grammar.
-
-The earlier [AC-3/E-AC-3 source slice](AC3.md) has 390 authored cases. The pinned
-public header API comparison of its 240 prefixes remains **NONPASS**: 166
-bsid/frame-size matches, 55 fact-case API errors, seven unexpected accepts and
-twelve observed rejections with unresolved error-class distinctions. Every
-original input/expectation/nonpass is retained. The parent separately completed 69
-SID/type/map diagnostic calls: 36 API successes and 33 API errors, with identical
-raw tuples across the three carriage lengths for each control. These observations
-do not waive any of the 62 original nonpasses or establish complete native parity.
-All native execution belongs to the parent queue; none ran in this lane.
-
-`feature-manifest.json`, `feature-manifest-av1-v1.json` and
-`feature-manifest-ac3-v1.json` retain their historical prepared-checkpoint status.
-The E-AC-3 BSI and DTS feature manifests also retain their historical authored
-checkpoint states. `EAC3-BSI.md`, `DTS-CORE.md` and this README name later actual
-host/reference evidence separately, without rewriting those manifests or receipts.
-Full selected parity, delivery runtime upper paired95 <=1.20 (optimization target <=0.80) and lower live heap/RSS
-remain hard, unqualified gates for these new framing features.
-
-The crate has one owned dependency, `triergon-core`, and forbids unsafe code.
-There is no I/O, platform decoder, native library, third-party crate or build
-script. Root workspace/lock integration belongs to the parent lane.
-
-## AVC/HEVC configuration and source facts
-
-The new [declared configuration layout draft](DECLARED-CONFIG.md) adds 14
-regressions verified on native Linux and a work-bounded validator for externally
-declared array/NAL ranges and big-endian length fields. It owns all output
-descriptors and preserves raw record bytes and zero-copy source spans. This is
-not an ISO avcC/hvcC wire parser. That historical76-test checkpoint passed
-Clippy and no-default checks on native Linux. The separate selected AVC wire
-parser is described above. hvcC, later AVC grammar and numerical qualification
-were open at that checkpoint.
-
-The earlier [DTS source jobs](DTS-SOURCE-JOBS.md) brought that native Linux
-checkpoint to 103 passing tests: all 76 existing tests, 14 source inspection tests
-and 13 low14-bit packing tests. Clippy, the no-default library check and release
-example builds pass. This adds explicit source facts and bounded payload-word
-conversion; full 14-bit frame acquisition and all native/numerical gates remain
-open. The 71 native acceptance differences have not been closed by these tests.
-
-`Configuration::declared_record` preserves a pool-owned avcC/hvcC record byte for
-byte, its declared encoding, and independently declared sample framing. Its
-inspection result is always `DeclaredOpaque`. **It does not parse either ISO
-record**, infer `lengthSizeMinusOne`, certify validity, or detect a conflicting
-caller declaration. A consumer without a separately validated framing fact must
-retain the raw record without using it to initialize this reader.
-
-`AnnexBConfigParser` incrementally frames a bounded, already pool-owned Annex-B
-configuration. It accepts AVC SPS/PPS types 7/8 and HEVC VPS/SPS/PPS types 32/33/34,
-preserving duplicates and order. It returns `AnnexBFramed`, not a complete or
-decoder-valid configuration. Parameter-set contents, IDs, relationships, profile,
-dimensions and completeness are not parsed. Other configuration NAL types return
-explicit `Unsupported`. Output parameter sets share the original immutable
-configuration storage; source padding and prefixes remain in `source_bytes()`.
-
-The framing of configuration bytes and the declared framing of media samples are
-separate facts. These source readers preserve parameter-set order and bytes.
-Packet/demux code supplies source/configuration generations, timestamps and side
-data. `NalPacketSession` adds the separately scoped pinned packet projection in
-[PACKET-BSF.md](PACKET-BSF.md).
-
-## Incremental NAL input
-
-`NalReader` owns an `InputCursor` for one source entity. It accepts arbitrary
-chunk boundaries, including one-byte windows through prefixes, NAL headers and
-emulation-prevention sequences. Call `step(work, cancel)` and handle core
-`Step::{Ready, NeedInput, Yield, End}`. Answer a request with same-pool
-`InputWindow` bytes and its exact token/source/offset. Empty input is starvation;
-call `finish(source, token)` to establish completion, or `fail` for transport or
-cancellation. Known length does not implicitly finish a source. A new source or
-logical reset needs a new reader; there is no cross-entity NAL continuation API.
-
-`LengthSize` declares an unsigned big-endian field of 1, 2, 3 or 4 bytes. This
-generic wire contract is deliberately separate from ISO record/sample-entry
-restrictions; accepting width 3 does not certify an avcC/hvcC record that names it.
-Zero-length NALs, partial prefixes/bodies and excessive sizes are errors.
-
-Each `Ready(NalUnit)` contains a complete pool-owned payload, source identity,
-payload offset/length, prefix offset/width or declared length, padding counts,
-and fixed-header facts. Length-prefix facts reconstruct the original prefix;
-Annex-B facts preserve its observed three/four-byte prefix and zero padding.
-An Annex-B reader may consume the next prefix before publishing the preceding
-NAL. A later failure does not invalidate previously published NALs. It does not
-make an entire access unit or source transactional.
-
-Fixed-header inspection checks minimum length, `forbidden_zero_bit`, and nonzero
-HEVC `nuh_temporal_id_plus1`. It preserves AVC `nal_ref_idc`, type, and HEVC type,
-layer ID and temporal field. Reserved types and nonzero layers remain facts;
-neither extension/header semantics nor decoding support follows from them.
-
-Annex-B extraction follows the literal H.264 B.2 / H.265 B.3 termination patterns:
-`00 00 00`, `00 00 01`, and explicit source completion. Runs preceding a prefix
-are classified into prefix and leading/trailing zeros. At EOF one or two final
-zero bytes remain payload; three or more terminate the NAL and are trailing
-padding. No RBSP inference occurs. Nonzero bytes after a terminating zero run
-without a prefix are rejected. Access-unit/type-dependent mandatory `zero_byte`
-rules are not checked by this framing-only reader; it accepts an initial
-three-byte prefix. Full EBSP/RBSP validity, including prohibited payload patterns,
-is outside fixed-header inspection.
-
-## Raw Annex B access units
-
-Use `RawAnnexBReader` with an explicitly identified AVC or HEVC source.
-It preserves original byte ranges and start-code widths and retains one
-access unit plus a lookahead NAL under charged limits. The scatter output
-shares the validated NAL payloads. The raw path uses incremental NAL
-capacity instead of reserving the configured ceiling for each NAL.
-
-The AVC boundary detector reads bounded SPS, PPS and slice-header prefixes
-and compares primary-picture identity. This covers multiple slices and
-streams without AUDs. Partitioned, redundant and extended AVC profiles
-have explicit refusals. The HEVC reader uses base-layer first-slice and
-leading-NAL rules and retains suffix and other-layer bytes in order. The
-reader reports coded random-access flags and preserves raw bytes without
-adding a presentation clock.
-[H.264 §§7.4.1.2.3–4](https://www.itu.int/rec/T-REC-H.264-202408-I/en)
-[H.265 §7.4.2.4.4](https://www.itu.int/rec/T-REC-H.265-202601-I/en)
-
-Four authored fixtures compare exact packet extents, key flags and complete
-source bytes. Four intact FATE streams add 243 access units. Native Linux
-runtime and memory remain open. The playback crate provides the separate
-[raw codec probe and decoder configuration](../playback/README.md#raw-avc-and-hevc-input).
-
-## Annex-B output, limits and work
-
-`AnnexBWriter` consumes a complete `NalUnit` and emits a pool-owned
-`00 00 00 01 || original NAL bytes`. Work is resumable; `BuildStep` distinguishes
-yield, one ready result and completion. Source facts accompany the output.
-No NAL byte changes, emulation-prevention edits, parameter-set injection, AUD,
-HDR/DV changes or keyframe policy occur. Invalid/opaque payload bytes remain
-unchanged, so this adapter alone does not certify a conforming Annex-B stream.
-
-All byte/offset/count arithmetic is checked. Callers set NAL, padding, count,
-input-window, config-source/config-count and output-size limits. Reader content,
-transport, limit and cancellation errors are sticky. Allocation/backpressure
-errors preserve the exact reserve/freeze checkpoint for retry. Rejected external
-responses leave parser state intact. Cancel is checked between byte scans and
-copies of at most 4096 bytes, and releases in-progress builders.
-
-Each input-byte visit includes constant parsing/copy work in the cursor's charged
-unit. Deferred Annex-B payload bytes, output bytes, parameter-set insertions and
-reserve/freeze attempts are separately charged. One-unit budgets make progress;
-zero budgets do not consume bytes. Allocator/deallocator and bounded list teardown
-costs are foundation operations, not a hard wall-clock latency guarantee.
-
-| Operation | Retained storage in this slice |
-|---|---|
-| Length-prefixed reader | One input window and one declared-length builder, then charged immutable output |
-| Annex-B reader | One input window and one `maximum_nal_bytes` scratch allocation per in-progress/output NAL |
-| Annex-B config parser | Original config storage, preallocated bounded descriptors, and one temporary NAL scratch; returned NALs share original config storage |
-| Annex-B writer | Input NAL plus one exact payload-length+4 output builder, including freeze metadata charged by core |
-
-The Annex-B scratch policy avoids hidden vector-growth copies but can retain much
-more capacity than a short NAL needs. This is an explicit memory optimization
-gap. Holders of immutable clones keep the full backing allocation charged. A
-pool that cannot hold an operation's internal peak needs a larger budget or
-smaller declared limits; releasing unrelated outputs cannot fix that situation.
-
-## NAL baseline evidence and parent verification
-
-`fixtures/framing-v1.tsv` has 30 original bit-authored cases, 54 NALs, and 501
-input bytes. The independent Python whole-buffer oracle computes payload,
-header, offset, prefix and padding expectations. Bodies are opaque authored
-bytes, not decoder-conformant media. `tests/framing.rs` contains 13 Rust
-regressions: all fixture chunk sizes with work 1/2/5/64, conversion fidelity,
-malformed/truncated input, header fields, 255/256 lengths, source lifecycle,
-limits, cancellation, reserve/freeze retries and retained ownership across
-reader drop and cross-thread release. Test polling loops have finite guards.
-
-The parent's first host-test log (private local receipt: `../../.research/parallel-framing-ts-dvb-first.log`)
-records:
-
-```text
-test result: ok. 13 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.03s
+// One length-prefixed MP4/Matroska sample -> Annex-B segments.
+let mut job = AvcAnnexBJob::new(&config, sample, packet_limits)?;
+if let BuildStep::Ready(unit) = job.step(&mut work, &cancel)? {
+    for segment in unit.segments() { decoder_input.extend_from_slice(segment); }
+}
 ```
 
-This result covers the authored Rust regressions, including the fixture chunk/work
-variations. Suite elapsed time is not numerical performance evidence. It does not
-establish source/native full parity, release behavior or memory qualification.
+## Supported
 
-The generator and frozen manifests are in `.research/parallel-framing/`. Its
-current v2 is self-contained Python; v1's exact script/manifest/table are kept
-separately. Both versions produce the identical TSV. Only the Python generator
-and preparation checks ran in this lane; the Rust result above comes from the
-parent queue. Parent make8/make9 subsequently passed all 13 NAL and 13 AV1/VP9
-regressions plus format/lint/release checks on those source snapshots. Target checks and the
-independently pinned reference harness remain pending. No installed FFmpeg was used here.
-Historical checkpoint, HOLD and preparation receipts remain unchanged and record
-the earlier pre-execution state and README hash. Compiled sources and fixtures
-were held at that checkpoint. The new batch adds separate files/receipts without
-rewriting those historical artifacts.
+| Area | Entry points | What it does |
+|---|---|---|
+| NAL streams | `NalReader`, `Framing::{AnnexB, LengthPrefixed}`, `LengthSize` | Incremental AVC/HEVC NAL extraction from any chunking; 1–4 byte big-endian lengths or Annex-B start codes; fixed NAL header facts |
+| Raw Annex-B access units | `RawAnnexBReader`, `RawAccessUnit` | Groups an elementary AVC/HEVC stream into access units (H.264 §7.4.1.2.3–4, H.265 §7.4.2.4.4); reports IDR/IRAP; keeps original start codes and padding |
+| avcC | `AvcConfigParser`, `AvcConfigViewParser` | Full record: fixed fields, SPS/PPS/SPS-ext arrays, high-profile extension, trailing bytes |
+| hvcC | `HvcConfigParser`, `HvcConfigViewParser`, `inspect_hvc_config_prefix` | Version 1: 23-byte fixed prefix, all NAL arrays in order (unknown/duplicate/empty arrays kept) |
+| Sample to Annex-B | `AvcAnnexBJob`, `HevcAnnexBJob` | Four-byte start codes; prepends record SPS/PPS (VPS/SPS/PPS) before IDR/IRAP; zero-copy segments |
+| Record to Annex-B | `HvcAnnexBWriter`, `HvcDecoderConfigWriter`, `AnnexBWriter` | All hvcC NALs in order, or the decoder subset (types 32–34, 39, 40); single NAL with `00 00 00 01` |
+| FFmpeg-compatible BSF | `NalPacketSession`, `NalPacketConfigWriter`, `NalObserved*ConfigParser` | Stateful `h264_mp4toannexb`/`hevc_mp4toannexb` packet behaviour, including in-band parameter-set tracking and AVC `NEW_EXTRADATA` |
+| Other config inputs | `AnnexBConfigParser`, `DeclaredConfigParser`, `Configuration::declared_record` | Annex-B extradata framing; caller-declared array/NAL layouts; opaque record retention |
+| AV1 | `Av1ObuReader`, `Av1ConfigParser`, `Av1TemporalUnitJob` | Low-overhead or single-OBU framing with exact LEB128; av1C v1 fields and config OBUs; container sample to decoder temporal unit |
+| VP9 | `Vp9ConfigParser` | vpcC v1 fields (profile, level, bit depth, chroma, range, CICP) |
+| AAC | `AacAscParser`, `AacAscScopeParser`, `aac_decoder_configuration_view` | AudioSpecificConfig for AAC-LC (2), SBR (5), PS (29): frequency, channels 1–7, GASpecificConfig, PCE, `0x2b7`/`0x548` sync extensions |
+| ADTS | `inspect_aac_adts_header`, `AacAdtsParser`, `AacAdtsWriter`, `AacAdtsStreamReader`, `AacAdtsCarrierReader` | 56-bit header facts; single-block AAC-LC frames; ADTS wrapping of raw access units (`AacAdtsParameters::from_asc`); aligned ADTS streams |
+| AC-3 / E-AC-3 | `probe_ac3_header`, `Ac3FrameReader`, `Ac3ConfigParser`, `Eac3BsiParser` | Header facts (bsid 0–8, 11–16), aligned syncframe reader, dac3/dec3 records, complete E-AC-3 BSI |
+| DTS core | `probe_dts_core_header`, `DtsCoreFrameReader`, `DtsCorePacket`, `DtsHeaderInspector` | Normal core header (all fields, optional HCRC), FSIZE+1 frame acquisition, container-packet core extraction |
+| DTS packings | `Dts14BitUnpacker`, `DtsPackedPayloadJob`, `Dts14FrameReader`, `Dts14CarrierReader`, `DtsNormalSourceReader`, `DtsOperation` | 16-bit LE and 14-bit BE/LE word packings; experimental 14-bit stream acquisition and FFmpeg-parser comparison views |
 
-Full selected parity, delivery runtime upper paired95 ratio <=1.20 (optimization target <=0.80), lower live heap and
-lower attributable RSS remain hard per-case gates on native Linux ARM64. All are
-**unmeasured for this slice**; 32-bit webOS and consumer integration are also open.
+## Behaviour and limits
 
-## Primary sources and provenance
+**Input model.** Incremental readers own a core `InputCursor` and accept same-pool
+windows of any size with the exact token, source and offset. An empty window is
+starvation; a known length is not EOF. Truncation, transport failure and
+cancellation are sticky errors, never a synthetic end. A new source or reset needs
+a new reader. Record parsers take a complete pool-owned record (box payload, no
+size/type header); sample jobs take one complete container sample.
 
-The implementation was authored from specification facts. The promoted O00
-inventory is requirements evidence only (INV09/12/15/16); no Streem, FFmpeg or
-other implementation was copied or translated. The lane stores exact source
-URLs/SHA-256 values and narrow PDF text extracts in its ignored `specs/` folder.
-The following editions are deliberately pinned, rather than assumed latest:
+**Source preservation.** Outputs keep exact source bytes, offsets, source ID and
+generation. Raw and reserved fields stay readable; local violations are reported
+through `syntax_issues()` bitsets rather than cleared. Absent and present-zero
+fields are distinct (`None` vs `Some(0)`). Views share the pool-owned input; a
+retained view keeps the whole backing allocation charged.
 
-- [ITU-T H.264 (08/2024)](https://www.itu.int/rec/T-REC-H.264-202408-S/en),
-  7.3.1, 7.4.1/Table 7-1, Annex B (printed pp. 45, 65–67, 311–312).
-- [ITU-T H.265 (07/2024)](https://www.itu.int/rec/T-REC-H.265-202407-S/en),
-  7.3.1.2, 7.4.2/Table 7-1, Annex B (printed pp. 34, 64–67, 273–274).
-- [RFC 6184 §1.3](https://www.rfc-editor.org/rfc/rfc6184#section-1.3) and
-  [RFC 7798 §1.1.4](https://www.rfc-editor.org/rfc/rfc7798#section-1.1.4)
-  corroborate fixed-header fields. RTP packetization is not implemented.
+**Resources.** All arithmetic is checked. Every operation has caller limits
+(bytes, NAL/OBU/frame counts, input window). Work is charged per byte or field;
+one unit always progresses and zero units consume nothing. Copies are at most
+4096 bytes between cancel checks. Allocation pressure returns retryable
+`Backpressure` at the exact checkpoint; no partial output is published.
 
-Acquisition and version selection for hvcC and later AVC profiles/corrigenda
-remain open. The selected older AVC grammar is acquired as described above.
-Neither a framework's record parser nor recollection of its layout substitutes
-for primary source evidence.
+**Codec-specific limits.**
 
+- NAL: payload bytes are opaque. No RBSP, SPS/PPS body or decoder-consistency
+  check. Annex-B termination follows H.264 B.2 / H.265 B.3; the leading `zero_byte`
+  rule is not enforced. `AnnexBWriter` never edits emulation prevention.
+- avcC/hvcC parsers refuse `lengthSizeMinusOne = 2` (three-byte lengths) and
+  unknown versions. The FFmpeg-compatible `NalObserved*` parsers accept them for
+  the packet session only.
+- `RawAnnexBReader` refuses data-partitioned, redundant-picture and extended AVC
+  profiles. It adds no timestamps.
+- AV1: LEB128 up to 8 bytes and `u32::MAX`. `OneObu` needs an external length;
+  AV1 Annex-B (length-delimited) streams are not parsed. Sequence headers are not
+  parsed. `Av1TemporalUnitJob` adds a missing temporal delimiter, inserts av1C
+  config OBUs at random access when the sample has no sequence header, and writes
+  a size field for a size-less final OBU.
+- VP9: only vpcC version 1. No frame header or superframe parsing.
+- AAC: other object types, unsupported extension modes and frequency indices
+  13/14 are refused. ADTS CRC is carried but not verified; multi-block and
+  protected frames are not parsed. The writer obeys the 8191-byte frame limit.
+- AC-3/E-AC-3: input must be aligned big-endian syncframes. There is no resync
+  search, no word-swapped or IEC 61937 input, and no CRC or audio-block check.
+  bsid 9/10 and E-AC-3 mixing definition 3 are refused. `sample_span()` is the
+  coded duration of one frame, not a presentation time.
+- DTS: canonical big-endian normal frames only in `DtsCoreFrameReader`; no
+  resync, termination frames or DTS-HD extension parsing. HCRC is reported, not
+  checked. `DtsCorePacket` normalises word-swapped and 14-bit cores into caller
+  storage and leaves extension bytes in the source packet.
 
-## Selected hvcC and AAC source operations
+## Conformance
 
-The earlier checkpoints above retain their original scopes and counts.
-The additive [hvcC/AAC API contract](HVCC-AAC.md) covers the selected full
-hvcC fixed fields and NAL arrays, ordered all-NAL conversion, AAC-LC/HE-AAC/
-HE-AACv2 ASC/GASpecific/PCE, ADTS records/streams, and separately named pinned
-receiver views. Raw source facts and default behavior remain independent of
-those views. All current DTS code, guards, fixtures and documentation remain
-unchanged. The complete prerequisite set adds 106 named framing guards
-(80 base + 26 compatibility), for an expected 317 framing guards. The
-composed adopted1863 + framing source has an expected 1969 passing Rust
-tests and its existing one ignored test; this source-only adoption package
-has not run that gate. Native and numerical/full-module qualification
-remain separate and open.
+Implemented from these specifications:
 
-## Stateful packet projection
+| Area | Reference |
+|---|---|
+| H.264 NAL / Annex B / AU | ITU-T H.264 (08/2024) §7.3.1, §7.4.1 Table 7-1, §§7.3.2.1.1, 7.3.2.2, 7.3.3, 7.4.1.2.3–4, Annex B |
+| HEVC NAL / Annex B / AU | ITU-T H.265 (07/2024) §7.3.1.2, §7.4.2 Table 7-1, §7.4.2.4.4, Annex B |
+| avcC | ISO/IEC 14496-15:2010 with the 2006 FRExt amendment |
+| hvcC, AAC ASC/ADTS | ISO/IEC 14496-15 and 14496-3 record layouts, from licensed interoperability references |
+| AV1 | AV1 Bitstream v1.0.0 Errata 1 §§4.10.5, 5.2–5.3, 6.2; AV1-ISOBMFF v1.3.0 §§2.3.3–2.4 |
+| VP9 | VP Codec ISO Media File Format Binding v1.0 |
+| AC-3 / E-AC-3 | ATSC A/52:2018 §§5.3–5.4, Table 5.18, Annex E Tables E1.2, E1.5, E1.6 and §E2.3; ETSI TS 102 366 V1.4.1 Annex F.4/F.6 (dac3/dec3) |
+| DTS | ETSI TS 102 114 V1.6.1 §§3.4, 5.3, 5.4.2, Tables 5-1 to 5-20; V1.2.1 §5.3 (14-bit packing) |
 
-The independent `NalPacketSession` and `NalPacketConfigWriter` preserve the source
-record and complete packet while producing a separately named pinned d32
-AVC/HEVC packet view. Injection origins, opaque caller metadata, receiver epochs,
-work, cancellation, ownership and refusals are explicit. Source readers and all
-317 existing guards are unchanged. [PACKET-BSF.md](PACKET-BSF.md) defines the
-implemented operation and remaining validation/qualification gaps.
+Verification:
+
+- `fixtures/*.tsv` are bit-authored corpora with expected values from an
+  independent whole-buffer oracle. Tests replay each case at many chunk sizes and
+  work grants, plus negative, limit, cancellation, backpressure and ownership cases.
+- `tests/nal_packet_receiver.rs` and `tests/framing_native_compat.rs` encode
+  behaviour observed from pinned FFmpeg (`h264_mp4toannexb`, `hevc_mp4toannexb`,
+  hvcC and AAC configuration handling).
+- `fixtures/raw-annex-b/*.packets` hold the packet extents and key flags FFmpeg's
+  raw H.264/HEVC demuxers produce for the paired streams.
+- The `examples/` trace programs (`nal_packet_receiver_trace`,
+  `dts-operation-trace`, `dts-source-observer`) emit JSON records that the
+  harness compares with FFmpeg's BSF and DCA parser output.
+
+Per-module parity, runtime and memory results are in
+[docs/status.md](../../docs/status.md); the gates and harness are described in
+[docs/quality.md](../../docs/quality.md).

@@ -1,75 +1,56 @@
-# Explicit multibyte text profiles, version 1
+# Multibyte charset profiles
 
-This additive API is independently authored safe Rust against licensed mapping
-DATA. It adds no runtime dependency. No FFmpeg or framework decoder code was
-copied or translated. It does not assert universal charset-label equivalence or
-normative conformance to an unavailable national standard. The original
-`Charset::from_label` resolver and all of its Unsupported outcomes stay unchanged.
-Callers explicitly opt into `MultibyteCharset::from_label`, `Charset::Multibyte`
-or `Encoding::Multibyte`; there is no language, filename or content detector.
+Mapping data, sources and licences for `text::charset::multibyte`. Each profile
+is selected explicitly with `MultibyteCharset::from_label`, `Charset::Multibyte`
+or `Encoding::Multibyte`; no label or content is guessed.
 
-| Profile | Admitted labels (ASCII case insensitive) | Exact mapping DATA |
+## Strict profiles (`MultibyteCharset::from_label`)
+
+| Profile | Labels (ASCII case-insensitive) | Mapping data |
 | --- | --- | --- |
-| GbkCp936 | gbk, cp936, windows-936 | Unicode/Microsoft CP936 table 2.01, 2000-01-07; includes 80 -> U+20AC. Not GB18030. |
-| Big5Unicode | big5, big-5 | Historical Unicode BIG5 table 2.0, mapping revision 1994; seven explicit NO MAPPING records are strict errors. |
-| ShiftJisUnicode | shift_jis, shift-jis, sjis | Historical Unicode SHIFTJIS table 2.0, mapping revision 1994; 5C is yen, 7E is overline. |
-| EucKr | euc-kr, euc_kr | Unicode/Microsoft CP949 table 2.01 restricted to pairs whose two bytes are A1..FE, plus ASCII. Includes later euro/registered-sign additions; refuses UHC extension pairs outside that geometry. |
-| Windows932 | cp932, windows-932 | Unicode/Microsoft CP932 table 2.01, 1998-04-15. |
-| Windows949 | cp949, windows-949 | Unicode/Microsoft CP949 table 2.01, 2000-01-07; UHC extension pairs are included. |
-| Windows950 | cp950, windows-950 | Unicode/Microsoft CP950 table 2.01, 2000-01-07; distinct punctuation and ETEN additions. |
+| `GbkCp936` | gbk, cp936, windows-936 | Microsoft CP936 table 2.01, including 0x80 → U+20AC. Not GB18030. |
+| `Big5Unicode` | big5, big-5 | Unicode historical BIG5 table 2.0; its seven NO MAPPING entries are errors. |
+| `ShiftJisUnicode` | shift_jis, shift-jis, sjis | Unicode historical SHIFTJIS table 2.0 (0x5C yen, 0x7E overline), plus C0/DEL identity. |
+| `EucKr` | euc-kr, euc_kr | CP949 table 2.01 restricted to A1–FE byte pairs, plus ASCII. UHC extension pairs are refused. |
+| `Windows932` | cp932, windows-932 | Microsoft CP932 table 2.01. |
+| `Windows949` | cp949, windows-949 | Microsoft CP949 table 2.01, including UHC extensions. |
+| `Windows950` | cp950, windows-950 | Microsoft CP950 table 2.01. |
 
-All aliases in this table are declarations of this API's exact selected profile,
-not assertions about every system iconv implementation. Other aliases, leading
-or trailing spaces, embedded NUL, HKSCS, GB18030 and ISO-2022 modes are refused.
-The Windows profiles do not invent private-use mappings missing from their pinned
-tables. The historical Big5/Shift-JIS profiles are deliberately named; modern web encodings may
-map the same labels to broader Windows-compatible repertoires. Complete selected
-consumer compatibility and other legacy coverage remain open until evaluated.
+Other aliases, padded labels, HKSCS, GB18030 and ISO-2022 are refused.
 
-The original mapping text, including copyright, limitations and historical
-ambiguity warnings, is retained in `tests/multibyte-mapping-data`. The packed
-production DATA is a sorted sequence of big-endian `(u16 wire, u16 scalar)`
-records. No mapping has a surrogate or scalar above U+FFFF. Unicode License V3
-is distributed with both data locations; KSC5601 also retains its original
-file-specific permission notice as independent evidence; its 1995 core mapping agrees with the selected EUC subset except the two later CP949 euro/registered-sign additions. The private source lock records every URL,
-raw-file hash and generated-data hash. This is data reuse, not admission of a
-production package. C0/DEL identity mappings are explicitly added to Shift-JIS;
-ASCII is explicitly added to Big5 and the EUC subset. The Big5 table's seven
-U+FFFD records explicitly mean NO MAPPING and are all retained as required
-negative controls, never emitted as replacement characters.
+## FFmpeg/glibc profiles (`native_charset::receiver_charset`)
 
-`MultibyteDecoder` retains at most one lead byte, consumes one byte per charged
-work unit and emits the exact original physical byte range for each scalar.
-Each unit includes at most sixteen binary-search comparisons over immutable
-mapping DATA. Lead/trail syntax is explicit and a structurally legal but unmapped
-pair is an error. Invalid trailing bytes are never replayed as ASCII. Caller
-chunk partitions do not change interpretation. Empty availability is not EOF;
-only `finish` asserts final source EOF. A partial lead at finish is sticky
-Truncated. Other malformed and overflow errors are sticky; cancellation is
-resumable. Zero work consumes no byte. The decoder allocates nothing and does
-not own or infer source IDs, labels, transport status, epochs or clocks.
+These match the label set and repertoire the pinned FFmpeg build accepts through
+glibc iconv when converting ASS packets (`native_charset::AssPacketJob`).
 
-`CharsetJob` uses the same scalar cursor as explicit SubRip extraction. It
-validates/counts the entire source before allocation/publication, then encodes
-into the exact charged output length. Work yields retain real lead/trail and
-pending output state. Source and even contradictory declared-label owners stay
-unchanged. Full backing capacities remain charged through caller retention.
-SubRip preserves raw physical ranges, caller generation/sequence/configuration
-epoch and exact cue times. Default formats and UTF8-only formats stay unchanged.
-There is no replacement, Unicode/line normalization, source rewriting or clock
-inference. Character conversion does not change ASS, tx3g rendering or modifiers.
+| Profile | Labels | Mapping data |
+| --- | --- | --- |
+| `GbkCp936`, `ShiftJisUnicode`, `Windows949`, `Windows950` | gbk, cp936, windows-936, shift_jis, shift-jis, sjis, cp949, cp950 | As above. |
+| `ReceiverBig5Glibc239` | big5, big-5 | GNU Big5 charmap 0.92 from glibc 2.39 (14,040 records). |
+| `ReceiverEucKrC1` | euc-kr | `EucKr` plus the 32 C1 controls. |
+| `ReceiverEucKrGlibc239` | euc-kr (`receiver_charset_v2` only) | `ReceiverEucKrC1` plus A2E8 → U+327E; equals the glibc 2.39 EUC-KR charmap. |
+| `ReceiverWindows932Pua` | cp932 | CP932 plus the 1,880 user-defined codes F040–F9FC → U+E000–U+E757. |
 
-Whole-mapping fixtures independently parse original text tables, compare all
-profile entries at work quanta 1/7/4096 and require outcomes for all 256 one-byte
-and 65,536 two-byte streams per profile. Other controls cover every physical
-chunk partition of authored mixed-width streams, EOF, invalid/unmapped bytes,
-overflow, cancellation, source-owner retention, foreign pools, decoded caps,
-allocation pressure and SubRip source facts. These are functional controls;
-no speed, heap/RSS, module, target-device or native-parity claim is made.
+`euc_kr` and `windows-932/949/950` are unavailable in this view.
 
-Native reference captures, the original177 memberships and24 D2 guards remain
-required and unchanged. Existing FFmpeg build/iconv capabilities must be checked
-on a separately assigned Linux lease before any new native comparison claim.
-Any new reference interface or build configuration needs its own pinned review;
-this source batch activates neither. Original SDKs, workers, flags and golds are
-immutable. Remaining tx3g modifier semantics are a separate required feature.
+## Data and licences
+
+Production tables are in `mapping-data/` as sorted big-endian `(u16 code, u16
+scalar)` records; no mapping exceeds U+FFFF. Unicode and Microsoft tables are
+under the Unicode License V3 (`charset/UNICODE-LICENSE.txt`,
+`mapping-data/UNICODE-LICENSE.txt`). The GNU Big5 charmap, with its
+free-distribution notice, is `mapping-data/RECEIVER-BIG5-DATA.txt`. The original text tables, including
+KSC5601 for cross-checking, are in `tests/multibyte-mapping-data/` and
+`tests/receiver-mapping-data/`. Mapping code is original; no iconv or FFmpeg
+code is used.
+
+## Decoder behaviour
+
+`MultibyteDecoder` holds at most one lead byte and consumes one byte per work
+unit, with at most sixteen binary-search comparisons. Each scalar keeps its
+source byte range. Unmapped but well-formed pairs are errors; invalid trail
+bytes are never replayed as ASCII. Chunk boundaries do not change the result.
+A lead byte pending at `finish` is `Truncated`. The decoder does not allocate.
+
+Tests compare every table entry at work quanta 1, 7 and 4096 and check all 256
+single-byte and 65,536 two-byte inputs per profile.
