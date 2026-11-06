@@ -215,10 +215,11 @@ pub(crate) struct EpochAdmission {
 /// Select whether the typed caller admits leaves after a pause or the
 /// envelope applies a preselected admission rule in place.
 #[derive(Clone, Copy, Debug)]
-enum Admit {
+pub(crate) enum Admit {
     Never,
     Pause,
     OrdinaryBlocks,
+    ScanSimpleBlocks,
     Epoch(EpochAdmission),
 }
 impl ElementReader {
@@ -717,7 +718,10 @@ impl ElementReader {
                         let ordinary_block = matches!(admit, Admit::OrdinaryBlocks)
                             && body.collect
                             && matches!(body.header.id, 0xa0 | 0xa3);
-                        if !ordinary_block && !matches!(admit, Admit::Epoch(_)) {
+                        let scan_block = matches!(admit, Admit::ScanSimpleBlocks)
+                            && body.collect
+                            && body.header.id == 0xa3;
+                        if !ordinary_block && !scan_block && !matches!(admit, Admit::Epoch(_)) {
                             return Ok(ParseStep::Yield);
                         }
                         if !work.try_charge(1) {
@@ -730,6 +734,9 @@ impl ElementReader {
                             body.collect = false;
                         }
                         body.typed_admitted = true;
+                        if scan_block && body.remaining >= 4 {
+                            body.scan = ScanBody::FirstSpan;
+                        }
                         continue;
                     }
                     // Private scan notifications use the existing typed bridge.

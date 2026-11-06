@@ -2,8 +2,8 @@
 //! There is still exactly one core InputCursor, no second buffered I/O layer.
 //! Internal ranges keep generation; the explicit seek transition resets once.
 use super::{
-    CLUSTER, ClusterCheckpoint, EBML, ElementHeader, ElementReader, Master, ParseStep, Phase,
-    SEGMENT, ScanBody, is_level_one,
+    Admit, CLUSTER, ClusterCheckpoint, EBML, ElementHeader, ElementReader, Master, ParseStep,
+    Phase, SEGMENT, ScanBody, is_level_one,
 };
 use crate::matroska::typed::syntax::Required;
 use crate::{Error, Result};
@@ -120,20 +120,15 @@ impl ElementReader {
         cancel: &AtomicBool,
     ) -> Result<CompactEnvelopeProgress> {
         self.healthy_for_job(work, cancel)?;
-        self.step_typed_compact_after_input_health(false, work, cancel)
+        self.step_typed_compact_after_input_health(Admit::Pause, work, cancel)
     }
 
     pub(crate) fn step_typed_compact_after_input_health(
         &mut self,
-        ordinary_blocks: bool,
+        admit: Admit,
         work: &mut WorkBudget,
         cancel: &AtomicBool,
     ) -> Result<CompactEnvelopeProgress> {
-        let admit = if ordinary_blocks {
-            super::Admit::OrdinaryBlocks
-        } else {
-            super::Admit::Pause
-        };
         let step = self.step_after_input_health::<CompactDelivery>(work, cancel, admit)?;
         if matches!(step, ParseStep::Yield)
             && let Some(header) = self.awaiting_typed_admission()
