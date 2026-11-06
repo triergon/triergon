@@ -1,8 +1,9 @@
-//! A small JSON reader for harness data files.
+//! JSON for harness data files and worker output, with Python's `json` semantics.
 //!
-//! Objects keep their key order. Numbers keep their source text so integers and
-//! floats can be told apart and written back unchanged. `NaN`, `Infinity` and
-//! `-Infinity` are accepted, as Python's `json` module accepts them.
+//! Objects keep their key order. Numbers keep integer/float identity: integers
+//! keep their digits, floats are held in Python's shortest `repr`, so a document
+//! read and written back is byte-identical to Python's `json.loads`/`json.dumps`.
+//! `NaN`, `Infinity` and `-Infinity` are accepted, as Python accepts them.
 
 use std::fmt;
 
@@ -21,6 +22,41 @@ pub enum Value {
 pub struct Number(String);
 
 impl Number {
+    /// An integer (as opposed to a float) in Python's sense.
+    pub fn is_integer(&self) -> bool {
+        !self.0.contains(['.', 'e', 'E', 'N', 'I'])
+    }
+
+    pub fn as_i128(&self) -> Option<i128> {
+        if self.is_integer() {
+            self.0.parse().ok()
+        } else {
+            None
+        }
+    }
+
+    /// Python's `==` between numbers: integers exactly, an integer and a float
+    /// only when the float is integral and equal.
+    pub fn equals(&self, other: &Number) -> bool {
+        match (self.is_integer(), other.is_integer()) {
+            (true, true) => self.0 == other.0,
+            (false, false) => self.as_f64() == other.as_f64(),
+            (true, false) => Self::int_float(&self.0, other.as_f64()),
+            (false, true) => Self::int_float(&other.0, self.as_f64()),
+        }
+    }
+
+    fn int_float(int: &str, float: f64) -> bool {
+        if !float.is_finite() || float.fract() != 0.0 || float.abs() >= 1.7e38 {
+            return false;
+        }
+        int.parse::<i128>().is_ok_and(|i| i == float as i128)
+    }
+
+    pub fn text(&self) -> &str {
+        &self.0
+    }
+
     pub fn as_f64(&self) -> f64 {
         match self.0.as_str() {
             "NaN" => f64::NAN,
@@ -99,6 +135,19 @@ impl Value {
     }
 }
 
+/// The text Python writes back for a JSON number it read.
+fn canonical_number(raw: &str) -> String {
+    if !raw.contains(['.', 'e', 'E']) {
+        // An integer; only "-0" changes ("0").
+        return if raw.trim_start_matches('-').bytes().all(|b| b == b'0') {
+            "0".into()
+        } else {
+            raw.into()
+        };
+    }
+    python_float(raw.parse().unwrap_or(f64::NAN))
+}
+
 /// Python's shortest round-trip float `repr`.
 fn python_float(value: f64) -> String {
     if value.is_nan() {
@@ -143,6 +192,45 @@ pub fn to_python(value: &Value, indent: Option<usize>) -> String {
     let mut out = String::new();
     write_value(&mut out, value, indent, 0);
     out
+}
+
+/// `json.dumps(value, sort_keys=True, separators=(",", ":"))`: the canonical
+/// form whose SHA-256 identifies a document.
+pub fn canonical(value: &Value) -> String {
+    let mut out = String::new();
+    write_canonical(&mut out, value);
+    out
+}
+
+fn write_canonical(out: &mut String, value: &Value) {
+    match value {
+        Value::Array(items) => {
+            out.push('[');
+            for (i, item) in items.iter().enumerate() {
+                if i > 0 {
+                    out.push(',');
+                }
+                write_canonical(out, item);
+            }
+            out.push(']');
+        }
+        Value::Object(members) => {
+            let mut keys: Vec<&str> = members.iter().map(|(k, _)| k.as_str()).collect();
+            keys.sort_unstable();
+            keys.dedup();
+            out.push('{');
+            for (i, key) in keys.iter().enumerate() {
+                if i > 0 {
+                    out.push(',');
+                }
+                write_string(out, key);
+                out.push(':');
+                write_canonical(out, value.get(key).expect("key"));
+            }
+            out.push('}');
+        }
+        other => write_value(out, other, None, 0),
+    }
 }
 
 fn write_value(out: &mut String, value: &Value, indent: Option<usize>, level: usize) {
@@ -409,7 +497,7 @@ impl Parser<'_> {
             }
         }
         let raw = std::str::from_utf8(&self.text[start..self.pos]).expect("ASCII number");
-        Ok(Value::Number(Number(raw.to_owned())))
+        Ok(Value::Number(Number(canonical_number(raw))))
     }
 
     fn digits(&mut self) {
@@ -519,7 +607,7 @@ mod tests {
             v.get("b").unwrap(),
             &Value::Array(vec![
                 num("1"),
-                num("-2.5e3"),
+                num("-2500.0"),
                 Value::Bool(true),
                 Value::Null
             ])
@@ -529,6 +617,27 @@ mod tests {
             v.get("b").unwrap().as_array().unwrap()[1].as_f64(),
             Some(-2500.0)
         );
+    }
+
+    #[test]
+    fn numbers_read_back_as_python_writes_them() {
+        for (text, back) in [
+            ("-0", "0"),
+            ("1.50", "1.5"),
+            ("1E3", "1000.0"),
+            ("1e400", "Infinity"),
+            ("12345678901234567890123", "12345678901234567890123"),
+            ("0.1e-7", "1e-08"),
+        ] {
+            assert_eq!(to_python(&parse(text).unwrap(), None), back, "{text}");
+        }
+        let n = |t: &str| match parse(t).unwrap() {
+            Value::Number(n) => n,
+            _ => unreachable!(),
+        };
+        assert!(n("48000").equals(&n("48000.0")));
+        assert!(!n("9007199254740993").equals(&n("9007199254740992.0")));
+        assert!(!n("1").equals(&n("1.5")));
     }
 
     #[test]
@@ -603,6 +712,12 @@ mod tests {
         ] {
             assert_eq!(parse(text).unwrap().truthy(), truth, "{text}");
         }
+    }
+
+    #[test]
+    fn canonical_form_sorts_keys_compactly() {
+        let v = parse(r#"{"b": [1, {"d": 2, "c": "\u00e9"}], "a": null}"#).unwrap();
+        assert_eq!(canonical(&v), r#"{"a":null,"b":[1,{"c":"\u00e9","d":2}]}"#);
     }
 
     #[test]

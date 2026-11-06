@@ -27,7 +27,7 @@ adapters:
 	python3 tools/build_harness.py
 
 report:
-	python3 tools/test_media.py --fate-cache .research/fate-samples
+	cargo xtask report --fate-cache .research/fate-samples
 
 qualify:
 	python3 tools/test_media.py --benchmark --memory --fate-cache .research/fate-samples --require-acceptance

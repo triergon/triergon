@@ -10,10 +10,13 @@ mod corpus;
 mod ebml;
 mod fate;
 mod fetch;
+mod harness;
 mod json;
 mod prepare;
 mod pyrandom;
 mod sha256;
+mod stats;
+mod toml;
 mod walk;
 mod zlib;
 
@@ -34,6 +37,12 @@ commands:
                  build the pinned FFmpeg reference into .research/reference[-formats]
   fetch-specs    [--record] cache the specification texts and verify specs/sources.json
   fetch-vectors  cache the required external test vectors and verify their hashes
+  report         [--contract F] [--manifest F] [--corpus DIR] [--output DIR] [--fate-cache DIR]
+                 [--additional-report F]... [--require-acceptance] [--require-slice-acceptance]
+                 correctness report of the built workers against one feature contract
+  compare        --candidate W --reference W --input FILE --output DIR
+                 [--operation plain|seek|colour|catalogue] [--content] [--no-short-reads]
+                 compare one input across a candidate and a reference worker
   fate-inventory --source DIR --output FILE [--configured-list FILE]
                  index FATE definitions as data; nothing is executed";
 
@@ -49,6 +58,8 @@ fn main() -> ExitCode {
         Some("fixtures") => fixtures(&root),
         Some("fixture") => fixture(&root, &args[1..]),
         Some("fate-inventory") => fate_inventory(&args[1..]),
+        Some("compare") => compare(&root, &args[1..]),
+        Some("report") => return report(&root, &args[1..]),
         Some("prepare-ffmpeg") => prepare_ffmpeg(&root, &args[1..]),
         Some("fetch-specs") => match &args[1..] {
             [] => fetch::specs(&root, false, &fetch::Network).map(|s| println!("{s}")),
@@ -114,6 +125,93 @@ fn fixtures(root: &Path) -> Task {
     for line in corpus::generate_all(&paths)? {
         println!("{line}");
     }
+    Ok(())
+}
+
+fn report(root: &Path, args: &[String]) -> ExitCode {
+    let mut options = harness::report::Options::defaults(root);
+    let mut rest = args.iter();
+    let parsed = (|| -> Task {
+        while let Some(flag) = rest.next() {
+            let mut value = || {
+                rest.next()
+                    .map(PathBuf::from)
+                    .ok_or_else(|| format!("{flag} needs a value"))
+            };
+            match flag.as_str() {
+                "--contract" => options.contract = value()?,
+                "--manifest" => options.manifest = value()?,
+                "--corpus" => options.corpus = value()?,
+                "--output" => options.output = value()?,
+                "--fate-cache" => options.fate_cache = Some(value()?),
+                "--additional-report" => options.additional_reports.push(value()?),
+                "--require-acceptance" => options.require_acceptance = true,
+                "--require-slice-acceptance" => options.require_slice_acceptance = true,
+                _ => return Err(USAGE.to_owned()),
+            }
+        }
+        Ok(())
+    })();
+    let result = parsed.and_then(|()| harness::report::run(root, &options));
+    match result {
+        Ok(code) => ExitCode::from(code as u8),
+        Err(message) => {
+            eprintln!("{message}");
+            ExitCode::from(2)
+        }
+    }
+}
+
+fn compare(root: &Path, args: &[String]) -> Task {
+    let mut values = std::collections::BTreeMap::new();
+    let (mut content, mut sequential) = (false, true);
+    let mut rest = args.iter();
+    while let Some(flag) = rest.next() {
+        match flag.as_str() {
+            "--content" => content = true,
+            "--no-short-reads" => sequential = false,
+            "--candidate" | "--reference" | "--input" | "--output" | "--operation" => {
+                values.insert(
+                    flag.clone(),
+                    rest.next()
+                        .ok_or_else(|| format!("{flag} needs a value"))?
+                        .clone(),
+                );
+            }
+            _ => return Err(USAGE.to_owned()),
+        }
+    }
+    let path = |key: &str| {
+        values
+            .get(key)
+            .map(PathBuf::from)
+            .ok_or_else(|| format!("{key} is required"))
+    };
+    let (candidate, reference, input) =
+        (path("--candidate")?, path("--reference")?, path("--input")?);
+    let run = harness::parity::Run {
+        root,
+        candidate: &candidate,
+        reference: &reference,
+        input: &input,
+        raw: path("--output")?,
+    };
+    use harness::parity::{catalogue_parity, colour_parity, parity, seek_parity};
+    let result = match values.get("--operation").map_or("plain", String::as_str) {
+        "plain" => parity(&run, sequential, None, content, "")?,
+        "seek" => seek_parity(&run, sequential, None, content)?,
+        "colour" => colour_parity(&run, sequential, None, content)?,
+        "catalogue" => catalogue_parity(&run, sequential, None, content)?,
+        other => return Err(format!("unknown operation {other}")),
+    };
+    corpus::write_json(&run.raw.join("result.json"), &result)?;
+    println!(
+        "{}",
+        result
+            .get("status")
+            .and_then(json::Value::as_str)
+            .unwrap_or("?")
+    );
     Ok(())
 }
 
