@@ -204,6 +204,16 @@ impl InputCursor {
             maximum,
         }
     }
+    /// Returns the next request if the cursor has consumed its buffered input
+    /// and the source has neither finished nor failed.
+    #[inline]
+    pub fn pending_request(&self) -> Option<InputRequest> {
+        (self.inline_len == 0
+            && self.window.is_none()
+            && self.end.is_none()
+            && self.failure.is_none())
+        .then(|| self.request())
+    }
     fn verify(&self, source: SourceId, token: &InputToken) -> Result<()> {
         if self.pool.identity() != token.pool {
             return Err(Error::ForeignPool);

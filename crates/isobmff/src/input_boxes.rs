@@ -191,6 +191,11 @@ impl BoxReader {
                             Step::Ready(count) => {
                                 self.filled += count;
                                 self.position = input.position();
+                                if self.filled < self.needed
+                                    && let Some(request) = input.pending_request()
+                                {
+                                    return Ok(Step::NeedInput(request));
+                                }
                             }
                             Step::NeedInput(request) => return Ok(Step::NeedInput(request)),
                             Step::Yield => return Ok(Step::Yield),
@@ -268,8 +273,13 @@ impl BoxReader {
                         .as_mut()
                         .ok_or(Error::Invalid("missing metadata buffer"))?;
                     match input.read_append(buffer, target - filled, work, cancel)? {
-                        Step::Ready(_) => {
+                        Step::Ready(count) => {
                             self.position = input.position();
+                            if count < target - filled
+                                && let Some(request) = input.pending_request()
+                            {
+                                return Ok(Step::NeedInput(request));
+                            }
                         }
                         Step::NeedInput(request) => return Ok(Step::NeedInput(request)),
                         Step::Yield => return Ok(Step::Yield),
