@@ -1,4 +1,5 @@
 {
+  "evidence": {"set": "subtitle-fixture-provenance", "sha256": "acebf0b39b33b7f05ed20c5dba1b6cc42ed0c95839caf1ac40cb6659d484deaf"},
   "schema": "m05-default-CLUT-source-native-provenance-v1",
   "primary": {
     "path": ".research/parallel-subtitles/dvb-native-closure-1/default-clut-1/CONTRACT.json",
@@ -17,60 +18,60 @@
   },
   "actual_default8": {
     "request": {
-      "path": ".research/aws-linux-extended1/exports/3.76.29.106/controls-generated/parent-request.json",
+      "path": ".research/evidence/subtitle-fixture-provenance/aws-linux-extended1/exports/3.76.29.106/controls-generated/parent-request.json",
       "sha256": "dd232856425c68d11c1273e82953c3301d2e15ef5ebb8eef3b2351ed2ca8bb0b",
       "bytes": 25187
     },
     "binding": {
-      "path": ".research/aws-linux-extended1/exports/3.76.29.106/builder-review-v1/binding.json",
+      "path": ".research/evidence/subtitle-fixture-provenance/aws-linux-extended1/exports/3.76.29.106/builder-review-v1/binding.json",
       "sha256": "48c393e87dc2687897550806ebdef4250b889e0891dfc9b5ccc5ac6aa4890f1a",
       "bytes": 1845
     },
     "review": {
-      "path": ".research/aws-linux-extended1/exports/3.76.29.106/builder-review-v1/review.json",
+      "path": ".research/evidence/subtitle-fixture-provenance/aws-linux-extended1/exports/3.76.29.106/builder-review-v1/review.json",
       "sha256": "5ec29c369e22a52df1346de9c1a174ef783c00df3248ae04de41b664d2787016",
       "bytes": 5970
     },
     "raw_results": {
-      "path": ".research/aws-linux-extended1/exports/3.76.29.106/builder-native-v1/results.json",
+      "path": ".research/evidence/subtitle-fixture-provenance/aws-linux-extended1/exports/3.76.29.106/builder-native-v1/results.json",
       "sha256": "79fcf10997dcfdd2747ceab8758555f6210acb74e2d0f33dfc90466ddd3cea83",
       "bytes": 3901
     },
     "summary": {
-      "path": ".research/aws-linux-extended1/exports/3.76.29.106/builder-native-v1/review/summary.json",
+      "path": ".research/evidence/subtitle-fixture-provenance/aws-linux-extended1/exports/3.76.29.106/builder-native-v1/review/summary.json",
       "sha256": "bbda278933c3c29cfede7650c5330e47c327a1eeb1d2ba29808fd35c0d0bffa9",
       "bytes": 137185
     }
   },
   "actual_edge8": {
     "request": {
-      "path": ".research/aws-linux-extended1/exports/3.76.29.106/builder-edge-native-v1/request.json",
+      "path": ".research/evidence/subtitle-fixture-provenance/aws-linux-extended1/exports/3.76.29.106/builder-edge-native-v1/request.json",
       "sha256": "e337c2a926de722bf5103a806e0ce266171500ad8ee3d6819fce3f7ea0202665",
       "bytes": 16231
     },
     "results": {
-      "path": ".research/aws-linux-extended1/exports/3.76.29.106/builder-edge-native-v1/results.json",
+      "path": ".research/evidence/subtitle-fixture-provenance/aws-linux-extended1/exports/3.76.29.106/builder-edge-native-v1/results.json",
       "sha256": "991955f05216ab72bc7376f5610341e7deb7af8b8f6550d5e0acb1337ece08d9",
       "bytes": 3769
     },
     "terminal": {
-      "path": ".research/aws-linux-extended1/exports/3.76.29.106/builder-edge-native-v1/terminal.json",
+      "path": ".research/evidence/subtitle-fixture-provenance/aws-linux-extended1/exports/3.76.29.106/builder-edge-native-v1/terminal.json",
       "sha256": "f75f07c2a9f79604377b6215b1c47d873c9e21ee5708e41064ffe73fbea22fba",
       "bytes": 153
     }
   },
   "exact107_green": {
-    "path": ".research/aws-linux-extended1/exports/3.76.29.106/gate-v3/completion.json",
+    "path": ".research/evidence/subtitle-fixture-provenance/aws-linux-extended1/exports/3.76.29.106/gate-v3/completion.json",
     "sha256": "b8c457ad95275075d57b897820dd5f7f17a97f6e6cda43a88c3a2fa6837eecbb",
     "bytes": 2446
   },
   "retained_field_comparisons96": {
-    "path": ".research/aws-linux-extended1/exports/3.76.29.106/trace-comparison-v2/summary.json",
+    "path": ".research/evidence/subtitle-fixture-provenance/aws-linux-extended1/exports/3.76.29.106/trace-comparison-v2/summary.json",
     "sha256": "f805665a955615f6897e79c6cbdf60fe04b5388c05a699f8cb97881aca515cd3",
     "bytes": 49499
   },
   "functional_pressure16": {
-    "path": ".research/aws-linux-extended1/exports/3.76.29.106/pressure-v3/summary.json",
+    "path": ".research/evidence/subtitle-fixture-provenance/aws-linux-extended1/exports/3.76.29.106/pressure-v3/summary.json",
     "sha256": "dd70f8806623eef9588a3767f472290dd1e0525a3abcf5238df05c8927f48aed",
     "bytes": 2555
   },

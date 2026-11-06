@@ -1,11 +1,12 @@
 {
+  "evidence": {"set": "subtitle-fixture-provenance", "sha256": "acebf0b39b33b7f05ed20c5dba1b6cc42ed0c95839caf1ac40cb6659d484deaf"},
   "schema": "m05-native40-regressions-v1",
   "observations_sha256": "841156bca955935f8983503edaae8900fe2ef36681d75c791171dd7ee14d37f3",
   "request_sha256": "211dcf501a20b7f75db4769c81853bde52f35a05c9d4adcc30c77bd4bd2c9093",
   "records": [
     {
       "id": "utf16-big-ascii",
-      "stdout_path": ".research/aws-linux-extended1/exports/3.71.101.21/extended-support-text-1793480178002079194/targeted40/utf16-big-ascii.jsonl",
+      "stdout_path": ".research/evidence/subtitle-fixture-provenance/aws-linux-extended1/exports/3.71.101.21/extended-support-text-1793480178002079194/targeted40/utf16-big-ascii.jsonl",
       "stdout_sha256": "814aebec5e7bd017f9b1247b5082c70c59671e2fefd2bd6d05635ce5bb71bb12",
       "stderr_sha256": "54dbb6382319d81b247e4fcc978aff48414cbcfbfb83cddc9c1053889e5525bc",
       "source_sha256": "a5e8601bcedec753cea9e4168d971be337ad996d9092aa50e64f270bcd36970b",
@@ -60,7 +61,7 @@
     },
     {
       "id": "utf16-little-ascii",
-      "stdout_path": ".research/aws-linux-extended1/exports/3.71.101.21/extended-support-text-1793480178002079194/targeted40/utf16-little-ascii.jsonl",
+      "stdout_path": ".research/evidence/subtitle-fixture-provenance/aws-linux-extended1/exports/3.71.101.21/extended-support-text-1793480178002079194/targeted40/utf16-little-ascii.jsonl",
       "stdout_sha256": "ab7de24ff1cd427941472930fd1e102407eb54722888d5e61beebc839473b983",
       "stderr_sha256": "6f60ec3ece6ee465f898ed25cd39902083074a8b5f1b6603a3c3e22338f91fed",
       "source_sha256": "37078d47648c75001b5adf046317c139adebc12cadedb5b6a2849d262afd683b",
@@ -115,7 +116,7 @@
     },
     {
       "id": "utf16-big-bmp-first-00c5",
-      "stdout_path": ".research/aws-linux-extended1/exports/3.71.101.21/extended-support-text-1793480178002079194/targeted40/utf16-big-bmp-first-00c5.jsonl",
+      "stdout_path": ".research/evidence/subtitle-fixture-provenance/aws-linux-extended1/exports/3.71.101.21/extended-support-text-1793480178002079194/targeted40/utf16-big-bmp-first-00c5.jsonl",
       "stdout_sha256": "68c38e3ec470513c56591d4e42f51c09b30d43f7010a83577a3ecdef2cd1fff0",
       "stderr_sha256": "b6fb8bbd41e46b087a15ca89268e361ed649a363199889198611d00fb4e654b6",
       "source_sha256": "e0a9a7e7bd614469120ed5a29f90b65a3d9aa01de582f41c78abc0cf2b157284",
@@ -170,7 +171,7 @@
     },
     {
       "id": "utf16-little-bmp-first-00c5",
-      "stdout_path": ".research/aws-linux-extended1/exports/3.71.101.21/extended-support-text-1793480178002079194/targeted40/utf16-little-bmp-first-00c5.jsonl",
+      "stdout_path": ".research/evidence/subtitle-fixture-provenance/aws-linux-extended1/exports/3.71.101.21/extended-support-text-1793480178002079194/targeted40/utf16-little-bmp-first-00c5.jsonl",
       "stdout_sha256": "960f55f9d1fa724735e04bb1f8917448b9737d2f51d4609a1a441640d5d200d8",
       "stderr_sha256": "2a83a517f952e2ff6557e025e5ee07b745a673b2350c75fa085e5b286fbd900e",
       "source_sha256": "7dc8331694dc595b30d754bead00fcfd3b35fd9ff1dd91ee4e8842163d078e9a",
@@ -225,7 +226,7 @@
     },
     {
       "id": "utf16-big-bmp-first-00e9",
-      "stdout_path": ".research/aws-linux-extended1/exports/3.71.101.21/extended-support-text-1793480178002079194/targeted40/utf16-big-bmp-first-00e9.jsonl",
+      "stdout_path": ".research/evidence/subtitle-fixture-provenance/aws-linux-extended1/exports/3.71.101.21/extended-support-text-1793480178002079194/targeted40/utf16-big-bmp-first-00e9.jsonl",
       "stdout_sha256": "f217581ce0e6e5f4667306b7a80236e4b3cb3177db326a523e4ce88bf8a26d4c",
       "stderr_sha256": "c5c7e36503475f06e4113a26271ee5f08ba6a0e03bc5af8016a17b51f91e4616",
       "source_sha256": "7989008073a40f19d4f8f6857c8884855e9e062d29772f26b2a9e4c5273cd872",
@@ -280,7 +281,7 @@
     },
     {
       "id": "utf16-little-bmp-first-00e9",
-      "stdout_path": ".research/aws-linux-extended1/exports/3.71.101.21/extended-support-text-1793480178002079194/targeted40/utf16-little-bmp-first-00e9.jsonl",
+      "stdout_path": ".research/evidence/subtitle-fixture-provenance/aws-linux-extended1/exports/3.71.101.21/extended-support-text-1793480178002079194/targeted40/utf16-little-bmp-first-00e9.jsonl",
       "stdout_sha256": "937e567c77b6038196ee8eeb76dfb2418dd23efb88f5e5810f79715342a9d3bf",
       "stderr_sha256": "d0372421006db2e138fe5b2294af6d4deeb4d8dddc24b3bf212a1aca921354c1",
       "source_sha256": "1de4e31520fc1dd1501e3d177ecccc0c5d47a6dede8d2c7915a829a9c0458610",
@@ -335,7 +336,7 @@
     },
     {
       "id": "utf16-big-bmp-middle-00c5",
-      "stdout_path": ".research/aws-linux-extended1/exports/3.71.101.21/extended-support-text-1793480178002079194/targeted40/utf16-big-bmp-middle-00c5.jsonl",
+      "stdout_path": ".research/evidence/subtitle-fixture-provenance/aws-linux-extended1/exports/3.71.101.21/extended-support-text-1793480178002079194/targeted40/utf16-big-bmp-middle-00c5.jsonl",
       "stdout_sha256": "33195d57d2beecd7b1b76537915ee43dbf96879f7efbbfe1787148c2d52a2449",
       "stderr_sha256": "4c185ac30e0b804d5d28ad8383f5c27693a2e5413b149153ceb5b8b06b78119f",
       "source_sha256": "036460b22877f1c52856e3eae9296be1827602a836888083e774d3c512bff48d",
@@ -390,7 +391,7 @@
     },
     {
       "id": "utf16-little-bmp-middle-00c5",
-      "stdout_path": ".research/aws-linux-extended1/exports/3.71.101.21/extended-support-text-1793480178002079194/targeted40/utf16-little-bmp-middle-00c5.jsonl",
+      "stdout_path": ".research/evidence/subtitle-fixture-provenance/aws-linux-extended1/exports/3.71.101.21/extended-support-text-1793480178002079194/targeted40/utf16-little-bmp-middle-00c5.jsonl",
       "stdout_sha256": "cb69caa91a6c2ab05de770e4ced8d7ca0e5ee3fa93de524d9885af224eff87bf",
       "stderr_sha256": "2c28129ae08773e922c7765dfb321b8eaedcf25d2d22bad82abfe1d86641e7f3",
       "source_sha256": "8876649910872db31fc7dab9abb8d78100e5fd03687ee6dd154b37b6220ede33",
@@ -445,7 +446,7 @@
     },
     {
       "id": "utf16-big-bmp-first-0145",
-      "stdout_path": ".research/aws-linux-extended1/exports/3.71.101.21/extended-support-text-1793480178002079194/targeted40/utf16-big-bmp-first-0145.jsonl",
+      "stdout_path": ".research/evidence/subtitle-fixture-provenance/aws-linux-extended1/exports/3.71.101.21/extended-support-text-1793480178002079194/targeted40/utf16-big-bmp-first-0145.jsonl",
       "stdout_sha256": "4d2aa361de8741d6bf533a0ecfc2c3a6cfc210e6e2338e2132aa26a34e9c444f",
       "stderr_sha256": "f78186aba8952a2f97b4c6ffcbed3e4b0717ab865118995e90c6d6f79148932b",
       "source_sha256": "dee831ee3b66e9604ea831f1ea59dfc0e1d49e3456e49ae0f103261b7c2a1a3a",
@@ -500,7 +501,7 @@
     },
     {
       "id": "utf16-little-bmp-first-0145",
-      "stdout_path": ".research/aws-linux-extended1/exports/3.71.101.21/extended-support-text-1793480178002079194/targeted40/utf16-little-bmp-first-0145.jsonl",
+      "stdout_path": ".research/evidence/subtitle-fixture-provenance/aws-linux-extended1/exports/3.71.101.21/extended-support-text-1793480178002079194/targeted40/utf16-little-bmp-first-0145.jsonl",
       "stdout_sha256": "94e767d1e8421ad521f3e3ecc8bfe3e4a64702a9fddb4f7573b3c9e063687078",
       "stderr_sha256": "eeba4828ad3c06a60d842c6eeff5fa0ffec2b813232c904a8d0800143b0ba6d4",
       "source_sha256": "3c71fc7db00496f5a28e2bd6693c128e58e294bdfef97f677173ce0ae5c4ce57",
@@ -555,7 +556,7 @@
     },
     {
       "id": "utf16-big-bmp-first-6c34",
-      "stdout_path": ".research/aws-linux-extended1/exports/3.71.101.21/extended-support-text-1793480178002079194/targeted40/utf16-big-bmp-first-6c34.jsonl",
+      "stdout_path": ".research/evidence/subtitle-fixture-provenance/aws-linux-extended1/exports/3.71.101.21/extended-support-text-1793480178002079194/targeted40/utf16-big-bmp-first-6c34.jsonl",
       "stdout_sha256": "3202652cc7cfbe844380b1b146256e01edc2f89ddef1e2bdb0ffcb570c0b6e5c",
       "stderr_sha256": "3db3182cda764a98bff68a1f077d36709b0b6525b32d90b5d19223dcefec9172",
       "source_sha256": "e05593ce08be16a18e816622330983f49f0924dc7faecb1219ec441f798d93fb",
@@ -610,7 +611,7 @@
     },
     {
       "id": "utf16-little-bmp-first-6c34",
-      "stdout_path": ".research/aws-linux-extended1/exports/3.71.101.21/extended-support-text-1793480178002079194/targeted40/utf16-little-bmp-first-6c34.jsonl",
+      "stdout_path": ".research/evidence/subtitle-fixture-provenance/aws-linux-extended1/exports/3.71.101.21/extended-support-text-1793480178002079194/targeted40/utf16-little-bmp-first-6c34.jsonl",
       "stdout_sha256": "a42a32ed15aab9f1e4bc1c7ffe4285aff1518687a79febb597f496358012c6dd",
       "stderr_sha256": "a2ee7466c4d92334b25f814a980a519579fa253f22d4324a05efc11ccc9e2933",
       "source_sha256": "29d8863d7ea0628188ed7d4addfa70b0cd04b7cf650c4036a22eeeef72558d27",
@@ -665,7 +666,7 @@
     },
     {
       "id": "utf16-big-supplementary-first",
-      "stdout_path": ".research/aws-linux-extended1/exports/3.71.101.21/extended-support-text-1793480178002079194/targeted40/utf16-big-supplementary-first.jsonl",
+      "stdout_path": ".research/evidence/subtitle-fixture-provenance/aws-linux-extended1/exports/3.71.101.21/extended-support-text-1793480178002079194/targeted40/utf16-big-supplementary-first.jsonl",
       "stdout_sha256": "d61a40c4b33195fdb99dab8879c48165dc0e2de1b5d62c9c2411c8ffdc6edb8f",
       "stderr_sha256": "c90ea62c08bee36935ee79e49e4b911473338a9732ae3e40a9f29533e0e3c3aa",
       "source_sha256": "042c091fb0dcb2c4511209bc8e089951c5270a7dad1c5a354c80fe5002aa7ff5",
@@ -720,7 +721,7 @@
     },
     {
       "id": "utf16-little-supplementary-first",
-      "stdout_path": ".research/aws-linux-extended1/exports/3.71.101.21/extended-support-text-1793480178002079194/targeted40/utf16-little-supplementary-first.jsonl",
+      "stdout_path": ".research/evidence/subtitle-fixture-provenance/aws-linux-extended1/exports/3.71.101.21/extended-support-text-1793480178002079194/targeted40/utf16-little-supplementary-first.jsonl",
       "stdout_sha256": "d2cb61c877f3154a713358dfef7f86db5821e378893fb78b82e77c5731459c73",
       "stderr_sha256": "d0303b8fe8d1a6d44bd85d2d43c3941e3d55efa2ae72fb046eb89682bbd81c8b",
       "source_sha256": "834dfc42f793e208fee3214798bf1bb506284edd27d3f61756f27ca9dc87b5a9",
@@ -775,7 +776,7 @@
     },
     {
       "id": "utf16-big-multiline-00c5",
-      "stdout_path": ".research/aws-linux-extended1/exports/3.71.101.21/extended-support-text-1793480178002079194/targeted40/utf16-big-multiline-00c5.jsonl",
+      "stdout_path": ".research/evidence/subtitle-fixture-provenance/aws-linux-extended1/exports/3.71.101.21/extended-support-text-1793480178002079194/targeted40/utf16-big-multiline-00c5.jsonl",
       "stdout_sha256": "35501563da7d721dee6728e46afff729be5079722acd4757f09e3b344e010a08",
       "stderr_sha256": "5b3b71461e1c9668a19c301f10c9b6ea909fbfdb8288bad6cca135b8d0742dfa",
       "source_sha256": "acb47c43b22e236671ed96fa37f9672b76c5a3f2afd8383426acedae41b2a970",
@@ -830,7 +831,7 @@
     },
     {
       "id": "utf16-little-multiline-00c5",
-      "stdout_path": ".research/aws-linux-extended1/exports/3.71.101.21/extended-support-text-1793480178002079194/targeted40/utf16-little-multiline-00c5.jsonl",
+      "stdout_path": ".research/evidence/subtitle-fixture-provenance/aws-linux-extended1/exports/3.71.101.21/extended-support-text-1793480178002079194/targeted40/utf16-little-multiline-00c5.jsonl",
       "stdout_sha256": "d58883753ee4166d8bbe513c5fb9beda96986e9b006da8d00097daa84f9e5f11",
       "stderr_sha256": "f99c074dffd8e5ea0872fc48193472d8f81fddebef3f41ec695258d0b7c30e7c",
       "source_sha256": "3c5ac5f87b90fcb5bc4fdd93cdb00fc11d88c6f76ec5cf6c4f95d21157f5e196",
@@ -885,7 +886,7 @@
     },
     {
       "id": "utf8-ascii",
-      "stdout_path": ".research/aws-linux-extended1/exports/3.71.101.21/extended-support-text-1793480178002079194/targeted40/utf8-ascii.jsonl",
+      "stdout_path": ".research/evidence/subtitle-fixture-provenance/aws-linux-extended1/exports/3.71.101.21/extended-support-text-1793480178002079194/targeted40/utf8-ascii.jsonl",
       "stdout_sha256": "af19326bba2510b5693a036b54d000dbd9b096c9843152fd639ec02d4a6777ae",
       "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
       "source_sha256": "8a04283d5a3a691bc6312c2816cc19e5a3c49267167b5d4feb412c523845a76f",
@@ -940,7 +941,7 @@
     },
     {
       "id": "utf8-bom-ascii",
-      "stdout_path": ".research/aws-linux-extended1/exports/3.71.101.21/extended-support-text-1793480178002079194/targeted40/utf8-bom-ascii.jsonl",
+      "stdout_path": ".research/evidence/subtitle-fixture-provenance/aws-linux-extended1/exports/3.71.101.21/extended-support-text-1793480178002079194/targeted40/utf8-bom-ascii.jsonl",
       "stdout_sha256": "56a905afc7a720b415824b4104476874dae0f8c06553763a151c7e58cb512f74",
       "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
       "source_sha256": "8dd7f48c5383309017a3557ad686e85fce6305a2ee16ab54748637cdc6141790",
@@ -995,7 +996,7 @@
     },
     {
       "id": "utf8-bmp-first-00c5",
-      "stdout_path": ".research/aws-linux-extended1/exports/3.71.101.21/extended-support-text-1793480178002079194/targeted40/utf8-bmp-first-00c5.jsonl",
+      "stdout_path": ".research/evidence/subtitle-fixture-provenance/aws-linux-extended1/exports/3.71.101.21/extended-support-text-1793480178002079194/targeted40/utf8-bmp-first-00c5.jsonl",
       "stdout_sha256": "e11a1f3f0746763f4cb86b4211f59240dd975bd95dc86b5259194dd6c03fffa2",
       "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
       "source_sha256": "76699b51147f9dbf758add59a274f21eb40d4b3a2f4cf64c0937124225686bcd",
@@ -1050,7 +1051,7 @@
     },
     {
       "id": "utf8-bom-bmp-first-00c5",
-      "stdout_path": ".research/aws-linux-extended1/exports/3.71.101.21/extended-support-text-1793480178002079194/targeted40/utf8-bom-bmp-first-00c5.jsonl",
+      "stdout_path": ".research/evidence/subtitle-fixture-provenance/aws-linux-extended1/exports/3.71.101.21/extended-support-text-1793480178002079194/targeted40/utf8-bom-bmp-first-00c5.jsonl",
       "stdout_sha256": "86550a35a7b56287b27b96c83e262761e7680d870e9369629b684a689e41c3c7",
       "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
       "source_sha256": "fafff63c6eafd9b382b6b9ce605c42b3347da6a6ddbb63167a9f36f15a1b28ab",
@@ -1105,7 +1106,7 @@
     },
     {
       "id": "utf8-bmp-first-00e9",
-      "stdout_path": ".research/aws-linux-extended1/exports/3.71.101.21/extended-support-text-1793480178002079194/targeted40/utf8-bmp-first-00e9.jsonl",
+      "stdout_path": ".research/evidence/subtitle-fixture-provenance/aws-linux-extended1/exports/3.71.101.21/extended-support-text-1793480178002079194/targeted40/utf8-bmp-first-00e9.jsonl",
       "stdout_sha256": "dde4f9490cadb05399c810a0c668e2b742ac77c4bbb080a3cf8dc0d6eb66f1bb",
       "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
       "source_sha256": "30f73688ff68365625925fb3fb5c622e85a22c7e77b886066b413fa10711dd4f",
@@ -1160,7 +1161,7 @@
     },
     {
       "id": "utf8-bom-bmp-first-00e9",
-      "stdout_path": ".research/aws-linux-extended1/exports/3.71.101.21/extended-support-text-1793480178002079194/targeted40/utf8-bom-bmp-first-00e9.jsonl",
+      "stdout_path": ".research/evidence/subtitle-fixture-provenance/aws-linux-extended1/exports/3.71.101.21/extended-support-text-1793480178002079194/targeted40/utf8-bom-bmp-first-00e9.jsonl",
       "stdout_sha256": "e2e17a3b71e00f4b570d51d6294b89523b3d8f8d2775870b82d129f986905062",
       "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
       "source_sha256": "8475c2984a5566e2d2df78ae8235c79c31354fabc37c080d3ff5e595189c05f5",
@@ -1215,7 +1216,7 @@
     },
     {
       "id": "utf8-bmp-middle-00c5",
-      "stdout_path": ".research/aws-linux-extended1/exports/3.71.101.21/extended-support-text-1793480178002079194/targeted40/utf8-bmp-middle-00c5.jsonl",
+      "stdout_path": ".research/evidence/subtitle-fixture-provenance/aws-linux-extended1/exports/3.71.101.21/extended-support-text-1793480178002079194/targeted40/utf8-bmp-middle-00c5.jsonl",
       "stdout_sha256": "1af970e666272aa588a99288cca0117124b1ee71700ba1767713208c0df24c3b",
       "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
       "source_sha256": "32f749f7f8cffa90443f2e13686632e5e56eea6753798b72dc8eda6777f63807",
@@ -1270,7 +1271,7 @@
     },
     {
       "id": "utf8-bom-bmp-middle-00c5",
-      "stdout_path": ".research/aws-linux-extended1/exports/3.71.101.21/extended-support-text-1793480178002079194/targeted40/utf8-bom-bmp-middle-00c5.jsonl",
+      "stdout_path": ".research/evidence/subtitle-fixture-provenance/aws-linux-extended1/exports/3.71.101.21/extended-support-text-1793480178002079194/targeted40/utf8-bom-bmp-middle-00c5.jsonl",
       "stdout_sha256": "a0ab3d09086f824461381a2a1bcd895359ee771838b9f4607c8cd64c1e492a0e",
       "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
       "source_sha256": "9838330499014833751d279558c454d7e1c2b0eac336b9c03c220d663d9ec031",
@@ -1325,7 +1326,7 @@
     },
     {
       "id": "utf8-bmp-first-0145",
-      "stdout_path": ".research/aws-linux-extended1/exports/3.71.101.21/extended-support-text-1793480178002079194/targeted40/utf8-bmp-first-0145.jsonl",
+      "stdout_path": ".research/evidence/subtitle-fixture-provenance/aws-linux-extended1/exports/3.71.101.21/extended-support-text-1793480178002079194/targeted40/utf8-bmp-first-0145.jsonl",
       "stdout_sha256": "106f25230a50b4e91f23e9f444e6bcd2d356a1ff6c9df207439203a1a8b7e6d8",
       "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
       "source_sha256": "6cf8e3bc21dce036d287729a9e5df35bc5d92c5a6a4947bc1f0dab075f6fc501",
@@ -1380,7 +1381,7 @@
     },
     {
       "id": "utf8-bom-bmp-first-0145",
-      "stdout_path": ".research/aws-linux-extended1/exports/3.71.101.21/extended-support-text-1793480178002079194/targeted40/utf8-bom-bmp-first-0145.jsonl",
+      "stdout_path": ".research/evidence/subtitle-fixture-provenance/aws-linux-extended1/exports/3.71.101.21/extended-support-text-1793480178002079194/targeted40/utf8-bom-bmp-first-0145.jsonl",
       "stdout_sha256": "1a0591ee0afbaea4d02592b610ded85a6accbe17ba4cd46f9357187ab1906009",
       "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
       "source_sha256": "e6faf685d21ef8845f9d0cd287be14c6807dcc563a52f36d9132f727795c7e27",
@@ -1435,7 +1436,7 @@
     },
     {
       "id": "utf8-bmp-first-6c34",
-      "stdout_path": ".research/aws-linux-extended1/exports/3.71.101.21/extended-support-text-1793480178002079194/targeted40/utf8-bmp-first-6c34.jsonl",
+      "stdout_path": ".research/evidence/subtitle-fixture-provenance/aws-linux-extended1/exports/3.71.101.21/extended-support-text-1793480178002079194/targeted40/utf8-bmp-first-6c34.jsonl",
       "stdout_sha256": "c2f5bb584192074e28ec38ed6eaf171d23225bac416aef6dda824ccae5bbd790",
       "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
       "source_sha256": "2746a2b6c9dd04b7e95a4169f22b78d7b48e964c1e9e4e214daeb7c98dcaa48f",
@@ -1490,7 +1491,7 @@
     },
     {
       "id": "utf8-bom-bmp-first-6c34",
-      "stdout_path": ".research/aws-linux-extended1/exports/3.71.101.21/extended-support-text-1793480178002079194/targeted40/utf8-bom-bmp-first-6c34.jsonl",
+      "stdout_path": ".research/evidence/subtitle-fixture-provenance/aws-linux-extended1/exports/3.71.101.21/extended-support-text-1793480178002079194/targeted40/utf8-bom-bmp-first-6c34.jsonl",
       "stdout_sha256": "f6b047dbacf353790813f13338e7ec14f317adf6761612e78947160579fa046d",
       "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
       "source_sha256": "8373eab17488a33ec7d273de72f849c2a07650a739f1b895111c1310b6454c8d",
@@ -1545,7 +1546,7 @@
     },
     {
       "id": "utf8-supplementary-first",
-      "stdout_path": ".research/aws-linux-extended1/exports/3.71.101.21/extended-support-text-1793480178002079194/targeted40/utf8-supplementary-first.jsonl",
+      "stdout_path": ".research/evidence/subtitle-fixture-provenance/aws-linux-extended1/exports/3.71.101.21/extended-support-text-1793480178002079194/targeted40/utf8-supplementary-first.jsonl",
       "stdout_sha256": "83fc8c162873fa2773a89b05b9799ab2b9c9c17815708910439676ab896438a0",
       "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
       "source_sha256": "43e53841afd304375752593d25e4d5bec68f9dd8db2627217a42373e80551cfd",
@@ -1600,7 +1601,7 @@
     },
     {
       "id": "utf8-bom-supplementary-first",
-      "stdout_path": ".research/aws-linux-extended1/exports/3.71.101.21/extended-support-text-1793480178002079194/targeted40/utf8-bom-supplementary-first.jsonl",
+      "stdout_path": ".research/evidence/subtitle-fixture-provenance/aws-linux-extended1/exports/3.71.101.21/extended-support-text-1793480178002079194/targeted40/utf8-bom-supplementary-first.jsonl",
       "stdout_sha256": "7b2024f55a9dc19b5cf9aa1b652df8ea40f9042d323901a2662b63b92449b178",
       "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
       "source_sha256": "06264c488c8c2cc145a63e6959ad5cf2a981036b205a940911ea9a20f6fa45be",
@@ -1655,7 +1656,7 @@
     },
     {
       "id": "utf8-multiline-00c5",
-      "stdout_path": ".research/aws-linux-extended1/exports/3.71.101.21/extended-support-text-1793480178002079194/targeted40/utf8-multiline-00c5.jsonl",
+      "stdout_path": ".research/evidence/subtitle-fixture-provenance/aws-linux-extended1/exports/3.71.101.21/extended-support-text-1793480178002079194/targeted40/utf8-multiline-00c5.jsonl",
       "stdout_sha256": "40c62248c28a9ef8d161113f3e3d3dfb1b209d5d9c51f35deebfa197dda79186",
       "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
       "source_sha256": "3bb022d70b91aa8d8005c0ff1534861706046aa55f99f0c1dbeb9617bd63892c",
@@ -1710,7 +1711,7 @@
     },
     {
       "id": "utf8-bom-multiline-00c5",
-      "stdout_path": ".research/aws-linux-extended1/exports/3.71.101.21/extended-support-text-1793480178002079194/targeted40/utf8-bom-multiline-00c5.jsonl",
+      "stdout_path": ".research/evidence/subtitle-fixture-provenance/aws-linux-extended1/exports/3.71.101.21/extended-support-text-1793480178002079194/targeted40/utf8-bom-multiline-00c5.jsonl",
       "stdout_sha256": "fcde900a6835eaa72d9c919a25e801a7f3064442ee756fff1a6da0f83e6f1781",
       "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
       "source_sha256": "6511480816e257febb5d30b554d462da28189707adafaacfdcfc2e0cf9b71075",
@@ -1765,7 +1766,7 @@
     },
     {
       "id": "utf16-big-scalar-0085-middle",
-      "stdout_path": ".research/aws-linux-extended1/exports/3.71.101.21/extended-support-text-1793480178002079194/targeted40/utf16-big-scalar-0085-middle.jsonl",
+      "stdout_path": ".research/evidence/subtitle-fixture-provenance/aws-linux-extended1/exports/3.71.101.21/extended-support-text-1793480178002079194/targeted40/utf16-big-scalar-0085-middle.jsonl",
       "stdout_sha256": "5ba8463c3240ad7776e8f322a86bd0ccfac1af794fbe3467b87148a87f30dce6",
       "stderr_sha256": "ff633f1d7f9690ce7230a61fcab6efba5fab0d573c7a5f76eef05b9852fe7933",
       "source_sha256": "5ec35073333492f1732b055abf6c068fd245f4e086ab2c60872d51d10e5b5865",
@@ -1820,7 +1821,7 @@
     },
     {
       "id": "utf16-little-scalar-0085-middle",
-      "stdout_path": ".research/aws-linux-extended1/exports/3.71.101.21/extended-support-text-1793480178002079194/targeted40/utf16-little-scalar-0085-middle.jsonl",
+      "stdout_path": ".research/evidence/subtitle-fixture-provenance/aws-linux-extended1/exports/3.71.101.21/extended-support-text-1793480178002079194/targeted40/utf16-little-scalar-0085-middle.jsonl",
       "stdout_sha256": "37d7aee7281b37b3c919ad29a3cd2d31ef993073bff9dbfcfed9245555d0dcaf",
       "stderr_sha256": "cd8225f58b4eb9d5994f70332c2c8f8609afaf691c471ab0616f95e88520b528",
       "source_sha256": "55b0e77ec0a3e7d84daf18c0a13ef2f495cd62bc89657d460a42d68aedd0efb8",
@@ -1875,7 +1876,7 @@
     },
     {
       "id": "utf8-scalar-0085-middle",
-      "stdout_path": ".research/aws-linux-extended1/exports/3.71.101.21/extended-support-text-1793480178002079194/targeted40/utf8-scalar-0085-middle.jsonl",
+      "stdout_path": ".research/evidence/subtitle-fixture-provenance/aws-linux-extended1/exports/3.71.101.21/extended-support-text-1793480178002079194/targeted40/utf8-scalar-0085-middle.jsonl",
       "stdout_sha256": "6a2926d15e482a0515bb1146401864ee02630b36de714dc59a4c81f6306eb32c",
       "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
       "source_sha256": "f4df58889d8061cf2e8d9099c2c0c572d67cd9f473c5cc93ceea1df49660e841",
@@ -1930,7 +1931,7 @@
     },
     {
       "id": "utf8-bom-scalar-0085-middle",
-      "stdout_path": ".research/aws-linux-extended1/exports/3.71.101.21/extended-support-text-1793480178002079194/targeted40/utf8-bom-scalar-0085-middle.jsonl",
+      "stdout_path": ".research/evidence/subtitle-fixture-provenance/aws-linux-extended1/exports/3.71.101.21/extended-support-text-1793480178002079194/targeted40/utf8-bom-scalar-0085-middle.jsonl",
       "stdout_sha256": "24b014843cd1f0fe01c03555baf0797e2d53b93f2089e57b1fadc6f5427a27f2",
       "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
       "source_sha256": "adf3e28e6c49568193eeb252c8d44b6806b799b2d60704f90f91c9add6087603",
@@ -1985,7 +1986,7 @@
     },
     {
       "id": "packet-00c5",
-      "stdout_path": ".research/aws-linux-extended1/exports/3.71.101.21/extended-support-text-1793480178002079194/targeted40/packet-00c5.jsonl",
+      "stdout_path": ".research/evidence/subtitle-fixture-provenance/aws-linux-extended1/exports/3.71.101.21/extended-support-text-1793480178002079194/targeted40/packet-00c5.jsonl",
       "stdout_sha256": "ae8bbb7cee4213db913e17a13e8ad50fc445cccdb2db694c7f0c34ad4ff9c8f4",
       "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
       "source_sha256": "0a94dc9d420d1142d6b71de60f9bf7e2f345a4d62c9f141b091539769ddf3075",
@@ -2040,7 +2041,7 @@
     },
     {
       "id": "packet-0145",
-      "stdout_path": ".research/aws-linux-extended1/exports/3.71.101.21/extended-support-text-1793480178002079194/targeted40/packet-0145.jsonl",
+      "stdout_path": ".research/evidence/subtitle-fixture-provenance/aws-linux-extended1/exports/3.71.101.21/extended-support-text-1793480178002079194/targeted40/packet-0145.jsonl",
       "stdout_sha256": "7e44580197436fd5b316b78f0d8ff3db73d3f5461a69ae7c85cc36ac895ecf21",
       "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
       "source_sha256": "7d7ca304547812fff72ace831b74dd3d38ee875ba128b3cfbc9df4cd7340304d",
@@ -2095,7 +2096,7 @@
     },
     {
       "id": "packet-6c34",
-      "stdout_path": ".research/aws-linux-extended1/exports/3.71.101.21/extended-support-text-1793480178002079194/targeted40/packet-6c34.jsonl",
+      "stdout_path": ".research/evidence/subtitle-fixture-provenance/aws-linux-extended1/exports/3.71.101.21/extended-support-text-1793480178002079194/targeted40/packet-6c34.jsonl",
       "stdout_sha256": "242e0a685ad9e497e34fbcfa9f0458c7b92d91b6a2efc3eb0edbf70d2635cd1d",
       "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
       "source_sha256": "327b54d04f71f2126114d9d61d4c3640ca0fc5b30878ad28416ff634a51a712d",
@@ -2150,7 +2151,7 @@
     },
     {
       "id": "packet-1f600",
-      "stdout_path": ".research/aws-linux-extended1/exports/3.71.101.21/extended-support-text-1793480178002079194/targeted40/packet-1f600.jsonl",
+      "stdout_path": ".research/evidence/subtitle-fixture-provenance/aws-linux-extended1/exports/3.71.101.21/extended-support-text-1793480178002079194/targeted40/packet-1f600.jsonl",
       "stdout_sha256": "805ed60111800c704adfc3bc9d53318bea5da3fa635303ee1a92ff416f19316d",
       "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
       "source_sha256": "f0443a342c5ef54783a111b51ba56c938e474c32324d90c3a60c9c8e3a37e2d9",

@@ -3,8 +3,7 @@
   "approval": {
     "status": "approved",
     "date": "2026-10-31",
-    "owner_message": "you are saying we are going to support more what ffmpeg does in that case? I approve then",
-    "scope": "The two-case proposal explained in research/review/zlib-reference-comparison/README.md; numerical gates and required cases unchanged"
+    "scope": "The two-case proposal in the zlib-reference-comparison evidence set (harness/evidence/index.json); numerical gates and required cases unchanged"
   },
   "reference_source_revision": "d32b387f2b0a484599d4587d651891f0c63c4238",
   "rules": [

@@ -115,4 +115,14 @@ input hashes, platform and all per-case outcomes. Summaries and identities are k
 in the pull request that changes the result and in [status](status.md), whose
 [measured revisions](status.md#measured-revisions) table names the revision and
 raw-sample SHA-256 behind each cited result. Raw samples are archived by content hash,
-outside the repository.
+outside the repository. [harness/evidence/index.json](../harness/evidence/index.json)
+lists every archived set:
+
+- its key and SHA-256;
+- whether it is kept (cited results) or expires after 90 days;
+- each file it holds, by path and SHA-256.
+
+The index also records how identifiers were renamed. With `TRIERGON_EVIDENCE_ARCHIVE` set
+to the archive location, `cargo xtask evidence fetch SET` downloads a set, verifies it
+against the index and unpacks it into `.research/evidence/SET/`. `cargo xtask evidence
+pack DIR OUT` writes the deterministic archive a new set is uploaded as.

@@ -16,16 +16,16 @@ README. The comparison harness is `harness/codecs` (`reference_decode.c`,
 | [adapter-contract.md](adapter-contract.md) | Session-layer contract for a host adapter |
 | `downmix-*.json` | Observed stereo downmix (`-ac 2`) rules |
 | `rgba-*.json` | Observed letterbox scaling and RGBA conversion rules |
-| `research/d4/evidence/` | Correctness rows and summaries, timing and memory records, identity hashes |
+| `codec-comparison` evidence set | Correctness rows and summaries, timing and memory records, identity hashes; `cargo xtask evidence fetch codec-comparison` unpacks it into `.research/evidence/codec-comparison/` |
 | `aac/`, `ac3/`, `dca/`, `h264/`, `hevc/` | Per-codec tools and derivation notes |
 
 ## Dispositions cited by the correctness summaries
 
 - AC-3/E-AC-3 noise: bap-0 dither, AHT zero-bin fill and SPX blending noise are random.
   A decoder matches FFmpeg's noisy output only by reproducing its noise stream, which
-  `codec-ac3` does under `ffmpeg_compat`. `research/d4/evidence/CORRECTNESS-D1-SUMMARY.json` and
-  `research/d4/evidence/D2/CORRECTNESS-D2-SUMMARY.json` were collected with a build that used its own
+  `codec-ac3` does under `ffmpeg_compat`. `.research/evidence/codec-comparison/CORRECTNESS-D1-SUMMARY.json` and
+  `.research/evidence/codec-comparison/D2/CORRECTNESS-D2-SUMMARY.json` were collected with a build that used its own
   generator; they record 10 AC-3/E-AC-3 vectors as failures for this reason. The
-  dither-stripped comparison set is `research/d4/evidence/CORRECTNESS-MANIFEST-AC3-NODITHER.json`.
+  dither-stripped comparison set is `.research/evidence/codec-comparison/CORRECTNESS-MANIFEST-AC3-NODITHER.json`.
 - `aac-sce-in-stereo.adts`: FFmpeg leaves FR unwritten in single-SCE frames; see the
   known differences in [crates/codec-aac](../../crates/codec-aac/README.md).

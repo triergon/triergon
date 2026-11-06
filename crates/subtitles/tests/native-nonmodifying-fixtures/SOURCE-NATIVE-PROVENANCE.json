@@ -1,4 +1,5 @@
 {
+  "evidence": {"set": "subtitle-fixture-provenance", "sha256": "acebf0b39b33b7f05ed20c5dba1b6cc42ed0c95839caf1ac40cb6659d484deaf"},
   "schema": "m05-original-nonmodifying-source-native-art-v2",
   "source_art_and_actual12": {
     "path": ".research/parallel-subtitles/dvb-native-closure-1/nonmodifying-fix-1/ACTUAL12.json",
@@ -630,7 +631,7 @@
     }
   ],
   "actual101_completion": {
-    "path": ".research/aws-linux-extended1/exports/3.76.29.106/dvb-nonmodifying-green-1793499733826966925/completion.json",
+    "path": ".research/evidence/subtitle-fixture-provenance/aws-linux-extended1/exports/3.76.29.106/dvb-nonmodifying-green-1793499733826966925/completion.json",
     "sha256": "d7a0054d5e08cca9c1385b808355fd9af1bb8f3a668f5c865eb46d3f74322b61",
     "bytes": 1819
   },
