@@ -7660,6 +7660,13 @@
    "reason": "ISO BMFF / MP4 status row",
    "key": "evidence/isobmff-terminal-media-boundaries-linux-arm64/73cd68402ee9ee7b0656e3c5fb8725d7d5806d609d18ecd45c88b6ec3d983f42.tar.gz",
    "sha256": "73cd68402ee9ee7b0656e3c5fb8725d7d5806d609d18ecd45c88b6ec3d983f42"
+  },
+  {
+   "name": "isobmff-regular-table-recovery-linux-arm64",
+   "retention": "retained",
+   "reason": "ISO BMFF / MP4 status row",
+   "key": "evidence/isobmff-regular-table-recovery-linux-arm64/fd718807e0ec1e6287bcb690226bf7056b79985796e74eba54f43544a034bc2c.tar.gz",
+   "sha256": "fd718807e0ec1e6287bcb690226bf7056b79985796e74eba54f43544a034bc2c"
   }
  ]
 }
