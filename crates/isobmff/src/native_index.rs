@@ -122,6 +122,12 @@ impl<'a> Mov9NativeIndexCursor<'a> {
         limits: Mov9NativeIndexLimits,
         profile: Mov9Profile,
     ) -> Result<Self> {
+        // A regular table with an explicitly bounded sync prefix may start
+        // before any usable sync marker. The first index distance is zero;
+        // this does not grant a seek point.
+        let recovery_initial_nonkey = track.fragments.is_empty()
+            && track.edits.is_none()
+            && track.table.unused_sync_entries() != 0;
         let cursor =
             Mov9PacketCursor::new_complete_source(pool, &[track], media, limits.packets, profile)?;
         Ok(Self {
@@ -133,7 +139,7 @@ impl<'a> Mov9NativeIndexCursor<'a> {
             carry: None,
             ready: None,
             failed: None,
-            recovery_initial_nonkey: false,
+            recovery_initial_nonkey,
             dependency_v4: false,
         })
     }

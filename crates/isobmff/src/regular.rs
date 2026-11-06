@@ -16,6 +16,22 @@ pub enum TimingRunPolicy {
     BoundedPrefix,
 }
 
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum SyncSamplePolicy {
+    #[default]
+    Strict,
+    /// Use the increasing prefix before the first entry past the last sample.
+    /// The remaining entries stay in the raw table and never provide a seek point.
+    BoundedPrefix,
+}
+
+/// Validation policies for regular sample tables. Both are strict by default.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct SampleTablePolicy {
+    pub timing_runs: TimingRunPolicy,
+    pub sync_samples: SyncSamplePolicy,
+}
+
 /// Declared timing occurrences beyond the number of samples with sizes.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct TimingRunSurplus {
@@ -36,6 +52,7 @@ pub struct SampleTable {
     partial: Option<Words>,
     dependency: Option<BoxView>,
     timing_run_surplus: TimingRunSurplus,
+    unused_sync_entries: u32,
 }
 
 struct SamplePosition {
@@ -61,9 +78,15 @@ impl SampleTable {
     pub fn timing_run_surplus(&self) -> TimingRunSurplus {
         self.timing_run_surplus
     }
-    /// None is absent; Some(0) is explicitly present-empty, not all-sync.
+    /// Raw entry count. None is absent; Some(0) is explicitly present-empty.
     pub fn sync_entry_count(&self) -> Option<u32> {
-        self.sync.as_ref().map(|table| table.count)
+        self.sync
+            .as_ref()
+            .map(|table| table.count + self.unused_sync_entries)
+    }
+    /// Number of raw entries at and after the first sync marker past the track.
+    pub fn unused_sync_entries(&self) -> u32 {
+        self.unused_sync_entries
     }
     /// Preserve presence separately from an explicitly encoded all-zero SDTP.
     /// Internal observation profiles can select a source-backed branch without
@@ -282,7 +305,8 @@ pub struct SampleTableBuilder {
     total: u64,
     previous: u32,
     failed: Option<Error>,
-    timing_policy: TimingRunPolicy,
+    policy: SampleTablePolicy,
+    sync_prefix: Option<u32>,
     recover_sync: bool,
     recover_initial_description: bool,
     recover_v3_descriptions: bool,
@@ -302,6 +326,23 @@ impl SampleTableBuilder {
         budget: Budget,
         limits: Limits,
         timing_policy: TimingRunPolicy,
+    ) -> Result<Self> {
+        Self::with_policy(
+            raw,
+            budget,
+            limits,
+            SampleTablePolicy {
+                timing_runs: timing_policy,
+                ..SampleTablePolicy::default()
+            },
+        )
+    }
+
+    pub fn with_policy(
+        raw: BoxView,
+        budget: Budget,
+        limits: Limits,
+        policy: SampleTablePolicy,
     ) -> Result<Self> {
         if raw.header().kind != *b"stbl" {
             return Err(Error::Invalid("not stbl"));
@@ -328,7 +369,8 @@ impl SampleTableBuilder {
             total: 0,
             previous: 0,
             failed: None,
-            timing_policy,
+            policy,
+            sync_prefix: None,
             recover_sync: false,
             recover_initial_description: false,
             recover_v3_descriptions: false,
@@ -486,6 +528,7 @@ impl SampleTableBuilder {
                                 partial,
                                 dependency: self.parts.dependency.clone(),
                                 timing_run_surplus: TimingRunSurplus::default(),
+                                unused_sync_entries: 0,
                             });
                             self.stage = Stage::Validate;
                         }
@@ -531,7 +574,7 @@ impl SampleTableBuilder {
                             .ok_or(Error::Overflow)?;
                         if total > t.sample_count() {
                             let decode = self.check == Check::Decode;
-                            if self.timing_policy == TimingRunPolicy::Strict
+                            if self.policy.timing_runs == TimingRunPolicy::Strict
                                 || t.sample_count() == 0
                                 || (decode
                                     && (self.row + 1 != source.count
@@ -572,7 +615,7 @@ impl SampleTableBuilder {
                         return Ok(());
                     }
                     if self.total != t.sample_count()
-                        && !(self.timing_policy == TimingRunPolicy::BoundedPrefix
+                        && !(self.policy.timing_runs == TimingRunPolicy::BoundedPrefix
                             && self.total > t.sample_count())
                     {
                         return Err(Error::Invalid("time table sample count mismatch"));
@@ -659,10 +702,16 @@ impl SampleTableBuilder {
                     && self.row < source.count
                 {
                     let sample = source.word(self.row, 0)?;
-                    if sample == 0
-                        || sample <= self.previous
-                        || u64::from(sample) > t.sample_count()
-                    {
+                    let past_end = u64::from(sample) > t.sample_count();
+                    if sample == 0 || sample <= self.previous || past_end {
+                        if past_end
+                            && self.check == Check::Sync
+                            && self.policy.sync_samples == SyncSamplePolicy::BoundedPrefix
+                        {
+                            self.sync_prefix = Some(self.row);
+                            self.next_check(Check::Partial);
+                            return Ok(());
+                        }
                         if !self.recover_sync || self.check != Check::Sync || sample == 0 {
                             return Err(Error::Invalid("sync sample order/range"));
                         }
@@ -713,12 +762,18 @@ impl SampleTableBuilder {
             .table
             .take()
             .ok_or(Error::Invalid("missing completed index"))?;
-        if self.timing_policy == TimingRunPolicy::BoundedPrefix {
+        if self.policy.timing_runs == TimingRunPolicy::BoundedPrefix {
             let [decode, composition] = self.coverage;
             table.timing_run_surplus = TimingRunSurplus {
                 decode_samples: decode.map_or(0, |run| run.surplus_samples),
                 composition_samples: composition.map_or(0, |run| run.surplus_samples),
             };
+        }
+        if let Some(prefix) = self.sync_prefix
+            && let Some(sync) = &mut table.sync
+        {
+            table.unused_sync_entries = sync.count - prefix;
+            sync.count = prefix;
         }
         Ok(table)
     }
