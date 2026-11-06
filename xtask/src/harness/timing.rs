@@ -18,9 +18,9 @@ use crate::stats;
 
 /// Shared by every checkout and tool on the host, so only one timing or memory
 /// session runs at a time.
-const LOCK_NAME: &str = "safe-media-bench.lock";
+const LOCK_NAME: &str = "triergon-bench.lock";
 pub const MODULE_POLICY: &str = "rss-kernel-module-must-be-absent-v1";
-const LINUX_MODULE: &str = "/sys/module/safe_media_rss_bound";
+const LINUX_MODULE: &str = "/sys/module/triergon_rss_bound";
 
 /// The exclusive host-wide measurement lock; fails at once if it is held.
 pub struct Lock(File);

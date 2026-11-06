@@ -8,11 +8,11 @@
  *   cc -std=c11 -O0 -Wall -Wextra -Werror -fno-builtin
  *      harness/portable-memory-check.c -ldl -pthread -o memory-check
  *   cc -std=c11 -O0 -Wall -Wextra -Werror -fno-builtin
- *      -DSAFE_MEDIA_LINUX_OBSERVER_SELFTEST harness/allocations-linux.c -ldl
+ *      -DTRIERGON_LINUX_OBSERVER_SELFTEST harness/allocations-linux.c -ldl
  *      -o allocations-linux-selftest
  * Run the selftest, then the probe separately in heap and rss mode, setting
- * LD_PRELOAD to the absolute .so path, SAFE_MEDIA_ALLOCATION_REPORT to a new
- * receipt path and SAFE_MEDIA_MEMORY_MODE to exactly heap or rss. Archive each
+ * LD_PRELOAD to the absolute .so path, TRIERGON_ALLOCATION_REPORT to a new
+ * receipt path and TRIERGON_MEMORY_MODE to exactly heap or rss. Archive each
  * command, exit, stdout, stderr, receipt, compiler/libc/kernel/page-size identity,
  * source/binary hashes and the selected workers' ELF allocator-import audit.
  * Admission requires calibration AND release, not just compilation or status.
@@ -187,7 +187,7 @@ static BootEntry boot_entries[BOOT_ENTRIES];
 static size_t boot_used, boot_count;
 static Entry entries[ENTRY_COUNT];
 static char proc_buffer[PROC_BYTES], report_buffer[8192], destination[4096];
-static char marker_line[20];
+static char marker_line[18];
 static size_t marker_length;
 static uint64_t stdout_bytes;
 static int configured, mode = 1, begins, ends;
@@ -740,7 +740,7 @@ size_t malloc_usable_size(void *pointer) {
 }
 
 static int kernel_rss_fd = -1, kernel_rss_requested;
-static struct safe_media_rss_bound kernel_rss;
+static struct triergon_rss_bound kernel_rss;
 
 static void boundary(int begin) {
     if (begin) {
@@ -774,7 +774,7 @@ static void boundary(int begin) {
         }
         hwm_end = reported_highwater();
         if (kernel_rss_requested) {
-            if (kernel_rss_fd < 0 || syscall(SYS_ioctl, kernel_rss_fd, SAFE_MEDIA_RSS_END, &kernel_rss) ||
+            if (kernel_rss_fd < 0 || syscall(SYS_ioctl, kernel_rss_fd, TRIERGON_RSS_END, &kernel_rss) ||
                 kernel_rss.abi != 1 || kernel_rss.errors || kernel_rss.missed ||
                 kernel_rss.page_size != (uint64_t)page_size || kernel_rss.upper_bytes < rss_peak)
                 fail(ERR_CONFIG);
@@ -807,8 +807,8 @@ static void stream(const char *bytes, size_t count) {
         if (marker_length < sizeof(marker_line)) marker_line[marker_length] = c;
         if (marker_length <= sizeof(marker_line)) ++marker_length;
         if (c == '\n') {
-            if (marker_length == 20 && !memcmp(marker_line, "SAFE_MEDIA_BEGIN_V1\n", 20)) boundary(1);
-            if (marker_length == 18 && !memcmp(marker_line, "SAFE_MEDIA_END_V1\n", 18)) boundary(0);
+            if (marker_length == 18 && !memcmp(marker_line, "TRIERGON_BEGIN_V1\n", 18)) boundary(1);
+            if (marker_length == 16 && !memcmp(marker_line, "TRIERGON_END_V1\n", 16)) boundary(0);
             marker_length = 0;
         }
     }
@@ -843,8 +843,8 @@ ssize_t writev(int fd, const struct iovec *vectors, int count) {
 
 __attribute__((constructor)) static void initialize(void) {
     resolve();
-    const char *path = getenv("SAFE_MEDIA_ALLOCATION_REPORT");
-    const char *which = getenv("SAFE_MEDIA_MEMORY_MODE");
+    const char *path = getenv("TRIERGON_ALLOCATION_REPORT");
+    const char *which = getenv("TRIERGON_MEMORY_MODE");
     if (!path) return;
     configured = 1;
     size_t length = strnlen(path, sizeof(destination));
@@ -860,12 +860,12 @@ __attribute__((constructor)) static void initialize(void) {
     memset(proc_buffer, 0, sizeof(proc_buffer));
     memset(report_buffer, 0, sizeof(report_buffer));
     if (mode == 1) memset(entries, 0, sizeof(entries));
-    const char *kernel = getenv("SAFE_MEDIA_RSS_KERNEL_BOUND");
+    const char *kernel = getenv("TRIERGON_RSS_KERNEL_BOUND");
     if (mode == 2 && kernel && !strcmp(kernel, "1")) {
         kernel_rss_requested = 1;
         if (syscall(SYS_prctl, PR_SET_THP_DISABLE, 1, 0, 0, 0)) fail(ERR_CONFIG);
         else {
-            kernel_rss_fd = (int)syscall(SYS_openat, AT_FDCWD, "/dev/safe_media_rss_bound", O_RDONLY | O_CLOEXEC, 0);
+            kernel_rss_fd = (int)syscall(SYS_openat, AT_FDCWD, "/dev/triergon_rss_bound", O_RDONLY | O_CLOEXEC, 0);
             if (kernel_rss_fd < 0) fail(ERR_CONFIG);
         }
     }
@@ -975,7 +975,7 @@ __attribute__((destructor)) static void report(void) {
     if (kernel_rss_fd >= 0) (void)syscall(SYS_close, kernel_rss_fd);
 }
 
-#ifdef SAFE_MEDIA_LINUX_OBSERVER_SELFTEST
+#ifdef TRIERGON_LINUX_OBSERVER_SELFTEST
 /* Parent-only native parser/ledger regressions, not executed by the author.
  * No proc fixture values are used as measurements or admission certificates. */
 int main(void) {

@@ -140,7 +140,7 @@ static int feed_main(int argc, char **argv, uint8_t *input, long size) {
         return 2;
     const AVInputFormat *demux = av_find_input_format("matroska");
     if (!demux) return 2;
-    if (memory && write(STDOUT_FILENO, "SAFE_MEDIA_BEGIN_V1\n", 20) != 20) return 2;
+    if (memory && write(STDOUT_FILENO, "TRIERGON_BEGIN_V1\n", 18) != 18) return 2;
     uint64_t start = timed ? now_ns() : 0;
     FeedWork total = {0};
     for (unsigned long i = 0; i < iterations; ++i) {
@@ -152,7 +152,7 @@ static int feed_main(int argc, char **argv, uint8_t *input, long size) {
         feed_fold(&total, work.digest);
     }
     uint64_t elapsed = timed ? now_ns() - start : 0;
-    if (memory && write(STDOUT_FILENO, "SAFE_MEDIA_END_V1\n", 18) != 18) return 2;
+    if (memory && write(STDOUT_FILENO, "TRIERGON_END_V1\n", 16) != 16) return 2;
     printf("{\"schema\":1,\"operation\":\"matroska-video-session\",\"iterations\":%lu,"
            "\"packets\":%" PRIu64 ",\"bytes\":%" PRIu64 ",\"digest\":%" PRIu64
            ",\"elapsed_ns\":%" PRIu64 ",\"eof\":true}\n",

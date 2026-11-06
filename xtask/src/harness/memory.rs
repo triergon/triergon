@@ -139,7 +139,7 @@ impl Host for Native<'_> {
     }
 
     fn kernel_requested(&self) -> Option<String> {
-        std::env::var("SAFE_MEDIA_RSS_KERNEL_BOUND").ok()
+        std::env::var("TRIERGON_RSS_KERNEL_BOUND").ok()
     }
 }
 
@@ -199,14 +199,14 @@ fn observe(
     let receipt = directory.join("window.json");
     let mut env = vec![
         (
-            "SAFE_MEDIA_ALLOCATION_REPORT".to_owned(),
+            "TRIERGON_ALLOCATION_REPORT".to_owned(),
             Some(receipt.display().to_string()),
         ),
-        ("SAFE_MEDIA_MEMORY_MODE".to_owned(), Some(mode.to_owned())),
+        ("TRIERGON_MEMORY_MODE".to_owned(), Some(mode.to_owned())),
     ];
     if linux {
         // Inherited opt-in never silently changes heap runs or controls.
-        env.push(("SAFE_MEDIA_RSS_KERNEL_BOUND".into(), None));
+        env.push(("TRIERGON_RSS_KERNEL_BOUND".into(), None));
         if kernel {
             if mode != "rss" {
                 let _ = fs::remove_dir_all(&directory);
@@ -215,7 +215,7 @@ fn observe(
                     ("error", Value::str("kernel bound is RSS-only")),
                 ]);
             }
-            env.push(("SAFE_MEDIA_RSS_KERNEL_BOUND".into(), Some("1".into())));
+            env.push(("TRIERGON_RSS_KERNEL_BOUND".into(), Some("1".into())));
         }
     }
     env.push((

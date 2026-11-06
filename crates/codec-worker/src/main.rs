@@ -220,10 +220,10 @@ fn main() {
         "memory" => {
             // Same observer protocol as the container workers: one whole operation between markers.
             let mut stdout = std::io::stdout().lock();
-            stdout.write_all(b"SAFE_MEDIA_BEGIN_V1\n").expect("stdout");
+            stdout.write_all(b"TRIERGON_BEGIN_V1\n").expect("stdout");
             stdout.flush().expect("stdout");
             run(op, &data, &mut out);
-            stdout.write_all(b"SAFE_MEDIA_END_V1\n").expect("stdout");
+            stdout.write_all(b"TRIERGON_END_V1\n").expect("stdout");
             stdout.flush().expect("stdout");
             // Equal memory work is equal units and bytes; the digest goes to stderr
             // because audio may differ within the graded 1 LSB.

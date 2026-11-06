@@ -28,7 +28,7 @@ capture-worker memory   <w> <h> <flip> <frames> <bitrate> <in.rgba>
 | `recon` | the encoder reconstruction of every frame, same layout |
 | `pipeline` | the TS file, and `{"bytes", "fnv1a64", "vbv_underflow_bits"}` on stdout |
 | `time` | one `{"ns", "bytes", "fnv1a64"}` line per iteration; each iteration opens a fresh session |
-| `memory` | `SAFE_MEDIA_BEGIN_V1` and `SAFE_MEDIA_END_V1` markers around one session, then `{"bytes", "fnv1a64"}` |
+| `memory` | `TRIERGON_BEGIN_V1` and `TRIERGON_END_V1` markers around one session, then `{"bytes", "fnv1a64"}` |
 
 `fnv1a64` is the 64-bit FNV-1a hash of all TS bytes. `time` and `memory` feed every
 frame to a hashing sink that keeps nothing, as the reference worker does. Any

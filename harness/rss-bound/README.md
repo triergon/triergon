@@ -7,7 +7,7 @@ licensed GPL-2.0-only, as a module using GPL-only kernel symbols must be.
 
 ## What it measures
 
-The observer opens `/dev/safe_media_rss_bound` from its constructor, before the
+The observer opens `/dev/triergon_rss_bound` from its constructor, before the
 worker's `main` and before any input is loaded. The module then sums the process's
 RSS counters once, exactly, across all CPUs, and adds every positive file, anonymous
 and shared-memory counter update until the observer's END ioctl. Releases are never
@@ -23,9 +23,9 @@ Any violation invalidates the session.
 
 ## Proof
 
-`cargo xtask report --memory` uses the bound only with `SAFE_MEDIA_RSS_KERNEL_BOUND=1`
+`cargo xtask report --memory` uses the bound only with `TRIERGON_RSS_KERNEL_BOUND=1`
 and a proof that `cargo xtask build-workers` pinned through
-`SAFE_MEDIA_RSS_KERNEL_PROOF`. The report re-checks the proof before every memory
+`TRIERGON_RSS_KERNEL_PROOF`. The report re-checks the proof before every memory
 collection. It pins:
 
 - the module, observer and probe sources and binaries, and the shared API header
@@ -51,7 +51,7 @@ collection.
 ```sh
 cargo xtask build-workers
 harness/rss-bound/prove.sh REVIEW .research/rss-bound
-SAFE_MEDIA_RSS_KERNEL_PROOF=.research/rss-bound/RSS-PROOF.json cargo xtask build-workers
-SAFE_MEDIA_RSS_KERNEL_BOUND=1 cargo xtask report --memory --contract … --manifest … --corpus …
-sudo rmmod safe_media_rss_bound
+TRIERGON_RSS_KERNEL_PROOF=.research/rss-bound/RSS-PROOF.json cargo xtask build-workers
+TRIERGON_RSS_KERNEL_BOUND=1 cargo xtask report --memory --contract … --manifest … --corpus …
+sudo rmmod triergon_rss_bound
 ```

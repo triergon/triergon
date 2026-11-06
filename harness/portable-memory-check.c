@@ -169,7 +169,7 @@ static int guard_operation(unsigned mode, GuardControl *control) {
     if (mode == MODE_DLOPEN_FAILURE || mode == MODE_DLMOPEN_FAILURE) {
         (void)dlerror();
         void *out = mode == MODE_DLOPEN_FAILURE ?
-            dlopen("/__safe_media_missing_scope_control__", RTLD_NOW | RTLD_LOCAL) :
+            dlopen("/__triergon_missing_scope_control__", RTLD_NOW | RTLD_LOCAL) :
             dlmopen(LM_ID_NEWLM, NULL, RTLD_NOW | RTLD_LOCAL);
         const char *error = dlerror();
         expected_guard(control, mode == MODE_DLOPEN_FAILURE ? 4 : 5, 0);
@@ -266,8 +266,8 @@ static int raw_write(const void *buffer, size_t count) {
 }
 
 static int marker(int begin, int fragmented) {
-    const char *text = begin ? "SAFE_MEDIA_BEGIN_V1\n" : "SAFE_MEDIA_END_V1\n";
-    size_t length = begin ? 20 : 18;
+    const char *text = begin ? "TRIERGON_BEGIN_V1\n" : "TRIERGON_END_V1\n";
+    size_t length = begin ? 18 : 16;
     if (!fragmented) return raw_write(text, length);
     /* One marker split across syscalls AND multiple iovecs, including an empty
      * vector. It must count once, without treating an arbitrary write as work. */

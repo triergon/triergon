@@ -72,8 +72,8 @@ static void *observed_aligned_alloc(size_t a,size_t n){
 }
 static void control(const void *buffer,size_t size){
     if(!enabled||nested)return;
-    int begin=size==20&&!memcmp(buffer,"SAFE_MEDIA_BEGIN_V1\n",20);
-    int end=size==18&&!memcmp(buffer,"SAFE_MEDIA_END_V1\n",18);if(!begin&&!end)return;
+    int begin=size==18&&!memcmp(buffer,"TRIERGON_BEGIN_V1\n",18);
+    int end=size==16&&!memcmp(buffer,"TRIERGON_END_V1\n",16);if(!begin&&!end)return;
     nested=1;lock();
     if(begin){
         if(active||begins++)invalid=1;
@@ -98,7 +98,7 @@ INTERPOSE(observed_aligned_alloc,aligned_alloc);
 INTERPOSE(observed_write,write);
 INTERPOSE(observed_writev,writev);
 __attribute__((constructor)) static void initialize(void){
-    destination=getenv("SAFE_MEDIA_ALLOCATION_REPORT");const char *which=getenv("SAFE_MEDIA_MEMORY_MODE");
+    destination=getenv("TRIERGON_ALLOCATION_REPORT");const char *which=getenv("TRIERGON_MEMORY_MODE");
     mode=which&&!strcmp(which,"rss")?2:1;enabled=destination!=NULL;
 }
 __attribute__((destructor)) static void report(void){

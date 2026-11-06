@@ -267,7 +267,7 @@ pub fn run(args: &[String]) -> Result<()> {
     let retained = pool.used();
     let mut out = io::stdout().lock();
     if memory {
-        out.write_all(b"SAFE_MEDIA_BEGIN_V1\n")?;
+        out.write_all(b"TRIERGON_BEGIN_V1\n")?;
         out.flush()?;
     }
     let start = (mode == "hls-bench").then(Instant::now);
@@ -284,7 +284,7 @@ pub fn run(args: &[String]) -> Result<()> {
     }
     let elapsed = start.map_or(0, |begin| begin.elapsed().as_nanos());
     if memory {
-        out.write_all(b"SAFE_MEDIA_END_V1\n")?;
+        out.write_all(b"TRIERGON_END_V1\n")?;
         out.flush()?;
     }
     writeln!(

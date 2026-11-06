@@ -1062,7 +1062,7 @@ fn guard_binding_ordinal_prevents_stale_transport_replay() {
 fn export_authored_inputs_for_parent_reference() {
     use std::{fs, io::Write, path::PathBuf};
     let root = PathBuf::from(
-        std::env::var_os("SAFE_MEDIA_TS_LIFECYCLE_EXPORT")
+        std::env::var_os("TRIERGON_TS_LIFECYCLE_EXPORT")
             .expect("explicit ignored export directory"),
     );
     assert!(root.is_absolute() && root.components().any(|c| c.as_os_str() == ".research"));

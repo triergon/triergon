@@ -263,9 +263,9 @@ int main(int argc, char **argv) {
     } else if (!strcmp(mode, "memory") && argc == 8) {
         Sink sink = {NULL, UINT64_C(14695981039346656037), 0, 0};
         fflush(stdout);
-        write_marker("SAFE_MEDIA_BEGIN_V1\n");
+        write_marker("TRIERGON_BEGIN_V1\n");
         session(w, h, flip, frames, bitrate, rgba, &sink);
-        write_marker("SAFE_MEDIA_END_V1\n");
+        write_marker("TRIERGON_END_V1\n");
         char line[128];
         int n = snprintf(line, sizeof line, "{\"bytes\":%" PRIu64 ",\"fnv1a64\":\"%016" PRIx64 "\"}\n",
                          sink.bytes, sink.hash);

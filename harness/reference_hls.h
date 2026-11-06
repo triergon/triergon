@@ -404,7 +404,7 @@ static int hls_main(int argc, char **argv, const uint8_t *bytes, long size)
     if (profile.video == AV_CODEC_ID_NONE || profile.audio == AV_CODEC_ID_NONE || size <= 0 ||
         size > HLS_MAX_INPUT || size % HLS_TS_BYTES)
         return 2;
-    if (memory && write(STDOUT_FILENO, "SAFE_MEDIA_BEGIN_V1\n", 20) != 20)
+    if (memory && write(STDOUT_FILENO, "TRIERGON_BEGIN_V1\n", 18) != 18)
         return 2;
     HlsWork total = {0};
     const uint64_t start = bench ? now_ns() : 0;
@@ -422,7 +422,7 @@ static int hls_main(int argc, char **argv, const uint8_t *bytes, long size)
         hls_mix(&total.digest, once.digest);
     }
     const uint64_t elapsed = bench ? now_ns() - start : 0;
-    if (memory && write(STDOUT_FILENO, "SAFE_MEDIA_END_V1\n", 18) != 18)
+    if (memory && write(STDOUT_FILENO, "TRIERGON_END_V1\n", 16) != 16)
         return 2;
     printf("{\"schema\":1,\"operation\":\"" HLS_OPERATION "\",\"iterations\":%lu"
            ",\"packets\":%" PRIu64 ",\"bytes\":%" PRIu64 ",\"digest\":%" PRIu64
