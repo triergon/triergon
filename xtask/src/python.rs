@@ -4,6 +4,7 @@
 //! same bytes the earlier Python runners wrote.
 
 use std::path::{Component, Path};
+use std::time::{SystemTime, UNIX_EPOCH};
 
 use crate::json::Value;
 
@@ -116,6 +117,27 @@ fn dict(value: Value) -> Value {
     }
 }
 
+/// `json.dumps(value, sort_keys=True)`: object keys sorted at every level.
+pub fn sort_keys(value: &Value) -> Value {
+    match value {
+        Value::Array(items) => Value::Array(items.iter().map(sort_keys).collect()),
+        Value::Object(members) => {
+            let mut sorted: Vec<(String, Value)> = members
+                .iter()
+                .map(|(k, v)| (k.clone(), sort_keys(v)))
+                .collect();
+            sorted.sort_by(|a, b| a.0.cmp(&b.0));
+            Value::Object(sorted)
+        }
+        other => other.clone(),
+    }
+}
+
+/// `str(value)` of a float.
+pub fn float(value: f64) -> String {
+    str(&Value::float(value))
+}
+
 /// `str()` of a value `json.loads` returned.
 pub fn str(value: &Value) -> String {
     match value {
@@ -180,6 +202,40 @@ pub fn repr_str(text: &str) -> String {
     out
 }
 
+/// `datetime.now(timezone.utc).isoformat()`.
+pub fn utc_now() -> String {
+    let now = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap_or_default();
+    isoformat(now.as_secs() as i64, now.subsec_micros())
+}
+
+fn isoformat(seconds: i64, micros: u32) -> String {
+    // Days to civil date (Howard Hinnant's algorithm).
+    let days = seconds.div_euclid(86_400);
+    let second_of_day = seconds.rem_euclid(86_400);
+    let z = days + 719_468;
+    let era = z.div_euclid(146_097);
+    let doe = z - era * 146_097;
+    let yoe = (doe - doe / 1460 + doe / 36_524 - doe / 146_096) / 365;
+    let doy = doe - (365 * yoe + yoe / 4 - yoe / 100);
+    let mp = (5 * doy + 2) / 153;
+    let day = doy - (153 * mp + 2) / 5 + 1;
+    let month = if mp < 10 { mp + 3 } else { mp - 9 };
+    let year = yoe + era * 400 + i64::from(month <= 2);
+    let clock = format!(
+        "{year:04}-{month:02}-{day:02}T{:02}:{:02}:{:02}",
+        second_of_day / 3600,
+        second_of_day / 60 % 60,
+        second_of_day % 60
+    );
+    if micros == 0 {
+        format!("{clock}+00:00")
+    } else {
+        format!("{clock}.{micros:06}+00:00")
+    }
+}
+
 /// Python's `a // b` for integers.
 pub fn floor_div(a: i128, b: i128) -> i128 {
     let q = a / b;
@@ -223,6 +279,87 @@ pub fn max(values: &[f64]) -> f64 {
     best
 }
 
+/// `hash(n)` of an integer on a 64-bit build.
+fn hash_int(n: i128) -> i64 {
+    const MODULUS: i128 = (1 << 61) - 1;
+    let h = (n.abs() % MODULUS) as i64;
+    let h = if n < 0 { -h } else { h };
+    if h == -1 { -2 } else { h }
+}
+
+/// `hash(t)` of a tuple of integers (CPython 3.8 and later, 64-bit).
+pub fn hash_tuple(items: &[i128]) -> i64 {
+    const PRIME_1: u64 = 11_400_714_785_074_694_791;
+    const PRIME_2: u64 = 14_029_467_366_897_019_727;
+    const PRIME_5: u64 = 2_870_177_450_012_600_261;
+    let mut acc = PRIME_5;
+    for &item in items {
+        acc = acc.wrapping_add((hash_int(item) as u64).wrapping_mul(PRIME_2));
+        acc = acc.rotate_left(31);
+        acc = acc.wrapping_mul(PRIME_1);
+    }
+    acc = acc.wrapping_add(items.len() as u64 ^ (PRIME_5 ^ 0x0035_d373));
+    if acc == u64::MAX {
+        1_546_275_796
+    } else {
+        acc as i64
+    }
+}
+
+/// The iteration order of a `set` built by adding `items` in order (CPython's
+/// open-addressing table: linear probes of 9, perturbation shift 5, growth to
+/// four times the used count once the table is three fifths full).
+pub fn set_order<T: Clone + PartialEq>(items: &[T], hash: impl Fn(&T) -> i64) -> Vec<T> {
+    const LINEAR_PROBES: usize = 9;
+    fn insert<T>(table: &mut [Option<(i64, T)>], hash: i64, item: T) {
+        let mask = table.len() - 1;
+        let mut perturb = hash as u64;
+        let mut i = (hash as u64 as usize) & mask;
+        loop {
+            let probes = if i + LINEAR_PROBES <= mask {
+                LINEAR_PROBES
+            } else {
+                0
+            };
+            for j in i..=i + probes {
+                if table[j].is_none() {
+                    table[j] = Some((hash, item));
+                    return;
+                }
+            }
+            perturb >>= 5;
+            i = (i
+                .wrapping_mul(5)
+                .wrapping_add(1)
+                .wrapping_add(perturb as usize))
+                & mask;
+        }
+    }
+    let mut table: Vec<Option<(i64, T)>> = vec![None; 8];
+    let mut used = 0usize;
+    for item in items {
+        let h = hash(item);
+        if table.iter().flatten().any(|(eh, e)| *eh == h && e == item) {
+            continue;
+        }
+        insert(&mut table, h, item.clone());
+        used += 1;
+        let mask = table.len() - 1;
+        if used * 5 >= mask * 3 {
+            let wanted = if used > 50_000 { used * 2 } else { used * 4 };
+            let mut size = 8;
+            while size <= wanted {
+                size <<= 1;
+            }
+            let old = std::mem::replace(&mut table, vec![None; size]);
+            for (h, e) in old.into_iter().flatten() {
+                insert(&mut table, h, e);
+            }
+        }
+    }
+    table.into_iter().flatten().map(|(_, e)| e).collect()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -249,6 +386,11 @@ mod tests {
     }
 
     #[test]
+    fn formats_floats_as_python() {
+        assert_eq!(float(1e-5), "1e-05");
+    }
+
+    #[test]
     fn reprs_as_python() {
         assert_eq!(
             repr(&crate::json::parse(r#"{"a": [1, 2.5, null, true, "it's"]}"#).unwrap()),
@@ -260,6 +402,38 @@ mod tests {
     fn loads_keeps_python_dict_semantics() {
         let value = loads(r#"{"a": 1, "b": 2, "a": 3}"#).unwrap();
         assert_eq!(crate::json::to_python(&value, None), r#"{"a": 3, "b": 2}"#);
+    }
+
+    #[test]
+    fn formats_utc_as_isoformat() {
+        // python3 -c "import datetime as d; print(d.datetime.fromtimestamp(1783000000.25, d.timezone.utc).isoformat())"
+        assert_eq!(
+            isoformat(1_783_000_000, 250_000),
+            "2026-07-02T13:46:40.250000+00:00"
+        );
+        assert_eq!(isoformat(0, 0), "1970-01-01T00:00:00+00:00");
+    }
+
+    #[test]
+    fn sets_iterate_in_cpython_order() {
+        // python3 -c "print(hash((120, 5000000, 120, 5000000)))"
+        assert_eq!(
+            hash_tuple(&[120, 5_000_000, 120, 5_000_000]),
+            -3743009442964967769
+        );
+        // python3 -c "print(list({(120, 5000000, 120, 5000000), (121, 5000000, 120, 5000000)}))"
+        let pair = [
+            [120, 5_000_000, 120, 5_000_000],
+            [121, 5_000_000, 120, 5_000_000],
+        ];
+        assert_eq!(set_order(&pair, |t| hash_tuple(t)), [pair[1], pair[0]]);
+        // python3 -c "s=set(); [s.add((i, 7, i*3, -1)) for i in range(12)]; print(list(s)[:6])"
+        let items: Vec<[i128; 4]> = (0..12).map(|i| [i, 7, i * 3, -1]).collect();
+        let firsts: Vec<i128> = set_order(&items, |t| hash_tuple(t))[..6]
+            .iter()
+            .map(|t| t[0])
+            .collect();
+        assert_eq!(firsts, [9, 1, 7, 8, 4, 6]);
     }
 
     #[test]

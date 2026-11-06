@@ -1,7 +1,8 @@
-//! `cargo xtask codecs`: correctness grading and its summary of the codec crates against the pinned FFmpeg decoders.
+//! `cargo xtask codecs`: correctness grading, its summary and paired timing of the codec crates against the pinned FFmpeg decoders.
 
 pub mod correctness;
 pub mod summary;
+pub mod timing;
 
 use std::path::{Path, PathBuf};
 
@@ -13,7 +14,10 @@ pub const USAGE: &str = "usage: cargo xtask codecs <command>
         --reference R2 --out OUT.jsonl [--scratch DIR] [--only SUBSTR,...]
                  grade every vector by harness/codecs/numeric-rules.json; appends one row each
   summarize RUN.jsonl OUT.json
-                 classify a grading run against the declared lane selection";
+                 classify a grading run against the declared lane selection
+  time --candidate W --reference W --workloads F --root R --ledger F --out DIR --label L
+       [--only ID,...] [--recollect-contaminated LABEL]
+                 paired timing of the decoder workloads (30 pairs, seed 280)";
 
 /// `--name value` and `--name=value` options and positional arguments, as
 /// `argparse` accepts them; `switches` take no value.
@@ -121,6 +125,37 @@ pub fn main(root: &Path, args: &[String]) -> Result<i32, String> {
             [run, out] => summary::summarize(run, Path::new(out))?,
             _ => return Err(USAGE.to_owned()),
         },
+        "time" => {
+            let a = Args::parse(
+                rest,
+                &[
+                    "candidate",
+                    "reference",
+                    "workloads",
+                    "root",
+                    "ledger",
+                    "out",
+                    "label",
+                    "only",
+                    "recollect-contaminated",
+                ],
+                &[],
+            )?;
+            timing::run(&timing::Options {
+                candidate: a.path("candidate")?,
+                reference: a.path("reference")?,
+                workloads: a.path("workloads")?,
+                root: a.path("root")?,
+                ledger: a.path("ledger")?,
+                out: a.path("out")?,
+                label: a.required("label")?.to_owned(),
+                only: a.get("only").filter(|o| !o.is_empty()).map(str::to_owned),
+                recollect_contaminated: a
+                    .get("recollect-contaminated")
+                    .filter(|o| !o.is_empty())
+                    .map(str::to_owned),
+            })?;
+        }
         _ => return Err(USAGE.to_owned()),
     }
     Ok(0)
