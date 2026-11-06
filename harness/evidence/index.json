@@ -8016,6 +8016,64 @@
      "sha256": "c8d32b30e76343d57d4b0db5ddb805576f7d6b41c7fcae2fbce9a700aa6242ad"
     }
    ]
+  },
+  {
+   "name": "progressive-ts188-correctness-linux-arm64",
+   "retention": "retained",
+   "reason": "MPEG-TS progressive playback in the measured revisions table",
+   "key": "evidence/progressive-ts188-correctness-linux-arm64/0186d64805bd75fe48194fa236d31ca3275584d50e04783081fb411dfc7de231.tar.gz",
+   "sha256": "0186d64805bd75fe48194fa236d31ca3275584d50e04783081fb411dfc7de231",
+   "bytes": 19175864,
+   "files": [
+    {
+     "path": "REV",
+     "sha256": "83fcfac04aea8298a1b122d545da14097e53b2699a71b00575ac3438c204c3c8"
+    },
+    {
+     "path": "TREE",
+     "sha256": "10dc4a898edee3e82cedc3fad38a47f9162fea48d1bc84ecba4b2ebe3ed43e97"
+    },
+    {
+     "path": "PACKAGE.sha256",
+     "sha256": "2b05929e84fa71844386141faa58f81e0719a938983cdbc6d95197b2859b30fd"
+    },
+    {
+     "path": "source.bundle",
+     "sha256": "9df8196c33062c474193e5171638f1ea4838fa7e86ffaa7b74a16320e386c43f"
+    },
+    {
+     "path": "EXPECTED-RUSTC.log",
+     "sha256": "ba203e33fe4a5b8e05147bb6e57fb1ddace26d9f799f357420b666887dd7e2f1"
+    },
+    {
+     "path": "NATIVE.sh",
+     "sha256": "efee0a2bb85891bf1461db8e96c2501f8f515b149d61e1300e9c0da878f24a77"
+    },
+    {
+     "path": "GUARD.sh",
+     "sha256": "c909278a393e597a23e6a55b8570bda81aa697a99028bf0b3e302785d9de9923"
+    },
+    {
+     "path": "NATIVE.log",
+     "sha256": "41fd31cacb43f15f6a6fb8b1a824156afe450ca88bae2ecf90b5b8ba0d24e497"
+    },
+    {
+     "path": "RUNNER.log",
+     "sha256": "ded86af944f5d380ae0714a2c9ab3dfb4cf6b4ba86d354be26d0bf59d08167e9"
+    },
+    {
+     "path": "build-output.tar.gz",
+     "sha256": "1823b65099af3e648222e806e25cc98ae2a8dd2cf7d304ae5996ab77f1f4cd9e"
+    },
+    {
+     "path": "qualification-output.tar.gz",
+     "sha256": "d684b64bde3c55bf13cd262230fd8f04cc529b3a70e48a51777d08a8ede06ae9"
+    },
+    {
+     "path": "comparison-inputs.tar.gz",
+     "sha256": "6e39ba4e3e8abed6e82f7ae219225c295e7009a6d0ed3ad050807c75c8783df7"
+    }
+   ]
   }
  ]
 }
