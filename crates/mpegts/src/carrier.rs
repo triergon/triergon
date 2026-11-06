@@ -25,6 +25,7 @@ pub(crate) fn payload_only_continuation(ts: &[u8]) -> Option<(u16, u8)> {
     Some((pid, control & 15))
 }
 
+#[derive(Debug)]
 struct CarrierHeader {
     pid: u16,
     pusi: bool,
@@ -52,6 +53,7 @@ impl CarrierHeader {
     }
 }
 
+#[derive(Debug)]
 pub(crate) struct PlainCarrier {
     header: CarrierHeader,
     payload_start: usize,
@@ -140,6 +142,7 @@ impl PlainCarrier {
 }
 
 /// A complete plain TS188 continuation with its charged backing storage.
+#[derive(Debug)]
 pub(crate) struct PlainContinuation {
     pub(crate) layout: PlainCarrier,
     pub(crate) source: Option<Bytes>,
