@@ -117,6 +117,9 @@ impl<S: Source> Transport<S> {
             if let Some(request) = &self.request {
                 let reply = self.source.poll(request, work, cancel)?;
                 if !self.provide(&reply)? {
+                    if work.remaining() == 0 {
+                        return Ok(BackendStep::Yield);
+                    }
                     let request = self
                         .request
                         .clone()
