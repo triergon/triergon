@@ -26,6 +26,7 @@ enum Completion {
 struct BodyState {
     available: Cell<usize>,
     read: Cell<usize>,
+    yield_before_reply: Cell<bool>,
     completion: Cell<Option<Completion>>,
     aborts: Cell<usize>,
     closes: Cell<usize>,
@@ -48,6 +49,10 @@ impl Source for Body<'_> {
         assert_eq!(request.source, ID);
         let offset = request.offset as usize;
         assert_eq!(offset, self.state.read.get());
+        if self.state.yield_before_reply.replace(false) {
+            work.take(work.remaining());
+            return Ok(SourceReply::Pending);
+        }
         let remaining = self.state.available.get() - offset;
         if remaining == 0 {
             let source = request.source;
@@ -135,6 +140,29 @@ fn closed(pool: &Budget, state: &BodyState) {
     assert_eq!(state.aborts.get(), 1);
     assert_eq!(state.closes.get(), 1);
     assert_eq!(pool.used(), Budget::control_storage_bytes());
+}
+
+#[test]
+fn pending_source_that_spends_its_work_yields_before_waiting_for_input() {
+    let pool = Budget::new(64 * 1024).unwrap();
+    let (mut reader, source) = reader(&pool, BASELINE, None, 4096);
+    source.yield_before_reply.set(true);
+    let cancel = AtomicBool::new(false);
+    let mut work = WorkBudget::new(32);
+    assert!(matches!(
+        reader.advance(&mut work, &cancel).unwrap(),
+        TsProgressiveStep::Yield
+    ));
+    assert_eq!(work.remaining(), 0);
+    let TsProgressiveStep::NeedInput(request) =
+        reader.advance(&mut WorkBudget::new(32), &cancel).unwrap()
+    else {
+        panic!("expected the outstanding input request");
+    };
+    assert_eq!(request.source, ID);
+    assert_eq!(request.offset, 0);
+    drop(reader);
+    closed(&pool, &source);
 }
 
 #[test]

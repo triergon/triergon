@@ -1467,12 +1467,14 @@ impl DemuxObserver {
         let Some(length) = self.body_limit else {
             return;
         };
-        // Even full carriers need this many spans. Only prepay a small
-        // reservation when the work and pool have room for it.
-        let spans = length.div_ceil(PLAIN_PAYLOAD_BYTES);
-        if !(5..=self.limits.source_spans.min(32)).contains(&spans) {
+        // Full carriers give a lower bound. Reserve on the same capacity
+        // ladder as ordinary growth so a short carrier cannot increase the
+        // peak required by a later replacement.
+        let minimum = length.div_ceil(PLAIN_PAYLOAD_BYTES);
+        if !(5..=self.limits.source_spans.min(32)).contains(&minimum) {
             return;
         }
+        let spans = minimum.next_power_of_two().min(self.limits.source_spans);
         let bytes = spans * size_of::<NativePesSpan>();
         if work.remaining() >= bytes as u64
             && self.budget.available() >= 2 * bytes
@@ -1639,5 +1641,38 @@ impl DemuxObserver {
                 return Ok(AssemblyStep::Yield);
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn finite_body_hint_preserves_room_for_growth_after_a_short_first_span() {
+        let span_bytes = size_of::<NativePesSpan>();
+        let pool = Budget::new(Budget::control_storage_bytes() + 12 * span_bytes).unwrap();
+        let mut observer = NativePesObserver::new(
+            NativeClockProfile::ArchivedPesV1,
+            NativePesScope {
+                program: 1,
+                pid: 256,
+                stream_type: 0x1b,
+                stream_id: 0xe0,
+                entity: SourceId(1),
+                epochs: SourceEpochs {
+                    configuration: 0,
+                    clock: 0,
+                },
+            },
+            pool,
+            ParseLimits::default(),
+        )
+        .unwrap();
+        // The header can make a body of five full payloads occupy six spans.
+        // The budget can grow from four slots to eight with both charged.
+        observer.body_limit = Some(5 * PLAIN_PAYLOAD_BYTES);
+        observer.reserve_finite_body_hint(&mut WorkBudget::new(u64::MAX));
+        assert_eq!(observer.spans.capacity(), 0);
     }
 }
