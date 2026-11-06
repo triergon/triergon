@@ -13,13 +13,14 @@ use triergon_core::{Budget, Bytes, Error, InputCursor, InputToken, Result, Sourc
 
 #[derive(Clone, Copy, Debug)]
 pub struct PinnedMovD32EncodedRegularV1;
+/// Limits for inspecting an encoded sample description and its configuration.
 #[derive(Clone, Copy, Debug)]
-pub struct Mov9EncodedLimitsV1 {
+pub struct ConfigurationLimits {
     pub max_config_bytes: usize,
     pub max_child_boxes: u32,
     pub max_descriptors: u32,
 }
-impl Default for Mov9EncodedLimitsV1 {
+impl Default for ConfigurationLimits {
     fn default() -> Self {
         Self {
             max_config_bytes: 1 << 20,
@@ -28,6 +29,8 @@ impl Default for Mov9EncodedLimitsV1 {
         }
     }
 }
+pub use ConfigurationLimits as Mov9EncodedLimitsV1;
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum EncodedEntryKindV1 {
     Avc,
@@ -120,6 +123,7 @@ enum DescriptorPhase {
 #[derive(Clone, Copy)]
 enum EsdsProfile {
     Aac,
+    AacDescription,
     RangeAudio,
     ObjectType,
 }
@@ -197,6 +201,13 @@ impl EsdsWalk {
                         });
                     }
                     let tag = self.byte()?;
+                    // ISO/IEC 14496-14 §6.7.2 gives esds one ES descriptor.
+                    if self.depth == 0
+                        && (tag != 3 || self.rows != 1)
+                        && matches!(self.profile, EsdsProfile::AacDescription)
+                    {
+                        return Err(Error::Invalid("AAC elementary stream descriptor root"));
+                    }
                     self.phase = DescriptorPhase::Length {
                         tag,
                         value: 0,
@@ -259,7 +270,7 @@ impl EsdsWalk {
                     let done = if tag == 4 {
                         if index == 0 {
                             let allowed = match self.profile {
-                                EsdsProfile::Aac => b == 0x40,
+                                EsdsProfile::Aac | EsdsProfile::AacDescription => b == 0x40,
                                 EsdsProfile::RangeAudio => b == 0x40 || dts_object_type(b)?,
                                 EsdsProfile::ObjectType => true,
                             };
@@ -331,42 +342,123 @@ impl EsdsWalk {
     }
 }
 
-/// Decoder-specific bytes borrowed from the original AAC sample entry.
-/// Only the unit tests drive the standalone job; shipped callers use the
-/// profile walk directly.
-#[cfg(test)]
+/// AudioSpecificConfig from an MPEG-4 Audio sample entry.
+/// Validate the bytes to identify the audio object type before decoding.
 #[derive(Debug)]
-pub struct Mp4AacConfig {
+pub struct AacConfiguration {
+    /// Absolute source offset of the first configuration byte.
     pub offset: u64,
+    /// Shared view into the sample description, without copying the payload.
     pub bytes: Bytes,
 }
 
+/// Progress when reading a sample description already in memory.
+#[derive(Debug)]
+pub enum AacConfigurationStep {
+    Yield,
+    Ready(AacConfiguration),
+    End,
+}
+
 /// Extracts AudioSpecificConfig from an `mp4a` description independently
-/// of its sample table. A QuickTime sound description may carry one
-/// `wave` container around the elementary stream descriptor.
-pub struct Mp4AacConfigJob {
+/// of its sample table. Supports ISO sound entries and the selected
+/// QuickTime sound layout with a `wave` container.
+pub struct AacConfigurationJob {
+    walk: Option<EsdsDescriptionWalk>,
+    failed: Option<Error>,
+}
+
+impl AacConfigurationJob {
+    pub fn new(entry: &SampleDescription, limits: ConfigurationLimits) -> Result<Self> {
+        if entry.format != entry.raw().header().kind {
+            return Err(Error::Invalid(
+                "sample entry format differs from raw source",
+            ));
+        }
+        Ok(Self {
+            walk: Some(EsdsDescriptionWalk::with_profile(
+                entry,
+                limits,
+                EsdsProfile::AacDescription,
+            )?),
+            failed: None,
+        })
+    }
+
+    /// Returns the configuration once, yielding when the work budget runs out.
+    /// Later polls return `End`. Errors, including cancellation, are sticky.
+    pub fn poll(
+        &mut self,
+        work: &mut WorkBudget,
+        cancel: &AtomicBool,
+    ) -> Result<AacConfigurationStep> {
+        if let Some(error) = self.failed {
+            return Err(error);
+        }
+        let Some(walk) = self.walk.as_mut() else {
+            return Ok(AacConfigurationStep::End);
+        };
+        let result = Self::advance(walk, work, cancel);
+        match result {
+            Ok(AacConfigurationStep::Ready(_)) => self.walk = None,
+            Err(error) => {
+                self.failed = Some(error);
+                self.walk = None;
+            }
+            _ => {}
+        }
+        result
+    }
+
+    fn advance(
+        walk: &mut EsdsDescriptionWalk,
+        work: &mut WorkBudget,
+        cancel: &AtomicBool,
+    ) -> Result<AacConfigurationStep> {
+        if cancel.load(std::sync::atomic::Ordering::Relaxed) {
+            return Err(Error::Cancelled);
+        }
+        if !walk.scan_configuration(work)? {
+            return Ok(AacConfigurationStep::Yield);
+        }
+        if cancel.load(std::sync::atomic::Ordering::Relaxed) {
+            return Err(Error::Cancelled);
+        }
+        let (base, walker) = walk
+            .esds
+            .as_mut()
+            .ok_or(Error::Invalid("missing AAC elementary stream descriptor"))?;
+        let (relative, bytes) = walker
+            .dsi
+            .take()
+            .ok_or(Error::Invalid("missing AAC decoder-specific bytes"))?;
+        if bytes.is_empty() {
+            return Err(Error::Invalid("empty AAC decoder-specific bytes"));
+        }
+        let offset = base.checked_add(relative as u64).ok_or(Error::Overflow)?;
+        Ok(AacConfigurationStep::Ready(AacConfiguration {
+            offset,
+            bytes,
+        }))
+    }
+}
+
+struct EsdsDescriptionWalk {
     children: BoxChildren,
     wave: Option<BoxChildren>,
     seen_wave: bool,
     wave_fields: AacWaveFields,
     scanned: bool,
-    limits: Mov9EncodedLimitsV1,
+    limits: ConfigurationLimits,
     inspected_boxes: u32,
     profile: EsdsProfile,
     esds: Option<(u64, EsdsWalk)>,
-    #[cfg(test)]
-    failed: Option<Error>,
 }
 
-impl Mp4AacConfigJob {
-    #[cfg(test)]
-    pub fn new(entry: &SampleDescription, limits: Mov9EncodedLimitsV1) -> Result<Self> {
-        Self::with_profile(entry, limits, EsdsProfile::Aac)
-    }
-
+impl EsdsDescriptionWalk {
     fn with_profile(
         entry: &SampleDescription,
-        limits: Mov9EncodedLimitsV1,
+        limits: ConfigurationLimits,
         profile: EsdsProfile,
     ) -> Result<Self> {
         if entry.format != *b"mp4a" {
@@ -394,53 +486,7 @@ impl Mp4AacConfigJob {
             inspected_boxes: 0,
             profile,
             esds: None,
-            #[cfg(test)]
-            failed: None,
         })
-    }
-
-    /// Yields when the work budget runs out. A parse error ends this job.
-    #[cfg(test)]
-    pub fn poll(
-        &mut self,
-        work: &mut WorkBudget,
-        cancel: &AtomicBool,
-    ) -> Result<Option<Mp4AacConfig>> {
-        if let Some(error) = self.failed {
-            return Err(error);
-        }
-        let result = self.advance(work, cancel);
-        if let Err(error) = result {
-            self.failed = Some(error);
-        }
-        result
-    }
-
-    #[cfg(test)]
-    fn advance(
-        &mut self,
-        work: &mut WorkBudget,
-        cancel: &AtomicBool,
-    ) -> Result<Option<Mp4AacConfig>> {
-        if cancel.load(std::sync::atomic::Ordering::Relaxed) {
-            return Err(Error::Cancelled);
-        }
-        if !self.scan_configuration(work)? {
-            return Ok(None);
-        }
-        let (base, walker) = self
-            .esds
-            .as_mut()
-            .ok_or(Error::Invalid("missing AAC elementary stream descriptor"))?;
-        let (relative, bytes) = walker
-            .dsi
-            .take()
-            .ok_or(Error::Invalid("missing AAC decoder-specific bytes"))?;
-        if bytes.is_empty() {
-            return Err(Error::Invalid("empty AAC decoder-specific bytes"));
-        }
-        let offset = base.checked_add(relative as u64).ok_or(Error::Overflow)?;
-        Ok(Some(Mp4AacConfig { offset, bytes }))
     }
 
     fn scan_configuration(&mut self, work: &mut WorkBudget) -> Result<bool> {
@@ -536,7 +582,7 @@ pub fn check_dts_core_description(
     match &description.format {
         b"mp4a" => {
             let mut job =
-                Mp4AacConfigJob::with_profile(description, limits, EsdsProfile::ObjectType)?;
+                EsdsDescriptionWalk::with_profile(description, limits, EsdsProfile::ObjectType)?;
             if !job.scan_configuration(&mut work)? {
                 return Err(Error::Overflow);
             }
@@ -1557,15 +1603,20 @@ mod aac_entry_tests {
                 esds(&ASC)
             };
             let (entry, bytes) = description(&children, wave);
-            let mut job = Mp4AacConfigJob::new(&entry, Mov9EncodedLimitsV1::default()).unwrap();
+            let mut job = AacConfigurationJob::new(&entry, ConfigurationLimits::default()).unwrap();
             let cancel = AtomicBool::new(false);
-            assert!(
-                job.poll(&mut WorkBudget::new(0), &cancel)
-                    .unwrap()
-                    .is_none()
-            );
+            assert!(matches!(
+                job.poll(&mut WorkBudget::new(0), &cancel).unwrap(),
+                AacConfigurationStep::Yield
+            ));
             let config = (0..200)
-                .find_map(|_| job.poll(&mut WorkBudget::new(16), &cancel).unwrap())
+                .find_map(
+                    |_| match job.poll(&mut WorkBudget::new(16), &cancel).unwrap() {
+                        AacConfigurationStep::Ready(config) => Some(config),
+                        AacConfigurationStep::Yield => None,
+                        AacConfigurationStep::End => panic!("AAC configuration missing"),
+                    },
+                )
                 .expect("AAC configuration");
             let trailing = if wave { 8 } else { 0 };
             assert_eq!(
@@ -1573,7 +1624,46 @@ mod aac_entry_tests {
                 START + (bytes.len() - ASC.len() - trailing) as u64
             );
             assert_eq!(config.bytes.as_ref(), ASC);
+            assert!(matches!(
+                job.poll(&mut WorkBudget::new(0), &cancel).unwrap(),
+                AacConfigurationStep::End
+            ));
         }
+    }
+
+    #[test]
+    fn cancellation_during_descriptor_scan_ends_the_job() {
+        let (entry, _) = description(&esds(&ASC), false);
+        let mut job = AacConfigurationJob::new(&entry, ConfigurationLimits::default()).unwrap();
+        let cancel = AtomicBool::new(false);
+        assert!(matches!(
+            job.poll(&mut WorkBudget::new(16), &cancel).unwrap(),
+            AacConfigurationStep::Yield
+        ));
+        assert_eq!(
+            job.poll(&mut WorkBudget::new(1024), &AtomicBool::new(true))
+                .unwrap_err(),
+            Error::Cancelled
+        );
+        assert_eq!(
+            job.poll(&mut WorkBudget::new(1024), &cancel).unwrap_err(),
+            Error::Cancelled
+        );
+    }
+
+    #[test]
+    fn refuses_a_second_top_level_elementary_stream_descriptor() {
+        let mut children = esds(&ASC);
+        children.extend([3, 3, 0, 2, 0]);
+        let size = u32::try_from(children.len()).unwrap();
+        children[..4].copy_from_slice(&size.to_be_bytes());
+        let (entry, _) = description(&children, false);
+        let mut job = AacConfigurationJob::new(&entry, ConfigurationLimits::default()).unwrap();
+        assert_eq!(
+            job.poll(&mut WorkBudget::new(1024), &AtomicBool::new(false))
+                .unwrap_err(),
+            Error::Invalid("AAC elementary stream descriptor root")
+        );
     }
 
     #[test]
@@ -1581,7 +1671,7 @@ mod aac_entry_tests {
         let mut duplicate = esds(&ASC);
         duplicate.extend(esds(&ASC));
         let (entry, _) = description(&duplicate, false);
-        let mut job = Mp4AacConfigJob::new(&entry, Mov9EncodedLimitsV1::default()).unwrap();
+        let mut job = AacConfigurationJob::new(&entry, ConfigurationLimits::default()).unwrap();
         let cancel = AtomicBool::new(false);
         let duplicate_error = Error::Invalid("duplicate AAC elementary stream descriptor");
         for _ in 0..2 {
@@ -1592,11 +1682,11 @@ mod aac_entry_tests {
         }
 
         let (entry, _) = description(&esds(&ASC), false);
-        let mut job = Mp4AacConfigJob::new(
+        let mut job = AacConfigurationJob::new(
             &entry,
-            Mov9EncodedLimitsV1 {
+            ConfigurationLimits {
                 max_descriptors: 2,
-                ..Mov9EncodedLimitsV1::default()
+                ..ConfigurationLimits::default()
             },
         )
         .unwrap();
@@ -1630,7 +1720,7 @@ mod aac_entry_tests {
             ),
         ] {
             let (entry, _) = description(&children, wave);
-            let mut job = Mp4AacConfigJob::new(&entry, Mov9EncodedLimitsV1::default()).unwrap();
+            let mut job = AacConfigurationJob::new(&entry, ConfigurationLimits::default()).unwrap();
             assert_eq!(
                 job.poll(&mut WorkBudget::new(1024), &cancel).unwrap_err(),
                 error
@@ -1641,11 +1731,11 @@ mod aac_entry_tests {
     #[test]
     fn counts_outer_and_wave_children_against_one_box_limit() {
         let (entry, _) = description(&wave_config(b"mp4a", false), true);
-        let limits = Mov9EncodedLimitsV1 {
+        let limits = ConfigurationLimits {
             max_child_boxes: 4,
-            ..Mov9EncodedLimitsV1::default()
+            ..ConfigurationLimits::default()
         };
-        let mut job = Mp4AacConfigJob::new(&entry, limits).unwrap();
+        let mut job = AacConfigurationJob::new(&entry, limits).unwrap();
         assert!(matches!(
             job.poll(&mut WorkBudget::new(1024), &AtomicBool::new(false)),
             Err(Error::Limit {
