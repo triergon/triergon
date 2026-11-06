@@ -3,7 +3,7 @@
  * Feeds crafted planar 4:2:0 frames through the exact reference video chain
  *   scale=1920:1080:force_original_aspect_ratio=decrease,
  *   pad=1920:1080:(ow-iw)/2:(oh-ih)/2,format=rgba
- * built the same way as harness/codecs/reference_decode.c (buffer source carrying
+ * built the same way as the decode reference in harness/reference_decode.h (buffer source carrying
  * colorspace and range), using only the public libavfilter API.
  *
  * usage: probe_rgba W H BITS COLORSPACE RANGE < frames > rgba
@@ -70,7 +70,7 @@ int main(int argc, char **argv) {
     size_t frame_bytes = (size_t)bps * ((size_t)w * h + 2 * (size_t)cw * ch);
     av_log_set_level(AV_LOG_ERROR);
     AVFilterGraph *g = avfilter_graph_alloc();
-    g->nb_threads = 1; /* as reference_decode.c */
+    g->nb_threads = 1; /* as the decode reference */
     AVFilterContext *src, *sink;
     char args[512];
     snprintf(args, sizeof args, "video_size=%dx%d:pix_fmt=%d:time_base=1/90000:pixel_aspect=1/1:colorspace=%d:range=%d", w, h, fmt, cs, range);

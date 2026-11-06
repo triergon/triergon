@@ -1,4 +1,4 @@
-"""Keep the capture collector's finite rate search tied to owner-approved R2."""
+"""Keep the capture collector's finite rate search tied to the approved encoder rule."""
 import ast
 import json
 from pathlib import Path
@@ -10,7 +10,7 @@ APPROVED_RATE_FACTORS = [1.25, 1.6, 2.0, 2.6, 3.4, 4.5]
 
 
 class CaptureContractTests(unittest.TestCase):
-    def test_encoder_rate_loop_matches_owner_approved_contract(self):
+    def test_encoder_rate_loop_matches_the_approved_contract(self):
         contract = json.loads((ROOT / "harness/capture/contract.json").read_text())
         factors = contract["comparison_rules"].get("encoder_rate_factors")
         tree = ast.parse((ROOT / "harness/capture/compare.py").read_text())
@@ -24,7 +24,7 @@ class CaptureContractTests(unittest.TestCase):
         self.assertEqual(len(loops), 1, "expected one finite encoder rate-search loop")
         self.assertIsInstance(loops[0].iter, ast.Tuple)
         collector_factors = list(ast.literal_eval(loops[0].iter))
-        with self.subTest(check="contract_records_owner_approved_six_points"):
+        with self.subTest(check="contract_records_the_approved_six_points"):
             self.assertEqual(factors, APPROVED_RATE_FACTORS)
         with self.subTest(check="collector_matches_contract"):
             self.assertEqual(collector_factors, factors)

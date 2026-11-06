@@ -3,7 +3,7 @@
 Inputs, rules and tools used to compare the codec crates (`crates/codec-aac`,
 `codec-ac3`, `codec-dca`, `codec-h264`, `codec-hevc`) and the session crate
 (`crates/session`) with FFmpeg 9.0.2. What each decoder supports and refuses is in its crate
-README. The comparison harness is `harness/codecs` (`reference_decode.c`,
+README. The comparison harness is `harness/codecs` (the decode build of `harness/reference.c`,
 `native_correctness.py`, `time_codecs.py`). Gate definitions:
 [docs/quality.md](../../docs/quality.md).
 

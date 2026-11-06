@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Deterministic RGBA capture inputs for the D5/O62 required cases.
+"""Deterministic RGBA capture inputs for the required capture cases.
 
 All content is authored here from seeded arithmetic: no third-party media and
 therefore no redistribution question. Each case regenerates byte-identically
@@ -21,7 +21,7 @@ import numpy as np
 
 
 def ui_screen(w, h, seed, height=None):
-    """A Streem-like UI: gradient backdrop, header, poster cards, text rows."""
+    """A media-browser UI: gradient backdrop, header, poster cards, text rows."""
     height = height or h
     rng = np.random.default_rng(seed)
     img = np.zeros((height, w, 3), np.float32)

@@ -18,8 +18,8 @@ import tempfile
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 from harness.common import digest, digest_bytes, load, write_json
-SUITE = ROOT / ".research/m1d4/fate-suite"
-WORKLOADS = ROOT / ".research/d4-v3-numerical-activation-plan-v1/WORKLOADS.json"
+SUITE = ROOT / ".research/fate-samples"
+WORKLOADS = ROOT / "harness/codecs/workloads.json"
 DECODERS = {"aac": ["aac"], "ac3": ["ac3", "eac3"], "dca": ["dts"],
             "h264": ["h264-conformance"], "hevc": ["hevc-conformance"]}
 

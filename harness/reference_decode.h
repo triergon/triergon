@@ -1,4 +1,4 @@
-/* Native codec reference worker (research tooling, never production).
+/* Decode reference: the decode build of harness/reference.c (tooling only).
  *
  * Reproduces the simulator's external ffmpeg work in-process with the same
  * libraries: an elementary-stream parser splits access units, the decoder
@@ -8,11 +8,11 @@
  *   audio: aformat=sample_fmts=s16:channel_layouts=stereo  (what -ac 2 to a
  *          pulse/alsa s16 sink negotiates; libavfilter inserts the resampler)
  *
- * usage: reference_decode KIND-CODEC-bench FILE ITERATIONS | KIND-CODEC-memory FILE
+ * usage: reference KIND-CODEC-bench FILE ITERATIONS | KIND-CODEC-memory FILE
  *        | KIND-CODEC-raw FILE OUT   (KIND-CODEC: video-h264 video-hevc audio-ac3
  *        audio-eac3 audio-aac audio-dts); the same protocol as crates/codec-worker.
  * The whole operation (parser/decoder/filter setup, decode, convert, teardown)
- * is inside the timed interval; file loading is outside, as in the M1 workers.
+ * is inside the timed interval; file loading is outside, as in the other workers.
  */
 #define _POSIX_C_SOURCE 200809L
 #include <libavcodec/avcodec.h>

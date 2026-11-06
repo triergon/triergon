@@ -137,7 +137,7 @@ fn letterbox_matches_reference_digests() {
 
 /// Harness hook (not a check): `RGBA_RAW="W H BITS MATRIX FULL IN OUT [CW CH LEFT TOP]"`
 /// converts every 4:2:0 picture in IN (planar, 16-bit little-endian above 8
-/// bits) to canvases in OUT, for comparison with `reference_decode` /
+/// bits) to canvases in OUT, for comparison with the decode reference /
 /// `probe_rgba` output. With the optional fields IN holds whole coded CW x CH
 /// pictures and the W x H view starts at (LEFT, TOP), as the decoders hand it
 /// over (see `codec::Plane`). `RGBA_BENCH=N` converts the first picture N

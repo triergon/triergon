@@ -15,7 +15,7 @@ def row(r):
     if heap:
         heap_cell = f"{max(heap['candidate']) / 1e6:.2f} / {min(heap['reference']) / 1e6:.2f}"
     rss = m.get("rss_bound_ratio")
-    streem = r.get("runtime_vs_streem_config", {}).get("ratio", {})
+    small = r.get("runtime_vs_small_config", {}).get("ratio", {})
     return "| {id} | {conv} | {mux} | {enc} ({mode}, {bits}×, {pc:.2f}/{pr:.2f} dB) | {rmed:.3f} / **{rup:.3f}**{tgt} | {smed} | {heap} | {rss} | {all} |".format(
         id=r["case"]["id"],
         conv=f"{'pass' if c.get('conversion') else 'FAIL'} (±{c.get('conversion_max_abs')}, {100 * c.get('conversion_exact', 0):.2f}% exact)",
@@ -28,7 +28,7 @@ def row(r):
         rmed=rt["ratio"]["median"],
         rup=rt["ratio"]["upper_95"],
         tgt=" ✓0.80" if rt["target_pass"] else "",
-        smed=f"{streem['median']:.3f}" if streem else "–",
+        smed=f"{small['median']:.3f}" if small else "–",
         heap=heap_cell + (" ✓" if m["heap_gate_pass"] else " ✗"),
         rss=(f"{rss['upper_95']:.3f}" if rss else "n/a") + (" ✓" if m["rss_gate_pass"] else " ✗"),
         all="**pass**" if v["all_gates"] else "**FAIL**",
@@ -38,7 +38,7 @@ def row(r):
 def main():
     run = Path(sys.argv[1])
     results = sorted(run.glob("*/result.json"))
-    print("| Case | Conversion | Mux | Encoder (mode, bits vs FFmpeg, PSNR-Y ours/FFmpeg) | Runtime ratio median / upper95 | vs Streem build (median) | Heap peak MB ours / FFmpeg | RSS bound upper95 | All gates |")
+    print("| Case | Conversion | Mux | Encoder (mode, bits vs FFmpeg, PSNR-Y ours/FFmpeg) | Runtime ratio median / upper95 | vs --enable-small build (median) | Heap peak MB ours / FFmpeg | RSS bound upper95 | All gates |")
     print("|---|---|---|---|---|---|---|---|---|")
     for path in results:
         print(row(json.loads(path.read_text())))

@@ -2,7 +2,7 @@
 
 Harness worker for the capture pipeline. It runs a
 [triergon-capture](../capture/README.md) session with the same command line as the
-FFmpeg reference worker `harness/capture/reference_capture.c`, so the harness can
+FFmpeg reference worker (`harness/reference.c`, capture build), so the harness can
 compare both case by case. It is tooling (`publish = false`), not part of the
 library.
 

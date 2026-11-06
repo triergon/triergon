@@ -1,4 +1,4 @@
-//! FATE vector tests. The vectors live outside git (`.research/m1d4/fate-suite/dts/`,
+//! FATE vector tests. The vectors live outside git (`.research/fate-samples/dts/`,
 //! rights unreviewed); every test skips with a note when its file is absent. Core frames
 //! are taken from the container (raw DTS / DTS-HD file chunks / MPEG-TS PES) by this
 //! file's own parsing, extension substreams are dropped, and the decoded output is
@@ -11,7 +11,7 @@ use support::harness;
 
 fn fate(rel: &str) -> Option<Vec<u8>> {
     let p = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-        .join("../../.research/m1d4/fate-suite/dts")
+        .join("../../.research/fate-samples/dts")
         .join(rel);
     match std::fs::read(&p) {
         Ok(b) => Some(b),

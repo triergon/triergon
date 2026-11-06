@@ -14,4 +14,4 @@ lavfi sources:
 AAC-LC 5.1 (384 kbit/s) and stereo come from sine sources (`-f adts`). The two DTS
 workloads are the cores of FATE `dts_es.dts` and `master_audio_7.1_24bit.dts`
 (`-bsf:a dca_core`); the AC-3 and E-AC-3 workloads are FATE vectors used as they are.
-Media stays outside git (`.research/m1d4/d4-inputs`, `.research/m1d4/fate-suite`).
+Media stays outside git (`.research/codec-inputs`, `.research/fate-samples`).

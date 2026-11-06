@@ -1,19 +1,19 @@
 #!/bin/bash
-# Native Linux setup for the D5/O62 capture lane (research tooling).
-# Builds, under $BASE (default ~/capture-d5):
-#   ffmpeg/streem   FFmpeg 9.0.2, exactly Streem's development host configure
-#                   (ci/build-ffmpeg.sh @ 3bc30f4e: component set, --enable-small)
-#   ffmpeg/speed    identical component set without --enable-small: the
-#                   gating ("best allowed configuration") runtime reference
+# Native Linux setup for the capture comparison (tooling).
+# Builds, under $BASE (default ~/capture-reference):
+#   ffmpeg/small    FFmpeg 9.0.2 with the application's development component set,
+#                   including --enable-small
+#   ffmpeg/speed    the same component set without --enable-small: the gating
+#                   ("best allowed configuration") runtime reference
 #   ffmpeg/oracle   default full configure with ffmpeg/ffprobe: independent
 #                   decoder/demuxer oracle, never a timed reference
-#   bin/reference_capture-{speed,streem}  harness/capture/reference_capture.c
+#   bin/reference-capture-{speed,small}  harness/reference.c, capture build
 #   bin/allocations.so   shared observer harness/allocations-linux.c
 #   bin/capture-worker   candidate (cargo +nightly --release --locked)
 # and records every hash/argv in $BASE/setup-receipt.json.
 set -euo pipefail
 SRC=$(cd "$(dirname "$0")/../.." && pwd)
-BASE=${BASE:-$HOME/capture-d5}
+BASE=${BASE:-$HOME/capture-reference}
 JOBS=${JOBS:-$(nproc)}
 VERSION=9.0.2
 SHA=8c3850283eb25fa026482078a04051e0be17347b09ef81a0849bec15a96e002e
@@ -22,7 +22,7 @@ cd "$BASE/dl"
 [ -f ffmpeg-$VERSION.tar.xz ] || curl --fail --location --retry 3 -o ffmpeg-$VERSION.tar.xz https://ffmpeg.org/releases/ffmpeg-$VERSION.tar.xz
 echo "$SHA  ffmpeg-$VERSION.tar.xz" | sha256sum --check
 
-STREEM_ARGS=(--enable-shared --disable-static --enable-pic
+SMALL_ARGS=(--enable-shared --disable-static --enable-pic
   "--extra-cflags=-Dstatic_assert=_Static_assert"
   --disable-programs --disable-doc --disable-avdevice --disable-avfilter
   --disable-network --disable-swresample
@@ -50,16 +50,16 @@ build() {
   touch "$prefix/.done"
 }
 
-build streem "${STREEM_ARGS[@]}"
+build small "${SMALL_ARGS[@]}"
 SPEED_ARGS=()
-for a in "${STREEM_ARGS[@]}"; do [ "$a" = --enable-small ] || SPEED_ARGS+=("$a"); done
+for a in "${SMALL_ARGS[@]}"; do [ "$a" = --enable-small ] || SPEED_ARGS+=("$a"); done
 build speed "${SPEED_ARGS[@]}"
 build oracle --disable-doc --disable-debug
 
-for name in speed streem; do
+for name in speed small; do
   P="$BASE/ffmpeg/$name"
-  cc -std=c11 -O2 -Wall -Wextra -Werror -o "$BASE/bin/reference_capture-$name" \
-    "$SRC/harness/capture/reference_capture.c" -I"$P/include" -L"$P/lib" \
+  cc -std=c11 -O2 -Wall -Wextra -Werror -DSAFE_MEDIA_CAPTURE_REFERENCE -o "$BASE/bin/reference-capture-$name" \
+    "$SRC/harness/reference.c" -I"$P/include" -L"$P/lib" \
     -Wl,-rpath,"$P/lib" -lavformat -lavcodec -lswscale -lavutil
 done
 cc -std=c11 -O2 -Wall -Wextra -Werror -fPIC -shared -fno-builtin -Wl,-z,now \
@@ -79,10 +79,10 @@ def run(*a):
     return subprocess.run(a, capture_output=True, text=True).stdout.strip()
 receipt = {
     "ffmpeg_archive_sha256": sha(f"{base}/dl/ffmpeg-9.0.2.tar.xz"),
-    "configure_args": {n: open(f"{base}/logs/{n}.configure-args").read().splitlines() for n in ("streem", "speed")},
+    "configure_args": {n: open(f"{base}/logs/{n}.configure-args").read().splitlines() for n in ("small", "speed")},
     "oracle_configure_args": open(f"{base}/logs/oracle.configure-args").read().splitlines(),
     "binaries": {n: sha(f"{base}/bin/{n}") for n in os.listdir(f"{base}/bin")},
-    "libraries": {f"{n}/{l}": sha(f"{base}/ffmpeg/{n}/lib/{l}") for n in ("speed", "streem")
+    "libraries": {f"{n}/{l}": sha(f"{base}/ffmpeg/{n}/lib/{l}") for n in ("speed", "small")
                   for l in sorted(os.listdir(f"{base}/ffmpeg/{n}/lib")) if ".so." in l and not os.path.islink(f"{base}/ffmpeg/{n}/lib/{l}")},
     "cc": run("cc", "--version").splitlines()[0],
     "rustc": run("rustc", "+nightly", "-Vv"),

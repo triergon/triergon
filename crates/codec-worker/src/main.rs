@@ -1,5 +1,5 @@
 //! Decoder measurement worker for the harness: the same operations as
-//! `harness/codecs/reference_decode.c`, through the session decoders.
+//! the decode build of `harness/reference.c`, through the session decoders.
 //!
 //! usage: codec-worker KIND-CODEC-bench FILE ITERATIONS | KIND-CODEC-memory FILE |
 //! KIND-CODEC-raw FILE OUT, KIND-CODEC one of video-h264, video-hevc, audio-ac3,
@@ -10,7 +10,7 @@
 //! interval.
 //!
 //! The elementary-stream splitting below mirrors the reference worker's own parser
-//! (`harness/codecs/reference_decode.c`, not in this repository) so both decode the same
+//! (the decode build of `harness/reference.c`) so both decode the same
 //! units. It is measurement framing, not product framing:
 //! playback frames access units through `triergon-framing`.
 #![forbid(unsafe_code)]

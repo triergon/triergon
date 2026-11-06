@@ -7,8 +7,8 @@ seeds, confidence bounds and gate thresholds are defined in
 
 ## Workers
 
-- Reference: `harness/codecs/reference_decode.c`, linked statically against the pinned
-  FFmpeg 9.0.2 libraries. It runs the same filter chains as the FFmpeg command line:
+- Reference: `harness/reference.c` built with `-DSAFE_MEDIA_DECODE_REFERENCE`, linked
+  statically against the pinned FFmpeg 9.0.2 libraries. It runs the same filter chains as the FFmpeg command line:
   video `scale=1920:1080:force_original_aspect_ratio=decrease`, centred `pad`,
   `format=rgba`; audio `aformat` to stereo s16 at the decoder rate. Its output is
   byte-identical to the command line's.
