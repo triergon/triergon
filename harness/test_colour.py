@@ -23,13 +23,13 @@ class ColourParityTests(unittest.TestCase):
 
     def test_seeded_mastering_rationals_match_the_public_native_representation(self):
         import random
-        from tools import generate_colour_corpus as fixture
+        from .common import xtask_fixture
         rng=random.Random(9559)
         with tempfile.TemporaryDirectory() as directory:
             path=Path(directory)/'mastering.mkv'
             for n in range(128):
                 values=[rng.random() for _ in range(8)]+[rng.uniform(1,10000),rng.random()]
-                path.write_bytes(fixture.make({},fixture.mastering(width=4 if n%2 else 8,values=values)))
+                path.write_bytes(xtask_fixture('colour','--mastering-width',4 if n%2 else 8,'--values',','.join(map(repr,values))))
                 left=execute([ROOT/'target/release/media-worker','metadata-trace',path])
                 right=execute([ROOT/'target/harness/ffmpeg-worker','metadata-trace',path])
                 self.assertEqual(left['status'],right['status'],'seed9559 case '+str(n))

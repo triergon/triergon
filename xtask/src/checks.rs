@@ -167,6 +167,17 @@ pub fn safety(root: &Path) -> Result<String, String> {
                 .unwrap_or_default(),
         );
         let local = package.get("source").is_some_and(|s| *s == Value::Null);
+        // Repository tooling is never part of a library's dependency graph.
+        let dependencies = package
+            .get("dependencies")
+            .and_then(Value::as_array)
+            .unwrap_or_default();
+        if dependencies
+            .iter()
+            .any(|d| d.get("name").and_then(Value::as_str) == Some("xtask"))
+        {
+            return Err(format!("{name} depends on the xtask tooling package"));
+        }
         if !local || !owned.iter().any(|dir| manifest.starts_with(dir)) {
             return Err(format!("Unadmitted dependency: {name}"));
         }

@@ -21,12 +21,7 @@ reference:
 	python3 tools/prepare_ffmpeg.py
 
 fixtures:
-	python3 tools/generate_corpus.py
-	python3 tools/generate_header_corpus.py
-	python3 tools/generate_zlib_corpus.py
-	python3 tools/generate_seek_corpus.py
-	python3 tools/generate_colour_corpus.py
-	python3 tools/generate_catalogue_corpus.py
+	cargo xtask fixtures
 
 adapters:
 	python3 tools/build_harness.py

@@ -8,7 +8,7 @@ and zlib headers (NASM on x86). The FFmpeg reference is only needed for differen
 and performance work.
 
 ```sh
-make fixtures                     # generate the authored test corpus into .research/
+cargo xtask fixtures              # generate the authored test corpus into .research/
 cargo test --workspace            # library tests
 make prepare-check                # once: pinned FFmpeg reference, fixtures, workers
 cargo xtask check                 # everything CI runs
@@ -67,3 +67,8 @@ Contributions are dual-licensed under [MIT](LICENSE-MIT) or [Apache-2.0](LICENSE
 Media fixtures and specification texts keep their own terms; record the source,
 licence and hash of any new input, and keep inputs without redistribution rights out
 of the repository.
+
+`xtask` (repository tooling, never linked into a library crate) contains a deflate
+encoder derived from zlib, under the zlib licence, and an MT19937 generator seeded as
+CPython's `random` module does, under the Mersenne Twister BSD licence and the PSF
+licence. See [xtask/THIRD-PARTY.md](xtask/THIRD-PARTY.md).

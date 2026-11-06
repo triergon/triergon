@@ -46,7 +46,7 @@ It is written from the published standards and measured case by case against FFm
 
 ```sh
 git clone https://github.com/triergon/triergon && cd triergon
-make fixtures          # generate the authored test corpus
+cargo xtask fixtures   # generate the authored test corpus
 cargo test --workspace
 ```
 
