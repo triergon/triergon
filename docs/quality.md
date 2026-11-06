@@ -28,7 +28,7 @@ resource limit becomes an explicit, reviewed rule for that case.
 - **FFmpeg pin.** `cargo xtask prepare-ffmpeg` builds FFmpeg from a pinned source
   revision with recorded configure flags, compiler and binary hashes. Each profile is a
   separate build of the same revision: `matroska` for the container harness, `formats`
-  for MOV, TS and subtitles, and `video` (the Matroska build plus the H.264 and HEVC
+  for MOV, TS, subtitles and the HLS segment reference, and `video` (the Matroska build plus the H.264 and HEVC
   decoders that stream discovery needs) for the playback startup and seek reference.
 - **Authored corpus.** Small canonical streams generated from synthetic signals and
   authored structures, so inputs stay identical across encoder versions
@@ -68,8 +68,8 @@ make qualify         # correctness, runtime and memory with acceptance
 
 `cargo xtask report` runs the correctness comparison of one feature contract
 (`--contract`, `--manifest`, `--corpus`) and grades it. A contract may name its own
-candidate worker and reference, as `matroska-startup-seek` does with `playback-worker`
-and the `video` reference. `--benchmark` adds paired
+candidate worker and reference, as `matroska-startup-seek` and `hls-segments` do with
+`playback-worker` and the `video` and `formats` references. `--benchmark` adds paired
 runtime and `--memory` the heap and RSS measurement under the native observers
 (`harness/allocations*.c`), including the Linux link-closure and active-window guard
 certificates. The report records the build identity, source provenance digest and input

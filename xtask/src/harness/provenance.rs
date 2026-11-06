@@ -48,6 +48,9 @@ pub fn matroska_inputs() -> Vec<String> {
         "harness/rss-bound-api.h",
         "harness/comparison-rules.json",
         "harness/fate/map.json",
+        "harness/features/hls-segments/measured.json",
+        "harness/reference_feed.h",
+        "harness/reference_hls.h",
     ]
     .map(String::from)
     .to_vec();
@@ -59,6 +62,7 @@ pub fn matroska_inputs() -> Vec<String> {
         "matroska-colour",
         "matroska-segment-metadata",
         "matroska-startup-seek",
+        "hls-segments",
     ] {
         for file in ["contract", "corpus"] {
             names.push(format!("harness/features/{feature}/{file}.json"));

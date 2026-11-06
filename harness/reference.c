@@ -184,6 +184,9 @@ static uint64_t now_ns(void){struct timespec t;clock_gettime(CLOCK_MONOTONIC,&t)
 #ifdef SAFE_MEDIA_FEED_REFERENCE
 #include "reference_feed.h"
 #endif
+#ifdef SAFE_MEDIA_HLS_REFERENCE
+#include "reference_hls.h"
+#endif
 int main(int argc,char **argv){
     av_log_set_level(AV_LOG_ERROR);
     if(argc<3)return 2;
@@ -202,6 +205,9 @@ int main(int argc,char **argv){
     if(!strcmp(argv[1],"baseline")){printf("{\"input_bytes\":%ld}\n",size);free(data);return 0;}
 #ifdef SAFE_MEDIA_FEED_REFERENCE
     if(!strncmp(argv[1],"feed-",5)){int result=feed_main(argc,argv,data,size);free(data);return result;}
+#endif
+#ifdef SAFE_MEDIA_HLS_REFERENCE
+    if(!strncmp(argv[1],"hls-",4)){int result=hls_main(argc,argv,data,size);free(data);return result;}
 #endif
     int metadata=!strncmp(argv[1],"catalogue-",10)?2:!strncmp(argv[1],"metadata-",9);
     int seek_mode=!strncmp(argv[1],"seek-",5);
