@@ -1,0 +1,77 @@
+{
+  "scan-projection-guards": {
+    "exact": true,
+    "equal_under_declared_layout_rule": true,
+    "layout_records": [],
+    "records": 23,
+    "expected": 23
+  },
+  "scan-projection-guards-release": {
+    "exact": true,
+    "equal_under_declared_layout_rule": true,
+    "layout_records": [],
+    "records": 23,
+    "expected": 23
+  },
+  "header-loop-guards": {
+    "exact": true,
+    "equal_under_declared_layout_rule": true,
+    "layout_records": [],
+    "records": 93,
+    "expected": 93
+  },
+  "header-loop-guards-release": {
+    "exact": true,
+    "equal_under_declared_layout_rule": true,
+    "layout_records": [],
+    "records": 93,
+    "expected": 93
+  },
+  "demux-traces": {
+    "exact": true,
+    "equal_under_declared_layout_rule": true,
+    "layout_records": [],
+    "records": 21,
+    "expected": 21
+  },
+  "demux-traces-release": {
+    "exact": true,
+    "equal_under_declared_layout_rule": true,
+    "layout_records": [],
+    "records": 21,
+    "expected": 21
+  },
+  "natural-pressure": {
+    "exact": true,
+    "equal_under_declared_layout_rule": true,
+    "layout_records": [],
+    "records": 1,
+    "expected": 1
+  },
+  "direct-traces": {
+    "exact": true,
+    "equal_under_declared_layout_rule": true,
+    "layout_records": [],
+    "records": 27,
+    "expected": 27
+  },
+  "inner-traces": {
+    "exact": true,
+    "equal_under_declared_layout_rule": true,
+    "layout_records": [],
+    "records": 30,
+    "expected": 30
+  },
+  "scan-traces": {
+    "exact": false,
+    "equal_under_declared_layout_rule": true,
+    "layout_records": [
+      {
+        "actual": "SCAN_INPLACE_LAYOUT|reader=10032|batch=3408|scan=456|scan_offset=9088",
+        "frozen": "SCAN_INPLACE_LAYOUT|reader=10048|batch=3408|scan=456|scan_offset=9128"
+      }
+    ],
+    "records": 10,
+    "expected": 10
+  }
+}

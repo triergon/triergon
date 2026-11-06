@@ -28,4 +28,4 @@ builds. The public receipt is `linux-framing-gate-1793484533696285403` under
 `.research/aws-linux-extended1/exports/3.122.247.247/`. Earlier proposals and
 failures remain under `.research/parallel-framing/dts-inspect-integration-v1/`.
 These are source/host checks. Complete native parity,
-delivery <=1.25, optimization <=0.80 and strict lower heap/RSS remain unqualified.
+delivery <=1.20, optimization <=0.80 and strict lower heap/RSS remain unqualified.

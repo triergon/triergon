@@ -16,7 +16,7 @@ Correctness tests precede the implementation. Retained-capacity accounting,
 backpressure and lifetime must remain valid through cloning, reader teardown,
 seek/reset and cross-thread release. Starvation, explicit EOF and transport failure
 are separate states. Complete format operations and new selected work classes
-still require full parity, initial-delivery runtime upper paired95 ratio <=1.25 and both lower-memory
+still require full parity, initial-delivery runtime upper paired95 ratio <=1.20 and both lower-memory
 gates. Host tests alone do not close M00, integration or shipping-target work.
 
 The prototype currently exposes:
@@ -75,7 +75,7 @@ rational reductions and 429 dense-division/construction cases; all **51,235**
 unique cases pass in both profiles. Every run preserves source, executables and
 raw outputs. This also runs in `make check`. The initial format implementations and the
 core are not numerically qualified; every selected operation keeps full parity,
-initial-delivery runtime upper paired95 <=1.25 and both lower-memory gates;0.80 remains the optimization target.
+initial-delivery runtime upper paired95 <=1.20 and both lower-memory gates;0.80 remains the optimization target.
 
 The make10 snapshot passes 306 Rust and 51 Python tests, Clippy, no-default
 features, release and safety/design checks. Fresh selected Matroska source/native

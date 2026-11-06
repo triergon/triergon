@@ -6,7 +6,7 @@
 
 ## Context
 
-The owner prefers clean bootstrapping in the age of AI and permits dependencies only when they fit perfectly, are pure safe Rust and are demonstrably better than implementing the bounded component. The initial customer needs compressed-packet playback on a constrained 32-bit target, not a desktop transcoder. FFmpeg sets the feature/performance reference. The owner now permits an initial-delivery runtime ratio up to1.25, retains0.80 as the optimization target, and keeps lower memory hard.
+The owner prefers clean bootstrapping in the age of AI and permits dependencies only when they fit perfectly, are pure safe Rust and are demonstrably better than implementing the bounded component. The initial customer needs compressed-packet playback on a constrained 32-bit target, not a desktop transcoder. FFmpeg sets the feature/performance reference. The owner now permits an initial-delivery runtime ratio up to 1.20, retains0.80 as the optimization target, and keeps lower memory hard.
 
 A new crate using `forbid(unsafe_code)` does not make its dependencies safe Rust. A safe public wrapper around C, assembly, custom unsafe arenas, or an unsafe transitive crate fails the stated production policy. The Rust standard library/compiler/OS substrate is the explicit trusted foundation; this is not a claim that the entire operating system or downstream TV application contains no unsafe code.
 
@@ -57,7 +57,7 @@ A parser never fabricates a valid-looking frame after incomplete data. A transpo
 
 Avoid full-file buffering, copy-on-every-packet, per-byte virtual calls, repeated parsing and eagerly materializing unused metadata. Decode no movie frame in demuxing benchmarks. Use buffer reuse, contiguous checked slices, cached indexes and optional caller-selectable metadata. These are hypotheses to measure; safe Rust and architectural simplicity do not guarantee a speedup over optimized FFmpeg, particularly for SIMD-heavy codecs.
 
-The owner later authorized a 1.25 initial-delivery runtime ceiling while retaining
+The owner later authorized a 1.25 initial-delivery runtime ceiling, lowered to 1.20 on 2026-11-05, while retaining
 0.80 as the optimization target. Both classifications and the lower-memory
 thresholds apply to identical accepted work, not a smaller feature set. A failed
 target remains failed; the harness must not move the denominator, hide slow
@@ -66,3 +66,5 @@ cases or weaken correctness to pass it.
 ## Consequences and next work
 
 H0, the comparison/performance harness, and an initial K0 reader are now implemented experimentally; [implementation status](implementation.md) records qualified snapshot evidence, current incomplete coverage and closed broader gates. A standalone library remains reusable beyond Streem, while the TV integration can retain FFmpeg during development. We must budget substantial work for unusual files and standards compliance. Every later codec gets an independent feature decision and benchmark. No third-party production dependency is selected by this ADR.
+
+Proposed follow-ups: [ADR-0003](container-model.md) turns the API sketch above into one shared container model, and [ADR-0004](refactor-plan.md) lays out a behaviour-preserving refactor towards a layered, modular workspace.

@@ -11,7 +11,7 @@ has a qualified replacement, including release playback, simulator playback and
 development capture. The integrated application must build and pass its playback
 regressions without loading, bundling or launching FFmpeg, and its supported target
 devices must be verified. Pure safe Rust and the dependency-admission policy apply to the new
-core. Source feature parity, initial-delivery runtime at most 1.25 of equivalent FFmpeg work and
+core. Source feature parity, initial-delivery runtime at most 1.20 of equivalent FFmpeg work and
 lower peak live heap and total peak RSS remain hard gates for every selected lane.
 Missing cases or evidence keep a lane open.
 The 0.80 runtime ratio remains the optimization target under the

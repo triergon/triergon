@@ -5,14 +5,14 @@
     "foundation": "independent bootstrap",
     "dependency_policy": "pure safe Rust across selected graph; exact fit; mature/optimal; justified against bootstrap",
     "feature_parity": "all frozen selected features and required cases",
-    "runtime_ratio_max": 1.25,
-    "runtime_interpretation": "Initial delivery permits up to25percent more executiontime;20percent less remains optimization target",
-    "runtime_confidence": "upper paired95percent bound <=1.25 for delivery; <=0.80 for optimization",
+    "runtime_ratio_max": 1.2,
+    "runtime_interpretation": "Initial delivery permits up to20percent more executiontime (policy v2, 2026-11-05; v1 allowed25percent);20percent less remains optimization target",
+    "runtime_confidence": "upper paired95percent bound <=1.20 for delivery; <=0.80 for optimization",
     "peak_live_allocation_ratio_max_exclusive": 1.0,
     "attributable_peak_rss_ratio_max_exclusive": 1.0,
     "comparison_decision": "decisions/2026-10-31-zlib-comparisons.md",
     "runtime_optimization_ratio_target": 0.8,
-    "runtime_policy": "initial-delivery-runtime-v1"
+    "runtime_policy": "initial-delivery-runtime-v2"
   },
   "targets": [
     "armv7-linux-webos-32",

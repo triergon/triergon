@@ -1,0 +1,341 @@
+[
+ {
+  "vector": "ac3/millers_crossing_4.0.ac3",
+  "format": "ac3",
+  "stream": {
+   "programs": [],
+   "stream_groups": [],
+   "streams": [
+    {
+     "codec_name": "ac3",
+     "sample_rate": "48000",
+     "channels": 4,
+     "channel_layout": "4.0"
+    }
+   ]
+  },
+  "mix_levels": [
+   "center 0.707107 - surround 0.707107 - lfe 0.000000."
+  ],
+  "matrix": [
+   "FL: FL:0.453082 FR:0.000000 FC:0.320377 BC:0.226541 ",
+   "FR: FL:0.000000 FR:0.453082 FC:0.320377 BC:0.226541 "
+  ],
+  "swr_lines": [
+   "auto-inserting filter 'auto_aresample_0' between the filter 'Parsed_anull_0' and the filter 'format_out_#0:0'",
+   "Mix levels: center 0.707107 - surround 0.707107 - lfe 0.000000.",
+   "Using fltp internally between filters",
+   "Matrix coefficients:",
+   "FL: FL:0.453082 FR:0.000000 FC:0.320377 BC:0.226541 ",
+   "FR: FL:0.000000 FR:0.453082 FC:0.320377 BC:0.226541 ",
+   "ch:4 chl:4.0 fmt:fltp r:48000Hz -> ch:2 chl:stereo fmt:s16 r:48000Hz"
+  ]
+ },
+ {
+  "vector": "ac3/monsters_inc_2.0_192_small.ac3",
+  "format": "ac3",
+  "stream": {
+   "programs": [],
+   "stream_groups": [],
+   "streams": [
+    {
+     "codec_name": "ac3",
+     "sample_rate": "48000",
+     "channels": 2,
+     "channel_layout": "stereo"
+    }
+   ]
+  },
+  "mix_levels": [],
+  "matrix": [],
+  "swr_lines": [
+   "auto-inserting filter 'auto_aresample_0' between the filter 'Parsed_anull_0' and the filter 'format_out_#0:0'",
+   "Using fltp internally between filters",
+   "ch:2 chl:stereo fmt:fltp r:48000Hz -> ch:2 chl:stereo fmt:s16 r:48000Hz"
+  ]
+ },
+ {
+  "vector": "ac3/monsters_inc_5.1_448_small.ac3",
+  "format": "ac3",
+  "stream": {
+   "programs": [],
+   "stream_groups": [],
+   "streams": [
+    {
+     "codec_name": "ac3",
+     "sample_rate": "48000",
+     "channels": 6,
+     "channel_layout": "5.1(side)"
+    }
+   ]
+  },
+  "mix_levels": [
+   "center 0.707107 - surround 0.500000 - lfe 0.000000."
+  ],
+  "matrix": [
+   "FL: FL:0.453082 FR:0.000000 FC:0.320377 LFE:0.000000 SL:0.226541 SR:0.000000 ",
+   "FR: FL:0.000000 FR:0.453082 FC:0.320377 LFE:0.000000 SL:0.000000 SR:0.226541 "
+  ],
+  "swr_lines": [
+   "auto-inserting filter 'auto_aresample_0' between the filter 'Parsed_anull_0' and the filter 'format_out_#0:0'",
+   "Mix levels: center 0.707107 - surround 0.500000 - lfe 0.000000.",
+   "Using fltp internally between filters",
+   "Matrix coefficients:",
+   "FL: FL:0.453082 FR:0.000000 FC:0.320377 LFE:0.000000 SL:0.226541 SR:0.000000 ",
+   "FR: FL:0.000000 FR:0.453082 FC:0.320377 LFE:0.000000 SL:0.000000 SR:0.226541 ",
+   "ch:6 chl:5.1(side) fmt:fltp r:48000Hz -> ch:2 chl:stereo fmt:s16 r:48000Hz"
+  ]
+ },
+ {
+  "vector": "eac3/csi_miami_5.1_256_spx_small.eac3",
+  "format": "eac3",
+  "stream": {
+   "programs": [],
+   "stream_groups": [],
+   "streams": [
+    {
+     "codec_name": "eac3",
+     "sample_rate": "48000",
+     "channels": 6,
+     "channel_layout": "5.1(side)"
+    }
+   ]
+  },
+  "mix_levels": [
+   "center 0.707107 - surround 0.707107 - lfe 2.238719."
+  ],
+  "matrix": [
+   "FL: FL:0.233094 FR:0.000000 FC:0.164822 LFE:0.368990 SL:-0.116547 SR:-0.116547 ",
+   "FR: FL:0.000000 FR:0.233094 FC:0.164822 LFE:0.368990 SL:0.116547 SR:0.116547 "
+  ],
+  "swr_lines": [
+   "auto-inserting filter 'auto_aresample_0' between the filter 'Parsed_anull_0' and the filter 'format_out_#0:0'",
+   "Mix levels: center 0.707107 - surround 0.707107 - lfe 2.238719.",
+   "Using fltp internally between filters",
+   "Matrix coefficients:",
+   "FL: FL:0.233094 FR:0.000000 FC:0.164822 LFE:0.368990 SL:-0.116547 SR:-0.116547 ",
+   "FR: FL:0.000000 FR:0.233094 FC:0.164822 LFE:0.368990 SL:0.116547 SR:0.116547 ",
+   "ch:6 chl:5.1(side) fmt:fltp r:48000Hz -> ch:2 chl:stereo fmt:s16 r:48000Hz"
+  ]
+ },
+ {
+  "vector": "eac3/csi_miami_stereo_128_spx.eac3",
+  "format": "eac3",
+  "stream": {
+   "programs": [],
+   "stream_groups": [],
+   "streams": [
+    {
+     "codec_name": "eac3",
+     "sample_rate": "48000",
+     "channels": 2,
+     "channel_layout": "stereo"
+    }
+   ]
+  },
+  "mix_levels": [],
+  "matrix": [],
+  "swr_lines": [
+   "auto-inserting filter 'auto_aresample_0' between the filter 'Parsed_anull_0' and the filter 'format_out_#0:0'",
+   "Using fltp internally between filters",
+   "ch:2 chl:stereo fmt:fltp r:48000Hz -> ch:2 chl:stereo fmt:s16 r:48000Hz"
+  ]
+ },
+ {
+  "vector": "eac3/csi_miami_stereo_128_spx_small.eac3",
+  "format": "eac3",
+  "stream": {
+   "programs": [],
+   "stream_groups": [],
+   "streams": [
+    {
+     "codec_name": "eac3",
+     "sample_rate": "48000",
+     "channels": 2,
+     "channel_layout": "stereo"
+    }
+   ]
+  },
+  "mix_levels": [],
+  "matrix": [],
+  "swr_lines": [
+   "auto-inserting filter 'auto_aresample_0' between the filter 'Parsed_anull_0' and the filter 'format_out_#0:0'",
+   "Using fltp internally between filters",
+   "ch:2 chl:stereo fmt:fltp r:48000Hz -> ch:2 chl:stereo fmt:s16 r:48000Hz"
+  ]
+ },
+ {
+  "vector": "eac3/matrix2_commentary1_stereo_192_small.eac3",
+  "format": "eac3",
+  "stream": {
+   "programs": [],
+   "stream_groups": [],
+   "streams": [
+    {
+     "codec_name": "eac3",
+     "sample_rate": "48000",
+     "channels": 2,
+     "channel_layout": "stereo"
+    }
+   ]
+  },
+  "mix_levels": [],
+  "matrix": [],
+  "swr_lines": [
+   "auto-inserting filter 'auto_aresample_0' between the filter 'Parsed_anull_0' and the filter 'format_out_#0:0'",
+   "Using fltp internally between filters",
+   "ch:2 chl:stereo fmt:fltp r:48000Hz -> ch:2 chl:stereo fmt:s16 r:48000Hz"
+  ]
+ },
+ {
+  "vector": "eac3/serenity_english_5.1_1536_small.eac3",
+  "format": "eac3",
+  "stream": {
+   "programs": [],
+   "stream_groups": [],
+   "streams": [
+    {
+     "codec_name": "eac3",
+     "sample_rate": "48000",
+     "channels": 6,
+     "channel_layout": "5.1(side)"
+    }
+   ]
+  },
+  "mix_levels": [
+   "center 0.707107 - surround 0.707107 - lfe 1.000000."
+  ],
+  "matrix": [
+   "FL: FL:0.264534 FR:0.000000 FC:0.187053 LFE:0.187053 SL:-0.229093 SR:-0.132267 ",
+   "FR: FL:0.000000 FR:0.264534 FC:0.187053 LFE:0.187053 SL:0.132267 SR:0.229093 "
+  ],
+  "swr_lines": [
+   "auto-inserting filter 'auto_aresample_0' between the filter 'Parsed_anull_0' and the filter 'format_out_#0:0'",
+   "Mix levels: center 0.707107 - surround 0.707107 - lfe 1.000000.",
+   "Using fltp internally between filters",
+   "Matrix coefficients:",
+   "FL: FL:0.264534 FR:0.000000 FC:0.187053 LFE:0.187053 SL:-0.229093 SR:-0.132267 ",
+   "FR: FL:0.000000 FR:0.264534 FC:0.187053 LFE:0.187053 SL:0.132267 SR:0.229093 ",
+   "ch:6 chl:5.1(side) fmt:fltp r:48000Hz -> ch:2 chl:stereo fmt:s16 r:48000Hz"
+  ]
+ },
+ {
+  "vector": "eac3/the_great_wall_7.1.eac3",
+  "format": "eac3",
+  "stream": {
+   "programs": [],
+   "stream_groups": [],
+   "streams": [
+    {
+     "codec_name": "eac3",
+     "sample_rate": "48000",
+     "channels": 8,
+     "channel_layout": "7.1"
+    }
+   ]
+  },
+  "mix_levels": [
+   "center 0.594604 - surround 0.500000 - lfe 0.000000."
+  ],
+  "matrix": [
+   "FL: FL:0.385415 FR:0.000000 FC:0.229169 LFE:0.000000 BL:0.192708 BR:0.000000 SL:0.192708 SR:0.000000 ",
+   "FR: FL:0.000000 FR:0.385415 FC:0.229169 LFE:0.000000 BL:0.000000 BR:0.192708 SL:0.000000 SR:0.192708 "
+  ],
+  "swr_lines": [
+   "auto-inserting filter 'auto_aresample_0' between the filter 'Parsed_anull_0' and the filter 'format_out_#0:0'",
+   "Mix levels: center 0.594604 - surround 0.500000 - lfe 0.000000.",
+   "Using fltp internally between filters",
+   "Matrix coefficients:",
+   "FL: FL:0.385415 FR:0.000000 FC:0.229169 LFE:0.000000 BL:0.192708 BR:0.000000 SL:0.192708 SR:0.000000 ",
+   "FR: FL:0.000000 FR:0.385415 FC:0.229169 LFE:0.000000 BL:0.000000 BR:0.192708 SL:0.000000 SR:0.192708 ",
+   "ch:8 chl:7.1 fmt:fltp r:48000Hz -> ch:2 chl:stereo fmt:s16 r:48000Hz"
+  ]
+ },
+ {
+  "vector": "dts/dts_es.dts",
+  "format": "dts",
+  "stream": {
+   "programs": [],
+   "stream_groups": [],
+   "streams": [
+    {
+     "codec_name": "dts",
+     "sample_rate": "48000",
+     "channels": 7,
+     "channel_layout": "6.1"
+    }
+   ]
+  },
+  "mix_levels": [],
+  "matrix": [
+   "FL: FL:0.343146 FR:0.000000 FC:0.242641 LFE:0.000000 BC:0.171573 SL:0.242641 SR:0.000000 ",
+   "FR: FL:0.000000 FR:0.343146 FC:0.242641 LFE:0.000000 BC:0.171573 SL:0.000000 SR:0.242641 "
+  ],
+  "swr_lines": [
+   "auto-inserting filter 'auto_aresample_0' between the filter 'Parsed_anull_0' and the filter 'format_out_#0:0'",
+   "Using fltp internally between filters",
+   "Matrix coefficients:",
+   "FL: FL:0.343146 FR:0.000000 FC:0.242641 LFE:0.000000 BC:0.171573 SL:0.242641 SR:0.000000 ",
+   "FR: FL:0.000000 FR:0.343146 FC:0.242641 LFE:0.000000 BC:0.171573 SL:0.000000 SR:0.242641 ",
+   "ch:7 chl:6.1 fmt:fltp r:48000Hz -> ch:2 chl:stereo fmt:s16 r:48000Hz"
+  ]
+ },
+ {
+  "vector": "dts/dtsx_7.1.4_24bit.dts",
+  "format": "dts",
+  "stream": {
+   "programs": [],
+   "stream_groups": [],
+   "streams": [
+    {
+     "codec_name": "dts",
+     "sample_rate": "48000",
+     "channels": 8,
+     "channel_layout": "7.1"
+    }
+   ]
+  },
+  "mix_levels": [],
+  "matrix": [
+   "FL: FL:0.320377 FR:0.000000 FC:0.226541 LFE:0.000000 BL:0.226541 BR:0.000000 SL:0.226541 SR:0.000000 ",
+   "FR: FL:0.000000 FR:0.320377 FC:0.226541 LFE:0.000000 BL:0.000000 BR:0.226541 SL:0.000000 SR:0.226541 "
+  ],
+  "swr_lines": [
+   "auto-inserting filter 'auto_aresample_0' between the filter 'Parsed_anull_0' and the filter 'format_out_#0:0'",
+   "Using fltp internally between filters",
+   "Matrix coefficients:",
+   "FL: FL:0.320377 FR:0.000000 FC:0.226541 LFE:0.000000 BL:0.226541 BR:0.000000 SL:0.226541 SR:0.000000 ",
+   "FR: FL:0.000000 FR:0.320377 FC:0.226541 LFE:0.000000 BL:0.000000 BR:0.226541 SL:0.000000 SR:0.226541 ",
+   "ch:8 chl:7.1 fmt:s32p r:48000Hz -> ch:2 chl:stereo fmt:s16 r:48000Hz"
+  ]
+ },
+ {
+  "vector": "dts/master_audio_7.1_24bit.dts",
+  "format": "dts",
+  "stream": {
+   "programs": [],
+   "stream_groups": [],
+   "streams": [
+    {
+     "codec_name": "dts",
+     "sample_rate": "48000",
+     "channels": 8,
+     "channel_layout": "7.1(wide)"
+    }
+   ]
+  },
+  "mix_levels": [],
+  "matrix": [
+   "FL: FL:0.292893 FR:0.000000 FC:0.207107 LFE:0.000000 BL:0.207107 BR:0.000000 FLC:0.292893 FRC:0.000000 ",
+   "FR: FL:0.000000 FR:0.292893 FC:0.207107 LFE:0.000000 BL:0.000000 BR:0.207107 FLC:0.000000 FRC:0.292893 "
+  ],
+  "swr_lines": [
+   "auto-inserting filter 'auto_aresample_0' between the filter 'Parsed_anull_0' and the filter 'format_out_#0:0'",
+   "Using fltp internally between filters",
+   "Matrix coefficients:",
+   "FL: FL:0.292893 FR:0.000000 FC:0.207107 LFE:0.000000 BL:0.207107 BR:0.000000 FLC:0.292893 FRC:0.000000 ",
+   "FR: FL:0.000000 FR:0.292893 FC:0.207107 LFE:0.000000 BL:0.000000 BR:0.207107 FLC:0.000000 FRC:0.292893 ",
+   "ch:8 chl:7.1(wide) fmt:s32p r:48000Hz -> ch:2 chl:stereo fmt:s16 r:48000Hz"
+  ]
+ }
+]

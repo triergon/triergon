@@ -44,7 +44,7 @@
     "armv7-linux-webos-32"
   ],
   "target_scope_authorization": "2026-10-31: owner moved qualification to native Linux ARM64; runtime policy is separately authorized by initial-delivery-runtime-v1",
-  "runtime_ratio_max": 1.25,
+  "runtime_ratio_max": 1.2,
   "memory_ratio_max_exclusive": 1.0,
   "minimum_pairs": 30,
   "confidence": 0.95,
@@ -67,5 +67,5 @@
     "live-allocation instrumentation"
   ],
   "runtime_optimization_ratio_target": 0.8,
-  "runtime_policy": "initial-delivery-runtime-v1"
+  "runtime_policy": "initial-delivery-runtime-v2"
 }

@@ -1,0 +1,103 @@
+[
+  {
+    "label": "negative-register",
+    "argv": [
+      "insmod",
+      "/home/ubuntu/m1d4/h0mem/kernel/safe_media_rss_bound.ko"
+    ],
+    "returncode": 0,
+    "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  {
+    "label": "negative-device-owner",
+    "argv": [
+      "chown",
+      "ubuntu:ubuntu",
+      "/dev/safe_media_rss_bound"
+    ],
+    "returncode": 0,
+    "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  {
+    "label": "negative-armed",
+    "argv": [
+      "cat",
+      "/sys/kernel/debug/kprobes/enabled"
+    ],
+    "returncode": 0,
+    "stdout_sha256": "4355a46b19d348dc2f57c046f8ef63d4538ebb936000f3c9ee954a27460dd865",
+    "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  {
+    "label": "negative-control",
+    "argv": [
+      "/home/ubuntu/m1d4/h0mem/kernel/check",
+      "invalidate"
+    ],
+    "returncode": 1,
+    "stdout_sha256": "86c575a1c6bf8958f994261701ed3b5f0ab3a49a8a8e0ef21df7d6fa4d0228e9",
+    "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  {
+    "label": "negative-unload",
+    "argv": [
+      "rmmod",
+      "safe_media_rss_bound"
+    ],
+    "returncode": 0,
+    "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  {
+    "label": "measurement-register",
+    "argv": [
+      "insmod",
+      "/home/ubuntu/m1d4/h0mem/kernel/safe_media_rss_bound.ko"
+    ],
+    "returncode": 0,
+    "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  {
+    "label": "measurement-device-owner",
+    "argv": [
+      "chown",
+      "ubuntu:ubuntu",
+      "/dev/safe_media_rss_bound"
+    ],
+    "returncode": 0,
+    "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  {
+    "label": "measurement-armed",
+    "argv": [
+      "cat",
+      "/sys/kernel/debug/kprobes/enabled"
+    ],
+    "returncode": 0,
+    "stdout_sha256": "4355a46b19d348dc2f57c046f8ef63d4538ebb936000f3c9ee954a27460dd865",
+    "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  {
+    "label": "positive-control",
+    "argv": [
+      "/home/ubuntu/m1d4/h0mem/kernel/check"
+    ],
+    "returncode": 0,
+    "stdout_sha256": "5e2ac0fd362d6c46657e435237d7161bcc68379b587c9f1598b3cb8383d140c7",
+    "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  {
+    "label": "final-unload",
+    "argv": [
+      "rmmod",
+      "safe_media_rss_bound"
+    ],
+    "returncode": 0,
+    "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  }
+]

@@ -13,7 +13,7 @@ docs/testing.md and specs/README.md before implementation.
 - Every dependency needs an exact-fit and bootstrap-versus-reuse decision with evidence. No
   dependency is currently admitted. A broad framework or safe C wrapper is not a shortcut.
 - FFmpeg is each selected module's correctness/feature/performance reference. Minimum acceptance:
-  full declared feature parity, initial-delivery runtime at most 1.25 of equivalent FFmpeg work, and lower measured
+  full declared feature parity, initial-delivery runtime at most 1.20 of equivalent FFmpeg work, and lower measured
   memory. Preserve per-case failures and confidence evidence; never manufacture acceptance by
   reducing the work or excluding inconvenient required inputs.
   The 0.80 runtime ratio remains the optimization target; see

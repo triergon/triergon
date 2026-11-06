@@ -43,7 +43,7 @@
   "delivery_policy": {
     "qualification_target": "native Linux ARM64",
     "parity": "complete frozen selected-feature contract per case",
-    "runtime_upper95_max": 1.25,
+    "runtime_upper95_max": 1.2,
     "optimization_upper95_target": 0.8,
     "memory": "strictly lower peak live heap and total peak resident RSS",
     "shipping_evidence": "32-bit ARM webOS build and real TV verification"

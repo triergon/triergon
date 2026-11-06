@@ -144,7 +144,7 @@ stream assembly, codec-state epochs, decoding, target integration and decoder
 readiness remain open. AVC/hvcC G01 remains a separate primary-acquisition gap;
 the subsequent DTS source/host/native evidence is a separate slice in `DTS-CORE.md`.
 
-Full selected parity, native Linux ARM64 delivery runtime upper paired95 <=1.25 (optimization target <=0.80), lower live
+Full selected parity, native Linux ARM64 delivery runtime upper paired95 <=1.20 (optimization target <=0.80), lower live
 heap and lower attributable RSS remain hard **unqualified/unmeasured** gates for
 this batch. The recorded host checks and 69 diagnostic observations are complete;
 full native BSI/equivalent-work parity and fresh numerical/32-bit/device proofs

@@ -84,7 +84,7 @@ execution time**, not an 80% reduction. On 2026-10-31 the owner authorized a
 separate [initial-delivery ceiling](../research/decisions/initial-delivery-runtime.md).
 
 `R_time = T_rust / T_ffmpeg`; initial delivery requires the upper paired 95%
-confidence bound to be at most **1.25** for every required benchmark
+confidence bound to be at most **1.20** (policy v2, lowered from 1.25 on 2026-11-05) for every required benchmark
 class/module/target. The optimization target remains **0.80**, corresponding to
 at least 1.25× throughput at equal work. Report both classifications, p50, p95,
 dispersion and the full per-case results; an aggregate average cannot hide a
@@ -127,7 +127,7 @@ pair count; changed observer/probe identities invalidate memory evidence separat
 from timing. Reuse requires a different output directory and records the previous
 report hash/path so earlier observations remain available.
 
-Read/copy/allocation counters diagnose results, not replace elapsed-time evidence. Every required case must meet the current delivery upper runtime ratio of 1.25; a case above 0.80 still misses the optimization target. I/O-bound work remains in the equivalent operation and its timing evidence. Distinguish module wins from total player speed—hardware decoding and network waits remain outside a container parser's control.
+Read/copy/allocation counters diagnose results, not replace elapsed-time evidence. Every required case must meet the current delivery upper runtime ratio of 1.20; a case above 0.80 still misses the optimization target. I/O-bound work remains in the equivalent operation and its timing evidence. Distinguish module wins from total player speed—hardware decoding and network waits remain outside a container parser's control.
 
 ## Lower-memory gate
 
@@ -152,7 +152,7 @@ Every report includes feature-manifest hash, module/source revision, dependency 
 
 1. All required selected-feature cases passing and no unexplained missing coverage.
 2. Strict-safe dependency gate passing on each enabled target/feature graph.
-3. The authorized 1.25 initial-delivery runtime ceiling and lower-memory gates
+3. The authorized 1.20 initial-delivery runtime ceiling and lower-memory gates
    passing at matched work, with the 0.80 optimization classification retained.
 4. Absolute limits/fuzz/regression gates passing.
 5. Streem integration and actual hardware acceptance for any claim involving its decoder/presentation.

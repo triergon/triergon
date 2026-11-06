@@ -148,7 +148,7 @@ make8 (private local receipt: `../../.research/parallel-workspace-check-8.log`) 
 make9 (private local receipt: `../../.research/parallel-workspace-check-9.log`) receipts establish the
 26-test framing snapshot and completed format/release/Clippy/safety gates.
 Target and independent reference harness work remain open. Full selected
-parity, delivery runtime upper paired95 <=1.25 (optimization target <=0.80), lower live heap and lower attributable RSS
+parity, delivery runtime upper paired95 <=1.20 (optimization target <=0.80), lower live heap and lower attributable RSS
 remain **unqualified and unmeasured** for all new features, with native Linux ARM64
 numerical and separate 32-bit/webOS integration proof still required.
 

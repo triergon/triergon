@@ -1,0 +1,3183 @@
+{
+ "schema": "triergon.d4.correctness-manifest.v1",
+ "vectors": [
+  {
+   "lane": "h264",
+   "name": "AUD_MW_E.264",
+   "path": ".research/m1d4/fate-suite/h264-conformance/AUD_MW_E.264",
+   "bytes": 54828,
+   "sha256": "173b75a2883f3208894877549362f118721f45633bf08007396703ef2c358987"
+  },
+  {
+   "lane": "h264",
+   "name": "BA1_FT_C.264",
+   "path": ".research/m1d4/fate-suite/h264-conformance/BA1_FT_C.264",
+   "bytes": 620090,
+   "sha256": "1bd3abeea6a5612602556a455cd2c59f235cba23e09a1a5556641296324c0bb7"
+  },
+  {
+   "lane": "h264",
+   "name": "BA1_Sony_D.jsv",
+   "path": ".research/m1d4/fate-suite/h264-conformance/BA1_Sony_D.jsv",
+   "bytes": 55537,
+   "sha256": "90c84dee7e57151b80918e4b81910d33885fba2ce131fa119e1753c1892086fc"
+  },
+  {
+   "lane": "h264",
+   "name": "BA2_Sony_F.jsv",
+   "path": ".research/m1d4/fate-suite/h264-conformance/BA2_Sony_F.jsv",
+   "bytes": 183140,
+   "sha256": "ea4d6cc823bb931b22fb4f5947745d0d0829cd79eca72209bb990b890afded0a"
+  },
+  {
+   "lane": "h264",
+   "name": "BA3_SVA_C.264",
+   "path": ".research/m1d4/fate-suite/h264-conformance/BA3_SVA_C.264",
+   "bytes": 10611,
+   "sha256": "f21e84fb480d24d1d912cc61d6487afd4f05b9a4956536313715a5741e3b695b"
+  },
+  {
+   "lane": "h264",
+   "name": "BAMQ1_JVC_C.264",
+   "path": ".research/m1d4/fate-suite/h264-conformance/BAMQ1_JVC_C.264",
+   "bytes": 411660,
+   "sha256": "3cb7ccaf39846b1e6a5de48580461427f7e96ad563918d4f9c85c8133da5d1f9"
+  },
+  {
+   "lane": "h264",
+   "name": "BAMQ2_JVC_C.264",
+   "path": ".research/m1d4/fate-suite/h264-conformance/BAMQ2_JVC_C.264",
+   "bytes": 258433,
+   "sha256": "7f251c556b17b26c1117ab30effb40867552ec3ace16a2c6262ae486d699b4e4"
+  },
+  {
+   "lane": "h264",
+   "name": "BANM_MW_D.264",
+   "path": ".research/m1d4/fate-suite/h264-conformance/BANM_MW_D.264",
+   "bytes": 56101,
+   "sha256": "5f370f414beadadc7bb8a5c4c7a410924fda0ae2e7c31037932b961418279231"
+  },
+  {
+   "lane": "h264",
+   "name": "BASQP1_Sony_C.jsv",
+   "path": ".research/m1d4/fate-suite/h264-conformance/BASQP1_Sony_C.jsv",
+   "bytes": 15045,
+   "sha256": "14cf421b985e0e5f62ac01129ea56c343a9804a13d4bd16122916a3315e6b71c"
+  },
+  {
+   "lane": "h264",
+   "name": "BA_MW_D.264",
+   "path": ".research/m1d4/fate-suite/h264-conformance/BA_MW_D.264",
+   "bytes": 55885,
+   "sha256": "47c59fbe8de6edad04457b8b412579d10cf6ecf87393f252cb2493f9c20dca32"
+  },
+  {
+   "lane": "h264",
+   "name": "CABA1_SVA_B.264",
+   "path": ".research/m1d4/fate-suite/h264-conformance/CABA1_SVA_B.264",
+   "bytes": 30920,
+   "sha256": "2c1319be664863d68bf22c26ccfff417b7eeca1d8d6360f1862b5b3aa4c24c0a"
+  },
+  {
+   "lane": "h264",
+   "name": "CABA1_Sony_D.jsv",
+   "path": ".research/m1d4/fate-suite/h264-conformance/CABA1_Sony_D.jsv",
+   "bytes": 161448,
+   "sha256": "eade82fff74fba464a7fbd89bd455b867877a6dce657f2f438e3a06662582cec"
+  },
+  {
+   "lane": "h264",
+   "name": "CABA2_SVA_B.264",
+   "path": ".research/m1d4/fate-suite/h264-conformance/CABA2_SVA_B.264",
+   "bytes": 8555,
+   "sha256": "31fbacc6c673226cd8300613cd1826714adf1dc467165870952c3568c2e0a011"
+  },
+  {
+   "lane": "h264",
+   "name": "CABA2_Sony_E.jsv",
+   "path": ".research/m1d4/fate-suite/h264-conformance/CABA2_Sony_E.jsv",
+   "bytes": 212899,
+   "sha256": "cc57f355f300338b345631ac828d28bc5423f6b155e198d7cf027547c84d5d22"
+  },
+  {
+   "lane": "h264",
+   "name": "CABA3_SVA_B.264",
+   "path": ".research/m1d4/fate-suite/h264-conformance/CABA3_SVA_B.264",
+   "bytes": 14075,
+   "sha256": "dd84719d9049ba58dd168c523d9636cc3334268c291a75978630b652b3a3bf30"
+  },
+  {
+   "lane": "h264",
+   "name": "CABA3_Sony_C.jsv",
+   "path": ".research/m1d4/fate-suite/h264-conformance/CABA3_Sony_C.jsv",
+   "bytes": 214652,
+   "sha256": "79bf1a6779d8e56047956e1d9344e456c01c89e277f22e084f042482ff6116be"
+  },
+  {
+   "lane": "h264",
+   "name": "CABA3_TOSHIBA_E.264",
+   "path": ".research/m1d4/fate-suite/h264-conformance/CABA3_TOSHIBA_E.264",
+   "bytes": 163989,
+   "sha256": "5051192d0fa49c938048791a31b8de7110b5f0d2b1ceb791b57bcc172572e813"
+  },
+  {
+   "lane": "h264",
+   "name": "CABACI3_Sony_B.jsv",
+   "path": ".research/m1d4/fate-suite/h264-conformance/CABACI3_Sony_B.jsv",
+   "bytes": 239937,
+   "sha256": "ef4c266b8478b6fdad06dd1d15299888ecc42c68ab5e1b6162e5c9d3fdbb781e"
+  },
+  {
+   "lane": "h264",
+   "name": "CABAST3_Sony_E.jsv",
+   "path": ".research/m1d4/fate-suite/h264-conformance/CABAST3_Sony_E.jsv",
+   "bytes": 441369,
+   "sha256": "8a4dcf13bacda58d7a208879b2e2a096b28f5530481040253b5959921bc5f8f1"
+  },
+  {
+   "lane": "h264",
+   "name": "CABASTBR3_Sony_B.jsv",
+   "path": ".research/m1d4/fate-suite/h264-conformance/CABASTBR3_Sony_B.jsv",
+   "bytes": 443324,
+   "sha256": "b2da637b6447340e8a63764bee20a49c255e2b59a9520ce45a303a5402752177"
+  },
+  {
+   "lane": "h264",
+   "name": "CABREF3_Sand_D.264",
+   "path": ".research/m1d4/fate-suite/h264-conformance/CABREF3_Sand_D.264",
+   "bytes": 287163,
+   "sha256": "93ff63a7f042abd81c7d1895d7e33ee7cd7264e493891752087c0f126e412cc9"
+  },
+  {
+   "lane": "h264",
+   "name": "CACQP3_Sony_D.jsv",
+   "path": ".research/m1d4/fate-suite/h264-conformance/CACQP3_Sony_D.jsv",
+   "bytes": 38148,
+   "sha256": "fb0dbedc8ce0bdfaf66e820068829bd8c5cd917e5058281c61b72955080cfbd9"
+  },
+  {
+   "lane": "h264",
+   "name": "CAFI1_SVA_C.264",
+   "path": ".research/m1d4/fate-suite/h264-conformance/CAFI1_SVA_C.264",
+   "bytes": 257764,
+   "sha256": "e29f14280edf5d10ad9857efc43114d829ed692dd156abf61bd68b2ab8f43d37"
+  },
+  {
+   "lane": "h264",
+   "name": "CAMA1_Sony_C.jsv",
+   "path": ".research/m1d4/fate-suite/h264-conformance/CAMA1_Sony_C.jsv",
+   "bytes": 301917,
+   "sha256": "db49b84b320b2cc87c6ef9daaf1653c492fae113299c9eaf8ed62155d2c937bf"
+  },
+  {
+   "lane": "h264",
+   "name": "CAMA1_TOSHIBA_B.264",
+   "path": ".research/m1d4/fate-suite/h264-conformance/CAMA1_TOSHIBA_B.264",
+   "bytes": 1429707,
+   "sha256": "554a13ca140965b1e3401a90a4726dad5dcd374f8978f8b24a96f2430c9365cc"
+  },
+  {
+   "lane": "h264",
+   "name": "CAMA3_Sand_E.264",
+   "path": ".research/m1d4/fate-suite/h264-conformance/CAMA3_Sand_E.264",
+   "bytes": 275734,
+   "sha256": "fea7da11585932184dbf804bf8aad22c7e34cda2369496a2588e19ab8dcd8b9a"
+  },
+  {
+   "lane": "h264",
+   "name": "CAMACI3_Sony_C.jsv",
+   "path": ".research/m1d4/fate-suite/h264-conformance/CAMACI3_Sony_C.jsv",
+   "bytes": 71613,
+   "sha256": "07baf951ecf6a9c8381311056dd1c4ccd152cea836c16ce1643f88e4848295cc"
+  },
+  {
+   "lane": "h264",
+   "name": "CAMANL1_TOSHIBA_B.264",
+   "path": ".research/m1d4/fate-suite/h264-conformance/CAMANL1_TOSHIBA_B.264",
+   "bytes": 1432454,
+   "sha256": "6a3505d67742e761ad56fcfa8cd4ecf6c13ca8452e726fe35ae701dda6b2f460"
+  },
+  {
+   "lane": "h264",
+   "name": "CAMANL2_TOSHIBA_B.264",
+   "path": ".research/m1d4/fate-suite/h264-conformance/CAMANL2_TOSHIBA_B.264",
+   "bytes": 1447843,
+   "sha256": "67ec3c3c36748125aefe35844e2418e7915afdc3218f56677a4fa9b6de2af6b7"
+  },
+  {
+   "lane": "h264",
+   "name": "CAMANL3_Sand_E.264",
+   "path": ".research/m1d4/fate-suite/h264-conformance/CAMANL3_Sand_E.264",
+   "bytes": 278858,
+   "sha256": "7a60ca81fdd59d6a27219fdc884dce33ac8fcd94004ef7f30153767f35d6be6e"
+  },
+  {
+   "lane": "h264",
+   "name": "CAMASL3_Sony_B.jsv",
+   "path": ".research/m1d4/fate-suite/h264-conformance/CAMASL3_Sony_B.jsv",
+   "bytes": 73426,
+   "sha256": "189dfeebe2f864507787cd7cb9c307e96dd2cf25cc77a018c64f4edc2b495fc2"
+  },
+  {
+   "lane": "h264",
+   "name": "CAMP_MOT_MBAFF_L30.26l",
+   "path": ".research/m1d4/fate-suite/h264-conformance/CAMP_MOT_MBAFF_L30.26l",
+   "bytes": 623720,
+   "sha256": "8b53b14b28c52dc0b9c5a61ad3bf9e38a857750233873868ea336cfe48cc7161"
+  },
+  {
+   "lane": "h264",
+   "name": "CAMP_MOT_MBAFF_L31.26l",
+   "path": ".research/m1d4/fate-suite/h264-conformance/CAMP_MOT_MBAFF_L31.26l",
+   "bytes": 468220,
+   "sha256": "ecf283ed5c6b60a80fcabbf33f8c8b107eadd991890a3e44fd22bad3e88f5889"
+  },
+  {
+   "lane": "h264",
+   "name": "CANL1_SVA_B.264",
+   "path": ".research/m1d4/fate-suite/h264-conformance/CANL1_SVA_B.264",
+   "bytes": 30903,
+   "sha256": "40f9ea2fca09e08b0486c53eafd43bf064c3b488276f74ff96a1afcd414332d4"
+  },
+  {
+   "lane": "h264",
+   "name": "CANL1_Sony_E.jsv",
+   "path": ".research/m1d4/fate-suite/h264-conformance/CANL1_Sony_E.jsv",
+   "bytes": 161448,
+   "sha256": "13b760dc501f7da7b692b6c428eb3f0a9e8f4772175aeed188afc18f7d27d04c"
+  },
+  {
+   "lane": "h264",
+   "name": "CANL1_TOSHIBA_G.264",
+   "path": ".research/m1d4/fate-suite/h264-conformance/CANL1_TOSHIBA_G.264",
+   "bytes": 510235,
+   "sha256": "63a405361ae25276b6adcc00afc2e8f17d537e2b34bb96285ca6eea5d3c87489"
+  },
+  {
+   "lane": "h264",
+   "name": "CANL2_SVA_B.264",
+   "path": ".research/m1d4/fate-suite/h264-conformance/CANL2_SVA_B.264",
+   "bytes": 30920,
+   "sha256": "d757f31c2546cbe222df728536765d7c162dcd71eb30279c1be8a5785a135dc3"
+  },
+  {
+   "lane": "h264",
+   "name": "CANL2_Sony_E.jsv",
+   "path": ".research/m1d4/fate-suite/h264-conformance/CANL2_Sony_E.jsv",
+   "bytes": 215448,
+   "sha256": "b16bc6b910c0457194eec86a62aeb39ea70190d45b8159fdbad0f4248c25e1cc"
+  },
+  {
+   "lane": "h264",
+   "name": "CANL3_SVA_B.264",
+   "path": ".research/m1d4/fate-suite/h264-conformance/CANL3_SVA_B.264",
+   "bytes": 8690,
+   "sha256": "ca3248a00e4a7ae20cd03c31f4fb32a3ef9865430d1af53dc9cf734d7fb6904a"
+  },
+  {
+   "lane": "h264",
+   "name": "CANL3_Sony_C.jsv",
+   "path": ".research/m1d4/fate-suite/h264-conformance/CANL3_Sony_C.jsv",
+   "bytes": 216542,
+   "sha256": "15e0d13ee6631ab750271fffe1102fd2946cf53c7a54fee54d728de66b98f15e"
+  },
+  {
+   "lane": "h264",
+   "name": "CANL4_SVA_B.264",
+   "path": ".research/m1d4/fate-suite/h264-conformance/CANL4_SVA_B.264",
+   "bytes": 14492,
+   "sha256": "617f57d8efeb240145d3cf891085d81040a3f87624713122b22ddc09b2e93742"
+  },
+  {
+   "lane": "h264",
+   "name": "CANLMA2_Sony_C.jsv",
+   "path": ".research/m1d4/fate-suite/h264-conformance/CANLMA2_Sony_C.jsv",
+   "bytes": 524455,
+   "sha256": "df797af98b7335d985c7c20197e61ece3a5d4e9c43cfbca9d4535c443551199f"
+  },
+  {
+   "lane": "h264",
+   "name": "CANLMA3_Sony_C.jsv",
+   "path": ".research/m1d4/fate-suite/h264-conformance/CANLMA3_Sony_C.jsv",
+   "bytes": 516876,
+   "sha256": "141bdf642d55421d3111c80dca838c9ab302763fa1d185d3fb5158280e9998d1"
+  },
+  {
+   "lane": "h264",
+   "name": "CAPA1_TOSHIBA_B.264",
+   "path": ".research/m1d4/fate-suite/h264-conformance/CAPA1_TOSHIBA_B.264",
+   "bytes": 1014353,
+   "sha256": "aa102d2b94fe48304d6cafbfe8b0427312853e079083e351470983149c1b8a6c"
+  },
+  {
+   "lane": "h264",
+   "name": "CAPAMA3_Sand_F.264",
+   "path": ".research/m1d4/fate-suite/h264-conformance/CAPAMA3_Sand_F.264",
+   "bytes": 340855,
+   "sha256": "a6490cfa63b5a3a8ce7e0a9d64af5dc2b32a1e66d2f0630bbcb182dceeef336c"
+  },
+  {
+   "lane": "h264",
+   "name": "CAPCM1_Sand_E.264",
+   "path": ".research/m1d4/fate-suite/h264-conformance/CAPCM1_Sand_E.264",
+   "bytes": 1237091,
+   "sha256": "02a3931287a0dfbf5cc5d95aaf95817b7c6c5791e665fc2a37c75abe211a5a25"
+  },
+  {
+   "lane": "h264",
+   "name": "CAPCMNL1_Sand_E.264",
+   "path": ".research/m1d4/fate-suite/h264-conformance/CAPCMNL1_Sand_E.264",
+   "bytes": 1237091,
+   "sha256": "5ccbbf7529ef54e169faf03a838a4aaed5e228685c3d93a831da07c3735077df"
+  },
+  {
+   "lane": "h264",
+   "name": "CAPM3_Sony_D.jsv",
+   "path": ".research/m1d4/fate-suite/h264-conformance/CAPM3_Sony_D.jsv",
+   "bytes": 1729239,
+   "sha256": "547cdfa56597adf715bc55cde3fcf1cf31cebe2dfa9272a6901d76768ea45d11"
+  },
+  {
+   "lane": "h264",
+   "name": "CAQP1_Sony_B.jsv",
+   "path": ".research/m1d4/fate-suite/h264-conformance/CAQP1_Sony_B.jsv",
+   "bytes": 252898,
+   "sha256": "0bba43b35aa2369f4f766f9621b5fdd9fd36dc1911601d20b0f53f302cc5f49c"
+  },
+  {
+   "lane": "h264",
+   "name": "CAWP1_TOSHIBA_E.264",
+   "path": ".research/m1d4/fate-suite/h264-conformance/CAWP1_TOSHIBA_E.264",
+   "bytes": 1445514,
+   "sha256": "d3c060da31a63e435bd6fcd8f6d8f8bdb2af1ae912cc29ade39d4f9042874326"
+  },
+  {
+   "lane": "h264",
+   "name": "CAWP5_TOSHIBA_E.264",
+   "path": ".research/m1d4/fate-suite/h264-conformance/CAWP5_TOSHIBA_E.264",
+   "bytes": 1374770,
+   "sha256": "6989abb80de85749862c33f6db57417f780aeab5214dd5544ff7794a0da96f1f"
+  },
+  {
+   "lane": "h264",
+   "name": "CI1_FT_B.264",
+   "path": ".research/m1d4/fate-suite/h264-conformance/CI1_FT_B.264",
+   "bytes": 414237,
+   "sha256": "900f033372ebd2f7b621a708eea82494b5a635140e5563a989ed9b824282fea6"
+  },
+  {
+   "lane": "h264",
+   "name": "CI_MW_D.264",
+   "path": ".research/m1d4/fate-suite/h264-conformance/CI_MW_D.264",
+   "bytes": 55987,
+   "sha256": "d773df1155183b9bcd01292c7f4dc4348732071b240f4fcc1bc871a0d41ff15b"
+  },
+  {
+   "lane": "h264",
+   "name": "CVBS3_Sony_C.jsv",
+   "path": ".research/m1d4/fate-suite/h264-conformance/CVBS3_Sony_C.jsv",
+   "bytes": 228757,
+   "sha256": "cda3fd657ff71f143a53e3c41e2dd2326b8c4ab550503449dd3dabeaae646ebd"
+  },
+  {
+   "lane": "h264",
+   "name": "CVCANLMA2_Sony_C.jsv",
+   "path": ".research/m1d4/fate-suite/h264-conformance/CVCANLMA2_Sony_C.jsv",
+   "bytes": 544970,
+   "sha256": "699b0395f7b55c41b79e1b3d31507bf73d169fb46b1e5552787f5f6756589932"
+  },
+  {
+   "lane": "h264",
+   "name": "CVFC1_Sony_C.jsv",
+   "path": ".research/m1d4/fate-suite/h264-conformance/CVFC1_Sony_C.jsv",
+   "bytes": 414997,
+   "sha256": "c8a1bc3e646d31cab9abaac3474769cf0fe134767ca53f9f88d9a3c272bb2ab3"
+  },
+  {
+   "lane": "h264",
+   "name": "CVFI1_SVA_C.264",
+   "path": ".research/m1d4/fate-suite/h264-conformance/CVFI1_SVA_C.264",
+   "bytes": 87225,
+   "sha256": "ca8ce1ed0a82f3404b16811b1a482bfdbe03dcc246effe1ca83b2669a38fa8a6"
+  },
+  {
+   "lane": "h264",
+   "name": "CVFI1_Sony_D.jsv",
+   "path": ".research/m1d4/fate-suite/h264-conformance/CVFI1_Sony_D.jsv",
+   "bytes": 524421,
+   "sha256": "dd90b73308db2e3c5cfd4a4e98dac088fd02938cd37ac49deda55dc7b894c2fa"
+  },
+  {
+   "lane": "h264",
+   "name": "CVFI2_SVA_C.264",
+   "path": ".research/m1d4/fate-suite/h264-conformance/CVFI2_SVA_C.264",
+   "bytes": 128245,
+   "sha256": "3708bf1db5f7fbe00668775389536a8df85a2bc8f52e20f7494af46345e60e82"
+  },
+  {
+   "lane": "h264",
+   "name": "CVFI2_Sony_H.jsv",
+   "path": ".research/m1d4/fate-suite/h264-conformance/CVFI2_Sony_H.jsv",
+   "bytes": 553382,
+   "sha256": "75f0a9326f9bb22928316db6326355b14dc0be235d87fed63e7c887eff024406"
+  },
+  {
+   "lane": "h264",
+   "name": "CVMA1_Sony_D.jsv",
+   "path": ".research/m1d4/fate-suite/h264-conformance/CVMA1_Sony_D.jsv",
+   "bytes": 315283,
+   "sha256": "f5268668039ae7bf115702643a0dabe11d94b752288afb245a0ab1caf34c73eb"
+  },
+  {
+   "lane": "h264",
+   "name": "CVMA1_TOSHIBA_B.264",
+   "path": ".research/m1d4/fate-suite/h264-conformance/CVMA1_TOSHIBA_B.264",
+   "bytes": 1487542,
+   "sha256": "2e5af580fdeb99b2ae7cae616bd75a1c32353590a889f190bd435880711b33ce"
+  },
+  {
+   "lane": "h264",
+   "name": "CVMANL1_TOSHIBA_B.264",
+   "path": ".research/m1d4/fate-suite/h264-conformance/CVMANL1_TOSHIBA_B.264",
+   "bytes": 1501093,
+   "sha256": "22342adae9a2c629aca85f348f76b5852b4f2cc17b1bc212546fd4102b0d37c4"
+  },
+  {
+   "lane": "h264",
+   "name": "CVMANL2_TOSHIBA_B.264",
+   "path": ".research/m1d4/fate-suite/h264-conformance/CVMANL2_TOSHIBA_B.264",
+   "bytes": 1519860,
+   "sha256": "8cfb15cf5571fc18e8d025f260b6e8101454392cd5121be436e80265a362d79d"
+  },
+  {
+   "lane": "h264",
+   "name": "CVMAPAQP3_Sony_E.jsv",
+   "path": ".research/m1d4/fate-suite/h264-conformance/CVMAPAQP3_Sony_E.jsv",
+   "bytes": 770638,
+   "sha256": "8a4bc3e7b291d405a2c2102e1147f53495d5af3e2fc3a3878c83e549bc63fc10"
+  },
+  {
+   "lane": "h264",
+   "name": "CVMAQP2_Sony_G.jsv",
+   "path": ".research/m1d4/fate-suite/h264-conformance/CVMAQP2_Sony_G.jsv",
+   "bytes": 150227,
+   "sha256": "785ba74a2a60efce6c081d8ac0001e13d1db8cd7ec1c83c8f7bfc47c27ec7d4d"
+  },
+  {
+   "lane": "h264",
+   "name": "CVMAQP3_Sony_D.jsv",
+   "path": ".research/m1d4/fate-suite/h264-conformance/CVMAQP3_Sony_D.jsv",
+   "bytes": 160689,
+   "sha256": "05edde53c10f651a0e214ded4e00d67e9df95cb9e660aab25dec3db80b9bf091"
+  },
+  {
+   "lane": "h264",
+   "name": "CVMP_MOT_FLD_L30_B.26l",
+   "path": ".research/m1d4/fate-suite/h264-conformance/CVMP_MOT_FLD_L30_B.26l",
+   "bytes": 561762,
+   "sha256": "9fa4178d0695cd5508d8523f4f6a614a0091df5c8cbddd338c591ba7ed1523b7"
+  },
+  {
+   "lane": "h264",
+   "name": "CVMP_MOT_FRM_L31_B.26l",
+   "path": ".research/m1d4/fate-suite/h264-conformance/CVMP_MOT_FRM_L31_B.26l",
+   "bytes": 495417,
+   "sha256": "707f7d4e56d925df950e8e6958cf7c22a2f37aa52a5113f2dc6023877632a475"
+  },
+  {
+   "lane": "h264",
+   "name": "CVNLFI1_Sony_C.jsv",
+   "path": ".research/m1d4/fate-suite/h264-conformance/CVNLFI1_Sony_C.jsv",
+   "bytes": 528443,
+   "sha256": "a3b1f8eb0b271987edacc7b8f1447794032d2e74fc946cac089233ddb9a47cf6"
+  },
+  {
+   "lane": "h264",
+   "name": "CVNLFI2_Sony_H.jsv",
+   "path": ".research/m1d4/fate-suite/h264-conformance/CVNLFI2_Sony_H.jsv",
+   "bytes": 555758,
+   "sha256": "448ea665fe7f81f1d2d76a53e75b34448d09d7df0c1c40ee154f85cd0e625468"
+  },
+  {
+   "lane": "h264",
+   "name": "CVPA1_TOSHIBA_B.264",
+   "path": ".research/m1d4/fate-suite/h264-conformance/CVPA1_TOSHIBA_B.264",
+   "bytes": 1120832,
+   "sha256": "23c2b3299efed3475956b0f7e6a098387ceba1cf3f0b17aff8906daadaf09dc3"
+  },
+  {
+   "lane": "h264",
+   "name": "CVPCMNL1_SVA_C.264",
+   "path": ".research/m1d4/fate-suite/h264-conformance/CVPCMNL1_SVA_C.264",
+   "bytes": 3193935,
+   "sha256": "6d8dee9086d4cedaa255c0c40fa61165fc9dd56d2bbec16b0bfed6f1f1d33f0c"
+  },
+  {
+   "lane": "h264",
+   "name": "CVPCMNL2_SVA_C.264",
+   "path": ".research/m1d4/fate-suite/h264-conformance/CVPCMNL2_SVA_C.264",
+   "bytes": 1781741,
+   "sha256": "d9def347076d58aa17ce2b5ba14cf00bfcf3378f8b8c2f0b61db29f69eb846fc"
+  },
+  {
+   "lane": "h264",
+   "name": "CVSE2_Sony_B.jsv",
+   "path": ".research/m1d4/fate-suite/h264-conformance/CVSE2_Sony_B.jsv",
+   "bytes": 205817,
+   "sha256": "f10009500cef910947b3e9f0369f27c44a1de2f966a5c75d852a1c8d70e2cfa7"
+  },
+  {
+   "lane": "h264",
+   "name": "CVSE3_Sony_H.jsv",
+   "path": ".research/m1d4/fate-suite/h264-conformance/CVSE3_Sony_H.jsv",
+   "bytes": 210626,
+   "sha256": "abe5743d9ee4e94fed9f203b6eaec147a0654c865407dd1b27a18917f141f827"
+  },
+  {
+   "lane": "h264",
+   "name": "CVSEFDFT3_Sony_E.jsv",
+   "path": ".research/m1d4/fate-suite/h264-conformance/CVSEFDFT3_Sony_E.jsv",
+   "bytes": 144796,
+   "sha256": "4ddecf869f616f49ef5a8cac725479082b834bf496357f47f6da7e214954a444"
+  },
+  {
+   "lane": "h264",
+   "name": "CVWP1_TOSHIBA_E.264",
+   "path": ".research/m1d4/fate-suite/h264-conformance/CVWP1_TOSHIBA_E.264",
+   "bytes": 1992012,
+   "sha256": "a2cbf860dd8e15fd66cdda72ba37cb81c378b49fe7439200f9c2c9c1ec9f2dbb"
+  },
+  {
+   "lane": "h264",
+   "name": "CVWP2_TOSHIBA_E.264",
+   "path": ".research/m1d4/fate-suite/h264-conformance/CVWP2_TOSHIBA_E.264",
+   "bytes": 1593767,
+   "sha256": "6b2b6205398d2cfebbee5708c4d4d8c67bb56cd4991f1cc4d90836a14215e257"
+  },
+  {
+   "lane": "h264",
+   "name": "CVWP3_TOSHIBA_E.264",
+   "path": ".research/m1d4/fate-suite/h264-conformance/CVWP3_TOSHIBA_E.264",
+   "bytes": 1152114,
+   "sha256": "1ad8b8dcb156dbd3bf050ce0c3cee0334a27f1b8a5d494fd5ce6b96db0eacfb8"
+  },
+  {
+   "lane": "h264",
+   "name": "CVWP5_TOSHIBA_E.264",
+   "path": ".research/m1d4/fate-suite/h264-conformance/CVWP5_TOSHIBA_E.264",
+   "bytes": 1557332,
+   "sha256": "3ed038ac27d66283049b15da0aa9c62e042eb39d057d65dc3e5ded2a18fecc22"
+  },
+  {
+   "lane": "h264",
+   "name": "FI1_Sony_E.jsv",
+   "path": ".research/m1d4/fate-suite/h264-conformance/FI1_Sony_E.jsv",
+   "bytes": 108322,
+   "sha256": "bb23c948562ff4da94baf70daeec531403345d866ebed885eb394831f9f21caf"
+  },
+  {
+   "lane": "h264",
+   "name": "FM1_BT_B.h264",
+   "path": ".research/m1d4/fate-suite/h264-conformance/FM1_BT_B.h264",
+   "bytes": 447469,
+   "sha256": "0d55226469e9515a4b80a086f3f419e9407ce452422b7afc3c04220f9cbe2568"
+  },
+  {
+   "lane": "h264",
+   "name": "FM1_FT_E.264",
+   "path": ".research/m1d4/fate-suite/h264-conformance/FM1_FT_E.264",
+   "bytes": 233023,
+   "sha256": "09c66ef606be137cb001fd6f806deabdc493ce5a06469ed8ce6ae8811ce8fade"
+  },
+  {
+   "lane": "h264",
+   "name": "FM2_SVA_B.264",
+   "path": ".research/m1d4/fate-suite/h264-conformance/FM2_SVA_B.264",
+   "bytes": 10722,
+   "sha256": "1695c27d34ce6723a16ce1606b56db235c942876d65b61b724a864229122d031"
+  },
+  {
+   "lane": "h264",
+   "name": "FM2_SVA_C.264",
+   "path": ".research/m1d4/fate-suite/h264-conformance/FM2_SVA_C.264",
+   "bytes": 10145,
+   "sha256": "f36f1435af82ac64cb5ba27f48da05b9878ca1d2aac4725712216255ae824220"
+  },
+  {
+   "lane": "h264",
+   "name": "FREXT01_JVC_D.264",
+   "path": ".research/m1d4/fate-suite/h264-conformance/FRext/FREXT01_JVC_D.264",
+   "bytes": 53343,
+   "sha256": "4a2fc1dea3c99ff7f37c55442f193d2beb4a042d5d9dcbbe79f0b95b409c0093"
+  },
+  {
+   "lane": "h264",
+   "name": "FREXT02_JVC_C.264",
+   "path": ".research/m1d4/fate-suite/h264-conformance/FRext/FREXT02_JVC_C.264",
+   "bytes": 62669,
+   "sha256": "29328da062fda0c3d5dddb9343a7aa17a6372a28dcc7101588adf23684c553f1"
+  },
+  {
+   "lane": "h264",
+   "name": "FRExt1_Panasonic.avc",
+   "path": ".research/m1d4/fate-suite/h264-conformance/FRext/FRExt1_Panasonic.avc",
+   "bytes": 36711,
+   "sha256": "13a40fa31692f5c2a96a7dfcd5786df1a1c41e3234268a017e9d53364e21c5fc"
+  },
+  {
+   "lane": "h264",
+   "name": "FRExt2_Panasonic.avc",
+   "path": ".research/m1d4/fate-suite/h264-conformance/FRext/FRExt2_Panasonic.avc",
+   "bytes": 180055,
+   "sha256": "ba31155d719727ff4f2cfe16881ba30a298782f012d1d4c45765344354fae3be"
+  },
+  {
+   "lane": "h264",
+   "name": "FRExt3_Panasonic.avc",
+   "path": ".research/m1d4/fate-suite/h264-conformance/FRext/FRExt3_Panasonic.avc",
+   "bytes": 25014,
+   "sha256": "53a3aeb2d43c50ea07a83d6f0afb221bfab34d445f17181801b34774b7f0ed34"
+  },
+  {
+   "lane": "h264",
+   "name": "FRExt4_Panasonic.avc",
+   "path": ".research/m1d4/fate-suite/h264-conformance/FRext/FRExt4_Panasonic.avc",
+   "bytes": 41489,
+   "sha256": "80c13db18b18122cd4cb772ab460933a9858a7c32dd887f55df52ac3a9323acb"
+  },
+  {
+   "lane": "h264",
+   "name": "FRExt_MMCO4_Sony_B.264",
+   "path": ".research/m1d4/fate-suite/h264-conformance/FRext/FRExt_MMCO4_Sony_B.264",
+   "bytes": 708020,
+   "sha256": "0704a0b6a784eac78b1eca3636439e23704d4d87a9faa3e655c19ad28331edf0"
+  },
+  {
+   "lane": "h264",
+   "name": "Freh12_B.264",
+   "path": ".research/m1d4/fate-suite/h264-conformance/FRext/Freh12_B.264",
+   "bytes": 298944,
+   "sha256": "57c4be9b9d00d6f370441373b42aa829a8575028e925972e2e66f57514db74d9"
+  },
+  {
+   "lane": "h264",
+   "name": "Freh1_B.264",
+   "path": ".research/m1d4/fate-suite/h264-conformance/FRext/Freh1_B.264",
+   "bytes": 570192,
+   "sha256": "64fe5b208fa46d9cab5e8138c6ad48c4ae4ac75ac1d6b943b485e8dde447e426"
+  },
+  {
+   "lane": "h264",
+   "name": "Freh2_B.264",
+   "path": ".research/m1d4/fate-suite/h264-conformance/FRext/Freh2_B.264",
+   "bytes": 470681,
+   "sha256": "6ea81f1bed5731ccf3d357d925405f968b53bd19854a9371e67c7a001c3c4dc3"
+  },
+  {
+   "lane": "h264",
+   "name": "Freh7_B.264",
+   "path": ".research/m1d4/fate-suite/h264-conformance/FRext/Freh7_B.264",
+   "bytes": 580965,
+   "sha256": "75495d41eba792d752e54dbf2273a1adeac71ef6fc70d1d6f3332a3b47ffca46"
+  },
+  {
+   "lane": "h264",
+   "name": "HCAFF1_HHI.264",
+   "path": ".research/m1d4/fate-suite/h264-conformance/FRext/HCAFF1_HHI.264",
+   "bytes": 19850,
+   "sha256": "752efafeb176bbf622565e5b3853c82e35bb50143e7175239802576b18e9f22c"
+  },
+  {
+   "lane": "h264",
+   "name": "HCAFR1_HHI.264",
+   "path": ".research/m1d4/fate-suite/h264-conformance/FRext/HCAFR1_HHI.264",
+   "bytes": 19672,
+   "sha256": "bc6b6fe1d3860c88eb6564125c20c3cd272240bf6a22b4fb93876c64cb1b6e83"
+  },
+  {
+   "lane": "h264",
+   "name": "HCAFR2_HHI.264",
+   "path": ".research/m1d4/fate-suite/h264-conformance/FRext/HCAFR2_HHI.264",
+   "bytes": 64501,
+   "sha256": "7e8717fcd5be62f3853a3daae2157193c8ccadcb79a79d962ff63bc92c7ce57d"
+  },
+  {
+   "lane": "h264",
+   "name": "HCAFR3_HHI.264",
+   "path": ".research/m1d4/fate-suite/h264-conformance/FRext/HCAFR3_HHI.264",
+   "bytes": 63674,
+   "sha256": "7e1cde6697bb8903d6e74ed0bbcd0924bac7bd84aa34a80afc6d64be8301d86d"
+  },
+  {
+   "lane": "h264",
+   "name": "HCAFR4_HHI.264",
+   "path": ".research/m1d4/fate-suite/h264-conformance/FRext/HCAFR4_HHI.264",
+   "bytes": 690024,
+   "sha256": "db1c1f97ef74e6c0cc254a8147daabb4c01cbfba6d8f579144597eabeba8e4f8"
+  },
+  {
+   "lane": "h264",
+   "name": "HCAMFF1_HHI.264",
+   "path": ".research/m1d4/fate-suite/h264-conformance/FRext/HCAMFF1_HHI.264",
+   "bytes": 19978,
+   "sha256": "329608bd31d8f56a8250e69b17d2add59faeff86815d135761e227d491d774fc"
+  },
+  {
+   "lane": "h264",
+   "name": "HPCADQ_BRCM_B.264",
+   "path": ".research/m1d4/fate-suite/h264-conformance/FRext/HPCADQ_BRCM_B.264",
+   "bytes": 2332978,
+   "sha256": "cc1c948ae04c383eec03a2f47fb27c163ecb21e0e265e3fa36f94d9c1b0b6fc9"
+  },
+  {
+   "lane": "h264",
+   "name": "HPCAFLNL_BRCM_C.264",
+   "path": ".research/m1d4/fate-suite/h264-conformance/FRext/HPCAFLNL_BRCM_C.264",
+   "bytes": 2315851,
+   "sha256": "acdac1869bdca2a05da12e57a61fe5cfa165e753d42b6980e2b923930731fbbc"
+  },
+  {
+   "lane": "h264",
+   "name": "HPCAFL_BRCM_C.264",
+   "path": ".research/m1d4/fate-suite/h264-conformance/FRext/HPCAFL_BRCM_C.264",
+   "bytes": 2292612,
+   "sha256": "37f7560b75430159c3c44f5bd4f2697708c03739f88159309247d177f2403121"
+  },
+  {
+   "lane": "h264",
+   "name": "HPCALQ_BRCM_B.264",
+   "path": ".research/m1d4/fate-suite/h264-conformance/FRext/HPCALQ_BRCM_B.264",
+   "bytes": 2332978,
+   "sha256": "cc1c948ae04c383eec03a2f47fb27c163ecb21e0e265e3fa36f94d9c1b0b6fc9"
+  },
+  {
+   "lane": "h264",
+   "name": "HPCAMAPALQ_BRCM_B.264",
+   "path": ".research/m1d4/fate-suite/h264-conformance/FRext/HPCAMAPALQ_BRCM_B.264",
+   "bytes": 2773498,
+   "sha256": "173b7e5d6fd6123f033512d0a9e3faf648740b375e3549f80c938018a9e77da0"
+  },
+  {
+   "lane": "h264",
+   "name": "HPCAMOLQ_BRCM_B.264",
+   "path": ".research/m1d4/fate-suite/h264-conformance/FRext/HPCAMOLQ_BRCM_B.264",
+   "bytes": 1828198,
+   "sha256": "4dc94a4e602cfdf9107924ab1a6101f52b23ec0acaf522231f6ca11b3a2bfb6a"
+  },
+  {
+   "lane": "h264",
+   "name": "HPCANL_BRCM_C.264",
+   "path": ".research/m1d4/fate-suite/h264-conformance/FRext/HPCANL_BRCM_C.264",
+   "bytes": 1678972,
+   "sha256": "fd920ee62b103c422b81dbcbf244e8dfc37fa9d24c0fe129bd5253635bf75246"
+  },
+  {
+   "lane": "h264",
+   "name": "HPCAQ2LQ_BRCM_B.264",
+   "path": ".research/m1d4/fate-suite/h264-conformance/FRext/HPCAQ2LQ_BRCM_B.264",
+   "bytes": 2303906,
+   "sha256": "5c6879de17a2eb8922cdf0f1727a84eb6c77516e3f5c1c3f5060756f4c166af6"
+  },
+  {
+   "lane": "h264",
+   "name": "HPCA_BRCM_C.264",
+   "path": ".research/m1d4/fate-suite/h264-conformance/FRext/HPCA_BRCM_C.264",
+   "bytes": 1662273,
+   "sha256": "0e0b8fedcd50c3659f35de4a462c43fe3625b2d0d4165759fd9836cbb87e914d"
+  },
+  {
+   "lane": "h264",
+   "name": "HPCVFLNL_BRCM_A.264",
+   "path": ".research/m1d4/fate-suite/h264-conformance/FRext/HPCVFLNL_BRCM_A.264",
+   "bytes": 2453516,
+   "sha256": "2460cb4cda146924af95bd359b73090c9731690ed64b0cd5035dfeea8a1637d6"
+  },
+  {
+   "lane": "h264",
+   "name": "HPCVFL_BRCM_A.264",
+   "path": ".research/m1d4/fate-suite/h264-conformance/FRext/HPCVFL_BRCM_A.264",
+   "bytes": 2429229,
+   "sha256": "5fd105148550967d57a3d0ed335c32d84643697061b78b9e5c7e835a57396983"
+  },
+  {
+   "lane": "h264",
+   "name": "HPCVMOLQ_BRCM_B.264",
+   "path": ".research/m1d4/fate-suite/h264-conformance/FRext/HPCVMOLQ_BRCM_B.264",
+   "bytes": 1858929,
+   "sha256": "5071e978fe987043ef3dc6222ffaef7346639aad3ad180b8688b46f1d91a6e8c"
+  },
+  {
+   "lane": "h264",
+   "name": "HPCVNL_BRCM_A.264",
+   "path": ".research/m1d4/fate-suite/h264-conformance/FRext/HPCVNL_BRCM_A.264",
+   "bytes": 1836430,
+   "sha256": "7bde98589d16b64bfad343b763aa112cf430e61e427b7f5077697547919bc561"
+  },
+  {
+   "lane": "h264",
+   "name": "HPCV_BRCM_A.264",
+   "path": ".research/m1d4/fate-suite/h264-conformance/FRext/HPCV_BRCM_A.264",
+   "bytes": 1819173,
+   "sha256": "87858e53b1d9b121efaf3e6f8adec967e7b74c0c9e2223e3b7e8b81c448d4176"
+  },
+  {
+   "lane": "h264",
+   "name": "Hi422FR10_SONY_B.264",
+   "path": ".research/m1d4/fate-suite/h264-conformance/FRext/Hi422FR10_SONY_B.264",
+   "bytes": 160404,
+   "sha256": "8aed60728f2b8be7dd4886a94e73702532941557d712e04680ce8c258be7ccec"
+  },
+  {
+   "lane": "h264",
+   "name": "Hi422FR13_SONY_B.264",
+   "path": ".research/m1d4/fate-suite/h264-conformance/FRext/Hi422FR13_SONY_B.264",
+   "bytes": 6905,
+   "sha256": "aa55f7064732a83c86fe228ba3cf8ab065b3129cf0f107c9fba469e57dd59881"
+  },
+  {
+   "lane": "h264",
+   "name": "Hi422FR1_SONY_A.jsv",
+   "path": ".research/m1d4/fate-suite/h264-conformance/FRext/Hi422FR1_SONY_A.jsv",
+   "bytes": 174556,
+   "sha256": "d0fcd8a6699d85f78eb80d8c2b2113ce6eb03347a0dc8ed19aa51b308986a589"
+  },
+  {
+   "lane": "h264",
+   "name": "Hi422FR6_SONY_A.jsv",
+   "path": ".research/m1d4/fate-suite/h264-conformance/FRext/Hi422FR6_SONY_A.jsv",
+   "bytes": 17648,
+   "sha256": "2ba847a7f9756eebd6a1204f9eecbb85628ebc6b424d5af2493bccb4fd0e2e61"
+  },
+  {
+   "lane": "h264",
+   "name": "PPH10I1_Panasonic_A.264",
+   "path": ".research/m1d4/fate-suite/h264-conformance/FRext/PPH10I1_Panasonic_A.264",
+   "bytes": 2547816,
+   "sha256": "7c2f72b1091095840aed11dd659530531ad4d17ac59386145878fa51de6667f5"
+  },
+  {
+   "lane": "h264",
+   "name": "PPH10I2_Panasonic_A.264",
+   "path": ".research/m1d4/fate-suite/h264-conformance/FRext/PPH10I2_Panasonic_A.264",
+   "bytes": 1850742,
+   "sha256": "80a02559ed20f0e3cc54d84faf7d8f6d79530c10067e7e4bbc663ef6590838c9"
+  },
+  {
+   "lane": "h264",
+   "name": "PPH10I3_Panasonic_A.264",
+   "path": ".research/m1d4/fate-suite/h264-conformance/FRext/PPH10I3_Panasonic_A.264",
+   "bytes": 1850762,
+   "sha256": "66c5b426e66b97bb9951a590fc52435d5da03e73673a25bcfbdfddca72a9a117"
+  },
+  {
+   "lane": "h264",
+   "name": "PPH10I4_Panasonic_A.264",
+   "path": ".research/m1d4/fate-suite/h264-conformance/FRext/PPH10I4_Panasonic_A.264",
+   "bytes": 2283683,
+   "sha256": "fc9b9512027d6c6ae2034e583f12f109823fc1bab4cf6fa9fa8720975b4db37e"
+  },
+  {
+   "lane": "h264",
+   "name": "PPH10I5_Panasonic_A.264",
+   "path": ".research/m1d4/fate-suite/h264-conformance/FRext/PPH10I5_Panasonic_A.264",
+   "bytes": 2122017,
+   "sha256": "72d732367e063fcc619ab3aeea79f894ba6afa702bab9855824a6d338bb92ee4"
+  },
+  {
+   "lane": "h264",
+   "name": "PPH10I6_Panasonic_A.264",
+   "path": ".research/m1d4/fate-suite/h264-conformance/FRext/PPH10I6_Panasonic_A.264",
+   "bytes": 2414996,
+   "sha256": "eec1ad9774aa0d6844786980a83a2d8a0ffd16772c31e175dc6096396abc8afd"
+  },
+  {
+   "lane": "h264",
+   "name": "PPH10I7_Panasonic_A.264",
+   "path": ".research/m1d4/fate-suite/h264-conformance/FRext/PPH10I7_Panasonic_A.264",
+   "bytes": 2278978,
+   "sha256": "50046fc1758b1f6bc71e6bdb8f99f8b752f1d590579ebb62ea520f8960599700"
+  },
+  {
+   "lane": "h264",
+   "name": "PPH422I1_Panasonic_A.264",
+   "path": ".research/m1d4/fate-suite/h264-conformance/FRext/PPH422I1_Panasonic_A.264",
+   "bytes": 2900614,
+   "sha256": "c6b53da3735d92a98bbf4f363e5af00e821bc8f8debe1ec9999910c7511b964c"
+  },
+  {
+   "lane": "h264",
+   "name": "PPH422I2_Panasonic_A.264",
+   "path": ".research/m1d4/fate-suite/h264-conformance/FRext/PPH422I2_Panasonic_A.264",
+   "bytes": 2239379,
+   "sha256": "faca58ec834c82c63ddcf406374c7e76e112b3c5cc71adf0f016b1327f60bfbf"
+  },
+  {
+   "lane": "h264",
+   "name": "PPH422I3_Panasonic_A.264",
+   "path": ".research/m1d4/fate-suite/h264-conformance/FRext/PPH422I3_Panasonic_A.264",
+   "bytes": 2239399,
+   "sha256": "2fc5a02e724c6b726b489e45f08e17a0fb68f04fb0221bd30028776594e1677c"
+  },
+  {
+   "lane": "h264",
+   "name": "PPH422I4_Panasonic_A.264",
+   "path": ".research/m1d4/fate-suite/h264-conformance/FRext/PPH422I4_Panasonic_A.264",
+   "bytes": 2767844,
+   "sha256": "af882d0e6e8ad83d6e7f414b0378867125732df987fb0f364167cd998d6802bf"
+  },
+  {
+   "lane": "h264",
+   "name": "PPH422I5_Panasonic_A.264",
+   "path": ".research/m1d4/fate-suite/h264-conformance/FRext/PPH422I5_Panasonic_A.264",
+   "bytes": 2531666,
+   "sha256": "532df6d3e181bd8f4e148bca0489614d1f5b370dc0f2d4e2d933e1a72ebc1d62"
+  },
+  {
+   "lane": "h264",
+   "name": "PPH422I6_Panasonic_A.264",
+   "path": ".research/m1d4/fate-suite/h264-conformance/FRext/PPH422I6_Panasonic_A.264",
+   "bytes": 2709290,
+   "sha256": "3e462f2f89c0313b4a53121785a4ccf6a944bf7d9cacb9be48f6988f7a5bdf52"
+  },
+  {
+   "lane": "h264",
+   "name": "PPH422I7_Panasonic_A.264",
+   "path": ".research/m1d4/fate-suite/h264-conformance/FRext/PPH422I7_Panasonic_A.264",
+   "bytes": 2534086,
+   "sha256": "b0d2b9fd99bc44033a9b22715644fd83fd563bdccabf6a092394a3e1f3507d4e"
+  },
+  {
+   "lane": "h264",
+   "name": "freh10.264",
+   "path": ".research/m1d4/fate-suite/h264-conformance/FRext/freh10.264",
+   "bytes": 312241,
+   "sha256": "bb0a280deb95c6ad01b0d9b9659ee6035ebd077ae0566237ea46413399378e40"
+  },
+  {
+   "lane": "h264",
+   "name": "freh11.264",
+   "path": ".research/m1d4/fate-suite/h264-conformance/FRext/freh11.264",
+   "bytes": 302850,
+   "sha256": "933b5ca93e46a8470b0bbd29671a8013b168e674449f8ce2fb88f621b4f751b5"
+  },
+  {
+   "lane": "h264",
+   "name": "freh3.264",
+   "path": ".research/m1d4/fate-suite/h264-conformance/FRext/freh3.264",
+   "bytes": 277311,
+   "sha256": "341a96f765114a6a05eae2039f546f4846e12e79ea339cb77e7b1a9d0f609318"
+  },
+  {
+   "lane": "h264",
+   "name": "freh4.264",
+   "path": ".research/m1d4/fate-suite/h264-conformance/FRext/freh4.264",
+   "bytes": 286771,
+   "sha256": "395e1e37c7697220dc8ec0c7c7f77f3bbe2f97a7972b4e31a83e06ef0551a6e0"
+  },
+  {
+   "lane": "h264",
+   "name": "freh5.264",
+   "path": ".research/m1d4/fate-suite/h264-conformance/FRext/freh5.264",
+   "bytes": 321365,
+   "sha256": "9ddbef250b94b5bd1cfc496553ef80153b5f0b7ad08b5186504cf3bcee49d439"
+  },
+  {
+   "lane": "h264",
+   "name": "freh6.264",
+   "path": ".research/m1d4/fate-suite/h264-conformance/FRext/freh6.264",
+   "bytes": 664348,
+   "sha256": "e994aea2f71a0aefa0d332b5d66140a56267504ebe37e5627f5d9f5303fe9fe1"
+  },
+  {
+   "lane": "h264",
+   "name": "freh8.264",
+   "path": ".research/m1d4/fate-suite/h264-conformance/FRext/freh8.264",
+   "bytes": 297973,
+   "sha256": "d2e32d901e791ae8d9673982909b6cfeb4e10fb094c121c622d09e926baa9db7"
+  },
+  {
+   "lane": "h264",
+   "name": "freh9.264",
+   "path": ".research/m1d4/fate-suite/h264-conformance/FRext/freh9.264",
+   "bytes": 293859,
+   "sha256": "00e1b08935f3acb3fdbd4963df1566deaf071c038be9fa32fe5d93d7e135b21f"
+  },
+  {
+   "lane": "h264",
+   "name": "test8b43.264",
+   "path": ".research/m1d4/fate-suite/h264-conformance/FRext/test8b43.264",
+   "bytes": 2611983,
+   "sha256": "be27c2f2e160850affcbfe4ca254dacb676d864f32f8335ce6599ef6a19a0252"
+  },
+  {
+   "lane": "h264",
+   "name": "HCBP1_HHI_A.264",
+   "path": ".research/m1d4/fate-suite/h264-conformance/HCBP1_HHI_A.264",
+   "bytes": 1350906,
+   "sha256": "96581d0ce8dcb4788520e1133599bf5f25ea5378ecfe375505288d17689ae644"
+  },
+  {
+   "lane": "h264",
+   "name": "HCBP2_HHI_A.264",
+   "path": ".research/m1d4/fate-suite/h264-conformance/HCBP2_HHI_A.264",
+   "bytes": 292326,
+   "sha256": "a3263e8212c6a03d123a972cbe8eb0066d03fe839d51b2026201efa6c640d25c"
+  },
+  {
+   "lane": "h264",
+   "name": "HCMP1_HHI_A.264",
+   "path": ".research/m1d4/fate-suite/h264-conformance/HCMP1_HHI_A.264",
+   "bytes": 190895,
+   "sha256": "f9bf6d36a7250dd86cf325cd458e92f3319236dcde075000e70f73028f05111a"
+  },
+  {
+   "lane": "h264",
+   "name": "LS_SVA_D.264",
+   "path": ".research/m1d4/fate-suite/h264-conformance/LS_SVA_D.264",
+   "bytes": 650358,
+   "sha256": "f11195ecadf83dde3a6774fc072c2f1f07528b5f23f1ae0f61569f661962ae79"
+  },
+  {
+   "lane": "h264",
+   "name": "MIDR_MW_D.264",
+   "path": ".research/m1d4/fate-suite/h264-conformance/MIDR_MW_D.264",
+   "bytes": 55954,
+   "sha256": "b39ba07a9734328a61d23ebc798ce32a17d6a88290d92501e94e5da731ba2a49"
+  },
+  {
+   "lane": "h264",
+   "name": "MPS_MW_A.264",
+   "path": ".research/m1d4/fate-suite/h264-conformance/MPS_MW_A.264",
+   "bytes": 157882,
+   "sha256": "f35413b51c427cc549779961209ca75c56e5e23614f88d27a10e7d66c3db6056"
+  },
+  {
+   "lane": "h264",
+   "name": "MR1_BT_A.h264",
+   "path": ".research/m1d4/fate-suite/h264-conformance/MR1_BT_A.h264",
+   "bytes": 148228,
+   "sha256": "20dc67331c81adcf40048bb37357883a69b3ab002b0927e599f43d86be9c3d8b"
+  },
+  {
+   "lane": "h264",
+   "name": "MR1_MW_A.264",
+   "path": ".research/m1d4/fate-suite/h264-conformance/MR1_MW_A.264",
+   "bytes": 162135,
+   "sha256": "d441f223c9dff05da43645cd5539eec21e8aef2684160040b61faf799f7f3b1f"
+  },
+  {
+   "lane": "h264",
+   "name": "MR2_MW_A.264",
+   "path": ".research/m1d4/fate-suite/h264-conformance/MR2_MW_A.264",
+   "bytes": 325244,
+   "sha256": "90b75468443485a893702b1349ce116a2e75e20f92df7d5bf8aca63b7ad2533c"
+  },
+  {
+   "lane": "h264",
+   "name": "MR2_TANDBERG_E.264",
+   "path": ".research/m1d4/fate-suite/h264-conformance/MR2_TANDBERG_E.264",
+   "bytes": 271181,
+   "sha256": "24d95632d3adff1808f391402d2bae4f111dd051c1187b915701c2201f995254"
+  },
+  {
+   "lane": "h264",
+   "name": "MR3_TANDBERG_B.264",
+   "path": ".research/m1d4/fate-suite/h264-conformance/MR3_TANDBERG_B.264",
+   "bytes": 252570,
+   "sha256": "05614f0c5c3b169d3520eb297796edb5227a2c7bcf84a1bfd15bbae42210fabc"
+  },
+  {
+   "lane": "h264",
+   "name": "MR4_TANDBERG_C.264",
+   "path": ".research/m1d4/fate-suite/h264-conformance/MR4_TANDBERG_C.264",
+   "bytes": 382111,
+   "sha256": "22c7460de21aa0b3ec68d2eb9e5ea712597e781c2e90940ed9c23803073d35e0"
+  },
+  {
+   "lane": "h264",
+   "name": "MR5_TANDBERG_C.264",
+   "path": ".research/m1d4/fate-suite/h264-conformance/MR5_TANDBERG_C.264",
+   "bytes": 382496,
+   "sha256": "d0749c59e6e34c607dac9aca210f470003947b64db6cdc5c3237ce9f53bfef93"
+  },
+  {
+   "lane": "h264",
+   "name": "MR6_BT_B.h264",
+   "path": ".research/m1d4/fate-suite/h264-conformance/MR6_BT_B.h264",
+   "bytes": 130685,
+   "sha256": "6b7fc0b3e6d57d7b5f58286c1fb4f5afb2324cc21e6d1c9ee9a846471fc21ae8"
+  },
+  {
+   "lane": "h264",
+   "name": "MR7_BT_B.h264",
+   "path": ".research/m1d4/fate-suite/h264-conformance/MR7_BT_B.h264",
+   "bytes": 123966,
+   "sha256": "8d66aae5033474155599b4cd7f06da9ef7977d89e3ccc2a23d364e1e772e3f27"
+  },
+  {
+   "lane": "h264",
+   "name": "MR8_BT_B.h264",
+   "path": ".research/m1d4/fate-suite/h264-conformance/MR8_BT_B.h264",
+   "bytes": 105819,
+   "sha256": "8ea256bd662006f28284e7485e9e71706fc036284a021873dec7d42d6eec986e"
+  },
+  {
+   "lane": "h264",
+   "name": "MR9_BT_B.h264",
+   "path": ".research/m1d4/fate-suite/h264-conformance/MR9_BT_B.h264",
+   "bytes": 96006,
+   "sha256": "dd2712e64c602bfd5b79b1eff6ac9ed5826bd3619b0d70653850768ab95c4817"
+  },
+  {
+   "lane": "h264",
+   "name": "NL1_Sony_D.jsv",
+   "path": ".research/m1d4/fate-suite/h264-conformance/NL1_Sony_D.jsv",
+   "bytes": 55537,
+   "sha256": "125f334b98af2609b481d9c2d34a2b855d0ced981145c8021618c5f10cb864e5"
+  },
+  {
+   "lane": "h264",
+   "name": "NL2_Sony_H.jsv",
+   "path": ".research/m1d4/fate-suite/h264-conformance/NL2_Sony_H.jsv",
+   "bytes": 192735,
+   "sha256": "5a4666b7269291f1d22d4190cfb9d327f818b212cdbc0c8e83d037f05d52a58c"
+  },
+  {
+   "lane": "h264",
+   "name": "NL3_SVA_E.264",
+   "path": ".research/m1d4/fate-suite/h264-conformance/NL3_SVA_E.264",
+   "bytes": 13074,
+   "sha256": "1fbaf6149a8d346cba7968de3c09604e883a35c4b0e494d7353a135f1631a987"
+  },
+  {
+   "lane": "h264",
+   "name": "NLMQ1_JVC_C.264",
+   "path": ".research/m1d4/fate-suite/h264-conformance/NLMQ1_JVC_C.264",
+   "bytes": 411674,
+   "sha256": "5e84ad3a0dc3f5b7578a38d3b1c6cc70e051b7eeba183104a690f8d0700557e5"
+  },
+  {
+   "lane": "h264",
+   "name": "NLMQ2_JVC_C.264",
+   "path": ".research/m1d4/fate-suite/h264-conformance/NLMQ2_JVC_C.264",
+   "bytes": 258964,
+   "sha256": "9ef3595fbf4604d8d2189fe75d76c619b2d4c0f313d3cdbe05422068476906ee"
+  },
+  {
+   "lane": "h264",
+   "name": "NRF_MW_E.264",
+   "path": ".research/m1d4/fate-suite/h264-conformance/NRF_MW_E.264",
+   "bytes": 55149,
+   "sha256": "02e5b0f3e018a998adcd4cfbeed184298a1c8e0cf27ef4f16bcf780b23a03c00"
+  },
+  {
+   "lane": "h264",
+   "name": "SL1_SVA_B.264",
+   "path": ".research/m1d4/fate-suite/h264-conformance/SL1_SVA_B.264",
+   "bytes": 11373,
+   "sha256": "47cdb0ded4dab7f41d8fdda4e76d7d01d38a5b58d8ac57e44e93b389bf107158"
+  },
+  {
+   "lane": "h264",
+   "name": "SVA_BA1_B.264",
+   "path": ".research/m1d4/fate-suite/h264-conformance/SVA_BA1_B.264",
+   "bytes": 32938,
+   "sha256": "67c74b563820b3da6bda325dd2b37a957e9573429715464debe9b0d98d35636f"
+  },
+  {
+   "lane": "h264",
+   "name": "SVA_BA2_D.264",
+   "path": ".research/m1d4/fate-suite/h264-conformance/SVA_BA2_D.264",
+   "bytes": 7516,
+   "sha256": "b7212b4610f8e64f7c894bbd70e48786061decaadbab623209c93ff061899a67"
+  },
+  {
+   "lane": "h264",
+   "name": "SVA_Base_B.264",
+   "path": ".research/m1d4/fate-suite/h264-conformance/SVA_Base_B.264",
+   "bytes": 8250,
+   "sha256": "e33d00e0e9358b118f152250b848e26f8d995a7bb06748e9f21f2f3cdd5c33e2"
+  },
+  {
+   "lane": "h264",
+   "name": "SVA_CL1_E.264",
+   "path": ".research/m1d4/fate-suite/h264-conformance/SVA_CL1_E.264",
+   "bytes": 18407,
+   "sha256": "81fc3e69b2ed52204d77473175593fa2fa0128a0c8736dc91a3bfd8d80b3b43d"
+  },
+  {
+   "lane": "h264",
+   "name": "SVA_FM1_E.264",
+   "path": ".research/m1d4/fate-suite/h264-conformance/SVA_FM1_E.264",
+   "bytes": 8350,
+   "sha256": "a997221bc0f056175ecc71d4d3e612ded7d460f8b5d8ff4f0b7648924f4e87f8"
+  },
+  {
+   "lane": "h264",
+   "name": "SVA_NL1_B.264",
+   "path": ".research/m1d4/fate-suite/h264-conformance/SVA_NL1_B.264",
+   "bytes": 32960,
+   "sha256": "8ff7ef385325e54e5f383eb652d82436b3c5dbac6d76a39c8ce1bb6793e24d46"
+  },
+  {
+   "lane": "h264",
+   "name": "SVA_NL2_E.264",
+   "path": ".research/m1d4/fate-suite/h264-conformance/SVA_NL2_E.264",
+   "bytes": 7866,
+   "sha256": "006daffa233010b1abc20f8368ff773ae96f1860cedc66e0a07e125a401f2cba"
+  },
+  {
+   "lane": "h264",
+   "name": "Sharp_MP_Field_1_B.jvt",
+   "path": ".research/m1d4/fate-suite/h264-conformance/Sharp_MP_Field_1_B.jvt",
+   "bytes": 256418,
+   "sha256": "19f22b627c6da7d075efc552c0b0d04429375f4ac7317b357175684d7c91ca19"
+  },
+  {
+   "lane": "h264",
+   "name": "Sharp_MP_Field_2_B.jvt",
+   "path": ".research/m1d4/fate-suite/h264-conformance/Sharp_MP_Field_2_B.jvt",
+   "bytes": 188413,
+   "sha256": "0800f039c62966dfe89c07c0e3a0f250918e0a7d7a6731f267b9cb3031e41470"
+  },
+  {
+   "lane": "h264",
+   "name": "Sharp_MP_Field_3_B.jvt",
+   "path": ".research/m1d4/fate-suite/h264-conformance/Sharp_MP_Field_3_B.jvt",
+   "bytes": 179458,
+   "sha256": "27e7e304c8298481270087b67c22e2ed8abd07d406b63c061e85ae50b1f570e6"
+  },
+  {
+   "lane": "h264",
+   "name": "Sharp_MP_PAFF_1r2.jvt",
+   "path": ".research/m1d4/fate-suite/h264-conformance/Sharp_MP_PAFF_1r2.jvt",
+   "bytes": 149391,
+   "sha256": "541df810a033d64a2706d25cc335b80d562041af586f3f622d2d1d79566bd588"
+  },
+  {
+   "lane": "h264",
+   "name": "Sharp_MP_PAFF_2.jvt",
+   "path": ".research/m1d4/fate-suite/h264-conformance/Sharp_MP_PAFF_2.jvt",
+   "bytes": 174220,
+   "sha256": "930856ab505cff7680353601c02b0fbf4e55800974065f7e90cebb9d8adf58cb"
+  },
+  {
+   "lane": "h264",
+   "name": "cama1_vtc_c.avc",
+   "path": ".research/m1d4/fate-suite/h264-conformance/cama1_vtc_c.avc",
+   "bytes": 126132,
+   "sha256": "e70ea27b1a543f0ab021636398aa912a796a7d1ef4ce444cea73c74cb38d365c"
+  },
+  {
+   "lane": "h264",
+   "name": "cama2_vtc_b.avc",
+   "path": ".research/m1d4/fate-suite/h264-conformance/cama2_vtc_b.avc",
+   "bytes": 197607,
+   "sha256": "f0ccd58dc44d8d8a8163fb21466cb19e63b6d4cce53be382329c4d60dcad6cd4"
+  },
+  {
+   "lane": "h264",
+   "name": "cama3_vtc_b.avc",
+   "path": ".research/m1d4/fate-suite/h264-conformance/cama3_vtc_b.avc",
+   "bytes": 198174,
+   "sha256": "8b7bc245e3465c90906f395076def7c97057df606c00ab5194b6e9402fb0953f"
+  },
+  {
+   "lane": "h264",
+   "name": "camp_mot_fld0_full.26l",
+   "path": ".research/m1d4/fate-suite/h264-conformance/camp_mot_fld0_full.26l",
+   "bytes": 405556,
+   "sha256": "2ff34d3b7fa25106dda248350730de340beeb32c94ed2028eb610dfeea377499"
+  },
+  {
+   "lane": "h264",
+   "name": "camp_mot_frm0_full.26l",
+   "path": ".research/m1d4/fate-suite/h264-conformance/camp_mot_frm0_full.26l",
+   "bytes": 405471,
+   "sha256": "36e1188ae32f0ffe764921d9471390687a7b07481d18b4d9fca4450c17116fac"
+  },
+  {
+   "lane": "h264",
+   "name": "camp_mot_mbaff0_full.26l",
+   "path": ".research/m1d4/fate-suite/h264-conformance/camp_mot_mbaff0_full.26l",
+   "bytes": 423053,
+   "sha256": "9c6ba659900a635da5a93e0bb68325fdea77db90ec8fcb4b19d9a54cad6e539e"
+  },
+  {
+   "lane": "h264",
+   "name": "camp_mot_picaff0_full.26l",
+   "path": ".research/m1d4/fate-suite/h264-conformance/camp_mot_picaff0_full.26l",
+   "bytes": 408004,
+   "sha256": "cdf09622b0879240864f1258dd3ae0a0fe03690028780d4be834f528ecdade83"
+  },
+  {
+   "lane": "h264",
+   "name": "cvmp_mot_fld0_full_B.26l",
+   "path": ".research/m1d4/fate-suite/h264-conformance/cvmp_mot_fld0_full_B.26l",
+   "bytes": 404183,
+   "sha256": "3dd58a1be9fd9b800f0dec163c0bce19c8c9021cadb23824c1da5de1f0b9681f"
+  },
+  {
+   "lane": "h264",
+   "name": "cvmp_mot_frm0_full_B.26l",
+   "path": ".research/m1d4/fate-suite/h264-conformance/cvmp_mot_frm0_full_B.26l",
+   "bytes": 391412,
+   "sha256": "d21e49a4f174a6933015ff2ecd94886d2ee5b5ebcf7cf1350ec7a97249e7bd77"
+  },
+  {
+   "lane": "h264",
+   "name": "cvmp_mot_mbaff0_full_B.26l",
+   "path": ".research/m1d4/fate-suite/h264-conformance/cvmp_mot_mbaff0_full_B.26l",
+   "bytes": 461615,
+   "sha256": "91d8e29a16e7cab22797d384dbdbd30643e4f8284866c3a81e2aabdb45f5c97b"
+  },
+  {
+   "lane": "h264",
+   "name": "cvmp_mot_picaff0_full_B.26l",
+   "path": ".research/m1d4/fate-suite/h264-conformance/cvmp_mot_picaff0_full_B.26l",
+   "bytes": 451544,
+   "sha256": "872fbc427c37e13c5c9fd49e6094f1cc59a3074226e687d225fa417dedd28ab6"
+  },
+  {
+   "lane": "h264",
+   "name": "slice2_field_aurora4.264",
+   "path": ".research/m1d4/fate-suite/h264-conformance/slice2_field_aurora4.264",
+   "bytes": 6806,
+   "sha256": "e38d4b7812401babc5f413dda83bc666cfeac9501d07f586eb950d2fbd7f2777"
+  },
+  {
+   "lane": "h264",
+   "name": "sp1_bt_a.h264",
+   "path": ".research/m1d4/fate-suite/h264-conformance/sp1_bt_a.h264",
+   "bytes": 285768,
+   "sha256": "2126d0489811e0bae6c3fd751506f883a673f9ecf1e4687d2cc1fbf791f6223f"
+  },
+  {
+   "lane": "h264",
+   "name": "sp2_bt_b.h264",
+   "path": ".research/m1d4/fate-suite/h264-conformance/sp2_bt_b.h264",
+   "bytes": 200443,
+   "sha256": "6482a8a5a7f1c1600ed291dca5be8417b88dd4c6d47aa724afde17eafabe43bf"
+  },
+  {
+   "lane": "h264",
+   "name": "src19td.IBP.264",
+   "path": ".research/m1d4/fate-suite/h264-conformance/src19td.IBP.264",
+   "bytes": 9286871,
+   "sha256": "5dc8e06bb1730033dd1ef06e88994704f1f30662a9229df5105bf78b0c29622b"
+  },
+  {
+   "lane": "hevc",
+   "name": "ADJUST_IPRED_ANGLE_A_RExt_Mitsubishi_1.bit",
+   "path": ".research/m1d4/fate-suite/hevc-conformance/ADJUST_IPRED_ANGLE_A_RExt_Mitsubishi_1.bit",
+   "bytes": 180029,
+   "sha256": "6063fb81c57d8596af226960f17b8dea06eb0661f97d76509ce331fa99e1ba46"
+  },
+  {
+   "lane": "hevc",
+   "name": "AMP_A_Samsung_4.bit",
+   "path": ".research/m1d4/fate-suite/hevc-conformance/AMP_A_Samsung_4.bit",
+   "bytes": 2097540,
+   "sha256": "52d5c79c26dc5caf916b018159f8d1dfdf28945a11a71788802b80927c730e95"
+  },
+  {
+   "lane": "hevc",
+   "name": "AMP_A_Samsung_6.bit",
+   "path": ".research/m1d4/fate-suite/hevc-conformance/AMP_A_Samsung_6.bit",
+   "bytes": 2096976,
+   "sha256": "51ce631db13a8207706182544d9ec9c69aacb85ead5805dd2b3196e352100183"
+  },
+  {
+   "lane": "hevc",
+   "name": "AMP_B_Samsung_4.bit",
+   "path": ".research/m1d4/fate-suite/hevc-conformance/AMP_B_Samsung_4.bit",
+   "bytes": 763633,
+   "sha256": "45f811c3bdf9179fb676b7b549662d99da1acdd09b2aacb8c0c1eb76fdc97fb3"
+  },
+  {
+   "lane": "hevc",
+   "name": "AMP_B_Samsung_6.bit",
+   "path": ".research/m1d4/fate-suite/hevc-conformance/AMP_B_Samsung_6.bit",
+   "bytes": 763599,
+   "sha256": "2746c8e9ad165bae79cb71b29ddf777c33133cafed8b7ae02457bb6f3757ba33"
+  },
+  {
+   "lane": "hevc",
+   "name": "AMP_D_Hisilicon.bit",
+   "path": ".research/m1d4/fate-suite/hevc-conformance/AMP_D_Hisilicon.bit",
+   "bytes": 715534,
+   "sha256": "a0d7fea2136ae47739bab1fa8c760705538a20b35467f34606f4bf9da5019a63"
+  },
+  {
+   "lane": "hevc",
+   "name": "AMP_E_Hisilicon.bit",
+   "path": ".research/m1d4/fate-suite/hevc-conformance/AMP_E_Hisilicon.bit",
+   "bytes": 807087,
+   "sha256": "2088d96297504a1e56da30a530d321fd1380ae48aeac7357d925da7b09f850dd"
+  },
+  {
+   "lane": "hevc",
+   "name": "AMP_F_Hisilicon_3.bit",
+   "path": ".research/m1d4/fate-suite/hevc-conformance/AMP_F_Hisilicon_3.bit",
+   "bytes": 557269,
+   "sha256": "5976368a7f37557cdbc6d8313bf16419a7b533bef9b73e8afced86c23be9c208"
+  },
+  {
+   "lane": "hevc",
+   "name": "AMVP_A_MTK_4.bit",
+   "path": ".research/m1d4/fate-suite/hevc-conformance/AMVP_A_MTK_4.bit",
+   "bytes": 17811,
+   "sha256": "dcbc3c321e66f8d4b06481ffbdb2e02214d83f60db5868823938715cfd275371"
+  },
+  {
+   "lane": "hevc",
+   "name": "AMVP_B_MTK_4.bit",
+   "path": ".research/m1d4/fate-suite/hevc-conformance/AMVP_B_MTK_4.bit",
+   "bytes": 23975,
+   "sha256": "6f863212547479c25f8f7d85b25d5ca6a1528cbc9e0ee6ff3fad799122d6c632"
+  },
+  {
+   "lane": "hevc",
+   "name": "AMVP_C_Samsung_4.bit",
+   "path": ".research/m1d4/fate-suite/hevc-conformance/AMVP_C_Samsung_4.bit",
+   "bytes": 748401,
+   "sha256": "4ce220e37329844b41628a9876df32d8d6e645b2ca78aece7fdf9aef474c874d"
+  },
+  {
+   "lane": "hevc",
+   "name": "AMVP_C_Samsung_6.bit",
+   "path": ".research/m1d4/fate-suite/hevc-conformance/AMVP_C_Samsung_6.bit",
+   "bytes": 749698,
+   "sha256": "256557367fc76454fcecda698c749c230c2477da1449ab416e780ea2f0452d62"
+  },
+  {
+   "lane": "hevc",
+   "name": "BUMPING_A_ericsson_1.bit",
+   "path": ".research/m1d4/fate-suite/hevc-conformance/BUMPING_A_ericsson_1.bit",
+   "bytes": 527550,
+   "sha256": "817ba50355043ac04abd76898e0d7d713c7055fee4524f22f24ddae6500577d9"
+  },
+  {
+   "lane": "hevc",
+   "name": "CAINIT_A_SHARP_4.bit",
+   "path": ".research/m1d4/fate-suite/hevc-conformance/CAINIT_A_SHARP_4.bit",
+   "bytes": 110099,
+   "sha256": "e7a4b9ab27dde802001582e8a189aaf8a72e7a95480b22c002a725fa02d25105"
+  },
+  {
+   "lane": "hevc",
+   "name": "CAINIT_B_SHARP_4.bit",
+   "path": ".research/m1d4/fate-suite/hevc-conformance/CAINIT_B_SHARP_4.bit",
+   "bytes": 110212,
+   "sha256": "d7f9bef49ab3c32bd6c53124f9c8f5e853b6706d6f32d2551046dea7ca2f4746"
+  },
+  {
+   "lane": "hevc",
+   "name": "CAINIT_C_SHARP_3.bit",
+   "path": ".research/m1d4/fate-suite/hevc-conformance/CAINIT_C_SHARP_3.bit",
+   "bytes": 111971,
+   "sha256": "bfdf239164cef54252ead77cd76cd436b96847b1a0b7ccba547fbb601e4a34f1"
+  },
+  {
+   "lane": "hevc",
+   "name": "CAINIT_D_SHARP_3.bit",
+   "path": ".research/m1d4/fate-suite/hevc-conformance/CAINIT_D_SHARP_3.bit",
+   "bytes": 107575,
+   "sha256": "7bb128ed1ca68961548fe8bc749d66665651387d4cf2a45c6fdcdc713dd4f5b8"
+  },
+  {
+   "lane": "hevc",
+   "name": "CAINIT_E_SHARP_3.bit",
+   "path": ".research/m1d4/fate-suite/hevc-conformance/CAINIT_E_SHARP_3.bit",
+   "bytes": 114648,
+   "sha256": "ef55f131f79e2f7f376131a68118ff41d89e7bdf9a02fc7e5b5aeb85563a3dfa"
+  },
+  {
+   "lane": "hevc",
+   "name": "CAINIT_F_SHARP_3.bit",
+   "path": ".research/m1d4/fate-suite/hevc-conformance/CAINIT_F_SHARP_3.bit",
+   "bytes": 109770,
+   "sha256": "eac6cebd384d31fbcea7983b17bb76290d77f865a3932ff1f05a4412cbcf9cfc"
+  },
+  {
+   "lane": "hevc",
+   "name": "CAINIT_G_SHARP_3.bit",
+   "path": ".research/m1d4/fate-suite/hevc-conformance/CAINIT_G_SHARP_3.bit",
+   "bytes": 126431,
+   "sha256": "caf40ca73dfea0efe2a8f7010036b25176d85d6959b12b5456fdaab44fd2d61d"
+  },
+  {
+   "lane": "hevc",
+   "name": "CAINIT_H_SHARP_3.bit",
+   "path": ".research/m1d4/fate-suite/hevc-conformance/CAINIT_H_SHARP_3.bit",
+   "bytes": 122377,
+   "sha256": "c658a14f3ae68bb137c37989d1789a2b09e0f313ea8739a02966207f7d64c0c9"
+  },
+  {
+   "lane": "hevc",
+   "name": "CIP_A_Panasonic_3.bit",
+   "path": ".research/m1d4/fate-suite/hevc-conformance/CIP_A_Panasonic_3.bit",
+   "bytes": 11957,
+   "sha256": "19f6a710e8b2c66f393392af24c11e5fbba10a5c9f6f28c8b26949942f384c1c"
+  },
+  {
+   "lane": "hevc",
+   "name": "CIP_C_Panasonic_2.bit",
+   "path": ".research/m1d4/fate-suite/hevc-conformance/CIP_C_Panasonic_2.bit",
+   "bytes": 12928,
+   "sha256": "1a696ecc7520b23c89ac6daca7ab1f1f325a01dc01845ba352528be775456ed5"
+  },
+  {
+   "lane": "hevc",
+   "name": "CONFWIN_A_Sony_1.bit",
+   "path": ".research/m1d4/fate-suite/hevc-conformance/CONFWIN_A_Sony_1.bit",
+   "bytes": 283483,
+   "sha256": "688c2684539ffdca60335e7da650da0236f76c20179c844a33395cceaebb1ca3"
+  },
+  {
+   "lane": "hevc",
+   "name": "DBLK_A_MAIN10_VIXS_2.bit",
+   "path": ".research/m1d4/fate-suite/hevc-conformance/DBLK_A_MAIN10_VIXS_2.bit",
+   "bytes": 100467,
+   "sha256": "7da55ba87bf18ce1c2edf41dabcf3a3eb44f19a65d5da78ee8010a75e17d0d77"
+  },
+  {
+   "lane": "hevc",
+   "name": "DBLK_A_MAIN10_VIXS_3.bit",
+   "path": ".research/m1d4/fate-suite/hevc-conformance/DBLK_A_MAIN10_VIXS_3.bit",
+   "bytes": 100468,
+   "sha256": "96c4f1a6b824cc51433d87ebc11bffcc6c2fe3de3ed18339316803e8bbc9be17"
+  },
+  {
+   "lane": "hevc",
+   "name": "DBLK_A_SONY_3.bit",
+   "path": ".research/m1d4/fate-suite/hevc-conformance/DBLK_A_SONY_3.bit",
+   "bytes": 279115,
+   "sha256": "d61a13e04a1678816c0f16cf7a47f5bb918de95ecf1b6fab305e2390c3dd7de9"
+  },
+  {
+   "lane": "hevc",
+   "name": "DBLK_B_SONY_3.bit",
+   "path": ".research/m1d4/fate-suite/hevc-conformance/DBLK_B_SONY_3.bit",
+   "bytes": 75869,
+   "sha256": "1800b72fdf655d1ad399ff4d35fb2789c2b89640c95045e3c1502c74efa232b0"
+  },
+  {
+   "lane": "hevc",
+   "name": "DBLK_C_SONY_3.bit",
+   "path": ".research/m1d4/fate-suite/hevc-conformance/DBLK_C_SONY_3.bit",
+   "bytes": 851236,
+   "sha256": "039835a155f8e72c5f3876ec63d0667e06928959d2767dd1764f1148d2d8c2e2"
+  },
+  {
+   "lane": "hevc",
+   "name": "DBLK_D_VIXS_1.bit",
+   "path": ".research/m1d4/fate-suite/hevc-conformance/DBLK_D_VIXS_1.bit",
+   "bytes": 17407,
+   "sha256": "b1b3b1fbff7ece03229180be508a5534ff3a352f74e5ca416c14f48f46ca4389"
+  },
+  {
+   "lane": "hevc",
+   "name": "DBLK_D_VIXS_2.bit",
+   "path": ".research/m1d4/fate-suite/hevc-conformance/DBLK_D_VIXS_2.bit",
+   "bytes": 17403,
+   "sha256": "7ac7196d25d339ba2be54b50d184463d47b8ba546cbb8c0a2a8882043bda1056"
+  },
+  {
+   "lane": "hevc",
+   "name": "DBLK_E_VIXS_1.bit",
+   "path": ".research/m1d4/fate-suite/hevc-conformance/DBLK_E_VIXS_1.bit",
+   "bytes": 20845,
+   "sha256": "cd67b201dd80c56d58a024749549a8944b773f0240268ac7c7007f8e9aa9dd0d"
+  },
+  {
+   "lane": "hevc",
+   "name": "DBLK_E_VIXS_2.bit",
+   "path": ".research/m1d4/fate-suite/hevc-conformance/DBLK_E_VIXS_2.bit",
+   "bytes": 26468,
+   "sha256": "1e48dc12c9107f28463772b5ea1de31201181b0c4b66b11f66f4aa13ac26ce74"
+  },
+  {
+   "lane": "hevc",
+   "name": "DBLK_F_VIXS_1.bit",
+   "path": ".research/m1d4/fate-suite/hevc-conformance/DBLK_F_VIXS_1.bit",
+   "bytes": 26468,
+   "sha256": "e2fd34a7cbcda21c669f09a94d2be3439be0471044cc97eaf78eb66a965e801b"
+  },
+  {
+   "lane": "hevc",
+   "name": "DBLK_F_VIXS_2.bit",
+   "path": ".research/m1d4/fate-suite/hevc-conformance/DBLK_F_VIXS_2.bit",
+   "bytes": 26469,
+   "sha256": "726c5fe34048cb3e19f69d28f9bec067bc632b13637e452fb0a536a1e32d93dd"
+  },
+  {
+   "lane": "hevc",
+   "name": "DBLK_G_VIXS_1.bit",
+   "path": ".research/m1d4/fate-suite/hevc-conformance/DBLK_G_VIXS_1.bit",
+   "bytes": 26345,
+   "sha256": "b8fb975fbd4b719cc420d8026f9fbf61a76f9d23be4eb744d05df109102256a0"
+  },
+  {
+   "lane": "hevc",
+   "name": "DBLK_G_VIXS_2.bit",
+   "path": ".research/m1d4/fate-suite/hevc-conformance/DBLK_G_VIXS_2.bit",
+   "bytes": 26468,
+   "sha256": "1e48dc12c9107f28463772b5ea1de31201181b0c4b66b11f66f4aa13ac26ce74"
+  },
+  {
+   "lane": "hevc",
+   "name": "DELTAQP_A_BRCM_4.bit",
+   "path": ".research/m1d4/fate-suite/hevc-conformance/DELTAQP_A_BRCM_4.bit",
+   "bytes": 9487729,
+   "sha256": "1274e3e308dfe684b38a88f8b3a2845b84f57492b0b02aaecbe5dc29ca8ed532"
+  },
+  {
+   "lane": "hevc",
+   "name": "DELTAQP_B_SONY_3.bit",
+   "path": ".research/m1d4/fate-suite/hevc-conformance/DELTAQP_B_SONY_3.bit",
+   "bytes": 5372548,
+   "sha256": "07b8fa589e71be769874d95a480e6c253ce8dfc730dc05ec1ad24c444752e5ee"
+  },
+  {
+   "lane": "hevc",
+   "name": "DELTAQP_C_SONY_3.bit",
+   "path": ".research/m1d4/fate-suite/hevc-conformance/DELTAQP_C_SONY_3.bit",
+   "bytes": 1380367,
+   "sha256": "4fc85c7ba2be608b3aa5ec3be4cf4e9c21c390ca48335b4c99e6fe4e429e8fe3"
+  },
+  {
+   "lane": "hevc",
+   "name": "DSLICE_A_HHI_5.bit",
+   "path": ".research/m1d4/fate-suite/hevc-conformance/DSLICE_A_HHI_5.bit",
+   "bytes": 373328,
+   "sha256": "8398fb23c814a197bba497ad2c6103f81ca8003434fa40ec347d4d0a07c9468a"
+  },
+  {
+   "lane": "hevc",
+   "name": "DSLICE_B_HHI_5.bit",
+   "path": ".research/m1d4/fate-suite/hevc-conformance/DSLICE_B_HHI_5.bit",
+   "bytes": 379617,
+   "sha256": "db582f1181f3b8ed3beeb32246a1a99123700dbdc3d3be4e1797032fcd46c486"
+  },
+  {
+   "lane": "hevc",
+   "name": "DSLICE_C_HHI_5.bit",
+   "path": ".research/m1d4/fate-suite/hevc-conformance/DSLICE_C_HHI_5.bit",
+   "bytes": 373275,
+   "sha256": "f162007f604aa0e48229c4153f940fd5f24db955ad158d11e2bd46c89c49ca76"
+  },
+  {
+   "lane": "hevc",
+   "name": "ENTP_A_LG_2.bit",
+   "path": ".research/m1d4/fate-suite/hevc-conformance/ENTP_A_LG_2.bit",
+   "bytes": 140782,
+   "sha256": "776f1c785b90dd50a9c1eb4000691ccd86b8f22017894cef011e448391eee7cb"
+  },
+  {
+   "lane": "hevc",
+   "name": "ENTP_A_Qualcomm_1.bit",
+   "path": ".research/m1d4/fate-suite/hevc-conformance/ENTP_A_Qualcomm_1.bit",
+   "bytes": 2623324,
+   "sha256": "1dc1dfb16f676f59cebde3a4732209ce5ce0d0f49ef697970987c0c3e0e087b1"
+  },
+  {
+   "lane": "hevc",
+   "name": "ENTP_B_LG_2.bit",
+   "path": ".research/m1d4/fate-suite/hevc-conformance/ENTP_B_LG_2.bit",
+   "bytes": 141176,
+   "sha256": "e437bf31ee60bea1e114817b24283e51351f407a7dafca79d8a00abe80517001"
+  },
+  {
+   "lane": "hevc",
+   "name": "ENTP_B_Qualcomm_1.bit",
+   "path": ".research/m1d4/fate-suite/hevc-conformance/ENTP_B_Qualcomm_1.bit",
+   "bytes": 311296,
+   "sha256": "8f7320cc17416a1a4b53d01b94b031edd01c804affad3474b58d910a23af3bd4"
+  },
+  {
+   "lane": "hevc",
+   "name": "ENTP_C_LG_3.bit",
+   "path": ".research/m1d4/fate-suite/hevc-conformance/ENTP_C_LG_3.bit",
+   "bytes": 5371407,
+   "sha256": "701be23df18ed14f9c03b4f23f2c2974fe75d7e83e0401d8f88a5bd2d8d07dc8"
+  },
+  {
+   "lane": "hevc",
+   "name": "ENTP_C_Qualcomm_1.bit",
+   "path": ".research/m1d4/fate-suite/hevc-conformance/ENTP_C_Qualcomm_1.bit",
+   "bytes": 218579,
+   "sha256": "993cd68f0e749cd1d9ce7cc3a368b4df26dccf07ded91048100217b9a0c56d28"
+  },
+  {
+   "lane": "hevc",
+   "name": "EXT_A_ericsson_3.bit",
+   "path": ".research/m1d4/fate-suite/hevc-conformance/EXT_A_ericsson_3.bit",
+   "bytes": 27620,
+   "sha256": "63f4532b481122f883d355d2d5d9a54b850a1dac3363385e0d2bfb63fedfc3dc"
+  },
+  {
+   "lane": "hevc",
+   "name": "EXT_A_ericsson_4.bit",
+   "path": ".research/m1d4/fate-suite/hevc-conformance/EXT_A_ericsson_4.bit",
+   "bytes": 27554,
+   "sha256": "1322c36a7c283f258fed90fc15f6f8dfe40bd621b090716dde9cce5c06f71e05"
+  },
+  {
+   "lane": "hevc",
+   "name": "FILLER_A_Sony_1.bit",
+   "path": ".research/m1d4/fate-suite/hevc-conformance/FILLER_A_Sony_1.bit",
+   "bytes": 285041,
+   "sha256": "63669795a10c50c898ef19bd75568cd8a6ae0a16797898f629692d4c6315fa31"
+  },
+  {
+   "lane": "hevc",
+   "name": "HRD_A_Fujitsu_2.bit",
+   "path": ".research/m1d4/fate-suite/hevc-conformance/HRD_A_Fujitsu_2.bit",
+   "bytes": 149511,
+   "sha256": "76a22e1d92a15ad5b0e9ef6d9c337094ee36ff973a7366c976c38aeb8082a21d"
+  },
+  {
+   "lane": "hevc",
+   "name": "HRD_A_Fujitsu_3.bit",
+   "path": ".research/m1d4/fate-suite/hevc-conformance/HRD_A_Fujitsu_3.bit",
+   "bytes": 149080,
+   "sha256": "61af83565147e9dc23842847111e748d32d95830d88cd3855a66143ea08d6915"
+  },
+  {
+   "lane": "hevc",
+   "name": "INITQP_A_Sony_1.bit",
+   "path": ".research/m1d4/fate-suite/hevc-conformance/INITQP_A_Sony_1.bit",
+   "bytes": 289114,
+   "sha256": "24bdf9511d93696aff09568f8698edae81fff52a6b551fc7d79965f8b4e10cab"
+  },
+  {
+   "lane": "hevc",
+   "name": "INITQP_B_Sony_1.bit",
+   "path": ".research/m1d4/fate-suite/hevc-conformance/INITQP_B_Sony_1.bit",
+   "bytes": 406866,
+   "sha256": "47a3eeabb3896b0af8f60c7a32475d69047409d609a740ef8b65c50c36c01401"
+  },
+  {
+   "lane": "hevc",
+   "name": "IPCM_A_RExt_NEC.bit",
+   "path": ".research/m1d4/fate-suite/hevc-conformance/IPCM_A_RExt_NEC.bit",
+   "bytes": 4255,
+   "sha256": "0e707edd0d6c46427bddff2ded8dafe2420ffe1bc57a81501097d068ae293562"
+  },
+  {
+   "lane": "hevc",
+   "name": "IPCM_B_RExt_NEC.bit",
+   "path": ".research/m1d4/fate-suite/hevc-conformance/IPCM_B_RExt_NEC.bit",
+   "bytes": 4973,
+   "sha256": "39f97b25079ce5f12340cce43c9dbd5821c5e23f44da58dd6f1942e135bc93b5"
+  },
+  {
+   "lane": "hevc",
+   "name": "IPRED_A_docomo_2.bit",
+   "path": ".research/m1d4/fate-suite/hevc-conformance/IPRED_A_docomo_2.bit",
+   "bytes": 335377,
+   "sha256": "db440d8ce43ba3706a42b7c42095464dace247dbc4651d37c9787e5eb4aa3875"
+  },
+  {
+   "lane": "hevc",
+   "name": "IPRED_B_Nokia_3.bit",
+   "path": ".research/m1d4/fate-suite/hevc-conformance/IPRED_B_Nokia_3.bit",
+   "bytes": 29168,
+   "sha256": "456608ae5c14fea0496d770ae9614cd3d7c6ae98c14b22d64bbd96b37f49d7a0"
+  },
+  {
+   "lane": "hevc",
+   "name": "IPRED_C_Mitsubishi_2.bit",
+   "path": ".research/m1d4/fate-suite/hevc-conformance/IPRED_C_Mitsubishi_2.bit",
+   "bytes": 163252,
+   "sha256": "c4bf9e2b266c62b3faedba7eb2c78ab7935f07acab250cfb4d82f5cc106a19ec"
+  },
+  {
+   "lane": "hevc",
+   "name": "IPRED_C_Mitsubishi_3.bit",
+   "path": ".research/m1d4/fate-suite/hevc-conformance/IPRED_C_Mitsubishi_3.bit",
+   "bytes": 257348,
+   "sha256": "dbad5ee9c095c0336deb4ab7c7785153da20f10ef941cac0fd27c04cb9c9ec95"
+  },
+  {
+   "lane": "hevc",
+   "name": "LS_A_Orange_2.bit",
+   "path": ".research/m1d4/fate-suite/hevc-conformance/LS_A_Orange_2.bit",
+   "bytes": 593001,
+   "sha256": "14251238f005a4576437429a327b34d216b346aaac2a7a05c132a3430174b11b"
+  },
+  {
+   "lane": "hevc",
+   "name": "LS_B_ORANGE_3.bit",
+   "path": ".research/m1d4/fate-suite/hevc-conformance/LS_B_ORANGE_3.bit",
+   "bytes": 3699418,
+   "sha256": "0d9a71541f971d7694dda1c829377cf1a30c6c55f8e2c39fecb6b24ff9e82519"
+  },
+  {
+   "lane": "hevc",
+   "name": "LS_B_ORANGE_4.bit",
+   "path": ".research/m1d4/fate-suite/hevc-conformance/LS_B_ORANGE_4.bit",
+   "bytes": 3699418,
+   "sha256": "0d9a71541f971d7694dda1c829377cf1a30c6c55f8e2c39fecb6b24ff9e82519"
+  },
+  {
+   "lane": "hevc",
+   "name": "LTRPSPS_A_Qualcomm_1.bit",
+   "path": ".research/m1d4/fate-suite/hevc-conformance/LTRPSPS_A_Qualcomm_1.bit",
+   "bytes": 490554,
+   "sha256": "8f8e50fa408b7e96e76e6936b380fc34c208271efb8c283b15a42cb1f8c78ae7"
+  },
+  {
+   "lane": "hevc",
+   "name": "MAXBINS_A_TI_4.bit",
+   "path": ".research/m1d4/fate-suite/hevc-conformance/MAXBINS_A_TI_4.bit",
+   "bytes": 442541,
+   "sha256": "501c050b158e4effe69256d23b42c9c9842f938a7eb59ee2291db9eb811ee9c0"
+  },
+  {
+   "lane": "hevc",
+   "name": "MAXBINS_B_TI_4.bit",
+   "path": ".research/m1d4/fate-suite/hevc-conformance/MAXBINS_B_TI_4.bit",
+   "bytes": 232973,
+   "sha256": "75205b9b52539d96e3f7770d14adf1a25da3000f2c58f7cefe1772b2b829b798"
+  },
+  {
+   "lane": "hevc",
+   "name": "MAXBINS_C_TI_4.bit",
+   "path": ".research/m1d4/fate-suite/hevc-conformance/MAXBINS_C_TI_4.bit",
+   "bytes": 232661,
+   "sha256": "6ae91c024db189a59abe82f7495ad79a7f276bca0bb0049c64e06fba6a98e056"
+  },
+  {
+   "lane": "hevc",
+   "name": "MERGE_A_TI_3.bit",
+   "path": ".research/m1d4/fate-suite/hevc-conformance/MERGE_A_TI_3.bit",
+   "bytes": 16374,
+   "sha256": "0a84103e548cf8944851cc33c7826ea5213245fd94517fd1071895740abce749"
+  },
+  {
+   "lane": "hevc",
+   "name": "MERGE_B_TI_3.bit",
+   "path": ".research/m1d4/fate-suite/hevc-conformance/MERGE_B_TI_3.bit",
+   "bytes": 16082,
+   "sha256": "a61399c23cff77098300cf96392cbcedd70c82c474458f8acf67a515df08cf19"
+  },
+  {
+   "lane": "hevc",
+   "name": "MERGE_C_TI_3.bit",
+   "path": ".research/m1d4/fate-suite/hevc-conformance/MERGE_C_TI_3.bit",
+   "bytes": 15995,
+   "sha256": "42096904b2145ed70a556aba2921f5e97284c8330f9b2aee50a7a1eae589cb51"
+  },
+  {
+   "lane": "hevc",
+   "name": "MERGE_D_TI_3.bit",
+   "path": ".research/m1d4/fate-suite/hevc-conformance/MERGE_D_TI_3.bit",
+   "bytes": 16006,
+   "sha256": "60a43e5ca40baa0e77617b9b392a2b6c75950ca0a9f8314ac42b01aea1f9880d"
+  },
+  {
+   "lane": "hevc",
+   "name": "MERGE_E_TI_3.bit",
+   "path": ".research/m1d4/fate-suite/hevc-conformance/MERGE_E_TI_3.bit",
+   "bytes": 15971,
+   "sha256": "e5f1f706176e91b72d13686b8864fe1c8e8be764faa417e3cabbf0df1cf78af0"
+  },
+  {
+   "lane": "hevc",
+   "name": "MERGE_F_MTK_4.bit",
+   "path": ".research/m1d4/fate-suite/hevc-conformance/MERGE_F_MTK_4.bit",
+   "bytes": 24558,
+   "sha256": "bdf3cdaf93284dfdabb4217bfa0e11ca2a54cd618e4d3b94ec131a1c73eabd36"
+  },
+  {
+   "lane": "hevc",
+   "name": "MERGE_G_HHI_4.bit",
+   "path": ".research/m1d4/fate-suite/hevc-conformance/MERGE_G_HHI_4.bit",
+   "bytes": 66094,
+   "sha256": "a7b157215595b68ddbb70d952fb786923826c26ecc448bbfe36f4df47f9abc5c"
+  },
+  {
+   "lane": "hevc",
+   "name": "MVCLIP_A_qualcomm_3.bit",
+   "path": ".research/m1d4/fate-suite/hevc-conformance/MVCLIP_A_qualcomm_3.bit",
+   "bytes": 100306,
+   "sha256": "9b287e76e0aa6943239debb517250e26489e72ad1bf504b5b2dd77d2a57dcba5"
+  },
+  {
+   "lane": "hevc",
+   "name": "MVDL1ZERO_A_docomo_3.bit",
+   "path": ".research/m1d4/fate-suite/hevc-conformance/MVDL1ZERO_A_docomo_3.bit",
+   "bytes": 1970408,
+   "sha256": "872a2ee8016796ffec9cf9d76fc91ce3a062ffb26a3d8468eac202367c2230ad"
+  },
+  {
+   "lane": "hevc",
+   "name": "MVEDGE_A_qualcomm_3.bit",
+   "path": ".research/m1d4/fate-suite/hevc-conformance/MVEDGE_A_qualcomm_3.bit",
+   "bytes": 51715,
+   "sha256": "aa19456c21b304b23e7dc568e8546982d66547bba15225a5d13b65ea27befa10"
+  },
+  {
+   "lane": "hevc",
+   "name": "MVHEVCS_A.bit",
+   "path": ".research/m1d4/fate-suite/hevc-conformance/MVHEVCS_A.bit",
+   "bytes": 214382,
+   "sha256": "f9358ead8ba3f7433713f4429d20ba7c75878a2a19090730026bb0926a2e9fa2"
+  },
+  {
+   "lane": "hevc",
+   "name": "MVHEVCS_B.bit",
+   "path": ".research/m1d4/fate-suite/hevc-conformance/MVHEVCS_B.bit",
+   "bytes": 616300,
+   "sha256": "bd34a09a13754b290c435f34744c53d41dec004b5796e03520b19f2c5d088696"
+  },
+  {
+   "lane": "hevc",
+   "name": "MVHEVCS_E.bit",
+   "path": ".research/m1d4/fate-suite/hevc-conformance/MVHEVCS_E.bit",
+   "bytes": 240393,
+   "sha256": "b83890b9691a496d37dae27dea81fd0ede1905e2a757d46646ce257e105de630"
+  },
+  {
+   "lane": "hevc",
+   "name": "MVHEVCS_F.bit",
+   "path": ".research/m1d4/fate-suite/hevc-conformance/MVHEVCS_F.bit",
+   "bytes": 268751,
+   "sha256": "6a09a8b5f2829d2d24fe13ce5ab5720154d3c8f2318cbf64bfd70ccae01b944a"
+  },
+  {
+   "lane": "hevc",
+   "name": "Main_422_10_A_RExt_Sony_1.bin",
+   "path": ".research/m1d4/fate-suite/hevc-conformance/Main_422_10_A_RExt_Sony_1.bin",
+   "bytes": 4072670,
+   "sha256": "91f796b1ef99c5391a4e1a2f3c5d64471290b642e272965201e7c7bb1bdac3be"
+  },
+  {
+   "lane": "hevc",
+   "name": "Main_422_10_B_RExt_Sony_1.bin",
+   "path": ".research/m1d4/fate-suite/hevc-conformance/Main_422_10_B_RExt_Sony_1.bin",
+   "bytes": 4217002,
+   "sha256": "57f4ad77560ad1698218b181f09fa42059a45408e285283ab49ef74dad2f796c"
+  },
+  {
+   "lane": "hevc",
+   "name": "NUT_A_ericsson_4.bit",
+   "path": ".research/m1d4/fate-suite/hevc-conformance/NUT_A_ericsson_4.bit",
+   "bytes": 302142,
+   "sha256": "d87dcae6353a680ff1c816395b578afae3ed9f1a88b56b07a24e62333e0621b7"
+  },
+  {
+   "lane": "hevc",
+   "name": "NUT_A_ericsson_5.bit",
+   "path": ".research/m1d4/fate-suite/hevc-conformance/NUT_A_ericsson_5.bit",
+   "bytes": 302142,
+   "sha256": "d87dcae6353a680ff1c816395b578afae3ed9f1a88b56b07a24e62333e0621b7"
+  },
+  {
+   "lane": "hevc",
+   "name": "NoOutPrior_A_Qualcomm_1.bit",
+   "path": ".research/m1d4/fate-suite/hevc-conformance/NoOutPrior_A_Qualcomm_1.bit",
+   "bytes": 139771,
+   "sha256": "cd01eedf3929a1ca4d917e933dfa5011ce7a5cc6ea46b23cb78a6e638fa50d2e"
+  },
+  {
+   "lane": "hevc",
+   "name": "NoOutPrior_B_Qualcomm_1.bit",
+   "path": ".research/m1d4/fate-suite/hevc-conformance/NoOutPrior_B_Qualcomm_1.bit",
+   "bytes": 142064,
+   "sha256": "d06212be8b66be424237dd084a9d1401dec2ac2bf1d08543629d870c8bf01994"
+  },
+  {
+   "lane": "hevc",
+   "name": "OPFLAG_A_Qualcomm_1.bit",
+   "path": ".research/m1d4/fate-suite/hevc-conformance/OPFLAG_A_Qualcomm_1.bit",
+   "bytes": 504908,
+   "sha256": "1fb75cf1426c0682f324fe0dcb029561cbc50aa813b9d91aa434d061610a123a"
+  },
+  {
+   "lane": "hevc",
+   "name": "OPFLAG_B_Qualcomm_1.bit",
+   "path": ".research/m1d4/fate-suite/hevc-conformance/OPFLAG_B_Qualcomm_1.bit",
+   "bytes": 2055485,
+   "sha256": "24cc9e1b1848673d45ecfd161a186bef7151a5e3b254ead5bcfa0ce93478cef7"
+  },
+  {
+   "lane": "hevc",
+   "name": "OPFLAG_C_Qualcomm_1.bit",
+   "path": ".research/m1d4/fate-suite/hevc-conformance/OPFLAG_C_Qualcomm_1.bit",
+   "bytes": 278706,
+   "sha256": "17016c7abdec5fdda16fb92a6b6521adf4d9485070a00d662b44665c1e247824"
+  },
+  {
+   "lane": "hevc",
+   "name": "PERSIST_RPARAM_A_RExt_Sony_1.bit",
+   "path": ".research/m1d4/fate-suite/hevc-conformance/PERSIST_RPARAM_A_RExt_Sony_1.bit",
+   "bytes": 707261,
+   "sha256": "e5e83ec018379e9bf83cad62a8f18ea7502261c8a554ab93cad16849154eca36"
+  },
+  {
+   "lane": "hevc",
+   "name": "PERSIST_RPARAM_A_RExt_Sony_3.bit",
+   "path": ".research/m1d4/fate-suite/hevc-conformance/PERSIST_RPARAM_A_RExt_Sony_3.bit",
+   "bytes": 707261,
+   "sha256": "5e1a69d29278e3e4cbd7695c7d3c229ac63c1e5e2b7af3b1c8f8062586ea1468"
+  },
+  {
+   "lane": "hevc",
+   "name": "PICSIZE_A_Bossen_1.bit",
+   "path": ".research/m1d4/fate-suite/hevc-conformance/PICSIZE_A_Bossen_1.bit",
+   "bytes": 419329,
+   "sha256": "3e490a54e23594294fe9e12b1c01880546ab2efcc7979d87d330a8428f1a1480"
+  },
+  {
+   "lane": "hevc",
+   "name": "PICSIZE_B_Bossen_1.bit",
+   "path": ".research/m1d4/fate-suite/hevc-conformance/PICSIZE_B_Bossen_1.bit",
+   "bytes": 337246,
+   "sha256": "f16bbcfb92d601cc0735641c9fd248591bcded97721a3d351d89bcfb6a48c2ad"
+  },
+  {
+   "lane": "hevc",
+   "name": "PICSIZE_C_Bossen_1.bit",
+   "path": ".research/m1d4/fate-suite/hevc-conformance/PICSIZE_C_Bossen_1.bit",
+   "bytes": 160080,
+   "sha256": "c16e7aab1f86ce96cbeb21577f3e6f66e50eb618a1cf9203abb00fef2d71e9ad"
+  },
+  {
+   "lane": "hevc",
+   "name": "PICSIZE_D_Bossen_1.bit",
+   "path": ".research/m1d4/fate-suite/hevc-conformance/PICSIZE_D_Bossen_1.bit",
+   "bytes": 76288,
+   "sha256": "bfdb504691a7228cb8b0acec17c56150464eb30fc3e3df6b5bf81e4d8e1898ca"
+  },
+  {
+   "lane": "hevc",
+   "name": "PMERGE_A_TI_3.bit",
+   "path": ".research/m1d4/fate-suite/hevc-conformance/PMERGE_A_TI_3.bit",
+   "bytes": 15971,
+   "sha256": "e5f1f706176e91b72d13686b8864fe1c8e8be764faa417e3cabbf0df1cf78af0"
+  },
+  {
+   "lane": "hevc",
+   "name": "PMERGE_B_TI_3.bit",
+   "path": ".research/m1d4/fate-suite/hevc-conformance/PMERGE_B_TI_3.bit",
+   "bytes": 16016,
+   "sha256": "c4830df0041aceaada75eb7233be96a4a8d3e1fb0ee72c4f9a7f40cf5d55514b"
+  },
+  {
+   "lane": "hevc",
+   "name": "PMERGE_C_TI_3.bit",
+   "path": ".research/m1d4/fate-suite/hevc-conformance/PMERGE_C_TI_3.bit",
+   "bytes": 16056,
+   "sha256": "ec68d2adca61ba94603fceafabcd865f17072ef67f04ec1cd97ab00ffb247944"
+  },
+  {
+   "lane": "hevc",
+   "name": "PMERGE_D_TI_3.bit",
+   "path": ".research/m1d4/fate-suite/hevc-conformance/PMERGE_D_TI_3.bit",
+   "bytes": 16169,
+   "sha256": "afb2952a6a4e2f446340d4053a6f5268028e3b61be52f5cee779c36275c4877a"
+  },
+  {
+   "lane": "hevc",
+   "name": "PMERGE_E_TI_3.bit",
+   "path": ".research/m1d4/fate-suite/hevc-conformance/PMERGE_E_TI_3.bit",
+   "bytes": 16369,
+   "sha256": "fc3d15683748f42229c64ce58804a9174686b79749e24f580337c2cb77e46feb"
+  },
+  {
+   "lane": "hevc",
+   "name": "POC_A_Bossen_3.bit",
+   "path": ".research/m1d4/fate-suite/hevc-conformance/POC_A_Bossen_3.bit",
+   "bytes": 85374,
+   "sha256": "0830773b2c3f6ef85ec973f09a08dfd0f1e7a36e05936d4b1fc0b6c014a3a639"
+  },
+  {
+   "lane": "hevc",
+   "name": "PPS_A_qualcomm_7.bit",
+   "path": ".research/m1d4/fate-suite/hevc-conformance/PPS_A_qualcomm_7.bit",
+   "bytes": 407074,
+   "sha256": "2382b56a09bc9bff001cc4b1e90826219c17324de944acce5dde490032322128"
+  },
+  {
+   "lane": "hevc",
+   "name": "PS_A_VIDYO_3.bit",
+   "path": ".research/m1d4/fate-suite/hevc-conformance/PS_A_VIDYO_3.bit",
+   "bytes": 17058,
+   "sha256": "6ab5194e7d9931e8618661f19f474ebb9f332705debdc7a85da900e22d8f2e13"
+  },
+  {
+   "lane": "hevc",
+   "name": "PS_B_VIDYO_3.bit",
+   "path": ".research/m1d4/fate-suite/hevc-conformance/PS_B_VIDYO_3.bit",
+   "bytes": 17052,
+   "sha256": "3f16134cdcaea5a2cc33a4b539693c3af1bf0e78b7c5ca051a7fb1d8ddc41ce3"
+  },
+  {
+   "lane": "hevc",
+   "name": "QMATRIX_A_RExt_Sony_1.bit",
+   "path": ".research/m1d4/fate-suite/hevc-conformance/QMATRIX_A_RExt_Sony_1.bit",
+   "bytes": 236915,
+   "sha256": "74847e07f3298923da0e9b68b1f861930d227bd5ad83a834a8280cf042a7e78f"
+  },
+  {
+   "lane": "hevc",
+   "name": "RAP_A_docomo_4.bit",
+   "path": ".research/m1d4/fate-suite/hevc-conformance/RAP_A_docomo_4.bit",
+   "bytes": 110162,
+   "sha256": "1d6c938a2d42391a81b52b1e4db8c83803bc3c0fe75f2aece191daade539faeb"
+  },
+  {
+   "lane": "hevc",
+   "name": "RAP_B_Bossen_1.bit",
+   "path": ".research/m1d4/fate-suite/hevc-conformance/RAP_B_Bossen_1.bit",
+   "bytes": 120616,
+   "sha256": "f8718a7b9a58a40845601879a167566fea4a842e4919be63569836974518224a"
+  },
+  {
+   "lane": "hevc",
+   "name": "RPLM_A_qualcomm_4.bit",
+   "path": ".research/m1d4/fate-suite/hevc-conformance/RPLM_A_qualcomm_4.bit",
+   "bytes": 206075,
+   "sha256": "b2994be2579c6835a16d14e8404470caa97d72d45312500703c59f3189075caa"
+  },
+  {
+   "lane": "hevc",
+   "name": "RPLM_B_qualcomm_4.bit",
+   "path": ".research/m1d4/fate-suite/hevc-conformance/RPLM_B_qualcomm_4.bit",
+   "bytes": 223289,
+   "sha256": "18d7bc82140f7f117acb48eb62c63d6dcda453bee0eda0975172b1c6012c4be2"
+  },
+  {
+   "lane": "hevc",
+   "name": "RPS_A_docomo_4.bit",
+   "path": ".research/m1d4/fate-suite/hevc-conformance/RPS_A_docomo_4.bit",
+   "bytes": 64948,
+   "sha256": "e7a90335952dc5718d931adb461d90049eb558b4d08c90ff1706612f8bca4439"
+  },
+  {
+   "lane": "hevc",
+   "name": "RPS_B_qualcomm_5.bit",
+   "path": ".research/m1d4/fate-suite/hevc-conformance/RPS_B_qualcomm_5.bit",
+   "bytes": 222629,
+   "sha256": "a5e2097201740c15824b75540b6d0d5050763681bedf7209cde80d93a3b88996"
+  },
+  {
+   "lane": "hevc",
+   "name": "RPS_C_ericsson_4.bit",
+   "path": ".research/m1d4/fate-suite/hevc-conformance/RPS_C_ericsson_4.bit",
+   "bytes": 353900,
+   "sha256": "87c9897397ebfa8b8e08400cd6b7fdebdaed171c2e453b3c596c91285c073f5a"
+  },
+  {
+   "lane": "hevc",
+   "name": "RPS_C_ericsson_5.bit",
+   "path": ".research/m1d4/fate-suite/hevc-conformance/RPS_C_ericsson_5.bit",
+   "bytes": 354259,
+   "sha256": "b0aa060407b3ad9a558a1212645a1bf137187f2dce8bf47f312efa1bd19ded6e"
+  },
+  {
+   "lane": "hevc",
+   "name": "RPS_D_ericsson_5.bit",
+   "path": ".research/m1d4/fate-suite/hevc-conformance/RPS_D_ericsson_5.bit",
+   "bytes": 561107,
+   "sha256": "e818e14f50bf73364b405ca3b07c407fdf191bcb2293552d3af8fc3bfcd1aca0"
+  },
+  {
+   "lane": "hevc",
+   "name": "RPS_D_ericsson_6.bit",
+   "path": ".research/m1d4/fate-suite/hevc-conformance/RPS_D_ericsson_6.bit",
+   "bytes": 561107,
+   "sha256": "e818e14f50bf73364b405ca3b07c407fdf191bcb2293552d3af8fc3bfcd1aca0"
+  },
+  {
+   "lane": "hevc",
+   "name": "RPS_E_qualcomm_5.bit",
+   "path": ".research/m1d4/fate-suite/hevc-conformance/RPS_E_qualcomm_5.bit",
+   "bytes": 438168,
+   "sha256": "b82c5c8c251943cc41b59e7f63f72890641fdcdbcec8e916223e4ee28a16c7ad"
+  },
+  {
+   "lane": "hevc",
+   "name": "RPS_F_docomo_1.bit",
+   "path": ".research/m1d4/fate-suite/hevc-conformance/RPS_F_docomo_1.bit",
+   "bytes": 79966,
+   "sha256": "57588b676e3d1c2b82b761671c66383fac2b5c9c3eb98644c70a8e5fed486ed6"
+  },
+  {
+   "lane": "hevc",
+   "name": "RQT_A_HHI_4.bit",
+   "path": ".research/m1d4/fate-suite/hevc-conformance/RQT_A_HHI_4.bit",
+   "bytes": 66244,
+   "sha256": "c07a976943200d97ba9eb0a16a858d2c77fb3fe37410c6c6f956e5960b2f4621"
+  },
+  {
+   "lane": "hevc",
+   "name": "RQT_B_HHI_4.bit",
+   "path": ".research/m1d4/fate-suite/hevc-conformance/RQT_B_HHI_4.bit",
+   "bytes": 66149,
+   "sha256": "49a8037bbbed4efa8de285c522d215c3c5a117dd58d17822db0ffb9808161e29"
+  },
+  {
+   "lane": "hevc",
+   "name": "RQT_C_HHI_4.bit",
+   "path": ".research/m1d4/fate-suite/hevc-conformance/RQT_C_HHI_4.bit",
+   "bytes": 66094,
+   "sha256": "a7b157215595b68ddbb70d952fb786923826c26ecc448bbfe36f4df47f9abc5c"
+  },
+  {
+   "lane": "hevc",
+   "name": "RQT_D_HHI_4.bit",
+   "path": ".research/m1d4/fate-suite/hevc-conformance/RQT_D_HHI_4.bit",
+   "bytes": 66078,
+   "sha256": "6b37468d7e4acf7d1fb97bf0062e0124785d3bda1284e1f698a1e8eb6441d76b"
+  },
+  {
+   "lane": "hevc",
+   "name": "RQT_E_HHI_4.bit",
+   "path": ".research/m1d4/fate-suite/hevc-conformance/RQT_E_HHI_4.bit",
+   "bytes": 84820,
+   "sha256": "d792e442c19d9ffc45f43a8842c7a6ad57d0a51d62364c43ef97810689c2eea8"
+  },
+  {
+   "lane": "hevc",
+   "name": "RQT_F_HHI_4.bit",
+   "path": ".research/m1d4/fate-suite/hevc-conformance/RQT_F_HHI_4.bit",
+   "bytes": 66027,
+   "sha256": "f784a12b06a78deafc2ab5fb51af6cbaa105e1b72ebf88e2fb28536f771fac9a"
+  },
+  {
+   "lane": "hevc",
+   "name": "RQT_G_HHI_4.bit",
+   "path": ".research/m1d4/fate-suite/hevc-conformance/RQT_G_HHI_4.bit",
+   "bytes": 66314,
+   "sha256": "3ce2c5f477fc2762d2153a373dbc4e5a6387c98035f34dfd32008cc7667286d3"
+  },
+  {
+   "lane": "hevc",
+   "name": "SAO_A_MediaTek_4.bit",
+   "path": ".research/m1d4/fate-suite/hevc-conformance/SAO_A_MediaTek_4.bit",
+   "bytes": 52606,
+   "sha256": "88f693ac4aec4dea03cb4bc0cb9d8c98a4023a015905369bb62688064fb58944"
+  },
+  {
+   "lane": "hevc",
+   "name": "SAO_A_RExt_MediaTek_1.bit",
+   "path": ".research/m1d4/fate-suite/hevc-conformance/SAO_A_RExt_MediaTek_1.bit",
+   "bytes": 1466031,
+   "sha256": "6b0d45b5ca4d4919eaec5a98daf0eb4cebcc6d8b0a12b30b748386cc9358df13"
+  },
+  {
+   "lane": "hevc",
+   "name": "SAO_B_MediaTek_5.bit",
+   "path": ".research/m1d4/fate-suite/hevc-conformance/SAO_B_MediaTek_5.bit",
+   "bytes": 163006,
+   "sha256": "77fb629a562234f2fea44886dafb597565d85433d9d9c4f22c208f5552950009"
+  },
+  {
+   "lane": "hevc",
+   "name": "SAO_C_Samsung_4.bit",
+   "path": ".research/m1d4/fate-suite/hevc-conformance/SAO_C_Samsung_4.bit",
+   "bytes": 53402,
+   "sha256": "dd33ab118cc5bedb09ad94b980c1508663333871e860c81a55d7f97fbc4334c5"
+  },
+  {
+   "lane": "hevc",
+   "name": "SAO_C_Samsung_5.bit",
+   "path": ".research/m1d4/fate-suite/hevc-conformance/SAO_C_Samsung_5.bit",
+   "bytes": 449008,
+   "sha256": "45c4b761e6f1d833b4e206ffadea66e8f5a3f5f1984ed0c29519eb9c0d666b4d"
+  },
+  {
+   "lane": "hevc",
+   "name": "SAO_D_Samsung_4.bit",
+   "path": ".research/m1d4/fate-suite/hevc-conformance/SAO_D_Samsung_4.bit",
+   "bytes": 65827,
+   "sha256": "60ca9e0cccd8e745e20637ff333232d6c7b092c859f6ea6e8745e54c4a44c26a"
+  },
+  {
+   "lane": "hevc",
+   "name": "SAO_D_Samsung_5.bit",
+   "path": ".research/m1d4/fate-suite/hevc-conformance/SAO_D_Samsung_5.bit",
+   "bytes": 462536,
+   "sha256": "84e1a6307db2a05144c73a5dbc338fc286c0a4f1c45ed04fc0182f8119d80c6c"
+  },
+  {
+   "lane": "hevc",
+   "name": "SAO_E_Canon_4.bit",
+   "path": ".research/m1d4/fate-suite/hevc-conformance/SAO_E_Canon_4.bit",
+   "bytes": 102584,
+   "sha256": "a3a3cbf0fbf4a1335070a085d0b01aa8064889e9c74ac7081631349fbc2c5915"
+  },
+  {
+   "lane": "hevc",
+   "name": "SAO_F_Canon_3.bit",
+   "path": ".research/m1d4/fate-suite/hevc-conformance/SAO_F_Canon_3.bit",
+   "bytes": 37408,
+   "sha256": "6e663fdf83681e8989f6b5e25a4d62e0a93f1024f0c4dd785e896c6db81caeed"
+  },
+  {
+   "lane": "hevc",
+   "name": "SAO_G_Canon_3.bit",
+   "path": ".research/m1d4/fate-suite/hevc-conformance/SAO_G_Canon_3.bit",
+   "bytes": 20038,
+   "sha256": "74224b18c1864efadaf9c06427905e9cd6e847e324a100d2373e4c780726b305"
+  },
+  {
+   "lane": "hevc",
+   "name": "SDH_A_Orange_3.bit",
+   "path": ".research/m1d4/fate-suite/hevc-conformance/SDH_A_Orange_3.bit",
+   "bytes": 1387921,
+   "sha256": "f7ba1c81185fe400d3486d1975e98d7e613fcd38f51bc52572d207135c1dcb58"
+  },
+  {
+   "lane": "hevc",
+   "name": "SLICES_A_Rovi_3.bit",
+   "path": ".research/m1d4/fate-suite/hevc-conformance/SLICES_A_Rovi_3.bit",
+   "bytes": 65943,
+   "sha256": "7440908beaa68768ee66b7af5823a28ce0716d90aa1b49de630d2c5aa555d955"
+  },
+  {
+   "lane": "hevc",
+   "name": "SLIST_A_Sony_4.bit",
+   "path": ".research/m1d4/fate-suite/hevc-conformance/SLIST_A_Sony_4.bit",
+   "bytes": 372917,
+   "sha256": "5bb955a9296a7fd6132137c49c1b329b817118a9f73f0222444ec2ba75519438"
+  },
+  {
+   "lane": "hevc",
+   "name": "SLIST_B_Sony_8.bit",
+   "path": ".research/m1d4/fate-suite/hevc-conformance/SLIST_B_Sony_8.bit",
+   "bytes": 344203,
+   "sha256": "94ac8ba55b5a528618720aab5f1a2a192a044a760c007d2f33dc1f89bc0e9833"
+  },
+  {
+   "lane": "hevc",
+   "name": "SLIST_C_Sony_3.bit",
+   "path": ".research/m1d4/fate-suite/hevc-conformance/SLIST_C_Sony_3.bit",
+   "bytes": 367546,
+   "sha256": "be7af3ff7974e90999e2155731cc033257382237263e2a3aab96094dd04bf27b"
+  },
+  {
+   "lane": "hevc",
+   "name": "SLIST_D_Sony_9.bit",
+   "path": ".research/m1d4/fate-suite/hevc-conformance/SLIST_D_Sony_9.bit",
+   "bytes": 354557,
+   "sha256": "f3d8468f5cd0ca4e4a2e78c372500f4859f95395e9f1c9c85b357e3dddd135e8"
+  },
+  {
+   "lane": "hevc",
+   "name": "SLPPLP_A_VIDYO_1.bit",
+   "path": ".research/m1d4/fate-suite/hevc-conformance/SLPPLP_A_VIDYO_1.bit",
+   "bytes": 22822,
+   "sha256": "405323c9b6b95028d9eb050a8593c9f9e0a6057ef211210cbe4bc200341274e9"
+  },
+  {
+   "lane": "hevc",
+   "name": "SLPPLP_A_VIDYO_2.bit",
+   "path": ".research/m1d4/fate-suite/hevc-conformance/SLPPLP_A_VIDYO_2.bit",
+   "bytes": 22822,
+   "sha256": "48f9cecfe1f86654fca3eb327c0914eec475bcf0fb8f6f726632976e5b34e2a6"
+  },
+  {
+   "lane": "hevc",
+   "name": "STRUCT_A_Samsung_5.bit",
+   "path": ".research/m1d4/fate-suite/hevc-conformance/STRUCT_A_Samsung_5.bit",
+   "bytes": 146580,
+   "sha256": "ce7c195b1f2810e2b40f95b4e2b23e9bae4e8576e20dae5ae7900dfbdaf1f5f5"
+  },
+  {
+   "lane": "hevc",
+   "name": "STRUCT_B_Samsung_4.bit",
+   "path": ".research/m1d4/fate-suite/hevc-conformance/STRUCT_B_Samsung_4.bit",
+   "bytes": 325535,
+   "sha256": "a72a878e64425b2e1f07ed04ed4ff90d4061525797c713567d07c8487a8669fd"
+  },
+  {
+   "lane": "hevc",
+   "name": "STRUCT_B_Samsung_6.bit",
+   "path": ".research/m1d4/fate-suite/hevc-conformance/STRUCT_B_Samsung_6.bit",
+   "bytes": 325643,
+   "sha256": "0451b520b45172327cd3431308b2dac873b65f23a2eb6baa64f48dc24e6e2984"
+  },
+  {
+   "lane": "hevc",
+   "name": "TILES_A_Cisco_2.bit",
+   "path": ".research/m1d4/fate-suite/hevc-conformance/TILES_A_Cisco_2.bit",
+   "bytes": 484767,
+   "sha256": "eff78a401ecccc21d995345988f1be60ee76604cf10fa39d421c3e00668a94d6"
+  },
+  {
+   "lane": "hevc",
+   "name": "TILES_B_Cisco_1.bit",
+   "path": ".research/m1d4/fate-suite/hevc-conformance/TILES_B_Cisco_1.bit",
+   "bytes": 533127,
+   "sha256": "d2f65167917e42030db804c60ca7775452445a61930ccee3fa2ad2cd3830a57a"
+  },
+  {
+   "lane": "hevc",
+   "name": "TMVP_A_MS_2.bit",
+   "path": ".research/m1d4/fate-suite/hevc-conformance/TMVP_A_MS_2.bit",
+   "bytes": 16401,
+   "sha256": "8bf3ae49dc68f6c6672515a7219708257f678a6e3ab7ab87d3bfcb842f9dc381"
+  },
+  {
+   "lane": "hevc",
+   "name": "TMVP_A_MS_3.bit",
+   "path": ".research/m1d4/fate-suite/hevc-conformance/TMVP_A_MS_3.bit",
+   "bytes": 17238,
+   "sha256": "33556aa42355ba43575a6e6f1b579420a9217f576fc0ae07ee57fa2750a38d52"
+  },
+  {
+   "lane": "hevc",
+   "name": "TSCL_A_VIDYO_5.bit",
+   "path": ".research/m1d4/fate-suite/hevc-conformance/TSCL_A_VIDYO_5.bit",
+   "bytes": 46546,
+   "sha256": "cab7d7ea801a5ee7d1ff495c98cf5e4eafa2c4fb32cc1473443f69f2457cfd16"
+  },
+  {
+   "lane": "hevc",
+   "name": "TSCL_B_VIDYO_4.bit",
+   "path": ".research/m1d4/fate-suite/hevc-conformance/TSCL_B_VIDYO_4.bit",
+   "bytes": 53530,
+   "sha256": "cdeff7b17f020f79f8c0d9264748f5f9104657e5900fb126858fda93be90f610"
+  },
+  {
+   "lane": "hevc",
+   "name": "TSKIP_A_MS_2.bit",
+   "path": ".research/m1d4/fate-suite/hevc-conformance/TSKIP_A_MS_2.bit",
+   "bytes": 204388,
+   "sha256": "fccdbfdec2078b36be8631283b1fe39b7b0f8757b9036ef6225c73c944c719a6"
+  },
+  {
+   "lane": "hevc",
+   "name": "TSKIP_A_MS_3.bit",
+   "path": ".research/m1d4/fate-suite/hevc-conformance/TSKIP_A_MS_3.bit",
+   "bytes": 86128,
+   "sha256": "8407a07198b8db84e2fb2aef5c06d2d73f32bd0e4ddf08c5a9455481dcd73141"
+  },
+  {
+   "lane": "hevc",
+   "name": "TSUNEQBD_A_MAIN10_Technicolor_2.bit",
+   "path": ".research/m1d4/fate-suite/hevc-conformance/TSUNEQBD_A_MAIN10_Technicolor_2.bit",
+   "bytes": 209282,
+   "sha256": "a0b12cc3b180a410614931c94a693852c34aa89587a934aa5af9dbaa10cd7dfc"
+  },
+  {
+   "lane": "hevc",
+   "name": "TUSIZE_A_Samsung_1.bit",
+   "path": ".research/m1d4/fate-suite/hevc-conformance/TUSIZE_A_Samsung_1.bit",
+   "bytes": 1238476,
+   "sha256": "23c9959a0dd09d9a0b9c64b980794ca18214d7a3cb0fd091ca87f98dda75acf4"
+  },
+  {
+   "lane": "hevc",
+   "name": "VPSID_A_VIDYO_1.bit",
+   "path": ".research/m1d4/fate-suite/hevc-conformance/VPSID_A_VIDYO_1.bit",
+   "bytes": 22786,
+   "sha256": "d5b26ee12d87b03082038e7a3b0de0ac661f13257aef434c8c0c4a0af459c75e"
+  },
+  {
+   "lane": "hevc",
+   "name": "VPSID_A_VIDYO_2.bit",
+   "path": ".research/m1d4/fate-suite/hevc-conformance/VPSID_A_VIDYO_2.bit",
+   "bytes": 22787,
+   "sha256": "d86bb746dadb63bdf561615a1de7860b2336c7616462507453e0fcec3ddf27f3"
+  },
+  {
+   "lane": "hevc",
+   "name": "WPP_A_ericsson_MAIN10_2.bit",
+   "path": ".research/m1d4/fate-suite/hevc-conformance/WPP_A_ericsson_MAIN10_2.bit",
+   "bytes": 67071,
+   "sha256": "3b0d7323bf81d64d3c1443c9cebb8df6a42e0719ed422e64125e03971999b956"
+  },
+  {
+   "lane": "hevc",
+   "name": "WPP_A_ericsson_MAIN_2.bit",
+   "path": ".research/m1d4/fate-suite/hevc-conformance/WPP_A_ericsson_MAIN_2.bit",
+   "bytes": 67554,
+   "sha256": "54d896d9fbdfa0aae15629001105c6ee132c8459e152abb06efc62cead4324ae"
+  },
+  {
+   "lane": "hevc",
+   "name": "WPP_B_ericsson_MAIN10_2.bit",
+   "path": ".research/m1d4/fate-suite/hevc-conformance/WPP_B_ericsson_MAIN10_2.bit",
+   "bytes": 68408,
+   "sha256": "64de8e2d12825ad760012421f6c334c71d62bf7a6d5c35af96eb76548f911fbc"
+  },
+  {
+   "lane": "hevc",
+   "name": "WPP_B_ericsson_MAIN_2.bit",
+   "path": ".research/m1d4/fate-suite/hevc-conformance/WPP_B_ericsson_MAIN_2.bit",
+   "bytes": 68895,
+   "sha256": "f1d18f737a9380f6ce58b6aeae158af458c5b557e06dd24977b7a5c6e095b9b2"
+  },
+  {
+   "lane": "hevc",
+   "name": "WPP_C_ericsson_MAIN10_2.bit",
+   "path": ".research/m1d4/fate-suite/hevc-conformance/WPP_C_ericsson_MAIN10_2.bit",
+   "bytes": 71447,
+   "sha256": "707d0aa04dbb25f57be710c3fa2216d93c0a4f4d0cc950b2564f2aab6686d047"
+  },
+  {
+   "lane": "hevc",
+   "name": "WPP_C_ericsson_MAIN_2.bit",
+   "path": ".research/m1d4/fate-suite/hevc-conformance/WPP_C_ericsson_MAIN_2.bit",
+   "bytes": 71856,
+   "sha256": "21cf0a7c5f6fba5a76c7132a2714313d120d1443a0130400fb55ab1e454d5bda"
+  },
+  {
+   "lane": "hevc",
+   "name": "WPP_D_ericsson_MAIN10_2.bit",
+   "path": ".research/m1d4/fate-suite/hevc-conformance/WPP_D_ericsson_MAIN10_2.bit",
+   "bytes": 22299,
+   "sha256": "eb411ab3baedf154ad85db24f11e4537177f04e995df4d609ef6f4ae9641aaa9"
+  },
+  {
+   "lane": "hevc",
+   "name": "WPP_D_ericsson_MAIN_2.bit",
+   "path": ".research/m1d4/fate-suite/hevc-conformance/WPP_D_ericsson_MAIN_2.bit",
+   "bytes": 22474,
+   "sha256": "30eec63f2324aa982fb91bd4c1c551c833c253ba711ee131aa9cc4d322398caf"
+  },
+  {
+   "lane": "hevc",
+   "name": "WPP_E_ericsson_MAIN10_2.bit",
+   "path": ".research/m1d4/fate-suite/hevc-conformance/WPP_E_ericsson_MAIN10_2.bit",
+   "bytes": 29618,
+   "sha256": "f22251fff614135de5a5b2ada01f793ea4c511fad773acda0e8fd411dfe84e76"
+  },
+  {
+   "lane": "hevc",
+   "name": "WPP_E_ericsson_MAIN_2.bit",
+   "path": ".research/m1d4/fate-suite/hevc-conformance/WPP_E_ericsson_MAIN_2.bit",
+   "bytes": 29642,
+   "sha256": "c8fe49762a13e1cc2b033308bb22aeb35da0c96f94ca8ef7d87d95bdadaeaa2c"
+  },
+  {
+   "lane": "hevc",
+   "name": "WPP_F_ericsson_MAIN10_2.bit",
+   "path": ".research/m1d4/fate-suite/hevc-conformance/WPP_F_ericsson_MAIN10_2.bit",
+   "bytes": 31389,
+   "sha256": "f772dc0d6ec106478ced3ac598e459d9273e260fb56734e055364653f46e79f1"
+  },
+  {
+   "lane": "hevc",
+   "name": "WPP_F_ericsson_MAIN_2.bit",
+   "path": ".research/m1d4/fate-suite/hevc-conformance/WPP_F_ericsson_MAIN_2.bit",
+   "bytes": 31461,
+   "sha256": "e8566e0e48509592dfaf7d314b7e292f51cede045559e3c32b447a9822a8b949"
+  },
+  {
+   "lane": "hevc",
+   "name": "WPP_HIGH_TP_444_8BIT_RExt_Apple_2.bit",
+   "path": ".research/m1d4/fate-suite/hevc-conformance/WPP_HIGH_TP_444_8BIT_RExt_Apple_2.bit",
+   "bytes": 49108,
+   "sha256": "2b7110f868bfb62da8282a0a6300408d7abad70a5a940a6a0ba1fbc69536f870"
+  },
+  {
+   "lane": "hevc",
+   "name": "WP_A_MAIN10_Toshiba_3.bit",
+   "path": ".research/m1d4/fate-suite/hevc-conformance/WP_A_MAIN10_Toshiba_3.bit",
+   "bytes": 36225,
+   "sha256": "3be359e9c70f56e478bb0c0710dcea112252541570f81856cc9f3dba3d988263"
+  },
+  {
+   "lane": "hevc",
+   "name": "WP_A_Toshiba_3.bit",
+   "path": ".research/m1d4/fate-suite/hevc-conformance/WP_A_Toshiba_3.bit",
+   "bytes": 36389,
+   "sha256": "d052c54c39078ee6d546a431094b53df633e0c17777e2bed693e7999b0ba29c5"
+  },
+  {
+   "lane": "hevc",
+   "name": "WP_B_Toshiba_3.bit",
+   "path": ".research/m1d4/fate-suite/hevc-conformance/WP_B_Toshiba_3.bit",
+   "bytes": 36403,
+   "sha256": "c638c1c1052639ac52bf6c1ffe5b5bee55484ccfb56c13bcdc2a085fdb066799"
+  },
+  {
+   "lane": "hevc",
+   "name": "WP_MAIN10_B_Toshiba_3.bit",
+   "path": ".research/m1d4/fate-suite/hevc-conformance/WP_MAIN10_B_Toshiba_3.bit",
+   "bytes": 36263,
+   "sha256": "0b307c3ae71258ec5f322cb85cda15ca766b93ed9a01fd3d0411ac8d113165fd"
+  },
+  {
+   "lane": "hevc",
+   "name": "cip_B_NEC_2.bit",
+   "path": ".research/m1d4/fate-suite/hevc-conformance/cip_B_NEC_2.bit",
+   "bytes": 13228,
+   "sha256": "786e5bd6ac5418f1e4950fc9c5251826128b15d94eda29679b72a4f79d8a77f7"
+  },
+  {
+   "lane": "hevc",
+   "name": "cip_B_NEC_3.bit",
+   "path": ".research/m1d4/fate-suite/hevc-conformance/cip_B_NEC_3.bit",
+   "bytes": 13228,
+   "sha256": "786e5bd6ac5418f1e4950fc9c5251826128b15d94eda29679b72a4f79d8a77f7"
+  },
+  {
+   "lane": "hevc",
+   "name": "ipcm_A_NEC_2.bit",
+   "path": ".research/m1d4/fate-suite/hevc-conformance/ipcm_A_NEC_2.bit",
+   "bytes": 5153,
+   "sha256": "f345fa066789908f6d2995a9d4fc7cee48a466c705857c75378e1d650feae30b"
+  },
+  {
+   "lane": "hevc",
+   "name": "ipcm_A_NEC_3.bit",
+   "path": ".research/m1d4/fate-suite/hevc-conformance/ipcm_A_NEC_3.bit",
+   "bytes": 5153,
+   "sha256": "f345fa066789908f6d2995a9d4fc7cee48a466c705857c75378e1d650feae30b"
+  },
+  {
+   "lane": "hevc",
+   "name": "ipcm_B_NEC_2.bit",
+   "path": ".research/m1d4/fate-suite/hevc-conformance/ipcm_B_NEC_2.bit",
+   "bytes": 5643,
+   "sha256": "cf1a824624d1cc26aca3d12656e30716b039e5edb48e41c3dd1c74538157f428"
+  },
+  {
+   "lane": "hevc",
+   "name": "ipcm_B_NEC_3.bit",
+   "path": ".research/m1d4/fate-suite/hevc-conformance/ipcm_B_NEC_3.bit",
+   "bytes": 5643,
+   "sha256": "cf1a824624d1cc26aca3d12656e30716b039e5edb48e41c3dd1c74538157f428"
+  },
+  {
+   "lane": "hevc",
+   "name": "ipcm_C_NEC_2.bit",
+   "path": ".research/m1d4/fate-suite/hevc-conformance/ipcm_C_NEC_2.bit",
+   "bytes": 5856,
+   "sha256": "a9800f093e66e7cb3147323e6ce6adc47620dfa4bbb89f15afb7f82b1e426977"
+  },
+  {
+   "lane": "hevc",
+   "name": "ipcm_C_NEC_3.bit",
+   "path": ".research/m1d4/fate-suite/hevc-conformance/ipcm_C_NEC_3.bit",
+   "bytes": 5856,
+   "sha256": "a9800f093e66e7cb3147323e6ce6adc47620dfa4bbb89f15afb7f82b1e426977"
+  },
+  {
+   "lane": "hevc",
+   "name": "ipcm_D_NEC_2.bit",
+   "path": ".research/m1d4/fate-suite/hevc-conformance/ipcm_D_NEC_2.bit",
+   "bytes": 5797,
+   "sha256": "acb72389ebab10574a4821fd0a3329a307f3cf384a9ef67e6d0e761e807d8689"
+  },
+  {
+   "lane": "hevc",
+   "name": "ipcm_D_NEC_3.bit",
+   "path": ".research/m1d4/fate-suite/hevc-conformance/ipcm_D_NEC_3.bit",
+   "bytes": 5797,
+   "sha256": "acb72389ebab10574a4821fd0a3329a307f3cf384a9ef67e6d0e761e807d8689"
+  },
+  {
+   "lane": "hevc",
+   "name": "ipcm_E_NEC_2.bit",
+   "path": ".research/m1d4/fate-suite/hevc-conformance/ipcm_E_NEC_2.bit",
+   "bytes": 5461,
+   "sha256": "1c0652e89cffbfd45625371cbaca3b2293b09593672c9d81b63b83c6a5b55416"
+  },
+  {
+   "lane": "ac3",
+   "name": "diatonis.ac3",
+   "path": "target/agent-ac3/es/diatonis.ac3",
+   "bytes": 117012,
+   "sha256": "d4b9294410dbf587aeda7ee8f469d8e383ba9027ec5297eaaeed85f9bbac2b7c"
+  },
+  {
+   "lane": "ac3",
+   "name": "millers_crossing_4.0.ac3",
+   "path": "target/agent-ac3/es/millers_crossing_4.0.ac3",
+   "bytes": 95232,
+   "sha256": "faa06c7b1ccbc5cf3c7897afb50004dd3d49feaa19d26bdeb03dc9bb4ec20802"
+  },
+  {
+   "lane": "ac3",
+   "name": "monsters_inc_2.0_192_small.ac3",
+   "path": "target/agent-ac3/es/monsters_inc_2.0_192_small.ac3",
+   "bytes": 100000,
+   "sha256": "4df071457c23d1a39fe52322892bc9333921ad6dfc8f87ffa0797bdfb5101bae"
+  },
+  {
+   "lane": "ac3",
+   "name": "monsters_inc_5.1_448_small.ac3",
+   "path": "target/agent-ac3/es/monsters_inc_5.1_448_small.ac3",
+   "bytes": 100000,
+   "sha256": "74fefeef070f663378a0864beb064cf88ee1186152f7ac320984af15be2f22db"
+  },
+  {
+   "lane": "ac3",
+   "name": "mp3ac325_a0.ac3",
+   "path": "target/agent-ac3/es/mp3ac325_a0.ac3",
+   "bytes": 7050,
+   "sha256": "890487cadca665da46e2822b006116eaec29233d6ccc447ea77def38e47586d3"
+  },
+  {
+   "lane": "ac3",
+   "name": "mp3ac325_a1.ac3",
+   "path": "target/agent-ac3/es/mp3ac325_a1.ac3",
+   "bytes": 3426,
+   "sha256": "d22b569a39c4dfe4461cb4a56496f43c473e588193524398d4ba0bb1e0cbf310"
+  },
+  {
+   "lane": "eac3",
+   "name": "csi_miami_5.1_256_spx_small.eac3",
+   "path": "target/agent-ac3/es/csi_miami_5.1_256_spx_small.eac3",
+   "bytes": 48128,
+   "sha256": "84f50317a49a98509bf174ace814b39860e6ab2a1d61bdbd10ada9081f2bb2b3"
+  },
+  {
+   "lane": "eac3",
+   "name": "csi_miami_stereo_128_spx.eac3",
+   "path": "target/agent-ac3/es/csi_miami_stereo_128_spx.eac3",
+   "bytes": 333664,
+   "sha256": "f96b45fa4d249522cd83dea009cd528ce552ec9d947e03cdecab44652bc86ecb"
+  },
+  {
+   "lane": "eac3",
+   "name": "csi_miami_stereo_128_spx_small.eac3",
+   "path": "target/agent-ac3/es/csi_miami_stereo_128_spx_small.eac3",
+   "bytes": 249856,
+   "sha256": "adc397f12472353237f7dc8139c2223937abc23eff9cd80ac2e3471814a04c3a"
+  },
+  {
+   "lane": "eac3",
+   "name": "matrix2_commentary1_stereo_192_small.eac3",
+   "path": "target/agent-ac3/es/matrix2_commentary1_stereo_192_small.eac3",
+   "bytes": 99840,
+   "sha256": "ea095d557bd6787266f4b7276a2be818a7fbc924997748be89d9ead962a3391c"
+  },
+  {
+   "lane": "eac3",
+   "name": "serenity_english_5.1_1536_small.eac3",
+   "path": "target/agent-ac3/es/serenity_english_5.1_1536_small.eac3",
+   "bytes": 99328,
+   "sha256": "3d81c22610a2602b7799ec5e59c2677e8ab23e03e4abc03c2a16b683aa3d5f0a"
+  },
+  {
+   "lane": "eac3",
+   "name": "the_great_wall_7.1.eac3",
+   "path": "target/agent-ac3/es/the_great_wall_7.1.eac3",
+   "bytes": 723456,
+   "sha256": "d698981ddc1c10e65d234dd6a02ff2b0f4c88787595c9d3e5adf7f097f2c9e50"
+  },
+  {
+   "lane": "aac",
+   "name": "aac-sce-in-stereo.adts",
+   "path": "target/agent-aac/vec/aac-sce-in-stereo.adts",
+   "bytes": 42006,
+   "sha256": "04947370585296a25c63f1e31252c4290328151a0fa2ecf3271518b4d4db8796"
+  },
+  {
+   "lane": "aac",
+   "name": "al04_44.adts",
+   "path": "target/agent-aac/vec/al04_44.adts",
+   "bytes": 68371,
+   "sha256": "ce01790c62e932cc33eb3a1092cece90df608e9f8b6b88baaa57b623488c8f1e"
+  },
+  {
+   "lane": "aac",
+   "name": "al05_44.adts",
+   "path": "target/agent-aac/vec/al05_44.adts",
+   "bytes": 121062,
+   "sha256": "7b11acefbea0c1180b370405d4933ef06a80e3abbb558e1400bc264384146903"
+  },
+  {
+   "lane": "aac",
+   "name": "al06_44.adts",
+   "path": "target/agent-aac/vec/al06_44.adts",
+   "bytes": 200256,
+   "sha256": "a28702cffbea3ade83390c2b8e83833261ca87468c139df3490ea9ef1dda399f"
+  },
+  {
+   "lane": "aac",
+   "name": "al07_96.adts",
+   "path": "target/agent-aac/vec/al07_96.adts",
+   "bytes": 404789,
+   "sha256": "77b8c71a77c98816f95a49b209264af383d4a515a5fd24486e9806bdfda2961a"
+  },
+  {
+   "lane": "aac",
+   "name": "al15_44.adts",
+   "path": "target/agent-aac/vec/al15_44.adts",
+   "bytes": 145819,
+   "sha256": "b6646ef38d56f50824a0ad3108bff9d560d3cb75833fbe2bcd69daa4bb1072d0"
+  },
+  {
+   "lane": "aac",
+   "name": "al17_44.adts",
+   "path": "target/agent-aac/vec/al17_44.adts",
+   "bytes": 121910,
+   "sha256": "15ce1b21c69691275140c4c0a474b660331716ba2b177f0c9abbbc8b8763be42"
+  },
+  {
+   "lane": "aac",
+   "name": "al18_44.adts",
+   "path": "target/agent-aac/vec/al18_44.adts",
+   "bytes": 542116,
+   "sha256": "17e6246f5e46613e903000b4387672586252b12128b3af882d8fa9b98ce127ba"
+  },
+  {
+   "lane": "aac",
+   "name": "al22_chCfg0PCE_44.adts",
+   "path": "target/agent-aac/vec/al22_chCfg0PCE_44.adts",
+   "bytes": 69547,
+   "sha256": "bcc3a68808c793f9865d87b1ec3d895c5010b5f6a6bd206cb1426d4151f9bad6"
+  },
+  {
+   "lane": "aac",
+   "name": "al_sbr_cm_48_2.adts",
+   "path": "target/agent-aac/vec/al_sbr_cm_48_2.adts",
+   "bytes": 198304,
+   "sha256": "0d17bc6adcb8dbebc4c5f1dc447d8631d0b1e0797ba5c3a4884e0e58230440d8"
+  },
+  {
+   "lane": "aac",
+   "name": "al_sbr_cm_48_5.1.adts",
+   "path": "target/agent-aac/vec/al_sbr_cm_48_5.1.adts",
+   "bytes": 520018,
+   "sha256": "2f756af575771e9890c97841c13c555612599ce85e82af47df175a1e0e16d6a8"
+  },
+  {
+   "lane": "aac",
+   "name": "al_sbr_ps_04_new.adts",
+   "path": "target/agent-aac/vec/al_sbr_ps_04_new.adts",
+   "bytes": 27887,
+   "sha256": "f95a16be6678ced08108ed788a3c4619501cea3936eabd831ad450b76b91f43f"
+  },
+  {
+   "lane": "aac",
+   "name": "al_sbr_ps_06_new.adts",
+   "path": "target/agent-aac/vec/al_sbr_ps_06_new.adts",
+   "bytes": 55767,
+   "sha256": "cc7e5b18455c04c76efa8a87bf7db40f297fb38aa56b93d4bd7f97a397b4fa87"
+  },
+  {
+   "lane": "aac",
+   "name": "al_sbr_sr_48_2_fsaac48.adts",
+   "path": "target/agent-aac/vec/al_sbr_sr_48_2_fsaac48.adts",
+   "bytes": 161104,
+   "sha256": "10f2d0f66455a3b9dea8138a1f21d9c39cd9633fde3f31750b8e61e16a59fb75"
+  },
+  {
+   "lane": "aac",
+   "name": "am00_88.adts",
+   "path": "target/agent-aac/vec/am00_88.adts",
+   "bytes": 563793,
+   "sha256": "1ff00000c44317a3eb32c7b6b67b1e2269e16e941cc3ff7990d473584c00688f"
+  },
+  {
+   "lane": "aac",
+   "name": "am05_44.adts",
+   "path": "target/agent-aac/vec/am05_44.adts",
+   "bytes": 145822,
+   "sha256": "090ecd1da2493bd920536964870423719bf6061202b8a27d8033507d08a122c1"
+  },
+  {
+   "lane": "aac",
+   "name": "ap05_48.adts",
+   "path": "target/agent-aac/vec/ap05_48.adts",
+   "bytes": 310736,
+   "sha256": "ec4aa0192a7672510eeca67d733868ada88600124f8ca81777fba75e98952005"
+  },
+  {
+   "lane": "aac",
+   "name": "ct_File1_fixed_raw.adts",
+   "path": "target/agent-aac/vec/ct_File1_fixed_raw.adts",
+   "bytes": 32690,
+   "sha256": "76e84aa3e0d142696699bdb5d9bc8b037415065c604e2fa9f7d00e5f59bb597d"
+  },
+  {
+   "lane": "aac",
+   "name": "ct_File1_raw.adts",
+   "path": "target/agent-aac/vec/ct_File1_raw.adts",
+   "bytes": 31507,
+   "sha256": "2b7312468bef3ba96a41b51e6e43b54a3edb1f6638d4c6cb96331efb757818b4"
+  },
+  {
+   "lane": "aac",
+   "name": "ct_File2.adts",
+   "path": "target/agent-aac/vec/ct_File2.adts",
+   "bytes": 32577,
+   "sha256": "aa49e70fa5dfa8465f14c857d7f92421c8df566d78775f1388656fe32fd3e6bb"
+  },
+  {
+   "lane": "aac",
+   "name": "ct_File3.adts",
+   "path": "target/agent-aac/vec/ct_File3.adts",
+   "bytes": 32577,
+   "sha256": "aa49e70fa5dfa8465f14c857d7f92421c8df566d78775f1388656fe32fd3e6bb"
+  },
+  {
+   "lane": "aac",
+   "name": "ct_File4.adts",
+   "path": "target/agent-aac/vec/ct_File4.adts",
+   "bytes": 32577,
+   "sha256": "aa49e70fa5dfa8465f14c857d7f92421c8df566d78775f1388656fe32fd3e6bb"
+  },
+  {
+   "lane": "aac",
+   "name": "ct_File5.adts",
+   "path": "target/agent-aac/vec/ct_File5.adts",
+   "bytes": 32577,
+   "sha256": "aa49e70fa5dfa8465f14c857d7f92421c8df566d78775f1388656fe32fd3e6bb"
+  },
+  {
+   "lane": "aac",
+   "name": "ct_File6.adts",
+   "path": "target/agent-aac/vec/ct_File6.adts",
+   "bytes": 32577,
+   "sha256": "aa49e70fa5dfa8465f14c857d7f92421c8df566d78775f1388656fe32fd3e6bb"
+  },
+  {
+   "lane": "aac",
+   "name": "ct_File7.adts",
+   "path": "target/agent-aac/vec/ct_File7.adts",
+   "bytes": 32577,
+   "sha256": "aa49e70fa5dfa8465f14c857d7f92421c8df566d78775f1388656fe32fd3e6bb"
+  },
+  {
+   "lane": "aac",
+   "name": "ct_faac-adts.adts",
+   "path": "target/agent-aac/vec/ct_faac-adts.adts",
+   "bytes": 299647,
+   "sha256": "052f9c7c5359d642fbba887d57fc72fe5745fc75b34cddc7a7adc0a912f9cf9c"
+  },
+  {
+   "lane": "aac",
+   "name": "ct_sbr_bc-ps_bc.adts",
+   "path": "target/agent-aac/vec/ct_sbr_bc-ps_bc.adts",
+   "bytes": 32577,
+   "sha256": "aa49e70fa5dfa8465f14c857d7f92421c8df566d78775f1388656fe32fd3e6bb"
+  },
+  {
+   "lane": "aac",
+   "name": "ct_sbr_bc-ps_i.adts",
+   "path": "target/agent-aac/vec/ct_sbr_bc-ps_i.adts",
+   "bytes": 32577,
+   "sha256": "aa49e70fa5dfa8465f14c857d7f92421c8df566d78775f1388656fe32fd3e6bb"
+  },
+  {
+   "lane": "aac",
+   "name": "ct_sbr_bic-ps_i.adts",
+   "path": "target/agent-aac/vec/ct_sbr_bic-ps_i.adts",
+   "bytes": 32577,
+   "sha256": "aa49e70fa5dfa8465f14c857d7f92421c8df566d78775f1388656fe32fd3e6bb"
+  },
+  {
+   "lane": "aac",
+   "name": "ct_sbr_i-ps_bic.adts",
+   "path": "target/agent-aac/vec/ct_sbr_i-ps_bic.adts",
+   "bytes": 32577,
+   "sha256": "aa49e70fa5dfa8465f14c857d7f92421c8df566d78775f1388656fe32fd3e6bb"
+  },
+  {
+   "lane": "aac",
+   "name": "ct_sbr_i-ps_i.adts",
+   "path": "target/agent-aac/vec/ct_sbr_i-ps_i.adts",
+   "bytes": 32577,
+   "sha256": "aa49e70fa5dfa8465f14c857d7f92421c8df566d78775f1388656fe32fd3e6bb"
+  },
+  {
+   "lane": "aac",
+   "name": "ct_sbr_i-ps_i_raw.adts",
+   "path": "target/agent-aac/vec/ct_sbr_i-ps_i_raw.adts",
+   "bytes": 32690,
+   "sha256": "76e84aa3e0d142696699bdb5d9bc8b037415065c604e2fa9f7d00e5f59bb597d"
+  },
+  {
+   "lane": "aac",
+   "name": "foo.adts",
+   "path": "target/agent-aac/vec/foo.adts",
+   "bytes": 32768,
+   "sha256": "4439c5a704ed599e45d3b88fe135f994d32d2b65f5d0c0f6a8eb329ea69c45ec"
+  },
+  {
+   "lane": "aac",
+   "name": "id3v1.adts",
+   "path": "target/agent-aac/vec/id3v1.adts",
+   "bytes": 2816,
+   "sha256": "2a0fc1de29e543806699655fa35d0f30ae5796b125e371fa59fa2848a04d0bdd"
+  },
+  {
+   "lane": "aac",
+   "name": "id3v2.adts",
+   "path": "target/agent-aac/vec/id3v2.adts",
+   "bytes": 30099,
+   "sha256": "a671b99d08c1b7c78a77685fceb1824587fa7139cb42fe839c4b0bed113acd64"
+  },
+  {
+   "lane": "aac",
+   "name": "id3v2_two_tags.adts",
+   "path": "target/agent-aac/vec/id3v2_two_tags.adts",
+   "bytes": 60240,
+   "sha256": "ccaab043f75b6949dce4569da9a8d311d992e0c3da0d0989cc993100291eb281"
+  },
+  {
+   "lane": "dts",
+   "name": "core_51_24_48_768_0.core.dts",
+   "path": "target/agent-dca/vec/core_51_24_48_768_0.core.dts",
+   "bytes": 6144,
+   "sha256": "e5023922b122a661c554c6ca411bf4664b541ac33ecf53b1bc99091f029fd143"
+  },
+  {
+   "lane": "dts",
+   "name": "core_51_24_48_768_1.core.dts",
+   "path": "target/agent-dca/vec/core_51_24_48_768_1.core.dts",
+   "bytes": 6144,
+   "sha256": "4df3d0ff921105a78716c0a2cf5cf6935290719daa7469f6a0db9f4393efea00"
+  },
+  {
+   "lane": "dts",
+   "name": "dts.core.dts",
+   "path": "target/agent-dca/vec/dts.core.dts",
+   "bytes": 254518,
+   "sha256": "a7c8f6f8df1fa822449ac7537afe75735aa858861aae3d2481e1ec14e91e5612"
+  },
+  {
+   "lane": "dts",
+   "name": "dts_es.core.dts",
+   "path": "target/agent-dca/vec/dts_es.core.dts",
+   "bytes": 503000,
+   "sha256": "2e2530d220d51b914d1e7acb63badb5b2dae1578f3274116206fa1aa5e597638"
+  },
+  {
+   "lane": "dts",
+   "name": "dtsx_7.1.4_24bit.core.dts",
+   "path": "target/agent-dca/vec/dtsx_7.1.4_24bit.core.dts",
+   "bytes": 4024,
+   "sha256": "eb5ceab778e7a5aedf0c47627b5de45858a3dd81903b12d153271f4830c09bc2"
+  },
+  {
+   "lane": "dts",
+   "name": "master_audio_7.1_24bit.core.dts",
+   "path": "target/agent-dca/vec/master_audio_7.1_24bit.core.dts",
+   "bytes": 2358064,
+   "sha256": "fd230401e49b41fbc892246cf22d7b04419104e02978215b50dcba3751c8de5f"
+  },
+  {
+   "lane": "dts",
+   "name": "x96_51_24_96_1509.core.dts",
+   "path": "target/agent-dca/vec/x96_51_24_96_1509.core.dts",
+   "bytes": 12072,
+   "sha256": "e902cc493e94aa95024a276ff0d36f5ac76d614ed8c163621d3222112e1cdb93"
+  },
+  {
+   "lane": "dts",
+   "name": "x96_xch_61_24_96_3840.core.dts",
+   "path": "target/agent-dca/vec/x96_xch_61_24_96_3840.core.dts",
+   "bytes": 12072,
+   "sha256": "1674302b733a95f25077101dc5a18de8fe9c624c0bbf4f5d2c70b747de155a5c"
+  },
+  {
+   "lane": "dts",
+   "name": "x96_xxch_71_24_96_3840.core.dts",
+   "path": "target/agent-dca/vec/x96_xxch_71_24_96_3840.core.dts",
+   "bytes": 12072,
+   "sha256": "19e3f42286e7616a0c06fba72fb0af51be7eec5dfc98bcb778b921ca89ffd897"
+  },
+  {
+   "lane": "dts",
+   "name": "xbr_51_24_48_3840.core.dts",
+   "path": "target/agent-dca/vec/xbr_51_24_48_3840.core.dts",
+   "bytes": 12072,
+   "sha256": "8500ec431e95f254eca8f3b6b42a2e243d52dc63526412ca3cdb709a84b1de40"
+  },
+  {
+   "lane": "dts",
+   "name": "xbr_xch_61_24_48_3840.core.dts",
+   "path": "target/agent-dca/vec/xbr_xch_61_24_48_3840.core.dts",
+   "bytes": 12072,
+   "sha256": "cfa5ec0089bd981f36b21aba617149b37299ed149055ed9bb3ab4efcee87bdac"
+  },
+  {
+   "lane": "dts",
+   "name": "xbr_xxch_71_24_48_3840.core.dts",
+   "path": "target/agent-dca/vec/xbr_xxch_71_24_48_3840.core.dts",
+   "bytes": 12072,
+   "sha256": "a03325e5336ca6eec85614dc926f8fe1257924a2b18ef12fa33e66d6fd634be4"
+  },
+  {
+   "lane": "dts",
+   "name": "xch_61_24_48_768.core.dts",
+   "path": "target/agent-dca/vec/xch_61_24_48_768.core.dts",
+   "bytes": 6144,
+   "sha256": "dc0a4caf2c2bf999772b537994d988e5b5bef316cdd01e82dac67156bbf4e2ba"
+  },
+  {
+   "lane": "dts",
+   "name": "xll_51_16_192_768_0.core.dts",
+   "path": "target/agent-dca/vec/xll_51_16_192_768_0.core.dts",
+   "bytes": 6144,
+   "sha256": "e92ea6eb72e254d134b2351b4a91e6d55da7f7397825fb042b819c447805a681"
+  },
+  {
+   "lane": "dts",
+   "name": "xll_51_16_192_768_1.core.dts",
+   "path": "target/agent-dca/vec/xll_51_16_192_768_1.core.dts",
+   "bytes": 6144,
+   "sha256": "03d51e49c3dbfb9574c3c222b8c9d4d11daef4719882835e030becfbb8308319"
+  },
+  {
+   "lane": "dts",
+   "name": "xll_51_24_48_768.core.dts",
+   "path": "target/agent-dca/vec/xll_51_24_48_768.core.dts",
+   "bytes": 6144,
+   "sha256": "d168cd189728296889ed5d9fb0b1e5d2cd6a1bcfec5a8088519b4e065f4e58d3"
+  },
+  {
+   "lane": "dts",
+   "name": "xll_51_24_48_none.core.dts",
+   "path": "target/agent-dca/vec/xll_51_24_48_none.core.dts",
+   "bytes": 34164,
+   "sha256": "d1c89e480474356e86370426052e7e389f1dec90a30473356b854b65b8c549d6"
+  },
+  {
+   "lane": "dts",
+   "name": "xll_71_24_48_768_0.core.dts",
+   "path": "target/agent-dca/vec/xll_71_24_48_768_0.core.dts",
+   "bytes": 6144,
+   "sha256": "3c5497ae22b12644fdaa0661c4d203dc131271e93ea10e1b3cdbfd6edf0ba3c0"
+  },
+  {
+   "lane": "dts",
+   "name": "xll_71_24_48_768_1.core.dts",
+   "path": "target/agent-dca/vec/xll_71_24_48_768_1.core.dts",
+   "bytes": 6144,
+   "sha256": "69ea01316c4322248cb02a01219c67ad2a7555b1494544630d9b3bc6b534b968"
+  },
+  {
+   "lane": "dts",
+   "name": "xll_71_24_96_768.core.dts",
+   "path": "target/agent-dca/vec/xll_71_24_96_768.core.dts",
+   "bytes": 6144,
+   "sha256": "c4ea4e1a9cc7357656692dd1376e2a269d69a74b86c421e868cb497cd0bbf16a"
+  },
+  {
+   "lane": "dts",
+   "name": "xll_x96_51_24_96_1509.core.dts",
+   "path": "target/agent-dca/vec/xll_x96_51_24_96_1509.core.dts",
+   "bytes": 12072,
+   "sha256": "e84b744c459a0c668668e481a16435e65facf2857a958fab90496dbab89b8956"
+  },
+  {
+   "lane": "dts",
+   "name": "xll_xch_61_24_48_768.core.dts",
+   "path": "target/agent-dca/vec/xll_xch_61_24_48_768.core.dts",
+   "bytes": 6144,
+   "sha256": "eb8e3d2edc9cbb7ae2d45739331dd883d9e5a3be6dc335a85e14b5519d6a2fb9"
+  },
+  {
+   "lane": "dts",
+   "name": "xxch_71_24_48_2046.core.dts",
+   "path": "target/agent-dca/vec/xxch_71_24_48_2046.core.dts",
+   "bytes": 12072,
+   "sha256": "a03325e5336ca6eec85614dc926f8fe1257924a2b18ef12fa33e66d6fd634be4"
+  }
+ ]
+}
