@@ -70,8 +70,9 @@ struct Tracks {
 
 /// One sequential response with a stable PAT/PMT and clock, one unambiguous
 /// AVC track and one unambiguous ADTS AAC track. AVC must start with a
-/// delimited IDR and pictures need PTS. The first AAC frame needs a PES time
-/// anchor.
+/// delimited IDR and pictures need PTS. One leading SEI NAL in the first
+/// delimiter's PES is retained for compatibility with muxed startup packets.
+/// The first AAC frame needs a PES time anchor.
 ///
 /// Each completed unit is delivered in assembler output order, including
 /// before source EOF. The reader keeps no queue of completed units. The
@@ -273,7 +274,7 @@ impl<S: Source> TsProgressiveReader<S> {
                 }
                 let pool = self.player.as_ref().ok_or(Error::Closed)?.budget();
                 if config.track == tracks.video {
-                    self.video = Some(AvcTsReader::new(pool, config, self.limits.avc)?);
+                    self.video = Some(AvcTsReader::new_progressive(pool, config, self.limits.avc)?);
                 } else if config.track == tracks.audio {
                     self.audio = Some(HlsAac::new(pool, config, 0x1fff)?);
                 }

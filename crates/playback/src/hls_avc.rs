@@ -18,6 +18,7 @@ use triergon_mpegts::{
 
 pub use syntax::AvcRaster;
 
+const SEI: u8 = 6;
 const AUD: u8 = 9;
 const PREFIX: &[u8] = &[0, 0, 0, 1];
 const LOOKAHEAD: usize = PREFIX.len() + 1;
@@ -217,6 +218,7 @@ pub struct AvcTsReader {
     bytes: BudgetVec<u8>,
     sps: BudgetVec<ParameterSet<AvcRaster>>,
     pps: BudgetVec<ParameterSet<u8>>,
+    allow_startup_sei: bool,
     ended: bool,
     failure: Option<Error>,
 }
@@ -257,9 +259,20 @@ impl AvcTsReader {
             bytes: BudgetVec::new(pool),
             sps: BudgetVec::new(pool),
             pps: BudgetVec::new(pool),
+            allow_startup_sei: false,
             ended: false,
             failure: None,
         })
+    }
+
+    pub(crate) fn new_progressive(
+        pool: &Budget,
+        config: TsNativeConfiguration,
+        limits: AvcTsLimits,
+    ) -> Result<Self> {
+        let mut reader = Self::new(pool, config, limits)?;
+        reader.allow_startup_sei = true;
+        Ok(reader)
     }
 
     /// Moves a PES only on acceptance. Drain to NeedInput before offering another.
@@ -385,7 +398,12 @@ impl AvcTsReader {
                     }
                     self.begin(next)?;
                 } else {
-                    if self.unit.is_none() {
+                    if self.unit.is_none()
+                        && !(self.allow_startup_sei
+                            && self.unit_serial == 0
+                            && next.kind == SEI
+                            && next.prefix.anchor.is_some())
+                    {
                         return Err(Error::Unsupported(
                             "AVC TS access unit has no initial delimiter",
                         ));
@@ -530,10 +548,23 @@ impl AvcTsReader {
     fn end_nal(&mut self, nal: Nal) -> Result<()> {
         let raw = &self.bytes.as_slice()[nal.header..self.nal_data_end];
         let payload = &raw[1..];
-        let unit = self
-            .unit
-            .as_mut()
-            .ok_or(Error::Invalid("AVC NAL outside an access unit"))?;
+        let Some(unit) = self.unit.as_mut() else {
+            // Keep the progressive muxer's leading SEI with the first
+            // delimited picture only when both begin in the same PES.
+            if let (Some(anchor), Some(delimiter)) = (nal.prefix.anchor, self.next_nal)
+                && delimiter.kind == AUD
+                && delimiter
+                    .prefix
+                    .anchor
+                    .is_some_and(|next| next.serial == anchor.serial)
+                && !payload.is_empty()
+            {
+                return Ok(());
+            }
+            return Err(Error::Invalid(
+                "AVC TS startup SEI without a delimiter in its PES",
+            ));
+        };
         match nal.kind {
             AUD if matches!(payload, [value] if value & 0x1f == 0x10) => {}
             AUD => return Err(Error::Invalid("AVC access unit delimiter RBSP")),
@@ -574,7 +605,7 @@ impl AvcTsReader {
                     remember(&mut self.pps, id, self.unit_serial, raw, sps)?;
                 }
             }
-            6 | 10 | 11 | 12 => {}
+            SEI | 10 | 11 | 12 => {}
             _ => return Err(Error::Unsupported("AVC TS NAL type")),
         }
         Ok(())
