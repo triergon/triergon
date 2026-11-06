@@ -92,9 +92,7 @@ impl<M, S: PacketSegment, C: PacketConfig> PacketJob<'_, M, S, C> {
             self.array += 1;
             return Ok(NEXT);
         }
-        self.phase = if self.config().codec_kind() == Codec::Hevc
-            && self.config().length_width().is_some()
-        {
+        self.phase = if self.codec == Codec::Hevc && self.length_width.is_some() {
             Phase::Lookahead
         } else {
             Phase::Scan
@@ -108,10 +106,11 @@ impl<M, S: PacketSegment, C: PacketConfig> PacketJob<'_, M, S, C> {
             .source
             .as_ref()
             .ok_or(Error::Invalid("missing packet source"))?;
-        let width = self
-            .config()
-            .length_width()
-            .ok_or(Error::Invalid("missing packet width"))?;
+        let width = usize::from(
+            self.length_width
+                .ok_or(Error::Invalid("missing packet width"))?
+                .bytes(),
+        );
         if self.look_offset == source.bytes.len() && self.look_prefix == 0 {
             self.phase = Phase::Scan;
             return Ok(NEXT);
@@ -185,7 +184,7 @@ impl<M, S: PacketSegment, C: PacketConfig> PacketJob<'_, M, S, C> {
             .source
             .as_ref()
             .ok_or(Error::Invalid("missing packet source"))?;
-        let Some(width) = self.config().length_width() else {
+        let Some(width) = self.length_width else {
             if !work.try_charge(1) {
                 return Ok(YIELD);
             }
@@ -194,7 +193,8 @@ impl<M, S: PacketSegment, C: PacketConfig> PacketJob<'_, M, S, C> {
             self.phase = Phase::Reserve;
             return Ok(NEXT);
         };
-        if self.offset == 0 && source.bytes.is_empty() && self.config().codec_kind() == Codec::Avc {
+        let width = usize::from(width.bytes());
+        if self.offset == 0 && source.bytes.is_empty() && self.codec == Codec::Avc {
             self.receiver_failure = Some(NalPacketReceiverErrorKind::EmptyAvcPacket);
             return Err(Error::Invalid("pinned AVC empty packet"));
         }
@@ -239,7 +239,7 @@ impl<M, S: PacketSegment, C: PacketConfig> PacketJob<'_, M, S, C> {
             return Err(Error::Truncated);
         }
         if self.length == 0 {
-            if self.config().codec_kind() == Codec::Hevc {
+            if self.codec == Codec::Hevc {
                 self.receiver_failure = Some(NalPacketReceiverErrorKind::EmptyHevcNal);
                 return Err(Error::Invalid("pinned HEVC empty NAL"));
             }
@@ -252,7 +252,7 @@ impl<M, S: PacketSegment, C: PacketConfig> PacketJob<'_, M, S, C> {
                 maximum: self.session.limits.maximum_nals,
             });
         }
-        let codec = self.config().codec_kind();
+        let codec = self.codec;
         let kind = if codec == Codec::Hevc {
             // Width-framed HEVC reaches Scan only after Lookahead
             // accepted every header or retained the first observed
@@ -388,10 +388,7 @@ impl<M, S: PacketSegment, C: PacketConfig> PacketJob<'_, M, S, C> {
             .nal
             .as_ref()
             .ok_or(Error::Invalid("missing source NAL"))?;
-        let prefix = if self.config().codec_kind() == Codec::Hevc
-            || matches!(nal.kind, 7 | 8)
-            || self.total == 0
-        {
+        let prefix = if self.codec == Codec::Hevc || matches!(nal.kind, 7 | 8) || self.total == 0 {
             4
         } else {
             3
@@ -420,7 +417,7 @@ impl<M, S: PacketSegment, C: PacketConfig> PacketJob<'_, M, S, C> {
         }
         // A passthrough packet already has its immutable payload
         // owner. Keep that owner and its charge instead of copying.
-        if self.config().length_width().is_none() {
+        if self.length_width.is_none() {
             self.phase = Phase::Freeze;
             return Ok(NEXT);
         }
@@ -523,7 +520,7 @@ impl<M, S: PacketSegment, C: PacketConfig> PacketJob<'_, M, S, C> {
             .output
             .take()
             .ok_or(Error::Invalid("missing packet buffer"))?;
-        let bytes = if self.config().length_width().is_none() {
+        let bytes = if self.length_width.is_none() {
             drop(b);
             self.source
                 .as_ref()
@@ -542,7 +539,7 @@ impl<M, S: PacketSegment, C: PacketConfig> PacketJob<'_, M, S, C> {
         let configuration = self.config().raw().clone();
         let configuration_identity = self.config().identity();
         let configuration_source_refusal = self.config().refusal();
-        let forward_new_extradata = self.config().codec_kind() == Codec::Hevc
+        let forward_new_extradata = self.codec == Codec::Hevc
             || self
                 .source
                 .as_ref()

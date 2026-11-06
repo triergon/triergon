@@ -140,7 +140,6 @@ pub struct AvcConfigArray {
     range: Range<usize>,
     first_nal: u16,
     nal_count: u8,
-    count_offset: usize,
 }
 
 // Shows the derived ranges and counts instead of their stored parts.
@@ -152,7 +151,7 @@ impl std::fmt::Debug for AvcConfigArray {
             .field("kind", &self.kind)
             .field("range", &self.range)
             .field("nals", &self.nal_indices())
-            .field("count_offset", &self.count_offset)
+            .field("count_offset", &self.count_offset())
             .finish()
     }
 }
@@ -170,7 +169,10 @@ impl AvcConfigArray {
         start..start + usize::from(self.nal_count)
     }
     pub const fn count_offset(&self) -> usize {
-        self.count_offset
+        match self.kind {
+            AvcConfigArrayKind::Sequence | AvcConfigArrayKind::Picture => self.range.start,
+            AvcConfigArrayKind::SequenceExtension => self.range.start + 3,
+        }
     }
 }
 
@@ -238,7 +240,6 @@ enum Event {
     Group {
         kind: AvcConfigArrayKind,
         start: usize,
-        count_offset: usize,
     },
     Nal {
         kind: AvcConfigArrayKind,
@@ -269,7 +270,6 @@ impl Scan {
             ScanPhase::Sequence => self.group(
                 AvcConfigArrayKind::Sequence,
                 5,
-                5,
                 raw[5] & 31,
                 ScanPhase::Picture,
             ),
@@ -279,7 +279,6 @@ impl Scan {
                 self.position = self.position.checked_add(1).ok_or(Error::Overflow)?;
                 self.group(
                     AvcConfigArrayKind::Picture,
-                    count_offset,
                     count_offset,
                     count,
                     ScanPhase::Extension,
@@ -304,7 +303,6 @@ impl Scan {
                 self.group(
                     AvcConfigArrayKind::SequenceExtension,
                     start,
-                    end - 1,
                     bytes[3],
                     ScanPhase::End,
                 )
@@ -345,7 +343,6 @@ impl Scan {
         &mut self,
         kind: AvcConfigArrayKind,
         start: usize,
-        count_offset: usize,
         count: u8,
         after: ScanPhase,
     ) -> Result<Event> {
@@ -357,11 +354,7 @@ impl Scan {
         } else {
             ScanPhase::Nals
         };
-        Ok(Event::Group {
-            kind,
-            start,
-            count_offset,
-        })
+        Ok(Event::Group { kind, start })
     }
 }
 
@@ -425,7 +418,6 @@ impl<S: AvcStorage> AvcParser<S> {
                 range: 0..0,
                 first_nal: 0,
                 nal_count: 0,
-                count_offset: 0,
             }),
             array_count: 0,
             total: 0,
@@ -508,11 +500,7 @@ impl<S: AvcStorage> AvcParser<S> {
                     let mut next = self.scan;
                     let event = next.next(raw.as_ref(), self.limits)?;
                     match event {
-                        Event::Group {
-                            kind,
-                            start,
-                            count_offset,
-                        } if matches!(self.phase, Phase::Count) => {
+                        Event::Group { kind, start } if matches!(self.phase, Phase::Count) => {
                             let slot = self
                                 .arrays
                                 .get_mut(self.array_count)
@@ -523,7 +511,6 @@ impl<S: AvcStorage> AvcParser<S> {
                                 // At most31+255+255 NALs in this grammar.
                                 first_nal: self.total as u16,
                                 nal_count: 0,
-                                count_offset,
                             };
                             self.array_count += 1;
                         }
@@ -711,26 +698,29 @@ impl AvcConfigParser {
 #[derive(Clone, Debug)]
 struct AvcNalDescriptor {
     payload: Range<usize>,
-    // Both endpoints were physically validated by Scan; no source offset is
-    // narrowed. Keeping the explicit field start avoids inferring its location.
-    length_offset: usize,
     kind: AvcConfigArrayKind,
     header: NalHeader,
 }
+impl AvcNalDescriptor {
+    fn length_field(&self) -> Range<usize> {
+        // The parser checks the two-byte prefix immediately before the payload.
+        self.payload.start - 2..self.payload.start
+    }
+}
+
 struct CompactAvc;
 impl AvcStorage for CompactAvc {
     type Nal = AvcNalDescriptor;
     type Output = AvcConfigurationView;
     fn nal(
         _raw: &Bytes,
-        field: Range<usize>,
+        _field: Range<usize>,
         payload: Range<usize>,
         kind: AvcConfigArrayKind,
         header: NalHeader,
     ) -> Result<Self::Nal> {
         Ok(AvcNalDescriptor {
             payload,
-            length_offset: field.start,
             kind,
             header,
         })
@@ -877,7 +867,7 @@ impl<'a> AvcConfigNalRef<'a> {
         &self.raw[self.descriptor.payload.clone()]
     }
     pub fn length_field_bytes(&self) -> &'a [u8] {
-        &self.raw[self.descriptor.length_offset..self.descriptor.length_offset + 2]
+        &self.raw[self.descriptor.length_field()]
     }
     pub fn source_range(&self) -> Range<usize> {
         self.descriptor.payload.clone()
@@ -928,7 +918,7 @@ impl RetainedAvcConfigNal {
         &self.raw[self.descriptor.payload.clone()]
     }
     pub fn length_field_bytes(&self) -> &[u8] {
-        &self.raw[self.descriptor.length_offset..self.descriptor.length_offset + 2]
+        &self.raw[self.descriptor.length_field()]
     }
     pub fn source_range(&self) -> Range<usize> {
         self.descriptor.payload.clone()
@@ -983,7 +973,7 @@ impl<'a> AvcConfigArrayRef<'a> {
         self.descriptor.nal_indices()
     }
     pub const fn count_offset(&self) -> usize {
-        self.descriptor.count_offset
+        self.descriptor.count_offset()
     }
     pub fn retain(&self) -> RetainedAvcConfigArray {
         RetainedAvcConfigArray {
@@ -1029,7 +1019,7 @@ impl RetainedAvcConfigArray {
         self.descriptor.nal_indices()
     }
     pub const fn count_offset(&self) -> usize {
-        self.descriptor.count_offset
+        self.descriptor.count_offset()
     }
     pub fn retained_storage_bytes(&self) -> usize {
         self.raw.retained_storage_bytes()
@@ -1108,7 +1098,7 @@ mod compact_descriptor_guards {
         .unwrap();
         // No physical check is repeated after Scan; the extents are copied.
         assert_eq!(descriptor.payload, high..usize::MAX);
-        assert_eq!(descriptor.length_offset, high - 2);
+        assert_eq!(descriptor.length_field(), high - 2..high);
         // The eager adapter still slices, so an unchecked span fails there.
         assert_eq!(
             EagerAvc::nal(
