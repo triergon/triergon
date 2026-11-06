@@ -8074,6 +8074,64 @@
      "sha256": "6e39ba4e3e8abed6e82f7ae219225c295e7009a6d0ed3ad050807c75c8783df7"
     }
    ]
+  },
+  {
+   "name": "progressive-ts188-on-demand-spans-linux-arm64",
+   "retention": "retained",
+   "reason": "MPEG-TS progressive playback in the measured revisions table",
+   "key": "evidence/progressive-ts188-on-demand-spans-linux-arm64/d7da488eda6923e979593cf5a1399556427590f9fb131cfe9ed9444dc61ad43f.tar.gz",
+   "sha256": "d7da488eda6923e979593cf5a1399556427590f9fb131cfe9ed9444dc61ad43f",
+   "bytes": 19179361,
+   "files": [
+    {
+     "path": "REV",
+     "sha256": "03a10470d1f4487c71ce3279243f0543e5d486eb1f9d1e657707f9442cae3e59"
+    },
+    {
+     "path": "TREE",
+     "sha256": "e11d025dd47d1f170a06945f66054ea0b425ab398bba6329fcfd5ca25fea98b9"
+    },
+    {
+     "path": "PACKAGE.sha256",
+     "sha256": "3f02bcac9a258c1468709233a9bc7ee58f7e8b3ddee4ffd78323ceb022fbdc7d"
+    },
+    {
+     "path": "source.bundle",
+     "sha256": "0453318993f9dbc1b0726709c71b33e67bbb9b386e03883f699ea4e3f17b8541"
+    },
+    {
+     "path": "EXPECTED-RUSTC.log",
+     "sha256": "ba203e33fe4a5b8e05147bb6e57fb1ddace26d9f799f357420b666887dd7e2f1"
+    },
+    {
+     "path": "NATIVE.sh",
+     "sha256": "5a101c5453fe81fbfb9f48470a2e83292aa5bdb39c6a180e7930194720a895d8"
+    },
+    {
+     "path": "GUARD.sh",
+     "sha256": "e90a76c002734e1bba2729310571e2af6e81ab76620683fdccd0e44d138693d0"
+    },
+    {
+     "path": "NATIVE.log",
+     "sha256": "f28fbcb0d7507b538bb31be20d5353899679f50745bc093851f1c50f6dd26788"
+    },
+    {
+     "path": "RUNNER.log",
+     "sha256": "63ff16d6c25f09451cc01880582937b6e5426efdf0fb405b895a6628e71476af"
+    },
+    {
+     "path": "build-output.tar.gz",
+     "sha256": "e8849abdaa252a27f7e8c09c34affb8d37c93b2447a96c7d1ddaba3c5d26c49a"
+    },
+    {
+     "path": "qualification-output.tar.gz",
+     "sha256": "b5a21abbf24199c320c600b6388eaadaba89ea8ca217a5e9220e28cd373d041a"
+    },
+    {
+     "path": "comparison-inputs.tar.gz",
+     "sha256": "6e39ba4e3e8abed6e82f7ae219225c295e7009a6d0ed3ad050807c75c8783df7"
+    }
+   ]
   }
  ]
 }
