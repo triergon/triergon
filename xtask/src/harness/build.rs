@@ -229,7 +229,7 @@ fn which(program: &str) -> Option<PathBuf> {
 
 /// Measurement workers a contract may name as its candidate besides
 /// `media-worker`, with the command that builds each.
-pub const ADDITIONAL_CANDIDATES: [&str; 1] = ["playback-worker"];
+pub const ADDITIONAL_CANDIDATES: [&str; 3] = ["playback-worker", "codec-worker", "capture-worker"];
 
 fn additional_candidates(root: &Path) -> R<Vec<(&'static str, Vec<String>)>> {
     let mut built = Vec::new();

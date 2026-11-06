@@ -96,7 +96,7 @@ generator `harness/capture/generate_inputs.py`, whose numpy PCG64 and float draw
 cited capture inputs depend on. `cargo xtask codecs` grades, times and records the
 identities of the codec crates against the pinned FFmpeg decoders
 (`harness/codecs/STATUS.md`); `cargo xtask capture` does the same for the capture
-pipeline (`harness/capture/contract.json`).
+pipeline ([harness/capture](../harness/capture/README.md)).
 `cargo xtask fuzz` runs a deterministic, replayable byte-mutation campaign against
 debug, release and reference workers from a pinned manifest.
 

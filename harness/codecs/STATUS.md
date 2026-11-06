@@ -19,6 +19,32 @@ README. The comparison harness is the decode build of `harness/reference.c` with
 | `rgba-*.json` | Observed letterbox scaling and RGBA conversion rules |
 | `codec-comparison` evidence set | Correctness rows and summaries, timing and memory records, identity hashes; `cargo xtask evidence fetch codec-comparison` unpacks it into `.research/evidence/codec-comparison/` |
 | `aac/`, `ac3/`, `dca/`, `h264/`, `hevc/` | Per-codec tools and derivation notes |
+| `codec-reference-binary`, `codec-reference-reproduction` evidence sets | The reference worker the cited results were measured with, and the proof that `prepare-ffmpeg --profile decode` rebuilds it: byte-identical output on every vector and workload, identical classifications |
+
+## Running the comparison
+
+```sh
+cargo xtask prepare-ffmpeg --profile decode   # FFmpeg 9.0.2, default configuration
+cargo xtask build-workers                     # ffmpeg-decode-worker, codec-worker, …
+cargo xtask codecs grade --manifest harness/codecs/correctness-manifest.json --root . \
+  --bin DIR --ffmpeg .research/reference-decode/install/bin/ffmpeg \
+  --ffprobe .research/reference-decode/install/bin/ffprobe \
+  --codec-worker target/release/codec-worker \
+  --reference target/harness/ffmpeg-decode-worker --out run.jsonl
+cargo xtask codecs summarize run.jsonl summary.json
+```
+
+`--bin` names a directory with the decoder examples as `codec-h264-decode`,
+`codec-hevc-decode`, `codec-ac3-decode`, `codec-aac-decode` and `codec-dca-decode`
+(`target/release/examples/decode_{h264,hevc,ac3,aac,dts}`).
+
+The vectors are the FATE suite's `aac`, `ac3`, `eac3`, `dts`, `h264-conformance` and
+`hevc-conformance` directories in `.research/fate-samples`, plus 71 elementary streams
+derived from them with the decode profile's `ffmpeg` (manifest paths under `target/`):
+ADTS from the MP4 and 3GP vectors (`-map 0:a:0 -c:a copy -f adts`), DTS cores
+(`-map 0:a:0 -c:a copy -bsf:a dca_core -f dts`) and AC-3 streams copied out of their
+containers (`-map 0:a:N -c:a copy -f ac3`). Grading checks every input against its
+manifest SHA-256.
 
 ## Dispositions cited by the correctness summaries
 
