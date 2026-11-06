@@ -14,17 +14,19 @@ use triergon_core::{
     SourceFailure, SourceId, Step, Time, WorkBudget,
 };
 use triergon_isobmff::{
-    BoxEvent, BoxHeader, BoxReader, BoxStep, BoxView, BuildStatus, EditList, FragmentBuilder,
-    FragmentContext, FragmentIndex, ImplicitBase, Limits, MediaDataPolicy, Mov9CursorStatus,
-    Mov9NativeGlobalSeekJob, Mov9NativeIndexCursor, Mov9NativeIndexLimits, Mov9NativeSeekLimits,
-    Mov9PacketCursor, Mov9PacketLimits, Mov9PartialSampleReader, Mov9PayloadBounds, Mov9Profile,
-    Mov9RecoveryTrackHeader, Mov9RecoveryV3Context, Mov9RecoveryV3Read, Mov9RunRecoveryV3Builder,
-    Mov9StreamView, Mov9Track, Mov9V3TransportBuilder, MovieHeader, MovieSeekClocks,
-    MovieSeekLimits, MovieSourceSeekContext, MovieSourceSeekPlanner, PinnedMovD32RegularRecoveryV1,
-    PinnedMovD32RegularRecoveryV3, PinnedMovD32SmallRawVideoTransportV3, RecoveryDescriptions,
-    RecoveryKind, RecoveryMappings, RecoveryScope, RecoverySyntax, Sample, SampleDescription,
-    SampleReader, SampleStep, SampleTable, SampleTableBuilder, SampleTablePolicy, SourcePacket,
-    SourceTrack, TrackHeader, TrackSampleCursor, Trex,
+    BoxEvent, BoxHeader, BoxReader, BoxStep, BoxView, BuildStatus, EditList, EntryLayout,
+    FragmentBuilder, FragmentContext, FragmentIndex, ImplicitBase, Limits, MediaDataPolicy,
+    Mov9CursorStatus, Mov9NativeGlobalSeekJob, Mov9NativeIndexCursor, Mov9NativeIndexLimits,
+    Mov9NativeSeekLimits, Mov9PacketCursor, Mov9PacketLimits, Mov9PartialSampleReader,
+    Mov9PayloadBounds, Mov9Profile, Mov9RecoveryTrackHeader, Mov9RecoveryV3Context,
+    Mov9RecoveryV3Read, Mov9RunRecoveryV3Builder, Mov9SampleEntryHeaderJobV7, Mov9StreamView,
+    Mov9Track, Mov9V3TransportBuilder, MovieHeader, MovieSeekClocks, MovieSeekLimits,
+    MovieSourceSeekContext, MovieSourceSeekPlanner, PinnedMovD32RegularRecoveryV1,
+    PinnedMovD32RegularRecoveryV3, PinnedMovD32SampleEntryHeaderV7,
+    PinnedMovD32SmallRawVideoTransportV3, RecoveryDescriptions, RecoveryKind, RecoveryMappings,
+    RecoveryScope, RecoverySyntax, Sample, SampleDescription, SampleReader, SampleStep,
+    SampleTable, SampleTableBuilder, SampleTablePolicy, SourcePacket, SourceTrack, TrackHeader,
+    TrackSampleCursor, Trex,
 };
 
 const MAX_SAMPLE_BYTES: usize = 16 * 1024 * 1024;
@@ -994,6 +996,32 @@ impl<'a> Driver<'a> {
         }
     }
 
+    fn check_comparison_visual_headers(&self, record: &Record) -> Result<()> {
+        if record.header.handler != *b"vide" {
+            return Ok(());
+        }
+        for entry in record.table.descriptions() {
+            // The comparison catalogue projects raw visual entries. Check
+            // their child boxes before it publishes a stream.
+            if entry.format != *b"raw " || entry.raw().payload().len() == 78 {
+                continue;
+            }
+            let mut job = Mov9SampleEntryHeaderJobV7::new(
+                entry,
+                EntryLayout::Visual,
+                Limits::default(),
+                PinnedMovD32SampleEntryHeaderV7,
+            )?;
+            while job.poll(&mut WorkBudget::new(self.quantum), &self.cancel)? != BuildStatus::Ready
+            {
+            }
+            if job.try_finish(&self.cancel)?.native_open_result().is_some() {
+                return Err(Error::Invalid("sample entry configuration").into());
+            }
+        }
+        Ok(())
+    }
+
     pub fn native_operation(
         &mut self,
         model: &Model,
@@ -1012,6 +1040,7 @@ impl<'a> Driver<'a> {
         let mut streams = BudgetVec::new(&self.budget);
         let movie_base = model.movie.time_base()?;
         for record in model.records.as_slice() {
+            self.check_comparison_visual_headers(record)?;
             let has_fragments = model
                 .fragments
                 .as_slice()
@@ -2014,6 +2043,58 @@ mod refill_transcript42 {
                 ));
             }
             assert_eq!(short.events, [(b'S', 0, 0), (b'R', 0, maximum)]);
+        }
+    }
+}
+
+#[cfg(test)]
+mod private_configuration_comparison {
+    use super::*;
+    use std::io::Cursor;
+
+    #[test]
+    fn malformed_opus_configuration_refuses_open_and_index() {
+        let original = include_bytes!("../../tests/fixtures/r-private-carriage.mov");
+        let mut control = original.to_vec();
+        for kind in [b"dOps", b"ddts"] {
+            let at = control.windows(4).position(|bytes| bytes == kind).unwrap();
+            control[at..at + 4].copy_from_slice(b"free");
+        }
+        for (bytes, rejected) in [(original.as_slice(), true), (control.as_slice(), false)] {
+            for (window, quantum) in [(65536, 4096), (1, 3)] {
+                let mut input = Cursor::new(bytes);
+                let mut driver =
+                    Driver::new(&mut input, bytes.len() as u64, window, quantum).unwrap();
+                let model = driver.open().unwrap();
+                let entry = model.records.as_slice()[0].table.descriptions()[0].raw();
+                let start = entry.header().start as usize;
+                assert_eq!(
+                    entry.bytes().as_ref(),
+                    &bytes[start..start + entry.bytes().len()]
+                );
+                for operation in [NativeOperation::Open, NativeOperation::Index] {
+                    let mut stats = Stats::default();
+                    let mut retention = Retention::new(&driver.budget, 0).unwrap();
+                    let mut trace = String::new();
+                    let result = driver.native_operation(
+                        &model,
+                        &mut stats,
+                        &mut retention,
+                        operation,
+                        Some(&mut trace),
+                    );
+                    if rejected {
+                        assert!(matches!(
+                            result,
+                            Err(Failure::Core(Error::Invalid("sample entry configuration")))
+                        ));
+                        assert!(trace.is_empty());
+                    } else {
+                        result.unwrap();
+                        assert_eq!(stats.packets, 6);
+                    }
+                }
+            }
         }
     }
 }
