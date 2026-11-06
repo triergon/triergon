@@ -172,10 +172,26 @@ enum Arena {
 }
 
 #[derive(Debug)]
-struct Growth {
+pub(crate) struct Growth {
     arena: Arena,
     target: usize,
-    remaining: u64,
+    pub(crate) remaining: u64,
+}
+
+impl Growth {
+    fn plan(arena: Arena, len: usize, maximum: usize, item_bytes: usize) -> Result<Self> {
+        let needed = len.checked_add(1).ok_or(Error::Overflow)?;
+        let target = len.saturating_mul(2).max(4).min(maximum).max(needed);
+        let bytes = target
+            .checked_add(len)
+            .and_then(|count| count.checked_mul(item_bytes))
+            .ok_or(Error::Overflow)?;
+        Ok(Self {
+            arena,
+            target,
+            remaining: u64::try_from(bytes).map_err(|_| Error::Overflow)?,
+        })
+    }
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -608,14 +624,18 @@ impl DemuxObserver {
             })
     }
 
-    fn ready_body(&self, counter: u8, next: usize) -> bool {
+    fn body_fits(&self, counter: u8, next: usize) -> bool {
         self.active
             && self.header.is_some()
-            && self.spans.len() < self.spans.capacity().min(self.limits.source_spans)
             && self.body_limit.is_none_or(|limit| next <= limit)
             && next < DEFAULT_NATIVE_PACKET_CAP
             && self.header_used + next <= self.limits.pes_bytes
             && self.previous_counter.map(|value| (value + 1) & 15) == Some(counter)
+    }
+
+    fn ready_body(&self, counter: u8, next: usize) -> bool {
+        self.spans.len() < self.spans.capacity().min(self.limits.source_spans)
+            && self.body_fits(counter, next)
     }
 
     /// Append an ordinary TS188 continuation when it fits the existing arena.
@@ -745,8 +765,8 @@ impl DemuxObserver {
         )
     }
 
-    /// A run stops before a completion or arena growth. The ordinary observer
-    /// owns publication and any resumable reservation.
+    /// A run stops before a completion. If the arena is full, plan the same
+    /// growth the first continuation would require in the ordinary observer.
     pub(crate) fn payload_run_capacity(
         &self,
         source: &Bytes,
@@ -754,11 +774,11 @@ impl DemuxObserver {
         counter: u8,
         start: SourceLocation,
         context: NativeSourceContext,
-    ) -> usize {
-        if !self.ready_body(counter, self.payload_len + PLAIN_PAYLOAD_BYTES)
+    ) -> (usize, Option<Growth>) {
+        if !self.body_fits(counter, self.payload_len + PLAIN_PAYLOAD_BYTES)
             || !self.accepts_plain_source(source, pid, Some(start.source), start.offset, context)
         {
-            return 0;
+            return (0, None);
         }
         let limit = self
             .body_limit
@@ -766,19 +786,51 @@ impl DemuxObserver {
                 end.saturating_sub(1).min(DEFAULT_NATIVE_PACKET_CAP - 1)
             })
             .min(self.limits.pes_bytes - self.header_used);
-        let slots = self.spans.capacity().min(self.limits.source_spans) - self.spans.len();
-        (limit.saturating_sub(self.payload_len) / PLAIN_PAYLOAD_BYTES).min(slots)
+        let len = self.spans.len();
+        let slots = self.spans.capacity().min(self.limits.source_spans) - len;
+        let growth = if slots == 0 && len < self.limits.source_spans && self.growth.is_none() {
+            Growth::plan(
+                Arena::Payload,
+                len,
+                self.limits.source_spans,
+                size_of::<NativePesSpan>(),
+            )
+            .ok()
+        } else {
+            None
+        };
+        let slots = growth.as_ref().map_or(slots, |plan| plan.target - len);
+        (
+            (limit.saturating_sub(self.payload_len) / PLAIN_PAYLOAD_BYTES).min(slots),
+            growth,
+        )
+    }
+
+    /// Keep the old arena intact until the cursor commits the run.
+    pub(crate) fn prepare_payload_run_growth(
+        &self,
+        growth: &Growth,
+    ) -> Option<BudgetVec<NativePesSpan>> {
+        let mut replacement = BudgetVec::new(&self.budget);
+        replacement.try_reserve_exact(growth.target).ok()?;
+        Some(replacement)
     }
 
     /// Commit preflighted carriers from one shared window. The arena already
-    /// has room for every span and the caller has checked the final ordinal.
+    /// has room for every span, including any spans moved from a full arena.
     pub(crate) fn append_payload_run(
         &mut self,
         bytes: &Bytes,
         start: SourceLocation,
         context: NativeSourceContext,
         first_counter: u8,
+        replacement: Option<BudgetVec<NativePesSpan>>,
     ) -> Result<()> {
+        if let Some(replacement) = replacement {
+            for span in std::mem::replace(&mut self.spans, replacement) {
+                self.spans.try_push(span).map_err(|error| error.error)?;
+            }
+        }
         let count = bytes.len() / TS188_BYTES;
         debug_assert!(count >= 2 && bytes.len().is_multiple_of(TS188_BYTES));
         debug_assert!(self.spans.len() + count <= self.spans.capacity());
@@ -954,17 +1006,7 @@ impl DemuxObserver {
             return Ok(true);
         }
         if self.growth.is_none() {
-            let needed = len.checked_add(1).ok_or(Error::Overflow)?;
-            let target = capacity.saturating_mul(2).max(4).min(maximum).max(needed);
-            let bytes = target
-                .checked_add(len)
-                .and_then(|count| count.checked_mul(item_bytes))
-                .ok_or(Error::Overflow)?;
-            self.growth = Some(Growth {
-                arena,
-                target,
-                remaining: u64::try_from(bytes).map_err(|_| Error::Overflow)?,
-            });
+            self.growth = Some(Growth::plan(arena, len, maximum, item_bytes)?);
         }
         let growth = self
             .growth

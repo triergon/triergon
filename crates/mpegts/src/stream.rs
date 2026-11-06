@@ -149,11 +149,18 @@ impl FeedPayloadRun<'_> {
             source: self.input.source(),
             offset: self.input.position(),
         };
-        let work_limit = work.remaining().saturating_sub(1) / PAYLOAD_RUN_WORK;
+        let (slots, growth) =
+            observer.payload_run_capacity(owner, self.pid, self.counter, start, context);
+        let growth_work = growth.as_ref().map_or(0, |plan| plan.remaining);
+        let work_limit = work
+            .remaining()
+            .saturating_sub(1)
+            .saturating_sub(growth_work)
+            / PAYLOAD_RUN_WORK;
         let maximum = maximum
             .min(self.maximum)
             .min(usize::try_from(work_limit).unwrap_or(usize::MAX))
-            .min(observer.payload_run_capacity(owner, self.pid, self.counter, start, context));
+            .min(slots);
         if maximum < 2 {
             return Ok(false);
         }
@@ -187,15 +194,24 @@ impl FeedPayloadRun<'_> {
         if self.cancel.load(Ordering::Relaxed) {
             return Err(Error::Cancelled);
         }
+        let replacement = if let Some(growth) = growth {
+            let Some(replacement) = observer.prepare_payload_run_growth(&growth) else {
+                return Ok(false);
+            };
+            Some(replacement)
+        } else {
+            None
+        };
 
         // The cursor charges the input bytes. The remaining checks and span
         // writes have already been bounded and need no allocation.
         let bytes = self
             .framer
             .read_payload_run(self.input, carriers, work, self.cancel)?;
-        let charged = work.try_charge((PAYLOAD_RUN_WORK - TS188_BYTES as u64) * carriers as u64);
+        let charged = work
+            .try_charge(growth_work + (PAYLOAD_RUN_WORK - TS188_BYTES as u64) * carriers as u64);
         debug_assert!(charged);
-        observer.append_payload_run(&bytes, start, context, self.counter)?;
+        observer.append_payload_run(&bytes, start, context, self.counter, replacement)?;
         self.assembler
             .record_body_carriers(carriers, carriers * PLAIN_PAYLOAD_BYTES);
         let ts = bytes.as_ref();
