@@ -1168,6 +1168,23 @@ impl<S: Source> Player<S> {
                         },
                         Some(_) => Delivery::Present,
                     },
+                    (
+                        ClockChoice::ExplicitNativeProjection,
+                        None,
+                        RawEvent::Mp4(crate::Mp4Event::Packet(packet)),
+                    ) => {
+                        // An i64 tick count in a u64 time base always fits Time.
+                        // Before a seek only timestamp presence affects delivery.
+                        if packet
+                            .native
+                            .as_ref()
+                            .is_some_and(|n| n.native.pts.is_some())
+                        {
+                            Delivery::Present
+                        } else {
+                            Delivery::UnknownTime
+                        }
+                    }
                     (clock, seek, _) => {
                         let pts = match clock {
                             ClockChoice::SourceExact => e.source_pts()?,
