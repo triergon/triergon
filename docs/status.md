@@ -43,7 +43,7 @@ have not been checked against it. Their numbers stay as measured until re-measur
 | ISO BMFF open and index runtime | `ea4b941b4454bcc2ea0cd213999d64a07928ed7c` | `fca8e54cb9b2f0d55acc8ba9be2a5849992ae7996f3c3db551896477c3359525` |
 | ISO BMFF open and index memory | `ea4b941b4454bcc2ea0cd213999d64a07928ed7c` | `46cf8ac9041b147c96108de6e09fde26c47e12fd10161f7eee9661db95f8c89a` |
 | HLS segments | `7699c80caff6efdce9be8226d12bfa606dadd7b2` | `e008a7fc75c87deb903038cdd38d4e417cf0efa8d92592f9fc6105faecbba991` |
-| Packet framing | `d225c35c1e2aa8a9b7dc4d61bb673a5728bd0ee6` | `edd793b50d38a95cfa0305aedde3982401b82f4b45507e163e6fd068cee9fde2` |
+| Packet framing | `d225c35c1e2aa8a9b7dc4d61bb673a5728bd0ee6` | `b59476c45d8f31ac4694a264ce49cf12bda9bf9709e5cb6979ece0acb41cc812` |
 | Capture, timing and memory | `e2cb0bea2c2fae823baef8169888ca84cf8b01f0` | `11f0572cf6d9294023340a35970f8fa5c4f6e75abfdab55d8e1fb67f0228f983` |
 | Capture, earlier timing | `1831a2aa54e56d45472e171429a98fe878055449` | `fac200b915c2b9a984e5b91cba29e7a3c016690596f128524f46c8f2cb40b6e6` |
 
