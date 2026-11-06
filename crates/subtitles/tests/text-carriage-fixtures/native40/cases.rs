@@ -1,4 +1,5 @@
 use super::*;
+#[rustfmt::skip]
 pub(super) static ALL: &[Case] = &[
 Case { id: "utf16-big-ascii", payload: include_bytes!("input/utf16-big-ascii.srt"), unicode: include_bytes!("unicode/b5d4045c3f466fa91fe2cc6abe79232a1a57cdf104f7a26e716e0a1e2789df78.utf8"), file_name: "input/utf16-big-ascii.srt".as_bytes(), packet: false, expected: include_bytes!("native/utf16-big-ascii.bin"), codec_id: 94225, codec_name: "subrip", stream_time_base: [1, 1000], position_raw: 7, flags: 1, pts_raw: 1000, dts_raw: 1000, duration_raw: 1000, packet_time_base: [0, 1] },
 Case { id: "utf16-little-ascii", payload: include_bytes!("input/utf16-little-ascii.srt"), unicode: include_bytes!("unicode/b5d4045c3f466fa91fe2cc6abe79232a1a57cdf104f7a26e716e0a1e2789df78.utf8"), file_name: "input/utf16-little-ascii.srt".as_bytes(), packet: false, expected: include_bytes!("native/utf16-little-ascii.bin"), codec_id: 94225, codec_name: "subrip", stream_time_base: [1, 1000], position_raw: 7, flags: 1, pts_raw: 1000, dts_raw: 1000, duration_raw: 1000, packet_time_base: [0, 1] },
