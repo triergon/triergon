@@ -27,9 +27,10 @@ resource limit becomes an explicit, reviewed rule for that case.
 - **Authored corpus.** Small canonical streams generated from synthetic signals and
   authored structures, so inputs stay identical across encoder versions
   (`cargo xtask fixtures`, `harness/*-corpus.json`, `harness/*-slice.json`).
-- **FATE.** Upstream regression identities are indexed (`research/fate-index.json`) and
-  mapped case by case. A FATE name is not a test until its input, operation and
-  expected result are mapped and run. Samples are fetched into an ignored cache with
+- **FATE.** Upstream regression identities are indexed as data, without running
+  Make (`cargo xtask fate-inventory`, `research/fate-index.json`), and mapped case by
+  case. A FATE name is not a test until its input, operation and expected result are
+  mapped and run. Samples are fetched into an ignored cache with
   recorded hashes; nothing is redistributed without reviewed rights.
 - **Required vectors.** Larger external vectors are fetched and hash-verified by
   `cargo xtask fetch-vectors` and kept outside version control.

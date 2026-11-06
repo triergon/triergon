@@ -8,6 +8,7 @@ mod archive;
 mod checks;
 mod corpus;
 mod ebml;
+mod fate;
 mod fetch;
 mod json;
 mod prepare;
@@ -32,7 +33,9 @@ commands:
   prepare-ffmpeg [--jobs N] [--profile matroska|formats]
                  build the pinned FFmpeg reference into .research/reference[-formats]
   fetch-specs    [--record] cache the specification texts and verify specs/sources.json
-  fetch-vectors  cache the required external test vectors and verify their hashes";
+  fetch-vectors  cache the required external test vectors and verify their hashes
+  fate-inventory --source DIR --output FILE [--configured-list FILE]
+                 index FATE definitions as data; nothing is executed";
 
 fn main() -> ExitCode {
     let args: Vec<String> = std::env::args().skip(1).collect();
@@ -45,6 +48,7 @@ fn main() -> ExitCode {
         Some("check-safety") => check_safety(&root),
         Some("fixtures") => fixtures(&root),
         Some("fixture") => fixture(&root, &args[1..]),
+        Some("fate-inventory") => fate_inventory(&args[1..]),
         Some("prepare-ffmpeg") => prepare_ffmpeg(&root, &args[1..]),
         Some("fetch-specs") => match &args[1..] {
             [] => fetch::specs(&root, false, &fetch::Network).map(|s| println!("{s}")),
@@ -110,6 +114,38 @@ fn fixtures(root: &Path) -> Task {
     for line in corpus::generate_all(&paths)? {
         println!("{line}");
     }
+    Ok(())
+}
+
+fn fate_inventory(args: &[String]) -> Task {
+    let (mut source, mut output, mut configured) = (None, None, None);
+    let mut rest = args.iter();
+    while let Some(flag) = rest.next() {
+        let value = PathBuf::from(rest.next().ok_or_else(|| format!("{flag} needs a value"))?);
+        match flag.as_str() {
+            "--source" => source = Some(value),
+            "--output" => output = Some(value),
+            "--configured-list" => configured = Some(value),
+            _ => return Err(USAGE.to_owned()),
+        }
+    }
+    let (source, output) = (
+        source.ok_or("--source is required")?,
+        output.ok_or("--output is required")?,
+    );
+    let mut report = fate::inventory(&source)?;
+    if let Some(list) = configured {
+        fate::annotate(
+            &mut report,
+            &std::fs::read(&list).map_err(|e| format!("{}: {e}", list.display()))?,
+        )?;
+    }
+    corpus::write_json(&output, &report)?;
+    let count = report
+        .get("cases")
+        .and_then(json::Value::as_array)
+        .map_or(0, <[_]>::len);
+    println!("Indexed {count} identities; none executed or accepted.");
     Ok(())
 }
 
