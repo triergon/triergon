@@ -186,6 +186,10 @@ rejects boxes extending past the source.
   `FragmentContext::decode_origin` has unknown DTS/CTS, not zero.
   `CompositionOffset` keeps version, raw bits and the signed reading separate;
   an absent offset differs from an explicit zero.
+- **Comparison decode runs.** For an explicit `tfdt` at or below `i64::MAX`,
+  the MOV comparison worker's open and native-index operations require the
+  accumulated decode end to be at most `i64::MAX`. Source indexes retain the
+  unsigned origin and exact end. Higher starts use the native clock projection.
 - **Surplus timing entries.** `SampleTableBuilder::with_timing_policy`
   accepts `TimingRunPolicy::BoundedPrefix` for the QuickTime-compatible
   interpretation of overlong timing runs. The last decode run may cross
