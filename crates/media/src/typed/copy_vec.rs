@@ -127,11 +127,11 @@ impl<T: Copy> CopyVec<T> {
                 self.growth = Some((replacement, 0));
                 continue;
             }
-            if let Some(Operation::Push(value)) = self.operation.take() {
-                if let Err(error) = self.data.try_push(value) {
-                    self.operation = Some(Operation::Push(error.value));
-                    return Err(error.error.into());
-                }
+            if let Some(Operation::Push(value)) = self.operation.take()
+                && let Err(error) = self.data.try_push(value)
+            {
+                self.operation = Some(Operation::Push(error.value));
+                return Err(error.error.into());
             }
             return Ok(ParseStep::Event(()));
         }

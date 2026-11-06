@@ -1160,16 +1160,15 @@ impl<M, S: PacketSegment, C: PacketConfig> PacketJob<'_, M, S, C> {
             packet.new_extradata.as_ref(),
         ];
         for (i, owner) in owners.iter().enumerate() {
-            if let Some(b) = owner {
-                if !owners[..i]
+            if let Some(b) = owner
+                && !owners[..i]
                     .iter()
                     .flatten()
                     .any(|old| old.shares_storage_with(b))
-                {
-                    total = total
-                        .checked_add(b.retained_storage_bytes())
-                        .ok_or(Error::Overflow)?;
-                }
+            {
+                total = total
+                    .checked_add(b.retained_storage_bytes())
+                    .ok_or(Error::Overflow)?;
             }
         }
         Ok(total)
@@ -1249,22 +1248,23 @@ impl<M, S: PacketSegment, C: PacketConfig> PacketJob<'_, M, S, C> {
             return Err(e);
         }
         let result = self.advance_into(work, cancel, ready);
-        if let Err(e) = result {
-            if !matches!(e, Error::Backpressure { .. } | Error::Allocation) {
-                // A valid side-data configuration precedes payload parsing in
-                // the pinned receiver. Its change survives a physical packet
-                // error, while partial in-band availability never commits.
-                if matches!(e, Error::Invalid(_) | Error::Truncated) && self.update_verified {
-                    if let Some(configuration) = self.update.take() {
-                        self.session.configuration = configuration;
-                        self.session.receiver_epoch = self.epoch;
-                        self.session.avc = AvcState::default();
-                    }
-                }
-                self.failure = Some(e);
-                self.output = None;
-                self.segments = None;
+        if let Err(e) = result
+            && !matches!(e, Error::Backpressure { .. } | Error::Allocation)
+        {
+            // A valid side-data configuration precedes payload parsing in
+            // the pinned receiver. Its change survives a physical packet
+            // error, while partial in-band availability never commits.
+            if matches!(e, Error::Invalid(_) | Error::Truncated)
+                && self.update_verified
+                && let Some(configuration) = self.update.take()
+            {
+                self.session.configuration = configuration;
+                self.session.receiver_epoch = self.epoch;
+                self.session.avc = AvcState::default();
             }
+            self.failure = Some(e);
+            self.output = None;
+            self.segments = None;
         }
         result
     }

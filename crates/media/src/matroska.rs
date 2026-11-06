@@ -396,10 +396,10 @@ impl<R: Read> Demuxer<R> {
     }
 
     fn check_parent(&self, h: Header, parent: Option<u64>) -> Result<()> {
-        if let Some(p) = parent {
-            if h.data > p || end(h)?.is_some_and(|e| e > p) {
-                return Err(Error::Invalid("element exceeds parent"));
-            }
+        if let Some(p) = parent
+            && (h.data > p || end(h)?.is_some_and(|e| e > p))
+        {
+            return Err(Error::Invalid("element exceeds parent"));
         }
         Ok(())
     }
@@ -1315,15 +1315,14 @@ impl<R: Read + Seek> Demuxer<R> {
             if self.input.position - start > self.limits.scan_bytes {
                 return Err(Error::Limit("seek scan bytes"));
             }
-            if let Some(pts) = p.pts_ns {
-                if first_in_block
-                    && p.track == track
-                    && p.keyframe
-                    && pts <= requested_ns
-                    && best.is_none_or(|(time, _)| pts > time)
-                {
-                    best = Some((pts, self.location));
-                }
+            if let Some(pts) = p.pts_ns
+                && first_in_block
+                && p.track == track
+                && p.keyframe
+                && pts <= requested_ns
+                && best.is_none_or(|(time, _)| pts > time)
+            {
+                best = Some((pts, self.location));
             }
         }
         let scanned_bytes = self.input.position - start;
@@ -1621,7 +1620,7 @@ fn lace(data: &[u8], mode: u8) -> Result<Lace<'_>> {
     let mut at = 1;
     let mut sizes = [0_usize; 256];
     if mode == 2 {
-        if (data.len() - 1) % count != 0 {
+        if !(data.len() - 1).is_multiple_of(count) {
             return Err(Error::Invalid("fixed lace remainder"));
         }
         sizes[..count].fill((data.len() - 1) / count);

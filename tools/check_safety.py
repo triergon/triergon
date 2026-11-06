@@ -11,7 +11,7 @@ ROOT = Path(__file__).resolve().parents[1]
 
 def main():
     env = dict(os.environ, CARGO_INCREMENTAL="0")
-    metadata = json.loads(subprocess.check_output(["cargo", "+nightly", "metadata", "--format-version", "1", "--locked", "--offline"], cwd=ROOT, env=env))
+    metadata = json.loads(subprocess.check_output(["cargo", "metadata", "--format-version", "1", "--locked", "--offline"], cwd=ROOT, env=env))
     for package in metadata["packages"]:
         if package["source"] is not None or not Path(package["manifest_path"]).is_relative_to(ROOT / "crates"):
             raise SystemExit("Unadmitted dependency: " + package["name"])

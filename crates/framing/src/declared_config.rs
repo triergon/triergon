@@ -223,10 +223,10 @@ impl<'a> DeclaredConfigParser<'a> {
             return Err(Error::Cancelled);
         }
         let result = self.advance(work, cancel);
-        if let Err(error) = result {
-            if !matches!(error, Error::Backpressure { .. } | Error::Allocation) {
-                self.stop(error);
-            }
+        if let Err(error) = result
+            && !matches!(error, Error::Backpressure { .. } | Error::Allocation)
+        {
+            self.stop(error);
         }
         result
     }

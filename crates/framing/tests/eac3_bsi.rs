@@ -6,16 +6,7 @@ use triergon_framing::{
     Ac3Frame, Ac3FrameDetails, Ac3FrameLimits, Ac3FrameReader, Ac3StreamSelection, BuildStep,
     Eac3BitRange, Eac3Bsi, Eac3BsiLimits, Eac3BsiParser,
 };
-
-fn hex(text: &str) -> Vec<u8> {
-    if text == "~" {
-        return Vec::new();
-    }
-    (0..text.len())
-        .step_by(2)
-        .map(|at| u8::from_str_radix(&text[at..at + 2], 16).unwrap())
-        .collect()
-}
+use triergon_harness_protocol::unhex;
 
 fn class(error: Error) -> &'static str {
     match error {
@@ -40,7 +31,7 @@ fn fixture(id: &str) -> Vec<u8> {
         .skip(1)
         .find(|line| line.split('\t').next() == Some(id))
         .unwrap();
-    hex(line.split('\t').nth(1).unwrap())
+    unhex(line.split('\t').nth(1).unwrap())
 }
 
 // These controls declare a complete source entity containing one frame. Framing
@@ -169,7 +160,7 @@ fn independent_complete_bsi_corpus_survives_chunks_and_bit_grants() {
     for line in include_str!("../fixtures/eac3-bsi-v1.tsv").lines().skip(1) {
         let row: Vec<_> = line.split('\t').collect();
         assert_eq!(row.len(), 28);
-        let input = hex(row[1]);
+        let input = unhex(row[1]);
         count += 1;
         for chunk in [1, 2, 7, 31] {
             for units in [1, 2, 17, 4096] {
@@ -226,7 +217,7 @@ fn sid_and_type_controls_preserve_source_ids_without_native_outcome_assumptions(
         assert_eq!(row.len(), 11);
         count += 1;
         assert_eq!(row[10], "unassigned");
-        let input = hex(row[1]);
+        let input = unhex(row[1]);
         let actual = framed(&pool, &input, 1).and_then(|frame| inspect(&pool, frame, 1));
         let expected = if row[0].ends_with("--full") {
             row[9]
@@ -430,7 +421,7 @@ fn mandatory_tail_overlap_sources_are_preserved_as_invalid_repros() {
     {
         let row: Vec<_> = line.split('\t').collect();
         count += 1;
-        let input = hex(row[1]);
+        let input = unhex(row[1]);
         let frame = framed(&pool, &input, 1).unwrap();
         let actual = inspect(&pool, frame, 1);
         assert_eq!(class(actual.err().unwrap()), row[2], "{}", row[0]);

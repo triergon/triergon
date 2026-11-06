@@ -21,7 +21,7 @@ impl Bits {
     }
     fn put(&mut self, value: u32, width: usize) {
         for bit in 0..width {
-            if self.used % 8 == 0 {
+            if self.used.is_multiple_of(8) {
                 self.data.push(0);
             }
             if value & (1 << bit) != 0 {
@@ -422,7 +422,7 @@ fn mixed_dynamic_fixed_and_stored_blocks_keep_bit_state_across_uneven_yields() {
     bits.fixed(256);
     bits.put(1, 1);
     bits.put(0, 2);
-    while bits.used % 8 != 0 {
+    while !bits.used.is_multiple_of(8) {
         bits.put(0, 1);
     }
     bits.put(4, 16);

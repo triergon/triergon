@@ -45,7 +45,7 @@ def main():
     parser.add_argument("--jobs", type=int, default=os.cpu_count())
     args = parser.parse_args()
     env = dict(os.environ, CARGO_INCREMENTAL="0")
-    subprocess.run(["cargo", "+nightly", "build", "--release", "--locked", "-p", "triergon-sim",
+    subprocess.run(["cargo", "build", "--release", "--locked", "-p", "triergon-sim",
                     "--features", "codecs", "--bin", "d4-worker"], cwd=ROOT, env=env, check=True)
     examples = ROOT / "target/release/examples"
     jobs = []
@@ -54,7 +54,7 @@ def main():
             binary = examples / "decode"
             # One example name per package: cargo overwrites target/release/examples/decode,
             # so build each package's example into its own copy first.
-            subprocess.run(["cargo", "+nightly", "build", "--release", "--locked", "--example",
+            subprocess.run(["cargo", "build", "--release", "--locked", "--example",
                             "decode", "-p", f"triergon-codec-{codec}"], cwd=ROOT, env=env, check=True,
                            capture_output=True)
             copy = Path(scratch) / f"decode-{codec}"

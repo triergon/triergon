@@ -211,12 +211,13 @@ impl Colour {
             [2, 2] => 2,
             _ => 0,
         };
-        if let (Some(cll), Some(fall)) = (self.max_cll, self.max_fall) {
-            if cll > 0 && fall > 0 {
-                out[6] = 1;
-                out[7] = i64::from(u32::try_from(cll).map_err(|_| Error::Overflow)?);
-                out[8] = i64::from(u32::try_from(fall).map_err(|_| Error::Overflow)?);
-            }
+        if let (Some(cll), Some(fall)) = (self.max_cll, self.max_fall)
+            && cll > 0
+            && fall > 0
+        {
+            out[6] = 1;
+            out[7] = i64::from(u32::try_from(cll).map_err(|_| Error::Overflow)?);
+            out[8] = i64::from(u32::try_from(fall).map_err(|_| Error::Overflow)?);
         }
         if let Some(m) = self.mastering {
             let primaries = m.chromaticity.iter().all(|v| v.is_some_and(|v| v > 0.));

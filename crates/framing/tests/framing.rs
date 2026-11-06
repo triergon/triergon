@@ -8,6 +8,7 @@ use triergon_framing::{
     ConfigLimits, Configuration, Framing, LengthSize, NalFraming, NalHeader, NalReader, NalUnit,
     ParameterSetKind, ReaderLimits,
 };
+use triergon_harness_protocol::unhex;
 
 fn limits() -> ReaderLimits {
     ReaderLimits {
@@ -100,11 +101,11 @@ fn authored_corpus_all_chunk_boundaries_and_small_work() {
         } else {
             Framing::LengthPrefixed(LengthSize::new(cells[3].parse().unwrap()).unwrap())
         };
-        let data = hex(cells[4]);
+        let data = unhex(cells[4]);
         let expected: Vec<_> = if cells[5].is_empty() {
             Vec::new()
         } else {
-            cells[5].split(',').map(hex).collect()
+            cells[5].split(',').map(unhex).collect()
         };
         for chunk in 1..=data.len().max(1) {
             for work in [1, 2, 5, 64] {
@@ -199,14 +200,6 @@ fn authored_corpus_all_chunk_boundaries_and_small_work() {
             }
         }
     }
-}
-
-fn hex(value: &str) -> Vec<u8> {
-    assert_eq!(value.len() % 2, 0);
-    (0..value.len())
-        .step_by(2)
-        .map(|at| u8::from_str_radix(&value[at..at + 2], 16).unwrap())
-        .collect()
 }
 
 #[test]

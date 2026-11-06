@@ -84,7 +84,7 @@ pub fn is_radl(t: u8) -> bool {
 /// Sub-layer non-reference picture (clause 7.4.2.2): even types below 16 (excluding reserved).
 #[inline]
 pub fn is_sub_layer_non_ref(t: u8) -> bool {
-    t <= RSV_VCL_N14 && t % 2 == 0
+    t <= RSV_VCL_N14 && t.is_multiple_of(2)
 }
 
 /// Iterate over NAL unit payloads (without start codes) in an Annex B byte stream.
@@ -246,18 +246,17 @@ impl<'a> Iterator for AccessUnitSplitter<'a> {
                 }
                 // EOS / EOB end the AU after themselves.
                 let h = NalHeader::parse(nal);
-                if let Some(h) = h {
-                    if seen_vcl
-                        && h.nuh_layer_id == 0
-                        && (h.nal_unit_type == EOS_NUT || h.nal_unit_type == EOB_NUT)
-                    {
-                        // AU ends after this NAL.
-                        let end = find_start_code(self.data, nal_start)
-                            .map(|(s, _)| s)
-                            .unwrap_or(self.data.len());
-                        self.pos = end;
-                        return Some(&self.data[au_start..end]);
-                    }
+                if let Some(h) = h
+                    && seen_vcl
+                    && h.nuh_layer_id == 0
+                    && (h.nal_unit_type == EOS_NUT || h.nal_unit_type == EOB_NUT)
+                {
+                    // AU ends after this NAL.
+                    let end = find_start_code(self.data, nal_start)
+                        .map(|(s, _)| s)
+                        .unwrap_or(self.data.len());
+                    self.pos = end;
+                    return Some(&self.data[au_start..end]);
                 }
             }
             i = nal_start;

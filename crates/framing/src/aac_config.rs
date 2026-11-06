@@ -371,12 +371,12 @@ impl AacAscParser {
             return Err(error);
         }
         let result = self.advance(work, cancel);
-        if let Err(error) = result {
-            if !matches!(error, Error::Backpressure { .. } | Error::Allocation) {
-                self.failure = Some(error);
-                self.raw = None;
-                self.pce = None;
-            }
+        if let Err(error) = result
+            && !matches!(error, Error::Backpressure { .. } | Error::Allocation)
+        {
+            self.failure = Some(error);
+            self.raw = None;
+            self.pce = None;
         }
         result
     }

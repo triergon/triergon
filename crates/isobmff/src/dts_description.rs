@@ -20,7 +20,7 @@ impl DtsCoreDescription {
     pub(crate) fn media_clock(self, base: TimeBase) -> Result<(u32, Option<u32>)> {
         let rate = u64::from(self.sample_entry_rate_hz);
         let scale = base.denominator();
-        if base.numerator() != 1 || scale % rate != 0 {
+        if base.numerator() != 1 || !scale.is_multiple_of(rate) {
             return Err(Error::Unsupported("DTS media timescale"));
         }
         let frame = self

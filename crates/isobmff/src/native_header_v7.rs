@@ -142,10 +142,10 @@ impl Mov9SampleEntryHeaderJobV7 {
                 .ok_or(Error::Invalid("v7 pending child absent"))?;
             self.inspected = self.inspected.checked_add(1).ok_or(Error::Overflow)?;
             // A failed native header still does not skip later source syntax.
-            if self.rejection.is_none() {
-                if let Some(cause) = self.inspect(&raw) {
-                    self.rejection = Some(Mov9HeaderRejectionV7 { raw, cause });
-                }
+            if self.rejection.is_none()
+                && let Some(cause) = self.inspect(&raw)
+            {
+                self.rejection = Some(Mov9HeaderRejectionV7 { raw, cause });
             }
         }
     }

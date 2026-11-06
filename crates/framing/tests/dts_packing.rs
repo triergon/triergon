@@ -23,11 +23,11 @@ fn limits() -> DtsPackingLimits {
 // Added low tail bits are authored control data, not a DTS frame-padding rule.
 fn pack(source: &[u8], order: DtsWordOrder) -> Vec<u8> {
     let mut bits: String = source.iter().map(|byte| format!("{byte:08b}")).collect();
-    while bits.len() % 14 != 0 {
+    while !bits.len().is_multiple_of(14) {
         bits.push('0');
     }
     let mut output = Vec::new();
-    for (index, chunk) in bits.as_bytes().chunks_exact(14).enumerate() {
+    for (index, chunk) in bits.as_bytes().as_chunks::<14>().0.iter().enumerate() {
         let low = u16::from_str_radix(std::str::from_utf8(chunk).unwrap(), 2).unwrap();
         let high = (index % 4) as u16;
         let word = low | high << 14;
@@ -41,7 +41,9 @@ fn pack(source: &[u8], order: DtsWordOrder) -> Vec<u8> {
 
 fn oracle(raw: &[u8], order: DtsWordOrder) -> (Vec<u8>, u8, u8) {
     let bits: String = raw
-        .chunks_exact(2)
+        .as_chunks::<2>()
+        .0
+        .iter()
         .map(|pair| {
             let word = match order {
                 DtsWordOrder::BigEndian => u16::from_be_bytes([pair[0], pair[1]]),
@@ -52,7 +54,9 @@ fn oracle(raw: &[u8], order: DtsWordOrder) -> (Vec<u8>, u8, u8) {
         .collect();
     let count = bits.len() / 8;
     let bytes = bits.as_bytes()[..count * 8]
-        .chunks_exact(8)
+        .as_chunks::<8>()
+        .0
+        .iter()
         .map(|chunk| u8::from_str_radix(std::str::from_utf8(chunk).unwrap(), 2).unwrap())
         .collect();
     let tail = &bits[count * 8..];
@@ -181,7 +185,9 @@ fn every_frozen396_source_prefix_roundtrips_without_changing_old_inputs() {
         } else {
             parts[1]
                 .as_bytes()
-                .chunks_exact(2)
+                .as_chunks::<2>()
+                .0
+                .iter()
                 .map(|s| u8::from_str_radix(std::str::from_utf8(s).unwrap(), 16).unwrap())
                 .collect()
         };

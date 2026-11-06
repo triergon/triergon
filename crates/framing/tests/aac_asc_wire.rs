@@ -33,7 +33,7 @@ impl Bits {
     }
     fn put(&mut self, value: u32, count: usize) {
         for i in (0..count).rev() {
-            if self.len % 8 == 0 {
+            if self.len.is_multiple_of(8) {
                 self.bytes.push(0);
             }
             let byte = self.len / 8;
@@ -131,7 +131,9 @@ fn all15_original_primary_examples_retain_core_render_and_source_views() {
         let fields: Vec<_> = line.split('\t').collect();
         let raw: Vec<_> = fields[1]
             .as_bytes()
-            .chunks_exact(2)
+            .as_chunks::<2>()
+            .0
+            .iter()
             .map(|pair| u8::from_str_radix(std::str::from_utf8(pair).unwrap(), 16).unwrap())
             .collect();
         let o = run(

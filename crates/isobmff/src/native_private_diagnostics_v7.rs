@@ -252,14 +252,14 @@ impl Mov9PrivateDiagnosticJobV7 {
             return Err(e);
         }
         let value = self.inner(work, cancel);
-        if let Err(e) = value {
-            if !matches!(e, Error::Backpressure { .. }) {
-                self.failed = Some(e);
-                self.pending = None;
-                self.esds = None;
-                self.emitting = [None, None];
-                self.children = None;
-            }
+        if let Err(e) = value
+            && !matches!(e, Error::Backpressure { .. })
+        {
+            self.failed = Some(e);
+            self.pending = None;
+            self.esds = None;
+            self.emitting = [None, None];
+            self.children = None;
         }
         value
     }

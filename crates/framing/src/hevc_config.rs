@@ -444,13 +444,13 @@ impl<S: HvcStorage> HvcParser<S> {
             return Err(error);
         }
         let result = self.advance(work, cancel);
-        if let Err(error) = result {
-            if !matches!(error, Error::Backpressure { .. } | Error::Allocation) {
-                self.failure = Some(error);
-                self.raw = None;
-                self.arrays = None;
-                self.nals = None;
-            }
+        if let Err(error) = result
+            && !matches!(error, Error::Backpressure { .. } | Error::Allocation)
+        {
+            self.failure = Some(error);
+            self.raw = None;
+            self.arrays = None;
+            self.nals = None;
         }
         result
     }

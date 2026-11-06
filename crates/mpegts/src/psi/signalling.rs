@@ -123,7 +123,7 @@ impl<'a> Descriptor<'a> {
         if self.tag != 10 {
             return Err(Error::Invalid("language descriptor tag"));
         }
-        if self.data.len() % 4 != 0 {
+        if !self.data.len().is_multiple_of(4) {
             return Err(Error::Invalid("language descriptor length"));
         }
         Ok(LanguageEntries {

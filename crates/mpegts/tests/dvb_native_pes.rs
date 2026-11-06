@@ -197,7 +197,7 @@ fn original(raw: &[u8], body: &[u8], descriptor: &[u8]) {
     )
     .expect("actual original D0 feature stub");
     let mut output = Vec::new();
-    for (index, bytes) in raw.chunks_exact(188).enumerate() {
+    for (index, bytes) in raw.as_chunks::<188>().0.iter().enumerate() {
         let p = packet(&b, bytes, (index * 188) as u64);
         if p.pid == 256 {
             o.push(p, context(index as u64)).unwrap();

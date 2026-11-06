@@ -199,12 +199,12 @@ impl Huffman {
         let mut code = 0_u16;
         for length in 1..=self.max {
             code = (code << 1) | bits.take(1)? as u16;
-            if let Some(index) = code.checked_sub(self.first[length]) {
-                if index < self.counts[length] {
-                    return Ok(usize::from(
-                        self.symbols[usize::from(self.offsets[length] + index)],
-                    ));
-                }
+            if let Some(index) = code.checked_sub(self.first[length])
+                && index < self.counts[length]
+            {
+                return Ok(usize::from(
+                    self.symbols[usize::from(self.offsets[length] + index)],
+                ));
             }
         }
         Err(Error::Invalid("invalid Huffman code"))
@@ -330,7 +330,10 @@ fn header(data: &[u8]) -> Result<usize> {
     if data.len() < 6 {
         return Err(Error::Truncated);
     }
-    if data[0] & 15 != 8 || data[0] >> 4 > 7 || u16::from_be_bytes([data[0], data[1]]) % 31 != 0 {
+    if data[0] & 15 != 8
+        || data[0] >> 4 > 7
+        || !u16::from_be_bytes([data[0], data[1]]).is_multiple_of(31)
+    {
         return Err(Error::Invalid("zlib header"));
     }
     if data[1] & 32 != 0 {

@@ -103,7 +103,7 @@ fn conventional_variable_carrier_has_literal_ranges_and_headers() {
 #[test]
 fn endian_views_do_not_change_source_bytes_or_order() {
     let mut le = GOOD.to_vec();
-    for pair in le.chunks_exact_mut(2) {
+    for pair in le.as_chunks_mut::<2>().0 {
         pair.swap(0, 1);
     }
     let (_, a) = acquire(GOOD, DtsWordOrder::BigEndian, 1, 31);

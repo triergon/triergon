@@ -20,22 +20,6 @@ fn unsigned(value: &str) -> Option<u64> {
     (value != "null").then(|| value.parse().unwrap())
 }
 
-fn hex(value: &str) -> Vec<u8> {
-    assert_eq!(value.len() % 2, 0);
-    value
-        .as_bytes()
-        .chunks_exact(2)
-        .map(|pair| {
-            let nibble = |byte| match byte {
-                b'0'..=b'9' => byte - b'0',
-                b'a'..=b'f' => byte - b'a' + 10,
-                _ => panic!("invalid immutable native hex"),
-            };
-            (nibble(pair[0]) << 4) | nibble(pair[1])
-        })
-        .collect()
-}
-
 #[test]
 fn seek_subtitle_recovery_observed_unknown_end_prefix_and_entire_native_suffix() {
     let cancel = AtomicBool::new(false);
@@ -69,7 +53,7 @@ fn seek_subtitle_recovery_observed_unknown_end_prefix_and_entire_native_suffix()
         assert_eq!(packet.keyframe, expected[4] == "true", "row {ordinal} key");
         assert_eq!(
             packet.data.as_ref(),
-            hex(expected[7]).as_slice(),
+            triergon_harness_protocol::unhex(expected[7]).as_slice(),
             "row {ordinal} payload"
         );
         // The raw trace retains both trim fields. This source has no discard

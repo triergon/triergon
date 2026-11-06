@@ -16,7 +16,7 @@ struct Bits {
 impl Bits {
     fn put(&mut self, value: u32, width: usize) {
         for bit in 0..width {
-            if self.used % 8 == 0 {
+            if self.used.is_multiple_of(8) {
                 self.bytes.push(0);
             }
             let index = self.used / 8;

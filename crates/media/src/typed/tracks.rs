@@ -187,16 +187,16 @@ impl TrackJob {
                                         continue;
                                     }
                                 }
-                                if matches!(child.id, 0x86 | 0x22b59c) {
-                                    if let Some(value) = super::super::static_metadata_text(bytes) {
-                                        if child.id == 0x86 {
-                                            t.codec = SharedText::constant(value);
-                                            self.codec_nonempty = true;
-                                        } else {
-                                            t.language = SharedText::constant(value);
-                                        }
-                                        continue;
+                                if matches!(child.id, 0x86 | 0x22b59c)
+                                    && let Some(value) = super::super::static_metadata_text(bytes)
+                                {
+                                    if child.id == 0x86 {
+                                        t.codec = SharedText::constant(value);
+                                        self.codec_nonempty = true;
+                                    } else {
+                                        t.language = SharedText::constant(value);
                                     }
+                                    continue;
                                 }
                                 self.text =
                                     Some(TextJob::new(self.source.clone(), child.payload, false)?);

@@ -7,22 +7,12 @@ use triergon_core::{
 use triergon_framing::{
     DtsCoreFrame, DtsCoreFrameLimits, DtsCoreFrameReader, DtsCoreHeader, probe_dts_core_header,
 };
+use triergon_harness_protocol::unhex;
 
 const SOURCE: SourceId = SourceId(2150);
 const STAGED: &str = "DTS core implementation pending parent runtime red";
 const HEADERS: &str = include_str!("../fixtures/dts-core-header-author-v1.tsv");
 const STREAMS: &str = include_str!("../fixtures/dts-core-frame-author-v1.tsv");
-
-fn hex(text: &str) -> Vec<u8> {
-    if text == "~" || text.is_empty() {
-        return Vec::new();
-    }
-    assert_eq!(text.len() % 2, 0);
-    (0..text.len())
-        .step_by(2)
-        .map(|at| u8::from_str_radix(&text[at..at + 2], 16).unwrap())
-        .collect()
-}
 
 fn class(error: Error) -> &'static str {
     match error {
@@ -226,7 +216,7 @@ fn fixture(table: &str, id: &str) -> Vec<u8> {
         .skip(1)
         .find(|line| line.split('\t').next() == Some(id))
         .unwrap();
-    hex(row.split('\t').nth(1).unwrap())
+    unhex(row.split('\t').nth(1).unwrap())
 }
 
 fn limits() -> DtsCoreFrameLimits {
@@ -390,7 +380,7 @@ fn independent_188_header_sources_all_reach_the_declared_result_and_facts() {
         let row: Vec<_> = line.split('\t').collect();
         assert_eq!(row.len(), 4);
         count += 1;
-        match probe_dts_core_header(&hex(row[1])) {
+        match probe_dts_core_header(&unhex(row[1])) {
             Ok(header) if row[2] == "ok" => {
                 if fields(header) != object(&tsv_json(row[3])) {
                     mismatches.push(format!("{} facts differ", row[0]));
@@ -423,7 +413,7 @@ fn independent_17_stream_sources_all_preserve_bytes_facts_and_partial_outputs() 
         let row: Vec<_> = line.split('\t').collect();
         assert_eq!(row.len(), 5);
         count += 1;
-        let input = hex(row[1]);
+        let input = unhex(row[1]);
         assert_eq!(input.len().to_string(), row[2]);
         let expected_json = tsv_json(row[4]);
         let expected = array(&expected_json);

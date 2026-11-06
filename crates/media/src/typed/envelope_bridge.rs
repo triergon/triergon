@@ -674,7 +674,7 @@ impl ElementReader {
                 return None;
             }
             elements += 1;
-            if elements % 1024 == 0 && cancel.load(std::sync::atomic::Ordering::Relaxed) {
+            if elements.is_multiple_of(1024) && cancel.load(std::sync::atomic::Ordering::Relaxed) {
                 return None;
             }
             if elements >= self.limits.elements {
@@ -699,7 +699,8 @@ impl ElementReader {
                     while child < end {
                         let (id, size, child_data) = header(child)?;
                         elements += 1;
-                        if elements % 1024 == 0 && cancel.load(std::sync::atomic::Ordering::Relaxed)
+                        if elements.is_multiple_of(1024)
+                            && cancel.load(std::sync::atomic::Ordering::Relaxed)
                         {
                             return None;
                         }

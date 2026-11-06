@@ -58,7 +58,7 @@ fn literal(
     }
     assert_eq!(bits.len(), 56);
     let mut out = Vec::new();
-    for byte in bits.chunks_exact(8) {
+    for byte in bits.as_chunks::<8>().0 {
         let mut value = 0;
         for bit in byte {
             value = (value << 1) | u8::from(*bit);

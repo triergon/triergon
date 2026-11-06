@@ -6,6 +6,7 @@ use triergon_framing::{
     DtsInspectionIssues as I, DtsInspectionStep, DtsPackedLimits, DtsPackedPayloadJob, DtsPacking,
     DtsSourceIdentity, FieldObservation, inspect_dts_header_bits,
 };
+use triergon_harness_protocol::unhex;
 
 fn identity() -> DtsInspectionIdentity {
     DtsInspectionIdentity {
@@ -34,14 +35,6 @@ fn inspect(raw: &[u8], quantum: u64) -> DtsInspection {
     let raw = Bytes::copy_from_slice(&pool, raw).unwrap();
     let mut job = DtsHeaderInspector::new(&pool, identity(), raw, 256).unwrap();
     finish(&mut job, quantum)
-}
-
-fn hex(raw: &str) -> Vec<u8> {
-    assert_eq!(raw.len() % 2, 0);
-    raw.as_bytes()
-        .chunks_exact(2)
-        .map(|p| u8::from_str_radix(std::str::from_utf8(p).unwrap(), 16).unwrap())
-        .collect()
 }
 
 fn assert_observed_ranges(value: &DtsInspection, logical_bits: usize) {
@@ -75,7 +68,7 @@ fn all_fourteen_original_prefix_findings_publish_known_absence() {
     {
         let columns: Vec<_> = row.split('\t').collect();
         assert_eq!(columns.len(), 2);
-        let raw = hex(columns[1]);
+        let raw = unhex(columns[1]);
         assert!((5..=10).contains(&raw.len()));
         assert_eq!((raw[4] >> 1) & 1, 0);
         for quantum in [1, 7, 31] {

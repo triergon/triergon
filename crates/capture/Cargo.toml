@@ -7,5 +7,13 @@ edition.workspace = true
 rust-version.workspace = true
 publish.workspace = true
 
-[lints]
-workspace = true
+# The library sources mirror the Streem development pin byte for byte; newer
+# stable style lints are allowed here instead of editing that copy.
+[lints.rust]
+unsafe_code = "forbid"
+
+[lints.clippy]
+needless_range_loop = "allow"
+chunks_exact_to_as_chunks = "allow"
+manual_is_multiple_of = "allow"
+collapsible_if = "allow"

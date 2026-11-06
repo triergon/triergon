@@ -42,7 +42,7 @@ def instrumentation_commands(compiler, out, system):
 
 def main():
     env = dict(os.environ, CARGO_INCREMENTAL="0")
-    candidate_command = ["cargo", "+nightly", "build", "-p", "media-worker", "--release", "--locked"]
+    candidate_command = ["cargo", "build", "-p", "media-worker", "--release", "--locked"]
     subprocess.run(candidate_command, cwd=ROOT, env=env, check=True)
     out = ROOT / "target/harness"
     out.mkdir(parents=True, exist_ok=True)
@@ -98,7 +98,7 @@ def main():
         "instrumentation": instrumentation,
         "compiler": subprocess.check_output([command[0], "--version"], text=True),
         "ffmpeg_version": subprocess.check_output(["ffmpeg", "-version"], text=True),
-        "rustc": subprocess.check_output(["rustc", "+nightly", "-Vv"], text=True),
+        "rustc": subprocess.check_output(["rustc", "-Vv"], text=True, cwd=ROOT),
         "binaries": {"candidate": sha(ROOT / "target/release/media-worker"), "reference": sha(out / "ffmpeg-worker")},
         "source_hashes": {name: digest for package in graph["packages"] for name, digest in package["files"].items()},
         "build_input_hashes": graph["shared_files"],

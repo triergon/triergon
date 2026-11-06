@@ -333,11 +333,12 @@ impl ConfigJob {
     }
 
     fn line_end(&mut self, eof: bool) -> Result<()> {
-        if let Line::Palette(state) = &mut self.line {
-            if state.continuation && !eof {
-                state.continuation = false;
-                return Ok(());
-            }
+        if let Line::Palette(state) = &mut self.line
+            && state.continuation
+            && !eof
+        {
+            state.continuation = false;
+            return Ok(());
         }
         match std::mem::take(&mut self.line) {
             Line::Size(state) => {

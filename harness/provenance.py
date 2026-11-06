@@ -17,9 +17,9 @@ from .common import canonical_digest, digest as file_hash
 
 def cargo_metadata(root):
     env = dict(os.environ, CARGO_INCREMENTAL='0')
-    compiler = subprocess.check_output(['rustc', '+nightly', '-Vv'], text=True, env=env)
+    compiler = subprocess.check_output(['rustc', '-Vv'], text=True, cwd=root, env=env)
     target = next(line.removeprefix('host: ') for line in compiler.splitlines() if line.startswith('host: '))
-    return json.loads(subprocess.check_output(['cargo', '+nightly', 'metadata', '--format-version', '1',
+    return json.loads(subprocess.check_output(['cargo', 'metadata', '--format-version', '1',
         '--locked', '--offline', '--filter-platform', target], cwd=root, env=env))
 
 

@@ -1,4 +1,4 @@
-.PHONY: check prepare-check core-oracle reference fixtures adapters report qualify
+.PHONY: check check-simd prepare-check core-oracle reference fixtures adapters report qualify
 
 export PATH := $(CURDIR)/.research/reference/install/bin:$(PATH)
 
@@ -9,15 +9,22 @@ prepare-check:
 	$(MAKE) adapters
 
 check:
-	CARGO_INCREMENTAL=0 cargo +nightly fmt --all --check
-	CARGO_INCREMENTAL=0 cargo +nightly test --workspace --locked
-	CARGO_INCREMENTAL=0 cargo +nightly clippy --workspace --all-targets --locked -- -D warnings
-	CARGO_INCREMENTAL=0 cargo +nightly check --workspace --no-default-features --locked
-	CARGO_INCREMENTAL=0 cargo +nightly build --workspace --release --locked
+	CARGO_INCREMENTAL=0 cargo fmt --all --check
+	CARGO_INCREMENTAL=0 cargo test --workspace --locked
+	CARGO_INCREMENTAL=0 cargo clippy --workspace --all-targets --locked -- -D warnings
+	CARGO_INCREMENTAL=0 cargo check --workspace --no-default-features --locked
+	CARGO_INCREMENTAL=0 cargo build --workspace --release --locked
+	$(MAKE) check-simd
 	python3 -m unittest discover -s harness -t .
 	python3 tools/check_safety.py
 	python3 tools/check_design.py
 	python3 tools/test-core-time.py
+
+# Opt-in nightly std::simd lane of the HEVC decoder; it must decode exactly as the
+# scalar default does (the conformance tests compare both with FFmpeg digests).
+check-simd:
+	CARGO_INCREMENTAL=0 cargo +nightly clippy -p triergon-codec-hevc -p triergon-sim --features triergon-codec-hevc/simd,triergon-sim/codecs --all-targets --locked -- -D warnings
+	CARGO_INCREMENTAL=0 cargo +nightly test -p triergon-codec-hevc --features simd --release --locked
 
 core-oracle:
 	python3 tools/test-core-time.py

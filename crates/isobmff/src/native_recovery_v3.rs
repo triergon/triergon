@@ -129,10 +129,10 @@ impl Mov9RunRecoveryV3Builder {
             return Err(e);
         }
         let result = self.poll_inner(work, cancel);
-        if let Err(e) = result {
-            if !matches!(e, Error::Backpressure { .. }) {
-                self.failed = Some(e);
-            }
+        if let Err(e) = result
+            && !matches!(e, Error::Backpressure { .. })
+        {
+            self.failed = Some(e);
         }
         result
     }

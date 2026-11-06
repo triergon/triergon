@@ -7,6 +7,7 @@ use triergon_framing::{
     Av1ConfigLimits, Av1ConfigParser, Av1Configuration, Av1Obu, Av1ObuFraming, Av1ObuLimits,
     Av1ObuReader, BuildStep, Vp9ConfigContext, Vp9ConfigLimits, Vp9ConfigParser, Vp9Configuration,
 };
+use triergon_harness_protocol::unhex;
 
 fn limits() -> Av1ObuLimits {
     Av1ObuLimits {
@@ -21,17 +22,6 @@ fn config_limits() -> Av1ConfigLimits {
         maximum_record_bytes: 4096,
         obu: limits(),
     }
-}
-
-fn hex(value: &str) -> Vec<u8> {
-    if value == "~" {
-        return Vec::new();
-    }
-    assert_eq!(value.len() % 2, 0);
-    (0..value.len())
-        .step_by(2)
-        .map(|at| u8::from_str_radix(&value[at..at + 2], 16).unwrap())
-        .collect()
 }
 
 fn error_class(error: Error) -> &'static str {
@@ -103,7 +93,7 @@ fn independent_obu_corpus_survives_all_chunk_sizes_and_tiny_work() {
     for line in include_str!("../fixtures/av1-obu-v1.tsv").lines().skip(1) {
         let row: Vec<_> = line.split('\t').collect();
         assert_eq!(row.len(), 12);
-        let input = hex(row[2]);
+        let input = unhex(row[2]);
         let framing = if row[1] == "low" {
             Av1ObuFraming::LowOverhead
         } else {
@@ -125,12 +115,12 @@ fn independent_obu_corpus_survives_all_chunk_sizes_and_tiny_work() {
                 let wires: Vec<_> = if row[3] == "-" {
                     Vec::new()
                 } else {
-                    row[3].split(',').map(hex).collect()
+                    row[3].split(',').map(unhex).collect()
                 };
                 let payloads: Vec<_> = if row[4] == "-" {
                     Vec::new()
                 } else {
-                    row[4].split(',').map(hex).collect()
+                    row[4].split(',').map(unhex).collect()
                 };
                 assert_eq!(actual.len(), wires.len(), "{}", row[0]);
                 for (index, obu) in actual.iter().enumerate() {
@@ -161,8 +151,8 @@ fn independent_obu_corpus_survives_all_chunk_sizes_and_tiny_work() {
                     }
                     match facts.size_field {
                         Some(leb) => {
-                            assert_eq!(leb.raw_bytes(), hex(item(7)).as_slice());
-                            assert_eq!(leb.width() as usize, hex(item(7)).len());
+                            assert_eq!(leb.raw_bytes(), unhex(item(7)).as_slice());
+                            assert_eq!(leb.width() as usize, unhex(item(7)).len());
                             assert_eq!(leb.value() as usize, payloads[index].len());
                         }
                         None => assert_eq!(item(7), "-"),
@@ -213,7 +203,7 @@ fn independent_av1c_records_preserve_fields_presence_reserved_bits_and_obus() {
         .skip(1)
     {
         let row: Vec<_> = line.split('\t').collect();
-        let input = hex(row[1]);
+        let input = unhex(row[1]);
         for units in [1, 3, 64] {
             let result = parse_config(&pool, &input, units);
             if row[5] != "ok" {
@@ -327,7 +317,7 @@ fn independent_vp9_records_keep_context_fields_and_opaque_initialization() {
         .skip(1)
     {
         let row: Vec<_> = line.split('\t').collect();
-        let input = hex(row[1]);
+        let input = unhex(row[1]);
         let context = Vp9ConfigContext {
             version: row[2].parse().unwrap(),
             flags: row[3].parse().unwrap(),
@@ -901,12 +891,12 @@ fn temporal_unit<'a>(
 fn temporal_unit_borrows_the_complete_sample_and_in_band_configuration() {
     use triergon_framing::Av1TemporalUnitConfig;
     let pool = Budget::new(1 << 20).unwrap();
-    let record = parse_config(&pool, &hex("81000c000a01b12a02c1807a0100"), 1).unwrap();
+    let record = parse_config(&pool, &unhex("81000c000a01b12a02c1807a0100"), 1).unwrap();
     let config = Av1TemporalUnitConfig::new(&record).unwrap();
-    let frame = hex("3202d1e2");
+    let frame = unhex("3202d1e2");
     let output = temporal_unit(&frame, Some(config), true, 1).unwrap();
     let segments: Vec<_> = output.segments().collect();
-    assert_eq!(segments.concat(), hex("12000a01b12a02c1803202d1e2"));
+    assert_eq!(segments.concat(), unhex("12000a01b12a02c1803202d1e2"));
     assert_eq!(segments.concat().len(), output.byte_len());
     assert!(std::ptr::eq(output.source(), frame.as_slice()));
     assert!(std::ptr::eq(segments[1], &record.raw_record()[4..7]));
@@ -917,10 +907,10 @@ fn temporal_unit_borrows_the_complete_sample_and_in_band_configuration() {
         let without_insert = temporal_unit(&frame, Some(config), false, units).unwrap();
         assert_eq!(
             without_insert.segments().collect::<Vec<_>>().concat(),
-            hex("12003202d1e2")
+            unhex("12003202d1e2")
         );
 
-        let source = hex("1280000a01ff3201e2");
+        let source = unhex("1280000a01ff3201e2");
         let output = temporal_unit(&source, Some(config), true, units).unwrap();
         assert_eq!(output.segments().collect::<Vec<_>>().concat(), source);
         assert!(std::ptr::eq(
@@ -932,7 +922,7 @@ fn temporal_unit_borrows_the_complete_sample_and_in_band_configuration() {
 
 #[test]
 fn temporal_unit_sizes_only_the_final_unbounded_obu() {
-    let mut source = hex("2a8100e43428");
+    let mut source = unhex("2a8100e43428");
     source.extend([0x7f; 128]);
     let output = temporal_unit(&source, None, false, 1).unwrap();
     let segments: Vec<_> = output.segments().collect();
@@ -948,11 +938,11 @@ fn temporal_unit_sizes_only_the_final_unbounded_obu() {
     assert_eq!(output.byte_len(), source.len() + 4);
     assert!(std::ptr::eq(segments[3], &source[6..]));
 
-    let source = hex("12003099");
+    let source = unhex("12003099");
     let output = temporal_unit(&source, None, false, 1).unwrap();
     assert_eq!(
         output.segments().collect::<Vec<_>>().concat(),
-        hex("1200320199")
+        unhex("1200320199")
     );
 }
 
@@ -974,7 +964,7 @@ fn temporal_unit_rejects_ambiguous_and_malformed_envelopes() {
         ("b20100", "invalid"),
         ("330100", "invalid"),
     ] {
-        let sample = hex(input);
+        let sample = unhex(input);
         let result = temporal_unit(&sample, None, true, 1);
         if expected == "ok" {
             assert!(result.is_ok(), "{input}");
@@ -987,7 +977,7 @@ fn temporal_unit_rejects_ambiguous_and_malformed_envelopes() {
 #[test]
 fn temporal_unit_fences_yield_cancel_and_enforces_both_size_limits() {
     use triergon_framing::Av1TemporalUnitJob;
-    let input = hex("1200320199");
+    let input = unhex("1200320199");
     let cancel = AtomicBool::new(false);
     let mut limits = temporal_limits();
     limits.maximum_sample_bytes = 4;

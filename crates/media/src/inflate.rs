@@ -79,12 +79,12 @@ impl<const SYMBOLS: usize, const QUICK: usize> HuffmanTree<SYMBOLS, QUICK> {
         let mut code = 0_u16;
         for width in 1..=self.max {
             code = (code << 1) | bits.take(1)? as u16;
-            if let Some(index) = code.checked_sub(self.first[width]) {
-                if index < self.counts[width] {
-                    return Ok(usize::from(
-                        self.symbols[usize::from(self.offsets[width] + index)],
-                    ));
-                }
+            if let Some(index) = code.checked_sub(self.first[width])
+                && index < self.counts[width]
+            {
+                return Ok(usize::from(
+                    self.symbols[usize::from(self.offsets[width] + index)],
+                ));
             }
         }
         Err(Error::Invalid("invalid Huffman code"))

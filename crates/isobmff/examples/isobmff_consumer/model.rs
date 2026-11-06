@@ -923,7 +923,7 @@ impl<'a> Driver<'a> {
             first = false;
             write!(out, "{{\"offset\":{},\"raw_hex\":\"", raw.header().start)
                 .expect("String write");
-            protocol::hex(out, raw.bytes().as_ref());
+            triergon_harness_protocol::push_hex(out, raw.bytes().as_ref());
             out.push_str("\",\"entries\":[");
             let mut entry_first = true;
             if raw.header().kind == *b"sidx" {
@@ -1054,7 +1054,7 @@ impl Driver<'_> {
             .into());
         }
         protocol::fold(&mut stats.digest, sample.ordinal);
-        protocol::framed(&mut stats.digest, packet.payload.as_ref())?;
+        protocol::fold_framed(&mut stats.digest, packet.payload.as_ref());
         write!(
             out,
             "{{\"ordinal\":{},\"description\":{},\"range\":[{},{}],\"duration\":{},\"dts\":",
@@ -1107,7 +1107,7 @@ impl Driver<'_> {
             packet.token.request()
         )
         .expect("String write");
-        protocol::hex(out, packet.payload.as_ref());
+        triergon_harness_protocol::push_hex(out, packet.payload.as_ref());
         out.push_str("\"}");
         Ok(())
     }
@@ -1159,7 +1159,7 @@ impl Driver<'_> {
                                 );
                             }
                             protocol::fold(&mut drain.digest, p.sample.ordinal);
-                            protocol::framed(&mut drain.digest, p.payload.as_ref())?;
+                            protocol::fold_framed(&mut drain.digest, p.payload.as_ref());
                         }
                     }
                 }

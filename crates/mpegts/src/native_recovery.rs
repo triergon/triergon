@@ -474,13 +474,13 @@ impl NativePesRecoveryObserver {
             return Err(error);
         }
         let result = self.poll_inner(work, cancel, input);
-        if let Err(error) = &result {
-            if !matches!(
+        if let Err(error) = &result
+            && !matches!(
                 error,
                 Error::Cancelled | Error::Allocation | Error::Backpressure { .. }
-            ) {
-                self.fault = Some(*error);
-            }
+            )
+        {
+            self.fault = Some(*error);
         }
         result
     }

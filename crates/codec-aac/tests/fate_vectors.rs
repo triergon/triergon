@@ -141,7 +141,9 @@ fn fate_numeric_with_references() {
         };
         let d = decode_file(&data);
         let r: Vec<f32> = rb
-            .chunks_exact(4)
+            .as_chunks::<4>()
+            .0
+            .iter()
             .map(|c| f32::from_le_bytes([c[0], c[1], c[2], c[3]]))
             .collect();
         assert_eq!(d.interleaved.len(), r.len(), "{name}: sample count");

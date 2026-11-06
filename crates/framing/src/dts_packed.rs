@@ -27,7 +27,7 @@ impl DtsPacking {
         }
     }
     pub fn payload_bits(self, source_bytes: usize) -> Result<usize> {
-        if source_bytes % self.source_unit_bytes() != 0 {
+        if !source_bytes.is_multiple_of(self.source_unit_bytes()) {
             return Err(Error::Truncated);
         }
         (source_bytes / self.source_unit_bytes())
@@ -275,13 +275,13 @@ impl DtsPackedPayloadJob {
             return Err(error);
         }
         let result = self.advance(work, cancel);
-        if let Err(error) = result {
-            if !matches!(error, Error::Backpressure { .. } | Error::Allocation) {
-                self.failure = Some(error);
-                self.raw = None;
-                self.builder = None;
-                self.frozen = None;
-            }
+        if let Err(error) = result
+            && !matches!(error, Error::Backpressure { .. } | Error::Allocation)
+        {
+            self.failure = Some(error);
+            self.raw = None;
+            self.builder = None;
+            self.frozen = None;
         }
         result
     }

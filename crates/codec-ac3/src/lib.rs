@@ -458,10 +458,10 @@ impl Decoder {
         }
         for i in 0..nframes {
             for c in 0..NCH {
-                if let Some(p) = maps[i][c] {
-                    if (i + 1..nframes).any(|j| maps[j].contains(&Some(p))) {
-                        maps[i][c] = None;
-                    }
+                if let Some(p) = maps[i][c]
+                    && (i + 1..nframes).any(|j| maps[j].contains(&Some(p)))
+                {
+                    maps[i][c] = None;
                 }
             }
         }

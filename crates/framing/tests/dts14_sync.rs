@@ -8,6 +8,7 @@ use triergon_framing::{
     DTS14_SYNC_PENDING, Dts14BoundaryEvidence, Dts14SyncFrame, Dts14SyncLimits, Dts14SyncReader,
     DtsWordOrder,
 };
+use triergon_harness_protocol::unhex;
 
 const SOURCE: SourceId = SourceId(211401);
 const CASES: &str = include_str!("../fixtures/dts14-sync-v1.tsv");
@@ -19,14 +20,6 @@ fn empty(pool: &Budget) -> Bytes {
     Bytes::copy_from_slice(pool, &[]).unwrap()
 }
 
-fn hex(source: &str) -> Vec<u8> {
-    assert_eq!(source.len() % 2, 0);
-    source
-        .as_bytes()
-        .chunks_exact(2)
-        .map(|pair| u8::from_str_radix(std::str::from_utf8(pair).unwrap(), 16).unwrap())
-        .collect()
-}
 fn rows() -> Vec<Vec<&'static str>> {
     CASES
         .lines()
@@ -152,7 +145,7 @@ fn list(source: &str, separator: char) -> Vec<&str> {
 fn all30_source_cases_preserve_bytes_offsets_boundaries_across_chunk_work_and_eof_modes() {
     assert_eq!(rows().len(), 30);
     for row in rows() {
-        let raw = hex(row[2]);
+        let raw = unhex(row[2]);
         let order = if row[1] == "little" {
             DtsWordOrder::LittleEndian
         } else {
@@ -177,13 +170,13 @@ fn all30_source_cases_preserve_bytes_offsets_boundaries_across_chunk_work_and_eo
                     for (i, frame) in frames.iter().enumerate() {
                         assert_eq!(
                             frame.physical_bytes().as_ref(),
-                            hex(physical[i]),
+                            unhex(physical[i]),
                             "{}",
                             row[0]
                         );
                         assert_eq!(
                             frame.canonical_bytes().as_ref(),
-                            hex(canonical[i]),
+                            unhex(canonical[i]),
                             "{}",
                             row[0]
                         );
@@ -229,7 +222,7 @@ fn all30_source_cases_preserve_bytes_offsets_boundaries_across_chunk_work_and_eo
 
 #[test]
 fn entity_eof_is_explicit_and_fsize_does_not_publish_or_crop_a_starved_source() {
-    let raw = hex(case("unused-high-0")[2]);
+    let raw = unhex(case("unused-high-0")[2]);
     let pool = Budget::new(65536).unwrap();
     let mut job = reader(
         &pool,
@@ -280,7 +273,7 @@ fn entity_eof_is_explicit_and_fsize_does_not_publish_or_crop_a_starved_source() 
 #[test]
 fn first_boundary_uses_measured_source_span_and_only_six_bytes_of_sync_lookahead() {
     let row = case("exact-little-cpf0-n98-three");
-    let raw = hex(row[2]);
+    let raw = unhex(row[2]);
     let pool = Budget::new(65536).unwrap();
     let mut job = reader(&pool, None, DtsWordOrder::LittleEndian, settings());
     let frame = next(&mut job, &pool, &raw, 1, 1).unwrap().unwrap();
@@ -298,7 +291,7 @@ fn first_boundary_uses_measured_source_span_and_only_six_bytes_of_sync_lookahead
 #[test]
 fn interior_extended_sync_is_preserved_when_its_measured_span_has_wrong_geometry() {
     let row = case("interior-normal-sync");
-    let raw = hex(row[2]);
+    let raw = unhex(row[2]);
     let pool = Budget::new(65536).unwrap();
     let mut job = reader(&pool, None, DtsWordOrder::LittleEndian, settings());
     let frame = next(&mut job, &pool, &raw, 2, 1).unwrap().unwrap();
@@ -306,14 +299,14 @@ fn interior_extended_sync_is_preserved_when_its_measured_span_has_wrong_geometry
     assert_eq!(frame.physical_bytes().as_ref(), &raw[..112]);
     assert_eq!(
         &frame.canonical_bytes().as_ref()[21..27],
-        hex("7ffe8001fc00")
+        unhex("7ffe8001fc00")
     );
 }
 
 #[test]
 fn artificial_prefix_end_is_retained_and_raw_source_end_is_not_a_native_future_offset() {
     let row = case("authored-real-geometry-four");
-    let raw = hex(row[2]);
+    let raw = unhex(row[2]);
     let pool = Budget::new(65536).unwrap();
     let mut job = reader(&pool, None, DtsWordOrder::LittleEndian, settings());
     let (frames, error) = collect(&mut job, &pool, &raw, 7, 31);
@@ -333,7 +326,7 @@ fn artificial_prefix_end_is_retained_and_raw_source_end_is_not_a_native_future_o
 
 #[test]
 fn healthy_reset_invalidates_old_input_tokens_without_relabeling_retained_outputs() {
-    let raw = hex(case("exact-little-cpf0-n98-three")[2]);
+    let raw = unhex(case("exact-little-cpf0-n98-three")[2]);
     let pool = Budget::new(65536).unwrap();
     let mut job = reader(&pool, None, DtsWordOrder::LittleEndian, settings());
     let first = next(&mut job, &pool, &raw, 7, 7).unwrap().unwrap();
@@ -364,7 +357,7 @@ fn healthy_reset_invalidates_old_input_tokens_without_relabeling_retained_output
 
 #[test]
 fn zero_work_consumes_and_allocates_nothing_but_quantum_one_finishes() {
-    let raw = hex(case("unused-high-1")[2]);
+    let raw = unhex(case("unused-high-1")[2]);
     let pool = Budget::new(65536).unwrap();
     let mut job = reader(&pool, None, DtsWordOrder::LittleEndian, settings());
     let used = pool.used();
@@ -392,7 +385,7 @@ fn zero_work_consumes_and_allocates_nothing_but_quantum_one_finishes() {
 
 #[test]
 fn raw_reserve_pressure_retries_without_losing_the_fixed_header_or_source_position() {
-    let raw = hex(case("unused-high-2")[2]);
+    let raw = unhex(case("unused-high-2")[2]);
     let pool = Budget::new(65536).unwrap();
     let mut job = reader(&pool, None, DtsWordOrder::LittleEndian, settings());
     let request = job.request();
@@ -422,7 +415,7 @@ fn raw_reserve_pressure_retries_without_losing_the_fixed_header_or_source_positi
 
 #[test]
 fn raw_freeze_and_canonical_reserve_pressure_preserve_owned_bytes_for_retry() {
-    let raw = hex(case("unused-high-3")[2]);
+    let raw = unhex(case("unused-high-3")[2]);
     for frozen in [false, true] {
         let pool = Budget::new(65536).unwrap();
         let baseline = pool.used();
@@ -483,7 +476,7 @@ fn raw_freeze_and_canonical_reserve_pressure_preserve_owned_bytes_for_retry() {
 
 #[test]
 fn cancellation_is_sticky_and_releases_header_scan_and_output_construction_owners() {
-    let raw = hex(case("unused-high-cycle")[2]);
+    let raw = unhex(case("unused-high-cycle")[2]);
     for stop in [0, 5, 18, 30, 112] {
         let pool = Budget::new(65536).unwrap();
         let baseline = pool.used();
@@ -545,7 +538,7 @@ fn transport_failure_and_short_known_entity_stay_failures_not_successful_eof() {
 
 #[test]
 fn independent_source_limits_and_pool_impossibility_are_explicit_without_growth() {
-    let raw = hex(case("exact-little-cpf0-n98-three")[2]);
+    let raw = unhex(case("exact-little-cpf0-n98-three")[2]);
     for selector in 0..4 {
         let pool = Budget::new(65536).unwrap();
         let mut limits = settings();
@@ -612,7 +605,7 @@ fn independent_source_limits_and_pool_impossibility_are_explicit_without_growth(
 
 #[test]
 fn rejected_foreign_pool_and_source_responses_leave_the_expected_request_usable() {
-    let raw = hex(case("unused-high-0")[2]);
+    let raw = unhex(case("unused-high-0")[2]);
     let pool = Budget::new(65536).unwrap();
     let foreign = Budget::new(65536).unwrap();
     let mut job = reader(&pool, None, DtsWordOrder::LittleEndian, settings());
@@ -643,7 +636,7 @@ fn rejected_foreign_pool_and_source_responses_leave_the_expected_request_usable(
 
 #[test]
 fn caller_clones_keep_both_full_owners_charged_after_reader_drop_and_cross_thread_release() {
-    let raw = hex(case("unused-high-cycle")[2]);
+    let raw = unhex(case("unused-high-cycle")[2]);
     let pool = Budget::new(65536).unwrap();
     let baseline = pool.used();
     let mut job = reader(&pool, None, DtsWordOrder::LittleEndian, settings());

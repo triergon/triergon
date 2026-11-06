@@ -4,7 +4,9 @@
 //! usage: compare CANDIDATE.f32 REFERENCE.f32 CHANNELS
 fn read(p: &str) -> Vec<f32> {
     let b = std::fs::read(p).expect("read");
-    b.chunks_exact(4)
+    b.as_chunks::<4>()
+        .0
+        .iter()
         .map(|c| f32::from_le_bytes([c[0], c[1], c[2], c[3]]))
         .collect()
 }
@@ -21,7 +23,7 @@ fn main() {
     let nc = c.len() / ch;
     let nr = r.len() / ch;
     let n = nc.min(nr);
-    let mut ok = nc == nr && c.len() % ch == 0 && r.len() % ch == 0;
+    let mut ok = nc == nr && c.len().is_multiple_of(ch) && r.len().is_multiple_of(ch);
     let mut first_bad: Option<usize> = None;
     let mut parts = Vec::new();
     for k in 0..ch {

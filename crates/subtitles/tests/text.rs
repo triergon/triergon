@@ -257,10 +257,10 @@ fn run_case(index: usize) {
                                     panic!("{}: unexpected prefix event", case.id)
                                 });
                                 check_event(&event, expected, &original);
-                                if let Event::Cue(cue) = &event {
-                                    if let Some(decoded) = &cue.decoded_utf8 {
-                                        assert!(decoded.belongs_to(&pool));
-                                    }
+                                if let Event::Cue(cue) = &event
+                                    && let Some(decoded) = &cue.decoded_utf8
+                                {
+                                    assert!(decoded.belongs_to(&pool));
                                 }
                                 output.push(event);
                             }

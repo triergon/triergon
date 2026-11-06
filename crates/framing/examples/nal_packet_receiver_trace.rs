@@ -3,9 +3,7 @@
 use std::sync::atomic::AtomicBool;
 use triergon_core::{Budget, BudgetVec, Bytes, Error, SourceId, SourceLocation, WorkBudget};
 use triergon_framing::*;
-fn hex(b: &[u8]) -> String {
-    b.iter().map(|v| format!("{v:02x}")).collect()
-}
+use triergon_harness_protocol::hex;
 fn error(e: Error, at: i64) {
     let s = format!("{e:?}").replace('\\', "\\\\").replace('"', "\\\"");
     println!("{{\"event\":\"source_error\",\"input_event\":{at},\"error\":\"{s}\"}}");

@@ -59,21 +59,22 @@ impl AdtsHeader {
 pub fn find_frame(data: &[u8], from: usize) -> Option<(usize, AdtsHeader)> {
     let mut i = from;
     while i + 7 <= data.len() {
-        if data[i] == 0xff && (data[i + 1] & 0xf6) == 0xf0 {
-            if let Ok(h) = AdtsHeader::parse(&data[i..]) {
-                let end = i + h.frame_length;
-                if h.sf_index < 13 && end <= data.len() {
-                    let next_ok = end + 2 > data.len()
-                        || (data[end] == 0xff && (data[end + 1] & 0xf6) == 0xf0)
-                        || data[end..].starts_with(b"TAG")
-                        || data[end..].starts_with(b"ID3");
-                    if next_ok {
-                        return Some((i, h));
-                    }
-                } else if h.sf_index < 13 && end > data.len() {
-                    // truncated final frame: report it, the decoder sees the short buffer
+        if data[i] == 0xff
+            && (data[i + 1] & 0xf6) == 0xf0
+            && let Ok(h) = AdtsHeader::parse(&data[i..])
+        {
+            let end = i + h.frame_length;
+            if h.sf_index < 13 && end <= data.len() {
+                let next_ok = end + 2 > data.len()
+                    || (data[end] == 0xff && (data[end + 1] & 0xf6) == 0xf0)
+                    || data[end..].starts_with(b"TAG")
+                    || data[end..].starts_with(b"ID3");
+                if next_ok {
                     return Some((i, h));
                 }
+            } else if h.sf_index < 13 && end > data.len() {
+                // truncated final frame: report it, the decoder sees the short buffer
+                return Some((i, h));
             }
         }
         i += 1;

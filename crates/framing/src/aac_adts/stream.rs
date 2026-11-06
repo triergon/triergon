@@ -281,10 +281,10 @@ impl AacAdtsStreamReader {
             return Err(e);
         }
         let result = self.advance(work, cancel);
-        if let Err(e) = result {
-            if !matches!(e, Error::Backpressure { .. } | Error::Allocation) {
-                self.stop(e)
-            }
+        if let Err(e) = result
+            && !matches!(e, Error::Backpressure { .. } | Error::Allocation)
+        {
+            self.stop(e)
         }
         result
     }

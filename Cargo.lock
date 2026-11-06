@@ -7,6 +7,7 @@ name = "media-worker"
 version = "0.0.0"
 dependencies = [
  "triergon",
+ "triergon-harness-protocol",
 ]
 
 [[package]]
@@ -14,6 +15,7 @@ name = "triergon"
 version = "0.0.0"
 dependencies = [
  "triergon-core",
+ "triergon-harness-protocol",
 ]
 
 [[package]]
@@ -35,10 +37,16 @@ version = "0.0.0"
 [[package]]
 name = "triergon-codec-h264"
 version = "0.0.0"
+dependencies = [
+ "triergon-harness-protocol",
+]
 
 [[package]]
 name = "triergon-codec-hevc"
 version = "0.0.0"
+dependencies = [
+ "triergon-harness-protocol",
+]
 
 [[package]]
 name = "triergon-core"
@@ -49,7 +57,12 @@ name = "triergon-framing"
 version = "0.0.0"
 dependencies = [
  "triergon-core",
+ "triergon-harness-protocol",
 ]
+
+[[package]]
+name = "triergon-harness-protocol"
+version = "0.0.0"
 
 [[package]]
 name = "triergon-isobmff"
@@ -57,6 +70,7 @@ version = "0.0.0"
 dependencies = [
  "triergon-core",
  "triergon-framing",
+ "triergon-harness-protocol",
 ]
 
 [[package]]
@@ -64,6 +78,7 @@ name = "triergon-mpegts"
 version = "0.0.0"
 dependencies = [
  "triergon-core",
+ "triergon-harness-protocol",
 ]
 
 [[package]]
@@ -95,4 +110,5 @@ name = "triergon-subtitles"
 version = "0.0.0"
 dependencies = [
  "triergon-core",
+ "triergon-harness-protocol",
 ]

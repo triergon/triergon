@@ -1052,10 +1052,10 @@ impl<'a> SliceDecoder<'a> {
             );
             pm.mv[list] = mv[list];
         }
-        if self.s.wp == Wp::Implicit {
-            if let (Some(p0), Some(p1)) = (pm.refs[0], pm.refs[1]) {
-                pm.wbi = self.implicit_weights(&p0, &p1);
-            }
+        if self.s.wp == Wp::Implicit
+            && let (Some(p0), Some(p1)) = (pm.refs[0], pm.refs[1])
+        {
+            pm.wbi = self.implicit_weights(&p0, &p1);
         }
         Ok(pm)
     }

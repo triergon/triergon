@@ -83,7 +83,7 @@ pub(crate) const V8: [[i32; 6]; 6] = [
 
 /// normAdjust4x4(m, i, j), equation 8-314 (i = row, j = column).
 pub(crate) fn norm_adjust4(m: usize, i: usize, j: usize) -> i32 {
-    if i % 2 == 0 && j % 2 == 0 {
+    if i.is_multiple_of(2) && j.is_multiple_of(2) {
         V4[m][0]
     } else if i % 2 == 1 && j % 2 == 1 {
         V4[m][1]
@@ -94,15 +94,15 @@ pub(crate) fn norm_adjust4(m: usize, i: usize, j: usize) -> i32 {
 
 /// normAdjust8x8(m, i, j), equation 8-317.
 pub(crate) fn norm_adjust8(m: usize, i: usize, j: usize) -> i32 {
-    if i % 4 == 0 && j % 4 == 0 {
+    if i.is_multiple_of(4) && j.is_multiple_of(4) {
         V8[m][0]
     } else if i % 2 == 1 && j % 2 == 1 {
         V8[m][1]
     } else if i % 4 == 2 && j % 4 == 2 {
         V8[m][2]
-    } else if (i % 4 == 0 && j % 2 == 1) || (i % 2 == 1 && j % 4 == 0) {
+    } else if (i.is_multiple_of(4) && j % 2 == 1) || (i % 2 == 1 && j.is_multiple_of(4)) {
         V8[m][3]
-    } else if (i % 4 == 0 && j % 4 == 2) || (i % 4 == 2 && j % 4 == 0) {
+    } else if (i.is_multiple_of(4) && j % 4 == 2) || (i % 4 == 2 && j.is_multiple_of(4)) {
         V8[m][4]
     } else {
         V8[m][5]

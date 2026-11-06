@@ -1278,12 +1278,12 @@ impl<'a, P: Pixel> SliceDecoder<'a, P> {
                 col.ref_idx[0] = 0;
                 avail = true;
             }
-            if self.sh.slice_type == SLICE_B {
-                if let Some(mv) = self.temporal_mv(xp, yp, w, h, 0, 1) {
-                    col.mv[1] = mv;
-                    col.ref_idx[1] = 0;
-                    avail = true;
-                }
+            if self.sh.slice_type == SLICE_B
+                && let Some(mv) = self.temporal_mv(xp, yp, w, h, 0, 1)
+            {
+                col.mv[1] = mv;
+                col.ref_idx[1] = 0;
+                avail = true;
             }
             if avail && n < 5 {
                 cand[n] = col;
@@ -1378,11 +1378,12 @@ impl<'a, P: Pixel> SliceDecoder<'a, P> {
         let col = self.refs.col?;
         let xbr = xp + w;
         let ybr = yp + h;
-        if (yp >> self.log2_ctb) == (ybr >> self.log2_ctb) && ybr < self.height && xbr < self.width
+        if (yp >> self.log2_ctb) == (ybr >> self.log2_ctb)
+            && ybr < self.height
+            && xbr < self.width
+            && let Some(mv) = self.col_mv(col, xbr, ybr, ref_idx, lx)
         {
-            if let Some(mv) = self.col_mv(col, xbr, ybr, ref_idx, lx) {
-                return Some(mv);
-            }
+            return Some(mv);
         }
         let xc = xp + (w >> 1);
         let yc = yp + (h >> 1);
@@ -1569,11 +1570,12 @@ impl<'a, P: Pixel> SliceDecoder<'a, P> {
         if (flag as usize) < i {
             return list[flag as usize];
         }
-        if i < 2 && !(avail_a && avail_b && mv_a != mv_b) {
-            if let Some(mv) = self.temporal_mv(xp, yp, w, h, ref_idx, lx) {
-                list[i] = mv;
-                i += 1;
-            }
+        if i < 2
+            && !(avail_a && avail_b && mv_a != mv_b)
+            && let Some(mv) = self.temporal_mv(xp, yp, w, h, ref_idx, lx)
+        {
+            list[i] = mv;
+            i += 1;
         }
         let _ = i;
         list[flag as usize]

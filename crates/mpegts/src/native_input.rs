@@ -308,7 +308,7 @@ impl NativeInputBootstrap {
             return Ok(NativeInputStep::NeedEntityEof);
         }
         let width = self.format.bytes();
-        if finite && (self.owner.is_empty() || self.owner.len() % width != 0) {
+        if finite && (self.owner.is_empty() || !self.owner.len().is_multiple_of(width)) {
             return Err(Error::Unsupported(
                 "native startup incomplete aligned finite entity",
             ));

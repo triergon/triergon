@@ -422,19 +422,17 @@ impl EpochRestoreJob {
                                     )?);
                                     self.phase = Phase::Group;
                                 }
-                                0xa3 => {
-                                    // A SimpleBlock cannot carry CodecState. Its Track
-                                    // membership still matters at the referenced RAP.
-                                    if self
-                                        .target
-                                        .reference
-                                        .is_some_and(|reference| reference.block == header.start)
-                                    {
-                                        self.header = Some(header);
-                                        self.simple = Some(data);
-                                        self.group = None;
-                                        self.phase = Phase::Header;
-                                    }
+                                // A SimpleBlock cannot carry CodecState. Its Track
+                                // membership still matters at the referenced RAP.
+                                0xa3 if self
+                                    .target
+                                    .reference
+                                    .is_some_and(|reference| reference.block == header.start) =>
+                                {
+                                    self.header = Some(header);
+                                    self.simple = Some(data);
+                                    self.group = None;
+                                    self.phase = Phase::Header;
                                 }
                                 _ => (),
                             }

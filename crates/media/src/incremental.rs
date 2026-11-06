@@ -337,10 +337,10 @@ impl ElementReader {
         if end.is_some_and(|end| header.data > end) {
             return Err(Error::Invalid("element exceeds parent"));
         }
-        if let (Some(parent), Some(end)) = (end, header.end()?) {
-            if end > parent {
-                return Err(Error::Invalid("element exceeds parent"));
-            }
+        if let (Some(parent), Some(end)) = (end, header.end()?)
+            && end > parent
+        {
+            return Err(Error::Invalid("element exceeds parent"));
         }
         Ok(())
     }
@@ -355,15 +355,15 @@ impl ElementReader {
             return Err(Error::Unsupported("element after finite Segment"));
         }
         self.check_parent(header, self.segment.and_then(|m| m.end))?;
-        if header.id == CLUSTER || is_level_one(header.id) {
-            if let Some(cluster) = self.cluster {
-                if cluster.end.is_some() {
-                    return Err(Error::Invalid("level-one element in finite Cluster"));
-                }
-                self.cluster = None;
-                self.pending_header = Some(header);
-                return Ok(Some(D::end(cluster.id, header.start, self.generation())));
+        if (header.id == CLUSTER || is_level_one(header.id))
+            && let Some(cluster) = self.cluster
+        {
+            if cluster.end.is_some() {
+                return Err(Error::Invalid("level-one element in finite Cluster"));
             }
+            self.cluster = None;
+            self.pending_header = Some(header);
+            return Ok(Some(D::end(cluster.id, header.start, self.generation())));
         }
         self.check_parent(header, self.cluster.and_then(|m| m.end))?;
         if !self.seen_ebml {
@@ -578,17 +578,17 @@ impl ElementReader {
                         }
                         continue;
                     }
-                    if let Some(master) = self.cluster {
-                        if master.end == Some(self.position()) {
-                            self.cluster = None;
-                            return Ok(ParseStep::Event(self.ended::<D>(master)));
-                        }
+                    if let Some(master) = self.cluster
+                        && master.end == Some(self.position())
+                    {
+                        self.cluster = None;
+                        return Ok(ParseStep::Event(self.ended::<D>(master)));
                     }
-                    if let Some(master) = self.segment {
-                        if master.end == Some(self.position()) {
-                            self.segment = None;
-                            return Ok(ParseStep::Event(self.ended::<D>(master)));
-                        }
+                    if let Some(master) = self.segment
+                        && master.end == Some(self.position())
+                    {
+                        self.segment = None;
+                        return Ok(ParseStep::Event(self.ended::<D>(master)));
                     }
                     if let Some(header) = self.take_buffered_header(work, cancel)? {
                         if let Some(event) = self.accept_header::<D>(header)? {

@@ -837,14 +837,14 @@ pub(crate) fn pce_slots(p: &Pce) -> (Vec<Slot>, bool) {
     // front
     let nfch: usize = front.iter().map(|e| if e.is_cpe { 2 } else { 1 }).sum();
     let mut rest: &[crate::pce::PceElement] = &front;
-    if nfch % 2 == 1 {
-        if let Some(e) = front.first() {
-            if !e.is_cpe {
-                slots.push(sce(e.tag, FrontCenter));
-                rest = &front[1..];
-            } else {
-                unordered = true;
-            }
+    if nfch % 2 == 1
+        && let Some(e) = front.first()
+    {
+        if !e.is_cpe {
+            slots.push(sce(e.tag, FrontCenter));
+            rest = &front[1..];
+        } else {
+            unordered = true;
         }
     }
     // group into pairs (CPE, or two consecutive SCEs)

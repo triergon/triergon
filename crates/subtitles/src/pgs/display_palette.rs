@@ -71,7 +71,7 @@ impl PaletteBuild {
         if payload.len() < 2 {
             return Err(Error::Truncated);
         }
-        if (payload.len() - 2) % 5 != 0 {
+        if !(payload.len() - 2).is_multiple_of(5) {
             return Err(Error::Invalid("PGS partial palette entry"));
         }
         if !payload.belongs_to(budget) || previous.as_ref().is_some_and(|p| !p.belongs_to(budget)) {

@@ -5,19 +5,19 @@ use triergon_framing::{
     Dts14BitUnpacker, DtsCoreField, DtsHeaderInspector, DtsInspectionIdentity,
     DtsInspectionSourceStatus, DtsPackingLimits, DtsWordOrder, FieldObservation,
 };
+use triergon_harness_protocol::hex;
 
-fn hex(bytes: &[u8]) -> String {
-    bytes.iter().map(|byte| format!("{byte:02x}")).collect()
-}
 fn decode(text: &str) -> Result<Vec<u8>, Error> {
     if text == "~" {
         return Ok(Vec::new());
     }
-    if text.len() > 8192 || text.len() % 2 != 0 || !text.is_ascii() {
+    if text.len() > 8192 || !text.len().is_multiple_of(2) || !text.is_ascii() {
         return Err(Error::Invalid("diagnostic hex input"));
     }
     text.as_bytes()
-        .chunks_exact(2)
+        .as_chunks::<2>()
+        .0
+        .iter()
         .map(|pair| {
             u8::from_str_radix(
                 std::str::from_utf8(pair).map_err(|_| Error::Invalid("hex"))?,

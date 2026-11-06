@@ -1,7 +1,10 @@
 //! Independent source-fact serialization. No serialization work enters timing.
-use super::{hex, quote};
 use std::{fmt::Write as _, io::Read, sync::atomic::AtomicBool};
 use triergon::{metadata::Document, typed::BlockingReader as Demuxer};
+use triergon_harness_protocol::{
+    digest::{fold, fold_bytes},
+    hex, quoted,
+};
 
 fn unsigned(id: u64) -> bool {
     matches!(
@@ -57,7 +60,7 @@ fn document(out: &mut String, d: &Document) -> Result<(), Box<dyn std::error::Er
         "{{\"kind\":{},\"source_offset\":{},\"raw\":{},\"nodes\":[",
         d.kind(),
         d.source_offset().map_or("null".into(), |v| v.to_string()),
-        quote(&hex(d.raw()))
+        quoted(&hex(d.raw()))
     )?;
     for (i, e) in d.elements().enumerate() {
         if i != 0 {
@@ -79,7 +82,7 @@ fn document(out: &mut String, d: &Document) -> Result<(), Box<dyn std::error::Er
                 "null".into()
             },
             if textual(e.id()) {
-                quote(e.text()?)
+                quoted(e.text()?)
             } else {
                 "null".into()
             },
@@ -89,7 +92,7 @@ fn document(out: &mut String, d: &Document) -> Result<(), Box<dyn std::error::Er
                 "null".into()
             },
             if e.id() == 0x4489 {
-                quote(&format!("{:016x}", e.float()?.to_bits()))
+                quoted(&format!("{:016x}", e.float()?.to_bits()))
             } else {
                 "null".into()
             }
@@ -118,13 +121,13 @@ pub fn source<R: Read>(mut d: Demuxer<R>) -> Result<(), Box<dyn std::error::Erro
         write!(
             out,
             "{{\"raw_track\":{},\"number\":{},\"uid\":{},\"name\":{},\"legacy_language\":{},\"bcp47\":{},\"effective_language\":{},\"flags\":[{},{},{},{},{},{},{},{},{}]}}",
-            quote(&hex(&t.source_metadata)),
+            quoted(&hex(&t.source_metadata)),
             t.number,
             t.uid,
-            quote(&t.name),
-            quote(&t.language),
-            t.language_bcp47.as_deref().map_or("null".into(), quote),
-            quote(t.effective_language()),
+            quoted(&t.name),
+            quoted(&t.language),
+            t.language_bcp47.as_deref().map_or("null".into(), quoted),
+            quoted(t.effective_language()),
             t.enabled,
             t.default,
             t.forced,
@@ -170,11 +173,11 @@ impl<'a> Dictionary<'a> {
                 Vec::new()
             }
             Self::One(k, v) => {
-                if k.eq_ignore_ascii_case(&pair.0) {
-                    if let (Cow::Borrowed(n), Cow::Borrowed(w)) = &pair {
-                        *self = Self::One(n, w);
-                        return Ok(());
-                    }
+                if k.eq_ignore_ascii_case(&pair.0)
+                    && let (Cow::Borrowed(n), Cow::Borrowed(w)) = &pair
+                {
+                    *self = Self::One(n, w);
+                    return Ok(());
                 }
                 let mut rows = Vec::new();
                 rows.try_reserve_exact(2)?;
@@ -201,35 +204,35 @@ impl<'a> Dictionary<'a> {
     fn output(&self, mut out: Option<&mut String>, digest: &mut u64) -> Result<(), Error> {
         match self {
             Self::Empty => {
-                super::fold(digest, 0);
+                fold(digest, 0);
                 if let Some(o) = out {
                     o.push_str("[]");
                 }
             }
             Self::One(k, v) => {
-                super::fold(digest, 1);
-                super::fold_bytes(digest, k.as_bytes());
-                super::fold_bytes(digest, v.as_bytes());
+                fold(digest, 1);
+                fold_bytes(digest, k.as_bytes());
+                fold_bytes(digest, v.as_bytes());
                 if let Some(o) = out {
-                    write!(o, "[[{},{}]]", quote(k), quote(v))?;
+                    write!(o, "[[{},{}]]", quoted(k), quoted(v))?;
                 }
             }
             Self::Rows(rows) => {
                 let mut order: Vec<_> = (0..rows.len()).collect();
                 order.sort_unstable_by(|a, b| rows[*a].0.cmp(&rows[*b].0));
-                super::fold(digest, rows.len() as u64);
+                fold(digest, rows.len() as u64);
                 if let Some(o) = out.as_deref_mut() {
                     o.push('[');
                 }
                 for (i, n) in order.into_iter().enumerate() {
                     let (k, v) = &rows[n];
-                    super::fold_bytes(digest, k.as_bytes());
-                    super::fold_bytes(digest, v.as_bytes());
+                    fold_bytes(digest, k.as_bytes());
+                    fold_bytes(digest, v.as_bytes());
                     if let Some(o) = out.as_deref_mut() {
                         if i != 0 {
                             o.push(',');
                         }
-                        write!(o, "[{},{}]", quote(k), quote(v))?;
+                        write!(o, "[{},{}]", quoted(k), quoted(v))?;
                     }
                 }
                 if let Some(o) = out {
@@ -468,12 +471,12 @@ impl<'a> CatalogueView<'a> {
             o.push_str(",\"catalogue\":{\"global\":");
         }
         self.global.output(out.as_deref_mut(), digest)?;
-        super::fold(digest, self.tracks.len() as u64);
+        fold(digest, self.tracks.len() as u64);
         if let Some(o) = out.as_deref_mut() {
             o.push_str(",\"tracks\":[");
         }
         for (i, (_, flags, tags)) in self.tracks.iter().enumerate() {
-            super::fold(digest, u64::from(*flags));
+            fold(digest, u64::from(*flags));
             if let Some(o) = out.as_deref_mut() {
                 if i != 0 {
                     o.push(',');
@@ -485,7 +488,7 @@ impl<'a> CatalogueView<'a> {
                 o.push('}');
             }
         }
-        super::fold(digest, self.chapters.len() as u64);
+        fold(digest, self.chapters.len() as u64);
         if let Some(o) = out.as_deref_mut() {
             o.push_str("],\"chapters\":[");
         }
@@ -499,7 +502,7 @@ impl<'a> CatalogueView<'a> {
                 .transpose()?
                 .unwrap_or(i64::MIN + 1);
             for v in [id, start as u64, end as u64] {
-                super::fold(digest, v);
+                fold(digest, v);
             }
             if let Some(o) = out.as_deref_mut() {
                 if i != 0 {
@@ -516,7 +519,7 @@ impl<'a> CatalogueView<'a> {
                 o.push('}');
             }
         }
-        super::fold(digest, self.attachments.len() as u64);
+        fold(digest, self.attachments.len() as u64);
         if let Some(o) = out.as_deref_mut() {
             o.push_str("],\"attachments\":[");
         }
@@ -528,10 +531,10 @@ impl<'a> CatalogueView<'a> {
                 o.push_str("{\"tags\":");
             }
             a.tags.output(out.as_deref_mut(), digest)?;
-            super::fold(digest, a.data.len() as u64);
-            super::fold_bytes(digest, a.data);
+            fold(digest, a.data.len() as u64);
+            fold_bytes(digest, a.data);
             if let Some(o) = out.as_deref_mut() {
-                write!(o, ",\"data\":{}}}", quote(&hex(a.data)))?;
+                write!(o, ",\"data\":{}}}", quoted(&hex(a.data)))?;
             }
         }
         if let Some(o) = out {

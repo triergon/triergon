@@ -405,10 +405,10 @@ impl DtsCoreFrameReader {
     ) -> Result<Step<DtsCoreFrame>> {
         self.healthy()?;
         let result = self.step_inner(work, cancel);
-        if let Err(error) = result {
-            if !matches!(error, Error::Backpressure { .. } | Error::Allocation) {
-                self.record_failure(error);
-            }
+        if let Err(error) = result
+            && !matches!(error, Error::Backpressure { .. } | Error::Allocation)
+        {
+            self.record_failure(error);
         }
         result
     }

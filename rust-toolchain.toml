@@ -1,0 +1,6 @@
+[toolchain]
+# Pinned stable compiler for builds, tests and qualification workers. Only the
+# opt-in HEVC `simd` lane uses nightly (`cargo +nightly ... --features simd`).
+channel = "1.99.1"
+profile = "minimal"
+components = ["rustfmt", "clippy"]

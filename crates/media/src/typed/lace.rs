@@ -151,7 +151,7 @@ impl LaceJob {
                     self.frames.count = count;
                     if self.mode == 2 {
                         let bytes = self.range.end - self.at;
-                        if bytes % count != 0 {
+                        if !bytes.is_multiple_of(count) {
                             return Err(Error::Invalid("fixed lace remainder"));
                         }
                         // Fill each fixed size in its separately charged range step.

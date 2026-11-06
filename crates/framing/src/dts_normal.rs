@@ -226,7 +226,7 @@ impl DtsNormalSourceReader {
     }
     pub fn reset(&mut self, offset: u64) -> Result<InputRequest> {
         self.healthy()?;
-        if offset % self.packing.source_unit_bytes() as u64 != 0 {
+        if !offset.is_multiple_of(self.packing.source_unit_bytes() as u64) {
             return Err(Error::Unsupported("DTS reset outside source unit grid"));
         }
         let request = self.cursor_mut()?.reset(offset)?;
@@ -271,10 +271,10 @@ impl DtsNormalSourceReader {
     ) -> Result<Step<DtsNormalSourceFrame>> {
         self.healthy()?;
         let result = self.advance(work, cancel);
-        if let Err(error) = result {
-            if !matches!(error, Error::Backpressure { .. } | Error::Allocation) {
-                self.record_failure(error);
-            }
+        if let Err(error) = result
+            && !matches!(error, Error::Backpressure { .. } | Error::Allocation)
+        {
+            self.record_failure(error);
         }
         result
     }

@@ -184,14 +184,14 @@ impl<'a> Feed<'a> {
         self.requests += 1;
         let at = usize::try_from(request.offset).unwrap();
         assert!(at <= self.raw.len() && (request.maximum != 0 || at == self.raw.len()));
-        if let Some((end, transport)) = self.fault {
-            if at == end {
-                return if transport {
-                    reader.fail(request.source, request.token, SourceFailure::Transport)
-                } else {
-                    reader.finish(request.source, request.token)
-                };
-            }
+        if let Some((end, transport)) = self.fault
+            && at == end
+        {
+            return if transport {
+                reader.fail(request.source, request.token, SourceFailure::Transport)
+            } else {
+                reader.finish(request.source, request.token)
+            };
         }
         if at == self.raw.len() {
             return reader.finish(request.source, request.token);

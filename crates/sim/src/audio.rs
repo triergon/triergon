@@ -106,10 +106,10 @@ impl AudioSession {
             let Some(pts) = self.queue.front_pts() else {
                 break;
             };
-            if let (Some(pts), Some(clock)) = (pts, clock_ns) {
-                if clock < pts.saturating_sub(lead_ns) {
-                    break;
-                }
+            if let (Some(pts), Some(clock)) = (pts, clock_ns)
+                && clock < pts.saturating_sub(lead_ns)
+            {
+                break;
             }
             let unit = self.queue.pop().expect("front unit");
             let (matrix, carry) = (&mut self.matrix, &mut self.carry);

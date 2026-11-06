@@ -735,9 +735,9 @@ fn deblock_mb(
     let same_slice = |p: usize| pic.mbs[p].slice == q.slice;
     let pair_w = pic.w;
     let left_exists = if pic.mbaff {
-        (addr / 2) % pair_w != 0
+        !(addr / 2).is_multiple_of(pair_w)
     } else {
-        addr % pair_w != 0
+        !addr.is_multiple_of(pair_w)
     };
     let top_exists = if pic.mbaff {
         let first_row = addr / 2 < pair_w;

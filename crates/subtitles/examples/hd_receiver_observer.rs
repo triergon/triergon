@@ -2,6 +2,7 @@
 //! Private source-only correctness observer. Never reads native expectations.
 use std::{fmt::Write as _, io::Read, sync::atomic::AtomicBool};
 use triergon_core::{Budget, Bytes, Rounding, Time, TimeBase, WorkBudget};
+use triergon_harness_protocol::hex;
 use triergon_subtitles::dvd::{
     ConfigJob, ConfigLimits, ConfigStatus, DvdBitmap, HdContextJob, HdContextOrigin, HdFacts,
     HdLimits, HdReceiverContext, HdReceiverStatus, HdSpan, HdStatus, NativeCropMode,
@@ -35,13 +36,6 @@ impl<'a> Cursor<'a> {
     }
 }
 
-fn hex(raw: &[u8]) -> String {
-    let mut text = String::with_capacity(raw.len() * 2);
-    for byte in raw {
-        write!(text, "{byte:02x}").expect("String formatting");
-    }
-    text
-}
 fn quoted(raw: &str) -> String {
     let mut out = String::from("\"");
     for c in raw.chars() {

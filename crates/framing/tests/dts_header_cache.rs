@@ -36,7 +36,9 @@ fn authored(cpf: bool) -> Vec<u8> {
         .collect();
     assert_eq!(bits.len(), if cpf { 120 } else { 104 });
     bits.as_bytes()
-        .chunks_exact(8)
+        .as_chunks::<8>()
+        .0
+        .iter()
         .map(|part| u8::from_str_radix(std::str::from_utf8(part).unwrap(), 2).unwrap())
         .collect()
 }

@@ -512,7 +512,7 @@ fn direct_destination_reads_handle_short_reads_and_interruptions_without_zero_pa
     impl Read for InterruptedShort {
         fn read(&mut self, output: &mut [u8]) -> io::Result<usize> {
             self.calls += 1;
-            if self.calls % 5 == 0 {
+            if self.calls.is_multiple_of(5) {
                 return Err(io::ErrorKind::Interrupted.into());
             }
             let count = output.len().min(2);

@@ -391,11 +391,11 @@ mod tests {
                 let mut b = BitReader::new(&buf, 8);
                 let va = t.run_before[(zl.min(7) - 1) as usize].read(&mut a);
                 let vb = read_run_before(&mut b, zl);
-                if let Some(va) = va {
-                    if va as i32 <= zl {
-                        assert_eq!(va as i32, vb, "zl {zl} bits {bits:012b}");
-                        assert_eq!(a.pos(), b.pos());
-                    }
+                if let Some(va) = va
+                    && va as i32 <= zl
+                {
+                    assert_eq!(va as i32, vb, "zl {zl} bits {bits:012b}");
+                    assert_eq!(a.pos(), b.pos());
                 }
             }
         }

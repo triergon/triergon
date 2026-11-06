@@ -141,7 +141,7 @@ fn real_prefix_retains_all_four_exact_source_spans() {
 #[test]
 fn big_and_little_real_storage_have_identical_source_payload() {
     let mut swapped = REAL.to_vec();
-    for pair in swapped.chunks_exact_mut(2) {
+    for pair in swapped.as_chunks_mut::<2>().0 {
         pair.swap(0, 1);
     }
     let pool = Budget::new(300_000).unwrap();

@@ -90,7 +90,7 @@ impl<'a> Checkpoints<'a> {
         if key {
             track.previous_sync = track.entries;
         }
-        if track.entries % CHECKPOINT_INTERVAL == 0 {
+        if track.entries.is_multiple_of(CHECKPOINT_INTERVAL) {
             if self.stored == MAX_CHECKPOINTS {
                 return None;
             }

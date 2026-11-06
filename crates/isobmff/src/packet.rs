@@ -206,10 +206,10 @@ impl SampleReader {
         self.record(result)
     }
     fn record<T>(&mut self, result: Result<T>) -> Result<T> {
-        if let Err(error) = &result {
-            if !matches!(error, Error::Backpressure { .. }) {
-                self.failed = Some(*error);
-            }
+        if let Err(error) = &result
+            && !matches!(error, Error::Backpressure { .. })
+        {
+            self.failed = Some(*error);
         }
         result
     }

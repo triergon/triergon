@@ -440,10 +440,10 @@ impl Reader {
             } else {
                 match &result {
                     Ok(ParseStep::Event(Event::Packet(packet))) => {
-                        if packet.configuration.tracks()[packet.packet.track].kind == 1 {
-                            if let Some(location) = &self.last_location {
-                                index.observe(packet, location.cluster_offset(), work);
-                            }
+                        if packet.configuration.tracks()[packet.packet.track].kind == 1
+                            && let Some(location) = &self.last_location
+                        {
+                            index.observe(packet, location.cluster_offset(), work);
                         }
                     }
                     Ok(ParseStep::Finished) => index.seal(self.envelope.position()),

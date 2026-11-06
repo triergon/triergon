@@ -927,30 +927,30 @@ impl Reader {
                 scan.policy.stop,
                 self.replay_prefix.is_none(),
             )?;
-            if let State::ScanSimple(job) = &self.state {
-                if let Some(fields) = job.completed_fields() {
-                    let context = ScanContext {
-                        configuration: self.configuration.as_ref(),
-                        pool: &self.pool,
-                        source: self.envelope.request().source,
-                        generation: self.generation(),
-                        cluster_ticks: self.cluster_time,
-                        scale: self.scale,
-                    };
-                    if !job.context_matches(&context) {
-                        return Err(Error::Invalid("completed scan source context changed"));
-                    }
-                    let header = job.header();
-                    self.state = State::Envelope;
-                    // The envelope has already admitted and drained this
-                    // complete SimpleBlock. Retain a replay location only if
-                    // it improves the landing.
-                    self.consider_scan_packet(scan, header.start, fields, || {
-                        self.envelope
-                            .block_replay_location(header, self.cluster_time)
-                    })?;
-                    continue;
+            if let State::ScanSimple(job) = &self.state
+                && let Some(fields) = job.completed_fields()
+            {
+                let context = ScanContext {
+                    configuration: self.configuration.as_ref(),
+                    pool: &self.pool,
+                    source: self.envelope.request().source,
+                    generation: self.generation(),
+                    cluster_ticks: self.cluster_time,
+                    scale: self.scale,
+                };
+                if !job.context_matches(&context) {
+                    return Err(Error::Invalid("completed scan source context changed"));
                 }
+                let header = job.header();
+                self.state = State::Envelope;
+                // The envelope has already admitted and drained this
+                // complete SimpleBlock. Retain a replay location only if
+                // it improves the landing.
+                self.consider_scan_packet(scan, header.start, fields, || {
+                    self.envelope
+                        .block_replay_location(header, self.cluster_time)
+                })?;
+                continue;
             }
             match progress {
                 ParseStep::Event(ScanEvent::Packet(packet)) => {
