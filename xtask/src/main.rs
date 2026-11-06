@@ -10,6 +10,7 @@ mod corpus;
 mod ebml;
 mod fate;
 mod fetch;
+mod fuzz;
 mod harness;
 mod json;
 mod prepare;
@@ -43,6 +44,9 @@ commands:
   fate-run       --case NAME [--demux-only]   run one supported upstream FATE case
   trace-identities --output F [--compare F] [--candidate W]
                  record the digest of every candidate trace over all recorded cases
+  fuzz           --manifest F --output DIR [--rounds N] [--seed N] [--maximum-input-bytes N]
+                 [--maximum-output-bytes N] [--timeout-seconds S]
+                 deterministic, replayable mutation campaign through JSON workers
   graph          PACKAGE [FILE]...   print the provenance graph of a workspace package
   build-workers  build the candidate and reference workers and the memory observers, and
                  record their identity in target/harness/identity.json
@@ -76,6 +80,7 @@ fn main() -> ExitCode {
         Some("external-vector") => return external_vector(&root, &args[1..]),
         Some("fate-run") => return fate_run(&root, &args[1..]),
         Some("graph") => graph(&root, &args[1..]),
+        Some("fuzz") => return fuzz_campaign(&root, &args[1..]),
         Some("trace-identities") => return trace_identities(&root, &args[1..]),
         Some("build-workers") => {
             harness::build::build(&root).map(|path| println!("{}", path.display()))
@@ -285,6 +290,44 @@ fn trace_identities(root: &Path, args: &[String]) -> ExitCode {
         let output = output.ok_or("--output is required")?;
         harness::vectors::trace_identities(root, &candidate, &output, compare.as_deref())
     }))
+}
+
+fn fuzz_campaign(root: &Path, args: &[String]) -> ExitCode {
+    let mut campaign = fuzz::Campaign {
+        manifest: PathBuf::new(),
+        output: PathBuf::new(),
+        rounds: 4,
+        seed: 280,
+        maximum_input_bytes: 4 << 20,
+        maximum_output_bytes: 8 << 20,
+        timeout_seconds: 3.0,
+    };
+    let mut rest = args.iter();
+    let parsed = (|| -> Task {
+        while let Some(flag) = rest.next() {
+            let value = rest.next().ok_or_else(|| format!("{flag} needs a value"))?;
+            let number = || {
+                value
+                    .parse::<u64>()
+                    .map_err(|_| format!("{flag}: not a number: {value}"))
+            };
+            match flag.as_str() {
+                "--manifest" => campaign.manifest = PathBuf::from(value),
+                "--output" => campaign.output = PathBuf::from(value),
+                "--rounds" => campaign.rounds = number()? as usize,
+                "--seed" => campaign.seed = number()?,
+                "--maximum-input-bytes" => campaign.maximum_input_bytes = number()? as usize,
+                "--maximum-output-bytes" => campaign.maximum_output_bytes = number()? as usize,
+                "--timeout-seconds" => {
+                    campaign.timeout_seconds =
+                        value.parse().map_err(|_| format!("{flag}: not a number"))?
+                }
+                _ => return Err(USAGE.to_owned()),
+            }
+        }
+        Ok(())
+    })();
+    exit(parsed.and_then(|()| fuzz::campaign(root, &campaign)))
 }
 
 fn graph(root: &Path, args: &[String]) -> Task {

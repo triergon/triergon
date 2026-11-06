@@ -72,9 +72,9 @@ upstream FATE case. `cargo xtask build-workers` builds the workers and records t
 identity every collection is checked against. `cargo xtask trace-identities` records the
 digest of every candidate trace, so a change can show its traces are byte-identical
 (`--compare` an earlier record). The independent oracles stay in Python
-(`harness/*_oracle.py`, run through `python3 -m harness.oracles`);
-`tools/fuzz_media.py` runs deterministic, replayable byte mutations against debug,
-release and reference workers.
+(`harness/*_oracle.py`, run through `python3 -m harness.oracles`).
+`cargo xtask fuzz` runs a deterministic, replayable byte-mutation campaign against
+debug, release and reference workers from a pinned manifest.
 
 ## Measuring performance
 
