@@ -1,8 +1,7 @@
 /*
- * Capture-lane FFmpeg reference worker. Research tooling only: never linked into
- * production Rust. It reproduces Streem's development-capture call sequence
- * (streem-webos upstream/main 3bc30f4e, rust-modules/media/src/ff.rs:998-1400,
- * `Venc::open`/`Venc::encode`) against a pinned FFmpeg build:
+ * Capture reference: the capture build of harness/reference.c (tooling only;
+ * never linked into the library). It reproduces an application's capture call
+ * sequence against a pinned FFmpeg build:
  *
  *   sws_getContext(w,h,RGBA -> w,h,NV12, SWS_BILINEAR), negative source stride
  *   for bottom-up input, NV12 UV deinterleaved into YUV420P U/V by the caller;
@@ -13,10 +12,10 @@
  *   no trailer.
  *
  * Usage:
- *   reference_capture convert  <w> <h> <flip> <frames> <in.rgba> <out.yuv>
- *   reference_capture pipeline <w> <h> <flip> <frames> <bitrate> <in.rgba> <out.ts>
- *   reference_capture time     <w> <h> <flip> <frames> <bitrate> <in.rgba> <iterations>
- *   reference_capture memory   <w> <h> <flip> <frames> <bitrate> <in.rgba>
+ *   reference convert  <w> <h> <flip> <frames> <in.rgba> <out.yuv>
+ *   reference pipeline <w> <h> <flip> <frames> <bitrate> <in.rgba> <out.ts>
+ *   reference time     <w> <h> <flip> <frames> <bitrate> <in.rgba> <iterations>
+ *   reference memory   <w> <h> <flip> <frames> <bitrate> <in.rgba>
  *
  * `time` prints one JSON line per iteration with the elapsed nanoseconds of the
  * complete session (open, every frame converted+encoded+muxed+flushed, close).

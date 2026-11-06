@@ -66,7 +66,7 @@ Multiplex differences (PMT stream type, SDT provider) are listed under
 ## Conformance
 
 The reference is FFmpeg 9.0.2 (`swscale` with `SWS_BILINEAR`, `mpeg1video` with an
-I/P GOP of 30, `mpegts`) driven by `harness/capture/reference_capture.c`. The
+I/P GOP of 30, `mpegts`) driven by the capture build of `harness/reference.c`. The
 contract and required cases live in `harness/capture/contract.json` and
 `harness/capture/cases.json`; `harness/capture/` runs both pipelines and applies
 the per-stage rules documented in [triergon-pixel](../pixel/README.md#conformance)

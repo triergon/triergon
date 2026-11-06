@@ -1,5 +1,20 @@
-/* Independent reference adapter. Native tooling only; never linked into Rust.
- * Uses public FFmpeg headers. No code copied from FFmpeg implementations. */
+/* The FFmpeg reference worker. Native tooling only; never linked into Rust.
+ * Uses public FFmpeg headers. No code copied from FFmpeg implementations.
+ *
+ * One source, built once per pinned FFmpeg profile; each build compiles only that
+ * profile's operations:
+ *   -DSAFE_MEDIA_DECODE_REFERENCE   decode, letterbox and downmix (reference_decode.h)
+ *   -DSAFE_MEDIA_CAPTURE_REFERENCE  RGBA conversion, MPEG-1 encode, MPEG-TS mux
+ *                                   (reference_capture.h)
+ *   otherwise                       the container operations below, with the feed
+ *                                   (SAFE_MEDIA_FEED_REFERENCE), HLS segment
+ *                                   (SAFE_MEDIA_HLS_REFERENCE) and combined-encoding
+ *                                   (SAFE_MEDIA_COMBINED_REFERENCE) variants. */
+#if defined(SAFE_MEDIA_DECODE_REFERENCE)
+#include "reference_decode.h"
+#elif defined(SAFE_MEDIA_CAPTURE_REFERENCE)
+#include "reference_capture.h"
+#else
 #include <libavformat/avformat.h>
 #ifdef SAFE_MEDIA_COMBINED_REFERENCE
 #include "reference_content_encoding.h"
@@ -231,3 +246,4 @@ int main(int argc,char **argv){
     if(!trace)printf("{\"schema\":1,\"iterations\":%lu,\"elapsed_ns\":%" PRIu64 ",\"packets\":%" PRIu64 ",\"bytes\":%" PRIu64 ",\"digest\":%" PRIu64 "}\n",iterations,elapsed,packets,bytes,digest);
     return 0;
 }
+#endif

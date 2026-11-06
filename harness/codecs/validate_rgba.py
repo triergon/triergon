@@ -3,7 +3,7 @@
 
 For each video vector, FFmpeg decodes to raw planes (the same pictures the reference decoder hands
 its filter graph); chunks of pictures go through (a) the reference chain (probe_rgba, identical to
-reference_decode's graph, colorspace/range as the decoder reports them) and (b) the Scaler
+the decode reference's graph, colorspace/range as the decoder reports them) and (b) the Scaler
 (release `raw_letterbox` hook). Prints per-vector exactness. Converter-only: decoder differences
 are excluded by construction.
 usage: validate_rgba.py OUT.json [VECTOR ...]   (default: every h264/hevc vector of

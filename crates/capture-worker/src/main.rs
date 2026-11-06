@@ -1,5 +1,5 @@
 //! Harness worker for the capture pipeline. Same command line as
-//! harness/capture/reference_capture.c:
+//! the capture build of harness/reference.c:
 //!
 //! ```text
 //!   capture-worker convert  <w> <h> <flip> <frames> <in.rgba> <out.yuv>
