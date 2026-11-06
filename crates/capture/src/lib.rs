@@ -1,19 +1,18 @@
-//! Development-capture pipeline: RGBA → YUV 4:2:0 conversion, MPEG-1 video
-//! encoding and MPEG-TS muxing, independently authored from ITU-R BT.601,
-//! ISO/IEC 11172-2 (via the freely available ITU-T H.262 syntax) and ITU-T
-//! H.222.0. The frozen contract lives in `research/capture/contract.json`.
+//! Development-capture session: RGBA in, MPEG-1-in-TS bytes out.
+//!
+//! A thin composition of the BT.601 converter (`triergon-pixel`), the MPEG-1
+//! video encoder (`triergon-codec-mpeg1`) and the single-program TS writer
+//! (`triergon_mpegts::mux`). The frozen contract lives in
+//! `research/capture/contract.json`.
 //!
 //! Experimental; this crate is not qualified. A passing slice is not O62.
 #![forbid(unsafe_code)]
 
-pub mod convert;
 mod error;
-pub mod mpeg1;
-mod picture;
-pub mod session;
-pub mod ts;
+mod session;
 
-pub use convert::{Orientation, rgba_to_yuv420};
 pub use error::{CaptureError, Result};
-pub use picture::{Geometry, Picture};
-pub use session::{Session, SessionConfig, Sink};
+pub use session::{FrameReport, Session, SessionConfig, Sink};
+pub use triergon_codec_mpeg1 as mpeg1;
+pub use triergon_mpegts::mux;
+pub use triergon_pixel as pixel;

@@ -1,4 +1,4 @@
-use crate::{CaptureError, Result};
+use crate::{Error, Result};
 
 /// Visible size plus the macroblock-aligned coded size MPEG-1 operates on.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -27,12 +27,12 @@ impl Geometry {
     pub fn new(width: u32, height: u32) -> Result<Geometry> {
         if width == 0
             || height == 0
-            || width % 2 != 0
-            || height % 2 != 0
+            || !width.is_multiple_of(2)
+            || !height.is_multiple_of(2)
             || width > 4095
             || height > 4095
         {
-            return Err(CaptureError::Geometry { width, height });
+            return Err(Error::Geometry { width, height });
         }
         let (width, height) = (width as usize, height as usize);
         Ok(Geometry {

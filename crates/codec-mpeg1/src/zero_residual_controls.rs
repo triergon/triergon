@@ -20,17 +20,17 @@ fn code(
     tight: bool,
 ) -> ([i32; 64], [i32; 64], usize) {
     let mut input = Picture::new(e.cfg.geometry);
-    e.reference.y.fill(base);
-    e.reference.cb.fill(base);
-    e.reference.cr.fill(base);
-    input.y.fill(base);
-    input.cb.fill(base);
-    input.cr.fill(base);
+    e.reference.y_mut().fill(base);
+    e.reference.cb_mut().fill(base);
+    e.reference.cr_mut().fill(base);
+    input.y_mut().fill(base);
+    input.cb_mut().fill(base);
+    input.cr_mut().fill(base);
     for y in 0..8 {
         for x in 0..8 {
             let sample = i32::from(base) + residual[y * 8 + x];
             assert!((0..=255).contains(&sample));
-            input.y[y * 16 + x] = u8::try_from(sample).unwrap();
+            input.y_mut()[y * 16 + x] = u8::try_from(sample).unwrap();
         }
     }
     let mut expected = [0; 64];
@@ -192,7 +192,7 @@ fn geometry_rejection_keeps_owned_output_and_subsequent_gop_state_unchanged() {
     let mut output = vec![9, 8, 7];
     assert!(matches!(
         e.encode(&wrong, &mut output),
-        Err(CaptureError::PictureGeometry { .. })
+        Err(Error::PictureGeometry { .. })
     ));
     assert_eq!(output, [9, 8, 7]);
     assert_eq!(e.index, 0);

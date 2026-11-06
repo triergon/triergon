@@ -336,14 +336,14 @@ mod header_budget_tests {
 
     #[test]
     fn header_budget_average_bank_counts_real_byte_alignment() {
-        use crate::mpeg1::{Encoder, EncoderConfig};
-        use crate::{Geometry, Picture};
+        use crate::{Encoder, EncoderConfig};
+        use triergon_pixel::{Geometry, Picture};
 
         let geometry = Geometry::new(16, 16).unwrap();
         let mut picture = Picture::new(geometry);
-        picture.y.fill(128);
-        picture.cb.fill(128);
-        picture.cr.fill(128);
+        picture.y_mut().fill(128);
+        picture.cb_mut().fill(128);
+        picture.cr_mut().fill(128);
         let mut encoder = Encoder::new(EncoderConfig {
             geometry,
             bit_rate: 30_000,
@@ -360,5 +360,4 @@ mod header_budget_tests {
 }
 
 #[cfg(test)]
-#[path = "censored_model_controls.rs"]
 mod censored_model_controls;

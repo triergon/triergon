@@ -6,7 +6,7 @@
 //! rows replicated. The conversion is linear, so chroma is formed from the
 //! filtered weighted sums in one rounding step.
 
-use crate::{CaptureError, Geometry, Picture, Result};
+use crate::{Error, Geometry, Picture, Result};
 
 /// Row order of the caller's RGBA buffer. Bottom-up buffers are read in reverse
 /// without a separate flip pass.
@@ -60,7 +60,7 @@ impl Converter {
     ) -> Result<()> {
         let g = out.geometry;
         if rgba.len() < g.rgba_len() {
-            return Err(CaptureError::InputLength {
+            return Err(Error::InputLength {
                 expected: g.rgba_len(),
                 actual: rgba.len(),
             });
@@ -248,7 +248,7 @@ mod tests {
         let err = rgba_to_yuv420(&[0; 16], Orientation::TopDown, &mut picture).unwrap_err();
         assert_eq!(
             err,
-            CaptureError::InputLength {
+            Error::InputLength {
                 expected: 512,
                 actual: 16
             }

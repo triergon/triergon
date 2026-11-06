@@ -3,6 +3,13 @@
 version = 4
 
 [[package]]
+name = "capture-worker"
+version = "0.0.0"
+dependencies = [
+ "triergon-capture",
+]
+
+[[package]]
 name = "media-worker"
 version = "0.0.0"
 dependencies = [
@@ -13,6 +20,12 @@ dependencies = [
 [[package]]
 name = "triergon-capture"
 version = "0.0.0"
+dependencies = [
+ "triergon-codec-mpeg1",
+ "triergon-core",
+ "triergon-mpegts",
+ "triergon-pixel",
+]
 
 [[package]]
 name = "triergon-codec-aac"
@@ -38,6 +51,13 @@ name = "triergon-codec-hevc"
 version = "0.0.0"
 dependencies = [
  "triergon-harness-protocol",
+]
+
+[[package]]
+name = "triergon-codec-mpeg1"
+version = "0.0.0"
+dependencies = [
+ "triergon-pixel",
 ]
 
 [[package]]
@@ -80,6 +100,10 @@ dependencies = [
  "triergon-core",
  "triergon-harness-protocol",
 ]
+
+[[package]]
+name = "triergon-pixel"
+version = "0.0.0"
 
 [[package]]
 name = "triergon-playback"

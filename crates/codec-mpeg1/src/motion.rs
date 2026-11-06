@@ -10,7 +10,7 @@
 //! samples) adds coarse candidates, followed by a full-sample diamond and a
 //! half-sample refinement, all on SAD plus a rate term.
 
-use crate::Geometry;
+use triergon_pixel::Geometry;
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct Mv {
@@ -40,7 +40,10 @@ pub struct Bounds {
 impl Bounds {
     /// `range` caps |component| (half-samples) to what the f_code can code.
     pub fn new(g: &Geometry, mb_x: usize, mb_y: usize, range: i32) -> Bounds {
-        let (w, h) = ((g.mb_width * 16) as i32, (g.mb_height * 16) as i32);
+        let (w, h) = (
+            (g.macroblock_width() * 16) as i32,
+            (g.macroblock_height() * 16) as i32,
+        );
         let (x, y) = ((mb_x * 16) as i32, (mb_y * 16) as i32);
         Bounds {
             lo_x: (-2 * x).max(-range),

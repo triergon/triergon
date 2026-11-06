@@ -5,10 +5,10 @@
 //! produces that picture's complete TS bytes with advancing PTS/DTS/PCR and
 //! continuity, and a sink failure poisons the session so the caller rebuilds.
 
-use crate::convert::Converter;
-use crate::mpeg1::{EncodedPicture, Encoder, EncoderConfig};
-use crate::ts::{MuxConfig, Muxer};
-use crate::{CaptureError, Geometry, Orientation, Picture, Result};
+use crate::{CaptureError, Result};
+use triergon_codec_mpeg1::{EncodedPicture, Encoder, EncoderConfig};
+use triergon_mpegts::mux::{MuxConfig, Muxer};
+use triergon_pixel::{Converter, Geometry, Orientation, Picture};
 
 /// Receives each frame's complete TS bytes. Returning `false` (refused or
 /// partially written) fails the frame.
@@ -91,7 +91,7 @@ impl Session {
     }
 
     pub fn geometry(&self) -> Geometry {
-        self.input.geometry
+        self.input.geometry()
     }
 
     /// Convert, encode and mux one frame, then hand its bytes to `sink`.
@@ -105,7 +105,7 @@ impl Session {
             return Err(CaptureError::Closed);
         }
         self.converter.convert(rgba, orientation, &mut self.input)?;
-        let picture = self.encoder.encode_validated(&self.input, &mut self.es);
+        let picture = self.encoder.encode(&self.input, &mut self.es)?;
         let k = picture.index as i64;
         self.ts.clear();
         self.muxer.write_picture(

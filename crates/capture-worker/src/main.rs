@@ -16,7 +16,8 @@ use std::io::Write;
 use std::process::ExitCode;
 use std::time::Instant;
 
-use triergon_capture::{Orientation, Session, SessionConfig, Sink};
+use triergon_capture::pixel::Orientation;
+use triergon_capture::{Session, SessionConfig, Sink};
 
 struct HashSink {
     hash: u64,

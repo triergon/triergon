@@ -1,8 +1,8 @@
 //! Baseline and candidate use the real rate controller; only the explicitly
 //! private driver routes the same censored observation to the new method.
-use super::super::{Encoder, EncoderConfig};
 use super::*;
-use crate::{Geometry, Picture};
+use crate::{Encoder, EncoderConfig};
+use triergon_pixel::{Geometry, Picture};
 
 fn finish(rc: &mut RateControl, bits: f64, texture: f64, q: f64, censored: bool) {
     if censored {
@@ -104,7 +104,7 @@ fn real_emergency_intra_picture_reports_underflow_but_keeps_probe_identity() {
     e.rc.seed_intra(800.0, 4, 1.0);
     let model = e.rc.alpha_i;
     let mut input = Picture::new(e.cfg.geometry);
-    for (i, p) in input.y.iter_mut().enumerate() {
+    for (i, p) in input.y_mut().iter_mut().enumerate() {
         *p = ((i * 137) % 256) as u8;
     }
     let mut output = Vec::new();

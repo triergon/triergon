@@ -7,7 +7,8 @@
 //! key pictures); SDT/PAT/PMT precede a PES when their period elapsed in PCR
 //! time, PAT/PMT also before a key picture following a non-key picture.
 
-use crate::{CaptureError, Result};
+use crate::psi::PsiCrc32;
+use triergon_core::{Error, Result};
 
 const PACKET: usize = 188;
 const PAT_PID: u16 = 0x0000;
@@ -68,10 +69,10 @@ impl Muxer {
         // 25 bytes of section/descriptor/CRC overhead, then the two names.
         for name in [&cfg.provider_name, &cfg.service_name] {
             if name.len() > 255 {
-                return Err(CaptureError::MuxConfig("service name length"));
+                return Err(Error::Unsupported("service name length"));
             }
             if !name.bytes().all(|b| (0x20..=0x7e).contains(&b)) {
-                return Err(CaptureError::MuxConfig(
+                return Err(Error::Unsupported(
                     "service name encoding: printable ASCII required",
                 ));
             }
@@ -80,23 +81,21 @@ impl Muxer {
             .provider_name
             .len()
             .checked_add(cfg.service_name.len())
-            .ok_or(CaptureError::MuxConfig("service descriptor length"))?;
+            .ok_or(Error::Unsupported("service descriptor length"))?;
         if names > PACKET - 30 {
-            return Err(CaptureError::MuxConfig("SDT exceeds one packet"));
+            return Err(Error::Unsupported("SDT exceeds one packet"));
         }
         if cfg.program_number == 0 {
-            return Err(CaptureError::MuxConfig("zero program number"));
+            return Err(Error::Unsupported("zero program number"));
         }
         if !(0x20..0x1fff).contains(&cfg.pmt_pid) || !(0x20..0x1fff).contains(&cfg.video_pid) {
-            return Err(CaptureError::MuxConfig(
-                "PMT/video PID must be usable13-bit PID",
-            ));
+            return Err(Error::Unsupported("PMT/video PID must be usable13-bit PID"));
         }
         if cfg.pmt_pid == cfg.video_pid {
-            return Err(CaptureError::MuxConfig("PMT/video PID collision"));
+            return Err(Error::Unsupported("PMT/video PID collision"));
         }
         if !matches!(cfg.stream_type, 0x01 | 0x02) {
-            return Err(CaptureError::MuxConfig("unselected stream type"));
+            return Err(Error::Unsupported("unselected stream type"));
         }
 
         let mut pat = Vec::new();
@@ -241,7 +240,7 @@ fn section(out: &mut Vec<u8>, table_id: u8, extension: u16, body: impl FnOnce(&m
     let high = if table_id == 0x42 { 0xF0 } else { 0xB0 };
     out[1] = high | (length >> 8) as u8;
     out[2] = length as u8;
-    let crc = crc32_mpeg(out);
+    let crc = PsiCrc32::of(out);
     out.extend_from_slice(&crc.to_be_bytes());
 }
 
@@ -263,22 +262,6 @@ fn pcr_bits(out: &mut [u8], pcr: i64) {
     out[3] = (base >> 1) as u8;
     out[4] = ((base << 7) as u8 & 0x80) | 0x7E | (ext >> 8) as u8;
     out[5] = ext as u8;
-}
-
-/// CRC-32/MPEG-2: polynomial 0x04C11DB7, initial 0xFFFFFFFF, MSB first, no final XOR.
-pub fn crc32_mpeg(data: &[u8]) -> u32 {
-    let mut crc = 0xFFFF_FFFFu32;
-    for &byte in data {
-        crc ^= (byte as u32) << 24;
-        for _ in 0..8 {
-            crc = if crc & 0x8000_0000 != 0 {
-                (crc << 1) ^ 0x04C1_1DB7
-            } else {
-                crc << 1
-            };
-        }
-    }
-    crc
 }
 
 #[cfg(test)]
@@ -310,7 +293,7 @@ mod tests {
 
     #[test]
     fn crc_check_value() {
-        assert_eq!(crc32_mpeg(b"123456789"), 0x0376_E6E7);
+        assert_eq!(PsiCrc32::of(b"123456789"), 0x0376_E6E7);
     }
 
     #[test]

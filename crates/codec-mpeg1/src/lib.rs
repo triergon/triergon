@@ -4,20 +4,24 @@
 //! control. Each `encode` call returns that picture's complete bytes; there
 //! is no reordering delay (contract difference D1).
 
+#![forbid(unsafe_code)]
+
 mod bits;
 mod block;
 mod dct;
+mod error;
 #[doc(hidden)]
 pub mod motion;
 mod rate;
 mod tables;
 
-use crate::{CaptureError, Geometry, Picture, Result};
 use bits::BitWriter;
 use block::Quantizer;
+pub use error::{Error, Result};
 use motion::{Bounds, Coarse, Mv, Search};
 use rate::{Kind, RateControl};
 use tables::*;
+use triergon_pixel::{Geometry, Picture};
 
 /// Encoder parameters. `Session` derives them from the Streem rate rule.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -102,17 +106,17 @@ struct SliceState {
 impl Encoder {
     pub fn new(cfg: EncoderConfig) -> Result<Encoder> {
         if cfg.gop == 0 {
-            return Err(CaptureError::Gop(0));
+            return Err(Error::Gop(0));
         }
         if cfg.max_rate == 0
             || cfg.max_rate.div_ceil(400) > 0x3FFFF
             || cfg.bit_rate == 0
             || cfg.vbv_bits == 0
         {
-            return Err(CaptureError::BitRate(cfg.bit_rate as u64));
+            return Err(Error::BitRate(cfg.bit_rate as u64));
         }
         let g = cfg.geometry;
-        let mbs = g.mb_width * g.mb_height;
+        let mbs = g.macroblock_width() * g.macroblock_height();
         Ok(Encoder {
             cfg,
             reference: Picture::new(g),
@@ -121,11 +125,11 @@ impl Encoder {
             quant: Quantizer::new(),
             rc: RateControl::new(cfg.bit_rate, cfg.max_rate, cfg.vbv_bits, cfg.gop, FPS),
             analysis: vec![Analysis::default(); mbs],
-            row_activity: vec![0.0; g.mb_height],
+            row_activity: vec![0.0; g.macroblock_height()],
             previous_mvs: vec![Mv::ZERO; mbs],
             coarse_cur: Vec::new(),
             coarse_ref: Vec::new(),
-            previous_luma: vec![0; g.luma_stride() * g.mb_height * 16],
+            previous_luma: vec![0; g.luma_stride() * g.macroblock_height() * 16],
             unchanged: Vec::with_capacity(mbs),
             levels: [[0; 64]; 6],
             index: 0,
@@ -149,27 +153,21 @@ impl Encoder {
 
     /// Encode `input` (same geometry, padded) into `out` (cleared first).
     pub fn encode(&mut self, input: &Picture, out: &mut Vec<u8>) -> Result<EncodedPicture> {
-        if input.geometry != self.cfg.geometry {
-            return Err(CaptureError::PictureGeometry {
+        if input.geometry() != self.cfg.geometry {
+            return Err(Error::PictureGeometry {
                 expected: self.cfg.geometry,
-                actual: input.geometry,
+                actual: input.geometry(),
             });
         }
         Ok(self.encode_validated(input, out))
     }
-    // Session owns the fixed-geometry input, so its validated path introduces
-    // no per-frame shape validation or plane-length scan.
-    pub(crate) fn encode_validated(
-        &mut self,
-        input: &Picture,
-        out: &mut Vec<u8>,
-    ) -> EncodedPicture {
-        debug_assert_eq!(input.geometry, self.cfg.geometry);
+    fn encode_validated(&mut self, input: &Picture, out: &mut Vec<u8>) -> EncodedPicture {
+        debug_assert_eq!(input.geometry(), self.cfg.geometry);
         // Scheduled I pictures every `gop`; a P picture whose prediction is
         // worse than intra coding across the picture becomes an I picture and
         // restarts the GOP (the reference's default scene-change rule).
         let mut key = self.index == 0 || self.index - self.gop_start >= self.cfg.gop as u64;
-        let same_source_luma = !key && input.y == self.previous_luma;
+        let same_source_luma = !key && input.y() == self.previous_luma;
         let mut f_code = 0;
         if !key {
             let (f, scene_change) = self.analyse(input, same_source_luma);
@@ -191,20 +189,20 @@ impl Encoder {
         let header_bits = self.writer.bit_len();
         let plan = self.rc.begin(kind, activity, header_bits);
         let g = self.cfg.geometry;
-        let total = (g.mb_width * g.mb_height) as f64;
+        let total = (g.macroblock_width() * g.macroblock_height()) as f64;
         let mut q_sum = 0u64;
         let mut slice: Option<SliceState> = None;
         let mut economy = false;
         let mut censored = false;
         let mut activity_done = 0.0;
-        for mb_y in 0..g.mb_height {
+        for mb_y in 0..g.macroblock_height() {
             let spent = (self.writer.bit_len() - header_bits) as f64;
             let mut q = self.rc.row_q(spent, activity_done);
-            let rows_left = (g.mb_height - mb_y) as f64;
+            let rows_left = (g.macroblock_height() - mb_y) as f64;
             // Conservative floor of what the remaining rows cost at minimum.
             let floor = rows_left
                 * if key {
-                    48.0 * g.mb_width as f64 + 64.0
+                    48.0 * g.macroblock_width() as f64 + 64.0
                 } else {
                     96.0
                 };
@@ -216,7 +214,7 @@ impl Encoder {
                 q = q.max(plan.q + 4).min(31);
             }
             economy |= self.writer.bit_len() as f64 + floor > plan.hard_limit - 8192.0;
-            q_sum += q as u64 * g.mb_width as u64;
+            q_sum += q as u64 * g.macroblock_width() as u64;
             let mut s = slice.take().unwrap_or_else(|| {
                 self.writer.start_code(1);
                 self.writer.put(q, 5);
@@ -241,7 +239,7 @@ impl Encoder {
         // Charge those real bits to both the reservoir and the average bank.
         let bits = out.len() * 8;
         if !same_source_luma {
-            self.previous_luma.copy_from_slice(&input.y);
+            self.previous_luma.copy_from_slice(input.y());
         }
         let mean_q = q_sum as f64 / total;
         if censored {
@@ -272,8 +270,8 @@ impl Encoder {
         let g = self.cfg.geometry;
         let w = &mut self.writer;
         w.start_code(0xB3);
-        w.put(g.width as u32, 12);
-        w.put(g.height as u32, 12);
+        w.put(g.width() as u32, 12);
+        w.put(g.height() as u32, 12);
         w.put(1, 4); // pel_aspect_ratio: 1.0 (square)
         w.put(FRAME_RATE_CODE, 4);
         w.put(self.cfg.max_rate.div_ceil(400), 18);
@@ -332,18 +330,18 @@ impl Encoder {
         let mut scene = 0.0f64;
         self.unchanged.clear();
         let (mut lo, mut hi) = (0i32, 0i32);
-        let rows = g.mb_height * 16;
-        motion::decimate4(&input.y, stride, rows, &mut self.coarse_cur);
-        motion::decimate4(&self.reference.y, stride, rows, &mut self.coarse_ref);
+        let rows = g.macroblock_height() * 16;
+        motion::decimate4(input.y(), stride, rows, &mut self.coarse_cur);
+        motion::decimate4(self.reference.y(), stride, rows, &mut self.coarse_ref);
         let coarse = Coarse {
             cur: &self.coarse_cur,
             reference: &self.coarse_ref,
-            width: g.mb_width * 4,
+            width: g.macroblock_width() * 4,
         };
-        for mb_y in 0..g.mb_height {
+        for mb_y in 0..g.macroblock_height() {
             let mut row = 0.0;
-            for mb_x in 0..g.mb_width {
-                let i = mb_y * g.mb_width + mb_x;
+            for mb_x in 0..g.macroblock_width() {
+                let i = mb_y * g.macroblock_width() + mb_x;
                 let (x, y) = (mb_x * 16, mb_y * 16);
                 let left = if mb_x > 0 {
                     self.analysis[i - 1].mv
@@ -352,17 +350,17 @@ impl Encoder {
                 };
                 let mut candidates = [left, self.previous_mvs[i], Mv::ZERO, Mv::ZERO, Mv::ZERO];
                 if mb_y > 0 {
-                    candidates[2] = self.analysis[i - g.mb_width].mv;
-                    if mb_x + 1 < g.mb_width {
-                        candidates[3] = self.analysis[i - g.mb_width + 1].mv;
+                    candidates[2] = self.analysis[i - g.macroblock_width()].mv;
+                    if mb_x + 1 < g.macroblock_width() {
+                        candidates[3] = self.analysis[i - g.macroblock_width() + 1].mv;
                     }
                 }
-                if mb_x + 1 < g.mb_width {
+                if mb_x + 1 < g.macroblock_width() {
                     candidates[4] = self.previous_mvs[i + 1];
                 }
                 let search = Search {
-                    cur: &input.y,
-                    reference: &self.reference.y,
+                    cur: input.y(),
+                    reference: self.reference.y(),
                     stride,
                     x,
                     y,
@@ -380,7 +378,7 @@ impl Encoder {
                 // Intra only pays off when prediction is poor; skip the
                 // deviation pass otherwise.
                 let deviation = if sad > INTRA_MARGIN {
-                    intra_activity(&input.y[y * stride + x..], stride)
+                    intra_activity(&input.y()[y * stride + x..], stride)
                 } else {
                     u32::MAX
                 };
@@ -388,7 +386,7 @@ impl Encoder {
                 // Rate-model activity: intra deviation or compensated SAD.
                 row += if intra { deviation } else { sad } as f64;
                 let origin = y * stride + x;
-                let block = &input.y[origin..];
+                let block = &input.y()[origin..];
                 let full =
                     (y as i32 + (mv.y >> 1)) as usize * stride + (x as i32 + (mv.x >> 1)) as usize;
                 // The scene metric compares two source blocks. A repeated
@@ -421,10 +419,10 @@ impl Encoder {
         if scene > 0.0 {
             for &i in &self.unchanged {
                 let (x, y) = (
-                    (i as usize % g.mb_width) * 16,
-                    (i as usize / g.mb_width) * 16,
+                    (i as usize % g.macroblock_width()) * 16,
+                    (i as usize / g.macroblock_width()) * 16,
                 );
-                let variance = variance256(&input.y[y * stride + x..], stride) as f64;
+                let variance = variance256(&input.y()[y * stride + x..], stride) as f64;
                 scene -= (variance + 20.0 * scene_lambda).sqrt() - scene_floor;
             }
         }
@@ -438,11 +436,11 @@ impl Encoder {
     fn intra_analysis(&mut self, input: &Picture) {
         let g = self.cfg.geometry;
         let stride = g.luma_stride();
-        for mb_y in 0..g.mb_height {
+        for mb_y in 0..g.macroblock_height() {
             let mut row = 0.0;
-            for mb_x in 0..g.mb_width {
-                let cost = intra_activity(&input.y[mb_y * 16 * stride + mb_x * 16..], stride);
-                self.analysis[mb_y * g.mb_width + mb_x] = Analysis {
+            for mb_x in 0..g.macroblock_width() {
+                let cost = intra_activity(&input.y()[mb_y * 16 * stride + mb_x * 16..], stride);
+                self.analysis[mb_y * g.macroblock_width() + mb_x] = Analysis {
                     mv: Mv::ZERO,
                     sad: 0,
                     intra: true,
@@ -462,7 +460,7 @@ impl Encoder {
         let mut scratch = BitWriter::with_capacity(4096);
         std::mem::swap(&mut self.writer, &mut scratch);
         let mut activity = 0.0;
-        for mb_y in (0..g.mb_height).step_by(2) {
+        for mb_y in (0..g.macroblock_height()).step_by(2) {
             let mut s = SliceState {
                 q: PROBE_Q,
                 target_q: PROBE_Q,
@@ -471,12 +469,12 @@ impl Encoder {
                 last_intra: None,
                 skipped: 0,
             };
-            for mb_x in 0..g.mb_width {
+            for mb_x in 0..g.macroblock_width() {
                 self.intra_mb(
                     input,
                     mb_x,
                     mb_y,
-                    mb_y * g.mb_width + mb_x,
+                    mb_y * g.macroblock_width() + mb_x,
                     &mut s,
                     Kind::Intra,
                     false,
@@ -501,10 +499,10 @@ impl Encoder {
         hard_limit: f64,
     ) -> bool {
         let g = self.cfg.geometry;
-        let last = g.mb_width * g.mb_height - 1;
+        let last = g.macroblock_width() * g.macroblock_height() - 1;
         let mut censored = false;
-        for mb_x in 0..g.mb_width {
-            let address = mb_y * g.mb_width + mb_x;
+        for mb_x in 0..g.macroblock_width() {
+            let address = mb_y * g.macroblock_width() + mb_x;
             // The first and last macroblock of a slice are never skipped.
             let edge = address == 0 || address == last;
             // Hard VBV guard: past this point only the cheapest legal codes.
@@ -570,9 +568,9 @@ impl Encoder {
         for b in 0..6 {
             let (plane, stride, x, y, comp) = block_origin(g, b, mb_x, mb_y);
             let src = match plane {
-                0 => &input.y,
-                1 => &input.cb,
-                _ => &input.cr,
+                0 => &input.y(),
+                1 => &input.cb(),
+                _ => &input.cr(),
             };
             for r in 0..8 {
                 let row = &src[(y + r) * stride + x..(y + r) * stride + x + 8];
@@ -593,9 +591,9 @@ impl Encoder {
             block::dequant_intra(&levels, mask, dc, s.q, &mut coeffs);
             dct::idct(&mut coeffs);
             let dst = match plane {
-                0 => &mut self.recon.y,
-                1 => &mut self.recon.cb,
-                _ => &mut self.recon.cr,
+                0 => self.recon.y_mut(),
+                1 => self.recon.cb_mut(),
+                _ => self.recon.cr_mut(),
             };
             for r in 0..8 {
                 let row = &mut dst[(y + r) * stride + x..(y + r) * stride + x + 8];
@@ -625,7 +623,7 @@ impl Encoder {
         let mut pred = [[0u8; 64]; 6];
         let ls = g.luma_stride();
         motion::predict_luma_blocks(
-            &self.reference.y,
+            self.reference.y(),
             ls,
             mb_x * 16,
             mb_y * 16,
@@ -636,7 +634,7 @@ impl Encoder {
         let cs = g.chroma_stride();
         let (cx, cy) = (motion::chroma(mv.x), motion::chroma(mv.y));
         motion::predict::<8>(
-            &self.reference.cb,
+            self.reference.cb(),
             cs,
             mb_x * 8,
             mb_y * 8,
@@ -645,7 +643,7 @@ impl Encoder {
             &mut pred[4],
         );
         motion::predict::<8>(
-            &self.reference.cr,
+            self.reference.cr(),
             cs,
             mb_x * 8,
             mb_y * 8,
@@ -661,9 +659,9 @@ impl Encoder {
             for b in 0..6 {
                 let (plane, stride, x, y, _) = block_origin(g, b, mb_x, mb_y);
                 let src = match plane {
-                    0 => &input.y,
-                    1 => &input.cb,
-                    _ => &input.cr,
+                    0 => &input.y(),
+                    1 => &input.cb(),
+                    _ => &input.cr(),
                 };
                 let mut magnitude = 0u32;
                 for r in 0..8 {
@@ -762,9 +760,9 @@ impl Encoder {
         for (b, block) in blocks.iter().enumerate() {
             let (plane, stride, x, y, _) = block_origin(g, b, mb_x, mb_y);
             let dst = match plane {
-                0 => &mut self.recon.y,
-                1 => &mut self.recon.cb,
-                _ => &mut self.recon.cr,
+                0 => self.recon.y_mut(),
+                1 => self.recon.cb_mut(),
+                _ => self.recon.cr_mut(),
             };
             for r in 0..8 {
                 dst[(y + r) * stride + x..(y + r) * stride + x + 8]
@@ -855,5 +853,4 @@ fn write_mv_component(w: &mut BitWriter, delta: i32, f_code: u32) {
 }
 
 #[cfg(test)]
-#[path = "zero_residual_controls.rs"]
 mod zero_residual_controls;

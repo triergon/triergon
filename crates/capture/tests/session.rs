@@ -1,6 +1,7 @@
 //! Session-level behaviour of the capture pipeline (contract `session`).
 
-use triergon_capture::{CaptureError, Orientation, Session, SessionConfig, Sink};
+use triergon_capture::pixel::{self, Orientation};
+use triergon_capture::{CaptureError, Session, SessionConfig, Sink, mpeg1};
 
 fn frame(w: usize, h: usize, seed: u32) -> Vec<u8> {
     (0..w * h * 4)
@@ -159,15 +160,30 @@ fn both_streem_geometries_and_rate_extremes_open() {
 fn invalid_requests_are_explicit_errors() {
     assert!(matches!(
         Session::open(&SessionConfig::streem(63, 48, 1_000_000)),
-        Err(CaptureError::Geometry { .. })
+        Err(CaptureError::Pixel(pixel::Error::Geometry { .. }))
     ));
     assert!(matches!(
         Session::open(&SessionConfig::streem(64, 48, 0)),
-        Err(CaptureError::BitRate(_))
+        Err(CaptureError::Encoder(mpeg1::Error::BitRate(_)))
     ));
     let mut s = Session::open(&SessionConfig::streem(64, 48, 1_000_000)).unwrap();
     assert!(matches!(
         s.encode(&[0; 10], Orientation::TopDown, &mut Vec::new()),
-        Err(CaptureError::InputLength { .. })
+        Err(CaptureError::Pixel(pixel::Error::InputLength { .. }))
     ));
+}
+#[test]
+fn session_and_direct_encoder_share_gop_validation() {
+    let mut c = SessionConfig::streem(16, 16, 1_000_000);
+    c.gop = 0;
+    assert!(matches!(
+        Session::open(&c),
+        Err(CaptureError::Encoder(mpeg1::Error::Gop(0)))
+    ));
+}
+#[test]
+fn invalid_session_mux_configuration_is_an_error() {
+    let mut c = SessionConfig::streem(16, 16, 1_000_000);
+    c.mux.video_pid = c.mux.pmt_pid;
+    assert!(matches!(Session::open(&c), Err(CaptureError::Mux(_))));
 }
