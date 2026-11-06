@@ -19,7 +19,8 @@ use std::{
 };
 use triergon_core::{Error, Time};
 use triergon_isobmff::{
-    MediaDataPolicy, RecoveryKind, RecoverySyntax, SyncSamplePolicy, TimingRunPolicy,
+    MediaDataPolicy, RecoveryKind, RecoverySyntax, SampleTablePolicy, SyncSamplePolicy,
+    TimingRunPolicy,
 };
 
 #[derive(Clone, Copy)]
@@ -128,13 +129,16 @@ fn operation(
     let mut driver = Driver::new(transport, length, o.window, o.quantum)?;
     let pool = driver.budget.clone();
     let mut retained = Retention::new(&pool, o.retain)?;
-    let model = driver.open_with_policy(policy)?;
-    if matches!(op, NativeOperation::Open) {
-        driver.native_open(&model, &mut stats, &mut retained, trace.as_deref_mut())?;
+    if policy.regular_recovery {
+        driver.recovered_regular_operation(op, &mut stats, &mut retained, trace.as_deref_mut())?;
     } else {
-        driver.native_operation(&model, &mut stats, &mut retained, op, trace.as_deref_mut())?;
+        let model = driver.open_with_policy(policy)?;
+        if matches!(op, NativeOperation::Open) {
+            driver.native_open(&model, &mut stats, &mut retained, trace.as_deref_mut())?;
+        } else {
+            driver.native_operation(&model, &mut stats, &mut retained, op, trace.as_deref_mut())?;
+        }
     }
-    drop(model);
     drop(driver);
     retained.consume_after_close(&mut stats.digest)?;
     drop(retained);
@@ -157,8 +161,7 @@ fn output_stats(stats: &Stats, iterations: u64, elapsed: u128) -> Result<()> {
     );
     Ok(())
 }
-fn main_result() -> Result<()> {
-    let mut args: Vec<_> = env::args().collect();
+fn main_result(mut args: Vec<String>) -> Result<()> {
     let mut policy = OpenPolicy::default();
     loop {
         match args.get(1).map(String::as_str) {
@@ -169,6 +172,7 @@ fn main_result() -> Result<()> {
             Some("--terminal-media-prefix") => {
                 policy.media_data = MediaDataPolicy::PreserveTerminalDeclaration;
             }
+            Some("--recover-regular-tables") => policy.regular_recovery = true,
             _ => break,
         }
         args.remove(1);
@@ -177,6 +181,25 @@ fn main_result() -> Result<()> {
         .get(1)
         .map(String::as_str)
         .ok_or(Error::Invalid("missing worker mode"))?;
+    if policy.regular_recovery {
+        if policy.tables != SampleTablePolicy::default()
+            || policy.media_data != MediaDataPolicy::Strict
+        {
+            return Err(Error::Invalid("regular table recovery is a standalone profile").into());
+        }
+        if !matches!(
+            mode,
+            "open-trace"
+                | "open-bench"
+                | "open-memory"
+                | "open-memory-baseline"
+                | "native-index-trace"
+                | "native-index-bench"
+                | "native-index-memory"
+        ) {
+            return Err(Error::Unsupported("regular table recovery requires open or index").into());
+        }
+    }
     if mode == "identity" {
         println!(
             "{{\"schema\":33,\"worker\":\"safe-media-isobmff-consumer34\",\"reference_api\":\"n9.0-public-mov\",\"native_seek\":\"bounded-aligned-native-view\",\"source_variant\":\"native37-profile-batch43-v2\",\"source_variant_sha256\":\"49d244ad58a4ea3c575dc5eebdba36edf86f27df1edb68949cd72566dcc479c9\",\"qualification\":false}}"
@@ -324,7 +347,7 @@ fn main_result() -> Result<()> {
     Ok(())
 }
 fn main() {
-    if let Err(error) = main_result() {
+    if let Err(error) = main_result(env::args().collect()) {
         eprintln!("isobmff-consumer: {error}");
         std::process::exit(if matches!(error, Failure::Core(Error::Unsupported(_))) {
             3
@@ -337,6 +360,30 @@ fn main() {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn regular_recovery_rejects_conflicting_profiles() {
+        for flag in [
+            "--bounded-timing",
+            "--bounded-sync",
+            "--terminal-media-prefix",
+        ] {
+            let args = ["worker", flag, "--recover-regular-tables", "open-trace"];
+            assert!(matches!(
+                main_result(args.into_iter().map(str::to_owned).collect()),
+                Err(Failure::Core(Error::Invalid(
+                    "regular table recovery is a standalone profile"
+                )))
+            ));
+        }
+        let args = ["worker", "--recover-regular-tables", "index-trace"];
+        assert!(matches!(
+            main_result(args.into_iter().map(str::to_owned).collect()),
+            Err(Failure::Core(Error::Unsupported(
+                "regular table recovery requires open or index"
+            )))
+        ));
+    }
+
     #[test]
     fn transport_failure_is_not_confirmed_eof() {
         struct Broken;

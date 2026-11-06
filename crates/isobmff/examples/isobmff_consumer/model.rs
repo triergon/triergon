@@ -14,13 +14,15 @@ use triergon_core::{
     SourceFailure, SourceId, Step, Time, WorkBudget,
 };
 use triergon_isobmff::{
-    BoxEvent, BoxReader, BoxStep, BoxView, BuildStatus, EditList, FragmentBuilder, FragmentContext,
-    FragmentIndex, ImplicitBase, Limits, MediaDataPolicy, Mov9CursorStatus,
+    BoxEvent, BoxHeader, BoxReader, BoxStep, BoxView, BuildStatus, EditList, FragmentBuilder,
+    FragmentContext, FragmentIndex, ImplicitBase, Limits, MediaDataPolicy, Mov9CursorStatus,
     Mov9NativeGlobalSeekJob, Mov9NativeIndexCursor, Mov9NativeIndexLimits, Mov9NativeSeekLimits,
     Mov9PacketCursor, Mov9PacketLimits, Mov9PartialSampleReader, Mov9PayloadBounds, Mov9Profile,
-    Mov9StreamView, Mov9Track, MovieHeader, MovieSeekClocks, MovieSeekLimits,
-    MovieSourceSeekContext, MovieSourceSeekPlanner, PinnedMovD32RegularRecoveryV1,
-    RecoveryDescriptions, RecoveryKind, RecoveryMappings, RecoveryScope, RecoverySyntax, Sample,
+    Mov9RecoveryTrackHeader, Mov9RecoveryV3Context, Mov9RecoveryV3Read, Mov9RunRecoveryV3Builder,
+    Mov9StreamView, Mov9Track, Mov9V3TransportBuilder, MovieHeader, MovieSeekClocks,
+    MovieSeekLimits, MovieSourceSeekContext, MovieSourceSeekPlanner, PinnedMovD32RegularRecoveryV1,
+    PinnedMovD32RegularRecoveryV3, PinnedMovD32SmallRawVideoTransportV3, RecoveryDescriptions,
+    RecoveryKind, RecoveryMappings, RecoveryScope, RecoverySyntax, Sample, SampleDescription,
     SampleReader, SampleStep, SampleTable, SampleTableBuilder, SampleTablePolicy, SourcePacket,
     SourceTrack, TrackHeader, TrackSampleCursor, Trex,
 };
@@ -65,6 +67,15 @@ pub enum NativeOperation {
     Index,
     Seek(NativeSeekRequest),
 }
+impl NativeOperation {
+    fn trace_name(self) -> &'static str {
+        match self {
+            Self::Open => "mov-native-open-consumer-v33",
+            Self::Index => "mov-native-index-consumer-v33",
+            Self::Seek(_) => "mov-native-seek-consumer-v33",
+        }
+    }
+}
 trait NativeRows {
     fn poll(
         &mut self,
@@ -87,6 +98,110 @@ impl NativeRows for Mov9PacketCursor<'_> {
 }
 fn append<T>(target: &mut BudgetVec<T>, value: T) -> Result<()> {
     target.try_push(value).map_err(|e| Failure::Core(e.error))
+}
+fn native_catalogue(
+    streams: &[Mov9StreamView],
+    stats: &mut Stats,
+    mut trace: Option<&mut String>,
+) -> Result<()> {
+    if let Some(out) = trace.as_deref_mut() {
+        out.push_str("],\"streams\":[");
+    }
+    protocol::fold(&mut stats.digest, 0x43);
+    protocol::fold(
+        &mut stats.digest,
+        u64::try_from(streams.len()).map_err(|_| Error::Overflow)?,
+    );
+    for (i, stream) in streams.iter().enumerate() {
+        protocol::consume_stream(&mut stats.digest, i, stream)?;
+        if let Some(out) = trace.as_deref_mut() {
+            if i != 0 {
+                out.push(',');
+            }
+            protocol::trace_stream(out, i, stream);
+        }
+    }
+    protocol::fold(&mut stats.digest, 0x47);
+    protocol::fold(&mut stats.digest, 0);
+    if let Some(out) = trace {
+        out.push_str("],\"programs\":[]");
+    }
+    Ok(())
+}
+
+fn native_result(eof: bool, stats: &mut Stats, trace: Option<&mut String>) {
+    let read_result = if eof { protocol::EOF } else { 0 };
+    protocol::fold(&mut stats.digest, 0x45);
+    protocol::fold(&mut stats.digest, protocol::signed(read_result));
+    protocol::fold(&mut stats.digest, u64::from(eof));
+    if let Some(out) = trace {
+        write!(
+            out,
+            ",\"read_result\":{read_result},\"confirmed_eof\":{eof}"
+        )
+        .expect("String write");
+    }
+}
+
+struct IndexRow {
+    ordinal: u64,
+    position: i64,
+    timestamp: i64,
+    flags: i32,
+    size: u32,
+    min_distance: i32,
+}
+
+fn native_index_stream(
+    stream: usize,
+    track_id: u32,
+    stats: &mut Stats,
+    mut trace: Option<&mut String>,
+    mut next_entry: impl FnMut() -> Result<Option<IndexRow>>,
+) -> Result<()> {
+    let (mut count, mut digest) = (0u64, 0u64);
+    if let Some(out) = trace.as_deref_mut() {
+        if stream != 0 {
+            out.push(',');
+        }
+        write!(
+            out,
+            "{{\"stream\":{stream},\"pid\":{track_id},\"entries\":["
+        )
+        .expect("String write");
+    }
+    while let Some(entry) = next_entry()? {
+        for value in [
+            protocol::signed(entry.position),
+            protocol::signed(entry.timestamp),
+            protocol::signed(i64::from(entry.flags)),
+            u64::from(entry.size),
+            protocol::signed(i64::from(entry.min_distance)),
+        ] {
+            protocol::fold(&mut digest, value);
+        }
+        if let Some(out) = trace.as_deref_mut() {
+            if count != 0 {
+                out.push(',');
+            }
+            write!(out,"{{\"ordinal\":{},\"position\":{},\"timestamp\":{},\"flags\":{},\"size\":{},\"min_distance\":{}}}",entry.ordinal,entry.position,entry.timestamp,entry.flags,entry.size,entry.min_distance).expect("String write");
+        }
+        count = count.checked_add(1).ok_or(Error::Overflow)?;
+    }
+    protocol::fold(
+        &mut stats.digest,
+        u64::try_from(stream).map_err(|_| Error::Overflow)?,
+    );
+    protocol::fold(&mut stats.digest, count);
+    protocol::append_words(
+        &mut stats.digest,
+        digest,
+        u32::try_from(count.checked_mul(5).ok_or(Error::Overflow)?).map_err(|_| Error::Overflow)?,
+    );
+    if let Some(out) = trace {
+        out.push_str("]}");
+    }
+    Ok(())
 }
 fn word(bytes: &[u8], offset: usize) -> Result<u32> {
     let end = offset.checked_add(4).ok_or(Error::Overflow)?;
@@ -135,14 +250,7 @@ fn self_contained_table(
     table_policy: SampleTablePolicy,
 ) -> Result<SampleTable> {
     let minf = child(mdia, b"minf", budget)?;
-    let dref = child(&child(&minf, b"dinf", budget)?, b"dref", budget)?;
-    if word(dref.payload(), 0)? != 0 {
-        return Err(Error::Unsupported("data reference version/flags").into());
-    }
-    let refs = children(&dref, 8, budget)?;
-    if refs.len() != usize::try_from(word(dref.payload(), 4)?).map_err(|_| Error::Overflow)? {
-        return Err(Error::Invalid("data reference count").into());
-    }
+    let refs = data_references(&minf, budget)?;
     let mut builder = SampleTableBuilder::with_policy(
         child(&minf, b"stbl", budget)?,
         budget.clone(),
@@ -151,12 +259,28 @@ fn self_contained_table(
     )?;
     while builder.poll(&mut WorkBudget::new(quantum))? != BuildStatus::Ready {}
     let table = builder.finish()?;
-    for description in table.descriptions() {
+    require_local_references(refs.as_slice(), table.descriptions())?;
+    Ok(table)
+}
+
+fn data_references(minf: &BoxView, budget: &Budget) -> Result<BudgetVec<BoxView>> {
+    let dref = child(&child(minf, b"dinf", budget)?, b"dref", budget)?;
+    if word(dref.payload(), 0)? != 0 {
+        return Err(Error::Unsupported("data reference version/flags").into());
+    }
+    let refs = children(&dref, 8, budget)?;
+    if refs.len() != usize::try_from(word(dref.payload(), 4)?).map_err(|_| Error::Overflow)? {
+        return Err(Error::Invalid("data reference count").into());
+    }
+    Ok(refs)
+}
+
+fn require_local_references(refs: &[BoxView], descriptions: &[SampleDescription]) -> Result<()> {
+    for description in descriptions {
         let reference = usize::from(description.data_reference_index)
             .checked_sub(1)
             .ok_or(Error::Invalid("zero data ref"))?;
         let target = refs
-            .as_slice()
             .get(reference)
             .ok_or(Error::Invalid("dangling data reference"))?;
         if target.header().kind != *b"url " || target.payload() != [0, 0, 0, 1] {
@@ -166,7 +290,7 @@ fn self_contained_table(
             .into());
         }
     }
-    Ok(table)
+    Ok(())
 }
 struct FragmentTrack {
     id: u32,
@@ -340,6 +464,10 @@ struct Scanned {
     indexes: BudgetVec<BoxView>,
     brand: Option<[u8; 4]>,
 }
+struct RootWalk {
+    headers: BudgetVec<BoxHeader>,
+    file_type: Option<BoxView>,
+}
 pub struct Record {
     pub header: TrackHeader,
     pub table: SampleTable,
@@ -360,6 +488,7 @@ pub struct Model {
 pub struct OpenPolicy {
     pub tables: SampleTablePolicy,
     pub media_data: MediaDataPolicy,
+    pub regular_recovery: bool,
 }
 impl<'a> Driver<'a> {
     pub fn new(
@@ -455,7 +584,11 @@ impl<'a> Driver<'a> {
         }
         Ok(())
     }
-    fn scan(&mut self, media_data: MediaDataPolicy) -> Result<Scanned> {
+    fn scan(
+        &mut self,
+        media_data: MediaDataPolicy,
+        mut roots: Option<&mut RootWalk>,
+    ) -> Result<Scanned> {
         let mut reader =
             BoxReader::with_media_data_policy(&self.input, 16 * 1024 * 1024, media_data)?;
         let (mut movie, mut brand) = (None, None);
@@ -473,6 +606,16 @@ impl<'a> Driver<'a> {
                 Step::Yield => {}
                 Step::End(_) => break,
                 Step::Ready(BoxEvent::Header(header)) => {
+                    if let Some(roots) = roots.as_deref_mut() {
+                        if roots.headers.len() == 64 {
+                            return Err(Error::Limit {
+                                requested: 65,
+                                maximum: 64,
+                            }
+                            .into());
+                        }
+                        append(&mut roots.headers, header)?;
+                    }
                     if header.kind == *b"mdat" && header.end()?.is_some_and(|end| end > self.length)
                     {
                         let declared = header.payload_range()?;
@@ -504,6 +647,9 @@ impl<'a> Driver<'a> {
                             return Err(Error::Invalid("file type box extent").into());
                         }
                         brand = Some(b[..4].try_into().map_err(|_| Error::Truncated)?);
+                        if let Some(roots) = roots.as_deref_mut() {
+                            roots.file_type = Some(raw);
+                        }
                     }
                     b"moov" => {
                         if movie.is_some() {
@@ -540,7 +686,7 @@ impl<'a> Driver<'a> {
     }
 
     pub fn open_with_policy(&mut self, policy: OpenPolicy) -> Result<Model> {
-        let scanned = self.scan(policy.media_data)?;
+        let scanned = self.scan(policy.media_data, None)?;
         let movie = MovieHeader::parse(&child(&scanned.movie, b"mvhd", &self.budget)?)?;
         let fragments = index_fragments(
             &scanned.movie,
@@ -625,6 +771,184 @@ impl<'a> Driver<'a> {
         trace: Option<&mut String>,
     ) -> Result<()> {
         self.native_operation(model, stats, retention, NativeOperation::Open, trace)
+    }
+
+    pub fn recovered_regular_operation(
+        &mut self,
+        operation: NativeOperation,
+        stats: &mut Stats,
+        retention: &mut Retention,
+        mut trace: Option<&mut String>,
+    ) -> Result<()> {
+        if matches!(operation, NativeOperation::Seek(_)) {
+            return Err(Error::Unsupported("seek with regular table recovery").into());
+        }
+        let mut roots = RootWalk {
+            headers: BudgetVec::new(&self.budget),
+            file_type: None,
+        };
+        let scanned = self.scan(MediaDataPolicy::Strict, Some(&mut roots))?;
+        let children = children(&scanned.movie, 0, &self.budget)?;
+        let mut tracks = children
+            .as_slice()
+            .iter()
+            .filter(|raw| raw.header().kind == *b"trak");
+        let track = tracks.next().ok_or(Error::Invalid("missing track"))?;
+        if tracks.next().is_some()
+            || !scanned.moofs.is_empty()
+            || scanned.media.len() != 1
+            || optional(track, b"edts", &self.budget)?.is_some()
+        {
+            return Err(
+                Error::Unsupported("regular recovery needs one unedited regular track").into(),
+            );
+        }
+        MovieHeader::parse(&child(&scanned.movie, b"mvhd", &self.budget)?)?;
+        let mdia = child(track, b"mdia", &self.budget)?;
+        let header = Mov9RecoveryTrackHeader::parse(
+            &child(track, b"tkhd", &self.budget)?,
+            &child(&mdia, b"mdhd", &self.budget)?,
+            &child(&mdia, b"hdlr", &self.budget)?,
+            PinnedMovD32RegularRecoveryV1,
+        )?;
+        let minf = child(&mdia, b"minf", &self.budget)?;
+        let refs = data_references(&minf, &self.budget)?;
+        let profile = PinnedMovD32RegularRecoveryV3;
+        let mut builder = Mov9RunRecoveryV3Builder::new(
+            child(&minf, b"stbl", &self.budget)?,
+            self.budget.clone(),
+            Limits::default(),
+            profile,
+        )?;
+        while builder.poll(&mut WorkBudget::new(self.quantum), &self.cancel)? != BuildStatus::Ready
+        {
+        }
+        let table = builder.finish()?;
+        require_local_references(refs.as_slice(), table.descriptions())?;
+        let stream = table.native_stream_for_recovery_header(&header, scanned.brand)?;
+        let track_id = header.source().track_id;
+        let context = Mov9RecoveryV3Context {
+            physical_length: self.length,
+            custom_read_maximum: self.window,
+        };
+        let media = scanned.media.as_slice();
+        if let Some(out) = trace.as_deref_mut() {
+            let name = operation.trace_name();
+            write!(
+                out,
+                "{{\"schema\":33,\"operation\":\"{name}\",\"packets\":["
+            )
+            .expect("String write");
+        }
+        let mut cursor = table.packet_cursor_v3(
+            &self.budget,
+            &header,
+            media,
+            Mov9PacketLimits::default(),
+            context,
+            profile,
+        )?;
+        loop {
+            match cursor.poll(&mut WorkBudget::new(self.quantum), &self.cancel)? {
+                Mov9CursorStatus::Yield => continue,
+                Mov9CursorStatus::End => break,
+                Mov9CursorStatus::Ready => {}
+            }
+            let event = cursor.take_event()?;
+            if event.read == Mov9RecoveryV3Read::NoNativePacketForAbsentCatalogue {
+                continue;
+            }
+            let view = event
+                .packet
+                .ok_or(Error::Invalid("missing projected packet"))?;
+            if event.read == Mov9RecoveryV3Read::UnavailablePhysicalStart
+                && event.declaration.ordinal == 1
+                && view.source_ordinal == 1
+                && stats.packets == 0
+            {
+                let file_type = roots
+                    .file_type
+                    .take()
+                    .ok_or(Error::Invalid("missing file type"))?;
+                let mut transport = Mov9V3TransportBuilder::new(
+                    file_type,
+                    scanned.movie.clone(),
+                    roots.headers.as_slice(),
+                    &table,
+                    &self.budget,
+                    context,
+                    PinnedMovD32SmallRawVideoTransportV3,
+                )?;
+                while transport.poll(&mut WorkBudget::new(self.quantum), &self.cancel)?
+                    != BuildStatus::Ready
+                {}
+                if transport
+                    .finish()?
+                    .models_initial_native_eof(view.source_range)
+                {
+                    break;
+                }
+                return Err(Error::Invalid("unreachable initial sample offset").into());
+            }
+            if event.read != Mov9RecoveryV3Read::Available {
+                return Err(Error::Invalid("unreachable sample offset").into());
+            }
+            let sample = Sample {
+                range: view.source_range.clone(),
+                ..event.declaration
+            };
+            let payload = self.packet(sample, media)?.payload;
+            let packet = Packet::from_view(0, track_id, &view, payload)?;
+            stats.packet(&packet)?;
+            if let Some(out) = trace.as_deref_mut() {
+                if stats.packets > 1 {
+                    out.push(',');
+                }
+                packet.trace(out);
+            }
+            retention.retain(packet);
+        }
+        native_catalogue(&[stream], stats, trace.as_deref_mut())?;
+        if matches!(operation, NativeOperation::Index) {
+            let mut index = table.index_cursor_v3(
+                &self.budget,
+                &header,
+                media,
+                Mov9NativeIndexLimits::default(),
+                context,
+                profile,
+            )?;
+            protocol::fold(&mut stats.digest, 0x49);
+            protocol::fold(&mut stats.digest, 1);
+            if let Some(out) = trace.as_deref_mut() {
+                out.push_str(",\"native_indexes\":[");
+            }
+            native_index_stream(0, track_id, stats, trace.as_deref_mut(), || {
+                loop {
+                    match index.poll(&mut WorkBudget::new(self.quantum), &self.cancel)? {
+                        Mov9CursorStatus::Yield => {}
+                        Mov9CursorStatus::End => return Ok(None),
+                        Mov9CursorStatus::Ready => {
+                            if let Some(entry) = index.take_event()?.native_entry {
+                                return Ok(Some(IndexRow {
+                                    ordinal: entry.ordinal,
+                                    position: entry.position,
+                                    timestamp: entry.timestamp,
+                                    flags: entry.flags,
+                                    size: entry.size,
+                                    min_distance: entry.min_distance,
+                                }));
+                            }
+                        }
+                    }
+                }
+            })?;
+            if let Some(out) = trace.as_deref_mut() {
+                out.push(']');
+            }
+        }
+        native_result(true, stats, trace);
+        Ok(())
     }
 
     #[cold]
@@ -767,11 +1091,7 @@ impl<'a> Driver<'a> {
             None
         };
         if let Some(out) = trace.as_deref_mut() {
-            let name = match operation {
-                NativeOperation::Open => "mov-native-open-consumer-v33",
-                NativeOperation::Index => "mov-native-index-consumer-v33",
-                NativeOperation::Seek(_) => "mov-native-seek-consumer-v33",
-            };
+            let name = operation.trace_name();
             write!(out, "{{\"schema\":33,\"operation\":\"{name}\"").expect("String write");
             if let Some(r) = seek {
                 write!(out,",\"track_id\":{},\"native_ticks\":{},\"after_eof\":{},\"seek_result\":0,\"native_drain\":{{\"packets\":{},\"bytes\":{},\"digest\":{}}}",r.track,r.ticks,r.after_eof,drain.packets,drain.bytes,drain.digest).expect("String write");
@@ -805,49 +1125,18 @@ impl<'a> Driver<'a> {
                 trace.as_deref_mut(),
             )?
         };
-        if let Some(out) = trace.as_deref_mut() {
-            out.push_str("],\"streams\":[");
-        }
-        protocol::fold(&mut stats.digest, 0x43);
-        protocol::fold(
-            &mut stats.digest,
-            u64::try_from(streams.len()).map_err(|_| Error::Overflow)?,
-        );
-        for (i, stream) in streams.as_slice().iter().enumerate() {
-            protocol::consume_stream(&mut stats.digest, i, stream)?;
-            if let Some(out) = trace.as_deref_mut() {
-                if i != 0 {
-                    out.push(',');
-                }
-                protocol::trace_stream(out, i, stream);
-            }
-        }
-        protocol::fold(&mut stats.digest, 0x47);
-        protocol::fold(&mut stats.digest, 0); // current MOV profile: no programs
-        if let Some(out) = trace.as_deref_mut() {
-            out.push_str("],\"programs\":[]");
-        }
+        native_catalogue(streams.as_slice(), stats, trace.as_deref_mut())?;
         if matches!(operation, NativeOperation::Index) {
             self.native_indexes(model, tracks.as_slice(), stats, trace.as_deref_mut())?;
         }
-        let read_result = if eof { protocol::EOF } else { 0 };
-        protocol::fold(&mut stats.digest, 0x45);
-        protocol::fold(&mut stats.digest, protocol::signed(read_result));
-        protocol::fold(&mut stats.digest, u64::from(eof));
-        if let Some(out) = trace {
+        native_result(eof, stats, trace.as_deref_mut());
+        if let (Some(out), Some(r)) = (trace, seek) {
             write!(
                 out,
-                ",\"read_result\":{read_result},\"confirmed_eof\":{eof}"
+                ",\"read_calls_after_seek\":{reads},\"delivery_limit_reached\":{}",
+                !eof && stats.packets >= u64::from(r.count)
             )
             .expect("String write");
-            if let Some(r) = seek {
-                write!(
-                    out,
-                    ",\"read_calls_after_seek\":{reads},\"delivery_limit_reached\":{}",
-                    !eof && stats.packets >= u64::from(r.count)
-                )
-                .expect("String write");
-            }
         }
         Ok(())
     }
@@ -944,57 +1233,25 @@ impl<'a> Driver<'a> {
                 Mov9NativeIndexLimits::default(),
                 Mov9Profile::PinnedNoParseNoFillin,
             )?;
-            let (mut count, mut digest) = (0u64, 0u64);
-            if let Some(out) = trace.as_deref_mut() {
-                if i != 0 {
-                    out.push(',');
-                }
-                write!(
-                    out,
-                    "{{\"stream\":{i},\"pid\":{},\"entries\":[",
-                    track.track_id
-                )
-                .expect("String write");
-            }
-            loop {
-                match index.poll(&mut WorkBudget::new(self.quantum), &self.cancel)? {
-                    Mov9CursorStatus::Yield => {}
-                    Mov9CursorStatus::End => break,
-                    Mov9CursorStatus::Ready => {
-                        let entry = index.take_entry()?;
-                        for value in [
-                            protocol::signed(entry.position),
-                            protocol::signed(entry.timestamp),
-                            protocol::signed(i64::from(entry.flags)),
-                            u64::from(entry.size),
-                            protocol::signed(i64::from(entry.min_distance)),
-                        ] {
-                            protocol::fold(&mut digest, value);
+            native_index_stream(i, track.track_id, stats, trace.as_deref_mut(), || {
+                loop {
+                    match index.poll(&mut WorkBudget::new(self.quantum), &self.cancel)? {
+                        Mov9CursorStatus::Yield => {}
+                        Mov9CursorStatus::End => return Ok(None),
+                        Mov9CursorStatus::Ready => {
+                            let entry = index.take_entry()?;
+                            return Ok(Some(IndexRow {
+                                ordinal: entry.ordinal,
+                                position: entry.position,
+                                timestamp: entry.timestamp,
+                                flags: entry.flags,
+                                size: entry.size,
+                                min_distance: entry.min_distance,
+                            }));
                         }
-                        if let Some(out) = trace.as_deref_mut() {
-                            if count != 0 {
-                                out.push(',');
-                            }
-                            write!(out,"{{\"ordinal\":{},\"position\":{},\"timestamp\":{},\"flags\":{},\"size\":{},\"min_distance\":{}}}",entry.ordinal,entry.position,entry.timestamp,entry.flags,entry.size,entry.min_distance).expect("String write");
-                        }
-                        count = count.checked_add(1).ok_or(Error::Overflow)?;
                     }
                 }
-            }
-            protocol::fold(
-                &mut stats.digest,
-                u64::try_from(i).map_err(|_| Error::Overflow)?,
-            );
-            protocol::fold(&mut stats.digest, count);
-            protocol::append_words(
-                &mut stats.digest,
-                digest,
-                u32::try_from(count.checked_mul(5).ok_or(Error::Overflow)?)
-                    .map_err(|_| Error::Overflow)?,
-            );
-            if let Some(out) = trace.as_deref_mut() {
-                out.push_str("]}");
-            }
+            })?;
         }
         if let Some(out) = trace {
             out.push(']');
@@ -1520,6 +1777,69 @@ mod refill_transcript42 {
             self.events.push((b'S', offset, 0));
             self.input.seek(SeekFrom::Start(offset))
         }
+    }
+
+    #[test]
+    fn regular_recovery_preserves_packet_and_index_boundaries() {
+        for (bytes, packets) in [
+            (
+                include_bytes!("../../tests/fixtures/bad-zero-timescale.mov").as_slice(),
+                6,
+            ),
+            (
+                include_bytes!("../../tests/fixtures/bad-stsc-description-zero.mov").as_slice(),
+                5,
+            ),
+            (
+                include_bytes!("../../tests/fixtures/bad-chunk-offset-outside-source.mov")
+                    .as_slice(),
+                0,
+            ),
+        ] {
+            for (window, quantum) in [(1, 3), (65536, 4096)] {
+                let mut input = Cursor::new(bytes);
+                let mut driver =
+                    Driver::new(&mut input, bytes.len() as u64, window, quantum).unwrap();
+                let mut retained = Retention::new(&driver.budget, 0).unwrap();
+                let mut stats = Stats::default();
+                let mut trace = String::new();
+                driver
+                    .recovered_regular_operation(
+                        NativeOperation::Index,
+                        &mut stats,
+                        &mut retained,
+                        Some(&mut trace),
+                    )
+                    .unwrap();
+                assert_eq!(stats.packets, packets);
+                assert!(trace.contains("\"confirmed_eof\":true"));
+                if packets == 0 {
+                    assert!(trace.contains("\"entries\":[{\"ordinal\":0,\"position\":4843,"));
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn regular_recovery_refuses_an_unreachable_initial_offset() {
+        let mut bytes = include_bytes!("../../tests/fixtures/r-front-stco.mov").to_vec();
+        let stco = bytes.windows(4).position(|kind| kind == b"stco").unwrap();
+        bytes[stco + 12..stco + 16].copy_from_slice(&40_000u32.to_be_bytes());
+        let length = bytes.len() as u64;
+        let mut input = Cursor::new(bytes);
+        let mut driver = Driver::new(&mut input, length, 65536, 4096).unwrap();
+        let mut retained = Retention::new(&driver.budget, 0).unwrap();
+        assert!(matches!(
+            driver.recovered_regular_operation(
+                NativeOperation::Open,
+                &mut Stats::default(),
+                &mut retained,
+                None
+            ),
+            Err(Failure::Core(Error::Invalid(
+                "unreachable initial sample offset"
+            )))
+        ));
     }
 
     #[test]

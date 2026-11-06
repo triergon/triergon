@@ -136,6 +136,14 @@ prints JSON lines (`isobmff_source_trace INPUT [WINDOW<=4096] [WORK_QUANTUM]
 [physical]`). `examples/isobmff_consumer_worker.rs` drives the
 FFmpeg-compatible operations for comparison runs.
 
+The comparison worker's `--recover-regular-tables` profile uses the bounded
+regular recovery cursors for a single local, unedited track. Use it alone
+for open and index comparisons. It projects
+a zero media timescale and an invalid initial sample description for comparison.
+For an initial offset past the source, it checks whether the bounded read
+model establishes EOF. The source trace keeps the original fields and
+strict validation.
+
 `AacConfigurationJob` reads AudioSpecificConfig from one `mp4a` sample
 description, including the supported QuickTime `wave` layout. It returns
 the source offset and shared bytes under `ConfigurationLimits` and a
