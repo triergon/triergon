@@ -5,6 +5,7 @@
 #![forbid(unsafe_code)]
 
 mod archive;
+mod capture;
 mod checks;
 mod codecs;
 mod corpus;
@@ -74,7 +75,9 @@ commands:
   fate-inventory --source DIR --output FILE [--configured-list FILE]
                  index FATE definitions as data; nothing is executed
   codecs         manifest|grade|summarize|time|equivalence   codec crates against the
-                 pinned FFmpeg decoders (see `cargo xtask codecs --help`)";
+                 pinned FFmpeg decoders (see `cargo xtask codecs --help`)
+  capture        compare|qualify|summarize|equivalence   capture pipeline against the
+                 FFmpeg capture reference (see `cargo xtask capture --help`)";
 
 fn main() -> ExitCode {
     if let Some(code) = without_cargo_library_path() {
@@ -100,6 +103,7 @@ fn main() -> ExitCode {
         Some("evidence") => evidence(&root, &args[1..]),
         Some("trace-identities") => return trace_identities(&root, &args[1..]),
         Some("codecs") => return failing(codecs::main(&root, &args[1..]), codecs::USAGE),
+        Some("capture") => return failing(capture::main(&root, &args[1..]), capture::USAGE),
         Some("build-workers") => {
             harness::build::build(&root).map(|path| println!("{}", path.display()))
         }

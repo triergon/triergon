@@ -45,6 +45,25 @@ pub fn run_text(argv: &[String], timeout: Duration) -> Result<Text, Stop> {
     }
 }
 
+/// `subprocess.run(argv, check=True, capture_output=True, text=True)`: stdout
+/// of a successful run; any failure is fatal.
+pub fn check_output(argv: &[String]) -> Result<String, String> {
+    let done = match run_text(argv, Duration::from_secs(u64::MAX / 4)) {
+        Ok(done) => done,
+        Err(Stop::Fatal(message)) => return Err(message),
+        Err(Stop::Timeout(_)) => unreachable!("no timeout"),
+    };
+    if done.code != 0 {
+        return Err(format!(
+            "Command {} returned non-zero exit status {}.\n{}",
+            python::repr_strings(argv),
+            done.code,
+            done.stderr
+        ));
+    }
+    Ok(done.stdout)
+}
+
 /// The placeholder argument a side-output child receives in place of its
 /// output path.
 pub const OUT: &str = "{out}";

@@ -133,6 +133,11 @@ pub fn sort_keys(value: &Value) -> Value {
     }
 }
 
+/// `round(value, digits)` for a float.
+pub fn round(value: f64, digits: usize) -> f64 {
+    format!("{value:.digits$}").parse().unwrap_or(value)
+}
+
 /// `str(value)` of a float.
 pub fn float(value: f64) -> String {
     str(&Value::float(value))
@@ -246,6 +251,14 @@ fn isoformat(seconds: i64, micros: u32) -> String {
     } else {
         format!("{clock}.{micros:06}+00:00")
     }
+}
+
+/// `time.time()`.
+pub fn time() -> f64 {
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_secs_f64()
 }
 
 /// Python's `a // b` for integers.
@@ -395,6 +408,16 @@ mod tests {
         assert_eq!(strip("\u{1f} {a} \u{a0}"), "{a}");
         assert_eq!(text(b"a\r\nb\rc"), "a\nb\nc");
         assert_eq!(tail("h\u{e9}llo", 4), "\u{e9}llo");
+    }
+
+    #[test]
+    fn rounds_as_python() {
+        // python3 -c "print(round(0.125, 2), round(1.0005, 3), round(2.675, 2), round(0.98765, 4))"
+        assert_eq!(round(0.125, 2), 0.12);
+        assert_eq!(round(1.0005, 3), 1.0);
+        assert_eq!(round(2.675, 2), 2.67);
+        assert_eq!(round(0.98765, 4), 0.9877);
+        assert!(round(f64::INFINITY, 3).is_infinite());
     }
 
     #[test]
