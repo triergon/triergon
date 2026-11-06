@@ -64,6 +64,7 @@ pub fn generate_all(paths: &Paths) -> Result<Vec<String>, String> {
         seek(paths, &source)?,
         colour(paths, &source)?,
         catalogue(paths, &source)?,
+        playback_capsules(paths)?,
     ])
 }
 
@@ -1720,9 +1721,98 @@ fn catalogue(paths: &Paths, source: &Source) -> Result<String, String> {
     Ok(format!("Generated {count} catalogue profiles"))
 }
 
+// ---------------------------------------------------------------------------
+// Playback startup and seek capsules.
+
+const PLAYBACK_CORPUS: &str = "harness/features/matroska-startup-seek/corpus.json";
+
+/// `SMVCL001`, the operation (0 startup, 1 seek after discovery, 2 seek after the
+/// end of file), the seek target in milliseconds as a big-endian `i64`, then the file.
+pub fn playback_capsule(operation: &str, target_ms: i64, source: &[u8]) -> Result<Vec<u8>, String> {
+    let kind = match operation {
+        "startup" => 0,
+        "seek-after-discovery" => 1,
+        "seek-after-end" => 2,
+        _ => return Err(format!("unknown playback operation {operation}")),
+    };
+    let mut capsule = b"SMVCL001".to_vec();
+    capsule.push(kind);
+    capsule.extend_from_slice(&target_ms.to_be_bytes());
+    capsule.extend_from_slice(source);
+    Ok(capsule)
+}
+
+/// Build every capsule of the committed playback manifest from its pinned source
+/// and refuse any whose source or capsule hash differs from the manifest.
+fn playback_capsules(paths: &Paths) -> Result<String, String> {
+    let output = paths.fixtures("startup-seek-fixtures")?;
+    let text = fs::read_to_string(paths.root.join(PLAYBACK_CORPUS))
+        .map_err(|e| format!("{PLAYBACK_CORPUS}: {e}"))?;
+    let manifest = json::parse(&text).map_err(|e| format!("{PLAYBACK_CORPUS}: {e}"))?;
+    let rows = manifest
+        .get("cases")
+        .and_then(Value::as_array)
+        .ok_or("playback manifest has no cases")?;
+    for row in rows {
+        let field = |key: &str| {
+            row.get(key)
+                .and_then(Value::as_str)
+                .ok_or_else(|| format!("playback case without {key}"))
+        };
+        let id = field("id")?;
+        let source_path = field("source")?;
+        let source =
+            fs::read(paths.root.join(source_path)).map_err(|e| format!("{source_path}: {e}"))?;
+        if sha256::hex(&source) != field("source_sha256")? {
+            return Err(format!(
+                "{id}: source {source_path} differs from the manifest"
+            ));
+        }
+        let target = crate::harness::linux::py_int(row.get("target_ms"))
+            .and_then(|t| i64::try_from(t).ok())
+            .ok_or_else(|| format!("{id}: invalid target_ms"))?;
+        let capsule = playback_capsule(field("operation")?, target, &source)?;
+        if sha256::hex(&capsule) != field("sha256")? {
+            return Err(format!("{id}: capsule differs from the manifest"));
+        }
+        let file = field("file")?;
+        if Path::new(file)
+            .components()
+            .any(|c| !matches!(c, std::path::Component::Normal(_)))
+        {
+            return Err(format!("{id}: file escapes the corpus"));
+        }
+        write(&output.join(file), &capsule)?;
+    }
+    Ok(format!("Built {} playback capsules", rows.len()))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn playback_capsules_match_the_manifest_and_refuse_changed_sources() {
+        let root = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .parent()
+            .unwrap()
+            .to_path_buf();
+        let out = crate::walk::scratch("capsules");
+        let paths = Paths {
+            root: root.clone(),
+            out: out.clone(),
+        };
+        assert_eq!(
+            playback_capsules(&paths).unwrap(),
+            "Built 44 playback capsules"
+        );
+        let capsule =
+            fs::read(out.join(".research/startup-seek-fixtures/seek-hevc-seek-700-eof.case"))
+                .unwrap();
+        assert_eq!(&capsule[..17], b"SMVCL001\x02\0\0\0\0\0\0\x02\xbc");
+        assert!(playback_capsule("rewind", 0, b"").is_err());
+        fs::remove_dir_all(out).unwrap();
+    }
 
     /// Regenerating into a scratch tree reproduces every committed manifest byte
     /// for byte, so every fixture hash and contract is unchanged.

@@ -1,0 +1,709 @@
+{
+  "schema": 1,
+  "cases": [
+    {
+      "id": "startup-avc-eight-pictures",
+      "profile": "startup-avc-eight-pictures",
+      "file": "startup-avc-eight-pictures.case",
+      "sha256": "8128ce26b5cc8f2b0aa053a24632a3612f60fdd6076b62ccf043537330c4af3b",
+      "rights": "authored-synthetic",
+      "source": "harness/fixtures/playback/avc-eight-pictures.mkv",
+      "source_sha256": "c4017ec0af03c3e4902d4c2602193b2754096b1c12b70d4d1f50b281acdae73d",
+      "operation": "startup",
+      "target_ms": 0,
+      "expected": {
+        "packets": 8,
+        "bytes": 4806,
+        "digest": 3461086427197307324
+      }
+    },
+    {
+      "id": "startup-avc-high-b",
+      "profile": "startup-avc-high-b",
+      "file": "startup-avc-high-b.case",
+      "sha256": "dd3342bf4a334436ac7211a43e61715dfe08add7cb4dc7c05c68b008cd8e9ee9",
+      "rights": "authored-synthetic",
+      "source": "harness/fixtures/playback/avc-high-b.mkv",
+      "source_sha256": "9eecf9c54905332e8da7dd31c78f8f3f38098f95cf3eb867d3152a7386931693",
+      "operation": "startup",
+      "target_ms": 0,
+      "expected": {
+        "packets": 12,
+        "bytes": 1862,
+        "digest": 3007871192481989494
+      }
+    },
+    {
+      "id": "startup-avc-high-b0",
+      "profile": "startup-avc-high-b0",
+      "file": "startup-avc-high-b0.case",
+      "sha256": "1273a757d3729afc568654a7801cb52177ee4e59de48682292d2ec45b78644bc",
+      "rights": "authored-synthetic",
+      "source": "harness/fixtures/playback/avc-high-b0.mkv",
+      "source_sha256": "8c0ae50e89b9f609390301f6ce720496f5311f262bf1a6462387e083ab09420e",
+      "operation": "startup",
+      "target_ms": 0,
+      "expected": {
+        "packets": 12,
+        "bytes": 1837,
+        "digest": 6848508061490563097
+      }
+    },
+    {
+      "id": "startup-avc-high-b1",
+      "profile": "startup-avc-high-b1",
+      "file": "startup-avc-high-b1.case",
+      "sha256": "f33241bcbf6c040d872ffa8e3c782f7407826a76f993f5053adb27c4cc9e0143",
+      "rights": "authored-synthetic",
+      "source": "crates/playback/tests/fixtures/mkv-feed/avc-reordered-discovery.mkv",
+      "source_sha256": "4ad06aff1285ddae3f1e4684220a6666a83d150111c37951fd4c6c46efb256bc",
+      "operation": "startup",
+      "target_ms": 0,
+      "expected": {
+        "packets": 12,
+        "bytes": 1871,
+        "digest": 11467862422508205043
+      }
+    },
+    {
+      "id": "startup-avc-mixed",
+      "profile": "startup-avc-mixed",
+      "file": "startup-avc-mixed.case",
+      "sha256": "fc27534590fc00afdc71f6b2b84807602baf8597bbfd7040046e8ae697dd4eed",
+      "rights": "authored-synthetic",
+      "source": "crates/playback/tests/fixtures/mkv-feed/three-tracks.mkv",
+      "source_sha256": "d0e2a1165ae19ea6af7a1827b4cddc25582f0691e62191d055935b0f5295279a",
+      "operation": "startup",
+      "target_ms": 0,
+      "expected": {
+        "packets": 8,
+        "bytes": 4806,
+        "digest": 3461086427197307324
+      }
+    },
+    {
+      "id": "startup-avc-six-pictures",
+      "profile": "startup-avc-six-pictures",
+      "file": "startup-avc-six-pictures.case",
+      "sha256": "335d92cfd87ba203ea2e09788dc900eb15a9ae01fb84bb8417fab6ecb9583394",
+      "rights": "authored-synthetic",
+      "source": "harness/fixtures/playback/avc-six-pictures.mkv",
+      "source_sha256": "52a3eb0fcb23f11726f0a3084775503e2c704b44094a6653dddeb2a0308d44c1",
+      "operation": "startup",
+      "target_ms": 0,
+      "expected": {
+        "packets": 6,
+        "bytes": 4544,
+        "digest": 6472190283934901387
+      }
+    },
+    {
+      "id": "startup-hevc-b0",
+      "profile": "startup-hevc-b0",
+      "file": "startup-hevc-b0.case",
+      "sha256": "3fcda6616f8d8ca64f17efde55291b697b05dff2a46d83bdea91b7e1537fe8c0",
+      "rights": "authored-synthetic",
+      "source": "harness/fixtures/playback/hevc-b0.mkv",
+      "source_sha256": "31e1d9527fb997ffc15eb1f58667f7d14997135d1056ae6dfbd5e95ab84647f3",
+      "operation": "startup",
+      "target_ms": 0,
+      "expected": {
+        "packets": 12,
+        "bytes": 1051,
+        "digest": 11757836774099484365
+      }
+    },
+    {
+      "id": "startup-hevc-b1",
+      "profile": "startup-hevc-b1",
+      "file": "startup-hevc-b1.case",
+      "sha256": "8fc4c29c41e9fe1c1685af06cd4cdc860b5fb397e1c80d30d5040ca8e4eb34d9",
+      "rights": "authored-synthetic",
+      "source": "harness/fixtures/playback/hevc-b1.mkv",
+      "source_sha256": "f70b123a68fb3da0683c5d7d9a9f5a07afbef996e7eb529e4eb7c0c323335f4f",
+      "operation": "startup",
+      "target_ms": 0,
+      "expected": {
+        "packets": 12,
+        "bytes": 1041,
+        "digest": 11237260712367827367
+      }
+    },
+    {
+      "id": "startup-hevc-b3",
+      "profile": "startup-hevc-b3",
+      "file": "startup-hevc-b3.case",
+      "sha256": "02123908a07ac9eaab8876edaaf04a809fbf99df2b4948c639bbc38bb9315269",
+      "rights": "authored-synthetic",
+      "source": "harness/fixtures/playback/hevc-b3.mkv",
+      "source_sha256": "436165ad073c131f99580d69933cc10c5b96c23442aa0c2e21dd7768968fa7b3",
+      "operation": "startup",
+      "target_ms": 0,
+      "expected": {
+        "packets": 12,
+        "bytes": 1059,
+        "digest": 415910191834225097
+      }
+    },
+    {
+      "id": "startup-hevc-mixed",
+      "profile": "startup-hevc-mixed",
+      "file": "startup-hevc-mixed.case",
+      "sha256": "2d8774181591ffdef111e917174c962f44e892664d6172f8d300636e3f46b7fc",
+      "rights": "authored-synthetic",
+      "source": "crates/playback/tests/fixtures/mkv-feed/hevc-dolby.mkv",
+      "source_sha256": "319b3ee94fe7c67a6f1cfde4d1f3e0238f9ac51c6c7cda1140acb44f2cdcb39a",
+      "operation": "startup",
+      "target_ms": 0,
+      "expected": {
+        "packets": 10,
+        "bytes": 7840,
+        "digest": 10378168423650658038
+      }
+    },
+    {
+      "id": "startup-hevc-no-default-duration",
+      "profile": "startup-hevc-no-default-duration",
+      "file": "startup-hevc-no-default-duration.case",
+      "sha256": "c15ee99c8ab0e9f9dc113ec5ae7d1253417509cf90f37302cc50569da4194f85",
+      "rights": "authored-synthetic",
+      "source": "crates/playback/tests/fixtures/mkv-feed/hevc-no-default-duration-discovery.mkv",
+      "source_sha256": "ad6fd4d430be9fd7e913893c0eeb7fb0d7ffd884ecd24985019c5e3506c0a118",
+      "operation": "startup",
+      "target_ms": 0,
+      "expected": {
+        "packets": 12,
+        "bytes": 1041,
+        "digest": 11237260712367827367
+      }
+    },
+    {
+      "id": "startup-hevc-vps-timed-no-default",
+      "profile": "startup-hevc-vps-timed-no-default",
+      "file": "startup-hevc-vps-timed-no-default.case",
+      "sha256": "40020b8a0bdd18f1102999810545271da84ab01dcd33de6f954b4d7054c8408b",
+      "rights": "authored-synthetic",
+      "source": "harness/fixtures/playback/hevc-vps-timed-no-default.mkv",
+      "source_sha256": "1b697518df58ee27bd77b7edb1dde88125095d8aeb4f81a6456c470ae16e12f1",
+      "operation": "startup",
+      "target_ms": 0,
+      "expected": {
+        "packets": 12,
+        "bytes": 1041,
+        "digest": 16464620269728985255
+      }
+    },
+    {
+      "id": "seek-avc-seek-0-fresh",
+      "profile": "seek-avc-seek-0-fresh",
+      "file": "seek-avc-seek-0-fresh.case",
+      "sha256": "b456c1f84f3d16efc21c6403d3d70f96b1912262703984db3d8c109025903433",
+      "rights": "authored-synthetic",
+      "source": "harness/fixtures/playback/avc-seek.mkv",
+      "source_sha256": "fcf875c19a557178014b8b2cfdf5a5b0194c875a579069ac43d125a48eecc52b",
+      "operation": "seek-after-discovery",
+      "target_ms": 0,
+      "expected": {
+        "packets": 64,
+        "bytes": 31096,
+        "digest": 17142420116411940208
+      }
+    },
+    {
+      "id": "seek-avc-seek-0-eof",
+      "profile": "seek-avc-seek-0-eof",
+      "file": "seek-avc-seek-0-eof.case",
+      "sha256": "eddd3ac23acddca6100b8aa16da5eb68d8f4a54b3d012d04fd52cfc2204e588e",
+      "rights": "authored-synthetic",
+      "source": "harness/fixtures/playback/avc-seek.mkv",
+      "source_sha256": "fcf875c19a557178014b8b2cfdf5a5b0194c875a579069ac43d125a48eecc52b",
+      "operation": "seek-after-end",
+      "target_ms": 0,
+      "expected": {
+        "packets": 64,
+        "bytes": 31096,
+        "digest": 17142420116411940208
+      }
+    },
+    {
+      "id": "seek-avc-seek-700-fresh",
+      "profile": "seek-avc-seek-700-fresh",
+      "file": "seek-avc-seek-700-fresh.case",
+      "sha256": "c4acf5a25a297292240f99e2ba6a0afba9886b29ce4c7247db57e16d166ffd05",
+      "rights": "authored-synthetic",
+      "source": "harness/fixtures/playback/avc-seek.mkv",
+      "source_sha256": "fcf875c19a557178014b8b2cfdf5a5b0194c875a579069ac43d125a48eecc52b",
+      "operation": "seek-after-discovery",
+      "target_ms": 700,
+      "expected": {
+        "packets": 48,
+        "bytes": 23582,
+        "digest": 1594105816710609116
+      }
+    },
+    {
+      "id": "seek-avc-seek-700-eof",
+      "profile": "seek-avc-seek-700-eof",
+      "file": "seek-avc-seek-700-eof.case",
+      "sha256": "db1febe6f23ccf343132db32ea4412be6a7c4146f883c12819480ea4a6d4491b",
+      "rights": "authored-synthetic",
+      "source": "harness/fixtures/playback/avc-seek.mkv",
+      "source_sha256": "fcf875c19a557178014b8b2cfdf5a5b0194c875a579069ac43d125a48eecc52b",
+      "operation": "seek-after-end",
+      "target_ms": 700,
+      "expected": {
+        "packets": 48,
+        "bytes": 23582,
+        "digest": 1594105816710609116
+      }
+    },
+    {
+      "id": "seek-avc-seek-1420-fresh",
+      "profile": "seek-avc-seek-1420-fresh",
+      "file": "seek-avc-seek-1420-fresh.case",
+      "sha256": "586e024f73a6717aae45e943bfc10a2efbcb463737356f84bef405112644a462",
+      "rights": "authored-synthetic",
+      "source": "harness/fixtures/playback/avc-seek.mkv",
+      "source_sha256": "fcf875c19a557178014b8b2cfdf5a5b0194c875a579069ac43d125a48eecc52b",
+      "operation": "seek-after-discovery",
+      "target_ms": 1420,
+      "expected": {
+        "packets": 32,
+        "bytes": 15596,
+        "digest": 12079946459903318718
+      }
+    },
+    {
+      "id": "seek-avc-seek-1420-eof",
+      "profile": "seek-avc-seek-1420-eof",
+      "file": "seek-avc-seek-1420-eof.case",
+      "sha256": "cc0048da234714758c4806c758ee2077597f9d0302e49ceb317a94639e854ae9",
+      "rights": "authored-synthetic",
+      "source": "harness/fixtures/playback/avc-seek.mkv",
+      "source_sha256": "fcf875c19a557178014b8b2cfdf5a5b0194c875a579069ac43d125a48eecc52b",
+      "operation": "seek-after-end",
+      "target_ms": 1420,
+      "expected": {
+        "packets": 32,
+        "bytes": 15596,
+        "digest": 12079946459903318718
+      }
+    },
+    {
+      "id": "seek-avc-seek-2700-fresh",
+      "profile": "seek-avc-seek-2700-fresh",
+      "file": "seek-avc-seek-2700-fresh.case",
+      "sha256": "6bb04d2d76dd883a3d1a153ab52343aae1eb85a5fe3b45f05b56748ffbed11e7",
+      "rights": "authored-synthetic",
+      "source": "harness/fixtures/playback/avc-seek.mkv",
+      "source_sha256": "fcf875c19a557178014b8b2cfdf5a5b0194c875a579069ac43d125a48eecc52b",
+      "operation": "seek-after-discovery",
+      "target_ms": 2700,
+      "expected": {
+        "packets": 8,
+        "bytes": 3471,
+        "digest": 8486726950211428620
+      }
+    },
+    {
+      "id": "seek-avc-seek-2700-eof",
+      "profile": "seek-avc-seek-2700-eof",
+      "file": "seek-avc-seek-2700-eof.case",
+      "sha256": "4cf9f94dc0ba82feb1e2daab81faa521c9f38fb96b2a33185accd51d18b539cf",
+      "rights": "authored-synthetic",
+      "source": "harness/fixtures/playback/avc-seek.mkv",
+      "source_sha256": "fcf875c19a557178014b8b2cfdf5a5b0194c875a579069ac43d125a48eecc52b",
+      "operation": "seek-after-end",
+      "target_ms": 2700,
+      "expected": {
+        "packets": 8,
+        "bytes": 3471,
+        "digest": 8486726950211428620
+      }
+    },
+    {
+      "id": "seek-hevc-seek-0-fresh",
+      "profile": "seek-hevc-seek-0-fresh",
+      "file": "seek-hevc-seek-0-fresh.case",
+      "sha256": "13d628a05304f08ac4e94cf1021ed45ac178bdfee798a9e36e1d9e9d76514156",
+      "rights": "authored-synthetic",
+      "source": "crates/playback/tests/fixtures/mkv-feed/hevc-indexed-seek.mkv",
+      "source_sha256": "f44a0d5f1520ae5da9e6b1b5faae517b0668cac1efc70d3bde848c31d753d98e",
+      "operation": "seek-after-discovery",
+      "target_ms": 0,
+      "expected": {
+        "packets": 64,
+        "bytes": 22673,
+        "digest": 14876295273655853558
+      }
+    },
+    {
+      "id": "seek-hevc-seek-0-eof",
+      "profile": "seek-hevc-seek-0-eof",
+      "file": "seek-hevc-seek-0-eof.case",
+      "sha256": "eac62771f883d41943154d569e0e5aa2026c007f0c500e80489f5b7dc6fc9655",
+      "rights": "authored-synthetic",
+      "source": "crates/playback/tests/fixtures/mkv-feed/hevc-indexed-seek.mkv",
+      "source_sha256": "f44a0d5f1520ae5da9e6b1b5faae517b0668cac1efc70d3bde848c31d753d98e",
+      "operation": "seek-after-end",
+      "target_ms": 0,
+      "expected": {
+        "packets": 64,
+        "bytes": 22673,
+        "digest": 14876295273655853558
+      }
+    },
+    {
+      "id": "seek-hevc-seek-700-fresh",
+      "profile": "seek-hevc-seek-700-fresh",
+      "file": "seek-hevc-seek-700-fresh.case",
+      "sha256": "5cf9ff5d5c824d7ad51691951d87046411569a5ca442a23a775d2c61e79b800a",
+      "rights": "authored-synthetic",
+      "source": "crates/playback/tests/fixtures/mkv-feed/hevc-indexed-seek.mkv",
+      "source_sha256": "f44a0d5f1520ae5da9e6b1b5faae517b0668cac1efc70d3bde848c31d753d98e",
+      "operation": "seek-after-discovery",
+      "target_ms": 700,
+      "expected": {
+        "packets": 48,
+        "bytes": 17726,
+        "digest": 14046551734197686298
+      }
+    },
+    {
+      "id": "seek-hevc-seek-700-eof",
+      "profile": "seek-hevc-seek-700-eof",
+      "file": "seek-hevc-seek-700-eof.case",
+      "sha256": "31687fad38dfafa803601334a558953f2311379f47e1750eea53960a59068207",
+      "rights": "authored-synthetic",
+      "source": "crates/playback/tests/fixtures/mkv-feed/hevc-indexed-seek.mkv",
+      "source_sha256": "f44a0d5f1520ae5da9e6b1b5faae517b0668cac1efc70d3bde848c31d753d98e",
+      "operation": "seek-after-end",
+      "target_ms": 700,
+      "expected": {
+        "packets": 48,
+        "bytes": 17726,
+        "digest": 14046551734197686298
+      }
+    },
+    {
+      "id": "seek-hevc-seek-1420-fresh",
+      "profile": "seek-hevc-seek-1420-fresh",
+      "file": "seek-hevc-seek-1420-fresh.case",
+      "sha256": "1138b2e62a2eab10c5a3be041bab176659e8fdd19793519c1d30eaf2d1a53b73",
+      "rights": "authored-synthetic",
+      "source": "crates/playback/tests/fixtures/mkv-feed/hevc-indexed-seek.mkv",
+      "source_sha256": "f44a0d5f1520ae5da9e6b1b5faae517b0668cac1efc70d3bde848c31d753d98e",
+      "operation": "seek-after-discovery",
+      "target_ms": 1420,
+      "expected": {
+        "packets": 32,
+        "bytes": 11850,
+        "digest": 9669570098325940823
+      }
+    },
+    {
+      "id": "seek-hevc-seek-1420-eof",
+      "profile": "seek-hevc-seek-1420-eof",
+      "file": "seek-hevc-seek-1420-eof.case",
+      "sha256": "0d017e1bd0b95b2faf0c040e7b476c96be5258533a76c103eca3bb788ca227a1",
+      "rights": "authored-synthetic",
+      "source": "crates/playback/tests/fixtures/mkv-feed/hevc-indexed-seek.mkv",
+      "source_sha256": "f44a0d5f1520ae5da9e6b1b5faae517b0668cac1efc70d3bde848c31d753d98e",
+      "operation": "seek-after-end",
+      "target_ms": 1420,
+      "expected": {
+        "packets": 32,
+        "bytes": 11850,
+        "digest": 9669570098325940823
+      }
+    },
+    {
+      "id": "seek-hevc-seek-2700-fresh",
+      "profile": "seek-hevc-seek-2700-fresh",
+      "file": "seek-hevc-seek-2700-fresh.case",
+      "sha256": "800b37e350d3344fdb8050d2f65618ff6a042f3a76492e58c9462166abb0eeab",
+      "rights": "authored-synthetic",
+      "source": "crates/playback/tests/fixtures/mkv-feed/hevc-indexed-seek.mkv",
+      "source_sha256": "f44a0d5f1520ae5da9e6b1b5faae517b0668cac1efc70d3bde848c31d753d98e",
+      "operation": "seek-after-discovery",
+      "target_ms": 2700,
+      "expected": {
+        "packets": 8,
+        "bytes": 2611,
+        "digest": 4099745984633170415
+      }
+    },
+    {
+      "id": "seek-hevc-seek-2700-eof",
+      "profile": "seek-hevc-seek-2700-eof",
+      "file": "seek-hevc-seek-2700-eof.case",
+      "sha256": "09a831483ed8016110cc405033f4152b72234536eb3cc7bd64ef77a5c1c901c6",
+      "rights": "authored-synthetic",
+      "source": "crates/playback/tests/fixtures/mkv-feed/hevc-indexed-seek.mkv",
+      "source_sha256": "f44a0d5f1520ae5da9e6b1b5faae517b0668cac1efc70d3bde848c31d753d98e",
+      "operation": "seek-after-end",
+      "target_ms": 2700,
+      "expected": {
+        "packets": 8,
+        "bytes": 2611,
+        "digest": 4099745984633170415
+      }
+    },
+    {
+      "id": "seek-hevc-seek-no-default-0-fresh",
+      "profile": "seek-hevc-seek-no-default-0-fresh",
+      "file": "seek-hevc-seek-no-default-0-fresh.case",
+      "sha256": "dd9cc3c32f5f4c02fa6ae475b43dc525bad51973817c0be57b4fd45733c02ad6",
+      "rights": "authored-synthetic",
+      "source": "harness/fixtures/playback/hevc-seek-no-default.mkv",
+      "source_sha256": "a6b9829e6f42eb34e571cc625f3f723f14b4677dbd355c6ba29f34131f2d11af",
+      "operation": "seek-after-discovery",
+      "target_ms": 0,
+      "expected": {
+        "packets": 64,
+        "bytes": 22673,
+        "digest": 14876295273655853558
+      }
+    },
+    {
+      "id": "seek-hevc-seek-no-default-0-eof",
+      "profile": "seek-hevc-seek-no-default-0-eof",
+      "file": "seek-hevc-seek-no-default-0-eof.case",
+      "sha256": "4031cf956855d27c37bbf6902150ecf61429a921fca3ab53d7bc902300076736",
+      "rights": "authored-synthetic",
+      "source": "harness/fixtures/playback/hevc-seek-no-default.mkv",
+      "source_sha256": "a6b9829e6f42eb34e571cc625f3f723f14b4677dbd355c6ba29f34131f2d11af",
+      "operation": "seek-after-end",
+      "target_ms": 0,
+      "expected": {
+        "packets": 64,
+        "bytes": 22673,
+        "digest": 14876295273655853558
+      }
+    },
+    {
+      "id": "seek-hevc-seek-no-default-700-fresh",
+      "profile": "seek-hevc-seek-no-default-700-fresh",
+      "file": "seek-hevc-seek-no-default-700-fresh.case",
+      "sha256": "0d38e0a9e23ca591b792e03efd0559b6ff03d231935096c3b1ccbf4ef7a0fabc",
+      "rights": "authored-synthetic",
+      "source": "harness/fixtures/playback/hevc-seek-no-default.mkv",
+      "source_sha256": "a6b9829e6f42eb34e571cc625f3f723f14b4677dbd355c6ba29f34131f2d11af",
+      "operation": "seek-after-discovery",
+      "target_ms": 700,
+      "expected": {
+        "packets": 48,
+        "bytes": 17726,
+        "digest": 14046551734197686298
+      }
+    },
+    {
+      "id": "seek-hevc-seek-no-default-700-eof",
+      "profile": "seek-hevc-seek-no-default-700-eof",
+      "file": "seek-hevc-seek-no-default-700-eof.case",
+      "sha256": "2f0c470f49861951610b7057bf449fe4134fd249f91394989c6488adc62609d5",
+      "rights": "authored-synthetic",
+      "source": "harness/fixtures/playback/hevc-seek-no-default.mkv",
+      "source_sha256": "a6b9829e6f42eb34e571cc625f3f723f14b4677dbd355c6ba29f34131f2d11af",
+      "operation": "seek-after-end",
+      "target_ms": 700,
+      "expected": {
+        "packets": 48,
+        "bytes": 17726,
+        "digest": 14046551734197686298
+      }
+    },
+    {
+      "id": "seek-hevc-seek-no-default-1420-fresh",
+      "profile": "seek-hevc-seek-no-default-1420-fresh",
+      "file": "seek-hevc-seek-no-default-1420-fresh.case",
+      "sha256": "bb16dd724f24278adfe889b56d802744c2b95ea26e84413c25295e978e6a9eaf",
+      "rights": "authored-synthetic",
+      "source": "harness/fixtures/playback/hevc-seek-no-default.mkv",
+      "source_sha256": "a6b9829e6f42eb34e571cc625f3f723f14b4677dbd355c6ba29f34131f2d11af",
+      "operation": "seek-after-discovery",
+      "target_ms": 1420,
+      "expected": {
+        "packets": 32,
+        "bytes": 11850,
+        "digest": 9669570098325940823
+      }
+    },
+    {
+      "id": "seek-hevc-seek-no-default-1420-eof",
+      "profile": "seek-hevc-seek-no-default-1420-eof",
+      "file": "seek-hevc-seek-no-default-1420-eof.case",
+      "sha256": "e609b34aac22255410f67d914ade00e730dfbf27db99f6d89974907bfba5c3b0",
+      "rights": "authored-synthetic",
+      "source": "harness/fixtures/playback/hevc-seek-no-default.mkv",
+      "source_sha256": "a6b9829e6f42eb34e571cc625f3f723f14b4677dbd355c6ba29f34131f2d11af",
+      "operation": "seek-after-end",
+      "target_ms": 1420,
+      "expected": {
+        "packets": 32,
+        "bytes": 11850,
+        "digest": 9669570098325940823
+      }
+    },
+    {
+      "id": "seek-hevc-seek-no-default-2700-fresh",
+      "profile": "seek-hevc-seek-no-default-2700-fresh",
+      "file": "seek-hevc-seek-no-default-2700-fresh.case",
+      "sha256": "2bf6ba58193b4ed8433a82bff1d07ba0e0f9684c7ace942749fa3400ee61c050",
+      "rights": "authored-synthetic",
+      "source": "harness/fixtures/playback/hevc-seek-no-default.mkv",
+      "source_sha256": "a6b9829e6f42eb34e571cc625f3f723f14b4677dbd355c6ba29f34131f2d11af",
+      "operation": "seek-after-discovery",
+      "target_ms": 2700,
+      "expected": {
+        "packets": 8,
+        "bytes": 2611,
+        "digest": 4099745984633170415
+      }
+    },
+    {
+      "id": "seek-hevc-seek-no-default-2700-eof",
+      "profile": "seek-hevc-seek-no-default-2700-eof",
+      "file": "seek-hevc-seek-no-default-2700-eof.case",
+      "sha256": "87f3ff1ec9374867e20150fd9c1398d49f9e6908dff28ee7f45e2b573805fa76",
+      "rights": "authored-synthetic",
+      "source": "harness/fixtures/playback/hevc-seek-no-default.mkv",
+      "source_sha256": "a6b9829e6f42eb34e571cc625f3f723f14b4677dbd355c6ba29f34131f2d11af",
+      "operation": "seek-after-end",
+      "target_ms": 2700,
+      "expected": {
+        "packets": 8,
+        "bytes": 2611,
+        "digest": 4099745984633170415
+      }
+    },
+    {
+      "id": "seek-hevc-seek-no-cues-0-fresh",
+      "profile": "seek-hevc-seek-no-cues-0-fresh",
+      "file": "seek-hevc-seek-no-cues-0-fresh.case",
+      "sha256": "16ffb44696a9fbfa616462da013be8b5e9e65d6dff7a855bc7fd80767c65460f",
+      "rights": "authored-synthetic",
+      "source": "harness/fixtures/playback/hevc-seek-no-cues.mkv",
+      "source_sha256": "fa0da94af9c92c80a8e3237aad4f89fe4ead934a9135b273150d476cc99a9535",
+      "operation": "seek-after-discovery",
+      "target_ms": 0,
+      "expected": {
+        "packets": 64,
+        "bytes": 22673,
+        "digest": 14876295273655853558
+      }
+    },
+    {
+      "id": "seek-hevc-seek-no-cues-0-eof",
+      "profile": "seek-hevc-seek-no-cues-0-eof",
+      "file": "seek-hevc-seek-no-cues-0-eof.case",
+      "sha256": "e40156ecc8fed4e70d821f5d061c348c072c5df3e54ca5b0d764615c4caffc2b",
+      "rights": "authored-synthetic",
+      "source": "harness/fixtures/playback/hevc-seek-no-cues.mkv",
+      "source_sha256": "fa0da94af9c92c80a8e3237aad4f89fe4ead934a9135b273150d476cc99a9535",
+      "operation": "seek-after-end",
+      "target_ms": 0,
+      "expected": {
+        "packets": 64,
+        "bytes": 22673,
+        "digest": 14876295273655853558
+      }
+    },
+    {
+      "id": "seek-hevc-seek-no-cues-700-fresh",
+      "profile": "seek-hevc-seek-no-cues-700-fresh",
+      "file": "seek-hevc-seek-no-cues-700-fresh.case",
+      "sha256": "3d097b844fd5a43a3276d4d5dff17ad30a345b1c365db2c9eb528a68c9e9591c",
+      "rights": "authored-synthetic",
+      "source": "harness/fixtures/playback/hevc-seek-no-cues.mkv",
+      "source_sha256": "fa0da94af9c92c80a8e3237aad4f89fe4ead934a9135b273150d476cc99a9535",
+      "operation": "seek-after-discovery",
+      "target_ms": 700,
+      "expected": {
+        "packets": 48,
+        "bytes": 17726,
+        "digest": 14046551734197686298
+      }
+    },
+    {
+      "id": "seek-hevc-seek-no-cues-700-eof",
+      "profile": "seek-hevc-seek-no-cues-700-eof",
+      "file": "seek-hevc-seek-no-cues-700-eof.case",
+      "sha256": "936b8a3dd75c1663e1f2411d20c0f6046ff8fc0afa42623fd19b261a770fb076",
+      "rights": "authored-synthetic",
+      "source": "harness/fixtures/playback/hevc-seek-no-cues.mkv",
+      "source_sha256": "fa0da94af9c92c80a8e3237aad4f89fe4ead934a9135b273150d476cc99a9535",
+      "operation": "seek-after-end",
+      "target_ms": 700,
+      "expected": {
+        "packets": 48,
+        "bytes": 17726,
+        "digest": 14046551734197686298
+      }
+    },
+    {
+      "id": "seek-hevc-seek-no-cues-1420-fresh",
+      "profile": "seek-hevc-seek-no-cues-1420-fresh",
+      "file": "seek-hevc-seek-no-cues-1420-fresh.case",
+      "sha256": "dec4d2c180abe1dd1b56e851340e19e0a2cb9f0ced95e2d566f64b95e330c93f",
+      "rights": "authored-synthetic",
+      "source": "harness/fixtures/playback/hevc-seek-no-cues.mkv",
+      "source_sha256": "fa0da94af9c92c80a8e3237aad4f89fe4ead934a9135b273150d476cc99a9535",
+      "operation": "seek-after-discovery",
+      "target_ms": 1420,
+      "expected": {
+        "packets": 32,
+        "bytes": 11850,
+        "digest": 9669570098325940823
+      }
+    },
+    {
+      "id": "seek-hevc-seek-no-cues-1420-eof",
+      "profile": "seek-hevc-seek-no-cues-1420-eof",
+      "file": "seek-hevc-seek-no-cues-1420-eof.case",
+      "sha256": "59ccc48fe9145d85028453696c4f447e1c9d7741758dec02342dfce238689665",
+      "rights": "authored-synthetic",
+      "source": "harness/fixtures/playback/hevc-seek-no-cues.mkv",
+      "source_sha256": "fa0da94af9c92c80a8e3237aad4f89fe4ead934a9135b273150d476cc99a9535",
+      "operation": "seek-after-end",
+      "target_ms": 1420,
+      "expected": {
+        "packets": 32,
+        "bytes": 11850,
+        "digest": 9669570098325940823
+      }
+    },
+    {
+      "id": "seek-hevc-seek-no-cues-2700-fresh",
+      "profile": "seek-hevc-seek-no-cues-2700-fresh",
+      "file": "seek-hevc-seek-no-cues-2700-fresh.case",
+      "sha256": "449d8070ccf0ee24c7cd3615843028f54e7e3dd895fd806136762ad88832f8f7",
+      "rights": "authored-synthetic",
+      "source": "harness/fixtures/playback/hevc-seek-no-cues.mkv",
+      "source_sha256": "fa0da94af9c92c80a8e3237aad4f89fe4ead934a9135b273150d476cc99a9535",
+      "operation": "seek-after-discovery",
+      "target_ms": 2700,
+      "expected": {
+        "packets": 8,
+        "bytes": 2611,
+        "digest": 4099745984633170415
+      }
+    },
+    {
+      "id": "seek-hevc-seek-no-cues-2700-eof",
+      "profile": "seek-hevc-seek-no-cues-2700-eof",
+      "file": "seek-hevc-seek-no-cues-2700-eof.case",
+      "sha256": "78fa366396b3c3d95eb87b6147be6d3ec1d3da319ac3c848a832027749aecd6e",
+      "rights": "authored-synthetic",
+      "source": "harness/fixtures/playback/hevc-seek-no-cues.mkv",
+      "source_sha256": "fa0da94af9c92c80a8e3237aad4f89fe4ead934a9135b273150d476cc99a9535",
+      "operation": "seek-after-end",
+      "target_ms": 2700,
+      "expected": {
+        "packets": 8,
+        "bytes": 2611,
+        "digest": 4099745984633170415
+      }
+    }
+  ]
+}
