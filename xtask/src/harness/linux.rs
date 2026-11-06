@@ -495,7 +495,9 @@ pub fn linked_libraries(worker: &Path, interpreter: Option<&str>) -> R<Value> {
     {
         return Err("ELF interpreter differs from calibration executable".into());
     }
-    let loader = PathBuf::from(interpreter.unwrap_or(found[0]));
+    // A shared object such as the observer has no PT_INTERP of its own; it is
+    // resolved with the interpreter of the executable it is preloaded into.
+    let loader = PathBuf::from(interpreter.unwrap_or_else(|| found[0]));
     if !loader.is_absolute() || !loader.is_file() {
         return Err("unavailable ELF interpreter".into());
     }

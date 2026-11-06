@@ -995,3 +995,42 @@ fn full_qualification_runs_every_control_and_refuses_a_missing_one() {
     );
     std::fs::remove_dir_all(dir).unwrap();
 }
+
+/// The observer is a shared object without PT_INTERP: it must resolve with the
+/// interpreter of the executable it is preloaded into, and only with one given.
+#[cfg(target_os = "linux")]
+#[test]
+fn a_shared_object_resolves_with_the_given_interpreter() {
+    use std::process::Command;
+    let dir = crate::walk::scratch("linked-object");
+    let source = dir.join("observer.c");
+    // Like the observer, it links libc, so the loader lists a real closure.
+    std::fs::write(
+        &source,
+        "#include <stdlib.h>\nvoid *observed(void) { return malloc(1); }\n",
+    )
+    .unwrap();
+    let object = dir.join("observer.so");
+    let built = Command::new("cc")
+        .args(["-shared", "-fPIC", "-o"])
+        .arg(&object)
+        .arg(&source)
+        .status()
+        .unwrap();
+    assert!(built.success());
+    let headers = Command::new("readelf")
+        .args(["--program-headers", "--wide"])
+        .arg(std::env::current_exe().unwrap())
+        .output()
+        .unwrap();
+    let headers = String::from_utf8(headers.stdout).unwrap();
+    let interpreter = headers
+        .split_once("[Requesting program interpreter: ")
+        .and_then(|(_, rest)| rest.split_once(']'))
+        .map(|(path, _)| path)
+        .unwrap();
+    assert!(linux::linked_libraries(&object, None).is_err());
+    let linked = linux::linked_libraries(&object, Some(interpreter)).unwrap();
+    assert_eq!(linked.get("interpreter"), Some(&Value::str(interpreter)));
+    std::fs::remove_dir_all(dir).unwrap();
+}
