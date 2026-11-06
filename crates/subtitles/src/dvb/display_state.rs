@@ -790,7 +790,7 @@ impl Segment {
                     full_resolution: full,
                 };
                 if let Some(values) = family.native_entries.as_mut() {
-                    // Frozen public-API controls: a reduced entry occupying the
+                    // Public-API controls: a reduced entry occupying the
                     // final four CDS bytes leaves the previous native value.
                     // Source still records every complete legal entry. Moving
                     // this same entry before a full entry applies it natively.

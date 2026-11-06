@@ -1,4 +1,4 @@
-//! Original deterministic fixture bytes. Materialize only on the parent's CPU lease.
+//! Deterministic fixture bytes.
 //! H.222.0 section/CRC/PES grammar, no production/native parser import.
 #[derive(Clone, Copy, Debug)]
 pub enum Case {

@@ -163,7 +163,7 @@ impl CopyJob {
                         return Ok(ParseStep::Yield);
                     }
                     let buffer = self.buffer.take().required("missing restore buffer")?;
-                    // Even an empty header restoration keeps the frozen API's
+                    // Even an empty header restoration keeps the API's
                     // owned empty allocation; pure empty zlib is separate below.
                     match buffer.freeze() {
                         Ok(bytes) => {

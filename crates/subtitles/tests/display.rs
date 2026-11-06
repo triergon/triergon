@@ -1,5 +1,4 @@
-//! Independent complete-state source art precedes connecting the production modules.
-//! Authored in the ignored lane before module promotion; parent executes Rust.
+//! Complete-state display tests over independent source art.
 #![forbid(unsafe_code)]
 
 #[path = "support/state_cases.rs"]

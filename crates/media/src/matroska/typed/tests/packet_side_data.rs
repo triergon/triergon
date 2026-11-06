@@ -1,5 +1,5 @@
 //! Private feature guards: real work-one progress, retry, cancellation and exact
-//! owner accounting. Parent must run these; this lane runs no compiler.
+//! owner accounting.
 use super::*;
 use crate::matroska::typed::{
     packet::PacketBatchJob,

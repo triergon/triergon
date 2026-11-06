@@ -201,7 +201,7 @@ enum Phase {
 }
 
 pub type DisplayDecoder = StoredDisplayDecoder<Bytes>;
-/// Additive strict decoder with owned indexed ARGB output. Parsing, source
+/// Strict decoder with owned indexed ARGB output. Parsing, source
 /// metadata, visibility, cache rules and refusal grammar use the same machine.
 pub type IndexedDisplayDecoder = StoredDisplayDecoder<IndexedArgb>;
 
@@ -795,8 +795,6 @@ mod generation_poison_controls {
 
 #[cfg(test)]
 mod independent_source6_orphan_regression {
-    // Standalone authored regression for inclusion as a child test module of
-    // pgs/display.rs in a NEW author workspace. NOT compiled/executed by review.
     use super::*;
     use triergon_core::TimeBase;
     fn segment(bytes: &mut Vec<u8>, kind: u8, body: &[u8]) {

@@ -21,7 +21,7 @@ pub enum Charset {
     Latin1,
     Windows1251,
     Windows1252,
-    /// Additive explicit profile; the original label resolver is unchanged.
+    /// Explicit multibyte profile.
     Multibyte(MultibyteCharset),
 }
 impl Charset {

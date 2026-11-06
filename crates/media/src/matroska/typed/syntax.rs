@@ -47,7 +47,7 @@ impl ChildCursor {
         if !work.try_charge(1) {
             return Ok(ParseStep::Yield);
         }
-        // At most twelve VINT bytes: the same syntax helper as the frozen reader.
+        // At most twelve VINT bytes.
         let header = self.at;
         let (id, a, _) = ebml::vint(&raw[header..self.end], true)?;
         let (size, b, unknown) = ebml::vint(&raw[header + a..self.end], false)?;

@@ -177,7 +177,7 @@ impl NativePesRecoveryObserver {
             fault: None,
         })
     }
-    /// Explicit DVB-signalled finite PES, implemented after actual7/20 runtime RED.
+    /// Explicit DVB-signalled finite PES.
     pub fn new_dvb_subtitles_v1(
         profile: NativeClockProfile,
         scope: NativePesScope,
@@ -368,7 +368,7 @@ impl NativePesRecoveryObserver {
         context: NativeSourceContext,
     ) -> std::result::Result<(), PushError<RejectedTransport>> {
         // This finite-input position view does not admit new rejected-carrier
-        // contexts. Legacy unbound recovery remains exactly the old operation.
+        // contexts. Legacy unbound recovery is unaffected.
         if let Err(error) = self.inner.validate_native_input(None) {
             return Err(PushError {
                 error,

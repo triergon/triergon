@@ -71,7 +71,7 @@ impl NalObservedHevcConfiguration {
 }
 
 /// A malformed nonempty version-one AVC update header. Only a completed
-/// short-header failure in the explicit update parser can create this receipt.
+/// short-header failure in the explicit update parser can create this rejection.
 pub struct NalAvcUpdateRejection {
     raw: Bytes,
     source: AvcConfigSource,
@@ -211,8 +211,8 @@ impl NalObservedHevcConfigParser {
     }
 }
 
-// Additive observed compact views. The AVC wrapper retains the same fixed
-// per-record raw handle required for source queries and short-update receipts;
+// Observed compact views. The AVC wrapper retains the same fixed
+// per-record raw handle required for source queries and short-update rejections;
 // it creates no eager NAL/array aliases and leaves the existing wrappers intact.
 pub struct NalObservedAvcConfigurationView {
     inner: AvcConfigurationView,

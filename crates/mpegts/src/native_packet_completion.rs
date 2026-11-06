@@ -185,7 +185,7 @@ impl NativePacketCompletionV1 {
     pub fn receipt(&self) -> Option<NativeNoMediaReceiptV1> {
         self.receipt
     }
-    /// Additive explicit physical format. The original constructor stays TS188.
+    /// Explicit physical format. The default constructor stays TS188.
     pub fn new_for_format_v2(
         budget: Budget,
         limits: ParseLimits,

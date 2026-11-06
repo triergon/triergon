@@ -842,9 +842,8 @@ impl ElementReader {
                             self.scan_left = self.limits.scan_bytes;
                         }
                         if body.collect && D::RETAIN_LEAF {
-                            // The old public delivery dropped the exhausted body
-                            // here. Keep only its already-owned frozen Bytes;
-                            // discard the empty builder at that same boundary.
+                            // Keep only the exhausted body's already-owned frozen
+                            // Bytes; discard the empty builder at that boundary.
                             body.buffer = None;
                             body.span = None;
                         } else {

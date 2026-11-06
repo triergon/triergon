@@ -1,5 +1,5 @@
-//! These guards use existing baseline fields/APIs, so a test-only module hook
-//! can execute the storage regressions against unchanged tested PGS4 first.
+//! These guards use existing fields/APIs through a test-only module hook to
+//! exercise the storage regressions.
 use super::*;
 use triergon_core::TimeBase;
 

@@ -455,7 +455,7 @@ fn parse_tns(br: &mut BitReader, cfg: &CoreCfg, ch: &mut ChannelData) -> Result<
     Ok(())
 }
 
-/// Next PNS random value (FFmpeg-compatible LCG; observed behaviour, see STATUS.md).
+/// Next PNS random value (FFmpeg-compatible LCG; observed behaviour).
 #[inline(always)]
 pub(crate) fn lcg(state: &mut u32) -> i32 {
     *state = state.wrapping_mul(1664525).wrapping_add(1013904223);

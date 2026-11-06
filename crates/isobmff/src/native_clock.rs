@@ -125,9 +125,8 @@ impl Mov9SchedulingClock {
 /// A native API field has a raw representation even when its API value is null.
 /// `exact_native_ticks` is the format-native projection input (which can be
 /// derived); source Sample/Time knownness and origin provenance remain separate.
-/// Supported by cp27 native boundary observations on the separately identified
-/// Linux formats worker and the original Mac wide-tfdt observations. Not ISO
-/// source semantics, a generic wrap rule, or qualification of either worker.
+/// Supported by native boundary observations, including wide-tfdt cases. Not
+/// ISO source semantics or a generic wrap rule.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Mov9ClockField {
     pub exact_native_ticks: i128,

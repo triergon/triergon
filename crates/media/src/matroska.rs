@@ -1,9 +1,9 @@
-//! Initial Matroska packet slice, specified by `harness/features/matroska-demux/contract.json`.
+//! Blocking Matroska packet demuxer, specified by
+//! `harness/features/matroska-demux/contract.json`.
 //!
 //! Streaming `Read` is sufficient for demuxing. Seeking additionally requires `Seek`
 //! and supports validated Cues, bounded fallback scans and all-track preroll. A
-//! resumable envelope reader is separate; typed incremental demux/seek integration
-//! remains open. No full Matroska claim is made.
+//! resumable envelope reader is separate. This is not a full Matroska implementation.
 use crate::Result;
 use crate::storage::{SharedBytes, SharedText};
 use crate::timing::BlockTiming;

@@ -1,4 +1,4 @@
-//! Frozen native C transcript bytes; no expected output is generated from this candidate.
+//! Native C transcript bytes; no expected output is generated from this implementation.
 pub struct FrozenCase {
     pub id: &'static str,
     pub input: &'static [u8],

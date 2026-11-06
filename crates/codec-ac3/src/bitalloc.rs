@@ -133,7 +133,7 @@ pub(crate) fn stage_mask(p: &MaskParams<'_>, c: &mut BaCache) -> Result<(), &'st
     let bndpsd = &c.bndpsd;
     // Reduced-rate AC-3 (bsid 9/10): each band spans 1/2 or 1/4 of the frequency range, so the
     // per-band decays are shifted down and hth is read at band >> shift. Not in A/52:2018; this is
-    // FFmpeg 9.0.2's rule, fitted black-box bin for bin (harness/codecs/ac3/STATUS.md).
+    // FFmpeg 9.0.2's rule, fitted black-box bin for bin.
     let sdecay = SLOWDEC[p.params.sdcycod as usize] >> p.rate_shift;
     let fdecay = FASTDEC[p.params.fdcycod as usize] >> p.rate_shift;
     let sgain = SLOWGAIN[p.params.sgaincod as usize];
@@ -210,7 +210,7 @@ pub(crate) fn stage_mask(p: &MaskParams<'_>, c: &mut BaCache) -> Result<(), &'st
         // Segment offsets count from the first band of the exponent set: band 0 for fbw
         // channels, the coupling channel's first band for cpldeltoffst (5.4.3.51 "the number
         // of the first bit allocation band of the coupling channel"; the 7.2.2.6 pseudo
-        // code starts at 0). FFmpeg 9.0.2 uses this reading too (black-box, STATUS.md).
+        // code starts at 0). FFmpeg 9.0.2 uses this reading too (black-box).
         let mut band = bndstrt;
         for seg in 0..=p.dba.nseg {
             band += p.dba.offst[seg] as usize;

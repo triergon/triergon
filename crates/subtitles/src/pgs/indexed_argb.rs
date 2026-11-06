@@ -1,4 +1,4 @@
-//! Additive owned indexed output and bounded ARGB writes. Source indices and
+//! Owned indexed output and bounded ARGB writes. Source indices and
 //! palette provenance remain immutable, charged owners; receiver words do not
 //! establish source colour knownness. The materialized decoder stays default.
 use super::display_model::PaletteSnapshot;

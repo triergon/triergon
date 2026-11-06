@@ -11,8 +11,6 @@ use triergon_core::{
     SourceCapabilities, SourceFailure, SourceId, SourceLocation, Step, WorkBudget,
 };
 
-pub const DTS_NORMAL_PENDING: &str = "DTS normal source acquisition pending parent RED";
-
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct DtsNormalLimits {
     pub maximum_source_frame_bytes: usize,

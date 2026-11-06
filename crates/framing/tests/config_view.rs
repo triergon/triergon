@@ -1,5 +1,5 @@
 #![forbid(unsafe_code)]
-//! Additive compact AVC/hvcC configuration views. The existing eager parsers are
+//! Compact AVC/hvcC configuration views. The existing eager parsers are
 //! the default-API oracle for differential sweeps; literal record arithmetic is
 //! the independent oracle for selected records. No native or encoder output.
 use std::ops::Range;

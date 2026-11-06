@@ -1,6 +1,6 @@
 //! Research source-trace adapter, separate from library parsing and all timing.
 //! Reads bounded windows through core InputCursor; never buffers the media file.
-//! No native reference, codec decoder, output normalization or qualification claim.
+//! No native reference, codec decoder or output normalization.
 #![forbid(unsafe_code)]
 
 use std::{
@@ -1507,8 +1507,8 @@ mod tests {
         }
     }
 
-    // Actual v8 RED and native4/partition controls preserve source facts and
-    // challenge the pinned previous-run append boundary at both work schedules.
+    // Partition controls preserve source facts and challenge the pinned
+    // previous-run append boundary at both work schedules.
     #[test]
     fn absent_tfdt_after_backward_anchor_keeps_source_unknown_and_native_discard_exact() {
         struct Case {
@@ -1701,10 +1701,6 @@ mod tests {
 
     #[test]
     fn physical_outside_mdat_is_invalid_before_offset_order_profile_rejection() {
-        // Original fixture and immutable authored bytes are retained. Parent v4
-        // observed Unsupported before any packet, while the default operation
-        // returned Invalid for the same outside-MDAT address. This regression
-        // must fail on that source before a production behavior change.
         let fixture = Path::new(env!("CARGO_MANIFEST_DIR"))
             .join("tests/fixtures/bad-chunk-offset-outside-source.mov");
         for (window, quantum) in [(4096, 4096), (1, 3)] {

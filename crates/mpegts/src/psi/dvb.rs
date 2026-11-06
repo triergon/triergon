@@ -117,8 +117,8 @@ pub struct DvbSubtitlingSignalling {
     pub audio_conflict: bool,
 }
 
-/// A parent-reviewed development native view, not the qualification baseline
-/// for a complete container/decoder operation. Multi-service behaviour is unknown.
+/// A development native view, not a complete container/decoder operation.
+/// Multi-service behaviour is unknown.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum DvbNativeViewProfile {
     D0SingleServiceV1,
@@ -199,7 +199,7 @@ impl ElementaryStream {
     /// Explicit single-descriptor/single-service D0 codecpar view. Additional ES
     /// context TLVs are unprobed and unsupported by this view. No first-service
     /// fallback, language conversion, PES envelope stripping or DTS inference.
-    /// Wider native field values remain unqualified; only six D0 inputs were probed.
+    /// Wider native field values are unverified; only six D0 inputs were probed.
     pub fn native_dvb_single_service_view(
         &self,
         profile: DvbNativeViewProfile,

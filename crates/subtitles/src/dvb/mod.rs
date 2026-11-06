@@ -1,6 +1,6 @@
 //! Independently authored EN300743 method-0 bitmap service operation and raster.
-//! Experimental slice; no full-DVB/M05 or numerical qualification is claimed.
-//! Complete packets come from the parent's demux/core input adapter. Pixel/RLE,
+//! Experimental; not a full DVB subtitle decoder.
+//! Complete packets come from the caller's demux/core input adapter. Pixel/RLE,
 //! service state, CLUT source facts and immutable display events remain local.
 
 mod bits;

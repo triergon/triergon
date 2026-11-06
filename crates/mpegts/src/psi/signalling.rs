@@ -130,7 +130,7 @@ impl<'a> Descriptor<'a> {
             remaining: self.data,
         })
     }
-    /// H.222.0 Table 2-92 syntax; matching the signalled SPS is M02 work.
+    /// H.222.0 Table 2-92 syntax; matching the signalled SPS is left to codec framing.
     pub fn avc_video(self) -> Result<AvcVideo> {
         if self.tag != 0x28 {
             return Err(Error::Invalid("AVC descriptor tag"));
@@ -160,7 +160,7 @@ impl<'a> Descriptor<'a> {
         })
     }
     /// H.222.0 Table 2-113. Association to a permitted stream type is checked
-    /// by PmtReader; profile/HDR and actual temporal-layer conformance need M02.
+    /// by PmtReader; profile/HDR and actual temporal-layer conformance are left to codec framing.
     pub fn hevc_video(self) -> Result<HevcVideo> {
         if self.tag != 0x38 {
             return Err(Error::Invalid("HEVC descriptor tag"));

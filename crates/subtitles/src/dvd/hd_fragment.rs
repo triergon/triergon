@@ -1,4 +1,4 @@
-//! Bounded original physical-packet HD receiver with explicit C3 research policy.
+//! Bounded original physical-packet HD receiver with an explicit input policy.
 use super::{HdContextJob, HdContextOutput, HdLimits, HdReceiverContext, HdReceiverStatus, HdSpan};
 use std::sync::atomic::{AtomicBool, Ordering};
 use triergon_core::{Budget, BudgetVec, Bytes, Error, Result, TimeBase, WorkBudget};

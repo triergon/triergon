@@ -1,4 +1,4 @@
-//! Resource/error-priority guard against the frozen, uncorrected0dd source.
+//! Resource/error-priority guard.
 //! No clock/measurement proves the bound: metadata discovery must not be needed
 //! to refuse a slice whose header count already exceeds the explicit policy.
 mod common;

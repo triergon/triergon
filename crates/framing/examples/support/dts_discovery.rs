@@ -1,4 +1,4 @@
-//! Private functional-helper draft. Not exported, compiled or admitted.
+//! Private functional helper. Not exported or compiled.
 //! Reuses the existing independent primary-derived packing detector; no hint.
 #![forbid(unsafe_code)]
 use std::sync::atomic::{AtomicBool, Ordering};

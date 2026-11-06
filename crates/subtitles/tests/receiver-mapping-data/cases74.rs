@@ -1,4 +1,4 @@
-// Original 74 membership; literal native bytes are TEST evidence, never production dispatch.
+// Literal native bytes are test data, never production dispatch.
 type Case = (
     &'static str,
     &'static [u8],

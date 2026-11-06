@@ -1,5 +1,5 @@
-//! Test-first boundary/state batch. Parent executes before production changes.
-//! Original source fixtures and EN300743 5.1.2/6.2; no native implementation.
+//! Boundary/state tests from original source fixtures and EN300743 5.1.2/6.2;
+//! no native implementation.
 #![forbid(unsafe_code)]
 
 use std::sync::atomic::AtomicBool;

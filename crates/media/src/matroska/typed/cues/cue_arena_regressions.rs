@@ -1,6 +1,5 @@
-//! Cue arena memory/work guard. The expected rows were recorded from the
-//! preimage (branded candidate) by the independent M1 review harness: one
-//! positions arena per CuePoint, freed after its merge. Peak and retained pool
+//! Cue arena memory/work guard. The expected rows record one positions arena
+//! per CuePoint, freed after its merge. Peak and retained pool
 //! bytes, work units, yields and pressure outcomes must stay identical.
 use super::*;
 use triergon_core::Bytes;

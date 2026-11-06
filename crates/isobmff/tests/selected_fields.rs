@@ -1,6 +1,5 @@
-// Additive runtime regressions staged before the selected field implementation.
-// Original primary-derived metadata vectors and independent bit/Fraction proof
-// are hash-bound beside these fixtures. Parent owns compiler/test execution.
+// Primary-derived metadata vectors and independent bit/Fraction proof are
+// hash-bound beside these fixtures.
 mod common;
 use std::{fs, path::Path};
 use triergon_core::{Budget, Error, WorkBudget};

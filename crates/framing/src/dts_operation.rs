@@ -1,4 +1,4 @@
-//! Complete Source35 acquisition alongside the separately named carrier/parser view.
+//! Complete source acquisition alongside the separately named carrier/parser view.
 //!
 //! The two real input cursors have distinct tokens and generations. Callers answer
 //! both from the same declared entity; no Source frame boundaries are supplied to

@@ -1,5 +1,4 @@
-//! Source-preserving runtime RED/resource guards and compatibility controls.
-//! No new production symbol or hypothetical Unsupported behavior is required.
+//! Source-preserving runtime/resource guards and compatibility controls.
 use super::*;
 use crate::timing::BlockTiming;
 use crate::typed::{InitializationOrigin, Packet as TypedPacket, SourcePosition};

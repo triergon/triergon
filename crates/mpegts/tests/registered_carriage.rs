@@ -1,5 +1,4 @@
-//! Independent primary OPCR and explicit registered-carriage runtime RED batch.
-//! Original authored bytes and archived19c observations are unchanged. These
+//! Independent primary OPCR and explicit registered-carriage regressions. These
 //! finite opaque payloads establish PES carriage, never codec AU conformance.
 use std::sync::atomic::{AtomicBool, Ordering};
 use triergon_core::{Budget, Bytes, Error, SourceId, WorkBudget};
@@ -71,7 +70,7 @@ fn scope(case: Case) -> NativePesScope {
     }
 }
 fn context() -> NativeSourceContext {
-    // The frozen ordinary traces contain PAT/PMT facts before transport event8.
+    // The ordinary traces contain PAT/PMT facts before transport event8.
     // This ordinal is neither packet index2 nor a core generation/range token.
     NativeSourceContext {
         source_event_ordinal: 8,

@@ -335,9 +335,7 @@ fn demux_slot_reentrant_seek_and_recovery_traces() {
         }
     }
 }
-// Test-only baseline adapter. On old Reader, method lookup uses this trait;
-// on the candidate it uses the real inherent thin boundary. Assertions and
-// fixture bytes stay identical, and public traces are frozen before the fix.
+// Test-only adapter from step_demux_projected to the slot-filling call shape.
 trait WideBaselineSlot {
     fn step_demux_projected_into<D: PacketProjection>(
         &mut self,

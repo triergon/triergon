@@ -1,7 +1,7 @@
 //! Test tooling: rewrite an AC-3 / E-AC-3 elementary stream so that no audio block uses
 //! dither (every dithflag = 0), fixing up CRCs. Decoders then produce noise-free output
 //! for all bap = 0 mantissas, which allows exact comparison against another decoder.
-//! (E-AC-3 SPX noise blending is not affected; see STATUS.md.)
+//! (E-AC-3 SPX noise blending is not affected.)
 //!
 //! usage: strip_dither <in> <out>
 

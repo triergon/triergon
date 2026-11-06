@@ -57,7 +57,7 @@ impl LfeState {
         // History for the next frame: the last 8 decimated samples. When the frame holds
         // fewer than 8 (8-block frames), FFmpeg (reference) refills the history by repeating
         // the frame's samples cyclically, end aligned (observed with the `blocks256s` and
-        // `lfe128_short` synthetic streams; STATUS.md). Frames of 16+ blocks are unaffected.
+        // `lfe128_short` synthetic streams). Frames of 16+ blocks are unaffected.
         let len = input.len();
         if len >= 8 {
             self.hist.copy_from_slice(&input[len - 8..]);
@@ -72,10 +72,10 @@ impl LfeState {
 /// X96 2x LFE interpolator.
 ///
 /// Clause 6.2.4.7 specifies the 5-tap filter of Table 6-11. FFmpeg's native decoder (the
-/// D4 reference) instead produces `z[2n] = 0.75 x[n-1] + 0.25 x[n]` and
+/// reference) instead produces `z[2n] = 0.75 x[n-1] + 0.25 x[n]` and
 /// `z[2n+1] = 0.25 x[n-1] + 0.75 x[n]` (least-squares fit of its output on the
-/// x96_51_24_96_1509 vector: residual 6e-8). This decoder follows the reference; the
-/// deviation from Table 6-11 is recorded in STATUS.md.
+/// x96_51_24_96_1509 vector: residual 6e-8). This decoder follows the reference and
+/// deviates from Table 6-11.
 #[derive(Clone, Copy, Default)]
 pub(crate) struct Lfe2x {
     x1: f32,

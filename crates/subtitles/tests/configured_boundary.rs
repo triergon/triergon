@@ -1,5 +1,4 @@
-//! Original configured-boundary tests authored before its module connection.
-//! Promoted after the parent's make10 gate; all nine first passed in make11.
+//! Configured-boundary tests.
 #![forbid(unsafe_code)]
 
 use std::sync::atomic::AtomicBool;

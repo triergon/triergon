@@ -1,5 +1,5 @@
 //! Source trace with explicit development views. JSON/CLI/I/O are outside timing.
-//! Parent owns compilation/execution; no native library is linked here.
+//! No native library is linked here.
 #![forbid(unsafe_code)]
 use std::{
     env,

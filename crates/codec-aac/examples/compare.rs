@@ -1,4 +1,4 @@
-//! Compare two interleaved f32le files per channel against the frozen D4 numeric rules
+//! Compare two interleaved f32le files per channel against the numeric rules
 //! (per-channel RMS <= 8.8e-6, max |diff| <= 6.1035e-5, identical sample counts).
 //!
 //! usage: compare CANDIDATE.f32 REFERENCE.f32 CHANNELS

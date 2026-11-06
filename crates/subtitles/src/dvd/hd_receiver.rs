@@ -1,6 +1,6 @@
 //! Explicit single-input fresh-context receiver lifecycle. Source rejection is
 //! retained separately from a decoded image; it never becomes a valid frame.
-//! Fragment reassembly and the C1/C2 zero-progress adapter are separate scope.
+//! Fragment reassembly and the zero-progress adapter are separate.
 use super::{HdFacts, HdLimits, HdPolicy, HdSpuJob, HdStatus, HdSubpicture};
 use std::sync::atomic::{AtomicBool, Ordering};
 use triergon_core::{Budget, Bytes, Error, Result, WorkBudget};

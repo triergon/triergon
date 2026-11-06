@@ -1,5 +1,5 @@
-//! Red-first distinct native packet operation, bound to actual archived19c data.
-//! Physical input assignments are independent of candidate output. No native
+//! Distinct native packet operation, bound to archived native data.
+//! Physical input assignments are independent of the output. No native
 //! worker/comparator executes here; strict source regressions remain separate.
 use std::sync::atomic::{AtomicBool, Ordering};
 use triergon_core::{Budget, Bytes, Error, SourceId, WorkBudget};
@@ -707,8 +707,8 @@ fn native_profile_keeps_exact_original_reference_contract() {
     );
 }
 
-// Isolated access-path correction for this original invalid fixture. No packet
-// gold is changed: source rejection and native encoded-header evidence are distinct.
+// Access path for the invalid fixture: source rejection and native
+// encoded-header evidence are distinct.
 fn check_rejected_original(source: &[u8]) {
     use triergon_mpegts::native_pes::NativeRegisteredCarriage;
     use triergon_mpegts::native_recovery::{

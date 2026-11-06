@@ -55,7 +55,7 @@ fn parse(pool: &Budget, bytes: &[u8]) -> Result<AvcConfiguration, Error> {
 
 #[test]
 fn wire_grammar_is_implemented_instead_of_declared_layout_only() {
-    // Input comes from one existing frozen source record; every expected fact
+    // Input comes from one fixture source record; every expected fact
     // below is literal ISO length/count/header arithmetic, not another parser.
     let line = include_str!("../fixtures/avc-wire-v1.tsv")
         .lines()

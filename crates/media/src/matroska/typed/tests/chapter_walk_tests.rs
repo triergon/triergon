@@ -1,4 +1,4 @@
-//! Chapter validation resource/semantic guards, authored before any new fix.
+//! Chapter validation resource/semantic guards.
 use super::*;
 use crate::{
     Error,

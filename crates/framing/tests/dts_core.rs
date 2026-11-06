@@ -36,7 +36,7 @@ fn class(error: Error) -> &'static str {
     }
 }
 
-// Test-only decoder for this frozen JSON subset: no escaped strings, nesting
+// Test-only decoder for this JSON subset: no escaped strings, nesting
 // greater than four, objects/arrays and scalar values only. It imports no JSON
 // implementation and is not a production parser or media oracle.
 fn components(text: &str) -> Vec<&str> {
@@ -96,7 +96,7 @@ fn array(text: &str) -> Vec<&str> {
     components(text.strip_prefix('[').unwrap().strip_suffix(']').unwrap())
 }
 
-// The frozen TSV writer quotes fields containing JSON quotes and doubles each
+// The fixture TSV writer quotes fields containing JSON quotes and doubles each
 // embedded quote. Decode that transport layer once, before parsing JSON. This
 // changes neither the fixture's bytes nor its independent expected values.
 fn tsv_json(text: &str) -> String {
@@ -809,7 +809,7 @@ fn termination_future_encoder_and_extension_sources_keep_required_gaps_explicit(
     assert_eq!(observed.frames.len(), 1);
     assert_eq!(observed.frames[0].facts().offset, 0);
     // No14-bit unpacking, word swapping, termination-duration or HD-asset API
-    // is introduced by this canonical core checkpoint.
+    // is part of the canonical core.
 }
 
 #[test]

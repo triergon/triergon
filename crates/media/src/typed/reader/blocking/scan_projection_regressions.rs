@@ -1,4 +1,4 @@
-//! Neutral baseline/candidate public traces, not invented behavioral RED.
+//! Neutral public traces.
 include!("scan_projection_helpers.rs");
 use triergon_core::{Bytes, InputWindow};
 

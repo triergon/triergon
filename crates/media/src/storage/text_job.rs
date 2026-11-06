@@ -1,4 +1,3 @@
-//! Intended as storage::text_job, a child of the existing SharedText owner.
 //! One byte per work unit; batches are bounded to256 bytes between checks.
 //! Independent ASCII/zero reductions permit compiler vectorization; UTF-8
 //! fallback still passes at most four bytes to safe std validation at a time.
@@ -81,7 +80,7 @@ impl TextJob {
                 return Ok(ParseStep::Event(result.clone()));
             }
             if self.at == self.range.end {
-                // Match frozen metadata::text/string_span precedence even when
+                // Match metadata::text/string_span precedence even when
                 // a malformed scalar or ASCII byte precedes the first zero.
                 if self.bad_terminator {
                     return Err(Error::Invalid("metadata string terminator"));

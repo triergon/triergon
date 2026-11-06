@@ -1,8 +1,8 @@
 //! Independently authored, bounded MPEG-TS syntax and assembly.
 //!
 //! Transport packets, PSI sections and PES byte runs are distinct outputs. A PES
-//! is NOT a codec access unit. M02 framing, source I/O tokens, exact rational time
-//! and seeking belong to their separate owners. This crate is not qualified M04.
+//! is NOT a codec access unit. Access-unit framing, source I/O tokens, exact rational
+//! time and seeking belong to other crates.
 #![forbid(unsafe_code)]
 
 pub mod carrier;

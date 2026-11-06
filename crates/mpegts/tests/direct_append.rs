@@ -1,5 +1,5 @@
-//! Observable cursor/framer resource interactions; both baseline and candidate
-//! must pass. These guards do not require or call read_append directly.
+//! Observable cursor/framer resource interactions. These guards do not require
+//! or call read_append directly.
 use std::sync::atomic::AtomicBool;
 use triergon_core::{
     Budget, Error, InputCursor, SourceCapabilities, SourceFailure, SourceId, Step, WorkBudget,

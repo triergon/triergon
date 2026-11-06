@@ -12,7 +12,7 @@ use triergon_core::{
     Budget, BudgetVec, Bytes, Error, InputCursor, InputToken, Result, SourceId, Step, WorkBudget,
 };
 
-/// Separate, explicit interpretation of original7ff/D32 packet observations.
+/// Separate, explicit interpretation of D32 packet observations.
 #[derive(Clone, Copy, Debug)]
 pub struct PinnedMovD32PcmV1;
 

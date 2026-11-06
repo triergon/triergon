@@ -1,5 +1,4 @@
-//! Selected ASC/GASpecific/PCE source grammar. Evidence and unsupported modes
-//! are pinned in the private AAC-CONTRACT; no encoded-audio decoder is implied.
+//! Selected ASC/GASpecific/PCE source grammar. No encoded-audio decoder is implied.
 use crate::BuildStep;
 use std::sync::atomic::{AtomicBool, Ordering};
 use triergon_core::{Budget, BudgetVec, Bytes, Error, Result, SourceId, WorkBudget};

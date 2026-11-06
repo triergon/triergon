@@ -10,7 +10,7 @@ use std::sync::atomic::AtomicBool;
 use triergon_core::{Budget, Bytes, Error, Result, WorkBudget};
 
 /// Versioned packet/first-event compatibility with the pinned native PGS API.
-/// This names a receiver contract, not complete PGS or numerical qualification.
+/// This names a receiver contract, not complete PGS compatibility.
 pub const NATIVE_COMPATIBILITY: &str = "NativeD32-PGS-first-event-compatibility-v1";
 
 /// Owned native application output, distinct from the full Source+Receiver API.

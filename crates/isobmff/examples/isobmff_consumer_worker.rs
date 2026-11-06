@@ -1,4 +1,4 @@
-//! Bounded MP4 diagnostic consumer; full release qualification remains open.
+//! Bounded MP4 diagnostic consumer.
 //! Existing core owns input, resource charges, ranges and exact clocks.
 #![forbid(unsafe_code)]
 #[path = "isobmff_consumer/model.rs"]
@@ -67,7 +67,7 @@ fn options(args: &[String], offset: usize) -> Result<Options> {
     })
 }
 // The immutable corpus image / open file lives outside each measured operation,
-// matching H0. Per-operation seek, parser/index creation and teardown stay inside.
+// as in the reference worker. Per-operation seek, parser/index creation and teardown stay inside.
 enum Input {
     Memory(Cursor<Vec<u8>>),
     File(File, u64),

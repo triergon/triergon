@@ -1,4 +1,4 @@
-//! Additional typed-API feature guards, activated only with the private overlay.
+//! Additional typed-API feature guards.
 //! Opaque payloads establish wire/ownership behavior, not coded-frame decoding.
 use std::{io::Cursor, sync::atomic::AtomicBool};
 use triergon_core::Step;

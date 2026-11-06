@@ -1,5 +1,5 @@
 //! Authored ownership-seam fixtures. These drive the existing envelope through
-//! the typed policy constructor; full typed-file parity is a separate gate.
+//! the typed policy constructor; full typed-file parity is tested separately.
 use super::*;
 use crate::storage::PayloadOwnership;
 use triergon_core::Bytes;

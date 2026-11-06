@@ -1,4 +1,4 @@
-//! Real existing encoder path; baseline compiles these same guards before fix.
+//! Guards over the real encoder path.
 use super::*;
 
 fn encoder() -> Encoder {

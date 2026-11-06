@@ -6,7 +6,7 @@ use crate::{
 use std::sync::atomic::{AtomicBool, Ordering};
 use triergon_core::{Budget, Error, InputCursor, InputToken, Result, SourceId, WorkBudget};
 
-/// Explicit admission to original7ff/D32 observations, not an ISO clock rule.
+/// Explicit admission to D32 observations, not an ISO clock rule.
 #[derive(Clone, Copy, Debug)]
 pub struct PinnedMovD32FragmentClockV6;
 #[derive(Debug)]

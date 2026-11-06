@@ -1,4 +1,4 @@
-//! Original actual1728B failure and independent input-lifetime controls.
+//! Native input failure and independent input-lifetime controls.
 use std::sync::atomic::{AtomicBool, Ordering};
 use triergon_core::{
     Budget, Bytes, Error, InputCursor, InputWindow, SourceCapabilities, SourceId, WorkBudget,

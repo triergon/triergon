@@ -161,7 +161,7 @@ impl Decoder {
         Ok(decoder)
     }
 
-    /// The named native view is additive; the old constructor stays source-only.
+    /// The named native view is opt-in; `new_configured` stays source-only.
     pub fn new_configured_with_receiver_view(
         budget: &Budget,
         configuration: &SourceConfiguration,
@@ -174,7 +174,7 @@ impl Decoder {
         decoder.state.receiver_view = view;
         Ok(decoder)
     }
-    /// Additive native projection. Both older constructors retain strict
+    /// Native projection. Both other constructors retain strict
     /// bounds validation, including empty regions. No source packet is trimmed.
     pub fn new_configured_with_native_geometry_policy(
         budget: &Budget,
@@ -462,7 +462,7 @@ impl Decoder {
         if remaining < 6 {
             if self.state.receiver_view == super::ReceiverView::NativeD32 {
                 if self.display_started && self.state.acquired {
-                    // Actual106/101 codec inputs establish publication of the
+                    // Native observations establish publication of the
                     // complete source prefix before the original tail error.
                     // The packet and five tail bytes remain owned and intact.
                     self.native_fallback = true;

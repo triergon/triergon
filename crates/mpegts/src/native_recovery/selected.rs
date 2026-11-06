@@ -1,4 +1,4 @@
-//! Explicit finite AVC diagnostic view, implemented after actual8/28 runtime RED.
+//! Explicit finite AVC diagnostic view.
 use super::*;
 use crate::{FaultKind, TraceFault};
 

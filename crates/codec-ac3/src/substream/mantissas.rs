@@ -193,7 +193,7 @@ impl Substream {
             let mut x = [0f32; 6];
             if h == 0 {
                 // No bits. FFmpeg 9.0.2 fills these DCT coefficients with uniform noise in
-                // [-0.5, 0.5) independent of dithflag (black-box, STATUS.md).
+                // [-0.5, 0.5) independent of dithflag (black-box).
                 if noise == NoiseMode::Normal {
                     for xj in x.iter_mut() {
                         *xj = rng.aht_coefficient();
@@ -206,7 +206,7 @@ impl Substream {
                     1 => &VQ_HEBAP1[idx],
                     2 => &VQ_HEBAP2[idx],
                     3 => &VQ_HEBAP3[idx],
-                    // FFmpeg 9.0.2 compatibility (black-box observation, STATUS.md): FFmpeg
+                    // FFmpeg 9.0.2 compatibility (black-box observation): FFmpeg
                     // decodes hebap-4 index i with Table E4.4 row i + 1 and index 31 as zero.
                     4 if self.reference_compat => VQ_HEBAP4.get(idx + 1).unwrap_or(&[0; 6]),
                     4 => &VQ_HEBAP4[idx],

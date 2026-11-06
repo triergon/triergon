@@ -1,5 +1,4 @@
-//! Original source/actual-reference regressions. No codec frame decoding or AU
-//! claims. Original four input bytes and archived19c native golds are immutable.
+//! Source/reference regressions. No codec frame decoding or AU claims.
 use std::sync::atomic::{AtomicBool, Ordering};
 use triergon_core::{
     Budget, Bytes, Error, InputCursor, InputWindow, SourceCapabilities, SourceId, SourceLocation,
@@ -722,7 +721,7 @@ fn audio_hidden_owner_is_fully_charged_and_not_replaced_by_visible_length() {
     assert_eq!(budget.used(), before);
 }
 
-// Authored H.222 transport/PES byte encodings; execution is deferred to A.
+// Authored H.222 transport/PES byte encodings.
 fn time(value: u64) -> [u8; 5] {
     assert!(value < (1_u64 << 33));
     [

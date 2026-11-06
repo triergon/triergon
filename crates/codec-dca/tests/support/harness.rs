@@ -153,7 +153,7 @@ pub fn parse_fingerprints(text: &str) -> Vec<Fingerprint> {
     out
 }
 
-/// D4 numeric rules: per-sample |diff| <= 2^-14; per-channel RMS <= 8.8e-6, applied to
+/// Numeric rules: per-sample |diff| <= 2^-14; per-channel RMS <= 8.8e-6, applied to
 /// block sums through |sum d| <= B * rms (Cauchy-Schwarz).
 pub fn check(fp: &Fingerprint, d: &Decoded) -> Result<(), String> {
     if d.sample_rate != fp.rate {

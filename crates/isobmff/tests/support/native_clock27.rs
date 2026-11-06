@@ -1,6 +1,6 @@
-// Included only in the unique source-trace example's test module. Expectations
-// retain three original authored inputs and exact actual v9 pinned-native rows.
-// Source rows/rationals/raw boxes are independently checked before native RED.
+// Included only in the source-trace example's test module. Expectations
+// cover three authored inputs and exact pinned-native rows. Source
+// rows/rationals/raw boxes are checked independently of the native rows.
 fn required_clock27_case(name: &str, extension: &str) {
     let folder = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/clock-boundary27");
     let expected = fs::read_to_string(folder.join(format!("{name}.txt"))).unwrap();

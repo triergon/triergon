@@ -1,5 +1,5 @@
-//! Original full-object RED inputs and ownership/format guards for the explicit
-//! additive selected native view. Source syntax and old entry points stay strict.
+//! Full-object inputs and ownership/format guards for the explicit selected
+//! native view. Source syntax and the other entry points stay strict.
 use std::sync::atomic::{AtomicBool, Ordering};
 use triergon_core::{
     Budget, Bytes, Error, InputCursor, InputWindow, SourceCapabilities, SourceId, Step, WorkBudget,

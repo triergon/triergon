@@ -1,5 +1,4 @@
-//! New public indexed output controls. Baseline has no such API: run this exact
-//! test source against frozen Source8 before applying the production overlay.
+//! Public indexed output controls.
 use std::sync::atomic::{AtomicBool, Ordering};
 use triergon_core::{Budget, Bytes, Error, TimeBase, WorkBudget};
 use triergon_subtitles::pgs::{

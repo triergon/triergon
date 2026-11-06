@@ -293,7 +293,7 @@ impl Renderer {
                     }
                     if self.found.is_none() && state.receiver_view == super::ReceiverView::NativeD32
                     {
-                        // Frozen source controls establish that an unavailable
+                        // Source controls establish that an unavailable
                         // ODS is not an instruction to replay old compressed
                         // data or to reject the native receiver transaction.
                         // Pay even when the object table is empty, and preserve

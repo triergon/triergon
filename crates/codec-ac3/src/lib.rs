@@ -4,8 +4,6 @@
 //!
 //! Output is planar `f32` at full scale 1.0, planes ordered as FFmpeg's native decoder
 //! orders them (ascending FFmpeg speaker bit, see [`triergon_codec::layout`]).
-//!
-//! Not qualified: see `harness/codecs/ac3/STATUS.md` for the measured state.
 #![forbid(unsafe_code)]
 // Channel/bin loops are written with explicit indices to mirror the A/52 pseudo code.
 #![allow(clippy::needless_range_loop)]
@@ -65,8 +63,8 @@ pub struct DecoderOptions {
 pub enum Compat {
     /// The pinned reference decoder (FFmpeg 9.0.2): its seed-zero dither noise
     /// stream, its E-AC-3 HEBAP-4 VQ table offset and its first-frame conventions;
-    /// E-AC-3 reduced sample rates are refused as it refuses them. Output is compared with the reference decoder,
-    /// so this is the default.
+    /// E-AC-3 reduced sample rates are refused as it refuses them. Output is compared
+    /// with the reference decoder, so this is the default.
     #[default]
     Reference,
     /// A/52:2018 only; also decodes E-AC-3 reduced sample rates.
@@ -183,7 +181,7 @@ const MIX_GAINS: [f64; 8] = [
 ];
 
 /// Derive FFmpeg-compatible downmix info from one syncframe's header fields
-/// (black-box verified, see harness/codecs/ac3/STATUS.md).
+/// (black-box verified).
 fn downmix_info(eac3: bool, acmod: u8, c: &DownmixCodes) -> Option<DownmixInfo> {
     if acmod <= 2 {
         return None;
@@ -359,7 +357,7 @@ impl Decoder {
                     // independent substream ("non-compatible") and outputs the core alone, e.g.
                     // a bsid 9 core (24 kHz) with a 48 kHz dependent. Behind a bsid 9/10 core
                     // it then labels the output with the dependent's rate (an FFmpeg quirk,
-                    // black-box, STATUS.md); behind any other core the core's rate is kept.
+                    // black-box); behind any other core the core's rate is kept.
                     if first.syntax == Syntax::Ac3 && first.bsid > 8 {
                         out_rate = h.sample_rate;
                     }
@@ -375,7 +373,7 @@ impl Decoder {
             off += h.frame_bytes;
         }
         // FFmpeg 9.0.2 refuses E-AC-3 reduced sample rates (fscod2) in any substream it would
-        // decode and outputs nothing for the access unit (black-box, STATUS.md).
+        // decode and outputs nothing for the access unit (black-box).
         if self.opts.compat == Compat::Reference
             && frames[..nframes]
                 .iter()

@@ -117,7 +117,7 @@ pub struct OpaqueSegment {
     pub kind: u8,
     pub page_id: u16,
     pub original: Bytes,
-    /// Known extension needing a separately frozen capability, rather than
+    /// Known extension needing a separate capability, rather than
     /// ordinary forward-compatible/private opaque data.
     pub unsupported_feature: bool,
 }

@@ -4,7 +4,7 @@ use crate::{BoxChildren, BoxStep, BoxView, BuildStatus, EntryLayout, Limits, Sam
 use std::sync::atomic::{AtomicBool, Ordering};
 use triergon_core::{Error, Result, WorkBudget};
 
-/// D32 public MOV open observations (original7ff), not a general native profile.
+/// D32 public MOV open observations, not a general native profile.
 #[derive(Clone, Copy, Debug)]
 pub struct PinnedMovD32SampleEntryHeaderV7;
 

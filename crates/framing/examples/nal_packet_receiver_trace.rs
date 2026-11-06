@@ -1,5 +1,5 @@
 //! Separate native packet/failure observation view; source refusals/raw facts
-//! remain present. No native call or numerical qualification is claimed.
+//! remain present.
 use std::sync::atomic::AtomicBool;
 use triergon_core::{Budget, BudgetVec, Bytes, Error, SourceId, SourceLocation, WorkBudget};
 use triergon_framing::*;

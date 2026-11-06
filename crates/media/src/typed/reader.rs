@@ -105,7 +105,6 @@ struct Admission {
 }
 // Exactly one transaction is live. A union keeps the maximum fixed workspace,
 // rather than the sum, and adds no per-packet heap allocation/pressure seam.
-// See .research/parallel-matroska-core/TYPED-INLINE-LAYOUT-REVIEW.md.
 #[expect(
     clippy::large_enum_variant,
     reason = "Exclusive bounded inline jobs; heap indirection adds allocation and retry state; host size guarded"
@@ -1644,8 +1643,8 @@ mod header_refill_route_tests {
     }
 }
 
-// Baseline-compatible runtime red: the engine, not only the blocking adapter,
-// must issue the bounded default header hint. No new helper API is referenced.
+// The engine, not only the blocking adapter, must issue the bounded default
+// header hint.
 #[cfg(test)]
 mod header_refill_canonical_runtime_red {
     use super::*;

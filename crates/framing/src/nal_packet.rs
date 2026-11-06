@@ -776,7 +776,7 @@ struct PacketOutput<M, S> {
 
 /// A physical complete-packet rejection observed at the pinned d32 receive
 /// boundary. Resource, cancellation and strict fixed-header refusals are not
-/// codec errors and do not acquire one of these receipts.
+/// codec errors and do not map to one of these kinds.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum NalPacketReceiverErrorKind {
     IncompleteLengthPrefix,
@@ -1101,7 +1101,7 @@ impl<M, S: PacketSegment, C: PacketConfig> PacketJob<'_, M, S, C> {
         self.source.as_ref()
     }
     /// Move the original failed source into an observed receiver-error view.
-    /// Only the physical error sites below can authorize this transition.
+    /// Only the physical error sites below can enable this transition.
     /// The job's source error remains sticky after the one-time move.
     pub fn take_receiver_rejection(&mut self) -> Option<NalPacketRejection<M>> {
         let kind = self.receiver_failure?;
@@ -1348,7 +1348,6 @@ impl<M> NalPacketViewJob<'_, M> {
     }
 }
 
-// This identical test module is appended to both RED and candidate nal_packet.rs.
 // It exercises the existing private constructor, not a new test-only API.
 #[cfg(test)]
 mod packed_plan_boundary_guards {

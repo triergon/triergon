@@ -1,5 +1,4 @@
-//! Original spec-derived signalling regressions, authored before typed views.
-//! Parent owns execution. These tests do not claim codec/AU conformance.
+//! Spec-derived signalling regressions. These tests do not claim codec/AU conformance.
 use std::sync::atomic::{AtomicBool, Ordering};
 use triergon_core::{Budget, Bytes, Error, SourceId, WorkBudget};
 use triergon_mpegts::{

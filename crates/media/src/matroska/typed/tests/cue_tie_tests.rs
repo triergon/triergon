@@ -219,7 +219,7 @@ fn wire_points(case: &Case) -> Vec<WirePoint> {
 }
 fn observed_landing(case: &Case, target: i64, playback: bool) -> Landing {
     // The no-preroll sister file has identical media/positions. Direct plain
-    // seek_previous is a format policy check here, not a claimed native API run.
+    // seek_previous is a format policy check here, not a native API run.
     let name = if playback {
         case.name.to_owned()
     } else {

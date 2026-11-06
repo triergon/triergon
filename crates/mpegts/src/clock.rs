@@ -86,7 +86,7 @@ fn check_raw33(raw: u64) -> Result<()> {
     Ok(())
 }
 
-/// Additive source interpretation; never mutates a timestamp/header or creates
+/// Source interpretation; never mutates a timestamp/header or creates
 /// a source DTS. Only already validated source fields are admissible inputs.
 /// Actual output overflow is Error::Overflow; raw33 outside its width is Invalid.
 pub fn source_timestamp(
