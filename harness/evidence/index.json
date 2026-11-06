@@ -7694,6 +7694,13 @@
    "reason": "Capture status row",
    "key": "evidence/capture-pipeline-linux-arm64/fac200b915c2b9a984e5b91cba29e7a3c016690596f128524f46c8f2cb40b6e6.tar.gz",
    "sha256": "fac200b915c2b9a984e5b91cba29e7a3c016690596f128524f46c8f2cb40b6e6"
+  },
+  {
+   "name": "isobmff-signed-clock-linux-arm64",
+   "retention": "retained",
+   "reason": "ISO BMFF signed decode runs status row",
+   "key": "evidence/isobmff-signed-clock-linux-arm64/cd2ead09e1909dba0478ea3d9dc170946fad2d4db14b41fc6e3f0307914364c6.tar.gz",
+   "sha256": "cd2ead09e1909dba0478ea3d9dc170946fad2d4db14b41fc6e3f0307914364c6"
   }
  ]
 }
