@@ -67,7 +67,7 @@ fn options(args: &[String], offset: usize) -> Result<Options> {
     })
 }
 // The immutable corpus image / open file lives outside each measured operation,
-// matching H0. Per-operation seek, parser/index creation and teardown stay inside.
+// as in the reference worker. Per-operation seek, parser/index creation and teardown stay inside.
 enum Input {
     Memory(Cursor<Vec<u8>>),
     File(File, u64),

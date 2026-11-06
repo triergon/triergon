@@ -1,4 +1,4 @@
-//! Shared bounded D32 receiver operation. Full recovery independently preserves
+//! Shared bounded PGS receiver operation. Full recovery independently preserves
 //! strict Source outputs/errors; native compatibility owns only native output.
 //! Receiver recovery never publishes guessed source pixels, colours or clocks.
 use super::display_model::{PaletteSnapshot, StoredDisplaySet};
