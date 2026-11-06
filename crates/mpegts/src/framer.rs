@@ -1,5 +1,5 @@
 //! Format-specific <=192-byte carry, not an I/O cursor/token framework.
-use crate::carrier::{PlainCarrier, PlainContinuation};
+use crate::carrier::{PlainCarrier, PlainContinuation, TS188_BYTES};
 use crate::{
     AssemblyStep, PacketFormat, RejectedTransport, TransportInspection, TransportInspector,
     TransportPacket,
@@ -314,6 +314,43 @@ impl TransportFramer {
         retained[index] = Some(window.clone());
         retained.swap(0, index);
         true
+    }
+
+    /// The cursor is already bound by the feed loop. Reuse the window admitted
+    /// by its last carrier so a probe never changes window retention.
+    pub(crate) fn retained_payload_window(&self, input: &InputCursor) -> bool {
+        self.buffered_carrier == BufferedCarrier::Progressive
+            && self.format == PacketFormat::Ts188
+            && self.next == Some(input.position())
+            && !self.entity_end_seen
+            && self.start.is_none()
+            && self.inspection.is_none()
+            && self.rejection.is_none()
+            && self.push_ack.is_none()
+            && self.carry.as_ref().is_some_and(|carry| carry.is_empty())
+            && self.progressive_windows[0]
+                .as_ref()
+                .zip(input.buffered_owner())
+                .is_some_and(|(retained, current)| retained.shares_storage_with(current))
+    }
+
+    /// Consume a preflighted, complete prefix of the already shared window.
+    pub(crate) fn read_payload_run(
+        &mut self,
+        input: &mut InputCursor,
+        carriers: usize,
+        work: &mut WorkBudget,
+        cancel: &AtomicBool,
+    ) -> Result<Bytes> {
+        debug_assert!(self.retained_payload_window(input));
+        let width = carriers * TS188_BYTES;
+        let Step::Ready(bytes) = input.read_span(width, work, cancel)? else {
+            return Err(Error::Invalid("validated payload run lost buffered span"));
+        };
+        debug_assert_eq!(bytes.len(), width);
+        self.next = Some(input.position());
+        self.last_packet_offset = Some(input.position() - TS188_BYTES as u64);
+        Ok(bytes)
     }
 
     pub(crate) fn try_null_run(

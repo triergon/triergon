@@ -39,8 +39,8 @@ pub use media_entity::MediaEntityEnd;
 pub use pes::{Pes, PesAssembler, PesHeader, PesSpan};
 pub use psi::SectionAssembler;
 pub use stream::{
-    CompactTraceEvent, FaultKind, FeedCarrier, FeedContinuation, TraceEvent, TraceFault,
-    TransportStream,
+    CompactTraceEvent, FaultKind, FeedCarrier, FeedContinuation, FeedItem, FeedPayloadRun,
+    TraceEvent, TraceFault, TransportStream,
 };
 pub use transport::{Adaptation, PacketFormat, Pcr, TransportPacket, parse_transport};
 

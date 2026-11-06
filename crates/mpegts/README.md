@@ -89,6 +89,10 @@ The sequential feed keeps program tables, clock transitions and diagnostics.
 `TransportStream::poll_feed` can deliver validated PES continuations directly
 in both feed modes. `poll_feed_carriers` lets a progressive feed move a
 plain continuation's charged payload storage into the native PES observer.
+`poll_feed_with_payload_runs` can offer several payload-only continuations
+on one PID from an already shared window. Each carrier keeps its source
+range and event ordinal. Runs use reserved span capacity and ordinary
+carrier polling handles PES completion and arena growth.
 Sequential playback can share up to four tight input windows of at most 4 KiB
 each. A full set, oversized backing storage or low budget headroom uses
 carrier-sized storage. Fallback uses the original transport event.

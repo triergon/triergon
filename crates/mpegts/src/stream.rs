@@ -1,4 +1,5 @@
 //! Composed selected-program TS -> PSI -> PES source operation. No codec AU work.
+use crate::carrier::{PLAIN_PAYLOAD_BYTES, TS188_BYTES, payload_only_continuation};
 use crate::framer::FramedCarrier;
 use crate::native_pes::{NativePesObserver, NativeSourceContext, ReadyContinuation};
 use crate::psi::{
@@ -97,6 +98,111 @@ impl FeedCarrier<'_> {
                 observer.append_plain_continuation(packet, context, work, cancel)
             }
         }
+    }
+}
+
+/// An ordinary carrier or a shared-window prefix offered to a progressive feed.
+pub enum FeedItem<'a> {
+    Carrier(FeedCarrier<'a>),
+    PayloadRun(FeedPayloadRun<'a>),
+}
+
+// Per carrier: input, header inspection, source PES, native append and event.
+const PAYLOAD_RUN_WORK: u64 = TS188_BYTES as u64 + 2 + (PLAIN_PAYLOAD_BYTES as u64 + 1) + 2 + 1;
+
+/// A same-PID continuation prefix that may be appended to a native observer.
+pub struct FeedPayloadRun<'a> {
+    input: &'a mut InputCursor,
+    framer: &'a mut TransportFramer,
+    continuity: &'a mut Continuity,
+    assembler: &'a mut PesAssembler,
+    omissions: &'a mut u64,
+    cancel: &'a AtomicBool,
+    epochs: SourceEpochs,
+    pid: u16,
+    counter: u8,
+    maximum: usize,
+}
+
+impl FeedPayloadRun<'_> {
+    pub fn pid(&self) -> u16 {
+        self.pid
+    }
+
+    /// Accept a run of at least two carriers, up to the caller's event limit.
+    /// False leaves input, work, observer and source state ready for the
+    /// ordinary carrier path.
+    pub fn append_ready(
+        self,
+        observer: &mut NativePesObserver,
+        context: NativeSourceContext,
+        maximum: usize,
+        work: &mut WorkBudget,
+    ) -> Result<bool> {
+        if context.epochs != self.epochs || context.byte_run_epoch.is_some() {
+            return Ok(false);
+        }
+        let Some(owner) = self.input.buffered_owner() else {
+            return Ok(false);
+        };
+        let start = SourceLocation {
+            source: self.input.source(),
+            offset: self.input.position(),
+        };
+        let work_limit = work.remaining().saturating_sub(1) / PAYLOAD_RUN_WORK;
+        let maximum = maximum
+            .min(self.maximum)
+            .min(usize::try_from(work_limit).unwrap_or(usize::MAX))
+            .min(observer.payload_run_capacity(owner, self.pid, self.counter, start, context));
+        if maximum < 2 {
+            return Ok(false);
+        }
+
+        // The first two headers were checked before routing the run. Finish
+        // the probe inside this window, stopping before the first exception.
+        let mut carriers = 2;
+        for ts in self
+            .input
+            .buffered()
+            .chunks_exact(TS188_BYTES)
+            .take(maximum)
+            .skip(2)
+        {
+            if self.cancel.load(Ordering::Relaxed) {
+                return Err(Error::Cancelled);
+            }
+            let expected = self.counter.wrapping_add(carriers as u8) & 15;
+            if payload_only_continuation(ts) != Some((self.pid, expected)) {
+                break;
+            }
+            carriers += 1;
+        }
+        let events = 2 * carriers as u64;
+        let Some(omissions) = self.omissions.checked_add(events) else {
+            return Ok(false);
+        };
+        if context.source_event_ordinal.checked_add(events).is_none() {
+            return Ok(false);
+        }
+        if self.cancel.load(Ordering::Relaxed) {
+            return Err(Error::Cancelled);
+        }
+
+        // The cursor charges the input bytes. The remaining checks and span
+        // writes have already been bounded and need no allocation.
+        let bytes = self
+            .framer
+            .read_payload_run(self.input, carriers, work, self.cancel)?;
+        let charged = work.try_charge((PAYLOAD_RUN_WORK - TS188_BYTES as u64) * carriers as u64);
+        debug_assert!(charged);
+        observer.append_payload_run(&bytes, start, context, self.counter)?;
+        self.assembler
+            .record_body_carriers(carriers, carriers * PLAIN_PAYLOAD_BYTES);
+        let ts = bytes.as_ref();
+        self.continuity
+            .record_payload_run(self.counter, &ts[ts.len() - TS188_BYTES..]);
+        *self.omissions = omissions;
+        Ok(true)
     }
 }
 
@@ -970,6 +1076,80 @@ impl TransportStream {
         Ok(true)
     }
 
+    fn try_feed_payload_run(
+        &mut self,
+        input: &mut InputCursor,
+        work: &mut WorkBudget,
+        cancel: &AtomicBool,
+        consume: &mut impl FnMut(
+            FeedItem<'_>,
+            u64,
+            SourceEpochs,
+            &mut WorkBudget,
+        ) -> Result<FeedContinuation>,
+    ) -> Result<bool> {
+        if work.remaining() <= 2 * PAYLOAD_RUN_WORK
+            || input.buffered().len() < 2 * TS188_BYTES
+            || !self.framer.retained_payload_window(input)
+        {
+            return Ok(false);
+        }
+        let buffered = input.buffered();
+        let Some((pid, counter)) = payload_only_continuation(&buffered[..TS188_BYTES]) else {
+            return Ok(false);
+        };
+        if payload_only_continuation(&buffered[TS188_BYTES..2 * TS188_BYTES])
+            != Some((pid, (counter + 1) & 15))
+            || (self.pcr_pid == Some(pid) && self.clock_pending)
+        {
+            return Ok(false);
+        }
+        let Route::Pes(index) = self.find_route(pid) else {
+            return Ok(false);
+        };
+        let epochs = self.source_epochs();
+        let route = &mut self.routes.as_mut_slice()[index];
+        let (Some(continuity), Some(assembler), Some(omissions)) = (
+            route.continuity.as_mut(),
+            route.assembler.as_mut(),
+            self.feed_omissions.as_mut(),
+        ) else {
+            return Ok(false);
+        };
+        let maximum = assembler.body_run_capacity(PLAIN_PAYLOAD_BYTES);
+        if maximum < 2 || !continuity.expects_payload_counter(counter) {
+            return Ok(false);
+        }
+        let before = *omissions;
+        let result = consume(
+            FeedItem::PayloadRun(FeedPayloadRun {
+                input,
+                framer: &mut self.framer,
+                continuity,
+                assembler,
+                omissions,
+                cancel,
+                epochs,
+                pid,
+                counter,
+                maximum,
+            }),
+            before,
+            epochs,
+            work,
+        );
+        let accepted = *omissions != before;
+        if accepted {
+            self.entity_end = None;
+            self.route = Route::Pes(index);
+            if self.pcr_pid == Some(pid) {
+                self.clock_signal = false;
+            }
+        }
+        result?;
+        Ok(accepted)
+    }
+
     fn clock_transition(&mut self) -> Result<Option<TraceEvent>> {
         let packet = self
             .packet
@@ -1289,7 +1469,10 @@ impl TransportStream {
             &mut WorkBudget,
         ) -> Result<FeedContinuation>,
     ) -> Result<Step<TraceEvent>> {
-        self.poll_feed_inner::<false>(input, work, cancel, |carrier, omitted, epochs, work| {
+        self.poll_feed_inner::<false, false>(input, work, cancel, |item, omitted, epochs, work| {
+            let FeedItem::Carrier(carrier) = item else {
+                unreachable!("literal carrier delivery");
+            };
             match carrier.0 {
                 FramedCarrier::Packet(packet) => consume(packet, omitted, epochs, work),
                 FramedCarrier::Plain(_) => unreachable!("literal carrier delivery"),
@@ -1311,26 +1494,54 @@ impl TransportStream {
             &mut WorkBudget,
         ) -> Result<FeedContinuation>,
     ) -> Result<Step<TraceEvent>> {
+        let mut single = |item: FeedItem<'_>, omitted, epochs, work: &mut WorkBudget| {
+            let FeedItem::Carrier(carrier) = item else {
+                unreachable!("single carrier delivery");
+            };
+            consume(carrier, omitted, epochs, work)
+        };
         if self.feed_validated_carriers {
-            self.poll_feed_inner::<true>(input, work, cancel, consume)
+            self.poll_feed_inner::<true, false>(input, work, cancel, &mut single)
         } else {
-            self.poll_feed_inner::<false>(input, work, cancel, consume)
+            self.poll_feed_inner::<false, false>(input, work, cancel, &mut single)
         }
     }
 
-    fn poll_feed_inner<const DIRECT: bool>(
+    /// Like poll_feed_carriers, with optional shared-window runs for progressive
+    /// feeds. A run is accepted by FeedPayloadRun::append_ready. The returned
+    /// FeedContinuation applies to ordinary carriers.
+    pub fn poll_feed_with_payload_runs(
         &mut self,
         input: &mut InputCursor,
         work: &mut WorkBudget,
         cancel: &AtomicBool,
-        consume: impl FnMut(
-            FeedCarrier<'_>,
+        consume: &mut impl FnMut(
+            FeedItem<'_>,
             u64,
             SourceEpochs,
             &mut WorkBudget,
         ) -> Result<FeedContinuation>,
     ) -> Result<Step<TraceEvent>> {
-        match self.poll_inner::<false, DIRECT>(input, work, cancel, consume)? {
+        if self.feed_validated_carriers {
+            self.poll_feed_inner::<true, true>(input, work, cancel, consume)
+        } else {
+            self.poll_feed_inner::<false, false>(input, work, cancel, consume)
+        }
+    }
+
+    fn poll_feed_inner<const DIRECT: bool, const RUNS: bool>(
+        &mut self,
+        input: &mut InputCursor,
+        work: &mut WorkBudget,
+        cancel: &AtomicBool,
+        consume: impl FnMut(
+            FeedItem<'_>,
+            u64,
+            SourceEpochs,
+            &mut WorkBudget,
+        ) -> Result<FeedContinuation>,
+    ) -> Result<Step<TraceEvent>> {
+        match self.poll_inner::<false, DIRECT, RUNS>(input, work, cancel, consume)? {
             Step::Ready(CompactTraceEvent::Event(event)) => Ok(Step::Ready(event)),
             Step::Ready(CompactTraceEvent::NullRun(_)) => unreachable!("literal source mode"),
             Step::NeedInput(request) => Ok(Step::NeedInput(request)),
@@ -1345,16 +1556,18 @@ impl TransportStream {
         work: &mut WorkBudget,
         cancel: &AtomicBool,
     ) -> Result<Step<CompactTraceEvent>> {
-        self.poll_inner::<true, false>(input, work, cancel, |_, _, _, _| Ok(FeedContinuation::Emit))
+        self.poll_inner::<true, false, false>(input, work, cancel, |_, _, _, _| {
+            Ok(FeedContinuation::Emit)
+        })
     }
 
-    fn poll_inner<const COMPACT: bool, const DIRECT: bool>(
+    fn poll_inner<const COMPACT: bool, const DIRECT: bool, const RUNS: bool>(
         &mut self,
         input: &mut InputCursor,
         work: &mut WorkBudget,
         cancel: &AtomicBool,
         mut consume: impl FnMut(
-            FeedCarrier<'_>,
+            FeedItem<'_>,
             u64,
             SourceEpochs,
             &mut WorkBudget,
@@ -1488,6 +1701,12 @@ impl TransportStream {
             // request. The feed callback never receives the cursor.
             self.framer.bind_input(input)?;
             loop {
+                if RUNS && self.try_feed_payload_run(input, work, cancel, &mut consume)? {
+                    if cancel.load(Ordering::Relaxed) {
+                        return Err(Error::Cancelled);
+                    }
+                    continue;
+                }
                 match self
                     .framer
                     .poll_bound_carrier::<DIRECT>(input, work, cancel)
@@ -1497,7 +1716,7 @@ impl TransportStream {
                         self.route = self.find_route(carrier.pid());
                         if self.validate_feed_continuation(&carrier, work)? {
                             match consume(
-                                FeedCarrier(&mut carrier),
+                                FeedItem::Carrier(FeedCarrier(&mut carrier)),
                                 self.feed_omissions.unwrap_or(0),
                                 self.source_epochs(),
                                 work,
@@ -1577,3 +1796,6 @@ impl TransportStream {
         }
     }
 }
+
+#[cfg(test)]
+mod tests;

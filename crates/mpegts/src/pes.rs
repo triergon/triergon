@@ -215,6 +215,33 @@ impl PesAssembler {
         &self.raw_header[..self.header_used]
     }
 
+    fn validating_body(&self) -> bool {
+        self.payload.is_none()
+            && !self.ended
+            && self.fault.is_none()
+            && self.active
+            && self.header.is_some()
+    }
+
+    /// Capacity before a finite PES completes and needs ordinary publication.
+    pub(crate) fn body_run_capacity(&self, carrier_payload: usize) -> usize {
+        if !self.validating_body() {
+            return 0;
+        }
+        let limit = self.total.map_or(self.limits.pes_bytes, |end| end - 1);
+        (limit.saturating_sub(self.seen) / carrier_payload)
+            .min(self.limits.source_spans - self.validated_spans)
+            .min(usize::try_from(u64::MAX - self.next_chunk).unwrap_or(usize::MAX))
+    }
+
+    pub(crate) fn record_body_carriers(&mut self, carriers: usize, payload: usize) {
+        self.next_chunk += carriers as u64;
+        self.validated_chunk = Some(self.next_chunk - 1);
+        self.validated_spans += carriers;
+        self.payload_len += payload;
+        self.seen += payload;
+    }
+
     /// Validate one ordinary body carrier. A successful result records whether
     /// this finishes the finite PES. Other cases use the incremental parser.
     pub(crate) fn validate_body_carrier(
@@ -222,11 +249,7 @@ impl PesAssembler {
         count: usize,
         work: &mut WorkBudget,
     ) -> Result<Option<bool>> {
-        if self.payload.is_some()
-            || self.ended
-            || self.fault.is_some()
-            || !self.active
-            || self.header.is_none()
+        if !self.validating_body()
             || self.next_chunk == u64::MAX
             || self.validated_spans == self.limits.source_spans
             || count > self.total.unwrap_or(self.limits.pes_bytes) - self.seen
@@ -234,11 +257,7 @@ impl PesAssembler {
         {
             return Ok(None);
         }
-        self.validated_chunk = Some(self.next_chunk);
-        self.next_chunk += 1;
-        self.validated_spans += 1;
-        self.payload_len += count;
-        self.seen += count;
+        self.record_body_carriers(1, count);
         let completed = self.total == Some(self.seen);
         if completed {
             self.emit::<false>()?;
