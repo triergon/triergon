@@ -17,7 +17,7 @@
 use std::io::Write;
 use std::time::Instant;
 use triergon_codec::{AudioCodec, AudioFrame, VideoCodec};
-use triergon_harness_protocol::lanes::LaneDigest;
+use triergon_harness_protocol::interleaved::InterleavedDigest;
 use triergon_pixel::letterbox::{CANVAS_BYTES, Scaler};
 use triergon_session::mix::Downmix;
 use triergon_session::{audio_decoder, video_decoder};
@@ -26,7 +26,7 @@ use triergon_session::{audio_decoder, video_decoder};
 struct Output {
     frames: u64,
     bytes: u64,
-    digest: LaneDigest,
+    digest: InterleavedDigest,
     raw: Option<std::io::BufWriter<std::fs::File>>,
 }
 impl Output {

@@ -1,25 +1,26 @@
-//! Eight-lane output digest of the decode workers (`codec-worker`, `harness/d4/reference_decode.c`).
+//! Interleaved output digest of the decode workers (`codec-worker`, `harness/d4/reference_decode.c`).
 //!
-//! Over the concatenated output in 64-byte blocks, lane `i` takes
-//! `lane_i <- (lane_i ^ le64(word 8k+i)) * K`; a short final block is zero-padded.
-//! The result is `h <- 31*h + lane_i` over the eight lanes, then `31*h + byte count`.
+//! Eight accumulators take the concatenated output in 64-byte blocks: accumulator `i`
+//! takes `a_i <- (a_i ^ le64(word 8k+i)) * K`; a short final block is zero-padded.
+//! The result is `h <- 31*h + a_i` over the eight accumulators, then `31*h + byte count`.
 //! Every output byte enters it at about 1% of the decode cost; it is a fingerprint of
 //! equal output, not a cryptographic hash.
 
 const K: u64 = 0x9E37_79B9_7F4A_7C15;
 
-/// Streaming state; feed with [`LaneDigest::update`], read with [`LaneDigest::finish`].
+/// Streaming state; feed with [`InterleavedDigest::update`], read with [`InterleavedDigest::finish`].
 #[derive(Clone, Debug, Default)]
-pub struct LaneDigest {
-    lanes: [u64; 8],
+pub struct InterleavedDigest {
+    accumulators: [u64; 8],
     total: u64,
     pending: Vec<u8>,
 }
 
-impl LaneDigest {
-    fn block(lanes: &mut [u64; 8], block: &[u8]) {
-        for (lane, word) in lanes.iter_mut().zip(block.chunks_exact(8)) {
-            *lane = (*lane ^ u64::from_le_bytes(word.try_into().expect("8 bytes"))).wrapping_mul(K);
+impl InterleavedDigest {
+    fn block(accumulators: &mut [u64; 8], block: &[u8]) {
+        for (accumulator, word) in accumulators.iter_mut().zip(block.chunks_exact(8)) {
+            *accumulator = (*accumulator ^ u64::from_le_bytes(word.try_into().expect("8 bytes")))
+                .wrapping_mul(K);
         }
     }
 
@@ -33,27 +34,27 @@ impl LaneDigest {
             if self.pending.len() < 64 {
                 return;
             }
-            Self::block(&mut self.lanes, &self.pending);
+            Self::block(&mut self.accumulators, &self.pending);
             self.pending.clear();
         }
         let blocks = bytes.chunks_exact(64);
         self.pending.extend_from_slice(blocks.remainder());
         for block in blocks {
-            Self::block(&mut self.lanes, block);
+            Self::block(&mut self.accumulators, block);
         }
     }
 
     /// The digest of everything appended so far.
     pub fn finish(&self) -> u64 {
-        let mut lanes = self.lanes;
+        let mut accumulators = self.accumulators;
         if !self.pending.is_empty() {
             let mut last = [0_u8; 64];
             last[..self.pending.len()].copy_from_slice(&self.pending);
-            Self::block(&mut lanes, &last);
+            Self::block(&mut accumulators, &last);
         }
-        let h = lanes
-            .iter()
-            .fold(0_u64, |h, &lane| h.wrapping_mul(31).wrapping_add(lane));
+        let h = accumulators.iter().fold(0_u64, |h, &accumulator| {
+            h.wrapping_mul(31).wrapping_add(accumulator)
+        });
         h.wrapping_mul(31).wrapping_add(self.total)
     }
 }
@@ -63,7 +64,7 @@ mod tests {
     use super::*;
 
     fn digest(chunks: &[&[u8]]) -> u64 {
-        let mut d = LaneDigest::default();
+        let mut d = InterleavedDigest::default();
         for chunk in chunks {
             d.update(chunk);
         }
