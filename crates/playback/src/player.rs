@@ -511,12 +511,19 @@ impl<S: Source> Player<S> {
         }
         let engine = self.engine.as_mut().ok_or(Error::Closed)?;
         selection.validate(engine)?;
-        if !engine
-            .facts()?
-            .as_slice()
-            .iter()
-            .any(|f| f.key == track && f.kind == TrackKind::Video && f.enabled)
-        {
+        let enabled_video = match (&*engine, track) {
+            (Engine::Mp4(mp4), TrackKey::Mp4(id)) => mp4
+                .plan
+                .track(id)
+                .is_ok_and(|t| t.snapshot.handler == *b"vide" && t.snapshot.enabled),
+            (Engine::Mp4(_), _) => false,
+            _ => engine
+                .facts()?
+                .as_slice()
+                .iter()
+                .any(|f| f.key == track && f.kind == TrackKind::Video && f.enabled),
+        };
+        if !enabled_video {
             return Err(Error::Invalid("seek target must be source video"));
         }
         let epoch = self.epoch.checked_add(1).ok_or(Error::Overflow)?;
