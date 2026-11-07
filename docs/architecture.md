@@ -111,9 +111,10 @@ performance gates where it touches hot code.
 2. **Formats.** ISO BMFF and MPEG-TS implement `ContainerReader` and become
    `AnyReader` variants. Box walking and track classification move out of playback
    into the readers.
-3. **Reference compatibility.** `triergon-framing` and `triergon-subtitles` follow
-   the convention in [reference-compatible behaviour](#reference-compatible-behaviour).
-   Matroska, MPEG-TS (whose packet-completion projection is already behind
+3. **Reference compatibility.** `triergon-framing`, `triergon-matroska` and
+   `triergon-subtitles` follow the convention in
+   [reference-compatible behaviour](#reference-compatible-behaviour). MPEG-TS
+   (whose packet-completion projection is already behind
    `reference-trace`), ISO BMFF and playback move to it one crate at a time.
 4. **Codecs.** Codecs allocate through core budgets.
 5. **Composition.** Playback runs over `AnyReader`; HLS and codec bridges become

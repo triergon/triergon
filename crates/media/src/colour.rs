@@ -1,5 +1,6 @@
 //! Matroska Colour and static HDR source facts (RFC 9559 §5.1.4.1.28).
 //! No decoder, display policy or native library belongs in this module.
+#[cfg(feature = "reference-trace")]
 use crate::{Error, Result};
 
 /// All ten source floats, without rational quantization or filling absent fields.
@@ -46,9 +47,10 @@ impl Default for Colour {
     }
 }
 
-/// Bounded nonnegative rational for the pinned public numeric view.
+/// Bounded nonnegative rational for the reference's numeric view.
 /// Continued fractions operate on the exact IEEE binary value. Source floats are
-/// never replaced by this explicit, optional compatibility representation.
+/// never replaced by this comparison-only representation.
+#[cfg(feature = "reference-trace")]
 fn bounded_rational(value: f64) -> Result<[i64; 2]> {
     const MAX: u128 = i32::MAX as u128;
     if !value.is_finite() || value < 0. || value > MAX as f64 {
@@ -58,7 +60,7 @@ fn bounded_rational(value: f64) -> Result<[i64; 2]> {
     if value < half_minimum {
         return Ok([0, 1]);
     }
-    // The native public view rounds the representable half-minimum boundary
+    // The reference's public view rounds the representable half-minimum boundary
     // toward 1/MAX. Keep this exact comparison separate from source storage.
     #[allow(clippy::float_cmp)] // Exact boundary value, not a tolerance test.
     if value == half_minimum {
@@ -109,12 +111,17 @@ fn bounded_rational(value: f64) -> Result<[i64; 2]> {
     }
 }
 
+#[cfg(feature = "reference-trace")]
 impl Colour {
-    /// Pinned FFmpeg 9 packet-metadata view, encoded as the 32 protocol integers.
-    /// It omits unavailable bit depth, incomplete/zero primaries and incomplete
-    /// light levels exactly as the native public API does. Use the source fields
-    /// above for complete facts; this view does not delete or mutate them.
-    pub fn ffmpeg9(&self) -> Result<[i64; 32]> {
+    /// The colour fields as the colour trace records them: FFmpeg's stream colour
+    /// properties, content light level and mastering display metadata, encoded as
+    /// 32 integers with signed 32-bit rationals. Comparison-only; see
+    /// [`reference_trace`](crate::reference_trace).
+    ///
+    /// It omits unavailable bit depth, incomplete or zero primaries and incomplete
+    /// light levels as FFmpeg's public API does. Use the source fields above for
+    /// complete facts; this view does not delete or mutate them.
+    pub fn trace_fields(&self) -> Result<[i64; 32]> {
         let mut out = [0; 32];
         let code = |v| i32::try_from(v).map(i64::from).map_err(|_| Error::Overflow);
         out[0] = code(self.matrix_coefficients)?;
@@ -168,7 +175,7 @@ impl Colour {
     }
 }
 
-#[cfg(test)]
+#[cfg(all(test, feature = "reference-trace"))]
 mod tests {
     use super::*;
     #[test]
@@ -202,6 +209,7 @@ mod tests {
 #[cfg(test)]
 mod source_tests {
     use super::*;
+    use crate::Result;
     use crate::incremental::ParseStep;
     use std::sync::atomic::AtomicBool;
     use triergon_core::WorkBudget;
@@ -259,7 +267,8 @@ mod source_tests {
         assert_eq!(m.luminance_max, None);
         let c = parse(&e(0x55bb, &u64::MAX.to_be_bytes())).unwrap();
         assert_eq!(c.primaries, u64::MAX);
-        assert!(c.ffmpeg9().is_err());
+        #[cfg(feature = "reference-trace")]
+        assert!(c.trace_fields().is_err());
     }
     #[test]
     fn malformed_metadata_duplicates_and_non_finite_or_out_of_range_values_fail() {
@@ -282,6 +291,7 @@ mod source_tests {
         let c = parse(&e(0x55d0, &e(0x55d9, &f64::MAX.to_be_bytes()))).unwrap();
         assert_eq!(c.mastering.unwrap().luminance_max, Some(f64::MAX));
     }
+    #[cfg(feature = "reference-trace")]
     #[test]
     fn numerical_boundaries_do_not_panic_or_lose_source_values() {
         for bits in (0..2047_u64).map(|exponent| (exponent << 52) | 0x1234_5678_9abc) {

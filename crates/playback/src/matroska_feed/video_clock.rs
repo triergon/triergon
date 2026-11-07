@@ -92,7 +92,7 @@ impl DecodeClock {
             self.valid = false;
             return Err(error);
         }
-        let native = timing.ffmpeg9()?;
+        let native = triergon_matroska::compat::clock::packet_timing(timing)?;
         let pts_ns = native
             .pts
             .map(triergon_matroska::timing::ExactTime::rounded_ns)

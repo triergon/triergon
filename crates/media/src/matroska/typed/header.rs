@@ -1,7 +1,7 @@
 //! Bounded EBML document and SeekHead syntax. No blocking parser calls.
 use super::{
+    block_additions::BlockAdditionContainer,
     copy_vec::CopyVec,
-    native_additions::BlockAdditionContainer,
     syntax::{ChildCursor, check},
 };
 use crate::matroska::typed::syntax::Required;

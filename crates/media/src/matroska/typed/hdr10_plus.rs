@@ -226,7 +226,7 @@ impl<'a> Hdr10Plus<'a> {
 
     /// Parse the complete registered ITU-T T.35 record. No heap allocation is
     /// needed. Both grids borrow validated bit ranges from the original bytes.
-    pub fn parse_t35_v1(
+    pub fn parse_t35(
         raw: &'a [u8],
         work: &mut WorkBudget,
         cancel: &AtomicBool,

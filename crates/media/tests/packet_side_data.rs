@@ -180,34 +180,36 @@ fn laces_share_complete_addition_sources_and_mapping_fields_survive_reader_drop(
         extensions.unknown_mapping_fields().next().unwrap().data(),
         b"unknown-map"
     );
-    use triergon_matroska::typed::{BlockAdditionContainer::Matroska, NativeBlockAddition};
+    use triergon_matroska::{
+        compat::block_additions::{PacketSideData, packet_side_data},
+        typed::BlockAdditionContainer::Matroska,
+    };
     let before_projection = pool.used();
     for packet in [&a, &b] {
         assert!(matches!(
-            packet
-                .project_native_block_additions_v1(
-                    &extensions,
-                    Matroska,
-                    &mut WorkBudget::new(0),
-                    &cancel,
-                )
-                .unwrap(),
-            ParseStep::Yield
-        ));
-        let ParseStep::Event([Some(projected), None]) = packet
-            .project_native_block_additions_v1(
+            packet_side_data(
+                packet,
                 &extensions,
                 Matroska,
-                &mut WorkBudget::new(18),
+                &mut WorkBudget::new(0),
                 &cancel,
             )
-            .unwrap()
-        else {
-            panic!("expected one native opaque addition");
+            .unwrap(),
+            ParseStep::Yield
+        ));
+        let ParseStep::Event([Some(projected), None]) = packet_side_data(
+            packet,
+            &extensions,
+            Matroska,
+            &mut WorkBudget::new(18),
+            &cancel,
+        )
+        .unwrap() else {
+            panic!("expected one opaque addition");
         };
         assert_eq!(
             projected,
-            NativeBlockAddition::Opaque {
+            PacketSideData::Opaque {
                 id: u64::MAX,
                 payload: b"opaque-4"
             }
@@ -240,8 +242,11 @@ fn laces_share_complete_addition_sources_and_mapping_fields_survive_reader_drop(
 }
 
 #[test]
-fn native_projection_keeps_lcevc_and_rejects_foreign_mapping_context() {
-    use triergon_matroska::typed::{BlockAdditionContainer::Matroska, NativeBlockAddition};
+fn side_data_projection_keeps_lcevc_and_rejects_foreign_mapping_context() {
+    use triergon_matroska::{
+        compat::block_additions::{PacketSideData, packet_side_data},
+        typed::BlockAdditionContainer::Matroska,
+    };
 
     let mapped = e(0x41e4, &[u(0x41f0, 4), u(0x41e7, 4)].concat());
     let config = [u(0x55ee, 4), mapped].concat();
@@ -272,7 +277,8 @@ fn native_projection_keeps_lcevc_and_rejects_foreign_mapping_context() {
     let (packet, extensions) = open();
     let (_, foreign) = open();
     assert!(matches!(
-        packet.project_native_block_additions_v1(
+        packet_side_data(
+            &packet,
             &foreign,
             Matroska,
             &mut WorkBudget::new(18),
@@ -281,17 +287,16 @@ fn native_projection_keeps_lcevc_and_rejects_foreign_mapping_context() {
         Err(Error::Invalid("packet additions TrackEntry mismatch"))
     ));
     let mut work = WorkBudget::new(18);
-    let ParseStep::Event(result) = packet
-        .project_native_block_additions_v1(&extensions, Matroska, &mut work, &cancel)
-        .unwrap()
+    let ParseStep::Event(result) =
+        packet_side_data(&packet, &extensions, Matroska, &mut work, &cancel).unwrap()
     else {
         panic!("projection has its exact grant");
     };
     assert_eq!(
         result,
         [
-            Some(NativeBlockAddition::Lcevc(b"ab")),
-            Some(NativeBlockAddition::Opaque {
+            Some(PacketSideData::Lcevc(b"ab")),
+            Some(PacketSideData::Opaque {
                 id: 1,
                 payload: b"opaque"
             })
@@ -299,7 +304,8 @@ fn native_projection_keeps_lcevc_and_rejects_foreign_mapping_context() {
     );
     assert_eq!(work.spent(), 18);
     assert!(matches!(
-        packet.project_native_block_additions_v1(
+        packet_side_data(
+            &packet,
             &extensions,
             Matroska,
             &mut work,
@@ -1009,11 +1015,11 @@ fn hdr10_plus_preserves_wire_values_and_borrowed_grid() {
     use triergon_matroska::typed::Hdr10Plus;
     let cancel = AtomicBool::new(false);
     assert!(matches!(
-        Hdr10Plus::parse_t35_v1(HDR10_PLUS, &mut WorkBudget::new(0), &cancel).unwrap(),
+        Hdr10Plus::parse_t35(HDR10_PLUS, &mut WorkBudget::new(0), &cancel).unwrap(),
         ParseStep::Yield
     ));
     let ParseStep::Event(metadata) =
-        Hdr10Plus::parse_t35_v1(HDR10_PLUS, &mut WorkBudget::new(4096), &cancel).unwrap()
+        Hdr10Plus::parse_t35(HDR10_PLUS, &mut WorkBudget::new(4096), &cancel).unwrap()
     else {
         panic!("bounded HDR10+ control");
     };
@@ -1038,7 +1044,7 @@ fn hdr10_plus_preserves_wire_values_and_borrowed_grid() {
     for length in 6..HDR10_PLUS.len() {
         assert!(
             matches!(
-                Hdr10Plus::parse_t35_v1(&HDR10_PLUS[..length], &mut WorkBudget::new(4096), &cancel),
+                Hdr10Plus::parse_t35(&HDR10_PLUS[..length], &mut WorkBudget::new(4096), &cancel),
                 Err(Error::Truncated)
             ),
             "truncated prefix length {length}"
@@ -1047,7 +1053,7 @@ fn hdr10_plus_preserves_wire_values_and_borrowed_grid() {
     let mut oversized = HDR10_PLUS.to_vec();
     oversized.resize(914, 0);
     assert!(matches!(
-        Hdr10Plus::parse_t35_v1(&oversized, &mut WorkBudget::new(8192), &cancel),
+        Hdr10Plus::parse_t35(&oversized, &mut WorkBudget::new(8192), &cancel),
         Err(Error::Policy("HDR10+ payload"))
     ));
 }
@@ -1055,7 +1061,10 @@ fn hdr10_plus_preserves_wire_values_and_borrowed_grid() {
 #[test]
 fn implicit_vp9_hdr10_plus_admission_is_bound_to_the_webm_track() {
     use triergon_core::OwnedInputBytes;
-    use triergon_matroska::typed::{BlockAdditionContainer::WebM, PayloadOwnership};
+    use triergon_matroska::{
+        compat::block_additions,
+        typed::{BlockAdditionContainer::WebM, PayloadOwnership},
+    };
     let cancel = AtomicBool::new(false);
     for (doctype, codec, maximum, profile, admitted) in [
         (b"webm".as_slice(), b"V_VP9".as_slice(), None, true, true),
@@ -1096,7 +1105,7 @@ fn implicit_vp9_hdr10_plus_admission_is_bound_to_the_webm_track() {
         let pool = Budget::new(256 * 1024).unwrap();
         let source = OwnedInputBytes::try_from_vec(&pool, data).unwrap();
         let open = if profile {
-            BlockingReader::open_owned_seekable_webm_vp9_t35_v1
+            block_additions::open_owned_seekable_in
         } else {
             BlockingReader::open_owned_seekable_in
         };
@@ -1122,9 +1131,9 @@ fn implicit_vp9_hdr10_plus_admission_is_bound_to_the_webm_track() {
                 .track_extensions_job(0, Limits::default())
                 .unwrap(),
         );
-        let ParseStep::Event(Some(hdr)) = packet
-            .project_native_hdr10_plus_v1(&map, WebM, &mut WorkBudget::new(4096), &cancel)
-            .unwrap()
+        let ParseStep::Event(Some(hdr)) =
+            block_additions::hdr10_plus(&packet, &map, WebM, &mut WorkBudget::new(4096), &cancel)
+                .unwrap()
         else {
             panic!("implicit T.35 event");
         };

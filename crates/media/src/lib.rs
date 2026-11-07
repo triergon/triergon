@@ -18,6 +18,7 @@
     clippy::unnested_or_patterns
 )]
 pub mod colour;
+pub mod compat;
 mod container;
 mod content_encoding;
 mod cues;
@@ -25,6 +26,9 @@ mod ebml;
 pub mod incremental;
 pub mod matroska;
 pub mod metadata;
+mod packet_clock;
+#[cfg(feature = "reference-trace")]
+pub mod reference_trace;
 pub mod storage;
 pub mod time;
 pub mod timing;

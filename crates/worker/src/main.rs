@@ -15,7 +15,7 @@ use triergon_harness_protocol::{
     hex, quoted,
 };
 use triergon_matroska::timing::ExactTime;
-use triergon_matroska::{Limits, typed::BlockingReader as Demuxer};
+use triergon_matroska::{Limits, compat::clock::packet_timing, typed::BlockingReader as Demuxer};
 
 // Explicit private operation binding. Library defaults remain OwnedExact.
 fn open_shared<R: Read>(source: R, limits: Limits) -> triergon_matroska::Result<Demuxer<R>> {
@@ -256,7 +256,7 @@ fn trace<R: Read>(
             write!(
                 out,
                 ",\"colour\":{:?}",
-                t.colour.unwrap_or_default().ffmpeg9()?
+                t.colour.unwrap_or_default().trace_fields()?
             )?;
         }
         out.push('}');
@@ -269,7 +269,7 @@ fn trace<R: Read>(
         if codec_packets && !decoder_packet(&d.tracks()[p.track], &p) {
             continue;
         }
-        let clock = p.timing.ffmpeg9()?;
+        let clock = packet_timing(p.timing)?;
         if !first {
             out.push(',');
         }
@@ -347,7 +347,7 @@ fn run(
                 fold(&mut digest, value);
             }
             if metadata != 0 {
-                for value in t.colour.unwrap_or_default().ffmpeg9()? {
+                for value in t.colour.unwrap_or_default().trace_fields()? {
                     fold(&mut digest, value as u64);
                 }
             }
@@ -360,7 +360,7 @@ fn run(
             packets += 1;
             bytes += p.data.len() as u64;
             fold_bytes(&mut digest, &p.data);
-            let time = p.timing.ffmpeg9()?;
+            let time = packet_timing(p.timing)?;
             let (trim_start, trim_end) =
                 trims(&d.tracks()[p.track], &p, initial_trim && !seen[p.track])?;
             seen[p.track] = true;

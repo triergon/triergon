@@ -3208,7 +3208,12 @@ fn matroska_discovery_observes_timed_audio_without_caller_confirmation() {
         let mut done = discovery.finish().unwrap();
         let track = |output: &Output| match output.event() {
             RawEvent::Matroska(Event::Packet(packet)) => {
-                assert!(packet.packet.timing.ffmpeg9().unwrap().pts.is_some());
+                assert!(
+                    triergon_matroska::compat::clock::packet_timing(packet.packet.timing)
+                        .unwrap()
+                        .pts
+                        .is_some()
+                );
                 Some(packet.packet.track)
             }
             _ => None,

@@ -191,8 +191,12 @@ fn matroska_avc_and_two_aac_tracks_match_complete_feed_packets_and_source_pts() 
                     let pts = i64::from_be_bytes(header[1..9].try_into().unwrap());
                     assert_eq!(usize::from(header[0]), track);
                     let timing = packet.packet.timing;
-                    let reference_pts =
-                        timing.ffmpeg9().unwrap().pts.unwrap().rounded_ns().unwrap();
+                    let reference_pts = triergon_matroska::compat::clock::packet_timing(timing)
+                        .unwrap()
+                        .pts
+                        .unwrap()
+                        .rounded_ns()
+                        .unwrap();
                     assert_eq!(pts, reference_pts);
                     let exact = timing.source().unwrap().pts.unwrap().rounded_ns().unwrap();
                     assert_eq!(Some(exact), output.source.packet.pts_ns);
@@ -380,7 +384,12 @@ fn matroska_hevc_ac3_and_eac3_match_complete_feed_packets_and_source_pts() {
                     assert_eq!(usize::from(header[0]), track);
                     let pts = i64::from_be_bytes(header[1..9].try_into().unwrap());
                     let timing = packet.packet.timing;
-                    let actual = timing.ffmpeg9().unwrap().pts.unwrap().rounded_ns().unwrap();
+                    let actual = triergon_matroska::compat::clock::packet_timing(timing)
+                        .unwrap()
+                        .pts
+                        .unwrap()
+                        .rounded_ns()
+                        .unwrap();
                     assert_eq!(pts, actual);
                     let exact = timing.source().unwrap().pts.unwrap().rounded_ns().unwrap();
                     assert_eq!(Some(exact), output.source.packet.pts_ns);

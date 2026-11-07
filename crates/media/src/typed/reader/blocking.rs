@@ -392,16 +392,6 @@ impl BlockingReader<std::io::Cursor<triergon_core::OwnedInputBytes>> {
         Self::open_owned_with_profile(source, limits, pool, policy, false)
     }
 
-    /// Opt into the implicit WebM VP9 T.35 admission on an owned input.
-    pub fn open_owned_seekable_webm_vp9_t35_v1(
-        source: triergon_core::OwnedInputBytes,
-        limits: Limits,
-        pool: &Budget,
-        policy: crate::storage::PayloadOwnership,
-    ) -> Result<Self> {
-        Self::open_owned_with_profile(source, limits, pool, policy, true)
-    }
-
     fn open_owned_with_profile(
         source: triergon_core::OwnedInputBytes,
         limits: Limits,
@@ -417,7 +407,7 @@ impl BlockingReader<std::io::Cursor<triergon_core::OwnedInputBytes>> {
             random_access: true,
         };
         let mut reader = if webm_vp9_t35 {
-            Reader::new_webm_vp9_t35_v1(pool, SourceId(1), capabilities, limits, 8192)?
+            new_reader(pool, SourceId(1), capabilities, limits, 8192)?
         } else {
             Reader::new(pool, SourceId(1), capabilities, limits, 8192)?
         };
@@ -431,6 +421,18 @@ impl BlockingReader<std::io::Cursor<triergon_core::OwnedInputBytes>> {
             }),
         })
     }
+}
+
+/// [`BlockingReader::open_owned_seekable_in`] with WebM VP9's implicit ITU-T T.35
+/// addition admitted, as [`new_reader`](super::new_reader) does. Documented on
+/// [`compat::block_additions`](crate::compat::block_additions).
+pub fn open_owned_seekable_in(
+    source: triergon_core::OwnedInputBytes,
+    limits: Limits,
+    pool: &Budget,
+    policy: crate::storage::PayloadOwnership,
+) -> Result<BlockingReader<std::io::Cursor<triergon_core::OwnedInputBytes>>> {
+    BlockingReader::open_owned_with_profile(source, limits, pool, policy, true)
 }
 
 #[cfg(test)]

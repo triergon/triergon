@@ -1,6 +1,8 @@
-//! Matroska source time and explicit FFmpeg packet-clock compatibility.
+//! Matroska source time.
 //!
-//! Container time never loses precision to satisfy another API's clock grid.
+//! Container time never loses precision to satisfy another API's clock grid. The
+//! packet clock FFmpeg reports is a separate policy,
+//! [`compat::clock`](crate::compat::clock).
 use crate::{Error, Result};
 
 /// Exact rational nanoseconds. Denominators are bounded by a block's frame count.
@@ -88,7 +90,7 @@ pub struct PacketTiming {
 }
 
 impl BlockTiming {
-    fn validate(self) -> Result<()> {
+    pub(crate) fn validate(self) -> Result<()> {
         if self.scale_ns == 0 || self.frames == 0 || self.frame >= self.frames {
             return Err(Error::Invalid("block timing parameters"));
         }
@@ -139,76 +141,12 @@ impl BlockTiming {
         };
         Ok(PacketTiming { pts, duration })
     }
-
-    /// Explicit compatibility with the pinned n9.0 packet API, in Segment ticks.
-    /// Source precision, including pre-zero PTS, remains separately available.
-    pub fn ffmpeg9(self) -> Result<PacketTiming> {
-        self.validate()?;
-        let scale = i128::from(self.scale_ns);
-        let delay = if self.codec_delay_ns == 0 {
-            0
-        } else {
-            match self.codec_delay_ns.checked_add(self.scale_ns / 2) {
-                Some(value) => i128::from(value / self.scale_ns),
-                None => (i128::from(self.codec_delay_ns) + scale / 2) / scale,
-            }
-        };
-        let total_ticks = match self.duration_ticks.filter(|d| *d != 0) {
-            Some(d) => i128::from(d),
-            None => match self.default_duration_ns {
-                Some(duration) if self.frames == 1 => i128::from(duration / self.scale_ns),
-                Some(duration) => i128::from(duration) * i128::from(self.frames) / scale,
-                None => 0,
-            },
-        };
-        let (start, duration, previous_duration) = if self.frames == 1 {
-            (0, total_ticks, 1)
-        } else {
-            let boundary = |n: u16| total_ticks * i128::from(n) / i128::from(self.frames);
-            let start = boundary(self.frame);
-            let duration = boundary(self.frame + 1) - start;
-            let previous = if self.frame > 0 {
-                start - boundary(self.frame - 1)
-            } else {
-                1
-            };
-            (start, duration, previous)
-        };
-        // Negative unadjusted block time has no packet timestamp in n9.0.
-        // A zero-duration preceding lace also terminates inferred timestamps.
-        let pts = if self.timestamp_ticks < 0
-            || previous_duration == 0
-            || (self.frame > 0 && total_ticks < i128::from(self.frames))
-        {
-            None
-        } else {
-            let ticks = self
-                .timestamp_ticks
-                .checked_sub(delay)
-                .and_then(|n| n.checked_add(start))
-                .ok_or(Error::Overflow)?;
-            Some(ExactTime::new(
-                ticks.checked_mul(scale).ok_or(Error::Overflow)?,
-                1,
-            )?)
-        };
-        Ok(PacketTiming {
-            pts,
-            duration: if duration == 0 {
-                None
-            } else {
-                Some(ExactTime::new(
-                    duration.checked_mul(scale).ok_or(Error::Overflow)?,
-                    1,
-                )?)
-            },
-        })
-    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::compat::clock::packet_timing;
     #[test]
     fn integral_exact_time_keeps_signed_extremes_unknowns_and_rounding_errors() {
         for value in [
@@ -251,7 +189,7 @@ mod tests {
             frame: 0,
             frames: 1,
         };
-        let time = wide.ffmpeg9().unwrap();
+        let time = packet_timing(wide).unwrap();
         assert_eq!(
             time.pts.unwrap(),
             ExactTime::new(2 * i128::from(u64::MAX), 1).unwrap()
@@ -269,25 +207,23 @@ mod tests {
             frame: 0,
             frames: 1,
         };
-        let time = zero.ffmpeg9().unwrap();
+        let time = packet_timing(zero).unwrap();
         assert_eq!(time.pts.unwrap().rounded_ns().unwrap(), 0);
         assert_eq!(time.duration, None);
         assert_eq!(
-            BlockTiming {
+            packet_timing(BlockTiming {
                 timestamp_ticks: -1,
                 ..zero
-            }
-            .ffmpeg9()
+            })
             .unwrap()
             .pts,
             None
         );
         assert!(matches!(
-            BlockTiming {
+            packet_timing(BlockTiming {
                 timestamp_ticks: i128::MAX,
                 ..wide
-            }
-            .ffmpeg9(),
+            }),
             Err(Error::Overflow)
         ));
     }
@@ -309,13 +245,21 @@ mod tests {
             b.source().unwrap().pts.unwrap().rounded_ns().unwrap(),
             -333_333
         );
-        assert_eq!(b.ffmpeg9().unwrap().pts.unwrap().rounded_ns().unwrap(), 0);
+        assert_eq!(
+            packet_timing(b).unwrap().pts.unwrap().rounded_ns().unwrap(),
+            0
+        );
         assert_eq!(
             b.source().unwrap().duration.unwrap().rounded_ns().unwrap(),
             21_333_333
         );
         assert_eq!(
-            b.ffmpeg9().unwrap().duration.unwrap().rounded_ns().unwrap(),
+            packet_timing(b)
+                .unwrap()
+                .duration
+                .unwrap()
+                .rounded_ns()
+                .unwrap(),
             21_000_000
         );
     }
@@ -330,7 +274,7 @@ mod tests {
             b.source().unwrap().pts.unwrap().rounded_ns().unwrap(),
             -4_000_000
         );
-        assert_eq!(b.ffmpeg9().unwrap().pts, None);
+        assert_eq!(packet_timing(b).unwrap().pts, None);
     }
     #[test]
     fn fractional_lace_duration_remains_exact() {

@@ -1,5 +1,6 @@
 //! Private retained jobs behind the typed Matroska reader.
 //! All transport/storage/time use shared core.
+pub(crate) mod block_additions;
 pub(crate) mod blocking;
 pub(crate) mod colour;
 pub(crate) mod configuration;
@@ -12,7 +13,6 @@ pub(crate) mod header;
 pub(crate) mod info;
 pub(crate) mod lace;
 pub(crate) mod mapping;
-pub(crate) mod native_additions;
 pub(crate) mod packet;
 pub(crate) mod range;
 pub(crate) mod seek;

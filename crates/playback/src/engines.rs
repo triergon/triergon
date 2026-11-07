@@ -411,7 +411,9 @@ impl Engine {
         window: usize,
     ) -> Result<Self> {
         Ok(Self::Matroska(MkvEngine {
-            reader: Reader::new_webm_vp9_t35_v1(pool, id, caps, limits, window)?,
+            reader: triergon_matroska::compat::block_additions::new_reader(
+                pool, id, caps, limits, window,
+            )?,
             source: id,
         }))
     }
