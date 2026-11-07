@@ -240,6 +240,22 @@ impl Time {
                 .ok_or(Error::Overflow)?;
             return signed(magnitude, self.numerator < 0);
         }
+        if base.numerator() == 1
+            && let (Ok(magnitude), Ok(denominator)) = (
+                u64::try_from(self.numerator.unsigned_abs()),
+                u64::try_from(exact_denominator),
+            )
+            && let Some(scaled) = magnitude.checked_mul(base.denominator())
+        {
+            let remainder = scaled % denominator;
+            return rounded(
+                u128::from(scaled / denominator),
+                remainder != 0,
+                remainder >= denominator - remainder,
+                self.numerator < 0,
+                rounding,
+            );
+        }
         // Cancel both cross factors before multiplication. This preserves large
         // source clocks, including unsigned tfdt values, without float conversion.
         let a = gcd(self.numerator.unsigned_abs(), u128::from(base.numerator()));
@@ -270,7 +286,7 @@ impl Time {
         i64::try_from(self.to_ticks(base, rounding)?).map_err(|_| Error::Overflow)
     }
     pub fn to_nanoseconds(self, rounding: Rounding) -> Result<i64> {
-        self.to_i64_ticks(TimeBase::new(1, 1_000_000_000)?, rounding)
+        self.to_i64_ticks(TimeBase::NANOSECONDS, rounding)
     }
 }
 

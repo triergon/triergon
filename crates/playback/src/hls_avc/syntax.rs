@@ -44,10 +44,18 @@ impl<'a> Rbsp<'a> {
         Ok(u32::from((self.byte >> self.bits) & 1))
     }
 
-    fn fixed(&mut self, width: u32) -> Result<u32> {
+    fn fixed(&mut self, mut width: u32) -> Result<u32> {
         let mut value = 0;
-        for _ in 0..width {
-            value = (value << 1) | self.bit()?;
+        while width != 0 {
+            if self.bits == 0 {
+                value = (value << 1) | self.bit()?;
+                width -= 1;
+            }
+            let count = width.min(u32::from(self.bits));
+            self.bits -= count as u8;
+            let mask = (1 << count) - 1;
+            value = (value << count) | ((u32::from(self.byte) >> self.bits) & mask);
+            width -= count;
         }
         Ok(value)
     }
@@ -315,4 +323,41 @@ pub(crate) fn slice_picture(raw: &[u8]) -> Result<(u32, u32, u8)> {
     let first_mb = r.ue()?;
     let slice_type = r.bounded(9)?;
     Ok((first_mb, slice_type % 5, r.bounded(255)? as u8))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::Rbsp;
+    use triergon_core::Result;
+
+    #[test]
+    fn fixed_fields_match_serial_bits_across_prevention_bytes_and_truncation() {
+        let inputs: &[&[u8]] = &[
+            &[],
+            &[0xa5],
+            &[0xa5, 0x81, 0x7e, 0x10, 0xff, 0],
+            &[0, 0, 3, 0, 1, 0x80],
+            &[0, 0, 3, 3, 0x55],
+            &[0, 0, 3, 4],
+            &[0, 0, 3],
+        ];
+        for input in inputs {
+            for offset in 0..=input.len() * 8 {
+                for width in 0..=32 {
+                    let mut serial = Rbsp::new(input);
+                    let mut grouped = Rbsp::new(input);
+                    for _ in 0..offset {
+                        assert_eq!(serial.bit(), grouped.bit());
+                    }
+                    let expected: Result<u32> =
+                        (0..width).try_fold(0, |value, _| Ok((value << 1) | serial.bit()?));
+                    assert_eq!(grouped.fixed(width), expected);
+                    assert_eq!(
+                        (grouped.rest, grouped.zeroes, grouped.byte, grouped.bits),
+                        (serial.rest, serial.zeroes, serial.byte, serial.bits),
+                    );
+                }
+            }
+        }
+    }
 }

@@ -9,8 +9,9 @@
     "one independently addressable TS188 segment from a preloaded forward-only source",
     "one selected video stream (AVC or HEVC) and one audio stream (AAC, AC-3 or E-AC-3), with stock parsers and no decoders on the reference",
     "every unit retained through the end of the segment; complete Annex B video and ADTS or Dolby audio bytes",
+    "each timed and memory operation calls contiguous_feed for every selected AVC or HEVC video unit and folds the complete contiguous payload; any required allocation, copy and release occur inside the operation",
     "video PTS, DTS, random access and raster; application audio clock from each anchor, sample count and rate",
-    "video units folded before audio units, then both lane tails; the expected fold is recorded independently per segment"
+    "video units folded before audio units, then both stream tails; the expected fold is recorded independently per segment"
   ],
   "required_profiles": [
     "replay-avc-aac-06",

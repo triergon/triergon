@@ -1,8 +1,8 @@
 //! One independently addressable TS188 HLS segment through the playback engine:
 //! open it from a preloaded forward-only source, select one video and one audio
 //! stream, retain every unit through the end of the segment, resolve the
-//! application audio clock, and fold video units first and audio units second,
-//! followed by the last video and audio presentation times.
+//! application audio clock, materialize each contiguous video feed, and fold
+//! video units first and audio units second, followed by their presentation tails.
 
 use std::io::{self, Write};
 use std::path::Path;
@@ -62,14 +62,13 @@ impl Work {
         Ok(())
     }
 
-    fn video<'a>(
+    fn video(
         &mut self,
         pts: i64,
         dts: i64,
         rap: bool,
         raster: (u32, u32),
-        length: usize,
-        spans: impl IntoIterator<Item = &'a [u8]>,
+        bytes: &[u8],
     ) -> Result<()> {
         let (width, height) = raster;
         let rap = u8::from(rap);
@@ -80,11 +79,9 @@ impl Work {
             rap.into(),
             width.into(),
             height.into(),
-            length as u64,
+            bytes.len() as u64,
         ]);
-        for span in spans {
-            self.payload(span)?;
-        }
+        self.payload(bytes)?;
         self.end_packet()
     }
 
@@ -162,13 +159,13 @@ fn measure(pool: &Budget, segment: Segment) -> Result<Work> {
                     match unit {
                         HlsFeedUnit::Video(unit) if video_pass => {
                             let clock = unit.clock.ok_or("missing AVC PES clock")?;
+                            let bytes = unit.contiguous_feed(pool)?;
                             work.video(
                                 clock.pts90.ok_or("missing AVC PTS")?,
                                 clock.dts90.ok_or("missing AVC DTS")?,
                                 unit.idr,
                                 (unit.raster.width, unit.raster.height),
-                                unit.feed_spans().map(<[u8]>::len).sum(),
-                                unit.feed_spans(),
+                                bytes.as_ref(),
                             )?;
                         }
                         HlsFeedUnit::Audio(unit, clock) if !video_pass => {
@@ -198,8 +195,7 @@ fn measure(pool: &Budget, segment: Segment) -> Result<Work> {
                                 clock.dts90.ok_or("missing video DTS")?,
                                 unit.random_access(),
                                 (raster.width, raster.height),
-                                bytes.len(),
-                                [bytes.as_ref()],
+                                bytes.as_ref(),
                             )?;
                         }
                         HlsFeedUnit::Audio(unit, clock) if !video_pass => {
@@ -294,4 +290,47 @@ pub fn run(args: &[String]) -> Result<()> {
     )?;
     out.flush()?;
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{HlsAudioCodec, HlsMediaProfile, HlsVideoCodec, measure, open_segment};
+    use triergon_core::{Budget, Bytes, Error};
+
+    #[test]
+    fn measurement_materializes_video_with_the_source_pool() {
+        for (fixture, video, audio) in [
+            (
+                "replay-avc-aac-00.ts",
+                HlsVideoCodec::Avc,
+                HlsAudioCodec::Aac,
+            ),
+            (
+                "replay-avc-ac3-00.ts",
+                HlsVideoCodec::Avc,
+                HlsAudioCodec::Ac3,
+            ),
+            (
+                "replay-hevc-ac3-00.ts",
+                HlsVideoCodec::Hevc,
+                HlsAudioCodec::Ac3,
+            ),
+        ] {
+            let pool = Budget::new(256 * 1024 * 1024).unwrap();
+            let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+                .join("../../harness/fixtures/hls")
+                .join(fixture);
+            let raw = Bytes::try_from_vec(&pool, std::fs::read(path).unwrap()).unwrap();
+            let profile = HlsMediaProfile {
+                video,
+                audio: Some(audio),
+            };
+            let segment = open_segment(&pool, &raw, profile).unwrap();
+            let foreign_pool = Budget::new(256 * 1024 * 1024).unwrap();
+            let Err(error) = measure(&foreign_pool, segment) else {
+                panic!("video measurement skipped contiguous_feed for {fixture}");
+            };
+            assert_eq!(error.downcast_ref::<Error>(), Some(&Error::ForeignPool));
+        }
+    }
 }

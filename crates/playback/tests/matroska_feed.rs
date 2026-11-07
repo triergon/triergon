@@ -804,8 +804,12 @@ fn shared_source_blocks_preserve_the_feed_and_keep_the_full_owner_charged() {
         assert_eq!(outputs.iter().map(event_key).collect::<Vec<_>>(), expected);
         let mut borrowed = 0;
         let mut copied = 0;
+        let foreign_pool = Budget::new(2 << 20).unwrap();
         for output in &outputs {
+            assert!(output.belongs_to(&pool));
+            assert!(!output.belongs_to(&foreign_pool));
             if let RawEvent::Matroska(Event::Packet(packet)) = output.event() {
+                assert!(packet.configuration.budget().same_pool(&pool));
                 let data = &packet.packet.data;
                 if data.retained_capacity() == INPUT.len() {
                     borrowed += 1;
@@ -822,6 +826,7 @@ fn shared_source_blocks_preserve_the_feed_and_keep_the_full_owner_charged() {
             assert!(copied > 0);
         }
         drop(shared);
+        assert!(outputs.iter().all(|output| output.belongs_to(&pool)));
         if borrowed > 0 {
             assert!(pool.used() >= INPUT.len());
         }

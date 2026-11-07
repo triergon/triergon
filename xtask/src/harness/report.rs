@@ -30,6 +30,8 @@ pub struct Options {
     pub benchmark: bool,
     pub memory: bool,
     pub pairs: usize,
+    /// Memory pairs when different from the timing pair count.
+    pub memory_pairs: Option<usize>,
     /// Timed iterations per pair member; the contract's `iterations` when unset.
     pub iterations: Option<u32>,
     pub seed: u64,
@@ -53,6 +55,7 @@ impl Options {
             benchmark: false,
             memory: false,
             pairs: 30,
+            memory_pairs: None,
             iterations: None,
             seed: 280,
         }
@@ -539,7 +542,7 @@ pub fn run(root: &Path, options: &Options) -> Result<i32, String> {
                     &candidate,
                     &reference,
                     &input,
-                    options.pairs,
+                    options.memory_pairs.unwrap_or(options.pairs),
                     options.seed,
                     &operation,
                 )?;

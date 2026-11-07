@@ -13,6 +13,9 @@ reference worker in `harness/` performs the same operation. It is tooling
 playback-worker feed-bench  CAPSULE ITERATIONS
 playback-worker feed-fold   CAPSULE
 playback-worker feed-memory CAPSULE
+playback-worker hls-fold    FILE VIDEO AUDIO
+playback-worker hls-bench   FILE ITERATIONS VIDEO AUDIO
+playback-worker hls-memory  FILE VIDEO AUDIO
 ```
 
 A capsule is `SMVCL001`, one operation byte (0 startup, 1 seek after discovery,
@@ -22,3 +25,11 @@ byte counts and an ordered digest of every selected packet's timing and payload;
 `feed-bench` adds the elapsed time of the timed loop and `feed-memory` brackets the
 operation with the allocation-window markers. The corpus is
 `harness/features/matroska-startup-seek/`.
+
+The `hls-fold`, `hls-bench` and `hls-memory` modes accept one TS188 segment
+and selected AVC/HEVC video with AAC, AC-3 or E-AC-3 audio. They retain every
+access unit through segment EOF, then call `contiguous_feed` for every video
+unit and fold its complete payload, audio bytes, timing and both stream tails.
+Allocation, copying and release of each contiguous feed are inside the timed
+and memory operations, in the order specified by
+`harness/features/hls-segments/contract.json`.

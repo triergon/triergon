@@ -106,14 +106,14 @@ impl OutputScope {
             && self.session == output.session
             && self.epoch == output.epoch
             && self.generation == output.generation
-            && self.pool.same_pool(&output.pool)
+            && self.pool.same_pool(output.pool())
     }
 }
 
 #[derive(Debug)]
 pub struct Output {
     source: triergon_core::SourceId,
-    pool: Budget,
+    pool: Option<Budget>,
     session: u64,
     epoch: u64,
     generation: u64,
@@ -122,14 +122,15 @@ pub struct Output {
     bytes: usize,
 }
 impl Output {
-    pub(crate) fn into_matroska_replay(self) -> Option<MatroskaReplayOutput> {
+    pub(crate) fn into_matroska_replay(mut self) -> Option<MatroskaReplayOutput> {
+        let pool = self.pool.take().unwrap_or_else(|| self.pool().clone());
         let RawEvent::Matroska(event) = self.event else {
             return None;
         };
         Some(MatroskaReplayOutput {
             scope: OutputScope {
                 source: self.source,
-                pool: self.pool,
+                pool,
                 session: self.session,
                 epoch: self.epoch,
                 generation: self.generation,
@@ -144,16 +145,25 @@ impl Output {
         self.source
     }
     pub fn belongs_to(&self, pool: &Budget) -> bool {
-        self.pool.same_pool(pool)
+        self.pool().same_pool(pool)
     }
     pub(crate) fn pool(&self) -> &Budget {
-        &self.pool
+        match &self.event {
+            RawEvent::Matroska(triergon_matroska::typed::Event::Packet(packet)) => {
+                packet.configuration.budget()
+            }
+            RawEvent::NativeTs { packet, .. } => packet.spans.budget(),
+            _ => self
+                .pool
+                .as_ref()
+                .expect("output without a payload budget retains its allocation budget"),
+        }
     }
 
     pub(crate) fn scope(&self) -> OutputScope {
         OutputScope {
             source: self.source,
-            pool: self.pool.clone(),
+            pool: self.pool().clone(),
             session: self.session,
             epoch: self.epoch,
             generation: self.generation,
@@ -186,7 +196,7 @@ impl MatroskaReplayOutput {
     pub fn into_output(self) -> Output {
         Output {
             source: self.scope.source,
-            pool: self.scope.pool,
+            pool: Some(self.scope.pool),
             session: self.scope.session,
             epoch: self.scope.epoch,
             generation: self.scope.generation,
@@ -377,7 +387,7 @@ impl<S: Source> Player<S> {
         !matches!(
             self.state,
             State::Stopped | State::Cancelled | State::Failed
-        ) && self.pool.same_pool(&o.pool)
+        ) && self.pool.same_pool(o.pool())
             && self.session == o.session
             && self.generation == o.generation
             && self.epoch == o.epoch
@@ -1154,6 +1164,17 @@ impl<S: Source> Player<S> {
                         }
                     }
                     (
+                        ClockChoice::ExplicitNativeProjection,
+                        None,
+                        RawEvent::NativeTs { clock, .. },
+                    ) => {
+                        if clock.pts90.is_some() {
+                            Delivery::Present
+                        } else {
+                            Delivery::UnknownTime
+                        }
+                    }
+                    (
                         ClockChoice::SourceExact,
                         Some(ActiveSeek {
                             intent,
@@ -1235,7 +1256,15 @@ impl<S: Source> Player<S> {
         };
         *destination = Some(Output {
             source,
-            pool: self.pool.clone(),
+            pool: if matches!(
+                &event,
+                RawEvent::Matroska(triergon_matroska::typed::Event::Packet(_))
+                    | RawEvent::NativeTs { .. }
+            ) {
+                None
+            } else {
+                Some(self.pool.clone())
+            },
             session: self.session,
             epoch: self.epoch,
             generation: self.generation,
