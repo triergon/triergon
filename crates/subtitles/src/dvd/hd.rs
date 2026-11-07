@@ -266,11 +266,6 @@ pub struct HdCommands<'a> {
     maximum: usize,
     done: bool,
 }
-impl<'a> HdCommands<'a> {
-    pub fn remainder(&self) -> &'a [u8] {
-        &self.raw[self.at..self.end]
-    }
-}
 impl<'a> Iterator for HdCommands<'a> {
     type Item = Result<HdCommand<'a>>;
     fn next(&mut self) -> Option<Self::Item> {
@@ -692,9 +687,6 @@ impl HdSpuJob {
     }
     pub(crate) fn parsed_context_facts(&self) -> HdFacts {
         self.facts
-    }
-    pub fn policy(&self) -> HdPolicy {
-        self.policy
     }
     fn raw(&self) -> Result<&[u8]> {
         self.packet

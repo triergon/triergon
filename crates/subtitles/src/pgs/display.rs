@@ -291,9 +291,6 @@ impl<A: ArgbStorage> StoredDisplayDecoder<A> {
     pub fn generation(&self) -> u64 {
         self.generation
     }
-    pub fn epoch(&self) -> u64 {
-        self.epoch
-    }
     pub(super) fn evidence_slots(&self) -> usize {
         self.objects.len()
     }

@@ -1,6 +1,5 @@
 //! Versioned opaque-byte carriage facts from the pinned public native API.
 //! This reader is separate from Unicode decoding and never edits source bytes.
-use super::Snapshot;
 use std::ops::Range;
 use triergon_core::{Error, Result};
 
@@ -60,14 +59,6 @@ impl ReaderView {
             separator,
             resume,
         })
-    }
-}
-
-impl Snapshot {
-    /// The opaque byte/clock/position view is explicitly pinned. Original
-    /// source Unicode/Time/configuration remains independently available.
-    pub const fn reader_view(&self) -> ReaderView {
-        ReaderView::Reference
     }
 }
 

@@ -154,9 +154,6 @@ impl Decoder {
     pub fn extradata(&self) -> Option<&Bytes> {
         self.configuration.raw.as_ref()
     }
-    pub fn header_uses_fallback(&self) -> Option<bool> {
-        self.subtitle_header().map(|_| self.configuration.fallback)
-    }
     pub fn work_spent(&self) -> usize {
         self.work.spent
     }

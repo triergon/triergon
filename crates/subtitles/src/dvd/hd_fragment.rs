@@ -134,20 +134,11 @@ impl HdFragmentState {
             ended: false,
         })
     }
-    pub fn context(&self) -> &HdReceiverContext {
-        &self.context
-    }
     pub fn pending(&self) -> Option<&[u8]> {
         self.carry.as_ref().map(Carry::raw)
     }
-    pub fn pending_history(&self) -> Option<HdFragmentHistory> {
-        self.carry.as_ref().map(Carry::history)
-    }
     pub fn work_spent(&self) -> usize {
         self.work
-    }
-    pub fn calls(&self) -> usize {
-        self.calls
     }
     pub fn start(
         slot: &mut Option<Self>,
