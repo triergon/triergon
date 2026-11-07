@@ -1539,12 +1539,39 @@ impl Mp4Engine {
             )?
         } else {
             match media {
-                Mov9SampleExtent::Finite(extent) => SampleReader::new_with_shared_window(
-                    &mut self.input,
-                    row.sample,
-                    extent,
-                    self.maximum_packet,
-                )?,
+                Mov9SampleExtent::Finite(extent) => {
+                    // The extent lookup checked this range. A whole sample
+                    // at the cursor can be emitted without staging a read.
+                    let bytes = row.sample.range.end - row.sample.range.start;
+                    if position == row.sample.range.start
+                        && (1..=self.maximum_packet as u64).contains(&bytes)
+                        && w.remaining() > bytes
+                        && self.input.buffered_owner().is_some()
+                        && bytes <= self.input.buffered().len() as u64
+                    {
+                        if !sequential {
+                            self.input.request_range_reusing_window(position)?;
+                        }
+                        let Step::Ready(payload) = self.input.read_span(bytes as usize, w, c)?
+                        else {
+                            return Err(Error::Invalid("buffered sample unavailable"));
+                        };
+                        w.take(1);
+                        let source = SourcePacket {
+                            sample: row.sample,
+                            payload,
+                            source: self.input.source(),
+                            token: self.input.token(),
+                        };
+                        return self.emit_packet(at, source, cursor);
+                    }
+                    SampleReader::new_with_shared_window(
+                        &mut self.input,
+                        row.sample,
+                        extent,
+                        self.maximum_packet,
+                    )?
+                }
                 Mov9SampleExtent::Terminal(terminal) => SampleReader::new_terminal_mdat(
                     &mut self.input,
                     row.sample,
