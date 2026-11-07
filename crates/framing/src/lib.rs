@@ -24,6 +24,7 @@ pub use nal_packet::{
 mod ac3;
 mod ac3_config;
 mod annexb;
+mod audio_config;
 mod av1;
 mod av1_config;
 mod av1_temporal_unit;
@@ -54,6 +55,9 @@ pub use ac3_config::{
     Dac3Configuration, Dac3Fields, Dec3Configuration, Dec3Substream,
 };
 pub use annexb::{AnnexBOutput, AnnexBWriter, BuildStep};
+pub use audio_config::{
+    canonical_flac_configuration, canonical_opus_configuration, canonical_vorbis_configuration,
+};
 pub use flac_config::{
     FLAC_STREAMINFO, FLAC_VORBIS_COMMENT, FlacBlocking, FlacFrameHeader, FlacMetadataBlock,
     FlacStreamInfo, flac_configuration_from_dfla, flac_configuration_from_ogg,

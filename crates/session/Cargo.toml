@@ -10,6 +10,8 @@ publish.workspace = true
 
 [dependencies]
 triergon-codec = { path = "../codec" }
+triergon-core = { path = "../core" }
+triergon-framing = { path = "../framing" }
 triergon-pixel = { path = "../pixel" }
 triergon-codec-ac3 = { path = "../codec-ac3", optional = true }
 triergon-codec-aac = { path = "../codec-aac", optional = true }
