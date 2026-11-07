@@ -1,8 +1,8 @@
 //! Choosing a face for an ASS style's font name, bold and italic values, with
 //! libass's scoring.
 
-use crate::Font;
 use crate::name::{NameRecord, id, platform};
+use crate::{Font, OutlineFormat};
 
 /// What an ASS style or override asks for.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -12,8 +12,7 @@ pub struct Request<'a> {
     /// The ASS bold value: 1 or -1 is bold (weight 700), 0 or less regular (400),
     /// and other values are weights.
     pub bold: i32,
-    /// The ASS italic value: 1 is italic, 0 or less upright; other positive values
-    /// are also treated as italic.
+    /// The ASS italic value: any positive value asks for an italic face.
     pub italic: i32,
     /// A character the face must map, or `None`.
     pub character: Option<char>,
@@ -29,13 +28,9 @@ impl Request<'_> {
         }
     }
 
-    /// The requested slant: 110 for italic, else the value, never negative.
-    pub const fn slant(&self) -> u32 {
-        match self.italic {
-            1 => 110,
-            ..=0 => 0,
-            slant => slant.unsigned_abs(),
-        }
+    /// Whether an italic face is requested.
+    pub const fn italic(&self) -> bool {
+        self.italic > 0
     }
 }
 
@@ -44,14 +39,15 @@ impl Request<'_> {
 pub struct FaceInfo<'a> {
     font: &'a Font,
     weight: u32,
-    slant: u32,
+    bold: bool,
+    italic: bool,
 }
 
 impl<'a> FaceInfo<'a> {
     pub fn new(font: &'a Font) -> Self {
-        let style = font.style();
+        let freetype = font.style();
         let weight = match font.os2().map_or(0, |o| o.weight_class) {
-            0 if style.bold => 700,
+            0 if freetype.bold => 700,
             0 => 400,
             1 => 100,
             2 => 200,
@@ -64,10 +60,16 @@ impl<'a> FaceInfo<'a> {
             9 => 900,
             weight => u32::from(weight),
         };
+        // With OS/2, only fsSelection's italic and bold bits count, as GDI reads them.
+        let (bold, italic) = match font.os2() {
+            Some(os2) => (os2.fs_selection & 0x20 != 0, os2.fs_selection & 1 != 0),
+            None => (freetype.bold, freetype.italic),
+        };
         Self {
             font,
             weight,
-            slant: if style.italic { 110 } else { 0 },
+            bold,
+            italic,
         }
     }
 
@@ -76,14 +78,20 @@ impl<'a> FaceInfo<'a> {
     }
 
     /// The weight libass assigns: `OS/2.usWeightClass`, with classes 1 to 9 read
-    /// as 100 to 900 (4 as 350), and 400 or 700 by the bold flag when it is zero.
+    /// as 100 to 900 (4 as 350), and 400 or 700 by FreeType's bold flag when it is
+    /// zero or the table is absent.
     pub const fn weight(&self) -> u32 {
         self.weight
     }
 
-    /// 110 when the face's style is italic, else 0.
-    pub const fn slant(&self) -> u32 {
-        self.slant
+    /// The italic flag: `fsSelection` bit 0, or FreeType's flag without `OS/2`.
+    pub const fn is_italic(&self) -> bool {
+        self.italic
+    }
+
+    /// The bold flag: `fsSelection` bit 5, or FreeType's flag without `OS/2`.
+    pub const fn is_bold(&self) -> bool {
+        self.bold
     }
 
     /// Whether a Windows-platform family name (ID 1) equals `name` ignoring ASCII
@@ -99,15 +107,24 @@ impl<'a> FaceInfo<'a> {
         !any && self.font.family_name().is_some_and(|r| ascii_eq(r, name))
     }
 
-    /// Whether a Windows-platform full name (ID 4) or the PostScript name equals
-    /// `name` ignoring ASCII case.
+    /// Whether `name` is the face's full name (Windows ID 4) or PostScript name,
+    /// ignoring ASCII case. When exactly one of the two matches, a face with CFF
+    /// outlines goes by its PostScript name and any other by its full name.
     pub fn has_full_name(&self, name: &str) -> bool {
-        self.windows(id::FULL_NAME)
-            .any(|r| r.eq_ignore_ascii_case(name))
-            || self
-                .font
-                .postscript_name()
-                .is_some_and(|r| postscript_eq(r, name))
+        let full = self
+            .windows(id::FULL_NAME)
+            .any(|r| r.eq_ignore_ascii_case(name));
+        let postscript = self
+            .font
+            .postscript_name()
+            .is_some_and(|r| postscript_eq(r, name));
+        if full == postscript {
+            full
+        } else if self.font.outline_format() == OutlineFormat::Cff {
+            postscript
+        } else {
+            full
+        }
     }
 
     fn windows(&self, name_id: u16) -> impl Iterator<Item = NameRecord<'a>> + 'a {
@@ -117,17 +134,31 @@ impl<'a> FaceInfo<'a> {
     }
 
     /// The distance from `request`: 1 for an upright face asked to be italic, 4 for
-    /// an italic face asked to be upright, plus 73/256 of the weight difference.
+    /// an italic face asked to be upright, plus 73/256 of the weight difference. A
+    /// face not flagged bold counts as 120 heavier when the request is more than 150
+    /// heavier, since the renderer emboldens it.
     pub fn score(&self, request: &Request<'_>) -> u32 {
-        let (want, have) = (request.slant(), self.slant);
-        let slant = if want > 0 && have == 0 {
-            1
-        } else if want == 0 && have > 0 {
-            4
-        } else {
-            0
+        let slant = match (request.italic(), self.italic) {
+            (true, false) => 1,
+            (false, true) => 4,
+            _ => 0,
         };
-        slant + 73 * request.weight().abs_diff(self.weight) / 256
+        let wanted = request.weight();
+        let weight = if wanted > self.weight + 150 && !self.bold {
+            self.weight + 120
+        } else {
+            self.weight
+        };
+        slant + 73 * wanted.abs_diff(weight) / 256
+    }
+
+    /// Whether the face maps `c` in its text charmap, looked up unchanged.
+    fn covers(&self, c: Option<char>) -> bool {
+        c.is_none_or(|c| {
+            self.font
+                .text_charmap()
+                .is_some_and(|charmap| self.font.glyph_for_code(charmap, u32::from(c)).is_some())
+        })
     }
 }
 
@@ -135,8 +166,8 @@ impl<'a> FaceInfo<'a> {
 ///
 /// A face whose family name matches scores [`FaceInfo::score`]; one whose full or
 /// PostScript name matches instead scores zero. The lowest score wins, the
-/// earlier face on a tie, and a face that lacks `request.character` is passed
-/// over. A score of zero ends the search.
+/// earlier face on a tie, and a face that does not map `request.character` is
+/// passed over. A face scoring zero ends the search.
 pub fn select(faces: &[FaceInfo<'_>], request: &Request<'_>) -> Option<usize> {
     let mut best: Option<(u32, usize)> = None;
     for (index, face) in faces.iter().enumerate() {
@@ -148,15 +179,12 @@ pub fn select(faces: &[FaceInfo<'_>], request: &Request<'_>) -> Option<usize> {
             continue;
         };
         if best.is_none_or(|(lowest, _)| score < lowest) {
-            let covered = request
-                .character
-                .is_none_or(|c| face.font.glyph_index(c).is_some());
-            if !covered {
+            if !face.covers(request.character) {
                 continue;
             }
             best = Some((score, index));
         }
-        if best.is_some_and(|(lowest, _)| lowest == 0) {
+        if score == 0 {
             break;
         }
     }
@@ -223,8 +251,7 @@ mod tests {
         assert_eq!(request(0, 0).weight(), 400);
         assert_eq!(request(-5, 0).weight(), 400);
         assert_eq!(request(300, 0).weight(), 300);
-        assert_eq!(request(0, 1).slant(), 110);
-        assert_eq!(request(0, -1).slant(), 0);
-        assert_eq!(request(0, 7).slant(), 7);
+        assert!(request(0, 1).italic() && request(0, 7).italic());
+        assert!(!request(0, -1).italic() && !request(0, 0).italic());
     }
 }

@@ -88,12 +88,16 @@ operators ignore a malformed remainder of operands.
 **Kerning.** Microsoft `kern` version 0: horizontal, non-minimum format 0
 subtables, at most 32, summed, with the override bit replacing the sum.
 
-**Face matching.** `FaceInfo` and `select` score faces as libass does: Windows
-family names (or FreeType's family name when a face has none) match the request
-ignoring ASCII case and score 1 for a missing italic, 4 for an unwanted one, plus
-73/256 of the weight difference; a full or PostScript name match scores 0 and ends
-the search; a face lacking the requested character is skipped. Weights come from
-`usWeightClass`, with classes 1 to 9 read as 100 to 900.
+**Face matching.** `FaceInfo` and `select` score faces as libass 0.17.5 does for
+fonts it loads itself. Windows family names (or FreeType's family name when a face
+has none) match the request ignoring ASCII case and score 1 for a missing italic, 4
+for an unwanted one, plus 73/256 of the weight difference, where a face not flagged
+bold counts as 120 heavier when the request is more than 150 heavier. A full or
+PostScript name match scores 0 and ends the search; when only one of the two
+matches, CFF faces go by the PostScript name and others by the full name. A face
+whose text charmap lacks the requested character is skipped. Weights come from
+`usWeightClass`, with classes 1 to 9 read as 100 to 900; the italic and bold flags
+from `fsSelection` bits 0 and 5.
 
 **Store.** `Store` caches built values, such as faces and outlines, by typed key.
 Held values keep a reservation on the store's `Budget`; when a reservation fails,

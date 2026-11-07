@@ -157,7 +157,7 @@ fn collections_select_faces_and_matching_scores_styles() {
     );
     let faces: Vec<FaceInfo<'_>> = fonts.iter().map(FaceInfo::new).collect();
     assert_eq!(faces[1].weight(), 700);
-    assert_eq!(faces[2].slant(), 110);
+    assert!(faces[2].is_italic() && !faces[2].is_bold());
     let request = |family, bold, italic| Request {
         family,
         bold,
@@ -167,11 +167,13 @@ fn collections_select_faces_and_matching_scores_styles() {
     assert_eq!(select(&faces, &request("test sans", 0, 0)), Some(0));
     assert_eq!(select(&faces, &request("Test Sans", 1, 0)), Some(1));
     assert_eq!(select(&faces, &request("Test Sans", 0, 1)), Some(2));
-    // Bold italic: an upright bold face costs 1, the regular italic 87.
+    // Bold italic: an upright bold face costs 1; the italic regular, emboldened, 51.
     assert_eq!(select(&faces, &request("Test Sans", 1, 1)), Some(1));
-    // Full and PostScript names match exactly, scoring zero.
+    // A full name matches exactly, scoring zero; a TrueType face is not matched by
+    // its PostScript name alone.
     assert_eq!(select(&faces, &request("Test Sans Italic", 1, 0)), Some(2));
-    assert_eq!(select(&faces, &request("TestSans-Bold", 0, 0)), Some(1));
+    assert_eq!(select(&faces, &request("test sans bold", 0, 0)), Some(1));
+    assert_eq!(select(&faces, &request("TestSans-Bold", 0, 0)), None);
     assert_eq!(select(&faces, &request("Arimo", 0, 0)), None);
     let needs_c = Request {
         character: Some('C'),
