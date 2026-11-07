@@ -17,8 +17,8 @@ release; fonts against FreeType 2.15.0 ([reference pins](quality.md#reference-an
 | Matroska audio clocks | AAC, AC-3, E-AC-3 startup and forward clocks | 10 inputs | 0.17 | heap 0.07, RSS 0.60 | audio seek |
 | ISO BMFF / MP4 | Regular and fragmented files, edit lists, seek and range plans, neutral `ContainerReader` over seekable sources, QuickTime compatibility, bounded AAC configuration and regular table recovery, timing, sync and terminal media prefixes; AVC, HEVC, AAC, AC-3, E-AC-3, DTS core, AV1, VP9 | 255 inputs, 1,020 open and index comparisons (972 matching outputs and 48 matching refusal outcomes with compatibility policies) | 1.1273 (972/972 pass) | heap ≤0.4133, total RSS ≤0.7283 (972/972) | seek and range-plan timing; neutral reader not yet compared with FFmpeg |
 | MPEG-TS | PSI, continuity, PES assembly; TS188 and M2TS192 | 272-request set (80 field matches, 23 open), recorded; no runner in the repository | not measured | not measured | access-unit demux, broader profiles |
-| MPEG-TS progressive playback | TS188 with AVC and AAC-LC, bounded sequential input and access units before EOF | 3 packet folds and all 5 functional inputs with 10 literal outcomes | 1.3208 (2/3 pass) | heap ≤0.015, total RSS ≤0.667 (3/3) | runtime optimization, broader transport and codec profiles |
-| HLS segments | Independent TS188 segments with contiguous AVC or HEVC video and AAC, AC-3 or E-AC-3 audio | 71 packet comparisons, 71 measured workloads | 1.2219 (69/71 pass) | heap ≤0.022, total RSS ≤0.744 | runtime optimization, other profiles |
+| MPEG-TS progressive playback | TS188 with AVC and AAC-LC, bounded sequential input and access units before EOF | 3 packet folds and all 5 functional inputs with 10 literal outcomes | 1.2895 (2/3 pass) | heap ≤0.015, total RSS ≤0.667 (3/3) | runtime optimization, broader transport and codec profiles |
+| HLS segments | Independent TS188 segments with contiguous AVC or HEVC video and AAC, AC-3 or E-AC-3 audio | 71 packet comparisons, 71 measured workloads | 1.1732 (71/71 pass) | heap ≤0.022, total RSS ≤0.744 | other profiles |
 | Packet framing | AVC/HEVC configuration and NAL framing, AV1, VP9, AC-3, E-AC-3, DTS core | 125 AVC/HEVC reference comparisons; DTS core byte-exact on 37,125 projections and 1,172 FATE packets, recorded without a timing runner | 1.3846 (45/125 pass for AVC/HEVC) | heap ≤0.985 (125/125 lower), total RSS ≤1.048 (0/125 lower) | runtime and RSS optimization; full AVC/HEVC/ADTS grammar |
 | Subtitles, text | SRT, WebVTT, ASS passthrough, mov_text and tx3g to ASS, charset handling | 82 mov_text cases, 79 tx3g regressions | not measured | not measured | timing and memory |
 | Subtitles, bitmap | PGS, DVB display state and colour lookup, DVD units | 229 PGS cases, replayed by tests from recorded output; 5,300 DVB display sets, recorded; no runner in the repository | PGS 1.11 | PGS heap 0.62, RSS 0.90 | full PGS recovery, DVB and DVD decoding |
@@ -32,9 +32,7 @@ release; fonts against FreeType 2.15.0 ([reference pins](quality.md#reference-an
 
 | Case | Upper runtime bound |
 |---|---|
-| `reordered-48000` (progressive TS188) | 1.3208 |
-| `dvb-avc-ac3-44100` (HLS) | 1.2025 |
-| `dvb-hevc-eac3-32000` (HLS) | 1.2219 |
+| `reordered-48000` (progressive TS188) | 1.2895 |
 
 ## Measured revisions
 
@@ -43,7 +41,7 @@ samples are archived, their SHA-256. Update the row in the same change as the re
 
 The Matroska and startup and seek rows use the [gate build](quality.md#measuring-performance)
 at `0e28298d038bea072629b3bad6389dcc806b4861` on a c8g.large pinned to CPU 1.
-The HLS row uses the gate build at `d99cd4669ceae4bcb47d62e4d4dad3a59f2abbe9`
+The HLS row uses the gate build at `ca794c789888afe981c1dfbc0af7c9c758d8dba6`
 on a c8g.large pinned to CPU 1. It covers all 71 cases in `corpus.json`, with
 100 timing pairs of 50 operations and 30 memory pairs. Every video unit passes through
 `contiguous_feed` inside the measured operation. Codec and decode-session runtime at
@@ -55,7 +53,7 @@ The packet-framing row uses the gate build at
 with 30 timing pairs of 50 complete operations and 30 memory pairs for all 125 cases.
 All memory observations are valid; lower total RSS remains unachieved on every case.
 
-The progressive TS188 row at `d99cd4669ceae4bcb47d62e4d4dad3a59f2abbe9` uses
+The progressive TS188 row at `ca794c789888afe981c1dfbc0af7c9c758d8dba6` uses
 30 timing pairs of 50 complete sessions and 30 memory pairs on a c8g.large pinned
 to CPU 1, with the gate build.
 
@@ -73,8 +71,8 @@ ISO BMFF open and index measurements use `cargo xtask isobmff-bench`, with
 | ISO BMFF comparison | `0a033ec3406aebd09d191298a546659e02c6b76c` | `f56d3fa78b8cc70222f58c7cfa9a17331b0924a9070c7ff6ecc6dc1f213561bc` |
 | ISO BMFF open and index runtime | `ea4b941b4454bcc2ea0cd213999d64a07928ed7c` | `fca8e54cb9b2f0d55acc8ba9be2a5849992ae7996f3c3db551896477c3359525` |
 | ISO BMFF open and index memory | `ea4b941b4454bcc2ea0cd213999d64a07928ed7c` | `46cf8ac9041b147c96108de6e09fde26c47e12fd10161f7eee9661db95f8c89a` |
-| MPEG-TS progressive playback | `d99cd4669ceae4bcb47d62e4d4dad3a59f2abbe9` | `543426b84f50e7c51297785c0129a181a3fdb64ae98be072d87e7721cb801b38` |
-| HLS segments | `d99cd4669ceae4bcb47d62e4d4dad3a59f2abbe9` | `543426b84f50e7c51297785c0129a181a3fdb64ae98be072d87e7721cb801b38` |
+| MPEG-TS progressive playback | `ca794c789888afe981c1dfbc0af7c9c758d8dba6` | `228fbb6d58f0b73e1f656e601c0080ef42786493403515c712c3461b55f0422a` |
+| HLS segments | `ca794c789888afe981c1dfbc0af7c9c758d8dba6` | `228fbb6d58f0b73e1f656e601c0080ef42786493403515c712c3461b55f0422a` |
 | Packet framing | `04512a07fbb7efdf0d6d7173db08ec1267f2fae3` | `677ce4b5aef58efd8523868cd2318d9cfde07868d2b7451d0017f013dfb3130b` |
 | Codecs and decode sessions, runtime | `add6b272cb622bae0d921dc3fbbf0812958c2023` | `ab2a174847322658159e93b2cd9bb994cdd9f4f9438926191518897aff28d929` |
 | Capture, timing and memory | `ceb5076659e00ca9a2d3f3cb55ee4513d6d0710f` | `b75c8d6e6d64d294a385ec25b176e4ffb8f1a0d3c11b3ca956b3d352ac44c3b4` |
