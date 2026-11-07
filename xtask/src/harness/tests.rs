@@ -155,6 +155,31 @@ fn verdict(contract: &Value, rows: &[Value], identity: &Value) -> (bool, bool) {
 }
 
 #[test]
+fn shared_acceptance_requires_the_declared_iteration_count() {
+    let (mut contract, rows, identity) = matched_gate_fixture();
+    put(&mut contract, &[], "iterations", Value::int(50));
+    for (iterations, accepted) in [(50, true), (1, false), (100, false)] {
+        let mut row = rows[0].clone();
+        let mut timing = row.get("timing").unwrap().clone();
+        let mut samples = timing.get("samples").unwrap().as_array().unwrap().to_vec();
+        for sample in &mut samples {
+            for role in ["candidate", "reference"] {
+                put(
+                    sample,
+                    &[role, "data"],
+                    "iterations",
+                    Value::int(iterations),
+                );
+            }
+        }
+        put(&mut timing, &[], "iterations", Value::int(iterations));
+        put(&mut timing, &[], "samples", Value::Array(samples));
+        put(&mut row, &[], "timing", timing);
+        assert_eq!(verdict(&contract, &[row], &identity), (accepted, accepted));
+    }
+}
+
+#[test]
 fn empty_or_missing_evidence_cannot_pass() {
     let result = acceptance(
         root(),

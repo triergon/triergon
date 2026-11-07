@@ -137,6 +137,9 @@ instrumentation hashes.
 
 ## Measuring performance
 
+Qualification enforces the iteration count declared by the contract. `--iterations`
+may override that count for diagnostic comparisons.
+
 - Gate results come from the gate build: workers compiled by the toolchain in
   `rust-toolchain.toml` with no extra compiler configuration, and nothing else counts.
   One revision built by a newer compiler or with `-C target-cpu` differs from it by up

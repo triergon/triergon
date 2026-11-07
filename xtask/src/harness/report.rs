@@ -254,6 +254,11 @@ pub fn run(root: &Path, options: &Options) -> Result<i32, String> {
                 .map(|n| n as u32)
         })
         .unwrap_or(200);
+    if (options.require_acceptance || options.require_slice_acceptance)
+        && !validation::iterations_valid(&contract, &Value::int(iterations))
+    {
+        return Err("qualification iterations do not match the contract".into());
+    }
     let contract_sha = digest(&options.contract)?;
     let contract_id = s(&contract, "id").map(str::to_owned);
     let mut additional = Vec::new();

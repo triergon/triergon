@@ -455,12 +455,8 @@ fn join_case(
     if text(clock, "status")? != "measured" || integer(clock, "iterations")? < 1 {
         return Err("timing is not measured".into());
     }
-    if contract.get("iterations").is_some() {
-        require_same(
-            field(clock, "iterations")?,
-            field(contract, "iterations")?,
-            "iterations",
-        )?;
+    if !validation::iterations_valid(contract, field(clock, "iterations")?) {
+        return Err("iterations do not match the contract".into());
     }
     require_same(field(clock, "worker_hashes")?, &workers, "timing workers")?;
     for measurement in [clock, memory] {
