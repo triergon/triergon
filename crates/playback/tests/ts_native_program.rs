@@ -311,9 +311,12 @@ fn mixed_avc_ac3_dvb_keep_carrier_order_and_a_common_clock() {
             quantum,
         );
         let output = collect(&mut player, work);
+        let foreign_pool = Budget::new(4 * 1024 * 1024).unwrap();
         let mut packets = Vec::new();
         let mut sources = Vec::new();
         for item in &output {
+            assert!(item.belongs_to(&budget));
+            assert!(!item.belongs_to(&foreign_pool));
             match item.event() {
                 RawEvent::NativeTs { packet, clock } => {
                     assert_eq!(item.delivery(), Delivery::Present);
@@ -362,6 +365,7 @@ fn mixed_avc_ac3_dvb_keep_carrier_order_and_a_common_clock() {
         );
         drop(player);
         assert!(budget.used() > Budget::control_storage_bytes());
+        assert!(output.iter().all(|item| item.belongs_to(&budget)));
         drop(output);
         assert_eq!(budget.used(), Budget::control_storage_bytes());
     }
