@@ -8,6 +8,7 @@ use crate::huffman::{Vlc, books};
 use std::f64::consts::PI;
 use std::sync::OnceLock;
 use triergon_bitstream::CachedBitReader;
+use triergon_codec::{Budget, BudgetVec};
 
 const NUM_SLOTS: usize = 32;
 /// Hybrid filter length and its group delay in QMF slots.
@@ -255,14 +256,10 @@ fn tables() -> &'static Tables {
     })
 }
 
-#[derive(Debug)]
-pub(crate) struct Ps {
-    // header state
-    enable_iid: bool,
-    enable_icc: bool,
+/// Parameters and filter state that a reset returns to `State::INITIAL`.
+#[derive(Clone, Copy, Debug)]
+struct State {
     enable_ext: bool,
-    iid_mode: u8,
-    icc_mode: u8,
     nr_iid_par: usize,
     nr_icc_par: usize,
     nr_ipdopd_par: usize,
@@ -270,7 +267,6 @@ pub(crate) struct Ps {
     enable_ipdopd: bool,
     is34: bool,
     is34_prev: bool,
-    header_seen: bool,
     // frame data
     num_env: usize,
     num_env_prev: usize,
@@ -282,94 +278,114 @@ pub(crate) struct Ps {
     ipd_hist: [u8; 17],
     opd_hist: [u8; 17],
     // signal state
-    /// QMF input history for the hybrid filters (bands 0..4, 12 slots) + delay for bands >= 3/5
-    qmf_hist: Vec<[Cpx; 64]>,
-    /// mono hybrid matrix for the frame: s[k][n]
-    s: Vec<[Cpx; NUM_SLOTS]>,
-    /// decorrelated output
-    d: Vec<[Cpx; NUM_SLOTS]>,
-    delay: Vec<[Cpx; MAX_DELAY + NUM_SLOTS]>,
-    ap_delay: Vec<[[Cpx; NUM_SLOTS + 5]; AP_LINKS]>,
     peak_decay: [f32; 34],
     power_smooth: [f32; 34],
     peak_decay_diff_smooth: [f32; 34],
     /// mixing coefficients at the end of the previous frame [re/im][4][par band]
     h_prev: [[[f32; 34]; 4]; 2],
-    out_l: Vec<[Cpx; NUM_SLOTS]>,
-    out_r: Vec<[Cpx; NUM_SLOTS]>,
+}
+
+impl State {
+    const INITIAL: State = State {
+        enable_ext: false,
+        nr_iid_par: 10,
+        nr_icc_par: 10,
+        nr_ipdopd_par: 5,
+        iid_fine: false,
+        enable_ipdopd: false,
+        is34: false,
+        is34_prev: false,
+        num_env: 0,
+        num_env_prev: 0,
+        border: [0; 6],
+        iid: [[0; 34]; 6],
+        icc: [[0; 34]; 6],
+        ipd: [[0; 17]; 6],
+        opd: [[0; 17]; 6],
+        ipd_hist: [0; 17],
+        opd_hist: [0; 17],
+        peak_decay: [0.0; 34],
+        power_smooth: [0.0; 34],
+        peak_decay_diff_smooth: [0.0; 34],
+        h_prev: [[[0.0; 34]; 4]; 2],
+    };
+}
+
+#[derive(Debug)]
+pub(crate) struct Ps {
+    // header state, kept across a reset
+    enable_iid: bool,
+    enable_icc: bool,
+    iid_mode: u8,
+    icc_mode: u8,
+    header_seen: bool,
+    st: State,
+    /// QMF input history for the hybrid filters (bands 0..4, 12 slots) + delay for bands >= 3/5
+    qmf_hist: BudgetVec<[Cpx; 64]>,
+    /// mono hybrid matrix for the frame: s[k][n]
+    s: BudgetVec<[Cpx; NUM_SLOTS]>,
+    /// decorrelated output
+    d: BudgetVec<[Cpx; NUM_SLOTS]>,
+    delay: BudgetVec<[Cpx; MAX_DELAY + NUM_SLOTS]>,
+    ap_delay: BudgetVec<[[Cpx; NUM_SLOTS + 5]; AP_LINKS]>,
+    out_l: BudgetVec<[Cpx; NUM_SLOTS]>,
+    out_r: BudgetVec<[Cpx; NUM_SLOTS]>,
 }
 
 impl Ps {
-    pub(crate) fn new() -> Ps {
-        Ps {
+    pub(crate) fn new(budget: &Budget) -> Result<Ps> {
+        let zero = [Cpx::default(); NUM_SLOTS];
+        Ok(Ps {
             enable_iid: false,
             enable_icc: false,
-            enable_ext: false,
             iid_mode: 0,
             icc_mode: 0,
-            nr_iid_par: 10,
-            nr_icc_par: 10,
-            nr_ipdopd_par: 5,
-            iid_fine: false,
-            enable_ipdopd: false,
-            is34: false,
-            is34_prev: false,
             header_seen: false,
-            num_env: 0,
-            num_env_prev: 0,
-            border: [0; 6],
-            iid: [[0; 34]; 6],
-            icc: [[0; 34]; 6],
-            ipd: [[0; 17]; 6],
-            opd: [[0; 17]; 6],
-            ipd_hist: [0; 17],
-            opd_hist: [0; 17],
-            qmf_hist: vec![[Cpx::default(); 64]; HYB_DELAY + NUM_SLOTS + HYB_DELAY],
-            s: vec![[Cpx::default(); NUM_SLOTS]; 91],
-            d: vec![[Cpx::default(); NUM_SLOTS]; 91],
-            delay: vec![[Cpx::default(); MAX_DELAY + NUM_SLOTS]; 91],
-            ap_delay: vec![[[Cpx::default(); NUM_SLOTS + 5]; AP_LINKS]; 50],
-            peak_decay: [0.0; 34],
-            power_smooth: [0.0; 34],
-            peak_decay_diff_smooth: [0.0; 34],
-            h_prev: [[[0.0; 34]; 4]; 2],
-            out_l: vec![[Cpx::default(); NUM_SLOTS]; 91],
-            out_r: vec![[Cpx::default(); NUM_SLOTS]; 91],
-        }
+            st: State::INITIAL,
+            qmf_hist: BudgetVec::try_filled(
+                budget,
+                [Cpx::default(); 64],
+                HYB_DELAY + NUM_SLOTS + HYB_DELAY,
+            )?,
+            s: BudgetVec::try_filled(budget, zero, 91)?,
+            d: BudgetVec::try_filled(budget, zero, 91)?,
+            delay: BudgetVec::try_filled(budget, [Cpx::default(); MAX_DELAY + NUM_SLOTS], 91)?,
+            ap_delay: BudgetVec::try_filled(
+                budget,
+                [[Cpx::default(); NUM_SLOTS + 5]; AP_LINKS],
+                50,
+            )?,
+            out_l: BudgetVec::try_filled(budget, zero, 91)?,
+            out_r: BudgetVec::try_filled(budget, zero, 91)?,
+        })
     }
 
+    /// Return to the state of `new`, keeping the header.
     pub(crate) fn reset(&mut self) {
-        let hdr = (
-            self.header_seen,
-            self.enable_iid,
-            self.enable_icc,
-            self.iid_mode,
-            self.icc_mode,
-        );
-        *self = Ps::new();
-        (
-            self.header_seen,
-            self.enable_iid,
-            self.enable_icc,
-            self.iid_mode,
-            self.icc_mode,
-        ) = hdr;
+        self.st = State::INITIAL;
+        for buffer in [&mut self.s, &mut self.d, &mut self.out_l, &mut self.out_r] {
+            buffer.fill([Cpx::default(); NUM_SLOTS]);
+        }
+        self.qmf_hist.fill([Cpx::default(); 64]);
+        self.clear_decorrelator();
+    }
+
+    /// Clear the decorrelator delay lines.
+    fn clear_decorrelator(&mut self) {
+        self.delay.fill([Cpx::default(); MAX_DELAY + NUM_SLOTS]);
+        self.ap_delay
+            .fill([[Cpx::default(); NUM_SLOTS + 5]; AP_LINKS]);
     }
 
     /// Switch between the 20- and 34-band configurations: the decorrelator state is
     /// cleared, the hybrid input history (QMF domain) is kept, and the interpolation start
     /// values of the mixing matrices are mapped to the new parameter-band resolution.
     fn switch_config(&mut self, to34: bool) {
-        for r in &mut self.delay {
-            *r = [Cpx::default(); MAX_DELAY + NUM_SLOTS];
-        }
-        for r in &mut self.ap_delay {
-            *r = [[Cpx::default(); NUM_SLOTS + 5]; AP_LINKS];
-        }
-        self.peak_decay = [0.0; 34];
-        self.power_smooth = [0.0; 34];
-        self.peak_decay_diff_smooth = [0.0; 34];
-        for p in &mut self.h_prev {
+        self.clear_decorrelator();
+        self.st.peak_decay = [0.0; 34];
+        self.st.power_smooth = [0.0; 34];
+        self.st.peak_decay_diff_smooth = [0.0; 34];
+        for p in &mut self.st.h_prev {
             for c in p.iter_mut() {
                 *c = if to34 {
                     map_20_to_34(c)
@@ -392,9 +408,9 @@ impl Ps {
                 if self.iid_mode > 5 {
                     return Err(DecodeError::InvalidData("PS iid_mode"));
                 }
-                self.nr_iid_par = NR_IIDICC_PAR[self.iid_mode as usize];
-                self.nr_ipdopd_par = NR_IPDOPD_PAR[self.iid_mode as usize];
-                self.iid_fine = self.iid_mode > 2;
+                self.st.nr_iid_par = NR_IIDICC_PAR[self.iid_mode as usize];
+                self.st.nr_ipdopd_par = NR_IPDOPD_PAR[self.iid_mode as usize];
+                self.st.iid_fine = self.iid_mode > 2;
             }
             self.enable_icc = br.bit();
             if self.enable_icc {
@@ -402,15 +418,22 @@ impl Ps {
                 if self.icc_mode > 5 {
                     return Err(DecodeError::InvalidData("PS icc_mode"));
                 }
-                self.nr_icc_par = NR_IIDICC_PAR[self.icc_mode as usize];
+                self.st.nr_icc_par = NR_IIDICC_PAR[self.icc_mode as usize];
             }
-            self.enable_ext = br.bit();
+            self.st.enable_ext = br.bit();
         }
         let frame_class = br.bit() as usize;
-        self.num_env_prev = self.num_env;
+        self.st.num_env_prev = self.st.num_env;
         let num_env = NUM_ENV_TAB[frame_class][br.read(2) as usize];
-        self.border[0] = -1;
-        for (e, b) in self.border.iter_mut().enumerate().take(num_env + 1).skip(1) {
+        self.st.border[0] = -1;
+        for (e, b) in self
+            .st
+            .border
+            .iter_mut()
+            .enumerate()
+            .take(num_env + 1)
+            .skip(1)
+        {
             *b = if frame_class == 1 {
                 br.read(5) as i32
             } else {
@@ -418,13 +441,13 @@ impl Ps {
             };
         }
         // keep the last envelope of the previous frame as reference [0]
-        let last = self.num_env_prev;
-        self.iid[0] = self.iid[last];
-        self.icc[0] = self.icc[last];
-        self.ipd[0] = self.ipd[last];
-        self.opd[0] = self.opd[last];
+        let last = self.st.num_env_prev;
+        self.st.iid[0] = self.st.iid[last];
+        self.st.icc[0] = self.st.icc[last];
+        self.st.ipd[0] = self.st.ipd[last];
+        self.st.opd[0] = self.st.opd[last];
         if self.enable_iid {
-            let (t_df, t_dt, off, lim) = if self.iid_fine {
+            let (t_df, t_dt, off, lim) = if self.st.iid_fine {
                 (&bk.ps[0], &bk.ps[1], 30, 15)
             } else {
                 (&bk.ps[2], &bk.ps[3], 14, 7)
@@ -436,11 +459,11 @@ impl Ps {
                     if dt { t_dt } else { t_df },
                     dt,
                     off,
-                    self.nr_iid_par,
-                    &mut self.iid,
+                    self.st.nr_iid_par,
+                    &mut self.st.iid,
                     e,
                 )?;
-                if self.iid[e][..self.nr_iid_par]
+                if self.st.iid[e][..self.st.nr_iid_par]
                     .iter()
                     .any(|&v| v.abs() as i32 > lim)
                 {
@@ -448,7 +471,7 @@ impl Ps {
                 }
             }
         } else {
-            self.iid[1..=num_env].fill([0; 34]);
+            self.st.iid[1..=num_env].fill([0; 34]);
         }
         if self.enable_icc {
             for e in 1..=num_env {
@@ -458,11 +481,11 @@ impl Ps {
                     if dt { &bk.ps[5] } else { &bk.ps[4] },
                     dt,
                     7,
-                    self.nr_icc_par,
-                    &mut self.icc,
+                    self.st.nr_icc_par,
+                    &mut self.st.icc,
                     e,
                 )?;
-                if self.icc[e][..self.nr_icc_par]
+                if self.st.icc[e][..self.st.nr_icc_par]
                     .iter()
                     .any(|v| !(0..=7).contains(v))
                 {
@@ -470,10 +493,10 @@ impl Ps {
                 }
             }
         } else {
-            self.icc[1..=num_env].fill([0; 34]);
+            self.st.icc[1..=num_env].fill([0; 34]);
         }
-        self.enable_ipdopd = false;
-        if self.enable_ext {
+        self.st.enable_ipdopd = false;
+        if self.st.enable_ext {
             let mut cnt = br.read(4) as usize;
             if cnt == 15 {
                 cnt += br.read(8) as usize;
@@ -484,8 +507,8 @@ impl Ps {
                 left -= 2;
                 let p0 = br.position();
                 if id == 0 {
-                    self.enable_ipdopd = br.bit();
-                    if self.enable_ipdopd {
+                    self.st.enable_ipdopd = br.bit();
+                    if self.st.enable_ipdopd {
                         for e in 1..=num_env {
                             let dt = br.bit();
                             let (tdf, tdt) = (&bk.ps[6], &bk.ps[7]);
@@ -493,8 +516,8 @@ impl Ps {
                                 br,
                                 if dt { tdt } else { tdf },
                                 dt,
-                                self.nr_ipdopd_par,
-                                &mut self.ipd,
+                                self.st.nr_ipdopd_par,
+                                &mut self.st.ipd,
                                 e,
                             )?;
                             let dt = br.bit();
@@ -503,8 +526,8 @@ impl Ps {
                                 br,
                                 if dt { tdt } else { tdf },
                                 dt,
-                                self.nr_ipdopd_par,
-                                &mut self.opd,
+                                self.st.nr_ipdopd_par,
+                                &mut self.st.opd,
                                 e,
                             )?;
                         }
@@ -519,41 +542,41 @@ impl Ps {
                 br.skip(left as usize);
             }
         }
-        if !self.enable_ipdopd {
+        if !self.st.enable_ipdopd {
             for e in 1..=num_env {
-                self.ipd[e] = [0; 17];
-                self.opd[e] = [0; 17];
+                self.st.ipd[e] = [0; 17];
+                self.st.opd[e] = [0; 17];
             }
         }
         // no new envelope: reuse the previous parameters for the whole frame
         let mut num_env = num_env;
         if num_env == 0 {
             num_env = 1;
-            self.border[1] = NUM_SLOTS as i32 - 1;
-            self.iid[1] = self.iid[0];
-            self.icc[1] = self.icc[0];
-            self.ipd[1] = self.ipd[0];
-            self.opd[1] = self.opd[0];
+            self.st.border[1] = NUM_SLOTS as i32 - 1;
+            self.st.iid[1] = self.st.iid[0];
+            self.st.icc[1] = self.st.icc[0];
+            self.st.ipd[1] = self.st.ipd[0];
+            self.st.opd[1] = self.st.opd[0];
         }
         // extend the last envelope to the end of the frame
-        if self.border[num_env] < NUM_SLOTS as i32 - 1 {
+        if self.st.border[num_env] < NUM_SLOTS as i32 - 1 {
             num_env += 1;
-            self.border[num_env] = NUM_SLOTS as i32 - 1;
-            self.iid[num_env] = self.iid[num_env - 1];
-            self.icc[num_env] = self.icc[num_env - 1];
-            self.ipd[num_env] = self.ipd[num_env - 1];
-            self.opd[num_env] = self.opd[num_env - 1];
+            self.st.border[num_env] = NUM_SLOTS as i32 - 1;
+            self.st.iid[num_env] = self.st.iid[num_env - 1];
+            self.st.icc[num_env] = self.st.icc[num_env - 1];
+            self.st.ipd[num_env] = self.st.ipd[num_env - 1];
+            self.st.opd[num_env] = self.st.opd[num_env - 1];
         }
         for e in 1..=num_env {
-            if self.border[e] <= self.border[e - 1] || self.border[e] >= NUM_SLOTS as i32 {
+            if self.st.border[e] <= self.st.border[e - 1] || self.st.border[e] >= NUM_SLOTS as i32 {
                 return Err(DecodeError::InvalidData("PS envelope borders"));
             }
         }
-        self.num_env = num_env;
-        self.is34_prev = self.is34;
+        self.st.num_env = num_env;
+        self.st.is34_prev = self.st.is34;
         if self.enable_iid || self.enable_icc {
-            self.is34 = (self.enable_iid && self.nr_iid_par == 34)
-                || (self.enable_icc && self.nr_icc_par == 34);
+            self.st.is34 = (self.enable_iid && self.st.nr_iid_par == 34)
+                || (self.enable_icc && self.st.nr_icc_par == 34);
         }
         let used = br.position() - start;
         if used > bits {
@@ -565,20 +588,16 @@ impl Ps {
     /// Apply PS to one frame: `l` holds the mono QMF matrix [slot][band] on input; on output
     /// `l` and `r` hold the left / right QMF matrices.
     pub(crate) fn apply(&mut self, l: &mut [[Cpx; 64]], r: &mut [[Cpx; 64]], _ok: bool) {
-        let cfg = self.is34 as usize;
-        if self.is34 != self.is34_prev {
-            self.switch_config(self.is34);
-            self.is34_prev = self.is34;
+        let cfg = self.st.is34 as usize;
+        if self.st.is34 != self.st.is34_prev {
+            self.switch_config(self.st.is34);
+            self.st.is34_prev = self.st.is34;
         }
         self.hybrid_analysis(l, cfg);
         self.decorrelate(cfg);
-        let mut out_l = std::mem::take(&mut self.out_l);
-        let mut out_r = std::mem::take(&mut self.out_r);
-        self.stereo(cfg, &mut out_l, &mut out_r);
-        hybrid_synthesis(&out_l, l, cfg);
-        hybrid_synthesis(&out_r, r, cfg);
-        self.out_l = out_l;
-        self.out_r = out_r;
+        self.stereo(cfg);
+        hybrid_synthesis(&self.out_l, l, cfg);
+        hybrid_synthesis(&self.out_r, r, cfg);
     }
 
     /// `x` holds 38 QMF slots: the 32 of this frame plus 6 look-ahead slots of the low band,
@@ -689,14 +708,14 @@ impl Ps {
         let mut gain = [[1f32; NUM_SLOTS]; 34];
         for i in 0..npar {
             for n in 0..NUM_SLOTS {
-                let decayed = PEAK_DECAY * self.peak_decay[i];
-                self.peak_decay[i] = decayed.max(power[i][n]);
-                self.power_smooth[i] += A_SMOOTH * (power[i][n] - self.power_smooth[i]);
-                self.peak_decay_diff_smooth[i] +=
-                    A_SMOOTH * (self.peak_decay[i] - power[i][n] - self.peak_decay_diff_smooth[i]);
-                let denom = TRANSIENT_IMPACT * self.peak_decay_diff_smooth[i];
-                gain[i][n] = if denom > self.power_smooth[i] {
-                    self.power_smooth[i] / denom
+                let decayed = PEAK_DECAY * self.st.peak_decay[i];
+                self.st.peak_decay[i] = decayed.max(power[i][n]);
+                self.st.power_smooth[i] += A_SMOOTH * (power[i][n] - self.st.power_smooth[i]);
+                self.st.peak_decay_diff_smooth[i] += A_SMOOTH
+                    * (self.st.peak_decay[i] - power[i][n] - self.st.peak_decay_diff_smooth[i]);
+                let denom = TRANSIENT_IMPACT * self.st.peak_decay_diff_smooth[i];
+                gain[i][n] = if denom > self.st.power_smooth[i] {
+                    self.st.power_smooth[i] / denom
                 } else {
                     1.0
                 };
@@ -742,29 +761,26 @@ impl Ps {
         }
     }
 
-    /// Stereo mixing (8.6.4.6); returns the left / right hybrid matrices.
-    fn stereo(
-        &mut self,
-        cfg: usize,
-        out_l: &mut [[Cpx; NUM_SLOTS]],
-        out_r: &mut [[Cpx; NUM_SLOTS]],
-    ) {
+    /// Stereo mixing (8.6.4.6) into the left / right hybrid matrices `out_l`, `out_r`.
+    fn stereo(&mut self, cfg: usize) {
+        let out_l: &mut [[Cpx; NUM_SLOTS]] = &mut self.out_l;
+        let out_r: &mut [[Cpx; NUM_SLOTS]] = &mut self.out_r;
         let t = tables();
         let nb = NR_BANDS[cfg];
         let npar = NR_PAR_BANDS[cfg];
         let k_to_i: &[u8] = if cfg == 1 { &K_TO_I_34 } else { &K_TO_I_20 };
         let mixing_b = self.icc_mode > 2;
         let lut = if mixing_b { &t.hb } else { &t.ha };
-        let iid_base = if self.iid_fine { 15 } else { 0 };
-        let iid_off = if self.iid_fine { 15 } else { 7 };
-        let ipdopd = self.enable_ipdopd;
-        let mut h_start = self.h_prev;
-        for e in 1..=self.num_env {
+        let iid_base = if self.st.iid_fine { 15 } else { 0 };
+        let iid_off = if self.st.iid_fine { 15 } else { 7 };
+        let ipdopd = self.st.enable_ipdopd;
+        let mut h_start = self.st.h_prev;
+        for e in 1..=self.st.num_env {
             // map the parameters to the processing resolution
-            let iid_m = map_par(&self.iid[e], self.nr_iid_par, npar);
-            let icc_m = map_par(&self.icc[e], self.nr_icc_par, npar);
-            let ipd_m = map_pd(&self.ipd[e], self.nr_ipdopd_par, NR_IPDOPD_BANDS[cfg]);
-            let opd_m = map_pd(&self.opd[e], self.nr_ipdopd_par, NR_IPDOPD_BANDS[cfg]);
+            let iid_m = map_par(&self.st.iid[e], self.st.nr_iid_par, npar);
+            let icc_m = map_par(&self.st.icc[e], self.st.nr_icc_par, npar);
+            let ipd_m = map_pd(&self.st.ipd[e], self.st.nr_ipdopd_par, NR_IPDOPD_BANDS[cfg]);
+            let opd_m = map_pd(&self.st.opd[e], self.st.nr_ipdopd_par, NR_IPDOPD_BANDS[cfg]);
             let mut h_end = [[[0f32; 34]; 4]; 2];
             for b in 0..npar {
                 let iid = (iid_m[b] as i32 + iid_off) as usize + iid_base;
@@ -773,12 +789,12 @@ impl Ps {
                 let mut h = [hh[0], hh[1], hh[2], hh[3]];
                 let mut hi = [0f32; 4];
                 if ipdopd && b < NR_IPDOPD_BANDS[cfg] {
-                    let oi = (self.opd_hist[b] as usize) * 8 + (opd_m[b] as usize & 7);
-                    let ii = (self.ipd_hist[b] as usize) * 8 + (ipd_m[b] as usize & 7);
+                    let oi = (self.st.opd_hist[b] as usize) * 8 + (opd_m[b] as usize & 7);
+                    let ii = (self.st.ipd_hist[b] as usize) * 8 + (ipd_m[b] as usize & 7);
                     let op = t.pd_smooth[oi];
                     let ip = t.pd_smooth[ii];
-                    self.opd_hist[b] = (oi & 0x3f) as u8;
-                    self.ipd_hist[b] = (ii & 0x3f) as u8;
+                    self.st.opd_hist[b] = (oi & 0x3f) as u8;
+                    self.st.ipd_hist[b] = (ii & 0x3f) as u8;
                     // phase of the right channel: opd - ipd
                     let adj =
                         Cpx::new(op.re * ip.re + op.im * ip.im, op.im * ip.re - op.re * ip.im);
@@ -790,8 +806,8 @@ impl Ps {
                     h_end[1][c][b] = hi[c];
                 }
             }
-            let start = self.border[e - 1];
-            let stop = self.border[e];
+            let start = self.st.border[e - 1];
+            let stop = self.st.border[e];
             let width = 1.0 / ((stop - start).max(1) as f32);
             for k in 0..nb {
                 let b = k_to_i[k] as usize;
@@ -829,7 +845,7 @@ impl Ps {
             }
             h_start = h_end;
         }
-        self.h_prev = h_start;
+        self.st.h_prev = h_start;
     }
 }
 

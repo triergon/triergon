@@ -110,9 +110,9 @@ pub(crate) struct ChannelData {
     /// scalefactor / intensity position / noise energy per band
     pub sf: [i32; 8 * MAX_SFB],
     pub tns: Tns,
-    pub coef: Vec<f32>,
+    pub coef: [f32; 1024],
     /// quantised values, only kept for frames with pulse data
-    pub qbuf: Vec<i32>,
+    pub qbuf: [i32; 1024],
 }
 
 impl ChannelData {
@@ -125,8 +125,8 @@ impl ChannelData {
             band_type: [0; 8 * MAX_SFB],
             sf: [0; 8 * MAX_SFB],
             tns: Tns::default(),
-            coef: vec![0.0; 1024],
-            qbuf: vec![0; 1024],
+            coef: [0.0; 1024],
+            qbuf: [0; 1024],
         }
     }
 }

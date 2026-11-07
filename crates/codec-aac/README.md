@@ -52,7 +52,15 @@ dec.reset(); // after a seek: drops overlap, prediction, PNS, SBR and PS history
   SBR/PS, a new PCE). A frame yields 1024 samples per raw data block, 2048 with SBR.
 - On error `out` is empty and the decoder stays usable. Errors are typed:
   `Unsupported(Feature)`, `InvalidData(&str)` naming the syntax element,
-  `ResourceLimit(&str)`, `Truncated`.
+  `ResourceLimit(&str)`, `Truncated`, `Budget(StorageError)`.
+- Storage that depends on the stream is charged to the decoder's budget before it is
+  allocated: each channel element, its SBR/PS state and each coupling channel when the
+  stream first needs it, and the output frame before an access unit is decoded.
+  `Decoder::with_limits(Limits { live_storage_bytes })` sets the pool, `Decoder::new_in`
+  charges a caller's `Budget`; a refused charge is `DecodeError::Budget` and the decoder
+  stays usable. The 32 MiB default holds the largest layout a PCE can declare: 48 elements
+  (93 channels) of 489 KiB each with SBR, PS and Main prediction, 16 coupling channels of
+  53 KiB and 93 planes of four SBR raw data blocks (2.9 MiB), 26.7 MiB in all.
 - Refused: SSR (`Feature::SsrGainControl`) and reserved sampling-frequency indices 13–15.
   ER, LD, ELD, USAC and 960-sample frames cannot be carried in ADTS; LATM/LOAS is not
   accepted.
