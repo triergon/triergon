@@ -8,10 +8,13 @@ use std::io::Write;
 use std::path::{Component, Path, PathBuf};
 
 use super::acceptance::acceptance;
-use super::comparison::{reference_named, reference_record, reference_summary, rule_for};
+use super::comparison::reference_summary;
+use super::gate_build;
 use super::timing::validate_module_absence as timing_module_absent;
-use super::validation::{array, field, text};
-use super::{diff, gate_build, provenance};
+use super::validation::{
+    self, WorkerCheck, array, external_contract, field, hash, members, put, require_same,
+    selected_operation, text,
+};
 use crate::checks::read_json;
 use crate::json::{self, Value};
 use crate::sha256;
@@ -96,26 +99,6 @@ fn integer(value: &Value, key: &str) -> R<i128> {
     }
 }
 
-fn members(value: &Value) -> R<&[(String, Value)]> {
-    match value {
-        Value::Object(fields) => Ok(fields),
-        _ => Err("expected a JSON object".into()),
-    }
-}
-
-fn same(a: &Value, b: &Value) -> bool {
-    // Unlike Python equality, a boolean cannot stand in for a recorded number.
-    diff::differences(a, b).is_empty()
-}
-
-fn require_same(a: &Value, b: &Value, label: &str) -> R<()> {
-    if same(a, b) {
-        Ok(())
-    } else {
-        Err(format!("{label} mismatch"))
-    }
-}
-
 fn same_field(a: &Value, b: &Value, key: &str) -> R<()> {
     match (a.get(key), b.get(key)) {
         (Some(a), Some(b)) => require_same(a, b, key),
@@ -132,23 +115,6 @@ fn without(value: &Value, keys: &[&str]) -> R<Value> {
             .cloned()
             .collect(),
     ))
-}
-
-fn put(value: &mut Value, key: &str, replacement: Value) -> R<()> {
-    let Value::Object(fields) = value else {
-        return Err("expected a JSON object".into());
-    };
-    fields.retain(|(name, _)| name != key);
-    fields.push((key.into(), replacement));
-    Ok(())
-}
-
-fn hash<'a>(value: &'a Value, key: &str) -> R<&'a str> {
-    let digest = text(value, key)?;
-    if digest.len() != 64 || !digest.bytes().all(|b| b.is_ascii_hexdigit()) {
-        return Err(format!("{key} must be a SHA-256"));
-    }
-    Ok(digest)
 }
 
 fn document(path: &Path) -> R<(Value, String)> {
@@ -387,59 +353,34 @@ fn membership<'a>(expected: &[Value], actual: &'a [Value]) -> R<BTreeMap<&'a str
 
 fn selected(row: &Value, expected: &Value, contract: &Value, identity: &Value) -> R<Value> {
     let id = text(contract, "id")?;
-    let rule = rule_for(expected, identity, Some(id))?;
-    let reference_name = contract.get("reference").and_then(Value::as_str);
-    let record = match (rule, reference_name) {
-        (None, Some(name)) => reference_named(identity, name)?,
-        _ => reference_record(identity, rule)?,
-    };
-    let named = if rule.is_none() { reference_name } else { None };
-    if row.get("reference_worker").and_then(Value::as_str) != named {
+    let resolved = selected_operation(expected, contract, identity)?;
+    if row.get("reference_worker").and_then(Value::as_str) != resolved.reference_worker {
         return Err("reference worker differs from the contract".into());
     }
     require_same(
         field(row, "reference")?,
-        &reference_summary(&record),
+        &reference_summary(&resolved.reference),
         "reference",
     )?;
-    let prefix = contract.get("worker_operation").and_then(Value::as_str);
-    let candidate = contract
-        .get("candidate")
-        .and_then(Value::as_str)
-        .unwrap_or("media-worker");
-    let expected_candidate = prefix.map(|_| candidate);
-    if row.get("candidate_worker").and_then(Value::as_str) != expected_candidate {
+    if row.get("candidate_worker").and_then(Value::as_str) != resolved.candidate_worker {
         return Err("candidate worker differs from the contract".into());
     }
-    let operation = if let Some(prefix) = prefix {
-        Value::object([
-            ("name", field(contract, "operation")?.clone()),
-            ("view", Value::str(format!("playback-{prefix}fold-v1"))),
-        ])
-    } else {
-        let seek = expected.get("seek_target_ns").unwrap_or(&Value::Null);
-        let view = match id {
-            "matroska-segment-metadata" => Value::str("catalogue-source-and-native-v1"),
-            "matroska-colour" => Value::str("colour-source-and-ffmpeg9-v1"),
-            _ => rule.map_or_else(
-                || Ok(Value::str("source-frames-ffmpeg9-clock-v1")),
-                |r| field(r, "view").cloned(),
-            )?,
-        };
-        Value::object([
-            (
-                "name",
-                Value::str(if *seek == Value::Null {
-                    "container-demux-v1"
-                } else {
-                    "container-seek-preroll-v1"
-                }),
-            ),
-            ("seek_target_ns", seek.clone()),
-            ("view", view),
-        ])
-    };
-    require_same(field(row, "operation")?, &operation, "contract operation")?;
+    if contract
+        .get("worker_operation")
+        .and_then(Value::as_str)
+        .is_some()
+    {
+        field(contract, "operation")?;
+    } else if !matches!(id, "matroska-segment-metadata" | "matroska-colour")
+        && let Some(rule) = resolved.rule
+    {
+        field(rule, "view")?;
+    }
+    require_same(
+        field(row, "operation")?,
+        &resolved.operation,
+        "contract operation",
+    )?;
     super::comparison::validate_case_evidence(row, identity, Some(id))
 }
 
@@ -479,22 +420,7 @@ fn memory_binding(memory: &Value, identity: &Value, workers: &Value, linux: bool
         // need a kernel proof. A certificate opt-in or any kernel-backed RSS
         // observation must retain the original proof binding; acceptance
         // recomputes its live kernel/boot validity and every sample below.
-        let kernel_used = certificate
-            .get("kernel_rss_required")
-            .is_some_and(Value::truthy)
-            || array(memory, "samples")?
-                .iter()
-                .filter_map(|sample| match sample {
-                    Value::Object(entries) => Some(entries),
-                    _ => None,
-                })
-                .flatten()
-                .filter(|(role, _)| role.ends_with("_rss"))
-                .filter_map(|(_, sample)| sample.get("observer"))
-                .any(|observer| {
-                    super::linux::py_int(observer.get("kernel_rss_requested")) == Some(1)
-                });
-        if !kernel_used {
+        if !super::memory::kernel_used(certificate, array(memory, "samples")?) {
             return Ok(());
         }
         if certificate.get("kernel_rss_required") != Some(&Value::Bool(true)) {
@@ -618,63 +544,13 @@ fn current_workers(root: &Path, identity: &Value, contract: &Value) -> R<()> {
         &read_json(&root.join("target/harness/identity.json"))?,
         "current memory build identity",
     )?;
-    for (role, path) in [
-        ("candidate", "target/release/media-worker"),
-        ("reference", "target/harness/ffmpeg-worker"),
-    ] {
-        if super::linux::file_sha(&root.join(path))? != hash(field(identity, "binaries")?, role)? {
-            return Err(format!(
-                "{role} worker changed since build identity; rebuild"
-            ));
-        }
-    }
-    let directory = root
-        .join("target/harness")
-        .canonicalize()
-        .map_err(|e| e.to_string())?;
-    for (_, reference) in members(field(identity, "comparison_references")?)? {
-        let path = root
-            .join(text(reference, "path")?)
-            .canonicalize()
-            .map_err(|e| e.to_string())?;
-        if !path.starts_with(&directory)
-            || super::linux::file_sha(&path)? != hash(reference, "sha256")?
-        {
-            return Err("comparison reference changed since build identity; rebuild".into());
-        }
-    }
-    if let Some(error) = provenance::source_identity_error(root, identity) {
-        return Err(format!("{error}; rebuild"));
-    }
+    validation::current_workers(root, identity, WorkerCheck::Grading)?;
     if let Some(name) = contract
         .get("candidate")
         .and_then(Value::as_str)
         .filter(|n| *n != "media-worker")
     {
-        if Path::new(name).components().count() != 1
-            || !matches!(
-                Path::new(name).components().next(),
-                Some(Component::Normal(_))
-            )
-        {
-            return Err("candidate must name a worker".into());
-        }
-        let record = field(field(identity, "additional_candidates")?, name)?;
-        if super::linux::file_sha(&root.join(format!("target/release/{name}")))?
-            != hash(record, "sha256")?
-        {
-            return Err(format!("{name} changed since build identity; rebuild"));
-        }
-        require_same(
-            field(record, "selected_graph")?,
-            &provenance::selected_graph(
-                root,
-                &provenance::cargo_metadata(root)?,
-                name,
-                &provenance::matroska_inputs(),
-            )?,
-            "candidate source graph",
-        )?;
+        validation::candidate_worker(root, identity, name, WorkerCheck::Grading)?;
     }
     Ok(())
 }
@@ -725,17 +601,6 @@ fn validate_additional(
         join_case(row, row, &expected[0], binding.contract, identity, target)?;
     }
     Ok(())
-}
-
-fn external_contract(contract: &Value, id: &str) -> R<Value> {
-    let mut derived = contract.clone();
-    put(&mut derived, "required_profiles", Value::strings([id]))?;
-    put(
-        &mut derived,
-        "required_additional_vectors",
-        Value::Array(vec![]),
-    )?;
-    Ok(derived)
 }
 
 fn exit_code(verdict: &Value, rows: &[Value], requirement: Option<&str>) -> i32 {
@@ -902,6 +767,7 @@ pub fn main(root: &Path, args: &[String]) -> R<i32> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::harness::comparison::reference_record;
     use crate::harness::timing;
 
     fn digest(byte: char) -> String {

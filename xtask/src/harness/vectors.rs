@@ -162,18 +162,7 @@ pub fn external_vector(root: &Path, options: &ExternalOptions) -> R<i32> {
         }
     }
     let case = Value::object(case);
-    let mut derived = match &contract {
-        Value::Object(m) => m.clone(),
-        _ => vec![],
-    };
-    for (key, value) in [
-        ("required_profiles", Value::strings([file.as_str()])),
-        ("required_additional_vectors", Value::Array(vec![])),
-    ] {
-        if let Some(slot) = derived.iter_mut().find(|(k, _)| k == key) {
-            slot.1 = value;
-        }
-    }
+    let derived = super::validation::external_contract(&contract, &file)?;
     let target = match host_target().as_str() {
         t @ ("aarch64-apple-darwin" | "aarch64-unknown-linux-gnu" | "x86_64-unknown-linux-gnu") => {
             t.to_owned()
@@ -182,7 +171,7 @@ pub fn external_vector(root: &Path, options: &ExternalOptions) -> R<i32> {
     };
     let mut verdict = acceptance(
         root,
-        &Value::Object(derived),
+        &derived,
         std::slice::from_ref(&case),
         &identity,
         &target,
