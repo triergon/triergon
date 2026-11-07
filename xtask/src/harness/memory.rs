@@ -1292,33 +1292,6 @@ pub fn evidence_valid(
     selected: &Value,
     require_linux: bool,
 ) -> bool {
-    evidence_valid_with_outputs(
-        root,
-        row,
-        memory,
-        contract,
-        identity,
-        selected,
-        require_linux,
-        None,
-    )
-}
-
-/// Validate recorded memory evidence against optional per-worker output shapes.
-#[allow(
-    clippy::too_many_arguments,
-    reason = "the report, build bindings and optional per-worker work are explicit validation inputs"
-)]
-pub fn evidence_valid_with_outputs(
-    root: &Path,
-    row: &Value,
-    memory: &Value,
-    contract: &Value,
-    identity: &Value,
-    selected: &Value,
-    require_linux: bool,
-    expected_outputs: Option<&Value>,
-) -> bool {
     let check = || -> Option<bool> {
         let certificate = memory.get("certificate")?;
         let raw = memory.get("samples")?.as_array()?;
@@ -1368,7 +1341,7 @@ pub fn evidence_valid_with_outputs(
             }
         }
         let seed = py_int(memory.get("seed")).unwrap_or(280) as u64;
-        let recomputed = evaluate(root, raw, pairs, seed, certificate, expected_outputs);
+        let recomputed = evaluate(root, raw, pairs, seed, certificate, None);
         let same = [
             "status",
             "total_rss_ratio_upper_95",

@@ -330,78 +330,6 @@ fn complete_matched_evidence_can_pass_and_summary_tampering_fails() {
 }
 
 #[test]
-fn per_worker_memory_outputs_reuse_the_same_observation_validation() {
-    let (contract, rows, identity) = matched_gate_fixture();
-    let selected = identity.get("binaries").unwrap();
-    let recorded = rows[0].get("memory").unwrap();
-    let certificate = recorded.get("certificate").unwrap();
-    let expected = v(r#"{
-        "candidate":{"packets":10,"bytes":100,"digest":9},
-        "reference":{"packets":10,"bytes":100,"digest":9,"metadata":"reference-only"}
-    }"#);
-    let mut samples = recorded
-        .get("samples")
-        .unwrap()
-        .as_array()
-        .unwrap()
-        .to_vec();
-    for sample in &mut samples {
-        for role in ["candidate", "reference"] {
-            for mode in ["heap", "rss"] {
-                put(
-                    sample,
-                    &[&format!("{role}_{mode}")],
-                    "work",
-                    expected.get(role).unwrap().clone(),
-                );
-            }
-        }
-    }
-    let measured = super::memory::evaluate(root(), &samples, 30, 0, certificate, Some(&expected));
-    let valid = |memory: &Value, outputs: &Value| {
-        super::memory::evidence_valid_with_outputs(
-            root(),
-            &rows[0],
-            memory,
-            &contract,
-            &identity,
-            selected,
-            false,
-            Some(outputs),
-        )
-    };
-    assert!(valid(&measured, &expected));
-    assert!(!super::memory::evidence_valid(
-        root(),
-        &rows[0],
-        &measured,
-        &contract,
-        &identity,
-        selected,
-        false,
-    ));
-    let mut wrong = expected.clone();
-    put(
-        &mut wrong,
-        &["reference"],
-        "metadata",
-        Value::str("changed"),
-    );
-    assert!(!valid(&measured, &wrong));
-    let mut changed = measured.clone();
-    put(
-        &mut changed,
-        &["certificate"],
-        "worker_hashes",
-        Value::Object(vec![]),
-    );
-    assert!(!valid(&changed, &expected));
-    let mut changed = measured;
-    put(&mut changed, &["heap_ratio"], "upper_95", Value::float(0.0));
-    assert!(!valid(&changed, &expected));
-}
-
-#[test]
 fn pair_identity_and_iteration_counts_bind_the_timing_samples() {
     let fixture = matched_gate_fixture();
     let edit = |change: &dyn Fn(&mut Value)| {
@@ -596,6 +524,60 @@ fn shared_operation_selection_covers_every_registered_corpus_case() {
     let mut contract = load("harness/features/matroska-zlib/contract.json");
     put(&mut contract, &[], "reference", Value::str("not-built"));
     assert!(super::validation::selected_operation(&mixed_case(), &contract, &identity).is_ok());
+}
+
+#[test]
+fn shared_operation_selection_rejects_missing_operation_and_reviewed_view() {
+    let identity = comparison_identity();
+    let mut contract = v(r#"{"id":"generic-feed","worker_operation":"feed-","operation":"feed"}"#);
+    let case = v(r#"{"id":"authored","profile":"authored","sha256":"input"}"#);
+    assert!(super::validation::selected_operation(&case, &contract, &identity).is_ok());
+    for value in [None, Some(Value::Null)] {
+        remove(&mut contract, "operation");
+        if let Some(value) = value {
+            put(&mut contract, &[], "operation", value);
+        }
+        assert_eq!(
+            super::validation::selected_operation(&case, &contract, &identity)
+                .err()
+                .as_deref(),
+            Some("missing operation")
+        );
+    }
+
+    let contract = load("harness/features/matroska-zlib/contract.json");
+    let case = mixed_case();
+    for value in [None, Some(Value::Null)] {
+        let mut changed = identity.clone();
+        let mut rules = changed
+            .get("comparison_rules")
+            .unwrap()
+            .get("rules")
+            .unwrap()
+            .as_array()
+            .unwrap()
+            .to_vec();
+        let rule = rules
+            .iter_mut()
+            .find(|r| r.get("case") == case.get("id"))
+            .unwrap();
+        remove(rule, "view");
+        if let Some(value) = value {
+            put(rule, &[], "view", value);
+        }
+        put(
+            &mut changed,
+            &["comparison_rules"],
+            "rules",
+            Value::Array(rules),
+        );
+        assert_eq!(
+            super::validation::selected_operation(&case, &contract, &changed)
+                .err()
+                .as_deref(),
+            Some("missing view")
+        );
+    }
 }
 
 #[test]

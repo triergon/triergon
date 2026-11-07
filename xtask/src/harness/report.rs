@@ -13,7 +13,7 @@ use super::gate_build;
 use super::parity::{self, Comparison, Run};
 use super::provenance::source_identity_error;
 use super::timing::{Operation, benchmark};
-use super::validation::{self, WorkerCheck, selected_operation};
+use super::validation::{self, selected_operation};
 use crate::checks::read_json;
 use crate::corpus::write_json;
 use crate::json::Value;
@@ -232,8 +232,7 @@ pub fn run(root: &Path, options: &Options) -> Result<i32, String> {
     if !refusals.is_empty() && (options.require_acceptance || options.require_slice_acceptance) {
         return Err(format!("not the gate build: {}", refusals.join("; ")));
     }
-    let (candidate, native) =
-        validation::current_workers(root, &identity, WorkerCheck::Collection)?;
+    let (candidate, native) = validation::current_workers(root, &identity)?;
     let contract = read_json(&options.contract)?;
     let candidate_name = s(&contract, "candidate")
         .unwrap_or("media-worker")
@@ -241,7 +240,7 @@ pub fn run(root: &Path, options: &Options) -> Result<i32, String> {
     let candidate = if candidate_name == "media-worker" {
         candidate
     } else {
-        validation::candidate_worker(root, &identity, &candidate_name, WorkerCheck::Collection)?
+        validation::candidate_worker(root, &identity, &candidate_name)?
     };
     // Workers that take one input per operation and print one fold: the contract
     // names the mode prefix, and each case may add arguments after the input.

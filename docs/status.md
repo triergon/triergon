@@ -58,4 +58,3 @@ codec and decode-session memory, await gate-build measurement with repository ru
 
 Qualification runs on native AArch64 Linux. 32-bit ARMv7 and x86_64 have no
 performance runs yet.
-Separate timing and memory grading requires a matching CPU record in each report.

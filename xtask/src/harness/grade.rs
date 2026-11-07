@@ -12,8 +12,8 @@ use super::comparison::reference_summary;
 use super::gate_build;
 use super::timing::validate_module_absence as timing_module_absent;
 use super::validation::{
-    self, WorkerCheck, array, external_contract, field, hash, members, put, require_same,
-    selected_operation, text,
+    self, array, external_contract, field, hash, members, put, require_same, selected_operation,
+    text,
 };
 use crate::checks::read_json;
 use crate::json::{self, Value};
@@ -368,17 +368,6 @@ fn selected(row: &Value, expected: &Value, contract: &Value, identity: &Value) -
     if row.get("candidate_worker").and_then(Value::as_str) != resolved.candidate_worker {
         return Err("candidate worker differs from the contract".into());
     }
-    if contract
-        .get("worker_operation")
-        .and_then(Value::as_str)
-        .is_some()
-    {
-        field(contract, "operation")?;
-    } else if !matches!(id, "matroska-segment-metadata" | "matroska-colour")
-        && let Some(rule) = resolved.rule
-    {
-        field(rule, "view")?;
-    }
     require_same(
         field(row, "operation")?,
         &resolved.operation,
@@ -547,13 +536,13 @@ fn current_workers(root: &Path, identity: &Value, contract: &Value) -> R<()> {
         &read_json(&root.join("target/harness/identity.json"))?,
         "current memory build identity",
     )?;
-    validation::current_workers(root, identity, WorkerCheck::Grading)?;
+    validation::current_workers(root, identity)?;
     if let Some(name) = contract
         .get("candidate")
         .and_then(Value::as_str)
         .filter(|n| *n != "media-worker")
     {
-        validation::candidate_worker(root, identity, name, WorkerCheck::Grading)?;
+        validation::candidate_worker(root, identity, name)?;
     }
     Ok(())
 }

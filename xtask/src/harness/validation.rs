@@ -97,10 +97,7 @@ pub(super) fn selected_operation<'a>(
     });
     let operation = if let Some(prefix) = prefix {
         Value::object([
-            (
-                "name",
-                contract.get("operation").cloned().unwrap_or(Value::Null),
-            ),
+            ("name", field(contract, "operation")?.clone()),
             ("view", Value::str(format!("playback-{prefix}fold-v1"))),
         ])
     } else {
@@ -108,10 +105,10 @@ pub(super) fn selected_operation<'a>(
         let view = match id {
             Some("matroska-segment-metadata") => Value::str("catalogue-source-and-native-v1"),
             Some("matroska-colour") => Value::str("colour-source-and-ffmpeg9-v1"),
-            _ => rule.map_or_else(
-                || Value::str("source-frames-ffmpeg9-clock-v1"),
-                |r| r.get("view").cloned().unwrap_or(Value::Null),
-            ),
+            _ => match rule {
+                Some(rule) => field(rule, "view")?.clone(),
+                None => Value::str("source-frames-ffmpeg9-clock-v1"),
+            },
         };
         Value::object([
             (
@@ -135,75 +132,27 @@ pub(super) fn selected_operation<'a>(
     })
 }
 
-/// Collection requires the exact primary binary map. Grading also requires
-/// comparison references and validates recorded hashes and candidate names.
-#[derive(Clone, Copy)]
-pub(super) enum WorkerCheck {
-    Collection,
-    Grading,
-}
-
-pub(super) fn current_workers(
-    root: &Path,
-    identity: &Value,
-    check: WorkerCheck,
-) -> Result<(PathBuf, PathBuf), String> {
+/// Verify the primary workers, comparison references and selected sources.
+pub(super) fn current_workers(root: &Path, identity: &Value) -> Result<(PathBuf, PathBuf), String> {
     let candidate = root.join("target/release/media-worker");
     let reference = root.join("target/harness/ffmpeg-worker");
-    match check {
-        WorkerCheck::Collection => {
-            let binaries = Value::object([
-                ("candidate", Value::str(linux::file_sha(&candidate)?)),
-                ("reference", Value::str(linux::file_sha(&reference)?)),
-            ]);
-            if !identity
-                .get("binaries")
-                .is_some_and(|b| diff::equal(b, &binaries))
-            {
-                return Err("adapter changed since build identity; rebuild".into());
-            }
-        }
-        WorkerCheck::Grading => {
-            for (role, path) in [("candidate", &candidate), ("reference", &reference)] {
-                if linux::file_sha(path)? != hash(field(identity, "binaries")?, role)? {
-                    return Err(format!(
-                        "{role} worker changed since build identity; rebuild"
-                    ));
-                }
-            }
+    for (role, path) in [("candidate", &candidate), ("reference", &reference)] {
+        if linux::file_sha(path)? != hash(field(identity, "binaries")?, role)? {
+            return Err(format!(
+                "{role} worker changed since build identity; rebuild"
+            ));
         }
     }
     let directory = root
         .join("target/harness")
         .canonicalize()
         .map_err(|e| e.to_string())?;
-    let references = match check {
-        WorkerCheck::Collection => match identity.get("comparison_references") {
-            Some(Value::Object(fields)) => fields.as_slice(),
-            _ => &[],
-        },
-        WorkerCheck::Grading => members(field(identity, "comparison_references")?)?,
-    };
-    for (_, record) in references {
-        let path = match check {
-            WorkerCheck::Collection => record
-                .get("path")
-                .and_then(Value::as_str)
-                .unwrap_or_default(),
-            WorkerCheck::Grading => text(record, "path")?,
-        };
-        let path = root.join(path).canonicalize().map_err(|e| e.to_string())?;
-        if !path.starts_with(&directory) {
-            return Err("comparison reference changed since build identity; rebuild".into());
-        }
-        let actual = linux::file_sha(&path)?;
-        let matches = match check {
-            WorkerCheck::Collection => {
-                record.get("sha256").and_then(Value::as_str) == Some(actual.as_str())
-            }
-            WorkerCheck::Grading => actual == hash(record, "sha256")?,
-        };
-        if !matches {
+    for (_, record) in members(field(identity, "comparison_references")?)? {
+        let path = root
+            .join(text(record, "path")?)
+            .canonicalize()
+            .map_err(|e| e.to_string())?;
+        if !path.starts_with(&directory) || linux::file_sha(&path)? != hash(record, "sha256")? {
             return Err("comparison reference changed since build identity; rebuild".into());
         }
     }
@@ -218,59 +167,30 @@ pub(super) fn candidate_worker(
     root: &Path,
     identity: &Value,
     name: &str,
-    check: WorkerCheck,
 ) -> Result<PathBuf, String> {
-    if matches!(check, WorkerCheck::Grading)
-        && (Path::new(name).components().count() != 1
-            || !matches!(
-                Path::new(name).components().next(),
-                Some(Component::Normal(_))
-            ))
+    if Path::new(name).components().count() != 1
+        || !matches!(
+            Path::new(name).components().next(),
+            Some(Component::Normal(_))
+        )
     {
         return Err("candidate must name a worker".into());
     }
-    let record = match check {
-        WorkerCheck::Collection => identity
-            .get("additional_candidates")
-            .and_then(|c| c.get(name))
-            .ok_or_else(|| format!("{name} is not in the build identity; rebuild"))?,
-        WorkerCheck::Grading => field(field(identity, "additional_candidates")?, name)?,
-    };
+    let record = field(field(identity, "additional_candidates")?, name)?;
     let path = root.join(format!("target/release/{name}"));
     let actual = linux::file_sha(&path)?;
-    let matches = match check {
-        WorkerCheck::Collection => {
-            record.get("sha256").and_then(Value::as_str) == Some(actual.as_str())
-        }
-        WorkerCheck::Grading => actual == hash(record, "sha256")?,
-    };
-    if !matches {
+    if actual != hash(record, "sha256")? {
         return Err(format!("{name} changed since build identity; rebuild"));
     }
-    let recorded = match check {
-        WorkerCheck::Collection => record.get("selected_graph"),
-        WorkerCheck::Grading => Some(field(record, "selected_graph")?),
-    };
+    let recorded = field(record, "selected_graph")?;
     let current = provenance::selected_graph(
         root,
         &provenance::cargo_metadata(root)?,
         name,
         &provenance::matroska_inputs(),
     )?;
-    match check {
-        WorkerCheck::Collection if !recorded.is_some_and(|g| diff::equal(g, &current)) => Err(
-            format!("{name} sources changed since build identity; rebuild"),
-        ),
-        WorkerCheck::Grading => {
-            require_same(
-                recorded.expect("checked graph"),
-                &current,
-                "candidate source graph",
-            )?;
-            Ok(path)
-        }
-        WorkerCheck::Collection => Ok(path),
-    }
+    require_same(recorded, &current, "candidate source graph")?;
+    Ok(path)
 }
 
 pub(super) fn external_contract(contract: &Value, id: &str) -> Result<Value, String> {
@@ -344,24 +264,22 @@ mod tests {
     fn current_worker_checks_reject_changed_binaries_and_sources() {
         let (directory, identity) = built_workers();
         let root = &directory.0;
-        for check in [WorkerCheck::Collection, WorkerCheck::Grading] {
-            assert!(current_workers(root, &identity, check).is_ok());
-            for path in [
-                "target/release/media-worker",
-                "target/harness/ffmpeg-worker",
-                "crates/example/src/lib.rs",
-                "config.json",
-            ] {
-                let original = fs::read(root.join(path)).unwrap();
-                fs::write(root.join(path), b"changed").unwrap();
-                assert!(current_workers(root, &identity, check).is_err(), "{path}");
-                fs::write(root.join(path), original).unwrap();
-            }
+        assert!(current_workers(root, &identity).is_ok());
+        for path in [
+            "target/release/media-worker",
+            "target/harness/ffmpeg-worker",
+            "crates/example/src/lib.rs",
+            "config.json",
+        ] {
+            let original = fs::read(root.join(path)).unwrap();
+            fs::write(root.join(path), b"changed").unwrap();
+            assert!(current_workers(root, &identity).is_err(), "{path}");
+            fs::write(root.join(path), original).unwrap();
         }
     }
 
     #[test]
-    fn collection_and_grading_keep_their_identity_requirements() {
+    fn worker_checks_require_reference_records_and_safe_candidate_names() {
         let (directory, identity) = built_workers();
         let root = &directory.0;
         let mut missing = identity.clone();
@@ -369,25 +287,58 @@ mod tests {
             unreachable!()
         };
         fields.retain(|(key, _)| key != "comparison_references");
-        assert!(current_workers(root, &missing, WorkerCheck::Collection).is_ok());
         assert_eq!(
-            current_workers(root, &missing, WorkerCheck::Grading).unwrap_err(),
+            current_workers(root, &missing).unwrap_err(),
             "missing comparison_references"
         );
 
-        let mut extra = identity.clone();
-        let mut binaries = field(&extra, "binaries").unwrap().clone();
-        put(&mut binaries, "other", Value::str("extra binary")).unwrap();
-        put(&mut extra, "binaries", binaries).unwrap();
-        assert!(current_workers(root, &extra, WorkerCheck::Collection).is_err());
-        assert!(current_workers(root, &extra, WorkerCheck::Grading).is_ok());
+        for value in [Value::Null, Value::Array(vec![])] {
+            let mut malformed = identity.clone();
+            put(&mut malformed, "comparison_references", value).unwrap();
+            assert!(current_workers(root, &malformed).is_err());
+        }
 
         for name in ["..", "../media-worker", "/media-worker", ""] {
             assert_eq!(
-                candidate_worker(root, &identity, name, WorkerCheck::Grading).unwrap_err(),
+                candidate_worker(root, &identity, name).unwrap_err(),
                 "candidate must name a worker"
             );
         }
+    }
+
+    #[test]
+    fn worker_checks_reject_malformed_hashes_and_missing_candidate_sources() {
+        let (directory, identity) = built_workers();
+        let root = &directory.0;
+        for role in ["candidate", "reference"] {
+            for value in [Value::Null, Value::Bool(true), Value::str("not-a-hash")] {
+                let mut changed = identity.clone();
+                let mut binaries = field(&changed, "binaries").unwrap().clone();
+                put(&mut binaries, role, value).unwrap();
+                put(&mut changed, "binaries", binaries).unwrap();
+                assert!(current_workers(root, &changed).is_err(), "{role}");
+            }
+        }
+        let mut changed = identity;
+        fs::write(root.join("target/release/custom-worker"), b"custom").unwrap();
+        put(
+            &mut changed,
+            "additional_candidates",
+            Value::object([(
+                "custom-worker",
+                Value::object([(
+                    "sha256",
+                    Value::str(
+                        linux::file_sha(&root.join("target/release/custom-worker")).unwrap(),
+                    ),
+                )]),
+            )]),
+        )
+        .unwrap();
+        assert_eq!(
+            candidate_worker(root, &changed, "custom-worker").unwrap_err(),
+            "missing selected_graph"
+        );
     }
 
     #[test]
@@ -411,12 +362,10 @@ mod tests {
                 )]),
             )
             .unwrap();
-            for check in [WorkerCheck::Collection, WorkerCheck::Grading] {
-                assert_eq!(
-                    current_workers(root, &identity, check).unwrap_err(),
-                    "comparison reference changed since build identity; rebuild"
-                );
-            }
+            assert_eq!(
+                current_workers(root, &identity).unwrap_err(),
+                "comparison reference changed since build identity; rebuild"
+            );
         }
     }
 }
