@@ -6,6 +6,7 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
+use super::gate_build;
 use super::linux;
 use super::provenance::{cargo_metadata, matroska_inputs, selected_graph};
 use crate::checks::read_json;
@@ -348,7 +349,8 @@ const PROFILE_REFERENCES: [ProfileReference; 5] = [
     },
 ];
 
-pub fn build(root: &Path) -> R<PathBuf> {
+pub fn build(root: &Path, comparison_build: bool) -> R<PathBuf> {
+    gate_build::admit(root, comparison_build)?;
     let linux = cfg!(target_os = "linux");
     let candidate_command: Vec<String> = [
         "cargo",
@@ -605,24 +607,6 @@ pub fn build(root: &Path) -> R<PathBuf> {
     } else {
         None
     };
-    let build_environment: Vec<(String, Value)> = {
-        let mut vars: Vec<(String, Value)> = std::env::vars()
-            .filter(|(k, _)| {
-                matches!(
-                    k.as_str(),
-                    "RUSTFLAGS"
-                        | "CARGO_ENCODED_RUSTFLAGS"
-                        | "RUSTC"
-                        | "RUSTC_WRAPPER"
-                        | "CARGO_BUILD_TARGET"
-                ) || k.starts_with("CARGO_PROFILE_")
-                    || k.starts_with("CARGO_TARGET_")
-            })
-            .map(|(k, v)| (k, Value::str(v)))
-            .collect();
-        vars.sort_by(|a, b| a.0.cmp(&b.0));
-        vars
-    };
     let files_of = |key: &str| -> Value {
         let mut map = Vec::new();
         if key == "source_hashes" {
@@ -721,7 +705,6 @@ pub fn build(root: &Path) -> R<PathBuf> {
         ("candidate_command", strings(&candidate_command)),
         ("selected_graph", graph.clone()),
         ("additional_candidates", Value::object(candidates)),
-        ("build_environment", Value::Object(build_environment)),
         (
             "source_revision",
             pinned_build
@@ -763,7 +746,6 @@ pub fn build(root: &Path) -> R<PathBuf> {
             "ffmpeg_version",
             Value::str(output(&ffmpeg.to_string_lossy(), &["-version"], &[])?),
         ),
-        ("rustc", Value::str(output("rustc", &["-Vv"], &[])?)),
         (
             "binaries",
             Value::object([
@@ -878,6 +860,7 @@ pub fn build(root: &Path) -> R<PathBuf> {
             }
         }
     }
+    identity.extend(gate_build::current(root)?);
     let path = out.join("identity.json");
     write_json(&path, &Value::Object(identity))?;
     if linux {

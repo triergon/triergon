@@ -6,6 +6,7 @@
 
 use super::comparison::validate_case_evidence;
 use super::diff::equal;
+use super::gate_build;
 use crate::json::Value;
 use crate::stats;
 
@@ -409,6 +410,14 @@ pub fn acceptance(
         .is_none_or(|v| *v == Value::Null)
     {
         reasons.push("FFmpeg source build/configuration is not qualified".into());
+    }
+    match gate_build::pinned_release(root) {
+        Ok(pinned) => reasons.extend(
+            gate_build::refusals(identity, &pinned)
+                .into_iter()
+                .map(|reason| format!("not the gate build: {reason}")),
+        ),
+        Err(error) => reasons.push(format!("gate build unknown: {error}")),
     }
     let targets: Vec<&str> = contract
         .get("required_targets")

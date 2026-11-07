@@ -36,6 +36,10 @@ release ([reference pins](quality.md#reference-and-corpus)).
 Each row names the source revision a result above was measured on and, where the raw
 samples are archived, their SHA-256. Update the row in the same change as the result.
 
+Every row predates the [gate build](quality.md#measuring-performance). Matroska startup
+and seek and HLS segments were built with `-C target-cpu=neoverse-v2`; the other rows
+have not been checked against it. Their numbers stay as measured until re-measured.
+
 | Area | Revision | Raw samples SHA-256 |
 |---|---|---|
 | Matroska / WebM | `cd6ed16d7b37974a8e9d0e13c983965fc6ef7f64` | `ae86dddc2c4ee549c5289429002e145b05fd88fd718a63a413aae909b0af5ddd` |

@@ -15,6 +15,7 @@ use std::path::{Path, PathBuf};
 use std::time::Duration;
 
 use crate::harness::acceptance::active_cpu;
+use crate::harness::gate_build;
 use crate::harness::timing::{competing_builds, cpu_snapshot, lock, timing_module_state};
 use crate::harness::worker::{self, data, status};
 use crate::json::{self, Value};
@@ -35,6 +36,8 @@ const KIND: &str = "codec-time";
 
 /// The arguments of `codecs time`.
 pub struct Options {
+    /// The repository whose recorded build the candidate is held against.
+    pub repository: PathBuf,
     pub candidate: PathBuf,
     pub reference: PathBuf,
     pub workloads: PathBuf,
@@ -115,6 +118,11 @@ pub fn run(options: &Options) -> Result<(), String> {
         Value::Object(Vec::new())
     };
     fs::create_dir_all(&options.out).map_err(|e| format!("{}: {e}", options.out.display()))?;
+    let refusals =
+        gate_build::pair_refusals(&options.repository, &options.candidate, &options.reference);
+    for reason in &refusals {
+        println!("no gate result: {reason}");
+    }
     let workers = [
         ("candidate", python::path(&options.candidate)),
         ("reference", python::path(&options.reference)),
@@ -251,6 +259,11 @@ pub fn run(options: &Options) -> Result<(), String> {
             ("iterations".to_owned(), iterations.clone()),
             ("status".to_owned(), Value::str(state.as_str())),
             ("samples".to_owned(), Value::Array(samples.clone())),
+            (
+                "build_refusals".to_owned(),
+                Value::strings(refusals.clone()),
+            ),
+            ("cpus".to_owned(), gate_build::cpus()),
         ];
         let mut ratio = None;
         let (mut delivery, mut digest_equal) = (None, None);
@@ -331,16 +344,15 @@ pub fn run(options: &Options) -> Result<(), String> {
                     let interval = stats::ratio_interval(&pairs, seed, RESAMPLES)?;
                     let value = interval_value(&interval);
                     result.push(("ratio".into(), value.clone()));
-                    result.push((
-                        "delivery".into(),
-                        Value::Bool(interval.upper_95 <= DELIVERY),
-                    ));
+                    let gate_build = refusals.is_empty();
+                    let passes = gate_build && interval.upper_95 <= DELIVERY;
+                    result.push(("delivery".into(), Value::Bool(passes)));
                     result.push((
                         "optimization".into(),
-                        Value::Bool(interval.upper_95 <= OPTIMIZATION),
+                        Value::Bool(gate_build && interval.upper_95 <= OPTIMIZATION),
                     ));
                     ratio = Some((value, interval.upper_95));
-                    delivery = Some(interval.upper_95 <= DELIVERY);
+                    delivery = Some(passes);
                 } else {
                     state = "unequal-work".into();
                 }

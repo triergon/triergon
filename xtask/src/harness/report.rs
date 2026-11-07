@@ -9,6 +9,7 @@ use std::process::Command;
 
 use super::acceptance::acceptance;
 use super::comparison::{reference_record, reference_summary, rule_for};
+use super::gate_build;
 use super::parity::{self, Comparison, Run};
 use super::provenance::source_identity_error;
 use super::timing::{Operation, benchmark};
@@ -251,6 +252,12 @@ pub fn run(root: &Path, options: &Options) -> Result<i32, String> {
     let candidate = root.join("target/release/media-worker");
     let native = root.join("target/harness/ffmpeg-worker");
     let identity = read_json(&root.join("target/harness/identity.json"))?;
+    let pinned = gate_build::pinned_release(root)?;
+    println!("{}", gate_build::describe(&identity, &pinned));
+    let refusals = gate_build::refusals(&identity, &pinned);
+    if !refusals.is_empty() && (options.require_acceptance || options.require_slice_acceptance) {
+        return Err(format!("not the gate build: {}", refusals.join("; ")));
+    }
     let binaries = Value::object([
         ("candidate", Value::str(digest(&candidate)?)),
         ("reference", Value::str(digest(&native)?)),
@@ -342,6 +349,7 @@ pub fn run(root: &Path, options: &Options) -> Result<i32, String> {
             Value::object([
                 ("platform", Value::str(platform_name())),
                 ("load", load_average()),
+                ("cpus", gate_build::cpus()),
             ]),
         ),
         ("fate_coverage", Value::Array(coverage.clone())),
