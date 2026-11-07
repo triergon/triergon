@@ -1,6 +1,9 @@
 //! A quick check that a change did not slow the workers down, for changes that are
-//! not meant to affect speed. Two independent readings:
+//! not meant to affect speed. Three independent readings:
 //!
+//! - [`count`] counts what two workers execute on one workload with `perf stat`. It
+//!   takes seconds, and on equal input the instruction count repeats closely, so it
+//!   finds a change in the code before any timing round is spent on it.
 //! - [`same_code`] compares two worker binaries function by function, so a change
 //!   that only moves or renames code shows as such. A worker whose functions moved
 //!   can still time differently: where a function sits changes branch prediction and
@@ -12,7 +15,7 @@
 use std::collections::BTreeMap;
 use std::fs;
 use std::path::Path;
-use std::process::Command;
+use std::process::{Command, Stdio};
 
 use super::gate_build;
 use crate::json::{self, Value};
@@ -23,6 +26,13 @@ use crate::stats;
 pub const CASE_LIMIT: f64 = 1.5;
 /// Above this for the median of a group of cases the round is flagged, in percent.
 pub const GROUP_LIMIT: f64 = 0.75;
+
+/// Above this many percent more instructions on one workload the count is flagged.
+pub const INSTRUCTION_LIMIT: f64 = 0.25;
+/// Runs of each worker. The reading of a counter is its least value over the runs.
+const COUNT_RUNS: usize = 5;
+/// The counters of [`count`], user mode only.
+const COUNTERS: [&str; 3] = ["instructions:u", "cycles:u", "branch-misses:u"];
 
 /// One group's reading, and the cases it flags or could not read.
 #[derive(Debug, PartialEq)]
@@ -282,9 +292,96 @@ pub fn same_code(candidate: &Path, reference: &Path) -> Result<bool, String> {
     Ok(change.changed.is_empty() && change.removed.is_empty() && change.added.is_empty())
 }
 
+/// The values of [`COUNTERS`] in `perf stat -x,` output.
+fn parse_counters(output: &str) -> Result<[u64; COUNTERS.len()], String> {
+    let mut values = [0; COUNTERS.len()];
+    for (value, name) in values.iter_mut().zip(COUNTERS) {
+        let line = output
+            .lines()
+            .find(|line| line.split(',').nth(2) == Some(name))
+            .ok_or_else(|| format!("perf reported no {name}"))?;
+        *value = line
+            .split(',')
+            .next()
+            .and_then(|field| field.parse().ok())
+            .ok_or_else(|| format!("perf could not count {name}: {line}"))?;
+    }
+    Ok(values)
+}
+
+/// The least of each counter over the runs of `worker` on `arguments`.
+fn counters(worker: &Path, arguments: &[String]) -> Result<[u64; COUNTERS.len()], String> {
+    let mut least = [u64::MAX; COUNTERS.len()];
+    for _ in 0..COUNT_RUNS {
+        let output = Command::new("perf")
+            .args(["stat", "-x,", "-e", &COUNTERS.join(","), "--"])
+            .arg(worker)
+            .args(arguments)
+            .stdout(Stdio::null())
+            .output()
+            .map_err(|e| format!("perf: {e}"))?;
+        if !output.status.success() {
+            return Err(format!(
+                "{} failed: {}",
+                worker.display(),
+                String::from_utf8_lossy(&output.stderr)
+            ));
+        }
+        let values = parse_counters(&String::from_utf8_lossy(&output.stderr))?;
+        for (low, value) in least.iter_mut().zip(values) {
+            *low = (*low).min(value);
+        }
+    }
+    Ok(least)
+}
+
+/// The candidate's count over the reference's, in percent.
+fn change_percent(candidate: u64, reference: u64) -> f64 {
+    (candidate as f64 / reference as f64 - 1.0) * 100.0
+}
+
+/// Count two workers on one workload and print each counter. True unless the candidate
+/// runs more than [`INSTRUCTION_LIMIT`] percent more instructions. Cycles and branch
+/// misses are printed for reading: they move with placement, so they do not grade.
+pub fn count(candidate: &Path, reference: &Path, arguments: &[String]) -> Result<bool, String> {
+    let candidate = counters(candidate, arguments)?;
+    let reference = counters(reference, arguments)?;
+    for (index, name) in COUNTERS.iter().enumerate() {
+        println!(
+            "{name:<18} {:>16} {:>16} {:+7.2}%",
+            reference[index],
+            candidate[index],
+            change_percent(candidate[index], reference[index])
+        );
+    }
+    Ok(change_percent(candidate[0], reference[0]) <= INSTRUCTION_LIMIT)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn perf_output_reads_by_counter_name() {
+        let output = "\n1200,,branch-misses:u,5,100.00,,\n\
+                      900,,instructions:u,5,100.00,0.75,insn per cycle\n\
+                      1000,,cycles:u,5,100.00,,\n";
+        assert_eq!(parse_counters(output), Ok([900, 1000, 1200]));
+    }
+
+    #[test]
+    fn a_counter_perf_could_not_read_is_an_error() {
+        let output = "<not supported>,,instructions:u,0,100.00,,\n";
+        assert!(parse_counters(output).is_err());
+        assert!(parse_counters("").is_err());
+    }
+
+    #[test]
+    fn the_limit_applies_to_more_instructions_only() {
+        assert!(change_percent(1002, 1000) <= INSTRUCTION_LIMIT);
+        assert!(change_percent(1003, 1000) > INSTRUCTION_LIMIT);
+        assert!(change_percent(900, 1000) <= INSTRUCTION_LIMIT);
+    }
 
     fn report(cases: &str) -> Value {
         json::parse(&format!(r#"{{"cases": [{cases}]}}"#)).unwrap()
