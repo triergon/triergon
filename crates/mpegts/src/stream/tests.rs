@@ -111,7 +111,7 @@ fn output_modes_preserve_null_carriers_faults_and_cancelled_partial_input() {
             };
             match step {
                 Step::Ready(CompactTraceEvent::Event(TraceEvent::Transport(packet))) => {
-                    record(packet)
+                    record(packet);
                 }
                 Step::Ready(CompactTraceEvent::NullRun(run)) => {
                     runs += 1;
