@@ -109,9 +109,6 @@ impl AacAdtsCarrierReader {
     pub fn token(&self) -> InputToken {
         self.inner.token()
     }
-    pub fn generation(&self) -> u64 {
-        self.inner.generation()
-    }
     pub fn position(&self) -> u64 {
         self.inner.position()
     }

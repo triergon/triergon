@@ -1025,64 +1025,6 @@ impl<'a> HvcConfigNalRef<'a> {
     pub fn type_matches_declaration(&self) -> bool {
         self.header().nal_unit_type() == self.descriptor.declared_type
     }
-    pub fn retain(&self) -> RetainedHvcConfigNal {
-        RetainedHvcConfigNal {
-            raw: Bytes::clone(self.raw),
-            source: self.source,
-            descriptor: (*self.descriptor).clone(),
-        }
-    }
-    pub fn retain_in(&self, pool: &Budget) -> Result<RetainedHvcConfigNal> {
-        if !self.raw.belongs_to(pool) {
-            return Err(Error::ForeignPool);
-        }
-        Ok(self.retain())
-    }
-}
-#[derive(Clone, Debug)]
-pub struct RetainedHvcConfigNal {
-    raw: Bytes,
-    source: HvcConfigSource,
-    descriptor: HvcNalDescriptor,
-}
-impl RetainedHvcConfigNal {
-    pub fn view(&self) -> HvcConfigNalRef<'_> {
-        HvcConfigNalRef {
-            raw: &self.raw,
-            source: self.source,
-            descriptor: &self.descriptor,
-        }
-    }
-    pub fn source_bytes(&self) -> &[u8] {
-        &self.raw[self.descriptor.payload_range()]
-    }
-    pub fn length_field_bytes(&self) -> &[u8] {
-        &self.raw[self.descriptor.length_offset()..self.descriptor.payload_start]
-    }
-    pub fn source_range(&self) -> Range<usize> {
-        self.descriptor.payload_range()
-    }
-    pub const fn source(&self) -> HvcConfigSource {
-        self.source
-    }
-    pub const fn header(&self) -> NalHeader {
-        self.descriptor.header
-    }
-    pub const fn array_index(&self) -> usize {
-        self.descriptor.array as usize
-    }
-    pub const fn declared_nal_type(&self) -> u8 {
-        self.descriptor.declared_type
-    }
-    pub fn type_matches_declaration(&self) -> bool {
-        self.header().nal_unit_type() == self.descriptor.declared_type
-    }
-    pub fn retained_storage_bytes(&self) -> usize {
-        self.raw.retained_storage_bytes()
-    }
-    pub fn belongs_to(&self, pool: &Budget) -> bool {
-        self.raw.belongs_to(pool)
-    }
 }
 
 /// ```compile_fail,E0505
@@ -1123,64 +1065,6 @@ impl<'a> HvcConfigArrayRef<'a> {
     }
     pub fn nal_indices(&self) -> Range<usize> {
         self.descriptor.nal_indices()
-    }
-    pub fn retain(&self) -> RetainedHvcConfigArray {
-        RetainedHvcConfigArray {
-            raw: Bytes::clone(self.raw),
-            source: self.source,
-            descriptor: (*self.descriptor).clone(),
-        }
-    }
-    pub fn retain_in(&self, pool: &Budget) -> Result<RetainedHvcConfigArray> {
-        if !self.raw.belongs_to(pool) {
-            return Err(Error::ForeignPool);
-        }
-        Ok(self.retain())
-    }
-}
-#[derive(Clone, Debug)]
-pub struct RetainedHvcConfigArray {
-    raw: Bytes,
-    source: HvcConfigSource,
-    descriptor: HvcArrayDescriptor,
-}
-impl RetainedHvcConfigArray {
-    pub fn view(&self) -> HvcConfigArrayRef<'_> {
-        HvcConfigArrayRef {
-            raw: &self.raw,
-            source: self.source,
-            descriptor: &self.descriptor,
-        }
-    }
-    pub fn source_bytes(&self) -> &[u8] {
-        &self.raw[self.descriptor.range.clone()]
-    }
-    pub fn source_header_bytes(&self) -> &[u8] {
-        &self.raw[self.descriptor.range.start..self.descriptor.range.start + 3]
-    }
-    pub const fn source(&self) -> HvcConfigSource {
-        self.source
-    }
-    pub fn completeness(&self) -> bool {
-        self.source_header_bytes()[0] & 128 != 0
-    }
-    pub fn reserved_bit(&self) -> bool {
-        self.source_header_bytes()[0] & 64 != 0
-    }
-    pub fn declared_nal_type(&self) -> u8 {
-        self.source_header_bytes()[0] & 63
-    }
-    pub fn source_range(&self) -> Range<usize> {
-        self.descriptor.range.clone()
-    }
-    pub fn nal_indices(&self) -> Range<usize> {
-        self.descriptor.nal_indices()
-    }
-    pub fn retained_storage_bytes(&self) -> usize {
-        self.raw.retained_storage_bytes()
-    }
-    pub fn belongs_to(&self, pool: &Budget) -> bool {
-        self.raw.belongs_to(pool)
     }
 }
 
@@ -1281,15 +1165,7 @@ mod compact_descriptor_guards {
         assert_eq!(view.nal(0).unwrap().length_field_bytes(), [0xff, 0xff]);
         assert_eq!(view.nal(0).unwrap().source_bytes(), &record[28..65_563]);
         assert_eq!(view.opaque_suffix(), [0xe7]);
-        let leaf = view.nal(1).unwrap().retain();
         drop((view, parser, owner));
-        assert_eq!(pool.used(), Budget::control_storage_bytes() + owner_bytes);
-        assert_eq!(leaf.source(), source);
-        assert_eq!(leaf.source_range(), 65_565..65_568);
-        assert_eq!(leaf.length_field_bytes(), [0, 3]);
-        assert_eq!(leaf.source_bytes(), [0x40, 1, 0x91]);
-        assert!(format!("{leaf:?}").contains("payload: 65565..65568"));
-        drop(leaf);
         assert_eq!(pool.used(), Budget::control_storage_bytes());
     }
 

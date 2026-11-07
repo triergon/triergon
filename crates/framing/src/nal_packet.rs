@@ -176,19 +176,6 @@ pub enum NalPacketViewConfiguration {
     },
 }
 impl NalPacketViewConfiguration {
-    pub fn bytes(&self) -> &Bytes {
-        PacketConfig::raw(self)
-    }
-    pub fn codec(&self) -> Codec {
-        PacketConfig::codec_kind(self)
-    }
-    pub fn strict_source_refusal(&self) -> Option<Error> {
-        PacketConfig::refusal(self).error()
-    }
-    /// Literal source identity, independently of a record-validity conclusion.
-    pub fn source_identity(&self) -> Option<(SourceLocation, u64)> {
-        PacketConfig::identity(self)
-    }
     fn avc_view(&self) -> Option<&crate::AvcConfigurationView> {
         match self {
             Self::Avc(v) => Some(v),
@@ -1312,9 +1299,6 @@ impl<M> NalPacketJob<'_, M> {
 }
 
 impl<M> NalPacketCompactJob<'_, M> {
-    pub fn source(&self) -> Option<&NalPacket<M>> {
-        self.inner.source()
-    }
     pub fn take_receiver_rejection(&mut self) -> Option<NalPacketRejection<M>> {
         self.inner.take_receiver_rejection()
     }
@@ -1338,9 +1322,6 @@ impl<M> NalPacketCompactJob<'_, M> {
 }
 
 impl<M> NalPacketViewJob<'_, M> {
-    pub fn source(&self) -> Option<&NalPacket<M>> {
-        self.inner.source()
-    }
     pub fn take_receiver_rejection(&mut self) -> Option<NalPacketRejection<M>> {
         self.inner.take_receiver_rejection()
     }

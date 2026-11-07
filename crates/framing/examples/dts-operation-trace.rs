@@ -10,8 +10,8 @@ use triergon_framing::reference_trace::dts::{
     ParserOperationStep, ParserPacket,
 };
 use triergon_framing::{
-    Dts14BoundaryEvidence, Dts14CarrierBoundary, Dts14CarrierLimits, Dts14Frame, Dts14SyncLimits,
-    DtsWordOrder,
+    Dts14BoundaryEvidence, Dts14CarrierBoundary, Dts14CarrierLimits, Dts14SyncFrame,
+    Dts14SyncLimits, DtsWordOrder,
 };
 use triergon_harness_protocol::hex;
 
@@ -36,7 +36,7 @@ fn digest(bytes: &[u8]) -> u64 {
         (h ^ u64::from(*b)).wrapping_mul(0x100000001b3)
     })
 }
-fn source_record(f: &Dts14Frame) -> String {
+fn source_record(f: &Dts14SyncFrame) -> String {
     let a = f.facts();
     let end = a.identity.offset + f.physical_bytes().len() as u64;
     let boundary = match a.boundary {
@@ -159,7 +159,7 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
     )?;
     let context = op.context();
     let cancel = AtomicBool::new(false);
-    let mut source_held: Vec<(Dts14Frame, String)> = Vec::new();
+    let mut source_held: Vec<(Dts14SyncFrame, String)> = Vec::new();
     let mut parser_held: Vec<(ParserPacket, String)> = Vec::new();
     let mut counts = [0usize; 4];
     let mut ended = false;

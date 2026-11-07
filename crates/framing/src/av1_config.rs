@@ -34,9 +34,6 @@ impl Av1ConfigFields {
         Ok(Self { raw })
     }
 
-    pub const fn raw_bytes(self) -> [u8; 4] {
-        self.raw
-    }
     pub const fn marker(self) -> bool {
         self.raw[0] & 128 != 0
     }

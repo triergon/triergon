@@ -4,7 +4,7 @@
 //! the independent oracle for selected records. No native or encoder output.
 use std::ops::Range;
 use std::sync::atomic::AtomicBool;
-use triergon_core::{Budget, BudgetVec, Bytes, Error, SourceId, WorkBudget};
+use triergon_core::{Budget, Bytes, Error, SourceId, WorkBudget};
 use triergon_framing::compat::nal::*;
 use triergon_framing::*;
 use triergon_harness_protocol::unhex;
@@ -745,35 +745,15 @@ fn g02_single_exports_outlive_parser_and_view_with_one_full_owner() {
     assert!(table > 0);
     assert_eq!(view.retained_storage_bytes().unwrap(), raw_charge + table);
     assert_eq!(pool.used(), baseline + raw_charge + table);
-    let nal = view.nal(3).unwrap().retain();
-    let array = view.array(1).unwrap().retain();
     let suffix = view.retain_opaque_suffix().unwrap();
-    // Exports add no charged allocation: they alias the one backing owner.
+    // The export adds no charged allocation: it aliases the one backing owner.
     assert_eq!(pool.used(), baseline + raw_charge + table);
     assert!(suffix.shares_storage_with(view.source_bytes()));
     drop(view);
     // Descriptor tables released; the full raw backing stays charged once.
     assert_eq!(pool.used(), baseline + raw_charge);
-    assert_eq!(nal.source_range(), 61..67);
-    assert_eq!(nal.source_bytes(), [68, 1, 0, 0, 3, 6]);
-    assert_eq!(nal.length_field_bytes(), [0, 6]);
-    assert_eq!((nal.array_index(), nal.declared_nal_type()), (3, 33));
-    assert!(!nal.type_matches_declaration());
-    assert_eq!(nal.source(), hvc_source());
-    assert_eq!(nal.view().source_bytes(), nal.source_bytes());
-    assert_eq!(nal.retained_storage_bytes(), raw_charge);
-    assert!(nal.belongs_to(&pool));
-    assert_eq!(array.source_bytes(), [55, 0, 0]);
-    assert_eq!(array.nal_indices(), 2..2);
-    assert_eq!(array.declared_nal_type(), 55);
     assert_eq!(&suffix[..], [0xde, 0xad]);
-    let copy = nal.clone();
-    drop(nal);
-    drop(array);
     drop(suffix);
-    assert_eq!(pool.used(), baseline + raw_charge);
-    assert_eq!(copy.source_bytes(), [68, 1, 0, 0, 3, 6]);
-    drop(copy);
     assert_eq!(pool.used(), baseline);
 
     let raw = bytes(&pool, &avc_rich());
@@ -781,75 +761,12 @@ fn g02_single_exports_outlive_parser_and_view_with_one_full_owner() {
     let mut parser = AvcConfigViewParser::new(&pool, avc_source(), raw, avc_limits()).unwrap();
     let view = run(&mut parser, 1).1.unwrap();
     drop(parser);
-    let nal = view.nal(4).unwrap().retain_in(&pool).unwrap();
-    let array = view.array(2).unwrap().retain_in(&pool).unwrap();
     let trailing = view.retain_trailing_bytes().unwrap();
     drop(view);
     assert_eq!(pool.used(), baseline + raw_charge);
-    assert_eq!(nal.source_bytes(), [0x6d, 1, 2, 3]);
-    assert_eq!(nal.length_field_bytes(), [0, 4]);
-    assert_eq!(nal.source_range(), 29..33);
-    assert_eq!(nal.array_kind(), AvcConfigArrayKind::SequenceExtension);
-    assert_eq!(nal.header().nal_unit_type(), 13);
-    assert_eq!(array.kind(), AvcConfigArrayKind::SequenceExtension);
-    assert_eq!(array.nal_indices(), 4..5);
-    assert_eq!(array.count_offset(), 26);
-    assert_eq!(
-        array.source_bytes(),
-        [0xfd, 0xf8, 0xf8, 1, 0, 4, 0x6d, 1, 2, 3]
-    );
     assert_eq!(&trailing[..], [0xaa, 0xbb]);
-    drop((nal, array, trailing));
+    drop(trailing);
     assert_eq!(pool.used(), baseline);
-}
-
-#[test]
-fn g02_batch_export_charges_its_own_actual_capacity() {
-    let pool = Budget::new(1 << 20).unwrap();
-    let baseline = pool.used();
-    let raw = bytes(&pool, &hvc_example(&[]));
-    let raw_charge = raw.retained_storage_bytes();
-    let mut parser = HvcConfigViewParser::new(&pool, hvc_source(), raw, hvc_limits()).unwrap();
-    let view = run(&mut parser, 4096).1.unwrap();
-    drop(parser);
-    let table = view.descriptor_storage_bytes().unwrap();
-    let mut batch = BudgetVec::new(&pool);
-    batch.try_reserve_exact(view.nal_count()).unwrap();
-    let batch_charge = batch.capacity() * size_of::<RetainedHvcConfigNal>();
-    for nal in view.nals() {
-        batch.try_push(nal.retain()).map_err(|e| e.error).unwrap();
-    }
-    assert_eq!(pool.used(), baseline + raw_charge + table + batch_charge);
-    drop(view);
-    // The batch keeps its own capacity charge plus one deduplicated backing.
-    assert_eq!(pool.used(), baseline + raw_charge + batch_charge);
-    let ranges: Vec<_> = batch
-        .as_slice()
-        .iter()
-        .map(RetainedHvcConfigNal::source_range)
-        .collect();
-    assert_eq!(ranges, [28..34, 36..42, 50..56, 61..67]);
-    drop(batch);
-    assert_eq!(pool.used(), baseline);
-}
-
-#[test]
-fn g03_retained_exports_are_static_owners() {
-    fn owned<T: 'static + Send + Sync>(_: &T) {}
-    let pool = Budget::new(1 << 16).unwrap();
-    let raw = bytes(&pool, &avc_rich());
-    let mut parser = AvcConfigViewParser::new(&pool, avc_source(), raw, avc_limits()).unwrap();
-    let view = run(&mut parser, 4096).1.unwrap();
-    let nal = view.nal(0).unwrap().retain();
-    let array = view.array(0).unwrap().retain();
-    drop(view);
-    owned(&nal);
-    owned(&array);
-    let moved = std::thread::spawn(move || nal.source_bytes().to_vec())
-        .join()
-        .unwrap();
-    assert_eq!(moved, [0x67, 0x64, 0x00]);
-    assert_eq!(array.nal_indices(), 0..2);
 }
 
 #[test]
@@ -865,8 +782,7 @@ fn g04_hidden_parent_offsets_are_record_relative_and_fully_charged() {
         let full = root.retained_storage_bytes();
         let span = root.slice(127..127 + record.len()).unwrap();
         drop(root);
-        let other = Budget::new(1 << 16).unwrap();
-        let retained = if codec == "avc" {
+        if codec == "avc" {
             let mut parser =
                 AvcConfigViewParser::new(&pool, avc_source(), span, avc_limits()).unwrap();
             let view = run(&mut parser, 3).1.unwrap();
@@ -878,18 +794,6 @@ fn g04_hidden_parent_offsets_are_record_relative_and_fully_charged() {
                 view.retained_storage_bytes().unwrap(),
                 full + view.descriptor_storage_bytes().unwrap()
             );
-            assert_eq!(
-                view.nal(0).unwrap().retain_in(&other).err(),
-                Some(Error::ForeignPool)
-            );
-            assert_eq!(
-                view.array(0).unwrap().retain_in(&other).err(),
-                Some(Error::ForeignPool)
-            );
-            let leaf = view.nal(0).unwrap().retain();
-            assert!(!leaf.belongs_to(&other));
-            drop(view);
-            leaf.retained_storage_bytes()
         } else {
             let mut parser =
                 HvcConfigViewParser::new(&pool, hvc_source(), span, hvc_limits()).unwrap();
@@ -897,19 +801,7 @@ fn g04_hidden_parent_offsets_are_record_relative_and_fully_charged() {
             assert_eq!(view.source_bytes().as_ref(), record);
             assert_eq!(view.nal(0).unwrap().source_range(), 28..34);
             assert_eq!(view.opaque_suffix(), [9]);
-            assert_eq!(
-                view.nal(0).unwrap().retain_in(&other).err(),
-                Some(Error::ForeignPool)
-            );
-            assert_eq!(
-                view.array(0).unwrap().retain_in(&other).err(),
-                Some(Error::ForeignPool)
-            );
-            let leaf = view.array(0).unwrap().retain();
-            drop(view);
-            leaf.retained_storage_bytes()
-        };
-        assert_eq!(retained, full);
+        }
         assert_eq!(pool.used(), baseline);
     }
     // Foreign records are refused at entry exactly like the eager parsers.

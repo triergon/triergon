@@ -980,63 +980,6 @@ impl<'a> AvcConfigNalRef<'a> {
     pub const fn header(&self) -> NalHeader {
         self.descriptor.header
     }
-    /// One complete raw-record alias and copied leaf facts; no table is retained.
-    pub fn retain(&self) -> RetainedAvcConfigNal {
-        RetainedAvcConfigNal {
-            raw: Bytes::clone(self.raw),
-            source: self.source,
-            descriptor: *self.descriptor,
-        }
-    }
-    /// An owning export remains charged to its original pool; no implicit move.
-    pub fn retain_in(&self, pool: &Budget) -> Result<RetainedAvcConfigNal> {
-        if !self.raw.belongs_to(pool) {
-            return Err(Error::ForeignPool);
-        }
-        Ok(self.retain())
-    }
-}
-
-/// Independent leaf with exactly one complete record handle. Collections of
-/// these values must account their own allocation, e.g. with BudgetVec.
-#[derive(Clone, Debug)]
-pub struct RetainedAvcConfigNal {
-    raw: Bytes,
-    source: AvcConfigSource,
-    descriptor: AvcNalDescriptor,
-}
-impl RetainedAvcConfigNal {
-    pub fn view(&self) -> AvcConfigNalRef<'_> {
-        AvcConfigNalRef {
-            raw: &self.raw,
-            source: self.source,
-            descriptor: &self.descriptor,
-        }
-    }
-    pub fn source_bytes(&self) -> &[u8] {
-        &self.raw[self.descriptor.payload()]
-    }
-    pub fn length_field_bytes(&self) -> &[u8] {
-        &self.raw[self.descriptor.length_field()]
-    }
-    pub fn source_range(&self) -> Range<usize> {
-        self.descriptor.payload()
-    }
-    pub const fn source(&self) -> AvcConfigSource {
-        self.source
-    }
-    pub const fn array_kind(&self) -> AvcConfigArrayKind {
-        self.descriptor.kind
-    }
-    pub const fn header(&self) -> NalHeader {
-        self.descriptor.header
-    }
-    pub fn retained_storage_bytes(&self) -> usize {
-        self.raw.retained_storage_bytes()
-    }
-    pub fn belongs_to(&self, pool: &Budget) -> bool {
-        self.raw.belongs_to(pool)
-    }
 }
 
 /// An array borrow is tied to the view in the same way.
@@ -1073,58 +1016,6 @@ impl<'a> AvcConfigArrayRef<'a> {
     }
     pub const fn count_offset(&self) -> usize {
         self.descriptor.count_offset()
-    }
-    pub fn retain(&self) -> RetainedAvcConfigArray {
-        RetainedAvcConfigArray {
-            raw: Bytes::clone(self.raw),
-            source: self.source,
-            descriptor: (*self.descriptor).clone(),
-        }
-    }
-    pub fn retain_in(&self, pool: &Budget) -> Result<RetainedAvcConfigArray> {
-        if !self.raw.belongs_to(pool) {
-            return Err(Error::ForeignPool);
-        }
-        Ok(self.retain())
-    }
-}
-#[derive(Clone, Debug)]
-pub struct RetainedAvcConfigArray {
-    raw: Bytes,
-    source: AvcConfigSource,
-    descriptor: AvcConfigArray,
-}
-impl RetainedAvcConfigArray {
-    pub fn view(&self) -> AvcConfigArrayRef<'_> {
-        AvcConfigArrayRef {
-            raw: &self.raw,
-            source: self.source,
-            descriptor: &self.descriptor,
-        }
-    }
-    pub fn source_bytes(&self) -> &[u8] {
-        &self.raw[self.descriptor.source_range()]
-    }
-    pub const fn source(&self) -> AvcConfigSource {
-        self.source
-    }
-    pub const fn kind(&self) -> AvcConfigArrayKind {
-        self.descriptor.kind
-    }
-    pub fn source_range(&self) -> Range<usize> {
-        self.descriptor.source_range()
-    }
-    pub fn nal_indices(&self) -> Range<usize> {
-        self.descriptor.nal_indices()
-    }
-    pub const fn count_offset(&self) -> usize {
-        self.descriptor.count_offset()
-    }
-    pub fn retained_storage_bytes(&self) -> usize {
-        self.raw.retained_storage_bytes()
-    }
-    pub fn belongs_to(&self, pool: &Budget) -> bool {
-        self.raw.belongs_to(pool)
     }
 }
 

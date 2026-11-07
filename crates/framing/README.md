@@ -86,7 +86,7 @@ assert_eq!(decoder_input, [
 | ADTS | `inspect_aac_adts_header`, `AacAdtsParser`, `AacAdtsWriter`, `AacAdtsStreamReader`, `AacAdtsCarrierReader` | 56-bit header facts; single-block AAC-LC frames; ADTS wrapping of raw access units (`AacAdtsParameters::from_asc`); aligned ADTS streams |
 | AC-3 / E-AC-3 | `probe_ac3_header`, `Ac3FrameReader`, `Ac3ConfigParser`, `Eac3BsiParser` | Header facts (bsid 0–8, 11–16), aligned syncframe reader, dac3/dec3 records, complete E-AC-3 BSI |
 | DTS core | `probe_dts_core_header`, `DtsCoreFrameReader`, `DtsCorePacket`, `DtsHeaderInspector` | Normal core header (all fields, optional HCRC), FSIZE+1 frame acquisition, container-packet core extraction |
-| DTS packings | `Dts14BitUnpacker`, `DtsPackedPayloadJob`, `Dts14FrameReader`, `Dts14CarrierReader`, `DtsNormalSourceReader` | 16-bit LE and 14-bit BE/LE word packings; experimental 14-bit stream acquisition |
+| DTS packings | `Dts14BitUnpacker`, `DtsPackedPayloadJob`, `Dts14SyncReader`, `Dts14CarrierReader`, `DtsNormalSourceReader` | 16-bit LE and 14-bit BE/LE word packings; experimental 14-bit stream acquisition |
 | DTS parser comparison | `reference_trace::dts::ParserOperation` (`reference-trace` feature) | Raw 14-bit source frames alongside the packets, clock and byte positions of FFmpeg's `dca` parser |
 
 ## Behaviour and limits
@@ -176,9 +176,8 @@ Verification:
 - `fixtures/raw-annex-b/*.packets` hold the packet extents and key flags FFmpeg's
   raw H.264/HEVC demuxers produce for the paired streams.
 - The `examples/` trace programs (`nal_packet_receiver_trace`,
-  `dts-operation-trace`, `dts-source-observer`) emit JSON records that the
-  harness compares with FFmpeg's BSF and DCA parser output. The first two need
-  `--features reference-trace`.
+  `dts-operation-trace`, `dts-source-observer`) emit JSON records for inspection;
+  no harness runner reads them. The first two need `--features reference-trace`.
 
 Per-module parity, runtime and memory results are in
 [docs/status.md](../../docs/status.md); the gates and harness are described in

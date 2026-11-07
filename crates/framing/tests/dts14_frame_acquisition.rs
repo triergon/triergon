@@ -5,7 +5,7 @@ use triergon_core::{
     WorkBudget,
 };
 use triergon_framing::{
-    Dts14BoundaryEvidence, Dts14Frame, Dts14FrameReader, Dts14SyncLimits, DtsWordOrder,
+    Dts14BoundaryEvidence, Dts14SyncFrame, Dts14SyncLimits, Dts14SyncReader, DtsWordOrder,
 };
 
 const SOURCE: SourceId = SourceId(142168);
@@ -21,8 +21,8 @@ fn limits() -> Dts14SyncLimits {
         maximum_input_window: 4096,
     }
 }
-fn new(pool: &Budget, order: DtsWordOrder, known: Option<u64>) -> Dts14FrameReader {
-    Dts14FrameReader::new(
+fn new(pool: &Budget, order: DtsWordOrder, known: Option<u64>) -> Dts14SyncReader {
+    Dts14SyncReader::per_frame(
         pool,
         SOURCE,
         SourceCapabilities {
@@ -35,12 +35,12 @@ fn new(pool: &Budget, order: DtsWordOrder, known: Option<u64>) -> Dts14FrameRead
     .unwrap()
 }
 fn next(
-    job: &mut Dts14FrameReader,
+    job: &mut Dts14SyncReader,
     pool: &Budget,
     input: &[u8],
     chunk: usize,
     q: u64,
-) -> Result<Option<Dts14Frame>, Error> {
+) -> Result<Option<Dts14SyncFrame>, Error> {
     for _ in 0..1_000_000 {
         match job.step(&mut WorkBudget::new(q), &AtomicBool::new(false))? {
             Step::Ready(f) => return Ok(Some(f)),
@@ -300,7 +300,7 @@ fn frame_limit_remains_a_real_source_limit() {
     let p = Budget::new(200_000).unwrap();
     let mut l = limits();
     l.maximum_frames = 1;
-    let mut j = Dts14FrameReader::new(
+    let mut j = Dts14SyncReader::per_frame(
         &p,
         SOURCE,
         SourceCapabilities {
@@ -325,7 +325,7 @@ fn impossible_capacity_is_rejected_without_allocating_media() {
     let p = Budget::new(256).unwrap();
     let before = p.used();
     assert!(matches!(
-        Dts14FrameReader::new(
+        Dts14SyncReader::per_frame(
             &p,
             SOURCE,
             SourceCapabilities {
