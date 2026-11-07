@@ -51,7 +51,7 @@ impl PendingPes {
         self.current
             .as_ref()
             .map(|bytes| bytes.view(0..bytes.len()).expect("complete joined tail"))
-            .or_else(|| self.spans.current().map(|span| span.bytes))
+            .or_else(|| self.spans.current_bytes())
     }
 
     fn try_coalesce(
@@ -358,14 +358,13 @@ impl HlsAac {
                 continue;
             }
             if input.current().is_none() {
-                let Some(span) = input.spans.next_span() else {
+                let Some(bytes) = input.spans.next_bytes() else {
                     if input.remaining != 0 {
                         return Err(Error::Invalid("HLS AAC PES payload extent"));
                     }
                     self.pending = None;
                     continue;
                 };
-                let bytes = span.bytes;
                 if !bytes.belongs_to(&self.pool) {
                     return Err(Error::ForeignPool);
                 }

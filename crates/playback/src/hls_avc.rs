@@ -185,7 +185,7 @@ impl Chunk {
         if let Some(bytes) = &self.bytes {
             return Some(bytes.view(0..bytes.len()).expect("complete direct chunk"));
         }
-        spans.and_then(|spans| spans.current().map(|span| span.bytes))
+        spans.and_then(PayloadCursor::current_bytes)
     }
 
     fn retire(&self, pending: &mut Option<PendingPes>) {
@@ -518,9 +518,8 @@ impl AvcTsReader {
                     }
                     let bytes = pending
                         .spans
-                        .next_span()
-                        .ok_or(Error::Invalid("AVC TS missing PES span"))?
-                        .bytes;
+                        .next_bytes()
+                        .ok_or(Error::Invalid("AVC TS missing PES span"))?;
                     if !bytes.belongs_to(&self.pool) {
                         return Err(Error::ForeignPool);
                     }

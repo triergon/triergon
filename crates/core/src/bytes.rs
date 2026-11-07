@@ -63,6 +63,7 @@ impl<'a> BytesView<'a> {
 }
 
 impl AsRef<[u8]> for BytesView<'_> {
+    #[inline]
     fn as_ref(&self) -> &[u8] {
         &self.backing.as_ref()[self.start..self.end]
     }

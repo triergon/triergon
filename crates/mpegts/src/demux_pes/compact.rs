@@ -33,13 +33,27 @@ fn record_count(span: &DemuxSpan, grouped: bool) -> usize {
     }
 }
 
+#[inline]
+fn byte_view(span: &DemuxSpan, index: usize, run: bool) -> BytesView<'_> {
+    let range = if run {
+        let at = index * TS188_BYTES;
+        at + TS_PAYLOAD_START..at + TS188_BYTES
+    } else {
+        0..span.bytes.len()
+    };
+    span.bytes.view(range).expect(if run {
+        "admitted complete carrier"
+    } else {
+        "complete stored span"
+    })
+}
+
 fn view(span: &DemuxSpan, index: usize, grouped: bool) -> DemuxSpanView<'_> {
-    if record_count(span, grouped) == 1 {
+    let run = record_count(span, grouped) != 1;
+    let bytes = byte_view(span, index, run);
+    if !run {
         return DemuxSpanView {
-            bytes: span
-                .bytes
-                .view(0..span.bytes.len())
-                .expect("complete stored span"),
+            bytes,
             source: span.source,
             transport: span.transport,
             context: span.context,
@@ -47,10 +61,7 @@ fn view(span: &DemuxSpan, index: usize, grouped: bool) -> DemuxSpanView<'_> {
     }
     let at = index * TS188_BYTES;
     DemuxSpanView {
-        bytes: span
-            .bytes
-            .view(at + TS_PAYLOAD_START..at + TS188_BYTES)
-            .expect("admitted complete carrier"),
+        bytes,
         source: SourceRange {
             offset: span.source.offset + at as u64,
             bytes: PLAIN_PAYLOAD_BYTES,
@@ -206,11 +217,33 @@ impl PayloadCursor {
             )
         })
     }
+    /// Borrow the active byte range without constructing its source facts.
+    /// The range and backing are identical to `current().map(|span| span.bytes)`.
+    #[inline]
+    pub fn current_bytes(&self) -> Option<BytesView<'_>> {
+        self.active.then(|| {
+            let span = self.current.as_ref().expect("active payload range");
+            byte_view(span, self.index, record_count(span, self.grouped) != 1)
+        })
+    }
     /// Admit the next logical range. The caller validates its pool and full
     /// extent before consuming bytes, as with an ordinary span iterator.
     pub fn next_span(&mut self) -> Option<DemuxSpanView<'_>> {
+        self.admit_next()?;
+        self.current()
+    }
+    /// Admit the next logical range with the same state transitions as
+    /// `next_span`, returning only its borrowed bytes. Its full facts remain
+    /// available through `current` until `retire_current`.
+    #[inline]
+    pub fn next_bytes(&mut self) -> Option<BytesView<'_>> {
+        self.admit_next()?;
+        self.current_bytes()
+    }
+
+    fn admit_next(&mut self) -> Option<()> {
         if self.active {
-            return self.current();
+            return Some(());
         }
         if self.remaining == 0 {
             return None;
@@ -227,10 +260,10 @@ impl PayloadCursor {
             self.current = self.records.next();
             self.index = std::mem::take(&mut self.head_retired);
         }
-        let span = self.current.as_ref()?;
+        self.current.as_ref()?;
         self.remaining -= 1;
         self.active = true;
-        Some(view(span, self.index, self.grouped))
+        Some(())
     }
     /// Release the active logical range. Other ranges keep its backing alive.
     /// Calling this without an active range has no effect.
@@ -483,8 +516,51 @@ mod tests {
         let mut cursor = payload.into_cursor();
         assert_eq!(cursor.next_span().unwrap().source, source);
         assert_eq!(cursor.current().unwrap().bytes.len(), 2 * TS188_BYTES);
+        assert_eq!(cursor.current_bytes().unwrap().len(), 2 * TS188_BYTES);
+        assert_eq!(cursor.next_bytes().unwrap().len(), 2 * TS188_BYTES);
         cursor.retire_current();
         assert!(cursor.next_span().is_none());
+    }
+
+    #[test]
+    fn byte_projection_preserves_full_facts_and_mixed_admission_boundaries() {
+        let pool = Budget::new(8192).unwrap();
+        let mut cursor = grouped_cursor(&pool, &[3, 2]);
+        assert!(cursor.current_bytes().is_none());
+        for index in 0..5 {
+            let (data, backing) = {
+                let bytes = if index % 2 == 0 {
+                    cursor.next_bytes().unwrap()
+                } else {
+                    cursor.next_span().unwrap().bytes
+                };
+                assert_eq!(bytes.as_ref(), &[0; PLAIN_PAYLOAD_BYTES]);
+                assert!(!bytes.backing_bytes().has_shared_storage());
+                (
+                    bytes.as_ref().as_ptr(),
+                    std::ptr::from_ref(bytes.backing_bytes()),
+                )
+            };
+            let span = cursor.current().unwrap();
+            assert_eq!(span.as_ref(), &[0; PLAIN_PAYLOAD_BYTES]);
+            assert_eq!(data, span.bytes.as_ref().as_ptr());
+            assert_eq!(backing, std::ptr::from_ref(span.bytes.backing_bytes()));
+            assert_eq!(span.source.offset, (index * TS188_BYTES + 4) as u64);
+            assert_eq!(span.source.bytes, PLAIN_PAYLOAD_BYTES);
+            assert_eq!(span.transport.offset, (index * TS188_BYTES) as u64);
+            assert_eq!(span.transport.bytes, TS188_BYTES);
+            assert_eq!(span.context.source_event_ordinal, 2 * index as u64);
+            assert_eq!(cursor.current_bytes().unwrap().as_ref(), span.as_ref());
+            assert_eq!(cursor.remaining(), 4 - index);
+            assert_eq!(cursor.next_bytes().unwrap().len(), PLAIN_PAYLOAD_BYTES);
+            assert_eq!(cursor.remaining(), 4 - index);
+            cursor.retire_current();
+            assert!(cursor.current_bytes().is_none());
+        }
+        assert!(cursor.next_bytes().is_none());
+        assert!(cursor.next_span().is_none());
+        drop(cursor);
+        assert_eq!(pool.used(), Budget::control_storage_bytes());
     }
 
     #[test]
