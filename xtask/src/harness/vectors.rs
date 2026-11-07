@@ -164,9 +164,10 @@ pub fn external_vector(root: &Path, options: &ExternalOptions) -> R<i32> {
     let case = Value::object(case);
     let derived = super::validation::external_contract(&contract, &file)?;
     let target = match host_target().as_str() {
-        t @ ("aarch64-apple-darwin" | "aarch64-unknown-linux-gnu" | "x86_64-unknown-linux-gnu") => {
-            t.to_owned()
-        }
+        t @ ("aarch64-apple-darwin"
+        | "aarch64-unknown-linux-gnu"
+        | "x86_64-unknown-linux-gnu"
+        | "armv7-unknown-linux-gnueabihf") => t.to_owned(),
         _ => "unqualified".to_owned(),
     };
     let mut verdict = acceptance(

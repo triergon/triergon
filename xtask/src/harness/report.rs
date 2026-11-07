@@ -81,17 +81,20 @@ fn command_output(program: &str, args: &[&str]) -> String {
         .unwrap_or_default()
 }
 
-/// The Rust target triple this host qualifies for.
+/// The Rust target triple this host qualifies for: the native target of the
+/// toolchain that built xtask, which builds the workers too. A 32-bit ARM user space
+/// on an AArch64 kernel reports `aarch64` or `armv8l` from `uname -m`, so the machine
+/// name cannot tell it apart from a 64-bit one.
 pub fn host_target() -> String {
-    let (system, machine) = (
-        command_output("uname", &["-s"]),
-        command_output("uname", &["-m"]),
-    );
-    match (system.as_str(), machine.as_str()) {
-        ("Darwin", "arm64") => "aarch64-apple-darwin".into(),
-        ("Linux", "x86_64") => "x86_64-unknown-linux-gnu".into(),
-        ("Linux", "aarch64") => "aarch64-unknown-linux-gnu".into(),
-        _ => format!("unqualified-{machine}"),
+    let gnu = cfg!(target_env = "gnu");
+    match (std::env::consts::OS, std::env::consts::ARCH) {
+        ("macos", "aarch64") => "aarch64-apple-darwin".into(),
+        ("linux", "x86_64") if gnu => "x86_64-unknown-linux-gnu".into(),
+        ("linux", "aarch64") if gnu => "aarch64-unknown-linux-gnu".into(),
+        ("linux", "arm") if gnu && cfg!(target_abi = "eabihf") => {
+            "armv7-unknown-linux-gnueabihf".into()
+        }
+        (_, arch) => format!("unqualified-{arch}"),
     }
 }
 

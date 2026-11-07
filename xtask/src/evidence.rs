@@ -206,7 +206,7 @@ pub fn fetch(root: &Path, name: &str, into: Option<&Path>) -> Result<String, Str
         let _ = fs::remove_file(&download);
         return Err(format!("{key}: SHA-256 differs from the index"));
     }
-    let tar = crate::archive::gunzip(&data, 1 << 32)?;
+    let tar = crate::archive::gunzip(&data, usize::try_from(1_u64 << 32).unwrap_or(usize::MAX))?;
     let entries = crate::archive::tar_files(&tar)?;
     // A set packed from repository files lists each file; an archived run copied
     // in whole is verified by its archive hash alone.

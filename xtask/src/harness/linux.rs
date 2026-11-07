@@ -312,7 +312,15 @@ fn loader_like(name: &str) -> bool {
         })
 }
 
-/// Every DT_NEEDED file of the inspected ELF64 DYN object resolves inside the
+/// The ELF class of objects built for this host: 64-bit on AArch64 and x86_64,
+/// 32-bit on ARMv7.
+const NATIVE_CLASS: &str = if cfg!(target_pointer_width = "64") {
+    "ELF64"
+} else {
+    "ELF32"
+};
+
+/// Every DT_NEEDED file of the inspected native-class DYN object resolves inside the
 /// listed closure, and nothing unexplained is listed.
 fn main_elf_closure(worker: &Path, libraries: &[Value], program_headers: &str) -> R<Value> {
     if libraries.len() > 128 {
@@ -340,8 +348,10 @@ fn main_elf_closure(worker: &Path, libraries: &[Value], program_headers: &str) -
                 .is_some_and(|r| r.trim().starts_with(value))
         })
     };
-    if !header("Class:", "ELF64") || !header("Type:", "DYN") {
-        return Err("anonymous main mapping requires an inspected ELF64 DYN object".into());
+    if !header("Class:", NATIVE_CLASS) || !header("Type:", "DYN") {
+        return Err(format!(
+            "anonymous main mapping requires an inspected {NATIVE_CLASS} DYN object"
+        ));
     }
     let paths: BTreeSet<String> = libraries
         .iter()
@@ -447,7 +457,7 @@ fn main_elf_closure(worker: &Path, libraries: &[Value], program_headers: &str) -
         )
     }));
     Ok(Value::object([
-        ("inspected_class", Value::str("ELF64")),
+        ("inspected_class", Value::str(NATIVE_CLASS)),
         ("inspected_type", Value::str("DYN")),
         ("first_LOAD_vaddr", Value::int(0)),
         ("needed_closure", closure),
