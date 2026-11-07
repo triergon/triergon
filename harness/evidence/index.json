@@ -8286,6 +8286,52 @@
      "sha256": "5590fdd699fa171643fc249b7ecae468a743613b122a8193204f699c7c13cd27"
     }
    ]
+  },
+  {
+   "name": "hls-prefix-anchor-comparison",
+   "path": "hls-prefix-anchor-comparison",
+   "retention": "retained",
+   "reason": "HLS prefix-anchor measurements",
+   "key": "evidence/hls-prefix-anchor-comparison/cbf3a1127074a1f710e37593c74a431b1d9f2d23f1aae44470c034e894f4aa9b.tar.gz",
+   "sha256": "cbf3a1127074a1f710e37593c74a431b1d9f2d23f1aae44470c034e894f4aa9b",
+   "files": [
+    {
+     "path": "hls-prefix-anchor-comparison/FINAL-STATE.txt",
+     "sha256": "f247a76b2893208aae7751dbf51f4c495efacfb6d9e743802870300f31ac45c8"
+    },
+    {
+     "path": "hls-prefix-anchor-comparison/GUEST-PREFLIGHT.log",
+     "sha256": "96410ed9ed7a9526259ee28e7ff757ea28a0ef7c31f535b4de7bb0b3648c1015"
+    },
+    {
+     "path": "hls-prefix-anchor-comparison/HLS-ANCHOR-RING-CLIPPY.log",
+     "sha256": "ae22e2c85e14f3688450142c31f28bd3539759cfa0db5c7db2515155260a683b"
+    },
+    {
+     "path": "hls-prefix-anchor-comparison/HLS-ANCHOR-RING-TEST.log",
+     "sha256": "64182d93675057df9156f5fc4d4a210ec8d00c018128c469ee44e00ac90d5977"
+    },
+    {
+     "path": "hls-prefix-anchor-comparison/NATIVE-EXIT.txt",
+     "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+    },
+    {
+     "path": "hls-prefix-anchor-comparison/NATIVE-RESULTS.sha256",
+     "sha256": "f52b18426ad9714c027c2890c2efb09dc3998a700192aa4f7f8fec6c1e2318c1"
+    },
+    {
+     "path": "hls-prefix-anchor-comparison/NATIVE-RESULTS.tar.gz",
+     "sha256": "378cfdfb39d4615fca9c252c262f4aaf0ae518644c2bd7426012019d39f75785"
+    },
+    {
+     "path": "hls-prefix-anchor-comparison/NATIVE.log",
+     "sha256": "5133408fefdd5aa6cab345ae065950d3436e938a529a0fef29596cbb198468d3"
+    },
+    {
+     "path": "hls-prefix-anchor-comparison/SOURCE.bundle",
+     "sha256": "56e89a16da211e1d4733c377b4c5174aa52af283b393b3490b9f6657464b3941"
+    }
+   ]
   }
  ]
 }
