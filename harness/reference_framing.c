@@ -1,6 +1,7 @@
 /* Public-API reference for the complete packet-framing operation. */
 #define _POSIX_C_SOURCE 200809L
 #include "reference_framing.h"
+#include <unistd.h>
 
 static void quote(const char *text) {
     putchar('"');
@@ -63,10 +64,10 @@ int main(int argc, char **argv) {
         free(data);
         return 65;
     }
-    if (memory) {
-        puts("TRIERGON_BEGIN_V1");
-        if (fflush(stdout))
-            return 74;
+    if (memory && write(STDOUT_FILENO, "TRIERGON_BEGIN_V1\n", 18) != 18) {
+        case_free(&c);
+        free(data);
+        return 74;
     }
     uint64_t start = now_ns();
     Outcome total = {0};
@@ -83,10 +84,10 @@ int main(int argc, char **argv) {
         total.bytes += next.bytes;
     }
     uint64_t elapsed = timing ? now_ns() - start : 0;
-    if (memory) {
-        puts("TRIERGON_END_V1");
-        if (fflush(stdout))
-            return 74;
+    if (memory && write(STDOUT_FILENO, "TRIERGON_END_V1\n", 16) != 16) {
+        case_free(&c);
+        free(data);
+        return 74;
     }
     case_free(&c);
     free(data);

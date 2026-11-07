@@ -739,9 +739,12 @@ int main(int argc, char **argv) {
         free(source.bytes);
         return 0;
     }
-    if (memory) {
-        printf("TRIERGON_BEGIN_V1\n");
-        fflush(stdout);
+    if (memory && write(STDOUT_FILENO, "TRIERGON_BEGIN_V1\n", 18) != 18) {
+        if (source.file) {
+            fclose(source.file);
+        }
+        free(source.bytes);
+        return 74;
     }
     Stats total = {0};
     struct timespec start = {0}, end = {0};
@@ -766,10 +769,8 @@ int main(int argc, char **argv) {
     if (bench && clock_gettime(CLOCK_MONOTONIC, &end) != 0)
         rc = AVERROR(EIO);
 complete:
-    if (memory) {
-        printf("TRIERGON_END_V1\n");
-        fflush(stdout);
-    }
+    if (memory && write(STDOUT_FILENO, "TRIERGON_END_V1\n", 16) != 16)
+        rc = AVERROR(EIO);
     if (rc >= 0 && !trace) {
         if (baseline && !memory)
             printf("{\"schema\":1,\"baseline\":true}\n");
