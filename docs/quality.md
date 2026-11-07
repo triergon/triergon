@@ -110,6 +110,60 @@ checks the worker libraries using the probe and observer in `target/harness`.
 It prints the calibration certificate and exits nonzero if coverage cannot
 be established. Use built workers you trust.
 
+### Separate timing and memory collections
+
+`cargo xtask grade TIMING MEMORY --contract F --manifest F --output DIR` joins
+complete standard-harness reports and recomputes the existing acceptance gates
+from their raw paired samples. Both collections must contain every case in the
+registered corpus, with identical parity, inputs, contract, workers, source graphs,
+compiler settings, instrumentation and allowed CPUs. The memory build identity may
+add a kernel RSS proof pin. Every other identity field must match. Both input reports
+and their raw samples are hash-linked from the graded report.
+
+Timing requires the RSS kernel module to be unloaded throughout warm-up and every
+pair. Standard memory bounds need no kernel proof. For kernel-backed memory,
+follow the [kernel proof workflow](../harness/rss-bound/README.md) after timing and
+keep the module loaded through memory collection and grading. The grader validates
+the recorded module-absence observations for timing and rechecks the live memory
+proof. Rebuilding workers to record the proof must reproduce the same worker and
+instrumentation hashes.
+
+For example, on a prepared native AArch64 Linux host, use new output directories
+for each phase and grade. Begin with the module unloaded and the kernel proof
+variables unset. `REVIEW` names the reviewed module-source and kernel artifact
+required by the proof workflow.
+
+```sh
+export CARGO_INCREMENTAL=0
+cargo xtask build-workers
+TRIERGON_RSS_KERNEL_BOUND=0 cargo xtask report \
+  --contract harness/features/hls-segments/contract.json \
+  --manifest harness/features/hls-segments/corpus.json \
+  --corpus harness/fixtures/hls --benchmark --pairs 30 \
+  --output .research/hls-timing
+
+harness/rss-bound/prove.sh REVIEW .research/rss-bound
+TRIERGON_RSS_KERNEL_PROOF=.research/rss-bound/RSS-PROOF.json cargo xtask build-workers
+TRIERGON_RSS_KERNEL_BOUND=1 cargo xtask memory-admission \
+  target/release/playback-worker target/harness/ffmpeg-formats-worker
+TRIERGON_RSS_KERNEL_BOUND=1 cargo xtask report \
+  --contract harness/features/hls-segments/contract.json \
+  --manifest harness/features/hls-segments/corpus.json \
+  --corpus harness/fixtures/hls --memory --pairs 30 \
+  --output .research/hls-memory
+
+cargo xtask grade .research/hls-timing/report.json .research/hls-memory/report.json \
+  --contract harness/features/hls-segments/contract.json \
+  --manifest harness/features/hls-segments/corpus.json \
+  --output .research/hls-graded --require-slice-acceptance
+sudo rmmod triergon_rss_bound
+```
+
+The runtime ceiling remains 1.20 at the upper paired 95% bound, with a 0.80 target.
+Peak live heap and total resident peak RSS must each remain strictly below the
+reference at their upper paired 95% bounds. A required gate that remains open
+returns a nonzero exit code. Earlier failures and their reports stay recorded.
+
 ## Measuring performance
 
 - Gate results come from the gate build: workers compiled by the toolchain in
