@@ -53,6 +53,7 @@ pub struct NalPacketConfigWriter<'a, C = NalPacketConfiguration> {
     // A pool's limit is immutable; the output vector holds the pool handle.
     pool_limit: usize,
     config: &'a C,
+    length_prefixed: bool,
     output: Option<BudgetVec<u8>>,
     maximum: usize,
     total: usize,
@@ -118,6 +119,7 @@ impl<'a, C> NalPacketConfigWriter<'a, C> {
         Ok(Self {
             pool_limit: pool.limit(),
             config: configuration,
+            length_prefixed: configuration.length_width().is_some(),
             output: Some(BudgetVec::new(pool)),
             maximum: maximum_output_bytes,
             total: 0,
@@ -130,11 +132,11 @@ impl<'a, C> NalPacketConfigWriter<'a, C> {
             rejection_taken: false,
         })
     }
-    fn nal(config: &C, index: usize) -> Option<(bool, &[u8], usize)>
+    fn nal(config: &C, length_prefixed: bool, index: usize) -> Option<(bool, &[u8], usize)>
     where
         C: PacketConfig,
     {
-        if config.length_width().is_some() {
+        if length_prefixed {
             config.config_nal(index).map(|n| {
                 (
                     n.kind != Some(AvcConfigArrayKind::SequenceExtension),
@@ -214,7 +216,9 @@ impl<'a, C> NalPacketConfigWriter<'a, C> {
                     if !work.try_charge(1) {
                         return Ok(BuildStep::Yield);
                     }
-                    if let Some((selected, n, prefix)) = Self::nal(self.config, self.index) {
+                    if let Some((selected, n, prefix)) =
+                        Self::nal(self.config, self.length_prefixed, self.index)
+                    {
                         if selected {
                             let total = self
                                 .total
@@ -257,41 +261,49 @@ impl<'a, C> NalPacketConfigWriter<'a, C> {
                     self.phase = 3;
                 }
                 3 => {
-                    let Some((selected, b, prefix)) = Self::nal(self.config, self.index) else {
+                    let Some((selected, b, prefix)) =
+                        Self::nal(self.config, self.length_prefixed, self.index)
+                    else {
                         self.phase = 4;
                         continue;
                     };
-                    if !selected
-                        || self.copied == b.len().checked_add(prefix).ok_or(Error::Overflow)?
-                    {
-                        if !work.try_charge(1) {
-                            return Ok(BuildStep::Yield);
+                    if selected {
+                        let end = b.len().checked_add(prefix).ok_or(Error::Overflow)?;
+                        while self.copied != end {
+                            let count = if self.copied < prefix {
+                                prefix - self.copied
+                            } else {
+                                (end - self.copied).min(4096)
+                            }
+                            .min(usize::try_from(work.remaining()).unwrap_or(usize::MAX));
+                            if count == 0 {
+                                return Ok(BuildStep::Yield);
+                            }
+                            let out = self
+                                .output
+                                .as_mut()
+                                .ok_or(Error::Invalid("missing config output"))?;
+                            if self.copied < prefix {
+                                out.try_extend_from_slice(
+                                    &[0, 0, 0, 1][self.copied..self.copied + count],
+                                )?;
+                            } else {
+                                let start = self.copied - prefix;
+                                out.try_extend_from_slice(&b[start..start + count])?;
+                            }
+                            work.take(count as u64);
+                            self.copied += count;
+                            // The next copy or NAL advance is independently cancellable.
+                            if cancel.load(Ordering::Relaxed) {
+                                return Err(Error::Cancelled);
+                            }
                         }
-                        self.index += 1;
-                        self.copied = 0;
-                        continue;
                     }
-                    let count = if self.copied < prefix {
-                        prefix - self.copied
-                    } else {
-                        (b.len() - (self.copied - prefix)).min(4096)
-                    }
-                    .min(usize::try_from(work.remaining()).unwrap_or(usize::MAX));
-                    if count == 0 {
+                    if !work.try_charge(1) {
                         return Ok(BuildStep::Yield);
                     }
-                    let out = self
-                        .output
-                        .as_mut()
-                        .ok_or(Error::Invalid("missing config output"))?;
-                    if self.copied < prefix {
-                        out.try_extend_from_slice(&[0, 0, 0, 1][self.copied..self.copied + count])?;
-                    } else {
-                        let start = self.copied - prefix;
-                        out.try_extend_from_slice(&b[start..start + count])?;
-                    }
-                    work.take(count as u64);
-                    self.copied += count;
+                    self.index += 1;
+                    self.copied = 0;
                 }
                 4 => {
                     if !work.try_charge(1) {
