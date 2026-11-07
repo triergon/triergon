@@ -8332,6 +8332,52 @@
      "sha256": "56e89a16da211e1d4733c377b4c5174aa52af283b393b3490b9f6657464b3941"
     }
    ]
+  },
+  {
+   "name": "hls-compact-clock-comparison",
+   "path": "hls-compact-clock-comparison",
+   "retention": "retained",
+   "reason": "HLS compact-clock measurements",
+   "key": "evidence/hls-compact-clock-comparison/5158ff99a01dd7a9af3ecda94683533e5ece1124ab457220f91b73bc551713f8.tar.gz",
+   "sha256": "5158ff99a01dd7a9af3ecda94683533e5ece1124ab457220f91b73bc551713f8",
+   "files": [
+    {
+     "path": "hls-compact-clock-comparison/FINAL-STATE.txt",
+     "sha256": "f247a76b2893208aae7751dbf51f4c495efacfb6d9e743802870300f31ac45c8"
+    },
+    {
+     "path": "hls-compact-clock-comparison/GUEST-PREFLIGHT.log",
+     "sha256": "398036f7f625fdc49d6c45dde2e2f1d0fc1cc0194df09c3de1fa09e6d52183e5"
+    },
+    {
+     "path": "hls-compact-clock-comparison/HLS-COMPACT-ANCHOR-CLIPPY.log",
+     "sha256": "fe67053f5b1b67eeb23d2289036b23ed2ee2cefc48e4ba12db95b13cb7541c68"
+    },
+    {
+     "path": "hls-compact-clock-comparison/HLS-COMPACT-ANCHOR-TEST.log",
+     "sha256": "7a9e0be59513ddc20bfdf4f3dd4e351570d5985e1fe61a6aa3aea7341dc3b60d"
+    },
+    {
+     "path": "hls-compact-clock-comparison/NATIVE-EXIT.txt",
+     "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+    },
+    {
+     "path": "hls-compact-clock-comparison/NATIVE-RESULTS.sha256",
+     "sha256": "687149488e1ded3ebcf3945dbde6d53dbd8d7dc0f02855965e60c5a43aeef63d"
+    },
+    {
+     "path": "hls-compact-clock-comparison/NATIVE-RESULTS.tar.gz",
+     "sha256": "fd24d81faac825f4cc3a251c01de3c34f7172ad856b9f7ef034b9b86bf219b8b"
+    },
+    {
+     "path": "hls-compact-clock-comparison/NATIVE.log",
+     "sha256": "626a9008cae81d7712172966155f6f8c81325ee63df248d277d70a15056dc6b5"
+    },
+    {
+     "path": "hls-compact-clock-comparison/SOURCE.bundle",
+     "sha256": "42be59cd28c62d5fc421a068fa314eba4469188012f95a4e28dbae71efecd0bb"
+    }
+   ]
   }
  ]
 }
