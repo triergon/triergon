@@ -8089,6 +8089,76 @@
      "sha256": "a6224d0dae3fce3fb297f29e0267a999457f223c94806bd4c920036810d520bb"
     }
    ]
+  },
+  {
+   "name": "hls-payload-budget-comparison",
+   "path": "hls-payload-budget-comparison",
+   "retention": "retained",
+   "reason": "HLS payload-budget measurements",
+   "key": "evidence/hls-payload-budget-comparison/946505e0f99964afc53515b7db2426cf7a3ded6376818a64a048d38103247857.tar.gz",
+   "sha256": "946505e0f99964afc53515b7db2426cf7a3ded6376818a64a048d38103247857",
+   "files": [
+    {
+     "path": "hls-payload-budget-comparison/CANDIDATE.bundle",
+     "sha256": "f16b1521977d885f1a8965f24d9cd1e2ac88c269d5054af4814fb5236292a24c"
+    },
+    {
+     "path": "hls-payload-budget-comparison/COMPARISON-SUMMARY.json",
+     "sha256": "788466b8a145dea32a8fa796fedb065a4419d92491f22b766a347009eaa7434b"
+    },
+    {
+     "path": "hls-payload-budget-comparison/FINAL-STATE.txt",
+     "sha256": "f247a76b2893208aae7751dbf51f4c495efacfb6d9e743802870300f31ac45c8"
+    },
+    {
+     "path": "hls-payload-budget-comparison/GUEST-PREFLIGHT.log",
+     "sha256": "a605869b1aec6ce3df21cd09b5a5f2f73af02844c8da30161f402ad8eb5c62e3"
+    },
+    {
+     "path": "hls-payload-budget-comparison/HLS-BUDGET-CLIPPY.log",
+     "sha256": "5ab043aaebb970f5ea3afa645ff681e78e49cbbf8ef54eeedf0812867ee1885a"
+    },
+    {
+     "path": "hls-payload-budget-comparison/HLS-BUDGET-DOC.log",
+     "sha256": "bacd11046922503619163be68f701036e3c4cad7fa6986663d4a14eff8a42b37"
+    },
+    {
+     "path": "hls-payload-budget-comparison/HLS-BUDGET-TEST.log",
+     "sha256": "f1e9e179d66cb56e7586df02b6777d6301839328160eeea7ec3532fd9d61f38a"
+    },
+    {
+     "path": "hls-payload-budget-comparison/NATIVE-EXIT.txt",
+     "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+    },
+    {
+     "path": "hls-payload-budget-comparison/NATIVE-RESULTS.sha256",
+     "sha256": "84357a29dabdd8e7b6d3bc74eb72472435f3a9e15dccfcf3a5ea845ce33fc20e"
+    },
+    {
+     "path": "hls-payload-budget-comparison/NATIVE-RESULTS.tar.gz",
+     "sha256": "701e737563634c52827d92decf7b5365935bdb0bd8a82cfff307a1524b635a12"
+    },
+    {
+     "path": "hls-payload-budget-comparison/NATIVE.log",
+     "sha256": "6e55151d3bbebae677a47d06ba086167aaf218614f566a914009ae4ff09c7847"
+    },
+    {
+     "path": "hls-payload-budget-comparison/PROFILE-SUMMARY.json",
+     "sha256": "115afa3c10f2b8e01abe71e659bfdf793bd6705f1a4a0279c25c48fb8edde47c"
+    },
+    {
+     "path": "hls-payload-budget-comparison/RSS-REVIEW.json",
+     "sha256": "35fcc38a12295baaefe8217d5a720ee351de7a3053c04bec08c3734ffc67a352"
+    },
+    {
+     "path": "hls-payload-budget-comparison/SOURCE.bundle",
+     "sha256": "a0afe23ac983e9e50d38bd65eb9aa4e7ce49c19a8746fdc3e4b18de0ad32be5e"
+    },
+    {
+     "path": "hls-payload-budget-comparison/playback_control.rs",
+     "sha256": "fd899565ff2c0868d942ff4831a1e1dc81d2c3174181ff9856d68fb550d2d64c"
+    }
+   ]
   }
  ]
 }
