@@ -8005,6 +8005,64 @@
    "reason": "HLS segment results",
    "key": "evidence/matroska-packet-work-comparison/93b671ad84e8fa2f568245439c49ef51449f9eae06aeabe90c86e0f8805e86fe.tar.gz",
    "sha256": "93b671ad84e8fa2f568245439c49ef51449f9eae06aeabe90c86e0f8805e86fe"
+  },
+  {
+   "name": "matroska-feature-set-comparison",
+   "path": "matroska-feature-set-comparison",
+   "retention": "retained",
+   "reason": "Matroska feature measurements",
+   "key": "evidence/matroska-feature-set-comparison/c5f98c04c695b7f7808f483964cc707ce58805c2a124022bd739653d0ede6553.tar.gz",
+   "sha256": "c5f98c04c695b7f7808f483964cc707ce58805c2a124022bd739653d0ede6553",
+   "files": [
+    {
+     "path": "matroska-feature-set-comparison/COMPARISON-SUMMARY.json",
+     "sha256": "fb346714212c75b596351c32c55baf3113105e6347774b409d9b549dc0e90c42"
+    },
+    {
+     "path": "matroska-feature-set-comparison/FINAL-DOC.log",
+     "sha256": "b22305cafe4d3a72956e302db50561c4d8f725e7e432d5eebe46ae6743f22457"
+    },
+    {
+     "path": "matroska-feature-set-comparison/FINAL-STATE.txt",
+     "sha256": "f247a76b2893208aae7751dbf51f4c495efacfb6d9e743802870300f31ac45c8"
+    },
+    {
+     "path": "matroska-feature-set-comparison/FINAL-TEST.log",
+     "sha256": "9d55f640352429a2df3694f7398bc599c784e255e7d672e8ac73edf71c313353"
+    },
+    {
+     "path": "matroska-feature-set-comparison/GUEST-PREFLIGHT.log",
+     "sha256": "460c5093de58c3b5982905bcc255497e51618e7364b5829fa0e3e660cbf94627"
+    },
+    {
+     "path": "matroska-feature-set-comparison/NATIVE-EXIT.txt",
+     "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+    },
+    {
+     "path": "matroska-feature-set-comparison/NATIVE-RESULTS.sha256",
+     "sha256": "a5e8e1038454875872655805eb00e180c82c10770a28f098f2cd9ffe443a9110"
+    },
+    {
+     "path": "matroska-feature-set-comparison/NATIVE-RESULTS.tar.gz",
+     "sha256": "e6fe709c1f7532771e182a65e9d1c8843bd0933127d440017aa0b130fc34685a"
+    },
+    {
+     "path": "matroska-feature-set-comparison/NATIVE.log",
+     "sha256": "2fc5a05dc47e06301a90c938c4809acac30fd11e613bfe158fbc414fe2cc13ae"
+    },
+    {
+     "path": "matroska-feature-set-comparison/RSS-REVIEW.json",
+     "sha256": "35fcc38a12295baaefe8217d5a720ee351de7a3053c04bec08c3734ffc67a352"
+    },
+    {
+     "path": "matroska-feature-set-comparison/SEEK-GATE-CLIPPY.log",
+     "sha256": "ae22e2c85e14f3688450142c31f28bd3539759cfa0db5c7db2515155260a683b"
+    },
+    {
+     "path": "matroska-feature-set-comparison/SOURCE.bundle",
+     "sha256": "a0afe23ac983e9e50d38bd65eb9aa4e7ce49c19a8746fdc3e4b18de0ad32be5e"
+    }
+   ]
   }
  ]
 }
