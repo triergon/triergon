@@ -93,6 +93,9 @@ plain continuation's charged payload storage into `compat::pes::DemuxObserver`.
 on one PID from an already shared window. Each carrier keeps its source
 range and event ordinal. Runs reserve checked span capacity before advancing
 input; ordinary carrier polling handles PES completion.
+Runs record the complete final carrier for duplicate detection before moving
+the shared window into its last payload span. Every span retains the full
+backing allocation's charge.
 Sequential playback can share up to four tight input windows of at most 4 KiB
 each. A full set, oversized backing storage or low budget headroom uses
 carrier-sized storage. Fallback uses the original transport event.

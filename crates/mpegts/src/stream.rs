@@ -221,12 +221,11 @@ impl FeedPayloadRun<'_> {
         let charged = work
             .try_charge(growth_work + (PAYLOAD_RUN_WORK - TS188_BYTES as u64) * carriers as u64);
         debug_assert!(charged);
-        observer.append_payload_run(&bytes, start, context, self.counter, replacement)?;
+        observer.append_payload_run(bytes, start, context, self.counter, replacement, |last| {
+            self.continuity.record_payload_run(self.counter, last);
+        })?;
         self.assembler
             .record_body_carriers(carriers, carriers * PLAIN_PAYLOAD_BYTES);
-        let ts = bytes.as_ref();
-        self.continuity
-            .record_payload_run(self.counter, &ts[ts.len() - TS188_BYTES..]);
         *self.omissions = omissions;
         Ok(true)
     }

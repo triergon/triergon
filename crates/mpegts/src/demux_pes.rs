@@ -822,11 +822,12 @@ impl DemuxObserver {
     /// has room for every span, including any spans moved from a full arena.
     pub(crate) fn append_payload_run(
         &mut self,
-        bytes: &Bytes,
+        bytes: Bytes,
         start: SourceLocation,
         context: SourceContext,
         first_counter: u8,
         replacement: Option<BudgetVec<DemuxSpan>>,
+        mut record_last: impl FnMut(&[u8]),
     ) -> Result<()> {
         if let Some(mut replacement) = replacement {
             replacement.try_append(&mut self.spans)?;
@@ -835,12 +836,20 @@ impl DemuxObserver {
         let count = bytes.len() / TS188_BYTES;
         debug_assert!(count >= 2 && bytes.len().is_multiple_of(TS188_BYTES));
         debug_assert!(self.spans.len() + count <= self.spans.capacity());
+        // Clone each preceding view and move the original into the final span.
+        let mut views = std::iter::repeat_n(bytes, count);
         self.spans.try_extend_with(count, |index| {
             let at = index * TS188_BYTES;
             let offset = start.offset + at as u64;
+            let bytes = views.next().expect("one view per admitted carrier");
+            if index + 1 == count {
+                // Capacity is reserved before this closure runs. Record the
+                // complete final carrier before narrowing its original view.
+                record_last(&bytes.as_ref()[at..at + TS188_BYTES]);
+            }
             DemuxSpan {
                 bytes: bytes
-                    .slice(at + TS_PAYLOAD_START..at + TS188_BYTES)
+                    .into_slice(at + TS_PAYLOAD_START..at + TS188_BYTES)
                     .expect("payload range inside complete carrier"),
                 source: SourceRange {
                     entity: start.source,

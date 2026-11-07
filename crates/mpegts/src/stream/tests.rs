@@ -454,17 +454,62 @@ fn payload_run_leaves_a_split_carrier_for_refill() {
 
 #[test]
 fn payload_run_keeps_the_literal_duplicate_snapshot() {
-    let last = carrier(2, false);
-    let wire = [carrier(0, true), carrier(1, false), last, last, last].concat();
+    for first in [0, 14] {
+        let mut last = carrier((first + 2) & 15, false);
+        if first == 14 {
+            last[1] |= 0x20;
+            last[TS188_BYTES - 1] = 0xa5;
+        }
+        let wire = [
+            carrier(first, true),
+            carrier(first + 1, false),
+            last,
+            last,
+            last,
+        ]
+        .concat();
+        let mut feed = PayloadFeed::new(&wire);
+        let mut work = WorkBudget::new(4096);
+        assert!(feed.try_run(&mut work, &AtomicBool::new(false)).unwrap());
+        assert_eq!(feed.stream.take_feed_omissions(), 4);
+        let Step::Ready(TraceEvent::Diagnostic(fault)) = feed.ordinary(&mut work) else {
+            panic!("expected the excess duplicate diagnostic");
+        };
+        assert_eq!(fault.error, Error::Invalid("TS excess duplicate"));
+        assert_eq!(fault.location.offset, (4 * TS188_BYTES) as u64);
+    }
+}
+
+#[test]
+fn payload_run_storage_remains_charged_until_the_retained_packet_drops() {
+    let wire = [carrier(14, true), carrier(15, false), carrier(0, false)].concat();
     let mut feed = PayloadFeed::new(&wire);
-    let mut work = WorkBudget::new(4096);
+    let pool = feed.input.budget().clone();
+    let mut work = WorkBudget::new(2 * PAYLOAD_RUN_WORK + 1);
     assert!(feed.try_run(&mut work, &AtomicBool::new(false)).unwrap());
-    assert_eq!(feed.stream.take_feed_omissions(), 4);
-    let Step::Ready(TraceEvent::Diagnostic(fault)) = feed.ordinary(&mut work) else {
-        panic!("expected the excess duplicate diagnostic");
-    };
-    assert_eq!(fault.error, Error::Invalid("TS excess duplicate"));
-    assert_eq!(fault.location.offset, (4 * TS188_BYTES) as u64);
+    assert_eq!(work.remaining(), 1);
+    let packet = feed.finish_native();
+    drop(feed);
+    assert_eq!(packet.spans.len(), 3);
+    assert_eq!(
+        pool.used(),
+        Budget::control_storage_bytes()
+            + packet.spans.capacity() * size_of::<DemuxSpan>()
+            + packet.header_source_ranges.capacity() * size_of::<crate::SourceRange>()
+            + packet.spans.as_slice()[0]
+                .backing_bytes()
+                .retained_storage_bytes()
+    );
+    for (index, span) in packet.spans.as_slice()[1..].iter().enumerate() {
+        let at = (index + 1) * TS188_BYTES;
+        assert_eq!(span.as_ref(), &wire[at + 4..at + TS188_BYTES]);
+        assert!(
+            span.backing_bytes()
+                .shares_storage_with(packet.spans.as_slice()[0].backing_bytes())
+        );
+    }
+    drop(packet);
+    assert_eq!(pool.used(), Budget::control_storage_bytes());
 }
 
 #[test]
