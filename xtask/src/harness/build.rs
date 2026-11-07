@@ -270,7 +270,7 @@ const ADDITIONAL_CANDIDATES: [Candidate; 5] = [
     },
 ];
 
-fn candidate_graph(root: &Path, name: &str) -> R<Value> {
+pub(super) fn candidate_graph(root: &Path, name: &str) -> R<Value> {
     let spec = ADDITIONAL_CANDIDATES
         .iter()
         .find(|spec| spec.name == name)
