@@ -301,11 +301,11 @@ fn range_playback_preserves_long_aac_sample_durations_and_coded_trim() {
     let packets = rows(&source, range_plan(&source, *b"isom").unwrap());
     assert_eq!(packets.len(), 189);
     assert_eq!(packets[0].1, Some([0xf0, 3, 0, 0, 0, 0, 0, 0, 0, 0]));
-    assert_eq!(packets[1].0.native.pts, Some(16));
-    assert_eq!(packets[1].0.native.duration, 1272);
+    assert_eq!(packets[1].0.demux.pts, Some(16));
+    assert_eq!(packets[1].0.demux.duration, 1272);
     assert_eq!(packets[1].1, None);
-    assert_eq!(packets[2].0.native.dts, Some(1288));
-    assert_eq!(packets[188].0.native.duration, 272);
+    assert_eq!(packets[2].0.demux.dts, Some(1288));
+    assert_eq!(packets[188].0.demux.duration, 272);
     assert_eq!(packets[188].1, Some([0, 0, 0, 0, 0xf0, 2, 0, 0, 0, 0]));
 }
 

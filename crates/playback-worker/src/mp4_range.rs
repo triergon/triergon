@@ -10,10 +10,16 @@ use triergon_core::{
 };
 use triergon_harness_protocol::digest::{fold, fold_bytes, signed};
 use triergon_isobmff::{
-    ConfigurationLimits, Mov9CursorStatus, Mov9EncodedEditContextV2 as EditContext,
-    Mov9EncodedEditJobV2 as EditJob, Mov9EncodedEditLimitsV2 as EditLimits,
-    Mov9EncodedSelectionV4 as DescriptionSelection, Mov9EncodedStreamJobV1 as ConfigurationJob,
-    Mov9NativeSeekLimits as SeekLimits,
+    ConfigurationLimits,
+    compat::mov::{
+        edits::{
+            EncodedEditContext as EditContext, EncodedEditJob as EditJob,
+            EncodedEditLimits as EditLimits,
+        },
+        encoded::{EncodedSelection as DescriptionSelection, EncodedStreamJob as ConfigurationJob},
+        packets::CursorStatus,
+        seek::SeekLimits,
+    },
 };
 use triergon_playback::{
     ByteSource, Format, Mp4Event, Mp4NativeSeekRequest, Mp4Packet, Mp4RangeOpen, PlayerPolicy,
@@ -37,7 +43,7 @@ struct Work {
 impl Work {
     fn packet(&mut self, packet: &Mp4Packet) -> Result<()> {
         let row = packet.native.as_ref().ok_or("missing projected packet")?;
-        let clock = &row.native;
+        let clock = &row.demux;
         let bytes = packet.source.payload.as_ref();
         let skip = packet.encoded_skip_samples.unwrap_or_default();
         let trim_start = u32::from_le_bytes(skip[..4].try_into()?);
@@ -118,8 +124,7 @@ fn measure(pool: &Budget, data: &Bytes, seek: Option<i64>) -> Result<Work> {
                     limits: ConfigurationLimits::default(),
                 },
             )?;
-            while config.poll(&mut opened.input, &mut work(), &cancel)? != Mov9CursorStatus::Ready {
-            }
+            while config.poll(&mut opened.input, &mut work(), &cancel)? != CursorStatus::Ready {}
             let configs = [config.take(&mut opened.input, &cancel)?];
             let mut edit = EditJob::new_range_playback(
                 EditContext {
@@ -133,7 +138,7 @@ fn measure(pool: &Budget, data: &Bytes, seek: Option<i64>) -> Result<Work> {
                 &opened.input,
                 EditLimits::default(),
             )?;
-            while edit.poll(&mut opened.input, &mut work(), &cancel)? != Mov9CursorStatus::Ready {}
+            while edit.poll(&mut opened.input, &mut work(), &cancel)? != CursorStatus::Ready {}
             Some(edit.take(&mut opened.input, &cancel)?)
         } else {
             None

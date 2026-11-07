@@ -1301,7 +1301,7 @@ impl Mp4Engine {
         &mut self,
         w: &mut WorkBudget,
         c: &AtomicBool,
-        cursor: Option<&mut Mov9PacketCursor<'_>>,
+        cursor: Option<&mut PacketCursor<'_>>,
     ) -> Result<BackendStep> {
         let (at_track, reader) = self
             .packet
@@ -1309,22 +1309,22 @@ impl Mp4Engine {
             .ok_or(Error::Invalid("pending sample missing"))?;
         let at_track = *at_track;
         let step = if self.plan.native_recovery && self.plan.native(self.row).is_some() {
-            reader.poll_pinned_mov_recovery(&mut self.input, w, c, PinnedMovD32RegularRecoveryV1)?
+            reader.poll_recovery(&mut self.input, w, c, RunRecoveryProfile)?
         } else {
             match reader.poll(&mut self.input, w, c)? {
-                Step::Ready(packet) => Step::Ready(Mov9SampleRead::Complete(packet)),
+                Step::Ready(packet) => Step::Ready(RecoverySampleRead::Complete(packet)),
                 Step::NeedInput(r) => Step::NeedInput(r),
                 Step::Yield => Step::Yield,
                 Step::End(at) => Step::End(at),
             }
         };
         match step {
-            Step::Ready(Mov9SampleRead::Complete(source)) => {
+            Step::Ready(RecoverySampleRead::Complete(source)) => {
                 let event = self.emit_packet(at_track, source, cursor)?;
                 self.packet = None;
                 Ok(event)
             }
-            Step::Ready(Mov9SampleRead::Short(prefix)) => {
+            Step::Ready(RecoverySampleRead::Short(prefix)) => {
                 let configuration =
                     self.packet_config(at_track, prefix.declared.description_index)?;
                 let mut native = self
@@ -1332,7 +1332,7 @@ impl Mp4Engine {
                     .native(self.row)
                     .ok_or(Error::Invalid("short packet needs native occurrence"))?
                     .clone();
-                native.native.flags |= 2;
+                native.demux.flags |= 2;
                 self.packet = None;
                 self.native_recovery_end = true;
                 Ok(BackendStep::Event(RawEvent::Mp4(

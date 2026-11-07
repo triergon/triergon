@@ -3309,7 +3309,7 @@ fn repeated_range_seek_preserves_catalogue_order_with_video_second() {
             .prepare_seek(Mp4NativeSeekRequest {
                 video: 1,
                 timestamp: 3500,
-                limits: triergon_isobmff::Mov9NativeSeekLimits::default(),
+                limits: triergon_isobmff::compat::mov::seek::SeekLimits::default(),
             })
             .unwrap();
         assert!((0..1000).any(|_| seek.poll(&mut WorkBudget::new(4096), &off()).unwrap()));
@@ -3325,7 +3325,7 @@ fn repeated_range_seek_preserves_catalogue_order_with_video_second() {
         let RawEvent::Mp4(Mp4Event::Packet(packet)) = output.event() else {
             panic!("expected a video packet");
         };
-        assert_eq!(packet.native.as_ref().unwrap().native.dts, Some(3000));
+        assert_eq!(packet.native.as_ref().unwrap().demux.dts, Some(3000));
     }
 }
 

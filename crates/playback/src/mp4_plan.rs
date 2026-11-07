@@ -891,9 +891,8 @@ impl<'a> Mp4IndexJob<'a> {
                             CursorStatus::Ready => {
                                 let row = cursor.take_occurrence()?;
                                 let Some(pts) = row.demux.pts else { continue };
-                                let end = pts
-                                    .checked_add(row.demux.duration)
-                                    .ok_or(Error::Overflow)?;
+                                let end =
+                                    pts.checked_add(row.demux.duration).ok_or(Error::Overflow)?;
                                 let micros = row.media_clock.demux_base.rescale(
                                     end,
                                     TimeBase::new(1, 1_000_000)?,

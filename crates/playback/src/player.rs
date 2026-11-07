@@ -1269,7 +1269,7 @@ impl<S: Source> Player<S> {
                     ) => match packet
                         .native
                         .as_ref()
-                        .and_then(|n| n.native.pts.map(|pts| (pts, n.media_clock.native_base)))
+                        .and_then(|n| n.demux.pts.map(|pts| (pts, n.media_clock.demux_base)))
                     {
                         None => Delivery::UnknownTime,
                         Some((pts, base)) => match seek {

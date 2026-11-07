@@ -1056,11 +1056,11 @@ impl<'a> PacketCursor<'a> {
                     let slot = &mut self.slots.as_mut_slice()[self.at];
                     if slot.head.is_none() {
                         match slot.fill(work, true, global_schedule, false)? {
-                            Mov9CursorStatus::Yield => return Ok(Mov9CursorStatus::Yield),
-                            Mov9CursorStatus::Ready => {}
-                            Mov9CursorStatus::End => {
+                            CursorStatus::Yield => return Ok(CursorStatus::Yield),
+                            CursorStatus::Ready => {}
+                            CursorStatus::End => {
                                 if !work.try_charge(1) {
-                                    return Ok(Mov9CursorStatus::Yield);
+                                    return Ok(CursorStatus::Yield);
                                 }
                                 self.at += 1;
                                 continue;
@@ -1068,7 +1068,7 @@ impl<'a> PacketCursor<'a> {
                         }
                     }
                     if !work.try_charge(1) {
-                        return Ok(Mov9CursorStatus::Yield);
+                        return Ok(CursorStatus::Yield);
                     }
                     self.generated = self.generated.checked_add(1).ok_or(Error::Overflow)?;
                     count(self.generated, self.limits.max_occurrences)?;
