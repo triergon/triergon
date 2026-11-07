@@ -479,13 +479,17 @@ fn report(root: &Path, args: &[String]) -> ExitCode {
                 "--require-slice-acceptance" => options.require_slice_acceptance = true,
                 "--benchmark" => options.benchmark = true,
                 "--memory" => options.memory = true,
-                "--pairs" | "--iterations" | "--seed" => {
+                "--pairs" | "--memory-pairs" | "--iterations" | "--seed" => {
                     let text = value()?.display().to_string();
                     let number: u64 = text
                         .parse()
                         .map_err(|_| format!("{flag}: not a number: {text}"))?;
                     match flag.as_str() {
                         "--pairs" => options.pairs = number as usize,
+                        "--memory-pairs" => {
+                            options.memory_pairs =
+                                Some(usize::try_from(number).map_err(|e| e.to_string())?);
+                        }
                         "--iterations" => {
                             options.iterations =
                                 Some(u32::try_from(number).map_err(|e| e.to_string())?);
