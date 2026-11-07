@@ -1,23 +1,23 @@
-//! Explicit pinned MOV physical-EOF payload observation. Raw declared ranges
+//! Explicit reference MOV physical-EOF payload observation. Raw declared ranges
 //! and source syntax remain distinct from the available, never padded, bytes.
-use crate::{PinnedMovD32RegularRecoveryV1, Sample, SampleReader};
+use crate::{RunRecoveryProfile, Sample, SampleReader};
 use std::{ops::Range, sync::atomic::AtomicBool};
 use triergon_core::{Bytes, Error, InputCursor, InputToken, Result, SourceId, Step, WorkBudget};
 
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub struct Mov9PayloadBounds {
+pub struct PayloadBounds {
     pub declared: Range<u64>,
     pub available: Option<Range<u64>>,
     pub known_source_length: u64,
     pub incomplete_at_known_eof: bool,
 }
-impl Mov9PayloadBounds {
+impl PayloadBounds {
     pub fn from_source(
         sample: &Sample,
         declared_media: Range<u64>,
         known_length: u64,
         maximum_packet: usize,
-        _profile: PinnedMovD32RegularRecoveryV1,
+        _profile: RunRecoveryProfile,
     ) -> Result<Self> {
         sample.require_within(declared_media)?;
         // The limit is on the original declaration, before any physical bound.
@@ -45,35 +45,35 @@ impl Mov9PayloadBounds {
     }
 }
 #[derive(Clone, Debug)]
-pub struct Mov9RecoveredPayload {
+pub struct RecoveredPayload {
     pub source_sample: Sample,
-    pub bounds: Mov9PayloadBounds,
+    pub bounds: PayloadBounds,
     pub payload: Bytes,
     pub source: SourceId,
     pub token: InputToken,
 }
 /// Uses the normal core-bound SampleReader for the actual range transaction.
 /// The temporary physical-read range is never returned as a declared sample.
-/// None availability must be observed separately as native EOF, not an empty
+/// None availability must be observed separately as demux EOF, not an empty
 /// valid-looking packet. Early transport EOF/failure still propagates unchanged.
 #[derive(Debug)]
-pub struct Mov9PartialSampleReader {
+pub struct PartialSampleReader {
     inner: SampleReader,
     source_sample: Sample,
-    bounds: Mov9PayloadBounds,
+    bounds: PayloadBounds,
 }
-impl Mov9PartialSampleReader {
+impl PartialSampleReader {
     pub fn new(
         input: &mut InputCursor,
         sample: Sample,
         declared_media: Range<u64>,
         maximum_packet: usize,
-        profile: PinnedMovD32RegularRecoveryV1,
+        profile: RunRecoveryProfile,
     ) -> Result<Self> {
         let known_length = input.capabilities().length.ok_or(Error::Unsupported(
             "partial MOV payload requires known physical length",
         ))?;
-        let bounds = Mov9PayloadBounds::from_source(
+        let bounds = PayloadBounds::from_source(
             &sample,
             declared_media,
             known_length,
@@ -98,9 +98,9 @@ impl Mov9PartialSampleReader {
         input: &mut InputCursor,
         work: &mut WorkBudget,
         cancel: &AtomicBool,
-    ) -> Result<Step<Mov9RecoveredPayload>> {
+    ) -> Result<Step<RecoveredPayload>> {
         Ok(match self.inner.poll(input, work, cancel)? {
-            Step::Ready(packet) => Step::Ready(Mov9RecoveredPayload {
+            Step::Ready(packet) => Step::Ready(RecoveredPayload {
                 source_sample: self.source_sample.clone(),
                 bounds: self.bounds.clone(),
                 payload: packet.payload,

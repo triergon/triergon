@@ -2,7 +2,7 @@
 //!
 //! Apple QTFF establishes the chunk/sample byte addresses, not a mandated merged
 //! demux packet schedule. This module implements an explicitly selected physical
-//! address order. It does not claim the pinned MOV reader's default interleaving.
+//! address order. It does not claim the reference MOV reader's default interleaving.
 use crate::{
     BoxHeader, FragmentCursor, FragmentIndex, Sample, SampleCursor, SampleStep, SampleTable,
     TimingRunPolicy, TimingRunSurplus,
@@ -42,7 +42,7 @@ impl<'a> SourceTrack<'a> {
         self.track_id
     }
     // Borrow the existing format indexes for source seek planning. No new
-    // owner, transport identity, sample array or native scheduling view.
+    // storage, transport identity, sample array or demux scheduling view.
     pub(crate) fn regular_index(self) -> Option<&'a SampleTable> {
         self.regular
     }
@@ -199,7 +199,7 @@ enum Phase {
 pub struct PhysicalSampleCursor<'a> {
     slots: BudgetVec<Slot<'a>>,
     media_extents: Option<&'a [Range<u64>]>,
-    forward_media: Option<ForwardRegularMdatV1>,
+    forward_media: Option<ForwardRegularMdat>,
     deferred_media: bool,
     limits: PhysicalInterleaveLimits,
     phase: Phase,
@@ -219,12 +219,12 @@ pub struct PhysicalSampleCursor<'a> {
 /// Evidence for the first finite MDAT of a forward-only regular movie.
 /// Later sample declarations are pending until their actual MDAT is read.
 #[derive(Clone, Copy, Debug)]
-pub struct ForwardRegularMdatV1 {
+pub struct ForwardRegularMdat {
     first_start: u64,
     first_end: u64,
     source_length: Option<u64>,
 }
-impl ForwardRegularMdatV1 {
+impl ForwardRegularMdat {
     pub fn new(header: BoxHeader, source_length: Option<u64>) -> Result<Self> {
         if header.kind != *b"mdat" {
             return Err(Error::Invalid("forward regular media header"));
@@ -288,11 +288,11 @@ impl<'a> PhysicalSampleCursor<'a> {
     /// Preserve regular table declarations beyond the observed first MDAT.
     /// The caller must admit each deferred row against a real later extent
     /// before reading or publishing its payload.
-    pub fn new_forward_regular_v1(
+    pub fn new_forward_regular(
         budget: &Budget,
         tracks: &[SourceTrack<'a>],
         media: &'a [Range<u64>],
-        bounds: ForwardRegularMdatV1,
+        bounds: ForwardRegularMdat,
         limits: PhysicalInterleaveLimits,
     ) -> Result<Self> {
         Self::new_forward_regular_with_timing_policy(
@@ -309,7 +309,7 @@ impl<'a> PhysicalSampleCursor<'a> {
         budget: &Budget,
         tracks: &[SourceTrack<'a>],
         media: &'a [Range<u64>],
-        bounds: ForwardRegularMdatV1,
+        bounds: ForwardRegularMdat,
         limits: PhysicalInterleaveLimits,
         timing_policy: TimingRunPolicy,
     ) -> Result<Self> {

@@ -19,6 +19,7 @@
     clippy::unnested_or_patterns
 )]
 mod boxes;
+pub mod compat;
 mod dts_description;
 pub(crate) use dts_description::DtsCoreDescription;
 mod fields;
@@ -27,34 +28,31 @@ mod fragment_time;
 mod input_boxes;
 mod interleave;
 mod metadata;
-mod native_clock;
-mod native_front;
-pub use native_front::{
-    Mov9FrontFragmentV1, Mov9FrontReadBoundaryV1, Mov9FrontSampleV1, Mov9FrontTrackV1,
+mod mov_clock;
+mod mov_front;
+pub(crate) use mov_front::FrontTrack;
+mod mov_cursor;
+mod mov_edits;
+mod mov_view;
+#[cfg(feature = "reference-trace")]
+mod raw_video_transport;
+#[cfg(feature = "reference-trace")]
+pub(crate) use raw_video_transport::{
+    EntryRevisit, ModeledInitialRead, ModeledOpenState, RawVideoTransportModel,
 };
-mod native_cursor;
-mod native_edits;
-mod native_operation_v5;
-mod native_transport_v3;
-mod native_view;
-pub use native_operation_v5::{
-    Mov9InitialOperationJobV5, Mov9InitialOperationV5, PinnedMovD32RejectedPacketSeekV5,
-};
-pub use native_transport_v3::{
-    Mov9V3EntryRevisit, Mov9V3TransportBuilder, Mov9V3TransportModel,
-    PinnedMovD32SmallRawVideoTransportV3,
-};
-pub(crate) use native_transport_v3::{Mov9V3ModeledInitialRead, Mov9V3ModeledOpenState};
 mod packet;
-mod physical_read_v4;
+mod physical_read;
 mod recovery_payload;
-pub use physical_read_v4::{Mov9PhysicalReadV4, Mov9PhysicalReaderV4, PinnedMovD32PhysicalReadV4};
+#[cfg(feature = "reference-trace")]
+mod rejected_packet_seek;
+pub(crate) use physical_read::PhysicalReadProfile;
+mod qt_sound;
+#[cfg(feature = "reference-trace")]
+pub mod reference_trace;
 mod regular;
-pub use recovery_payload::{Mov9PartialSampleReader, Mov9PayloadBounds};
 mod sidx;
-mod sound_v0;
 mod tables;
-pub use sound_v0::{
+pub use qt_sound::{
     QtPcmEncodingV0, QtPcmSampleReaderV0, QtPcmSourcePacketV0, QtSoundDescriptionV0,
 };
 
@@ -64,38 +62,29 @@ pub(crate) use fragment::{FragmentCursor, FragmentLocator};
 pub use fragment_time::FragmentDecodeTime;
 pub use input_boxes::{BoxEvent, BoxReader, MediaDataPolicy};
 pub use interleave::{
-    ForwardRegularMdatV1, InterleaveStatus, PhysicalInterleaveLimits, PhysicalSampleCursor,
+    ForwardRegularMdat, InterleaveStatus, PhysicalInterleaveLimits, PhysicalSampleCursor,
     SourceTrack, TrackSampleCursor,
 };
-pub use metadata::{
-    EditEntry, EditList, EntryLayout, Mov9RecoveryTrackHeader, MovieHeader, SampleDescription,
-    TrackHeader,
+pub(crate) use metadata::RecoveryTrackHeader;
+pub use metadata::{EditEntry, EditList, EntryLayout, MovieHeader, SampleDescription, TrackHeader};
+pub(crate) use mov_clock::{ClockField, MediaClock, SchedulingClock};
+pub(crate) use mov_cursor::PredecessorClock;
+pub(crate) use mov_cursor::{
+    ClockOrigin, DemuxProfile, DemuxTrack, PacketCursor, PacketLimits, PacketOccurrence,
+    ResumePoint,
 };
-pub use native_clock::{
-    Mov9ClockField, Mov9MediaClock, Mov9MediaClockCause, Mov9SchedulingClock, SourceTimeBase,
+pub(crate) use mov_edits::{CursorStatus, DurationBasis, EditCursor, EditLimits};
+pub(crate) use mov_view::{PacketProjector, PacketView, ProjectedEdit, StreamView};
+pub use packet::{SampleReader, SourcePacket, TerminalMdat};
+#[cfg(feature = "reference-trace")]
+pub(crate) use regular::{
+    DescriptionContext, DescriptionEmission, DescriptionPacketCursor, DescriptionRecoveryTable,
 };
-pub(crate) use native_cursor::Mov9PredecessorClock;
-pub use native_cursor::{
-    Mov9ClockOrigin, Mov9PacketCursor, Mov9PacketLimits, Mov9PacketOccurrence, Mov9Profile,
-    Mov9RangeSeekJob, Mov9ResumePoint, Mov9Track, mov9_seekable_head_precedes,
-};
-pub use native_edits::{Mov9CursorStatus, Mov9DurationBasis, Mov9EditCursor, Mov9EditLimits};
-pub use native_view::{Mov9Edit, Mov9PacketView, Mov9StreamView, Mov9View};
-pub use packet::{
-    Mov9SampleExtent, Mov9SampleRead, Mov9ShortSample, SampleReader, SourcePacket, TerminalMdat,
-};
-pub(crate) use regular::Mov9RecoveryV3PacketCursor;
-pub(crate) use regular::SampleLocator;
+pub(crate) use regular::{DescriptionEvent, DescriptionRead};
+pub(crate) use regular::{RunRecoveryProfile, SampleLocator};
 pub use regular::{
-    Mov9RecoveryV2Association, Mov9RecoveryV2Context, Mov9RecoveryV2Read, Mov9RunKind,
-    Mov9RunRecoveryBuilder, Mov9RunRecoveryTable, PinnedMovD32RegularRecoveryV1,
-    PinnedMovD32RegularRecoveryV2, SampleCursor, SampleTable, SampleTableBuilder,
-    SampleTablePolicy, SyncSamplePolicy, TimingRunPolicy, TimingRunSurplus,
-};
-pub use regular::{
-    Mov9RecoveryV3Association, Mov9RecoveryV3Context, Mov9RecoveryV3Emission, Mov9RecoveryV3Event,
-    Mov9RecoveryV3Read, Mov9RunRecoveryV3Builder, Mov9RunRecoveryV3Table,
-    PinnedMovD32RegularRecoveryV3,
+    SampleCursor, SampleTable, SampleTableBuilder, SampleTablePolicy, SyncSamplePolicy,
+    TimingRunPolicy, TimingRunSurplus,
 };
 pub use sidx::{IndexStep, SegmentIndex};
 use std::ops::Range;
@@ -190,7 +179,7 @@ impl Sample {
         self.access == Access::ContainerSync
     }
     /// Uses the parent's exact seconds representation. Unknown fragment origin
-    /// remains unknown; rounding/native compatibility are separate operations.
+    /// remains unknown; rounding/demux compatibility are separate operations.
     pub fn source_times(&self, base: TimeBase) -> Result<SourceTimes> {
         Ok(SourceTimes {
             dts: self
@@ -241,7 +230,7 @@ pub(crate) fn add_offset(base: u64, delta: i32) -> Result<u64> {
     u64::try_from(end).map_err(|_| Error::Overflow)
 }
 
-// Source-only seek/index API. Native views remain independently named above.
+// Source-only seek/index API. Demux views remain independently named above.
 mod source_seek;
 mod tfra;
 pub use source_seek::{SourceSeekLimits, SourceSeekPlan, SourceSeekPlanner, SourceSeekRequest};
@@ -249,7 +238,7 @@ pub use tfra::{
     FragmentRandomAccessStep, MovieFragmentRandomAccessTail, TrackFragmentRandomAccess,
 };
 
-// Source-only movie targeting/recovery; pinned native views above stay separate.
+// Source-only movie targeting/recovery; reference demux views above stay separate.
 mod movie_seek;
 mod recovery;
 pub use movie_seek::{
@@ -263,89 +252,64 @@ pub use recovery::{
     RecoverySelection, RecoverySyntax,
 };
 
-// Pinned native index/seek view; source clocks/indices remain unchanged.
-mod native_index;
-pub use native_index::{
-    Mov9NativeGlobalSeekJob, Mov9NativeGlobalSeekPlan, Mov9NativeIndexCursor, Mov9NativeIndexEntry,
-    Mov9NativeIndexLimits, Mov9NativeSeekJob, Mov9NativeSeekLimits, Mov9NativeSeekPlan,
-    Mov9NativeSeekReceipt,
+// Reference demux index/seek view; source clocks/indices remain unchanged.
+mod mov_index;
+pub(crate) use mov_index::{IndexCursor, IndexEntry, IndexLimits, SeekLanding, SeekLimits};
+
+#[cfg(feature = "reference-trace")]
+mod root_walk_transport;
+#[cfg(feature = "reference-trace")]
+pub(crate) use root_walk_transport::{RootWalkTransportModel, RootWalkTransportProfile};
+
+#[cfg(feature = "reference-trace")]
+mod fragment_open_clock;
+
+mod mov_pcm;
+
+#[cfg(feature = "reference-trace")]
+mod receiver_clock;
+
+#[cfg(feature = "reference-trace")]
+mod sample_entry_header;
+#[cfg(feature = "reference-trace")]
+pub(crate) use sample_entry_header::{
+    SampleEntryHeader, SampleEntryHeaderJob, SampleEntryHeaderProfile,
 };
 
-mod native_transport_v4;
-pub use native_transport_v4::{
-    Mov9V4RootWalkTransportBuilder, Mov9V4RootWalkTransportModel, PinnedMovD32RootWalkTransportV4,
-};
-
-mod native_open_clock_v6;
-pub use native_open_clock_v6::{
-    Mov9FragmentClockJobV6, Mov9FragmentClockResultV6, PinnedMovD32FragmentClockV6,
-};
-
-mod native_pcm_v1;
-pub use native_pcm_v1::{
-    Mov9PcmCursorV1, Mov9PcmLimitsV1, Mov9PcmPacketV1, Mov9PcmPayloadV1, Mov9PcmReaderV1,
-    Mov9PcmStreamV1, PinnedMovD32PcmV1,
-};
-
-mod native_public_receiver_v6;
-pub use native_public_receiver_v6::{
-    Mov9PublicClockV6, Mov9PublicPacketTimesV6, Mov9ReceiverOriginV6, PinnedMovD32PublicReceiverV6,
-};
-
-mod native_header_v7;
-pub(crate) use native_header_v7::Mov9SampleEntryHeaderV7;
-pub use native_header_v7::{Mov9SampleEntryHeaderJobV7, PinnedMovD32SampleEntryHeaderV7};
-
-mod native_encoded_v1;
-pub use native_encoded_v1::{
+mod encoded_stream;
+pub use encoded_stream::{
     AacConfiguration, AacConfigurationJob, AacConfigurationStep, ConfigurationLimits,
-    EncodedEntryKindV1, Mov9EncodedLimitsV1, Mov9EncodedStreamJobV1, Mov9EncodedStreamV1,
-    PinnedMovD32EncodedRegularV1, check_dts_core_description,
+    check_dts_core_description,
 };
+pub(crate) use encoded_stream::{EncodedEntryKind, EncodedStream};
 
-mod native_encoded_edits_v2;
-pub use native_encoded_edits_v2::{
-    Mov9EncodedEditContextV2, Mov9EncodedEditJobV2, Mov9EncodedEditLimitsV2, Mov9EncodedEditPlanV2,
-    PinnedMovD32EncodedEditsV2,
-};
+mod encoded_edits;
+pub(crate) use encoded_edits::{EncodedEditPlan, EncodedEditProfile};
 
-mod native_encoded_configs_v3;
-pub use native_encoded_configs_v3::{
-    Mov9EncodedConfigSequenceV3, Mov9EncodedConfigStepV3, Mov9EncodedCreationV3,
-    Mov9EncodedInitialV3, PinnedMovD32EncodedRegularV3,
-};
+mod encoded_configs;
+pub(crate) use encoded_configs::EncodedConfigProfile;
 
-mod native_encoded_metadata_v4;
-pub use native_encoded_metadata_v4::{
-    Mov9DependedOnV4, Mov9EncodedCreationV4, Mov9EncodedSelectionV4, PinnedMovD32EncodedRegularV4,
-};
-pub(crate) use native_encoded_metadata_v4::{
-    Mov9DependencyViewV4, Mov9EncodedSourceV4, Mov9SoundV1SourceV4,
-};
+mod encoded_metadata;
+pub(crate) use encoded_metadata::{DependencyView, EncodedSource, SoundV1Source};
+pub(crate) use encoded_metadata::{EncodedMetadataProfile, EncodedSelection};
 
-mod native_encoded_dependency_v4;
+mod encoded_dependency;
 
-mod native_private_catalogue_v8;
-pub use native_private_catalogue_v8::{
-    Mov9PrivateConfigCauseV8, Mov9PrivateConfigurationJobV8, Mov9PrivateConfigurationV8,
-    PinnedMovD32OpaquePrivateCatalogueV8,
-};
+#[cfg(feature = "reference-trace")]
+mod private_catalogue;
 
-mod native_encoded_recovery_v5;
-pub(crate) use native_encoded_recovery_v5::Mov9RecoveryFactsV5;
-pub use native_encoded_recovery_v5::{
-    Mov9DependencyCauseV5, Mov9DependencyObservationV5, Mov9RecoveryReceiverCauseV5,
-    PinnedMovD32EncodedRecoveryV5,
-};
+mod encoded_recovery;
+pub(crate) use encoded_recovery::RecoveryFacts;
+pub(crate) use encoded_recovery::{DependencyObservation, EncodedRecoveryProfile};
 
-mod native_context_reports_v7;
-pub use native_context_reports_v7::PinnedMovD32EncodedContextsV7;
-pub(crate) use native_context_reports_v7::{Mov9SourceProfileFaultV7, Mov9WaveObservationV7};
+mod encoded_contexts;
+pub(crate) use encoded_contexts::EncodedContextProfile;
+pub(crate) use encoded_contexts::{SourceProfileFault, WaveObservation};
 
-mod native_recovery_context_v7;
-pub(crate) use native_recovery_context_v7::Mov9RecoveryObservationV7;
+mod encoded_recovery_context;
+pub(crate) use encoded_recovery_context::RecoveryObservation;
 
-mod native_private_diagnostics_v7;
-pub use native_private_diagnostics_v7::Mov9PrivateDiagnosticJobV7;
+#[cfg(feature = "reference-trace")]
+mod private_diagnostics;
 
 pub use fragment::OwnedFragmentCursor;

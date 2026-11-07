@@ -261,7 +261,7 @@ pub struct FragmentIndex {
     decode_end: Option<i128>,
 }
 impl FragmentIndex {
-    /// Format-local source syntax provenance; no native distance semantics.
+    /// Format-local source syntax provenance; no demux distance semantics.
     pub(crate) fn run_flags(&self, run: usize) -> Result<u32> {
         self.runs
             .as_slice()
@@ -414,9 +414,9 @@ impl FragmentBuilder {
             failed: None,
         })
     }
-    /// The pinned MOV receiver rejects a zero-size sample in a fragment
+    /// The reference MOV receiver rejects a zero-size sample in a fragment
     /// reached during header opening. Source and packet-stage parsing retain it.
-    pub fn new_pinned_mov_header(
+    pub fn new_header_open(
         raw: BoxView,
         trex: Trex,
         context: FragmentContext,
@@ -701,7 +701,7 @@ pub struct FragmentCursor<'a> {
 }
 impl FragmentCursor<'_> {
     /// Source run ordinal for the most recently emitted fragment sample. The
-    /// owner reads this after Sample, before another poll can leave that run.
+    /// storage reads this after Sample, before another poll can leave that run.
     pub(crate) fn run_index(&self) -> usize {
         self.run
     }

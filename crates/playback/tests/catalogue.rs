@@ -1016,7 +1016,7 @@ fn catalogue_replacement_selects_native_terminal_and_waits_for_source_end() {
     for (packet, expected) in packets.iter().zip(case.samples) {
         assert_eq!(packet.source.sample.ordinal, expected.ordinal);
         assert_eq!(packet.source.payload.as_ref(), expected.payload);
-        let native = &packet.native.as_ref().unwrap().native;
+        let native = &packet.native.as_ref().unwrap().demux;
         assert_eq!(native.dts.map(i128::from), Some(expected.dts));
         assert_eq!(native.pts.map(i128::from), Some(expected.cts));
     }
@@ -1742,7 +1742,7 @@ fn progressive_native_seek_matches_pinned_fragment_replay_after_reopening_ranges
     let request = Mp4NativeSeekRequest {
         video: 1,
         timestamp: 3500,
-        limits: triergon_isobmff::Mov9NativeSeekLimits::default(),
+        limits: triergon_isobmff::compat::mov::seek::SeekLimits::default(),
     };
     let mut job = p
         .prepare_mp4_progressive_native_seek(
@@ -1807,12 +1807,12 @@ fn progressive_native_seek_matches_pinned_fragment_replay_after_reopening_ranges
         let native = packet.native.as_ref().unwrap();
         let fields: Vec<_> = row.split_ascii_whitespace().collect();
         assert_eq!(native.track_id, fields[0].parse().unwrap());
-        assert_eq!(native.native.pts, fields[1].parse().ok());
-        assert_eq!(native.native.dts, fields[2].parse().ok());
-        assert_eq!(native.native.duration, fields[3].parse::<i64>().unwrap());
+        assert_eq!(native.demux.pts, fields[1].parse().ok());
+        assert_eq!(native.demux.dts, fields[2].parse().ok());
+        assert_eq!(native.demux.duration, fields[3].parse::<i64>().unwrap());
         let offset = fields[4].parse::<usize>().unwrap();
         let size = fields[5].parse::<usize>().unwrap();
-        assert_eq!(native.native.flags, fields[6].parse::<u32>().unwrap());
+        assert_eq!(native.demux.flags, fields[6].parse::<u32>().unwrap());
         assert_eq!(packet.source.sample.range.start, offset as u64);
         assert_eq!(packet.source.payload.as_ref(), &raw[offset..offset + size]);
     }

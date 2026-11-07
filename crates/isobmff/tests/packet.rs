@@ -35,7 +35,7 @@ fn input(budget: &Budget, length: Option<u64>) -> InputCursor {
 }
 
 #[test]
-fn packet_tiny_windows_preserve_source_and_retained_ownership() {
+fn packet_tiny_windows_preserve_source_and_retained_backing() {
     let budget = Budget::new(4096).unwrap();
     let pool_baseline = budget.used();
     let mut input = input(&budget, Some(16));

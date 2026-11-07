@@ -264,18 +264,18 @@ impl EditList {
     }
 }
 
-/// Raw source clock remains zero/invalid. Only the explicitly labelled native
+/// Raw source clock remains zero/invalid. Only the explicitly labelled demux
 /// projection has a fallback base; source_seconds must still reject that scale.
 #[derive(Debug)]
-pub struct Mov9RecoveryTrackHeader {
+pub struct RecoveryTrackHeader {
     source: TrackHeader,
 }
-impl Mov9RecoveryTrackHeader {
+impl RecoveryTrackHeader {
     pub fn parse(
         tkhd: &BoxView,
         mdhd: &BoxView,
         hdlr: &BoxView,
-        _profile: crate::PinnedMovD32RegularRecoveryV1,
+        _profile: crate::RunRecoveryProfile,
     ) -> Result<Self> {
         Ok(Self {
             source: TrackHeader::parse_inner(tkhd, mdhd, hdlr, true)?,
@@ -287,7 +287,7 @@ impl Mov9RecoveryTrackHeader {
     pub fn into_source(self) -> TrackHeader {
         self.source
     }
-    pub fn native_projection_base(&self) -> Result<TimeBase> {
+    pub fn demux_projection_base(&self) -> Result<TimeBase> {
         TimeBase::new(1, u64::from(self.source.timescale.max(1)))
     }
     pub fn source_clock_valid(&self) -> bool {

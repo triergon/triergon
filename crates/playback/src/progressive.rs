@@ -35,7 +35,7 @@ impl Default for ProgressiveLimits {
 }
 enum SourceCursor {
     Physical(OwnedFragmentCursor),
-    Native(iso::Mov9FrontFragmentV1),
+    Native(iso::compat::mov::front::FrontFragment),
 }
 impl SourceCursor {
     fn index(&self) -> &iso::FragmentIndex {
@@ -48,11 +48,11 @@ impl SourceCursor {
 struct Cursor {
     cursor: SourceCursor,
     head: Option<SourceRow>,
-    native: Option<iso::Mov9FrontSampleV1>,
+    native: Option<iso::compat::mov::front::FrontSample>,
 }
 struct PendingRow {
     source: SourceRow,
-    native: Option<iso::Mov9FrontSampleV1>,
+    native: Option<iso::compat::mov::front::FrontSample>,
 }
 #[derive(Clone, Copy, PartialEq, Eq)]
 enum Phase {
@@ -439,7 +439,9 @@ impl ProgressiveState {
                             .finish()?;
                         self.pending_cursor = Some(Cursor {
                             cursor: if engine.plan.native_front {
-                                SourceCursor::Native(iso::Mov9FrontFragmentV1::new(index))
+                                SourceCursor::Native(iso::compat::mov::front::FrontFragment::new(
+                                    index,
+                                ))
                             } else {
                                 SourceCursor::Physical(index.into_cursor())
                             },
@@ -544,9 +546,9 @@ impl ProgressiveState {
                     let step = match &mut current.cursor {
                         SourceCursor::Physical(cursor) => cursor.poll(w)?,
                         SourceCursor::Native(cursor) => match cursor.poll(w, c)? {
-                            iso::Mov9CursorStatus::Yield => SampleStep::Yield,
-                            iso::Mov9CursorStatus::End => SampleStep::End,
-                            iso::Mov9CursorStatus::Ready => {
+                            iso::compat::mov::packets::CursorStatus::Yield => SampleStep::Yield,
+                            iso::compat::mov::packets::CursorStatus::End => SampleStep::End,
+                            iso::compat::mov::packets::CursorStatus::Ready => {
                                 let head = cursor.take_sample()?;
                                 let source = head.source().clone();
                                 current.native = Some(head);
@@ -755,7 +757,7 @@ impl ProgressiveState {
                             &native,
                             boundary.is_none() && head.remaining_in_run() == 0,
                         );
-                        let base = native.media_clock.native_base;
+                        let base = native.media_clock.demux_base;
                         engine.plan.native_rows.try_reserve_exact(1)?;
                         engine
                             .plan

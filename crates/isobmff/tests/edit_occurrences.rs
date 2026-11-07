@@ -1,8 +1,11 @@
 mod common;
 use triergon_core::{Budget, Error, TimeBase, WorkBudget};
 use triergon_isobmff::{
-    BoxView, EditList, Limits, Mov9CursorStatus, Mov9EditCursor, Mov9EditLimits, MovieHeader,
-    Sample, SampleStep, SampleTable, TrackHeader,
+    BoxView, EditList, Limits, MovieHeader, Sample, SampleStep, SampleTable, TrackHeader,
+    compat::mov::{
+        edits::{EditCursor, EditLimits},
+        packets::CursorStatus,
+    },
 };
 
 struct Wanted {
@@ -149,26 +152,25 @@ fn check(wanted: &Wanted, quantum: u64) {
     let (table, edits, media, movie) = source(wanted.input);
     let originals = unique_samples(&table);
     let raw_edits = edits.raw().bytes().as_ref().to_vec();
-    let mut cursor =
-        Mov9EditCursor::new(&table, &edits, media, movie, Mov9EditLimits::default()).unwrap();
+    let mut cursor = EditCursor::new(&table, &edits, media, movie, EditLimits::default()).unwrap();
     let mut ordinal = 0usize;
     loop {
         match cursor.poll(&mut WorkBudget::new(quantum)).unwrap() {
-            Mov9CursorStatus::Yield => {}
-            Mov9CursorStatus::End => break,
-            Mov9CursorStatus::Ready => {
+            CursorStatus::Yield => {}
+            CursorStatus::End => break,
+            CursorStatus::Ready => {
                 let occurrence = cursor.take_occurrence().unwrap();
                 assert_eq!(occurrence.sequence, ordinal as u64 + 1);
                 assert_eq!(occurrence.source.ordinal, wanted.samples[ordinal]);
-                assert_eq!(occurrence.native.dts, Some(wanted.dts[ordinal]));
-                assert_eq!(occurrence.native.pts, Some(wanted.dts[ordinal]));
-                assert_eq!(occurrence.native.duration, wanted.durations[ordinal]);
-                assert_eq!(occurrence.native.flags, wanted.flags[ordinal]);
+                assert_eq!(occurrence.demux.dts, Some(wanted.dts[ordinal]));
+                assert_eq!(occurrence.demux.pts, Some(wanted.dts[ordinal]));
+                assert_eq!(occurrence.demux.duration, wanted.durations[ordinal]);
+                assert_eq!(occurrence.demux.flags, wanted.flags[ordinal]);
                 assert_eq!(
                     occurrence.source,
                     originals[wanted.samples[ordinal] as usize - 1]
                 );
-                assert_eq!(occurrence.native.source_range, occurrence.source.range);
+                assert_eq!(occurrence.demux.source_range, occurrence.source.range);
                 ordinal += 1;
             }
         }
@@ -179,7 +181,7 @@ fn check(wanted: &Wanted, quantum: u64) {
 }
 
 #[test]
-fn all_twelve_native_probe_occurrences_preserve_unique_source_samples_at_both_work_schedules() {
+fn all_twelve_demux_probe_occurrences_preserve_unique_source_samples_at_both_work_schedules() {
     for wanted in PROBES {
         for quantum in [1, 4096] {
             check(wanted, quantum);
@@ -229,12 +231,11 @@ fn original_four_edit_cases_are_separate_holdouts_including_exact_prime_clocks()
 #[test]
 fn ready_occurrence_waits_for_the_caller_without_advancing_or_spending_work() {
     let (table, edits, media, movie) = source(PROBES[1].input);
-    let mut cursor =
-        Mov9EditCursor::new(&table, &edits, media, movie, Mov9EditLimits::default()).unwrap();
-    while cursor.poll(&mut WorkBudget::new(1)).unwrap() != Mov9CursorStatus::Ready {}
+    let mut cursor = EditCursor::new(&table, &edits, media, movie, EditLimits::default()).unwrap();
+    while cursor.poll(&mut WorkBudget::new(1)).unwrap() != CursorStatus::Ready {}
     assert_eq!(
         cursor.poll(&mut WorkBudget::new(0)).unwrap(),
-        Mov9CursorStatus::Ready
+        CursorStatus::Ready
     );
     assert_eq!(cursor.take_occurrence().unwrap().sequence, 1);
     assert!(cursor.take_occurrence().is_err());
@@ -243,21 +244,21 @@ fn ready_occurrence_waits_for_the_caller_without_advancing_or_spending_work() {
 #[test]
 fn occurrence_and_cumulative_source_scan_limits_are_explicit() {
     for limits in [
-        Mov9EditLimits {
+        EditLimits {
             max_occurrences: 1,
             max_scanned_samples: 1000,
         },
-        Mov9EditLimits {
+        EditLimits {
             max_occurrences: 1000,
             max_scanned_samples: 1,
         },
     ] {
         let (table, edits, media, movie) = source(PROBES[5].input);
-        let mut cursor = Mov9EditCursor::new(&table, &edits, media, movie, limits).unwrap();
+        let mut cursor = EditCursor::new(&table, &edits, media, movie, limits).unwrap();
         loop {
             match cursor.poll(&mut WorkBudget::new(1)) {
-                Ok(Mov9CursorStatus::Yield) => {}
-                Ok(Mov9CursorStatus::Ready) => {
+                Ok(CursorStatus::Yield) => {}
+                Ok(CursorStatus::Ready) => {
                     cursor.take_occurrence().unwrap();
                 }
                 Err(Error::Limit { .. }) => break,
@@ -287,11 +288,10 @@ fn authored_edits(count: u32, duration: u32, rate: i16) -> EditList {
 }
 
 #[test]
-fn non_unit_rates_stay_unsupported_and_required_fractional_native_edits_preserve_source() {
+fn non_unit_rates_stay_unsupported_and_required_fractional_demux_edits_preserve_source() {
     let (table, _, media, movie) = source(PROBES[0].input);
     let rate = authored_edits(1, 1000, 2);
-    let mut cursor =
-        Mov9EditCursor::new(&table, &rate, media, movie, Mov9EditLimits::default()).unwrap();
+    let mut cursor = EditCursor::new(&table, &rate, media, movie, EditLimits::default()).unwrap();
     assert!(matches!(
         cursor.poll(&mut WorkBudget::new(4096)),
         Err(Error::Unsupported(_))
@@ -299,31 +299,31 @@ fn non_unit_rates_stay_unsupported_and_required_fractional_native_edits_preserve
     assert_eq!(rate.entry(0).unwrap().rate_integer, 2);
     let fractional = authored_edits(7, 1, 1);
     let original = unique_samples(&table);
-    let mut cursor = Mov9EditCursor::new(
+    let mut cursor = EditCursor::new(
         &table,
         &fractional,
         media,
         TimeBase::new(1, 3).unwrap(),
-        Mov9EditLimits::default(),
+        EditLimits::default(),
     )
     .unwrap();
     let mut count = 0usize;
     let expected = [0, 333, 666, 999, 1332, 1665, 1998];
     loop {
         match cursor.poll(&mut WorkBudget::new(1)) {
-            Ok(Mov9CursorStatus::Ready) => {
+            Ok(CursorStatus::Ready) => {
                 let occurrence = cursor.take_occurrence().unwrap();
                 assert_eq!(occurrence.source, original[0]);
-                assert_eq!(occurrence.native.dts, Some(expected[count]));
-                assert_eq!(occurrence.native.pts, Some(expected[count]));
+                assert_eq!(occurrence.demux.dts, Some(expected[count]));
+                assert_eq!(occurrence.demux.pts, Some(expected[count]));
                 assert_eq!(
-                    occurrence.native.duration,
+                    occurrence.demux.duration,
                     if count < 6 { 1000 } else { 333 }
                 );
                 count += 1;
             }
-            Ok(Mov9CursorStatus::Yield) => {}
-            Ok(Mov9CursorStatus::End) => break,
+            Ok(CursorStatus::Yield) => {}
+            Ok(CursorStatus::End) => break,
             result => panic!("unreviewed terminal result: {result:?}"),
         }
     }

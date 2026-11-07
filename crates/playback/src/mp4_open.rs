@@ -23,10 +23,10 @@ pub(crate) fn box_reader(
     native_recovery: bool,
 ) -> Result<BoxReader> {
     if native_recovery {
-        BoxReader::new_pinned_mov_recovery(
+        BoxReader::new_recovery(
             input,
             metadata_bytes,
-            iso::PinnedMovD32RegularRecoveryV1,
+            iso::compat::mov::recovery::RunRecoveryProfile,
         )
     } else {
         BoxReader::new(input, metadata_bytes)
@@ -491,7 +491,7 @@ impl<S: Source> Mp4Open<S> {
 
     /// Admit terminal media declarations for the explicit pinned native
     /// recovery view. SourcePhysical uses the strict opener.
-    pub fn new_pinned_mov_recovery(selected: SelectedInput<S>, limits: OpenLimits) -> Result<Self> {
+    pub fn new_recovery(selected: SelectedInput<S>, limits: OpenLimits) -> Result<Self> {
         Self::new_inner(selected, limits, true, false)
     }
 
@@ -793,11 +793,11 @@ impl<S: Source> Mp4Open<S> {
         let mdhd = p.mdhd.as_ref().ok_or(Error::Invalid("missing mdhd"))?;
         let hdlr = p.hdlr.as_ref().ok_or(Error::Invalid("missing hdlr"))?;
         let header = if self.native_recovery {
-            iso::Mov9RecoveryTrackHeader::parse(
+            iso::compat::mov::recovery::RecoveryTrackHeader::parse(
                 tkhd,
                 mdhd,
                 hdlr,
-                iso::PinnedMovD32RegularRecoveryV1,
+                iso::compat::mov::recovery::RunRecoveryProfile,
             )?
             .into_source()
         } else {
@@ -1049,7 +1049,7 @@ impl<S: Source> Mp4Open<S> {
                         .ok_or(Error::Invalid("traf missing"))?
                         .clone();
                     let build = if self.native_recovery {
-                        FragmentBuilder::new_pinned_mov_header
+                        FragmentBuilder::new_header_open
                     } else {
                         FragmentBuilder::new
                     };
