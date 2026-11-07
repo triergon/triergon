@@ -8,7 +8,7 @@ use crate::matroska::{SeekReceipt as MatroskaSeek, Track};
 use crate::typed::{Event, Packet, Reader};
 use std::sync::atomic::AtomicBool;
 use triergon_core::container::{
-    ColourDescription, ColourRange, ContainerReader, ContentLight, Event as Neutral,
+    CodecId, ColourDescription, ColourRange, ContainerReader, ContentLight, Event as Neutral,
     MasteringDisplay, MediaKind, Origin, PacketInfo, RandomAccess, ReaderStep, SeekMethod,
     SeekPolicy, SeekReceipt, SeekRequest, Sourced, TrackId, TrackInfo, Trim,
 };
@@ -79,6 +79,9 @@ impl TrackInfo for Track {
     fn codec_tag(&self) -> &[u8] {
         self.codec.as_str().as_bytes()
     }
+    fn codec(&self) -> CodecId<'_> {
+        codec_id(self.codec.as_str())
+    }
     fn configuration(&self) -> &[u8] {
         &self.codec_private
     }
@@ -94,6 +97,33 @@ impl TrackInfo for Track {
     fn colour(&self) -> Option<ColourDescription> {
         let colour = self.colour.as_ref()?;
         Some(colour.description(colour_presence(&self.source_metadata)))
+    }
+}
+
+/// The one mapping from a Matroska CodecID. The comparison is exact, so an
+/// unlisted CodecID, including a longer form of a listed one, stays
+/// [`CodecId::Other`].
+fn codec_id(codec: &str) -> CodecId<'_> {
+    match codec {
+        "V_MPEG4/ISO/AVC" => CodecId::H264,
+        "V_MPEGH/ISO/HEVC" => CodecId::Hevc,
+        "V_AV1" => CodecId::Av1,
+        "V_VP9" => CodecId::Vp9,
+        "A_AAC" => CodecId::Aac,
+        "A_AC3" | "A_AC3/BSID9" | "A_AC3/BSID10" => CodecId::Ac3,
+        "A_EAC3" => CodecId::Eac3,
+        "A_DTS" => CodecId::Dts,
+        "A_VORBIS" => CodecId::Vorbis,
+        "A_OPUS" => CodecId::Opus,
+        "A_PCM/INT/LIT" => CodecId::Pcm,
+        "S_TEXT/UTF8" => CodecId::Utf8Text,
+        "S_TEXT/ASS" => CodecId::Ass,
+        "S_TEXT/SSA" => CodecId::Ssa,
+        "S_TEXT/WEBVTT" => CodecId::WebVtt,
+        "S_VOBSUB" => CodecId::VobSub,
+        "S_DVBSUB" => CodecId::DvbSubtitle,
+        "S_HDMV/PGS" => CodecId::Pgs,
+        other => CodecId::Other(other.as_bytes()),
     }
 }
 
@@ -239,5 +269,54 @@ impl ContainerReader for Reader {
     }
     fn capabilities(&self) -> SourceCapabilities {
         Reader::capabilities(self)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn every_recognised_codec_id_has_one_name() {
+        for (tag, id) in [
+            ("V_MPEG4/ISO/AVC", CodecId::H264),
+            ("V_MPEGH/ISO/HEVC", CodecId::Hevc),
+            ("V_AV1", CodecId::Av1),
+            ("V_VP9", CodecId::Vp9),
+            ("A_AAC", CodecId::Aac),
+            ("A_AC3", CodecId::Ac3),
+            ("A_AC3/BSID9", CodecId::Ac3),
+            ("A_AC3/BSID10", CodecId::Ac3),
+            ("A_EAC3", CodecId::Eac3),
+            ("A_DTS", CodecId::Dts),
+            ("A_VORBIS", CodecId::Vorbis),
+            ("A_OPUS", CodecId::Opus),
+            ("A_PCM/INT/LIT", CodecId::Pcm),
+            ("S_TEXT/UTF8", CodecId::Utf8Text),
+            ("S_TEXT/ASS", CodecId::Ass),
+            ("S_TEXT/SSA", CodecId::Ssa),
+            ("S_TEXT/WEBVTT", CodecId::WebVtt),
+            ("S_VOBSUB", CodecId::VobSub),
+            ("S_DVBSUB", CodecId::DvbSubtitle),
+            ("S_HDMV/PGS", CodecId::Pgs),
+        ] {
+            assert_eq!(codec_id(tag), id, "{tag}");
+        }
+    }
+
+    #[test]
+    fn an_unrecognised_codec_id_is_reported_with_its_own_bytes() {
+        for tag in [
+            "",
+            "V_VP8",
+            "A_FLAC",
+            "A_DTS/LOSSLESS",
+            "A_AAC/MPEG4/LC",
+            "A_PCM/INT/BIG",
+            "a_aac",
+            "V_AUTHORED/OPAQUE",
+        ] {
+            assert_eq!(codec_id(tag), CodecId::Other(tag.as_bytes()));
+        }
     }
 }

@@ -80,7 +80,7 @@ works in generic code and inside `triergon::AnyReader`:
 | Neutral view | Matroska source |
 |---|---|
 | `PacketInfo` | `typed::Packet`: time base nanoseconds (TimestampScale applied), `pts`/`duration` from the packet, `dts` `None`, `RandomAccess` from the Block keyframe flag, `Trim::end` from DiscardPadding |
-| `TrackInfo` | `matroska::Track`: `TrackId` = TrackNumber, `codec_tag` = CodecID, `configuration` = CodecPrivate, effective language, default and forced flags, `colour` as a `ColourDescription` with `Origin::SpecificationDefault` for omitted Colour children |
+| `TrackInfo` | `matroska::Track`: `TrackId` = TrackNumber, `codec_tag` = CodecID, `codec` from an exact CodecID match with any other CodecID as `CodecId::Other`, `configuration` = CodecPrivate, effective language, default and forced flags, `colour` as a `ColourDescription` with `Origin::SpecificationDefault` for omitted Colour children |
 | `Event::Seek` | `matroska::SeekReceipt::neutral()`: method `Index` or `BoundedScan`; Cue and preroll detail stay on the Matroska receipt |
 | `Event::Other` | the other `typed::Event`s (Envelope, Configuration, Document) |
 

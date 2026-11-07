@@ -67,6 +67,9 @@ All readers follow the same semantic rules, and the harness checks them:
 6. A seek returns a receipt with the actual landing point, the preceding
    random-access point, preroll and the method used (index, bounded scan or restart).
    A timestamp alone is not proof that the next packet is decodable.
+7. A track reports its container's own codec tag unchanged and one neutral `CodecId`.
+   Each reader owns one mapping from its native identifier. A codec the source does
+   not identify is `CodecId::Other` with that tag, never a guess.
 
 ## Reference-compatible behaviour
 

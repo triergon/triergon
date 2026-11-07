@@ -61,7 +61,7 @@ assert_eq!(base.rescale(183_003, TimeBase::new(1, 1000)?, Rounding::Floor)?, 203
 | Input | `InputCursor`, `InputRequest`, `InputWindow`, `InputToken`, `SourceId`, `SourceCapabilities`, `SourceLocation`, `SourceFailure` |
 | Steps | `Step<T, B>`, `Backpressure` |
 | Work | `WorkBudget` |
-| Container model | module `container`: `ContainerReader`, `ReaderStep`, `Event`, `PacketInfo`, `TrackInfo`, `TrackId`, `MediaKind`, `RandomAccess`, `Trim`, seek and colour types |
+| Container model | module `container`: `ContainerReader`, `ReaderStep`, `Event`, `PacketInfo`, `TrackInfo`, `TrackId`, `MediaKind`, `CodecId`, `RandomAccess`, `Trim`, seek and colour types |
 | Errors | `Error`, `Result`, `FreezeError`, `PushError<T>`, `TransferError` |
 
 ## Behaviour and limits
@@ -149,7 +149,7 @@ type.
 | `ReaderStep<R>` | What `step` returns: `Step<Event<R::Packet, R::Other>, Backpressure>` |
 | `Event<P, X>` | `Packet(P)`, `Seek(SeekReceipt)` or `Other(X)` (configuration, documents, structure) |
 | `PacketInfo` | `track`, `payload`, `time_base`, `pts`, `dts`, `duration` (ticks in `time_base`), `random_access`, `trim`, and `pts_time` as exact `Time` |
-| `TrackInfo` | `id`, `kind`, `codec_tag` (the container's own identifier, unnormalised), `configuration` (codec configuration bytes), `language`, `default_track`, `forced`, `colour` |
+| `TrackInfo` | `id`, `kind`, `codec_tag` (the container's own identifier, unnormalised), `codec` (the `CodecId` the reader identifies from it), `configuration` (codec configuration bytes), `language`, `default_track`, `forced`, `colour` |
 | `TrackId` | Matroska TrackNumber, ISO BMFF track_ID or MPEG-TS elementary PID |
 | `MediaKind`, `RandomAccess`, `Trim` | `Video`/`Audio`/`Subtitle`/`Data`/`Unknown`; `Sync`/`NotSync`/`Unknown`; samples to discard at start and end |
 | `SeekRequest`, `SeekPolicy` | track, target `Time`, `PreviousRandomAccess` or `PlaybackPreroll` |

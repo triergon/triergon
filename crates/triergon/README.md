@@ -44,7 +44,7 @@ loop {
 }
 for i in 0..reader.track_count() {
     let track = reader.track(i).ok_or("no such track")?; // &dyn TrackInfo
-    // track.id(), track.kind(), track.codec_tag(), track.configuration(), track.colour()
+    // track.id(), track.kind(), track.codec(), track.codec_tag(), track.configuration()
 }
 # Ok::<(), Box<dyn std::error::Error>>(())
 ```
@@ -66,7 +66,7 @@ Re-exported from triergon-core, independent of features:
 
 | Area | Items |
 |---|---|
-| Container model | `ContainerReader`, `ReaderStep`, `Event`, `PacketInfo`, `TrackInfo`, `TrackId`, `MediaKind`, `RandomAccess`, `Trim`, `SeekRequest`, `SeekPolicy`, `SeekReceipt`, `SeekMethod`, `ColourDescription`, `ColourRange`, `MasteringDisplay`, `ContentLight`, `Sourced`, `Origin` |
+| Container model | `ContainerReader`, `ReaderStep`, `Event`, `PacketInfo`, `TrackInfo`, `TrackId`, `MediaKind`, `CodecId`, `RandomAccess`, `Trim`, `SeekRequest`, `SeekPolicy`, `SeekReceipt`, `SeekMethod`, `ColourDescription`, `ColourRange`, `MasteringDisplay`, `ContentLight`, `Sourced`, `Origin` |
 | Input and work | `Step`, `Backpressure`, `InputRequest`, `InputWindow`, `InputToken`, `SourceId`, `SourceCapabilities`, `SourceLocation`, `SourceFailure`, `WorkBudget` |
 | Storage, time, errors | `Budget`, `Bytes`, `Time`, `TimeBase`, `Error`, `Result` |
 
