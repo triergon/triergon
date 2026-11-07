@@ -37,6 +37,10 @@ impl HlsHevcPicture {
         self.size
     }
 
+    pub(crate) fn feed_spans(&self) -> impl Iterator<Item = &[u8]> {
+        self.unit.segments()
+    }
+
     /// Copy the original Annex B extent into a contiguous queue payload.
     pub(crate) fn contiguous_feed(&self, pool: &Budget) -> Result<Bytes> {
         if self
@@ -49,7 +53,7 @@ impl HlsHevcPicture {
         }
         let mut feed = BudgetVec::new(pool);
         feed.try_reserve_exact(self.size)?;
-        for span in self.unit.segments() {
+        for span in self.feed_spans() {
             feed.try_extend_from_slice(span)?;
         }
         feed.freeze().map_err(|error| error.error)
@@ -699,6 +703,10 @@ mod tests {
             .zip([first.as_slice(), &second, &third, &fourth])
         {
             assert_eq!(picture.feed_size(), bytes.len());
+            assert_eq!(
+                picture.feed_spans().flatten().copied().collect::<Vec<_>>(),
+                bytes
+            );
             assert_eq!(
                 picture.contiguous_feed(&fixture.pool).unwrap().as_ref(),
                 bytes

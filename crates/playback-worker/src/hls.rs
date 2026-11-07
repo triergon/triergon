@@ -153,7 +153,7 @@ fn open_segment(pool: &Budget, raw: &Bytes, profile: HlsMediaProfile) -> Result<
     Err("segment never reached logical EOF".into())
 }
 
-fn measure(pool: &Budget, segment: Segment) -> Result<Work> {
+fn measure(segment: Segment) -> Result<Work> {
     let mut work = Work::default();
     let (video_tail, audio_tail, feed_bytes, count) = match segment {
         Segment::AvcAac(segment) => {
@@ -192,14 +192,13 @@ fn measure(pool: &Budget, segment: Segment) -> Result<Work> {
                     match unit {
                         HlsFeedUnit::Video(unit) if video_pass => {
                             let clock = unit.clock().ok_or("missing video PES clock")?;
-                            let bytes = unit.contiguous_feed(pool)?;
                             work.video(
                                 clock.pts90.ok_or("missing video PTS")?,
                                 clock.dts90.ok_or("missing video DTS")?,
                                 unit.random_access(),
                                 (raster.width, raster.height),
-                                bytes.len(),
-                                [bytes.as_ref()],
+                                unit.feed_spans().map(<[u8]>::len).sum(),
+                                unit.feed_spans(),
                             )?;
                         }
                         HlsFeedUnit::Audio(unit, clock) if !video_pass => {
@@ -274,7 +273,7 @@ pub fn run(args: &[String]) -> Result<()> {
     let mut total = Work::default();
     for _ in 0..iterations {
         let segment = open_segment(&pool, std::hint::black_box(&raw), profile)?;
-        let work = measure(&pool, segment)?;
+        let work = measure(segment)?;
         total.mix(work.digest);
         total.packets += work.packets;
         total.bytes += work.bytes;
