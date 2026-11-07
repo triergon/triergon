@@ -64,16 +64,16 @@ impl Vlc {
     pub(crate) fn read(&self, r: &mut BitReader<'_>) -> Option<u16> {
         let (s, l) = self.table[r.peek(self.bits) as usize];
         if l > 0 {
-            r.skip((l as u32) as usize);
+            r.skip(l as usize);
             Some(s)
         } else if l < 0 {
-            r.skip((self.bits) as usize);
+            r.skip(self.bits as usize);
             let sub = (-l) as u32;
             let (s2, l2) = self.table[s as usize + r.peek(sub) as usize];
             if l2 <= 0 {
                 return None;
             }
-            r.skip((l2 as u32) as usize);
+            r.skip(l2 as usize);
             Some(s2)
         } else {
             None
@@ -187,7 +187,7 @@ fn read_run_before(r: &mut BitReader<'_>, zeros_left: i32) -> i32 {
     ];
     if zeros_left <= 6 {
         let (v, l) = T[(zeros_left - 1) as usize][r.peek(3) as usize];
-        r.skip((l as u32) as usize);
+        r.skip(l as usize);
         v as i32
     } else {
         let w = r.peek(16);
@@ -196,7 +196,7 @@ fn read_run_before(r: &mut BitReader<'_>, zeros_left: i32) -> i32 {
             7 - (w >> 13) as i32
         } else {
             let lz = w.leading_zeros() - 16;
-            r.skip(((lz + 1).min(16)) as usize);
+            r.skip((lz + 1).min(16) as usize);
             4 + lz as i32
         }
     }

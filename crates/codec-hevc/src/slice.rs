@@ -433,7 +433,7 @@ pub fn parse_slice_header(
             let len = r.ue_max(31, "offset_len_minus1")? + 1;
             sh.entry_points.reserve(n as usize);
             for _ in 0..n {
-                let v = if len == 32 { r.read(32)? } else { r.read(len)? };
+                let v = r.read(len)?;
                 sh.entry_points.push(v.wrapping_add(1));
             }
         }

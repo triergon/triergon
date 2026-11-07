@@ -3,6 +3,7 @@ use crate::{
     DtsCoreField as F, DtsInspectionIssues as I, DtsInspectionSourceStatus, DtsInspectionViews,
     FieldObservation,
 };
+use triergon_bitstream::bits_at;
 use triergon_core::{Error, Result, Time};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -113,10 +114,7 @@ pub fn inspect_dts_header_bits(storage: &[u8], valid_bits: usize) -> Result<DtsP
         }
         let width = usize::from(field.width());
         let count = width.min(available - position);
-        let mut prefix = 0_u32;
-        for bit in position..position + count {
-            prefix = (prefix << 1) | u32::from((storage[bit / 8] >> (7 - bit % 8)) & 1);
-        }
+        let prefix = bits_at(storage, position, count as u32).ok_or(Error::Truncated)?;
         fields[field as usize] = FieldObservation::Bits {
             offset: u16::try_from(position).map_err(|_| Error::Overflow)?,
             width: field.width(),
