@@ -382,7 +382,7 @@ static int progressive_main(int argc, char **argv) {
     const unsigned iterations = bench ? 50 : 1;
     const int require_streaming = !strcmp(argv[argc - 1], "before-eof");
     ProgressiveWork total = {0};
-    if (mem && (puts("TRIERGON_BEGIN_V1") == EOF || fflush(stdout)))
+    if (mem && write(STDOUT_FILENO, "TRIERGON_BEGIN_V1\n", 18) != 18)
         return 1;
     const uint64_t start = bench ? progressive_now_ns() : 0;
     if (bench && !start)
@@ -403,7 +403,7 @@ static int progressive_main(int argc, char **argv) {
     uint64_t end = bench ? progressive_now_ns() : 0;
     if (bench && end <= start)
         return 1;
-    if (mem && (puts("TRIERGON_END_V1") == EOF || fflush(stdout)))
+    if (mem && write(STDOUT_FILENO, "TRIERGON_END_V1\n", 16) != 16)
         return 1;
     printf("{\"schema\":1,\"operation\":\"" PROGRESSIVE_OPERATION "\",\"iterations\":%u"
            ",\"packets\":%" PRIu64 ",\"bytes\":%" PRIu64 ",\"digest\":%" PRIu64
