@@ -128,6 +128,16 @@ impl<'a, W: Window> Reader<'a, W> {
         }
     }
 
+    /// A reader over the first `end` bits of `data`. The bytes after them stay readable;
+    /// only [`Reader::overrun`], [`Reader::left`] and [`Reader::more_rbsp_data`] measure
+    /// from `end`.
+    #[must_use]
+    pub fn with_end(data: &'a [u8], end: usize) -> Self {
+        let mut reader = Self::new(data);
+        reader.end = end;
+        reader
+    }
+
     #[inline(always)]
     fn window(&mut self) -> u64 {
         self.window.at(self.data, self.position)
@@ -137,6 +147,13 @@ impl<'a, W: Window> Reader<'a, W> {
     #[inline(always)]
     pub fn peek32(&mut self) -> u32 {
         (self.window() >> 32) as u32
+    }
+
+    /// The next `width` bits (1 to 32) without consuming them.
+    #[inline(always)]
+    pub fn peek(&mut self, width: u32) -> u32 {
+        debug_assert!((1..=32).contains(&width));
+        (self.window() >> (64 - width)) as u32
     }
 
     /// The next `width` bits (at most 32) as an unsigned value.
@@ -161,6 +178,62 @@ impl<'a, W: Window> Reader<'a, W> {
     #[inline(always)]
     pub fn bit(&mut self) -> bool {
         self.read(1) != 0
+    }
+
+    /// ue(v), with a code number above `u32::MAX` read as `u32::MAX`. The zeros past the
+    /// end of the slice make a truncated code long, so a decoder sees an out-of-range value
+    /// and [`Reader::overrun`].
+    #[inline(always)]
+    pub fn ue(&mut self) -> u32 {
+        let window = self.window();
+        let zeros = window.leading_zeros();
+        if zeros <= 15 {
+            let length = 2 * zeros + 1;
+            self.position += length as usize;
+            (window >> (64 - length)) as u32 - 1
+        } else {
+            self.long_ue()
+        }
+    }
+
+    #[cold]
+    fn long_ue(&mut self) -> u32 {
+        let mut zeros = 0;
+        while self.read(1) == 0 {
+            zeros += 1;
+            if zeros > 32 || self.position > self.end + 64 {
+                return u32::MAX;
+            }
+        }
+        if zeros == 32 {
+            return u32::MAX;
+        }
+        let low_bits = zeros.min(16);
+        let high = u64::from(self.read(zeros - low_bits));
+        let low = u64::from(self.read(low_bits));
+        ((1u64 << zeros) - 1 + ((high << low_bits) | low)).min(u64::from(u32::MAX)) as u32
+    }
+
+    /// se(v), over the code numbers of [`Reader::ue`].
+    #[inline(always)]
+    pub fn se(&mut self) -> i32 {
+        let code = i64::from(self.ue());
+        if code & 1 == 1 {
+            ((code + 1) >> 1) as i32
+        } else {
+            (-(code >> 1)) as i32
+        }
+    }
+
+    /// more_rbsp_data(): true when a bit before the last set bit of the first
+    /// [`Reader::end`] bits is still unread.
+    #[must_use]
+    pub fn more_rbsp_data(&self) -> bool {
+        let bytes = self.data.get(..self.end / 8).unwrap_or(self.data);
+        let Some(last) = bytes.iter().rposition(|&byte| byte != 0) else {
+            return false;
+        };
+        self.position < last * 8 + (7 - bytes[last].trailing_zeros() as usize)
     }
 
     /// Passes over `count` bits.
@@ -193,6 +266,12 @@ impl<'a, W: Window> Reader<'a, W> {
     #[must_use]
     pub fn left(&self) -> isize {
         self.end as isize - self.position as isize
+    }
+
+    /// The whole slice, including the bits already read.
+    #[must_use]
+    pub fn data(&self) -> &'a [u8] {
+        self.data
     }
 
     /// True when a read went past the end.
@@ -293,6 +372,63 @@ mod tests {
         }
         reader.seek(3);
         assert_eq!(reader.read(32), scalar(3, 32));
+    }
+
+    #[test]
+    fn exp_golomb() {
+        // 1 | 010 | 011 | 00100 | 00101
+        let data = [0b1010_0110, 0b0100_0010, 0b1000_0000];
+        let mut reader = CachedBitReader::new(&data);
+        assert_eq!(reader.ue(), 0);
+        assert_eq!(reader.ue(), 1);
+        assert_eq!(reader.ue(), 2);
+        assert_eq!(reader.ue(), 3);
+        assert_eq!(reader.se(), -2);
+        assert_eq!(reader.position(), 17);
+    }
+
+    #[test]
+    fn long_exp_golomb_matches_the_checked_codes() {
+        use crate::{BitCursor, BitSource};
+        for zeros in 0..=31u32 {
+            let mut bits = vec![false; zeros as usize];
+            bits.push(true);
+            bits.extend((0..zeros).map(|bit| bit % 3 != 0));
+            let mut bytes = vec![0u8; bits.len().div_ceil(8) + 8];
+            for (at, &bit) in bits.iter().enumerate() {
+                bytes[at / 8] |= u8::from(bit) << (7 - at % 8);
+            }
+            let mut reader = CachedBitReader::new(&bytes);
+            let mut cursor = BitCursor::new(&bytes);
+            assert_eq!(reader.ue(), cursor.ue().unwrap());
+            assert_eq!(reader.position(), cursor.position());
+            let mut reader = CachedBitReader::new(&bytes);
+            let mut cursor = BitCursor::new(&bytes);
+            assert_eq!(reader.se(), cursor.se().unwrap());
+        }
+    }
+
+    #[test]
+    fn broken_exp_golomb_stops_with_the_largest_value() {
+        // 32 zeros and a one: the code is outside ue(v).
+        let mut reader = CachedBitReader::new(&[0, 0, 0, 0, 0x80, 0, 0, 0, 0]);
+        assert_eq!(reader.ue(), u32::MAX);
+        assert_eq!(reader.position(), 33);
+        // All zeros past the end: 33 zeros are enough.
+        let mut reader = CachedBitReader::new(&[]);
+        assert_eq!(reader.ue(), u32::MAX);
+        assert_eq!(reader.position(), 33);
+        assert!(reader.overrun());
+    }
+
+    #[test]
+    fn more_rbsp_data_stops_at_the_stop_bit() {
+        let data = [0b1100_0000, 0b1010_0000, 0, 0];
+        let mut reader = BitReader::with_end(&data, 16);
+        assert!(reader.more_rbsp_data());
+        reader.skip(10);
+        assert!(!reader.more_rbsp_data());
+        assert!(!BitReader::new(&[0, 0]).more_rbsp_data());
     }
 
     #[test]

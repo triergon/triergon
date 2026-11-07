@@ -2,9 +2,9 @@
 //! weight table (7.3.3.2) and decoded reference picture marking (7.3.3.3).
 
 use crate::DecodeError;
-use crate::bitreader::BitReader;
 use crate::nal::NalHeader;
 use crate::ps::{Pps, R, Sps};
+use triergon_bitstream::BitReader;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) enum SliceType {
@@ -104,15 +104,15 @@ pub(crate) fn parse_slice_header(
     };
     let idr = nal.nal_unit_type == 5;
     if sps.separate_colour_plane {
-        r.u(2);
+        r.read(2);
     }
-    let frame_num = r.u(sps.log2_max_frame_num);
+    let frame_num = r.read(sps.log2_max_frame_num);
     let mut field_pic = false;
     let mut bottom_field = false;
     if !sps.frame_mbs_only {
-        field_pic = r.flag();
+        field_pic = r.bit();
         if field_pic {
-            bottom_field = r.flag();
+            bottom_field = r.bit();
         }
     }
     let mbaff = sps.mb_adaptive_frame_field && !field_pic;
@@ -128,7 +128,7 @@ pub(crate) fn parse_slice_header(
     let mut delta_poc_bottom = 0;
     let mut delta_poc = [0; 2];
     if sps.poc_type == 0 {
-        poc_lsb = r.u(sps.log2_max_poc_lsb);
+        poc_lsb = r.read(sps.log2_max_poc_lsb);
         if pps.bottom_field_pic_order_in_frame_present && !field_pic {
             delta_poc_bottom = r.se();
         }
@@ -145,11 +145,11 @@ pub(crate) fn parse_slice_header(
     }
     let mut direct_spatial_mv_pred = false;
     if slice_type == SliceType::B {
-        direct_spatial_mv_pred = r.flag();
+        direct_spatial_mv_pred = r.bit();
     }
     let mut num_ref_idx_active = pps.num_ref_idx_default;
     if matches!(slice_type, SliceType::P | SliceType::SP | SliceType::B) {
-        if r.flag() {
+        if r.bit() {
             num_ref_idx_active[0] = r.ue() + 1;
             if slice_type == SliceType::B {
                 num_ref_idx_active[1] = r.ue() + 1;
@@ -176,7 +176,7 @@ pub(crate) fn parse_slice_header(
         } else {
             slice_type == SliceType::B
         };
-        if present && r.flag() {
+        if present && r.bit() {
             loop {
                 let idc = r.ue();
                 if idc == 3 {
@@ -211,7 +211,7 @@ pub(crate) fn parse_slice_header(
         let nlists = if slice_type == SliceType::B { 2 } else { 1 };
         for list in 0..nlists {
             for entry in w[list].iter_mut().take(num_ref_idx_active[list] as usize) {
-                if r.flag() {
+                if r.bit() {
                     let lw = r.se();
                     let lo = r.se();
                     if !(-128..=127).contains(&lw) || !(-128..=127).contains(&lo) {
@@ -219,7 +219,7 @@ pub(crate) fn parse_slice_header(
                     }
                     entry.luma = Some((lw, lo));
                 }
-                if chroma && r.flag() {
+                if chroma && r.bit() {
                     for c in &mut entry.chroma {
                         let cw = r.se();
                         let co = r.se();
@@ -239,10 +239,10 @@ pub(crate) fn parse_slice_header(
     let mut mmcos = Vec::new();
     if nal.nal_ref_idc != 0 {
         if idr {
-            no_output_of_prior_pics = r.flag();
-            long_term_reference_flag = r.flag();
+            no_output_of_prior_pics = r.bit();
+            long_term_reference_flag = r.bit();
         } else {
-            adaptive_ref_pic_marking = r.flag();
+            adaptive_ref_pic_marking = r.bit();
             if adaptive_ref_pic_marking {
                 loop {
                     let op = r.ue();
@@ -286,7 +286,7 @@ pub(crate) fn parse_slice_header(
     }
     if matches!(slice_type, SliceType::SP | SliceType::SI) {
         if slice_type == SliceType::SP {
-            r.flag();
+            r.bit();
         }
         r.se();
     }
@@ -341,6 +341,6 @@ pub(crate) fn parse_slice_header(
         slice_alpha_c0_offset,
         slice_beta_offset,
         mbaff,
-        data_bit_pos: r.pos(),
+        data_bit_pos: r.position(),
     })
 }

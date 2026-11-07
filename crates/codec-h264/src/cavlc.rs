@@ -1,9 +1,9 @@
 //! CAVLC residual parsing (clause 9.2) with two-level lookup tables built from the
 //! spec tables in `tables_vlc` (Tables 9-5, 9-7, 9-8, 9-9, 9-10).
 
-use crate::bitreader::BitReader;
 use crate::tables_vlc::*;
 use std::sync::OnceLock;
+use triergon_bitstream::BitReader;
 
 /// Two-level VLC lookup table. Entry: (symbol or subtable base, length or -subtable_bits).
 pub(crate) struct Vlc {
@@ -64,16 +64,16 @@ impl Vlc {
     pub(crate) fn read(&self, r: &mut BitReader<'_>) -> Option<u16> {
         let (s, l) = self.table[r.peek(self.bits) as usize];
         if l > 0 {
-            r.skip(l as u32);
+            r.skip((l as u32) as usize);
             Some(s)
         } else if l < 0 {
-            r.skip(self.bits);
+            r.skip((self.bits) as usize);
             let sub = (-l) as u32;
             let (s2, l2) = self.table[s as usize + r.peek(sub) as usize];
             if l2 <= 0 {
                 return None;
             }
-            r.skip(l2 as u32);
+            r.skip((l2 as u32) as usize);
             Some(s2)
         } else {
             None
@@ -187,7 +187,7 @@ fn read_run_before(r: &mut BitReader<'_>, zeros_left: i32) -> i32 {
     ];
     if zeros_left <= 6 {
         let (v, l) = T[(zeros_left - 1) as usize][r.peek(3) as usize];
-        r.skip(l as u32);
+        r.skip((l as u32) as usize);
         v as i32
     } else {
         let w = r.peek(16);
@@ -196,7 +196,7 @@ fn read_run_before(r: &mut BitReader<'_>, zeros_left: i32) -> i32 {
             7 - (w >> 13) as i32
         } else {
             let lz = w.leading_zeros() - 16;
-            r.skip((lz + 1).min(16));
+            r.skip(((lz + 1).min(16)) as usize);
             4 + lz as i32
         }
     }
@@ -246,7 +246,7 @@ fn residual_block_inner(
     };
     let sym = if vt == 3 {
         // 8 <= nC: 6-bit fixed length code (Table 9-5 column 4: xxxxyy with special 000011).
-        let v = r.u(6);
+        let v = r.read(6);
         if v == 3 {
             0
         } else {
@@ -271,7 +271,7 @@ fn residual_block_inner(
     let mut level_val = [0i32; 16];
     // Trailing ones signs.
     if t1s > 0 {
-        let signs = r.u(t1s as u32);
+        let signs = r.read(t1s as u32);
         for i in 0..t1s {
             level_val[i] = if (signs >> (t1s - 1 - i)) & 1 != 0 {
                 -1
@@ -297,14 +297,14 @@ fn residual_block_inner(
             suffix_length
         };
         let level_suffix = if level_suffix_size == 0 {
-            r.skip(lz + 1);
+            r.skip((lz + 1) as usize);
             0
         } else if lz + 1 + level_suffix_size <= 32 {
-            r.skip(lz + 1 + level_suffix_size);
+            r.skip((lz + 1 + level_suffix_size) as usize);
             ((w << (lz + 1)) >> (32 - level_suffix_size)) as i32
         } else {
-            r.skip(lz + 1);
-            r.u(level_suffix_size) as i32
+            r.skip((lz + 1) as usize);
+            r.read(level_suffix_size) as i32
         };
         let mut level_code = ((level_prefix.min(15) as i32) << suffix_length) + level_suffix;
         if level_prefix >= 15 && suffix_length == 0 {
@@ -387,15 +387,15 @@ mod tests {
             for bits in 0u32..(1 << 12) {
                 let mut buf = vec![0u8; 32];
                 buf[..4].copy_from_slice(&((bits << 20) | 0x8_0000).to_be_bytes());
-                let mut a = BitReader::new(&buf, 8);
-                let mut b = BitReader::new(&buf, 8);
+                let mut a = BitReader::with_end(&buf, 8 * 8);
+                let mut b = BitReader::with_end(&buf, 8 * 8);
                 let va = t.run_before[(zl.min(7) - 1) as usize].read(&mut a);
                 let vb = read_run_before(&mut b, zl);
                 if let Some(va) = va
                     && va as i32 <= zl
                 {
                     assert_eq!(va as i32, vb, "zl {zl} bits {bits:012b}");
-                    assert_eq!(a.pos(), b.pos());
+                    assert_eq!(a.position(), b.position());
                 }
             }
         }
@@ -423,9 +423,9 @@ mod tests {
                 let mut buf = vec![0u8; 32];
                 let v = (code as u64) << (64 - len as u32);
                 buf[..8].copy_from_slice(&v.to_be_bytes());
-                let mut r = BitReader::new(&buf, 8);
+                let mut r = BitReader::with_end(&buf, 8 * 8);
                 assert_eq!(vlc.read(&mut r), Some(sym));
-                assert_eq!(r.pos(), len as usize);
+                assert_eq!(r.position(), len as usize);
             }
         }
         for t in TOTAL_ZEROS_4X4
@@ -440,7 +440,7 @@ mod tests {
                 let mut buf = vec![0u8; 32];
                 let v = (code as u64) << (64 - len as u32);
                 buf[..8].copy_from_slice(&v.to_be_bytes());
-                let mut r = BitReader::new(&buf, 8);
+                let mut r = BitReader::with_end(&buf, 8 * 8);
                 assert_eq!(vlc.read(&mut r), Some(sym));
             }
         }

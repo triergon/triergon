@@ -1,7 +1,8 @@
 # triergon-codec-h264
 
 H.264/AVC decoder for Annex B byte streams, written from Rec. ITU-T H.264 (08/2024). It
-is a codec-layer crate whose only dependency is [triergon-codec](../codec/README.md)
+is a codec-layer crate that depends on [triergon-bitstream](../bitstream/README.md) and
+[triergon-codec](../codec/README.md)
 (it implements `VideoDecoder`) and builds on stable Rust. It
 decodes 8-bit 4:2:0 (and 4:0:0) Constrained Baseline, Main and High streams to cropped
 pictures in output order. It does not scale, convert colour or conceal damaged slices.

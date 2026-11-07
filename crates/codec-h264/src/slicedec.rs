@@ -2,12 +2,12 @@
 //! and the shared per-slice / per-picture contexts.
 
 use crate::DecodeError;
-use crate::bitreader::BitReader;
 use crate::cabac::Cabac;
 use crate::cavlc::{self, CavlcTables};
 use crate::mbinfo::*;
 use crate::picture::*;
 use crate::slice::{SliceHeader, SliceType};
+use triergon_bitstream::BitReader;
 
 /// Weighted prediction mode for a slice.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
@@ -146,8 +146,8 @@ impl<'a> SliceDecoder<'a> {
         rbsp: &'a [u8],
         rbsp_len: usize,
     ) -> SliceDecoder<'a> {
-        let mut br = BitReader::new(rbsp, rbsp_len);
-        br.set_pos(s.sh.data_bit_pos);
+        let mut br = BitReader::with_end(rbsp, rbsp_len * 8);
+        br.seek(s.sh.data_bit_pos);
         let qp = s.sh.slice_qp;
         let store = pic.store;
         let self_ref_possible = s.ref_list.iter().flatten().any(|r| r.idx == store);
@@ -549,9 +549,9 @@ impl<'a> SliceDecoder<'a> {
         let mut addr = sh.first_mb as usize * (1 + mbaff as usize);
         let is_i = sh.slice_type.is_intra();
         if cabac {
-            self.br.align();
-            let start = self.br.pos() / 8;
-            let len = self.br.len_bits() / 8;
+            self.br.align(8);
+            let start = self.br.position() / 8;
+            let len = self.br.end() / 8;
             let init_idx = if is_i {
                 0
             } else {
@@ -582,7 +582,7 @@ impl<'a> SliceDecoder<'a> {
                         self.begin_mb(addr)?;
                         if mbaff && addr & 1 == 0 && i + 1 == run && self.br.more_rbsp_data() {
                             // The bottom MB is coded and its mb_field_decoding_flag follows.
-                            let f = self.br.flag();
+                            let f = self.br.bit();
                             self.pending_field = Some(f);
                             self.set_field(f);
                         }
@@ -629,7 +629,7 @@ impl<'a> SliceDecoder<'a> {
                             if cabac {
                                 self.decode_field_flag_cabac()
                             } else {
-                                self.br.flag()
+                                self.br.bit()
                             }
                         }
                     };
