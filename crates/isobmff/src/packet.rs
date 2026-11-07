@@ -83,9 +83,15 @@ pub struct SampleReader {
     token: InputToken,
     position: u64,
     length: usize,
-    buffer: Option<BudgetVec<u8>>,
+    buffer: SampleBuffer,
     failed: Option<Error>,
-    mode: ReadMode,
+}
+
+#[derive(Debug)]
+enum SampleBuffer {
+    WaitingForWindow,
+    Copying(BudgetVec<u8>),
+    Complete,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -161,10 +167,13 @@ impl SampleReader {
                 maximum: maximum_packet,
             });
         }
-        let mut buffer = BudgetVec::new(input.budget());
-        if mode != ReadMode::SharedWindow {
+        let buffer = if mode == ReadMode::SharedWindow {
+            SampleBuffer::WaitingForWindow
+        } else {
+            let mut buffer = BudgetVec::new(input.budget());
             buffer.try_reserve_exact(length)?;
-        }
+            SampleBuffer::Copying(buffer)
+        };
         // Internal I/O transaction only; core preserves parser generation.
         if mode == ReadMode::SharedWindow && input.capabilities().random_access {
             input.request_range_reusing_window(sample.range.start)?;
@@ -177,9 +186,8 @@ impl SampleReader {
             source: input.source(),
             token: input.token(),
             length,
-            buffer: Some(buffer),
+            buffer,
             failed: None,
-            mode,
         })
     }
     pub fn poll(
@@ -217,7 +225,8 @@ impl SampleReader {
                 Step::NeedInput(r) => Step::NeedInput(r),
                 Step::Yield => Step::Yield,
                 Step::End(end) => {
-                    if self.buffer.as_ref().is_none_or(BudgetVec::is_empty) {
+                    if !matches!(&self.buffer, SampleBuffer::Copying(buffer) if !buffer.is_empty())
+                    {
                         return Err(Error::Truncated);
                     }
                     if !work.try_charge(1) {
@@ -255,53 +264,68 @@ impl SampleReader {
             return Err(Error::SourceMismatch);
         }
         let current = input.token();
-        if current.generation() != self.token.generation() {
-            return Err(Error::StaleGeneration {
-                expected: self.token.generation(),
-                received: current.generation(),
-            });
-        }
-        if current.request() != self.token.request() {
-            return Err(Error::StaleRequest {
-                expected: self.token.request(),
-                received: current.request(),
-            });
-        }
         if self.token != current {
+            if current.generation() != self.token.generation() {
+                return Err(Error::StaleGeneration {
+                    expected: self.token.generation(),
+                    received: current.generation(),
+                });
+            }
+            if current.request() != self.token.request() {
+                return Err(Error::StaleRequest {
+                    expected: self.token.request(),
+                    received: current.request(),
+                });
+            }
             return Err(Error::ForeignPool);
         }
         if self.position != input.position() {
             return Err(Error::Invalid("input changed outside sample reader"));
         }
+        if matches!(self.buffer, SampleBuffer::WaitingForWindow) {
+            if self.length == 0 {
+                if !work.try_charge(1) {
+                    return Ok(Step::Yield);
+                }
+                let payload = Bytes::copy_from_slice(input.budget(), &[])?;
+                self.buffer = SampleBuffer::Complete;
+                return Ok(Step::Ready(self.packet(payload)));
+            }
+            let available = input.buffered().len();
+            if available == 0
+                || (available >= self.length
+                    && input.buffered_owner().is_some()
+                    && work.remaining() > self.length as u64)
+            {
+                return match input.read_span(self.length, work, cancel)? {
+                    Step::Ready(payload) => {
+                        work.take(1);
+                        self.position = input.position();
+                        self.buffer = SampleBuffer::Complete;
+                        Ok(Step::Ready(self.packet(payload)))
+                    }
+                    Step::NeedInput(request) => Ok(Step::NeedInput(request)),
+                    Step::Yield => Ok(Step::Yield),
+                    Step::End(end) => Ok(Step::End(end)),
+                };
+            }
+            if work.remaining() == 0 {
+                return Ok(Step::Yield);
+            }
+            let mut buffer = BudgetVec::new(input.budget());
+            buffer.try_reserve_exact(self.length)?;
+            self.buffer = SampleBuffer::Copying(buffer);
+        }
+        let SampleBuffer::Copying(buffer) = &mut self.buffer else {
+            return Err(Error::Invalid("sample reader completed"));
+        };
         loop {
-            let buffer = self
-                .buffer
-                .as_mut()
-                .ok_or(Error::Invalid("sample reader completed"))?;
             if buffer.len() == self.length {
                 if !work.try_charge(1) {
                     return Ok(Step::Yield);
                 }
                 let payload = self.freeze_buffer()?;
                 return Ok(Step::Ready(self.packet(payload)));
-            }
-            if self.mode == ReadMode::SharedWindow && buffer.is_empty() {
-                let available = input.buffered().len();
-                if available >= self.length
-                    && input.buffered_owner().is_some()
-                    && work.remaining() > self.length as u64
-                {
-                    let Step::Ready(payload) = input.read_span(self.length, work, cancel)? else {
-                        return Err(Error::Invalid("buffered sample unavailable"));
-                    };
-                    work.take(1);
-                    self.position = input.position();
-                    self.buffer = None;
-                    return Ok(Step::Ready(self.packet(payload)));
-                }
-                if available != 0 && work.remaining() != 0 {
-                    buffer.try_reserve_exact(self.length)?;
-                }
             }
             let maximum = self.length - buffer.len();
             match input.read_append(buffer, maximum, work, cancel)? {
@@ -323,14 +347,15 @@ impl SampleReader {
         }
     }
     fn freeze_buffer(&mut self) -> Result<Bytes> {
-        let buffer = self
-            .buffer
-            .take()
-            .ok_or(Error::Invalid("missing sample buffer"))?;
+        let SampleBuffer::Copying(buffer) =
+            std::mem::replace(&mut self.buffer, SampleBuffer::Complete)
+        else {
+            return Err(Error::Invalid("missing sample buffer"));
+        };
         match buffer.freeze() {
             Ok(bytes) => Ok(bytes),
             Err(failure) => {
-                self.buffer = Some(failure.buffer);
+                self.buffer = SampleBuffer::Copying(failure.buffer);
                 Err(failure.error)
             }
         }
