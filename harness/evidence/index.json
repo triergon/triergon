@@ -7752,7 +7752,7 @@
   },
   {
    "name": "capture-pipeline-memory-linux-arm64",
-   "retention": "keep",
+   "retention": "retained",
    "reason": "Capture correctness, runtime, peak heap and total resident peak across 15 cases",
    "key": "evidence/capture-pipeline-memory-linux-arm64/11f0572cf6d9294023340a35970f8fa5c4f6e75abfdab55d8e1fb67f0228f983.tar.gz",
    "sha256": "11f0572cf6d9294023340a35970f8fa5c4f6e75abfdab55d8e1fb67f0228f983"
@@ -7773,42 +7773,42 @@
   },
   {
    "name": "isobmff-runtime-linux-arm64",
-   "retention": "keep",
+   "retention": "retained",
    "reason": "ISO BMFF runtime for 972 open and index workloads",
    "key": "evidence/isobmff-runtime-linux-arm64/bac2ceeb165144a6a232509c33884c4987b4a440eb675f3c04de5a0da4fbc4a7.tar.gz",
    "sha256": "bac2ceeb165144a6a232509c33884c4987b4a440eb675f3c04de5a0da4fbc4a7"
   },
   {
    "name": "isobmff-index-memory-linux-arm64",
-   "retention": "keep",
+   "retention": "retained",
    "reason": "ISO BMFF heap and total resident peak for 972 open and index workloads",
    "key": "evidence/isobmff-index-memory-linux-arm64/fc26644112a092f7f63ec4a22716c8700d0486b295670590c198651801364f9c.tar.gz",
    "sha256": "fc26644112a092f7f63ec4a22716c8700d0486b295670590c198651801364f9c"
   },
   {
    "name": "isobmff-child-lookup-runtime-linux-arm64",
-   "retention": "keep",
+   "retention": "retained",
    "reason": "ISO BMFF runtime for 972 open and index workloads with child lookup",
    "key": "evidence/isobmff-child-lookup-runtime-linux-arm64/fca8e54cb9b2f0d55acc8ba9be2a5849992ae7996f3c3db551896477c3359525.tar.gz",
    "sha256": "fca8e54cb9b2f0d55acc8ba9be2a5849992ae7996f3c3db551896477c3359525"
   },
   {
    "name": "isobmff-child-lookup-memory-linux-arm64",
-   "retention": "keep",
+   "retention": "retained",
    "reason": "ISO BMFF heap and total resident peak with child lookup",
    "key": "evidence/isobmff-child-lookup-memory-linux-arm64/46cf8ac9041b147c96108de6e09fde26c47e12fd10161f7eee9661db95f8c89a.tar.gz",
    "sha256": "46cf8ac9041b147c96108de6e09fde26c47e12fd10161f7eee9661db95f8c89a"
   },
   {
    "name": "isobmff-index-replay-runtime-linux-arm64",
-   "retention": "keep",
+   "retention": "retained",
    "reason": "ISO BMFF index replay runtime including 18 one-byte index cases above 1.20",
    "key": "evidence/isobmff-index-replay-runtime-linux-arm64/3bbe7e9157dc3f2860ac7117368639faccbb6547fe8be8aa755b34d9479ec0e3.tar.gz",
    "sha256": "3bbe7e9157dc3f2860ac7117368639faccbb6547fe8be8aa755b34d9479ec0e3"
   },
   {
    "name": "isobmff-header-comparison-linux-arm64",
-   "retention": "keep",
+   "retention": "retained",
    "reason": "ISO BMFF open and index comparisons on native AArch64 Linux",
    "key": "evidence/isobmff-header-comparison-linux-arm64/f56d3fa78b8cc70222f58c7cfa9a17331b0924a9070c7ff6ecc6dc1f213561bc.tar.gz",
    "sha256": "f56d3fa78b8cc70222f58c7cfa9a17331b0924a9070c7ff6ecc6dc1f213561bc",
