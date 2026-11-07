@@ -8597,6 +8597,110 @@
      "sha256": "8a508a9571125909b3e082e84fc031e7f5ecb10a18d586647c94535ccdad41c3"
     }
    ]
+  },
+  {
+   "name": "playback-host-checks",
+   "path": "playback-host-checks",
+   "retention": "retained",
+   "reason": "Playback and clock host checks",
+   "key": "evidence/playback-host-checks/e16cec7708ba18d38fbec778836d45763391f3b9b74863174095d1bcc612cbb8.tar.gz",
+   "sha256": "e16cec7708ba18d38fbec778836d45763391f3b9b74863174095d1bcc612cbb8",
+   "files": [
+    {
+     "path": "playback-host-checks/COMPAT-REFERENCE-TEST.log",
+     "sha256": "f8a878d24c16d69a23ae19627c5a7ce2921e5290a6e93534bf651f389f30b758"
+    },
+    {
+     "path": "playback-host-checks/COMPAT-TIME-ORACLE.log",
+     "sha256": "aabc6aa3ed3dbeb988c771a1c615cc17ddbd784326d9220d8b8215befd8b3ca7"
+    },
+    {
+     "path": "playback-host-checks/COMPAT-WORKSPACE-CHECK.log",
+     "sha256": "f804c1e069614ecd56fbccf52c91d36fb0b9aa6f8e4875ce595278f6ccb325db"
+    },
+    {
+     "path": "playback-host-checks/COMPAT-WORKSPACE-CLIPPY.log",
+     "sha256": "f5fa357d8f51e0c25786f8cab2c675c70c11382f318fed905446910a0d5bf121"
+    },
+    {
+     "path": "playback-host-checks/COMPAT-WORKSPACE-DOC.log",
+     "sha256": "dd949629615b74fd7fbeeef6f4085f97b7d264049c2ebd6b8ede4c0d7eaa64d2"
+    },
+    {
+     "path": "playback-host-checks/COMPAT-WORKSPACE-TEST.log",
+     "sha256": "fadae6686f7f0eeb028252b5282adba853ac6f3ce500259e9169c55fd4b4b4e6"
+    },
+    {
+     "path": "playback-host-checks/ORACLE.tar.gz",
+     "sha256": "862d9f40947b7525cec99bfea5b32a12fc5ff645ce5d71a4fffab83e520c22d3"
+    },
+    {
+     "path": "playback-host-checks/REVIEW.json",
+     "sha256": "78cb9a3e8b54ad92cb1e52634fba8e4f18b6bec75e611afe792c09b872c16a56"
+    },
+    {
+     "path": "playback-host-checks/SOURCE.bundle",
+     "sha256": "ea064f0510957eac949d91b14646c4f2d2413fe2dec550403e5123b54245dd35"
+    }
+   ]
+  },
+  {
+   "name": "playback-feed-comparison",
+   "path": "playback-feed-comparison",
+   "retention": "retained",
+   "reason": "Complete playback and Matroska comparison",
+   "key": "evidence/playback-feed-comparison/038ad80c09e63b069919a95ca761665982ccba986238cc76caa33e5f46237eee.tar.gz",
+   "sha256": "038ad80c09e63b069919a95ca761665982ccba986238cc76caa33e5f46237eee",
+   "files": [
+    {
+     "path": "playback-feed-comparison/COMPACT-RESULTS.json",
+     "sha256": "ce18c8d2ed1d42c9d570bb902361c17241e781e86af6f287425e9ebbaa015dce"
+    },
+    {
+     "path": "playback-feed-comparison/FINAL-STATE.txt",
+     "sha256": "f247a76b2893208aae7751dbf51f4c495efacfb6d9e743802870300f31ac45c8"
+    },
+    {
+     "path": "playback-feed-comparison/GRADE-CONTEXT.json",
+     "sha256": "be41da78aabb495dbae2f65ddbf7aea61185bc8588eb1784f8aff2ffcd8a0d12"
+    },
+    {
+     "path": "playback-feed-comparison/GRADE.json",
+     "sha256": "b29311fbe0f33a87bcea9256484804e3c6f7fdb956a6724e1bc53ec630aaa288"
+    },
+    {
+     "path": "playback-feed-comparison/GRADE.log",
+     "sha256": "e86edca07358ca2b78e5962e173305322e525ea9a1298ac4c1568c7a4768e369"
+    },
+    {
+     "path": "playback-feed-comparison/HOST.log",
+     "sha256": "d9c1d2d1d9e35165747bbe07a3bdc3cd8f0ab7ba47d676f1331b164b33ade5b6"
+    },
+    {
+     "path": "playback-feed-comparison/LIVE-GRADE-EXIT.txt",
+     "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+    },
+    {
+     "path": "playback-feed-comparison/LIVE-GRADE.log",
+     "sha256": "605850cfda73d5a6f739fb7b666a45279991c9d89aa42d8923625e6733d83dcc"
+    },
+    {
+     "path": "playback-feed-comparison/NATIVE-RESULTS.sha256",
+     "sha256": "d19e411d64a505c9c414b070fb64641cb96bc8d7d4e733896e65f93135f2c681"
+    },
+    {
+     "path": "playback-feed-comparison/NATIVE-RESULTS.tar.gz",
+     "sha256": "acb34394b7af2007c0d93fc71766cfd8552014bdf7da5b4f7062dd0adc34cdcb"
+    },
+    {
+     "path": "playback-feed-comparison/NATIVE.log",
+     "sha256": "7f407242d5368f2304772ba91631892b95c55226ab7423463020da46a1cef40f"
+    },
+    {
+     "path": "playback-feed-comparison/SOURCE.bundle",
+     "sha256": "ea064f0510957eac949d91b14646c4f2d2413fe2dec550403e5123b54245dd35"
+    }
+   ]
   }
  ]
 }
