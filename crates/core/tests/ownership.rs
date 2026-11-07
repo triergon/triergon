@@ -84,15 +84,18 @@ fn temporary_backpressure_recovers_after_caller_retention_ends() {
     let budget = Budget::new(4096).unwrap();
     let first = Bytes::copy_from_slice(&budget, &[1; 3000]).unwrap();
     let used = budget.used();
+    // As many bytes as the budget has left cannot fit: their storage is charged too.
+    // Header sizes depend on the pointer width, so the size is taken from the budget.
+    let rest = vec![2; 4096 - used];
     assert!(matches!(
-        Bytes::copy_from_slice(&budget, &[2; 1000]),
+        Bytes::copy_from_slice(&budget, &rest),
         Err(Error::Backpressure { .. })
     ));
     assert_eq!(budget.used(), used);
     drop(first);
     assert_eq!(
-        Bytes::copy_from_slice(&budget, &[2; 1000]).unwrap().len(),
-        1000
+        Bytes::copy_from_slice(&budget, &rest).unwrap().len(),
+        rest.len()
     );
     assert!(matches!(
         Bytes::copy_from_slice(&budget, &[0; 8192]),
