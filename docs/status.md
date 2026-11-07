@@ -16,7 +16,7 @@ release ([reference pins](quality.md#reference-and-corpus)).
 | Matroska audio clocks | AAC, AC-3, E-AC-3 startup and forward clocks | 10 inputs | 0.17 | heap 0.07, RSS 0.60 | audio seek |
 | ISO BMFF / MP4 | Regular and fragmented files, edit lists, seek and range plans, QuickTime compatibility, bounded AAC configuration and regular table recovery, timing, sync and terminal media prefixes; AVC, HEVC, AAC, AC-3, E-AC-3, DTS core, AV1, VP9 | 255 inputs, 1,020 open and index comparisons (972 matching outputs and 48 matching refusal outcomes with compatibility policies) | 1.1273 (972/972 within 1.20) | heap ≤0.4133, total RSS ≤0.7283 (972/972) | seek and range-plan timing |
 | MPEG-TS | PSI, continuity, PES assembly; TS188 and M2TS192 | 272-request set (80 field matches, 23 open) | not measured | not measured | access-unit demux, broader profiles |
-| HLS segments | Independent TS188 segments: AVC or HEVC with AAC, AC-3 or E-AC-3 | 71 packet comparisons, 71 measured workloads | 1.1704 (71/71 within 1.20) | heap ≤0.022, total RSS ≤0.722 | other profiles |
+| HLS segments | Independent TS188 segments: AVC or HEVC with AAC, AC-3 or E-AC-3 | 71 packet comparisons, 10 measured workloads | 1.2125 (9/10 within 1.20) | heap ≤0.022, total RSS ≤0.723 | above 1.20 on one case; contiguous-feed remeasurement; other profiles |
 | Packet framing | AVC/HEVC configuration and NAL framing, AV1, VP9, AC-3, E-AC-3, DTS core | 125 reference matches for AVC/HEVC; DTS core byte-exact on 37,125 projections and 1,172 FATE packets | 1.1772 (125/125 within 1.20 for AVC/HEVC) | heap ≤0.985, total RSS ≤0.990 on the same 125 cases | full AVC/HEVC/ADTS grammar |
 | Subtitles, text | SRT, WebVTT, ASS passthrough, mov_text and tx3g to ASS, charset handling | 82 mov_text cases, 79 tx3g regressions | not measured | not measured | timing and memory |
 | Subtitles, bitmap | PGS, DVB display state and colour lookup, DVD units | 229 PGS cases; 5,300 DVB display sets | PGS 1.11 | PGS heap 0.62, RSS 0.90 | full PGS recovery, DVB and DVD decoding |
@@ -25,15 +25,22 @@ release ([reference pins](quality.md#reference-and-corpus)).
 | Decode sessions | Bounded queues, clock-gated output, flush and seek, RGBA letterbox, stereo mix | with the codecs | 1.0524 | with the codecs | — |
 | Capture | RGBA to YUV 4:2:0, MPEG-1 video, MPEG-TS mux | 15/15 quality cases against FFmpeg 9.0.2 | 1.1210 (15/15 within 1.20) | heap ≤0.548, total RSS ≤0.978 (15/15) | — |
 
+## Above the 1.20 ceiling
+
+| Case | Worst upper bound |
+|---|---|
+| HLS segments: `dvb-avc-ac3-44100` | 1.2125 |
+
 ## Measured revisions
 
 Each row names the source revision a result above was measured on and, where the raw
 samples are archived, their SHA-256. Update the row in the same change as the result.
 
-The Matroska, startup and seek, and HLS rows use the [gate build](quality.md#measuring-performance)
+The Matroska and startup and seek rows use the [gate build](quality.md#measuring-performance)
 at `0e28298d038bea072629b3bad6389dcc806b4861` on a c8g.large pinned to CPU 1.
-Codec and capture rows at `ceb5076` report the higher of two unpinned gate-build
-passes on one c8g.2xlarge. The remaining rows retain their earlier measurements.
+HLS, codec and capture rows at `ceb5076` report the higher of two unpinned gate-build
+passes on one c8g.2xlarge. HLS awaits measurement with the explicit contiguous-feed
+contract on all 71 cases. The remaining rows retain their earlier measurements.
 ISO BMFF, packet framing, PGS, Matroska audio clocks and playback timing, plus
 codec and decode-session memory, await gate-build measurement with repository runners.
 
@@ -45,7 +52,7 @@ codec and decode-session memory, await gate-build measurement with repository ru
 | ISO BMFF comparison | `0a033ec3406aebd09d191298a546659e02c6b76c` | `f56d3fa78b8cc70222f58c7cfa9a17331b0924a9070c7ff6ecc6dc1f213561bc` |
 | ISO BMFF open and index runtime | `ea4b941b4454bcc2ea0cd213999d64a07928ed7c` | `fca8e54cb9b2f0d55acc8ba9be2a5849992ae7996f3c3db551896477c3359525` |
 | ISO BMFF open and index memory | `ea4b941b4454bcc2ea0cd213999d64a07928ed7c` | `46cf8ac9041b147c96108de6e09fde26c47e12fd10161f7eee9661db95f8c89a` |
-| HLS segments | `0e28298d038bea072629b3bad6389dcc806b4861` | `a20dcbbe804bfd21ee631cc42f61466d2400d5115abb8ea97dd243ef733ba74f` |
+| HLS segments | `ceb5076659e00ca9a2d3f3cb55ee4513d6d0710f` | `da9191e09ce06eebb15f164adf577e0ba01461021122db7eb418450cfb37b7db` |
 | Packet framing | `d225c35c1e2aa8a9b7dc4d61bb673a5728bd0ee6` | `b59476c45d8f31ac4694a264ce49cf12bda9bf9709e5cb6979ece0acb41cc812` |
 | Codecs and decode sessions, runtime | `ceb5076659e00ca9a2d3f3cb55ee4513d6d0710f` | `12940dd90cf511dc37b8311946ccc43626f9e5e7a79cd3e7dfbeed68f48c77ed` |
 | Capture, timing and memory | `ceb5076659e00ca9a2d3f3cb55ee4513d6d0710f` | `b75c8d6e6d64d294a385ec25b176e4ffb8f1a0d3c11b3ca956b3d352ac44c3b4` |

@@ -28,6 +28,8 @@ operation with the allocation-window markers. The corpus is
 
 The `hls-fold`, `hls-bench` and `hls-memory` modes accept one TS188 segment
 and selected AVC/HEVC video with AAC, AC-3 or E-AC-3 audio. They retain every
-access unit through segment EOF, then fold complete borrowed video spans,
-audio bytes, timing and both stream tails in the order specified by
+access unit through segment EOF, then call `contiguous_feed` for every video
+unit and fold its complete payload, audio bytes, timing and both stream tails.
+Allocation, copying and release of each contiguous feed are inside the timed
+and memory operations, in the order specified by
 `harness/features/hls-segments/contract.json`.
