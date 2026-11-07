@@ -10,6 +10,10 @@
 )]
 // Pending: `missing_docs`.
 
+// Shared by the SILK and CELT layers.
+#[allow(dead_code)]
+mod range;
+
 use triergon_codec::{AudioDecoder, AudioFrame, DecodeFailure, DownmixLevels, StorageError};
 
 /// Bounds of one decoder.
