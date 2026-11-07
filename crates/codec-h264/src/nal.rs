@@ -1,6 +1,6 @@
 //! Annex B byte stream splitting and NAL unit header / RBSP extraction (clauses 7.3.1, 7.4.1, B.1).
 
-/// Zero bytes kept after an RBSP, for the CABAC engine's loads.
+/// Zero bytes kept after an RBSP, for `BitReader`'s eight-byte loads.
 pub(crate) const RBSP_PAD: usize = 16;
 
 /// Iterate over NAL unit payloads (without start code prefixes) in an Annex B byte stream chunk.

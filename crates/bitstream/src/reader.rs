@@ -9,14 +9,17 @@ pub trait Window: Copy {
     /// The bits at bit `position` of `data`, left aligned. At least the top 32 are stream
     /// bits, inside the part of `data` this window can reach.
     fn at(&mut self, data: &[u8], position: usize) -> u64;
+
+    /// The last bit position of a slice of `bytes` bytes at which every read is whole.
+    fn reach(bytes: usize) -> usize;
 }
 
 /// One unaligned eight-byte load per read. It has no state, so its cost does not depend
 /// on the widths of the fields; this suits fixed-width fields and short tables.
 ///
 /// A load that does not fit in the slice reads as zero, so the slice carries eight bytes
-/// of padding after its last field. Assembling a short tail here instead costs AC-3 about
-/// 1% more instructions.
+/// of padding after its last field, and a [`Reader`] over it ends before them. Assembling
+/// a short tail here instead costs AC-3 about 1% more instructions.
 #[derive(Clone, Copy, Debug)]
 pub struct Direct;
 
@@ -38,6 +41,10 @@ impl Window for Direct {
             None => [0; 8],
         };
         u64::from_be_bytes(bytes) << (position & 7)
+    }
+
+    fn reach(bytes: usize) -> usize {
+        bytes.saturating_sub(8) * 8
     }
 }
 
@@ -90,6 +97,10 @@ impl Window for Cached {
         }
         self.word << offset
     }
+
+    fn reach(bytes: usize) -> usize {
+        bytes * 8
+    }
 }
 
 /// MSB-first bits of a slice. Reads past what the window can reach yield zero bits and
@@ -111,19 +122,19 @@ pub type BitReader<'a> = Reader<'a, Direct>;
 pub type CachedBitReader<'a> = Reader<'a, Cached>;
 
 impl<'a, W: Window> Reader<'a, W> {
-    /// A reader at the first bit of `data`, ending at its last bit.
+    /// A reader at the first bit of `data`, ending at the last bit its window can reach.
     #[must_use]
     pub fn new(data: &'a [u8]) -> Self {
         Self::at(data, 0)
     }
 
-    /// A reader `position` bits into `data`.
+    /// A reader `position` bits into `data`, ending at the last bit its window can reach.
     #[must_use]
     pub fn at(data: &'a [u8], position: usize) -> Self {
         Self {
             data,
             position,
-            end: data.len() * 8,
+            end: W::reach(data.len()),
             window: W::new(data, position),
         }
     }
@@ -133,6 +144,7 @@ impl<'a, W: Window> Reader<'a, W> {
     /// from `end`.
     #[must_use]
     pub fn with_end(data: &'a [u8], end: usize) -> Self {
+        debug_assert!(end <= W::reach(data.len()), "too little padding");
         let mut reader = Self::new(data);
         reader.end = end;
         reader
@@ -290,6 +302,7 @@ impl<'a, W: Window> Reader<'a, W> {
     /// Sets the position at which [`Reader::overrun`] and [`Reader::left`] measure
     /// the end. The bytes the reader returns do not change.
     pub fn set_end(&mut self, end: usize) {
+        debug_assert!(end <= W::reach(self.data.len()), "too little padding");
         self.end = end;
     }
 }
@@ -322,6 +335,23 @@ mod tests {
         reader.seek(9 * 8 - 64 + 8);
         assert_eq!(reader.read(32), 0);
         assert_eq!(BitReader::new(&[0xff; 7]).peek32(), 0);
+    }
+
+    #[test]
+    fn direct_ends_before_its_padding() {
+        assert_eq!(BitReader::new(&[0; 24]).end(), 16 * 8);
+        let mut reader = BitReader::new(&[0xff; 7]);
+        assert_eq!(reader.end(), 0);
+        reader.skip(1);
+        assert!(reader.overrun());
+        assert_eq!(CachedBitReader::new(&[0xff; 7]).end(), 7 * 8);
+    }
+
+    #[test]
+    #[should_panic(expected = "too little padding")]
+    #[cfg(debug_assertions)]
+    fn with_end_refuses_an_unpadded_slice() {
+        let _ = BitReader::with_end(&[0; 8], 8);
     }
 
     #[test]
@@ -424,11 +454,11 @@ mod tests {
     #[test]
     fn more_rbsp_data_stops_at_the_stop_bit() {
         let data = [0b1100_0000, 0b1010_0000, 0, 0];
-        let mut reader = BitReader::with_end(&data, 16);
+        let mut reader = CachedBitReader::with_end(&data, 16);
         assert!(reader.more_rbsp_data());
         reader.skip(10);
         assert!(!reader.more_rbsp_data());
-        assert!(!BitReader::new(&[0, 0]).more_rbsp_data());
+        assert!(!CachedBitReader::new(&[0, 0]).more_rbsp_data());
     }
 
     #[test]
