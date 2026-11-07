@@ -9,8 +9,6 @@ pub(crate) mod cues;
 pub(crate) mod epoch;
 pub(crate) mod hdr10_plus;
 pub(crate) mod header;
-#[cfg(test)]
-pub(crate) mod info;
 pub(crate) mod lace;
 pub(crate) mod mapping;
 pub(crate) mod packet;

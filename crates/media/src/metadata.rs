@@ -246,9 +246,6 @@ impl Document {
     pub fn node_count(&self) -> usize {
         self.nodes.len()
     }
-    pub fn attachment_bytes(&self) -> usize {
-        self.attachment_bytes
-    }
     pub fn retained_bytes(&self) -> usize {
         self.raw.retained_capacity()
             + self.nodes.capacity() * size_of::<Node>()

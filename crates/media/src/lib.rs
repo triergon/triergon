@@ -30,7 +30,6 @@ mod packet_clock;
 #[cfg(feature = "reference-trace")]
 pub mod reference_trace;
 pub mod storage;
-pub mod time;
 pub mod timing;
 pub mod typed;
 pub mod zlib;
