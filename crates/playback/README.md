@@ -138,8 +138,8 @@ before the end of input. Each advance can process several internal steps within
 the caller's work budget. A source that spends its remaining work before a
 reply is ready leaves the request pending for the next advance. Start a new
 reader to begin at another offset.
-Progressive PES payloads retain one shared backing handle per admitted carrier
-run. The AVC and AAC cursors borrow each logical carrier range, preserving its
+On 64-bit targets, progressive PES payloads retain one shared backing handle per
+admitted carrier run. The AVC and AAC cursors borrow each logical carrier range, preserving its
 validation, work and retirement boundaries. Independently retained AAC frames
 still keep the full backing allocation charged. Both framers also expose
 `push_compact` for explicit `CompactDemuxPacket` delivery alongside ordinary `push`.

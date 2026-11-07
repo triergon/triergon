@@ -95,12 +95,11 @@ range and event ordinal. Runs reserve checked span capacity before advancing
 input; ordinary carrier polling handles PES completion.
 Feed dispatch reuses the selected PES route after checking its PID against the
 current program table. Other PIDs use the ordinary route lookup.
-Runs record the complete final carrier for duplicate detection before moving
-the shared window into its last payload span. Every span retains the full
-backing allocation's charge.
-An inactive `DemuxObserver` can select `enable_compact_payloads` and then use
+Runs record the complete final carrier for duplicate detection before transferring
+the shared backing storage. Every retained view keeps the full allocation charged.
+A fresh, inactive `DemuxObserver` can select `enable_compact_payloads` before input and then use
 `poll_compact_payload` (or its input-bound counterpart). `CompactDemuxPacket`
-retains one backing handle per admitted run; `CompactPayload::spans` and its
+retains one backing handle per admitted run on 64-bit targets; `CompactPayload::spans` and its
 consuming `PayloadCursor` expose every logical carrier's payload range, source
 range, transport extent and context. Span capacity remains charged for the full
 logical count. Retiring the last range of a run releases its backing handle.
