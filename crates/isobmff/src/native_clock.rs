@@ -96,6 +96,21 @@ impl Mov9SchedulingClock {
         let Some(ticks) = field.api_ticks() else {
             return Ok(Self::ApiSentinel);
         };
+        if let Some(scaled) = ticks
+            .unsigned_abs()
+            .checked_mul(base.numerator())
+            .and_then(|magnitude| magnitude.checked_mul(1_000_000))
+        {
+            let divisor = base.denominator();
+            let remainder = scaled % divisor;
+            // Round the magnitude to the nearest tick, with ties away from zero.
+            // A nonzero remainder implies a divisor greater than one.
+            let rounded = scaled / divisor + u64::from(remainder >= divisor - remainder);
+            if let Ok(magnitude) = i64::try_from(rounded) {
+                let signed = if ticks < 0 { -magnitude } else { magnitude };
+                return Ok(Self::ExactMicroseconds(signed));
+            }
+        }
         let microseconds = TimeBase::new(1, 1_000_000)?;
         match base.rescale(ticks, microseconds, Rounding::NearestAway) {
             Ok(i64::MIN) => {
