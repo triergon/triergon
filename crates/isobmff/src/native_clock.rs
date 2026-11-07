@@ -96,6 +96,21 @@ impl Mov9SchedulingClock {
         let Some(ticks) = field.api_ticks() else {
             return Ok(Self::ApiSentinel);
         };
+        if let Some(scaled) = ticks
+            .unsigned_abs()
+            .checked_mul(base.numerator())
+            .and_then(|magnitude| magnitude.checked_mul(1_000_000))
+        {
+            let divisor = base.denominator();
+            let remainder = scaled % divisor;
+            // Round to the nearest microsecond, with ties away from zero.
+            // A nonzero remainder implies a divisor greater than one.
+            let rounded = scaled / divisor + u64::from(remainder >= divisor - remainder);
+            if let Ok(magnitude) = i64::try_from(rounded) {
+                let signed = if ticks < 0 { -magnitude } else { magnitude };
+                return Ok(Self::ExactMicroseconds(signed));
+            }
+        }
         let microseconds = TimeBase::new(1, 1_000_000)?;
         match base.rescale(ticks, microseconds, Rounding::NearestAway) {
             Ok(i64::MIN) => {
@@ -120,6 +135,28 @@ impl Mov9SchedulingClock {
             Err(error) => Err(error),
         }
     }
+}
+
+#[test]
+fn scheduling_keeps_signed_rounding_and_wide_clock_boundaries() {
+    let half_microsecond = TimeBase::new(1, 2_000_000).unwrap();
+    for (ticks, expected) in [(-3, -2), (-1, -1), (0, 0), (1, 1), (3, 2)] {
+        let field = Mov9ClockField::from_exact_native_ticks(ticks).unwrap();
+        assert_eq!(
+            Mov9SchedulingClock::from_native(field, half_microsecond).unwrap(),
+            Mov9SchedulingClock::ExactMicroseconds(expected)
+        );
+    }
+    let largest = Mov9ClockField::from_exact_native_ticks(i128::from(i64::MAX)).unwrap();
+    assert_eq!(
+        Mov9SchedulingClock::from_native(largest, TimeBase::new(1, 1_000_000).unwrap()).unwrap(),
+        Mov9SchedulingClock::ExactMicroseconds(i64::MAX)
+    );
+    let collision = Mov9ClockField::from_exact_native_ticks(i128::from(i64::MIN / 2)).unwrap();
+    assert!(matches!(
+        Mov9SchedulingClock::from_native(collision, TimeBase::new(1, 500_000).unwrap()),
+        Err(Error::Unsupported(_))
+    ));
 }
 
 /// A native API field has a raw representation even when its API value is null.

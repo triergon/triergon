@@ -70,6 +70,37 @@ fn starvation_empty_input_work_yield_and_explicit_entity_end_are_distinct() {
 }
 
 #[test]
+fn range_request_reuses_shared_bytes_with_a_fresh_token() {
+    let pool = Budget::new(8192).unwrap();
+    let mut input = cursor(&pool, Some(24), true);
+    input.request_range(8).unwrap();
+    let original_token = input.token();
+    let original = window(&input, b"abcdef");
+    input.provide(&original).unwrap();
+    let cancel = AtomicBool::new(false);
+    let mut work = WorkBudget::new(8);
+    assert!(matches!(
+        input.read_discard(3, &mut work, &cancel).unwrap(),
+        Step::Ready(3)
+    ));
+    let request = input.request_range_reusing_window(9).unwrap();
+    assert_eq!(request.offset, 9);
+    assert_eq!(request.token.generation(), original_token.generation());
+    assert!(matches!(
+        input.provide(&original),
+        Err(Error::StaleRequest { .. })
+    ));
+    let Step::Ready(span) = input.read_span(2, &mut work, &cancel).unwrap() else {
+        panic!("repositioned bytes must be available");
+    };
+    assert_eq!(span.as_ref(), b"bc");
+    assert!(span.shares_storage_with(original.bytes()));
+    input.request_range_reusing_window(14).unwrap();
+    assert!(input.buffered().is_empty());
+    assert_eq!(input.position(), 14);
+}
+
+#[test]
 fn source_offsets_above_four_gib_are_not_lengths_or_usize_indices() {
     let pool = Budget::new(8192).unwrap();
     let mut input = cursor(&pool, Some(1 << 42), true);

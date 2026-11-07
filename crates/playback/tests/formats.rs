@@ -3365,6 +3365,63 @@ fn native_range_cursor_matches_ffprobe_and_preserves_seek_lifecycle() {
 }
 
 #[test]
+fn repeated_range_seek_preserves_catalogue_order_with_video_second() {
+    let mut raw = include_bytes!("fixtures/mp4/r-multitrack.mov").to_vec();
+    let tracks: Vec<_> = raw
+        .windows(4)
+        .enumerate()
+        .filter(|(_, kind)| *kind == b"trak")
+        .map(|(at, _)| at - 4)
+        .collect();
+    let [first, second] = tracks[..] else {
+        panic!("expected two contiguous track boxes");
+    };
+    let size = |at| u32::from_be_bytes(raw[at..at + 4].try_into().unwrap()) as usize;
+    let first_len = size(first);
+    let end = second + size(second);
+    assert_eq!(first + first_len, second);
+    raw[first..end].rotate_left(first_len);
+
+    let (opened, _, _) = observed_mp4_open(&raw);
+    assert_eq!(opened.movie.tracks()[0].header().handler, *b"sbtl");
+    assert_eq!(opened.movie.tracks()[1].header().track_id, 1);
+    let mut open = Mp4RangeOpen::new(&opened.movie, None, PlanLimits::default()).unwrap();
+    assert!((0..1000).any(|_| open.poll(&mut WorkBudget::new(4096), &off()).unwrap()));
+    let mut player = open
+        .finish(
+            opened.input,
+            opened.source,
+            1 << 20,
+            Selection::All,
+            PlayerPolicy::default(),
+        )
+        .unwrap();
+    for _ in 0..2 {
+        let mut seek = player
+            .prepare_seek(Mp4NativeSeekRequest {
+                video: 1,
+                timestamp: 3500,
+                limits: triergon_isobmff::Mov9NativeSeekLimits::default(),
+            })
+            .unwrap();
+        assert!((0..1000).any(|_| seek.poll(&mut WorkBudget::new(4096), &off()).unwrap()));
+        let mut command = seek.finish().unwrap();
+        assert!(
+            player
+                .apply_seek(&mut command, &mut WorkBudget::new(1), &off())
+                .unwrap()
+        );
+        let output = std::iter::from_fn(|| next_range_output(&mut player))
+            .find(|item| item.event().track() == Some(TrackKey::Mp4(1)))
+            .unwrap();
+        let RawEvent::Mp4(Mp4Event::Packet(packet)) = output.event() else {
+            panic!("expected a video packet");
+        };
+        assert_eq!(packet.native.as_ref().unwrap().native.dts, Some(3000));
+    }
+}
+
+#[test]
 fn native_range_cursor_checks_all_extents_and_replays_after_duration_scan() {
     use triergon_core::{Rounding, TimeBase};
 
@@ -3433,6 +3490,45 @@ fn native_range_cursor_checks_all_extents_and_replays_after_duration_scan() {
             expected.source.payload.as_ref()
         );
     }
+}
+
+#[test]
+fn range_preflight_limits_occurrences_across_tracks() {
+    let bytes = include_bytes!("fixtures/mp4/encoded-avc-aac-native-seek.mp4");
+    let (mut indexed, _, _, _) = native_range_player(bytes);
+    let outputs = collect(&mut indexed, 4096).unwrap();
+    let mut counts = std::collections::BTreeMap::new();
+    for packet in mp4_packets(&outputs) {
+        *counts
+            .entry(packet.configuration.track.track_id)
+            .or_insert(0) += 1;
+    }
+    assert!(counts.len() > 1);
+    let maximum = *counts.values().max().unwrap();
+    let (opened, calls, _) = observed_mp4_open(bytes);
+    assert!(opened.movie.header().duration > 0);
+    calls.lock().unwrap().clear();
+    let mut job = Mp4RangeOpen::new(
+        &opened.movie,
+        None,
+        PlanLimits {
+            occurrences: maximum as u64,
+            ..PlanLimits::default()
+        },
+    )
+    .unwrap();
+    let result = (0..100_000).find_map(|_| match job.poll(&mut WorkBudget::new(1), &off()) {
+        Ok(false) => None,
+        result => Some(result),
+    });
+    assert_eq!(
+        result,
+        Some(Err(C::Limit {
+            requested: maximum + 1,
+            maximum
+        }))
+    );
+    assert!(calls.lock().unwrap().is_empty());
 }
 
 #[test]
@@ -3768,8 +3864,21 @@ fn native_range_cursor_keeps_edited_av1_and_vp9_description_transitions() {
 
 #[test]
 fn native_range_cursor_keeps_encoded_source_clocks_and_trim() {
-    let fixtures: [&[u8]; 3] = [
-        include_bytes!("../../isobmff/tests/fixtures/encoded-edit-v2/original.mp4"),
+    let original = include_bytes!("../../isobmff/tests/fixtures/encoded-edit-v2/original.mp4");
+    let mut variable = original.to_vec();
+    let audio_timing = variable
+        .windows(4)
+        .rposition(|kind| kind == b"stts")
+        .unwrap()
+        + 4;
+    for (offset, before, after) in [(20, 1016u32, 1272u32), (36, 528, 272)] {
+        let duration = &mut variable[audio_timing + offset..audio_timing + offset + 4];
+        assert_eq!(duration, &before.to_be_bytes());
+        duration.copy_from_slice(&after.to_be_bytes());
+    }
+    let fixtures: [&[u8]; 4] = [
+        original,
+        &variable,
         include_bytes!("../../isobmff/tests/fixtures/range-encoded-edits/leading-ac3.mp4"),
         include_bytes!("../../isobmff/tests/fixtures/range-encoded-edits/leading-eac3.mp4"),
     ];

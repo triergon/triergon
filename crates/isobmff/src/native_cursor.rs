@@ -372,6 +372,7 @@ enum Phase {
     Bounds,
     Clock,
     Initialize,
+    CheckProjections,
     Fill,
     Select,
     End,
@@ -403,6 +404,7 @@ pub struct Mov9PacketCursor<'a> {
     front_source: bool,
     terminal: Option<crate::TerminalMdat>,
     forward_regular: Option<crate::ForwardRegularMdatV1>,
+    check_projections: bool,
     recording_seek_checkpoints: bool,
     seek_checkpoints: Option<Arc<Checkpoints<'a>>>,
 }
@@ -487,6 +489,7 @@ impl<'a> Mov9PacketCursor<'a> {
             front_source: false,
             terminal: None,
             forward_regular: None,
+            check_projections: false,
             recording_seek_checkpoints: false,
             seek_checkpoints: None,
         }
@@ -645,6 +648,28 @@ impl<'a> Mov9PacketCursor<'a> {
     pub fn validated_samples(&self) -> u64 {
         self.validated
     }
+
+    /// Check source ranges and packet projections before playback without
+    /// merging the track heads. Poll to End, then rewind for packet delivery.
+    /// Use a complete indexed source from its beginning.
+    pub fn check_projections_before_replay(&mut self) -> Result<()> {
+        if !self.complete_source
+            || self.front_source
+            || !matches!(self.phase, Phase::Media)
+            || self.at != 0
+            || self
+                .slots
+                .as_slice()
+                .iter()
+                .any(|slot| slot.resume_remaining != 0)
+        {
+            return Err(Error::Invalid(
+                "range check requires a fresh complete cursor",
+            ));
+        }
+        self.check_projections = true;
+        Ok(())
+    }
     /// Reconstruct each track's real native state up to its checked occurrence
     /// position before the existing global selector begins delivery. Full source
     /// extent validation still runs first; skipped metadata reads no payload.
@@ -789,6 +814,7 @@ impl<'a> Mov9PacketCursor<'a> {
             slot.ended = false;
         }
         self.recording_seek_checkpoints = false;
+        self.check_projections = false;
         self.at = 0;
         self.generated = 0;
         self.phase = Phase::Initialize;
@@ -877,6 +903,19 @@ impl<'a> Mov9PacketCursor<'a> {
                                 slot.fragment_cto_minimum =
                                     slot.fragment_cto_minimum.min(i64::from(signed));
                             }
+                            if let [extent] = self.media
+                                && self.terminal.is_none()
+                                && self.forward_regular.is_none()
+                                && work.try_charge(2)
+                            {
+                                // A single extent needs no search state. Charge the same
+                                // lookup and bounds check as the resumable path.
+                                if sample.range.start < extent.start {
+                                    return Err(Error::Invalid("native sample outside mdat"));
+                                }
+                                sample.require_within(extent.clone())?;
+                                continue;
+                            }
                             self.checking = Some(sample);
                             self.low = 0;
                             self.high = self.media.len();
@@ -949,7 +988,11 @@ impl<'a> Mov9PacketCursor<'a> {
                 Phase::Initialize => {
                     if self.at == self.slots.len() {
                         self.at = 0;
-                        self.phase = Phase::Fill;
+                        self.phase = if self.check_projections {
+                            Phase::CheckProjections
+                        } else {
+                            Phase::Fill
+                        };
                         continue;
                     }
                     if !work.try_charge(1) {
@@ -981,6 +1024,36 @@ impl<'a> Mov9PacketCursor<'a> {
                     };
                     slot.cursor = TrackSampleCursor::new(slot.source()?);
                     self.at += 1;
+                }
+                Phase::CheckProjections => {
+                    if self.at == self.slots.len() {
+                        self.phase = Phase::End;
+                        continue;
+                    }
+                    let global_schedule = self.slots.len() > 1;
+                    let slot = &mut self.slots.as_mut_slice()[self.at];
+                    if slot.head.is_none() {
+                        match slot.fill(work, true, global_schedule, false)? {
+                            Mov9CursorStatus::Yield => return Ok(Mov9CursorStatus::Yield),
+                            Mov9CursorStatus::Ready => {}
+                            Mov9CursorStatus::End => {
+                                if !work.try_charge(1) {
+                                    return Ok(Mov9CursorStatus::Yield);
+                                }
+                                self.at += 1;
+                                continue;
+                            }
+                        }
+                    }
+                    if !work.try_charge(1) {
+                        return Ok(Mov9CursorStatus::Yield);
+                    }
+                    self.generated = self.generated.checked_add(1).ok_or(Error::Overflow)?;
+                    count(self.generated, self.limits.max_occurrences)?;
+                    if self.recording_seek_checkpoints {
+                        self.record_seek_checkpoint(self.at);
+                    }
+                    self.slots.as_mut_slice()[self.at].head = None;
                 }
                 Phase::Fill => {
                     if self.at == self.slots.len() {

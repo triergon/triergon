@@ -1,7 +1,7 @@
 use crate::input::{Source, SourceReply};
 use crate::{BackendStep, Engine, RawEvent, Result, io::SourceOwner};
 use std::sync::atomic::{AtomicBool, Ordering};
-use triergon_core::{Budget, BudgetVec, Error, InputRequest, Time, WorkBudget};
+use triergon_core::{Budget, BudgetVec, Error, InputRequest, Time, TimeBase, WorkBudget};
 use triergon_isobmff::Mov9PacketCursor;
 
 mod mp4_native_seek;
@@ -240,6 +240,36 @@ struct ActiveSeek {
     intent: SeekIntent,
     matroska_ceiling_ns: Option<i64>,
     reached_target: bool,
+}
+
+fn mp4_tick_before(ticks: i64, base: TimeBase, target: Time) -> Result<bool> {
+    // A signed 64-bit tick count times an unsigned 64-bit scale fits i128.
+    // Compare the fractions before reducing them to Time.
+    let numerator = i128::from(ticks) * i128::from(base.numerator());
+    if let Ok(denominator) = i128::try_from(target.denominator())
+        && let Some(left) = numerator.checked_mul(denominator)
+        && let Some(right) = target
+            .numerator()
+            .checked_mul(i128::from(base.denominator()))
+    {
+        return Ok(left < right);
+    }
+    Ok(Time::from_ticks(i128::from(ticks), base)? < target)
+}
+
+#[test]
+fn mp4_seek_tick_comparison_keeps_exact_order() {
+    let audio = TimeBase::new(1, 48_000).unwrap();
+    let wide = TimeBase::new(u64::MAX, u64::MAX - 1).unwrap();
+    for (ticks, base, target) in [
+        (-1024, audio, Time::new(-1, 48).unwrap()),
+        (1000, audio, Time::new(1, 48).unwrap()),
+        (i64::MIN, wide, Time::new(i128::MIN + 1, u128::MAX).unwrap()),
+        (i64::MAX, wide, Time::new(i128::MAX, u128::MAX).unwrap()),
+    ] {
+        let pts = Time::from_ticks(i128::from(ticks), base).unwrap();
+        assert_eq!(mp4_tick_before(ticks, base, target).unwrap(), pts < target);
+    }
 }
 
 pub struct Player<S: Source> {
@@ -481,12 +511,19 @@ impl<S: Source> Player<S> {
         }
         let engine = self.engine.as_mut().ok_or(Error::Closed)?;
         selection.validate(engine)?;
-        if !engine
-            .facts()?
-            .as_slice()
-            .iter()
-            .any(|f| f.key == track && f.kind == TrackKind::Video && f.enabled)
-        {
+        let enabled_video = match (&*engine, track) {
+            (Engine::Mp4(mp4), TrackKey::Mp4(id)) => mp4
+                .plan
+                .track(id)
+                .is_ok_and(|t| t.snapshot.handler == *b"vide" && t.snapshot.enabled),
+            (Engine::Mp4(_), _) => false,
+            _ => engine
+                .facts()?
+                .as_slice()
+                .iter()
+                .any(|f| f.key == track && f.kind == TrackKind::Video && f.enabled),
+        };
+        if !enabled_video {
             return Err(Error::Invalid("seek target must be source video"));
         }
         let epoch = self.epoch.checked_add(1).ok_or(Error::Overflow)?;
@@ -1167,6 +1204,25 @@ impl<S: Source> Player<S> {
                             until: intent.target,
                         },
                         Some(_) => Delivery::Present,
+                    },
+                    (
+                        ClockChoice::ExplicitNativeProjection,
+                        seek,
+                        RawEvent::Mp4(crate::Mp4Event::Packet(packet)),
+                    ) => match packet
+                        .native
+                        .as_ref()
+                        .and_then(|n| n.native.pts.map(|pts| (pts, n.media_clock.native_base)))
+                    {
+                        None => Delivery::UnknownTime,
+                        Some((pts, base)) => match seek {
+                            Some(s) if mp4_tick_before(pts, base, s.intent.target)? => {
+                                Delivery::DecodeOnly {
+                                    until: s.intent.target,
+                                }
+                            }
+                            _ => Delivery::Present,
+                        },
                     },
                     (clock, seek, _) => {
                         let pts = match clock {

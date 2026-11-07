@@ -106,6 +106,7 @@ source is the separate `finish` call, after which reads return
 | Transition | Generation | Effect |
 |---|---|---|
 | `request_range(offset)` | kept | internal metadata/index jump; outstanding requests become stale |
+| `request_range_reusing_window(offset)` | kept | internal jump that retains the current shared window if it covers the offset |
 | `reset(offset)` | new | logical seek or recovery; the parser resets its own state too |
 | `continue_source(id, caps)` | kept | next entity of the same logical stream (playlist segment) |
 

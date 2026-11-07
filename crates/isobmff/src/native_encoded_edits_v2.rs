@@ -233,6 +233,7 @@ pub struct Mov9EncodedEditJobV2<'a> {
     source_end: i128,
     count: u64,
     frame: u32,
+    preserve_aac_media_durations: bool,
     dts_scale: Option<u32>,
     dolby_config: Option<Ac3ConfigParser>,
     descriptions: u32,
@@ -335,6 +336,7 @@ impl<'a> Mov9EncodedEditJobV2<'a> {
     }
     /// Range playback admits leading encoder-delay edits for AC-3, E-AC-3
     /// and DTS. DTS also supports a leading empty edit before the media edit.
+    /// AAC uses the sample durations in `stts` and the coded frame length for trim.
     pub fn new_range_playback(
         context: Mov9EncodedEditContextV2<'a>,
         configs: &[Mov9EncodedStreamV1],
@@ -347,6 +349,7 @@ impl<'a> Mov9EncodedEditJobV2<'a> {
             input.budget(),
         )?;
         let mut job = Self::new_recovery_bound(context, input, limits, configs.len())?;
+        job.preserve_aac_media_durations = true;
         let stream = job.context.stream;
         let kind = match stream.kind() {
             EncodedEntryKindV1::Ac3 => Ac3ConfigKind::Dac3,
@@ -492,6 +495,7 @@ impl<'a> Mov9EncodedEditJobV2<'a> {
             source_end: 0,
             count: 0,
             frame,
+            preserve_aac_media_durations: false,
             dts_scale,
             dolby_config: None,
             descriptions,
@@ -811,7 +815,9 @@ impl<'a> Mov9EncodedEditJobV2<'a> {
                                 "encoded Dolby source packet clock profile",
                             ));
                         }
-                    } else if c != d || s.duration_ticks > self.frame {
+                    } else if c != d
+                        || (s.duration_ticks > self.frame && !self.preserve_aac_media_durations)
+                    {
                         return Err(Error::Unsupported(
                             "encoded AAC source packet clock profile",
                         ));

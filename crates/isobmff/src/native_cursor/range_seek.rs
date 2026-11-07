@@ -14,6 +14,8 @@ use std::{
 use triergon_core::{Budget, BudgetVec, Error, Reservation, Result, Rounding, WorkBudget};
 
 const CHECKPOINT_INTERVAL: u64 = 8192;
+const SHORT_CHECKPOINT_INTERVAL: u64 = 32;
+const MAX_SHORT_CHECKPOINTS_PER_TRACK: usize = 4;
 const MAX_CHECKPOINTS: usize = 256;
 
 #[derive(Clone, Debug)]
@@ -37,15 +39,20 @@ pub(super) struct Checkpoints<'a> {
     tracks: BudgetVec<Track<'a>>,
     total: u64,
     stored: usize,
+    use_spare_capacity: bool,
     _charge: Reservation,
 }
 
 impl<'a> Checkpoints<'a> {
-    fn new(budget: &Budget, tracks: usize) -> Result<Self> {
+    fn new(budget: &Budget, tracks: &[Slot<'a>]) -> Result<Self> {
+        let use_spare_capacity = tracks.iter().all(|slot| {
+            slot.track.table.sample_count() <= CHECKPOINT_INTERVAL
+                && (slot.track.edits.is_none() || slot.encoded_edit.is_some())
+        });
         let charge = budget.reserve(size_of::<Self>() + 2 * size_of::<usize>())?;
         let mut slots = BudgetVec::new(budget);
-        slots.try_reserve_exact(tracks)?;
-        for _ in 0..tracks {
+        slots.try_reserve_exact(tracks.len())?;
+        for _ in tracks {
             slots
                 .try_push(Track {
                     points: BudgetVec::new(budget),
@@ -59,6 +66,7 @@ impl<'a> Checkpoints<'a> {
             tracks: slots,
             total: 0,
             stored: 0,
+            use_spare_capacity,
             _charge: charge,
         })
     }
@@ -90,7 +98,12 @@ impl<'a> Checkpoints<'a> {
         if key {
             track.previous_sync = track.entries;
         }
-        if track.entries.is_multiple_of(CHECKPOINT_INTERVAL) {
+        // Short regular tracks can use their existing checkpoint capacity
+        // for earlier restarts without growing the index.
+        let spare = self.use_spare_capacity
+            && track.entries.is_multiple_of(SHORT_CHECKPOINT_INTERVAL)
+            && track.points.len() < track.points.capacity().min(MAX_SHORT_CHECKPOINTS_PER_TRACK);
+        if track.entries.is_multiple_of(CHECKPOINT_INTERVAL) || spare {
             if self.stored == MAX_CHECKPOINTS {
                 return None;
             }
@@ -126,7 +139,7 @@ impl<'a> Mov9PacketCursor<'a> {
                 .iter()
                 .all(|slot| slot.resume_remaining == 0 && slot.track.fragments.is_empty())
         {
-            self.seek_checkpoints = Checkpoints::new(self.slots.budget(), self.slots.len())
+            self.seek_checkpoints = Checkpoints::new(self.slots.budget(), self.slots.as_slice())
                 .ok()
                 .map(Arc::new);
             self.recording_seek_checkpoints = self.seek_checkpoints.is_some();
@@ -191,11 +204,6 @@ impl<'a> Mov9PacketCursor<'a> {
             .ok_or(Error::Invalid("native seek reference track absent"))?;
         let mut slots = BudgetVec::new(self.slots.budget());
         slots.try_reserve_exact(self.slots.len())?;
-        for track in index.tracks.as_slice() {
-            slots
-                .try_push(track.points.as_slice()[0].slot.clone())
-                .map_err(|e| e.error)?;
-        }
         Ok(Some(Mov9RangeSeekJob {
             index: Arc::clone(index),
             slots,
@@ -362,7 +370,7 @@ impl<'a> Mov9RangeSeekJob<'a> {
             if cancel.load(Ordering::Relaxed) {
                 return Err(Error::Cancelled);
             }
-            if self.at == self.slots.len() {
+            if self.at == self.index.tracks.len() {
                 return Ok(BuildStatus::Ready);
             }
             let at = if self.receipt.is_none() {
@@ -387,8 +395,8 @@ impl<'a> Mov9RangeSeekJob<'a> {
                     self.at += 1;
                     continue;
                 }
-                let reference_base = self.slots.as_slice()[self.reference].clock.native_base;
-                let target_base = self.slots.as_slice()[at].clock.native_base;
+                let reference_base = self.slots.as_slice()[0].clock.native_base;
+                let target_base = points[0].slot.clock.native_base;
                 reference_base.rescale(
                     receipt.selected.timestamp,
                     target_base,
@@ -441,12 +449,12 @@ impl<'a> Mov9RangeSeekJob<'a> {
         } else {
             self.at += 1;
         }
-        head.scheduling_clock = if self.slots.len() > 1 {
+        head.scheduling_clock = if self.index.tracks.len() > 1 {
             Mov9SchedulingClock::from_native(head.native.dts_field, slot.clock.native_base)?
         } else {
             Mov9SchedulingClock::SingleTrack
         };
-        self.slots.as_mut_slice()[at] = slot;
+        self.slots.try_push(slot).map_err(|failure| failure.error)?;
         self.skipped = self.skipped.checked_add(ordinal).ok_or(Error::Overflow)?;
         Ok(())
     }
@@ -455,11 +463,14 @@ impl<'a> Mov9RangeSeekJob<'a> {
         if let Some(error) = self.failed {
             return Err(error);
         }
-        if self.at != self.slots.len() {
+        if self.at != self.index.tracks.len() || self.slots.len() != self.index.tracks.len() {
             return Err(Error::Invalid("checked range seek still pending"));
         }
         count(self.skipped, self.maximum_skipped)?;
-        let mut cursor = Mov9PacketCursor::from_slots(self.slots, self.media, self.packet_limits);
+        // The reference was searched first. Restore catalogue order before merging.
+        let mut slots = self.slots;
+        slots.as_mut_slice()[..=self.reference].rotate_left(1);
+        let mut cursor = Mov9PacketCursor::from_slots(slots, self.media, self.packet_limits);
         cursor.complete_source = true;
         cursor.phase = Phase::Fill;
         cursor.validated = self.validated;
