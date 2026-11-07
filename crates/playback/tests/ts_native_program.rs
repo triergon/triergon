@@ -372,6 +372,43 @@ fn mixed_avc_ac3_dvb_keep_carrier_order_and_a_common_clock() {
 }
 
 #[test]
+fn packet_delivery_uses_projected_timestamp_availability_without_a_seek() {
+    let mut without_timestamps = MIXED.to_vec();
+    let pes_offsets: Vec<_> = MIXED
+        .windows(9)
+        .enumerate()
+        .filter(|(_, header)| header[..3] == [0, 0, 1] && matches!(header[3], 0xbd | 0xe0))
+        .map(|(offset, _)| offset)
+        .collect();
+    assert_eq!(pes_offsets.len(), 3);
+    for offset in pes_offsets {
+        let header_length = usize::from(without_timestamps[offset + 8]);
+        assert_eq!(header_length, 5);
+        without_timestamps[offset + 7] &= 0x3f;
+        let optional_start = offset + 9;
+        without_timestamps[optional_start..optional_start + header_length].fill(0xff);
+    }
+    for (raw, has_timestamps) in [(MIXED, true), (without_timestamps.as_slice(), false)] {
+        let (mut player, _) = player(raw, &[DVB, AVC, AC3], Selection::All, 1);
+        let expected = if has_timestamps {
+            Delivery::Present
+        } else {
+            Delivery::UnknownTime
+        };
+        let mut packets = 0;
+        for item in collect(&mut player, 1) {
+            if let RawEvent::NativeTs { clock, .. } = item.event() {
+                packets += 1;
+                assert_eq!(clock.pts90.is_some(), has_timestamps);
+                assert_eq!(item.event().native_pts().unwrap().is_some(), has_timestamps);
+                assert_eq!(item.delivery(), expected);
+            }
+        }
+        assert_eq!(packets, 3);
+    }
+}
+
+#[test]
 fn unbounded_packets_drain_by_pid_only_after_logical_eof() {
     let (mut player, _) = player(EOF, &[AAC, AVC], Selection::All, 7);
     let output = collect(&mut player, 1);
