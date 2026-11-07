@@ -1,14 +1,15 @@
 //! Paired runtime measurement: warm both workers, then time them in randomly
-//! ordered pairs under a host-wide lock, rejecting any pair during which a
+//! ordered pairs under a host-wide lock, rejecting any run during which a
 //! compiler, linker or FFmpeg process used CPU (or, on Linux, steal time grew).
-//! Every raw sample is kept; equal work is proven by the work digest.
+//! The whole run is observed: each pair starts from the snapshot that closed the
+//! one before. Every raw sample is kept; equal work is proven by the work digest.
 
 use std::ffi::OsString;
 use std::fs::{self, File};
 use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::process::Command;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use super::acceptance::{LINUX_CPU_KEY, active_cpu};
 use super::worker::{self, DEFAULT_TIMEOUT, arg, data, ok};
@@ -21,6 +22,9 @@ use crate::stats;
 const LOCK_NAME: &str = "triergon-bench.lock";
 pub const MODULE_POLICY: &str = "rss-kernel-module-must-be-absent-v1";
 const LINUX_MODULE: &str = "/sys/module/triergon_rss_bound";
+/// The shortest span over which tracked processes are compared. CPU clocks tick
+/// every 10 ms or so, and a pair can be shorter than that.
+const CONTAMINATION_WINDOW: Duration = Duration::from_millis(125);
 
 /// The exclusive host-wide measurement lock; fails at once if it is held.
 pub struct Lock(File);
@@ -163,16 +167,21 @@ fn linux_snapshot() -> Value {
     linux_snapshot_in(Path::new("/proc"), ps, clock_ticks)
 }
 
-/// The system clock rate (`getconf CLK_TCK`).
+/// The system clock rate (`getconf CLK_TCK`), which is fixed while the host runs.
 fn clock_ticks() -> Result<i64, String> {
-    let output = Command::new("getconf")
-        .arg("CLK_TCK")
-        .output()
-        .map_err(|e| e.to_string())?;
-    String::from_utf8_lossy(&output.stdout)
-        .trim()
-        .parse()
-        .map_err(|_| "missing boot/tick identity".to_owned())
+    static TICKS: std::sync::OnceLock<Result<i64, String>> = std::sync::OnceLock::new();
+    TICKS
+        .get_or_init(|| {
+            let output = Command::new("getconf")
+                .arg("CLK_TCK")
+                .output()
+                .map_err(|e| e.to_string())?;
+            String::from_utf8_lossy(&output.stdout)
+                .trim()
+                .parse()
+                .map_err(|_| "missing boot/tick identity".to_owned())
+        })
+        .clone()
 }
 
 /// [`linux_snapshot`] with `proc` mounted at the given root and the process
@@ -301,8 +310,42 @@ pub fn cpu_snapshot() -> Result<Value, String> {
 /// Tracked processes that used CPU over a short window.
 pub fn competing_builds() -> Result<Vec<String>, String> {
     let before = cpu_snapshot()?;
-    std::thread::sleep(Duration::from_millis(125));
+    std::thread::sleep(CONTAMINATION_WINDOW);
     Ok(active_cpu(&before, &cpu_snapshot()?, false))
+}
+
+/// Compares each snapshot of a run with the one that opened the current window, and
+/// opens the next window once this one is long enough to show a process's CPU clock.
+struct ContaminationWatch {
+    opened: Instant,
+    snapshot: Value,
+}
+
+impl ContaminationWatch {
+    fn new(snapshot: Value) -> Self {
+        Self {
+            opened: Instant::now(),
+            snapshot,
+        }
+    }
+
+    fn observe(&mut self, snapshot: &Value, now: Instant) -> Vec<String> {
+        if now.saturating_duration_since(self.opened) < CONTAMINATION_WINDOW {
+            return Vec::new();
+        }
+        let busy = active_cpu(&self.snapshot, snapshot, false);
+        self.opened = now;
+        self.snapshot = snapshot.clone();
+        busy
+    }
+
+    /// Wait out the open window and check it, so a run shorter than one window is
+    /// still observed over a full window.
+    fn close(mut self) -> Result<Vec<String>, String> {
+        std::thread::sleep(CONTAMINATION_WINDOW.saturating_sub(self.opened.elapsed()));
+        let last = cpu_snapshot()?;
+        Ok(self.observe(&last, Instant::now()))
+    }
 }
 
 /// The external RSS kernel module must not even be loaded while timing.
@@ -572,20 +615,11 @@ fn benchmark_once(
             return Ok(status_only("warmup-failed", vec![("result", warm)]));
         }
     }
+    let mut before = cpu_snapshot()?;
+    let mut watch = ContaminationWatch::new(before.clone());
     for index in 0..pairs {
-        let busy = competing_builds()?;
-        if !busy.is_empty() {
-            return Ok(status_only(
-                "contaminated",
-                vec![
-                    ("contaminants", Value::strings(busy)),
-                    ("samples", Value::Array(samples)),
-                ],
-            ));
-        }
         let mut order = [0usize, 1];
         rng.shuffle(&mut order);
-        let before = cpu_snapshot()?;
         let mut row = vec![
             ("pair".to_owned(), Value::int(index as i64)),
             (
@@ -609,7 +643,8 @@ fn benchmark_once(
         let after = cpu_snapshot()?;
         row.push(("cpu_after".into(), after.clone()));
         *samples.last_mut().expect("row") = Value::Object(row);
-        let busy = active_cpu(&before, &after, false);
+        let mut busy = active_cpu(&before, &after, false);
+        busy.extend(watch.observe(&after, Instant::now()));
         if !busy.is_empty() {
             return Ok(status_only(
                 "contaminated",
@@ -619,6 +654,17 @@ fn benchmark_once(
                 ],
             ));
         }
+        before = after;
+    }
+    let busy = watch.close()?;
+    if !busy.is_empty() {
+        return Ok(status_only(
+            "contaminated",
+            vec![
+                ("contaminants", Value::strings(busy)),
+                ("samples", Value::Array(samples)),
+            ],
+        ));
     }
     let mut values = Vec::new();
     for row in &samples {
@@ -828,6 +874,27 @@ mod tests {
         fn drop(&mut self) {
             let _ = fs::remove_dir_all(&self.0);
         }
+    }
+
+    #[test]
+    fn a_watch_compares_processes_only_across_a_full_window() {
+        let proc = Proc::new();
+        let quiet = proc.snapshot(CLANG);
+        proc.write("123/stat", &proc_stat(11, 100));
+        let busy = proc.snapshot(CLANG);
+        let mut watch = ContaminationWatch::new(quiet.clone());
+        let start = watch.opened;
+        assert!(watch.observe(&busy, start).is_empty());
+        assert_eq!(
+            watch.observe(&busy, start + CONTAMINATION_WINDOW),
+            ["clang".to_owned()]
+        );
+        // The next window opens at the snapshot that closed this one.
+        assert!(
+            watch
+                .observe(&busy, start + CONTAMINATION_WINDOW * 2)
+                .is_empty()
+        );
     }
 
     fn linux(snapshot: &Value) -> &Value {

@@ -119,7 +119,8 @@ be established. Use built workers you trust.
   and report p50, p95 and the confidence bound per case. An aggregate never hides a
   failing case.
 - Measure on an isolated machine. Never time while compiling, fuzzing or running
-  another benchmark; the runner rejects contaminated pairs.
+  another benchmark; the runner watches the whole run and rejects it if a tracked
+  process uses CPU or steal time grows.
 - Allocation tracking and timing are separate runs, because instrumentation changes
   timing.
 - To compare two revisions, build both on the same machine and run `cargo xtask report
