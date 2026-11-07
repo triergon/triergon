@@ -1,0 +1,18 @@
+[package]
+name = "triergon-codec-opus"
+version = "0.0.0"
+description = "Opus decoder (RFC 6716): SILK, CELT and hybrid"
+repository.workspace = true
+license.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+
+[dependencies]
+triergon-bitstream = { path = "../bitstream" }
+triergon-codec = { path = "../codec" }
+triergon-core = { path = "../core" }
+triergon-framing = { path = "../framing" }
+
+[lints]
+workspace = true

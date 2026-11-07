@@ -253,14 +253,14 @@ fn a_selection_starts_the_lanes_it_names() {
         video: VideoCodec::Hevc,
         audio: Some(AudioCodec::Dts),
     };
-    selection.load(&mut video, &mut audio);
+    selection.load(&mut video, &mut audio, &[]).unwrap();
     assert_eq!(video.state(), SessionState::Starved);
     assert_eq!(audio.state(), SessionState::Starved);
     let silent = StreamSelection {
         audio: None,
         ..selection
     };
-    silent.load(&mut video, &mut audio);
+    silent.load(&mut video, &mut audio, &[]).unwrap();
     assert_eq!(video.state(), SessionState::Starved);
     assert_eq!(audio.state(), SessionState::Idle);
     assert_eq!(audio.feed(&[1], None), Err(FeedError::Idle));

@@ -11,6 +11,7 @@
 // Pending: `missing_docs`.
 
 pub mod layout;
+pub mod mdct;
 mod window;
 
 pub use layout::{ChannelLayout, Speaker};
@@ -30,6 +31,11 @@ pub enum AudioCodec {
     Eac3,
     Aac,
     Dts,
+    Flac,
+    Opus,
+    Vorbis,
+    /// MPEG-1/2 audio Layer I, II or III.
+    MpegAudio,
 }
 
 /// Why a decoder refused an access unit: the codec error's `Debug` text.

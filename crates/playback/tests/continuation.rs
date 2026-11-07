@@ -989,7 +989,7 @@ fn mp4_playback_feeds_real_simulator_decoders_across_clock_and_seek() {
         video: VideoCodec::H264,
         audio: Some(AudioCodec::Aac),
     };
-    selection.load(&mut video, &mut audio);
+    selection.load(&mut video, &mut audio, &[]).unwrap();
     let mut reference = None;
 
     for iteration in 0..2 {
