@@ -14,6 +14,7 @@ use std::fs;
 use std::path::Path;
 use std::process::Command;
 
+use super::gate_build;
 use crate::json::{self, Value};
 use crate::stats;
 
@@ -97,7 +98,8 @@ fn grade(name: &str, report: &Value) -> Group {
 
 /// Grade every `<group>/report.json` under `reports`. Passing means no flagged case,
 /// no flagged group and no case left unmeasured.
-pub fn screen(reports: &Path) -> Result<bool, String> {
+pub fn screen(root: &Path, reports: &Path) -> Result<bool, String> {
+    let pinned = gate_build::pinned_release(root)?;
     let mut folders: Vec<_> = fs::read_dir(reports)
         .map_err(|e| format!("{}: {e}", reports.display()))?
         .filter_map(Result::ok)
@@ -118,6 +120,8 @@ pub fn screen(reports: &Path) -> Result<bool, String> {
             "{:32} {:4} cases  median {:+.2}%",
             group.name, group.cases, group.median_percent
         );
+        let identity = report.get("identity").unwrap_or(&Value::Null);
+        println!("  {}", gate_build::describe(identity, &pinned));
         for (case, change) in &group.flagged {
             println!("  above {CASE_LIMIT}%: {case} {change:+.2}%");
         }

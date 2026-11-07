@@ -3,6 +3,7 @@
 use super::acceptance::{acceptance, active_cpu};
 use super::comparison::{reference_record, reference_summary, rule_for, validate_case_evidence};
 use super::diff::differences;
+use super::gate_build;
 use super::parity::review_native_difference;
 use crate::json::{Value, parse};
 
@@ -119,9 +120,16 @@ fn matched_gate_fixture() -> (Value, Vec<Value>, Value) {
         ("timing", timing),
         ("memory", memory),
     ]);
+    let compiler = format!(
+        "rustc\nrelease: {}\n",
+        gate_build::pinned_release(root()).unwrap()
+    );
     let identity = Value::object([
         ("source_revision", Value::str("pin")),
         ("binaries", hashes),
+        ("rustc", Value::str(compiler)),
+        ("build_environment", Value::Object(Vec::new())),
+        ("cargo_configuration", Value::Array(Vec::new())),
         (
             "instrumentation",
             v(r#"{"probe_sha256": "probe-hash", "observer_sha256": "observer-hash"}"#),
@@ -681,4 +689,58 @@ fn same_difference_paths_do_not_allow_changed_native_values() {
         status(&altered).as_deref(),
         Some("unexpected-native-difference")
     );
+}
+
+#[test]
+fn a_report_off_the_gate_build_fails_both_verdicts_and_says_why() {
+    let (contract, rows, identity) = matched_gate_fixture();
+    assert_eq!(verdict(&contract, &rows, &identity), (true, true));
+    let reasons = |identity: &Value| {
+        let result = acceptance(
+            root(),
+            &contract,
+            &rows,
+            identity,
+            "host",
+            &[v(r#"{"status": "pass"}"#)],
+            &[],
+        );
+        python_list(result.get("slice_reasons"))
+    };
+    let mut nightly = identity.clone();
+    put(
+        &mut nightly,
+        &[],
+        "rustc",
+        Value::str("rustc\nrelease: 1.101.0-nightly\n"),
+    );
+    assert_eq!(verdict(&contract, &rows, &nightly), (false, false));
+    assert!(reasons(&nightly)[0].contains("1.101.0-nightly"));
+
+    let mut flagged = identity.clone();
+    put(
+        &mut flagged,
+        &[],
+        "build_environment",
+        v(r#"{"RUSTFLAGS": "-C target-cpu=neoverse-v2"}"#),
+    );
+    assert_eq!(verdict(&contract, &rows, &flagged), (false, false));
+    assert!(reasons(&flagged)[0].contains("RUSTFLAGS"));
+
+    let mut silent = identity.clone();
+    if let Value::Object(fields) = &mut silent {
+        fields.retain(|(key, _)| key != "cargo_configuration");
+    }
+    assert_eq!(verdict(&contract, &rows, &silent), (false, false));
+    assert!(reasons(&silent)[0].contains("no Cargo configuration"));
+}
+
+fn python_list(value: Option<&Value>) -> Vec<String> {
+    value
+        .and_then(Value::as_array)
+        .unwrap_or_default()
+        .iter()
+        .filter_map(Value::as_str)
+        .map(str::to_owned)
+        .collect()
 }

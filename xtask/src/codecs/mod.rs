@@ -160,6 +160,7 @@ pub fn main(root: &Path, args: &[String]) -> Result<i32, String> {
                 &[],
             )?;
             timing::run(&timing::Options {
+                repository: root.to_path_buf(),
                 candidate: a.path("candidate")?,
                 reference: a.path("reference")?,
                 workloads: a.path("workloads")?,

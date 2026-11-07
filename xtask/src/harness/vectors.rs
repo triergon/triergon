@@ -9,6 +9,7 @@ use std::time::Duration;
 
 use super::acceptance::acceptance;
 use super::comparison::{reference_record, reference_summary};
+use super::gate_build;
 use super::parity::{self, Run};
 use super::provenance::source_identity_error;
 use super::report::host_target;
@@ -83,6 +84,10 @@ pub fn external_vector(root: &Path, options: &ExternalOptions) -> R<i32> {
         .cloned()
         .ok_or("contract names no external vector")?;
     let (candidate, reference, identity) = workers(root)?;
+    println!(
+        "{}",
+        gate_build::describe(&identity, &gate_build::pinned_release(root)?)
+    );
     let file = s(&spec, "file").unwrap_or_default().to_owned();
     if Path::new(&file)
         .components()

@@ -63,8 +63,10 @@ commands:
                  [--maximum-output-bytes N] [--timeout-seconds S]
                  deterministic, replayable mutation campaign through JSON workers
   graph          PACKAGE [FILE]...   print the provenance graph of a workspace package
-  build-workers  build the candidate and reference workers and the memory observers, and
-                 record their identity in target/harness/identity.json
+  build-workers  [--comparison-build]
+                 build the candidate and reference workers and the memory observers, and
+                 record their identity in target/harness/identity.json; anything but the
+                 gate build is refused unless it is for paired comparisons only
   memory-admission CANDIDATE REFERENCE
                  check the native AArch64 memory observer for two built workers
                  and print the certificate
@@ -118,7 +120,7 @@ fn main() -> ExitCode {
             _ => Err("usage: cargo xtask same-code CANDIDATE REFERENCE".into()),
         },
         Some("screen") => match &args[1..] {
-            [reports] => return passing(harness::screen::screen(Path::new(reports))),
+            [reports] => return passing(harness::screen::screen(&root, Path::new(reports))),
             _ => Err("usage: cargo xtask screen REPORTS".into()),
         },
         Some("report") => return report(&root, &args[1..]),
@@ -130,9 +132,12 @@ fn main() -> ExitCode {
         Some("trace-identities") => return trace_identities(&root, &args[1..]),
         Some("codecs") => return failing(codecs::main(&root, &args[1..]), codecs::USAGE),
         Some("capture") => return failing(capture::main(&root, &args[1..]), capture::USAGE),
-        Some("build-workers") => {
-            harness::build::build(&root).map(|path| println!("{}", path.display()))
+        Some("build-workers") => match &args[1..] {
+            [] => harness::build::build(&root, false),
+            [flag] if flag == "--comparison-build" => harness::build::build(&root, true),
+            _ => Err("usage: cargo xtask build-workers [--comparison-build]".into()),
         }
+        .map(|path| println!("{}", path.display())),
         Some("memory-admission") => match &args[1..] {
             [candidate, reference] => {
                 harness::memory::admission(&root, Path::new(candidate), Path::new(reference))

@@ -27,6 +27,7 @@ use std::time::Duration;
 use crate::codecs::correctness::file_sha;
 use crate::harness::acceptance::active_cpu;
 use crate::harness::diff::equal;
+use crate::harness::gate_build;
 use crate::harness::memory;
 use crate::harness::timing::{competing_builds, cpu_snapshot, lock};
 use crate::json::{self, Value};
@@ -217,6 +218,17 @@ fn shuffled(rng: &mut PyRandom) -> [&'static str; 2] {
     let mut order = ["candidate", "reference"];
     rng.shuffle(&mut order);
     order
+}
+
+/// Keep a measurement but pass nothing: the run was not on the gate build.
+fn withhold_gates(timed: &mut Value) {
+    if let Value::Object(fields) = timed {
+        for (key, value) in fields {
+            if key == "gate_pass" || key == "target_pass" {
+                *value = Value::Bool(false);
+            }
+        }
+    }
 }
 
 #[allow(clippy::too_many_arguments)] // The workers, input and paired timing settings.
@@ -416,9 +428,15 @@ pub fn run(root: &Path, a: &Options) -> Result<(), String> {
     if observer != Value::str(file_sha(&root.join("target/harness/allocations.so"))?) {
         return Err("capture requires the observer built in target/harness".into());
     }
+    let refusals =
+        gate_build::pair_refusals(root, Path::new(&a.candidate), Path::new(&a.reference));
+    for reason in &refusals {
+        println!("no gate result: {reason}");
+    }
     let identity = Value::object([
         ("source_digest", Value::str(digest)),
         ("source_manifest", Value::Object(manifest)),
+        ("build_refusals", Value::strings(refusals.clone())),
         ("candidate_sha256", sha(&a.candidate)?),
         ("reference_sha256", sha(&a.reference)?),
         (
@@ -510,7 +528,7 @@ pub fn run(root: &Path, a: &Options) -> Result<(), String> {
         };
         record.push(("correctness_summary".into(), correctness.clone()));
         let outputs = correctness.get("outputs");
-        let timed = runtime(
+        let mut timed = runtime(
             &a.candidate,
             &a.reference,
             case,
@@ -520,6 +538,9 @@ pub fn run(root: &Path, a: &Options) -> Result<(), String> {
             a.seed,
             outputs,
         )?;
+        if !refusals.is_empty() {
+            withhold_gates(&mut timed);
+        }
         let runtime_gate =
             outputs.is_some() && a.pairs >= 30 && timed.get("gate_pass").is_some_and(Value::truthy);
         let runtime_target = timed.get("target_pass").is_some_and(Value::truthy);
