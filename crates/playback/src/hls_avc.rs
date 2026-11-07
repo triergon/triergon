@@ -752,13 +752,25 @@ impl AvcTsReader {
     }
 }
 
-fn adjacent_zero_bytes(chunk: &[u8; 16], next: u8) -> u128 {
-    let word = u128::from_le_bytes(*chunk);
-    let adjacent = word | (word >> 8) | (u128::from(next) << 120);
-    // Borrow can mark a later byte. The first mark always starts a zero pair.
-    adjacent.wrapping_sub(0x0101_0101_0101_0101_0101_0101_0101_0101)
-        & !adjacent
-        & 0x8080_8080_8080_8080_8080_8080_8080_8080
+fn adjacent_zero_masks(chunk: &[u8; 16], next: u8) -> (u64, u64) {
+    let (words, _) = chunk.as_chunks::<8>();
+    let first = u64::from_le_bytes(words[0]);
+    let second = u64::from_le_bytes(words[1]);
+    let first_pairs = first | (first >> 8) | (second << 56);
+    let second_pairs = second | (second >> 8) | (u64::from(next) << 56);
+    let zeroes = |pairs: u64| {
+        // Borrow can mark a later byte. The first mark starts a zero pair.
+        pairs.wrapping_sub(0x0101_0101_0101_0101) & !pairs & 0x8080_8080_8080_8080
+    };
+    (zeroes(first_pairs), zeroes(second_pairs))
+}
+
+fn first_zero_pair(first: u64, second: u64) -> usize {
+    if first != 0 {
+        first.trailing_zeros() as usize / 8
+    } else {
+        8 + second.trailing_zeros() as usize / 8
+    }
 }
 
 fn nal_body_prefix_len(bytes: &[u8]) -> usize {
@@ -766,16 +778,17 @@ fn nal_body_prefix_len(bytes: &[u8]) -> usize {
     while let Some((chunk, tail)) = rest.split_first_chunk::<16>()
         && let Some(&next) = tail.first()
     {
-        let zero_pairs = adjacent_zero_bytes(chunk, next);
-        if zero_pairs != 0 {
-            return bytes.len() - rest.len() + zero_pairs.trailing_zeros() as usize / 8;
+        let (first, second) = adjacent_zero_masks(chunk, next);
+        if first | second != 0 {
+            return bytes.len() - rest.len() + first_zero_pair(first, second);
         }
         rest = tail;
     }
     if let Some((head, tail)) = bytes.split_last_chunk::<16>() {
         // The overlap has already been checked. Treat a trailing zero as a
         // possible prefix for the next input span.
-        return head.len() + adjacent_zero_bytes(tail, 0).trailing_zeros() as usize / 8;
+        let (first, second) = adjacent_zero_masks(tail, 0);
+        return head.len() + first_zero_pair(first, second);
     }
     bytes
         .windows(2)

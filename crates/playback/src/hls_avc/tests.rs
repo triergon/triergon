@@ -484,3 +484,31 @@ fn nal_body_scan_keeps_possible_prefixes_at_every_input_boundary() {
         }
     }
 }
+
+#[test]
+fn nal_body_scan_matches_scalar_search_for_mixed_bytes() {
+    let mut state = 0x6f24_b381_08da_75c9_u64;
+    for len in 0..=257 {
+        for sample in 0..16 {
+            let mut bytes = vec![0; len];
+            for byte in &mut bytes {
+                state ^= state << 13;
+                state ^= state >> 7;
+                state ^= state << 17;
+                *byte = (state >> 32) as u8;
+            }
+            if len != 0 {
+                let at = sample * len / 16;
+                bytes[at] = 0;
+                if sample % 2 == 0 && at + 1 < len {
+                    bytes[at + 1] = 0;
+                }
+            }
+            let expected = bytes
+                .windows(2)
+                .position(|pair| pair == [0, 0])
+                .unwrap_or_else(|| len - usize::from(bytes.last() == Some(&0)));
+            assert_eq!(nal_body_prefix_len(&bytes), expected, "{len}, {sample}");
+        }
+    }
+}
