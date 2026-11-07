@@ -14518,9 +14518,64 @@
   {
    "name": "mp4-range-playback-linux-arm64",
    "retention": "retained",
-   "reason": "MP4 range playback status row",
+   "reason": "Initial MP4 range playback comparison",
    "key": "evidence/mp4-range-playback-linux-arm64/475345439338ad74a057e89ffaf8837a508c5f4e6e110916de12a1ec5048646d.tar.gz",
    "sha256": "475345439338ad74a057e89ffaf8837a508c5f4e6e110916de12a1ec5048646d"
+  },
+  {
+   "name": "mp4-shared-packet-comparison",
+   "retention": "retained",
+   "reason": "MP4 packet sharing comparison",
+   "key": "evidence/mp4-shared-packet-comparison/13f0528ba25501e92ed2840f44184bb1460c7d91ad31c0c2b234d2432faa58da.tar.gz",
+   "sha256": "13f0528ba25501e92ed2840f44184bb1460c7d91ad31c0c2b234d2432faa58da"
+  },
+  {
+   "name": "mp4-window-reuse-comparison",
+   "retention": "retained",
+   "reason": "MP4 input window reuse and resident peak comparison",
+   "key": "evidence/mp4-window-reuse-comparison/6fedaebeae1999dea6df8293e51434cd69b36d64c3d20f0783f04d8cd260b386.tar.gz",
+   "sha256": "6fedaebeae1999dea6df8293e51434cd69b36d64c3d20f0783f04d8cd260b386"
+  },
+  {
+   "name": "mp4-indexed-packet-delivery",
+   "retention": "retained",
+   "reason": "MP4 range playback status row",
+   "key": "evidence/mp4-indexed-packet-delivery/4c2992b765efb52b60ba6bec8425cbf4c3d1ec55967ddd6d291e1efb14a4e8e5.tar.gz",
+   "sha256": "4c2992b765efb52b60ba6bec8425cbf4c3d1ec55967ddd6d291e1efb14a4e8e5",
+   "files": [
+    {
+     "path": "EXACT-TEST.log",
+     "sha256": "bf6606e9f65e3c1850a692e29ad174926faae1c029f266f658dfb1fddbe91312"
+    },
+    {
+     "path": "FINAL-CLIPPY.log",
+     "sha256": "294b0a9d3d2ed367e880407e44c887e5b1416b5f91727f563eb0e5b661f6e435"
+    },
+    {
+     "path": "NATIVE-RESULTS.sha256",
+     "sha256": "e940bbfacda1e10c3ef9faa2b5317952b88a92e963d3cb0b789b9e1ffca10a90"
+    },
+    {
+     "path": "NATIVE-RESULTS.tar.gz",
+     "sha256": "e627eb146139c4b1dab83bd6086578e7057f957d8b1e08a06ca3817dea211df0"
+    },
+    {
+     "path": "NATIVE.log",
+     "sha256": "2e507eda0da16ccbf6c74dd20ceaaeeb1930cd232ee0b53693260e58f2101d21"
+    },
+    {
+     "path": "RSS-REVIEW.json",
+     "sha256": "35fcc38a12295baaefe8217d5a720ee351de7a3053c04bec08c3734ffc67a352"
+    },
+    {
+     "path": "guest.sh",
+     "sha256": "a92d5c54c420ac759fda375f5e8d6f13ea69df21a6925951f20bfa7493976498"
+    },
+    {
+     "path": "source.bundle",
+     "sha256": "f1f7e29a09feea3cd4e4455920d49ff06eeec2011c14b1bbc786c2c404e11f34"
+    }
+   ]
   }
  ]
 }
