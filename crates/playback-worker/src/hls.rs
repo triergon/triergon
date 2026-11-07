@@ -55,9 +55,7 @@ impl Work {
     }
 
     fn payload(&mut self, data: &[u8]) -> Result<()> {
-        for &byte in data {
-            self.mix(u64::from(byte));
-        }
+        triergon_harness_protocol::digest::fold_bytes(&mut self.digest, data);
         self.bytes += data.len();
         Ok(())
     }
