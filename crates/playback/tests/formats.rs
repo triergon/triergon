@@ -1,5 +1,5 @@
 mod common;
-use common::{byte_input, collect, off, run_open};
+use common::{annex_b, annex_b_session, byte_input, collect, off, run_open};
 use std::sync::{
     Arc, Mutex,
     atomic::{AtomicBool, Ordering},
@@ -1242,66 +1242,23 @@ fn actual_queue_pressure_stops_read_and_release_resumes_whole_operation() {
     assert_eq!(pes(&out).len(), 1);
 }
 #[test]
-fn real_mp4_avc_packets_flow_through_existing_stateful_bsf_with_all_raw_metadata() {
-    use triergon_framing::{AvcConfigLimits, BuildStep, NalPacketLimits};
+fn real_mp4_avc_packets_frame_as_annex_b_from_their_source_bytes() {
     let raw = include_bytes!("fixtures/mp4/encoded-avc-aac-front.mp4");
     let (mut p, b) = mp4(raw, Mp4View::SourcePhysical, 7, 17).unwrap();
     let out = collect(&mut p, 17).unwrap();
     let packets: Vec<_> = mp4_packets(&out)
         .into_iter()
         .filter(|p| p.configuration.description.format == *b"avc1")
-        .cloned()
         .collect();
     assert!(!packets.is_empty());
-    let mut setup = nal_bridge::AvcBridgeSetup::new(
-        &b,
-        ID,
-        packets[0].configuration.clone(),
-        AvcConfigLimits {
-            maximum_record_bytes: 1 << 20,
-            maximum_nals: 256,
-            maximum_nal_bytes: 1 << 20,
-        },
-        NalPacketLimits {
-            maximum_packet_bytes: 1 << 20,
-            maximum_output_bytes: 2 << 20,
-            maximum_nals: 1024,
-            maximum_segments: 2048,
-        },
-    )
-    .unwrap();
-    let mut bridge = loop {
-        if let Some(bridge) = setup.poll(&mut WorkBudget::new(1), &off()).unwrap() {
-            break bridge;
-        }
-    };
+    let mut session = annex_b_session(&b, packets[0]);
     for packet in packets {
-        let source = packet.source.payload.clone();
-        let clock = packet
-            .source
-            .sample
-            .source_times(packet.configuration.track.base.require().unwrap())
-            .unwrap();
-        let generation = packet.source.token.generation();
-        let mut job = bridge.packet(packet).unwrap();
-        let result = loop {
-            match job.step(&mut WorkBudget::new(1), &off()).unwrap() {
-                BuildStep::Ready(o) => break o,
-                BuildStep::Yield => {}
-                BuildStep::Complete => panic!(),
-            }
-        };
-        assert_eq!(result.source().bytes.as_ref(), source.as_ref());
-        assert_eq!(result.source().generation, generation);
-        let original = &result.source().fields;
+        let result = annex_b(&mut session, packet);
         assert_eq!(
-            original
-                .source
-                .sample
-                .source_times(original.configuration.track.base.require().unwrap())
-                .unwrap(),
-            clock
+            result.source().bytes.as_ref(),
+            packet.source.payload.as_ref()
         );
+        assert_eq!(result.source().generation, packet.source.token.generation());
         assert!(
             result.bytes().starts_with(&[0, 0, 0, 1]) || result.bytes().starts_with(&[0, 0, 1])
         );

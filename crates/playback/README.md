@@ -68,7 +68,7 @@ MP4 needs an open and index step first: `mp4_open::Mp4Open` →
 | TS / M2TS | `Engine::ts`, `ts_with_namespace`, `ts_segmented`, `ts_native`, `ts_native_private_audio_v1`, `ts_native_program_v1`, `ts_native_segment_v1`; `native_startup::NativeStartup` |
 | HLS media segments | `hls_segment::HlsSegmentReader` (AVC + AAC), `HlsMediaSegmentReader` (AVC/HEVC + AAC/AC-3/E-AC-3) |
 | Raw Annex B | `raw_video::RawVideoProbe`, `RawVideoSource`, `RawVideoConfigTracker`, `RawVideoFeed` |
-| Packet bridges | `nal_bridge::AvcBridge`, `hevc_bridge::HevcBridge`, `aac_bridge::AacBridge`, `av1_bridge::Av1Bridge` |
+| Packet bridges | `aac_bridge::AacBridge`, `av1_bridge::Av1Bridge`; MP4 AVC and HEVC samples frame through `triergon_framing::NalPacketSession` |
 | Subtitles | `text_bridge::TextBridge`, `bitmap_bridge::{PgsBridge, DvdJob, DvdReceiver}`, `matroska_feed::MatroskaBitmapTrack`, `dvb_ts::DvbTsBridge` |
 | Sink handoff | `pump::{Pump, Sink, CatalogueSink, Feed}` |
 
