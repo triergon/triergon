@@ -27,21 +27,27 @@ pub struct BytesView<'a> {
 }
 
 impl<'a> BytesView<'a> {
+    /// Number of bytes in this borrowed range.
     pub fn len(self) -> usize {
         self.end - self.start
     }
+    /// Whether the checked range contains no bytes.
     pub fn is_empty(self) -> bool {
         self.start == self.end
     }
+    /// Borrow the original handle, including its full retained allocation.
     pub fn backing_bytes(self) -> &'a Bytes {
         self.backing
     }
+    /// Capacity of the backing allocation, including bytes outside this range.
     pub fn retained_capacity(self) -> usize {
         self.backing.retained_capacity()
     }
+    /// Whether the backing allocation is charged to this budget pool.
     pub fn belongs_to(self, budget: &Budget) -> bool {
         self.backing.belongs_to(budget)
     }
+    /// Borrow a relative subrange, rejecting reversed or out-of-range bounds.
     pub fn slice(self, range: Range<usize>) -> Result<Self> {
         if range.start > range.end || range.end > self.len() {
             return Err(Error::Invalid("byte span range"));

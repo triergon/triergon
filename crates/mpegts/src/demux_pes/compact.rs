@@ -95,18 +95,24 @@ impl CompactPayload {
         let logical = records.len();
         Self::new(records, logical, false)
     }
+    /// Number of logical spans, including those represented by a stored run.
     pub fn len(&self) -> usize {
         self.logical
     }
+    /// Whether the payload contains no logical spans.
     pub fn is_empty(&self) -> bool {
         self.logical == 0
     }
+    /// Charged span slots, including slots represented by a run.
     pub fn capacity(&self) -> usize {
         self.records.capacity()
     }
+    /// Allocation pool for the span arena. Individual backing pools remain
+    /// available through each view for ordered validation.
     pub fn budget(&self) -> &Budget {
         self.records.budget()
     }
+    /// Visit every logical span in source order without adding shared handles.
     pub fn spans(&self) -> DemuxSpanViews<'_> {
         DemuxSpanViews {
             records: self.records.as_slice().iter(),
@@ -116,6 +122,7 @@ impl CompactPayload {
             grouped: self.grouped,
         }
     }
+    /// Move storage into a cursor that retires individual logical ranges.
     pub fn into_cursor(self) -> PayloadCursor {
         PayloadCursor {
             records: self.records.into_iter(),
@@ -185,9 +192,11 @@ pub struct PayloadCursor {
     grouped: bool,
 }
 impl PayloadCursor {
+    /// Unadmitted ranges, excluding the active range and successful retirements.
     pub fn remaining(&self) -> usize {
         self.remaining
     }
+    /// Borrow the active range until it is explicitly retired.
     pub fn current(&self) -> Option<DemuxSpanView<'_>> {
         self.active.then(|| {
             view(
@@ -223,6 +232,8 @@ impl PayloadCursor {
         self.active = true;
         Some(view(span, self.index, self.grouped))
     }
+    /// Release the active logical range. Other ranges keep its backing alive.
+    /// Calling this without an active range has no effect.
     pub fn retire_current(&mut self) {
         if !self.active {
             return;
@@ -238,14 +249,13 @@ impl PayloadCursor {
             self.index = 0;
         }
     }
+    /// Borrow only ranges not yet admitted or successfully retired.
     pub fn remaining_spans(&self) -> DemuxSpanViews<'_> {
         DemuxSpanViews {
             records: self.records.as_slice().iter(),
-            current: self.current.as_ref().map(|span| {
-                (
-                    span,
-                    self.index + usize::from(self.active) + self.tail_retired,
-                )
+            current: self.current.as_ref().and_then(|span| {
+                let index = self.index + usize::from(self.active) + self.tail_retired;
+                (index < record_count(span, self.grouped)).then_some((span, index))
             }),
             first_index: self.head_retired,
             remaining: self.remaining,
@@ -354,10 +364,18 @@ mod tests {
             .drain_remaining(|| panic!("completed drain must not revisit ranges"))
             .unwrap();
         assert_eq!(cursor.remaining(), 0);
-        assert!(cursor.remaining_spans().next().is_none());
+        let mut remaining = cursor.remaining_spans();
+        assert_eq!(remaining.len(), 0);
+        assert_eq!(remaining.size_hint(), (0, Some(0)));
+        assert!(remaining.next().is_none());
+        assert!(remaining.next().is_none());
+        assert_eq!(remaining.count(), 0);
         assert_eq!(cursor.current().unwrap().context.source_event_ordinal, 0);
         assert_eq!(pool.used(), charged);
         cursor.retire_current();
+        assert_eq!(cursor.remaining_spans().len(), 0);
+        assert_eq!(cursor.remaining_spans().count(), 0);
+        assert!(cursor.remaining_spans().next().is_none());
         assert!(cursor.next_span().is_none());
         assert_eq!(pool.used(), charged - storage);
         cursor

@@ -170,6 +170,7 @@ pub struct CompactDemuxPacket {
 }
 
 impl CompactDemuxPacket {
+    /// Original causal header when its time fields apply to this payload.
     pub fn time_header(&self) -> Option<&PesHeader> {
         self.time_header_applies.then_some(&self.source_header)
     }
@@ -1150,6 +1151,8 @@ impl DemuxObserver {
         self.payload_format == PayloadFormat::Compact
     }
 
+    /// Poll after selecting compact delivery, with the ordinary work and
+    /// cancellation boundaries. A mismatched polling mode leaves state intact.
     pub fn poll_compact_payload(
         &mut self,
         work: &mut WorkBudget,
@@ -1157,6 +1160,7 @@ impl DemuxObserver {
     ) -> Result<AssemblyStep<CompactDemuxPacket>> {
         self.poll_payload_bound(work, cancel, None, true)
     }
+    /// Poll compact delivery while validating the observer's input binding.
     pub fn poll_compact_payload_with_input(
         &mut self,
         input: &triergon_core::InputCursor,
