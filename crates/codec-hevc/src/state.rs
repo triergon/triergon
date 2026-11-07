@@ -2,6 +2,7 @@
 
 use crate::cabac::ctx;
 use crate::picture::PuMotion;
+use triergon_codec::{Budget, BudgetVec, StorageError};
 
 pub const F_INTRA: u8 = 1;
 pub const F_SKIP: u8 = 2;
@@ -43,22 +44,24 @@ pub struct SliceInfo {
     pub ref_lt: [[bool; 16]; 2],
 }
 
+/// The per-picture maps are `BudgetVec`s sized when a picture starts and reused (grown,
+/// never shrunk) for later pictures.
 #[derive(Debug)]
 pub struct PicState {
     pub w4: usize,
     pub h4: usize,
-    pub blk: Vec<BlkInfo>,
-    pub motion: Vec<PuMotion>,
+    pub blk: BudgetVec<BlkInfo>,
+    pub motion: BudgetVec<PuMotion>,
     /// Vertical edge marks / boundary strengths at x multiple of 8, per 4 rows.
-    pub bs_v: Vec<u8>,
+    pub bs_v: BudgetVec<u8>,
     /// Horizontal edge marks / boundary strengths at y multiple of 8, per 4 columns.
-    pub bs_h: Vec<u8>,
+    pub bs_h: BudgetVec<u8>,
     pub bs_v_stride: usize,
     pub bs_h_stride: usize,
-    pub ctb_slice_addr: Vec<u32>,
-    pub ctb_slice_idx: Vec<u16>,
-    pub sao: Vec<SaoParams>,
-    pub slices: Vec<SliceInfo>,
+    pub ctb_slice_addr: BudgetVec<u32>,
+    pub ctb_slice_idx: BudgetVec<u16>,
+    pub sao: BudgetVec<SaoParams>,
+    pub slices: BudgetVec<SliceInfo>,
     pub ctx_wpp: [u8; ctx::NUM],
     pub ctx_ds: [u8; ctx::NUM],
     pub ctx_wpp_valid: bool,
@@ -71,26 +74,26 @@ pub struct PicState {
     pub decoded_ctbs: usize,
     /// Decoded CTBs per CTB row, and the next rows to deblock / to SAO (in-loop filters
     /// run row by row during decoding, see decoder::filter_ready).
-    pub row_done: Vec<u16>,
+    pub row_done: BudgetVec<u16>,
     pub filt_next: usize,
     pub sao_next: usize,
 }
 
 impl PicState {
-    pub fn new() -> Self {
+    pub fn new(budget: &Budget) -> Self {
         PicState {
             w4: 0,
             h4: 0,
-            blk: Vec::new(),
-            motion: Vec::new(),
-            bs_v: Vec::new(),
-            bs_h: Vec::new(),
+            blk: BudgetVec::new(budget),
+            motion: BudgetVec::new(budget),
+            bs_v: BudgetVec::new(budget),
+            bs_h: BudgetVec::new(budget),
             bs_v_stride: 0,
             bs_h_stride: 0,
-            ctb_slice_addr: Vec::new(),
-            ctb_slice_idx: Vec::new(),
-            sao: Vec::new(),
-            slices: Vec::new(),
+            ctb_slice_addr: BudgetVec::new(budget),
+            ctb_slice_idx: BudgetVec::new(budget),
+            sao: BudgetVec::new(budget),
+            slices: BudgetVec::new(budget),
             ctx_wpp: [0; ctx::NUM],
             ctx_ds: [0; ctx::NUM],
             ctx_wpp_valid: false,
@@ -100,38 +103,50 @@ impl PicState {
             any_sao: false,
             any_nofilter: false,
             decoded_ctbs: 0,
-            row_done: Vec::new(),
+            row_done: BudgetVec::new(budget),
             filt_next: 0,
             sao_next: 0,
         }
     }
 
-    /// Prepare for a new picture of the given luma size and CTB count.
-    pub fn reset(&mut self, width: usize, height: usize, num_ctb: usize) {
+    /// Prepare for a new picture of the given luma size, CTB count and CTB rows. Every
+    /// map is sized before any of them changes, so a refused charge leaves the state as
+    /// it was.
+    pub fn reset(
+        &mut self,
+        width: usize,
+        height: usize,
+        num_ctb: usize,
+        ctb_rows: usize,
+    ) -> Result<(), StorageError> {
         let w4 = width / 4;
         let h4 = height / 4;
+        let (bs_v_stride, bs_h_stride) = (width / 8 + 1, w4);
+        let blk = resized(&self.blk, w4 * h4, BlkInfo::default())?;
+        let motion = resized(&self.motion, w4 * h4, PuMotion::default())?;
+        let bs_v = resized(&self.bs_v, bs_v_stride * h4, 0)?;
+        let bs_h = resized(&self.bs_h, bs_h_stride * (height / 8 + 1), 0)?;
+        let ctb_slice_addr = resized(&self.ctb_slice_addr, num_ctb, u32::MAX)?;
+        let ctb_slice_idx = resized(&self.ctb_slice_idx, num_ctb, 0)?;
+        let sao = resized(&self.sao, num_ctb, SaoParams::default())?;
+        let row_done = resized(&self.row_done, ctb_rows, 0)?;
         if self.w4 != w4 || self.h4 != h4 {
             self.w4 = w4;
             self.h4 = h4;
-            self.blk = vec![BlkInfo::default(); w4 * h4];
-            self.motion = vec![PuMotion::default(); w4 * h4];
-            self.bs_v_stride = width / 8 + 1;
-            self.bs_h_stride = w4;
-            self.bs_v = vec![0; self.bs_v_stride * h4];
-            self.bs_h = vec![0; self.bs_h_stride * (height / 8 + 1)];
-        } else {
-            // blk / motion entries are always written (in decoding order) before any read
-            // within a picture: neighbour reads are gated by availability, the loop filters
-            // read only decoded CTBs. Only the edge marks need clearing.
-            self.bs_v.fill(0);
-            self.bs_h.fill(0);
+            self.bs_v_stride = bs_v_stride;
+            self.bs_h_stride = bs_h_stride;
+            refill(&mut self.blk, blk, BlkInfo::default());
+            refill(&mut self.motion, motion, PuMotion::default());
         }
-        self.ctb_slice_addr.clear();
-        self.ctb_slice_addr.resize(num_ctb, u32::MAX);
-        self.ctb_slice_idx.clear();
-        self.ctb_slice_idx.resize(num_ctb, 0);
-        self.sao.clear();
-        self.sao.resize(num_ctb, SaoParams::default());
+        // blk / motion entries are always written (in decoding order) before any read
+        // within a picture: neighbour reads are gated by availability, the loop filters
+        // read only decoded CTBs. The edge marks and CTB maps are cleared.
+        refill(&mut self.bs_v, bs_v, 0);
+        refill(&mut self.bs_h, bs_h, 0);
+        refill(&mut self.ctb_slice_addr, ctb_slice_addr, u32::MAX);
+        refill(&mut self.ctb_slice_idx, ctb_slice_idx, 0);
+        refill(&mut self.sao, sao, SaoParams::default());
+        refill(&mut self.row_done, row_done, 0);
         self.slices.clear();
         self.ctx_wpp_valid = false;
         self.ctx_ds_valid = false;
@@ -141,11 +156,36 @@ impl PicState {
         self.decoded_ctbs = 0;
         self.filt_next = 0;
         self.sao_next = 0;
+        Ok(())
+    }
+
+    /// Make room for one more slice segment's `SliceInfo` (doubling), so that it is
+    /// charged before the slice header changes any picture state.
+    pub fn reserve_slice(&mut self) -> Result<(), StorageError> {
+        if self.slices.len() < self.slices.capacity() {
+            return Ok(());
+        }
+        self.slices.try_reserve_exact(self.slices.len().max(4))
     }
 }
 
-impl Default for PicState {
-    fn default() -> Self {
-        Self::new()
+/// New storage of `n` copies of `value` when `v` does not hold `n` elements, so a size
+/// change in either direction moves the charge; `None` keeps `v` (the steady state).
+fn resized<T: Clone>(
+    v: &BudgetVec<T>,
+    n: usize,
+    value: T,
+) -> Result<Option<BudgetVec<T>>, StorageError> {
+    if v.len() == n {
+        return Ok(None);
+    }
+    BudgetVec::try_filled(v.budget(), value, n).map(Some)
+}
+
+/// Fill `v` with `value`, or replace it with the storage `resized` made.
+fn refill<T: Clone>(v: &mut BudgetVec<T>, resized: Option<BudgetVec<T>>, value: T) {
+    match resized {
+        Some(new) => *v = new,
+        None => v.fill(value),
     }
 }

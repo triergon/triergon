@@ -3,6 +3,7 @@
 //! splitter (clause 7.4.2.4.4) for elementary-stream input.
 
 use triergon_bitstream::runs;
+use triergon_codec::{BudgetVec, StorageError};
 
 pub const RADL_N: u8 = 6;
 pub const RADL_R: u8 = 7;
@@ -140,14 +141,16 @@ impl<'a> Iterator for AnnexBIter<'a> {
 }
 
 /// Remove emulation prevention bytes (clause 7.3.1.1) from `src` (a NAL unit including its
-/// two header bytes) into `dst` (header bytes are dropped). Returns nothing; `dst` is cleared first.
-pub fn unescape_rbsp(src: &[u8], dst: &mut Vec<u8>) {
+/// two header bytes) into `dst` (header bytes are dropped). `dst` is cleared first and
+/// charged for the whole payload before it grows.
+pub fn unescape_rbsp(src: &[u8], dst: &mut BudgetVec<u8>) -> Result<(), StorageError> {
     let ebsp = src.get(2..).unwrap_or(&[]);
     dst.clear();
-    dst.reserve(ebsp.len());
+    dst.try_reserve_exact(ebsp.len())?;
     for run in runs(ebsp) {
-        dst.extend_from_slice(run);
+        dst.try_extend_from_slice(run)?;
     }
+    Ok(())
 }
 
 /// Splits an Annex B elementary stream into access units (clause 7.4.2.4.4 rules for the
@@ -250,10 +253,11 @@ mod tests {
 
     #[test]
     fn unescape() {
+        let budget = triergon_codec::Budget::new(1 << 12).unwrap();
         let src = [0x40, 0x01, 0x00, 0x00, 0x03, 0x01, 0x00, 0x00, 0x03];
-        let mut d = Vec::new();
-        unescape_rbsp(&src, &mut d);
-        assert_eq!(d, vec![0, 0, 1, 0, 0]);
+        let mut d = BudgetVec::new(&budget);
+        unescape_rbsp(&src, &mut d).unwrap();
+        assert_eq!(&d[..], &[0, 0, 1, 0, 0]);
     }
 
     #[test]
