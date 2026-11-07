@@ -267,7 +267,7 @@ fn actual_mp4_native_order_stays_distinct_from_all_source_facts() {
     for p in packets {
         let n = p.native.as_ref().unwrap();
         assert_eq!(n.source, p.source.sample);
-        assert_eq!(n.native.source_range, p.source.sample.range);
+        assert_eq!(n.demux.source_range, p.source.sample.range);
     }
 }
 #[test]
@@ -344,7 +344,7 @@ fn source_unknown_fragment_clock_is_not_filled_from_native_projection() {
     assert!(
         unknown
             .iter()
-            .any(|p| p.native.as_ref().is_some_and(|n| n.native.dts.is_some()))
+            .any(|p| p.native.as_ref().is_some_and(|n| n.demux.dts.is_some()))
     );
 }
 #[test]
@@ -3026,7 +3026,7 @@ fn native_range_seek_matches_ffprobe_packet_order_bytes_and_clocks() {
         let request = Mp4NativeSeekRequest {
             video: 1,
             timestamp: target,
-            limits: triergon_isobmff::Mov9NativeSeekLimits::default(),
+            limits: triergon_isobmff::compat::mov::seek::SeekLimits::default(),
         };
         let mut job = player
             .prepare_mp4_native_seek(&movie, request, Selection::All)
@@ -3113,10 +3113,10 @@ fn assert_native_seek_packets(
                 );
                 let native = packet.native.as_ref().unwrap();
                 assert_eq!(native.track_id, track);
-                assert_eq!(native.native.pts, fields[1].parse().ok());
-                assert_eq!(native.native.dts, fields[2].parse().ok());
-                assert_eq!(native.native.duration, fields[3].parse::<i64>().unwrap());
-                assert_eq!(native.native.flags, fields[6].parse::<u32>().unwrap());
+                assert_eq!(native.demux.pts, fields[1].parse().ok());
+                assert_eq!(native.demux.dts, fields[2].parse().ok());
+                assert_eq!(native.demux.duration, fields[3].parse::<i64>().unwrap());
+                assert_eq!(native.demux.flags, fields[6].parse::<u32>().unwrap());
                 let pos: usize = fields[4].parse().unwrap();
                 let size: usize = fields[5].parse().unwrap();
                 assert_eq!(packet.source.sample.range, pos as u64..(pos + size) as u64);
@@ -3229,7 +3229,7 @@ fn bounded_timing_range_playback_preserves_packets_and_seeks() {
         assert_eq!(packets.len(), 6);
         for (index, packet) in packets.into_iter().enumerate() {
             let dts = index as i64 * 1000;
-            let native = &packet.native.as_ref().unwrap().native;
+            let native = &packet.native.as_ref().unwrap().demux;
             assert_eq!((native.dts, native.pts), (Some(dts), Some(dts + offset)));
             let range = &packet.source.sample.range;
             assert_eq!(range.end - range.start, 12);
@@ -3244,7 +3244,7 @@ fn bounded_timing_range_playback_preserves_packets_and_seeks() {
             .prepare_seek(Mp4NativeSeekRequest {
                 video: track.header().track_id,
                 timestamp: 3000,
-                limits: triergon_isobmff::Mov9NativeSeekLimits::default(),
+                limits: triergon_isobmff::compat::mov::seek::SeekLimits::default(),
             })
             .unwrap();
         assert!((0..100_000).any(|_| seek.poll(&mut WorkBudget::new(3), &off()).unwrap()));
@@ -3258,7 +3258,7 @@ fn bounded_timing_range_playback_preserves_packets_and_seeks() {
         let resumed: Vec<_> = std::iter::from_fn(|| next_range_output(&mut player)).collect();
         let packets = mp4_packets(&resumed);
         assert_eq!(packets.len(), 3);
-        assert_eq!(packets[0].native.as_ref().unwrap().native.dts, Some(3000));
+        assert_eq!(packets[0].native.as_ref().unwrap().demux.dts, Some(3000));
         assert!(
             calls
                 .lock()
@@ -3319,7 +3319,7 @@ fn native_range_cursor_matches_ffprobe_and_preserves_seek_lifecycle() {
             .prepare_seek(Mp4NativeSeekRequest {
                 video: 1,
                 timestamp: target,
-                limits: triergon_isobmff::Mov9NativeSeekLimits::default(),
+                limits: triergon_isobmff::compat::mov::seek::SeekLimits::default(),
             })
             .unwrap();
         assert!(!job.poll(&mut WorkBudget::new(0), &off()).unwrap());
@@ -3408,9 +3408,9 @@ fn native_range_cursor_checks_all_extents_and_replays_after_duration_scan() {
         .map(|packet| {
             let row = packet.native.as_ref().unwrap();
             row.media_clock
-                .native_base
+                .demux_base
                 .rescale(
-                    row.native.pts.unwrap() + row.native.duration,
+                    row.demux.pts.unwrap() + row.demux.duration,
                     TimeBase::new(1, 1_000_000).unwrap(),
                     Rounding::NearestAway,
                 )
@@ -3425,8 +3425,8 @@ fn native_range_cursor_checks_all_extents_and_replays_after_duration_scan() {
     for (actual, expected) in actual.into_iter().zip(expected) {
         assert_eq!(actual.source.sample, expected.source.sample);
         assert_eq!(
-            actual.native.as_ref().unwrap().native,
-            expected.native.as_ref().unwrap().native
+            actual.native.as_ref().unwrap().demux,
+            expected.native.as_ref().unwrap().demux
         );
         assert_eq!(
             actual.source.payload.as_ref(),
@@ -3463,19 +3463,22 @@ fn range_configs(
     track: &mp4_open::MovieTrack,
     major_brand: Option<[u8; 4]>,
     input: &mut InputCursor,
-) -> Vec<triergon_isobmff::Mov9EncodedStreamV1> {
-    use triergon_isobmff::{Mov9CursorStatus, Mov9EncodedSelectionV4, Mov9EncodedStreamJobV1};
+) -> Vec<triergon_isobmff::compat::mov::encoded::EncodedStream> {
+    use triergon_isobmff::compat::mov::{
+        encoded::{EncodedSelection, EncodedStreamJob},
+        packets::CursorStatus,
+    };
     let cancel = off();
     track
         .table()
         .descriptions()
         .iter()
         .map(|description| {
-            let mut stream = Mov9EncodedStreamJobV1::new_range_playback(
+            let mut stream = EncodedStreamJob::new_range_playback(
                 track.header(),
                 track.table(),
                 input,
-                Mov9EncodedSelectionV4 {
+                EncodedSelection {
                     major_brand,
                     description: description.index,
                     limits: triergon_isobmff::ConfigurationLimits::default(),
@@ -3486,7 +3489,7 @@ fn range_configs(
                 stream
                     .poll(input, &mut WorkBudget::new(4096), &cancel)
                     .unwrap()
-                    == Mov9CursorStatus::Ready
+                    == CursorStatus::Ready
             }));
             stream.take(input, &cancel).unwrap()
         })
@@ -3497,16 +3500,19 @@ fn encoded_range_open(
     raw: &[u8],
 ) -> (
     mp4_open::OpenedMp4<ByteSource>,
-    Vec<Option<triergon_isobmff::Mov9EncodedEditPlanV2>>,
+    Vec<Option<triergon_isobmff::compat::mov::edits::EncodedEditPlan>>,
 ) {
-    use triergon_isobmff::{Mov9CursorStatus, Mov9EncodedEditContextV2, Mov9EncodedEditJobV2};
+    use triergon_isobmff::compat::mov::{
+        edits::{EncodedEditContext, EncodedEditJob},
+        packets::CursorStatus,
+    };
     let (mut opened, _) = open(raw, 97, 4096).unwrap();
     let cancel = off();
     let mut plans = Vec::new();
     for track in opened.movie.tracks() {
         let configs = range_configs(track, opened.movie.major_brand(), &mut opened.input);
-        let mut edit = Mov9EncodedEditJobV2::new_range_playback(
-            Mov9EncodedEditContextV2 {
+        let mut edit = EncodedEditJob::new_range_playback(
+            EncodedEditContext {
                 table: track.table(),
                 edits: track.edits().unwrap(),
                 stream: &configs[0],
@@ -3515,13 +3521,13 @@ fn encoded_range_open(
             },
             &configs,
             &opened.input,
-            triergon_isobmff::Mov9EncodedEditLimitsV2::default(),
+            triergon_isobmff::compat::mov::edits::EncodedEditLimits::default(),
         )
         .unwrap();
         while edit
             .poll(&mut opened.input, &mut WorkBudget::new(4096), &cancel)
             .unwrap()
-            != Mov9CursorStatus::Ready
+            != CursorStatus::Ready
         {}
         plans.push(Some(edit.take(&mut opened.input, &cancel).unwrap()));
     }
@@ -3606,9 +3612,14 @@ fn edited_visual_description_fixture(
 #[test]
 fn native_range_cursor_keeps_edited_av1_and_vp9_description_transitions() {
     use triergon_isobmff::{
-        BoxStep, EntryLayout, Limits, Mov9EncodedConfigSequenceV3, Mov9EncodedEditContextV2,
-        Mov9EncodedEditJobV2, Mov9EncodedInitialV3, Mov9EncodedSelectionV4, Mov9EncodedStreamJobV1,
-        PinnedMovD32EncodedContextsV7, PinnedMovD32EncodedRegularV3, SampleStep,
+        BoxStep, EntryLayout, Limits, SampleStep,
+        compat::mov::{
+            edits::{EncodedEditContext, EncodedEditJob},
+            encoded::{
+                EncodedConfigProfile, EncodedConfigSequence, EncodedContextProfile, EncodedInitial,
+                EncodedSelection, EncodedStreamJob,
+            },
+        },
     };
 
     for (format, config_kind, records) in [
@@ -3636,16 +3647,16 @@ fn native_range_cursor_keeps_edited_av1_and_vp9_description_transitions() {
         };
         for description in [1, 2] {
             assert!(matches!(
-                Mov9EncodedStreamJobV1::new_description_v7(
+                EncodedStreamJob::new_description_with_contexts(
                     track.header(),
                     track.table(),
                     &opened.input,
-                    Mov9EncodedSelectionV4 {
+                    EncodedSelection {
                         major_brand: opened.movie.major_brand(),
                         description,
                         limits: triergon_isobmff::ConfigurationLimits::default(),
                     },
-                    PinnedMovD32EncodedContextsV7,
+                    EncodedContextProfile,
                 ),
                 Err(C::Unsupported("encoded catalogue namespace/handler"))
             ));
@@ -3658,31 +3669,19 @@ fn native_range_cursor_keeps_edited_av1_and_vp9_description_transitions() {
         };
         let refusal = Some(C::Unsupported("encoded codec requires range playback"));
         assert_eq!(
-            Mov9EncodedInitialV3::new(
-                table,
-                &configs,
-                &first,
-                &opened.input,
-                PinnedMovD32EncodedRegularV3,
-            )
-            .err(),
+            EncodedInitial::new(table, &configs, &first, &opened.input, EncodedConfigProfile,)
+                .err(),
             refusal,
             "pinned V3 initial catalogue"
         );
         assert_eq!(
-            Mov9EncodedConfigSequenceV3::new(
-                table,
-                &configs,
-                &opened.input,
-                PinnedMovD32EncodedRegularV3,
-            )
-            .err(),
+            EncodedConfigSequence::new(table, &configs, &opened.input, EncodedConfigProfile,).err(),
             refusal,
             "pinned V3 configuration sequence"
         );
         assert_eq!(
-            Mov9EncodedEditJobV2::new_v7(
-                Mov9EncodedEditContextV2 {
+            EncodedEditJob::new_with_recovery_contexts(
+                EncodedEditContext {
                     table,
                     edits: track.edits().unwrap(),
                     stream: &configs[0],
@@ -3691,8 +3690,8 @@ fn native_range_cursor_keeps_edited_av1_and_vp9_description_transitions() {
                 },
                 &configs,
                 &opened.input,
-                triergon_isobmff::Mov9EncodedEditLimitsV2::default(),
-                PinnedMovD32EncodedContextsV7,
+                triergon_isobmff::compat::mov::edits::EncodedEditLimits::default(),
+                EncodedContextProfile,
             )
             .err(),
             refusal,
@@ -3756,7 +3755,7 @@ fn native_range_cursor_keeps_edited_av1_and_vp9_description_transitions() {
             );
             assert_eq!(packet.source.payload.as_ref(), &raw[range]);
             assert_eq!(packet.source.sample.cts_ticks, Some(i128::from(pts + 40)));
-            let clock = &packet.native.as_ref().unwrap().native;
+            let clock = &packet.native.as_ref().unwrap().demux;
             assert_eq!(
                 (clock.pts, clock.dts, clock.duration, clock.flags),
                 (Some(pts), Some(pts), 40, flags)
@@ -3806,7 +3805,7 @@ fn native_range_cursor_keeps_encoded_source_clocks_and_trim() {
                 e.configuration.description.index
             );
             let (a, e) = (a.native.as_ref().unwrap(), e.native.as_ref().unwrap());
-            assert_eq!(a.native, e.native);
+            assert_eq!(a.demux, e.demux);
             assert_eq!(a.edit, e.edit);
             assert_eq!(a.clock_origin, e.clock_origin);
             assert_eq!(a.media_clock, e.media_clock);
@@ -3871,7 +3870,7 @@ fn native_range_seek_replays_the_encoded_edit_occurrences() {
                 Mp4NativeSeekRequest {
                     video: 1,
                     timestamp: 43_200,
-                    limits: triergon_isobmff::Mov9NativeSeekLimits::default(),
+                    limits: triergon_isobmff::compat::mov::seek::SeekLimits::default(),
                 },
                 Selection::All,
             )
@@ -3899,7 +3898,7 @@ fn native_range_seek_replays_the_encoded_edit_occurrences() {
         (2, 87_048, 87_048, 38_074, 133),
         (1, 32_000, 29_328, 38_207, 3220),
     ]) {
-        let native = &packet.native.as_ref().unwrap().native;
+        let native = &packet.native.as_ref().unwrap().demux;
         assert_eq!(packet.configuration.track.track_id, id);
         assert_eq!((native.pts, native.dts), (Some(pts), Some(dts)));
         assert_eq!(packet.source.payload.as_ref(), &raw[start..start + length]);
@@ -3923,7 +3922,7 @@ fn native_range_seek_refusals_leave_the_current_player_untouched() {
     let request = Mp4NativeSeekRequest {
         video: 1,
         timestamp: 3500,
-        limits: triergon_isobmff::Mov9NativeSeekLimits::default(),
+        limits: triergon_isobmff::compat::mov::seek::SeekLimits::default(),
     };
     let mut job = player
         .prepare_mp4_native_seek(&movie, request, Selection::All)

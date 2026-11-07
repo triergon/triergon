@@ -12,9 +12,12 @@ use triergon_core::{
     SourceLocation, Step, Time, TimeBase, WorkBudget,
 };
 use triergon_isobmff::{
-    Mov9CursorStatus, Mov9FrontReadBoundaryV1, Mov9PacketCursor, Mov9PacketOccurrence,
-    Mov9SampleExtent, Mov9SampleRead, Mov9ShortSample, PinnedMovD32RegularRecoveryV1, SampleReader,
-    SourcePacket,
+    SampleReader, SourcePacket,
+    compat::mov::{
+        front::FrontReadBoundary,
+        packets::{CursorStatus, PacketCursor, PacketOccurrence},
+        recovery::{RecoverySampleExtent, RecoverySampleRead, RunRecoveryProfile, ShortSample},
+    },
 };
 use triergon_matroska::{
     incremental::ParseStep,
@@ -34,10 +37,10 @@ use ts::psi::{DescriptorNamespace, ProgramMap};
 pub struct Mp4Packet {
     /// Explicit native read boundary, independent of the full Source stream.
     /// Later Source packets remain present with `native == None`.
-    pub native_front_read_boundary_v1: Option<Mov9FrontReadBoundaryV1>,
+    pub native_front_read_boundary_v1: Option<FrontReadBoundary>,
     pub source: SourcePacket,
     pub configuration: Mp4Configuration,
-    pub native: Option<Mov9PacketOccurrence>,
+    pub native: Option<PacketOccurrence>,
     /// Sample trim from the associated encoded edit plan, in native skip-samples layout.
     pub encoded_skip_samples: Option<[u8; 10]>,
 }
@@ -45,7 +48,7 @@ pub struct Mp4Packet {
 /// position is a receiver field, with no corresponding physical sample.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Mp4NativeEmptyPacket {
-    pub boundary: Mov9FrontReadBoundaryV1,
+    pub boundary: FrontReadBoundary,
     pub time_base: TimeBase,
     pub handler: [u8; 4],
     pub pts: i64,
@@ -58,9 +61,9 @@ pub struct Mp4NativeEmptyPacket {
 /// retained sample declaration. It is never a complete Source packet.
 #[derive(Clone, Debug)]
 pub struct Mp4NativeShortPacket {
-    pub prefix: Mov9ShortSample,
+    pub prefix: ShortSample,
     pub configuration: Mp4Configuration,
-    pub native: Mov9PacketOccurrence,
+    pub native: PacketOccurrence,
 }
 /// The first native read has a positive declaration starting at or beyond the
 /// confirmed physical end. The view ends without emitting a packet.
@@ -167,7 +170,7 @@ pub(crate) enum Mp4RangeLanding<'a> {
 pub struct Mp4Engine {
     progressive: Option<crate::progressive::ProgressiveState>,
     replay_media: Option<PendingMedia>,
-    native_boundary_observed: Option<Mov9FrontReadBoundaryV1>,
+    native_boundary_observed: Option<FrontReadBoundary>,
     native_empty_run: Option<(Mp4NativeEmptyPacket, u32)>,
     native_recovery_end: bool,
     pub(crate) input: InputCursor,
@@ -935,7 +938,7 @@ impl Engine {
 
     pub(crate) fn poll_mp4_range(
         &mut self,
-        cursor: &mut Mov9PacketCursor<'_>,
+        cursor: &mut PacketCursor<'_>,
         work: &mut WorkBudget,
         cancel: &AtomicBool,
     ) -> Result<BackendStep> {
@@ -1148,7 +1151,7 @@ impl Mp4Engine {
 
     pub(crate) fn stage_native_empty_run(
         &mut self,
-        boundary: Mov9FrontReadBoundaryV1,
+        boundary: FrontReadBoundary,
         time_base: TimeBase,
         duration: i64,
         remaining: u32,
@@ -1208,7 +1211,7 @@ impl Mp4Engine {
         &mut self,
         row: &SourceRow,
         source: SourcePacket,
-        cursor: Option<&mut Mov9PacketCursor<'_>>,
+        cursor: Option<&mut PacketCursor<'_>>,
     ) -> Result<BackendStep> {
         let (at_track, cfg) = self.packet_config(row)?;
         let native = match cursor {
@@ -1316,7 +1319,7 @@ impl Mp4Engine {
         &mut self,
         w: &mut WorkBudget,
         c: &AtomicBool,
-        mut cursor: Option<&mut Mov9PacketCursor<'_>>,
+        mut cursor: Option<&mut PacketCursor<'_>>,
     ) -> Result<BackendStep> {
         if self.native_recovery_end {
             self.input.read_into(&mut [], w, c)?;
@@ -1358,22 +1361,17 @@ impl Mp4Engine {
         }
         if let Some(reader) = self.packet.as_mut() {
             let step = if self.plan.native_recovery && self.plan.native(self.row).is_some() {
-                reader.poll_pinned_mov_recovery(
-                    &mut self.input,
-                    w,
-                    c,
-                    PinnedMovD32RegularRecoveryV1,
-                )?
+                reader.poll_recovery(&mut self.input, w, c, RunRecoveryProfile)?
             } else {
                 match reader.poll(&mut self.input, w, c)? {
-                    Step::Ready(packet) => Step::Ready(Mov9SampleRead::Complete(packet)),
+                    Step::Ready(packet) => Step::Ready(RecoverySampleRead::Complete(packet)),
                     Step::NeedInput(r) => Step::NeedInput(r),
                     Step::Yield => Step::Yield,
                     Step::End(at) => Step::End(at),
                 }
             };
             return match step {
-                Step::Ready(Mov9SampleRead::Complete(source)) => {
+                Step::Ready(RecoverySampleRead::Complete(source)) => {
                     let row = self
                         .pending
                         .take()
@@ -1382,7 +1380,7 @@ impl Mp4Engine {
                     self.packet = None;
                     Ok(event)
                 }
-                Step::Ready(Mov9SampleRead::Short(prefix)) => {
+                Step::Ready(RecoverySampleRead::Short(prefix)) => {
                     let row = self
                         .pending
                         .take()
@@ -1393,7 +1391,7 @@ impl Mp4Engine {
                         .native(self.row)
                         .ok_or(Error::Invalid("short packet needs native occurrence"))?
                         .clone();
-                    native.native.flags |= 2;
+                    native.demux.flags |= 2;
                     self.packet = None;
                     self.native_recovery_end = true;
                     Ok(BackendStep::Event(RawEvent::Mp4(
@@ -1432,7 +1430,7 @@ impl Mp4Engine {
         }
         let row = if let Some(cursor) = cursor.as_deref_mut() {
             match cursor.poll(w, c)? {
-                Mov9CursorStatus::Ready => {
+                CursorStatus::Ready => {
                     let occurrence = cursor
                         .occurrence()
                         .ok_or(Error::Invalid("missing native range occurrence"))?;
@@ -1441,8 +1439,8 @@ impl Mp4Engine {
                         sample: occurrence.source.clone(),
                     })
                 }
-                Mov9CursorStatus::Yield => return Ok(BackendStep::Yield),
-                Mov9CursorStatus::End => return Ok(BackendStep::End),
+                CursorStatus::Yield => return Ok(BackendStep::Yield),
+                CursorStatus::End => return Ok(BackendStep::End),
             }
         } else {
             self.plan.row(self.row)
@@ -1534,29 +1532,29 @@ impl Mp4Engine {
             .find(|r| row.sample.require_within((*r).clone()).is_ok())
             .cloned();
         let media = if let Some(extent) = extent {
-            Mov9SampleExtent::Finite(extent)
+            RecoverySampleExtent::Finite(extent)
         } else if let Some(terminal) = self.plan.terminal_mdat {
-            Mov9SampleExtent::Terminal(terminal)
+            RecoverySampleExtent::Terminal(terminal)
         } else {
             return Err(Error::Invalid("sample has no source mdat"));
         };
         let packet = if self.plan.native_recovery && self.plan.native(self.row).is_some() {
-            SampleReader::new_pinned_mov_recovery(
+            SampleReader::new_recovery(
                 &mut self.input,
                 row.sample.clone(),
                 media,
                 self.maximum_packet,
-                PinnedMovD32RegularRecoveryV1,
+                RunRecoveryProfile,
             )?
         } else {
             match media {
-                Mov9SampleExtent::Finite(extent) => SampleReader::new(
+                RecoverySampleExtent::Finite(extent) => SampleReader::new(
                     &mut self.input,
                     row.sample.clone(),
                     extent,
                     self.maximum_packet,
                 )?,
-                Mov9SampleExtent::Terminal(terminal) => SampleReader::new_terminal_mdat(
+                RecoverySampleExtent::Terminal(terminal) => SampleReader::new_terminal_mdat(
                     &mut self.input,
                     row.sample.clone(),
                     terminal,
@@ -2201,18 +2199,18 @@ impl RawEvent {
                 .native
                 .as_ref()
                 .map(|n| {
-                    n.native
+                    n.demux
                         .pts
-                        .map(|ticks| Time::from_ticks(i128::from(ticks), n.media_clock.native_base))
+                        .map(|ticks| Time::from_ticks(i128::from(ticks), n.media_clock.demux_base))
                         .transpose()
                 })
                 .transpose()
                 .map(Option::flatten),
             Self::Mp4(Mp4Event::NativeShortPacket(p)) => p
                 .native
-                .native
+                .demux
                 .pts
-                .map(|ticks| Time::from_ticks(i128::from(ticks), p.native.media_clock.native_base))
+                .map(|ticks| Time::from_ticks(i128::from(ticks), p.native.media_clock.demux_base))
                 .transpose(),
             Self::Ts(e) => e
                 .native_clock

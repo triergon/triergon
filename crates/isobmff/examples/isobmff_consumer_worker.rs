@@ -6,8 +6,7 @@ mod model;
 #[path = "isobmff_consumer/protocol.rs"]
 mod protocol;
 use model::{
-    Driver, Failure, NativeOperation, NativeSeekRequest, OpenPolicy, Result, SourceRequest,
-    Transport,
+    DemuxOperation, DemuxSeekRequest, Driver, Failure, OpenPolicy, Result, SourceRequest, Transport,
 };
 use protocol::{Retention, Stats};
 use std::{
@@ -119,7 +118,7 @@ impl Input {
 fn operation(
     input: &mut Input,
     o: Options,
-    op: NativeOperation,
+    op: DemuxOperation,
     policy: OpenPolicy,
     mut trace: Option<&mut String>,
 ) -> Result<Stats> {
@@ -133,10 +132,10 @@ fn operation(
         driver.recovered_regular_operation(op, &mut stats, &mut retained, trace.as_deref_mut())?;
     } else {
         let model = driver.open_with_policy(policy)?;
-        if matches!(op, NativeOperation::Open) {
-            driver.native_open(&model, &mut stats, &mut retained, trace.as_deref_mut())?;
+        if matches!(op, DemuxOperation::Open) {
+            driver.demux_open(&model, &mut stats, &mut retained, trace.as_deref_mut())?;
         } else {
-            driver.native_operation(&model, &mut stats, &mut retained, op, trace.as_deref_mut())?;
+            driver.demux_operation(&model, &mut stats, &mut retained, op, trace.as_deref_mut())?;
         }
     }
     drop(driver);
@@ -226,7 +225,7 @@ fn main_result(mut args: Vec<String>) -> Result<()> {
             1 => true,
             _ => return Err(Error::Invalid("native afterEOF boolean").into()),
         };
-        NativeOperation::Seek(NativeSeekRequest {
+        DemuxOperation::Seek(DemuxSeekRequest {
             track: argument(&args, at, 0i32)?,
             ticks: argument(&args, at + 1, 0i64)?,
             count,
@@ -236,9 +235,9 @@ fn main_result(mut args: Vec<String>) -> Result<()> {
         mode,
         "native-index-trace" | "native-index-bench" | "native-index-memory"
     ) {
-        NativeOperation::Index
+        DemuxOperation::Index
     } else {
-        NativeOperation::Open
+        DemuxOperation::Open
     };
     let o = options(&args, option_offset)?;
     let mut input = Input::open(Path::new(path), o.file)?;
@@ -402,7 +401,7 @@ mod tests {
         assert!(matches!(driver.open(), Err(Failure::Io(_))));
     }
     #[test]
-    fn parser_work_and_native_io_settings_remain_explicit() {
+    fn parser_work_and_demux_io_settings_remain_explicit() {
         let args: Vec<String> = ["worker", "open-trace", "x", "1", "64", "file", "3"]
             .into_iter()
             .map(str::to_owned)

@@ -94,7 +94,7 @@ impl SampleTable {
     pub(crate) fn has_dependency_table(&self) -> bool {
         self.dependency.is_some()
     }
-    /// Borrow compact validated wire runs for the separate native observation
+    /// Borrow compact validated wire runs for the separate demux observation
     /// view. Their source version, raw bytes and per-sample meaning stay intact.
     pub(crate) fn composition_runs(&self) -> Option<&Words> {
         self.ctts.as_ref()
@@ -309,10 +309,10 @@ pub struct SampleTableBuilder {
     sync_prefix: Option<u32>,
     recover_sync: bool,
     recover_initial_description: bool,
-    recover_v3_descriptions: bool,
-    initial_description: Option<Mov9InitialDescriptionDiagnostic>,
-    coverage: [Option<Mov9RunCoverage>; 2],
-    sync_diagnostic: Option<Mov9SyncDiagnostic>,
+    recover_descriptions: bool,
+    initial_description: Option<InitialDescriptionDiagnostic>,
+    coverage: [Option<RunCoverage>; 2],
+    sync_diagnostic: Option<SyncDiagnostic>,
 }
 impl SampleTableBuilder {
     pub fn new(raw: BoxView, budget: Budget, limits: Limits) -> Result<Self> {
@@ -373,7 +373,7 @@ impl SampleTableBuilder {
             sync_prefix: None,
             recover_sync: false,
             recover_initial_description: false,
-            recover_v3_descriptions: false,
+            recover_descriptions: false,
             initial_description: None,
             coverage: [None, None],
             sync_diagnostic: None,
@@ -593,11 +593,11 @@ impl SampleTableBuilder {
                                 .and_then(|v| v.checked_add(8))
                                 .and_then(|v| v.checked_add(u64::from(first) * 8))
                                 .ok_or(Error::Overflow)?;
-                            self.coverage[slot] = Some(Mov9RunCoverage {
+                            self.coverage[slot] = Some(RunCoverage {
                                 kind: if decode {
-                                    Mov9RunKind::Decode
+                                    RunKind::Decode
                                 } else {
-                                    Mov9RunKind::Composition
+                                    RunKind::Composition
                                 },
                                 first_excess_row: first,
                                 count_field_start: field_start,
@@ -651,12 +651,12 @@ impl SampleTableBuilder {
                                 && t.stsc.word(1, 0)? == 2
                                 && t.stsc.word(1, 8)? == 1
                                 && self.description_count == 1)
-                            && !self.recover_v3_descriptions)
-                        || (description > self.description_count && !self.recover_v3_descriptions)
+                            && !self.recover_descriptions)
+                        || (description > self.description_count && !self.recover_descriptions)
                     {
                         return Err(Error::Invalid("stsc order/count/description"));
                     }
-                    if description == 0 && !self.recover_v3_descriptions {
+                    if description == 0 && !self.recover_descriptions {
                         let field_start = t
                             .stsc
                             .raw
@@ -665,13 +665,13 @@ impl SampleTableBuilder {
                             .checked_add(u64::from(t.stsc.raw.header().header_size))
                             .and_then(|v| v.checked_add(16))
                             .ok_or(Error::Overflow)?;
-                        self.initial_description = Some(Mov9InitialDescriptionDiagnostic {
+                        self.initial_description = Some(InitialDescriptionDiagnostic {
                             field_start,
                             field_end: field_start.checked_add(4).ok_or(Error::Overflow)?,
                             raw_description: 0,
                             declared_first_chunk_samples: per_chunk,
                             observed_first_chunk_samples: t.stsc.word(1, 4)?,
-                            native_catalogue_entry: 1,
+                            demux_catalogue_entry: 1,
                             strict_error: Error::Invalid("stsc order/count/description"),
                         });
                     }
@@ -723,7 +723,7 @@ impl SampleTableBuilder {
                                 .checked_add(u64::from(source.raw.header().header_size))
                                 .and_then(|v| v.checked_add(8 + u64::from(self.row) * 4))
                                 .ok_or(Error::Overflow)?;
-                            self.sync_diagnostic = Some(Mov9SyncDiagnostic {
+                            self.sync_diagnostic = Some(SyncDiagnostic {
                                 first_bad_row: self.row,
                                 source_value: sample,
                                 field_start: start,
@@ -1053,24 +1053,25 @@ impl SampleLocator<'_> {
     }
 }
 
-/// Explicit opt-in to the observed D32 MOV run-prefix operation. This does not
+/// Explicit opt-in to the observed reference MOV run-prefix operation. This does not
 /// change source validity, Strict defaults, packet order or codec configuration.
 #[derive(Clone, Copy, Debug)]
-pub struct PinnedMovD32RegularRecoveryV1;
-impl PinnedMovD32RegularRecoveryV1 {
+pub struct RunRecoveryProfile;
+#[cfg(feature = "reference-trace")]
+impl RunRecoveryProfile {
     pub const REFERENCE_WORKER_SHA256: &'static str =
         "7ff6742eaafa59884b6dc95f65c701c26b18975c265aa8401d61154eb2ef1204";
 }
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum Mov9RunKind {
+pub enum RunKind {
     Decode,
     Composition,
 }
 /// Original run coverage and the first offending source count field. Row zero
 /// is the first encoded row. The full raw table, including unused runs, is owned.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub struct Mov9RunCoverage {
-    pub kind: Mov9RunKind,
+pub struct RunCoverage {
+    pub kind: RunKind,
     pub first_excess_row: u32,
     pub count_field_start: u64,
     pub count_field_end: u64,
@@ -1083,15 +1084,15 @@ pub struct Mov9RunCoverage {
 /// CTTS may have an overcovering positive prefix and positive trailing runs.
 /// All other validation/limits/pool identity checks are the Strict checks.
 #[derive(Debug)]
-pub struct Mov9RunRecoveryBuilder {
+pub struct RunRecoveryBuilder {
     inner: SampleTableBuilder,
 }
-impl Mov9RunRecoveryBuilder {
+impl RunRecoveryBuilder {
     pub fn new(
         raw: BoxView,
         budget: Budget,
         limits: Limits,
-        _profile: PinnedMovD32RegularRecoveryV1,
+        _profile: RunRecoveryProfile,
     ) -> Result<Self> {
         let mut inner = SampleTableBuilder::with_timing_policy(
             raw,
@@ -1116,14 +1117,14 @@ impl Mov9RunRecoveryBuilder {
         }
         self.inner.poll(work)
     }
-    pub fn finish(mut self) -> Result<Mov9RunRecoveryTable> {
+    pub fn finish(mut self) -> Result<RunRecoveryTable> {
         if let Some(error) = self.inner.failed {
             return Err(error);
         }
         if self.inner.stage != Stage::Ready {
             return Err(Error::Invalid("run recovery builder not ready"));
         }
-        Ok(Mov9RunRecoveryTable {
+        Ok(RunRecoveryTable {
             storage: self
                 .inner
                 .table
@@ -1139,38 +1140,38 @@ impl Mov9RunRecoveryBuilder {
 /// Private storage is shared with the partially validated Strict builder; only
 /// this labelled type can expose the bounded observations after a recovery.
 #[derive(Debug)]
-pub struct Mov9RunRecoveryTable {
+pub struct RunRecoveryTable {
     storage: SampleTable,
-    coverage: [Option<Mov9RunCoverage>; 2],
-    sync_diagnostic: Option<Mov9SyncDiagnostic>,
-    initial_description: Option<Mov9InitialDescriptionDiagnostic>,
+    coverage: [Option<RunCoverage>; 2],
+    sync_diagnostic: Option<SyncDiagnostic>,
+    initial_description: Option<InitialDescriptionDiagnostic>,
 }
-impl Mov9RunRecoveryTable {
+impl RunRecoveryTable {
     pub fn raw(&self) -> &BoxView {
         self.storage.raw()
     }
     pub fn descriptions(&self) -> &[SampleDescription] {
         self.storage.descriptions()
     }
-    pub fn coverage(&self) -> &[Option<Mov9RunCoverage>; 2] {
+    pub fn coverage(&self) -> &[Option<RunCoverage>; 2] {
         &self.coverage
     }
     /// Encoded facts for the first STSZ count samples. This is not a claim that
     /// the source table is valid. Coverage diagnostics must accompany the result.
-    pub fn source_prefix_cursor(&self) -> Mov9RecoverySourceCursor<'_> {
-        Mov9RecoverySourceCursor {
+    pub fn source_prefix_cursor(&self) -> RecoverySourceCursor<'_> {
+        RecoverySourceCursor {
             inner: self.storage.cursor(),
             unknown_access: self.sync_diagnostic.is_some(),
         }
     }
-    pub fn sync_diagnostic(&self) -> Option<Mov9SyncDiagnostic> {
+    pub fn sync_diagnostic(&self) -> Option<SyncDiagnostic> {
         self.sync_diagnostic
     }
-    pub fn native_stream_for_recovery_header(
+    pub fn stream_view_for_recovery_header(
         &self,
-        header: &crate::Mov9RecoveryTrackHeader,
+        header: &crate::RecoveryTrackHeader,
         major_brand: Option<[u8; 4]>,
-    ) -> Result<crate::Mov9StreamView> {
+    ) -> Result<crate::StreamView> {
         let entry = self
             .storage
             .descriptions()
@@ -1179,10 +1180,10 @@ impl Mov9RunRecoveryTable {
         if self.storage.sample_count() == 0 {
             return Err(Error::Unsupported("empty recovery stream"));
         }
-        let mut stream = crate::Mov9StreamView::with_projection_base(
+        let mut stream = crate::StreamView::with_projection_base(
             header.source(),
             entry,
-            header.native_projection_base()?,
+            header.demux_projection_base()?,
         )?;
         if stream.codec == "rawvideo" {
             match major_brand {
@@ -1193,15 +1194,15 @@ impl Mov9RunRecoveryTable {
         }
         Ok(stream)
     }
-    pub fn native_stream(
+    pub fn stream_view(
         &self,
         header: &crate::TrackHeader,
         major_brand: Option<[u8; 4]>,
-    ) -> Result<crate::Mov9StreamView> {
-        crate::Mov9StreamView::for_source(header, &self.storage, false, major_brand)
+    ) -> Result<crate::StreamView> {
+        crate::StreamView::for_source(header, &self.storage, false, major_brand)
     }
-    fn track(&self, track_id: u32, media_base: triergon_core::TimeBase) -> crate::Mov9Track<'_> {
-        crate::Mov9Track {
+    fn track(&self, track_id: u32, media_base: triergon_core::TimeBase) -> crate::DemuxTrack<'_> {
+        crate::DemuxTrack {
             track_id,
             table: &self.storage,
             fragments: &[],
@@ -1209,27 +1210,27 @@ impl Mov9RunRecoveryTable {
             edits: None,
         }
     }
-    /// Native extraction is separate from source validity/clock knownness.
+    /// Demux extraction is separate from source validity/clock knownness.
     pub fn packet_cursor<'a>(
         &'a self,
         pool: &Budget,
-        header: &crate::Mov9RecoveryTrackHeader,
+        header: &crate::RecoveryTrackHeader,
         media: &'a [std::ops::Range<u64>],
-        limits: crate::Mov9PacketLimits,
-    ) -> Result<Mov9RecoveryPacketCursor<'a>> {
+        limits: crate::PacketLimits,
+    ) -> Result<RecoveryPacketCursor<'a>> {
         if self.initial_description.is_some() {
             return Err(Error::Unsupported(
                 "initial-description recovery requires explicit v2 cursor",
             ));
         }
-        let inner = crate::Mov9PacketCursor::new_complete_source(
+        let inner = crate::PacketCursor::new_complete_source(
             pool,
-            &[self.track(header.source().track_id, header.native_projection_base()?)],
+            &[self.track(header.source().track_id, header.demux_projection_base()?)],
             media,
             limits,
-            crate::Mov9Profile::PinnedNoParseNoFillin,
+            crate::DemuxProfile::NoParseNoFillin,
         )?;
-        Ok(Mov9RecoveryPacketCursor {
+        Ok(RecoveryPacketCursor {
             inner,
             unknown_access: self.sync_diagnostic.is_some(),
             source_timescale: header.source().timescale,
@@ -1238,24 +1239,24 @@ impl Mov9RunRecoveryTable {
     pub fn index_cursor<'a>(
         &'a self,
         pool: &Budget,
-        header: &crate::Mov9RecoveryTrackHeader,
+        header: &crate::RecoveryTrackHeader,
         media: &'a [std::ops::Range<u64>],
-        limits: crate::Mov9NativeIndexLimits,
-    ) -> Result<Mov9RecoveryIndexCursor<'a>> {
+        limits: crate::IndexLimits,
+    ) -> Result<RecoveryIndexCursor<'a>> {
         if self.initial_description.is_some() {
             return Err(Error::Unsupported(
                 "initial-description recovery requires explicit v2 cursor",
             ));
         }
-        let mut inner = crate::Mov9NativeIndexCursor::new_complete_source(
+        let mut inner = crate::IndexCursor::new_complete_source(
             pool,
-            self.track(header.source().track_id, header.native_projection_base()?),
+            self.track(header.source().track_id, header.demux_projection_base()?),
             media,
             limits,
-            crate::Mov9Profile::PinnedNoParseNoFillin,
+            crate::DemuxProfile::NoParseNoFillin,
         )?;
         inner.allow_recovery_initial_nonkey();
-        Ok(Mov9RecoveryIndexCursor {
+        Ok(RecoveryIndexCursor {
             inner,
             unknown_access: self.sync_diagnostic.is_some(),
             source_timescale: header.source().timescale,
@@ -1264,7 +1265,7 @@ impl Mov9RunRecoveryTable {
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub struct Mov9SyncDiagnostic {
+pub struct SyncDiagnostic {
     pub first_bad_row: u32,
     pub source_value: u32,
     pub field_start: u64,
@@ -1272,11 +1273,11 @@ pub struct Mov9SyncDiagnostic {
     pub strict_error: Error,
 }
 #[derive(Debug)]
-pub struct Mov9RecoverySourceCursor<'a> {
+pub struct RecoverySourceCursor<'a> {
     inner: SampleCursor<'a>,
     unknown_access: bool,
 }
-impl Mov9RecoverySourceCursor<'_> {
+impl RecoverySourceCursor<'_> {
     pub fn poll(&mut self, work: &mut WorkBudget) -> Result<SampleStep> {
         match self.inner.poll(work)? {
             SampleStep::Sample(mut source) => {
@@ -1289,45 +1290,45 @@ impl Mov9RecoverySourceCursor<'_> {
         }
     }
 }
-/// Native ticks are observations; source_timescale zero means that conversion
+/// Demux ticks are observations; source_timescale zero means that conversion
 /// to source seconds is invalid, even though the original raw ticks are known.
 #[derive(Debug)]
-pub struct Mov9RecoveryOccurrence {
+pub struct RecoveryOccurrence {
     pub track_id: u32,
     pub source: Sample,
-    pub native: crate::Mov9PacketView,
+    pub demux: crate::PacketView,
     pub source_timescale: u32,
 }
 #[derive(Debug)]
-pub struct Mov9RecoveryPacketCursor<'a> {
-    inner: crate::Mov9PacketCursor<'a>,
+pub struct RecoveryPacketCursor<'a> {
+    inner: crate::PacketCursor<'a>,
     unknown_access: bool,
     source_timescale: u32,
 }
-impl Mov9RecoveryPacketCursor<'_> {
+impl RecoveryPacketCursor<'_> {
     pub fn poll(
         &mut self,
         work: &mut WorkBudget,
         cancel: &std::sync::atomic::AtomicBool,
-    ) -> Result<crate::Mov9CursorStatus> {
+    ) -> Result<crate::CursorStatus> {
         self.inner.poll(work, cancel)
     }
-    pub fn take_occurrence(&mut self) -> Result<Mov9RecoveryOccurrence> {
+    pub fn take_occurrence(&mut self) -> Result<RecoveryOccurrence> {
         let row = self.inner.take_occurrence()?;
         let mut source = row.source;
         if self.unknown_access {
             source.access = Access::Unknown;
         }
-        Ok(Mov9RecoveryOccurrence {
+        Ok(RecoveryOccurrence {
             source,
-            native: row.native,
+            demux: row.demux,
             track_id: row.track_id,
             source_timescale: self.source_timescale,
         })
     }
 }
 #[derive(Debug)]
-pub struct Mov9RecoveryIndexEntry {
+pub struct RecoveryIndexEntry {
     pub ordinal: u64,
     pub position: i64,
     pub timestamp: i64,
@@ -1338,26 +1339,26 @@ pub struct Mov9RecoveryIndexEntry {
     pub source_timescale: u32,
 }
 #[derive(Debug)]
-pub struct Mov9RecoveryIndexCursor<'a> {
-    inner: crate::Mov9NativeIndexCursor<'a>,
+pub struct RecoveryIndexCursor<'a> {
+    inner: crate::IndexCursor<'a>,
     unknown_access: bool,
     source_timescale: u32,
 }
-impl Mov9RecoveryIndexCursor<'_> {
+impl RecoveryIndexCursor<'_> {
     pub fn poll(
         &mut self,
         work: &mut WorkBudget,
         cancel: &std::sync::atomic::AtomicBool,
-    ) -> Result<crate::Mov9CursorStatus> {
+    ) -> Result<crate::CursorStatus> {
         self.inner.poll(work, cancel)
     }
-    pub fn take_entry(&mut self) -> Result<Mov9RecoveryIndexEntry> {
+    pub fn take_entry(&mut self) -> Result<RecoveryIndexEntry> {
         let e = self.inner.take_entry()?;
         let mut source = e.occurrence.source;
         if self.unknown_access {
             source.access = Access::Unknown;
         }
-        Ok(Mov9RecoveryIndexEntry {
+        Ok(RecoveryIndexEntry {
             ordinal: e.ordinal,
             position: e.position,
             timestamp: e.timestamp,
@@ -1370,12 +1371,8 @@ impl Mov9RecoveryIndexCursor<'_> {
     }
 }
 
-mod recovery_v2;
-pub(crate) use recovery_v2::{Mov9InitialDescriptionDiagnostic, Mov9RecoveryV2PacketCursor};
-pub use recovery_v2::{
-    Mov9RecoveryV2Association, Mov9RecoveryV2Context, Mov9RecoveryV2Read,
-    PinnedMovD32RegularRecoveryV2,
-};
+mod direct_recovery;
+pub use direct_recovery::*;
 
-mod recovery_v3;
-pub use recovery_v3::*;
+mod description_recovery;
+pub use description_recovery::*;

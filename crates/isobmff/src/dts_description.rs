@@ -45,7 +45,7 @@ impl DtsCoreDescription {
 
 pub(crate) fn dts_entry_children(entry: &SampleDescription, limits: Limits) -> Result<BoxChildren> {
     if entry.format == *b"dtsc" && fields::u16_at(entry.raw().payload(), 8)? == 1 {
-        crate::Mov9SoundV1SourceV4::parse(entry)?;
+        crate::SoundV1Source::parse(entry)?;
         entry.raw().children(44, limits)
     } else {
         entry.extensions(EntryLayout::AudioV0, limits)

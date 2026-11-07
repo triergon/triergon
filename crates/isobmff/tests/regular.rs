@@ -217,7 +217,7 @@ fn original_regular_corpus_and_explicit_specification_gaps() {
 #[test]
 fn required_signed_ctts_v1_preserves_raw_bits_and_negative_source_time() {
     // Published ISO/IEC 14496-12:2008/Amd.1:2009 §§8.6.1.3.1-.3.
-    // Native clocks stay separate.
+    // Demux clocks stay separate.
     for name in ["r-ctts-v1", "r-negative-cts"] {
         let case = CASES.iter().find(|c| c.name == name).unwrap();
         for quantum in [1, 4096] {

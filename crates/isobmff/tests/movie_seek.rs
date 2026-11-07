@@ -1,7 +1,7 @@
 mod common;
-#[path = "support/movie32.rs"]
+#[path = "support/movie.rs"]
 mod fixture;
-#[path = "support/recovery32.rs"]
+#[path = "support/recovery.rs"]
 mod wire;
 use std::sync::atomic::{AtomicBool, Ordering};
 use triergon_core::{Budget, Error, Time, TimeBase, WorkBudget};
@@ -290,12 +290,12 @@ fn repeated_movie_edit_and_roll_mapping_feed_real_source_seek_with_config_return
         assert_eq!(recovery.raw_mapping_index, Some(1));
         assert_eq!(recovery.preceding_samples(), Ok(1));
         let plan = result.plan.as_ref().unwrap();
-        let receipt = plan.receipt();
+        let landing = plan.landing();
         assert_eq!(
             (
-                receipt.target.ordinal,
-                receipt.sync_sample.ordinal,
-                receipt.decode_start.ordinal
+                landing.target.ordinal,
+                landing.sync_sample.ordinal,
+                landing.decode_start.ordinal
             ),
             (5, 4, 3)
         );
@@ -385,9 +385,9 @@ fn inherited_fragment_prol_drives_cross_fragment_preroll_in_original_decode_orde
         let plan = result.plan.as_ref().unwrap();
         assert_eq!(
             (
-                plan.receipt().target.ordinal,
-                plan.receipt().sync_sample.ordinal,
-                plan.receipt().decode_start.ordinal
+                plan.landing().target.ordinal,
+                plan.landing().sync_sample.ordinal,
+                plan.landing().decode_start.ordinal
             ),
             (6, 5, 3)
         );

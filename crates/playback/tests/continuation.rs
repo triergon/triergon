@@ -865,6 +865,7 @@ fn real_hevc_mp4_bridge_preserves_packet_clock_config_and_source_bytes() {
     }
 }
 fn aac_fixture_player() -> (Player<ByteSource>, Budget, Bytes, u64) {
+    use triergon_isobmff::compat::mov::{encoded::*, packets::CursorStatus};
     use triergon_isobmff::*;
     let raw = include_bytes!("fixtures/mp4/encoded-avc-aac-front.mp4");
     let b = pool();
@@ -899,22 +900,22 @@ fn aac_fixture_player() -> (Player<ByteSource>, Budget, Bytes, u64) {
         .iter()
         .find(|t| t.header().handler == *b"soun")
         .unwrap();
-    let mut job = Mov9EncodedStreamJobV1::new(
+    let mut job = EncodedStreamJob::new(
         track.header(),
         track.table(),
         &opened.input,
         Some(raw[8..12].try_into().unwrap()),
-        Mov9EncodedLimitsV1::default(),
-        PinnedMovD32EncodedRegularV1,
+        ConfigurationLimits::default(),
+        EncodedStreamProfile,
     )
     .unwrap();
     while job
         .poll(&mut opened.input, &mut WorkBudget::new(1), &off())
         .unwrap()
-        != Mov9CursorStatus::Ready
+        != CursorStatus::Ready
     {}
     let catalogue = job.take(&mut opened.input, &off()).unwrap();
-    let asc = catalogue.native().extradata.clone();
+    let asc = catalogue.demux().extradata.clone();
     let config = catalogue.configuration_box();
     assert!(asc.shares_storage_with(config.bytes()));
     let relative = (asc.as_ref().as_ptr() as usize)

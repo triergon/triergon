@@ -87,20 +87,20 @@ fn regular_seek_preserves_configuration_return_and_source_identity() {
             quantum,
         )
         .unwrap();
-        let receipt = plan.receipt();
-        assert_eq!((receipt.track_id, receipt.requested_ordinal), (1, 6));
+        let landing = plan.landing();
+        assert_eq!((landing.track_id, landing.requested_ordinal), (1, 6));
         assert_eq!(
-            (receipt.sync_sample.ordinal, receipt.decode_start.ordinal),
+            (landing.sync_sample.ordinal, landing.decode_start.ordinal),
             (4, 3)
         );
         assert_eq!(
             (
-                receipt.available_preroll_samples,
-                receipt.missing_preroll_samples
+                landing.available_preroll_samples,
+                landing.missing_preroll_samples
             ),
             (1, 0)
         );
-        assert_eq!(receipt.validated_samples, 4);
+        assert_eq!(landing.validated_samples, 4);
         let actual = samples(&plan, quantum);
         assert_eq!(
             actual.iter().map(|s| s.ordinal).collect::<Vec<_>>(),
@@ -160,16 +160,16 @@ fn no_sync_is_explicit_and_clipped_preroll_reports_missing_samples() {
         1,
     )
     .unwrap();
-    let receipt = p.receipt();
+    let landing = p.landing();
     assert_eq!(
-        (receipt.sync_sample.ordinal, receipt.decode_start.ordinal),
+        (landing.sync_sample.ordinal, landing.decode_start.ordinal),
         (1, 1)
     );
     assert_eq!(
         (
-            receipt.requested_preroll_samples,
-            receipt.available_preroll_samples,
-            receipt.missing_preroll_samples
+            landing.requested_preroll_samples,
+            landing.available_preroll_samples,
+            landing.missing_preroll_samples
         ),
         (2, 0, 2)
     );
@@ -254,7 +254,7 @@ fn fragmented_seek_prerolls_across_indexes_without_filling_unknown_source_clock(
             fragment(&pool, 4, high - 64, 2, None, &[0x10000, 0, 0x10000]),
         ];
         // Confirm the canonical index facts before exercising the missing seek
-        // surface. No predecessor clock or native observation supplies origin.
+        // surface. No predecessor clock or demux observation supplies origin.
         for (which, index) in indexes.iter().enumerate() {
             let mut cursor = index.cursor();
             for local in 0..3 {
@@ -286,8 +286,8 @@ fn fragmented_seek_prerolls_across_indexes_without_filling_unknown_source_clock(
         .unwrap();
         assert_eq!(
             (
-                p.receipt().sync_sample.ordinal,
-                p.receipt().decode_start.ordinal
+                p.landing().sync_sample.ordinal,
+                p.landing().decode_start.ordinal
             ),
             (5, 3)
         );
@@ -316,7 +316,7 @@ fn fragmented_seek_prerolls_across_indexes_without_filling_unknown_source_clock(
 }
 
 #[test]
-fn seek_checks_preroll_media_extents_before_publishing_a_receipt() {
+fn seek_checks_preroll_media_extents_before_publishing_a_landing() {
     let pool = Budget::new(1024 * 1024).unwrap();
     let (table, _) = regular(&pool, "r-description-change");
     // Target6 and sync4 are present; the required preceding sample3 is outside.
@@ -419,7 +419,7 @@ fn zero_byte_sample_at_media_end_remains_a_separate_seek_target() {
         1,
     )
     .unwrap();
-    assert_eq!(p.receipt().target.range, 100..100);
+    assert_eq!(p.landing().target.range, 100..100);
     assert_eq!(samples(&p, 1).last().unwrap().ordinal, 1);
 }
 
@@ -438,7 +438,7 @@ fn absent_sync_and_negative_cts_keep_their_original_source_meaning() {
         1,
     )
     .unwrap();
-    assert_eq!(p.receipt().sync_sample.ordinal, 3);
+    assert_eq!(p.landing().sync_sample.ordinal, 3);
     let (table, media) = regular(&pool, "r-negative-cts");
     let p = plan(
         SourceTrack::new(1, Some(&table), &[]).unwrap(),
@@ -451,9 +451,9 @@ fn absent_sync_and_negative_cts_keep_their_original_source_meaning() {
         1,
     )
     .unwrap();
-    assert_eq!(p.receipt().target.cts_ticks, Some(-1000));
+    assert_eq!(p.landing().target.cts_ticks, Some(-1000));
     assert_eq!(
-        p.receipt().target.composition_offset.unwrap().raw_bits(),
+        p.landing().target.composition_offset.unwrap().raw_bits(),
         u32::from_be_bytes((-1000i32).to_be_bytes())
     );
 }

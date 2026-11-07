@@ -2,7 +2,7 @@
 //!
 //! Apple QTFF seeking/stss/chunk tables supply the addressing basis. Preroll is
 //! an explicit caller requirement in container samples, not inferred codec or
-//! sample-group semantics. Native edit occurrences and clocks are separate.
+//! sample-group semantics. Demux edit occurrences and clocks are separate.
 use crate::{Access, BuildStatus, FragmentLocator, Sample, SampleLocator, SampleStep, SourceTrack};
 use std::{
     ops::Range,
@@ -37,7 +37,7 @@ impl Default for SourceSeekLimits {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub struct SourceSeekReceipt {
+pub struct SourceSeekLanding {
     pub track_id: u32,
     pub requested_ordinal: u64,
     pub target: Sample,
@@ -141,7 +141,7 @@ enum Phase {
     Ready,
 }
 
-/// Validates every requested byte range before making a receipt available.
+/// Validates every requested byte range before making a confirmation available.
 /// Only source declarations are used; no clock/flag/description is rewritten.
 #[derive(Debug)]
 pub struct SourceSeekPlanner<'a> {
@@ -164,7 +164,7 @@ pub struct SourceSeekPlanner<'a> {
     pending: Option<Sample>,
     available_preroll: u16,
     validated: u64,
-    receipt: Option<SourceSeekReceipt>,
+    landing: Option<SourceSeekLanding>,
     failed: Option<Error>,
 }
 impl<'a> SourceSeekPlanner<'a> {
@@ -205,7 +205,7 @@ impl<'a> SourceSeekPlanner<'a> {
             pending: None,
             available_preroll: 0,
             validated: 0,
-            receipt: None,
+            landing: None,
             failed: None,
         })
     }
@@ -395,7 +395,7 @@ impl<'a> SourceSeekPlanner<'a> {
                     self.validated = self.validated.checked_add(1).ok_or(Error::Overflow)?;
                     self.pending = None;
                     if self.range_ordinal == self.request.target_ordinal {
-                        self.receipt = Some(SourceSeekReceipt {
+                        self.landing = Some(SourceSeekLanding {
                             track_id: self.source.track_id(),
                             requested_ordinal: self.request.target_ordinal,
                             target: self
@@ -438,8 +438,8 @@ impl<'a> SourceSeekPlanner<'a> {
         }
         Ok(SourceSeekPlan {
             source: self.source,
-            receipt: self
-                .receipt
+            landing: self
+                .landing
                 .take()
                 .ok_or(Error::Invalid("missing source seek receipt"))?,
         })
@@ -449,17 +449,17 @@ impl<'a> SourceSeekPlanner<'a> {
 #[derive(Debug)]
 pub struct SourceSeekPlan<'a> {
     source: SourceTrack<'a>,
-    receipt: SourceSeekReceipt,
+    landing: SourceSeekLanding,
 }
 impl SourceSeekPlan<'_> {
-    pub fn receipt(&self) -> &SourceSeekReceipt {
-        &self.receipt
+    pub fn landing(&self) -> &SourceSeekLanding {
+        &self.landing
     }
     pub fn cursor(&self) -> SourceSeekSamples<'_> {
         SourceSeekSamples {
             source: self.source,
-            next: self.receipt.decode_start.ordinal,
-            last: self.receipt.target.ordinal,
+            next: self.landing.decode_start.ordinal,
+            last: self.landing.target.ordinal,
             lookup: None,
             done: false,
             failed: None,

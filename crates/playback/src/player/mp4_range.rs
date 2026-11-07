@@ -15,11 +15,16 @@ use crate::{
 use std::sync::atomic::AtomicBool;
 use triergon_core::{Budget, Error, InputCursor, Time, WorkBudget};
 use triergon_isobmff::{
-    BuildStatus, Mov9CursorStatus, Mov9EncodedEditPlanV2, Mov9MediaClock, Mov9NativeGlobalSeekJob,
-    Mov9NativeSeekReceipt, Mov9PacketCursor, Mov9RangeSeekJob,
+    BuildStatus,
+    compat::mov::{
+        clock::MediaClock,
+        edits::EncodedEditPlan,
+        packets::{CursorStatus, PacketCursor},
+        seek::{GlobalSeekJob, RangeSeekJob, SeekLanding},
+    },
 };
 
-type Edits<'a> = &'a [Option<Mov9EncodedEditPlanV2>];
+type Edits<'a> = &'a [Option<EncodedEditPlan>];
 
 /// Prepare range playback from a complete, checked MP4 open transaction.
 /// The native cursor checks every source extent and projected occurrence
@@ -84,7 +89,7 @@ impl<'a> Mp4RangeOpen<'a> {
 pub struct Mp4RangePlayer<'a, S: Source> {
     movie: &'a Movie,
     edits: Option<Edits<'a>>,
-    cursor: Mov9PacketCursor<'a>,
+    cursor: PacketCursor<'a>,
     player: Player<S>,
     duration_us: i64,
 }
@@ -141,7 +146,7 @@ impl<'a, S: Source> Mp4RangePlayer<'a, S> {
         {
             return Err(Error::Invalid("native seek requires selected MP4 video"));
         }
-        let base = Mov9MediaClock::from_source(selected.snapshot.base.require()?)?.native_base;
+        let base = MediaClock::from_source(selected.snapshot.base.require()?)?.demux_base;
         let checked = self.cursor.prepare_checked_range_seek(
             request.video,
             request.timestamp,
@@ -236,10 +241,10 @@ struct SeekScope {
 
 pub struct Mp4RangeSeekJob<'a> {
     scope: SeekScope,
-    checked: Option<Mov9RangeSeekJob<'a>>,
-    global: Option<Mov9NativeGlobalSeekJob<'a>>,
-    replay: Option<(Mov9PacketCursor<'a>, Mov9NativeSeekReceipt)>,
-    replay_seed: Option<Mov9PacketCursor<'a>>,
+    checked: Option<RangeSeekJob<'a>>,
+    global: Option<GlobalSeekJob<'a>>,
+    replay: Option<(PacketCursor<'a>, SeekLanding)>,
+    replay_seed: Option<PacketCursor<'a>>,
     maximum_skipped: u64,
     failure: Option<Error>,
 }
@@ -282,16 +287,16 @@ impl<'a> Mp4RangeSeekJob<'a> {
                 .take()
                 .ok_or(Error::Invalid("native range replay seed missing"))?
                 .resume_checked_replay(plan.anchors())?;
-            self.replay = Some((cursor, plan.receipt().clone()));
+            self.replay = Some((cursor, plan.landing().clone()));
         }
         let (cursor, _) = self
             .replay
             .as_mut()
             .ok_or(Error::Invalid("native range replay missing"))?;
         match cursor.poll(work, cancel)? {
-            Mov9CursorStatus::Ready => Ok(true),
-            Mov9CursorStatus::Yield => Ok(false),
-            Mov9CursorStatus::End => Err(Error::Invalid("native range seek landed at end")),
+            CursorStatus::Ready => Ok(true),
+            CursorStatus::Yield => Ok(false),
+            CursorStatus::End => Err(Error::Invalid("native range seek landed at end")),
         }
     }
 
@@ -319,13 +324,13 @@ impl<'a> Mp4RangeSeekJob<'a> {
 
 pub struct Mp4RangeSeek<'a> {
     scope: SeekScope,
-    cursor: Option<Mov9PacketCursor<'a>>,
-    receipt: Mov9NativeSeekReceipt,
+    cursor: Option<PacketCursor<'a>>,
+    receipt: SeekLanding,
     offset: u64,
 }
 
 impl Mp4RangeSeek<'_> {
-    pub fn receipt(&self) -> &Mov9NativeSeekReceipt {
+    pub fn receipt(&self) -> &SeekLanding {
         &self.receipt
     }
 

@@ -4,7 +4,7 @@ use std::fmt::Write as _;
 use triergon_core::{Budget, BudgetVec, Bytes, Error};
 pub use triergon_harness_protocol::digest::{append_words, fold, fold_framed, signed};
 use triergon_harness_protocol::{push_hex, push_quoted};
-use triergon_isobmff::{Mov9PacketView, Mov9StreamView};
+use triergon_isobmff::compat::mov::packets::{PacketView, StreamView};
 
 pub const MAX_PACKETS: u64 = 1_000_000;
 pub const MAX_DELIVERED_BYTES: u64 = 256 * 1024 * 1024;
@@ -71,7 +71,7 @@ pub fn source_sample(out: &mut String, s: &triergon_isobmff::Sample) {
     }
     out.push('}');
 }
-pub fn source_receipts(out: &mut String, r: &triergon_isobmff::MovieSeekResult<'_>) {
+pub fn source_landings(out: &mut String, r: &triergon_isobmff::MovieSeekResult<'_>) {
     use triergon_isobmff::RecoveryDefinitionOrigin;
     out.push_str(",\"point_receipt\":");
     if let Some(p) = &r.point {
@@ -158,7 +158,7 @@ pub fn source_receipts(out: &mut String, r: &triergon_isobmff::MovieSeekResult<'
     }
     out.push_str(",\"plan_receipt\":");
     if let Some(plan) = &r.plan {
-        let p = plan.receipt();
+        let p = plan.landing();
         write!(out,"{{\"track_id\":{},\"requested_ordinal\":{},\"requested_preroll\":{},\"available_preroll\":{},\"missing_preroll\":{},\"validated_samples\":{},\"target\":",
             p.track_id,p.requested_ordinal,p.requested_preroll_samples,p.available_preroll_samples,p.missing_preroll_samples,p.validated_samples).expect("String write");
         source_sample(out, &p.target);
@@ -194,7 +194,7 @@ impl Packet {
     pub fn from_view(
         stream: usize,
         pid: u32,
-        native: &Mov9PacketView,
+        demux: &PacketView,
         payload: Bytes,
     ) -> Result<Self, Error> {
         let pid = i32::try_from(pid)
@@ -202,12 +202,12 @@ impl Packet {
         Ok(Self {
             stream,
             pid: i64::from(pid),
-            pts: native.pts_field.signed_ticks(),
-            dts: native.dts_field.signed_ticks(),
-            duration: native.duration,
-            position: i64::try_from(native.source_range.start)
+            pts: demux.pts_field.signed_ticks(),
+            dts: demux.dts_field.signed_ticks(),
+            duration: demux.duration,
+            position: i64::try_from(demux.source_range.start)
                 .map_err(|_| Error::Unsupported("native signed position projection"))?,
-            flags: native.flags,
+            flags: demux.flags,
             payload,
         })
     }
@@ -224,7 +224,7 @@ impl Packet {
         }
         fold(h, u64::from(self.flags));
         fold_framed(h, self.payload.as_ref());
-        // Current production native view exposes no packet-side-data projection.
+        // Current production demux view exposes no packet-side-data projection.
         // Reference items remain fully consumed; any nonempty result mismatches.
         fold(h, 0);
         Ok(())
@@ -250,7 +250,7 @@ impl Packet {
     }
 }
 
-pub fn consume_stream(h: &mut u64, index: usize, stream: &Mov9StreamView) -> Result<(), Error> {
+pub fn consume_stream(h: &mut u64, index: usize, stream: &StreamView) -> Result<(), Error> {
     fold(h, 0x53);
     fold(h, u64::try_from(index).map_err(|_| Error::Overflow)?);
     fold(
@@ -278,7 +278,7 @@ pub fn consume_stream(h: &mut u64, index: usize, stream: &Mov9StreamView) -> Res
     }
     Ok(())
 }
-pub fn trace_stream(out: &mut String, index: usize, stream: &Mov9StreamView) {
+pub fn trace_stream(out: &mut String, index: usize, stream: &StreamView) {
     write!(
         out,
         "{{\"stream\":{index},\"pid\":{},\"codec\":",

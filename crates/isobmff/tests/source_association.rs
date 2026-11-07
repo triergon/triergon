@@ -5,13 +5,23 @@ use std::sync::atomic::AtomicBool;
 use triergon_core::TimeBase;
 use triergon_core::{Budget, Error, InputCursor, SourceCapabilities, SourceId, WorkBudget};
 use triergon_isobmff::{
-    BoxView, BuildStatus, EditList, Limits, Mov9CursorStatus, Mov9EncodedEditContextV2,
-    Mov9EncodedEditJobV2, Mov9EncodedEditLimitsV2, Mov9EncodedInitialV3, Mov9EncodedLimitsV1,
-    Mov9EncodedSelectionV4, Mov9EncodedStreamJobV1, Mov9PacketCursor, Mov9PacketLimits,
-    Mov9PrivateConfigurationJobV8, Mov9StreamView, Mov9Track, PinnedMovD32EncodedEditsV2,
-    PinnedMovD32EncodedRegularV3, PinnedMovD32EncodedRegularV4,
-    PinnedMovD32OpaquePrivateCatalogueV8, SampleStep, SampleTable, TrackHeader,
+    BoxView, ConfigurationLimits, EditList, Limits, SampleStep, SampleTable, TrackHeader,
+    compat::mov::{
+        edits::{EncodedEditContext, EncodedEditJob, EncodedEditLimits, EncodedEditProfile},
+        encoded::{
+            EncodedConfigProfile, EncodedInitial, EncodedMetadataProfile, EncodedSelection,
+            EncodedStreamJob,
+        },
+        packets::{CursorStatus, DemuxTrack, PacketCursor, PacketLimits},
+    },
 };
+#[cfg(feature = "reference-trace")]
+use triergon_isobmff::{
+    BuildStatus,
+    compat::mov::packets::StreamView,
+    reference_trace::mov::sample_entry::{PrivateCatalogueProfile, PrivateConfigurationJob},
+};
+#[cfg(feature = "reference-trace")]
 const RAW: &[u8] = include_bytes!("fixtures/private-catalogue-v8/dOps-only-size-11.mov");
 const AVC: &[u8] = include_bytes!("fixtures/encoded-dependency-v4/dep-unreferenced.mp4");
 struct Source {
@@ -92,24 +102,24 @@ impl Source {
         &self,
         table: &SampleTable,
         input: &mut InputCursor,
-    ) -> triergon_isobmff::Mov9EncodedStreamV1 {
-        let mut job = Mov9EncodedStreamJobV1::new_description_v4(
+    ) -> triergon_isobmff::compat::mov::encoded::EncodedStream {
+        let mut job = EncodedStreamJob::new_description_with_metadata(
             &self.header,
             table,
             input,
-            Mov9EncodedSelectionV4 {
+            EncodedSelection {
                 major_brand: Some(*b"isom"),
                 description: 1,
-                limits: Mov9EncodedLimitsV1::default(),
+                limits: ConfigurationLimits::default(),
             },
-            PinnedMovD32EncodedRegularV4,
+            EncodedMetadataProfile,
         )
         .unwrap();
         for _ in 0..10000 {
             if job
                 .poll(input, &mut WorkBudget::new(1), &AtomicBool::new(false))
                 .unwrap()
-                == Mov9CursorStatus::Ready
+                == CursorStatus::Ready
             {
                 return job.take(input, &AtomicBool::new(false)).unwrap();
             }
@@ -117,13 +127,17 @@ impl Source {
         panic!("config progress");
     }
 }
-fn private(s: &Source, other: &SampleTable) -> triergon_isobmff::Mov9PrivateConfigurationV8 {
-    let mut job = Mov9PrivateConfigurationJobV8::new(
+#[cfg(feature = "reference-trace")]
+fn private(
+    s: &Source,
+    other: &SampleTable,
+) -> triergon_isobmff::reference_trace::mov::sample_entry::PrivateConfiguration {
+    let mut job = PrivateConfigurationJob::new(
         &other.descriptions()[0],
         &s.pool,
         1024 * 1024,
         Limits::default(),
-        PinnedMovD32OpaquePrivateCatalogueV8,
+        PrivateCatalogueProfile,
     )
     .unwrap();
     for _ in 0..10000 {
@@ -147,8 +161,9 @@ fn first(table: &SampleTable) -> triergon_isobmff::Sample {
         }
     }
 }
+#[cfg(feature = "reference-trace")]
 #[test]
-fn v8_same_bytes_relocated_physical_entry_is_rejected() {
+fn same_bytes_relocated_physical_entry_is_rejected() {
     let s = Source::new(RAW);
     let shifted = s.shifted(4);
     let a = s.table.descriptions()[0].raw();
@@ -157,13 +172,13 @@ fn v8_same_bytes_relocated_physical_entry_is_rejected() {
     assert_eq!(a.bytes().len(), b.bytes().len());
     assert_ne!(a.header().start, b.header().start);
     let config = private(&s, &shifted);
-    let result = Mov9StreamView::for_source_private_v8(
+    let result = StreamView::for_source_private(
         &s.header,
         &s.table,
         false,
         Some(*b"qt  "),
         &config,
-        PinnedMovD32OpaquePrivateCatalogueV8,
+        PrivateCatalogueProfile,
     );
     assert!(
         matches!(
@@ -174,7 +189,7 @@ fn v8_same_bytes_relocated_physical_entry_is_rejected() {
     );
 }
 #[test]
-fn v3_same_bytes_relocated_encoded_description_is_rejected() {
+fn same_bytes_relocated_encoded_description_is_rejected() {
     let s = Source::new(AVC);
     let shifted = s.shifted(4);
     let mut input = s.input();
@@ -187,12 +202,12 @@ fn v3_same_bytes_relocated_encoded_description_is_rejected() {
         config.source_description().raw().header().start,
         s.table.descriptions()[0].raw().header().start
     );
-    let result = Mov9EncodedInitialV3::new(
+    let result = EncodedInitial::new(
         &s.table,
         &[config],
         &first(&s.table),
         &input,
-        PinnedMovD32EncodedRegularV3,
+        EncodedConfigProfile,
     );
     assert!(
         matches!(
@@ -203,13 +218,13 @@ fn v3_same_bytes_relocated_encoded_description_is_rejected() {
     );
 }
 #[test]
-fn v2_direct_edit_constructor_rejects_relocated_configuration() {
+fn direct_edit_constructor_rejects_relocated_configuration() {
     let s = Source::new(AVC);
     let shifted = s.shifted(4);
     let mut input = s.input();
     let config = s.encoded(&shifted, &mut input);
-    let result = Mov9EncodedEditJobV2::new(
-        Mov9EncodedEditContextV2 {
+    let result = EncodedEditJob::new(
+        EncodedEditContext {
             table: &s.table,
             edits: s.edits.as_ref().unwrap(),
             stream: &config,
@@ -217,8 +232,8 @@ fn v2_direct_edit_constructor_rejects_relocated_configuration() {
             movie_base: TimeBase::new(1, 1000).unwrap(),
         },
         &input,
-        Mov9EncodedEditLimitsV2::default(),
-        PinnedMovD32EncodedEditsV2,
+        EncodedEditLimits::default(),
+        EncodedEditProfile,
     );
     assert!(
         matches!(
@@ -235,8 +250,8 @@ fn packet_cursor_rejects_plan_at_relocated_metadata_origin() {
     let mut input = s.input();
     let config = s.encoded(&shifted, &mut input);
     let configs = [config.clone()];
-    let mut job = Mov9EncodedEditJobV2::new_v4(
-        Mov9EncodedEditContextV2 {
+    let mut job = EncodedEditJob::new_with_dependency_table(
+        EncodedEditContext {
             table: &shifted,
             edits: s.edits.as_ref().unwrap(),
             stream: &config,
@@ -245,17 +260,17 @@ fn packet_cursor_rejects_plan_at_relocated_metadata_origin() {
         },
         &configs,
         &input,
-        Mov9EncodedEditLimitsV2::default(),
-        PinnedMovD32EncodedRegularV4,
+        EncodedEditLimits::default(),
+        EncodedMetadataProfile,
     )
     .unwrap();
     while job
         .poll(&mut input, &mut WorkBudget::new(1), &AtomicBool::new(false))
         .unwrap()
-        != Mov9CursorStatus::Ready
+        != CursorStatus::Ready
     {}
     let plan = job.take(&mut input, &AtomicBool::new(false)).unwrap();
-    let tracks = [Mov9Track {
+    let tracks = [DemuxTrack {
         track_id: s.header.track_id,
         table: &s.table,
         fragments: &[],
@@ -263,13 +278,13 @@ fn packet_cursor_rejects_plan_at_relocated_metadata_origin() {
         edits: Some((s.edits.as_ref().unwrap(), TimeBase::new(1, 1000).unwrap())),
     }];
     let plans = [Some(plan)];
-    let result = Mov9PacketCursor::new_encoded_regular_v2(
+    let result = PacketCursor::new_encoded_regular(
         &s.pool,
         &tracks,
         &s.media,
-        Mov9PacketLimits::default(),
+        PacketLimits::default(),
         &plans,
-        PinnedMovD32EncodedEditsV2,
+        EncodedEditProfile,
     );
     assert!(
         matches!(
@@ -279,36 +294,37 @@ fn packet_cursor_rejects_plan_at_relocated_metadata_origin() {
         "relocated metadata plan was admitted"
     );
 }
+#[cfg(feature = "reference-trace")]
 #[test]
-fn v8_same_allocation_same_physical_start_stays_valid() {
+fn private_same_allocation_same_physical_start_stays_valid() {
     let s = Source::new(RAW);
     let reconstructed = s.shifted(0);
     let config = private(&s, &reconstructed);
     assert!(
-        Mov9StreamView::for_source_private_v8(
+        StreamView::for_source_private(
             &s.header,
             &s.table,
             false,
             Some(*b"qt  "),
             &config,
-            PinnedMovD32OpaquePrivateCatalogueV8
+            PrivateCatalogueProfile
         )
         .is_ok()
     );
 }
 #[test]
-fn v3_same_allocation_same_physical_start_stays_valid() {
+fn encoded_same_allocation_same_physical_start_stays_valid() {
     let s = Source::new(AVC);
     let reconstructed = s.shifted(0);
     let mut input = s.input();
     let config = s.encoded(&reconstructed, &mut input);
     assert!(
-        Mov9EncodedInitialV3::new(
+        EncodedInitial::new(
             &s.table,
             &[config],
             &first(&s.table),
             &input,
-            PinnedMovD32EncodedRegularV3
+            EncodedConfigProfile
         )
         .is_ok()
     );

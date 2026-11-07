@@ -2,7 +2,7 @@
 
 use std::sync::atomic::{AtomicBool, Ordering};
 use triergon_core::{Error, Result, WorkBudget};
-use triergon_isobmff::{Mov9PacketOccurrence, mov9_seekable_head_precedes};
+use triergon_isobmff::compat::mov::{clock::seekable_head_precedes, packets::PacketOccurrence};
 
 const MAX_TRACKS: usize = 64;
 
@@ -42,7 +42,7 @@ impl NativeMp4Replay {
     pub(crate) fn new(
         track_ids: &[u32],
         starts: &[usize],
-        rows: &[Mov9PacketOccurrence],
+        rows: &[PacketOccurrence],
     ) -> Result<Self> {
         if track_ids.len() > MAX_TRACKS {
             return Err(Error::Limit {
@@ -70,7 +70,7 @@ impl NativeMp4Replay {
                 track_id,
                 head: Some(start),
             };
-            if slot != 0 && mov9_seekable_head_precedes(occurrence, &rows[starts[first]]) {
+            if slot != 0 && seekable_head_precedes(occurrence, &rows[starts[first]]) {
                 first = slot;
             }
         }
@@ -89,7 +89,7 @@ impl NativeMp4Replay {
 
     pub(crate) fn poll(
         &mut self,
-        rows: &[Mov9PacketOccurrence],
+        rows: &[PacketOccurrence],
         work: &mut WorkBudget,
         cancel: &AtomicBool,
     ) -> Result<NativeMp4ReplayStep> {
@@ -136,7 +136,7 @@ impl NativeMp4Replay {
                     if let Some(row) = self.slots[next].head {
                         let prefer = match best {
                             Some(slot) => {
-                                mov9_seekable_head_precedes(&rows[row], &rows[self.head(slot)?])
+                                seekable_head_precedes(&rows[row], &rows[self.head(slot)?])
                             }
                             None => true,
                         };
@@ -179,12 +179,16 @@ mod tests {
     use super::*;
     use triergon_core::TimeBase;
     use triergon_isobmff::{
-        Access, Mov9ClockOrigin, Mov9MediaClock, Mov9SchedulingClock, Mov9View, Sample,
+        Access, Sample,
+        compat::mov::{
+            clock::{ClockOrigin, MediaClock, SchedulingClock},
+            packets::PacketProjector,
+        },
     };
 
     static RUN: AtomicBool = AtomicBool::new(false);
 
-    fn row(track_id: u32, clock: i64, position: u64) -> Mov9PacketOccurrence {
+    fn row(track_id: u32, clock: i64, position: u64) -> PacketOccurrence {
         let base = TimeBase::new(1, 1_000_000).unwrap();
         let source = Sample {
             ordinal: position,
@@ -199,15 +203,17 @@ mod tests {
             dependency: None,
             fragment_flags: None,
         };
-        let native = Mov9View::new(base, None).project(&source, None).unwrap();
-        Mov9PacketOccurrence {
+        let native = PacketProjector::new(base, None)
+            .project(&source, None)
+            .unwrap();
+        PacketOccurrence {
             track_id,
-            scheduling_clock: Mov9SchedulingClock::from_native(native.dts_field, base).unwrap(),
+            scheduling_clock: SchedulingClock::from_demux_clock(native.dts_field, base).unwrap(),
             source,
-            native,
+            demux: native,
             edit: None,
-            clock_origin: Mov9ClockOrigin::SourceClock,
-            media_clock: Mov9MediaClock::from_source(base).unwrap(),
+            clock_origin: ClockOrigin::SourceClock,
+            media_clock: MediaClock::from_source(base).unwrap(),
         }
     }
 
@@ -270,15 +276,15 @@ mod tests {
     #[test]
     fn replay_uses_seekable_threshold_and_sticky_catalogue_order() {
         let mut rows = [row(1, 2_000_000, 50), row(2, 1_000_000, 80)];
-        let first = |rows: &[Mov9PacketOccurrence]| {
+        let first = |rows: &[PacketOccurrence]| {
             NativeMp4Replay::new(&[1, 2], &[0, 1], rows)
                 .unwrap()
                 .first_row()
         };
         assert_eq!(first(&rows), 0);
-        rows[1].scheduling_clock = Mov9SchedulingClock::ExactMicroseconds(999_999);
+        rows[1].scheduling_clock = SchedulingClock::ExactMicroseconds(999_999);
         assert_eq!(first(&rows), 1);
-        rows[1].scheduling_clock = Mov9SchedulingClock::ApiSentinel;
+        rows[1].scheduling_clock = SchedulingClock::ApiSentinel;
         assert_eq!(first(&rows), 0);
         assert_eq!(
             NativeMp4Replay::new(&[2, 1], &[1, 0], &rows)

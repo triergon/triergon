@@ -14,19 +14,26 @@ use triergon_core::{
     SourceFailure, SourceId, Step, Time, WorkBudget,
 };
 use triergon_isobmff::{
-    BoxEvent, BoxHeader, BoxReader, BoxStep, BoxView, BuildStatus, EditList, EntryLayout,
-    FragmentBuilder, FragmentContext, FragmentIndex, ImplicitBase, Limits, MediaDataPolicy,
-    Mov9CursorStatus, Mov9NativeGlobalSeekJob, Mov9NativeIndexCursor, Mov9NativeIndexLimits,
-    Mov9NativeSeekLimits, Mov9PacketCursor, Mov9PacketLimits, Mov9PartialSampleReader,
-    Mov9PayloadBounds, Mov9Profile, Mov9RecoveryTrackHeader, Mov9RecoveryV3Context,
-    Mov9RecoveryV3Read, Mov9RunRecoveryV3Builder, Mov9SampleEntryHeaderJobV7, Mov9StreamView,
-    Mov9Track, Mov9V3TransportBuilder, MovieHeader, MovieSeekClocks, MovieSeekLimits,
-    MovieSourceSeekContext, MovieSourceSeekPlanner, PinnedMovD32RegularRecoveryV1,
-    PinnedMovD32RegularRecoveryV3, PinnedMovD32SampleEntryHeaderV7,
-    PinnedMovD32SmallRawVideoTransportV3, RecoveryDescriptions, RecoveryKind, RecoveryMappings,
-    RecoveryScope, RecoverySyntax, Sample, SampleDescription, SampleReader, SampleStep,
-    SampleTable, SampleTableBuilder, SampleTablePolicy, SourcePacket, SourceTrack, TrackHeader,
-    TrackSampleCursor, Trex,
+    BoxEvent, BoxHeader, BoxReader, BoxStep, BoxView, BuildStatus, EditList, FragmentBuilder,
+    FragmentContext, FragmentIndex, ImplicitBase, Limits, MediaDataPolicy, MovieHeader,
+    MovieSeekClocks, MovieSeekLimits, MovieSourceSeekContext, MovieSourceSeekPlanner,
+    RecoveryDescriptions, RecoveryKind, RecoveryMappings, RecoveryScope, RecoverySyntax, Sample,
+    SampleDescription, SampleReader, SampleStep, SampleTable, SampleTableBuilder,
+    SampleTablePolicy, SourcePacket, SourceTrack, TrackHeader, TrackSampleCursor, Trex,
+    compat::mov::{
+        packets::{CursorStatus, DemuxProfile, DemuxTrack, PacketCursor, PacketLimits, StreamView},
+        recovery::{
+            DescriptionContext, DescriptionRead, DescriptionRecoveryBuilder,
+            DescriptionRecoveryProfile, PartialSampleReader, PayloadBounds, RecoveryTrackHeader,
+            RunRecoveryProfile,
+        },
+        seek::{GlobalSeekJob, IndexCursor, IndexLimits, SeekLimits},
+    },
+    reference_trace::mov::{
+        fragment_clock::{FragmentClockProfile, check_signed_decode_runs},
+        sample_entry::{RawVisualEntriesJob, SampleEntryHeaderProfile},
+        transport::{RawVideoTransportBuilder, RawVideoTransportProfile},
+    },
 };
 
 const MAX_SAMPLE_BYTES: usize = 16 * 1024 * 1024;
@@ -57,19 +64,19 @@ impl fmt::Display for Failure {
 impl std::error::Error for Failure {}
 pub type Result<T> = std::result::Result<T, Failure>;
 #[derive(Clone, Copy)]
-pub struct NativeSeekRequest {
+pub struct DemuxSeekRequest {
     pub track: i32,
     pub ticks: i64,
     pub count: u32,
     pub after_eof: bool,
 }
 #[derive(Clone, Copy)]
-pub enum NativeOperation {
+pub enum DemuxOperation {
     Open,
     Index,
-    Seek(NativeSeekRequest),
+    Seek(DemuxSeekRequest),
 }
-impl NativeOperation {
+impl DemuxOperation {
     fn trace_name(self) -> &'static str {
         match self {
             Self::Open => "mov-native-open-consumer-v33",
@@ -78,31 +85,35 @@ impl NativeOperation {
         }
     }
 }
-trait NativeRows {
+trait DemuxRows {
     fn poll(
         &mut self,
         work: &mut WorkBudget,
         cancel: &AtomicBool,
-    ) -> triergon_core::Result<Mov9CursorStatus>;
-    fn take(&mut self) -> triergon_core::Result<triergon_isobmff::Mov9PacketOccurrence>;
+    ) -> triergon_core::Result<CursorStatus>;
+    fn take(
+        &mut self,
+    ) -> triergon_core::Result<triergon_isobmff::compat::mov::packets::PacketOccurrence>;
 }
-impl NativeRows for Mov9PacketCursor<'_> {
+impl DemuxRows for PacketCursor<'_> {
     fn poll(
         &mut self,
         work: &mut WorkBudget,
         cancel: &AtomicBool,
-    ) -> triergon_core::Result<Mov9CursorStatus> {
-        Mov9PacketCursor::poll(self, work, cancel)
+    ) -> triergon_core::Result<CursorStatus> {
+        PacketCursor::poll(self, work, cancel)
     }
-    fn take(&mut self) -> triergon_core::Result<triergon_isobmff::Mov9PacketOccurrence> {
+    fn take(
+        &mut self,
+    ) -> triergon_core::Result<triergon_isobmff::compat::mov::packets::PacketOccurrence> {
         self.take_occurrence()
     }
 }
 fn append<T>(target: &mut BudgetVec<T>, value: T) -> Result<()> {
     target.try_push(value).map_err(|e| Failure::Core(e.error))
 }
-fn native_catalogue(
-    streams: &[Mov9StreamView],
+fn demux_catalogue(
+    streams: &[StreamView],
     stats: &mut Stats,
     mut trace: Option<&mut String>,
 ) -> Result<()> {
@@ -131,7 +142,7 @@ fn native_catalogue(
     Ok(())
 }
 
-fn native_result(eof: bool, stats: &mut Stats, trace: Option<&mut String>) {
+fn demux_result(eof: bool, stats: &mut Stats, trace: Option<&mut String>) {
     let read_result = if eof { protocol::EOF } else { 0 };
     protocol::fold(&mut stats.digest, 0x45);
     protocol::fold(&mut stats.digest, protocol::signed(read_result));
@@ -154,7 +165,7 @@ struct IndexRow {
     min_distance: i32,
 }
 
-fn native_index_stream(
+fn demux_index_stream(
     stream: usize,
     track_id: u32,
     stats: &mut Stats,
@@ -442,22 +453,6 @@ fn index_fragments(
         }
     }
     Ok(indexes)
-}
-
-fn check_signed_decode_runs(fragments: &[FragmentIndex]) -> Result<()> {
-    let maximum = i128::from(i64::MAX);
-    for fragment in fragments {
-        // The pinned comparison bounds duration accumulation from a
-        // nonnegative signed start. The source index sums all run durations.
-        if fragment
-            .decode_time()
-            .is_some_and(|start| i128::from(start.ticks()) <= maximum)
-            && fragment.decode_end().is_some_and(|end| end > maximum)
-        {
-            return Err(Error::Invalid("native signed decode run overflow").into());
-        }
-    }
-    Ok(())
 }
 
 pub trait Transport: Read + Seek {}
@@ -786,24 +781,24 @@ impl<'a> Driver<'a> {
             }
         }
     }
-    pub fn native_open(
+    pub fn demux_open(
         &mut self,
         model: &Model,
         stats: &mut Stats,
         retention: &mut Retention,
         trace: Option<&mut String>,
     ) -> Result<()> {
-        self.native_operation(model, stats, retention, NativeOperation::Open, trace)
+        self.demux_operation(model, stats, retention, DemuxOperation::Open, trace)
     }
 
     pub fn recovered_regular_operation(
         &mut self,
-        operation: NativeOperation,
+        operation: DemuxOperation,
         stats: &mut Stats,
         retention: &mut Retention,
         mut trace: Option<&mut String>,
     ) -> Result<()> {
-        if matches!(operation, NativeOperation::Seek(_)) {
+        if matches!(operation, DemuxOperation::Seek(_)) {
             return Err(Error::Unsupported("seek with regular table recovery").into());
         }
         let mut roots = RootWalk {
@@ -828,16 +823,16 @@ impl<'a> Driver<'a> {
         }
         MovieHeader::parse(&child(&scanned.movie, b"mvhd")?)?;
         let mdia = child(track, b"mdia")?;
-        let header = Mov9RecoveryTrackHeader::parse(
+        let header = RecoveryTrackHeader::parse(
             &child(track, b"tkhd")?,
             &child(&mdia, b"mdhd")?,
             &child(&mdia, b"hdlr")?,
-            PinnedMovD32RegularRecoveryV1,
+            RunRecoveryProfile,
         )?;
         let minf = child(&mdia, b"minf")?;
         let refs = data_references(&minf, &self.budget)?;
-        let profile = PinnedMovD32RegularRecoveryV3;
-        let mut builder = Mov9RunRecoveryV3Builder::new(
+        let profile = DescriptionRecoveryProfile;
+        let mut builder = DescriptionRecoveryBuilder::new(
             child(&minf, b"stbl")?,
             self.budget.clone(),
             Limits::default(),
@@ -848,9 +843,9 @@ impl<'a> Driver<'a> {
         }
         let table = builder.finish()?;
         require_local_references(refs.as_slice(), table.descriptions())?;
-        let stream = table.native_stream_for_recovery_header(&header, scanned.brand)?;
+        let stream = table.stream_view_for_recovery_header(&header, scanned.brand)?;
         let track_id = header.source().track_id;
-        let context = Mov9RecoveryV3Context {
+        let context = DescriptionContext {
             physical_length: self.length,
             custom_read_maximum: self.window,
         };
@@ -863,28 +858,28 @@ impl<'a> Driver<'a> {
             )
             .expect("String write");
         }
-        let mut cursor = table.packet_cursor_v3(
+        let mut cursor = table.description_packet_cursor(
             &self.budget,
             &header,
             media,
-            Mov9PacketLimits::default(),
+            PacketLimits::default(),
             context,
             profile,
         )?;
         loop {
             match cursor.poll(&mut WorkBudget::new(self.quantum), &self.cancel)? {
-                Mov9CursorStatus::Yield => continue,
-                Mov9CursorStatus::End => break,
-                Mov9CursorStatus::Ready => {}
+                CursorStatus::Yield => continue,
+                CursorStatus::End => break,
+                CursorStatus::Ready => {}
             }
             let event = cursor.take_event()?;
-            if event.read == Mov9RecoveryV3Read::NoNativePacketForAbsentCatalogue {
+            if event.read == DescriptionRead::NoPacketForAbsentCatalogue {
                 continue;
             }
             let view = event
                 .packet
                 .ok_or(Error::Invalid("missing projected packet"))?;
-            if event.read == Mov9RecoveryV3Read::UnavailablePhysicalStart
+            if event.read == DescriptionRead::UnavailablePhysicalStart
                 && event.declaration.ordinal == 1
                 && view.source_ordinal == 1
                 && stats.packets == 0
@@ -893,27 +888,24 @@ impl<'a> Driver<'a> {
                     .file_type
                     .take()
                     .ok_or(Error::Invalid("missing file type"))?;
-                let mut transport = Mov9V3TransportBuilder::new(
+                let mut transport = RawVideoTransportBuilder::new(
                     file_type,
                     scanned.movie.clone(),
                     roots.headers.as_slice(),
                     &table,
                     &self.budget,
                     context,
-                    PinnedMovD32SmallRawVideoTransportV3,
+                    RawVideoTransportProfile,
                 )?;
                 while transport.poll(&mut WorkBudget::new(self.quantum), &self.cancel)?
                     != BuildStatus::Ready
                 {}
-                if transport
-                    .finish()?
-                    .models_initial_native_eof(view.source_range)
-                {
+                if transport.finish()?.models_initial_eof(view.source_range) {
                     break;
                 }
                 return Err(Error::Invalid("unreachable initial sample offset").into());
             }
-            if event.read != Mov9RecoveryV3Read::Available {
+            if event.read != DescriptionRead::Available {
                 return Err(Error::Invalid("unreachable sample offset").into());
             }
             let sample = Sample {
@@ -931,13 +923,13 @@ impl<'a> Driver<'a> {
             }
             retention.retain(packet);
         }
-        native_catalogue(&[stream], stats, trace.as_deref_mut())?;
-        if matches!(operation, NativeOperation::Index) {
-            let mut index = table.index_cursor_v3(
+        demux_catalogue(&[stream], stats, trace.as_deref_mut())?;
+        if matches!(operation, DemuxOperation::Index) {
+            let mut index = table.description_index_cursor(
                 &self.budget,
                 &header,
                 media,
-                Mov9NativeIndexLimits::default(),
+                IndexLimits::default(),
                 context,
                 profile,
             )?;
@@ -946,13 +938,13 @@ impl<'a> Driver<'a> {
             if let Some(out) = trace.as_deref_mut() {
                 out.push_str(",\"native_indexes\":[");
             }
-            native_index_stream(0, track_id, stats, trace.as_deref_mut(), || {
+            demux_index_stream(0, track_id, stats, trace.as_deref_mut(), || {
                 loop {
                     match index.poll(&mut WorkBudget::new(self.quantum), &self.cancel)? {
-                        Mov9CursorStatus::Yield => {}
-                        Mov9CursorStatus::End => return Ok(None),
-                        Mov9CursorStatus::Ready => {
-                            if let Some(entry) = index.take_event()?.native_entry {
+                        CursorStatus::Yield => {}
+                        CursorStatus::End => return Ok(None),
+                        CursorStatus::Ready => {
+                            if let Some(entry) = index.take_event()?.demux_entry {
                                 return Ok(Some(IndexRow {
                                     ordinal: entry.ordinal,
                                     position: entry.position,
@@ -970,14 +962,14 @@ impl<'a> Driver<'a> {
                 out.push(']');
             }
         }
-        native_result(true, stats, trace);
+        demux_result(true, stats, trace);
         Ok(())
     }
 
     #[cold]
     fn terminal_payload(&mut self, sample: Sample, declared: &Range<u64>) -> Result<Bytes> {
-        let profile = PinnedMovD32RegularRecoveryV1;
-        let mut reader = Mov9PartialSampleReader::new(
+        let profile = RunRecoveryProfile;
+        let mut reader = PartialSampleReader::new(
             &mut self.input,
             sample,
             declared.clone(),
@@ -1001,51 +993,33 @@ impl<'a> Driver<'a> {
         }
     }
 
-    fn check_comparison_visual_headers(&self, record: &Record) -> Result<()> {
-        if record.header.handler != *b"vide" {
-            return Ok(());
-        }
-        for entry in record.table.descriptions() {
-            // The comparison catalogue projects raw visual entries. Check
-            // their child boxes before it publishes a stream.
-            if entry.format != *b"raw " || entry.raw().payload().len() == 78 {
-                continue;
-            }
-            let mut job = Mov9SampleEntryHeaderJobV7::new(
-                entry,
-                EntryLayout::Visual,
-                Limits::default(),
-                PinnedMovD32SampleEntryHeaderV7,
-            )?;
-            while job.poll(&mut WorkBudget::new(self.quantum), &self.cancel)? != BuildStatus::Ready
-            {
-            }
-            if job.try_finish(&self.cancel)?.native_open_result().is_some() {
-                return Err(Error::Invalid("sample entry configuration").into());
-            }
-        }
-        Ok(())
-    }
-
-    pub fn native_operation(
+    pub fn demux_operation(
         &mut self,
         model: &Model,
         stats: &mut Stats,
         retention: &mut Retention,
-        operation: NativeOperation,
+        operation: DemuxOperation,
         mut trace: Option<&mut String>,
     ) -> Result<()> {
-        if matches!(operation, NativeOperation::Seek(_)) && model.truncated_media.is_some() {
+        if matches!(operation, DemuxOperation::Seek(_)) && model.truncated_media.is_some() {
             return Err(Error::Truncated.into());
         }
-        if matches!(operation, NativeOperation::Open | NativeOperation::Index) {
-            check_signed_decode_runs(model.fragments.as_slice())?;
+        if matches!(operation, DemuxOperation::Open | DemuxOperation::Index) {
+            check_signed_decode_runs(model.fragments.as_slice(), FragmentClockProfile)?;
         }
         let mut tracks = BudgetVec::new(&self.budget);
         let mut streams = BudgetVec::new(&self.budget);
         let movie_base = model.movie.time_base()?;
         for record in model.records.as_slice() {
-            self.check_comparison_visual_headers(record)?;
+            let mut entries = RawVisualEntriesJob::new(
+                &record.header,
+                &record.table,
+                Limits::default(),
+                SampleEntryHeaderProfile,
+            );
+            while entries.poll(&mut WorkBudget::new(self.quantum), &self.cancel)?
+                != BuildStatus::Ready
+            {}
             let has_fragments = model
                 .fragments
                 .as_slice()
@@ -1053,16 +1027,11 @@ impl<'a> Driver<'a> {
                 .any(|f| f.track_id() == record.header.track_id);
             append(
                 &mut streams,
-                Mov9StreamView::for_source(
-                    &record.header,
-                    &record.table,
-                    has_fragments,
-                    model.brand,
-                )?,
+                StreamView::for_source(&record.header, &record.table, has_fragments, model.brand)?,
             )?;
             append(
                 &mut tracks,
-                Mov9Track {
+                DemuxTrack {
                     track_id: record.header.track_id,
                     table: &record.table,
                     fragments: model.fragments.as_slice(),
@@ -1073,7 +1042,7 @@ impl<'a> Driver<'a> {
         }
         let mut drain = Stats::default();
         let seek = match operation {
-            NativeOperation::Seek(r) => Some(r),
+            DemuxOperation::Seek(r) => Some(r),
             _ => None,
         };
         if let Some(r) = seek {
@@ -1088,18 +1057,18 @@ impl<'a> Driver<'a> {
                 return Err(Error::Invalid("native seek track ID absent").into());
             }
             if r.after_eof {
-                let mut cursor = Mov9PacketCursor::new_complete_source(
+                let mut cursor = PacketCursor::new_complete_source(
                     &self.budget,
                     tracks.as_slice(),
                     model.media.as_slice(),
-                    Mov9PacketLimits::default(),
-                    Mov9Profile::PinnedNoParseNoFillin,
+                    PacketLimits::default(),
+                    DemuxProfile::NoParseNoFillin,
                 )?;
                 loop {
                     match cursor.poll(&mut WorkBudget::new(self.quantum), &self.cancel)? {
-                        Mov9CursorStatus::Yield => {}
-                        Mov9CursorStatus::End => break,
-                        Mov9CursorStatus::Ready => {
+                        CursorStatus::Yield => {}
+                        CursorStatus::End => break,
+                        CursorStatus::Ready => {
                             let row = cursor.take_occurrence()?;
                             let payload = self.packet(row.source, model.media.as_slice())?.payload;
                             let stream = tracks
@@ -1110,7 +1079,7 @@ impl<'a> Driver<'a> {
                             drain.packet(&Packet::from_view(
                                 stream,
                                 row.track_id,
-                                &row.native,
+                                &row.demux,
                                 payload,
                             )?)?;
                         }
@@ -1122,21 +1091,21 @@ impl<'a> Driver<'a> {
             }
         }
         let plan = if let Some(r) = seek {
-            let mut job = Mov9NativeGlobalSeekJob::new_complete_source(
+            let mut job = GlobalSeekJob::new_complete_source(
                 &self.budget,
                 tracks.as_slice(),
                 model.media.as_slice(),
                 u32::try_from(r.track).map_err(|_| Error::Unsupported("native signed track ID"))?,
                 r.ticks,
-                Mov9NativeSeekLimits::default(),
-                Mov9Profile::PinnedNoParseNoFillin,
+                SeekLimits::default(),
+                DemuxProfile::NoParseNoFillin,
             )?;
             while job.poll(&mut WorkBudget::new(self.quantum), &self.cancel)? != BuildStatus::Ready
             {
             }
             let plan = job.finish()?;
             self.input
-                .reset(plan.receipt().selected.occurrence.source.range.start)?;
+                .reset(plan.landing().selected.occurrence.source.range.start)?;
             protocol::fold(&mut stats.digest, 0x51);
             protocol::fold(&mut stats.digest, 0);
             Some(plan)
@@ -1163,12 +1132,12 @@ impl<'a> Driver<'a> {
                 trace.as_deref_mut(),
             )?
         } else {
-            let mut cursor = Mov9PacketCursor::new_complete_source(
+            let mut cursor = PacketCursor::new_complete_source(
                 &self.budget,
                 tracks.as_slice(),
                 model.media.as_slice(),
-                Mov9PacketLimits::default(),
-                Mov9Profile::PinnedNoParseNoFillin,
+                PacketLimits::default(),
+                DemuxProfile::NoParseNoFillin,
             )?;
             let result = self.deliver_rows(
                 model,
@@ -1178,14 +1147,14 @@ impl<'a> Driver<'a> {
                 retention,
                 trace.as_deref_mut(),
             )?;
-            if matches!(operation, NativeOperation::Index) && result.1 {
+            if matches!(operation, DemuxOperation::Index) && result.1 {
                 completed_packets = Some(cursor);
             }
             result
         };
-        native_catalogue(streams.as_slice(), stats, trace.as_deref_mut())?;
-        if matches!(operation, NativeOperation::Index) {
-            self.native_indexes(
+        demux_catalogue(streams.as_slice(), stats, trace.as_deref_mut())?;
+        if matches!(operation, DemuxOperation::Index) {
+            self.demux_indexes(
                 model,
                 tracks.as_slice(),
                 completed_packets.as_ref(),
@@ -1193,7 +1162,7 @@ impl<'a> Driver<'a> {
                 trace.as_deref_mut(),
             )?;
         }
-        native_result(eof, stats, trace.as_deref_mut());
+        demux_result(eof, stats, trace.as_deref_mut());
         if let (Some(out), Some(r)) = (trace, seek) {
             write!(
                 out,
@@ -1207,7 +1176,7 @@ impl<'a> Driver<'a> {
     fn deliver_rows(
         &mut self,
         model: &Model,
-        cursor: &mut impl NativeRows,
+        cursor: &mut impl DemuxRows,
         limit: Option<u32>,
         stats: &mut Stats,
         retention: &mut Retention,
@@ -1221,9 +1190,9 @@ impl<'a> Driver<'a> {
             }
             loop {
                 match cursor.poll(&mut WorkBudget::new(self.quantum), &self.cancel)? {
-                    Mov9CursorStatus::Yield => {}
-                    Mov9CursorStatus::End => return Ok((reads, true)),
-                    Mov9CursorStatus::Ready => break,
+                    CursorStatus::Yield => {}
+                    CursorStatus::End => return Ok((reads, true)),
+                    CursorStatus::Ready => break,
                 }
             }
             let item = cursor.take()?;
@@ -1241,12 +1210,12 @@ impl<'a> Driver<'a> {
                 // A positive short read can be followed by the adjacent
                 // declared sample at EOF. Validate its full declared size.
                 if short_end == Some(item.source.range.start) && !item.source.range.is_empty() {
-                    Mov9PayloadBounds::from_source(
+                    PayloadBounds::from_source(
                         &item.source,
                         declared.clone(),
                         self.length,
                         MAX_SAMPLE_BYTES,
-                        PinnedMovD32RegularRecoveryV1,
+                        RunRecoveryProfile,
                     )?;
                     return Ok((reads, true));
                 }
@@ -1258,7 +1227,7 @@ impl<'a> Driver<'a> {
                 short_end = None;
                 self.packet(item.source, model.media.as_slice())?.payload
             };
-            let mut packet = Packet::from_view(index, item.track_id, &item.native, payload)?;
+            let mut packet = Packet::from_view(index, item.track_id, &item.demux, payload)?;
             if terminal.is_some() {
                 packet.flags |= protocol::CORRUPT_PACKET;
             }
@@ -1274,11 +1243,11 @@ impl<'a> Driver<'a> {
         }
         Ok((reads, false))
     }
-    fn native_indexes<'model>(
+    fn demux_indexes<'model>(
         &self,
         model: &'model Model,
-        tracks: &[Mov9Track<'model>],
-        completed_packets: Option<&Mov9PacketCursor<'model>>,
+        tracks: &[DemuxTrack<'model>],
+        completed_packets: Option<&PacketCursor<'model>>,
         stats: &mut Stats,
         mut trace: Option<&mut String>,
     ) -> Result<()> {
@@ -1291,24 +1260,24 @@ impl<'a> Driver<'a> {
             out.push_str(",\"native_indexes\":[");
         }
         for (i, track) in tracks.iter().enumerate() {
-            let limits = Mov9NativeIndexLimits::default();
+            let limits = IndexLimits::default();
             let mut index = if let Some(cursor) = completed_packets {
-                Mov9NativeIndexCursor::replay_track(cursor, track.track_id, limits.max_entries)?
+                IndexCursor::replay_track(cursor, track.track_id, limits.max_entries)?
             } else {
-                Mov9NativeIndexCursor::new_complete_source(
+                IndexCursor::new_complete_source(
                     &self.budget,
                     *track,
                     model.media.as_slice(),
                     limits,
-                    Mov9Profile::PinnedNoParseNoFillin,
+                    DemuxProfile::NoParseNoFillin,
                 )?
             };
-            native_index_stream(i, track.track_id, stats, trace.as_deref_mut(), || {
+            demux_index_stream(i, track.track_id, stats, trace.as_deref_mut(), || {
                 loop {
                     match index.poll(&mut WorkBudget::new(self.quantum), &self.cancel)? {
-                        Mov9CursorStatus::Yield => {}
-                        Mov9CursorStatus::End => return Ok(None),
-                        Mov9CursorStatus::Ready => {
+                        CursorStatus::Yield => {}
+                        CursorStatus::End => return Ok(None),
+                        CursorStatus::Ready => {
                             let entry = index.take_entry()?;
                             return Ok(Some(IndexRow {
                                 ordinal: entry.ordinal,
@@ -1607,7 +1576,7 @@ impl Driver<'_> {
             request.syntax,
             &self.budget,
         )?;
-        let mut owners = BudgetVec::new(&self.budget);
+        let mut backings = BudgetVec::new(&self.budget);
         let mut next = record
             .table
             .sample_count()
@@ -1615,7 +1584,7 @@ impl Driver<'_> {
             .ok_or(Error::Overflow)?;
         if record.table.sample_count() != 0 {
             append(
-                &mut owners,
+                &mut backings,
                 GroupOwner {
                     first: 1,
                     count: record.table.sample_count(),
@@ -1635,7 +1604,7 @@ impl Driver<'_> {
             let (descriptions, mappings) =
                 groups(index.raw(), request.kind, request.syntax, &self.budget)?;
             append(
-                &mut owners,
+                &mut backings,
                 GroupOwner {
                     first: next,
                     count: index.sample_count(),
@@ -1654,17 +1623,17 @@ impl Driver<'_> {
                 .ok_or(Error::Overflow)?;
         }
         let mut scopes = BudgetVec::new(&self.budget);
-        for owner in owners.as_slice() {
+        for backing in backings.as_slice() {
             append(
                 &mut scopes,
                 RecoveryScope {
                     kind: request.kind,
-                    first_ordinal: owner.first,
-                    sample_count: owner.count,
-                    fragment_ordinal: owner.fragment,
+                    first_ordinal: backing.first,
+                    sample_count: backing.count,
+                    fragment_ordinal: backing.fragment,
                     track_descriptions: track_descriptions.as_ref(),
-                    local_descriptions: owner.descriptions.as_ref(),
-                    mappings: owner.mappings.as_ref(),
+                    local_descriptions: backing.descriptions.as_ref(),
+                    mappings: backing.mappings.as_ref(),
                 },
             )?;
         }
@@ -1715,7 +1684,7 @@ impl Driver<'_> {
             drain.packets, drain.bytes, drain.digest
         )
         .expect("String write");
-        protocol::source_receipts(out, &result);
+        protocol::source_landings(out, &result);
         out.push_str(",\"raw_sources\":[");
         protocol::raw_box(out, record.table.raw());
         if let Some(edits) = &record.edits {
@@ -1736,7 +1705,7 @@ impl Driver<'_> {
         let mut stats = Stats::default();
         let mut first = true;
         if let Some(plan) = &result.plan {
-            self.input.reset(plan.receipt().decode_start.range.start)?;
+            self.input.reset(plan.landing().decode_start.range.start)?;
             let mut cursor = plan.cursor();
             loop {
                 match cursor.poll(&mut WorkBudget::new(self.quantum), &self.cancel)? {
@@ -1753,7 +1722,7 @@ impl Driver<'_> {
             }
             for offset in 1..=u64::from(request.following) {
                 let ordinal = plan
-                    .receipt()
+                    .landing()
                     .target
                     .ordinal
                     .checked_add(offset)
@@ -1898,7 +1867,7 @@ mod refill_transcript42 {
                 let mut trace = String::new();
                 driver
                     .recovered_regular_operation(
-                        NativeOperation::Index,
+                        DemuxOperation::Index,
                         &mut stats,
                         &mut retained,
                         Some(&mut trace),
@@ -1924,7 +1893,7 @@ mod refill_transcript42 {
         let mut retained = Retention::new(&driver.budget, 0).unwrap();
         assert!(matches!(
             driver.recovered_regular_operation(
-                NativeOperation::Open,
+                DemuxOperation::Open,
                 &mut Stats::default(),
                 &mut retained,
                 None
@@ -2117,11 +2086,11 @@ mod private_configuration_comparison {
                     entry.bytes().as_ref(),
                     &bytes[start..start + entry.bytes().len()]
                 );
-                for operation in [NativeOperation::Open, NativeOperation::Index] {
+                for operation in [DemuxOperation::Open, DemuxOperation::Index] {
                     let mut stats = Stats::default();
                     let mut retention = Retention::new(&driver.budget, 0).unwrap();
                     let mut trace = String::new();
-                    let result = driver.native_operation(
+                    let result = driver.demux_operation(
                         &model,
                         &mut stats,
                         &mut retention,
@@ -2151,7 +2120,7 @@ mod signed_decode_comparison {
 
     fn check(bytes: &[u8], decode_end: Option<i128>, admitted: bool) {
         for (window, quantum) in [(65536, 4096), (1, 3)] {
-            for operation in [NativeOperation::Open, NativeOperation::Index] {
+            for operation in [DemuxOperation::Open, DemuxOperation::Index] {
                 let mut input = Cursor::new(bytes);
                 let mut driver = Driver::new(
                     &mut input,
@@ -2170,7 +2139,7 @@ mod signed_decode_comparison {
                 let mut stats = Stats::default();
                 let mut retention = Retention::new(&driver.budget, 0).unwrap();
                 let mut trace = String::new();
-                let result = driver.native_operation(
+                let result = driver.demux_operation(
                     &model,
                     &mut stats,
                     &mut retention,

@@ -13,8 +13,13 @@ use crate::{
 use std::sync::atomic::{AtomicBool, Ordering};
 use triergon_core::{Budget, BudgetVec, Error, Time, WorkBudget};
 use triergon_isobmff::{
-    BuildStatus, Mov9EncodedEditPlanV2, Mov9MediaClock, Mov9NativeGlobalSeekJob,
-    Mov9NativeSeekLimits, Mov9NativeSeekReceipt, Mov9Profile, Mov9Track,
+    BuildStatus,
+    compat::mov::{
+        clock::MediaClock,
+        edits::EncodedEditPlan,
+        packets::{DemuxProfile, DemuxTrack},
+        seek::{GlobalSeekJob, SeekLanding, SeekLimits},
+    },
 };
 
 #[derive(Clone, Copy, Debug)]
@@ -22,7 +27,7 @@ pub struct Mp4NativeSeekRequest {
     pub video: u32,
     /// Signed ticks in the reference track's native timebase.
     pub timestamp: i64,
-    pub limits: Mov9NativeSeekLimits,
+    pub limits: SeekLimits,
 }
 
 #[derive(Clone, Copy, Default)]
@@ -35,8 +40,8 @@ struct Anchor {
 
 pub struct Mp4NativeSeekJob<'a> {
     plan: &'a PreparedMp4,
-    global: Option<Mov9NativeGlobalSeekJob<'a>>,
-    receipt: Option<Mov9NativeSeekReceipt>,
+    global: Option<GlobalSeekJob<'a>>,
+    receipt: Option<SeekLanding>,
     request: Mp4NativeSeekRequest,
     target: Time,
     selection: Selection,
@@ -59,12 +64,12 @@ pub struct Mp4NativeSeekCommand {
     target: Time,
     selection: Selection,
     replay: NativeMp4Replay,
-    receipt: Mov9NativeSeekReceipt,
+    receipt: SeekLanding,
     offset: u64,
 }
 
 impl Mp4NativeSeekCommand {
-    pub fn receipt(&self) -> &Mov9NativeSeekReceipt {
+    pub fn receipt(&self) -> &SeekLanding {
         &self.receipt
     }
 
@@ -227,7 +232,7 @@ impl<'a> Mp4NativeSeekJob<'a> {
         {
             return Err(Error::Invalid("native seek requires selected MP4 video"));
         }
-        let base = Mov9MediaClock::from_source(selected.snapshot.base.require()?)?.native_base;
+        let base = MediaClock::from_source(selected.snapshot.base.require()?)?.demux_base;
         let target = Time::from_ticks(i128::from(request.timestamp), base)?;
         let global = native_global_seek(
             movie,
@@ -255,9 +260,9 @@ impl<'a> Mp4NativeSeekJob<'a> {
 
 pub(super) fn native_global_seek<'a>(
     movie: &'a Movie,
-    edits: Option<&'a [Option<Mov9EncodedEditPlanV2>]>,
+    edits: Option<&'a [Option<EncodedEditPlan>]>,
     request: Mp4NativeSeekRequest,
-) -> Result<Mov9NativeGlobalSeekJob<'a>> {
+) -> Result<GlobalSeekJob<'a>> {
     let tracks = movie.tracks();
     let maximum = request.limits.index.packets.max_tracks.min(64);
     if tracks.len() > maximum {
@@ -271,7 +276,7 @@ pub(super) fn native_global_seek<'a>(
     let movie_base = movie.header().time_base()?;
     for track in tracks {
         native
-            .try_push(Mov9Track {
+            .try_push(DemuxTrack {
                 track_id: track.header().track_id,
                 table: track.table(),
                 fragments: track.fragments(),
@@ -281,7 +286,7 @@ pub(super) fn native_global_seek<'a>(
             .map_err(|error| error.error)?;
     }
     Ok(if let Some(plans) = edits {
-        Mov9NativeGlobalSeekJob::new_encoded_regular_v2_rescaled(
+        GlobalSeekJob::new_encoded_regular_rescaled(
             &movie.pool,
             native.as_slice(),
             movie.media.as_slice(),
@@ -290,14 +295,14 @@ pub(super) fn native_global_seek<'a>(
             plans,
         )?
     } else {
-        Mov9NativeGlobalSeekJob::new_complete_source_rescaled(
+        GlobalSeekJob::new_complete_source_rescaled(
             &movie.pool,
             native.as_slice(),
             movie.media.as_slice(),
             request.video,
             request.timestamp,
             request.limits,
-            Mov9Profile::PinnedNoParseNoFillin,
+            DemuxProfile::NoParseNoFillin,
         )?
     })
 }
@@ -334,7 +339,7 @@ impl Mp4NativeSeekJob<'_> {
                 .take()
                 .ok_or(Error::Invalid("missing native seek planner"))?
                 .finish()?;
-            self.receipt = Some(global.receipt().clone());
+            self.receipt = Some(global.landing().clone());
             self.tracks = global.anchors().len();
             self.pending = self.tracks;
             for (slot, anchor) in self.anchors.iter_mut().zip(global.anchors()) {
@@ -390,7 +395,7 @@ impl Mp4NativeSeekJob<'_> {
             let row = &rows[anchor.row];
             if anchor.track == self.request.video
                 && (row.source != receipt.selected.occurrence.source
-                    || row.native != receipt.selected.occurrence.native
+                    || row.demux != receipt.selected.occurrence.demux
                     || row.edit != receipt.selected.occurrence.edit)
             {
                 return Err(Error::Invalid(
