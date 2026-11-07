@@ -10,24 +10,25 @@
 //!    median of `--iterations` in-process sessions after one discarded warm-up
 //!    session; the ratio interval is the bootstrap of the median paired ratio.
 //!    Gate: upper 95% bound ≤ 1.20 (target 0.80);
-//! 4. memory: the glibc observer (`harness/allocations-linux.c`) in separate
-//!    heap and RSS runs, alternating order. The RSS diagnostic reports growth
-//!    during the operation. Capture qualification requires observer admission
-//!    and total resident peak RSS, so memory is recorded as diagnostic only and
-//!    the memory gates are not met.
+//! 4. memory: admit both workers to the shared observer and run separate heap
+//!    and RSS measurements. Each worker must reproduce its checked output.
+//!    Peak live heap must be lower in every pair. The upper paired 95% bounds
+//!    for heap and total resident peak RSS must both be below 1.0.
 //!
 //! The machine must be otherwise idle: a CPU-contention check runs before
 //! every timing and memory pair, and contaminated pairs wait and are retried,
 //! never silently used. Every raw observation is written.
 
-use std::ffi::OsString;
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::time::Duration;
 
 use crate::codecs::correctness::file_sha;
-use crate::harness::timing::competing_builds;
+use crate::harness::acceptance::active_cpu;
+use crate::harness::diff::equal;
+use crate::harness::memory;
+use crate::harness::timing::{competing_builds, cpu_snapshot, lock};
 use crate::json::{self, Value};
 use crate::process::{check_output, exit_code};
 use crate::pyrandom::PyRandom;
@@ -55,16 +56,25 @@ pub struct Options {
 }
 
 /// Source files whose digest identifies a qualification run.
-const SOURCE_TREES: [&str; 3] = ["crates/capture", "harness/capture", "xtask/src/capture"];
-const SOURCE_FILES: [&str; 9] = [
+const SOURCE_TREES: [&str; 5] = [
+    "crates/capture",
+    "crates/capture-worker",
+    "harness/capture",
+    "xtask/src/capture",
+    "xtask/src/harness",
+];
+const SOURCE_FILES: &[&str] = &[
     "Cargo.toml",
     "Cargo.lock",
-    "xtask/src/harness/timing.rs",
     "xtask/src/numpy.rs",
     "xtask/src/pyrandom.rs",
     "xtask/src/python.rs",
     "xtask/src/stats.rs",
     "harness/allocations-linux.c",
+    "harness/policy.json",
+    "harness/portable-memory-check.c",
+    "harness/reference.c",
+    "harness/reference_capture.h",
     "harness/rss-bound-api.h",
 ];
 
@@ -140,7 +150,13 @@ fn case_args(case: &Value, keys: &[&str]) -> Vec<String> {
         .collect()
 }
 
-fn time_sample(worker: &str, case: &Value, path: &str, iterations: usize) -> Result<Value, String> {
+fn time_sample(
+    worker: &str,
+    case: &Value,
+    path: &str,
+    iterations: usize,
+    expected: Option<&Value>,
+) -> Result<Value, String> {
     let mut argv = vec![worker.to_owned(), "time".into()];
     argv.extend(case_args(
         case,
@@ -158,6 +174,9 @@ fn time_sample(worker: &str, case: &Value, path: &str, iterations: usize) -> Res
             .ok_or_else(|| format!("{worker}: time row without {key}"))
     };
     let first = rows.first().ok_or("worker printed no time rows")?;
+    if rows.len() != iterations + 1 {
+        return Err(format!("{worker}: wrong number of time rows"));
+    }
     let measured = rows[1..]
         .iter()
         .map(|r| field(r, "ns"))
@@ -165,7 +184,7 @@ fn time_sample(worker: &str, case: &Value, path: &str, iterations: usize) -> Res
     let mut hashes: Vec<Value> = Vec::new();
     for row in &rows {
         let hash = field(row, "fnv1a64")?;
-        if !hashes.iter().any(|h| crate::harness::diff::equal(h, &hash)) {
+        if !hashes.iter().any(|h| equal(h, &hash)) {
             hashes.push(hash);
         }
     }
@@ -175,12 +194,22 @@ fn time_sample(worker: &str, case: &Value, path: &str, iterations: usize) -> Res
             .unwrap_or(f64::NAN)
             .total_cmp(&number(b).unwrap_or(f64::NAN)),
     });
+    let output_matches = expected.is_none_or(|work| {
+        rows.iter().all(|row| {
+            ["bytes", "fnv1a64"].iter().all(|key| {
+                row.get(key)
+                    .zip(work.get(key))
+                    .is_some_and(|(a, b)| equal(a, b))
+            })
+        })
+    });
     Ok(Value::object([
         ("warmup_ns", field(first, "ns")?),
         ("ns", Value::Array(measured.clone())),
         ("median_ns", median(&measured)?),
         ("hashes", Value::Array(hashes)),
         ("bytes", field(first, "bytes")?),
+        ("output_matches", Value::Bool(output_matches)),
     ]))
 }
 
@@ -190,6 +219,7 @@ fn shuffled(rng: &mut PyRandom) -> [&'static str; 2] {
     order
 }
 
+#[allow(clippy::too_many_arguments)] // The workers, input and paired timing settings.
 fn runtime(
     candidate: &str,
     reference: &str,
@@ -198,10 +228,14 @@ fn runtime(
     pairs: usize,
     iterations: usize,
     seed: u64,
+    expected_outputs: Option<&Value>,
 ) -> Result<Value, String> {
+    let _lock = lock()?;
     let mut rng = PyRandom::new(seed);
     let mut contamination = Vec::new();
     let mut samples = Vec::new();
+    wait_idle(&mut contamination)?;
+    let before = cpu_snapshot()?;
     for i in 0..pairs {
         wait_idle(&mut contamination)?;
         let order = shuffled(&mut rng);
@@ -217,11 +251,19 @@ fn runtime(
             };
             pair.push((
                 role.to_owned(),
-                time_sample(worker, case, path, iterations)?,
+                time_sample(
+                    worker,
+                    case,
+                    path,
+                    iterations,
+                    expected_outputs.and_then(|outputs| outputs.get(role)),
+                )?,
             ));
         }
         samples.push(Value::Object(pair));
     }
+    let after = cpu_snapshot()?;
+    let contaminants = active_cpu(&before, &after, cfg!(target_os = "linux"));
     let medians = |role: &str| -> Vec<Value> {
         samples
             .iter()
@@ -242,12 +284,16 @@ fn runtime(
     let ratio = interval(&pairs_ns, 0)?;
     let stable = samples.iter().all(|p| {
         ["candidate", "reference"].iter().all(|role| {
-            p.get(role)
-                .and_then(|s| s.get("hashes"))
-                .and_then(Value::as_array)
-                .is_some_and(|h| h.len() == 1)
+            p.get(role).is_some_and(|sample| {
+                sample.get("output_matches").is_some_and(Value::truthy)
+                    && sample
+                        .get("hashes")
+                        .and_then(Value::as_array)
+                        .is_some_and(|hashes| hashes.len() == 1)
+            })
         })
     });
+    let clean = contaminants.is_empty();
     let upper_95 = upper(&ratio);
     Ok(Value::object([
         ("pairs", Value::int(pairs as i64)),
@@ -265,206 +311,18 @@ fn runtime(
         ),
         ("deterministic_output", Value::Bool(stable)),
         ("contamination_waits", Value::Array(contamination)),
-        ("gate_pass", Value::Bool(upper_95 <= RUNTIME_GATE)),
-        ("target_pass", Value::Bool(upper_95 <= RUNTIME_TARGET)),
+        ("contaminants", Value::strings(contaminants)),
+        ("cpu_before", before),
+        ("cpu_after", after),
+        (
+            "gate_pass",
+            Value::Bool(clean && stable && upper_95 <= RUNTIME_GATE),
+        ),
+        (
+            "target_pass",
+            Value::Bool(clean && stable && upper_95 <= RUNTIME_TARGET),
+        ),
     ]))
-}
-
-fn observe(
-    worker: &str,
-    case: &Value,
-    path: &str,
-    observer: &str,
-    mode: &str,
-    receipt: &Path,
-) -> Result<Value, String> {
-    let mut argv: Vec<OsString> = vec![worker.into(), "memory".into()];
-    argv.extend(
-        case_args(case, &["width", "height", "flip", "frames", "bitrate"])
-            .into_iter()
-            .map(OsString::from),
-    );
-    argv.push(path.into());
-    let output = Command::new(&argv[0])
-        .args(&argv[1..])
-        .env("LD_PRELOAD", observer)
-        .env("TRIERGON_ALLOCATION_REPORT", python::path(receipt))
-        .env("TRIERGON_MEMORY_MODE", mode)
-        .output()
-        .map_err(|e| format!("{worker}: {e}"))?;
-    let data = if receipt.exists() {
-        let text =
-            fs::read_to_string(receipt).map_err(|e| format!("{}: {e}", receipt.display()))?;
-        python::loads(&text).ok_or_else(|| format!("{}: not JSON", receipt.display()))?
-    } else {
-        Value::Null
-    };
-    Ok(Value::object([
-        ("exit", Value::int(exit_code(output.status))),
-        (
-            "stdout",
-            Value::str(python::tail(&python::text(&output.stdout), 400)),
-        ),
-        (
-            "stderr",
-            Value::str(python::tail(&python::text(&output.stderr), 400)),
-        ),
-        ("receipt", data),
-    ]))
-}
-
-fn receipt_int(receipt: &Value, key: &str) -> Result<i128, String> {
-    receipt
-        .get(key)
-        .and_then(python::int)
-        .ok_or_else(|| format!("receipt without {key}"))
-}
-
-fn valid(observation: &Value, mode: &str) -> Result<bool, String> {
-    if !observation
-        .get("exit")
-        .is_some_and(|e| python::equals_int(e, 0))
-    {
-        return Ok(false);
-    }
-    let d = observation.get("receipt").unwrap_or(&Value::Null);
-    if matches!(d, Value::Null) {
-        return Ok(false);
-    }
-    let field = |key: &str| d.get(key).ok_or_else(|| format!("receipt without {key}"));
-    Ok(field("status")?.as_str() == Some("measured")
-        && field("mode")?.as_str() == Some(mode)
-        && python::equals_int(field("error_bits")?, 0))
-}
-
-#[allow(clippy::too_many_arguments)] // The memory run's case, workers and settings.
-fn memory(
-    candidate: &str,
-    reference: &str,
-    case: &Value,
-    path: &str,
-    observer: &str,
-    pairs: usize,
-    out: &Path,
-    seed: u64,
-) -> Result<Value, String> {
-    let mut rng = PyRandom::new(seed);
-    let mut contamination = Vec::new();
-    let mut runs: Vec<(&str, Vec<Value>)> = vec![("heap", Vec::new()), ("rss", Vec::new())];
-    for (mode, list) in &mut runs {
-        for i in 0..pairs {
-            wait_idle(&mut contamination)?;
-            let order = shuffled(&mut rng);
-            let mut pair = vec![
-                ("index".to_owned(), Value::int(i as i64)),
-                ("order".to_owned(), Value::strings(order)),
-            ];
-            for role in order {
-                let receipt = out.join(format!("{mode}-{i}-{role}.json"));
-                if receipt.exists() {
-                    fs::remove_file(&receipt).map_err(|e| e.to_string())?;
-                }
-                let worker = if role == "candidate" {
-                    candidate
-                } else {
-                    reference
-                };
-                pair.push((
-                    role.to_owned(),
-                    observe(worker, case, path, observer, mode, &receipt)?,
-                ));
-            }
-            list.push(Value::Object(pair));
-        }
-    }
-    let (heap, rss) = (runs[0].1.clone(), runs[1].1.clone());
-    let all_valid = |list: &[Value], mode: &str| -> Result<bool, String> {
-        for p in list {
-            for role in ["candidate", "reference"] {
-                if !valid(p.get(role).unwrap_or(&Value::Null), mode)? {
-                    return Ok(false);
-                }
-            }
-        }
-        Ok(true)
-    };
-    let heap_ok = all_valid(&heap, "heap")?;
-    let rss_ok = all_valid(&rss, "rss")?;
-    let receipt = |p: &Value, role: &str| {
-        p.get(role)
-            .and_then(|o| o.get("receipt"))
-            .cloned()
-            .unwrap_or(Value::Null)
-    };
-    let mut result = vec![
-        ("pairs".to_owned(), Value::int(pairs as i64)),
-        ("heap".to_owned(), Value::Array(heap.clone())),
-        ("rss".to_owned(), Value::Array(rss.clone())),
-        (
-            "contamination_waits".to_owned(),
-            Value::Array(contamination),
-        ),
-        ("heap_valid".to_owned(), Value::Bool(heap_ok)),
-        ("rss_valid".to_owned(), Value::Bool(rss_ok)),
-    ];
-    if heap_ok {
-        let peaks = |role: &str| -> Result<Vec<i128>, String> {
-            heap.iter()
-                .map(|p| receipt_int(&receipt(p, role), "heap_peak_bytes"))
-                .collect()
-        };
-        let (c, r) = (peaks("candidate")?, peaks("reference")?);
-        let as_values = |v: &[i128]| Value::Array(v.iter().map(|&x| Value::int(x)).collect());
-        result.push((
-            "heap_peak_bytes".into(),
-            Value::object([("candidate", as_values(&c)), ("reference", as_values(&r))]),
-        ));
-        let pairs: Vec<(f64, f64)> = c
-            .iter()
-            .zip(&r)
-            .map(|(&a, &b)| (a as f64, b as f64))
-            .collect();
-        result.push(("heap_ratio".into(), interval(&pairs, 0)?));
-    }
-    if rss_ok {
-        let (mut bound, mut observed) = (Vec::new(), Vec::new());
-        for p in &rss {
-            let (cd, rd) = (receipt(p, "candidate"), receipt(p, "reference"));
-            let page = receipt_int(&cd, "page_size")?;
-            let candidate_upper = receipt_int(&cd, "rss_peak_upper_bound_bytes")?
-                - receipt_int(&cd, "rss_start")?
-                + 2 * page;
-            let reference_lower =
-                receipt_int(&rd, "rss_peak_observed")? - receipt_int(&rd, "rss_start")? - 2 * page;
-            bound.push((candidate_upper, reference_lower));
-            observed.push((
-                receipt_int(&cd, "rss_peak_observed")? - receipt_int(&cd, "rss_start")? + 1,
-                receipt_int(&rd, "rss_peak_observed")? - receipt_int(&rd, "rss_start")? + 1,
-            ));
-        }
-        let pairs_value = |v: &[(i128, i128)]| {
-            Value::Array(
-                v.iter()
-                    .map(|&(a, b)| Value::Array(vec![Value::int(a), Value::int(b)]))
-                    .collect(),
-            )
-        };
-        let floats = |v: &[(i128, i128)]| -> Vec<(f64, f64)> {
-            v.iter().map(|&(a, b)| (a as f64, b as f64)).collect()
-        };
-        result.push(("rss_bound_pairs".into(), pairs_value(&bound)));
-        result.push(("rss_observed_growth_pairs".into(), pairs_value(&observed)));
-        if bound.iter().all(|&(a, b)| a > 0 && b > 0) {
-            result.push(("rss_bound_ratio".into(), interval(&floats(&bound), 0)?));
-        } else {
-            result.push(("rss_bound_ratio".into(), Value::Null));
-        }
-        result.push((
-            "rss_observed_ratio".into(),
-            interval(&floats(&observed), 0)?,
-        ));
-    }
-    Ok(Value::Object(result))
 }
 
 /// `platform.uname()._asdict()`.
@@ -509,7 +367,7 @@ fn source_manifest(root: &Path) -> Result<Vec<(String, Value)>, String> {
         }
     }
     for file in SOURCE_FILES {
-        manifest.push((file.to_owned(), Value::str(file_sha(&root.join(file))?)));
+        manifest.push(((*file).to_owned(), Value::str(file_sha(&root.join(file))?)));
     }
     Ok(manifest)
 }
@@ -554,6 +412,10 @@ pub fn run(root: &Path, a: &Options) -> Result<(), String> {
         json::to_python(&python::sort_keys(&Value::Object(manifest.clone())), None).as_bytes(),
     );
     let sha = |path: &str| file_sha(Path::new(path)).map(Value::str);
+    let observer = sha(&a.observer)?;
+    if observer != Value::str(file_sha(&root.join("target/harness/allocations.so"))?) {
+        return Err("capture requires the observer built in target/harness".into());
+    }
     let identity = Value::object([
         ("source_digest", Value::str(digest)),
         ("source_manifest", Value::Object(manifest)),
@@ -566,7 +428,7 @@ pub fn run(root: &Path, a: &Options) -> Result<(), String> {
                 None => Value::Null,
             },
         ),
-        ("observer_sha256", sha(&a.observer)?),
+        ("observer_sha256", observer),
         ("cases_sha256", Value::str(file_sha(&a.cases)?)),
         ("host", uname()),
         ("utc", Value::float(python::time())),
@@ -647,6 +509,7 @@ pub fn run(root: &Path, a: &Options) -> Result<(), String> {
             )])
         };
         record.push(("correctness_summary".into(), correctness.clone()));
+        let outputs = correctness.get("outputs");
         let timed = runtime(
             &a.candidate,
             &a.reference,
@@ -655,8 +518,10 @@ pub fn run(root: &Path, a: &Options) -> Result<(), String> {
             a.pairs,
             a.iterations,
             a.seed,
+            outputs,
         )?;
-        let runtime_gate = timed.get("gate_pass").is_some_and(Value::truthy);
+        let runtime_gate =
+            outputs.is_some() && a.pairs >= 30 && timed.get("gate_pass").is_some_and(Value::truthy);
         let runtime_target = timed.get("target_pass").is_some_and(Value::truthy);
         let runtime_upper = upper(timed.get("ratio").unwrap_or(&Value::Null));
         record.push(("runtime".into(), timed));
@@ -671,21 +536,54 @@ pub fn run(root: &Path, a: &Options) -> Result<(), String> {
                     10.max(a.pairs / 3),
                     a.iterations,
                     a.seed + 1,
+                    None,
                 )?,
             ));
         }
-        let mdir = cdir.join("memory");
-        fs::create_dir_all(&mdir).map_err(|e| format!("{}: {e}", mdir.display()))?;
-        let measured = memory(
-            &a.candidate,
-            &a.reference,
-            case,
-            &path_text,
-            &a.observer,
-            a.memory_pairs,
-            &mdir,
-            a.seed + 2,
-        )?;
+        let measured = if let Some(outputs) = outputs {
+            let mut args = vec!["memory".to_owned()];
+            args.extend(case_args(
+                case,
+                &["width", "height", "flip", "frames", "bitrate"],
+            ));
+            args.push(path_text);
+            memory::collect_command(
+                root,
+                Path::new(&a.candidate),
+                Path::new(&a.reference),
+                &path,
+                a.memory_pairs,
+                a.seed + 2,
+                &args,
+                outputs,
+            )?
+        } else {
+            Value::object([("status", Value::str("missing-correctness-output"))])
+        };
+        let memory_status = measured
+            .get("status")
+            .and_then(Value::as_str)
+            .unwrap_or("invalid-memory-observation");
+        let admitted = memory_status == "qualified"
+            && a.memory_pairs >= 30
+            && cfg!(all(
+                target_os = "linux",
+                target_arch = "aarch64",
+                target_env = "gnu"
+            ));
+        let lower = |name| {
+            measured
+                .get(name)
+                .and_then(Value::as_f64)
+                .is_some_and(|ratio| ratio < 1.0)
+        };
+        let heap_gate = admitted
+            && lower("heap_ratio_upper_95")
+            && measured
+                .get("heap_lower_in_each_pair")
+                .is_some_and(Value::truthy);
+        let rss_gate = admitted && lower("total_rss_ratio_upper_95");
+        let memory_status = Value::str(memory_status);
         record.push(("memory".into(), measured));
         let flag = |key: &str| correctness.get(key).is_some_and(Value::truthy);
         let pipeline = flag("pipeline");
@@ -699,10 +597,13 @@ pub fn run(root: &Path, a: &Options) -> Result<(), String> {
                 "runtime_target_0_80".to_owned(),
                 Value::Bool(runtime_target),
             ),
-            ("heap_gate".to_owned(), Value::Bool(false)),
-            ("rss_gate".to_owned(), Value::Bool(false)),
-            ("memory_status".to_owned(), Value::str("diagnostic-only")),
-            ("all_gates".to_owned(), Value::Bool(false)),
+            ("heap_gate".to_owned(), Value::Bool(heap_gate)),
+            ("rss_gate".to_owned(), Value::Bool(rss_gate)),
+            ("memory_status".to_owned(), memory_status),
+            (
+                "all_gates".to_owned(),
+                Value::Bool(pipeline && runtime_gate && heap_gate && rss_gate),
+            ),
         ];
         record.push(("verdict".into(), Value::Object(verdict.clone())));
         write(

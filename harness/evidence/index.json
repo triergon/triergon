@@ -7751,6 +7751,13 @@
    "sha256": "fd718807e0ec1e6287bcb690226bf7056b79985796e74eba54f43544a034bc2c"
   },
   {
+   "name": "capture-pipeline-memory-linux-arm64",
+   "retention": "keep",
+   "reason": "Capture correctness, runtime, peak heap and total resident peak across 15 cases",
+   "key": "evidence/capture-pipeline-memory-linux-arm64/11f0572cf6d9294023340a35970f8fa5c4f6e75abfdab55d8e1fb67f0228f983.tar.gz",
+   "sha256": "11f0572cf6d9294023340a35970f8fa5c4f6e75abfdab55d8e1fb67f0228f983"
+  },
+  {
    "name": "capture-pipeline-linux-arm64",
    "retention": "retained",
    "reason": "Capture status row",

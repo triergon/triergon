@@ -690,11 +690,63 @@ fn the_resident_bound_uses_the_declared_ceiling_and_observed_reference_growth() 
     }
     let mut samples = vec![Value::Object(row.clone()), Value::Object(row)];
     let certificate = v(r#"{"platform": "Linux", "observer_sha256": "observer"}"#);
-    let result = super::memory::evaluate(std::path::Path::new("."), &samples, 2, 0, &certificate);
+    let result = super::memory::evaluate(
+        std::path::Path::new("."),
+        &samples,
+        2,
+        0,
+        &certificate,
+        None,
+    );
     assert_eq!(
         result.get("status").and_then(Value::as_str),
         Some("qualified")
     );
+    let outputs = v(
+        r#"{"candidate":{"bytes":100,"fnv1a64":"1234"},"reference":{"bytes":120,"fnv1a64":"5678"}}"#,
+    );
+    let mut sample = samples[0].clone();
+    for role in ["candidate", "reference"] {
+        for mode in ["heap", "rss"] {
+            let key = format!("{role}_{mode}");
+            set(
+                &mut sample,
+                &[key.as_str()],
+                "work",
+                outputs.get(role).unwrap().clone(),
+            );
+        }
+    }
+    let evaluate = |sample: &Value, outputs| {
+        super::memory::evaluate(
+            std::path::Path::new("."),
+            &[sample.clone(), sample.clone()],
+            2,
+            0,
+            &certificate,
+            outputs,
+        )
+    };
+    let status = |value: &Value| value.get("status").cloned();
+    assert_eq!(
+        status(&evaluate(&sample, None)),
+        Some(Value::str("unequal-memory-work"))
+    );
+    assert_eq!(
+        status(&evaluate(&sample, Some(&outputs))),
+        Some(Value::str("qualified"))
+    );
+    set(
+        &mut sample,
+        &["candidate_rss"],
+        "work",
+        outputs.get("reference").unwrap().clone(),
+    );
+    assert_eq!(
+        status(&evaluate(&sample, Some(&outputs))),
+        Some(Value::str("unequal-memory-work"))
+    );
+
     // Graded: the candidate's peak ceiling plus two pages against the
     // reference's observed peak minus two pages.
     assert_eq!(
@@ -719,8 +771,14 @@ fn the_resident_bound_uses_the_declared_ceiling_and_observed_reference_growth() 
         "rss_start",
         Value::int(5_000_000),
     );
-    let without_growth =
-        super::memory::evaluate(std::path::Path::new("."), &samples, 2, 0, &certificate);
+    let without_growth = super::memory::evaluate(
+        std::path::Path::new("."),
+        &samples,
+        2,
+        0,
+        &certificate,
+        None,
+    );
     assert_eq!(
         without_growth.get("status").and_then(Value::as_str),
         Some("qualified")

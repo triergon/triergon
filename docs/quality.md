@@ -39,7 +39,8 @@ resource limit becomes an explicit, reviewed rule for that case.
   capture are measured against the FFmpeg 9.0.2 release tarball: `decode` (the default
   configuration) for the codec comparison, whose `ffmpeg` and `ffprobe` also decode
   capture output independently, and `capture` (gating) and `capture-small` for the
-  capture comparison.
+  capture comparison. The two capture profiles link FFmpeg's component libraries
+  into the worker so the allocation observer can audit the code doing the work.
 - **Authored corpus.** Small canonical streams generated from synthetic signals and
   authored structures, so inputs stay identical across encoder versions
   (`cargo xtask fixtures`, `harness/features/<feature>/{contract,corpus}.json`).

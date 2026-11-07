@@ -35,8 +35,7 @@ pub enum Profile {
     /// the decoder comparison reference, and the independent decoder and demuxer
     /// of the capture comparison.
     Decode,
-    /// The gating capture reference: the shared-library component set of the
-    /// capture comparison (`mpeg1video`, MPEG-TS, `swscale`).
+    /// The gating capture reference: the statically linked component set (`mpeg1video`, MPEG-TS, `swscale`).
     Capture,
     /// The same capture component set built with `--enable-small`, reported
     /// alongside the gating reference.
@@ -58,8 +57,8 @@ impl Profile {
             Profile::Formats => ".research/reference-formats",
             Profile::Video => ".research/reference-video",
             Profile::Decode => ".research/reference-decode",
-            Profile::Capture => ".research/reference-capture",
-            Profile::CaptureSmall => ".research/reference-capture-small",
+            Profile::Capture => ".research/reference-capture-static",
+            Profile::CaptureSmall => ".research/reference-capture-small-static",
         }
     }
 
@@ -95,10 +94,10 @@ impl Profile {
     }
 }
 
-/// The capture comparison's component set (shared libraries, no programs).
+/// The capture comparison's component set (static libraries, no programs).
 const CAPTURE_ARGS: [&str; 22] = [
-    "--enable-shared",
-    "--disable-static",
+    "--disable-shared",
+    "--enable-static",
     "--enable-pic",
     "--extra-cflags=-Dstatic_assert=_Static_assert",
     "--disable-programs",
@@ -522,6 +521,22 @@ mod tests {
         assert_eq!(
             formats.last().unwrap(),
             "--enable-bsf=h264_mp4toannexb,hevc_mp4toannexb,extract_extradata"
+        );
+    }
+
+    #[test]
+    fn capture_profiles_differ_only_in_size_optimization() {
+        let prefix = Path::new("/p/install");
+        let speed = configure_argv(prefix, Profile::Capture);
+        let small = configure_argv(prefix, Profile::CaptureSmall);
+        assert!(speed.iter().any(|arg| arg == "--enable-static"));
+        assert!(speed.iter().any(|arg| arg == "--disable-shared"));
+        assert_eq!(
+            speed,
+            small
+                .into_iter()
+                .filter(|arg| arg != "--enable-small")
+                .collect::<Vec<_>>()
         );
     }
 

@@ -18,7 +18,7 @@ pub const USAGE: &str = "usage: cargo xtask capture <command>
   qualify --candidate W --reference W [--reference-small W] --oracle-bin DIR --observer SO
           --inputs DIR --out DIR [--cases F] [--only ID...] [--pairs N] [--iterations N]
           [--memory-pairs N] [--seed N]
-                 correctness, paired runtime and memory diagnostics of every required case
+                 correctness, paired runtime, peak heap and total resident RSS per required case
                  (native Linux); inputs are generated with harness/capture/generate_inputs.py
                  using $TRIERGON_PYTHON (default python3), which needs numpy
   summarize RUN  a qualify run's per-case results as a Markdown table
@@ -107,7 +107,7 @@ pub fn main(root: &Path, args: &[String]) -> Result<i32, String> {
                     out: a.path("out")?,
                     pairs: a.number("pairs")?.unwrap_or(30),
                     iterations: a.number("iterations")?.unwrap_or(3),
-                    memory_pairs: a.number("memory-pairs")?.unwrap_or(10),
+                    memory_pairs: a.number("memory-pairs")?.unwrap_or(30),
                     seed: a.number("seed")?.map_or(20_261_102, |s| s as u64),
                 },
             )?;

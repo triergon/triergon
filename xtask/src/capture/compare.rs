@@ -267,6 +267,7 @@ pub fn run(a: &Options) -> Result<(), String> {
         n_text.clone(),
     ];
     let mut roles = Vec::new();
+    let mut outputs = Vec::new();
     for (role, worker) in [("candidate", &a.candidate), ("reference", &a.reference)] {
         let yuv = join(&a.out, &format!("{role}.convert.yuv"));
         let mut argv = vec![worker.clone(), "convert".into()];
@@ -278,7 +279,24 @@ pub fn run(a: &Options) -> Result<(), String> {
         argv.extend(geometry.iter().cloned());
         argv.extend([rate_text.clone(), a.input.clone(), ts_path.clone()]);
         let out = check_output(&argv)?;
-        json::parse(&out).map_err(|e| format!("{role} pipeline output: {e}"))?;
+        let result = json::parse(&out).map_err(|e| format!("{role} pipeline output: {e}"))?;
+        let bytes = result.get("bytes").and_then(python::int).filter(|&n| n > 0);
+        let digest = result
+            .get("fnv1a64")
+            .and_then(Value::as_str)
+            .filter(|s| s.len() == 16 && s.bytes().all(|b| b.is_ascii_hexdigit()));
+        let (Some(bytes), Some(digest)) = (bytes, digest) else {
+            return Err(format!(
+                "{role} pipeline output has no byte count or digest"
+            ));
+        };
+        outputs.push((
+            role.to_owned(),
+            Value::object([
+                ("bytes", Value::int(bytes)),
+                ("fnv1a64", Value::str(digest)),
+            ]),
+        ));
         roles.push((role, yuv, ts_path));
     }
     // Conversion rule.
@@ -599,6 +617,8 @@ pub fn run(a: &Options) -> Result<(), String> {
     report.push(("encoder".into(), Value::Object(enc)));
     let pipeline = conv_pass && mux_pass && encoder_pass;
     report.push(("pipeline_pass".into(), Value::Bool(pipeline)));
+    let outputs = Value::Object(outputs);
+    report.push(("outputs".into(), outputs.clone()));
     let path = join(&a.out, "report.json");
     fs::write(&path, json::to_python(&Value::Object(report), Some(1)))
         .map_err(|e| format!("{path}: {e}"))?;
@@ -633,6 +653,7 @@ pub fn run(a: &Options) -> Result<(), String> {
         ("psnr_delta", Value::float(python::round(delta, 3))),
         ("vbv_underflow", floats(&underflow)),
         ("pipeline", Value::Bool(pipeline)),
+        ("outputs", outputs),
     ]);
     println!("{}", json::to_python(&summary, None));
     Ok(())
