@@ -102,7 +102,8 @@ target.
 **Matroska.** `SharedBounded` payload ownership lets packets borrow complete
 blocks from the source window; a borrowed packet keeps the whole backing
 allocation charged until it drops. Blocks split across reads are copied. The
-immutable seek index reuses keyframe positions after one sequential read and
+packet's configuration supplies its allocation budget to the output.
+The immutable seek index reuses keyframe positions after one sequential read and
 needs no Cues. The Dolby clock probe retains at most 4,096 timing rows and
 inspects up to 32 syncframes to infer a missing duration.
 
