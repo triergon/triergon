@@ -13,6 +13,7 @@ mod ebml;
 mod evidence;
 mod fate;
 mod fetch;
+mod fonts;
 mod fuzz;
 mod harness;
 mod json;
@@ -38,7 +39,8 @@ commands:
   check          everything CI runs: format, tests, lints, builds and the checks below
   check-simd     clippy and tests of the opt-in HEVC SIMD lane on the pinned nightly
   prepare-check  once before `check`: the pinned FFmpeg reference, the fixtures, the required
-                 vectors and the workers (built with the reference first on PATH)
+                 vectors and the workers (built with the reference first on PATH), and the
+                 FreeType reference with its font corpus
   check-links    every relative link in the Markdown files resolves
   check-design   harness data files parse and recorded gates keep their values
   check-safety   owned packages only, no build scripts, no unsafe code
@@ -97,7 +99,9 @@ commands:
   codecs         manifest|grade|summarize|time|equivalence   codec crates against the
                  pinned FFmpeg decoders (see `cargo xtask codecs --help`)
   capture        compare|qualify|summarize|equivalence   capture pipeline against the
-                 FFmpeg capture reference (see `cargo xtask capture --help`)";
+                 FFmpeg capture reference (see `cargo xtask capture --help`)
+  fonts          prepare|fetch|compare|fuzz   triergon-font against the pinned FreeType
+                 reference on the font corpus (see `cargo xtask fonts --help`)";
 
 fn main() -> ExitCode {
     if let Some(code) = without_cargo_library_path() {
@@ -154,6 +158,7 @@ fn main() -> ExitCode {
         Some("trace-identities") => return trace_identities(&root, &args[1..]),
         Some("codecs") => return failing(codecs::main(&root, &args[1..]), codecs::USAGE),
         Some("capture") => return failing(capture::main(&root, &args[1..]), capture::USAGE),
+        Some("fonts") => fonts::main(&root, &args[1..]),
         Some("build-workers") => match &args[1..] {
             [] => harness::build::build(&root, false),
             [flag] if flag == "--comparison-build" => harness::build::build(&root, true),
@@ -758,12 +763,14 @@ const NIGHTLY: &str = "nightly-2026-10-17";
 fn prepare_check() -> Task {
     let exe = std::env::current_exe().map_err(|e| e.to_string())?;
     for step in [
-        "prepare-ffmpeg",
-        "fixtures",
-        "fetch-vectors",
-        "build-workers",
+        &["prepare-ffmpeg"][..],
+        &["fixtures"],
+        &["fetch-vectors"],
+        &["build-workers"],
+        &["fonts", "prepare"],
+        &["fonts", "fetch"],
     ] {
-        run(Command::new(&exe).arg(step))?;
+        run(Command::new(&exe).args(step))?;
     }
     Ok(())
 }
@@ -903,6 +910,10 @@ fn check(root: &Path) -> Task {
     check_simd(root)?;
     println!("$ cargo xtask worker-tests");
     worker_tests::run(root, None)?;
+    println!("$ cargo xtask fonts compare");
+    fonts::main(root, &["compare".to_owned()])?;
+    println!("$ cargo xtask fonts fuzz");
+    fonts::main(root, &["fuzz".to_owned()])?;
     check_safety(root)?;
     check_design(root)?;
     check_links(root)?;

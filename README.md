@@ -1,12 +1,13 @@
 # Triergon
 
-Media containers, packet framing, subtitles and decoders in safe Rust, with no
+Media containers, packet framing, subtitles, fonts and decoders in safe Rust, with no
 dependencies.
 
 Triergon reads Matroska/WebM, MP4/MOV and MPEG-TS, frames H.264, HEVC, AV1, VP9, AAC,
 AC-3 and DTS packets for hardware or software decoders, decodes text and bitmap
-subtitles, and includes software decoders for H.264, HEVC, AAC, AC-3/E-AC-3 and DTS.
-It is written from the published standards and measured case by case against FFmpeg.
+subtitles, reads OpenType and TrueType fonts, and includes software decoders for H.264,
+HEVC, AAC, AC-3/E-AC-3 and DTS. It is written from the published standards and measured
+case by case against a pinned reference: FFmpeg for media, FreeType for fonts.
 
 > **Status: experimental.** APIs change without notice and nothing is published to
 > crates.io yet. See [status](docs/status.md) for what is verified today.
@@ -15,10 +16,11 @@ It is written from the published standards and measured case by case against FFm
 
 - **Safe Rust, zero dependencies.** Every crate forbids `unsafe`. The dependency graph
   is `std` and nothing else.
-- **As good as FFmpeg, or it does not ship.** Each module must match FFmpeg on its whole
-  declared feature set, stay within the [runtime ceiling](docs/quality.md#gates) of
-  FFmpeg's time per case and use less memory. Results are measured, paired and published
-  per case.
+- **As good as the reference, or it does not ship.** Each module must match its pinned
+  reference (FFmpeg for media, FreeType for fonts, libass for subtitle rendering) on its
+  whole declared feature set, stay within the [runtime ceiling](docs/quality.md#gates) of
+  the reference's time per case and use less memory. Results are measured, paired and
+  published per case.
 - **Built for untrusted input.** Every input-dependent allocation is budgeted, every
   loop is bounded, and malformed data produces an error, never a panic or a hang.
 - **You own the I/O.** Parsers take byte windows and tell you which bytes they need
@@ -39,6 +41,7 @@ It is written from the published standards and measured case by case against FFm
 | [`triergon-mpegts`](crates/mpegts) | MPEG-TS and M2TS: PSI, PES assembly, timestamps, HLS segments |
 | [`triergon-framing`](crates/framing) | Codec configuration and packet conversion for H.264, HEVC, AV1, VP9, AAC, AC-3, DTS |
 | [`triergon-subtitles`](crates/subtitles) | SRT, WebVTT, ASS, mov_text and tx3g; PGS, DVB and DVD bitmap subtitles |
+| [`triergon-font`](crates/font) | OpenType and TrueType faces and collections: cmap, names, `glyf` and CFF/CFF2 outlines, metrics, kerning, face matching |
 | [`triergon-pixel`](crates/pixel) | Decoded-picture views, BT.601 RGBA to YUV 4:2:0, letterboxing into a 1920×1080 RGBA canvas |
 | [`triergon-codec`](crates/codec) | Decoder traits, audio frames, channel layouts and the shared channel order |
 | [`triergon-codec-h264`](crates/codec-h264), [`-hevc`](crates/codec-hevc) | Software video decoders |
@@ -78,7 +81,7 @@ small programs.
 ## Documentation
 
 - [Architecture](docs/architecture.md): layers, input and resource model, container contract
-- [Quality](docs/quality.md): the FFmpeg gates, corpus, harness and measurement rules
+- [Quality](docs/quality.md): the reference gates, corpus, harness and measurement rules
 - [Status](docs/status.md): verified scope and current results per module
 - [Contributing](CONTRIBUTING.md)
 

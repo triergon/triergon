@@ -7,7 +7,7 @@ heap and total resident peak RSS relative to FFmpeg. Unless noted, measurements 
 AArch64 Linux.
 Containers, framing, subtitles and playback are measured against FFmpeg git revision
 `d32b387f` on the 9.0 branch; codecs, decode sessions and capture against the FFmpeg 9.0.2
-release ([reference pins](quality.md#reference-and-corpus)).
+release; fonts against FreeType 2.15.0 ([reference pins](quality.md#reference-and-corpus)).
 
 | Area | Implemented | Verified against FFmpeg | Runtime | Memory | Open |
 |---|---|---|---|---|---|
@@ -24,6 +24,7 @@ release ([reference pins](quality.md#reference-and-corpus)).
 | Playback | Matroska, MP4, TS and raw AVC/HEVC feeds; seeking; end-of-file continuation | 746 of 998 matrix rows | not measured | not measured | most profiles unmeasured |
 | Codecs | H.264 8-bit 4:2:0; HEVC Main and Main10; AAC LC, HE, HEv2; AC-3 and E-AC-3; DTS core with XCh and X96 | 417/417 comparable conformance and FATE vectors | 1.0524 (17/17 pass) | heap 0.92, RSS 0.82 | error concealment, unverified tool paths |
 | Decode sessions | Bounded queues, clock-gated output, flush and seek, RGBA letterbox, stereo mix | with the codecs | 1.0524 | with the codecs | — |
+| Fonts | sfnt and collections; `head`, `hhea`, `maxp`, `hmtx`, `OS/2`, `name`; `cmap` formats 0, 4, 6, 10, 12, 13; `glyf`/`loca`; CFF and CFF2 at the default instance; `kern` format 0; libass-style face matching | All 49 faces of 40 corpus files (TrueType, name-keyed and CID-keyed CFF, CFF2, a 10-face collection; 831,665 glyphs) identical to FreeType: names, cmap, kerning, advances and outlines at 1/64 unit; macOS AArch64 | not measured | not measured | runtime and memory; face matching against libass; Linux runs |
 | Capture | RGBA to YUV 4:2:0, MPEG-1 video, MPEG-TS mux | 15/15 quality cases against FFmpeg 9.0.2 | 1.1210 (15/15 pass) | heap ≤0.548, total RSS ≤0.978 (15/15) | — |
 
 ## Measured revisions

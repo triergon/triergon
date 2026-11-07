@@ -1,14 +1,17 @@
 # Quality: reference, gates and harness
 
-Every module is measured against a pinned FFmpeg build doing the same work. A module
-is complete only when it passes all three gates on every case in its corpus.
+Every module is measured against a pinned reference implementation doing the same
+work: FFmpeg for containers, framing, subtitle decoding, codecs and capture, FreeType
+for font tables and outlines, and libass for subtitle rendering. The gates and the
+measurement rules below are the same for every reference. A module is complete only
+when it passes all three gates on every case in its corpus.
 
 ## Gates
 
 | Gate | Requirement |
 |---|---|
 | Parity | Every declared feature matches the reference on every required case. Missing inputs, crashes, unsupported declared cases and unexplained differences are failures, never omitted rows. |
-| Runtime | `T_triergon / T_ffmpeg` at most **1.20** per case, using the upper bound of a paired 95% confidence interval. The optimisation target is **0.80**. Both values are defined in [`harness/policy.json`](../harness/policy.json) and nowhere else; `cargo xtask check` keeps this line and every status row in step with it. |
+| Runtime | `T_triergon / T_reference` at most **1.20** per case, using the upper bound of a paired 95% confidence interval. The optimisation target is **0.80**. Both values are defined in [`harness/policy.json`](../harness/policy.json) and nowhere else; `cargo xtask check` keeps this line and every status row in step with it. |
 | Memory | Peak live heap and total resident peak RSS both strictly lower than the reference, each at the upper bound of a paired 95% interval. |
 
 The harness reads these limits from `harness/policy.json`. Each feature's contract and
@@ -21,7 +24,7 @@ same output. A gate is never passed by narrowing the work, dropping slow cases o
 weakening a comparison. A failed result stays recorded against the exact source and
 binaries that produced it.
 
-FFmpeg is the compatibility reference, not the specification. Disagreements are
+The reference is the compatibility reference, not the specification. Disagreements are
 investigated against the standard. A reference bug or a deliberately stricter
 resource limit becomes an explicit, reviewed rule for that case.
 
@@ -41,6 +44,14 @@ resource limit becomes an explicit, reviewed rule for that case.
   capture output independently, and `capture` (gating) and `capture-small` for the
   capture comparison. The two capture profiles link FFmpeg's component libraries
   into the worker so the allocation observer can audit the code doing the work.
+- **FreeType pin.** `cargo xtask fonts prepare` builds the FreeType 2.15.0 release
+  tarball (hash-checked, tree verified before and after the build) as a static
+  library without optional dependencies, links the reference worker
+  `harness/freetype-font.c` and records the configure flags, library, worker and
+  compiler in `.research/freetype/build.json`. `cargo xtask fonts fetch` fetches the
+  font corpus listed with sources, licences and hashes in `harness/fonts/corpus.json`;
+  `cargo xtask fonts compare` requires `triergon-font`'s output to equal the worker's
+  on every face, and `cargo xtask fonts fuzz` mutates every corpus file.
 - **Authored corpus.** Small canonical streams generated from synthetic signals and
   authored structures, so inputs stay identical across encoder versions
   (`cargo xtask fixtures`, `harness/features/<feature>/{contract,corpus}.json`).
@@ -66,7 +77,7 @@ resource limit becomes an explicit, reviewed rule for that case.
 
 ## Harness
 
-The harness runs the same operation through a Triergon worker and an FFmpeg worker and
+The harness runs the same operation through a Triergon worker and a reference worker and
 compares canonical output. Workers speak one line protocol with `trace`, `bench` and
 `memory` modes, framed by begin/end markers and a named digest.
 

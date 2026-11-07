@@ -4,13 +4,14 @@
 
 You need Rust (see `rust-version` in `Cargo.toml`; the full check also installs the
 dated nightly toolchain pinned in xtask for the optional SIMD lane), Python 3, a C compiler,
-`make` (for the FFmpeg build), `pkg-config` and zlib headers (NASM on x86). The FFmpeg
-reference is only needed for differential and performance work.
+`make` (for the FFmpeg and FreeType builds), `pkg-config` and zlib headers (NASM on x86).
+The FFmpeg and FreeType references are only needed for differential and performance work.
 
 ```sh
 cargo xtask fixtures              # generate the authored test corpus into .research/
 cargo test --workspace            # library tests
-cargo xtask prepare-check         # once: pinned FFmpeg reference, fixtures, workers
+cargo xtask prepare-check         # once: pinned FFmpeg and FreeType references, fixtures,
+                                  # font corpus, workers
 cargo xtask check                 # everything CI runs
 ```
 
