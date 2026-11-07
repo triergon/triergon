@@ -237,15 +237,18 @@ fn reviewed_inputs(root: &Path) -> Result<Vec<Value>, String> {
         .collect()
 }
 
-/// Whether a case's input may be measured: authored synthetic data, or a
+/// Whether a case's input may be measured: authored synthetic data, a
 /// `reviewed-licence` file whose hash a reviewed input manifest records under the
-/// licence the case names. Any other rights value is unreviewed.
+/// licence the case names, or a `fetched-not-redistributed` public sample (such
+/// as a FATE file) that names its source, is fetched by hash into an ignored
+/// cache and is compared locally only. Any other rights value is unreviewed.
 fn rights_reviewed(reviewed: &[Value], case: &Value) -> bool {
     fn list<'a>(value: &'a Value, key: &str) -> &'a [Value] {
         value.get(key).and_then(Value::as_array).unwrap_or_default()
     }
     match s(case, "rights") {
         Some("authored-synthetic") => true,
+        Some("fetched-not-redistributed") => s(case, "source").is_some(),
         Some("reviewed-licence") => {
             let (Some(licence), Some(sha)) = (s(case, "licence"), s(case, "sha256")) else {
                 return false;

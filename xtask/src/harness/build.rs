@@ -264,7 +264,7 @@ struct Candidate {
     features: &'static [&'static str],
 }
 
-const ADDITIONAL_CANDIDATES: [Candidate; 9] = [
+const ADDITIONAL_CANDIDATES: [Candidate; 10] = [
     Candidate {
         name: "playback-worker",
         package: "playback-worker",
@@ -304,6 +304,12 @@ const ADDITIONAL_CANDIDATES: [Candidate; 9] = [
     Candidate {
         name: "ass-worker",
         package: "ass-worker",
+        example: None,
+        features: &[],
+    },
+    Candidate {
+        name: "subtitle-worker",
+        package: "subtitle-worker",
         example: None,
         features: &[],
     },
@@ -517,7 +523,7 @@ const SHAPE_OPTIONS: &[&str] = &[
 const RASTER_OPTIONS: &[&str] = &["-Wall", "-Wextra", "-Werror", "-Werror=uninitialized"];
 const CAPTURE_PACKAGES: &[&str] = &["libavformat", "libavcodec", "libswscale", "libavutil"];
 
-const PROFILE_REFERENCES: [ProfileReference; 11] = [
+const PROFILE_REFERENCES: [ProfileReference; 12] = [
     ProfileReference {
         profile: ".research/reference-video",
         linked: &[],
@@ -543,6 +549,22 @@ const PROFILE_REFERENCES: [ProfileReference; 11] = [
         record: "ffmpeg-formats-native",
         kind: "pinned FFmpeg MOV, TS and subtitle build for HLS and MP4 range operations",
         libraries: "formats_reference",
+        packages: CONTAINER_PACKAGES,
+        link_static: true,
+        options: CONTAINER_OPTIONS,
+        identity: true,
+        prepared: None,
+        generated: None,
+    },
+    ProfileReference {
+        profile: ".research/reference-subtitles",
+        linked: &[],
+        binary: "ffmpeg-subtitles-worker",
+        source: "harness/reference.c",
+        define: Some("-DTRIERGON_SUBTITLE_REFERENCE=1"),
+        record: "ffmpeg-subtitles-native",
+        kind: "pinned FFmpeg subtitle decoders with libzvbi and the video decoders closed captions need; subtitle decode operations",
+        libraries: "subtitles_reference",
         packages: CONTAINER_PACKAGES,
         link_static: true,
         options: CONTAINER_OPTIONS,
