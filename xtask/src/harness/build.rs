@@ -230,14 +230,135 @@ fn which(program: &str) -> Option<PathBuf> {
 
 /// Measurement workers a contract may name as its candidate besides
 /// `media-worker`, with the command that builds each.
-pub const ADDITIONAL_CANDIDATES: [&str; 3] = ["playback-worker", "codec-worker", "capture-worker"];
+struct Candidate {
+    name: &'static str,
+    package: &'static str,
+    example: Option<&'static str>,
+    features: &'static [&'static str],
+}
+
+const ADDITIONAL_CANDIDATES: [Candidate; 5] = [
+    Candidate {
+        name: "playback-worker",
+        package: "playback-worker",
+        example: None,
+        features: &[],
+    },
+    Candidate {
+        name: "codec-worker",
+        package: "codec-worker",
+        example: None,
+        features: &[],
+    },
+    Candidate {
+        name: "capture-worker",
+        package: "capture-worker",
+        example: None,
+        features: &[],
+    },
+    Candidate {
+        name: "isobmff-worker",
+        package: "triergon-isobmff",
+        example: Some("isobmff_consumer_worker"),
+        features: &[],
+    },
+    Candidate {
+        name: "framing-worker",
+        package: "triergon-framing",
+        example: Some("framing_worker"),
+        features: &["reference-trace"],
+    },
+];
+
+fn candidate_graph(root: &Path, name: &str) -> R<Value> {
+    let spec = ADDITIONAL_CANDIDATES
+        .iter()
+        .find(|spec| spec.name == name)
+        .ok_or_else(|| format!("unknown measurement worker {name}"))?;
+    let features: Vec<String> = spec
+        .features
+        .iter()
+        .map(|feature| format!("{}/{feature}", spec.package))
+        .collect();
+    let metadata = super::provenance::cargo_metadata_with_features(root, &features)?;
+    let mut inputs = matroska_inputs();
+    if name == "isobmff-worker" {
+        inputs.extend(crate::isobmff_bench::source_inputs(root)?);
+    }
+    if name == "framing-worker" {
+        inputs.extend(
+            [
+                "xtask/src/framing_bench.rs",
+                "harness/reference_framing.c",
+                "harness/reference_framing.h",
+            ]
+            .map(str::to_owned),
+        );
+        for file in [
+            "contract.json",
+            "corpus.json",
+            "fixtures.rs",
+            "inputs.json",
+            "observations.json",
+            "oracle.rs",
+            "provenance.json",
+            "worker.rs",
+            "worker_model.rs",
+            "worker_operation.rs",
+        ] {
+            inputs.push(format!("harness/features/packet-framing/{file}"));
+        }
+    }
+    inputs.sort();
+    inputs.dedup();
+    selected_graph(root, &metadata, spec.package, &inputs)
+}
+
+/// A known measurement worker whose binary and selected source graph still match.
+pub(crate) fn candidate_worker(root: &Path, identity: &Value, name: &str) -> R<PathBuf> {
+    let record = identity
+        .get("additional_candidates")
+        .and_then(|workers| workers.get(name))
+        .ok_or_else(|| format!("{name} is not in the build identity; rebuild"))?;
+    let path = root.join(format!("target/release/{name}"));
+    if record.get("sha256").and_then(Value::as_str) != Some(sha(&path)?.as_str()) {
+        return Err(format!("{name} changed since build identity; rebuild"));
+    }
+    let current = candidate_graph(root, name)?;
+    if !record
+        .get("selected_graph")
+        .is_some_and(|graph| super::diff::equal(graph, &current))
+    {
+        return Err(format!(
+            "{name} sources changed since build identity; rebuild"
+        ));
+    }
+    Ok(path)
+}
 
 fn additional_candidates(root: &Path) -> R<Vec<(&'static str, Vec<String>)>> {
     let mut built = Vec::new();
-    for name in ADDITIONAL_CANDIDATES {
-        let command: Vec<String> = ["cargo", "build", "-p", name, "--release", "--locked"]
-            .map(String::from)
-            .to_vec();
+    for spec in &ADDITIONAL_CANDIDATES {
+        let mut command: Vec<String> = [
+            "cargo",
+            "build",
+            "-p",
+            spec.package,
+            "--release",
+            "--locked",
+        ]
+        .map(String::from)
+        .to_vec();
+        command.extend([
+            "--target-dir".into(),
+            root.join("target").display().to_string(),
+        ]);
+        if let Some(example) = spec.example {
+            command.extend(["--example".into(), example.into()]);
+        }
+        if !spec.features.is_empty() {
+            command.extend(["--features".into(), spec.features.join(",")]);
+        }
         let status = Command::new("cargo")
             .args(&command[1..])
             .env("CARGO_INCREMENTAL", "0")
@@ -245,19 +366,26 @@ fn additional_candidates(root: &Path) -> R<Vec<(&'static str, Vec<String>)>> {
             .status()
             .map_err(|e| e.to_string())?;
         if !status.success() {
-            return Err(format!("{name} build failed: {status}"));
+            return Err(format!("{} build failed: {status}", spec.name));
         }
-        built.push((name, command));
+        if let Some(example) = spec.example {
+            fs::copy(
+                root.join(format!("target/release/examples/{example}")),
+                root.join(format!("target/release/{}", spec.name)),
+            )
+            .map_err(|error| format!("{}: {error}", spec.name))?;
+        }
+        built.push((spec.name, command));
     }
     Ok(built)
 }
 
-/// A comparison reference built from `harness/reference.c` against another pinned
-/// FFmpeg profile, with only that profile's operations compiled in.
+/// A public-API reference adapter linked against one pinned FFmpeg profile.
 struct ProfileReference {
     profile: &'static str,
     binary: &'static str,
-    define: &'static str,
+    source: &'static str,
+    define: Option<&'static str>,
     record: &'static str,
     kind: &'static str,
     libraries: &'static str,
@@ -279,11 +407,12 @@ const CONTAINER_OPTIONS: &[&str] = &["-O3", "-Wall", "-Wextra", "-Werror"];
 const RELEASE_OPTIONS: &[&str] = &["-std=c11", "-O2", "-Wall", "-Wextra", "-Werror"];
 const CAPTURE_PACKAGES: &[&str] = &["libavformat", "libavcodec", "libswscale", "libavutil"];
 
-const PROFILE_REFERENCES: [ProfileReference; 5] = [
+const PROFILE_REFERENCES: [ProfileReference; 7] = [
     ProfileReference {
         profile: ".research/reference-video",
         binary: "ffmpeg-video-worker",
-        define: "-DTRIERGON_FEED_REFERENCE=1",
+        source: "harness/reference.c",
+        define: Some("-DTRIERGON_FEED_REFERENCE=1"),
         record: "ffmpeg-video-native",
         kind: "pinned FFmpeg with the H.264 and HEVC decoders; feed operations",
         libraries: "video_reference",
@@ -295,7 +424,8 @@ const PROFILE_REFERENCES: [ProfileReference; 5] = [
     ProfileReference {
         profile: ".research/reference-formats",
         binary: "ffmpeg-formats-worker",
-        define: "-DTRIERGON_HLS_REFERENCE=1",
+        source: "harness/reference.c",
+        define: Some("-DTRIERGON_HLS_REFERENCE=1"),
         record: "ffmpeg-formats-native",
         kind: "pinned FFmpeg MOV, TS and subtitle build; HLS segment operations",
         libraries: "formats_reference",
@@ -307,7 +437,8 @@ const PROFILE_REFERENCES: [ProfileReference; 5] = [
     ProfileReference {
         profile: ".research/reference-decode",
         binary: "ffmpeg-decode-worker",
-        define: "-DTRIERGON_DECODE_REFERENCE=1",
+        source: "harness/reference.c",
+        define: Some("-DTRIERGON_DECODE_REFERENCE=1"),
         record: "ffmpeg-decode-native",
         kind: "FFmpeg 9.0.2 decoders with the letterbox and downmix filter chains; codec operations",
         libraries: "decode_reference",
@@ -326,7 +457,8 @@ const PROFILE_REFERENCES: [ProfileReference; 5] = [
     ProfileReference {
         profile: ".research/reference-capture-static",
         binary: "ffmpeg-capture-worker",
-        define: "-DTRIERGON_CAPTURE_REFERENCE=1",
+        source: "harness/reference.c",
+        define: Some("-DTRIERGON_CAPTURE_REFERENCE=1"),
         record: "ffmpeg-capture-native",
         kind: "FFmpeg 9.0.2 capture component set (gating); RGBA conversion, MPEG-1 encode, MPEG-TS mux",
         libraries: "capture_reference",
@@ -338,7 +470,8 @@ const PROFILE_REFERENCES: [ProfileReference; 5] = [
     ProfileReference {
         profile: ".research/reference-capture-small-static",
         binary: "ffmpeg-capture-small-worker",
-        define: "-DTRIERGON_CAPTURE_REFERENCE=1",
+        source: "harness/reference.c",
+        define: Some("-DTRIERGON_CAPTURE_REFERENCE=1"),
         record: "ffmpeg-capture-small-native",
         kind: "FFmpeg 9.0.2 capture component set built with --enable-small; reported, not gating",
         libraries: "capture_small_reference",
@@ -347,12 +480,38 @@ const PROFILE_REFERENCES: [ProfileReference; 5] = [
         options: RELEASE_OPTIONS,
         identity: false,
     },
+    ProfileReference {
+        profile: ".research/reference-formats",
+        binary: "ffmpeg-isobmff-worker",
+        source: "harness/reference_isobmff.c",
+        define: None,
+        record: "ffmpeg-isobmff-native",
+        kind: "pinned FFmpeg MOV public-API open and index operations",
+        libraries: "isobmff_reference",
+        packages: CONTAINER_PACKAGES,
+        link_static: true,
+        options: CONTAINER_OPTIONS,
+        identity: false,
+    },
+    ProfileReference {
+        profile: ".research/reference-formats",
+        binary: "ffmpeg-framing-worker",
+        source: "harness/reference_framing.c",
+        define: None,
+        record: "ffmpeg-framing-native",
+        kind: "pinned FFmpeg AVC and HEVC public-API packet framing operations",
+        libraries: "framing_reference",
+        packages: CONTAINER_PACKAGES,
+        link_static: true,
+        options: CONTAINER_OPTIONS,
+        identity: false,
+    },
 ];
 
 pub fn build(root: &Path, comparison_build: bool) -> R<PathBuf> {
     gate_build::admit(root, comparison_build)?;
     let linux = cfg!(target_os = "linux");
-    let candidate_command: Vec<String> = [
+    let mut candidate_command: Vec<String> = [
         "cargo",
         "build",
         "-p",
@@ -362,6 +521,10 @@ pub fn build(root: &Path, comparison_build: bool) -> R<PathBuf> {
     ]
     .map(String::from)
     .to_vec();
+    candidate_command.extend([
+        "--target-dir".into(),
+        root.join("target").display().to_string(),
+    ]);
     let status = Command::new("cargo")
         .args(&candidate_command[1..])
         .env("CARGO_INCREMENTAL", "0")
@@ -439,10 +602,10 @@ pub fn build(root: &Path, comparison_build: bool) -> R<PathBuf> {
         )?;
         let mut command: Vec<String> = vec![compiler.clone()];
         command.extend(reference.options.iter().map(ToString::to_string));
-        command.extend([
-            reference.define.into(),
-            root.join("harness/reference.c").display().to_string(),
-        ]);
+        if let Some(define) = reference.define {
+            command.push(define.into());
+        }
+        command.push(root.join(reference.source).display().to_string());
         command.extend(shell_words(&flags)?);
         if !reference.link_static {
             let lib = root.join(reference.profile).join("install/lib");
@@ -595,10 +758,7 @@ pub fn build(root: &Path, comparison_build: bool) -> R<PathBuf> {
                 ("path", Value::str(&path)),
                 ("sha256", Value::str(sha(&root.join(&path))?)),
                 ("command", strings(command)),
-                (
-                    "selected_graph",
-                    selected_graph(root, &metadata, name, &matroska_inputs())?,
-                ),
+                ("selected_graph", candidate_graph(root, name)?),
             ]),
         ));
     }
@@ -671,6 +831,11 @@ pub fn build(root: &Path, comparison_build: bool) -> R<PathBuf> {
                 ("sha256", Value::str(sha(path)?)),
                 ("kind", Value::str(reference.kind)),
                 ("compiler_command", strings(command)),
+                ("source", Value::str(reference.source)),
+                (
+                    "source_sha256",
+                    Value::str(sha(&root.join(reference.source))?),
+                ),
                 ("reference_build", read_json(build)?),
                 (
                     "worker_identity",

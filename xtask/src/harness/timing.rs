@@ -422,6 +422,33 @@ fn module_state(module: &Path) -> Value {
 pub struct Operation {
     pub prefix: String,
     pub arguments: Vec<OsString>,
+    /// Candidate compatibility options before the operation name.
+    pub candidate_options: Vec<OsString>,
+    /// Contract work fields in addition to the mandatory packet/byte/digest work.
+    pub work_fields: Vec<String>,
+}
+
+impl Operation {
+    /// Arguments for one role, excluding the executable path.
+    pub(crate) fn worker_arguments(
+        &self,
+        candidate: bool,
+        mode: &str,
+        input: &Path,
+        iterations: Option<u32>,
+    ) -> Vec<OsString> {
+        let mut arguments = Vec::new();
+        if candidate {
+            arguments.extend(self.candidate_options.iter().cloned());
+        }
+        arguments.push(format!("{}{mode}", self.prefix).into());
+        arguments.push(input.as_os_str().to_owned());
+        if let Some(iterations) = iterations {
+            arguments.push(arg(iterations));
+        }
+        arguments.extend(self.arguments.iter().cloned());
+        arguments
+    }
 }
 
 fn digest(path: &Path) -> Result<String, String> {
@@ -430,8 +457,23 @@ fn digest(path: &Path) -> Result<String, String> {
     ))
 }
 
-fn status_only(status: &str, extra: Vec<(&str, Value)>) -> Value {
-    let mut fields = vec![("status", Value::str(status))];
+fn status_only(
+    status: &str,
+    samples: &[Value],
+    warmups: &[Value],
+    observations: &[Value],
+    extra: Vec<(&str, Value)>,
+) -> Value {
+    let mut fields = vec![
+        ("status", Value::str(status)),
+        ("samples", Value::Array(samples.to_vec())),
+        ("warmups", Value::Array(warmups.to_vec())),
+        (
+            "timing_module_observations",
+            Value::Array(observations.to_vec()),
+        ),
+        ("timing_module_policy", Value::str(MODULE_POLICY)),
+    ];
     fields.extend(extra);
     Value::object(fields)
 }
@@ -546,14 +588,14 @@ fn benchmark_once(
     let mut rng = PyRandom::new(seed);
     let mut samples: Vec<Value> = Vec::new();
     let (mut observations, mut warmups) = (Vec::new(), Vec::new());
-    let argv = |worker: &Path| {
-        let mut argv = vec![
-            worker.as_os_str().to_owned(),
-            format!("{}bench", operation.prefix).into(),
-            input.as_os_str().to_owned(),
-            arg(iterations),
-        ];
-        argv.extend(operation.arguments.iter().cloned());
+    let argv = |name: &str, worker: &Path| {
+        let mut argv = vec![worker.as_os_str().to_owned()];
+        argv.extend(operation.worker_arguments(
+            name == "candidate",
+            "bench",
+            input,
+            Some(iterations),
+        ));
         argv
     };
     macro_rules! module_check {
@@ -592,10 +634,10 @@ fn benchmark_once(
     if !busy.is_empty() {
         return Ok(status_only(
             "contaminated",
-            vec![
-                ("contaminants", Value::strings(busy)),
-                ("samples", Value::Array(vec![])),
-            ],
+            &samples,
+            &warmups,
+            &observations,
+            vec![("contaminants", Value::strings(busy))],
         ));
     }
     let hashes: Vec<(&str, String)> = workers
@@ -605,16 +647,33 @@ fn benchmark_once(
     let input_sha = digest(input)?;
     for (name, worker) in &workers {
         module_check!(format!("before-warmup:{name}"));
-        let warm = worker::execute(&argv(worker), DEFAULT_TIMEOUT);
+        let warm = worker::execute(&argv(name, worker), DEFAULT_TIMEOUT);
         warmups.push(Value::object([
             ("worker", Value::str(*name)),
             ("result", warm.clone()),
         ]));
         module_check!(format!("after-warmup:{name}"));
         if !ok(&warm) {
-            return Ok(status_only("warmup-failed", vec![("result", warm)]));
+            return Ok(status_only(
+                "warmup-failed",
+                &samples,
+                &warmups,
+                &observations,
+                vec![("result", warm)],
+            ));
         }
     }
+    let Ok(warm_work) =
+        super::comparison::warmup_work(&warmups, i128::from(iterations), &operation.work_fields)
+    else {
+        return Ok(status_only(
+            "unequal-work",
+            &samples,
+            &warmups,
+            &observations,
+            vec![],
+        ));
+    };
     let mut before = cpu_snapshot()?;
     let mut watch = ContaminationWatch::new(before.clone());
     for index in 0..pairs {
@@ -635,7 +694,7 @@ fn benchmark_once(
             module_check!(format!("before-pair:{index}:{name}"));
             row.push((
                 name.to_string(),
-                worker::execute(&argv(worker), DEFAULT_TIMEOUT),
+                worker::execute(&argv(name, worker), DEFAULT_TIMEOUT),
             ));
             *samples.last_mut().expect("row") = Value::Object(row.clone());
             module_check!(format!("after-pair:{index}:{name}"));
@@ -648,10 +707,10 @@ fn benchmark_once(
         if !busy.is_empty() {
             return Ok(status_only(
                 "contaminated",
-                vec![
-                    ("contaminants", Value::strings(busy)),
-                    ("samples", Value::Array(samples)),
-                ],
+                &samples,
+                &warmups,
+                &observations,
+                vec![("contaminants", Value::strings(busy))],
             ));
         }
         before = after;
@@ -660,10 +719,10 @@ fn benchmark_once(
     if !busy.is_empty() {
         return Ok(status_only(
             "contaminated",
-            vec![
-                ("contaminants", Value::strings(busy)),
-                ("samples", Value::Array(samples)),
-            ],
+            &samples,
+            &warmups,
+            &observations,
+            vec![("contaminants", Value::strings(busy))],
         ));
     }
     let mut values = Vec::new();
@@ -671,24 +730,32 @@ fn benchmark_once(
         if workers.iter().any(|(n, _)| !row.get(n).is_some_and(ok)) {
             return Ok(status_only(
                 "worker-failure",
-                vec![("samples", Value::Array(samples))],
+                &samples,
+                &warmups,
+                &observations,
+                vec![],
             ));
         }
         let (a, b) = (
             data(row.get("candidate").unwrap()),
             data(row.get("reference").unwrap()),
         );
-        if ["iterations", "packets", "bytes", "digest"]
-            .iter()
-            .any(|k| {
-                !a.get(k)
-                    .zip(b.get(k))
-                    .is_some_and(|(x, y)| super::diff::equal(x, y))
-            })
+        let work = super::comparison::paired_timing_work(
+            row.get("candidate").expect("checked candidate"),
+            row.get("reference").expect("checked reference"),
+            i128::from(iterations),
+            &operation.work_fields,
+        );
+        if !work
+            .as_ref()
+            .is_ok_and(|w| super::diff::equal(w, &warm_work))
         {
             return Ok(status_only(
                 "unequal-work",
-                vec![("samples", Value::Array(samples))],
+                &samples,
+                &warmups,
+                &observations,
+                vec![],
             ));
         }
         let elapsed = |d: &Value| {
@@ -707,7 +774,10 @@ fn benchmark_once(
     if !unchanged {
         return Ok(status_only(
             "worker-or-input-changed",
-            vec![("samples", Value::Array(samples))],
+            &samples,
+            &warmups,
+            &observations,
+            vec![],
         ));
     }
     let summary = stats::ratio_interval(&values, seed, 4000)?;
@@ -746,6 +816,7 @@ fn benchmark_once(
             ]),
         ),
         ("samples", Value::Array(samples.clone())),
+        ("warmups", Value::Array(warmups)),
         ("contaminants", Value::Array(vec![])),
         ("timing_module_observations", Value::Array(observations)),
         ("timing_module_policy", Value::str(MODULE_POLICY)),
@@ -759,6 +830,64 @@ fn benchmark_once(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn failed_timing_preserves_complete_warmups_and_module_observations() {
+        let warmups = vec![Value::object([
+            ("worker", Value::str("candidate")),
+            ("result", Value::object([("digest_b", Value::int(17))])),
+        ])];
+        let observations = vec![Value::object([(
+            "stage",
+            Value::str("after-warmup:candidate"),
+        )])];
+        let result = status_only("unequal-work", &[], &warmups, &observations, vec![]);
+        assert_eq!(result.get("warmups"), Some(&Value::Array(warmups)));
+        assert_eq!(
+            result.get("timing_module_observations"),
+            Some(&Value::Array(observations))
+        );
+        assert_eq!(result.get("samples"), Some(&Value::Array(vec![])));
+    }
+
+    #[test]
+    fn compatibility_options_apply_only_to_the_candidate() {
+        let operation = Operation {
+            prefix: "open-".into(),
+            arguments: ["1", "0", "memory", "4096"].map(OsString::from).to_vec(),
+            candidate_options: vec!["--bounded-timing".into(), "--bounded-sync".into()],
+            work_fields: vec![],
+        };
+        let expected = ["open-bench", "input.mov", "50", "1", "0", "memory", "4096"]
+            .map(OsString::from)
+            .to_vec();
+        assert_eq!(
+            operation.worker_arguments(false, "bench", Path::new("input.mov"), Some(50)),
+            expected
+        );
+        let mut candidate = operation.candidate_options.clone();
+        candidate.extend(expected);
+        assert_eq!(
+            operation.worker_arguments(true, "bench", Path::new("input.mov"), Some(50)),
+            candidate
+        );
+    }
+
+    #[test]
+    fn ordinary_memory_arguments_keep_the_existing_order() {
+        let operation = Operation {
+            prefix: "hls-".into(),
+            arguments: vec!["avc".into(), "aac".into()],
+            candidate_options: vec![],
+            work_fields: vec![],
+        };
+        for candidate in [false, true] {
+            assert_eq!(
+                operation.worker_arguments(candidate, "memory", Path::new("input.ts"), None),
+                ["hls-memory", "input.ts", "avc", "aac"].map(OsString::from)
+            );
+        }
+    }
 
     #[test]
     fn timed_workers_are_equal_length_copies_removed_afterwards() {

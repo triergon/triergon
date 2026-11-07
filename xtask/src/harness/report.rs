@@ -30,6 +30,8 @@ pub struct Options {
     pub benchmark: bool,
     pub memory: bool,
     pub pairs: usize,
+    /// Memory pairs when different from the timing pair count.
+    pub memory_pairs: Option<usize>,
     /// Timed iterations per pair member; the contract's `iterations` when unset.
     pub iterations: Option<u32>,
     pub seed: u64,
@@ -53,6 +55,7 @@ impl Options {
             benchmark: false,
             memory: false,
             pairs: 30,
+            memory_pairs: None,
             iterations: None,
             seed: 280,
         }
@@ -203,34 +206,6 @@ pub fn fate_coverage(
     Ok(rows)
 }
 
-/// A contract's own candidate worker, bound to the build identity: its hash and
-/// its selected source graph must both still match.
-fn additional_candidate(root: &Path, identity: &Value, name: &str) -> Result<PathBuf, String> {
-    let record = identity
-        .get("additional_candidates")
-        .and_then(|c| c.get(name))
-        .ok_or_else(|| format!("{name} is not in the build identity; rebuild"))?;
-    let path = root.join(format!("target/release/{name}"));
-    if s(record, "sha256") != Some(digest(&path)?.as_str()) {
-        return Err(format!("{name} changed since build identity; rebuild"));
-    }
-    let current = super::provenance::selected_graph(
-        root,
-        &super::provenance::cargo_metadata(root)?,
-        name,
-        &super::provenance::matroska_inputs(),
-    )?;
-    if !record
-        .get("selected_graph")
-        .is_some_and(|g| super::diff::equal(g, &current))
-    {
-        return Err(format!(
-            "{name} sources changed since build identity; rebuild"
-        ));
-    }
-    Ok(path)
-}
-
 fn save_json(path: &Path, value: &Value) -> Result<(), String> {
     let temporary = path.with_extension("tmp");
     write_json(&temporary, value)?;
@@ -289,13 +264,14 @@ pub fn run(root: &Path, options: &Options) -> Result<i32, String> {
         return Err(format!("{error}; rebuild"));
     }
     let contract = read_json(&options.contract)?;
+    let work_fields = super::comparison::work_fields(&contract)?;
     let candidate_name = s(&contract, "candidate")
         .unwrap_or("media-worker")
         .to_owned();
     let candidate = if candidate_name == "media-worker" {
         candidate
     } else {
-        additional_candidate(root, &identity, &candidate_name)?
+        super::build::candidate_worker(root, &identity, &candidate_name)?
     };
     // Workers that take one input per operation and print one fold: the contract
     // names the mode prefix, and each case may add arguments after the input.
@@ -433,6 +409,8 @@ pub fn run(root: &Path, options: &Options) -> Result<i32, String> {
                 Operation {
                     prefix: prefix.clone(),
                     arguments: arguments.clone(),
+                    candidate_options: vec![],
+                    work_fields: work_fields.clone(),
                 },
             ));
             parity::feed_parity(
@@ -440,6 +418,7 @@ pub fn run(root: &Path, options: &Options) -> Result<i32, String> {
                 prefix,
                 &arguments,
                 case.get("expected").unwrap_or(&Value::Null),
+                &work_fields,
             )?
         } else {
             row.push(("input_sha256", Value::str(sha)));
@@ -504,6 +483,8 @@ pub fn run(root: &Path, options: &Options) -> Result<i32, String> {
                 Operation {
                     prefix: prefix.into(),
                     arguments,
+                    candidate_options: vec![],
+                    work_fields: work_fields.clone(),
                 },
             ));
             if catalogue {
@@ -539,7 +520,7 @@ pub fn run(root: &Path, options: &Options) -> Result<i32, String> {
                     &candidate,
                     &reference,
                     &input,
-                    options.pairs,
+                    options.memory_pairs.unwrap_or(options.pairs),
                     options.seed,
                     &operation,
                 )?;

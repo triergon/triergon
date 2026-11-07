@@ -79,6 +79,19 @@ cargo xtask report --benchmark --memory --fate-cache .research/fate-samples --re
                             # correctness, runtime and memory with acceptance
 ```
 
+Prepare the formats reference with `cargo xtask prepare-ffmpeg --profile formats`
+and rebuild workers before running the container and packet-framing commands.
+`cargo xtask isobmff-bench` compares all 1,020 open and index outcomes, including
+48 refusals. `--benchmark --memory` measures the 972 output labels, with 956
+physical operations and 16 explicit aliases. `--subset52` selects the separate
+52-operation measurement set while retaining the full correctness comparison.
+`cargo xtask framing --benchmark --memory` measures all 125 packet-framing scripts.
+Their contracts and input manifests are in `harness/features/isobmff-open-index/`
+and `harness/features/packet-framing/`.
+
+`report --memory-pairs N` selects a separate memory sample count, with
+`--pairs` applying to both measurements by default.
+
 `cargo xtask report` runs the correctness comparison of one feature contract
 (`--contract`, `--manifest`, `--corpus`) and grades it. A contract may name its own
 candidate worker and reference, as `matroska-startup-seek` and `hls-segments` do with
