@@ -934,3 +934,35 @@ impl OwnedFragmentCursor {
         result
     }
 }
+
+/// A [`FragmentCursor`]'s place in its index, kept without borrowing the index so
+/// an owner can hold both.
+#[derive(Clone, Copy, Debug, Default)]
+pub(crate) struct FragmentCursorPosition {
+    run: usize,
+    sample: u32,
+    byte: u64,
+    decode: Option<i128>,
+}
+impl FragmentIndex {
+    /// The cursor continuing from `position`, which must come from this index.
+    pub(crate) fn resume(&self, position: FragmentCursorPosition) -> FragmentCursor<'_> {
+        FragmentCursor {
+            index: self,
+            run: position.run,
+            sample: position.sample,
+            byte: position.byte,
+            decode: position.decode,
+        }
+    }
+}
+impl FragmentCursor<'_> {
+    pub(crate) fn position(&self) -> FragmentCursorPosition {
+        FragmentCursorPosition {
+            run: self.run,
+            sample: self.sample,
+            byte: self.byte,
+            decode: self.decode,
+        }
+    }
+}

@@ -165,7 +165,8 @@ numeric, and a conflict between container and bitstream colour is reported as tw
 descriptions, never resolved. Readers are concrete types used through generics or
 one closed enum; there is no registry and no dynamic dispatch on the packet path
 (`Track` may be `dyn TrackInfo` for a closed enum). Implementations:
-`triergon_matroska::typed::Reader` and the facade's `triergon::AnyReader`. The
+`triergon_matroska::typed::Reader`, `triergon_isobmff::Reader` and the facade's
+`triergon::AnyReader`. The
 semantic contract is described in
 [docs/architecture.md](../../docs/architecture.md#container-contract).
 
