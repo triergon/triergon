@@ -12,13 +12,12 @@ use std::path::{Path, PathBuf};
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use crate::checks::read_json;
-use crate::harness::acceptance::active_cpu;
 use crate::harness::diff::equal;
 use crate::harness::timing::{self, Operation};
 use crate::harness::worker::{self, Finished};
-use crate::harness::{build, comparison, gate_build, memory, provenance, report};
+use crate::harness::{acceptance, build, comparison, gate_build, memory, provenance, report};
 use crate::json::{self, Value};
-use crate::{sha256, stats};
+use crate::sha256;
 
 type R<T> = Result<T, String>;
 
@@ -276,6 +275,17 @@ impl Case {
         Value::Object(fields)
     }
 
+    fn evidence(&self, kind: &str, raw: Value) -> Value {
+        Value::object([
+            ("input_sha256", Value::str(&self.input_sha)),
+            (
+                "parity",
+                Value::object([("expected", self.work(true, false))]),
+            ),
+            (kind, raw),
+        ])
+    }
+
     fn description(&self) -> Value {
         Value::object([
             (
@@ -341,6 +351,7 @@ impl Case {
 }
 
 struct Suite {
+    contract: Value,
     cases: Vec<Case>,
     subset: Vec<usize>,
 }
@@ -371,7 +382,11 @@ impl Suite {
                     .map_err(|e| e.to_string())
             })
             .collect::<R<_>>()?;
-        let suite = Self { cases, subset };
+        let suite = Self {
+            contract,
+            cases,
+            subset,
+        };
         suite.validate()?;
         Ok(suite)
     }
@@ -657,139 +672,58 @@ fn native() -> bool {
     ))
 }
 
-fn timing_valid(raw: &Value, case: &Case, workers: &Value, pairs: usize) -> bool {
+fn sampling_matches(raw: &Value, pairs: usize, seed: u64) -> bool {
+    number(raw, "pairs").ok() == Some(pairs as i128)
+        && number(raw, "seed").ok() == Some(i128::from(seed))
+}
+
+/// Complete role-specific output metadata supplements the shared work projection.
+fn timing_outputs_match(raw: &Value, case: &Case) -> bool {
     let check = || -> Option<bool> {
+        let warmups = raw.get("warmups")?.as_array()?;
         let samples = raw.get("samples")?.as_array()?;
-        let seed = u64::try_from(number(raw, "seed").ok()?).ok()?;
-        if text(raw, "status").ok()? != "measured"
-            || raw.get("worker_hashes")? != workers
-            || text(raw, "input_sha256").ok()? != case.input_sha
-            || number(raw, "pairs").ok()? != pairs as i128
-            || number(raw, "iterations").ok()? != i128::from(ITERATIONS)
-            || samples.len() != pairs
-            || pairs < MINIMUM_PAIRS
-            || raw.get("contaminants")?.truthy()
-            || text(raw, "timing_module_policy").ok()? != timing::MODULE_POLICY
-        {
+        if warmups.len() != 2 {
             return Some(false);
         }
-        let observations = raw.get("timing_module_observations")?.as_array()?;
-        if observations.is_empty()
-            || observations.iter().any(|o| {
-                !matches!(
-                    o.get("state")
-                        .and_then(|s| s.get("status"))
-                        .and_then(Value::as_str),
-                    Some("module-absent" | "not-applicable")
-                )
-            })
-        {
-            return Some(false);
-        }
-        let mut elapsed = Vec::new();
-        for sample in samples {
-            if !active_cpu(
-                sample.get("cpu_before")?,
-                sample.get("cpu_after")?,
-                native(),
-            )
-            .is_empty()
-            {
+        for (index, candidate) in [true, false].into_iter().enumerate() {
+            let expected = case.work(candidate, true);
+            if !work_matches(worker::data(warmups[index].get("result")?), &expected, true) {
                 return Some(false);
             }
-            let (a, b) = (sample.get("candidate")?, sample.get("reference")?);
-            if !worker::ok(a)
-                || !worker::ok(b)
-                || !work_matches(worker::data(a), &case.work(true, true), true)
-                || !work_matches(worker::data(b), &case.work(false, true), true)
-            {
-                return Some(false);
+            let role = if candidate { "candidate" } else { "reference" };
+            for sample in samples {
+                if !work_matches(worker::data(sample.get(role)?), &expected, true) {
+                    return Some(false);
+                }
             }
-            elapsed.push((
-                worker::data(a).get("elapsed_ns")?.as_f64()?,
-                worker::data(b).get("elapsed_ns")?.as_f64()?,
-            ));
         }
-        let interval = stats::ratio_interval(&elapsed, seed, 4000).ok()?;
-        Some(
-            raw.get("ratio")?
-                == &Value::object([
-                    ("median", Value::float(interval.median)),
-                    ("lower_95", Value::float(interval.lower_95)),
-                    ("upper_95", Value::float(interval.upper_95)),
-                ]),
-        )
+        Some(true)
     };
     check().unwrap_or(false)
 }
 
-fn memory_valid(
-    root: &Path,
-    raw: &Value,
-    case: &Case,
-    workers: &Value,
-    identity: &Value,
-    pairs: usize,
-    seed: u64,
-) -> bool {
-    let check = || -> Option<bool> {
-        let samples = raw.get("samples")?.as_array()?;
-        let certificate = raw.get("certificate")?;
-        if text(raw, "status").ok()? != "qualified"
-            || text(raw, "input_sha256").ok()? != case.input_sha
-            || number(raw, "pairs").ok()? != pairs as i128
-            || samples.len() != pairs
-            || pairs < MINIMUM_PAIRS
-            || certificate.get("worker_hashes")? != workers
-            || raw.get("contaminants")?.truthy()
-            || !active_cpu(raw.get("cpu_before")?, raw.get("cpu_after")?, native()).is_empty()
-        {
-            return Some(false);
-        }
-        for key in ["observer_sha256", "probe_sha256"] {
-            if certificate.get(key)? != identity.get("instrumentation")?.get(key)? {
-                return Some(false);
-            }
-        }
-        for sample in samples {
-            for (role, candidate) in [("candidate", true), ("reference", false)] {
-                for mode in ["heap", "rss"] {
-                    if !work_matches(
-                        sample.get(&format!("{role}_{mode}"))?.get("work")?,
-                        &case.work(candidate, false),
-                        false,
-                    ) {
-                        return Some(false);
-                    }
-                }
-            }
-        }
-        let expected = Value::object([
-            ("candidate", case.work(true, false)),
-            ("reference", case.work(false, false)),
-        ]);
-        let recomputed = memory::evaluate(
-            root,
-            samples,
-            pairs as i128,
-            seed,
-            certificate,
-            Some(&expected),
-        );
-        Some(
-            [
-                "status",
-                "heap_ratio",
-                "total_rss_ratio",
-                "heap_lower_in_each_pair",
-                "total_rss_ratio_upper_95",
-                "heap_ratio_upper_95",
-            ]
-            .iter()
-            .all(|k| recomputed.get(k) == raw.get(k)),
-        )
-    };
-    check().unwrap_or(false)
+fn memory_outputs_match(raw: &Value, expected: &Value) -> bool {
+    raw.get("samples")
+        .and_then(Value::as_array)
+        .is_some_and(|samples| {
+            samples.iter().all(|sample| {
+                let Value::Object(entries) = sample else {
+                    return false;
+                };
+                entries.len() == 4
+                    && ["candidate", "reference"].iter().all(|role| {
+                        ["heap", "rss"].iter().all(|mode| {
+                            sample
+                                .get(&format!("{role}_{mode}"))
+                                .and_then(|value| value.get("work"))
+                                .zip(expected.get(role))
+                                .is_some_and(|(actual, expected)| {
+                                    work_matches(actual, expected, false)
+                                })
+                        })
+                    })
+            })
+        })
 }
 
 fn upper(value: &Value, key: &str, limit: f64, exclusive: bool) -> bool {
@@ -1004,7 +938,13 @@ fn measurement_error(error: String) -> Value {
     ])
 }
 
-fn measure(root: &Path, build: &Build, case: &Case, options: &Options) -> R<(Value, Value)> {
+fn measure(
+    root: &Path,
+    build: &Build,
+    case: &Case,
+    options: &Options,
+    contract: &Value,
+) -> R<(Value, Value)> {
     let directory = case_directory(&options.output, case.index);
     let operation = case.operation();
     let input = case.path(root);
@@ -1021,12 +961,26 @@ fn measure(root: &Path, build: &Build, case: &Case, options: &Options) -> R<(Val
             &operation,
         )
         .unwrap_or_else(measurement_error);
-        let valid = timing_valid(&raw, case, &build.workers, options.pairs);
-        let digest = write_json(&directory.join("timing.json"), &raw)?;
+        let evidence = case.evidence("timing", raw);
+        let raw = evidence.get("timing").expect("recorded timing evidence");
+        let require_linux = cfg!(target_os = "linux");
+        let valid = text(raw, "status").ok() == Some("measured")
+            && number(raw, "iterations").ok() == Some(i128::from(ITERATIONS))
+            && sampling_matches(raw, options.pairs, options.seed)
+            && raw.get("contaminants").is_some_and(|value| !value.truthy())
+            && timing_outputs_match(raw, case)
+            && acceptance::timing_valid(&evidence, contract, &build.workers, require_linux)
+            && raw
+                .get("samples")
+                .and_then(Value::as_array)
+                .is_some_and(|samples| {
+                    timing::validate_module_absence(raw, samples, require_linux).is_ok()
+                });
+        let digest = write_json(&directory.join("timing.json"), raw)?;
         time = Value::object([
             (
                 "status",
-                Value::str(text(&raw, "status").unwrap_or("invalid")),
+                Value::str(text(raw, "status").unwrap_or("invalid")),
             ),
             ("work_matches", Value::Bool(valid)),
             (
@@ -1081,23 +1035,29 @@ fn measure(root: &Path, build: &Build, case: &Case, options: &Options) -> R<(Val
             },
         )
         .unwrap_or_else(measurement_error);
-        let valid = memory_valid(
-            root,
-            &raw,
-            case,
-            &build.workers,
-            &build.identity,
-            options.memory_pairs,
-            options.seed,
-        );
-        let digest = write_json(&directory.join("memory.json"), &raw)?;
+        let evidence = case.evidence("memory", raw);
+        let raw = evidence.get("memory").expect("recorded memory evidence");
+        let valid = text(raw, "status").ok() == Some("qualified")
+            && sampling_matches(raw, options.memory_pairs, options.seed)
+            && memory_outputs_match(raw, &expected)
+            && memory::evidence_valid_with_outputs(
+                root,
+                &evidence,
+                raw,
+                contract,
+                &build.identity,
+                &build.workers,
+                cfg!(target_os = "linux"),
+                Some(&expected),
+            );
+        let digest = write_json(&directory.join("memory.json"), raw)?;
         memory_result = Value::object([
             (
                 "status",
-                Value::str(text(&raw, "status").unwrap_or("invalid")),
+                Value::str(text(raw, "status").unwrap_or("invalid")),
             ),
             ("work_matches", Value::Bool(valid)),
-            ("pass", Value::Bool(valid && memory_pass(&raw))),
+            ("pass", Value::Bool(valid && memory_pass(raw))),
             (
                 "heap_ratio_upper_95",
                 raw.get("heap_ratio_upper_95")
@@ -1468,7 +1428,7 @@ pub fn main(root: &Path, args: &[String]) -> R<i32> {
                     checkpoint(&options.output, &base, &rows, &selection, &options, false)?;
                     break;
                 }
-                measure(&root, &build, case, &options)?
+                measure(&root, &build, case, &options, &suite.contract)?
             };
             field(&mut rows[index], "timing", time);
             field(&mut rows[index], "memory", memory);
@@ -1666,6 +1626,140 @@ mod tests {
         field(&mut altered, "elapsed_ns", Value::int(1));
         assert!(!work_matches(&altered, &reference, false));
         assert!(work_matches(&altered, &reference, true));
+    }
+
+    fn value_at<'a>(value: &'a mut Value, path: &[&str]) -> &'a mut Value {
+        let mut current = value;
+        for key in path {
+            current = match current {
+                Value::Object(fields) => &mut fields.iter_mut().find(|(k, _)| k == key).unwrap().1,
+                Value::Array(values) => &mut values[key.parse::<usize>().unwrap()],
+                _ => panic!("expected a container at {key}"),
+            };
+        }
+        current
+    }
+
+    #[test]
+    fn timing_role_proofs_are_required_in_warmups_and_every_pair() {
+        let suite = Suite::load(&root()).unwrap();
+        let case = &suite.cases[0];
+        let result = |candidate| {
+            let mut work = case.work(candidate, true);
+            field(&mut work, "elapsed_ns", Value::int(100));
+            Value::object([("status", Value::str("ok")), ("data", work)])
+        };
+        let raw = Value::object([
+            (
+                "warmups",
+                Value::Array(vec![
+                    Value::object([
+                        ("worker", Value::str("candidate")),
+                        ("result", result(true)),
+                    ]),
+                    Value::object([
+                        ("worker", Value::str("reference")),
+                        ("result", result(false)),
+                    ]),
+                ]),
+            ),
+            (
+                "samples",
+                Value::Array(vec![Value::object([
+                    ("candidate", result(true)),
+                    ("reference", result(false)),
+                ])]),
+            ),
+        ]);
+        assert!(timing_outputs_match(&raw, case));
+        for path in [
+            vec!["warmups", "1", "result", "data", "input_sha256"],
+            vec!["warmups", "1", "result", "data", "contract_sha256"],
+            vec!["samples", "0", "reference", "data", "input_sha256"],
+            vec!["samples", "0", "reference", "data", "contract_sha256"],
+        ] {
+            let mut changed = raw.clone();
+            *value_at(&mut changed, &path) = Value::str("changed");
+            assert!(!timing_outputs_match(&changed, case), "{path:?}");
+        }
+        for path in [
+            vec!["warmups", "0", "result", "data", "elapsed_ns"],
+            vec!["samples", "0", "candidate", "data", "elapsed_ns"],
+        ] {
+            let mut changed = raw.clone();
+            *value_at(&mut changed, &path) = Value::int(0);
+            assert!(!timing_outputs_match(&changed, case), "{path:?}");
+        }
+    }
+
+    #[test]
+    fn memory_role_proofs_preserve_exact_outputs_and_all_four_receipts() {
+        let suite = Suite::load(&root()).unwrap();
+        let case = &suite.cases[0];
+        let expected = Value::object([
+            ("candidate", case.work(true, false)),
+            ("reference", case.work(false, false)),
+        ]);
+        let raw = Value::object([(
+            "samples",
+            Value::Array(vec![Value::object([
+                (
+                    "candidate_heap",
+                    Value::object([("work", case.work(true, false))]),
+                ),
+                (
+                    "candidate_rss",
+                    Value::object([("work", case.work(true, false))]),
+                ),
+                (
+                    "reference_heap",
+                    Value::object([("work", case.work(false, false))]),
+                ),
+                (
+                    "reference_rss",
+                    Value::object([("work", case.work(false, false))]),
+                ),
+            ])]),
+        )]);
+        assert!(memory_outputs_match(&raw, &expected));
+        for role in ["reference_heap", "reference_rss"] {
+            let mut changed = raw.clone();
+            *value_at(
+                &mut changed,
+                &["samples", "0", role, "work", "contract_sha256"],
+            ) = Value::str("changed");
+            assert!(!memory_outputs_match(&changed, &expected));
+        }
+        let mut changed = raw.clone();
+        *value_at(&mut changed, &["samples", "0", "candidate_heap", "work"]) =
+            case.work(false, false);
+        assert!(!memory_outputs_match(&changed, &expected));
+        let mut changed = raw.clone();
+        let Value::Object(receipts) = value_at(&mut changed, &["samples", "0"]) else {
+            panic!("expected the four receipts");
+        };
+        receipts.pop();
+        assert!(!memory_outputs_match(&changed, &expected));
+        let evidence = case.evidence("memory", raw.clone());
+        assert_eq!(evidence.get("memory"), Some(&raw));
+        assert_eq!(
+            evidence.get("parity").unwrap().get("expected"),
+            expected.get("candidate")
+        );
+        assert_eq!(text(&evidence, "input_sha256").unwrap(), case.input_sha);
+    }
+
+    #[test]
+    fn recorded_sampling_must_match_the_selected_integer_counts_and_seed() {
+        let mut raw = Value::object([("pairs", Value::int(30)), ("seed", Value::int(280))]);
+        assert!(sampling_matches(&raw, 30, 280));
+        assert!(!sampling_matches(&raw, 31, 280));
+        assert!(!sampling_matches(&raw, 30, 281));
+        field(&mut raw, "pairs", Value::float(30.0));
+        assert!(!sampling_matches(&raw, 30, 280));
+        field(&mut raw, "pairs", Value::int(30));
+        field(&mut raw, "seed", Value::Bool(true));
+        assert!(!sampling_matches(&raw, 30, 1));
     }
 
     #[test]
