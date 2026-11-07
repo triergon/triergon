@@ -77,7 +77,7 @@ fn progressive_keeps_startup_sei_and_requires_the_delimiter_in_that_pes() {
     };
     let mut progressive =
         AvcTsReader::new_progressive(&pool, strict.config, strict.limits).unwrap();
-    strict.pes = Some(anchor);
+    strict.remember_clock(anchor.clock).unwrap();
     push_span(&mut strict, &first);
     assert!(matches!(
         strict.step(&mut WorkBudget::new(1024), &AtomicBool::new(false)),
@@ -86,7 +86,7 @@ fn progressive_keeps_startup_sei_and_requires_the_delimiter_in_that_pes() {
         ))
     ));
 
-    progressive.pes = Some(anchor);
+    progressive.remember_clock(anchor.clock).unwrap();
     let mut units = Vec::new();
     for bytes in first.chunks(3) {
         push_span(&mut progressive, bytes);
@@ -100,13 +100,10 @@ fn progressive_keeps_startup_sei_and_requires_the_delimiter_in_that_pes() {
     assert_eq!(units[0].source_bytes().as_ref(), first);
 
     let mut split = AvcTsReader::new_progressive(&pool, strict.config, strict.limits).unwrap();
-    split.pes = Some(anchor);
+    split.remember_clock(anchor.clock).unwrap();
     push_span(&mut split, &leading_sei);
     drain(&mut split, &mut Vec::new());
-    split.pes = Some(Anchor {
-        serial: 2,
-        clock: clock(12000),
-    });
+    split.remember_clock(clock(12000)).unwrap();
     push_span(&mut split, &delimited_idr);
     assert!(matches!(
         split.step(&mut WorkBudget::new(1024), &AtomicBool::new(false)),
@@ -182,7 +179,12 @@ fn prefix_anchor_ring_keeps_full_clocks_across_pes_and_wraps() {
                     })
                     .collect();
                 for anchor in &anchors {
-                    reader.pes = *anchor;
+                    if let Some(anchor) = anchor {
+                        reader.pes_serial = anchor.serial - 1;
+                        reader.remember_clock(anchor.clock).unwrap();
+                    } else {
+                        reader.pes_anchor = None;
+                    }
                     reader.bytes.try_push(0).unwrap();
                     reader.accept(0).unwrap();
                 }
@@ -310,10 +312,7 @@ fn pes_extent_hint_preserves_packed_and_split_units_under_pressure() {
 
     for headroom in [None, Some(ordinary_growth + publication), Some(0)] {
         let (pool, mut reader) = fixture();
-        reader.pes = Some(Anchor {
-            serial: 1,
-            clock: clock(9000),
-        });
+        reader.remember_clock(clock(9000)).unwrap();
         push_pes_span(&mut reader, &packed);
         // Stop after the first slice header. The IDR fixture ends with two
         // payload bytes and the four NAL transitions cost one unit each.
@@ -374,5 +373,72 @@ fn nal_body_scan_keeps_possible_prefixes_at_every_input_boundary() {
                 );
             }
         }
+    }
+}
+
+#[test]
+fn prefix_anchor_ring_preserves_clocks_for_short_and_long_zero_runs() {
+    for zeroes in 2_usize..=9 {
+        for switch in 0..=zeroes {
+            let (_pool, mut reader) = fixture();
+            let first = [DELIMITER, PREFIX, SPS, PREFIX, PPS, IDR].concat();
+            let delimiter = [vec![0; zeroes], vec![1, 9, 0xf0]].concat();
+            let next = [delimiter.as_slice(), IDR].concat();
+            let last = [DELIMITER, IDR].concat();
+            let raw = [first.as_slice(), &next, &last].concat();
+            let mut units = Vec::new();
+            reader.remember_clock(clock(9000)).unwrap();
+            for (offset, byte) in raw.iter().enumerate() {
+                if offset == first.len() + switch {
+                    reader.remember_clock(clock(12000)).unwrap();
+                }
+                push_span(&mut reader, std::slice::from_ref(byte));
+                drain(&mut reader, &mut units);
+            }
+            reader.finish();
+            drain(&mut reader, &mut units);
+            let second_has_new_anchor = switch <= zeroes.saturating_sub(3);
+            assert_eq!(units.len(), 3);
+            assert_eq!(units[0].clock, Some(clock(9000)));
+            assert_eq!(units[1].clock, second_has_new_anchor.then(|| clock(12000)));
+            assert_eq!(
+                units[2].clock,
+                (!second_has_new_anchor).then(|| clock(12000))
+            );
+        }
+    }
+}
+
+#[test]
+fn prefix_clock_history_survives_a_new_pes_on_every_byte() {
+    for zeroes in 2_usize..=9 {
+        let (_pool, mut reader) = fixture();
+        let first = [DELIMITER, PREFIX, SPS, PREFIX, PPS, IDR].concat();
+        let delimiter = [vec![0; zeroes], vec![1, 9, 0xf0]].concat();
+        let next = [delimiter.as_slice(), IDR].concat();
+        let last = [DELIMITER, IDR].concat();
+        let raw = [first.as_slice(), &next, &last].concat();
+        let mut units = Vec::new();
+        reader.remember_clock(clock(9000)).unwrap();
+        for (offset, byte) in raw.iter().enumerate() {
+            if offset >= first.len() {
+                let pts = 12_000 + (offset - first.len()) as u64 * 3000;
+                reader.remember_clock(clock(pts)).unwrap();
+            }
+            push_span(&mut reader, std::slice::from_ref(byte));
+            drain(&mut reader, &mut units);
+        }
+        reader.finish();
+        drain(&mut reader, &mut units);
+        assert_eq!(units.len(), 3);
+        assert_eq!(units[0].clock, Some(clock(9000)));
+        assert_eq!(
+            units[1].clock,
+            Some(clock(12_000 + zeroes.saturating_sub(3) as u64 * 3000))
+        );
+        assert_eq!(
+            units[2].clock,
+            Some(clock(12_000 + next.len() as u64 * 3000))
+        );
     }
 }
