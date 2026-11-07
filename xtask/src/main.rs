@@ -63,6 +63,8 @@ commands:
                  [--maximum-output-bytes N] [--timeout-seconds S]
                  deterministic, replayable mutation campaign through JSON workers
   graph          PACKAGE [FILE]...   print the provenance graph of a workspace package
+  grade          TIMING MEMORY --contract F --manifest F --output DIR
+                 join complete timing and memory reports and recompute the feature gates
   build-workers  [--comparison-build]
                  build the candidate and reference workers and the memory observers, and
                  record their identity in target/harness/identity.json; anything but the
@@ -124,6 +126,12 @@ fn main() -> ExitCode {
             _ => Err("usage: cargo xtask screen REPORTS".into()),
         },
         Some("report") => return report(&root, &args[1..]),
+        Some("grade") => {
+            return failing(
+                harness::grade::main(&root, &args[1..]),
+                harness::grade::USAGE,
+            );
+        }
         Some("external-vector") => return external_vector(&root, &args[1..]),
         Some("fate-run") => return fate_run(&root, &args[1..]),
         Some("graph") => graph(&root, &args[1..]),
