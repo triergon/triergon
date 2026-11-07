@@ -327,6 +327,11 @@ fn signed(magnitude: u128, negative: bool) -> Result<i128> {
 }
 
 fn positive_cmp(mut a: u128, mut b: u128, mut c: u128, mut d: u128) -> Ordering {
+    if let Some(left) = a.checked_mul(d)
+        && let Some(right) = c.checked_mul(b)
+    {
+        return left.cmp(&right);
+    }
     let mut reverse = false;
     loop {
         let ordering = (a / b).cmp(&(c / d));
