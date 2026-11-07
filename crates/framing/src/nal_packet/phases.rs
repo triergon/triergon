@@ -541,7 +541,16 @@ impl<M, S: PacketSegment, C: PacketConfig> PacketJob<'_, M, S, C> {
                 }
             }
         };
-        let configuration = self.config().raw().clone();
+        let raw_configuration = self.config().raw();
+        let shared_side_data = self
+            .source
+            .as_ref()
+            .and_then(|source| source.new_extradata.as_ref())
+            .is_some_and(|extra| {
+                extra.shares_storage_with(raw_configuration)
+                    && std::ptr::eq(extra.as_ref(), raw_configuration.as_ref())
+            });
+        let configuration = (!shared_side_data).then(|| raw_configuration.clone());
         let configuration_identity = self.config().identity();
         let configuration_source_refusal = self.config().refusal();
         let forward_new_extradata = self.codec == Codec::Hevc

@@ -206,6 +206,100 @@ fn compact_facts(value: &NalPacketCompactOutput) -> OutputFacts {
             .collect()
     )
 }
+
+#[test]
+fn configuration_windows_survive_session_close_with_shared_side_data() {
+    for variant in 0..3 {
+        let pool = Budget::new(16_384).unwrap();
+        let baseline = pool.used();
+        let encoded = avcc(130);
+        let backing = hidden(&pool, &[encoded.as_slice(), encoded.as_slice()].concat());
+        let raw = backing.slice(0..encoded.len()).unwrap();
+        let address = raw.storage_address();
+        let pointer = raw.as_ref().as_ptr();
+        let extra = match variant {
+            0 => raw.clone(),
+            1 => backing.slice(encoded.len()..2 * encoded.len()).unwrap(),
+            _ => hidden(&pool, &encoded),
+        };
+        let NalPacketConfiguration::Avc(update) = config(&pool, raw, Codec::Avc) else {
+            unreachable!();
+        };
+        let mut session = NalPacketSession::new(
+            &pool,
+            config(&pool, hidden(&pool, &avcc(128)), Codec::Avc),
+            limits(),
+        )
+        .unwrap();
+        let mut source = packet(hidden(&pool, &[0, 0, 0, 3, 0x65, 0xb8, 128]));
+        source.new_extradata = Some(extra);
+        let mut job = session.packet_compact(source, Some(update)).unwrap();
+        let (_, ready) = drive(&[0, 1, 4], |work, ready| {
+            job.step_into(work, &AtomicBool::new(false), ready)
+        });
+        let output = ready.unwrap();
+        drop(job);
+        drop(session);
+        drop(backing);
+
+        assert_eq!(output.configuration_bytes().as_ref(), encoded);
+        assert_eq!(output.configuration_bytes().storage_address(), address);
+        assert_eq!(output.configuration_bytes().as_ref().as_ptr(), pointer);
+        assert_eq!(output.configuration_source_identity().unwrap().0.offset, 17);
+        assert_eq!(output.source().fields, fields());
+        for index in 0..output.segments().len() {
+            let segment = output.materialize_segment(index).unwrap();
+            assert_eq!(
+                segment.source_bytes().as_ref(),
+                output.segment_bytes(index).unwrap()
+            );
+        }
+        assert!(pool.used() > baseline);
+        drop(output);
+        assert_eq!(pool.used(), baseline);
+    }
+}
+
+#[test]
+fn empty_configuration_keeps_its_distinct_backing_after_close() {
+    let pool = Budget::new(16_384).unwrap();
+    let baseline = pool.used();
+    let raw = Bytes::copy_from_slice(&pool, &[]).unwrap();
+    let address = raw.storage_address();
+    let mut session = NalPacketSession::new(
+        &pool,
+        NalPacketConfiguration::Passthrough {
+            codec: Codec::Avc,
+            raw,
+        },
+        limits(),
+    )
+    .unwrap();
+    let mut source = packet(hidden(&pool, &[0, 0, 0, 1, 0x65, 0xb8, 128]));
+    source.new_extradata = Some(Bytes::copy_from_slice(&pool, &[]).unwrap());
+    let mut job = session.packet_compact(source, None).unwrap();
+    let (_, ready) = drive(&[1], |work, ready| {
+        job.step_into(work, &AtomicBool::new(false), ready)
+    });
+    let output = ready.unwrap();
+    drop(job);
+    drop(session);
+
+    assert!(output.configuration_bytes().is_empty());
+    assert_eq!(output.configuration_bytes().storage_address(), address);
+    assert_ne!(
+        output.configuration_bytes().storage_address(),
+        output
+            .source()
+            .new_extradata
+            .as_ref()
+            .unwrap()
+            .storage_address()
+    );
+    drop(output);
+    assert_eq!(pool.used(), baseline);
+}
+
 fn trace(
     codec: Codec,
     raw: &[u8],

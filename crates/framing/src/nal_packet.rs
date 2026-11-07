@@ -761,7 +761,8 @@ pub struct NalPacketCompactOutput<M = NalPacketFields> {
 struct PacketOutput<M, S> {
     bytes: Bytes,
     source: NalPacket<M>,
-    configuration: Bytes,
+    // An identical side-data window already retains the configuration backing.
+    configuration: Option<Bytes>,
     // Stored unwrapped with a separate presence flag: the flag packs with the
     // other one-byte fields instead of adding an eight-byte Option tag to every
     // retained output.
@@ -772,6 +773,16 @@ struct PacketOutput<M, S> {
     segments: BudgetVec<S>,
     receiver_epoch: u64,
     forward_new_extradata: bool,
+}
+
+impl<M, S> PacketOutput<M, S> {
+    fn configuration_bytes(&self) -> &Bytes {
+        match (&self.configuration, &self.source.new_extradata) {
+            (Some(bytes), _) | (None, Some(bytes)) => bytes,
+            // Publication omits the separate handle only for this exact window.
+            (None, None) => unreachable!("packet publication retains its configuration"),
+        }
+    }
 }
 
 /// A physical complete-packet rejection observed at the reference receive
@@ -838,7 +849,7 @@ impl<M> NalPacketOutput<M> {
         &self.inner.source
     }
     pub fn configuration_bytes(&self) -> &Bytes {
-        &self.inner.configuration
+        self.inner.configuration_bytes()
     }
     pub fn configuration_source_identity(&self) -> Option<(SourceLocation, u64)> {
         self.inner
@@ -869,7 +880,7 @@ impl<M> NalPacketCompactOutput<M> {
         &self.inner.source
     }
     pub fn configuration_bytes(&self) -> &Bytes {
-        &self.inner.configuration
+        self.inner.configuration_bytes()
     }
     pub fn configuration_source_identity(&self) -> Option<(SourceLocation, u64)> {
         self.inner
@@ -895,7 +906,7 @@ impl<M> NalPacketCompactOutput<M> {
     /// owner. No Bytes clone or allocation occurs.
     pub fn segment_bytes(&self, index: usize) -> Option<&[u8]> {
         let part = self.inner.segments.as_slice().get(index)?;
-        part.owner(&self.inner.source.bytes, &self.inner.configuration)
+        part.owner(&self.inner.source.bytes, self.inner.configuration_bytes())
             .as_ref()
             .get(part.range().clone())
     }
@@ -910,7 +921,7 @@ impl<M> NalPacketCompactOutput<M> {
             .ok_or(Error::Invalid("packet segment index"))?;
         Ok(NalPacketSegment {
             bytes: part
-                .owner(&self.inner.source.bytes, &self.inner.configuration)
+                .owner(&self.inner.source.bytes, self.inner.configuration_bytes())
                 .slice(part.range().clone())?,
             origin: part.origin(),
             prefix_bytes: part.prefix_bytes(),
