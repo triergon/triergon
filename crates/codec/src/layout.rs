@@ -181,6 +181,100 @@ impl core::fmt::Debug for ChannelLayout {
     }
 }
 
+/// Speaker of each coded channel in the Vorbis I channel order (section 4.3.9), which
+/// Opus channel mapping family 1 also uses (RFC 7845 section 5.1.1.2), for 1 to 8
+/// channels. `None` beyond 8, where the order is application defined.
+#[must_use]
+pub fn vorbis_order(channels: usize) -> Option<&'static [Speaker]> {
+    use Speaker::{
+        BackCenter, BackLeft, BackRight, FrontCenter, FrontLeft, FrontRight, LowFrequency,
+        SideLeft, SideRight,
+    };
+    Some(match channels {
+        1 => &[FrontCenter],
+        2 => &[FrontLeft, FrontRight],
+        3 => &[FrontLeft, FrontCenter, FrontRight],
+        4 => &[FrontLeft, FrontRight, BackLeft, BackRight],
+        5 => &[FrontLeft, FrontCenter, FrontRight, BackLeft, BackRight],
+        6 => &[FrontLeft, FrontCenter, FrontRight, BackLeft, BackRight, LowFrequency],
+        7 => &[
+            FrontLeft,
+            FrontCenter,
+            FrontRight,
+            SideLeft,
+            SideRight,
+            BackCenter,
+            LowFrequency,
+        ],
+        8 => &[
+            FrontLeft,
+            FrontCenter,
+            FrontRight,
+            SideLeft,
+            SideRight,
+            BackLeft,
+            BackRight,
+            LowFrequency,
+        ],
+        _ => return None,
+    })
+}
+
+/// Speaker of each coded channel in the FLAC default order (RFC 9639 section 9.1.3), for
+/// 1 to 8 channels.
+#[must_use]
+pub fn flac_order(channels: usize) -> Option<&'static [Speaker]> {
+    use Speaker::{
+        BackCenter, BackLeft, BackRight, FrontCenter, FrontLeft, FrontRight, LowFrequency,
+        SideLeft, SideRight,
+    };
+    Some(match channels {
+        1 => &[FrontCenter],
+        2 => &[FrontLeft, FrontRight],
+        3 => &[FrontLeft, FrontRight, FrontCenter],
+        4 => &[FrontLeft, FrontRight, BackLeft, BackRight],
+        5 => &[FrontLeft, FrontRight, FrontCenter, BackLeft, BackRight],
+        6 => &[FrontLeft, FrontRight, FrontCenter, LowFrequency, BackLeft, BackRight],
+        7 => &[
+            FrontLeft,
+            FrontRight,
+            FrontCenter,
+            LowFrequency,
+            BackCenter,
+            SideLeft,
+            SideRight,
+        ],
+        8 => &[
+            FrontLeft,
+            FrontRight,
+            FrontCenter,
+            LowFrequency,
+            BackLeft,
+            BackRight,
+            SideLeft,
+            SideRight,
+        ],
+        _ => return None,
+    })
+}
+
+/// The output layout for channels coded in `coded` order, and the plane each coded
+/// channel goes to: planes follow ascending [`Speaker`] order, as everywhere in this crate.
+/// `None` if a speaker repeats or there are more than [`ChannelLayout::CAPACITY`].
+#[must_use]
+pub fn native_order(coded: &[Speaker]) -> Option<(ChannelLayout, [u8; ChannelLayout::CAPACITY])> {
+    let mut sorted = ChannelLayout::new(coded.iter().copied())?;
+    sorted.speakers[..coded.len()].sort_unstable();
+    if sorted.speakers().windows(2).any(|w| w[0] == w[1]) {
+        return None;
+    }
+    let mut plane = [0u8; ChannelLayout::CAPACITY];
+    for (i, speaker) in coded.iter().enumerate() {
+        plane[i] = sorted.position(*speaker)? as u8;
+    }
+    Some((sorted, plane))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -202,5 +296,28 @@ mod tests {
         assert_eq!(format!("{stereo:?}"), r#"["FL", "FR"]"#);
         assert!(ChannelLayout::new([FrontCenter; ChannelLayout::CAPACITY]).is_some());
         assert!(ChannelLayout::new([FrontCenter; ChannelLayout::CAPACITY + 1]).is_none());
+    }
+
+    #[test]
+    fn vorbis_and_flac_orders_map_to_ffmpeg_layouts() {
+        use Speaker::*;
+        // 5.1: Vorbis FL FC FR BL BR LFE -> FFmpeg 5.1(back) FL FR FC LFE BL BR.
+        let (layout, plane) = native_order(vorbis_order(6).unwrap()).unwrap();
+        assert_eq!(layout.mask(), 0x3f);
+        assert_eq!(&plane[..6], &[0, 2, 1, 4, 5, 3]);
+        // 7.1: FL FC FR SL SR BL BR LFE -> FL FR FC LFE BL BR SL SR.
+        let (layout, plane) = native_order(vorbis_order(8).unwrap()).unwrap();
+        assert_eq!(layout.mask(), 0x63f);
+        assert_eq!(&plane[..8], &[0, 2, 1, 6, 7, 4, 5, 3]);
+        assert_eq!(
+            native_order(vorbis_order(7).unwrap()).unwrap().0.speakers(),
+            &[FrontLeft, FrontRight, FrontCenter, LowFrequency, BackCenter, SideLeft, SideRight]
+        );
+        for channels in 1..=8 {
+            let (_, plane) = native_order(flac_order(channels).unwrap()).unwrap();
+            assert!(plane[..channels].iter().enumerate().all(|(i, &p)| usize::from(p) == i));
+        }
+        assert!(vorbis_order(9).is_none());
+        assert!(native_order(&[FrontLeft, FrontLeft]).is_none());
     }
 }

@@ -16,10 +16,14 @@ triergon-codec-aac = { path = "../codec-aac", optional = true }
 triergon-codec-dca = { path = "../codec-dca", optional = true }
 triergon-codec-h264 = { path = "../codec-h264", optional = true }
 triergon-codec-hevc = { path = "../codec-hevc", optional = true }
+triergon-codec-flac = { path = "../codec-flac", optional = true }
+triergon-codec-mp3 = { path = "../codec-mp3", optional = true }
+triergon-codec-opus = { path = "../codec-opus", optional = true }
+triergon-codec-vorbis = { path = "../codec-vorbis", optional = true }
 
 [features]
 # The pure-Rust decoders behind `video_decoder` and `audio_decoder`.
-codecs = ["dep:triergon-codec-ac3", "dep:triergon-codec-aac", "dep:triergon-codec-dca", "dep:triergon-codec-h264", "dep:triergon-codec-hevc"]
+codecs = ["dep:triergon-codec-ac3", "dep:triergon-codec-aac", "dep:triergon-codec-dca", "dep:triergon-codec-h264", "dep:triergon-codec-hevc", "dep:triergon-codec-flac", "dep:triergon-codec-mp3", "dep:triergon-codec-opus", "dep:triergon-codec-vorbis"]
 # Nightly-only explicit SIMD kernels in the HEVC decoder; output is identical.
 simd = ["triergon-codec-hevc?/simd"]
 

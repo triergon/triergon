@@ -1,0 +1,17 @@
+[package]
+name = "triergon-ogg"
+version = "0.0.0"
+description = "Ogg reader: pages, packets and the FLAC, Opus and Vorbis mappings"
+repository.workspace = true
+license.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+
+[dependencies]
+triergon-bitstream = { path = "../bitstream" }
+triergon-core = { path = "../core" }
+triergon-framing = { path = "../framing" }
+
+[lints]
+workspace = true

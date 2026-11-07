@@ -10,7 +10,7 @@ pub mod video;
 
 pub use audio::{AudioSession, PcmBlock};
 pub use queue::{FeedError, QueueLimits};
-pub use triergon_codec::{AudioCodec, AudioDecoder, VideoCodec, VideoDecoder};
+pub use triergon_codec::{AudioCodec, AudioDecoder, DecodeFailure, VideoCodec, VideoDecoder};
 pub use video::{Published, VideoSession};
 
 /// The codecs of one stream: a video lane and, optionally, an audio lane.
@@ -24,9 +24,21 @@ pub struct StreamSelection {
 #[cfg(feature = "codecs")]
 impl StreamSelection {
     /// Start this stream on both sessions with the pure-Rust decoders.
-    pub fn load(self, video: &mut VideoSession, audio: &mut AudioSession) {
+    /// `audio_configuration` is the audio codec's configuration, as [`audio_decoder`]
+    /// takes it. A refused configuration loads neither session.
+    pub fn load(
+        self,
+        video: &mut VideoSession,
+        audio: &mut AudioSession,
+        audio_configuration: &[u8],
+    ) -> Result<(), DecodeFailure> {
+        let decoder = self
+            .audio
+            .map(|codec| audio_decoder(codec, audio_configuration))
+            .transpose()?;
         video.load(video_decoder(self.video));
-        audio.load(self.audio.map(audio_decoder));
+        audio.load(decoder);
+        Ok(())
     }
 }
 
@@ -39,14 +51,36 @@ pub fn video_decoder(codec: VideoCodec) -> Box<dyn VideoDecoder> {
     }
 }
 
-/// The pure-Rust decoder for `codec`.
+/// The pure-Rust decoder for `codec`, set up from `configuration`: for FLAC the `fLaC`
+/// stream header, for Opus the `OpusHead` packet, for Vorbis the three header packets
+/// with Xiph lacing (the canonical forms of `triergon-framing`). AC-3, E-AC-3, AAC
+/// (ADTS), DTS and MPEG audio take none and ignore it.
 #[cfg(feature = "codecs")]
-pub fn audio_decoder(codec: AudioCodec) -> Box<dyn AudioDecoder> {
-    match codec {
+pub fn audio_decoder(
+    codec: AudioCodec,
+    configuration: &[u8],
+) -> Result<Box<dyn AudioDecoder>, DecodeFailure> {
+    Ok(match codec {
         AudioCodec::Ac3 | AudioCodec::Eac3 => Box::new(triergon_codec_ac3::Decoder::new()),
         AudioCodec::Aac => Box::new(triergon_codec_aac::Decoder::new()),
         AudioCodec::Dts => Box::new(triergon_codec_dca::Decoder::new()),
-    }
+        AudioCodec::Flac => Box::new(
+            triergon_codec_flac::Decoder::from_configuration(configuration, Default::default())
+                .map_err(DecodeFailure::from_error)?,
+        ),
+        AudioCodec::Opus => Box::new(
+            triergon_codec_opus::Decoder::from_configuration(configuration, Default::default())
+                .map_err(DecodeFailure::from_error)?,
+        ),
+        AudioCodec::Vorbis => Box::new(
+            triergon_codec_vorbis::Decoder::from_configuration(configuration, Default::default())
+                .map_err(DecodeFailure::from_error)?,
+        ),
+        AudioCodec::MpegAudio => Box::new(
+            triergon_codec_mp3::Decoder::from_configuration(configuration, Default::default())
+                .map_err(DecodeFailure::from_error)?,
+        ),
+    })
 }
 
 /// Why a session is not producing output right now. A starved session waits

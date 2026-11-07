@@ -136,6 +136,9 @@ fn audio_units<'a>(codec: AudioCodec, data: &'a [u8], mut each: impl FnMut(&'a [
                 .ok()
                 .map(|h| h.frame_length),
             AudioCodec::Dts => dts_frame_len(rest),
+            AudioCodec::Flac | AudioCodec::Opus | AudioCodec::Vorbis | AudioCodec::MpegAudio => {
+                None
+            }
         };
         match len {
             Some(len) if len > 0 && len <= rest.len() => {
@@ -154,7 +157,7 @@ fn audio_units<'a>(codec: AudioCodec, data: &'a [u8], mut each: impl FnMut(&'a [
 }
 
 fn audio(codec: AudioCodec, data: &[u8], out: &mut Output) {
-    let mut decoder = audio_decoder(codec);
+    let mut decoder = audio_decoder(codec, &[]).expect("decoder");
     let mut frame = AudioFrame::default();
     let mut downmix = Downmix::default();
     let mut pcm = Vec::new();
