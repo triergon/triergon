@@ -90,7 +90,9 @@ pub(crate) fn parse_header(nal: &[u8]) -> Option<NalHeader> {
 pub(crate) fn unescape(src: &[u8], dst: &mut Vec<u8>) -> usize {
     dst.clear();
     dst.reserve(src.len() + RBSP_PAD);
-    triergon_bitstream::unescape(src, dst);
+    for run in triergon_bitstream::runs(src) {
+        dst.extend_from_slice(run);
+    }
     let mut len = dst.len();
     while len > 0 && dst[len - 1] == 0 {
         len -= 1;
