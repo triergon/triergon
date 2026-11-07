@@ -2,6 +2,7 @@
 //! 7.3.6.1 and Table 6-1, with an opt-in timing projection through Annex E.2.1.
 
 use super::Sps;
+use triergon_bitstream::{BitError, BitSource};
 use triergon_core::{Error, Result};
 use triergon_framing::{Codec, NalHeader};
 
@@ -163,7 +164,7 @@ pub(crate) fn sps_timing(payload: &[u8]) -> Result<Option<HevcVuiTiming>> {
     };
     // At least the SPS extension flag remains. A VUI field cannot consume
     // the RBSP stop bit or its alignment padding in the final byte.
-    if bits.rest.is_empty() && u32::from(bits.remaining) <= bits.byte.trailing_zeros() {
+    if bits.0.stop_bit_consumed() {
         return Err(Error::Truncated);
     }
     Ok(timing)
@@ -389,93 +390,40 @@ fn slice_picture(payload: &[u8], nal_type: u8) -> Result<(bool, u8)> {
     Ok((first, bits.id(63)?))
 }
 
-struct Rbsp<'a> {
-    rest: &'a [u8],
-    byte: u8,
-    remaining: u8,
-    zeroes: u8,
+struct Rbsp<'a>(triergon_bitstream::Rbsp<'a>);
+
+fn rbsp_error(error: BitError) -> Error {
+    match error {
+        BitError::End => Error::Truncated,
+        BitError::LongPrefix => Error::Invalid("HEVC Exp-Golomb width"),
+        BitError::MissingPrevention => Error::Invalid("HEVC missing emulation-prevention byte"),
+        BitError::InvalidPrevention => Error::Invalid("HEVC emulation-prevention byte"),
+    }
 }
 
 impl<'a> Rbsp<'a> {
     fn new(rest: &'a [u8]) -> Self {
-        Self {
-            rest,
-            byte: 0,
-            remaining: 0,
-            zeroes: 0,
-        }
-    }
-
-    fn refill(&mut self) -> Result<()> {
-        let (&byte, rest) = self.rest.split_first().ok_or(Error::Truncated)?;
-        let (byte, rest) = if self.zeroes == 2 {
-            match byte {
-                0..=2 => return Err(Error::Invalid("HEVC missing emulation-prevention byte")),
-                3 => {
-                    let (&next, rest) = rest.split_first().ok_or(Error::Truncated)?;
-                    if next > 3 {
-                        return Err(Error::Invalid("HEVC emulation-prevention byte"));
-                    }
-                    self.zeroes = 0;
-                    (next, rest)
-                }
-                _ => (byte, rest),
-            }
-        } else {
-            (byte, rest)
-        };
-        self.rest = rest;
-        self.byte = byte;
-        self.zeroes = if byte == 0 { self.zeroes + 1 } else { 0 };
-        self.remaining = 8;
-        Ok(())
+        Self(triergon_bitstream::Rbsp::new(rest))
     }
 
     fn bit(&mut self) -> Result<u32> {
-        if self.remaining == 0 {
-            self.refill()?;
-        }
-        self.remaining -= 1;
-        Ok(u32::from(self.byte >> self.remaining & 1))
+        self.0.bit().map_err(rbsp_error)
     }
 
-    fn fixed(&mut self, mut width: u8) -> Result<u32> {
-        let mut value = 0;
-        while width != 0 {
-            if self.remaining == 0 {
-                self.refill()?;
-            }
-            let count = width.min(self.remaining);
-            self.remaining -= count;
-            let bits = u32::from(self.byte >> self.remaining) & ((1 << count) - 1);
-            value = (value << count) | bits;
-            width -= count;
-        }
-        Ok(value)
+    fn fixed(&mut self, width: u8) -> Result<u32> {
+        self.0.read(u32::from(width)).map_err(rbsp_error)
     }
 
     fn flag(&mut self) -> Result<bool> {
-        Ok(self.bit()? != 0)
+        self.0.flag().map_err(rbsp_error)
     }
 
-    fn skip(&mut self, mut count: u8) -> Result<()> {
-        while count > self.remaining {
-            count -= std::mem::take(&mut self.remaining);
-            self.refill()?;
-        }
-        self.remaining -= count;
-        Ok(())
+    fn skip(&mut self, count: u8) -> Result<()> {
+        self.0.skip(u32::from(count)).map_err(rbsp_error)
     }
 
     fn ue(&mut self) -> Result<u32> {
-        let mut zeroes = 0;
-        while self.bit()? == 0 {
-            zeroes += 1;
-            if zeroes > 32 {
-                return Err(Error::Invalid("HEVC Exp-Golomb width"));
-            }
-        }
-        let value = (1u64 << zeroes) - 1 + u64::from(self.fixed(zeroes)?);
+        let value = self.0.exp_golomb(32).map_err(rbsp_error)?;
         u32::try_from(value).map_err(|_| Error::Invalid("HEVC Exp-Golomb value"))
     }
 

@@ -110,8 +110,7 @@ Open structural work. Each step keeps worker traces byte-identical and re-runs t
 performance gates where it touches hot code.
 
 1. **Bitstream.** `triergon-bitstream` holds bit reading, exp-Golomb, RBSP unescaping,
-   CABAC and CRCs. The HLS and raw video parameter set parsers in playback move onto its
-   RBSP reader next. The DTS decoder keeps its own reader: both shared forms are slower
+   CABAC and CRCs. The DTS decoder keeps its own reader: both shared forms are slower
    on its subframe parser.
 2. **Formats.** ISO BMFF and MPEG-TS implement `ContainerReader` and become
    `AnyReader` variants. Box walking and track classification move out of playback

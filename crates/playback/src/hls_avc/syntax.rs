@@ -1,74 +1,34 @@
+use triergon_bitstream::{BitError, BitSource};
 use triergon_core::{Error, Result};
 
 /// Read RBSP prefixes without copying or decoding their uninspected suffixes.
-struct Rbsp<'a> {
-    rest: &'a [u8],
-    zeroes: u8,
-    byte: u8,
-    bits: u8,
+struct Rbsp<'a>(triergon_bitstream::Rbsp<'a>);
+
+fn rbsp_error(error: BitError) -> Error {
+    match error {
+        BitError::End => Error::Truncated,
+        BitError::LongPrefix => Error::Invalid("AVC Exp-Golomb width"),
+        BitError::MissingPrevention | BitError::InvalidPrevention => {
+            Error::Invalid("AVC emulation-prevention byte")
+        }
+    }
 }
 
 impl<'a> Rbsp<'a> {
     fn new(rest: &'a [u8]) -> Self {
-        Self {
-            rest,
-            zeroes: 0,
-            byte: 0,
-            bits: 0,
-        }
+        Self(triergon_bitstream::Rbsp::lenient(rest))
     }
 
     fn bit(&mut self) -> Result<u32> {
-        if self.bits == 0 {
-            let (&first, rest) = self.rest.split_first().ok_or(Error::Truncated)?;
-            let (byte, rest) = if self.zeroes == 2 && first == 3 {
-                self.zeroes = 0;
-                let (&byte, rest) = rest.split_first().ok_or(Error::Truncated)?;
-                if byte > 3 {
-                    return Err(Error::Invalid("AVC emulation-prevention byte"));
-                }
-                (byte, rest)
-            } else {
-                (first, rest)
-            };
-            self.rest = rest;
-            self.zeroes = if byte == 0 {
-                (self.zeroes + 1).min(2)
-            } else {
-                0
-            };
-            self.byte = byte;
-            self.bits = 8;
-        }
-        self.bits -= 1;
-        Ok(u32::from((self.byte >> self.bits) & 1))
+        self.0.bit().map_err(rbsp_error)
     }
 
-    fn fixed(&mut self, mut width: u32) -> Result<u32> {
-        let mut value = 0;
-        while width != 0 {
-            if self.bits == 0 {
-                value = (value << 1) | self.bit()?;
-                width -= 1;
-            }
-            let count = width.min(u32::from(self.bits));
-            self.bits -= count as u8;
-            let mask = (1 << count) - 1;
-            value = (value << count) | ((u32::from(self.byte) >> self.bits) & mask);
-            width -= count;
-        }
-        Ok(value)
+    fn fixed(&mut self, width: u32) -> Result<u32> {
+        self.0.read(width).map_err(rbsp_error)
     }
 
     fn ue(&mut self) -> Result<u32> {
-        let mut prefix = 0;
-        while self.bit()? == 0 {
-            prefix += 1;
-            if prefix > 31 {
-                return Err(Error::Invalid("AVC Exp-Golomb width"));
-            }
-        }
-        Ok((1 << prefix) - 1 + self.fixed(prefix)?)
+        self.0.ue().map_err(rbsp_error)
     }
 
     fn bounded(&mut self, maximum: u32) -> Result<u32> {
@@ -80,13 +40,7 @@ impl<'a> Rbsp<'a> {
     }
 
     fn se(&mut self) -> Result<i32> {
-        let value = self.ue()?;
-        let magnitude = (value / 2) as i32;
-        Ok(if value & 1 == 0 {
-            -magnitude
-        } else {
-            magnitude + 1
-        })
+        self.0.se().map_err(rbsp_error)
     }
 }
 
@@ -119,7 +73,7 @@ pub(crate) fn sps_with_timing(raw: &[u8]) -> Result<(u8, AvcRaster, Option<AvcVu
         None
     };
     // The final set bit is rbsp_stop_one_bit. It cannot supply a VUI field.
-    if r.rest.is_empty() && u32::from(r.bits) <= r.byte.trailing_zeros() {
+    if r.0.stop_bit_consumed() {
         return Err(Error::Truncated);
     }
     Ok((id, raster, timing))
@@ -139,7 +93,7 @@ pub(crate) fn startup_sps(raw: &[u8]) -> Result<(u8, u8)> {
     } else {
         None
     };
-    if r.rest.is_empty() && u32::from(r.bits) <= r.byte.trailing_zeros() {
+    if r.0.stop_bit_consumed() {
         return Err(Error::Truncated);
     }
     let reorder = match (constrained_baseline, reorder) {
@@ -352,10 +306,7 @@ mod tests {
                     let expected: Result<u32> =
                         (0..width).try_fold(0, |value, _| Ok((value << 1) | serial.bit()?));
                     assert_eq!(grouped.fixed(width), expected);
-                    assert_eq!(
-                        (grouped.rest, grouped.zeroes, grouped.byte, grouped.bits),
-                        (serial.rest, serial.zeroes, serial.byte, serial.bits),
-                    );
+                    assert_eq!(grouped.0, serial.0);
                 }
             }
         }
