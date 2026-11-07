@@ -56,7 +56,7 @@ impl VideoSession {
             failure: None,
         }
     }
-    /// A new stream (the source's Load): old input, decoder state and picture go.
+    /// A new stream: old input, decoder state and picture go.
     pub fn load(&mut self, decoder: Box<dyn VideoDecoder>) {
         self.reset(true);
         self.decoder = Some(decoder);

@@ -4,16 +4,31 @@
 // Pending: `missing_docs`, `missing_debug_implementations`, `unreachable_pub`, `clippy::expect_used`.
 
 pub mod audio;
-pub mod load;
 pub mod mix;
 pub mod queue;
 pub mod video;
 
 pub use audio::{AudioSession, PcmBlock};
-pub use load::{LoadSelection, select};
 pub use queue::{FeedError, QueueLimits};
 pub use triergon_codec::{AudioCodec, AudioDecoder, VideoCodec, VideoDecoder};
 pub use video::{Published, VideoSession};
+
+/// The codecs of one stream: a video lane and, optionally, an audio lane.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct StreamSelection {
+    pub video: VideoCodec,
+    /// `None` plays no audio.
+    pub audio: Option<AudioCodec>,
+}
+
+#[cfg(feature = "codecs")]
+impl StreamSelection {
+    /// Start this stream on both sessions with the pure-Rust decoders.
+    pub fn load(self, video: &mut VideoSession, audio: &mut AudioSession) {
+        video.load(video_decoder(self.video));
+        audio.load(self.audio.map(audio_decoder));
+    }
+}
 
 /// The pure-Rust decoder for `codec`.
 #[cfg(feature = "codecs")]

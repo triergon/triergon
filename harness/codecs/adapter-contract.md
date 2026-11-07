@@ -6,7 +6,7 @@ devices and GPU upload; nothing in the crate spawns a process or links a native 
 
 | Host action | Call |
 |---|---|
-| Open a stream | `let sel = triergon_sim::select(payload);` then `VideoSession::load` and `AudioSession::load` with decoders from `adapters::video_decoder` / `audio_decoder` (feature `codecs`) |
+| Open a stream | `StreamSelection { video, audio }.load(&mut video_session, &mut audio_session)` (feature `codecs`), or `VideoSession::load` and `AudioSession::load` with the host's own decoders |
 | Feed video / audio | `feed(au, pts)`; `Err(FeedError::Backpressure)` means keep the access unit and retry after output progresses |
 | Advance video | `step(clock_ns)` decodes until one picture waits ahead of the clock and publishes it once `clock >= pts`; returns true on a new picture |
 | Show video | `latest()` → `Published { sequence, generation, pts, rgba }` |
@@ -15,10 +15,8 @@ devices and GPU upload; nothing in the crate spawns a process or links a native 
 | Stop / unload | `stop()` on both (picture cleared) |
 | End of input | `end_of_stream()` on both; the state becomes `Ended` once all output is delivered |
 
-`select` picks HEVC when the lowercased payload contains `h265` or `hevc`, otherwise
-H.264; audio is the literal `"audio":"` value `AC3`, `AC3 PLUS`, `AAC` or `DTS`, otherwise
-no audio session. A stream the H.264 decoder cannot decode reports `Failed`, never a
-black picture.
+The host chooses the codecs; `audio: None` opens no audio session. A stream the H.264
+decoder cannot decode reports `Failed`, never a black picture.
 
 ## States and timing
 
@@ -28,7 +26,7 @@ black picture.
 - Each picture carries the PTS of the access unit that coded it through reordering.
   Unknown PTS publishes immediately in output order.
 - A sample-rate change ends the PCM block; the next `pull` returns the new rate.
-- `audio::lead_ns` parses the lead in milliseconds (default 120, clamped to 0–2000).
+- The host passes the lead to `pull`; `audio::DEFAULT_LEAD_NS` is 120 ms.
 
 ## Bounds
 
