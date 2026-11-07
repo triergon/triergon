@@ -17,7 +17,7 @@ release; fonts against FreeType 2.15.0 ([reference pins](quality.md#reference-an
 | Matroska audio clocks | AAC, AC-3, E-AC-3 startup and forward clocks | 10 inputs | 0.17 | heap 0.07, RSS 0.60 | audio seek |
 | ISO BMFF / MP4 | Regular and fragmented files, edit lists, seek and range plans, neutral `ContainerReader` over seekable sources, QuickTime compatibility, bounded AAC configuration and regular table recovery, timing, sync and terminal media prefixes; AVC, HEVC, AAC, AC-3, E-AC-3, DTS core, AV1, VP9 | 255 inputs, 1,020 open and index comparisons (972 matching outputs and 48 matching refusal outcomes with compatibility policies) | 1.1273 (972/972 pass) | heap ≤0.4133, total RSS ≤0.7283 (972/972) | seek and range-plan timing; neutral reader not yet compared with FFmpeg |
 | MPEG-TS | PSI, continuity, PES assembly; TS188 and M2TS192 | 272-request set (80 field matches, 23 open), recorded; no runner in the repository | not measured | not measured | access-unit demux, broader profiles |
-| MPEG-TS progressive playback | TS188 with AVC and AAC-LC, bounded sequential input and access units before EOF | 3 comparable packet folds; all 5 host functional controls (10 literal outcomes), including the expected reference refusal on the legal duplicate | pending gate-build measurements on all 3 comparable cases | pending gate-build measurements on all 3 comparable cases | broader transport and codec profiles |
+| MPEG-TS progressive playback | TS188 with AVC and AAC-LC, bounded sequential input and access units before EOF | 3 packet folds and all 5 functional inputs with 10 literal outcomes | 1.2608 (2/3 pass) | heap ≤0.015, total RSS ≤0.635 (3/3) | runtime optimization, broader transport and codec profiles |
 | HLS segments | Independent TS188 segments with contiguous AVC or HEVC video and AAC, AC-3 or E-AC-3 audio | 71 packet comparisons, 71 measured workloads | 1.1808 (71/71 pass) | heap ≤0.022, total RSS ≤0.722 | other profiles |
 | Packet framing | AVC/HEVC configuration and NAL framing, AV1, VP9, AC-3, E-AC-3, DTS core | 125 AVC/HEVC reference comparisons; DTS core byte-exact on 37,125 projections and 1,172 FATE packets, recorded without a timing runner | 1.3846 (45/125 pass for AVC/HEVC) | heap ≤0.985 (125/125 lower), total RSS ≤1.048 (0/125 lower) | runtime and RSS optimization; full AVC/HEVC/ADTS grammar |
 | Subtitles, text | SRT, WebVTT, ASS passthrough, mov_text and tx3g to ASS, charset handling | 82 mov_text cases, 79 tx3g regressions | not measured | not measured | timing and memory |
@@ -27,6 +27,12 @@ release; fonts against FreeType 2.15.0 ([reference pins](quality.md#reference-an
 | Decode sessions | Bounded queues, clock-gated output, flush and seek, RGBA letterbox, stereo mix | with the codecs | 1.0551 (17/17 pass) | with the codecs | — |
 | Fonts | sfnt and collections; `head`, `hhea`, `maxp`, `hmtx`, `OS/2`, `name`; `cmap` formats 0, 4, 6, 10, 12, 13; `glyf`/`loca`; CFF and CFF2 at the default instance; `kern` format 0; loading at a size as libass does with hinting off (unhinted outlines, synthetic bold and oblique, size metrics, kerning, decoration bands, default-load advances where hinting cannot move them); face matching with libass's rules (unit tests only, unverified until the libass lane compares it) | The gate covers libass's default configuration (hinting off). All 59 faces of 50 corpus files (TrueType including Arabic, Hebrew, Indic and Thai fonts, name-keyed and CID-keyed CFF, CFF2, a 10-face collection, three authored fonts; 836,291 glyphs) identical to FreeType: names, cmap, the kerning of every listed pair, advances and unscaled outlines (`font-outlines` 50/50); at 256 pixels, size metrics, kerning, every glyph's unhinted outline with its synthetic styles, and default-load advances (`font-hinting-none` 98/100, 2 open: auto-hinter); macOS AArch64 | not measured | not measured | libass's hinting-enabled modes (NATIVE, LIGHT, NORMAL): their nine other sizes are measured, not gated (`font-hinting-modes` 882/900: unhinted outlines 450/450, default-load advances 432/450), and hinted outlines are not compared; the FreeType auto-hinter, which leaves DejaVuMathTeXGyre and authored-cmap-formats open at every size; tricky fonts and instruction-control programs; face matching against libass; `cmap` format 14; runtime and memory; Linux runs |
 | Capture | RGBA to YUV 4:2:0, MPEG-1 video with budgeted storage, MPEG-TS mux | 15/15 quality cases against FFmpeg 9.0.2 | 1.1210 (15/15 pass) | heap ≤0.548, total RSS ≤0.978 (15/15) | — |
+
+## Above the 1.20 ceiling
+
+| Case | Upper runtime bound |
+|---|---|
+| `reordered-48000` (progressive TS188) | 1.2608 |
 
 ## Measured revisions
 
@@ -47,6 +53,10 @@ The packet-framing row uses the gate build at
 with 30 timing pairs of 50 complete operations and 30 memory pairs for all 125 cases.
 All memory observations are valid; lower total RSS remains unachieved on every case.
 
+The progressive TS188 row at `58d9d0807a3dc1b75adcf0e3a9655175f9649996` uses
+30 timing pairs of 50 complete sessions and 30 memory pairs on a c8g.large pinned
+to CPU 1, with the gate build.
+
 ISO BMFF, PGS, Matroska audio clocks and playback timing, plus
 codec and decode-session memory, await gate-build measurement with repository runners.
 
@@ -61,6 +71,7 @@ ISO BMFF open and index measurements use `cargo xtask isobmff-bench`, with
 | ISO BMFF comparison | `0a033ec3406aebd09d191298a546659e02c6b76c` | `f56d3fa78b8cc70222f58c7cfa9a17331b0924a9070c7ff6ecc6dc1f213561bc` |
 | ISO BMFF open and index runtime | `ea4b941b4454bcc2ea0cd213999d64a07928ed7c` | `fca8e54cb9b2f0d55acc8ba9be2a5849992ae7996f3c3db551896477c3359525` |
 | ISO BMFF open and index memory | `ea4b941b4454bcc2ea0cd213999d64a07928ed7c` | `46cf8ac9041b147c96108de6e09fde26c47e12fd10161f7eee9661db95f8c89a` |
+| MPEG-TS progressive playback | `58d9d0807a3dc1b75adcf0e3a9655175f9649996` | `0bb7c6833a18fd197b6b9f4c2704ee72530a320faab447b13e2ad4138851eb82` |
 | HLS segments | `a3e8adb2c1b67488a3168a37145a4bc9cc5aa80d` | `ea55e44697ea603b8ffc82e8e3f2b114888c3b8f9844c5a2dd1c6aa8c914079c` |
 | Packet framing | `04512a07fbb7efdf0d6d7173db08ec1267f2fae3` | `677ce4b5aef58efd8523868cd2318d9cfde07868d2b7451d0017f013dfb3130b` |
 | Codecs and decode sessions, runtime | `add6b272cb622bae0d921dc3fbbf0812958c2023` | `ab2a174847322658159e93b2cd9bb994cdd9f4f9438926191518897aff28d929` |
