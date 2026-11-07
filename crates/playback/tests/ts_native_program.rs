@@ -1,3 +1,5 @@
+mod common;
+use common::collect;
 use std::sync::atomic::AtomicBool;
 use triergon_core::{
     Budget, Bytes, Error, InputCursor, SourceCapabilities, SourceId, Time, WorkBudget,
@@ -9,8 +11,8 @@ use triergon_mpegts::{
     psi::{DescriptorNamespace, DvbNamespaceEvidence},
 };
 use triergon_playback::{
-    ByteSource, ClockChoice, Delivery, Engine, Output, Player, PlayerPolicy, Progress, RawEvent,
-    Selection, TrackKey, TsEvent, TsNativeCarriage, TsNativeTrackSelection, io::SourceOwner,
+    ByteSource, ClockChoice, Delivery, Engine, Player, PlayerPolicy, Progress, RawEvent, Selection,
+    TrackKey, TsEvent, TsNativeCarriage, TsNativeTrackSelection, io::SourceOwner,
 };
 
 const ENTITY: SourceId = SourceId(77);
@@ -105,21 +107,6 @@ fn player_with_namespace(
         .set_clock_view(ClockChoice::ExplicitNativeProjection)
         .unwrap();
     (player, budget)
-}
-
-fn collect(player: &mut Player<ByteSource>, work: u64) -> Vec<Output> {
-    let cancel = AtomicBool::new(false);
-    let mut output = Vec::new();
-    for _ in 0..20_000 {
-        let progress = player.advance(&mut WorkBudget::new(work), &cancel).unwrap();
-        while let Some(value) = player.pop() {
-            output.push(value);
-        }
-        if matches!(progress, Progress::Ended) {
-            return output;
-        }
-    }
-    panic!("native program playback stalled");
 }
 
 // Captured by the no-parser FFmpeg 9.0.2 demux reference for these fixtures.
@@ -225,7 +212,7 @@ fn independent_ts_segments_discover_tracks_and_emit_configuration_before_packets
             ),
         ] {
             let (mut automatic, b) = segment_player(raw, quantum);
-            let output = collect(&mut automatic, work);
+            let output = collect(&mut automatic, work).unwrap();
             let mut announced = [None; 2];
             let mut audio = Vec::new();
             let mut actual = Vec::new();
@@ -276,6 +263,7 @@ fn independent_ts_segments_discover_tracks_and_emit_configuration_before_packets
             );
             let (mut explicit, _) = player(raw, &[AVC, FOLLOW_AUDIO], Selection::All, quantum);
             let expected: Vec<_> = collect(&mut explicit, work)
+                .unwrap()
                 .iter()
                 .filter_map(|item| match item.event() {
                     RawEvent::NativeTs { packet, clock } => {
@@ -306,7 +294,7 @@ fn mixed_avc_ac3_dvb_keep_carrier_order_and_a_common_clock() {
             },
             quantum,
         );
-        let output = collect(&mut player, work);
+        let output = collect(&mut player, work).unwrap();
         let foreign_pool = Budget::new(4 * 1024 * 1024).unwrap();
         let mut packets = Vec::new();
         let mut sources = Vec::new();
@@ -392,7 +380,7 @@ fn packet_delivery_uses_projected_timestamp_availability_without_a_seek() {
             Delivery::UnknownTime
         };
         let mut packets = 0;
-        for item in collect(&mut player, 1) {
+        for item in collect(&mut player, 1).unwrap() {
             if let RawEvent::NativeTs { clock, .. } = item.event() {
                 packets += 1;
                 assert_eq!(clock.pts90.is_some(), has_timestamps);
@@ -407,7 +395,7 @@ fn packet_delivery_uses_projected_timestamp_availability_without_a_seek() {
 #[test]
 fn unbounded_packets_drain_by_pid_only_after_logical_eof() {
     let (mut player, _) = player(EOF, &[AAC, AVC], Selection::All, 7);
-    let output = collect(&mut player, 1);
+    let output = collect(&mut player, 1).unwrap();
     let packets: Vec<_> = output
         .iter()
         .filter_map(|item| match item.event() {
@@ -426,7 +414,7 @@ fn unbounded_packets_drain_by_pid_only_after_logical_eof() {
 #[test]
 fn pmt_retype_only_refuses_the_changed_pid() {
     let (mut player, _) = player(RETYPE, &[AVC, AC3, DVB], Selection::All, 17);
-    let output = collect(&mut player, 1);
+    let output = collect(&mut player, 1).unwrap();
     let mut packets = Vec::new();
     let mut refusals = Vec::new();
     let mut maps = Vec::new();
@@ -455,7 +443,7 @@ fn selected_audio_follows_pmt_and_matches_native_carrier_order() {
     };
     for (quantum, work) in [(1, 1), (128, 64)] {
         let (mut player, _) = player(RETYPE, &[AVC, FOLLOW_AUDIO, DVB], selection, quantum);
-        let output = collect(&mut player, work);
+        let output = collect(&mut player, work).unwrap();
         let mut map = None;
         let mut audio = None;
         let mut configurations = Vec::new();
@@ -544,7 +532,7 @@ fn missing_dvb_context_preserves_private_source_and_later_latm_recovers() {
         11,
         DescriptorNamespace::Unspecified,
     );
-    let output = collect(&mut player, 2);
+    let output = collect(&mut player, 2).unwrap();
     let mut audio = Vec::new();
     for item in &output {
         match item.event() {
@@ -591,7 +579,7 @@ fn missing_dvb_context_preserves_private_source_and_later_latm_recovers() {
 #[test]
 fn seeking_replays_the_current_audio_configurations_in_a_new_generation() {
     let (mut player, _) = player(RETYPE, &[AVC, FOLLOW_AUDIO], Selection::All, 97);
-    let initial = collect(&mut player, 5);
+    let initial = collect(&mut player, 5).unwrap();
     let last_audio = initial
         .iter()
         .rev()
@@ -614,7 +602,7 @@ fn seeking_replays_the_current_audio_configurations_in_a_new_generation() {
             .unwrap()
     );
     assert!(!player.may_deliver(last_audio));
-    let replay = collect(&mut player, 3);
+    let replay = collect(&mut player, 3).unwrap();
     let carriages: Vec<_> = replay
         .iter()
         .filter_map(|item| match item.event() {

@@ -1,3 +1,5 @@
+mod common;
+use common::{off, packets, read};
 use std::sync::{
     Arc,
     atomic::{AtomicBool, AtomicUsize, Ordering},
@@ -16,9 +18,6 @@ mod gold {
     include!("fixtures/progressive/source_golds.rs");
 }
 const ID: SourceId = SourceId(6501);
-fn off() -> AtomicBool {
-    AtomicBool::new(false)
-}
 struct Signals {
     gate: AtomicUsize,
     polls: AtomicUsize,
@@ -144,29 +143,6 @@ fn player(raw: &[u8], limits: ProgressiveLimits) -> (Player<Transport>, Budget, 
         b,
         signals,
     )
-}
-fn packets(out: &[Output]) -> Vec<&Mp4Packet> {
-    out.iter()
-        .filter_map(|o| {
-            if let RawEvent::Mp4(Mp4Event::Packet(p)) = o.event() {
-                Some(p)
-            } else {
-                None
-            }
-        })
-        .collect()
-}
-fn read(p: &mut Player<Transport>, out: &mut Vec<Output>) -> Result<()> {
-    for _ in 0..300_000 {
-        let step = p.advance(&mut WorkBudget::new(1), &off())?;
-        while let Some(value) = p.pop() {
-            out.push(value);
-        }
-        if matches!(step, Progress::Ended) {
-            return Ok(());
-        }
-    }
-    panic!("bounded source did not complete");
 }
 fn check(out: &[Output], case: &gold::Case) {
     let got = packets(out);
