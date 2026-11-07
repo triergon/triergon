@@ -745,9 +745,44 @@ impl<'a> Mov9PacketCursor<'a> {
                 "native replay needs complete checked tables",
             ));
         }
+        let mut replay = self.fork_checked_slots(self.slots.as_slice())?;
+        if !self.recording_seek_checkpoints {
+            replay.seek_checkpoints.clone_from(&self.seek_checkpoints);
+        }
+        Ok(replay)
+    }
+
+    pub(crate) fn fork_index_track(&self, track_id: u32) -> Result<(Self, Mov9Track<'a>)> {
+        if !matches!(self.phase, Phase::End)
+            || self.failed.is_some()
+            || !self.complete_source
+            || self.front_source
+            || self.terminal.is_some()
+            || self.forward_regular.is_some()
+        {
+            return Err(Error::Invalid(
+                "index replay requires complete sample tables",
+            ));
+        }
+        let slot = self
+            .slots
+            .as_slice()
+            .iter()
+            .find(|slot| slot.track.track_id == track_id)
+            .ok_or(Error::Invalid("index replay track is absent"))?;
+        if slot.encoded_edit.is_some() {
+            return Err(Error::Invalid("index replay requires a source track"));
+        }
+        Ok((
+            self.fork_checked_slots(std::slice::from_ref(slot))?,
+            slot.track,
+        ))
+    }
+
+    fn fork_checked_slots(&self, checked_slots: &[Slot<'a>]) -> Result<Self> {
         let mut slots = BudgetVec::new(self.slots.budget());
-        slots.try_reserve_exact(self.slots.len())?;
-        for checked in self.slots.as_slice() {
+        slots.try_reserve_exact(checked_slots.len())?;
+        for checked in checked_slots {
             let mut slot = Slot::new(checked.track)?;
             slot.encoded_edit = checked.encoded_edit;
             slot.shift = checked.shift;
@@ -759,9 +794,6 @@ impl<'a> Mov9PacketCursor<'a> {
         replay.complete_source = true;
         replay.phase = Phase::Initialize;
         replay.validated = self.validated;
-        if !self.recording_seek_checkpoints {
-            replay.seek_checkpoints.clone_from(&self.seek_checkpoints);
-        }
         Ok(replay)
     }
 

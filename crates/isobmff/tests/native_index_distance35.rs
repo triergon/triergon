@@ -6,7 +6,7 @@ use std::sync::atomic::AtomicBool;
 use triergon_core::{Budget, WorkBudget};
 use triergon_isobmff::{
     Mov9ClockOrigin, Mov9CursorStatus, Mov9NativeIndexCursor, Mov9NativeIndexEntry,
-    Mov9NativeIndexLimits, Mov9Profile,
+    Mov9NativeIndexLimits, Mov9PacketCursor, Mov9PacketLimits, Mov9Profile,
 };
 
 fn entries(
@@ -115,6 +115,53 @@ fn one_trun_distance_is_independent_for_each_track_and_native_null_clock() {
             // Native reference output native-index/223-{ordinary,tiny}.
             let actual: Vec<_> = rows.iter().map(|row| row.min_distance).collect();
             assert_eq!(actual, [0, 1, 2, 0, 1, 2]);
+        }
+    }
+}
+
+#[test]
+fn index_replay_uses_checked_facts_for_the_selected_track() {
+    let pool = Budget::new(2 * 1024 * 1024).unwrap();
+    let movie = support::parse(
+        &pool,
+        include_bytes!("fixtures/native-clock29/order27-MIN-scale1000-cat12.mp4"),
+    );
+    let tracks = movie.native();
+    let mut packets = Mov9PacketCursor::new_complete_source(
+        &pool,
+        &tracks,
+        &movie.media,
+        Mov9PacketLimits::default(),
+        Mov9Profile::PinnedNoParseNoFillin,
+    )
+    .unwrap();
+    assert!(Mov9NativeIndexCursor::replay_track(&packets, tracks[0].track_id, 6).is_err());
+    let cancel = AtomicBool::new(false);
+    loop {
+        match packets.poll(&mut WorkBudget::new(3), &cancel).unwrap() {
+            Mov9CursorStatus::Ready => {
+                packets.take_occurrence().unwrap();
+            }
+            Mov9CursorStatus::Yield => {}
+            Mov9CursorStatus::End => break,
+        }
+    }
+    for (track, selected) in tracks.iter().enumerate() {
+        let mut replay =
+            Mov9NativeIndexCursor::replay_track(&packets, selected.track_id, 6).unwrap();
+        for expected in entries(&pool, &movie, track, 3) {
+            while replay.poll(&mut WorkBudget::new(3), &cancel).unwrap() == Mov9CursorStatus::Yield
+            {
+            }
+            let actual = replay.take_entry().unwrap();
+            assert_eq!(actual.track_id, selected.track_id);
+            assert_eq!(actual.timestamp, expected.timestamp);
+            assert_eq!(actual.position, expected.position);
+            assert_eq!(actual.min_distance, expected.min_distance);
+            assert_eq!(
+                actual.occurrence.source.dts_ticks,
+                expected.occurrence.source.dts_ticks
+            );
         }
     }
 }
