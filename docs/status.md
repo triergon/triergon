@@ -11,7 +11,7 @@ release ([reference pins](quality.md#reference-and-corpus)).
 | Area | Implemented | Verified against FFmpeg | Runtime | Memory | Open |
 |---|---|---|---|---|---|
 | Core | Charged storage, exact time, input windows, work budgets | 51,235 exact-arithmetic cases against an independent oracle | via dependents | via dependents | 32-bit target runs, fuzzing |
-| Matroska / WebM | Incremental reader: lacing, header removal, bounded zlib, Cues and preroll, colour and static HDR, chapters, tags, attachments, side data | 116 workloads in six feature groups, including an external HDR sample, and four FATE demux comparisons | 1.1558 (116/116 within 1.20) | heap ≤0.627, RSS ≤0.966 | full EBML/Matroska scope |
+| Matroska / WebM | Incremental reader: lacing, header removal, bounded zlib, Cues and preroll, colour and static HDR, chapters, tags, attachments, side data | 116 workloads in six feature groups, including an external HDR sample | 1.1924 (116/116 within 1.20) | heap ≤0.627, total RSS ≤0.965 | full EBML/Matroska scope, broader FATE coverage |
 | Matroska startup and seek | Startup and seek with lazy scan replay | 44 cases, 1,344 packets | 1.1875 (44/44 within 1.20) | heap ≤0.404, total RSS ≤0.845 | — |
 | Matroska Cues and preroll | Validated Cue positions, bounded fallback scans and all-track preroll | 8 cases with fresh, repeated and after-EOF seeks | 1.1849 (8/8 within 1.20) | heap ≤0.182, total RSS ≤0.910 | broader Matroska and FATE coverage |
 | Matroska audio clocks | AAC, AC-3, E-AC-3 startup and forward clocks | 10 inputs | 0.17 | heap 0.07, RSS 0.60 | audio seek |
@@ -21,7 +21,7 @@ release ([reference pins](quality.md#reference-and-corpus)).
 | Packet framing | AVC/HEVC configuration and NAL framing, AV1, VP9, AC-3, E-AC-3, DTS core | 125 cases; DTS core byte-exact on 37,125 projections and 1,172 FATE packets | 1.2395 | heap 0.98, RSS 0.99 | above 1.20; full AVC/HEVC/ADTS grammar |
 | Subtitles, text | SRT, WebVTT, ASS passthrough, mov_text and tx3g to ASS, charset handling | 82 mov_text cases, 79 tx3g regressions | not measured | not measured | timing and memory |
 | Subtitles, bitmap | PGS, DVB display state and colour lookup, DVD units | 229 PGS cases; 5,300 DVB display sets | PGS 1.11 | PGS heap 0.62, RSS 0.90 | full PGS recovery, DVB and DVD decoding |
-| Playback | Matroska, MP4, TS and raw AVC/HEVC feeds; seeking; end-of-file continuation | 120/120 continuation observations; 746 of 998 matrix rows | Matroska AVC/AAC feed within 1.25 | lower | most profiles unmeasured |
+| Playback | Matroska, MP4, TS and raw AVC/HEVC feeds; seeking; end-of-file continuation | 120/120 continuation observations; 746 of 998 matrix rows | see format rows | see format rows | most profiles unmeasured |
 | Codecs | H.264 8-bit 4:2:0; HEVC Main and Main10; AAC LC, HE, HEv2; AC-3 and E-AC-3; DTS core with XCh and X96 | 417/417 comparable conformance and FATE vectors | 1.10 | heap 0.92, RSS 0.82 | error concealment, unverified tool paths |
 | Decode sessions | Bounded queues, clock-gated output, flush and seek, RGBA letterbox, stereo mix | with the codecs | 1.10 | with the codecs | — |
 | Capture | RGBA to YUV 4:2:0, MPEG-1 video, MPEG-TS mux | 15/15 quality cases against FFmpeg 9.0.2 | 1.1206 (15/15 within 1.20) | heap ≤0.548, total RSS ≤0.978 (15/15) | — |
@@ -40,7 +40,7 @@ samples are archived, their SHA-256. Update the row in the same change as the re
 
 | Area | Revision | Raw samples SHA-256 |
 |---|---|---|
-| Matroska / WebM | `cd6ed16d7b37974a8e9d0e13c983965fc6ef7f64` | `ae86dddc2c4ee549c5289429002e145b05fd88fd718a63a413aae909b0af5ddd` |
+| Matroska / WebM | `9f541bc475adbeb7faa2a69be1d364d88c12cde5` | `c5f98c04c695b7f7808f483964cc707ce58805c2a124022bd739653d0ede6553` |
 | Matroska startup and seek | `9f541bc475adbeb7faa2a69be1d364d88c12cde5` | `79b4c35e628bf7a3b043046219d4ebf30d3840049c1632546f20ac41545f7196` |
 | Matroska Cues and preroll | `9f541bc475adbeb7faa2a69be1d364d88c12cde5` | `79b4c35e628bf7a3b043046219d4ebf30d3840049c1632546f20ac41545f7196` |
 | ISO BMFF / MP4 | `f958c0b9624a8b7c7bd91b7d2a0c30299ae1dbed` | `fd718807e0ec1e6287bcb690226bf7056b79985796e74eba54f43544a034bc2c` |
