@@ -44,6 +44,7 @@ dependencies = [
 name = "triergon"
 version = "0.0.0"
 dependencies = [
+ "triergon",
  "triergon-core",
  "triergon-framing",
  "triergon-isobmff",

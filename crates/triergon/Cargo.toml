@@ -16,6 +16,10 @@ triergon-mpegts = { path = "../mpegts", optional = true }
 triergon-framing = { path = "../framing", optional = true }
 triergon-subtitles = { path = "../subtitles", optional = true }
 
+[dev-dependencies]
+# The workspace test run builds no other crate with this feature.
+triergon = { path = ".", features = ["isobmff"] }
+
 [features]
 default = ["matroska"]
 matroska = ["dep:triergon-matroska"]
