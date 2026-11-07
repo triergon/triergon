@@ -7763,6 +7763,71 @@
    "reason": "Capture status row",
    "key": "evidence/capture-pipeline-linux-arm64/fac200b915c2b9a984e5b91cba29e7a3c016690596f128524f46c8f2cb40b6e6.tar.gz",
    "sha256": "fac200b915c2b9a984e5b91cba29e7a3c016690596f128524f46c8f2cb40b6e6"
+  },
+  {
+   "name": "matroska-playback-output-comparison",
+   "path": "matroska-playback-output-comparison",
+   "retention": "retained",
+   "reason": "Matroska startup, seek and Cues results",
+   "key": "evidence/matroska-playback-output-comparison/79b4c35e628bf7a3b043046219d4ebf30d3840049c1632546f20ac41545f7196.tar.gz",
+   "sha256": "79b4c35e628bf7a3b043046219d4ebf30d3840049c1632546f20ac41545f7196",
+   "files": [
+    {
+     "path": "matroska-playback-output-comparison/COMPARISON-SUMMARY.json",
+     "sha256": "43b991976ca95bdebe411c80959fe2a5bb652c286d0ebd32f69f8fa48426324a"
+    },
+    {
+     "path": "matroska-playback-output-comparison/FINAL-DOC.log",
+     "sha256": "b22305cafe4d3a72956e302db50561c4d8f725e7e432d5eebe46ae6743f22457"
+    },
+    {
+     "path": "matroska-playback-output-comparison/FINAL-STATE.txt",
+     "sha256": "f247a76b2893208aae7751dbf51f4c495efacfb6d9e743802870300f31ac45c8"
+    },
+    {
+     "path": "matroska-playback-output-comparison/FINAL-TEST.log",
+     "sha256": "9d55f640352429a2df3694f7398bc599c784e255e7d672e8ac73edf71c313353"
+    },
+    {
+     "path": "matroska-playback-output-comparison/NATIVE-RESULTS.sha256",
+     "sha256": "2bc1cf4698c31538ac148153215a1a2dd68eec2376279d9c5733f19dd9eef5af"
+    },
+    {
+     "path": "matroska-playback-output-comparison/NATIVE-RESULTS.tar.gz",
+     "sha256": "96688c9a9198cf4ec3c8fc087a223c5aa03ebd86a4ce4ccfb419b9468d019e3b"
+    },
+    {
+     "path": "matroska-playback-output-comparison/NATIVE.log",
+     "sha256": "2177d78e4020882ecaae5e5721d90e4c95e24e580195e199afe5f6e97ba81d16"
+    },
+    {
+     "path": "matroska-playback-output-comparison/OUTPUT-BUDGET-CLIPPY.log",
+     "sha256": "1a3b7ff1e7fc049cdffc47ead468b3c983dacfa138ecc0ed87babc8ead0f6aa8"
+    },
+    {
+     "path": "matroska-playback-output-comparison/RSS-REVIEW.json",
+     "sha256": "35fcc38a12295baaefe8217d5a720ee351de7a3053c04bec08c3734ffc67a352"
+    },
+    {
+     "path": "matroska-playback-output-comparison/SEEK-GATE-CLIPPY.log",
+     "sha256": "ae22e2c85e14f3688450142c31f28bd3539759cfa0db5c7db2515155260a683b"
+    },
+    {
+     "path": "matroska-playback-output-comparison/SOURCE.bundle",
+     "sha256": "a0afe23ac983e9e50d38bd65eb9aa4e7ce49c19a8746fdc3e4b18de0ad32be5e"
+    },
+    {
+     "path": "matroska-playback-output-comparison/guest.sh",
+     "sha256": "ec48587042b0002203b1f4487cca7523755e73eb01c6e11a39ad8866710691f2"
+    }
+   ]
+  },
+  {
+   "name": "matroska-packet-work-comparison",
+   "retention": "retained",
+   "reason": "HLS segment results",
+   "key": "evidence/matroska-packet-work-comparison/93b671ad84e8fa2f568245439c49ef51449f9eae06aeabe90c86e0f8805e86fe.tar.gz",
+   "sha256": "93b671ad84e8fa2f568245439c49ef51449f9eae06aeabe90c86e0f8805e86fe"
   }
  ]
 }
