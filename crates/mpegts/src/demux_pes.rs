@@ -734,14 +734,11 @@ impl DemuxObserver {
             ))
         } else if !self.follows_input(context, packet.source_offset) {
             Some(Error::Invalid("native PES source event order"))
-        } else if packet
-            .source_offset
-            .checked_add(packet.source.len() as u64)
-            .is_none()
-        {
-            Some(Error::Overflow)
         } else {
-            Self::transport_bounds(packet).err()
+            let Some(end) = packet.source_offset.checked_add(packet.source.len() as u64) else {
+                return Some(Error::Overflow);
+            };
+            Self::transport_bounds_to(packet, Some(end)).err()
         }
     }
 
@@ -1058,19 +1055,29 @@ impl DemuxObserver {
         self.set_payload_len(next);
     }
     pub(crate) fn transport_bounds(packet: &TransportPacket) -> Result<()> {
+        Self::transport_bounds_to(packet, None)
+    }
+    fn transport_bounds_to(packet: &TransportPacket, checked_end: Option<u64>) -> Result<()> {
         let prefix = packet.prefix.as_ref().map_or(0, Bytes::len);
         if (prefix != 0 && prefix != 4) || packet.source.len() != 188 + prefix {
             return Err(Error::Invalid("native TS packet layout"));
         }
         if let Some(payload) = packet.payload.as_ref() {
-            let start = packet
-                .source_offset
-                .checked_add(prefix as u64 + 4)
-                .ok_or(Error::Overflow)?;
-            let end = packet
-                .source_offset
-                .checked_add(packet.source.len() as u64)
-                .ok_or(Error::Overflow)?;
+            let (start, end) = if let Some(end) = checked_end {
+                // Admission checked the entire carrier end. The layout above
+                // proves its prefix and header fit inside that same extent.
+                (packet.source_offset + prefix as u64 + 4, end)
+            } else {
+                let start = packet
+                    .source_offset
+                    .checked_add(prefix as u64 + 4)
+                    .ok_or(Error::Overflow)?;
+                let end = packet
+                    .source_offset
+                    .checked_add(packet.source.len() as u64)
+                    .ok_or(Error::Overflow)?;
+                (start, end)
+            };
             let payload_end = packet
                 .payload_source_offset
                 .checked_add(payload.len() as u64)
@@ -1965,13 +1972,12 @@ mod tests {
         packet
     }
 
-    fn pending_body(length: u16) -> (DemuxObserver, Bytes, SourceContext) {
-        let pool = Budget::new(8192).unwrap();
+    fn body_observer(pool: &Budget) -> (DemuxObserver, SourceContext) {
         let epochs = SourceEpochs {
             configuration: 0,
             clock: 0,
         };
-        let mut observer = DemuxObserver::new(
+        let observer = DemuxObserver::new(
             DemuxProfile::PesPackets,
             DemuxScope {
                 program: 1,
@@ -1985,13 +1991,19 @@ mod tests {
             ParseLimits::default(),
         )
         .unwrap();
-        let packet = body_carrier(&pool, length, 564, 0);
-        let payload = packet.payload.as_ref().unwrap().clone();
         let context = SourceContext {
             source_event_ordinal: 4,
             epochs,
             byte_run_epoch: None,
         };
+        (observer, context)
+    }
+
+    fn pending_body(length: u16) -> (DemuxObserver, Bytes, SourceContext) {
+        let pool = Budget::new(8192).unwrap();
+        let (mut observer, context) = body_observer(&pool);
+        let packet = body_carrier(&pool, length, 564, 0);
+        let payload = packet.payload.as_ref().unwrap().clone();
         observer.push(packet, context).unwrap();
         let mut work = WorkBudget::new(u64::MAX);
         assert!(observer.poll_start(&mut work).unwrap());
@@ -2008,6 +2020,208 @@ mod tests {
         assert!(observer.header.is_some());
         assert_eq!(observer.pending.as_ref().unwrap().position, 9);
         (observer, payload, context)
+    }
+
+    #[test]
+    fn admitted_carrier_bounds_keep_ranges_and_cancellation_across_quanta() {
+        for format in [crate::PacketFormat::Ts188, crate::PacketFormat::M2ts192] {
+            for compact in [false, true] {
+                for quantum in [1, 2, 7, 64, u64::MAX] {
+                    let pool = Budget::new(8192).unwrap();
+                    let (mut observer, context) = body_observer(&pool);
+                    if compact {
+                        observer.enable_compact_payloads().unwrap();
+                    }
+                    let mut packet = body_carrier(&pool, 178, 564, 0);
+                    let prefix = if format == crate::PacketFormat::M2ts192 {
+                        let mut raw = vec![0, 0, 0, 1];
+                        raw.extend_from_slice(packet.source.as_ref());
+                        packet = crate::parse_transport(
+                            Bytes::copy_from_slice(&pool, &raw).unwrap(),
+                            format,
+                            564,
+                        )
+                        .unwrap();
+                        packet.source_id = Some(SourceId(1));
+                        4
+                    } else {
+                        0
+                    };
+                    let original = packet.source.clone();
+                    observer.push(packet, context).unwrap();
+                    assert!(matches!(
+                        observer.poll_payload_bound(
+                            &mut WorkBudget::new(0),
+                            &AtomicBool::new(true),
+                            None,
+                            compact,
+                        ),
+                        Err(Error::Cancelled)
+                    ));
+                    assert!(
+                        observer
+                            .pending
+                            .as_ref()
+                            .unwrap()
+                            .packet
+                            .source
+                            .shares_storage_with(&original)
+                    );
+                    assert!(matches!(
+                        observer
+                            .poll_payload_bound(
+                                &mut WorkBudget::new(0),
+                                &AtomicBool::new(false),
+                                None,
+                                compact,
+                            )
+                            .unwrap(),
+                        AssemblyStep::Yield
+                    ));
+                    let mut output = None;
+                    for _ in 0..4096 {
+                        match observer
+                            .poll_payload_bound(
+                                &mut WorkBudget::new(quantum),
+                                &AtomicBool::new(false),
+                                None,
+                                compact,
+                            )
+                            .unwrap()
+                        {
+                            AssemblyStep::Output(packet) => {
+                                output = Some(packet);
+                                break;
+                            }
+                            AssemblyStep::Yield => {}
+                            other => panic!("unexpected finite PES step: {other:?}"),
+                        }
+                    }
+                    let packet = output.expect("finite PES completes with every positive quantum");
+                    assert_eq!(packet.position, 564 + prefix as i64);
+                    assert_eq!(packet.boundary, DemuxBoundary::FiniteLength);
+                    assert_eq!(packet.payload_len, 175);
+                    let spans = packet.payload.spans().collect::<Vec<_>>();
+                    assert_eq!(spans.len(), 1);
+                    assert_eq!(
+                        spans[0].source,
+                        SourceRange {
+                            entity: SourceId(1),
+                            offset: 577 + prefix as u64,
+                            bytes: 175
+                        }
+                    );
+                    assert_eq!(
+                        spans[0].transport,
+                        SourceRange {
+                            entity: SourceId(1),
+                            offset: 564,
+                            bytes: TS188_BYTES + prefix
+                        }
+                    );
+                    assert_eq!(spans[0].context, context);
+                    assert_eq!(spans[0].as_ref(), &original.as_ref()[prefix + 13..]);
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn invalid_carrier_bounds_keep_admission_precedence_and_original_input() {
+        for fault in 0..9 {
+            for quantum in [0, 1, 7] {
+                let pool = Budget::new(8192).unwrap();
+                let (mut observer, mut context) = body_observer(&pool);
+                let mut packet = body_carrier(&pool, 178, 564, 0);
+                let expected = match fault {
+                    0 => {
+                        packet.source_offset = u64::MAX;
+                        packet.prefix = Some(packet.source.slice(0..1).unwrap());
+                        Error::Overflow
+                    }
+                    1 => {
+                        packet.prefix = Some(packet.source.slice(0..1).unwrap());
+                        Error::Invalid("native TS packet layout")
+                    }
+                    2 => {
+                        packet.payload_source_offset = 567;
+                        Error::Invalid("native TS payload bounds")
+                    }
+                    3 => {
+                        packet.payload_source_offset = u64::MAX;
+                        Error::Overflow
+                    }
+                    4 => {
+                        packet.payload = Some(Bytes::copy_from_slice(&pool, &[0; 184]).unwrap());
+                        Error::Invalid("native TS payload bounds")
+                    }
+                    5 => {
+                        context.epochs.clock = 1;
+                        Error::Unsupported("native PES source context transition unobserved")
+                    }
+                    6 => {
+                        packet.source_id = Some(SourceId(2));
+                        Error::Unsupported("native PES source context transition unobserved")
+                    }
+                    7 => {
+                        observer.last_input = Some((context.source_event_ordinal, 376));
+                        Error::Invalid("native PES source event order")
+                    }
+                    _ => {
+                        let foreign = Budget::new(8192).unwrap();
+                        packet = body_carrier(&foreign, 178, 564, 0);
+                        packet.prefix = Some(packet.source.slice(0..1).unwrap());
+                        Error::Invalid("foreign native PES byte pool")
+                    }
+                };
+                let pointer = packet.source.as_ref().as_ptr();
+                let payload_pointer = packet.payload.as_ref().unwrap().as_ref().as_ptr();
+                let used = pool.used();
+                let previous = observer.last_input;
+                let rejected = observer.push(packet, context).unwrap_err();
+                assert_eq!(rejected.error, expected);
+                assert_eq!(rejected.value.source.as_ref().as_ptr(), pointer);
+                assert_eq!(
+                    rejected.value.payload.as_ref().unwrap().as_ref().as_ptr(),
+                    payload_pointer
+                );
+                assert_eq!(pool.used(), used);
+                assert!(observer.pending.is_none());
+                assert_eq!(observer.last_input, previous);
+                let mut work = WorkBudget::new(quantum);
+                let step = observer.poll(&mut work, &AtomicBool::new(false)).unwrap();
+                assert!(if quantum == 0 {
+                    matches!(step, AssemblyStep::Yield)
+                } else {
+                    matches!(step, AssemblyStep::NeedPayload)
+                });
+                assert_eq!(work.spent(), 0);
+            }
+        }
+    }
+
+    #[test]
+    fn independent_transport_bounds_keep_layout_and_payloadless_error_order() {
+        let pool = Budget::new(8192).unwrap();
+        let (mut observer, context) = body_observer(&pool);
+        let mut packet = body_carrier(&pool, 178, 564, 0);
+        packet.source_offset = u64::MAX;
+        packet.prefix = Some(packet.source.slice(0..1).unwrap());
+        assert_eq!(
+            DemuxObserver::transport_bounds(&packet),
+            Err(Error::Invalid("native TS packet layout"))
+        );
+        packet.prefix = None;
+        assert_eq!(
+            DemuxObserver::transport_bounds(&packet),
+            Err(Error::Overflow)
+        );
+        packet.payload = None;
+        assert_eq!(DemuxObserver::transport_bounds(&packet), Ok(()));
+        assert_eq!(
+            observer.push(packet, context).unwrap_err().error,
+            Error::Overflow
+        );
     }
 
     fn assert_body_not_moved(observer: &DemuxObserver, expected: &Bytes) {
