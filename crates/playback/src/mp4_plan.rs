@@ -757,8 +757,11 @@ impl<'a> Mp4IndexJob<'a> {
                     }
                     push(&mut p.media_cache, extent.clone())?;
                 } else {
-                    self.phase = if self.range_duration.is_some() {
+                    self.phase = if let Some(duration) = &self.range_duration {
                         if let Some(cursor) = &mut self.native {
+                            if !duration.scan {
+                                cursor.check_projections_before_replay()?;
+                            }
                             cursor.enable_range_seek_checkpoints();
                         }
                         4
@@ -887,12 +890,10 @@ impl<'a> Mp4IndexJob<'a> {
                             CursorStatus::Ready if !w.try_charge(1) => return Ok(false),
                             CursorStatus::Ready => {
                                 let row = cursor.take_occurrence()?;
-                                if !duration.scan {
-                                    continue;
-                                }
                                 let Some(pts) = row.demux.pts else { continue };
-                                let end =
-                                    pts.checked_add(row.demux.duration).ok_or(Error::Overflow)?;
+                                let end = pts
+                                    .checked_add(row.demux.duration)
+                                    .ok_or(Error::Overflow)?;
                                 let micros = row.media_clock.demux_base.rescale(
                                     end,
                                     TimeBase::new(1, 1_000_000)?,

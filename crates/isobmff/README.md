@@ -41,6 +41,8 @@ flag) and returns `Yield`, a result, or `Step::NeedInput` for the shared
 in an existing shared input window. The view retains the window's budget charge.
 Random access can reuse bytes already supplied in the same generation. Samples
 split across windows use a bounded packet buffer.
+Complete indexed sources can check all packet projections by track before
+rewinding for merged playback.
 
 ```rust
 use std::sync::atomic::AtomicBool;
