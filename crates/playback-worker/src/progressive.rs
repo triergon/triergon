@@ -122,10 +122,14 @@ impl RetainedStream {
     }
 
     fn payload(&mut self, data: &[u8], out: &mut Option<&mut dyn Write>) -> Result<()> {
-        for &byte in data {
-            mix(&mut self.digest, u64::from(byte));
-            if let Some(out) = out.as_deref_mut() {
+        if let Some(out) = out.as_deref_mut() {
+            for &byte in data {
+                mix(&mut self.digest, u64::from(byte));
                 write!(out, "{byte:02x}")?;
+            }
+        } else {
+            for &byte in data {
+                mix(&mut self.digest, u64::from(byte));
             }
         }
         self.bytes += data.len() as u64;
