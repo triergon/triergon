@@ -39,7 +39,6 @@ mod slice;
 mod slicedec;
 mod tables;
 mod tables_cabac_init;
-#[allow(dead_code)]
 mod tables_vlc;
 
 use dpb::{PicNums, PocState};
