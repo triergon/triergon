@@ -202,10 +202,11 @@ pub struct AvcTsReader {
     source_clock_epoch: Option<(SourceId, u64)>,
     pending_pes: Option<PendingPes>,
     input: Option<Chunk>,
-    pes: Option<Anchor>,
+    pes_anchors: [Option<Anchor>; 4],
+    pes_anchor: Option<u8>,
     pes_serial: u64,
     stamped_serial: u64,
-    zero_anchors: [Option<Anchor>; 3],
+    zero_anchors: [Option<u8>; 3],
     next_zero_anchor: usize,
     zeroes: usize,
     prefix: Option<Prefix>,
@@ -243,7 +244,8 @@ impl AvcTsReader {
             source_clock_epoch: None,
             pending_pes: None,
             input: None,
-            pes: None,
+            pes_anchors: [None; 4],
+            pes_anchor: None,
             pes_serial: 0,
             stamped_serial: 0,
             zero_anchors: [None; 3],
@@ -319,12 +321,7 @@ impl AvcTsReader {
             return Err(Error::Invalid("AVC TS clock does not describe this PES"));
         }
         if header.is_some() {
-            let clock = AvcTsClock::try_from(clock)?;
-            self.pes_serial = self.pes_serial.checked_add(1).ok_or(Error::Overflow)?;
-            self.pes = Some(Anchor {
-                serial: self.pes_serial,
-                clock,
-            });
+            self.remember_clock(AvcTsClock::try_from(clock)?)?;
         }
         self.source_clock_epoch = Some(origin);
         self.pending_pes = mailbox.take().map(|packet| PendingPes {
@@ -332,6 +329,16 @@ impl AvcTsReader {
             spans: packet.spans.into_iter(),
         });
         Ok(true)
+    }
+
+    fn remember_clock(&mut self, clock: AvcTsClock) -> Result<()> {
+        let serial = self.pes_serial.checked_add(1).ok_or(Error::Overflow)?;
+        // Three prefix zeros and the following byte can each start a PES.
+        let index = (serial % 4) as u8;
+        self.pes_anchors[usize::from(index)] = Some(Anchor { serial, clock });
+        self.pes_anchor = Some(index);
+        self.pes_serial = serial;
+        Ok(())
     }
 
     /// Seal only after definitive segment EOF. Already provided bytes drain.
@@ -486,7 +493,7 @@ impl AvcTsReader {
                 kind,
             });
         } else if byte == 0 {
-            self.zero_anchors[self.next_zero_anchor] = self.pes;
+            self.zero_anchors[self.next_zero_anchor] = self.pes_anchor;
             self.next_zero_anchor = (self.next_zero_anchor + 1) % self.zero_anchors.len();
             self.zeroes = (self.zeroes + 1).min(3);
             return Ok(());
@@ -495,7 +502,8 @@ impl AvcTsReader {
                 start: self.bytes.len() - self.zeroes - 1,
                 anchor: self.zero_anchors[(self.next_zero_anchor + self.zero_anchors.len()
                     - self.zeroes)
-                    % self.zero_anchors.len()],
+                    % self.zero_anchors.len()]
+                .and_then(|index| self.pes_anchors[usize::from(index)]),
             });
         } else if self.nal.is_none() {
             return Err(Error::Invalid("bytes before AVC Annex B start code"));
