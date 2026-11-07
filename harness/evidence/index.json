@@ -8281,6 +8281,126 @@
      "sha256": "582d0c0b0c8fa6956fd26f77bf830de303cb41c64f6b8970e67cb14e197a8511"
     }
    ]
+  },
+  {
+   "name": "avc-field-reader-comparison",
+   "path": "avc-field-reader-comparison",
+   "retention": "retained",
+   "reason": "AVC field reader measurements",
+   "key": "evidence/avc-field-reader-comparison/fbfcc68bc53984b6e18fbd385a21d8d7b63e40922699afe156972449ace77fa6.tar.gz",
+   "sha256": "fbfcc68bc53984b6e18fbd385a21d8d7b63e40922699afe156972449ace77fa6",
+   "files": [
+    {
+     "path": "avc-field-reader-comparison/FINAL-STATE.txt",
+     "sha256": "f247a76b2893208aae7751dbf51f4c495efacfb6d9e743802870300f31ac45c8"
+    },
+    {
+     "path": "avc-field-reader-comparison/GUEST-PREFLIGHT.log",
+     "sha256": "3275677b26eeab6c6726f7ce54dcae2785cd538459d9361fefb7b25982e15a55"
+    },
+    {
+     "path": "avc-field-reader-comparison/HLS-CLOCK-ORACLE.log",
+     "sha256": "f1201b12e5b6af45b374b4e110e578871ab0b5f7cfc931b677b24ffc17f8f5ab"
+    },
+    {
+     "path": "avc-field-reader-comparison/HLS-WORKSPACE-CHECK.log",
+     "sha256": "4b5aa8cd3f03f02b95e54943ad03d7925f7bc2ddd21ac91bd2d0f6d6e74e74d3"
+    },
+    {
+     "path": "avc-field-reader-comparison/HLS-WORKSPACE-CLIPPY.log",
+     "sha256": "f885cbb9a9c57802408cd55651033ed13612036b926cddae11723925fc001950"
+    },
+    {
+     "path": "avc-field-reader-comparison/HLS-WORKSPACE-DOC.log",
+     "sha256": "e936f709dd473160b4f5994164274b856e7aa2563c0e9eedda460140ccd2887f"
+    },
+    {
+     "path": "avc-field-reader-comparison/HLS-WORKSPACE-TEST.log",
+     "sha256": "568d354bc3423a47c89cba7085d33117ff1c447501296877d7edcf1e27927e4b"
+    },
+    {
+     "path": "avc-field-reader-comparison/NATIVE-EXIT.txt",
+     "sha256": "ce8bafb38615aeb5d44ebbabe78ec14ac35a5de87bdc5ad5ea82a72656024ce4"
+    },
+    {
+     "path": "avc-field-reader-comparison/NATIVE-RESULTS.sha256",
+     "sha256": "ee629061566c2715b488e994c5b9d639de21ab90613df33516324ba2a2994380"
+    },
+    {
+     "path": "avc-field-reader-comparison/NATIVE-RESULTS.tar.gz",
+     "sha256": "e2fa753f8a55d029b2d05f8131f36f55f735b354e477e5f86d193b61adfe5de4"
+    },
+    {
+     "path": "avc-field-reader-comparison/NATIVE.log",
+     "sha256": "21463f46b64413bf035aeaca4cd518b5485c0744be3a049109d6228d7b9a6298"
+    },
+    {
+     "path": "avc-field-reader-comparison/ORACLE.tar.gz",
+     "sha256": "ea24cfa82af6eb92cc6fba54a0632b8d4013cd9f90ef02cc659cdf9a49b94c09"
+    },
+    {
+     "path": "avc-field-reader-comparison/SOURCE.bundle",
+     "sha256": "590eb6526fc9494033123699065d1a294dcad1b62d63534e854800e1bd6e7d30"
+    },
+    {
+     "path": "avc-field-reader-comparison/STOP-FAILED-COLLECTION.log",
+     "sha256": "4d0071af89ae38bf899e5bf3a473b2b16cc4b98af67a49b4b61043fb788671a7"
+    }
+   ]
+  },
+  {
+   "name": "byte-scan-comparison",
+   "path": "byte-scan-comparison",
+   "retention": "retained",
+   "reason": "Bounded byte-scan measurements",
+   "key": "evidence/byte-scan-comparison/766e5642fdae63e696ec91f528897c6bb6656eb4c640fa921b3e996445096a1e.tar.gz",
+   "sha256": "766e5642fdae63e696ec91f528897c6bb6656eb4c640fa921b3e996445096a1e",
+   "files": [
+    {
+     "path": "byte-scan-comparison/FINAL-STATE.txt",
+     "sha256": "f247a76b2893208aae7751dbf51f4c495efacfb6d9e743802870300f31ac45c8"
+    },
+    {
+     "path": "byte-scan-comparison/GUEST-PREFLIGHT.log",
+     "sha256": "9b8a7f9edf70c25be2ce419bac5d3071d98a407a1aecd175f386fcb2d5213e49"
+    },
+    {
+     "path": "byte-scan-comparison/HLS-SCAN-WORKSPACE-CHECK.log",
+     "sha256": "9e68b622dfda70139931f628de520ca962a3bd49a5374a5aba6b7fc9a8a4b7b0"
+    },
+    {
+     "path": "byte-scan-comparison/HLS-SCAN-WORKSPACE-CLIPPY.log",
+     "sha256": "a2578498d4ffaffda04d53b2b1ec2333e6f420cc2e8e56530874e2a347a5a603"
+    },
+    {
+     "path": "byte-scan-comparison/HLS-SCAN-WORKSPACE-DOC.log",
+     "sha256": "4feb8d98bf63aea52ec3a113790dc0ccc2a1d562ee5a8f886fb3dbe736ef9f6c"
+    },
+    {
+     "path": "byte-scan-comparison/HLS-SCAN-WORKSPACE-TEST.log",
+     "sha256": "2c6bf74427120f74f0d560aaedd106ba94bd3b52ff17f4ea44b542d34402e1bd"
+    },
+    {
+     "path": "byte-scan-comparison/NATIVE-EXIT.txt",
+     "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+    },
+    {
+     "path": "byte-scan-comparison/NATIVE-RESULTS.sha256",
+     "sha256": "80dcc10a7e62873c86c180853c13a5c97c46c0ed488d5dfe72f652d43485aa2a"
+    },
+    {
+     "path": "byte-scan-comparison/NATIVE-RESULTS.tar.gz",
+     "sha256": "84c17edec630d0056cc5bf783fc6981a35218b1850c80cc6a320fef0a5f54900"
+    },
+    {
+     "path": "byte-scan-comparison/NATIVE.log",
+     "sha256": "8b8854faaf5f15b3414819ef5309553252ef84f3b0641205d5f77687160211f4"
+    },
+    {
+     "path": "byte-scan-comparison/SOURCE.bundle",
+     "sha256": "67f7a6873695f6ae222315ce192e9b8acca34f54aab884dfb17f01c67fc28615"
+    }
+   ]
   }
  ]
 }
