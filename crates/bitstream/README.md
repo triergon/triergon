@@ -62,6 +62,24 @@ let mut rbsp = Rbsp::new(&[0, 0, 3, 1]);
 assert_eq!(rbsp.read(24), Ok(1));
 ```
 
+## Arithmetic decoding
+
+[`cabac::Engine`] is the CABAC engine of H.264 and H.265, which differ only in their
+binarizations and context tables. A context is one state byte; `decision_unfilled` and
+`refill` let a hot loop decode two bins per refill on a local copy of the engine. The
+`HEADROOM` parameter only matters on corrupt streams, where it fixes what a decoder does
+once the offset has left its range.
+
+```rust
+use triergon_bitstream::cabac::{Engine, init_state};
+
+let mut state = init_state(0, 64, 26);
+let mut engine = Engine::<true>::new(&[0; 16], 0);
+assert_eq!(engine.decision(&mut state), 1); // the most probable symbol of this context
+assert_eq!(engine.bypass(), 0);
+assert_eq!(engine.terminate(), 0);
+```
+
 ## Checksums
 
 [`crc`] holds the three checksums the workspace uses. Each function continues from a

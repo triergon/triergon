@@ -9,7 +9,7 @@ mod prediction_unit;
 mod residual;
 mod transform_tree;
 
-use crate::cabac::{Cabac, ctx, init_contexts};
+use crate::cabac::{Bins, Cabac, ctx, init_contexts};
 use crate::error::{DecodeError, Result};
 use crate::inter::{McScratch, PRED_STRIDE};
 use crate::picture::{ColMotion, Frame, Pixel, PuMotion};
@@ -433,8 +433,8 @@ impl<'a, P: Pixel> SliceDecoder<'a, P> {
                 if one != 1 {
                     return Err(DecodeError::InvalidData("end_of_subset_one_bit"));
                 }
-                let pos = self.cabac.aligned_byte_pos();
-                self.cabac.reinit(pos);
+                let pos = self.cabac.aligned_byte_position();
+                self.cabac.restart(pos);
             }
         }
     }

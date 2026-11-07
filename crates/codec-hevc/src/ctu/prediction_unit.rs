@@ -29,13 +29,13 @@ impl<P: Pixel> SliceDecoder<'_, P> {
         let merge = if skip {
             true
         } else {
-            self.cabac.decode(&mut self.c[ctx::MERGE_FLAG]) != 0
+            self.cabac.decision(&mut self.c[ctx::MERGE_FLAG]) != 0
         };
         let mut m;
         if merge {
             let mut idx = 0;
             let max = self.sh.max_num_merge_cand;
-            if max > 1 && self.cabac.decode(&mut self.c[ctx::MERGE_IDX]) != 0 {
+            if max > 1 && self.cabac.decision(&mut self.c[ctx::MERGE_IDX]) != 0 {
                 idx = 1;
                 while idx < max - 1 && self.cabac.bypass() == 1 {
                     idx += 1;
@@ -47,13 +47,13 @@ impl<P: Pixel> SliceDecoder<'_, P> {
             if self.sh.slice_type == SLICE_B {
                 if w + h != 12 {
                     let d = self.blk(cu.x0, cu.y0).depth as usize;
-                    if self.cabac.decode(&mut self.c[ctx::INTER_PRED_IDC + d]) != 0 {
+                    if self.cabac.decision(&mut self.c[ctx::INTER_PRED_IDC + d]) != 0 {
                         pred_idc = 2;
                     } else {
-                        pred_idc = self.cabac.decode(&mut self.c[ctx::INTER_PRED_IDC + 4]);
+                        pred_idc = self.cabac.decision(&mut self.c[ctx::INTER_PRED_IDC + 4]);
                     }
                 } else {
-                    pred_idc = self.cabac.decode(&mut self.c[ctx::INTER_PRED_IDC + 4]);
+                    pred_idc = self.cabac.decision(&mut self.c[ctx::INTER_PRED_IDC + 4]);
                 }
             }
             let mut mvd = [[0i32; 2]; 2];
@@ -62,7 +62,7 @@ impl<P: Pixel> SliceDecoder<'_, P> {
             if pred_idc != 1 {
                 ref_idx[0] = self.parse_ref_idx(self.sh.num_ref_idx[0]) as i32;
                 mvd[0] = self.mvd_coding();
-                mvp_flag[0] = self.cabac.decode(&mut self.c[ctx::MVP_FLAG]);
+                mvp_flag[0] = self.cabac.decision(&mut self.c[ctx::MVP_FLAG]);
             }
             if pred_idc != 0 {
                 ref_idx[1] = self.parse_ref_idx(self.sh.num_ref_idx[1]) as i32;
@@ -71,7 +71,7 @@ impl<P: Pixel> SliceDecoder<'_, P> {
                 } else {
                     mvd[1] = self.mvd_coding();
                 }
-                mvp_flag[1] = self.cabac.decode(&mut self.c[ctx::MVP_FLAG]);
+                mvp_flag[1] = self.cabac.decision(&mut self.c[ctx::MVP_FLAG]);
             }
             m = PuMotion::default();
             for l in 0..2 {
@@ -114,7 +114,7 @@ impl<P: Pixel> SliceDecoder<'_, P> {
         let mut v = 0;
         while v < cmax {
             let bin = if v < 2 {
-                self.cabac.decode(&mut self.c[ctx::REF_IDX + v as usize])
+                self.cabac.decision(&mut self.c[ctx::REF_IDX + v as usize])
             } else {
                 self.cabac.bypass()
             };
@@ -127,15 +127,15 @@ impl<P: Pixel> SliceDecoder<'_, P> {
     }
 
     fn mvd_coding(&mut self) -> [i32; 2] {
-        let g0x = self.cabac.decode(&mut self.c[ctx::ABS_MVD_GT0]) != 0;
-        let g0y = self.cabac.decode(&mut self.c[ctx::ABS_MVD_GT0]) != 0;
+        let g0x = self.cabac.decision(&mut self.c[ctx::ABS_MVD_GT0]) != 0;
+        let g0y = self.cabac.decision(&mut self.c[ctx::ABS_MVD_GT0]) != 0;
         let g1x = if g0x {
-            self.cabac.decode(&mut self.c[ctx::ABS_MVD_GT1]) != 0
+            self.cabac.decision(&mut self.c[ctx::ABS_MVD_GT1]) != 0
         } else {
             false
         };
         let g1y = if g0y {
-            self.cabac.decode(&mut self.c[ctx::ABS_MVD_GT1]) != 0
+            self.cabac.decision(&mut self.c[ctx::ABS_MVD_GT1]) != 0
         } else {
             false
         };

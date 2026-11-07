@@ -1,7 +1,7 @@
 //! Residual coding (7.3.8.11): coefficient parsing, scaling and inverse transform (8.6).
 
 use super::{Cu, Scratch, SliceDecoder};
-use crate::cabac::ctx;
+use crate::cabac::{Bins, ctx};
 use crate::error::{DecodeError, Result};
 use crate::picture::Pixel;
 use crate::tables::{
@@ -21,11 +21,11 @@ impl<P: Pixel> SliceDecoder<'_, P> {
         pred_mode_intra: u32,
     ) -> Result<()> {
         let n = 1usize << log2;
-        let mut cab = self.cabac.clone();
+        let mut cab = self.cabac;
         let c = &mut self.c;
         let mut transform_skip = false;
         if self.pps.transform_skip && !cu.bypass && log2 <= 2 {
-            transform_skip = cab.decode(&mut c[ctx::TRANSFORM_SKIP + (c_idx > 0) as usize]) != 0;
+            transform_skip = cab.decision(&mut c[ctx::TRANSFORM_SKIP + (c_idx > 0) as usize]) != 0;
         }
         let scan_idx = if cu.intra && (log2 == 2 || (log2 == 3 && c_idx == 0)) {
             if (6..=14).contains(&pred_mode_intra) {
@@ -84,13 +84,15 @@ impl<P: Pixel> SliceDecoder<'_, P> {
         let max_prefix = (log2 << 1) - 1;
         let mut px = 0u32;
         while px < max_prefix
-            && cab.decode(&mut c[ctx::LAST_X_PREFIX + (ctx_off + (px >> ctx_shift)) as usize]) != 0
+            && cab.decision(&mut c[ctx::LAST_X_PREFIX + (ctx_off + (px >> ctx_shift)) as usize])
+                != 0
         {
             px += 1;
         }
         let mut py = 0u32;
         while py < max_prefix
-            && cab.decode(&mut c[ctx::LAST_Y_PREFIX + (ctx_off + (py >> ctx_shift)) as usize]) != 0
+            && cab.decision(&mut c[ctx::LAST_Y_PREFIX + (ctx_off + (py >> ctx_shift)) as usize])
+                != 0
         {
             py += 1;
         }
@@ -159,7 +161,7 @@ impl<P: Pixel> SliceDecoder<'_, P> {
             let coded = if i < last_sub_block && i > 0 {
                 let inc = (right | below) as usize;
                 infer_sb_dc = true;
-                cab.decode(&mut c[csbf_base + inc])
+                cab.decision(&mut c[csbf_base + inc])
             } else {
                 1
             };
@@ -193,7 +195,7 @@ impl<P: Pixel> SliceDecoder<'_, P> {
             let mut any_sig = 0u32;
             while np > 0 {
                 let nn = np as usize & 15;
-                let b = cab.decode(&mut sig_ctx[tab[nn] as usize]);
+                let b = cab.decision(&mut sig_ctx[tab[nn] as usize]);
                 sig_pos[nsig] = nn as u8;
                 nsig += b as usize;
                 any_sig |= b;
@@ -208,7 +210,7 @@ impl<P: Pixel> SliceDecoder<'_, P> {
                     } else {
                         &mut c[sig_base + off + tab[0] as usize]
                     };
-                    if cab.decode(s0) != 0 {
+                    if cab.decision(s0) != 0 {
                         sig_pos[nsig] = 0;
                         nsig += 1;
                     }
@@ -232,7 +234,7 @@ impl<P: Pixel> SliceDecoder<'_, P> {
             let ngt1 = nsig.min(8);
             let gt1_ctx = &mut c[gt1_base + ctx_set * 4..gt1_base + ctx_set * 4 + 4];
             for (k, a) in abs.iter_mut().enumerate().take(ngt1) {
-                let b = cab.decode(&mut gt1_ctx[greater1_ctx.min(3) as usize]);
+                let b = cab.decision(&mut gt1_ctx[greater1_ctx.min(3) as usize]);
                 *a = 1 + b as i32;
                 // greater1Ctx: 0 after a 1-bin, else incremented while > 0 (9.3.4.2.6).
                 greater1_ctx = if b != 0 {
@@ -245,7 +247,7 @@ impl<P: Pixel> SliceDecoder<'_, P> {
                 }
             }
             greater1_ctx_carry = greater1_ctx;
-            if gt1_first < 16 && cab.decode(&mut c[gt2_base + ctx_set]) != 0 {
+            if gt1_first < 16 && cab.decision(&mut c[gt2_base + ctx_set]) != 0 {
                 abs[gt1_first] = 3;
             }
             let first_sig_scan = sig_pos[nsig - 1] as isize;
