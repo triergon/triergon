@@ -1059,11 +1059,45 @@ pub fn evaluate(
     obj(fields)
 }
 
+fn work_valid(samples: &[Value], fields: &[String], expected: Option<&Value>) -> bool {
+    let Ok(expected) = expected
+        .map(|v| super::comparison::work_summary(v, fields))
+        .transpose()
+    else {
+        return false;
+    };
+    !samples.is_empty()
+        && samples.iter().all(|sample| {
+            let Value::Object(entries) = sample else {
+                return false;
+            };
+            !entries.is_empty()
+                && entries.iter().all(|(_, observed)| {
+                    observed
+                        .get("work")
+                        .and_then(|work| super::comparison::work_summary(work, fields).ok())
+                        .is_some_and(|work| expected.as_ref().is_none_or(|e| equal(&work, e)))
+                })
+        })
+}
+
 struct Invocation<'a> {
     operation: Option<&'a str>,
     input: &'a Path,
     arguments: &'a [String],
+    candidate_arguments: Option<&'a [String]>,
     expected_outputs: Option<&'a Value>,
+    work_fields: Option<&'a [String]>,
+}
+
+impl Invocation<'_> {
+    fn arguments_for(&self, candidate: bool) -> &[String] {
+        if candidate {
+            self.candidate_arguments.unwrap_or(self.arguments)
+        } else {
+            self.arguments
+        }
+    }
 }
 
 /// Measure `pairs` randomly ordered sets of the four observer runs.
@@ -1117,21 +1151,32 @@ fn measure(
                 invocation.operation,
                 Some(invocation.input),
                 mode,
-                invocation.arguments,
+                invocation.arguments_for(name == "candidate"),
                 kernel && mode == "rss",
             );
             row.push((format!("{name}_{mode}"), observed));
         }
         samples.push(Value::Object(row));
     }
-    let mut result = evaluate(
-        root,
-        &samples,
-        pairs as i128,
-        seed,
-        certificate,
-        invocation.expected_outputs,
-    );
+    let mut result = if invocation
+        .work_fields
+        .is_some_and(|fields| !work_valid(&samples, fields, None))
+    {
+        obj(vec![
+            ("status", Value::str("invalid-memory-work")),
+            ("samples", Value::Array(samples.clone())),
+            ("certificate", certificate.clone()),
+        ])
+    } else {
+        evaluate(
+            root,
+            &samples,
+            pairs as i128,
+            seed,
+            certificate,
+            invocation.expected_outputs,
+        )
+    };
     push(&mut result, "input_sha256", Value::str(&input_sha));
     if file_sha(invocation.input)? != input_sha {
         push(&mut result, "status", Value::str("input-changed"));
@@ -1186,6 +1231,36 @@ pub fn collect(
     seed: u64,
     operation: &Operation,
 ) -> R<Value> {
+    if !operation.candidate_options.is_empty() {
+        let arguments = |candidate| {
+            operation
+                .worker_arguments(candidate, "memory", input, None)
+                .into_iter()
+                .map(|argument| {
+                    argument
+                        .into_string()
+                        .map_err(|_| "compatibility command arguments must be UTF-8".to_owned())
+                })
+                .collect::<R<Vec<_>>>()
+        };
+        let candidate_arguments = arguments(true)?;
+        let reference_arguments = arguments(false)?;
+        return collect_invocation(
+            root,
+            candidate,
+            reference,
+            pairs,
+            seed,
+            Invocation {
+                operation: None,
+                input,
+                arguments: &reference_arguments,
+                candidate_arguments: Some(&candidate_arguments),
+                expected_outputs: None,
+                work_fields: Some(&operation.work_fields),
+            },
+        );
+    }
     let name = format!("{}memory", operation.prefix);
     let arguments: Vec<String> = operation
         .arguments
@@ -1202,7 +1277,9 @@ pub fn collect(
             operation: Some(&name),
             input,
             arguments: &arguments,
+            candidate_arguments: None,
             expected_outputs: None,
+            work_fields: Some(&operation.work_fields),
         },
     )
 }
@@ -1229,7 +1306,43 @@ pub(crate) fn collect_command(
             operation: None,
             input,
             arguments,
+            candidate_arguments: None,
             expected_outputs: Some(expected_outputs),
+            work_fields: None,
+        },
+    )
+}
+
+/// Complete commands and independently checked output for each measured role.
+pub(crate) struct Commands<'a> {
+    pub candidate: &'a [String],
+    pub reference: &'a [String],
+    pub expected_outputs: &'a Value,
+}
+
+/// Observe distinct role commands under the shared allocation and RSS checks.
+pub(crate) fn collect_commands(
+    root: &Path,
+    candidate: &Path,
+    reference: &Path,
+    input: &Path,
+    pairs: usize,
+    seed: u64,
+    commands: Commands<'_>,
+) -> R<Value> {
+    collect_invocation(
+        root,
+        candidate,
+        reference,
+        pairs,
+        seed,
+        Invocation {
+            operation: None,
+            input,
+            arguments: commands.reference,
+            candidate_arguments: Some(commands.candidate),
+            expected_outputs: Some(commands.expected_outputs),
+            work_fields: None,
         },
     )
 }
@@ -1292,6 +1405,33 @@ pub fn evidence_valid(
     selected: &Value,
     require_linux: bool,
 ) -> bool {
+    evidence_valid_with_outputs(
+        root,
+        row,
+        memory,
+        contract,
+        identity,
+        selected,
+        require_linux,
+        None,
+    )
+}
+
+/// Validate recorded memory evidence against optional per-worker output shapes.
+#[allow(
+    clippy::too_many_arguments,
+    reason = "the report, build bindings and optional per-worker work are explicit validation inputs"
+)]
+pub fn evidence_valid_with_outputs(
+    root: &Path,
+    row: &Value,
+    memory: &Value,
+    contract: &Value,
+    identity: &Value,
+    selected: &Value,
+    require_linux: bool,
+    expected_outputs: Option<&Value>,
+) -> bool {
     let check = || -> Option<bool> {
         let certificate = memory.get("certificate")?;
         let raw = memory.get("samples")?.as_array()?;
@@ -1331,6 +1471,11 @@ pub fn evidence_valid(
         if !(covered && raw.len() as i128 == pairs && raw.len() as i128 >= minimum) {
             return Some(false);
         }
+        let fields = super::comparison::work_fields(contract).ok()?;
+        let expected = row.get("parity").and_then(|p| p.get("expected"));
+        if !work_valid(raw, &fields, expected) {
+            return Some(false);
+        }
         for sample in raw {
             let Value::Object(entries) = sample else {
                 return None;
@@ -1341,7 +1486,7 @@ pub fn evidence_valid(
             }
         }
         let seed = py_int(memory.get("seed")).unwrap_or(280) as u64;
-        let recomputed = evaluate(root, raw, pairs, seed, certificate, None);
+        let recomputed = evaluate(root, raw, pairs, seed, certificate, expected_outputs);
         let same = [
             "status",
             "total_rss_ratio_upper_95",
@@ -1360,4 +1505,98 @@ pub fn evidence_valid(
         Some(covered && same)
     };
     check().unwrap_or(false)
+}
+
+#[cfg(test)]
+mod command_tests {
+    use super::*;
+
+    #[test]
+    fn memory_work_requires_both_digests_even_when_all_roles_omit_the_second() {
+        let expected = json::parse(r#"{"packets":1,"bytes":2,"digest":3,"digest_b":4}"#).unwrap();
+        let fields = vec!["digest_b".to_owned()];
+        let observed = Value::object([("work", expected.clone())]);
+        let sample = Value::object(
+            [
+                "candidate_heap",
+                "candidate_rss",
+                "reference_heap",
+                "reference_rss",
+            ]
+            .map(|role| (role, observed.clone())),
+        );
+        assert!(work_valid(
+            std::slice::from_ref(&sample),
+            &fields,
+            Some(&expected)
+        ));
+        for bad in [Some(Value::int(5)), None] {
+            for roles in [
+                vec!["candidate_rss"],
+                vec!["reference_heap"],
+                vec![
+                    "candidate_heap",
+                    "candidate_rss",
+                    "reference_heap",
+                    "reference_rss",
+                ],
+            ] {
+                let Value::Object(mut entries) = sample.clone() else {
+                    unreachable!()
+                };
+                for (role, observed) in &mut entries {
+                    if roles.contains(&role.as_str()) {
+                        let Value::Object(wrapper) = observed else {
+                            unreachable!()
+                        };
+                        let Value::Object(work) =
+                            &mut wrapper.iter_mut().find(|(k, _)| k == "work").unwrap().1
+                        else {
+                            unreachable!()
+                        };
+                        work.retain(|(k, _)| k != "digest_b");
+                        if let Some(bad) = &bad {
+                            work.push(("digest_b".into(), bad.clone()));
+                        }
+                    }
+                }
+                assert!(!work_valid(
+                    &[Value::Object(entries)],
+                    &fields,
+                    Some(&expected)
+                ));
+            }
+        }
+    }
+
+    #[test]
+    fn distinct_commands_keep_compatibility_options_on_the_candidate() {
+        let reference = ["open-memory", "input.mov", "1"].map(String::from);
+        let candidate = ["--bounded-timing", "open-memory", "input.mov", "1"].map(String::from);
+        let invocation = Invocation {
+            operation: None,
+            input: Path::new("input.mov"),
+            arguments: &reference,
+            candidate_arguments: Some(&candidate),
+            expected_outputs: None,
+            work_fields: None,
+        };
+        assert_eq!(invocation.arguments_for(true), candidate);
+        assert_eq!(invocation.arguments_for(false), reference);
+    }
+
+    #[test]
+    fn shared_commands_remain_identical_for_both_roles() {
+        let arguments = ["avc", "aac"].map(String::from);
+        let invocation = Invocation {
+            operation: Some("hls-memory"),
+            input: Path::new("input.ts"),
+            arguments: &arguments,
+            candidate_arguments: None,
+            expected_outputs: None,
+            work_fields: None,
+        };
+        assert_eq!(invocation.arguments_for(true), arguments);
+        assert_eq!(invocation.arguments_for(false), arguments);
+    }
 }

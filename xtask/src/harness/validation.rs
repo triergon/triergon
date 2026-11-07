@@ -183,12 +183,7 @@ pub(super) fn candidate_worker(
         return Err(format!("{name} changed since build identity; rebuild"));
     }
     let recorded = field(record, "selected_graph")?;
-    let current = provenance::selected_graph(
-        root,
-        &provenance::cargo_metadata(root)?,
-        name,
-        &provenance::matroska_inputs(),
-    )?;
+    let current = super::build::candidate_graph(root, name)?;
     require_same(recorded, &current, "candidate source graph")?;
     Ok(path)
 }

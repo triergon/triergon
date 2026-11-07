@@ -24,6 +24,10 @@ name = "nal_packet_receiver_trace"
 required-features = ["reference-trace"]
 
 [[example]]
+name = "framing_worker"
+required-features = ["reference-trace"]
+
+[[example]]
 name = "dts-operation-trace"
 required-features = ["reference-trace"]
 

@@ -125,7 +125,18 @@ pub fn active_cpu(before: &Value, after: &Value, require_linux: bool) -> Vec<Str
     names
 }
 
-fn sample_work_ok(sample: &Value, iterations: i128) -> Result<(f64, f64), ()> {
+fn sample_work_ok(
+    sample: &Value,
+    iterations: i128,
+    fields: &[String],
+) -> Result<(f64, f64, Value), ()> {
+    let work = super::comparison::paired_timing_work(
+        sample.get("candidate").ok_or(())?,
+        sample.get("reference").ok_or(())?,
+        iterations,
+        fields,
+    )
+    .map_err(|_| ())?;
     let a = sample
         .get("candidate")
         .and_then(|c| c.get("data"))
@@ -134,33 +145,10 @@ fn sample_work_ok(sample: &Value, iterations: i128) -> Result<(f64, f64), ()> {
         .get("reference")
         .and_then(|c| c.get("data"))
         .ok_or(())?;
-    let keys = ["iterations", "packets", "bytes", "digest", "elapsed_ns"];
-    for work in [a, b] {
-        for key in keys {
-            if int(work.get(key)).is_none_or(|v| v < 0)
-                || matches!(work.get(key), Some(Value::Bool(_)))
-            {
-                return Err(());
-            }
-        }
-    }
-    if int(a.get("iterations")) != Some(iterations) || int(b.get("iterations")) != Some(iterations)
-    {
-        return Err(());
-    }
-    let statuses_ok = ["candidate", "reference"]
-        .iter()
-        .all(|k| sample.get(k).and_then(|v| s(v, "status")) == Some("ok"));
-    if !statuses_ok
-        || ["iterations", "packets", "bytes", "digest"]
-            .iter()
-            .any(|k| int(a.get(k)) != int(b.get(k)))
-    {
-        return Err(());
-    }
     Ok((
         int(a.get("elapsed_ns")).unwrap() as f64,
         int(b.get("elapsed_ns")).unwrap() as f64,
+        work,
     ))
 }
 
@@ -194,6 +182,19 @@ pub fn timing_valid(row: &Value, contract: &Value, selected: &Value, require_lin
     if !valid {
         return false;
     }
+    let Ok(fields) = super::comparison::work_fields(contract) else {
+        return false;
+    };
+    let mut expected_work = match timing.get("warmups") {
+        Some(Value::Array(warmups)) => {
+            match super::comparison::warmup_work(warmups, iterations, &fields) {
+                Ok(work) => Some(work),
+                Err(_) => return false,
+            }
+        }
+        None if fields.len() == super::comparison::BASE_WORK_FIELDS.len() => None,
+        _ => return false,
+    };
     let mut paired = Vec::new();
     for (index, sample) in raw.iter().enumerate() {
         if int(sample.get("pair")) != Some(index as i128)
@@ -208,8 +209,17 @@ pub fn timing_valid(row: &Value, contract: &Value, selected: &Value, require_lin
         if !active_cpu(before, after, require_linux).is_empty() {
             return false;
         }
-        match sample_work_ok(sample, iterations) {
-            Ok(pair) => paired.push(pair),
+        match sample_work_ok(sample, iterations, &fields) {
+            Ok((a, b, work)) => {
+                if expected_work
+                    .as_ref()
+                    .is_some_and(|expected| !equal(expected, &work))
+                {
+                    return false;
+                }
+                expected_work = Some(work);
+                paired.push((a, b));
+            }
             Err(()) => return false,
         }
     }
@@ -283,6 +293,15 @@ pub fn acceptance(
             }
         };
         let proof = row.get("parity").cloned().unwrap_or(Value::Object(vec![]));
+        match super::comparison::work_fields(contract) {
+            Ok(fields) if fields.len() > super::comparison::BASE_WORK_FIELDS.len() => {
+                if !super::comparison::parity_work_valid(&proof, &fields) {
+                    reasons.push(format!("{id}: declared work parity incomplete or failing"));
+                }
+            }
+            Err(error) => reasons.push(format!("{id}: {error}")),
+            _ => (),
+        }
         let three_passes = Value::Array(
             [1, 7, 4096]
                 .map(|n| Value::object([("chunk", Value::int(n)), ("status", Value::str("pass"))]))

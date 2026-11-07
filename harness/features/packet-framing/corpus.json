@@ -1,0 +1,2755 @@
+{
+  "schema": 1,
+  "cases": [
+    {
+      "id": "avc-width1",
+      "profile": "avc-width1",
+      "file": "avc-width1.bsf",
+      "sha256": "3cf5394e96ac5d88f73aa4eda8254f6d5118e369315c22e3432748dc74a3faf3",
+      "rights": "authored-synthetic",
+      "group": "base",
+      "required": true,
+      "observation_sha256": "763aa6843735d85745de4ab3b1563a79e815d762c78f09d8f7149626780ba4ff",
+      "expected_once": {
+        "packets": 1,
+        "bytes": 23,
+        "digest": 4553856692835250118,
+        "digest_b": 8908528131118393542
+      },
+      "expected": {
+        "packets": 1,
+        "bytes": 23,
+        "digest": 7447693291637819895,
+        "digest_b": 16019681687699292763
+      }
+    },
+    {
+      "id": "avc-width2",
+      "profile": "avc-width2",
+      "file": "avc-width2.bsf",
+      "sha256": "97c202886fdf2f6d243bc4cfa3ff4c94e6c1fe081b8c8e8d77b709b3b526e2ef",
+      "rights": "authored-synthetic",
+      "group": "base",
+      "required": true,
+      "observation_sha256": "763aa6843735d85745de4ab3b1563a79e815d762c78f09d8f7149626780ba4ff",
+      "expected_once": {
+        "packets": 1,
+        "bytes": 23,
+        "digest": 4553856692835250118,
+        "digest_b": 8908528131118393542
+      },
+      "expected": {
+        "packets": 1,
+        "bytes": 23,
+        "digest": 7447693291637819895,
+        "digest_b": 16019681687699292763
+      }
+    },
+    {
+      "id": "avc-width3",
+      "profile": "avc-width3",
+      "file": "avc-width3.bsf",
+      "sha256": "95661890cbaa2e39b6ed75594bc5f2a999ed5a2bc706add085b435c35c23c17a",
+      "rights": "authored-synthetic",
+      "group": "base",
+      "required": true,
+      "observation_sha256": "763aa6843735d85745de4ab3b1563a79e815d762c78f09d8f7149626780ba4ff",
+      "expected_once": {
+        "packets": 1,
+        "bytes": 23,
+        "digest": 4553856692835250118,
+        "digest_b": 8908528131118393542
+      },
+      "expected": {
+        "packets": 1,
+        "bytes": 23,
+        "digest": 7447693291637819895,
+        "digest_b": 16019681687699292763
+      }
+    },
+    {
+      "id": "avc-width4",
+      "profile": "avc-width4",
+      "file": "avc-width4.bsf",
+      "sha256": "f2cc235b821b3a83ab89f35a60dd81a8a1cf51c11a59a46520d2e6b1dd8f27fc",
+      "rights": "authored-synthetic",
+      "group": "base",
+      "required": true,
+      "observation_sha256": "763aa6843735d85745de4ab3b1563a79e815d762c78f09d8f7149626780ba4ff",
+      "expected_once": {
+        "packets": 1,
+        "bytes": 23,
+        "digest": 4553856692835250118,
+        "digest_b": 8908528131118393542
+      },
+      "expected": {
+        "packets": 1,
+        "bytes": 23,
+        "digest": 7447693291637819895,
+        "digest_b": 16019681687699292763
+      }
+    },
+    {
+      "id": "avc-idr_repeat",
+      "profile": "avc-idr_repeat",
+      "file": "avc-idr_repeat.bsf",
+      "sha256": "1e059e344849c4c151e8c8a6cf02ef51bd1b4003cdc26679eac8b48e03ec40bd",
+      "rights": "authored-synthetic",
+      "group": "base",
+      "required": true,
+      "observation_sha256": "2e7365b6a4927d2558ebf9c9161aebdce293a0c34372d10b294002df486d2538",
+      "expected_once": {
+        "packets": 4,
+        "bytes": 76,
+        "digest": 9286858264235711420,
+        "digest_b": 1679866143291959864
+      },
+      "expected": {
+        "packets": 4,
+        "bytes": 76,
+        "digest": 10466854060266194884,
+        "digest_b": 2139726491801861768
+      }
+    },
+    {
+      "id": "avc-idr_continuation",
+      "profile": "avc-idr_continuation",
+      "file": "avc-idr_continuation.bsf",
+      "sha256": "880877df0f93ead0da61d89809d9cc6b15098dde74a81aa50109038c61e81c47",
+      "rights": "authored-synthetic",
+      "group": "base",
+      "required": true,
+      "observation_sha256": "31c970937805573a6d5bab0ef83db8415a0bbb64aa860d1a9812cd796581fd8f",
+      "expected_once": {
+        "packets": 4,
+        "bytes": 60,
+        "digest": 18328939629509089242,
+        "digest_b": 14051756232641093758
+      },
+      "expected": {
+        "packets": 4,
+        "bytes": 60,
+        "digest": 6549008987354950915,
+        "digest_b": 15146933975938921719
+      }
+    },
+    {
+      "id": "avc-nonfirst",
+      "profile": "avc-nonfirst",
+      "file": "avc-nonfirst.bsf",
+      "sha256": "810db70273fda19bf8b380e503d93ceb1aa541367dc85e5368826b623bc197e0",
+      "rights": "authored-synthetic",
+      "group": "base",
+      "required": true,
+      "observation_sha256": "a1194820e8bcf6fbe7f0dd0cad38bd9c42972831bf424f846f7b14403662467b",
+      "expected_once": {
+        "packets": 4,
+        "bytes": 60,
+        "digest": 12847589286215438174,
+        "digest_b": 15772096924516639978
+      },
+      "expected": {
+        "packets": 4,
+        "bytes": 60,
+        "digest": 7711934199812367079,
+        "digest_b": 8822363694250809615
+      }
+    },
+    {
+      "id": "avc-inband_both",
+      "profile": "avc-inband_both",
+      "file": "avc-inband_both.bsf",
+      "sha256": "d1982befb08aa1c591537cdceccc3527430060331cd9ccac69086eb365a65309",
+      "rights": "authored-synthetic",
+      "group": "base",
+      "required": true,
+      "observation_sha256": "4e6fd49737c0caee83a6a12371f313bc9cdbeaf1f363745ff4231967ef27511f",
+      "expected_once": {
+        "packets": 2,
+        "bytes": 30,
+        "digest": 7683523927131211807,
+        "digest_b": 9222171956326319455
+      },
+      "expected": {
+        "packets": 2,
+        "bytes": 30,
+        "digest": 13058650608140469168,
+        "digest_b": 17939135936857195852
+      }
+    },
+    {
+      "id": "avc-only_sps",
+      "profile": "avc-only_sps",
+      "file": "avc-only_sps.bsf",
+      "sha256": "5355ac16711b5ccc9388405442298cb21e2f777c85085b2af51cc2379a972076",
+      "rights": "authored-synthetic",
+      "group": "base",
+      "required": true,
+      "observation_sha256": "9076171fa1959ec9833fec287c6e97c5b0a58c026fb7c69269f81bc2f5523183",
+      "expected_once": {
+        "packets": 2,
+        "bytes": 37,
+        "digest": 18325796791892888421,
+        "digest_b": 16536761887490278441
+      },
+      "expected": {
+        "packets": 2,
+        "bytes": 37,
+        "digest": 10988365001664884450,
+        "digest_b": 15364373757472503438
+      }
+    },
+    {
+      "id": "avc-only_pps",
+      "profile": "avc-only_pps",
+      "file": "avc-only_pps.bsf",
+      "sha256": "53babef487d88e6740fa630190a525b28d5f1c67482e409af0ad7d9ed8c35e00",
+      "rights": "authored-synthetic",
+      "group": "base",
+      "required": true,
+      "observation_sha256": "4e6fd49737c0caee83a6a12371f313bc9cdbeaf1f363745ff4231967ef27511f",
+      "expected_once": {
+        "packets": 2,
+        "bytes": 30,
+        "digest": 7683523927131211807,
+        "digest_b": 9222171956326319455
+      },
+      "expected": {
+        "packets": 2,
+        "bytes": 30,
+        "digest": 13058650608140469168,
+        "digest_b": 17939135936857195852
+      }
+    },
+    {
+      "id": "avc-after_idr",
+      "profile": "avc-after_idr",
+      "file": "avc-after_idr.bsf",
+      "sha256": "8548daf0978beefddaef7be1e4ede348690bae7c7bca75f0e545053e42e1e91e",
+      "rights": "authored-synthetic",
+      "group": "base",
+      "required": true,
+      "observation_sha256": "cf8759c4bc060989002b0a42ddd8e09c4afc5e0a757ad66ed65900def67413df",
+      "expected_once": {
+        "packets": 2,
+        "bytes": 47,
+        "digest": 4616539576285115817,
+        "digest_b": 4948757255335731077
+      },
+      "expected": {
+        "packets": 2,
+        "bytes": 47,
+        "digest": 14336873216768656034,
+        "digest_b": 5909074166680365598
+      }
+    },
+    {
+      "id": "avc-aud_sei",
+      "profile": "avc-aud_sei",
+      "file": "avc-aud_sei.bsf",
+      "sha256": "5779ac70c7ab82c7f650af9a89e0f073756a84bf993bf179c44807c12098b5ca",
+      "rights": "authored-synthetic",
+      "group": "base",
+      "required": true,
+      "observation_sha256": "46d01eda10158087550bcde78b8e66436bfadef27165c185ba2fa8df70679b3c",
+      "expected_once": {
+        "packets": 2,
+        "bytes": 66,
+        "digest": 3915544509415223341,
+        "digest_b": 3703441691835893157
+      },
+      "expected": {
+        "packets": 2,
+        "bytes": 66,
+        "digest": 9174629701446415036,
+        "digest_b": 14638940352989299864
+      }
+    },
+    {
+      "id": "avc-multi_idr",
+      "profile": "avc-multi_idr",
+      "file": "avc-multi_idr.bsf",
+      "sha256": "36cf9e9efd44b040e1ea4d9ebae6fc29648c24732db33343afdc48c2a8321f65",
+      "rights": "authored-synthetic",
+      "group": "base",
+      "required": true,
+      "observation_sha256": "e88d560e4057763066d91f2312879eaa1ee057f3342d26f0b50631ef0551c635",
+      "expected_once": {
+        "packets": 2,
+        "bytes": 75,
+        "digest": 6503967045568542025,
+        "digest_b": 9561676914126465017
+      },
+      "expected": {
+        "packets": 2,
+        "bytes": 75,
+        "digest": 5826536728093184235,
+        "digest_b": 5049037650853979819
+      }
+    },
+    {
+      "id": "avc-nonvcl",
+      "profile": "avc-nonvcl",
+      "file": "avc-nonvcl.bsf",
+      "sha256": "2aaf9c36ecf048380b0d071148604fcaa0d6bfec186c043d958d1d0c10e92eea",
+      "rights": "authored-synthetic",
+      "group": "base",
+      "required": true,
+      "observation_sha256": "ba348bca6e8955b78c88bf0f135d4ecad7e2fee8248b29bd5f1f87be4dfcde6c",
+      "expected_once": {
+        "packets": 2,
+        "bytes": 37,
+        "digest": 12653236776766774409,
+        "digest_b": 220259203688921185
+      },
+      "expected": {
+        "packets": 2,
+        "bytes": 37,
+        "digest": 16964399469813146531,
+        "digest_b": 2050488491226426603
+      }
+    },
+    {
+      "id": "avc-separate_ps",
+      "profile": "avc-separate_ps",
+      "file": "avc-separate_ps.bsf",
+      "sha256": "e2e3427f95151d2524cb13f5c3acdb6efb8c48646d4a898aed8beb5859135675",
+      "rights": "authored-synthetic",
+      "group": "base",
+      "required": true,
+      "observation_sha256": "b2794c23a8ce9881491838171b8e4d6aa44548c8bbeaf4d904dc79fae4acf26c",
+      "expected_once": {
+        "packets": 4,
+        "bytes": 31,
+        "digest": 16392365168762234470,
+        "digest_b": 12769953897077023738
+      },
+      "expected": {
+        "packets": 4,
+        "bytes": 31,
+        "digest": 17702746760170314223,
+        "digest_b": 10910365412998127931
+      }
+    },
+    {
+      "id": "avc-config-empty",
+      "profile": "avc-config-empty",
+      "file": "avc-config-empty.bsf",
+      "sha256": "aa0ac22df34b964222aca9279d496bde07193e38bf32c120d625f698647977b0",
+      "rights": "authored-synthetic",
+      "group": "base",
+      "required": true,
+      "observation_sha256": "784b1d53f80839641c006e0bc4b7bfa48fa5a56a6c3cac5200caa688fca7f1d7",
+      "expected_once": {
+        "packets": 2,
+        "bytes": 14,
+        "digest": 16754562749148782793,
+        "digest_b": 8483699209129794305
+      },
+      "expected": {
+        "packets": 2,
+        "bytes": 14,
+        "digest": 14753438940543312920,
+        "digest_b": 5693669187269825016
+      }
+    },
+    {
+      "id": "avc-config-sps_only",
+      "profile": "avc-config-sps_only",
+      "file": "avc-config-sps_only.bsf",
+      "sha256": "f54d7da76c8278f28221c5456409e9065d28d1204a625dbf78ebbe60f4ed1ce2",
+      "rights": "authored-synthetic",
+      "group": "base",
+      "required": true,
+      "observation_sha256": "23d3c77e70281b9f839a289a7d6e65ef119f1bcb8dce57d1761713be5b37cc55",
+      "expected_once": {
+        "packets": 2,
+        "bytes": 30,
+        "digest": 10097822657615893422,
+        "digest_b": 9042129870617689246
+      },
+      "expected": {
+        "packets": 2,
+        "bytes": 30,
+        "digest": 16177377068200536638,
+        "digest_b": 12606656360076160638
+      }
+    },
+    {
+      "id": "avc-config-pps_only",
+      "profile": "avc-config-pps_only",
+      "file": "avc-config-pps_only.bsf",
+      "sha256": "dac6ac43ee80d3574e19e2d088eab6c240be51face3bf2e517b311cd3ed96109",
+      "rights": "authored-synthetic",
+      "group": "base",
+      "required": true,
+      "observation_sha256": "3dec2a185a2c273f97eede72124e03352d70b106d5ddf1a8cd4e610980049314",
+      "expected_once": {
+        "packets": 2,
+        "bytes": 28,
+        "digest": 15653823732799934708,
+        "digest_b": 7077102072185110676
+      },
+      "expected": {
+        "packets": 2,
+        "bytes": 28,
+        "digest": 18346041303251207571,
+        "digest_b": 16984298184979825891
+      }
+    },
+    {
+      "id": "avc-config-duplicate",
+      "profile": "avc-config-duplicate",
+      "file": "avc-config-duplicate.bsf",
+      "sha256": "68c57b5ddd98d68e434abc699310aa86faba937ad2224d8c8d896144449a926c",
+      "rights": "authored-synthetic",
+      "group": "base",
+      "required": true,
+      "observation_sha256": "b7b8969d3f109f3779d300e2836095dd207de78ba784483b7f0a425954cba721",
+      "expected_once": {
+        "packets": 2,
+        "bytes": 80,
+        "digest": 15946491947974735425,
+        "digest_b": 9535691626234556913
+      },
+      "expected": {
+        "packets": 2,
+        "bytes": 80,
+        "digest": 5759002270719116327,
+        "digest_b": 15477185207913734839
+      }
+    },
+    {
+      "id": "avc-config-multi",
+      "profile": "avc-config-multi",
+      "file": "avc-config-multi.bsf",
+      "sha256": "d751a334cc0e5d52e71037cd6cfaa20d4d6758afd4b5f80f0341dd7baced1128",
+      "rights": "authored-synthetic",
+      "group": "base",
+      "required": true,
+      "observation_sha256": "047e4d32e2b330c6953987229af36b4172a79cf9592fe00c1d35b32c4fee587c",
+      "expected_once": {
+        "packets": 2,
+        "bytes": 80,
+        "digest": 12469717336093550155,
+        "digest_b": 1632462212269108475
+      },
+      "expected": {
+        "packets": 2,
+        "bytes": 80,
+        "digest": 15890333585049001283,
+        "digest_b": 457868270257648307
+      }
+    },
+    {
+      "id": "avc-flush",
+      "profile": "avc-flush",
+      "file": "avc-flush.bsf",
+      "sha256": "41575063c063b47b974ffb5f921878c8a2e9ffdbad20e275abc3094617baec40",
+      "rights": "authored-synthetic",
+      "group": "base",
+      "required": true,
+      "observation_sha256": "498e5cccd7ba14c0ccf4c7260ff2292547a517e412b5abf622a373615199f7f7",
+      "expected_once": {
+        "packets": 2,
+        "bytes": 46,
+        "digest": 1482978651421844218,
+        "digest_b": 12097224522714785194
+      },
+      "expected": {
+        "packets": 2,
+        "bytes": 46,
+        "digest": 9909050853931516342,
+        "digest_b": 10728660518043181354
+      }
+    },
+    {
+      "id": "avc-drain-flush",
+      "profile": "avc-drain-flush",
+      "file": "avc-drain-flush.bsf",
+      "sha256": "f6632cc5d8716270de60721a59e667c90194ebe484ea574b049fe3ffabb9a093",
+      "rights": "authored-synthetic",
+      "group": "base",
+      "required": true,
+      "observation_sha256": "667c2a4cece94c01e25e120f6aa58111d26909434e0f9eeaf9a6feb23937232e",
+      "expected_once": {
+        "packets": 2,
+        "bytes": 46,
+        "digest": 9540265091784477307,
+        "digest_b": 276295414217894395
+      },
+      "expected": {
+        "packets": 2,
+        "bytes": 46,
+        "digest": 1887785196167844801,
+        "digest_b": 904749240047519909
+      }
+    },
+    {
+      "id": "avc-update",
+      "profile": "avc-update",
+      "file": "avc-update.bsf",
+      "sha256": "ad5ebce3217899be515e63352865e695adc795d5ad382d4e7c4a503ddd4498a7",
+      "rights": "authored-synthetic",
+      "group": "base",
+      "required": true,
+      "observation_sha256": "027d9363a748e57491a37c4148922e253e1af3123b44f73efc9fe2a07fd41606",
+      "expected_once": {
+        "packets": 3,
+        "bytes": 69,
+        "digest": 4840311015217634343,
+        "digest_b": 8702230753444687539
+      },
+      "expected": {
+        "packets": 3,
+        "bytes": 69,
+        "digest": 13532289491642286487,
+        "digest_b": 1140598583095857835
+      }
+    },
+    {
+      "id": "avc-update-width",
+      "profile": "avc-update-width",
+      "file": "avc-update-width.bsf",
+      "sha256": "9c6e3ed42f1daec84d55cf913c5b848fdf994d69df398c9ac92669ad5bae5821",
+      "rights": "authored-synthetic",
+      "group": "base",
+      "required": true,
+      "observation_sha256": "db8446d67c8857dd33b0716563c3330535f76966fafe00789c3e3aa1cb52cedc",
+      "expected_once": {
+        "packets": 3,
+        "bytes": 69,
+        "digest": 3367397969756062759,
+        "digest_b": 14864604962403040467
+      },
+      "expected": {
+        "packets": 3,
+        "bytes": 69,
+        "digest": 3291870536602898996,
+        "digest_b": 1933189526958329632
+      }
+    },
+    {
+      "id": "avc-empty-update",
+      "profile": "avc-empty-update",
+      "file": "avc-empty-update.bsf",
+      "sha256": "06f30510001b4363fc0722d0a2d197a07010ed0fb2333195b4a9ebe294289976",
+      "rights": "authored-synthetic",
+      "group": "base",
+      "required": true,
+      "observation_sha256": "a279417186a46d8804ee03606fa114b7b0624fcc40224bcdc3aa200b2c918327",
+      "expected_once": {
+        "packets": 2,
+        "bytes": 46,
+        "digest": 5953051745838241533,
+        "digest_b": 8870384401221795565
+      },
+      "expected": {
+        "packets": 2,
+        "bytes": 46,
+        "digest": 3588404668675877088,
+        "digest_b": 680354181960502560
+      }
+    },
+    {
+      "id": "avc-bad-update",
+      "profile": "avc-bad-update",
+      "file": "avc-bad-update.bsf",
+      "sha256": "f3cdf06a437889c2988ecf533a98eaa10595f15c2fc33a9973761e602fc50bf8",
+      "rights": "authored-synthetic",
+      "group": "base",
+      "required": true,
+      "observation_sha256": "6db8dbb2fb8995622a0cd8f51c0a17d90a9b42ad39c773d6fe836e7c9e09eaf3",
+      "expected_once": {
+        "packets": 1,
+        "bytes": 23,
+        "digest": 6419759466051247711,
+        "digest_b": 7220582514208640275
+      },
+      "expected": {
+        "packets": 1,
+        "bytes": 23,
+        "digest": 16901528844779314290,
+        "digest_b": 7621164171299111878
+      }
+    },
+    {
+      "id": "avc-zero_length",
+      "profile": "avc-zero_length",
+      "file": "avc-zero_length.bsf",
+      "sha256": "d3fec1d55141ab2286592268cf529e6712188a5220c9a242b2c126187ba0970a",
+      "rights": "authored-synthetic",
+      "group": "base",
+      "required": true,
+      "observation_sha256": "8dde7fb31fc006c7828314b8c515be5744d234c2a9a290ae835d6edb01021d6e",
+      "expected_once": {
+        "packets": 2,
+        "bytes": 23,
+        "digest": 9063098321512766089,
+        "digest_b": 12016524964446344289
+      },
+      "expected": {
+        "packets": 2,
+        "bytes": 23,
+        "digest": 7709160287802190987,
+        "digest_b": 3106004751962997723
+      }
+    },
+    {
+      "id": "avc-short_prefix",
+      "profile": "avc-short_prefix",
+      "file": "avc-short_prefix.bsf",
+      "sha256": "f5eb2576d8009871da49d88755eef1b094e3c55c70ea97db44dbabbd5fd8dcef",
+      "rights": "authored-synthetic",
+      "group": "base",
+      "required": true,
+      "observation_sha256": "6db8dbb2fb8995622a0cd8f51c0a17d90a9b42ad39c773d6fe836e7c9e09eaf3",
+      "expected_once": {
+        "packets": 1,
+        "bytes": 23,
+        "digest": 6419759466051247711,
+        "digest_b": 7220582514208640275
+      },
+      "expected": {
+        "packets": 1,
+        "bytes": 23,
+        "digest": 16901528844779314290,
+        "digest_b": 7621164171299111878
+      }
+    },
+    {
+      "id": "avc-short_nal",
+      "profile": "avc-short_nal",
+      "file": "avc-short_nal.bsf",
+      "sha256": "8e9476409ec1061be1b0787db9b8dbe39c47f658e758a0d758b271131780f846",
+      "rights": "authored-synthetic",
+      "group": "base",
+      "required": true,
+      "observation_sha256": "6db8dbb2fb8995622a0cd8f51c0a17d90a9b42ad39c773d6fe836e7c9e09eaf3",
+      "expected_once": {
+        "packets": 1,
+        "bytes": 23,
+        "digest": 6419759466051247711,
+        "digest_b": 7220582514208640275
+      },
+      "expected": {
+        "packets": 1,
+        "bytes": 23,
+        "digest": 16901528844779314290,
+        "digest_b": 7621164171299111878
+      }
+    },
+    {
+      "id": "avc-trailing_prefix",
+      "profile": "avc-trailing_prefix",
+      "file": "avc-trailing_prefix.bsf",
+      "sha256": "db6835f0b06e371a627317bd39c8d0015802e01434123d88818eb9135ea96e1f",
+      "rights": "authored-synthetic",
+      "group": "base",
+      "required": true,
+      "observation_sha256": "6db8dbb2fb8995622a0cd8f51c0a17d90a9b42ad39c773d6fe836e7c9e09eaf3",
+      "expected_once": {
+        "packets": 1,
+        "bytes": 23,
+        "digest": 6419759466051247711,
+        "digest_b": 7220582514208640275
+      },
+      "expected": {
+        "packets": 1,
+        "bytes": 23,
+        "digest": 16901528844779314290,
+        "digest_b": 7621164171299111878
+      }
+    },
+    {
+      "id": "avc-empty_packet",
+      "profile": "avc-empty_packet",
+      "file": "avc-empty_packet.bsf",
+      "sha256": "5137be28ba8f472d73b3581c94b4fb46437f9f9e6b3cde8217491d9dacaf7c1a",
+      "rights": "authored-synthetic",
+      "group": "base",
+      "required": true,
+      "observation_sha256": "6db8dbb2fb8995622a0cd8f51c0a17d90a9b42ad39c773d6fe836e7c9e09eaf3",
+      "expected_once": {
+        "packets": 1,
+        "bytes": 23,
+        "digest": 6419759466051247711,
+        "digest_b": 7220582514208640275
+      },
+      "expected": {
+        "packets": 1,
+        "bytes": 23,
+        "digest": 16901528844779314290,
+        "digest_b": 7621164171299111878
+      }
+    },
+    {
+      "id": "avc-no-extra",
+      "profile": "avc-no-extra",
+      "file": "avc-no-extra.bsf",
+      "sha256": "c278c41af876467f675df7e9f384a3647bfb9d7287d1446899c842d432b94bb0",
+      "rights": "authored-synthetic",
+      "group": "base",
+      "required": true,
+      "observation_sha256": "1ac3e94c08b0b855ca61598534748e5aa3d3380ef95703912794faf8a36c127c",
+      "expected_once": {
+        "packets": 2,
+        "bytes": 14,
+        "digest": 16959438437638474181,
+        "digest_b": 459477140174804285
+      },
+      "expected": {
+        "packets": 2,
+        "bytes": 14,
+        "digest": 5634543245820968662,
+        "digest_b": 10702872102641562514
+      }
+    },
+    {
+      "id": "avc-annexb-extra",
+      "profile": "avc-annexb-extra",
+      "file": "avc-annexb-extra.bsf",
+      "sha256": "b949b3eb88f77f65e2933857688dd622d914c599013d9ae8a978956b34174962",
+      "rights": "authored-synthetic",
+      "group": "base",
+      "required": true,
+      "observation_sha256": "f63dd9f34da81b34bd18f115fc3d138b8385a346a60b7fb1e1808b80cd043bad",
+      "expected_once": {
+        "packets": 2,
+        "bytes": 14,
+        "digest": 13845221920098706730,
+        "digest_b": 9454354009812584586
+      },
+      "expected": {
+        "packets": 2,
+        "bytes": 14,
+        "digest": 7987924844299959427,
+        "digest_b": 3776435137308650971
+      }
+    },
+    {
+      "id": "hevc-flush",
+      "profile": "hevc-flush",
+      "file": "hevc-flush.bsf",
+      "sha256": "a5993f2866dbcb829b60a3170bb6606e5f08ff538ba3327d36f77bf787206fb8",
+      "rights": "authored-synthetic",
+      "group": "base",
+      "required": true,
+      "observation_sha256": "7f468b94e2d1c3d0c371960a97c7ab176f26bf4e89b1f3febf89749a5f958c94",
+      "expected_once": {
+        "packets": 2,
+        "bytes": 56,
+        "digest": 5966018135784611563,
+        "digest_b": 2258803422352304467
+      },
+      "expected": {
+        "packets": 2,
+        "bytes": 56,
+        "digest": 2734218074510917405,
+        "digest_b": 10631996364616646025
+      }
+    },
+    {
+      "id": "hevc-drain-flush",
+      "profile": "hevc-drain-flush",
+      "file": "hevc-drain-flush.bsf",
+      "sha256": "70c46246575d310df305ee43ca5d3ab4e0e944308fef943858841304402501bd",
+      "rights": "authored-synthetic",
+      "group": "base",
+      "required": true,
+      "observation_sha256": "794e19d35f23f69a4dd1a3cc960b1ab3b5c8ed9f1e8a1297e0aa356809fce1f5",
+      "expected_once": {
+        "packets": 2,
+        "bytes": 56,
+        "digest": 14268581499007526218,
+        "digest_b": 1493953915497671854
+      },
+      "expected": {
+        "packets": 2,
+        "bytes": 56,
+        "digest": 17451121420195571007,
+        "digest_b": 1015285400670432795
+      }
+    },
+    {
+      "id": "hevc-update",
+      "profile": "hevc-update",
+      "file": "hevc-update.bsf",
+      "sha256": "d56a5a3d2fb3328a1cea27e58c3ee7e2a2a9c5ba0cde4a66580428510ba2e482",
+      "rights": "authored-synthetic",
+      "group": "base",
+      "required": true,
+      "observation_sha256": "7dca15959cfde58209c415d10aa2f9d91bb34548121906263414ebd78dbd1d4f",
+      "expected_once": {
+        "packets": 3,
+        "bytes": 84,
+        "digest": 7556975281042027152,
+        "digest_b": 11056719397010332988
+      },
+      "expected": {
+        "packets": 3,
+        "bytes": 84,
+        "digest": 8164602487263451851,
+        "digest_b": 3608752322047556055
+      }
+    },
+    {
+      "id": "hevc-update-width",
+      "profile": "hevc-update-width",
+      "file": "hevc-update-width.bsf",
+      "sha256": "fe9a8feb9d1de33313073e98d86901ee880facc8afa1d3e986ce5e524b94fde6",
+      "rights": "authored-synthetic",
+      "group": "base",
+      "required": true,
+      "observation_sha256": "932556cbfad62d6a7877039ca5a7cfeeb9c70db9892ca888ce1d76918b6faa9b",
+      "expected_once": {
+        "packets": 1,
+        "bytes": 28,
+        "digest": 9969544193883806808,
+        "digest_b": 1853686631053812004
+      },
+      "expected": {
+        "packets": 1,
+        "bytes": 28,
+        "digest": 15792284653183668579,
+        "digest_b": 16306470502758647503
+      }
+    },
+    {
+      "id": "hevc-empty-update",
+      "profile": "hevc-empty-update",
+      "file": "hevc-empty-update.bsf",
+      "sha256": "07f84ff12f9441647ea3aad96a8822c9e03b43203cef7244d5d65e972c7a719e",
+      "rights": "authored-synthetic",
+      "group": "base",
+      "required": true,
+      "observation_sha256": "617c071dc28062abaee719a41da499a5d3b2fd27b38f476181edef9ebce3c6af",
+      "expected_once": {
+        "packets": 2,
+        "bytes": 56,
+        "digest": 10607794954793326088,
+        "digest_b": 5999177858480892132
+      },
+      "expected": {
+        "packets": 2,
+        "bytes": 56,
+        "digest": 15230899322582917475,
+        "digest_b": 6561425123165393087
+      }
+    },
+    {
+      "id": "hevc-bad-update",
+      "profile": "hevc-bad-update",
+      "file": "hevc-bad-update.bsf",
+      "sha256": "6feaa4e96e36fa40be56e14ebd59f56e1767a04bb60fbb833844bc2455523c2f",
+      "rights": "authored-synthetic",
+      "group": "base",
+      "required": true,
+      "observation_sha256": "beef12c2c0ad275beb8ba95774e1a02db43e88f3e2161fc25b80373afb55b202",
+      "expected_once": {
+        "packets": 2,
+        "bytes": 56,
+        "digest": 17619925844749205132,
+        "digest_b": 4706658226625221416
+      },
+      "expected": {
+        "packets": 2,
+        "bytes": 56,
+        "digest": 18319855079691615241,
+        "digest_b": 16823313496136328337
+      }
+    },
+    {
+      "id": "hevc-zero_length",
+      "profile": "hevc-zero_length",
+      "file": "hevc-zero_length.bsf",
+      "sha256": "ebdfed8914f867215df49ff500e18040e717bab4ed489dace774c8fd43b7e557",
+      "rights": "authored-synthetic",
+      "group": "base",
+      "required": true,
+      "observation_sha256": "447a717521cf7a44456e34160c2b023f49e26ee188fb90ed7505f9e11bf134da",
+      "expected_once": {
+        "packets": 1,
+        "bytes": 28,
+        "digest": 1352941880839593342,
+        "digest_b": 11734446842301098406
+      },
+      "expected": {
+        "packets": 1,
+        "bytes": 28,
+        "digest": 6291820518658888298,
+        "digest_b": 16842547482769301674
+      }
+    },
+    {
+      "id": "hevc-short_prefix",
+      "profile": "hevc-short_prefix",
+      "file": "hevc-short_prefix.bsf",
+      "sha256": "9a852bf9ffc8364335e96fe3b01c62702b7fa59969757ce754049e588889be87",
+      "rights": "authored-synthetic",
+      "group": "base",
+      "required": true,
+      "observation_sha256": "447a717521cf7a44456e34160c2b023f49e26ee188fb90ed7505f9e11bf134da",
+      "expected_once": {
+        "packets": 1,
+        "bytes": 28,
+        "digest": 1352941880839593342,
+        "digest_b": 11734446842301098406
+      },
+      "expected": {
+        "packets": 1,
+        "bytes": 28,
+        "digest": 6291820518658888298,
+        "digest_b": 16842547482769301674
+      }
+    },
+    {
+      "id": "hevc-short_nal",
+      "profile": "hevc-short_nal",
+      "file": "hevc-short_nal.bsf",
+      "sha256": "288124c1a1ba3eca204829faa820429576c0b0d6855aa89517484f81f50b6359",
+      "rights": "authored-synthetic",
+      "group": "base",
+      "required": true,
+      "observation_sha256": "447a717521cf7a44456e34160c2b023f49e26ee188fb90ed7505f9e11bf134da",
+      "expected_once": {
+        "packets": 1,
+        "bytes": 28,
+        "digest": 1352941880839593342,
+        "digest_b": 11734446842301098406
+      },
+      "expected": {
+        "packets": 1,
+        "bytes": 28,
+        "digest": 6291820518658888298,
+        "digest_b": 16842547482769301674
+      }
+    },
+    {
+      "id": "hevc-trailing_prefix",
+      "profile": "hevc-trailing_prefix",
+      "file": "hevc-trailing_prefix.bsf",
+      "sha256": "0766f7555955c9ff7a37635986581ca2bcf30a16c8545f213b1de039752abce9",
+      "rights": "authored-synthetic",
+      "group": "base",
+      "required": true,
+      "observation_sha256": "447a717521cf7a44456e34160c2b023f49e26ee188fb90ed7505f9e11bf134da",
+      "expected_once": {
+        "packets": 1,
+        "bytes": 28,
+        "digest": 1352941880839593342,
+        "digest_b": 11734446842301098406
+      },
+      "expected": {
+        "packets": 1,
+        "bytes": 28,
+        "digest": 6291820518658888298,
+        "digest_b": 16842547482769301674
+      }
+    },
+    {
+      "id": "hevc-empty_packet",
+      "profile": "hevc-empty_packet",
+      "file": "hevc-empty_packet.bsf",
+      "sha256": "54991caf3391cc97b41da0632e5db85bd6bd0ca08545480c288d8c6f35849b7f",
+      "rights": "authored-synthetic",
+      "group": "base",
+      "required": true,
+      "observation_sha256": "1460e7f2feaf575f70bafe1b8ca0c7b0706b53f98c12aab8dcd2551764a3df67",
+      "expected_once": {
+        "packets": 2,
+        "bytes": 28,
+        "digest": 12747018822820773628,
+        "digest_b": 6552278411694278120
+      },
+      "expected": {
+        "packets": 2,
+        "bytes": 28,
+        "digest": 1527979958541133212,
+        "digest_b": 2457680652549789484
+      }
+    },
+    {
+      "id": "hevc-no-extra",
+      "profile": "hevc-no-extra",
+      "file": "hevc-no-extra.bsf",
+      "sha256": "5e05b7584cfd94ea8df6a29afb0f7c8fc63a7656852e8ee882289fe81e2149e6",
+      "rights": "authored-synthetic",
+      "group": "base",
+      "required": true,
+      "observation_sha256": "98898c8d2138d553da13caab17c6ea0f96cb7edc14b7367d923066444613ee42",
+      "expected_once": {
+        "packets": 2,
+        "bytes": 14,
+        "digest": 10130105359734068165,
+        "digest_b": 3600463422880108061
+      },
+      "expected": {
+        "packets": 2,
+        "bytes": 14,
+        "digest": 14292060502387445795,
+        "digest_b": 13170306971999986927
+      }
+    },
+    {
+      "id": "hevc-annexb-extra",
+      "profile": "hevc-annexb-extra",
+      "file": "hevc-annexb-extra.bsf",
+      "sha256": "6d32aecc31ad8c691c60af0c485899dfd7bb1c314005dc23f9f8b4b660e7aa3d",
+      "rights": "authored-synthetic",
+      "group": "base",
+      "required": true,
+      "observation_sha256": "2f1d993f3f96c48cbf224ad902c17ff48afc449676b0abd5741bafe9316f07a4",
+      "expected_once": {
+        "packets": 2,
+        "bytes": 14,
+        "digest": 13877270080447955884,
+        "digest_b": 13108406429630499464
+      },
+      "expected": {
+        "packets": 2,
+        "bytes": 14,
+        "digest": 1063064576052453781,
+        "digest_b": 5925021949633890469
+      }
+    },
+    {
+      "id": "hevc-width1",
+      "profile": "hevc-width1",
+      "file": "hevc-width1.bsf",
+      "sha256": "4339ecd9f964133f674b117d047620ea31f1a6970357fef0b6552515cc70512c",
+      "rights": "authored-synthetic",
+      "group": "base",
+      "required": true,
+      "observation_sha256": "a5a4860459c5d11d47ec2bc672ba6ab96ffa81ec20a6f601db7153d2d10bf21f",
+      "expected_once": {
+        "packets": 1,
+        "bytes": 28,
+        "digest": 3037083848997224711,
+        "digest_b": 14294675732129699383
+      },
+      "expected": {
+        "packets": 1,
+        "bytes": 28,
+        "digest": 1282222729787864330,
+        "digest_b": 6667294099197473822
+      }
+    },
+    {
+      "id": "hevc-width2",
+      "profile": "hevc-width2",
+      "file": "hevc-width2.bsf",
+      "sha256": "28f51bc9dde2a12b00bf70d2b2dd39d919af92283163b1b202e48c221f15e2c7",
+      "rights": "authored-synthetic",
+      "group": "base",
+      "required": true,
+      "observation_sha256": "a5a4860459c5d11d47ec2bc672ba6ab96ffa81ec20a6f601db7153d2d10bf21f",
+      "expected_once": {
+        "packets": 1,
+        "bytes": 28,
+        "digest": 3037083848997224711,
+        "digest_b": 14294675732129699383
+      },
+      "expected": {
+        "packets": 1,
+        "bytes": 28,
+        "digest": 1282222729787864330,
+        "digest_b": 6667294099197473822
+      }
+    },
+    {
+      "id": "hevc-width3",
+      "profile": "hevc-width3",
+      "file": "hevc-width3.bsf",
+      "sha256": "29702bf2124e991b98069927996aea64906fbbac3b227fedb93ba18cfb958535",
+      "rights": "authored-synthetic",
+      "group": "base",
+      "required": true,
+      "observation_sha256": "a5a4860459c5d11d47ec2bc672ba6ab96ffa81ec20a6f601db7153d2d10bf21f",
+      "expected_once": {
+        "packets": 1,
+        "bytes": 28,
+        "digest": 3037083848997224711,
+        "digest_b": 14294675732129699383
+      },
+      "expected": {
+        "packets": 1,
+        "bytes": 28,
+        "digest": 1282222729787864330,
+        "digest_b": 6667294099197473822
+      }
+    },
+    {
+      "id": "hevc-width4",
+      "profile": "hevc-width4",
+      "file": "hevc-width4.bsf",
+      "sha256": "db0ea9b8653a43c8c5c67087ffec03a6add3fb725949279ab76a709c4a0202f5",
+      "rights": "authored-synthetic",
+      "group": "base",
+      "required": true,
+      "observation_sha256": "a5a4860459c5d11d47ec2bc672ba6ab96ffa81ec20a6f601db7153d2d10bf21f",
+      "expected_once": {
+        "packets": 1,
+        "bytes": 28,
+        "digest": 3037083848997224711,
+        "digest_b": 14294675732129699383
+      },
+      "expected": {
+        "packets": 1,
+        "bytes": 28,
+        "digest": 1282222729787864330,
+        "digest_b": 6667294099197473822
+      }
+    },
+    {
+      "id": "hevc-type0",
+      "profile": "hevc-type0",
+      "file": "hevc-type0.bsf",
+      "sha256": "bfcc0dabd7368dd78cab0813d44737d92d582e7fc8c499e1ed1f0ebe751ec8ec",
+      "rights": "authored-synthetic",
+      "group": "base",
+      "required": true,
+      "observation_sha256": "ad3df8cf1bfe2cc26658129cd845bce1579cb45f00e7a87f6793b4a5fad4c624",
+      "expected_once": {
+        "packets": 2,
+        "bytes": 14,
+        "digest": 10115031122507694144,
+        "digest_b": 15226383731402709452
+      },
+      "expected": {
+        "packets": 2,
+        "bytes": 14,
+        "digest": 8459858996278469318,
+        "digest_b": 6475318280604237666
+      }
+    },
+    {
+      "id": "hevc-type1",
+      "profile": "hevc-type1",
+      "file": "hevc-type1.bsf",
+      "sha256": "3f25b3db442b6e5b07aa189f6fc97fcf79ac01d1c043d2a8d3e7dace0f122f84",
+      "rights": "authored-synthetic",
+      "group": "base",
+      "required": true,
+      "observation_sha256": "b6291168c45ca533ce19c68e4bdea3d4b53c92284dc9f890607dc08724b28c16",
+      "expected_once": {
+        "packets": 2,
+        "bytes": 14,
+        "digest": 4717057569636104128,
+        "digest_b": 8804984695457141308
+      },
+      "expected": {
+        "packets": 2,
+        "bytes": 14,
+        "digest": 7030915569179850282,
+        "digest_b": 17799568181938120186
+      }
+    },
+    {
+      "id": "hevc-type15",
+      "profile": "hevc-type15",
+      "file": "hevc-type15.bsf",
+      "sha256": "7774a7a83d29f6a979bd0f3b9c99b35037e2661ebb12fcd207b7dd4f6201536b",
+      "rights": "authored-synthetic",
+      "group": "base",
+      "required": true,
+      "observation_sha256": "886f617a7f4acc450e651be56215b5bce09772d1fa79b086fbe99d1630f9e0b5",
+      "expected_once": {
+        "packets": 2,
+        "bytes": 14,
+        "digest": 2932404124272050368,
+        "digest_b": 11139118560766945372
+      },
+      "expected": {
+        "packets": 2,
+        "bytes": 14,
+        "digest": 13352621640572443780,
+        "digest_b": 6251020593241792880
+      }
+    },
+    {
+      "id": "hevc-type16",
+      "profile": "hevc-type16",
+      "file": "hevc-type16.bsf",
+      "sha256": "6052186b3fb3ed157d50782c7b273b19d56d96c075f022aa97e5b5e602cc0606",
+      "rights": "authored-synthetic",
+      "group": "base",
+      "required": true,
+      "observation_sha256": "487fcb392c20006271ec25f3813af76b762fee2ee125cae988161e097e64d924",
+      "expected_once": {
+        "packets": 2,
+        "bytes": 56,
+        "digest": 10636649107302850676,
+        "digest_b": 5059995925429481952
+      },
+      "expected": {
+        "packets": 2,
+        "bytes": 56,
+        "digest": 13468888255244966553,
+        "digest_b": 1535294460451339813
+      }
+    },
+    {
+      "id": "hevc-type17",
+      "profile": "hevc-type17",
+      "file": "hevc-type17.bsf",
+      "sha256": "8233003fd5b08f0c4ccd9848b67fe775befc14ea5a025a8f4776b0d0b1858c8b",
+      "rights": "authored-synthetic",
+      "group": "base",
+      "required": true,
+      "observation_sha256": "fdc750792c0e33ab6a94bc91cb37cf3377a72081a3c1d5c1569af3137fb42283",
+      "expected_once": {
+        "packets": 2,
+        "bytes": 56,
+        "digest": 12461165686958983292,
+        "digest_b": 16679044309161668072
+      },
+      "expected": {
+        "packets": 2,
+        "bytes": 56,
+        "digest": 14962101899911383684,
+        "digest_b": 4392608122209320612
+      }
+    },
+    {
+      "id": "hevc-type18",
+      "profile": "hevc-type18",
+      "file": "hevc-type18.bsf",
+      "sha256": "f4d6b43e2fa84c815833abce91860bb2b78933a13f2222fca6a073678c1bcaca",
+      "rights": "authored-synthetic",
+      "group": "base",
+      "required": true,
+      "observation_sha256": "07518ba0b46485474df18a30a0aa48be8aa0fc4f7dd854e642c7939a6b517839",
+      "expected_once": {
+        "packets": 2,
+        "bytes": 56,
+        "digest": 14285682266615115908,
+        "digest_b": 9851348619184302576
+      },
+      "expected": {
+        "packets": 2,
+        "bytes": 56,
+        "digest": 5078667828386497810,
+        "digest_b": 18397003466595886506
+      }
+    },
+    {
+      "id": "hevc-type19",
+      "profile": "hevc-type19",
+      "file": "hevc-type19.bsf",
+      "sha256": "c1563d579a3f070c115bbad9b7e2ec0c519a87483f16194cade59ce3d35729c0",
+      "rights": "authored-synthetic",
+      "group": "base",
+      "required": true,
+      "observation_sha256": "5a5b455b76e535a80f5932e26cc77d96dc242202b2e3e60108e8856cd86c89e6",
+      "expected_once": {
+        "packets": 2,
+        "bytes": 56,
+        "digest": 16110198846271248524,
+        "digest_b": 3023652929206937080
+      },
+      "expected": {
+        "packets": 2,
+        "bytes": 56,
+        "digest": 5273960835220180894,
+        "digest_b": 16978570433869496494
+      }
+    },
+    {
+      "id": "hevc-type20",
+      "profile": "hevc-type20",
+      "file": "hevc-type20.bsf",
+      "sha256": "0debdb5f5f67422be808080836e7c31e9fbe246c31923c6482ccb4e7b573a810",
+      "rights": "authored-synthetic",
+      "group": "base",
+      "required": true,
+      "observation_sha256": "b8a38ee146ac51818713e7c375c89edb930389d2cedcf23bbb305d03f04c625f",
+      "expected_once": {
+        "packets": 2,
+        "bytes": 56,
+        "digest": 17934715425927381140,
+        "digest_b": 14642701312939123200
+      },
+      "expected": {
+        "packets": 2,
+        "bytes": 56,
+        "digest": 10109219062940525644,
+        "digest_b": 7940151810790423032
+      }
+    },
+    {
+      "id": "hevc-type21",
+      "profile": "hevc-type21",
+      "file": "hevc-type21.bsf",
+      "sha256": "9a544698b1008366e3ac832932ae6be4de48ffb41c3b44428652aa8f52cd151d",
+      "rights": "authored-synthetic",
+      "group": "base",
+      "required": true,
+      "observation_sha256": "10d4ce0203313231d44df6a110ce177b2d0f875e7599ebe228972eb81e6f40d0",
+      "expected_once": {
+        "packets": 2,
+        "bytes": 56,
+        "digest": 1312487931873962140,
+        "digest_b": 7815005622961757704
+      },
+      "expected": {
+        "packets": 2,
+        "bytes": 56,
+        "digest": 10297526031958390362,
+        "digest_b": 8853711200637999598
+      }
+    },
+    {
+      "id": "hevc-type22",
+      "profile": "hevc-type22",
+      "file": "hevc-type22.bsf",
+      "sha256": "d59a504a67e241b0ddebad260c88e799ee74ca530c4bc82663db8ea4fe4a8be1",
+      "rights": "authored-synthetic",
+      "group": "base",
+      "required": true,
+      "observation_sha256": "8462f2b319f2d982f43d36e73d1237f8f3684c0dfff48dc049f616a9a5b4b8d3",
+      "expected_once": {
+        "packets": 2,
+        "bytes": 56,
+        "digest": 3137004511530094756,
+        "digest_b": 987309932984392208
+      },
+      "expected": {
+        "packets": 2,
+        "bytes": 56,
+        "digest": 11790739676624807237,
+        "digest_b": 11711024862395980141
+      }
+    },
+    {
+      "id": "hevc-type23",
+      "profile": "hevc-type23",
+      "file": "hevc-type23.bsf",
+      "sha256": "0b650f4d7dc8cb678006a37fc21f177a8875abd83d68a86d00dd4f37677042ee",
+      "rights": "authored-synthetic",
+      "group": "base",
+      "required": true,
+      "observation_sha256": "895f0cdbf49b5afa2241262a1b483878e45be4460b144dd9032e443ab15cda31",
+      "expected_once": {
+        "packets": 2,
+        "bytes": 56,
+        "digest": 4961521091186227372,
+        "digest_b": 12606358316716578328
+      },
+      "expected": {
+        "packets": 2,
+        "bytes": 56,
+        "digest": 6780202856770429298,
+        "digest_b": 11643856290439444454
+      }
+    },
+    {
+      "id": "hevc-type24",
+      "profile": "hevc-type24",
+      "file": "hevc-type24.bsf",
+      "sha256": "7fa2598a40b3fba46f6f0aa42726c1ca081a2cb8fcf4f19bf00067c46be4900f",
+      "rights": "authored-synthetic",
+      "group": "base",
+      "required": true,
+      "observation_sha256": "8efa6108ee063b8a6fa505ee76bce3891d8389cad9931c064eedddafdc14b523",
+      "expected_once": {
+        "packets": 2,
+        "bytes": 14,
+        "digest": 9690874369556395072,
+        "digest_b": 8686759458385486924
+      },
+      "expected": {
+        "packets": 2,
+        "bytes": 14,
+        "digest": 13929075249413189522,
+        "digest_b": 5225840597851053870
+      }
+    },
+    {
+      "id": "hevc-type35",
+      "profile": "hevc-type35",
+      "file": "hevc-type35.bsf",
+      "sha256": "454ff6a61c8865bb8a43a39aec83e7101ca680f6577caf85a7c9a7f362cae2b9",
+      "rights": "authored-synthetic",
+      "group": "base",
+      "required": true,
+      "observation_sha256": "629cdfbe47278851eb66e1e2cf841a74b6407d36c3b67cfa70f27058cb75daec",
+      "expected_once": {
+        "packets": 2,
+        "bytes": 14,
+        "digest": 5653397509097559744,
+        "digest_b": 11838346357822443804
+      },
+      "expected": {
+        "packets": 2,
+        "bytes": 14,
+        "digest": 6899178229533322801,
+        "digest_b": 1075040517277210573
+      }
+    },
+    {
+      "id": "hevc-type39",
+      "profile": "hevc-type39",
+      "file": "hevc-type39.bsf",
+      "sha256": "4732b2ae658768577deabd191803aa777ad91a4f53d572c965cb2487d165aa0c",
+      "rights": "authored-synthetic",
+      "group": "base",
+      "required": true,
+      "observation_sha256": "de52ffeff6ff35749b1c612d3149414ce09ec3f03fc610a795fe44957acc3b1a",
+      "expected_once": {
+        "packets": 2,
+        "bytes": 14,
+        "digest": 2508247371320751296,
+        "digest_b": 4599494287749722844
+      },
+      "expected": {
+        "packets": 2,
+        "bytes": 14,
+        "digest": 17314125896371460528,
+        "digest_b": 5238215024808479944
+      }
+    },
+    {
+      "id": "hevc-type40",
+      "profile": "hevc-type40",
+      "file": "hevc-type40.bsf",
+      "sha256": "61ab793fe23aea00ed3f4e8ebaae14f1414a63ebbe9c995cd2ee64ec8392ab98",
+      "rights": "authored-synthetic",
+      "group": "base",
+      "required": true,
+      "observation_sha256": "d203ea1dd3b52ae489edac68b099f2ea47ec1d0480c70887f5757ea2543060de",
+      "expected_once": {
+        "packets": 2,
+        "bytes": 14,
+        "digest": 15557017892158712896,
+        "digest_b": 16624839325513706316
+      },
+      "expected": {
+        "packets": 2,
+        "bytes": 14,
+        "digest": 11569591926683502554,
+        "digest_b": 14417968292601936862
+      }
+    },
+    {
+      "id": "hevc-irap_repeat",
+      "profile": "hevc-irap_repeat",
+      "file": "hevc-irap_repeat.bsf",
+      "sha256": "4788b14c60191c0ced8eba8a342b66a5bfb44272ed3b6bc2c8276e20a818b860",
+      "rights": "authored-synthetic",
+      "group": "base",
+      "required": true,
+      "observation_sha256": "956d5b830627bca291104521ea26e1420dba69ff3139f62e119b5db47ce373f2",
+      "expected_once": {
+        "packets": 4,
+        "bytes": 91,
+        "digest": 161580277257266931,
+        "digest_b": 8571171085853076283
+      },
+      "expected": {
+        "packets": 4,
+        "bytes": 91,
+        "digest": 7233164843835794760,
+        "digest_b": 11890736551863757912
+      }
+    },
+    {
+      "id": "hevc-inband_both",
+      "profile": "hevc-inband_both",
+      "file": "hevc-inband_both.bsf",
+      "sha256": "adaec6a7a5fac105695ae6727a6bdc0b71901d1d099be7236a33cdac38a3bcdc",
+      "rights": "authored-synthetic",
+      "group": "base",
+      "required": true,
+      "observation_sha256": "20fcfc7e3e020e3d3827f146acfd7176776d4d9a246256de8db3fbe5586708d0",
+      "expected_once": {
+        "packets": 2,
+        "bytes": 77,
+        "digest": 14988452557673716524,
+        "digest_b": 15098155397809695452
+      },
+      "expected": {
+        "packets": 2,
+        "bytes": 77,
+        "digest": 6908179630333315109,
+        "digest_b": 4531953144745666889
+      }
+    },
+    {
+      "id": "hevc-only_vps",
+      "profile": "hevc-only_vps",
+      "file": "hevc-only_vps.bsf",
+      "sha256": "5ef0894cab153d277da0c291133f8e6f8ef0865b596fe40fe9f226d911c8d1a5",
+      "rights": "authored-synthetic",
+      "group": "base",
+      "required": true,
+      "observation_sha256": "1a72a959a896541ac5dc24536a56fc2dbc7ee5ec49352dccc1e556e32e283a01",
+      "expected_once": {
+        "packets": 1,
+        "bytes": 35,
+        "digest": 1085780489751539693,
+        "digest_b": 9646702687241233829
+      },
+      "expected": {
+        "packets": 1,
+        "bytes": 35,
+        "digest": 4290591750293794328,
+        "digest_b": 5655649736406820376
+      }
+    },
+    {
+      "id": "hevc-aud_sei",
+      "profile": "hevc-aud_sei",
+      "file": "hevc-aud_sei.bsf",
+      "sha256": "5cd973f397921469bcac59c0ee1947c320ec6dd8b635cdc48bbd9288d9c4d15d",
+      "rights": "authored-synthetic",
+      "group": "base",
+      "required": true,
+      "observation_sha256": "a02bc1d7209f781eadeefbef9922c95d4f07dc629266b66af77a0c389f648093",
+      "expected_once": {
+        "packets": 1,
+        "bytes": 42,
+        "digest": 4573842743168124219,
+        "digest_b": 2889119933999493571
+      },
+      "expected": {
+        "packets": 1,
+        "bytes": 42,
+        "digest": 3744181673307012750,
+        "digest_b": 16838250371720515082
+      }
+    },
+    {
+      "id": "hevc-multiple_irap",
+      "profile": "hevc-multiple_irap",
+      "file": "hevc-multiple_irap.bsf",
+      "sha256": "a270db62170a150a1fe2875cf5eaf159b73d0805cf3254d74b60f7784ac555d2",
+      "rights": "authored-synthetic",
+      "group": "base",
+      "required": true,
+      "observation_sha256": "ab1e000ee49067abf22bb8e193aacb79a1d2cb1cac51dd333291b124fe9ef095",
+      "expected_once": {
+        "packets": 1,
+        "bytes": 42,
+        "digest": 15415435093538271795,
+        "digest_b": 2637565298345932059
+      },
+      "expected": {
+        "packets": 1,
+        "bytes": 42,
+        "digest": 8197399167443892793,
+        "digest_b": 12876006682772661397
+      }
+    },
+    {
+      "id": "hevc-ps_after",
+      "profile": "hevc-ps_after",
+      "file": "hevc-ps_after.bsf",
+      "sha256": "a8753590afebe8fedeebaf78aeb25e60c635a14fcca9317cf5f94ab34692aea8",
+      "rights": "authored-synthetic",
+      "group": "base",
+      "required": true,
+      "observation_sha256": "d2c6e4153f76481d74954fb74d2a994816343b05a27e5f9c28a4b8fde3f6ba86",
+      "expected_once": {
+        "packets": 1,
+        "bytes": 49,
+        "digest": 16360298006092297709,
+        "digest_b": 499866134045934853
+      },
+      "expected": {
+        "packets": 1,
+        "bytes": 49,
+        "digest": 4573846664514656028,
+        "digest_b": 13022693831746671968
+      }
+    },
+    {
+      "id": "hevc-non_then_irap",
+      "profile": "hevc-non_then_irap",
+      "file": "hevc-non_then_irap.bsf",
+      "sha256": "b7b335326d0a469362bf8a4ef5424001c1145a54165676d62ea9829cec34769d",
+      "rights": "authored-synthetic",
+      "group": "base",
+      "required": true,
+      "observation_sha256": "7a9dcac80d968920b9ad33966e33c200cfb66e10ead23db1d0148682f15f01d9",
+      "expected_once": {
+        "packets": 1,
+        "bytes": 35,
+        "digest": 1648112967538467117,
+        "digest_b": 5632848817743372173
+      },
+      "expected": {
+        "packets": 1,
+        "bytes": 35,
+        "digest": 2563928728332282266,
+        "digest_b": 1920906701174689338
+      }
+    },
+    {
+      "id": "hevc-config-empty",
+      "profile": "hevc-config-empty",
+      "file": "hevc-config-empty.bsf",
+      "sha256": "399b4d24ceb9dc2b17b196173e53ab992465aa0c6b56a064242a987ff8d442fa",
+      "rights": "authored-synthetic",
+      "group": "base",
+      "required": true,
+      "observation_sha256": "abc726e43791cc3e9df0d7bc744fe4270e86d83c901bc0ab318e2fb60b41c739",
+      "expected_once": {
+        "packets": 1,
+        "bytes": 7,
+        "digest": 10127278277244058230,
+        "digest_b": 14504593052847968426
+      },
+      "expected": {
+        "packets": 1,
+        "bytes": 7,
+        "digest": 14790118401527462201,
+        "digest_b": 353337418434622069
+      }
+    },
+    {
+      "id": "hevc-config-sei",
+      "profile": "hevc-config-sei",
+      "file": "hevc-config-sei.bsf",
+      "sha256": "c0dae731cf27ca3e659dd0ec0d081d1bacee9898ced1b583f0de59a8ff837893",
+      "rights": "authored-synthetic",
+      "group": "base",
+      "required": true,
+      "observation_sha256": "2ed47308b5700b257048f99d771f8e41d599cda9b4113f5e8630fc8aa052bb80",
+      "expected_once": {
+        "packets": 1,
+        "bytes": 28,
+        "digest": 17012692035866322567,
+        "digest_b": 3738839980523387815
+      },
+      "expected": {
+        "packets": 1,
+        "bytes": 28,
+        "digest": 15138988252162066668,
+        "digest_b": 876229708051064560
+      }
+    },
+    {
+      "id": "hevc-config-duplicate",
+      "profile": "hevc-config-duplicate",
+      "file": "hevc-config-duplicate.bsf",
+      "sha256": "4107cf6442f2e9ba05992966bc9887d5dbaa00d6cc1ca6426d8a39503b26ea39",
+      "rights": "authored-synthetic",
+      "group": "base",
+      "required": true,
+      "observation_sha256": "f316a403238993b9b9d7e51c84602eeb11ff311f9e7c10010b6e4280cdf380bb",
+      "expected_once": {
+        "packets": 1,
+        "bytes": 35,
+        "digest": 2928277615457833052,
+        "digest_b": 6226499336896922992
+      },
+      "expected": {
+        "packets": 1,
+        "bytes": 35,
+        "digest": 13621208138573404271,
+        "digest_b": 5963674231780495311
+      }
+    },
+    {
+      "id": "hevc-config-unknown_empty",
+      "profile": "hevc-config-unknown_empty",
+      "file": "hevc-config-unknown_empty.bsf",
+      "sha256": "bebd8e16d64c9558bc5a9443bc9bd56f980d8eb30225ef6283a982d856bd7c6c",
+      "rights": "authored-synthetic",
+      "group": "base",
+      "required": true,
+      "observation_sha256": "98e91514a8e23da89e3fa2b10e2836d855a5a80bda6e8a067a474640a10b2723",
+      "expected_once": {
+        "packets": 0,
+        "bytes": 0,
+        "digest": 6833708558471272883,
+        "digest_b": 8733963982232535371
+      },
+      "expected": {
+        "packets": 0,
+        "bytes": 0,
+        "digest": 17084000890159047177,
+        "digest_b": 1416415496543130457
+      }
+    },
+    {
+      "id": "state-pps_repeat",
+      "profile": "state-pps_repeat",
+      "file": "state-pps_repeat.bsf",
+      "sha256": "b39a6ff9175e5abbcf64c8769b0a72947af7fbb11f72076e83dccd442d843105",
+      "rights": "authored-synthetic",
+      "group": "followup",
+      "required": true,
+      "observation_sha256": "ada61755ee2b970e3f7dd0318462f5cfe38b61545c7aa387e2ec51ecf6702482",
+      "expected_once": {
+        "packets": 3,
+        "bytes": 32,
+        "digest": 17959959154276986727,
+        "digest_b": 12261169822144652395
+      },
+      "expected": {
+        "packets": 3,
+        "bytes": 32,
+        "digest": 2829428888655233242,
+        "digest_b": 6335567168571707454
+      }
+    },
+    {
+      "id": "state-pps_non",
+      "profile": "state-pps_non",
+      "file": "state-pps_non.bsf",
+      "sha256": "401f19f3665b2912554faaa16ee89803d8957116d4d3bd0358a2fd136af6d655",
+      "rights": "authored-synthetic",
+      "group": "followup",
+      "required": true,
+      "observation_sha256": "fb2da7569a59ee4dc24832783e77c0295b8833cefd6f417676d1bbec9d58f44b",
+      "expected_once": {
+        "packets": 3,
+        "bytes": 47,
+        "digest": 10131030341884448967,
+        "digest_b": 13945946154352227783
+      },
+      "expected": {
+        "packets": 3,
+        "bytes": 47,
+        "digest": 15279282843808534060,
+        "digest_b": 7687341212911364844
+      }
+    },
+    {
+      "id": "state-sps_non",
+      "profile": "state-sps_non",
+      "file": "state-sps_non.bsf",
+      "sha256": "b1a9a17c4e7bb100d13882f688d03802c392cc383c73bef101a0e630eb6e3492",
+      "rights": "authored-synthetic",
+      "group": "followup",
+      "required": true,
+      "observation_sha256": "808ab74e8dc033a390cd4ee04639fadd05ca18167618721e2cea3aa004fca2e1",
+      "expected_once": {
+        "packets": 3,
+        "bytes": 39,
+        "digest": 6223921990706960167,
+        "digest_b": 18101634246312865987
+      },
+      "expected": {
+        "packets": 3,
+        "bytes": 39,
+        "digest": 9089466389226190271,
+        "digest_b": 267839178496073355
+      }
+    },
+    {
+      "id": "state-both_non",
+      "profile": "state-both_non",
+      "file": "state-both_non.bsf",
+      "sha256": "2da743f56a6b736c6ccddd1947d027a83e2b483818563020bf26141cc0895878",
+      "rights": "authored-synthetic",
+      "group": "followup",
+      "required": true,
+      "observation_sha256": "fb2da7569a59ee4dc24832783e77c0295b8833cefd6f417676d1bbec9d58f44b",
+      "expected_once": {
+        "packets": 3,
+        "bytes": 47,
+        "digest": 10131030341884448967,
+        "digest_b": 13945946154352227783
+      },
+      "expected": {
+        "packets": 3,
+        "bytes": 47,
+        "digest": 15279282843808534060,
+        "digest_b": 7687341212911364844
+      }
+    },
+    {
+      "id": "state-idr_ps_cont",
+      "profile": "state-idr_ps_cont",
+      "file": "state-idr_ps_cont.bsf",
+      "sha256": "e3da7a986a0ae7f364023f6fb913e78cf99174abeaa2f11deb28d35880b492bf",
+      "rights": "authored-synthetic",
+      "group": "followup",
+      "required": true,
+      "observation_sha256": "49ef56bd52736628effaba1cc7bb7014df064f357bbcfb68d20b76aa5beafc5e",
+      "expected_once": {
+        "packets": 3,
+        "bytes": 54,
+        "digest": 1519250436212986051,
+        "digest_b": 4660290755927249119
+      },
+      "expected": {
+        "packets": 3,
+        "bytes": 54,
+        "digest": 17573267031376742996,
+        "digest_b": 16479667758344126236
+      }
+    },
+    {
+      "id": "state-sps_pps_separate",
+      "profile": "state-sps_pps_separate",
+      "file": "state-sps_pps_separate.bsf",
+      "sha256": "54c62c1ae95f219158f65262c8a0eb09594f736dcd14d3a0681e9c4a22b8c493",
+      "rights": "authored-synthetic",
+      "group": "followup",
+      "required": true,
+      "observation_sha256": "8edad1f20d38c06893ac041755f7eed880ec9ebc947c68b469c8e7e495570308",
+      "expected_once": {
+        "packets": 5,
+        "bytes": 54,
+        "digest": 233644399073184494,
+        "digest_b": 14694507887239734802
+      },
+      "expected": {
+        "packets": 5,
+        "bytes": 54,
+        "digest": 5120005652523644707,
+        "digest_b": 13812643314521715339
+      }
+    },
+    {
+      "id": "state-idr_sps_non",
+      "profile": "state-idr_sps_non",
+      "file": "state-idr_sps_non.bsf",
+      "sha256": "d45c79c44b5549f8789fb801c3dc85a48ab311c755b1942e9afffc5c1a97d9f0",
+      "rights": "authored-synthetic",
+      "group": "followup",
+      "required": true,
+      "observation_sha256": "ef5bccd32021ee3995f14ce05d5ae393d07a033c7b523bad124d78ced0fe090e",
+      "expected_once": {
+        "packets": 4,
+        "bytes": 62,
+        "digest": 7719455877720122114,
+        "digest_b": 1515975493212198950
+      },
+      "expected": {
+        "packets": 4,
+        "bytes": 62,
+        "digest": 11747093266826850483,
+        "digest_b": 12652231215999526771
+      }
+    },
+    {
+      "id": "state-idr_pps_non",
+      "profile": "state-idr_pps_non",
+      "file": "state-idr_pps_non.bsf",
+      "sha256": "1e86f6ebf8c1a0075a9c75a10376084aa86f8ee77f2c65d0ff6eba2d8d1b3445",
+      "rights": "authored-synthetic",
+      "group": "followup",
+      "required": true,
+      "observation_sha256": "1f963791957566cbe61e24a3657d764cea02717a4f63bb4b8e3638511363a2d5",
+      "expected_once": {
+        "packets": 4,
+        "bytes": 70,
+        "digest": 18166698120092115032,
+        "digest_b": 2604883837688706820
+      },
+      "expected": {
+        "packets": 4,
+        "bytes": 70,
+        "digest": 9868939738951266135,
+        "digest_b": 10719727306997857183
+      }
+    },
+    {
+      "id": "rearm-type1",
+      "profile": "rearm-type1",
+      "file": "rearm-type1.bsf",
+      "sha256": "1732eb85e018e98b5d1850207afe57b8788ceba14d659744d99285b8a784f0fa",
+      "rights": "authored-synthetic",
+      "group": "followup",
+      "required": true,
+      "observation_sha256": "76f91543b84cd27fc58934d7691338914e5d58da3ba4df159bce65d661583c19",
+      "expected_once": {
+        "packets": 3,
+        "bytes": 52,
+        "digest": 15187089715095057247,
+        "digest_b": 2718740457679538867
+      },
+      "expected": {
+        "packets": 3,
+        "bytes": 52,
+        "digest": 13769099875292020441,
+        "digest_b": 3589981576060984993
+      }
+    },
+    {
+      "id": "rearm-type2",
+      "profile": "rearm-type2",
+      "file": "rearm-type2.bsf",
+      "sha256": "57a6743565790250b569b39511ab7d1a82d575ce26b1003a6e2be83f402c699b",
+      "rights": "authored-synthetic",
+      "group": "followup",
+      "required": true,
+      "observation_sha256": "3af41e9aa73804bc6dada54cfe6d9a3d076e8163c0af3f959d0317a1d400db7e",
+      "expected_once": {
+        "packets": 3,
+        "bytes": 36,
+        "digest": 17308089049425818951,
+        "digest_b": 10136068706962327923
+      },
+      "expected": {
+        "packets": 3,
+        "bytes": 36,
+        "digest": 6585131075123148374,
+        "digest_b": 9062053214479489818
+      }
+    },
+    {
+      "id": "rearm-type3",
+      "profile": "rearm-type3",
+      "file": "rearm-type3.bsf",
+      "sha256": "cdf646fc2166016e550039f980f19aa984e0bc6d8db427d41af4f18638b373ac",
+      "rights": "authored-synthetic",
+      "group": "followup",
+      "required": true,
+      "observation_sha256": "0a4ed4c4545cd57ca2d5b7dd1c9d04a953ac7466d79441d4e0851319468b6d86",
+      "expected_once": {
+        "packets": 3,
+        "bytes": 36,
+        "digest": 8312717206186512841,
+        "digest_b": 4261886292261276069
+      },
+      "expected": {
+        "packets": 3,
+        "bytes": 36,
+        "digest": 11143002487065259854,
+        "digest_b": 9121136041588753314
+      }
+    },
+    {
+      "id": "rearm-type4",
+      "profile": "rearm-type4",
+      "file": "rearm-type4.bsf",
+      "sha256": "78a77f261e42f6f9416885372d212c38f92f76025f53f32ab202b8d16a7396f4",
+      "rights": "authored-synthetic",
+      "group": "followup",
+      "required": true,
+      "observation_sha256": "a65abdf9e6321a595647ba6ac5b7a7acdb0336b9c8d6571e8c2e1d3c08ffbf65",
+      "expected_once": {
+        "packets": 3,
+        "bytes": 36,
+        "digest": 17764089436656758347,
+        "digest_b": 16834447951269775831
+      },
+      "expected": {
+        "packets": 3,
+        "bytes": 36,
+        "digest": 2967304001696078918,
+        "digest_b": 12642840318087130362
+      }
+    },
+    {
+      "id": "rearm-type6",
+      "profile": "rearm-type6",
+      "file": "rearm-type6.bsf",
+      "sha256": "662de2106b56e3783205ddf54fadf23d53de881b6165872008e08fc38d0bb902",
+      "rights": "authored-synthetic",
+      "group": "followup",
+      "required": true,
+      "observation_sha256": "f6f5ac43e76c2f98c0df2ceafb13ef4e055427411f16ea39d70a25a96284dffb",
+      "expected_once": {
+        "packets": 3,
+        "bytes": 36,
+        "digest": 18220089823887697743,
+        "digest_b": 5086083121867672123
+      },
+      "expected": {
+        "packets": 3,
+        "bytes": 36,
+        "digest": 7377298052320329011,
+        "digest_b": 4273454820697465447
+      }
+    },
+    {
+      "id": "rearm-type7",
+      "profile": "rearm-type7",
+      "file": "rearm-type7.bsf",
+      "sha256": "90dc48a83a700ea42ca3877f3e9bb7b9804140c3972db605667d2f4a676f8595",
+      "rights": "authored-synthetic",
+      "group": "followup",
+      "required": true,
+      "observation_sha256": "664a317e411acbf2faf198c8cc145c33705fa8f5055c123f986147de03719776",
+      "expected_once": {
+        "packets": 3,
+        "bytes": 36,
+        "digest": 9224717980648391633,
+        "digest_b": 17658644780876171885
+      },
+      "expected": {
+        "packets": 3,
+        "bytes": 36,
+        "digest": 14365293572743678154,
+        "digest_b": 4483397471695075090
+      }
+    },
+    {
+      "id": "rearm-type8",
+      "profile": "rearm-type8",
+      "file": "rearm-type8.bsf",
+      "sha256": "4585b5f6a16e7335872790136b281978d6c4fa492e8d54beae85b7ec8148df2c",
+      "rights": "authored-synthetic",
+      "group": "followup",
+      "required": true,
+      "observation_sha256": "45dbda7def91668c09daf83a271e8d5e5662052c832310c0e76a99b4cdf5279a",
+      "expected_once": {
+        "packets": 3,
+        "bytes": 36,
+        "digest": 229346137409085523,
+        "digest_b": 11784462366175120031
+      },
+      "expected": {
+        "packets": 3,
+        "bytes": 36,
+        "digest": 17559256766214892995,
+        "digest_b": 17636756712047960875
+      }
+    },
+    {
+      "id": "rearm-type9",
+      "profile": "rearm-type9",
+      "file": "rearm-type9.bsf",
+      "sha256": "5afe2bdcc00a8b4ab7ca87c97fde3310b71bf2a502061b78643046db139ab617",
+      "rights": "authored-synthetic",
+      "group": "followup",
+      "required": true,
+      "observation_sha256": "7ea216047a61910c8e500c6bae8470fee55cbd58fec3dc47f9f3b1f23996bd49",
+      "expected_once": {
+        "packets": 3,
+        "bytes": 36,
+        "digest": 9680718367879331029,
+        "digest_b": 5910279951474068177
+      },
+      "expected": {
+        "packets": 3,
+        "bytes": 36,
+        "digest": 10747466499316608442,
+        "digest_b": 8064184575302715378
+      }
+    },
+    {
+      "id": "rearm-type10",
+      "profile": "rearm-type10",
+      "file": "rearm-type10.bsf",
+      "sha256": "95181d71f5368133edaf582dce5902c447f931db84c3258cb8f3bb3c21a98d8c",
+      "rights": "authored-synthetic",
+      "group": "followup",
+      "required": true,
+      "observation_sha256": "31528923ca1ceea594d307326943f953f0b8794616e22eb7167e3c9e50922b01",
+      "expected_once": {
+        "packets": 3,
+        "bytes": 36,
+        "digest": 685346524640024919,
+        "digest_b": 36097536773016323
+      },
+      "expected": {
+        "packets": 3,
+        "bytes": 36,
+        "digest": 13941422423281180913,
+        "digest_b": 2600023002038240977
+      }
+    },
+    {
+      "id": "rearm-type12",
+      "profile": "rearm-type12",
+      "file": "rearm-type12.bsf",
+      "sha256": "983d74f76ccff371cb45b512737f65f3d7fa2b7c455c0c580252fc38991d1aac",
+      "rights": "authored-synthetic",
+      "group": "followup",
+      "required": true,
+      "observation_sha256": "573a534371127b1f03d1b5a17425d0500d5942a4e6bf6a5f8a45d4f59378837a",
+      "expected_once": {
+        "packets": 3,
+        "bytes": 36,
+        "digest": 1141346911870964315,
+        "digest_b": 6734476781080464231
+      },
+      "expected": {
+        "packets": 3,
+        "bytes": 36,
+        "digest": 13485294181658748638,
+        "digest_b": 2384787697715047182
+      }
+    },
+    {
+      "id": "idr-body-0",
+      "profile": "idr-body-0",
+      "file": "idr-body-0.bsf",
+      "sha256": "b1fcd35086015e3ce2068e899622dd8b3603c27f05269cd0809b8a7d87f0ed01",
+      "rights": "authored-synthetic",
+      "group": "followup",
+      "required": true,
+      "observation_sha256": "dc7e188589b2c63a73252705a1877b7cf032280d20e486aeae5e98bbc3bbb55c",
+      "expected_once": {
+        "packets": 3,
+        "bytes": 53,
+        "digest": 1678864041294233095,
+        "digest_b": 16342182378243344143
+      },
+      "expected": {
+        "packets": 3,
+        "bytes": 53,
+        "digest": 14778404814041570883,
+        "digest_b": 5517201075103629491
+      }
+    },
+    {
+      "id": "idr-body-1",
+      "profile": "idr-body-1",
+      "file": "idr-body-1.bsf",
+      "sha256": "4966c2b051567602b89f8d5577198f22eaf4e3bc4cc6a5cacb13ba2229687d3a",
+      "rights": "authored-synthetic",
+      "group": "followup",
+      "required": true,
+      "observation_sha256": "80dd31004cf7a4f376f7c2e953a09c75d5983196d0febbb24077f8bd8c189206",
+      "expected_once": {
+        "packets": 3,
+        "bytes": 53,
+        "digest": 1385694995468636775,
+        "digest_b": 15354183518785159275
+      },
+      "expected": {
+        "packets": 3,
+        "bytes": 53,
+        "digest": 9155586484800433830,
+        "digest_b": 2705711318555438670
+      }
+    },
+    {
+      "id": "idr-body-32",
+      "profile": "idr-body-32",
+      "file": "idr-body-32.bsf",
+      "sha256": "86e3134cd64139951a611642c44ecad4bba7e2868c85f655edcea2e51a47bc3f",
+      "rights": "authored-synthetic",
+      "group": "followup",
+      "required": true,
+      "observation_sha256": "49f8f27d395896b650f9a1a81843effd2559fcf2d243a1e695c0cc4bf9d60428",
+      "expected_once": {
+        "packets": 3,
+        "bytes": 53,
+        "digest": 10744198648584702471,
+        "digest_b": 3172962949290979983
+      },
+      "expected": {
+        "packets": 3,
+        "bytes": 53,
+        "digest": 2751596746339058221,
+        "digest_b": 14650167041513371601
+      }
+    },
+    {
+      "id": "idr-body-64",
+      "profile": "idr-body-64",
+      "file": "idr-body-64.bsf",
+      "sha256": "57811a8b1869615b59ae0ed7655cd93c671f8c3d0f9bf8d98cc0894e7ec5f118",
+      "rights": "authored-synthetic",
+      "group": "followup",
+      "required": true,
+      "observation_sha256": "d7405f883e7493091847e57ef44c665fd5c63a7dff321443b27fa2cd9d41906b",
+      "expected_once": {
+        "packets": 3,
+        "bytes": 53,
+        "digest": 1362789182165620231,
+        "digest_b": 8450487594048167439
+      },
+      "expected": {
+        "packets": 3,
+        "bytes": 53,
+        "digest": 7343742240054596117,
+        "digest_b": 6980284160280581789
+      }
+    },
+    {
+      "id": "idr-body-127",
+      "profile": "idr-body-127",
+      "file": "idr-body-127.bsf",
+      "sha256": "06c4ed51e7416215322beb2e8a1a7c5b9da6458ae241a9996b53619d76c69104",
+      "rights": "authored-synthetic",
+      "group": "followup",
+      "required": true,
+      "observation_sha256": "9b8bdb678d9ad6a32f6a072e1cdd703d4fbbda1bec205cbf31171ebb5761bce1",
+      "expected_once": {
+        "packets": 3,
+        "bytes": 53,
+        "digest": 1339883368862603687,
+        "digest_b": 1546791669311175603
+      },
+      "expected": {
+        "packets": 3,
+        "bytes": 53,
+        "digest": 10623858457008981316,
+        "digest_b": 2759257685617839140
+      }
+    },
+    {
+      "id": "idr-body-128",
+      "profile": "idr-body-128",
+      "file": "idr-body-128.bsf",
+      "sha256": "14822a43f18575005f9156862350e6d655cc965b36dc2255c3c3001b1e22b6fb",
+      "rights": "authored-synthetic",
+      "group": "followup",
+      "required": true,
+      "observation_sha256": "1ac1f1108a6882cf2d7875dfd0b41ebc71773995e899e78575f8deeb8c8b58fb",
+      "expected_once": {
+        "packets": 3,
+        "bytes": 53,
+        "digest": 1046714323037007367,
+        "digest_b": 558792809852990735
+      },
+      "expected": {
+        "packets": 3,
+        "bytes": 53,
+        "digest": 6979176265170698473,
+        "digest_b": 1145018293710916377
+      }
+    },
+    {
+      "id": "idr-body-255",
+      "profile": "idr-body-255",
+      "file": "idr-body-255.bsf",
+      "sha256": "82b3dfb8634cf780dba4a951b145e83f8be2fed2d9cbe2acdaa68bf7814785a5",
+      "rights": "authored-synthetic",
+      "group": "followup",
+      "required": true,
+      "observation_sha256": "47c9198fff1157d2f5c71a66351b7144500d2056d2436e388771155151fa0166",
+      "expected_once": {
+        "packets": 3,
+        "bytes": 53,
+        "digest": 707733650605377959,
+        "digest_b": 4210146174630373811
+      },
+      "expected": {
+        "packets": 3,
+        "bytes": 53,
+        "digest": 9901493963130445899,
+        "digest_b": 3445976074538360375
+      }
+    },
+    {
+      "id": "flush-inband",
+      "profile": "flush-inband",
+      "file": "flush-inband.bsf",
+      "sha256": "6a4b77e697b1f0a11855c602517c347ecda0cb0cdef0b6066a5ba1360ea3fbf4",
+      "rights": "authored-synthetic",
+      "group": "followup",
+      "required": true,
+      "observation_sha256": "498e5cccd7ba14c0ccf4c7260ff2292547a517e412b5abf622a373615199f7f7",
+      "expected_once": {
+        "packets": 2,
+        "bytes": 46,
+        "digest": 1482978651421844218,
+        "digest_b": 12097224522714785194
+      },
+      "expected": {
+        "packets": 2,
+        "bytes": 46,
+        "digest": 9909050853931516342,
+        "digest_b": 10728660518043181354
+      }
+    },
+    {
+      "id": "flush-update",
+      "profile": "flush-update",
+      "file": "flush-update.bsf",
+      "sha256": "340e1c17465331d43aa8ce72bcbc6eac0236586e10da9f71238334de9fb7e9ff",
+      "rights": "authored-synthetic",
+      "group": "followup",
+      "required": true,
+      "observation_sha256": "2725c740908eafe04311126ad35c6cf6c9630e84e4e39de1958d4ab895fb51f6",
+      "expected_once": {
+        "packets": 2,
+        "bytes": 46,
+        "digest": 7762408683049984570,
+        "digest_b": 10704896708720732754
+      },
+      "expected": {
+        "packets": 2,
+        "bytes": 46,
+        "digest": 736073041167188735,
+        "digest_b": 1933618537401172963
+      }
+    },
+    {
+      "id": "error-after-inband",
+      "profile": "error-after-inband",
+      "file": "error-after-inband.bsf",
+      "sha256": "287753bea3360afdd6b0a9941b9f208b75fa99913a5556f617f310bf6cf5ec9c",
+      "rights": "authored-synthetic",
+      "group": "followup",
+      "required": true,
+      "observation_sha256": "6db8dbb2fb8995622a0cd8f51c0a17d90a9b42ad39c773d6fe836e7c9e09eaf3",
+      "expected_once": {
+        "packets": 1,
+        "bytes": 23,
+        "digest": 6419759466051247711,
+        "digest_b": 7220582514208640275
+      },
+      "expected": {
+        "packets": 1,
+        "bytes": 23,
+        "digest": 16901528844779314290,
+        "digest_b": 7621164171299111878
+      }
+    },
+    {
+      "id": "bad-packet-good-update",
+      "profile": "bad-packet-good-update",
+      "file": "bad-packet-good-update.bsf",
+      "sha256": "6391edb3478af08a331fb8e2b75216059be2a811d0a51d3b6b7af3687bc01c29",
+      "rights": "authored-synthetic",
+      "group": "followup",
+      "required": true,
+      "observation_sha256": "960ef5d4536bb4f64337e94d326897b983e6b1df3a8948ae11d2be04dfe996e9",
+      "expected_once": {
+        "packets": 1,
+        "bytes": 23,
+        "digest": 13545075506981990399,
+        "digest_b": 13979277016780881719
+      },
+      "expected": {
+        "packets": 1,
+        "bytes": 23,
+        "digest": 7918300845455072152,
+        "digest_b": 13093086073228508232
+      }
+    },
+    {
+      "id": "sequence-extension",
+      "profile": "sequence-extension",
+      "file": "sequence-extension.bsf",
+      "sha256": "1df536265f80d9d9600812616ae517f41456c3736f8b1955913f30fe1f4026af",
+      "rights": "authored-synthetic",
+      "group": "followup",
+      "required": true,
+      "observation_sha256": "763aa6843735d85745de4ab3b1563a79e815d762c78f09d8f7149626780ba4ff",
+      "expected_once": {
+        "packets": 1,
+        "bytes": 23,
+        "digest": 4553856692835250118,
+        "digest_b": 8908528131118393542
+      },
+      "expected": {
+        "packets": 1,
+        "bytes": 23,
+        "digest": 7447693291637819895,
+        "digest_b": 16019681687699292763
+      }
+    },
+    {
+      "id": "vps-alone",
+      "profile": "vps-alone",
+      "file": "vps-alone.bsf",
+      "sha256": "6540c8995c7efee3854c6a38629a475fd89acfc9636937c1cef076f88573bd6f",
+      "rights": "authored-synthetic",
+      "group": "hevc-boundary",
+      "required": true,
+      "observation_sha256": "a74e77859d9cd3ae596842537def3422cf8f93cb6e31f62c83a9dc4ee0c95a3f",
+      "expected_once": {
+        "packets": 1,
+        "bytes": 7,
+        "digest": 16853797398671316333,
+        "digest_b": 9652507634636424309
+      },
+      "expected": {
+        "packets": 1,
+        "bytes": 7,
+        "digest": 17082443459025533141,
+        "digest_b": 279334438173805849
+      }
+    },
+    {
+      "id": "sps-alone",
+      "profile": "sps-alone",
+      "file": "sps-alone.bsf",
+      "sha256": "2d1f5af1a0fac159c8c170223c51ee5bbb86ab33099475159ada7802376c4201",
+      "rights": "authored-synthetic",
+      "group": "hevc-boundary",
+      "required": true,
+      "observation_sha256": "6513069c9802351f736ded304e03c2e1a5759fb46abe7f4cf59842c472eb705a",
+      "expected_once": {
+        "packets": 1,
+        "bytes": 7,
+        "digest": 6539072727359110445,
+        "digest_b": 14333766378874293901
+      },
+      "expected": {
+        "packets": 1,
+        "bytes": 7,
+        "digest": 4746507781926208604,
+        "digest_b": 4899581416416704872
+      }
+    },
+    {
+      "id": "pps-alone",
+      "profile": "pps-alone",
+      "file": "pps-alone.bsf",
+      "sha256": "e53673e761cf0239489ed81da108b8521be0e9d64577cb25381bdf006fab6b38",
+      "rights": "authored-synthetic",
+      "group": "hevc-boundary",
+      "required": true,
+      "observation_sha256": "783ec9250511f7252eea1e5edf97c9943f452ef6882a40756e2485a8ec7d08ee",
+      "expected_once": {
+        "packets": 1,
+        "bytes": 7,
+        "digest": 14671092129756456173,
+        "digest_b": 568281049402611877
+      },
+      "expected": {
+        "packets": 1,
+        "bytes": 7,
+        "digest": 6057392764691799747,
+        "digest_b": 3890660517060697939
+      }
+    },
+    {
+      "id": "vps-non",
+      "profile": "vps-non",
+      "file": "vps-non.bsf",
+      "sha256": "6be4437b6e80e1767d1f9ab6830c6a8299114158b6b7087e9655f21dae0003e5",
+      "rights": "authored-synthetic",
+      "group": "hevc-boundary",
+      "required": true,
+      "observation_sha256": "4d06557b19ecc98d9daa63d126a806c23272376d74db7f0892433034e62e5fe0",
+      "expected_once": {
+        "packets": 1,
+        "bytes": 14,
+        "digest": 17655553247226307231,
+        "digest_b": 3690386342507042903
+      },
+      "expected": {
+        "packets": 1,
+        "bytes": 14,
+        "digest": 11485427365081628560,
+        "digest_b": 12280601137772303440
+      }
+    },
+    {
+      "id": "sps-non",
+      "profile": "sps-non",
+      "file": "sps-non.bsf",
+      "sha256": "91ba136d8bdb5ea2aa59876f65d699ef09c48abc6979934203c6b18d0270a30d",
+      "rights": "authored-synthetic",
+      "group": "hevc-boundary",
+      "required": true,
+      "observation_sha256": "f12285162f8c38bf586cc9ab00212de47897626e96fc4845ee4dd8bb7ded2eba",
+      "expected_once": {
+        "packets": 1,
+        "bytes": 14,
+        "digest": 7251265031520134299,
+        "digest_b": 1824500474268336243
+      },
+      "expected": {
+        "packets": 1,
+        "bytes": 14,
+        "digest": 7900752369562564847,
+        "digest_b": 8018921435569188655
+      }
+    },
+    {
+      "id": "pps-non",
+      "profile": "pps-non",
+      "file": "pps-non.bsf",
+      "sha256": "841a46682ca6d85701fe4c69f42d0bf4fc443c6972cb4df2055fc9cf6013990b",
+      "rights": "authored-synthetic",
+      "group": "hevc-boundary",
+      "required": true,
+      "observation_sha256": "871961c0f3c4544404dbddae88cd9da79f3340f0e2240b9772f04896de29dd15",
+      "expected_once": {
+        "packets": 1,
+        "bytes": 14,
+        "digest": 15293720889523512983,
+        "digest_b": 18405358679739181199
+      },
+      "expected": {
+        "packets": 1,
+        "bytes": 14,
+        "digest": 7441781247081320270,
+        "digest_b": 6218306509280079518
+      }
+    },
+    {
+      "id": "aud-vps",
+      "profile": "aud-vps",
+      "file": "aud-vps.bsf",
+      "sha256": "90d4dd2363b785882c58fe549e5562181c76e0fdeb7b9bbb9bb8ab113608112e",
+      "rights": "authored-synthetic",
+      "group": "hevc-boundary",
+      "required": true,
+      "observation_sha256": "3dd2e12803d003069fc2b2c3cd3abd2f383e8c58e4d486e6f1a9fd563250ad84",
+      "expected_once": {
+        "packets": 1,
+        "bytes": 14,
+        "digest": 3696719275400583055,
+        "digest_b": 17879224300324408663
+      },
+      "expected": {
+        "packets": 1,
+        "bytes": 14,
+        "digest": 1344180186649871356,
+        "digest_b": 3125580347821801356
+      }
+    },
+    {
+      "id": "sei-sps-irap",
+      "profile": "sei-sps-irap",
+      "file": "sei-sps-irap.bsf",
+      "sha256": "3a447669beeb24334d7825c4b46d24997be4cb943c0e5bdda50bf9f186c7da03",
+      "rights": "authored-synthetic",
+      "group": "hevc-boundary",
+      "required": true,
+      "observation_sha256": "7ddbf525145231b5484f4e7a72e43a2cd2cece87919826bd7a13b346b3cbd74c",
+      "expected_once": {
+        "packets": 1,
+        "bytes": 42,
+        "digest": 16341001180070560787,
+        "digest_b": 5227581088665246395
+      },
+      "expected": {
+        "packets": 1,
+        "bytes": 42,
+        "digest": 16165948023785559014,
+        "digest_b": 2921802221927404894
+      }
+    },
+    {
+      "id": "irap-vps",
+      "profile": "irap-vps",
+      "file": "irap-vps.bsf",
+      "sha256": "a1a607dbaa06b52449b98acf0785b23078b8c3fd7ceaf7987c0e902d2ce0bcdd",
+      "rights": "authored-synthetic",
+      "group": "hevc-boundary",
+      "required": true,
+      "observation_sha256": "345453895766dfa167e2408299ff41d21e5b9311eb3ccd127710b27cd1470871",
+      "expected_once": {
+        "packets": 1,
+        "bytes": 35,
+        "digest": 17232651348771424109,
+        "digest_b": 4315434981312626485
+      },
+      "expected": {
+        "packets": 1,
+        "bytes": 35,
+        "digest": 12834528203894206684,
+        "digest_b": 6525197818417568864
+      }
+    },
+    {
+      "id": "non-vps-irap",
+      "profile": "non-vps-irap",
+      "file": "non-vps-irap.bsf",
+      "sha256": "ba11129488d2b4f46df091d239e59b11360210cbdc8d9c99d138cf6ce540573c",
+      "rights": "authored-synthetic",
+      "group": "hevc-boundary",
+      "required": true,
+      "observation_sha256": "cf9fd67d2d5ace60606b1a3287ce026e2f4dc2e7cfc275a3294e9ed4ae231f00",
+      "expected_once": {
+        "packets": 1,
+        "bytes": 42,
+        "digest": 16124937022076101039,
+        "digest_b": 3945801526387795991
+      },
+      "expected": {
+        "packets": 1,
+        "bytes": 42,
+        "digest": 4296017645132182961,
+        "digest_b": 16237581618576167209
+      }
+    },
+    {
+      "id": "pps-sps-irap",
+      "profile": "pps-sps-irap",
+      "file": "pps-sps-irap.bsf",
+      "sha256": "5268aa3d9127e94fcee1ec53870156081c42f9708cde9aeaf1219ba694a07e73",
+      "rights": "authored-synthetic",
+      "group": "hevc-boundary",
+      "required": true,
+      "observation_sha256": "8825cb8b2ce5d832b43ab0a0a0196754ad09943677184bd144c22b25854ff258",
+      "expected_once": {
+        "packets": 1,
+        "bytes": 42,
+        "digest": 7180137875794124719,
+        "digest_b": 8520406116917451943
+      },
+      "expected": {
+        "packets": 1,
+        "bytes": 42,
+        "digest": 7030221713170962596,
+        "digest_b": 678126205031431348
+      }
+    },
+    {
+      "id": "avc-high-flags",
+      "profile": "avc-high-flags",
+      "file": "avc-high-flags.bsf",
+      "sha256": "26075555ee83aa1ebd5fad2e322d215c8f636e4a0ecfacfe2636eea16c0e5f99",
+      "rights": "authored-synthetic",
+      "group": "metadata",
+      "required": true,
+      "observation_sha256": "ba6b59f70033f9e8e99c82e4886e7a9ac5bc3a5eb4d2b5e934298724a9cf8f84",
+      "expected_once": {
+        "packets": 1,
+        "bytes": 23,
+        "digest": 7167549371842596070,
+        "digest_b": 13376133926076070330
+      },
+      "expected": {
+        "packets": 1,
+        "bytes": 23,
+        "digest": 13727677641464624627,
+        "digest_b": 599231676602999391
+      }
+    },
+    {
+      "id": "hevc-all-flags",
+      "profile": "hevc-all-flags",
+      "file": "hevc-all-flags.bsf",
+      "sha256": "9f4f8a70a34be2a8211fd25343a9448ad638eced0e080c66ebcfa9872bc65ae4",
+      "rights": "authored-synthetic",
+      "group": "metadata",
+      "required": true,
+      "observation_sha256": "a2c0299792e04c5041998a3c2aec56c2bb8289a4f7071a1688f68ad555cd0f8d",
+      "expected_once": {
+        "packets": 1,
+        "bytes": 28,
+        "digest": 11693092285137088447,
+        "digest_b": 2292742701832555471
+      },
+      "expected": {
+        "packets": 1,
+        "bytes": 28,
+        "digest": 14635269619045316910,
+        "digest_b": 12528121164062036670
+      }
+    },
+    {
+      "id": "avc-opaque-nonkey-idr",
+      "profile": "avc-opaque-nonkey-idr",
+      "file": "avc-opaque-nonkey-idr.bsf",
+      "sha256": "a1ba2fca21a9c283f0fb710a108b7d9be7b19a580d03dfa5eae3bd8cb75f54e6",
+      "rights": "authored-synthetic",
+      "group": "metadata",
+      "required": true,
+      "observation_sha256": "666ef21f620ba63c233fd935c0031c532a29f4677268709c287bd01cc625c9a3",
+      "expected_once": {
+        "packets": 1,
+        "bytes": 23,
+        "digest": 18127230557914536774,
+        "digest_b": 7858431999145629718
+      },
+      "expected": {
+        "packets": 1,
+        "bytes": 23,
+        "digest": 4481202786564041126,
+        "digest_b": 6117021954689008610
+      }
+    },
+    {
+      "id": "avc-key-nonidr",
+      "profile": "avc-key-nonidr",
+      "file": "avc-key-nonidr.bsf",
+      "sha256": "5ef14032ecfde968e6973f3ca9e7e968538b428a31a83a17ca1d6d93f5113059",
+      "rights": "authored-synthetic",
+      "group": "metadata",
+      "required": true,
+      "observation_sha256": "145b5942bf84df5a9f58a8a83c6b8ce9a6c26d89aefd59e918dd98977009ad1b",
+      "expected_once": {
+        "packets": 1,
+        "bytes": 7,
+        "digest": 8901686382502282278,
+        "digest_b": 14711172197009000338
+      },
+      "expected": {
+        "packets": 1,
+        "bytes": 7,
+        "digest": 1611483091657340001,
+        "digest_b": 1768504748519079097
+      }
+    },
+    {
+      "id": "avc-same-update-continuation",
+      "profile": "avc-same-update-continuation",
+      "file": "avc-same-update-continuation.bsf",
+      "sha256": "8fa728dafc64a1b9a4b7c00e1ef2c09679f66e255bc8e8c56dbbd23f630649b8",
+      "rights": "authored-synthetic",
+      "group": "metadata",
+      "required": true,
+      "observation_sha256": "6e508029f8a12443ce249162dce0edbe1e14cb44174f4635629d14935f371d20",
+      "expected_once": {
+        "packets": 2,
+        "bytes": 46,
+        "digest": 14095633331492387917,
+        "digest_b": 13900004482227469389
+      },
+      "expected": {
+        "packets": 2,
+        "bytes": 46,
+        "digest": 9846415019530780765,
+        "digest_b": 4578934081648707369
+      }
+    },
+    {
+      "id": "avc-inband-update-continuation",
+      "profile": "avc-inband-update-continuation",
+      "file": "avc-inband-update-continuation.bsf",
+      "sha256": "7912bafd245dd5d88140bccb870f7d962433a7bf6100d782088cbd92bf2a550e",
+      "rights": "authored-synthetic",
+      "group": "metadata",
+      "required": true,
+      "observation_sha256": "6e508029f8a12443ce249162dce0edbe1e14cb44174f4635629d14935f371d20",
+      "expected_once": {
+        "packets": 2,
+        "bytes": 46,
+        "digest": 14095633331492387917,
+        "digest_b": 13900004482227469389
+      },
+      "expected": {
+        "packets": 2,
+        "bytes": 46,
+        "digest": 9846415019530780765,
+        "digest_b": 4578934081648707369
+      }
+    },
+    {
+      "id": "avc-configured-annexb",
+      "profile": "avc-configured-annexb",
+      "file": "avc-configured-annexb.bsf",
+      "sha256": "bce09a8472c9dcda811b445fc28a7fcd0dd8c964a27c1ac4493b4123bb081edd",
+      "rights": "authored-synthetic",
+      "group": "metadata",
+      "required": true,
+      "observation_sha256": "b2cda10c874f1fba0466f71688a5701270e5fa36007d9b811606a1ec34d39619",
+      "expected_once": {
+        "packets": 0,
+        "bytes": 0,
+        "digest": 5446154078416766896,
+        "digest_b": 10097657778509831264
+      },
+      "expected": {
+        "packets": 0,
+        "bytes": 0,
+        "digest": 1064608036817123523,
+        "digest_b": 8978186812328352027
+      }
+    },
+    {
+      "id": "hevc-configured-annexb",
+      "profile": "hevc-configured-annexb",
+      "file": "hevc-configured-annexb.bsf",
+      "sha256": "d87c815b7a7cce557f1e52b9144900a03f83bb9b2c914216b898b315bba05e29",
+      "rights": "authored-synthetic",
+      "group": "metadata",
+      "required": true,
+      "observation_sha256": "c206adac2c99453b50c2b0728062899169e0eb6e0b75861940307db85190b99a",
+      "expected_once": {
+        "packets": 0,
+        "bytes": 0,
+        "digest": 9998634358760748343,
+        "digest_b": 13768918753399353163
+      },
+      "expected": {
+        "packets": 0,
+        "bytes": 0,
+        "digest": 4347213743278495047,
+        "digest_b": 14016551016102411099
+      }
+    }
+  ]
+}

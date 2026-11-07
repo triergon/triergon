@@ -1,0 +1,25 @@
+{
+  "schema": 1,
+  "archive_sha256": "b59476c45d8f31ac4694a264ce49cf12bda9bf9709e5cb6979ece0acb41cc812",
+  "timing_archive_sha256": "0f3d82dfe8ab49e0eb85c32e4b9adc6579cc70590c89b8f09d4842550c8348c5",
+  "memory_archive_sha256": "6f7dcfa92afbe4a025d4a0c1a8a4132fc3a3125f796ef8c20be8606bdba843d8",
+  "operation_manifest_sha256": "bb9b19d094a42c49f7651dd423e65260c654f3c80c7feab6435a0f7610b91853",
+  "membership_sha256": "fa3bda4fd8e3fe6d2a6ddb082054f11af0537feb6afbe82a8b46266ff680f3f0",
+  "cases": 125,
+  "distinct_inputs": 125,
+  "distinct_observations": 106,
+  "groups": {
+    "base": 76,
+    "followup": 30,
+    "hevc-boundary": 11,
+    "metadata": 8
+  },
+  "measured_revision": "d225c35c1e2aa8a9b7dc4d61bb673a5728bd0ee6",
+  "historical_build": "nightly with target-cpu, link and ordering overrides; not a current gate build",
+  "source_files": {
+    "model.rs": "d3060f8128195119c0c05a3b27ee54f7a7817071bdee957de4333eaa478e1843",
+    "operation.rs": "46d6bccfa4b6b042007bab6b5ac42e7bdc65771a9176e04c41f20461cff30bab",
+    "reference.c": "b33c8f2773bfa7cbe3ad2ea13d66049dff5435a2c85b92efe36c866a33fd7985",
+    "main.rs": "28da273a73c9f5996a40318d2ba3b910e163df7d2e9c0eacf10e1c035ec32df9"
+  }
+}

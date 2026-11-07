@@ -86,7 +86,7 @@ fn matched_gate_fixture() -> (Value, Vec<Value>, Value) {
     let sample = |candidate: bool| {
         let (heap, peak) = if candidate { (79, 160) } else { (100, 300) };
         v(&format!(
-            r#"{{"status": "measured", "instrument_sha256": "observer-hash", "work": {{"packets": 10}},
+            r#"{{"status": "measured", "instrument_sha256": "observer-hash", "work": {{"packets": 10, "bytes": 100, "digest": 9}},
             "observer": {{"status": "measured", "heap_peak_bytes": {heap}, "rss_start": 100, "rss_peak_observed": {peak}, "hwm_end": {peak}, "page_size": 1}}}}"#
         ))
     };
@@ -152,6 +152,178 @@ fn verdict(contract: &Value, rows: &[Value], identity: &Value) -> (bool, bool) {
         result.get("accepted") == Some(&Value::Bool(true)),
         result.get("slice_accepted") == Some(&Value::Bool(true)),
     )
+}
+
+fn four_field_gate_fixture() -> (Value, Vec<Value>, Value) {
+    let (mut contract, mut rows, identity) = matched_gate_fixture();
+    put(
+        &mut contract,
+        &[],
+        "work_fields",
+        Value::strings(["packets", "bytes", "digest", "digest_b"]),
+    );
+    let mut timed = rows[0].get("timing").unwrap().clone();
+    let mut samples = timed
+        .get("samples")
+        .and_then(Value::as_array)
+        .unwrap()
+        .to_vec();
+    for sample in &mut samples {
+        for role in ["candidate", "reference"] {
+            put(sample, &[role, "data"], "digest_b", Value::int(4));
+        }
+    }
+    let warmups = ["candidate", "reference"].map(|role| {
+        Value::object([
+            ("worker", Value::str(role)),
+            ("result", samples[0].get(role).unwrap().clone()),
+        ])
+    });
+    put(&mut timed, &[], "samples", Value::Array(samples));
+    put(&mut timed, &[], "warmups", Value::Array(warmups.into()));
+    put(&mut rows[0], &[], "timing", timed);
+    let mut samples = rows[0]
+        .get("memory")
+        .unwrap()
+        .get("samples")
+        .and_then(Value::as_array)
+        .unwrap()
+        .to_vec();
+    for sample in &mut samples {
+        for role in [
+            "candidate_heap",
+            "candidate_rss",
+            "reference_heap",
+            "reference_rss",
+        ] {
+            put(sample, &[role, "work"], "digest_b", Value::int(4));
+        }
+    }
+    put(&mut rows[0], &["memory"], "samples", Value::Array(samples));
+    put(
+        &mut rows[0],
+        &["parity"],
+        "expected",
+        v(r#"{"packets":10,"bytes":100,"digest":9,"digest_b":4}"#),
+    );
+    for role in ["candidate", "reference"] {
+        let expected = rows[0]
+            .get("parity")
+            .unwrap()
+            .get("expected")
+            .unwrap()
+            .clone();
+        put(&mut rows[0], &["parity"], role, expected);
+    }
+    (contract, rows, identity)
+}
+
+#[test]
+fn declared_work_fields_are_required_in_timing_warmups_samples_and_memory() {
+    let (contract, rows, identity) = four_field_gate_fixture();
+    assert_eq!(verdict(&contract, &rows, &identity), (true, true));
+    for (section, collection) in [
+        ("timing", "samples"),
+        ("timing", "warmups"),
+        ("memory", "samples"),
+    ] {
+        for role_set in [
+            vec!["candidate"],
+            vec!["reference"],
+            vec!["candidate", "reference"],
+        ] {
+            for bad in [Some(Value::int(5)), None] {
+                let mut changed = rows.clone();
+                let mut values = changed[0]
+                    .get(section)
+                    .unwrap()
+                    .get(collection)
+                    .and_then(Value::as_array)
+                    .unwrap()
+                    .to_vec();
+                for value in &mut values {
+                    if collection == "warmups" {
+                        if role_set.contains(&value.get("worker").and_then(Value::as_str).unwrap())
+                        {
+                            let mut data =
+                                value.get("result").unwrap().get("data").unwrap().clone();
+                            remove(&mut data, "digest_b");
+                            if let Some(bad) = &bad {
+                                put(&mut data, &[], "digest_b", bad.clone());
+                            }
+                            put(value, &["result"], "data", data);
+                        }
+                    } else {
+                        let roles = if section == "memory" {
+                            vec![
+                                "candidate_heap",
+                                "candidate_rss",
+                                "reference_heap",
+                                "reference_rss",
+                            ]
+                        } else {
+                            vec!["candidate", "reference"]
+                        };
+                        for role in roles {
+                            let worker_role = role.split('_').next().unwrap();
+                            if role_set.contains(&worker_role) {
+                                let key = if section == "memory" { "work" } else { "data" };
+                                let mut data = value.get(role).unwrap().get(key).unwrap().clone();
+                                remove(&mut data, "digest_b");
+                                if let Some(bad) = &bad {
+                                    put(&mut data, &[], "digest_b", bad.clone());
+                                }
+                                put(value, &[role], key, data);
+                            }
+                        }
+                    }
+                }
+                put(
+                    &mut changed[0],
+                    &[section],
+                    collection,
+                    Value::Array(values),
+                );
+                assert_eq!(
+                    verdict(&contract, &changed, &identity),
+                    (false, false),
+                    "{section}/{collection} {role_set:?} {bad:?}"
+                );
+            }
+        }
+    }
+    let mut changed = rows;
+    let mut timing = changed[0].get("timing").unwrap().clone();
+    remove(&mut timing, "warmups");
+    put(&mut changed[0], &[], "timing", timing);
+    assert_eq!(verdict(&contract, &changed, &identity), (false, false));
+}
+
+#[test]
+fn acceptance_rechecks_declared_parity_fields_even_when_status_says_pass() {
+    let (contract, rows, identity) = four_field_gate_fixture();
+    assert_eq!(verdict(&contract, &rows, &identity), (true, true));
+    for bad in [Some(Value::int(5)), None] {
+        for roles in [
+            vec!["candidate"],
+            vec!["reference"],
+            vec!["candidate", "reference"],
+            vec!["candidate", "reference", "expected"],
+        ] {
+            let mut changed = rows.clone();
+            for role in roles {
+                let mut work = changed[0].get("parity").unwrap().get(role).unwrap().clone();
+                remove(&mut work, "digest_b");
+                if let Some(bad) = &bad {
+                    put(&mut work, &[], "digest_b", bad.clone());
+                }
+                put(&mut changed[0], &["parity"], role, work);
+            }
+            // Changing the expectation as well also invalidates the unchanged
+            // memory work, which remains bound to the declared parity work.
+            assert_eq!(verdict(&contract, &changed, &identity), (false, false));
+        }
+    }
 }
 
 #[test]
@@ -327,6 +499,78 @@ fn complete_matched_evidence_can_pass_and_summary_tampering_fails() {
         Value::float(0.1),
     );
     assert!(!verdict(&contract, &rows, &identity).1);
+}
+
+#[test]
+fn per_worker_memory_outputs_reuse_the_same_observation_validation() {
+    let (contract, rows, identity) = matched_gate_fixture();
+    let selected = identity.get("binaries").unwrap();
+    let recorded = rows[0].get("memory").unwrap();
+    let certificate = recorded.get("certificate").unwrap();
+    let expected = v(r#"{
+        "candidate":{"packets":10,"bytes":100,"digest":9},
+        "reference":{"packets":10,"bytes":100,"digest":9,"metadata":"reference-only"}
+    }"#);
+    let mut samples = recorded
+        .get("samples")
+        .unwrap()
+        .as_array()
+        .unwrap()
+        .to_vec();
+    for sample in &mut samples {
+        for role in ["candidate", "reference"] {
+            for mode in ["heap", "rss"] {
+                put(
+                    sample,
+                    &[&format!("{role}_{mode}")],
+                    "work",
+                    expected.get(role).unwrap().clone(),
+                );
+            }
+        }
+    }
+    let measured = super::memory::evaluate(root(), &samples, 30, 0, certificate, Some(&expected));
+    let valid = |memory: &Value, outputs: &Value| {
+        super::memory::evidence_valid_with_outputs(
+            root(),
+            &rows[0],
+            memory,
+            &contract,
+            &identity,
+            selected,
+            false,
+            Some(outputs),
+        )
+    };
+    assert!(valid(&measured, &expected));
+    assert!(!super::memory::evidence_valid(
+        root(),
+        &rows[0],
+        &measured,
+        &contract,
+        &identity,
+        selected,
+        false,
+    ));
+    let mut wrong = expected.clone();
+    put(
+        &mut wrong,
+        &["reference"],
+        "metadata",
+        Value::str("changed"),
+    );
+    assert!(!valid(&measured, &wrong));
+    let mut changed = measured.clone();
+    put(
+        &mut changed,
+        &["certificate"],
+        "worker_hashes",
+        Value::Object(vec![]),
+    );
+    assert!(!valid(&changed, &expected));
+    let mut changed = measured;
+    put(&mut changed, &["heap_ratio"], "upper_95", Value::float(0.0));
+    assert!(!valid(&changed, &expected));
 }
 
 #[test]

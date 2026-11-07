@@ -234,6 +234,7 @@ pub fn run(root: &Path, options: &Options) -> Result<i32, String> {
     }
     let (candidate, native) = validation::current_workers(root, &identity)?;
     let contract = read_json(&options.contract)?;
+    let work_fields = super::comparison::work_fields(&contract)?;
     let candidate_name = s(&contract, "candidate")
         .unwrap_or("media-worker")
         .to_owned();
@@ -366,6 +367,8 @@ pub fn run(root: &Path, options: &Options) -> Result<i32, String> {
                 Operation {
                     prefix: prefix.clone(),
                     arguments: arguments.clone(),
+                    candidate_options: vec![],
+                    work_fields: work_fields.clone(),
                 },
             ));
             parity::feed_parity(
@@ -373,6 +376,7 @@ pub fn run(root: &Path, options: &Options) -> Result<i32, String> {
                 prefix,
                 &arguments,
                 case.get("expected").unwrap_or(&Value::Null),
+                &work_fields,
             )?
         } else {
             row.push(("input_sha256", Value::str(sha)));
@@ -416,6 +420,8 @@ pub fn run(root: &Path, options: &Options) -> Result<i32, String> {
                 Operation {
                     prefix: prefix.into(),
                     arguments,
+                    candidate_options: vec![],
+                    work_fields: work_fields.clone(),
                 },
             ));
             if catalogue {
