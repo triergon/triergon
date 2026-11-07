@@ -556,7 +556,6 @@ impl Projector {
                 .take()
                 .ok_or(Error::Invalid("PGS receiver ARGB not frozen"))?,
             palette: object.palette().clone(),
-            suppressed: object.receiver_forced_only_suppressed,
         };
         self.rectangles
             .as_mut()

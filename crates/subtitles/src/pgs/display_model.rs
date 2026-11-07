@@ -96,14 +96,6 @@ impl ColourMatrix {
             Self::Hd709
         }
     }
-    /// Comparison label of this matrix's receiver quantisation.
-    #[cfg(feature = "reference-trace")]
-    pub fn identifier(self) -> &'static str {
-        match self {
-            Self::Sd601 => "native-pgs-sd601-quantized10-v1",
-            Self::Hd709 => "native-pgs-hd709-quantized10-v1",
-        }
-    }
 
     /// Original integer matrix evaluator. Coefficients are rounded rational
     /// receiver facts, independently tested through public native palettes.

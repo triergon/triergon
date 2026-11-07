@@ -92,8 +92,8 @@ source facts. The two never share or rewrite each other's output.
 `reference_trace`: the receiver's profile labels and the reference revision, the
 DVB receiver's packet refusal (`dvb::Decoder::receiver_failure`), the PGS
 `Projector` of strict display sets onto FFmpeg's API rectangles, and the text
-`carriage` session that reproduces FFmpeg's demuxer packets. They exist to compare
-traces with FFmpeg and are absent from default builds.
+`carriage` session that reproduces FFmpeg's demuxer packets. They exist so tests
+can compare them with recorded FFmpeg output, and are absent from default builds.
 
 ### Text
 
@@ -186,8 +186,6 @@ the standards, not produced by this code: `tests/text-fixtures/` (with a
 separate Python oracle), `tests/fixtures/`, `tests/state-fixtures/` and the
 DVB regression sets. Receiver views are checked against recorded output of the
 pinned FFmpeg build. Every operation is also exercised at several work quanta,
-under allocation pressure and with cancellation. The PGS trace examples
-(`pgs_display`, `pgs_native_compat`, `pgs_native_recovery`) print receiver
-profile labels and need `--features reference-trace`. Gates and the reference build
+under allocation pressure and with cancellation. Gates and the reference build
 are described in [docs/quality.md](../../docs/quality.md); current results are
 in [docs/status.md](../../docs/status.md).

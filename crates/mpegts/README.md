@@ -89,11 +89,7 @@ to a consumer in segment feed mode. `take_feed_omissions` counts the skipped
 events so consumers can retain positions in the source trace.
 
 `TransportStream::poll_compact` coalesces runs of null packets into one
-`CompactTraceEvent::NullRun`. `examples/mpegts_source_trace.rs` prints the
-source view as JSON lines (`mpegts_source_trace 188|192 PROGRAM [--dvb]
-[--native-clock-v1] [--media-entities-v1] [--compact] FILE...
-[--discontinuity FILE...]`); `examples/mpegts_native_pes_trace.rs` adds the
-FFmpeg-compatible PES rows. Both need the `reference-trace` feature.
+`CompactTraceEvent::NullRun`.
 
 ### Writing TS
 

@@ -7,11 +7,6 @@ use super::{DisplayConfig, DisplayLimits, PacketClock};
 use std::sync::atomic::AtomicBool;
 use triergon_core::{Budget, Bytes, Error, Result, WorkBudget};
 
-/// Comparison label of the receiver decoder's packet and first-event contract.
-/// This names a receiver contract, not complete PGS compatibility.
-#[cfg(feature = "reference-trace")]
-pub const RECEIVER_DECODER_PROFILE: &str = "native-pgs-first-event-compatibility-v1";
-
 /// Owned receiver output, distinct from the full Source+Receiver API.
 /// Later segments still update the decoder's cache and final context canvas.
 /// No Source validity, Source error or omitted Source output is represented here.

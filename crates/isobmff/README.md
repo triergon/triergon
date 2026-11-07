@@ -194,11 +194,8 @@ What the reader does not do:
 - **A QuickTime `mp4a` entry** whose version 1 or `wave` layout cannot be walked
   stays `CodecId::Other`, as does any object type other than AAC or DTS with a core.
 
-`examples/isobmff_source_trace.rs` drives the source view over a real file and
-prints JSON lines (`isobmff_source_trace INPUT [WINDOW<=4096] [WORK_QUANTUM]
-[physical]`). `examples/isobmff_consumer_worker.rs` drives the
-FFmpeg-compatible operations for comparison runs and needs the `reference-trace`
-feature.
+`examples/isobmff_consumer_worker.rs` drives the FFmpeg-compatible operations for
+comparison runs and needs the `reference-trace` feature.
 
 The comparison worker's `--recover-regular-tables` profile uses the bounded
 regular recovery cursors for a single local, unedited track. Use it alone
