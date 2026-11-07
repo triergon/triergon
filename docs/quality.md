@@ -205,7 +205,8 @@ returns a nonzero exit code. Earlier failures and their reports stay recorded.
   than 0.25%. A count takes seconds, so a code change that adds work shows here first.
   Passing it says nothing about speed: it cannot see load latency, cache misses or where
   functions sit, and it grades neither cycles nor mispredictions, so a change can pass
-  and still run slower. The timing pass decides.
+  and still run slower. The timing pass decides. On a stock Linux host, run
+  `sudo sysctl kernel.perf_event_paranoid=1` first, or `perf` reports no supported events.
 - A change not meant to affect speed gets a quick check: `cargo xtask same-code`
   on both workers, then one round of 30 pairs against a main build for every contract
   the change reaches, graded by `cargo xtask screen`. It flags a case above 1.5% or a
