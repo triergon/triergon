@@ -3440,6 +3440,45 @@ fn native_range_cursor_checks_all_extents_and_replays_after_duration_scan() {
 }
 
 #[test]
+fn range_preflight_limits_occurrences_across_tracks() {
+    let bytes = include_bytes!("fixtures/mp4/encoded-avc-aac-native-seek.mp4");
+    let (mut indexed, _, _, _) = native_range_player(bytes);
+    let outputs = collect(&mut indexed, 4096).unwrap();
+    let mut counts = std::collections::BTreeMap::new();
+    for packet in mp4_packets(&outputs) {
+        *counts
+            .entry(packet.configuration.track.track_id)
+            .or_insert(0) += 1;
+    }
+    assert!(counts.len() > 1);
+    let maximum = *counts.values().max().unwrap();
+    let (opened, calls, _) = observed_mp4_open(bytes);
+    assert!(opened.movie.header().duration > 0);
+    calls.lock().unwrap().clear();
+    let mut job = Mp4RangeOpen::new(
+        &opened.movie,
+        None,
+        PlanLimits {
+            occurrences: maximum as u64,
+            ..PlanLimits::default()
+        },
+    )
+    .unwrap();
+    let result = (0..100_000).find_map(|_| match job.poll(&mut WorkBudget::new(1), &off()) {
+        Ok(false) => None,
+        result => Some(result),
+    });
+    assert_eq!(
+        result,
+        Some(Err(C::Limit {
+            requested: maximum + 1,
+            maximum
+        }))
+    );
+    assert!(calls.lock().unwrap().is_empty());
+}
+
+#[test]
 fn native_range_open_refuses_late_unprojectable_metadata_before_playback() {
     let mut raw = include_bytes!("fixtures/mp4/encoded-avc-aac-native-seek.mp4").to_vec();
     let at = raw.windows(4).position(|kind| kind == b"stss").unwrap();

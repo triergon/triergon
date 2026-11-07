@@ -753,8 +753,11 @@ impl<'a> Mp4IndexJob<'a> {
                     }
                     push(&mut p.media_cache, extent.clone())?;
                 } else {
-                    self.phase = if self.range_duration.is_some() {
+                    self.phase = if let Some(duration) = &self.range_duration {
                         if let Some(cursor) = &mut self.native {
+                            if !duration.scan {
+                                cursor.check_projections_before_replay()?;
+                            }
                             cursor.enable_range_seek_checkpoints();
                         }
                         4
@@ -883,9 +886,6 @@ impl<'a> Mp4IndexJob<'a> {
                             Mov9CursorStatus::Ready if !w.try_charge(1) => return Ok(false),
                             Mov9CursorStatus::Ready => {
                                 let row = cursor.take_occurrence()?;
-                                if !duration.scan {
-                                    continue;
-                                }
                                 let Some(pts) = row.native.pts else { continue };
                                 let end = pts
                                     .checked_add(row.native.duration)
