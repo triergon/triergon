@@ -406,38 +406,50 @@ impl<'a> Rbsp<'a> {
         }
     }
 
+    fn refill(&mut self) -> Result<()> {
+        let (&byte, rest) = self.rest.split_first().ok_or(Error::Truncated)?;
+        let (byte, rest) = if self.zeroes == 2 {
+            match byte {
+                0..=2 => return Err(Error::Invalid("HEVC missing emulation-prevention byte")),
+                3 => {
+                    let (&next, rest) = rest.split_first().ok_or(Error::Truncated)?;
+                    if next > 3 {
+                        return Err(Error::Invalid("HEVC emulation-prevention byte"));
+                    }
+                    self.zeroes = 0;
+                    (next, rest)
+                }
+                _ => (byte, rest),
+            }
+        } else {
+            (byte, rest)
+        };
+        self.rest = rest;
+        self.byte = byte;
+        self.zeroes = if byte == 0 { self.zeroes + 1 } else { 0 };
+        self.remaining = 8;
+        Ok(())
+    }
+
     fn bit(&mut self) -> Result<u32> {
         if self.remaining == 0 {
-            let (&byte, rest) = self.rest.split_first().ok_or(Error::Truncated)?;
-            let (byte, rest) = if self.zeroes == 2 {
-                match byte {
-                    0..=2 => return Err(Error::Invalid("HEVC missing emulation-prevention byte")),
-                    3 => {
-                        let (&next, rest) = rest.split_first().ok_or(Error::Truncated)?;
-                        if next > 3 {
-                            return Err(Error::Invalid("HEVC emulation-prevention byte"));
-                        }
-                        self.zeroes = 0;
-                        (next, rest)
-                    }
-                    _ => (byte, rest),
-                }
-            } else {
-                (byte, rest)
-            };
-            self.rest = rest;
-            self.byte = byte;
-            self.zeroes = if byte == 0 { self.zeroes + 1 } else { 0 };
-            self.remaining = 8;
+            self.refill()?;
         }
         self.remaining -= 1;
         Ok(u32::from(self.byte >> self.remaining & 1))
     }
 
-    fn fixed(&mut self, width: u8) -> Result<u32> {
+    fn fixed(&mut self, mut width: u8) -> Result<u32> {
         let mut value = 0;
-        for _ in 0..width {
-            value = (value << 1) | self.bit()?;
+        while width != 0 {
+            if self.remaining == 0 {
+                self.refill()?;
+            }
+            let count = width.min(self.remaining);
+            self.remaining -= count;
+            let bits = u32::from(self.byte >> self.remaining) & ((1 << count) - 1);
+            value = (value << count) | bits;
+            width -= count;
         }
         Ok(value)
     }
@@ -446,10 +458,12 @@ impl<'a> Rbsp<'a> {
         Ok(self.bit()? != 0)
     }
 
-    fn skip(&mut self, count: u8) -> Result<()> {
-        for _ in 0..count {
-            self.bit()?;
+    fn skip(&mut self, mut count: u8) -> Result<()> {
+        while count > self.remaining {
+            count -= std::mem::take(&mut self.remaining);
+            self.refill()?;
         }
+        self.remaining -= count;
         Ok(())
     }
 
@@ -475,5 +489,45 @@ impl<'a> Rbsp<'a> {
 
     fn id(&mut self, maximum: u32) -> Result<u8> {
         Ok(self.bounded(maximum)? as u8)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn reads_and_skips_unaligned_fields_across_emulation_prevention() {
+        let mut bits = Rbsp::new(&[0xb5, 0, 0, 3, 1, 0xcd, 0xf2]);
+        assert!(bits.flag().unwrap());
+        assert_eq!(bits.fixed(7), Ok(0x35));
+        bits.skip(19).unwrap();
+        assert_eq!(bits.fixed(13), Ok(0x01cd));
+        assert_eq!(bits.fixed(8), Ok(0xf2));
+        assert_eq!(bits.bit(), Err(Error::Truncated));
+
+        let mut bits = Rbsp::new(&[0x80, 0, 0, 3, 1, 0x12]);
+        bits.skip(1).unwrap();
+        assert_eq!(bits.fixed(32), Ok(2));
+        assert_eq!(bits.fixed(7), Ok(0x12));
+    }
+
+    #[test]
+    fn skips_validate_each_crossed_byte_without_reading_ahead() {
+        for (raw, error) in [
+            (
+                &[0, 0, 1][..],
+                Error::Invalid("HEVC missing emulation-prevention byte"),
+            ),
+            (
+                &[0, 0, 3, 4][..],
+                Error::Invalid("HEVC emulation-prevention byte"),
+            ),
+            (&[0, 0, 3][..], Error::Truncated),
+        ] {
+            let mut bits = Rbsp::new(raw);
+            bits.skip(16).unwrap();
+            assert_eq!(bits.skip(1), Err(error));
+        }
     }
 }
