@@ -1,19 +1,9 @@
 //! Original full-reader guards for the explicit immutable source operation.
 use super::*;
+use crate::ebml_kit::element;
 use std::io::Cursor;
 use triergon_core::{Bytes, OwnedInputBytes};
 
-fn element(id: u64, data: &[u8]) -> Vec<u8> {
-    let mut out: Vec<_> = id
-        .to_be_bytes()
-        .into_iter()
-        .skip_while(|b| *b == 0)
-        .collect();
-    assert!(data.len() < 127);
-    out.push(0x80 | data.len() as u8);
-    out.extend_from_slice(data);
-    out
-}
 fn source() -> Vec<u8> {
     let track = element(
         0xae,

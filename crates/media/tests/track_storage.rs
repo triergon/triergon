@@ -1,21 +1,11 @@
 //! Regression against the existing API: cloning a library track must share its
 //! immutable allocations, including source bytes and non-static strings.
+#[path = "support/ebml.rs"]
+mod ebml;
+use ebml::{element as e, mkv};
 use std::io::Cursor;
 use triergon_matroska::{Limits, typed::BlockingReader as Demuxer};
 
-fn e(id: u64, bytes: &[u8]) -> Vec<u8> {
-    let mut out: Vec<_> = id
-        .to_be_bytes()
-        .into_iter()
-        .skip_while(|b| *b == 0)
-        .collect();
-    let width = (1..=8)
-        .find(|w| (bytes.len() as u64) < (1_u64 << (7 * w)) - 1)
-        .unwrap();
-    out.extend(((1_u64 << (7 * width)) | bytes.len() as u64).to_be_bytes()[8 - width..].iter());
-    out.extend(bytes);
-    out
-}
 fn fixture() -> Vec<u8> {
     let track = [
         e(0xd7, &[1]),
@@ -28,14 +18,7 @@ fn fixture() -> Vec<u8> {
         e(0x22b59d, b"fr-CA"),
     ]
     .concat();
-    [
-        e(0x1a45dfa3, &e(0x4282, b"matroska")),
-        e(
-            0x18538067,
-            &[e(0x1654ae6b, &e(0xae, &track)), e(0x1f43b675, &[])].concat(),
-        ),
-    ]
-    .concat()
+    mkv(&[e(0x1654ae6b, &e(0xae, &track)), e(0x1f43b675, &[])].concat())
 }
 fn tracks() -> (
     triergon_matroska::matroska::Track,
@@ -135,14 +118,7 @@ fn sibling_source_views_keep_one_charged_tracks_owner_after_teardown() {
     let first = entry(1);
     let second = entry(2);
     let raw = [e(0xae, &first), e(0xae, &second)].concat();
-    let bytes = [
-        e(0x1a45dfa3, &e(0x4282, b"matroska")),
-        e(
-            0x18538067,
-            &[e(0x1654ae6b, &raw), e(0x1f43b675, &[])].concat(),
-        ),
-    ]
-    .concat();
+    let bytes = mkv(&[e(0x1654ae6b, &raw), e(0x1f43b675, &[])].concat());
     let pool = Budget::new(64 * 1024).unwrap();
     let baseline = pool.used();
     let reader = Demuxer::open_in(Cursor::new(bytes), Limits::default(), &pool).unwrap();

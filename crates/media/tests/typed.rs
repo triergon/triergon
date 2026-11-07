@@ -1,4 +1,7 @@
 //! Runtime contracts for the typed reader.
+#[path = "support/ebml.rs"]
+mod ebml;
+use ebml::{element, mkv, track, uint};
 use std::sync::atomic::AtomicBool;
 use triergon_core::Step;
 use triergon_core::{
@@ -9,42 +12,6 @@ use triergon_matroska::{
     typed::{Event, Reader},
 };
 
-fn element(id: u64, data: &[u8]) -> Vec<u8> {
-    let mut out: Vec<_> = id
-        .to_be_bytes()
-        .into_iter()
-        .skip_while(|b| *b == 0)
-        .collect();
-    let width = (1..=8)
-        .find(|w| (data.len() as u64) < (1_u64 << (7 * w)) - 1)
-        .unwrap();
-    out.extend(((1_u64 << (7 * width)) | data.len() as u64).to_be_bytes()[8 - width..].iter());
-    out.extend(data);
-    out
-}
-fn uint(id: u64, value: u64) -> Vec<u8> {
-    element(id, &value.to_be_bytes())
-}
-fn entry(number: u64, kind: u64, extra: &[u8]) -> Vec<u8> {
-    element(
-        0xae,
-        &[
-            uint(0xd7, number),
-            uint(0x73c5, number),
-            uint(0x83, kind),
-            element(0x86, b"V_AUTHORED/OPAQUE"),
-            extra.to_vec(),
-        ]
-        .concat(),
-    )
-}
-fn document(payload: &[u8]) -> Vec<u8> {
-    [
-        element(0x1a45dfa3, &element(0x4282, b"matroska")),
-        element(0x18538067, payload),
-    ]
-    .concat()
-}
 const ABC: [u8; 14] = [120, 1, 1, 3, 0, 252, 255, 97, 98, 99, 2, 77, 1, 39];
 fn zlib_encoding(scope: u64) -> Vec<u8> {
     element(
@@ -64,7 +31,7 @@ fn stored_laced_source(bad: bool) -> Vec<u8> {
     }
     let tracks = element(
         0x1654ae6b,
-        &entry(
+        &track(
             1,
             1,
             &[
@@ -76,13 +43,11 @@ fn stored_laced_source(bad: bool) -> Vec<u8> {
             .concat(),
         ),
     );
-    document(
-        &[
-            tracks,
-            element(0x1f43b675, &[uint(0xe7, 2), element(0xa3, &block)].concat()),
-        ]
-        .concat(),
-    )
+    mkv(&[
+        tracks,
+        element(0x1f43b675, &[uint(0xe7, 2), element(0xa3, &block)].concat()),
+    ]
+    .concat())
 }
 fn reader(raw: &[u8], known: bool, limits: Limits, pool: &Budget) -> Reader {
     Reader::new(
@@ -210,8 +175,8 @@ fn late_lace_crc_failure_cannot_publish_a_packet_or_succeed_at_eof() {
 
 #[test]
 fn duplicate_track_rejects_the_whole_configuration_transaction() {
-    let tracks = element(0x1654ae6b, &[entry(1, 1, &[]), entry(1, 1, &[])].concat());
-    let raw = document(&[tracks, element(0x1f43b675, &[])].concat());
+    let tracks = element(0x1654ae6b, &[track(1, 1, &[]), track(1, 1, &[])].concat());
+    let raw = mkv(&[tracks, element(0x1f43b675, &[])].concat());
     let pool = Budget::new(128 * 1024).unwrap();
     let mut reader = reader(&raw, false, Limits::default(), &pool);
     let mut configurations = 0;
@@ -241,14 +206,12 @@ fn metadata_catalogue_requires_bounded_full_validation_before_document_publicati
         )
     };
     let chapters = element(0x1043a770, &element(0x45b9, &[atom(1), atom(1)].concat()));
-    let raw = document(
-        &[
-            element(0x1654ae6b, &entry(1, 1, &[])),
-            chapters,
-            element(0x1f43b675, &[]),
-        ]
-        .concat(),
-    );
+    let raw = mkv(&[
+        element(0x1654ae6b, &track(1, 1, &[])),
+        chapters,
+        element(0x1f43b675, &[]),
+    ]
+    .concat());
     let pool = Budget::new(128 * 1024).unwrap();
     let mut reader = reader(&raw, false, Limits::default(), &pool);
     let mut documents = 0;
@@ -276,13 +239,11 @@ fn block_group_trailing_duration_reference_and_padding_apply_before_the_first_la
         ]
         .concat(),
     );
-    let raw = document(
-        &[
-            element(0x1654ae6b, &entry(1, 1, &[])),
-            element(0x1f43b675, &[uint(0xe7, 10), group].concat()),
-        ]
-        .concat(),
-    );
+    let raw = mkv(&[
+        element(0x1654ae6b, &track(1, 1, &[])),
+        element(0x1f43b675, &[uint(0xe7, 10), group].concat()),
+    ]
+    .concat());
     let pool = Budget::new(128 * 1024).unwrap();
     let mut reader = reader(&raw, false, Limits::default(), &pool);
     let mut packets = Vec::new();
@@ -308,7 +269,7 @@ fn block_group_trailing_duration_reference_and_padding_apply_before_the_first_la
 fn cues_and_all_track_preroll_produce_verified_receipt_and_replay_interleaved_audio() {
     let tracks = element(
         0x1654ae6b,
-        &[entry(1, 1, &[]), entry(2, 2, &uint(0x56bb, 32_000_000))].concat(),
+        &[track(1, 1, &[]), track(2, 2, &uint(0x56bb, 32_000_000))].concat(),
     );
     let first = element(
         0x1f43b675,
@@ -341,7 +302,7 @@ fn cues_and_all_track_preroll_produce_verified_receipt_and_replay_interleaved_au
         ]
         .concat(),
     );
-    let raw = document(&[tracks, first, second, cues].concat());
+    let raw = mkv(&[tracks, first, second, cues].concat());
     let pool = Budget::new(256 * 1024).unwrap();
     let mut reader = reader(&raw, true, Limits::default(), &pool);
     drive(&mut reader, &raw, |_| ()).unwrap();
@@ -377,13 +338,11 @@ fn cues_and_all_track_preroll_produce_verified_receipt_and_replay_interleaved_au
 
 #[test]
 fn known_length_starvation_and_transport_failure_stay_distinct_from_end() {
-    let raw = document(
-        &[
-            element(0x1654ae6b, &entry(1, 1, &[])),
-            element(0x1f43b675, &[]),
-        ]
-        .concat(),
-    );
+    let raw = mkv(&[
+        element(0x1654ae6b, &track(1, 1, &[])),
+        element(0x1f43b675, &[]),
+    ]
+    .concat());
     let pool = Budget::new(128 * 1024).unwrap();
     let mut reader = reader(&raw, true, Limits::default(), &pool);
     let cancel = AtomicBool::new(false);

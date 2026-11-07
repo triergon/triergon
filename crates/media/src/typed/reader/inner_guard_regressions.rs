@@ -1,5 +1,6 @@
 //! Guard coalescing: source failure priority, sticky cancellation, and exact traces.
 use super::*;
+use crate::ebml_kit::{element, mkv};
 use triergon_core::Bytes;
 
 fn reader(pool: &Budget, length: u64) -> Reader {
@@ -124,19 +125,6 @@ fn inner_guard_healthy_empty_check_needs_no_work_or_storage() {
     drop(held);
 }
 
-fn element(id: u64, data: &[u8]) -> Vec<u8> {
-    let mut out: Vec<_> = id
-        .to_be_bytes()
-        .into_iter()
-        .skip_while(|b| *b == 0)
-        .collect();
-    let width = (1..=8)
-        .find(|width| (data.len() as u64) < (1_u64 << (7 * width)) - 1)
-        .unwrap();
-    out.extend(((1_u64 << (7 * width)) | data.len() as u64).to_be_bytes()[8 - width..].iter());
-    out.extend(data);
-    out
-}
 fn fixture() -> Vec<u8> {
     let entry = element(
         0xae,
@@ -152,19 +140,12 @@ fn fixture() -> Vec<u8> {
     let blocks: Vec<_> = (0..3)
         .map(|at| element(0xa3, &[0x81, 0, at, 0x80, b'a' + at]))
         .collect();
-    [
-        element(0x1a45dfa3, &element(0x4282, b"matroska")),
-        element(
-            SEGMENT,
-            &[
-                element(INFO, &element(0x2ad7b1, &[0x0f, 0x42, 0x40])),
-                element(TRACKS, &entry),
-                element(CLUSTER, &[element(0xe7, &[0]), blocks.concat()].concat()),
-            ]
-            .concat(),
-        ),
+    mkv(&[
+        element(INFO, &element(0x2ad7b1, &[0x0f, 0x42, 0x40])),
+        element(TRACKS, &entry),
+        element(CLUSTER, &[element(0xe7, &[0]), blocks.concat()].concat()),
     ]
-    .concat()
+    .concat())
 }
 
 fn event(step: &Step<Event, Backpressure>) -> String {

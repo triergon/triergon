@@ -1,25 +1,10 @@
 //! Source-preserving runtime/resource guards and compatibility controls.
 use super::*;
+use crate::ebml_kit::{cluster, element as e, mkv, uint as u};
 use crate::timing::BlockTiming;
 use crate::typed::{InitializationOrigin, Packet as TypedPacket, SourcePosition};
 use triergon_core::Bytes;
 
-fn e(id: u64, data: &[u8]) -> Vec<u8> {
-    let mut out: Vec<_> = id
-        .to_be_bytes()
-        .into_iter()
-        .skip_while(|b| *b == 0)
-        .collect();
-    let width = (1..=8)
-        .find(|w| (data.len() as u64) < (1_u64 << (7 * w)) - 1)
-        .unwrap();
-    out.extend(((1_u64 << (7 * width)) | data.len() as u64).to_be_bytes()[8 - width..].iter());
-    out.extend(data);
-    out
-}
-fn u(id: u64, value: u64) -> Vec<u8> {
-    e(id, &value.to_be_bytes())
-}
 fn entry(number: u64, kind: u64, extra: &[u8]) -> Vec<u8> {
     e(
         0xae,
@@ -49,9 +34,6 @@ fn simple(number: u64, width: usize, offset: i16, flags: u8, payload: &[u8]) -> 
     body.extend(payload);
     e(0xa3, &body)
 }
-fn cluster(ticks: u64, blocks: &[Vec<u8>]) -> Vec<u8> {
-    e(0x1f43b675, &[u(0xe7, ticks), blocks.concat()].concat())
-}
 struct Fixture {
     raw: Vec<u8>,
     clusters: u64,
@@ -59,7 +41,7 @@ struct Fixture {
 fn file(entries: &[u8], info: &[u8], clusters: &[Vec<u8>]) -> Fixture {
     let body = [info.to_vec(), e(0x1654ae6b, entries), clusters.concat()].concat();
     Fixture {
-        raw: [e(0x1a45dfa3, &e(0x4282, b"matroska")), e(0x18538067, &body)].concat(),
+        raw: mkv(&body),
         // Independent concatenated wire lengths, not a parser/seek helper.
         clusters: clusters.iter().map(|bytes| bytes.len() as u64).sum(),
     }
@@ -68,7 +50,7 @@ fn repeated(count: usize, payload: usize) -> Fixture {
     let blocks: Vec<_> = (0..count)
         .map(|index| simple(1, 1, index as i16, 0x80, &vec![b'x'; payload]))
         .collect();
-    file(&entry(1, 1, &[]), &[], &[cluster(0, &blocks)])
+    file(&entry(1, 1, &[]), &[], &[cluster(0, blocks.concat())])
 }
 
 #[derive(Debug, PartialEq, Eq)]
@@ -403,7 +385,7 @@ fn scan_prefix_control_first_span_widths_empty_payload_and_source_clock() {
             let fixture = file(
                 &entry(1, 1, &u(0x56aa, 333_333)),
                 &[],
-                &[cluster(10, &[simple(1, width, -2, 0x89, payload)])],
+                &[cluster(10, simple(1, width, -2, 0x89, payload))],
             );
             for after_eof in [false, true] {
                 let eligible = run(&fixture.raw, 64, 8192, after_eof, 9_000_000);
@@ -429,18 +411,19 @@ fn scan_prefix_control_physical_equal_time_and_other_tracks_use_identical_receip
         &[
             cluster(
                 0,
-                &[simple(2, 1, 0, 0x80, b"s0"), simple(1, 1, 0, 0x80, b"v0")],
+                [simple(2, 1, 0, 0x80, b"s0"), simple(1, 1, 0, 0x80, b"v0")].concat(),
             ),
             cluster(
                 10,
-                &[
+                [
                     simple(2, 1, 0, 0x80, b"s10"),
                     simple(1, 1, 0, 0x80, b"first"),
                     simple(1, 1, 0, 0x80, b"tie"),
                     simple(2, 1, 1, 0x80, b"s11"),
-                ],
+                ]
+                .concat(),
             ),
-            cluster(20, &[simple(1, 1, 0, 0x80, b"v20")]),
+            cluster(20, simple(1, 1, 0, 0x80, b"v20")),
         ],
     );
     for after_eof in [false, true] {
@@ -465,16 +448,17 @@ fn scan_prefix_control_plain_previous_uses_the_real_block_and_unchanged_epoch_re
         &entries,
         &[],
         &[
-            cluster(0, &[simple(1, 1, 0, 0x80, b"v0")]),
+            cluster(0, simple(1, 1, 0, 0x80, b"v0")),
             cluster(
                 10,
-                &[
+                [
                     simple(2, 1, 0, 0x80, b"before"),
                     simple(1, 1, 0, 0x80, b"first"),
                     simple(1, 1, 0, 0x80, b"tie"),
-                ],
+                ]
+                .concat(),
             ),
-            cluster(20, &[simple(1, 1, 0, 0x80, b"v20")]),
+            cluster(20, simple(1, 1, 0, 0x80, b"v20")),
         ],
     );
     for after_eof in [false, true] {
@@ -502,13 +486,13 @@ fn scan_prefix_control_all_track_preroll_keeps_original_source_packets() {
         &[
             cluster(
                 0,
-                &[simple(2, 1, 0, 0x80, b"a0"), simple(1, 1, 0, 0x80, b"v0")],
+                [simple(2, 1, 0, 0x80, b"a0"), simple(1, 1, 0, 0x80, b"v0")].concat(),
             ),
             cluster(
                 10,
-                &[simple(2, 1, 0, 0x80, b"a10"), simple(1, 1, 0, 0x80, b"v10")],
+                [simple(2, 1, 0, 0x80, b"a10"), simple(1, 1, 0, 0x80, b"v10")].concat(),
             ),
-            cluster(20, &[simple(1, 1, 0, 0x80, b"v20")]),
+            cluster(20, simple(1, 1, 0, 0x80, b"v20")),
         ],
     );
     for after_eof in [false, true] {
@@ -564,7 +548,7 @@ fn scan_prefix_control_invalid_or_valid_prefix_keeps_late_source_error_priority(
         vec![0x83, 0, 0, 0x80],
     ] {
         let block = e(0xa3, &[prefix, vec![b'x'; 128]].concat());
-        let fixture = file(&entry(1, 1, &[]), &[], &[cluster(0, &[block])]);
+        let fixture = file(&entry(1, 1, &[]), &[], &[cluster(0, block)]);
         let cut = fixture.raw.len() - 8;
         assert!(matches!(
             seek_error(&fixture, Some((cut, false)), 64),
@@ -581,7 +565,7 @@ fn scan_prefix_control_bad_prefix_and_clock_errors_are_not_silently_accepted() {
     let invalid = file(
         &entry(1, 1, &[]),
         &[],
-        &[cluster(0, &[e(0xa3, &[0, 0, 0, 0x80, b'x'])])],
+        &[cluster(0, e(0xa3, &[0, 0, 0, 0x80, b'x']))],
     );
     assert!(matches!(
         seek_error(&invalid, None, 64),
@@ -590,7 +574,7 @@ fn scan_prefix_control_bad_prefix_and_clock_errors_are_not_silently_accepted() {
     let unknown = file(
         &entry(1, 1, &[]),
         &[],
-        &[cluster(0, &[simple(3, 1, 0, 0x80, b"x")])],
+        &[cluster(0, simple(3, 1, 0, 0x80, b"x"))],
     );
     assert!(matches!(
         seek_error(&unknown, None, 64),
@@ -599,7 +583,7 @@ fn scan_prefix_control_bad_prefix_and_clock_errors_are_not_silently_accepted() {
     let overflow = file(
         &entry(1, 1, &[]),
         &e(0x1549a966, &u(0x2ad7b1, u64::MAX)),
-        &[cluster(u64::MAX, &[simple(1, 1, 0, 0x80, &[b'x'; 128])])],
+        &[cluster(u64::MAX, simple(1, 1, 0, 0x80, &[b'x'; 128]))],
     );
     assert!(matches!(seek_error(&overflow, None, 64), Error::Overflow));
     let cut = overflow.raw.len() - 8;
@@ -679,7 +663,7 @@ fn scan_prefix_control_lacing_compression_restoration_and_codec_state_use_full_v
     ));
     cases.push((u(0x55ee, 1), group(false), vec![b"g".to_vec()]));
     for (extra, block, expected) in cases {
-        let fixture = file(&entry(1, 1, &extra), &[], &[cluster(0, &[block])]);
+        let fixture = file(&entry(1, 1, &extra), &[], &[cluster(0, block)]);
         for after_eof in [false, true] {
             let a = run(&fixture.raw, 64, 8192, after_eof, 0);
             let b = run(&fixture.raw, 1, 1, after_eof, 0);
@@ -705,11 +689,7 @@ fn scan_prefix_control_lacing_compression_restoration_and_codec_state_use_full_v
 }
 #[test]
 fn scan_prefix_control_group_crc_and_last_compressed_lace_error_precede_seek_receipt() {
-    let fixture = file(
-        &entry(1, 1, &u(0x55ee, 1)),
-        &[],
-        &[cluster(0, &[group(true)])],
-    );
+    let fixture = file(&entry(1, 1, &u(0x55ee, 1)), &[], &[cluster(0, group(true))]);
     assert!(
         matches!(seek_error(&fixture, None, 64), Error::Invalid(reason) if reason.contains("CRC"))
     );
@@ -720,7 +700,7 @@ fn scan_prefix_control_group_crc_and_last_compressed_lace_error_precede_seek_rec
     let fixture = file(
         &entry(1, 1, &encoding(0, &[])),
         &[],
-        &[cluster(0, &[simple(1, 1, 0, 0x84, &laces)])],
+        &[cluster(0, simple(1, 1, 0, 0x84, &laces))],
     );
     assert!(matches!(
         seek_error(&fixture, None, 64),
@@ -959,7 +939,7 @@ fn scan_prefix_control_caller_pressure_can_be_released_without_losing_seek_progr
 #[test]
 fn scan_prefix_control_short_prefix_and_missing_timestamp_keep_body_error_order() {
     for body in [vec![0x81], vec![0x81, 0], vec![1, 0, 0, 0, 0, 0, 1]] {
-        let fixture = file(&entry(1, 1, &[]), &[], &[cluster(0, &[e(0xa3, &body)])]);
+        let fixture = file(&entry(1, 1, &[]), &[], &[cluster(0, e(0xa3, &body))]);
         assert!(matches!(seek_error(&fixture, None, 64), Error::Truncated));
     }
     let block = simple(1, 1, 0, 0x80, &[b'x'; 128]);
@@ -1133,18 +1113,20 @@ fn scan_inplace_guard_exact_request_work_and_owner_trace() {
         &[
             cluster(
                 0,
-                &[
+                [
                     simple(1, 1, 10, 0x80, b"late"),
                     simple(1, 1, 5, 0x80, b"first"),
                     simple(17, 1, 6, 0, b"sub"),
-                ],
+                ]
+                .concat(),
             ),
             cluster(
                 0,
-                &[
+                [
                     simple(1, 1, 7, 0x80, b"best"),
                     simple(1, 1, 5, 0x80, b"last"),
-                ],
+                ]
+                .concat(),
             ),
         ],
     );
@@ -1177,9 +1159,9 @@ fn scan_inplace_guard_codec_epoch_and_reentrant_seek_trace() {
         &entry(1, 1, &u(0x55ee, 1)),
         &[],
         &[
-            cluster(0, &[group(false)]),
-            cluster(1, &[simple(1, 1, 0, 0x80, b"best")]),
-            cluster(2, &[group(false), simple(1, 1, 1, 0, b"tail")]),
+            cluster(0, group(false)),
+            cluster(1, simple(1, 1, 0, 0x80, b"best")),
+            cluster(2, [group(false), simple(1, 1, 1, 0, b"tail")].concat()),
         ],
     );
     let pool = Budget::new(4 * 1024 * 1024).unwrap();
@@ -1204,9 +1186,9 @@ fn scan_inplace_guard_pending_best_cancel_reset_retained_alias() {
         &entry(1, 1, &u(0x55ee, 1)),
         &[],
         &[
-            cluster(0, &[group(false)]),
-            cluster(1, &[simple(1, 1, 0, 0x80, b"best")]),
-            cluster(2, &[simple(1, 1, 0, 0, &[b'x'; 256])]),
+            cluster(0, group(false)),
+            cluster(1, simple(1, 1, 0, 0x80, b"best")),
+            cluster(2, simple(1, 1, 0, 0, &[b'x'; 256])),
         ],
     );
     let pool = Budget::new(256 * 1024).unwrap();
@@ -1302,7 +1284,7 @@ fn immutable_fixture(raw: &[u8], limits: Limits) -> (Reader, Feed<'_>) {
 #[test]
 fn immutable_playback_seek_reuses_complete_index_and_earliest_equal_timestamp() {
     let clusters = [(0, b"a"), (100, b"b"), (100, b"c"), (200, b"d")]
-        .map(|(time, payload)| cluster(time, &[simple(1, 1, 0, 0x80, payload)]));
+        .map(|(time, payload)| cluster(time, simple(1, 1, 0, 0x80, payload)));
     let fixture = file(&entry(1, 1, &[]), &[], &clusters);
     let (mut reader, mut feed) = immutable_fixture(&fixture.raw, Limits::default());
     open(&mut reader, &mut feed).unwrap();
@@ -1331,11 +1313,11 @@ fn immutable_playback_seek_reuses_complete_index_and_earliest_equal_timestamp() 
 
 #[test]
 fn immutable_seek_falls_back_for_incomplete_unordered_bounded_and_stateful_sources() {
-    let first = cluster(0, &[simple(1, 1, 0, 0x80, b"a")]);
-    let second = cluster(100, &[simple(1, 1, 0, 0x80, b"b")]);
+    let first = cluster(0, simple(1, 1, 0, 0x80, b"a"));
+    let second = cluster(100, simple(1, 1, 0, 0x80, b"b"));
     let plain = file(&entry(1, 1, &[]), &[], &[first.clone(), second.clone()]);
     let unordered = file(&entry(1, 1, &[]), &[], &[second, first.clone()]);
-    let state = cluster(100, &[group(false)]);
+    let state = cluster(100, group(false));
     let stateful = file(&entry(1, 1, &u(0x55ee, 1)), &[], &[first, state]);
     for (fixture, complete, index_entries) in [
         (&plain, false, 8),

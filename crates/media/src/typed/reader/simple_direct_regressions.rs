@@ -1,21 +1,9 @@
 //! Common SimpleBlock publication and full-batch handoff use identical wire facts.
 use super::*;
+use crate::ebml_kit::{element as e, mkv};
 use crate::matroska::typed::usage::Storage;
 use triergon_core::Bytes;
 
-fn e(id: u64, data: &[u8]) -> Vec<u8> {
-    let mut v: Vec<_> = id
-        .to_be_bytes()
-        .into_iter()
-        .skip_while(|b| *b == 0)
-        .collect();
-    let w = (1..=8)
-        .find(|w| (data.len() as u64) < (1_u64 << (7 * w)) - 1)
-        .unwrap();
-    v.extend(((1_u64 << (7 * w)) | data.len() as u64).to_be_bytes()[8 - w..].iter());
-    v.extend(data);
-    v
-}
 fn entry(n: u8, kind: u8, extra: Vec<u8>) -> Vec<u8> {
     e(
         0xae,
@@ -58,26 +46,19 @@ fn file(bodies: Vec<Vec<u8>>, prefix: bool) -> Vec<u8> {
     } else {
         Vec::new()
     };
-    [
-        e(0x1a45dfa3, &e(0x4282, b"matroska")),
+    mkv(&[
         e(
-            SEGMENT,
+            TRACKS,
             &[
-                e(
-                    TRACKS,
-                    &[
-                        entry(1, 1, Vec::new()),
-                        entry(2, 1, encoding),
-                        entry(3, 17, Vec::new()),
-                    ]
-                    .concat(),
-                ),
-                e(CLUSTER, &[e(0xe7, &[0]), bodies.concat()].concat()),
+                entry(1, 1, Vec::new()),
+                entry(2, 1, encoding),
+                entry(3, 17, Vec::new()),
             ]
             .concat(),
         ),
+        e(CLUSTER, &[e(0xe7, &[0]), bodies.concat()].concat()),
     ]
-    .concat()
+    .concat())
 }
 fn mixed() -> Vec<u8> {
     file(

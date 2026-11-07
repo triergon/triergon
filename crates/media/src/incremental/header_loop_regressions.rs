@@ -1,20 +1,8 @@
 //! Authored source/work/health guards for the existing envelope engine.
 use super::*;
+use crate::ebml_kit::element;
 use triergon_core::{Budget, Bytes, InputWindow};
 
-fn element(id: u64, body: &[u8]) -> Vec<u8> {
-    let mut out: Vec<_> = id
-        .to_be_bytes()
-        .into_iter()
-        .skip_while(|b| *b == 0)
-        .collect();
-    let width = (1..=8)
-        .find(|w| (body.len() as u64) < (1_u64 << (7 * w)) - 1)
-        .unwrap();
-    out.extend_from_slice(&((1_u64 << (7 * width)) | body.len() as u64).to_be_bytes()[8 - width..]);
-    out.extend_from_slice(body);
-    out
-}
 fn fixture(width: usize) -> Vec<u8> {
     let mut out = element(0x1a45dfa3, &element(0x4282, b"matroska"));
     out.extend_from_slice(&[0x18, 0x53, 0x80, 0x67]);

@@ -2,25 +2,13 @@
 mod cue_reference_closure;
 mod packet_side_data;
 use super::*;
+use crate::ebml_kit::{element, mkv, track, track_entry, uint};
 use crate::{incremental::ParseStep, storage::SharedBytes};
 use std::sync::atomic::AtomicBool;
 use triergon_core::{
     Budget, BudgetVec, Bytes, InputCursor, InputWindow, SourceCapabilities, SourceId, WorkBudget,
 };
 
-fn element(id: u64, data: &[u8]) -> Vec<u8> {
-    let mut out: Vec<_> = id
-        .to_be_bytes()
-        .into_iter()
-        .skip_while(|b| *b == 0)
-        .collect();
-    let width = (1..=8)
-        .find(|w| (data.len() as u64) < (1_u64 << (7 * w)) - 1)
-        .unwrap();
-    out.extend(((1_u64 << (7 * width)) | data.len() as u64).to_be_bytes()[8 - width..].iter());
-    out.extend(data);
-    out
-}
 const ABC: [u8; 14] = [120, 1, 1, 3, 0, 252, 255, 97, 98, 99, 2, 77, 1, 39];
 
 #[test]
@@ -180,19 +168,6 @@ fn info_projection_reports_only_source_values_and_preserves_unknown_fields_as_ra
     assert_eq!(info.source.as_ref(), raw.as_slice());
 }
 
-fn uint(id: u64, value: u64) -> Vec<u8> {
-    element(id, &value.to_be_bytes())
-}
-fn track_entry(number: u64, kind: u64, extra: &[u8]) -> Vec<u8> {
-    [
-        uint(0xd7, number),
-        uint(0x73c5, number),
-        uint(0x83, kind),
-        element(0x86, b"V_AUTHORED/OPAQUE"),
-        extra.to_vec(),
-    ]
-    .concat()
-}
 fn encoding(scope: u64) -> Vec<u8> {
     element(
         0x6d80,
@@ -205,18 +180,11 @@ fn encoding(scope: u64) -> Vec<u8> {
 // Only this fixture seed uses the blocking parser. Packet-job tests must
 // not rely on the raw Tracks builder to provide their independent oracle.
 fn seed_configuration(pool: &Budget, extra: &[u8]) -> configuration::Configuration {
-    seed_configuration_tracks(pool, &element(0xae, &track_entry(1, 1, extra)))
+    seed_configuration_tracks(pool, &track(1, 1, extra))
 }
 fn seed_configuration_tracks(pool: &Budget, entries: &[u8]) -> configuration::Configuration {
     use crate::typed::BlockingReader as Demuxer;
-    let raw = [
-        element(0x1a45dfa3, &element(0x4282, b"matroska")),
-        element(
-            0x18538067,
-            &[element(0x1654ae6b, entries), element(0x1f43b675, &[])].concat(),
-        ),
-    ]
-    .concat();
+    let raw = mkv(&[element(0x1654ae6b, entries), element(0x1f43b675, &[])].concat());
     let reader =
         Demuxer::open_in(std::io::Cursor::new(raw), crate::Limits::default(), pool).unwrap();
     let mut tracks = BudgetVec::new(pool);
@@ -529,19 +497,11 @@ fn raw_tracks_job_keeps_late_duplicate_and_decoded_private_limits_atomic() {
     let extra = [encoding(2), element(0x63a2, &ABC)].concat();
     for (raw, metadata_left, message) in [
         (
-            [
-                element(0xae, &track_entry(1, 1, &[])),
-                element(0xae, &track_entry(1, 1, &[])),
-            ]
-            .concat(),
+            [track(1, 1, &[]), track(1, 1, &[])].concat(),
             4096,
             "duplicate track number",
         ),
-        (
-            element(0xae, &track_entry(1, 1, &extra)),
-            0,
-            "decoded private metadata",
-        ),
+        (track(1, 1, &extra), 0, "decoded private metadata"),
     ] {
         let pool = Budget::new(64 * 1024).unwrap();
         let source = SharedBytes::copy_from_slice(&pool, &raw).unwrap();
@@ -620,7 +580,7 @@ fn raw_tracks_job_preserves_mixed_encoding_order_and_all_hdr_source_floats() {
         ),
     ]
     .concat();
-    let raw = element(0xae, &track_entry(1, 1, &extra));
+    let raw = track(1, 1, &extra);
     let pool = Budget::new(64 * 1024).unwrap();
     let source = SharedBytes::copy_from_slice(&pool, &raw).unwrap();
     let mut job =
@@ -689,11 +649,7 @@ fn cluster_anchor(
     Vec<u8>,
 ) {
     use crate::incremental::{ElementEvent, ElementReader};
-    let raw = [
-        element(0x1a45dfa3, &element(0x4282, b"matroska")),
-        element(0x18538067, tail),
-    ]
-    .concat();
+    let raw = mkv(tail);
     let mut reader = ElementReader::new(
         pool,
         SourceId(11),
@@ -1423,11 +1379,7 @@ fn range_job_rejects_stale_generation_and_a_transport_failure_even_at_its_pendin
 fn playback_preroll_plan_validates_video_but_replays_the_earlier_interleaved_audio() {
     use crate::{cues::Cue, incremental::ElementEvent};
     let pool = Budget::new(128 * 1024).unwrap();
-    let entries = [
-        element(0xae, &track_entry(1, 1, &[])),
-        element(0xae, &track_entry(2, 2, &uint(0x56bb, 2_000_000))),
-    ]
-    .concat();
+    let entries = [track(1, 1, &[]), track(2, 2, &uint(0x56bb, 2_000_000))].concat();
     let configuration = seed_configuration_tracks(&pool, &entries);
     let timestamp = uint(0xe7, 2);
     let audio = element(0xa3, &[0x82, 0xff, 0xff, 0x80, b'A']);

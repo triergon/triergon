@@ -1,46 +1,13 @@
 //! Blocking adapter: one-byte short reads and whole-buffer reads of the same
 //! authored sources yield identical tracks, metadata, seek receipts and packets.
+#[path = "support/ebml.rs"]
+mod ebml;
+use ebml::{element as e, mkv, track, uint as u};
 use std::{
     io::{self, Cursor, Read},
     sync::atomic::AtomicBool,
 };
 use triergon_matroska::{Limits, matroska::Packet, typed::BlockingReader};
-fn e(id: u64, data: &[u8]) -> Vec<u8> {
-    let mut out: Vec<_> = id
-        .to_be_bytes()
-        .into_iter()
-        .skip_while(|b| *b == 0)
-        .collect();
-    let width = (1..=8)
-        .find(|w| (data.len() as u64) < (1_u64 << (7 * w)) - 1)
-        .unwrap();
-    out.extend(((1_u64 << (7 * width)) | data.len() as u64).to_be_bytes()[8 - width..].iter());
-    out.extend(data);
-    out
-}
-fn u(id: u64, value: u64) -> Vec<u8> {
-    e(id, &value.to_be_bytes())
-}
-fn track(number: u64, kind: u64, extra: &[u8]) -> Vec<u8> {
-    e(
-        0xae,
-        &[
-            u(0xd7, number),
-            u(0x73c5, number),
-            u(0x83, kind),
-            e(0x86, b"V_AUTHORED/OPAQUE"),
-            extra.to_vec(),
-        ]
-        .concat(),
-    )
-}
-fn file(payload: &[u8]) -> Vec<u8> {
-    [
-        e(0x1a45dfa3, &e(0x4282, b"matroska")),
-        e(0x18538067, payload),
-    ]
-    .concat()
-}
 const ABC: [u8; 14] = [120, 1, 1, 3, 0, 252, 255, 97, 98, 99, 2, 77, 1, 39];
 fn packets_equal(a: &Packet, b: &Packet) {
     assert_eq!(
@@ -98,13 +65,11 @@ fn sequential_short_reads_restore_private_and_laced_packets_without_a_second_par
     let mut block = vec![0x81, 0, 0, 0x84, 1];
     block.extend(ABC);
     block.extend(ABC);
-    let raw = file(
-        &[
-            e(0x1654ae6b, &track(1, 1, &extra)),
-            e(0x1f43b675, &[u(0xe7, 2), e(0xa3, &block)].concat()),
-        ]
-        .concat(),
-    );
+    let raw = mkv(&[
+        e(0x1654ae6b, &track(1, 1, &extra)),
+        e(0x1f43b675, &[u(0xe7, 2), e(0xa3, &block)].concat()),
+    ]
+    .concat());
     struct Short(Cursor<Vec<u8>>);
     impl Read for Short {
         fn read(&mut self, out: &mut [u8]) -> io::Result<usize> {
@@ -198,7 +163,7 @@ fn seekable_adapter_resolves_late_catalogue_and_matches_preroll_receipt_and_repl
     let cues_position = first_position + first.len() + second.len();
     let head = make_head(cues_position as u64, (cues_position + cues.len()) as u64);
     assert_eq!(head.len(), placeholder.len());
-    let raw = file(&[head, tracks, first, second, cues, chapters].concat());
+    let raw = mkv(&[head, tracks, first, second, cues, chapters].concat());
     let mut old =
         BlockingReader::open_seekable(Cursor::new(raw.clone()), Limits::default()).unwrap();
     let mut new = BlockingReader::open_seekable(Cursor::new(raw), Limits::default()).unwrap();
@@ -256,7 +221,7 @@ fn retaining_only_an_existing_static_codec_id_does_not_retain_the_tracks_allocat
         0xae,
         &[u(0xd7, 1), u(0x73c5, 1), u(0x83, 2), e(0x86, b"A_AAC")].concat(),
     );
-    let raw = file(&[e(0x1654ae6b, &entry), e(0x1f43b675, &[])].concat());
+    let raw = mkv(&[e(0x1654ae6b, &entry), e(0x1f43b675, &[])].concat());
     let pool = Budget::new(128 * 1024).unwrap();
     let baseline = pool.used();
     let reader = BlockingReader::open_in(Cursor::new(raw), Limits::default(), &pool).unwrap();

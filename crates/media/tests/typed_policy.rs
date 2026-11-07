@@ -1,4 +1,7 @@
 //! Resource/work and cancellation regressions for retained typed operations.
+#[path = "support/ebml.rs"]
+mod ebml;
+use ebml::{element as e, mkv};
 use std::sync::atomic::AtomicBool;
 use triergon_core::Step;
 use triergon_core::{Budget, Bytes, InputWindow, SourceCapabilities, SourceId, WorkBudget};
@@ -56,19 +59,6 @@ fn repeated(repeats: usize) -> (Vec<u8>, Vec<u8>) {
     source.extend(bits.bytes);
     source.extend(((b << 16) | a).to_be_bytes());
     (source, expected)
-}
-fn e(id: u64, data: &[u8]) -> Vec<u8> {
-    let mut out: Vec<_> = id
-        .to_be_bytes()
-        .into_iter()
-        .skip_while(|b| *b == 0)
-        .collect();
-    let width = (1..=8)
-        .find(|w| (data.len() as u64) < (1_u64 << (7 * w)) - 1)
-        .unwrap();
-    out.extend(((1_u64 << (7 * width)) | data.len() as u64).to_be_bytes()[8 - width..].iter());
-    out.extend(data);
-    out
 }
 
 #[test]
@@ -149,18 +139,11 @@ fn an_atomic_frame_larger_than_its_own_pool_minimum_is_a_permanent_limit_not_an_
         .concat(),
     );
     let block = [&[0x81, 0, 0, 0x80][..], compressed.as_slice()].concat();
-    let raw = [
-        e(0x1a45dfa3, &e(0x4282, b"matroska")),
-        e(
-            0x18538067,
-            &[
-                e(0x1654ae6b, &track),
-                e(0x1f43b675, &[e(0xe7, &[0]), e(0xa3, &block)].concat()),
-            ]
-            .concat(),
-        ),
+    let raw = mkv(&[
+        e(0x1654ae6b, &track),
+        e(0x1f43b675, &[e(0xe7, &[0]), e(0xa3, &block)].concat()),
     ]
-    .concat();
+    .concat());
     let pool = Budget::new(4096).unwrap();
     let mut reader = Reader::new(
         &pool,

@@ -78,3 +78,7 @@ impl Default for Limits {
         }
     }
 }
+
+#[cfg(test)]
+#[path = "../tests/support/ebml.rs"]
+mod ebml_kit;

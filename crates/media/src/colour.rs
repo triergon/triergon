@@ -210,6 +210,7 @@ mod tests {
 mod source_tests {
     use super::*;
     use crate::Result;
+    use crate::ebml_kit::element as e;
     use crate::incremental::ParseStep;
     use std::sync::atomic::AtomicBool;
     use triergon_core::WorkBudget;
@@ -225,17 +226,6 @@ mod source_tests {
                 other => panic!("unexpected colour step {other:?}"),
             }
         }
-    }
-    fn e(id: u64, bytes: &[u8]) -> Vec<u8> {
-        let mut out: Vec<_> = id
-            .to_be_bytes()
-            .into_iter()
-            .skip_while(|b| *b == 0)
-            .collect();
-        assert!(bytes.len() < 127);
-        out.push(0x80 | bytes.len() as u8);
-        out.extend(bytes);
-        out
     }
     #[test]
     fn defaults_zero_widths_future_values_and_source_precision() {
