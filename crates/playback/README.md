@@ -54,6 +54,8 @@ MP4 needs an open and index step first: `mp4_open::Mp4Open` →
 `mp4_plan::Mp4IndexJob` → `Engine::mp4`.
 Indexed MP4 packets share immutable track metadata. A complete sample in a
 shared input window can retain that window as its payload.
+When the movie declares its duration, the range player checks source ranges and
+packet projections before merging the tracks for delivery.
 
 ## Supported
 
