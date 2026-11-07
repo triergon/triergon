@@ -139,6 +139,7 @@ impl CompactPayload {
             records: self.records.into_iter(),
             current: None,
             index: 0,
+            current_count: 0,
             active: false,
             remaining: self.logical,
             tail_retired: 0,
@@ -196,6 +197,7 @@ pub struct PayloadCursor {
     records: BudgetVecIntoIter<DemuxSpan>,
     current: Option<DemuxSpan>,
     index: usize,
+    current_count: usize,
     active: bool,
     remaining: usize,
     tail_retired: usize,
@@ -223,7 +225,7 @@ impl PayloadCursor {
     pub fn current_bytes(&self) -> Option<BytesView<'_>> {
         self.active.then(|| {
             let span = self.current.as_ref().expect("active payload range");
-            byte_view(span, self.index, record_count(span, self.grouped) != 1)
+            byte_view(span, self.index, self.current_count != 1)
         })
     }
     /// Admit the next logical range. The caller validates its pool and full
@@ -252,12 +254,17 @@ impl PayloadCursor {
         if self
             .current
             .as_ref()
-            .is_some_and(|span| self.index == record_count(span, self.grouped))
+            .is_some_and(|_| self.index == self.current_count)
         {
             self.current = None;
+            self.current_count = 0;
         }
         if self.current.is_none() {
             self.current = self.records.next();
+            self.current_count = self
+                .current
+                .as_ref()
+                .map_or(0, |span| record_count(span, self.grouped));
             self.index = std::mem::take(&mut self.head_retired);
         }
         self.current.as_ref()?;
@@ -276,10 +283,11 @@ impl PayloadCursor {
         if self
             .current
             .as_ref()
-            .is_some_and(|span| self.index == record_count(span, self.grouped))
+            .is_some_and(|_| self.index == self.current_count)
         {
             self.current = None;
             self.index = 0;
+            self.current_count = 0;
         }
     }
     /// Borrow only ranges not yet admitted or successfully retired.
@@ -288,7 +296,7 @@ impl PayloadCursor {
             records: self.records.as_slice().iter(),
             current: self.current.as_ref().and_then(|span| {
                 let index = self.index + usize::from(self.active) + self.tail_retired;
-                (index < record_count(span, self.grouped)).then_some((span, index))
+                (index < self.current_count).then_some((span, index))
             }),
             first_index: self.head_retired,
             remaining: self.remaining,
@@ -312,9 +320,9 @@ impl PayloadCursor {
         if self.remaining == 0 {
             return Ok(());
         }
-        if let Some(span) = &self.current {
+        if self.current.is_some() {
             let start = self.index + usize::from(self.active) + self.tail_retired;
-            for _ in start..record_count(span, self.grouped) {
+            for _ in start..self.current_count {
                 retire()?;
                 self.remaining -= 1;
                 self.tail_retired += 1;
@@ -323,6 +331,7 @@ impl PayloadCursor {
         if !self.active {
             self.current = None;
             self.index = 0;
+            self.current_count = 0;
             self.tail_retired = 0;
         }
         while let Some(span) = self.records.as_slice().first() {

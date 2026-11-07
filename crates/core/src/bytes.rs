@@ -19,21 +19,20 @@ pub struct Bytes {
 
 /// A checked borrowed range. Copies borrow the original handle rather than
 /// incrementing its shared-storage count. Call `into_bytes` for independent retention.
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy)]
 pub struct BytesView<'a> {
     backing: &'a Bytes,
-    start: usize,
-    end: usize,
+    data: &'a [u8],
 }
 
 impl<'a> BytesView<'a> {
     /// Number of bytes in this borrowed range.
     pub fn len(self) -> usize {
-        self.end - self.start
+        self.data.len()
     }
     /// Whether the checked range contains no bytes.
     pub fn is_empty(self) -> bool {
-        self.start == self.end
+        self.data.is_empty()
     }
     /// Borrow the original handle, including its full retained allocation.
     pub fn backing_bytes(self) -> &'a Bytes {
@@ -49,23 +48,49 @@ impl<'a> BytesView<'a> {
     }
     /// Borrow a relative subrange, rejecting reversed or out-of-range bounds.
     pub fn slice(self, range: Range<usize>) -> Result<Self> {
-        if range.start > range.end || range.end > self.len() {
-            return Err(Error::Invalid("byte span range"));
-        }
-        let start = self.start.checked_add(range.start).ok_or(Error::Overflow)?;
-        let end = self.start.checked_add(range.end).ok_or(Error::Overflow)?;
-        self.backing.view(start..end)
+        let data = self
+            .data
+            .get(range)
+            .ok_or(Error::Invalid("byte span range"))?;
+        Ok(Self {
+            backing: self.backing,
+            data,
+        })
     }
     /// Retain this exact range independently, adding one shared handle.
     pub fn into_bytes(self) -> Result<Bytes> {
-        self.backing.slice(self.start..self.end)
+        let start = self.offset()?;
+        let end = start.checked_add(self.len()).ok_or(Error::Overflow)?;
+        self.backing.slice(start..end)
+    }
+
+    fn offset(self) -> Result<usize> {
+        // Construction and subslicing keep both slices in the same allocation.
+        self.data
+            .as_ptr()
+            .addr()
+            .checked_sub(self.backing.as_ref().as_ptr().addr())
+            .ok_or(Error::Invalid("byte span range"))
+    }
+}
+
+impl std::fmt::Debug for BytesView<'_> {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let start = self.offset().map_err(|_| std::fmt::Error)?;
+        let end = start.checked_add(self.len()).ok_or(std::fmt::Error)?;
+        formatter
+            .debug_struct("BytesView")
+            .field("backing", &self.backing)
+            .field("start", &start)
+            .field("end", &end)
+            .finish()
     }
 }
 
 impl AsRef<[u8]> for BytesView<'_> {
     #[inline]
     fn as_ref(&self) -> &[u8] {
-        &self.backing.as_ref()[self.start..self.end]
+        self.data
     }
 }
 
@@ -122,11 +147,10 @@ impl Bytes {
     }
     /// Borrow a checked range without allocating or cloning shared storage.
     pub fn view(&self, range: Range<usize>) -> Result<BytesView<'_>> {
-        self.subrange(range.clone())?;
+        let range = self.subrange(range)?;
         Ok(BytesView {
             backing: self,
-            start: range.start,
-            end: range.end,
+            data: &self.storage.data[range],
         })
     }
     /// Consumes this handle and selects a checked subspan without cloning or
@@ -680,6 +704,36 @@ mod tests {
         assert_eq!(pool.used(), Budget::control_storage_bytes() + charge);
         drop(retained);
         assert_eq!(pool.used(), Budget::control_storage_bytes());
+    }
+
+    #[test]
+    fn borrowed_subranges_preserve_empty_and_nested_storage_windows() {
+        let pool = Budget::new(8192).unwrap();
+        for input in [b"".as_slice(), b"abcdef".as_slice()] {
+            let bytes = Bytes::copy_from_slice(&pool, input).unwrap();
+            let charge = pool.used();
+            for outer_start in 0..=input.len() {
+                for outer_end in outer_start..=input.len() {
+                    let backing = bytes.slice(outer_start..outer_end).unwrap();
+                    let view = backing.view(0..backing.len()).unwrap();
+                    for start in 0..=view.len() {
+                        for end in start..=view.len() {
+                            let borrowed = view.slice(start..end).unwrap();
+                            let retained = borrowed.into_bytes().unwrap();
+                            assert_eq!(
+                                retained.as_ref(),
+                                &input[outer_start + start..outer_start + end]
+                            );
+                            assert_eq!(retained.as_ref().as_ptr(), borrowed.as_ref().as_ptr());
+                            assert!(retained.shares_storage_with(&bytes));
+                            assert_eq!(pool.used(), charge);
+                        }
+                    }
+                }
+            }
+            drop(bytes);
+            assert_eq!(pool.used(), Budget::control_storage_bytes());
+        }
     }
 
     #[test]

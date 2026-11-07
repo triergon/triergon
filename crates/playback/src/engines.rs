@@ -351,6 +351,23 @@ impl From<BackendStep> for TsPayloadStep {
     }
 }
 
+// Each poller keeps the return layout of its consumer.
+trait TsStepProjection: From<BackendStep> {
+    fn compact_packet(packet: CompactDemuxPacket, clock: DemuxTimeView) -> Result<Self>;
+}
+
+impl TsStepProjection for BackendStep {
+    fn compact_packet(_: CompactDemuxPacket, _: DemuxTimeView) -> Result<Self> {
+        Err(Error::Invalid("compact TS payload polling required"))
+    }
+}
+
+impl TsStepProjection for TsPayloadStep {
+    fn compact_packet(packet: CompactDemuxPacket, clock: DemuxTimeView) -> Result<Self> {
+        Ok(Self::Packet { packet, clock })
+    }
+}
+
 fn map_payload<T, U>(step: ts::AssemblyStep<T>, map: impl FnOnce(T) -> U) -> ts::AssemblyStep<U> {
     match step {
         ts::AssemblyStep::Output(packet) => ts::AssemblyStep::Output(map(packet)),
@@ -942,12 +959,7 @@ impl Engine {
                 if r.segment_discovery == Some(SegmentDiscovery::CompactProgressive) {
                     return Err(Error::Invalid("compact TS payload polling required"));
                 }
-                match r.poll(w, c)? {
-                    TsPayloadStep::Step(step) => Ok(step),
-                    TsPayloadStep::Packet { .. } => {
-                        Err(Error::Invalid("compact TS payload polling required"))
-                    }
-                }
+                r.poll::<BackendStep>(w, c)
             }
         }
     }
@@ -966,7 +978,7 @@ impl Engine {
         ) {
             return Err(Error::Invalid("compact TS payload selection required"));
         }
-        engine.poll(work, cancel)
+        engine.poll::<TsPayloadStep>(work, cancel)
     }
 
     pub(crate) fn take_suppressed_events(&mut self) -> u64 {
@@ -1884,11 +1896,11 @@ impl TsEngine {
         )
     }
 
-    fn project_pending_packet(
+    fn project_pending_packet<T: TsStepProjection>(
         &mut self,
         work: &mut WorkBudget,
         cancel: &AtomicBool,
-    ) -> Result<TsPayloadStep> {
+    ) -> Result<T> {
         let packet = self
             .native_pending
             .as_ref()
@@ -1910,17 +1922,17 @@ impl TsEngine {
             .native_pending
             .take()
             .ok_or(Error::Invalid("native packet missing"))?;
-        Ok(match packet {
+        match packet {
             NativePacket::Owned(packet) => {
-                BackendStep::Event(RawEvent::NativeTs { packet, clock }).into()
+                Ok(BackendStep::Event(RawEvent::NativeTs { packet, clock }).into())
             }
-            NativePacket::Compact(packet) => TsPayloadStep::Packet { packet, clock },
-        })
+            NativePacket::Compact(packet) => T::compact_packet(packet, clock),
+        }
     }
 
     // Keep backend-specific polling workspaces out of the shared dispatcher.
     #[inline(never)]
-    fn poll(&mut self, w: &mut WorkBudget, c: &AtomicBool) -> Result<TsPayloadStep> {
+    fn poll<T: TsStepProjection>(&mut self, w: &mut WorkBudget, c: &AtomicBool) -> Result<T> {
         if let Some(at) = self.native_update_at.take()
             && let Some((index, pid, update)) = self
                 .native_tracks
