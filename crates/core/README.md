@@ -88,6 +88,8 @@ reserve or `freeze` returns the original value or builder unchanged.
 `OwnedInputBytes` adopts a caller `Vec<u8>` as immutable input; produced
 packets or views cannot be converted back into it. `used()` and `peak()` report
 requested capacity, not RSS or allocator overhead.
+`nonzero_prefix_len` scans complete 16-byte groups and the final short tail
+within the supplied slice.
 
 Two capacity errors are distinct. `Error::Limit` means the request can never fit
 the policy. `Error::Backpressure` means it fits once the caller releases retained
