@@ -132,6 +132,17 @@ impl HlsMediaVideoUnit {
         }
     }
 
+    /// Borrow the complete Annex B feed, including inserted parameter sets.
+    pub fn feed_spans(&self) -> impl Iterator<Item = &[u8]> {
+        let (avc, hevc) = match &self.0 {
+            Picture::Avc(unit) => (Some(unit), None),
+            Picture::Hevc(unit) => (None, Some(unit)),
+        };
+        avc.into_iter()
+            .flat_map(AvcTsAccessUnit::feed_spans)
+            .chain(hevc.into_iter().flat_map(HlsHevcPicture::feed_spans))
+    }
+
     pub fn contiguous_feed(&self, pool: &Budget) -> Result<Bytes> {
         match &self.0 {
             Picture::Avc(unit) => unit.contiguous_feed(pool),
