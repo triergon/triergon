@@ -506,30 +506,17 @@ impl BudgetVec<u8> {
 /// Length of the leading run of nonzero bytes.
 #[inline]
 pub fn nonzero_prefix_len(bytes: &[u8]) -> usize {
-    let mut offset = 0;
-    for group in bytes.chunks_exact(16) {
-        #[expect(
-            clippy::needless_bitwise_bool,
-            reason = "evaluate every byte in the fixed-size group for auto-vectorisation"
-        )]
-        let has_zero = group.iter().fold(false, |found, &byte| found | (byte == 0));
-        if has_zero {
-            break;
-        }
-        offset += 16;
-    }
-    let bytes = &bytes[offset..];
     let mut words = bytes.chunks_exact(8);
     for (index, chunk) in words.by_ref().enumerate() {
         let word = u64::from_le_bytes(chunk.try_into().expect("eight-byte chunk"));
         let zeroes = word.wrapping_sub(0x0101_0101_0101_0101) & !word & 0x8080_8080_8080_8080;
         if zeroes != 0 {
             // Borrow can mark a following byte, so use the lowest marked octet.
-            return offset + index * 8 + zeroes.trailing_zeros() as usize / 8;
+            return index * 8 + zeroes.trailing_zeros() as usize / 8;
         }
     }
     let tail = words.remainder();
-    offset + bytes.len() - tail.len()
+    bytes.len() - tail.len()
         + tail
             .iter()
             .position(|&byte| byte == 0)
