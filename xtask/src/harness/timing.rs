@@ -12,6 +12,7 @@ use std::process::Command;
 use std::time::{Duration, Instant};
 
 use super::acceptance::{LINUX_CPU_KEY, active_cpu};
+use super::validation::{array, field, text};
 use super::worker::{self, DEFAULT_TIMEOUT, arg, data, ok};
 use crate::json::Value;
 use crate::pyrandom::PyRandom;
@@ -22,6 +23,61 @@ use crate::stats;
 const LOCK_NAME: &str = "triergon-bench.lock";
 pub const MODULE_POLICY: &str = "rss-kernel-module-must-be-absent-v1";
 const LINUX_MODULE: &str = "/sys/module/triergon_rss_bound";
+
+/// Validate every recorded module-absence stage, independently of the current boot.
+pub fn validate_module_absence(
+    clock: &Value,
+    raw: &[Value],
+    require_linux: bool,
+) -> Result<(), String> {
+    if text(clock, "timing_module_policy")? != MODULE_POLICY {
+        return Err("timing module policy mismatch".into());
+    }
+    let mut stages = vec!["before-timing-session".to_owned()];
+    for role in ["candidate", "reference"] {
+        stages.extend([
+            format!("before-warmup:{role}"),
+            format!("after-warmup:{role}"),
+        ]);
+    }
+    for (index, sample) in raw.iter().enumerate() {
+        let order = array(sample, "order")?;
+        if order.len() != 2
+            || !order.contains(&Value::str("candidate"))
+            || !order.contains(&Value::str("reference"))
+        {
+            return Err("timing pair worker order is incomplete".into());
+        }
+        for role in order {
+            let role = role.as_str().ok_or("timing worker order is not a string")?;
+            stages.extend([
+                format!("before-pair:{index}:{role}"),
+                format!("after-pair:{index}:{role}"),
+            ]);
+        }
+    }
+    let observations = array(clock, "timing_module_observations")?;
+    if stages.len() != observations.len() {
+        return Err("timing module observations are incomplete".into());
+    }
+    for (stage, observation) in stages.iter().zip(observations) {
+        if text(observation, "stage")? != stage {
+            return Err("timing module observation stage mismatch".into());
+        }
+        let state = field(observation, "state")?;
+        if text(state, "status")?
+            != if require_linux {
+                "module-absent"
+            } else {
+                "not-applicable"
+            }
+        {
+            return Err("RSS kernel module absence during timing is unproven".into());
+        }
+    }
+    Ok(())
+}
+
 /// The shortest span over which tracked processes are compared. CPU clocks tick
 /// every 10 ms or so, and a pair can be shorter than that.
 const CONTAMINATION_WINDOW: Duration = Duration::from_millis(125);

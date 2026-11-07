@@ -160,7 +160,8 @@ fn interval_value(interval: &stats::Interval) -> Value {
     ])
 }
 
-fn timing_valid(row: &Value, contract: &Value, selected: &Value, require_linux: bool) -> bool {
+/// Check a timing row's samples, worker bindings, isolation and recorded interval.
+pub fn timing_valid(row: &Value, contract: &Value, selected: &Value, require_linux: bool) -> bool {
     let timing = row.get("timing").cloned().unwrap_or(Value::Object(vec![]));
     let raw = timing
         .get("samples")
