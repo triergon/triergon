@@ -153,7 +153,11 @@ retry with a new reader.
 
 **ADTS AAC.** Complete frames contained in one source span can share its charged
 backing storage when its capacity fits the configured maximum frame size. Split
-frames use charged assembly buffers.
+frames use charged assembly buffers. The reader caches up to four recently
+published buffers and reuses them after the caller releases every alias.
+A shared cached buffer or allocation pressure clears the cache and ends recycling
+for that reader. The cache also clears when another PES is needed, at EOF and
+on failure.
 
 **Sinks.** `pump::Sink` owns accepted `Feed` envelopes until their callbacks
 retire; `Submission::Blocked` returns the same envelope. Threading and

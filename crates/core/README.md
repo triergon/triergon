@@ -89,6 +89,9 @@ capacity charged (`retained_capacity`). `BudgetVec<T>` is the charged mutable
 vector and reads and writes as a slice (`try_filled` builds one filled with a value,
 `try_clone` charges a copy); growth charges old and new buffers together, and a rejected push,
 reserve or `freeze` returns the original value or builder unchanged.
+`Bytes::try_into_buffer` converts an exclusive, complete view into a charged
+mutable buffer with its existing contents and capacity. Rejection returns the
+original view and its complete charge.
 `OwnedInputBytes` adopts a caller `Vec<u8>` as immutable input; produced
 packets or views cannot be converted back into it. `used()` and `peak()` report
 requested capacity, not RSS or allocator overhead.
