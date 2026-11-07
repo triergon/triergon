@@ -8258,9 +8258,9 @@
   {
    "name": "matroska-playback-output-comparison",
    "path": "matroska-playback-output-comparison",
-   "retention": "retained",
+   "retention": "90 days",
    "reason": "Matroska startup, seek and Cues results",
-   "key": "evidence/matroska-playback-output-comparison/79b4c35e628bf7a3b043046219d4ebf30d3840049c1632546f20ac41545f7196.tar.gz",
+   "key": "qualification/repository/matroska-playback-output-comparison/79b4c35e628bf7a3b043046219d4ebf30d3840049c1632546f20ac41545f7196.tar.gz",
    "sha256": "79b4c35e628bf7a3b043046219d4ebf30d3840049c1632546f20ac41545f7196",
    "files": [
     {
@@ -8315,17 +8315,29 @@
   },
   {
    "name": "matroska-packet-work-comparison",
-   "retention": "retained",
+   "retention": "90 days",
    "reason": "HLS segment results",
-   "key": "evidence/matroska-packet-work-comparison/93b671ad84e8fa2f568245439c49ef51449f9eae06aeabe90c86e0f8805e86fe.tar.gz",
-   "sha256": "93b671ad84e8fa2f568245439c49ef51449f9eae06aeabe90c86e0f8805e86fe"
+   "key": "qualification/repository/matroska-packet-work-comparison/17616435eb698188cc65dc9aa8974b20bcdc550fbb7a97605e550f95ae9c25c0.tar.gz",
+   "sha256": "17616435eb698188cc65dc9aa8974b20bcdc550fbb7a97605e550f95ae9c25c0",
+   "path": "matroska-packet-work-comparison",
+   "files": [
+    {
+     "path": "matroska-packet-work-comparison/comparison.tar.gz",
+     "sha256": "93b671ad84e8fa2f568245439c49ef51449f9eae06aeabe90c86e0f8805e86fe"
+    },
+    {
+     "path": "matroska-packet-work-comparison/contents.json",
+     "sha256": "9b400af3ad0ec5f191d1f51d81504b699cd9df3ba61811ae9433593919cf8a17"
+    }
+   ],
+   "bytes": 22108332
   },
   {
    "name": "matroska-feature-set-comparison",
    "path": "matroska-feature-set-comparison",
-   "retention": "retained",
+   "retention": "90 days",
    "reason": "Matroska feature measurements",
-   "key": "evidence/matroska-feature-set-comparison/c5f98c04c695b7f7808f483964cc707ce58805c2a124022bd739653d0ede6553.tar.gz",
+   "key": "qualification/repository/matroska-feature-set-comparison/c5f98c04c695b7f7808f483964cc707ce58805c2a124022bd739653d0ede6553.tar.gz",
    "sha256": "c5f98c04c695b7f7808f483964cc707ce58805c2a124022bd739653d0ede6553",
    "files": [
     {
@@ -8381,9 +8393,9 @@
   {
    "name": "matroska-fate-demux-comparison",
    "path": "matroska-fate-demux-comparison",
-   "retention": "retained",
+   "retention": "90 days",
    "reason": "Matroska comparisons using FATE inputs",
-   "key": "evidence/matroska-fate-demux-comparison/5f73707d4dc7d8a5689d301dcfd894ea4939523bd54259c900ecb53b8a7aa95a.tar.gz",
+   "key": "qualification/repository/matroska-fate-demux-comparison/5f73707d4dc7d8a5689d301dcfd894ea4939523bd54259c900ecb53b8a7aa95a.tar.gz",
    "sha256": "5f73707d4dc7d8a5689d301dcfd894ea4939523bd54259c900ecb53b8a7aa95a",
    "files": [
     {
@@ -8407,9 +8419,9 @@
   {
    "name": "hls-payload-budget-comparison",
    "path": "hls-payload-budget-comparison",
-   "retention": "retained",
+   "retention": "90 days",
    "reason": "HLS payload-budget measurements",
-   "key": "evidence/hls-payload-budget-comparison/946505e0f99964afc53515b7db2426cf7a3ded6376818a64a048d38103247857.tar.gz",
+   "key": "qualification/repository/hls-payload-budget-comparison/946505e0f99964afc53515b7db2426cf7a3ded6376818a64a048d38103247857.tar.gz",
    "sha256": "946505e0f99964afc53515b7db2426cf7a3ded6376818a64a048d38103247857",
    "files": [
     {
@@ -8477,9 +8489,9 @@
   {
    "name": "hls-clock-projection-comparison",
    "path": "hls-clock-projection-comparison",
-   "retention": "retained",
+   "retention": "90 days",
    "reason": "HLS clock projection measurements",
-   "key": "evidence/hls-clock-projection-comparison/474667621e4ca0f6c093d4b0c799309cc45b07663d48734edb1ba469be076c3b.tar.gz",
+   "key": "qualification/repository/hls-clock-projection-comparison/474667621e4ca0f6c093d4b0c799309cc45b07663d48734edb1ba469be076c3b.tar.gz",
    "sha256": "474667621e4ca0f6c093d4b0c799309cc45b07663d48734edb1ba469be076c3b",
    "files": [
     {
@@ -8515,9 +8527,9 @@
   {
    "name": "clock-projection-feature-comparison",
    "path": "clock-projection-feature-comparison",
-   "retention": "retained",
+   "retention": "90 days",
    "reason": "Clock projection feature measurements",
-   "key": "evidence/clock-projection-feature-comparison/9b70162ae0b6a416520857a019a72a0bd66984c532d7dacb174c7b0c12c120ae.tar.gz",
+   "key": "qualification/repository/clock-projection-feature-comparison/9b70162ae0b6a416520857a019a72a0bd66984c532d7dacb174c7b0c12c120ae.tar.gz",
    "sha256": "9b70162ae0b6a416520857a019a72a0bd66984c532d7dacb174c7b0c12c120ae",
    "files": [
     {
@@ -8561,9 +8573,9 @@
   {
    "name": "integral-clock-projection-comparison",
    "path": "integral-clock-projection-comparison",
-   "retention": "retained",
+   "retention": "90 days",
    "reason": "Integral clock projection measurements",
-   "key": "evidence/integral-clock-projection-comparison/597c3d0810af32b14476e2a1c0904f5aea72306159db36d7870ad326060b6491.tar.gz",
+   "key": "qualification/repository/integral-clock-projection-comparison/597c3d0810af32b14476e2a1c0904f5aea72306159db36d7870ad326060b6491.tar.gz",
    "sha256": "597c3d0810af32b14476e2a1c0904f5aea72306159db36d7870ad326060b6491",
    "files": [
     {
@@ -8599,9 +8611,9 @@
   {
    "name": "avc-field-reader-comparison",
    "path": "avc-field-reader-comparison",
-   "retention": "retained",
+   "retention": "90 days",
    "reason": "AVC field reader measurements",
-   "key": "evidence/avc-field-reader-comparison/fbfcc68bc53984b6e18fbd385a21d8d7b63e40922699afe156972449ace77fa6.tar.gz",
+   "key": "qualification/repository/avc-field-reader-comparison/fbfcc68bc53984b6e18fbd385a21d8d7b63e40922699afe156972449ace77fa6.tar.gz",
    "sha256": "fbfcc68bc53984b6e18fbd385a21d8d7b63e40922699afe156972449ace77fa6",
    "files": [
     {
@@ -8665,9 +8677,9 @@
   {
    "name": "byte-scan-comparison",
    "path": "byte-scan-comparison",
-   "retention": "retained",
+   "retention": "90 days",
    "reason": "Bounded byte-scan measurements",
-   "key": "evidence/byte-scan-comparison/766e5642fdae63e696ec91f528897c6bb6656eb4c640fa921b3e996445096a1e.tar.gz",
+   "key": "qualification/repository/byte-scan-comparison/766e5642fdae63e696ec91f528897c6bb6656eb4c640fa921b3e996445096a1e.tar.gz",
    "sha256": "766e5642fdae63e696ec91f528897c6bb6656eb4c640fa921b3e996445096a1e",
    "files": [
     {
@@ -8719,9 +8731,9 @@
   {
    "name": "hls-borrowed-span-comparison",
    "path": "hls-borrowed-span-comparison",
-   "retention": "retained",
+   "retention": "90 days",
    "reason": "HLS borrowed-span measurements",
-   "key": "evidence/hls-borrowed-span-comparison/f817ca9f76e0812cf9e8235d4848a95906270a606b3930272da4e44ee1541324.tar.gz",
+   "key": "qualification/repository/hls-borrowed-span-comparison/f817ca9f76e0812cf9e8235d4848a95906270a606b3930272da4e44ee1541324.tar.gz",
    "sha256": "f817ca9f76e0812cf9e8235d4848a95906270a606b3930272da4e44ee1541324",
    "files": [
     {
@@ -8781,9 +8793,9 @@
   {
    "name": "hls-prefix-anchor-comparison",
    "path": "hls-prefix-anchor-comparison",
-   "retention": "retained",
+   "retention": "90 days",
    "reason": "HLS prefix-anchor measurements",
-   "key": "evidence/hls-prefix-anchor-comparison/cbf3a1127074a1f710e37593c74a431b1d9f2d23f1aae44470c034e894f4aa9b.tar.gz",
+   "key": "qualification/repository/hls-prefix-anchor-comparison/cbf3a1127074a1f710e37593c74a431b1d9f2d23f1aae44470c034e894f4aa9b.tar.gz",
    "sha256": "cbf3a1127074a1f710e37593c74a431b1d9f2d23f1aae44470c034e894f4aa9b",
    "files": [
     {
@@ -8827,9 +8839,9 @@
   {
    "name": "hls-compact-clock-comparison",
    "path": "hls-compact-clock-comparison",
-   "retention": "retained",
+   "retention": "90 days",
    "reason": "HLS compact-clock measurements",
-   "key": "evidence/hls-compact-clock-comparison/5158ff99a01dd7a9af3ecda94683533e5ece1124ab457220f91b73bc551713f8.tar.gz",
+   "key": "qualification/repository/hls-compact-clock-comparison/5158ff99a01dd7a9af3ecda94683533e5ece1124ab457220f91b73bc551713f8.tar.gz",
    "sha256": "5158ff99a01dd7a9af3ecda94683533e5ece1124ab457220f91b73bc551713f8",
    "files": [
     {
@@ -8873,9 +8885,9 @@
   {
    "name": "playback-paired-diagnostics",
    "path": "playback-paired-diagnostics",
-   "retention": "retained",
+   "retention": "90 days",
    "reason": "Paired playback diagnostic measurements",
-   "key": "evidence/playback-paired-diagnostics/8aa5701e42ff435cc7f1f9dc55623c3993c5939a03cc42e03c8c48be8ca2ddfa.tar.gz",
+   "key": "qualification/repository/playback-paired-diagnostics/8aa5701e42ff435cc7f1f9dc55623c3993c5939a03cc42e03c8c48be8ca2ddfa.tar.gz",
    "sha256": "8aa5701e42ff435cc7f1f9dc55623c3993c5939a03cc42e03c8c48be8ca2ddfa",
    "files": [
     {
@@ -8915,9 +8927,9 @@
   {
    "name": "playback-host-checks",
    "path": "playback-host-checks",
-   "retention": "retained",
+   "retention": "90 days",
    "reason": "Playback and clock host checks",
-   "key": "evidence/playback-host-checks/e16cec7708ba18d38fbec778836d45763391f3b9b74863174095d1bcc612cbb8.tar.gz",
+   "key": "qualification/repository/playback-host-checks/e16cec7708ba18d38fbec778836d45763391f3b9b74863174095d1bcc612cbb8.tar.gz",
    "sha256": "e16cec7708ba18d38fbec778836d45763391f3b9b74863174095d1bcc612cbb8",
    "files": [
     {
@@ -8961,9 +8973,9 @@
   {
    "name": "playback-feed-comparison",
    "path": "playback-feed-comparison",
-   "retention": "retained",
+   "retention": "90 days",
    "reason": "Complete playback and Matroska comparison",
-   "key": "evidence/playback-feed-comparison/038ad80c09e63b069919a95ca761665982ccba986238cc76caa33e5f46237eee.tar.gz",
+   "key": "qualification/repository/playback-feed-comparison/038ad80c09e63b069919a95ca761665982ccba986238cc76caa33e5f46237eee.tar.gz",
    "sha256": "038ad80c09e63b069919a95ca761665982ccba986238cc76caa33e5f46237eee",
    "files": [
     {
@@ -9019,9 +9031,9 @@
   {
    "name": "grouped-hls-digest-comparison",
    "path": "grouped-hls-digest-comparison",
-   "retention": "retained",
+   "retention": "90 days",
    "reason": "Grouped HLS digest comparison",
-   "key": "evidence/grouped-hls-digest-comparison/135137b0b06c55995dccb4941ddc644c198ad267dfc1667ce3ef654b147ebacc.tar.gz",
+   "key": "qualification/repository/grouped-hls-digest-comparison/135137b0b06c55995dccb4941ddc644c198ad267dfc1667ce3ef654b147ebacc.tar.gz",
    "sha256": "135137b0b06c55995dccb4941ddc644c198ad267dfc1667ce3ef654b147ebacc",
    "files": [
     {
@@ -9065,9 +9077,9 @@
   {
    "name": "parser-regression-host-checks",
    "path": "parser-regression-host-checks",
-   "retention": "retained",
+   "retention": "90 days",
    "reason": "workspace tests and lint checks for combined container and framing changes",
-   "key": "evidence/parser-regression-host-checks/3c6c2b2d127bd3ecf198e9699691367f54f314e140d792da5070afa5a68cd4e3.tar.gz",
+   "key": "qualification/repository/parser-regression-host-checks/3c6c2b2d127bd3ecf198e9699691367f54f314e140d792da5070afa5a68cd4e3.tar.gz",
    "sha256": "3c6c2b2d127bd3ecf198e9699691367f54f314e140d792da5070afa5a68cd4e3",
    "bytes": 12665308,
    "files": [
@@ -9112,9 +9124,9 @@
   {
    "name": "playback-gate-build-conservative-rss",
    "path": "playback-gate-build-conservative-rss",
-   "retention": "retained",
+   "retention": "90 days",
    "reason": "Rust 1.99.1 default-flag playback measurements with conservative RSS bounds",
-   "key": "evidence/playback-gate-build-conservative-rss/34f1816f920419540ad4efc84d4a2890fff3736c96536e53706e9f1057584a35.tar.gz",
+   "key": "qualification/repository/playback-gate-build-conservative-rss/34f1816f920419540ad4efc84d4a2890fff3736c96536e53706e9f1057584a35.tar.gz",
    "sha256": "34f1816f920419540ad4efc84d4a2890fff3736c96536e53706e9f1057584a35",
    "bytes": 99508157,
    "files": [
@@ -9254,9 +9266,9 @@
   {
    "name": "playback-host-verification",
    "path": "playback-host-verification",
-   "retention": "retained",
+   "retention": "90 days",
    "reason": "Playback host worker checks and four FATE demux comparisons; no native performance claim",
-   "key": "evidence/playback-host-verification/0d2f9054df8a633006ea5f6b0ca828c5a40b185495a6e5ce3fdb57c6fc299b9b.tar.gz",
+   "key": "qualification/repository/playback-host-verification/0d2f9054df8a633006ea5f6b0ca828c5a40b185495a6e5ce3fdb57c6fc299b9b.tar.gz",
    "sha256": "0d2f9054df8a633006ea5f6b0ca828c5a40b185495a6e5ce3fdb57c6fc299b9b",
    "bytes": 3325713,
    "source_bundle_revision": "1599b7fd246a4a7518c89bdce70bc2252a1f39b9",

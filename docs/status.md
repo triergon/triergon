@@ -16,7 +16,7 @@ release ([reference pins](quality.md#reference-and-corpus)).
 | Matroska audio clocks | AAC, AC-3, E-AC-3 startup and forward clocks | 10 inputs | 0.17 | heap 0.07, RSS 0.60 | audio seek |
 | ISO BMFF / MP4 | Regular and fragmented files, edit lists, seek and range plans, QuickTime compatibility, bounded AAC configuration and regular table recovery, timing, sync and terminal media prefixes; AVC, HEVC, AAC, AC-3, E-AC-3, DTS core, AV1, VP9 | 255 inputs, 1,020 open and index comparisons (972 matching outputs and 48 matching refusal outcomes with compatibility policies) | 1.1273 (972/972 within 1.20) | heap ≤0.4133, total RSS ≤0.7283 (972/972) | seek and range-plan timing |
 | MPEG-TS | PSI, continuity, PES assembly; TS188 and M2TS192 | 272-request set (80 field matches, 23 open) | not measured | not measured | access-unit demux, broader profiles |
-| HLS segments | Independent TS188 segments: AVC or HEVC with AAC, AC-3 or E-AC-3; contiguous video feed | 71 packet comparisons, 71 measured workloads | 1.1808 (71/71 within 1.20) | heap ≤0.022, total RSS ≤0.722 | other profiles |
+| HLS segments | Independent TS188 segments with contiguous AVC or HEVC video and AAC, AC-3 or E-AC-3 audio | 71 packet comparisons, 71 measured workloads | 1.1808 (71/71 within 1.20) | heap ≤0.022, total RSS ≤0.722 | other profiles |
 | Packet framing | AVC/HEVC configuration and NAL framing, AV1, VP9, AC-3, E-AC-3, DTS core | 125 reference matches for AVC/HEVC; DTS core byte-exact on 37,125 projections and 1,172 FATE packets | 1.1772 (125/125 within 1.20 for AVC/HEVC) | heap ≤0.985, total RSS ≤0.990 on the same 125 cases | full AVC/HEVC/ADTS grammar |
 | Subtitles, text | SRT, WebVTT, ASS passthrough, mov_text and tx3g to ASS, charset handling | 82 mov_text cases, 79 tx3g regressions | not measured | not measured | timing and memory |
 | Subtitles, bitmap | PGS, DVB display state and colour lookup, DVD units | 229 PGS cases; 5,300 DVB display sets | PGS 1.11 | PGS heap 0.62, RSS 0.90 | full PGS recovery, DVB and DVD decoding |
@@ -33,8 +33,8 @@ samples are archived, their SHA-256. Update the row in the same change as the re
 The Matroska and startup and seek rows use the [gate build](quality.md#measuring-performance)
 at `0e28298d038bea072629b3bad6389dcc806b4861` on a c8g.large pinned to CPU 1.
 The HLS row uses the gate build at `a3e8adb2c1b67488a3168a37145a4bc9cc5aa80d`
-on a c8g.large pinned to CPU 1: all 71 cases in `corpus.json`, with 100 timing pairs
-of 50 operations and 30 memory pairs. Every video unit passes through
+on a c8g.large pinned to CPU 1. It covers all 71 cases in `corpus.json`, with
+100 timing pairs of 50 operations and 30 memory pairs. Every video unit passes through
 `contiguous_feed` inside the measured operation. Codec and capture rows at
 `ceb5076` report the higher of two unpinned gate-build passes on one c8g.2xlarge.
 The remaining rows retain their earlier measurements.
