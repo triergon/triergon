@@ -206,6 +206,7 @@ pub struct AvcTsReader {
     pes_serial: u64,
     stamped_serial: u64,
     zero_anchors: [Option<Anchor>; 3],
+    next_zero_anchor: usize,
     zeroes: usize,
     prefix: Option<Prefix>,
     next_nal: Option<Nal>,
@@ -246,6 +247,7 @@ impl AvcTsReader {
             pes_serial: 0,
             stamped_serial: 0,
             zero_anchors: [None; 3],
+            next_zero_anchor: 0,
             zeroes: 0,
             prefix: None,
             next_nal: None,
@@ -484,14 +486,16 @@ impl AvcTsReader {
                 kind,
             });
         } else if byte == 0 {
-            self.zero_anchors.rotate_left(1);
-            self.zero_anchors[2] = self.pes;
+            self.zero_anchors[self.next_zero_anchor] = self.pes;
+            self.next_zero_anchor = (self.next_zero_anchor + 1) % self.zero_anchors.len();
             self.zeroes = (self.zeroes + 1).min(3);
             return Ok(());
         } else if byte == 1 && self.zeroes >= 2 {
             self.prefix = Some(Prefix {
                 start: self.bytes.len() - self.zeroes - 1,
-                anchor: self.zero_anchors[3 - self.zeroes],
+                anchor: self.zero_anchors[(self.next_zero_anchor + self.zero_anchors.len()
+                    - self.zeroes)
+                    % self.zero_anchors.len()],
             });
         } else if self.nal.is_none() {
             return Err(Error::Invalid("bytes before AVC Annex B start code"));
