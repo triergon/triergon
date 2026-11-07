@@ -688,7 +688,7 @@ fn the_resident_bound_uses_the_declared_ceiling_and_observed_reference_growth() 
             ));
         }
     }
-    let samples = vec![Value::Object(row.clone()), Value::Object(row)];
+    let mut samples = vec![Value::Object(row.clone()), Value::Object(row)];
     let certificate = v(r#"{"platform": "Linux", "observer_sha256": "observer"}"#);
     let result = super::memory::evaluate(std::path::Path::new("."), &samples, 2, 0, &certificate);
     assert_eq!(
@@ -709,6 +709,31 @@ fn the_resident_bound_uses_the_declared_ceiling_and_observed_reference_growth() 
             .get("rss_growth_ratio_upper_95")
             .and_then(Value::as_f64),
         Some(1_008_192.0 / 3_991_808.0)
+    );
+
+    // A stable reference resident set gives no positive growth lower bound.
+    // Its observed total peak remains available in both samples.
+    set(
+        &mut samples[0],
+        &["reference_rss", "observer"],
+        "rss_start",
+        Value::int(5_000_000),
+    );
+    let without_growth =
+        super::memory::evaluate(std::path::Path::new("."), &samples, 2, 0, &certificate);
+    assert_eq!(
+        without_growth.get("status").and_then(Value::as_str),
+        Some("qualified")
+    );
+    assert_eq!(
+        without_growth.get("total_rss_ratio"),
+        result.get("total_rss_ratio")
+    );
+    assert_eq!(without_growth.get("heap_ratio"), result.get("heap_ratio"));
+    assert_eq!(without_growth.get("rss_growth_ratio"), Some(&Value::Null));
+    assert_eq!(
+        without_growth.get("rss_growth_ratio_upper_95"),
+        Some(&Value::Null)
     );
 }
 

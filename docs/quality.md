@@ -13,6 +13,8 @@ is complete only when it passes all three gates on every case in its corpus.
 
 The harness reads these limits from `harness/policy.json`. Each feature's contract and
 corpus manifest live in `harness/features/<feature>/`.
+RSS growth from the start of the operation is reported separately when every pair
+has positive growth bounds.
 
 The work being compared must be identical: the same selection, the same packets, the
 same output. A gate is never passed by narrowing the work, dropping slow cases or
