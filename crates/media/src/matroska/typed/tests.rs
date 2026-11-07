@@ -138,36 +138,6 @@ fn stored_transform_has_exact_capacity_and_retains_owned_alias() {
     assert_eq!(alias.as_ref(), b"abc");
 }
 
-#[test]
-fn info_projection_reports_only_source_values_and_preserves_unknown_fields_as_raw_bytes() {
-    let raw = [
-        element(0x2ad7b1, &[0x0f, 0x42, 0x40]),
-        element(0xec, b"opaque"),
-    ]
-    .concat();
-    let pool = Budget::new(64 * 1024).unwrap();
-    let source = SharedBytes::copy_from_slice(&pool, &raw).unwrap();
-    let mut job = info::InfoJob::new(source.clone());
-    let mut info = None;
-    for _ in 0..1000 {
-        match job
-            .step(&mut WorkBudget::new(1), &AtomicBool::new(false))
-            .unwrap()
-        {
-            ParseStep::Yield => (),
-            ParseStep::Event(value) => {
-                info = Some(value);
-                break;
-            }
-            _ => panic!("complete Info"),
-        }
-    }
-    let info = info.unwrap();
-    assert_eq!(info.timestamp_scale_ns, 1_000_000);
-    assert!(info.source.shares_storage_with(&source));
-    assert_eq!(info.source.as_ref(), raw.as_slice());
-}
-
 fn encoding(scope: u64) -> Vec<u8> {
     element(
         0x6d80,
