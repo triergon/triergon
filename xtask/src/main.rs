@@ -22,6 +22,7 @@ mod json;
 mod numpy;
 mod prepare;
 mod process;
+mod progressive_bench;
 mod pyrandom;
 mod python;
 mod sha256;
@@ -47,6 +48,7 @@ commands:
   check-design   harness data files parse and recorded gates keep their values
   check-safety   owned packages only, no build scripts, no unsafe code
   fixtures       generate the authored Matroska corpus into .research/ and its manifests
+  progressive    compare all five forward-only AVC/AAC TS188 feeds; --help for measurement options
   fixture        write one corpus variant (see `cargo xtask fixture --help`)
   prepare-ffmpeg [--jobs N] [--profile PROFILE]
                  build a pinned FFmpeg reference into .research/reference[-PROFILE]:
@@ -123,6 +125,15 @@ fn main() -> ExitCode {
     let root = root();
     let result = match args.first().map(String::as_str) {
         Some("check") => check(&root),
+        Some("progressive") => {
+            return match progressive_bench::main(&root, &args[1..]) {
+                Ok(code) => ExitCode::from(code as u8),
+                Err(message) => {
+                    eprintln!("{message}");
+                    ExitCode::from(2)
+                }
+            };
+        }
         Some("check-simd") => check_simd(&root),
         Some("prepare-check") => prepare_check(),
         Some("check-links") => check_links(&root),

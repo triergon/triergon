@@ -1,0 +1,155 @@
+{
+  "schema": 1,
+  "operation": "ProgressiveAvcAacTsOwnedFeedV1",
+  "cases": [
+    {
+      "id": "continuous-44100",
+      "profile": "continuous-44100",
+      "file": "continuous-44100.ts",
+      "sha256": "d2a98a04558583e3e7a5f1c03e23f5ed6c2e9e41e3cd669b136b1bb66595b25f",
+      "size": 44744,
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "pts-dts",
+        "before-eof"
+      ],
+      "expected": {
+        "packets": 294,
+        "bytes": 22945,
+        "digest": 1094976622303096385
+      },
+      "literal_sha256": "e5c4d22e63196f96e88cdaa373dcd338e5d3b8093f629f11a9670761c1a8ed4d",
+      "outcomes": {
+        "candidate": {
+          "exit": 0,
+          "stdout_sha256": "3cb65552f33799eef43176a7d4832da689e4284c08a58de97f57d9dada0def11"
+        },
+        "reference": {
+          "exit": 0,
+          "stdout_sha256": "3cb65552f33799eef43176a7d4832da689e4284c08a58de97f57d9dada0def11"
+        }
+      }
+    },
+    {
+      "id": "reordered-48000",
+      "profile": "reordered-48000",
+      "file": "reordered-48000.ts",
+      "sha256": "ccc8b45b5138dc0d33c72513db7f0aed0a20a9b1546ddd7253b7577674b1f076",
+      "size": 525648,
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "pts-dts",
+        "before-eof"
+      ],
+      "expected": {
+        "packets": 1135,
+        "bytes": 458820,
+        "digest": 5443732115938617358
+      },
+      "literal_sha256": "91b15596f659843b1e0f462832cbc77296ab062e60a76ced6bf8061eadf001e4",
+      "outcomes": {
+        "candidate": {
+          "exit": 0,
+          "stdout_sha256": "d52ac972792170c643edd6d31165d8c4c048df1afc1e843fcc85ad09e00cc0a2"
+        },
+        "reference": {
+          "exit": 0,
+          "stdout_sha256": "d52ac972792170c643edd6d31165d8c4c048df1afc1e843fcc85ad09e00cc0a2"
+        }
+      }
+    },
+    {
+      "id": "later-entry-48000",
+      "profile": "later-entry-48000",
+      "file": "later-entry-48000.ts",
+      "sha256": "3e45f745f546d6af07a1a50fb46b533de4077656ca83b53135ed48ffc462d41e",
+      "size": 261320,
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "pts-dts",
+        "before-eof"
+      ],
+      "expected": {
+        "packets": 570,
+        "bytes": 227934,
+        "digest": 15326070614139702354
+      },
+      "literal_sha256": "4e180e7fcad18958398369842b67c50b02ec4e0e79bd31fc06c55b3ecf3800f8",
+      "outcomes": {
+        "candidate": {
+          "exit": 0,
+          "stdout_sha256": "bb8bdf5ac0b2569d567f163b22dd355d1efaa15c66a45a3d7e8bef02503991ff"
+        },
+        "reference": {
+          "exit": 0,
+          "stdout_sha256": "bb8bdf5ac0b2569d567f163b22dd355d1efaa15c66a45a3d7e8bef02503991ff"
+        }
+      }
+    },
+    {
+      "id": "duplicate-control-44100",
+      "profile": "duplicate-control-44100",
+      "file": "duplicate-control-44100.ts",
+      "sha256": "7aa124baf0dab938ac55b937726e381e8acf6d4f337f82cda6da0395db35eec9",
+      "size": 9588,
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "pts-only",
+        "at-eof"
+      ],
+      "expected": {
+        "packets": 36,
+        "bytes": 5573,
+        "digest": 3597551009296673325
+      },
+      "literal_sha256": "ce53759281f6a34be11014d10e98660252e78f865e67cca607e19d550d1d2724",
+      "outcomes": {
+        "candidate": {
+          "exit": 0,
+          "stdout_sha256": "a3311858070286c1b55f2cf5c60e8aaeca00a82c47ddf519535068a97aa92937"
+        },
+        "reference": {
+          "exit": 0,
+          "stdout_sha256": "a3311858070286c1b55f2cf5c60e8aaeca00a82c47ddf519535068a97aa92937"
+        }
+      }
+    },
+    {
+      "id": "legal-duplicate-44100",
+      "profile": "legal-duplicate-44100",
+      "file": "legal-duplicate-44100.ts",
+      "sha256": "6f0025e4b2b6ac10b7fc4a9ec792951e59c4eff5873adcede982dc449f622e9f",
+      "size": 9776,
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "pts-only",
+        "at-eof"
+      ],
+      "expected": {
+        "packets": 36,
+        "bytes": 5573,
+        "digest": 3597551009296673325
+      },
+      "literal_sha256": "ce53759281f6a34be11014d10e98660252e78f865e67cca607e19d550d1d2724",
+      "outcomes": {
+        "candidate": {
+          "exit": 0,
+          "stdout_sha256": "a3311858070286c1b55f2cf5c60e8aaeca00a82c47ddf519535068a97aa92937"
+        },
+        "reference": {
+          "exit": 1,
+          "stdout_sha256": "140ada56427ac8596a0e5a687eafb91d355429f96ba9aaedf924aec2293dadc1",
+          "stderr_contains": [
+            "reference stage: read progressive packet",
+            "reference: Invalid data found when processing input (-1094995529)"
+          ]
+        }
+      }
+    }
+  ]
+}

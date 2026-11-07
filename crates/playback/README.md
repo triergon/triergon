@@ -156,6 +156,15 @@ retire; `Submission::Blocked` returns the same envelope. Threading and
 platform decoder configuration are the sink's responsibility; no `Send` bound
 is imposed.
 
+`cargo xtask progressive` checks three comparable AVC/AAC TS188 packet folds and
+all five authored functional controls through the bounded sequential reader.
+All ten literal worker outcomes are required, including positive Rust output and
+the recorded reference refusal on the legal duplicate control. The
+[contract](../../harness/features/progressive-ts188/contract.json) preserves complete
+packet fields and payloads with two retained units per stream. `--benchmark --memory`
+uses the standard paired harness for the three original comparable cases only;
+native gate-build qualification remains pending.
+
 ## Conformance
 
 - Matroska: [codec mappings](https://www.ietf.org/archive/id/draft-ietf-cellar-codec-21.html).

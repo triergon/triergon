@@ -129,6 +129,14 @@ and `harness/features/packet-framing/`.
 `report --memory-pairs N` selects a separate memory sample count, with
 `--pairs` applying to both measurements by default.
 
+`cargo xtask progressive` requires three comparable forward-only AVC/AAC TS188
+packet folds and all five functional inputs before measurement. All ten literal
+worker outcomes are asserted, including positive normative Rust output and the
+recorded reference refusal on the legal duplicate control. `--benchmark --memory`
+measures only the three original comparable cases, with unchanged runtime, heap
+and total RSS limits. Its contract, separate functional-control manifest and
+hash-pinned inputs live in `harness/features/progressive-ts188/`.
+
 `cargo xtask report` runs the correctness comparison of one feature contract
 (`--contract`, `--manifest`, `--corpus`; a manifest may record its corpus `directory`)
 and grades it. A contract may name its own candidate worker and reference, as

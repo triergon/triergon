@@ -56,6 +56,15 @@ pub fn matroska_inputs() -> Vec<String> {
         "harness/reference_feed.h",
         "harness/reference_hls.h",
         "harness/reference_font.h",
+        "harness/reference_progressive.h",
+        "xtask/src/progressive_bench.rs",
+        "harness/features/progressive-ts188/provenance.json",
+        "harness/features/progressive-ts188/controls.json",
+        "harness/features/progressive-ts188/inputs/continuous-44100.ts",
+        "harness/features/progressive-ts188/inputs/reordered-48000.ts",
+        "harness/features/progressive-ts188/inputs/later-entry-48000.ts",
+        "harness/features/progressive-ts188/inputs/duplicate-control-44100.ts",
+        "harness/features/progressive-ts188/inputs/legal-duplicate-44100.ts",
     ]
     .map(String::from)
     .to_vec();
@@ -68,6 +77,7 @@ pub fn matroska_inputs() -> Vec<String> {
         "matroska-segment-metadata",
         "matroska-startup-seek",
         "hls-segments",
+        "progressive-ts188",
     ] {
         for file in ["contract", "corpus"] {
             names.push(format!("harness/features/{feature}/{file}.json"));

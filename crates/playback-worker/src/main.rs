@@ -1,6 +1,7 @@
 //! Playback measurement worker; serialization and startup are outside the timed loop.
 #![forbid(unsafe_code)]
 mod hls;
+mod progressive;
 use std::{
     io::{self, Write},
     process::ExitCode,
@@ -318,6 +319,12 @@ fn main() -> ExitCode {
 
 fn work() -> Result<(), Box<dyn std::error::Error>> {
     let all: Vec<String> = std::env::args().skip(1).collect();
+    if all
+        .first()
+        .is_some_and(|mode| mode.starts_with("progressive-"))
+    {
+        return progressive::run(&all);
+    }
     if all.first().is_some_and(|mode| mode.starts_with("hls-")) {
         return hls::run(&all);
     }

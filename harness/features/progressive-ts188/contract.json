@@ -1,0 +1,39 @@
+{
+  "schema": 1,
+  "id": "progressive-ts188",
+  "operation": "ProgressiveAvcAacTsOwnedFeedV1",
+  "candidate": "playback-worker",
+  "worker_operation": "progressive-",
+  "reference": "ffmpeg-formats-native",
+  "work_fields": [
+    "packets",
+    "bytes",
+    "digest"
+  ],
+  "contract": [
+    "Open one fresh unknown-length, forward-only AVC/AAC TS188 session, including file opening and reads in the measured operation.",
+    "Read input windows of at most 4096 bytes through the forward-only source.",
+    "Retain two complete units per stream plus an incoming unit, folding output on eviction and EOF.",
+    "Fold exact signed AVC PTS, DTS, raw33 source clocks, IDR, raster and complete Annex B bytes.",
+    "Fold AAC source PTS/DTS, resolved presentation, duration, rate, channels, sample count and complete ADTS bytes.",
+    "Combine the video stream count and fold followed by the audio stream count and fold, releasing source and session before returning.",
+    "Require delivery and retained-unit retirement before EOF for the three timing inputs. Both short controls use the same operation with progress checked at EOF.",
+    "Require all three comparable inputs for correctness, runtime and memory. Validate all five functional inputs and their ten per-engine literal outcomes before measurement."
+  ],
+  "required_profiles": [
+    "continuous-44100",
+    "reordered-48000",
+    "later-entry-48000"
+  ],
+  "required_targets": [
+    "aarch64-unknown-linux-gnu"
+  ],
+  "iterations": 50,
+  "minimum_pairs": 30,
+  "confidence": 0.95,
+  "runtime_ratio_max": 1.2,
+  "runtime_optimization_ratio_target": 0.8,
+  "memory_ratio_max_exclusive": 1.0,
+  "runtime_policy": "runtime-ceiling-1.20",
+  "functional_controls": "controls.json"
+}
