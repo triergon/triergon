@@ -8063,6 +8063,32 @@
      "sha256": "a0afe23ac983e9e50d38bd65eb9aa4e7ce49c19a8746fdc3e4b18de0ad32be5e"
     }
    ]
+  },
+  {
+   "name": "matroska-fate-demux-comparison",
+   "path": "matroska-fate-demux-comparison",
+   "retention": "retained",
+   "reason": "Matroska comparisons using FATE inputs",
+   "key": "evidence/matroska-fate-demux-comparison/5f73707d4dc7d8a5689d301dcfd894ea4939523bd54259c900ecb53b8a7aa95a.tar.gz",
+   "sha256": "5f73707d4dc7d8a5689d301dcfd894ea4939523bd54259c900ecb53b8a7aa95a",
+   "files": [
+    {
+     "path": "matroska-fate-demux-comparison/RAW.sha256",
+     "sha256": "366bc04089b76c6048961a99cc1696582241f0dab7bff50eb53e1bf7ef3b88bf"
+    },
+    {
+     "path": "matroska-fate-demux-comparison/RAW.tar.gz",
+     "sha256": "1f9425c538c2784ac3509c2ff1623568f6c594712b3ba41243a66b11b82f651d"
+    },
+    {
+     "path": "matroska-fate-demux-comparison/SOURCE.bundle",
+     "sha256": "a0afe23ac983e9e50d38bd65eb9aa4e7ce49c19a8746fdc3e4b18de0ad32be5e"
+    },
+    {
+     "path": "matroska-fate-demux-comparison/SUMMARY.json",
+     "sha256": "a6224d0dae3fce3fb297f29e0267a999457f223c94806bd4c920036810d520bb"
+    }
+   ]
   }
  ]
 }
