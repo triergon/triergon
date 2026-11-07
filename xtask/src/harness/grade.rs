@@ -9,7 +9,9 @@ use std::path::{Component, Path, PathBuf};
 
 use super::acceptance::acceptance;
 use super::comparison::{reference_named, reference_record, reference_summary, rule_for};
-use super::{diff, gate_build, provenance, timing};
+use super::timing::validate_module_absence as timing_module_absent;
+use super::validation::{array, field, text};
+use super::{diff, gate_build, provenance};
 use crate::checks::read_json;
 use crate::json::{self, Value};
 use crate::sha256;
@@ -85,20 +87,6 @@ impl Options {
     }
 }
 
-fn field<'a>(value: &'a Value, key: &str) -> R<&'a Value> {
-    value
-        .get(key)
-        .filter(|v| **v != Value::Null)
-        .ok_or_else(|| format!("missing {key}"))
-}
-
-fn text<'a>(value: &'a Value, key: &str) -> R<&'a str> {
-    field(value, key)?
-        .as_str()
-        .filter(|s| !s.is_empty())
-        .ok_or_else(|| format!("{key} must be a nonempty string"))
-}
-
 fn integer(value: &Value, key: &str) -> R<i128> {
     match field(value, key)? {
         Value::Number(n) => n
@@ -106,12 +94,6 @@ fn integer(value: &Value, key: &str) -> R<i128> {
             .ok_or_else(|| format!("{key} must be an integer")),
         _ => Err(format!("{key} must be an integer")),
     }
-}
-
-fn array<'a>(value: &'a Value, key: &str) -> R<&'a [Value]> {
-    field(value, key)?
-        .as_array()
-        .ok_or_else(|| format!("{key} must be an array"))
 }
 
 fn members(value: &Value) -> R<&[(String, Value)]> {
@@ -468,57 +450,6 @@ fn samples(measurement: &Value, minimum: i128) -> R<&[Value]> {
         return Err("missing paired samples or pair count mismatch".into());
     }
     Ok(raw)
-}
-
-/// Check the recorded absence evidence, never the current module state: the
-/// module is loaded again for memory collection and its proof must still be live.
-fn timing_module_absent(clock: &Value, raw: &[Value], linux: bool) -> R<()> {
-    if text(clock, "timing_module_policy")? != timing::MODULE_POLICY {
-        return Err("timing module policy mismatch".into());
-    }
-    let mut stages = vec!["before-timing-session".to_owned()];
-    for role in ["candidate", "reference"] {
-        stages.extend([
-            format!("before-warmup:{role}"),
-            format!("after-warmup:{role}"),
-        ]);
-    }
-    for (index, sample) in raw.iter().enumerate() {
-        let order = array(sample, "order")?;
-        if order.len() != 2
-            || !order.contains(&Value::str("candidate"))
-            || !order.contains(&Value::str("reference"))
-        {
-            return Err("timing pair worker order is incomplete".into());
-        }
-        for role in order {
-            let role = role.as_str().ok_or("timing worker order is not a string")?;
-            stages.extend([
-                format!("before-pair:{index}:{role}"),
-                format!("after-pair:{index}:{role}"),
-            ]);
-        }
-    }
-    let observations = array(clock, "timing_module_observations")?;
-    if stages.len() != observations.len() {
-        return Err("timing module observations are incomplete".into());
-    }
-    for (stage, observation) in stages.iter().zip(observations) {
-        if text(observation, "stage")? != stage {
-            return Err("timing module observation stage mismatch".into());
-        }
-        let state = field(observation, "state")?;
-        if text(state, "status")?
-            != if linux {
-                "module-absent"
-            } else {
-                "not-applicable"
-            }
-        {
-            return Err("RSS kernel module absence during timing is unproven".into());
-        }
-    }
-    Ok(())
 }
 
 fn work(value: &Value) -> R<Value> {
@@ -971,6 +902,7 @@ pub fn main(root: &Path, args: &[String]) -> R<i32> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::harness::timing;
 
     fn digest(byte: char) -> String {
         std::iter::repeat_n(byte, 64).collect()
