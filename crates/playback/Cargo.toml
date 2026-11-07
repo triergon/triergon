@@ -8,6 +8,7 @@ rust-version.workspace = true
 publish.workspace = true
 
 [dependencies]
+triergon-bitstream = { path = "../bitstream" }
 triergon-core = { path = "../core" }
 triergon-matroska = { path = "../media" }
 triergon-isobmff = { path = "../isobmff" }

@@ -11,7 +11,7 @@ Crates depend only on layers below them. Core never depends on a format.
 
 | Layer | Crates | Role |
 |---|---|---|
-| Foundation | [`triergon-core`](../crates/core) | Budgets, shared byte storage, exact time, input windows, resumable steps, errors, the neutral container model (`ContainerReader`) |
+| Foundation | [`triergon-core`](../crates/core), [`triergon-bitstream`](../crates/bitstream) | Budgets, shared byte storage, exact time, input windows, resumable steps, errors, the neutral container model (`ContainerReader`); bit-level primitives |
 | Formats | [`triergon-matroska`](../crates/media) (Matroska/WebM), [`triergon-isobmff`](../crates/isobmff), [`triergon-mpegts`](../crates/mpegts) | Container readers: tracks, packets, metadata, seeking |
 | Framing | [`triergon-framing`](../crates/framing) | Codec configuration and packet-format adapters (Annex-B, ADTS, AC-3, DTS core, AV1, VP9) |
 | Subtitles | [`triergon-subtitles`](../crates/subtitles) | Text cue extraction and bitmap subtitle decoding |
@@ -109,8 +109,8 @@ limit violation).
 Open structural work. Each step keeps worker traces byte-identical and re-runs the
 performance gates where it touches hot code.
 
-1. **Bitstream.** A shared `triergon-bitstream` crate for bit reading, exp-Golomb,
-   RBSP unescaping, CABAC and CRCs.
+1. **Bitstream.** `triergon-bitstream` holds the CRCs. Bit reading, exp-Golomb, RBSP
+   unescaping and CABAC move there next.
 2. **Formats.** ISO BMFF and MPEG-TS implement `ContainerReader` and become
    `AnyReader` variants. Box walking and track classification move out of playback
    into the readers.

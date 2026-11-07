@@ -1,9 +1,9 @@
 # triergon-codec-ac3
 
 AC-3 and E-AC-3 decoder written from ATSC A/52:2018 (main body, Annex D alternate bit
-stream information, Annex E). It is a codec-layer crate whose only dependency is
+stream information, Annex E). It is a codec-layer crate that depends on
 [triergon-codec](../codec/README.md) (`AudioDecoder`, `AudioFrame`, `ChannelLayout`,
-`Speaker`, `DownmixLevels`). It decodes one access unit at a time to planar `f32` in FFmpeg's native channel
+`Speaker`, `DownmixLevels`) and [triergon-bitstream](../bitstream/README.md). It decodes one access unit at a time to planar `f32` in FFmpeg's native channel
 order and exports FFmpeg-compatible downmix metadata. It does not downmix or resample.
 
 ## Usage
