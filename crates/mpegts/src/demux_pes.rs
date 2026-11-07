@@ -616,7 +616,7 @@ impl DemuxObserver {
         }
     }
 
-    fn follows_input(&self, context: NativeSourceContext, offset: u64) -> bool {
+    fn follows_input(&self, context: SourceContext, offset: u64) -> bool {
         self.last_input
             .is_none_or(|(previous_event, previous_offset)| {
                 context.source_event_ordinal > previous_event
@@ -628,7 +628,7 @@ impl DemuxObserver {
         self.active
             && self.header.is_some()
             && self.body_limit.is_none_or(|limit| next <= limit)
-            && next < DEFAULT_NATIVE_PACKET_CAP
+            && next < DEFAULT_PACKET_CAP
             && self.header_used + next <= self.limits.pes_bytes
             && self.previous_counter.map(|value| (value + 1) & 15) == Some(counter)
     }
@@ -693,9 +693,9 @@ impl DemuxObserver {
         pid: u16,
         entity: Option<SourceId>,
         offset: u64,
-        context: NativeSourceContext,
+        context: SourceContext,
     ) -> bool {
-        self.validate_native_input(None).is_ok()
+        self.validate_input(None).is_ok()
             && !self.finite_private()
             && source.belongs_to(&self.budget)
             && self.pending.is_none()
@@ -711,7 +711,7 @@ impl DemuxObserver {
     pub(crate) fn append_plain_continuation(
         &mut self,
         packet: &mut PlainContinuation,
-        context: NativeSourceContext,
+        context: SourceContext,
         work: &mut WorkBudget,
         cancel: &AtomicBool,
     ) -> Result<ReadyContinuation> {
@@ -746,7 +746,7 @@ impl DemuxObserver {
             .ok_or(Error::Invalid("missing continuation source"))?
             .into_slice(start..width)?;
         self.append_ready_span(
-            NativePesSpan {
+            DemuxSpan {
                 bytes,
                 source: SourceRange {
                     entity: self.scope.entity,
@@ -773,7 +773,7 @@ impl DemuxObserver {
         pid: u16,
         counter: u8,
         start: SourceLocation,
-        context: NativeSourceContext,
+        context: SourceContext,
     ) -> (usize, Option<Growth>) {
         if !self.body_fits(counter, self.payload_len + PLAIN_PAYLOAD_BYTES)
             || !self.accepts_plain_source(source, pid, Some(start.source), start.offset, context)
@@ -782,8 +782,8 @@ impl DemuxObserver {
         }
         let limit = self
             .body_limit
-            .map_or(DEFAULT_NATIVE_PACKET_CAP - 1, |end| {
-                end.saturating_sub(1).min(DEFAULT_NATIVE_PACKET_CAP - 1)
+            .map_or(DEFAULT_PACKET_CAP - 1, |end| {
+                end.saturating_sub(1).min(DEFAULT_PACKET_CAP - 1)
             })
             .min(self.limits.pes_bytes - self.header_used);
         let len = self.spans.len();
@@ -793,7 +793,7 @@ impl DemuxObserver {
                 Arena::Payload,
                 len,
                 self.limits.source_spans,
-                size_of::<NativePesSpan>(),
+                size_of::<DemuxSpan>(),
             )
             .ok()
         } else {
@@ -810,7 +810,7 @@ impl DemuxObserver {
     pub(crate) fn prepare_payload_run_growth(
         &self,
         growth: &Growth,
-    ) -> Option<BudgetVec<NativePesSpan>> {
+    ) -> Option<BudgetVec<DemuxSpan>> {
         let mut replacement = BudgetVec::new(&self.budget);
         replacement.try_reserve_exact(growth.target).ok()?;
         Some(replacement)
@@ -822,9 +822,9 @@ impl DemuxObserver {
         &mut self,
         bytes: &Bytes,
         start: SourceLocation,
-        context: NativeSourceContext,
+        context: SourceContext,
         first_counter: u8,
-        replacement: Option<BudgetVec<NativePesSpan>>,
+        replacement: Option<BudgetVec<DemuxSpan>>,
     ) -> Result<()> {
         if let Some(mut replacement) = replacement {
             replacement.try_append(&mut self.spans)?;
@@ -836,7 +836,7 @@ impl DemuxObserver {
         self.spans.try_extend_with(count, |index| {
             let at = index * TS188_BYTES;
             let offset = start.offset + at as u64;
-            NativePesSpan {
+            DemuxSpan {
                 bytes: bytes
                     .slice(at + TS_PAYLOAD_START..at + TS188_BYTES)
                     .expect("payload range inside complete carrier"),
@@ -850,7 +850,7 @@ impl DemuxObserver {
                     offset,
                     bytes: TS188_BYTES,
                 },
-                context: NativeSourceContext {
+                context: SourceContext {
                     source_event_ordinal: context.source_event_ordinal + 2 * index as u64,
                     ..context
                 },
@@ -870,7 +870,7 @@ impl DemuxObserver {
 
     fn append_ready_span(
         &mut self,
-        span: NativePesSpan,
+        span: DemuxSpan,
         counter: u8,
         next: usize,
     ) -> Result<ReadyContinuation> {
@@ -1632,9 +1632,9 @@ mod tests {
             configuration: 0,
             clock: 0,
         };
-        let mut observer = NativePesObserver::new(
-            NativeClockProfile::ArchivedPesV1,
-            NativePesScope {
+        let mut observer = DemuxObserver::new(
+            DemuxProfile::PesPackets,
+            DemuxScope {
                 program: 1,
                 pid: 256,
                 stream_type: 0x1b,
@@ -1660,7 +1660,7 @@ mod tests {
         observer
             .push(
                 carrier,
-                NativeSourceContext {
+                SourceContext {
                     source_event_ordinal: 0,
                     epochs,
                     byte_run_epoch: None,

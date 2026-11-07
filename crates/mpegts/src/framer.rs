@@ -883,9 +883,8 @@ mod tests {
 
     #[test]
     fn progressive_continuation_moves_charged_payload_storage() {
-        use crate::clock::NativeClockProfile;
-        use crate::native_pes::{
-            NativePesObserver, NativePesScope, NativeSourceContext, ReadyContinuation,
+        use crate::compat::pes::{
+            DemuxObserver, DemuxProfile, DemuxScope, ReadyContinuation, SourceContext,
         };
         use crate::{ParseLimits, SourceEpochs, SourceRange};
 
@@ -929,14 +928,14 @@ mod tests {
             clock: 0,
             configuration: 2,
         };
-        let context = |source_event_ordinal| NativeSourceContext {
+        let context = |source_event_ordinal| SourceContext {
             source_event_ordinal,
             epochs,
             byte_run_epoch: None,
         };
-        let mut observer = NativePesObserver::new(
-            NativeClockProfile::ArchivedPesV1,
-            NativePesScope {
+        let mut observer = DemuxObserver::new(
+            DemuxProfile::PesPackets,
+            DemuxScope {
                 program: 1,
                 pid: 256,
                 stream_type: 0x1b,
