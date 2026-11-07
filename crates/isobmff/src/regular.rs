@@ -1376,3 +1376,70 @@ pub use direct_recovery::*;
 
 mod description_recovery;
 pub use description_recovery::*;
+
+/// A [`SampleCursor`]'s place in its table, kept without borrowing the table so
+/// an owner can hold both.
+#[derive(Clone, Copy, Debug)]
+pub(crate) struct SampleCursorPosition {
+    ordinal: u64,
+    stts_run: u32,
+    stts_left: u32,
+    delta: u32,
+    ctts_run: u32,
+    ctts_left: u32,
+    offset: u32,
+    chunk: u32,
+    chunk_left: u32,
+    stsc_run: u32,
+    description: u32,
+    byte: u64,
+    dts: i128,
+    sync_row: u32,
+    partial_row: u32,
+}
+
+impl SampleTable {
+    /// The cursor continuing from `position`, which must come from this table.
+    pub(crate) fn resume(&self, position: SampleCursorPosition) -> SampleCursor<'_> {
+        SampleCursor {
+            table: self,
+            ordinal: position.ordinal,
+            stts_run: position.stts_run,
+            stts_left: position.stts_left,
+            delta: position.delta,
+            ctts_run: position.ctts_run,
+            ctts_left: position.ctts_left,
+            offset: position.offset,
+            chunk: position.chunk,
+            chunk_left: position.chunk_left,
+            stsc_run: position.stsc_run,
+            description: position.description,
+            byte: position.byte,
+            dts: position.dts,
+            sync_row: position.sync_row,
+            partial_row: position.partial_row,
+        }
+    }
+}
+
+impl SampleCursor<'_> {
+    pub(crate) fn position(&self) -> SampleCursorPosition {
+        SampleCursorPosition {
+            ordinal: self.ordinal,
+            stts_run: self.stts_run,
+            stts_left: self.stts_left,
+            delta: self.delta,
+            ctts_run: self.ctts_run,
+            ctts_left: self.ctts_left,
+            offset: self.offset,
+            chunk: self.chunk,
+            chunk_left: self.chunk_left,
+            stsc_run: self.stsc_run,
+            description: self.description,
+            byte: self.byte,
+            dts: self.dts,
+            sync_row: self.sync_row,
+            partial_row: self.partial_row,
+        }
+    }
+}

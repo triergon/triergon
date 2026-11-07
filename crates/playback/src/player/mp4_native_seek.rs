@@ -215,12 +215,12 @@ impl<'a> Mp4NativeSeekJob<'a> {
                 "native seek needs complete native range MP4",
             ));
         }
-        if !movie.pool.same_pool(&plan.pool) {
+        if !movie.pool().same_pool(&plan.pool) {
             return Err(Error::ForeignPool);
         }
-        if movie.source != plan.source
-            || movie.generation != plan.opening_generation
-            || movie.read_scope != plan.read_scope
+        if movie.source() != plan.source
+            || movie.generation() != plan.opening_generation
+            || movie.read_scope() != plan.read_scope
         {
             return Err(Error::SourceMismatch);
         }
@@ -271,7 +271,7 @@ pub(super) fn native_global_seek<'a>(
             maximum,
         });
     }
-    let mut native = BudgetVec::new(&movie.pool);
+    let mut native = BudgetVec::new(movie.pool());
     native.try_reserve_exact(tracks.len())?;
     let movie_base = movie.header().time_base()?;
     for track in tracks {
@@ -281,24 +281,24 @@ pub(super) fn native_global_seek<'a>(
                 table: track.table(),
                 fragments: track.fragments(),
                 media_base: track.header().time_base()?,
-                edits: track.edits.as_ref().map(|edits| (edits, movie_base)),
+                edits: track.edits().map(|edits| (edits, movie_base)),
             })
             .map_err(|error| error.error)?;
     }
     Ok(if let Some(plans) = edits {
         GlobalSeekJob::new_encoded_regular_rescaled(
-            &movie.pool,
+            movie.pool(),
             native.as_slice(),
-            movie.media.as_slice(),
+            movie.media(),
             (request.video, request.timestamp),
             request.limits,
             plans,
         )?
     } else {
         GlobalSeekJob::new_complete_source_rescaled(
-            &movie.pool,
+            movie.pool(),
             native.as_slice(),
-            movie.media.as_slice(),
+            movie.media(),
             request.video,
             request.timestamp,
             request.limits,

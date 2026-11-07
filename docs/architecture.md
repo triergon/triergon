@@ -113,8 +113,8 @@ performance gates where it touches hot code.
    CABAC and CRCs. The HLS and raw video parameter set parsers in playback move onto its
    RBSP reader next. The DTS decoder keeps its own reader: both shared forms are slower
    on its subframe parser.
-2. **Formats.** ISO BMFF and MPEG-TS implement `ContainerReader` and become
-   `AnyReader` variants. Box walking and track classification move out of playback
+2. **Formats.** ISO BMFF becomes an `AnyReader` variant, and MPEG-TS implements
+   `ContainerReader` and becomes one too. Track classification moves out of playback
    into the readers.
 3. **Reference compatibility.** `triergon-framing`, `triergon-matroska`,
    `triergon-subtitles`, `triergon-mpegts` and `triergon-isobmff` follow the convention

@@ -313,3 +313,8 @@ pub(crate) use encoded_recovery_context::RecoveryObservation;
 mod private_diagnostics;
 
 pub use fragment::OwnedFragmentCursor;
+
+pub mod open;
+
+mod container;
+pub use container::{Packet, Reader, ReaderEvent, ReaderLimits, Track};

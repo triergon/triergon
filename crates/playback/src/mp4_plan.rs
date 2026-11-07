@@ -130,18 +130,21 @@ impl PreparedMp4 {
     pub(crate) fn cached_payload(&self, range: &Range<u64>) -> Result<Option<Bytes>> {
         let cache = self.media_cache.as_slice();
         let Some(index) = cache
-            .partition_point(|extent| extent.start <= range.start)
+            .partition_point(|extent| extent.start() <= range.start)
             .checked_sub(1)
         else {
             return Ok(None);
         };
         let extent = &cache[index];
-        let end = range.end.checked_sub(extent.start).ok_or(Error::Overflow)?;
-        if end > extent.bytes.len() as u64 {
+        let end = range
+            .end
+            .checked_sub(extent.start())
+            .ok_or(Error::Overflow)?;
+        if end > extent.bytes().len() as u64 {
             return Ok(None);
         }
-        let start = (range.start - extent.start) as usize;
-        Ok(Some(extent.bytes.slice(start..end as usize)?))
+        let start = (range.start - extent.start()) as usize;
+        Ok(Some(extent.bytes().slice(start..end as usize)?))
     }
 
     pub fn read_scope(&self) -> crate::mp4_open::MetadataReadScope {
@@ -277,7 +280,7 @@ impl<'a> Mp4IndexJob<'a> {
     /// This does not establish a complete-source fact for an isolated fragment.
     pub fn new_native_terminal_v1(movie: &'a Movie, limits: PlanLimits) -> Result<Self> {
         if !matches!(
-            movie.read_scope,
+            movie.read_scope(),
             crate::mp4_open::MetadataReadScope::FrontMetadataBeforeMdat(_)
         ) {
             return Err(Error::Invalid(
@@ -303,8 +306,8 @@ impl<'a> Mp4IndexJob<'a> {
         plans: &'a [Option<iso::compat::mov::edits::EncodedEditPlan>],
         limits: PlanLimits,
     ) -> Result<Self> {
-        if movie.native_recovery
-            || movie.read_scope != crate::mp4_open::MetadataReadScope::CompleteEntity
+        if movie.native_recovery()
+            || movie.read_scope() != crate::mp4_open::MetadataReadScope::CompleteEntity
         {
             return Err(Error::Unsupported(
                 "encoded edits require a complete native range source",
@@ -325,8 +328,8 @@ impl<'a> Mp4IndexJob<'a> {
         plans: Option<&'a [Option<iso::compat::mov::edits::EncodedEditPlan>]>,
         limits: PlanLimits,
     ) -> Result<Self> {
-        if movie.native_recovery
-            || movie.read_scope != crate::mp4_open::MetadataReadScope::CompleteEntity
+        if movie.native_recovery()
+            || movie.read_scope() != crate::mp4_open::MetadataReadScope::CompleteEntity
         {
             return Err(Error::Unsupported(
                 "native range playback requires a complete source",
@@ -356,26 +359,26 @@ impl<'a> Mp4IndexJob<'a> {
         encoded_edits: Option<&'a [Option<iso::compat::mov::edits::EncodedEditPlan>]>,
         range_duration: Option<RangeDuration>,
     ) -> Result<Self> {
-        if movie.native_recovery && view == Mp4View::SourcePhysical {
+        if movie.native_recovery() && view == Mp4View::SourcePhysical {
             return Err(Error::Invalid(
                 "native recovery open requires native packet view",
             ));
         }
-        if limits.tracks == 0 || limits.tracks > 64 || movie.tracks.len() > limits.tracks {
+        if limits.tracks == 0 || limits.tracks > 64 || movie.tracks().len() > limits.tracks {
             return Err(Error::Limit {
-                requested: movie.tracks.len(),
+                requested: movie.tracks().len(),
                 maximum: limits.tracks.min(64),
             });
         }
-        if movie.terminal_mdat.is_some() && view != Mp4View::SourcePhysical && !native_front {
+        if movie.terminal_mdat().is_some() && view != Mp4View::SourcePhysical && !native_front {
             return Err(Error::Unsupported(
                 "native terminal MDAT context is not established",
             ));
         }
         let media_count = movie
-            .media
+            .media()
             .len()
-            .checked_add(usize::from(movie.terminal_mdat.is_some()))
+            .checked_add(usize::from(movie.terminal_mdat().is_some()))
             .ok_or(Error::Overflow)?;
         if media_count > limits.media_extents {
             return Err(Error::Limit {
@@ -383,18 +386,18 @@ impl<'a> Mp4IndexJob<'a> {
                 maximum: limits.media_extents,
             });
         }
-        let b = &movie.pool;
+        let b = movie.pool();
         let mut sources = BudgetVec::new(b);
         let mut native = BudgetVec::new(b);
         let mut zero_scale_clock = None;
-        for t in movie.tracks.as_slice() {
-            let media_base = if t.header.timescale == 0 && movie.native_recovery {
-                if !movie.trex.is_empty()
-                    || !t.fragments.is_empty()
-                    || t.edits.is_some()
-                    || t.table.sample_count() == 0
-                    || t.header.handler != *b"vide"
-                    || !matches!(t.table.descriptions(), [entry] if entry.format == *b"raw ")
+        for t in movie.tracks() {
+            let media_base = if t.header().timescale == 0 && movie.native_recovery() {
+                if !movie.trex().is_empty()
+                    || !t.fragments().is_empty()
+                    || t.edits().is_some()
+                    || t.table().sample_count() == 0
+                    || t.header().handler != *b"vide"
+                    || !matches!(t.table().descriptions(), [entry] if entry.format == *b"raw ")
                 {
                     return Err(Error::Unsupported("zero-scale native track context"));
                 }
@@ -403,25 +406,24 @@ impl<'a> Mp4IndexJob<'a> {
                 zero_scale_clock = Some(clock);
                 clock.demux_base
             } else {
-                t.header.time_base()?
+                t.header().time_base()?
             };
             if range_duration.is_none() {
                 push(
                     &mut sources,
-                    SourceTrack::new(t.header.track_id, Some(&t.table), t.fragments.as_slice())?,
+                    SourceTrack::new(t.header().track_id, Some(t.table()), t.fragments())?,
                 )?;
             }
             push(
                 &mut native,
                 DemuxTrack {
-                    track_id: t.header.track_id,
-                    table: &t.table,
-                    fragments: t.fragments.as_slice(),
+                    track_id: t.header().track_id,
+                    table: t.table(),
+                    fragments: t.fragments(),
                     media_base,
                     edits: t
-                        .edits
-                        .as_ref()
-                        .map(|e| Ok::<_, Error>((e, movie.movie.time_base()?)))
+                        .edits()
+                        .map(|e| Ok::<_, Error>((e, movie.header().time_base()?)))
                         .transpose()?,
                 },
             )?;
@@ -435,23 +437,22 @@ impl<'a> Mp4IndexJob<'a> {
         } else {
             iso::TimingRunPolicy::BoundedPrefix
         };
-        let forward_regular = match movie.read_scope {
+        let forward_regular = match movie.read_scope() {
             crate::mp4_open::MetadataReadScope::FrontMetadataBeforeMdat(h)
-                if movie.terminal_mdat.is_none()
-                    && movie.media.len() == 1
-                    && (!movie.native_recovery
+                if movie.terminal_mdat().is_none()
+                    && movie.media().len() == 1
+                    && (!movie.native_recovery()
                         || movie
-                            .source_length
-                            .is_none_or(|length| movie.media.as_slice()[0].end <= length))
+                            .source_length()
+                            .is_none_or(|length| movie.media()[0].end <= length))
                     && (view == Mp4View::SourcePhysical || native_front)
-                    && movie.trex.is_empty()
+                    && movie.trex().is_empty()
                     && movie
-                        .tracks
-                        .as_slice()
+                        .tracks()
                         .iter()
-                        .all(|track| track.edits.is_none() && track.fragments.is_empty()) =>
+                        .all(|track| track.edits().is_none() && track.fragments().is_empty()) =>
             {
-                Some(iso::ForwardRegularMdat::new(h, movie.source_length)?)
+                Some(iso::ForwardRegularMdat::new(h, movie.source_length())?)
             }
             _ => None,
         };
@@ -462,13 +463,13 @@ impl<'a> Mp4IndexJob<'a> {
                 PhysicalSampleCursor::new_forward_regular_with_timing_policy(
                     b,
                     sources.as_slice(),
-                    movie.media.as_slice(),
+                    movie.media(),
                     bounds,
                     interleave_limits,
                     timing_policy,
                 )?,
             )
-        } else if movie.terminal_mdat.is_some() {
+        } else if movie.terminal_mdat().is_some() {
             // Metadata traversal preserves declared source coordinates. Each row
             // is checked against the terminal declaration, then read physically.
             Some(PhysicalSampleCursor::with_timing_policy(
@@ -482,7 +483,7 @@ impl<'a> Mp4IndexJob<'a> {
             Some(PhysicalSampleCursor::with_timing_policy(
                 b,
                 sources.as_slice(),
-                Some(movie.media.as_slice()),
+                Some(movie.media()),
                 interleave_limits,
                 timing_policy,
             )?)
@@ -493,7 +494,7 @@ impl<'a> Mp4IndexJob<'a> {
                 PacketCursor::new_encoded_regular(
                     b,
                     native.as_slice(),
-                    movie.media.as_slice(),
+                    movie.media(),
                     native_limits,
                     plans,
                     iso::compat::mov::edits::EncodedEditProfile,
@@ -502,7 +503,7 @@ impl<'a> Mp4IndexJob<'a> {
                 PacketCursor::new_front_regular(
                     b,
                     native.as_slice(),
-                    movie.media.as_slice(),
+                    movie.media(),
                     bounds,
                     native_limits,
                     DemuxProfile::NoParseNoFillin,
@@ -511,16 +512,16 @@ impl<'a> Mp4IndexJob<'a> {
                 PacketCursor::new_front_source(
                     b,
                     native.as_slice(),
-                    movie.media.as_slice(),
-                    movie.terminal_mdat,
+                    movie.media(),
+                    movie.terminal_mdat(),
                     native_limits,
                     DemuxProfile::NoParseNoFillin,
                 )?
-            } else if movie.read_scope == crate::mp4_open::MetadataReadScope::CompleteEntity {
+            } else if movie.read_scope() == crate::mp4_open::MetadataReadScope::CompleteEntity {
                 PacketCursor::new_complete_source(
                     b,
                     native.as_slice(),
-                    movie.media.as_slice(),
+                    movie.media(),
                     native_limits,
                     DemuxProfile::NoParseNoFillin,
                 )?
@@ -528,7 +529,7 @@ impl<'a> Mp4IndexJob<'a> {
                 PacketCursor::new(
                     b,
                     native.as_slice(),
-                    movie.media.as_slice(),
+                    movie.media(),
                     native_limits,
                     DemuxProfile::NoParseNoFillin,
                 )?
@@ -547,25 +548,25 @@ impl<'a> Mp4IndexJob<'a> {
             None
         };
         let native_empty_duration = if native_front
-            && let [track] = movie.tracks.as_slice()
-            && track.edits.is_none()
-            && track.table.sample_count() == 0
-            && track.header.handler == *b"vide"
-            && matches!(track.table.descriptions(), [entry] if entry.format == *b"raw ")
+            && let [track] = movie.tracks()
+            && track.edits().is_none()
+            && track.table().sample_count() == 0
+            && track.header().handler == *b"vide"
+            && matches!(track.table().descriptions(), [entry] if entry.format == *b"raw ")
         {
-            i64::try_from(track.header.duration).ok()
+            i64::try_from(track.header().duration).ok()
         } else {
             None
         };
         Ok(Self {
             movie,
             plan: Some(PreparedMp4 {
-                read_scope: movie.read_scope,
-                native_recovery: movie.native_recovery,
+                read_scope: movie.read_scope(),
+                native_recovery: movie.native_recovery(),
                 unavailable_first: None,
-                source: movie.source,
-                opening_generation: movie.generation,
-                source_length: movie.source_length,
+                source: movie.source(),
+                opening_generation: movie.generation(),
+                source_length: movie.source_length(),
                 view,
                 native_front,
                 replay_native_order: false,
@@ -579,9 +580,9 @@ impl<'a> Mp4IndexJob<'a> {
                 media: BudgetVec::new(b),
                 media_cache: BudgetVec::new(b),
                 forward_regular_extents: None,
-                terminal_mdat: movie.terminal_mdat,
+                terminal_mdat: movie.terminal_mdat(),
                 raw_roots: BudgetVec::new(b),
-                movie_base: movie.movie.time_base()?,
+                movie_base: movie.header().time_base()?,
                 pool: b.clone(),
             }),
             source,
@@ -615,19 +616,19 @@ impl<'a> Mp4IndexJob<'a> {
         let p = self.plan.as_mut().ok_or(Error::Invalid("plan consumed"))?;
         match self.phase {
             0 => {
-                if let Some(t) = self.movie.tracks.as_slice().get(self.track) {
+                if let Some(t) = self.movie.tracks().get(self.track) {
                     if self.description == 0 {
                         if !w.try_charge(1) {
                             return Ok(false);
                         }
-                        let h = &t.header;
+                        let h = t.header();
                         let (base, native_catalogue) = if h.timescale == 0 {
                             (
                                 SourceTimeBase::UNAVAILABLE,
                                 StreamView::for_zero_scale_source(
                                     h,
-                                    &t.table,
-                                    self.movie.major_brand,
+                                    t.table(),
+                                    self.movie.major_brand(),
                                     iso::compat::mov::recovery::RunRecoveryProfile,
                                 ),
                             )
@@ -636,9 +637,9 @@ impl<'a> Mp4IndexJob<'a> {
                                 h.time_base()?.into(),
                                 StreamView::for_source(
                                     h,
-                                    &t.table,
-                                    !t.fragments.is_empty(),
-                                    self.movie.major_brand,
+                                    t.table(),
+                                    !t.fragments().is_empty(),
+                                    self.movie.major_brand(),
                                 ),
                             )
                         };
@@ -647,12 +648,11 @@ impl<'a> Mp4IndexJob<'a> {
                             PlanTrack {
                                 trex: self
                                     .movie
-                                    .trex
-                                    .as_slice()
+                                    .trex()
                                     .iter()
-                                    .find(|x| x.track_id == t.header.track_id)
+                                    .find(|x| x.track_id == t.header().track_id)
                                     .copied(),
-                                next_ordinal: t.next_ordinal,
+                                next_ordinal: t.next_ordinal(),
                                 snapshot: TrackSnapshot {
                                     track_id: h.track_id,
                                     base,
@@ -661,15 +661,14 @@ impl<'a> Mp4IndexJob<'a> {
                                     raw_tkhd: h.raw_tkhd.clone(),
                                     raw_mdhd: h.raw_mdhd.clone(),
                                     raw_hdlr: h.raw_hdlr.clone(),
-                                    raw_table: t.table.raw().clone(),
-                                    raw_edits: t.edits.as_ref().map(|e| e.raw().clone()),
-                                    raw_dref: t.raw_dref.clone(),
+                                    raw_table: t.table().raw().clone(),
+                                    raw_edits: t.edits().map(|e| e.raw().clone()),
+                                    raw_dref: t.raw_dref().clone(),
                                     native_catalogue,
                                 },
                                 descriptions: BudgetVec::new(&p.pool),
                                 edits: t
-                                    .edits
-                                    .as_ref()
+                                    .edits()
                                     .map(|e| {
                                         EditList::parse(e.raw().clone(), iso::Limits::default())
                                     })
@@ -679,7 +678,7 @@ impl<'a> Mp4IndexJob<'a> {
                         self.description = 1;
                         return Ok(false);
                     }
-                    if let Some(d) = t.table.descriptions().get(self.description - 1) {
+                    if let Some(d) = t.table().descriptions().get(self.description - 1) {
                         if !w.try_charge(1) {
                             return Ok(false);
                         }
@@ -697,7 +696,7 @@ impl<'a> Mp4IndexJob<'a> {
                 }
             }
             1 => {
-                if let Some(raw) = self.movie.raw_roots.as_slice().get(self.root) {
+                if let Some(raw) = self.movie.raw_roots().get(self.root) {
                     if !w.try_charge(1) {
                         return Ok(false);
                     }
@@ -708,15 +707,13 @@ impl<'a> Mp4IndexJob<'a> {
                 }
             }
             2 => {
-                if let Some(range) = self.movie.media.as_slice().get(self.extent) {
+                if let Some(range) = self.movie.media().get(self.extent) {
                     if !w.try_charge(1) {
                         return Ok(false);
                     }
                     push(&mut p.media, range.clone())?;
                     self.extent += 1;
-                } else if let Some(extent) =
-                    self.movie.media_cache.as_slice().get(p.media_cache.len())
-                {
+                } else if let Some(extent) = self.movie.media_cache().get(p.media_cache.len()) {
                     if !w.try_charge(1) {
                         return Ok(false);
                     }
@@ -805,17 +802,17 @@ impl<'a> Mp4IndexJob<'a> {
                         && p.source_rows.is_empty()
                         && p.terminal_mdat.is_none()
                         && !p.media.is_empty()
-                        && self.movie.trex.is_empty() =>
+                        && self.movie.trex().is_empty() =>
                     {
-                        let [track] = self.movie.tracks.as_slice() else {
+                        let [track] = self.movie.tracks() else {
                             return Err(error);
                         };
-                        if !track.fragments.is_empty() || track.edits.is_some() {
+                        if !track.fragments().is_empty() || track.edits().is_some() {
                             return Err(error);
                         }
                         // Probe the first decode occurrence only after a layout refusal.
                         // The engine still needs the actual physical end before reporting it.
-                        self.first_sample_probe = Some((track.table.cursor(), error));
+                        self.first_sample_probe = Some((track.table().cursor(), error));
                         return Ok(false);
                     }
                     result => result?,
@@ -894,7 +891,7 @@ impl<'a> Mp4IndexJob<'a> {
                                 [extent] if (1..=RETAINED_MEDIA_BYTES as u64)
                                     .contains(&(extent.end - extent.start))
                             ) && p.terminal_mdat.is_none()
-                                && self.movie.trex.is_empty()
+                                && self.movie.trex().is_empty()
                                 && p.tracks
                                     .as_slice()
                                     .iter()

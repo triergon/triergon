@@ -7,6 +7,10 @@ configuration in encoded edit plans. It parses boxes, sample tables, fragments,
 edit lists and seek indexes, and reads sample payloads by byte range. It does no
 I/O of its own, decodes no codec, and does not apply edits to presentation.
 
+`Reader` implements the core `ContainerReader` over the source view, so the crate
+works in generic code and inside `triergon::AnyReader`. The parts below stay
+available for finer control.
+
 The crate exposes two views of the same file:
 
 - **Source view** (`BoxReader`, `SampleTable`, `FragmentIndex`, `SampleReader`,
@@ -136,10 +140,59 @@ of all tracks in file order through `PhysicalSampleCursor`.
 | Segment/fragment indexes | `SegmentIndex` (`sidx`), `TrackFragmentRandomAccess` (`tfra`), `MovieFragmentRandomAccessTail` (`mfro`) |
 | Recovery groups | `RecoveryDescriptions` (`sgpd`), `RecoveryMappings` (`sbgp`), `RecoveryLookup` |
 | Codec configuration | `SampleDescription::extensions`, `AacConfigurationJob`, `check_dts_core_description`, `QtSoundDescriptionV0` |
+| Whole movie | `open::MovieOpen` → `open::Movie`, under `open::OpenLimits`; `new_progressive` stops at the first media after a front movie, `new_recovery` admits terminal media declarations |
+| Neutral reader | `Reader`, `ReaderLimits`, `Track`, `Packet`, `ReaderEvent` |
 | FFmpeg-compatible packets | `compat::mov::packets::{PacketCursor, StreamView}`, `compat::mov::edits::EditCursor` |
 | FFmpeg-compatible seek | `compat::mov::seek::{IndexCursor, SeekJob, GlobalSeekJob}` |
 | FFmpeg-compatible recovery | `compat::mov::recovery::{RecoveryTrackHeader, RunRecoveryBuilder, PartialSampleReader}` |
 | Encoded tracks | `compat::mov::encoded::EncodedStreamJob`, `compat::mov::edits::EncodedEditJob` |
+
+## Container reader
+
+`Reader::new` takes a seekable source, runs `open::MovieOpen` over it and then
+delivers samples in ascending byte order across tracks, each track in decode order.
+Every step takes a `WorkBudget` and the reader asks for input with `Step::NeedInput`,
+as any `ContainerReader` does. It retains `moov` and each `moof`, under `ReaderLimits`,
+and shares a sample's window where the whole sample fits in one.
+
+| Neutral item | ISO BMFF source |
+|---|---|
+| `TrackId` | `track_ID` |
+| `MediaKind` | `hdlr` handler; an unlisted handler is `MediaKind::Unknown` |
+| `codec_tag` | The first sample entry code |
+| `codec` | One mapping from handler and entry code, plus the object type `esds` states for `mp4a`. Anything else is `CodecId::Other` with the entry code |
+| `configuration` | The payload of `avcC`, `hvcC`, `av1C`, `vpcC`, `dac3`, `dec3` or `ddts`; AudioSpecificConfig for AAC; empty if the record is absent; the whole sample entry payload for any other entry |
+| `language` | The ISO 639-2/T code in `mdhd`; `None` for a QuickTime language code |
+| `pts`, `dts`, `duration` | Ticks of the media timescale, from the sample tables or `trun` and `tfdt`; the duration is the decode delta |
+| `random_access` | `stss` or fragment sample flags |
+| `Event::Other` | `ReaderEvent::Box` for each root box, `ReaderEvent::Movie` once tracks are available |
+
+`request_seek` finds the latest stated sync sample presented at or before the target
+on the track's media clock, or the first one if none is, without reading media. It
+reports `SeekMethod::Index`. Other tracks resume at their first sample at or after
+that time, which may not be a sync sample.
+
+What the reader does not do:
+
+- **Forward-only sources** are refused, because `mdat` can precede the metadata.
+- **Edit lists** are not applied. Times are media times and the list is on
+  `Track::edits`; `compat::mov` gives FFmpeg's edited packets.
+- **A sample entry change inside a track** is not reflected in `TrackInfo`, which
+  describes the first entry. `Packet::sample` names each sample's entry and
+  `Track::descriptions` keeps them all.
+- **Colour, chapters and other metadata** have no typed field here. They stay
+  readable through `Track::descriptions` and `Reader::movie_box`, so `colour` is
+  `None`, and `default_track` and `forced` are `None` because the format has no
+  such flags.
+- **External data references** are refused, as is media outside an `mdat`. Only a
+  `url ` entry flagged self-contained counts as this file.
+- **An empty `traf`** fails the open, because it cannot state the base the next
+  `traf` may inherit.
+- **A fragment without `tfdt`** has `None` times, and a seek cannot land on it.
+- **Times beyond `i64`** fail the read with `Error::Overflow`.
+- **Encrypted entries** report their outer code (`encv`, `enca`) as `CodecId::Other`.
+- **A QuickTime `mp4a` entry** whose version 1 or `wave` layout cannot be walked
+  stays `CodecId::Other`, as does any object type other than AAC or DTS with a core.
 
 `examples/isobmff_source_trace.rs` drives the source view over a real file and
 prints JSON lines (`isobmff_source_trace INPUT [WINDOW<=4096] [WORK_QUANTUM]
