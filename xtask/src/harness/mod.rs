@@ -14,6 +14,7 @@ pub mod oracle;
 pub mod parity;
 pub mod provenance;
 pub mod report;
+pub mod screen;
 #[cfg(test)]
 mod tests;
 pub mod timing;
