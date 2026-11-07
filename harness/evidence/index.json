@@ -31073,6 +31073,62 @@
    "source_diff_from_tested": [
     "docs/quality.md"
    ]
+  },
+  {
+   "name": "playback-host-verification",
+   "path": "playback-host-verification",
+   "retention": "retained",
+   "reason": "Playback host worker checks and four FATE demux comparisons; no native performance claim",
+   "key": "evidence/playback-host-verification/0d2f9054df8a633006ea5f6b0ca828c5a40b185495a6e5ce3fdb57c6fc299b9b.tar.gz",
+   "sha256": "0d2f9054df8a633006ea5f6b0ca828c5a40b185495a6e5ce3fdb57c6fc299b9b",
+   "bytes": 3325713,
+   "source_bundle_revision": "1599b7fd246a4a7518c89bdce70bc2252a1f39b9",
+   "files": [
+    {
+     "path": "playback-host-verification/HOST-WORKERS.log",
+     "sha256": "8578c02e51003d0ff612e8784ce397326f974f7e974401b5a973528bcd767b01"
+    },
+    {
+     "path": "playback-host-verification/RAW-FATE.tar.gz",
+     "sha256": "9b2563e7c2e3ac7ace2d8a4ee049d1254f7065c1faee2f1d8425065f104c6d29"
+    },
+    {
+     "path": "playback-host-verification/SOURCE.bundle",
+     "sha256": "92805fa00a756d54c1c090077a5e4a77296931bca8a35c48b087a75073234b5b"
+    },
+    {
+     "path": "playback-host-verification/fate-matroska-opus-remux.log",
+     "sha256": "b9f7609de943f01215baf35d560aa8b956ef0997d7b6ef329bbf918b80101a47"
+    },
+    {
+     "path": "playback-host-verification/fate-matroska-xiph-lacing.log",
+     "sha256": "f24332f0f01d67862bcd188f62d2ea5191850eca6cfbf6f944d82280403c7331"
+    },
+    {
+     "path": "playback-host-verification/fate-matroska-zero-length-block.log",
+     "sha256": "51249ad20a7c86c8d3babc820c2bb977ac927a9f4473cafebadf695af04327d0"
+    },
+    {
+     "path": "playback-host-verification/fate-matroska-zlib-decompression.log",
+     "sha256": "0578bd3943898c3d09b61f3fb1d5d1b2cbc871f18b9b116762fe22fa5d6f2b1f"
+    },
+    {
+     "path": "playback-host-verification/fate-opus.json",
+     "sha256": "9cb2f7cf4b6db3cbdd855ca70a8d8b496ad0d4a545911d69b327de24fd85e16d"
+    },
+    {
+     "path": "playback-host-verification/fate-xiph.json",
+     "sha256": "30dcde17c442ff4dec22fd24f403d9fbd9680f2c914313c33881b5f1314ba859"
+    },
+    {
+     "path": "playback-host-verification/fate-zero-length.json",
+     "sha256": "b31de942476c6963ab38a0f77a41708325c448762217df67b7d878f6e945a1f1"
+    },
+    {
+     "path": "playback-host-verification/fate-zlib.json",
+     "sha256": "79358bd8eac29ec38f186ca2a9799ecaa8a0e14bc9c5321f5b3bfa0deadfc998"
+    }
+   ]
   }
  ]
 }
