@@ -155,6 +155,31 @@ fn verdict(contract: &Value, rows: &[Value], identity: &Value) -> (bool, bool) {
 }
 
 #[test]
+fn shared_acceptance_requires_the_declared_iteration_count() {
+    let (mut contract, rows, identity) = matched_gate_fixture();
+    put(&mut contract, &[], "iterations", Value::int(50));
+    for (iterations, accepted) in [(50, true), (1, false), (100, false)] {
+        let mut row = rows[0].clone();
+        let mut timing = row.get("timing").unwrap().clone();
+        let mut samples = timing.get("samples").unwrap().as_array().unwrap().to_vec();
+        for sample in &mut samples {
+            for role in ["candidate", "reference"] {
+                put(
+                    sample,
+                    &[role, "data"],
+                    "iterations",
+                    Value::int(iterations),
+                );
+            }
+        }
+        put(&mut timing, &[], "iterations", Value::int(iterations));
+        put(&mut timing, &[], "samples", Value::Array(samples));
+        put(&mut row, &[], "timing", timing);
+        assert_eq!(verdict(&contract, &[row], &identity), (accepted, accepted));
+    }
+}
+
+#[test]
 fn empty_or_missing_evidence_cannot_pass() {
     let result = acceptance(
         root(),
@@ -401,6 +426,254 @@ fn mixed_case() -> Value {
         .find(|c| c.get("id").and_then(Value::as_str) == Some("zlib-mixed"))
         .cloned()
         .unwrap()
+}
+
+#[test]
+fn shared_operation_selection_covers_every_registered_corpus_case() {
+    let mut identity = comparison_identity();
+    for name in ["ffmpeg-video-native", "ffmpeg-formats-native"] {
+        put(
+            &mut identity,
+            &["comparison_references"],
+            name,
+            v(
+                r#"{"path":"target/harness/selected-worker","sha256":"selected","kind":"selected reference"}"#,
+            ),
+        );
+    }
+    let mut checked = 0;
+    for (feature, view, candidate, reference) in [
+        (
+            "matroska-demux",
+            "source-frames-ffmpeg9-clock-v1",
+            None,
+            None,
+        ),
+        (
+            "matroska-header-removal",
+            "source-frames-ffmpeg9-clock-v1",
+            None,
+            None,
+        ),
+        (
+            "matroska-zlib",
+            "source-frames-ffmpeg9-clock-v1",
+            None,
+            None,
+        ),
+        (
+            "matroska-cues-preroll",
+            "source-frames-ffmpeg9-clock-v1",
+            None,
+            None,
+        ),
+        (
+            "matroska-colour",
+            "colour-source-and-ffmpeg9-v1",
+            None,
+            None,
+        ),
+        (
+            "matroska-segment-metadata",
+            "catalogue-source-and-native-v1",
+            None,
+            None,
+        ),
+        (
+            "matroska-startup-seek",
+            "playback-feed-fold-v1",
+            Some("playback-worker"),
+            Some("ffmpeg-video-native"),
+        ),
+        (
+            "hls-segments",
+            "playback-hls-fold-v1",
+            Some("playback-worker"),
+            Some("ffmpeg-formats-native"),
+        ),
+    ] {
+        let contract = load(&format!("harness/features/{feature}/contract.json"));
+        let manifest = load(&format!("harness/features/{feature}/corpus.json"));
+        for case in manifest.get("cases").unwrap().as_array().unwrap() {
+            let selected =
+                super::validation::selected_operation(case, &contract, &identity).unwrap();
+            let id = case.get("id").unwrap().as_str().unwrap();
+            let reviewed = matches!(id, "zlib-empty" | "zlib-mixed");
+            assert_eq!(selected.rule.is_some(), reviewed, "{id}");
+            assert_eq!(selected.candidate_worker, candidate, "{id}");
+            assert_eq!(selected.reference_worker, reference, "{id}");
+            assert_eq!(
+                selected.reference.get("id").and_then(Value::as_str),
+                Some(if id == "zlib-mixed" {
+                    "ffmpeg-combined-native"
+                } else {
+                    reference.unwrap_or("ffmpeg-native")
+                }),
+                "{id}"
+            );
+            let operation = if candidate.is_some() {
+                Value::object([
+                    ("name", contract.get("operation").unwrap().clone()),
+                    ("view", Value::str(view)),
+                ])
+            } else {
+                let seek = case.get("seek_target_ns").unwrap_or(&Value::Null);
+                Value::object([
+                    (
+                        "name",
+                        Value::str(if *seek == Value::Null {
+                            "container-demux-v1"
+                        } else {
+                            "container-seek-preroll-v1"
+                        }),
+                    ),
+                    ("seek_target_ns", seek.clone()),
+                    (
+                        "view",
+                        Value::str(if reviewed {
+                            "optional-pcm-decoder-packets-v1"
+                        } else {
+                            view
+                        }),
+                    ),
+                ])
+            };
+            assert!(
+                differences(&selected.operation, &operation).is_empty(),
+                "{id}"
+            );
+            checked += 1;
+        }
+    }
+    assert_eq!(checked, 230);
+    let mut contract = load("harness/features/matroska-zlib/contract.json");
+    put(&mut contract, &[], "reference", Value::str("not-built"));
+    assert!(super::validation::selected_operation(&mixed_case(), &contract, &identity).is_ok());
+}
+
+#[test]
+fn shared_operation_selection_rejects_missing_operation_and_reviewed_view() {
+    let identity = comparison_identity();
+    let mut contract = v(r#"{"id":"generic-feed","worker_operation":"feed-","operation":"feed"}"#);
+    let case = v(r#"{"id":"authored","profile":"authored","sha256":"input"}"#);
+    assert!(super::validation::selected_operation(&case, &contract, &identity).is_ok());
+    for value in [None, Some(Value::Null)] {
+        remove(&mut contract, "operation");
+        if let Some(value) = value {
+            put(&mut contract, &[], "operation", value);
+        }
+        assert_eq!(
+            super::validation::selected_operation(&case, &contract, &identity)
+                .err()
+                .as_deref(),
+            Some("missing operation")
+        );
+    }
+
+    let contract = load("harness/features/matroska-zlib/contract.json");
+    let case = mixed_case();
+    for value in [None, Some(Value::Null)] {
+        let mut changed = identity.clone();
+        let mut rules = changed
+            .get("comparison_rules")
+            .unwrap()
+            .get("rules")
+            .unwrap()
+            .as_array()
+            .unwrap()
+            .to_vec();
+        let rule = rules
+            .iter_mut()
+            .find(|r| r.get("case") == case.get("id"))
+            .unwrap();
+        remove(rule, "view");
+        if let Some(value) = value {
+            put(rule, &[], "view", value);
+        }
+        put(
+            &mut changed,
+            &["comparison_rules"],
+            "rules",
+            Value::Array(rules),
+        );
+        assert_eq!(
+            super::validation::selected_operation(&case, &contract, &changed)
+                .err()
+                .as_deref(),
+            Some("missing view")
+        );
+    }
+}
+
+#[test]
+fn external_contract_derivation_preserves_registered_gates_and_requirements() {
+    let contract = load("harness/features/matroska-segment-metadata/contract.json");
+    let spec = &contract
+        .get("required_additional_vectors")
+        .unwrap()
+        .as_array()
+        .unwrap()[0];
+    let file = spec.get("file").unwrap().as_str().unwrap();
+    let derived = super::validation::external_contract(&contract, file).unwrap();
+    assert_eq!(
+        derived.get("required_profiles"),
+        Some(&Value::strings([file]))
+    );
+    assert_eq!(
+        derived.get("required_additional_vectors"),
+        Some(&Value::Array(vec![]))
+    );
+    let Value::Object(fields) = &contract else {
+        unreachable!()
+    };
+    for (key, value) in fields {
+        if !matches!(
+            key.as_str(),
+            "required_profiles" | "required_additional_vectors"
+        ) {
+            assert_eq!(derived.get(key), Some(value), "{key}");
+        }
+    }
+    assert!(super::validation::external_contract(&Value::Null, file).is_err());
+}
+
+#[test]
+fn kernel_measurement_selection_checks_certificate_and_each_rss_role() {
+    let standard = v(r#"{"kernel_rss_required":false}"#);
+    let mut samples = v(r#"[
+        {"candidate_rss":{"observer":{"kernel_rss_requested":0}}},
+        {"reference_rss":{"observer":{"kernel_rss_requested":0}}}
+    ]"#);
+    let used = |certificate: &Value, samples: &Value| {
+        super::memory::kernel_used(certificate, samples.as_array().unwrap())
+    };
+    assert!(!used(&standard, &samples));
+    assert!(used(&v(r#"{"kernel_rss_required":true}"#), &samples));
+    for (index, role) in [(0, "candidate_rss"), (1, "reference_rss")] {
+        let Value::Array(rows) = &mut samples else {
+            unreachable!()
+        };
+        put(
+            &mut rows[index],
+            &[role, "observer"],
+            "kernel_rss_requested",
+            Value::int(1),
+        );
+        assert!(used(&standard, &samples));
+        let Value::Array(rows) = &mut samples else {
+            unreachable!()
+        };
+        put(
+            &mut rows[index],
+            &[role, "observer"],
+            "kernel_rss_requested",
+            Value::int(0),
+        );
+    }
+    assert!(!used(
+        &standard,
+        &v(r#"[null,{"candidate_heap":{"observer":{"kernel_rss_requested":1}}}]"#)
+    ));
 }
 
 const ZLIB: Option<&str> = Some("matroska-zlib");

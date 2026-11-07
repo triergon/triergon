@@ -8,11 +8,12 @@ use std::path::{Path, PathBuf};
 use std::process::Command;
 
 use super::acceptance::acceptance;
-use super::comparison::{reference_record, reference_summary, rule_for};
+use super::comparison::reference_summary;
 use super::gate_build;
 use super::parity::{self, Comparison, Run};
 use super::provenance::source_identity_error;
 use super::timing::{Operation, benchmark};
+use super::validation::{self, selected_operation};
 use crate::checks::read_json;
 use crate::corpus::write_json;
 use crate::json::Value;
@@ -206,34 +207,6 @@ pub fn fate_coverage(
     Ok(rows)
 }
 
-/// A contract's own candidate worker, bound to the build identity: its hash and
-/// its selected source graph must both still match.
-fn additional_candidate(root: &Path, identity: &Value, name: &str) -> Result<PathBuf, String> {
-    let record = identity
-        .get("additional_candidates")
-        .and_then(|c| c.get(name))
-        .ok_or_else(|| format!("{name} is not in the build identity; rebuild"))?;
-    let path = root.join(format!("target/release/{name}"));
-    if s(record, "sha256") != Some(digest(&path)?.as_str()) {
-        return Err(format!("{name} changed since build identity; rebuild"));
-    }
-    let current = super::provenance::selected_graph(
-        root,
-        &super::provenance::cargo_metadata(root)?,
-        name,
-        &super::provenance::matroska_inputs(),
-    )?;
-    if !record
-        .get("selected_graph")
-        .is_some_and(|g| super::diff::equal(g, &current))
-    {
-        return Err(format!(
-            "{name} sources changed since build identity; rebuild"
-        ));
-    }
-    Ok(path)
-}
-
 fn save_json(path: &Path, value: &Value) -> Result<(), String> {
     let temporary = path.with_extension("tmp");
     write_json(&temporary, value)?;
@@ -252,8 +225,6 @@ pub fn run(root: &Path, options: &Options) -> Result<i32, String> {
     {
         return Err("a baseline comparison is not an acceptance run".into());
     }
-    let candidate = root.join("target/release/media-worker");
-    let native = root.join("target/harness/ffmpeg-worker");
     let identity = read_json(&root.join("target/harness/identity.json"))?;
     let pinned = gate_build::pinned_release(root)?;
     println!("{}", gate_build::describe(&identity, &pinned));
@@ -261,36 +232,7 @@ pub fn run(root: &Path, options: &Options) -> Result<i32, String> {
     if !refusals.is_empty() && (options.require_acceptance || options.require_slice_acceptance) {
         return Err(format!("not the gate build: {}", refusals.join("; ")));
     }
-    let binaries = Value::object([
-        ("candidate", Value::str(digest(&candidate)?)),
-        ("reference", Value::str(digest(&native)?)),
-    ]);
-    if !identity
-        .get("binaries")
-        .is_some_and(|b| super::diff::equal(b, &binaries))
-    {
-        return Err("adapter changed since build identity; rebuild".into());
-    }
-    let harness_dir = root
-        .join("target/harness")
-        .canonicalize()
-        .map_err(|e| e.to_string())?;
-    if let Some(Value::Object(references)) = identity.get("comparison_references") {
-        for (_, record) in references {
-            let worker = root
-                .join(s(record, "path").unwrap_or_default())
-                .canonicalize()
-                .map_err(|e| e.to_string())?;
-            if !worker.starts_with(&harness_dir)
-                || Some(digest(&worker)?.as_str()) != s(record, "sha256")
-            {
-                return Err("comparison reference changed since build identity; rebuild".into());
-            }
-        }
-    }
-    if let Some(error) = source_identity_error(root, &identity) {
-        return Err(format!("{error}; rebuild"));
-    }
+    let (candidate, native) = validation::current_workers(root, &identity)?;
     let contract = read_json(&options.contract)?;
     let candidate_name = s(&contract, "candidate")
         .unwrap_or("media-worker")
@@ -298,7 +240,7 @@ pub fn run(root: &Path, options: &Options) -> Result<i32, String> {
     let candidate = if candidate_name == "media-worker" {
         candidate
     } else {
-        additional_candidate(root, &identity, &candidate_name)?
+        validation::candidate_worker(root, &identity, &candidate_name)?
     };
     // Workers that take one input per operation and print one fold: the contract
     // names the mode prefix, and each case may add arguments after the input.
@@ -312,6 +254,11 @@ pub fn run(root: &Path, options: &Options) -> Result<i32, String> {
                 .map(|n| n as u32)
         })
         .unwrap_or(200);
+    if (options.require_acceptance || options.require_slice_acceptance)
+        && !validation::iterations_valid(&contract, &Value::int(iterations))
+    {
+        return Err("qualification iterations do not match the contract".into());
+    }
     let contract_sha = digest(&options.contract)?;
     let contract_id = s(&contract, "id").map(str::to_owned);
     let mut additional = Vec::new();
@@ -377,16 +324,13 @@ pub fn run(root: &Path, options: &Options) -> Result<i32, String> {
                 case.get("profile").cloned().unwrap_or(Value::Null),
             ),
         ];
-        let rule = rule_for(case, &identity, contract_id.as_deref())?;
-        let selected = match (rule, s(&contract, "reference")) {
-            (None, Some(name)) => {
-                row.push(("reference_worker", Value::str(name)));
-                super::comparison::reference_named(&identity, name)?
-            }
-            _ => reference_record(&identity, rule)?,
-        };
-        let reference = root.join(s(&selected, "path").unwrap_or_default());
-        row.push(("reference", reference_summary(&selected)));
+        let selected = selected_operation(case, &contract, &identity)?;
+        let rule = selected.rule;
+        if let Some(name) = selected.reference_worker {
+            row.push(("reference_worker", Value::str(name)));
+        }
+        let reference = root.join(s(&selected.reference, "path").unwrap_or_default());
+        row.push(("reference", reference_summary(&selected.reference)));
         let file = s(case, "file").unwrap_or_default();
         let path = corpus.join(file);
         if Path::new(file)
@@ -413,16 +357,7 @@ pub fn run(root: &Path, options: &Options) -> Result<i32, String> {
                 .collect();
             row.push(("input_sha256", Value::str(sha)));
             row.push(("candidate_worker", Value::str(&candidate_name)));
-            row.push((
-                "operation",
-                Value::object([
-                    (
-                        "name",
-                        contract.get("operation").cloned().unwrap_or(Value::Null),
-                    ),
-                    ("view", Value::str(format!("playback-{prefix}fold-v1"))),
-                ]),
-            ));
+            row.push(("operation", selected.operation));
             let run = Run {
                 root,
                 candidate: &candidate,
@@ -452,28 +387,7 @@ pub fn run(root: &Path, options: &Options) -> Result<i32, String> {
                 .cloned();
             let catalogue = contract_id.as_deref() == Some("matroska-segment-metadata");
             let colour = contract_id.as_deref() == Some("matroska-colour");
-            let view = if catalogue {
-                Value::str("catalogue-source-and-native-v1")
-            } else if colour {
-                Value::str("colour-source-and-ffmpeg9-v1")
-            } else if let Some(rule) = rule {
-                rule.get("view").cloned().unwrap_or(Value::Null)
-            } else {
-                Value::str("source-frames-ffmpeg9-clock-v1")
-            };
-            let name = if seek.is_none() {
-                "container-demux-v1"
-            } else {
-                "container-seek-preroll-v1"
-            };
-            row.push((
-                "operation",
-                Value::object([
-                    ("name", Value::str(name)),
-                    ("seek_target_ns", seek.clone().unwrap_or(Value::Null)),
-                    ("view", view),
-                ]),
-            ));
+            row.push(("operation", selected.operation));
             let run = Run {
                 root,
                 candidate: &candidate,

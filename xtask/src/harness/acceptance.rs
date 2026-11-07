@@ -172,7 +172,8 @@ fn interval_value(interval: &stats::Interval) -> Value {
     ])
 }
 
-fn timing_valid(row: &Value, contract: &Value, selected: &Value, require_linux: bool) -> bool {
+/// Check a timing row's samples, worker bindings, isolation and recorded interval.
+pub fn timing_valid(row: &Value, contract: &Value, selected: &Value, require_linux: bool) -> bool {
     let timing = row.get("timing").cloned().unwrap_or(Value::Object(vec![]));
     let raw = timing
         .get("samples")
@@ -183,7 +184,11 @@ fn timing_valid(row: &Value, contract: &Value, selected: &Value, require_linux: 
         return false;
     };
     let minimum = int(contract.get("minimum_pairs")).unwrap_or(i128::MAX);
-    let mut valid = raw.len() as i128 == pairs && raw.len() as i128 >= minimum && iterations > 0;
+    let mut valid = raw.len() as i128 == pairs
+        && raw.len() as i128 >= minimum
+        && timing
+            .get("iterations")
+            .is_some_and(|count| super::validation::iterations_valid(contract, count));
     valid &= timing
         .get("worker_hashes")
         .is_some_and(|h| equal(h, selected));
@@ -375,19 +380,13 @@ pub fn acceptance(
             ));
             continue;
         }
-        let mut derived = members(contract).to_vec();
-        for (key, value) in [
-            ("required_profiles", Value::strings([file])),
-            ("required_additional_vectors", Value::Array(vec![])),
-        ] {
-            match derived.iter_mut().find(|(k, _)| k == key) {
-                Some(slot) => slot.1 = value,
-                None => derived.push((key.into(), value)),
-            }
-        }
+        let Ok(derived) = super::validation::external_contract(contract, file) else {
+            reasons.push(format!("invalid additional vector contract: {file}"));
+            continue;
+        };
         let extra = acceptance(
             root,
-            &Value::Object(derived),
+            &derived,
             &[matches[0].clone()],
             identity,
             target,
