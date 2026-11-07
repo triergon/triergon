@@ -2,30 +2,30 @@
 //! (Annex E 2.3.2).
 
 use super::{CPL, DownmixCodes, E, LFE, NCH, NFCHANS, REUSE, Substream, Trace, bad};
-use crate::bits::BitReader;
 use crate::error::{DecodeError, Feature};
 use crate::tables::{DEF_SPX_BNDSTRC, FRM_EXPSTR};
+use triergon_bitstream::BitReader;
 
 impl Substream {
     pub(super) fn parse_bsi_ac3(&mut self, br: &mut BitReader<'_>) -> Result<(), E> {
-        let _crc1 = br.get(16);
-        let fscod = br.get(2) as u8;
-        let _frmsizecod = br.get(6);
-        let bsid = br.get(5) as u8;
-        let _bsmod = br.get(3);
-        let acmod = br.get(3) as u8;
+        let _crc1 = br.read(16);
+        let fscod = br.read(2) as u8;
+        let _frmsizecod = br.read(6);
+        let bsid = br.read(5) as u8;
+        let _bsmod = br.read(3);
+        let acmod = br.read(3) as u8;
         let mut dm = DownmixCodes::default();
         if (acmod & 1) != 0 && acmod != 1 {
-            dm.cmixlev = Some(br.get(2) as u8);
+            dm.cmixlev = Some(br.read(2) as u8);
         }
         if acmod & 4 != 0 {
-            dm.surmixlev = Some(br.get(2) as u8);
+            dm.surmixlev = Some(br.read(2) as u8);
         }
         if acmod == 2 {
             br.skip(2); // dsurmod
         }
         let lfeon = br.bit();
-        let dialnorm = br.get(5) as u8;
+        let dialnorm = br.read(5) as u8;
         if br.bit() {
             br.skip(8); // compr
         }
@@ -51,11 +51,11 @@ impl Substream {
         // timecod1e/timecod2e, or for bsid 6 (Annex D) xbsi1e/xbsi2e: both carry 14 bits.
         if br.bit() {
             if bsid == 6 {
-                dm.dmixmod = Some(br.get(2) as u8);
-                dm.ltrtcmixlev = Some(br.get(3) as u8);
-                dm.ltrtsurmixlev = Some(br.get(3) as u8);
-                dm.lorocmixlev = Some(br.get(3) as u8);
-                dm.lorosurmixlev = Some(br.get(3) as u8);
+                dm.dmixmod = Some(br.read(2) as u8);
+                dm.ltrtcmixlev = Some(br.read(3) as u8);
+                dm.ltrtsurmixlev = Some(br.read(3) as u8);
+                dm.lorocmixlev = Some(br.read(3) as u8);
+                dm.lorosurmixlev = Some(br.read(3) as u8);
             } else {
                 br.skip(14);
             }
@@ -64,7 +64,7 @@ impl Substream {
             br.skip(14);
         }
         if br.bit() {
-            let addbsil = br.get(6) as usize;
+            let addbsil = br.read(6) as usize;
             br.skip((addbsil + 1) * 8);
         }
         self.eac3 = false;
@@ -78,24 +78,24 @@ impl Substream {
     }
 
     pub(super) fn parse_bsi_eac3(&mut self, br: &mut BitReader<'_>) -> Result<(), E> {
-        let strmtyp = br.get(2) as u8;
-        let _substreamid = br.get(3);
-        let _frmsiz = br.get(11);
-        let fscod = br.get(2) as u8;
+        let strmtyp = br.read(2) as u8;
+        let _substreamid = br.read(3);
+        let _frmsiz = br.read(11);
+        let fscod = br.read(2) as u8;
         let (numblkscod, hth_idx) = if fscod == 3 {
-            let fscod2 = br.get(2) as usize;
+            let fscod2 = br.read(2) as usize;
             if fscod2 == 3 {
                 return Err(DecodeError::Unsupported(Feature::ReservedSampleRate));
             }
             (3usize, fscod2)
         } else {
-            (br.get(2) as usize, fscod as usize)
+            (br.read(2) as usize, fscod as usize)
         };
         let num_blocks = [1, 2, 3, 6][numblkscod];
-        let acmod = br.get(3) as u8;
+        let acmod = br.read(3) as u8;
         let lfeon = br.bit();
-        let bsid = br.get(5) as u8;
-        let dialnorm = br.get(5) as u8;
+        let bsid = br.read(5) as u8;
+        let dialnorm = br.read(5) as u8;
         if br.bit() {
             br.skip(8); // compr
         }
@@ -107,24 +107,24 @@ impl Substream {
         }
         let mut chanmap = None;
         if strmtyp == 1 && br.bit() {
-            chanmap = Some(br.get(16) as u16);
+            chanmap = Some(br.read(16) as u16);
         }
         let mut dm = DownmixCodes::default();
         if br.bit() {
             // mixmdate
             if acmod > 2 {
-                dm.dmixmod = Some(br.get(2) as u8);
+                dm.dmixmod = Some(br.read(2) as u8);
             }
             if (acmod & 1) != 0 && acmod > 2 {
-                dm.ltrtcmixlev = Some(br.get(3) as u8);
-                dm.lorocmixlev = Some(br.get(3) as u8);
+                dm.ltrtcmixlev = Some(br.read(3) as u8);
+                dm.lorocmixlev = Some(br.read(3) as u8);
             }
             if acmod & 4 != 0 {
-                dm.ltrtsurmixlev = Some(br.get(3) as u8);
-                dm.lorosurmixlev = Some(br.get(3) as u8);
+                dm.ltrtsurmixlev = Some(br.read(3) as u8);
+                dm.lorosurmixlev = Some(br.read(3) as u8);
             }
             if lfeon && br.bit() {
-                dm.lfemixlevcod = Some(br.get(5) as u8);
+                dm.lfemixlevcod = Some(br.read(5) as u8);
             }
             if strmtyp == 0 {
                 if br.bit() {
@@ -136,16 +136,16 @@ impl Substream {
                 if br.bit() {
                     br.skip(6); // extpgmscl
                 }
-                match br.get(2) {
+                match br.read(2) {
                     1 => br.skip(5),
                     2 => br.skip(12),
                     3 => {
                         // mixdeflen gives the length (2..=33 bytes) of the mixdata field,
                         // which begins with mixdeflen itself (Annex E 2.3.1.22, 3.10.4).
-                        let start = br.pos();
-                        let mixdeflen = br.get(5) as usize;
+                        let start = br.position();
+                        let mixdeflen = br.read(5) as usize;
                         let end = start + 8 * (mixdeflen + 2);
-                        br.skip(end - br.pos());
+                        br.skip(end - br.position());
                     }
                     _ => {}
                 }
@@ -200,7 +200,7 @@ impl Substream {
             }
         }
         if br.bit() {
-            let addbsil = br.get(6) as usize;
+            let addbsil = br.read(6) as usize;
             br.skip((addbsil + 1) * 8);
         }
         self.eac3 = true;
@@ -252,23 +252,23 @@ impl Substream {
             (true, false)
         };
         self.ahte = ahte;
-        self.snroffststr = br.get(2) as u8;
+        self.snroffststr = br.read(2) as u8;
         if self.snroffststr == 3 {
             return Err(bad("reserved snroffststr"));
         }
         if let Some(t) = trace.cur() {
-            t.transproce_bit = Some(br.pos());
+            t.transproce_bit = Some(br.position());
         }
         let transproce = br.bit();
         self.blkswe = br.bit();
         if let Some(t) = trace.cur() {
-            t.dithflage_bit = Some(br.pos());
+            t.dithflage_bit = Some(br.position());
         }
         self.dithflage = br.bit();
         self.bamode = br.bit();
         self.frmfgaincode = br.bit();
         if let Some(t) = trace.cur() {
-            t.dbaflde_bit = Some(br.pos());
+            t.dbaflde_bit = Some(br.position());
         }
         self.dbaflde = br.bit();
         self.skipflde = br.bit();
@@ -294,18 +294,18 @@ impl Substream {
         if expstre {
             for blk in 0..nblk {
                 self.expstr[CPL][blk] = if self.cplinu_blk[blk] {
-                    br.get(2) as u8
+                    br.read(2) as u8
                 } else {
                     REUSE
                 };
                 for ch in 0..nfch {
-                    self.expstr[ch][blk] = br.get(2) as u8;
+                    self.expstr[ch][blk] = br.read(2) as u8;
                 }
             }
         } else {
             self.features.frame_expstr = true;
             if self.acmod > 1 && ncplblks > 0 {
-                let s = br.get(5) as usize;
+                let s = br.read(5) as usize;
                 for blk in 0..6 {
                     self.expstr[CPL][blk] = FRM_EXPSTR[s][blk];
                 }
@@ -313,13 +313,13 @@ impl Substream {
                 self.expstr[CPL] = [REUSE; 6];
             }
             for ch in 0..nfch {
-                let s = br.get(5) as usize;
+                let s = br.read(5) as usize;
                 self.expstr[ch] = FRM_EXPSTR[s];
             }
         }
         if self.lfeon {
             for blk in 0..nblk {
-                self.expstr[LFE][blk] = br.get(1) as u8;
+                self.expstr[LFE][blk] = br.read(1) as u8;
             }
         }
         // Converter exponent strategy.
@@ -354,11 +354,11 @@ impl Substream {
             self.features.aht |= self.aht.iter().any(|&a| a);
         }
         if self.snroffststr == 0 {
-            self.frmcsnroffst = br.get(6) as u8;
-            self.frmfsnroffst = br.get(4) as u8;
+            self.frmcsnroffst = br.read(6) as u8;
+            self.frmfsnroffst = br.read(4) as u8;
         }
         if let Some(t) = trace.cur() {
-            t.transproc_data_bit = Some(br.pos());
+            t.transproc_data_bit = Some(br.position());
         }
         if transproce {
             // Transient pre-noise processing data: parsed, not applied (FFmpeg 9.0.2 does
@@ -375,7 +375,7 @@ impl Substream {
             for ch in 0..nfch {
                 self.chinspxatten[ch] = br.bit();
                 if self.chinspxatten[ch] {
-                    self.spxattencod[ch] = br.get(5) as u8;
+                    self.spxattencod[ch] = br.read(5) as u8;
                 }
             }
         }

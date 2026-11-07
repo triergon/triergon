@@ -1,10 +1,10 @@
 //! Coupling and spectral extension side information (5.4.3, Annex E 2.3.3).
 
 use super::{BlockTrace, E, Substream, Trace, bad};
-use crate::bits::BitReader;
 use crate::error::{DecodeError, Feature};
 use crate::quant::EXP_SCALE;
 use crate::tables::{DEF_CPL_BNDSTRC, spx_band_start};
+use triergon_bitstream::BitReader;
 
 impl Substream {
     /// Coupling strategy flags; returns whether a new coupling strategy was read.
@@ -28,7 +28,7 @@ impl Substream {
             self.cplinu = cplinu;
             if cplinu {
                 if let Some(t) = trace.cur() {
-                    t.ecplinu_bits.push(br.pos());
+                    t.ecplinu_bits.push(br.position());
                 }
                 self.parse_cpl_strategy(br)?;
             } else {
@@ -68,10 +68,10 @@ impl Substream {
                     if ch < 2 {
                         cplcoe0[ch] = true;
                     }
-                    let mstrcplco = br.get(2) as usize;
+                    let mstrcplco = br.read(2) as usize;
                     for bnd in 0..self.ncplbnd {
-                        let e = br.get(4) as usize;
-                        let m = br.get(4) as f32;
+                        let e = br.read(4) as usize;
+                        let m = br.read(4) as f32;
                         let t = if e == 15 { m / 16.0 } else { (m + 16.0) / 32.0 };
                         let sh = e + 3 * mstrcplco;
                         self.cplco[ch][bnd] = t * EXP_SCALE[sh.min(31)];
@@ -86,7 +86,7 @@ impl Substream {
                 blk,
                 cplstre: new_cpl_strategy,
                 phsflginu_bit: self.phsflginu_pos,
-                phsflg_bit: br.pos(),
+                phsflg_bit: br.position(),
                 ncplbnd: self.ncplbnd,
                 cplcoe_any: cplcoe0[0] || cplcoe0[1],
                 dba_bit: 0,
@@ -115,9 +115,9 @@ impl Substream {
                 self.chinspx[ch] = br.bit();
             }
         }
-        self.spxstrtf = br.get(2) as usize;
-        let spxbegf = br.get(3) as usize;
-        let spxendf = br.get(3) as usize;
+        self.spxstrtf = br.read(2) as usize;
+        let spxbegf = br.read(3) as usize;
+        let spxendf = br.read(3) as usize;
         self.spxbegf = spxbegf;
         self.spx_begin = if spxbegf < 6 {
             spxbegf + 2
@@ -169,14 +169,14 @@ impl Substream {
             if !spxcoe {
                 continue;
             }
-            let spxblnd = br.get(5) as f32;
-            let mstrspxco = br.get(2) as usize;
+            let spxblnd = br.read(5) as f32;
+            let mstrspxco = br.read(2) as usize;
             let noffset = spxblnd / 32.0;
             let spx_end_mant = spx_band_start(self.spx_end) as f32;
             let mut spxmant = spx_band_start(self.spx_begin);
             for bnd in 0..self.nspxbnds {
-                let e = br.get(4) as usize;
-                let m = br.get(2) as f32;
+                let e = br.read(4) as usize;
+                let m = br.read(2) as f32;
                 let t = if e == 15 { m / 4.0 } else { (m + 4.0) / 8.0 };
                 self.spxco[ch][bnd] = t * EXP_SCALE[(e + 3 * mstrspxco).min(31)];
                 // Annex E 3.6.4.2.1 blending factors.
@@ -212,17 +212,17 @@ impl Substream {
             self.chincpl[ch] = false;
         }
         self.phsflginu_pos = if self.acmod == 2 {
-            Some(br.pos())
+            Some(br.position())
         } else {
             None
         };
         self.phsflginu = if self.acmod == 2 { br.bit() } else { false };
-        self.cplbegf = br.get(4) as i32;
+        self.cplbegf = br.read(4) as i32;
         if eac3 && self.spxinu {
             let s = self.spxbegf as i32;
             self.cplendf = if s < 6 { s - 2 } else { s * 2 - 7 };
         } else {
-            self.cplendf = br.get(4) as i32;
+            self.cplendf = br.read(4) as i32;
         }
         let ncplsubnd = 3 + self.cplendf - self.cplbegf;
         if ncplsubnd < 1 {

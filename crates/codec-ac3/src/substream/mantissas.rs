@@ -2,7 +2,6 @@
 //! 3.4).
 
 use super::{CPL, E, LFE, NoiseMode, Substream};
-use crate::bits::BitReader;
 use crate::noise::Rng;
 use crate::quant::{EXP_SCALE, GroupTables};
 use crate::spec_tables::{
@@ -12,6 +11,7 @@ use crate::tables::{
     BAP_BITS, GAQ_A1, GAQ_A2, GAQ_A4, GAQ_B2_NEG, GAQ_B2_POS, GAQ_B4_NEG, GAQ_B4_POS, HEBAP_BITS,
     frac16,
 };
+use triergon_bitstream::BitReader;
 
 /// Per-block mantissa group state (7.3.5): groups are shared across exponent sets.
 struct Groups {
@@ -146,7 +146,7 @@ impl Substream {
         noise: NoiseMode,
     ) -> Result<(), E> {
         let (start, end) = (self.strtmant[ch], self.endmant[ch]);
-        let gaqmod = br.get(2) as u8;
+        let gaqmod = br.read(2) as u8;
         let endbap = if gaqmod < 2 { 12 } else { 17 };
         let hebap = &self.bap[ch];
         let mut active = 0usize;
@@ -175,7 +175,7 @@ impl Substream {
             }
             3 => {
                 for s in 0..nsections {
-                    let grp = br.get(5) as usize;
+                    let grp = br.read(5) as usize;
                     let m = [grp / 9, (grp % 9) / 3, grp % 3];
                     for (k, &mv) in m.iter().enumerate() {
                         if 3 * s + k < 256 {
@@ -201,7 +201,7 @@ impl Substream {
                 }
             } else if h < 8 {
                 let bits = HEBAP_BITS[h] as u32;
-                let idx = br.get(bits) as usize;
+                let idx = br.read(bits) as usize;
                 let row: &[i16; 6] = match h {
                     1 => &VQ_HEBAP1[idx],
                     2 => &VQ_HEBAP2[idx],
@@ -280,7 +280,7 @@ fn read_mantissas(
             }
             1 => {
                 if g.n1 == 0 {
-                    g.g1 = t.g1[br.get(5) as usize];
+                    g.g1 = t.g1[br.read(5) as usize];
                     g.n1 = 3;
                 }
                 g.n1 -= 1;
@@ -288,25 +288,25 @@ fn read_mantissas(
             }
             2 => {
                 if g.n2 == 0 {
-                    g.g2 = t.g2[br.get(7) as usize];
+                    g.g2 = t.g2[br.read(7) as usize];
                     g.n2 = 3;
                 }
                 g.n2 -= 1;
                 g.g2[2 - g.n2]
             }
-            3 => t.b3[br.get(3) as usize],
+            3 => t.b3[br.read(3) as usize],
             4 => {
                 if g.n4 == 0 {
-                    g.g4 = t.g4[br.get(7) as usize];
+                    g.g4 = t.g4[br.read(7) as usize];
                     g.n4 = 2;
                 }
                 g.n4 -= 1;
                 g.g4[1 - g.n4]
             }
-            5 => t.b5[br.get(4) as usize],
+            5 => t.b5[br.read(4) as usize],
             _ => {
                 let bits = BAP_BITS[b as usize] as u32;
-                br.get_signed(bits) << (24 - bits)
+                br.read_signed(bits) << (24 - bits)
             }
         };
         out[bin] = m >> exps[bin];
@@ -319,15 +319,15 @@ fn gaq_mantissa(br: &mut BitReader<'_>, hebap: usize, m: u32, gain_log: u8) -> f
     let idx = hebap - 8;
     match gain_log {
         0 => {
-            let x = br.get_signed(m) as f32 * EXP_SCALE[(m - 1) as usize];
+            let x = br.read_signed(m) as f32 * EXP_SCALE[(m - 1) as usize];
             x + frac16(GAQ_A1[idx] as u16) * x
         }
         1 => {
             let sb = m - 1;
-            let s = br.get_signed(sb);
+            let s = br.read_signed(sb);
             if s == -(1 << (sb - 1)) {
                 let lb = m - 1;
-                let x = br.get_signed(lb) as f32 * EXP_SCALE[(lb - 1) as usize];
+                let x = br.read_signed(lb) as f32 * EXP_SCALE[(lb - 1) as usize];
                 let b = if x >= 0.0 {
                     frac16(GAQ_B2_POS)
                 } else {
@@ -340,10 +340,10 @@ fn gaq_mantissa(br: &mut BitReader<'_>, hebap: usize, m: u32, gain_log: u8) -> f
         }
         _ => {
             let sb = m - 2;
-            let s = br.get_signed(sb);
+            let s = br.read_signed(sb);
             if s == -(1 << (sb - 1)) {
                 let lb = m;
-                let x = br.get_signed(lb) as f32 * EXP_SCALE[(lb - 1) as usize];
+                let x = br.read_signed(lb) as f32 * EXP_SCALE[(lb - 1) as usize];
                 let b = if x >= 0.0 {
                     frac16(GAQ_B4_POS)
                 } else {

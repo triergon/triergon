@@ -13,11 +13,11 @@ mod mantissas;
 mod reconstruct;
 
 use crate::bitalloc::{BaCache, BaParams, Dba};
-use crate::bits::BitReader;
 use crate::error::DecodeError;
 use crate::imdct::Imdct;
 use crate::noise::Rng;
 use crate::quant::GroupTables;
+use triergon_bitstream::BitReader;
 
 pub(crate) const CPL: usize = 5;
 pub(crate) const LFE: usize = 6;
@@ -394,7 +394,7 @@ impl Substream {
         trace: &mut Trace,
         quirk_armed: &mut bool,
     ) -> Result<(), (usize, E)> {
-        let mut br = BitReader::new(buf, 16);
+        let mut br = BitReader::at(buf, 16);
         let eac3 = buf[5] >> 3 > 10;
         self.features = FrameFeatures::default();
         let r = if eac3 {
@@ -428,7 +428,7 @@ impl Substream {
         for blk in 0..self.num_blocks {
             self.parse_block(&mut br, blk, rng, noise, groups, trace)
                 .map_err(|e| (blk, e))?;
-            if br.pos() > frame_bits {
+            if br.position() > frame_bits {
                 // FFmpeg 9.0.2 keeps decoding with zero bits past the frame end; A/52 7.10
                 // leaves error handling to the implementation.
                 self.features.overrun = true;
@@ -446,7 +446,7 @@ impl Substream {
             self.synthesize(blk, imdct, sink);
         }
         if let Some(t) = trace.cur() {
-            t.audio_end_bit = br.pos();
+            t.audio_end_bit = br.position();
             t.features = self.features;
         }
         Ok(())
@@ -473,7 +473,7 @@ mod noise_tests {
         sub.cplco[1][0] = 0.125;
 
         let mut rng = Rng::new(true);
-        let mut reader = BitReader::new(&[0; crate::bits::PAD], 0);
+        let mut reader = BitReader::new(&[0; crate::PAD]);
         sub.unpack_mantissas(
             &mut reader,
             0,
@@ -482,7 +482,7 @@ mod noise_tests {
             &GroupTables::new(),
         )
         .unwrap();
-        assert_eq!(reader.pos(), 0);
+        assert_eq!(reader.position(), 0);
         assert_eq!(sub.icoef[CPL][37], 4762085);
         assert_eq!(sub.icoef[1][0], -4643861);
         sub.reconstruct(&mut rng, NoiseMode::Normal);

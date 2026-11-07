@@ -5,6 +5,33 @@ foundation layer, depends only on `std`, and knows nothing about containers, cod
 any crate above it. Errors a parser reports stay in that parser: everything here returns
 plain values, so a caller chooses its own error type and text.
 
+## Decode loops
+
+[`BitReader`] and [`CachedBitReader`] read MSB-first bits of a slice and yield zeros past
+what they can reach, so a decoder polls [`Reader::overrun`] at syntax boundaries instead
+of branching on every field. They share every method and differ in how they reach the
+bits, which can decide several percent of a decoder's time:
+
+- `BitReader` does one unaligned eight-byte load per read and keeps no state. Use it for
+  fixed-width fields and short tables, as AC-3 and H.264 do. A load that does not fit in
+  the slice reads as zero, so the slice carries eight bytes of padding after its last
+  field, and [`Reader::with_end`] says where the fields end.
+- `CachedBitReader` keeps eight bytes in a register, so a read is a shift and consecutive
+  codewords do not wait for a load. Use it for Huffman codes, as AAC does. It reads every
+  byte of the slice and needs no padding.
+
+```rust
+use triergon_bitstream::CachedBitReader;
+
+let mut reader = CachedBitReader::new(&[0b1010_1100, 0xff]);
+assert_eq!(reader.read(4), 0b1010);
+assert_eq!(reader.read_signed(4), -4);
+assert_eq!(reader.peek32(), 0xff00_0000);
+reader.skip(16);
+assert_eq!(reader.read(8), 0);
+assert!(reader.overrun());
+```
+
 ## Checked reads
 
 [`BitCursor`] reads MSB-first bits of a slice and fails at its end. Headers and parameter

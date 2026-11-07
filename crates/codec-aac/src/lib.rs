@@ -18,7 +18,6 @@
     clippy::unnested_or_patterns
 )]
 pub mod adts;
-mod bits;
 mod cce;
 mod decoder;
 mod error;
@@ -37,7 +36,7 @@ pub use adts::AdtsHeader;
 pub use error::{DecodeError, Feature};
 pub use triergon_codec::{AudioFrame, ChannelLayout, Speaker};
 
-use bits::BitReader;
+use triergon_bitstream::CachedBitReader;
 use triergon_codec::{AudioDecoder, DecodeFailure, DownmixLevels};
 
 /// ADTS AAC decoder.
@@ -95,7 +94,7 @@ impl Decoder {
         let payload = &au[hdr..h.frame_length];
         #[cfg(feature = "inspect")]
         core.sbr_fil_ranges.clear();
-        let mut br = BitReader::new(payload);
+        let mut br = CachedBitReader::new(payload);
         // planes sized for the current layout; a mid-frame layout change restarts collection
         let mut planes: Vec<Vec<f32>> = std::mem::take(&mut out.planes);
         for _ in 0..h.raw_data_blocks {

@@ -13,7 +13,6 @@
 // adopted with an A/B timing run.
 #![allow(clippy::single_match_else)]
 mod bitalloc;
-mod bits;
 mod error;
 mod header;
 mod imdct;
@@ -33,11 +32,13 @@ pub use substream::{DownmixCodes, FrameFeatures, NoiseMode};
 pub use triergon_bitstream::crc::crc16_a52 as crc16;
 pub use triergon_codec::{AudioFrame, ChannelLayout, Speaker};
 
-use bits::PAD;
 use quant::GroupTables;
 use substream::{BlockSink, LFE, NCH, PlaneMap, Substream, acmod_channels};
+use triergon_bitstream::BitReader;
 use triergon_codec::{AudioDecoder, DecodeFailure, DownmixLevels, SurroundEncoding};
 
+/// Bytes of zero padding kept after a frame in the decode buffer.
+pub(crate) const PAD: usize = 16;
 /// Largest syncframe: 2048 16-bit words (E-AC-3 frmsiz) / 1920 words (AC-3 32 kHz 640 kbps).
 const MAX_FRAME_BYTES: usize = 4096;
 /// Maximum syncframes per access unit (independent + 8 dependents + other programs).
@@ -723,13 +724,13 @@ fn peek_chanmap(frame: &[u8]) -> Option<u16> {
     let mut b = [0u8; 24];
     let n = frame.len().min(16);
     b[..n].copy_from_slice(&frame[..n]);
-    let mut r = bits::BitReader::new(&b, 16);
-    let strmtyp = r.get(2);
+    let mut r = BitReader::at(&b, 16);
+    let strmtyp = r.read(2);
     r.skip(3 + 11);
-    let fscod = r.get(2);
+    let fscod = r.read(2);
     r.skip(2); // fscod2 or numblkscod
     let _ = fscod;
-    let acmod = r.get(3);
+    let acmod = r.read(3);
     r.skip(1 + 5 + 5); // lfeon, bsid, dialnorm
     if r.bit() {
         r.skip(8);
@@ -741,7 +742,7 @@ fn peek_chanmap(frame: &[u8]) -> Option<u16> {
         }
     }
     if strmtyp == 1 && r.bit() {
-        Some(r.get(16) as u16)
+        Some(r.read(16) as u16)
     } else {
         None
     }

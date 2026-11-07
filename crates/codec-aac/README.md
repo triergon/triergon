@@ -1,7 +1,8 @@
 # triergon-codec-aac
 
 MPEG-4 AAC decoder for ADTS access units: AAC Main, LC and LTP, HE-AAC (SBR) and
-HE-AAC v2 (Parametric Stereo). It is a codec-layer crate whose only dependency is
+HE-AAC v2 (Parametric Stereo). It is a codec-layer crate that depends on
+[triergon-bitstream](../bitstream/README.md) and
 [triergon-codec](../codec/README.md), whose `AudioDecoder` trait it implements and
 whose `AudioFrame`, `ChannelLayout` and `Speaker` it re-exports. It does not split streams, resample or downmix: the caller hands it one ADTS
 frame at a time and receives planar `f32` in FFmpeg's native channel order.

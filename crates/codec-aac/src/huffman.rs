@@ -1,8 +1,8 @@
 //! Table-driven Huffman decoding (two-level lookup) for all AAC / SBR / PS codebooks.
 
-use crate::bits::BitReader;
 use crate::huffman_tables as t;
 use std::sync::OnceLock;
+use triergon_bitstream::CachedBitReader;
 
 /// Two-level lookup table. Primary table indexed by the next `PRIMARY` bits.
 /// Entry encoding (u32): bits 0..5 = code length (0 = invalid / escape to subtable),
@@ -58,7 +58,7 @@ impl Vlc {
 
     /// Decode one symbol. Returns `None` on an invalid code.
     #[inline(always)]
-    pub(crate) fn decode(&self, br: &mut BitReader<'_>) -> Option<u32> {
+    pub(crate) fn decode(&self, br: &mut CachedBitReader<'_>) -> Option<u32> {
         let bits = br.peek32();
         let e = self.table[(bits >> (32 - self.primary_bits)) as usize];
         if e & SUB_FLAG == 0 {
@@ -260,7 +260,7 @@ mod tests {
         for (sym, &(c, l)) in codes.iter().enumerate() {
             let word = (c as u64) << (40 - l as u32);
             let bytes = word.to_be_bytes();
-            let mut br = BitReader::new(&bytes[3..]);
+            let mut br = CachedBitReader::new(&bytes[3..]);
             assert_eq!(vlc.decode(&mut br), Some(sym as u32), "{name} sym {sym}");
             assert_eq!(br.position(), l as usize);
         }
@@ -284,7 +284,7 @@ mod tests {
         ] {
             let trailing = u16::MAX >> len;
             let bytes = ((wire << (16 - len)) | trailing).to_be_bytes();
-            let mut reader = BitReader::new(&bytes);
+            let mut reader = CachedBitReader::new(&bytes);
             assert_eq!(vlc.decode(&mut reader), Some((delta + 12) as u32));
             assert_eq!(reader.position(), len);
         }
