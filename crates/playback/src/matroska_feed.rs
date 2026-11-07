@@ -87,10 +87,6 @@ enum Parser {
     Aac(AacAscParser),
 }
 
-#[expect(
-    clippy::large_enum_variant,
-    reason = "one inline configuration per selected track avoids an uncharged allocation"
-)]
 enum FeedCodec {
     Avc(AvcAnnexBConfig),
     Aac(AacAdtsParameters),

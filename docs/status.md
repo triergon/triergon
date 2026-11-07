@@ -17,19 +17,13 @@ release ([reference pins](quality.md#reference-and-corpus)).
 | ISO BMFF / MP4 | Regular and fragmented files, edit lists, seek and range plans, QuickTime compatibility, bounded AAC configuration and regular table recovery, timing, sync and terminal media prefixes; AVC, HEVC, AAC, AC-3, E-AC-3, DTS core, AV1, VP9 | 255 inputs, 1,020 open and index comparisons (972 matching outputs and 48 matching refusal outcomes with compatibility policies) | 1.1273 (972/972 within 1.20) | heap ≤0.4133, total RSS ≤0.7283 (972/972) | seek and range-plan timing |
 | MPEG-TS | PSI, continuity, PES assembly; TS188 and M2TS192 | 272-request set (80 field matches, 23 open) | not measured | not measured | access-unit demux, broader profiles |
 | HLS segments | Independent TS188 segments: AVC or HEVC with AAC, AC-3 or E-AC-3 | 71 packet comparisons, 10 measured workloads | 1.1914 (10/10 within 1.20) | heap ≤0.022, total RSS ≤0.725 | other profiles |
-| Packet framing | AVC/HEVC configuration and NAL framing, AV1, VP9, AC-3, E-AC-3, DTS core | 125 cases; DTS core byte-exact on 37,125 projections and 1,172 FATE packets | 1.2395 | heap 0.98, RSS 0.99 | above 1.20; full AVC/HEVC/ADTS grammar |
+| Packet framing | AVC/HEVC configuration and NAL framing, AV1, VP9, AC-3, E-AC-3, DTS core | 125 reference matches for AVC/HEVC; DTS core byte-exact on 37,125 projections and 1,172 FATE packets | 1.1772 (125/125 within 1.20 for AVC/HEVC) | heap ≤0.985, total RSS ≤0.990 on the same 125 cases | full AVC/HEVC/ADTS grammar |
 | Subtitles, text | SRT, WebVTT, ASS passthrough, mov_text and tx3g to ASS, charset handling | 82 mov_text cases, 79 tx3g regressions | not measured | not measured | timing and memory |
 | Subtitles, bitmap | PGS, DVB display state and colour lookup, DVD units | 229 PGS cases; 5,300 DVB display sets | PGS 1.11 | PGS heap 0.62, RSS 0.90 | full PGS recovery, DVB and DVD decoding |
 | Playback | Matroska, MP4, TS and raw AVC/HEVC feeds; seeking; end-of-file continuation | 120/120 continuation observations; 746 of 998 matrix rows | Matroska AVC/AAC feed within 1.25 | lower | most profiles unmeasured |
 | Codecs | H.264 8-bit 4:2:0; HEVC Main and Main10; AAC LC, HE, HEv2; AC-3 and E-AC-3; DTS core with XCh and X96 | 417/417 comparable conformance and FATE vectors | 1.10 | heap 0.92, RSS 0.82 | error concealment, unverified tool paths |
 | Decode sessions | Bounded queues, clock-gated output, flush and seek, RGBA letterbox, stereo mix | with the codecs | 1.10 | with the codecs | — |
 | Capture | RGBA to YUV 4:2:0, MPEG-1 video, MPEG-TS mux | 15/15 quality cases against FFmpeg 9.0.2 | 1.1206 (15/15 within 1.20) | heap ≤0.548, total RSS ≤0.978 (15/15) | — |
-
-## Above the 1.20 ceiling
-
-| Case | Worst upper bound |
-|---|---|
-| Packet framing: 125-case set | 1.2395 |
 
 ## Measured revisions
 
@@ -49,6 +43,7 @@ have not been checked against it. Their numbers stay as measured until re-measur
 | ISO BMFF open and index runtime | `ea4b941b4454bcc2ea0cd213999d64a07928ed7c` | `fca8e54cb9b2f0d55acc8ba9be2a5849992ae7996f3c3db551896477c3359525` |
 | ISO BMFF open and index memory | `ea4b941b4454bcc2ea0cd213999d64a07928ed7c` | `46cf8ac9041b147c96108de6e09fde26c47e12fd10161f7eee9661db95f8c89a` |
 | HLS segments | `7699c80caff6efdce9be8226d12bfa606dadd7b2` | `e008a7fc75c87deb903038cdd38d4e417cf0efa8d92592f9fc6105faecbba991` |
+| Packet framing | `d225c35c1e2aa8a9b7dc4d61bb673a5728bd0ee6` | `b59476c45d8f31ac4694a264ce49cf12bda9bf9709e5cb6979ece0acb41cc812` |
 | Capture, timing and memory | `e2cb0bea2c2fae823baef8169888ca84cf8b01f0` | `11f0572cf6d9294023340a35970f8fa5c4f6e75abfdab55d8e1fb67f0228f983` |
 | Capture, earlier timing | `1831a2aa54e56d45472e171429a98fe878055449` | `fac200b915c2b9a984e5b91cba29e7a3c016690596f128524f46c8f2cb40b6e6` |
 

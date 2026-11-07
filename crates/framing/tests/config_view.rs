@@ -1185,6 +1185,39 @@ fn g07_quanta_traces_cancellation_and_complete_ordering() {
 }
 
 #[test]
+fn avc_cached_fill_boundary_matches_fallback_output_and_work() {
+    let raw = avc_fixture_records()
+        .into_iter()
+        .find(|(label, _)| label == "plain-control")
+        .unwrap()
+        .1;
+    // Two groups and their ends, two NALs, then the end event.
+    let fill_work = 7;
+    let before_fill_work = 1 + fill_work + 1; // Prefix, Count and Reserve.
+    let mut previous = None;
+    for remaining in [fill_work - 1, fill_work] {
+        let quantum = before_fill_work + remaining;
+        let (eager_trace, eager, view_trace, view) = avc_both(&raw, avc_limits(), quantum);
+        let expected_trace = if remaining == fill_work {
+            vec![("ready", 0)]
+        } else {
+            vec![("yield", 0), ("ready", quantum - 1)]
+        };
+        assert_eq!(eager_trace, expected_trace);
+        assert_eq!(view_trace, eager_trace);
+        let spent = |trace: &Trace| trace.iter().map(|(_, left)| quantum - left).sum::<u64>();
+        assert_eq!(spent(&eager_trace), before_fill_work + fill_work);
+        assert_eq!(spent(&view_trace), spent(&eager_trace));
+        let (eager, view) = (eager.unwrap(), view.unwrap());
+        assert_eq!(view, eager);
+        if let Some(previous) = &previous {
+            assert_eq!(&view, previous);
+        }
+        previous = Some(view);
+    }
+}
+
+#[test]
 fn g08_permanent_failures_latch_release_and_match_eager() {
     let rich = avc_rich();
     // Late physical truncation, zero NAL length and a bad fixed NAL header.
