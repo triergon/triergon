@@ -78,7 +78,9 @@ pub struct FlacMetadataBlock<'a> {
 pub fn flac_metadata_blocks(
     bytes: &[u8],
 ) -> Result<impl Iterator<Item = Result<FlacMetadataBlock<'_>>>> {
-    let mut rest = bytes.strip_prefix(b"fLaC").ok_or(Error::Invalid("FLAC marker"))?;
+    let mut rest = bytes
+        .strip_prefix(b"fLaC")
+        .ok_or(Error::Invalid("FLAC marker"))?;
     let mut done = false;
     Ok(core::iter::from_fn(move || {
         if done || rest.is_empty() {
@@ -110,7 +112,9 @@ pub fn flac_stream_info(configuration: &[u8]) -> Result<FlacStreamInfo> {
         .next()
         .ok_or(Error::Truncated)??;
     if first.kind != FLAC_STREAMINFO {
-        return Err(Error::Invalid("FLAC first metadata block is not STREAMINFO"));
+        return Err(Error::Invalid(
+            "FLAC first metadata block is not STREAMINFO",
+        ));
     }
     FlacStreamInfo::parse(first.body)
 }
@@ -154,6 +158,29 @@ pub enum FlacBlocking {
     Variable,
 }
 
+/// How a frame codes its channels (RFC 9639 section 9.1.3).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum FlacChannelAssignment {
+    /// 1 to 8 channels, each coded on its own.
+    Independent(u8),
+    /// Left and side (left minus right).
+    LeftSide,
+    /// Side and right.
+    SideRight,
+    /// Mid (the average, rounded down) and side.
+    MidSide,
+}
+
+impl FlacChannelAssignment {
+    /// Channels the frame codes.
+    pub fn channels(self) -> u8 {
+        match self {
+            FlacChannelAssignment::Independent(count) => count,
+            _ => 2,
+        }
+    }
+}
+
 /// A frame header (RFC 9639 section 9.1) with its CRC-8 checked.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct FlacFrameHeader {
@@ -161,9 +188,7 @@ pub struct FlacFrameHeader {
     pub block_size: u32,
     /// `None` when the header defers to STREAMINFO.
     pub sample_rate: Option<u32>,
-    /// Channel assignment code 0 to 10: 0-7 independent channels, 8 left/side,
-    /// 9 side/right, 10 mid/side.
-    pub channel_assignment: u8,
+    pub channels: FlacChannelAssignment,
     /// `None` when the header defers to STREAMINFO.
     pub bits_per_sample: Option<u8>,
     /// Frame number (fixed blocking) or first sample number (variable blocking).
@@ -173,15 +198,6 @@ pub struct FlacFrameHeader {
 }
 
 impl FlacFrameHeader {
-    /// Channels the frame codes.
-    pub fn channels(&self) -> u8 {
-        if self.channel_assignment < 8 {
-            self.channel_assignment + 1
-        } else {
-            2
-        }
-    }
-
     /// The first sample of the frame, given STREAMINFO's maximum block size for fixed
     /// blocking.
     pub fn first_sample(&self, max_block_size: u16) -> Option<u64> {
@@ -205,16 +221,19 @@ impl FlacFrameHeader {
         };
         let size_code = fixed[2] >> 4;
         let rate_code = fixed[2] & 15;
-        let channel_assignment = fixed[3] >> 4;
+        let channels = match fixed[3] >> 4 {
+            code @ 0..=7 => FlacChannelAssignment::Independent(code + 1),
+            8 => FlacChannelAssignment::LeftSide,
+            9 => FlacChannelAssignment::SideRight,
+            10 => FlacChannelAssignment::MidSide,
+            _ => return Err(Error::Invalid("FLAC reserved channel assignment")),
+        };
         let depth_code = (fixed[3] >> 1) & 7;
         if size_code == 0 {
             return Err(Error::Invalid("FLAC reserved block size"));
         }
         if rate_code == 15 {
             return Err(Error::Invalid("FLAC invalid sample rate code"));
-        }
-        if channel_assignment > 10 {
-            return Err(Error::Invalid("FLAC reserved channel assignment"));
         }
         if depth_code == 3 {
             return Err(Error::Invalid("FLAC reserved sample size"));
@@ -290,7 +309,7 @@ impl FlacFrameHeader {
             blocking,
             block_size,
             sample_rate,
-            channel_assignment,
+            channels,
             bits_per_sample,
             number,
             len: at + 1,
@@ -316,7 +335,10 @@ mod tests {
         let mut native = b"fLaC\x80\0\0\x22".to_vec();
         native.extend_from_slice(&streaminfo());
         let info = flac_stream_info(&native).unwrap();
-        assert_eq!((info.sample_rate, info.channels, info.bits_per_sample), (44100, 2, 16));
+        assert_eq!(
+            (info.sample_rate, info.channels, info.bits_per_sample),
+            (44100, 2, 16)
+        );
         assert_eq!((info.max_block_size, info.total_samples), (4096, 1000));
 
         let mut dfla = vec![0, 0, 0, 0];
@@ -340,7 +362,7 @@ mod tests {
         let parsed = FlacFrameHeader::parse(&header).unwrap();
         assert_eq!(parsed.block_size, 4096);
         assert_eq!(parsed.sample_rate, Some(44100));
-        assert_eq!(parsed.channels(), 2);
+        assert_eq!(parsed.channels, FlacChannelAssignment::Independent(2));
         assert_eq!(parsed.bits_per_sample, Some(16));
         assert_eq!(parsed.len, 6);
         header[5] ^= 1;
@@ -351,6 +373,9 @@ mod tests {
         let parsed = FlacFrameHeader::parse(&header).unwrap();
         assert_eq!((parsed.number, parsed.block_size), (128, 257));
         assert_eq!(parsed.first_sample(4096), Some(128));
-        assert!(matches!(FlacFrameHeader::parse(&header[..5]), Err(Error::Truncated)));
+        assert!(matches!(
+            FlacFrameHeader::parse(&header[..5]),
+            Err(Error::Truncated)
+        ));
     }
 }

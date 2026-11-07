@@ -17,6 +17,14 @@ pub enum MpegVersion {
     Mpeg25,
 }
 
+/// The coding layer a header names.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
+pub enum MpegLayer {
+    I,
+    II,
+    III,
+}
+
 /// Channel mode of a frame header.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum MpegChannelMode {
@@ -30,8 +38,7 @@ pub enum MpegChannelMode {
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct MpegAudioHeader {
     pub version: MpegVersion,
-    /// 1, 2 or 3.
-    pub layer: u8,
+    pub layer: MpegLayer,
     /// A 16-bit CRC follows the header.
     pub crc: bool,
     /// Kilobits per second; 0 for a free-format frame.
@@ -48,13 +55,21 @@ pub struct MpegAudioHeader {
 const BITRATES: [[[u16; 15]; 3]; 2] = [
     // MPEG-1 Layer I, II, III.
     [
-        [0, 32, 64, 96, 128, 160, 192, 224, 256, 288, 320, 352, 384, 416, 448],
-        [0, 32, 48, 56, 64, 80, 96, 112, 128, 160, 192, 224, 256, 320, 384],
-        [0, 32, 40, 48, 56, 64, 80, 96, 112, 128, 160, 192, 224, 256, 320],
+        [
+            0, 32, 64, 96, 128, 160, 192, 224, 256, 288, 320, 352, 384, 416, 448,
+        ],
+        [
+            0, 32, 48, 56, 64, 80, 96, 112, 128, 160, 192, 224, 256, 320, 384,
+        ],
+        [
+            0, 32, 40, 48, 56, 64, 80, 96, 112, 128, 160, 192, 224, 256, 320,
+        ],
     ],
     // MPEG-2 and 2.5 Layer I, II and III.
     [
-        [0, 32, 48, 56, 64, 80, 96, 112, 128, 144, 160, 176, 192, 224, 256],
+        [
+            0, 32, 48, 56, 64, 80, 96, 112, 128, 144, 160, 176, 192, 224, 256,
+        ],
         [0, 8, 16, 24, 32, 40, 48, 56, 64, 80, 96, 112, 128, 144, 160],
         [0, 8, 16, 24, 32, 40, 48, 56, 64, 80, 96, 112, 128, 144, 160],
     ],
@@ -74,9 +89,9 @@ impl MpegAudioHeader {
             _ => return None,
         };
         let layer = match (word >> 17) & 3 {
-            1 => 3,
-            2 => 2,
-            3 => 1,
+            1 => MpegLayer::III,
+            2 => MpegLayer::II,
+            3 => MpegLayer::I,
             _ => return None,
         };
         let bitrate_index = ((word >> 12) & 15) as usize;
@@ -95,7 +110,7 @@ impl MpegAudioHeader {
             version,
             layer,
             crc: word & (1 << 16) == 0,
-            bitrate_kbps: BITRATES[table][usize::from(layer - 1)][bitrate_index],
+            bitrate_kbps: BITRATES[table][layer as usize][bitrate_index],
             sample_rate,
             padding: word & (1 << 9) != 0,
             channel_mode: match (word >> 6) & 3 {
@@ -129,9 +144,9 @@ impl MpegAudioHeader {
     /// Samples per channel a frame decodes to.
     pub fn samples_per_frame(&self) -> u32 {
         match (self.layer, self.version) {
-            (1, _) => 384,
-            (2, _) | (3, MpegVersion::Mpeg1) => 1152,
-            _ => 576,
+            (MpegLayer::I, _) => 384,
+            (MpegLayer::II, _) | (MpegLayer::III, MpegVersion::Mpeg1) => 1152,
+            (MpegLayer::III, _) => 576,
         }
     }
 
@@ -143,7 +158,7 @@ impl MpegAudioHeader {
         let bitrate = u64::from(self.bitrate_kbps) * 1000;
         let rate = u64::from(self.sample_rate);
         let padding = u64::from(self.padding);
-        let bytes = if self.layer == 1 {
+        let bytes = if self.layer == MpegLayer::I {
             (12 * bitrate / rate + padding) * 4
         } else {
             let slots = u64::from(self.samples_per_frame()) / 8;
@@ -208,7 +223,7 @@ pub struct MpegInfoFrame {
 
 /// The information frame carried by `frame`, one whole frame with header `header`.
 pub fn mpeg_info_frame(frame: &[u8], header: &MpegAudioHeader) -> Option<MpegInfoFrame> {
-    if header.layer != 3 {
+    if header.layer != MpegLayer::III {
         return None;
     }
     let at = 4 + if header.crc { 2 } else { 0 } + header.side_info_bytes();
@@ -243,7 +258,10 @@ pub fn mpeg_info_frame(frame: &[u8], header: &MpegAudioHeader) -> Option<MpegInf
         }
         let lame = frame.get(next..next + 24).and_then(|tag| {
             let encoder: [u8; 9] = tag[..9].try_into().ok()?;
-            if !encoder.iter().all(|&b| b.is_ascii_graphic() || b == b' ' || b == 0) {
+            if !encoder
+                .iter()
+                .all(|&b| b.is_ascii_graphic() || b == b' ' || b == 0)
+            {
                 return None;
             }
             let delay = (u16::from(tag[21]) << 4) | u16::from(tag[22] >> 4);
@@ -301,19 +319,25 @@ mod tests {
     fn header_fields_and_frame_lengths() {
         // MPEG-1 Layer III, 128 kbit/s, 44.1 kHz, joint stereo, no CRC.
         let h = MpegAudioHeader::parse(0xfffb_9064).unwrap();
-        assert_eq!((h.version, h.layer, h.bitrate_kbps, h.sample_rate), (MpegVersion::Mpeg1, 3, 128, 44100));
+        assert_eq!(
+            (h.version, h.layer, h.bitrate_kbps, h.sample_rate),
+            (MpegVersion::Mpeg1, MpegLayer::III, 128, 44100)
+        );
         assert_eq!(h.channel_mode, MpegChannelMode::JointStereo);
         assert_eq!(h.frame_bytes(), Some(417));
         assert_eq!(h.samples_per_frame(), 1152);
         assert_eq!(h.side_info_bytes(), 32);
         // MPEG-2 Layer III, 64 kbit/s, 22.05 kHz, mono, padded.
         let h = MpegAudioHeader::parse(0xfff3_82c4).unwrap();
-        assert_eq!((h.version, h.sample_rate, h.channels()), (MpegVersion::Mpeg2, 22050, 1));
+        assert_eq!(
+            (h.version, h.sample_rate, h.channels()),
+            (MpegVersion::Mpeg2, 22050, 1)
+        );
         assert_eq!(h.frame_bytes(), Some(209));
         assert_eq!(h.samples_per_frame(), 576);
         // MPEG-1 Layer I, 384 kbit/s, 48 kHz.
         let h = MpegAudioHeader::parse(0xffff_c400).unwrap();
-        assert_eq!((h.layer, h.frame_bytes()), (1, Some(384)));
+        assert_eq!((h.layer, h.frame_bytes()), (MpegLayer::I, Some(384)));
         assert!(MpegAudioHeader::parse(0xfffb_f064).is_none()); // bit rate index 15
         assert!(MpegAudioHeader::parse(0xffeb_9064).is_none()); // reserved version
     }
