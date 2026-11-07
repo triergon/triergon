@@ -14,5 +14,46 @@ triergon-framing = { path = "../framing" }
 [dev-dependencies]
 triergon-harness-protocol = { path = "../harness-protocol" }
 
+[features]
+# Comparison-only projections the harness compares against the reference; not
+# shipped behaviour.
+reference-trace = []
+
+[[example]]
+name = "isobmff_consumer_worker"
+required-features = ["reference-trace"]
+
+[[test]]
+name = "fragment_open_clock"
+required-features = ["reference-trace"]
+
+[[test]]
+name = "private_catalogue"
+required-features = ["reference-trace"]
+
+[[test]]
+name = "raw_visual_entries"
+required-features = ["reference-trace"]
+
+[[test]]
+name = "receiver_clock"
+required-features = ["reference-trace"]
+
+[[test]]
+name = "recovery_transport"
+required-features = ["reference-trace"]
+
+[[test]]
+name = "rejected_packet_seek"
+required-features = ["reference-trace"]
+
+[[test]]
+name = "root_count"
+required-features = ["reference-trace"]
+
+[[test]]
+name = "root_walk"
+required-features = ["reference-trace"]
+
 [lints]
 workspace = true

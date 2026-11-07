@@ -1,7 +1,7 @@
 //! Compact source roll/prol descriptions, runs and explicitly scoped defaults.
 //! Apple QTFF signed16 values; MPEG m76694 Original binary grammar; ISO FDAM3
 //! same-fragment namespace; named MPEG2026 draft profile for version2 defaults.
-//! No codec delay, native-clock, cross-fragment cache or decoder recovery claim.
+//! No codec delay, demux-clock, cross-fragment cache or decoder recovery claim.
 use crate::{BoxView, BuildStatus, fields};
 use std::{
     ops::Range,

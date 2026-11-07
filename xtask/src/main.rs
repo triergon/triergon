@@ -790,8 +790,9 @@ fn check_simd(root: &Path) -> Task {
 }
 
 /// Crates whose comparison-only projections sit behind the `reference-trace` feature.
-const REFERENCE_TRACE_CRATES: [&str; 4] = [
+const REFERENCE_TRACE_CRATES: [&str; 5] = [
     "triergon-framing",
+    "triergon-isobmff",
     "triergon-matroska",
     "triergon-mpegts",
     "triergon-subtitles",

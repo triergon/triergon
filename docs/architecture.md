@@ -112,9 +112,9 @@ performance gates where it touches hot code.
    `AnyReader` variants. Box walking and track classification move out of playback
    into the readers.
 3. **Reference compatibility.** `triergon-framing`, `triergon-matroska`,
-   `triergon-subtitles` and `triergon-mpegts` follow the convention in
-   [reference-compatible behaviour](#reference-compatible-behaviour). ISO BMFF and
-   playback move to it one crate at a time.
+   `triergon-subtitles`, `triergon-mpegts` and `triergon-isobmff` follow the convention
+   in [reference-compatible behaviour](#reference-compatible-behaviour). Playback moves
+   to it next.
 4. **Codecs.** Codecs allocate through core budgets.
 5. **Composition.** Playback runs over `AnyReader`; HLS and codec bridges become
    separate crates.

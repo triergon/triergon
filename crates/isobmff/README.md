@@ -13,11 +13,15 @@ The crate exposes two views of the same file:
   seek planners). Every value is a wire fact: original sample ordinals, byte
   ranges, raw composition-offset bits and exact clocks. Unknown clocks stay
   `None`.
-- **FFmpeg-compatible view** (types prefixed `Mov9` or `PinnedMovD32`). It
-  reproduces the packet order, timestamps, flags and seek behaviour of the
-  pinned FFmpeg 9.0 MOV demuxer run with `+noparse+nofillin`
-  (`Mov9Profile::PinnedNoParseNoFillin`). It is a separate projection and
-  never rewrites source facts.
+- **FFmpeg-compatible view** (`compat::mov`). It reproduces the packet order,
+  timestamps, flags and seek behaviour of FFmpeg's MOV demuxer run with
+  `+noparse+nofillin` (`DemuxProfile::NoParseNoFillin`), for a consumer that
+  chooses FFmpeg's result. It is a separate projection and never rewrites source
+  facts. The `compat::mov` documentation names the FFmpeg revision it reproduces.
+
+Values that only make sense when comparing traces with FFmpeg, such as its return
+codes, log lines and models of its input layer, are compiled only with the
+non-default `reference-trace` feature, under `reference_trace::mov`.
 
 After packet traversal reaches the end, `replay_track` can build an index for a
 selected track using the sample extents and clock facts already checked during
@@ -132,13 +136,16 @@ of all tracks in file order through `PhysicalSampleCursor`.
 | Segment/fragment indexes | `SegmentIndex` (`sidx`), `TrackFragmentRandomAccess` (`tfra`), `MovieFragmentRandomAccessTail` (`mfro`) |
 | Recovery groups | `RecoveryDescriptions` (`sgpd`), `RecoveryMappings` (`sbgp`), `RecoveryLookup` |
 | Codec configuration | `SampleDescription::extensions`, `AacConfigurationJob`, `check_dts_core_description`, `QtSoundDescriptionV0` |
-| FFmpeg-compatible packets | `Mov9PacketCursor`, `Mov9EditCursor`, `Mov9StreamView` |
-| FFmpeg-compatible seek | `Mov9NativeIndexCursor`, `Mov9NativeSeekJob`, `Mov9NativeGlobalSeekJob` |
+| FFmpeg-compatible packets | `compat::mov::packets::{PacketCursor, StreamView}`, `compat::mov::edits::EditCursor` |
+| FFmpeg-compatible seek | `compat::mov::seek::{IndexCursor, SeekJob, GlobalSeekJob}` |
+| FFmpeg-compatible recovery | `compat::mov::recovery::{RecoveryTrackHeader, RunRecoveryBuilder, PartialSampleReader}` |
+| Encoded tracks | `compat::mov::encoded::EncodedStreamJob`, `compat::mov::edits::EncodedEditJob` |
 
 `examples/isobmff_source_trace.rs` drives the source view over a real file and
 prints JSON lines (`isobmff_source_trace INPUT [WINDOW<=4096] [WORK_QUANTUM]
 [physical]`). `examples/isobmff_consumer_worker.rs` drives the
-FFmpeg-compatible operations for comparison runs.
+FFmpeg-compatible operations for comparison runs and needs the `reference-trace`
+feature.
 
 The comparison worker's `--recover-regular-tables` profile uses the bounded
 regular recovery cursors for a single local, unedited track. Use it alone
@@ -172,7 +179,7 @@ rejects boxes extending past the source.
 | Seek and indexes | sync/preroll plans, movie-time and composition targets, `sidx`, `tfra`/`mfro`, `roll`/`prol` groups |
 | Codec configuration | AAC `AudioSpecificConfig` (incl. QuickTime `wave`), DTS core signalling, AC-3/E-AC-3, opaque `avcC`/`hvcC`/`av1C`/`vpcC` |
 | QuickTime PCM | v0 unsigned 8-bit and signed 16-bit big-endian (`QtPcmSampleReaderV0`) |
-| FFmpeg-compatible view | AVC, HEVC, AV1, VP9, AAC, AC-3, E-AC-3, DTS (`EncodedEntryKindV1`), raw video, `tx3g`, PCM |
+| FFmpeg-compatible view | AVC, HEVC, AV1, VP9, AAC, AC-3, E-AC-3, DTS (`compat::mov::encoded::EncodedEntryKind`), raw video, `tx3g`, PCM |
 
 ## Behaviour and limits
 
@@ -191,13 +198,16 @@ rejects boxes extending past the source.
   `CompositionOffset` keeps version, raw bits and the signed reading separate;
   an absent offset differs from an explicit zero.
 - **Comparison decode runs.** For an explicit `tfdt` at or below `i64::MAX`,
-  the MOV comparison worker's open and native-index operations require the
-  accumulated decode end to be at most `i64::MAX`. Source indexes retain the
-  unsigned origin and exact end. Higher starts use the native clock projection.
-- **Comparison sample entries.** The MOV comparison worker checks configuration
-  boxes in raw visual entries before publishing streams. A nonempty Opus
-  configuration shorter than 11 payload bytes fails the comparison operation.
-  Source inspection retains the original entry and its child boxes.
+  `reference_trace::mov::fragment_clock::check_signed_decode_runs` requires the
+  accumulated decode end to be at most `i64::MAX`. The MOV comparison worker applies
+  it to open and index operations. Source indexes retain the unsigned origin and
+  exact end. Higher starts stay on `compat::mov::clock::ClockField`.
+- **Comparison sample entries.**
+  `reference_trace::mov::sample_entry::RawVisualEntriesJob` checks configuration
+  boxes in raw visual entries. The MOV comparison worker runs it for every track
+  before publishing streams, for open, index and seek. A nonempty Opus configuration
+  shorter than 11 payload bytes fails the operation. Source inspection retains the
+  original entry and its child boxes.
 - **Surplus timing entries.** `SampleTableBuilder::with_timing_policy`
   accepts `TimingRunPolicy::BoundedPrefix` for the QuickTime-compatible
   interpretation of overlong timing runs. The last decode run may cross

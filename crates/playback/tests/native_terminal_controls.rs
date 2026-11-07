@@ -6,7 +6,7 @@ use triergon_core::{
     Budget, Bytes, Error, InputCursor, InputRequest, SourceCapabilities, SourceFailure, SourceId,
     WorkBudget,
 };
-use triergon_isobmff::Mov9ClockOrigin;
+use triergon_isobmff::compat::mov::clock::ClockOrigin;
 use triergon_playback::{
     io::{SelectedInput, SourceOwner},
     mp4_open::{Mp4Open, OpenLimits, OpenProgress},
@@ -145,7 +145,7 @@ fn try_make_source_mode(
         format: Format::Mp4,
     };
     let mut open = if view == TestView::NativeRecovery {
-        Mp4Open::new_pinned_mov_recovery(selected, OpenLimits::default())?
+        Mp4Open::new_recovery(selected, OpenLimits::default())?
     } else {
         Mp4Open::new(selected, OpenLimits::default())?
     };
@@ -261,18 +261,18 @@ fn check(out: &[Output], case: &gold::Case) {
         let n = p.native.as_ref().expect("native occurrence required");
         assert_eq!(n.source, p.source.sample);
         assert_eq!(n.track_id, p.configuration.track.track_id);
-        assert_eq!(n.native.source_ordinal, p.source.sample.ordinal);
+        assert_eq!(n.demux.source_ordinal, p.source.sample.ordinal);
         assert_eq!(
-            n.native.source_description,
+            n.demux.source_description,
             p.source.sample.description_index
         );
-        assert_eq!(n.native.source_range, p.source.sample.range);
-        assert_eq!(n.native.pts, w.pts);
-        assert_eq!(n.native.dts, w.dts);
-        assert_eq!(n.native.pts_field.api_ticks(), w.pts);
-        assert_eq!(n.native.dts_field.api_ticks(), w.dts);
-        assert_eq!(n.native.duration, w.duration);
-        assert_eq!(n.native.flags, w.flags);
+        assert_eq!(n.demux.source_range, p.source.sample.range);
+        assert_eq!(n.demux.pts, w.pts);
+        assert_eq!(n.demux.dts, w.dts);
+        assert_eq!(n.demux.pts_field.api_ticks(), w.pts);
+        assert_eq!(n.demux.dts_field.api_ticks(), w.dts);
+        assert_eq!(n.demux.duration, w.duration);
+        assert_eq!(n.demux.flags, w.flags);
     }
 }
 #[test]
@@ -318,7 +318,7 @@ fn native_terminal_unknown_source_clocks_and_literal_origin_chain_are_retained()
         if at >= 6 {
             assert_eq!(p.source.sample.dts_ticks, None);
             assert_eq!(p.source.sample.cts_ticks, None);
-            let Mov9ClockOrigin::PredecessorEnd(origin) = p.native.as_ref().unwrap().clock_origin
+            let ClockOrigin::PredecessorEnd(origin) = p.native.as_ref().unwrap().clock_origin
             else {
                 panic!("derived native origin required")
             };
@@ -887,12 +887,12 @@ fn native_zero_timescale_keeps_the_declared_source_clock_unavailable() {
                     assert_eq!(track.base.get(), None);
                     assert_eq!(clock.source_base.get(), None);
                     assert_eq!(
-                        clock.native_base,
+                        clock.demux_base,
                         triergon_core::TimeBase::new(1, 1).unwrap()
                     );
                     assert_eq!(
                         clock.cause,
-                        triergon_isobmff::Mov9MediaClockCause::ObservedZeroScaleWord
+                        triergon_isobmff::compat::mov::clock::MediaClockCause::ObservedZeroScaleWord
                     );
                     assert_eq!(track.native_catalogue.as_ref().unwrap().clock, *clock);
                     assert_eq!(output.event().source_pts().unwrap(), None);
@@ -954,9 +954,9 @@ fn native_short_media_packet_requires_a_positive_prefix_at_eof() {
                     assert_eq!(p.prefix.declared.range, start..start + 12);
                     assert_eq!(p.prefix.end.offset, start + 11);
                     assert_eq!(p.prefix.payload.as_ref(), &raw[start as usize..]);
-                    assert_eq!(p.native.native.dts, Some(5000));
-                    assert_eq!(p.native.native.duration, 1000);
-                    assert_eq!(p.native.native.flags, 2);
+                    assert_eq!(p.native.demux.dts, Some(5000));
+                    assert_eq!(p.native.demux.duration, 1000);
+                    assert_eq!(p.native.demux.flags, 2);
                     assert_eq!(last.payload_bytes(), 11);
                     assert_eq!(last.source_pts().unwrap(), None);
                     assert!(signals.ends.load(Ordering::Relaxed) >= 1);
@@ -1042,8 +1042,8 @@ fn interior_zero_read_preserves_the_native_packet_prefix_and_source() {
                 assert!(got[..8].iter().all(|p| p.native.is_some()));
                 assert!(got[8].native.is_none() && !got[8].source.payload.is_empty());
                 let zero = got[7].native.as_ref().unwrap();
-                assert_eq!(zero.native.dts, Some(7000));
-                assert_eq!(zero.native.source_range, 1151..1151);
+                assert_eq!(zero.demux.dts, Some(7000));
+                assert_eq!(zero.demux.source_range, 1151..1151);
                 let empty: Vec<_> = output
                     .iter()
                     .enumerate()
@@ -1063,7 +1063,7 @@ fn interior_zero_read_preserves_the_native_packet_prefix_and_source() {
                 );
                 assert_eq!(Some(empty.boundary), got[7].native_front_read_boundary_v1);
                 assert_eq!(empty.boundary.source_ordinal, 8);
-                assert_eq!(empty.time_base, zero.media_clock.native_base);
+                assert_eq!(empty.time_base, zero.media_clock.demux_base);
                 assert_eq!(empty.handler, *b"vide");
                 assert_eq!(
                     (
@@ -1238,7 +1238,7 @@ fn final_zero_read_at_media_end_keeps_later_indexed_payloads() {
         assert!(got[..9].iter().all(|p| p.native.is_some()));
         let boundary = got[8].native_front_read_boundary_v1.unwrap();
         assert_eq!((boundary.source_ordinal, boundary.source_offset), (9, 1311));
-        assert_eq!(got[8].native.as_ref().unwrap().native.dts, Some(8000));
+        assert_eq!(got[8].native.as_ref().unwrap().demux.dts, Some(8000));
         assert!(got[8].source.payload.is_empty());
         for p in &got[9..] {
             assert_eq!(p.source.payload.len(), 12);
@@ -1373,9 +1373,9 @@ fn native_from_start_origin_never_claims_complete_entity_or_source_clock() {
     }
     assert_eq!(
         format!("{:?}", samples[0].native.as_ref().unwrap().clock_origin),
-        "FrontSourceMediaStartV1"
+        "FrontSourceMediaStart"
     );
-    assert_eq!(samples[0].native.as_ref().unwrap().native.dts, Some(0));
+    assert_eq!(samples[0].native.as_ref().unwrap().demux.dts, Some(0));
     s.eof.store(true, Ordering::Relaxed);
     out.extend(collect(&mut p, 1).unwrap());
     assert_eq!(packets(&out).len(), 9);
@@ -1569,7 +1569,7 @@ fn forward_tail_moov_resolves_offsets_across_multiple_retained_mdats() {
         let offset = gold.offset + if i < 3 { 0 } else { 8 };
         assert_eq!(packet.source.sample.range, offset..offset + 12);
         assert_eq!(packet.source.payload.as_ref(), gold.bytes);
-        assert_eq!(packet.native.as_ref().unwrap().native.dts, gold.dts);
+        assert_eq!(packet.native.as_ref().unwrap().demux.dts, gold.dts);
         assert!(
             packet
                 .source

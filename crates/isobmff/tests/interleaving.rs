@@ -96,7 +96,7 @@ fn physical_regular_interleaving_matches_independent_source_ranges_in_both_sched
     let case = CASES.iter().find(|c| c.name == "r-multitrack").unwrap();
     let mut expected: Vec<_> = case.samples.iter().collect();
     // Only the independent source expectation is ordered by physical byte address.
-    // Native comparison never sorts either actual operation's packet stream.
+    // Demux comparison never sorts either actual operation's packet stream.
     expected.sort_by_key(|s| s.offset);
     for quantum in [1, 4096] {
         let budget = Budget::new(1024 * 1024).unwrap();
@@ -149,12 +149,12 @@ fn physical_regular_interleaving_matches_independent_source_ranges_in_both_sched
 }
 
 #[test]
-fn pinned_default_native_order_remains_distinct_from_source_physical_order() {
-    // Exact transcription of the already captured r-multitrack native operation.
+fn default_demux_order_remains_distinct_from_source_physical_order() {
+    // Exact transcription of the already captured r-multitrack demux operation.
     // Input SHA256 221d72b05e73706c99dc97228b15aa4aa7c8761350f642a1e9776d97df7c378c.
-    // Pinned worker SHA256 d97ce08126efe876cf92dfaac3655073da87fd8c590793a7d37ffd9e1fbea2d2.
-    // This is a disagreement-preservation regression, not a native-parity pass.
-    let native = [
+    // Reference worker SHA256 d97ce08126efe876cf92dfaac3655073da87fd8c590793a7d37ffd9e1fbea2d2.
+    // This is a disagreement-preservation regression, not a demux-parity pass.
+    let demux = [
         (1, 1),
         (1, 2),
         (2, 1),
@@ -190,14 +190,14 @@ fn pinned_default_native_order_remains_distinct_from_source_physical_order() {
             InterleaveStatus::End => break,
         }
     }
-    assert_eq!(physical.len(), native.len());
-    assert_eq!(&physical[..8], &native[..8]);
+    assert_eq!(physical.len(), demux.len());
+    assert_eq!(&physical[..8], &demux[..8]);
     assert_eq!(physical[8], (1, 6));
-    assert_eq!(native[8], (2, 4));
-    assert_ne!(physical, native);
+    assert_eq!(demux[8], (2, 4));
+    assert_ne!(physical, demux);
     for id in [1, 2] {
         let left: Vec<_> = physical.iter().filter(|(track, _)| *track == id).collect();
-        let right: Vec<_> = native.iter().filter(|(track, _)| *track == id).collect();
+        let right: Vec<_> = demux.iter().filter(|(track, _)| *track == id).collect();
         assert_eq!(left, right);
     }
 }

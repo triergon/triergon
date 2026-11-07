@@ -2,7 +2,7 @@ use crate::input::{Source, SourceReply};
 use crate::{BackendStep, Engine, RawEvent, Result, io::SourceOwner};
 use std::sync::atomic::{AtomicBool, Ordering};
 use triergon_core::{Budget, BudgetVec, Error, InputRequest, Time, WorkBudget};
-use triergon_isobmff::Mov9PacketCursor;
+use triergon_isobmff::compat::mov::packets::PacketCursor;
 
 mod mp4_native_seek;
 mod mp4_range;
@@ -907,7 +907,7 @@ impl<S: Source> Player<S> {
         slot: &mut Option<Output>,
         work: &mut WorkBudget,
         cancel: &AtomicBool,
-        mut cursor: Option<&mut Mov9PacketCursor<'_>>,
+        mut cursor: Option<&mut PacketCursor<'_>>,
     ) -> Result<Progress> {
         if cancel.load(Ordering::Relaxed) {
             self.cancel();
@@ -951,7 +951,7 @@ impl<S: Source> Player<S> {
         w: &mut WorkBudget,
         c: &AtomicBool,
         slot: Option<&mut Option<Output>>,
-        cursor: Option<&mut Mov9PacketCursor<'_>>,
+        cursor: Option<&mut PacketCursor<'_>>,
     ) -> Result<Progress> {
         if c.load(Ordering::Relaxed) {
             self.cancel();
@@ -977,7 +977,7 @@ impl<S: Source> Player<S> {
         &mut self,
         w: &mut WorkBudget,
         slot: Option<&mut Option<Output>>,
-        cursor: Option<&mut Mov9PacketCursor<'_>>,
+        cursor: Option<&mut PacketCursor<'_>>,
     ) -> Result<Progress> {
         match self.state {
             State::Paused => return Ok(Progress::Paused),

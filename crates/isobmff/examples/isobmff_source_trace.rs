@@ -1,6 +1,6 @@
 //! Research source-trace adapter, separate from library parsing and all timing.
 //! Reads bounded windows through core InputCursor; never buffers the media file.
-//! No native reference, codec decoder or output normalization.
+//! No demux reference, codec decoder or output normalization.
 #![forbid(unsafe_code)]
 
 use std::{
@@ -18,11 +18,17 @@ use triergon_core::{
 use triergon_harness_protocol::write_hex;
 use triergon_isobmff::{
     BoxEvent, BoxReader, BoxStep, BoxView, BuildStatus, EditList, FragmentBuilder, FragmentContext,
-    FragmentIndex, ImplicitBase, IndexStep, InterleaveStatus, Limits, Mov9ClockOrigin,
-    Mov9CursorStatus, Mov9DurationBasis, Mov9PacketCursor, Mov9PacketLimits, Mov9PacketView,
-    Mov9Profile, Mov9StreamView, Mov9Track, MovieHeader, PhysicalInterleaveLimits,
-    PhysicalSampleCursor, Sample, SampleReader, SampleStep, SampleTable, SampleTableBuilder,
-    SegmentIndex, SourceTrack, TrackHeader, TrackSampleCursor, Trex,
+    FragmentIndex, ImplicitBase, IndexStep, InterleaveStatus, Limits, MovieHeader,
+    PhysicalInterleaveLimits, PhysicalSampleCursor, Sample, SampleReader, SampleStep, SampleTable,
+    SampleTableBuilder, SegmentIndex, SourceTrack, TrackHeader, TrackSampleCursor, Trex,
+    compat::mov::{
+        clock::ClockOrigin,
+        edits::DurationBasis,
+        packets::{
+            CursorStatus, DemuxProfile, DemuxTrack, PacketCursor, PacketLimits, PacketView,
+            StreamView,
+        },
+    },
 };
 
 #[derive(Debug)]
@@ -163,7 +169,7 @@ struct Scanned {
     major_brand: Option<[u8; 4]>,
 }
 
-struct NativeTrack {
+struct TraceTrack {
     id: u32,
     base: TimeBase,
     table: SampleTable,
@@ -373,21 +379,16 @@ impl<W: Write> Driver<W> {
             }
         }
     }
-    fn native_origin(
-        &mut self,
-        track_id: u32,
-        source: &Sample,
-        origin: Mov9ClockOrigin,
-    ) -> Result<()> {
+    fn demux_origin(&mut self, track_id: u32, source: &Sample, origin: ClockOrigin) -> Result<()> {
         match origin {
-            Mov9ClockOrigin::SourceClock => {}
-            Mov9ClockOrigin::PredecessorEnd(previous) => {
+            ClockOrigin::SourceClock => {}
+            ClockOrigin::PredecessorEnd(previous) => {
                 writeln!(
                     self.out,
                     "{{\"event\":\"native_origin\",\"kind\":\"predecessor-end\",\"track_id\":{track_id},\"source_sample\":{},\"predecessor_sample\":{},\"predecessor_native_dts_ticks\":{},\"predecessor_duration_ticks\":{},\"predecessor_source_dts_known\":{},\"derived_dts_ticks\":{},\"source_dts_known\":{},\"source_cts_known\":{}}}",
                     source.ordinal,
                     previous.predecessor_sample,
-                    previous.predecessor_native_dts_ticks,
+                    previous.predecessor_demux_dts_ticks,
                     previous.predecessor_duration_ticks,
                     previous.predecessor_source_dts_known,
                     previous.derived_dts_ticks,
@@ -395,7 +396,7 @@ impl<W: Write> Driver<W> {
                     source.cts_ticks.is_some()
                 )?;
             }
-            Mov9ClockOrigin::CompleteMediaStart => {
+            ClockOrigin::CompleteMediaStart => {
                 writeln!(
                     self.out,
                     "{{\"event\":\"native_origin\",\"kind\":\"complete-media-start\",\"track_id\":{track_id},\"source_sample\":{},\"derived_dts_ticks\":0,\"source_dts_known\":{},\"source_cts_known\":{}}}",
@@ -404,7 +405,7 @@ impl<W: Write> Driver<W> {
                     source.cts_ticks.is_some()
                 )?;
             }
-            Mov9ClockOrigin::FrontSourceMediaStartV1 => {
+            ClockOrigin::FrontSourceMediaStart => {
                 writeln!(
                     self.out,
                     "{{\"event\":\"native_origin\",\"kind\":\"front-source-media-start-v1\",\"track_id\":{track_id},\"source_sample\":{},\"derived_dts_ticks\":0,\"source_dts_known\":{},\"source_cts_known\":{}}}",
@@ -416,27 +417,27 @@ impl<W: Write> Driver<W> {
         }
         Ok(())
     }
-    fn native_packet(
+    fn demux_packet(
         &mut self,
         track_id: u32,
-        packet: &Mov9PacketView,
+        packet: &PacketView,
         payload: &[u8],
-        occurrence: Option<(u64, u32, Mov9DurationBasis)>,
+        occurrence: Option<(u64, u32, DurationBasis)>,
     ) -> Result<()> {
         if packet.dts_field.api_ticks().is_none()
             || packet.pts_field.api_ticks().is_none()
-            || packet.dts_field.exact_native_ticks != i128::from(packet.dts_field.signed_ticks())
-            || packet.pts_field.exact_native_ticks != i128::from(packet.pts_field.signed_ticks())
+            || packet.dts_field.exact_ticks != i128::from(packet.dts_field.signed_ticks())
+            || packet.pts_field.exact_ticks != i128::from(packet.pts_field.signed_ticks())
         {
             writeln!(
                 self.out,
                 "{{\"event\":\"native_clock_projection\",\"profile\":\"mov9-signed64-null-min\",\"track_id\":{},\"source_sample\":{},\"exact_native_dts_ticks\":{},\"exact_native_pts_ticks\":{},\"native_dts_bits\":{},\"native_pts_bits\":{},\"source_knownness_unchanged\":true}}",
                 track_id,
                 packet.source_ordinal,
-                packet.dts_field.exact_native_ticks,
-                packet.pts_field.exact_native_ticks,
-                packet.dts_field.native_bits,
-                packet.pts_field.native_bits
+                packet.dts_field.exact_ticks,
+                packet.pts_field.exact_ticks,
+                packet.dts_field.demux_bits,
+                packet.pts_field.demux_bits
             )?;
         }
         write!(
@@ -456,14 +457,14 @@ impl<W: Write> Driver<W> {
         self.out.write_all(b"\"")?;
         if let Some((sequence, edit, basis)) = occurrence {
             let basis = match basis {
-                Mov9DurationBasis::TerminalEmptyEndpointObservation => {
+                DurationBasis::TerminalEmptyEndpointObservation => {
                     "terminal-empty-endpoint-observation"
                 }
-                Mov9DurationBasis::OriginalDecodeTableOrdinal => "original-decode-table-ordinal",
-                Mov9DurationBasis::FollowingOccurrenceDts => "following-occurrence-dts",
-                Mov9DurationBasis::SourceDeltaAtBackwardJump => "source-delta-at-backward-jump",
-                Mov9DurationBasis::SourceDeltaAtTerminal => "source-delta-at-terminal",
-                Mov9DurationBasis::ExpandedTerminalEndObservation => {
+                DurationBasis::OriginalDecodeTableOrdinal => "original-decode-table-ordinal",
+                DurationBasis::FollowingOccurrenceDts => "following-occurrence-dts",
+                DurationBasis::SourceDeltaAtBackwardJump => "source-delta-at-backward-jump",
+                DurationBasis::SourceDeltaAtTerminal => "source-delta-at-terminal",
+                DurationBasis::ExpandedTerminalEndObservation => {
                     "expanded-terminal-end-observation"
                 }
             };
@@ -475,15 +476,15 @@ impl<W: Write> Driver<W> {
         writeln!(self.out, "}}")?;
         Ok(())
     }
-    fn trace_native(
+    fn trace_demux(
         &mut self,
-        records: &[NativeTrack],
+        records: &[TraceTrack],
         fragments: &[FragmentIndex],
         media: &[Range<u64>],
         movie_base: TimeBase,
     ) -> Result<()> {
         if records.iter().any(|track| !track.available) {
-            // Source facts have already been emitted. An incomplete native
+            // Source facts have already been emitted. An incomplete demux
             // catalogue cannot establish the selected all-stream operation.
             return Ok(());
         }
@@ -491,7 +492,7 @@ impl<W: Write> Driver<W> {
         for record in records {
             append(
                 &mut tracks,
-                Mov9Track {
+                DemuxTrack {
                     track_id: record.id,
                     table: &record.table,
                     fragments,
@@ -503,18 +504,18 @@ impl<W: Write> Driver<W> {
         let result: Result<()> = (|| {
             // This adapter has read the complete file's metadata from offset0
             // through confirmed EOF. No isolated segment is passed as complete.
-            let mut cursor = Mov9PacketCursor::new_complete_source(
+            let mut cursor = PacketCursor::new_complete_source(
                 &self.budget,
                 tracks.as_slice(),
                 media,
-                Mov9PacketLimits::default(),
-                Mov9Profile::PinnedNoParseNoFillin,
+                PacketLimits::default(),
+                DemuxProfile::NoParseNoFillin,
             )?;
             loop {
                 match cursor.poll(&mut WorkBudget::new(self.quantum), &self.cancel)? {
-                    Mov9CursorStatus::Yield => {}
-                    Mov9CursorStatus::End => return Ok(()),
-                    Mov9CursorStatus::Ready => {
+                    CursorStatus::Yield => {}
+                    CursorStatus::End => return Ok(()),
+                    CursorStatus::Ready => {
                         let occurrence = cursor.take_occurrence()?;
                         let extent = media
                             .iter()
@@ -527,20 +528,20 @@ impl<W: Write> Driver<W> {
                             .cloned()
                             .ok_or(Error::Invalid("native source sample outside mdat"))?;
                         let payload = self.payload(occurrence.source.clone(), extent)?;
-                        self.native_origin(
+                        self.demux_origin(
                             occurrence.track_id,
                             &occurrence.source,
                             occurrence.clock_origin,
                         )?;
                         match occurrence.scheduling_clock {
-                            triergon_isobmff::Mov9SchedulingClock::ApiSentinel => {
+                            triergon_isobmff::compat::mov::clock::SchedulingClock::ApiSentinel => {
                                 writeln!(
                                     self.out,
                                     "{{\"event\":\"native_scheduling_projection\",\"track_id\":{},\"source_sample\":{},\"cause\":\"api-sentinel\",\"source_knownness_unchanged\":true}}",
                                     occurrence.track_id, occurrence.source.ordinal
                                 )?;
                             }
-                            triergon_isobmff::Mov9SchedulingClock::RescaleOverflow {
+                            triergon_isobmff::compat::mov::clock::SchedulingClock::RescaleOverflow {
                                 exact_microseconds,
                             } => {
                                 write!(
@@ -553,9 +554,9 @@ impl<W: Write> Driver<W> {
                             }
                             _ => {}
                         }
-                        self.native_packet(
+                        self.demux_packet(
                             occurrence.track_id,
-                            &occurrence.native,
+                            &occurrence.demux,
                             payload.as_ref(),
                             occurrence.edit.map(|edit| {
                                 (edit.sequence, edit.edit_ordinal, edit.duration_basis)
@@ -838,7 +839,7 @@ impl<W: Write> Driver<W> {
             index_fragments(&movie, fragments.as_slice(), &budget, self.quantum)?;
         let mut track_ids = BudgetVec::new(&budget);
         let mut sample_total = 0u64;
-        let mut native_tracks = BudgetVec::new(&budget);
+        let mut demux_tracks = BudgetVec::new(&budget);
         for track in children(&movie, 0, &budget)?
             .as_slice()
             .iter()
@@ -912,9 +913,8 @@ impl<W: Write> Driver<W> {
             let base = header.time_base()?;
             let mut selected = None;
             let mut epoch = 0u64;
-            let native = {
-                match Mov9StreamView::for_source(&header, &table, has_track_fragments, major_brand)
-                {
+            let demux = {
+                match StreamView::for_source(&header, &table, has_track_fragments, major_brand) {
                     Ok(stream) => {
                         write!(
                             self.out,
@@ -936,7 +936,7 @@ impl<W: Write> Driver<W> {
                             stream.vendor_id == Some([0; 4])
                         )?;
                         if stream.clock.cause
-                            == triergon_isobmff::Mov9MediaClockCause::ObservedAllOnesScaleWord
+                            == triergon_isobmff::compat::mov::clock::MediaClockCause::ObservedAllOnesScaleWord
                         {
                             writeln!(
                                 self.out,
@@ -944,8 +944,8 @@ impl<W: Write> Driver<W> {
                                 stream.track_id,
                                 stream.clock.source_base.require()?.numerator(),
                                 stream.clock.source_base.require()?.denominator(),
-                                stream.clock.native_base.numerator(),
-                                stream.clock.native_base.denominator()
+                                stream.clock.demux_base.numerator(),
+                                stream.clock.demux_base.denominator()
                             )?;
                         }
                         Some(())
@@ -953,7 +953,7 @@ impl<W: Write> Driver<W> {
                     _ => None,
                 }
             };
-            if native.is_none() {
+            if demux.is_none() {
                 writeln!(
                     self.out,
                     "{{\"event\":\"native_status\",\"track_id\":{},\"status\":\"unsupported\",\"reason\":\"native catalogue profile unresolved\",\"qualification\":false}}",
@@ -1041,18 +1041,18 @@ impl<W: Write> Driver<W> {
                 sample_total = sample_total.checked_add(1).ok_or(Error::Overflow)?;
             }
             append(
-                &mut native_tracks,
-                NativeTrack {
+                &mut demux_tracks,
+                TraceTrack {
                     id: header.track_id,
                     base,
                     table,
                     edits,
-                    available: native.is_some(),
+                    available: demux.is_some(),
                 },
             )?;
         }
-        self.trace_native(
-            native_tracks.as_slice(),
+        self.trace_demux(
+            demux_tracks.as_slice(),
             fragment_indexes.as_slice(),
             media,
             movie_header.time_base()?,
@@ -1180,20 +1180,20 @@ mod tests {
     use std::fs;
     use std::path::Path;
 
-    include!("../tests/support/native_clock27.rs");
+    include!("../tests/support/demux_clock.rs");
 
     #[test]
-    fn native_clock29_remaining_global_rescale_and_catalogue_controls() {
-        native_behavior_cases("native-clock29", "clock", 9);
+    fn demux_clock_remaining_global_rescale_and_catalogue_controls() {
+        demux_behavior_cases("native-clock29", "clock", 9);
     }
 
     #[test]
-    fn native_clock29_terminal_gap_and_unaligned_fractional_controls() {
-        native_behavior_cases("native-clock29", "edits", 2);
+    fn demux_clock_terminal_gap_and_unaligned_fractional_controls() {
+        demux_behavior_cases("native-clock29", "edits", 2);
     }
 
     #[test]
-    fn native_clock29_all_ones_native_base_keeps_unsigned_source_scale() {
+    fn demux_clock_all_ones_demux_base_keeps_unsigned_source_scale() {
         let fixture = Path::new(env!("CARGO_MANIFEST_DIR"))
             .join("tests/fixtures/native-clock29/order27-MIN-u32max-scale-cat12.mp4");
         for (window, quantum) in [(4096, 4096), (1, 3)] {
@@ -1226,18 +1226,18 @@ mod tests {
     }
 
     #[test]
-    fn native_clock28_observed_signed_null_and_bounded_order_controls() {
-        native_behavior_cases("native-clock28", "clock", 11);
+    fn demux_clock_observed_signed_null_and_bounded_order_controls() {
+        demux_behavior_cases("native-clock28", "clock", 11);
     }
 
     #[test]
-    fn native_clock28_observed_fractional_clocks_and_decode_table_ordinals() {
-        native_behavior_cases("native-clock28", "fractional", 18);
+    fn demux_clock_observed_fractional_clocks_and_decode_table_ordinals() {
+        demux_behavior_cases("native-clock28", "fractional", 18);
     }
 
     // Test-only scalar reader for this example's controlled JSONL writer. This
     // is not an input parser or a production JSON dependency. Expected S rows
-    // come from an independent source oracle; N rows retain exact pinned-native
+    // come from an independent source oracle; N rows retain exact reference-demux
     // observations and global order. Their provenance is beside the fixtures.
     fn field<'a>(line: &'a str, name: &str) -> &'a str {
         line.split_once(&format!("\"{name}\":"))
@@ -1273,7 +1273,7 @@ mod tests {
         row
     }
 
-    fn native_row(line: &str) -> Vec<&str> {
+    fn demux_row(line: &str) -> Vec<&str> {
         [
             "track_id",
             "source_sample",
@@ -1290,17 +1290,17 @@ mod tests {
         .collect()
     }
 
-    fn native_behavior_family(family: &str) {
+    fn demux_behavior_family(family: &str) {
         let expected_cases = match family {
             "clock" => 16,
             "flags" => 14,
             "order" => 17,
             _ => panic!("unknown authored regression family"),
         };
-        native_behavior_cases("native-behavior", family, expected_cases);
+        demux_behavior_cases("native-behavior", family, expected_cases);
     }
 
-    fn native_behavior_cases(folder: &str, family: &str, expected_cases: usize) {
+    fn demux_behavior_cases(folder: &str, family: &str, expected_cases: usize) {
         let fixtures = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures");
         let expected =
             fs::read_to_string(fixtures.join(folder).join(format!("{family}.txt"))).unwrap();
@@ -1319,10 +1319,10 @@ mod tests {
                     .collect::<Vec<_>>()
             };
             let source_expected = rows("S ");
-            let native_expected = rows("N ");
+            let demux_expected = rows("N ");
             let tags_expected = rows("T ");
             assert!(!source_expected.is_empty());
-            assert!(!native_expected.is_empty());
+            assert!(!demux_expected.is_empty());
             for (window, quantum) in [(4096, 4096), (1, 3)] {
                 let mut output = Vec::new();
                 run(&fixtures.join(name), window, quantum, false, &mut output)
@@ -1337,7 +1337,7 @@ mod tests {
                     .collect();
                 assert_eq!(source_actual.len(), source_expected.len(), "{name}");
                 // Match immutable source identity without imposing a global
-                // source traversal order on a future native occurrence cursor.
+                // source traversal order on a future demux occurrence cursor.
                 for wanted in &source_expected {
                     let matching: Vec<_> = source_actual
                         .iter()
@@ -1362,27 +1362,27 @@ mod tests {
                         "native vendor presence {name} {window}/{quantum}"
                     );
                 }
-                let native_actual: Vec<_> = trace
+                let demux_actual: Vec<_> = trace
                     .lines()
                     .filter(|line| line.starts_with("{\"event\":\"native_packet\","))
                     .map(|line| {
                         assert!(line.contains("\"side_data\":[]"));
-                        native_row(line)
+                        demux_row(line)
                     })
                     .collect();
                 // Compare the actual global sequence directly. No sorting,
                 // timestamp rescale, flag masking or oracle-fed output.
-                if native_actual != native_expected {
-                    let first = native_actual
+                if demux_actual != demux_expected {
+                    let first = demux_actual
                         .iter()
-                        .zip(&native_expected)
+                        .zip(&demux_expected)
                         .position(|(actual, wanted)| actual != wanted);
                     nonfits.push(format!(
                         "{name} {window}/{quantum}: native counts {}/{}, first differing row {first:?}: actual {:?}, expected {:?}",
-                        native_actual.len(),
-                        native_expected.len(),
-                        first.and_then(|i| native_actual.get(i)),
-                        first.and_then(|i| native_expected.get(i)),
+                        demux_actual.len(),
+                        demux_expected.len(),
+                        first.and_then(|i| demux_actual.get(i)),
+                        first.and_then(|i| demux_expected.get(i)),
                     ));
                 }
             }
@@ -1392,42 +1392,42 @@ mod tests {
     }
 
     #[test]
-    fn native_behavior_clock_observations_preserve_exact_source_time_and_offset_bits() {
-        native_behavior_family("clock");
+    fn demux_behavior_clock_observations_preserve_exact_source_time_and_offset_bits() {
+        demux_behavior_family("clock");
     }
 
     #[test]
-    fn native_behavior_fragment_flag_observations_preserve_raw_source_flags() {
-        native_behavior_family("flags");
+    fn demux_behavior_fragment_flag_observations_preserve_raw_source_flags() {
+        demux_behavior_family("flags");
     }
 
     #[test]
-    fn native_behavior_global_order_matches_exact_pinned_all_stream_operation() {
-        native_behavior_family("order");
+    fn demux_behavior_global_order_matches_exact_all_stream_operation() {
+        demux_behavior_family("order");
     }
 
     #[test]
-    fn native_behavior_followup_clock_runs_and_unsigned_source_bits() {
-        native_behavior_cases("native-followup", "clock", 13);
+    fn demux_behavior_followup_clock_runs_and_unsigned_source_bits() {
+        demux_behavior_cases("native-followup", "clock", 13);
     }
 
     #[test]
-    fn native_behavior_followup_flag_boundaries_and_track_isolation() {
-        native_behavior_cases("native-followup", "flags", 8);
+    fn demux_behavior_followup_flag_boundaries_and_track_isolation() {
+        demux_behavior_cases("native-followup", "flags", 8);
     }
 
     #[test]
-    fn native_behavior_followup_global_cycles_and_submicrosecond_boundaries() {
-        native_behavior_cases("native-followup", "order", 13);
+    fn demux_behavior_followup_global_cycles_and_submicrosecond_boundaries() {
+        demux_behavior_cases("native-followup", "order", 13);
     }
 
     #[test]
-    fn native_behavior_followup_major_and_compatible_brand_catalogue_controls() {
-        native_behavior_cases("native-followup", "brand", 5);
+    fn demux_behavior_followup_major_and_compatible_brand_catalogue_controls() {
+        demux_behavior_cases("native-followup", "brand", 5);
     }
 
     #[test]
-    fn required_absent_tfdt_native_origin_keeps_unknown_source_and_explicit_predecessor() {
+    fn required_absent_tfdt_demux_origin_keeps_unknown_source_and_explicit_predecessor() {
         let fixture =
             Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/f-no-second-tfdt.mp4");
         for (window, quantum) in [(4096, 4096), (1, 3)] {
@@ -1455,7 +1455,7 @@ mod tests {
                     }
                 }
             }
-            // Exact original native observations provide the compatibility
+            // Exact original demux observations provide the compatibility
             // expectations; no known source clock is fabricated to obtain them.
             assert!(
                 trace.contains("\"event\":\"native_end\",\"confirmed_eof\":true"),
@@ -1504,25 +1504,25 @@ mod tests {
         }
     }
 
-    // Partition controls preserve source facts and challenge the pinned
+    // Partition controls preserve source facts and challenge the reference
     // previous-run append boundary at both work schedules.
     #[test]
-    fn absent_tfdt_after_backward_anchor_keeps_source_unknown_and_native_discard_exact() {
+    fn absent_tfdt_after_backward_anchor_keeps_source_unknown_and_demux_discard_exact() {
         struct Case {
             fixture: &'static str,
             source: &'static [Option<i128>],
-            native: &'static [i128],
+            demux: &'static [i128],
             duration: &'static [u32],
             flags: &'static [u32],
         }
-        // Exact source oracle and actual pinned-native values, without retiming or
+        // Exact source oracle and actual reference-demux values, without retiming or
         // flag normalization. Explicit-equivalent and split-run cases differ only
         // in their wire run partition.
         let cases = [
             Case {
                 fixture: "selected-native18/origin18-three-backward-then-absent.mp4",
                 source: &[Some(7000), Some(8000), Some(1000), Some(2000), None, None],
-                native: &[7000, 8000, 1000, 2000, 3000, 4000],
+                demux: &[7000, 8000, 1000, 2000, 3000, 4000],
                 duration: &[1000; 6],
                 flags: &[1, 0, 4, 5, 0, 0],
             },
@@ -1536,7 +1536,7 @@ mod tests {
                     Some(3000),
                     Some(4000),
                 ],
-                native: &[7000, 8000, 1000, 2000, 3000, 4000],
+                demux: &[7000, 8000, 1000, 2000, 3000, 4000],
                 duration: &[1000; 6],
                 flags: &[1, 0, 4, 5, 0, 0],
             },
@@ -1552,7 +1552,7 @@ mod tests {
                     Some(5000),
                     Some(6000),
                 ],
-                native: &[7000, 8000, 1000, 2000, 3000, 4000, 5000, 6000],
+                demux: &[7000, 8000, 1000, 2000, 3000, 4000, 5000, 6000],
                 duration: &[1000; 8],
                 flags: &[1, 0, 4, 5, 0, 0, 1, 0],
             },
@@ -1568,14 +1568,14 @@ mod tests {
                     Some(10000),
                     Some(11000),
                 ],
-                native: &[7000, 8000, 1000, 2000, 25000, 26000, 10000, 11000],
+                demux: &[7000, 8000, 1000, 2000, 25000, 26000, 10000, 11000],
                 duration: &[1000, 1000, 1000, 23000, 1000, 1000, 1000, 1000],
                 flags: &[1, 0, 4, 5, 0, 0, 5, 4],
             },
             Case {
                 fixture: "append-boundary/discard22-zero-delta-derived-equality.mp4",
                 source: &[Some(7000), Some(8000), Some(1000), Some(2000), None, None],
-                native: &[7000, 8000, 1000, 2000, 3000, 3000],
+                demux: &[7000, 8000, 1000, 2000, 3000, 3000],
                 duration: &[1000, 1000, 1000, 1000, 0, 1000],
                 flags: &[1, 0, 4, 5, 0, 0],
             },
@@ -1589,7 +1589,7 @@ mod tests {
                     Some(3000),
                     Some(4000),
                 ],
-                native: &[7000, 8000, 1000, 2000, 3000, 4000],
+                demux: &[7000, 8000, 1000, 2000, 3000, 4000],
                 duration: &[1000; 6],
                 flags: &[1, 0, 4, 1, 0, 0],
             },
@@ -1634,11 +1634,11 @@ mod tests {
                     .lines()
                     .filter(|line| line.starts_with("{\"event\":\"native_packet\","))
                     .collect();
-                assert_eq!(packets.len(), case.native.len());
+                assert_eq!(packets.len(), case.demux.len());
                 for (index, line) in packets.iter().enumerate() {
                     assert_eq!(field(line, "source_sample"), (index + 1).to_string());
-                    assert_eq!(field(line, "dts"), case.native[index].to_string());
-                    assert_eq!(field(line, "pts"), case.native[index].to_string());
+                    assert_eq!(field(line, "dts"), case.demux[index].to_string());
+                    assert_eq!(field(line, "pts"), case.demux[index].to_string());
                     assert_eq!(field(line, "duration"), case.duration[index].to_string());
                     assert_eq!(
                         field(line, "flags"),
@@ -1675,7 +1675,7 @@ mod tests {
                     assert_eq!(field(line, "predecessor_sample"), index.to_string());
                     assert_eq!(
                         field(line, "predecessor_native_dts_ticks"),
-                        case.native[previous].to_string()
+                        case.demux[previous].to_string()
                     );
                     assert_eq!(
                         field(line, "predecessor_duration_ticks"),
@@ -1683,7 +1683,7 @@ mod tests {
                     );
                     assert_eq!(
                         field(line, "derived_dts_ticks"),
-                        case.native[index].to_string()
+                        case.demux[index].to_string()
                     );
                     assert_eq!(field(line, "source_dts_known"), "false");
                     assert_eq!(field(line, "source_cts_known"), "false");

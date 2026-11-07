@@ -1,5 +1,5 @@
 // Tiny wire fixtures and hand-authored facts, checked by an independent
-// Python wire oracle. Full brand/codec/presentation conformance and native
+// Python wire oracle. Full brand/codec/presentation conformance and demux
 // parity are not covered here.
 mod common;
 use triergon_core::{Budget, Error, WorkBudget};

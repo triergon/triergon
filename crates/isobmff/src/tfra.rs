@@ -1,5 +1,5 @@
 //! Historical primary Adobe F4V10.1 §§2.16.1-.2 syntax and MPEG m76694
-//! table9 Original corroboration. Compact source hints; no native-clock or
+//! table9 Original corroboration. Compact source hints; no demux-clock or
 //! decoder-recovery claim, including for an empty tfra table.
 use crate::{BoxView, Limits, fields, policy};
 use std::ops::Range;

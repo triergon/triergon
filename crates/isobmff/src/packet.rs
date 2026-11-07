@@ -1,6 +1,6 @@
 //! One indexed, self-contained source sample through the shared input contract.
 //! No I/O, demux clock inference, configuration epoch or second allocation pool.
-use crate::{BoxHeader, PinnedMovD32RegularRecoveryV1, Sample};
+use crate::{BoxHeader, RunRecoveryProfile, Sample};
 use std::{ops::Range, sync::atomic::AtomicBool};
 use triergon_core::{
     BudgetVec, Bytes, Error, InputCursor, InputToken, Result, SourceId, SourceLocation, Step,
@@ -18,7 +18,7 @@ pub struct SourcePacket {
 /// A positive, physically observed prefix of an incomplete declared sample.
 /// The declaration and the source-bound EOF remain separate facts.
 #[derive(Clone, Debug)]
-pub struct Mov9ShortSample {
+pub struct ShortSample {
     pub declared: Sample,
     pub payload: Bytes,
     pub end: SourceLocation,
@@ -26,19 +26,19 @@ pub struct Mov9ShortSample {
 }
 
 #[derive(Debug)]
-pub enum Mov9SampleRead {
+pub enum RecoverySampleRead {
     Complete(SourcePacket),
-    Short(Mov9ShortSample),
+    Short(ShortSample),
 }
 
 #[derive(Debug)]
-pub enum Mov9SampleExtent {
+pub enum RecoverySampleExtent {
     Finite(Range<u64>),
     Terminal(TerminalMdat),
 }
 
 /// A checked terminal, top-level size-zero MDAT declaration. This preserves an
-/// unknown physical endpoint; it is not a read/EOF receipt or a finite range.
+/// unknown physical endpoint; it is not a read/EOF confirmation or a finite range.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct TerminalMdat {
     header: BoxHeader,
@@ -106,16 +106,16 @@ impl SampleReader {
         terminal.require_sample(&sample)?;
         Self::new_checked(input, sample, maximum_packet, false)
     }
-    pub fn new_pinned_mov_recovery(
+    pub fn new_recovery(
         input: &mut InputCursor,
         sample: Sample,
-        media: Mov9SampleExtent,
+        media: RecoverySampleExtent,
         maximum_packet: usize,
-        _profile: PinnedMovD32RegularRecoveryV1,
+        _profile: RunRecoveryProfile,
     ) -> Result<Self> {
         match media {
-            Mov9SampleExtent::Finite(extent) => sample.require_within(extent)?,
-            Mov9SampleExtent::Terminal(terminal) => terminal.require_sample(&sample)?,
+            RecoverySampleExtent::Finite(extent) => sample.require_within(extent)?,
+            RecoverySampleExtent::Terminal(terminal) => terminal.require_sample(&sample)?,
         }
         Self::new_checked(input, sample, maximum_packet, true)
     }
@@ -171,21 +171,21 @@ impl SampleReader {
             });
         self.record(result)
     }
-    /// The same bounded read transaction with an explicit native short result.
+    /// The same bounded read transaction with an explicit demux short result.
     /// Only the matching physical End with a positive prefix permits recovery.
-    pub fn poll_pinned_mov_recovery(
+    pub fn poll_recovery(
         &mut self,
         input: &mut InputCursor,
         work: &mut WorkBudget,
         cancel: &AtomicBool,
-        _profile: PinnedMovD32RegularRecoveryV1,
-    ) -> Result<Step<Mov9SampleRead>> {
+        _profile: RunRecoveryProfile,
+    ) -> Result<Step<RecoverySampleRead>> {
         if let Some(error) = self.failed {
             return Err(error);
         }
         let result = self.poll_inner(input, work, cancel).and_then(|step| {
             Ok(match step {
-                Step::Ready(packet) => Step::Ready(Mov9SampleRead::Complete(packet)),
+                Step::Ready(packet) => Step::Ready(RecoverySampleRead::Complete(packet)),
                 Step::NeedInput(r) => Step::NeedInput(r),
                 Step::Yield => Step::Yield,
                 Step::End(end) => {
@@ -195,7 +195,7 @@ impl SampleReader {
                     if !work.try_charge(1) {
                         return Ok(Step::Yield);
                     }
-                    Step::Ready(Mov9SampleRead::Short(Mov9ShortSample {
+                    Step::Ready(RecoverySampleRead::Short(ShortSample {
                         declared: self.sample.clone(),
                         payload: self.freeze_buffer()?,
                         end,
@@ -380,7 +380,7 @@ mod terminal_mdat_tests {
         assert_eq!(b.used(), used);
     }
     #[test]
-    fn terminal_mdat_packet_reservation_retry_workzero_and_retained_owner() {
+    fn terminal_mdat_packet_reservation_retry_workzero_and_retained_backing() {
         let b = Budget::new(64 << 10).unwrap();
         let mut input = input(&b);
         let token = input.token();

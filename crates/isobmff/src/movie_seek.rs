@@ -1,5 +1,5 @@
 //! Exact source movie/edit point mapping and recovery-aware source range plans.
-//! Apple QTFF point conversion/CTS and original compact indexes; no native
+//! Apple QTFF point conversion/CTS and original compact indexes; no demux
 //! occurrence projection, display-duration inference or packet sorting.
 use crate::{
     BuildStatus, EditEntry, EditList, RecoveryKind, RecoveryLimits, RecoveryLookup, RecoveryScope,
@@ -609,7 +609,7 @@ impl<'a> MovieSourceSeekPlanner<'a> {
                         .ok_or(Error::Invalid("missing source seek job"))?
                         .finish()?;
                     if self.phase == Phase::InitialSeek {
-                        self.sync_ordinal = plan.receipt().sync_sample.ordinal;
+                        self.sync_ordinal = plan.landing().sync_sample.ordinal;
                         self.provisional = Some(plan);
                         self.phase = Phase::Scopes;
                     } else {

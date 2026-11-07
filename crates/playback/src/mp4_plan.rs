@@ -11,10 +11,15 @@ use std::{
 };
 use triergon_core::{Budget, BudgetVec, Bytes, Error, Rounding, Time, TimeBase, WorkBudget};
 use triergon_isobmff::{
-    self as iso, BoxView, EditList, InterleaveStatus, Mov9CursorStatus, Mov9MediaClock,
-    Mov9PacketCursor, Mov9PacketLimits, Mov9PacketOccurrence, Mov9Profile, Mov9StreamView,
-    Mov9Track, PhysicalInterleaveLimits, PhysicalSampleCursor, Sample, SampleCursor,
-    SampleDescription, SampleStep, SourceTimeBase, SourceTrack,
+    self as iso, BoxView, EditList, InterleaveStatus, PhysicalInterleaveLimits,
+    PhysicalSampleCursor, Sample, SampleCursor, SampleDescription, SampleStep, SourceTrack,
+    compat::mov::{
+        clock::{MediaClock, SourceTimeBase},
+        packets::{
+            CursorStatus, DemuxProfile, DemuxTrack, PacketCursor, PacketLimits, PacketOccurrence,
+            StreamView,
+        },
+    },
 };
 fn push<T>(v: &mut BudgetVec<T>, x: T) -> Result<()> {
     v.try_push(x).map_err(|e| e.error)
@@ -43,13 +48,13 @@ impl Default for PlanLimits {
 }
 
 impl PlanLimits {
-    fn native_packet_limits(self) -> Mov9PacketLimits {
-        Mov9PacketLimits {
+    fn native_packet_limits(self) -> PacketLimits {
+        PacketLimits {
             max_tracks: self.tracks,
             max_media_extents: self.media_extents,
             max_source_samples: self.samples,
             max_occurrences: self.occurrences,
-            ..Mov9PacketLimits::default()
+            ..PacketLimits::default()
         }
     }
 }
@@ -65,7 +70,7 @@ pub struct TrackSnapshot {
     pub raw_table: BoxView,
     pub raw_edits: Option<BoxView>,
     pub raw_dref: BoxView,
-    pub native_catalogue: std::result::Result<Mov9StreamView, Error>,
+    pub native_catalogue: std::result::Result<StreamView, Error>,
 }
 #[derive(Clone, Debug)]
 pub struct Mp4Configuration {
@@ -106,12 +111,12 @@ pub struct PreparedMp4 {
     pub(crate) view: Mp4View,
     pub(crate) native_front: bool,
     pub(crate) replay_native_order: bool,
-    pub(crate) native_front_boundary: Option<iso::Mov9FrontReadBoundaryV1>,
+    pub(crate) native_front_boundary: Option<iso::compat::mov::front::FrontReadBoundary>,
     pub(crate) native_empty_duration: Option<i64>,
-    pub(crate) front_tracks: BudgetVec<iso::Mov9FrontTrackV1>,
+    pub(crate) front_tracks: BudgetVec<iso::compat::mov::front::FrontTrack>,
     pub(crate) source_rows: BudgetVec<SourceRow>,
-    pub(crate) native_rows: BudgetVec<Mov9PacketOccurrence>,
-    pub(crate) encoded_edits: Option<BudgetVec<Option<iso::Mov9EncodedEditPlanV2>>>,
+    pub(crate) native_rows: BudgetVec<PacketOccurrence>,
+    pub(crate) encoded_edits: Option<BudgetVec<Option<iso::compat::mov::edits::EncodedEditPlan>>>,
     pub(crate) tracks: BudgetVec<PlanTrack>,
     pub(crate) media: BudgetVec<Range<u64>>,
     pub(crate) media_cache: BudgetVec<CachedMedia>,
@@ -153,7 +158,7 @@ impl PreparedMp4 {
     pub fn source_rows(&self) -> &[SourceRow] {
         self.source_rows.as_slice()
     }
-    pub fn native_rows(&self) -> &[Mov9PacketOccurrence] {
+    pub fn native_rows(&self) -> &[PacketOccurrence] {
         self.native_rows.as_slice()
     }
     pub fn tracks(&self) -> &[PlanTrack] {
@@ -165,12 +170,14 @@ impl PreparedMp4 {
 
     /// A front-native operation continues all Source declarations even after a
     /// separately reported native read boundary. Only native occurrences stop.
-    pub fn native_front_read_boundary_v1(&self) -> Option<iso::Mov9FrontReadBoundaryV1> {
+    pub fn native_front_read_boundary_v1(
+        &self,
+    ) -> Option<iso::compat::mov::front::FrontReadBoundary> {
         self.native_front_boundary
     }
     pub(crate) fn next_native_empty_duration(
         &self,
-        packet: &Mov9PacketOccurrence,
+        packet: &PacketOccurrence,
         completed_run: bool,
     ) -> Option<i64> {
         let previous = self.native_empty_duration?;
@@ -181,7 +188,7 @@ impl PreparedMp4 {
             return Some(previous);
         }
         let end = packet
-            .native
+            .demux
             .dts?
             .checked_add(i64::from(packet.source.duration_ticks))?;
         Some(previous.max(end))
@@ -216,7 +223,7 @@ impl PreparedMp4 {
             .find(|t| t.snapshot.track_id == id)
             .ok_or(Error::Invalid("unknown plan track"))
     }
-    pub fn native(&self, at: usize) -> Option<&Mov9PacketOccurrence> {
+    pub fn native(&self, at: usize) -> Option<&PacketOccurrence> {
         if self.view == Mp4View::PinnedMov9NoParseNoFillin {
             self.native_rows.as_slice().get(at)
         } else {
@@ -242,7 +249,7 @@ pub struct Mp4IndexJob<'a> {
     movie: &'a Movie,
     plan: Option<PreparedMp4>,
     source: Option<PhysicalSampleCursor<'a>>,
-    native: Option<Mov9PacketCursor<'a>>,
+    native: Option<PacketCursor<'a>>,
     range_duration: Option<RangeDuration>,
     limits: PlanLimits,
     phase: u8,
@@ -252,10 +259,10 @@ pub struct Mp4IndexJob<'a> {
     extent: usize,
     ready: bool,
     pending_source: Option<SourceRow>,
-    pending_native: Option<Mov9PacketOccurrence>,
+    pending_native: Option<PacketOccurrence>,
     source_track_order: bool,
     source_sort: Option<SampleSort>,
-    zero_scale_clock: Option<Mov9MediaClock>,
+    zero_scale_clock: Option<MediaClock>,
     first_sample_probe: Option<(SampleCursor<'a>, Error)>,
 }
 
@@ -293,7 +300,7 @@ impl<'a> Mp4IndexJob<'a> {
     /// The retained plans also govern seeks on this exact range index.
     pub fn new_native_encoded_range(
         movie: &'a Movie,
-        plans: &'a [Option<iso::Mov9EncodedEditPlanV2>],
+        plans: &'a [Option<iso::compat::mov::edits::EncodedEditPlan>],
         limits: PlanLimits,
     ) -> Result<Self> {
         if movie.native_recovery
@@ -315,7 +322,7 @@ impl<'a> Mp4IndexJob<'a> {
 
     pub(crate) fn new_native_range(
         movie: &'a Movie,
-        plans: Option<&'a [Option<iso::Mov9EncodedEditPlanV2>]>,
+        plans: Option<&'a [Option<iso::compat::mov::edits::EncodedEditPlan>]>,
         limits: PlanLimits,
     ) -> Result<Self> {
         if movie.native_recovery
@@ -346,7 +353,7 @@ impl<'a> Mp4IndexJob<'a> {
         view: Mp4View,
         limits: PlanLimits,
         native_front: bool,
-        encoded_edits: Option<&'a [Option<iso::Mov9EncodedEditPlanV2>]>,
+        encoded_edits: Option<&'a [Option<iso::compat::mov::edits::EncodedEditPlan>]>,
         range_duration: Option<RangeDuration>,
     ) -> Result<Self> {
         if movie.native_recovery && view == Mp4View::SourcePhysical {
@@ -392,9 +399,9 @@ impl<'a> Mp4IndexJob<'a> {
                     return Err(Error::Unsupported("zero-scale native track context"));
                 }
                 let clock =
-                    Mov9MediaClock::for_pinned_zero_scale(iso::PinnedMovD32RegularRecoveryV1)?;
+                    MediaClock::for_zero_scale(iso::compat::mov::recovery::RunRecoveryProfile)?;
                 zero_scale_clock = Some(clock);
-                clock.native_base
+                clock.demux_base
             } else {
                 t.header.time_base()?
             };
@@ -406,7 +413,7 @@ impl<'a> Mp4IndexJob<'a> {
             }
             push(
                 &mut native,
-                Mov9Track {
+                DemuxTrack {
                     track_id: t.header.track_id,
                     table: &t.table,
                     fragments: t.fragments.as_slice(),
@@ -444,7 +451,7 @@ impl<'a> Mp4IndexJob<'a> {
                         .iter()
                         .all(|track| track.edits.is_none() && track.fragments.is_empty()) =>
             {
-                Some(iso::ForwardRegularMdatV1::new(h, movie.source_length)?)
+                Some(iso::ForwardRegularMdat::new(h, movie.source_length)?)
             }
             _ => None,
         };
@@ -483,47 +490,47 @@ impl<'a> Mp4IndexJob<'a> {
         let native = if view == Mp4View::PinnedMov9NoParseNoFillin {
             let native_limits = limits.native_packet_limits();
             Some(if let Some(plans) = encoded_edits {
-                Mov9PacketCursor::new_encoded_regular_v2(
+                PacketCursor::new_encoded_regular(
                     b,
                     native.as_slice(),
                     movie.media.as_slice(),
                     native_limits,
                     plans,
-                    iso::PinnedMovD32EncodedEditsV2,
+                    iso::compat::mov::edits::EncodedEditProfile,
                 )?
             } else if let Some(bounds) = forward_regular {
-                Mov9PacketCursor::new_front_regular_v1(
+                PacketCursor::new_front_regular(
                     b,
                     native.as_slice(),
                     movie.media.as_slice(),
                     bounds,
                     native_limits,
-                    Mov9Profile::PinnedNoParseNoFillin,
+                    DemuxProfile::NoParseNoFillin,
                 )?
             } else if native_front {
-                Mov9PacketCursor::new_front_source_v1(
+                PacketCursor::new_front_source(
                     b,
                     native.as_slice(),
                     movie.media.as_slice(),
                     movie.terminal_mdat,
                     native_limits,
-                    Mov9Profile::PinnedNoParseNoFillin,
+                    DemuxProfile::NoParseNoFillin,
                 )?
             } else if movie.read_scope == crate::mp4_open::MetadataReadScope::CompleteEntity {
-                Mov9PacketCursor::new_complete_source(
+                PacketCursor::new_complete_source(
                     b,
                     native.as_slice(),
                     movie.media.as_slice(),
                     native_limits,
-                    Mov9Profile::PinnedNoParseNoFillin,
+                    DemuxProfile::NoParseNoFillin,
                 )?
             } else {
-                Mov9PacketCursor::new(
+                PacketCursor::new(
                     b,
                     native.as_slice(),
                     movie.media.as_slice(),
                     native_limits,
-                    Mov9Profile::PinnedNoParseNoFillin,
+                    DemuxProfile::NoParseNoFillin,
                 )?
             })
         } else {
@@ -617,17 +624,17 @@ impl<'a> Mp4IndexJob<'a> {
                         let (base, native_catalogue) = if h.timescale == 0 {
                             (
                                 SourceTimeBase::UNAVAILABLE,
-                                Mov9StreamView::for_pinned_zero_scale_source(
+                                StreamView::for_zero_scale_source(
                                     h,
                                     &t.table,
                                     self.movie.major_brand,
-                                    iso::PinnedMovD32RegularRecoveryV1,
+                                    iso::compat::mov::recovery::RunRecoveryProfile,
                                 ),
                             )
                         } else {
                             (
                                 h.time_base()?.into(),
-                                Mov9StreamView::for_source(
+                                StreamView::for_source(
                                     h,
                                     &t.table,
                                     !t.fragments.is_empty(),
@@ -841,25 +848,24 @@ impl<'a> Mp4IndexJob<'a> {
                         .ok_or(Error::Invalid("missing native range cursor"))?;
                     loop {
                         match cursor.poll(w, c)? {
-                            Mov9CursorStatus::Yield => return Ok(false),
-                            Mov9CursorStatus::Ready if !w.try_charge(1) => return Ok(false),
-                            Mov9CursorStatus::Ready => {
+                            CursorStatus::Yield => return Ok(false),
+                            CursorStatus::Ready if !w.try_charge(1) => return Ok(false),
+                            CursorStatus::Ready => {
                                 let row = cursor.take_occurrence()?;
                                 if !duration.scan {
                                     continue;
                                 }
-                                let Some(pts) = row.native.pts else { continue };
-                                let end = pts
-                                    .checked_add(row.native.duration)
-                                    .ok_or(Error::Overflow)?;
-                                let micros = row.media_clock.native_base.rescale(
+                                let Some(pts) = row.demux.pts else { continue };
+                                let end =
+                                    pts.checked_add(row.demux.duration).ok_or(Error::Overflow)?;
+                                let micros = row.media_clock.demux_base.rescale(
                                     end,
                                     TimeBase::new(1, 1_000_000)?,
                                     Rounding::NearestAway,
                                 )?;
                                 duration.micros = duration.micros.max(micros);
                             }
-                            Mov9CursorStatus::End => {
+                            CursorStatus::End => {
                                 cursor.rewind_at_end()?;
                                 self.ready = true;
                                 return Ok(true);
@@ -928,11 +934,11 @@ impl<'a> Mp4IndexJob<'a> {
                 }
                 if let Some(native) = self.native.as_mut() {
                     match native.poll(w, c)? {
-                        Mov9CursorStatus::Yield => {}
-                        Mov9CursorStatus::Ready => {
+                        CursorStatus::Yield => {}
+                        CursorStatus::Ready => {
                             self.pending_native = Some(native.take_occurrence()?);
                         }
-                        Mov9CursorStatus::End => {
+                        CursorStatus::End => {
                             self.track = 0;
                             self.phase = 5;
                         }
@@ -949,7 +955,7 @@ impl<'a> Mp4IndexJob<'a> {
                     .native
                     .as_ref()
                     .ok_or(Error::Invalid("front native cursor"))?
-                    .front_track_v1(self.track)?;
+                    .front_track(self.track)?;
                 push(&mut p.front_tracks, state)?;
                 self.track += 1;
             }
@@ -971,9 +977,7 @@ impl<'a> Mp4IndexJob<'a> {
         self.plan.take().ok_or(Error::Invalid("plan consumed"))
     }
 
-    pub(crate) fn finish_native_range(
-        mut self,
-    ) -> Result<(PreparedMp4, Mov9PacketCursor<'a>, i64)> {
+    pub(crate) fn finish_native_range(mut self) -> Result<(PreparedMp4, PacketCursor<'a>, i64)> {
         let duration = self
             .range_duration
             .take()
