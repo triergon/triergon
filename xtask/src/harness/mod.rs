@@ -7,6 +7,7 @@ pub mod build;
 pub mod comparison;
 pub mod diff;
 pub mod gate_build;
+pub mod grade;
 pub mod linux;
 #[cfg(test)]
 mod linux_tests;
