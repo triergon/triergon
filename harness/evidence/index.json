@@ -9306,6 +9306,127 @@
      "sha256": "79358bd8eac29ec38f186ca2a9799ecaa8a0e14bc9c5321f5b3bfa0deadfc998"
     }
    ]
+  },
+  {
+   "name": "hls-contiguous-feed-gate",
+   "path": "hls-contiguous-feed-gate",
+   "retention": "retained",
+   "reason": "Cited corrected contiguous-feed HLS results: all 71 cases pass parity, runtime, peak live heap and total resident peak RSS at the recorded gate build",
+   "key": "evidence/hls-contiguous-feed-gate/ea55e44697ea603b8ffc82e8e3f2b114888c3b8f9844c5a2dd1c6aa8c914079c.tar.gz",
+   "sha256": "ea55e44697ea603b8ffc82e8e3f2b114888c3b8f9844c5a2dd1c6aa8c914079c",
+   "bytes": 44960637,
+   "source_revision": "a3e8adb2c1b67488a3168a37145a4bc9cc5aa80d",
+   "collection_status": "slice-passed",
+   "files": [
+    {
+     "path": "hls-contiguous-feed-gate/SOURCE.bundle",
+     "sha256": "b5c30119d56cb193ee67a8c4f5557d43dd97a79babb92ead5b933aae4130615d"
+    },
+    {
+     "path": "hls-contiguous-feed-gate/SUMMARY.json",
+     "sha256": "b56eb15734acfb1c73c5d3f7a3c5cefbe04dac7bb43012b9e0bf2f7a3fe241d8"
+    },
+    {
+     "path": "hls-contiguous-feed-gate/collection/EXPORTED-GATE-RESULT.json",
+     "sha256": "44430ef3d10e7694c2c07f6f475e0f0bb968044ad285cf133f0022e38928c7c4"
+    },
+    {
+     "path": "hls-contiguous-feed-gate/collection/EXPORTED-GRADE.log",
+     "sha256": "089f13b4e99f0c61eeaec636922f08d4c01c5867d66bccfce0e323a7011db313"
+    },
+    {
+     "path": "hls-contiguous-feed-gate/collection/EXPORTED-candidate-SOURCE.txt",
+     "sha256": "9f217f9f8026a5ac8bc3abbb172799a4e287503816a663cde63210d1e95bec19"
+    },
+    {
+     "path": "hls-contiguous-feed-gate/collection/FINAL-STATE.txt",
+     "sha256": "f247a76b2893208aae7751dbf51f4c495efacfb6d9e743802870300f31ac45c8"
+    },
+    {
+     "path": "hls-contiguous-feed-gate/collection/GUEST-PREFLIGHT.log",
+     "sha256": "69addf86c180f917f6228dabd2f9b00b4b6afd6638def9ddd629da11a182979a"
+    },
+    {
+     "path": "hls-contiguous-feed-gate/collection/HOST.log",
+     "sha256": "47968bb7375fb0338d254dae78348dddfb9c251765635e237fb29fd754ef4a9b"
+    },
+    {
+     "path": "hls-contiguous-feed-gate/collection/NATIVE-EXIT.txt",
+     "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+    },
+    {
+     "path": "hls-contiguous-feed-gate/collection/NATIVE-MEMBERS.txt",
+     "sha256": "40e615628be4eef4d5fbee960e7370ccac11d391bf6d3552d65007ed33a8285d"
+    },
+    {
+     "path": "hls-contiguous-feed-gate/collection/NATIVE-RESULTS.sha256",
+     "sha256": "d427d4bfc0a3fd55c6934e2ed56fe3c22bd52086bc448db82d760d97e68e19f3"
+    },
+    {
+     "path": "hls-contiguous-feed-gate/collection/NATIVE-RESULTS.tar.gz",
+     "sha256": "b93b443d864109b8a0c37bf7c20a880747567dbe211889a2df00a28952f5bcdb"
+    },
+    {
+     "path": "hls-contiguous-feed-gate/collection/NATIVE.log",
+     "sha256": "e642410391a04f0fbe175016e090f3e08e25b83a7f82ceae1c20a8cec4d5dc68"
+    },
+    {
+     "path": "hls-contiguous-feed-gate/collection/QUALIFIED-SUMMARY.json",
+     "sha256": "257e0d949fa03ce744adfbbfcdd2c51ba16db188d275ae12388dcae9383b70bb"
+    },
+    {
+     "path": "hls-contiguous-feed-gate/collection/REPORT-CASE-KEYS.json",
+     "sha256": "0cd2ee0caf518420f3955f05ea907c77cfddb7680e2b58f1d3cebb833888efbe"
+    },
+    {
+     "path": "hls-contiguous-feed-gate/collection/RSS-REVIEW.json",
+     "sha256": "35fcc38a12295baaefe8217d5a720ee351de7a3053c04bec08c3734ffc67a352"
+    },
+    {
+     "path": "hls-contiguous-feed-gate/collection/RUNNER-ADDRESS",
+     "sha256": "a82937476efe50c869b6d38c606dc89b999545e2f01bab12d9c104c7ff5e18a3"
+    },
+    {
+     "path": "hls-contiguous-feed-gate/collection/SOURCE.bundle",
+     "sha256": "61d209eacfff5fc73b0e244fa7203453cbddaf0e3d0b3c8540578e553663d231"
+    },
+    {
+     "path": "hls-contiguous-feed-gate/collection/SSH-WAIT.log",
+     "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+     "path": "hls-contiguous-feed-gate/collection/START-INSTANCE.json",
+     "sha256": "f72a9e3a724183d93017f1cbcea71f0d4b8321d9d534912be0741931e4f36660"
+    },
+    {
+     "path": "hls-contiguous-feed-gate/collection/STOP-INSTANCE.json",
+     "sha256": "323daa66c70209032719102e3db2718e12c1b6d653d1cf1ece33dd6e1690642e"
+    },
+    {
+     "path": "hls-contiguous-feed-gate/collection/guest.sh",
+     "sha256": "237da760f2ac535d33e82cc4b8c6c1d5731f5ebbac63baa2ec6d1f029d67c2ec"
+    },
+    {
+     "path": "hls-contiguous-feed-gate/collection/host.sh",
+     "sha256": "bd7be05527a7586f39ff2d875dfa8f2cfff947629e03f29c09b64227de2ab4f8"
+    },
+    {
+     "path": "hls-contiguous-feed-gate/host-checks/HLS-CONTIGUOUS-CLIPPY.log",
+     "sha256": "590e9c433afc691f943aed5371506d4cafd8c16ef4aadd5379e9d96db2db5826"
+    },
+    {
+     "path": "hls-contiguous-feed-gate/host-checks/HLS-CONTIGUOUS-DESIGN.log",
+     "sha256": "21d6171555e15e78129b998696ff56b51213f56804f836092a2607a9878b96cb"
+    },
+    {
+     "path": "hls-contiguous-feed-gate/host-checks/HLS-CONTIGUOUS-LINKS.log",
+     "sha256": "352916839c9d534b0ddf427ad2474ff61738ee839882eff5ab73702cb7e3ba42"
+    },
+    {
+     "path": "hls-contiguous-feed-gate/host-checks/HLS-CONTIGUOUS-TESTS.log",
+     "sha256": "8038717182e50c75af73dd6b9d70ee2165c0bf48a44ea05d4462ee2b1285f657"
+    }
+   ]
   }
  ]
 }
