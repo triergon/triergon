@@ -51,6 +51,7 @@ commands:
   fetch-specs    [--record] cache the specification texts and verify specs/sources.json
   fetch-vectors  cache the required external test vectors and verify their hashes
   external-vector --output DIR [--pairs N] [--iterations N] [--benchmark] [--memory]
+                 [--baseline-worker W]
                  qualify the mandatory external metadata vector through the same gates
   fate-run       --case NAME [--demux-only]   run one supported upstream FATE case
   trace-identities --output F [--compare F] [--candidate W]
@@ -72,7 +73,9 @@ commands:
   report         [--contract F] [--manifest F] [--corpus DIR] [--output DIR] [--fate-cache DIR]
                  [--additional-report F]... [--require-acceptance] [--require-slice-acceptance]
                  [--benchmark] [--memory] [--pairs N] [--iterations N] [--seed N]
-                 correctness, paired runtime and memory report of the built workers for one contract
+                 [--baseline-worker W]
+                 correctness, paired runtime and memory report of the built workers for one contract;
+                 with a baseline worker of another build, timing and memory pair against it
   compare        --candidate W --reference W --input FILE --output DIR
                  [--operation plain|seek|colour|catalogue] [--content] [--no-short-reads]
                  compare one input across a candidate and a reference worker
@@ -291,6 +294,7 @@ fn external_vector(root: &Path, args: &[String]) -> ExitCode {
         iterations: 50,
         benchmark: false,
         memory: false,
+        baseline_worker: None,
     };
     let mut rest = args.iter();
     let parsed = (|| -> Task {
@@ -311,6 +315,7 @@ fn external_vector(root: &Path, args: &[String]) -> ExitCode {
                 }
                 "--benchmark" => options.benchmark = true,
                 "--memory" => options.memory = true,
+                "--baseline-worker" => options.baseline_worker = Some(PathBuf::from(value()?)),
                 _ => return Err(USAGE.to_owned()),
             }
         }
@@ -425,6 +430,7 @@ fn report(root: &Path, args: &[String]) -> ExitCode {
                 "--corpus" => options.corpus = value()?,
                 "--output" => options.output = value()?,
                 "--fate-cache" => options.fate_cache = Some(value()?),
+                "--baseline-worker" => options.baseline_worker = Some(value()?),
                 "--additional-report" => options.additional_reports.push(value()?),
                 "--require-acceptance" => options.require_acceptance = true,
                 "--require-slice-acceptance" => options.require_slice_acceptance = true,
