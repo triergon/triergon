@@ -122,6 +122,7 @@ impl RetainedStream {
         Ok(())
     }
 
+    #[inline]
     fn payload(&mut self, data: &[u8], out: &mut Option<&mut dyn Write>) -> Result<()> {
         if let Some(out) = out.as_deref_mut() {
             for &byte in data {
