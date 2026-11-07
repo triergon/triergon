@@ -20,7 +20,7 @@ release ([reference pins](quality.md#reference-and-corpus)).
 | Packet framing | AVC/HEVC configuration and NAL framing, AV1, VP9, AC-3, E-AC-3, DTS core | 125 reference matches for AVC/HEVC; DTS core byte-exact on 37,125 projections and 1,172 FATE packets | 1.1772 (125/125 within 1.20 for AVC/HEVC) | heap ≤0.985, total RSS ≤0.990 on the same 125 cases | full AVC/HEVC/ADTS grammar |
 | Subtitles, text | SRT, WebVTT, ASS passthrough, mov_text and tx3g to ASS, charset handling | 82 mov_text cases, 79 tx3g regressions | not measured | not measured | timing and memory |
 | Subtitles, bitmap | PGS, DVB display state and colour lookup, DVD units | 229 PGS cases; 5,300 DVB display sets | PGS 1.11 | PGS heap 0.62, RSS 0.90 | full PGS recovery, DVB and DVD decoding |
-| Playback | Matroska, MP4, TS and raw AVC/HEVC feeds; seeking; end-of-file continuation | 120/120 continuation observations; 746 of 998 matrix rows | Matroska AVC/AAC feed within 1.25 | lower | most profiles unmeasured |
+| Playback | Matroska, MP4, TS and raw AVC/HEVC feeds; seeking; end-of-file continuation | 746 of 998 matrix rows | Matroska AVC/AAC feed within 1.25 | lower | most profiles unmeasured |
 | Codecs | H.264 8-bit 4:2:0; HEVC Main and Main10; AAC LC, HE, HEv2; AC-3 and E-AC-3; DTS core with XCh and X96 | 417/417 comparable conformance and FATE vectors | 1.10 | heap 0.92, RSS 0.82 | error concealment, unverified tool paths |
 | Decode sessions | Bounded queues, clock-gated output, flush and seek, RGBA letterbox, stereo mix | with the codecs | 1.10 | with the codecs | — |
 | Capture | RGBA to YUV 4:2:0, MPEG-1 video, MPEG-TS mux | 15/15 quality cases against FFmpeg 9.0.2 | 1.1206 (15/15 within 1.20) | heap ≤0.548, total RSS ≤0.978 (15/15) | — |
@@ -30,10 +30,9 @@ release ([reference pins](quality.md#reference-and-corpus)).
 Each row names the source revision a result above was measured on and, where the raw
 samples are archived, their SHA-256. Update the row in the same change as the result.
 
-Every row predates the [gate build](quality.md#measuring-performance). The Matroska,
-startup and seek, and HLS rows were measured with `1.101.0-nightly`; the other rows
-have not been checked against the gate build. Their numbers stay as measured until
-re-measured.
+Every row predates the [gate build](quality.md#measuring-performance). Matroska startup
+and seek and HLS segments were built with `-C target-cpu=neoverse-v2`; the other rows
+have not been checked against it. Their numbers stay as measured until re-measured.
 
 | Area | Revision | Raw samples SHA-256 |
 |---|---|---|
