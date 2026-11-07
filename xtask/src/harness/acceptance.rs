@@ -172,7 +172,8 @@ fn interval_value(interval: &stats::Interval) -> Value {
     ])
 }
 
-fn timing_valid(row: &Value, contract: &Value, selected: &Value, require_linux: bool) -> bool {
+/// Check a timing row's samples, worker bindings, isolation and recorded interval.
+pub fn timing_valid(row: &Value, contract: &Value, selected: &Value, require_linux: bool) -> bool {
     let timing = row.get("timing").cloned().unwrap_or(Value::Object(vec![]));
     let raw = timing
         .get("samples")
@@ -375,19 +376,13 @@ pub fn acceptance(
             ));
             continue;
         }
-        let mut derived = members(contract).to_vec();
-        for (key, value) in [
-            ("required_profiles", Value::strings([file])),
-            ("required_additional_vectors", Value::Array(vec![])),
-        ] {
-            match derived.iter_mut().find(|(k, _)| k == key) {
-                Some(slot) => slot.1 = value,
-                None => derived.push((key.into(), value)),
-            }
-        }
+        let Ok(derived) = super::validation::external_contract(contract, file) else {
+            reasons.push(format!("invalid additional vector contract: {file}"));
+            continue;
+        };
         let extra = acceptance(
             root,
-            &Value::Object(derived),
+            &derived,
             &[matches[0].clone()],
             identity,
             target,

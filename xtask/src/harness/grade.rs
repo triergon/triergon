@@ -8,8 +8,13 @@ use std::io::Write;
 use std::path::{Component, Path, PathBuf};
 
 use super::acceptance::acceptance;
-use super::comparison::{reference_named, reference_record, reference_summary, rule_for};
-use super::{diff, gate_build, provenance, timing};
+use super::comparison::reference_summary;
+use super::gate_build;
+use super::timing::validate_module_absence as timing_module_absent;
+use super::validation::{
+    self, array, external_contract, field, hash, members, put, require_same, selected_operation,
+    text,
+};
 use crate::checks::read_json;
 use crate::json::{self, Value};
 use crate::sha256;
@@ -85,52 +90,12 @@ impl Options {
     }
 }
 
-fn field<'a>(value: &'a Value, key: &str) -> R<&'a Value> {
-    value
-        .get(key)
-        .filter(|v| **v != Value::Null)
-        .ok_or_else(|| format!("missing {key}"))
-}
-
-fn text<'a>(value: &'a Value, key: &str) -> R<&'a str> {
-    field(value, key)?
-        .as_str()
-        .filter(|s| !s.is_empty())
-        .ok_or_else(|| format!("{key} must be a nonempty string"))
-}
-
 fn integer(value: &Value, key: &str) -> R<i128> {
     match field(value, key)? {
         Value::Number(n) => n
             .as_i128()
             .ok_or_else(|| format!("{key} must be an integer")),
         _ => Err(format!("{key} must be an integer")),
-    }
-}
-
-fn array<'a>(value: &'a Value, key: &str) -> R<&'a [Value]> {
-    field(value, key)?
-        .as_array()
-        .ok_or_else(|| format!("{key} must be an array"))
-}
-
-fn members(value: &Value) -> R<&[(String, Value)]> {
-    match value {
-        Value::Object(fields) => Ok(fields),
-        _ => Err("expected a JSON object".into()),
-    }
-}
-
-fn same(a: &Value, b: &Value) -> bool {
-    // Unlike Python equality, a boolean cannot stand in for a recorded number.
-    diff::differences(a, b).is_empty()
-}
-
-fn require_same(a: &Value, b: &Value, label: &str) -> R<()> {
-    if same(a, b) {
-        Ok(())
-    } else {
-        Err(format!("{label} mismatch"))
     }
 }
 
@@ -150,23 +115,6 @@ fn without(value: &Value, keys: &[&str]) -> R<Value> {
             .cloned()
             .collect(),
     ))
-}
-
-fn put(value: &mut Value, key: &str, replacement: Value) -> R<()> {
-    let Value::Object(fields) = value else {
-        return Err("expected a JSON object".into());
-    };
-    fields.retain(|(name, _)| name != key);
-    fields.push((key.into(), replacement));
-    Ok(())
-}
-
-fn hash<'a>(value: &'a Value, key: &str) -> R<&'a str> {
-    let digest = text(value, key)?;
-    if digest.len() != 64 || !digest.bytes().all(|b| b.is_ascii_hexdigit()) {
-        return Err(format!("{key} must be a SHA-256"));
-    }
-    Ok(digest)
 }
 
 fn document(path: &Path) -> R<(Value, String)> {
@@ -241,8 +189,8 @@ fn shape(report: &Value) -> R<Shape> {
             Ok(Shape::Corpus)
         }
         (None, Some(Value::Object(_))) => {
-            // The external-vector collector writes one complete document and
-            // has no checkpoint/collection_status field in its original format.
+            // External-vector reports contain one complete case. Their
+            // collection_status field is optional.
             if report.get("collection_status").is_some()
                 && text(report, "collection_status")? != "complete"
             {
@@ -279,8 +227,7 @@ impl Binding<'_> {
         {
             return Err("contract must name a registered feature".into());
         }
-        // A report may name a pilot manifest, but it cannot qualify that subset
-        // as the complete feature, or supply different gate values in a copy.
+        // The complete registered feature fixes case membership and gate values.
         for (name, expected) in [
             ("contract.json", self.contract_sha),
             ("corpus.json", self.manifest_sha),
@@ -318,6 +265,10 @@ impl Binding<'_> {
                 }
             }
             text(report, "target")?;
+            match kind {
+                Shape::Corpus => field(field(report, "environment")?, "cpus")?,
+                Shape::External => field(report, "cpus")?,
+            };
         }
         for key in [
             "target",
@@ -405,59 +356,23 @@ fn membership<'a>(expected: &[Value], actual: &'a [Value]) -> R<BTreeMap<&'a str
 
 fn selected(row: &Value, expected: &Value, contract: &Value, identity: &Value) -> R<Value> {
     let id = text(contract, "id")?;
-    let rule = rule_for(expected, identity, Some(id))?;
-    let reference_name = contract.get("reference").and_then(Value::as_str);
-    let record = match (rule, reference_name) {
-        (None, Some(name)) => reference_named(identity, name)?,
-        _ => reference_record(identity, rule)?,
-    };
-    let named = if rule.is_none() { reference_name } else { None };
-    if row.get("reference_worker").and_then(Value::as_str) != named {
+    let resolved = selected_operation(expected, contract, identity)?;
+    if row.get("reference_worker").and_then(Value::as_str) != resolved.reference_worker {
         return Err("reference worker differs from the contract".into());
     }
     require_same(
         field(row, "reference")?,
-        &reference_summary(&record),
+        &reference_summary(&resolved.reference),
         "reference",
     )?;
-    let prefix = contract.get("worker_operation").and_then(Value::as_str);
-    let candidate = contract
-        .get("candidate")
-        .and_then(Value::as_str)
-        .unwrap_or("media-worker");
-    let expected_candidate = prefix.map(|_| candidate);
-    if row.get("candidate_worker").and_then(Value::as_str) != expected_candidate {
+    if row.get("candidate_worker").and_then(Value::as_str) != resolved.candidate_worker {
         return Err("candidate worker differs from the contract".into());
     }
-    let operation = if let Some(prefix) = prefix {
-        Value::object([
-            ("name", field(contract, "operation")?.clone()),
-            ("view", Value::str(format!("playback-{prefix}fold-v1"))),
-        ])
-    } else {
-        let seek = expected.get("seek_target_ns").unwrap_or(&Value::Null);
-        let view = match id {
-            "matroska-segment-metadata" => Value::str("catalogue-source-and-native-v1"),
-            "matroska-colour" => Value::str("colour-source-and-ffmpeg9-v1"),
-            _ => rule.map_or_else(
-                || Ok(Value::str("source-frames-ffmpeg9-clock-v1")),
-                |r| field(r, "view").cloned(),
-            )?,
-        };
-        Value::object([
-            (
-                "name",
-                Value::str(if *seek == Value::Null {
-                    "container-demux-v1"
-                } else {
-                    "container-seek-preroll-v1"
-                }),
-            ),
-            ("seek_target_ns", seek.clone()),
-            ("view", view),
-        ])
-    };
-    require_same(field(row, "operation")?, &operation, "contract operation")?;
+    require_same(
+        field(row, "operation")?,
+        &resolved.operation,
+        "contract operation",
+    )?;
     super::comparison::validate_case_evidence(row, identity, Some(id))
 }
 
@@ -468,57 +383,6 @@ fn samples(measurement: &Value, minimum: i128) -> R<&[Value]> {
         return Err("missing paired samples or pair count mismatch".into());
     }
     Ok(raw)
-}
-
-/// Check the recorded absence evidence, never the current module state: the
-/// module is loaded again for memory collection and its proof must still be live.
-fn timing_module_absent(clock: &Value, raw: &[Value], linux: bool) -> R<()> {
-    if text(clock, "timing_module_policy")? != timing::MODULE_POLICY {
-        return Err("timing module policy mismatch".into());
-    }
-    let mut stages = vec!["before-timing-session".to_owned()];
-    for role in ["candidate", "reference"] {
-        stages.extend([
-            format!("before-warmup:{role}"),
-            format!("after-warmup:{role}"),
-        ]);
-    }
-    for (index, sample) in raw.iter().enumerate() {
-        let order = array(sample, "order")?;
-        if order.len() != 2
-            || !order.contains(&Value::str("candidate"))
-            || !order.contains(&Value::str("reference"))
-        {
-            return Err("timing pair worker order is incomplete".into());
-        }
-        for role in order {
-            let role = role.as_str().ok_or("timing worker order is not a string")?;
-            stages.extend([
-                format!("before-pair:{index}:{role}"),
-                format!("after-pair:{index}:{role}"),
-            ]);
-        }
-    }
-    let observations = array(clock, "timing_module_observations")?;
-    if stages.len() != observations.len() {
-        return Err("timing module observations are incomplete".into());
-    }
-    for (stage, observation) in stages.iter().zip(observations) {
-        if text(observation, "stage")? != stage {
-            return Err("timing module observation stage mismatch".into());
-        }
-        let state = field(observation, "state")?;
-        if text(state, "status")?
-            != if linux {
-                "module-absent"
-            } else {
-                "not-applicable"
-            }
-        {
-            return Err("RSS kernel module absence during timing is unproven".into());
-        }
-    }
-    Ok(())
 }
 
 fn work(value: &Value) -> R<Value> {
@@ -548,22 +412,7 @@ fn memory_binding(memory: &Value, identity: &Value, workers: &Value, linux: bool
         // need a kernel proof. A certificate opt-in or any kernel-backed RSS
         // observation must retain the original proof binding; acceptance
         // recomputes its live kernel/boot validity and every sample below.
-        let kernel_used = certificate
-            .get("kernel_rss_required")
-            .is_some_and(Value::truthy)
-            || array(memory, "samples")?
-                .iter()
-                .filter_map(|sample| match sample {
-                    Value::Object(entries) => Some(entries),
-                    _ => None,
-                })
-                .flatten()
-                .filter(|(role, _)| role.ends_with("_rss"))
-                .filter_map(|(_, sample)| sample.get("observer"))
-                .any(|observer| {
-                    super::linux::py_int(observer.get("kernel_rss_requested")) == Some(1)
-                });
-        if !kernel_used {
+        if !super::memory::kernel_used(certificate, array(memory, "samples")?) {
             return Ok(());
         }
         if certificate.get("kernel_rss_required") != Some(&Value::Bool(true)) {
@@ -687,63 +536,13 @@ fn current_workers(root: &Path, identity: &Value, contract: &Value) -> R<()> {
         &read_json(&root.join("target/harness/identity.json"))?,
         "current memory build identity",
     )?;
-    for (role, path) in [
-        ("candidate", "target/release/media-worker"),
-        ("reference", "target/harness/ffmpeg-worker"),
-    ] {
-        if super::linux::file_sha(&root.join(path))? != hash(field(identity, "binaries")?, role)? {
-            return Err(format!(
-                "{role} worker changed since build identity; rebuild"
-            ));
-        }
-    }
-    let directory = root
-        .join("target/harness")
-        .canonicalize()
-        .map_err(|e| e.to_string())?;
-    for (_, reference) in members(field(identity, "comparison_references")?)? {
-        let path = root
-            .join(text(reference, "path")?)
-            .canonicalize()
-            .map_err(|e| e.to_string())?;
-        if !path.starts_with(&directory)
-            || super::linux::file_sha(&path)? != hash(reference, "sha256")?
-        {
-            return Err("comparison reference changed since build identity; rebuild".into());
-        }
-    }
-    if let Some(error) = provenance::source_identity_error(root, identity) {
-        return Err(format!("{error}; rebuild"));
-    }
+    validation::current_workers(root, identity)?;
     if let Some(name) = contract
         .get("candidate")
         .and_then(Value::as_str)
         .filter(|n| *n != "media-worker")
     {
-        if Path::new(name).components().count() != 1
-            || !matches!(
-                Path::new(name).components().next(),
-                Some(Component::Normal(_))
-            )
-        {
-            return Err("candidate must name a worker".into());
-        }
-        let record = field(field(identity, "additional_candidates")?, name)?;
-        if super::linux::file_sha(&root.join(format!("target/release/{name}")))?
-            != hash(record, "sha256")?
-        {
-            return Err(format!("{name} changed since build identity; rebuild"));
-        }
-        require_same(
-            field(record, "selected_graph")?,
-            &provenance::selected_graph(
-                root,
-                &provenance::cargo_metadata(root)?,
-                name,
-                &provenance::matroska_inputs(),
-            )?,
-            "candidate source graph",
-        )?;
+        validation::candidate_worker(root, identity, name)?;
     }
     Ok(())
 }
@@ -794,17 +593,6 @@ fn validate_additional(
         join_case(row, row, &expected[0], binding.contract, identity, target)?;
     }
     Ok(())
-}
-
-fn external_contract(contract: &Value, id: &str) -> R<Value> {
-    let mut derived = contract.clone();
-    put(&mut derived, "required_profiles", Value::strings([id]))?;
-    put(
-        &mut derived,
-        "required_additional_vectors",
-        Value::Array(vec![]),
-    )?;
-    Ok(derived)
 }
 
 fn exit_code(verdict: &Value, rows: &[Value], requirement: Option<&str>) -> i32 {
@@ -971,6 +759,8 @@ pub fn main(root: &Path, args: &[String]) -> R<i32> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::harness::comparison::reference_record;
+    use crate::harness::timing;
 
     fn digest(byte: char) -> String {
         std::iter::repeat_n(byte, 64).collect()
@@ -1844,6 +1634,13 @@ mod tests {
             ("corpus_manifest_sha256", Value::str(digest('b'))),
             ("collection_status", Value::str("complete")),
             ("fate_coverage", Value::Array(vec![])),
+            (
+                "environment",
+                object(&[(
+                    "cpus",
+                    object(&[("allowed", Value::str("1")), ("online", Value::str("0-1"))]),
+                )]),
+            ),
             ("cases", Value::Array(vec![fixture.timed])),
         ]);
         assert!(binding.headers(&header, &header).is_ok());
@@ -1876,6 +1673,48 @@ mod tests {
         )
         .unwrap();
         put(&mut report, "case", external.clone()).unwrap();
+        put(
+            &mut report,
+            "cpus",
+            field(field(&header, "environment").unwrap(), "cpus")
+                .unwrap()
+                .clone(),
+        )
+        .unwrap();
+        assert!(binding.headers(&report, &report).is_ok());
+        for base in [&header, &report] {
+            let parent = if shape(base).unwrap() == Shape::Corpus {
+                Some("environment")
+            } else {
+                None
+            };
+            for replacement in [
+                None,
+                Some(Value::Null),
+                Some(object(&[("allowed", Value::str("0"))])),
+            ] {
+                let missing = replacement
+                    .as_ref()
+                    .is_none_or(|value| *value == Value::Null);
+                let mut changed = base.clone();
+                let mut record = parent.map_or_else(
+                    || changed.clone(),
+                    |key| field(&changed, key).unwrap().clone(),
+                );
+                record = without(&record, &["cpus"]).unwrap();
+                if let Some(value) = replacement {
+                    put(&mut record, "cpus", value).unwrap();
+                }
+                match parent {
+                    Some(key) => put(&mut changed, key, record).unwrap(),
+                    None => changed = record,
+                }
+                assert!(binding.headers(base, &changed).is_err());
+                if missing {
+                    assert!(binding.headers(&changed, &changed).is_err());
+                }
+            }
+        }
         let expected = binding.expected(&report, Shape::External).unwrap();
         assert_eq!(
             membership(&expected, rows(&report, Shape::External).unwrap())

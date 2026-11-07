@@ -832,6 +832,23 @@ fn canonical(path: &Path) -> String {
     fs::canonicalize(path).map_or_else(|_| path.display().to_string(), |p| p.display().to_string())
 }
 
+/// Whether the certificate or any RSS observation requests kernel measurement.
+pub(super) fn kernel_used(certificate: &Value, samples: &[Value]) -> bool {
+    certificate
+        .get("kernel_rss_required")
+        .is_some_and(Value::truthy)
+        || samples
+            .iter()
+            .filter_map(|sample| match sample {
+                Value::Object(entries) => Some(entries),
+                _ => None,
+            })
+            .flatten()
+            .filter(|(role, _)| role.ends_with("_rss"))
+            .filter_map(|(_, sample)| sample.get("observer"))
+            .any(|observer| py_int(observer.get("kernel_rss_requested")) == Some(1))
+}
+
 /// Recompute the memory verdict of raw samples. Failures return the failing
 /// status with the samples and certificate kept.
 pub fn evaluate(
@@ -873,14 +890,7 @@ pub fn evaluate(
                 .filter(|(k, _)| k.ends_with("_rss"))
                 .filter_map(|(_, v)| v.get("observer"))
                 .collect();
-            let required = certificate
-                .get("kernel_rss_required")
-                .is_some_and(Value::truthy);
-            if required
-                || kernel_rows
-                    .iter()
-                    .any(|d| n(d, "kernel_rss_requested") == Some(1))
-            {
+            if kernel_used(certificate, std::slice::from_ref(row)) {
                 let ok = matches!(
                     certificate.get("kernel_rss_required"),
                     Some(Value::Bool(true))
