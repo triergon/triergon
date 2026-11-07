@@ -37,24 +37,34 @@ fn video_extensions(lane: &str) -> Option<&'static [&'static str]> {
     }
 }
 
-fn audio_suffix(lane: &str) -> Option<&'static str> {
+fn audio_suffixes(lane: &str) -> Option<&'static [&'static str]> {
     match lane {
-        "ac3" => Some(".ac3"),
-        "eac3" => Some(".eac3"),
-        "aac" => Some(".adts"),
-        "dts" => Some(".core.dts"),
+        "ac3" => Some(&[".ac3"]),
+        "eac3" => Some(&[".eac3"]),
+        "aac" => Some(&[".adts"]),
+        "dts" => Some(&[".core.dts"]),
+        "flac" => Some(&[".flac"]),
+        "mp3" => Some(&[".bit", ".mp3", ".mp2", ".mp1"]),
+        "vorbis" => Some(&[".ogg"]),
+        "opus" => Some(&[".opus", ".mka"]),
         _ => None,
     }
 }
 
-fn audio_format(lane: &str) -> Option<&'static str> {
-    match lane {
+/// The demuxer FFmpeg is told to use for a lane's vectors; `None` lets it probe (Opus
+/// vectors come in Ogg and in Matroska).
+fn audio_format(lane: &str) -> Result<Option<&'static str>, String> {
+    Ok(match lane {
         "ac3" => Some("ac3"),
         "eac3" => Some("eac3"),
         "aac" => Some("aac"),
         "dts" => Some("dts"),
-        _ => None,
-    }
+        "flac" => Some("flac"),
+        "mp3" => Some("mp3"),
+        "vorbis" => Some("ogg"),
+        "opus" => None,
+        _ => return Err(unknown(lane)),
+    })
 }
 
 fn example(lane: &str) -> Option<&'static str> {
@@ -64,6 +74,10 @@ fn example(lane: &str) -> Option<&'static str> {
         "ac3" | "eac3" => "codec-ac3-decode",
         "aac" => "codec-aac-decode",
         "dts" => "codec-dca-decode",
+        "flac" => "codec-flac-decode",
+        "mp3" => "codec-mp3-decode",
+        "vorbis" => "codec-vorbis-decode",
+        "opus" => "codec-opus-decode",
         _ => return None,
     })
 }
@@ -76,6 +90,10 @@ fn operation(lane: &str) -> Option<&'static str> {
         "eac3" => "audio-eac3",
         "aac" => "audio-aac",
         "dts" => "audio-dts",
+        "flac" => "audio-flac",
+        "mp3" => "audio-mp3",
+        "vorbis" => "audio-vorbis",
+        "opus" => "audio-opus",
         _ => return None,
     })
 }
@@ -140,8 +158,8 @@ pub fn manifest(out: &Path, lanes: &[String]) -> Result<(), String> {
                         continue;
                     }
                 } else {
-                    let want = audio_suffix(lane).ok_or_else(|| unknown(lane))?;
-                    if !name.ends_with(want) {
+                    let want = audio_suffixes(lane).ok_or_else(|| unknown(lane))?;
+                    if !want.iter().any(|suffix| name.ends_with(suffix)) {
                         continue;
                     }
                 }
@@ -178,7 +196,7 @@ fn suffix(name: &str) -> &str {
 }
 
 /// The grading limits of `harness/codecs/numeric-rules.json`.
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct Rules {
     /// Per-channel RMS of the float audio difference.
     pub rms: f64,
@@ -186,6 +204,8 @@ pub struct Rules {
     pub abs: f64,
     /// Per-sample s16 difference of the stereo output path, in LSB.
     pub lsb: i64,
+    /// Lanes whose decoder output must equal the reference exactly.
+    pub exact: Vec<String>,
 }
 
 impl Rules {
@@ -199,10 +219,20 @@ impl Rules {
                 .and_then(Value::as_f64)
                 .ok_or_else(|| format!("{}: missing {section}.{key}", path.display()))
         };
+        let exact = rules
+            .get("lossless_audio_decode")
+            .and_then(|s| s.get("applies_to"))
+            .and_then(Value::as_array)
+            .ok_or_else(|| format!("{}: missing lossless_audio_decode.applies_to", path.display()))?
+            .iter()
+            .map(|lane| lane.as_str().map(str::to_owned))
+            .collect::<Option<Vec<_>>>()
+            .ok_or_else(|| format!("{}: lossless lanes are not strings", path.display()))?;
         Ok(Rules {
             rms: number("audio_decode", "per_channel_rms_max")?,
             abs: number("audio_decode", "per_sample_abs_max")?,
             lsb: number("audio_device_path", "per_sample_abs_max_lsb")? as i64,
+            exact,
         })
     }
 }
@@ -525,19 +555,17 @@ fn samples_per_channel(bytes: usize, channels: Option<&Value>) -> Result<Value, 
 }
 
 fn audio_decoder(a: &Grade, lane: &str, path: &str, tmp: &Path) -> Result<Value, Stop> {
-    let format = audio_format(lane).ok_or_else(|| unknown(lane))?;
-    let stream = probe(&a.ffprobe, path, Some(format), true)?;
+    let format = audio_format(lane)?;
+    let stream = probe(&a.ffprobe, path, format, true)?;
     let (reference_path, ours_path) = (tmp.join("ref.f32"), tmp.join("ours.f32"));
-    let reference_run = run_text(
-        &[
-            a.ffmpeg.as_str(),
-            "-nostdin",
-            "-v",
-            "error",
-            "-threads",
-            "1",
-            "-f",
-            format,
+    let mut reference_argv: Vec<String> = [a.ffmpeg.as_str(), "-nostdin", "-v", "error", "-threads", "1"]
+        .map(String::from)
+        .to_vec();
+    if let Some(format) = format {
+        reference_argv.extend(["-f".to_owned(), format.to_owned()]);
+    }
+    reference_argv.extend(
+        [
             "-i",
             path,
             "-f",
@@ -548,8 +576,8 @@ fn audio_decoder(a: &Grade, lane: &str, path: &str, tmp: &Path) -> Result<Value,
             &python::path(&reference_path),
         ]
         .map(String::from),
-        RUN_TIMEOUT,
-    )?;
+    );
+    let reference_run = run_text(&reference_argv, RUN_TIMEOUT)?;
     let ours_run = run_text(
         &[a.example(lane)?, path.to_owned(), python::path(&ours_path)],
         RUN_TIMEOUT,
@@ -662,7 +690,11 @@ fn audio_decoder(a: &Grade, lane: &str, path: &str, tmp: &Path) -> Result<Value,
         ));
         row.push(("worst_rms".into(), Value::float(worst_rms)));
         row.push(("worst_abs".into(), Value::float(worst_abs)));
-        let pass = worst_rms <= a.rules.rms && worst_abs <= a.rules.abs;
+        let pass = if a.rules.exact.iter().any(|exact| exact == lane) {
+            worst_abs == 0.0
+        } else {
+            worst_rms <= a.rules.rms && worst_abs <= a.rules.abs
+        };
         status(&mut row, if pass { "pass" } else { "fail" });
     } else {
         row.push(("stats".into(), Value::Null));

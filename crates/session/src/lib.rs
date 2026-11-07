@@ -51,6 +51,47 @@ pub fn video_decoder(codec: VideoCodec) -> Box<dyn VideoDecoder> {
     }
 }
 
+/// The decoder lane for a container track's codec, if this crate decodes it.
+pub fn audio_codec(codec: triergon_core::container::CodecId<'_>) -> Option<AudioCodec> {
+    use triergon_core::container::CodecId;
+    Some(match codec {
+        CodecId::Ac3 => AudioCodec::Ac3,
+        CodecId::Eac3 => AudioCodec::Eac3,
+        CodecId::Aac => AudioCodec::Aac,
+        CodecId::Dts => AudioCodec::Dts,
+        CodecId::Flac => AudioCodec::Flac,
+        CodecId::Opus => AudioCodec::Opus,
+        CodecId::Vorbis => AudioCodec::Vorbis,
+        CodecId::MpegAudio => AudioCodec::MpegAudio,
+        _ => return None,
+    })
+}
+
+/// The canonical configuration [`audio_decoder`] takes, from the configuration bytes a
+/// container track carries (`TrackInfo::configuration`): Matroska CodecPrivate, an ISO
+/// BMFF `dfLa` or `dOps` payload, or the headers an Ogg reader collects. Empty for codecs
+/// that take none.
+pub fn audio_configuration(
+    codec: AudioCodec,
+    track_configuration: &[u8],
+    out: &mut Vec<u8>,
+) -> triergon_core::Result<()> {
+    out.clear();
+    match codec {
+        AudioCodec::Flac => {
+            triergon_framing::canonical_flac_configuration(track_configuration, out)
+        }
+        AudioCodec::Opus => {
+            triergon_framing::canonical_opus_configuration(track_configuration, out)
+        }
+        AudioCodec::Vorbis => {
+            triergon_framing::canonical_vorbis_configuration(track_configuration, out)
+        }
+        AudioCodec::Ac3 | AudioCodec::Eac3 | AudioCodec::Aac | AudioCodec::Dts => Ok(()),
+        AudioCodec::MpegAudio => Ok(()),
+    }
+}
+
 /// The pure-Rust decoder for `codec`, set up from `configuration`: for FLAC the `fLaC`
 /// stream header, for Opus the `OpusHead` packet, for Vorbis the three header packets
 /// with Xiph lacing (the canonical forms of `triergon-framing`). AC-3, E-AC-3, AAC
