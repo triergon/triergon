@@ -532,8 +532,10 @@ fn per_worker_memory_outputs_reuse_the_same_observation_validation() {
     let selected = identity.get("binaries").unwrap();
     let recorded = rows[0].get("memory").unwrap();
     let certificate = recorded.get("certificate").unwrap();
-    let expected =
-        v(r#"{"candidate":{"packets":10},"reference":{"packets":10,"metadata":"reference-only"}}"#);
+    let expected = v(r#"{
+        "candidate":{"packets":10,"bytes":100,"digest":9},
+        "reference":{"packets":10,"bytes":100,"digest":9,"metadata":"reference-only"}
+    }"#);
     let mut samples = recorded
         .get("samples")
         .unwrap()
