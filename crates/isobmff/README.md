@@ -43,6 +43,8 @@ Random access can reuse bytes already supplied in the same generation. Samples
 split across windows use a bounded packet buffer.
 Complete indexed sources can check all packet projections by track before
 rewinding for merged playback.
+Short regular tracks can keep extra seek restart points in the existing
+checkpoint allocation.
 
 ```rust
 use std::sync::atomic::AtomicBool;
