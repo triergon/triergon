@@ -170,14 +170,20 @@ pub fn main(root: &Path, args: &[String]) -> Result<i32, String> {
         return Ok(0);
     }
     let options = options(root, args)?;
-    validate(root, &options)?;
-    let code = collect(root, &options, report::run, |root, selected| {
-        let code = check_controls(root, selected)?;
-        bind_controls(selected)?;
+    let result: Result<i32, String> = (|| {
+        validate(root, &options)?;
+        let code = collect(root, &options, report::run, |root, selected| {
+            let code = check_controls(root, selected)?;
+            bind_controls(root, selected)?;
+            Ok(code)
+        })?;
+        bind_controls(root, &options)?;
         Ok(code)
-    })?;
-    bind_controls(&options)?;
-    Ok(code)
+    })();
+    if let Err(error) = &result {
+        invalidate_controls(&options, error)?;
+    }
+    result
 }
 
 fn collect(
@@ -217,7 +223,17 @@ fn context(root: &Path, selected: &Options) -> Result<Context, String> {
     validate(root, selected)?;
     let identity_path = root.join("target/harness/identity.json");
     let identity = read_json(&identity_path)?;
-    if let Some(error) = provenance::source_identity_error(root, &identity) {
+    let (candidate, reference, reference_record) = bound_workers(root, &identity)?;
+    let binding = proof_binding(root, &identity, &reference_record)?;
+    Ok(Context {
+        candidate,
+        reference,
+        binding,
+    })
+}
+
+fn bound_workers(root: &Path, identity: &Value) -> Result<(PathBuf, PathBuf, Value), String> {
+    if let Some(error) = provenance::source_identity_error(root, identity) {
         return Err(error);
     }
     let candidate = root.join("target/release/playback-worker");
@@ -234,11 +250,11 @@ fn context(root: &Path, selected: &Options) -> Result<Context, String> {
     if text(record, "sha256")? != digest(&candidate)?
         || !record
             .get("selected_graph")
-            .is_some_and(|value| diff::equal(value, &graph))
+            .is_some_and(|value| diff::differences(value, &graph).is_empty())
     {
         return Err("playback-worker sources or binary changed; rebuild".into());
     }
-    let reference_record = comparison::reference_named(&identity, "ffmpeg-formats-native")?;
+    let reference_record = comparison::reference_named(identity, "ffmpeg-formats-native")?;
     let reference = root
         .join(text(&reference_record, "path")?)
         .canonicalize()
@@ -251,26 +267,224 @@ fn context(root: &Path, selected: &Options) -> Result<Context, String> {
     {
         return Err("progressive reference changed; rebuild".into());
     }
-    let binding = Value::object([
-        ("identity_sha256", Value::str(digest(&identity_path)?)),
-        ("identity", identity),
-        ("candidate_sha256", Value::str(digest(&candidate)?)),
-        ("reference", reference_record),
-        ("contract_sha256", Value::str(digest(&selected.contract)?)),
+    Ok((candidate, reference, reference_record))
+}
+
+fn proof_binding(root: &Path, identity: &Value, reference: &Value) -> Result<Value, String> {
+    let candidate = identity
+        .get("additional_candidates")
+        .and_then(|value| value.get("playback-worker"))
+        .ok_or("playback-worker is not in the build identity")?;
+    Ok(Value::object([
+        (
+            "identity_sha256",
+            Value::str(sha256::hex(
+                (json::to_python(identity, Some(2)) + "\n").as_bytes(),
+            )),
+        ),
+        ("identity", identity.clone()),
+        ("candidate_sha256", Value::str(text(candidate, "sha256")?)),
+        ("reference", reference.clone()),
+        (
+            "contract_sha256",
+            Value::str(digest(&root.join(FEATURE).join("contract.json"))?),
+        ),
         (
             "corpus_manifest_sha256",
-            Value::str(digest(&selected.manifest)?),
+            Value::str(digest(&root.join(FEATURE).join("corpus.json"))?),
         ),
         (
             "controls_sha256",
             Value::str(digest(&root.join(FEATURE).join("controls.json"))?),
         ),
-    ]);
-    Ok(Context {
-        candidate,
-        reference,
-        binding,
-    })
+    ]))
+}
+
+fn require_same(actual: Option<&Value>, expected: &Value, label: &str) -> Result<(), String> {
+    if actual.is_some_and(|actual| diff::differences(actual, expected).is_empty()) {
+        Ok(())
+    } else {
+        Err(format!("functional control {label} mismatch"))
+    }
+}
+
+fn recorded_cases<'a>(
+    proof: &'a Value,
+    controls: &Value,
+    binding: &Value,
+) -> Result<&'a [Value], String> {
+    for (field, expected) in [
+        ("schema", Value::int(1)),
+        ("complete", Value::Bool(true)),
+        ("passed", Value::Bool(true)),
+        ("context_error", Value::Null),
+    ] {
+        require_same(proof.get(field), &expected, field)?;
+    }
+    require_same(proof.get("binding"), binding, "source/build binding")?;
+    let recorded = rows(proof)?;
+    let declared = rows(controls)?;
+    if recorded.len() != CONTROLS.len() || declared.len() != CONTROLS.len() {
+        return Err("all five functional controls are required".into());
+    }
+    for ((case, declared), id) in recorded.iter().zip(declared).zip(CONTROLS) {
+        require_same(case.get("id"), &Value::str(id), "case membership")?;
+        require_same(
+            case.get("input_sha256"),
+            declared
+                .get("sha256")
+                .ok_or("missing declared input hash")?,
+            "input hash",
+        )?;
+        let Some(Value::Object(outcomes)) = case.get("outcomes") else {
+            return Err("missing functional control outcomes".into());
+        };
+        if outcomes.len() != 2 {
+            return Err("both functional control worker outcomes are required".into());
+        }
+        for role in ["candidate", "reference"] {
+            let outcome = case
+                .get("outcomes")
+                .and_then(|value| value.get(role))
+                .ok_or("missing functional control worker outcome")?;
+            let expected = declared
+                .get("outcomes")
+                .and_then(|value| value.get(role))
+                .ok_or("missing declared worker outcome")?;
+            for (field, expected) in [
+                ("passed", &Value::Bool(true)),
+                ("error", &Value::Null),
+                ("expected", expected),
+                ("exit", expected.get("exit").ok_or("missing declared exit")?),
+                (
+                    "stdout_sha256",
+                    expected
+                        .get("stdout_sha256")
+                        .ok_or("missing declared stdout hash")?,
+                ),
+            ] {
+                require_same(
+                    outcome.get(field),
+                    expected,
+                    &format!("{id}/{role}/{field}"),
+                )?;
+            }
+        }
+    }
+    Ok(recorded)
+}
+
+fn artifact_path(root: &Path, report_path: &Path, encoded: &str) -> PathBuf {
+    let path = Path::new(encoded);
+    if path.is_absolute() || root.join(path).is_file() {
+        root.join(path)
+    } else {
+        report_path.parent().unwrap_or(root).join(path)
+    }
+}
+
+fn check_artifacts(
+    root: &Path,
+    proof_path: &Path,
+    recorded: &[Value],
+    controls: &Value,
+) -> Result<(), String> {
+    for (case, declared) in recorded.iter().zip(rows(controls)?) {
+        for role in ["candidate", "reference"] {
+            let outcome = case
+                .get("outcomes")
+                .and_then(|value| value.get(role))
+                .ok_or("missing outcome")?;
+            let read = |field| -> Result<Vec<u8>, String> {
+                let path = artifact_path(root, proof_path, text(outcome, field)?);
+                let bytes = fs::read(&path).map_err(|e| format!("{}: {e}", path.display()))?;
+                if text(outcome, &format!("{field}_sha256"))? != sha256::hex(&bytes) {
+                    return Err(format!(
+                        "{}: functional control {field} hash mismatch",
+                        path.display()
+                    ));
+                }
+                Ok(bytes)
+            };
+            let code = match outcome.get("exit") {
+                Some(Value::Number(value)) => {
+                    value.as_i128().and_then(|value| i64::try_from(value).ok())
+                }
+                _ => None,
+            }
+            .ok_or("functional control exit must be an integer")?;
+            let finished = worker::Finished {
+                code,
+                stdout: read("stdout")?,
+                stderr: read("stderr")?,
+            };
+            let expected = declared
+                .get("outcomes")
+                .and_then(|value| value.get(role))
+                .ok_or("missing declared outcome")?;
+            check_trace(declared, expected, &finished)?;
+        }
+    }
+    Ok(())
+}
+
+/// Verify a progressive collection's own five-case proof before reusing its data.
+/// Timing and memory may have different kernel proof pins, so neither uses the
+/// other report's identity or the current identity file to attest its controls.
+pub(crate) fn validate_report_controls(
+    root: &Path,
+    report_path: &Path,
+    report: &Value,
+    contract: &Value,
+    manifest: &Value,
+) -> Result<(), String> {
+    if contract.get("functional_controls").is_none()
+        && contract.get("id").and_then(Value::as_str) != Some("progressive-ts188")
+    {
+        return Ok(());
+    }
+    let selected = options(root, &[])?;
+    validate(root, &selected)?;
+    require_same(
+        Some(contract),
+        &read_json(&selected.contract)?,
+        "registered contract",
+    )?;
+    require_same(
+        Some(manifest),
+        &read_json(&selected.manifest)?,
+        "registered manifest",
+    )?;
+    let attachment = report
+        .get("functional_controls")
+        .ok_or("missing functional controls")?;
+    require_same(
+        attachment.get("passed"),
+        &Value::Bool(true),
+        "attachment status",
+    )?;
+    let path = artifact_path(root, report_path, text(attachment, "path")?);
+    let bytes = fs::read(&path).map_err(|e| format!("{}: {e}", path.display()))?;
+    if text(attachment, "sha256")? != sha256::hex(&bytes) {
+        return Err("functional control proof hash mismatch".into());
+    }
+    let proof = json::parse_strict(std::str::from_utf8(&bytes).map_err(|e| e.to_string())?)
+        .map_err(|e| e.to_string())?;
+    let identity = report.get("identity").ok_or("missing report identity")?;
+    let reference = comparison::reference_named(identity, "ffmpeg-formats-native")?;
+    let binding = proof_binding(root, identity, &reference)?;
+    for key in ["contract_sha256", "corpus_manifest_sha256"] {
+        require_same(
+            report.get(key),
+            binding.get(key).ok_or("missing proof binding")?,
+            key,
+        )?;
+    }
+    let controls = read_json(&root.join(FEATURE).join("controls.json"))?;
+    let recorded = recorded_cases(&proof, &controls, &binding)?;
+    check_artifacts(root, &path, recorded, &controls)?;
+    bound_workers(root, identity)?;
+    Ok(())
 }
 
 fn check_trace(case: &Value, expected: &Value, finished: &worker::Finished) -> Result<(), String> {
@@ -301,7 +515,7 @@ fn check_trace(case: &Value, expected: &Value, finished: &worker::Finished) -> R
         for field in ["packets", "bytes", "digest"] {
             fields.push((field, work.get(field).ok_or("missing work field")?.clone()));
         }
-        if !diff::equal(&footer, &Value::object(fields)) {
+        if !diff::differences(&footer, &Value::object(fields)).is_empty() {
             return Err("trace footer differs from normative work".into());
         }
     } else {
@@ -419,51 +633,45 @@ fn check_controls(root: &Path, selected: &Options) -> Result<i32, String> {
     Ok(i32::from(!passed))
 }
 
-fn bind_controls(selected: &Options) -> Result<(), String> {
-    let controls_path = selected.output.join("controls/report.json");
-    let controls = read_json(&controls_path)?;
-    let binding = controls.get("binding").ok_or("missing control binding")?;
-    for path in [
+fn report_paths(selected: &Options) -> [PathBuf; 2] {
+    [
         selected.output.join("report.json"),
         selected.output.join("parity/report.json"),
-    ] {
+    ]
+}
+
+fn bind_controls(root: &Path, selected: &Options) -> Result<(), String> {
+    let result = bind_verified_controls(root, selected);
+    if let Err(error) = &result {
+        invalidate_controls(selected, error)?;
+    }
+    result
+}
+
+fn bind_verified_controls(root: &Path, selected: &Options) -> Result<(), String> {
+    let controls_path = selected.output.join("controls/report.json");
+    let controls = read_json(&controls_path)?;
+    let contract = read_json(&selected.contract)?;
+    let manifest = read_json(&selected.manifest)?;
+    for path in report_paths(selected) {
         if !path.is_file() {
             continue;
         }
         let mut report = read_json(&path)?;
-        for key in ["identity", "contract_sha256", "corpus_manifest_sha256"] {
-            if !report
-                .get(key)
-                .zip(binding.get(key))
-                .is_some_and(|(a, b)| diff::equal(a, b))
-            {
-                return Err(format!("{key} differs between parity and controls"));
-            }
-        }
         if let Value::Object(fields) = &mut report {
-            if controls.get("passed") != Some(&Value::Bool(true))
-                && let Some((_, Value::Object(verdict))) =
-                    fields.iter_mut().find(|(key, _)| key == "acceptance")
-            {
-                for (key, value) in verdict {
-                    match key.as_str() {
-                        "accepted" | "slice_accepted" => *value = Value::Bool(false),
-                        "reasons" | "slice_reasons" => {
-                            if let Value::Array(reasons) = value {
-                                reasons.push(Value::str(
-                                    "mandatory progressive functional controls failed",
-                                ));
-                            }
-                        }
-                        _ => {}
-                    }
-                }
-            }
             fields.retain(|(key, _)| key != "functional_controls");
             fields.push((
                 "functional_controls".to_owned(),
                 Value::object([
-                    ("path", Value::str(controls_path.to_string_lossy())),
+                    (
+                        "path",
+                        Value::str(
+                            controls_path
+                                .canonicalize()
+                                .map_err(|e| e.to_string())?
+                                .to_string_lossy(),
+                        ),
+                    ),
                     ("sha256", Value::str(digest(&controls_path)?)),
                     (
                         "passed",
@@ -475,14 +683,189 @@ fn bind_controls(selected: &Options) -> Result<(), String> {
                 ]),
             ));
         }
+        validate_report_controls(root, &path, &report, &contract, &manifest)?;
         write_json(&path, &report)?;
     }
     Ok(())
 }
 
+fn set(value: &mut Value, key: &str, replacement: Value) -> Result<(), String> {
+    let Value::Object(fields) = value else {
+        return Err("expected an object".into());
+    };
+    fields.retain(|(name, _)| name != key);
+    fields.push((key.to_owned(), replacement));
+    Ok(())
+}
+
+fn invalidate_controls(selected: &Options, error: &str) -> Result<(), String> {
+    let mut errors = Vec::new();
+    for path in report_paths(selected) {
+        if !path.is_file() {
+            continue;
+        }
+        let update = || -> Result<(), String> {
+            let mut report = read_json(&path)?;
+            let mut verdict = report
+                .get("acceptance")
+                .cloned()
+                .unwrap_or(Value::Object(Vec::new()));
+            if !matches!(verdict, Value::Object(_)) {
+                verdict = Value::Object(Vec::new());
+            }
+            for key in ["accepted", "slice_accepted"] {
+                set(&mut verdict, key, Value::Bool(false))?;
+            }
+            for key in ["reasons", "slice_reasons"] {
+                let mut reasons = verdict
+                    .get(key)
+                    .and_then(Value::as_array)
+                    .unwrap_or_default()
+                    .to_vec();
+                let reason = Value::str(format!(
+                    "mandatory progressive functional controls: {error}"
+                ));
+                if !reasons.contains(&reason) {
+                    reasons.push(reason);
+                }
+                set(&mut verdict, key, Value::Array(reasons))?;
+            }
+            set(&mut report, "acceptance", verdict)?;
+            let mut controls = report
+                .get("functional_controls")
+                .cloned()
+                .unwrap_or(Value::Object(Vec::new()));
+            if !matches!(controls, Value::Object(_)) {
+                controls = Value::Object(Vec::new());
+            }
+            set(&mut controls, "passed", Value::Bool(false))?;
+            set(&mut report, "functional_controls", controls)?;
+            write_json(&path, &report)
+        };
+        if let Err(error) = update() {
+            errors.push(error);
+        }
+    }
+    if errors.is_empty() {
+        Ok(())
+    } else {
+        Err(errors.join("; "))
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    struct Temporary(PathBuf);
+
+    impl Temporary {
+        fn new() -> Self {
+            static NEXT: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+            let path = std::env::temp_dir().join(format!(
+                "triergon-control-proof-{}-{}",
+                std::process::id(),
+                NEXT.fetch_add(1, std::sync::atomic::Ordering::Relaxed)
+            ));
+            fs::create_dir(&path).unwrap();
+            Self(path)
+        }
+    }
+
+    impl Drop for Temporary {
+        fn drop(&mut self) {
+            fs::remove_dir_all(&self.0).unwrap();
+        }
+    }
+
+    fn change(value: &mut Value, path: &[&str], replacement: Value) {
+        let (key, parents) = path.split_last().unwrap();
+        let mut node = value;
+        for key in parents {
+            node = match node {
+                Value::Object(fields) => {
+                    &mut fields.iter_mut().find(|(name, _)| name == key).unwrap().1
+                }
+                Value::Array(values) => &mut values[key.parse::<usize>().unwrap()],
+                _ => panic!("invalid test path"),
+            };
+        }
+        set(node, key, replacement).unwrap();
+    }
+
+    // Functional-proof metadata only: these fixtures have no timing, memory,
+    // observer or native gate evidence. Raw traces are checked separately.
+    fn proof_fixture(identity: Value) -> (Value, Value, Value) {
+        let controls = read_json(&root().join(FEATURE).join("controls.json")).unwrap();
+        let reference = comparison::reference_named(&identity, "ffmpeg-formats-native").unwrap();
+        let binding = proof_binding(root(), &identity, &reference).unwrap();
+        let cases = rows(&controls)
+            .unwrap()
+            .iter()
+            .map(|case| {
+                let outcomes = ["candidate", "reference"].map(|role| {
+                    let expected = case.get("outcomes").unwrap().get(role).unwrap();
+                    (
+                        role,
+                        Value::object([
+                            ("expected", expected.clone()),
+                            ("exit", expected.get("exit").unwrap().clone()),
+                            (
+                                "stdout_sha256",
+                                expected.get("stdout_sha256").unwrap().clone(),
+                            ),
+                            ("stderr_sha256", Value::str(sha256::hex(b""))),
+                            ("stdout", Value::str("trace.stdout")),
+                            ("stderr", Value::str("trace.stderr")),
+                            ("passed", Value::Bool(true)),
+                            ("error", Value::Null),
+                        ]),
+                    )
+                });
+                Value::object([
+                    ("id", case.get("id").unwrap().clone()),
+                    ("input_sha256", case.get("sha256").unwrap().clone()),
+                    ("outcomes", Value::object(outcomes)),
+                ])
+            })
+            .collect();
+        let proof = Value::object([
+            ("schema", Value::int(1)),
+            ("binding", binding.clone()),
+            ("cases", Value::Array(cases)),
+            ("complete", Value::Bool(true)),
+            ("passed", Value::Bool(true)),
+            ("context_error", Value::Null),
+        ]);
+        (controls, binding, proof)
+    }
+
+    fn proof_identity() -> Value {
+        Value::object([
+            ("source_revision", Value::str("test source binding")),
+            ("instrumentation", Value::Object(Vec::new())),
+            (
+                "additional_candidates",
+                Value::object([(
+                    "playback-worker",
+                    Value::object([
+                        ("sha256", Value::str("a".repeat(64))),
+                        ("selected_graph", Value::str("test source graph")),
+                    ]),
+                )]),
+            ),
+            (
+                "comparison_references",
+                Value::object([(
+                    "ffmpeg-formats-native",
+                    Value::object([
+                        ("path", Value::str("target/harness/ffmpeg-formats-worker")),
+                        ("sha256", Value::str("b".repeat(64))),
+                    ]),
+                )]),
+            ),
+        ])
+    }
 
     fn root() -> &'static Path {
         Path::new(env!("CARGO_MANIFEST_DIR")).parent().unwrap()
@@ -490,6 +873,267 @@ mod tests {
 
     fn args(values: &[&str]) -> Vec<String> {
         values.iter().map(|s| (*s).to_owned()).collect()
+    }
+
+    #[test]
+    fn all_ten_declared_outcomes_and_every_control_are_required() {
+        let (controls, binding, proof) = proof_fixture(proof_identity());
+        recorded_cases(&proof, &controls, &binding).unwrap();
+        for index in 0..5 {
+            for role in ["candidate", "reference"] {
+                for (field, replacement) in [
+                    ("passed", Value::Bool(false)),
+                    ("passed", Value::int(1)),
+                    ("error", Value::str("worker failed")),
+                    ("exit", Value::int(9)),
+                    ("stdout_sha256", Value::str("c".repeat(64))),
+                    ("expected", Value::Null),
+                ] {
+                    let mut changed = proof.clone();
+                    change(
+                        &mut changed,
+                        &["cases", &index.to_string(), "outcomes", role, field],
+                        replacement,
+                    );
+                    assert!(
+                        recorded_cases(&changed, &controls, &binding).is_err(),
+                        "{index}/{role}/{field}"
+                    );
+                }
+            }
+            for field in ["id", "input_sha256"] {
+                let mut changed = proof.clone();
+                change(
+                    &mut changed,
+                    &["cases", &index.to_string(), field],
+                    Value::str("changed"),
+                );
+                assert!(recorded_cases(&changed, &controls, &binding).is_err());
+            }
+            let mut changed = proof.clone();
+            if let Value::Object(fields) = &mut changed {
+                let Value::Array(cases) = &mut fields
+                    .iter_mut()
+                    .find(|(name, _)| name == "cases")
+                    .unwrap()
+                    .1
+                else {
+                    panic!()
+                };
+                cases.remove(index);
+            }
+            assert!(recorded_cases(&changed, &controls, &binding).is_err());
+        }
+        for replacement in [
+            Value::Object(Vec::new()),
+            Value::object([("candidate", Value::Null)]),
+            Value::object([
+                ("candidate", Value::Null),
+                ("reference", Value::Null),
+                ("extra", Value::Null),
+            ]),
+        ] {
+            let mut changed = proof.clone();
+            change(&mut changed, &["cases", "4", "outcomes"], replacement);
+            assert!(recorded_cases(&changed, &controls, &binding).is_err());
+        }
+        for (field, replacement) in [
+            ("complete", Value::Bool(false)),
+            ("passed", Value::Bool(false)),
+            ("context_error", Value::str("source changed")),
+        ] {
+            let mut changed = proof.clone();
+            set(&mut changed, field, replacement).unwrap();
+            assert!(recorded_cases(&changed, &controls, &binding).is_err());
+        }
+    }
+
+    #[test]
+    fn each_collection_uses_its_own_identity_and_worker_bindings() {
+        let identity = proof_identity();
+        let (controls, timing_binding, timed) = proof_fixture(identity.clone());
+        let mut memory_identity = identity;
+        change(
+            &mut memory_identity,
+            &["instrumentation", "rss_kernel_bound"],
+            Value::str("test memory proof pin"),
+        );
+        let (_, memory_binding, memory) = proof_fixture(memory_identity);
+        recorded_cases(&timed, &controls, &timing_binding).unwrap();
+        recorded_cases(&memory, &controls, &memory_binding).unwrap();
+        assert!(recorded_cases(&timed, &controls, &memory_binding).is_err());
+        assert!(recorded_cases(&memory, &controls, &timing_binding).is_err());
+        for path in [
+            vec!["identity_sha256"],
+            vec!["candidate_sha256"],
+            vec!["controls_sha256"],
+            vec!["contract_sha256"],
+            vec!["corpus_manifest_sha256"],
+            vec!["reference", "sha256"],
+            vec!["identity", "source_revision"],
+            vec![
+                "identity",
+                "additional_candidates",
+                "playback-worker",
+                "selected_graph",
+            ],
+        ] {
+            let mut changed = timed.clone();
+            let mut full = vec!["binding"];
+            full.extend(path);
+            change(&mut changed, &full, Value::str("changed"));
+            assert!(recorded_cases(&changed, &controls, &timing_binding).is_err());
+        }
+    }
+
+    #[test]
+    fn duplicate_or_extra_controls_are_not_a_complete_precheck() {
+        let (controls, binding, proof) = proof_fixture(proof_identity());
+        let mut duplicate = rows(&proof).unwrap().to_vec();
+        duplicate[1] = duplicate[0].clone();
+        let mut extra = rows(&proof).unwrap().to_vec();
+        extra.push(extra[0].clone());
+        for cases in [Vec::new(), duplicate, extra] {
+            let mut changed = proof.clone();
+            set(&mut changed, "cases", Value::Array(cases)).unwrap();
+            assert!(recorded_cases(&changed, &controls, &binding).is_err());
+        }
+    }
+
+    #[test]
+    fn raw_control_files_and_their_declared_hashes_are_rechecked() {
+        let directory = Temporary::new();
+        let (controls, binding, mut proof) = proof_fixture(proof_identity());
+        recorded_cases(&proof, &controls, &binding).unwrap();
+        let output = directory.0.join("trace.stdout");
+        let errors = directory.0.join("trace.stderr");
+        fs::write(&output, b"altered trace\n").unwrap();
+        fs::write(&errors, b"").unwrap();
+        let recorded = rows(&proof).unwrap();
+        assert!(
+            check_artifacts(
+                &directory.0,
+                &directory.0.join("report.json"),
+                recorded,
+                &controls
+            )
+            .unwrap_err()
+            .contains("hash mismatch")
+        );
+        change(
+            &mut proof,
+            &["cases", "0", "outcomes", "candidate", "stdout_sha256"],
+            Value::str(sha256::hex(b"altered trace\n")),
+        );
+        assert!(
+            check_artifacts(
+                &directory.0,
+                &directory.0.join("report.json"),
+                rows(&proof).unwrap(),
+                &controls
+            )
+            .unwrap_err()
+            .contains("literal stdout")
+        );
+        fs::remove_file(&output).unwrap();
+        assert!(
+            check_artifacts(
+                &directory.0,
+                &directory.0.join("report.json"),
+                rows(&proof).unwrap(),
+                &controls
+            )
+            .is_err()
+        );
+    }
+
+    #[test]
+    fn missing_or_rehashed_proof_cannot_leave_an_accepted_report() {
+        let directory = Temporary::new();
+        let mut selected = options(root(), &[]).unwrap();
+        selected.output = directory.0.clone();
+        // Untrusted stale flags, with no metric evidence or positive gate.
+        let stale = Value::object([(
+            "acceptance",
+            Value::object([
+                ("accepted", Value::Bool(true)),
+                ("slice_accepted", Value::Bool(true)),
+            ]),
+        )]);
+        for path in report_paths(&selected) {
+            write_json(&path, &stale).unwrap();
+        }
+        assert!(bind_controls(root(), &selected).is_err());
+        for path in report_paths(&selected) {
+            let report = read_json(&path).unwrap();
+            assert_eq!(
+                report.get("acceptance").unwrap().get("accepted"),
+                Some(&Value::Bool(false))
+            );
+            assert_eq!(
+                report.get("acceptance").unwrap().get("slice_accepted"),
+                Some(&Value::Bool(false))
+            );
+            assert_eq!(
+                report.get("functional_controls").unwrap().get("passed"),
+                Some(&Value::Bool(false))
+            );
+        }
+        let path = directory.0.join("proof with spaces.json");
+        fs::write(&path, b"{}\n").unwrap();
+        let report = Value::object([(
+            "functional_controls",
+            Value::object([
+                ("passed", Value::Bool(true)),
+                ("path", Value::str(path.to_string_lossy())),
+                ("sha256", Value::str("f".repeat(64))),
+            ]),
+        )]);
+        let contract = read_json(&selected.contract).unwrap();
+        let manifest = read_json(&selected.manifest).unwrap();
+        assert!(
+            validate_report_controls(
+                root(),
+                &directory.0.join("timing.json"),
+                &report,
+                &contract,
+                &manifest
+            )
+            .unwrap_err()
+            .contains("proof hash mismatch")
+        );
+        let mut failed = report;
+        change(
+            &mut failed,
+            &["functional_controls", "passed"],
+            Value::Bool(false),
+        );
+        assert!(validate_report_controls(root(), &path, &failed, &contract, &manifest).is_err());
+    }
+
+    #[test]
+    fn early_entrypoint_failure_revokes_stale_acceptance() {
+        let directory = Temporary::new();
+        let mut selected = options(&directory.0, &[]).unwrap();
+        selected.output = directory.0.join("output");
+        write_json(
+            &selected.output.join("report.json"),
+            &Value::object([(
+                "acceptance",
+                Value::object([("accepted", Value::Bool(true))]),
+            )]),
+        )
+        .unwrap();
+        let args = args(&["--output", selected.output.to_str().unwrap()]);
+        assert!(main(&directory.0, &args).is_err());
+        assert_eq!(
+            read_json(&selected.output.join("report.json"))
+                .unwrap()
+                .get("acceptance")
+                .unwrap()
+                .get("accepted"),
+            Some(&Value::Bool(false))
+        );
     }
 
     #[test]
