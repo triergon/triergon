@@ -147,6 +147,8 @@ groups while retaining emulation-prevention validation. The segment reader uses 
 feed, including any inserted parameter sets. Its spans remain valid while the
 video unit is retained.
 AVC delimiter lookbehind uses compact indices into four retained PES clocks.
+Repeated AVC parameter sets reuse their parsed values when their bytes exactly
+match the last stored set. Different bytes follow normal parsing and ID lookup.
 Units are released only after EOF and both the video and audio assemblers drain. Defaults: 64 MiB
 source, 64 MiB feed, 8,192 access units. A failed reader releases its source;
 retry with a new reader.

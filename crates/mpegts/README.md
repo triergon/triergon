@@ -93,6 +93,8 @@ plain continuation's charged payload storage into `compat::pes::DemuxObserver`.
 on one PID from an already shared window. Each carrier keeps its source
 range and event ordinal. Runs reserve checked span capacity before advancing
 input; ordinary carrier polling handles PES completion.
+Feed dispatch reuses the selected PES route after checking its PID against the
+current program table. Other PIDs use the ordinary route lookup.
 Runs record the complete final carrier for duplicate detection before moving
 the shared window into its last payload span. Every span retains the full
 backing allocation's charge.
