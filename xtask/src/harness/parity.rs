@@ -519,32 +519,114 @@ pub fn feed_parity(
     prefix: &str,
     arguments: &[OsString],
     expected: &Value,
+    work_fields: &[String],
 ) -> Result<Value, String> {
     let mode = format!("{prefix}fold");
     let left = run.candidate(&mode, arguments);
     let right = run.exec(run.reference, &mode, arguments);
-    let work = |outcome: &Value| {
-        Value::object(
-            ["packets", "bytes", "digest"]
-                .map(|key| (key, data(outcome).get(key).cloned().unwrap_or(Value::Null))),
-        )
-    };
-    let complete =
-        |outcome: &Value| ok(outcome) && data(outcome).get("eof") == Some(&Value::Bool(true));
-    let (candidate, reference) = (work(&left), work(&right));
-    let pass = complete(&left)
-        && complete(&right)
-        && super::diff::equal(&candidate, expected)
-        && super::diff::equal(&reference, expected);
+    let result = feed_result(&left, &right, expected, work_fields);
     run.write(
         &mode,
         &Value::object([("candidate", left), ("reference", right)]),
     )?;
-    Ok(Value::object([
+    Ok(result)
+}
+
+fn feed_result(left: &Value, right: &Value, expected: &Value, work_fields: &[String]) -> Value {
+    let work = |outcome: &Value| super::comparison::work_summary(data(outcome), work_fields);
+    let complete =
+        |outcome: &Value| ok(outcome) && data(outcome).get("eof") == Some(&Value::Bool(true));
+    let (candidate, reference) = (work(left), work(right));
+    let pass = complete(left)
+        && complete(right)
+        && super::comparison::work_summary(expected, work_fields).is_ok()
+        && candidate
+            .as_ref()
+            .is_ok_and(|c| super::diff::equal(c, expected))
+        && reference
+            .as_ref()
+            .is_ok_and(|r| super::diff::equal(r, expected));
+    Value::object([
         ("status", status_of(pass)),
         ("source_timing_status", status_of(pass)),
         ("expected", expected.clone()),
-        ("candidate", candidate),
-        ("reference", reference),
-    ]))
+        ("candidate", candidate.unwrap_or(Value::Null)),
+        ("reference", reference.unwrap_or(Value::Null)),
+    ])
+}
+
+#[cfg(test)]
+mod feed_tests {
+    use super::*;
+
+    fn outcome(work: &Value) -> Value {
+        let Value::Object(mut data) = work.clone() else {
+            panic!("work object")
+        };
+        data.push(("eof".into(), Value::Bool(true)));
+        Value::object([("status", Value::str("ok")), ("data", Value::Object(data))])
+    }
+
+    #[test]
+    fn all_125_framing_expectations_use_both_digests() {
+        let root = Path::new(env!("CARGO_MANIFEST_DIR")).parent().unwrap();
+        let contract =
+            crate::checks::read_json(&root.join("harness/features/packet-framing/contract.json"))
+                .unwrap();
+        let manifest =
+            crate::checks::read_json(&root.join("harness/features/packet-framing/corpus.json"))
+                .unwrap();
+        let fields = super::super::comparison::work_fields(&contract).unwrap();
+        let rows = manifest.get("cases").and_then(Value::as_array).unwrap();
+        assert_eq!(rows.len(), 125);
+        for row in rows {
+            let expected = row.get("expected").unwrap();
+            let result = feed_result(&outcome(expected), &outcome(expected), expected, &fields);
+            assert_eq!(
+                result.get("status"),
+                Some(&Value::str("pass")),
+                "{:?}",
+                row.get("id")
+            );
+            assert_eq!(result.get("candidate"), Some(expected));
+            for changed in [Some(Value::int(0)), None] {
+                let Value::Object(mut work) = expected.clone() else {
+                    unreachable!()
+                };
+                work.retain(|(k, _)| k != "digest_b");
+                if let Some(changed) = changed {
+                    work.push(("digest_b".into(), changed));
+                }
+                let changed = Value::Object(work);
+                for (a, b) in [
+                    (outcome(&changed), outcome(expected)),
+                    (outcome(expected), outcome(&changed)),
+                    (outcome(&changed), outcome(&changed)),
+                ] {
+                    assert_eq!(
+                        feed_result(&a, &b, expected, &fields).get("status"),
+                        Some(&Value::str("mismatch"))
+                    );
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn ordinary_feed_projection_remains_exactly_three_fields() {
+        let expected = Value::object([
+            ("packets", Value::int(1)),
+            ("bytes", Value::int(2)),
+            ("digest", Value::int(3)),
+        ]);
+        let mut extra = expected.clone();
+        let Value::Object(fields) = &mut extra else {
+            unreachable!()
+        };
+        fields.push(("digest_b".into(), Value::int(4)));
+        let result = feed_result(&outcome(&extra), &outcome(&extra), &expected, &[]);
+        assert_eq!(result.get("status"), Some(&Value::str("pass")));
+        assert_eq!(result.get("candidate"), Some(&expected));
+        assert_eq!(result.get("reference"), Some(&expected));
+    }
 }

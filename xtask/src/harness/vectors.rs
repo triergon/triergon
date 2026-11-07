@@ -129,6 +129,8 @@ pub fn external_vector(root: &Path, options: &ExternalOptions) -> R<i32> {
     let timed = Operation {
         prefix: "catalogue-".into(),
         arguments: vec![],
+        candidate_options: vec![],
+        work_fields: super::comparison::work_fields(&contract)?,
     };
     if s(&result, "status") == Some("pass") {
         let comparison = options.baseline_worker.as_ref().unwrap_or(&reference);

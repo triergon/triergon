@@ -521,15 +521,8 @@ fn timing_module_absent(clock: &Value, raw: &[Value], linux: bool) -> R<()> {
     Ok(())
 }
 
-fn work(value: &Value) -> R<Value> {
-    let mut fields = Vec::new();
-    for key in ["packets", "bytes", "digest"] {
-        if integer(value, key)? < 0 {
-            return Err(format!("negative work field {key}"));
-        }
-        fields.push((key, field(value, key)?.clone()));
-    }
-    Ok(Value::object(fields))
+fn work(value: &Value, fields: &[String]) -> R<Value> {
+    super::comparison::work_summary(value, fields)
 }
 
 fn memory_binding(memory: &Value, identity: &Value, workers: &Value, linux: bool) -> R<()> {
@@ -592,6 +585,7 @@ fn join_case(
         "case fields/parity",
     )?;
     let workers = selected(timed, expected, contract, identity)?;
+    let fields = super::comparison::work_fields(contract)?;
     let clock = field(timed, "timing")?;
     let memory = field(measured, "memory")?;
     if let Some(previous) = timed.get("memory") {
@@ -629,17 +623,20 @@ fn join_case(
             == Some("Linux");
     timing_module_absent(clock, timed_raw, linux)?;
     memory_binding(memory, identity, &workers, linux)?;
-    let timed_output = work(field(field(&timed_raw[0], "reference")?, "data")?)?;
+    let timed_output = work(field(field(&timed_raw[0], "reference")?, "data")?, &fields)?;
     for sample in timed_raw {
         for role in ["candidate", "reference"] {
             require_same(
-                &work(field(field(sample, role)?, "data")?)?,
+                &work(field(field(sample, role)?, "data")?, &fields)?,
                 &timed_output,
                 "timed output",
             )?;
         }
     }
-    let output = work(field(field(&memory_raw[0], "reference_heap")?, "work")?)?;
+    let output = work(
+        field(field(&memory_raw[0], "reference_heap")?, "work")?,
+        &fields,
+    )?;
     // Timing folds every iteration into one result; memory folds one operation.
     // Counts scale with iterations. Digests are compared within each phase,
     // whose complete operation, input, workers and parity were bound above.
@@ -658,7 +655,7 @@ fn join_case(
             "reference_rss",
         ] {
             require_same(
-                &work(field(field(sample, role)?, "work")?)?,
+                &work(field(field(sample, role)?, "work")?, &fields)?,
                 &output,
                 "memory output",
             )?;
@@ -674,7 +671,7 @@ fn join_case(
     .into_iter()
     .flatten()
     {
-        require_same(&work(expected)?, &output, "expected output")?;
+        require_same(&work(expected, &fields)?, &output, "expected output")?;
     }
     let mut row = timed.clone();
     put(&mut row, "memory", memory.clone())?;
@@ -728,22 +725,7 @@ fn current_workers(root: &Path, identity: &Value, contract: &Value) -> R<()> {
         {
             return Err("candidate must name a worker".into());
         }
-        let record = field(field(identity, "additional_candidates")?, name)?;
-        if super::linux::file_sha(&root.join(format!("target/release/{name}")))?
-            != hash(record, "sha256")?
-        {
-            return Err(format!("{name} changed since build identity; rebuild"));
-        }
-        require_same(
-            field(record, "selected_graph")?,
-            &provenance::selected_graph(
-                root,
-                &provenance::cargo_metadata(root)?,
-                name,
-                &provenance::matroska_inputs(),
-            )?,
-            "candidate source graph",
-        )?;
+        super::build::candidate_worker(root, identity, name)?;
     }
     Ok(())
 }
@@ -1454,6 +1436,85 @@ mod tests {
             text(field(&joined, "memory").unwrap(), "status").unwrap(),
             "observer-unqualified"
         );
+    }
+
+    #[test]
+    fn joining_checks_declared_work_fields_without_dropping_the_second_digest() {
+        let mut fixture = Fixture::new();
+        put(
+            &mut fixture.contract,
+            "work_fields",
+            Value::strings(["digest_b"]),
+        )
+        .unwrap();
+        for (row, section, key, roles, digest) in [
+            (
+                &mut fixture.timed,
+                "timing",
+                "data",
+                vec!["candidate", "reference"],
+                17,
+            ),
+            (
+                &mut fixture.measured,
+                "memory",
+                "work",
+                vec![
+                    "candidate_heap",
+                    "candidate_rss",
+                    "reference_heap",
+                    "reference_rss",
+                ],
+                4,
+            ),
+        ] {
+            let mut samples = array(field(row, section).unwrap(), "samples")
+                .unwrap()
+                .to_vec();
+            for sample in &mut samples {
+                for role in &roles {
+                    change(sample, &[role, key], "digest_b", Value::int(digest));
+                }
+            }
+            change(row, &[section], "samples", Value::Array(samples));
+        }
+        put(
+            &mut fixture.expected,
+            "expected",
+            object(&[
+                ("packets", Value::int(2)),
+                ("bytes", Value::int(40)),
+                ("digest", Value::int(7)),
+                ("digest_b", Value::int(4)),
+            ]),
+        )
+        .unwrap();
+        let joined = fixture.join().unwrap();
+        assert_eq!(joined.get("timing"), fixture.timed.get("timing"));
+        assert_eq!(joined.get("memory"), fixture.measured.get("memory"));
+        let mut samples = array(field(&fixture.measured, "memory").unwrap(), "samples")
+            .unwrap()
+            .to_vec();
+        for sample in &mut samples {
+            let Value::Object(entries) = sample else {
+                unreachable!()
+            };
+            for (_, observed) in entries {
+                let mut work = field(observed, "work").unwrap().clone();
+                let Value::Object(fields) = &mut work else {
+                    unreachable!()
+                };
+                fields.retain(|(k, _)| k != "digest_b");
+                put(observed, "work", work).unwrap();
+            }
+        }
+        change(
+            &mut fixture.measured,
+            &["memory"],
+            "samples",
+            Value::Array(samples),
+        );
+        assert!(fixture.join().unwrap_err().contains("digest_b"));
     }
 
     #[test]
