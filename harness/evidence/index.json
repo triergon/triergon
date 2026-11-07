@@ -8224,6 +8224,68 @@
      "sha256": "67f7a6873695f6ae222315ce192e9b8acca34f54aab884dfb17f01c67fc28615"
     }
    ]
+  },
+  {
+   "name": "hls-borrowed-span-comparison",
+   "path": "hls-borrowed-span-comparison",
+   "retention": "retained",
+   "reason": "HLS borrowed-span measurements",
+   "key": "evidence/hls-borrowed-span-comparison/f817ca9f76e0812cf9e8235d4848a95906270a606b3930272da4e44ee1541324.tar.gz",
+   "sha256": "f817ca9f76e0812cf9e8235d4848a95906270a606b3930272da4e44ee1541324",
+   "files": [
+    {
+     "path": "hls-borrowed-span-comparison/FINAL-STATE.txt",
+     "sha256": "f247a76b2893208aae7751dbf51f4c495efacfb6d9e743802870300f31ac45c8"
+    },
+    {
+     "path": "hls-borrowed-span-comparison/GUEST-PREFLIGHT.log",
+     "sha256": "0d7270d48f0b9368c344f72cdb6304fdf98f533c6e1950ba41f1567c6df52069"
+    },
+    {
+     "path": "hls-borrowed-span-comparison/HLS-SPANS-ORACLE.log",
+     "sha256": "5c5eaa60d0366f26dc50354961e84a58f3fc699655fcb7a1d53d0fa305a73d8c"
+    },
+    {
+     "path": "hls-borrowed-span-comparison/HLS-SPANS-WORKSPACE-CHECK.log",
+     "sha256": "5195fd2cc11a39348da2cdbe279cac799211ec777dace297db3e4fbe985f771c"
+    },
+    {
+     "path": "hls-borrowed-span-comparison/HLS-SPANS-WORKSPACE-CLIPPY.log",
+     "sha256": "9356ab3faf814c2b53aa8190a4ac1183ba2d9175149c11d31263ef9d2cf45189"
+    },
+    {
+     "path": "hls-borrowed-span-comparison/HLS-SPANS-WORKSPACE-DOC.log",
+     "sha256": "3f429f13575bb11d77adc686114dd35592cb2c6cb56a55f8a8d8de95f49e063a"
+    },
+    {
+     "path": "hls-borrowed-span-comparison/HLS-SPANS-WORKSPACE-TEST.log",
+     "sha256": "3f05f9f11e67bf62cf23d047bfc0ab56c78c8286174b4dca67c9f8d09e879953"
+    },
+    {
+     "path": "hls-borrowed-span-comparison/NATIVE-EXIT.txt",
+     "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+    },
+    {
+     "path": "hls-borrowed-span-comparison/NATIVE-RESULTS.sha256",
+     "sha256": "d5284e5dd0a86b771ad9aef35243b86cc667957ec82beb711f4a6726ac87b1fa"
+    },
+    {
+     "path": "hls-borrowed-span-comparison/NATIVE-RESULTS.tar.gz",
+     "sha256": "612997b671faaff89cde5a3b655d09f1aa4ea387744815e147c368f516f8c333"
+    },
+    {
+     "path": "hls-borrowed-span-comparison/NATIVE.log",
+     "sha256": "e327a6864d05d589b5d3fc982699af156efd0e9452ff68693572119103030d0c"
+    },
+    {
+     "path": "hls-borrowed-span-comparison/ORACLE.tar.gz",
+     "sha256": "ac8808901112c343fdac10f43aabda58c43c5f46a146d45784ad053623a5026d"
+    },
+    {
+     "path": "hls-borrowed-span-comparison/SOURCE.bundle",
+     "sha256": "5590fdd699fa171643fc249b7ecae468a743613b122a8193204f699c7c13cd27"
+    }
+   ]
   }
  ]
 }
