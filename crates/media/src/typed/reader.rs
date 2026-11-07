@@ -42,23 +42,7 @@ use projection::{
     LegacyEvent, LegacyProjection, PacketProjection, ScanEvent, ScanProjection, TypedProjection,
 };
 
-const SEGMENT: u64 = 0x18538067;
-const CLUSTER: u64 = 0x1f43b675;
-const INFO: u64 = 0x1549a966;
-const TRACKS: u64 = 0x1654ae6b;
-const CUES: u64 = 0x1c53bb6b;
-const SEEK_HEAD: u64 = 0x114d9b74;
-fn metadata(id: u64) -> bool {
-    matches!(
-        id,
-        INFO | TRACKS
-            | CUES
-            | SEEK_HEAD
-            | crate::metadata::ATTACHMENTS
-            | crate::metadata::CHAPTERS
-            | crate::metadata::TAGS
-    )
-}
+use crate::metadata::{CLUSTER, CUES, INFO, SEEK_HEAD, SEGMENT, TRACKS, is_level_one};
 fn document(id: u64) -> bool {
     matches!(
         id,
@@ -1018,7 +1002,7 @@ impl Reader {
                         // Non-metadata leaves have no lookup or reservation:
                         // the Admit unit and decision apply here directly, and
                         // only an unpaid unit leaves the Admission state behind.
-                        EnvelopeProgress::Header(header) if !metadata(header.id) => {
+                        EnvelopeProgress::Header(header) if !is_level_one(header.id) => {
                             if !work.try_charge(1) {
                                 self.state = State::Admission(Admission {
                                     header,
@@ -1104,7 +1088,7 @@ impl Reader {
                 }
                 State::Admission(admission) => match admission.phase {
                     AdmitPhase::Lookup => {
-                        if !metadata(admission.header.id) {
+                        if !is_level_one(admission.header.id) {
                             admission.phase = AdmitPhase::Admit;
                             continue;
                         }
