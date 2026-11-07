@@ -126,6 +126,7 @@ version = "0.0.0"
 name = "triergon-framing"
 version = "0.0.0"
 dependencies = [
+ "triergon-bitstream",
  "triergon-core",
  "triergon-harness-protocol",
 ]

@@ -1,6 +1,7 @@
 //! Independent AC-3 / E-AC-3 prefix facts from ATSC A/52:2018. Complete frame
 //! envelopes are not CRC, BSI-tail, audio-block or decoder conformance proofs.
 use std::sync::atomic::{AtomicBool, Ordering};
+use triergon_bitstream::bits_at;
 use triergon_core::{
     Budget, BudgetVec, Bytes, Error, InputCursor, InputRequest, InputToken, InputWindow, Result,
     SourceCapabilities, SourceFailure, SourceId, SourceLocation, Step, Time, WorkBudget,
@@ -274,20 +275,7 @@ impl PrefixBits<'_> {
         if end > self.limit {
             return Err(Error::Invalid("audio BSI probe overlaps final CRC word"));
         }
-        if end > self.bytes.len().checked_mul(8).ok_or(Error::Overflow)? {
-            return Err(Error::Truncated);
-        }
-        if count == 0 {
-            return Ok(0);
-        }
-        let word = match &self.bytes[self.position / 8..end.div_ceil(8)] {
-            [a] => u32::from(*a),
-            [a, b] => u32::from(u16::from_be_bytes([*a, *b])),
-            [a, b, c] => u32::from_be_bytes([0, *a, *b, *c]),
-            _ => return Err(Error::Invalid("audio probe bit width")),
-        };
-        let shift = (8 - end % 8) % 8;
-        let value = (word >> shift) & ((1 << count) - 1);
+        let value = bits_at(self.bytes, self.position, count as u32).ok_or(Error::Truncated)?;
         self.position = end;
         Ok(value as u16)
     }

@@ -2,6 +2,7 @@
 //! addition. Quantized values retain their wire units and source ownership.
 use crate::{Error, Result, incremental::ParseStep};
 use std::sync::atomic::AtomicBool;
+use triergon_bitstream::{BitCursor, BitSource};
 use triergon_core::WorkBudget;
 
 pub(crate) const T35_HEADER: [u8; 6] = [0xb5, 0, 0x3c, 0, 1, 4];
@@ -9,30 +10,17 @@ pub(crate) const T35_HEADER: [u8; 6] = [0xb5, 0, 0x3c, 0, 1, 4];
 // optional field, excluding the registered six-byte terminal code.
 pub(crate) const MAX_BODY: usize = 907;
 
-struct Bits<'a> {
-    bytes: &'a [u8],
-    at: usize,
-}
+struct Bits<'a>(BitCursor<'a>);
 
 impl Bits<'_> {
     fn advance(&mut self, count: usize) -> Result<usize> {
-        let start = self.at;
-        let end = start + count;
-        if end > self.bytes.len() * 8 {
-            return Err(Error::Truncated);
-        }
-        self.at = end;
+        let start = self.0.position();
+        self.0.skip(count).map_err(|_| Error::Truncated)?;
         Ok(start)
     }
 
-    fn read(&mut self, width: usize) -> Result<u32> {
-        let at = self.advance(width)?;
-        let start = at / 8;
-        let end = self.at.div_ceil(8);
-        let raw = self.bytes[start..end]
-            .iter()
-            .fold(0_u64, |bits, &byte| (bits << 8) | u64::from(byte));
-        Ok(((raw >> ((8 - self.at % 8) % 8)) & ((1_u64 << width) - 1)) as u32)
+    fn read(&mut self, width: u32) -> Result<u32> {
+        self.0.read(width).map_err(|_| Error::Truncated)
     }
 
     fn flag(&mut self) -> Result<bool> {
@@ -82,7 +70,7 @@ fn peak_grid<'a>(bits: &mut Bits<'a>) -> Result<Option<Hdr10PlusPeakGrid<'a>>> {
     }
     let offset = bits.advance(usize::from(rows) * usize::from(columns) * 4)?;
     Ok(Some(Hdr10PlusPeakGrid {
-        bytes: bits.bytes,
+        bytes: bits.0.data(),
         offset,
         rows,
         columns,
@@ -250,12 +238,10 @@ impl<'a> Hdr10Plus<'a> {
     }
 
     pub(crate) fn decode(raw: &'a [u8], cancel: &AtomicBool) -> Result<Self> {
-        let mut bits = Bits {
-            bytes: raw
-                .strip_prefix(&T35_HEADER)
+        let mut bits = Bits(BitCursor::new(
+            raw.strip_prefix(&T35_HEADER)
                 .ok_or(Error::Invalid("HDR10+ terminal code"))?,
-            at: 0,
-        };
+        ));
         let application_version = bits.read(8)? as u8;
         let window_count = bits.read(2)? as u8;
         if window_count == 0 {
@@ -283,7 +269,7 @@ impl<'a> Hdr10Plus<'a> {
         }
         Ok(Self {
             raw,
-            body_bits: bits.at,
+            body_bits: bits.0.position(),
             application_version,
             target_luminance,
             target_grid,

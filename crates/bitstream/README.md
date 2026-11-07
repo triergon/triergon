@@ -5,6 +5,25 @@ foundation layer, depends only on `std`, and knows nothing about containers, cod
 any crate above it. Errors a parser reports stay in that parser: everything here returns
 plain values, so a caller chooses its own error type and text.
 
+## Checked reads
+
+[`BitCursor`] reads MSB-first bits of a slice and fails at its end. Headers and parameter
+sets use it, or [`bits_at`] where a parser keeps its own position. The [`BitSource`] trait
+adds Exp-Golomb codes over any such source.
+
+```rust
+use triergon_bitstream::{BitCursor, BitError, BitSource};
+
+// 1 | 010 | 011 | 00100 | 00101
+let mut bits = BitCursor::new(&[0b1010_0110, 0b0100_0010, 0b1000_0000]);
+assert_eq!(bits.ue(), Ok(0));
+assert_eq!(bits.read(3), Ok(0b010));
+assert_eq!(bits.ue(), Ok(2));
+assert_eq!(bits.ue(), Ok(3));
+assert_eq!(bits.se(), Ok(-2));
+assert_eq!(bits.read(8), Err(BitError::End));
+```
+
 ## Checksums
 
 [`crc`] holds the three checksums the workspace uses. Each function continues from a

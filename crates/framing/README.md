@@ -4,7 +4,8 @@ Packet framing and codec-configuration parsing for the format layer: H.264/HEVC
 NAL units and records, AV1 OBUs, VP9 records, AAC, AC-3/E-AC-3 and DTS core.
 Containers hand it record bytes and complete samples; it returns source-preserving
 views, decoder-ready Annex-B/ADTS/temporal-unit output and typed refusals. It
-depends only on `triergon-core`, does no I/O and does not decode audio or video.
+depends on `triergon-core` and `triergon-bitstream`, does no I/O and does not decode
+audio or video.
 
 ## Usage
 

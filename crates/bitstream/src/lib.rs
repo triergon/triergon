@@ -10,4 +10,7 @@
     clippy::expect_used
 )]
 
+mod checked;
 pub mod crc;
+
+pub use checked::{BitCursor, BitError, BitSource, bits_at};
