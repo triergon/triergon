@@ -9443,9 +9443,9 @@
   {
    "name": "container-framing-playback-comparison",
    "path": "container-framing-playback-comparison",
-   "retention": "retained",
+   "retention": "90 days",
    "reason": "paired startup, seek and HLS comparisons with all control samples",
-   "key": "evidence/container-framing-playback-comparison/2740fe84cb35b36452e6c2c28ecbd6e131db03bd010c737edf4ef3a93ca476c7.tar.gz",
+   "key": "qualification/repository/container-framing-playback-comparison/2740fe84cb35b36452e6c2c28ecbd6e131db03bd010c737edf4ef3a93ca476c7.tar.gz",
    "sha256": "2740fe84cb35b36452e6c2c28ecbd6e131db03bd010c737edf4ef3a93ca476c7",
    "bytes": 424660130,
    "files": [
@@ -9518,9 +9518,9 @@
   {
    "name": "container-framing-host-checks",
    "path": "container-framing-host-checks",
-   "retention": "retained",
+   "retention": "90 days",
    "reason": "stable compiler workspace tests and lint checks for combined container and framing changes",
-   "key": "evidence/rebased-parser-host-checks/d4d0ed5dd8c225c14c764882e6884cbba220ee74c17115c1cf04f87449000bf9.tar.gz",
+   "key": "qualification/repository/container-framing-host-checks/d4d0ed5dd8c225c14c764882e6884cbba220ee74c17115c1cf04f87449000bf9.tar.gz",
    "sha256": "d4d0ed5dd8c225c14c764882e6884cbba220ee74c17115c1cf04f87449000bf9",
    "bytes": 13160447,
    "files": [
@@ -9565,9 +9565,9 @@
   {
    "name": "tooling-worktree-checks",
    "path": "tooling-worktree-checks",
-   "retention": "retained",
+   "retention": "90 days",
    "reason": "Tooling source bundle and preserved host checks",
-   "key": "evidence/tooling-worktree-checks/0923544b7a20e0ad5de7753d39ede56de688db20865b281a3c4d05d3915fa202.tar.gz",
+   "key": "qualification/repository/tooling-worktree-checks/0923544b7a20e0ad5de7753d39ede56de688db20865b281a3c4d05d3915fa202.tar.gz",
    "sha256": "0923544b7a20e0ad5de7753d39ede56de688db20865b281a3c4d05d3915fa202",
    "bytes": 37013787,
    "files": [
@@ -9585,9 +9585,9 @@
   {
    "name": "container-framing-runner-host-checks",
    "path": "container-framing-runner-host-checks",
-   "retention": "retained",
+   "retention": "90 days",
    "reason": "ISO BMFF and packet-framing runner host checks, including the initial framing failure",
-   "key": "evidence/container-framing-runner-host-checks/e1a947e44c8af18d1e33fef624cf741099b161e3f5719e7f3e235b5c63fc39c4.tar.gz",
+   "key": "qualification/repository/container-framing-runner-host-checks/e1a947e44c8af18d1e33fef624cf741099b161e3f5719e7f3e235b5c63fc39c4.tar.gz",
    "sha256": "e1a947e44c8af18d1e33fef624cf741099b161e3f5719e7f3e235b5c63fc39c4",
    "bytes": 35160719,
    "files": [
