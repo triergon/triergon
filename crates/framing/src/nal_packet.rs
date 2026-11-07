@@ -736,7 +736,7 @@ impl NalPacketRangeSegment {
     fn range(&self) -> &Range<usize> {
         &self.source_range
     }
-    fn owner<'a>(&self, packet: &'a Bytes, configuration: &'a Bytes) -> &'a Bytes {
+    fn backing_bytes<'a>(&self, packet: &'a Bytes, configuration: &'a Bytes) -> &'a Bytes {
         if (self.nal_and_prefix >> 24) as u8 & Self::CONFIGURATION_SOURCE == 0 {
             packet
         } else {
@@ -906,7 +906,7 @@ impl<M> NalPacketCompactOutput<M> {
     /// owner. No Bytes clone or allocation occurs.
     pub fn segment_bytes(&self, index: usize) -> Option<&[u8]> {
         let part = self.inner.segments.as_slice().get(index)?;
-        part.owner(&self.inner.source.bytes, self.inner.configuration_bytes())
+        part.backing_bytes(&self.inner.source.bytes, self.inner.configuration_bytes())
             .as_ref()
             .get(part.range().clone())
     }
@@ -921,7 +921,7 @@ impl<M> NalPacketCompactOutput<M> {
             .ok_or(Error::Invalid("packet segment index"))?;
         Ok(NalPacketSegment {
             bytes: part
-                .owner(&self.inner.source.bytes, self.inner.configuration_bytes())
+                .backing_bytes(&self.inner.source.bytes, self.inner.configuration_bytes())
                 .slice(part.range().clone())?,
             origin: part.origin(),
             prefix_bytes: part.prefix_bytes(),
@@ -1022,7 +1022,7 @@ impl PacketSegment for NalPacketRangeSegment {
         NalPacketRangeSegment::prefix_bytes(self)
     }
     fn payload<'a>(&'a self, packet: &'a Bytes, configuration: &'a Bytes) -> Result<&'a [u8]> {
-        self.owner(packet, configuration)
+        self.backing_bytes(packet, configuration)
             .as_ref()
             .get(self.range().clone())
             .ok_or(Error::Invalid("packet segment range"))
