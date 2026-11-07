@@ -4,7 +4,7 @@
 //! The engine keeps ivlOffset scaled by 2^bits together with `bits` look-ahead bits in a
 //! 64-bit window so that renormalization is a shift and refills happen once per several bytes.
 
-use crate::tables::{RANGE_TAB_LPS, TRANS_IDX_LPS, TRANS_IDX_MPS};
+use triergon_bitstream::cabac::{RANGE_TAB_LPS, TRANS_IDX_LPS, TRANS_IDX_MPS, init_state};
 
 /// Context offsets (one context variable per entry).
 pub mod ctx {
@@ -188,16 +188,10 @@ fn init_values(init_type: usize) -> [u8; ctx::NUM] {
 /// (pStateIdx << 1) | valMps.
 pub fn init_contexts(states: &mut [u8; ctx::NUM], slice_qp: i32, init_type: usize) {
     let iv = init_values(init_type);
-    let qp = slice_qp.clamp(0, 51);
     for (s, &init) in states.iter_mut().zip(iv.iter()) {
         let slope = (init >> 4) as i32;
         let offset = (init & 15) as i32;
-        let m = slope * 5 - 45;
-        let n = (offset << 3) - 16;
-        let pre = (((m * qp) >> 4) + n).clamp(1, 126);
-        let mps = if pre <= 63 { 0 } else { 1 };
-        let p = if mps == 1 { pre - 64 } else { 63 - pre };
-        *s = ((p as u8) << 1) | mps as u8;
+        *s = init_state(slope * 5 - 45, (offset << 3) - 16, slice_qp);
     }
 }
 

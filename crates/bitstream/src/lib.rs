@@ -10,6 +10,7 @@
     clippy::expect_used
 )]
 
+pub mod cabac;
 mod checked;
 pub mod crc;
 mod rbsp;

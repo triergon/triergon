@@ -5,7 +5,7 @@
 //! plus an occasional 32-bit refill off the critical path.
 
 use crate::tables_cabac_init::CABAC_INIT_MN;
-use crate::tables_vlc::{RANGE_TAB_LPS, TRANS_IDX_LPS, TRANS_IDX_MPS};
+use triergon_bitstream::cabac::{RANGE_TAB_LPS, TRANS_IDX_LPS, TRANS_IDX_MPS, init_state};
 
 pub(crate) const NUM_CTX: usize = 1024;
 
@@ -183,15 +183,9 @@ impl<'a> Cabac<'a> {
     }
 
     fn init_contexts(&mut self, slice_qp: i32, init_idx: usize) {
-        let qp = slice_qp.clamp(0, 51);
         for i in 0..NUM_CTX {
             let (m, n) = CABAC_INIT_MN[i][init_idx];
-            let pre = (((m as i32 * qp) >> 4) + n as i32).clamp(1, 126);
-            self.ctx[i] = if pre <= 63 {
-                ((63 - pre) << 1) as u8
-            } else {
-                (((pre - 64) << 1) | 1) as u8
-            };
+            self.ctx[i] = init_state(m as i32, n as i32, slice_qp);
         }
         // ctxIdx 276 is handled by decode_terminate.
     }
