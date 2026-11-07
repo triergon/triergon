@@ -12,10 +12,6 @@ use super::{
 use std::sync::atomic::{AtomicBool, Ordering};
 use triergon_core::{Budget, BudgetVec, Bytes, Error, Reservation, Result, WorkBudget};
 
-/// Comparison label of the recovery decoder's output.
-#[cfg(feature = "reference-trace")]
-pub const RECOVERY_PROFILE: &str = "native-pgs-bounded-packet-recovery-v1";
-
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum EofBehavior {
     NoDelayedSubtitle,

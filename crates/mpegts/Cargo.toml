@@ -19,14 +19,6 @@ triergon-harness-protocol = { path = "../harness-protocol" }
 # shipped behaviour.
 reference-trace = []
 
-[[example]]
-name = "mpegts_native_pes_trace"
-required-features = ["reference-trace"]
-
-[[example]]
-name = "mpegts_source_trace"
-required-features = ["reference-trace"]
-
 [[test]]
 name = "rejected_carrier"
 required-features = ["reference-trace"]

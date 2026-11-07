@@ -5,7 +5,6 @@
 //! the parser view. These are two operations, with both costs exposed, rather than
 //! a replacement of the original Strict/native comparison or automatic DTS probing.
 //! The reference revision is recorded once, on [`crate::reference_trace::dts`].
-use crate::dts14_parser_view::ParserHints;
 use crate::{
     Dts14CarrierLimits, Dts14CarrierPacket, Dts14CarrierReader, Dts14CarrierSyntax, Dts14SyncFrame,
     Dts14SyncLimits, Dts14SyncReader, DtsCoreHeader, DtsSourceIdentity, DtsWordOrder,
@@ -155,7 +154,6 @@ pub struct ParserPacket {
     packet: Dts14CarrierPacket,
     context: ParserOperationContext,
     range: Range<u64>,
-    hints: Result<ParserHints>,
     clock: Result<ParserClock>,
 }
 impl ParserPacket {
@@ -175,24 +173,15 @@ impl ParserPacket {
             .checked_add(u64::try_from(packet.source_bytes().len()).map_err(|_| Error::Overflow)?)
             .ok_or(Error::Overflow)?;
         let range = packet.identity.offset..end;
-        let hints = if context.fresh_zero_origin {
-            ParserHints::observe(&packet)
-        } else {
-            Err(Error::Unsupported("DTS parser hints after source reset"))
-        };
         Ok(Self {
             packet,
             context,
             range,
-            hints,
             clock,
         })
     }
     pub fn source_bytes(&self) -> &Bytes {
         self.packet.source_bytes()
-    }
-    pub fn canonical_bytes(&self) -> Option<&Bytes> {
-        self.packet.canonical_bytes()
     }
     pub fn physical_range(&self) -> Range<u64> {
         self.range.clone()
@@ -215,13 +204,6 @@ impl ParserPacket {
         } else {
             None
         }
-    }
-    pub fn source_syntax(&self) -> Dts14CarrierSyntax {
-        self.packet.syntax
-    }
-    /// Modelled parser positions, not a fresh native I/O observation or Source end.
-    pub fn parser_hints(&self) -> Result<ParserHints> {
-        self.hints
     }
     /// This modeled public state is never a source coding-window duration.
     pub fn clock(&self) -> Result<ParserClock> {

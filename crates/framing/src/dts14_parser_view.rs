@@ -5,9 +5,6 @@
 //! syntax validation, a generated timestamp, or a generic DTS/FFmpeg promise.
 use crate::{Dts14CarrierBoundary, Dts14CarrierPacket};
 use triergon_core::{Error, Result};
-/// Identifies this parser-position model. The value is stable and does not follow
-/// the item's name.
-pub const PARSER_HINT_PROFILE: &str = "d32b387-default-raw14-parser-positions-v1";
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum ParserHintOrigin {
     FollowingSync,

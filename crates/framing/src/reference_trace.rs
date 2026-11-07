@@ -1,7 +1,7 @@
 //! Comparison-only projections, compiled with the `reference-trace` feature.
 //!
-//! These report values in the form FFmpeg's public API exposes them, so the
-//! harness can compare traces byte for byte. They are not behaviour a consumer
+//! These report values in the form FFmpeg's public API exposes them, so tests
+//! can compare them with recorded reference output. They are not behaviour a consumer
 //! selects outside a comparison, and they are absent from default builds. With the
 //! feature enabled,
 //! [`NalPacketRejection::native_receive_result`](crate::NalPacketRejection::native_receive_result),
@@ -32,5 +32,5 @@ pub mod dts {
         ParserOperationContext, ParserOperationEvent, ParserOperationLane, ParserOperationLimits,
         ParserOperationStep, ParserOperationTerminal, ParserPacket,
     };
-    pub use crate::dts14_parser_view::{PARSER_HINT_PROFILE, ParserHintOrigin, ParserHints};
+    pub use crate::dts14_parser_view::{ParserHintOrigin, ParserHints};
 }

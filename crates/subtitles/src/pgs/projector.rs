@@ -10,8 +10,6 @@ use super::{
 use std::sync::atomic::{AtomicBool, Ordering};
 use triergon_core::{Budget, BudgetVec, Bytes, Error, Result, WorkBudget};
 
-pub const PROJECTION_PROFILE: &str = "native-pgs-public-api-projection-v1";
-
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum RasterOrigin {
     SourceRaster,
@@ -32,7 +30,6 @@ pub struct ProjectedRect {
     pub(crate) pixels: Bytes,
     pub(crate) argb: Bytes,
     pub(crate) palette: PaletteSnapshot,
-    pub(crate) suppressed: bool,
 }
 impl ProjectedRect {
     pub fn pixels(&self) -> &Bytes {
@@ -40,13 +37,6 @@ impl ProjectedRect {
     }
     pub fn argb_pixels(&self) -> &Bytes {
         &self.argb
-    }
-    pub fn receiver_argb(&self, index: u8) -> u32 {
-        if self.suppressed {
-            0
-        } else {
-            self.palette.receiver_argb(index)
-        }
     }
     pub fn palette(&self) -> &PaletteSnapshot {
         &self.palette

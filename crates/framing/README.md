@@ -176,9 +176,6 @@ Verification:
   hvcC and AAC configuration handling).
 - `fixtures/raw-annex-b/*.packets` hold the packet extents and key flags FFmpeg's
   raw H.264/HEVC demuxers produce for the paired streams.
-- The `examples/` trace programs (`nal_packet_receiver_trace`,
-  `dts-operation-trace`, `dts-source-observer`) emit JSON records for inspection;
-  no harness runner reads them. The first two need `--features reference-trace`.
 
 Per-module parity, runtime and memory results are in
 [docs/status.md](../../docs/status.md); the gates and harness are described in
