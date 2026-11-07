@@ -258,7 +258,7 @@ struct PesRoute {
     assembler: Option<PesAssembler>,
     reuse: Option<usize>,
 }
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum Route {
     Pat,
     Pmt,
@@ -540,6 +540,20 @@ impl TransportStream {
         } else {
             Route::Ignore
         }
+    }
+    fn find_feed_route(&self, pid: u16) -> Route {
+        // Elementary PIDs are unique. PAT/PMT changes clear or replace the
+        // table before another carrier is read; recheck the indexed PID.
+        if let Route::Pes(index) = self.route
+            && self
+                .routes
+                .as_slice()
+                .get(index)
+                .is_some_and(|route| route.pid == pid)
+        {
+            return self.route;
+        }
+        self.find_route(pid)
     }
     fn discard_route(&mut self, route: Route) {
         match route {
@@ -1131,7 +1145,7 @@ impl TransportStream {
         {
             return Ok(false);
         }
-        let Route::Pes(index) = self.find_route(pid) else {
+        let Route::Pes(index) = self.find_feed_route(pid) else {
             return Ok(false);
         };
         let epochs = self.source_epochs();
@@ -1753,7 +1767,11 @@ impl TransportStream {
                 {
                     Ok(Step::Ready(mut carrier)) => {
                         self.entity_end = None;
-                        self.route = self.find_route(carrier.pid());
+                        self.route = if DIRECT {
+                            self.find_feed_route(carrier.pid())
+                        } else {
+                            self.find_route(carrier.pid())
+                        };
                         if self.validate_feed_continuation(&carrier, work)? {
                             match consume(
                                 FeedItem::Carrier(FeedCarrier(&mut carrier)),
@@ -1839,3 +1857,74 @@ impl TransportStream {
 
 #[cfg(test)]
 mod tests;
+
+#[cfg(test)]
+mod dispatch_tests {
+    use super::*;
+
+    fn stream() -> TransportStream {
+        let pool = Budget::new(64 * 1024).unwrap();
+        let limits = ParseLimits::default();
+        let mut stream = TransportStream::new_single_program_progressive_feed(
+            pool.clone(),
+            limits,
+            DescriptorNamespace::Unspecified,
+        )
+        .unwrap();
+        stream.pmt = Some(PsiRoute::new(100, &pool, limits).unwrap());
+        stream.pcr_pid = Some(300);
+        for pid in [256, 257] {
+            stream
+                .routes
+                .try_push(PesRoute {
+                    pid,
+                    stream_type: 0x1b,
+                    descriptors: Bytes::copy_from_slice(&pool, &[]).unwrap(),
+                    epochs: stream.source_epochs(),
+                    continuity: Some(Continuity::new(pid).unwrap()),
+                    assembler: None,
+                    reuse: None,
+                })
+                .unwrap();
+        }
+        stream
+    }
+
+    #[test]
+    fn selected_feed_route_preserves_control_and_interleaved_pid_dispatch() {
+        fn assert_send_sync<T: Send + Sync>() {}
+        assert_send_sync::<TransportStream>();
+        let mut stream = stream();
+        let expected = [
+            (0, Route::Pat),
+            (100, Route::Pmt),
+            (256, Route::Pes(0)),
+            (257, Route::Pes(1)),
+            (300, Route::Clock),
+            (0x1fff, Route::Ignore),
+        ];
+        for previous in [Route::Ignore, Route::Pmt, Route::Pes(0), Route::Pes(1)] {
+            stream.route = previous;
+            for (pid, expected) in expected {
+                let actual = stream.find_feed_route(pid);
+                assert_eq!(actual, expected);
+                stream.route = actual;
+                assert_eq!(stream.find_feed_route(pid), expected);
+            }
+        }
+    }
+
+    #[test]
+    fn selected_feed_route_rechecks_replaced_and_cleared_tables() {
+        let mut stream = stream();
+        stream.route = Route::Pes(1);
+        stream.routes.as_mut_slice().swap(0, 1);
+        assert_eq!(stream.find_feed_route(257), Route::Pes(0));
+        assert_eq!(stream.find_feed_route(256), Route::Pes(1));
+        stream.route = Route::Pes(1);
+        stream.routes.clear();
+        assert_eq!(stream.find_feed_route(256), Route::Ignore);
+        assert_eq!(stream.find_feed_route(100), Route::Pmt);
+        assert_eq!(stream.find_feed_route(300), Route::Clock);
+    }
+}
