@@ -440,6 +440,49 @@ pub fn benchmark(
     ]))
 }
 
+/// Private copies of the two workers, each written in one sequential pass and at
+/// paths of equal length.
+///
+/// A freshly linked binary and a sequentially written copy of it sit differently in
+/// the page cache, and identical bytes then time about 0.7% apart, so neither worker
+/// runs from the file its build left behind.
+struct TimedWorkers {
+    directory: PathBuf,
+    candidate: PathBuf,
+    reference: PathBuf,
+}
+
+impl TimedWorkers {
+    fn new(candidate: &Path, reference: &Path) -> Result<Self, String> {
+        let directory = candidate.with_file_name(format!(".timed-{}", std::process::id()));
+        let copy = |slot: &str, worker: &Path| -> Result<PathBuf, String> {
+            let target = directory.join(slot);
+            fs::create_dir_all(&target).map_err(|e| format!("{}: {e}", target.display()))?;
+            let target = target.join("worker");
+            let bytes = fs::read(worker).map_err(|e| format!("{}: {e}", worker.display()))?;
+            fs::write(&target, bytes).map_err(|e| format!("{}: {e}", target.display()))?;
+            let permissions = fs::metadata(worker)
+                .map_err(|e| format!("{}: {e}", worker.display()))?
+                .permissions();
+            fs::set_permissions(&target, permissions)
+                .map_err(|e| format!("{}: {e}", target.display()))?;
+            Ok(target)
+        };
+        let (candidate, reference) = (copy("a", candidate)?, copy("b", reference)?);
+        Ok(TimedWorkers {
+            directory,
+            candidate,
+            reference,
+        })
+    }
+}
+
+impl Drop for TimedWorkers {
+    fn drop(&mut self) {
+        let _ = fs::remove_dir_all(&self.directory);
+    }
+}
+
 fn benchmark_once(
     candidate: &Path,
     reference: &Path,
@@ -452,9 +495,10 @@ fn benchmark_once(
     if pairs < 2 || iterations < 1 {
         return Err("need at least two pairs and one iteration".into());
     }
+    let timed = TimedWorkers::new(candidate, reference)?;
     let workers: [(&str, PathBuf); 2] = [
-        ("candidate", candidate.to_path_buf()),
-        ("reference", reference.to_path_buf()),
+        ("candidate", timed.candidate.clone()),
+        ("reference", timed.reference.clone()),
     ];
     let mut rng = PyRandom::new(seed);
     let mut samples: Vec<Value> = Vec::new();
@@ -608,10 +652,11 @@ fn benchmark_once(
         };
         values.push((elapsed(a), elapsed(b)));
     }
-    let unchanged = workers
-        .iter()
-        .zip(&hashes)
-        .all(|((_, w), (_, h))| digest(w).is_ok_and(|d| &d == h))
+    let unchanged = [candidate, reference]
+        .into_iter()
+        .chain(workers.iter().map(|(_, w)| w.as_path()))
+        .zip(hashes.iter().chain(&hashes))
+        .all(|(w, (_, h))| digest(w).is_ok_and(|d| &d == h))
         && digest(input)? == input_sha;
     if !unchanged {
         return Ok(status_only(
@@ -668,6 +713,26 @@ fn benchmark_once(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn timed_workers_are_equal_length_copies_removed_afterwards() {
+        let dir = crate::walk::scratch("timed-workers");
+        fs::create_dir_all(dir.join("other")).unwrap();
+        fs::write(dir.join("media-worker"), b"candidate").unwrap();
+        fs::write(dir.join("other/ffmpeg-worker"), b"reference").unwrap();
+        let timed =
+            TimedWorkers::new(&dir.join("media-worker"), &dir.join("other/ffmpeg-worker")).unwrap();
+        assert_eq!(fs::read(&timed.candidate).unwrap(), b"candidate");
+        assert_eq!(fs::read(&timed.reference).unwrap(), b"reference");
+        assert_eq!(
+            timed.candidate.as_os_str().len(),
+            timed.reference.as_os_str().len()
+        );
+        let directory = timed.directory.clone();
+        drop(timed);
+        assert!(!directory.exists());
+        fs::remove_dir_all(dir).unwrap();
+    }
 
     #[test]
     fn linux_process_names_follow_the_tracked_set() {

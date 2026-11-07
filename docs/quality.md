@@ -126,6 +126,10 @@ be established. Use built workers you trust.
   --benchmark --baseline-worker W` from the changed tree, with `W` the same worker from
   the base tree. Correctness is still compared with the reference; the pairs and ratios
   are against `W`. Such a report is never an acceptance run.
+- Time copies, not build outputs. A freshly linked binary and a sequentially written
+  copy of it sit differently in the page cache, and identical bytes then time about
+  0.7% apart. The runner writes both workers afresh, at paths of equal length, before
+  each timing session.
 - Qualification runs on native AArch64 Linux. Results on one platform do not establish
   another; 32-bit ARMv7 needs its own runs.
 
