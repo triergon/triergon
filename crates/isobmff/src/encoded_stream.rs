@@ -1537,6 +1537,35 @@ fn metadata(
     ))
 }
 
+/// The object type and decoder-specific bytes an `mp4a` description states.
+#[derive(Debug)]
+pub(crate) struct ObjectTypeScan(EsdsDescriptionWalk);
+
+impl ObjectTypeScan {
+    pub(crate) fn new(entry: &SampleDescription, limits: ConfigurationLimits) -> Result<Self> {
+        EsdsDescriptionWalk::with_profile(entry, limits, EsdsProfile::ObjectType).map(Self)
+    }
+
+    /// `None` until the walk completes; yields by returning `None` with `work` spent.
+    pub(crate) fn poll(&mut self, work: &mut WorkBudget) -> Result<Option<(u8, Option<Bytes>)>> {
+        if !self.0.scan_configuration(work)? {
+            return Ok(None);
+        }
+        let (_, walk) = self
+            .0
+            .esds
+            .as_ref()
+            .ok_or(Error::Invalid("missing elementary stream descriptor"))?;
+        let object_type = walk
+            .object_type
+            .ok_or(Error::Invalid("missing decoder configuration"))?;
+        Ok(Some((
+            object_type,
+            walk.dsi.as_ref().map(|(_, bytes)| bytes.clone()),
+        )))
+    }
+}
+
 #[cfg(test)]
 mod aac_entry_tests {
     use super::*;
