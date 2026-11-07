@@ -159,6 +159,49 @@ fn split_delimiter_keeps_first_byte_clock_and_cached_parameter_sets() {
 }
 
 #[test]
+fn prefix_anchor_ring_keeps_full_clocks_across_pes_and_wraps() {
+    for origin in 0..3 {
+        for length in 2..=9 {
+            for missing in 0..=length {
+                let (_pool, mut reader) = fixture();
+                reader.next_zero_anchor = origin;
+                let anchors: Vec<_> = (0..length)
+                    .map(|index| {
+                        let pts = -10 - index as i64;
+                        let dts = if index % 2 == 0 { pts - 7 } else { pts };
+                        (index != missing).then_some(Anchor {
+                            serial: index as u64 + 1,
+                            clock: AvcTsClock {
+                                source_pts_raw33: Some(pts.rem_euclid(1 << 33) as u64),
+                                source_dts_raw33: (index % 2 == 0)
+                                    .then_some(dts.rem_euclid(1 << 33) as u64),
+                                pts90: Some(pts),
+                                dts90: Some(dts),
+                            },
+                        })
+                    })
+                    .collect();
+                for anchor in &anchors {
+                    reader.pes = *anchor;
+                    reader.bytes.try_push(0).unwrap();
+                    reader.accept(0).unwrap();
+                }
+                reader.bytes.try_push(1).unwrap();
+                reader.accept(1).unwrap();
+                let prefix = reader.prefix.unwrap();
+                let start = length - length.min(3);
+                assert_eq!(prefix.start, start);
+                assert_eq!(
+                    prefix.anchor.map(|anchor| (anchor.serial, anchor.clock)),
+                    anchors[start].map(|anchor| (anchor.serial, anchor.clock)),
+                    "origin {origin}, zeroes {length}, missing {missing}"
+                );
+            }
+        }
+    }
+}
+
+#[test]
 fn eof_publication_retries_after_pressure_and_a_partial_next_nal_fails() {
     let (pool, mut reader) = fixture();
     let data = [DELIMITER, PREFIX, SPS, PREFIX, PPS, IDR].concat();
