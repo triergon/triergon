@@ -318,6 +318,10 @@ impl<T> BudgetVec<T> {
     pub fn clear(&mut self) {
         self.data.clear();
     }
+    /// Shortens the vector; its allocation and charge are kept.
+    pub fn truncate(&mut self, len: usize) {
+        self.data.truncate(len);
+    }
     pub fn pop(&mut self) -> Option<T> {
         self.data.pop()
     }
@@ -410,11 +414,27 @@ impl<T> BudgetVec<T> {
     /// Shrinking retains the allocation and its existing charge.
     pub fn try_resize(&mut self, new_len: usize, value: T) -> Result<()>
     where
-        T: Copy,
+        T: Clone,
     {
         self.grow_to(new_len)?;
         self.data.resize(new_len, value);
         Ok(())
+    }
+}
+
+impl<T> std::ops::Deref for BudgetVec<T> {
+    type Target = [T];
+
+    #[inline]
+    fn deref(&self) -> &[T] {
+        &self.data
+    }
+}
+
+impl<T> std::ops::DerefMut for BudgetVec<T> {
+    #[inline]
+    fn deref_mut(&mut self) -> &mut [T] {
+        &mut self.data
     }
 }
 

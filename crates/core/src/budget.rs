@@ -156,7 +156,21 @@ impl Reservation {
     pub fn bytes(&self) -> usize {
         self.bytes
     }
-    pub(crate) fn empty(budget: &Budget) -> Self {
+    /// Charges exactly `bytes`, for an owner that keeps its storage in plain
+    /// containers. Growth claims the difference with the pool's limit and
+    /// pressure checks and leaves the charge unchanged on failure; shrinking
+    /// returns the difference to the pool.
+    pub fn resize_to(&mut self, bytes: usize) -> Result<()> {
+        if bytes < self.bytes {
+            self.shrink_by(self.bytes - bytes);
+            Ok(())
+        } else {
+            self.grow_to(bytes)
+        }
+    }
+    /// A zero-byte charge on `budget`, for an owner that sizes it later with
+    /// [`resize_to`](Self::resize_to).
+    pub fn empty(budget: &Budget) -> Self {
         Self {
             budget: budget.clone(),
             bytes: 0,

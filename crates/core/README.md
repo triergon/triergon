@@ -80,10 +80,11 @@ the scaled magnitude fits, with the selected rounding policy.
 **Budget and storage.** `Budget::new(limit)` creates one accounting pool; clones
 share it. Its limit includes its own fixed control block
 (`Budget::control_storage_bytes()`). Every owned allocation holds a linear
-`Reservation` until it drops. `Bytes` is an immutable shared span: slicing and
+`Reservation` until it drops; an owner that keeps its storage in plain containers
+resizes its reservation (`resize_to`) before it allocates. `Bytes` is an immutable shared span: slicing and
 cloning share one backing allocation, and every alias keeps the whole backing
 capacity charged (`retained_capacity`). `BudgetVec<T>` is the charged mutable
-builder; growth charges old and new buffers together, and a rejected push,
+vector and reads and writes as a slice; growth charges old and new buffers together, and a rejected push,
 reserve or `freeze` returns the original value or builder unchanged.
 `OwnedInputBytes` adopts a caller `Vec<u8>` as immutable input; produced
 packets or views cannot be converted back into it. `used()` and `peak()` report
