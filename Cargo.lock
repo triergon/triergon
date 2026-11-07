@@ -83,6 +83,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "subtitle-worker"
+version = "0.0.0"
+dependencies = [
+ "triergon",
+ "triergon-core",
+ "triergon-harness-protocol",
+ "triergon-mpegts",
+ "triergon-subtitles",
+]
+
+[[package]]
 name = "triergon"
 version = "0.0.0"
 dependencies = [

@@ -17,5 +17,7 @@ pub mod text;
 
 pub mod context;
 
+pub mod cc;
 pub mod dvd;
 pub mod pgs;
+pub mod teletext;

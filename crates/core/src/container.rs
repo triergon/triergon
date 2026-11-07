@@ -68,6 +68,10 @@ pub enum CodecId<'a> {
     Tx3g,
     VobSub,
     DvbSubtitle,
+    /// EN 300 472 teletext, including its subtitle pages.
+    DvbTeletext,
+    /// CEA-608 byte pairs as their own track (QuickTime `c608`).
+    Eia608,
     Pgs,
     /// Not named above; the same bytes as [`TrackInfo::codec_tag`].
     Other(&'a [u8]),
