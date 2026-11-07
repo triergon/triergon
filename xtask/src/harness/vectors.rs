@@ -207,6 +207,7 @@ pub fn external_vector(root: &Path, options: &ExternalOptions) -> R<i32> {
         ("case", case),
         ("acceptance", verdict.clone()),
         ("target", Value::str(target)),
+        ("cpus", gate_build::cpus()),
         (
             "input_path",
             Value::str(

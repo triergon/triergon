@@ -437,6 +437,7 @@ pub fn run(root: &Path, a: &Options) -> Result<(), String> {
         ("source_digest", Value::str(digest)),
         ("source_manifest", Value::Object(manifest)),
         ("build_refusals", Value::strings(refusals.clone())),
+        ("cpus", gate_build::cpus()),
         ("candidate_sha256", sha(&a.candidate)?),
         ("reference_sha256", sha(&a.reference)?),
         (

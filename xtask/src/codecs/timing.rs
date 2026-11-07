@@ -263,6 +263,7 @@ pub fn run(options: &Options) -> Result<(), String> {
                 "build_refusals".to_owned(),
                 Value::strings(refusals.clone()),
             ),
+            ("cpus".to_owned(), gate_build::cpus()),
         ];
         let mut ratio = None;
         let (mut delivery, mut digest_equal) = (None, None);

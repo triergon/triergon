@@ -123,9 +123,9 @@ be established. Use built workers you trust.
   any of these, or doesn't say. `--comparison-build` builds workers for paired
   comparisons and quick checks only. Those name their build and produce no gate
   result. The opt-in `simd` lane keeps its own nightly and is not a gate build.
-- Reports record the CPUs available to the run. Neither instance size nor pinning is
-  required, but a bound measured pinned to one CPU is not comparable with one measured
-  unpinned.
+- `report`, `external-vector`, `codecs time` and `capture qualify` record the CPUs the
+  run may use and those online. Neither instance size nor pinning is required, but a
+  bound measured pinned to one CPU is not comparable with one measured unpinned.
 - Time optimised builds doing equivalent work. For demuxing, the timed operation is
   open, probe, the required reads and packet production for the same selection, with
   process startup and serialisation outside the timing.

@@ -59,7 +59,7 @@ fn compiler_variable(name: &str) -> bool {
             | "CARGO_BUILD_RUSTC_WORKSPACE_WRAPPER"
             | "CARGO_BUILD_RUSTFLAGS"
             | "CARGO_BUILD_TARGET"
-    ) || name.starts_with("CARGO_PROFILE_")
+    ) || name.starts_with("CARGO_PROFILE_RELEASE_")
         || (name.starts_with("CARGO_TARGET_") && name != "CARGO_TARGET_DIR")
 }
 
@@ -111,8 +111,11 @@ fn overriding_keys(configuration: &Value) -> Vec<String> {
             }
         }
     }
-    if let Some(Value::Object(profiles)) = configuration.get("profile") {
-        keys.extend(profiles.iter().map(|(name, _)| format!("profile.{name}")));
+    if configuration
+        .get("profile")
+        .is_some_and(|profiles| profiles.get("release").is_some())
+    {
+        keys.push("profile.release".to_owned());
     }
     keys
 }
@@ -292,22 +295,25 @@ pub fn pair_refusals(root: &Path, candidate: &Path, reference: &Path) -> Vec<Str
     reasons
 }
 
-/// The CPUs this process may run on and those the machine has. A bound measured
-/// pinned to one CPU is not comparable with one measured unpinned.
+/// The CPUs this process may run on and those online on the machine, as Linux lists
+/// them; null elsewhere. A bound measured pinned to one CPU is not comparable with one
+/// measured unpinned.
 pub fn cpus() -> Value {
     let allowed = std::fs::read_to_string("/proc/self/status")
         .ok()
-        .and_then(|status| {
-            status
-                .lines()
-                .find_map(|l| l.strip_prefix("Cpus_allowed_list:"))
-                .map(|list| list.trim().to_owned())
-        });
-    let online = std::thread::available_parallelism().map_or(0, std::num::NonZero::get);
-    Value::object([
-        ("allowed", allowed.map_or(Value::Null, Value::str)),
-        ("available", Value::int(online as i64)),
-    ])
+        .as_deref()
+        .and_then(allowed_cpus)
+        .map_or(Value::Null, Value::str);
+    let online = std::fs::read_to_string("/sys/devices/system/cpu/online")
+        .map_or(Value::Null, |list| Value::str(list.trim()));
+    Value::object([("allowed", allowed), ("online", online)])
+}
+
+fn allowed_cpus(status: &str) -> Option<&str> {
+    status
+        .lines()
+        .find_map(|line| line.strip_prefix("Cpus_allowed_list:"))
+        .map(str::trim)
 }
 
 #[cfg(test)]
@@ -416,6 +422,7 @@ mod tests {
             "CARGO_BUILD_RUSTFLAGS",
             "CARGO_BUILD_TARGET",
             "CARGO_PROFILE_RELEASE_LTO",
+            "CARGO_PROFILE_RELEASE_BUILD_OVERRIDE_DEBUG",
             "CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_RUSTFLAGS",
             "CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER",
         ] {
@@ -436,6 +443,8 @@ mod tests {
                 ("CARGO_TARGET_DIR", "/tmp/target"),
                 ("CARGO_INCREMENTAL", "0"),
                 ("RUSTDOCFLAGS", "-D warnings"),
+                ("CARGO_PROFILE_TEST_DEBUG", "0"),
+                ("CARGO_PROFILE_DEV_OPT_LEVEL", "1"),
                 ("RUSTFLAGS", ""),
             ])
             .is_empty()
@@ -489,6 +498,27 @@ mod tests {
             assert!(reasons[0].starts_with("Cargo configuration: "));
             fs::remove_dir_all(&tree).unwrap();
         }
+    }
+
+    #[test]
+    fn other_profiles_do_not_reach_a_release_worker() {
+        let tree = scratch("profiles");
+        fs::create_dir_all(tree.join(".cargo")).unwrap();
+        fs::write(
+            tree.join(".cargo/config.toml"),
+            "[profile.test]\ndebug = 0\n[profile.dev]\nopt-level = 1\n",
+        )
+        .unwrap();
+        let found = configuration(&tree, None);
+        fs::remove_dir_all(&tree).unwrap();
+        assert_eq!(found, Vec::<String>::new());
+    }
+
+    #[test]
+    fn the_allowed_cpus_come_from_the_process_status() {
+        let status = "Name:\tx\nCpus_allowed:\t02\nCpus_allowed_list:\t1\nMems:\t1\n";
+        assert_eq!(allowed_cpus(status), Some("1"));
+        assert_eq!(allowed_cpus("Name:\tx\n"), None);
     }
 
     #[test]
