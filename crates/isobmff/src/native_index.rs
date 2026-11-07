@@ -105,7 +105,7 @@ impl RunCarry {
 #[derive(Debug)]
 pub struct Mov9NativeIndexCursor<'a> {
     cursor: Mov9PacketCursor<'a>,
-    limits: Mov9NativeIndexLimits,
+    max_entries: u64,
     next: u64,
     distance: u64,
     run: Option<(usize, usize)>,
@@ -116,6 +116,32 @@ pub struct Mov9NativeIndexCursor<'a> {
     dependency_v4: bool,
 }
 impl<'a> Mov9NativeIndexCursor<'a> {
+    fn from_cursor(
+        cursor: Mov9PacketCursor<'a>,
+        max_entries: u64,
+        recovery_initial_nonkey: bool,
+        dependency_v4: bool,
+    ) -> Self {
+        Self {
+            cursor,
+            max_entries,
+            next: 0,
+            distance: 0,
+            run: None,
+            carry: None,
+            ready: None,
+            failed: None,
+            recovery_initial_nonkey,
+            dependency_v4,
+        }
+    }
+
+    fn starts_before_sync(track: Mov9Track<'_>) -> bool {
+        track.fragments.is_empty()
+            && track.edits.is_none()
+            && track.table.unused_sync_entries() != 0
+    }
+
     pub fn new_complete_source(
         pool: &Budget,
         track: Mov9Track<'a>,
@@ -126,23 +152,30 @@ impl<'a> Mov9NativeIndexCursor<'a> {
         // A regular table with an explicitly bounded sync prefix may start
         // before any usable sync marker. The first index distance is zero;
         // this does not grant a seek point.
-        let recovery_initial_nonkey = track.fragments.is_empty()
-            && track.edits.is_none()
-            && track.table.unused_sync_entries() != 0;
         let cursor =
             Mov9PacketCursor::new_complete_source(pool, &[track], media, limits.packets, profile)?;
-        Ok(Self {
+        Ok(Self::from_cursor(
             cursor,
-            limits,
-            next: 0,
-            distance: 0,
-            run: None,
-            carry: None,
-            ready: None,
-            failed: None,
-            recovery_initial_nonkey,
-            dependency_v4: false,
-        })
+            limits.max_entries,
+            Self::starts_before_sync(track),
+            false,
+        ))
+    }
+
+    /// Replay one track from a completed packet cursor using its checked sample
+    /// extents and initial clock facts. The index has its own entry limit.
+    pub fn replay_track(
+        checked: &Mov9PacketCursor<'a>,
+        track_id: u32,
+        max_entries: u64,
+    ) -> Result<Self> {
+        let (cursor, track) = checked.fork_index_track(track_id)?;
+        Ok(Self::from_cursor(
+            cursor,
+            max_entries,
+            Self::starts_before_sync(track),
+            false,
+        ))
     }
     pub fn new_encoded_regular_v2(
         pool: &Budget,
@@ -160,18 +193,12 @@ impl<'a> Mov9NativeIndexCursor<'a> {
             plans,
             profile,
         )?;
-        Ok(Self {
+        Ok(Self::from_cursor(
             cursor,
-            limits,
-            next: 0,
-            distance: 0,
-            run: None,
-            carry: None,
-            ready: None,
-            failed: None,
-            recovery_initial_nonkey: false,
-            dependency_v4: plans.iter().flatten().any(|p| p.has_dependency_view_v4()),
-        })
+            limits.max_entries,
+            false,
+            plans.iter().flatten().any(|p| p.has_dependency_view_v4()),
+        ))
     }
     pub(crate) fn allow_recovery_initial_nonkey(&mut self) {
         self.recovery_initial_nonkey = true;
@@ -206,7 +233,7 @@ impl<'a> Mov9NativeIndexCursor<'a> {
                     return Ok(Mov9CursorStatus::Yield);
                 }
                 let next = self.next.checked_add(1).ok_or(Error::Overflow)?;
-                bound(next, self.limits.max_entries)?;
+                bound(next, self.max_entries)?;
                 let source_run = self.cursor.ready_source_run()?;
                 let occurrence = self.cursor.take_occurrence()?;
                 // Public AVIndexEntry has key/discard bits, independently of

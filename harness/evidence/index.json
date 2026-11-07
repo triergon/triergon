@@ -8524,6 +8524,183 @@
      "sha256": "ea064f0510957eac949d91b14646c4f2d2413fe2dec550403e5123b54245dd35"
     }
    ]
+  },
+  {
+   "name": "isobmff-signed-clock-linux-arm64",
+   "retention": "retained",
+   "reason": "ISO BMFF signed decode runs status row",
+   "key": "evidence/isobmff-signed-clock-linux-arm64/cd2ead09e1909dba0478ea3d9dc170946fad2d4db14b41fc6e3f0307914364c6.tar.gz",
+   "sha256": "cd2ead09e1909dba0478ea3d9dc170946fad2d4db14b41fc6e3f0307914364c6"
+  },
+  {
+   "name": "isobmff-runtime-linux-arm64",
+   "retention": "keep",
+   "reason": "ISO BMFF runtime for 972 open and index workloads",
+   "key": "evidence/isobmff-runtime-linux-arm64/bac2ceeb165144a6a232509c33884c4987b4a440eb675f3c04de5a0da4fbc4a7.tar.gz",
+   "sha256": "bac2ceeb165144a6a232509c33884c4987b4a440eb675f3c04de5a0da4fbc4a7"
+  },
+  {
+   "name": "isobmff-index-memory-linux-arm64",
+   "retention": "keep",
+   "reason": "ISO BMFF heap and total resident peak for 972 open and index workloads",
+   "key": "evidence/isobmff-index-memory-linux-arm64/fc26644112a092f7f63ec4a22716c8700d0486b295670590c198651801364f9c.tar.gz",
+   "sha256": "fc26644112a092f7f63ec4a22716c8700d0486b295670590c198651801364f9c"
+  },
+  {
+   "name": "isobmff-child-lookup-runtime-linux-arm64",
+   "retention": "keep",
+   "reason": "ISO BMFF runtime for 972 open and index workloads with child lookup",
+   "key": "evidence/isobmff-child-lookup-runtime-linux-arm64/fca8e54cb9b2f0d55acc8ba9be2a5849992ae7996f3c3db551896477c3359525.tar.gz",
+   "sha256": "fca8e54cb9b2f0d55acc8ba9be2a5849992ae7996f3c3db551896477c3359525"
+  },
+  {
+   "name": "isobmff-child-lookup-memory-linux-arm64",
+   "retention": "keep",
+   "reason": "ISO BMFF heap and total resident peak with child lookup",
+   "key": "evidence/isobmff-child-lookup-memory-linux-arm64/46cf8ac9041b147c96108de6e09fde26c47e12fd10161f7eee9661db95f8c89a.tar.gz",
+   "sha256": "46cf8ac9041b147c96108de6e09fde26c47e12fd10161f7eee9661db95f8c89a"
+  },
+  {
+   "name": "isobmff-index-replay-runtime-linux-arm64",
+   "retention": "keep",
+   "reason": "ISO BMFF index replay runtime including 18 one-byte index cases above 1.20",
+   "key": "evidence/isobmff-index-replay-runtime-linux-arm64/3bbe7e9157dc3f2860ac7117368639faccbb6547fe8be8aa755b34d9479ec0e3.tar.gz",
+   "sha256": "3bbe7e9157dc3f2860ac7117368639faccbb6547fe8be8aa755b34d9479ec0e3"
+  },
+  {
+   "name": "isobmff-header-comparison-linux-arm64",
+   "retention": "keep",
+   "reason": "ISO BMFF open and index comparisons on native AArch64 Linux",
+   "key": "evidence/isobmff-header-comparison-linux-arm64/f56d3fa78b8cc70222f58c7cfa9a17331b0924a9070c7ff6ecc6dc1f213561bc.tar.gz",
+   "sha256": "f56d3fa78b8cc70222f58c7cfa9a17331b0924a9070c7ff6ecc6dc1f213561bc",
+   "files": [
+    {
+     "path": "FIRST-NATIVE.sh",
+     "sha256": "6e1788bb3a12c1ea151b11b13fc864979ead13e6fbdcfc0fe443ff8260f298e0"
+    },
+    {
+     "path": "MEMORY.log",
+     "sha256": "d0037e0590f3c888b29c437cc7f49538b2b212ec568d01c7c5eeb24c732e7cf4"
+    },
+    {
+     "path": "MEMORY.sh",
+     "sha256": "56f1f47cd84946e075f1991bff0e5266f973cff879324cf58806dafe3b003c89"
+    },
+    {
+     "path": "NATIVE.log",
+     "sha256": "a37d0fa6fa0a6240e0fc073a436291898924cbbe890d5a147feed6791d8efb71"
+    },
+    {
+     "path": "NATIVE.sh",
+     "sha256": "56cc31d69ddb60e876a5ce3595bdca2bfff861f830b4a16beeeb987761cceea2"
+    },
+    {
+     "path": "REBASED-BUILD.log",
+     "sha256": "5d36748c5c3296f9bfb3e4ba4a12d240aa04583163b810604d71ceb6555bea7f"
+    },
+    {
+     "path": "REBASED-CLIPPY.log",
+     "sha256": "035c66ec960f95fd7f75901511563ad2c3724fc2725f37d6997290cd3d6738fc"
+    },
+    {
+     "path": "REBASED-TEST.log",
+     "sha256": "b524c4af4c7e3b639f1b65615a51b63a53d155cb805f207f3b6d222573414649"
+    },
+    {
+     "path": "REPLAY-BASE.json",
+     "sha256": "59f954949e0749aff501b83c2a7ecff18b0e3de09a5bb386fd053ca8e4bec94f"
+    },
+    {
+     "path": "REPLAY-REBASED-REV",
+     "sha256": "5a11f9a888f6a84e63be58fea7207786f25db4bc7373ed76743da5c29bd12f3e"
+    },
+    {
+     "path": "REPLAY-REBASED.json",
+     "sha256": "f205fd44e111f12d4bbece3ce8241281fe50271efb47d250855c9f1afca28d3f"
+    },
+    {
+     "path": "REV",
+     "sha256": "14d423936850355ee257b2768ca652e83f06114165ba59556a2cd44d433808da"
+    },
+    {
+     "path": "RUN-HISTORY.json",
+     "sha256": "01905f5816da4e5108f7b4d13eaf921130f39ba719253eb9f15c31542931437c"
+    },
+    {
+     "path": "RUNNER.log",
+     "sha256": "3beb73fbc6bae783f02302db544d1cb3c12e0f6d5de0a2eed3c454f987f36f02"
+    },
+    {
+     "path": "SECOND-NATIVE.sh",
+     "sha256": "330593f05fe85633a0dd2f2742acd8790982bc79d2301915842d275956a8c757"
+    },
+    {
+     "path": "SOURCE.sha256",
+     "sha256": "7d7dc601267df4ccbe2de53055eb0549ff57ea0adbac9674c84c5ce158d200f2"
+    },
+    {
+     "path": "VERIFY.py",
+     "sha256": "36963c412f5e4d13e1fd048ef22679b5cf42087703f69c5a23b0458059881d92"
+    },
+    {
+     "path": "first-launch-results.tar.gz",
+     "sha256": "85cea451eec057fa7e734548ca3ba6d779ed5836a3f9de14b8394575ef0d7d8e"
+    },
+    {
+     "path": "first-launch.log",
+     "sha256": "f742bd132e11b871fd5b1de0def83239449fd9d755d85845a9d17fe625e317fd"
+    },
+    {
+     "path": "first-runner.log",
+     "sha256": "3beb73fbc6bae783f02302db544d1cb3c12e0f6d5de0a2eed3c454f987f36f02"
+    },
+    {
+     "path": "inputs.tar.gz",
+     "sha256": "a030ee3ecd779727f5694cdadedf49a2c1ef458bb890f851f60c3d48cbac878b"
+    },
+    {
+     "path": "memory-results.tar.gz",
+     "sha256": "2569c22e76b77cd1823571dadc32048f78f073d94f573c4180363d7d6de6ced2"
+    },
+    {
+     "path": "native-results.tar.gz",
+     "sha256": "8f51e6a9b16a627e6cac1f3b3ff5e907fd60590a08c24f1278f7e717ae0782a9"
+    },
+    {
+     "path": "second-launch-results.tar.gz",
+     "sha256": "b929b1c93a71a922e5e94213bcbc8d755dd18e091754d55d4f64f14d9671b978"
+    },
+    {
+     "path": "second-launch.log",
+     "sha256": "be39da4e8f0d966a9b8a62c24847926804515f80795dd72d7a856cfcdbaf0149"
+    },
+    {
+     "path": "second-runner.log",
+     "sha256": "3beb73fbc6bae783f02302db544d1cb3c12e0f6d5de0a2eed3c454f987f36f02"
+    },
+    {
+     "path": "source.tar.gz",
+     "sha256": "fb55cd4e1e7504561486f2779be1c0a42716a30c52d7c2a0e5dfe9a31e902522"
+    }
+   ]
+  },
+  {
+   "name": "avc-hevc-framing-linux-arm64",
+   "retention": "retained",
+   "reason": "Packet framing in the measured revisions table",
+   "key": "evidence/avc-hevc-framing-linux-arm64/b59476c45d8f31ac4694a264ce49cf12bda9bf9709e5cb6979ece0acb41cc812.tar.gz",
+   "sha256": "b59476c45d8f31ac4694a264ce49cf12bda9bf9709e5cb6979ece0acb41cc812",
+   "bytes": 19676147,
+   "files": [
+    {
+     "path": "avc-hevc-framing/memory.tar.gz",
+     "sha256": "6f7dcfa92afbe4a025d4a0c1a8a4132fc3a3125f796ef8c20be8606bdba843d8"
+    },
+    {
+     "path": "avc-hevc-framing/time.tar.gz",
+     "sha256": "0f3d82dfe8ab49e0eb85c32e4b9adc6579cc70590c89b8f09d4842550c8348c5"
+    }
+   ]
   }
  ]
 }
