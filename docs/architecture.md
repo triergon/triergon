@@ -112,9 +112,8 @@ performance gates where it touches hot code.
 1. **Bitstream.** `triergon-bitstream` holds bit reading, exp-Golomb, RBSP unescaping,
    CABAC and CRCs. The DTS decoder keeps its own reader: both shared forms are slower
    on its subframe parser.
-2. **Formats.** ISO BMFF becomes an `AnyReader` variant, and MPEG-TS implements
-   `ContainerReader` and becomes one too. Track classification moves out of playback
-   into the readers.
+2. **Formats.** MPEG-TS implements `ContainerReader` and becomes an `AnyReader`
+   variant. Track classification moves out of playback into the readers.
 3. **Reference compatibility.** `triergon-framing`, `triergon-matroska`,
    `triergon-subtitles`, `triergon-mpegts` and `triergon-isobmff` follow the convention
    in [reference-compatible behaviour](#reference-compatible-behaviour). Playback moves

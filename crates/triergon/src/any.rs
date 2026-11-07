@@ -3,12 +3,12 @@
 //! A player may receive Matroska directly and TS or fragmented MP4 through HLS,
 //! so the reader is chosen at open time from probed bytes. Each variant sits behind its format
 //! feature; forwarding is one predictable `match` per step with no allocation
-//! and no dynamic dispatch on the packet path. ISO BMFF and MPEG-TS join once
-//! their readers implement [`ContainerReader`]; until then
-//! [`probe`] reports them and [`AnyReader::open`] refuses them explicitly.
+//! and no dynamic dispatch on the packet path. MPEG-TS joins once its reader
+//! implements [`ContainerReader`]; until then [`probe`] reports it and
+//! [`AnyReader::open`] refuses it explicitly.
 // With no format feature the enums are empty and their forwarding is dead code.
 #![cfg_attr(
-    not(feature = "matroska"),
+    not(any(feature = "matroska", feature = "isobmff")),
     allow(unused_imports, unused_variables, unreachable_code)
 )]
 use std::sync::atomic::AtomicBool;
@@ -22,7 +22,7 @@ use triergon_core::{
 };
 
 /// The largest input window a reader asks for at once.
-#[cfg(feature = "matroska")]
+#[cfg(any(feature = "matroska", feature = "isobmff"))]
 const WINDOW: usize = 64 * 1024;
 
 /// What the first bytes of a source look like.
@@ -58,24 +58,36 @@ pub fn probe(bytes: &[u8]) -> Probe {
 }
 
 /// Every reader the facade can open, one variant per enabled format.
+// Stored inline: a box would add an allocation outside the caller's budget.
+#[allow(clippy::large_enum_variant)]
 #[derive(Debug)]
 pub enum AnyReader {
     #[cfg(feature = "matroska")]
     Matroska(triergon_matroska::typed::Reader),
+    #[cfg(feature = "isobmff")]
+    Isobmff(triergon_isobmff::Reader),
 }
 
 /// The packet of whichever reader produced it.
+// Stored inline: a box would allocate per packet, outside the caller's budget.
+#[allow(clippy::large_enum_variant)]
 #[derive(Clone, Debug)]
 pub enum AnyPacket {
     #[cfg(feature = "matroska")]
     Matroska(triergon_matroska::typed::Packet),
+    #[cfg(feature = "isobmff")]
+    Isobmff(triergon_isobmff::Packet),
 }
 
 /// Non-packet events of whichever reader produced them.
+// Stored inline for the same reason as `AnyPacket`.
+#[allow(clippy::large_enum_variant)]
 #[derive(Clone, Debug)]
 pub enum AnyOther {
     #[cfg(feature = "matroska")]
     Matroska(triergon_matroska::typed::Event),
+    #[cfg(feature = "isobmff")]
+    Isobmff(triergon_isobmff::ReaderEvent),
 }
 
 macro_rules! each {
@@ -83,8 +95,26 @@ macro_rules! each {
         match $value {
             #[cfg(feature = "matroska")]
             Self::Matroska($inner) => $body,
-            #[cfg(not(feature = "matroska"))]
+            #[cfg(feature = "isobmff")]
+            Self::Isobmff($inner) => $body,
+            #[cfg(not(any(feature = "matroska", feature = "isobmff")))]
             _ => unreachable!("no format feature: the enum is uninhabited"),
+        }
+    };
+}
+
+/// Wrap one reader's step in the closed enums.
+#[cfg(any(feature = "matroska", feature = "isobmff"))]
+macro_rules! neutral_step {
+    ($step:expr, $variant:ident) => {
+        match $step {
+            Step::Ready(Event::Packet(p)) => Step::Ready(Event::Packet(AnyPacket::$variant(p))),
+            Step::Ready(Event::Seek(receipt)) => Step::Ready(Event::Seek(receipt)),
+            Step::Ready(Event::Other(o)) => Step::Ready(Event::Other(AnyOther::$variant(o))),
+            Step::NeedInput(request) => Step::NeedInput(request),
+            Step::Yield => Step::Yield,
+            Step::Backpressure(pressure) => Step::Backpressure(pressure),
+            Step::End(location) => Step::End(location),
         }
     };
 }
@@ -106,8 +136,16 @@ impl AnyReader {
                 triergon_matroska::Limits::default(),
                 WINDOW,
             )?)),
-            Probe::Isobmff | Probe::Ts => Err(Error::Unsupported(
-                "ISO BMFF and MPEG-TS readers do not implement ContainerReader yet",
+            #[cfg(feature = "isobmff")]
+            Probe::Isobmff => Ok(Self::Isobmff(triergon_isobmff::Reader::new(
+                pool,
+                source,
+                capabilities,
+                triergon_isobmff::ReaderLimits::default(),
+                WINDOW,
+            )?)),
+            Probe::Ts => Err(Error::Unsupported(
+                "the MPEG-TS reader does not implement ContainerReader yet",
             )),
             _ => {
                 let _ = (pool, source, capabilities);
@@ -173,16 +211,14 @@ impl ContainerReader for AnyReader {
     fn step(&mut self, work: &mut WorkBudget, cancel: &AtomicBool) -> Result<ReaderStep<Self>> {
         Ok(match self {
             #[cfg(feature = "matroska")]
-            Self::Matroska(reader) => match ContainerReader::step(reader, work, cancel)? {
-                Step::Ready(Event::Packet(p)) => Step::Ready(Event::Packet(AnyPacket::Matroska(p))),
-                Step::Ready(Event::Seek(receipt)) => Step::Ready(Event::Seek(receipt)),
-                Step::Ready(Event::Other(o)) => Step::Ready(Event::Other(AnyOther::Matroska(o))),
-                Step::NeedInput(request) => Step::NeedInput(request),
-                Step::Yield => Step::Yield,
-                Step::Backpressure(pressure) => Step::Backpressure(pressure),
-                Step::End(location) => Step::End(location),
-            },
-            #[cfg(not(feature = "matroska"))]
+            Self::Matroska(reader) => {
+                neutral_step!(ContainerReader::step(reader, work, cancel)?, Matroska)
+            }
+            #[cfg(feature = "isobmff")]
+            Self::Isobmff(reader) => {
+                neutral_step!(ContainerReader::step(reader, work, cancel)?, Isobmff)
+            }
+            #[cfg(not(any(feature = "matroska", feature = "isobmff")))]
             _ => unreachable!("no format feature: the enum is uninhabited"),
         })
     }

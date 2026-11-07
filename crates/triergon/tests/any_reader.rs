@@ -97,6 +97,10 @@ fn any_reader_reads_matroska_through_the_neutral_model() {
     assert_eq!(track.kind(), MediaKind::Audio);
     assert_eq!(track.codec(), CodecId::Other(b"A_AUTHORED"));
     assert_eq!(track.codec_tag(), b"A_AUTHORED");
-    let refused = AnyReader::open(b"\0\0\0\x18ftypisom", &pool, SourceId(2), capabilities);
+    let mut ts = vec![0u8; 188 * 3];
+    for packet in ts.chunks_mut(188) {
+        packet[0] = 0x47;
+    }
+    let refused = AnyReader::open(&ts, &pool, SourceId(2), capabilities);
     assert!(matches!(refused, Err(triergon::Error::Unsupported(_))));
 }

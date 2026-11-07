@@ -57,7 +57,7 @@ then asks for input and delivers `Event::Seek(SeekReceipt)` before the next pack
 | Feature | Default | Module | Through `AnyReader` |
 |---|---|---|---|
 | `matroska` | yes | `triergon::matroska` ([triergon-matroska](../media/README.md)) | yes |
-| `isobmff` | no | `triergon::isobmff` ([triergon-isobmff](../isobmff/README.md)) | probed, refused by `open` |
+| `isobmff` | no | `triergon::isobmff` ([triergon-isobmff](../isobmff/README.md)) | yes, for seekable sources |
 | `mpegts` | no | `triergon::mpegts` ([triergon-mpegts](../mpegts/README.md)) | probed, refused by `open` |
 | `framing` | no | `triergon::framing` ([triergon-framing](../framing/README.md)) | not a reader |
 | `subtitles` | no | `triergon::subtitles` ([triergon-subtitles](../subtitles/README.md)) | not a reader |
@@ -80,24 +80,27 @@ The meaning of each type is documented in
   `moof`, `mdat`, `free`, `skip` or `sidx`, and `Probe::Ts` when sync bytes `0x47`
   sit at offsets 0, 188 and 376 (at least 377 bytes). 192-byte M2TS is not probed.
   Anything else, including a prefix too short to decide, is `Probe::Unknown`.
-- **Opening.** `AnyReader::open` refuses ISO BMFF and MPEG-TS with
-  `Error::Unsupported` whatever features are enabled, because their readers do not
-  implement `ContainerReader`; use `triergon::isobmff` and `triergon::mpegts`
-  directly. Unknown sources, and Matroska without the `matroska` feature, are also
-  `Error::Unsupported`.
-- **Matroska defaults.** `open` builds the Matroska reader with
-  `triergon_matroska::Limits::default()` and asks for at most 64 KiB per
-  `NeedInput`. For other limits or windows, construct `matroska::typed::Reader`
-  directly and wrap it as `AnyReader::Matroska`.
+- **Opening.** `AnyReader::open` refuses MPEG-TS with `Error::Unsupported` whatever
+  features are enabled, because its reader does not implement `ContainerReader`; use
+  `triergon::mpegts` directly. Unknown sources, a format without its feature, and ISO
+  BMFF on a source without random access are also `Error::Unsupported`.
+- **Defaults.** `open` builds each reader with its default limits
+  (`triergon_matroska::Limits`, `triergon_isobmff::ReaderLimits`) and asks for at most
+  64 KiB per `NeedInput`. For other limits or windows, construct
+  `matroska::typed::Reader` or `isobmff::Reader` directly and wrap it as
+  `AnyReader::Matroska` or `AnyReader::Isobmff`.
 - **Dispatch.** Forwarding is one `match` per call with no allocation and no
   dynamic dispatch on the packet path. Tracks are returned as `&dyn TrackInfo`.
-  `AnyPacket` implements `PacketInfo`; match `AnyPacket::Matroska(p)` for the
-  format's own packet type.
+  `AnyPacket` implements `PacketInfo`; match `AnyPacket::Matroska(p)` or
+  `AnyPacket::Isobmff(p)` for the format's own packet type.
 - **Other events.** `Event::Other` carries an `AnyOther`; match
-  `AnyOther::Matroska(event)` for Matroska configuration, documents and structure.
+  `AnyOther::Matroska(event)` for Matroska configuration, documents and structure,
+  or `AnyOther::Isobmff(event)` for root boxes and the end of opening. ISO BMFF has
+  no tracks until `ReaderEvent::Movie`.
 - **Seeking.** `request_seek` forwards to the format reader. For Matroska the
   `TrackId` is the TrackNumber, the target is floored to nanoseconds, and only
-  video tracks can be seek targets.
+  video tracks can be seek targets. For ISO BMFF the `TrackId` is the `track_ID`, the
+  target is on that track's media clock without edits, and any track can be a target.
 
 ## Conformance
 
@@ -106,4 +109,5 @@ the format crates, and the rules every reader follows are the
 [container contract](../../docs/architecture.md#container-contract).
 `tests/any_reader.rs` checks that `probe` classifies the three container families,
 that an authored Matroska file reads through `AnyReader` with the expected track and
-packet, and that ISO BMFF is refused. Gates: [docs/quality.md](../../docs/quality.md).
+packet, and that MPEG-TS is refused. `tests/any_reader_isobmff.rs` reads and seeks an
+authored MP4 through `AnyReader`. Gates: [docs/quality.md](../../docs/quality.md).
