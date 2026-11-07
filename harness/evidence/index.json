@@ -8747,6 +8747,53 @@
      "sha256": "80108f59492d82d575e4e7e250ad9614d5d873fec0bae8765e2c5a90837722d9"
     }
    ]
+  },
+  {
+   "name": "parser-regression-host-checks",
+   "path": "parser-regression-host-checks",
+   "retention": "retained",
+   "reason": "workspace tests and lint checks for combined container and framing changes",
+   "key": "evidence/parser-regression-host-checks/3c6c2b2d127bd3ecf198e9699691367f54f314e140d792da5070afa5a68cd4e3.tar.gz",
+   "sha256": "3c6c2b2d127bd3ecf198e9699691367f54f314e140d792da5070afa5a68cd4e3",
+   "bytes": 12665308,
+   "files": [
+    {
+     "path": "parser-regression-host-checks/BOUNDARY-CLIPPY.log",
+     "sha256": "047b2e63428727c432c807283e23904c04589c46d492124f304bb6ae9bace2ac"
+    },
+    {
+     "path": "parser-regression-host-checks/BOUNDARY-TEST.log",
+     "sha256": "97c1cf497e5faa788bbacb88f67af6c48f5fa6f9a5018eff9c2a78a0d061dbd2"
+    },
+    {
+     "path": "parser-regression-host-checks/CANONICAL-HOST-SOURCE.txt",
+     "sha256": "0267b86724dc87a0b99307cd59f430dbc72b9497a3a9dab304b62b1a1bb544ac"
+    },
+    {
+     "path": "parser-regression-host-checks/CANONICAL-WORKSPACE-CHECK.log",
+     "sha256": "39f91754a406da334c2b7564c049c51ff4310e19a74fb2714a74f06e2e4defb7"
+    },
+    {
+     "path": "parser-regression-host-checks/CANONICAL-WORKSPACE-CLIPPY.log",
+     "sha256": "575478b659c793ea930b34bb1444c386c378609f1c9b882ddc111ad2570a2370"
+    },
+    {
+     "path": "parser-regression-host-checks/CANONICAL-WORKSPACE-DOC.log",
+     "sha256": "ca1c70a4f04de4470d8c087401f2477864257d9cb11d504e650a512daab66309"
+    },
+    {
+     "path": "parser-regression-host-checks/CANONICAL-WORKSPACE-TEST.log",
+     "sha256": "3aa8708c05a5a81a9f422caeca7f71c2f3964ca7d42fec759e751eecb9559148"
+    },
+    {
+     "path": "parser-regression-host-checks/RUST.txt",
+     "sha256": "e003fd3d385fcd0de16bc6b049124efb20207831dd810fd4ab39ff079bbb12a5"
+    },
+    {
+     "path": "parser-regression-host-checks/SOURCE.bundle",
+     "sha256": "6831ff2baa63f35a14e2e5595cc7fbf07f21f22b8daa0fceabc517dc590fe6ff"
+    }
+   ]
   }
  ]
 }
