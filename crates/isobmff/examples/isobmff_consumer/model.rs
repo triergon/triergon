@@ -14,17 +14,19 @@ use triergon_core::{
     SourceFailure, SourceId, Step, Time, WorkBudget,
 };
 use triergon_isobmff::{
-    BoxEvent, BoxHeader, BoxReader, BoxStep, BoxView, BuildStatus, EditList, FragmentBuilder,
-    FragmentContext, FragmentIndex, ImplicitBase, Limits, MediaDataPolicy, Mov9CursorStatus,
-    Mov9NativeGlobalSeekJob, Mov9NativeIndexCursor, Mov9NativeIndexLimits, Mov9NativeSeekLimits,
-    Mov9PacketCursor, Mov9PacketLimits, Mov9PartialSampleReader, Mov9PayloadBounds, Mov9Profile,
-    Mov9RecoveryTrackHeader, Mov9RecoveryV3Context, Mov9RecoveryV3Read, Mov9RunRecoveryV3Builder,
-    Mov9StreamView, Mov9Track, Mov9V3TransportBuilder, MovieHeader, MovieSeekClocks,
-    MovieSeekLimits, MovieSourceSeekContext, MovieSourceSeekPlanner, PinnedMovD32RegularRecoveryV1,
-    PinnedMovD32RegularRecoveryV3, PinnedMovD32SmallRawVideoTransportV3, RecoveryDescriptions,
-    RecoveryKind, RecoveryMappings, RecoveryScope, RecoverySyntax, Sample, SampleDescription,
-    SampleReader, SampleStep, SampleTable, SampleTableBuilder, SampleTablePolicy, SourcePacket,
-    SourceTrack, TrackHeader, TrackSampleCursor, Trex,
+    BoxEvent, BoxHeader, BoxReader, BoxStep, BoxView, BuildStatus, EditList, EntryLayout,
+    FragmentBuilder, FragmentContext, FragmentIndex, ImplicitBase, Limits, MediaDataPolicy,
+    Mov9CursorStatus, Mov9NativeGlobalSeekJob, Mov9NativeIndexCursor, Mov9NativeIndexLimits,
+    Mov9NativeSeekLimits, Mov9PacketCursor, Mov9PacketLimits, Mov9PartialSampleReader,
+    Mov9PayloadBounds, Mov9Profile, Mov9RecoveryTrackHeader, Mov9RecoveryV3Context,
+    Mov9RecoveryV3Read, Mov9RunRecoveryV3Builder, Mov9SampleEntryHeaderJobV7, Mov9StreamView,
+    Mov9Track, Mov9V3TransportBuilder, MovieHeader, MovieSeekClocks, MovieSeekLimits,
+    MovieSourceSeekContext, MovieSourceSeekPlanner, PinnedMovD32RegularRecoveryV1,
+    PinnedMovD32RegularRecoveryV3, PinnedMovD32SampleEntryHeaderV7,
+    PinnedMovD32SmallRawVideoTransportV3, RecoveryDescriptions, RecoveryKind, RecoveryMappings,
+    RecoveryScope, RecoverySyntax, Sample, SampleDescription, SampleReader, SampleStep,
+    SampleTable, SampleTableBuilder, SampleTablePolicy, SourcePacket, SourceTrack, TrackHeader,
+    TrackSampleCursor, Trex,
 };
 
 const MAX_SAMPLE_BYTES: usize = 16 * 1024 * 1024;
@@ -219,27 +221,33 @@ fn children(raw: &BoxView, skip: usize, budget: &Budget) -> Result<BudgetVec<Box
         }
     }
 }
-fn optional(raw: &BoxView, kind: &[u8; 4], budget: &Budget) -> Result<Option<BoxView>> {
+fn optional(raw: &BoxView, kind: &[u8; 4]) -> Result<Option<BoxView>> {
+    let mut cursor = raw.children(0, Limits::default())?;
     let mut found = None;
-    for child in children(raw, 0, budget)?.as_slice() {
-        if child.header().kind == *kind {
-            if found.is_some() {
-                return Err(Error::Invalid("duplicate required child").into());
+    let mut duplicate = false;
+    loop {
+        match cursor.poll(&mut WorkBudget::new(4096))? {
+            BoxStep::Box(child) if child.header().kind == *kind => {
+                duplicate |= found.replace(child).is_some();
             }
-            found = Some(child.clone());
+            BoxStep::End => break,
+            BoxStep::Box(_) | BoxStep::Yield => {}
         }
+    }
+    if duplicate {
+        return Err(Error::Invalid("duplicate required child").into());
     }
     Ok(found)
 }
-fn child(raw: &BoxView, kind: &[u8; 4], budget: &Budget) -> Result<BoxView> {
-    optional(raw, kind, budget)?.ok_or(Failure::Core(Error::Invalid("missing required child")))
+fn child(raw: &BoxView, kind: &[u8; 4]) -> Result<BoxView> {
+    optional(raw, kind)?.ok_or(Failure::Core(Error::Invalid("missing required child")))
 }
-fn track_header(track: &BoxView, budget: &Budget) -> Result<(TrackHeader, BoxView)> {
-    let mdia = child(track, b"mdia", budget)?;
+fn track_header(track: &BoxView) -> Result<(TrackHeader, BoxView)> {
+    let mdia = child(track, b"mdia")?;
     let header = TrackHeader::parse(
-        &child(track, b"tkhd", budget)?,
-        &child(&mdia, b"mdhd", budget)?,
-        &child(&mdia, b"hdlr", budget)?,
+        &child(track, b"tkhd")?,
+        &child(&mdia, b"mdhd")?,
+        &child(&mdia, b"hdlr")?,
     )?;
     Ok((header, mdia))
 }
@@ -249,10 +257,10 @@ fn self_contained_table(
     quantum: u64,
     table_policy: SampleTablePolicy,
 ) -> Result<SampleTable> {
-    let minf = child(mdia, b"minf", budget)?;
+    let minf = child(mdia, b"minf")?;
     let refs = data_references(&minf, budget)?;
     let mut builder = SampleTableBuilder::with_policy(
-        child(&minf, b"stbl", budget)?,
+        child(&minf, b"stbl")?,
         budget.clone(),
         Limits::default(),
         table_policy,
@@ -264,7 +272,7 @@ fn self_contained_table(
 }
 
 fn data_references(minf: &BoxView, budget: &Budget) -> Result<BudgetVec<BoxView>> {
-    let dref = child(&child(minf, b"dinf", budget)?, b"dref", budget)?;
+    let dref = child(&child(minf, b"dinf")?, b"dref")?;
     if word(dref.payload(), 0)? != 0 {
         return Err(Error::Unsupported("data reference version/flags").into());
     }
@@ -309,7 +317,7 @@ fn index_fragments(
     if moofs.is_empty() {
         return Ok(indexes);
     }
-    let extends = child(movie, b"mvex", budget)?;
+    let extends = child(movie, b"mvex")?;
     let mut defaults = BudgetVec::new(budget);
     for raw in children(&extends, 0, budget)?.as_slice() {
         if raw.header().kind != *b"trex" {
@@ -331,12 +339,7 @@ fn index_fragments(
         .iter()
         .filter(|b| b.header().kind == *b"trak")
     {
-        let media = child(track, b"mdia", budget)?;
-        let header = TrackHeader::parse(
-            &child(track, b"tkhd", budget)?,
-            &child(&media, b"mdhd", budget)?,
-            &child(&media, b"hdlr", budget)?,
-        )?;
+        let (header, media) = track_header(track)?;
         if tracks.len() >= 64 {
             return Err(Error::Limit {
                 requested: tracks.len() + 1,
@@ -351,8 +354,8 @@ fn index_fragments(
         {
             return Err(Error::Invalid("duplicate fragment track ID").into());
         }
-        let stbl = child(&child(&media, b"minf", budget)?, b"stbl", budget)?;
-        let descriptions = word(child(&stbl, b"stsd", budget)?.payload(), 4)?;
+        let stbl = child(&child(&media, b"minf")?, b"stbl")?;
+        let descriptions = word(child(&stbl, b"stsd")?.payload(), 4)?;
         if descriptions > Limits::default().max_descriptions {
             return Err(Error::Limit {
                 requested: usize::try_from(descriptions).map_err(|_| Error::Overflow)?,
@@ -363,10 +366,7 @@ fn index_fragments(
         }
         // Both selected size layouts carry sample_count at payload offset8.
         // The real SampleTableBuilder below validates their full wire grammar.
-        let sizes = match (
-            optional(&stbl, b"stsz", budget)?,
-            optional(&stbl, b"stz2", budget)?,
-        ) {
+        let sizes = match (optional(&stbl, b"stsz")?, optional(&stbl, b"stz2")?) {
             (Some(_), Some(_)) => return Err(Error::Invalid("both stsz and stz2").into()),
             (Some(raw), None) | (None, Some(raw)) => raw,
             (None, None) => return Err(Error::Invalid("missing sample size table").into()),
@@ -389,7 +389,7 @@ fn index_fragments(
         )?;
     }
     for moof in moofs {
-        let mfhd = child(moof, b"mfhd", budget)?;
+        let mfhd = child(moof, b"mfhd")?;
         if mfhd.payload().len() != 8 || word(mfhd.payload(), 0)? != 0 {
             return Err(Error::Unsupported("mfhd version/flags/layout").into());
         }
@@ -399,7 +399,7 @@ fn index_fragments(
             .iter()
             .filter(|b| b.header().kind == *b"traf")
         {
-            let tfhd = child(traf, b"tfhd", budget)?;
+            let tfhd = child(traf, b"tfhd")?;
             let id = word(tfhd.payload(), 4)?;
             let state = tracks
                 .as_mut_slice()
@@ -442,6 +442,22 @@ fn index_fragments(
         }
     }
     Ok(indexes)
+}
+
+fn check_signed_decode_runs(fragments: &[FragmentIndex]) -> Result<()> {
+    let maximum = i128::from(i64::MAX);
+    for fragment in fragments {
+        // The pinned comparison bounds duration accumulation from a
+        // nonnegative signed start. The source index sums all run durations.
+        if fragment
+            .decode_time()
+            .is_some_and(|start| i128::from(start.ticks()) <= maximum)
+            && fragment.decode_end().is_some_and(|end| end > maximum)
+        {
+            return Err(Error::Invalid("native signed decode run overflow").into());
+        }
+    }
+    Ok(())
 }
 
 pub trait Transport: Read + Seek {}
@@ -529,15 +545,22 @@ impl<'a> Driver<'a> {
         } else if maximum <= InputCursor::INLINE_CAPACITY {
             self.supply_buffer::<{ InputCursor::INLINE_CAPACITY }>(request, maximum)
         } else if maximum <= 4096 {
-            self.supply_buffer::<4096>(request, maximum)
+            self.supply_large_buffer::<4096>(request, maximum)
         } else {
-            self.supply_buffer::<65536>(request, maximum)
+            self.supply_large_buffer::<65536>(request, maximum)
         }
     }
-    // Keep the 64 KiB initialization/frame outside the small-request path.
-    // Each monomorph remains initialized safe stack storage; the I/O and core
-    // handoff below are shared, with no per-refill heap/cache or work change.
+    // Keep large scratch frames out of the small-request path.
     #[inline(never)]
+    fn supply_large_buffer<const CAPACITY: usize>(
+        &mut self,
+        request: InputRequest,
+        maximum: usize,
+    ) -> Result<()> {
+        self.supply_buffer::<CAPACITY>(request, maximum)
+    }
+
+    #[inline(always)]
     fn supply_buffer<const CAPACITY: usize>(
         &mut self,
         request: InputRequest,
@@ -687,7 +710,7 @@ impl<'a> Driver<'a> {
 
     pub fn open_with_policy(&mut self, policy: OpenPolicy) -> Result<Model> {
         let scanned = self.scan(policy.media_data, None)?;
-        let movie = MovieHeader::parse(&child(&scanned.movie, b"mvhd", &self.budget)?)?;
+        let movie = MovieHeader::parse(&child(&scanned.movie, b"mvhd")?)?;
         let fragments = index_fragments(
             &scanned.movie,
             scanned.moofs.as_slice(),
@@ -700,7 +723,7 @@ impl<'a> Driver<'a> {
             .iter()
             .filter(|b| b.header().kind == *b"trak")
         {
-            let (header, mdia) = track_header(track, &self.budget)?;
+            let (header, mdia) = track_header(track)?;
             if records.len() >= 64 {
                 return Err(Error::Limit {
                     requested: records.len() + 1,
@@ -716,9 +739,9 @@ impl<'a> Driver<'a> {
                 return Err(Error::Invalid("duplicate track ID").into());
             }
             let table = self_contained_table(&mdia, &self.budget, self.quantum, policy.tables)?;
-            let edits = optional(track, b"edts", &self.budget)?
+            let edits = optional(track, b"edts")?
                 .map(|raw| {
-                    child(&raw, b"elst", &self.budget).and_then(|raw| {
+                    child(&raw, b"elst").and_then(|raw| {
                         EditList::parse(raw, Limits::default()).map_err(Failure::Core)
                     })
                 })
@@ -797,25 +820,25 @@ impl<'a> Driver<'a> {
         if tracks.next().is_some()
             || !scanned.moofs.is_empty()
             || scanned.media.len() != 1
-            || optional(track, b"edts", &self.budget)?.is_some()
+            || optional(track, b"edts")?.is_some()
         {
             return Err(
                 Error::Unsupported("regular recovery needs one unedited regular track").into(),
             );
         }
-        MovieHeader::parse(&child(&scanned.movie, b"mvhd", &self.budget)?)?;
-        let mdia = child(track, b"mdia", &self.budget)?;
+        MovieHeader::parse(&child(&scanned.movie, b"mvhd")?)?;
+        let mdia = child(track, b"mdia")?;
         let header = Mov9RecoveryTrackHeader::parse(
-            &child(track, b"tkhd", &self.budget)?,
-            &child(&mdia, b"mdhd", &self.budget)?,
-            &child(&mdia, b"hdlr", &self.budget)?,
+            &child(track, b"tkhd")?,
+            &child(&mdia, b"mdhd")?,
+            &child(&mdia, b"hdlr")?,
             PinnedMovD32RegularRecoveryV1,
         )?;
-        let minf = child(&mdia, b"minf", &self.budget)?;
+        let minf = child(&mdia, b"minf")?;
         let refs = data_references(&minf, &self.budget)?;
         let profile = PinnedMovD32RegularRecoveryV3;
         let mut builder = Mov9RunRecoveryV3Builder::new(
-            child(&minf, b"stbl", &self.budget)?,
+            child(&minf, b"stbl")?,
             self.budget.clone(),
             Limits::default(),
             profile,
@@ -978,6 +1001,32 @@ impl<'a> Driver<'a> {
         }
     }
 
+    fn check_comparison_visual_headers(&self, record: &Record) -> Result<()> {
+        if record.header.handler != *b"vide" {
+            return Ok(());
+        }
+        for entry in record.table.descriptions() {
+            // The comparison catalogue projects raw visual entries. Check
+            // their child boxes before it publishes a stream.
+            if entry.format != *b"raw " || entry.raw().payload().len() == 78 {
+                continue;
+            }
+            let mut job = Mov9SampleEntryHeaderJobV7::new(
+                entry,
+                EntryLayout::Visual,
+                Limits::default(),
+                PinnedMovD32SampleEntryHeaderV7,
+            )?;
+            while job.poll(&mut WorkBudget::new(self.quantum), &self.cancel)? != BuildStatus::Ready
+            {
+            }
+            if job.try_finish(&self.cancel)?.native_open_result().is_some() {
+                return Err(Error::Invalid("sample entry configuration").into());
+            }
+        }
+        Ok(())
+    }
+
     pub fn native_operation(
         &mut self,
         model: &Model,
@@ -989,10 +1038,14 @@ impl<'a> Driver<'a> {
         if matches!(operation, NativeOperation::Seek(_)) && model.truncated_media.is_some() {
             return Err(Error::Truncated.into());
         }
+        if matches!(operation, NativeOperation::Open | NativeOperation::Index) {
+            check_signed_decode_runs(model.fragments.as_slice())?;
+        }
         let mut tracks = BudgetVec::new(&self.budget);
         let mut streams = BudgetVec::new(&self.budget);
         let movie_base = model.movie.time_base()?;
         for record in model.records.as_slice() {
+            self.check_comparison_visual_headers(record)?;
             let has_fragments = model
                 .fragments
                 .as_slice()
@@ -1098,6 +1151,7 @@ impl<'a> Driver<'a> {
             }
             out.push_str(",\"packets\":[");
         }
+        let mut completed_packets = None;
         let (reads, eof) = if let Some(plan) = &plan {
             let mut cursor = plan.cursor()?;
             self.deliver_rows(
@@ -1116,18 +1170,28 @@ impl<'a> Driver<'a> {
                 Mov9PacketLimits::default(),
                 Mov9Profile::PinnedNoParseNoFillin,
             )?;
-            self.deliver_rows(
+            let result = self.deliver_rows(
                 model,
                 &mut cursor,
                 None,
                 stats,
                 retention,
                 trace.as_deref_mut(),
-            )?
+            )?;
+            if matches!(operation, NativeOperation::Index) && result.1 {
+                completed_packets = Some(cursor);
+            }
+            result
         };
         native_catalogue(streams.as_slice(), stats, trace.as_deref_mut())?;
         if matches!(operation, NativeOperation::Index) {
-            self.native_indexes(model, tracks.as_slice(), stats, trace.as_deref_mut())?;
+            self.native_indexes(
+                model,
+                tracks.as_slice(),
+                completed_packets.as_ref(),
+                stats,
+                trace.as_deref_mut(),
+            )?;
         }
         native_result(eof, stats, trace.as_deref_mut());
         if let (Some(out), Some(r)) = (trace, seek) {
@@ -1210,10 +1274,11 @@ impl<'a> Driver<'a> {
         }
         Ok((reads, false))
     }
-    fn native_indexes(
+    fn native_indexes<'model>(
         &self,
-        model: &Model,
-        tracks: &[Mov9Track<'_>],
+        model: &'model Model,
+        tracks: &[Mov9Track<'model>],
+        completed_packets: Option<&Mov9PacketCursor<'model>>,
         stats: &mut Stats,
         mut trace: Option<&mut String>,
     ) -> Result<()> {
@@ -1226,13 +1291,18 @@ impl<'a> Driver<'a> {
             out.push_str(",\"native_indexes\":[");
         }
         for (i, track) in tracks.iter().enumerate() {
-            let mut index = Mov9NativeIndexCursor::new_complete_source(
-                &self.budget,
-                *track,
-                model.media.as_slice(),
-                Mov9NativeIndexLimits::default(),
-                Mov9Profile::PinnedNoParseNoFillin,
-            )?;
+            let limits = Mov9NativeIndexLimits::default();
+            let mut index = if let Some(cursor) = completed_packets {
+                Mov9NativeIndexCursor::replay_track(cursor, track.track_id, limits.max_entries)?
+            } else {
+                Mov9NativeIndexCursor::new_complete_source(
+                    &self.budget,
+                    *track,
+                    model.media.as_slice(),
+                    limits,
+                    Mov9Profile::PinnedNoParseNoFillin,
+                )?
+            };
             native_index_stream(i, track.track_id, stats, trace.as_deref_mut(), || {
                 loop {
                     match index.poll(&mut WorkBudget::new(self.quantum), &self.cancel)? {
@@ -1758,6 +1828,29 @@ mod refill_transcript42 {
     use super::*;
     use std::io::Cursor;
 
+    #[test]
+    fn child_lookup_validates_the_entire_parent() {
+        let budget = Budget::new(4096).unwrap();
+        let parent = |wire: &[u8]| {
+            BoxView::new(Bytes::copy_from_slice(&budget, wire).unwrap(), 100).unwrap()
+        };
+        let valid = parent(b"\0\0\0\x18moov\0\0\0\x08trak\0\0\0\x08free");
+        assert_eq!(child(&valid, b"trak").unwrap().header().start, 108);
+        assert!(optional(&valid, b"mvhd").unwrap().is_none());
+
+        let duplicate = parent(b"\0\0\0\x18moov\0\0\0\x08trak\0\0\0\x08trak");
+        assert!(matches!(
+            child(&duplicate, b"trak"),
+            Err(Failure::Core(Error::Invalid("duplicate required child")))
+        ));
+
+        let trailing = parent(b"\0\0\0\x19moov\0\0\0\x08trak\0\0\0\x08trak\0");
+        assert!(matches!(
+            child(&trailing, b"trak"),
+            Err(Failure::Core(Error::Truncated))
+        ));
+    }
+
     struct TraceIo<'a> {
         input: Cursor<&'a [u8]>,
         events: Vec<(u8, u64, usize)>,
@@ -1995,6 +2088,140 @@ mod refill_transcript42 {
                 ));
             }
             assert_eq!(short.events, [(b'S', 0, 0), (b'R', 0, maximum)]);
+        }
+    }
+}
+
+#[cfg(test)]
+mod private_configuration_comparison {
+    use super::*;
+    use std::io::Cursor;
+
+    #[test]
+    fn malformed_opus_configuration_refuses_open_and_index() {
+        let original = include_bytes!("../../tests/fixtures/r-private-carriage.mov");
+        let mut control = original.to_vec();
+        for kind in [b"dOps", b"ddts"] {
+            let at = control.windows(4).position(|bytes| bytes == kind).unwrap();
+            control[at..at + 4].copy_from_slice(b"free");
+        }
+        for (bytes, rejected) in [(original.as_slice(), true), (control.as_slice(), false)] {
+            for (window, quantum) in [(65536, 4096), (1, 3)] {
+                let mut input = Cursor::new(bytes);
+                let mut driver =
+                    Driver::new(&mut input, bytes.len() as u64, window, quantum).unwrap();
+                let model = driver.open().unwrap();
+                let entry = model.records.as_slice()[0].table.descriptions()[0].raw();
+                let start = entry.header().start as usize;
+                assert_eq!(
+                    entry.bytes().as_ref(),
+                    &bytes[start..start + entry.bytes().len()]
+                );
+                for operation in [NativeOperation::Open, NativeOperation::Index] {
+                    let mut stats = Stats::default();
+                    let mut retention = Retention::new(&driver.budget, 0).unwrap();
+                    let mut trace = String::new();
+                    let result = driver.native_operation(
+                        &model,
+                        &mut stats,
+                        &mut retention,
+                        operation,
+                        Some(&mut trace),
+                    );
+                    if rejected {
+                        assert!(matches!(
+                            result,
+                            Err(Failure::Core(Error::Invalid("sample entry configuration")))
+                        ));
+                        assert!(trace.is_empty());
+                    } else {
+                        result.unwrap();
+                        assert_eq!(stats.packets, 6);
+                    }
+                }
+            }
+        }
+    }
+}
+
+#[cfg(test)]
+mod signed_decode_comparison {
+    use super::*;
+    use std::io::Cursor;
+
+    fn check(bytes: &[u8], decode_end: Option<i128>, admitted: bool) {
+        for (window, quantum) in [(65536, 4096), (1, 3)] {
+            for operation in [NativeOperation::Open, NativeOperation::Index] {
+                let mut input = Cursor::new(bytes);
+                let mut driver = Driver::new(
+                    &mut input,
+                    u64::try_from(bytes.len()).unwrap(),
+                    window,
+                    quantum,
+                )
+                .unwrap();
+                let model = driver.open().unwrap();
+                if let Some(end) = decode_end {
+                    let [fragment] = model.fragments.as_slice() else {
+                        panic!("expected one fragment");
+                    };
+                    assert_eq!(fragment.decode_end(), Some(end));
+                }
+                let mut stats = Stats::default();
+                let mut retention = Retention::new(&driver.budget, 0).unwrap();
+                let mut trace = String::new();
+                let result = driver.native_operation(
+                    &model,
+                    &mut stats,
+                    &mut retention,
+                    operation,
+                    Some(&mut trace),
+                );
+                if admitted {
+                    result.unwrap();
+                    assert_eq!(stats.packets, 6);
+                    assert!(trace.contains("\"confirmed_eof\":true"));
+                } else {
+                    assert!(matches!(
+                        result,
+                        Err(Failure::Core(Error::Invalid(
+                            "native signed decode run overflow"
+                        )))
+                    ));
+                    assert!(trace.is_empty());
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn signed_comparison_accepts_an_exact_end_and_rejects_one_tick_beyond() {
+        let original = include_bytes!("../../tests/fixtures/native-clock28/clock27-i63-step12.mp4");
+        let header = b"\x00\x00\x00\x14tfdt\x01\x00\x00\x00";
+        let at = original
+            .windows(header.len())
+            .position(|window| window == header)
+            .unwrap()
+            + header.len();
+        let mut bytes = original.to_vec();
+        // The six sample durations sum to nine, including the final sample.
+        for (distance, admitted) in [(9, true), (8, false)] {
+            let start = i64::MAX.unsigned_abs() - distance;
+            bytes[at..at + 8].copy_from_slice(&start.to_be_bytes());
+            check(&bytes, Some(i128::from(start) + 9), admitted);
+        }
+    }
+
+    #[test]
+    fn signed_comparison_preserves_large_legacy_and_modern_starts() {
+        for bytes in [
+            include_bytes!("../../tests/fixtures/clock-boundary27/f-tfdt-above-i64.mp4").as_slice(),
+            include_bytes!("../../tests/fixtures/clock-boundary27/modern-iso6-tfdt-above-i64.mp4")
+                .as_slice(),
+            include_bytes!("../../tests/fixtures/native-clock28/clock27-u64-minus1-step12.mp4")
+                .as_slice(),
+        ] {
+            check(bytes, None, true);
         }
     }
 }

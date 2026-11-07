@@ -19,6 +19,10 @@ The crate exposes two views of the same file:
   (`Mov9Profile::PinnedNoParseNoFillin`). It is a separate projection and
   never rewrites source facts.
 
+After packet traversal reaches the end, `replay_track` can build an index for a
+selected track using the sample extents and clock facts already checked during
+that traversal. Each replay has its own entry limit.
+
 ## Usage
 
 All parsers are polled. Each `poll` takes a `WorkBudget` (and usually a cancel
@@ -186,6 +190,14 @@ rejects boxes extending past the source.
   `FragmentContext::decode_origin` has unknown DTS/CTS, not zero.
   `CompositionOffset` keeps version, raw bits and the signed reading separate;
   an absent offset differs from an explicit zero.
+- **Comparison decode runs.** For an explicit `tfdt` at or below `i64::MAX`,
+  the MOV comparison worker's open and native-index operations require the
+  accumulated decode end to be at most `i64::MAX`. Source indexes retain the
+  unsigned origin and exact end. Higher starts use the native clock projection.
+- **Comparison sample entries.** The MOV comparison worker checks configuration
+  boxes in raw visual entries before publishing streams. A nonempty Opus
+  configuration shorter than 11 payload bytes fails the comparison operation.
+  Source inspection retains the original entry and its child boxes.
 - **Surplus timing entries.** `SampleTableBuilder::with_timing_policy`
   accepts `TimingRunPolicy::BoundedPrefix` for the QuickTime-compatible
   interpretation of overlong timing runs. The last decode run may cross
