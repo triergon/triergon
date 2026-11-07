@@ -1,9 +1,13 @@
 //! Aligned Dolby syncframes for one selected independent HLS TS segment.
-use crate::{TrackKey, TsNativeCarriage, TsNativeConfiguration};
+use crate::{
+    TrackKey, TsNativeCarriage, TsNativeConfiguration,
+    hls_avc::{clock_describes, lane_track, pes_time},
+    hls_segment::HlsMediaAudioUnit,
+};
 use std::sync::atomic::AtomicBool;
 use triergon_core::{
-    Budget, BudgetVecIntoIter, Bytes, Error, InputWindow, Result, SourceCapabilities, SourceId,
-    Step, Time, WorkBudget,
+    Budget, BudgetVecIntoIter, Error, InputWindow, Result, SourceCapabilities, SourceId, Step,
+    Time, WorkBudget,
 };
 use triergon_framing::{Ac3FrameDetails, Ac3FrameLimits, Ac3FrameReader, Ac3StreamSelection};
 use triergon_mpegts::{
@@ -17,14 +21,6 @@ use triergon_mpegts::{
 const PES_CORRUPT: u32 = 2;
 const MAXIMUM_SYNCFRAME_BYTES: usize = 4096;
 const TS_PAYLOAD_BYTES: usize = 184;
-
-#[derive(Debug)]
-pub(crate) struct HlsDolbyFrame {
-    pub(crate) bytes: Bytes,
-    pub(crate) pts: Option<Time>,
-    pub(crate) dts: Option<Time>,
-    pub(crate) duration: Time,
-}
 
 #[derive(Default)]
 struct PesAnchor {
@@ -117,12 +113,7 @@ impl HlsDolby {
         let Some(packet) = mailbox.as_ref() else {
             return Ok(false);
         };
-        if self.config.track
-            != (TrackKey::Ts {
-                program: packet.program,
-                pid: packet.pid,
-            })
-            || packet.source_epochs.configuration != self.config.configuration_epoch
+        if !lane_track(self.config.track, self.config.configuration_epoch, packet)
             || packet.stream_id != 0xbd
             || packet.source_header.stream_id != packet.stream_id
         {
@@ -155,18 +146,12 @@ impl HlsDolby {
         let header = packet
             .time_header()
             .ok_or(Error::Invalid("HLS Dolby PES missing applicable header"))?;
-        if clock.program != packet.program
-            || clock.pid != packet.pid
-            || clock.profile != packet.profile
-            || clock.source_epochs != packet.source_epochs
-            || clock.source_pts_raw33 != header.pts_raw33
-            || clock.source_dts_raw33 != header.dts_raw33
-        {
+        if !clock_describes(&clock, packet, header.pts_raw33, header.dts_raw33) {
             return Err(Error::Invalid("HLS Dolby clock does not describe this PES"));
         }
         let anchor = PesAnchor {
-            pts: pes_time(header.pts_raw33, clock.pts90)?,
-            dts: pes_time(header.dts_raw33, clock.dts90)?,
+            pts: pes_time(header.pts_raw33, clock.pts90, TIMESTAMP)?,
+            dts: pes_time(header.dts_raw33, clock.dts90, TIMESTAMP)?,
         };
         if reader.position() == self.frame_start {
             self.frame_anchor = anchor;
@@ -191,7 +176,7 @@ impl HlsDolby {
         &mut self,
         work: &mut WorkBudget,
         cancel: &AtomicBool,
-    ) -> Result<AssemblyStep<HlsDolbyFrame>> {
+    ) -> Result<AssemblyStep<HlsMediaAudioUnit>> {
         let result = self.advance(work, cancel);
         if let Err(error) = result
             && !matches!(error, Error::Allocation | Error::Backpressure { .. })
@@ -206,7 +191,7 @@ impl HlsDolby {
         &mut self,
         work: &mut WorkBudget,
         cancel: &AtomicBool,
-    ) -> Result<AssemblyStep<HlsDolbyFrame>> {
+    ) -> Result<AssemblyStep<HlsMediaAudioUnit>> {
         let reader = self.reader.as_mut().map_err(|error| *error)?;
         loop {
             match reader.step(work, cancel)? {
@@ -245,7 +230,7 @@ impl HlsDolby {
                         std::mem::take(&mut self.next_anchor),
                     );
                     self.frame_start = reader.position();
-                    return Ok(AssemblyStep::Output(HlsDolbyFrame {
+                    return Ok(AssemblyStep::Output(HlsMediaAudioUnit {
                         bytes: frame.into_bytes(),
                         pts: anchor.pts,
                         dts: anchor.dts,
@@ -290,21 +275,12 @@ impl HlsDolby {
     }
 }
 
-fn pes_time(raw: Option<u64>, ticks: Option<i128>) -> Result<Option<Time>> {
-    let Some(raw) = raw else {
-        // A PTS-only clock projection can mirror PTS into DTS. Keep the
-        // physical absence of DTS on the frame.
-        return Ok(None);
-    };
-    let ticks = ticks
-        .filter(|value| value.rem_euclid(1 << 33) == i128::from(raw))
-        .ok_or(Error::Invalid("HLS Dolby PES timestamp representative"))?;
-    Ok(Some(Time::new(ticks, 90_000)?))
-}
+const TIMESTAMP: &str = "HLS Dolby PES timestamp representative";
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use triergon_core::Bytes;
     use triergon_mpegts::{
         PacketFormat, ParseLimits, SourceEpochs,
         compat::pes::{
@@ -471,7 +447,7 @@ mod tests {
         frame
     }
 
-    fn drain(reader: &mut HlsDolby, frames: &mut Vec<HlsDolbyFrame>) -> AssemblyStep<()> {
+    fn drain(reader: &mut HlsDolby, frames: &mut Vec<HlsMediaAudioUnit>) -> AssemblyStep<()> {
         let cancel = AtomicBool::new(false);
         for _ in 0..128 {
             match reader.poll(&mut WorkBudget::new(1), &cancel).unwrap() {
