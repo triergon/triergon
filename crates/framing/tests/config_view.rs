@@ -1,7 +1,7 @@
 #![forbid(unsafe_code)]
-//! Compact AVC/hvcC configuration views. The existing eager parsers are
-//! the default-API oracle for differential sweeps; literal record arithmetic is
-//! the independent oracle for selected records. No native or encoder output.
+//! AVC/hvcC configuration storage, work accounting and receiver acceptance.
+//! Literal record arithmetic and pool accounting are the oracles; no native or
+//! encoder output.
 use std::ops::Range;
 use std::sync::atomic::AtomicBool;
 use triergon_core::{Budget, Bytes, Error, SourceId, WorkBudget};
@@ -36,13 +36,9 @@ macro_rules! drive {
 }
 drive!(
     AvcConfigParser => AvcConfiguration,
-    AvcConfigViewParser => AvcConfigurationView,
     HvcConfigParser => HvcConfiguration,
-    HvcConfigViewParser => HvcConfigurationView,
     ReceiverAvcConfigParser => ReceiverAvcConfiguration,
-    ReceiverAvcConfigViewParser => ReceiverAvcConfigurationView,
     ReceiverHevcConfigParser => ReceiverHevcConfiguration,
-    ReceiverHevcConfigViewParser => ReceiverHevcConfigurationView,
 );
 
 static NO: AtomicBool = AtomicBool::new(false);
@@ -122,43 +118,7 @@ struct AvcFacts {
     nals: Vec<AvcNalFact>,
 }
 
-fn avc_eager_facts(c: &AvcConfiguration) -> AvcFacts {
-    AvcFacts {
-        raw: c.source_bytes().to_vec(),
-        source: c.source(),
-        fields: c.fields(),
-        width: c.sample_length_size().bytes(),
-        understood_end: c.understood_end(),
-        trailing: c.trailing_bytes().unwrap().to_vec(),
-        arrays: c
-            .arrays()
-            .iter()
-            .map(|a| {
-                (
-                    a.kind(),
-                    a.source_range(),
-                    a.nal_indices(),
-                    a.count_offset(),
-                )
-            })
-            .collect(),
-        nals: c
-            .nals()
-            .iter()
-            .map(|n| {
-                (
-                    n.source_range(),
-                    n.length_field_bytes().to_vec(),
-                    n.source_bytes().to_vec(),
-                    n.array_kind(),
-                    n.header(),
-                )
-            })
-            .collect(),
-    }
-}
-
-fn avc_view_facts(v: &AvcConfigurationView) -> AvcFacts {
+fn avc_facts(v: &AvcConfiguration) -> AvcFacts {
     assert_eq!(v.nals().len(), v.nal_count());
     assert_eq!(v.arrays().len(), v.array_count());
     assert!(v.nal(v.nal_count()).is_none());
@@ -212,32 +172,21 @@ fn avc_view_facts(v: &AvcConfigurationView) -> AvcFacts {
     }
 }
 
-type Both<F> = (Trace, Outcome<F>, Trace, Outcome<F>);
-
-fn avc_both(raw: &[u8], limits: AvcConfigLimits, quantum: u64) -> Both<AvcFacts> {
+/// Parses once; a published configuration holds exactly its retained storage
+/// and everything returns to the pool afterwards.
+fn avc_check(raw: &[u8], limits: AvcConfigLimits, quantum: u64) -> (Trace, Outcome<AvcFacts>) {
     let pool = Budget::new(4_000_000).unwrap();
     let baseline = pool.used();
-    let (et, e) = AvcConfigParser::new(&pool, avc_source(), bytes(&pool, raw), limits)
+    let (trace, out) = AvcConfigParser::new(&pool, avc_source(), bytes(&pool, raw), limits)
         .map_or_else(|e| (Vec::new(), Err(e)), |mut p| run(&mut p, quantum));
-    let e = e.map(|c| avc_eager_facts(&c));
-    assert_eq!(pool.used(), baseline);
-    let (vt, v) = AvcConfigViewParser::new(&pool, avc_source(), bytes(&pool, raw), limits)
-        .map_or_else(|e| (Vec::new(), Err(e)), |mut p| run(&mut p, quantum));
-    let v = v.map(|v| {
+    let out = out.map(|v| {
         // Parser and caller handle are gone: only the record handle and the
         // charged descriptor table remain live in the pool.
         assert_eq!(pool.used(), baseline + v.retained_storage_bytes().unwrap());
-        avc_view_facts(&v)
+        avc_facts(&v)
     });
     assert_eq!(pool.used(), baseline);
-    (et, e, vt, v)
-}
-
-fn assert_avc_equal(raw: &[u8], limits: AvcConfigLimits, quantum: u64, label: &str) -> bool {
-    let (et, e, vt, v) = avc_both(raw, limits, quantum);
-    assert_eq!(e, v, "{label} quantum{quantum}");
-    assert_eq!(et, vt, "{label} quantum{quantum} work trace");
-    e.is_ok()
+    (trace, out)
 }
 
 fn avc_fixture_records() -> Vec<(String, Vec<u8>)> {
@@ -359,48 +308,7 @@ struct HvcFacts {
     nals: Vec<HvcNalFact>,
 }
 
-fn hvc_eager_facts(c: &HvcConfiguration) -> HvcFacts {
-    HvcFacts {
-        raw: c.source_bytes().to_vec(),
-        source: c.source(),
-        fields: c.fields(),
-        width: c.length_size().bytes(),
-        understood_end: c.understood_end(),
-        suffix: c.opaque_suffix().unwrap().to_vec(),
-        syntax_issues: c.syntax_issues(),
-        arrays: c
-            .arrays()
-            .iter()
-            .map(|a| {
-                (
-                    a.source_header_bytes().to_vec(),
-                    a.source_range(),
-                    a.nal_indices(),
-                    a.completeness(),
-                    a.reserved_bit(),
-                    a.declared_nal_type(),
-                )
-            })
-            .collect(),
-        nals: c
-            .nals()
-            .iter()
-            .map(|n| {
-                (
-                    n.source_range(),
-                    n.length_field_bytes().to_vec(),
-                    n.source_bytes().to_vec(),
-                    n.header(),
-                    n.array_index(),
-                    n.declared_nal_type(),
-                    n.type_matches_declaration(),
-                )
-            })
-            .collect(),
-    }
-}
-
-fn hvc_view_facts(v: &HvcConfigurationView) -> HvcFacts {
+fn hvc_facts(v: &HvcConfiguration) -> HvcFacts {
     assert_eq!(v.nals().len(), v.nal_count());
     assert_eq!(v.arrays().len(), v.array_count());
     assert!(v.nal(v.nal_count()).is_none());
@@ -456,28 +364,17 @@ fn hvc_view_facts(v: &HvcConfigurationView) -> HvcFacts {
     }
 }
 
-fn hvc_both(raw: &[u8], limits: HvcConfigLimits, quantum: u64) -> Both<HvcFacts> {
+fn hvc_check(raw: &[u8], limits: HvcConfigLimits, quantum: u64) -> (Trace, Outcome<HvcFacts>) {
     let pool = Budget::new(8_000_000).unwrap();
     let baseline = pool.used();
-    let (et, e) = HvcConfigParser::new(&pool, hvc_source(), bytes(&pool, raw), limits)
+    let (trace, out) = HvcConfigParser::new(&pool, hvc_source(), bytes(&pool, raw), limits)
         .map_or_else(|e| (Vec::new(), Err(e)), |mut p| run(&mut p, quantum));
-    let e = e.map(|c| hvc_eager_facts(&c));
-    assert_eq!(pool.used(), baseline);
-    let (vt, v) = HvcConfigViewParser::new(&pool, hvc_source(), bytes(&pool, raw), limits)
-        .map_or_else(|e| (Vec::new(), Err(e)), |mut p| run(&mut p, quantum));
-    let v = v.map(|v| {
+    let out = out.map(|v| {
         assert_eq!(pool.used(), baseline + v.retained_storage_bytes().unwrap());
-        hvc_view_facts(&v)
+        hvc_facts(&v)
     });
     assert_eq!(pool.used(), baseline);
-    (et, e, vt, v)
-}
-
-fn assert_hvc_equal(raw: &[u8], limits: HvcConfigLimits, quantum: u64, label: &str) -> bool {
-    let (et, e, vt, v) = hvc_both(raw, limits, quantum);
-    assert_eq!(e, v, "{label} quantum{quantum}");
-    assert_eq!(et, vt, "{label} quantum{quantum} work trace");
-    e.is_ok()
+    (trace, out)
 }
 
 fn hvc_corpus() -> Vec<(&'static str, Vec<u8>)> {
@@ -520,13 +417,13 @@ fn hvc_corpus() -> Vec<(&'static str, Vec<u8>)> {
 // ================================================================== groups
 
 #[test]
-fn g01_borrowed_inspection_equals_every_eager_fact_and_trace() {
+fn g01_every_record_and_quantum_holds_exact_storage_and_record_extents() {
     let mut ok = 0;
     let mut total = 0;
-    for (label, raw) in avc_fixture_records() {
+    for (_, raw) in avc_fixture_records() {
         for quantum in [1, 2, 7, 64, 4096] {
             total += 1;
-            ok += usize::from(assert_avc_equal(&raw, avc_limits(), quantum, &label));
+            ok += usize::from(avc_check(&raw, avc_limits(), quantum).1.is_ok());
         }
     }
     assert!(total >= 82 * 5, "frozen AVC fixture rows {total}");
@@ -535,18 +432,18 @@ fn g01_borrowed_inspection_equals_every_eager_fact_and_trace() {
         "fixtures include accepted and refused rows"
     );
     let mut ok = 0;
-    for (label, raw) in hvc_corpus() {
+    for (_, raw) in hvc_corpus() {
         for quantum in [1, 2, 7, 64, 4096] {
-            ok += usize::from(assert_hvc_equal(&raw, hvc_limits(), quantum, label));
+            ok += usize::from(hvc_check(&raw, hvc_limits(), quantum).1.is_ok());
         }
     }
     assert!(ok > 0 && ok < hvc_corpus().len() * 5);
-    // The borrowed getters return slices with the view lifetime, never Bytes
-    // handles: these signatures only compile for `&'a [u8]` results.
-    fn avc<'a>(n: AvcConfigNalRef<'a>, a: AvcConfigArrayRef<'a>) -> [&'a [u8]; 3] {
+    // The borrowed getters return slices with the configuration lifetime,
+    // never Bytes handles: these signatures only compile for `&'a [u8]`.
+    fn avc<'a>(n: AvcConfigNal<'a>, a: AvcConfigArray<'a>) -> [&'a [u8]; 3] {
         [n.source_bytes(), n.length_field_bytes(), a.source_bytes()]
     }
-    fn hvc<'a>(n: HvcConfigNalRef<'a>, a: HvcConfigArrayRef<'a>) -> [&'a [u8]; 4] {
+    fn hvc<'a>(n: HvcConfigNal<'a>, a: HvcConfigArray<'a>) -> [&'a [u8]; 4] {
         [
             n.source_bytes(),
             n.length_field_bytes(),
@@ -556,8 +453,7 @@ fn g01_borrowed_inspection_equals_every_eager_fact_and_trace() {
     }
     let pool = Budget::new(1 << 16).unwrap();
     let mut p =
-        AvcConfigViewParser::new(&pool, avc_source(), bytes(&pool, &avc_rich()), avc_limits())
-            .unwrap();
+        AvcConfigParser::new(&pool, avc_source(), bytes(&pool, &avc_rich()), avc_limits()).unwrap();
     let v = run(&mut p, 4096).1.unwrap();
     let parts = avc(v.nal(4).unwrap(), v.array(2).unwrap());
     assert_eq!(
@@ -569,7 +465,7 @@ fn g01_borrowed_inspection_equals_every_eager_fact_and_trace() {
         ]
     );
     let _: &[u8] = v.trailing_bytes();
-    let mut p = HvcConfigViewParser::new(
+    let mut p = HvcConfigParser::new(
         &pool,
         hvc_source(),
         bytes(&pool, &hvc_example(&[])),
@@ -584,12 +480,18 @@ fn g01_borrowed_inspection_equals_every_eager_fact_and_trace() {
 }
 
 #[test]
-fn g01_mutation_and_truncation_sweeps_match_eager_outcomes() {
+fn g01_truncations_refuse_physically_and_mutations_keep_exact_storage() {
     let rich = avc_rich();
-    assert!(assert_avc_equal(&rich, avc_limits(), 4096, "rich"));
+    // Everything before the two trailing bytes is structure.
+    let understood = rich.len() - 2;
     for cut in 0..=rich.len() {
         for quantum in [1, 4096] {
-            assert_avc_equal(&rich[..cut], avc_limits(), quantum, &format!("cut{cut}"));
+            let out = avc_check(&rich[..cut], avc_limits(), quantum).1;
+            if cut < understood {
+                assert_eq!(out.err(), Some(Error::Truncated), "cut{cut}");
+            } else {
+                assert_eq!(out.unwrap().trailing, rich[understood..cut], "cut{cut}");
+            }
         }
     }
     for at in 0..rich.len() {
@@ -607,14 +509,20 @@ fn g01_mutation_and_truncation_sweeps_match_eager_outcomes() {
             let mut mutated = rich.clone();
             mutated[at] = value;
             for quantum in [1, 7] {
-                assert_avc_equal(&mutated, avc_limits(), quantum, &format!("at{at}={value}"));
+                let _ = avc_check(&mutated, avc_limits(), quantum);
             }
         }
     }
     let example = hvc_example(&[0xde, 0xad]);
+    let understood = example.len() - 2;
     for cut in 0..=example.len() {
         for quantum in [1, 4096] {
-            assert_hvc_equal(&example[..cut], hvc_limits(), quantum, &format!("cut{cut}"));
+            let out = hvc_check(&example[..cut], hvc_limits(), quantum).1;
+            if cut < understood {
+                assert_eq!(out.err(), Some(Error::Truncated), "cut{cut}");
+            } else {
+                assert_eq!(out.unwrap().suffix, example[understood..cut], "cut{cut}");
+            }
         }
     }
     for at in 0..example.len() {
@@ -632,59 +540,21 @@ fn g01_mutation_and_truncation_sweeps_match_eager_outcomes() {
             let mut mutated = example.clone();
             mutated[at] = value;
             for quantum in [1, 7] {
-                assert_hvc_equal(&mutated, hvc_limits(), quantum, &format!("at{at}={value}"));
+                let _ = hvc_check(&mutated, hvc_limits(), quantum);
             }
         }
     }
 }
 
 #[test]
-fn g01_literal_record_arithmetic_is_an_independent_oracle() {
-    // Plain AVC control: 01 42 a5 28 ff | e1 0002 6780 | 01 0002 6840.
-    let raw = unhex("0142a528ffe1000267800100026840");
-    let pool = Budget::new(65_536).unwrap();
-    let mut parser =
-        AvcConfigViewParser::new(&pool, avc_source(), bytes(&pool, &raw), avc_limits()).unwrap();
-    let view = run(&mut parser, 1).1.unwrap();
-    assert_eq!(view.fields().raw_prefix(), [1, 66, 165, 40, 255, 225]);
-    assert_eq!(view.sample_length_size().bytes(), 4);
-    assert_eq!(view.understood_end(), 15);
-    assert!(view.trailing_bytes().is_empty());
-    let arrays: Vec<_> = view
-        .arrays()
-        .map(|a| {
-            (
-                a.kind(),
-                a.source_range(),
-                a.count_offset(),
-                a.nal_indices(),
-            )
-        })
-        .collect();
-    assert_eq!(
-        arrays,
-        [
-            (AvcConfigArrayKind::Sequence, 5..10, 5, 0..1),
-            (AvcConfigArrayKind::Picture, 10..15, 10, 1..2)
-        ]
-    );
-    let n0 = view.nal(0).unwrap();
-    assert_eq!(n0.source_range(), 8..10);
-    assert_eq!(n0.length_field_bytes(), [0, 2]);
-    assert_eq!(n0.source_bytes(), [0x67, 0x80]);
-    assert_eq!(n0.header().nal_unit_type(), 7);
-    let n1 = view.nal(1).unwrap();
-    assert_eq!(n1.source_range(), 13..15);
-    assert_eq!(n1.length_field_bytes(), [0, 2]);
-    assert_eq!(n1.source_bytes(), [0x68, 0x40]);
-    assert_eq!(n1.header().nal_unit_type(), 8);
-
+fn g01_literal_hvcc_record_arithmetic() {
     // hvcC example: 23-byte prefix, four arrays (one empty, one mismatched).
+    let pool = Budget::new(65_536).unwrap();
     let raw = hvc_example(&[0xde, 0xad, 0xbe]);
     let mut parser =
-        HvcConfigViewParser::new(&pool, hvc_source(), bytes(&pool, &raw), hvc_limits()).unwrap();
-    let view = run(&mut parser, 1).1.unwrap();
-    let arrays: Vec<_> = view
+        HvcConfigParser::new(&pool, hvc_source(), bytes(&pool, &raw), hvc_limits()).unwrap();
+    let config = run(&mut parser, 1).1.unwrap();
+    let arrays: Vec<_> = config
         .arrays()
         .map(|a| {
             (
@@ -705,7 +575,7 @@ fn g01_literal_record_arithmetic_is_an_independent_oracle() {
             (vec![33, 0, 1], 56..67, 3..4, false, 33),
         ]
     );
-    let nals: Vec<_> = view
+    let nals: Vec<_> = config
         .nals()
         .map(|n| {
             (
@@ -727,29 +597,28 @@ fn g01_literal_record_arithmetic_is_an_independent_oracle() {
             (61..67, vec![0, 6], Some(6), 3, 33, 34),
         ]
     );
-    assert_eq!(view.understood_end(), 67);
-    assert_eq!(view.opaque_suffix(), [0xde, 0xad, 0xbe]);
-    assert_eq!(view.syntax_issues(), 1 << 7);
+    assert_eq!(config.understood_end(), 67);
+    assert_eq!(config.opaque_suffix(), [0xde, 0xad, 0xbe]);
+    assert_eq!(config.syntax_issues(), 1 << 7);
 }
-
 #[test]
-fn g02_single_exports_outlive_parser_and_view_with_one_full_owner() {
+fn g02_single_exports_outlive_parser_and_configuration_with_one_full_owner() {
     let pool = Budget::new(1 << 20).unwrap();
     let baseline = pool.used();
     let raw = bytes(&pool, &hvc_example(&[0xde, 0xad]));
     let raw_charge = raw.retained_storage_bytes();
-    let mut parser = HvcConfigViewParser::new(&pool, hvc_source(), raw, hvc_limits()).unwrap();
-    let view = run(&mut parser, 4096).1.unwrap();
+    let mut parser = HvcConfigParser::new(&pool, hvc_source(), raw, hvc_limits()).unwrap();
+    let config = run(&mut parser, 4096).1.unwrap();
     drop(parser);
-    let table = view.descriptor_storage_bytes().unwrap();
+    let table = config.descriptor_storage_bytes().unwrap();
     assert!(table > 0);
-    assert_eq!(view.retained_storage_bytes().unwrap(), raw_charge + table);
+    assert_eq!(config.retained_storage_bytes().unwrap(), raw_charge + table);
     assert_eq!(pool.used(), baseline + raw_charge + table);
-    let suffix = view.retain_opaque_suffix().unwrap();
+    let suffix = config.retain_opaque_suffix().unwrap();
     // The export adds no charged allocation: it aliases the one backing owner.
     assert_eq!(pool.used(), baseline + raw_charge + table);
-    assert!(suffix.shares_storage_with(view.source_bytes()));
-    drop(view);
+    assert!(suffix.shares_storage_with(config.source_bytes()));
+    drop(config);
     // Descriptor tables released; the full raw backing stays charged once.
     assert_eq!(pool.used(), baseline + raw_charge);
     assert_eq!(&suffix[..], [0xde, 0xad]);
@@ -758,11 +627,11 @@ fn g02_single_exports_outlive_parser_and_view_with_one_full_owner() {
 
     let raw = bytes(&pool, &avc_rich());
     let raw_charge = raw.retained_storage_bytes();
-    let mut parser = AvcConfigViewParser::new(&pool, avc_source(), raw, avc_limits()).unwrap();
-    let view = run(&mut parser, 1).1.unwrap();
+    let mut parser = AvcConfigParser::new(&pool, avc_source(), raw, avc_limits()).unwrap();
+    let config = run(&mut parser, 1).1.unwrap();
     drop(parser);
-    let trailing = view.retain_trailing_bytes().unwrap();
-    drop(view);
+    let trailing = config.retain_trailing_bytes().unwrap();
+    drop(config);
     assert_eq!(pool.used(), baseline + raw_charge);
     assert_eq!(&trailing[..], [0xaa, 0xbb]);
     drop(trailing);
@@ -783,145 +652,58 @@ fn g04_hidden_parent_offsets_are_record_relative_and_fully_charged() {
         let span = root.slice(127..127 + record.len()).unwrap();
         drop(root);
         if codec == "avc" {
-            let mut parser =
-                AvcConfigViewParser::new(&pool, avc_source(), span, avc_limits()).unwrap();
-            let view = run(&mut parser, 3).1.unwrap();
-            assert_eq!(view.source_bytes().as_ref(), record);
-            assert_eq!(view.nal(0).unwrap().source_range(), 8..11);
-            assert_eq!(view.nal(0).unwrap().source_bytes(), [0x67, 0x64, 0x00]);
-            assert_eq!(view.trailing_bytes(), [0xaa, 0xbb]);
+            let mut parser = AvcConfigParser::new(&pool, avc_source(), span, avc_limits()).unwrap();
+            let config = run(&mut parser, 3).1.unwrap();
+            assert_eq!(config.source_bytes().as_ref(), record);
+            assert_eq!(config.nal(0).unwrap().source_range(), 8..11);
+            assert_eq!(config.nal(0).unwrap().source_bytes(), [0x67, 0x64, 0x00]);
+            assert_eq!(config.trailing_bytes(), [0xaa, 0xbb]);
             assert_eq!(
-                view.retained_storage_bytes().unwrap(),
-                full + view.descriptor_storage_bytes().unwrap()
+                config.retained_storage_bytes().unwrap(),
+                full + config.descriptor_storage_bytes().unwrap()
             );
         } else {
-            let mut parser =
-                HvcConfigViewParser::new(&pool, hvc_source(), span, hvc_limits()).unwrap();
-            let view = run(&mut parser, 3).1.unwrap();
-            assert_eq!(view.source_bytes().as_ref(), record);
-            assert_eq!(view.nal(0).unwrap().source_range(), 28..34);
-            assert_eq!(view.opaque_suffix(), [9]);
+            let mut parser = HvcConfigParser::new(&pool, hvc_source(), span, hvc_limits()).unwrap();
+            let config = run(&mut parser, 3).1.unwrap();
+            assert_eq!(config.source_bytes().as_ref(), record);
+            assert_eq!(config.nal(0).unwrap().source_range(), 28..34);
+            assert_eq!(config.opaque_suffix(), [9]);
         }
         assert_eq!(pool.used(), baseline);
     }
-    // Foreign records are refused at entry exactly like the eager parsers.
-    let pool = Budget::new(1 << 16).unwrap();
-    let other = Budget::new(1 << 16).unwrap();
-    let raw = bytes(&other, &avc_rich());
-    assert_eq!(
-        AvcConfigViewParser::new(&pool, avc_source(), raw.clone(), avc_limits()).err(),
-        Some(Error::ForeignPool)
-    );
-    assert_eq!(
-        AvcConfigParser::new(&pool, avc_source(), raw, avc_limits()).err(),
-        Some(Error::ForeignPool)
-    );
-    let raw = bytes(&other, &hvc_example(&[]));
-    assert_eq!(
-        HvcConfigViewParser::new(&pool, hvc_source(), raw.clone(), hvc_limits()).err(),
-        Some(Error::ForeignPool)
-    );
-    assert_eq!(
-        HvcConfigParser::new(&pool, hvc_source(), raw, hvc_limits()).err(),
-        Some(Error::ForeignPool)
-    );
 }
 
 #[test]
-fn g05_full_width_offsets_wire_maxima_and_541_memberships() {
-    // 65535-byte payloads put later spans far above u16.
-    let mut avc = vec![1, 66, 0, 10, 255, 225, 255, 255, 0x67];
-    avc.resize(8 + 65_535, 0);
-    avc.extend_from_slice(&[1, 0, 3, 0x68, 1, 99]);
+fn g05_hvcc_full_width_offsets_and_absolute_extent() {
+    // A 65535-byte payload puts the later spans far above u16.
     let pool = Budget::new(1 << 20).unwrap();
-    let source = AvcConfigSource {
-        source: SourceId(7),
-        generation: u64::MAX,
-        offset: u64::MAX - avc.len() as u64,
-    };
-    for quantum in [1, 7, 4096] {
-        let mut parser =
-            AvcConfigViewParser::new(&pool, source, bytes(&pool, &avc), avc_limits()).unwrap();
-        let view = run(&mut parser, quantum).1.unwrap();
-        assert_eq!(view.source(), source);
-        assert_eq!(view.nal(0).unwrap().source_range(), 8..65_543);
-        assert_eq!(view.nal(0).unwrap().length_field_bytes(), [255, 255]);
-        assert_eq!(view.nal(1).unwrap().source_range(), 65_546..65_549);
-        assert_eq!(view.nal(1).unwrap().length_field_bytes(), [0, 3]);
-        assert_eq!(view.nal(1).unwrap().source_bytes(), [0x68, 1, 99]);
-        assert_eq!(view.array(1).unwrap().count_offset(), 65_543);
-    }
-    assert!(assert_avc_equal(&avc, avc_limits(), 7, "payload65535"));
-    // One byte past the absolute u64 extent is refused at entry, unchanged.
-    let raw = bytes(&pool, &avc);
-    let late = AvcConfigSource {
-        offset: u64::MAX - avc.len() as u64 + 1,
-        ..source
-    };
-    assert_eq!(
-        AvcConfigViewParser::new(&pool, late, raw.clone(), avc_limits()).err(),
-        Some(Error::Overflow)
-    );
-    assert_eq!(
-        AvcConfigParser::new(&pool, late, raw, avc_limits()).err(),
-        Some(Error::Overflow)
-    );
-
     let mut hvc = hvc_prefix(4, 2);
     hvc.extend_from_slice(&[32, 0, 1, 255, 255, 0x40, 1]);
     hvc.resize(28 + 65_535, 0x11);
     hvc.extend_from_slice(&[33, 0, 1, 0, 6]);
     hvc.extend_from_slice(&hvc_nal(33, 1));
-    assert!(assert_hvc_equal(&hvc, hvc_limits(), 7, "hvc-payload65535"));
     let late = HvcConfigSource {
         source: SourceId(1),
         generation: u64::MAX,
         offset: u64::MAX - hvc.len() as u64,
     };
     let raw = bytes(&pool, &hvc);
-    let mut parser = HvcConfigViewParser::new(&pool, late, raw.clone(), hvc_limits()).unwrap();
-    let view = run(&mut parser, 4096).1.unwrap();
-    assert_eq!(view.source(), late);
-    assert_eq!(view.nal(0).unwrap().source_range(), 28..65_563);
-    assert_eq!(view.nal(0).unwrap().length_field_bytes(), [255, 255]);
-    assert_eq!(view.array(0).unwrap().source_range(), 23..65_563);
-    assert_eq!(view.array(1).unwrap().source_range(), 65_563..65_574);
-    assert_eq!(view.nal(1).unwrap().source_range(), 65_568..65_574);
+    let mut parser = HvcConfigParser::new(&pool, late, raw.clone(), hvc_limits()).unwrap();
+    let config = run(&mut parser, 4096).1.unwrap();
+    assert_eq!(config.source(), late);
+    assert_eq!(config.nal(0).unwrap().source_range(), 28..65_563);
+    assert_eq!(config.nal(0).unwrap().length_field_bytes(), [255, 255]);
+    assert_eq!(config.array(0).unwrap().source_range(), 23..65_563);
+    assert_eq!(config.array(1).unwrap().source_range(), 65_563..65_574);
+    assert_eq!(config.nal(1).unwrap().source_range(), 65_568..65_574);
     let after = HvcConfigSource {
         offset: late.offset + 1,
         ..late
     };
     assert_eq!(
-        HvcConfigViewParser::new(&pool, after, raw, hvc_limits()).err(),
+        HvcConfigParser::new(&pool, after, raw, hvc_limits()).err(),
         Some(Error::Overflow)
     );
-
-    // Literal maximum AVC group counts: 31 + 255 + 255 memberships.
-    let mut raw = vec![1, 100, 0, 10, 255, 255];
-    for _ in 0..31 {
-        raw.extend_from_slice(&[0, 1, 0x67]);
-    }
-    raw.push(255);
-    for _ in 0..255 {
-        raw.extend_from_slice(&[0, 1, 0x68]);
-    }
-    raw.extend_from_slice(&[253, 248, 248, 255]);
-    for _ in 0..255 {
-        raw.extend_from_slice(&[0, 1, 0x6d]);
-    }
-    for quantum in [1, 7, 4096] {
-        assert!(assert_avc_equal(&raw, avc_limits(), quantum, "avc541"));
-        let pool = Budget::new(1 << 20).unwrap();
-        let mut parser =
-            AvcConfigViewParser::new(&pool, avc_source(), bytes(&pool, &raw), avc_limits())
-                .unwrap();
-        let view = run(&mut parser, quantum).1.unwrap();
-        assert_eq!(view.nal_count(), 541);
-        let groups: Vec<_> = view.arrays().map(|a| a.nal_indices()).collect();
-        assert_eq!(groups, [0..31, 31..286, 286..541]);
-        assert_eq!(view.array(2).unwrap().source_range().end, raw.len());
-        assert!(view.nals().all(|n| n.length_field_bytes() == [0, 1]));
-    }
 }
 
 #[test]
@@ -929,14 +711,11 @@ fn g06_empty_arrays_extensions_reserved_bits_mismatch_and_suffix() {
     // AVC: empty SPS and PPS groups, extension with no SPS-ext, suffix, and
     // a non-all-ones length-reserved pattern retained without repair.
     let raw = vec![1, 100, 0, 40, 0x7c, 0xe0, 0, 0xfc, 0xf8, 0xf8, 0, 1, 2];
-    for quantum in [1, 4096] {
-        assert!(assert_avc_equal(&raw, avc_limits(), quantum, "avc-empty"));
-    }
     let pool = Budget::new(1 << 16).unwrap();
     let mut parser =
-        AvcConfigViewParser::new(&pool, avc_source(), bytes(&pool, &raw), avc_limits()).unwrap();
-    let view = run(&mut parser, 1).1.unwrap();
-    let arrays: Vec<_> = view
+        AvcConfigParser::new(&pool, avc_source(), bytes(&pool, &raw), avc_limits()).unwrap();
+    let config = run(&mut parser, 1).1.unwrap();
+    let arrays: Vec<_> = config
         .arrays()
         .map(|a| {
             (
@@ -960,49 +739,37 @@ fn g06_empty_arrays_extensions_reserved_bits_mismatch_and_suffix() {
             ),
         ]
     );
-    assert_eq!(view.sample_length_size().bytes(), 1);
-    assert_eq!(view.fields().raw_extension(), Some([0xfc, 0xf8, 0xf8, 0]));
-    assert_eq!(view.fields().syntax_issues(), 1);
-    assert_eq!(view.trailing_bytes(), [1, 2]);
-    // hvcC: every corpus record, reserved bits and declaration mismatch.
-    for (label, raw) in hvc_corpus() {
-        assert_hvc_equal(&raw, hvc_limits(), 1, label);
-    }
+    assert_eq!(config.sample_length_size().bytes(), 1);
+    assert_eq!(config.fields().raw_extension(), Some([0xfc, 0xf8, 0xf8, 0]));
+    assert_eq!(config.fields().syntax_issues(), 1);
+    assert_eq!(config.trailing_bytes(), [1, 2]);
+    // hvcC: reserved bits and an empty array.
     let raw = hvc_corpus()
         .into_iter()
         .find(|(l, _)| *l == "reserved-and-empty")
         .unwrap()
         .1;
     let mut parser =
-        HvcConfigViewParser::new(&pool, hvc_source(), bytes(&pool, &raw), hvc_limits()).unwrap();
-    let view = run(&mut parser, 1).1.unwrap();
-    let facts: Vec<_> = view
+        HvcConfigParser::new(&pool, hvc_source(), bytes(&pool, &raw), hvc_limits()).unwrap();
+    let config = run(&mut parser, 1).1.unwrap();
+    let facts: Vec<_> = config
         .arrays()
         .map(|a| (a.reserved_bit(), a.completeness(), a.nal_indices()))
         .collect();
     assert_eq!(facts, [(true, false, 0..0), (true, true, 0..1)]);
-    assert_eq!(view.syntax_issues() & (1 << 6), 1 << 6);
+    assert_eq!(config.syntax_issues() & (1 << 6), 1 << 6);
 }
 
 #[test]
-fn g07_quanta_traces_cancellation_and_complete_ordering() {
+fn g07_cancellation_and_complete_ordering() {
     let rich = avc_rich();
     let hvc = hvc_example(&[1]);
-    for quantum in [1, 7, 4096] {
-        assert!(assert_avc_equal(&rich, avc_limits(), quantum, "trace"));
-        assert!(assert_hvc_equal(&hvc, hvc_limits(), quantum, "trace"));
-    }
     let pool = Budget::new(1 << 20).unwrap();
     let baseline = pool.used();
-    let avc_eager =
+    let avc =
         || AvcConfigParser::new(&pool, avc_source(), bytes(&pool, &rich), avc_limits()).unwrap();
-    let avc_view = || {
-        AvcConfigViewParser::new(&pool, avc_source(), bytes(&pool, &rich), avc_limits()).unwrap()
-    };
-    let hvc_eager =
+    let hvc =
         || HvcConfigParser::new(&pool, hvc_source(), bytes(&pool, &hvc), hvc_limits()).unwrap();
-    let hvc_view =
-        || HvcConfigViewParser::new(&pool, hvc_source(), bytes(&pool, &hvc), hvc_limits()).unwrap();
 
     // Zero work: an active parse yields without charging; cancellation
     // precedes that Yield and is sticky.
@@ -1021,10 +788,8 @@ fn g07_quanta_traces_cancellation_and_complete_ordering() {
         assert_eq!(parser.drive(&mut work, &NO).err(), Some(Error::Cancelled));
         assert_eq!(work.remaining(), 9);
     }
-    zero_work(avc_eager());
-    zero_work(avc_view());
-    zero_work(hvc_eager());
-    zero_work(hvc_view());
+    zero_work(avc());
+    zero_work(hvc());
     assert_eq!(pool.used(), baseline);
 
     // After publication AVC checks cancellation first; hvcC reports Complete.
@@ -1035,13 +800,12 @@ fn g07_quanta_traces_cancellation_and_complete_ordering() {
             .drive(&mut WorkBudget::new(0), &AtomicBool::new(true))
             .map(|step| matches!(step, BuildStep::Complete))
     }
-    assert_eq!(after_ready(avc_eager()), Err(Error::Cancelled));
-    assert_eq!(after_ready(avc_view()), Err(Error::Cancelled));
-    assert_eq!(after_ready(hvc_eager()), Ok(true));
-    assert_eq!(after_ready(hvc_view()), Ok(true));
+    assert_eq!(after_ready(avc()), Err(Error::Cancelled));
+    assert_eq!(after_ready(hvc()), Ok(true));
     assert_eq!(pool.used(), baseline);
 
-    // Cancellation at every step index stops both walks identically.
+    // Cancellation at any step index before publication stops the walk
+    // with the step's whole work unit unspent.
     fn cancelled<P: Drive>(mut parser: P, at: usize) -> Vec<u64> {
         let mut trace = Vec::new();
         for step in 0.. {
@@ -1062,16 +826,18 @@ fn g07_quanta_traces_cancellation_and_complete_ordering() {
         }
         trace
     }
-    let avc_steps = cancelled(avc_eager(), usize::MAX).len();
-    let hvc_steps = cancelled(hvc_eager(), usize::MAX).len();
+    let avc_steps = cancelled(avc(), usize::MAX).len();
+    let hvc_steps = cancelled(hvc(), usize::MAX).len();
     assert!(avc_steps > 10 && hvc_steps > 10);
     for at in 0..40 {
-        let e = cancelled(avc_eager(), at);
-        assert_eq!(e, cancelled(avc_view(), at), "avc cancel{at}");
-        assert_eq!(e.last() == Some(&201), at < avc_steps, "avc cancel{at}");
-        let e = cancelled(hvc_eager(), at);
-        assert_eq!(e, cancelled(hvc_view(), at), "hevc cancel{at}");
-        assert_eq!(e.last() == Some(&201), at < hvc_steps, "hevc cancel{at}");
+        let trace = cancelled(avc(), at);
+        assert_eq!(trace.last() == Some(&201), at < avc_steps, "avc cancel{at}");
+        let trace = cancelled(hvc(), at);
+        assert_eq!(
+            trace.last() == Some(&201),
+            at < hvc_steps,
+            "hevc cancel{at}"
+        );
         assert_eq!(pool.used(), baseline);
     }
 }
@@ -1089,28 +855,25 @@ fn avc_cached_fill_boundary_matches_fallback_output_and_work() {
     let mut previous = None;
     for remaining in [fill_work - 1, fill_work] {
         let quantum = before_fill_work + remaining;
-        let (eager_trace, eager, view_trace, view) = avc_both(&raw, avc_limits(), quantum);
+        let (trace, facts) = avc_check(&raw, avc_limits(), quantum);
         let expected_trace = if remaining == fill_work {
             vec![("ready", 0)]
         } else {
             vec![("yield", 0), ("ready", quantum - 1)]
         };
-        assert_eq!(eager_trace, expected_trace);
-        assert_eq!(view_trace, eager_trace);
-        let spent = |trace: &Trace| trace.iter().map(|(_, left)| quantum - left).sum::<u64>();
-        assert_eq!(spent(&eager_trace), before_fill_work + fill_work);
-        assert_eq!(spent(&view_trace), spent(&eager_trace));
-        let (eager, view) = (eager.unwrap(), view.unwrap());
-        assert_eq!(view, eager);
+        assert_eq!(trace, expected_trace);
+        let spent = trace.iter().map(|(_, left)| quantum - left).sum::<u64>();
+        assert_eq!(spent, before_fill_work + fill_work);
+        let facts = facts.unwrap();
         if let Some(previous) = &previous {
-            assert_eq!(&view, previous);
+            assert_eq!(&facts, previous);
         }
-        previous = Some(view);
+        previous = Some(facts);
     }
 }
 
 #[test]
-fn g08_permanent_failures_latch_release_and_match_eager() {
+fn g08_permanent_failures_and_limits_latch_and_release() {
     let rich = avc_rich();
     // Late physical truncation, zero NAL length and a bad fixed NAL header.
     let mut zero = rich.clone();
@@ -1124,13 +887,10 @@ fn g08_permanent_failures_latch_release_and_match_eager() {
     ];
     for (label, raw) in &cases {
         for quantum in [1, 7, 4096] {
-            let (et, e, vt, v) = avc_both(raw, avc_limits(), quantum);
-            assert!(e.is_err(), "{label}");
-            assert_eq!(e, v, "{label}");
-            assert_eq!(et, vt, "{label}");
+            assert!(avc_check(raw, avc_limits(), quantum).1.is_err(), "{label}");
         }
     }
-    // Record, NAL-count and NAL-size limits.
+    // Record, NAL-count and NAL-size limits: five NALs, the largest four bytes.
     for maximum_nals in 0..=6 {
         for maximum_nal_bytes in [1, 2, 3, 4, 65_535] {
             let limits = AvcConfigLimits {
@@ -1138,7 +898,12 @@ fn g08_permanent_failures_latch_release_and_match_eager() {
                 maximum_nal_bytes,
                 ..avc_limits()
             };
-            assert_avc_equal(&rich, limits, 1, "avc-limits");
+            let out = avc_check(&rich, limits, 1).1;
+            if maximum_nals >= 5 && maximum_nal_bytes >= 4 {
+                assert!(out.is_ok(), "{limits:?}");
+            } else {
+                assert!(matches!(out, Err(Error::Limit { .. })), "{limits:?}");
+            }
         }
     }
     for maximum_record_bytes in [0, rich.len() - 1, rich.len()] {
@@ -1146,8 +911,10 @@ fn g08_permanent_failures_latch_release_and_match_eager() {
             maximum_record_bytes,
             ..avc_limits()
         };
-        assert_avc_equal(&rich, limits, 4096, "avc-record-limit");
+        let out = avc_check(&rich, limits, 4096).1;
+        assert_eq!(out.is_ok(), maximum_record_bytes == rich.len());
     }
+    // Four arrays and four six-byte NALs.
     let hvc = hvc_example(&[5]);
     for maximum_arrays in 0..=5 {
         for maximum_nals in [0, 3, 4, 5] {
@@ -1158,7 +925,12 @@ fn g08_permanent_failures_latch_release_and_match_eager() {
                     maximum_nal_bytes,
                     ..hvc_limits()
                 };
-                assert_hvc_equal(&hvc, limits, 1, "hvc-limits");
+                let out = hvc_check(&hvc, limits, 1).1;
+                if maximum_arrays >= 4 && maximum_nals >= 4 && maximum_nal_bytes >= 6 {
+                    assert!(out.is_ok(), "{limits:?}");
+                } else {
+                    assert!(matches!(out, Err(Error::Limit { .. })), "{limits:?}");
+                }
             }
         }
     }
@@ -1167,30 +939,29 @@ fn g08_permanent_failures_latch_release_and_match_eager() {
             maximum_record_bytes,
             ..hvc_limits()
         };
-        assert_hvc_equal(&hvc, limits, 4096, "hvc-record-limit");
+        let out = hvc_check(&hvc, limits, 4096).1;
+        assert_eq!(out.is_ok(), maximum_record_bytes == hvc.len());
     }
     // A latched failure released its raw handle: only the caller's remains.
     let pool = Budget::new(1 << 16).unwrap();
     let baseline = pool.used();
     let raw = bytes(&pool, &cases[0].1);
     let charge = raw.retained_storage_bytes();
-    let mut parser =
-        AvcConfigViewParser::new(&pool, avc_source(), raw.clone(), avc_limits()).unwrap();
+    let mut parser = AvcConfigParser::new(&pool, avc_source(), raw.clone(), avc_limits()).unwrap();
     assert_eq!(run(&mut parser, 1).1.err(), Some(Error::Truncated));
     assert_eq!(pool.used(), baseline + charge);
     drop(raw);
     assert_eq!(pool.used(), baseline);
     drop(parser);
     let raw = bytes(&pool, &hvc[..hvc.len() - 3]);
-    let mut parser =
-        HvcConfigViewParser::new(&pool, hvc_source(), raw.clone(), hvc_limits()).unwrap();
+    let mut parser = HvcConfigParser::new(&pool, hvc_source(), raw.clone(), hvc_limits()).unwrap();
     assert_eq!(run(&mut parser, 1).1.err(), Some(Error::Truncated));
     drop(raw);
     assert_eq!(pool.used(), baseline);
 }
 
 /// Smallest pool limit that publishes, with the caller's raw handle moved in.
-fn minimum_limit(codec: &str, record: &[u8], view: bool) -> usize {
+fn minimum_limit(codec: &str, record: &[u8]) -> usize {
     (Budget::control_storage_bytes()..1 << 16)
         .find(|&limit| {
             let Ok(pool) = Budget::new(limit) else {
@@ -1199,15 +970,12 @@ fn minimum_limit(codec: &str, record: &[u8], view: bool) -> usize {
             let Ok(raw) = Bytes::copy_from_slice(&pool, record) else {
                 return false;
             };
-            match (codec, view) {
-                ("avc", false) => AvcConfigParser::new(&pool, avc_source(), raw, avc_limits())
-                    .is_ok_and(|mut p| run(&mut p, 4096).1.is_ok()),
-                ("avc", true) => AvcConfigViewParser::new(&pool, avc_source(), raw, avc_limits())
-                    .is_ok_and(|mut p| run(&mut p, 4096).1.is_ok()),
-                (_, false) => HvcConfigParser::new(&pool, hvc_source(), raw, hvc_limits())
-                    .is_ok_and(|mut p| run(&mut p, 4096).1.is_ok()),
-                (_, true) => HvcConfigViewParser::new(&pool, hvc_source(), raw, hvc_limits())
-                    .is_ok_and(|mut p| run(&mut p, 4096).1.is_ok()),
+            if codec == "avc" {
+                AvcConfigParser::new(&pool, avc_source(), raw, avc_limits())
+                    .is_ok_and(|mut p| run(&mut p, 4096).1.is_ok())
+            } else {
+                HvcConfigParser::new(&pool, hvc_source(), raw, hvc_limits())
+                    .is_ok_and(|mut p| run(&mut p, 4096).1.is_ok())
             }
         })
         .unwrap()
@@ -1218,17 +986,12 @@ fn g09_actual_capacity_minimum_budget_and_resumable_pressure() {
     let rich = avc_rich();
     let hvc = hvc_example(&[]);
     for (codec, record) in [("avc", &rich), ("hevc", &hvc)] {
-        let eager = minimum_limit(codec, record, false);
-        let view = minimum_limit(codec, record, true);
-        // The compact table is smaller, so the view fits a pool that the
-        // eager representation cannot; eager admission itself is unchanged.
-        assert!(view < eager, "{codec} view{view} eager{eager}");
-        let pool = Budget::new(view).unwrap();
+        let minimum = minimum_limit(codec, record);
+        let pool = Budget::new(minimum).unwrap();
         let raw = bytes(&pool, record);
         let charge = raw.retained_storage_bytes();
         let table = if codec == "avc" {
-            let mut parser =
-                AvcConfigViewParser::new(&pool, avc_source(), raw, avc_limits()).unwrap();
+            let mut parser = AvcConfigParser::new(&pool, avc_source(), raw, avc_limits()).unwrap();
             let v = run(&mut parser, 4096).1.unwrap();
             drop(parser);
             assert_eq!(
@@ -1237,8 +1000,7 @@ fn g09_actual_capacity_minimum_budget_and_resumable_pressure() {
             );
             v.descriptor_storage_bytes().unwrap()
         } else {
-            let mut parser =
-                HvcConfigViewParser::new(&pool, hvc_source(), raw, hvc_limits()).unwrap();
+            let mut parser = HvcConfigParser::new(&pool, hvc_source(), raw, hvc_limits()).unwrap();
             let v = run(&mut parser, 4096).1.unwrap();
             drop(parser);
             assert_eq!(
@@ -1247,25 +1009,10 @@ fn g09_actual_capacity_minimum_budget_and_resumable_pressure() {
             );
             v.descriptor_storage_bytes().unwrap()
         };
-        // The view held only its record charge plus its actual table capacity.
+        // The configuration held only its record charge plus its actual
+        // table capacity.
         assert!(table > 0 && charge > 0);
         assert_eq!(pool.used(), Budget::control_storage_bytes());
-        let pool = Budget::new(view).unwrap();
-        let raw = bytes(&pool, record);
-        let result = if codec == "avc" {
-            AvcConfigParser::new(&pool, avc_source(), raw, avc_limits())
-                .map(|mut p| run(&mut p, 4096).1.map(drop))
-        } else {
-            HvcConfigParser::new(&pool, hvc_source(), raw, hvc_limits())
-                .map(|mut p| run(&mut p, 4096).1.map(drop))
-        };
-        assert!(
-            matches!(
-                result,
-                Ok(Err(Error::Backpressure { .. } | Error::Limit { .. }))
-            ),
-            "{codec} {result:?}"
-        );
     }
 
     // Backpressure while reserving is resumable and commits no event twice.
@@ -1297,213 +1044,100 @@ fn g09_actual_capacity_minimum_budget_and_resumable_pressure() {
         let size = pool.available() - 64 - Bytes::owner_overhead_bytes();
         bytes(pool, &vec![0; size])
     };
-    let roomy = Budget::new(1 << 20).unwrap();
-    let mut p =
-        AvcConfigViewParser::new(&roomy, avc_source(), bytes(&roomy, &rich), avc_limits()).unwrap();
-    let expected = avc_view_facts(&run(&mut p, 1).1.unwrap());
+    let expected = avc_check(&rich, avc_limits(), 1).1.unwrap();
     let pool = Budget::new(1 << 16).unwrap();
     let raw = bytes(&pool, &rich);
     let blocker = block(&pool);
-    let parser = AvcConfigViewParser::new(&pool, avc_source(), raw, avc_limits()).unwrap();
-    assert_eq!(avc_view_facts(&pressured(parser, blocker)), expected);
+    let parser = AvcConfigParser::new(&pool, avc_source(), raw, avc_limits()).unwrap();
+    assert_eq!(avc_facts(&pressured(parser, blocker)), expected);
 
-    let mut p =
-        HvcConfigViewParser::new(&roomy, hvc_source(), bytes(&roomy, &hvc), hvc_limits()).unwrap();
-    let expected = hvc_view_facts(&run(&mut p, 1).1.unwrap());
+    let expected = hvc_check(&hvc, hvc_limits(), 1).1.unwrap();
     let pool = Budget::new(1 << 16).unwrap();
     let raw = bytes(&pool, &hvc);
     let blocker = block(&pool);
-    let parser = HvcConfigViewParser::new(&pool, hvc_source(), raw, hvc_limits()).unwrap();
-    assert_eq!(hvc_view_facts(&pressured(parser, blocker)), expected);
+    let parser = HvcConfigParser::new(&pool, hvc_source(), raw, hvc_limits()).unwrap();
+    assert_eq!(hvc_facts(&pressured(parser, blocker)), expected);
 }
 
 #[test]
-fn g10_default_eager_api_and_owned_clone_behavior_are_unchanged() {
-    // Owned eager leaves still clone their Bytes handles and keep the owner.
-    let pool = Budget::new(1 << 16).unwrap();
-    let baseline = pool.used();
-    let raw = bytes(&pool, &hvc_example(&[]));
-    let charge = raw.retained_storage_bytes();
-    let mut parser = HvcConfigParser::new(&pool, hvc_source(), raw, hvc_limits()).unwrap();
-    let config = run(&mut parser, 1).1.unwrap();
-    let nal: HvcConfigNal = config.nals()[3].clone();
-    let array: HvcConfigArray = config.arrays()[1].clone();
-    let suffix = config.opaque_suffix().unwrap();
-    let _: &Bytes = nal.source_bytes();
-    let _: &Bytes = array.source_header_bytes();
-    assert!(
-        nal.source_bytes()
-            .shares_storage_with(config.source_bytes())
-    );
-    drop((config, parser));
-    assert_eq!(pool.used(), baseline + charge);
-    assert_eq!(nal.source_bytes().as_ref(), [68, 1, 0, 0, 3, 6]);
-    assert_eq!(array.source_header_bytes().as_ref(), [55, 0, 0]);
-    drop((nal, array, suffix));
-    assert_eq!(pool.used(), baseline);
-    let raw = bytes(&pool, &avc_rich());
-    let mut parser = AvcConfigParser::new(&pool, avc_source(), raw, avc_limits()).unwrap();
-    let config = run(&mut parser, 1).1.unwrap();
-    let nal: AvcConfigNal = config.nals()[4].clone();
-    let _: &Bytes = nal.length_field_bytes();
-    drop((config, parser));
-    assert_eq!(nal.source_bytes().as_ref(), [0x6d, 1, 2, 3]);
-    drop(nal);
-    assert_eq!(pool.used(), baseline);
-}
-
-#[test]
-fn g11_strict_and_observed_views_keep_distinct_typed_refusals() {
+fn g11_strict_and_observed_configurations_keep_distinct_typed_refusals() {
     let mut avc3 = avc_rich();
     avc3[4] = 0xfe;
     let mut hvc3 = hvc_example(&[]);
     hvc3[21] = 0xb4 | 2;
     let pool = Budget::new(1 << 20).unwrap();
     let baseline = pool.used();
-    // Strict source parsers refuse width three; the views stay strict.
+    // Strict source parsers refuse width three.
     for quantum in [1, 4096] {
-        let (_, e, _, v) = avc_both(&avc3, avc_limits(), quantum);
-        let refusal = Error::Invalid("AVC three-byte sample length");
-        assert_eq!((e.err(), v.err()), (Some(refusal), Some(refusal)));
-        let (_, e, _, v) = hvc_both(&hvc3, hvc_limits(), quantum);
-        let refusal = Error::Unsupported("hvcC three-byte sample length");
-        assert_eq!((e.err(), v.err()), (Some(refusal), Some(refusal)));
+        assert_eq!(
+            avc_check(&avc3, avc_limits(), quantum).1.err(),
+            Some(Error::Invalid("AVC three-byte sample length"))
+        );
+        assert_eq!(
+            hvc_check(&hvc3, hvc_limits(), quantum).1.err(),
+            Some(Error::Unsupported("hvcC three-byte sample length"))
+        );
     }
-    // Explicit observed views accept the same bytes with the refusal attached.
+    // Explicit observed receivers accept the same bytes with the refusal attached.
     for quantum in [1, 7, 4096] {
-        let mut eager =
+        let mut parser =
             ReceiverAvcConfigParser::new(&pool, avc_source(), bytes(&pool, &avc3), avc_limits())
                 .unwrap();
-        let mut view = ReceiverAvcConfigViewParser::new(
-            &pool,
-            avc_source(),
-            bytes(&pool, &avc3),
-            avc_limits(),
-        )
-        .unwrap();
-        let (et, e) = run(&mut eager, quantum);
-        let (vt, v) = run(&mut view, quantum);
-        assert_eq!(et, vt);
-        let (e, v) = (e.unwrap(), v.unwrap());
+        let v = run(&mut parser, quantum).1.unwrap();
         assert_eq!(v.observed_length_size().bytes(), 3);
-        assert_eq!(v.observed_length_size(), e.observed_length_size());
-        assert_eq!(v.strict_source_refusal(), e.strict_source_refusal());
         assert_eq!(
             v.strict_source_refusal(),
             Some(Error::Invalid("AVC three-byte sample length"))
         );
-        assert_eq!((v.source(), v.fields()), (e.source(), e.fields()));
-        assert_eq!(v.source_bytes().as_ref(), e.source_bytes().as_ref());
-        let ranges: Vec<_> = v.nals().map(|n| n.source_range()).collect();
-        let eager_ranges: Vec<_> = e.nals().iter().map(AvcConfigNal::source_range).collect();
-        assert_eq!(ranges, eager_ranges);
-        assert_eq!(v.nal_count(), e.nals().len());
+        assert_eq!(v.source(), avc_source());
+        assert_eq!(v.source_bytes().as_ref(), avc3);
+        assert_eq!(v.nal_count(), 5);
         assert_eq!(v.trailing_bytes(), [0xaa, 0xbb]);
 
-        let mut eager =
+        let mut parser =
             ReceiverHevcConfigParser::new(&pool, hvc_source(), bytes(&pool, &hvc3), hvc_limits())
                 .unwrap();
-        let mut view = ReceiverHevcConfigViewParser::new(
-            &pool,
-            hvc_source(),
-            bytes(&pool, &hvc3),
-            hvc_limits(),
-        )
-        .unwrap();
-        let (et, e) = run(&mut eager, quantum);
-        let (vt, v) = run(&mut view, quantum);
-        assert_eq!(et, vt);
-        let (e, v) = (e.unwrap(), v.unwrap());
+        let v = run(&mut parser, quantum).1.unwrap();
         assert_eq!(v.observed_length_size().bytes(), 3);
-        assert_eq!(v.strict_source_refusal(), e.strict_source_refusal());
         assert_eq!(
             v.strict_source_refusal(),
             Some(Error::Unsupported("hvcC three-byte sample length"))
         );
-        let arrays: Vec<_> = v
-            .arrays()
-            .map(|a| (a.source_range(), a.nal_indices()))
-            .collect();
-        let eager_arrays: Vec<_> = e
-            .arrays()
-            .iter()
-            .map(|a| (a.source_range(), a.nal_indices()))
-            .collect();
-        assert_eq!(arrays, eager_arrays);
         assert_eq!(v.syntax_issues() & (1 << 5), 1 << 5);
     }
     assert_eq!(pool.used(), baseline);
 
-    // Short-update rejections are identical, including refusals.
+    // Only a short version-one update header produces a rejection, once.
     let mut records: Vec<Vec<u8>> = (1..7).map(|n| avc3[..n].to_vec()).collect();
     records.extend((1..7).map(|n| avc_rich()[..n].to_vec()));
     records.push(vec![2, 66, 0, 10, 0xff]);
     records.push(avc_rich());
-    type Rejected = (Vec<u8>, AvcConfigSource, Error, Option<Error>, Option<i32>);
-    fn rejected(r: Option<ReceiverAvcUpdateRejection>) -> Option<Rejected> {
-        r.map(|r| {
-            #[cfg(feature = "reference-trace")]
-            let native = Some(r.native_receive_result());
-            #[cfg(not(feature = "reference-trace"))]
-            let native = None;
-            (
-                r.source_bytes().to_vec(),
-                r.source(),
-                r.source_error(),
-                r.strict_source_refusal(),
-                native,
-            )
-        })
-    }
     for raw in records {
         for update in [false, true] {
-            let (mut eager, mut view) = if update {
-                (
-                    ReceiverAvcConfigParser::new_update(
-                        &pool,
-                        avc_source(),
-                        bytes(&pool, &raw),
-                        avc_limits(),
-                    )
-                    .unwrap(),
-                    ReceiverAvcConfigViewParser::new_update(
-                        &pool,
-                        avc_source(),
-                        bytes(&pool, &raw),
-                        avc_limits(),
-                    )
-                    .unwrap(),
-                )
+            let new = if update {
+                ReceiverAvcConfigParser::new_update
             } else {
-                (
-                    ReceiverAvcConfigParser::new(
-                        &pool,
-                        avc_source(),
-                        bytes(&pool, &raw),
-                        avc_limits(),
-                    )
-                    .unwrap(),
-                    ReceiverAvcConfigViewParser::new(
-                        &pool,
-                        avc_source(),
-                        bytes(&pool, &raw),
-                        avc_limits(),
-                    )
-                    .unwrap(),
-                )
+                ReceiverAvcConfigParser::new
             };
-            assert_eq!(view.source_bytes().as_ref(), raw);
-            assert_eq!(view.strict_source_refusal(), eager.strict_source_refusal());
-            let (et, e) = run(&mut eager, 1);
-            let (vt, v) = run(&mut view, 1);
-            assert_eq!(et, vt);
-            assert_eq!(e.err(), v.err());
-            let er = rejected(eager.take_update_rejection());
-            let vr = rejected(view.take_update_rejection());
-            assert_eq!(er, vr, "{raw:?} update{update}");
-            assert_eq!(er.is_some(), update && raw.len() < 7 && raw[0] == 1);
+            let mut parser = new(&pool, avc_source(), bytes(&pool, &raw), avc_limits()).unwrap();
+            assert_eq!(parser.source_bytes().as_ref(), raw);
+            let _ = run(&mut parser, 1);
+            let rejection = parser.take_update_rejection();
+            assert_eq!(
+                rejection.is_some(),
+                update && raw.len() < 7 && raw[0] == 1,
+                "{raw:?} update{update}"
+            );
+            if let Some(r) = rejection {
+                assert_eq!(r.source_bytes().as_ref(), raw);
+                assert_eq!(r.source(), avc_source());
+                assert_eq!(r.source_error(), Error::Truncated);
+                assert_eq!(r.strict_source_refusal(), parser.strict_source_refusal());
+                #[cfg(feature = "reference-trace")]
+                assert_eq!(r.native_receive_result(), -1_094_995_529);
+            }
             // A rejection is produced at most once.
-            assert!(view.take_update_rejection().is_none());
+            assert!(parser.take_update_rejection().is_none());
         }
     }
     assert_eq!(pool.used(), baseline);

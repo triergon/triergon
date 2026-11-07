@@ -1,6 +1,5 @@
 #![forbid(unsafe_code)]
 use std::mem::size_of;
-use std::ops::Range;
 use std::sync::atomic::AtomicBool;
 use triergon_core::{Budget, Bytes, Error, SourceId, WorkBudget};
 use triergon_framing::*;
@@ -46,28 +45,10 @@ fn parsed(pool: &Budget, raw: Bytes, quantum: u64) -> HvcConfiguration {
 }
 
 #[test]
-fn compact_descriptor_fits_four_machine_words() {
-    println!(
-        "PACKED_LAYOUT range={} compact={}",
-        size_of::<Range<usize>>(),
-        size_of::<NalPacketRangeSegment>()
-    );
+fn packet_segment_fits_four_machine_words() {
     assert!(
-        size_of::<NalPacketRangeSegment>() <= 4 * size_of::<usize>(),
-        "compact source-range descriptor retains a separate index/tag word"
-    );
-}
-
-#[test]
-fn hevc_descriptor_does_not_store_machine_word_array_index() {
-    let ceiling = 2 * size_of::<Bytes>() + size_of::<Range<usize>>() + 8;
-    println!(
-        "PACKED_LAYOUT hevc={} ceiling={ceiling}",
-        size_of::<HvcConfigNal>()
-    );
-    assert!(
-        size_of::<HvcConfigNal>() <= ceiling,
-        "wire-bounded array index still consumes a machine word"
+        size_of::<NalPacketSegment>() <= 4 * size_of::<usize>(),
+        "source-range segment descriptor retains a separate index/tag word"
     );
 }
 
@@ -88,25 +69,24 @@ fn all255_array_indices_and_source_fields_survive_hidden_parent_and_close() {
         assert_eq!(config.source().source, SourceId(u64::MAX));
         assert_eq!(config.source().generation, u64::MAX);
         assert_eq!(config.nals().len(), 255);
-        for (index, nal) in config.nals().iter().enumerate() {
+        assert_eq!(config.source_bytes().retained_storage_bytes(), retained);
+        for (index, nal) in config.nals().enumerate() {
             assert_eq!(nal.array_index(), index);
             assert_eq!(nal.declared_nal_type(), 32 + (index % 3) as u8);
             assert!(nal.type_matches_declaration());
             assert_eq!(nal.source_range(), 28 + 8 * index..31 + 8 * index);
-            assert_eq!(nal.length_field_bytes().as_ref(), &[0, 3]);
-            assert_eq!(
-                nal.source_bytes().as_ref(),
-                &bytes[28 + 8 * index..31 + 8 * index]
-            );
-            assert_eq!(nal.source_bytes().retained_storage_bytes(), retained);
+            assert_eq!(nal.length_field_bytes(), &[0, 3]);
+            assert_eq!(nal.source_bytes(), &bytes[28 + 8 * index..31 + 8 * index]);
         }
-        let held = config.nals()[254].clone();
-        drop(config);
         drop(root);
-        assert_eq!(pool.used(), baseline + retained);
-        assert_eq!(held.array_index(), 254);
-        assert_eq!(held.source_bytes().as_ref(), &[68, 1, 254]);
-        drop(held);
+        assert_eq!(
+            pool.used(),
+            baseline + config.retained_storage_bytes().unwrap()
+        );
+        let last = config.nal(254).unwrap();
+        assert_eq!(last.array_index(), 254);
+        assert_eq!(last.source_bytes(), &[68, 1, 254]);
+        drop(config);
         assert_eq!(pool.used(), baseline);
     }
 }
@@ -117,8 +97,8 @@ fn zero_array_configuration_and_cancel_preserve_old_semantics() {
     let baseline = pool.used();
     let raw = Bytes::copy_from_slice(&pool, &hvcc(0)).unwrap();
     let configuration = parsed(&pool, raw.clone(), 1);
-    assert!(configuration.nals().is_empty());
-    assert!(configuration.arrays().is_empty());
+    assert_eq!(configuration.nal_count(), 0);
+    assert_eq!(configuration.array_count(), 0);
     drop(configuration);
     let before = pool.used();
     let mut parser = HvcConfigParser::new(

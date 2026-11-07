@@ -1,9 +1,9 @@
 //! The packet job state machine: one method per [`Phase`], driven by
-//! [`PacketJob::advance_into`]. Each method is one step of the original
+//! [`NalPacketJob::advance_into`]. Each method is one step of the original
 //! loop; `Step::Continue` re-enters the loop and `Step::Break` returns.
 use super::{
-    AvcState, Injection, NalPacketProgress, NalPacketReceiverErrorKind, PacketConfig, PacketJob,
-    PacketOutput, PacketSegment, PendingNal, Phase,
+    AvcState, Injection, NalPacketJob, NalPacketOutput, NalPacketProgress,
+    NalPacketReceiverErrorKind, NalPacketSegment, PendingNal, Phase,
 };
 use crate::{AvcConfigArrayKind, Codec, NalHeader};
 use std::ops::ControlFlow;
@@ -17,12 +17,12 @@ type Step = ControlFlow<NalPacketProgress>;
 const NEXT: Step = Step::Continue(());
 const YIELD: Step = Step::Break(NalPacketProgress::Yield);
 
-impl<M, S: PacketSegment, C: PacketConfig> PacketJob<'_, M, S, C> {
+impl<M> NalPacketJob<'_, M> {
     pub(super) fn advance_into(
         &mut self,
         work: &mut WorkBudget,
         cancel: &AtomicBool,
-        ready: &mut Option<S::Output<M>>,
+        ready: &mut Option<NalPacketOutput<M>>,
     ) -> Result<NalPacketProgress> {
         loop {
             if cancel.load(Ordering::Relaxed) {
@@ -57,7 +57,7 @@ impl<M, S: PacketSegment, C: PacketConfig> PacketJob<'_, M, S, C> {
                 .as_ref()
                 .and_then(|s| s.new_extradata.as_ref())
                 .ok_or(Error::Invalid("missing source update"))?;
-            let raw = update.raw();
+            let raw = update.bytes();
             if extra.len() != raw.len() {
                 return Err(Error::Invalid("configuration update bytes differ"));
             }
@@ -201,7 +201,7 @@ impl<M, S: PacketSegment, C: PacketConfig> PacketJob<'_, M, S, C> {
                 return Ok(YIELD);
             }
             self.segment_hint = Some(1);
-            self.append(S::passthrough(&source.bytes, self.total))?;
+            self.append(NalPacketSegment::passthrough(&source.bytes, self.total))?;
             self.phase = Phase::Reserve;
             return Ok(NEXT);
         };
@@ -376,7 +376,7 @@ impl<M, S: PacketSegment, C: PacketConfig> PacketJob<'_, M, S, C> {
                 (Some(kind), Injection::Pps) => kind == AvcConfigArrayKind::Picture,
             };
             if selected {
-                self.append(S::configuration(n.owner, index, n.range, self.total))?;
+                self.append(NalPacketSegment::configuration(index, n.range, self.total))?;
             }
             self.injection = Some((which, index + 1));
         } else {
@@ -406,12 +406,7 @@ impl<M, S: PacketSegment, C: PacketConfig> PacketJob<'_, M, S, C> {
         };
         let range = nal.range.clone();
         let end = range.end;
-        let source = &self
-            .source
-            .as_ref()
-            .ok_or(Error::Invalid("missing packet"))?
-            .bytes;
-        let segment = S::packet(source, range, prefix, self.total)?;
+        let segment = NalPacketSegment::packet(range, prefix, self.total);
         self.append(segment)?;
         self.offset = end;
         self.length = 0;
@@ -503,7 +498,7 @@ impl<M, S: PacketSegment, C: PacketConfig> PacketJob<'_, M, S, C> {
                     .update
                     .as_ref()
                     .unwrap_or(&self.session.configuration)
-                    .raw();
+                    .bytes();
                 let payload = p.payload(source, configuration)?;
                 b.try_extend_from_slice(&payload[start..start + count])?;
             }
@@ -517,7 +512,7 @@ impl<M, S: PacketSegment, C: PacketConfig> PacketJob<'_, M, S, C> {
     fn freeze_output(
         &mut self,
         work: &mut WorkBudget,
-        ready: &mut Option<S::Output<M>>,
+        ready: &mut Option<NalPacketOutput<M>>,
     ) -> Result<Step> {
         if !work.try_charge(1) {
             return Ok(YIELD);
@@ -541,8 +536,8 @@ impl<M, S: PacketSegment, C: PacketConfig> PacketJob<'_, M, S, C> {
                 }
             }
         };
-        let configuration = self.config().raw().clone();
-        let configuration_identity = self.config().identity();
+        let configuration = self.config().bytes().clone();
+        let configuration_identity = self.config().source_identity();
         let configuration_source_refusal = self.config().refusal();
         let forward_new_extradata = self.codec == Codec::Hevc
             || self
@@ -556,7 +551,7 @@ impl<M, S: PacketSegment, C: PacketConfig> PacketJob<'_, M, S, C> {
         self.session.avc = self.avc;
         self.session.receiver_epoch = self.epoch;
         self.phase = Phase::Complete;
-        *ready = Some(S::finish(PacketOutput {
+        *ready = Some(NalPacketOutput {
             bytes,
             source: self
                 .source
@@ -579,7 +574,7 @@ impl<M, S: PacketSegment, C: PacketConfig> PacketJob<'_, M, S, C> {
                 .unwrap_or_else(|| BudgetVec::new(&self.session.pool)),
             receiver_epoch: self.epoch,
             forward_new_extradata,
-        }));
+        });
         Ok(Step::Break(NalPacketProgress::Ready))
     }
 }

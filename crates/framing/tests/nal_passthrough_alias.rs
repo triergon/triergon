@@ -84,13 +84,20 @@ fn passthrough_outputs_keep_the_original_storage_after_the_producer_closes() {
                 assert_eq!(output.source().location.source, SourceId(42));
                 assert_eq!(output.segments().len(), 1);
                 let segment = &output.segments()[0];
-                assert!(segment.source_bytes().shares_storage_with(&root));
-                assert_eq!(segment.prefix_bytes, 0);
-                assert_eq!(segment.output_offset, 0);
-                assert!(matches!(
-                    &segment.origin,
-                    NalPacketOrigin::Packet { source_range } if *source_range == (0..length)
-                ));
+                assert!(
+                    output
+                        .retain_segment_bytes(0)
+                        .unwrap()
+                        .shares_storage_with(&root)
+                );
+                assert_eq!(segment.prefix_bytes(), 0);
+                assert_eq!(segment.output_offset(), 0);
+                assert_eq!(
+                    segment.origin(),
+                    NalPacketOrigin::Packet {
+                        source_range: 0..length
+                    }
+                );
                 if codec == Codec::Hevc {
                     assert!(output.forward_new_extradata());
                     assert!(

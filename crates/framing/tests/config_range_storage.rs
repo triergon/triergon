@@ -79,27 +79,29 @@ fn hevc(pool: &Budget, raw: Bytes, q: u64) -> HvcConfiguration {
 }
 
 #[test]
-fn avc_nal_does_not_store_redundant_range_end() {
-    let ceiling = 2 * size_of::<Bytes>() + size_of::<usize>() + 8;
-    println!(
-        "CONFIG_RANGE_LAYOUT avc={} ceiling={ceiling}",
-        size_of::<AvcConfigNal>()
-    );
+fn avc_nal_descriptor_does_not_store_redundant_range_end() {
+    // A full-width start plus at most eight bytes of length, kind and header.
+    let ceiling = size_of::<usize>() + 8;
+    let pool = Budget::new(512 * 1024).unwrap();
+    let config = avc(&pool, Bytes::copy_from_slice(&pool, &avcc()).unwrap(), 4096);
+    let table = config.descriptor_storage_bytes().unwrap();
+    println!("CONFIG_RANGE_LAYOUT avc_table={table} ceiling={ceiling}");
     assert!(
-        size_of::<AvcConfigNal>() <= ceiling,
+        table <= config.nal_count() * ceiling,
         "AVC NAL retains an end already determined by its immutable payload"
     );
 }
 #[test]
-fn hevc_nal_does_not_store_redundant_range_end() {
-    let ceiling = 2 * size_of::<Bytes>() + size_of::<usize>() + 8;
-    println!(
-        "CONFIG_RANGE_LAYOUT hevc={} ceiling={ceiling}",
-        size_of::<HvcConfigNal>()
-    );
+fn hevc_descriptors_do_not_store_redundant_range_end_or_wide_membership() {
+    let nal = size_of::<usize>() + 8;
+    let array = size_of::<std::ops::Range<usize>>() + 8;
+    let pool = Budget::new(512 * 1024).unwrap();
+    let config = hevc(&pool, Bytes::copy_from_slice(&pool, &hvcc()).unwrap(), 4096);
+    let table = config.descriptor_storage_bytes().unwrap();
+    println!("CONFIG_RANGE_LAYOUT hevc_table={table} nal={nal} array={array}");
     assert!(
-        size_of::<HvcConfigNal>() <= ceiling,
-        "HEVC NAL retains an end already determined by its immutable payload"
+        table <= config.nal_count() * nal + config.array_count() * array,
+        "HEVC descriptors retain an end or membership wider than needed"
     );
 }
 #[test]
@@ -111,18 +113,40 @@ fn avc_source_ranges_above_u16_and_headers_survive_all_quanta() {
         let config = avc(&pool, Bytes::copy_from_slice(&pool, &raw).unwrap(), q);
         assert_eq!(config.source().offset + raw.len() as u64, u64::MAX);
         assert_eq!(config.source().generation, u64::MAX);
-        assert_eq!(config.nals()[0].source_range(), 8..65_543);
-        assert_eq!(config.nals()[1].source_range(), 65_546..65_549);
-        assert_eq!(config.nals()[1].length_field_bytes().as_ref(), &[0, 3]);
-        assert_eq!(config.nals()[1].source_bytes().as_ref(), &[0x68, 1, 99]);
-        assert_eq!(config.nals()[1].array_kind(), AvcConfigArrayKind::Picture);
-        assert_eq!(config.arrays()[0].nal_indices(), 0..1);
-        assert_eq!(config.arrays()[1].nal_indices(), 1..2);
-        assert_eq!(config.nals()[1].header().nal_unit_type(), 8);
-        assert!(format!("{:?}", config.nals()[1]).contains("range: 65546..65549"));
+        assert_eq!(config.nal(0).unwrap().source_range(), 8..65_543);
+        assert_eq!(config.nal(0).unwrap().length_field_bytes(), [255, 255]);
+        assert_eq!(config.array(1).unwrap().count_offset(), 65_543);
+        assert_eq!(config.nal(1).unwrap().source_range(), 65_546..65_549);
+        assert_eq!(config.nal(1).unwrap().length_field_bytes(), [0, 3]);
+        assert_eq!(config.nal(1).unwrap().source_bytes(), [0x68, 1, 99]);
+        assert_eq!(
+            config.nal(1).unwrap().array_kind(),
+            AvcConfigArrayKind::Picture
+        );
+        assert_eq!(config.array(0).unwrap().nal_indices(), 0..1);
+        assert_eq!(config.array(1).unwrap().nal_indices(), 1..2);
+        assert_eq!(config.nal(1).unwrap().header().nal_unit_type(), 8);
         drop(config);
         assert_eq!(pool.used(), baseline);
     }
+    // One byte past the absolute u64 extent is refused at entry.
+    let pool = Budget::new(512 * 1024).unwrap();
+    let raw = avcc();
+    let late = AvcConfigSource {
+        source: SourceId(7),
+        generation: u64::MAX,
+        offset: u64::MAX - raw.len() as u64 + 1,
+    };
+    let limits = AvcConfigLimits {
+        maximum_record_bytes: 262_144,
+        maximum_nals: 1024,
+        maximum_nal_bytes: 65_535,
+    };
+    let bytes = Bytes::copy_from_slice(&pool, &raw).unwrap();
+    assert_eq!(
+        AvcConfigParser::new(&pool, late, bytes, limits).err(),
+        Some(Error::Overflow)
+    );
 }
 #[test]
 fn hevc_source_ranges_above_u16_and_array_facts_survive_all_quanta() {
@@ -132,22 +156,21 @@ fn hevc_source_ranges_above_u16_and_array_facts_survive_all_quanta() {
         let raw = hvcc();
         let config = hevc(&pool, Bytes::copy_from_slice(&pool, &raw).unwrap(), q);
         assert_eq!(config.source().offset + raw.len() as u64, u64::MAX);
-        assert_eq!(config.nals()[0].source_range(), 28..65_563);
-        assert_eq!(config.nals()[1].source_range(), 65_568..65_571);
-        assert_eq!(config.nals()[1].array_index(), 1);
-        assert_eq!(config.arrays()[0].nal_indices(), 0..1);
-        assert_eq!(config.arrays()[1].nal_indices(), 1..2);
-        assert_eq!(config.nals()[1].declared_nal_type(), 33);
-        assert_eq!(config.nals()[1].length_field_bytes().as_ref(), &[0, 3]);
-        assert_eq!(config.nals()[1].source_bytes().as_ref(), &[66, 1, 99]);
-        assert!(config.nals()[1].type_matches_declaration());
-        assert!(format!("{:?}", config.nals()[1]).contains("range: 65568..65571"));
+        assert_eq!(config.nal(0).unwrap().source_range(), 28..65_563);
+        assert_eq!(config.nal(1).unwrap().source_range(), 65_568..65_571);
+        assert_eq!(config.nal(1).unwrap().array_index(), 1);
+        assert_eq!(config.array(0).unwrap().nal_indices(), 0..1);
+        assert_eq!(config.array(1).unwrap().nal_indices(), 1..2);
+        assert_eq!(config.nal(1).unwrap().declared_nal_type(), 33);
+        assert_eq!(config.nal(1).unwrap().length_field_bytes(), [0, 3]);
+        assert_eq!(config.nal(1).unwrap().source_bytes(), [66, 1, 99]);
+        assert!(config.nal(1).unwrap().type_matches_declaration());
         drop(config);
         assert_eq!(pool.used(), baseline);
     }
 }
 #[test]
-fn cloned_descriptor_keeps_full_hidden_owner_after_record_closes() {
+fn configuration_keeps_full_hidden_owner_after_record_closes() {
     let pool = Budget::new(512 * 1024).unwrap();
     let baseline = pool.used();
     let raw = hvcc();
@@ -158,14 +181,16 @@ fn cloned_descriptor_keeps_full_hidden_owner_after_record_closes() {
         .unwrap();
     let retained = root.retained_storage_bytes();
     let record = hevc(&pool, root.slice(127..127 + raw.len()).unwrap(), 1);
-    let nal = record.nals()[1].clone();
-    drop(record);
     drop(root);
-    assert_eq!(pool.used(), baseline + retained);
+    let table = record.descriptor_storage_bytes().unwrap();
+    assert_eq!(pool.used(), baseline + retained + table);
+    assert_eq!(record.retained_storage_bytes().unwrap(), retained + table);
+    assert_eq!(record.source_bytes().retained_storage_bytes(), retained);
+    let nal = record.nal(1).unwrap();
     assert_eq!(nal.source_range(), 65_568..65_571);
-    assert_eq!(nal.source_bytes().retained_storage_bytes(), retained);
-    assert_eq!(nal.length_field_bytes().retained_storage_bytes(), retained);
-    drop(nal);
+    assert_eq!(nal.source_bytes(), &raw[65_568..65_571]);
+    assert_eq!(nal.length_field_bytes(), [0, 3]);
+    drop(record);
     assert_eq!(pool.used(), baseline);
 }
 #[test]
@@ -212,29 +237,6 @@ fn cancellation_precedes_work0_and_truncation_stays_physical() {
 }
 
 #[test]
-fn avc_array_uses_four_machine_words() {
-    println!(
-        "CONFIG_RANGE_LAYOUT avc_array={}",
-        size_of::<AvcConfigArray>()
-    );
-    assert!(
-        size_of::<AvcConfigArray>() <= 4 * size_of::<usize>(),
-        "AVC array membership retains two full machine words"
-    );
-}
-#[test]
-fn hevc_array_membership_uses_at_most_eight_bytes() {
-    let ceiling = size_of::<Bytes>() + size_of::<std::ops::Range<usize>>() + 8;
-    println!(
-        "CONFIG_RANGE_LAYOUT hevc_array={}",
-        size_of::<HvcConfigArray>()
-    );
-    assert!(
-        size_of::<HvcConfigArray>() <= ceiling,
-        "HEVC array membership retains two full machine words"
-    );
-}
-#[test]
 fn maximum_avc_group_counts_preserve_all541_memberships() {
     let mut raw = vec![1, 100, 0, 10, 255, 255];
     for _ in 0..31 {
@@ -252,17 +254,17 @@ fn maximum_avc_group_counts_preserve_all541_memberships() {
         let pool = Budget::new(512 * 1024).unwrap();
         let baseline = pool.used();
         let config = avc(&pool, Bytes::copy_from_slice(&pool, &raw).unwrap(), q);
-        assert_eq!(config.nals().len(), 541);
-        assert_eq!(config.arrays()[0].nal_indices(), 0..31);
-        assert_eq!(config.arrays()[1].nal_indices(), 31..286);
-        assert_eq!(config.arrays()[2].nal_indices(), 286..541);
-        assert_eq!(config.arrays()[2].source_range().end, raw.len());
+        assert_eq!(config.nal_count(), 541);
+        assert_eq!(config.array(0).unwrap().nal_indices(), 0..31);
+        assert_eq!(config.array(1).unwrap().nal_indices(), 31..286);
+        assert_eq!(config.array(2).unwrap().nal_indices(), 286..541);
+        assert_eq!(config.array(2).unwrap().source_range().end, raw.len());
         assert_eq!(
-            config.nals()[540].array_kind(),
+            config.nal(540).unwrap().array_kind(),
             AvcConfigArrayKind::SequenceExtension
         );
-        assert_eq!(config.nals()[540].source_bytes().as_ref(), &[0x6d]);
-        assert!(format!("{:?}", config.arrays()[2]).contains("nals: 286..541"));
+        assert_eq!(config.nal(540).unwrap().source_bytes(), [0x6d]);
+        assert!(config.nals().all(|n| n.length_field_bytes() == [0, 1]));
         drop(config);
         assert_eq!(pool.used(), baseline);
     }

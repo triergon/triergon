@@ -361,7 +361,7 @@ fn failed_partial_inband_packet_does_not_commit_availability() {
     let mut next = s.packet(packet(&p, IDR), None).unwrap();
     let out = output(&mut next);
     assert!(matches!(
-        out.segments()[0].origin,
+        out.segments()[0].origin(),
         NalPacketOrigin::Configuration { .. }
     ));
     assert_eq!(rejected.source().bytes.as_ref(), raw);

@@ -2,8 +2,8 @@
 use std::sync::atomic::AtomicBool;
 use triergon_core::{Budget, BudgetVec, Bytes, Error, SourceId, WorkBudget};
 use triergon_framing::{
-    BuildStep, HvcConfigArray, HvcConfigLimits, HvcConfigNal, HvcConfigParser, HvcConfigSource,
-    HvcConfiguration, LengthSize, inspect_hvc_config_prefix,
+    BuildStep, HvcConfigLimits, HvcConfigParser, HvcConfigSource, HvcConfiguration, LengthSize,
+    inspect_hvc_config_prefix,
 };
 fn limits() -> HvcConfigLimits {
     HvcConfigLimits {
@@ -173,15 +173,15 @@ fn every_temporal_flag_combination_is_independent_of_length_and_nesting() {
 fn empty_arrays_and_empty_configuration_are_distinct_and_owned() {
     let a = parse(&prefix(1, 0)).unwrap();
     assert_eq!(a.length_size(), LengthSize::new(1).unwrap());
-    assert!(a.arrays().is_empty());
-    assert!(a.nals().is_empty());
+    assert_eq!(a.array_count(), 0);
+    assert_eq!(a.nal_count(), 0);
     let b = record(&[(32, true, vec![]), (55, false, vec![])], &[]);
     let o = parse(&b).unwrap();
-    assert_eq!(o.arrays().len(), 2);
-    assert!(o.nals().is_empty());
+    assert_eq!(o.array_count(), 2);
+    assert_eq!(o.nal_count(), 0);
     assert_eq!(o.source_bytes().as_ref(), b);
-    assert_eq!(o.arrays()[0].nal_indices(), 0..0);
-    assert_eq!(o.arrays()[1].declared_nal_type(), 55);
+    assert_eq!(o.array(0).unwrap().nal_indices(), 0..0);
+    assert_eq!(o.array(1).unwrap().declared_nal_type(), 55);
 }
 #[test]
 fn all_arrays_nals_duplicates_unknown_types_order_and_emulation_bytes_survive() {
@@ -189,33 +189,33 @@ fn all_arrays_nals_duplicates_unknown_types_order_and_emulation_bytes_survive() 
     let o = parse(&b).unwrap();
     assert_eq!(o.source(), source());
     assert_eq!(o.source_bytes().as_ref(), b);
-    assert_eq!(o.arrays().len(), 4);
-    assert_eq!(o.nals().len(), 4);
+    assert_eq!(o.array_count(), 4);
+    assert_eq!(o.nal_count(), 4);
     assert_eq!(
-        o.nals()
-            .iter()
-            .map(HvcConfigNal::declared_nal_type)
-            .collect::<Vec<_>>(),
+        o.nals().map(|n| n.declared_nal_type()).collect::<Vec<_>>(),
         vec![33, 33, 32, 33]
     );
-    assert_eq!(o.nals()[0].source_bytes().as_ref(), nal(33, 9));
-    assert_eq!(o.nals()[1].source_bytes().as_ref(), nal(33, 9));
-    assert_eq!(o.nals()[3].header().nal_unit_type(), 34);
-    assert!(!o.nals()[3].type_matches_declaration());
+    assert_eq!(o.nal(0).unwrap().source_bytes(), nal(33, 9));
+    assert_eq!(o.nal(1).unwrap().source_bytes(), nal(33, 9));
+    assert_eq!(o.nal(3).unwrap().header().nal_unit_type(), 34);
+    assert!(!o.nal(3).unwrap().type_matches_declaration());
     assert_ne!(o.syntax_issues() & 128, 0);
     for n in o.nals() {
         let range = n.source_range();
-        assert_eq!(&b[range], n.source_bytes().as_ref());
-        assert!(n.source_bytes().shares_storage_with(o.source_bytes()));
+        assert_eq!(&b[range.clone()], n.source_bytes());
         assert_eq!(
-            u16::from_be_bytes(n.length_field_bytes().as_ref().try_into().unwrap()) as usize,
+            n.source_bytes().as_ptr_range(),
+            o.source_bytes()[range].as_ptr_range()
+        );
+        assert_eq!(
+            u16::from_be_bytes(n.length_field_bytes().try_into().unwrap()) as usize,
             n.source_bytes().len()
         );
     }
     for a in o.arrays() {
         assert_eq!(
             &b[a.source_range().start..a.source_range().start + 3],
-            a.source_header_bytes().as_ref()
+            a.source_header_bytes()
         );
     }
 }
@@ -237,7 +237,7 @@ fn all_five_reserved_patterns_and_array_reserved_bit_are_retained_not_repaired()
     let mut b = record(&[(55, false, vec![])], &[]);
     b[23] |= 64;
     let o = parse(&b).unwrap();
-    assert!(o.arrays()[0].reserved_bit());
+    assert!(o.array(0).unwrap().reserved_bit());
     assert_ne!(o.syntax_issues() & 64, 0);
 }
 #[test]
@@ -285,7 +285,7 @@ fn complete_suffix_is_owned_opaque_with_exact_understood_end() {
     b.extend_from_slice(&suffix);
     let o = parse(&b).unwrap();
     assert_eq!(o.understood_end(), base.len());
-    assert_eq!(o.opaque_suffix().unwrap().as_ref(), suffix);
+    assert_eq!(o.opaque_suffix(), suffix);
     assert_eq!(o.source_bytes().as_ref(), b);
 }
 #[test]
@@ -302,12 +302,12 @@ fn all255_arrays_and_all65535_nal_count_values_are_bounded_and_supported() {
         .collect();
     let b = record(&groups, &[]);
     let o = parse(&b).unwrap();
-    assert_eq!(o.arrays().len(), 255);
+    assert_eq!(o.array_count(), 255);
     let groups = [(32, true, vec![vec![64, 1]; 65535])];
     let b = record(&groups, &[]);
     let o = parse(&b).unwrap();
-    assert_eq!(o.nals().len(), 65535);
-    assert_eq!(o.arrays()[0].nal_indices(), 0..65535);
+    assert_eq!(o.nal_count(), 65535);
+    assert_eq!(o.array(0).unwrap().nal_indices(), 0..65535);
 }
 #[test]
 fn record_array_nal_count_and_size_limits_reject_without_truncating_output() {
@@ -361,7 +361,7 @@ fn descriptor_backpressure_retries_the_same_complete_record() {
     let pool = Budget::new(10_000).unwrap();
     let raw = example();
     let data = Bytes::copy_from_slice(&pool, &raw).unwrap();
-    let needed = 4 * size_of::<HvcConfigArray>() + 4 * size_of::<HvcConfigNal>();
+    let needed = parse(&raw).unwrap().descriptor_storage_bytes().unwrap();
     let mut blocker = BudgetVec::<u8>::new(&pool);
     blocker
         .try_reserve_exact(pool.available() - needed / 2)
@@ -383,7 +383,7 @@ fn descriptor_backpressure_retries_the_same_complete_record() {
         }
     };
     assert_eq!(o.source_bytes().as_ref(), raw);
-    assert_eq!(o.nals().len(), 4);
+    assert_eq!(o.nal_count(), 4);
 }
 #[test]
 fn foreign_pool_and_absolute_source_overflow_are_explicit() {
@@ -414,7 +414,10 @@ fn caller_retains_exact_charged_payload_after_parser_input_close_and_thread_rele
     let raw = example();
     let data = Bytes::copy_from_slice(&pool, &raw).unwrap();
     let o = run(&pool, data, limits(), 1).unwrap();
-    let n = o.nals()[0].source_bytes().clone();
+    let n = o
+        .source_bytes()
+        .slice(o.nal(0).unwrap().source_range())
+        .unwrap();
     drop(o);
     assert!(pool.used() > baseline);
     assert_eq!(n.as_ref(), nal(33, 9));
@@ -429,11 +432,11 @@ fn array_extents_cover_each_physical_header_length_and_payload_once() {
     let output = parse(&raw).unwrap();
     let mut reconstructed = raw[..23].to_vec();
     let mut position = 23;
-    for (index, array) in output.arrays().iter().enumerate() {
+    for (index, array) in output.arrays().enumerate() {
         let range = array.source_range();
         assert_eq!(range.start, position);
         let mut end = range.start + 3;
-        for nal in &output.nals()[array.nal_indices()] {
+        for nal in array.nal_indices().map(|i| output.nal(i).unwrap()) {
             assert_eq!(nal.array_index(), index);
             assert_eq!(nal.source_range().start, end + 2);
             end = nal.source_range().end;
@@ -443,7 +446,7 @@ fn array_extents_cover_each_physical_header_length_and_payload_once() {
         position = range.end;
     }
     assert_eq!(position, output.understood_end());
-    reconstructed.extend_from_slice(output.opaque_suffix().unwrap().as_ref());
+    reconstructed.extend_from_slice(output.opaque_suffix());
     assert_eq!(reconstructed, raw);
 }
 
@@ -461,9 +464,9 @@ fn maximum_nal_extent_and_each_sample_work_partition_preserve_the_full_record() 
             work,
         )
         .unwrap();
-        assert_eq!(output.nals()[0].source_bytes().len(), 65535);
+        assert_eq!(output.nal(0).unwrap().source_bytes().len(), 65535);
         assert_eq!(output.source_bytes().as_ref(), raw);
-        assert_eq!(output.opaque_suffix().unwrap().as_ref(), [0xfe, 0xed]);
+        assert_eq!(output.opaque_suffix(), [0xfe, 0xed]);
     }
 }
 
@@ -482,7 +485,7 @@ fn zero_count_limits_allow_only_the_literal_empty_structure() {
         1,
     )
     .unwrap();
-    assert!(output.arrays().is_empty());
+    assert_eq!(output.array_count(), 0);
     let raw = record(&[(32, true, vec![])], &[]);
     assert!(matches!(
         run(&pool, Bytes::copy_from_slice(&pool, &raw).unwrap(), none, 1),
@@ -492,7 +495,7 @@ fn zero_count_limits_allow_only_the_literal_empty_structure() {
         maximum_nals: 0,
         ..limits()
     };
-    assert!(
+    assert_eq!(
         run(
             &pool,
             Bytes::copy_from_slice(&pool, &raw).unwrap(),
@@ -500,8 +503,8 @@ fn zero_count_limits_allow_only_the_literal_empty_structure() {
             1
         )
         .unwrap()
-        .nals()
-        .is_empty()
+        .nal_count(),
+        0
     );
     assert!(matches!(
         run(

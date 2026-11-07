@@ -63,9 +63,9 @@ impl NalPacketConfiguration {
         }
     }
     pub fn strict_source_refusal(&self) -> Option<Error> {
-        self.compact_source_refusal().error()
+        self.refusal().error()
     }
-    pub(crate) fn compact_source_refusal(&self) -> NalConfigurationRefusal {
+    pub(crate) fn refusal(&self) -> NalConfigurationRefusal {
         match self {
             Self::ReceiverAvc(v) if v.fields().length_size_minus_one() == 2 => {
                 NalConfigurationRefusal::AvcWidthThree
@@ -76,14 +76,14 @@ impl NalPacketConfiguration {
             _ => NalConfigurationRefusal::None,
         }
     }
-    pub(crate) fn avc_record(&self) -> Option<&AvcConfiguration> {
+    fn avc_record(&self) -> Option<&AvcConfiguration> {
         match self {
             Self::Avc(v) => Some(v),
             Self::ReceiverAvc(v) => Some(v.record()),
             _ => None,
         }
     }
-    pub(crate) fn hevc_record(&self) -> Option<&HvcConfiguration> {
+    fn hevc_record(&self) -> Option<&HvcConfiguration> {
         match self {
             Self::Hevc(v) => Some(v),
             Self::ReceiverHevc(v) => Some(v.record()),
@@ -92,53 +92,60 @@ impl NalPacketConfiguration {
     }
     /// Literal source identity, independently of a record-validity conclusion.
     pub fn source_identity(&self) -> Option<(SourceLocation, u64)> {
-        if let Some(c) = self.avc_record() {
+        let (source, offset, generation) = if let Some(c) = self.avc_record() {
             let s = c.source();
-            Some((
-                SourceLocation {
-                    source: s.source,
-                    offset: s.offset,
-                },
-                s.generation,
-            ))
-        } else if let Some(c) = self.hevc_record() {
-            let s = c.source();
-            Some((
-                SourceLocation {
-                    source: s.source,
-                    offset: s.offset,
-                },
-                s.generation,
-            ))
+            (s.source, s.offset, s.generation)
         } else {
-            None
-        }
+            let s = self.hevc_record()?.source();
+            (s.source, s.offset, s.generation)
+        };
+        Some((SourceLocation { source, offset }, generation))
     }
-    fn descriptor_storage_lower_bound(&self) -> Result<usize> {
+    /// Element-count lower bound for live descriptor storage.
+    pub(crate) fn descriptor_lower_bound(&self) -> Result<usize> {
         if let Some(c) = self.avc_record() {
-            c.nals()
-                .len()
-                .checked_mul(size_of::<crate::AvcConfigNal>())
-                .ok_or(Error::Overflow)
+            c.descriptor_lower_bound()
         } else if let Some(c) = self.hevc_record() {
-            c.nals()
-                .len()
-                .checked_mul(size_of::<crate::HvcConfigNal>())
-                .and_then(|n| {
-                    c.arrays()
-                        .len()
-                        .checked_mul(size_of::<crate::HvcConfigArray>())
-                        .and_then(|a| a.checked_add(n))
-                })
-                .ok_or(Error::Overflow)
+            c.descriptor_lower_bound()
         } else {
             Ok(0)
         }
     }
-    fn width(&self) -> Option<LengthSize> {
+    /// Sample length width; None for explicit passthrough.
+    pub(crate) fn width(&self) -> Option<LengthSize> {
         self.avc_record()
             .map(AvcConfiguration::sample_length_size)
             .or_else(|| self.hevc_record().map(HvcConfiguration::length_size))
+    }
+    /// Declared HEVC array type, or None past the last array or for non-HEVC.
+    pub(crate) fn hevc_array_type(&self, index: usize) -> Option<u8> {
+        self.hevc_record()?
+            .array(index)
+            .map(|a| a.declared_nal_type())
+    }
+    /// Configuration NAL, or None past the last NAL or for passthrough.
+    pub(crate) fn config_nal(&self, index: usize) -> Option<ConfigNal<'_>> {
+        if let Some(c) = self.avc_record() {
+            c.nal(index).map(|n| ConfigNal {
+                kind: Some(n.array_kind()),
+                owner: c.source_bytes(),
+                range: n.source_range(),
+            })
+        } else {
+            let c = self.hevc_record()?;
+            c.nal(index).map(|n| ConfigNal {
+                kind: None,
+                owner: c.source_bytes(),
+                range: n.source_range(),
+            })
+        }
+    }
+    /// Number of configuration NALs; an upper bound on one injection.
+    pub(crate) fn config_nal_count(&self) -> usize {
+        self.avc_record()
+            .map(AvcConfiguration::nal_count)
+            .or_else(|| self.hevc_record().map(HvcConfiguration::nal_count))
+            .unwrap_or(0)
     }
 }
 
@@ -160,231 +167,19 @@ impl NalConfigurationRefusal {
     }
 }
 
-/// Effective receiver configuration viewed through one compact descriptor
-/// table and one raw owner. Packet and initialization framing are identical to
-/// [`NalPacketConfiguration`]; borrowed NAL inspection creates no per-NAL owner.
-pub enum NalPacketViewConfiguration {
-    Avc(crate::AvcConfigurationView),
-    Hevc(crate::HvcConfigurationView),
-    /// Receiver acceptance ([`crate::compat::nal`]); any strict ISO refusal remains attached.
-    ReceiverAvc(crate::compat::nal::ReceiverAvcConfigurationView),
-    ReceiverHevc(crate::compat::nal::ReceiverHevcConfigurationView),
-    /// Explicit native passthrough mode. This is not Annex-B validation.
-    Passthrough {
-        codec: Codec,
-        raw: Bytes,
-    },
-}
-impl NalPacketViewConfiguration {
-    fn avc_view(&self) -> Option<&crate::AvcConfigurationView> {
-        match self {
-            Self::Avc(v) => Some(v),
-            Self::ReceiverAvc(v) => Some(v.view()),
-            _ => None,
-        }
-    }
-    fn hevc_view(&self) -> Option<&crate::HvcConfigurationView> {
-        match self {
-            Self::Hevc(v) => Some(v),
-            Self::ReceiverHevc(v) => Some(v.view()),
-            _ => None,
-        }
-    }
-}
-
 /// One configuration NAL as the packet and initialization writers read it.
 pub(crate) struct ConfigNal<'a> {
     /// AVC array kind; HEVC records select every NAL.
     pub(crate) kind: Option<AvcConfigArrayKind>,
-    /// Eager records: the NAL's own owner. Views: the raw record, whose
-    /// `range` addresses the NAL; compact segments read it through the range.
+    /// The raw record, whose `range` addresses the NAL.
     pub(crate) owner: &'a Bytes,
     pub(crate) range: Range<usize>,
-    /// True when `owner` is exactly the NAL payload (eager records).
-    pub(crate) owner_is_payload: bool,
 }
 
 impl<'a> ConfigNal<'a> {
-    /// The NAL payload. An eager owner is exactly that payload; a view owner is
-    /// the raw record that the validated range addresses.
+    /// The NAL payload. The parser validated its range against the same record.
     pub(crate) fn payload(&self) -> &'a [u8] {
-        if self.owner_is_payload {
-            self.owner.as_ref()
-        } else {
-            // The parser validated this range against the same raw record.
-            &self.owner[self.range.clone()]
-        }
-    }
-}
-
-/// Facts the shared packet/initialization state engines read from an effective
-/// configuration. Both representations answer from the same parsed record.
-pub(crate) trait PacketConfig {
-    fn raw(&self) -> &Bytes;
-    fn codec_kind(&self) -> Codec;
-    /// Sample length width; None for explicit passthrough.
-    fn length_width(&self) -> Option<LengthSize>;
-    fn refusal(&self) -> NalConfigurationRefusal;
-    fn identity(&self) -> Option<(SourceLocation, u64)>;
-    fn descriptor_lower_bound(&self) -> Result<usize>;
-    /// Declared HEVC array type, or None past the last array or for non-HEVC.
-    fn hevc_array_type(&self, index: usize) -> Option<u8>;
-    /// Configuration NAL, or None past the last NAL or for passthrough.
-    fn config_nal(&self, index: usize) -> Option<ConfigNal<'_>>;
-    /// Number of configuration NALs; an upper bound on one injection.
-    fn config_nal_count(&self) -> usize;
-}
-impl PacketConfig for NalPacketConfiguration {
-    fn raw(&self) -> &Bytes {
-        NalPacketConfiguration::bytes(self)
-    }
-    fn codec_kind(&self) -> Codec {
-        NalPacketConfiguration::codec(self)
-    }
-    fn length_width(&self) -> Option<LengthSize> {
-        NalPacketConfiguration::width(self)
-    }
-    fn refusal(&self) -> NalConfigurationRefusal {
-        NalPacketConfiguration::compact_source_refusal(self)
-    }
-    fn identity(&self) -> Option<(SourceLocation, u64)> {
-        NalPacketConfiguration::source_identity(self)
-    }
-    fn descriptor_lower_bound(&self) -> Result<usize> {
-        NalPacketConfiguration::descriptor_storage_lower_bound(self)
-    }
-    fn hevc_array_type(&self, index: usize) -> Option<u8> {
-        self.hevc_record()?
-            .arrays()
-            .get(index)
-            .map(super::hevc_config::HvcConfigArray::declared_nal_type)
-    }
-    fn config_nal(&self, index: usize) -> Option<ConfigNal<'_>> {
-        if let Some(c) = self.avc_record() {
-            c.nals().get(index).map(|n| ConfigNal {
-                kind: Some(n.array_kind()),
-                owner: n.source_bytes(),
-                range: n.source_range(),
-                owner_is_payload: true,
-            })
-        } else if let Some(c) = self.hevc_record() {
-            c.nals().get(index).map(|n| ConfigNal {
-                kind: None,
-                owner: n.source_bytes(),
-                range: n.source_range(),
-                owner_is_payload: true,
-            })
-        } else {
-            None
-        }
-    }
-    fn config_nal_count(&self) -> usize {
-        self.avc_record()
-            .map(|c| c.nals().len())
-            .or_else(|| self.hevc_record().map(|c| c.nals().len()))
-            .unwrap_or(0)
-    }
-}
-impl PacketConfig for NalPacketViewConfiguration {
-    fn raw(&self) -> &Bytes {
-        match self {
-            Self::Avc(v) => v.source_bytes(),
-            Self::Hevc(v) => v.source_bytes(),
-            Self::ReceiverAvc(v) => v.source_bytes(),
-            Self::ReceiverHevc(v) => v.source_bytes(),
-            Self::Passthrough { raw, .. } => raw,
-        }
-    }
-    fn codec_kind(&self) -> Codec {
-        match self {
-            Self::Avc(_) | Self::ReceiverAvc(_) => Codec::Avc,
-            Self::Hevc(_) | Self::ReceiverHevc(_) => Codec::Hevc,
-            Self::Passthrough { codec, .. } => *codec,
-        }
-    }
-    fn length_width(&self) -> Option<LengthSize> {
-        self.avc_view()
-            .map(crate::AvcConfigurationView::sample_length_size)
-            .or_else(|| {
-                self.hevc_view()
-                    .map(crate::HvcConfigurationView::length_size)
-            })
-    }
-    fn refusal(&self) -> NalConfigurationRefusal {
-        match self {
-            Self::ReceiverAvc(v) if v.fields().length_size_minus_one() == 2 => {
-                NalConfigurationRefusal::AvcWidthThree
-            }
-            Self::ReceiverHevc(v) if v.fields().length_size_minus_one() == 2 => {
-                NalConfigurationRefusal::HevcWidthThree
-            }
-            _ => NalConfigurationRefusal::None,
-        }
-    }
-    fn identity(&self) -> Option<(SourceLocation, u64)> {
-        if let Some(c) = self.avc_view() {
-            let s = c.source();
-            Some((
-                SourceLocation {
-                    source: s.source,
-                    offset: s.offset,
-                },
-                s.generation,
-            ))
-        } else if let Some(c) = self.hevc_view() {
-            let s = c.source();
-            Some((
-                SourceLocation {
-                    source: s.source,
-                    offset: s.offset,
-                },
-                s.generation,
-            ))
-        } else {
-            None
-        }
-    }
-    fn descriptor_lower_bound(&self) -> Result<usize> {
-        if let Some(c) = self.avc_view() {
-            c.descriptor_lower_bound()
-        } else if let Some(c) = self.hevc_view() {
-            c.descriptor_lower_bound()
-        } else {
-            Ok(0)
-        }
-    }
-    fn hevc_array_type(&self, index: usize) -> Option<u8> {
-        self.hevc_view()?
-            .array(index)
-            .map(|a| a.declared_nal_type())
-    }
-    fn config_nal(&self, index: usize) -> Option<ConfigNal<'_>> {
-        if let Some(c) = self.avc_view() {
-            c.nal(index).map(|n| ConfigNal {
-                kind: Some(n.array_kind()),
-                owner: c.source_bytes(),
-                range: n.source_range(),
-                owner_is_payload: false,
-            })
-        } else if let Some(c) = self.hevc_view() {
-            c.nal(index).map(|n| ConfigNal {
-                kind: None,
-                owner: c.source_bytes(),
-                range: n.source_range(),
-                owner_is_payload: false,
-            })
-        } else {
-            None
-        }
-    }
-    fn config_nal_count(&self) -> usize {
-        self.avc_view()
-            .map(super::avc_config::AvcConfigurationView::nal_count)
-            .or_else(|| {
-                self.hevc_view()
-                    .map(super::hevc_config::HvcConfigurationView::nal_count)
-            })
-            .unwrap_or(0)
+        &self.owner[self.range.clone()]
     }
 }
 
@@ -416,9 +211,9 @@ impl Default for AvcState {
 /// jobs never publish partial packets or commit partial in-band state. A valid
 /// AVC side-data update survives a later physical payload error, as an explicit
 /// receiver fact; cancellation/resource refusal does not adopt that update.
-pub struct NalPacketSession<C = NalPacketConfiguration> {
+pub struct NalPacketSession {
     pool: Budget,
-    configuration: C,
+    configuration: NalPacketConfiguration,
     limits: NalPacketLimits,
     avc: AvcState,
     receiver_epoch: u64,
@@ -430,40 +225,7 @@ impl NalPacketSession {
         configuration: NalPacketConfiguration,
         limits: NalPacketLimits,
     ) -> Result<Self> {
-        Self::with_configuration(pool, configuration, limits)
-    }
-}
-impl NalPacketSession<NalPacketViewConfiguration> {
-    /// The same receiver over a compact configuration view. Packet framing,
-    /// work, validation and errors match [`NalPacketSession::new`].
-    pub fn new_view(
-        pool: &Budget,
-        configuration: NalPacketViewConfiguration,
-        limits: NalPacketLimits,
-    ) -> Result<Self> {
-        Self::with_configuration(pool, configuration, limits)
-    }
-    /// Observed receiver view with compact descriptors; the packet job is the
-    /// same state engine as [`NalPacketSession::receiver_packet_compact`].
-    pub fn receiver_packet_view<M>(
-        &mut self,
-        source: NalPacket<M>,
-        update: Option<crate::compat::nal::ReceiverAvcConfigurationView>,
-    ) -> Result<NalPacketViewJob<'_, M>> {
-        self.begin_packet(
-            source,
-            update.map(NalPacketViewConfiguration::ReceiverAvc),
-            true,
-        )
-        .map(|inner| NalPacketViewJob { inner })
-    }
-}
-impl<C> NalPacketSession<C> {
-    fn with_configuration(pool: &Budget, configuration: C, limits: NalPacketLimits) -> Result<Self>
-    where
-        C: PacketConfig,
-    {
-        if !configuration.raw().belongs_to(pool) {
+        if !configuration.bytes().belongs_to(pool) {
             return Err(Error::ForeignPool);
         }
         if limits.maximum_nals == 0 || limits.maximum_segments == 0 {
@@ -478,9 +240,7 @@ impl<C> NalPacketSession<C> {
             drained: false,
         })
     }
-}
-impl<C> NalPacketSession<C> {
-    pub fn configuration(&self) -> &C {
+    pub fn configuration(&self) -> &NalPacketConfiguration {
         &self.configuration
     }
     pub fn receiver_epoch(&self) -> u64 {
@@ -495,8 +255,6 @@ impl<C> NalPacketSession<C> {
         self.avc = AvcState::default();
         self.drained = false;
     }
-}
-impl NalPacketSession {
     /// A nonempty AVC side-data record is parsed by the existing cooperative
     /// AvcConfigParser before this call. Exact raw equality is then work-bounded
     /// inside the job. HEVC retains but does not adopt the side-data record.
@@ -506,7 +264,6 @@ impl NalPacketSession {
         avc_update: Option<AvcConfiguration>,
     ) -> Result<NalPacketJob<'_, M>> {
         self.begin_packet(source, avc_update.map(NalPacketConfiguration::Avc), false)
-            .map(|inner| NalPacketJob { inner })
     }
     /// Frames a packet with the receiver's acceptance ([`crate::compat::nal`]):
     /// a NAL header the strict path refuses is framed and its refusal recorded.
@@ -522,44 +279,13 @@ impl NalPacketSession {
             update.map(NalPacketConfiguration::ReceiverAvc),
             true,
         )
-        .map(|inner| NalPacketJob { inner })
     }
-    /// The same framing operation with range descriptors instead of one Bytes
-    /// clone per segment. The output still owns the complete packet and raw
-    /// effective configuration; all packet work and validation are unchanged.
-    pub fn packet_compact<M>(
+    fn begin_packet<M>(
         &mut self,
         source: NalPacket<M>,
-        avc_update: Option<AvcConfiguration>,
-    ) -> Result<NalPacketCompactJob<'_, M>> {
-        self.begin_packet(source, avc_update.map(NalPacketConfiguration::Avc), false)
-            .map(|inner| NalPacketCompactJob { inner })
-    }
-    /// Observed receiver view with compact descriptors, preserving both source
-    /// refusals and the independently retained raw configuration facts.
-    pub fn receiver_packet_compact<M>(
-        &mut self,
-        source: NalPacket<M>,
-        update: Option<crate::compat::nal::ReceiverAvcConfiguration>,
-    ) -> Result<NalPacketCompactJob<'_, M>> {
-        self.begin_packet(
-            source,
-            update.map(NalPacketConfiguration::ReceiverAvc),
-            true,
-        )
-        .map(|inner| NalPacketCompactJob { inner })
-    }
-}
-impl<C> NalPacketSession<C> {
-    fn begin_packet<M, S: PacketSegment>(
-        &mut self,
-        source: NalPacket<M>,
-        avc_update: Option<C>,
+        avc_update: Option<NalPacketConfiguration>,
         observed_packet: bool,
-    ) -> Result<PacketJob<'_, M, S, C>>
-    where
-        C: PacketConfig,
-    {
+    ) -> Result<NalPacketJob<'_, M>> {
         if self.drained {
             return Err(Error::Invalid("packet after drain requires flush"));
         }
@@ -570,7 +296,7 @@ impl<C> NalPacketSession<C> {
                 .is_some_and(|v| !v.belongs_to(&self.pool))
             || avc_update
                 .as_ref()
-                .is_some_and(|v| !v.raw().belongs_to(&self.pool))
+                .is_some_and(|v| !v.bytes().belongs_to(&self.pool))
         {
             return Err(Error::ForeignPool);
         }
@@ -585,7 +311,7 @@ impl<C> NalPacketSession<C> {
             .offset
             .checked_add(u64::try_from(source.bytes.len()).map_err(|_| Error::Overflow)?)
             .ok_or(Error::Overflow)?;
-        let codec = self.configuration.codec_kind();
+        let codec = self.configuration.codec();
         let changes =
             codec == Codec::Avc && source.new_extradata.as_ref().is_some_and(|v| !v.is_empty());
         if changes != avc_update.is_some() {
@@ -601,10 +327,7 @@ impl<C> NalPacketSession<C> {
         } else {
             self.avc
         };
-        let length_width = avc_update
-            .as_ref()
-            .unwrap_or(&self.configuration)
-            .length_width();
+        let length_width = avc_update.as_ref().unwrap_or(&self.configuration).width();
         let phase = if changes {
             Phase::Verify
         } else if codec == Codec::Hevc {
@@ -612,7 +335,7 @@ impl<C> NalPacketSession<C> {
         } else {
             Phase::Scan
         };
-        Ok(PacketJob {
+        Ok(NalPacketJob {
             session: self,
             source: Some(source),
             update: avc_update,
@@ -661,19 +384,6 @@ pub enum NalPacketOrigin {
         source_range: Range<usize>,
     },
 }
-#[derive(Clone, Debug)]
-pub struct NalPacketSegment {
-    bytes: Bytes,
-    pub origin: NalPacketOrigin,
-    pub prefix_bytes: u8,
-    pub output_offset: usize,
-}
-impl NalPacketSegment {
-    pub fn source_bytes(&self) -> &Bytes {
-        &self.bytes
-    }
-}
-
 /// Small progress result for publication into an empty caller-owned slot.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum NalPacketProgress {
@@ -682,14 +392,10 @@ pub enum NalPacketProgress {
     Complete,
 }
 
-pub struct NalPacketOutput<M = NalPacketFields> {
-    inner: PacketOutput<M, NalPacketSegment>,
-}
-
-/// An immutable source range. Its backing bytes are owned by the compact output,
+/// An immutable source range. Its backing bytes are owned by the output,
 /// rather than independently cloned into each descriptor.
 #[derive(Clone, PartialEq, Eq)]
-pub struct NalPacketRangeSegment {
+pub struct NalPacketSegment {
     source_range: Range<usize>,
     // The high byte carries the existing source/prefix tag. The low24 bits
     // carry a configuration NAL index: avcC has at most31+255+255 NALs;
@@ -698,13 +404,13 @@ pub struct NalPacketRangeSegment {
     nal_and_prefix: u32,
     output_offset: usize,
 }
-impl std::fmt::Debug for NalPacketRangeSegment {
+impl std::fmt::Debug for NalPacketSegment {
     fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         // Preserve the existing public diagnostic fields after private packing.
         let nal_index = (self.nal_and_prefix & Self::NAL_INDEX_MASK) as usize;
         let prefix_and_source = (self.nal_and_prefix >> 24) as u8;
         formatter
-            .debug_struct("NalPacketRangeSegment")
+            .debug_struct("NalPacketSegment")
             .field("source_range", &self.source_range)
             .field("nal_index", &nal_index)
             .field("prefix_and_source", &prefix_and_source)
@@ -712,9 +418,34 @@ impl std::fmt::Debug for NalPacketRangeSegment {
             .finish()
     }
 }
-impl NalPacketRangeSegment {
+impl NalPacketSegment {
     const CONFIGURATION_SOURCE: u8 = 0x80;
     const NAL_INDEX_MASK: u32 = 0x00ff_ffff;
+    fn packet(range: Range<usize>, prefix: u8, offset: usize) -> Self {
+        Self {
+            source_range: range,
+            nal_and_prefix: u32::from(prefix) << 24,
+            output_offset: offset,
+        }
+    }
+    fn configuration(index: usize, range: Range<usize>, offset: usize) -> Self {
+        // Called only for an entry in the parsed avcC/hvcC descriptor slice.
+        // Their literal count fields bound every index below255*65535<2^24;
+        // this does not narrow source ranges, output lengths or packet offsets.
+        debug_assert!(index < usize::from(u8::MAX) * usize::from(u16::MAX));
+        Self {
+            source_range: range,
+            nal_and_prefix: (index as u32) | (u32::from(Self::CONFIGURATION_SOURCE | 4) << 24),
+            output_offset: offset,
+        }
+    }
+    fn passthrough(source: &Bytes, offset: usize) -> Self {
+        Self {
+            source_range: 0..source.len(),
+            nal_and_prefix: 0,
+            output_offset: offset,
+        }
+    }
     pub fn origin(&self) -> NalPacketOrigin {
         if (self.nal_and_prefix >> 24) as u8 & Self::CONFIGURATION_SOURCE == 0 {
             NalPacketOrigin::Packet {
@@ -733,8 +464,8 @@ impl NalPacketRangeSegment {
     pub fn output_offset(&self) -> usize {
         self.output_offset
     }
-    fn range(&self) -> &Range<usize> {
-        &self.source_range
+    fn len(&self) -> usize {
+        self.source_range.end - self.source_range.start
     }
     fn owner<'a>(&self, packet: &'a Bytes, configuration: &'a Bytes) -> &'a Bytes {
         if (self.nal_and_prefix >> 24) as u8 & Self::CONFIGURATION_SOURCE == 0 {
@@ -743,22 +474,24 @@ impl NalPacketRangeSegment {
             configuration
         }
     }
+    fn payload<'a>(&self, packet: &'a Bytes, configuration: &'a Bytes) -> Result<&'a [u8]> {
+        self.owner(packet, configuration)
+            .as_ref()
+            .get(self.source_range.clone())
+            .ok_or(Error::Invalid("packet segment range"))
+    }
 }
 
-/// Complete output with compact descriptors. Payload, source, side data and raw
-/// effective configuration remain owned and charged after producer teardown.
-/// Borrowed segment bytes cannot outlive that output:
+/// Complete output. Payload, source, side data and raw effective configuration
+/// remain owned and charged after producer teardown. Borrowed segment bytes
+/// cannot outlive that output:
 /// ```compile_fail
-/// use triergon_framing::NalPacketCompactOutput;
-/// fn invalid(output: NalPacketCompactOutput) -> &'static [u8] {
+/// use triergon_framing::NalPacketOutput;
+/// fn invalid(output: NalPacketOutput) -> &'static [u8] {
 ///     output.segment_bytes(0).unwrap()
 /// }
 /// ```
-pub struct NalPacketCompactOutput<M = NalPacketFields> {
-    inner: PacketOutput<M, NalPacketRangeSegment>,
-}
-
-struct PacketOutput<M, S> {
+pub struct NalPacketOutput<M = NalPacketFields> {
     bytes: Bytes,
     source: NalPacket<M>,
     configuration: Bytes,
@@ -769,7 +502,7 @@ struct PacketOutput<M, S> {
     has_configuration_identity: bool,
     configuration_source_refusal: NalConfigurationRefusal,
     packet_source_refusal: Option<NalHeaderError>,
-    segments: BudgetVec<S>,
+    segments: BudgetVec<NalPacketSegment>,
     receiver_epoch: u64,
     forward_new_extradata: bool,
 }
@@ -832,192 +565,51 @@ impl<M> NalPacketRejection<M> {
 }
 impl<M> NalPacketOutput<M> {
     pub fn bytes(&self) -> &Bytes {
-        &self.inner.bytes
+        &self.bytes
     }
     pub fn source(&self) -> &NalPacket<M> {
-        &self.inner.source
+        &self.source
     }
     pub fn configuration_bytes(&self) -> &Bytes {
-        &self.inner.configuration
+        &self.configuration
     }
     pub fn configuration_source_identity(&self) -> Option<(SourceLocation, u64)> {
-        self.inner
-            .has_configuration_identity
-            .then_some(self.inner.configuration_identity)
+        self.has_configuration_identity
+            .then_some(self.configuration_identity)
     }
     pub fn segments(&self) -> &[NalPacketSegment] {
-        self.inner.segments.as_slice()
+        self.segments.as_slice()
     }
     pub fn configuration_source_refusal(&self) -> Option<Error> {
-        self.inner.configuration_source_refusal.error()
+        self.configuration_source_refusal.error()
     }
     pub fn packet_source_refusal(&self) -> Option<Error> {
-        self.inner.packet_source_refusal.map(NalHeaderError::error)
+        self.packet_source_refusal.map(NalHeaderError::error)
     }
     pub fn receiver_epoch(&self) -> u64 {
-        self.inner.receiver_epoch
+        self.receiver_epoch
     }
     pub fn forward_new_extradata(&self) -> bool {
-        self.inner.forward_new_extradata
-    }
-}
-impl<M> NalPacketCompactOutput<M> {
-    pub fn bytes(&self) -> &Bytes {
-        &self.inner.bytes
-    }
-    pub fn source(&self) -> &NalPacket<M> {
-        &self.inner.source
-    }
-    pub fn configuration_bytes(&self) -> &Bytes {
-        &self.inner.configuration
-    }
-    pub fn configuration_source_identity(&self) -> Option<(SourceLocation, u64)> {
-        self.inner
-            .has_configuration_identity
-            .then_some(self.inner.configuration_identity)
-    }
-    pub fn segments(&self) -> &[NalPacketRangeSegment] {
-        self.inner.segments.as_slice()
-    }
-    pub fn configuration_source_refusal(&self) -> Option<Error> {
-        self.inner.configuration_source_refusal.error()
-    }
-    pub fn packet_source_refusal(&self) -> Option<Error> {
-        self.inner.packet_source_refusal.map(NalHeaderError::error)
-    }
-    pub fn receiver_epoch(&self) -> u64 {
-        self.inner.receiver_epoch
-    }
-    pub fn forward_new_extradata(&self) -> bool {
-        self.inner.forward_new_extradata
+        self.forward_new_extradata
     }
     /// Borrow a segment payload through the output's retained packet/configuration
     /// owner. No Bytes clone or allocation occurs.
     pub fn segment_bytes(&self, index: usize) -> Option<&[u8]> {
-        let part = self.inner.segments.as_slice().get(index)?;
-        part.owner(&self.inner.source.bytes, &self.inner.configuration)
+        let part = self.segments.as_slice().get(index)?;
+        part.owner(&self.source.bytes, &self.configuration)
             .as_ref()
-            .get(part.range().clone())
+            .get(part.source_range.clone())
     }
-    /// Explicit compatibility materialization of one owned segment. This clones
-    /// the existing immutable owner; descriptor collection remains caller-owned.
-    pub fn materialize_segment(&self, index: usize) -> Result<NalPacketSegment> {
+    /// One segment's payload as its own handle on the retained packet or
+    /// configuration owner. No bytes are copied.
+    pub fn retain_segment_bytes(&self, index: usize) -> Result<Bytes> {
         let part = self
-            .inner
             .segments
             .as_slice()
             .get(index)
             .ok_or(Error::Invalid("packet segment index"))?;
-        Ok(NalPacketSegment {
-            bytes: part
-                .owner(&self.inner.source.bytes, &self.inner.configuration)
-                .slice(part.range().clone())?,
-            origin: part.origin(),
-            prefix_bytes: part.prefix_bytes(),
-            output_offset: part.output_offset,
-        })
-    }
-}
-
-// A compile-time storage choice for one parser/state engine. Neither job nor
-// output has a runtime storage tag, spare vector or inline segment array.
-trait PacketSegment: Sized {
-    type Output<M>;
-    fn packet(source: &Bytes, range: Range<usize>, prefix: u8, offset: usize) -> Result<Self>;
-    fn configuration(source: &Bytes, index: usize, range: Range<usize>, offset: usize) -> Self;
-    fn passthrough(source: &Bytes, offset: usize) -> Self;
-    fn len(&self) -> usize;
-    fn prefix_bytes(&self) -> u8;
-    fn payload<'a>(&'a self, packet: &'a Bytes, configuration: &'a Bytes) -> Result<&'a [u8]>;
-    fn finish<M>(output: PacketOutput<M, Self>) -> Self::Output<M>;
-}
-impl PacketSegment for NalPacketSegment {
-    type Output<M> = NalPacketOutput<M>;
-    fn packet(source: &Bytes, range: Range<usize>, prefix: u8, offset: usize) -> Result<Self> {
-        Ok(Self {
-            bytes: source.slice(range.clone())?,
-            origin: NalPacketOrigin::Packet {
-                source_range: range,
-            },
-            prefix_bytes: prefix,
-            output_offset: offset,
-        })
-    }
-    fn configuration(source: &Bytes, index: usize, range: Range<usize>, offset: usize) -> Self {
-        Self {
-            bytes: source.clone(),
-            origin: NalPacketOrigin::Configuration {
-                nal_index: index,
-                source_range: range,
-            },
-            prefix_bytes: 4,
-            output_offset: offset,
-        }
-    }
-    fn passthrough(source: &Bytes, offset: usize) -> Self {
-        Self {
-            bytes: source.clone(),
-            origin: NalPacketOrigin::Packet {
-                source_range: 0..source.len(),
-            },
-            prefix_bytes: 0,
-            output_offset: offset,
-        }
-    }
-    fn len(&self) -> usize {
-        self.bytes.len()
-    }
-    fn prefix_bytes(&self) -> u8 {
-        self.prefix_bytes
-    }
-    fn payload<'a>(&'a self, _: &'a Bytes, _: &'a Bytes) -> Result<&'a [u8]> {
-        Ok(self.bytes.as_ref())
-    }
-    fn finish<M>(inner: PacketOutput<M, Self>) -> Self::Output<M> {
-        NalPacketOutput { inner }
-    }
-}
-impl PacketSegment for NalPacketRangeSegment {
-    type Output<M> = NalPacketCompactOutput<M>;
-    fn packet(_: &Bytes, range: Range<usize>, prefix: u8, offset: usize) -> Result<Self> {
-        Ok(Self {
-            source_range: range,
-            nal_and_prefix: u32::from(prefix) << 24,
-            output_offset: offset,
-        })
-    }
-    fn configuration(_: &Bytes, index: usize, range: Range<usize>, offset: usize) -> Self {
-        // Called only for an entry in the parsed avcC/hvcC descriptor slice.
-        // Their literal count fields bound every index below255*65535<2^24;
-        // this does not narrow source ranges, output lengths or packet offsets.
-        debug_assert!(index < usize::from(u8::MAX) * usize::from(u16::MAX));
-        Self {
-            source_range: range,
-            nal_and_prefix: (index as u32) | (u32::from(Self::CONFIGURATION_SOURCE | 4) << 24),
-            output_offset: offset,
-        }
-    }
-    fn passthrough(source: &Bytes, offset: usize) -> Self {
-        Self {
-            source_range: 0..source.len(),
-            nal_and_prefix: 0,
-            output_offset: offset,
-        }
-    }
-    fn len(&self) -> usize {
-        self.range().end - self.range().start
-    }
-    fn prefix_bytes(&self) -> u8 {
-        NalPacketRangeSegment::prefix_bytes(self)
-    }
-    fn payload<'a>(&'a self, packet: &'a Bytes, configuration: &'a Bytes) -> Result<&'a [u8]> {
-        self.owner(packet, configuration)
-            .as_ref()
-            .get(self.range().clone())
-            .ok_or(Error::Invalid("packet segment range"))
-    }
-    fn finish<M>(inner: PacketOutput<M, Self>) -> Self::Output<M> {
-        NalPacketCompactOutput { inner }
+        part.owner(&self.source.bytes, &self.configuration)
+            .slice(part.source_range.clone())
     }
 }
 
@@ -1044,21 +636,11 @@ struct PendingNal {
     range: Range<usize>,
     kind: u8,
 }
+/// One cooperative packet framing job over the session it borrows.
 pub struct NalPacketJob<'a, M = NalPacketFields> {
-    inner: PacketJob<'a, M, NalPacketSegment, NalPacketConfiguration>,
-}
-/// The compact descriptor variant of the same cooperative packet job.
-pub struct NalPacketCompactJob<'a, M = NalPacketFields> {
-    inner: PacketJob<'a, M, NalPacketRangeSegment, NalPacketConfiguration>,
-}
-/// The compact descriptor job over a configuration view.
-pub struct NalPacketViewJob<'a, M = NalPacketFields> {
-    inner: PacketJob<'a, M, NalPacketRangeSegment, NalPacketViewConfiguration>,
-}
-struct PacketJob<'a, M, S: PacketSegment, C> {
-    session: &'a mut NalPacketSession<C>,
+    session: &'a mut NalPacketSession,
     source: Option<NalPacket<M>>,
-    update: Option<C>,
+    update: Option<NalPacketConfiguration>,
     // Codec and width stay fixed while the job borrows the session. A valid
     // update changes only the width of this AVC packet and subsequent packets.
     codec: Codec,
@@ -1089,7 +671,7 @@ struct PacketJob<'a, M, S: PacketSegment, C> {
     /// lookahead, or a packet whose first NAL is also its last. Only sizes the
     /// first allocation; a refused reservation falls back to ordinary growth.
     segment_hint: Option<usize>,
-    segments: Option<BudgetVec<S>>,
+    segments: Option<BudgetVec<NalPacketSegment>>,
     output: Option<BudgetVec<u8>>,
     total: usize,
     copy_segment: usize,
@@ -1099,8 +681,8 @@ struct PacketJob<'a, M, S: PacketSegment, C> {
     observed_packet: bool,
     packet_source_refusal: Option<NalHeaderError>,
 }
-impl<M, S: PacketSegment, C: PacketConfig> PacketJob<'_, M, S, C> {
-    fn config(&self) -> &C {
+impl<M> NalPacketJob<'_, M> {
+    fn config(&self) -> &NalPacketConfiguration {
         self.update.as_ref().unwrap_or(&self.session.configuration)
     }
     pub fn source(&self) -> Option<&NalPacket<M>> {
@@ -1117,8 +699,8 @@ impl<M, S: PacketSegment, C: PacketConfig> PacketJob<'_, M, S, C> {
             kind,
             error,
             source,
-            configuration: self.session.configuration.raw().clone(),
-            configuration_identity: self.session.configuration.identity(),
+            configuration: self.session.configuration.bytes().clone(),
+            configuration_identity: self.session.configuration.source_identity(),
             configuration_source_refusal: self.session.configuration.refusal(),
             packet_source_refusal: self.packet_source_refusal,
             receiver_epoch: self.session.receiver_epoch,
@@ -1141,7 +723,7 @@ impl<M, S: PacketSegment, C: PacketConfig> PacketJob<'_, M, S, C> {
             0
         };
         segments
-            .checked_mul(size_of::<S>())
+            .checked_mul(size_of::<NalPacketSegment>())
             .and_then(|p| p.checked_add(copied_storage))
             .and_then(|n| n.checked_add(base))
             .ok_or(Error::Overflow)
@@ -1160,8 +742,8 @@ impl<M, S: PacketSegment, C: PacketConfig> PacketJob<'_, M, S, C> {
                 .ok_or(Error::Overflow)?;
         }
         let owners = [
-            Some(self.session.configuration.raw()),
-            self.update.as_ref().map(C::raw),
+            Some(self.session.configuration.bytes()),
+            self.update.as_ref().map(NalPacketConfiguration::bytes),
             Some(&packet.bytes),
             packet.new_extradata.as_ref(),
         ];
@@ -1179,7 +761,7 @@ impl<M, S: PacketSegment, C: PacketConfig> PacketJob<'_, M, S, C> {
         }
         Ok(total)
     }
-    fn append(&mut self, segment: S) -> Result<()> {
+    fn append(&mut self, segment: NalPacketSegment) -> Result<()> {
         let parts = self.segments.as_ref().map_or(0, BudgetVec::len);
         if parts == self.session.limits.maximum_segments {
             return Err(Error::Limit {
@@ -1219,12 +801,12 @@ impl<M, S: PacketSegment, C: PacketConfig> PacketJob<'_, M, S, C> {
         self.total = total;
         Ok(())
     }
-    /// Compatibility adapter over the same state engine used by `step_into`.
+    /// The same state engine as `step_into`, returning the output directly.
     pub fn step(
         &mut self,
         work: &mut WorkBudget,
         cancel: &AtomicBool,
-    ) -> Result<BuildStep<S::Output<M>>> {
+    ) -> Result<BuildStep<NalPacketOutput<M>>> {
         let mut ready = None;
         match self.step_into(work, cancel, &mut ready)? {
             NalPacketProgress::Yield => Ok(BuildStep::Yield),
@@ -1241,7 +823,7 @@ impl<M, S: PacketSegment, C: PacketConfig> PacketJob<'_, M, S, C> {
         &mut self,
         work: &mut WorkBudget,
         cancel: &AtomicBool,
-        ready: &mut Option<S::Output<M>>,
+        ready: &mut Option<NalPacketOutput<M>>,
     ) -> Result<NalPacketProgress> {
         if ready.is_some() {
             return Err(Error::Invalid("packet output sink occupied"));
@@ -1272,78 +854,6 @@ impl<M, S: PacketSegment, C: PacketConfig> PacketJob<'_, M, S, C> {
     }
 }
 
-impl<M> NalPacketJob<'_, M> {
-    pub fn source(&self) -> Option<&NalPacket<M>> {
-        self.inner.source()
-    }
-    pub fn take_receiver_rejection(&mut self) -> Option<NalPacketRejection<M>> {
-        self.inner.take_receiver_rejection()
-    }
-    pub fn step(
-        &mut self,
-        work: &mut WorkBudget,
-        cancel: &AtomicBool,
-    ) -> Result<BuildStep<NalPacketOutput<M>>> {
-        self.inner.step(work, cancel)
-    }
-    /// The sink must be empty. An occupied sink is rejected without job,
-    /// owner, work or cancellation side effects; all other semantics match step.
-    pub fn step_into(
-        &mut self,
-        work: &mut WorkBudget,
-        cancel: &AtomicBool,
-        ready: &mut Option<NalPacketOutput<M>>,
-    ) -> Result<NalPacketProgress> {
-        self.inner.step_into(work, cancel, ready)
-    }
-}
-
-impl<M> NalPacketCompactJob<'_, M> {
-    pub fn take_receiver_rejection(&mut self) -> Option<NalPacketRejection<M>> {
-        self.inner.take_receiver_rejection()
-    }
-    pub fn step(
-        &mut self,
-        work: &mut WorkBudget,
-        cancel: &AtomicBool,
-    ) -> Result<BuildStep<NalPacketCompactOutput<M>>> {
-        self.inner.step(work, cancel)
-    }
-    /// The sink must be empty. An occupied sink is rejected without job,
-    /// owner, work or cancellation side effects; all other semantics match step.
-    pub fn step_into(
-        &mut self,
-        work: &mut WorkBudget,
-        cancel: &AtomicBool,
-        ready: &mut Option<NalPacketCompactOutput<M>>,
-    ) -> Result<NalPacketProgress> {
-        self.inner.step_into(work, cancel, ready)
-    }
-}
-
-impl<M> NalPacketViewJob<'_, M> {
-    pub fn take_receiver_rejection(&mut self) -> Option<NalPacketRejection<M>> {
-        self.inner.take_receiver_rejection()
-    }
-    pub fn step(
-        &mut self,
-        work: &mut WorkBudget,
-        cancel: &AtomicBool,
-    ) -> Result<BuildStep<NalPacketCompactOutput<M>>> {
-        self.inner.step(work, cancel)
-    }
-    /// The sink must be empty. An occupied sink is rejected without job,
-    /// owner, work or cancellation side effects; all other semantics match step.
-    pub fn step_into(
-        &mut self,
-        work: &mut WorkBudget,
-        cancel: &AtomicBool,
-        ready: &mut Option<NalPacketCompactOutput<M>>,
-    ) -> Result<NalPacketProgress> {
-        self.inner.step_into(work, cancel, ready)
-    }
-}
-
 // It exercises the existing private constructor, not a new test-only API.
 #[cfg(test)]
 mod packed_plan_boundary_guards {
@@ -1351,18 +861,11 @@ mod packed_plan_boundary_guards {
 
     #[test]
     fn every_configuration_index_boundary_preserves_full_source_ranges() {
-        let pool = Budget::new(4096).unwrap();
-        let raw = Bytes::copy_from_slice(&pool, &[0x40, 1]).unwrap();
         // A hvcC has at most255 arrays with65535 NALs each. The last possible
         // index is checked without allocating a multi-gigabyte record.
         for index in [0, 31, 255, 65_535, 255 * 65_535 - 1] {
             let range = usize::MAX - 1..usize::MAX;
-            let part = <NalPacketRangeSegment as PacketSegment>::configuration(
-                &raw,
-                index,
-                range.clone(),
-                usize::MAX,
-            );
+            let part = NalPacketSegment::configuration(index, range.clone(), usize::MAX);
             assert_eq!(
                 part.origin(),
                 NalPacketOrigin::Configuration {
@@ -1375,7 +878,7 @@ mod packed_plan_boundary_guards {
             assert_eq!(
                 format!("{part:?}"),
                 format!(
-                    "NalPacketRangeSegment {{ source_range: {}..{}, nal_index: {index}, prefix_and_source: 132, output_offset: {} }}",
+                    "NalPacketSegment {{ source_range: {}..{}, nal_index: {index}, prefix_and_source: 132, output_offset: {} }}",
                     usize::MAX - 1,
                     usize::MAX,
                     usize::MAX,
@@ -1389,9 +892,7 @@ mod packed_plan_boundary_guards {
         let pool = Budget::new(4096).unwrap();
         let raw = Bytes::copy_from_slice(&pool, &[0x41]).unwrap();
         for prefix in [0, 3, 4] {
-            let part =
-                <NalPacketRangeSegment as PacketSegment>::packet(&raw, 0..1, prefix, usize::MAX)
-                    .unwrap();
+            let part = NalPacketSegment::packet(0..1, prefix, usize::MAX);
             assert_eq!(
                 part.origin(),
                 NalPacketOrigin::Packet { source_range: 0..1 }
@@ -1402,7 +903,7 @@ mod packed_plan_boundary_guards {
             assert_eq!(
                 format!("{part:?}"),
                 format!(
-                    "NalPacketRangeSegment {{ source_range: 0..1, nal_index: 0, prefix_and_source: {prefix}, output_offset: {} }}",
+                    "NalPacketSegment {{ source_range: 0..1, nal_index: 0, prefix_and_source: {prefix}, output_offset: {} }}",
                     usize::MAX,
                 )
             );

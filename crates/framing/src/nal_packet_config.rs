@@ -1,6 +1,6 @@
 //! Bounded initialization-extradata view of the same pinned packet receiver.
-use crate::nal_packet::{NalConfigurationRefusal, PacketConfig};
-use crate::{AvcConfigArrayKind, BuildStep, NalPacketConfiguration, NalPacketViewConfiguration};
+use crate::nal_packet::NalConfigurationRefusal;
+use crate::{AvcConfigArrayKind, BuildStep, NalPacketConfiguration};
 use std::sync::atomic::{AtomicBool, Ordering};
 use triergon_core::{Budget, BudgetVec, Bytes, Error, Result, WorkBudget};
 
@@ -49,10 +49,10 @@ impl NalPacketConfigRejection {
         -1_094_995_529
     }
 }
-pub struct NalPacketConfigWriter<'a, C = NalPacketConfiguration> {
+pub struct NalPacketConfigWriter<'a> {
     // A pool's limit is immutable; the output vector holds the pool handle.
     pool_limit: usize,
-    config: &'a C,
+    config: &'a NalPacketConfiguration,
     length_prefixed: bool,
     output: Option<BudgetVec<u8>>,
     maximum: usize,
@@ -71,55 +71,13 @@ impl<'a> NalPacketConfigWriter<'a> {
         configuration: &'a NalPacketConfiguration,
         maximum_output_bytes: usize,
     ) -> Result<Self> {
-        Self::with_configuration(pool, configuration, maximum_output_bytes)
-    }
-    pub fn take_receiver_rejection(&mut self) -> Option<NalPacketConfigRejection> {
-        self.rejection()
-    }
-    pub fn step(
-        &mut self,
-        work: &mut WorkBudget,
-        cancel: &AtomicBool,
-    ) -> Result<BuildStep<NalPacketConfigOutput>> {
-        self.run(work, cancel)
-    }
-}
-impl<'a> NalPacketConfigWriter<'a, NalPacketViewConfiguration> {
-    /// The same initialization writer over a compact configuration view.
-    pub fn new_view(
-        pool: &Budget,
-        configuration: &'a NalPacketViewConfiguration,
-        maximum_output_bytes: usize,
-    ) -> Result<Self> {
-        Self::with_configuration(pool, configuration, maximum_output_bytes)
-    }
-    pub fn take_receiver_rejection(&mut self) -> Option<NalPacketConfigRejection> {
-        self.rejection()
-    }
-    pub fn step(
-        &mut self,
-        work: &mut WorkBudget,
-        cancel: &AtomicBool,
-    ) -> Result<BuildStep<NalPacketConfigOutput>> {
-        self.run(work, cancel)
-    }
-}
-impl<'a, C> NalPacketConfigWriter<'a, C> {
-    fn with_configuration(
-        pool: &Budget,
-        configuration: &'a C,
-        maximum_output_bytes: usize,
-    ) -> Result<Self>
-    where
-        C: PacketConfig,
-    {
-        if !configuration.raw().belongs_to(pool) {
+        if !configuration.bytes().belongs_to(pool) {
             return Err(Error::ForeignPool);
         }
         Ok(Self {
             pool_limit: pool.limit(),
             config: configuration,
-            length_prefixed: configuration.length_width().is_some(),
+            length_prefixed: configuration.width().is_some(),
             output: Some(BudgetVec::new(pool)),
             maximum: maximum_output_bytes,
             total: 0,
@@ -132,10 +90,11 @@ impl<'a, C> NalPacketConfigWriter<'a, C> {
             rejection_taken: false,
         })
     }
-    fn nal(config: &C, length_prefixed: bool, index: usize) -> Option<(bool, &[u8], usize)>
-    where
-        C: PacketConfig,
-    {
+    fn nal(
+        config: &NalPacketConfiguration,
+        length_prefixed: bool,
+        index: usize,
+    ) -> Option<(bool, &[u8], usize)> {
         if length_prefixed {
             config.config_nal(index).map(|n| {
                 (
@@ -145,13 +104,10 @@ impl<'a, C> NalPacketConfigWriter<'a, C> {
                 )
             })
         } else {
-            (index == 0).then_some((true, config.raw().as_ref(), 0))
+            (index == 0).then_some((true, config.bytes().as_ref(), 0))
         }
     }
-    fn rejection(&mut self) -> Option<NalPacketConfigRejection>
-    where
-        C: PacketConfig,
-    {
+    pub fn take_receiver_rejection(&mut self) -> Option<NalPacketConfigRejection> {
         if self.rejection_taken {
             return None;
         }
@@ -159,20 +115,17 @@ impl<'a, C> NalPacketConfigWriter<'a, C> {
         let error = self.failure?;
         self.rejection_taken = true;
         Some(NalPacketConfigRejection {
-            source: self.config.raw().clone(),
+            source: self.config.bytes().clone(),
             error,
             declared_array_type,
             source_refusal: self.config.refusal(),
         })
     }
-    fn run(
+    pub fn step(
         &mut self,
         work: &mut WorkBudget,
         cancel: &AtomicBool,
-    ) -> Result<BuildStep<NalPacketConfigOutput>>
-    where
-        C: PacketConfig,
-    {
+    ) -> Result<BuildStep<NalPacketConfigOutput>> {
         if let Some(e) = self.failure {
             return Err(e);
         }
@@ -189,10 +142,7 @@ impl<'a, C> NalPacketConfigWriter<'a, C> {
         &mut self,
         work: &mut WorkBudget,
         cancel: &AtomicBool,
-    ) -> Result<BuildStep<NalPacketConfigOutput>>
-    where
-        C: PacketConfig,
-    {
+    ) -> Result<BuildStep<NalPacketConfigOutput>> {
         loop {
             if cancel.load(Ordering::Relaxed) {
                 return Err(Error::Cancelled);
@@ -323,7 +273,7 @@ impl<'a, C> NalPacketConfigWriter<'a, C> {
                     self.phase = 5;
                     return Ok(BuildStep::Ready(NalPacketConfigOutput {
                         bytes,
-                        source: self.config.raw().clone(),
+                        source: self.config.bytes().clone(),
                         source_refusal: self.config.refusal(),
                     }));
                 }

@@ -1,8 +1,9 @@
 #![forbid(unsafe_code)]
-//! The view-configuration receiver is the same packet/initialization state engine
-//! as the eager observed compact receiver. The legacy path is the oracle: every
-//! step's result and remaining work, every published fact and every refusal must
-//! match, while the view never holds more pool charge at any step.
+//! Receiver acceptance across AVC sample widths 1-4 and HEVC array shapes at
+//! several work quanta. Every scenario reaches the packet engine with published
+//! outputs and a physical rejection; a short AVC update is a receiver rejection;
+//! an unsupported HEVC decoder array is an initialization rejection; teardown
+//! releases every pool charge.
 use std::sync::atomic::AtomicBool;
 use triergon_core::{Budget, Bytes, SourceId, SourceLocation, WorkBudget};
 use triergon_framing::compat::nal::*;
@@ -16,12 +17,14 @@ const LIMITS: NalPacketLimits = NalPacketLimits {
     maximum_segments: 128,
 };
 
-#[derive(Default, Debug, PartialEq)]
+#[derive(Default, Debug)]
 struct Run {
-    /// Literal step kinds, remaining work and every published or refused fact.
-    events: Vec<String>,
-    /// Pool charge after each step, compared as view <= legacy.
-    used: Vec<usize>,
+    outputs: usize,
+    rejections: usize,
+    /// Reference receive result (with `reference-trace`) and raw update bytes.
+    update_rejections: Vec<(Option<i32>, Vec<u8>)>,
+    /// Raw record and declared array type.
+    init_rejection: Option<(Vec<u8>, u8)>,
 }
 
 struct Packet {
@@ -119,275 +122,165 @@ fn framed(width: usize, nals: &[&[u8]]) -> Vec<u8> {
     out
 }
 
-fn step_fact<T>(
-    run: &mut Run,
-    pool: &Budget,
-    label: &str,
-    work: &WorkBudget,
-    r: &Result<BuildStep<T>, triergon_core::Error>,
-) {
-    let kind = match r {
-        Ok(BuildStep::Yield) => "yield".to_string(),
-        Ok(BuildStep::Ready(_)) => "ready".to_string(),
-        Ok(BuildStep::Complete) => "complete".to_string(),
-        Err(e) => format!("error {e:?}"),
+fn receive(codec: Codec, record: &[u8], packets: &[Packet], q: u64) -> Run {
+    let pool = Budget::new(1 << 20).unwrap();
+    let base = pool.used();
+    let mut run = Run::default();
+    let raw = Bytes::copy_from_slice(&pool, record).unwrap();
+    let config = match codec {
+        Codec::Avc => {
+            let mut p =
+                ReceiverAvcConfigParser::new(&pool, avc_source(20), raw, avc_limits()).unwrap();
+            loop {
+                match p.step(&mut WorkBudget::new(q), &NO).unwrap() {
+                    BuildStep::Ready(v) => break NalPacketConfiguration::ReceiverAvc(v),
+                    BuildStep::Yield => (),
+                    BuildStep::Complete => panic!("missing AVC configuration"),
+                }
+            }
+        }
+        Codec::Hevc => {
+            let mut p =
+                ReceiverHevcConfigParser::new(&pool, hvc_source(), raw, hvc_limits()).unwrap();
+            loop {
+                match p.step(&mut WorkBudget::new(q), &NO).unwrap() {
+                    BuildStep::Ready(v) => break NalPacketConfiguration::ReceiverHevc(v),
+                    BuildStep::Yield => (),
+                    BuildStep::Complete => panic!("missing HEVC configuration"),
+                }
+            }
+        }
     };
-    run.events
-        .push(format!("{label} {kind} {}", work.remaining()));
-    run.used.push(pool.used());
-}
-
-fn output_facts(run: &mut Run, out: &NalPacketCompactOutput) {
-    run.events.push(format!(
-        "out {:?} cfg {:?} id {:?} crefuse {:?} prefuse {:?} epoch {} fwd {} segs {:?}",
-        out.bytes().as_ref(),
-        out.configuration_bytes().as_ref(),
-        out.configuration_source_identity(),
-        out.configuration_source_refusal(),
-        out.packet_source_refusal(),
-        out.receiver_epoch(),
-        out.forward_new_extradata(),
-        out.segments(),
-    ));
-    for i in 0..out.segments().len() {
-        run.events
-            .push(format!("seg {i} {:?}", out.segment_bytes(i)));
+    let mut session = NalPacketSession::new(&pool, config, LIMITS).unwrap();
+    {
+        let mut writer =
+            NalPacketConfigWriter::new(&pool, session.configuration(), 1 << 20).unwrap();
+        loop {
+            match writer.step(&mut WorkBudget::new(q), &NO) {
+                Ok(BuildStep::Ready(_)) => break,
+                Ok(BuildStep::Yield) => (),
+                _ => {
+                    run.init_rejection = writer
+                        .take_receiver_rejection()
+                        .map(|r| (r.source_bytes().to_vec(), r.declared_array_type()));
+                    drop(writer);
+                    drop(session);
+                    assert_eq!(pool.used(), base, "teardown releases every charge");
+                    return run;
+                }
+            }
+        }
     }
-}
-
-macro_rules! receiver {
-    ($name:ident, $avc_parser:ident, $hvc_parser:ident, $config:ident, $session:path, $writer:path, $packet:ident) => {
-        fn $name(codec: Codec, record: &[u8], packets: &[Packet], q: u64) -> Run {
-            let pool = Budget::new(1 << 20).unwrap();
-            let base = pool.used();
-            let mut run = Run::default();
-            let raw = Bytes::copy_from_slice(&pool, record).unwrap();
-            let config = match codec {
-                Codec::Avc => {
-                    let mut p = $avc_parser::new(&pool, avc_source(20), raw, avc_limits()).unwrap();
-                    loop {
-                        let mut w = WorkBudget::new(q);
-                        let r = p.step(&mut w, &NO);
-                        step_fact(&mut run, &pool, "avc", &w, &r);
-                        match r {
-                            Ok(BuildStep::Ready(v)) => break $config::ReceiverAvc(v),
-                            Ok(BuildStep::Yield) => (),
-                            _ => return run,
-                        }
-                    }
-                }
-                Codec::Hevc => {
-                    let mut p = $hvc_parser::new(&pool, hvc_source(), raw, hvc_limits()).unwrap();
-                    loop {
-                        let mut w = WorkBudget::new(q);
-                        let r = p.step(&mut w, &NO);
-                        step_fact(&mut run, &pool, "hevc", &w, &r);
-                        match r {
-                            Ok(BuildStep::Ready(v)) => break $config::ReceiverHevc(v),
-                            Ok(BuildStep::Yield) => (),
-                            _ => return run,
-                        }
-                    }
-                }
-            };
-            let mut session = $session(&pool, config, LIMITS).unwrap();
-            {
-                let mut writer = $writer(&pool, session.configuration(), 1 << 20).unwrap();
-                loop {
-                    let mut w = WorkBudget::new(q);
-                    let r = writer.step(&mut w, &NO);
-                    step_fact(&mut run, &pool, "init", &w, &r);
-                    match r {
-                        Ok(BuildStep::Ready(v)) => {
-                            run.events.push(format!(
-                                "init {:?} src {:?} refuse {:?}",
-                                v.bytes().as_ref(),
-                                v.source_bytes().as_ref(),
-                                v.strict_source_refusal()
-                            ));
-                            break;
-                        }
+    let mut kept = Vec::new();
+    for (index, packet) in packets.iter().enumerate() {
+        let extra = packet
+            .extra
+            .as_ref()
+            .map(|e| Bytes::copy_from_slice(&pool, e).unwrap());
+        let update = match (codec, &extra) {
+            (Codec::Avc, Some(e)) if !e.is_empty() => {
+                let mut p = ReceiverAvcConfigParser::new_update(
+                    &pool,
+                    avc_source(900),
+                    e.clone(),
+                    avc_limits(),
+                )
+                .unwrap();
+                let parsed = loop {
+                    match p.step(&mut WorkBudget::new(q), &NO) {
+                        Ok(BuildStep::Ready(v)) => break Some(v),
                         Ok(BuildStep::Yield) => (),
                         _ => {
-                            let r = writer.take_receiver_rejection();
-                            run.events.push(format!(
-                                "init-rejection {:?}",
-                                r.map(|r| (r.source_bytes().to_vec(), r.declared_array_type()))
-                            ));
-                            return run;
-                        }
-                    }
-                }
-            }
-            let mut kept = Vec::new();
-            for (index, packet) in packets.iter().enumerate() {
-                let extra = packet
-                    .extra
-                    .as_ref()
-                    .map(|e| Bytes::copy_from_slice(&pool, e).unwrap());
-                let update =
-                    match (codec, &extra) {
-                        (Codec::Avc, Some(e)) if !e.is_empty() => {
-                            let mut p = $avc_parser::new_update(
-                                &pool,
-                                avc_source(900),
-                                e.clone(),
-                                avc_limits(),
-                            )
-                            .unwrap();
-                            let mut parsed = None;
-                            loop {
-                                let mut w = WorkBudget::new(q);
-                                let r = p.step(&mut w, &NO);
-                                step_fact(&mut run, &pool, "update", &w, &r);
-                                match r {
-                                    Ok(BuildStep::Ready(v)) => {
-                                        parsed = Some(v);
-                                        break;
-                                    }
-                                    Ok(BuildStep::Yield) => (),
-                                    _ => {
-                                        let r = p.take_update_rejection();
-                                        run.events.push(format!(
-                                            "update-rejection {:?}",
-                                            r.map(|r| {
-                                                #[cfg(feature = "reference-trace")]
-                                                let native = Some(r.native_receive_result());
-                                                #[cfg(not(feature = "reference-trace"))]
-                                                                    let native: Option<i32> = None;
-                                                (native, r.source_bytes().to_vec())
-                                            })
-                                        ));
-                                        break;
-                                    }
-                                }
+                            if let Some(r) = p.take_update_rejection() {
+                                #[cfg(feature = "reference-trace")]
+                                let native = Some(r.native_receive_result());
+                                #[cfg(not(feature = "reference-trace"))]
+                                let native = None;
+                                run.update_rejections
+                                    .push((native, r.source_bytes().to_vec()));
                             }
-                            match parsed {
-                                Some(v) => Some(v),
-                                None => continue,
-                            }
+                            break None;
                         }
-                        _ => None,
-                    };
-                let source = NalPacket {
-                    bytes: Bytes::copy_from_slice(&pool, &packet.bytes).unwrap(),
-                    location: SourceLocation {
-                        source: SourceId(1),
-                        offset: 1000 + index as u64,
-                    },
-                    generation: 1,
-                    fields: NalPacketFields {
-                        pts: index as i64,
-                        dts: index as i64,
-                        duration: 1,
-                        position: -1,
-                        flags: 1,
-                        stream_index: 0,
-                    },
-                    new_extradata: extra,
-                };
-                let mut job = match session.$packet(source, update) {
-                    Ok(job) => job,
-                    Err(e) => {
-                        run.events.push(format!("begin {e:?}"));
-                        continue;
                     }
                 };
-                loop {
-                    let mut w = WorkBudget::new(q);
-                    let r = job.step(&mut w, &NO);
-                    step_fact(&mut run, &pool, "packet", &w, &r);
-                    match r {
-                        Ok(BuildStep::Ready(v)) => {
-                            output_facts(&mut run, &v);
-                            kept.push(v);
-                            break;
-                        }
-                        Ok(BuildStep::Yield) => (),
-                        Ok(BuildStep::Complete) => break,
-                        Err(_) => {
-                            let r = job.take_receiver_rejection();
-                            run.events.push(format!(
-                                "rejection {:?}",
-                                r.map(|r| (
-                                    r.kind(),
-                                    r.source_error(),
-                                    r.configuration_bytes().to_vec(),
-                                    r.configuration_source_identity(),
-                                    r.configuration_source_refusal(),
-                                    r.packet_source_refusal(),
-                                    r.receiver_epoch(),
-                                ))
-                            ));
-                            break;
-                        }
-                    }
+                match parsed {
+                    Some(v) => Some(v),
+                    None => continue,
                 }
-                run.events
-                    .push(format!("epoch {}", session.receiver_epoch()));
             }
-            drop(session);
-            for out in &kept {
-                output_facts(&mut run, out);
+            _ => None,
+        };
+        let source = NalPacket {
+            bytes: Bytes::copy_from_slice(&pool, &packet.bytes).unwrap(),
+            location: SourceLocation {
+                source: SourceId(1),
+                offset: 1000 + index as u64,
+            },
+            generation: 1,
+            fields: NalPacketFields {
+                pts: index as i64,
+                dts: index as i64,
+                duration: 1,
+                position: -1,
+                flags: 1,
+                stream_index: 0,
+            },
+            new_extradata: extra,
+        };
+        let Ok(mut job) = session.receiver_packet(source, update) else {
+            continue;
+        };
+        loop {
+            match job.step(&mut WorkBudget::new(q), &NO) {
+                Ok(BuildStep::Ready(v)) => {
+                    run.outputs += 1;
+                    kept.push(v);
+                    break;
+                }
+                Ok(BuildStep::Yield) => (),
+                Ok(BuildStep::Complete) => break,
+                Err(_) => {
+                    if job.take_receiver_rejection().is_some() {
+                        run.rejections += 1;
+                    }
+                    break;
+                }
             }
-            run.used.push(pool.used());
-            drop(kept);
-            assert_eq!(pool.used(), base, "teardown releases every charge");
-            run
         }
-    };
+    }
+    drop(session);
+    drop(kept);
+    assert_eq!(pool.used(), base, "teardown releases every charge");
+    run
 }
-receiver!(
-    legacy,
-    ReceiverAvcConfigParser,
-    ReceiverHevcConfigParser,
-    NalPacketConfiguration,
-    NalPacketSession::new,
-    NalPacketConfigWriter::new,
-    receiver_packet_compact
-);
-receiver!(
-    view,
-    ReceiverAvcConfigViewParser,
-    ReceiverHevcConfigViewParser,
-    NalPacketViewConfiguration,
-    NalPacketSession::new_view,
-    NalPacketConfigWriter::new_view,
-    receiver_packet_view
-);
 
-fn assert_same(codec: Codec, record: &[u8], packets: &[Packet], label: &str) {
+fn assert_receives(codec: Codec, record: &[u8], packets: &[Packet], label: &str) {
     for q in [1, 2, 3, 5, 7, 16, 4096] {
-        let old = legacy(codec, record, packets, q);
-        let new = view(codec, record, packets, q);
-        assert_eq!(old.events, new.events, "{label} quantum {q}");
-        // Every scenario must reach the packet engine, so the comparison covers
-        // published outputs rather than only an early configuration refusal.
-        let outputs = old.events.iter().filter(|e| e.starts_with("out ")).count();
-        let rejections = old
-            .events
-            .iter()
-            .filter(|e| e.starts_with("rejection "))
-            .count();
+        let run = receive(codec, record, packets, q);
         if label.contains("unsupported") {
-            assert!(
-                old.events
-                    .iter()
-                    .any(|e| e.starts_with("init-rejection Some")),
-                "{label}"
+            assert_eq!(
+                run.init_rejection,
+                Some((record.to_vec(), 55)),
+                "{label} quantum {q}"
             );
-        } else {
-            assert!(
-                outputs >= 4 && rejections >= 1,
-                "{label} q{q}: {outputs} outputs, {rejections} rejections: {:#?}",
-                old.events
-            );
+            continue;
         }
-        assert_eq!(old.used.len(), new.used.len(), "{label} quantum {q}");
-        for (step, (a, b)) in old.used.iter().zip(&new.used).enumerate() {
-            assert!(
-                b <= a,
-                "{label} quantum {q} step {step}: view {b} > legacy {a}"
+        // Every scenario must reach the packet engine, so the run covers
+        // published outputs rather than only an early configuration refusal.
+        assert!(
+            run.outputs >= 4 && run.rejections >= 1,
+            "{label} quantum {q}: {run:?}"
+        );
+        if codec == Codec::Avc {
+            // The two-byte version-one update is shorter than a complete record.
+            #[cfg(feature = "reference-trace")]
+            let native = Some(-1_094_995_529);
+            #[cfg(not(feature = "reference-trace"))]
+            let native = None;
+            assert_eq!(
+                run.update_rejections,
+                [(native, vec![1, 100])],
+                "{label} quantum {q}"
             );
         }
     }
@@ -440,12 +333,12 @@ fn avc_packets(width: usize, record: &[u8]) -> Vec<Packet> {
 }
 
 #[test]
-fn avc_view_receiver_matches_eager_receiver_step_for_step() {
+fn avc_receiver_publishes_and_rejects_at_every_width_and_quantum() {
     for width in [1u8, 2, 4] {
         for extra_pps in [false, true] {
             let record = avc_record(width, extra_pps);
             let packets = avc_packets(usize::from(width), &record);
-            assert_same(
+            assert_receives(
                 Codec::Avc,
                 &record,
                 &packets,
@@ -455,11 +348,11 @@ fn avc_view_receiver_matches_eager_receiver_step_for_step() {
     }
     // Observed three-byte width keeps its source refusal on every output.
     let record = avc_record(3, true);
-    assert_same(Codec::Avc, &record, &avc_packets(3, &record), "avc w3");
+    assert_receives(Codec::Avc, &record, &avc_packets(3, &record), "avc w3");
 }
 
 #[test]
-fn hevc_view_receiver_matches_eager_receiver_step_for_step() {
+fn hevc_receiver_publishes_and_rejects_for_every_array_shape_and_quantum() {
     let irap = hvc_nal(19, 1);
     let trail = hvc_nal(1, 2);
     let prefix_sei = hvc_nal(39, 3);
@@ -528,7 +421,7 @@ fn hevc_view_receiver_matches_eager_receiver_step_for_step() {
                 ),
             ),
         ] {
-            assert_same(
+            assert_receives(
                 Codec::Hevc,
                 &record,
                 &packets,

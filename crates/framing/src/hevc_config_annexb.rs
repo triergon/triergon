@@ -95,7 +95,7 @@ impl HvcAnnexBWriter {
                     if !work.try_charge(1) {
                         return Ok(BuildStep::Yield);
                     }
-                    if let Some(nal) = input.nals().get(self.index) {
+                    if let Some(nal) = input.nal(self.index) {
                         let total = self
                             .total
                             .checked_add(4)
@@ -139,7 +139,7 @@ impl HvcAnnexBWriter {
                     self.phase = Phase::Copy;
                 }
                 Phase::Copy => {
-                    let Some(nal) = input.nals().get(self.index) else {
+                    let Some(nal) = input.nal(self.index) else {
                         self.phase = Phase::Freeze;
                         continue;
                     };

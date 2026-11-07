@@ -112,7 +112,7 @@ impl HvcDecoderConfigWriter {
                 .input
                 .as_ref()
                 .ok_or(Error::Invalid("missing decoder configuration"))?;
-            if let Some(array) = input.arrays().get(self.array) {
+            if let Some(array) = input.array(self.array) {
                 let kind = array.declared_nal_type();
                 if !matches!(kind, 32 | 33 | 34 | 39 | 40) {
                     let reason = HvcDecoderConfigRefusal {

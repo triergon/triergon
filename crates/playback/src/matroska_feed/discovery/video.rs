@@ -4,8 +4,8 @@ use crate::{Output, Result, raw_video::hevc_syntax as hevc};
 use std::sync::atomic::{AtomicBool, Ordering};
 use triergon_core::{Error, WorkBudget};
 use triergon_framing::{
-    AvcConfigLimits, AvcConfigSource, AvcConfigViewParser, BuildStep, Codec, HvcConfigLimits,
-    HvcConfigSource, HvcConfigViewParser, LengthSize,
+    AvcConfigLimits, AvcConfigParser, AvcConfigSource, BuildStep, Codec, HvcConfigLimits,
+    HvcConfigParser, HvcConfigSource, LengthSize,
 };
 use triergon_matroska::{matroska::Track, typed::Packet};
 
@@ -38,8 +38,8 @@ struct Sample {
 
 #[allow(clippy::large_enum_variant, reason = "one bounded setup at a time")]
 enum Setup {
-    Avc(AvcConfigViewParser),
-    Hevc(HvcConfigViewParser),
+    Avc(AvcConfigParser),
+    Hevc(HvcConfigParser),
 }
 
 pub(super) struct VideoProbe {
@@ -179,7 +179,7 @@ impl Setup {
         let source = output.source_id();
         let generation = packet.configuration.generation();
         Ok(Some(match codec {
-            Codec::Avc => Self::Avc(AvcConfigViewParser::new(
+            Codec::Avc => Self::Avc(AvcConfigParser::new(
                 pool,
                 AvcConfigSource {
                     source,
@@ -193,7 +193,7 @@ impl Setup {
                     maximum_nal_bytes: 4096,
                 },
             )?),
-            Codec::Hevc => Self::Hevc(HvcConfigViewParser::new(
+            Codec::Hevc => Self::Hevc(HvcConfigParser::new(
                 pool,
                 HvcConfigSource {
                     source,

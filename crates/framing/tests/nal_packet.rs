@@ -210,7 +210,7 @@ fn pps_without_sps_gets_config_sps_before_its_original_bytes() {
         [framed(4, SPS), framed(4, PPS), framed(3, IDR)].concat()
     );
     assert!(matches!(
-        out.segments()[0].origin,
+        out.segments()[0].origin(),
         NalPacketOrigin::Configuration { nal_index: 0, .. }
     ));
     assert_eq!(
@@ -551,7 +551,7 @@ fn explicit_passthrough_preserves_every_byte_and_does_not_certify_headers() {
     src.bytes = bytes(&p, &[0, 0, 1, 255, 0, 0, 9]);
     let out = run(&mut s, src, None, 1).unwrap();
     assert_eq!(out.bytes().as_ref(), [0, 0, 1, 255, 0, 0, 9]);
-    assert_eq!(out.segments()[0].prefix_bytes, 0);
+    assert_eq!(out.segments()[0].prefix_bytes(), 0);
 }
 
 #[test]
@@ -688,7 +688,7 @@ fn hevc_unknown_empty_array_is_preserved_source_but_refused_at_initialization() 
             break v;
         }
     };
-    assert_eq!(cfg.arrays()[3].declared_nal_type(), 55);
+    assert_eq!(cfg.array(3).unwrap().declared_nal_type(), 55);
     assert_eq!(cfg.source_bytes().as_ref(), b);
     let s = NalPacketSession::new(&p, NalPacketConfiguration::Hevc(cfg), limits()).unwrap();
     assert!(matches!(init(&s, &p, 1), Err(Error::Unsupported(_))));
@@ -717,11 +717,11 @@ fn hevc_lookahead_does_not_inject_without_irap_but_precedes_earliest_parameter_s
         [framed(4, &non), extra, framed(4, &v), framed(4, &irap)].concat()
     );
     assert!(matches!(
-        o.segments()[0].origin,
+        o.segments()[0].origin(),
         NalPacketOrigin::Packet { .. }
     ));
     assert!(matches!(
-        o.segments()[1].origin,
+        o.segments()[1].origin(),
         NalPacketOrigin::Configuration { .. }
     ));
     assert_eq!(
