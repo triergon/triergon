@@ -171,8 +171,8 @@ may override that count for diagnostic comparisons.
   are against `W`. Such a report is never an acceptance run.
 - Time copies, not build outputs. A freshly linked binary and a sequentially written
   copy of it sit differently in the page cache, and identical bytes then time about
-  0.7% apart. The runner writes both workers afresh, at paths of equal length, before
-  each timing session.
+  0.7% apart. `report`, `codecs time` and `capture qualify` write both workers afresh,
+  at paths of equal length, before each timing session.
 - Before a timing pass, `cargo xtask count CANDIDATE REFERENCE ARGUMENT...` runs both
   workers on one workload under Linux `perf stat`, five runs each, and prints the least
   user-mode instructions, cycles and branch misses. It fails when instructions rise more

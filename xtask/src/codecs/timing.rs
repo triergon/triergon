@@ -16,7 +16,10 @@ use std::time::Duration;
 
 use crate::harness::acceptance::active_cpu;
 use crate::harness::gate_build;
-use crate::harness::timing::{competing_builds, cpu_snapshot, lock, timing_module_state};
+use crate::harness::policy;
+use crate::harness::timing::{
+    TimedWorkers, competing_builds, cpu_snapshot, lock, timing_module_state,
+};
 use crate::harness::worker::{self, data, status};
 use crate::json::{self, Value};
 use crate::pyrandom::PyRandom;
@@ -26,10 +29,6 @@ const PAIRS: usize = 30;
 const SEED: u64 = 280;
 const RESAMPLES: usize = 4000;
 const WORKER_TIMEOUT: Duration = Duration::from_secs(600);
-/// Gate: upper 95% bound of the candidate/reference time ratio.
-const DELIVERY: f64 = 1.25;
-/// Optimisation target for the same bound.
-const OPTIMIZATION: f64 = 0.80;
 /// `kind` of a claim key; keys of ledgers written before the Rust runner
 /// differ.
 const KIND: &str = "codec-time";
@@ -118,15 +117,12 @@ pub fn run(options: &Options) -> Result<(), String> {
         Value::Object(Vec::new())
     };
     fs::create_dir_all(&options.out).map_err(|e| format!("{}: {e}", options.out.display()))?;
+    let gate = policy::Runtime::load(&options.repository)?;
     let refusals =
         gate_build::pair_refusals(&options.repository, &options.candidate, &options.reference);
     for reason in &refusals {
         println!("no gate result: {reason}");
     }
-    let workers = [
-        ("candidate", python::path(&options.candidate)),
-        ("reference", python::path(&options.reference)),
-    ];
     let hashes = Value::object([
         ("candidate", Value::str(sha(&options.candidate)?)),
         ("reference", Value::str(sha(&options.reference)?)),
@@ -206,6 +202,11 @@ pub fn run(options: &Options) -> Result<(), String> {
             ]
         };
         {
+            let timed = TimedWorkers::new(&options.candidate, &options.reference)?;
+            let workers = [
+                ("candidate", python::path(&timed.candidate)),
+                ("reference", python::path(&timed.reference)),
+            ];
             let _lock = lock()?;
             if !competing_builds()?.is_empty() {
                 state = "contaminated".into();
@@ -269,9 +270,9 @@ pub fn run(options: &Options) -> Result<(), String> {
         let (mut delivery, mut digest_equal) = (None, None);
         if state == "measured" {
             let failed = samples.iter().any(|r| {
-                workers
+                ["candidate", "reference"]
                     .iter()
-                    .any(|(name, _)| status(r.get(name).unwrap_or(&Value::Null)) != "ok")
+                    .any(|name| status(r.get(name).unwrap_or(&Value::Null)) != "ok")
             });
             if failed {
                 state = "worker-failure".into();
@@ -345,11 +346,11 @@ pub fn run(options: &Options) -> Result<(), String> {
                     let value = interval_value(&interval);
                     result.push(("ratio".into(), value.clone()));
                     let gate_build = refusals.is_empty();
-                    let passes = gate_build && interval.upper_95 <= DELIVERY;
+                    let passes = gate_build && interval.upper_95 <= gate.ceiling;
                     result.push(("delivery".into(), Value::Bool(passes)));
                     result.push((
                         "optimization".into(),
-                        Value::Bool(gate_build && interval.upper_95 <= OPTIMIZATION),
+                        Value::Bool(gate_build && interval.upper_95 <= gate.target),
                     ));
                     ratio = Some((value, interval.upper_95));
                     delivery = Some(passes);
