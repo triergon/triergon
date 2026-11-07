@@ -98,6 +98,13 @@
  * diagnostic and does NOT authorize a caller to write beyond its requested size.
  */
 #define _GNU_SOURCE 1
+#if defined(__arm__)
+/* 32-bit ARM: glibc exports both mmap (32-bit off_t) and mmap64. A toolchain that
+ * predefines 64-bit file offsets would turn the mmap defined below into a second
+ * mmap64, so the observer keeps the 32-bit default and interposes both symbols. */
+#undef _TIME_BITS
+#undef _FILE_OFFSET_BITS
+#endif
 #include <dlfcn.h>
 #include <errno.h>
 #include <fcntl.h>
@@ -128,8 +135,31 @@
 #endif
 _Static_assert(ATOMIC_INT_LOCK_FREE == 2 && ATOMIC_LONG_LOCK_FREE == 2 &&
                ATOMIC_LLONG_LOCK_FREE == 2, "observer needs lock-free integer atomics");
+#if defined(__aarch64__) || defined(__x86_64__)
 _Static_assert(sizeof(void *) == 8 && sizeof(off_t) == 8 && sizeof(off64_t) == 8,
                "mapping bootstrap selects the 64-bit Linux syscall ABI");
+/* Mapping before the real functions are resolved: the kernel call itself. */
+static void *boot_mmap(void *address, size_t length, int protection, int flags, int fd,
+                       off64_t offset) {
+    return (void *)syscall(SYS_mmap, address, length, protection, flags, fd, offset);
+}
+#elif defined(__arm__)
+_Static_assert(sizeof(void *) == 4 && sizeof(off_t) == 4 && sizeof(off64_t) == 8,
+               "mapping bootstrap selects the 32-bit ARM EABI syscall ABI");
+/* mmap2 takes the file offset in 4096-byte units; like glibc, refuse an offset that
+ * is not a multiple of that unit or does not fit. */
+static void *boot_mmap(void *address, size_t length, int protection, int flags, int fd,
+                       off64_t offset) {
+    if (offset < 0 || (offset & 4095) || ((uint64_t)offset >> 12) > UINT32_MAX) {
+        errno = EINVAL;
+        return MAP_FAILED;
+    }
+    return (void *)syscall(SYS_mmap2, address, length, protection, flags, fd,
+                           (unsigned long)((uint64_t)offset >> 12));
+}
+#else
+#error "allocations-linux.c supports AArch64, x86_64 and 32-bit ARM Linux"
+#endif
 
 #define ENTRY_COUNT 65536u
 #define BOOT_BYTES 131072u
@@ -344,7 +374,7 @@ void *mmap(void *address, size_t length, int protection, int flags, int fd, off_
     void *out;
     if (resolving) {
         errno = incoming;
-        out = (void *)syscall(SYS_mmap, address, length, protection, flags, fd, offset);
+        out = boot_mmap(address, length, protection, flags, fd, offset);
     } else {
         resolve();
         errno = incoming;
@@ -361,7 +391,7 @@ void *mmap64(void *address, size_t length, int protection, int flags, int fd, of
     void *out;
     if (resolving) {
         errno = incoming;
-        out = (void *)syscall(SYS_mmap, address, length, protection, flags, fd, offset);
+        out = boot_mmap(address, length, protection, flags, fd, offset);
     } else {
         resolve();
         errno = incoming;

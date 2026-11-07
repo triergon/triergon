@@ -42,6 +42,12 @@
  * malloc_usable_size is diagnostic: writes remain within REQUESTED sizes.
  */
 #define _GNU_SOURCE 1
+#if defined(__arm__)
+/* 32-bit ARM: keep the 32-bit off_t default so guard-mmap calls mmap, not mmap64,
+ * when a toolchain predefines 64-bit file offsets. */
+#undef _TIME_BITS
+#undef _FILE_OFFSET_BITS
+#endif
 #include <errno.h>
 #include <inttypes.h>
 #include <stdint.h>
