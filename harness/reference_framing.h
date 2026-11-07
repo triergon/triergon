@@ -46,7 +46,27 @@ typedef struct {
     Digest hash;
     uint64_t packets, bytes;
 } Outcome;
+static void group(Digest *h, const uint8_t *p) {
+    /* Match the Rust worker's eight-byte polynomial grouping modulo 2^64. */
+    static const uint64_t pow31[9] = {
+        1, 31, 961, 29791, 923521, 28629151, 887503681, 27512614111, 852891037441};
+    static const uint64_t pow131[9] = {
+        1, 131, 17161, 2248091, 294499921, 38579489651, 5053913144281,
+        662062621900811, 86730203469006241};
+    uint64_t a = 0, b = 0;
+    for (unsigned i = 0; i < 8; ++i) {
+        a += (uint64_t)p[i] * pow31[7 - i];
+        b += (uint64_t)p[i] * pow131[7 - i];
+    }
+    h->a = h->a * pow31[8] + a;
+    h->b = h->b * pow131[8] + b;
+}
 static void raw(Digest *h, const uint8_t *p, size_t n) {
+    while (n >= 8) {
+        group(h, p);
+        p += 8;
+        n -= 8;
+    }
     for (size_t i = 0; i < n; ++i) {
         h->a = h->a * 31 + p[i];
         h->b = h->b * 131 + p[i];
@@ -56,7 +76,7 @@ static void word(Digest *h, uint64_t n) {
     uint8_t b[8];
     for (unsigned i = 0; i < 8; ++i)
         b[i] = (uint8_t)(n >> (i * 8));
-    raw(h, b, 8);
+    group(h, b);
 }
 static void blob(Digest *h, const uint8_t *p, size_t n) {
     word(h, n);
