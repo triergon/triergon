@@ -12,27 +12,26 @@
 
 use crate::dct::Dct4;
 
+/// Synthesis bank of `TAPS / 16` bands.
 #[derive(Debug)]
-pub(crate) struct Qmf {
-    n: usize,
+pub(crate) struct Qmf<const TAPS: usize> {
     /// Sign-modified prototype regrouped as 16 taps x n, gain folded in.
-    coef: Vec<f32>,
+    coef: [f32; TAPS],
     dct: Dct4,
 }
 
-/// Per-channel synthesis history: 16 slots of `[U | W]` vectors (2 n floats each).
-#[derive(Debug)]
-pub(crate) struct QmfState {
-    n: usize,
-    ring: Vec<f32>,
+/// Per-channel synthesis history: 16 slots of `[U | W]` vectors (2 n floats each,
+/// `LEN = 32 n`).
+#[derive(Clone, Debug)]
+pub(crate) struct QmfState<const LEN: usize> {
+    ring: [f32; LEN],
     pos: usize,
 }
 
-impl QmfState {
-    pub(crate) fn new(n: usize) -> Self {
+impl<const LEN: usize> QmfState<LEN> {
+    pub(crate) const fn new() -> Self {
         Self {
-            n,
-            ring: vec![0.0; 16 * 2 * n],
+            ring: [0.0; LEN],
             pos: 0,
         }
     }
@@ -43,30 +42,37 @@ impl QmfState {
     }
 }
 
-impl Qmf {
-    pub(crate) fn new(proto: &[f64], scale: f64) -> Self {
-        let n = proto.len() / 16;
-        let coef = proto.iter().map(|&c| (c * scale) as f32).collect();
+impl<const TAPS: usize> Qmf<TAPS> {
+    pub(crate) fn new(proto: &[f64; TAPS], scale: f64) -> Self {
         Self {
-            n,
-            coef,
-            dct: Dct4::new(n),
+            coef: std::array::from_fn(|i| (proto[i] * scale) as f32),
+            dct: Dct4::new(TAPS / 16),
         }
     }
 
     /// Synthesize one block: `input` holds `n` subband samples (clobbered), `out`
     /// receives `n` PCM samples.
     #[inline]
-    pub(crate) fn synth(&self, st: &mut QmfState, input: &mut [f32], out: &mut [f32]) {
-        match self.n {
-            32 => self.synth_n::<32>(st, input, out),
-            _ => self.synth_n::<64>(st, input, out),
+    pub(crate) fn synth<const LEN: usize>(
+        &self,
+        st: &mut QmfState<LEN>,
+        input: &mut [f32],
+        out: &mut [f32],
+    ) {
+        match TAPS / 16 {
+            32 => self.synth_n::<32, LEN>(st, input, out),
+            _ => self.synth_n::<64, LEN>(st, input, out),
         }
     }
 
     #[inline]
-    fn synth_n<const N: usize>(&self, st: &mut QmfState, input: &mut [f32], out: &mut [f32]) {
-        debug_assert_eq!(st.n, N);
+    fn synth_n<const N: usize, const LEN: usize>(
+        &self,
+        st: &mut QmfState<LEN>,
+        input: &mut [f32],
+        out: &mut [f32],
+    ) {
+        debug_assert_eq!(LEN, 32 * N);
         let x: &mut [f32; N] = (&mut input[..N]).try_into().expect("block length");
         // V = DCT-IV(X); the 0.25 factor of C.3.6 is folded into the prototype.
         self.dct.transform(x);
@@ -106,12 +112,10 @@ mod tests {
     #[test]
     #[ignore = "timing probe; run on demand with --release"]
     fn qmf_speed() {
-        for (proto, n) in [
-            (&crate::tables::QMF_NONPERFECT[..], 32usize),
-            (&crate::tables::X96_FIR[..], 64),
-        ] {
+        fn probe<const TAPS: usize, const LEN: usize>(proto: &[f64; TAPS]) {
+            let n = TAPS / 16;
             let q = Qmf::new(proto, 1.0);
-            let mut st = QmfState::new(n);
+            let mut st = QmfState::<LEN>::new();
             let mut x = vec![0.0f32; n];
             let mut out = vec![0.0f32; n];
             let iters = 2_000_000;
@@ -130,5 +134,7 @@ mod tests {
                 ns / n as f64
             );
         }
+        probe::<512, 1024>(&crate::tables::QMF_NONPERFECT);
+        probe::<1024, 2048>(&crate::tables::X96_FIR);
     }
 }

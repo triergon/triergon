@@ -4,6 +4,8 @@
 //! Every packing is normalized to the canonical 16-bit big-endian bitstream before
 //! parsing. Normalization reuses a caller-owned scratch buffer.
 
+use triergon_codec::{BudgetVec, StorageError};
+
 /// Word packing of a DTS core frame.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Packing {
@@ -42,25 +44,35 @@ impl Packing {
     }
 }
 
-/// Normalize `au` into `scratch` (canonical 16-bit big-endian bitstream).
-/// For `Be16` the input is copied unchanged.
-pub(crate) fn normalize(au: &[u8], packing: Packing, scratch: &mut Vec<u8>) {
-    scratch.clear();
+/// Normalize `au` into `scratch` (canonical 16-bit big-endian bitstream) and return
+/// the normalized frame. `scratch` only grows, charged to its budget first.
+pub(crate) fn normalize<'a>(
+    au: &[u8],
+    packing: Packing,
+    scratch: &'a mut BudgetVec<u8>,
+) -> Result<&'a [u8], StorageError> {
+    let len = match packing {
+        Packing::Be16 => au.len(),
+        Packing::Le16 => au.len() / 2 * 2,
+        Packing::Be14 | Packing::Le14 => au.len() / 2 * 14 / 8,
+    };
+    if scratch.len() < len {
+        scratch.try_resize(len, 0)?;
+    }
+    let out = &mut scratch[..len];
     match packing {
-        Packing::Be16 => scratch.extend_from_slice(au),
+        Packing::Be16 => out.copy_from_slice(au),
         Packing::Le16 => {
-            let words = au.len() / 2;
-            scratch.reserve(words * 2);
-            for w in au.chunks_exact(2) {
-                scratch.push(w[1]);
-                scratch.push(w[0]);
+            for (o, w) in out.chunks_exact_mut(2).zip(au.chunks_exact(2)) {
+                o[0] = w[1];
+                o[1] = w[0];
             }
         }
         Packing::Be14 | Packing::Le14 => {
             let le = packing == Packing::Le14;
-            scratch.reserve(au.len() * 7 / 8 + 1);
             let mut acc: u32 = 0;
             let mut nbits = 0u32;
+            let mut n = 0;
             for w in au.chunks_exact(2) {
                 let word = if le {
                     u16::from_le_bytes([w[0], w[1]])
@@ -71,10 +83,12 @@ pub(crate) fn normalize(au: &[u8], packing: Packing, scratch: &mut Vec<u8>) {
                 nbits += 14;
                 while nbits >= 8 {
                     nbits -= 8;
-                    scratch.push((acc >> nbits) as u8);
+                    out[n] = (acc >> nbits) as u8;
+                    n += 1;
                 }
                 acc &= (1 << nbits) - 1;
             }
         }
     }
+    Ok(&scratch[..len])
 }

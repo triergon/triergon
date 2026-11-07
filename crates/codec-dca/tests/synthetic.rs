@@ -6,7 +6,8 @@
 mod support;
 use support::{harness, scenarios, synth};
 
-use triergon_codec_dca::{AudioFrame, DecodeError, Decoder, Packing};
+use triergon_codec::{Budget, StorageError};
+use triergon_codec_dca::{AudioFrame, DecodeError, Decoder, Limits, Packing};
 
 fn scenario(name: &str) -> Vec<u8> {
     let mut meta = String::new();
@@ -220,4 +221,69 @@ fn failed_frame_is_dropped_without_disturbing_history() {
     without.remove(5);
     let d2 = harness::decode_all(&without);
     assert_eq!(d1.planes, d2.planes);
+}
+
+#[test]
+fn a_budget_too_small_for_the_frame_is_a_typed_error() {
+    let bytes = scenario("basic");
+    let frames = harness::split(&bytes);
+    let mut dec = Decoder::with_limits(Limits {
+        live_storage_bytes: 4096,
+    })
+    .unwrap();
+    let mut out = AudioFrame::default();
+    assert!(matches!(
+        dec.decode(frames[0], &mut out),
+        Err(DecodeError::Budget(StorageError::Limit { .. }))
+    ));
+}
+
+#[test]
+fn a_shared_budget_carries_the_decoder_storage_until_it_drops() {
+    let budget = Budget::new(Limits::default().live_storage_bytes).unwrap();
+    let idle = budget.used();
+    let mut dec = Decoder::new_in(&budget);
+    let mut out = AudioFrame::default();
+    for name in ["x96_basic", "pack_le14"] {
+        for frame in harness::split(&scenario(name)) {
+            dec.decode(frame, &mut out).unwrap();
+        }
+    }
+    let planes = out.planes.len() * out.samples_per_channel * size_of::<f32>();
+    assert!(budget.used() >= idle + planes);
+    drop(dec);
+    assert_eq!(budget.used(), idle);
+}
+
+#[test]
+fn the_default_limit_holds_the_largest_frames_with_room_to_spare() {
+    let budget = Budget::new(Limits::default().live_storage_bytes).unwrap();
+    let mut dec = Decoder::new_in(&budget);
+    let mut out = AudioFrame::default();
+    for name in ["amode9", "blocks128", "x96_vq", "x96_aspf", "x96_lfe128"] {
+        for frame in harness::split(&scenario(name)) {
+            dec.decode(frame, &mut out).unwrap();
+        }
+    }
+    assert!(budget.peak() < budget.limit() / 2, "{}", budget.peak());
+}
+
+#[test]
+fn decoding_resumes_after_a_refused_charge() {
+    let bytes = scenario("x96_basic");
+    let frames = harness::split(&bytes);
+    let budget = Budget::new(Limits::default().live_storage_bytes).unwrap();
+    let mut dec = Decoder::new_in(&budget);
+    let mut out = AudioFrame::default();
+    let held = budget.reserve(budget.available()).unwrap();
+    assert!(matches!(
+        dec.decode(frames[0], &mut out),
+        Err(DecodeError::Budget(StorageError::Backpressure { .. }))
+    ));
+    drop(held);
+    dec.decode(frames[0], &mut out).unwrap();
+    let mut fresh = Decoder::new();
+    let mut expected = AudioFrame::default();
+    fresh.decode(frames[0], &mut expected).unwrap();
+    assert_eq!(out.planes, expected.planes);
 }
