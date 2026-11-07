@@ -254,7 +254,7 @@ impl HlsAac {
                 if self.frame.is_empty() {
                     let body = length - PREFIX_BYTES;
                     // A split prefix consumes at most six bytes of its last
-                    // span. Otherwise retain a bounded owner and charge the
+                    // span. Otherwise retain bounded backing storage and charge the
                     // same staging, body and publication work as a copy.
                     if input.offset >= PREFIX_BYTES
                         && span.retained_capacity() <= self.maximum_frame_bytes
@@ -520,7 +520,7 @@ mod tests {
     }
 
     #[test]
-    fn complete_frames_share_one_bounded_owner_without_new_capacity() {
+    fn complete_frames_share_bounded_storage_without_new_capacity() {
         let mut fixture = PesFixture::new();
         let (mut packet, clock) = fixture.chunk(&[&F48[..], &F44_CRC[..]].concat(), 90_000, None);
         let backing = packet.as_ref().unwrap().spans.as_slice()[0]
@@ -562,7 +562,7 @@ mod tests {
     }
 
     #[test]
-    fn complete_frame_uses_buffer_when_owner_or_work_exceeds_the_fast_path() {
+    fn complete_frame_uses_buffer_when_storage_or_work_exceeds_the_fast_path() {
         for (maximum, units) in [(F48.len(), 13), (MAXIMUM_ADTS_BYTES, 12)] {
             let mut fixture = PesFixture::new();
             let (mut packet, clock) = fixture.chunk(&F48, 90_000, None);
