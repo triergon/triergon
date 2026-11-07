@@ -8794,6 +8794,69 @@
      "sha256": "6831ff2baa63f35a14e2e5595cc7fbf07f21f22b8daa0fceabc517dc590fe6ff"
     }
    ]
+  },
+  {
+   "name": "playback-gate-build-conservative-rss",
+   "path": "playback-gate-build-conservative-rss",
+   "retention": "retained",
+   "reason": "Rust 1.99.1 default-flag playback measurements with conservative RSS bounds",
+   "key": "evidence/playback-gate-build-conservative-rss/34f1816f920419540ad4efc84d4a2890fff3736c96536e53706e9f1057584a35.tar.gz",
+   "sha256": "34f1816f920419540ad4efc84d4a2890fff3736c96536e53706e9f1057584a35",
+   "bytes": 99508157,
+   "files": [
+    {
+     "path": "playback-gate-build-conservative-rss/ARCHIVED-COMPARISON.json",
+     "sha256": "8b288ba4af923fc5f27848149523c30d5b6fc015d50139d7eb12dfd739979193"
+    },
+    {
+     "path": "playback-gate-build-conservative-rss/COMPILER-PATH-SETUP.tar.gz",
+     "sha256": "0f6126a789c11cf36095368387102181cd5e2eba376073938cf890965757e99d"
+    },
+    {
+     "path": "playback-gate-build-conservative-rss/FINAL-STATE.txt",
+     "sha256": "f247a76b2893208aae7751dbf51f4c495efacfb6d9e743802870300f31ac45c8"
+    },
+    {
+     "path": "playback-gate-build-conservative-rss/HOST.log",
+     "sha256": "8452a639c8af956e37385a1f16da47dc7bdb00d6c77ddc527621ae8085fcc053"
+    },
+    {
+     "path": "playback-gate-build-conservative-rss/INITIAL-SETUP.tar.gz",
+     "sha256": "8ea8a4b064a7d2d8f63ec3dd12adc71a3ebba6cd94ec15bc322ca63c79c95faa"
+    },
+    {
+     "path": "playback-gate-build-conservative-rss/NATIVE-EXIT.txt",
+     "sha256": "4355a46b19d348dc2f57c046f8ef63d4538ebb936000f3c9ee954a27460dd865"
+    },
+    {
+     "path": "playback-gate-build-conservative-rss/NATIVE-RESULTS.sha256",
+     "sha256": "aa1f2af7ec914c31bbbe34cea3362e687a57ec71b6cfed607f600c3abbe92438"
+    },
+    {
+     "path": "playback-gate-build-conservative-rss/NATIVE-RESULTS.tar.gz",
+     "sha256": "242d9832cfc7b751309c651c1376b501091108f513eed57a401ac7595601256b"
+    },
+    {
+     "path": "playback-gate-build-conservative-rss/RESULT-COUNTS.json",
+     "sha256": "5233b961b3d713b7bf62f3194172049ec60d489d348e71f50ab40f37d638cc44"
+    },
+    {
+     "path": "playback-gate-build-conservative-rss/RSS-REVIEW.json",
+     "sha256": "35fcc38a12295baaefe8217d5a720ee351de7a3053c04bec08c3734ffc67a352"
+    },
+    {
+     "path": "playback-gate-build-conservative-rss/SOURCE.bundle",
+     "sha256": "37a5096478308f64f1731b670ee931c5a1cc04c1f6d74e9f42aa6db8b2c2c4c5"
+    },
+    {
+     "path": "playback-gate-build-conservative-rss/guest.sh",
+     "sha256": "14244f24671d4b7ab7b96aeda09ea9f7e94a15e7f674c6699fa099e00c548b1e"
+    },
+    {
+     "path": "playback-gate-build-conservative-rss/host.sh",
+     "sha256": "0a857dfde9b247bc92a51d01cd4a56d907332adff8dfaa37b2ce986f1d0e1b5b"
+    }
+   ]
   }
  ]
 }
