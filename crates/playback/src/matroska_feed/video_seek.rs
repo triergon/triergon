@@ -8,7 +8,7 @@ use triergon_matroska::typed::Event;
 /// The player keeps complete source replay available for other consumers.
 pub struct MatroskaVideoSeekGate {
     scope: OutputScope,
-    track: TrackKey,
+    track: u64,
     landing_ns: i64,
     landed: bool,
 }
@@ -19,7 +19,7 @@ impl MatroskaVideoSeekGate {
         let RawEvent::Seek(seek) = intent.event() else {
             return Err(Error::Invalid("Matroska video seek intent"));
         };
-        let TrackKey::Matroska(_) = seek.track else {
+        let TrackKey::Matroska(track) = seek.track else {
             return Err(Error::Invalid("Matroska video seek track"));
         };
         let RawEvent::Matroska(Event::Seek(landing)) = receipt.event() else {
@@ -31,7 +31,7 @@ impl MatroskaVideoSeekGate {
         }
         Ok(Self {
             scope,
-            track: seek.track,
+            track,
             landing_ns: landing.actual_ns,
             landed: false,
         })
@@ -43,13 +43,23 @@ impl MatroskaVideoSeekGate {
         if !self.scope.matches(output) {
             return Err(Error::Invalid("Matroska video seek packet scope"));
         }
-        if output.delivery() == Delivery::Unselected || output.event().track() != Some(self.track) {
+        if output.delivery() == Delivery::Unselected {
             return Ok(false);
         }
         let RawEvent::Matroska(Event::Packet(packet)) = output.event() else {
             return Ok(false);
         };
-        self.landed |= packet.packet.keyframe && packet.packet.pts_ns == Some(self.landing_ns);
+        if packet
+            .configuration
+            .tracks()
+            .get(packet.packet.track)
+            .is_none_or(|track| track.number != self.track)
+        {
+            return Ok(false);
+        }
+        if !self.landed {
+            self.landed = packet.packet.keyframe && packet.packet.pts_ns == Some(self.landing_ns);
+        }
         Ok(self.landed)
     }
 
