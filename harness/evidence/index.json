@@ -7683,7 +7683,7 @@
   {
    "name": "matroska-demux-linux-arm64",
    "retention": "retained",
-   "reason": "Matroska / WebM status row",
+   "reason": "Matroska / WebM status row before the gate build",
    "key": "evidence/matroska-demux-linux-arm64/ae86dddc2c4ee549c5289429002e145b05fd88fd718a63a413aae909b0af5ddd.tar.gz",
    "sha256": "ae86dddc2c4ee549c5289429002e145b05fd88fd718a63a413aae909b0af5ddd"
   },
@@ -7697,7 +7697,7 @@
   {
    "name": "matroska-startup-seek-reproduction-linux-arm64",
    "retention": "retained",
-   "reason": "Matroska startup and seek status row",
+   "reason": "Matroska startup and seek status row before the gate build",
    "key": "evidence/matroska-startup-seek-reproduction-linux-arm64/f449a8af7381be72dad4ffaba5615a99a0884a8bfb3a61b19c35f961f171f17a.tar.gz",
    "sha256": "f449a8af7381be72dad4ffaba5615a99a0884a8bfb3a61b19c35f961f171f17a"
   },
@@ -7718,14 +7718,14 @@
   {
    "name": "hls-segments-linux-arm64",
    "retention": "retained",
-   "reason": "HLS segments status row",
+   "reason": "HLS segments status row before the gate build",
    "key": "evidence/hls-segments-linux-arm64/de885f051789ceeff07556b40fcd3928c9e651d3c6b5ee3b193b8126d82435c1.tar.gz",
    "sha256": "de885f051789ceeff07556b40fcd3928c9e651d3c6b5ee3b193b8126d82435c1"
   },
   {
    "name": "hls-segments-reproduction-linux-arm64",
    "retention": "retained",
-   "reason": "HLS segments status row",
+   "reason": "HLS segments status row before the gate build",
    "key": "evidence/hls-segments-reproduction-linux-arm64/e008a7fc75c87deb903038cdd38d4e417cf0efa8d92592f9fc6105faecbba991.tar.gz",
    "sha256": "e008a7fc75c87deb903038cdd38d4e417cf0efa8d92592f9fc6105faecbba991"
   },
@@ -7753,14 +7753,14 @@
   {
    "name": "capture-pipeline-memory-linux-arm64",
    "retention": "retained",
-   "reason": "Capture correctness, runtime, peak heap and total resident peak across 15 cases",
+   "reason": "Capture correctness, runtime, peak heap and total resident peak across 15 cases before the gate build",
    "key": "evidence/capture-pipeline-memory-linux-arm64/11f0572cf6d9294023340a35970f8fa5c4f6e75abfdab55d8e1fb67f0228f983.tar.gz",
    "sha256": "11f0572cf6d9294023340a35970f8fa5c4f6e75abfdab55d8e1fb67f0228f983"
   },
   {
    "name": "capture-pipeline-linux-arm64",
    "retention": "retained",
-   "reason": "Capture status row",
+   "reason": "Capture status row before the gate build",
    "key": "evidence/capture-pipeline-linux-arm64/fac200b915c2b9a984e5b91cba29e7a3c016690596f128524f46c8f2cb40b6e6.tar.gz",
    "sha256": "fac200b915c2b9a984e5b91cba29e7a3c016690596f128524f46c8f2cb40b6e6"
   },
@@ -7938,6 +7938,320 @@
     {
      "path": "avc-hevc-framing/time.tar.gz",
      "sha256": "0f3d82dfe8ab49e0eb85c32e4b9adc6579cc70590c89b8f09d4842550c8348c5"
+    }
+   ]
+  },
+  {
+   "name": "matroska-gate-build-linux-arm64",
+   "retention": "retained",
+   "reason": "Matroska / WebM status row: 116 workloads, two passes of timing and memory on the gate build",
+   "key": "evidence/matroska-gate-build-linux-arm64/6b81354ffb50545a6e5eaf641a95ac054442824f66a47724c11f1dd50ff6f060.tar.gz",
+   "sha256": "6b81354ffb50545a6e5eaf641a95ac054442824f66a47724c11f1dd50ff6f060",
+   "bytes": 60230661,
+   "files": [
+    {
+     "path": "matroska-gate-build-linux-arm64/PLATFORM",
+     "sha256": "d5a9cea8ee1794cd306c6d3224e00f74d2a722cf8f84d638512290da30afc213"
+    },
+    {
+     "path": "matroska-gate-build-linux-arm64/REV",
+     "sha256": "399b49db2b3cdfc031d4f7b0ac5358ae4b51a0722b7bc1bda494f1c436e3ea3d"
+    },
+    {
+     "path": "matroska-gate-build-linux-arm64/RSS-PROOF.json",
+     "sha256": "b99cfb0e01babcb1bd7d61e6d37c47a2610947cf282303737c4d6e845cd52a89"
+    },
+    {
+     "path": "matroska-gate-build-linux-arm64/binaries-memory.sha256",
+     "sha256": "339fa8556072d19ff33f2ba65da6d96016fd1e1b5df673918c90b003d479bdea"
+    },
+    {
+     "path": "matroska-gate-build-linux-arm64/build-memory.log",
+     "sha256": "b9cb68a5302c008d7ae766f44e5b7f79c33d9a5fdc0dbb000697cc22e91e7403"
+    },
+    {
+     "path": "matroska-gate-build-linux-arm64/identity.json",
+     "sha256": "c994db85668fbe8182031dde675b76130b1b7ad70249f88dfe6c1315f8a731ca"
+    },
+    {
+     "path": "matroska-gate-build-linux-arm64/measure.log",
+     "sha256": "dece56de1c40e9d8bb374d7a570cd69b2e6edd13bbce443a3435b7292a9b8f51"
+    },
+    {
+     "path": "matroska-gate-build-linux-arm64/measure.sh",
+     "sha256": "6f0f09bfc1f3e67ee099022f27440cf03dcefa19c39e606b9a9cf58e30ba9d68"
+    },
+    {
+     "path": "matroska-gate-build-linux-arm64/p1-memory.tar.gz",
+     "sha256": "66d59a1e1ce0e21032e043dfa059ca76ab4cc3ccc582ca6f902072516248ed3d"
+    },
+    {
+     "path": "matroska-gate-build-linux-arm64/p1-time.tar.gz",
+     "sha256": "974094908e3ac2f28898aeffc64977af2b182d577e2adc9007f87f7795d88271"
+    },
+    {
+     "path": "matroska-gate-build-linux-arm64/p2-memory.tar.gz",
+     "sha256": "83d0c292cc0a8910b5303eb594871b7b4c81ec73511a65d566af57402f8d193f"
+    },
+    {
+     "path": "matroska-gate-build-linux-arm64/p2-time.tar.gz",
+     "sha256": "70aa0da91d256597d5f4e9a81d6a77bc4e7e7a745f739a7d26fe94616ded3d19"
+    },
+    {
+     "path": "matroska-gate-build-linux-arm64/prove.log",
+     "sha256": "f65e8e4016013914ef770220054248dc053084f5033d687ff7ef77053d133367"
+    },
+    {
+     "path": "matroska-gate-build-linux-arm64/setup.sh",
+     "sha256": "b3f9c2dd40138ce3efc90e702c1b95907a2f7b3971e19b9ebe54c96301973aea"
+    }
+   ]
+  },
+  {
+   "name": "matroska-startup-seek-gate-build-linux-arm64",
+   "retention": "retained",
+   "reason": "Matroska startup and seek status row: 44 cases, two passes of timing and memory on the gate build",
+   "key": "evidence/matroska-startup-seek-gate-build-linux-arm64/f46f8c621a128fddc62d04de72611813cd5653e05596c6ba36e41d7b7dcbc958.tar.gz",
+   "sha256": "f46f8c621a128fddc62d04de72611813cd5653e05596c6ba36e41d7b7dcbc958",
+   "bytes": 16666893,
+   "files": [
+    {
+     "path": "matroska-startup-seek-gate-build-linux-arm64/PLATFORM",
+     "sha256": "d5a9cea8ee1794cd306c6d3224e00f74d2a722cf8f84d638512290da30afc213"
+    },
+    {
+     "path": "matroska-startup-seek-gate-build-linux-arm64/REV",
+     "sha256": "399b49db2b3cdfc031d4f7b0ac5358ae4b51a0722b7bc1bda494f1c436e3ea3d"
+    },
+    {
+     "path": "matroska-startup-seek-gate-build-linux-arm64/RSS-PROOF.json",
+     "sha256": "b99cfb0e01babcb1bd7d61e6d37c47a2610947cf282303737c4d6e845cd52a89"
+    },
+    {
+     "path": "matroska-startup-seek-gate-build-linux-arm64/binaries-memory.sha256",
+     "sha256": "339fa8556072d19ff33f2ba65da6d96016fd1e1b5df673918c90b003d479bdea"
+    },
+    {
+     "path": "matroska-startup-seek-gate-build-linux-arm64/build-memory.log",
+     "sha256": "b9cb68a5302c008d7ae766f44e5b7f79c33d9a5fdc0dbb000697cc22e91e7403"
+    },
+    {
+     "path": "matroska-startup-seek-gate-build-linux-arm64/identity.json",
+     "sha256": "c994db85668fbe8182031dde675b76130b1b7ad70249f88dfe6c1315f8a731ca"
+    },
+    {
+     "path": "matroska-startup-seek-gate-build-linux-arm64/measure.log",
+     "sha256": "dece56de1c40e9d8bb374d7a570cd69b2e6edd13bbce443a3435b7292a9b8f51"
+    },
+    {
+     "path": "matroska-startup-seek-gate-build-linux-arm64/measure.sh",
+     "sha256": "6f0f09bfc1f3e67ee099022f27440cf03dcefa19c39e606b9a9cf58e30ba9d68"
+    },
+    {
+     "path": "matroska-startup-seek-gate-build-linux-arm64/p1-memory.tar.gz",
+     "sha256": "8881171a0f0f25e99eb3f85347a0d73e0f1102f5daf7dda9ca99d6caf070a482"
+    },
+    {
+     "path": "matroska-startup-seek-gate-build-linux-arm64/p1-time.tar.gz",
+     "sha256": "ea2e5fd818ed3c6c786f54f580e0a67fa71975bdb8116b29c3a60a143fd88959"
+    },
+    {
+     "path": "matroska-startup-seek-gate-build-linux-arm64/p2-memory.tar.gz",
+     "sha256": "a9f421d59ab1cc8b245cc7b0d83ea443e935aa10b7709f2a6534a64b452e7017"
+    },
+    {
+     "path": "matroska-startup-seek-gate-build-linux-arm64/p2-time.tar.gz",
+     "sha256": "be922bdb150d00494d1b6444a5d242976c1924eb293f340512cc821642c8b8e1"
+    },
+    {
+     "path": "matroska-startup-seek-gate-build-linux-arm64/prove.log",
+     "sha256": "f65e8e4016013914ef770220054248dc053084f5033d687ff7ef77053d133367"
+    },
+    {
+     "path": "matroska-startup-seek-gate-build-linux-arm64/setup.sh",
+     "sha256": "b3f9c2dd40138ce3efc90e702c1b95907a2f7b3971e19b9ebe54c96301973aea"
+    }
+   ]
+  },
+  {
+   "name": "hls-segments-gate-build-linux-arm64",
+   "retention": "retained",
+   "reason": "HLS segments status row: 10 workloads, two passes of timing and memory on the gate build",
+   "key": "evidence/hls-segments-gate-build-linux-arm64/da9191e09ce06eebb15f164adf577e0ba01461021122db7eb418450cfb37b7db.tar.gz",
+   "sha256": "da9191e09ce06eebb15f164adf577e0ba01461021122db7eb418450cfb37b7db",
+   "bytes": 5926361,
+   "files": [
+    {
+     "path": "hls-segments-gate-build-linux-arm64/PLATFORM",
+     "sha256": "d5a9cea8ee1794cd306c6d3224e00f74d2a722cf8f84d638512290da30afc213"
+    },
+    {
+     "path": "hls-segments-gate-build-linux-arm64/REV",
+     "sha256": "399b49db2b3cdfc031d4f7b0ac5358ae4b51a0722b7bc1bda494f1c436e3ea3d"
+    },
+    {
+     "path": "hls-segments-gate-build-linux-arm64/RSS-PROOF.json",
+     "sha256": "b99cfb0e01babcb1bd7d61e6d37c47a2610947cf282303737c4d6e845cd52a89"
+    },
+    {
+     "path": "hls-segments-gate-build-linux-arm64/binaries-memory.sha256",
+     "sha256": "339fa8556072d19ff33f2ba65da6d96016fd1e1b5df673918c90b003d479bdea"
+    },
+    {
+     "path": "hls-segments-gate-build-linux-arm64/build-memory.log",
+     "sha256": "b9cb68a5302c008d7ae766f44e5b7f79c33d9a5fdc0dbb000697cc22e91e7403"
+    },
+    {
+     "path": "hls-segments-gate-build-linux-arm64/identity.json",
+     "sha256": "c994db85668fbe8182031dde675b76130b1b7ad70249f88dfe6c1315f8a731ca"
+    },
+    {
+     "path": "hls-segments-gate-build-linux-arm64/measure.log",
+     "sha256": "dece56de1c40e9d8bb374d7a570cd69b2e6edd13bbce443a3435b7292a9b8f51"
+    },
+    {
+     "path": "hls-segments-gate-build-linux-arm64/measure.sh",
+     "sha256": "6f0f09bfc1f3e67ee099022f27440cf03dcefa19c39e606b9a9cf58e30ba9d68"
+    },
+    {
+     "path": "hls-segments-gate-build-linux-arm64/p1-memory.tar.gz",
+     "sha256": "f84e9f00d4f929498902a35bfeab066ff42bbea5683db00c2eef880c0f307546"
+    },
+    {
+     "path": "hls-segments-gate-build-linux-arm64/p1-time.tar.gz",
+     "sha256": "08e27e072a8f71d80f7ff22d0b679ccd12d3a5ec5f7cde5b02fe5ecfc119e391"
+    },
+    {
+     "path": "hls-segments-gate-build-linux-arm64/p2-memory.tar.gz",
+     "sha256": "6423d1f1aca7229323ccf1fb0c0742b20f7126e7b69bc1616e9a0c83c9b3f7e4"
+    },
+    {
+     "path": "hls-segments-gate-build-linux-arm64/p2-time.tar.gz",
+     "sha256": "d24d2bcff0e9ad63592175126d6997d7950113d021565cadb9535f5d26e251b6"
+    },
+    {
+     "path": "hls-segments-gate-build-linux-arm64/prove.log",
+     "sha256": "f65e8e4016013914ef770220054248dc053084f5033d687ff7ef77053d133367"
+    },
+    {
+     "path": "hls-segments-gate-build-linux-arm64/setup.sh",
+     "sha256": "b3f9c2dd40138ce3efc90e702c1b95907a2f7b3971e19b9ebe54c96301973aea"
+    }
+   ]
+  },
+  {
+   "name": "codecs-gate-build-linux-arm64",
+   "retention": "retained",
+   "reason": "Codecs and decode sessions runtime: 17 workloads, two passes on the gate build",
+   "key": "evidence/codecs-gate-build-linux-arm64/12940dd90cf511dc37b8311946ccc43626f9e5e7a79cd3e7dfbeed68f48c77ed.tar.gz",
+   "sha256": "12940dd90cf511dc37b8311946ccc43626f9e5e7a79cd3e7dfbeed68f48c77ed",
+   "bytes": 1322107,
+   "files": [
+    {
+     "path": "codecs-gate-build-linux-arm64/PLATFORM",
+     "sha256": "d5a9cea8ee1794cd306c6d3224e00f74d2a722cf8f84d638512290da30afc213"
+    },
+    {
+     "path": "codecs-gate-build-linux-arm64/REV",
+     "sha256": "399b49db2b3cdfc031d4f7b0ac5358ae4b51a0722b7bc1bda494f1c436e3ea3d"
+    },
+    {
+     "path": "codecs-gate-build-linux-arm64/RSS-PROOF.json",
+     "sha256": "b99cfb0e01babcb1bd7d61e6d37c47a2610947cf282303737c4d6e845cd52a89"
+    },
+    {
+     "path": "codecs-gate-build-linux-arm64/binaries-memory.sha256",
+     "sha256": "339fa8556072d19ff33f2ba65da6d96016fd1e1b5df673918c90b003d479bdea"
+    },
+    {
+     "path": "codecs-gate-build-linux-arm64/build-memory.log",
+     "sha256": "b9cb68a5302c008d7ae766f44e5b7f79c33d9a5fdc0dbb000697cc22e91e7403"
+    },
+    {
+     "path": "codecs-gate-build-linux-arm64/identity.json",
+     "sha256": "c994db85668fbe8182031dde675b76130b1b7ad70249f88dfe6c1315f8a731ca"
+    },
+    {
+     "path": "codecs-gate-build-linux-arm64/measure.log",
+     "sha256": "dece56de1c40e9d8bb374d7a570cd69b2e6edd13bbce443a3435b7292a9b8f51"
+    },
+    {
+     "path": "codecs-gate-build-linux-arm64/measure.sh",
+     "sha256": "6f0f09bfc1f3e67ee099022f27440cf03dcefa19c39e606b9a9cf58e30ba9d68"
+    },
+    {
+     "path": "codecs-gate-build-linux-arm64/p1-codecs.tar.gz",
+     "sha256": "d16ad6bedad7f7d10b94520f30b33e36558b0bc21d3bf78d2c17b2899b56380a"
+    },
+    {
+     "path": "codecs-gate-build-linux-arm64/p2-codecs.tar.gz",
+     "sha256": "b6fa02d61c4e4f9e83ffb4ddd9b9ef7b7e60eb48d806834908fa542c81b2f7c0"
+    },
+    {
+     "path": "codecs-gate-build-linux-arm64/prove.log",
+     "sha256": "f65e8e4016013914ef770220054248dc053084f5033d687ff7ef77053d133367"
+    },
+    {
+     "path": "codecs-gate-build-linux-arm64/setup.sh",
+     "sha256": "b3f9c2dd40138ce3efc90e702c1b95907a2f7b3971e19b9ebe54c96301973aea"
+    }
+   ]
+  },
+  {
+   "name": "capture-gate-build-linux-arm64",
+   "retention": "retained",
+   "reason": "Capture status row: 15 cases, two passes of correctness, timing and memory on the gate build",
+   "key": "evidence/capture-gate-build-linux-arm64/b75c8d6e6d64d294a385ec25b176e4ffb8f1a0d3c11b3ca956b3d352ac44c3b4.tar.gz",
+   "sha256": "b75c8d6e6d64d294a385ec25b176e4ffb8f1a0d3c11b3ca956b3d352ac44c3b4",
+   "bytes": 102530723,
+   "files": [
+    {
+     "path": "capture-gate-build-linux-arm64/PLATFORM",
+     "sha256": "d5a9cea8ee1794cd306c6d3224e00f74d2a722cf8f84d638512290da30afc213"
+    },
+    {
+     "path": "capture-gate-build-linux-arm64/REV",
+     "sha256": "399b49db2b3cdfc031d4f7b0ac5358ae4b51a0722b7bc1bda494f1c436e3ea3d"
+    },
+    {
+     "path": "capture-gate-build-linux-arm64/RSS-PROOF.json",
+     "sha256": "b99cfb0e01babcb1bd7d61e6d37c47a2610947cf282303737c4d6e845cd52a89"
+    },
+    {
+     "path": "capture-gate-build-linux-arm64/binaries-memory.sha256",
+     "sha256": "339fa8556072d19ff33f2ba65da6d96016fd1e1b5df673918c90b003d479bdea"
+    },
+    {
+     "path": "capture-gate-build-linux-arm64/build-memory.log",
+     "sha256": "b9cb68a5302c008d7ae766f44e5b7f79c33d9a5fdc0dbb000697cc22e91e7403"
+    },
+    {
+     "path": "capture-gate-build-linux-arm64/identity.json",
+     "sha256": "c994db85668fbe8182031dde675b76130b1b7ad70249f88dfe6c1315f8a731ca"
+    },
+    {
+     "path": "capture-gate-build-linux-arm64/measure.log",
+     "sha256": "dece56de1c40e9d8bb374d7a570cd69b2e6edd13bbce443a3435b7292a9b8f51"
+    },
+    {
+     "path": "capture-gate-build-linux-arm64/measure.sh",
+     "sha256": "6f0f09bfc1f3e67ee099022f27440cf03dcefa19c39e606b9a9cf58e30ba9d68"
+    },
+    {
+     "path": "capture-gate-build-linux-arm64/p1-capture.tar.gz",
+     "sha256": "65a45c4ef6412b1f5bdd9499977017dbfcdc2d0fe6e544c82532ff9d969703a7"
+    },
+    {
+     "path": "capture-gate-build-linux-arm64/p2-capture.tar.gz",
+     "sha256": "3b8591a3933a377bd822875b2c07dee156e791687c829a8c9b0332310f30808c"
+    },
+    {
+     "path": "capture-gate-build-linux-arm64/prove.log",
+     "sha256": "f65e8e4016013914ef770220054248dc053084f5033d687ff7ef77053d133367"
+    },
+    {
+     "path": "capture-gate-build-linux-arm64/setup.sh",
+     "sha256": "b3f9c2dd40138ce3efc90e702c1b95907a2f7b3971e19b9ebe54c96301973aea"
     }
    ]
   }
