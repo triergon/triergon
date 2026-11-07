@@ -3,8 +3,9 @@
 //! Independently authored from H.222.0 source syntax and recorded public-API
 //! observations. Assembly consumes real input
 //! boundaries; no complete source/demux output is split, repeated or repaired.
+use crate::carrier::{PLAIN_PAYLOAD_BYTES, PlainContinuation, TS_PAYLOAD_START, TS188_BYTES};
 use crate::demux_clock::DemuxProfile;
-use crate::pes::{HEADER_MAX, parse_header};
+use crate::pes::{HEADER_MAX, parse_header, parse_timed_header};
 use crate::{
     AssemblyStep, ParseLimits, PesHeader, SourceEpochs, SourceRange, TransportPacket, checked_pid,
     commit_range, limit, prepare_range,
@@ -171,10 +172,26 @@ enum Arena {
 }
 
 #[derive(Debug)]
-struct Growth {
+pub(crate) struct Growth {
     arena: Arena,
     target: usize,
-    remaining: u64,
+    pub(crate) remaining: u64,
+}
+
+impl Growth {
+    fn plan(arena: Arena, len: usize, maximum: usize, item_bytes: usize) -> Result<Self> {
+        let needed = len.checked_add(1).ok_or(Error::Overflow)?;
+        let target = len.saturating_mul(2).max(4).min(maximum).max(needed);
+        let bytes = target
+            .checked_add(len)
+            .and_then(|count| count.checked_mul(item_bytes))
+            .ok_or(Error::Overflow)?;
+        Ok(Self {
+            arena,
+            target,
+            remaining: u64::try_from(bytes).map_err(|_| Error::Overflow)?,
+        })
+    }
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -586,10 +603,7 @@ impl DemuxObserver {
             Some(Error::Unsupported(
                 "native PCR clock boundary context unobserved",
             ))
-        } else if self.last_input.is_some_and(|(event, offset)| {
-            context.source_event_ordinal <= event
-                || (!self.entity_first && packet.source_offset <= offset)
-        }) {
+        } else if !self.follows_input(context, packet.source_offset) {
             Some(Error::Invalid("native PES source event order"))
         } else if packet
             .source_offset
@@ -600,6 +614,28 @@ impl DemuxObserver {
         } else {
             Self::transport_bounds(packet).err()
         }
+    }
+
+    fn follows_input(&self, context: SourceContext, offset: u64) -> bool {
+        self.last_input
+            .is_none_or(|(previous_event, previous_offset)| {
+                context.source_event_ordinal > previous_event
+                    && (self.entity_first || offset > previous_offset)
+            })
+    }
+
+    fn body_fits(&self, counter: u8, next: usize) -> bool {
+        self.active
+            && self.header.is_some()
+            && self.body_limit.is_none_or(|limit| next <= limit)
+            && next < DEFAULT_PACKET_CAP
+            && self.header_used + next <= self.limits.pes_bytes
+            && self.previous_counter.map(|value| (value + 1) & 15) == Some(counter)
+    }
+
+    fn ready_body(&self, counter: u8, next: usize) -> bool {
+        self.spans.len() < self.spans.capacity().min(self.limits.source_spans)
+            && self.body_fits(counter, next)
     }
 
     /// Append an ordinary TS188 continuation when it fits the existing arena.
@@ -620,14 +656,7 @@ impl DemuxObserver {
             || packet.discontinuity_indicator()
             || packet.prefix.is_some()
             || count == 0
-            || !self.active
-            || self.header.is_none()
-            || self.spans.len() >= self.spans.capacity().min(self.limits.source_spans)
-            || self.body_limit.is_some_and(|limit| next > limit)
-            || next >= DEFAULT_PACKET_CAP
-            || self.header_used + next > self.limits.pes_bytes
-            || self.previous_counter.map(|value| (value + 1) & 15)
-                != Some(packet.continuity_counter)
+            || !self.ready_body(packet.continuity_counter, next)
             || self.input_error(packet, context, false, None).is_some()
             || cancel.load(Ordering::Relaxed)
             || !work.try_charge(2)
@@ -638,8 +667,8 @@ impl DemuxObserver {
             .payload
             .take()
             .ok_or(Error::Invalid("native PES payload missing"))?;
-        self.spans
-            .try_push(DemuxSpan {
+        self.append_ready_span(
+            DemuxSpan {
                 bytes,
                 source: SourceRange {
                     entity: self.scope.entity,
@@ -652,17 +681,214 @@ impl DemuxObserver {
                     bytes: packet.source.len(),
                 },
                 context,
+            },
+            packet.continuity_counter,
+            next,
+        )
+    }
+
+    fn accepts_plain_source(
+        &self,
+        source: &Bytes,
+        pid: u16,
+        entity: Option<SourceId>,
+        offset: u64,
+        context: SourceContext,
+    ) -> bool {
+        self.validate_input(None).is_ok()
+            && !self.finite_private()
+            && source.belongs_to(&self.budget)
+            && self.pending.is_none()
+            && self.emission.is_none()
+            && !self.ended
+            && self.fault.is_none()
+            && pid == self.scope.pid
+            && entity == Some(self.scope.entity)
+            && context.epochs == self.scope.epochs
+            && self.follows_input(context, offset)
+    }
+
+    pub(crate) fn append_plain_continuation(
+        &mut self,
+        packet: &mut PlainContinuation,
+        context: SourceContext,
+        work: &mut WorkBudget,
+        cancel: &AtomicBool,
+    ) -> Result<ReadyContinuation> {
+        let Some(source) = packet.source.as_ref() else {
+            return Ok(ReadyContinuation::Unhandled);
+        };
+        let start = packet.payload_start();
+        let count = source.len() - start;
+        let counter = packet.counter();
+        let next = self.payload_len.checked_add(count).ok_or(Error::Overflow)?;
+        // Framing proved the layout, clear transport and nonempty payload.
+        // The observer still checks its own binding, order and arena capacity.
+        if !self.ready_body(counter, next)
+            || !self.accepts_plain_source(
+                source,
+                packet.pid(),
+                packet.entity,
+                packet.offset,
+                context,
+            )
+            || packet.offset.checked_add(source.len() as u64).is_none()
+            || cancel.load(Ordering::Relaxed)
+            || !work.try_charge(2)
+        {
+            return Ok(ReadyContinuation::Unhandled);
+        }
+        let width = source.len();
+        // Move the charged storage directly into the payload view.
+        let bytes = packet
+            .source
+            .take()
+            .ok_or(Error::Invalid("missing continuation source"))?
+            .into_slice(start..width)?;
+        self.append_ready_span(
+            DemuxSpan {
+                bytes,
+                source: SourceRange {
+                    entity: self.scope.entity,
+                    offset: packet.offset + start as u64,
+                    bytes: count,
+                },
+                transport: SourceRange {
+                    entity: self.scope.entity,
+                    offset: packet.offset,
+                    bytes: width,
+                },
+                context,
+            },
+            counter,
+            next,
+        )
+    }
+
+    /// A run stops before a completion. If the arena is full, plan the same
+    /// growth the first continuation would require in the ordinary observer.
+    pub(crate) fn payload_run_capacity(
+        &self,
+        source: &Bytes,
+        pid: u16,
+        counter: u8,
+        start: SourceLocation,
+        context: SourceContext,
+    ) -> (usize, Option<Growth>) {
+        if !self.body_fits(counter, self.payload_len + PLAIN_PAYLOAD_BYTES)
+            || !self.accepts_plain_source(source, pid, Some(start.source), start.offset, context)
+        {
+            return (0, None);
+        }
+        let limit = self
+            .body_limit
+            .map_or(DEFAULT_PACKET_CAP - 1, |end| {
+                end.saturating_sub(1).min(DEFAULT_PACKET_CAP - 1)
             })
-            .map_err(|error| error.error)?;
-        self.last_input = Some((context.source_event_ordinal, packet.source_offset));
-        self.entity_first = false;
-        self.previous_counter = Some(packet.continuity_counter);
-        self.payload_len = next;
+            .min(self.limits.pes_bytes - self.header_used);
+        let len = self.spans.len();
+        let slots = self.spans.capacity().min(self.limits.source_spans) - len;
+        let growth = if slots == 0 && len < self.limits.source_spans && self.growth.is_none() {
+            Growth::plan(
+                Arena::Payload,
+                len,
+                self.limits.source_spans,
+                size_of::<DemuxSpan>(),
+            )
+            .ok()
+        } else {
+            None
+        };
+        let slots = growth.as_ref().map_or(slots, |plan| plan.target - len);
+        (
+            (limit.saturating_sub(self.payload_len) / PLAIN_PAYLOAD_BYTES).min(slots),
+            growth,
+        )
+    }
+
+    /// Keep the old arena intact until the cursor commits the run.
+    pub(crate) fn prepare_payload_run_growth(
+        &self,
+        growth: &Growth,
+    ) -> Option<BudgetVec<DemuxSpan>> {
+        let mut replacement = BudgetVec::new(&self.budget);
+        replacement.try_reserve_exact(growth.target).ok()?;
+        Some(replacement)
+    }
+
+    /// Commit preflighted carriers from one shared window. The arena already
+    /// has room for every span, including any spans moved from a full arena.
+    pub(crate) fn append_payload_run(
+        &mut self,
+        bytes: &Bytes,
+        start: SourceLocation,
+        context: SourceContext,
+        first_counter: u8,
+        replacement: Option<BudgetVec<DemuxSpan>>,
+    ) -> Result<()> {
+        if let Some(mut replacement) = replacement {
+            replacement.try_append(&mut self.spans)?;
+            self.spans = replacement;
+        }
+        let count = bytes.len() / TS188_BYTES;
+        debug_assert!(count >= 2 && bytes.len().is_multiple_of(TS188_BYTES));
+        debug_assert!(self.spans.len() + count <= self.spans.capacity());
+        self.spans.try_extend_with(count, |index| {
+            let at = index * TS188_BYTES;
+            let offset = start.offset + at as u64;
+            DemuxSpan {
+                bytes: bytes
+                    .slice(at + TS_PAYLOAD_START..at + TS188_BYTES)
+                    .expect("payload range inside complete carrier"),
+                source: SourceRange {
+                    entity: start.source,
+                    offset: offset + TS_PAYLOAD_START as u64,
+                    bytes: PLAIN_PAYLOAD_BYTES,
+                },
+                transport: SourceRange {
+                    entity: start.source,
+                    offset,
+                    bytes: TS188_BYTES,
+                },
+                context: SourceContext {
+                    source_event_ordinal: context.source_event_ordinal + 2 * index as u64,
+                    ..context
+                },
+            }
+        })?;
+        let last = (count - 1) as u64;
+        self.record_ready_body(
+            (
+                context.source_event_ordinal + 2 * last,
+                start.offset + last * TS188_BYTES as u64,
+            ),
+            first_counter.wrapping_add(last as u8) & 15,
+            self.payload_len + count * PLAIN_PAYLOAD_BYTES,
+        );
+        Ok(())
+    }
+
+    fn append_ready_span(
+        &mut self,
+        span: DemuxSpan,
+        counter: u8,
+        next: usize,
+    ) -> Result<ReadyContinuation> {
+        let position = (span.context.source_event_ordinal, span.transport.offset);
+        self.spans.try_push(span).map_err(|error| error.error)?;
+        self.record_ready_body(position, counter, next);
         Ok(if self.body_limit == Some(next) {
             ReadyContinuation::Complete
         } else {
             ReadyContinuation::Buffered
         })
+    }
+
+    fn record_ready_body(&mut self, position: (u64, u64), counter: u8, next: usize) {
+        self.last_input = Some(position);
+        self.entity_first = false;
+        self.previous_counter = Some(counter);
+        self.payload_len = next;
     }
     pub(crate) fn transport_bounds(packet: &TransportPacket) -> Result<()> {
         let prefix = packet.prefix.as_ref().map_or(0, Bytes::len);
@@ -779,17 +1005,7 @@ impl DemuxObserver {
             return Ok(true);
         }
         if self.growth.is_none() {
-            let needed = len.checked_add(1).ok_or(Error::Overflow)?;
-            let target = capacity.saturating_mul(2).max(4).min(maximum).max(needed);
-            let bytes = target
-                .checked_add(len)
-                .and_then(|count| count.checked_mul(item_bytes))
-                .ok_or(Error::Overflow)?;
-            self.growth = Some(Growth {
-                arena,
-                target,
-                remaining: u64::try_from(bytes).map_err(|_| Error::Overflow)?,
-            });
+            self.growth = Some(Growth::plan(arena, len, maximum, item_bytes)?);
         }
         let growth = self
             .growth
@@ -931,14 +1147,15 @@ impl DemuxObserver {
         let emission = self
             .emission
             .ok_or(Error::Invalid("native PES emission missing"))?;
-        let header = self
-            .header
-            .as_ref()
-            .ok_or(Error::Invalid("native PES causal header missing"))?
-            .clone();
         let origin = self
             .origin
             .ok_or(Error::Invalid("native PES origin missing"))?;
+        let header = if emission.continue_without_header {
+            self.header.clone()
+        } else {
+            self.header.take()
+        }
+        .ok_or(Error::Invalid("native PES causal header missing"))?;
         let packet = DemuxPacket {
             profile: self.profile,
             program: self.scope.program,
@@ -992,7 +1209,69 @@ impl DemuxObserver {
         Ok(())
     }
 
+    /// Read a timestamp-only header from one carrier when its whole validation
+    /// fits. The ordinary staged parser handles incomplete or invalid headers.
+    fn complete_timed_header(
+        &mut self,
+        work: &mut WorkBudget,
+        cancel: &AtomicBool,
+    ) -> Result<bool> {
+        let pending = self
+            .pending
+            .as_ref()
+            .ok_or(Error::Invalid("native PES input missing"))?;
+        let payload = pending
+            .packet
+            .payload
+            .as_ref()
+            .ok_or(Error::Invalid("native PES payload missing"))?;
+        let bytes = &payload[pending.position..];
+        let Some((header, declared)) = parse_timed_header(bytes, self.limits.pes_bytes, work)
+        else {
+            return Ok(false);
+        };
+        if header.stream_id != self.scope.stream_id || (declared.is_none() && self.finite_private())
+        {
+            return Ok(false);
+        }
+        let used = header.as_bytes().len();
+        let charge = used as u64 + 3;
+        let extent = SourceRange {
+            entity: self.scope.entity,
+            offset: pending
+                .packet
+                .payload_source_offset
+                .checked_add(pending.position as u64)
+                .ok_or(Error::Overflow)?,
+            bytes: used,
+        };
+        extent.end()?;
+        if !self.reserve(Arena::Header, work, cancel)? || !work.try_charge(charge) {
+            return Ok(false);
+        }
+        if cancel.load(Ordering::Relaxed) {
+            return Err(Error::Cancelled);
+        }
+        debug_assert!(self.header_ranges.is_empty());
+        self.header_ranges
+            .try_push(extent)
+            .map_err(|error| error.error)?;
+        self.header_used = used;
+        self.header_target = used;
+        self.declared_total = declared;
+        self.body_limit = declared.map(|total| total - used);
+        self.header = Some(header);
+        self.pending
+            .as_mut()
+            .ok_or(Error::Invalid("native PES input missing"))?
+            .position += used;
+        Ok(true)
+    }
+
     fn poll_header(&mut self, work: &mut WorkBudget, cancel: &AtomicBool) -> Result<bool> {
+        if self.header_used == 0 && self.complete_timed_header(work, cancel)? {
+            return Ok(true);
+        }
         if self.header_used == self.header_target {
             if !work.try_charge(1) {
                 return Ok(false);
@@ -1338,5 +1617,65 @@ impl DemuxObserver {
                 return Ok(AssemblyStep::Yield);
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn finite_body_reserves_only_the_received_span() {
+        let pool = Budget::new(8192).unwrap();
+        let entity = SourceId(1);
+        let epochs = SourceEpochs {
+            configuration: 0,
+            clock: 0,
+        };
+        let mut observer = DemuxObserver::new(
+            DemuxProfile::PesPackets,
+            DemuxScope {
+                program: 1,
+                pid: 256,
+                stream_type: 0x1b,
+                stream_id: 0xe0,
+                entity,
+                epochs,
+            },
+            pool.clone(),
+            ParseLimits::default(),
+        )
+        .unwrap();
+        let length = (3 + 5 * PLAIN_PAYLOAD_BYTES) as u16;
+        let [hi, lo] = length.to_be_bytes();
+        let mut raw = [0xff; TS188_BYTES];
+        raw[..13].copy_from_slice(&[0x47, 0x41, 0, 0x10, 0, 0, 1, 0xe0, hi, lo, 0x80, 0, 0]);
+        let mut carrier = crate::parse_transport(
+            Bytes::copy_from_slice(&pool, &raw).unwrap(),
+            crate::PacketFormat::Ts188,
+            0,
+        )
+        .unwrap();
+        carrier.source_id = Some(entity);
+        observer
+            .push(
+                carrier,
+                SourceContext {
+                    source_event_ordinal: 0,
+                    epochs,
+                    byte_run_epoch: None,
+                },
+            )
+            .unwrap();
+        assert!(matches!(
+            observer
+                .poll(&mut WorkBudget::new(u64::MAX), &AtomicBool::new(false))
+                .unwrap(),
+            AssemblyStep::NeedPayload
+        ));
+        assert_eq!(observer.spans.len(), 1);
+        // The first append uses the ordinary arena size. Other tracks can
+        // still use the pool while this one waits for its remaining carriers.
+        assert_eq!(observer.spans.capacity(), 4);
     }
 }

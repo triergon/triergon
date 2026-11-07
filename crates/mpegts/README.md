@@ -74,6 +74,7 @@ file.
 | --- | --- |
 | Whole stream, one program | `TransportStream::{new, new_with_namespace}` |
 | One HLS segment (TS188, in-band PAT/PMT) | `TransportStream::new_single_program_segment`, `new_single_program_feed` |
+| Sequential TS188 playback input | `TransportStream::new_single_program_progressive_feed` |
 | Packets only | `parse_transport`, `TransportFramer`, `carrier::TransportInspector` |
 | Continuity | `Continuity::observe` → `ContinuityOutcome` |
 | PSI | `SectionAssembler`, `psi::{PatReader, PmtReader, PatCollector}` |
@@ -84,9 +85,19 @@ file.
 | FFmpeg-compatible clock | `compat::pes::DemuxClock` |
 | FFmpeg-compatible start position | `compat::input::InputBootstrap` |
 
+The sequential feed keeps program tables, clock transitions and diagnostics.
 `TransportStream::poll_feed` can deliver validated PES continuations directly
-to a consumer in segment feed mode. `take_feed_omissions` counts the skipped
-events so consumers can retain positions in the source trace.
+in both feed modes. `poll_feed_carriers` lets a progressive feed move a
+plain continuation's charged payload storage into `compat::pes::DemuxObserver`.
+`poll_feed_with_payload_runs` can offer several payload-only continuations
+on one PID from an already shared window. Each carrier keeps its source
+range and event ordinal. Runs reserve checked span capacity before advancing
+input; ordinary carrier polling handles PES completion.
+Sequential playback can share up to four tight input windows of at most 4 KiB
+each. A full set, oversized backing storage or low budget headroom uses
+carrier-sized storage. Fallback uses the original transport event.
+`take_feed_omissions` counts
+skipped events so consumers can retain positions in the source trace.
 
 `TransportStream::poll_compact` coalesces runs of null packets into one
 `CompactTraceEvent::NullRun`. `examples/mpegts_source_trace.rs` prints the

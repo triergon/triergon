@@ -21,7 +21,7 @@ use triergon_matroska::{
     typed::{Event as MkvEvent, Reader},
 };
 use triergon_mpegts::{
-    self as ts, FeedContinuation, TraceEvent, TransportStream,
+    self as ts, FeedContinuation, FeedItem, TraceEvent, TransportStream,
     clock::{ClockKey, SourceTimePolicy, SourceTimestamp, source_timestamp},
 };
 use ts::compat::pes::{
@@ -288,6 +288,7 @@ impl TsNativeTracks {
 #[derive(Clone, Copy, PartialEq, Eq)]
 enum SegmentDiscovery {
     Native,
+    Progressive,
     AvcAacFeed,
     MediaFeed,
 }
@@ -763,6 +764,16 @@ impl Engine {
         )
     }
 
+    pub(crate) fn ts_progressive(input: InputCursor, limits: ts::ParseLimits) -> Result<Self> {
+        Self::ts_native_segment(
+            input,
+            limits,
+            SourceTimePolicy::Unanchored,
+            DescriptorNamespace::Unspecified,
+            SegmentDiscovery::Progressive,
+        )
+    }
+
     fn ts_native_segment(
         input: InputCursor,
         limits: ts::ParseLimits,
@@ -774,6 +785,9 @@ impl Engine {
         let stream = match discovery {
             SegmentDiscovery::Native => {
                 TransportStream::new_single_program_segment(budget, limits, namespace)?
+            }
+            SegmentDiscovery::Progressive => {
+                TransportStream::new_single_program_progressive_feed(budget, limits, namespace)?
             }
             SegmentDiscovery::AvcAacFeed | SegmentDiscovery::MediaFeed => {
                 TransportStream::new_single_program_feed(budget, limits, namespace)?
@@ -1722,15 +1736,11 @@ impl TsEngine {
         &mut self,
         index: usize,
         mut packet: ts::TransportPacket,
+        context: SourceContext,
         ready: Option<(&mut WorkBudget, &AtomicBool)>,
     ) -> Result<bool> {
         let track = &mut self.native_tracks.as_mut_slice()[index];
         if let Some(observer) = track.observer.as_mut() {
-            let context = SourceContext {
-                source_event_ordinal: self.event_ordinal,
-                epochs: self.stream.source_epochs(),
-                byte_run_epoch: None,
-            };
             if let Some((work, cancel)) = ready {
                 match observer.append_ready_continuation(&mut packet, context, work, cancel)? {
                     ReadyContinuation::Buffered => return Ok(true),
@@ -1758,6 +1768,14 @@ impl TsEngine {
         Ok(true)
     }
 
+    fn native_source_context(&self) -> SourceContext {
+        SourceContext {
+            source_event_ordinal: self.event_ordinal,
+            epochs: self.stream.source_epochs(),
+            byte_run_epoch: None,
+        }
+    }
+
     const FEED_EVENT_QUANTUM: u64 = 64;
 
     fn poll_feed_stream(
@@ -1769,16 +1787,45 @@ impl TsEngine {
         let active = &mut self.native_active;
         let ordinal = self.event_ordinal;
         let suppressed = self.suppressed_events;
-        self.stream.poll_feed(
+        self.stream.poll_feed_with_payload_runs(
             &mut self.input,
             work,
             cancel,
-            &mut |packet, omitted, epochs, work| {
-                // Leave one unit for consuming the event after appending its payload.
+            &mut |item, omitted, epochs, work| {
+                let packet = match item {
+                    FeedItem::Carrier(packet) => packet,
+                    FeedItem::PayloadRun(run) => {
+                        // Leave the carrier that triggers a yield to the
+                        // ordinary path, including its deferred continuity event.
+                        let maximum = (Self::FEED_EVENT_QUANTUM - 1)
+                            .saturating_sub(suppressed.saturating_add(omitted))
+                            .div_ceil(2) as usize;
+                        if maximum >= 2
+                            && active.is_none()
+                            && let Some(source_event_ordinal) = ordinal.checked_add(omitted)
+                            && let Some(index) = tracks.index(run.pid())
+                            && let Some(observer) = tracks.as_mut_slice()[index].observer.as_mut()
+                            && run.append_ready(
+                                observer,
+                                SourceContext {
+                                    source_event_ordinal,
+                                    epochs,
+                                    byte_run_epoch: None,
+                                },
+                                maximum,
+                                work,
+                            )?
+                        {
+                            return Ok(FeedContinuation::Buffered);
+                        }
+                        return Ok(FeedContinuation::Emit);
+                    }
+                };
+                // Leave one unit for event consumption in addition to native append.
                 if work.remaining() < 3 {
                     return Ok(FeedContinuation::Emit);
                 }
-                if let Some(index) = tracks.index(packet.pid)
+                if let Some(index) = tracks.index(packet.pid())
                     && let Some(observer) = tracks.as_mut_slice()[index].observer.as_mut()
                 {
                     let context = SourceContext {
@@ -1788,7 +1835,7 @@ impl TsEngine {
                         epochs,
                         byte_run_epoch: None,
                     };
-                    match observer.append_ready_continuation(packet, context, work, cancel)? {
+                    match packet.append_ready_continuation(observer, context, work, cancel)? {
                         ReadyContinuation::Unhandled => return Ok(FeedContinuation::Emit),
                         ReadyContinuation::Buffered => {}
                         ReadyContinuation::Complete => *active = Some(index),
@@ -1806,6 +1853,36 @@ impl TsEngine {
                 }
             },
         )
+    }
+
+    fn project_pending_packet(
+        &mut self,
+        work: &mut WorkBudget,
+        cancel: &AtomicBool,
+    ) -> Result<BackendStep> {
+        let packet = self
+            .native_pending
+            .as_ref()
+            .ok_or(Error::Invalid("native packet missing"))?;
+        let projector = self
+            .native_packet_clock
+            .as_mut()
+            .ok_or(Error::Invalid("native TS packet before program discovery"))?;
+        let Some(clock) = projector.project_header(
+            packet.pid,
+            packet.source_epochs,
+            packet.time_header(),
+            work,
+            cancel,
+        )?
+        else {
+            return Ok(BackendStep::Yield);
+        };
+        let packet = self
+            .native_pending
+            .take()
+            .ok_or(Error::Invalid("native packet missing"))?;
+        Ok(BackendStep::Event(RawEvent::NativeTs { packet, clock }))
     }
 
     // Keep backend-specific polling workspaces out of the shared dispatcher.
@@ -1836,26 +1913,8 @@ impl TsEngine {
             };
             return Ok(BackendStep::Event(event));
         }
-        if let Some(packet) = self.native_pending.as_ref() {
-            let projector = self
-                .native_packet_clock
-                .as_mut()
-                .ok_or(Error::Invalid("native TS packet before program discovery"))?;
-            let clock = projector.project_header(
-                packet.pid,
-                packet.source_epochs,
-                packet.time_header(),
-                w,
-                c,
-            )?;
-            let Some(clock) = clock else {
-                return Ok(BackendStep::Yield);
-            };
-            let packet = self
-                .native_pending
-                .take()
-                .ok_or(Error::Invalid("native packet missing"))?;
-            return Ok(BackendStep::Event(RawEvent::NativeTs { packet, clock }));
+        if self.native_pending.is_some() {
+            return self.project_pending_packet(w, c);
         }
         while let Some(index) = self.native_active {
             let Some(track) = self.native_tracks.as_mut_slice().get_mut(index) else {
@@ -1871,6 +1930,9 @@ impl TsEngine {
                 match result {
                     Ok(ts::AssemblyStep::Output(packet)) => {
                         self.native_pending = Some(packet);
+                        if self.segment_discovery == Some(SegmentDiscovery::Progressive) {
+                            return self.project_pending_packet(w, c);
+                        }
                         return Ok(BackendStep::Yield);
                     }
                     Ok(ts::AssemblyStep::Yield) => return Ok(BackendStep::Yield),
@@ -1888,9 +1950,14 @@ impl TsEngine {
             }
             self.native_active = self.draining.then_some(index + 1);
         }
+        let progressive = self.segment_discovery == Some(SegmentDiscovery::Progressive);
         let feed_only = matches!(
             self.segment_discovery,
-            Some(SegmentDiscovery::AvcAacFeed | SegmentDiscovery::MediaFeed)
+            Some(
+                SegmentDiscovery::Progressive
+                    | SegmentDiscovery::AvcAacFeed
+                    | SegmentDiscovery::MediaFeed
+            )
         );
         if self.ended {
             return Ok(BackendStep::End);
@@ -2065,13 +2132,20 @@ impl TsEngine {
                 }
                 self.tsid = Some(table.header.extension);
             }
-            // The HLS feed consumes active maps, faults and native payloads. The
-            // source parser still validates every packet and advances its epochs.
+            // Feeds consume native payloads and the source facts needed for
+            // admission. The source parser still validates every carrier.
             if feed_only
                 && !matches!(
                     event,
                     TraceEvent::ProgramMap { active: true, .. } | TraceEvent::Diagnostic(_)
                 )
+                && !(progressive
+                    && matches!(
+                        event,
+                        TraceEvent::Pat(_)
+                            | TraceEvent::Continuity { .. }
+                            | TraceEvent::Timeline { .. }
+                    ))
             {
                 let event = self
                     .pending
@@ -2081,7 +2155,9 @@ impl TsEngine {
                 match event {
                     TraceEvent::Transport(packet) => {
                         if let Some(index) = self.native_tracks.index(packet.pid) {
-                            drained = self.offer_native_transport(index, packet, Some((w, c)))?;
+                            let context = self.native_source_context();
+                            drained =
+                                self.offer_native_transport(index, packet, context, Some((w, c)))?;
                         }
                     }
                     TraceEvent::Pes(_) if self.program == 0 => {
@@ -2140,7 +2216,8 @@ impl TsEngine {
             if let TraceEvent::Transport(packet) = &event
                 && let Some(index) = self.native_tracks.index(packet.pid)
             {
-                self.offer_native_transport(index, packet.clone(), None)?;
+                let context = self.native_source_context();
+                self.offer_native_transport(index, packet.clone(), context, None)?;
             }
             self.event_ordinal = self.event_ordinal.checked_add(1).ok_or(Error::Overflow)?;
             if matches!(event, TraceEvent::Finished) {

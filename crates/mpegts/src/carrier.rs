@@ -9,7 +9,23 @@ use triergon_core::{
 };
 
 const STUFFING: [u8; 182] = [0xff; 182];
+pub(crate) const TS188_BYTES: usize = 188;
+pub(crate) const TS_PAYLOAD_START: usize = 4;
+pub(crate) const PLAIN_PAYLOAD_BYTES: usize = TS188_BYTES - TS_PAYLOAD_START;
 
+/// Header of a clear, payload-only continuation in a complete TS188 carrier.
+pub(crate) fn payload_only_continuation(ts: &[u8]) -> Option<(u16, u8)> {
+    let [0x47, high, low, control, ..] = ts else {
+        return None;
+    };
+    if high & 0xc0 != 0 || control & 0xf0 != 0x10 {
+        return None;
+    }
+    let pid = (u16::from(high & 31) << 8) | u16::from(*low);
+    Some((pid, control & 15))
+}
+
+#[derive(Debug)]
 struct CarrierHeader {
     pid: u16,
     pusi: bool,
@@ -37,6 +53,7 @@ impl CarrierHeader {
     }
 }
 
+#[derive(Debug)]
 pub(crate) struct PlainCarrier {
     header: CarrierHeader,
     payload_start: usize,
@@ -71,6 +88,13 @@ impl PlainCarrier {
             payload_start,
             flags,
         })
+    }
+
+    pub(crate) fn is_plain_continuation(&self) -> bool {
+        !self.header.pusi
+            && !self.header.tei
+            && self.header.scrambling == 0
+            && self.flags.unwrap_or(0) & 0x80 == 0
     }
 
     pub(crate) fn into_packet(
@@ -114,6 +138,38 @@ impl PlainCarrier {
             sync: 0,
             pcr_range: None,
         })
+    }
+}
+
+/// A complete plain TS188 continuation with its charged backing storage.
+#[derive(Debug)]
+pub(crate) struct PlainContinuation {
+    pub(crate) layout: PlainCarrier,
+    pub(crate) source: Option<Bytes>,
+    pub(crate) offset: u64,
+    pub(crate) entity: Option<SourceId>,
+}
+
+impl PlainContinuation {
+    pub(crate) fn pid(&self) -> u16 {
+        self.layout.header.pid
+    }
+
+    pub(crate) fn counter(&self) -> u8 {
+        self.layout.header.cc
+    }
+
+    pub(crate) fn payload_start(&self) -> usize {
+        self.layout.payload_start
+    }
+
+    pub(crate) fn into_packet(self) -> Result<TransportPacket> {
+        self.layout.into_packet(
+            self.source
+                .ok_or(Error::Invalid("missing continuation source"))?,
+            self.offset,
+            self.entity,
+        )
     }
 }
 

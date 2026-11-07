@@ -116,6 +116,10 @@ impl Bytes {
     pub fn shares_storage_with(&self, other: &Self) -> bool {
         Arc::ptr_eq(&self.storage, &other.storage)
     }
+    /// Whether another live view retains this allocation.
+    pub fn has_shared_storage(&self) -> bool {
+        Arc::strong_count(&self.storage) != 1
+    }
     /// Compare backing allocations without extending their lifetimes.
     pub fn storage_address(&self) -> ByteStorageAddress {
         ByteStorageAddress(Arc::as_ptr(&self.storage).addr())
@@ -365,33 +369,34 @@ impl<T> BudgetVec<T> {
         self.charge.shrink_by(old);
         Ok(())
     }
+    #[inline]
     pub fn try_push(&mut self, value: T) -> std::result::Result<(), PushError<T>> {
-        if self.len() == self.capacity() {
-            let Some(needed) = self.len().checked_add(1) else {
-                return Err(PushError {
-                    error: Error::Overflow,
-                    value,
-                });
-            };
-            let target = needed.max(self.capacity().saturating_mul(2).max(4));
-            let result = self.grow_to(target).or_else(|error| {
-                if target != needed
-                    && matches!(
-                        error,
-                        Error::Backpressure { .. } | Error::Limit { .. } | Error::Overflow
-                    )
-                {
-                    self.grow_to(needed)
-                } else {
-                    Err(error)
-                }
-            });
-            if let Err(error) = result {
-                return Err(PushError { error, value });
-            }
+        if self.len() == self.capacity()
+            && let Err(error) = self.grow_for_push()
+        {
+            return Err(PushError { error, value });
         }
         self.data.push(value);
         Ok(())
+    }
+
+    #[cold]
+    #[inline(never)]
+    fn grow_for_push(&mut self) -> Result<()> {
+        let needed = self.len().checked_add(1).ok_or(Error::Overflow)?;
+        let target = needed.max(self.capacity().saturating_mul(2).max(4));
+        self.grow_to(target).or_else(|error| {
+            if target != needed
+                && matches!(
+                    error,
+                    Error::Backpressure { .. } | Error::Limit { .. } | Error::Overflow
+                )
+            {
+                self.grow_to(needed)
+            } else {
+                Err(error)
+            }
+        })
     }
     #[inline]
     pub fn try_extend_from_slice(&mut self, values: &[T]) -> Result<()>
@@ -406,6 +411,20 @@ impl<T> BudgetVec<T> {
         self.data.extend_from_slice(values);
         Ok(())
     }
+    /// Reserve space for all new elements before constructing any of them.
+    pub fn try_extend_with(&mut self, count: usize, make: impl FnMut(usize) -> T) -> Result<()> {
+        self.try_reserve_exact(count)?;
+        self.data.extend((0..count).map(make));
+        Ok(())
+    }
+    /// Move elements after reserving destination capacity. Both buffers stay
+    /// charged to their existing pools. A failed reserve leaves both intact.
+    pub fn try_append(&mut self, other: &mut Self) -> Result<()> {
+        self.try_reserve_exact(other.len())?;
+        self.data.append(&mut other.data);
+        Ok(())
+    }
+
     /// Initializes new elements only after reserving their complete capacity.
     /// Shrinking retains the allocation and its existing charge.
     pub fn try_resize(&mut self, new_len: usize, value: T) -> Result<()>

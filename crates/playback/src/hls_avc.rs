@@ -8,7 +8,6 @@ use crate::{TrackKey, TsNativeCarriage, TsNativeConfiguration};
 use std::sync::atomic::{AtomicBool, Ordering};
 use triergon_core::{
     Budget, BudgetVec, BudgetVecIntoIter, Bytes, Error, Result, SourceId, WorkBudget,
-    nonzero_prefix_len,
 };
 use triergon_framing::{Codec, NalHeader};
 use triergon_mpegts::compat::pes::{
@@ -17,6 +16,7 @@ use triergon_mpegts::compat::pes::{
 
 pub use syntax::AvcRaster;
 
+const SEI: u8 = 6;
 const AUD: u8 = 9;
 const PREFIX: &[u8] = &[0, 0, 0, 1];
 const LOOKAHEAD: usize = PREFIX.len() + 1;
@@ -131,6 +131,7 @@ struct Chunk {
 struct PendingPes {
     spans: BudgetVecIntoIter<DemuxSpan>,
     remaining: usize,
+    may_reserve: bool,
 }
 
 #[derive(Clone, Copy)]
@@ -216,6 +217,7 @@ pub struct AvcTsReader {
     bytes: BudgetVec<u8>,
     sps: BudgetVec<ParameterSet<AvcRaster>>,
     pps: BudgetVec<ParameterSet<u8>>,
+    allow_startup_sei: bool,
     ended: bool,
     failure: Option<Error>,
 }
@@ -256,9 +258,20 @@ impl AvcTsReader {
             bytes: BudgetVec::new(pool),
             sps: BudgetVec::new(pool),
             pps: BudgetVec::new(pool),
+            allow_startup_sei: false,
             ended: false,
             failure: None,
         })
+    }
+
+    pub(crate) fn new_progressive(
+        pool: &Budget,
+        config: TsNativeConfiguration,
+        limits: AvcTsLimits,
+    ) -> Result<Self> {
+        let mut reader = Self::new(pool, config, limits)?;
+        reader.allow_startup_sei = true;
+        Ok(reader)
     }
 
     /// Moves a PES only on acceptance. Drain to NeedInput before offering another.
@@ -328,6 +341,7 @@ impl AvcTsReader {
         self.pending_pes = mailbox.take().map(|packet| PendingPes {
             remaining: packet.payload_len,
             spans: packet.spans.into_iter(),
+            may_reserve: true,
         });
         Ok(true)
     }
@@ -384,7 +398,12 @@ impl AvcTsReader {
                     }
                     self.begin(next)?;
                 } else {
-                    if self.unit.is_none() {
+                    if self.unit.is_none()
+                        && !(self.allow_startup_sei
+                            && self.unit_serial == 0
+                            && next.kind == SEI
+                            && next.prefix.anchor.is_some())
+                    {
                         return Err(Error::Unsupported(
                             "AVC TS access unit has no initial delimiter",
                         ));
@@ -393,42 +412,9 @@ impl AvcTsReader {
                 }
                 continue;
             }
-            if let Some(chunk) = &mut self.input {
-                if chunk.offset == chunk.bytes.len() {
-                    self.input = None;
-                    continue;
-                }
-                let available = &chunk.bytes.as_ref()[chunk.offset..];
-                let count = available.len().min(work.remaining().min(4096) as usize);
-                if count == 0 {
-                    return Ok(AvcTsStep::Yield);
-                }
-                let first = available[0];
-                // Between prefix candidates, append a whole nonzero run. All
-                // possible cross-span prefixes are still handled bytewise.
-                let copy =
-                    if first != 0 && self.prefix.is_none() && self.zeroes < 2 && self.nal.is_some()
-                    {
-                        nonzero_prefix_len(&available[..count])
-                    } else {
-                        1
-                    };
-                append(
-                    &mut self.bytes,
-                    &available[..copy],
-                    self.limits.maximum_access_unit_bytes + LOOKAHEAD,
-                )?;
-                chunk.offset += copy;
-                work.try_charge(copy as u64);
-                if copy == 1 {
-                    self.accept(first)?;
-                } else {
-                    self.zeroes = 0;
-                    self.nal_data_end = self.bytes.len();
-                }
-                continue;
-            }
-            if let Some(pending) = &mut self.pending_pes {
+            if self.input.is_none()
+                && let Some(pending) = &mut self.pending_pes
+            {
                 if pending.spans.len() != 0 {
                     if !work.try_charge(1) {
                         return Ok(AvcTsStep::Yield);
@@ -451,6 +437,56 @@ impl AvcTsReader {
                         return Err(Error::Invalid("AVC TS PES payload extent"));
                     }
                     self.pending_pes = None;
+                }
+            }
+            if let Some(chunk) = &mut self.input {
+                if chunk.offset == chunk.bytes.len() {
+                    self.input = None;
+                    continue;
+                }
+                let available = &chunk.bytes.as_ref()[chunk.offset..];
+                let count = available.len().min(work.remaining().min(4096) as usize);
+                if count == 0 {
+                    return Ok(AvcTsStep::Yield);
+                }
+                let first = available[0];
+                // Within a NAL, isolated zeros followed by data cannot
+                // begin a start code. Leave possible split prefixes for accept.
+                let copy =
+                    if first != 0 && self.prefix.is_none() && self.zeroes < 2 && self.nal.is_some()
+                    {
+                        nal_body_prefix_len(&available[..count])
+                    } else {
+                        1
+                    };
+                let limit = self.limits.maximum_access_unit_bytes + LOOKAHEAD;
+                append(&mut self.bytes, &available[..copy], limit, |len, growth| {
+                    // Once a slice has started, parameter set processing for
+                    // this picture is complete.
+                    self.nal.as_ref().filter(|nal| matches!(nal.kind, 1 | 5))?;
+                    let pending = self.pending_pes.as_mut().filter(|pes| pes.may_reserve)?;
+                    let extent = len
+                        .checked_add(available.len())?
+                        .checked_add(pending.remaining)?
+                        .checked_add(LOOKAHEAD)?;
+                    // A PES can contain multiple pictures. Limit the hint
+                    // relative to ordinary growth and try it once per PES.
+                    if extent <= growth || extent > limit.min(growth.saturating_mul(4)) {
+                        return None;
+                    }
+                    pending.may_reserve = false;
+                    Some(extent)
+                })?;
+                chunk.offset += copy;
+                if chunk.offset == chunk.bytes.len() {
+                    self.input = None;
+                }
+                work.try_charge(copy as u64);
+                if copy == 1 {
+                    self.accept(first)?;
+                } else {
+                    self.zeroes = 0;
+                    self.nal_data_end = self.bytes.len();
                 }
                 continue;
             }
@@ -529,10 +565,23 @@ impl AvcTsReader {
     fn end_nal(&mut self, nal: Nal) -> Result<()> {
         let raw = &self.bytes.as_slice()[nal.header..self.nal_data_end];
         let payload = &raw[1..];
-        let unit = self
-            .unit
-            .as_mut()
-            .ok_or(Error::Invalid("AVC NAL outside an access unit"))?;
+        let Some(unit) = self.unit.as_mut() else {
+            // Keep the progressive muxer's leading SEI with the first
+            // delimited picture only when both begin in the same PES.
+            if let (Some(anchor), Some(delimiter)) = (nal.prefix.anchor, self.next_nal)
+                && delimiter.kind == AUD
+                && delimiter
+                    .prefix
+                    .anchor
+                    .is_some_and(|next| next.serial == anchor.serial)
+                && !payload.is_empty()
+            {
+                return Ok(());
+            }
+            return Err(Error::Invalid(
+                "AVC TS startup SEI without a delimiter in its PES",
+            ));
+        };
         match nal.kind {
             AUD if matches!(payload, [value] if value & 0x1f == 0x10) => {}
             AUD => return Err(Error::Invalid("AVC access unit delimiter RBSP")),
@@ -573,7 +622,7 @@ impl AvcTsReader {
                     remember(&mut self.pps, id, self.unit_serial, raw, sps)?;
                 }
             }
-            6 | 10 | 11 | 12 => {}
+            SEI | 10 | 11 | 12 => {}
             _ => return Err(Error::Unsupported("AVC TS NAL type")),
         }
         Ok(())
@@ -651,7 +700,43 @@ impl AvcTsReader {
     }
 }
 
-fn append(buffer: &mut BudgetVec<u8>, bytes: &[u8], limit: usize) -> Result<()> {
+fn adjacent_zero_bytes(chunk: &[u8; 16], next: u8) -> u128 {
+    let word = u128::from_le_bytes(*chunk);
+    let adjacent = word | (word >> 8) | (u128::from(next) << 120);
+    // Borrow can mark a later byte. The first mark always starts a zero pair.
+    adjacent.wrapping_sub(0x0101_0101_0101_0101_0101_0101_0101_0101)
+        & !adjacent
+        & 0x8080_8080_8080_8080_8080_8080_8080_8080
+}
+
+fn nal_body_prefix_len(bytes: &[u8]) -> usize {
+    let mut rest = bytes;
+    while let Some((chunk, tail)) = rest.split_first_chunk::<16>()
+        && let Some(&next) = tail.first()
+    {
+        let zero_pairs = adjacent_zero_bytes(chunk, next);
+        if zero_pairs != 0 {
+            return bytes.len() - rest.len() + zero_pairs.trailing_zeros() as usize / 8;
+        }
+        rest = tail;
+    }
+    if let Some((head, tail)) = bytes.split_last_chunk::<16>() {
+        // The overlap has already been checked. Treat a trailing zero as a
+        // possible prefix for the next input span.
+        return head.len() + adjacent_zero_bytes(tail, 0).trailing_zeros() as usize / 8;
+    }
+    bytes
+        .windows(2)
+        .position(|pair| pair == [0, 0])
+        .unwrap_or_else(|| bytes.len() - usize::from(bytes.last() == Some(&0)))
+}
+
+fn append(
+    buffer: &mut BudgetVec<u8>,
+    bytes: &[u8],
+    limit: usize,
+    reserve_hint: impl FnOnce(usize, usize) -> Option<usize>,
+) -> Result<()> {
     let end = buffer
         .len()
         .checked_add(bytes.len())
@@ -669,7 +754,16 @@ fn append(buffer: &mut BudgetVec<u8>, bytes: &[u8], limit: usize) -> Result<()> 
             .max(64)
             .max(end)
             .min(limit);
-        if let Err(error) = buffer.try_reserve_exact(target - buffer.len()) {
+        let reserved = reserve_hint(buffer.len(), target).is_some_and(|extent| {
+            // Leave room for publication and subsequent input. A refused
+            // hint leaves the builder ready for its ordinary growth.
+            let headroom = buffer
+                .budget()
+                .available()
+                .saturating_sub(Bytes::owner_overhead_bytes() + LOOKAHEAD);
+            extent <= headroom / 2 && buffer.try_reserve_exact(extent - buffer.len()).is_ok()
+        });
+        if !reserved && let Err(error) = buffer.try_reserve_exact(target - buffer.len()) {
             if target == end
                 || !matches!(
                     error,
