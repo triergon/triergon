@@ -6,7 +6,7 @@
 //! shift plus an occasional 32-bit refill off the critical path.
 
 /// `rangeTabLPS[pStateIdx][qCodIRangeIdx]` (H.264 Table 9-44, H.265 Table 9-52).
-pub const RANGE_TAB_LPS: [[u8; 4]; 64] = [
+const RANGE_TAB_LPS: [[u8; 4]; 64] = [
     [128, 176, 208, 240],
     [128, 167, 197, 227],
     [128, 158, 187, 216],
@@ -74,14 +74,14 @@ pub const RANGE_TAB_LPS: [[u8; 4]; 64] = [
 ];
 
 /// transIdxLPS (H.264 Table 9-45, H.265 Table 9-53).
-pub const TRANS_IDX_LPS: [u8; 64] = [
+const TRANS_IDX_LPS: [u8; 64] = [
     0, 0, 1, 2, 2, 4, 4, 5, 6, 7, 8, 9, 9, 11, 11, 12, 13, 13, 15, 15, 16, 16, 18, 18, 19, 19, 21,
     21, 22, 22, 23, 24, 24, 25, 26, 26, 27, 27, 28, 29, 29, 30, 30, 30, 31, 32, 32, 33, 33, 33, 34,
     34, 35, 35, 35, 36, 36, 36, 37, 37, 37, 38, 38, 63,
 ];
 
 /// transIdxMPS (H.264 Table 9-45, H.265 Table 9-53).
-pub const TRANS_IDX_MPS: [u8; 64] = [
+const TRANS_IDX_MPS: [u8; 64] = [
     1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26,
     27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50,
     51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 62, 63,
@@ -207,11 +207,13 @@ impl<'a, const HEADROOM: bool> Engine<'a, HEADROOM> {
         }
     }
 
-    /// Appends 32 bits below the look-ahead.
+    /// Appends 32 bits below the look-ahead. A corrupt stream's long [`Engine::bypass_bits`]
+    /// can get here with too much look-ahead for 32 more bits, and the shift then wraps.
     #[inline(always)]
     fn append(&mut self) {
         let word = self.load();
-        self.value |= word << (Self::OFFSET_SHIFT as i32 - self.available - 32);
+        let shift = Self::OFFSET_SHIFT as i32 - self.available - 32;
+        self.value |= word.wrapping_shl(shift as u32);
         self.available += 32;
     }
 
@@ -505,6 +507,26 @@ mod tests {
     fn engine_matches_the_serial_process() {
         follows_the_serial_process::<false>();
         follows_the_serial_process::<true>();
+    }
+
+    /// A corrupt stream's reads of 24 to 31 bins, past the room for one more word.
+    fn over_long_bypass_reads<const HEADROOM: bool>() -> u64 {
+        let mut random = noise(0x0bad_cafe);
+        let data: Vec<u8> = (0..4096).map(|_| random() as u8).collect();
+        let mut engine = Engine::<HEADROOM>::new(&data, 0);
+        let mut digest = 0xcbf2_9ce4_8422_2325u64;
+        for _ in 0..4000 {
+            let count = 2 + random() % 30;
+            let bins = u64::from(engine.bypass_bits(count));
+            digest = (digest ^ bins).wrapping_mul(0x0100_0000_01b3);
+        }
+        digest
+    }
+
+    #[test]
+    fn over_long_bypass_reads_are_the_same_in_every_build() {
+        assert_eq!(over_long_bypass_reads::<false>(), 15052386680786097469);
+        assert_eq!(over_long_bypass_reads::<true>(), 5587722021355268864);
     }
 
     #[test]

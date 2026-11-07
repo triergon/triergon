@@ -28,20 +28,18 @@ pub fn unescape(ebsp: &[u8], out: &mut Vec<u8>) {
 /// Reads the RBSP of a NAL unit payload in place, removing emulation prevention bytes as
 /// it goes, so parsing a prefix costs no copy of the suffix.
 ///
-/// [`Rbsp::new`] rejects a payload that a conforming encoder cannot produce: `00 00`
-/// followed by `00`, `01` or `02`. [`Rbsp::lenient`] accepts those bytes as data. Both
-/// reject an emulation prevention byte followed by a byte above `03`.
+/// It rejects a payload that a conforming encoder cannot produce: `00 00` followed by
+/// `00`, `01` or `02`, or an emulation prevention byte followed by a byte above `03`.
 #[derive(Clone, Copy, Debug)]
 pub struct Rbsp<'a> {
     rest: &'a [u8],
     byte: u8,
     remaining: u8,
     zeroes: u8,
-    strict: bool,
 }
 
 impl<'a> Rbsp<'a> {
-    /// A strict reader at the first payload byte.
+    /// A reader at the first payload byte.
     #[must_use]
     pub fn new(payload: &'a [u8]) -> Self {
         Self {
@@ -49,24 +47,7 @@ impl<'a> Rbsp<'a> {
             byte: 0,
             remaining: 0,
             zeroes: 0,
-            strict: true,
         }
-    }
-
-    /// A lenient reader at the first payload byte.
-    #[must_use]
-    pub fn lenient(payload: &'a [u8]) -> Self {
-        Self {
-            strict: false,
-            ..Self::new(payload)
-        }
-    }
-
-    /// True when the payload has no set bit left: the last bit read was the
-    /// rbsp_stop_one_bit or lies after it.
-    #[must_use]
-    pub fn stop_bit_consumed(&self) -> bool {
-        self.rest.is_empty() && u32::from(self.remaining) <= self.byte.trailing_zeros()
     }
 
     fn next_byte(&mut self) -> Result<u8, BitError> {
@@ -80,7 +61,7 @@ impl<'a> Rbsp<'a> {
                 self.zeroes = 0;
                 (next, rest)
             }
-            0..=2 if self.zeroes == 2 && self.strict => {
+            0..=2 if self.zeroes == 2 => {
                 return Err(BitError::MissingPrevention);
             }
             _ => (first, rest),
@@ -144,8 +125,7 @@ mod tests {
     fn removes_prevention_bytes() {
         let payload = [1, 0, 0, 3, 1, 0, 0, 3, 0, 0, 3, 3, 9];
         let expected = vec![1, 0, 0, 1, 0, 0, 0, 0, 3, 9];
-        assert_eq!(bytes(Rbsp::new(&payload)), Ok(expected.clone()));
-        assert_eq!(bytes(Rbsp::lenient(&payload)), Ok(expected));
+        assert_eq!(bytes(Rbsp::new(&payload)), Ok(expected));
     }
 
     #[test]
@@ -167,22 +147,15 @@ mod tests {
 
     #[test]
     fn prevention_errors() {
-        for reader in [Rbsp::new, Rbsp::lenient] {
-            assert_eq!(
-                bytes(reader(&[0, 0, 3, 4])),
-                Err(BitError::InvalidPrevention)
-            );
-            // A prevention byte at the very end has nothing to protect.
-            assert_eq!(bytes(reader(&[0, 0, 3])), Ok(vec![0, 0]));
-        }
+        assert_eq!(
+            bytes(Rbsp::new(&[0, 0, 3, 4])),
+            Err(BitError::InvalidPrevention)
+        );
+        // A prevention byte at the very end has nothing to protect.
+        assert_eq!(bytes(Rbsp::new(&[0, 0, 3])), Ok(vec![0, 0]));
         assert_eq!(
             bytes(Rbsp::new(&[0, 0, 1])),
             Err(BitError::MissingPrevention)
-        );
-        assert_eq!(bytes(Rbsp::lenient(&[0, 0, 1])), Ok(vec![0, 0, 1]));
-        assert_eq!(
-            bytes(Rbsp::lenient(&[0, 0, 0, 0, 3, 1])),
-            Ok(vec![0, 0, 0, 0, 1])
         );
     }
 
@@ -213,16 +186,5 @@ mod tests {
             unescape(case, &mut out);
             assert_eq!(out, expected);
         }
-    }
-
-    #[test]
-    fn stop_bit() {
-        let mut reader = Rbsp::new(&[0b1010_0000]);
-        for _ in 0..2 {
-            reader.bit().unwrap();
-            assert!(!reader.stop_bit_consumed());
-        }
-        reader.bit().unwrap();
-        assert!(reader.stop_bit_consumed());
     }
 }
