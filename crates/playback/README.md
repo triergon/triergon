@@ -102,7 +102,8 @@ target.
 **Matroska.** `SharedBounded` payload ownership lets packets borrow complete
 blocks from the source window; a borrowed packet keeps the whole backing
 allocation charged until it drops. Blocks split across reads are copied. The
-immutable seek index reuses keyframe positions after one sequential read and
+packet's configuration supplies its allocation budget to the output.
+The immutable seek index reuses keyframe positions after one sequential read and
 needs no Cues. The Dolby clock probe retains at most 4,096 timing rows and
 inspects up to 32 syncframes to infer a missing duration.
 
@@ -122,11 +123,19 @@ requires exact coverage.
 Private stream type `0x06` is audio only after explicit AC-3/E-AC-3 or DVB
 admission. M2TS prefix startup (`NativeStartup::new_m2ts_prefix_v2`) needs an
 8 KiB input window. The DVB native PES parser caps a continued segment at
-65,536 bytes.
+65,536 bytes. PES outputs reuse their payload storage's budget handle, which
+remains valid while a caller retains an output after closing the player.
+Delivery without a seek uses the presence of the projected presentation
+timestamp directly.
 
 **HLS segments.** One independent TS188 segment with in-band PAT and PMT.
 The feed consumes validated PES continuations directly and preserves source
-event positions.
+event positions. AVC fixed-width fields consume buffered RBSP bits in byte-sized
+groups while retaining emulation-prevention validation. The segment reader uses one caller-owned player output slot.
+`HlsMediaVideoUnit::feed_spans` borrows the complete AVC or HEVC Annex B
+feed, including any inserted parameter sets. Its spans remain valid while the
+video unit is retained.
+AVC delimiter lookbehind uses compact indices into four retained PES clocks.
 Units are released only after EOF and both the video and audio assemblers drain. Defaults: 64 MiB
 source, 64 MiB feed, 8,192 access units. A failed reader releases its source;
 retry with a new reader.

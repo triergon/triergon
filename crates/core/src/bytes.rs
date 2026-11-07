@@ -528,12 +528,17 @@ mod tests {
     use super::nonzero_prefix_len;
 
     #[test]
-    fn nonzero_prefix_stops_at_the_first_zero_in_words_and_tails() {
-        for length in 0..32 {
-            for zero in 0..=length {
-                let mut data = [1; 33];
-                data[zero + 1] = 0;
-                assert_eq!(nonzero_prefix_len(&data[1..length + 1]), zero);
+    fn nonzero_prefix_stops_at_the_first_zero_in_groups_and_tails() {
+        for fill in [1, 0x80, 0xff] {
+            for offset in 0..16 {
+                for length in 0..=80 {
+                    for zero in 0..=length {
+                        let mut data = [fill; 97];
+                        data[offset + zero] = 0;
+                        let view = &data[offset..offset + length];
+                        assert_eq!(nonzero_prefix_len(view), zero);
+                    }
+                }
             }
         }
     }

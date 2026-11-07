@@ -74,6 +74,8 @@ calculation without heap allocation. Rounded views (`to_ticks`, `to_i64_ticks`,
 `to_nanoseconds`, `TimeBase::rescale`) take an explicit `Rounding`:
 `TowardZero`, `AwayFromZero`, `Floor`, `Ceil` or `NearestAway`. Results that do
 not fit return `Error::Overflow`; a zero timebase or denominator is `Invalid`.
+Clock projections use checked 64-bit multiplication and division when
+the scaled magnitude fits, with the selected rounding policy.
 
 **Budget and storage.** `Budget::new(limit)` creates one accounting pool; clones
 share it. Its limit includes its own fixed control block

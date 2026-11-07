@@ -341,7 +341,7 @@ where
             limits.transport,
             matches!(tracks, TrackSelection::Media(_)),
         )?;
-        let mut player = Player::new(
+        let mut player = Player::new_direct(
             engine,
             owner,
             Selection::All,
@@ -907,6 +907,61 @@ mod tests {
     use super::*;
     use crate::ByteSource;
     use triergon_core::{Bytes, SourceCapabilities, SourceId};
+
+    #[test]
+    fn borrowed_media_spans_match_contiguous_feed_after_reader_drop() {
+        let fixture = include_bytes!("../tests/fixtures/hls/baseline-stereo.ts");
+        let pool = Budget::new(1024 * 1024).unwrap();
+        let source = SourceId(1);
+        let cursor = InputCursor::new(
+            &pool,
+            source,
+            SourceCapabilities {
+                length: Some(fixture.len() as u64),
+                random_access: false,
+            },
+            4096,
+        )
+        .unwrap();
+        let bytes = Bytes::copy_from_slice(&pool, fixture).unwrap();
+        let mut reader = HlsMediaSegmentReader::new(
+            cursor,
+            ByteSource::new(source, bytes, 4096).unwrap(),
+            HlsMediaProfile {
+                video: HlsVideoCodec::Avc,
+                audio: Some(HlsAudioCodec::Aac),
+            },
+            HlsSegmentLimits::default(),
+        )
+        .unwrap();
+        let cancel = AtomicBool::new(false);
+        for _ in 0..10_000 {
+            if matches!(
+                reader.advance(&mut WorkBudget::new(4096), &cancel).unwrap(),
+                HlsSegmentProgress::Ready
+            ) {
+                break;
+            }
+        }
+        let segment = reader.take(&cancel).unwrap().unwrap();
+        drop(reader);
+        let foreign_pool = Budget::new(4096).unwrap();
+        let mut video_units = 0;
+        for unit in segment.access_units() {
+            if let HlsFeedUnit::Video(unit) = unit {
+                let borrowed = unit.feed_spans().flatten().copied().collect::<Vec<_>>();
+                assert_eq!(borrowed, unit.contiguous_feed(&pool).unwrap().as_ref());
+                assert!(matches!(
+                    unit.contiguous_feed(&foreign_pool),
+                    Err(Error::ForeignPool)
+                ));
+                video_units += 1;
+            }
+        }
+        assert!(video_units > 0);
+        drop(segment);
+        assert_eq!(pool.used(), Budget::control_storage_bytes());
+    }
 
     #[test]
     fn suppressed_source_events_still_charge_the_player_event_limit() {
