@@ -11,7 +11,7 @@ release ([reference pins](quality.md#reference-and-corpus)).
 | Area | Implemented | Verified against FFmpeg | Runtime | Memory | Open |
 |---|---|---|---|---|---|
 | Core | Charged storage, exact time, input windows, work budgets | 51,235 exact-arithmetic cases against an independent oracle | via dependents | via dependents | 32-bit target runs, fuzzing |
-| Matroska / WebM | Incremental reader: lacing, header removal, bounded zlib, Cues and preroll, colour and static HDR, chapters, tags, attachments, side data | 116 workloads in six feature groups, including an external HDR sample | 1.1924 (116/116 within 1.20) | heap ≤0.627, total RSS ≤0.965 | full EBML/Matroska scope, broader FATE coverage |
+| Matroska / WebM | Incremental reader: lacing, header removal, bounded zlib, Cues and preroll, colour and static HDR, chapters, tags, attachments, side data | 116 workloads in six feature groups, including an external HDR sample, and four FATE demux comparisons | 1.1924 (116/116 within 1.20) | heap ≤0.627, total RSS ≤0.965 | full EBML/Matroska scope, broader FATE coverage |
 | Matroska startup and seek | Startup and seek with lazy scan replay | 44 cases, 1,344 packets | 1.1875 (44/44 within 1.20) | heap ≤0.404, total RSS ≤0.845 | — |
 | Matroska Cues and preroll | Validated Cue positions, bounded fallback scans and all-track preroll | 8 cases with fresh, repeated and after-EOF seeks | 1.1849 (8/8 within 1.20) | heap ≤0.182, total RSS ≤0.910 | broader Matroska and FATE coverage |
 | Matroska audio clocks | AAC, AC-3, E-AC-3 startup and forward clocks | 10 inputs | 0.17 | heap 0.07, RSS 0.60 | audio seek |
@@ -41,6 +41,7 @@ samples are archived, their SHA-256. Update the row in the same change as the re
 | Area | Revision | Raw samples SHA-256 |
 |---|---|---|
 | Matroska / WebM | `9f541bc475adbeb7faa2a69be1d364d88c12cde5` | `c5f98c04c695b7f7808f483964cc707ce58805c2a124022bd739653d0ede6553` |
+| Matroska FATE demux comparisons | `9f541bc475adbeb7faa2a69be1d364d88c12cde5` | `5f73707d4dc7d8a5689d301dcfd894ea4939523bd54259c900ecb53b8a7aa95a` |
 | Matroska startup and seek | `9f541bc475adbeb7faa2a69be1d364d88c12cde5` | `79b4c35e628bf7a3b043046219d4ebf30d3840049c1632546f20ac41545f7196` |
 | Matroska Cues and preroll | `9f541bc475adbeb7faa2a69be1d364d88c12cde5` | `79b4c35e628bf7a3b043046219d4ebf30d3840049c1632546f20ac41545f7196` |
 | ISO BMFF / MP4 | `f958c0b9624a8b7c7bd91b7d2a0c30299ae1dbed` | `fd718807e0ec1e6287bcb690226bf7056b79985796e74eba54f43544a034bc2c` |
