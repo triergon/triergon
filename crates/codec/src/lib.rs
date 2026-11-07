@@ -11,10 +11,12 @@
 // Pending: `missing_docs`.
 
 pub mod layout;
+mod window;
 
 pub use layout::{ChannelLayout, Speaker};
 pub use triergon_core::{Budget, BudgetVec, Charged, Error as StorageError, Reservation};
 pub use triergon_pixel::{Colour, PictureView, Plane};
+pub use window::kbd_window;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum VideoCodec {

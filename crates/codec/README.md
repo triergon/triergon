@@ -2,9 +2,11 @@
 
 The decoder vocabulary shared by the codec crates: the `VideoDecoder` and
 `AudioDecoder` traits, decoded audio as `AudioFrame` with a `ChannelLayout` of
-`Speaker`s, stream downmix metadata and the codec selectors. It sits in the codec
+`Speaker`s, stream downmix metadata, the codec selectors and the Kaiser-Bessel-derived
+window the AAC and AC-3 filterbanks share. It sits in the codec
 layer below the five decoders and depends only on
-[triergon-pixel](../pixel/README.md), whose picture views (`PictureView`, `Plane`,
+[triergon-core](../core/README.md), whose storage types it re-exports for the
+decoders' budgets, and [triergon-pixel](../pixel/README.md), whose picture views (`PictureView`, `Plane`,
 `Colour`) it re-exports. It contains no decoder; sessions and workers drive the
 decoders only through these traits.
 
@@ -48,6 +50,8 @@ Implementations: `triergon_codec_h264::Decoder` and `triergon_codec_hevc::Decode
 | `Speaker` | loudspeaker position; `name()` gives FFmpeg's short name, `mask()` its `AV_CH_*` bit |
 | `DownmixLevels` | `center`, `surround`, `lfe` gains and `SurroundEncoding` (`None`, `Dolby`, `ProLogicII`) |
 | `DecodeFailure` | the refusing codec error's `Debug` text; `from_error` builds one |
+| `AudioFrame::try_resize` | sizes the planes, charging the frame's capacity to a decoder's `Reservation` first |
+| `kbd_window` | rising half of a Kaiser-Bessel-derived window of any length and alpha |
 
 ### Channel order
 

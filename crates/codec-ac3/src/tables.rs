@@ -118,39 +118,12 @@ pub(crate) fn spx_atten(code: usize, bin: usize) -> f32 {
     2f64.powf(-(((code + 1) * (bin + 1)) as f64) / 15.0) as f32
 }
 
-/// Modified Bessel function of the first kind, order 0 (power series).
-fn bessel_i0(x: f64) -> f64 {
-    let mut sum = 1.0;
-    let mut term = 1.0;
-    let q = x * x / 4.0;
-    for k in 1..200 {
-        term *= q / (k as f64 * k as f64);
-        sum += term;
-        if term < sum * 1e-17 {
-            break;
-        }
-    }
-    sum
-}
-
-/// First half (256 values) of the 512-point transform window of A/52:2018 Table 7.33.
-/// The printed table is a Kaiser-Bessel-derived window with alpha = 5; it is regenerated
-/// here at full precision (checked against the 5-decimal printed values in a test).
+/// First half (256 values) of the 512-point transform window of A/52:2018 Table 7.33,
+/// a Kaiser-Bessel-derived window with alpha = 5 regenerated at full precision
+/// (checked against the 5-decimal printed values in a test).
 pub(crate) fn kbd_window() -> [f32; 256] {
-    const M: usize = 256;
-    let alpha = 5.0f64;
-    let mut kernel = [0f64; M + 1];
-    for (j, k) in kernel.iter_mut().enumerate() {
-        let r = 2.0 * j as f64 / M as f64 - 1.0;
-        *k = bessel_i0(core::f64::consts::PI * alpha * (1.0 - r * r).max(0.0).sqrt());
-    }
-    let total: f64 = kernel.iter().sum();
-    let mut w = [0f32; M];
-    let mut acc = 0.0;
-    for n in 0..M {
-        acc += kernel[n];
-        w[n] = (acc / total).sqrt() as f32;
-    }
+    let mut w = [0f32; 256];
+    triergon_codec::kbd_window(5.0, &mut w);
     w
 }
 
