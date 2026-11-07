@@ -1692,7 +1692,7 @@ impl TsEngine {
         &mut self,
         index: usize,
         mut packet: ts::TransportPacket,
-        context: NativeSourceContext,
+        context: SourceContext,
         ready: Option<(&mut WorkBudget, &AtomicBool)>,
     ) -> Result<bool> {
         let track = &mut self.native_tracks.as_mut_slice()[index];
@@ -1724,8 +1724,8 @@ impl TsEngine {
         Ok(true)
     }
 
-    fn native_source_context(&self) -> NativeSourceContext {
-        NativeSourceContext {
+    fn native_source_context(&self) -> SourceContext {
+        SourceContext {
             source_event_ordinal: self.event_ordinal,
             epochs: self.stream.source_epochs(),
             byte_run_epoch: None,
@@ -1763,7 +1763,7 @@ impl TsEngine {
                             && let Some(observer) = tracks.as_mut_slice()[index].observer.as_mut()
                             && run.append_ready(
                                 observer,
-                                NativeSourceContext {
+                                SourceContext {
                                     source_event_ordinal,
                                     epochs,
                                     byte_run_epoch: None,
@@ -1824,7 +1824,7 @@ impl TsEngine {
             .native_packet_clock
             .as_mut()
             .ok_or(Error::Invalid("native TS packet before program discovery"))?;
-        let Some(clock) = projector.project_native_header(
+        let Some(clock) = projector.project_header(
             packet.pid,
             packet.source_epochs,
             packet.time_header(),

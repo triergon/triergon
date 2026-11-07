@@ -1,6 +1,5 @@
 use super::*;
-use crate::clock::NativeClockProfile;
-use crate::native_pes::{NativePesScope, NativePesSpan, NativeRegisteredCarriage};
+use crate::compat::pes::{DemuxProfile, DemuxScope, DemuxSpan, RegisteredCarriage};
 use triergon_core::{InputWindow, SourceCapabilities};
 
 const PID: u16 = 256;
@@ -16,8 +15,8 @@ fn carrier(counter: u8, start: bool) -> [u8; TS188_BYTES] {
     ts
 }
 
-fn context(ordinal: u64, epochs: SourceEpochs) -> NativeSourceContext {
-    NativeSourceContext {
+fn context(ordinal: u64, epochs: SourceEpochs) -> SourceContext {
+    SourceContext {
         source_event_ordinal: ordinal,
         epochs,
         byte_run_epoch: None,
@@ -37,7 +36,7 @@ fn provide(input: &mut InputCursor, bytes: &[u8]) {
 struct PayloadFeed {
     stream: TransportStream,
     input: InputCursor,
-    observer: NativePesObserver,
+    observer: DemuxObserver,
 }
 
 impl PayloadFeed {
@@ -92,9 +91,9 @@ impl PayloadFeed {
             assembler.poll_source::<false>(&mut work, &cancel).unwrap(),
             AssemblyStep::NeedPayload
         ));
-        let mut observer = NativePesObserver::new_registered(
-            NativeClockProfile::ArchivedPesV1,
-            NativePesScope {
+        let mut observer = DemuxObserver::new_registered(
+            DemuxProfile::PesPackets,
+            DemuxScope {
                 program: 1,
                 pid: PID,
                 stream_type: 0x1b,
@@ -102,7 +101,7 @@ impl PayloadFeed {
                 entity: SOURCE,
                 epochs,
             },
-            NativeRegisteredCarriage::Avc,
+            RegisteredCarriage::Avc,
             pool.clone(),
             limits,
         )
@@ -165,7 +164,7 @@ impl PayloadFeed {
             .unwrap()
     }
 
-    fn finish_native(&mut self) -> crate::native_pes::NativePesPacket {
+    fn finish_native(&mut self) -> crate::compat::pes::DemuxPacket {
         self.observer.end_of_source().unwrap();
         let AssemblyStep::Output(packet) = self
             .observer
@@ -245,7 +244,7 @@ fn payload_run_preserves_work_boundary_and_span_provenance() {
     }
 }
 
-const TWO_AFTER_GROWTH: u64 = (4 + 8) * size_of::<NativePesSpan>() as u64 + 2 * PAYLOAD_RUN_WORK;
+const TWO_AFTER_GROWTH: u64 = (4 + 8) * size_of::<DemuxSpan>() as u64 + 2 * PAYLOAD_RUN_WORK;
 
 fn full_payload_arena() -> PayloadFeed {
     let mut start = carrier(0, true);

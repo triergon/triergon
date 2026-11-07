@@ -1,7 +1,7 @@
 //! Composed selected-program TS -> PSI -> PES source operation. No codec AU work.
 use crate::carrier::{PLAIN_PAYLOAD_BYTES, TS188_BYTES, payload_only_continuation};
+use crate::compat::pes::{DemuxObserver, ReadyContinuation, SourceContext};
 use crate::framer::FramedCarrier;
-use crate::native_pes::{NativePesObserver, NativeSourceContext, ReadyContinuation};
 use crate::psi::{
     DescriptorNamespace, PatCollector, PatReader, PatTable, PmtReader, ProgramMap, Section,
     TableStep,
@@ -86,8 +86,8 @@ impl FeedCarrier<'_> {
     /// An unhandled carrier remains available for ordinary delivery.
     pub fn append_ready_continuation(
         self,
-        observer: &mut NativePesObserver,
-        context: NativeSourceContext,
+        observer: &mut DemuxObserver,
+        context: SourceContext,
         work: &mut WorkBudget,
         cancel: &AtomicBool,
     ) -> Result<ReadyContinuation> {
@@ -144,8 +144,8 @@ impl FeedPayloadRun<'_> {
     /// ordinary carrier path.
     pub fn append_ready(
         self,
-        observer: &mut NativePesObserver,
-        context: NativeSourceContext,
+        observer: &mut DemuxObserver,
+        context: SourceContext,
         maximum: usize,
         work: &mut WorkBudget,
     ) -> Result<bool> {
