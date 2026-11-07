@@ -55,6 +55,40 @@ struct Case {
     events: &'static [ExpectedEvent],
 }
 
+/// What a fixture row leaves unstated: nothing supplied, nothing expected.
+const EMPTY: Case = Case {
+    id: "",
+    format: Format::Utf8Packet,
+    encoding: Encoding::Utf8,
+    payload: &[],
+    codec_id: None,
+    codec_private: None,
+    charset_label: None,
+    addition: None,
+    start: None,
+    duration: None,
+    clock: None,
+    input_limit: None,
+    error: None,
+    events: &[],
+};
+
+/// What an expected event leaves unstated.
+const EMPTY_EVENT: ExpectedEvent = ExpectedEvent {
+    kind: ExpectedKind::Cue,
+    raw: (0, 0),
+    text: (0, 0),
+    decoded: None,
+    encoding: Encoding::Utf8,
+    identifier: None,
+    settings: None,
+    comments: None,
+    start: None,
+    end: None,
+    duration: None,
+    modifiers: &[],
+};
+
 #[path = "text-fixtures/fixtures/cases.rs"]
 mod cases;
 
