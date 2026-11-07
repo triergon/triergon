@@ -8701,6 +8701,52 @@
      "sha256": "ea064f0510957eac949d91b14646c4f2d2413fe2dec550403e5123b54245dd35"
     }
    ]
+  },
+  {
+   "name": "grouped-hls-digest-comparison",
+   "path": "grouped-hls-digest-comparison",
+   "retention": "retained",
+   "reason": "Grouped HLS digest comparison",
+   "key": "evidence/grouped-hls-digest-comparison/135137b0b06c55995dccb4941ddc644c198ad267dfc1667ce3ef654b147ebacc.tar.gz",
+   "sha256": "135137b0b06c55995dccb4941ddc644c198ad267dfc1667ce3ef654b147ebacc",
+   "files": [
+    {
+     "path": "grouped-hls-digest-comparison/FINAL-STATE.txt",
+     "sha256": "f247a76b2893208aae7751dbf51f4c495efacfb6d9e743802870300f31ac45c8"
+    },
+    {
+     "path": "grouped-hls-digest-comparison/HOST.log",
+     "sha256": "90dea1424a9162ed935512ebd7b25b0f5ce5f0a086f62f32ce9ec546568f3c0a"
+    },
+    {
+     "path": "grouped-hls-digest-comparison/NATIVE-EXIT.txt",
+     "sha256": "4355a46b19d348dc2f57c046f8ef63d4538ebb936000f3c9ee954a27460dd865"
+    },
+    {
+     "path": "grouped-hls-digest-comparison/NATIVE-RESULTS.sha256",
+     "sha256": "eb4d31e6101479a8e64f8a697ee26954895b2359197194d1dd08ec08c0eb1274"
+    },
+    {
+     "path": "grouped-hls-digest-comparison/NATIVE-RESULTS.tar.gz",
+     "sha256": "23caa3b0891437058479f52cfd314577c3dbb80be95fc4f605f45c87ce24fa5d"
+    },
+    {
+     "path": "grouped-hls-digest-comparison/NATIVE.log",
+     "sha256": "4ec7304032eb34452c9bc4ca33ef498376708269ecb7a9eafab12161f2d542e8"
+    },
+    {
+     "path": "grouped-hls-digest-comparison/PER-TRACK-VIEWS.patch",
+     "sha256": "4ed72208280541a61316813d0e25b6e8a8dd496ad41378c02da96cdd1529daf1"
+    },
+    {
+     "path": "grouped-hls-digest-comparison/QUALIFICATION.json",
+     "sha256": "2a2733af097abc44d0fca46ed70e4db6ce83a75f11b714d1c9247edd01d3485d"
+    },
+    {
+     "path": "grouped-hls-digest-comparison/SOURCE.bundle",
+     "sha256": "80108f59492d82d575e4e7e250ad9614d5d873fec0bae8765e2c5a90837722d9"
+    }
+   ]
   }
  ]
 }
