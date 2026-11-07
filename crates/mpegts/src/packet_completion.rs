@@ -2,13 +2,13 @@
 //!
 //! H.222.0 (08/2023) 2.4.3.3 and 2.4.4 distinguish control PIDs/sections
 //! from PES payload. No validated PES scope, source table, timestamp or clock
-//! can be constructed from this operation's receipt. Non-control payload needs
+//! can be constructed from this operation's confirmation. Non-control payload needs
 //! the existing real-scope observer; it can never select an empty fallback.
-use crate::native_pes::NativeSourceContext;
+use crate::demux_pes::SourceContext;
 use crate::psi::{PatReader, PatSection, Section, SectionAssembler, TableStep};
 use crate::{
-    AssemblyStep, FaultKind, MediaEntityEndV1, NullCarrierRun, PacketFormat, ParseLimits,
-    TraceEvent, TraceFault, TransportInspection, TransportInspector, TransportPacket,
+    AssemblyStep, FaultKind, MediaEntityEnd, NullCarrierRun, PacketFormat, ParseLimits, TraceEvent,
+    TraceFault, TransportInspection, TransportInspector, TransportPacket,
 };
 use std::sync::atomic::{AtomicBool, Ordering};
 use triergon_core::{
@@ -17,7 +17,7 @@ use triergon_core::{
 };
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum NativeControlCarrierKindV1 {
+pub enum ControlCarrierKind {
     PatPid,
     PmtSection { association: usize },
     NullPid,
@@ -25,46 +25,46 @@ pub enum NativeControlCarrierKindV1 {
     RequiresScopedPacketObserver,
 }
 #[derive(Debug)]
-pub struct NativePhysicalCarrierV1 {
+pub struct PhysicalCarrier {
     packet: TransportPacket,
-    context: NativeSourceContext,
-    kind: NativeControlCarrierKindV1,
+    context: SourceContext,
+    kind: ControlCarrierKind,
 }
-impl NativePhysicalCarrierV1 {
+impl PhysicalCarrier {
     pub fn packet(&self) -> &TransportPacket {
         &self.packet
     }
-    pub fn context(&self) -> NativeSourceContext {
+    pub fn context(&self) -> SourceContext {
         self.context
     }
-    pub fn kind(&self) -> NativeControlCarrierKindV1 {
+    pub fn kind(&self) -> ControlCarrierKind {
         self.kind
     }
 }
 /// Physical carrier evidence compacted by the opt-in source poll.
 #[derive(Debug)]
-pub struct NativePhysicalNullRun {
+pub struct PhysicalNullRun {
     run: NullCarrierRun,
-    first_context: NativeSourceContext,
+    first_context: SourceContext,
 }
-impl NativePhysicalNullRun {
+impl PhysicalNullRun {
     pub fn run(&self) -> &NullCarrierRun {
         &self.run
     }
-    pub fn first_context(&self) -> NativeSourceContext {
+    pub fn first_context(&self) -> SourceContext {
         self.first_context
     }
 }
 #[derive(Debug)]
-pub struct NativeControlPatFactV1 {
+pub struct ControlPatFact {
     section: PatSection,
-    context: NativeSourceContext,
+    context: SourceContext,
 }
-impl NativeControlPatFactV1 {
+impl ControlPatFact {
     pub fn section(&self) -> &PatSection {
         &self.section
     }
-    pub fn context(&self) -> NativeSourceContext {
+    pub fn context(&self) -> SourceContext {
         self.context
     }
 }
@@ -80,15 +80,15 @@ struct ControlRoute {
 }
 /// Proof of absence of media carriers, not proof of a source-validated PES scope.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub struct NativeNoMediaReceiptV1 {
+pub struct NoMediaConfirmation {
     source: SourceId,
     source_bytes: u64,
     physical_carriers: usize,
     pat_facts: usize,
     pmt_sections: usize,
-    source_finished: NativeSourceContext,
+    source_finished: SourceContext,
 }
-impl NativeNoMediaReceiptV1 {
+impl NoMediaConfirmation {
     pub fn source(self) -> SourceId {
         self.source
     }
@@ -104,30 +104,30 @@ impl NativeNoMediaReceiptV1 {
     pub fn pmt_sections(self) -> usize {
         self.pmt_sections
     }
-    pub fn source_finished(self) -> NativeSourceContext {
+    pub fn source_finished(self) -> SourceContext {
         self.source_finished
     }
 }
 #[derive(Debug)]
-pub struct NativePacketCompletionV1 {
+pub struct PacketCompletion {
     budget: Budget,
     limits: ParseLimits,
     program: u16,
     format: PacketFormat,
     source: Option<SourceId>,
     next_offset: u64,
-    last_context: Option<NativeSourceContext>,
-    carriers: BudgetVec<NativePhysicalCarrierV1>,
-    null_runs: BudgetVec<NativePhysicalNullRun>,
+    last_context: Option<SourceContext>,
+    carriers: BudgetVec<PhysicalCarrier>,
+    null_runs: BudgetVec<PhysicalNullRun>,
     compact_carrier_count: usize,
-    pats: BudgetVec<NativeControlPatFactV1>,
+    pats: BudgetVec<ControlPatFact>,
     routes: BudgetVec<ControlRoute>,
-    diagnostics: BudgetVec<(TraceFault, NativeSourceContext)>,
+    diagnostics: BudgetVec<(TraceFault, SourceContext)>,
     no_media_blocker: Option<Error>,
     fault: Option<Error>,
-    physical_end: Option<MediaEntityEndV1>,
-    source_finished: Option<NativeSourceContext>,
-    receipt: Option<NativeNoMediaReceiptV1>,
+    physical_end: Option<MediaEntityEnd>,
+    source_finished: Option<SourceContext>,
+    confirmation: Option<NoMediaConfirmation>,
     pat_pid_seen: bool,
 }
 fn check_cancel(cancel: &AtomicBool) -> Result<()> {
@@ -137,7 +137,7 @@ fn check_cancel(cancel: &AtomicBool) -> Result<()> {
         Ok(())
     }
 }
-impl NativePacketCompletionV1 {
+impl PacketCompletion {
     pub fn new(budget: Budget, limits: ParseLimits, program: u16) -> Result<Self> {
         if program == 0 {
             return Err(Error::Invalid("packet completion selected program"));
@@ -161,32 +161,32 @@ impl NativePacketCompletionV1 {
             fault: None,
             physical_end: None,
             source_finished: None,
-            receipt: None,
+            confirmation: None,
             pat_pid_seen: false,
         })
     }
     /// Individually admitted carriers. With compact polling, merge these
     /// with physical_null_runs by source offset for the complete evidence.
-    pub fn physical_carriers(&self) -> &[NativePhysicalCarrierV1] {
+    pub fn physical_carriers(&self) -> &[PhysicalCarrier] {
         self.carriers.as_slice()
     }
-    pub fn physical_null_runs(&self) -> &[NativePhysicalNullRun] {
+    pub fn physical_null_runs(&self) -> &[PhysicalNullRun] {
         self.null_runs.as_slice()
     }
     pub fn physical_carrier_count(&self) -> usize {
         self.carriers.len() + self.compact_carrier_count
     }
-    pub fn raw_pat_facts(&self) -> &[NativeControlPatFactV1] {
+    pub fn raw_pat_facts(&self) -> &[ControlPatFact] {
         self.pats.as_slice()
     }
-    pub fn source_diagnostics(&self) -> &[(TraceFault, NativeSourceContext)] {
+    pub fn source_diagnostics(&self) -> &[(TraceFault, SourceContext)] {
         self.diagnostics.as_slice()
     }
-    pub fn receipt(&self) -> Option<NativeNoMediaReceiptV1> {
-        self.receipt
+    pub fn confirmation(&self) -> Option<NoMediaConfirmation> {
+        self.confirmation
     }
     /// Explicit physical format. The default constructor stays TS188.
-    pub fn new_for_format_v2(
+    pub fn new_for_format(
         budget: Budget,
         limits: ParseLimits,
         program: u16,
@@ -203,14 +203,14 @@ impl NativePacketCompletionV1 {
         self.no_media_blocker
     }
     /// Only the exact last admitted physical carrier can bypass a no-scope guard.
-    pub fn is_control_transport_v1(&self, pid: u16, context: NativeSourceContext) -> bool {
+    pub fn is_control_transport(&self, pid: u16, context: SourceContext) -> bool {
         self.carriers.as_slice().last().is_some_and(|r| {
             r.packet.pid == pid
                 && r.context == context
-                && r.kind != NativeControlCarrierKindV1::RequiresScopedPacketObserver
+                && r.kind != ControlCarrierKind::RequiresScopedPacketObserver
         })
     }
-    pub fn required_work_v1(&self, event: &TraceEvent) -> Result<u64> {
+    pub fn required_work(&self, event: &TraceEvent) -> Result<u64> {
         let bytes = match event {
             TraceEvent::Transport(_) => self.format.bytes(),
             TraceEvent::Section(s) => s.bytes().len(),
@@ -229,7 +229,7 @@ impl NativePacketCompletionV1 {
             self.no_media_blocker = Some(error);
         }
     }
-    fn check_context(&self, source: SourceId, context: NativeSourceContext) -> Result<()> {
+    fn check_context(&self, source: SourceId, context: SourceContext) -> Result<()> {
         if self.source.is_some_and(|old| old != source) {
             return Err(Error::SourceMismatch);
         }
@@ -255,7 +255,7 @@ impl NativePacketCompletionV1 {
         &mut self,
         packet: &TransportPacket,
         source: SourceId,
-        context: NativeSourceContext,
+        context: SourceContext,
         work: &mut WorkBudget,
         cancel: &AtomicBool,
     ) -> Result<()> {
@@ -341,11 +341,11 @@ impl NativePacketCompletionV1 {
                     "packet completion ambiguous PES start on PAT PID",
                 ));
             }
-            NativeControlCarrierKindV1::PatPid
+            ControlCarrierKind::PatPid
         } else if actual.pid == 0x1fff && !actual.payload_unit_start {
-            NativeControlCarrierKindV1::NullPid
+            ControlCarrierKind::NullPid
         } else if actual.payload.is_none() {
-            NativeControlCarrierKindV1::NoPayload
+            ControlCarrierKind::NoPayload
         } else if let Some(index) = self
             .routes
             .as_slice()
@@ -403,17 +403,17 @@ impl NativePacketCompletionV1 {
                     }
                 }
             }
-            NativeControlCarrierKindV1::PmtSection {
+            ControlCarrierKind::PmtSection {
                 association: route.association,
             }
         } else {
             self.block_empty(Error::Unsupported(
                 "packet completion physical payload needs validated PES observer",
             ));
-            NativeControlCarrierKindV1::RequiresScopedPacketObserver
+            ControlCarrierKind::RequiresScopedPacketObserver
         };
         self.carriers
-            .try_push(NativePhysicalCarrierV1 {
+            .try_push(PhysicalCarrier {
                 packet: actual,
                 context,
                 kind,
@@ -421,7 +421,7 @@ impl NativePacketCompletionV1 {
             .map_err(|e| e.error)?;
         Ok(())
     }
-    fn literal_section(&self, section: &Section, context: NativeSourceContext) -> Result<()> {
+    fn literal_section(&self, section: &Section, context: SourceContext) -> Result<()> {
         if !section.bytes().belongs_to(&self.budget) {
             return Err(Error::ForeignPool);
         }
@@ -479,7 +479,7 @@ impl NativePacketCompletionV1 {
     fn pat(
         &mut self,
         section: &Section,
-        context: NativeSourceContext,
+        context: SourceContext,
         work: &mut WorkBudget,
         cancel: &AtomicBool,
     ) -> Result<()> {
@@ -539,7 +539,7 @@ impl NativePacketCompletionV1 {
         // current_next/section numbers are retained literally; this is a raw
         // association fact, including inactive/incomplete tables, never a scope.
         self.pats
-            .try_push(NativeControlPatFactV1 {
+            .try_push(ControlPatFact {
                 section: decoded,
                 context,
             })
@@ -550,7 +550,7 @@ impl NativePacketCompletionV1 {
         &mut self,
         event: &TraceEvent,
         source: SourceId,
-        context: NativeSourceContext,
+        context: SourceContext,
         work: &mut WorkBudget,
         cancel: &AtomicBool,
     ) -> Result<()> {
@@ -613,11 +613,11 @@ impl NativePacketCompletionV1 {
     }
     /// false means the source event has not been consumed. Errors are sticky
     /// after admission; cancellation before the reservation leaves it retryable.
-    pub fn observe_v1(
+    pub fn observe(
         &mut self,
         event: &TraceEvent,
         source: SourceId,
-        context: NativeSourceContext,
+        context: SourceContext,
         work: &mut WorkBudget,
         cancel: &AtomicBool,
     ) -> Result<bool> {
@@ -625,7 +625,7 @@ impl NativePacketCompletionV1 {
         if let Some(e) = self.fault {
             return Err(e);
         }
-        let cost = self.required_work_v1(event)?;
+        let cost = self.required_work(event)?;
         if !work.try_charge(cost) {
             return Ok(false);
         }
@@ -642,7 +642,7 @@ impl NativePacketCompletionV1 {
     pub fn observe_null_run(
         &mut self,
         run: &NullCarrierRun,
-        context: NativeSourceContext,
+        context: SourceContext,
         work: &mut WorkBudget,
         cancel: &AtomicBool,
     ) -> Result<bool> {
@@ -660,7 +660,7 @@ impl NativePacketCompletionV1 {
         }
         Ok(true)
     }
-    fn admit_null_run(&mut self, run: &NullCarrierRun, context: NativeSourceContext) -> Result<()> {
+    fn admit_null_run(&mut self, run: &NullCarrierRun, context: SourceContext) -> Result<()> {
         let location = run.start();
         self.check_context(location.source, context)?;
         if !run.bytes().belongs_to(&self.budget) {
@@ -688,7 +688,7 @@ impl NativePacketCompletionV1 {
             .checked_add((run.len() - 1) as u64)
             .ok_or(Error::Overflow)?;
         self.null_runs
-            .try_push(NativePhysicalNullRun {
+            .try_push(PhysicalNullRun {
                 run: run.clone(),
                 first_context: context,
             })
@@ -700,14 +700,14 @@ impl NativePacketCompletionV1 {
         }
         self.source = Some(location.source);
         self.next_offset = end;
-        self.last_context = Some(NativeSourceContext {
+        self.last_context = Some(SourceContext {
             source_event_ordinal: last_ordinal,
             ..context
         });
         self.compact_carrier_count += run.len();
         Ok(())
     }
-    pub fn required_end_work_v1(&self) -> Result<u64> {
+    pub fn required_end_work(&self) -> Result<u64> {
         u64::try_from(
             self.carriers
                 .len()
@@ -718,7 +718,7 @@ impl NativePacketCompletionV1 {
         )
         .map_err(|_| Error::Overflow)
     }
-    fn end_matches(&self, end: &MediaEntityEndV1, input: &InputCursor) -> Result<()> {
+    fn end_matches(&self, end: &MediaEntityEnd, input: &InputCursor) -> Result<()> {
         if !self.budget.same_pool(input.budget()) || !self.budget.same_pool(&end.budget) {
             return Err(Error::ForeignPool);
         }
@@ -741,9 +741,9 @@ impl NativePacketCompletionV1 {
         Ok(())
     }
     /// The composed source must supply its real drained InputCursor/TS End.
-    pub fn seal_physical_end_v1(
+    pub fn seal_physical_end(
         &mut self,
-        end: &MediaEntityEndV1,
+        end: &MediaEntityEnd,
         input: &mut InputCursor,
         work: &mut WorkBudget,
         cancel: &AtomicBool,
@@ -756,7 +756,7 @@ impl NativePacketCompletionV1 {
             return Err(Error::Invalid("packet completion duplicate physical End"));
         }
         self.end_matches(end, input)?;
-        let cost = self.required_end_work_v1()?;
+        let cost = self.required_end_work()?;
         if !work.try_charge(cost) {
             return Ok(false);
         }
@@ -778,7 +778,7 @@ impl NativePacketCompletionV1 {
     }
     /// Real EOF and source Finished are mandatory even on the ordinary scoped
     /// branch. This method does not reinterpret transport failure as EOF.
-    pub fn validate_finished_v1(
+    pub fn validate_finished(
         &self,
         input: &mut InputCursor,
         work: &mut WorkBudget,
@@ -807,26 +807,26 @@ impl NativePacketCompletionV1 {
     }
     /// No metadata count, filename or empty observer selects this path. Every
     /// literal physical carrier must have a non-media classification and EOF.
-    pub fn confirm_no_media_v1(
+    pub fn confirm_no_media(
         &mut self,
         input: &mut InputCursor,
         work: &mut WorkBudget,
         cancel: &AtomicBool,
-    ) -> Result<Option<NativeNoMediaReceiptV1>> {
+    ) -> Result<Option<NoMediaConfirmation>> {
         check_cancel(cancel)?;
         if let Some(e) = self.fault {
             return Err(e);
         }
-        if self.receipt.is_some() {
+        if self.confirmation.is_some() {
             return Err(Error::Invalid(
                 "packet completion duplicate no-media receipt",
             ));
         }
-        let cost = self.required_end_work_v1()?;
+        let cost = self.required_end_work()?;
         if !work.try_charge(cost) {
             return Ok(None);
         }
-        if !self.validate_finished_v1(input, &mut WorkBudget::new(1), cancel)? {
+        if !self.validate_finished(input, &mut WorkBudget::new(1), cancel)? {
             return Err(Error::Invalid("packet completion terminal grant exhausted"));
         }
         if let Some(e) = self.no_media_blocker {
@@ -853,7 +853,7 @@ impl NativePacketCompletionV1 {
             .physical_end
             .as_ref()
             .ok_or(Error::Invalid("packet completion lost End"))?;
-        let receipt = NativeNoMediaReceiptV1 {
+        let confirmation = NoMediaConfirmation {
             source: end.location.source,
             source_bytes: end.location.offset,
             physical_carriers: self.physical_carrier_count(),
@@ -865,8 +865,8 @@ impl NativePacketCompletionV1 {
                 .source_finished
                 .ok_or(Error::Invalid("packet completion lost Finished"))?,
         };
-        self.receipt = Some(receipt);
-        Ok(Some(receipt))
+        self.confirmation = Some(confirmation);
+        Ok(Some(confirmation))
     }
 }
 

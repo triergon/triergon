@@ -74,8 +74,9 @@ impl Section {
         self.crc
     }
     /// Internal fallible clone of the actual immutable source section. It adds
-    /// no validation or acceptance and preserves the original owners and ranges.
-    pub(crate) fn try_clone_charged_v1(&self, budget: &Budget) -> Result<Self> {
+    /// no validation or acceptance and preserves the original storage and ranges.
+    #[cfg(feature = "reference-trace")]
+    pub(crate) fn try_clone_charged(&self, budget: &Budget) -> Result<Self> {
         if !self.source.belongs_to(budget) {
             return Err(Error::ForeignPool);
         }

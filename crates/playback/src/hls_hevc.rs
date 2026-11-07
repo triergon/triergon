@@ -17,8 +17,7 @@ use triergon_framing::{
 };
 use triergon_mpegts::{
     AssemblyStep,
-    clock::NativePesTimeView,
-    native_pes::{NativePesPacket, NativePesPayloadKind, NativePesSpan, NativeRegisteredCarriage},
+    compat::pes::{DemuxPacket, DemuxPayloadKind, DemuxSpan, DemuxTimeView, RegisteredCarriage},
 };
 
 const ELEMENTARY: SourceId = SourceId(0);
@@ -98,7 +97,7 @@ impl PesAnchors {
 }
 
 struct PendingPes {
-    spans: BudgetVecIntoIter<NativePesSpan>,
+    spans: BudgetVecIntoIter<DemuxSpan>,
     end: u64,
     anchor: Option<PesAnchor>,
 }
@@ -136,7 +135,7 @@ impl HlsHevc {
         config: TsNativeConfiguration,
         limits: AvcTsLimits,
     ) -> Result<Self> {
-        if config.carriage != TsNativeCarriage::Registered(NativeRegisteredCarriage::Hevc) {
+        if config.carriage != TsNativeCarriage::Registered(RegisteredCarriage::Hevc) {
             return Err(Error::Unsupported("HLS HEVC needs selected HEVC carriage"));
         }
         if !matches!(config.track, TrackKey::Ts { program, pid } if program != 0 && (1..0x1fff).contains(&pid))
@@ -192,8 +191,8 @@ impl HlsHevc {
     /// Drain to NeedPayload before offering another PES. Rejection keeps the mailbox.
     pub(crate) fn push(
         &mut self,
-        mailbox: &mut Option<NativePesPacket>,
-        clock: NativePesTimeView,
+        mailbox: &mut Option<DemuxPacket>,
+        clock: DemuxTimeView,
     ) -> Result<bool> {
         if let Some(error) = self.failure {
             return Err(error);
@@ -235,11 +234,7 @@ impl HlsHevc {
 }
 
 impl Active {
-    fn push(
-        &mut self,
-        mailbox: &mut Option<NativePesPacket>,
-        clock: NativePesTimeView,
-    ) -> Result<bool> {
+    fn push(&mut self, mailbox: &mut Option<DemuxPacket>, clock: DemuxTimeView) -> Result<bool> {
         if self.eof {
             return Err(Error::Invalid("HLS HEVC input after EOF"));
         }
@@ -255,13 +250,13 @@ impl Active {
                 pid: packet.pid,
             })
             || packet.source_epochs.configuration != self.config.configuration_epoch
-            || packet.native_stream_id & 0xf0 != 0xe0
-            || packet.source_header.stream_id != packet.native_stream_id
+            || packet.stream_id & 0xf0 != 0xe0
+            || packet.source_header.stream_id != packet.stream_id
         {
             return Err(Error::Invalid("HLS HEVC PES track or configuration"));
         }
-        if packet.native_flags & 2 != 0
-            || packet.payload_kind == NativePesPayloadKind::DeclaredIncomplete
+        if packet.flags & 2 != 0
+            || packet.payload_kind == DemuxPayloadKind::DeclaredIncomplete
             || packet.payload_len == 0
             || packet.spans.is_empty()
         {
@@ -282,7 +277,7 @@ impl Active {
         }
 
         let header = packet.time_header();
-        let continuation = packet.payload_kind == NativePesPayloadKind::HeaderlessContinuation;
+        let continuation = packet.payload_kind == DemuxPayloadKind::HeaderlessContinuation;
         if continuation != header.is_none()
             || (continuation && self.last_pes != Some(packet.source_origin))
         {
@@ -506,8 +501,7 @@ mod tests {
     use super::*;
     use triergon_mpegts::{
         PacketFormat, ParseLimits, SourceEpochs,
-        clock::{NativeClockProfile, NativePesClockV1},
-        native_pes::{NativePesObserver, NativePesScope, NativeSourceContext},
+        compat::pes::{DemuxClock, DemuxObserver, DemuxProfile, DemuxScope, SourceContext},
         parse_transport,
     };
 
@@ -523,7 +517,7 @@ mod tests {
             pid: 257,
         },
         configuration_epoch: EPOCHS.configuration,
-        carriage: TsNativeCarriage::Registered(NativeRegisteredCarriage::Hevc),
+        carriage: TsNativeCarriage::Registered(RegisteredCarriage::Hevc),
     };
 
     // The first three NALs of the authored fixture are VPS, SPS and PPS.
@@ -532,17 +526,17 @@ mod tests {
 
     struct PesFixture {
         pool: Budget,
-        observer: NativePesObserver,
-        clock: NativePesClockV1,
+        observer: DemuxObserver,
+        clock: DemuxClock,
         carrier: u8,
     }
 
     impl PesFixture {
         fn new() -> Self {
             let pool = Budget::new(1 << 20).unwrap();
-            let observer = NativePesObserver::new_registered(
-                NativeClockProfile::ArchivedPesV1,
-                NativePesScope {
+            let observer = DemuxObserver::new_registered(
+                DemuxProfile::PesPackets,
+                DemuxScope {
                     program: 1,
                     pid: 257,
                     stream_type: 0x24,
@@ -550,7 +544,7 @@ mod tests {
                     entity: SOURCE,
                     epochs: EPOCHS,
                 },
-                NativeRegisteredCarriage::Hevc,
+                RegisteredCarriage::Hevc,
                 pool.clone(),
                 ParseLimits::default(),
             )
@@ -558,7 +552,7 @@ mod tests {
             Self {
                 pool,
                 observer,
-                clock: NativePesClockV1::new(1).unwrap(),
+                clock: DemuxClock::new(1).unwrap(),
                 carrier: 0,
             }
         }
@@ -572,7 +566,7 @@ mod tests {
             bytes: &[u8],
             pts: u64,
             dts: u64,
-        ) -> (Option<NativePesPacket>, NativePesTimeView) {
+        ) -> (Option<DemuxPacket>, DemuxTimeView) {
             let length = u16::try_from(13 + bytes.len()).unwrap().to_be_bytes();
             let mut pes = vec![0, 0, 1, 0xe0, length[0], length[1], 0x80, 0xc0, 10];
             pes.extend_from_slice(&timestamp(3, pts));
@@ -592,7 +586,7 @@ mod tests {
             self.observer
                 .push(
                     transport,
-                    NativeSourceContext {
+                    SourceContext {
                         source_event_ordinal: u64::from(self.carrier),
                         epochs: EPOCHS,
                         byte_run_epoch: None,
@@ -606,7 +600,7 @@ mod tests {
             };
             let view = self
                 .clock
-                .project_native_header(257, EPOCHS, packet.time_header(), &mut work, &NO)
+                .project_header(257, EPOCHS, packet.time_header(), &mut work, &NO)
                 .unwrap()
                 .unwrap();
             (Some(packet), view)

@@ -15,7 +15,7 @@ struct Observed {
         SourceEpochs,
         Vec<triergon_mpegts::SourceRange>,
     )>,
-    native: String,
+    compat: String,
     packets: u64,
     discontinuities: usize,
 }
@@ -42,10 +42,10 @@ fn run_format(
     .unwrap();
     let mut source =
         TransportStream::new(budget.clone(), format, ParseLimits::default(), 1).unwrap();
-    let mut native = NativeAdapter::new(budget.clone(), 1).unwrap();
+    let mut compat = DemuxAdapter::new(budget.clone(), 1).unwrap();
     if bound {
         bind_finite_startup(
-            &mut native,
+            &mut compat,
             &mut input,
             &budget,
             entities[0].0,
@@ -83,28 +83,28 @@ fn run_format(
                     "source fixture must stay valid: {event:?}"
                 );
                 if matches!(event, TraceEvent::Finished) {
-                    native
+                    compat
                         .logical_end_with_input(&mut raw, cause, &cancel, Some(&input))
                         .unwrap();
-                    assert!(!native.failed, "{}", String::from_utf8_lossy(&raw));
+                    assert!(!compat.failed, "{}", String::from_utf8_lossy(&raw));
                     return Observed {
                         source: source_packets,
-                        native: String::from_utf8(raw).unwrap(),
-                        packets: native.packets,
+                        compat: String::from_utf8(raw).unwrap(),
+                        packets: compat.packets,
                         discontinuities,
                     };
                 }
-                native.observe_with_input(
+                compat.observe_with_input(
                     &event,
                     cause,
                     source.clock_is_quarantined(),
                     &cancel,
                     &input,
                 );
-                native
+                compat
                     .drain_with_input(&mut raw, cause, &cancel, Some(&input))
                     .unwrap();
-                assert!(!native.failed, "{}", String::from_utf8_lossy(&raw));
+                assert!(!compat.failed, "{}", String::from_utf8_lossy(&raw));
             }
             Step::Yield => {}
             Step::NeedInput(request) => {
@@ -133,7 +133,7 @@ fn run_format(
                     source.end_of_source().unwrap();
                 } else {
                     let end = source
-                        .media_entity_end_v1(&mut input, &mut WorkBudget::new(1), &cancel)
+                        .media_entity_end(&mut input, &mut WorkBudget::new(1), &cancel)
                         .unwrap()
                         .unwrap();
                     assert_eq!(end.location(), location);
@@ -148,8 +148,8 @@ fn run_format(
                         )
                         .unwrap();
                     assert!(
-                        native
-                            .media_entity_boundary_v1(
+                        compat
+                            .media_entity_boundary(
                                 &end,
                                 &mut input,
                                 discontinuity,
@@ -162,7 +162,7 @@ fn run_format(
                         source.discontinuity().unwrap();
                         if bound {
                             bind_finite_startup(
-                                &mut native,
+                                &mut compat,
                                 &mut input,
                                 &budget,
                                 entities[current].0,
@@ -197,12 +197,12 @@ fn original_contiguous_pes_keeps_all512_bytes_and_both_physical_entities() {
     );
     assert!(o.source[0].3.iter().any(|r| r.entity == SourceId(1)));
     assert!(o.source[0].3.iter().any(|r| r.entity == SourceId(2)));
-    assert!(o.native.contains("\"source\":2,\"offset\":4"));
+    assert!(o.compat.contains("\"source\":2,\"offset\":4"));
     assert!(
-        o.native
+        o.compat
             .contains("\"source_origin\":{\"source\":1,\"offset\":376}")
     );
-    assert!(o.native.contains("\"native_flags\":0"));
+    assert!(o.compat.contains("\"native_flags\":0"));
     assert_eq!(o.discontinuities, 0);
 }
 
@@ -221,10 +221,10 @@ fn original_external_map_retains_validated_configuration_without_invented_psi() 
     );
     assert!(o.source[0].3.iter().all(|r| r.entity == SourceId(2)));
     assert!(
-        o.native
+        o.compat
             .contains("\"source_origin\":{\"source\":2,\"offset\":0}")
     );
-    assert!(o.native.contains("\"native_position\":376"));
+    assert!(o.compat.contains("\"native_position\":376"));
     assert_eq!(o.discontinuities, 0);
 }
 
@@ -244,7 +244,7 @@ fn original_explicit_discontinuity_reestablishes_signalling_and_clock_config() {
     );
     assert_eq!(o.discontinuities, 1);
     assert!(
-        o.native
+        o.compat
             .contains("\"source_clock_epoch\":1,\"source_configuration_epoch\":5")
     );
 }
@@ -253,8 +253,8 @@ struct AtEnd {
     budget: Budget,
     source: TransportStream,
     input: InputCursor,
-    native: NativeAdapter,
-    end: triergon_mpegts::MediaEntityEndV1,
+    compat: DemuxAdapter,
+    end: triergon_mpegts::MediaEntityEnd,
 }
 fn at_end(bytes: &[u8]) -> AtEnd {
     let budget = Budget::new(1 << 20).unwrap();
@@ -275,7 +275,7 @@ fn at_end(bytes: &[u8]) -> AtEnd {
         1,
     )
     .unwrap();
-    let mut native = NativeAdapter::new(budget.clone(), 1).unwrap();
+    let mut compat = DemuxAdapter::new(budget.clone(), 1).unwrap();
     let cancel = AtomicBool::new(false);
     let mut ordinal = 0;
     let mut raw = Vec::new();
@@ -290,17 +290,17 @@ fn at_end(bytes: &[u8]) -> AtEnd {
                     TraceEvent::Diagnostic(_) | TraceEvent::Finished
                 ));
                 let cause = Cause::event(&event, ordinal, input.source(), source.source_epochs());
-                native.observe_with_input(
+                compat.observe_with_input(
                     &event,
                     cause,
                     source.clock_is_quarantined(),
                     &cancel,
                     &input,
                 );
-                native
+                compat
                     .drain_with_input(&mut raw, cause, &cancel, Some(&input))
                     .unwrap();
-                assert!(!native.failed, "{}", String::from_utf8_lossy(&raw));
+                assert!(!compat.failed, "{}", String::from_utf8_lossy(&raw));
                 ordinal += 1;
             }
             Step::Yield => {}
@@ -325,14 +325,14 @@ fn at_end(bytes: &[u8]) -> AtEnd {
             }
             Step::End(_) => {
                 let end = source
-                    .media_entity_end_v1(&mut input, &mut WorkBudget::new(1), &cancel)
+                    .media_entity_end(&mut input, &mut WorkBudget::new(1), &cancel)
                     .unwrap()
                     .unwrap();
                 return AtEnd {
                     budget,
                     source,
                     input,
-                    native,
+                    compat,
                     end,
                 };
             }
@@ -358,7 +358,7 @@ fn transition(
     units: u64,
     cancel: &AtomicBool,
 ) -> triergon_core::Result<bool> {
-    state.native.media_entity_boundary_v1(
+    state.compat.media_entity_boundary(
         &state.end,
         &mut state.input,
         discontinuity,
@@ -380,7 +380,7 @@ fn entity_witness_work_zero_does_not_consume_or_seal_input() {
     let used = s.budget.used();
     assert!(
         s.source
-            .media_entity_end_v1(&mut s.input, &mut WorkBudget::new(0), &live())
+            .media_entity_end(&mut s.input, &mut WorkBudget::new(0), &live())
             .unwrap()
             .is_none()
     );
@@ -393,12 +393,12 @@ fn entity_witness_cancellation_is_retryable_and_does_not_cancel_core_input() {
     let mut s = at_end(MAP);
     assert!(matches!(
         s.source
-            .media_entity_end_v1(&mut s.input, &mut WorkBudget::new(1), &cancelled()),
+            .media_entity_end(&mut s.input, &mut WorkBudget::new(1), &cancelled()),
         Err(Error::Cancelled)
     ));
     assert!(
         s.source
-            .media_entity_end_v1(&mut s.input, &mut WorkBudget::new(1), &live())
+            .media_entity_end(&mut s.input, &mut WorkBudget::new(1), &live())
             .unwrap()
             .is_some()
     );
@@ -419,7 +419,7 @@ fn advertised_length_without_a_real_source_end_cannot_create_a_witness() {
     let source = TransportStream::new(b, PacketFormat::Ts188, ParseLimits::default(), 1).unwrap();
     assert!(
         source
-            .media_entity_end_v1(&mut i, &mut WorkBudget::new(1), &live())
+            .media_entity_end(&mut i, &mut WorkBudget::new(1), &live())
             .is_err()
     );
 }
@@ -439,7 +439,7 @@ fn a_different_core_cursor_cannot_borrow_an_observed_source_end() {
     other.finish(other.source(), other.token()).unwrap();
     assert!(
         s.source
-            .media_entity_end_v1(&mut other, &mut WorkBudget::new(1), &live())
+            .media_entity_end(&mut other, &mut WorkBudget::new(1), &live())
             .is_err()
     );
 }
@@ -449,7 +449,7 @@ fn logical_eof_cannot_be_relabelled_as_a_media_boundary() {
     s.source.end_of_source().unwrap();
     assert!(
         s.source
-            .media_entity_end_v1(&mut s.input, &mut WorkBudget::new(1), &live())
+            .media_entity_end(&mut s.input, &mut WorkBudget::new(1), &live())
             .is_err()
     );
 }
@@ -461,18 +461,18 @@ fn transport_failure_after_end_remains_a_transport_failure() {
         .unwrap();
     assert!(matches!(
         s.source
-            .media_entity_end_v1(&mut s.input, &mut WorkBudget::new(1), &live()),
+            .media_entity_end(&mut s.input, &mut WorkBudget::new(1), &live()),
         Err(Error::Transport)
     ));
 }
 #[test]
-fn contiguous_transaction_work_zero_preserves_scope_and_charged_owners() {
+fn contiguous_transaction_work_zero_preserves_scope_and_charged_backings() {
     let mut s = at_end(A);
     next(&mut s, 2, Some(B.len() as u64));
-    let old = s.native.scope.unwrap().scope;
+    let old = s.compat.scope.unwrap().scope;
     let used = s.budget.used();
     assert!(!transition(&mut s, false, 0, &live()).unwrap());
-    assert_eq!(s.native.scope.unwrap().scope, old);
+    assert_eq!(s.compat.scope.unwrap().scope, old);
     assert_eq!(s.budget.used(), used);
     assert!(transition(&mut s, false, 1, &live()).unwrap());
 }
@@ -480,13 +480,13 @@ fn contiguous_transaction_work_zero_preserves_scope_and_charged_owners() {
 fn contiguous_transaction_cancel_preserves_partial_pes_for_retry() {
     let mut s = at_end(A);
     next(&mut s, 2, Some(B.len() as u64));
-    let old = s.native.scope.unwrap().scope;
+    let old = s.compat.scope.unwrap().scope;
     let used = s.budget.used();
     assert_eq!(
         transition(&mut s, false, 1, &cancelled()),
         Err(Error::Cancelled)
     );
-    assert_eq!(s.native.scope.unwrap().scope, old);
+    assert_eq!(s.compat.scope.unwrap().scope, old);
     assert_eq!(s.budget.used(), used);
     assert!(transition(&mut s, false, 1, &live()).unwrap());
 }
@@ -496,8 +496,8 @@ fn reset_work_zero_does_not_drop_partial_pes_or_signalling() {
     next(&mut s, 2, Some(NEW.len() as u64));
     let used = s.budget.used();
     assert!(!transition(&mut s, true, 0, &live()).unwrap());
-    assert!(s.native.observer.is_some());
-    assert!(s.native.scope.is_some());
+    assert!(s.compat.observer.is_some());
+    assert!(s.compat.scope.is_some());
     assert_eq!(s.budget.used(), used);
 }
 #[test]
@@ -509,8 +509,8 @@ fn reset_cancel_does_not_drop_partial_pes_or_signalling() {
         transition(&mut s, true, 1, &cancelled()),
         Err(Error::Cancelled)
     );
-    assert!(s.native.observer.is_some());
-    assert!(s.native.scope.is_some());
+    assert!(s.compat.observer.is_some());
+    assert!(s.compat.scope.is_some());
     assert_eq!(s.budget.used(), used);
 }
 #[test]
@@ -528,16 +528,11 @@ fn unrelated_pool_cannot_continue_an_observer() {
     )
     .unwrap();
     assert_eq!(
-        s.native.media_entity_boundary_v1(
-            &s.end,
-            &mut other,
-            false,
-            &mut WorkBudget::new(1),
-            &live()
-        ),
+        s.compat
+            .media_entity_boundary(&s.end, &mut other, false, &mut WorkBudget::new(1), &live()),
         Err(Error::ForeignPool)
     );
-    assert_eq!(s.native.scope.unwrap().scope.entity, SourceId(1));
+    assert_eq!(s.compat.scope.unwrap().scope.entity, SourceId(1));
 }
 #[test]
 fn a_generation_reset_is_not_entity_continuation() {
@@ -574,7 +569,7 @@ fn replayed_boundary_is_rejected_after_the_first_commit() {
     next(&mut s, 2, Some(188));
     assert!(transition(&mut s, false, 1, &live()).unwrap());
     assert!(transition(&mut s, false, 1, &live()).is_err());
-    assert_eq!(s.native.scope.unwrap().scope.entity, SourceId(2));
+    assert_eq!(s.compat.scope.unwrap().scope.entity, SourceId(2));
 }
 #[test]
 fn already_consumed_new_entity_cannot_be_rebound_retroactively() {
@@ -607,7 +602,7 @@ fn a_failed_new_entity_cannot_be_committed_as_contiguous_media() {
         .fail(s.input.source(), s.input.token(), SourceFailure::Transport)
         .unwrap();
     assert_eq!(transition(&mut s, false, 1, &live()), Err(Error::Transport));
-    assert_eq!(s.native.scope.unwrap().scope.entity, SourceId(1));
+    assert_eq!(s.compat.scope.unwrap().scope.entity, SourceId(1));
 }
 #[test]
 fn a_failed_new_entity_cannot_discard_old_state_as_a_reset() {
@@ -618,7 +613,7 @@ fn a_failed_new_entity_cannot_discard_old_state_as_a_reset() {
         .fail(s.input.source(), s.input.token(), SourceFailure::Transport)
         .unwrap();
     assert_eq!(transition(&mut s, true, 1, &live()), Err(Error::Transport));
-    assert!(s.native.observer.is_some());
+    assert!(s.compat.observer.is_some());
     assert_eq!(s.budget.used(), used);
 }
 #[test]
@@ -627,7 +622,7 @@ fn unknown_entity_length_does_not_imply_eof_or_reset_the_source_clock() {
     next(&mut s, 2, None);
     assert!(transition(&mut s, false, 1, &live()).unwrap());
     assert_eq!(
-        s.native.scope.unwrap().scope.epochs,
+        s.compat.scope.unwrap().scope.epochs,
         SourceEpochs {
             clock: 0,
             configuration: 2
@@ -693,9 +688,9 @@ fn a_pes_header_can_cross_an_entity_boundary_without_reparse_or_timestamp_fill()
     assert_eq!(o.packets, 1);
     assert_eq!(o.source[0].0, b"original boundary header");
     assert_eq!(o.source[0].1, Some(12345));
-    assert!(o.native.contains("\"header_source_ranges\":[{\"source\":1"));
+    assert!(o.compat.contains("\"header_source_ranges\":[{\"source\":1"));
     assert!(
-        o.native
+        o.compat
             .contains("\"source_pts_raw33\":12345,\"source_dts_raw33\":null")
     );
 }
@@ -709,7 +704,7 @@ fn unbounded_video_pes_is_flushed_only_at_the_final_logical_eof() {
     assert_eq!(o.packets, 1);
     assert_eq!(o.source[0].0, b"original unbounded media");
     assert!(
-        o.native
+        o.compat
             .contains("\"boundary\":\"LogicalEof\",\"payload_kind\":\"Unbounded\"")
     );
 }
@@ -720,7 +715,7 @@ fn explicit_reset_discards_old_partial_pes_without_emitting_a_fabricated_packet(
     assert_eq!(o.source.len(), 1);
     assert_eq!(o.source[0].0, b"lane-ts-original-payload\0\x47\xff");
     assert_eq!(o.source[0].1, Some(10));
-    assert!(!o.native.contains("\"payload_bytes\":170"));
+    assert!(!o.compat.contains("\"payload_bytes\":170"));
 }
 #[test]
 fn explicit_reset_discards_partial_psi_and_partial_pes_together() {
@@ -744,7 +739,7 @@ fn explicit_reset_allows_fresh_hevc_signalling_without_stale_avc_scope() {
     let o = run(&[(A, false), (hevc, true)], 1, 7);
     assert_eq!(o.packets, 1);
     assert_eq!(o.source.len(), 1);
-    assert!(o.native.contains("\"stream_type\":36"));
+    assert!(o.compat.contains("\"stream_type\":36"));
     assert_eq!(
         o.source[0].2,
         SourceEpochs {
@@ -754,32 +749,32 @@ fn explicit_reset_allows_fresh_hevc_signalling_without_stale_avc_scope() {
     );
 }
 #[test]
-fn contiguous_entities_preserve_the_independent_native_clock_interval() {
+fn contiguous_entities_preserve_the_independent_demux_clock_interval() {
     let first = mapped_packet((1_u64 << 32) + 100, 0, b"first clock context");
     let second = carrier(256, 1, true, &pes(10, b"same clock context", false));
     let o = run(&[(&first, false), (&second, false)], 1, 7);
     assert_eq!(o.packets, 2);
     assert_eq!(o.source[1].1, Some(10));
     assert!(
-        o.native
+        o.compat
             .contains("\"pts90\":8589934602,\"dts90\":8589934602")
     );
     assert_eq!(
-        o.native
+        o.compat
             .matches("\"first_reference_raw90\":4294967396")
             .count(),
         2
     );
 }
 #[test]
-fn explicit_reset_creates_a_new_native_clock_context_without_changing_raw_source_time() {
+fn explicit_reset_creates_a_new_demux_clock_context_without_changing_raw_source_time() {
     let first = mapped_packet((1_u64 << 32) + 100, 0, b"first clock context");
     let second = mapped_packet(10, 0, b"new clock context");
     let o = run(&[(&first, false), (&second, true)], 1, 7);
     assert_eq!(o.packets, 2);
     assert_eq!(o.source[1].1, Some(10));
-    assert!(o.native.contains("\"pts90\":10,\"dts90\":10"));
-    assert!(o.native.contains("\"first_reference_raw90\":10"));
+    assert!(o.compat.contains("\"pts90\":10,\"dts90\":10"));
+    assert!(o.compat.contains("\"first_reference_raw90\":10"));
 }
 #[test]
 fn empty_contiguous_entity_neither_flushes_nor_duplicates_a_partial_pes() {
@@ -810,7 +805,7 @@ fn repartitioning_at_packet_boundaries_preserves_original_payload_and_source_clo
 }
 
 fn bind_finite_startup(
-    native: &mut NativeAdapter,
+    compat: &mut DemuxAdapter,
     input: &mut InputCursor,
     budget: &Budget,
     bytes: &[u8],
@@ -820,7 +815,7 @@ fn bind_finite_startup(
     if format == PacketFormat::M2ts192 {
         let mut reader = std::io::Cursor::new(bytes);
         let mut buffer = [0_u8; 16 * 1024];
-        let mut startup = prepare_native_startup_v1(
+        let mut startup = prepare_demux_startup(
             &mut reader,
             input,
             budget,
@@ -830,8 +825,8 @@ fn bind_finite_startup(
             &live(),
         )
         .unwrap();
-        apply_native_startup_v1(native, &mut startup, input, epochs);
-        assert!(!native.failed && startup.eof && !startup.failure && startup.byte.is_none());
+        apply_demux_startup(compat, &mut startup, input, epochs);
+        assert!(!compat.failed && startup.eof && !startup.failure && startup.byte.is_none());
         input.finish(input.source(), input.token()).unwrap();
         return;
     }
@@ -844,17 +839,17 @@ fn bind_finite_startup(
     .unwrap();
     input.provide(&window).unwrap();
     input.finish(input.source(), input.token()).unwrap();
-    let mut job = NativeInputBootstrap::new(input, &window, format).unwrap();
+    let mut job = InputBootstrap::new(input, &window, format).unwrap();
     job.observe_entity_eof(input, window.source, &window.token, bytes.len() as u64)
         .unwrap();
     for _ in 0..100_000 {
         match job.poll(input, &mut WorkBudget::new(1), &live()).unwrap() {
-            NativeInputStep::Ready(context) => {
-                native.initial_input = Some(context);
+            InputStep::Ready(context) => {
+                compat.initial_input = Some(context);
                 return;
             }
-            NativeInputStep::Yield => {}
-            NativeInputStep::NeedEntityEof => panic!("test supplied a real complete finite entity"),
+            InputStep::Yield => {}
+            InputStep::NeedEntityEof => panic!("test supplied a real complete finite entity"),
         }
     }
     panic!("bounded finite startup did not finish");
@@ -933,25 +928,25 @@ fn reset_requires_the_actual_source_discontinuity_event() {
     }
     let event = event.unwrap();
     let cause = Cause::event(&event, 100, s.input.source(), s.source.source_epochs());
-    s.native
+    s.compat
         .observe_with_input(&event, cause, false, &live(), &s.input);
-    assert!(s.native.failed);
+    assert!(s.compat.failed);
     assert_eq!(
-        s.native.failure.as_ref().unwrap().error,
+        s.compat.failure.as_ref().unwrap().error,
         Error::Invalid("native media reset lacks actual source discontinuity")
     );
 }
 #[test]
-fn an_existing_native_nonpass_cannot_be_hidden_by_a_later_reset() {
+fn an_existing_demux_nonpass_cannot_be_hidden_by_a_later_reset() {
     let mut s = at_end(MAP);
-    s.native.fail(
+    s.compat.fail(
         Error::Unsupported("retained earlier native context"),
         Cause::boundary("test_prior_fault", s.end.location(), s.end.epochs()),
     );
     next(&mut s, 2, Some(NEW.len() as u64));
     assert!(transition(&mut s, true, 1, &live()).is_err());
     assert_eq!(
-        s.native.failure.as_ref().unwrap().error,
+        s.compat.failure.as_ref().unwrap().error,
         Error::Unsupported("retained earlier native context")
     );
 }
@@ -961,10 +956,10 @@ fn input_bound_continuation_preserves_the_existing_startup_basis_and_pes() {
     assert_eq!(o.packets, 1);
     assert_eq!(o.source[0].0.len(), 512);
     assert!(
-        o.native
+        o.compat
             .contains("\"source_origin\":{\"source\":1,\"offset\":376}")
     );
-    assert!(o.native.contains("\"native_position\":376"));
+    assert!(o.compat.contains("\"native_position\":376"));
 }
 #[test]
 fn input_bound_m2ts_entities_keep_opaque_prefixes_and_physical_source_coordinates() {
@@ -980,10 +975,10 @@ fn input_bound_m2ts_entities_keep_opaque_prefixes_and_physical_source_coordinate
     assert_eq!(o.packets, 1);
     assert_eq!(o.source[0].0.len(), 512);
     assert!(
-        o.native
+        o.compat
             .contains("\"source_origin\":{\"source\":1,\"offset\":384}")
     );
-    assert!(o.native.contains("\"native_position\":388"));
+    assert!(o.compat.contains("\"native_position\":388"));
     assert!(
         o.source[0]
             .3
@@ -1005,11 +1000,11 @@ fn input_bound_m2ts_reset_restarts_the_real_startup_evidence_for_each_context() 
     );
     assert_eq!(o.packets, 3);
     assert!(
-        o.native
+        o.compat
             .contains("\"source_origin\":{\"source\":2,\"offset\":384}")
     );
-    assert!(o.native.contains("\"native_position\":384"));
-    assert!(o.native.contains("\"native_position\":1152"));
+    assert!(o.compat.contains("\"native_position\":384"));
+    assert!(o.compat.contains("\"native_position\":1152"));
 }
 
 #[test]
@@ -1025,17 +1020,17 @@ fn input_bound_m2ts_map_applies_the_same_basis_to_a_pusi_in_the_next_entity() {
     );
     assert_eq!(o.packets, 1);
     assert!(
-        o.native
+        o.compat
             .contains("\"source_origin\":{\"source\":2,\"offset\":0}")
     );
-    assert!(o.native.contains("\"native_position\":388"));
+    assert!(o.compat.contains("\"native_position\":388"));
     assert_eq!(o.source[0].1, Some(90000));
 }
 #[test]
 fn short_contiguous_m2ts_entity_does_not_reseed_a_carrier_start_context() {
     let first = include_bytes!("../data/native-input-v1/original-valid-rebind-192.m2ts");
     let mut second = m2ts(MEDIA);
-    // The pinned original stream finishes PID256 at counter5.
+    // The original stream finishes PID256 at counter5.
     // This new derived continuation advances that counter without a reset.
     second[7] = (second[7] & 0xf0) | 6;
     let o = run_format(
@@ -1047,10 +1042,10 @@ fn short_contiguous_m2ts_entity_does_not_reseed_a_carrier_start_context() {
     );
     assert_eq!(o.packets, 3);
     assert!(
-        o.native
+        o.compat
             .contains("\"source_origin\":{\"source\":2,\"offset\":0}")
     );
-    assert!(o.native.contains("\"native_position\":1728"));
-    assert!(!o.native.contains("\"native_position\":1732"));
+    assert!(o.compat.contains("\"native_position\":1728"));
+    assert!(!o.compat.contains("\"native_position\":1732"));
     assert_eq!(o.source[2].2.clock, 0);
 }

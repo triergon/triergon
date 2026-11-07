@@ -22,16 +22,12 @@ use triergon_matroska::{
 };
 use triergon_mpegts::{
     self as ts, FeedContinuation, TraceEvent, TransportStream,
-    clock::{
-        ClockKey, NativePesClockV1, NativePesTimeView, SourceTimePolicy, SourceTimestamp,
-        source_timestamp,
-    },
+    clock::{ClockKey, SourceTimePolicy, SourceTimestamp, source_timestamp},
 };
-use ts::clock::NativeClockProfile;
-use ts::native_pes::{
-    NativeDvbSubtitlesDescriptors, NativePesObserver, NativePesPacket, NativePesScope,
-    NativePrivateAudioCarriage, NativePrivateAudioDescriptors, NativeRegisteredCarriage,
-    NativeSourceContext, ReadyContinuation,
+use ts::compat::pes::{
+    DemuxClock, DemuxObserver, DemuxPacket, DemuxProfile, DemuxScope, DemuxTimeView,
+    DvbSubtitlesDescriptors, PrivateAudioCarriage, PrivateAudioDescriptors, ReadyContinuation,
+    RegisteredCarriage, SourceContext,
 };
 use ts::psi::{DescriptorNamespace, ProgramMap};
 #[derive(Clone, Debug)]
@@ -87,7 +83,7 @@ pub struct TsEvent {
     pub source: TraceEvent,
     pub source_pts: Option<SourceTimestamp>,
     pub source_dts: Option<SourceTimestamp>,
-    pub native_clock: Option<NativePesTimeView>,
+    pub native_clock: Option<DemuxTimeView>,
     pub clock_key: Option<ClockKey>,
 }
 #[derive(Debug)]
@@ -97,10 +93,10 @@ pub struct TsEvent {
 )]
 pub enum RawEvent {
     Mp4Root(triergon_isobmff::BoxView),
-    EntityEnd(ts::MediaEntityEndV1),
+    EntityEnd(ts::MediaEntityEnd),
     NativeTs {
-        packet: NativePesPacket,
-        clock: NativePesTimeView,
+        packet: DemuxPacket,
+        clock: DemuxTimeView,
     },
     NativeTsConfiguration(TsNativeConfiguration),
     NativeRefusal {
@@ -188,20 +184,20 @@ pub struct Mp4Engine {
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct TsNativeSelection {
     pub pid: u16,
-    pub carriage: NativeRegisteredCarriage,
+    pub carriage: RegisteredCarriage,
 }
 /// Opt in to the finite private-audio packet view for one TS188 PID.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct TsNativePrivateAudioSelection {
     pub pid: u16,
-    pub carriage: NativePrivateAudioCarriage,
+    pub carriage: PrivateAudioCarriage,
 }
 
 /// Explicit packet interpretation for one selected PID of a TS program.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum TsNativeCarriage {
-    Registered(NativeRegisteredCarriage),
-    PrivateAudio(NativePrivateAudioCarriage),
+    Registered(RegisteredCarriage),
+    PrivateAudio(PrivateAudioCarriage),
     DvbSubtitles,
     /// Resolve the established AAC and private-audio profiles from each active PMT.
     AudioFromPmt,
@@ -237,7 +233,7 @@ enum TsNativeUpdate {
 
 struct TsNativeTrack {
     selection: TsNativeTrackSelection,
-    observer: Option<NativePesObserver>,
+    observer: Option<DemuxObserver>,
     update: Option<TsNativeUpdate>,
 }
 impl TsNativeTrack {
@@ -297,7 +293,7 @@ enum SegmentDiscovery {
 }
 
 pub struct TsEngine {
-    native_context: Option<ts::native_input::NativeInputContext>,
+    native_context: Option<ts::compat::input::InputContext>,
     native_prefix_failed: bool,
     pub(crate) input: InputCursor,
     stream: TransportStream,
@@ -306,7 +302,7 @@ pub struct TsEngine {
     limits: ts::ParseLimits,
     policy: SourceTimePolicy,
     namespace: DescriptorNamespace,
-    native: Option<NativePesClockV1>,
+    native: Option<DemuxClock>,
     tsid: Option<u16>,
     pcr_pid: Option<u16>,
     facts: BudgetVec<TrackFact>,
@@ -316,14 +312,14 @@ pub struct TsEngine {
     native_tracks: TsNativeTracks,
     native_active: Option<usize>,
     native_map_next: usize,
-    native_pending: Option<NativePesPacket>,
-    native_packet_clock: Option<NativePesClockV1>,
+    native_pending: Option<DemuxPacket>,
+    native_packet_clock: Option<DemuxClock>,
     event_ordinal: u64,
     suppressed_events: u64,
     native_update_at: Option<usize>,
     segment_discovery: Option<SegmentDiscovery>,
     segmented: bool,
-    boundary: Option<ts::MediaEntityEndV1>,
+    boundary: Option<ts::MediaEntityEnd>,
 }
 pub struct MkvEngine {
     reader: Reader,
@@ -565,7 +561,7 @@ impl Engine {
         let program = stream.selected_program();
         let clock = || match program {
             0 => Ok(None),
-            program => NativePesClockV1::new(program).map(Some),
+            program => DemuxClock::new(program).map(Some),
         };
         Ok(Self::Ts(TsEngine {
             native_context: None,
@@ -658,7 +654,7 @@ impl Engine {
         limits: ts::ParseLimits,
         policy: SourceTimePolicy,
         selection: TsNativeSelection,
-        context: ts::native_input::NativeInputContext,
+        context: ts::compat::input::InputContext,
     ) -> Result<Self> {
         context.validate_cursor(&input)?;
         let mut engine =
@@ -1117,7 +1113,7 @@ impl Engine {
                     r.program,
                     r.namespace,
                 )?;
-                r.native = Some(NativePesClockV1::new(r.program)?);
+                r.native = Some(DemuxClock::new(r.program)?);
                 r.tsid = None;
                 r.pcr_pid = None;
                 r.pending = None;
@@ -1130,7 +1126,7 @@ impl Engine {
                 r.native_active = None;
                 r.native_map_next = 0;
                 r.native_pending = None;
-                r.native_packet_clock = Some(NativePesClockV1::new(r.program)?);
+                r.native_packet_clock = Some(DemuxClock::new(r.program)?);
                 r.event_ordinal = 0;
                 r.native_update_at = None;
                 r.boundary = None;
@@ -1577,8 +1573,8 @@ impl TsEngine {
     fn discover_tracks(&self, map: &ProgramMap) -> Result<TsNativeTracks> {
         let mut selections = map.streams.as_slice().iter().filter_map(|stream| {
             let carriage = match stream.stream_type {
-                0x1b => TsNativeCarriage::Registered(NativeRegisteredCarriage::Avc),
-                0x24 => TsNativeCarriage::Registered(NativeRegisteredCarriage::Hevc),
+                0x1b => TsNativeCarriage::Registered(RegisteredCarriage::Avc),
+                0x24 => TsNativeCarriage::Registered(RegisteredCarriage::Hevc),
                 0x0f | 0x11 | 0x81 | 0x87 => TsNativeCarriage::AudioFromPmt,
                 0x06 if (matches!(map.descriptor_namespace, DescriptorNamespace::Dvb(_))
                     || self.segment_discovery == Some(SegmentDiscovery::MediaFeed))
@@ -1619,7 +1615,7 @@ impl TsEngine {
         spec: TsNativeTrackSelection,
         map: &ProgramMap,
         configuration_epoch: u64,
-    ) -> Result<(NativePesObserver, TsNativeCarriage)> {
+    ) -> Result<(DemuxObserver, TsNativeCarriage)> {
         let mismatch =
             Error::Unsupported("selected native carriage disagrees with accepted source PMT");
         let stream = map
@@ -1628,7 +1624,7 @@ impl TsEngine {
             .iter()
             .find(|entry| entry.pid == spec.pid)
             .ok_or(mismatch)?;
-        let mut scope = NativePesScope {
+        let mut scope = DemuxScope {
             program: self.program,
             pid: spec.pid,
             stream_type: stream.stream_type,
@@ -1639,15 +1635,15 @@ impl TsEngine {
                 configuration: configuration_epoch,
             },
         };
-        let private_audio = NativePrivateAudioDescriptors {
+        let private_audio = PrivateAudioDescriptors {
             program: map.program_descriptors.as_ref(),
             elementary: stream.descriptor_bytes.as_ref(),
         };
         let hls_audio = self.segment_discovery == Some(SegmentDiscovery::MediaFeed);
         let carriage = match spec.carriage {
             TsNativeCarriage::AudioFromPmt => match stream.stream_type {
-                0x0f => TsNativeCarriage::Registered(NativeRegisteredCarriage::AacAdts),
-                0x11 => TsNativeCarriage::Registered(NativeRegisteredCarriage::AacLatm),
+                0x0f => TsNativeCarriage::Registered(RegisteredCarriage::AacAdts),
+                0x11 => TsNativeCarriage::Registered(RegisteredCarriage::AacLatm),
                 0x06 if !hls_audio
                     && !matches!(map.descriptor_namespace, DescriptorNamespace::Dvb(_)) =>
                 {
@@ -1656,13 +1652,13 @@ impl TsEngine {
                     ));
                 }
                 0x06 | 0x81 | 0x87 => TsNativeCarriage::PrivateAudio(if hls_audio {
-                    NativePrivateAudioCarriage::from_hls_pmt(
+                    PrivateAudioCarriage::from_hls_pmt(
                         stream.stream_type,
                         private_audio,
                         self.limits,
                     )?
                 } else {
-                    NativePrivateAudioCarriage::from_observed_pmt(
+                    PrivateAudioCarriage::from_observed_pmt(
                         stream.stream_type,
                         private_audio,
                         self.limits,
@@ -1672,24 +1668,24 @@ impl TsEngine {
             },
             fixed => fixed,
         };
-        let profile = NativeClockProfile::ArchivedPesV1;
+        let profile = DemuxProfile::PesPackets;
         let pool = self.input.budget().clone();
         let observer = match carriage {
             TsNativeCarriage::Registered(carriage) => {
                 let (stream_type, stream_id) = match carriage {
-                    NativeRegisteredCarriage::Avc => (0x1b, 0xe0),
-                    NativeRegisteredCarriage::Hevc => (0x24, 0xe0),
-                    NativeRegisteredCarriage::AacAdts => (0x0f, 0xc0),
-                    NativeRegisteredCarriage::AacLatm => (0x11, 0xc0),
+                    RegisteredCarriage::Avc => (0x1b, 0xe0),
+                    RegisteredCarriage::Hevc => (0x24, 0xe0),
+                    RegisteredCarriage::AacAdts => (0x0f, 0xc0),
+                    RegisteredCarriage::AacLatm => (0x11, 0xc0),
                 };
                 if stream.stream_type != stream_type {
                     return Err(mismatch);
                 }
                 scope.stream_id = stream_id;
-                NativePesObserver::new_registered(profile, scope, carriage, pool, self.limits)
+                DemuxObserver::new_registered(profile, scope, carriage, pool, self.limits)
             }
             TsNativeCarriage::PrivateAudio(carriage) if hls_audio => {
-                NativePesObserver::new_hls_private_audio_v1(
+                DemuxObserver::new_hls_private_audio(
                     profile,
                     scope,
                     carriage,
@@ -1698,7 +1694,7 @@ impl TsEngine {
                     self.limits,
                 )
             }
-            TsNativeCarriage::PrivateAudio(carriage) => NativePesObserver::new_private_audio_v1(
+            TsNativeCarriage::PrivateAudio(carriage) => DemuxObserver::new_private_audio(
                 profile,
                 scope,
                 carriage,
@@ -1706,11 +1702,11 @@ impl TsEngine {
                 pool,
                 self.limits,
             ),
-            TsNativeCarriage::DvbSubtitles => NativePesObserver::new_dvb_subtitles_v1(
+            TsNativeCarriage::DvbSubtitles => DemuxObserver::new_dvb_subtitles(
                 profile,
                 scope,
                 map.descriptor_namespace,
-                NativeDvbSubtitlesDescriptors {
+                DvbSubtitlesDescriptors {
                     program: map.program_descriptors.as_ref(),
                     elementary: stream.descriptor_bytes.as_ref(),
                 },
@@ -1730,7 +1726,7 @@ impl TsEngine {
     ) -> Result<bool> {
         let track = &mut self.native_tracks.as_mut_slice()[index];
         if let Some(observer) = track.observer.as_mut() {
-            let context = NativeSourceContext {
+            let context = SourceContext {
                 source_event_ordinal: self.event_ordinal,
                 epochs: self.stream.source_epochs(),
                 byte_run_epoch: None,
@@ -1785,7 +1781,7 @@ impl TsEngine {
                 if let Some(index) = tracks.index(packet.pid)
                     && let Some(observer) = tracks.as_mut_slice()[index].observer.as_mut()
                 {
-                    let context = NativeSourceContext {
+                    let context = SourceContext {
                         source_event_ordinal: ordinal
                             .checked_add(omitted)
                             .ok_or(Error::Overflow)?,
@@ -1845,7 +1841,7 @@ impl TsEngine {
                 .native_packet_clock
                 .as_mut()
                 .ok_or(Error::Invalid("native TS packet before program discovery"))?;
-            let clock = projector.project_native_header(
+            let clock = projector.project_header(
                 packet.pid,
                 packet.source_epochs,
                 packet.time_header(),
@@ -1927,7 +1923,7 @@ impl TsEngine {
                         }
                         if self.segmented {
                             if let Some(end) =
-                                self.stream.media_entity_end_v1(&mut self.input, w, c)?
+                                self.stream.media_entity_end(&mut self.input, w, c)?
                             {
                                 self.boundary = Some(end.clone());
                                 return Ok(BackendStep::Event(RawEvent::EntityEnd(end)));
@@ -1967,7 +1963,7 @@ impl TsEngine {
                 && self
                     .native_context
                     .as_ref()
-                    .is_some_and(triergon_mpegts::native_input::NativeInputContext::is_prefix_v2)
+                    .is_some_and(triergon_mpegts::compat::input::InputContext::is_prefix)
             {
                 self.native_prefix_failed = true;
                 for track in self.native_tracks.as_mut_slice() {
@@ -1998,7 +1994,7 @@ impl TsEngine {
                     match observer {
                         Ok((mut observer, carriage)) => {
                             if let Some(context) = self.native_context.as_ref() {
-                                observer.bind_native_input_v1(context, &self.input)?;
+                                observer.bind_input(context, &self.input)?;
                             }
                             track.observer = Some(observer);
                             track.update = (self.segment_discovery.is_some()
@@ -2062,9 +2058,9 @@ impl TsEngine {
                 if self.program == 0 {
                     let program = self.stream.selected_program();
                     if !feed_only {
-                        self.native = Some(NativePesClockV1::new(program)?);
+                        self.native = Some(DemuxClock::new(program)?);
                     }
-                    self.native_packet_clock = Some(NativePesClockV1::new(program)?);
+                    self.native_packet_clock = Some(DemuxClock::new(program)?);
                     self.program = program;
                 }
                 self.tsid = Some(table.header.extension);

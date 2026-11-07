@@ -1,9 +1,9 @@
-//! Explicit archived-native packet operation, separate from strict source PES.
+//! The demuxer's packet operation, separate from strict source PES.
 //!
-//! Independently authored from H.222.0 source syntax and archived public-API
+//! Independently authored from H.222.0 source syntax and recorded public-API
 //! observations. Assembly consumes real input
-//! boundaries; no complete source/native output is split, repeated or repaired.
-use crate::clock::NativeClockProfile;
+//! boundaries; no complete source/demux output is split, repeated or repaired.
+use crate::demux_clock::DemuxProfile;
 use crate::pes::{HEADER_MAX, parse_header};
 use crate::{
     AssemblyStep, ParseLimits, PesHeader, SourceEpochs, SourceRange, TransportPacket, checked_pid,
@@ -14,21 +14,21 @@ use triergon_core::{
     Budget, BudgetVec, Bytes, Error, PushError, Result, SourceId, SourceLocation, WorkBudget,
 };
 
-// Public option data in the exact pin's doc/demuxers.texi, not a parser
+// Public option data in the reference's doc/demuxers.texi, not a parser
 // implementation. This operation leaves cap-boundary/split contexts unsupported
 // rather than changing the reference buffer or guessing their packet shape.
-const DEFAULT_NATIVE_PACKET_CAP: usize = 204_800;
+const DEFAULT_PACKET_CAP: usize = 204_800;
 
 mod audio;
 mod dvb;
-pub use audio::{NativePrivateAudioCarriage, NativePrivateAudioDescriptors};
-pub use dvb::NativeDvbSubtitlesDescriptors;
+pub use audio::{PrivateAudioCarriage, PrivateAudioDescriptors};
+pub use dvb::DvbSubtitlesDescriptors;
 
 /// Explicit single-program/single-PID profile from validated source signalling.
-/// Legacy pushes reject entity transitions; the explicit media transaction and
+/// Plain pushes reject entity transitions; the explicit media transaction and
 /// selected lifecycle APIs admit only their checked boundary contracts.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub struct NativePesScope {
+pub struct DemuxScope {
     pub program: u16,
     pub pid: u16,
     pub stream_type: u8,
@@ -37,17 +37,17 @@ pub struct NativePesScope {
     pub epochs: SourceEpochs,
 }
 
-/// Explicit registered transport carriage, separate from the legacy constructor's
+/// Explicit registered transport carriage, separate from the plain constructor's
 /// H264-only contract. These selected stream IDs are the observed narrow profile;
 /// this enum does not parse or identify codec access units/configuration.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum NativeRegisteredCarriage {
+pub enum RegisteredCarriage {
     Avc,
     Hevc,
     AacAdts,
     AacLatm,
 }
-impl NativeRegisteredCarriage {
+impl RegisteredCarriage {
     fn selected_signature(self) -> (u8, u8) {
         match self {
             Self::Avc => (0x1b, 0xe0),
@@ -59,16 +59,16 @@ impl NativeRegisteredCarriage {
 }
 
 /// Caller links the original strict-source event. None is an unknown source byte
-/// run, never a native-invented epoch. Event ordinals are not core I/O tokens.
+/// run, never a demux-invented epoch. Event ordinals are not core I/O tokens.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub struct NativeSourceContext {
+pub struct SourceContext {
     pub source_event_ordinal: u64,
     pub epochs: SourceEpochs,
     pub byte_run_epoch: Option<u64>,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum NativePesBoundary {
+pub enum DemuxBoundary {
     FiniteLength,
     NextPesStart,
     LogicalEof,
@@ -76,7 +76,7 @@ pub enum NativePesBoundary {
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum NativePesPayloadKind {
+pub enum DemuxPayloadKind {
     DeclaredComplete,
     DeclaredIncomplete,
     Unbounded,
@@ -86,19 +86,19 @@ pub enum NativePesPayloadKind {
 /// A span of real input, with its original transport packet and source-event
 /// context. Backing bytes and vector capacity remain shared/charged core storage.
 #[derive(Debug)]
-pub struct NativePesSpan {
+pub struct DemuxSpan {
     pub(crate) bytes: Bytes,
     pub source: SourceRange,
     pub transport: SourceRange,
-    pub context: NativeSourceContext,
+    pub context: SourceContext,
 }
-impl AsRef<[u8]> for NativePesSpan {
+impl AsRef<[u8]> for DemuxSpan {
     fn as_ref(&self) -> &[u8] {
         self.bytes.as_ref()
     }
 }
-impl NativePesSpan {
-    /// Shared immutable owner for retained-capacity accounting/deduplication.
+impl DemuxSpan {
+    /// Shared immutable storage for retained-capacity accounting/deduplication.
     pub fn backing_bytes(&self) -> &Bytes {
         &self.bytes
     }
@@ -109,33 +109,33 @@ impl NativePesSpan {
     }
 }
 
-/// This may be a corrupt/partial/headerless native packet, NEVER a complete
-/// strict-source `Pes` or a codec access unit. Native position can name the last
+/// This may be a corrupt/partial/headerless demux packet, NEVER a complete
+/// strict-source `Pes` or a codec access unit. Demux position can name the last
 /// PES-start sync even when the physical payload starts in a later packet.
 #[derive(Debug)]
-pub struct NativePesPacket {
-    pub profile: NativeClockProfile,
+pub struct DemuxPacket {
+    pub profile: DemuxProfile,
     pub program: u16,
     pub pid: u16,
     pub source_origin: SourceLocation,
     pub source_epochs: SourceEpochs,
-    pub native_position: i64,
-    pub native_flags: u32,
-    /// Native raw90-kHz duration; zero is its unknown sentinel, not source time.
-    pub native_duration90_raw: i64,
+    pub position: i64,
+    pub flags: u32,
+    /// Demux raw90-kHz duration; zero is its unknown sentinel, not source time.
+    pub duration90_raw: i64,
     /// Explicit MPEGTS stream-ID side-data byte, retained on continuations.
-    pub native_stream_id: u8,
-    pub boundary: NativePesBoundary,
-    pub payload_kind: NativePesPayloadKind,
+    pub stream_id: u8,
+    pub boundary: DemuxBoundary,
+    pub payload_kind: DemuxPayloadKind,
     /// Original valid causal PES header, including raw33/None. It is retained
-    /// even for a continuation whose native output has no applicable time header.
+    /// even for a continuation whose demux output has no applicable time header.
     pub source_header: PesHeader,
     pub header_source_ranges: BudgetVec<SourceRange>,
     pub time_header_applies: bool,
     pub payload_len: usize,
-    pub spans: BudgetVec<NativePesSpan>,
+    pub spans: BudgetVec<DemuxSpan>,
 }
-impl NativePesPacket {
+impl DemuxPacket {
     pub fn payload(&self) -> impl Iterator<Item = &[u8]> {
         self.spans.as_slice().iter().map(AsRef::as_ref)
     }
@@ -157,7 +157,7 @@ pub enum ReadyContinuation {
 #[derive(Debug)]
 struct Pending {
     packet: TransportPacket,
-    context: NativeSourceContext,
+    context: SourceContext,
     position: usize,
     counter_checked: bool,
     started: bool,
@@ -179,8 +179,8 @@ struct Growth {
 
 #[derive(Clone, Copy, Debug)]
 struct Emission {
-    boundary: NativePesBoundary,
-    kind: NativePesPayloadKind,
+    boundary: DemuxBoundary,
+    kind: DemuxPayloadKind,
     flags: u32,
     continue_without_header: bool,
 }
@@ -188,12 +188,12 @@ struct Emission {
 /// Opt-in, charged, one-transport-input mailbox. Caller keeps the strict source
 /// operation and causal events; this observer cannot replace or suppress them.
 #[derive(Debug)]
-pub struct NativePesObserver {
-    profile: NativeClockProfile,
-    scope: NativePesScope,
-    // No source owner or auxiliary queue; only selects a bounded native view.
-    private_audio: Option<NativePrivateAudioCarriage>,
-    native_input: Option<crate::native_input::NativeInputBinding>,
+pub struct DemuxObserver {
+    profile: DemuxProfile,
+    scope: DemuxScope,
+    // No source storage or auxiliary queue; only selects a bounded demux view.
+    private_audio: Option<PrivateAudioCarriage>,
+    demux_input: Option<crate::demux_input::InputBinding>,
     dvb_subtitles: bool,
     budget: Budget,
     limits: ParseLimits,
@@ -205,7 +205,7 @@ pub struct NativePesObserver {
     previous_counter: Option<u8>,
     active: bool,
     origin: Option<SourceLocation>,
-    native_position: i64,
+    position: i64,
     raw_header: [u8; HEADER_MAX],
     header_used: usize,
     header_target: usize,
@@ -216,20 +216,20 @@ pub struct NativePesObserver {
     corrupt: bool,
     payload_len: usize,
     header_ranges: BudgetVec<SourceRange>,
-    spans: BudgetVec<NativePesSpan>,
+    spans: BudgetVec<DemuxSpan>,
     output_header: BudgetVec<SourceRange>,
     growth: Option<Growth>,
     emission: Option<Emission>,
     fault: Option<Error>,
 }
-impl NativePesObserver {
+impl DemuxObserver {
     /// Explicit registered carriage.
     /// All selected kinds share the existing bounded charged assembly.
     /// Preflight is allocation-free; no source bytes, times or epochs are altered.
     pub fn new_registered(
-        profile: NativeClockProfile,
-        scope: NativePesScope,
-        carriage: NativeRegisteredCarriage,
+        profile: DemuxProfile,
+        scope: DemuxScope,
+        carriage: RegisteredCarriage,
         budget: Budget,
         limits: ParseLimits,
     ) -> Result<Self> {
@@ -251,8 +251,8 @@ impl NativePesObserver {
     }
 
     pub fn new(
-        profile: NativeClockProfile,
-        scope: NativePesScope,
+        profile: DemuxProfile,
+        scope: DemuxScope,
         budget: Budget,
         limits: ParseLimits,
     ) -> Result<Self> {
@@ -267,8 +267,8 @@ impl NativePesObserver {
         Self::admitted(profile, scope, budget, limits)
     }
     fn admitted(
-        profile: NativeClockProfile,
-        scope: NativePesScope,
+        profile: DemuxProfile,
+        scope: DemuxScope,
         budget: Budget,
         limits: ParseLimits,
     ) -> Result<Self> {
@@ -276,7 +276,7 @@ impl NativePesObserver {
             profile,
             scope,
             private_audio: None,
-            native_input: None,
+            demux_input: None,
             dvb_subtitles: false,
             header_ranges: BudgetVec::new(&budget),
             spans: BudgetVec::new(&budget),
@@ -291,7 +291,7 @@ impl NativePesObserver {
             previous_counter: None,
             active: false,
             origin: None,
-            native_position: 0,
+            position: 0,
             raw_header: [0; HEADER_MAX],
             header_used: 0,
             header_target: 6,
@@ -308,27 +308,24 @@ impl NativePesObserver {
     }
     /// Install once, before any carrier. Sequential input, clock and PMT
     /// epochs are separate; every bound push/poll must supply the actual cursor.
-    pub fn bind_native_input_v1(
+    pub fn bind_input(
         &mut self,
-        context: &crate::native_input::NativeInputContext,
+        context: &crate::demux_input::InputContext,
         input: &triergon_core::InputCursor,
     ) -> Result<()> {
         context.validate_cursor(input)?;
-        if !self.recovery_idle() || self.last_input.is_some() || self.native_input.is_some() {
+        if !self.recovery_idle() || self.last_input.is_some() || self.demux_input.is_some() {
             return Err(Error::Invalid("native startup binding after input"));
         }
         if input.source() != self.scope.entity || !context.backing_bytes().belongs_to(&self.budget)
         {
             return Err(Error::ForeignPool);
         }
-        self.native_input = Some(context.binding());
+        self.demux_input = Some(context.binding());
         Ok(())
     }
-    pub(crate) fn validate_native_input(
-        &self,
-        input: Option<&triergon_core::InputCursor>,
-    ) -> Result<()> {
-        match (&self.native_input, input) {
+    pub(crate) fn validate_input(&self, input: Option<&triergon_core::InputCursor>) -> Result<()> {
+        match (&self.demux_input, input) {
             (Some(context), Some(input)) => context.validate_cursor(input),
             (Some(_), None) => Err(Error::Invalid(
                 "bound native operation requires input cursor",
@@ -343,7 +340,7 @@ impl NativePesObserver {
     pub fn push_with_input(
         &mut self,
         packet: TransportPacket,
-        context: NativeSourceContext,
+        context: SourceContext,
         input: &triergon_core::InputCursor,
     ) -> std::result::Result<(), PushError<TransportPacket>> {
         self.push_input_boundary(packet, context, false, input)
@@ -355,12 +352,13 @@ impl NativePesObserver {
     pub(crate) fn push_input_boundary(
         &mut self,
         packet: TransportPacket,
-        context: NativeSourceContext,
+        context: SourceContext,
         boundary: bool,
         input: &triergon_core::InputCursor,
     ) -> std::result::Result<(), PushError<TransportPacket>> {
         self.push_boundary(packet, context, boundary, Some(input))
     }
+    #[cfg(feature = "reference-trace")]
     pub(crate) fn is_dvb_subtitles(&self) -> bool {
         self.dvb_subtitles
     }
@@ -377,27 +375,30 @@ impl NativePesObserver {
             && !self.ended
             && self.fault.is_none()
     }
+    #[cfg(feature = "reference-trace")]
     pub(crate) fn note_recovered(&mut self, counter: u8, offset: u64, ordinal: u64) {
         self.previous_counter = Some(counter);
         self.last_input = Some((ordinal, offset));
         self.entity_first = false;
     }
 
-    pub fn profile(&self) -> NativeClockProfile {
+    #[cfg(feature = "reference-trace")]
+    pub fn profile(&self) -> DemuxProfile {
         self.profile
     }
+    #[cfg(feature = "reference-trace")]
     pub fn operation(&self) -> &'static str {
         "ArchivedNativePesPacketsV1"
     }
-    pub fn scope(&self) -> NativePesScope {
+    pub fn scope(&self) -> DemuxScope {
         self.scope
     }
-    /// Retain the same logical TS/PES/native-clock operation across a confirmed
+    /// Retain the same logical TS/PES/demux-clock operation across a confirmed
     /// entity End. Only physical entity/order and input-binding facts change.
     /// A false result is a work yield; every rejection leaves assembly intact.
-    pub fn continue_media_entity_v1(
+    pub fn continue_media_entity(
         &mut self,
-        end: &crate::MediaEntityEndV1,
+        end: &crate::MediaEntityEnd,
         input: &mut triergon_core::InputCursor,
         work: &mut WorkBudget,
         cancel: &AtomicBool,
@@ -432,9 +433,9 @@ impl NativePesObserver {
             .ok_or(Error::Overflow)?;
         i64::try_from(position).map_err(|_| Error::Overflow)?;
         let binding = self
-            .native_input
+            .demux_input
             .as_ref()
-            .map(|b| b.continued_media_entity_v1(end, input))
+            .map(|b| b.continued_media_entity(end, input))
             .transpose()?;
         // An empty core read checks sticky transport/cancellation failure without
         // consuming an already supplied new-entity window.
@@ -446,12 +447,12 @@ impl NativePesObserver {
             return Err(Error::Cancelled);
         }
         self.scope.entity = input.source();
-        self.native_input = binding;
+        self.demux_input = binding;
         self.entity_first = true;
         self.media_position_base = position;
         Ok(true)
     }
-    pub(crate) fn media_native_position_v1(&self, offset: u64) -> Result<i64> {
+    pub(crate) fn media_position(&self, offset: u64) -> Result<i64> {
         i64::try_from(
             self.media_position_base
                 .checked_add(offset)
@@ -471,32 +472,36 @@ impl NativePesObserver {
     pub fn push(
         &mut self,
         packet: TransportPacket,
-        context: NativeSourceContext,
+        context: SourceContext,
     ) -> std::result::Result<(), PushError<TransportPacket>> {
         self.push_boundary(packet, context, false, None)
     }
+    #[cfg(feature = "reference-trace")]
     #[allow(
         clippy::result_large_err,
         reason = "return original charged transport input inline"
     )]
-    pub(crate) fn push_clock_boundary_v1(
+    pub(crate) fn push_clock_boundary(
         &mut self,
         packet: TransportPacket,
-        context: NativeSourceContext,
+        context: SourceContext,
     ) -> std::result::Result<(), PushError<TransportPacket>> {
         self.push_boundary(packet, context, true, None)
     }
-    pub(crate) fn commit_clock_epoch_v1(&mut self, epochs: SourceEpochs) {
+    #[cfg(feature = "reference-trace")]
+    pub(crate) fn commit_clock_epoch(&mut self, epochs: SourceEpochs) {
         self.scope.epochs = epochs;
     }
     /// A drained codec-map commit. Returned old packets keep their original
-    /// headers/owners. Retire only the idle internal header alias; preserve wire
+    /// headers/storage. Retire only the idle internal header alias; preserve wire
     /// counter/order and charged arena capacity, without copying a payload.
-    pub(crate) fn commit_pmt_scope_v1(&mut self, scope: NativePesScope) {
+    #[cfg(feature = "reference-trace")]
+    pub(crate) fn commit_pmt_scope(&mut self, scope: DemuxScope) {
         self.scope = scope;
         self.header = None;
         self.origin = None;
     }
+    #[cfg(feature = "reference-trace")]
     pub(crate) fn recovery_counter(&self) -> Option<u8> {
         self.previous_counter
     }
@@ -507,7 +512,7 @@ impl NativePesObserver {
     fn push_boundary(
         &mut self,
         packet: TransportPacket,
-        context: NativeSourceContext,
+        context: SourceContext,
         selected_boundary: bool,
         input: Option<&triergon_core::InputCursor>,
     ) -> std::result::Result<(), PushError<TransportPacket>> {
@@ -532,11 +537,11 @@ impl NativePesObserver {
     fn input_error(
         &self,
         packet: &TransportPacket,
-        context: NativeSourceContext,
+        context: SourceContext,
         selected_boundary: bool,
         input: Option<&triergon_core::InputCursor>,
     ) -> Option<Error> {
-        if let Err(error) = self.validate_native_input(input) {
+        if let Err(error) = self.validate_input(input) {
             Some(error)
         } else if !packet.source.belongs_to(&self.budget) {
             Some(Error::Invalid("foreign native PES byte pool"))
@@ -602,7 +607,7 @@ impl NativePesObserver {
     pub fn append_ready_continuation(
         &mut self,
         packet: &mut TransportPacket,
-        context: NativeSourceContext,
+        context: SourceContext,
         work: &mut WorkBudget,
         cancel: &AtomicBool,
     ) -> Result<ReadyContinuation> {
@@ -619,7 +624,7 @@ impl NativePesObserver {
             || self.header.is_none()
             || self.spans.len() >= self.spans.capacity().min(self.limits.source_spans)
             || self.body_limit.is_some_and(|limit| next > limit)
-            || next >= DEFAULT_NATIVE_PACKET_CAP
+            || next >= DEFAULT_PACKET_CAP
             || self.header_used + next > self.limits.pes_bytes
             || self.previous_counter.map(|value| (value + 1) & 15)
                 != Some(packet.continuity_counter)
@@ -634,7 +639,7 @@ impl NativePesObserver {
             .take()
             .ok_or(Error::Invalid("native PES payload missing"))?;
         self.spans
-            .try_push(NativePesSpan {
+            .try_push(DemuxSpan {
                 bytes,
                 source: SourceRange {
                     entity: self.scope.entity,
@@ -688,7 +693,7 @@ impl NativePesObserver {
         Ok(())
     }
     /// Logical EOF only. Segment/entity continuation is a distinct unproven
-    /// native context and must not be silently mapped to this operation.
+    /// demux context and must not be silently mapped to this operation.
     pub fn end_of_source(&mut self) -> Result<()> {
         if self.pending.is_some() || self.emission.is_some() {
             return Err(Error::Invalid("native PES input not drained"));
@@ -700,7 +705,7 @@ impl NativePesObserver {
         &mut self,
         work: &mut WorkBudget,
         cancel: &AtomicBool,
-    ) -> Result<AssemblyStep<NativePesPacket>> {
+    ) -> Result<AssemblyStep<DemuxPacket>> {
         self.poll_bound(work, cancel, None)
     }
     pub fn poll_with_input(
@@ -708,7 +713,7 @@ impl NativePesObserver {
         input: &triergon_core::InputCursor,
         work: &mut WorkBudget,
         cancel: &AtomicBool,
-    ) -> Result<AssemblyStep<NativePesPacket>> {
+    ) -> Result<AssemblyStep<DemuxPacket>> {
         self.poll_bound(work, cancel, Some(input))
     }
     pub(crate) fn poll_bound(
@@ -716,8 +721,8 @@ impl NativePesObserver {
         work: &mut WorkBudget,
         cancel: &AtomicBool,
         input: Option<&triergon_core::InputCursor>,
-    ) -> Result<AssemblyStep<NativePesPacket>> {
-        self.validate_native_input(input)?;
+    ) -> Result<AssemblyStep<DemuxPacket>> {
+        self.validate_input(input)?;
         if cancel.load(Ordering::Relaxed) {
             return Err(Error::Cancelled);
         }
@@ -754,7 +759,7 @@ impl NativePesObserver {
             Arena::Payload => (
                 self.spans.len(),
                 self.spans.capacity(),
-                size_of::<NativePesSpan>(),
+                size_of::<DemuxSpan>(),
             ),
             Arena::OutputHeader => (
                 self.output_header.len(),
@@ -816,7 +821,7 @@ impl NativePesObserver {
             .pending
             .as_ref()
             .ok_or(Error::Invalid("native PES input missing"))?;
-        let local_position = if let Some(context) = &self.native_input {
+        let local_position = if let Some(context) = &self.demux_input {
             context.position(&pending.packet)?
         } else {
             let prefix = pending.packet.prefix.as_ref().map_or(0, Bytes::len);
@@ -829,9 +834,8 @@ impl NativePesObserver {
             )
             .map_err(|_| Error::Overflow)?
         };
-        self.native_position = self.media_native_position_v1(
-            u64::try_from(local_position).map_err(|_| Error::Overflow)?,
-        )?;
+        self.position =
+            self.media_position(u64::try_from(local_position).map_err(|_| Error::Overflow)?)?;
         self.origin = Some(SourceLocation {
             source: self.scope.entity,
             offset: pending.packet.source_offset,
@@ -854,7 +858,7 @@ impl NativePesObserver {
 
     fn schedule(
         &mut self,
-        boundary: NativePesBoundary,
+        boundary: DemuxBoundary,
         continuation: bool,
         forced_corrupt: bool,
     ) -> Result<()> {
@@ -862,7 +866,7 @@ impl NativePesObserver {
             "native interrupted PES header unobserved",
         ))?;
         if self.finite_private()
-            && (boundary != NativePesBoundary::FiniteLength
+            && (boundary != DemuxBoundary::FiniteLength
                 || continuation
                 || forced_corrupt
                 || self.corrupt
@@ -880,13 +884,13 @@ impl NativePesObserver {
             .body_limit
             .is_some_and(|expected| expected != self.payload_len);
         let kind = if !self.time_header_applies {
-            NativePesPayloadKind::HeaderlessContinuation
+            DemuxPayloadKind::HeaderlessContinuation
         } else if header.declared_packet_length == 0 {
-            NativePesPayloadKind::Unbounded
+            DemuxPayloadKind::Unbounded
         } else if incomplete {
-            NativePesPayloadKind::DeclaredIncomplete
+            DemuxPayloadKind::DeclaredIncomplete
         } else {
-            NativePesPayloadKind::DeclaredComplete
+            DemuxPayloadKind::DeclaredComplete
         };
         self.emission = Some(Emission {
             boundary,
@@ -905,7 +909,7 @@ impl NativePesObserver {
         &mut self,
         work: &mut WorkBudget,
         cancel: &AtomicBool,
-    ) -> Result<AssemblyStep<NativePesPacket>> {
+    ) -> Result<AssemblyStep<DemuxPacket>> {
         while self.output_header.len() < self.header_ranges.len() {
             if cancel.load(Ordering::Relaxed) {
                 return Err(Error::Cancelled);
@@ -935,16 +939,16 @@ impl NativePesObserver {
         let origin = self
             .origin
             .ok_or(Error::Invalid("native PES origin missing"))?;
-        let packet = NativePesPacket {
+        let packet = DemuxPacket {
             profile: self.profile,
             program: self.scope.program,
             pid: self.scope.pid,
             source_origin: origin,
             source_epochs: self.scope.epochs,
-            native_position: self.native_position,
-            native_flags: emission.flags,
-            native_duration90_raw: 0,
-            native_stream_id: header.stream_id,
+            position: self.position,
+            flags: emission.flags,
+            duration90_raw: 0,
+            stream_id: header.stream_id,
             boundary: emission.boundary,
             payload_kind: emission.kind,
             source_header: header,
@@ -1162,7 +1166,7 @@ impl NativePesObserver {
             .packet
             .payload_unit_start;
         if start && self.active {
-            self.schedule(NativePesBoundary::NextPesStart, false, false)?;
+            self.schedule(DemuxBoundary::NextPesStart, false, false)?;
             return Ok(true);
         }
         if start {
@@ -1212,7 +1216,7 @@ impl NativePesObserver {
                     // declared PES bytes. The original raw carrier is unchanged.
                     count = remaining;
                 } else {
-                    self.schedule(NativePesBoundary::FiniteOverrun, true, true)?;
+                    self.schedule(DemuxBoundary::FiniteOverrun, true, true)?;
                     return Ok(true);
                 }
             }
@@ -1222,7 +1226,7 @@ impl NativePesObserver {
         if retained > self.limits.pes_bytes {
             return Err(limit(retained, self.limits.pes_bytes));
         }
-        if next >= DEFAULT_NATIVE_PACKET_CAP {
+        if next >= DEFAULT_PACKET_CAP {
             return Err(Error::Unsupported("native packet-cap boundary unobserved"));
         }
         if !self.reserve(Arena::Payload, work, cancel)? || !work.try_charge(1) {
@@ -1239,7 +1243,7 @@ impl NativePesObserver {
             .ok_or(Error::Invalid("native PES payload missing"))?;
         let start = pending.position;
         let end = start.checked_add(count).ok_or(Error::Overflow)?;
-        let span = NativePesSpan {
+        let span = DemuxSpan {
             bytes: payload.slice(start..end)?,
             source: SourceRange {
                 entity: self.scope.entity,
@@ -1281,7 +1285,7 @@ impl NativePesObserver {
         &mut self,
         work: &mut WorkBudget,
         cancel: &AtomicBool,
-    ) -> Result<AssemblyStep<NativePesPacket>> {
+    ) -> Result<AssemblyStep<DemuxPacket>> {
         loop {
             if cancel.load(Ordering::Relaxed) {
                 return Err(Error::Cancelled);
@@ -1302,7 +1306,7 @@ impl NativePesObserver {
                 }) {
                     self.pending = None;
                 }
-                self.schedule(NativePesBoundary::FiniteLength, false, false)?;
+                self.schedule(DemuxBoundary::FiniteLength, false, false)?;
                 continue;
             }
             if self.pending.is_none() {
@@ -1312,7 +1316,7 @@ impl NativePesObserver {
                 if !self.active {
                     return Ok(AssemblyStep::Finished);
                 }
-                self.schedule(NativePesBoundary::LogicalEof, false, false)?;
+                self.schedule(DemuxBoundary::LogicalEof, false, false)?;
                 continue;
             }
             if !self

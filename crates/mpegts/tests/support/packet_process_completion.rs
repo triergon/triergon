@@ -1,16 +1,16 @@
 //! Literal original packet-view/process regressions. No filename dispatch in production.
 use super::*;
-fn adapter(b: Budget) -> NativeAdapter {
-    NativeAdapter::new_packet_completion_v1(b, 1).unwrap()
+fn adapter(b: Budget) -> DemuxAdapter {
+    DemuxAdapter::new_packet_completion(b, 1).unwrap()
 }
 struct Seen {
     failed: bool,
     finished: bool,
     packets: u64,
     validated_scope: bool,
-    no_media_receipt: bool,
+    no_media_confirmation: bool,
     source: Vec<u8>,
-    native: Vec<u8>,
+    compat: Vec<u8>,
     object: Option<String>,
 }
 fn observe(data: &[u8], active: bool) -> Seen {
@@ -35,13 +35,13 @@ fn observe_with_late_failure(data: &[u8], active: bool, late_failure: bool) -> S
         1,
     )
     .unwrap();
-    let mut native = if active {
+    let mut compat = if active {
         adapter(budget.clone())
     } else {
-        NativeAdapter::new_psi_compatibility_v1(
+        DemuxAdapter::new_psi_compatibility(
             budget.clone(),
             1,
-            triergon_mpegts::native_catalogue::NativePsiCompatibilityPoliciesV1::ALL_OBSERVED,
+            triergon_mpegts::reference_trace::catalogue::PsiCompatibilityPolicies::ALL_OBSERVED,
         )
         .unwrap()
     };
@@ -57,7 +57,7 @@ fn observe_with_late_failure(data: &[u8], active: bool, late_failure: bool) -> S
             Step::Ready(event) => {
                 let cause = Cause::event(&event, ordinal, input.source(), source.source_epochs());
                 ordinal += 1;
-                native.observe_with_cancel(&event, cause, source.clock_is_quarantined(), &cancel);
+                compat.observe_with_cancel(&event, cause, source.clock_is_quarantined(), &cancel);
                 let done = source_trace::event(
                     &mut strict,
                     event,
@@ -66,7 +66,7 @@ fn observe_with_late_failure(data: &[u8], active: bool, late_failure: bool) -> S
                     &cancel,
                 )
                 .unwrap();
-                native.drain(&mut raw, cause, &cancel).unwrap();
+                compat.drain(&mut raw, cause, &cancel).unwrap();
                 if done {
                     if late_failure {
                         let request = input.request();
@@ -75,25 +75,25 @@ fn observe_with_late_failure(data: &[u8], active: bool, late_failure: bool) -> S
                             .unwrap();
                     }
                     if active {
-                        native
-                            .packet_logical_end_v1(&mut raw, cause, &cancel, &mut input)
+                        compat
+                            .packet_logical_end(&mut raw, cause, &cancel, &mut input)
                             .unwrap();
                     } else {
-                        native.logical_end(&mut raw, cause, &cancel).unwrap();
+                        compat.logical_end(&mut raw, cause, &cancel).unwrap();
                     }
                     let mut object = Vec::new();
-                    let present = native.object_json(&mut object).unwrap();
+                    let present = compat.object_json(&mut object).unwrap();
                     return Seen {
-                        failed: native.failed,
-                        finished: native.finished,
-                        packets: native.packets,
-                        validated_scope: native.scope.is_some(),
-                        no_media_receipt: native
+                        failed: compat.failed,
+                        finished: compat.finished,
+                        packets: compat.packets,
+                        validated_scope: compat.scope.is_some(),
+                        no_media_confirmation: compat
                             .packet_completion
                             .as_ref()
-                            .is_some_and(|c| c.receipt().is_some()),
+                            .is_some_and(|c| c.confirmation().is_some()),
                         source: strict,
-                        native: raw,
+                        compat: raw,
                         object: present.then(|| String::from_utf8(object).unwrap()),
                     };
                 }
@@ -120,13 +120,13 @@ fn observe_with_late_failure(data: &[u8], active: bool, late_failure: bool) -> S
             }
             Step::End(_) => {
                 let end = source
-                    .media_entity_end_v1(&mut input, &mut WorkBudget::new(1), &cancel)
+                    .media_entity_end(&mut input, &mut WorkBudget::new(1), &cancel)
                     .unwrap()
                     .unwrap();
                 if active {
-                    let _ = native.packet_physical_end_v1(&end, &mut input, &cancel);
+                    let _ = compat.packet_physical_end(&end, &mut input, &cancel);
                 } else {
-                    let _ = native.object_end_with_cancel_v1(&end, &input, &cancel);
+                    let _ = compat.object_end_with_cancel(&end, &input, &cancel);
                 }
                 source.end_of_source().unwrap();
             }
@@ -142,12 +142,12 @@ fn check(data: &[u8], literal: &str) {
         "original packet-view refusal remains visible in old profile"
     );
     assert_eq!(new.source, old.source, "Strict facts must stay literal");
-    assert!(!new.failed, "{}", String::from_utf8_lossy(&new.native));
+    assert!(!new.failed, "{}", String::from_utf8_lossy(&new.compat));
     assert!(new.finished);
     assert_eq!(new.packets, 0);
     assert!(!new.validated_scope);
-    assert!(new.no_media_receipt);
-    assert!(!String::from_utf8_lossy(&new.native).contains("\"kind\":\"native_pes_nonpass\""));
+    assert!(new.no_media_confirmation);
+    assert!(!String::from_utf8_lossy(&new.compat).contains("\"kind\":\"native_pes_nonpass\""));
     assert_eq!(new.object.as_deref(), Some(literal));
 }
 
@@ -267,7 +267,7 @@ fn actual_nonempty_validated_scope_packet_and_full_object_are_preserved() {
     assert!(!new.failed);
     assert!(new.finished);
     assert!(new.validated_scope);
-    assert!(!new.no_media_receipt);
+    assert!(!new.no_media_confirmation);
     assert_eq!(new.packets, 1);
     assert_eq!(new.source, old.source);
     assert_eq!(
@@ -283,10 +283,10 @@ fn actual_nonempty_validated_scope_packet_and_full_object_are_preserved() {
 fn later_real_pes_after_bad_control_is_not_dropped() {
     let data = include_bytes!("../data/packet-completion-v1/crc-control-then-valid-pes.ts");
     let new = observe(data, true);
-    assert!(!new.failed, "{}", String::from_utf8_lossy(&new.native));
+    assert!(!new.failed, "{}", String::from_utf8_lossy(&new.compat));
     assert!(new.finished);
     assert!(new.validated_scope);
-    assert!(!new.no_media_receipt);
+    assert!(!new.no_media_confirmation);
     assert_eq!(new.packets, 1);
     assert!(
         new.object
@@ -306,7 +306,7 @@ fn unvalidated_pes_after_control_remains_refused_not_empty() {
     ] {
         let new = observe(data, true);
         assert!(new.failed);
-        assert!(!new.no_media_receipt);
+        assert!(!new.no_media_confirmation);
         assert!(new.object.is_none());
     }
 }
@@ -315,7 +315,7 @@ fn failed_core_after_real_end_cannot_emit_confirmed_eof_object() {
     let new = observe_with_late_failure(include_bytes!("../data/psi-crc-invalid.ts"), true, true);
     assert!(new.failed);
     assert!(!new.finished);
-    assert!(!new.no_media_receipt);
+    assert!(!new.no_media_confirmation);
     assert!(new.object.is_none());
 }
 #[test]
@@ -330,7 +330,7 @@ fn incomplete_or_rejected_physical_control_is_not_complete_empty() {
         let new = observe(data, true);
         assert!(new.failed);
         assert!(!new.finished);
-        assert!(!new.no_media_receipt);
+        assert!(!new.no_media_confirmation);
         assert!(new.object.is_none());
     }
 }

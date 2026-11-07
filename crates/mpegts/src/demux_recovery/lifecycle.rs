@@ -4,18 +4,18 @@ use crate::psi::{PatTable, ProgramMap, TableStep};
 use triergon_core::SourceId;
 
 /// Scalar acknowledgement of a borrowed complete source PAT. Raw sections,
-/// ordered entries and owners remain in that source table; nothing is flattened.
+/// ordered entries and storage remain in that source table; nothing is flattened.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub struct NativePatRoute {
+pub struct PatRoute {
     entity: SourceId,
     tsid: u16,
     program: u16,
     pmt_pid: u16,
     version: u8,
-    context: NativeSourceContext,
+    context: SourceContext,
     programs: usize,
 }
-impl NativePatRoute {
+impl PatRoute {
     pub fn entity(self) -> SourceId {
         self.entity
     }
@@ -31,7 +31,7 @@ impl NativePatRoute {
     pub fn version(self) -> u8 {
         self.version
     }
-    pub fn context(self) -> NativeSourceContext {
+    pub fn context(self) -> SourceContext {
         self.context
     }
     pub fn program_count(self) -> usize {
@@ -39,14 +39,14 @@ impl NativePatRoute {
     }
 }
 
-/// One actual source owner/range/entry per work unit. Borrows the table; no heap
+/// One actual source storage/range/entry per work unit. Borrows the table; no heap
 /// workspace, reparsing, source mutation or queue is involved.
 #[derive(Debug)]
-pub struct NativePatSelection<'a> {
+pub struct PatSelection<'a> {
     table: &'a PatTable,
     budget: &'a Budget,
     requested: u16,
-    context: NativeSourceContext,
+    context: SourceContext,
     phase: u8,
     index: usize,
     entity: Option<SourceId>,
@@ -56,12 +56,12 @@ pub struct NativePatSelection<'a> {
     programs: usize,
     done: bool,
 }
-impl<'a> NativePatSelection<'a> {
+impl<'a> PatSelection<'a> {
     pub fn new(
         table: &'a PatTable,
         requested: u16,
         budget: &'a Budget,
-        context: NativeSourceContext,
+        context: SourceContext,
     ) -> Result<Self> {
         if requested == 0 {
             return Err(Error::Invalid(
@@ -87,7 +87,7 @@ impl<'a> NativePatSelection<'a> {
         &mut self,
         work: &mut WorkBudget,
         cancel: &AtomicBool,
-    ) -> Result<TableStep<Option<NativePatRoute>>> {
+    ) -> Result<TableStep<Option<PatRoute>>> {
         loop {
             if cancel.load(Ordering::Relaxed) {
                 return Err(Error::Cancelled);
@@ -185,7 +185,7 @@ impl<'a> NativePatSelection<'a> {
                     }
                 }
                 4 => {
-                    let route = self.selected.map(|pmt_pid| NativePatRoute {
+                    let route = self.selected.map(|pmt_pid| PatRoute {
                         entity: self.entity.expect("validated PAT range"),
                         tsid: self.table.header.extension,
                         program: self.requested,
@@ -206,16 +206,16 @@ impl<'a> NativePatSelection<'a> {
     }
 }
 
-/// Historical source-map acknowledgement. This scalar value does not claim to
+/// Acknowledgement of a source map. This scalar value does not claim to
 /// own descriptor bytes or a core generation token. Keep the real source Map
 /// whenever its raw sections/descriptors are needed after the borrowed job.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub struct NativePmtBinding {
-    pub route: NativePatRoute,
+pub struct PmtBinding {
+    pub route: PatRoute,
     pub version: u8,
     pub pcr_pid: u16,
-    pub scope: NativePesScope,
-    pub context: NativeSourceContext,
+    pub scope: DemuxScope,
+    pub context: SourceContext,
 }
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum Mode {
@@ -226,50 +226,50 @@ enum Mode {
 /// Exclusive observer + immutable actual source Map, held only for this bounded
 /// transaction. Dropping before commit aborts; no pending input is fabricated.
 #[derive(Debug)]
-pub struct NativePmtBindingJob<'a> {
-    observer: &'a mut NativePesRecoveryObserver,
+pub struct PmtBindingJob<'a> {
+    observer: &'a mut RecoveryObserver,
     map: &'a ProgramMap,
-    route: NativePatRoute,
-    context: NativeSourceContext,
+    route: PatRoute,
+    context: SourceContext,
     mode: Mode,
     phase: u8,
     range: usize,
     bytes: usize,
     previous_end: Option<u64>,
-    target: Option<NativePesScope>,
+    target: Option<DemuxScope>,
     done: bool,
 }
-impl NativePesRecoveryObserver {
-    pub fn pmt_binding_v1(&self) -> Option<NativePmtBinding> {
+impl RecoveryObserver {
+    pub fn pmt_binding(&self) -> Option<PmtBinding> {
         self.pmt_binding
     }
-    pub(super) fn after_pmt_binding_v1(&self, c: NativeSourceContext) -> bool {
+    pub(super) fn after_pmt_binding(&self, c: SourceContext) -> bool {
         self.pmt_binding
             .is_none_or(|b| c.source_event_ordinal > b.context.source_event_ordinal)
     }
-    pub fn bind_selected_pmt_v1<'a>(
+    pub fn bind_selected_pmt<'a>(
         &'a mut self,
-        route: NativePatRoute,
+        route: PatRoute,
         map: &'a ProgramMap,
-        context: NativeSourceContext,
-    ) -> Result<NativePmtBindingJob<'a>> {
-        NativePmtBindingJob::begin(self, route, map, context, Mode::Initial)
+        context: SourceContext,
+    ) -> Result<PmtBindingJob<'a>> {
+        PmtBindingJob::begin(self, route, map, context, Mode::Initial)
     }
-    pub fn rebind_drained_selected_pmt_v1<'a>(
+    pub fn rebind_drained_selected_pmt<'a>(
         &'a mut self,
-        route: NativePatRoute,
+        route: PatRoute,
         map: &'a ProgramMap,
-        context: NativeSourceContext,
-    ) -> Result<NativePmtBindingJob<'a>> {
-        NativePmtBindingJob::begin(self, route, map, context, Mode::Rebind)
+        context: SourceContext,
+    ) -> Result<PmtBindingJob<'a>> {
+        PmtBindingJob::begin(self, route, map, context, Mode::Rebind)
     }
 }
-impl<'a> NativePmtBindingJob<'a> {
+impl<'a> PmtBindingJob<'a> {
     fn begin(
-        observer: &'a mut NativePesRecoveryObserver,
-        route: NativePatRoute,
+        observer: &'a mut RecoveryObserver,
+        route: PatRoute,
         map: &'a ProgramMap,
-        context: NativeSourceContext,
+        context: SourceContext,
         mode: Mode,
     ) -> Result<Self> {
         if observer.pending.is_some()
@@ -300,14 +300,14 @@ impl<'a> NativePmtBindingJob<'a> {
             done: false,
         })
     }
-    pub fn current_scope(&self) -> NativePesScope {
+    pub fn current_scope(&self) -> DemuxScope {
         self.observer.scope()
     }
     pub fn poll(
         &mut self,
         work: &mut WorkBudget,
         cancel: &AtomicBool,
-    ) -> Result<TableStep<NativePmtBinding>> {
+    ) -> Result<TableStep<PmtBinding>> {
         loop {
             if cancel.load(Ordering::Relaxed) {
                 return Err(Error::Cancelled);
@@ -447,7 +447,7 @@ impl<'a> NativePmtBindingJob<'a> {
                     let scope = self
                         .target
                         .ok_or(Error::Invalid("selected PMT target missing"))?;
-                    let binding = NativePmtBinding {
+                    let binding = PmtBinding {
                         route: self.route,
                         version: self.map.header.version,
                         pcr_pid: self.map.pcr_pid,
@@ -458,7 +458,7 @@ impl<'a> NativePmtBindingJob<'a> {
                         return Err(Error::Cancelled);
                     }
                     if self.mode == Mode::Rebind {
-                        self.observer.inner.commit_pmt_scope_v1(scope);
+                        self.observer.inner.commit_pmt_scope(scope);
                         self.observer.selected_faults = false;
                     }
                     self.observer.pmt_binding = Some(binding);

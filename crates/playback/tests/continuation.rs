@@ -665,7 +665,7 @@ fn native_m2ts_context_uses_real_complete_window_and_positive_eof_reply() {
             triergon_mpegts::clock::SourceTimePolicy::Unanchored,
             TsNativeSelection {
                 pid: 256,
-                carriage: triergon_mpegts::native_pes::NativeRegisteredCarriage::Avc,
+                carriage: triergon_mpegts::compat::pes::RegisteredCarriage::Avc,
             },
             Selection::All,
             PlayerPolicy::default(),
@@ -685,10 +685,10 @@ fn native_m2ts_context_uses_real_complete_window_and_positive_eof_reply() {
         })
         .collect();
     assert_eq!(native.len(), 1);
-    assert_eq!(native[0].0.native_position, 388);
+    assert_eq!(native[0].0.position, 388);
     assert_eq!(native[0].0.source_origin.offset, 384);
-    assert_eq!(native[0].0.native_flags, 0);
-    assert_eq!(native[0].0.native_duration90_raw, 0);
+    assert_eq!(native[0].0.flags, 0);
+    assert_eq!(native[0].0.duration90_raw, 0);
     assert_eq!(native[0].1.pts90, Some(90_000));
     assert!(out.iter().any(|o| matches!(
         o.event(),
@@ -776,7 +776,7 @@ fn native_m2ts_seek_requires_new_context_and_keeps_old_output_scope() {
             triergon_mpegts::clock::SourceTimePolicy::RelativeEpochZero,
             TsNativeSelection {
                 pid: 256,
-                carriage: triergon_mpegts::native_pes::NativeRegisteredCarriage::Avc,
+                carriage: triergon_mpegts::compat::pes::RegisteredCarriage::Avc,
             },
             Selection::All,
             PlayerPolicy::default(),
@@ -2036,7 +2036,7 @@ fn open_prefix(
             == native_startup::StartupStep::Ready
         {
             let prepared = startup.finish().unwrap();
-            assert!(prepared.context().is_prefix_v2());
+            assert!(prepared.context().is_prefix());
             assert_eq!(prepared.context().inspected_bytes(), 8192);
             let mut player = prepared
                 .into_player(
@@ -2045,7 +2045,7 @@ fn open_prefix(
                     triergon_mpegts::clock::SourceTimePolicy::Unanchored,
                     TsNativeSelection {
                         pid: 256,
-                        carriage: triergon_mpegts::native_pes::NativeRegisteredCarriage::Avc,
+                        carriage: triergon_mpegts::compat::pes::RegisteredCarriage::Avc,
                     },
                     Selection::All,
                     PlayerPolicy::default(),
@@ -2072,7 +2072,7 @@ fn native_m2ts_prefix_preserves_the_same_sequential_source_through_late_pes() {
             .iter()
             .filter_map(|item| match item.event() {
                 RawEvent::NativeTs { packet, .. } => {
-                    Some((packet.native_position, packet.source_origin.offset))
+                    Some((packet.position, packet.source_origin.offset))
                 }
                 RawEvent::NativeRefusal { error, .. } => {
                     panic!("unexpected native refusal {error:?}")

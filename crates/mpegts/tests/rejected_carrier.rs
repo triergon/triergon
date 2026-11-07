@@ -1,13 +1,14 @@
-//! Owned strict rejection/native recovery guards. No native worker is invoked.
+//! Owned strict rejection/demux recovery guards. No demux worker is invoked.
 use std::sync::atomic::{AtomicBool, Ordering};
 use triergon_core::{
     Budget, Bytes, Error, InputCursor, InputWindow, SourceCapabilities, SourceId, SourceLocation,
     Step, WorkBudget,
 };
-use triergon_mpegts::clock::{NativeClockProfile, NativePesClockV1};
-use triergon_mpegts::native_pes::{NativePesScope, NativeRegisteredCarriage, NativeSourceContext};
-use triergon_mpegts::native_recovery::{
-    NativePesObservation, NativePesRecoveryObserver, NativeRecoveredPesPacket, NativeRejectedPolicy,
+use triergon_mpegts::compat::pes::{
+    DemuxClock, DemuxProfile, DemuxScope, RegisteredCarriage, SourceContext,
+};
+use triergon_mpegts::reference_trace::recovery::{
+    DemuxObservation, RecoveredPacket, RecoveryObserver, RejectedPolicy,
 };
 use triergon_mpegts::{
     AssemblyStep, PacketFormat, ParseLimits, RejectedTransport, SourceEpochs, TraceEvent,
@@ -19,17 +20,17 @@ const EPOCHS: SourceEpochs = SourceEpochs {
     clock: 0,
     configuration: 2,
 };
-fn context(ordinal: u64) -> NativeSourceContext {
-    NativeSourceContext {
+fn context(ordinal: u64) -> SourceContext {
+    SourceContext {
         source_event_ordinal: ordinal,
         epochs: EPOCHS,
         byte_run_epoch: None,
     }
 }
-fn observer(budget: &Budget) -> NativePesRecoveryObserver {
-    NativePesRecoveryObserver::new(
-        NativeClockProfile::ArchivedPesV1,
-        NativePesScope {
+fn observer(budget: &Budget) -> RecoveryObserver {
+    RecoveryObserver::new(
+        DemuxProfile::PesPackets,
+        DemuxScope {
             program: 1,
             pid: 256,
             stream_type: 0x1b,
@@ -37,8 +38,8 @@ fn observer(budget: &Budget) -> NativePesRecoveryObserver {
             entity: SourceId(1),
             epochs: EPOCHS,
         },
-        NativeRegisteredCarriage::Avc,
-        NativeRejectedPolicy::OpcrWithoutPcrV1,
+        RegisteredCarriage::Avc,
+        RejectedPolicy::OpcrWithoutPcr,
         budget.clone(),
         ParseLimits::default(),
     )
@@ -74,7 +75,7 @@ fn original(budget: &Budget) -> RejectedTransport {
         SourceId(1),
     )
 }
-fn recovered(observer: &mut NativePesRecoveryObserver) -> NativeRecoveredPesPacket {
+fn recovered(observer: &mut RecoveryObserver) -> RecoveredPacket {
     let mut result = None;
     for _ in 0..1024 {
         match observer
@@ -82,7 +83,7 @@ fn recovered(observer: &mut NativePesRecoveryObserver) -> NativeRecoveredPesPack
             .unwrap()
         {
             AssemblyStep::Yield => {}
-            AssemblyStep::Output(NativePesObservation::FromRejectedCarrier(packet)) => {
+            AssemblyStep::Output(DemuxObservation::FromRejectedCarrier(packet)) => {
                 assert!(result.replace(packet).is_none());
             }
             AssemblyStep::NeedPayload => {
@@ -95,11 +96,11 @@ fn recovered(observer: &mut NativePesRecoveryObserver) -> NativeRecoveredPesPack
 }
 
 #[test]
-fn inspector_zero_work_cancel_and_one_unit_resume_keep_original_owner() {
+fn inspector_zero_work_cancel_and_one_unit_resume_keep_original_backing() {
     let budget = Budget::new(16384).unwrap();
-    let owner = Bytes::copy_from_slice(&budget, INPUT).unwrap();
+    let backing = Bytes::copy_from_slice(&budget, INPUT).unwrap();
     let mut inspector = TransportInspector::new(
-        owner.slice(376..564).unwrap(),
+        backing.slice(376..564).unwrap(),
         PacketFormat::Ts188,
         SourceLocation {
             source: SourceId(1),
@@ -124,7 +125,7 @@ fn inspector_zero_work_cancel_and_one_unit_resume_keep_original_owner() {
         inspector
             .backing_bytes()
             .unwrap()
-            .shares_storage_with(&owner)
+            .shares_storage_with(&backing)
     );
     let mut fields = 0;
     loop {
@@ -139,7 +140,7 @@ fn inspector_zero_work_cancel_and_one_unit_resume_keep_original_owner() {
                 assert!(rejected.fully_checked());
                 assert_eq!(rejected.secondary_error(), None);
                 assert_eq!(rejected.source_range().unwrap().offset, 376);
-                assert!(rejected.backing_bytes().shares_storage_with(&owner));
+                assert!(rejected.backing_bytes().shares_storage_with(&backing));
                 break;
             }
             other => panic!("unexpected {other:?}"),
@@ -157,17 +158,17 @@ fn inspector_zero_work_cancel_and_one_unit_resume_keep_original_owner() {
 }
 
 #[test]
-fn rejection_and_native_outputs_keep_full_hidden_owner_until_last_alias_drops() {
+fn rejection_and_demux_outputs_keep_full_hidden_backing_until_last_alias_drops() {
     let budget = Budget::new(32768).unwrap();
     let initial = budget.used();
     let mut data = Vec::with_capacity(4096);
     data.extend_from_slice(INPUT);
-    let owner = Bytes::try_from_vec(&budget, data).unwrap();
-    let retained = owner.retained_storage_bytes();
-    let rejection = inspect(owner.slice(376..564).unwrap(), &budget, SourceId(1));
+    let backing = Bytes::try_from_vec(&budget, data).unwrap();
+    let retained = backing.retained_storage_bytes();
+    let rejection = inspect(backing.slice(376..564).unwrap(), &budget, SourceId(1));
     assert_eq!(
         rejection.backing_bytes().retained_capacity(),
-        owner.retained_capacity()
+        backing.retained_capacity()
     );
     assert_eq!(
         budget.used(),
@@ -178,19 +179,24 @@ fn rejection_and_native_outputs_keep_full_hidden_owner_until_last_alias_drops() 
     let mut parser = observer(&budget);
     parser.push_rejected(rejection, context(8)).unwrap();
     let packet = recovered(&mut parser);
-    assert!(packet.rejection.backing_bytes().shares_storage_with(&owner));
+    assert!(
+        packet
+            .rejection
+            .backing_bytes()
+            .shares_storage_with(&backing)
+    );
     assert!(
         packet
             .encoded_header
             .backing_bytes()
-            .shares_storage_with(&owner)
+            .shares_storage_with(&backing)
     );
     assert!(
         packet.spans.as_slice()[0]
             .backing_bytes()
-            .shares_storage_with(&owner)
+            .shares_storage_with(&backing)
     );
-    drop(owner);
+    drop(backing);
     drop(alias);
     drop(parser);
     assert!(budget.used() >= initial + retained);
@@ -287,7 +293,7 @@ fn exact_primary_error_does_not_mask_bad_stuffing() {
 }
 
 #[test]
-fn invalid_marker_never_becomes_a_validated_source_or_native_header() {
+fn invalid_marker_never_becomes_a_validated_source_or_demux_header() {
     let budget = Budget::new(16384).unwrap();
     let mut raw = INPUT[376..564].to_vec();
     let start = 5 + usize::from(raw[4]);
@@ -353,7 +359,7 @@ fn rejected_header_flags_are_an_explicit_unproven_context() {
 }
 
 #[test]
-fn native_rejected_zero_work_cancel_and_resume_preserve_boundary() {
+fn demux_rejected_zero_work_cancel_and_resume_preserve_boundary() {
     let budget = Budget::new(16384).unwrap();
     let rejection = original(&budget);
     let alias = rejection.backing_bytes().clone();
@@ -380,8 +386,8 @@ fn native_rejected_zero_work_cancel_and_resume_preserve_boundary() {
     cancel.store(false, Ordering::Relaxed);
     let packet = recovered(&mut parser);
     assert_eq!(packet.context.source_event_ordinal, 8);
-    assert_eq!(packet.native_position, 376);
-    let mut clock = NativePesClockV1::new(1).unwrap();
+    assert_eq!(packet.position, 376);
+    let mut clock = DemuxClock::new(1).unwrap();
     assert!(
         clock
             .project_encoded_header(
@@ -407,7 +413,7 @@ fn native_rejected_zero_work_cancel_and_resume_preserve_boundary() {
 }
 
 #[test]
-fn native_rejected_shared_pressure_retries_without_replaying_input() {
+fn demux_rejected_shared_pressure_retries_without_replaying_input() {
     let budget = Budget::new(16384).unwrap();
     let mut parser = observer(&budget);
     parser.push_rejected(original(&budget), context(8)).unwrap();
@@ -434,7 +440,7 @@ fn native_rejected_shared_pressure_retries_without_replaying_input() {
 }
 
 #[test]
-fn wrong_pool_recovers_exact_rejection_and_hidden_owner() {
+fn wrong_pool_recovers_exact_rejection_and_hidden_backing() {
     let budget = Budget::new(16384).unwrap();
     let foreign = Budget::new(16384).unwrap();
     let rejection = original(&foreign);
@@ -482,9 +488,9 @@ fn a_rejected_mailbox_does_not_accept_duplicate_or_logical_eof() {
 fn inspector_precondition_failure_returns_the_original_input() {
     let budget = Budget::new(16384).unwrap();
     let foreign = Budget::new(16384).unwrap();
-    let owner = Bytes::copy_from_slice(&foreign, &INPUT[376..564]).unwrap();
+    let backing = Bytes::copy_from_slice(&foreign, &INPUT[376..564]).unwrap();
     let error = TransportInspector::new(
-        owner.clone(),
+        backing.clone(),
         PacketFormat::Ts188,
         SourceLocation {
             source: SourceId(1),
@@ -494,9 +500,9 @@ fn inspector_precondition_failure_returns_the_original_input() {
     )
     .unwrap_err();
     assert_eq!(error.error, Error::ForeignPool);
-    assert!(error.value.shares_storage_with(&owner));
+    assert!(error.value.shares_storage_with(&backing));
     let error = TransportInspector::new(
-        owner.clone(),
+        backing.clone(),
         PacketFormat::Ts188,
         SourceLocation {
             source: SourceId(1),
@@ -506,7 +512,7 @@ fn inspector_precondition_failure_returns_the_original_input() {
     )
     .unwrap_err();
     assert_eq!(error.error, Error::Overflow);
-    assert!(error.value.shares_storage_with(&owner));
+    assert!(error.value.shares_storage_with(&backing));
 }
 
 #[test]
@@ -514,9 +520,9 @@ fn opaque_m2ts_rejection_is_not_automatically_admitted_by_188_policy() {
     let budget = Budget::new(16384).unwrap();
     let mut raw = vec![1, 2, 3, 4];
     raw.extend_from_slice(&INPUT[376..564]);
-    let owner = Bytes::copy_from_slice(&budget, &raw).unwrap();
+    let backing = Bytes::copy_from_slice(&budget, &raw).unwrap();
     let mut inspection = TransportInspector::new(
-        owner.clone(),
+        backing.clone(),
         PacketFormat::M2ts192,
         SourceLocation {
             source: SourceId(1),
@@ -540,7 +546,7 @@ fn opaque_m2ts_rejection_is_not_automatically_admitted_by_188_policy() {
         .push_rejected(rejection, context(8))
         .unwrap_err();
     assert!(matches!(error.error, Error::Unsupported(_)));
-    assert!(error.value.backing_bytes().shares_storage_with(&owner));
+    assert!(error.value.backing_bytes().shares_storage_with(&backing));
     assert_eq!(error.value.bytes().as_ref(), raw);
 }
 
@@ -603,7 +609,7 @@ fn framer_freeze_pressure_preserves_final_chunk_and_real_rejection() {
 #[test]
 fn composed_source_emits_real_diagnostics_8_9_without_video_or_epoch_reset() {
     let budget = Budget::new(1 << 20).unwrap();
-    let owner = Bytes::copy_from_slice(&budget, INPUT).unwrap();
+    let backing = Bytes::copy_from_slice(&budget, INPUT).unwrap();
     let mut input = InputCursor::new(
         &budget,
         SourceId(1),
@@ -663,7 +669,7 @@ fn composed_source_emits_real_diagnostics_8_9_without_video_or_epoch_reset() {
                                 request.source,
                                 request.token,
                                 request.offset,
-                                owner.slice(start..end).unwrap(),
+                                backing.slice(start..end).unwrap(),
                             )
                             .unwrap(),
                         )

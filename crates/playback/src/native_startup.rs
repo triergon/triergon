@@ -13,7 +13,7 @@ use triergon_core::{
 use triergon_mpegts::{
     PacketFormat, ParseLimits,
     clock::SourceTimePolicy,
-    native_input::{NativeInputBootstrap, NativeInputContext, NativeInputStep},
+    compat::input::{InputBootstrap, InputContext, InputStep},
 };
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum StartupStep {
@@ -25,17 +25,17 @@ pub struct NativeStartup<S: Source> {
     input: Option<InputCursor>,
     source: Option<SourceOwner<S>>,
     format: PacketFormat,
-    bootstrap: Option<NativeInputBootstrap>,
+    bootstrap: Option<InputBootstrap>,
     prefix: Option<PrefixRead>,
     eof_request: Option<InputRequest>,
-    context: Option<NativeInputContext>,
+    context: Option<InputContext>,
     failed: bool,
 }
 pub struct PreparedNative<S: Source> {
     input: InputCursor,
     source: SourceOwner<S>,
     format: PacketFormat,
-    context: NativeInputContext,
+    context: InputContext,
 }
 impl<S: Source> NativeStartup<S> {
     pub fn new(selected: SelectedInput<S>) -> Result<Self> {
@@ -61,7 +61,7 @@ impl<S: Source> NativeStartup<S> {
     pub fn new_m2ts_prefix_v2(selected: SelectedInput<S>) -> Result<Self> {
         if selected.format != Format::Ts(PacketFormat::M2ts192)
             || !selected.input.buffered().is_empty()
-            || selected.input.request().maximum < NativeInputBootstrap::M2TS_PREFIX_BYTES_V2
+            || selected.input.request().maximum < InputBootstrap::M2TS_PREFIX_BYTES
         {
             return Err(Error::Unsupported(
                 "native M2TS prefix needs a fresh 8192-byte window",
@@ -143,7 +143,7 @@ impl<S: Source> NativeStartup<S> {
                         ));
                     }
                     input.provide(&window)?;
-                    let bootstrap = NativeInputBootstrap::new(input, &window, self.format)?;
+                    let bootstrap = InputBootstrap::new(input, &window, self.format)?;
                     let mut eof = request;
                     eof.offset = window.bytes().len() as u64;
                     eof.maximum = 1;
@@ -203,9 +203,9 @@ impl<S: Source> NativeStartup<S> {
             .ok_or(Error::Closed)?
             .poll(input, w, c)?
         {
-            NativeInputStep::NeedEntityEof => Ok(StartupStep::NeedEof),
-            NativeInputStep::Yield => Ok(StartupStep::Yield),
-            NativeInputStep::Ready(context) => {
+            InputStep::NeedEntityEof => Ok(StartupStep::NeedEof),
+            InputStep::Yield => Ok(StartupStep::Yield),
+            InputStep::Ready(context) => {
                 self.context = Some(context);
                 Ok(StartupStep::Ready)
             }
@@ -238,8 +238,8 @@ impl PrefixRead {
         source: &mut SourceOwner<S>,
         work: &mut WorkBudget,
         cancel: &AtomicBool,
-    ) -> Result<Option<NativeInputBootstrap>> {
-        let limit = NativeInputBootstrap::M2TS_PREFIX_BYTES_V2;
+    ) -> Result<Option<InputBootstrap>> {
+        let limit = InputBootstrap::M2TS_PREFIX_BYTES;
         if self.pending.is_none() && self.bytes.len() < limit {
             let mut request = input.request();
             request.offset = self.bytes.len() as u64;
@@ -288,9 +288,7 @@ impl PrefixRead {
                     }
                     if window.bytes().len() == limit {
                         input.provide(&window)?;
-                        return Ok(Some(NativeInputBootstrap::new_m2ts_prefix_v2(
-                            input, &window,
-                        )?));
+                        return Ok(Some(InputBootstrap::new_m2ts_prefix(input, &window)?));
                     }
                     self.pending = Some(window);
                 }
@@ -325,14 +323,12 @@ impl PrefixRead {
         };
         let window = InputWindow::new(input.source(), input.token(), 0, bytes)?;
         input.provide(&window)?;
-        Ok(Some(NativeInputBootstrap::new_m2ts_prefix_v2(
-            input, &window,
-        )?))
+        Ok(Some(InputBootstrap::new_m2ts_prefix(input, &window)?))
     }
 }
 
 impl<S: Source> PreparedNative<S> {
-    pub fn context(&self) -> &NativeInputContext {
+    pub fn context(&self) -> &InputContext {
         &self.context
     }
     pub fn into_player(

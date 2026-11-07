@@ -4,10 +4,10 @@ use super::*;
 mod fixtures;
 use fixtures::Case;
 
-fn drive(case: Case) -> (NativeAdapter, String) {
+fn drive(case: Case) -> (DemuxAdapter, String) {
     let b = Budget::new(1 << 20).unwrap();
     let bytes = fixtures::bytes(case);
-    let owner = Bytes::copy_from_slice(&b, &bytes).unwrap();
+    let backing = Bytes::copy_from_slice(&b, &bytes).unwrap();
     let format = if fixtures::width(case) == 192 {
         PacketFormat::M2ts192
     } else {
@@ -30,7 +30,7 @@ fn drive(case: Case) -> (NativeAdapter, String) {
         4096,
     )
     .unwrap();
-    let mut native = NativeAdapter::new(b, fixtures::selected(case)).unwrap();
+    let mut compat = DemuxAdapter::new(b, fixtures::selected(case)).unwrap();
     let mut out = Vec::new();
     let mut n = 0;
     let cancel = AtomicBool::new(false);
@@ -41,11 +41,11 @@ fn drive(case: Case) -> (NativeAdapter, String) {
         {
             Step::Ready(e) => {
                 let cause = Cause::event(&e, n, SourceId(1), source.source_epochs());
-                native.observe(&e, cause, source.clock_is_quarantined());
-                native.drain(&mut out, cause, &cancel).unwrap();
+                compat.observe(&e, cause, source.clock_is_quarantined());
+                compat.drain(&mut out, cause, &cancel).unwrap();
                 n += 1;
                 if matches!(e, TraceEvent::Finished) {
-                    native
+                    compat
                         .logical_end(
                             &mut out,
                             Cause::boundary(
@@ -59,7 +59,7 @@ fn drive(case: Case) -> (NativeAdapter, String) {
                             &cancel,
                         )
                         .unwrap();
-                    return (native, String::from_utf8(out).unwrap());
+                    return (compat, String::from_utf8(out).unwrap());
                 }
             }
             Step::Yield => {}
@@ -75,7 +75,7 @@ fn drive(case: Case) -> (NativeAdapter, String) {
                                 r.source,
                                 r.token,
                                 r.offset,
-                                owner.slice(start..end).unwrap(),
+                                backing.slice(start..end).unwrap(),
                             )
                             .unwrap(),
                         )
@@ -87,7 +87,7 @@ fn drive(case: Case) -> (NativeAdapter, String) {
     }
     panic!("composed adapter {} did not finish", fixtures::id(case));
 }
-fn complete(case: Case, count: u64) -> (NativeAdapter, String) {
+fn complete(case: Case, count: u64) -> (DemuxAdapter, String) {
     let (n, text) = drive(case);
     assert!(
         !n.failed,
@@ -134,7 +134,7 @@ fn lifecycle_adapter_rebind_192_uses_real_sync_offsets() {
     assert!(s.contains("\"native_position\":772"));
 }
 #[test]
-fn lifecycle_adapter_rebind_keeps_one_native_wrap_interval() {
+fn lifecycle_adapter_rebind_keeps_one_demux_wrap_interval() {
     let (_, s) = complete(Case::RetypeWrap, 2);
     assert!(s.contains("\"pts90\":-90000"));
     assert!(s.contains("\"pts90\":45000"));

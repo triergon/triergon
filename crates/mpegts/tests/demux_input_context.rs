@@ -1,17 +1,18 @@
-//! Native input failure and independent input-lifetime controls.
+//! Demux input failure and independent input-lifetime controls.
 use std::sync::atomic::{AtomicBool, Ordering};
 use triergon_core::{
     Budget, Bytes, Error, InputCursor, InputWindow, SourceCapabilities, SourceId, WorkBudget,
 };
-use triergon_mpegts::clock::NativeClockProfile;
-use triergon_mpegts::native_input::{
-    NativeInputBootstrap, NativeInputContext, NativeInputStep, NativePositionBasis,
-};
-use triergon_mpegts::native_pes::{NativePesObserver, NativePesScope, NativeSourceContext};
+use triergon_mpegts::compat::input::{InputBootstrap, InputContext, InputStep};
+use triergon_mpegts::compat::pes::{DemuxObserver, DemuxProfile, DemuxScope, SourceContext};
+#[cfg(feature = "reference-trace")]
+use triergon_mpegts::reference_trace::input::PositionBasis;
 use triergon_mpegts::{AssemblyStep, PacketFormat, ParseLimits, SourceEpochs, parse_transport};
 
 const LONG: &[u8] = include_bytes!("data/native-input-v1/original-valid-rebind-192.m2ts");
+#[cfg(feature = "reference-trace")]
 const SHORT: &[u8] = include_bytes!("data/native-input-v1/opaque-PES-1-carrier-192-tail-3.m2ts");
+#[cfg(feature = "reference-trace")]
 const TS: &[u8] = include_bytes!("data/native-input-v1/original-valid-rebind-188.ts");
 
 fn setup(bytes: &[u8], known: bool) -> (Budget, InputCursor, InputWindow) {
@@ -36,22 +37,22 @@ fn setup(bytes: &[u8], known: bool) -> (Budget, InputCursor, InputWindow) {
     i.provide(&w).unwrap();
     (b, i, w)
 }
-fn complete(i: &InputCursor, w: &InputWindow, format: PacketFormat) -> NativeInputContext {
-    let mut job = NativeInputBootstrap::new(i, w, format).unwrap();
+fn complete(i: &InputCursor, w: &InputWindow, format: PacketFormat) -> InputContext {
+    let mut job = InputBootstrap::new(i, w, format).unwrap();
     job.observe_entity_eof(i, w.source, &w.token, w.bytes().len() as u64)
         .unwrap();
     match job
         .poll(i, &mut WorkBudget::new(20000), &AtomicBool::new(false))
         .unwrap()
     {
-        NativeInputStep::Ready(c) => c,
+        InputStep::Ready(c) => c,
         _ => panic!("finite borrowed context did not complete"),
     }
 }
-fn observer(b: &Budget) -> NativePesObserver {
-    NativePesObserver::new(
-        NativeClockProfile::ArchivedPesV1,
-        NativePesScope {
+fn observer(b: &Budget) -> DemuxObserver {
+    DemuxObserver::new(
+        DemuxProfile::PesPackets,
+        DemuxScope {
             program: 1,
             pid: 256,
             stream_type: 0x1b,
@@ -69,7 +70,7 @@ fn actual_original_long_m2ts_first_pes_uses_carrier_start_with_real_context() {
     let (b, i, w) = setup(LONG, true);
     let c = complete(&i, &w, PacketFormat::M2ts192);
     let mut o = observer(&b);
-    o.bind_native_input_v1(&c, &i).unwrap();
+    o.bind_input(&c, &i).unwrap();
     let mut packets = Vec::new();
     for n in 2..5 {
         let mut p = parse_transport(
@@ -81,7 +82,7 @@ fn actual_original_long_m2ts_first_pes_uses_carrier_start_with_real_context() {
         p.source_id = Some(SourceId(1));
         o.push_with_input(
             p,
-            NativeSourceContext {
+            SourceContext {
                 source_event_ordinal: n as u64,
                 epochs: SourceEpochs::default(),
                 byte_run_epoch: None,
@@ -109,36 +110,38 @@ fn actual_original_long_m2ts_first_pes_uses_carrier_start_with_real_context() {
     assert_eq!(packets[0].source_origin.offset, 384);
     assert_eq!(packets[0].source_header.pts_raw33, Some(90000));
     assert_eq!(packets[0].source_header.dts_raw33, None);
-    assert_eq!(packets[0].native_flags, 0);
+    assert_eq!(packets[0].flags, 0);
     assert_eq!(
-        packets[0].native_position, 384,
+        packets[0].position, 384,
         "literal pinned7f9372 native AVPacket.pos; original388 failure remains preserved"
     );
 }
+#[cfg(feature = "reference-trace")]
 #[test]
 fn short_192_stays_sync_start() {
     let (_, i, w) = setup(SHORT, true);
     assert_eq!(
         complete(&i, &w, PacketFormat::M2ts192).basis(),
-        NativePositionBasis::SyncStart
+        PositionBasis::SyncStart
     );
 }
+#[cfg(feature = "reference-trace")]
 #[test]
 fn ordinary_188_stays_carrier_start() {
     let (_, i, w) = setup(TS, true);
     assert_eq!(
         complete(&i, &w, PacketFormat::Ts188).basis(),
-        NativePositionBasis::CarrierStart
+        PositionBasis::CarrierStart
     );
 }
 #[test]
 fn declared_size_alone_is_not_eof() {
     let (_, i, w) = setup(LONG, true);
-    let mut j = NativeInputBootstrap::new(&i, &w, PacketFormat::M2ts192).unwrap();
+    let mut j = InputBootstrap::new(&i, &w, PacketFormat::M2ts192).unwrap();
     let mut work = WorkBudget::new(10000);
     assert!(matches!(
         j.poll(&i, &mut work, &AtomicBool::new(false)).unwrap(),
-        NativeInputStep::NeedEntityEof
+        InputStep::NeedEntityEof
     ));
     assert_eq!(work.spent(), 0);
     assert_eq!(j.inspected_bytes(), 0);
@@ -146,13 +149,13 @@ fn declared_size_alone_is_not_eof() {
 #[test]
 fn work_zero_one_counts_actual_inspection_without_source_consumption() {
     let (_, i, w) = setup(LONG, true);
-    let mut j = NativeInputBootstrap::new(&i, &w, PacketFormat::M2ts192).unwrap();
+    let mut j = InputBootstrap::new(&i, &w, PacketFormat::M2ts192).unwrap();
     j.observe_entity_eof(&i, w.source, &w.token, LONG.len() as u64)
         .unwrap();
     assert!(matches!(
         j.poll(&i, &mut WorkBudget::new(0), &AtomicBool::new(false))
             .unwrap(),
-        NativeInputStep::Yield
+        InputStep::Yield
     ));
     assert_eq!(j.inspected_bytes(), 0);
     for n in 1..=LONG.len() {
@@ -160,14 +163,14 @@ fn work_zero_one_counts_actual_inspection_without_source_consumption() {
         let step = j.poll(&i, &mut work, &AtomicBool::new(false)).unwrap();
         assert_eq!(work.spent(), 1);
         assert_eq!(j.inspected_bytes(), n);
-        assert_eq!(matches!(step, NativeInputStep::Ready(_)), n == LONG.len());
+        assert_eq!(matches!(step, InputStep::Ready(_)), n == LONG.len());
     }
     assert_eq!(i.position(), 0);
 }
 #[test]
 fn cancellation_does_no_inspection_and_preserves_retry() {
     let (_, i, w) = setup(LONG, true);
-    let mut j = NativeInputBootstrap::new(&i, &w, PacketFormat::M2ts192).unwrap();
+    let mut j = InputBootstrap::new(&i, &w, PacketFormat::M2ts192).unwrap();
     j.observe_entity_eof(&i, w.source, &w.token, LONG.len() as u64)
         .unwrap();
     let cancel = AtomicBool::new(true);
@@ -179,16 +182,17 @@ fn cancellation_does_no_inspection_and_preserves_retry() {
     cancel.store(false, Ordering::Relaxed);
     assert!(matches!(
         j.poll(&i, &mut WorkBudget::new(1), &cancel).unwrap(),
-        NativeInputStep::Yield
+        InputStep::Yield
     ));
     assert_eq!(j.inspected_bytes(), 1);
 }
+#[cfg(feature = "reference-trace")]
 #[test]
 fn unknown_declared_size_can_use_actual_eof() {
     let (_, i, w) = setup(LONG, false);
     assert_eq!(
         complete(&i, &w, PacketFormat::M2ts192).basis(),
-        NativePositionBasis::CarrierStart
+        PositionBasis::CarrierStart
     );
 }
 #[test]
@@ -202,11 +206,11 @@ fn reset_invalidates_even_identical_source_bytes() {
 fn foreign_pool_with_same_numeric_request_is_not_evidence() {
     let (_, i, w) = setup(LONG, true);
     let (_, other, _) = setup(LONG, true);
-    assert!(NativeInputBootstrap::new(&other, &w, PacketFormat::M2ts192).is_err());
+    assert!(InputBootstrap::new(&other, &w, PacketFormat::M2ts192).is_err());
     assert_eq!(i.position(), 0);
 }
 #[test]
-fn unprovided_owner_cannot_be_substituted() {
+fn unprovided_backing_cannot_be_substituted() {
     let (b, i, _) = setup(LONG, true);
     let alternate = InputWindow::new(
         i.source(),
@@ -215,13 +219,13 @@ fn unprovided_owner_cannot_be_substituted() {
         Bytes::copy_from_slice(&b, LONG).unwrap(),
     )
     .unwrap();
-    assert!(NativeInputBootstrap::new(&i, &alternate, PacketFormat::M2ts192).is_err());
+    assert!(InputBootstrap::new(&i, &alternate, PacketFormat::M2ts192).is_err());
 }
 #[test]
 fn competing_grid_is_visible_refusal() {
     let bytes = include_bytes!("data/native-input-v1/false188-7.bin");
     let (_, i, w) = setup(bytes, true);
-    let mut j = NativeInputBootstrap::new(&i, &w, PacketFormat::M2ts192).unwrap();
+    let mut j = InputBootstrap::new(&i, &w, PacketFormat::M2ts192).unwrap();
     j.observe_entity_eof(&i, w.source, &w.token, bytes.len() as u64)
         .unwrap();
     assert!(matches!(
@@ -233,7 +237,7 @@ fn competing_grid_is_visible_refusal() {
 fn damaged_sync_is_visible_refusal() {
     let bytes = include_bytes!("data/native-input-v1/seventh-sync-zero.bin");
     let (_, i, w) = setup(bytes, true);
-    let mut j = NativeInputBootstrap::new(&i, &w, PacketFormat::M2ts192).unwrap();
+    let mut j = InputBootstrap::new(&i, &w, PacketFormat::M2ts192).unwrap();
     j.observe_entity_eof(&i, w.source, &w.token, bytes.len() as u64)
         .unwrap();
     assert!(matches!(
@@ -242,12 +246,12 @@ fn damaged_sync_is_visible_refusal() {
     ));
 }
 #[test]
-fn borrowed_full_hidden_owner_stays_charged_without_new_allocation() {
+fn borrowed_full_hidden_backing_stays_charged_without_new_allocation() {
     let b = Budget::new(10000).unwrap();
     let mut raw = Vec::with_capacity(6000);
     raw.extend_from_slice(LONG);
-    let owner = Bytes::try_from_vec(&b, raw).unwrap();
-    let capacity = owner.retained_capacity();
+    let backing = Bytes::try_from_vec(&b, raw).unwrap();
+    let capacity = backing.retained_capacity();
     let mut i = InputCursor::new(
         &b,
         SourceId(1),
@@ -258,7 +262,7 @@ fn borrowed_full_hidden_owner_stays_charged_without_new_allocation() {
         16384,
     )
     .unwrap();
-    let w = InputWindow::new(i.source(), i.token(), 0, owner).unwrap();
+    let w = InputWindow::new(i.source(), i.token(), 0, backing).unwrap();
     i.provide(&w).unwrap();
     let before = b.used();
     let hold = b.reserve(b.available()).unwrap();
@@ -277,7 +281,7 @@ fn bound_observer_cannot_bypass_input_token_on_poll() {
     let (b, mut i, w) = setup(LONG, true);
     let c = complete(&i, &w, PacketFormat::M2ts192);
     let mut o = observer(&b);
-    o.bind_native_input_v1(&c, &i).unwrap();
+    o.bind_input(&c, &i).unwrap();
     assert!(
         o.poll(&mut WorkBudget::new(100), &AtomicBool::new(false))
             .is_err()
@@ -290,11 +294,11 @@ fn bound_observer_cannot_bypass_input_token_on_poll() {
 }
 
 #[test]
-fn bound_observer_does_not_retain_unrelated_startup_owner_after_inspection() {
+fn bound_observer_does_not_retain_unrelated_startup_backing_after_inspection() {
     let (b, mut i, w) = setup(LONG, true);
     let c = complete(&i, &w, PacketFormat::M2ts192);
     let mut o = observer(&b);
-    o.bind_native_input_v1(&c, &i).unwrap();
+    o.bind_input(&c, &i).unwrap();
     drop(c);
     drop(w);
     let mut work = WorkBudget::new(LONG.len() as u64);

@@ -1,15 +1,13 @@
-//! Source-first lifecycle guards. No native worker is invoked by these tests.
+//! Source-first lifecycle guards. No demux worker is invoked by these tests.
 use std::sync::atomic::AtomicBool;
 use triergon_core::{
     Budget, Bytes, Error, InputCursor, InputWindow, SourceCapabilities, SourceId, Step, WorkBudget,
 };
-use triergon_mpegts::clock::{NativeClockProfile, NativePesClockV1};
-use triergon_mpegts::native_pes::{NativePesScope, NativeSourceContext};
-use triergon_mpegts::native_recovery::{
-    NativePatRoute, NativePatSelection, NativePesObservation, NativePesRecoveryObserver,
-    NativePmtBinding,
-};
+use triergon_mpegts::compat::pes::{DemuxClock, DemuxProfile, DemuxScope, SourceContext};
 use triergon_mpegts::psi::{DescriptorNamespace, PatTable, ProgramMap, TableStep};
+use triergon_mpegts::reference_trace::recovery::{
+    DemuxObservation, PatRoute, PatSelection, PmtBinding, RecoveryObserver,
+};
 use triergon_mpegts::{
     AssemblyStep, FeedContinuation, PacketFormat, ParseLimits, SourceEpochs, TraceEvent,
     TransportStream,
@@ -26,8 +24,8 @@ struct FeedCapture {
     reject_next: bool,
 }
 
-fn context(n: usize, e: SourceEpochs) -> NativeSourceContext {
-    NativeSourceContext {
+fn context(n: usize, e: SourceEpochs) -> SourceContext {
+    SourceContext {
         source_event_ordinal: n as u64,
         epochs: e,
         byte_run_epoch: None,
@@ -59,7 +57,7 @@ fn collect_stream(
 ) -> (Events, Vec<u64>) {
     let mut capacity = Vec::with_capacity(data.len().max(4096));
     capacity.extend_from_slice(data);
-    let owner = Bytes::try_from_vec(b, capacity).unwrap();
+    let backing = Bytes::try_from_vec(b, capacity).unwrap();
     let mut input = InputCursor::new(
         b,
         entity,
@@ -141,7 +139,7 @@ fn collect_stream(
                                 r.source,
                                 r.token,
                                 r.offset,
-                                owner.slice(start..end).unwrap(),
+                                backing.slice(start..end).unwrap(),
                             )
                             .unwrap(),
                         )
@@ -260,9 +258,9 @@ fn pes(events: &Events) -> Vec<(usize, &triergon_mpegts::Pes)> {
         })
         .collect()
 }
-fn route(events: &Events, program: u16, b: &Budget) -> NativePatRoute {
+fn route(events: &Events, program: u16, b: &Budget) -> PatRoute {
     let (n, t, c) = pat(events);
-    let mut selection = NativePatSelection::new(t, program, b, context(n, c)).unwrap();
+    let mut selection = PatSelection::new(t, program, b, context(n, c)).unwrap();
     for _ in 0..4096 {
         let mut w = WorkBudget::new(1);
         match selection
@@ -276,7 +274,7 @@ fn route(events: &Events, program: u16, b: &Budget) -> NativePatRoute {
     }
     panic!("bounded PAT selection did not finish");
 }
-fn bind(events: &Events, b: &Budget) -> (NativePesRecoveryObserver, NativePatRoute) {
+fn bind(events: &Events, b: &Budget) -> (RecoveryObserver, PatRoute) {
     let program = pat(events)
         .1
         .programs
@@ -292,7 +290,7 @@ fn bind(events: &Events, b: &Budget) -> (NativePesRecoveryObserver, NativePatRou
     let r = route(events, program, b);
     let (n, m, c, _) = maps(events)[0];
     let stream = &m.streams.as_slice()[0];
-    let scope = NativePesScope {
+    let scope = DemuxScope {
         program: r.program(),
         pid: stream.pid,
         stream_type: stream.stream_type,
@@ -300,15 +298,15 @@ fn bind(events: &Events, b: &Budget) -> (NativePesRecoveryObserver, NativePatRou
         entity: r.entity(),
         epochs: c,
     };
-    let mut o = NativePesRecoveryObserver::new_selected_avc_faults_v1(
-        NativeClockProfile::ArchivedPesV1,
+    let mut o = RecoveryObserver::new_selected_avc_faults(
+        DemuxProfile::PesPackets,
         scope,
         b.clone(),
         ParseLimits::default(),
     )
     .unwrap();
     {
-        let mut job = o.bind_selected_pmt_v1(r, m, context(n, c)).unwrap();
+        let mut job = o.bind_selected_pmt(r, m, context(n, c)).unwrap();
         let mut done = false;
         for _ in 0..4096 {
             match job
@@ -328,13 +326,13 @@ fn bind(events: &Events, b: &Budget) -> (NativePesRecoveryObserver, NativePatRou
     }
     (o, r)
 }
-fn drain(o: &mut NativePesRecoveryObserver) -> Vec<triergon_mpegts::native_pes::NativePesPacket> {
+fn drain(o: &mut RecoveryObserver) -> Vec<triergon_mpegts::compat::pes::DemuxPacket> {
     let mut p = Vec::new();
     for _ in 0..4096 {
         let mut w = WorkBudget::new(1);
         match o.poll(&mut w, &AtomicBool::new(false)).unwrap() {
             AssemblyStep::Yield => assert!(w.spent() <= 1),
-            AssemblyStep::Output(NativePesObservation::Accepted(v)) => p.push(v),
+            AssemblyStep::Output(DemuxObservation::Accepted(v)) => p.push(v),
             AssemblyStep::NeedPayload => return p,
             other => panic!("unexpected {other:?}"),
         }
@@ -342,9 +340,9 @@ fn drain(o: &mut NativePesRecoveryObserver) -> Vec<triergon_mpegts::native_pes::
     panic!("native observer did not drain");
 }
 fn push_first(
-    o: &mut NativePesRecoveryObserver,
+    o: &mut RecoveryObserver,
     e: &Events,
-) -> Vec<triergon_mpegts::native_pes::NativePesPacket> {
+) -> Vec<triergon_mpegts::compat::pes::DemuxPacket> {
     let (n, p, c) = e
         .iter()
         .enumerate()
@@ -362,11 +360,9 @@ fn push_first(
     o.push_accepted(p.clone(), context(n, c)).unwrap();
     drain(o)
 }
-fn rebind(o: &mut NativePesRecoveryObserver, r: NativePatRoute, e: &Events) -> NativePmtBinding {
+fn rebind(o: &mut RecoveryObserver, r: PatRoute, e: &Events) -> PmtBinding {
     let (n, m, c, _) = maps(e)[1];
-    let mut job = o
-        .rebind_drained_selected_pmt_v1(r, m, context(n, c))
-        .unwrap();
+    let mut job = o.rebind_drained_selected_pmt(r, m, context(n, c)).unwrap();
     for _ in 0..4096 {
         let mut w = WorkBudget::new(1);
         match job
@@ -385,7 +381,7 @@ fn drive(
 ) -> (
     Budget,
     Events,
-    Vec<triergon_mpegts::native_pes::NativePesPacket>,
+    Vec<triergon_mpegts::compat::pes::DemuxPacket>,
 ) {
     let b = Budget::new(1 << 20).unwrap();
     let e = collect(case, &b);
@@ -538,7 +534,7 @@ fn source_network_entry_is_not_a_track() {
     assert!(pat(&e).1.programs.as_slice()[0].is_network_pid());
     assert!(maps(&e).is_empty() && pes(&e).is_empty());
     let (n, t, c) = pat(&e);
-    let mut s = NativePatSelection::new(t, 1, &b, context(n, c)).unwrap();
+    let mut s = PatSelection::new(t, 1, &b, context(n, c)).unwrap();
     loop {
         match s
             .poll(&mut WorkBudget::new(1), &AtomicBool::new(false))
@@ -595,13 +591,13 @@ fn source_fixture_crc_matches_prior_original_primary_sections() {
 }
 
 #[test]
-fn initial_single_pat_work_cancel_foreign_pool_and_owner() {
+fn initial_single_pat_work_cancel_foreign_pool_and_backing() {
     let b = Budget::new(1 << 20).unwrap();
     let e = collect(Case::Retype188, &b);
     let (n, t, c) = pat(&e);
     let used = b.used();
     {
-        let mut s = NativePatSelection::new(t, 1, &b, context(n, c)).unwrap();
+        let mut s = PatSelection::new(t, 1, &b, context(n, c)).unwrap();
         assert!(matches!(
             s.poll(&mut WorkBudget::new(0), &AtomicBool::new(false)),
             Ok(TableStep::Yield)
@@ -615,7 +611,7 @@ fn initial_single_pat_work_cancel_foreign_pool_and_owner() {
     assert_eq!((r.program(), r.pmt_pid(), r.program_count()), (1, 4096, 1));
     assert_eq!(b.used(), used);
     let f = Budget::new(1 << 20).unwrap();
-    let mut wrong = NativePatSelection::new(t, 1, &f, context(n, c)).unwrap();
+    let mut wrong = PatSelection::new(t, 1, &f, context(n, c)).unwrap();
     let mut failed = false;
     for _ in 0..64 {
         match wrong.poll(&mut WorkBudget::new(1), &AtomicBool::new(false)) {
@@ -635,7 +631,7 @@ fn initial_binding_is_allocation_free_and_drop_cancel_is_atomic() {
     let e = collect(Case::Retype188, &b);
     let r = route(&e, 1, &b);
     let (n, m, c, _) = maps(&e)[0];
-    let scope = NativePesScope {
+    let scope = DemuxScope {
         program: 1,
         pid: 256,
         stream_type: 0x1b,
@@ -643,8 +639,8 @@ fn initial_binding_is_allocation_free_and_drop_cancel_is_atomic() {
         entity: SourceId(1),
         epochs: c,
     };
-    let mut o = NativePesRecoveryObserver::new_selected_avc_faults_v1(
-        NativeClockProfile::ArchivedPesV1,
+    let mut o = RecoveryObserver::new_selected_avc_faults(
+        DemuxProfile::PesPackets,
         scope,
         b.clone(),
         ParseLimits::default(),
@@ -652,7 +648,7 @@ fn initial_binding_is_allocation_free_and_drop_cancel_is_atomic() {
     .unwrap();
     let used = b.used();
     {
-        let mut job = o.bind_selected_pmt_v1(r, m, context(n, c)).unwrap();
+        let mut job = o.bind_selected_pmt(r, m, context(n, c)).unwrap();
         assert!(matches!(
             job.poll(&mut WorkBudget::new(0), &AtomicBool::new(false)),
             Ok(TableStep::Yield)
@@ -663,7 +659,7 @@ fn initial_binding_is_allocation_free_and_drop_cancel_is_atomic() {
         ));
         assert_eq!(job.current_scope(), scope);
     }
-    assert!(o.pmt_binding_v1().is_none());
+    assert!(o.pmt_binding().is_none());
     assert_eq!(b.used(), used);
 }
 
@@ -673,7 +669,7 @@ fn multi(case: Case) {
     assert_eq!(p[0].program, fixtures::selected(case));
     assert_eq!(p[0].source_header.dts_raw33, None);
     assert_eq!(p[0].payload_len, 4);
-    assert_eq!(p[0].native_flags, 0);
+    assert_eq!(p[0].flags, 0);
     assert_eq!(pes(&e).len(), 1);
 }
 #[test]
@@ -696,11 +692,11 @@ fn check_retype(case: Case, positions: [i64; 2]) {
     let (_, e, p) = drive(case);
     assert_eq!(p.len(), 2);
     for (i, p) in p.iter().enumerate() {
-        assert_eq!(p.native_position, positions[i]);
+        assert_eq!(p.position, positions[i]);
         assert_eq!(p.source_epochs.configuration, 2 + i as u64);
-        assert_eq!(p.native_stream_id, 0xe0);
-        assert_eq!(p.native_flags, 0);
-        assert_eq!(p.native_duration90_raw, 0);
+        assert_eq!(p.stream_id, 0xe0);
+        assert_eq!(p.flags, 0);
+        assert_eq!(p.duration90_raw, 0);
         assert_eq!(p.source_header.dts_raw33, None);
         assert_eq!(
             p.payload().flatten().copied().collect::<Vec<_>>(),
@@ -718,14 +714,14 @@ fn feature_drained_avc_hevc_with_opaque_prefix_192() {
     check_retype(Case::Retype192, [388, 772]);
 }
 #[test]
-fn feature_rebind_does_not_reseed_native_clock_or_fill_source_dts() {
+fn feature_rebind_does_not_reseed_demux_clock_or_fill_source_dts() {
     let (_, _, p) = drive(Case::RetypeWrap);
-    let mut clock = NativePesClockV1::new(1).unwrap();
+    let mut clock = DemuxClock::new(1).unwrap();
     let mut views = Vec::new();
     for p in &p {
         views.push(
             clock
-                .project_native_header(
+                .project_header(
                     p.pid,
                     p.source_epochs,
                     p.time_header(),
@@ -742,16 +738,16 @@ fn feature_rebind_does_not_reseed_native_clock_or_fill_source_dts() {
     assert!(views.iter().all(|v| v.source_dts_raw33.is_none()));
 }
 #[test]
-fn feature_retained_old_output_keeps_its_full_owner_and_epoch() {
+fn feature_retained_old_output_keeps_its_full_backing_and_epoch() {
     let b = Budget::new(1 << 20).unwrap();
     let initial = b.used();
     let e = collect(Case::Retype188, &b);
     let (mut o, r) = bind(&e, &b);
     let mut storage = Vec::with_capacity(4096);
     storage.extend_from_slice(&fixtures::bytes(Case::Retype188));
-    let carrier_owner = Bytes::try_from_vec(&b, storage).unwrap();
+    let carrier_backing = Bytes::try_from_vec(&b, storage).unwrap();
     let mut input = triergon_mpegts::parse_transport(
-        carrier_owner.slice(376..564).unwrap(),
+        carrier_backing.slice(376..564).unwrap(),
         PacketFormat::Ts188,
         376,
     )
@@ -763,8 +759,8 @@ fn feature_retained_old_output_keeps_its_full_owner_and_epoch() {
     assert_eq!(input.source.as_ref(), actual.source.as_ref());
     o.push_accepted(input, context(8, e[8].1)).unwrap();
     let old = drain(&mut o).pop().unwrap();
-    let owner = old.spans.as_slice()[0].backing_bytes().clone();
-    assert!(owner.retained_capacity() >= 4096);
+    let backing = old.spans.as_slice()[0].backing_bytes().clone();
+    assert!(backing.retained_capacity() >= 4096);
     let next = rebind(&mut o, r, &e);
     assert_eq!(next.scope.stream_type, 0x24);
     assert_eq!(old.source_epochs.configuration, 2);
@@ -772,13 +768,13 @@ fn feature_retained_old_output_keeps_its_full_owner_and_epoch() {
     assert!(
         old.spans.as_slice()[0]
             .backing_bytes()
-            .shares_storage_with(&owner)
+            .shares_storage_with(&backing)
     );
     drop(o);
     drop(e);
-    drop(carrier_owner);
+    drop(carrier_backing);
     assert!(old.payload().flatten().copied().eq(b"AVC0".iter().copied()));
-    drop(owner);
+    drop(backing);
     drop(old);
     assert_eq!(b.used(), initial);
 }
@@ -791,9 +787,7 @@ fn feature_rebind_work_zero_one_cancel_retry_and_scope_commit() {
     let old = o.scope();
     let (n, m, c, _) = maps(&e)[1];
     {
-        let mut j = o
-            .rebind_drained_selected_pmt_v1(r, m, context(n, c))
-            .unwrap();
+        let mut j = o.rebind_drained_selected_pmt(r, m, context(n, c)).unwrap();
         let used = b.used();
         assert!(matches!(
             j.poll(&mut WorkBudget::new(0), &AtomicBool::new(false)),
@@ -911,7 +905,7 @@ fn guard_pending_body_header_and_mailbox_refuse_rebind() {
         }
         let (n, m, c, _) = maps(&e)[1];
         assert!(matches!(
-            o.rebind_drained_selected_pmt_v1(r, m, context(n, c)),
+            o.rebind_drained_selected_pmt(r, m, context(n, c)),
             Err(Error::Unsupported(
                 "selected PMT binding requires drained observer"
             ))
@@ -928,19 +922,14 @@ fn guard_eof_refuses_rebind() {
     o.end_of_source().unwrap();
     let (n, m, c, _) = maps(&e)[1];
     assert!(matches!(
-        o.rebind_drained_selected_pmt_v1(r, m, context(n, c)),
+        o.rebind_drained_selected_pmt(r, m, context(n, c)),
         Err(Error::Unsupported(
             "selected PMT binding requires drained observer"
         ))
     ));
 }
-fn fail_job(
-    o: &mut NativePesRecoveryObserver,
-    r: NativePatRoute,
-    m: &ProgramMap,
-    c: NativeSourceContext,
-) -> Error {
-    let mut j = o.rebind_drained_selected_pmt_v1(r, m, c).unwrap();
+fn fail_job(o: &mut RecoveryObserver, r: PatRoute, m: &ProgramMap, c: SourceContext) -> Error {
+    let mut j = o.rebind_drained_selected_pmt(r, m, c).unwrap();
     for _ in 0..4096 {
         match j.poll(&mut WorkBudget::new(1), &AtomicBool::new(false)) {
             Ok(TableStep::Yield) => {}
@@ -1005,7 +994,7 @@ fn guard_stale_epoch_order_and_clock_cannot_mutate_binding() {
     }
 }
 #[test]
-fn guard_foreign_map_and_entity_owners_are_not_admitted() {
+fn guard_foreign_map_and_entity_backings_are_not_admitted() {
     let b = Budget::new(1 << 20).unwrap();
     let e = collect(Case::Retype188, &b);
     let (mut o, r) = bind(&e, &b);
@@ -1027,12 +1016,10 @@ fn guard_drop_and_cancel_preserve_old_binding_for_retry() {
     let e = collect(Case::Retype188, &b);
     let (mut o, r) = bind(&e, &b);
     push_first(&mut o, &e);
-    let before = o.pmt_binding_v1();
+    let before = o.pmt_binding();
     let (n, m, c, _) = maps(&e)[1];
     {
-        let mut j = o
-            .rebind_drained_selected_pmt_v1(r, m, context(n, c))
-            .unwrap();
+        let mut j = o.rebind_drained_selected_pmt(r, m, context(n, c)).unwrap();
         assert!(matches!(
             j.poll(&mut WorkBudget::new(0), &AtomicBool::new(false)),
             Ok(TableStep::Yield)
@@ -1042,7 +1029,7 @@ fn guard_drop_and_cancel_preserve_old_binding_for_retry() {
             Err(Error::Cancelled)
         ));
     }
-    assert_eq!(o.pmt_binding_v1(), before);
+    assert_eq!(o.pmt_binding(), before);
 }
 #[test]
 fn guard_binding_ordinal_prevents_stale_transport_replay() {

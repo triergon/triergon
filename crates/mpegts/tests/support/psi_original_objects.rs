@@ -1,17 +1,17 @@
-//! Original PSI memberships: literal complete native objects, unchanged Strict trace.
+//! Original PSI memberships: literal complete demux objects, unchanged Strict trace.
 use super::*;
-fn compatible_adapter(budget: Budget) -> NativeAdapter {
-    NativeAdapter::new_psi_compatibility_v1(
+fn compatible_adapter(budget: Budget) -> DemuxAdapter {
+    DemuxAdapter::new_psi_compatibility(
         budget,
         1,
-        triergon_mpegts::native_catalogue::NativePsiCompatibilityPoliciesV1::ALL_OBSERVED,
+        triergon_mpegts::reference_trace::catalogue::PsiCompatibilityPolicies::ALL_OBSERVED,
     )
     .unwrap()
 }
 struct Observed {
     object: Option<String>,
     source: Vec<u8>,
-    native: String,
+    compat: String,
 }
 fn observe(data: &[u8], compatibility: bool, chunk: usize) -> Observed {
     let budget = Budget::new(8 * 1024 * 1024).unwrap();
@@ -32,10 +32,10 @@ fn observe(data: &[u8], compatibility: bool, chunk: usize) -> Observed {
         1,
     )
     .unwrap();
-    let mut native = if compatibility {
+    let mut compat = if compatibility {
         compatible_adapter(budget.clone())
     } else {
-        NativeAdapter::new_object_v1(budget.clone(), 1).unwrap()
+        DemuxAdapter::new_object(budget.clone(), 1).unwrap()
     };
     let cancel = AtomicBool::new(false);
     let mut ordinal = 0;
@@ -49,7 +49,7 @@ fn observe(data: &[u8], compatibility: bool, chunk: usize) -> Observed {
             Step::Ready(event) => {
                 let cause = Cause::event(&event, ordinal, input.source(), source.source_epochs());
                 ordinal += 1;
-                native.observe_with_cancel(&event, cause, source.clock_is_quarantined(), &cancel);
+                compat.observe_with_cancel(&event, cause, source.clock_is_quarantined(), &cancel);
                 let finished = source_trace::event(
                     &mut strict,
                     event,
@@ -58,18 +58,18 @@ fn observe(data: &[u8], compatibility: bool, chunk: usize) -> Observed {
                     &cancel,
                 )
                 .unwrap();
-                native.drain(&mut raw, cause, &cancel).unwrap();
+                compat.drain(&mut raw, cause, &cancel).unwrap();
                 if finished {
-                    native.logical_end(&mut raw, cause, &cancel).unwrap();
-                    if let Some(object) = native.object.as_ref() {
+                    compat.logical_end(&mut raw, cause, &cancel).unwrap();
+                    if let Some(object) = compat.object.as_ref() {
                         object.evidence_json(&mut raw).unwrap();
                     }
                     let mut object = Vec::new();
-                    let complete = native.object_json(&mut object).unwrap();
+                    let complete = compat.object_json(&mut object).unwrap();
                     return Observed {
                         object: complete.then(|| String::from_utf8(object).unwrap()),
                         source: strict,
-                        native: String::from_utf8(raw).unwrap(),
+                        compat: String::from_utf8(raw).unwrap(),
                     };
                 }
             }
@@ -95,10 +95,10 @@ fn observe(data: &[u8], compatibility: bool, chunk: usize) -> Observed {
             }
             Step::End(_) => {
                 let end = source
-                    .media_entity_end_v1(&mut input, &mut WorkBudget::new(1), &cancel)
+                    .media_entity_end(&mut input, &mut WorkBudget::new(1), &cancel)
                     .unwrap()
                     .unwrap();
-                let _ = native.object_end_with_cancel_v1(&end, &input, &cancel);
+                let _ = compat.object_end_with_cancel(&end, &input, &cancel);
                 source.end_of_source().unwrap();
             }
         }
@@ -126,10 +126,10 @@ fn original_pat_incomplete_version_literal_object_and_source() {
 "###
         ),
         "{}",
-        new.native
+        new.compat
     );
-    assert!(new.native.contains("IncompleteCurrentPat"));
-    assert!(new.native.contains("CurrentPatSectionBeforeWholeTableV1"));
+    assert!(new.compat.contains("IncompleteCurrentPat"));
+    assert!(new.compat.contains("CurrentPatSectionBeforeWholeTableV1"));
 }
 
 #[test]
@@ -152,11 +152,11 @@ fn original_pmt_descriptor_overrun_literal_object_and_source() {
 "###
         ),
         "{}",
-        new.native
+        new.compat
     );
-    assert!(new.native.contains("RejectedPmt"));
+    assert!(new.compat.contains("RejectedPmt"));
     assert!(
-        new.native
+        new.compat
             .contains("PmtDescriptorStopsAfterStreamIdentityV1")
     );
 }
@@ -181,8 +181,8 @@ fn original_pmt_multi_section_forbidden_literal_object_and_source() {
 "###
         ),
         "{}",
-        new.native
+        new.compat
     );
-    assert!(new.native.contains("RejectedPmt"));
-    assert!(new.native.contains("PmtNonzeroSectionV1"));
+    assert!(new.compat.contains("RejectedPmt"));
+    assert!(new.compat.contains("PmtNonzeroSectionV1"));
 }

@@ -1,6 +1,6 @@
 //! Continuity/PSI/PES regressions.
 //! H.222.0 (08/2023) 2.4.3.3/5: a flag and an actual counter break differ.
-//! These assert the strict source operation, never native replay/corrupt-packet policy.
+//! These assert the strict source operation, never demux replay/corrupt-packet policy.
 use std::sync::atomic::{AtomicBool, Ordering};
 use triergon_core::{
     Budget, Bytes, Error, InputCursor, InputWindow, SourceCapabilities, SourceId, Step, WorkBudget,
@@ -190,7 +190,7 @@ fn frozen_one_duplicate_keeps_one_source_pes_and_both_raw_packets() {
             .count(),
         1
     );
-    // The native reference emits two PES packets; this source assertion does not waive it.
+    // The demux reference emits two PES packets; this source assertion does not waive it.
 }
 
 #[test]
@@ -203,7 +203,7 @@ fn frozen_third_copy_keeps_the_invalid_source_diagnostic() {
     stamp(pes[0], 90000, 0, 0);
     fault(&events, 752, "TS excess duplicate");
     raw(&events, source, PacketFormat::Ts188);
-    // The native reference emits three unflagged PES packets. Source error remains required.
+    // The demux reference emits three unflagged PES packets. Source error remains required.
 }
 
 #[test]
@@ -224,7 +224,7 @@ fn frozen_duplicate_pcr_update_keeps_two_raw_clocks_and_one_source_pes() {
         .collect();
     assert_eq!(clocks, [(376, 90000, 7), (564, 90100, 9)]);
     raw(&events, source, PacketFormat::Ts188);
-    // No PCR field or repeated native PES is rewritten into a single source sample.
+    // No PCR field or repeated demux PES is rewritten into a single source sample.
 }
 
 #[test]
@@ -234,7 +234,7 @@ fn frozen_mid_pes_loss_never_becomes_a_complete_source_packet() {
     assert!(packets(&events).is_empty());
     fault(&events, 564, "TS continuity loss");
     raw(&events, source, PacketFormat::Ts188);
-    // The native reference emits 354 bytes with AV_PKT_FLAG_CORRUPT=2. Separate operation only.
+    // The demux reference emits 354 bytes with AV_PKT_FLAG_CORRUPT=2. Separate operation only.
 }
 
 #[test]

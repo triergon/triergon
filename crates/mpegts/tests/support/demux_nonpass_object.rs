@@ -1,4 +1,4 @@
-//! Whole archived native objects, original physical bytes, shared core input.
+//! Whole recorded demux objects, original physical bytes, shared core input.
 use super::*;
 fn run(data: &[u8]) -> String {
     try_run(data).expect("complete native object required")
@@ -22,7 +22,7 @@ fn try_run(data: &[u8]) -> Option<String> {
         1,
     )
     .unwrap();
-    let mut native = NativeAdapter::new_object_v1(budget.clone(), 1).unwrap();
+    let mut compat = DemuxAdapter::new_object(budget.clone(), 1).unwrap();
     let cancel = AtomicBool::new(false);
     let mut ordinal = 0;
     let mut raw = Vec::new();
@@ -35,15 +35,15 @@ fn try_run(data: &[u8]) -> Option<String> {
                 let cause = Cause::event(&event, ordinal, input.source(), source.source_epochs());
                 ordinal += 1;
                 if matches!(event, TraceEvent::Finished) {
-                    native.logical_end(&mut raw, cause, &cancel).unwrap();
+                    compat.logical_end(&mut raw, cause, &cancel).unwrap();
                     let mut object = Vec::new();
-                    return native
+                    return compat
                         .object_json(&mut object)
                         .unwrap()
                         .then(|| String::from_utf8(object).unwrap());
                 }
-                native.observe_with_cancel(&event, cause, source.clock_is_quarantined(), &cancel);
-                native.drain(&mut raw, cause, &cancel).unwrap();
+                compat.observe_with_cancel(&event, cause, source.clock_is_quarantined(), &cancel);
+                compat.drain(&mut raw, cause, &cancel).unwrap();
             }
             Step::Yield => {}
             Step::NeedInput(request) => {
@@ -67,10 +67,10 @@ fn try_run(data: &[u8]) -> Option<String> {
             }
             Step::End(_) => {
                 let end = source
-                    .media_entity_end_v1(&mut input, &mut WorkBudget::new(1), &cancel)
+                    .media_entity_end(&mut input, &mut WorkBudget::new(1), &cancel)
                     .unwrap()
                     .unwrap();
-                let _ = native.object_end_v1(&end, &input);
+                let _ = compat.object_end(&end, &input);
                 source.end_of_source().unwrap();
             }
         }
@@ -348,7 +348,7 @@ fn guard_early_pmt_cannot_be_reported_as_an_empty_catalogue() {
     let original = include_bytes!("../data/pat-atomic-two-sections.ts");
     assert_eq!(original.len(), 3 * 188);
     // Authored single-TS mutation: PMT physically precedes the final PAT section.
-    // It is a separate source-only refusal guard, with no native parity claim.
+    // It is a separate source-only refusal guard, with no demux parity claim.
     let mut bytes = Vec::new();
     bytes.extend_from_slice(&original[..188]);
     bytes.extend_from_slice(&original[376..]);
@@ -357,7 +357,7 @@ fn guard_early_pmt_cannot_be_reported_as_an_empty_catalogue() {
 }
 
 #[test]
-fn guard_other_program_pmt_is_not_an_absent_native_programme() {
+fn guard_other_program_pmt_is_not_an_absent_demux_programme() {
     let original = include_bytes!("../data/pat-atomic-two-sections.ts");
     let mut input = original.to_vec();
     let mut other = original[376..564].to_vec();

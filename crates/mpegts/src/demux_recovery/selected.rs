@@ -3,14 +3,14 @@ use super::*;
 use crate::{FaultKind, TraceFault};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum NativeSelectedFault {
+pub enum SelectedFault {
     PcrEncoding,
     TransportError,
     Scrambling,
     TimestampMarkers,
     ForbiddenTimeFlags,
 }
-impl NativeSelectedFault {
+impl SelectedFault {
     pub fn source_error(self) -> Error {
         match self {
             Self::PcrEncoding => Error::Invalid("PCR reserved bits/extension"),
@@ -32,11 +32,11 @@ impl NativeSelectedFault {
     clippy::large_enum_variant,
     reason = "one charged original input inline; no uncharged Box"
 )]
-pub enum NativeDiagnosticCarrier {
+pub enum DiagnosticCarrier {
     Transport(TransportPacket),
     Rejected(RejectedTransport),
 }
-impl NativeDiagnosticCarrier {
+impl DiagnosticCarrier {
     pub fn backing_bytes(&self) -> &Bytes {
         match self {
             Self::Transport(p) => &p.source,
@@ -50,15 +50,15 @@ impl NativeDiagnosticCarrier {
         }
     }
 }
-/// Encoded native fact, not a source PesHeader. Invalid marker bits remain raw.
+/// Encoded demux fact, not a source PesHeader. Invalid marker bits remain raw.
 #[derive(Debug)]
-pub struct NativeDiagnosticHeader {
+pub struct DiagnosticHeader {
     pub(crate) bytes: Bytes,
     pub(crate) pts: Option<u64>,
     pub(crate) markers_valid: bool,
     pub(crate) time_flags: u8,
 }
-impl NativeDiagnosticHeader {
+impl DiagnosticHeader {
     pub fn as_bytes(&self) -> &[u8] {
         self.bytes.as_ref()
     }
@@ -76,27 +76,27 @@ impl NativeDiagnosticHeader {
     }
 }
 #[derive(Debug)]
-pub struct NativeDiagnosticPesPacket {
-    pub profile: NativeClockProfile,
+pub struct DiagnosticPacket {
+    pub profile: DemuxProfile,
     pub program: u16,
     pub pid: u16,
     pub source_origin: SourceLocation,
     pub source_epochs: SourceEpochs,
-    pub native_position: i64,
-    pub native_flags: u32,
-    pub native_duration90_raw: i64,
-    pub native_stream_id: u8,
-    pub selected_fault: NativeSelectedFault,
+    pub position: i64,
+    pub flags: u32,
+    pub duration90_raw: i64,
+    pub stream_id: u8,
+    pub selected_fault: SelectedFault,
     pub source_fault: TraceFault,
-    pub carrier: NativeDiagnosticCarrier,
-    pub input_context: NativeSourceContext,
-    pub diagnostic_context: NativeSourceContext,
-    pub encoded_header: NativeDiagnosticHeader,
+    pub carrier: DiagnosticCarrier,
+    pub input_context: SourceContext,
+    pub diagnostic_context: SourceContext,
+    pub encoded_header: DiagnosticHeader,
     pub header_source_ranges: BudgetVec<SourceRange>,
     pub payload_len: usize,
-    pub spans: BudgetVec<NativePesSpan>,
+    pub spans: BudgetVec<DemuxSpan>,
 }
-impl NativeDiagnosticPesPacket {
+impl DiagnosticPacket {
     pub fn payload(&self) -> impl Iterator<Item = &[u8]> {
         self.spans.as_slice().iter().map(AsRef::as_ref)
     }
@@ -104,22 +104,22 @@ impl NativeDiagnosticPesPacket {
 
 #[derive(Debug)]
 pub(super) struct SelectedPending {
-    carrier: NativeDiagnosticCarrier,
-    kind: NativeSelectedFault,
-    input: NativeSourceContext,
-    diagnostic: Option<(TraceFault, NativeSourceContext)>,
+    carrier: DiagnosticCarrier,
+    kind: SelectedFault,
+    input: SourceContext,
+    diagnostic: Option<(TraceFault, SourceContext)>,
     start: usize,
     phase: u8,
     header_len: usize,
     pts: Option<u64>,
     header_ranges: BudgetVec<SourceRange>,
-    spans: BudgetVec<NativePesSpan>,
+    spans: BudgetVec<DemuxSpan>,
 }
 impl SelectedPending {
     pub(super) fn rejection(&self) -> Option<&RejectedTransport> {
         match &self.carrier {
-            NativeDiagnosticCarrier::Rejected(r) => Some(r),
-            NativeDiagnosticCarrier::Transport(_) => None,
+            DiagnosticCarrier::Rejected(r) => Some(r),
+            DiagnosticCarrier::Transport(_) => None,
         }
     }
     fn counter(&self) -> u8 {
@@ -147,12 +147,12 @@ pub(super) fn has_selected_hint(packet: &TransportPacket) -> bool {
                 && (p[9] >> 4 != 2 || p[9] & 1 == 0 || p[11] & 1 == 0 || p[13] & 1 == 0)))
 }
 
-impl NativePesRecoveryObserver {
-    /// Explicit d32/default-options finite AVC diagnostic profile, distinct from
-    /// the legacy observer. This is not permission to recover other fault kinds.
-    pub fn new_selected_avc_faults_v1(
-        profile: NativeClockProfile,
-        scope: NativePesScope,
+impl RecoveryObserver {
+    /// Explicit default-options finite AVC diagnostic profile, distinct from the
+    /// plain observer. This does not recover other fault kinds.
+    pub fn new_selected_avc_faults(
+        profile: DemuxProfile,
+        scope: DemuxScope,
         budget: Budget,
         limits: ParseLimits,
     ) -> Result<Self> {
@@ -164,8 +164,8 @@ impl NativePesRecoveryObserver {
         let mut observer = Self::new(
             profile,
             scope,
-            NativeRegisteredCarriage::Avc,
-            NativeRejectedPolicy::OpcrWithoutPcrV1,
+            RegisteredCarriage::Avc,
+            RejectedPolicy::OpcrWithoutPcr,
             budget,
             limits,
         )?;
@@ -176,7 +176,7 @@ impl NativePesRecoveryObserver {
         &self,
         source: Option<triergon_core::SourceId>,
         offset: u64,
-        c: NativeSourceContext,
+        c: SourceContext,
         bytes: &Bytes,
     ) -> Result<()> {
         let s = self.scope();
@@ -194,7 +194,7 @@ impl NativePesRecoveryObserver {
                 "selected diagnostic source context unobserved",
             ));
         }
-        if !self.after_pmt_binding_v1(c)
+        if !self.after_pmt_binding(c)
             || self.last.is_some_and(|(event, old)| {
                 c.source_event_ordinal <= event || (!self.entity_first && offset <= old)
             })
@@ -214,11 +214,11 @@ impl NativePesRecoveryObserver {
     pub(super) fn stage_selected_input(
         &mut self,
         packet: TransportPacket,
-        c: NativeSourceContext,
+        c: SourceContext,
     ) -> std::result::Result<(), PushError<TransportPacket>> {
         let admission = (|| {
             self.selected_context(packet.source_id, packet.source_offset, c, &packet.source)?;
-            NativePesObserver::transport_bounds(&packet)?;
+            DemuxObserver::transport_bounds(&packet)?;
             if packet.pid != self.scope().pid
                 || packet.prefix.is_some()
                 || !packet.payload_unit_start
@@ -242,13 +242,13 @@ impl NativePesRecoveryObserver {
                 return Err(Error::Invalid("selected diagnostic payload extent"));
             }
             let kind = if packet.transport_error {
-                NativeSelectedFault::TransportError
+                SelectedFault::TransportError
             } else if packet.scrambling != 0 {
-                NativeSelectedFault::Scrambling
+                SelectedFault::Scrambling
             } else if body.as_ref().get(7).is_some_and(|b| b >> 6 == 1) {
-                NativeSelectedFault::ForbiddenTimeFlags
+                SelectedFault::ForbiddenTimeFlags
             } else {
-                NativeSelectedFault::TimestampMarkers
+                SelectedFault::TimestampMarkers
             };
             Ok((kind, start))
         })();
@@ -264,7 +264,7 @@ impl NativePesRecoveryObserver {
         self.last = Some((c.source_event_ordinal, packet.source_offset));
         self.entity_first = false;
         self.pending = Some(RecoveryPending::Selected(SelectedPending {
-            carrier: NativeDiagnosticCarrier::Transport(packet),
+            carrier: DiagnosticCarrier::Transport(packet),
             kind,
             input: c,
             diagnostic: None,
@@ -283,12 +283,12 @@ impl NativePesRecoveryObserver {
         clippy::result_large_err,
         reason = "recover the original charged source diagnostic inline"
     )]
-    pub fn push_diagnostic_rejection_v1(
+    pub fn push_diagnostic_rejection(
         &mut self,
         fault: TraceFault,
-        c: NativeSourceContext,
+        c: SourceContext,
     ) -> std::result::Result<(), PushError<TraceFault>> {
-        if let Err(error) = self.inner.validate_native_input(None) {
+        if let Err(error) = self.inner.validate_input(None) {
             return Err(PushError {
                 error,
                 value: fault,
@@ -302,7 +302,7 @@ impl NativePesRecoveryObserver {
             self.selected_context(r.source_id(), r.source_offset(), c, r.bytes())?;
             if fault.kind != FaultKind::Transport
                 || fault.pid.is_some()
-                || fault.error != NativeSelectedFault::PcrEncoding.source_error()
+                || fault.error != SelectedFault::PcrEncoding.source_error()
                 || r.error() != fault.error
                 || fault.location.source != self.scope().entity
                 || fault.location.offset != r.source_offset()
@@ -340,8 +340,8 @@ impl NativePesRecoveryObserver {
         self.last = Some((c.source_event_ordinal, r.source_offset()));
         self.entity_first = false;
         self.pending = Some(RecoveryPending::Selected(SelectedPending {
-            carrier: NativeDiagnosticCarrier::Rejected(r),
-            kind: NativeSelectedFault::PcrEncoding,
+            carrier: DiagnosticCarrier::Rejected(r),
+            kind: SelectedFault::PcrEncoding,
             input: c,
             diagnostic: Some((fault, c)),
             start,
@@ -353,12 +353,8 @@ impl NativePesRecoveryObserver {
         }));
         Ok(())
     }
-    /// A wrong/stale diagnostic leaves the one original pending owner intact.
-    pub fn confirm_source_fault_v1(
-        &mut self,
-        fault: &TraceFault,
-        c: NativeSourceContext,
-    ) -> Result<()> {
+    /// A wrong/stale diagnostic leaves the one original pending storage intact.
+    pub fn confirm_source_fault(&mut self, fault: &TraceFault, c: SourceContext) -> Result<()> {
         let Some(RecoveryPending::Selected(p)) = self.pending.as_mut() else {
             return Err(Error::Invalid(
                 "no selected source fault awaiting diagnostic",
@@ -385,8 +381,8 @@ impl NativePesRecoveryObserver {
         Ok(())
     }
     /// Acknowledge only the real next source Timeline after a previously seen
-    /// validated PCR/DI boundary has drained. No native clock context is reset.
-    pub fn commit_source_timeline_v1(&mut self, c: NativeSourceContext) -> Result<()> {
+    /// validated PCR/DI boundary has drained. No demux clock context is reset.
+    pub fn commit_source_timeline(&mut self, c: SourceContext) -> Result<()> {
         let Some((ordinal, old)) = self.pending_timeline else {
             return Err(Error::Unsupported(
                 "no selected PCR boundary awaiting Timeline",
@@ -404,7 +400,7 @@ impl NativePesRecoveryObserver {
                 "selected source Timeline context unobserved",
             ));
         }
-        self.inner.commit_clock_epoch_v1(c.epochs);
+        self.inner.commit_clock_epoch(c.epochs);
         self.pending_timeline = None;
         Ok(())
     }
@@ -414,7 +410,7 @@ impl NativePesRecoveryObserver {
         &mut self,
         work: &mut WorkBudget,
         cancel: &AtomicBool,
-    ) -> Result<AssemblyStep<NativePesObservation>> {
+    ) -> Result<AssemblyStep<DemuxObservation>> {
         loop {
             if cancel.load(Ordering::Relaxed) {
                 return Err(Error::Cancelled);
@@ -462,9 +458,9 @@ impl NativePesRecoveryObserver {
                     let tei = raw[1] & 0x80 != 0;
                     let scramble = raw[3] >> 6;
                     let envelope_ok = match p.kind {
-                        NativeSelectedFault::PcrEncoding => !tei && scramble == 0 && raw[5] == 16,
-                        NativeSelectedFault::TransportError => tei && scramble == 0 && raw[5] == 0,
-                        NativeSelectedFault::Scrambling => !tei && scramble != 0 && raw[5] == 0,
+                        SelectedFault::PcrEncoding => !tei && scramble == 0 && raw[5] == 16,
+                        SelectedFault::TransportError => tei && scramble == 0 && raw[5] == 0,
+                        SelectedFault::Scrambling => !tei && scramble != 0 && raw[5] == 0,
                         _ => !tei && scramble == 0 && raw[5] == 0,
                     };
                     if !envelope_ok {
@@ -492,7 +488,7 @@ impl NativePesRecoveryObserver {
                     }
                 }
                 3 => {
-                    let forbidden = p.kind == NativeSelectedFault::ForbiddenTimeFlags;
+                    let forbidden = p.kind == SelectedFault::ForbiddenTimeFlags;
                     if body[6] != 0x80
                         || body[7] != (if forbidden { 0x40 } else { 0x80 })
                         || (!forbidden && body[8] != 5)
@@ -513,14 +509,12 @@ impl NativePesRecoveryObserver {
                     if p.header_len == 14 {
                         let t = &body[9..14];
                         let valid = t[0] & 1 != 0 && t[2] & 1 != 0 && t[4] & 1 != 0;
-                        if t[0] >> 4 != 2
-                            || valid == (p.kind == NativeSelectedFault::TimestampMarkers)
-                        {
+                        if t[0] >> 4 != 2 || valid == (p.kind == SelectedFault::TimestampMarkers) {
                             return Err(Error::Unsupported(
                                 "selected diagnostic additional timestamp fault/prefix",
                             ));
                         }
-                        if p.kind != NativeSelectedFault::ForbiddenTimeFlags {
+                        if p.kind != SelectedFault::ForbiddenTimeFlags {
                             p.pts = Some(
                                 (u64::from((t[0] >> 1) & 7) << 30)
                                     | (u64::from(t[1]) << 22)
@@ -544,7 +538,7 @@ impl NativePesRecoveryObserver {
                 7 => p.spans.try_reserve_exact(1)?,
                 8 => {
                     p.spans
-                        .try_push(NativePesSpan {
+                        .try_push(DemuxSpan {
                             bytes: p
                                 .carrier
                                 .backing_bytes()
@@ -564,19 +558,18 @@ impl NativePesRecoveryObserver {
                         .map_err(|e| e.error)?;
                 }
                 9 => {
-                    let header = NativeDiagnosticHeader {
+                    let header = DiagnosticHeader {
                         bytes: p
                             .carrier
                             .backing_bytes()
                             .slice(p.start..p.start + p.header_len)?,
                         pts: p.pts,
-                        markers_valid: p.pts.is_some()
-                            && p.kind != NativeSelectedFault::TimestampMarkers,
+                        markers_valid: p.pts.is_some() && p.kind != SelectedFault::TimestampMarkers,
                         time_flags: body[7] >> 6,
                     };
                     let offset = p.carrier.source_offset();
                     let counter = p.counter();
-                    let position = self.inner.media_native_position_v1(offset)?;
+                    let position = self.inner.media_position(offset)?;
                     let Some(RecoveryPending::Selected(p)) = self.pending.take() else {
                         unreachable!()
                     };
@@ -587,7 +580,7 @@ impl NativePesRecoveryObserver {
                         .note_recovered(counter, offset, diagnostic.source_event_ordinal);
                     let scope = self.inner.scope();
                     return Ok(AssemblyStep::Output(
-                        NativePesObservation::FromSelectedDiagnostic(NativeDiagnosticPesPacket {
+                        DemuxObservation::FromSelectedDiagnostic(DiagnosticPacket {
                             profile: self.inner.profile(),
                             program: scope.program,
                             pid: scope.pid,
@@ -596,10 +589,10 @@ impl NativePesRecoveryObserver {
                                 offset,
                             },
                             source_epochs: p.input.epochs,
-                            native_position: position,
-                            native_flags: 0,
-                            native_duration90_raw: 0,
-                            native_stream_id: 0xe0,
+                            position,
+                            flags: 0,
+                            duration90_raw: 0,
+                            stream_id: 0xe0,
                             selected_fault: p.kind,
                             source_fault: fault,
                             carrier: p.carrier,

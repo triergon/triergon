@@ -1,6 +1,6 @@
 //! H.222.0 2.4.4/2.6 and Annex A; DVB descriptor framing from EN 300 468.
 mod descriptors;
-mod dvb;
+pub(crate) mod dvb;
 mod pat_table;
 mod section;
 mod signalling;
@@ -8,9 +8,8 @@ mod tables;
 
 pub use descriptors::{Descriptor, Descriptors};
 pub use dvb::{
-    CodecIdentification, DescriptorNamespace, DvbNamespaceEvidence, DvbNativeViewProfile,
-    DvbSubtitling, DvbSubtitlingService, DvbSubtitlingServices, DvbSubtitlingSignalling,
-    NativeDvbSingleServiceView,
+    CodecIdentification, DescriptorNamespace, DvbNamespaceEvidence, DvbSubtitling,
+    DvbSubtitlingService, DvbSubtitlingServices, DvbSubtitlingSignalling,
 };
 pub use pat_table::{PatCollector, PatSourceRange, PatTable};
 pub use section::{PsiCrc32, Section, SectionAssembler};

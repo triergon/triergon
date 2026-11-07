@@ -1,44 +1,43 @@
-//! Bounded native catalogue view of actual strict PAT/PMT events.
+//! Bounded demux catalogue view of actual strict PAT/PMT events.
 //!
-//! H.222.0 2.4.4/2.6 remain the source grammar. The separate d32/flags48
-//! compatibility view supplies native stream order, absent-PCR zero and language
+//! H.222.0 2.4.4/2.6 remain the source grammar. The separate flags48
+//! compatibility view supplies demux stream order, absent-PCR zero and language
 //! tags. It does not activate incomplete PATs or rejected PMTs.
 use crate::psi::{PatTable, ProgramMap, PsiCrc32};
-use crate::{MediaEntityEndV1, PacketFormat, ParseLimits, SourceRange, TraceEvent};
+use crate::{MediaEntityEnd, PacketFormat, ParseLimits, SourceRange, TraceEvent};
 use std::sync::atomic::{AtomicBool, Ordering};
 use triergon_core::{Budget, BudgetVec, Bytes, Error, InputCursor, Result, SourceId, WorkBudget};
 
 mod psi_compatibility;
 pub use psi_compatibility::{
-    NativePsiCompatibilityEvidenceV1, NativePsiCompatibilityPoliciesV1,
-    NativePsiCompatibilityReceiptV1, NativePsiCompatibilitySourceStatusV1,
-    NativePsiCompatibilityV1,
+    PsiCompatibility, PsiCompatibilityEvidence, PsiCompatibilityPolicies, PsiCompatibilityRecord,
+    PsiCompatibilitySourceStatus,
 };
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub struct NativeProgramV1 {
+pub struct Program {
     pub program: u16,
     pub pmt_pid: u16,
-    /// Native AVProgram default when no valid PMT was observed; not a source PCR.
-    pub native_pcr_pid: u16,
+    /// Demux AVProgram default when no valid PMT was observed; not a source PCR.
+    pub pcr_pid: u16,
     pub evidence: usize,
 }
 #[derive(Debug)]
-pub struct NativeStreamV1 {
+pub struct Stream {
     pub pid: u16,
     pub stream_type: u8,
     pub language: BudgetVec<u8>,
     pub evidence: usize,
-    native_codec: NativeCatalogueCodecV2,
+    codec: CatalogueCodec,
 }
-impl NativeStreamV1 {
-    pub fn native_codec_v2(&self) -> NativeCatalogueCodecV2 {
-        self.native_codec
+impl Stream {
+    pub fn codec(&self) -> CatalogueCodec {
+        self.codec
     }
 }
-/// Pinned native catalogue identity, never a source namespace or codec configuration.
+/// Demux catalogue identity, never a source namespace or codec configuration.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum NativeCatalogueCodecV2 {
+pub enum CatalogueCodec {
     Avc,
     Hevc,
     AacAdts,
@@ -46,7 +45,7 @@ pub enum NativeCatalogueCodecV2 {
     Ac3,
     Eac3,
 }
-impl NativeCatalogueCodecV2 {
+impl CatalogueCodec {
     pub fn name(self) -> &'static str {
         match self {
             Self::Avc => "h264",
@@ -65,29 +64,29 @@ impl NativeCatalogueCodecV2 {
     }
 }
 #[derive(Debug)]
-pub struct NativeCatalogueEvidenceV1 {
+pub struct CatalogueEvidence {
     pub bytes: BudgetVec<Bytes>,
     pub ranges: BudgetVec<SourceRange>,
 }
 #[derive(Debug)]
-pub struct NativeCatalogueV1 {
+pub struct Catalogue {
     budget: Budget,
     limits: ParseLimits,
     program: u16,
     entity: Option<SourceId>,
-    programs: BudgetVec<NativeProgramV1>,
-    streams: BudgetVec<NativeStreamV1>,
-    evidence: BudgetVec<NativeCatalogueEvidenceV1>,
+    programs: BudgetVec<Program>,
+    streams: BudgetVec<Stream>,
+    evidence: BudgetVec<CatalogueEvidence>,
     pending_pat: Option<(u16, u8)>,
     pending_pmt: Option<(u16, u8)>,
     retained_ranges: usize,
     ended: bool,
     fault: Option<Error>,
-    compatibility: Option<psi_compatibility::CompatibilityStateV1>,
+    compatibility: Option<psi_compatibility::CompatibilityState>,
     format: PacketFormat,
-    selected_carriage_v2: bool,
+    selected_carriage: bool,
 }
-impl NativeCatalogueV1 {
+impl Catalogue {
     pub fn new(budget: Budget, limits: ParseLimits, program: u16) -> Result<Self> {
         limits.validate()?;
         if limits.programs > 64 || limits.streams > 64 || limits.source_spans > 4096 {
@@ -113,12 +112,12 @@ impl NativeCatalogueV1 {
             fault: None,
             compatibility: None,
             format: PacketFormat::Ts188,
-            selected_carriage_v2: false,
+            selected_carriage: false,
         })
     }
-    /// Explicit TS188/M2TS192 audio/video native view. The default
+    /// Explicit TS188/M2TS192 audio/video demux view. The default
     /// constructor remains the TS188/video profile; source semantics are untouched.
-    pub fn new_selected_carriage_v2(
+    pub fn new_selected_carriage(
         budget: Budget,
         limits: ParseLimits,
         program: u16,
@@ -126,38 +125,31 @@ impl NativeCatalogueV1 {
     ) -> Result<Self> {
         let mut value = Self::new(budget, limits, program)?;
         value.format = format;
-        value.selected_carriage_v2 = true;
+        value.selected_carriage = true;
         Ok(value)
     }
-    fn native_codec(
-        &self,
-        kind: u8,
-        program: &[u8],
-        elementary: &[u8],
-    ) -> Result<NativeCatalogueCodecV2> {
+    fn codec(&self, kind: u8, program: &[u8], elementary: &[u8]) -> Result<CatalogueCodec> {
         match kind {
-            0x1b => Ok(NativeCatalogueCodecV2::Avc),
-            0x24 => Ok(NativeCatalogueCodecV2::Hevc),
-            _ if !self.selected_carriage_v2 => Err(Error::Unsupported(
+            0x1b => Ok(CatalogueCodec::Avc),
+            0x24 => Ok(CatalogueCodec::Hevc),
+            _ if !self.selected_carriage => Err(Error::Unsupported(
                 "native catalogue selected video types only",
             )),
-            0x0f => Ok(NativeCatalogueCodecV2::AacAdts),
-            0x11 => Ok(NativeCatalogueCodecV2::AacLatm),
+            0x0f => Ok(CatalogueCodec::AacAdts),
+            0x11 => Ok(CatalogueCodec::AacLatm),
             6 | 0x81 | 0x87 => {
-                use crate::native_pes::{
-                    NativePrivateAudioCarriage as C, NativePrivateAudioDescriptors,
-                };
+                use crate::demux_pes::{PrivateAudioCarriage as C, PrivateAudioDescriptors};
                 let observed = C::from_observed_pmt(
                     kind,
-                    NativePrivateAudioDescriptors {
+                    PrivateAudioDescriptors {
                         program,
                         elementary,
                     },
                     self.limits,
                 )?;
                 Ok(match observed {
-                    C::DvbAc3Tag | C::PrivateType81Ac3 => NativeCatalogueCodecV2::Ac3,
-                    C::DvbEac3Tag | C::PrivateType87Eac3 => NativeCatalogueCodecV2::Eac3,
+                    C::DvbAc3Tag | C::PrivateType81Ac3 => CatalogueCodec::Ac3,
+                    C::DvbEac3Tag | C::PrivateType87Eac3 => CatalogueCodec::Eac3,
                 })
             }
             _ => Err(Error::Unsupported(
@@ -165,13 +157,13 @@ impl NativeCatalogueV1 {
             )),
         }
     }
-    pub fn programs(&self) -> &[NativeProgramV1] {
+    pub fn programs(&self) -> &[Program] {
         self.programs.as_slice()
     }
-    pub fn streams(&self) -> &[NativeStreamV1] {
+    pub fn streams(&self) -> &[Stream] {
         self.streams.as_slice()
     }
-    pub fn evidence(&self) -> &[NativeCatalogueEvidenceV1] {
+    pub fn evidence(&self) -> &[CatalogueEvidence] {
         self.evidence.as_slice()
     }
     /// Current raw PAT section seen, but no complete strict table yet.
@@ -244,7 +236,7 @@ impl NativeCatalogueV1 {
         }
         Ok(())
     }
-    fn retain(&mut self, owners: &[Bytes], ranges: &[SourceRange]) -> Result<usize> {
+    fn retain(&mut self, backings: &[Bytes], ranges: &[SourceRange]) -> Result<usize> {
         if self.evidence.len() >= self.limits.source_spans {
             return Err(Error::Unsupported("native catalogue evidence limit"));
         }
@@ -257,18 +249,18 @@ impl NativeCatalogueV1 {
                 "native catalogue retained source-range limit",
             ));
         }
-        let owner_bytes = owners
+        let backing_bytes = backings
             .iter()
             .try_fold(0usize, |n, b| n.checked_add(b.len()).ok_or(Error::Overflow))?;
         let range_bytes = ranges
             .iter()
             .try_fold(0usize, |n, r| n.checked_add(r.bytes).ok_or(Error::Overflow))?;
-        if owner_bytes != range_bytes || (owner_bytes != 0 && ranges.is_empty()) {
+        if backing_bytes != range_bytes || (backing_bytes != 0 && ranges.is_empty()) {
             return Err(Error::Invalid("native catalogue source accounting"));
         }
         let mut bytes = BudgetVec::new(&self.budget);
         let mut kept = BudgetVec::new(&self.budget);
-        for b in owners {
+        for b in backings {
             if !b.belongs_to(&self.budget) {
                 return Err(Error::ForeignPool);
             }
@@ -278,7 +270,7 @@ impl NativeCatalogueV1 {
         self.source(ranges)?;
         let index = self.evidence.len();
         self.evidence
-            .try_push(NativeCatalogueEvidenceV1 {
+            .try_push(CatalogueEvidence {
                 bytes,
                 ranges: kept,
             })
@@ -423,10 +415,10 @@ impl NativeCatalogueV1 {
                     return Err(Error::Unsupported("native catalogue program limit"));
                 }
                 self.programs
-                    .try_push(NativeProgramV1 {
+                    .try_push(Program {
                         program: e.program_number,
                         pmt_pid: e.pid,
-                        native_pcr_pid: 0,
+                        pcr_pid: 0,
                         evidence,
                     })
                     .map_err(|e| e.error)?;
@@ -502,7 +494,7 @@ impl NativeCatalogueV1 {
                 return Err(Error::Invalid("native catalogue encoded stream mismatch"));
             }
             if !(matches!(stream.stream_type, 0x1b | 0x24)
-                || self.selected_carriage_v2
+                || self.selected_carriage
                     && matches!(stream.stream_type, 0x0f | 0x11 | 6 | 0x81 | 0x87))
             {
                 return Err(Error::Unsupported(
@@ -519,7 +511,7 @@ impl NativeCatalogueV1 {
             map.source_ranges.as_slice(),
         )?;
         for stream in map.streams.as_slice() {
-            let codec = self.native_codec(
+            let codec = self.codec(
                 stream.stream_type,
                 map.program_descriptors.as_ref(),
                 stream.descriptor_bytes.as_ref(),
@@ -531,11 +523,8 @@ impl NativeCatalogueV1 {
                 }
                 let descriptor = descriptor?;
                 if !(matches!(descriptor.tag, 0x0a | 0xee)
-                    || self.selected_carriage_v2
-                        && matches!(
-                            codec,
-                            NativeCatalogueCodecV2::Ac3 | NativeCatalogueCodecV2::Eac3
-                        )
+                    || self.selected_carriage
+                        && matches!(codec, CatalogueCodec::Ac3 | CatalogueCodec::Eac3)
                         && matches!(descriptor.tag, 0x6a | 0x7a))
                 {
                     return Err(Error::Unsupported(
@@ -563,7 +552,7 @@ impl NativeCatalogueV1 {
                 .find(|s| s.pid == stream.pid)
             {
                 old.stream_type = stream.stream_type;
-                old.native_codec = codec;
+                old.codec = codec;
                 old.language = language;
                 old.evidence = evidence;
             } else {
@@ -571,10 +560,10 @@ impl NativeCatalogueV1 {
                     return Err(Error::Unsupported("native catalogue stream limit"));
                 }
                 self.streams
-                    .try_push(NativeStreamV1 {
+                    .try_push(Stream {
                         pid: stream.pid,
                         stream_type: stream.stream_type,
-                        native_codec: codec,
+                        codec,
                         language,
                         evidence,
                     })
@@ -586,17 +575,13 @@ impl NativeCatalogueV1 {
             .iter_mut()
             .find(|p| p.program == h.extension)
             .ok_or(Error::Invalid("native catalogue program vanished"))?
-            .native_pcr_pid = map.pcr_pid;
+            .pcr_pid = map.pcr_pid;
         if self.pending_pmt == Some((h.extension, h.version)) {
             self.pending_pmt = None;
         }
         Ok(())
     }
-    fn validate_terminal_witness_v1(
-        &self,
-        end: &MediaEntityEndV1,
-        input: &InputCursor,
-    ) -> Result<()> {
+    fn validate_terminal_witness(&self, end: &MediaEntityEnd, input: &InputCursor) -> Result<()> {
         if let Some(e) = self.fault {
             return Err(e);
         }
@@ -627,8 +612,8 @@ impl NativeCatalogueV1 {
         Ok(())
     }
     /// Real core/framer witness; advertised length alone never establishes EOF.
-    pub fn finish(&mut self, end: &MediaEntityEndV1, input: &InputCursor) -> Result<()> {
-        self.validate_terminal_witness_v1(end, input)?;
+    pub fn finish(&mut self, end: &MediaEntityEnd, input: &InputCursor) -> Result<()> {
+        self.validate_terminal_witness(end, input)?;
         if self.pending_pat.is_some() {
             return Err(Error::Unsupported(
                 "incomplete current PAT requires compatibility review",
@@ -649,7 +634,7 @@ mod tests {
     use super::*;
     use crate::TransportStream;
     use triergon_core::{InputWindow, SourceCapabilities, Step};
-    fn fixture(budget: &Budget) -> (PatTable, MediaEntityEndV1, InputCursor) {
+    fn fixture(budget: &Budget) -> (PatTable, MediaEntityEnd, InputCursor) {
         let data = include_bytes!("../tests/data/ts188-basic.ts");
         let mut input = InputCursor::new(
             budget,
@@ -700,7 +685,7 @@ mod tests {
                     return (
                         pat.unwrap(),
                         demux
-                            .media_entity_end_v1(&mut input, &mut WorkBudget::new(1), &cancel)
+                            .media_entity_end(&mut input, &mut WorkBudget::new(1), &cancel)
                             .unwrap()
                             .unwrap(),
                         input,
@@ -715,7 +700,7 @@ mod tests {
         let b = Budget::new(1024 * 1024).unwrap();
         let (pat, _, _) = fixture(&b);
         let e = TraceEvent::Pat(pat);
-        let mut view = NativeCatalogueV1::new(b, ParseLimits::default(), 1).unwrap();
+        let mut view = Catalogue::new(b, ParseLimits::default(), 1).unwrap();
         let cancel = AtomicBool::new(false);
         assert!(!view.observe(&e, &mut WorkBudget::new(0), &cancel).unwrap());
         assert!(view.programs().is_empty());
@@ -723,7 +708,7 @@ mod tests {
         assert!(
             view.observe(
                 &e,
-                &mut WorkBudget::new(NativeCatalogueV1::required_work(&e).unwrap()),
+                &mut WorkBudget::new(Catalogue::required_work(&e).unwrap()),
                 &cancel
             )
             .unwrap()
@@ -735,7 +720,7 @@ mod tests {
         let b = Budget::new(1024 * 1024).unwrap();
         let (pat, _, _) = fixture(&b);
         let e = TraceEvent::Pat(pat);
-        let mut view = NativeCatalogueV1::new(b, ParseLimits::default(), 1).unwrap();
+        let mut view = Catalogue::new(b, ParseLimits::default(), 1).unwrap();
         let cancel = AtomicBool::new(true);
         assert_eq!(
             view.observe(&e, &mut WorkBudget::new(4096), &cancel),
@@ -753,8 +738,7 @@ mod tests {
         let b = Budget::new(1024 * 1024).unwrap();
         let (pat, _, _) = fixture(&b);
         let mut view =
-            NativeCatalogueV1::new(Budget::new(1024 * 1024).unwrap(), ParseLimits::default(), 1)
-                .unwrap();
+            Catalogue::new(Budget::new(1024 * 1024).unwrap(), ParseLimits::default(), 1).unwrap();
         assert_eq!(
             view.observe(
                 &TraceEvent::Pat(pat),
@@ -770,7 +754,7 @@ mod tests {
         let b = Budget::new(1024 * 1024).unwrap();
         let (mut pat, _, _) = fixture(&b);
         pat.programs.as_mut_slice()[0].pid += 1;
-        let mut view = NativeCatalogueV1::new(b, ParseLimits::default(), 1).unwrap();
+        let mut view = Catalogue::new(b, ParseLimits::default(), 1).unwrap();
         assert!(
             view.observe(
                 &TraceEvent::Pat(pat),
@@ -787,7 +771,7 @@ mod tests {
         let b = Budget::new(1024 * 1024).unwrap();
         let (mut pat, end, input) = fixture(&b);
         pat.source_ranges.as_mut_slice()[0].range.offset = end.location().offset + 1;
-        let mut view = NativeCatalogueV1::new(b, ParseLimits::default(), 1).unwrap();
+        let mut view = Catalogue::new(b, ParseLimits::default(), 1).unwrap();
         assert!(
             view.observe(
                 &TraceEvent::Pat(pat),
@@ -813,7 +797,7 @@ mod tests {
             4096,
         )
         .unwrap();
-        let mut view = NativeCatalogueV1::new(b, ParseLimits::default(), 1).unwrap();
+        let mut view = Catalogue::new(b, ParseLimits::default(), 1).unwrap();
         assert!(
             view.observe(
                 &TraceEvent::Pat(pat),
@@ -831,7 +815,7 @@ mod tests {
         let (pat, _, _) = fixture(&b);
         let before = b.used();
         let held = b.reserve(b.available() - 16).unwrap();
-        let mut view = NativeCatalogueV1::new(b.clone(), ParseLimits::default(), 1).unwrap();
+        let mut view = Catalogue::new(b.clone(), ParseLimits::default(), 1).unwrap();
         assert!(
             view.observe(
                 &TraceEvent::Pat(pat),
@@ -843,7 +827,7 @@ mod tests {
         assert!(view.fault().is_some());
         drop(view);
         drop(held);
-        // The consumed PAT owner has also been dropped; no view keeps its bytes.
+        // The consumed PAT storage has also been dropped; no view keeps its bytes.
         assert!(b.used() < before);
     }
 }

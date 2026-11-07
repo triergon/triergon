@@ -1,9 +1,9 @@
 //! Opt-in real rejected-carrier observation. No validated source packet/header
-//! is forged. Legacy OPCR and explicit selected-AVC diagnostic policies are separate.
-use crate::clock::NativeClockProfile;
-use crate::native_pes::{
-    NativePesObserver, NativePesPacket, NativePesScope, NativePesSpan, NativePrivateAudioCarriage,
-    NativePrivateAudioDescriptors, NativeRegisteredCarriage, NativeSourceContext,
+//! is forged. OPCR and explicit selected-AVC diagnostic policies are separate.
+use crate::demux_clock::DemuxProfile;
+use crate::demux_pes::{
+    DemuxObserver, DemuxPacket, DemuxScope, DemuxSpan, PrivateAudioCarriage,
+    PrivateAudioDescriptors, RegisteredCarriage, SourceContext,
 };
 use crate::{
     AssemblyStep, PacketFormat, ParseLimits, RejectedTransport, SourceEpochs, SourceRange,
@@ -16,25 +16,23 @@ use triergon_core::{
 
 mod lifecycle;
 mod selected;
-pub use lifecycle::{NativePatRoute, NativePatSelection, NativePmtBinding, NativePmtBindingJob};
-pub use selected::{
-    NativeDiagnosticCarrier, NativeDiagnosticHeader, NativeDiagnosticPesPacket, NativeSelectedFault,
-};
+pub use lifecycle::{PatRoute, PatSelection, PmtBinding, PmtBindingJob};
+pub use selected::{DiagnosticCarrier, DiagnosticHeader, DiagnosticPacket, SelectedFault};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum NativeRejectedPolicy {
+pub enum RejectedPolicy {
     /// This carriage profile has no observed rejected-carrier operation.
-    NoRejectedCarrierV1,
-    OpcrWithoutPcrV1,
+    NoRejectedCarrier,
+    OpcrWithoutPcr,
 }
 
 /// Independently checked encoding in a rejected carrier, NOT a source PesHeader.
 #[derive(Debug)]
-pub struct NativeEncodedHeader {
+pub struct EncodedHeader {
     bytes: Bytes,
     pts: u64,
 }
-impl NativeEncodedHeader {
+impl EncodedHeader {
     pub fn as_bytes(&self) -> &[u8] {
         self.bytes.as_ref()
     }
@@ -50,24 +48,24 @@ impl NativeEncodedHeader {
 }
 
 #[derive(Debug)]
-pub struct NativeRecoveredPesPacket {
-    pub profile: NativeClockProfile,
+pub struct RecoveredPacket {
+    pub profile: DemuxProfile,
     pub program: u16,
     pub pid: u16,
     pub source_origin: SourceLocation,
     pub source_epochs: SourceEpochs,
-    pub native_position: i64,
-    pub native_flags: u32,
-    pub native_duration90_raw: i64,
-    pub native_stream_id: u8,
+    pub position: i64,
+    pub flags: u32,
+    pub duration90_raw: i64,
+    pub stream_id: u8,
     pub rejection: RejectedTransport,
-    pub context: NativeSourceContext,
-    pub encoded_header: NativeEncodedHeader,
+    pub context: SourceContext,
+    pub encoded_header: EncodedHeader,
     pub header_source_ranges: BudgetVec<SourceRange>,
     pub payload_len: usize,
-    pub spans: BudgetVec<NativePesSpan>,
+    pub spans: BudgetVec<DemuxSpan>,
 }
-impl NativeRecoveredPesPacket {
+impl RecoveredPacket {
     pub fn payload(&self) -> impl Iterator<Item = &[u8]> {
         self.spans.as_slice().iter().map(AsRef::as_ref)
     }
@@ -77,20 +75,20 @@ impl NativeRecoveredPesPacket {
     clippy::large_enum_variant,
     reason = "one owned inline observation; dynamic storage is charged, no Box"
 )]
-pub enum NativePesObservation {
-    Accepted(NativePesPacket),
-    FromRejectedCarrier(NativeRecoveredPesPacket),
-    FromSelectedDiagnostic(NativeDiagnosticPesPacket),
+pub enum DemuxObservation {
+    Accepted(DemuxPacket),
+    FromRejectedCarrier(RecoveredPacket),
+    FromSelectedDiagnostic(DiagnosticPacket),
 }
 
 #[derive(Debug)]
 struct Pending {
     rejection: RejectedTransport,
-    context: NativeSourceContext,
+    context: SourceContext,
     phase: u8,
     pts: Option<u64>,
     header_ranges: BudgetVec<SourceRange>,
-    spans: BudgetVec<NativePesSpan>,
+    spans: BudgetVec<DemuxSpan>,
 }
 
 #[derive(Debug)]
@@ -107,11 +105,11 @@ enum RecoveryPending {
 /// single-carrier PES is assembled directly from that real boundary, never from
 /// a completed output. Exactly one pending mailbox, shared pool and clock scope.
 #[derive(Debug)]
-pub struct NativePesRecoveryObserver {
-    inner: NativePesObserver,
-    pmt_binding: Option<NativePmtBinding>,
+pub struct RecoveryObserver {
+    inner: DemuxObserver,
+    pmt_binding: Option<PmtBinding>,
     budget: Budget,
-    policy: NativeRejectedPolicy,
+    policy: RejectedPolicy,
     pending: Option<RecoveryPending>,
     selected_faults: bool,
     pending_timeline: Option<(u64, SourceEpochs)>,
@@ -119,23 +117,17 @@ pub struct NativePesRecoveryObserver {
     entity_first: bool,
     fault: Option<Error>,
 }
-impl NativePesRecoveryObserver {
+impl RecoveryObserver {
     pub fn new(
-        profile: NativeClockProfile,
-        scope: NativePesScope,
-        carriage: NativeRegisteredCarriage,
-        policy: NativeRejectedPolicy,
+        profile: DemuxProfile,
+        scope: DemuxScope,
+        carriage: RegisteredCarriage,
+        policy: RejectedPolicy,
         budget: Budget,
         limits: ParseLimits,
     ) -> Result<Self> {
         Ok(Self {
-            inner: NativePesObserver::new_registered(
-                profile,
-                scope,
-                carriage,
-                budget.clone(),
-                limits,
-            )?,
+            inner: DemuxObserver::new_registered(profile, scope, carriage, budget.clone(), limits)?,
             budget,
             policy,
             pmt_binding: None,
@@ -149,16 +141,16 @@ impl NativePesRecoveryObserver {
     }
     /// Explicit finite private-audio operation; rejected source carriers stay
     /// outside this profile. Accepted carriers use the same charged assembly.
-    pub fn new_private_audio_v1(
-        profile: NativeClockProfile,
-        scope: NativePesScope,
-        carriage: NativePrivateAudioCarriage,
-        descriptors: NativePrivateAudioDescriptors<'_>,
+    pub fn new_private_audio(
+        profile: DemuxProfile,
+        scope: DemuxScope,
+        carriage: PrivateAudioCarriage,
+        descriptors: PrivateAudioDescriptors<'_>,
         budget: Budget,
         limits: ParseLimits,
     ) -> Result<Self> {
         Ok(Self {
-            inner: NativePesObserver::new_private_audio_v1(
+            inner: DemuxObserver::new_private_audio(
                 profile,
                 scope,
                 carriage,
@@ -167,7 +159,7 @@ impl NativePesRecoveryObserver {
                 limits,
             )?,
             budget,
-            policy: NativeRejectedPolicy::NoRejectedCarrierV1,
+            policy: RejectedPolicy::NoRejectedCarrier,
             pmt_binding: None,
             pending: None,
             selected_faults: false,
@@ -178,16 +170,16 @@ impl NativePesRecoveryObserver {
         })
     }
     /// Explicit DVB-signalled finite PES.
-    pub fn new_dvb_subtitles_v1(
-        profile: NativeClockProfile,
-        scope: NativePesScope,
+    pub fn new_dvb_subtitles(
+        profile: DemuxProfile,
+        scope: DemuxScope,
         namespace: crate::psi::DescriptorNamespace,
-        descriptors: super::native_pes::NativeDvbSubtitlesDescriptors<'_>,
+        descriptors: super::demux_pes::DvbSubtitlesDescriptors<'_>,
         budget: Budget,
         limits: ParseLimits,
     ) -> Result<Self> {
         Ok(Self {
-            inner: NativePesObserver::new_dvb_subtitles_v1(
+            inner: DemuxObserver::new_dvb_subtitles(
                 profile,
                 scope,
                 namespace,
@@ -196,7 +188,7 @@ impl NativePesRecoveryObserver {
                 limits,
             )?,
             budget,
-            policy: NativeRejectedPolicy::NoRejectedCarrierV1,
+            policy: RejectedPolicy::NoRejectedCarrier,
             pmt_binding: None,
             pending: None,
             selected_faults: false,
@@ -207,9 +199,9 @@ impl NativePesRecoveryObserver {
         })
     }
 
-    pub fn bind_native_input_v1(
+    pub fn bind_input(
         &mut self,
-        context: &crate::native_input::NativeInputContext,
+        context: &crate::demux_input::InputContext,
         input: &triergon_core::InputCursor,
     ) -> Result<()> {
         if self.pending.is_some() || self.last.is_some() {
@@ -217,26 +209,26 @@ impl NativePesRecoveryObserver {
                 "native recovery startup binding after input",
             ));
         }
-        self.inner.bind_native_input_v1(context, input)
+        self.inner.bind_input(context, input)
     }
-    pub fn validate_native_input_v1(&self, input: &triergon_core::InputCursor) -> Result<()> {
-        self.inner.validate_native_input(Some(input))
+    pub fn validate_input(&self, input: &triergon_core::InputCursor) -> Result<()> {
+        self.inner.validate_input(Some(input))
     }
     /// No active assembly/output/fault: required before dropping an unusable
     /// carrier in the separate complete-object view. Does not alter continuity.
-    pub fn discard_idle_v1(&self) -> bool {
+    pub fn discard_idle(&self) -> bool {
         self.pending.is_none()
             && self.pending_timeline.is_none()
             && self.fault.is_none()
             && self.inner.recovery_idle()
     }
-    pub fn scope(&self) -> NativePesScope {
+    pub fn scope(&self) -> DemuxScope {
         self.inner.scope()
     }
-    /// Explicit contiguous media transaction; legacy pushes stay single-entity.
-    pub fn continue_media_entity_v1(
+    /// Explicit contiguous media transaction; plain pushes stay single-entity.
+    pub fn continue_media_entity(
         &mut self,
-        end: &crate::MediaEntityEndV1,
+        end: &crate::MediaEntityEnd,
         input: &mut triergon_core::InputCursor,
         work: &mut WorkBudget,
         cancel: &AtomicBool,
@@ -252,16 +244,13 @@ impl NativePesRecoveryObserver {
                 "native recovery media entity operation not drained",
             ));
         }
-        if !self
-            .inner
-            .continue_media_entity_v1(end, input, work, cancel)?
-        {
+        if !self.inner.continue_media_entity(end, input, work, cancel)? {
             return Ok(false);
         }
         self.entity_first = true;
         Ok(true)
     }
-    pub fn policy(&self) -> NativeRejectedPolicy {
+    pub fn policy(&self) -> RejectedPolicy {
         self.policy
     }
     pub fn pending_rejection(&self) -> Option<&RejectedTransport> {
@@ -277,7 +266,7 @@ impl NativePesRecoveryObserver {
     pub fn push_accepted(
         &mut self,
         packet: TransportPacket,
-        context: NativeSourceContext,
+        context: SourceContext,
     ) -> std::result::Result<(), PushError<TransportPacket>> {
         self.push_accepted_bound(packet, context, None)
     }
@@ -288,7 +277,7 @@ impl NativePesRecoveryObserver {
     pub fn push_accepted_with_input(
         &mut self,
         packet: TransportPacket,
-        context: NativeSourceContext,
+        context: SourceContext,
         input: &triergon_core::InputCursor,
     ) -> std::result::Result<(), PushError<TransportPacket>> {
         self.push_accepted_bound(packet, context, Some(input))
@@ -300,17 +289,17 @@ impl NativePesRecoveryObserver {
     fn push_accepted_bound(
         &mut self,
         packet: TransportPacket,
-        context: NativeSourceContext,
+        context: SourceContext,
         input: Option<&triergon_core::InputCursor>,
     ) -> std::result::Result<(), PushError<TransportPacket>> {
-        if let Err(error) = self.inner.validate_native_input(input) {
+        if let Err(error) = self.inner.validate_input(input) {
             return Err(PushError {
                 error,
                 value: packet,
             });
         }
         if self.pending.is_some()
-            || !self.after_pmt_binding_v1(context)
+            || !self.after_pmt_binding(context)
             || self.fault.is_some()
             || self.last.is_some_and(|(event, offset)| {
                 context.source_event_ordinal <= event
@@ -343,7 +332,7 @@ impl NativePesRecoveryObserver {
                 self.inner
                     .push_input_boundary(packet, context, true, input)?;
             } else {
-                self.inner.push_clock_boundary_v1(packet, context)?;
+                self.inner.push_clock_boundary(packet, context)?;
             }
             self.pending_timeline = Some((context.source_event_ordinal, context.epochs));
         } else if let Some(input) = input {
@@ -358,16 +347,16 @@ impl NativePesRecoveryObserver {
     }
     #[allow(
         clippy::result_large_err,
-        reason = "recover original charged rejection, error and full owner inline"
+        reason = "recover original charged rejection, error and full storage inline"
     )]
     pub fn push_rejected(
         &mut self,
         rejection: RejectedTransport,
-        context: NativeSourceContext,
+        context: SourceContext,
     ) -> std::result::Result<(), PushError<RejectedTransport>> {
         // This finite-input position view does not admit new rejected-carrier
-        // contexts. Legacy unbound recovery is unaffected.
-        if let Err(error) = self.inner.validate_native_input(None) {
+        // contexts. Unbound recovery is unaffected.
+        if let Err(error) = self.inner.validate_input(None) {
             return Err(PushError {
                 error,
                 value: rejection,
@@ -381,7 +370,7 @@ impl NativePesRecoveryObserver {
             Some(Error::Invalid("native recovery input not drained"))
         } else if !rejection.bytes().belongs_to(&self.budget) {
             Some(Error::ForeignPool)
-        } else if self.policy == NativeRejectedPolicy::NoRejectedCarrierV1 {
+        } else if self.policy == RejectedPolicy::NoRejectedCarrier {
             Some(Error::Unsupported(if self.inner.is_dvb_subtitles() {
                 "native DVB rejected carrier unobserved"
             } else {
@@ -394,7 +383,7 @@ impl NativePesRecoveryObserver {
             Some(Error::Unsupported(
                 "native rejected carrier context unobserved",
             ))
-        } else if !self.after_pmt_binding_v1(context)
+        } else if !self.after_pmt_binding(context)
             || self.last.is_some_and(|(event, offset)| {
                 context.source_event_ordinal <= event || rejection.source_offset() <= offset
             })
@@ -450,7 +439,7 @@ impl NativePesRecoveryObserver {
         &mut self,
         work: &mut WorkBudget,
         cancel: &AtomicBool,
-    ) -> Result<AssemblyStep<NativePesObservation>> {
+    ) -> Result<AssemblyStep<DemuxObservation>> {
         self.poll_bound(work, cancel, None)
     }
     pub fn poll_with_input(
@@ -458,7 +447,7 @@ impl NativePesRecoveryObserver {
         input: &triergon_core::InputCursor,
         work: &mut WorkBudget,
         cancel: &AtomicBool,
-    ) -> Result<AssemblyStep<NativePesObservation>> {
+    ) -> Result<AssemblyStep<DemuxObservation>> {
         self.poll_bound(work, cancel, Some(input))
     }
     fn poll_bound(
@@ -466,8 +455,8 @@ impl NativePesRecoveryObserver {
         work: &mut WorkBudget,
         cancel: &AtomicBool,
         input: Option<&triergon_core::InputCursor>,
-    ) -> Result<AssemblyStep<NativePesObservation>> {
-        self.inner.validate_native_input(input)?;
+    ) -> Result<AssemblyStep<DemuxObservation>> {
+        self.inner.validate_input(input)?;
         if let Some(error) = self.fault {
             return Err(error);
         }
@@ -487,14 +476,14 @@ impl NativePesRecoveryObserver {
         work: &mut WorkBudget,
         cancel: &AtomicBool,
         input: Option<&triergon_core::InputCursor>,
-    ) -> Result<AssemblyStep<NativePesObservation>> {
+    ) -> Result<AssemblyStep<DemuxObservation>> {
         if self.pending.is_none() {
             return self
                 .inner
                 .poll_bound(work, cancel, input)
                 .map(|step| match step {
                     AssemblyStep::Output(packet) => {
-                        AssemblyStep::Output(NativePesObservation::Accepted(packet))
+                        AssemblyStep::Output(DemuxObservation::Accepted(packet))
                     }
                     AssemblyStep::Yield => AssemblyStep::Yield,
                     AssemblyStep::NeedPayload => AssemblyStep::NeedPayload,
@@ -572,7 +561,7 @@ impl NativePesRecoveryObserver {
                     }
                     let scope = self.inner.scope();
                     p.spans
-                        .try_push(NativePesSpan {
+                        .try_push(DemuxSpan {
                             bytes: p
                                 .rejection
                                 .bytes()
@@ -590,11 +579,11 @@ impl NativePesRecoveryObserver {
                 8 => {
                     let scope = self.inner.scope();
                     let offset = p.rejection.source_offset();
-                    let header = NativeEncodedHeader {
+                    let header = EncodedHeader {
                         bytes: p.rejection.bytes().slice(start..start + 14)?,
                         pts: p.pts.ok_or(Error::Invalid("native encoded PTS missing"))?,
                     };
-                    let position = self.inner.media_native_position_v1(offset)?;
+                    let position = self.inner.media_position(offset)?;
                     let Some(RecoveryPending::Opcr(p)) = self.pending.take() else {
                         return Err(Error::Invalid("native rejected input missing"));
                     };
@@ -603,8 +592,8 @@ impl NativePesRecoveryObserver {
                         offset,
                         p.context.source_event_ordinal,
                     );
-                    return Ok(AssemblyStep::Output(
-                        NativePesObservation::FromRejectedCarrier(NativeRecoveredPesPacket {
+                    return Ok(AssemblyStep::Output(DemuxObservation::FromRejectedCarrier(
+                        RecoveredPacket {
                             profile: self.inner.profile(),
                             program: scope.program,
                             pid: scope.pid,
@@ -613,18 +602,18 @@ impl NativePesRecoveryObserver {
                                 offset,
                             },
                             source_epochs: scope.epochs,
-                            native_position: position,
-                            native_flags: 0,
-                            native_duration90_raw: 0,
-                            native_stream_id: 0xe0,
+                            position,
+                            flags: 0,
+                            duration90_raw: 0,
+                            stream_id: 0xe0,
                             payload_len: p.spans.as_slice()[0].as_ref().len(),
                             rejection: p.rejection,
                             context: p.context,
                             encoded_header: header,
                             header_source_ranges: p.header_ranges,
                             spans: p.spans,
-                        }),
-                    ));
+                        },
+                    )));
                 }
                 _ => return Err(Error::Invalid("native rejected input stage")),
             }

@@ -1,5 +1,5 @@
-//! Composed strict-source trace plus the explicit archived native PES operation.
-//! Diagnostic JSON/CLI/I/O are outside timing. No native library is linked.
+//! Composed strict-source trace plus the explicit demux PES operation.
+//! Diagnostic JSON/CLI/I/O are outside timing. No reference library is linked.
 #![forbid(unsafe_code)]
 
 // Reuse the checked source renderer verbatim. Its standalone CLI stays separate.
@@ -20,52 +20,49 @@ use triergon_core::{
     Budget, Bytes, Error, InputCursor, InputWindow, SourceCapabilities, SourceFailure, SourceId,
     SourceLocation, Step, WorkBudget,
 };
-use triergon_mpegts::clock::{NativeClockProfile, NativePesClockV1, NativePesTimeView};
-use triergon_mpegts::native_input::{
-    NativeInputBootstrap, NativeInputContext, NativeInputStep, NativePositionBasis,
+use triergon_mpegts::compat::input::{InputBootstrap, InputContext, InputStep};
+use triergon_mpegts::compat::pes::{
+    DemuxClock, DemuxPacket, DemuxProfile, DemuxScope, DemuxTimeView, DvbSubtitlesDescriptors,
+    PrivateAudioCarriage, PrivateAudioDescriptors, RegisteredCarriage, SourceContext,
 };
-use triergon_mpegts::native_pes::{
-    NativeDvbSubtitlesDescriptors, NativePesPacket, NativePesScope, NativePrivateAudioCarriage,
-    NativePrivateAudioDescriptors, NativeRegisteredCarriage, NativeSourceContext,
-};
-use triergon_mpegts::native_recovery::{
-    NativeDiagnosticPesPacket, NativePesObservation, NativePesRecoveryObserver,
-    NativeRecoveredPesPacket, NativeRejectedPolicy,
-};
-use triergon_mpegts::native_recovery::{NativePatRoute, NativePatSelection};
 use triergon_mpegts::psi::{DescriptorNamespace, Descriptors, DvbNamespaceEvidence};
+use triergon_mpegts::reference_trace::input::PositionBasis;
+use triergon_mpegts::reference_trace::recovery::{
+    DemuxObservation, DiagnosticPacket, RecoveredPacket, RecoveryObserver, RejectedPolicy,
+};
+use triergon_mpegts::reference_trace::recovery::{PatRoute, PatSelection};
 use triergon_mpegts::{
     AssemblyStep, FaultKind, PacketFormat, ParseLimits, RejectedTransport, SourceEpochs,
     SourceRange, TraceEvent, TransportStream,
 };
 
-const PROFILE: NativeClockProfile = NativeClockProfile::ArchivedPesV1;
+const PROFILE: DemuxProfile = DemuxProfile::PesPackets;
 
-#[path = "support/native_object_v1.rs"]
-mod native_object_v1;
+#[path = "support/demux_object.rs"]
+mod demux_object;
 
 fn diagnostic_packet_json(
     output: &mut impl Write,
-    p: &NativeDiagnosticPesPacket,
+    p: &DiagnosticPacket,
     n: u64,
     cause: Cause,
-    time: &triergon_core::Result<triergon_mpegts::clock::NativeDiagnosticTimeView>,
+    time: &triergon_core::Result<triergon_mpegts::reference_trace::recovery::DiagnosticTimeView>,
     budget: &Budget,
 ) -> io::Result<()> {
     write!(
         output,
-        "{{\"kind\":\"native_pes\",\"operation\":\"ArchivedNativePesPacketsV1\",\"profile\":\"{:?}\",\"source_fault_view\":\"NativeD32SelectedAvcDiagnosticsV1\",\"native_packet_ordinal\":{n},\"program\":{},\"pid\":{},\"native_stream_index\":0,\"native_time_base\":[1,90000],\"source_origin\":{{\"source\":{},\"offset\":{}}},\"source_clock_epoch\":{},\"source_configuration_epoch\":{},\"native_position\":{},\"native_flags\":{},\"native_duration90_raw\":{},\"native_stream_id\":{},\"boundary\":\"FiniteLength\",\"payload_kind\":\"DeclaredComplete\",\"source_acceptance\":\"rejected\",\"source_header_status\":\"NotAcceptedBecauseSourceDiagnostic\",\"source_header_hex\":null,\"source_pts_raw33\":null,\"source_dts_raw33\":null,\"time_header_applies\":false,\"native_encoded_header_applies\":true,\"selected_fault\":\"{:?}\",\"native_encoded_header_hex\":",
-        p.profile,
+        "{{\"kind\":\"native_pes\",\"operation\":\"ArchivedNativePesPacketsV1\",\"profile\":\"{}\",\"source_fault_view\":\"NativeD32SelectedAvcDiagnosticsV1\",\"native_packet_ordinal\":{n},\"program\":{},\"pid\":{},\"native_stream_index\":0,\"native_time_base\":[1,90000],\"source_origin\":{{\"source\":{},\"offset\":{}}},\"source_clock_epoch\":{},\"source_configuration_epoch\":{},\"native_position\":{},\"native_flags\":{},\"native_duration90_raw\":{},\"native_stream_id\":{},\"boundary\":\"FiniteLength\",\"payload_kind\":\"DeclaredComplete\",\"source_acceptance\":\"rejected\",\"source_header_status\":\"NotAcceptedBecauseSourceDiagnostic\",\"source_header_hex\":null,\"source_pts_raw33\":null,\"source_dts_raw33\":null,\"time_header_applies\":false,\"native_encoded_header_applies\":true,\"selected_fault\":\"{:?}\",\"native_encoded_header_hex\":",
+        p.profile.label(),
         p.program,
         p.pid,
         p.source_origin.source.0,
         p.source_origin.offset,
         p.source_epochs.clock,
         p.source_epochs.configuration,
-        p.native_position,
-        p.native_flags,
-        p.native_duration90_raw,
-        p.native_stream_id,
+        p.position,
+        p.flags,
+        p.duration90_raw,
+        p.stream_id,
         p.selected_fault
     )?;
     source_trace::hex(output, p.encoded_header.as_bytes())?;
@@ -94,7 +91,7 @@ fn diagnostic_packet_json(
     )?;
     source_trace::hex(output, p.carrier.backing_bytes().as_ref())?;
     output.write_all(b"}")?;
-    if let triergon_mpegts::native_recovery::NativeDiagnosticCarrier::Rejected(r) = &p.carrier {
+    if let triergon_mpegts::reference_trace::recovery::DiagnosticCarrier::Rejected(r) = &p.carrier {
         output.write_all(b",\"rejected_carrier\":")?;
         rejection_json(output, r)?;
     }
@@ -211,26 +208,26 @@ fn rejection_json(output: &mut impl Write, rejection: &RejectedTransport) -> io:
 
 fn recovered_json(
     output: &mut impl Write,
-    packet: &NativeRecoveredPesPacket,
+    packet: &RecoveredPacket,
     ordinal: u64,
     cause: Cause,
-    time: &triergon_core::Result<triergon_mpegts::clock::NativeEncodedTimeView>,
+    time: &triergon_core::Result<triergon_mpegts::reference_trace::recovery::EncodedTimeView>,
     budget: &Budget,
 ) -> io::Result<()> {
     write!(
         output,
-        "{{\"kind\":\"native_pes\",\"operation\":\"ArchivedNativePesPacketsV1\",\"profile\":\"{:?}\",\"native_packet_ordinal\":{ordinal},\"program\":{},\"pid\":{},\"native_stream_index\":0,\"native_time_base\":[1,90000],\"source_origin\":{{\"source\":{},\"offset\":{}}},\"source_clock_epoch\":{},\"source_configuration_epoch\":{},\"native_position\":{},\"native_flags\":{},\"native_duration90_raw\":{},\"native_stream_id\":{},\"boundary\":\"FiniteLength\",\"payload_kind\":\"DeclaredComplete\",\"source_acceptance\":\"rejected\",\"source_header_status\":\"NotAcceptedBecauseCarrierRejected\",\"source_header_hex\":null,\"source_pts_raw33\":null,\"source_dts_raw33\":null,\"time_header_applies\":false,\"native_encoded_header_applies\":true,\"native_encoded_header_hex\":",
-        packet.profile,
+        "{{\"kind\":\"native_pes\",\"operation\":\"ArchivedNativePesPacketsV1\",\"profile\":\"{}\",\"native_packet_ordinal\":{ordinal},\"program\":{},\"pid\":{},\"native_stream_index\":0,\"native_time_base\":[1,90000],\"source_origin\":{{\"source\":{},\"offset\":{}}},\"source_clock_epoch\":{},\"source_configuration_epoch\":{},\"native_position\":{},\"native_flags\":{},\"native_duration90_raw\":{},\"native_stream_id\":{},\"boundary\":\"FiniteLength\",\"payload_kind\":\"DeclaredComplete\",\"source_acceptance\":\"rejected\",\"source_header_status\":\"NotAcceptedBecauseCarrierRejected\",\"source_header_hex\":null,\"source_pts_raw33\":null,\"source_dts_raw33\":null,\"time_header_applies\":false,\"native_encoded_header_applies\":true,\"native_encoded_header_hex\":",
+        packet.profile.label(),
         packet.program,
         packet.pid,
         packet.source_origin.source.0,
         packet.source_origin.offset,
         packet.source_epochs.clock,
         packet.source_epochs.configuration,
-        packet.native_position,
-        packet.native_flags,
-        packet.native_duration90_raw,
-        packet.native_stream_id
+        packet.position,
+        packet.flags,
+        packet.duration90_raw,
+        packet.stream_id
     )?;
     source_trace::hex(output, packet.encoded_header.as_bytes())?;
     write!(
@@ -394,7 +391,7 @@ fn range_json(output: &mut impl Write, range: SourceRange) -> io::Result<()> {
         range.entity.0, range.offset, range.bytes
     )
 }
-fn time_json(output: &mut impl Write, view: &NativePesTimeView) -> io::Result<()> {
+fn time_json(output: &mut impl Write, view: &DemuxTimeView) -> io::Result<()> {
     output.write_all(b"{\"applicable_source_pts_raw33\":")?;
     source_trace::optional(output, view.source_pts_raw33)?;
     output.write_all(b",\"applicable_source_dts_raw33\":")?;
@@ -419,26 +416,26 @@ fn time_json(output: &mut impl Write, view: &NativePesTimeView) -> io::Result<()
 
 fn packet_json(
     output: &mut impl Write,
-    packet: &NativePesPacket,
+    packet: &DemuxPacket,
     ordinal: u64,
     cause: Cause,
-    time: &triergon_core::Result<NativePesTimeView>,
+    time: &triergon_core::Result<DemuxTimeView>,
     budget: &Budget,
 ) -> io::Result<()> {
     write!(
         output,
-        "{{\"kind\":\"native_pes\",\"operation\":\"ArchivedNativePesPacketsV1\",\"profile\":\"{:?}\",\"native_packet_ordinal\":{ordinal},\"program\":{},\"pid\":{},\"native_stream_index\":0,\"native_time_base\":[1,90000],\"source_origin\":{{\"source\":{},\"offset\":{}}},\"source_clock_epoch\":{},\"source_configuration_epoch\":{},\"native_position\":{},\"native_flags\":{},\"native_duration90_raw\":{},\"native_stream_id\":{},\"boundary\":\"{:?}\",\"payload_kind\":\"{:?}\",\"time_header_applies\":{},\"source_header_hex\":",
-        packet.profile,
+        "{{\"kind\":\"native_pes\",\"operation\":\"ArchivedNativePesPacketsV1\",\"profile\":\"{}\",\"native_packet_ordinal\":{ordinal},\"program\":{},\"pid\":{},\"native_stream_index\":0,\"native_time_base\":[1,90000],\"source_origin\":{{\"source\":{},\"offset\":{}}},\"source_clock_epoch\":{},\"source_configuration_epoch\":{},\"native_position\":{},\"native_flags\":{},\"native_duration90_raw\":{},\"native_stream_id\":{},\"boundary\":\"{:?}\",\"payload_kind\":\"{:?}\",\"time_header_applies\":{},\"source_header_hex\":",
+        packet.profile.label(),
         packet.program,
         packet.pid,
         packet.source_origin.source.0,
         packet.source_origin.offset,
         packet.source_epochs.clock,
         packet.source_epochs.configuration,
-        packet.native_position,
-        packet.native_flags,
-        packet.native_duration90_raw,
-        packet.native_stream_id,
+        packet.position,
+        packet.flags,
+        packet.duration90_raw,
+        packet.stream_id,
         packet.boundary,
         packet.payload_kind,
         packet.time_header_applies
@@ -482,7 +479,7 @@ fn packet_json(
             span.context.epochs.configuration
         )?;
         source_trace::optional(output, span.context.byte_run_epoch)?;
-        // Per-span owner charge is not a sum: aliases can share the same owner.
+        // Per-span storage charge is not a sum: aliases can share the same storage.
         write!(
             output,
             ",\"owner_retained_capacity\":{},\"owner_storage_bytes\":{}}}",
@@ -494,7 +491,7 @@ fn packet_json(
     write!(
         output,
         "],\"native_side_data\":[{{\"type\":19,\"hex\":\"{:02x}\"}}],\"native_time\":",
-        packet.native_stream_id
+        packet.stream_id
     )?;
     match time {
         Ok(view) => time_json(output, view)?,
@@ -516,8 +513,8 @@ fn packet_json(
 
 #[derive(Clone, Copy)]
 struct ScopeRecord {
-    scope: NativePesScope,
-    audio: Option<NativePrivateAudioCarriage>,
+    scope: DemuxScope,
+    audio: Option<PrivateAudioCarriage>,
     dvb_namespace: Option<DescriptorNamespace>,
     tsid: u16,
     pmt_pid: u16,
@@ -533,16 +530,16 @@ struct Failure {
 }
 
 /// One inline observer, one pending cause, no output queue. All carrier/results
-/// retain the same charged input owners as the independent source operation.
-struct NativeAdapter {
+/// retain the same charged input storage as the independent source operation.
+struct DemuxAdapter {
     budget: Budget,
     program: u16,
-    clock: NativePesClockV1,
-    observer: Option<NativePesRecoveryObserver>,
-    initial_input: Option<NativeInputContext>,
+    clock: DemuxClock,
+    observer: Option<RecoveryObserver>,
+    initial_input: Option<InputContext>,
     scope: Option<ScopeRecord>,
     pat: Option<(u16, u16)>,
-    pat_route: Option<NativePatRoute>,
+    pat_route: Option<PatRoute>,
     scope_update: Option<(ScopeRecord, ScopeRecord)>,
     announce: bool,
     failure: Option<Failure>,
@@ -551,15 +548,16 @@ struct NativeAdapter {
     packets: u64,
     pending_media_discontinuity: Option<(SourceId, SourceEpochs)>,
     media_entities: bool,
-    object: Option<native_object_v1::ObjectAdapter>,
-    packet_completion: Option<triergon_mpegts::native_packet_completion::NativePacketCompletionV1>,
+    object: Option<demux_object::ObjectAdapter>,
+    packet_completion:
+        Option<triergon_mpegts::reference_trace::packet_completion::PacketCompletion>,
 }
-impl NativeAdapter {
+impl DemuxAdapter {
     fn new(budget: Budget, program: u16) -> triergon_core::Result<Self> {
         Ok(Self {
             budget,
             program,
-            clock: NativePesClockV1::new(program)?,
+            clock: DemuxClock::new(program)?,
             observer: None,
             initial_input: None,
             scope: None,
@@ -577,61 +575,61 @@ impl NativeAdapter {
             packet_completion: None,
         })
     }
-    fn new_object_v1(budget: Budget, program: u16) -> triergon_core::Result<Self> {
-        let mut native = Self::new(budget.clone(), program)?;
-        native.object = Some(native_object_v1::ObjectAdapter::new(budget, program)?);
-        Ok(native)
+    fn new_object(budget: Budget, program: u16) -> triergon_core::Result<Self> {
+        let mut compat = Self::new(budget.clone(), program)?;
+        compat.object = Some(demux_object::ObjectAdapter::new(budget, program)?);
+        Ok(compat)
     }
-    fn new_psi_compatibility_v1(
+    fn new_psi_compatibility(
         budget: Budget,
         program: u16,
-        policies: triergon_mpegts::native_catalogue::NativePsiCompatibilityPoliciesV1,
+        policies: triergon_mpegts::reference_trace::catalogue::PsiCompatibilityPolicies,
     ) -> triergon_core::Result<Self> {
-        let mut native = Self::new(budget.clone(), program)?;
-        native.object = Some(native_object_v1::ObjectAdapter::new_psi_compatibility_v1(
+        let mut compat = Self::new(budget.clone(), program)?;
+        compat.object = Some(demux_object::ObjectAdapter::new_psi_compatibility(
             budget, program, policies,
         )?);
-        Ok(native)
+        Ok(compat)
     }
-    fn new_packet_completion_v1(budget: Budget, program: u16) -> triergon_core::Result<Self> {
-        let mut native = Self::new_psi_compatibility_v1(
+    fn new_packet_completion(budget: Budget, program: u16) -> triergon_core::Result<Self> {
+        let mut compat = Self::new_psi_compatibility(
             budget.clone(),
             program,
-            triergon_mpegts::native_catalogue::NativePsiCompatibilityPoliciesV1::ALL_OBSERVED,
+            triergon_mpegts::reference_trace::catalogue::PsiCompatibilityPolicies::ALL_OBSERVED,
         )?;
-        native.packet_completion = Some(
-            triergon_mpegts::native_packet_completion::NativePacketCompletionV1::new(
+        compat.packet_completion = Some(
+            triergon_mpegts::reference_trace::packet_completion::PacketCompletion::new(
                 budget,
                 ParseLimits::default(),
                 program,
             )?,
         );
-        Ok(native)
+        Ok(compat)
     }
-    fn new_selected_object_v2(
+    fn new_selected_object(
         budget: Budget,
         program: u16,
         format: PacketFormat,
     ) -> triergon_core::Result<Self> {
-        let mut native = Self::new(budget.clone(), program)?;
-        native.object = Some(native_object_v1::ObjectAdapter::new_selected_carriage_v2(
+        let mut compat = Self::new(budget.clone(), program)?;
+        compat.object = Some(demux_object::ObjectAdapter::new_selected_carriage(
             budget.clone(),
             program,
             format,
         )?);
-        native.packet_completion = Some(
-            triergon_mpegts::native_packet_completion::NativePacketCompletionV1::new_for_format_v2(
+        compat.packet_completion = Some(
+            triergon_mpegts::reference_trace::packet_completion::PacketCompletion::new_for_format(
                 budget,
                 ParseLimits::default(),
                 program,
                 format,
             )?,
         );
-        Ok(native)
+        Ok(compat)
     }
-    fn object_end_with_cancel_v1(
+    fn object_end_with_cancel(
         &mut self,
-        end: &triergon_mpegts::MediaEntityEndV1,
+        end: &triergon_mpegts::MediaEntityEnd,
         input: &InputCursor,
         cancel: &AtomicBool,
     ) -> triergon_core::Result<()> {
@@ -639,26 +637,26 @@ impl NativeAdapter {
             .object
             .as_mut()
             .ok_or(Error::Invalid("native whole object not enabled"))?;
-        if object.uses_psi_compatibility_v1() {
-            object.end_psi_with_cancel_v1(end, input, cancel)
+        if object.uses_psi_compatibility() {
+            object.end_psi_with_cancel(end, input, cancel)
         } else {
             object.end(end, input)
         }
     }
-    fn packet_physical_end_v1(
+    fn packet_physical_end(
         &mut self,
-        end: &triergon_mpegts::MediaEntityEndV1,
+        end: &triergon_mpegts::MediaEntityEnd,
         input: &mut InputCursor,
         cancel: &AtomicBool,
     ) -> triergon_core::Result<()> {
-        let result = self.object_end_with_cancel_v1(end, input, cancel);
+        let result = self.object_end_with_cancel(end, input, cancel);
         let sealed = (|| {
             let completion = self
                 .packet_completion
                 .as_mut()
                 .ok_or(Error::Invalid("packet completion profile not enabled"))?;
-            let cost = completion.required_end_work_v1()?;
-            if !completion.seal_physical_end_v1(end, input, &mut WorkBudget::new(cost), cancel)? {
+            let cost = completion.required_end_work()?;
+            if !completion.seal_physical_end(end, input, &mut WorkBudget::new(cost), cancel)? {
                 return Err(Error::Invalid("packet completion exact End grant yielded"));
             }
             Ok(())
@@ -677,9 +675,9 @@ impl NativeAdapter {
         result
     }
     #[cfg(test)]
-    fn object_end_v1(
+    fn object_end(
         &mut self,
-        end: &triergon_mpegts::MediaEntityEndV1,
+        end: &triergon_mpegts::MediaEntityEnd,
         input: &InputCursor,
     ) -> triergon_core::Result<()> {
         self.object
@@ -720,9 +718,9 @@ impl NativeAdapter {
             self.initial_input = None;
         }
     }
-    fn media_entity_boundary_v1(
+    fn media_entity_boundary(
         &mut self,
-        end: &triergon_mpegts::MediaEntityEndV1,
+        end: &triergon_mpegts::MediaEntityEnd,
         input: &mut InputCursor,
         discontinuity: bool,
         work: &mut WorkBudget,
@@ -755,7 +753,7 @@ impl NativeAdapter {
                     .checked_add(1)
                     .ok_or(Error::Overflow)?,
             };
-            let clock = NativePesClockV1::new(self.program)?;
+            let clock = DemuxClock::new(self.program)?;
             input.read_into(&mut [], work, cancel)?;
             if !work.try_charge(1) {
                 return Ok(false);
@@ -777,7 +775,7 @@ impl NativeAdapter {
                 .observer
                 .as_mut()
                 .ok_or(Error::Invalid("native media observer missing"))?;
-            if !observer.continue_media_entity_v1(end, input, work, cancel)? {
+            if !observer.continue_media_entity(end, input, work, cancel)? {
                 return Ok(false);
             }
             let mut next = record;
@@ -820,7 +818,7 @@ impl NativeAdapter {
             return;
         }
         if let Some(observer) = &self.observer
-            && let Err(error) = observer.validate_native_input_v1(input)
+            && let Err(error) = observer.validate_input(input)
         {
             self.fail(error, cause);
             return;
@@ -842,7 +840,7 @@ impl NativeAdapter {
     ) {
         if self.packet_completion.is_some() {
             let admitted = (|| {
-                let context = NativeSourceContext {
+                let context = SourceContext {
                     source_event_ordinal: cause.ordinal.ok_or(Error::Invalid(
                         "packet completion actual source ordinal missing",
                     ))?,
@@ -853,8 +851,8 @@ impl NativeAdapter {
                     .packet_completion
                     .as_mut()
                     .ok_or(Error::Invalid("packet completion state missing"))?;
-                let cost = completion.required_work_v1(event)?;
-                if !completion.observe_v1(
+                let cost = completion.required_work(event)?;
+                if !completion.observe(
                     event,
                     cause.source,
                     context,
@@ -876,14 +874,14 @@ impl NativeAdapter {
             let idle = self
                 .observer
                 .as_ref()
-                .is_none_or(NativePesRecoveryObserver::discard_idle_v1);
-            let skipped = if object.uses_psi_compatibility_v1() {
+                .is_none_or(RecoveryObserver::discard_idle);
+            let skipped = if object.uses_psi_compatibility() {
                 if let Some(ordinal) = cause.ordinal {
-                    object.observe_psi_context_v1(
+                    object.observe_psi_context(
                         event,
                         idle,
                         cause.source,
-                        NativeSourceContext {
+                        SourceContext {
                             source_event_ordinal: ordinal,
                             epochs: cause.epochs,
                             byte_run_epoch: None,
@@ -891,7 +889,7 @@ impl NativeAdapter {
                         cancel,
                     )
                 } else {
-                    object.missing_psi_source_context_v1();
+                    object.missing_psi_source_context();
                     return;
                 }
             } else {
@@ -952,10 +950,10 @@ impl NativeAdapter {
                     .observer
                     .as_mut()
                     .ok_or(Error::Invalid("native observer missing"))?;
-                let mut job = observer.rebind_drained_selected_pmt_v1(
+                let mut job = observer.rebind_drained_selected_pmt(
                     route,
                     map,
-                    NativeSourceContext {
+                    SourceContext {
                         source_event_ordinal: ordinal,
                         epochs: cause.epochs,
                         byte_run_epoch: None,
@@ -1001,7 +999,7 @@ impl NativeAdapter {
                         .as_mut()
                         .ok_or(Error::Invalid("native observer missing"))
                         .and_then(|o| {
-                            o.commit_source_timeline_v1(NativeSourceContext {
+                            o.commit_source_timeline(SourceContext {
                                 source_event_ordinal: cause
                                     .ordinal
                                     .ok_or(Error::Invalid("native Timeline ordinal missing"))?,
@@ -1054,11 +1052,11 @@ impl NativeAdapter {
                     let ordinal = cause
                         .ordinal
                         .ok_or(Error::Invalid("selected PAT source ordinal missing"))?;
-                    let mut search = NativePatSelection::new(
+                    let mut search = PatSelection::new(
                         table,
                         self.program,
                         &self.budget,
-                        NativeSourceContext {
+                        SourceContext {
                             source_event_ordinal: ordinal,
                             epochs: cause.epochs,
                             byte_run_epoch: None,
@@ -1138,13 +1136,13 @@ impl NativeAdapter {
                     return;
                 }
                 let carriage = match streams[0].stream_type {
-                    0x1b => Some(NativeRegisteredCarriage::Avc),
-                    0x24 => Some(NativeRegisteredCarriage::Hevc),
-                    0x0f => Some(NativeRegisteredCarriage::AacAdts),
-                    0x11 => Some(NativeRegisteredCarriage::AacLatm),
+                    0x1b => Some(RegisteredCarriage::Avc),
+                    0x24 => Some(RegisteredCarriage::Hevc),
+                    0x0f => Some(RegisteredCarriage::AacAdts),
+                    0x11 => Some(RegisteredCarriage::AacLatm),
                     _ => None,
                 };
-                let descriptors = NativePrivateAudioDescriptors {
+                let descriptors = PrivateAudioDescriptors {
                     program: map.program_descriptors.as_ref(),
                     elementary: streams[0].descriptor_bytes.as_ref(),
                 };
@@ -1170,7 +1168,7 @@ impl NativeAdapter {
                         );
                         return;
                     }
-                    match NativePrivateAudioCarriage::from_observed_pmt(
+                    match PrivateAudioCarriage::from_observed_pmt(
                         streams[0].stream_type,
                         descriptors,
                         ParseLimits::default(),
@@ -1184,7 +1182,7 @@ impl NativeAdapter {
                 } else {
                     None
                 };
-                let scope = NativePesScope {
+                let scope = DemuxScope {
                     program: self.program,
                     pid: streams[0].pid,
                     stream_type: streams[0].stream_type,
@@ -1192,7 +1190,7 @@ impl NativeAdapter {
                         0xbd
                     } else if matches!(
                         carriage,
-                        Some(NativeRegisteredCarriage::AacAdts | NativeRegisteredCarriage::AacLatm)
+                        Some(RegisteredCarriage::AacAdts | RegisteredCarriage::AacLatm)
                     ) {
                         0xc0
                     } else {
@@ -1202,23 +1200,23 @@ impl NativeAdapter {
                     epochs: cause.epochs,
                 };
                 let admitted = match (carriage, audio, dvb_namespace) {
-                    (Some(NativeRegisteredCarriage::Avc), None, None) => {
-                        NativePesRecoveryObserver::new_selected_avc_faults_v1(
+                    (Some(RegisteredCarriage::Avc), None, None) => {
+                        RecoveryObserver::new_selected_avc_faults(
                             PROFILE,
                             scope,
                             self.budget.clone(),
                             ParseLimits::default(),
                         )
                     }
-                    (Some(carriage), None, None) => NativePesRecoveryObserver::new(
+                    (Some(carriage), None, None) => RecoveryObserver::new(
                         PROFILE,
                         scope,
                         carriage,
-                        NativeRejectedPolicy::OpcrWithoutPcrV1,
+                        RejectedPolicy::OpcrWithoutPcr,
                         self.budget.clone(),
                         ParseLimits::default(),
                     ),
-                    (None, Some(audio), None) => NativePesRecoveryObserver::new_private_audio_v1(
+                    (None, Some(audio), None) => RecoveryObserver::new_private_audio(
                         PROFILE,
                         scope,
                         audio,
@@ -1226,19 +1224,17 @@ impl NativeAdapter {
                         self.budget.clone(),
                         ParseLimits::default(),
                     ),
-                    (None, None, Some(namespace)) => {
-                        NativePesRecoveryObserver::new_dvb_subtitles_v1(
-                            PROFILE,
-                            scope,
-                            namespace,
-                            NativeDvbSubtitlesDescriptors {
-                                program: descriptors.program,
-                                elementary: descriptors.elementary,
-                            },
-                            self.budget.clone(),
-                            ParseLimits::default(),
-                        )
-                    }
+                    (None, None, Some(namespace)) => RecoveryObserver::new_dvb_subtitles(
+                        PROFILE,
+                        scope,
+                        namespace,
+                        DvbSubtitlesDescriptors {
+                            program: descriptors.program,
+                            elementary: descriptors.elementary,
+                        },
+                        self.budget.clone(),
+                        ParseLimits::default(),
+                    ),
                     _ => Err(Error::Invalid("native carriage selection")),
                 };
                 match admitted {
@@ -1246,7 +1242,7 @@ impl NativeAdapter {
                         if let Some(context) = &self.initial_input {
                             let binding = input
                                 .ok_or(Error::Invalid("native startup input missing"))
-                                .and_then(|input| observer.bind_native_input_v1(context, input));
+                                .and_then(|input| observer.bind_input(context, input));
                             if let Err(error) = binding {
                                 self.fail(error, cause);
                                 return;
@@ -1261,10 +1257,10 @@ impl NativeAdapter {
                                 let ordinal = cause
                                     .ordinal
                                     .ok_or(Error::Invalid("selected PMT source ordinal missing"))?;
-                                let mut job = observer.bind_selected_pmt_v1(
+                                let mut job = observer.bind_selected_pmt(
                                     route,
                                     map,
-                                    NativeSourceContext {
+                                    SourceContext {
                                         source_event_ordinal: ordinal,
                                         epochs: cause.epochs,
                                         byte_run_epoch: None,
@@ -1312,9 +1308,9 @@ impl NativeAdapter {
                 let Some(record) = self.scope else {
                     if let (Some(completion), Some(ordinal)) =
                         (self.packet_completion.as_ref(), cause.ordinal)
-                        && completion.is_control_transport_v1(
+                        && completion.is_control_transport(
                             packet.pid,
-                            NativeSourceContext {
+                            SourceContext {
                                 source_event_ordinal: ordinal,
                                 epochs: cause.epochs,
                                 byte_run_epoch: None,
@@ -1342,7 +1338,7 @@ impl NativeAdapter {
                         );
                         return;
                     };
-                    let context = NativeSourceContext {
+                    let context = SourceContext {
                         source_event_ordinal: ordinal,
                         epochs: cause.epochs,
                         byte_run_epoch: None,
@@ -1403,7 +1399,7 @@ impl NativeAdapter {
                 let result = if let (Some(ordinal), Some(observer)) =
                     (cause.ordinal, self.observer.as_mut())
                 {
-                    let context = NativeSourceContext {
+                    let context = SourceContext {
                         source_event_ordinal: ordinal,
                         epochs: cause.epochs,
                         byte_run_epoch: None,
@@ -1412,7 +1408,7 @@ impl NativeAdapter {
                         && fault.rejected.is_some()
                     {
                         observer
-                            .push_diagnostic_rejection_v1(fault.clone(), context)
+                            .push_diagnostic_rejection(fault.clone(), context)
                             .map_err(|e| e.error)
                     } else if let Some(rejection) = fault.rejected.as_ref() {
                         if rejection.error() != fault.error
@@ -1437,7 +1433,7 @@ impl NativeAdapter {
                             ) | Error::Unsupported("scrambled TS payload")
                         )
                     {
-                        observer.confirm_source_fault_v1(fault, context)
+                        observer.confirm_source_fault(fault, context)
                     } else {
                         Err(Error::Unsupported(
                             "native raw transport unavailable after source rejection",
@@ -1488,7 +1484,7 @@ impl NativeAdapter {
                 cause_json(output, record.cause)?;
                 if let Some(audio) = record.audio {
                     output.write_all(b",\"carriage_view\":")?;
-                    triergon_harness_protocol::write_quoted(output, audio.name())?;
+                    triergon_harness_protocol::write_quoted(output, audio.label())?;
                     output.write_all(b",\"source_namespace_inferred\":false,\"scope_rejected_policy\":\"NoRejectedCarrierV1\"")?;
                 }
                 if let Some(namespace) = record.dvb_namespace {
@@ -1503,12 +1499,12 @@ impl NativeAdapter {
                 if self
                     .observer
                     .as_ref()
-                    .is_some_and(|o| o.pmt_binding_v1().is_some())
+                    .is_some_and(|o| o.pmt_binding().is_some())
                 {
                     write!(
                         output,
                         ",\"lifecycle_view\":\"NativeSelectedProgramLifecycleV1\",\"selected_pat_programs\":{}",
-                        self.pat_route.map_or(0, NativePatRoute::program_count)
+                        self.pat_route.map_or(0, PatRoute::program_count)
                     )?;
                 }
                 output.write_all(b",\"qualified\":false}\n")?;
@@ -1577,10 +1573,10 @@ impl NativeAdapter {
                 observer.poll(&mut WorkBudget::new(4096), cancel)
             };
             match step {
-                Ok(AssemblyStep::Output(NativePesObservation::Accepted(packet))) => {
+                Ok(AssemblyStep::Output(DemuxObservation::Accepted(packet))) => {
                     let time = self
                         .clock
-                        .project_native_header(
+                        .project_header(
                             packet.pid,
                             packet.source_epochs,
                             packet.time_header(),
@@ -1609,7 +1605,7 @@ impl NativeAdapter {
                         break;
                     }
                 }
-                Ok(AssemblyStep::Output(NativePesObservation::FromRejectedCarrier(packet))) => {
+                Ok(AssemblyStep::Output(DemuxObservation::FromRejectedCarrier(packet))) => {
                     let time = self
                         .clock
                         .project_encoded_header(
@@ -1635,10 +1631,10 @@ impl NativeAdapter {
                         break;
                     }
                 }
-                Ok(AssemblyStep::Output(NativePesObservation::FromSelectedDiagnostic(packet))) => {
+                Ok(AssemblyStep::Output(DemuxObservation::FromSelectedDiagnostic(packet))) => {
                     let time = self
                         .clock
-                        .project_diagnostic_header_v1(
+                        .project_diagnostic_header(
                             packet.pid,
                             &packet.encoded_header,
                             &mut WorkBudget::new(1),
@@ -1707,7 +1703,7 @@ impl NativeAdapter {
                 .ok_or(Error::Unsupported(
                     "native scope not established at logical EOF",
                 ))
-                .and_then(NativePesRecoveryObserver::end_of_source);
+                .and_then(RecoveryObserver::end_of_source);
             if let Err(error) = result {
                 self.fail(error, cause);
             }
@@ -1719,7 +1715,7 @@ impl NativeAdapter {
         }
         Ok(())
     }
-    fn packet_logical_end_v1(
+    fn packet_logical_end(
         &mut self,
         output: &mut impl Write,
         cause: Cause,
@@ -1734,7 +1730,7 @@ impl NativeAdapter {
                 .packet_completion
                 .as_mut()
                 .ok_or(Error::Invalid("packet completion profile not enabled"))?;
-            if !completion.validate_finished_v1(input, &mut WorkBudget::new(1), cancel)? {
+            if !completion.validate_finished(input, &mut WorkBudget::new(1), cancel)? {
                 return Err(Error::Invalid(
                     "packet completion exact terminal grant yielded",
                 ));
@@ -1742,16 +1738,16 @@ impl NativeAdapter {
             self.object
                 .as_ref()
                 .ok_or(Error::Invalid("packet completion whole object missing"))?
-                .packet_completion_ready_v1()?;
+                .packet_completion_ready()?;
             if self.observer.is_none() {
                 if self.scope.is_some() || self.packets != 0 {
                     return Err(Error::Invalid(
                         "packet completion no-media/observer state mismatch",
                     ));
                 }
-                let cost = completion.required_end_work_v1()?;
+                let cost = completion.required_end_work()?;
                 if completion
-                    .confirm_no_media_v1(input, &mut WorkBudget::new(cost), cancel)?
+                    .confirm_no_media(input, &mut WorkBudget::new(cost), cancel)?
                     .is_none()
                 {
                     return Err(Error::Invalid(
@@ -1774,7 +1770,7 @@ impl NativeAdapter {
             self.logical_end_with_input(output, cause, cancel, Some(input))
         }
     }
-    fn packet_completion_json_v1(&self, output: &mut impl Write) -> io::Result<()> {
+    fn packet_completion_json(&self, output: &mut impl Write) -> io::Result<()> {
         let Some(completion) = self.packet_completion.as_ref() else {
             return Ok(());
         };
@@ -1785,16 +1781,16 @@ impl NativeAdapter {
             self.scope.is_some(),
             self.packets
         )?;
-        if let Some(receipt) = completion.receipt() {
+        if let Some(confirmation) = completion.confirmation() {
             write!(
                 output,
                 "{{\"source\":{},\"source_bytes\":{},\"physical_carriers\":{},\"pat_facts\":{},\"pmt_sections\":{},\"source_finished_ordinal\":{}}}",
-                receipt.source().0,
-                receipt.source_bytes(),
-                receipt.physical_carriers(),
-                receipt.pat_facts(),
-                receipt.pmt_sections(),
-                receipt.source_finished().source_event_ordinal
+                confirmation.source().0,
+                confirmation.source_bytes(),
+                confirmation.physical_carriers(),
+                confirmation.pat_facts(),
+                confirmation.pmt_sections(),
+                confirmation.source_finished().source_event_ordinal
             )?;
         } else {
             output.write_all(b"null")?;
@@ -1874,14 +1870,14 @@ impl NativeAdapter {
 }
 
 #[derive(Default)]
-struct NativeStartupV1 {
+struct DemuxStartup {
     eof: bool,
     failure: bool,
     byte: Option<u8>,
-    result: Option<triergon_core::Result<NativeInputContext>>,
+    result: Option<triergon_core::Result<InputContext>>,
 }
 
-fn prepare_native_startup_v1(
+fn prepare_demux_startup(
     reader: &mut impl Read,
     input: &mut InputCursor,
     budget: &Budget,
@@ -1889,8 +1885,8 @@ fn prepare_native_startup_v1(
     enabled: bool,
     buffer: &mut [u8; 16 * 1024],
     cancel: &AtomicBool,
-) -> Result<NativeStartupV1, Box<dyn std::error::Error>> {
-    let mut startup = NativeStartupV1::default();
+) -> Result<DemuxStartup, Box<dyn std::error::Error>> {
+    let mut startup = DemuxStartup::default();
     // The opt-in finite operation uses one real InputWindow, not a second
     // parser/cursor. A positive-size terminal read is kept separate from the
     // advertised size and deferred core finish/fail until the prefix drains.
@@ -1910,7 +1906,7 @@ fn prepare_native_startup_v1(
                 Ok(0) => {
                     startup.eof = true;
                     (|| {
-                        let mut job = NativeInputBootstrap::new(input, &window, format)?;
+                        let mut job = InputBootstrap::new(input, &window, format)?;
                         job.observe_entity_eof(
                             input,
                             request.source,
@@ -1919,9 +1915,9 @@ fn prepare_native_startup_v1(
                         )?;
                         loop {
                             match job.poll(input, &mut WorkBudget::new(4096), cancel)? {
-                                NativeInputStep::Ready(context) => return Ok(context),
-                                NativeInputStep::Yield => {}
-                                NativeInputStep::NeedEntityEof => {
+                                InputStep::Ready(context) => return Ok(context),
+                                InputStep::Yield => {}
+                                InputStep::NeedEntityEof => {
                                     return Err(Error::Invalid("real startup EOF lost"));
                                 }
                             }
@@ -1946,16 +1942,16 @@ fn prepare_native_startup_v1(
     Ok(startup)
 }
 
-fn apply_native_startup_v1(
-    native: &mut NativeAdapter,
-    startup: &mut NativeStartupV1,
+fn apply_demux_startup(
+    compat: &mut DemuxAdapter,
+    startup: &mut DemuxStartup,
     input: &InputCursor,
     epochs: SourceEpochs,
 ) {
     if let Some(result) = startup.result.take() {
         match result {
-            Ok(context) => native.initial_input = Some(context),
-            Err(error) => native.fail(
+            Ok(context) => compat.initial_input = Some(context),
+            Err(error) => compat.fail(
                 error,
                 Cause::boundary(
                     "native_startup_context",
@@ -1970,25 +1966,25 @@ fn apply_native_startup_v1(
     }
 }
 
-fn native_input_operation_json(
+fn demux_input_operation_json(
     output: &mut impl Write,
-    native: &NativeAdapter,
+    compat: &DemuxAdapter,
     input: &InputCursor,
     startup_eof: bool,
 ) -> io::Result<()> {
-    let basis = match native.initial_input.as_ref().map(NativeInputContext::basis) {
-        Some(NativePositionBasis::CarrierStart) => "carrier_start",
-        Some(NativePositionBasis::SyncStart) => "sync_start",
+    let basis = match compat.initial_input.as_ref().map(InputContext::basis) {
+        Some(PositionBasis::CarrierStart) => "carrier_start",
+        Some(PositionBasis::SyncStart) => "sync_start",
         None => "unavailable",
     };
     writeln!(
         output,
         "{{\"kind\":\"native_input_operation\",\"operation\":\"FiniteAlignedNativeInputV1\",\"real_initial_eof\":{startup_eof},\"context_available\":{},\"basis\":\"{basis}\",\"inspected_bytes\":{},\"source\":{},\"input_generation\":{},\"input_request\":{},\"native_callback_maximum\":65536,\"native_avio_buffer\":32768,\"native_reference_worker_sha256\":\"7f9372f35a5a6b26494e5c41a8579bd0654c1142733058738948078b856cdd67\",\"qualified\":false}}",
-        native.initial_input.is_some(),
-        native
+        compat.initial_input.is_some(),
+        compat
             .initial_input
             .as_ref()
-            .map_or(0, NativeInputContext::inspected_bytes),
+            .map_or(0, InputContext::inspected_bytes),
         input.source().0,
         input.token().generation(),
         input.token().request()
@@ -2009,13 +2005,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .parse()?;
     let mut namespace = DescriptorNamespace::Unspecified;
     let mut source_clock_enabled = false;
-    let mut native_input_enabled = false;
+    let mut demux_input_enabled = false;
     let mut media_entities_enabled = false;
     let mut whole_object_enabled = false;
     let mut psi_compatibility_enabled = false;
     let mut packet_completion_enabled = false;
     // Explicit selected audio/M2TS whole-object operation; old flags stay literal.
-    let mut selected_object_v2 = false;
+    let mut selected_object = false;
     let mut path = loop {
         let argument = arguments.next().ok_or("missing source entity")?;
         match argument.as_str() {
@@ -2024,15 +2020,15 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     DescriptorNamespace::Dvb(DvbNamespaceEvidence::CallerDeclaredTransportProfile);
             }
             "--native-clock-v1" => source_clock_enabled = true,
-            "--native-input-v1" => native_input_enabled = true,
+            "--native-input-v1" => demux_input_enabled = true,
             "--media-entities-v1" => media_entities_enabled = true,
             "--native-object-v1" => whole_object_enabled = true,
             "--native-selected-object-v2" => {
-                selected_object_v2 = true;
+                selected_object = true;
                 whole_object_enabled = true;
                 psi_compatibility_enabled = true;
                 packet_completion_enabled = true;
-                native_input_enabled = format == PacketFormat::M2ts192;
+                demux_input_enabled = format == PacketFormat::M2ts192;
             }
             "--native-packet-completion-v1" => {
                 whole_object_enabled = true;
@@ -2046,9 +2042,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             _ => break argument,
         }
     };
-    // Source-PES and real native-packet time contexts have separate histories.
+    // Source-PES and real demux-packet time contexts have separate histories.
     let mut source_clock = if source_clock_enabled {
-        Some(NativePesClockV1::new(program)?)
+        Some(DemuxClock::new(program)?)
     } else {
         None
     };
@@ -2075,55 +2071,56 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     if whole_object_enabled
         && (media_entities_enabled
             || namespace != DescriptorNamespace::Unspecified
-            || (!selected_object_v2 && (format != PacketFormat::Ts188 || native_input_enabled)))
+            || (!selected_object && (format != PacketFormat::Ts188 || demux_input_enabled)))
     {
         return Err(
             "native whole object is the explicit single-entity TS188 video operation".into(),
         );
     }
-    let mut native = if selected_object_v2 {
-        NativeAdapter::new_selected_object_v2(budget.clone(), program, format)?
+    let mut compat = if selected_object {
+        DemuxAdapter::new_selected_object(budget.clone(), program, format)?
     } else if packet_completion_enabled {
-        NativeAdapter::new_packet_completion_v1(budget.clone(), program)?
+        DemuxAdapter::new_packet_completion(budget.clone(), program)?
     } else if psi_compatibility_enabled {
-        NativeAdapter::new_psi_compatibility_v1(
+        DemuxAdapter::new_psi_compatibility(
             budget.clone(),
             program,
-            triergon_mpegts::native_catalogue::NativePsiCompatibilityPoliciesV1::ALL_OBSERVED,
+            triergon_mpegts::reference_trace::catalogue::PsiCompatibilityPolicies::ALL_OBSERVED,
         )?
     } else if whole_object_enabled {
-        NativeAdapter::new_object_v1(budget.clone(), program)?
+        DemuxAdapter::new_object(budget.clone(), program)?
     } else {
-        NativeAdapter::new(budget.clone(), program)?
+        DemuxAdapter::new(budget.clone(), program)?
     };
     let mut source_events = 0_u64;
     let mut logical_eof = None;
     let mut buffer = [0_u8; 16 * 1024];
-    let mut startup = prepare_native_startup_v1(
+    let mut startup = prepare_demux_startup(
         &mut file,
         &mut input,
         &budget,
         format,
-        native_input_enabled,
+        demux_input_enabled,
         &mut buffer,
         &cancel,
     )?;
-    apply_native_startup_v1(&mut native, &mut startup, &input, demux.source_epochs());
+    apply_demux_startup(&mut compat, &mut startup, &input, demux.source_epochs());
 
     let stdout = io::stdout();
     let mut output = stdout.lock();
     writeln!(
         output,
-        "{{\"kind\":\"native_pes_operation\",\"operation\":\"ArchivedNativePesPacketsV1\",\"reference_operation\":\"{}\",\"profile\":\"{PROFILE:?}\",\"source_pin\":\"{}\",\"worker_sha256\":\"{}\",\"flags\":{},\"correct_ts_overflow\":{},\"find_stream_info\":{},\"packet_buffer_policy\":\"reference_default\",\"native_packet_cap\":204800,\"rejected_policy\":\"OpcrWithoutPcrV1\",\"native_evidence_version\":2,\"program\":{program},\"source_ordinals\":\"zero_based_source_rows_only\",\"qualified\":false}}",
+        "{{\"kind\":\"native_pes_operation\",\"operation\":\"ArchivedNativePesPacketsV1\",\"reference_operation\":\"{}\",\"profile\":\"{}\",\"source_pin\":\"{}\",\"worker_sha256\":\"{}\",\"flags\":{},\"correct_ts_overflow\":{},\"find_stream_info\":{},\"packet_buffer_policy\":\"reference_default\",\"native_packet_cap\":204800,\"rejected_policy\":\"OpcrWithoutPcrV1\",\"native_evidence_version\":2,\"program\":{program},\"source_ordinals\":\"zero_based_source_rows_only\",\"qualified\":false}}",
         PROFILE.operation(),
-        PROFILE.source_pin(),
+        PROFILE.label(),
+        PROFILE.reference_revision(),
         PROFILE.worker_sha256(),
         PROFILE.flags(),
         PROFILE.default_overflow_correction(),
         PROFILE.find_stream_info()
     )?;
-    if native_input_enabled {
-        native_input_operation_json(&mut output, &native, &input, startup.eof)?;
+    if demux_input_enabled {
+        demux_input_operation_json(&mut output, &compat, &input, startup.eof)?;
     }
     let execution = (|| -> Result<(), Box<dyn std::error::Error>> {
         loop {
@@ -2138,7 +2135,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                         },
                         demux.source_epochs(),
                     );
-                    native.fail(error, cause);
+                    compat.fail(error, cause);
                     return Err(error.into());
                 }
             };
@@ -2147,10 +2144,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     let cause =
                         Cause::event(&value, source_events, input.source(), demux.source_epochs());
                     let quarantined = demux.clock_is_quarantined();
-                    if native_input_enabled {
-                        native.observe_with_input(&value, cause, quarantined, &cancel, &input);
+                    if demux_input_enabled {
+                        compat.observe_with_input(&value, cause, quarantined, &cancel, &input);
                     } else {
-                        native.observe_with_cancel(&value, cause, quarantined, &cancel);
+                        compat.observe_with_cancel(&value, cause, quarantined, &cancel);
                     }
                     let finished = source_trace::event(
                         &mut output,
@@ -2162,60 +2159,60 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     source_events = source_events
                         .checked_add(1)
                         .ok_or("source ordinal overflow")?;
-                    native.drain_with_input(
+                    compat.drain_with_input(
                         &mut output,
                         cause,
                         &cancel,
-                        native_input_enabled.then_some(&input),
+                        demux_input_enabled.then_some(&input),
                     )?;
                     if finished {
                         if let Some(cause) = logical_eof {
                             if packet_completion_enabled {
-                                native.packet_logical_end_v1(
+                                compat.packet_logical_end(
                                     &mut output,
                                     cause,
                                     &cancel,
                                     &mut input,
                                 )?;
                             } else {
-                                native.logical_end_with_input(
+                                compat.logical_end_with_input(
                                     &mut output,
                                     cause,
                                     &cancel,
-                                    native_input_enabled.then_some(&input),
+                                    demux_input_enabled.then_some(&input),
                                 )?;
                             }
                         } else {
-                            native.fail(
+                            compat.fail(
                                 Error::Invalid("source finished without explicit logical EOF"),
                                 cause,
                             );
                         }
-                        native.complete_json(&mut output, source_events, true)?;
-                        native.packet_completion_json_v1(&mut output)?;
+                        compat.complete_json(&mut output, source_events, true)?;
+                        compat.packet_completion_json(&mut output)?;
                         if whole_object_enabled {
-                            if let Some(object) = native.object.as_ref() {
+                            if let Some(object) = compat.object.as_ref() {
                                 object.evidence_json(&mut output)?;
                             }
                             // The inner object is emitted byte-for-byte in the old schema.
                             output.write_all(b"{\"kind\":\"native_object\",\"object\":")?;
                             let packet_complete =
-                                !packet_completion_enabled || (!native.failed && native.finished);
+                                !packet_completion_enabled || (!compat.failed && compat.finished);
                             if packet_complete
-                                && native.object.as_ref().expect("whole object enabled").json(
+                                && compat.object.as_ref().expect("whole object enabled").json(
                                     &mut output,
-                                    native.failed,
-                                    native.finished,
-                                    native.packets,
+                                    compat.failed,
+                                    compat.finished,
+                                    compat.packets,
                                 )?
                             {
                                 output.write_all(b",\"qualified\":false}\n")?;
                             } else {
                                 output.write_all(b"null,\"error\":")?;
-                                let error = native
+                                let error = compat
                                     .object
                                     .as_ref()
-                                    .and_then(native_object_v1::ObjectAdapter::error)
+                                    .and_then(demux_object::ObjectAdapter::error)
                                     .unwrap_or(Error::Unsupported(
                                         "native whole object incomplete",
                                     ));
@@ -2263,7 +2260,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                                 },
                                 demux.source_epochs(),
                             );
-                            native.fail(Error::Transport, cause);
+                            compat.fail(Error::Transport, cause);
                             input.fail(request.source, request.token, SourceFailure::Transport)?;
                             return Err(error.into());
                         }
@@ -2282,13 +2279,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 Step::End(location) => {
                     if whole_object_enabled {
                         let end = demux
-                            .media_entity_end_v1(&mut input, &mut WorkBudget::new(1), &cancel)?
+                            .media_entity_end(&mut input, &mut WorkBudget::new(1), &cancel)?
                             .ok_or("native whole object End grant yielded")?;
                         // An unsupported catalogue stays explicit; source still drains unchanged.
                         if packet_completion_enabled {
-                            let _ = native.packet_physical_end_v1(&end, &mut input, &cancel);
+                            let _ = compat.packet_physical_end(&end, &mut input, &cancel);
                         } else {
-                            let _ = native.object_end_with_cancel_v1(&end, &input, &cancel);
+                            let _ = compat.object_end_with_cancel(&end, &input, &cancel);
                         }
                     }
                     if let Some(next) = arguments.next() {
@@ -2300,15 +2297,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                         let end = if media_entities_enabled {
                             Some(
                                 demux
-                                    .media_entity_end_v1(
-                                        &mut input,
-                                        &mut WorkBudget::new(1),
-                                        &cancel,
-                                    )?
+                                    .media_entity_end(&mut input, &mut WorkBudget::new(1), &cancel)?
                                     .ok_or("media entity End fixed grant yielded")?,
                             )
                         } else {
-                            native.fail(
+                            compat.fail(
                                 Error::Unsupported("native entity boundary context unobserved"),
                                 Cause::boundary(
                                     "entity_end_not_logical_eof",
@@ -2316,7 +2309,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                                     demux.source_epochs(),
                                 ),
                             );
-                            native.pending_json(&mut output)?;
+                            compat.pending_json(&mut output)?;
                             None
                         };
                         let discontinuity = next == "--discontinuity";
@@ -2330,7 +2323,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                         if discontinuity {
                             demux.discontinuity()?;
                             if media_entities_enabled && source_clock_enabled {
-                                source_clock = Some(NativePesClockV1::new(program)?);
+                                source_clock = Some(DemuxClock::new(program)?);
                             }
                         }
                         file = File::open(&path)?;
@@ -2348,7 +2341,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                                 location,
                                 end.epochs(),
                             );
-                            let result = native.media_entity_boundary_v1(
+                            let result = compat.media_entity_boundary(
                                 &end,
                                 &mut input,
                                 discontinuity,
@@ -2358,7 +2351,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                             let committed = match result {
                                 Ok(true) => true,
                                 Ok(false) => {
-                                    native.fail(
+                                    compat.fail(
                                         Error::Invalid(
                                             "media entity transaction fixed grant yielded",
                                         ),
@@ -2367,7 +2360,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                                     false
                                 }
                                 Err(error) => {
-                                    native.fail(error, cause);
+                                    compat.fail(error, cause);
                                     false
                                 }
                             };
@@ -2378,8 +2371,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                                 location.offset,
                                 input.source().0
                             )?;
-                            if committed && discontinuity && native_input_enabled {
-                                startup = prepare_native_startup_v1(
+                            if committed && discontinuity && demux_input_enabled {
+                                startup = prepare_demux_startup(
                                     &mut file,
                                     &mut input,
                                     &budget,
@@ -2388,20 +2381,20 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                                     &mut buffer,
                                     &cancel,
                                 )?;
-                                apply_native_startup_v1(
-                                    &mut native,
+                                apply_demux_startup(
+                                    &mut compat,
                                     &mut startup,
                                     &input,
                                     demux.source_epochs(),
                                 );
-                                native_input_operation_json(
+                                demux_input_operation_json(
                                     &mut output,
-                                    &native,
+                                    &compat,
                                     &input,
                                     startup.eof,
                                 )?;
                             }
-                            native.pending_json(&mut output)?;
+                            compat.pending_json(&mut output)?;
                         }
                     } else {
                         logical_eof = Some(Cause::boundary(
@@ -2425,7 +2418,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             },
             demux.source_epochs(),
         );
-        native.fail(
+        compat.fail(
             error
                 .downcast_ref::<Error>()
                 .copied()
@@ -2434,18 +2427,18 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 )),
             cause,
         );
-        native.pending_json(&mut output)?;
+        compat.pending_json(&mut output)?;
         output.write_all(b"{\"kind\":\"native_pes_driver_error\",\"error\":")?;
         triergon_harness_protocol::write_quoted(&mut output, &error.to_string())?;
         output.write_all(b",\"cause\":")?;
         cause_json(&mut output, cause)?;
         output.write_all(b",\"qualified\":false}\n")?;
-        native.complete_json(&mut output, source_events, false)?;
+        compat.complete_json(&mut output, source_events, false)?;
         output.flush()?;
         return Err(error);
     }
     output.flush()?;
-    if native.failed {
+    if compat.failed {
         return Err("native operation has an explicit retained nonpass".into());
     }
     Ok(())
@@ -2456,11 +2449,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 mod selected_lifecycle_adapter;
 
 #[cfg(test)]
-#[path = "../tests/support/media_entity_adapter_v1.rs"]
-mod media_entity_adapter_v1;
+#[path = "../tests/support/media_entity_adapter.rs"]
+mod media_entity_adapter;
 
 #[cfg(test)]
-mod native_input_abort_guard {
+mod demux_input_abort_guard {
     use super::*;
     #[test]
     fn aborting_optional_view_releases_its_startup_alias_without_discarding_source() {
@@ -2485,22 +2478,21 @@ mod native_input_abort_guard {
         .unwrap();
         input.provide(&window).unwrap();
         let context = {
-            let mut job =
-                NativeInputBootstrap::new(&input, &window, PacketFormat::M2ts192).unwrap();
+            let mut job = InputBootstrap::new(&input, &window, PacketFormat::M2ts192).unwrap();
             job.observe_entity_eof(&input, window.source, &window.token, bytes.len() as u64)
                 .unwrap();
             match job
                 .poll(&input, &mut WorkBudget::new(20000), &AtomicBool::new(false))
                 .unwrap()
             {
-                NativeInputStep::Ready(c) => c,
+                InputStep::Ready(c) => c,
                 _ => panic!("finite context"),
             }
         };
-        let mut native = NativeAdapter::new(budget.clone(), 1).unwrap();
-        native.initial_input = Some(context);
+        let mut compat = DemuxAdapter::new(budget.clone(), 1).unwrap();
+        compat.initial_input = Some(context);
         drop(window);
-        native.fail(
+        compat.fail(
             Error::Unsupported("unobserved selected map"),
             Cause::boundary(
                 "actual_native_scope_refusal",
@@ -2512,8 +2504,8 @@ mod native_input_abort_guard {
             ),
         );
         assert!(
-            native.initial_input.is_none(),
-            "aborted optional view must release its real startup owner"
+            compat.initial_input.is_none(),
+            "aborted optional view must release its real startup storage"
         );
         assert_eq!(
             input.position(),
@@ -2530,19 +2522,19 @@ mod native_input_abort_guard {
         assert_eq!(
             budget.used(),
             Budget::control_storage_bytes(),
-            "only the real core input owner and optional alias existed; both now released"
+            "only the real core input storage and optional alias existed; both now released"
         );
     }
 }
 
 #[cfg(test)]
-#[path = "../tests/support/native_nonpass_object_v1.rs"]
-mod native_nonpass_object_v1;
+#[path = "../tests/support/demux_nonpass_object.rs"]
+mod demux_nonpass_object;
 
 #[cfg(test)]
-#[path = "../tests/support/psi_original_objects_v1.rs"]
-mod psi_original_objects_v1;
+#[path = "../tests/support/psi_original_objects.rs"]
+mod psi_original_objects;
 
 #[cfg(test)]
-#[path = "../tests/support/packet_process_completion_v1.rs"]
-mod packet_process_completion_v1;
+#[path = "../tests/support/packet_process_completion.rs"]
+mod packet_process_completion;

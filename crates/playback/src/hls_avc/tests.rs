@@ -17,7 +17,7 @@ fn fixture() -> (Budget, AvcTsReader) {
             pid: 256,
         },
         configuration_epoch: 1,
-        carriage: TsNativeCarriage::Registered(NativeRegisteredCarriage::Avc),
+        carriage: TsNativeCarriage::Registered(RegisteredCarriage::Avc),
     };
     let reader = AvcTsReader::new(&pool, config, AvcTsLimits::default()).unwrap();
     (pool, reader)

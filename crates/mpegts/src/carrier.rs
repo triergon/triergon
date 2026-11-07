@@ -147,6 +147,10 @@ pub struct RejectedTransport {
     error: Error,
     secondary: Option<Error>,
     complete_check: bool,
+    #[cfg_attr(
+        not(feature = "reference-trace"),
+        allow(dead_code, reason = "read only by the recovery projection")
+    )]
     envelope: Envelope,
 }
 impl RejectedTransport {
@@ -181,6 +185,7 @@ impl RejectedTransport {
             bytes: self.bytes.len(),
         })
     }
+    #[cfg(feature = "reference-trace")]
     pub(crate) fn envelope(&self) -> &Envelope {
         &self.envelope
     }

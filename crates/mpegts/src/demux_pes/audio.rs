@@ -1,13 +1,13 @@
-//! Explicit archived-native private-audio interpretation, not source namespace
+//! The demuxer's private-audio interpretation, not source namespace
 //! inference, audio-frame parsing, ATSC service conformance or decoder config.
-use super::{NativePesObserver, NativePesScope};
-use crate::clock::NativeClockProfile;
+use super::{DemuxObserver, DemuxScope};
+use crate::demux_clock::DemuxProfile;
 use crate::psi::Descriptors;
 use crate::{ParseLimits, checked_pid, limit};
 use triergon_core::{Budget, Error, Result};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum NativePrivateAudioCarriage {
+pub enum PrivateAudioCarriage {
     DvbAc3Tag,
     DvbEac3Tag,
     PrivateType81Ac3,
@@ -15,15 +15,17 @@ pub enum NativePrivateAudioCarriage {
 }
 
 /// Borrow exact source loops; neither loop is copied, rewritten or retained by
-/// admission. Their source owners and namespaces remain the caller's facts.
+/// admission. Their source storage and namespaces remain the caller's facts.
 #[derive(Clone, Copy, Debug, Default)]
-pub struct NativePrivateAudioDescriptors<'a> {
+pub struct PrivateAudioDescriptors<'a> {
     pub program: &'a [u8],
     pub elementary: &'a [u8],
 }
 
-impl NativePrivateAudioCarriage {
-    pub fn name(self) -> &'static str {
+impl PrivateAudioCarriage {
+    /// The carriage's name in reference traces.
+    #[cfg(feature = "reference-trace")]
+    pub fn label(self) -> &'static str {
         match self {
             Self::DvbAc3Tag => "ArchivedNativePrivateAudioV1.DvbAc3Tag",
             Self::DvbEac3Tag => "ArchivedNativePrivateAudioV1.DvbEac3Tag",
@@ -40,11 +42,11 @@ impl NativePrivateAudioCarriage {
     }
     /// Allocation-free bounded admission, using existing descriptor views.
     /// At most section_bytes (<=4096) bytes / descriptors entries are inspected.
-    /// A private tag is interpreted ONLY in this explicitly named native view.
+    /// A private tag is interpreted ONLY in this explicitly named demux view.
     /// This does not backfill DescriptorNamespace or source codec identity.
     pub fn from_observed_pmt(
         stream_type: u8,
-        source: NativePrivateAudioDescriptors<'_>,
+        source: PrivateAudioDescriptors<'_>,
         limits: ParseLimits,
     ) -> Result<Self> {
         Self::from_pmt(stream_type, source, limits, false)
@@ -55,7 +57,7 @@ impl NativePrivateAudioCarriage {
     /// audio descriptor. The source PMT and its namespace stay intact.
     pub fn from_hls_pmt(
         stream_type: u8,
-        source: NativePrivateAudioDescriptors<'_>,
+        source: PrivateAudioDescriptors<'_>,
         limits: ParseLimits,
     ) -> Result<Self> {
         Self::from_pmt(stream_type, source, limits, true)
@@ -63,7 +65,7 @@ impl NativePrivateAudioCarriage {
 
     fn from_pmt(
         stream_type: u8,
-        source: NativePrivateAudioDescriptors<'_>,
+        source: PrivateAudioDescriptors<'_>,
         limits: ParseLimits,
         hls: bool,
     ) -> Result<Self> {
@@ -163,42 +165,42 @@ impl NativePrivateAudioCarriage {
     }
 }
 
-impl NativePesObserver {
+impl DemuxObserver {
     /// Opt-in finite clean private-audio PES, independent of source namespace.
     /// Reuses charged real transport assembly; no codec AU parser or output repair.
-    pub fn new_private_audio_v1(
-        profile: NativeClockProfile,
-        scope: NativePesScope,
-        carriage: NativePrivateAudioCarriage,
-        source: NativePrivateAudioDescriptors<'_>,
+    pub fn new_private_audio(
+        profile: DemuxProfile,
+        scope: DemuxScope,
+        carriage: PrivateAudioCarriage,
+        source: PrivateAudioDescriptors<'_>,
         budget: Budget,
         limits: ParseLimits,
     ) -> Result<Self> {
         Self::with_private_audio(profile, scope, carriage, budget, limits, || {
-            NativePrivateAudioCarriage::from_observed_pmt(scope.stream_type, source, limits)
+            PrivateAudioCarriage::from_observed_pmt(scope.stream_type, source, limits)
         })
     }
 
-    pub fn new_hls_private_audio_v1(
-        profile: NativeClockProfile,
-        scope: NativePesScope,
-        carriage: NativePrivateAudioCarriage,
-        source: NativePrivateAudioDescriptors<'_>,
+    pub fn new_hls_private_audio(
+        profile: DemuxProfile,
+        scope: DemuxScope,
+        carriage: PrivateAudioCarriage,
+        source: PrivateAudioDescriptors<'_>,
         budget: Budget,
         limits: ParseLimits,
     ) -> Result<Self> {
         Self::with_private_audio(profile, scope, carriage, budget, limits, || {
-            NativePrivateAudioCarriage::from_hls_pmt(scope.stream_type, source, limits)
+            PrivateAudioCarriage::from_hls_pmt(scope.stream_type, source, limits)
         })
     }
 
     fn with_private_audio(
-        profile: NativeClockProfile,
-        scope: NativePesScope,
-        carriage: NativePrivateAudioCarriage,
+        profile: DemuxProfile,
+        scope: DemuxScope,
+        carriage: PrivateAudioCarriage,
         budget: Budget,
         limits: ParseLimits,
-        observe: impl FnOnce() -> Result<NativePrivateAudioCarriage>,
+        observe: impl FnOnce() -> Result<PrivateAudioCarriage>,
     ) -> Result<Self> {
         if scope.program == 0 {
             return Err(Error::Invalid("native PES selected program"));

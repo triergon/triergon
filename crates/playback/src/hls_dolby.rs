@@ -8,10 +8,9 @@ use triergon_core::{
 use triergon_framing::{Ac3FrameDetails, Ac3FrameLimits, Ac3FrameReader, Ac3StreamSelection};
 use triergon_mpegts::{
     AssemblyStep,
-    clock::NativePesTimeView,
-    native_pes::{
-        NativePesBoundary, NativePesPacket, NativePesPayloadKind, NativePesSpan,
-        NativePrivateAudioCarriage,
+    compat::pes::{
+        DemuxBoundary, DemuxPacket, DemuxPayloadKind, DemuxSpan, DemuxTimeView,
+        PrivateAudioCarriage,
     },
 };
 
@@ -34,7 +33,7 @@ struct PesAnchor {
 }
 
 struct PendingPes {
-    spans: BudgetVecIntoIter<NativePesSpan>,
+    spans: BudgetVecIntoIter<DemuxSpan>,
     remaining: usize,
 }
 
@@ -57,12 +56,10 @@ impl HlsDolby {
     pub(crate) fn new(pool: &Budget, config: TsNativeConfiguration) -> Result<Self> {
         let selection = match config.carriage {
             TsNativeCarriage::PrivateAudio(
-                NativePrivateAudioCarriage::DvbAc3Tag
-                | NativePrivateAudioCarriage::PrivateType81Ac3,
+                PrivateAudioCarriage::DvbAc3Tag | PrivateAudioCarriage::PrivateType81Ac3,
             ) => Ac3StreamSelection::Ac3Only,
             TsNativeCarriage::PrivateAudio(
-                NativePrivateAudioCarriage::DvbEac3Tag
-                | NativePrivateAudioCarriage::PrivateType87Eac3,
+                PrivateAudioCarriage::DvbEac3Tag | PrivateAudioCarriage::PrivateType87Eac3,
             ) => Ac3StreamSelection::Eac3Only,
             _ => {
                 return Err(Error::Unsupported(
@@ -107,8 +104,8 @@ impl HlsDolby {
     /// leave the mailbox with its caller.
     pub(crate) fn push(
         &mut self,
-        mailbox: &mut Option<NativePesPacket>,
-        clock: NativePesTimeView,
+        mailbox: &mut Option<DemuxPacket>,
+        clock: DemuxTimeView,
     ) -> Result<bool> {
         let reader = self.reader.as_ref().map_err(|error| *error)?;
         if self.eof {
@@ -126,14 +123,14 @@ impl HlsDolby {
                 pid: packet.pid,
             })
             || packet.source_epochs.configuration != self.config.configuration_epoch
-            || packet.native_stream_id != 0xbd
-            || packet.source_header.stream_id != packet.native_stream_id
+            || packet.stream_id != 0xbd
+            || packet.source_header.stream_id != packet.stream_id
         {
             return Err(Error::Invalid("HLS Dolby PES track or configuration"));
         }
-        if packet.native_flags & PES_CORRUPT != 0
-            || packet.payload_kind != NativePesPayloadKind::DeclaredComplete
-            || packet.boundary != NativePesBoundary::FiniteLength
+        if packet.flags & PES_CORRUPT != 0
+            || packet.payload_kind != DemuxPayloadKind::DeclaredComplete
+            || packet.boundary != DemuxBoundary::FiniteLength
             || packet.payload_len == 0
             || packet.spans.is_empty()
         {
@@ -310,9 +307,9 @@ mod tests {
     use super::*;
     use triergon_mpegts::{
         PacketFormat, ParseLimits, SourceEpochs,
-        clock::{NativeClockProfile, NativePesClockV1},
-        native_pes::{
-            NativePesObserver, NativePesScope, NativePrivateAudioDescriptors, NativeSourceContext,
+        compat::pes::{
+            DemuxClock, DemuxObserver, DemuxProfile, DemuxScope, PrivateAudioDescriptors,
+            SourceContext,
         },
         parse_transport,
     };
@@ -326,17 +323,17 @@ mod tests {
     struct PesFixture {
         pool: Budget,
         reader: HlsDolby,
-        observer: NativePesObserver,
-        clock: NativePesClockV1,
+        observer: DemuxObserver,
+        clock: DemuxClock,
         carrier: u8,
     }
 
     impl PesFixture {
-        fn new(carriage: NativePrivateAudioCarriage, stream_type: u8) -> Self {
+        fn new(carriage: PrivateAudioCarriage, stream_type: u8) -> Self {
             let pool = Budget::new(16 * 1024).unwrap();
-            let observer = NativePesObserver::new_private_audio_v1(
-                NativeClockProfile::ArchivedPesV1,
-                NativePesScope {
+            let observer = DemuxObserver::new_private_audio(
+                DemuxProfile::PesPackets,
+                DemuxScope {
                     program: 1,
                     pid: 257,
                     stream_type,
@@ -345,7 +342,7 @@ mod tests {
                     epochs: EPOCHS,
                 },
                 carriage,
-                NativePrivateAudioDescriptors::default(),
+                PrivateAudioDescriptors::default(),
                 pool.clone(),
                 ParseLimits::default(),
             )
@@ -366,7 +363,7 @@ mod tests {
                 pool,
                 reader,
                 observer,
-                clock: NativePesClockV1::new(1).unwrap(),
+                clock: DemuxClock::new(1).unwrap(),
                 carrier: 0,
             }
         }
@@ -376,7 +373,7 @@ mod tests {
             bytes: &[u8],
             pts: u32,
             dts: Option<u32>,
-        ) -> (Option<NativePesPacket>, NativePesTimeView) {
+        ) -> (Option<DemuxPacket>, DemuxTimeView) {
             let optional = if dts.is_some() { 10 } else { 5 };
             let length = u16::try_from(3 + optional + bytes.len())
                 .unwrap()
@@ -425,7 +422,7 @@ mod tests {
                 self.observer
                     .push(
                         packet,
-                        NativeSourceContext {
+                        SourceContext {
                             source_event_ordinal: ordinal,
                             epochs: EPOCHS,
                             byte_run_epoch: None,
@@ -436,13 +433,7 @@ mod tests {
                     AssemblyStep::Output(packet) => {
                         let clock = self
                             .clock
-                            .project_native_header(
-                                257,
-                                EPOCHS,
-                                packet.time_header(),
-                                &mut work,
-                                &cancel,
-                            )
+                            .project_header(257, EPOCHS, packet.time_header(), &mut work, &cancel)
                             .unwrap()
                             .unwrap();
                         return (Some(packet), clock);
@@ -495,7 +486,7 @@ mod tests {
 
     #[test]
     fn split_syncframe_keeps_its_anchor_and_next_start_uses_current_pes() {
-        let mut fixture = PesFixture::new(NativePrivateAudioCarriage::PrivateType87Eac3, 0x87);
+        let mut fixture = PesFixture::new(PrivateAudioCarriage::PrivateType87Eac3, 0x87);
         let first = eac3(0, 0, 0x40);
         let second = eac3(0, 0, 0x20);
         let third = eac3(2, 0, 0xb0);
@@ -535,7 +526,7 @@ mod tests {
 
     #[test]
     fn ac3_across_ts_spans_retries_after_pool_pressure() {
-        let mut fixture = PesFixture::new(NativePrivateAudioCarriage::PrivateType81Ac3, 0x81);
+        let mut fixture = PesFixture::new(PrivateAudioCarriage::PrivateType81Ac3, 0x81);
         let mut frame = [0; 192];
         frame[..8].copy_from_slice(&[0x0b, 0x77, 0, 0, 4, 0x40, 0x40, 0x1f]);
         let (mut packet, clock) = fixture.packet(&frame, 90_000, None);
@@ -583,7 +574,7 @@ mod tests {
                 Error::Unsupported("HLS E-AC-3 additional substream"),
             ),
         ] {
-            let mut fixture = PesFixture::new(NativePrivateAudioCarriage::PrivateType87Eac3, 0x87);
+            let mut fixture = PesFixture::new(PrivateAudioCarriage::PrivateType87Eac3, 0x87);
             let (mut packet, clock) = fixture.packet(bytes, 90_000, None);
             assert!(fixture.reader.push(&mut packet, clock).unwrap());
             fixture.reader.finish();
@@ -602,7 +593,7 @@ mod tests {
 
     #[test]
     fn rejects_damaged_and_stale_pes_without_taking_the_mailbox() {
-        let mut fixture = PesFixture::new(NativePrivateAudioCarriage::PrivateType87Eac3, 0x87);
+        let mut fixture = PesFixture::new(PrivateAudioCarriage::PrivateType87Eac3, 0x87);
         let bytes = eac3(0, 0, 0);
         let (mut packet, clock) = fixture.packet(&bytes[..7], 90_000, None);
         assert!(fixture.reader.push(&mut packet, clock).unwrap());
@@ -611,7 +602,7 @@ mod tests {
             AssemblyStep::NeedPayload
         ));
         let (mut packet, mut clock) = fixture.packet(&bytes[7..], 180_000, None);
-        packet.as_mut().unwrap().payload_kind = NativePesPayloadKind::DeclaredIncomplete;
+        packet.as_mut().unwrap().payload_kind = DemuxPayloadKind::DeclaredIncomplete;
         assert!(matches!(
             fixture.reader.push(&mut packet, clock),
             Err(Error::Invalid(
@@ -619,7 +610,7 @@ mod tests {
             ))
         ));
         let source = packet.as_mut().unwrap();
-        source.payload_kind = NativePesPayloadKind::DeclaredComplete;
+        source.payload_kind = DemuxPayloadKind::DeclaredComplete;
         source.source_epochs.clock += 1;
         clock.source_epochs = source.source_epochs;
         assert!(matches!(

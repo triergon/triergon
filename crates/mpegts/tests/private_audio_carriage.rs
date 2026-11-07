@@ -1,22 +1,25 @@
 //! Source/reference regressions. No codec frame decoding or AU claims.
 use std::sync::atomic::{AtomicBool, Ordering};
+#[cfg(feature = "reference-trace")]
+use triergon_core::SourceLocation;
 use triergon_core::{
-    Budget, Bytes, Error, InputCursor, InputWindow, SourceCapabilities, SourceId, SourceLocation,
-    Step, WorkBudget,
+    Budget, Bytes, Error, InputCursor, InputWindow, SourceCapabilities, SourceId, Step, WorkBudget,
 };
-use triergon_mpegts::clock::{NativeClockProfile, NativePesClockV1, NativeTimestampOrigin};
-use triergon_mpegts::native_pes::{
-    NativePesBoundary, NativePesObserver, NativePesPacket, NativePesPayloadKind, NativePesScope,
-    NativePrivateAudioCarriage, NativePrivateAudioDescriptors, NativeSourceContext,
-};
-use triergon_mpegts::native_recovery::{
-    NativePesObservation, NativePesRecoveryObserver, NativeRejectedPolicy,
+use triergon_mpegts::compat::pes::{
+    DemuxBoundary, DemuxClock, DemuxObserver, DemuxPacket, DemuxPayloadKind, DemuxProfile,
+    DemuxScope, PrivateAudioCarriage, PrivateAudioDescriptors, SourceContext, TimestampOrigin,
 };
 use triergon_mpegts::psi::{CodecIdentification, DescriptorNamespace};
+#[cfg(feature = "reference-trace")]
+use triergon_mpegts::reference_trace::recovery::{
+    DemuxObservation, RecoveryObserver, RejectedPolicy,
+};
 use triergon_mpegts::{
     AssemblyStep, PacketFormat, ParseLimits, SourceEpochs, SourceRange, TraceEvent,
-    TransportInspection, TransportInspector, TransportPacket, TransportStream, parse_transport,
+    TransportPacket, TransportStream, parse_transport,
 };
+#[cfg(feature = "reference-trace")]
+use triergon_mpegts::{TransportInspection, TransportInspector};
 
 const PAYLOAD: &[u8] = b"lane-ts-original-payload\x00\x47\xff";
 const EPOCHS: SourceEpochs = SourceEpochs {
@@ -28,45 +31,45 @@ const UNSUPPORTED: Error =
 
 #[derive(Clone, Copy)]
 struct Case {
-    carriage: NativePrivateAudioCarriage,
+    carriage: PrivateAudioCarriage,
     stream_type: u8,
     descriptors: &'static [u8],
     bytes: &'static [u8],
 }
 const AC3_DVB: Case = Case {
-    carriage: NativePrivateAudioCarriage::DvbAc3Tag,
+    carriage: PrivateAudioCarriage::DvbAc3Tag,
     stream_type: 6,
     descriptors: &[0x6a, 1, 0],
     bytes: include_bytes!("data/carriage-ac3-dvb.ts"),
 };
 const EAC3_DVB: Case = Case {
-    carriage: NativePrivateAudioCarriage::DvbEac3Tag,
+    carriage: PrivateAudioCarriage::DvbEac3Tag,
     stream_type: 6,
     descriptors: &[0x7a, 1, 0],
     bytes: include_bytes!("data/carriage-eac3-dvb.ts"),
 };
 const AC3_DIRECT: Case = Case {
-    carriage: NativePrivateAudioCarriage::PrivateType81Ac3,
+    carriage: PrivateAudioCarriage::PrivateType81Ac3,
     stream_type: 0x81,
     descriptors: &[],
     bytes: include_bytes!("data/carriage-ac3-direct.ts"),
 };
 const EAC3_DIRECT: Case = Case {
-    carriage: NativePrivateAudioCarriage::PrivateType87Eac3,
+    carriage: PrivateAudioCarriage::PrivateType87Eac3,
     stream_type: 0x87,
     descriptors: &[],
     bytes: include_bytes!("data/carriage-eac3-direct.ts"),
 };
 const CASES: [Case; 4] = [AC3_DVB, EAC3_DVB, AC3_DIRECT, EAC3_DIRECT];
 
-fn descriptors(case: Case) -> NativePrivateAudioDescriptors<'static> {
-    NativePrivateAudioDescriptors {
+fn descriptors(case: Case) -> PrivateAudioDescriptors<'static> {
+    PrivateAudioDescriptors {
         program: &[],
         elementary: case.descriptors,
     }
 }
-fn scope(case: Case) -> NativePesScope {
-    NativePesScope {
+fn scope(case: Case) -> DemuxScope {
+    DemuxScope {
         program: 1,
         pid: 257,
         stream_type: case.stream_type,
@@ -75,16 +78,16 @@ fn scope(case: Case) -> NativePesScope {
         epochs: EPOCHS,
     }
 }
-fn context(ordinal: u64) -> NativeSourceContext {
-    NativeSourceContext {
+fn context(ordinal: u64) -> SourceContext {
+    SourceContext {
         source_event_ordinal: ordinal,
         epochs: EPOCHS,
         byte_run_epoch: None,
     }
 }
-fn observer(case: Case, budget: &Budget) -> NativePesObserver {
-    NativePesObserver::new_private_audio_v1(
-        NativeClockProfile::ArchivedPesV1,
+fn observer(case: Case, budget: &Budget) -> DemuxObserver {
+    DemuxObserver::new_private_audio(
+        DemuxProfile::PesPackets,
         scope(case),
         case.carriage,
         descriptors(case),
@@ -105,7 +108,7 @@ fn original(case: Case, budget: &Budget) -> TransportPacket {
     assert_eq!(case.bytes.len(), 564);
     carrier(&case.bytes[376..564], budget, 376)
 }
-fn drain(observer: &mut NativePesObserver) -> Vec<NativePesPacket> {
+fn drain(observer: &mut DemuxObserver) -> Vec<DemuxPacket> {
     let mut out = Vec::new();
     for _ in 0..16_384 {
         let mut work = WorkBudget::new(1);
@@ -119,7 +122,7 @@ fn drain(observer: &mut NativePesObserver) -> Vec<NativePesPacket> {
     }
     panic!("bounded actual field/byte work did not finish");
 }
-fn check_packet(packet: &NativePesPacket, case: Case) {
+fn check_packet(packet: &DemuxPacket, case: Case) {
     assert_eq!((packet.program, packet.pid), (1, 257));
     assert_eq!(packet.source_epochs, EPOCHS);
     assert_eq!(
@@ -127,16 +130,12 @@ fn check_packet(packet: &NativePesPacket, case: Case) {
         (SourceId(1), 376)
     );
     assert_eq!(
-        (
-            packet.native_position,
-            packet.native_flags,
-            packet.native_duration90_raw
-        ),
+        (packet.position, packet.flags, packet.duration90_raw),
         (376, 0, 0)
     );
-    assert_eq!(packet.native_stream_id, 0xbd); // public side-data type19 byte bd
-    assert_eq!(packet.boundary, NativePesBoundary::FiniteLength);
-    assert_eq!(packet.payload_kind, NativePesPayloadKind::DeclaredComplete);
+    assert_eq!(packet.stream_id, 0xbd); // public side-data type19 byte bd
+    assert_eq!(packet.boundary, DemuxBoundary::FiniteLength);
+    assert_eq!(packet.payload_kind, DemuxPayloadKind::DeclaredComplete);
     assert_eq!(packet.payload_len, 27);
     assert!(
         packet
@@ -178,9 +177,9 @@ fn check_packet(packet: &NativePesPacket, case: Case) {
     assert_eq!(spans[0].context, context(8));
     assert_eq!(spans[0].as_ref(), PAYLOAD);
     assert!(spans[0].backing_bytes().retained_capacity() >= 188);
-    let mut clock = NativePesClockV1::new(1).unwrap();
+    let mut clock = DemuxClock::new(1).unwrap();
     let view = clock
-        .project_native_header(
+        .project_header(
             257,
             EPOCHS,
             packet.time_header(),
@@ -194,7 +193,7 @@ fn check_packet(packet: &NativePesPacket, case: Case) {
         (Some(90_000), None)
     );
     assert_eq!((view.pts90, view.dts90), (Some(90_000), Some(90_000)));
-    assert_eq!(view.dts_origin, NativeTimestampOrigin::PtsOnlyCompatibility);
+    assert_eq!(view.dts_origin, TimestampOrigin::PtsOnlyCompatibility);
 }
 fn finite(case: Case) {
     let budget = Budget::new(16_384).unwrap();
@@ -350,8 +349,8 @@ fn audio_legacy_new_remains_h264_only() {
         let budget = Budget::new(4096).unwrap();
         let used = budget.used();
         assert_eq!(
-            NativePesObserver::new(
-                NativeClockProfile::ArchivedPesV1,
+            DemuxObserver::new(
+                DemuxProfile::PesPackets,
                 scope(case),
                 budget.clone(),
                 ParseLimits::default()
@@ -369,8 +368,8 @@ fn audio_bad_scope_kind_id_and_limits_precede_feature_stub_without_charge() {
         let budget = Budget::new(4096).unwrap();
         let used = budget.used();
         let call = |value, kind, limits| {
-            NativePesObserver::new_private_audio_v1(
-                NativeClockProfile::ArchivedPesV1,
+            DemuxObserver::new_private_audio(
+                DemuxProfile::PesPackets,
                 value,
                 kind,
                 descriptors(case),
@@ -423,9 +422,9 @@ fn audio_private_tag_conflicts_and_missing_evidence_never_choose_first_codec() {
     let limits = ParseLimits::default();
     for raw in [&[0x6a, 1, 0, 0x7a, 1, 0][..], &[0x59, 0, 0x6a, 1, 0][..]] {
         assert_eq!(
-            NativePrivateAudioCarriage::from_observed_pmt(
+            PrivateAudioCarriage::from_observed_pmt(
                 6,
-                NativePrivateAudioDescriptors {
+                PrivateAudioDescriptors {
                     program: &[],
                     elementary: raw
                 },
@@ -436,12 +435,8 @@ fn audio_private_tag_conflicts_and_missing_evidence_never_choose_first_codec() {
         );
     }
     assert_eq!(
-        NativePrivateAudioCarriage::from_observed_pmt(
-            6,
-            NativePrivateAudioDescriptors::default(),
-            limits
-        )
-        .unwrap_err(),
+        PrivateAudioCarriage::from_observed_pmt(6, PrivateAudioDescriptors::default(), limits)
+            .unwrap_err(),
         Error::Unsupported("native private audio descriptor evidence absent")
     );
 }
@@ -453,9 +448,9 @@ fn audio_registration_specifier_and_program_tags_are_explicit_nonpasses_not_name
         &[0x5f, 4, 0, 0, 0, 1][..],
     ] {
         assert_eq!(
-            NativePrivateAudioCarriage::from_observed_pmt(
+            PrivateAudioCarriage::from_observed_pmt(
                 0x81,
-                NativePrivateAudioDescriptors {
+                PrivateAudioDescriptors {
                     program: raw,
                     elementary: &[]
                 },
@@ -466,9 +461,9 @@ fn audio_registration_specifier_and_program_tags_are_explicit_nonpasses_not_name
         );
     }
     assert_eq!(
-        NativePrivateAudioCarriage::from_observed_pmt(
+        PrivateAudioCarriage::from_observed_pmt(
             6,
-            NativePrivateAudioDescriptors {
+            PrivateAudioDescriptors {
                 program: AC3_DVB.descriptors,
                 elementary: &[]
             },
@@ -483,40 +478,32 @@ fn audio_registration_specifier_and_program_tags_are_explicit_nonpasses_not_name
 fn hls_audio_registration_confirms_the_existing_carriage_rules() {
     let ac3 = b"\x05\x04AC-3";
     let eac3 = b"\x05\x04EAC3";
-    let descriptors = |elementary| NativePrivateAudioDescriptors {
+    let descriptors = |elementary| PrivateAudioDescriptors {
         program: &[],
         elementary,
     };
     let limits = ParseLimits::default();
     for (stream_type, elementary, carriage) in [
-        (0x81, &ac3[..], NativePrivateAudioCarriage::PrivateType81Ac3),
-        (
-            0x87,
-            &eac3[..],
-            NativePrivateAudioCarriage::PrivateType87Eac3,
-        ),
+        (0x81, &ac3[..], PrivateAudioCarriage::PrivateType81Ac3),
+        (0x87, &eac3[..], PrivateAudioCarriage::PrivateType87Eac3),
         (
             6,
             &b"\x05\x04AC-3\x6a\x03\xc0\x42\x08"[..],
-            NativePrivateAudioCarriage::DvbAc3Tag,
+            PrivateAudioCarriage::DvbAc3Tag,
         ),
         (
             6,
             &b"\x05\x04EAC3\x7a\x01\x00"[..],
-            NativePrivateAudioCarriage::DvbEac3Tag,
+            PrivateAudioCarriage::DvbEac3Tag,
         ),
     ] {
         assert_eq!(
-            NativePrivateAudioCarriage::from_hls_pmt(stream_type, descriptors(elementary), limits),
+            PrivateAudioCarriage::from_hls_pmt(stream_type, descriptors(elementary), limits),
             Ok(carriage)
         );
         assert!(
-            NativePrivateAudioCarriage::from_observed_pmt(
-                stream_type,
-                descriptors(elementary),
-                limits
-            )
-            .is_err()
+            PrivateAudioCarriage::from_observed_pmt(stream_type, descriptors(elementary), limits)
+                .is_err()
         );
     }
     for (stream_type, elementary) in [
@@ -529,7 +516,7 @@ fn hls_audio_registration_confirms_the_existing_carriage_rules() {
         (0x81, &b"\x05\x04AC-3\x05\x04EAC3"[..]),
     ] {
         assert!(
-            NativePrivateAudioCarriage::from_hls_pmt(stream_type, descriptors(elementary), limits)
+            PrivateAudioCarriage::from_hls_pmt(stream_type, descriptors(elementary), limits)
                 .is_err()
         );
     }
@@ -542,38 +529,38 @@ fn audio_descriptor_optional_fields_duplicates_languages_and_opaque_tails_stay_r
     ];
     let original = raw;
     assert_eq!(
-        NativePrivateAudioCarriage::from_observed_pmt(
+        PrivateAudioCarriage::from_observed_pmt(
             6,
-            NativePrivateAudioDescriptors {
+            PrivateAudioDescriptors {
                 program: &[],
                 elementary: &raw
             },
             ParseLimits::default()
         )
         .unwrap(),
-        NativePrivateAudioCarriage::DvbAc3Tag
+        PrivateAudioCarriage::DvbAc3Tag
     );
     assert_eq!(raw, original);
     assert_eq!(
-        NativePrivateAudioCarriage::from_observed_pmt(
+        PrivateAudioCarriage::from_observed_pmt(
             6,
-            NativePrivateAudioDescriptors {
+            PrivateAudioDescriptors {
                 program: &[],
                 elementary: &[0x7a, 1, 8]
             },
             ParseLimits::default()
         )
         .unwrap(),
-        NativePrivateAudioCarriage::DvbEac3Tag
+        PrivateAudioCarriage::DvbEac3Tag
     ); // mix-info flag adds no byte
 }
 
 #[test]
 fn audio_bad_tlv_and_real_descriptor_limits_remain_checked() {
     assert_eq!(
-        NativePrivateAudioCarriage::from_observed_pmt(
+        PrivateAudioCarriage::from_observed_pmt(
             6,
-            NativePrivateAudioDescriptors {
+            PrivateAudioDescriptors {
                 program: &[],
                 elementary: &[0x6a, 2, 0]
             },
@@ -583,9 +570,9 @@ fn audio_bad_tlv_and_real_descriptor_limits_remain_checked() {
         Error::Invalid("descriptor length")
     );
     assert_eq!(
-        NativePrivateAudioCarriage::from_observed_pmt(
+        PrivateAudioCarriage::from_observed_pmt(
             6,
-            NativePrivateAudioDescriptors {
+            PrivateAudioDescriptors {
                 program: &[],
                 elementary: &[0x6a, 1, 0x80]
             },
@@ -595,9 +582,9 @@ fn audio_bad_tlv_and_real_descriptor_limits_remain_checked() {
         Error::Invalid("audio descriptor optional fields")
     );
     assert_eq!(
-        NativePrivateAudioCarriage::from_observed_pmt(
+        PrivateAudioCarriage::from_observed_pmt(
             6,
-            NativePrivateAudioDescriptors {
+            PrivateAudioDescriptors {
                 program: &[],
                 elementary: &[0x6a, 1, 0, 0x90, 0, 0x90, 0]
             },
@@ -686,17 +673,17 @@ fn audio_external_pressure_retries_same_input_then_owned_packet_survives_observe
 }
 
 #[test]
-fn audio_hidden_owner_is_fully_charged_and_not_replaced_by_visible_length() {
+fn audio_hidden_backing_is_fully_charged_and_not_replaced_by_visible_length() {
     let budget = Budget::new(16_384).unwrap();
     let before = budget.used();
     let mut observer = observer(AC3_DVB, &budget);
     let mut source = vec![0xaa; 13];
     source.extend_from_slice(&AC3_DVB.bytes[376..564]);
     source.extend_from_slice(&[0xbb; 37]);
-    let owner = Bytes::copy_from_slice(&budget, &source).unwrap();
-    let capacity = owner.retained_capacity();
+    let backing = Bytes::copy_from_slice(&budget, &source).unwrap();
+    let capacity = backing.retained_capacity();
     let mut packet =
-        parse_transport(owner.slice(13..201).unwrap(), PacketFormat::Ts188, 376).unwrap();
+        parse_transport(backing.slice(13..201).unwrap(), PacketFormat::Ts188, 376).unwrap();
     packet.source_id = Some(SourceId(1));
     observer.push(packet, context(8)).unwrap();
     let out = drain(&mut observer);
@@ -711,9 +698,9 @@ fn audio_hidden_owner_is_fully_charged_and_not_replaced_by_visible_length() {
     assert!(
         out[0].spans.as_slice()[0]
             .backing_bytes()
-            .shares_storage_with(&owner)
+            .shares_storage_with(&backing)
     );
-    drop(owner);
+    drop(backing);
     drop(observer);
     check_packet(&out[0], AC3_DVB);
     assert!(budget.used() > before);
@@ -777,7 +764,7 @@ fn audio_two_real_pes_keep_order_raw_timestamps_context_and_no_after_eof_repetit
     assert_eq!(second.len(), 1);
     assert_eq!(second[0].source_header.pts_raw33, Some(180_000));
     assert_eq!(second[0].source_header.dts_raw33, None);
-    assert_eq!(second[0].native_position, 564);
+    assert_eq!(second[0].position, 564);
     assert_eq!(second[0].source_epochs, EPOCHS);
     assert_eq!(second[0].spans.as_slice()[0].context, context(9));
     assert!(
@@ -798,7 +785,7 @@ fn audio_two_real_pes_keep_order_raw_timestamps_context_and_no_after_eof_repetit
 }
 
 #[test]
-fn audio_mailbox_rejects_second_input_and_returns_exact_charged_owner() {
+fn audio_mailbox_rejects_second_input_and_returns_exact_charged_backing() {
     let budget = Budget::new(16_384).unwrap();
     let mut observer = observer(AC3_DIRECT, &budget);
     observer
@@ -819,7 +806,7 @@ fn audio_mailbox_rejects_second_input_and_returns_exact_charged_owner() {
 }
 
 #[test]
-fn audio_source_entity_epoch_and_foreign_pool_rejection_do_not_poison_valid_owner() {
+fn audio_source_entity_epoch_and_foreign_pool_rejection_do_not_poison_valid_backing() {
     for case in CASES {
         let budget = Budget::new(16_384).unwrap();
         let mut observer = observer(case, &budget);
@@ -857,8 +844,8 @@ fn audio_source_entity_epoch_and_foreign_pool_rejection_do_not_poison_valid_owne
 #[test]
 fn audio_finite_pes_policy_limit_is_real_and_has_no_partial_output() {
     let budget = Budget::new(16_384).unwrap();
-    let mut observer = NativePesObserver::new_private_audio_v1(
-        NativeClockProfile::ArchivedPesV1,
+    let mut observer = DemuxObserver::new_private_audio(
+        DemuxProfile::PesPackets,
         scope(AC3_DVB),
         AC3_DVB.carriage,
         descriptors(AC3_DVB),
@@ -890,7 +877,7 @@ fn audio_finite_pes_policy_limit_is_real_and_has_no_partial_output() {
 }
 
 #[test]
-fn audio_fragmented_valid_header_and_body_preserve_full_real_span_ownership() {
+fn audio_fragmented_valid_header_and_body_preserve_full_real_span_backing() {
     for cut in [5, 20] {
         let budget = Budget::new(16_384).unwrap();
         let mut observer = observer(EAC3_DVB, &budget);
@@ -908,7 +895,7 @@ fn audio_fragmented_valid_header_and_body_preserve_full_real_span_ownership() {
         assert_eq!(out.len(), 1);
         let packet = &out[0];
         assert_eq!(packet.payload_len, 27);
-        assert_eq!(packet.native_position, 376);
+        assert_eq!(packet.position, 376);
         assert_eq!(
             (
                 packet.source_header.pts_raw33,
@@ -938,7 +925,7 @@ fn audio_fragmented_valid_header_and_body_preserve_full_real_span_ownership() {
     }
 }
 
-fn require_nonpass(observer: &mut NativePesObserver) {
+fn require_nonpass(observer: &mut DemuxObserver) {
     for _ in 0..16_384 {
         match observer.poll(&mut WorkBudget::new(1), &AtomicBool::new(false)) {
             Ok(AssemblyStep::Yield) => (),
@@ -949,7 +936,7 @@ fn require_nonpass(observer: &mut NativePesObserver) {
     panic!("nonpass not reached with bounded work");
 }
 #[test]
-fn audio_incomplete_eof_and_next_pusi_are_explicit_nonpasses_not_partial_native_packets() {
+fn audio_incomplete_eof_and_next_pusi_are_explicit_nonpasses_not_partial_demux_packets() {
     for next_pusi in [false, true] {
         let budget = Budget::new(16_384).unwrap();
         let mut observer = observer(AC3_DVB, &budget);
@@ -1002,11 +989,12 @@ fn audio_counter_damage_unbounded_length_and_finite_overrun_are_not_h264_recover
     }
 }
 
+#[cfg(feature = "reference-trace")]
 #[test]
 fn audio_composed_wrapper_explicit_policy_uses_real_accepted_packets_only() {
     let budget = Budget::new(16_384).unwrap();
-    let mut observer = NativePesRecoveryObserver::new_private_audio_v1(
-        NativeClockProfile::ArchivedPesV1,
+    let mut observer = RecoveryObserver::new_private_audio(
+        DemuxProfile::PesPackets,
         scope(AC3_DVB),
         AC3_DVB.carriage,
         descriptors(AC3_DVB),
@@ -1014,7 +1002,7 @@ fn audio_composed_wrapper_explicit_policy_uses_real_accepted_packets_only() {
         ParseLimits::default(),
     )
     .unwrap();
-    assert_eq!(observer.policy(), NativeRejectedPolicy::NoRejectedCarrierV1);
+    assert_eq!(observer.policy(), RejectedPolicy::NoRejectedCarrier);
     observer
         .push_accepted(original(AC3_DVB, &budget), context(8))
         .unwrap();
@@ -1023,7 +1011,7 @@ fn audio_composed_wrapper_explicit_policy_uses_real_accepted_packets_only() {
         let mut work = WorkBudget::new(1);
         match observer.poll(&mut work, &AtomicBool::new(false)).unwrap() {
             AssemblyStep::Yield => (),
-            AssemblyStep::Output(NativePesObservation::Accepted(packet)) => {
+            AssemblyStep::Output(DemuxObservation::Accepted(packet)) => {
                 check_packet(&packet, AC3_DVB);
                 count += 1;
             }
@@ -1035,11 +1023,12 @@ fn audio_composed_wrapper_explicit_policy_uses_real_accepted_packets_only() {
     assert_eq!(count, 1);
 }
 
+#[cfg(feature = "reference-trace")]
 #[test]
-fn audio_rejected_carrier_stays_original_invalid_source_and_does_not_advance_native_input() {
+fn audio_rejected_carrier_stays_original_invalid_source_and_does_not_advance_demux_input() {
     let budget = Budget::new(16_384).unwrap();
-    let mut observer = NativePesRecoveryObserver::new_private_audio_v1(
-        NativeClockProfile::ArchivedPesV1,
+    let mut observer = RecoveryObserver::new_private_audio(
+        DemuxProfile::PesPackets,
         scope(AC3_DVB),
         AC3_DVB.carriage,
         descriptors(AC3_DVB),
@@ -1048,9 +1037,9 @@ fn audio_rejected_carrier_stays_original_invalid_source_and_does_not_advance_nat
     )
     .unwrap();
     let raw = include_bytes!("data/native-pes-v1/opcr-without-pcr-invalid.ts");
-    let owner = Bytes::copy_from_slice(&budget, &raw[376..564]).unwrap();
+    let backing = Bytes::copy_from_slice(&budget, &raw[376..564]).unwrap();
     let mut inspector = TransportInspector::new(
-        owner.clone(),
+        backing.clone(),
         PacketFormat::Ts188,
         SourceLocation {
             source: SourceId(1),
@@ -1076,7 +1065,7 @@ fn audio_rejected_carrier_stays_original_invalid_source_and_does_not_advance_nat
     );
     assert_eq!(error.value.error(), Error::Invalid("OPCR without PCR"));
     assert_eq!(error.value.source_offset(), 376);
-    assert!(error.value.bytes().shares_storage_with(&owner));
+    assert!(error.value.bytes().shares_storage_with(&backing));
     assert_eq!(error.value.bytes().as_ref(), &raw[376..564]);
     // The unsupported opt-in observation does not poison/reseed its real source.
     observer
@@ -1089,7 +1078,7 @@ fn audio_rejected_carrier_stays_original_invalid_source_and_does_not_advance_nat
             .unwrap()
         {
             AssemblyStep::Yield => (),
-            AssemblyStep::Output(NativePesObservation::Accepted(packet)) => {
+            AssemblyStep::Output(DemuxObservation::Accepted(packet)) => {
                 check_packet(&packet, AC3_DVB);
                 packets += 1;
             }

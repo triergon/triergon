@@ -15,7 +15,7 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use triergon_core::{Budget, BudgetVec, InputCursor, InputRequest, WorkBudget};
 use triergon_mpegts::{
     AssemblyStep, FaultKind, ParseLimits, TraceEvent,
-    native_pes::{NativePrivateAudioCarriage, NativePrivateAudioDescriptors},
+    compat::pes::{PrivateAudioCarriage, PrivateAudioDescriptors},
     psi::{ElementaryStream, ProgramMap},
 };
 
@@ -784,7 +784,7 @@ fn media_audio_matches(
     codec: HlsAudioCodec,
     limits: ParseLimits,
 ) -> Result<bool> {
-    use NativePrivateAudioCarriage as Dolby;
+    use PrivateAudioCarriage as Dolby;
     if codec == HlsAudioCodec::Aac {
         return Ok(stream.stream_type == 0x0f);
     }
@@ -798,7 +798,7 @@ fn media_audio_matches(
     }
     let carriage = Dolby::from_hls_pmt(
         stream.stream_type,
-        NativePrivateAudioDescriptors {
+        PrivateAudioDescriptors {
             program: map.program_descriptors.as_ref(),
             elementary: stream.descriptor_bytes.as_ref(),
         },
