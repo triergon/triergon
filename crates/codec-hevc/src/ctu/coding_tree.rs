@@ -5,7 +5,7 @@ use super::{
     Cu, PART_2NX2N, PART_2NXN, PART_2NXND, PART_2NXNU, PART_NLX2N, PART_NRX2N, PART_NX2N, PART_NXN,
     SliceDecoder,
 };
-use crate::bits::BitReader;
+use crate::bits::{BitCursor, BitSource};
 use crate::cabac::ctx;
 use crate::error::{DecodeError, Result};
 use crate::picture::{Pixel, PuMotion};
@@ -26,7 +26,7 @@ impl<P: Pixel> SliceDecoder<'_, P> {
             let left_in_tile =
                 layout.tile_id[layout.ctb_addr_rs_to_ts[rs as usize - 1] as usize] == tile;
             if left_in_slice && left_in_tile {
-                merge_left = self.cabac.decode(&mut self.c[ctx::SAO_MERGE]) != 0;
+                merge_left = self.cabac.decision(&mut self.c[ctx::SAO_MERGE]) != 0;
             }
         }
         if ry > 0 && !merge_left {
@@ -34,7 +34,7 @@ impl<P: Pixel> SliceDecoder<'_, P> {
             let up_in_slice = up >= self.sh.slice_addr_rs;
             let up_in_tile = layout.tile_id[layout.ctb_addr_rs_to_ts[up as usize] as usize] == tile;
             if up_in_slice && up_in_tile {
-                merge_up = self.cabac.decode(&mut self.c[ctx::SAO_MERGE]) != 0;
+                merge_up = self.cabac.decision(&mut self.c[ctx::SAO_MERGE]) != 0;
             }
         }
         let mut p = SaoParams::default();
@@ -53,7 +53,7 @@ impl<P: Pixel> SliceDecoder<'_, P> {
                     continue;
                 }
                 if c_idx == 0 || c_idx == 1 {
-                    let t = if self.cabac.decode(&mut self.c[ctx::SAO_TYPE]) == 0 {
+                    let t = if self.cabac.decision(&mut self.c[ctx::SAO_TYPE]) == 0 {
                         0
                     } else if self.cabac.bypass() == 0 {
                         1
@@ -130,7 +130,7 @@ impl<P: Pixel> SliceDecoder<'_, P> {
             {
                 inc += 1;
             }
-            self.cabac.decode(&mut self.c[ctx::SPLIT_CU + inc]) != 0
+            self.cabac.decision(&mut self.c[ctx::SPLIT_CU + inc]) != 0
         } else {
             log2 > self.min_cb
         };
@@ -191,7 +191,7 @@ impl<P: Pixel> SliceDecoder<'_, P> {
         let n = 1u32 << log2;
         self.inner_edges = false;
         let bypass = if self.pps.transquant_bypass {
-            self.cabac.decode(&mut self.c[ctx::CU_TRANSQUANT_BYPASS]) != 0
+            self.cabac.decision(&mut self.c[ctx::CU_TRANSQUANT_BYPASS]) != 0
         } else {
             false
         };
@@ -208,7 +208,7 @@ impl<P: Pixel> SliceDecoder<'_, P> {
             {
                 inc += 1;
             }
-            skip = self.cabac.decode(&mut self.c[ctx::CU_SKIP + inc]) != 0;
+            skip = self.cabac.decision(&mut self.c[ctx::CU_SKIP + inc]) != 0;
         }
         self.update_qp();
         let d = depth as u8;
@@ -239,7 +239,7 @@ impl<P: Pixel> SliceDecoder<'_, P> {
             self.prediction_unit(&cu, x0, y0, n, n, 0, true)?;
         } else {
             let intra = if self.sh.slice_type != SLICE_I {
-                self.cabac.decode(&mut self.c[ctx::PRED_MODE]) != 0
+                self.cabac.decision(&mut self.c[ctx::PRED_MODE]) != 0
             } else {
                 true
             };
@@ -313,7 +313,7 @@ impl<P: Pixel> SliceDecoder<'_, P> {
             }
             if !pcm {
                 let rqt_root_cbf = if !intra && !(cu.part == PART_2NX2N && merge_2nx2n) {
-                    self.cabac.decode(&mut self.c[ctx::RQT_ROOT_CBF]) != 0
+                    self.cabac.decision(&mut self.c[ctx::RQT_ROOT_CBF]) != 0
                 } else {
                     true
                 };
@@ -356,30 +356,30 @@ impl<P: Pixel> SliceDecoder<'_, P> {
     }
 
     fn parse_part_mode(&mut self, intra: bool, log2: u32) -> u8 {
-        if self.cabac.decode(&mut self.c[ctx::PART_MODE]) != 0 {
+        if self.cabac.decision(&mut self.c[ctx::PART_MODE]) != 0 {
             return PART_2NX2N;
         }
         if intra {
             return PART_NXN;
         }
         if log2 == self.min_cb {
-            if self.cabac.decode(&mut self.c[ctx::PART_MODE + 1]) != 0 {
+            if self.cabac.decision(&mut self.c[ctx::PART_MODE + 1]) != 0 {
                 return PART_2NXN;
             }
             if log2 == 3 {
                 return PART_NX2N;
             }
-            if self.cabac.decode(&mut self.c[ctx::PART_MODE + 2]) != 0 {
+            if self.cabac.decision(&mut self.c[ctx::PART_MODE + 2]) != 0 {
                 return PART_NX2N;
             }
             return PART_NXN;
         }
-        let horizontal = self.cabac.decode(&mut self.c[ctx::PART_MODE + 1]) != 0;
+        let horizontal = self.cabac.decision(&mut self.c[ctx::PART_MODE + 1]) != 0;
         if !self.sps.amp {
             return if horizontal { PART_2NXN } else { PART_NX2N };
         }
         if horizontal {
-            if self.cabac.decode(&mut self.c[ctx::PART_MODE + 3]) != 0 {
+            if self.cabac.decision(&mut self.c[ctx::PART_MODE + 3]) != 0 {
                 return PART_2NXN;
             }
             if self.cabac.bypass() == 0 {
@@ -388,7 +388,7 @@ impl<P: Pixel> SliceDecoder<'_, P> {
                 PART_2NXND
             }
         } else {
-            if self.cabac.decode(&mut self.c[ctx::PART_MODE + 3]) != 0 {
+            if self.cabac.decision(&mut self.c[ctx::PART_MODE + 3]) != 0 {
                 return PART_NX2N;
             }
             if self.cabac.bypass() == 0 {
@@ -400,11 +400,11 @@ impl<P: Pixel> SliceDecoder<'_, P> {
     }
 
     fn pcm_sample(&mut self, x0: u32, y0: u32, log2: u32) -> Result<()> {
-        let pos = self.cabac.aligned_byte_pos();
+        let pos = self.cabac.aligned_byte_position();
         if pos > self.data.len() {
             return Err(DecodeError::InvalidData("PCM data overrun"));
         }
-        let mut r = BitReader::new(&self.data[pos..]);
+        let mut r = BitCursor::new(&self.data[pos..]);
         let n = 1usize << log2;
         let bd_y = self.sps.pcm_bit_depth_luma;
         let bd_c = self.sps.pcm_bit_depth_chroma;
@@ -415,7 +415,7 @@ impl<P: Pixel> SliceDecoder<'_, P> {
             let stride = pl.stride;
             for j in 0..n {
                 for i in 0..n {
-                    let v = r.u(bd_y)? as i32;
+                    let v = r.read(bd_y)? as i32;
                     pl.data[(y0 as usize + j) * stride + x0 as usize + i] = P::from_i32(v << sy);
                 }
             }
@@ -425,14 +425,14 @@ impl<P: Pixel> SliceDecoder<'_, P> {
             let stride = pl.stride;
             for j in 0..nc {
                 for i in 0..nc {
-                    let v = r.u(bd_c)? as i32;
+                    let v = r.read(bd_c)? as i32;
                     pl.data[(y0 as usize / 2 + j) * stride + x0 as usize / 2 + i] =
                         P::from_i32(v << scy);
                 }
             }
         }
-        let consumed = r.bit_pos().div_ceil(8);
-        self.cabac.reinit(pos + consumed);
+        let consumed = r.position().div_ceil(8);
+        self.cabac.restart(pos + consumed);
         Ok(())
     }
 
@@ -443,7 +443,7 @@ impl<P: Pixel> SliceDecoder<'_, P> {
         let pb = if nparts == 4 { n / 2 } else { n };
         let mut prev = [false; 4];
         for p in prev.iter_mut().take(nparts) {
-            *p = self.cabac.decode(&mut self.c[ctx::PREV_INTRA_LUMA_PRED]) != 0;
+            *p = self.cabac.decision(&mut self.c[ctx::PREV_INTRA_LUMA_PRED]) != 0;
         }
         for i in 0..nparts {
             let xp = cu.x0 + (i as u32 & 1) * pb;
@@ -505,7 +505,11 @@ impl<P: Pixel> SliceDecoder<'_, P> {
             self.set_blk_area(xp, yp, pb, pb, |b| b.ipm = mb);
         }
         // intra_chroma_pred_mode (4:2:0: one per CU), Table 8-2.
-        let icpm = if self.cabac.decode(&mut self.c[ctx::INTRA_CHROMA_PRED_MODE]) == 0 {
+        let icpm = if self
+            .cabac
+            .decision(&mut self.c[ctx::INTRA_CHROMA_PRED_MODE])
+            == 0
+        {
             4
         } else {
             self.cabac.bypass_bits(2)

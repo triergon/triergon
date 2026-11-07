@@ -1,8 +1,8 @@
 //! Sequence and picture parameter sets (clauses 7.3.2.1, 7.3.2.2, 7.4.2.1, 7.4.2.2, Annex E VUI).
 
 use crate::DecodeError;
-use crate::bitreader::BitReader;
 use crate::tables::*;
+use triergon_bitstream::BitReader;
 
 pub(crate) type R<T> = Result<T, DecodeError>;
 
@@ -158,7 +158,7 @@ fn parse_scaling_matrix(
     fallback: Option<ScalingFallback<'_>>,
 ) -> R<()> {
     for i in 0..n_lists {
-        let present = r.flag();
+        let present = r.bit();
         if i < 6 {
             let use_default = if present {
                 scaling_list(r, &mut s4[i])?
@@ -210,77 +210,77 @@ fn hrd(r: &mut BitReader<'_>, v: &mut Vui) -> R<()> {
     if cpb_cnt > 32 {
         return Err(inval("cpb_cnt_minus1"));
     }
-    r.u(4);
-    r.u(4);
+    r.read(4);
+    r.read(4);
     for _ in 0..cpb_cnt {
         r.ue();
         r.ue();
-        r.flag();
+        r.bit();
     }
-    r.u(5);
-    v.cpb_removal_delay_len = r.u(5) as u8 + 1;
-    v.dpb_output_delay_len = r.u(5) as u8 + 1;
-    v.time_offset_len = r.u(5) as u8;
+    r.read(5);
+    v.cpb_removal_delay_len = r.read(5) as u8 + 1;
+    v.dpb_output_delay_len = r.read(5) as u8 + 1;
+    v.time_offset_len = r.read(5) as u8;
     Ok(())
 }
 
 fn parse_vui(r: &mut BitReader<'_>) -> R<Vui> {
     let mut v = Vui::default();
-    if r.flag() {
-        let idc = r.u(8);
+    if r.bit() {
+        let idc = r.read(8);
         if idc == 255 {
-            let w = r.u(16);
-            let h = r.u(16);
+            let w = r.read(16);
+            let h = r.read(16);
             v.sar = (w, h);
         } else if (idc as usize) < SAR_TABLE.len() {
             v.sar = SAR_TABLE[idc as usize];
         }
     }
-    if r.flag() {
-        r.flag(); // overscan_appropriate_flag
+    if r.bit() {
+        r.bit(); // overscan_appropriate_flag
     }
     v.colour_primaries = 2;
     v.transfer_characteristics = 2;
     v.matrix_coefficients = 2;
-    if r.flag() {
-        r.u(3); // video_format
-        v.video_full_range = r.flag();
-        if r.flag() {
+    if r.bit() {
+        r.read(3); // video_format
+        v.video_full_range = r.bit();
+        if r.bit() {
             v.colour_description_present = true;
-            v.colour_primaries = r.u(8) as u8;
-            v.transfer_characteristics = r.u(8) as u8;
-            v.matrix_coefficients = r.u(8) as u8;
+            v.colour_primaries = r.read(8) as u8;
+            v.transfer_characteristics = r.read(8) as u8;
+            v.matrix_coefficients = r.read(8) as u8;
         }
     }
-    if r.flag() {
+    if r.bit() {
         r.ue();
         r.ue();
     }
-    if r.flag() {
-        let a = r.u(32);
-        let b = r.u(32);
-        let f = r.flag();
+    if r.bit() {
+        let a = r.read(32);
+        let b = r.read(32);
+        let f = r.bit();
         v.timing = Some((a, b, f));
     }
-    v.nal_hrd = r.flag();
+    v.nal_hrd = r.bit();
     if v.nal_hrd {
         hrd(r, &mut v)?;
     }
-    v.vcl_hrd = r.flag();
+    v.vcl_hrd = r.bit();
     if v.vcl_hrd {
         hrd(r, &mut v)?;
     }
     if v.nal_hrd || v.vcl_hrd {
-        r.flag(); // low_delay_hrd_flag
+        r.bit(); // low_delay_hrd_flag
     }
-    v.pic_struct_present = r.flag();
+    v.pic_struct_present = r.bit();
     // Truncated VUIs exist in the wild; stop before reading past the end.
-    if r.bits_left() <= 0 {
+    if r.left() <= 0 {
         return Ok(v);
     }
-    v.bitstream_restriction = r.flag();
+    v.bitstream_restriction = r.bit();
     if v.bitstream_restriction {
-        r.flag();
+        r.bit();
         r.ue();
         r.ue();
         r.ue();
@@ -297,9 +297,9 @@ fn parse_vui(r: &mut BitReader<'_>) -> R<Vui> {
 }
 
 pub(crate) fn parse_sps(r: &mut BitReader<'_>) -> R<Sps> {
-    let profile_idc = r.u(8) as u8;
-    let constraint_flags = r.u(8) as u8;
-    let level_idc = r.u(8) as u8;
+    let profile_idc = r.read(8) as u8;
+    let constraint_flags = r.read(8) as u8;
+    let level_idc = r.read(8) as u8;
     let id = r.ue();
     if id > 31 {
         return Err(inval("seq_parameter_set_id"));
@@ -343,15 +343,15 @@ pub(crate) fn parse_sps(r: &mut BitReader<'_>) -> R<Sps> {
             return Err(inval("chroma_format_idc"));
         }
         if sps.chroma_format_idc == 3 {
-            sps.separate_colour_plane = r.flag();
+            sps.separate_colour_plane = r.bit();
         }
         sps.bit_depth_luma = r.ue() + 8;
         sps.bit_depth_chroma = r.ue() + 8;
         if sps.bit_depth_luma > 14 || sps.bit_depth_chroma > 14 {
             return Err(inval("bit_depth"));
         }
-        sps.qpprime_y_zero_transform_bypass = r.flag();
-        sps.seq_scaling_matrix_present = r.flag();
+        sps.qpprime_y_zero_transform_bypass = r.bit();
+        sps.seq_scaling_matrix_present = r.bit();
         if sps.seq_scaling_matrix_present {
             let n = if sps.chroma_format_idc != 3 { 8 } else { 12 };
             let mut s4 = [[16u8; 16]; 6];
@@ -374,7 +374,7 @@ pub(crate) fn parse_sps(r: &mut BitReader<'_>) -> R<Sps> {
             }
         }
         1 => {
-            sps.delta_pic_order_always_zero = r.flag();
+            sps.delta_pic_order_always_zero = r.bit();
             sps.offset_for_non_ref_pic = r.se();
             sps.offset_for_top_to_bottom_field = r.se();
             let n = r.ue();
@@ -392,20 +392,20 @@ pub(crate) fn parse_sps(r: &mut BitReader<'_>) -> R<Sps> {
     if sps.max_num_ref_frames > 16 {
         return Err(inval("max_num_ref_frames"));
     }
-    sps.gaps_in_frame_num_allowed = r.flag();
+    sps.gaps_in_frame_num_allowed = r.bit();
     sps.pic_width_in_mbs = r.ue() + 1;
     sps.pic_height_in_map_units = r.ue() + 1;
-    sps.frame_mbs_only = r.flag();
+    sps.frame_mbs_only = r.bit();
     if !sps.frame_mbs_only {
-        sps.mb_adaptive_frame_field = r.flag();
+        sps.mb_adaptive_frame_field = r.bit();
     }
-    sps.direct_8x8_inference = r.flag();
-    if r.flag() {
+    sps.direct_8x8_inference = r.bit();
+    if r.bit() {
         for c in &mut sps.crop {
             *c = r.ue();
         }
     }
-    if r.flag() {
+    if r.bit() {
         sps.vui = Some(parse_vui(r)?);
     }
     if sps.pic_width_in_mbs > 1024 || sps.frame_height_in_mbs() > 1024 {
@@ -423,8 +423,8 @@ pub(crate) fn parse_pps(r: &mut BitReader<'_>, spss: &[Option<Box<Sps>>]) -> R<P
     if sps_id > 31 {
         return Err(inval("seq_parameter_set_id"));
     }
-    let entropy_coding_mode = r.flag();
-    let bottom_field_pic_order_in_frame_present = r.flag();
+    let entropy_coding_mode = r.bit();
+    let bottom_field_pic_order_in_frame_present = r.bit();
     let num_slice_groups = r.ue() + 1;
     if num_slice_groups > 8 {
         return Err(inval("num_slice_groups_minus1"));
@@ -445,14 +445,14 @@ pub(crate) fn parse_pps(r: &mut BitReader<'_>, spss: &[Option<Box<Sps>>]) -> R<P
                 }
             }
             3..=5 => {
-                r.flag();
+                r.bit();
                 r.ue();
             }
             6 => {
                 let n = r.ue() + 1;
                 let bits = 32 - (num_slice_groups - 1).leading_zeros();
                 for _ in 0..n.min(1 << 20) {
-                    r.u(bits);
+                    r.read(bits);
                 }
             }
             _ => {}
@@ -463,17 +463,17 @@ pub(crate) fn parse_pps(r: &mut BitReader<'_>, spss: &[Option<Box<Sps>>]) -> R<P
     if l0 > 32 || l1 > 32 {
         return Err(inval("num_ref_idx_default_active_minus1"));
     }
-    let weighted_pred = r.flag();
-    let weighted_bipred_idc = r.u(2);
+    let weighted_pred = r.bit();
+    let weighted_bipred_idc = r.read(2);
     let pic_init_qp = 26 + r.se();
     let pic_init_qs = 26 + r.se();
     let chroma_qp_index_offset = r.se();
     if !(-12..=12).contains(&chroma_qp_index_offset) {
         return Err(inval("chroma_qp_index_offset"));
     }
-    let deblocking_filter_control_present = r.flag();
-    let constrained_intra_pred = r.flag();
-    let redundant_pic_cnt_present = r.flag();
+    let deblocking_filter_control_present = r.bit();
+    let constrained_intra_pred = r.bit();
+    let redundant_pic_cnt_present = r.bit();
     let sps = spss.get(sps_id as usize).and_then(|s| s.as_deref());
     let (mut s4, mut s8) = match sps {
         Some(s) => (s.scaling4, s.scaling8),
@@ -483,8 +483,8 @@ pub(crate) fn parse_pps(r: &mut BitReader<'_>, spss: &[Option<Box<Sps>>]) -> R<P
     let mut pic_scaling_matrix_present = false;
     let mut second = chroma_qp_index_offset;
     if r.more_rbsp_data() {
-        transform_8x8_mode = r.flag();
-        pic_scaling_matrix_present = r.flag();
+        transform_8x8_mode = r.bit();
+        pic_scaling_matrix_present = r.bit();
         if pic_scaling_matrix_present {
             let chroma_format_idc = sps.map(|s| s.chroma_format_idc).unwrap_or(1);
             let n = 6 + if chroma_format_idc != 3 { 2 } else { 6 } * transform_8x8_mode as usize;

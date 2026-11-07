@@ -1,11 +1,11 @@
 //! Stream feature inspection (parameter sets and slice headers only). Used to classify
 //! conformance vectors into the selected feature matrix; not part of the decoding path.
 
-use crate::bitreader::BitReader;
 use crate::nal::{NalIter, parse_header, unescape};
 use crate::ps::{Pps, Sps, parse_pps, parse_sps};
 use crate::slice::{SliceType, parse_slice_header, peek_pps_id};
 use std::collections::BTreeSet;
+use triergon_bitstream::BitReader;
 
 #[derive(Debug, Default, Clone)]
 pub struct StreamFeatures {
@@ -54,7 +54,7 @@ pub fn inspect(data: &[u8]) -> StreamFeatures {
         let Some(h) = parse_header(nal) else { continue };
         f.nal_types.insert(h.nal_unit_type);
         let len = unescape(&nal[1..], &mut buf);
-        let mut r = BitReader::new(&buf, len);
+        let mut r = BitReader::with_end(&buf, len * 8);
         match h.nal_unit_type {
             7 => match parse_sps(&mut r) {
                 Ok(s) => {

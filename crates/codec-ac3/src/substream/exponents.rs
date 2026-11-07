@@ -1,8 +1,8 @@
 //! Exponent strategies, channel bandwidths and grouped exponents (5.4.3, 7.1).
 
 use super::{CPL, E, LFE, REUSE, Substream, bad};
-use crate::bits::BitReader;
 use crate::tables::spx_band_start;
+use triergon_bitstream::BitReader;
 
 impl Substream {
     /// Exponent strategies (AC-3 carries them per block) and channel bandwidth codes.
@@ -16,12 +16,12 @@ impl Substream {
         let nfch = self.nfchans;
         let eac3 = self.eac3;
         if !eac3 {
-            self.expstr[CPL][blk] = if cplinu { br.get(2) as u8 } else { REUSE };
+            self.expstr[CPL][blk] = if cplinu { br.read(2) as u8 } else { REUSE };
             for ch in 0..nfch {
-                self.expstr[ch][blk] = br.get(2) as u8;
+                self.expstr[ch][blk] = br.read(2) as u8;
             }
             if self.lfeon {
-                self.expstr[LFE][blk] = br.get(1) as u8;
+                self.expstr[LFE][blk] = br.read(1) as u8;
             }
         }
         if blk == 0 {
@@ -39,7 +39,7 @@ impl Substream {
                 } else if eac3 && self.spxinu && self.chinspx[ch] {
                     self.endmant[ch] = spx_band_start(self.spx_begin);
                 } else {
-                    let chbwcod = br.get(6) as usize;
+                    let chbwcod = br.read(6) as usize;
                     if chbwcod > 60 {
                         return Err(bad("chbwcod > 60"));
                     }
@@ -64,7 +64,7 @@ impl Substream {
         let eac3 = self.eac3;
         if cplinu && self.expstr[CPL][blk] != REUSE {
             let strategy = self.expstr[CPL][blk];
-            let cplabsexp = (br.get(4) as u8) << 1;
+            let cplabsexp = (br.read(4) as u8) << 1;
             let gs = grp_size(strategy);
             let ngrps = (self.cplendmant - self.cplstrtmant) / (3 * gs);
             let start = self.cplstrtmant;
@@ -79,7 +79,7 @@ impl Substream {
         for ch in 0..nfch {
             let strategy = self.expstr[ch][blk];
             if strategy != REUSE {
-                let absexp = br.get(4) as u8;
+                let absexp = br.read(4) as u8;
                 let gs = grp_size(strategy);
                 let end = self.endmant[ch];
                 let ngrps = (end - 1 + 3 * gs - 3) / (3 * gs);
@@ -90,7 +90,7 @@ impl Substream {
             }
         }
         if self.lfeon && self.expstr[LFE][blk] != REUSE {
-            let absexp = br.get(4) as u8;
+            let absexp = br.read(4) as u8;
             self.exps[LFE][0] = absexp;
             decode_exponents(br, &mut self.exps[LFE], absexp, 1, 2, 1)?;
             self.strtmant[LFE] = 0;
@@ -151,7 +151,7 @@ fn decode_exponents(
         return Err(bad("exponent range"));
     }
     for _ in 0..ngrps {
-        let gexp = br.get(7) as usize;
+        let gexp = br.read(7) as usize;
         if gexp > 124 {
             return Err(bad("grouped exponent > 124"));
         }

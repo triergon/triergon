@@ -4,11 +4,11 @@
 //! target's TNS (cc_domain 0 / 1); independently switched CCEs are added in the time domain
 //! after the target's filterbank. The coupling channel's own spectrum is TNS-filtered first.
 
-use crate::bits::BitReader;
 use crate::decoder::{Core, ID_CPE};
 use crate::error::{DecodeError, Result};
 use crate::huffman::books;
 use crate::ics::{ChannelData, CoreCfg, MAX_SFB, ZERO_HCB, parse_ics};
+use triergon_bitstream::CachedBitReader;
 
 /// cc_scale for gain_element_scale 0..3: 2^(1/8), 2^(1/4), 2^(1/2), 2.
 const CC_SCALE: [f64; 4] = [
@@ -63,7 +63,11 @@ impl CceState {
     }
 }
 
-pub(crate) fn parse_cce(core: &mut Core, br: &mut BitReader<'_>, cfg: &CoreCfg) -> Result<usize> {
+pub(crate) fn parse_cce(
+    core: &mut Core,
+    br: &mut CachedBitReader<'_>,
+    cfg: &CoreCfg,
+) -> Result<usize> {
     let tag = br.read(4) as u8;
     let ci = match core.cce.iter().position(|c| c.tag == tag) {
         Some(i) => i,

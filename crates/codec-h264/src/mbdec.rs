@@ -8,6 +8,7 @@ use crate::mbinfo::*;
 use crate::slice::SliceType;
 use crate::slicedec::SliceDecoder;
 use crate::tables::*;
+use triergon_bitstream::BitReader;
 
 fn inval(s: &'static str) -> DecodeError {
     DecodeError::InvalidData(s)
@@ -41,6 +42,12 @@ pub(crate) struct MbData {
     pub total: [u8; 24],
     pub cbf: u32,
     pub qp_delta: i32,
+}
+
+/// te(v) (clause 9.1): ue(v) for a range above 1, otherwise the inverted single bit.
+#[inline(always)]
+fn te(r: &mut BitReader<'_>, max: u32) -> u32 {
+    if max > 1 { r.ue() } else { (!r.bit()) as u32 }
 }
 
 impl MbData {
@@ -453,7 +460,7 @@ impl SliceDecoder<'_> {
                 transform_size_8x8_flag = if cabac {
                     self.cabac_t8x8()
                 } else {
-                    self.br.flag()
+                    self.br.bit()
                 };
                 if transform_size_8x8_flag {
                     self.mb.kind = Kind::I8x8;
@@ -512,7 +519,7 @@ impl SliceDecoder<'_> {
                 transform_size_8x8_flag = if cabac {
                     self.cabac_t8x8()
                 } else {
-                    self.br.flag()
+                    self.br.bit()
                 };
             }
         }
@@ -544,10 +551,10 @@ impl SliceDecoder<'_> {
                 .unwrap()
                 .intra_pred_mode()
                 .map(|v| v as u8))
-        } else if self.br.flag() {
+        } else if self.br.bit() {
             Ok(None)
         } else {
-            Ok(Some(self.br.u(3) as u8))
+            Ok(Some(self.br.read(3) as u8))
         }
     }
 
@@ -570,7 +577,7 @@ impl SliceDecoder<'_> {
                         let inc = self.ref_idx_inc(list, p);
                         self.cabac.as_mut().unwrap().ref_idx(inc) as i32
                     } else {
-                        self.br.te((nref - 1) as u32) as i32
+                        te(&mut self.br, (nref - 1) as u32) as i32
                     }
                 } else {
                     0
@@ -650,7 +657,7 @@ impl SliceDecoder<'_> {
                         let inc = self.ref_idx_inc_8x8(list, i);
                         self.cabac.as_mut().unwrap().ref_idx(inc) as i32
                     } else {
-                        self.br.te((nref - 1) as u32) as i32
+                        te(&mut self.br, (nref - 1) as u32) as i32
                     }
                 } else {
                     0
@@ -1053,15 +1060,15 @@ impl SliceDecoder<'_> {
             let c = self.cabac.as_mut().unwrap();
             let pos = c.pcm_byte_pos();
             let data = self.br.data();
-            if pos + n > self.br.len_bits() / 8 + 2 {
+            if pos + n > self.br.end() / 8 + 2 {
                 return Err(inval("I_PCM truncated"));
             }
             samples[..n].copy_from_slice(&data[pos..pos + n]);
             c.reinit_at(pos + n);
         } else {
-            self.br.align();
+            self.br.align(8);
             for v in &mut samples[..n] {
-                *v = self.br.u(8) as u8;
+                *v = self.br.read(8) as u8;
             }
         }
         let buf = &mut self.pic.buf;

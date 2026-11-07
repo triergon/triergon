@@ -2,12 +2,12 @@
 //! ps_data() parsing, hybrid QMF analysis/synthesis, all-pass decorrelation with transient
 //! attenuation, and IID/ICC(/IPD/OPD) stereo mixing with per-envelope interpolation.
 
-use crate::bits::BitReader;
 use crate::error::{DecodeError, Result};
 use crate::fft::Cpx;
 use crate::huffman::{Vlc, books};
 use std::f64::consts::PI;
 use std::sync::OnceLock;
+use triergon_bitstream::CachedBitReader;
 
 const NUM_SLOTS: usize = 32;
 /// Hybrid filter length and its group delay in QMF slots.
@@ -381,7 +381,7 @@ impl Ps {
     }
 
     /// ps_data(); `bits` is the number of bits available in the SBR extension.
-    pub(crate) fn parse(&mut self, br: &mut BitReader<'_>, bits: usize) -> Result<usize> {
+    pub(crate) fn parse(&mut self, br: &mut CachedBitReader<'_>, bits: usize) -> Result<usize> {
         let start = br.position();
         let bk = books();
         if br.bit() {
@@ -997,7 +997,7 @@ fn map_pd(p: &[i8; 17], n: usize, to: usize) -> [i8; 17] {
 }
 
 fn read_par(
-    br: &mut BitReader<'_>,
+    br: &mut CachedBitReader<'_>,
     v: &Vlc,
     dt: bool,
     off: i32,
@@ -1020,7 +1020,7 @@ fn read_par(
 }
 
 fn read_ipd(
-    br: &mut BitReader<'_>,
+    br: &mut CachedBitReader<'_>,
     v: &Vlc,
     dt: bool,
     n: usize,

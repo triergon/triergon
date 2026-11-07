@@ -9439,6 +9439,26 @@
      "sha256": "8038717182e50c75af73dd6b9d70ee2165c0bf48a44ea05d4462ee2b1285f657"
     }
    ]
+  },
+  {
+   "name": "bitstream-comparison-linux-arm64",
+   "path": "bitstream-comparison-linux-arm64",
+   "retention": "retained",
+   "reason": "Cited paired timing, trace identities and corrupted-input comparison of the shared bit reading crate against main at 6c101e523",
+   "key": "evidence/bitstream-comparison-linux-arm64/e8b90048233eedf91c90b3116d7521586b5eb58a684315e56f7bba3401b3e46d.tar.gz",
+   "sha256": "e8b90048233eedf91c90b3116d7521586b5eb58a684315e56f7bba3401b3e46d",
+   "bytes": 845041640,
+   "source_revision": "19e41fbb7ec70cc25959ba890304c32d4bbfd115"
+  },
+  {
+   "name": "bitstream-review-linux-arm64",
+   "path": "bitstream-review-linux-arm64",
+   "retention": "retained",
+   "reason": "Cited same-code listings, instruction counts, capture timing, trace identities and corrupted-input comparison of the shared bit reading crate against main at 70629e9a0",
+   "key": "evidence/bitstream-review-linux-arm64/67f176a4efe3e45e6e1b784cd607ac754ad6b2c19d27ea2e659c8de71ab131f9.tar.gz",
+   "sha256": "67f176a4efe3e45e6e1b784cd607ac754ad6b2c19d27ea2e659c8de71ab131f9",
+   "bytes": 1487493,
+   "source_revision": "eba2f07a76b58fb60e918f40fa731e55cecfffa2"
   }
  ]
 }

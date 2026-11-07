@@ -10,6 +10,7 @@ use std::{
     ops::Range,
     sync::{Arc, atomic::AtomicBool},
 };
+use triergon_bitstream::crc::Crc32Ieee;
 use triergon_core::{Budget, BudgetVec, Reservation, SourceId, WorkBudget};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -346,7 +347,7 @@ pub(crate) struct GroupJob {
     ids: BudgetVec<u64>,
     heap: Option<crate::metadata::typed_document::Heap>,
     at: usize,
-    crc: u32,
+    crc: Crc32Ieee,
     phase: Phase,
     result: Option<BlockGroupSource>,
     failed: bool,
@@ -405,7 +406,7 @@ impl GroupJob {
             ids: BudgetVec::new(pool),
             heap: None,
             at: 0,
-            crc: u32::MAX,
+            crc: Crc32Ieee::default(),
             phase: Phase::Parse,
             result: None,
             failed: false,
@@ -628,7 +629,7 @@ impl GroupJob {
                                 .required("missing group frame")?;
                             if frame.crc.is_some() && !frame.checked {
                                 self.at = frame.span.data;
-                                self.crc = u32::MAX;
+                                self.crc = Crc32Ieee::default();
                                 self.phase = Phase::Crc;
                             } else {
                                 if !work.try_charge(1) {
@@ -670,7 +671,7 @@ impl GroupJob {
                         .required("missing CRC frame")?;
                     let (skip, expected) = frame.crc.required("missing packet CRC")?;
                     if self.at == frame.span.end {
-                        if !self.crc != expected {
+                        if self.crc.finish() != expected {
                             return Err(Error::Invalid("packet source CRC mismatch"));
                         }
                         self.frames[self.depth - 1]
@@ -693,13 +694,7 @@ impl GroupJob {
                     if count == 0 {
                         return Ok(ParseStep::Yield);
                     }
-                    for byte in &self.raw[self.at..self.at + count] {
-                        self.crc ^= u32::from(*byte);
-                        for _ in 0..8 {
-                            self.crc =
-                                (self.crc >> 1) ^ if self.crc & 1 == 1 { 0xedb88320 } else { 0 };
-                        }
-                    }
+                    self.crc.update(&self.raw[self.at..self.at + count]);
                     self.at += count;
                 }
                 Phase::IdReserve => {

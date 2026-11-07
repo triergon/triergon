@@ -3,8 +3,8 @@
 Package `triergon-matroska`. A bounded Matroska and WebM demuxer: EBML parsing, tracks,
 packets with lacing and content encoding, Cues-based seeking, static colour/HDR,
 block additions and segment metadata (Info, chapters, tags, attachments). It is a
-format-layer crate on top of [triergon-core](../core/README.md) and has no other
-dependency; its push reader implements the core `ContainerReader`. It does not
+format-layer crate on top of [triergon-core](../core/README.md) and
+[triergon-bitstream](../bitstream/README.md); its push reader implements the core `ContainerReader`. It does not
 decode codecs, schedule playback or render metadata; it returns source facts, and
 the `compat` modules reproduce FFmpeg's choices where a consumer needs them.
 

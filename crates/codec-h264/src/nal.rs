@@ -1,6 +1,7 @@
 //! Annex B byte stream splitting and NAL unit header / RBSP extraction (clauses 7.3.1, 7.4.1, B.1).
 
-use crate::bitreader::RBSP_PAD;
+/// Zero bytes kept after an RBSP, for `BitReader`'s eight-byte loads.
+pub(crate) const RBSP_PAD: usize = 16;
 
 /// Iterate over NAL unit payloads (without start code prefixes) in an Annex B byte stream chunk.
 /// Trailing zero bytes (trailing_zero_8bits / next start code's leading zero) are stripped.
@@ -89,23 +90,7 @@ pub(crate) fn parse_header(nal: &[u8]) -> Option<NalHeader> {
 pub(crate) fn unescape(src: &[u8], dst: &mut Vec<u8>) -> usize {
     dst.clear();
     dst.reserve(src.len() + RBSP_PAD);
-    let n = src.len();
-    let mut i = 0;
-    let mut run_start = 0;
-    while i + 2 < n {
-        if src[i + 2] > 3 {
-            i += 3;
-            continue;
-        }
-        if src[i] == 0 && src[i + 1] == 0 && src[i + 2] == 3 {
-            dst.extend_from_slice(&src[run_start..i + 2]);
-            i += 3;
-            run_start = i;
-        } else {
-            i += 1;
-        }
-    }
-    dst.extend_from_slice(&src[run_start..]);
+    triergon_bitstream::unescape(src, dst);
     let mut len = dst.len();
     while len > 0 && dst[len - 1] == 0 {
         len -= 1;

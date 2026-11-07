@@ -1,8 +1,8 @@
 # triergon-mpegts
 
 Bounded, incremental MPEG-2 transport stream reader for 188-byte TS and
-192-byte M2TS. It is a format-layer crate whose only dependency is
-`triergon-core` (input cursor, budgets, exact time). It frames packets, checks
+192-byte M2TS. It is a format-layer crate on top of `triergon-core` (input cursor,
+budgets, exact time) and `triergon-bitstream` (the section CRC). It frames packets, checks
 continuity, assembles PSI sections and PAT/PMT tables, and assembles PES
 packets with their raw timestamps. A PES is a byte run, not a codec access
 unit: access-unit framing belongs to `triergon-framing`, decoding to the codec

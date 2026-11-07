@@ -19,7 +19,6 @@
     clippy::stable_sort_primitive,
     clippy::unnested_or_patterns
 )]
-mod bitreader;
 mod cabac;
 mod cavlc;
 mod deblock;
@@ -43,7 +42,6 @@ mod tables_cabac_init;
 #[allow(dead_code)]
 mod tables_vlc;
 
-use bitreader::BitReader;
 use dpb::{PicNums, PocState};
 use mbinfo::{MbInfo, SliceDbk};
 use nal::{NalIter, parse_header, unescape};
@@ -53,6 +51,7 @@ use slice::{SliceHeader, SliceType};
 use slicedec::{ColInfo, CurPic, Refs, SliceCtx, SliceDecoder, Wp};
 use std::collections::VecDeque;
 use tables::*;
+use triergon_bitstream::BitReader;
 use triergon_codec::{Colour, DecodeFailure, PictureView, VideoDecoder};
 
 pub use nal::NalIter as AnnexBNalIter;
@@ -372,7 +371,7 @@ impl Decoder {
             7 => {
                 self.finish_picture();
                 let len = unescape(&nal[1..], &mut self.rbsp);
-                let mut r = BitReader::new(&self.rbsp, len);
+                let mut r = BitReader::with_end(&self.rbsp, len * 8);
                 let sps = ps::parse_sps(&mut r)?;
                 let id = sps.id as usize;
                 self.spss[id] = Some(Box::new(sps));
@@ -381,7 +380,7 @@ impl Decoder {
             8 => {
                 self.finish_picture();
                 let len = unescape(&nal[1..], &mut self.rbsp);
-                let mut r = BitReader::new(&self.rbsp, len);
+                let mut r = BitReader::with_end(&self.rbsp, len * 8);
                 let pps = ps::parse_pps(&mut r, &self.spss)?;
                 let id = pps.id as usize;
                 self.ppss[id] = Some(Box::new(pps));
@@ -439,7 +438,7 @@ impl Decoder {
         len: usize,
         h: nal::NalHeader,
     ) -> Result<(), DecodeError> {
-        let mut r = BitReader::new(rbsp, len);
+        let mut r = BitReader::with_end(rbsp, len * 8);
         let (_, _, pps_id) = slice::peek_pps_id(&mut r.clone())?;
         let pps = self.ppss[pps_id as usize]
             .as_deref()

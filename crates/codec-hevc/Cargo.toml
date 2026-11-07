@@ -14,6 +14,7 @@ default = []
 simd = []
 
 [dependencies]
+triergon-bitstream = { path = "../bitstream" }
 triergon-codec = { path = "../codec" }
 
 [dev-dependencies]

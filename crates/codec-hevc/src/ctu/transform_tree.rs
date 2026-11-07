@@ -32,7 +32,7 @@ impl<P: Pixel> SliceDecoder<'_, P> {
             && !(cu.intra_split && depth == 0)
         {
             self.cabac
-                .decode(&mut self.c[ctx::SPLIT_TRANSFORM + (5 - log2) as usize])
+                .decision(&mut self.c[ctx::SPLIT_TRANSFORM + (5 - log2) as usize])
                 != 0
         } else {
             log2 > sps.log2_max_tb || (cu.intra_split && depth == 0) || inter_split
@@ -43,13 +43,13 @@ impl<P: Pixel> SliceDecoder<'_, P> {
             if depth == 0 || parent_cb {
                 cbf_cb = self
                     .cabac
-                    .decode(&mut self.c[ctx::CBF_CHROMA + depth as usize])
+                    .decision(&mut self.c[ctx::CBF_CHROMA + depth as usize])
                     != 0;
             }
             if depth == 0 || parent_cr {
                 cbf_cr = self
                     .cabac
-                    .decode(&mut self.c[ctx::CBF_CHROMA + depth as usize])
+                    .decision(&mut self.c[ctx::CBF_CHROMA + depth as usize])
                     != 0;
             }
         }
@@ -96,7 +96,7 @@ impl<P: Pixel> SliceDecoder<'_, P> {
         } else {
             let cbf_luma = if cu.intra || depth != 0 || cbf_cb || cbf_cr {
                 self.cabac
-                    .decode(&mut self.c[ctx::CBF_LUMA + if depth == 0 { 1 } else { 0 }])
+                    .decision(&mut self.c[ctx::CBF_LUMA + if depth == 0 { 1 } else { 0 }])
                     != 0
             } else {
                 true
@@ -134,7 +134,7 @@ impl<P: Pixel> SliceDecoder<'_, P> {
             let mut v = 0i32;
             while v < 5 {
                 let inc = if v == 0 { 0 } else { 1 };
-                if self.cabac.decode(&mut self.c[ctx::CU_QP_DELTA_ABS + inc]) == 0 {
+                if self.cabac.decision(&mut self.c[ctx::CU_QP_DELTA_ABS + inc]) == 0 {
                     break;
                 }
                 v += 1;

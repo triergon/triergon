@@ -2,13 +2,13 @@
 //! output assembly.
 
 use crate::adts::AdtsHeader;
-use crate::bits::BitReader;
 use crate::error::{DecodeError, Feature, Result};
 use crate::filterbank::Filterbank;
 use crate::ics::*;
 use crate::pce::{Pce, parse_pce};
 use crate::tables::SAMPLE_RATES;
 use crate::{ltp, pred, sbr};
+use triergon_bitstream::CachedBitReader;
 use triergon_codec::{ChannelLayout, Speaker};
 
 pub(crate) const ID_SCE: u8 = 0;
@@ -292,7 +292,7 @@ impl Core {
     /// Decode one raw_data_block(); appends `frame_len()` samples per plane to `planes`.
     pub(crate) fn decode_block(
         &mut self,
-        br: &mut BitReader<'_>,
+        br: &mut CachedBitReader<'_>,
         block_start: usize,
     ) -> Result<bool> {
         for e in &mut self.elements {
@@ -405,7 +405,7 @@ impl Core {
                             // EXT_FILL carrying an encoder signature. FFmpeg skips the first
                             // 1024 output samples when it reads "libfaac <major>.<minor>" here
                             // (faac encoder delay compensation); replicated for output parity.
-                            let mut r = br.clone();
+                            let mut r = *br;
                             r.skip(13);
                             let mut left = count * 8 - 4 - 13;
                             let mut txt = [0u8; 255];
@@ -462,7 +462,7 @@ impl Core {
 
     fn decode_sce(
         &mut self,
-        br: &mut BitReader<'_>,
+        br: &mut CachedBitReader<'_>,
         cfg: &CoreCfg,
         ei: usize,
         chan: usize,
@@ -477,7 +477,7 @@ impl Core {
         Ok(())
     }
 
-    fn decode_cpe(&mut self, br: &mut BitReader<'_>, cfg: &CoreCfg, ei: usize) -> Result<()> {
+    fn decode_cpe(&mut self, br: &mut CachedBitReader<'_>, cfg: &CoreCfg, ei: usize) -> Result<()> {
         let e = &mut self.elements[ei];
         let common = br.bit();
         let mut ms_present = 0u8;
@@ -537,7 +537,7 @@ impl Core {
 
     fn decode_sbr_ext(
         &mut self,
-        br: &mut BitReader<'_>,
+        br: &mut CachedBitReader<'_>,
         ei: usize,
         crc: bool,
         bits: usize,

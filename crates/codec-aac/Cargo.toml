@@ -12,6 +12,7 @@ publish.workspace = true
 inspect = []
 
 [dependencies]
+triergon-bitstream = { path = "../bitstream" }
 triergon-codec = { path = "../codec" }
 
 [lints]

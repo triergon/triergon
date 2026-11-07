@@ -10,6 +10,7 @@ pub use dolby_clock::{
 use super::{Association, check_limit, probe_clock::syncframe_duration_ns};
 use crate::{Output, Result};
 use std::sync::atomic::{AtomicBool, Ordering};
+use triergon_bitstream::crc::crc16_a52;
 use triergon_core::{Budget, Bytes, Error, SourceId, WorkBudget};
 use triergon_framing::{
     Ac3Family, Ac3FrameDetails, Ac3FrameHeader, BuildStep, HevcAnnexBAccessUnit, HevcAnnexBConfig,
@@ -284,7 +285,7 @@ fn dolby_final_syncframe(family: Ac3Family, mut raw: &[u8]) -> Option<Ac3FrameHe
         if remaining.is_empty() {
             // The native header parser takes its duration from the final
             // syncframe. The CRC covers bytes after the sync word.
-            if !dolby_crc_valid(&frame[2..]) {
+            if crc16_a52(0, &frame[2..]) != 0 {
                 return None;
             }
             return Some(header);
@@ -292,29 +293,6 @@ fn dolby_final_syncframe(family: Ac3Family, mut raw: &[u8]) -> Option<Ac3FrameHe
         raw = remaining;
     }
     None
-}
-
-// ATSC A/52 CRC-16 with generator x^16 + x^15 + x^2 + 1.
-const DOLBY_CRC: [u16; 256] = {
-    let mut table = [0; 256];
-    let mut index = 0;
-    while index < table.len() {
-        let mut crc = (index as u16) << 8;
-        let mut bit = 0;
-        while bit < 8 {
-            crc = (crc << 1) ^ if crc & 0x8000 != 0 { 0x8005 } else { 0 };
-            bit += 1;
-        }
-        table[index] = crc;
-        index += 1;
-    }
-    table
-};
-
-fn dolby_crc_valid(data: &[u8]) -> bool {
-    data.iter().fold(0u16, |crc, &byte| {
-        (crc << 8) ^ DOLBY_CRC[usize::from(((crc >> 8) as u8) ^ byte)]
-    }) == 0
 }
 
 pub enum MatroskaHevcDolbyPayload<'a> {

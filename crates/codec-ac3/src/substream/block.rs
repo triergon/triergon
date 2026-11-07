@@ -2,9 +2,9 @@
 //! range, rematrixing and the sequence of side-information sections up to the mantissas.
 
 use super::{E, NoiseMode, Substream, Trace};
-use crate::bits::BitReader;
 use crate::noise::Rng;
 use crate::quant::GroupTables;
+use triergon_bitstream::BitReader;
 
 impl Substream {
     /// Side-information sections in bitstream order, bit allocation, then mantissas.
@@ -49,7 +49,7 @@ impl Substream {
 
         // Skip field.
         if (!self.eac3 || self.skipflde) && br.bit() {
-            let skipl = br.get(9) as usize;
+            let skipl = br.read(9) as usize;
             br.skip(skipl * 8);
             self.features.skip_fields = true;
         }
@@ -75,12 +75,12 @@ impl Substream {
             self.blksw = [false; 5];
         }
         if let Some(t) = trace.cur() {
-            t.dithflag_insert_bits.push(br.pos());
+            t.dithflag_insert_bits.push(br.position());
         }
         if !eac3 || self.dithflage {
             for ch in 0..nfch {
                 if let Some(t) = trace.cur() {
-                    t.dithflag_bits.push(br.pos());
+                    t.dithflag_bits.push(br.position());
                 }
                 self.dithflag[ch] = br.bit();
             }
@@ -95,11 +95,11 @@ impl Substream {
     #[inline(always)]
     fn parse_dynrng(&mut self, br: &mut BitReader<'_>) {
         if br.bit() {
-            self.dynrng[0] = dynrng_gain(br.get(8));
+            self.dynrng[0] = dynrng_gain(br.read(8));
             self.features.dynrng = true;
         }
         if self.acmod == 0 && br.bit() {
-            self.dynrng[1] = dynrng_gain(br.get(8));
+            self.dynrng[1] = dynrng_gain(br.read(8));
         }
     }
 

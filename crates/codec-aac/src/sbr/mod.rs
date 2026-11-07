@@ -6,12 +6,12 @@ pub(crate) mod ps;
 mod qmf;
 pub(crate) mod tables;
 
-use crate::bits::BitReader;
 use crate::error::{DecodeError, Result};
 use crate::fft::Cpx;
 use crate::huffman::{Vlc, books};
 use freq::FreqTables;
 use tables::NOISE;
+use triergon_bitstream::CachedBitReader;
 
 const FIXFIX: u8 = 0;
 const FIXVAR: u8 = 1;
@@ -243,7 +243,7 @@ impl Sbr {
     /// sbr_extension_data(): returns true when a PS extension was found.
     pub(crate) fn parse(
         &mut self,
-        br: &mut BitReader<'_>,
+        br: &mut CachedBitReader<'_>,
         crc: bool,
         bits: usize,
         is_cpe: bool,
@@ -281,7 +281,7 @@ impl Sbr {
         }
     }
 
-    fn parse_header(&mut self, br: &mut BitReader<'_>) -> Result<()> {
+    fn parse_header(&mut self, br: &mut CachedBitReader<'_>) -> Result<()> {
         let mut h = Header {
             amp_res: br.bit(),
             start_freq: br.read(4) as u8,
@@ -336,7 +336,7 @@ impl Sbr {
         Ok(())
     }
 
-    fn parse_sce(&mut self, br: &mut BitReader<'_>, end: usize) -> Result<bool> {
+    fn parse_sce(&mut self, br: &mut CachedBitReader<'_>, end: usize) -> Result<bool> {
         if br.bit() {
             br.skip(4);
         }
@@ -359,7 +359,7 @@ impl Sbr {
         self.parse_extended(br, end)
     }
 
-    fn parse_cpe(&mut self, br: &mut BitReader<'_>, end: usize) -> Result<bool> {
+    fn parse_cpe(&mut self, br: &mut CachedBitReader<'_>, end: usize) -> Result<bool> {
         if br.bit() {
             br.skip(8);
         }
@@ -404,7 +404,7 @@ impl Sbr {
         self.parse_extended(br, end)
     }
 
-    fn parse_extended(&mut self, br: &mut BitReader<'_>, end: usize) -> Result<bool> {
+    fn parse_extended(&mut self, br: &mut CachedBitReader<'_>, end: usize) -> Result<bool> {
         let mut ps = false;
         let ext = br.bit();
         if ext {
@@ -592,7 +592,7 @@ fn copy_grid(a: &Chan, b: &mut Chan) {
 }
 
 /// sbr_grid() and the derived time borders (4.6.18.3.3).
-fn parse_grid(br: &mut BitReader<'_>, c: &mut Chan) -> Result<()> {
+fn parse_grid(br: &mut CachedBitReader<'_>, c: &mut Chan) -> Result<()> {
     // a transient at the end of the previous frame affects this frame's first envelope
     c.l_a_prev = if c.l_a >= 0 && c.l_a as usize == c.num_env {
         0
@@ -748,7 +748,7 @@ fn ptr_bits(num_env: usize) -> u32 {
     b
 }
 
-fn parse_dtdf(br: &mut BitReader<'_>, c: &mut Chan) {
+fn parse_dtdf(br: &mut CachedBitReader<'_>, c: &mut Chan) {
     for e in 0..c.num_env {
         c.df_env[e] = br.bit();
     }
@@ -757,11 +757,11 @@ fn parse_dtdf(br: &mut BitReader<'_>, c: &mut Chan) {
     }
 }
 
-fn parse_invf(br: &mut BitReader<'_>, c: &mut Chan, n_q: usize) {
+fn parse_invf(br: &mut CachedBitReader<'_>, c: &mut Chan, n_q: usize) {
     c.invf[..n_q].iter_mut().for_each(|v| *v = br.read(2) as u8);
 }
 
-fn huff(br: &mut BitReader<'_>, v: &Vlc) -> Result<i32> {
+fn huff(br: &mut CachedBitReader<'_>, v: &Vlc) -> Result<i32> {
     v.decode(br)
         .map(|s| s as i32)
         .ok_or(DecodeError::InvalidData("SBR Huffman code"))
@@ -769,7 +769,7 @@ fn huff(br: &mut BitReader<'_>, v: &Vlc) -> Result<i32> {
 
 /// sbr_envelope() with delta decoding (4.6.18.3.4).
 fn parse_envelope(
-    br: &mut BitReader<'_>,
+    br: &mut CachedBitReader<'_>,
     c: &mut Chan,
     ft: &FreqTables,
     hdr_amp: bool,
@@ -823,7 +823,12 @@ fn parse_envelope(
 }
 
 /// sbr_noise() with delta decoding.
-fn parse_noise(br: &mut BitReader<'_>, c: &mut Chan, ft: &FreqTables, balance: bool) -> Result<()> {
+fn parse_noise(
+    br: &mut CachedBitReader<'_>,
+    c: &mut Chan,
+    ft: &FreqTables,
+    balance: bool,
+) -> Result<()> {
     let bk = books();
     let (t, f, lav) = if balance {
         (&bk.sbr[9], &bk.sbr[7], 12)

@@ -2,6 +2,7 @@
 //! Original implementation from ETSI TS 102 114 V1.6.1 clauses 3.4/5.3/5.4.2.
 //! Encoded audio and internal extensions remain opaque, unchanged source bytes.
 use std::sync::atomic::{AtomicBool, Ordering};
+use triergon_bitstream::{BitCursor, BitSource};
 use triergon_core::{
     Budget, BudgetVec, Bytes, Error, InputCursor, InputRequest, InputToken, InputWindow, Result,
     SourceCapabilities, SourceFailure, SourceId, SourceLocation, Step, Time, WorkBudget,
@@ -68,32 +69,16 @@ fn check_sync(input: &[u8]) -> Result<()> {
     }
 }
 
-struct HeaderBits<'a> {
-    source: &'a [u8],
-    position: usize,
-}
+struct HeaderBits<'a>(BitCursor<'a>);
 
 impl HeaderBits<'_> {
-    fn read(&mut self, width: usize) -> Result<u32> {
-        if width == 0 || width > 32 {
-            return Err(Error::Invalid("DTS bit field width"));
-        }
-        let end = self.position.checked_add(width).ok_or(Error::Overflow)?;
-        if end > self.source.len().checked_mul(8).ok_or(Error::Overflow)? {
-            return Err(Error::Truncated);
-        }
-        let mut value = 0_u32;
-        while self.position < end {
-            let bit = (self.source[self.position / 8] >> (7 - self.position % 8)) & 1;
-            value = (value << 1) | u32::from(bit);
-            self.position += 1;
-        }
-        Ok(value)
+    fn read(&mut self, width: u32) -> Result<u32> {
+        self.0.read(width).map_err(|_| Error::Truncated)
     }
-    fn byte(&mut self, width: usize) -> Result<u8> {
+    fn byte(&mut self, width: u32) -> Result<u8> {
         u8::try_from(self.read(width)?).map_err(|_| Error::Overflow)
     }
-    fn word(&mut self, width: usize) -> Result<u16> {
+    fn word(&mut self, width: u32) -> Result<u16> {
         u16::try_from(self.read(width)?).map_err(|_| Error::Overflow)
     }
 }
@@ -108,10 +93,7 @@ pub fn probe_dts_core_header(input: &[u8]) -> Result<DtsCoreHeader> {
     }
     let required = if input[4] & 2 == 0 { 13 } else { 15 };
     let source = input.get(..required).ok_or(Error::Truncated)?;
-    let mut bits = HeaderBits {
-        source,
-        position: 32,
-    };
+    let mut bits = HeaderBits(BitCursor::at(source, 32));
     let normal = bits.byte(1)?;
     let short = bits.byte(5)?;
     let cpf = bits.byte(1)?;
@@ -219,7 +201,7 @@ pub fn probe_dts_core_header(input: &[u8]) -> Result<DtsCoreHeader> {
         sum_front,
         sum_surround,
         dialog_word,
-        header_bits: u16::try_from(bits.position).map_err(|_| Error::Overflow)?,
+        header_bits: u16::try_from(bits.0.position()).map_err(|_| Error::Overflow)?,
         frame_bytes,
         core_rate_hz,
         coding_window_samples,

@@ -1,8 +1,8 @@
 //! program_config_element() (ISO/IEC 14496-3 4.4.1.1, Table 4.2) including the height
 //! extension carried in its comment field (ISO/IEC 14496-3:2009/Amd.4, 4.5.1.2.2).
 
-use crate::bits::BitReader;
 use crate::error::{DecodeError, Result};
+use triergon_bitstream::CachedBitReader;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Default)]
 pub(crate) struct PceElement {
@@ -26,7 +26,7 @@ pub(crate) struct Pce {
     pub cc: Vec<(bool, u8)>,
 }
 
-fn read_elements(br: &mut BitReader<'_>, n: usize, with_cpe: bool) -> Vec<PceElement> {
+fn read_elements(br: &mut CachedBitReader<'_>, n: usize, with_cpe: bool) -> Vec<PceElement> {
     (0..n)
         .map(|_| {
             let is_cpe = if with_cpe { br.bit() } else { false };
@@ -40,7 +40,7 @@ fn read_elements(br: &mut BitReader<'_>, n: usize, with_cpe: bool) -> Vec<PceEle
 }
 
 /// Parse a PCE. `align_base` is the bit position that byte_alignment() refers to.
-pub(crate) fn parse_pce(br: &mut BitReader<'_>, align_base: usize) -> Result<Pce> {
+pub(crate) fn parse_pce(br: &mut CachedBitReader<'_>, align_base: usize) -> Result<Pce> {
     let mut p = Pce {
         tag: br.read(4) as u8,
         object_type: br.read(2) as u8,
@@ -83,7 +83,7 @@ pub(crate) fn parse_pce(br: &mut BitReader<'_>, align_base: usize) -> Result<Pce
     let comment_start = br.position();
     // height extension (sync 0xAC) followed by one 2-bit height per front/side/back element
     if comment_bytes > 0 {
-        let mut hb = br.clone();
+        let mut hb = *br;
         if hb.read(8) == 0xAC {
             let mut ok = true;
             for e in p

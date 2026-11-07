@@ -4,53 +4,7 @@ use crate::{
 use std::sync::atomic::{AtomicBool, Ordering};
 use triergon_core::{Budget, BudgetVec, Bytes, Error, PushError, Result, SourceId, WorkBudget};
 
-// H.222.0 Annex A uses the most-significant bit first and polynomial
-// 0x04c11db7. Compute the eight shifts for each possible high byte once.
-const CRC_OCTET: [u32; 256] = {
-    let mut table = [0; 256];
-    let mut byte = 0;
-    while byte < table.len() {
-        let mut remainder = (byte as u32) << 24;
-        let mut bits = 0;
-        while bits < 8 {
-            remainder = (remainder << 1)
-                ^ if remainder & 0x8000_0000 != 0 {
-                    0x04c1_1db7
-                } else {
-                    0
-                };
-            bits += 1;
-        }
-        table[byte] = remainder;
-        byte += 1;
-    }
-    table
-};
-
-#[derive(Clone, Copy, Debug)]
-pub struct PsiCrc32(u32);
-impl Default for PsiCrc32 {
-    fn default() -> Self {
-        Self(0xffff_ffff)
-    }
-}
-impl PsiCrc32 {
-    pub fn update_byte(&mut self, byte: u8) {
-        let index = (self.0 >> 24) as u8 ^ byte;
-        self.0 = (self.0 << 8) ^ CRC_OCTET[usize::from(index)];
-    }
-    pub fn remainder(self) -> u32 {
-        self.0
-    }
-    /// Convenience for small bounded buffers. Incremental assembly updates per byte.
-    pub fn of(bytes: &[u8]) -> u32 {
-        let mut crc = Self::default();
-        for byte in bytes {
-            crc.update_byte(*byte);
-        }
-        crc.remainder()
-    }
-}
+pub use triergon_bitstream::crc::Crc32Mpeg as PsiCrc32;
 
 #[derive(Debug)]
 pub struct Section {

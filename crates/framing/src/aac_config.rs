@@ -1,6 +1,7 @@
 //! Selected ASC/GASpecific/PCE source grammar. No encoded-audio decoder is implied.
 use crate::BuildStep;
 use std::sync::atomic::{AtomicBool, Ordering};
+use triergon_bitstream::bits_at;
 use triergon_core::{Budget, BudgetVec, Bytes, Error, Result, SourceId, WorkBudget};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -212,11 +213,7 @@ impl Bits {
         if end > self.end {
             return Err(Error::Truncated);
         }
-        let mut value = 0_u32;
-        for at in self.position..end {
-            value = (value << 1)
-                | u32::from((raw.get(at / 8).ok_or(Error::Truncated)? >> (7 - at % 8)) & 1);
-        }
+        let value = bits_at(raw, self.position, count as u32).ok_or(Error::Truncated)?;
         self.position = end;
         Ok(value)
     }

@@ -1,11 +1,11 @@
 //! individual_channel_stream() parsing, inverse quantisation and the spectral tools
 //! (PNS, M/S, intensity, TNS) of ISO/IEC 14496-3 subpart 4.
 
-use crate::bits::BitReader;
 use crate::error::{DecodeError, Result};
 use crate::huffman::{FAST_BITS, SpectralBook, books, fast_field};
 use crate::tables::*;
 use std::sync::OnceLock;
+use triergon_bitstream::CachedBitReader;
 
 // window_sequence 0 of the syntax; the decoder only tests for the other three
 #[allow(dead_code)]
@@ -158,7 +158,7 @@ pub(crate) fn pow2_quarter(i: i32) -> f32 {
 }
 
 pub(crate) fn parse_ics_info(
-    br: &mut BitReader<'_>,
+    br: &mut CachedBitReader<'_>,
     cfg: &CoreCfg,
     common_window: bool,
     info: &mut IcsInfo,
@@ -232,7 +232,7 @@ pub(crate) fn parse_ics_info(
     Ok(())
 }
 
-fn parse_ltp(br: &mut BitReader<'_>, max_sfb: usize, ltp: &mut Ltp) {
+fn parse_ltp(br: &mut CachedBitReader<'_>, max_sfb: usize, ltp: &mut Ltp) {
     ltp.lag = br.read(11) as u16;
     ltp.coef = br.read(3) as u8;
     let n = max_sfb.min(MAX_LTP_LONG_SFB);
@@ -243,7 +243,7 @@ fn parse_ltp(br: &mut BitReader<'_>, max_sfb: usize, ltp: &mut Ltp) {
 
 /// individual_channel_stream(common_window, scale_flag) after ics_info.
 pub(crate) fn parse_ics(
-    br: &mut BitReader<'_>,
+    br: &mut CachedBitReader<'_>,
     cfg: &CoreCfg,
     common_window: bool,
     scale_flag: bool,
@@ -303,7 +303,7 @@ pub(crate) fn parse_ics(
     Ok(())
 }
 
-fn parse_section_data(br: &mut BitReader<'_>, ch: &mut ChannelData) -> Result<()> {
+fn parse_section_data(br: &mut CachedBitReader<'_>, ch: &mut ChannelData) -> Result<()> {
     let info = &ch.info;
     let (bits, esc) = if info.window_sequence == EIGHT_SHORT {
         (3, 7)
@@ -346,7 +346,7 @@ fn parse_section_data(br: &mut BitReader<'_>, ch: &mut ChannelData) -> Result<()
     Ok(())
 }
 
-fn parse_scalefactors(br: &mut BitReader<'_>, ch: &mut ChannelData) -> Result<()> {
+fn parse_scalefactors(br: &mut CachedBitReader<'_>, ch: &mut ChannelData) -> Result<()> {
     let vlc = &books().scalefactor;
     let mut sf = ch.global_gain as i32;
     let mut is_pos = 0i32;
@@ -399,7 +399,7 @@ fn parse_scalefactors(br: &mut BitReader<'_>, ch: &mut ChannelData) -> Result<()
     Ok(())
 }
 
-fn parse_tns(br: &mut BitReader<'_>, cfg: &CoreCfg, ch: &mut ChannelData) -> Result<()> {
+fn parse_tns(br: &mut CachedBitReader<'_>, cfg: &CoreCfg, ch: &mut ChannelData) -> Result<()> {
     let info = &ch.info;
     let short = info.window_sequence == EIGHT_SHORT;
     let (nf_bits, len_bits, ord_bits, max_order) = if short {
@@ -466,7 +466,7 @@ pub(crate) fn lcg(state: &mut u32) -> i32 {
 /// Negate the non-zero entries of `v` whose sign bit (MSB first, one per non-zero value,
 /// following the codeword) is set. Branch-free: sign bits are data, not control flow.
 #[inline(always)]
-fn read_signs_f32(br: &mut BitReader<'_>, v: &mut [f32]) {
+fn read_signs_f32(br: &mut CachedBitReader<'_>, v: &mut [f32]) {
     let bits = br.peek32();
     let mut used = 0u32;
     for x in v.iter_mut() {
@@ -480,7 +480,7 @@ fn read_signs_f32(br: &mut BitReader<'_>, v: &mut [f32]) {
 }
 
 #[inline(always)]
-fn read_signs_i32(br: &mut BitReader<'_>, v: &mut [i32]) {
+fn read_signs_i32(br: &mut CachedBitReader<'_>, v: &mut [i32]) {
     let bits = br.peek32();
     let mut used = 0u32;
     for x in v.iter_mut() {
@@ -504,7 +504,7 @@ fn pow43_signed() -> &'static [f32; 33] {
 /// One band of an N-tuple codebook without escapes, decoded and inverse quantised.
 #[inline(always)]
 fn band<const N: usize, const UNSIGNED: bool>(
-    br: &mut BitReader<'_>,
+    br: &mut CachedBitReader<'_>,
     book: &SpectralBook,
     gain: f32,
     out: &mut [f32],
@@ -537,7 +537,7 @@ fn band<const N: usize, const UNSIGNED: bool>(
 
 /// Escape sequence of codebook 11 for a value of magnitude 16.
 #[inline(always)]
-fn escape(br: &mut BitReader<'_>, v: i32) -> Result<i32> {
+fn escape(br: &mut CachedBitReader<'_>, v: i32) -> Result<i32> {
     if v != 16 && v != -16 {
         return Ok(v);
     }
@@ -565,7 +565,7 @@ fn dequant(q: i32, pow43: &[f32], gain: f32) -> f32 {
 
 /// One band of codebook 11 (pairs, unsigned, escapes), decoded and inverse quantised.
 fn band_esc(
-    br: &mut BitReader<'_>,
+    br: &mut CachedBitReader<'_>,
     book: &SpectralBook,
     gain: f32,
     pow43: &[f32],
@@ -595,7 +595,12 @@ fn band_esc(
 }
 
 /// One band decoded to quantised integers (used when pulse data follows).
-fn band_int(br: &mut BitReader<'_>, book: &SpectralBook, esc: bool, out: &mut [i32]) -> Result<()> {
+fn band_int(
+    br: &mut CachedBitReader<'_>,
+    book: &SpectralBook,
+    esc: bool,
+    out: &mut [i32],
+) -> Result<()> {
     let n = if book.quad { 4 } else { 2 };
     for o in out.chunks_exact_mut(n) {
         let sym = book
@@ -619,7 +624,7 @@ fn band_int(br: &mut BitReader<'_>, book: &SpectralBook, esc: bool, out: &mut [i
 }
 
 fn decode_spectrum(
-    br: &mut BitReader<'_>,
+    br: &mut CachedBitReader<'_>,
     ch: &mut ChannelData,
     pulse: &[(usize, i32)],
     random: &mut u32,

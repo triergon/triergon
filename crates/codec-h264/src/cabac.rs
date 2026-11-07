@@ -1,103 +1,29 @@
-//! CABAC arithmetic decoding engine and binarizations (clause 9.3).
-//!
-//! The engine keeps codIOffset in the top 9 bits of a 64-bit register with `avail` look-ahead
-//! stream bits below it, so comparisons use a constant shift and renormalisation is a shift
-//! plus an occasional 32-bit refill off the critical path.
+//! CABAC context layout and binarizations (clause 9.3) over the shared arithmetic engine.
 
 use crate::tables_cabac_init::CABAC_INIT_MN;
-use crate::tables_vlc::{RANGE_TAB_LPS, TRANS_IDX_LPS, TRANS_IDX_MPS};
+use triergon_bitstream::cabac::init_state;
+
+type Engine<'a> = triergon_bitstream::cabac::Engine<'a, false>;
 
 pub(crate) const NUM_CTX: usize = 1024;
 
-/// The four rangeTabLPS values of a state packed into one word (qCodIRangeIdx k in byte k), so
-/// the range-dependent selection is a shift instead of a dependent table load.
-static LPS_ROW: [u32; 128] = {
-    let mut t = [0u32; 128];
-    let mut s = 0;
-    while s < 128 {
-        let r = RANGE_TAB_LPS[s >> 1];
-        t[s] = r[0] as u32 | (r[1] as u32) << 8 | (r[2] as u32) << 16 | (r[3] as u32) << 24;
-        s += 1;
-    }
-    t
-};
-/// Next full state after an MPS / LPS (Table 9-45, valMPS toggles on LPS in state 0).
-static NEXT_MPS_S: [u8; 128] = {
-    let mut t = [0u8; 128];
-    let mut s = 0;
-    while s < 128 {
-        t[s] = (TRANS_IDX_MPS[s >> 1] << 1) | (s as u8 & 1);
-        s += 1;
-    }
-    t
-};
-static NEXT_LPS_S: [u8; 128] = {
-    let mut t = [0u8; 128];
-    let mut s = 0;
-    while s < 128 {
-        let mps = (s as u8 & 1) ^ ((s >> 1) == 0) as u8;
-        t[s] = (TRANS_IDX_LPS[s >> 1] << 1) | mps;
-        s += 1;
-    }
-    t
-};
-
-/// Arithmetic decoding engine registers (9.3.1.2), kept apart from the context array. Hot
-/// loops work on a local copy so the registers stay in machine registers (a panic path would
-/// otherwise force them to memory after every bin).
-#[derive(Clone, Copy)]
-pub(crate) struct Engine<'a> {
-    data: &'a [u8],
-    end: usize,
-    pos: usize,
-    range: u32,
-    value: u64,
-    avail: i32,
-}
-
 pub(crate) struct Cabac<'a> {
     e: Engine<'a>,
+    /// Payload bytes of the slice, for the overrun check.
+    end: usize,
     /// Context states: (pStateIdx << 1) | valMPS.
     pub ctx: [u8; NUM_CTX],
 }
 
-/// DecodeDecision (9.3.3.2.1) with branchless interval selection and clz renormalisation.
 #[inline(always)]
 fn decide(e: &mut Engine<'_>, ctx: &mut [u8; NUM_CTX], ctx_idx: usize) -> u32 {
-    let bin = decide_nr(e, ctx, ctx_idx);
-    e.refill();
-    bin
+    e.decision(&mut ctx[ctx_idx & (NUM_CTX - 1)])
 }
 
-/// `decide` without the look-ahead refill: a decision consumes at most 6 bits (rangeTabLPS >= 6),
-/// so two of them may follow one `refill` (which leaves at least 16 bits).
+/// `decide` without the look-ahead refill.
 #[inline(always)]
 fn decide_nr(e: &mut Engine<'_>, ctx: &mut [u8; NUM_CTX], ctx_idx: usize) -> u32 {
-    let ci = ctx_idx & (NUM_CTX - 1);
-    let st = (ctx[ci] & 127) as usize;
-    let row = LPS_ROW[st];
-    let lps = (row >> ((e.range >> 3) & 0x18)) & 0xFF;
-    let rmps = e.range - lps;
-    let scaled = (rmps as u64) << 55;
-    let is_lps = e.value >= scaled;
-    // Renormalisation shifts of both outcomes are computed in parallel (9.3.3.2.2).
-    let sh_lps = lps.leading_zeros() - 23;
-    let sh_mps = (rmps < 256) as u32;
-    let (value, range, shift) = if is_lps {
-        (e.value - scaled, lps, sh_lps)
-    } else {
-        (e.value, rmps, sh_mps)
-    };
-    ctx[ci] = if is_lps {
-        NEXT_LPS_S[st]
-    } else {
-        NEXT_MPS_S[st]
-    };
-    let bin = (st as u32 & 1) ^ is_lps as u32;
-    e.range = range << shift;
-    e.value = value << shift;
-    e.avail -= shift as i32;
-    bin
+    e.decision_unfilled(&mut ctx[ctx_idx & (NUM_CTX - 1)])
 }
 
 /// Context index offsets (Table 9-34).
@@ -167,43 +93,33 @@ impl<'a> Cabac<'a> {
         init_idx: usize,
     ) -> Self {
         let mut c = Cabac {
-            e: Engine {
-                data,
-                end,
-                pos: start,
-                range: 510,
-                value: 0,
-                avail: 0,
-            },
+            e: Engine::new(data, start),
+            end,
             ctx: [0; NUM_CTX],
         };
         c.init_contexts(slice_qp, init_idx);
-        c.e.init_engine();
         c
     }
 
     fn init_contexts(&mut self, slice_qp: i32, init_idx: usize) {
-        let qp = slice_qp.clamp(0, 51);
         for i in 0..NUM_CTX {
             let (m, n) = CABAC_INIT_MN[i][init_idx];
-            let pre = (((m as i32 * qp) >> 4) + n as i32).clamp(1, 126);
-            self.ctx[i] = if pre <= 63 {
-                ((63 - pre) << 1) as u8
-            } else {
-                (((pre - 64) << 1) | 1) as u8
-            };
+            self.ctx[i] = init_state(m as i32, n as i32, slice_qp);
         }
         // ctxIdx 276 is handled by decode_terminate.
     }
 
+    /// Re-initialise the engine at a byte position (after I_PCM samples).
     pub(crate) fn reinit_at(&mut self, byte_pos: usize) {
-        self.e.reinit_at(byte_pos);
+        self.e.restart(byte_pos);
     }
+    /// Byte position following the bits consumed by the engine (for I_PCM: after decoding the
+    /// terminate bin, pcm_alignment_zero_bits follow up to the next byte boundary).
     pub(crate) fn pcm_byte_pos(&self) -> usize {
-        self.e.pcm_byte_pos()
+        self.e.aligned_byte_position()
     }
     pub(crate) fn overrun(&self) -> bool {
-        self.e.overrun()
+        self.e.next_byte() > self.end + 8
     }
     #[inline(always)]
     pub(crate) fn decision(&mut self, ctx_idx: usize) -> u32 {
@@ -568,184 +484,9 @@ fn residual_inner(
     }
 }
 
-impl Engine<'_> {
-    #[inline(always)]
-    fn load32(&mut self) -> u64 {
-        let p = self.pos;
-        self.pos += 4;
-        if p + 4 <= self.data.len() {
-            u32::from_be_bytes([
-                self.data[p],
-                self.data[p + 1],
-                self.data[p + 2],
-                self.data[p + 3],
-            ]) as u64
-        } else {
-            let mut v = 0u64;
-            for k in 0..4 {
-                v = (v << 8) | *self.data.get(p + k).unwrap_or(&0) as u64;
-            }
-            v
-        }
-    }
-
-    #[inline(always)]
-    fn refill(&mut self) {
-        if self.avail < 16 {
-            let w = self.load32();
-            self.value |= w << (55 - self.avail - 32);
-            self.avail += 32;
-        }
-    }
-
-    fn init_engine(&mut self) {
-        self.range = 510;
-        // codIOffset = read_bits(9) sits in bits 63..55; 23 look-ahead bits follow.
-        let hi = self.load32();
-        self.value = hi << 32;
-        self.avail = 32 - 9;
-        self.refill();
-    }
-
-    /// Re-initialise the engine at the current byte position (after I_PCM samples).
-    pub(crate) fn reinit_at(&mut self, byte_pos: usize) {
-        self.pos = byte_pos;
-        self.value = 0;
-        self.init_engine();
-    }
-
-    /// Byte position following the bits consumed by the engine (for I_PCM: after decoding the
-    /// terminate bin, pcm_alignment_zero_bits follow up to the next byte boundary).
-    pub(crate) fn pcm_byte_pos(&self) -> usize {
-        let consumed = self.pos * 8 - self.avail as usize;
-        consumed.div_ceil(8)
-    }
-
-    pub(crate) fn overrun(&self) -> bool {
-        self.pos > self.end + 8
-    }
-
-    #[inline(always)]
-    pub(crate) fn bypass(&mut self) -> u32 {
-        // The top 10 bits are (codIOffset << 1) | next bit (9.3.3.2.3).
-        let scaled = (self.range as u64) << 54;
-        let b = self.value >= scaled;
-        self.value -= scaled & (b as u64).wrapping_neg();
-        self.value <<= 1;
-        self.avail -= 1;
-        self.refill();
-        b as u32
-    }
-
-    #[inline(always)]
-    pub(crate) fn terminate(&mut self) -> u32 {
-        self.range -= 2;
-        let scaled = (self.range as u64) << 55;
-        if self.value >= scaled {
-            1
-        } else {
-            if self.range < 256 {
-                self.range <<= 1;
-                self.value <<= 1;
-                self.avail -= 1;
-                self.refill();
-            }
-            0
-        }
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    /// Straightforward bit-serial implementation of 9.3.1.2 / 9.3.3.2 for cross-checking.
-    struct RefEngine<'a> {
-        data: &'a [u8],
-        bitpos: usize,
-        range: u32,
-        offset: u32,
-    }
-    impl RefEngine<'_> {
-        fn bit(&mut self) -> u32 {
-            let b =
-                (self.data.get(self.bitpos / 8).copied().unwrap_or(0) >> (7 - self.bitpos % 8)) & 1;
-            self.bitpos += 1;
-            b as u32
-        }
-        fn new(data: &[u8]) -> RefEngine<'_> {
-            let mut e = RefEngine {
-                data,
-                bitpos: 0,
-                range: 510,
-                offset: 0,
-            };
-            for _ in 0..9 {
-                e.offset = (e.offset << 1) | e.bit();
-            }
-            e
-        }
-        fn decision(&mut self, st: &mut u8) -> u32 {
-            let p = (*st >> 1) as usize;
-            let mps = (*st & 1) as u32;
-            let lps = RANGE_TAB_LPS[p][((self.range >> 6) & 3) as usize] as u32;
-            self.range -= lps;
-            let bin;
-            if self.offset >= self.range {
-                bin = 1 - mps;
-                self.offset -= self.range;
-                self.range = lps;
-                let nm = if p == 0 { 1 - mps } else { mps };
-                *st = (TRANS_IDX_LPS[p] << 1) | nm as u8;
-            } else {
-                bin = mps;
-                *st = (TRANS_IDX_MPS[p] << 1) | mps as u8;
-            }
-            while self.range < 256 {
-                self.range <<= 1;
-                self.offset = (self.offset << 1) | self.bit();
-            }
-            bin
-        }
-        fn bypass(&mut self) -> u32 {
-            self.offset = (self.offset << 1) | self.bit();
-            if self.offset >= self.range {
-                self.offset -= self.range;
-                1
-            } else {
-                0
-            }
-        }
-    }
-
-    #[test]
-    fn engine_matches_bit_serial_reference() {
-        let mut seed = 0x1234_5678u32;
-        let mut rnd = || {
-            seed ^= seed << 13;
-            seed ^= seed >> 17;
-            seed ^= seed << 5;
-            seed
-        };
-        let mut data = vec![0u8; 4096 + 32];
-        for b in data.iter_mut().take(4096) {
-            *b = rnd() as u8;
-        }
-        let mut c = Cabac::new(&data, 0, 4096, 30, 1);
-        let mut r = RefEngine::new(&data);
-        let mut states = c.ctx;
-        for i in 0..20000 {
-            let k = (rnd() % 64) as usize;
-            if rnd() % 5 == 0 {
-                assert_eq!(c.bypass(), r.bypass(), "bypass {i}");
-            } else {
-                let a = c.decision(k);
-                let b = r.decision(&mut states[k]);
-                assert_eq!(a, b, "decision {i}");
-                assert_eq!(c.ctx[k], states[k]);
-            }
-        }
-    }
 
     #[test]
     fn init_states_in_range() {
