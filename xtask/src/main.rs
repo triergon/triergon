@@ -84,6 +84,9 @@ commands:
   same-code      CANDIDATE REFERENCE
                  compare two worker binaries function by function; fails if any
                  function differs beyond its position
+  count          CANDIDATE REFERENCE ARGUMENT...
+                 count instructions of two workers on one workload with perf stat;
+                 fails above the quick-check limit
   screen         REPORTS   grade one paired timing round, with each contract's report
                  under REPORTS/<contract>, against the quick-check tolerances
   fate-inventory --source DIR --output FILE [--configured-list FILE]
@@ -118,6 +121,16 @@ fn main() -> ExitCode {
                 ));
             }
             _ => Err("usage: cargo xtask same-code CANDIDATE REFERENCE".into()),
+        },
+        Some("count") => match &args[1..] {
+            [candidate, reference, arguments @ ..] if !arguments.is_empty() => {
+                return passing(harness::screen::count(
+                    Path::new(candidate),
+                    Path::new(reference),
+                    arguments,
+                ));
+            }
+            _ => Err("usage: cargo xtask count CANDIDATE REFERENCE ARGUMENT...".into()),
         },
         Some("screen") => match &args[1..] {
             [reports] => return passing(harness::screen::screen(&root, Path::new(reports))),

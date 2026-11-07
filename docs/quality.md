@@ -145,6 +145,13 @@ be established. Use built workers you trust.
   copy of it sit differently in the page cache, and identical bytes then time about
   0.7% apart. The runner writes both workers afresh, at paths of equal length, before
   each timing session.
+- Before a timing pass, `cargo xtask count CANDIDATE REFERENCE ARGUMENT...` runs both
+  workers on one workload under Linux `perf stat`, five runs each, and prints the least
+  user-mode instructions, cycles and branch misses. It fails when instructions rise more
+  than 0.25%. A count takes seconds, so a code change that adds work shows here first.
+  Passing it says nothing about speed: it cannot see load latency, cache misses or where
+  functions sit, and it grades neither cycles nor mispredictions, so a change can pass
+  and still run slower. The timing pass decides.
 - A change not meant to affect speed gets a quick check: `cargo xtask same-code`
   on both workers, then one round of 30 pairs against a main build for every contract
   the change reaches, graded by `cargo xtask screen`. It flags a case above 1.5% or a
