@@ -10,7 +10,12 @@
  *
  * usage: reference KIND-CODEC-bench FILE ITERATIONS | KIND-CODEC-memory FILE
  *        | KIND-CODEC-raw FILE OUT   (KIND-CODEC: video-h264 video-hevc audio-ac3
- *        audio-eac3 audio-aac audio-dts); the same protocol as crates/codec-worker.
+ *        audio-eac3 audio-aac audio-dts audio-flac audio-mp3 audio-vorbis audio-opus);
+ *        the same protocol as crates/codec-worker.
+ * FLAC, MPEG audio, Vorbis and Opus come in a file format (native FLAC, raw MPEG
+ * audio, Ogg), so their lanes read it through the demuxer the CLI uses and decode
+ * the decoder it picks for the stream; packet trims (skip samples, end padding)
+ * apply as they do in the CLI.
  * The whole operation (parser/decoder/filter setup, decode, convert, teardown)
  * is inside the timed interval; file loading is outside, as in the other workers.
  */
@@ -270,6 +275,84 @@ static void one_pass(const char *codec_name, const AVCodecParameters *par, const
     av_parser_close(parser);
 }
 
+/* The demuxer of a file-format lane, or NULL for an elementary-stream lane. */
+static const char *lane_demuxer(const char *name) {
+    if (!strcmp(name, "flac")) return "flac";
+    if (!strcmp(name, "mp3")) return "mp3";
+    if (!strcmp(name, "vorbis") || !strcmp(name, "opus")) return "ogg";
+    return NULL;
+}
+
+/* A file-format lane: the demuxer reads the piped (non-seekable) file, the decoder for
+ * its first audio stream decodes every packet, and the same filter chain converts. */
+static void demux_pass(const char *demuxer, const uint8_t *data, size_t size, struct out *o) {
+    struct memory_input m = {data, size, 0};
+    unsigned char *buffer = av_malloc(65536);
+    AVIOContext *io = avio_alloc_context(buffer, 65536, 0, &m, memory_read, NULL, NULL);
+    AVFormatContext *fmt = avformat_alloc_context();
+    fmt->pb = io;
+    int r = avformat_open_input(&fmt, NULL, av_find_input_format(demuxer), NULL);
+    if (r < 0) die("open", r);
+    /* The first audio stream, without probing: stream info would decode packets the
+     * candidate does not, so the reference does the least work that yields the output. */
+    int index = -1;
+    for (unsigned i = 0; i < fmt->nb_streams && index < 0; i++)
+        if (fmt->streams[i]->codecpar->codec_type == AVMEDIA_TYPE_AUDIO) index = (int)i;
+    if (index < 0) die("stream", AVERROR_STREAM_NOT_FOUND);
+    AVStream *st = fmt->streams[index];
+    const AVCodec *codec = avcodec_find_decoder(st->codecpar->codec_id);
+    if (!codec) die("decoder", AVERROR_DECODER_NOT_FOUND);
+    AVCodecContext *dec = avcodec_alloc_context3(codec);
+    if ((r = avcodec_parameters_to_context(dec, st->codecpar)) < 0) die("parameters", r);
+    dec->pkt_timebase = st->time_base;
+    dec->thread_count = 1;
+    if ((r = avcodec_open2(dec, codec, NULL)) < 0) die("open", r);
+    AVPacket *pkt = av_packet_alloc();
+    AVFrame *frame = av_frame_alloc();
+    AVFilterGraph *graph = NULL;
+    AVFilterContext *src = NULL, *sink = NULL;
+    for (int done = 0; !done;) {
+        r = av_read_frame(fmt, pkt);
+        if (r < 0) {
+            avcodec_send_packet(dec, NULL);
+            done = 1;
+        } else {
+            if (pkt->stream_index == index && (r = avcodec_send_packet(dec, pkt)) < 0 && r != AVERROR_INVALIDDATA)
+                die("send", r);
+            av_packet_unref(pkt);
+        }
+        for (;;) {
+            r = avcodec_receive_frame(dec, frame);
+            if (r == AVERROR(EAGAIN) || r == AVERROR_EOF) break;
+            if (r < 0) die("receive", r);
+            if (!graph) graph = graph_for(dec, frame, 0, &src, &sink);
+            if ((r = av_buffersrc_add_frame_flags(src, frame, AV_BUFFERSRC_FLAG_KEEP_REF)) < 0) die("buffersrc", r);
+            av_frame_unref(frame);
+            sink_frames(sink, o, 0);
+        }
+    }
+    if (graph) {
+        if ((r = av_buffersrc_add_frame_flags(src, NULL, 0)) < 0) die("buffersrc eof", r);
+        sink_frames(sink, o, 0);
+        avfilter_graph_free(&graph);
+    }
+    av_frame_free(&frame);
+    av_packet_free(&pkt);
+    avcodec_free_context(&dec);
+    avformat_close_input(&fmt);
+    av_freep(&io->buffer);
+    avio_context_free(&io);
+}
+
+static void pass(const char *name, const AVCodecParameters *par, const uint8_t *data, size_t size, int video,
+                 struct out *o) {
+    const char *demuxer = video ? NULL : lane_demuxer(name);
+    if (demuxer)
+        demux_pass(demuxer, data, size, o);
+    else
+        one_pass(name, par, data, size, video, o);
+}
+
 int main(int argc, char **argv) {
     /* KIND-CODEC-bench FILE ITERATIONS | KIND-CODEC-memory FILE | KIND-CODEC-raw FILE OUT */
     if (argc < 3) {
@@ -302,7 +385,7 @@ int main(int argc, char **argv) {
     if (!strcmp(kind, "bench")) {
         long iterations = argc > 3 ? strtol(argv[3], NULL, 10) : 1;
         uint64_t start = now_ns();
-        for (long i = 0; i < iterations; i++) one_pass(name, par, data, (size_t)size, video, &o);
+        for (long i = 0; i < iterations; i++) pass(name, par, data, (size_t)size, video, &o);
         uint64_t elapsed = now_ns() - start;
         printf("{\"schema\":1,\"iterations\":%ld,\"elapsed_ns\":%llu,\"packets\":%llu,\"bytes\":%llu,\"digest\":%llu}\n",
                iterations, (unsigned long long)elapsed, (unsigned long long)o.frames, (unsigned long long)o.bytes,
@@ -310,7 +393,7 @@ int main(int argc, char **argv) {
     } else if (!strcmp(kind, "memory")) {
         /* write(2) directly: the observer interposes write, which glibc stdio bypasses. */
         if (write(STDOUT_FILENO, "TRIERGON_BEGIN_V1\n", 18) != 18) return 2;
-        one_pass(name, par, data, (size_t)size, video, &o);
+        pass(name, par, data, (size_t)size, video, &o);
         if (write(STDOUT_FILENO, "TRIERGON_END_V1\n", 16) != 16) return 2;
         /* Equal memory work is equal units and bytes; the digest goes to stderr because
          * audio output may differ within the graded 1 LSB (see native_correctness.py). */
@@ -318,7 +401,7 @@ int main(int argc, char **argv) {
         fprintf(stderr, "{\"digest\":%llu}\n", (unsigned long long)fold_finish(o.digest));
     } else if (!strcmp(kind, "raw") && argc > 3) {
         o.raw = fopen(argv[3], "wb");
-        one_pass(name, par, data, (size_t)size, video, &o);
+        pass(name, par, data, (size_t)size, video, &o);
         fclose(o.raw);
         printf("{\"packets\":%llu,\"bytes\":%llu,\"digest\":%llu}\n", (unsigned long long)o.frames,
                (unsigned long long)o.bytes, (unsigned long long)fold_finish(o.digest));
