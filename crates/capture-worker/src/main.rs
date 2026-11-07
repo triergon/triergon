@@ -17,7 +17,7 @@ use std::io::Write;
 use std::process::ExitCode;
 use std::time::Instant;
 
-use triergon_capture::pixel::Orientation;
+use triergon_capture::pixel::{Orientation, PictureView, Plane};
 use triergon_capture::{Session, SessionConfig, Sink};
 
 struct HashSink {
@@ -139,7 +139,7 @@ fn main() -> ExitCode {
                 {
                     return fail("encode");
                 }
-                out.extend_from_slice(&s.reconstruction().visible_yuv420());
+                visible_yuv420(&s.reconstruction(), &mut out);
             }
             if std::fs::write(&args[8], out).is_err() {
                 return fail("output");
@@ -224,4 +224,25 @@ fn main() -> ExitCode {
         _ => return fail("usage"),
     }
     ExitCode::SUCCESS
+}
+
+/// The visible planes of an 8-bit 4:2:0 view, tightly packed (Y, then Cb, then Cr), as
+/// `Picture::visible_yuv420` lays them out.
+fn visible_yuv420(view: &PictureView<'_>, out: &mut Vec<u8>) {
+    for (i, plane) in view.planes.iter().enumerate() {
+        let (width, height) = match i {
+            0 => (view.width, view.height),
+            _ => (view.width / 2, view.height / 2),
+        };
+        if let Plane::U8 {
+            data,
+            stride,
+            offset,
+        } = *plane
+        {
+            for row in data[offset..].chunks(stride).take(height) {
+                out.extend_from_slice(&row[..width]);
+            }
+        }
+    }
 }
