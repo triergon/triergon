@@ -13,8 +13,10 @@ mod ebml;
 mod evidence;
 mod fate;
 mod fetch;
+mod framing_bench;
 mod fuzz;
 mod harness;
+mod isobmff_bench;
 mod json;
 mod numpy;
 mod prepare;
@@ -63,8 +65,10 @@ commands:
                  [--maximum-output-bytes N] [--timeout-seconds S]
                  deterministic, replayable mutation campaign through JSON workers
   graph          PACKAGE [FILE]...   print the provenance graph of a workspace package
+  isobmff-bench   compare all 1020 open/index traces; optionally measure 972 labels or --subset52
+  framing        [fixtures] compare all 125 whole-packet framing cases; use --help for options
   grade          TIMING MEMORY --contract F --manifest F --output DIR
-                 join complete timing and memory reports and recompute the feature gates
+                 join complete measurements and recompute the unchanged feature gates
   build-workers  [--comparison-build]
                  build the candidate and reference workers and the memory observers, and
                  record their identity in target/harness/identity.json; anything but the
@@ -76,7 +80,7 @@ commands:
                  workers and the independent oracles (tests whose name contains FILTER)
   report         [--contract F] [--manifest F] [--corpus DIR] [--output DIR] [--fate-cache DIR]
                  [--additional-report F]... [--require-acceptance] [--require-slice-acceptance]
-                 [--benchmark] [--memory] [--pairs N] [--iterations N] [--seed N]
+                 [--benchmark] [--memory] [--pairs N] [--memory-pairs N] [--iterations N] [--seed N]
                  [--baseline-worker W]
                  correctness, paired runtime and memory report of the built workers for one contract;
                  with a baseline worker of another build, timing and memory pair against it
@@ -139,11 +143,17 @@ fn main() -> ExitCode {
             _ => Err("usage: cargo xtask screen REPORTS".into()),
         },
         Some("report") => return report(&root, &args[1..]),
+        Some("framing") => {
+            return failing(framing_bench::main(&root, &args[1..]), framing_bench::USAGE);
+        }
         Some("grade") => {
             return failing(
                 harness::grade::main(&root, &args[1..]),
                 harness::grade::USAGE,
             );
+        }
+        Some("isobmff-bench") => {
+            return failing(isobmff_bench::main(&root, &args[1..]), isobmff_bench::USAGE);
         }
         Some("external-vector") => return external_vector(&root, &args[1..]),
         Some("fate-run") => return fate_run(&root, &args[1..]),

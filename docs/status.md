@@ -41,6 +41,9 @@ The remaining rows retain their earlier measurements.
 ISO BMFF, packet framing, PGS, Matroska audio clocks and playback timing, plus
 codec and decode-session memory, await gate-build measurement with repository runners.
 
+ISO BMFF open and index measurements use `cargo xtask isobmff-bench`, with
+`--subset52` selecting the 52-operation set. Packet framing uses `cargo xtask framing`.
+
 | Area | Revision | Raw samples SHA-256 |
 |---|---|---|
 | Matroska / WebM | `0e28298d038bea072629b3bad6389dcc806b4861` | `a20dcbbe804bfd21ee631cc42f61466d2400d5115abb8ea97dd243ef733ba74f` |

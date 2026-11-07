@@ -4,6 +4,113 @@
 
 use crate::json::Value;
 
+pub(crate) const BASE_WORK_FIELDS: [&str; 3] = ["packets", "bytes", "digest"];
+
+fn required_fields(declared: &[String]) -> Vec<String> {
+    let mut fields: Vec<_> = BASE_WORK_FIELDS.map(str::to_owned).into();
+    for field in declared {
+        if !fields.contains(field) {
+            fields.push(field.clone());
+        }
+    }
+    fields
+}
+
+/// Every declared numeric work field, with the three ordinary fields mandatory.
+pub(crate) fn work_fields(contract: &Value) -> Result<Vec<String>, String> {
+    let mut declared = Vec::new();
+    if let Some(value) = contract.get("work_fields") {
+        let values = value.as_array().ok_or("work_fields must be an array")?;
+        for value in values {
+            let field = value
+                .as_str()
+                .filter(|s| !s.is_empty())
+                .ok_or("work_fields must contain nonempty strings")?
+                .to_owned();
+            if declared.contains(&field) {
+                return Err(format!("duplicate work field {field}"));
+            }
+            declared.push(field);
+        }
+    }
+    Ok(required_fields(&declared))
+}
+
+/// A complete numeric work projection. Missing fields on both sides still fail.
+pub(crate) fn work_summary(data: &Value, fields: &[String]) -> Result<Value, String> {
+    let mut work = Vec::new();
+    for key in required_fields(fields) {
+        if super::linux::py_int(data.get(&key)).is_none_or(|n| n < 0) {
+            return Err(format!("missing or invalid work field {key}"));
+        }
+        work.push((
+            key.clone(),
+            data.get(&key).expect("checked work field").clone(),
+        ));
+    }
+    Ok(Value::Object(work))
+}
+
+/// Equal work by both timed roles, including the declared iteration count.
+pub(crate) fn paired_timing_work(
+    candidate: &Value,
+    reference: &Value,
+    iterations: i128,
+    fields: &[String],
+) -> Result<Value, String> {
+    for outcome in [candidate, reference] {
+        let data = super::worker::data(outcome);
+        if !super::worker::ok(outcome)
+            || super::linux::py_int(data.get("iterations")) != Some(iterations)
+            || super::linux::py_int(data.get("elapsed_ns")).is_none_or(|n| n < 0)
+        {
+            return Err("invalid timed worker result".into());
+        }
+    }
+    let a = work_summary(super::worker::data(candidate), fields)?;
+    let b = work_summary(super::worker::data(reference), fields)?;
+    if !super::diff::equal(&a, &b) {
+        return Err("unequal timed work".into());
+    }
+    Ok(a)
+}
+
+/// Both warmups publish the same complete work before any timed pair runs.
+pub(crate) fn warmup_work(
+    warmups: &[Value],
+    iterations: i128,
+    fields: &[String],
+) -> Result<Value, String> {
+    if warmups.len() != 2
+        || warmups[0].get("worker").and_then(Value::as_str) != Some("candidate")
+        || warmups[1].get("worker").and_then(Value::as_str) != Some("reference")
+    {
+        return Err("missing or duplicate timed warmups".into());
+    }
+    paired_timing_work(
+        warmups[0].get("result").ok_or("missing candidate warmup")?,
+        warmups[1].get("result").ok_or("missing reference warmup")?,
+        iterations,
+        fields,
+    )
+}
+
+/// Recheck the complete selected work in a detailed parity record.
+pub(crate) fn parity_work_valid(proof: &Value, fields: &[String]) -> bool {
+    let Some(expected) = proof
+        .get("expected")
+        .and_then(|v| work_summary(v, fields).ok())
+    else {
+        return false;
+    };
+    ["candidate", "reference"].iter().all(|role| {
+        proof
+            .get(role)
+            .and_then(|v| work_summary(v, fields).ok())
+            .is_some_and(|work| super::diff::equal(&work, &expected))
+    })
+}
+
 fn s<'a>(value: &'a Value, key: &str) -> Option<&'a str> {
     value.get(key).and_then(Value::as_str)
 }
@@ -163,4 +270,83 @@ pub fn validate_case_evidence(
             selected.get("sha256").cloned().unwrap_or(Value::Null),
         ),
     ]))
+}
+
+#[cfg(test)]
+mod work_tests {
+    use super::*;
+    use crate::json::parse;
+
+    fn v(text: &str) -> Value {
+        parse(text).unwrap()
+    }
+
+    fn result(second: Option<u64>) -> Value {
+        let mut data = vec![
+            ("iterations", Value::int(50)),
+            ("elapsed_ns", Value::int(100)),
+            ("packets", Value::int(1)),
+            ("bytes", Value::int(2)),
+            ("digest", Value::int(3)),
+        ];
+        if let Some(second) = second {
+            data.push(("digest_b", Value::int(second)));
+        }
+        Value::object([("status", Value::str("ok")), ("data", Value::object(data))])
+    }
+
+    #[test]
+    fn base_fields_stay_mandatory_and_default_projection_stays_three_fields() {
+        let fields = work_fields(&v(r#"{"work_fields":["digest_b"]}"#)).unwrap();
+        assert_eq!(fields, ["packets", "bytes", "digest", "digest_b"]);
+        let data = super::super::worker::data(&result(Some(4))).clone();
+        assert_eq!(
+            work_summary(&data, &[]).unwrap(),
+            v(r#"{"packets":1,"bytes":2,"digest":3}"#)
+        );
+        for missing in BASE_WORK_FIELDS {
+            let Value::Object(mut changed) = data.clone() else {
+                unreachable!()
+            };
+            changed.retain(|(k, _)| k != missing);
+            assert!(work_summary(&Value::Object(changed), &fields).is_err());
+        }
+        for contract in [
+            r#"{"work_fields":null}"#,
+            r#"{"work_fields":[""]}"#,
+            r#"{"work_fields":[1]}"#,
+            r#"{"work_fields":["digest_b","digest_b"]}"#,
+        ] {
+            assert!(work_fields(&v(contract)).is_err());
+        }
+    }
+
+    #[test]
+    fn pairs_and_warmups_require_every_declared_field_on_both_roles() {
+        let fields = work_fields(&v(r#"{"work_fields":["digest_b"]}"#)).unwrap();
+        let complete = result(Some(4));
+        let summary = paired_timing_work(&complete, &complete, 50, &fields).unwrap();
+        assert_eq!(summary.get("digest_b"), Some(&Value::int(4)));
+        for (a, b) in [
+            (result(None), complete.clone()),
+            (complete.clone(), result(None)),
+            (result(None), result(None)),
+            (result(Some(5)), complete.clone()),
+        ] {
+            assert!(paired_timing_work(&a, &b, 50, &fields).is_err());
+            let warmups = [
+                Value::object([("worker", Value::str("candidate")), ("result", a)]),
+                Value::object([("worker", Value::str("reference")), ("result", b)]),
+            ];
+            assert!(warmup_work(&warmups, 50, &fields).is_err());
+        }
+        let warmups = [
+            Value::object([
+                ("worker", Value::str("candidate")),
+                ("result", complete.clone()),
+            ]),
+            Value::object([("worker", Value::str("reference")), ("result", complete)]),
+        ];
+        assert_eq!(warmup_work(&warmups, 50, &fields).unwrap(), summary);
+    }
 }
