@@ -52,9 +52,7 @@ impl OpusHead {
         if !bytes.starts_with(b"OpusHead") {
             return Err(Error::Invalid("Opus identification header magic"));
         }
-        let field = |range: core::ops::Range<usize>| {
-            bytes.get(range).ok_or(Error::Truncated)
-        };
+        let field = |range: core::ops::Range<usize>| bytes.get(range).ok_or(Error::Truncated);
         let version = field(8..9)?[0];
         let channels = field(9..10)?[0];
         let pre_skip = u16::from_le_bytes(field(10..12)?.try_into().map_err(|_| Error::Truncated)?);
@@ -77,9 +75,7 @@ impl OpusHead {
     /// Parse the payload of an ISO BMFF `dOps` box (Opus in ISO BMFF, section 4.3.2):
     /// the same fields, big-endian, without the magic.
     pub fn from_dops(bytes: &[u8]) -> Result<OpusHead> {
-        let field = |range: core::ops::Range<usize>| {
-            bytes.get(range).ok_or(Error::Truncated)
-        };
+        let field = |range: core::ops::Range<usize>| bytes.get(range).ok_or(Error::Truncated);
         let version = field(0..1)?[0];
         if version != 0 {
             return Err(Error::Unsupported("dOps version"));
