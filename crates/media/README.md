@@ -34,6 +34,7 @@ need `Read + Seek`; `open_owned_seekable_in` reads an `OwnedInputBytes` and lets
 packets alias the input allocation. The `*_in` variants share a caller `Budget`.
 `next_packet` returns the plain `matroska::Packet` and refuses packets that carry
 block additions or CodecState; use `next_typed_packet` for those.
+Typed configurations expose their allocation accounting through `Configuration::budget()`.
 
 `examples/matroska_packets.rs FILE` prints the tracks and packets of a file.
 
