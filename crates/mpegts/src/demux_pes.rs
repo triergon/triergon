@@ -162,6 +162,7 @@ struct Pending {
     position: usize,
     counter_checked: bool,
     started: bool,
+    body_drained: bool,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -547,6 +548,7 @@ impl DemuxObserver {
             position: 0,
             counter_checked: false,
             started: false,
+            body_drained: false,
         });
         Ok(())
     }
@@ -1468,6 +1470,10 @@ impl DemuxObserver {
             .pending
             .as_ref()
             .ok_or(Error::Invalid("native PES input missing"))?;
+        if pending.body_drained {
+            self.pending = None;
+            return Ok(true);
+        }
         let payload = pending
             .packet
             .payload
@@ -1513,7 +1519,7 @@ impl DemuxObserver {
         }
         let pending = self
             .pending
-            .as_ref()
+            .as_mut()
             .ok_or(Error::Invalid("native PES input missing"))?;
         let payload = pending
             .packet
@@ -1522,26 +1528,27 @@ impl DemuxObserver {
             .ok_or(Error::Invalid("native PES payload missing"))?;
         let start = pending.position;
         let end = start.checked_add(count).ok_or(Error::Overflow)?;
-        let span = DemuxSpan {
-            bytes: payload.slice(start..end)?,
-            source: SourceRange {
-                entity: self.scope.entity,
-                offset: pending
-                    .packet
-                    .payload_source_offset
-                    .checked_add(start as u64)
-                    .ok_or(Error::Overflow)?,
-                bytes: count,
-            },
-            transport: SourceRange {
-                entity: self.scope.entity,
-                offset: pending.packet.source_offset,
-                bytes: pending.packet.source.len(),
-            },
-            context: pending.context,
+        payload
+            .as_ref()
+            .get(start..end)
+            .ok_or(Error::Invalid("byte span range"))?;
+        let source = SourceRange {
+            entity: self.scope.entity,
+            offset: pending
+                .packet
+                .payload_source_offset
+                .checked_add(start as u64)
+                .ok_or(Error::Overflow)?,
+            bytes: count,
         };
-        span.source.end()?;
-        span.transport.end()?;
+        let transport = SourceRange {
+            entity: self.scope.entity,
+            offset: pending.packet.source_offset,
+            bytes: pending.packet.source.len(),
+        };
+        source.end()?;
+        transport.end()?;
+        let complete = end == payload.len();
         let next_position = if count < available {
             payload.len()
         } else {
@@ -1550,13 +1557,29 @@ impl DemuxObserver {
         if cancel.load(Ordering::Relaxed) {
             return Err(Error::Cancelled);
         }
+        // The arena has a free slot and all ranges are checked. Keep the
+        // pending carrier until the same poll boundary after moving its payload.
+        let bytes = if complete {
+            pending
+                .packet
+                .payload
+                .take()
+                .ok_or(Error::Invalid("native PES payload missing"))?
+                .into_slice(start..end)?
+        } else {
+            payload.slice(start..end)?
+        };
+        let span = DemuxSpan {
+            bytes,
+            source,
+            transport,
+            context: pending.context,
+        };
         self.spans.try_push(span).map_err(|error| error.error)?;
         self.payload_len = next;
         // A bounded <=184-byte admission per work unit, not a per-yield span.
-        self.pending
-            .as_mut()
-            .ok_or(Error::Invalid("native PES input missing"))?
-            .position = next_position;
+        pending.position = next_position;
+        pending.body_drained = complete;
         Ok(true)
     }
 
@@ -1577,11 +1600,12 @@ impl DemuxObserver {
             }
             if self.active && self.header.is_some() && self.body_limit == Some(self.payload_len) {
                 if self.pending.as_ref().is_some_and(|pending| {
-                    pending
-                        .packet
-                        .payload
-                        .as_ref()
-                        .is_some_and(|payload| pending.position == payload.len())
+                    pending.body_drained
+                        || pending
+                            .packet
+                            .payload
+                            .as_ref()
+                            .is_some_and(|payload| pending.position == payload.len())
                 }) {
                     self.pending = None;
                 }
@@ -1623,6 +1647,294 @@ impl DemuxObserver {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn body_carrier(pool: &Budget, length: u16, offset: u64, counter: u8) -> TransportPacket {
+        let [hi, lo] = length.to_be_bytes();
+        let mut raw = [0xff; TS188_BYTES];
+        raw[..13].copy_from_slice(&[
+            0x47,
+            0x41,
+            0,
+            0x10 | counter,
+            0,
+            0,
+            1,
+            0xe0,
+            hi,
+            lo,
+            0x80,
+            0,
+            0,
+        ]);
+        let mut packet = crate::parse_transport(
+            Bytes::copy_from_slice(pool, &raw).unwrap(),
+            crate::PacketFormat::Ts188,
+            offset,
+        )
+        .unwrap();
+        packet.source_id = Some(SourceId(1));
+        packet
+    }
+
+    fn pending_body(length: u16) -> (DemuxObserver, Bytes, SourceContext) {
+        let pool = Budget::new(8192).unwrap();
+        let epochs = SourceEpochs {
+            configuration: 0,
+            clock: 0,
+        };
+        let mut observer = DemuxObserver::new(
+            DemuxProfile::PesPackets,
+            DemuxScope {
+                program: 1,
+                pid: 256,
+                stream_type: 0x1b,
+                stream_id: 0xe0,
+                entity: SourceId(1),
+                epochs,
+            },
+            pool.clone(),
+            ParseLimits::default(),
+        )
+        .unwrap();
+        let packet = body_carrier(&pool, length, 564, 0);
+        let payload = packet.payload.as_ref().unwrap().clone();
+        let context = SourceContext {
+            source_event_ordinal: 4,
+            epochs,
+            byte_run_epoch: None,
+        };
+        observer.push(packet, context).unwrap();
+        let mut work = WorkBudget::new(u64::MAX);
+        assert!(observer.poll_start(&mut work).unwrap());
+        for _ in 0..8 {
+            if observer.header.is_some() {
+                break;
+            }
+            assert!(
+                observer
+                    .poll_header(&mut work, &AtomicBool::new(false))
+                    .unwrap()
+            );
+        }
+        assert!(observer.header.is_some());
+        assert_eq!(observer.pending.as_ref().unwrap().position, 9);
+        (observer, payload, context)
+    }
+
+    fn assert_body_not_moved(observer: &DemuxObserver, expected: &Bytes) {
+        let pending = observer.pending.as_ref().unwrap();
+        let payload = pending.packet.payload.as_ref().unwrap();
+        assert!(payload.shares_storage_with(expected));
+        assert_eq!(payload.as_ref().as_ptr(), expected.as_ref().as_ptr());
+        assert_eq!(payload.as_ref(), expected.as_ref());
+        assert_eq!(pending.position, 9);
+        assert!(!pending.body_drained);
+        assert_eq!(observer.payload_len, 0);
+        assert!(observer.spans.is_empty());
+    }
+
+    #[test]
+    fn completed_body_moves_its_view_but_keeps_pending_until_the_same_poll_boundary() {
+        let (mut observer, payload, context) = pending_body(0);
+        let cancel = AtomicBool::new(false);
+        assert!(
+            observer
+                .reserve(Arena::Payload, &mut WorkBudget::new(u64::MAX), &cancel)
+                .unwrap()
+        );
+        assert!(
+            !observer
+                .poll_body(&mut WorkBudget::new(0), &cancel)
+                .unwrap()
+        );
+        assert_body_not_moved(&observer, &payload);
+        let mut work = WorkBudget::new(1);
+        assert!(observer.poll_body(&mut work, &cancel).unwrap());
+        assert_eq!(work.spent(), 1);
+        let pending = observer.pending.as_ref().unwrap();
+        assert!(pending.body_drained);
+        assert!(pending.packet.payload.is_none());
+        assert_eq!(pending.position, payload.len());
+        assert_eq!(
+            &pending.packet.source.as_ref()[TS_PAYLOAD_START..],
+            payload.as_ref()
+        );
+        let [span] = observer.spans.as_slice() else {
+            panic!("expected one admitted span")
+        };
+        assert!(span.backing_bytes().shares_storage_with(&payload));
+        assert_eq!(span.as_ref().as_ptr(), payload.as_ref()[9..].as_ptr());
+        assert_eq!(span.as_ref(), &payload.as_ref()[9..]);
+        assert_eq!(span.context, context);
+        assert_eq!(
+            span.source,
+            SourceRange {
+                entity: SourceId(1),
+                offset: 577,
+                bytes: 175
+            }
+        );
+        assert_eq!(
+            span.transport,
+            SourceRange {
+                entity: SourceId(1),
+                offset: 564,
+                bytes: TS188_BYTES
+            }
+        );
+        assert!(matches!(
+            observer.poll(&mut WorkBudget::new(0), &cancel).unwrap(),
+            AssemblyStep::Yield
+        ));
+        let next = body_carrier(&observer.budget, 0, 752, 1);
+        let next_context = SourceContext {
+            source_event_ordinal: 6,
+            ..context
+        };
+        let rejected = observer.push(next, next_context).unwrap_err();
+        assert_eq!(
+            rejected.error,
+            Error::Invalid("native PES input not drained")
+        );
+        assert!(matches!(
+            observer.poll(&mut WorkBudget::new(1), &AtomicBool::new(true)),
+            Err(Error::Cancelled)
+        ));
+        assert!(observer.pending.as_ref().unwrap().body_drained);
+        let mut work = WorkBudget::new(1);
+        assert!(matches!(
+            observer.poll(&mut work, &cancel).unwrap(),
+            AssemblyStep::NeedPayload
+        ));
+        assert_eq!(work.spent(), 0);
+        observer.push(rejected.value, next_context).unwrap();
+    }
+
+    #[test]
+    fn body_transfer_waits_for_arena_capacity_and_keeps_prepaid_retry_work() {
+        let (mut observer, payload, _) = pending_body(0);
+        let cancel = AtomicBool::new(false);
+        assert!(
+            !observer
+                .poll_body(&mut WorkBudget::new(1), &cancel)
+                .unwrap()
+        );
+        assert_body_not_moved(&observer, &payload);
+        let pressure = observer
+            .budget
+            .reserve(observer.budget.available())
+            .unwrap();
+        assert!(matches!(
+            observer.poll_body(&mut WorkBudget::new(u64::MAX), &cancel),
+            Err(Error::Backpressure { .. })
+        ));
+        assert_body_not_moved(&observer, &payload);
+        assert_eq!(observer.growth.as_ref().unwrap().remaining, 0);
+        drop(pressure);
+        let mut work = WorkBudget::new(1);
+        assert!(observer.poll_body(&mut work, &cancel).unwrap());
+        assert_eq!(work.spent(), 1);
+        assert!(observer.pending.as_ref().unwrap().body_drained);
+        assert!(
+            observer.spans.as_slice()[0]
+                .backing_bytes()
+                .shares_storage_with(&payload)
+        );
+    }
+
+    #[test]
+    fn body_ranges_and_cancellation_are_checked_before_transfer_in_original_order() {
+        for fault in 0..4 {
+            let (mut observer, payload, _) = pending_body(0);
+            assert!(
+                observer
+                    .reserve(
+                        Arena::Payload,
+                        &mut WorkBudget::new(u64::MAX),
+                        &AtomicBool::new(false)
+                    )
+                    .unwrap()
+            );
+            let packet = &mut observer.pending.as_mut().unwrap().packet;
+            match fault {
+                0 => {}
+                1 => packet.payload_source_offset = u64::MAX - 8,
+                2 => packet.payload_source_offset = u64::MAX - 180,
+                _ => packet.source_offset = u64::MAX - 100,
+            }
+            let mut work = WorkBudget::new(1);
+            assert_eq!(
+                observer.poll_body(&mut work, &AtomicBool::new(true)),
+                Err(if fault == 0 {
+                    Error::Cancelled
+                } else {
+                    Error::Overflow
+                })
+            );
+            assert_eq!(work.spent(), 1);
+            assert_body_not_moved(&observer, &payload);
+        }
+    }
+
+    #[test]
+    fn finite_completion_keeps_full_extents_and_overlong_start_trimming() {
+        for (length, count, moved) in [(178, 175, true), (8, 5, false)] {
+            let (mut observer, payload, context) = pending_body(length);
+            let cancel = AtomicBool::new(false);
+            assert!(
+                observer
+                    .reserve(Arena::Payload, &mut WorkBudget::new(u64::MAX), &cancel)
+                    .unwrap()
+            );
+            let mut work = WorkBudget::new(1);
+            assert!(observer.poll_body(&mut work, &cancel).unwrap());
+            assert_eq!(work.spent(), 1);
+            let pending = observer.pending.as_ref().unwrap();
+            assert_eq!(pending.body_drained, moved);
+            assert_eq!(pending.packet.payload.is_none(), moved);
+            assert_eq!(pending.position, payload.len());
+            assert_eq!(
+                &pending.packet.source.as_ref()[TS_PAYLOAD_START..],
+                payload.as_ref()
+            );
+            assert!(matches!(
+                observer.poll(&mut WorkBudget::new(0), &cancel).unwrap(),
+                AssemblyStep::Yield
+            ));
+            let AssemblyStep::Output(packet) = observer
+                .poll(&mut WorkBudget::new(u64::MAX), &cancel)
+                .unwrap()
+            else {
+                panic!("expected the finite PES");
+            };
+            assert_eq!(packet.boundary, DemuxBoundary::FiniteLength);
+            assert_eq!(packet.payload_len, count);
+            assert_eq!(packet.source_header.as_bytes(), &payload.as_ref()[..9]);
+            let [span] = packet.spans.as_slice() else {
+                panic!("expected one finite body span")
+            };
+            assert_eq!(span.as_ref(), &payload.as_ref()[9..9 + count]);
+            assert!(span.backing_bytes().shares_storage_with(&payload));
+            assert_eq!(
+                span.source,
+                SourceRange {
+                    entity: SourceId(1),
+                    offset: 577,
+                    bytes: count
+                }
+            );
+            assert_eq!(
+                span.transport,
+                SourceRange {
+                    entity: SourceId(1),
+                    offset: 564,
+                    bytes: TS188_BYTES
+                }
+            );
+            assert_eq!(span.context, context);
+            assert!(observer.pending.is_none());
+        }
+    }
 
     #[test]
     fn finite_body_reserves_only_the_received_span() {
