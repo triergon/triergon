@@ -14539,7 +14539,7 @@
   {
    "name": "mp4-indexed-packet-delivery",
    "retention": "retained",
-   "reason": "MP4 range playback status row",
+   "reason": "Earlier MP4 packet delivery comparison",
    "key": "evidence/mp4-indexed-packet-delivery/4c2992b765efb52b60ba6bec8425cbf4c3d1ec55967ddd6d291e1efb14a4e8e5.tar.gz",
    "sha256": "4c2992b765efb52b60ba6bec8425cbf4c3d1ec55967ddd6d291e1efb14a4e8e5",
    "files": [
@@ -14574,6 +14574,72 @@
     {
      "path": "source.bundle",
      "sha256": "f1f7e29a09feea3cd4e4455920d49ff06eeec2011c14b1bbc786c2c404e11f34"
+    }
+   ]
+  },
+  {
+   "name": "mp4-track-projection-comparison",
+   "retention": "retained",
+   "reason": "MP4 track projection comparison",
+   "key": "evidence/mp4-track-projection-comparison/704ca5abcb7b7b44ac33ded9293d6a6897071e638abed5954feeabafa7e22012.tar.gz",
+   "sha256": "704ca5abcb7b7b44ac33ded9293d6a6897071e638abed5954feeabafa7e22012"
+  },
+  {
+   "name": "mp4-shared-window-clock-comparison",
+   "retention": "retained",
+   "reason": "MP4 sample window and scheduling clock comparison",
+   "key": "evidence/mp4-shared-window-clock-comparison/923da5960b5deb92c3cae78c892704ae43d22a41bc0751d4d10e38a327ba925f.tar.gz",
+   "sha256": "923da5960b5deb92c3cae78c892704ae43d22a41bc0751d4d10e38a327ba925f"
+  },
+  {
+   "name": "mp4-seek-checkpoint-comparison",
+   "retention": "retained",
+   "reason": "MP4 seek checkpoint comparison",
+   "key": "evidence/mp4-seek-checkpoint-comparison/c61a612a85e692e30b0dc4d7c165dcec794e0248ef5d177ac77b712cc1aa2728.tar.gz",
+   "sha256": "c61a612a85e692e30b0dc4d7c165dcec794e0248ef5d177ac77b712cc1aa2728"
+  },
+  {
+   "name": "mp4-buffered-sample-delivery",
+   "retention": "retained",
+   "reason": "MP4 range playback status row",
+   "key": "evidence/mp4-buffered-sample-delivery/78e5d64743203173b7dfd8beed2dc4ab750d137e6fe3b00df321536b15057f05.tar.gz",
+   "sha256": "78e5d64743203173b7dfd8beed2dc4ab750d137e6fe3b00df321536b15057f05",
+   "files": [
+    {
+     "path": "FINAL-STATE.txt",
+     "sha256": "f247a76b2893208aae7751dbf51f4c495efacfb6d9e743802870300f31ac45c8"
+    },
+    {
+     "path": "NATIVE-RESULTS.sha256",
+     "sha256": "c513eb7249536e83aaece519b88930b4b3a32eab7eef148bbd67ee2fe3c4853c"
+    },
+    {
+     "path": "NATIVE-RESULTS.tar.gz",
+     "sha256": "4a49d78ea04fd2456128577bf077aa798bd7e17497b6d0c20e82cb9d9e773691"
+    },
+    {
+     "path": "NATIVE.log",
+     "sha256": "d965d3995234ffce4dec306b4d913be00298180986c79e04c5d98bd39f77d02e"
+    },
+    {
+     "path": "REBASED-CLIPPY.log",
+     "sha256": "67090b658af3e401f255877bc7e81d30eede21d41962a5f71025fd8fda78f093"
+    },
+    {
+     "path": "REBASED-TEST.log",
+     "sha256": "bec94715f734e45e1fd6837cf6c79b01d08c10a2520ee7f8b64061257721e856"
+    },
+    {
+     "path": "RSS-REVIEW.json",
+     "sha256": "35fcc38a12295baaefe8217d5a720ee351de7a3053c04bec08c3734ffc67a352"
+    },
+    {
+     "path": "guest.sh",
+     "sha256": "f697087afc8a240938e76dcf827743422ac0da57e7af4009be95eeb442882140"
+    },
+    {
+     "path": "source.bundle",
+     "sha256": "4cda7a2c61b1fba1124203794aa20818b8cff7d9b52994b691905389c12b9159"
     }
    ]
   }
