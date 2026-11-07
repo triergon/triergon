@@ -286,7 +286,7 @@ impl Time {
         i64::try_from(self.to_ticks(base, rounding)?).map_err(|_| Error::Overflow)
     }
     pub fn to_nanoseconds(self, rounding: Rounding) -> Result<i64> {
-        self.to_i64_ticks(TimeBase::new(1, 1_000_000_000)?, rounding)
+        self.to_i64_ticks(TimeBase::NANOSECONDS, rounding)
     }
 }
 
