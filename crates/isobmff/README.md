@@ -320,5 +320,20 @@ Verification:
   flags, bytes) with the pinned FFmpeg reference. Comparisons never sort or
   normalise either side.
 
+With the `formats` reference prepared, `cargo xtask build-workers` registers the
+comparison workers. Run `cargo xtask isobmff-bench` for all 1,020 open and index
+parity checks, covering 972 output labels and 48 explicit refusals. Add
+`--benchmark --memory` to measure the complete selection, or
+`--benchmark --memory --subset52` for the separate 52-operation selection.
+Both retain all 1,020 parity checks. The complete selection measures 956 physical
+operations with 16 explicit aliases. Run these commands with `CARGO_INCREMENTAL=0`
+and keep the RSS kernel module unloaded while timing.
+
+Use `--benchmark --memory --require-acceptance` for a combined native AArch64 Linux
+run, with `TRIERGON_RSS_KERNEL_BOUND` unset or `0`. Each case completes timing
+before memory on the same recorded worker pair. The conservative RSS observer
+must pass the strict memory gates. Final report assembly streams one case's raw
+observations at a time and keeps the individual JSON files and hashes alongside it.
+
 Gates, harness and current results: [docs/quality.md](../../docs/quality.md)
 and [docs/status.md](../../docs/status.md).

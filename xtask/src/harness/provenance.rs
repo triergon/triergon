@@ -22,8 +22,9 @@ pub fn matroska_inputs() -> Vec<String> {
         "xtask/src/harness/acceptance.rs",
         "xtask/src/harness/build.rs",
         "xtask/src/harness/comparison.rs",
-        "xtask/src/harness/diff.rs",
+        "xtask/src/harness/gate_build.rs",
         "xtask/src/harness/grade.rs",
+        "xtask/src/harness/diff.rs",
         "xtask/src/harness/linux.rs",
         "xtask/src/harness/memory.rs",
         "xtask/src/harness/oracle.rs",
@@ -74,6 +75,14 @@ pub fn matroska_inputs() -> Vec<String> {
 
 /// `cargo metadata` for the host target, as the build ran it.
 pub fn cargo_metadata(root: &Path) -> Result<Value, String> {
+    cargo_metadata_with_features(root, &[])
+}
+
+/// Resolved metadata with the same explicitly enabled features as a worker build.
+pub(crate) fn cargo_metadata_with_features(
+    root: &Path,
+    features: &[String],
+) -> Result<Value, String> {
     let rustc = Command::new("rustc")
         .arg("-Vv")
         .current_dir(root)
@@ -85,16 +94,20 @@ pub fn cargo_metadata(root: &Path) -> Result<Value, String> {
         .find_map(|l| l.strip_prefix("host: "))
         .ok_or("rustc reports no host")?
         .to_owned();
-    let output = Command::new("cargo")
-        .args([
-            "metadata",
-            "--format-version",
-            "1",
-            "--locked",
-            "--offline",
-            "--filter-platform",
-            &host,
-        ])
+    let mut command = Command::new("cargo");
+    command.args([
+        "metadata",
+        "--format-version",
+        "1",
+        "--locked",
+        "--offline",
+        "--filter-platform",
+        &host,
+    ]);
+    if !features.is_empty() {
+        command.arg("--features").arg(features.join(","));
+    }
+    let output = command
         .env("CARGO_INCREMENTAL", "0")
         .current_dir(root)
         .output()
