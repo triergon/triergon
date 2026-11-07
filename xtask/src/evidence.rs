@@ -259,7 +259,7 @@ enum Compression {
 }
 
 /// The largest tar an archived set may decompress to.
-const TAR_LIMIT: usize = 1 << 32;
+const TAR_LIMIT: u64 = 1 << 32;
 
 impl Compression {
     fn of(key: &str) -> Option<Self> {
@@ -281,7 +281,9 @@ impl Compression {
 
     fn decompress(self, data: &[u8]) -> Result<Vec<u8>, String> {
         match self {
-            Self::Gzip => crate::archive::gunzip(data, TAR_LIMIT),
+            Self::Gzip => {
+                crate::archive::gunzip(data, usize::try_from(TAR_LIMIT).unwrap_or(usize::MAX))
+            }
             Self::Zstd => unzstd(data),
         }
     }
@@ -304,13 +306,12 @@ fn unzstd(data: &[u8]) -> Result<Vec<u8>, String> {
     let input = data.to_vec();
     let writer = std::thread::spawn(move || stdin.write_all(&input));
     let mut tar = Vec::new();
-    let limit = u64::try_from(TAR_LIMIT).expect("limit fits u64");
     stdout
         .by_ref()
-        .take(limit + 1)
+        .take(TAR_LIMIT + 1)
         .read_to_end(&mut tar)
         .map_err(|e| format!("zstd: {e}"))?;
-    if tar.len() > TAR_LIMIT {
+    if tar.len() as u64 > TAR_LIMIT {
         let _ = child.kill();
         let _ = child.wait();
         return Err(format!("zstd: more than {TAR_LIMIT} bytes"));
