@@ -16,6 +16,8 @@ each input and its recorded public-API observation. `observations.json` retains
 those observations verbatim; the serial oracle derives both independent byte
 polynomials from them. A word is eight little-endian bytes. Each iteration folds
 both whole-operation digest words, including iterations with zero output packets.
+Both workers fold eight-byte groups with the same polynomial recurrence and
+process any trailing bytes individually.
 
 The xtask entry point generates all inputs and delegates reports, paired timing,
 memory collection, isolation and gate-build checks to the shared harness. There
