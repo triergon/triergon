@@ -42,10 +42,9 @@ impl Configuration {
     pub fn belongs_to(&self, pool: &Budget) -> bool {
         self.data.pool.same_pool(pool)
     }
-    /// The constructor already validated this shared owner against the source
-    /// pool. Borrowing it avoids a redundant budget handle in a packet job.
+    /// The budget accounting for this configuration and its shared track storage.
     #[inline(always)]
-    pub(crate) fn budget(&self) -> &Budget {
+    pub fn budget(&self) -> &Budget {
         &self.data.pool
     }
     // Cache rebinding changes only format bookkeeping; retained older handles
