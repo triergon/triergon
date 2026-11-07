@@ -3,6 +3,7 @@ use crate::{
     TrackKey, TsNativeCarriage, TsNativeConfiguration,
     hls_avc::{clock_describes, lane_track, pes_time},
     hls_segment::HlsMediaAudioUnit,
+    ts_payload::PesInput,
 };
 use std::sync::atomic::AtomicBool;
 use triergon_core::{
@@ -113,7 +114,7 @@ impl HlsDolby {
         let Some(packet) = mailbox.as_ref() else {
             return Ok(false);
         };
-        if !lane_track(self.config.track, self.config.configuration_epoch, packet)
+        if !lane_track(self.config.track, self.config.configuration_epoch, &packet.facts())
             || packet.stream_id != 0xbd
             || packet.source_header.stream_id != packet.stream_id
         {
@@ -146,7 +147,7 @@ impl HlsDolby {
         let header = packet
             .time_header()
             .ok_or(Error::Invalid("HLS Dolby PES missing applicable header"))?;
-        if !clock_describes(&clock, packet, header.pts_raw33, header.dts_raw33) {
+        if !clock_describes(&clock, &packet.facts(), header.pts_raw33, header.dts_raw33) {
             return Err(Error::Invalid("HLS Dolby clock does not describe this PES"));
         }
         let anchor = PesAnchor {

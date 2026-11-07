@@ -41,6 +41,10 @@ struct PayloadFeed {
 
 impl PayloadFeed {
     fn new(bytes: &[u8]) -> Self {
+        Self::with_compact_payloads(bytes, false)
+    }
+
+    fn with_compact_payloads(bytes: &[u8], compact: bool) -> Self {
         let pool = Budget::new(64 * 1024).unwrap();
         let limits = ParseLimits::default();
         let mut stream = TransportStream::new_single_program_progressive_feed(
@@ -106,11 +110,22 @@ impl PayloadFeed {
             limits,
         )
         .unwrap();
+        if compact {
+            observer.enable_compact_payloads().unwrap();
+        }
         observer.push(start, context(0, epochs)).unwrap();
-        assert!(matches!(
-            observer.poll(&mut work, &cancel).unwrap(),
-            AssemblyStep::NeedPayload
-        ));
+        let needs_payload = if compact {
+            matches!(
+                observer.poll_compact_payload(&mut work, &cancel).unwrap(),
+                AssemblyStep::NeedPayload
+            )
+        } else {
+            matches!(
+                observer.poll(&mut work, &cancel).unwrap(),
+                AssemblyStep::NeedPayload
+            )
+        };
+        assert!(needs_payload);
         stream
             .routes
             .try_push(PesRoute {
@@ -175,6 +190,132 @@ impl PayloadFeed {
         };
         packet
     }
+
+    fn finish_compact(&mut self) -> crate::compat::pes::CompactDemuxPacket {
+        self.observer.end_of_source().unwrap();
+        let AssemblyStep::Output(packet) = self
+            .observer
+            .poll_compact_payload(&mut WorkBudget::new(4096), &AtomicBool::new(false))
+            .unwrap()
+        else {
+            panic!("expected compact PES output");
+        };
+        packet
+    }
+}
+
+#[test]
+fn mixed_payload_polling_rejects_before_work_or_state_changes() {
+    let wire = [carrier(14, true), carrier(15, false), carrier(0, false)].concat();
+    let cancel = AtomicBool::new(false);
+    for compact in [false, true] {
+        let mut feed = PayloadFeed::with_compact_payloads(&wire, compact);
+        let before = format!("{:?}", feed.observer);
+        let used = feed.input.budget().used();
+        let mut work = WorkBudget::new(1000);
+        for bound in [false, true] {
+            let error = if compact {
+                if bound {
+                    feed.observer
+                        .poll_with_input(&feed.input, &mut work, &cancel)
+                } else {
+                    feed.observer.poll(&mut work, &cancel)
+                }
+                .unwrap_err()
+            } else {
+                if bound {
+                    feed.observer
+                        .poll_compact_payload_with_input(&feed.input, &mut work, &cancel)
+                } else {
+                    feed.observer.poll_compact_payload(&mut work, &cancel)
+                }
+                .unwrap_err()
+            };
+            assert_eq!(error, Error::Invalid("PES payload polling representation"));
+            assert_eq!(work.remaining(), 1000);
+            assert_eq!(feed.input.budget().used(), used);
+            assert_eq!(format!("{:?}", feed.observer), before);
+        }
+        assert!(feed.try_run(&mut work, &cancel).unwrap());
+        if compact {
+            assert_eq!(feed.finish_compact().payload.len(), 3);
+        } else {
+            assert_eq!(feed.finish_native().spans.len(), 3);
+        }
+    }
+}
+
+#[test]
+fn compact_run_keeps_owned_records_work_and_charges_without_carrier_handles() {
+    let wire = [carrier(14, true), carrier(15, false), carrier(0, false)].concat();
+    let mut owned = PayloadFeed::new(&wire);
+    let mut compact = PayloadFeed::with_compact_payloads(&wire, true);
+    let mut first = WorkBudget::new(2 * PAYLOAD_RUN_WORK + 1);
+    let mut second = WorkBudget::new(2 * PAYLOAD_RUN_WORK + 1);
+    assert!(owned.try_run(&mut first, &AtomicBool::new(false)).unwrap());
+    assert!(
+        compact
+            .try_run(&mut second, &AtomicBool::new(false))
+            .unwrap()
+    );
+    assert_eq!(first.remaining(), second.remaining());
+    assert_eq!(owned.stream.feed_omissions, compact.stream.feed_omissions);
+    assert_eq!(owned.input.position(), compact.input.position());
+    assert_eq!(owned.input.budget().used(), compact.input.budget().used());
+    let ordinary = owned.finish_native();
+    let packet = compact.finish_compact();
+    assert_eq!(ordinary.spans.len(), 3);
+    assert_eq!(
+        packet.payload.retained_handles(),
+        if cfg!(target_pointer_width = "64") {
+            2
+        } else {
+            3
+        }
+    );
+    assert_eq!(ordinary.payload_len, packet.payload_len);
+    assert_eq!(ordinary.source_origin, packet.source_origin);
+    assert_eq!(ordinary.source_epochs, packet.source_epochs);
+    assert_eq!(ordinary.flags, packet.flags);
+    assert_eq!(ordinary.boundary, packet.boundary);
+    assert_eq!(ordinary.payload_kind, packet.payload_kind);
+    assert_eq!(
+        format!("{:?}", ordinary.source_header),
+        format!("{:?}", packet.source_header)
+    );
+    assert_eq!(
+        ordinary.header_source_ranges.as_slice(),
+        packet.header_source_ranges.as_slice()
+    );
+    assert_eq!(ordinary.spans.len(), packet.payload.len());
+    assert_eq!(ordinary.spans.capacity(), packet.payload.capacity());
+    for (expected, span) in ordinary.spans.as_slice().iter().zip(packet.payload.spans()) {
+        assert_eq!(expected.as_ref(), span.as_ref());
+        assert_eq!(expected.source, span.source);
+        assert_eq!(expected.transport, span.transport);
+        assert_eq!(expected.context, span.context);
+    }
+    let pool = compact.input.budget().clone();
+    let source_charge = packet
+        .payload
+        .spans()
+        .next()
+        .unwrap()
+        .bytes
+        .backing_bytes()
+        .retained_storage_bytes();
+    let capacity = packet.payload.capacity();
+    let header_capacity = packet.header_source_ranges.capacity();
+    drop(compact);
+    assert_eq!(
+        pool.used(),
+        Budget::control_storage_bytes()
+            + source_charge
+            + capacity * size_of::<DemuxSpan>()
+            + header_capacity * size_of::<crate::SourceRange>()
+    );
+    drop(packet);
+    assert_eq!(pool.used(), Budget::control_storage_bytes());
 }
 
 #[test]
@@ -330,6 +471,10 @@ fn payload_run_preserves_work_boundary_and_span_provenance() {
 const TWO_AFTER_GROWTH: u64 = (4 + 8) * size_of::<DemuxSpan>() as u64 + 2 * PAYLOAD_RUN_WORK;
 
 fn full_payload_arena() -> PayloadFeed {
+    full_payload_arena_with_format(false)
+}
+
+fn full_payload_arena_with_format(compact: bool) -> PayloadFeed {
     let mut start = carrier(0, true);
     start[11..23].copy_from_slice(&[0xc0, 10, 0x31, 0, 1, 0, 7, 0x11, 0, 1, 0, 3]);
     let wire = [
@@ -341,11 +486,60 @@ fn full_payload_arena() -> PayloadFeed {
         carrier(5, false),
     ]
     .concat();
-    let mut feed = PayloadFeed::new(&wire);
+    let mut feed = PayloadFeed::with_compact_payloads(&wire, compact);
     let mut work = WorkBudget::new(3 * PAYLOAD_RUN_WORK + 1);
     assert!(feed.try_run(&mut work, &AtomicBool::new(false)).unwrap());
     assert_eq!(feed.input.position(), (4 * TS188_BYTES) as u64);
     feed
+}
+
+#[test]
+fn compact_growth_matches_owned_admission_work_and_every_carrier() {
+    let cancel = AtomicBool::new(false);
+    let mut owned = full_payload_arena();
+    let mut compact = full_payload_arena_with_format(true);
+    for feed in [&mut owned, &mut compact] {
+        let pool = feed.input.budget().clone();
+        let position = feed.input.position();
+        let used = pool.used();
+        let mut work = WorkBudget::new(TWO_AFTER_GROWTH);
+        assert!(!feed.try_run(&mut work, &cancel).unwrap());
+        assert_eq!(work.spent(), 0);
+        let pressure = pool.reserve(pool.available()).unwrap();
+        let mut work = WorkBudget::new(TWO_AFTER_GROWTH + 1);
+        assert!(!feed.try_run(&mut work, &cancel).unwrap());
+        drop(pressure);
+        assert_eq!(
+            feed.try_run(&mut work, &AtomicBool::new(true)),
+            Err(Error::Cancelled)
+        );
+        assert_eq!(work.spent(), 0);
+        assert_eq!(pool.used(), used);
+        assert_eq!(feed.input.position(), position);
+        assert!(feed.try_run(&mut work, &cancel).unwrap());
+        assert_eq!(work.remaining(), 1);
+    }
+    assert_eq!(owned.input.budget().used(), compact.input.budget().used());
+    assert_eq!(owned.stream.feed_omissions, compact.stream.feed_omissions);
+    let owned = owned.finish_native();
+    let compact = compact.finish_compact();
+    assert_eq!(owned.payload_len, compact.payload_len);
+    assert_eq!(owned.spans.len(), compact.payload.len());
+    assert_eq!(owned.spans.capacity(), compact.payload.capacity());
+    assert_eq!(
+        compact.payload.retained_handles(),
+        if cfg!(target_pointer_width = "64") {
+            3
+        } else {
+            6
+        }
+    );
+    for (span, expected) in compact.payload.spans().zip(owned.spans.as_slice()) {
+        assert_eq!(span.as_ref(), expected.as_ref());
+        assert_eq!(span.source, expected.source);
+        assert_eq!(span.transport, expected.transport);
+        assert_eq!(span.context, expected.context);
+    }
 }
 
 #[test]
@@ -454,7 +648,7 @@ fn payload_run_leaves_a_split_carrier_for_refill() {
 
 #[test]
 fn payload_run_keeps_the_literal_duplicate_snapshot() {
-    for first in [0, 14] {
+    for (first, compact) in [(0, false), (14, false), (0, true), (14, true)] {
         let mut last = carrier((first + 2) & 15, false);
         if first == 14 {
             last[1] |= 0x20;
@@ -468,7 +662,7 @@ fn payload_run_keeps_the_literal_duplicate_snapshot() {
             last,
         ]
         .concat();
-        let mut feed = PayloadFeed::new(&wire);
+        let mut feed = PayloadFeed::with_compact_payloads(&wire, compact);
         let mut work = WorkBudget::new(4096);
         assert!(feed.try_run(&mut work, &AtomicBool::new(false)).unwrap());
         assert_eq!(feed.stream.take_feed_omissions(), 4);

@@ -2,9 +2,11 @@
 
 use crate::{
     BackendStep, Engine, Error, RawEvent, Result, Source, SourceReply, TrackKey,
+    engines::TsPayloadStep,
     hls_aac::{HlsAac, HlsAacFrame},
     hls_avc::{AvcTsAccessUnit, AvcTsLimits, AvcTsReader, AvcTsStep},
     io::SourceOwner,
+    ts_payload::PesInput,
 };
 use std::sync::atomic::{AtomicBool, Ordering};
 use triergon_core::{InputCursor, InputRequest, Time, WorkBudget};
@@ -78,7 +80,7 @@ enum NextAudioTime {
 struct Transport<S: Source> {
     engine: Engine,
     request: Option<InputRequest>,
-    pending: Option<RawEvent>,
+    pending: Option<TsPayloadStep>,
     source: SourceOwner<S>,
 }
 
@@ -108,32 +110,37 @@ impl<S: Source> Transport<S> {
         work: &mut WorkBudget,
         cancel: &AtomicBool,
         maximum_payload_bytes: usize,
-    ) -> Result<BackendStep> {
+    ) -> Result<TsPayloadStep> {
         while work.remaining() != 0 {
             if let Some(event) = self.pending.take() {
                 work.try_charge(1);
-                return Ok(BackendStep::Event(event));
+                return Ok(event);
             }
             if let Some(request) = &self.request {
                 let reply = self.source.poll(request, work, cancel)?;
                 if !self.provide(&reply)? {
                     if work.remaining() == 0 {
-                        return Ok(BackendStep::Yield);
+                        return Ok(BackendStep::Yield.into());
                     }
                     let request = self
                         .request
                         .clone()
                         .ok_or(Error::Invalid("missing TS input request"))?;
-                    return Ok(BackendStep::NeedInput(request));
+                    return Ok(BackendStep::NeedInput(request).into());
                 }
                 continue;
             }
             let before = work.remaining();
-            let step = self.engine.poll(work, cancel);
+            let step = self.engine.poll_progressive_payload(work, cancel);
             self.engine.take_suppressed_events();
             match step? {
-                BackendStep::Event(event) => {
-                    let bytes = event.payload_bytes();
+                event @ (TsPayloadStep::Step(BackendStep::Event(_))
+                | TsPayloadStep::Packet { .. }) => {
+                    let bytes = match &event {
+                        TsPayloadStep::Step(BackendStep::Event(event)) => event.payload_bytes(),
+                        TsPayloadStep::Packet { packet, .. } => packet.payload_len,
+                        TsPayloadStep::Step(_) => unreachable!("payload delivery"),
+                    };
                     if bytes > maximum_payload_bytes {
                         return Err(Error::Limit {
                             requested: bytes,
@@ -141,21 +148,21 @@ impl<S: Source> Transport<S> {
                         });
                     }
                     if work.try_charge(1) {
-                        return Ok(BackendStep::Event(event));
+                        return Ok(event);
                     }
                     self.pending = Some(event);
                 }
-                BackendStep::NeedInput(request) => {
+                TsPayloadStep::Step(BackendStep::NeedInput(request)) => {
                     self.request = Some(request.clone());
                     if work.remaining() == 0 {
-                        return Ok(BackendStep::NeedInput(request));
+                        return Ok(BackendStep::NeedInput(request).into());
                     }
                 }
-                BackendStep::Yield if work.remaining() < before => {}
+                TsPayloadStep::Step(BackendStep::Yield) if work.remaining() < before => {}
                 other => return Ok(other),
             }
         }
-        Ok(BackendStep::Yield)
+        Ok(BackendStep::Yield.into())
     }
 }
 
@@ -202,7 +209,7 @@ impl<S: Source> TsProgressiveReader<S> {
         }
         Ok(Self {
             transport: Some(Transport {
-                engine: Engine::ts_progressive(input, limits.transport)?,
+                engine: Engine::ts_progressive(input, limits.transport, true)?,
                 request: None,
                 pending: None,
                 source,
@@ -279,29 +286,32 @@ impl<S: Source> TsProgressiveReader<S> {
             Phase::Read => {
                 let transport = self.transport.as_mut().ok_or(Error::Closed)?;
                 match transport.poll(work, cancel, self.limits.transport.pes_bytes)? {
-                    BackendStep::Event(event) => self.on_event(event)?,
-                    BackendStep::NeedInput(request) => {
-                        return Ok(TsProgressiveStep::NeedInput(request));
-                    }
-                    BackendStep::Backpressure {
-                        requested,
-                        available,
-                    } => {
-                        return Ok(TsProgressiveStep::Backpressure {
+                    TsPayloadStep::Packet { packet, clock } => self.on_packet(packet, clock)?,
+                    TsPayloadStep::Step(step) => match step {
+                        BackendStep::Event(event) => self.on_event(event)?,
+                        BackendStep::NeedInput(request) => {
+                            return Ok(TsProgressiveStep::NeedInput(request));
+                        }
+                        BackendStep::Backpressure {
                             requested,
                             available,
-                        });
-                    }
-                    BackendStep::End => {
-                        self.transport = None;
-                        self.video.as_mut().ok_or(Error::Truncated)?.finish();
-                        self.audio.as_mut().ok_or(Error::Truncated)?.finish();
-                        self.phase = Phase::DrainVideo;
-                    }
-                    BackendStep::Yield => {}
-                    BackendStep::AwaitEntity => {
-                        return Err(Error::Invalid("unexpected TS entity boundary"));
-                    }
+                        } => {
+                            return Ok(TsProgressiveStep::Backpressure {
+                                requested,
+                                available,
+                            });
+                        }
+                        BackendStep::End => {
+                            self.transport = None;
+                            self.video.as_mut().ok_or(Error::Truncated)?.finish();
+                            self.audio.as_mut().ok_or(Error::Truncated)?.finish();
+                            self.phase = Phase::DrainVideo;
+                        }
+                        BackendStep::Yield => {}
+                        BackendStep::AwaitEntity => {
+                            return Err(Error::Invalid("unexpected TS entity boundary"));
+                        }
+                    },
                 }
             }
             Phase::Video | Phase::DrainVideo => {
@@ -379,34 +389,7 @@ impl<S: Source> TsProgressiveReader<S> {
                 }
             }
             RawEvent::NativeTs { packet, clock } => {
-                let tracks = self
-                    .tracks
-                    .as_ref()
-                    .ok_or(Error::Invalid("missing TS PMT"))?;
-                let track = TrackKey::Ts {
-                    program: packet.program,
-                    pid: packet.pid,
-                };
-                let mut mailbox = Some(packet);
-                if track == tracks.video {
-                    let video = self
-                        .video
-                        .as_mut()
-                        .ok_or(Error::Invalid("missing AVC configuration"))?;
-                    if !video.push(&mut mailbox, clock)? {
-                        return Err(Error::Invalid("progressive AVC mailbox is busy"));
-                    }
-                    self.phase = Phase::Video;
-                } else if track == tracks.audio {
-                    let audio = self
-                        .audio
-                        .as_mut()
-                        .ok_or(Error::Invalid("missing AAC configuration"))?;
-                    if !audio.push(&mut mailbox, clock)? {
-                        return Err(Error::Invalid("progressive AAC mailbox is busy"));
-                    }
-                    self.phase = Phase::Audio;
-                }
+                self.on_packet(packet, clock)?;
             }
             RawEvent::NativeRefusal { track, error, .. }
                 if self
@@ -417,6 +400,43 @@ impl<S: Source> TsProgressiveReader<S> {
                 return Err(error);
             }
             _ => {}
+        }
+        Ok(())
+    }
+
+    fn on_packet<P: PesInput>(
+        &mut self,
+        packet: P,
+        clock: triergon_mpegts::compat::pes::DemuxTimeView,
+    ) -> Result<()> {
+        let tracks = self
+            .tracks
+            .as_ref()
+            .ok_or(Error::Invalid("missing TS PMT"))?;
+        let facts = packet.facts();
+        let track = TrackKey::Ts {
+            program: facts.program,
+            pid: facts.pid,
+        };
+        let mut mailbox = Some(packet);
+        if track == tracks.video {
+            let video = self
+                .video
+                .as_mut()
+                .ok_or(Error::Invalid("missing AVC configuration"))?;
+            if !video.push_packet(&mut mailbox, clock)? {
+                return Err(Error::Invalid("progressive AVC mailbox is busy"));
+            }
+            self.phase = Phase::Video;
+        } else if track == tracks.audio {
+            let audio = self
+                .audio
+                .as_mut()
+                .ok_or(Error::Invalid("missing AAC configuration"))?;
+            if !audio.push_packet(&mut mailbox, clock)? {
+                return Err(Error::Invalid("progressive AAC mailbox is busy"));
+            }
+            self.phase = Phase::Audio;
         }
         Ok(())
     }
@@ -565,6 +585,111 @@ fn select_track(map: &ProgramMap, stream_type: u8) -> Result<TrackKey> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use triergon_core::{Budget, Bytes, SourceCapabilities, SourceId};
+
+    #[test]
+    fn compact_payloads_preserve_every_output_work_boundary_and_retained_charge() {
+        fn read(
+            compact: bool,
+            quantum: u64,
+            window: usize,
+            private_audio: bool,
+        ) -> Vec<(String, Vec<u8>, u64, usize)> {
+            let pool = Budget::new(8 << 20).unwrap();
+            let mut wire = include_bytes!("../tests/fixtures/hls/baseline-stereo.ts").to_vec();
+            if private_audio {
+                // Keep ordinary private-audio discovery and its eventual
+                // progressive track refusal on the original observer path.
+                let pmt = &mut wire[2 * 188 + 5..2 * 188 + 5 + 26];
+                pmt[17] = 0x81;
+                let crc = triergon_mpegts::psi::PsiCrc32::of(&pmt[..22]).to_be_bytes();
+                pmt[22..].copy_from_slice(&crc);
+            }
+            let id = SourceId(31);
+            let caps = SourceCapabilities {
+                length: Some(wire.len() as u64),
+                random_access: false,
+            };
+            let source =
+                crate::ByteSource::new(id, Bytes::copy_from_slice(&pool, &wire).unwrap(), window)
+                    .unwrap();
+            let input = InputCursor::new(&pool, id, caps, window).unwrap();
+            let limits = TsProgressiveLimits::default();
+            let mut reader = TsProgressiveReader::new(input, source, limits).unwrap();
+            if !compact {
+                let input = InputCursor::new(&pool, id, caps, window).unwrap();
+                reader.transport.as_mut().unwrap().engine =
+                    Engine::ts_progressive(input, limits.transport, false).unwrap();
+            }
+            let cancel = AtomicBool::new(false);
+            let mut trace = Vec::new();
+            let mut retained = Vec::new();
+            for _ in 0..2_000_000 {
+                let mut work = WorkBudget::new(quantum);
+                let step = match reader.advance(&mut work, &cancel) {
+                    Ok(step) => step,
+                    Err(error) => {
+                        assert!(private_audio);
+                        trace.push((
+                            format!("error {error:?}"),
+                            Vec::new(),
+                            work.spent(),
+                            pool.used(),
+                        ));
+                        drop(reader);
+                        drop(retained);
+                        assert_eq!(pool.used(), Budget::control_storage_bytes());
+                        return trace;
+                    }
+                };
+                let (tag, bytes) = match step {
+                    TsProgressiveStep::Unit(unit) => {
+                        let result = match &unit {
+                            TsProgressiveUnit::Video(video) => (
+                                format!("video {:?} {:?} {}", video.clock, video.raster, video.idr),
+                                video.feed_spans().flatten().copied().collect(),
+                            ),
+                            TsProgressiveUnit::Audio {
+                                frame,
+                                presentation,
+                            } => (
+                                format!(
+                                    "audio {:?} {:?} {:?} {:?} {presentation:?}",
+                                    frame.header, frame.pts, frame.dts, frame.duration
+                                ),
+                                frame.bytes.as_ref().to_vec(),
+                            ),
+                        };
+                        retained.push(unit);
+                        result
+                    }
+                    TsProgressiveStep::Yield => ("yield".into(), Vec::new()),
+                    TsProgressiveStep::End => {
+                        assert!(!private_audio);
+                        trace.push(("end".into(), Vec::new(), work.spent(), pool.used()));
+                        drop(reader);
+                        drop(retained);
+                        assert_eq!(pool.used(), Budget::control_storage_bytes());
+                        return trace;
+                    }
+                    other => panic!("unexpected {other:?}"),
+                };
+                trace.push((tag, bytes, work.spent(), pool.used()));
+            }
+            panic!("progressive input did not complete");
+        }
+        for quantum in [1, 31, 4096] {
+            for window in [188, 4096] {
+                for private_audio in [false, true] {
+                    assert_eq!(
+                        read(false, quantum, window, private_audio),
+                        read(true, quantum, window, private_audio),
+                        "work {quantum}, window {window}"
+                    );
+                }
+            }
+        }
+    }
 
     #[test]
     fn integral_audio_ticks_match_exact_time_and_accept_a_fresh_anchor() {

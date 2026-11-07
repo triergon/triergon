@@ -98,6 +98,18 @@ current program table. Other PIDs use the ordinary route lookup.
 Runs record the complete final carrier for duplicate detection before moving
 the shared window into its last payload span. Every span retains the full
 backing allocation's charge.
+An inactive `DemuxObserver` can select `enable_compact_payloads` and then use
+`poll_compact_payload` (or its input-bound counterpart). `CompactDemuxPacket`
+retains one backing handle per admitted run; `CompactPayload::spans` and its
+consuming `PayloadCursor` expose every logical carrier's payload range, source
+range, transport extent and context. Span capacity remains charged for the full
+logical count. Retiring the last range of a run releases its backing handle.
+On 32-bit targets the same cursor uses ordinary span storage, keeping the
+observer's charged size and constant-time counters unchanged.
+Ordinary constructors and polling keep the owned `DemuxPacket.spans` API.
+Mixing polling representations returns a typed error before changing state or
+spending work. `CompactPayload::from_spans` always adopts ordinary spans and
+never interprets public metadata as a run marker.
 Sequential playback can share up to four tight input windows of at most 4 KiB
 each. A full set, oversized backing storage or low budget headroom uses
 carrier-sized storage. Fallback uses the original transport event.

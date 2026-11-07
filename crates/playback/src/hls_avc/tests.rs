@@ -35,7 +35,7 @@ fn clock(pts: u64) -> AvcTsClock {
 fn push_span(reader: &mut AvcTsReader, bytes: &[u8]) {
     assert!(reader.input.is_none());
     reader.input = Some(Chunk {
-        bytes: Bytes::copy_from_slice(&reader.pool, bytes).unwrap(),
+        bytes: Some(Bytes::copy_from_slice(&reader.pool, bytes).unwrap()),
         offset: 0,
     });
 }
@@ -44,7 +44,10 @@ fn push_pes_span(reader: &mut AvcTsReader, bytes: &[u8]) {
     assert!(reader.pending_pes.is_none());
     push_span(reader, bytes);
     reader.pending_pes = Some(PendingPes {
-        spans: BudgetVec::new(&reader.pool).into_iter(),
+        spans: triergon_mpegts::compat::pes::CompactPayload::from_spans(BudgetVec::new(
+            &reader.pool,
+        ))
+        .into_cursor(),
         remaining: 0,
         may_reserve: true,
     });

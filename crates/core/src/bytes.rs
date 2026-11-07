@@ -17,6 +17,51 @@ pub struct Bytes {
     range: Range<usize>,
 }
 
+/// A checked borrowed range. Copies borrow the original handle rather than
+/// incrementing its shared-storage count. Call `into_bytes` for independent retention.
+#[derive(Clone, Copy, Debug)]
+pub struct BytesView<'a> {
+    backing: &'a Bytes,
+    start: usize,
+    end: usize,
+}
+
+impl<'a> BytesView<'a> {
+    pub fn len(self) -> usize {
+        self.end - self.start
+    }
+    pub fn is_empty(self) -> bool {
+        self.start == self.end
+    }
+    pub fn backing_bytes(self) -> &'a Bytes {
+        self.backing
+    }
+    pub fn retained_capacity(self) -> usize {
+        self.backing.retained_capacity()
+    }
+    pub fn belongs_to(self, budget: &Budget) -> bool {
+        self.backing.belongs_to(budget)
+    }
+    pub fn slice(self, range: Range<usize>) -> Result<Self> {
+        if range.start > range.end || range.end > self.len() {
+            return Err(Error::Invalid("byte span range"));
+        }
+        let start = self.start.checked_add(range.start).ok_or(Error::Overflow)?;
+        let end = self.start.checked_add(range.end).ok_or(Error::Overflow)?;
+        self.backing.view(start..end)
+    }
+    /// Retain this exact range independently, adding one shared handle.
+    pub fn into_bytes(self) -> Result<Bytes> {
+        self.backing.slice(self.start..self.end)
+    }
+}
+
+impl AsRef<[u8]> for BytesView<'_> {
+    fn as_ref(&self) -> &[u8] {
+        &self.backing.as_ref()[self.start..self.end]
+    }
+}
+
 /// A shared allocation's address. It can be reused after the last owner drops.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct ByteStorageAddress(usize);
@@ -66,6 +111,15 @@ impl Bytes {
         Ok(Self {
             storage: Arc::clone(&self.storage),
             range,
+        })
+    }
+    /// Borrow a checked range without allocating or cloning shared storage.
+    pub fn view(&self, range: Range<usize>) -> Result<BytesView<'_>> {
+        self.subrange(range.clone())?;
+        Ok(BytesView {
+            backing: self,
+            start: range.start,
+            end: range.end,
         })
     }
     /// Consumes this handle and selects a checked subspan without cloning or
@@ -591,7 +645,35 @@ pub fn nonzero_prefix_len(bytes: &[u8]) -> usize {
 
 #[cfg(test)]
 mod tests {
-    use super::nonzero_prefix_len;
+    use super::{Bytes, BytesView, nonzero_prefix_len};
+    use crate::Budget;
+
+    #[test]
+    fn borrowed_ranges_do_not_clone_storage_and_owned_ranges_keep_the_full_charge() {
+        fn send_sync<T: Send + Sync>() {}
+        send_sync::<BytesView<'static>>();
+        let pool = Budget::new(8192).unwrap();
+        let bytes = Bytes::copy_from_slice(&pool, b"0123456789").unwrap();
+        let charge = bytes.retained_storage_bytes();
+        let nested = bytes.slice(2..9).unwrap();
+        drop(bytes);
+        let view = nested.view(1..5).unwrap();
+        let copied = view;
+        assert_eq!(copied.as_ref(), b"3456");
+        assert_eq!(view.slice(1..3).unwrap().as_ref(), b"45");
+        assert!(!nested.has_shared_storage());
+        assert_eq!(pool.used(), Budget::control_storage_bytes() + charge);
+        for (start, end) in [(5, 4), (0, 8), (usize::MAX, usize::MAX)] {
+            assert!(view.slice(start..end).is_err());
+        }
+        let retained = view.into_bytes().unwrap();
+        assert!(nested.has_shared_storage());
+        drop(nested);
+        assert_eq!(retained.as_ref(), b"3456");
+        assert_eq!(pool.used(), Budget::control_storage_bytes() + charge);
+        drop(retained);
+        assert_eq!(pool.used(), Budget::control_storage_bytes());
+    }
 
     #[test]
     fn nonzero_prefix_stops_at_the_first_zero_in_groups_and_tails() {

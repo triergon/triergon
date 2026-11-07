@@ -6,6 +6,7 @@ use crate::{
     TrackKey, TsNativeCarriage, TsNativeConfiguration,
     hls_avc::{AvcRaster, AvcTsClock, AvcTsLimits, clock_describes, lane_track},
     raw_video::RawVideoConfigTracker,
+    ts_payload::PesInput,
 };
 use std::sync::atomic::{AtomicBool, Ordering};
 use triergon_core::{
@@ -248,7 +249,7 @@ impl Active {
         let Some(packet) = mailbox.as_ref() else {
             return Ok(false);
         };
-        if !lane_track(self.config.track, self.config.configuration_epoch, packet)
+        if !lane_track(self.config.track, self.config.configuration_epoch, &packet.facts())
             || packet.stream_id & 0xf0 != 0xe0
             || packet.source_header.stream_id != packet.stream_id
         {
@@ -288,7 +289,7 @@ impl Active {
             header.and_then(|h| h.pts_raw33),
             header.and_then(|h| h.dts_raw33),
         );
-        if !clock_describes(&clock, packet, pts, dts) {
+        if !clock_describes(&clock, &packet.facts(), pts, dts) {
             return Err(Error::Invalid("HLS HEVC clock does not describe this PES"));
         }
         let end = self

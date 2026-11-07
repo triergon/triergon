@@ -87,7 +87,7 @@ impl DemuxObserver {
     ) -> Result<Self> {
         preflight(scope, namespace, descriptors, limits)?;
         let mut observer = Self::admitted(profile, scope, budget, limits)?;
-        observer.dvb_subtitles = true;
+        observer.payload_format = super::PayloadFormat::Dvb;
         Ok(observer)
     }
 }

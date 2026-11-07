@@ -3,13 +3,17 @@
 use crate::{
     TrackKey, TsNativeCarriage, TsNativeConfiguration,
     hls_avc::{clock_describes, lane_track, pes_time},
+    ts_payload::PesInput,
 };
 use std::sync::atomic::{AtomicBool, Ordering};
-use triergon_core::{Budget, BudgetVec, BudgetVecIntoIter, Bytes, Error, Result, Time, WorkBudget};
+use triergon_core::{Budget, BudgetVec, Bytes, BytesView, Error, Result, Time, WorkBudget};
 use triergon_framing::{AacAdtsHeader, inspect_aac_adts_header};
 use triergon_mpegts::{
     AssemblyStep,
-    compat::pes::{DemuxPacket, DemuxPayloadKind, DemuxSpan, DemuxTimeView, RegisteredCarriage},
+    compat::pes::{
+        CompactDemuxPacket, DemuxPacket, DemuxPayloadKind, DemuxTimeView, PayloadCursor,
+        RegisteredCarriage,
+    },
 };
 
 const PREFIX_BYTES: usize = 7;
@@ -33,7 +37,9 @@ struct Clock {
 }
 
 struct PendingPes {
-    spans: BudgetVecIntoIter<DemuxSpan>,
+    spans: PayloadCursor,
+    // A joined tail replaces the current logical span only after its complete
+    // allocation, copy and freeze succeed. Ordinary spans borrow the cursor.
     current: Option<Bytes>,
     offset: usize,
     remaining: usize,
@@ -41,6 +47,13 @@ struct PendingPes {
 }
 
 impl PendingPes {
+    fn current(&self) -> Option<BytesView<'_>> {
+        self.current
+            .as_ref()
+            .map(|bytes| bytes.view(0..bytes.len()).expect("complete joined tail"))
+            .or_else(|| self.spans.current().map(|span| span.bytes))
+    }
+
     fn try_coalesce(
         &mut self,
         pool: &Budget,
@@ -52,21 +65,20 @@ impl PendingPes {
         if self.coalescing_attempted || self.offset != PREFIX_BYTES || self.remaining == 0 {
             return Ok(false);
         }
-        let Some(current) = self.current.as_ref() else {
+        let Some(current_len) = self.current().map(BytesView::len) else {
             return Ok(false);
         };
-        if frame_length - PREFIX_BYTES <= current.len() - self.offset {
+        if frame_length - PREFIX_BYTES <= current_len - self.offset {
             return Ok(false);
         }
-        let Some(total) = current
-            .len()
+        let Some(total) = current_len
             .checked_add(self.remaining)
             .filter(|&n| n <= maximum)
         else {
             return Ok(false);
         };
         // Bound the metadata scan, full copy, allocation/freeze and retirement.
-        let Some(required) = u64::try_from(self.spans.len())
+        let Some(required) = u64::try_from(self.spans.remaining())
             .ok()
             .and_then(|count| count.checked_mul(2))
             .and_then(|scan_and_drop| scan_and_drop.checked_add(total as u64 + 2))
@@ -78,12 +90,12 @@ impl PendingPes {
         }
         self.coalescing_attempted = true;
         let mut remaining = self.remaining;
-        for span in self.spans.as_slice() {
+        for span in self.spans.remaining_spans() {
             if cancel.load(Ordering::Relaxed) {
                 return Err(Error::Cancelled);
             }
             work.take(1);
-            if !span.backing_bytes().belongs_to(pool) {
+            if !span.bytes.belongs_to(pool) {
                 return Ok(false);
             }
             let Some(next) = remaining.checked_sub(span.as_ref().len()) else {
@@ -102,11 +114,12 @@ impl PendingPes {
         if joined.try_reserve_exact(total).is_err() || joined.capacity() > maximum {
             return Ok(false);
         }
+        let current = self.current().expect("admitted coalescing span");
         work.take(current.len() as u64);
         if joined.try_extend_from_slice(current.as_ref()).is_err() {
             return Ok(false);
         }
-        for span in self.spans.as_slice() {
+        for span in self.spans.remaining_spans() {
             if cancel.load(Ordering::Relaxed) {
                 return Err(Error::Cancelled);
             }
@@ -119,12 +132,14 @@ impl PendingPes {
         let Ok(joined) = joined.freeze() else {
             return Ok(false);
         };
-        for _ in self.spans.by_ref() {
+        self.spans.drain_remaining(|| {
             if cancel.load(Ordering::Relaxed) {
                 return Err(Error::Cancelled);
             }
             work.take(1);
-        }
+            Ok(())
+        })?;
+        self.spans.retire_current();
         self.current = Some(joined);
         self.remaining = 0;
         Ok(true)
@@ -191,6 +206,24 @@ impl HlsAac {
         mailbox: &mut Option<DemuxPacket>,
         clock: DemuxTimeView,
     ) -> Result<bool> {
+        self.push_packet(mailbox, clock)
+    }
+
+    /// Accept the same PES facts through borrowed logical carrier ranges.
+    /// The mailbox is moved only after the ordinary admission checks succeed.
+    pub fn push_compact(
+        &mut self,
+        mailbox: &mut Option<CompactDemuxPacket>,
+        clock: DemuxTimeView,
+    ) -> Result<bool> {
+        self.push_packet(mailbox, clock)
+    }
+
+    pub(crate) fn push_packet<P: PesInput>(
+        &mut self,
+        mailbox: &mut Option<P>,
+        clock: DemuxTimeView,
+    ) -> Result<bool> {
         if let Some(error) = self.failure {
             return Err(error);
         }
@@ -203,7 +236,8 @@ impl HlsAac {
         let Some(packet) = mailbox.as_ref() else {
             return Ok(false);
         };
-        if !lane_track(self.config.track, self.config.configuration_epoch, packet)
+        let packet = packet.facts();
+        if !lane_track(self.config.track, self.config.configuration_epoch, &packet)
             || packet.stream_id != 0xc0
             || packet.source_header.stream_id != packet.stream_id
         {
@@ -212,12 +246,12 @@ impl HlsAac {
         if packet.flags & PES_CORRUPT != 0
             || packet.payload_kind == DemuxPayloadKind::DeclaredIncomplete
             || packet.payload_len == 0
-            || packet.spans.is_empty()
+            || packet.empty
         {
             return Err(Error::Invalid("HLS AAC corrupt or empty PES"));
         }
-        if !packet.spans.budget().same_pool(&self.pool)
-            || !packet.header_source_ranges.budget().same_pool(&self.pool)
+        if !packet.payload_budget.same_pool(&self.pool)
+            || !packet.header_budget.same_pool(&self.pool)
         {
             return Err(Error::ForeignPool);
         }
@@ -229,7 +263,7 @@ impl HlsAac {
         let anchor = packet.time_header();
         let raw_pts = anchor.and_then(|header| header.pts_raw33);
         let raw_dts = anchor.and_then(|header| header.dts_raw33);
-        if !clock_describes(&clock, packet, raw_pts, raw_dts) {
+        if !clock_describes(&clock, &packet, raw_pts, raw_dts) {
             return Err(Error::Invalid("HLS AAC clock does not describe this PES"));
         }
         if anchor.is_some() {
@@ -243,11 +277,12 @@ impl HlsAac {
             self.next_clock = Clock::default();
         }
         self.clock_epoch = Some(clock_epoch);
+        let remaining = packet.payload_len;
         self.pending = mailbox.take().map(|packet| PendingPes {
-            spans: packet.spans.into_iter(),
+            spans: packet.into_payload().into_cursor(),
             current: None,
             offset: 0,
-            remaining: packet.payload_len,
+            remaining,
             coalescing_attempted: false,
         });
         Ok(true)
@@ -322,34 +357,34 @@ impl HlsAac {
             {
                 continue;
             }
-            let span = match &mut input.current {
-                Some(bytes) => bytes,
-                slot @ None => {
-                    let Some(span) = input.spans.next() else {
-                        if input.remaining != 0 {
-                            return Err(Error::Invalid("HLS AAC PES payload extent"));
-                        }
-                        self.pending = None;
-                        continue;
-                    };
-                    let bytes = span.into_bytes();
-                    if !bytes.belongs_to(&self.pool) {
-                        return Err(Error::ForeignPool);
+            if input.current().is_none() {
+                let Some(span) = input.spans.next_span() else {
+                    if input.remaining != 0 {
+                        return Err(Error::Invalid("HLS AAC PES payload extent"));
                     }
-                    // Validate a span's full extent before reading any of it.
-                    input.remaining = input
-                        .remaining
-                        .checked_sub(bytes.len())
-                        .ok_or(Error::Invalid("HLS AAC PES payload extent"))?;
-                    slot.insert(bytes)
+                    self.pending = None;
+                    continue;
+                };
+                let bytes = span.bytes;
+                if !bytes.belongs_to(&self.pool) {
+                    return Err(Error::ForeignPool);
                 }
-            };
+                // Validate a span's full extent before reading any of it.
+                input.remaining = input
+                    .remaining
+                    .checked_sub(bytes.len())
+                    .ok_or(Error::Invalid("HLS AAC PES payload extent"))?;
+            }
+            let span = input
+                .current()
+                .ok_or(Error::Invalid("HLS AAC missing PES span"))?;
             let bytes = &span.as_ref()[input.offset..];
             if bytes.is_empty() {
                 if !work.try_charge(1) {
                     return Ok(AssemblyStep::Yield);
                 }
                 input.current = None;
+                input.spans.retire_current();
                 input.offset = 0;
                 continue;
             }
@@ -366,7 +401,9 @@ impl HlsAac {
                         && body <= bytes.len()
                         && work.try_charge(body as u64 + 2)
                     {
-                        let bytes = span.slice(input.offset - PREFIX_BYTES..input.offset + body)?;
+                        let bytes = span
+                            .slice(input.offset - PREFIX_BYTES..input.offset + body)?
+                            .into_bytes()?;
                         input.offset += body;
                         return self.publish(header, Some(bytes));
                     }
@@ -723,7 +760,7 @@ mod tests {
         let pending = reader.pending.as_ref().unwrap();
         assert_eq!(pending.offset, PREFIX_BYTES);
         assert_eq!(pending.remaining, 0);
-        assert!(pending.spans.as_slice().is_empty());
+        assert_eq!(pending.spans.remaining(), 0);
         assert_eq!(pending.current.as_ref().unwrap().as_ref(), wire);
         assert!(reader.frame.is_empty());
         let pressure = fixture.pool.reserve(fixture.pool.available()).unwrap();
@@ -754,12 +791,11 @@ mod tests {
                 AssemblyStep::Yield
             ));
             let pending = reader.pending.as_mut().unwrap();
-            let original = pending.current.as_ref().unwrap().storage_address();
+            let original = pending.current().unwrap().backing_bytes().storage_address();
             let tail: Vec<_> = pending
                 .spans
-                .as_slice()
-                .iter()
-                .map(|span| span.backing_bytes().storage_address())
+                .remaining_spans()
+                .map(|span| span.bytes.backing_bytes().storage_address())
                 .collect();
             let mut short = WorkBudget::new(wire.len() as u64 + 2 * 5 + 1);
             assert!(
@@ -795,7 +831,7 @@ mod tests {
             assert_eq!(work.spent(), if available == 0 { 6 } else { 727 });
             assert_eq!(fixture.pool.used(), used);
             assert_eq!(
-                pending.current.as_ref().unwrap().storage_address(),
+                pending.current().unwrap().backing_bytes().storage_address(),
                 original
             );
             assert_eq!(pending.offset, PREFIX_BYTES);
@@ -803,9 +839,8 @@ mod tests {
             assert_eq!(
                 pending
                     .spans
-                    .as_slice()
-                    .iter()
-                    .map(|span| span.backing_bytes().storage_address())
+                    .remaining_spans()
+                    .map(|span| span.bytes.backing_bytes().storage_address())
                     .collect::<Vec<_>>(),
                 tail
             );

@@ -4,14 +4,16 @@
 
 pub(crate) mod syntax;
 
-use crate::{TrackKey, TsNativeCarriage, TsNativeConfiguration};
-use std::sync::atomic::{AtomicBool, Ordering};
-use triergon_core::{
-    Budget, BudgetVec, BudgetVecIntoIter, Bytes, Error, Result, SourceId, WorkBudget,
+use crate::{
+    TrackKey, TsNativeCarriage, TsNativeConfiguration,
+    ts_payload::{PesFacts, PesInput},
 };
+use std::sync::atomic::{AtomicBool, Ordering};
+use triergon_core::{Budget, BudgetVec, Bytes, BytesView, Error, Result, SourceId, WorkBudget};
 use triergon_framing::{Codec, NalHeader};
 use triergon_mpegts::compat::pes::{
-    DemuxPacket, DemuxPayloadKind, DemuxSpan, DemuxTimeView, RegisteredCarriage,
+    CompactDemuxPacket, DemuxPacket, DemuxPayloadKind, DemuxTimeView, PayloadCursor,
+    RegisteredCarriage,
 };
 
 pub use syntax::AvcRaster;
@@ -118,7 +120,7 @@ pub enum AvcTsStep {
 }
 
 /// Whether a PES belongs to an HLS lane's track and configuration epoch.
-pub(crate) fn lane_track(track: TrackKey, configuration_epoch: u64, packet: &DemuxPacket) -> bool {
+pub(crate) fn lane_track(track: TrackKey, configuration_epoch: u64, packet: &PesFacts<'_>) -> bool {
     track
         == (TrackKey::Ts {
             program: packet.program,
@@ -130,7 +132,7 @@ pub(crate) fn lane_track(track: TrackKey, configuration_epoch: u64, packet: &Dem
 /// Whether the demux clock view describes this PES and its header's raw stamps.
 pub(crate) fn clock_describes(
     clock: &DemuxTimeView,
-    packet: &DemuxPacket,
+    packet: &PesFacts<'_>,
     pts_raw33: Option<u64>,
     dts_raw33: Option<u64>,
 ) -> bool {
@@ -165,14 +167,38 @@ struct Anchor {
 }
 
 struct Chunk {
-    bytes: Bytes,
+    // Direct syntax fixtures do not construct a transport packet.
+    #[cfg(test)]
+    bytes: Option<Bytes>,
     offset: usize,
 }
 
 struct PendingPes {
-    spans: BudgetVecIntoIter<DemuxSpan>,
+    spans: PayloadCursor,
     remaining: usize,
     may_reserve: bool,
+}
+
+impl Chunk {
+    fn view<'a>(&'a self, spans: Option<&'a PayloadCursor>) -> Option<BytesView<'a>> {
+        #[cfg(test)]
+        if let Some(bytes) = &self.bytes {
+            return Some(bytes.view(0..bytes.len()).expect("complete direct chunk"));
+        }
+        spans.and_then(|spans| spans.current().map(|span| span.bytes))
+    }
+
+    fn retire(&self, pending: &mut Option<PendingPes>) {
+        #[cfg(test)]
+        if self.bytes.is_some() {
+            return;
+        }
+        pending
+            .as_mut()
+            .expect("pending PES chunk")
+            .spans
+            .retire_current();
+    }
 }
 
 #[derive(Clone, Copy)]
@@ -333,6 +359,24 @@ impl AvcTsReader {
         mailbox: &mut Option<DemuxPacket>,
         clock: DemuxTimeView,
     ) -> Result<bool> {
+        self.push_packet(mailbox, clock)
+    }
+
+    /// Accept the same PES facts through borrowed logical carrier ranges.
+    /// The mailbox is moved only after the ordinary admission checks succeed.
+    pub fn push_compact(
+        &mut self,
+        mailbox: &mut Option<CompactDemuxPacket>,
+        clock: DemuxTimeView,
+    ) -> Result<bool> {
+        self.push_packet(mailbox, clock)
+    }
+
+    pub(crate) fn push_packet<P: PesInput>(
+        &mut self,
+        mailbox: &mut Option<P>,
+        clock: DemuxTimeView,
+    ) -> Result<bool> {
         if let Some(error) = self.failure {
             return Err(error);
         }
@@ -345,19 +389,20 @@ impl AvcTsReader {
         let Some(packet) = mailbox.as_ref() else {
             return Ok(false);
         };
-        if !lane_track(self.config.track, self.config.configuration_epoch, packet)
+        let packet = packet.facts();
+        if !lane_track(self.config.track, self.config.configuration_epoch, &packet)
             || packet.source_header.stream_id & 0xf0 != 0xe0
         {
             return Err(Error::Invalid("AVC TS PES track or configuration"));
         }
         if packet.flags & 2 != 0
             || packet.payload_kind == DemuxPayloadKind::DeclaredIncomplete
-            || packet.spans.is_empty()
+            || packet.empty
             || packet.payload_len == 0
         {
             return Err(Error::Invalid("AVC TS corrupt or empty PES"));
         }
-        if !packet.spans.budget().same_pool(&self.pool) {
+        if !packet.payload_budget.same_pool(&self.pool) {
             return Err(Error::ForeignPool);
         }
         let origin = (packet.source_origin.source, packet.source_epochs.clock);
@@ -372,16 +417,17 @@ impl AvcTsReader {
             header.and_then(|h| h.pts_raw33),
             header.and_then(|h| h.dts_raw33),
         );
-        if !clock_describes(&clock, packet, pts, dts) {
+        if !clock_describes(&clock, &packet, pts, dts) {
             return Err(Error::Invalid("AVC TS clock does not describe this PES"));
         }
         if header.is_some() {
             self.remember_clock(AvcTsClock::try_from(clock)?)?;
         }
         self.source_clock_epoch = Some(origin);
+        let remaining = packet.payload_len;
         self.pending_pes = mailbox.take().map(|packet| PendingPes {
-            remaining: packet.payload_len,
-            spans: packet.spans.into_iter(),
+            remaining,
+            spans: packet.into_payload().into_cursor(),
             may_reserve: true,
         });
         Ok(true)
@@ -466,15 +512,15 @@ impl AvcTsReader {
             if self.input.is_none()
                 && let Some(pending) = &mut self.pending_pes
             {
-                if pending.spans.len() != 0 {
+                if pending.spans.remaining() != 0 {
                     if !work.try_charge(1) {
                         return Ok(AvcTsStep::Yield);
                     }
                     let bytes = pending
                         .spans
-                        .next()
+                        .next_span()
                         .ok_or(Error::Invalid("AVC TS missing PES span"))?
-                        .into_bytes();
+                        .bytes;
                     if !bytes.belongs_to(&self.pool) {
                         return Err(Error::ForeignPool);
                     }
@@ -482,7 +528,11 @@ impl AvcTsReader {
                         .remaining
                         .checked_sub(bytes.len())
                         .ok_or(Error::Invalid("AVC TS PES payload extent"))?;
-                    self.input = Some(Chunk { bytes, offset: 0 });
+                    self.input = Some(Chunk {
+                        #[cfg(test)]
+                        bytes: None,
+                        offset: 0,
+                    });
                 } else {
                     if pending.remaining != 0 {
                         return Err(Error::Invalid("AVC TS PES payload extent"));
@@ -491,11 +541,22 @@ impl AvcTsReader {
                 }
             }
             if let Some(chunk) = &mut self.input {
-                if chunk.offset == chunk.bytes.len() {
+                let (span, remaining, may_reserve) = match self.pending_pes.as_mut() {
+                    Some(PendingPes {
+                        spans,
+                        remaining,
+                        may_reserve,
+                    }) => (chunk.view(Some(spans)), *remaining, Some(may_reserve)),
+                    None => (chunk.view(None), 0, None),
+                };
+                let span = span.ok_or(Error::Invalid("AVC TS missing PES span"))?;
+                let span_len = span.len();
+                if chunk.offset == span_len {
+                    chunk.retire(&mut self.pending_pes);
                     self.input = None;
                     continue;
                 }
-                let available = &chunk.bytes.as_ref()[chunk.offset..];
+                let available = &span.as_ref()[chunk.offset..];
                 let count = available.len().min(work.remaining().min(4096) as usize);
                 if count == 0 {
                     return Ok(AvcTsStep::Yield);
@@ -515,21 +576,22 @@ impl AvcTsReader {
                     // Once a slice has started, parameter set processing for
                     // this picture is complete.
                     self.nal.as_ref().filter(|nal| matches!(nal.kind, 1 | 5))?;
-                    let pending = self.pending_pes.as_mut().filter(|pes| pes.may_reserve)?;
+                    let may_reserve = may_reserve.filter(|reserve| **reserve)?;
                     let extent = len
                         .checked_add(available.len())?
-                        .checked_add(pending.remaining)?
+                        .checked_add(remaining)?
                         .checked_add(LOOKAHEAD)?;
                     // A PES can contain multiple pictures. Limit the hint
                     // relative to ordinary growth and try it once per PES.
                     if extent <= growth || extent > limit.min(growth.saturating_mul(4)) {
                         return None;
                     }
-                    pending.may_reserve = false;
+                    *may_reserve = false;
                     Some(extent)
                 })?;
                 chunk.offset += copy;
-                if chunk.offset == chunk.bytes.len() {
+                if chunk.offset == span_len {
+                    chunk.retire(&mut self.pending_pes);
                     self.input = None;
                 }
                 work.try_charge(copy as u64);
