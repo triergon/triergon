@@ -7855,42 +7855,43 @@
    "sha256": "78e5d64743203173b7dfd8beed2dc4ab750d137e6fe3b00df321536b15057f05",
    "files": [
     {
-     "path": "FINAL-STATE.txt",
+     "path": "mp4-buffered-sample-delivery/FINAL-STATE.txt",
      "sha256": "f247a76b2893208aae7751dbf51f4c495efacfb6d9e743802870300f31ac45c8"
     },
     {
-     "path": "NATIVE-RESULTS.sha256",
+     "path": "mp4-buffered-sample-delivery/NATIVE-RESULTS.sha256",
      "sha256": "c513eb7249536e83aaece519b88930b4b3a32eab7eef148bbd67ee2fe3c4853c"
     },
     {
-     "path": "NATIVE-RESULTS.tar.gz",
+     "path": "mp4-buffered-sample-delivery/NATIVE-RESULTS.tar.gz",
      "sha256": "4a49d78ea04fd2456128577bf077aa798bd7e17497b6d0c20e82cb9d9e773691"
     },
     {
-     "path": "NATIVE.log",
+     "path": "mp4-buffered-sample-delivery/NATIVE.log",
      "sha256": "d965d3995234ffce4dec306b4d913be00298180986c79e04c5d98bd39f77d02e"
     },
     {
-     "path": "REBASED-CLIPPY.log",
+     "path": "mp4-buffered-sample-delivery/REBASED-CLIPPY.log",
      "sha256": "67090b658af3e401f255877bc7e81d30eede21d41962a5f71025fd8fda78f093"
     },
     {
-     "path": "REBASED-TEST.log",
+     "path": "mp4-buffered-sample-delivery/REBASED-TEST.log",
      "sha256": "bec94715f734e45e1fd6837cf6c79b01d08c10a2520ee7f8b64061257721e856"
     },
     {
-     "path": "RSS-REVIEW.json",
+     "path": "mp4-buffered-sample-delivery/RSS-REVIEW.json",
      "sha256": "35fcc38a12295baaefe8217d5a720ee351de7a3053c04bec08c3734ffc67a352"
     },
     {
-     "path": "guest.sh",
+     "path": "mp4-buffered-sample-delivery/guest.sh",
      "sha256": "f697087afc8a240938e76dcf827743422ac0da57e7af4009be95eeb442882140"
     },
     {
-     "path": "source.bundle",
+     "path": "mp4-buffered-sample-delivery/source.bundle",
      "sha256": "4cda7a2c61b1fba1124203794aa20818b8cff7d9b52994b691905389c12b9159"
     }
-   ]
+   ],
+   "path": "mp4-buffered-sample-delivery"
   }
  ]
 }
