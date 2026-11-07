@@ -98,8 +98,8 @@ impl<'a> Checkpoints<'a> {
         // Short regular tracks can use their existing checkpoint capacity
         // for earlier restarts without growing the index.
         let spare = self.use_spare_capacity
-            && track.points.len() < track.points.capacity().min(MAX_SHORT_CHECKPOINTS_PER_TRACK)
-            && track.entries.is_multiple_of(SHORT_CHECKPOINT_INTERVAL);
+            && track.entries.is_multiple_of(SHORT_CHECKPOINT_INTERVAL)
+            && track.points.len() < track.points.capacity().min(MAX_SHORT_CHECKPOINTS_PER_TRACK);
         if track.entries.is_multiple_of(CHECKPOINT_INTERVAL) || spare {
             if self.stored == MAX_CHECKPOINTS {
                 return None;
