@@ -59,7 +59,7 @@ fn interval(pairs: &[(f64, f64)]) -> Value {
 fn matched_gate_fixture() -> (Value, Vec<Value>, Value) {
     let contract = v(
         r#"{"required_profiles": ["fixture"], "required_targets": ["host"], "minimum_pairs": 30,
-                         "runtime_ratio_max": 0.8, "pending_module_requirements": []}"#,
+                         "pending_module_requirements": []}"#,
     );
     let result = |ns: i64| {
         v(&format!(
@@ -854,33 +854,19 @@ fn the_required_external_vector_cannot_be_missing_or_substituted() {
 }
 
 #[test]
-fn every_contract_keeps_the_delivery_ceiling_and_optimisation_target() {
-    for prefix in [
-        "matroska-demux",
-        "matroska-header-removal",
-        "matroska-zlib",
-        "matroska-cues-preroll",
-        "matroska-colour",
-        "matroska-segment-metadata",
-    ] {
-        let contract = load(&format!("harness/features/{prefix}/contract.json"));
-        assert_eq!(
-            contract.get("runtime_ratio_max").and_then(Value::as_f64),
-            Some(1.2),
-            "{prefix}"
-        );
-        assert_eq!(
-            contract
-                .get("runtime_optimization_ratio_target")
-                .and_then(Value::as_f64),
-            Some(0.8),
-            "{prefix}"
-        );
-        assert_eq!(
-            contract.get("runtime_policy").and_then(Value::as_str),
-            Some("runtime-ceiling-1.20"),
-            "{prefix}"
-        );
+fn no_contract_restates_the_policy_gates() {
+    let features = root().join("harness/features");
+    for entry in std::fs::read_dir(&features).unwrap() {
+        let feature = entry.unwrap().file_name().into_string().unwrap();
+        let contract = load(&format!("harness/features/{feature}/contract.json"));
+        for key in [
+            "runtime_ratio_max",
+            "runtime_optimization_ratio_target",
+            "runtime_policy",
+            "memory_ratio_max_exclusive",
+        ] {
+            assert!(contract.get(key).is_none(), "{feature} restates {key}");
+        }
     }
 }
 
@@ -914,19 +900,17 @@ fn the_delivery_ceiling_is_inclusive_and_does_not_replace_correctness_or_memory(
             interval(&[(elapsed as f64, 100.0); 30]),
         );
     };
-    let (mut contract, mut rows, identity) = matched_gate_fixture();
-    put(&mut contract, &[], "runtime_ratio_max", Value::float(1.2));
-    for (elapsed, passes) in [(119, true), (121, false)] {
+    let (contract, mut rows, identity) = matched_gate_fixture();
+    let ceiling = (crate::harness::policy::Runtime::load(root())
+        .unwrap()
+        .ceiling
+        * 100.0)
+        .round() as i64;
+    for (elapsed, passes) in [(ceiling, true), (ceiling + 1, false)] {
         set_elapsed(&mut rows, elapsed);
         assert_eq!(verdict(&contract, &rows, &identity).1, passes, "{elapsed}");
     }
-    set_elapsed(&mut rows, 119);
-    let mut strict = contract.clone();
-    put(&mut strict, &[], "runtime_ratio_max", Value::float(0.8));
-    assert!(
-        !verdict(&strict, &rows, &identity).1,
-        "the optimisation target is stricter"
-    );
+    set_elapsed(&mut rows, ceiling - 1);
     put(&mut rows[0], &["parity"], "status", Value::str("mismatch"));
     assert!(!verdict(&contract, &rows, &identity).1);
     put(&mut rows[0], &["parity"], "status", Value::str("pass"));

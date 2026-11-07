@@ -238,6 +238,9 @@ pub fn acceptance(
     additional: &[Value],
 ) -> Value {
     let mut reasons: Vec<String> = Vec::new();
+    let runtime = super::policy::Runtime::load(root)
+        .map_err(|error| reasons.push(error))
+        .ok();
     let ids: Vec<&str> = rows.iter().filter_map(|r| s(r, "id")).collect();
     let mut unique = ids.clone();
     unique.sort_unstable();
@@ -333,13 +336,12 @@ pub fn acceptance(
         let timing = row.get("timing").cloned().unwrap_or(Value::Object(vec![]));
         let upper =
             float(timing.get("ratio").and_then(|r| r.get("upper_95"))).unwrap_or(f64::INFINITY);
-        let ceiling = float(contract.get("runtime_ratio_max")).unwrap_or(0.0);
         let timing_ok = s(&timing, "status") == Some("measured")
             && timing_valid(row, contract, &selected, require_linux)
             && !timing.get("contaminants").is_some_and(Value::truthy)
             && upper.is_finite()
             && upper > 0.0
-            && upper <= ceiling;
+            && runtime.is_some_and(|gate| upper <= gate.ceiling);
         if !timing_ok {
             reasons.push(format!("{id}: runtime gate unproven or failed"));
         }

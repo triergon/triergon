@@ -9,7 +9,7 @@
 //! 3. runtime: paired, randomly ordered worker processes; each sample is the
 //!    median of `--iterations` in-process sessions after one discarded warm-up
 //!    session; the ratio interval is the bootstrap of the median paired ratio.
-//!    Gate: upper 95% bound ≤ 1.20 (target 0.80);
+//!    graded against the runtime gate of `harness/policy.json`;
 //! 4. memory: admit both workers to the shared observer and run separate heap
 //!    and RSS measurements. Each worker must reproduce its checked output.
 //!    Peak live heap must be lower in every pair. The upper paired 95% bounds

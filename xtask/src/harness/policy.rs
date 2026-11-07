@@ -1,5 +1,5 @@
-//! The runtime gate of `harness/policy.json`, which feature contracts restate and
-//! the codec and capture runners read directly.
+//! The runtime gate of `harness/policy.json`. It is the only definition of the ceiling
+//! and target: every runner and grader reads it from here, and nothing restates it.
 
 use std::path::Path;
 
@@ -38,9 +38,9 @@ mod tests {
     use super::Runtime;
 
     #[test]
-    fn the_repository_policy_is_the_published_runtime_gate() {
+    fn the_repository_policy_has_a_target_below_its_ceiling() {
         let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("..");
         let runtime = Runtime::load(&root).unwrap();
-        assert_eq!((runtime.ceiling, runtime.target), (1.2, 0.8));
+        assert!(0.0 < runtime.target && runtime.target < runtime.ceiling);
     }
 }

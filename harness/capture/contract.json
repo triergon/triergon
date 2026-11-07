@@ -95,7 +95,7 @@
       4.5
     ],
     "pipeline": "complete RGBA -> TS session: all three rules above on the same output",
-    "runtime": "Use the per-case paired upper 95% bound on AArch64 Linux. The ceiling is 1.20 and the target is 0.80.",
+    "runtime": "Use the per-case paired upper 95% bound on AArch64 Linux. The ceiling and target are those of harness/policy.json.",
     "memory": "Require admitted heap and RSS observation in separate runs. Peak live heap must be lower in every pair. The per-case paired upper 95% bounds for peak heap and total resident peak RSS must both be below 1.0.",
     "encoder_v1_superseded": "independent FFmpeg decode of every frame succeeds with no decode errors; picture type sequence identical (I every 30, P otherwise); per case, PSNR-Y of the Rust output >= reference PSNR-Y - 0.25 dB at Rust bytes <= 1.03 * reference bytes over the same frame count, and VBV (maxrate, bufsize) never underflows under the H.262 Annex C model",
     "encoder_revision_reason": "Exploratory local runs showed FFmpeg's short-session rate control lands far from the requested rate in both directions (content-limited UI pictures at qmin underspend; motion at 0.1-1 Mbps overspends up to 1.2x; noise exceeds the VBV by 26 Mbit), so v1's fixed '<= 1.03x reference bytes' made quality comparisons at unequal rates. v2 compares at equal bits where the reference overspent and permits spending within the client's requested budget where the reference underspent; clause (b) is a policy choice, approved under decisions, and results under it are labelled 'within-requested-budget'."

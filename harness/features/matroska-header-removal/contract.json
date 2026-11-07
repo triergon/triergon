@@ -21,14 +21,10 @@
   "required_targets": [
     "aarch64-unknown-linux-gnu"
   ],
-  "runtime_ratio_max": 1.2,
-  "memory_ratio_max_exclusive": 1.0,
   "minimum_pairs": 30,
   "confidence": 0.95,
   "pending_module_requirements": [
     "remaining container features",
     "complete applicable FATE mapping and asset qualification"
-  ],
-  "runtime_optimization_ratio_target": 0.8,
-  "runtime_policy": "runtime-ceiling-1.20"
+  ]
 }

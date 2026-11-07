@@ -514,8 +514,6 @@ fn delivery_contract(id: &str, operation: &str, contract: &[&str], profiles: Vec
             "required_targets",
             Value::strings(["aarch64-unknown-linux-gnu"]),
         ),
-        ("runtime_ratio_max", Value::float(1.2)),
-        ("memory_ratio_max_exclusive", Value::float(1.0)),
         ("minimum_pairs", Value::int(30)),
         ("confidence", Value::float(0.95)),
         (
@@ -526,8 +524,6 @@ fn delivery_contract(id: &str, operation: &str, contract: &[&str], profiles: Vec
                 "deferred targets",
             ]),
         ),
-        ("runtime_optimization_ratio_target", Value::float(0.8)),
-        ("runtime_policy", Value::str("runtime-ceiling-1.20")),
     ])
 }
 

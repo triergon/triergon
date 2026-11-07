@@ -92,29 +92,15 @@ pub fn design(root: &Path) -> Result<String, Vec<String>> {
             errors.push(format!("{}: {error}", rel.display()));
         }
     }
-    let (policy, gates) = match (
+    let gates = match (
         read_json(&root.join("harness/policy.json")),
         read_json(&root.join("harness/module-gates.json")),
     ) {
-        (Ok(policy), Ok(gates)) => (policy, gates),
+        (Ok(_), Ok(gates)) => gates,
         (Err(error), _) => return Err(vec![format!("harness/policy.json: {error}")]),
         (_, Err(error)) => return Err(vec![format!("harness/module-gates.json: {error}")]),
     };
-    let runtime = policy.get("runtime");
-    if runtime
-        .and_then(|r| r.get("ratio_max"))
-        .and_then(Value::as_f64)
-        != Some(1.2)
-    {
-        errors.push("runtime ceiling differs from the policy (1.20)".into());
-    }
-    if runtime
-        .and_then(|r| r.get("optimisation_target"))
-        .and_then(Value::as_f64)
-        != Some(0.8)
-    {
-        errors.push("runtime optimisation target differs from the policy (0.80)".into());
-    }
+    errors.extend(runtime_mentions(root));
     let modules = gates
         .get("modules")
         .and_then(Value::as_array)
@@ -150,6 +136,143 @@ pub fn design(root: &Path) -> Result<String, Vec<String>> {
     } else {
         Err(errors)
     }
+}
+
+/// `harness/policy.json` is the only definition of the runtime ceiling and target.
+/// `docs/quality.md` states both once, and no other document restates the ceiling. A
+/// row of `docs/status.md` above the ceiling must say how many of its cases pass, and
+/// not all of them, so lowering the ceiling flags every result that no longer holds.
+fn runtime_mentions(root: &Path) -> Vec<String> {
+    let gate = match crate::harness::policy::Runtime::load(root) {
+        Ok(gate) => gate,
+        Err(error) => return vec![error],
+    };
+    let mut errors = Vec::new();
+    if !(0.0 < gate.target && gate.target < gate.ceiling) {
+        errors.push("harness/policy.json: the runtime target must lie below the ceiling".into());
+    }
+    let (ceiling, target) = (
+        format!("{:.2}", gate.ceiling),
+        format!("{:.2}", gate.target),
+    );
+    let read = |rel: &str| fs::read_to_string(root.join(rel)).unwrap_or_default();
+    let quality = read("docs/quality.md");
+    for value in [&ceiling, &target] {
+        if !quality.contains(&format!("**{value}**")) {
+            errors.push(format!(
+                "docs/quality.md: does not state the policy value {value}"
+            ));
+        }
+    }
+    for rel in documents(root) {
+        if rel != "docs/quality.md" && mentions(&read(&rel), &ceiling) {
+            errors.push(format!(
+                "{rel}: restates the runtime ceiling {ceiling}; refer to docs/quality.md"
+            ));
+        }
+    }
+    for (area, cell) in status_runtimes(&read("docs/status.md")) {
+        let Some(runtime) = leading_ratio(&cell) else {
+            continue;
+        };
+        let above = runtime.parse().is_ok_and(|r: f64| r > gate.ceiling);
+        let claims_every_case = pass_count(&cell).is_none_or(|(passing, cases)| passing >= cases);
+        if above && claims_every_case {
+            errors.push(format!(
+                "docs/status.md: {area} runtime {runtime} is above the ceiling {ceiling}, \
+                 but the row does not say which cases fail"
+            ));
+        }
+    }
+    errors
+}
+
+/// The prose documents a reader meets: top-level guides, `docs/` and crate READMEs.
+fn documents(root: &Path) -> Vec<String> {
+    let names = |dir: &str| -> Vec<String> {
+        let mut names: Vec<String> = fs::read_dir(root.join(dir))
+            .into_iter()
+            .flatten()
+            .flatten()
+            .map(|entry| entry.file_name().to_string_lossy().into_owned())
+            .collect();
+        names.sort();
+        names
+    };
+    let guides = ["README.md", "CONTRIBUTING.md", "AGENTS.md"].map(String::from);
+    let docs = names("docs")
+        .into_iter()
+        .filter(|name| Path::new(name).extension().is_some_and(|e| e == "md"))
+        .map(|name| format!("docs/{name}"));
+    let crates = names("crates")
+        .into_iter()
+        .map(|name| format!("crates/{name}/README.md"));
+    guides
+        .into_iter()
+        .chain(docs)
+        .chain(crates)
+        .filter(|rel| root.join(rel).is_file())
+        .collect()
+}
+
+/// Whether `text` contains `value` as a whole number, not as the prefix of a longer one.
+fn mentions(text: &str, value: &str) -> bool {
+    text.match_indices(value).any(|(at, _)| {
+        let before = text[..at].chars().next_back();
+        let after = text[at + value.len()..].chars().next();
+        !before.is_some_and(|c| c.is_ascii_digit() || c == '.')
+            && !after.is_some_and(|c| c.is_ascii_digit())
+    })
+}
+
+/// The area and runtime cell of every row of the status table.
+fn status_runtimes(status: &str) -> Vec<(String, String)> {
+    let cells = |line: &str| -> Vec<String> {
+        line.trim()
+            .trim_matches('|')
+            .split('|')
+            .map(|cell| cell.trim().to_owned())
+            .collect()
+    };
+    let mut lines = status.lines();
+    let Some(column) = lines.by_ref().find_map(|line| {
+        let header = cells(line);
+        (header.first().is_some_and(|c| c == "Area"))
+            .then(|| header.iter().position(|c| c == "Runtime"))
+            .flatten()
+    }) else {
+        return Vec::new();
+    };
+    lines
+        .skip(1)
+        .take_while(|line| line.starts_with('|'))
+        .filter_map(|line| {
+            let row = cells(line);
+            Some((row.first()?.clone(), row.get(column)?.clone()))
+        })
+        .collect()
+}
+
+/// The first decimal number in `cell`, such as 1.1808 in "1.1808 (71/71 pass)".
+fn leading_ratio(cell: &str) -> Option<&str> {
+    let start = cell.find(|c: char| c.is_ascii_digit())?;
+    let rest = &cell[start..];
+    let end = rest
+        .find(|c: char| !(c.is_ascii_digit() || c == '.'))
+        .unwrap_or(rest.len());
+    let number = rest[..end].trim_end_matches('.');
+    number.contains('.').then_some(number)
+}
+
+/// The `n/m` before "pass", such as (45, 125) in "1.3846 (45/125 pass for AVC/HEVC)".
+fn pass_count(cell: &str) -> Option<(u64, u64)> {
+    let words: Vec<&str> = cell
+        .split(|c: char| c.is_whitespace() || c == '(' || c == ')')
+        .filter(|word| !word.is_empty())
+        .collect();
+    let counted = words.windows(2).find(|pair| pair[1].starts_with("pass"))?[0];
+    let (passing, cases) = counted.split_once('/')?;
+    Some((passing.parse().ok()?, cases.parse().ok()?))
 }
 
 pub fn read_json(path: &Path) -> Result<Value, String> {
@@ -353,6 +476,7 @@ mod tests {
             r#"{"cases": [{"status": "unmapped", "rights": "unreviewed"}]}"#,
         )
         .unwrap();
+        stated_policy(&root);
         let ok = design(&root).unwrap();
         assert!(ok.starts_with(
             "Design integrity OK: JSON, 2 unaccepted module gates, 1 unmapped FATE identities."
@@ -371,6 +495,52 @@ mod tests {
         let errors = design(&root).unwrap_err();
         assert_eq!(errors.len(), 3, "{errors:?}");
         assert!(errors[0].starts_with("research/sub/bad.json: "));
+        assert!(errors.contains(&"docs/quality.md: does not state the policy value 1.25".into()));
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    /// The quality guide stating the policy of 1.20 and 0.80, and one passing status row.
+    fn stated_policy(root: &Path) {
+        fs::create_dir_all(root.join("docs")).unwrap();
+        fs::write(
+            root.join("docs/quality.md"),
+            "Runtime at most **1.20** per case. The target is **0.80**.\n",
+        )
+        .unwrap();
+        fs::write(
+            root.join("docs/status.md"),
+            "| Area | Runtime | Open |\n|---|---|---|\n| HLS | 1.1808 (71/71 pass) | — |\n",
+        )
+        .unwrap();
+    }
+
+    #[test]
+    fn the_runtime_ceiling_is_stated_once_and_bounds_every_status_row() {
+        let root = walk::scratch("ceiling");
+        fs::create_dir_all(root.join("harness")).unwrap();
+        fs::write(
+            root.join("harness/policy.json"),
+            r#"{"runtime": {"ratio_max": 1.2, "optimisation_target": 0.8}}"#,
+        )
+        .unwrap();
+        stated_policy(&root);
+        fs::write(root.join("README.md"), "Measured at 1.2041 and 11.20.\n").unwrap();
+        assert_eq!(runtime_mentions(&root), Vec::<String>::new());
+        fs::write(root.join("README.md"), "At most 1.20× per case.\n").unwrap();
+        fs::write(
+            root.join("docs/status.md"),
+            "| Area | Runtime |\n|---|---|\n| HLS | 1.2125 (71/71 pass) |\n\
+             | Framing | 1.3846 (45/125 pass for AVC/HEVC) |\n| PGS | PGS 1.11 |\n| TS | not measured |\n",
+        )
+        .unwrap();
+        assert_eq!(
+            runtime_mentions(&root),
+            [
+                "README.md: restates the runtime ceiling 1.20; refer to docs/quality.md",
+                "docs/status.md: HLS runtime 1.2125 is above the ceiling 1.20, \
+                 but the row does not say which cases fail",
+            ]
+        );
         fs::remove_dir_all(root).unwrap();
     }
 }
