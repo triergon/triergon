@@ -124,7 +124,9 @@ impl RetiredCatalogue {
     }
 }
 
-pub(crate) struct ProgressiveSeek<'a> {
+/// A planned MP4 range seek, from either clock's seek command.
+#[derive(Clone, Copy)]
+pub(crate) struct RangeSeek<'a> {
     pub(crate) pool: &'a Budget,
     pub(crate) active_generation: Option<u64>,
     pub(crate) candidate_generation: u64,

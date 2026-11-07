@@ -728,10 +728,46 @@ impl<S: Source> Player<S> {
         Ok(engine)
     }
 
-    fn prepare_progressive_commit<'a>(
+    /// Apply a range seek planned for this player's current generation.
+    fn apply_range_seek(
+        &mut self,
+        seek: crate::catalogue::RangeSeek<'_>,
+        work: &mut WorkBudget,
+        cancel: &AtomicBool,
+    ) -> Result<bool> {
+        if seek.active_generation.is_some() {
+            return Err(Error::Invalid(
+                "progressive seek needs its candidate catalogue",
+            ));
+        }
+        if !self.pool.same_pool(seek.pool) {
+            return Err(Error::ForeignPool);
+        }
+        if self.generation != seek.candidate_generation {
+            return Err(Error::StaleGeneration {
+                expected: self.generation,
+                received: seek.candidate_generation,
+            });
+        }
+        if seek.intent.clock == ClockChoice::ExplicitNativeProjection
+            && self.clock != seek.intent.clock
+        {
+            return Err(Error::Invalid("native seek clock changed"));
+        }
+        self.apply_seek(
+            seek.intent.track,
+            seek.intent.target,
+            seek.selection,
+            Some(seek.landing),
+            work,
+            cancel,
+        )
+    }
+
+    pub(crate) fn prepare_progressive_commit<'a>(
         &'a mut self,
         next: &'a mut Option<crate::catalogue::Mp4Catalogue<S>>,
-        seek: crate::catalogue::ProgressiveSeek<'a>,
+        seek: crate::catalogue::RangeSeek<'a>,
         work: &mut WorkBudget,
         cancel: &'a AtomicBool,
     ) -> Result<Option<crate::catalogue::CatalogueCommit<'a, S>>> {

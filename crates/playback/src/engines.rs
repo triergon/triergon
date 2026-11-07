@@ -161,6 +161,7 @@ pub(crate) struct Mp4SyncLanding {
     pub(crate) sync_row: usize,
 }
 
+#[derive(Clone, Copy)]
 pub(crate) enum Mp4RangeLanding<'a> {
     Source(Mp4SyncLanding),
     Native(&'a NativeMp4Replay),

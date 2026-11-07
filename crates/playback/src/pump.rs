@@ -77,8 +77,7 @@ pub enum PumpStep {
 }
 enum CatalogueChange<'a> {
     Replace(Selection),
-    ProgressiveSeek(&'a Mp4SyncSeekCommand),
-    ProgressiveNativeSeek(&'a Mp4NativeSeekCommand),
+    ProgressiveSeek(crate::catalogue::RangeSeek<'a>),
 }
 
 pub struct Pump<S: Source, T: Sink> {
@@ -225,7 +224,7 @@ impl<S: Source, T: Sink> Pump<S, T> {
     where
         T: CatalogueSink,
     {
-        self.commit_catalogue_change(next, CatalogueChange::ProgressiveSeek(command), w, c)
+        self.commit_catalogue_change(next, CatalogueChange::ProgressiveSeek(command.seek()), w, c)
     }
 
     /// Promote a progressive native-clock player to the same entity's
@@ -240,7 +239,7 @@ impl<S: Source, T: Sink> Pump<S, T> {
     where
         T: CatalogueSink,
     {
-        self.commit_catalogue_change(next, CatalogueChange::ProgressiveNativeSeek(command), w, c)
+        self.commit_catalogue_change(next, CatalogueChange::ProgressiveSeek(command.seek()), w, c)
     }
 
     fn commit_catalogue_change(
@@ -284,11 +283,8 @@ impl<S: Source, T: Sink> Pump<S, T> {
             CatalogueChange::Replace(selection) => {
                 player.prepare_mp4_catalogue(next, selection, w, c)?
             }
-            CatalogueChange::ProgressiveSeek(command) => {
-                player.prepare_mp4_progressive_sync_commit(next, command, w, c)?
-            }
-            CatalogueChange::ProgressiveNativeSeek(command) => {
-                player.prepare_mp4_progressive_native_commit(next, command, w, c)?
+            CatalogueChange::ProgressiveSeek(seek) => {
+                player.prepare_progressive_commit(next, seek, w, c)?
             }
         };
         let Some(transaction) = transaction else {
@@ -311,8 +307,7 @@ impl<S: Source, T: Sink> Pump<S, T> {
         self.ended = false;
         let intent = match change {
             CatalogueChange::Replace(_) => None,
-            CatalogueChange::ProgressiveSeek(command) => Some(command.intent()),
-            CatalogueChange::ProgressiveNativeSeek(command) => Some(command.intent()),
+            CatalogueChange::ProgressiveSeek(seek) => Some(seek.intent),
         };
         if let Some(intent) = intent
             && let Err(error) = sink.reset(&intent)
