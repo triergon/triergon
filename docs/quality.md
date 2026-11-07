@@ -117,8 +117,8 @@ complete standard-harness reports and recomputes the existing acceptance gates
 from their raw paired samples. Both collections must contain every case in the
 registered corpus, with identical parity, inputs, contract, workers, source graphs,
 compiler settings, instrumentation and allowed CPUs. The memory build identity may
-add a kernel RSS proof pin; every other identity field must match. Original samples,
-failed attempts and input report hashes remain in the graded report.
+add a kernel RSS proof pin. Every other identity field must match. Both input reports
+and their raw samples are hash-linked from the graded report.
 
 Timing requires the RSS kernel module to be unloaded throughout warm-up and every
 pair. Standard memory bounds need no kernel proof. For kernel-backed memory,
@@ -162,7 +162,7 @@ sudo rmmod triergon_rss_bound
 The runtime ceiling remains 1.20 at the upper paired 95% bound, with a 0.80 target.
 Peak live heap and total resident peak RSS must each remain strictly below the
 reference at their upper paired 95% bounds. A required gate that remains open
-returns a nonzero exit code; earlier failures and their reports stay recorded.
+returns a nonzero exit code. Earlier failures and their reports stay recorded.
 
 ## Measuring performance
 
