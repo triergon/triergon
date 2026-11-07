@@ -71,6 +71,7 @@ dependencies = [
 name = "triergon-codec"
 version = "0.0.0"
 dependencies = [
+ "triergon-core",
  "triergon-pixel",
 ]
 

@@ -9,6 +9,7 @@ rust-version.workspace = true
 publish.workspace = true
 
 [dependencies]
+triergon-core = { path = "../core" }
 triergon-pixel = { path = "../pixel" }
 
 [lints]
