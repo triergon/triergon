@@ -200,7 +200,7 @@ from a codec lane's FATE vectors instead: release and `checked` builds of `codec
 (release optimisation with overflow checks and debug assertions) decode each mutation
 whole. `cargo xtask check` runs one round on each required font feature.
 
-On native AArch64 Linux, `cargo xtask memory-admission CANDIDATE REFERENCE`
+On native AArch64 or 32-bit ARMv7 Linux, `cargo xtask memory-admission CANDIDATE REFERENCE`
 checks the worker libraries using the probe and observer in `target/harness`.
 It prints the calibration certificate and exits nonzero if coverage cannot
 be established. Use built workers you trust.
@@ -284,6 +284,28 @@ may override that count for diagnostic comparisons.
   and instruction counts is placement. A screen never replaces a recorded result.
 - Qualification runs on native AArch64 Linux. Results on one platform do not establish
   another; 32-bit ARMv7 needs its own runs.
+
+### 32-bit ARMv7
+
+The harness runs natively in a 32-bit ARM Linux user space. The same commands
+build xtask, the workers and the FFmpeg references there, and reports name the
+target of the toolchain that built them, `armv7-unknown-linux-gnueabihf`. That
+toolchain's default target has no NEON, while FFmpeg selects its NEON code at run
+time, so on this target the gate build compares Rust built without NEON with
+FFmpeg's NEON paths. An AWS Graviton2 host (Neoverse N1) runs a 32-bit user space
+on its AArch64 kernel; later Graviton generations cannot. One way to set one up on Ubuntu 24.04:
+
+```sh
+sudo debootstrap --arch=armhf --variant=buildd --components=main,universe noble \
+  /srv/armhf http://ports.ubuntu.com/ubuntu-ports
+for d in proc sys dev dev/pts; do sudo mount --bind /$d /srv/armhf/$d; done
+sudo chroot /srv/armhf setarch linux32 bash -l
+```
+
+Inside, install the tools listed under [setup](../CONTRIBUTING.md#setup) and rustup as on
+any host, and run every command under `setarch linux32`. Memory uses the standard
+bounds: the kernel RSS proof module has no 32-bit ioctl entry point. Record the CPU,
+kernel and user-space package list with the results.
 
 ## Robustness
 
