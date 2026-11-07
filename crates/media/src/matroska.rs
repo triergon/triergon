@@ -4,9 +4,9 @@
 //! Streaming `Read` is sufficient for demuxing. Seeking additionally requires `Seek`
 //! and supports validated Cues, bounded fallback scans and all-track preroll. A
 //! resumable envelope reader is separate. This is not a full Matroska implementation.
-use crate::Result;
 use crate::storage::{SharedBytes, SharedText};
 use crate::timing::BlockTiming;
+use crate::{Error, Result};
 
 #[derive(Clone, Debug)]
 pub struct Track {
@@ -130,15 +130,26 @@ impl PacketFields {
         keyframe: bool,
         discard_padding_ns: i64,
     ) -> Result<Self> {
-        let source = timing.source()?;
+        let (pts_ns, duration_ns) = if timing.frames == 1 && timing.duration_ticks.is_none() {
+            // The single frame starts at the integral block time. Its default
+            // duration is already in nanoseconds.
+            let pts = i64::try_from(timing.source_base_ns()?).map_err(|_| Error::Overflow)?;
+            (Some(pts), timing.default_duration_ns)
+        } else {
+            let source = timing.source()?;
+            (
+                source.pts.map(|pts| pts.rounded_ns()).transpose()?,
+                source
+                    .duration
+                    .map(|duration| duration.rounded_duration_ns())
+                    .transpose()?,
+            )
+        };
         Ok(Self {
             timing,
             track,
-            pts_ns: source.pts.map(|p| p.rounded_ns()).transpose()?,
-            duration_ns: source
-                .duration
-                .map(|d| d.rounded_duration_ns())
-                .transpose()?,
+            pts_ns,
+            duration_ns,
             keyframe,
             discard_padding_ns,
         })
