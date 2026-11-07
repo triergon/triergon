@@ -148,12 +148,16 @@ impl Output {
         self.pool().same_pool(pool)
     }
     pub(crate) fn pool(&self) -> &Budget {
-        if let RawEvent::Matroska(triergon_matroska::typed::Event::Packet(packet)) = &self.event {
-            return packet.configuration.budget();
+        match &self.event {
+            RawEvent::Matroska(triergon_matroska::typed::Event::Packet(packet)) => {
+                packet.configuration.budget()
+            }
+            RawEvent::NativeTs { packet, .. } => packet.spans.budget(),
+            _ => self
+                .pool
+                .as_ref()
+                .expect("output without a payload budget retains its allocation budget"),
         }
-        self.pool
-            .as_ref()
-            .expect("non-packet output retains its allocation budget")
     }
 
     pub(crate) fn scope(&self) -> OutputScope {
@@ -1244,6 +1248,7 @@ impl<S: Source> Player<S> {
             pool: if matches!(
                 &event,
                 RawEvent::Matroska(triergon_matroska::typed::Event::Packet(_))
+                    | RawEvent::NativeTs { .. }
             ) {
                 None
             } else {

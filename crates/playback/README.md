@@ -123,7 +123,8 @@ requires exact coverage.
 Private stream type `0x06` is audio only after explicit AC-3/E-AC-3 or DVB
 admission. M2TS prefix startup (`NativeStartup::new_m2ts_prefix_v2`) needs an
 8 KiB input window. The DVB native PES parser caps a continued segment at
-65,536 bytes.
+65,536 bytes. PES outputs reuse their payload storage's budget handle, which
+remains valid while a caller retains an output after closing the player.
 
 **HLS segments.** One independent TS188 segment with in-band PAT and PMT.
 The feed consumes validated PES continuations directly and preserves source
