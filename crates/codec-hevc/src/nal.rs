@@ -4,16 +4,12 @@
 
 use triergon_bitstream::runs;
 
-pub const TRAIL_N: u8 = 0;
-pub const TRAIL_R: u8 = 1;
-pub const TSA_N: u8 = 2;
 pub const RADL_N: u8 = 6;
 pub const RADL_R: u8 = 7;
 pub const RASL_N: u8 = 8;
 pub const RASL_R: u8 = 9;
 pub const RSV_VCL_N14: u8 = 14;
 pub const BLA_W_LP: u8 = 16;
-pub const BLA_W_RADL: u8 = 17;
 pub const BLA_N_LP: u8 = 18;
 pub const IDR_W_RADL: u8 = 19;
 pub const IDR_N_LP: u8 = 20;
@@ -25,9 +21,7 @@ pub const PPS_NUT: u8 = 34;
 pub const AUD_NUT: u8 = 35;
 pub const EOS_NUT: u8 = 36;
 pub const EOB_NUT: u8 = 37;
-pub const FD_NUT: u8 = 38;
 pub const PREFIX_SEI: u8 = 39;
-pub const SUFFIX_SEI: u8 = 40;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct NalHeader {
