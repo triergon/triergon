@@ -275,9 +275,9 @@ enum ScanPhase {
 struct Scan {
     phase: ScanPhase,
     position: usize,
-    index: usize,
-    array_count: usize,
-    remaining: usize,
+    index: u8,
+    array_count: u8,
+    remaining: u16,
     declared_type: u8,
 }
 
@@ -296,7 +296,7 @@ enum Event {
 }
 
 impl Scan {
-    const fn new(array_count: usize) -> Self {
+    const fn new(array_count: u8) -> Self {
         Self {
             phase: ScanPhase::Array,
             position: 23,
@@ -320,7 +320,7 @@ impl Scan {
                 let start = self.position;
                 let end = start.checked_add(3).ok_or(Error::Overflow)?;
                 let header = raw.get(start..end).ok_or(Error::Truncated)?;
-                let count = usize::from(u16::from_be_bytes([header[1], header[2]]));
+                let count = u16::from_be_bytes([header[1], header[2]]);
                 self.position = end;
                 self.remaining = count;
                 self.declared_type = header[0] & 63;
@@ -331,7 +331,7 @@ impl Scan {
                 };
                 Ok(Event::Array {
                     header: start..end,
-                    count,
+                    count: usize::from(count),
                 })
             }
             ScanPhase::Nal => {
@@ -487,8 +487,8 @@ impl<S: HvcStorage> HvcParser<S> {
                     if fields.length_size_minus_one() == 2 && !self.observed_width_three {
                         return Err(Error::Unsupported("hvcC three-byte sample length"));
                     }
-                    let count = usize::from(fields.array_count());
-                    check_limit(count, self.limits.maximum_arrays)?;
+                    let count = fields.array_count();
+                    check_limit(usize::from(count), self.limits.maximum_arrays)?;
                     self.width = Some(LengthSize::new(fields.length_size_minus_one() + 1)?);
                     self.fields = Some(fields);
                     self.scan = Scan::new(count);
@@ -526,7 +526,7 @@ impl<S: HvcStorage> HvcParser<S> {
                                     length,
                                     payload,
                                     header,
-                                    next.index,
+                                    usize::from(next.index),
                                     next.declared_type,
                                 )?)
                                 .map_err(|e| e.error)?;
@@ -552,9 +552,7 @@ impl<S: HvcStorage> HvcParser<S> {
                                 // Detect an intrinsically impossible live-set without
                                 // blaming caller retention. Capacity is charged by
                                 // BudgetVec, including any allocator over-allocation.
-                                let array_bytes = self
-                                    .scan
-                                    .array_count
+                                let array_bytes = usize::from(self.scan.array_count)
                                     .checked_mul(size_of::<S::Array>())
                                     .ok_or(Error::Overflow)?;
                                 let nal_bytes = self
@@ -578,7 +576,7 @@ impl<S: HvcStorage> HvcParser<S> {
                                 if end != self.understood_end
                                     || self.nals.as_ref().map_or(0, BudgetVec::len) != self.total
                                     || self.arrays.as_ref().map_or(0, BudgetVec::len)
-                                        != next.array_count
+                                        != usize::from(next.array_count)
                                 {
                                     return Err(Error::Invalid("hvcC second walk"));
                                 }
@@ -617,7 +615,7 @@ impl<S: HvcStorage> HvcParser<S> {
                     self.arrays
                         .as_mut()
                         .ok_or(Error::Invalid("missing hvcC descriptors"))?
-                        .try_reserve_exact(self.scan.array_count)?;
+                        .try_reserve_exact(usize::from(self.scan.array_count))?;
                     self.phase = Phase::ReserveNals;
                 }
                 Phase::ReserveNals => {

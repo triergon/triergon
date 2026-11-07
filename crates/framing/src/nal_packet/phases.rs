@@ -8,7 +8,9 @@ use super::{
 use crate::{AvcConfigArrayKind, Codec, NalHeader};
 use std::ops::ControlFlow;
 use std::sync::atomic::{AtomicBool, Ordering};
-use triergon_core::{Budget, Bytes, Error, Result, SourceId, SourceLocation, WorkBudget};
+use triergon_core::{
+    Budget, BudgetVec, Bytes, Error, Result, SourceId, SourceLocation, WorkBudget,
+};
 
 /// Outcome of one phase step.
 type Step = ControlFlow<NalPacketProgress>;
@@ -32,8 +34,8 @@ impl<M, S: PacketSegment, C: PacketConfig> PacketJob<'_, M, S, C> {
             let step = match self.phase {
                 Phase::Verify => self.verify_update(work)?,
                 Phase::Arrays => self.check_arrays(work)?,
-                Phase::Lookahead => self.lookahead(work)?,
-                Phase::Scan => self.scan_nal(work)?,
+                Phase::Lookahead => self.lookahead(work, cancel)?,
+                Phase::Scan => self.scan_nal(work, cancel)?,
                 Phase::Inject => self.inject_configuration(work)?,
                 Phase::Nal => self.append_nal(work)?,
                 Phase::Reserve => self.reserve_output(work)?,
@@ -66,17 +68,22 @@ impl<M, S: PacketSegment, C: PacketConfig> PacketJob<'_, M, S, C> {
                 if count == 0 {
                     return Ok(YIELD);
                 }
-                if extra[self.verify..self.verify + count] != raw[self.verify..self.verify + count]
+                // Parsed side data usually retains the same immutable input span.
+                if !std::ptr::eq(extra.as_ref(), raw.as_ref())
+                    && extra[self.verify..self.verify + count]
+                        != raw[self.verify..self.verify + count]
                 {
                     return Err(Error::Invalid("configuration update bytes differ"));
                 }
                 work.take(count as u64);
                 self.verify += count;
-                return Ok(NEXT);
+                if self.verify < raw.len() {
+                    return Ok(NEXT);
+                }
             }
         }
         self.update_verified = true;
-        self.phase = Phase::Arrays;
+        self.phase = Phase::Scan;
         Ok(NEXT)
     }
 
@@ -92,9 +99,7 @@ impl<M, S: PacketSegment, C: PacketConfig> PacketJob<'_, M, S, C> {
             self.array += 1;
             return Ok(NEXT);
         }
-        self.phase = if self.config().codec_kind() == Codec::Hevc
-            && self.config().length_width().is_some()
-        {
+        self.phase = if self.length_width.is_some() {
             Phase::Lookahead
         } else {
             Phase::Scan
@@ -103,15 +108,16 @@ impl<M, S: PacketSegment, C: PacketConfig> PacketJob<'_, M, S, C> {
     }
 
     #[inline]
-    fn lookahead(&mut self, work: &mut WorkBudget) -> Result<Step> {
+    fn lookahead(&mut self, work: &mut WorkBudget, cancel: &AtomicBool) -> Result<Step> {
         let source = self
             .source
             .as_ref()
             .ok_or(Error::Invalid("missing packet source"))?;
-        let width = self
-            .config()
-            .length_width()
-            .ok_or(Error::Invalid("missing packet width"))?;
+        let width = usize::from(
+            self.length_width
+                .ok_or(Error::Invalid("missing packet width"))?
+                .bytes(),
+        );
         if self.look_offset == source.bytes.len() && self.look_prefix == 0 {
             self.phase = Phase::Scan;
             return Ok(NEXT);
@@ -139,7 +145,12 @@ impl<M, S: PacketSegment, C: PacketConfig> PacketJob<'_, M, S, C> {
             }
             self.look_offset += count;
             self.look_prefix += count;
-            return Ok(NEXT);
+            if self.look_prefix < width {
+                return Ok(NEXT);
+            }
+            if cancel.load(Ordering::Relaxed) {
+                return Err(Error::Cancelled);
+            }
         }
         if !work.try_charge(1) {
             return Ok(YIELD);
@@ -180,12 +191,12 @@ impl<M, S: PacketSegment, C: PacketConfig> PacketJob<'_, M, S, C> {
     }
 
     #[inline]
-    fn scan_nal(&mut self, work: &mut WorkBudget) -> Result<Step> {
+    fn scan_nal(&mut self, work: &mut WorkBudget, cancel: &AtomicBool) -> Result<Step> {
         let source = self
             .source
             .as_ref()
             .ok_or(Error::Invalid("missing packet source"))?;
-        let Some(width) = self.config().length_width() else {
+        let Some(width) = self.length_width else {
             if !work.try_charge(1) {
                 return Ok(YIELD);
             }
@@ -194,7 +205,8 @@ impl<M, S: PacketSegment, C: PacketConfig> PacketJob<'_, M, S, C> {
             self.phase = Phase::Reserve;
             return Ok(NEXT);
         };
-        if self.offset == 0 && source.bytes.is_empty() && self.config().codec_kind() == Codec::Avc {
+        let width = usize::from(width.bytes());
+        if self.offset == 0 && source.bytes.is_empty() && self.codec == Codec::Avc {
             self.receiver_failure = Some(NalPacketReceiverErrorKind::EmptyAvcPacket);
             return Err(Error::Invalid("pinned AVC empty packet"));
         }
@@ -225,7 +237,12 @@ impl<M, S: PacketSegment, C: PacketConfig> PacketJob<'_, M, S, C> {
             }
             self.offset += count;
             self.prefix_read += count;
-            return Ok(NEXT);
+            if self.prefix_read < width {
+                return Ok(NEXT);
+            }
+            if cancel.load(Ordering::Relaxed) {
+                return Err(Error::Cancelled);
+            }
         }
         if !work.try_charge(1) {
             return Ok(YIELD);
@@ -239,7 +256,7 @@ impl<M, S: PacketSegment, C: PacketConfig> PacketJob<'_, M, S, C> {
             return Err(Error::Truncated);
         }
         if self.length == 0 {
-            if self.config().codec_kind() == Codec::Hevc {
+            if self.codec == Codec::Hevc {
                 self.receiver_failure = Some(NalPacketReceiverErrorKind::EmptyHevcNal);
                 return Err(Error::Invalid("pinned HEVC empty NAL"));
             }
@@ -252,7 +269,7 @@ impl<M, S: PacketSegment, C: PacketConfig> PacketJob<'_, M, S, C> {
                 maximum: self.session.limits.maximum_nals,
             });
         }
-        let codec = self.config().codec_kind();
+        let codec = self.codec;
         let kind = if codec == Codec::Hevc {
             // Width-framed HEVC reaches Scan only after Lookahead
             // accepted every header or retained the first observed
@@ -351,21 +368,15 @@ impl<M, S: PacketSegment, C: PacketConfig> PacketJob<'_, M, S, C> {
         if !work.try_charge(1) {
             return Ok(YIELD);
         }
-        let next = self.config().config_nal(index).map(|n| {
+        if let Some(n) = self.config().config_nal(index) {
             let selected = match (n.kind, which) {
                 (None, _) => true,
                 (Some(kind), Injection::All) => kind != AvcConfigArrayKind::SequenceExtension,
                 (Some(kind), Injection::Sps) => kind == AvcConfigArrayKind::Sequence,
                 (Some(kind), Injection::Pps) => kind == AvcConfigArrayKind::Picture,
             };
-            (
-                selected,
-                S::configuration(n.owner, index, n.range, self.total),
-            )
-        });
-        if let Some((selected, segment)) = next {
             if selected {
-                self.append(segment)?;
+                self.append(S::configuration(n.owner, index, n.range, self.total))?;
             }
             self.injection = Some((which, index + 1));
         } else {
@@ -388,10 +399,7 @@ impl<M, S: PacketSegment, C: PacketConfig> PacketJob<'_, M, S, C> {
             .nal
             .as_ref()
             .ok_or(Error::Invalid("missing source NAL"))?;
-        let prefix = if self.config().codec_kind() == Codec::Hevc
-            || matches!(nal.kind, 7 | 8)
-            || self.total == 0
-        {
+        let prefix = if self.codec == Codec::Hevc || matches!(nal.kind, 7 | 8) || self.total == 0 {
             4
         } else {
             3
@@ -418,9 +426,8 @@ impl<M, S: PacketSegment, C: PacketConfig> PacketJob<'_, M, S, C> {
         if !work.try_charge(1) {
             return Ok(YIELD);
         }
-        // A passthrough packet already has its immutable payload
-        // owner. Keep that owner and its charge instead of copying.
-        if self.config().length_width().is_none() {
+        // A passthrough packet can share its charged payload.
+        if self.length_width.is_none() {
             self.phase = Phase::Freeze;
             return Ok(NEXT);
         }
@@ -436,8 +443,7 @@ impl<M, S: PacketSegment, C: PacketConfig> PacketJob<'_, M, S, C> {
             });
         }
         self.output
-            .as_mut()
-            .ok_or(Error::Invalid("missing packet buffer"))?
+            .get_or_insert_with(|| BudgetVec::new(&self.session.pool))
             .try_reserve_exact(self.total)?;
         self.phase = Phase::Copy;
         Ok(NEXT)
@@ -449,17 +455,14 @@ impl<M, S: PacketSegment, C: PacketConfig> PacketJob<'_, M, S, C> {
         // cancellation check precedes every unit after the first, and
         // every yield, charge and error is unchanged. Only the phase
         // dispatch between units is skipped.
-        let parts = self
-            .segments
-            .as_ref()
-            .ok_or(Error::Invalid("missing packet plan"))?;
+        let parts = self.segments.as_ref().map_or(&[][..], BudgetVec::as_slice);
         let mut first = true;
         loop {
             if !first && cancel.load(Ordering::Relaxed) {
                 return Err(Error::Cancelled);
             }
             first = false;
-            let Some(p) = parts.as_slice().get(self.copy_segment) else {
+            let Some(p) = parts.get(self.copy_segment) else {
                 self.phase = Phase::Freeze;
                 break;
             };
@@ -519,18 +522,17 @@ impl<M, S: PacketSegment, C: PacketConfig> PacketJob<'_, M, S, C> {
         if !work.try_charge(1) {
             return Ok(YIELD);
         }
-        let b = self
-            .output
-            .take()
-            .ok_or(Error::Invalid("missing packet buffer"))?;
-        let bytes = if self.config().length_width().is_none() {
-            drop(b);
+        let bytes = if self.length_width.is_none() {
             self.source
                 .as_ref()
                 .ok_or(Error::Invalid("missing packet source"))?
                 .bytes
                 .clone()
         } else {
+            let b = self
+                .output
+                .take()
+                .ok_or(Error::Invalid("missing packet buffer"))?;
             match b.freeze() {
                 Ok(v) => v,
                 Err(e) => {
@@ -542,7 +544,7 @@ impl<M, S: PacketSegment, C: PacketConfig> PacketJob<'_, M, S, C> {
         let configuration = self.config().raw().clone();
         let configuration_identity = self.config().identity();
         let configuration_source_refusal = self.config().refusal();
-        let forward_new_extradata = self.config().codec_kind() == Codec::Hevc
+        let forward_new_extradata = self.codec == Codec::Hevc
             || self
                 .source
                 .as_ref()
@@ -574,7 +576,7 @@ impl<M, S: PacketSegment, C: PacketConfig> PacketJob<'_, M, S, C> {
             segments: self
                 .segments
                 .take()
-                .ok_or(Error::Invalid("missing packet plan"))?,
+                .unwrap_or_else(|| BudgetVec::new(&self.session.pool)),
             receiver_epoch: self.epoch,
             forward_new_extradata,
         }));

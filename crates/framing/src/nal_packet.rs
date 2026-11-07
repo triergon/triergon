@@ -4,7 +4,7 @@
 mod phases;
 
 use crate::header::NalHeaderError;
-use crate::{AvcConfigArrayKind, AvcConfiguration, BuildStep, Codec, HvcConfiguration};
+use crate::{AvcConfigArrayKind, AvcConfiguration, BuildStep, Codec, HvcConfiguration, LengthSize};
 use std::ops::Range;
 use std::sync::atomic::AtomicBool;
 use triergon_core::{Budget, BudgetVec, Bytes, Error, Result, SourceLocation, WorkBudget};
@@ -135,13 +135,10 @@ impl NalPacketConfiguration {
             Ok(0)
         }
     }
-    fn width(&self) -> Option<usize> {
+    fn width(&self) -> Option<LengthSize> {
         self.avc_record()
-            .map(|v| usize::from(v.sample_length_size().bytes()))
-            .or_else(|| {
-                self.hevc_record()
-                    .map(|v| usize::from(v.length_size().bytes()))
-            })
+            .map(AvcConfiguration::sample_length_size)
+            .or_else(|| self.hevc_record().map(HvcConfiguration::length_size))
     }
 }
 
@@ -239,7 +236,7 @@ pub(crate) trait PacketConfig {
     fn raw(&self) -> &Bytes;
     fn codec_kind(&self) -> Codec;
     /// Sample length width; None for explicit passthrough.
-    fn length_width(&self) -> Option<usize>;
+    fn length_width(&self) -> Option<LengthSize>;
     fn refusal(&self) -> NalConfigurationRefusal;
     fn identity(&self) -> Option<(SourceLocation, u64)>;
     fn descriptor_lower_bound(&self) -> Result<usize>;
@@ -257,7 +254,7 @@ impl PacketConfig for NalPacketConfiguration {
     fn codec_kind(&self) -> Codec {
         NalPacketConfiguration::codec(self)
     }
-    fn length_width(&self) -> Option<usize> {
+    fn length_width(&self) -> Option<LengthSize> {
         NalPacketConfiguration::width(self)
     }
     fn refusal(&self) -> NalConfigurationRefusal {
@@ -318,12 +315,12 @@ impl PacketConfig for NalPacketViewConfiguration {
             Self::Passthrough { codec, .. } => *codec,
         }
     }
-    fn length_width(&self) -> Option<usize> {
+    fn length_width(&self) -> Option<LengthSize> {
         self.avc_view()
-            .map(|v| usize::from(v.sample_length_size().bytes()))
+            .map(crate::AvcConfigurationView::sample_length_size)
             .or_else(|| {
                 self.hevc_view()
-                    .map(|v| usize::from(v.length_size().bytes()))
+                    .map(crate::HvcConfigurationView::length_size)
             })
     }
     fn refusal(&self) -> NalConfigurationRefusal {
@@ -601,8 +598,9 @@ impl<C> NalPacketSession<C> {
             .offset
             .checked_add(u64::try_from(source.bytes.len()).map_err(|_| Error::Overflow)?)
             .ok_or(Error::Overflow)?;
-        let is_avc = self.configuration.codec_kind() == Codec::Avc;
-        let changes = is_avc && source.new_extradata.as_ref().is_some_and(|v| !v.is_empty());
+        let codec = self.configuration.codec_kind();
+        let changes =
+            codec == Codec::Avc && source.new_extradata.as_ref().is_some_and(|v| !v.is_empty());
         if changes != avc_update.is_some() {
             return Err(Error::Invalid("AVC update and literal side data disagree"));
         }
@@ -616,17 +614,26 @@ impl<C> NalPacketSession<C> {
         } else {
             self.avc
         };
-        // Both vectors are created before the session borrow moves into the job,
-        // so no extra pool handle is cloned per packet.
-        let segments = BudgetVec::new(&self.pool);
-        let output = BudgetVec::new(&self.pool);
+        let length_width = avc_update
+            .as_ref()
+            .unwrap_or(&self.configuration)
+            .length_width();
+        let phase = if changes {
+            Phase::Verify
+        } else if codec == Codec::Hevc {
+            Phase::Arrays
+        } else {
+            Phase::Scan
+        };
         Ok(PacketJob {
             session: self,
             source: Some(source),
             update: avc_update,
+            codec,
+            length_width,
             avc,
             epoch,
-            phase: Phase::Verify,
+            phase,
             verify: 0,
             update_verified: false,
             array: 0,
@@ -644,8 +651,8 @@ impl<C> NalPacketSession<C> {
             look_nals: 0,
             live_base: None,
             segment_hint: None,
-            segments: Some(segments),
-            output: Some(output),
+            segments: None,
+            output: None,
             total: 0,
             copy_segment: 0,
             copied: 0,
@@ -1065,6 +1072,10 @@ struct PacketJob<'a, M, S: PacketSegment, C> {
     session: &'a mut NalPacketSession<C>,
     source: Option<NalPacket<M>>,
     update: Option<C>,
+    // Codec and width stay fixed while the job borrows the session. A valid
+    // update changes only the width of this AVC packet and subsequent packets.
+    codec: Codec,
+    length_width: Option<LengthSize>,
     avc: AvcState,
     epoch: u64,
     phase: Phase,
@@ -1135,7 +1146,7 @@ impl<M, S: PacketSegment, C: PacketConfig> PacketJob<'_, M, S, C> {
             Some(base) => base,
             None => *self.live_base.insert(self.fixed_live_bytes()),
         }?;
-        let copied_storage = if self.config().length_width().is_some() {
+        let copied_storage = if self.length_width.is_some() {
             Bytes::owner_overhead_bytes()
                 .checked_add(output)
                 .ok_or(Error::Overflow)?
@@ -1182,17 +1193,14 @@ impl<M, S: PacketSegment, C: PacketConfig> PacketJob<'_, M, S, C> {
         Ok(total)
     }
     fn append(&mut self, segment: S) -> Result<()> {
-        let parts = self
-            .segments
-            .as_ref()
-            .ok_or(Error::Invalid("missing packet plan"))?;
-        if parts.len() == self.session.limits.maximum_segments {
+        let parts = self.segments.as_ref().map_or(0, BudgetVec::len);
+        if parts == self.session.limits.maximum_segments {
             return Err(Error::Limit {
-                requested: parts.len().saturating_add(1),
+                requested: parts.saturating_add(1),
                 maximum: self.session.limits.maximum_segments,
             });
         }
-        let count = parts.len().checked_add(1).ok_or(Error::Overflow)?;
+        let count = parts.checked_add(1).ok_or(Error::Overflow)?;
         let total = self
             .total
             .checked_add(usize::from(segment.prefix_bytes()))
@@ -1213,8 +1221,7 @@ impl<M, S: PacketSegment, C: PacketConfig> PacketJob<'_, M, S, C> {
         }
         let parts = self
             .segments
-            .as_mut()
-            .ok_or(Error::Invalid("missing packet plan"))?;
+            .get_or_insert_with(|| BudgetVec::new(&self.session.pool));
         if let Some(planned) = self.segment_hint.take().filter(|_| parts.capacity() == 0) {
             // Exact first allocation instead of the default four slots. Any
             // refusal leaves the vector empty and try_push applies its own

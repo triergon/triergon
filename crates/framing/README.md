@@ -110,13 +110,17 @@ size/type header); sample jobs take one complete container sample.
 generation. Raw and reserved fields stay readable; local violations are reported
 through `syntax_issues()` bitsets rather than cleared. Absent and present-zero
 fields are distinct (`None` vs `Some(0)`). Views share the pool-owned input; a
-retained view keeps the whole backing allocation charged.
+retained view keeps the whole backing allocation charged. Small AVC records can
+reuse the checked offsets from the validation pass when the remaining work
+budget covers publishing the descriptors.
 
 **Resources.** All arithmetic is checked. Every operation has caller limits
 (bytes, NAL/OBU/frame counts, input window). Work is charged per byte or field;
 one unit always progresses and zero units consume nothing. Copies are at most
 4096 bytes between cancel checks. Allocation pressure returns retryable
 `Backpressure` at the exact checkpoint; no partial output is published.
+Stateful packet jobs allocate segment storage as needed and share the original
+payload for passthrough packets.
 
 **Codec-specific limits.**
 
