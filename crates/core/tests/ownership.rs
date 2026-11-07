@@ -216,11 +216,18 @@ fn consuming_vector_keeps_capacity_charged_until_iterator_drops() {
     values.try_push(7_u64).unwrap();
     values.try_push(9).unwrap();
     let allocated = pool.used();
+    let pointer = values.as_slice().as_ptr();
     let mut iter = values.into_iter();
+    assert_eq!(iter.as_slice(), &[7, 9]);
+    assert_eq!(iter.as_slice().as_ptr(), pointer);
+    assert_eq!(iter.len(), 2);
+    assert_eq!(pool.used(), allocated);
     assert_eq!(iter.next(), Some(7));
+    assert_eq!(iter.as_slice(), &[9]);
     assert_eq!(iter.len(), 1);
     assert_eq!(pool.used(), allocated);
     assert_eq!(iter.next(), Some(9));
+    assert!(iter.as_slice().is_empty());
     assert_eq!(pool.used(), allocated);
     drop(iter);
     assert_eq!(pool.used(), baseline);

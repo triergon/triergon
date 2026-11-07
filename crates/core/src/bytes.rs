@@ -139,25 +139,6 @@ impl Bytes {
         storage.data.clear();
         Ok(BytesWriter(self.storage))
     }
-
-    /// Convert an exclusive, complete view into charged mutable storage.
-    /// Retains the allocation, contents and capacity charge. Releases the
-    /// shared-header charge after disposing of that header. Rejection returns
-    /// the original shared or partial view with its complete charge.
-    pub fn try_into_buffer(self) -> std::result::Result<BudgetVec<u8>, Self> {
-        if self.range != (0..self.storage.data.len()) {
-            return Err(self);
-        }
-        let Self { storage, range } = self;
-        match Arc::try_unwrap(storage) {
-            Ok(Storage { data, mut charge }) => {
-                // The Arc allocation has been released before its charge.
-                charge.shrink_by(STORAGE_BYTES);
-                Ok(BudgetVec { data, charge })
-            }
-            Err(storage) => Err(Self { storage, range }),
-        }
-    }
 }
 
 /// Exclusive access to an existing charged byte allocation. Its capacity
@@ -504,6 +485,13 @@ pub struct BudgetVecIntoIter<T> {
     _charge: Reservation,
 }
 
+impl<T> BudgetVecIntoIter<T> {
+    /// Borrow the remaining elements in traversal order without advancing.
+    pub fn as_slice(&self) -> &[T] {
+        self.iter.as_slice()
+    }
+}
+
 impl<T> Iterator for BudgetVecIntoIter<T> {
     type Item = T;
 
@@ -603,72 +591,7 @@ pub fn nonzero_prefix_len(bytes: &[u8]) -> usize {
 
 #[cfg(test)]
 mod tests {
-    use super::{BudgetVec, Bytes, nonzero_prefix_len};
-    use crate::Budget;
-
-    #[test]
-    fn complete_bytes_transfer_the_allocation_and_release_only_the_shared_header() {
-        let pool = Budget::new(4096).unwrap();
-        let mut buffer = BudgetVec::new(&pool);
-        buffer.try_reserve_exact(64).unwrap();
-        buffer.try_extend_from_slice(b"frame").unwrap();
-        let bytes = buffer.freeze().unwrap();
-        let pointer = bytes.as_ref().as_ptr();
-        let capacity = bytes.retained_capacity();
-        let pressure = pool.reserve(pool.available()).unwrap();
-        let before = pool.used();
-        let mut buffer = bytes.try_into_buffer().unwrap();
-        assert_eq!(buffer.as_slice(), b"frame");
-        assert_eq!(buffer.as_slice().as_ptr(), pointer);
-        assert_eq!(buffer.capacity(), capacity);
-        assert!(buffer.budget().same_pool(&pool));
-        assert_eq!(pool.used(), before - Bytes::owner_overhead_bytes());
-        buffer.clear();
-        buffer.try_extend_from_slice(b"next").unwrap();
-        let bytes = buffer.freeze().unwrap();
-        assert_eq!(bytes.as_ref(), b"next");
-        assert_eq!(bytes.as_ref().as_ptr(), pointer);
-        assert_eq!(pool.used(), before);
-        drop(pressure);
-        drop(bytes);
-        assert_eq!(pool.used(), Budget::control_storage_bytes());
-    }
-
-    #[test]
-    fn shared_bytes_reject_buffer_conversion_without_changes() {
-        let pool = Budget::new(4096).unwrap();
-        let bytes = Bytes::copy_from_slice(&pool, b"frame").unwrap();
-        let alias = bytes.clone();
-        let before = pool.used();
-        let bytes = bytes.try_into_buffer().unwrap_err();
-        assert!(bytes.shares_storage_with(&alias));
-        assert_eq!(bytes.as_ref(), b"frame");
-        assert_eq!(pool.used(), before);
-        drop(alias);
-        assert_eq!(bytes.try_into_buffer().unwrap().as_slice(), b"frame");
-        assert_eq!(pool.used(), Budget::control_storage_bytes());
-    }
-
-    #[test]
-    fn exclusive_slices_reject_buffer_conversion_without_changes() {
-        let pool = Budget::new(4096).unwrap();
-        for range in [0..3, 1..4, 1..3, 2..2] {
-            let bytes = Bytes::copy_from_slice(&pool, b"data")
-                .unwrap()
-                .into_slice(range.clone())
-                .unwrap();
-            let address = bytes.storage_address();
-            let before = pool.used();
-            assert!(!bytes.has_shared_storage());
-            let bytes = bytes.try_into_buffer().unwrap_err();
-            assert_eq!(bytes.storage_address(), address);
-            assert_eq!(bytes.as_ref(), &b"data"[range]);
-            assert_eq!(bytes.retained_capacity(), 4);
-            assert_eq!(pool.used(), before);
-            drop(bytes);
-            assert_eq!(pool.used(), Budget::control_storage_bytes());
-        }
-    }
+    use super::nonzero_prefix_len;
 
     #[test]
     fn nonzero_prefix_stops_at_the_first_zero_in_groups_and_tails() {

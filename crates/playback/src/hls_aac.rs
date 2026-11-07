@@ -15,7 +15,6 @@ use triergon_mpegts::{
 const PREFIX_BYTES: usize = 7;
 const MAXIMUM_ADTS_BYTES: usize = 0x1fff;
 const PES_CORRUPT: u32 = 2;
-const RECYCLED_FRAMES: usize = 4;
 
 #[derive(Debug)]
 pub struct HlsAacFrame {
@@ -38,14 +37,104 @@ struct PendingPes {
     current: Option<Bytes>,
     offset: usize,
     remaining: usize,
+    coalescing_attempted: bool,
+}
+
+impl PendingPes {
+    fn try_coalesce(
+        &mut self,
+        pool: &Budget,
+        maximum: usize,
+        frame_length: usize,
+        work: &mut WorkBudget,
+        cancel: &AtomicBool,
+    ) -> Result<bool> {
+        if self.coalescing_attempted || self.offset != PREFIX_BYTES || self.remaining == 0 {
+            return Ok(false);
+        }
+        let Some(current) = self.current.as_ref() else {
+            return Ok(false);
+        };
+        if frame_length - PREFIX_BYTES <= current.len() - self.offset {
+            return Ok(false);
+        }
+        let Some(total) = current
+            .len()
+            .checked_add(self.remaining)
+            .filter(|&n| n <= maximum)
+        else {
+            return Ok(false);
+        };
+        // Bound the metadata scan, full copy, allocation/freeze and retirement.
+        let Some(required) = u64::try_from(self.spans.len())
+            .ok()
+            .and_then(|count| count.checked_mul(2))
+            .and_then(|scan_and_drop| scan_and_drop.checked_add(total as u64 + 2))
+        else {
+            return Ok(false);
+        };
+        if work.remaining() < required {
+            return Ok(false);
+        }
+        self.coalescing_attempted = true;
+        let mut remaining = self.remaining;
+        for span in self.spans.as_slice() {
+            if cancel.load(Ordering::Relaxed) {
+                return Err(Error::Cancelled);
+            }
+            work.take(1);
+            if !span.backing_bytes().belongs_to(pool) {
+                return Ok(false);
+            }
+            let Some(next) = remaining.checked_sub(span.as_ref().len()) else {
+                return Ok(false);
+            };
+            remaining = next;
+        }
+        if remaining != 0 {
+            return Ok(false);
+        }
+
+        // Keep every original span until allocation, copying and freezing all
+        // succeed. An optional failure resumes the ordered span path.
+        work.take(1);
+        let mut joined = BudgetVec::new(pool);
+        if joined.try_reserve_exact(total).is_err() || joined.capacity() > maximum {
+            return Ok(false);
+        }
+        work.take(current.len() as u64);
+        if joined.try_extend_from_slice(current.as_ref()).is_err() {
+            return Ok(false);
+        }
+        for span in self.spans.as_slice() {
+            if cancel.load(Ordering::Relaxed) {
+                return Err(Error::Cancelled);
+            }
+            work.take(span.as_ref().len() as u64);
+            if joined.try_extend_from_slice(span.as_ref()).is_err() {
+                return Ok(false);
+            }
+        }
+        work.take(1);
+        let Ok(joined) = joined.freeze() else {
+            return Ok(false);
+        };
+        for _ in self.spans.by_ref() {
+            if cancel.load(Ordering::Relaxed) {
+                return Err(Error::Cancelled);
+            }
+            work.take(1);
+        }
+        self.current = Some(joined);
+        self.remaining = 0;
+        Ok(true)
+    }
 }
 
 /// One logical AAC byte stream. Create a new reader at a configuration change
-/// or a discontinuity. Retention is one PES span list, one charged frame
-/// buffer and up to four recent buffered frames. Recycling stops when a
-/// cached frame is still shared or allocation pressure occurs. Consumed spans
-/// are released as the cursor advances, and delivered frames retain their
-/// charge independently of the reader.
+/// or a discontinuity. Retention is one PES span list and one charged frame
+/// buffer. Consumed spans are released as the cursor advances, and delivered
+/// frames own their charge independently of the reader.
 pub struct HlsAac {
     pool: Budget,
     config: TsNativeConfiguration,
@@ -59,8 +148,6 @@ pub struct HlsAac {
     header: Option<AacAdtsHeader>,
     duration: Option<(u32, Time)>,
     frame: BudgetVec<u8>,
-    recycled: [Option<Bytes>; RECYCLED_FRAMES],
-    next_recycled: Option<usize>,
     eof: bool,
     failure: Option<Error>,
 }
@@ -92,8 +179,6 @@ impl HlsAac {
             header: None,
             duration: None,
             frame: BudgetVec::new(pool),
-            recycled: [const { None }; RECYCLED_FRAMES],
-            next_recycled: Some(0),
             eof: false,
             failure: None,
         })
@@ -163,6 +248,7 @@ impl HlsAac {
             current: None,
             offset: 0,
             remaining: packet.payload_len,
+            coalescing_attempted: false,
         });
         Ok(true)
     }
@@ -184,17 +270,6 @@ impl HlsAac {
             return Err(error);
         }
         let result = self.advance(work, cancel);
-        match &result {
-            Ok(AssemblyStep::NeedPayload) => {
-                self.recycled.fill_with(|| None);
-                self.next_recycled = self.next_recycled.map(|_| 0);
-            }
-            Err(_) | Ok(AssemblyStep::Finished) => {
-                self.recycled.fill_with(|| None);
-                self.next_recycled = None;
-            }
-            _ => {}
-        }
         if let Err(error) = result
             && !matches!(error, Error::Backpressure { .. } | Error::Allocation)
         {
@@ -235,6 +310,18 @@ impl HlsAac {
                     (true, _) => Err(Error::Truncated),
                 };
             };
+            if self.frame.is_empty()
+                && let Some(header) = self.header
+                && input.try_coalesce(
+                    &self.pool,
+                    self.maximum_frame_bytes,
+                    usize::from(header.frame_length()),
+                    work,
+                    cancel,
+                )?
+            {
+                continue;
+            }
             let span = match &mut input.current {
                 Some(bytes) => bytes,
                 slot @ None => {
@@ -286,35 +373,7 @@ impl HlsAac {
                     if !work.try_charge(1) {
                         return Ok(AssemblyStep::Yield);
                     }
-                    if let Some(index) = self.next_recycled
-                        && let Some(bytes) = self.recycled[index].take()
-                    {
-                        match bytes.try_into_buffer() {
-                            Ok(mut buffer) => {
-                                buffer.clear();
-                                self.frame = buffer;
-                            }
-                            Err(bytes) => {
-                                drop(bytes);
-                                self.recycled.fill_with(|| None);
-                                self.next_recycled = None;
-                            }
-                        }
-                    }
-                    if let Err(error) = self.frame.try_reserve_exact(length) {
-                        let retained =
-                            self.frame.capacity() != 0 || self.recycled.iter().any(Option::is_some);
-                        if !matches!(error, Error::Backpressure { .. }) || !retained {
-                            return Err(error);
-                        }
-                        self.recycled.fill_with(|| None);
-                        self.next_recycled = None;
-                        self.frame = BudgetVec::new(&self.pool);
-                        if !work.try_charge(1) {
-                            return Ok(AssemblyStep::Yield);
-                        }
-                        self.frame.try_reserve_exact(length)?;
-                    }
+                    self.frame.try_reserve_exact(length)?;
                     self.frame.try_extend_from_slice(&self.prefix)?;
                 }
                 length - self.frame.len()
@@ -389,13 +448,7 @@ impl HlsAac {
         } else {
             let frame = std::mem::replace(&mut self.frame, BudgetVec::new(&self.pool));
             match frame.freeze() {
-                Ok(bytes) => {
-                    if let Some(index) = self.next_recycled {
-                        self.recycled[index] = Some(bytes.clone());
-                        self.next_recycled = Some((index + 1) % RECYCLED_FRAMES);
-                    }
-                    bytes
-                }
+                Ok(bytes) => bytes,
                 Err(error) => {
                     self.frame = error.buffer;
                     return Err(error.error);
@@ -571,209 +624,308 @@ mod tests {
         panic!("AAC reader stalled at work quantum 1");
     }
 
-    fn buffered_frame(reader: &mut HlsAac, bytes: &[u8]) -> HlsAacFrame {
-        let cancel = AtomicBool::new(false);
-        let AssemblyStep::Output(frame) = reader.poll(&mut WorkBudget::new(4096), &cancel).unwrap()
-        else {
-            panic!("complete buffered frame");
-        };
-        assert_eq!(frame.bytes.as_ref(), bytes);
+    fn fragmented_packet(
+        fixture: &mut PesFixture,
+        parts: &[&[u8]],
+    ) -> (Option<DemuxPacket>, DemuxTimeView) {
+        let (mut packet, clock) = fixture.chunk(parts[0], 90_000, Some(89_000));
+        for part in &parts[1..] {
+            let (tail, _) = fixture.chunk(part, 180_000, None);
+            let tail = tail.unwrap();
+            let packet = packet.as_mut().unwrap();
+            packet.payload_len += tail.payload_len;
+            for span in tail.spans {
+                packet.spans.try_push(span).unwrap();
+            }
+        }
+        (packet, clock)
+    }
+
+    fn long_frame() -> Vec<u8> {
+        let mut frame = vec![0x31; 240];
+        frame[..PREFIX_BYTES].copy_from_slice(&[0xff, 0xf1, 0x4c, 0x40, 30, 0x1f, 0xfc]);
         frame
     }
 
-    #[test]
-    fn buffered_allocations_recycle_after_four_frames_with_two_retained() {
-        let mut fixture = PesFixture::new();
-        let mut reader = HlsAac::new(&fixture.pool, CONFIG, 128).unwrap();
-        let data: Vec<_> = (0..12)
-            .flat_map(|index| {
-                let mut frame = F48;
-                frame[9] = index;
-                frame
-            })
-            .collect();
-        let (mut packet, clock) = fixture.chunk(&data, 90_000, None);
-        assert!(reader.push(&mut packet, clock).unwrap());
-        let mut held = std::collections::VecDeque::new();
-        let mut pointers = [std::ptr::null(); RECYCLED_FRAMES];
-        for index in 0..12 {
-            if held.len() == 2 {
-                held.pop_front();
+    fn collect(reader: &mut HlsAac, quantum: u64) -> (Vec<HlsAacFrame>, u64) {
+        let mut frames = Vec::new();
+        let mut spent = 0;
+        for _ in 0..4096 {
+            let mut work = WorkBudget::new(quantum);
+            let step = reader.poll(&mut work, &AtomicBool::new(false)).unwrap();
+            spent += work.spent();
+            match step {
+                AssemblyStep::Output(frame) => frames.push(frame),
+                AssemblyStep::Yield => {}
+                AssemblyStep::NeedPayload => return (frames, spent),
+                AssemblyStep::Finished => {
+                    panic!("expected frames followed by a request for another PES");
+                }
             }
-            let frame = buffered_frame(
-                &mut reader,
-                &data[index * F48.len()..(index + 1) * F48.len()],
+        }
+        panic!("fragmented AAC reader stalled");
+    }
+
+    #[test]
+    fn fragmented_frames_share_one_bounded_pes_copy_with_exact_work_and_clocks() {
+        let mut fixture = PesFixture::new();
+        let frame = long_frame();
+        let wire = frame.repeat(3);
+        let parts: Vec<_> = wire.chunks(120).collect();
+        let (mut packet, clock) = fragmented_packet(&mut fixture, &parts);
+        let mut reader = fixture.reader();
+        assert!(reader.push(&mut packet, clock).unwrap());
+        let (frames, spent) = collect(&mut reader, 4096);
+        assert_eq!(frames.len(), 3);
+        // Copy the whole PES, inspect and retire its five remaining spans,
+        // allocate/freeze once, retain ordinary frame work and one boundary.
+        assert_eq!(spent, wire.len() as u64 + 2 * 5 + 2 + 3 * 243 + 1);
+        for (index, output) in frames.iter().enumerate() {
+            assert_eq!(output.bytes.as_ref(), frame);
+            assert!(output.bytes.shares_storage_with(&frames[0].bytes));
+            assert_eq!(output.bytes.retained_capacity(), wire.len());
+            assert!(output.bytes.belongs_to(&fixture.pool));
+            assert_eq!(output.duration, Time::new(1024, 48_000).unwrap());
+            assert_eq!(output.pts, (index == 0).then(|| Time::new(1, 1).unwrap()));
+            assert_eq!(
+                output.dts,
+                (index == 0).then(|| Time::new(89_000, 90_000).unwrap())
             );
-            let slot = index % RECYCLED_FRAMES;
-            if index < RECYCLED_FRAMES {
-                pointers[slot] = frame.bytes.as_ref().as_ptr();
-            } else {
-                assert_eq!(frame.bytes.as_ref().as_ptr(), pointers[slot]);
-            }
-            held.push_back(frame);
         }
-        assert_eq!(reader.next_recycled, Some(0));
-        assert_eq!(reader.recycled.iter().flatten().count(), RECYCLED_FRAMES);
-        reader.finish();
-        assert!(matches!(
-            reader
-                .poll(&mut WorkBudget::new(1), &AtomicBool::new(false))
-                .unwrap(),
-            AssemblyStep::Finished
-        ));
-        assert!(reader.recycled.iter().all(Option::is_none));
-        for (index, frame) in (10..12).zip(&held) {
-            assert_eq!(frame.bytes[9], index as u8);
-            assert_eq!(frame.pts, None);
-            assert_eq!(frame.dts, None);
-        }
+        let pool = fixture.pool.clone();
+        drop(reader);
+        drop(fixture);
+        assert_eq!(
+            pool.used(),
+            Budget::control_storage_bytes() + frames[0].bytes.retained_storage_bytes()
+        );
+        drop(frames);
+        assert_eq!(pool.used(), Budget::control_storage_bytes());
     }
 
     #[test]
-    fn retained_frames_disable_recycling_without_changing_bytes_or_clocks() {
+    fn coalescing_waits_for_complete_work_and_retains_publication_under_pressure() {
         let mut fixture = PesFixture::new();
-        let mut reader = HlsAac::new(&fixture.pool, CONFIG, 128).unwrap();
-        let data: Vec<_> = (0..8)
-            .flat_map(|index| {
-                let mut frame = F48;
-                frame[9] = index;
-                frame
-            })
-            .collect();
-        let (mut packet, clock) = fixture.chunk(&data, 90_000, None);
+        let frame = long_frame();
+        let wire = frame.repeat(3);
+        let parts: Vec<_> = wire.chunks(120).collect();
+        let (mut packet, clock) = fragmented_packet(&mut fixture, &parts);
+        let mut reader = fixture.reader();
         assert!(reader.push(&mut packet, clock).unwrap());
-        let mut held = Vec::new();
-        for index in 0..8 {
-            held.push(buffered_frame(
-                &mut reader,
-                &data[index * F48.len()..(index + 1) * F48.len()],
-            ));
-            if index >= RECYCLED_FRAMES {
-                assert_eq!(reader.next_recycled, None);
-                assert!(reader.recycled.iter().all(Option::is_none));
-            }
-        }
-        assert!(matches!(
-            reader
-                .poll(&mut WorkBudget::new(1), &AtomicBool::new(false))
-                .unwrap(),
-            AssemblyStep::NeedPayload
-        ));
-        assert_eq!(reader.next_recycled, None);
-        for (index, frame) in held.iter().enumerate() {
-            let mut data = F48;
-            data[9] = index as u8;
-            assert_eq!(frame.bytes.as_ref(), data);
-            assert_eq!(frame.pts, (index == 0).then(|| Time::new(1, 1).unwrap()));
-            assert_eq!(frame.dts, None);
-            assert!(!frame.bytes.has_shared_storage());
-        }
-    }
-
-    #[test]
-    fn recycled_capacity_grows_and_remains_available_for_shorter_frames() {
-        let mut fixture = PesFixture::new();
-        let mut reader = HlsAac::new(&fixture.pool, CONFIG, 128).unwrap();
-        let data = [
-            F48.repeat(RECYCLED_FRAMES),
-            F44_CRC.to_vec(),
-            F48.repeat(RECYCLED_FRAMES),
-        ]
-        .concat();
-        let (mut packet, clock) = fixture.chunk(&data, 90_000, None);
-        assert!(reader.push(&mut packet, clock).unwrap());
-        for _ in 0..RECYCLED_FRAMES {
-            drop(buffered_frame(&mut reader, &F48));
-        }
-        let larger = buffered_frame(&mut reader, &F44_CRC);
-        let pointer = larger.bytes.as_ref().as_ptr();
-        let capacity = larger.bytes.retained_capacity();
-        assert!(capacity >= F44_CRC.len());
-        drop(larger);
-        for _ in 1..RECYCLED_FRAMES {
-            drop(buffered_frame(&mut reader, &F48));
-        }
-        let shorter = buffered_frame(&mut reader, &F48);
-        assert_eq!(shorter.bytes.as_ref().as_ptr(), pointer);
-        assert_eq!(shorter.bytes.retained_capacity(), capacity);
-    }
-
-    #[test]
-    fn growth_pressure_releases_the_cache_and_resumes_with_one_work_unit() {
-        let mut fixture = PesFixture::new();
-        let mut reader = HlsAac::new(&fixture.pool, CONFIG, 128).unwrap();
-        let mut larger = [0x55; 128];
-        larger[..PREFIX_BYTES].copy_from_slice(&F48[..PREFIX_BYTES]);
-        larger[4] = 16;
-        larger[5] = 0x1f;
-        let data = [F48.repeat(RECYCLED_FRAMES), larger.to_vec()].concat();
-        let (mut packet, clock) = fixture.chunk(&data, 90_000, None);
-        assert!(reader.push(&mut packet, clock).unwrap());
-        for _ in 0..RECYCLED_FRAMES {
-            drop(buffered_frame(&mut reader, &F48));
-        }
         let cancel = AtomicBool::new(false);
-        assert!(matches!(
-            reader.poll(&mut WorkBudget::new(8), &cancel).unwrap(),
-            AssemblyStep::Yield
-        ));
-        let pressure = fixture.pool.reserve(fixture.pool.available()).unwrap();
-        let mut work = WorkBudget::new(1);
+        let required = wire.len() as u64 + 2 * 5 + 2;
+        let mut work = WorkBudget::new(PREFIX_BYTES as u64 + 1 + required);
         assert!(matches!(
             reader.poll(&mut work, &cancel).unwrap(),
             AssemblyStep::Yield
         ));
-        assert_eq!(work.spent(), 1);
-        assert_eq!(reader.next_recycled, None);
-        assert!(reader.recycled.iter().all(Option::is_none));
-        assert_eq!(reader.frame.capacity(), 0);
-        let mut output = Vec::new();
-        for _ in 0..256 {
-            match reader.poll(&mut WorkBudget::new(1), &cancel).unwrap() {
-                AssemblyStep::Output(frame) => output.push(frame),
-                AssemblyStep::Yield => {}
-                AssemblyStep::NeedPayload => break,
-                AssemblyStep::Finished => panic!("input remains open"),
-            }
-        }
-        assert_eq!(output.len(), 1);
-        assert_eq!(output[0].bytes.as_ref(), larger);
-        assert_eq!(output[0].pts, None);
-        assert!(!output[0].bytes.has_shared_storage());
+        assert_eq!(work.remaining(), 0);
+        let pending = reader.pending.as_ref().unwrap();
+        assert_eq!(pending.offset, PREFIX_BYTES);
+        assert_eq!(pending.remaining, 0);
+        assert!(pending.spans.as_slice().is_empty());
+        assert_eq!(pending.current.as_ref().unwrap().as_ref(), wire);
+        assert!(reader.frame.is_empty());
+        let pressure = fixture.pool.reserve(fixture.pool.available()).unwrap();
+        let mut work = WorkBudget::new(frame.len() as u64 - PREFIX_BYTES as u64 + 2);
+        let AssemblyStep::Output(output) = reader.poll(&mut work, &cancel).unwrap() else {
+            panic!("coalesced bytes must publish without another allocation");
+        };
+        assert_eq!(work.remaining(), 0);
+        assert_eq!(output.bytes.as_ref(), frame);
+        assert_eq!(output.pts, Some(Time::new(1, 1).unwrap()));
+        assert_eq!(output.dts, Some(Time::new(89_000, 90_000).unwrap()));
         drop(pressure);
     }
 
     #[test]
-    fn payload_boundary_releases_cached_capacity_for_transport_input() {
-        let mut fixture = PesFixture::new();
-        // Include the transport parser's persistent scratch allocation.
-        drop(fixture.chunk(&F48, 90_000, None));
-        let baseline = fixture.pool.used();
-        let mut reader = HlsAac::new(&fixture.pool, CONFIG, 128).unwrap();
-        let (mut packet, clock) = fixture.chunk(&F48.repeat(RECYCLED_FRAMES), 90_000, None);
-        assert!(reader.push(&mut packet, clock).unwrap());
-        let held = buffered_frame(&mut reader, &F48);
-        for _ in 1..RECYCLED_FRAMES {
-            drop(buffered_frame(&mut reader, &F48));
+    fn optional_allocation_and_freeze_failures_keep_every_original_span() {
+        for available in [0, 720] {
+            let mut fixture = PesFixture::new();
+            let frame = long_frame();
+            let wire = frame.repeat(3);
+            let parts: Vec<_> = wire.chunks(120).collect();
+            let (mut packet, clock) = fragmented_packet(&mut fixture, &parts);
+            let mut reader = fixture.reader();
+            assert!(reader.push(&mut packet, clock).unwrap());
+            let cancel = AtomicBool::new(false);
+            assert!(matches!(
+                reader.poll(&mut WorkBudget::new(8), &cancel).unwrap(),
+                AssemblyStep::Yield
+            ));
+            let pending = reader.pending.as_mut().unwrap();
+            let original = pending.current.as_ref().unwrap().storage_address();
+            let tail: Vec<_> = pending
+                .spans
+                .as_slice()
+                .iter()
+                .map(|span| span.backing_bytes().storage_address())
+                .collect();
+            let mut short = WorkBudget::new(wire.len() as u64 + 2 * 5 + 1);
+            assert!(
+                !pending
+                    .try_coalesce(
+                        &fixture.pool,
+                        MAXIMUM_ADTS_BYTES,
+                        frame.len(),
+                        &mut short,
+                        &cancel
+                    )
+                    .unwrap()
+            );
+            assert_eq!(short.spent(), 0);
+            assert!(!pending.coalescing_attempted);
+            let pressure = fixture
+                .pool
+                .reserve(fixture.pool.available() - available)
+                .unwrap();
+            let used = fixture.pool.used();
+            let mut work = WorkBudget::new(4096);
+            assert!(
+                !pending
+                    .try_coalesce(
+                        &fixture.pool,
+                        MAXIMUM_ADTS_BYTES,
+                        frame.len(),
+                        &mut work,
+                        &cancel
+                    )
+                    .unwrap()
+            );
+            assert_eq!(work.spent(), if available == 0 { 6 } else { 727 });
+            assert_eq!(fixture.pool.used(), used);
+            assert_eq!(
+                pending.current.as_ref().unwrap().storage_address(),
+                original
+            );
+            assert_eq!(pending.offset, PREFIX_BYTES);
+            assert_eq!(pending.remaining, wire.len() - 120);
+            assert_eq!(
+                pending
+                    .spans
+                    .as_slice()
+                    .iter()
+                    .map(|span| span.backing_bytes().storage_address())
+                    .collect::<Vec<_>>(),
+                tail
+            );
+            assert!(pending.coalescing_attempted);
+            let mut retry = WorkBudget::new(4096);
+            assert!(
+                !pending
+                    .try_coalesce(
+                        &fixture.pool,
+                        MAXIMUM_ADTS_BYTES,
+                        frame.len(),
+                        &mut retry,
+                        &cancel
+                    )
+                    .unwrap()
+            );
+            assert_eq!(retry.spent(), 0);
+            drop(pressure);
+            let (frames, _) = collect(&mut reader, 4096);
+            assert_eq!(frames.len(), 3);
+            for output in frames {
+                assert_eq!(output.bytes.as_ref(), frame);
+                assert_eq!(output.bytes.retained_capacity(), frame.len());
+            }
         }
-        let pressure = fixture.pool.reserve(fixture.pool.available()).unwrap();
-        assert!(matches!(
-            reader
-                .poll(&mut WorkBudget::new(1), &AtomicBool::new(false))
-                .unwrap(),
-            AssemblyStep::NeedPayload
-        ));
-        assert!(reader.recycled.iter().all(Option::is_none));
-        assert_eq!(reader.next_recycled, Some(0));
-        assert_eq!(
-            fixture.pool.used(),
-            baseline + held.bytes.retained_storage_bytes() + pressure.bytes()
-        );
-        let next_input = Bytes::copy_from_slice(&fixture.pool, &[0; 188]).unwrap();
-        assert_eq!(held.bytes.as_ref(), F48);
-        assert_eq!(held.pts, Some(Time::new(1, 1).unwrap()));
-        drop(next_input);
-        drop(pressure);
+    }
+
+    #[test]
+    fn bounded_coalescing_preserves_delayed_span_errors() {
+        for (foreign, missing) in [(true, false), (false, false), (false, true)] {
+            let mut fixture = PesFixture::new();
+            let (mut packet, clock) = fragmented_packet(&mut fixture, &[&F48[..8], &F48[8..]]);
+            if missing {
+                packet.as_mut().unwrap().payload_len += 1;
+            } else {
+                let (tail, _) = if foreign {
+                    PesFixture::new().chunk(&F48, 180_000, None)
+                } else {
+                    fixture.chunk(&F48, 180_000, None)
+                };
+                let mut tail = tail.unwrap();
+                let packet = packet.as_mut().unwrap();
+                if foreign {
+                    packet.payload_len += tail.payload_len;
+                }
+                packet.spans.try_push(tail.spans.pop().unwrap()).unwrap();
+            }
+            let mut reader = fixture.reader();
+            assert!(reader.push(&mut packet, clock).unwrap());
+            let cancel = AtomicBool::new(false);
+            let mut work = WorkBudget::new(128);
+            let AssemblyStep::Output(output) = reader.poll(&mut work, &cancel).unwrap() else {
+                panic!("the earlier valid fragmented frame must be delivered");
+            };
+            assert_eq!(output.bytes.as_ref(), F48);
+            assert!(reader.pending.as_ref().unwrap().coalescing_attempted);
+            assert_eq!(
+                reader.poll(&mut work, &cancel).unwrap_err(),
+                if foreign {
+                    Error::ForeignPool
+                } else {
+                    Error::Invalid("HLS AAC PES payload extent")
+                }
+            );
+        }
+    }
+
+    #[test]
+    fn tiny_work_keeps_copy_accounting_and_joined_tails_respect_the_frame_bound() {
+        for (maximum, quantum) in [(MAXIMUM_ADTS_BYTES, 1), (240, 4096)] {
+            let mut fixture = PesFixture::new();
+            let frame = long_frame();
+            let wire = frame.repeat(3);
+            let parts: Vec<_> = wire.chunks(120).collect();
+            let (mut packet, clock) = fragmented_packet(&mut fixture, &parts);
+            let mut reader = HlsAac::new(&fixture.pool, CONFIG, maximum).unwrap();
+            assert!(reader.push(&mut packet, clock).unwrap());
+            let (frames, spent) = collect(&mut reader, quantum);
+            // With a 240-byte bound only the last frame's tail can join: its
+            // copy and four setup/metadata units replace one span boundary.
+            assert_eq!(
+                spent,
+                3 * 243 + 6 + if quantum == 1 { 0 } else { 240 + 4 - 1 }
+            );
+            assert_eq!(frames.len(), 3);
+            for (index, output) in frames.iter().enumerate() {
+                assert_eq!(output.bytes.as_ref(), frame);
+                assert_eq!(output.bytes.retained_capacity(), frame.len());
+                if index != 0 {
+                    assert!(!output.bytes.shares_storage_with(&frames[0].bytes));
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn coalesced_tail_keeps_a_split_prefix_and_the_next_pes_anchor() {
+        let mut fixture = PesFixture::new();
+        let wire = [&F48[..], &F48[..], &F48[..5]].concat();
+        let (mut packet, clock) = fragmented_packet(&mut fixture, &[&wire[..8], &wire[8..]]);
+        let mut reader = fixture.reader();
+        assert!(reader.push(&mut packet, clock).unwrap());
+        let (mut frames, _) = collect(&mut reader, 4096);
+        assert_eq!(frames.len(), 2);
+        assert!(frames[0].bytes.shares_storage_with(&frames[1].bytes));
+        assert_eq!(reader.prefix_used, 5);
+        let (mut packet, clock) =
+            fixture.chunk(&[&F48[5..], &F48[..]].concat(), 180_000, Some(179_000));
+        assert!(reader.push(&mut packet, clock).unwrap());
+        frames.extend(collect(&mut reader, 4096).0);
+        assert_eq!(frames.len(), 4);
+        for output in &frames {
+            assert_eq!(output.bytes.as_ref(), F48);
+        }
+        assert_eq!(frames[0].pts, Some(Time::new(1, 1).unwrap()));
+        assert_eq!(frames[0].dts, Some(Time::new(89_000, 90_000).unwrap()));
+        assert_eq!((frames[1].pts, frames[1].dts), (None, None));
+        assert_eq!((frames[2].pts, frames[2].dts), (None, None));
+        assert_eq!(frames[3].pts, Some(Time::new(2, 1).unwrap()));
+        assert_eq!(frames[3].dts, Some(Time::new(179_000, 90_000).unwrap()));
     }
 
     #[test]

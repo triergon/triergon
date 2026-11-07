@@ -152,12 +152,14 @@ source, 64 MiB feed, 8,192 access units. A failed reader releases its source;
 retry with a new reader.
 
 **ADTS AAC.** Complete frames contained in one source span can share its charged
-backing storage when its capacity fits the configured maximum frame size. Split
-frames use charged assembly buffers. The reader caches up to four recently
-published buffers and reuses them after the caller releases every alias.
-A shared cached buffer or allocation pressure clears the cache and ends recycling
-for that reader. The cache also clears when another PES is needed, at EOF and
-on failure.
+backing storage when its capacity fits the configured maximum frame size. After
+header validation, a fragmented frame can use one copy of the remaining PES tail
+when that tail fits the frame size limit (at most 8,191 bytes) and the work budget
+covers validation, copying, allocation and span retirement. Every remaining span
+must use the same pool and their lengths must exactly match the declared extent.
+Frames then share the joined storage and keep its full capacity charged while
+retained. Insufficient work, invalid tail metadata or allocation pressure keeps
+ordered span assembly, so a later invalid span still follows earlier valid frames.
 
 **Sinks.** `pump::Sink` owns accepted `Feed` envelopes until their callbacks
 retire; `Submission::Blocked` returns the same envelope. Threading and
