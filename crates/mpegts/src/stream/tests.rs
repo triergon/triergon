@@ -178,6 +178,89 @@ impl PayloadFeed {
 }
 
 #[test]
+fn rejected_pes_payload_stays_available_for_a_drained_retry() {
+    let mut feed = PayloadFeed::new(&carrier(0, true));
+    let pool = feed.input.budget().clone();
+    let limits = ParseLimits::default();
+    let blocker = Bytes::copy_from_slice(&pool, &[2; 4]).unwrap();
+    feed.stream.routes.as_mut_slice()[0]
+        .assembler
+        .as_mut()
+        .unwrap()
+        .push(blocker, false, SOURCE, 188)
+        .unwrap();
+    let mut packet = crate::parse_transport(
+        Bytes::copy_from_slice(&pool, &carrier(1, false)).unwrap(),
+        PacketFormat::Ts188,
+        376,
+    )
+    .unwrap();
+    packet.source_id = Some(SOURCE);
+    let address = packet.payload.as_ref().unwrap().storage_address();
+    let expected = packet.payload.as_ref().unwrap().as_ref().to_vec();
+    feed.stream.packet = Some(packet);
+    feed.stream.phase = 5;
+    let mut work = WorkBudget::new(limits.pes_bytes as u64);
+    assert_eq!(
+        feed.stream.feed(&mut work),
+        Err(Error::Invalid("PES payload not drained"))
+    );
+    let payload = feed
+        .stream
+        .packet
+        .as_ref()
+        .unwrap()
+        .payload
+        .as_ref()
+        .unwrap();
+    assert_eq!(payload.storage_address(), address);
+    assert_eq!(payload.as_ref(), expected);
+    assert_eq!(feed.stream.phase, 5);
+    assert!(matches!(
+        feed.stream.routes.as_mut_slice()[0]
+            .assembler
+            .as_mut()
+            .unwrap()
+            .poll_source::<false>(&mut work, &AtomicBool::new(false))
+            .unwrap(),
+        AssemblyStep::NeedPayload
+    ));
+    feed.stream.feed(&mut work).unwrap();
+    assert_eq!(feed.stream.phase, 6);
+    assert!(feed.stream.packet.as_ref().unwrap().payload.is_none());
+}
+
+#[test]
+fn invalid_psi_pointer_restores_payload_before_diagnostic_recovery() {
+    let pool = Budget::new(8192).unwrap();
+    let mut stream =
+        TransportStream::new(pool.clone(), PacketFormat::Ts188, ParseLimits::default(), 1).unwrap();
+    let mut raw = carrier(0, true);
+    raw[1] = 0x40;
+    raw[4] = 0xff;
+    let mut packet = crate::parse_transport(
+        Bytes::copy_from_slice(&pool, &raw).unwrap(),
+        PacketFormat::Ts188,
+        0,
+    )
+    .unwrap();
+    packet.source_id = Some(SOURCE);
+    let address = packet.payload.as_ref().unwrap().storage_address();
+    stream.packet = Some(packet);
+    stream.route = Route::Pat;
+    stream.phase = 5;
+    stream.feed(&mut WorkBudget::new(1)).unwrap();
+    assert_eq!(stream.phase, 7);
+    assert_eq!(
+        stream.fault.as_ref().unwrap().error,
+        Error::Invalid("PSI pointer")
+    );
+    let payload = stream.packet.as_ref().unwrap().payload.as_ref().unwrap();
+    assert_eq!(payload.storage_address(), address);
+    assert_eq!(payload.as_ref(), &raw[4..]);
+}
+
+#[test]
 fn payload_run_preserves_work_boundary_and_span_provenance() {
     let wire = [carrier(14, true), carrier(15, false), carrier(0, false)].concat();
     let cancel = AtomicBool::new(false);

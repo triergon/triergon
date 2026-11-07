@@ -1243,7 +1243,7 @@ impl TransportStream {
     fn feed(&mut self, work: &mut WorkBudget) -> Result<()> {
         let packet = self
             .packet
-            .as_ref()
+            .as_mut()
             .ok_or(Error::Invalid("TS packet missing"))?;
         let Some(payload) = packet.payload.as_ref() else {
             self.phase = 7;
@@ -1277,31 +1277,44 @@ impl TransportStream {
                 return Ok(());
             }
         }
-        let payload = payload.clone();
+        let payload = &mut packet.payload;
         let pushed = match self.route {
-            Route::Pat => self
-                .pat
-                .assembler
-                .push(payload, pusi, entity, offset)
-                .map_err(|error| error.error),
+            Route::Pat => self.pat.assembler.push(
+                payload.take().ok_or(Error::Invalid("TS payload missing"))?,
+                pusi,
+                entity,
+                offset,
+            ),
             Route::Pmt => self
                 .pmt
                 .as_mut()
                 .ok_or(Error::Invalid("PMT route missing"))?
                 .assembler
-                .push(payload, pusi, entity, offset)
-                .map_err(|error| error.error),
+                .push(
+                    payload.take().ok_or(Error::Invalid("TS payload missing"))?,
+                    pusi,
+                    entity,
+                    offset,
+                ),
             Route::Pes(index) => self.routes.as_mut_slice()[index]
                 .assembler
                 .as_mut()
                 .ok_or(Error::Invalid("PES route missing"))?
-                .push(payload, pusi, entity, offset)
-                .map_err(|error| error.error),
+                .push(
+                    payload.take().ok_or(Error::Invalid("TS payload missing"))?,
+                    pusi,
+                    entity,
+                    offset,
+                ),
             Route::Clock | Route::Ignore => {
                 self.phase = 7;
                 return Ok(());
             }
         };
+        let pushed = pushed.map_err(|rejected| {
+            *payload = Some(rejected.value);
+            rejected.error
+        });
         match pushed {
             Ok(()) => self.phase = 6,
             Err(error)
