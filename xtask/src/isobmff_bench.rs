@@ -1693,7 +1693,7 @@ mod tests {
     }
 
     #[test]
-    fn memory_role_proofs_preserve_exact_outputs_and_all_four_receipts() {
+    fn memory_role_proofs_preserve_exact_outputs_and_all_four_reports() {
         let suite = Suite::load(&root()).unwrap();
         let case = &suite.cases[0];
         let expected = Value::object([
@@ -1735,10 +1735,10 @@ mod tests {
             case.work(false, false);
         assert!(!memory_outputs_match(&changed, &expected));
         let mut changed = raw.clone();
-        let Value::Object(receipts) = value_at(&mut changed, &["samples", "0"]) else {
-            panic!("expected the four receipts");
+        let Value::Object(reports) = value_at(&mut changed, &["samples", "0"]) else {
+            panic!("expected the four reports");
         };
-        receipts.pop();
+        reports.pop();
         assert!(!memory_outputs_match(&changed, &expected));
         let evidence = case.evidence("memory", raw.clone());
         assert_eq!(evidence.get("memory"), Some(&raw));
