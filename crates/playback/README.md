@@ -132,6 +132,9 @@ timestamp directly.
 The feed consumes validated PES continuations directly and preserves source
 event positions. AVC fixed-width fields consume buffered RBSP bits in byte-sized
 groups while retaining emulation-prevention validation. The segment reader uses one caller-owned player output slot.
+`HlsMediaVideoUnit::feed_spans` borrows the complete AVC or HEVC Annex B
+feed, including any inserted parameter sets. Its spans remain valid while the
+video unit is retained.
 Units are released only after EOF and both the video and audio assemblers drain. Defaults: 64 MiB
 source, 64 MiB feed, 8,192 access units. A failed reader releases its source;
 retry with a new reader.
