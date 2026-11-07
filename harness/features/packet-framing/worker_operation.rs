@@ -11,11 +11,10 @@ use triergon_framing::*;
 const QUANTUM: u64 = 4096;
 static CANCEL: AtomicBool = AtomicBool::new(false);
 
-fn avc(
+fn avc<const UPDATE: bool>(
     pool: &Budget,
     raw: Bytes,
     offset: u64,
-    update: bool,
 ) -> std::result::Result<ReceiverAvcConfigurationView, (Error, Option<i32>)> {
     let source = AvcConfigSource {
         source: SourceId(1),
@@ -27,7 +26,7 @@ fn avc(
         maximum_nals: 65536,
         maximum_nal_bytes: 65535,
     };
-    let mut parser = if update {
+    let mut parser = if UPDATE {
         ReceiverAvcConfigViewParser::new_update(pool, source, raw, limits)
     } else {
         ReceiverAvcConfigViewParser::new(pool, source, raw, limits)
@@ -59,7 +58,7 @@ fn configuration(case: &Case) -> Result<NalPacketViewConfiguration> {
         });
     }
     match case.codec {
-        Codec::Avc => avc(&case.pool, raw.clone(), case.config_offset, false)
+        Codec::Avc => avc::<false>(&case.pool, raw.clone(), case.config_offset)
             .map(NalPacketViewConfiguration::ReceiverAvc)
             .map_err(|(e, _)| e),
         Codec::Hevc => {
@@ -214,7 +213,7 @@ fn operation(case: &Case) -> Result<Outcome> {
         };
         let update = if case.codec == Codec::Avc {
             if let Some(raw) = extra.as_ref().filter(|b| !b.is_empty()) {
-                match avc(&case.pool, raw.clone(), *extra_offset, true) {
+                match avc::<true>(&case.pool, raw.clone(), *extra_offset) {
                     Ok(v) => Some(v),
                     Err((_, Some(code))) => {
                         receive_failure(&mut outcome.digest, index, code);
