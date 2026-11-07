@@ -12,5 +12,7 @@
 
 mod checked;
 pub mod crc;
+mod rbsp;
 
 pub use checked::{BitCursor, BitError, BitSource, bits_at};
+pub use rbsp::Rbsp;

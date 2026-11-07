@@ -2,6 +2,7 @@
 //! §§7.3.2.1.1, 7.3.2.2, 7.3.3 and 7.4.1.2.4. This inspects the syntax
 //! needed for picture identity, leaving the rest of each RBSP opaque.
 use crate::{Codec, NalHeader};
+use triergon_bitstream::{BitError, BitSource};
 use triergon_core::{Error, Result};
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
@@ -301,72 +302,32 @@ fn parse_pps(payload: &[u8]) -> Result<(usize, Pps)> {
 
 /// On-demand EBSP unescape. Syntax fields and their Exp-Golomb prefixes have
 /// finite bounds, independent of the length of the uninspected slice body.
-struct Rbsp<'a> {
-    tail: &'a [u8],
-    byte: u8,
-    remaining_bits: u8,
-    zeroes: u8,
+struct Rbsp<'a>(triergon_bitstream::Rbsp<'a>);
+
+fn rbsp_error(error: BitError) -> Error {
+    match error {
+        BitError::End => Error::Truncated,
+        BitError::LongPrefix => Error::Invalid("AVC Exp-Golomb width"),
+        BitError::MissingPrevention => Error::Invalid("AVC missing emulation-prevention byte"),
+        BitError::InvalidPrevention => Error::Invalid("AVC emulation-prevention byte"),
+    }
 }
 
 impl<'a> Rbsp<'a> {
     fn new(tail: &'a [u8]) -> Self {
-        Self {
-            tail,
-            byte: 0,
-            remaining_bits: 0,
-            zeroes: 0,
-        }
-    }
-
-    fn bit(&mut self) -> Result<u32> {
-        if self.remaining_bits == 0 {
-            let (&byte, tail) = self.tail.split_first().ok_or(Error::Truncated)?;
-            let (byte, tail) = if self.zeroes == 2 {
-                match byte {
-                    3 => {
-                        let (&next, tail) = tail.split_first().ok_or(Error::Truncated)?;
-                        if next > 3 {
-                            return Err(Error::Invalid("AVC emulation-prevention byte"));
-                        }
-                        self.zeroes = 0;
-                        (next, tail)
-                    }
-                    0..=2 => return Err(Error::Invalid("AVC missing emulation-prevention byte")),
-                    _ => (byte, tail),
-                }
-            } else {
-                (byte, tail)
-            };
-            self.tail = tail;
-            self.byte = byte;
-            self.zeroes = if byte == 0 { self.zeroes + 1 } else { 0 };
-            self.remaining_bits = 8;
-        }
-        self.remaining_bits -= 1;
-        Ok(u32::from(self.byte >> self.remaining_bits & 1))
+        Self(triergon_bitstream::Rbsp::new(tail))
     }
 
     fn flag(&mut self) -> Result<bool> {
-        Ok(self.bit()? != 0)
+        self.0.flag().map_err(rbsp_error)
     }
 
     fn fixed(&mut self, width: u8) -> Result<u32> {
-        let mut value = 0;
-        for _ in 0..width {
-            value = (value << 1) | self.bit()?;
-        }
-        Ok(value)
+        self.0.read(u32::from(width)).map_err(rbsp_error)
     }
 
     fn golomb(&mut self) -> Result<u64> {
-        let mut leading_zeroes = 0;
-        while !self.flag()? {
-            leading_zeroes += 1;
-            if leading_zeroes > 32 {
-                return Err(Error::Invalid("AVC Exp-Golomb width"));
-            }
-        }
-        Ok((1u64 << leading_zeroes) - 1 + u64::from(self.fixed(leading_zeroes)?))
+        self.0.exp_golomb(32).map_err(rbsp_error)
     }
 
     fn unsigned(&mut self, maximum: u32) -> Result<u32> {

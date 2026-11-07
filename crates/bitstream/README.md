@@ -24,6 +24,16 @@ assert_eq!(bits.se(), Ok(-2));
 assert_eq!(bits.read(8), Err(BitError::End));
 ```
 
+[`Rbsp`] is the same trait over a NAL unit payload: it removes emulation prevention bytes
+as it reads, so parsing a prefix copies nothing.
+
+```rust
+use triergon_bitstream::{BitSource, Rbsp};
+
+let mut rbsp = Rbsp::new(&[0, 0, 3, 1]);
+assert_eq!(rbsp.read(24), Ok(1));
+```
+
 ## Checksums
 
 [`crc`] holds the three checksums the workspace uses. Each function continues from a
