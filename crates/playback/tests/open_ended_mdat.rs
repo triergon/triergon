@@ -1,3 +1,5 @@
+mod common;
+use common::{off, packets, read, run_open};
 use std::sync::{
     Arc,
     atomic::{AtomicBool, AtomicUsize, Ordering},
@@ -24,9 +26,6 @@ mod fragment_gold {
 const ID: SourceId = SourceId(6401);
 const REGULAR: &[u8] = include_bytes!("fixtures/open-ended/regular-terminal.mp4");
 const PENDING: &[u8] = include_bytes!("fixtures/open-ended/pending-terminal.mp4");
-fn off() -> AtomicBool {
-    AtomicBool::new(false)
-}
 #[derive(Default)]
 struct Signals {
     allow_end: AtomicBool,
@@ -129,15 +128,8 @@ fn opened(
     allow_end: bool,
 ) -> (mp4_open::OpenedMp4<FiniteSource>, Budget, Arc<Signals>) {
     let (mut open, b, signals) = opener(raw, known, allow_end);
-    for _ in 0..200_000 {
-        if matches!(
-            open.advance(&mut WorkBudget::new(1), &off()).unwrap(),
-            OpenProgress::Ready
-        ) {
-            return (open.finish().unwrap(), b, signals);
-        }
-    }
-    panic!("bounded opener did not complete");
+    run_open(&mut open, 1).unwrap();
+    (open.finish().unwrap(), b, signals)
 }
 fn make(
     raw: &[u8],
@@ -170,29 +162,6 @@ fn make(
         b,
         signals,
     )
-}
-fn packets(out: &[Output]) -> Vec<&Mp4Packet> {
-    out.iter()
-        .filter_map(|o| {
-            if let RawEvent::Mp4(Mp4Event::Packet(p)) = o.event() {
-                Some(p)
-            } else {
-                None
-            }
-        })
-        .collect()
-}
-fn read(p: &mut Player<FiniteSource>, out: &mut Vec<Output>) -> Result<()> {
-    for _ in 0..300_000 {
-        let step = p.advance(&mut WorkBudget::new(1), &off())?;
-        while let Some(value) = p.pop() {
-            out.push(value);
-        }
-        if matches!(step, Progress::Ended) {
-            return Ok(());
-        }
-    }
-    panic!("bounded terminal source did not complete");
 }
 fn check_regular(out: &[Output]) {
     let want = regular_gold::CASES

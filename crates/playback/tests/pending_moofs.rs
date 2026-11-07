@@ -1,3 +1,5 @@
+mod common;
+use common::{collect, off, packets, run_open};
 use std::sync::{
     Arc, Mutex,
     atomic::{AtomicBool, AtomicUsize, Ordering},
@@ -7,7 +9,7 @@ use triergon_core::{
 };
 use triergon_playback::{
     io::{SelectedInput, SourceOwner},
-    mp4_open::{Mp4Open, OpenLimits, OpenProgress},
+    mp4_open::{Mp4Open, OpenLimits},
     mp4_plan::{Mp4IndexJob, Mp4View, PlanLimits},
     progressive::ProgressiveLimits,
     *,
@@ -16,9 +18,6 @@ mod art {
     include!("fixtures/progressive/source_golds.rs");
 }
 const ID: SourceId = SourceId(6301);
-fn off() -> AtomicBool {
-    AtomicBool::new(false)
-}
 struct Transport {
     bytes: ByteSource,
     gate: Arc<AtomicUsize>,
@@ -85,14 +84,7 @@ fn make(
         OpenLimits::default(),
     )
     .unwrap();
-    for _ in 0..100000 {
-        if matches!(
-            open.advance(&mut WorkBudget::new(1), &off()).unwrap(),
-            OpenProgress::Ready
-        ) {
-            break;
-        }
-    }
+    run_open(&mut open, 1).unwrap();
     let opened = open.finish().unwrap();
     let mut j = Mp4IndexJob::new(
         &opened.movie,
@@ -115,30 +107,6 @@ fn make(
         gate,
         calls,
     )
-}
-fn read(p: &mut Player<Transport>) -> Result<Vec<Output>> {
-    let mut out = Vec::new();
-    for _ in 0..200000 {
-        let r = p.advance(&mut WorkBudget::new(1), &off())?;
-        while let Some(o) = p.pop() {
-            out.push(o);
-        }
-        if matches!(r, Progress::Ended) {
-            return Ok(out);
-        }
-    }
-    panic!("bounded pending-moof source did not complete")
-}
-fn packets(out: &[Output]) -> Vec<&Mp4Packet> {
-    out.iter()
-        .filter_map(|o| {
-            if let RawEvent::Mp4(Mp4Event::Packet(p)) = o.event() {
-                Some(p)
-            } else {
-                None
-            }
-        })
-        .collect()
 }
 fn check(out: &[Output], case: &art::Case) {
     let got = packets(out);
@@ -165,7 +133,7 @@ fn pending_moofs_required_whole_source_matches_independent_box_recipe() {
     for case in art::CASES {
         println!("DECLARED_SOURCE {}", case.name);
         let (mut p, b, _, _) = make(case.bytes, ProgressiveLimits::default());
-        let out = read(&mut p).unwrap();
+        let out = collect(&mut p, 1).unwrap();
         check(&out, case);
         assert_eq!(
             out.iter()
@@ -260,7 +228,7 @@ fn pending_moofs_required_starvation_pause_workzero_are_distinct_from_eof() {
     assert_eq!((b.used(), calls.lock().unwrap().len()), before);
     p.pause(false).unwrap();
     gate.store(usize::MAX, Ordering::Relaxed);
-    out.extend(read(&mut p).unwrap());
+    out.extend(collect(&mut p, 1).unwrap());
     check(&out, &art::CASES[0]);
 }
 #[test]
@@ -370,7 +338,7 @@ fn pending_moofs_nonseekable_refusal_preserves_live_source_fence() {
     assert!(result.is_err());
     assert!(p.current(held));
     gate.store(usize::MAX, Ordering::Relaxed);
-    out.extend(read(&mut p).unwrap());
+    out.extend(collect(&mut p, 1).unwrap());
     check(&out, &art::CASES[0]);
 }
 
@@ -378,7 +346,7 @@ fn pending_moofs_nonseekable_refusal_preserves_live_source_fence() {
 fn pending_moofs_empty_samples_at_media_endpoint_keep_source_declarations() {
     let raw = include_bytes!("fixtures/progressive/pending-empty-endpoint.mp4");
     let (mut p, b, _, _) = make(raw, ProgressiveLimits::default());
-    let out = read(&mut p).unwrap();
+    let out = collect(&mut p, 1).unwrap();
     let got = packets(&out);
     assert_eq!(got.len(), 9);
     for (i, packet) in got.iter().enumerate().skip(6) {

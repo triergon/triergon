@@ -1,9 +1,10 @@
-use std::{ops::Range, sync::atomic::AtomicBool};
-use triergon_core::{Budget, Bytes, Error, InputCursor, SourceCapabilities, SourceId, WorkBudget};
+mod common;
+use common::{byte_input, run_open};
+use std::ops::Range;
+use triergon_core::{Budget, Error, SourceCapabilities, SourceId};
 use triergon_playback::{
-    ByteSource, Format, Result,
-    io::{SelectedInput, SourceOwner},
-    mp4_open::{MetadataReadScope, Movie, Mp4Open, OpenLimits, OpenProgress},
+    Result,
+    mp4_open::{MetadataReadScope, Movie, Mp4Open, OpenLimits},
 };
 
 const ISO: &[u8] = include_bytes!("../../isobmff/tests/fixtures/encoded-edit-v2/original.mp4");
@@ -15,38 +16,18 @@ const DATA_HANDLER: &[u8] =
 fn open(raw: &[u8], progressive: bool) -> Result<Movie> {
     let pool = Budget::new(1 << 22)?;
     let id = SourceId(772);
-    let selected = SelectedInput {
-        input: InputCursor::new(
-            &pool,
-            id,
-            SourceCapabilities {
-                length: Some(raw.len() as u64),
-                random_access: true,
-            },
-            4096,
-        )?,
-        source: SourceOwner::new(ByteSource::new(
-            id,
-            Bytes::copy_from_slice(&pool, raw)?,
-            97,
-        )?),
-        format: Format::Mp4,
+    let capabilities = SourceCapabilities {
+        length: Some(raw.len() as u64),
+        random_access: true,
     };
+    let selected = byte_input(&pool, id, raw, 97, capabilities, 4096)?;
     let mut opener = if progressive {
         Mp4Open::new_progressive(selected, OpenLimits::default())?
     } else {
         Mp4Open::new(selected, OpenLimits::default())?
     };
-    let cancelled = AtomicBool::new(false);
-    for _ in 0..100_000 {
-        if matches!(
-            opener.advance(&mut WorkBudget::new(17), &cancelled)?,
-            OpenProgress::Ready
-        ) {
-            return Ok(opener.finish()?.movie);
-        }
-    }
-    panic!("MP4 opener did not finish");
+    run_open(&mut opener, 17)?;
+    Ok(opener.finish()?.movie)
 }
 
 fn word(raw: &[u8], at: usize) -> u32 {

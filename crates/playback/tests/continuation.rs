@@ -1,3 +1,5 @@
+mod common;
+use common::{collect, off, packets, run_open};
 use std::sync::{
     Arc, Mutex,
     atomic::{AtomicBool, AtomicUsize, Ordering},
@@ -15,9 +17,6 @@ use triergon_playback::{
     *,
 };
 const ID: SourceId = SourceId(901);
-fn off() -> AtomicBool {
-    AtomicBool::new(false)
-}
 fn pool() -> Budget {
     Budget::new(64 << 20).unwrap()
 }
@@ -88,14 +87,7 @@ fn player(
         OpenLimits::default(),
     )
     .unwrap();
-    for _ in 0..1_000_000 {
-        if matches!(
-            open.advance(&mut WorkBudget::new(1), &off()).unwrap(),
-            OpenProgress::Ready
-        ) {
-            break;
-        }
-    }
+    run_open(&mut open, 1).unwrap();
     let opened = open.finish().unwrap();
     let mut index = Mp4IndexJob::new(
         &opened.movie,
@@ -123,30 +115,6 @@ fn player(
         calls,
     )
 }
-fn collect<S: Source>(p: &mut Player<S>) -> Result<Vec<Output>> {
-    let mut out = Vec::new();
-    for _ in 0..1_000_000 {
-        let r = p.advance(&mut WorkBudget::new(1), &off())?;
-        while let Some(x) = p.pop() {
-            out.push(x);
-        }
-        if matches!(r, Progress::Ended) {
-            return Ok(out);
-        }
-    }
-    panic!("bounded fixture stalled")
-}
-fn packets(out: &[Output]) -> Vec<&Mp4Packet> {
-    out.iter()
-        .filter_map(|o| {
-            if let RawEvent::Mp4(Mp4Event::Packet(p)) = o.event() {
-                Some(p)
-            } else {
-                None
-            }
-        })
-        .collect()
-}
 mod gold {
     include!("fixtures/mp4_golds.rs");
 }
@@ -167,7 +135,7 @@ fn progressive_all_five_fragment_sequences_keep_original_source_golds() {
             "original native-comparison gap membership must remain visible; source closure does not waive it"
         );
         let (mut p, b, _, _) = player(case.bytes, true, ProgressiveLimits::default());
-        let out = collect(&mut p).unwrap();
+        let out = collect(&mut p, 1).unwrap();
         let got = packets(&out);
         assert_eq!(got.len(), case.samples.len(), "{}", case.name);
         for want in case.samples {
@@ -227,7 +195,7 @@ fn progressive_gap_is_pending_until_actual_later_fragment_data_and_eof() {
     }
     assert!(calls.lock().unwrap().len() > before);
     gate.store(usize::MAX, Ordering::Relaxed);
-    out.extend(collect(&mut p).unwrap());
+    out.extend(collect(&mut p, 1).unwrap());
     assert_eq!(packets(&out).len(), 6);
 }
 #[test]
@@ -254,7 +222,7 @@ fn progressive_second_fragment_description_precedes_its_packets() {
         true,
         ProgressiveLimits::default(),
     );
-    let out = collect(&mut p).unwrap();
+    let out = collect(&mut p, 1).unwrap();
     let mut cfg = None;
     let mut descriptions = Vec::new();
     for o in &out {
@@ -673,7 +641,7 @@ fn native_m2ts_context_uses_real_complete_window_and_positive_eof_reply() {
         .unwrap();
     p.set_clock_view(ClockChoice::ExplicitNativeProjection)
         .unwrap();
-    let out = collect(&mut p).unwrap();
+    let out = collect(&mut p, 1).unwrap();
     let native: Vec<_> = out
         .iter()
         .filter_map(|o| {
@@ -814,7 +782,7 @@ fn real_hevc_mp4_bridge_preserves_packet_clock_config_and_source_bytes() {
         false,
         ProgressiveLimits::default(),
     );
-    let out = collect(&mut p).unwrap();
+    let out = collect(&mut p, 1).unwrap();
     let packets: Vec<_> = packets(&out)
         .into_iter()
         .filter(|p| matches!(&p.configuration.description.format, b"hvc1" | b"hev1"))
@@ -942,7 +910,7 @@ fn aac_fixture_player() -> (Player<ByteSource>, Budget, Bytes, u64) {
 }
 fn aac_packets() -> (Vec<Mp4Packet>, Budget, Bytes, u64) {
     let (mut player, b, asc, offset) = aac_fixture_player();
-    let out = collect(&mut player).unwrap();
+    let out = collect(&mut player, 1).unwrap();
     (
         packets(&out)
             .into_iter()
@@ -1071,7 +1039,7 @@ fn mp4_playback_feeds_real_simulator_decoders_across_clock_and_seek() {
     }
 
     for iteration in 0..2 {
-        let outputs = collect(&mut player).unwrap();
+        let outputs = collect(&mut player, 1).unwrap();
         let packets = packets(&outputs);
         assert_eq!(packets.len(), 4);
         let avc = &packets
@@ -1235,7 +1203,7 @@ fn tx3g_real_reader_handoff_retains_source_sample_and_exact_clock_after_teardown
         false,
         ProgressiveLimits::default(),
     );
-    let out = collect(&mut p).unwrap();
+    let out = collect(&mut p, 1).unwrap();
     let output=out.into_iter().find(|o|matches!(o.event(),RawEvent::Mp4(Mp4Event::Packet(p))if p.configuration.description.format==*b"tx3g")).unwrap();
     let source = TextSource::from_output(output).unwrap_or_else(|e| panic!("{:?}", e.error));
     let packet = source.mp4().unwrap();
@@ -1306,7 +1274,7 @@ fn matroska_utf8_text_bridge_runs_real_reader_without_core_or_native_field_repai
         PlayerPolicy::default(),
     )
     .unwrap();
-    let out = collect(&mut p).unwrap();
+    let out = collect(&mut p, 1).unwrap();
     let output=out.into_iter().find(|o|matches!(o.event(),RawEvent::Matroska(triergon_matroska::typed::Event::Packet(p))if p.configuration.tracks()[p.packet.track].codec.as_ref()=="S_TEXT/UTF8")).unwrap();
     assert_eq!(output.source_id(), ID);
     let source = TextSource::from_output(output).unwrap_or_else(|e| panic!("{:?}", e.error));
@@ -2068,7 +2036,7 @@ fn native_m2ts_prefix_preserves_the_same_sequential_source_through_late_pes() {
         let (startup, budget, next) = prefix_setup(&raw, known, quantum);
         let mut player = open_prefix(startup);
         assert_eq!(next.load(Ordering::Relaxed), 8192);
-        let output = collect(&mut player).unwrap();
+        let output = collect(&mut player, 1).unwrap();
         let positions: Vec<_> = output
             .iter()
             .filter_map(|item| match item.event() {
@@ -2107,7 +2075,7 @@ fn native_m2ts_prefix_pressure_keeps_the_completed_reply() {
     assert_eq!(next.load(Ordering::Relaxed), 13);
     let mut player = open_prefix(startup);
     assert_eq!(next.load(Ordering::Relaxed), 8192);
-    assert!(collect(&mut player).is_ok());
+    assert!(collect(&mut player, 1).is_ok());
     drop(player);
     assert_eq!(budget.used(), Budget::control_storage_bytes());
 }
@@ -2142,7 +2110,7 @@ fn native_m2ts_prefix_grid_loss_preserves_source_and_refuses_native_tail() {
     raw[50 * 192 + 4] = 0x46;
     let (startup, _, _) = prefix_setup(&raw, false, 512);
     let mut player = open_prefix(startup);
-    let output = collect(&mut player).unwrap();
+    let output = collect(&mut player, 1).unwrap();
     assert_eq!(
         output
             .iter()
@@ -2412,7 +2380,7 @@ fn matroska_bitmap_tracks_feed_native_receivers_without_copying_frames() {
         PlayerPolicy::default(),
     )
     .unwrap();
-    let outputs = collect(&mut player).unwrap();
+    let outputs = collect(&mut player, 1).unwrap();
     let configuration = outputs
         .iter()
         .find(|o| matches!(o.event(), RawEvent::Matroska(Event::Configuration(_))))
@@ -2650,7 +2618,7 @@ fn matroska_bitmap_tracks_feed_native_receivers_without_copying_frames() {
             )
             .unwrap()
     );
-    let after_seek = collect(&mut player).unwrap();
+    let after_seek = collect(&mut player, 1).unwrap();
     let next_dvd = after_seek
         .iter()
         .find(|output| output.event().track() == Some(TrackKey::Matroska(7)))
@@ -2790,7 +2758,7 @@ fn matroska_bitmap_probe_matches_ffmpeg_startup_clocks() {
             PlayerPolicy::default(),
         )
         .unwrap();
-        let outputs = collect(&mut player).unwrap();
+        let outputs = collect(&mut player, 1).unwrap();
         let config = outputs
             .iter()
             .find(|output| matches!(output.event(), RawEvent::Matroska(Event::Configuration(_))))
@@ -3089,7 +3057,7 @@ fn matroska_discovery_stops_on_canvas_or_limits_and_replays_the_same_source() {
                 .count(),
             prefix_packets
         );
-        let rest = collect(&mut player).unwrap();
+        let rest = collect(&mut player, 1).unwrap();
         assert_eq!(transferred.load(Ordering::Relaxed), fixture.len());
         let all = prefix.iter().chain(&rest);
         assert_eq!(
@@ -3224,7 +3192,7 @@ fn matroska_discovery_observes_timed_audio_without_caller_confirmation() {
         };
         let prefix: Vec<_> = done.prefix.as_slice().iter().filter_map(track).collect();
         assert_eq!(prefix, expected_prefix);
-        let rest = collect(&mut done.player).unwrap();
+        let rest = collect(&mut done.player, 1).unwrap();
         assert_eq!(
             prefix.len() + rest.iter().filter_map(track).count(),
             expected_count
@@ -3319,7 +3287,7 @@ fn matroska_discovery_observes_video_and_keeps_decode_order() {
         if packets == 5 {
             assert_eq!(video, [Some(0), Some(250_000_000), Some(167_000_000)]);
         }
-        let rest = collect(&mut done.player).unwrap();
+        let rest = collect(&mut done.player, 1).unwrap();
         assert_eq!(prefix.len() + rest.iter().filter_map(packet).count(), total);
     }
 }

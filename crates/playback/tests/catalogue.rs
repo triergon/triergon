@@ -1,3 +1,5 @@
+mod common;
+use common::{collect, off, run_open};
 use std::sync::{
     Arc,
     atomic::{AtomicBool, AtomicUsize, Ordering},
@@ -15,9 +17,6 @@ use triergon_playback::{
 };
 mod gold {
     include!("fixtures/mp4_golds.rs");
-}
-fn off() -> AtomicBool {
-    AtomicBool::new(false)
 }
 #[derive(Default)]
 struct Signals {
@@ -214,17 +213,10 @@ fn prepared(
     view: Mp4View,
 ) -> (OpenedMp4<Transport>, PreparedMp4, Arc<Signals>) {
     let (mut job, signals) = opener(b, id, case.bytes, 7);
-    for _ in 0..200_000 {
-        if matches!(
-            job.advance(&mut WorkBudget::new(1), &off()).unwrap(),
-            OpenProgress::Ready
-        ) {
-            let opened = job.finish().unwrap();
-            let plan = index(&opened, view);
-            return (opened, plan, signals);
-        }
-    }
-    panic!("bounded fixture open did not complete");
+    run_open(&mut job, 1).unwrap();
+    let opened = job.finish().unwrap();
+    let plan = index(&opened, view);
+    (opened, plan, signals)
 }
 fn player(
     b: &Budget,
@@ -255,19 +247,6 @@ fn candidate(
         Some(Mp4Catalogue::new(opened, plan, 1 << 20, Mp4CatalogueMode::Indexed).unwrap()),
         signals,
     )
-}
-fn read(p: &mut Player<Transport>) -> Vec<Output> {
-    let mut out = Vec::new();
-    for _ in 0..200_000 {
-        let step = p.advance(&mut WorkBudget::new(1), &off()).unwrap();
-        while let Some(value) = p.pop() {
-            out.push(value);
-        }
-        if matches!(step, Progress::Ended) {
-            return out;
-        }
-    }
-    panic!("bounded fixture delivery did not complete");
 }
 fn first_packet(p: &mut Player<Transport>) -> Output {
     for _ in 0..200_000 {
@@ -448,7 +427,7 @@ fn catalogue_all_valid_original_movies_replace_without_rewriting_source_facts() 
             panic!()
         };
         check_plan(&old_engine.plan, &gold::CASES[0]);
-        let out = read(&mut p);
+        let out = collect(&mut p, 1).unwrap();
         check_outputs(&out, case, SourceId(8202));
         assert!(out.iter().all(|o| p.current(o) && o.epoch() == 1));
         drop(p);
@@ -498,7 +477,11 @@ fn catalogue_retirement_pressure_returns_candidate_and_keeps_old_output_current(
         .unwrap()
         .unwrap();
     assert_eq!(retired.queued(), 2);
-    check_outputs(&read(&mut p), &gold::CASES[4], SourceId(8302));
+    check_outputs(
+        &collect(&mut p, 1).unwrap(),
+        &gold::CASES[4],
+        SourceId(8302),
+    );
 }
 
 #[test]
@@ -633,7 +616,11 @@ fn catalogue_selection_storage_pressure_retries_before_retiring_any_owner() {
     p.replace_mp4_catalogue(&mut next, selected, &mut WorkBudget::new(1), &off())
         .unwrap()
         .unwrap();
-    check_outputs(&read(&mut p), &gold::CASES[0], SourceId(8702));
+    check_outputs(
+        &collect(&mut p, 1).unwrap(),
+        &gold::CASES[0],
+        SourceId(8702),
+    );
 }
 
 #[test]
@@ -662,7 +649,11 @@ fn catalogue_empty_retirement_under_pressure_retains_unqueued_configuration() {
     assert_eq!(config.track.track_id, 1);
     once(&old);
     drop(hold);
-    check_outputs(&read(&mut p), &gold::CASES[4], SourceId(8802));
+    check_outputs(
+        &collect(&mut p, 1).unwrap(),
+        &gold::CASES[4],
+        SourceId(8802),
+    );
 }
 
 #[test]
@@ -686,7 +677,11 @@ fn catalogue_pause_survives_replacement_and_resume_emits_fresh_configuration() {
     ));
     assert_eq!(new.polls.load(Ordering::Relaxed), before);
     p.pause(false).unwrap();
-    check_outputs(&read(&mut p), &gold::CASES[4], SourceId(8902));
+    check_outputs(
+        &collect(&mut p, 1).unwrap(),
+        &gold::CASES[4],
+        SourceId(8902),
+    );
     once(&old);
 }
 
@@ -694,7 +689,7 @@ fn catalogue_pause_survives_replacement_and_resume_emits_fresh_configuration() {
 fn catalogue_eof_handoff_keeps_old_outputs_and_restarts_only_new_entity() {
     let b = Budget::new(64 << 20).unwrap();
     let (mut p, old) = player(&b, SourceId(9001), &gold::CASES[0], PlayerPolicy::default());
-    let out = read(&mut p);
+    let out = collect(&mut p, 1).unwrap();
     assert_eq!(p.state(), State::Ended);
     let (mut next, _) = candidate(&b, SourceId(9002), &gold::CASES[4], Mp4View::SourcePhysical);
     let retired = p
@@ -704,7 +699,11 @@ fn catalogue_eof_handoff_keeps_old_outputs_and_restarts_only_new_entity() {
     assert_eq!(p.state(), State::Running);
     assert!(out.iter().all(|o| !p.current(o)));
     check_outputs(&out, &gold::CASES[0], SourceId(9001));
-    check_outputs(&read(&mut p), &gold::CASES[4], SourceId(9002));
+    check_outputs(
+        &collect(&mut p, 1).unwrap(),
+        &gold::CASES[4],
+        SourceId(9002),
+    );
     once(&old);
     drop(retired);
     check_outputs(&out, &gold::CASES[0], SourceId(9001));
@@ -749,7 +748,7 @@ fn catalogue_old_range_receipt_remains_readable_and_late_completion_is_rejected(
     while let Some(value) = p.pop() {
         out.push(value);
     }
-    out.extend(read(&mut p));
+    out.extend(collect(&mut p, 1).unwrap());
     check_outputs(&out, &gold::CASES[4], SourceId(9102));
     once(&old);
 }
@@ -805,7 +804,7 @@ fn catalogue_explicit_native_projection_keeps_literal_source_and_clock_view() {
     p.replace_mp4_catalogue(&mut next, Selection::All, &mut WorkBudget::new(1), &off())
         .unwrap()
         .unwrap();
-    let out = read(&mut p);
+    let out = collect(&mut p, 1).unwrap();
     check_outputs(&out, &gold::CASES[7], SourceId(9302));
     let order: Vec<_> = out
         .iter()
@@ -922,15 +921,8 @@ fn open_progressive(b: &Budget, id: SourceId, raw: &[u8]) -> (OpenedMp4<Transpor
         OpenLimits::default(),
     )
     .unwrap();
-    for _ in 0..200_000 {
-        if matches!(
-            open.advance(&mut WorkBudget::new(1), &off()).unwrap(),
-            OpenProgress::Ready
-        ) {
-            return (open.finish().unwrap(), signals);
-        }
-    }
-    panic!("progressive fixture startup did not complete");
+    run_open(&mut open, 1).unwrap();
+    (open.finish().unwrap(), signals)
 }
 
 fn progressive_candidate(
@@ -1022,7 +1014,7 @@ fn catalogue_replacement_selects_native_terminal_and_waits_for_source_end() {
     }
     untouched(&next_signals);
     next_signals.stall_end.store(false, Ordering::Relaxed);
-    assert!(read(&mut p).is_empty());
+    assert!(collect(&mut p, 1).unwrap().is_empty());
     assert_eq!(p.state(), State::Ended);
     drop(p);
     once(&next_signals);
@@ -1041,7 +1033,7 @@ fn catalogue_progressive_replacement_keeps_future_batches_and_unknown_clocks() {
     p.replace_mp4_catalogue(&mut next, Selection::All, &mut WorkBudget::new(1), &off())
         .unwrap()
         .unwrap();
-    let out = read(&mut p);
+    let out = collect(&mut p, 1).unwrap();
     check_outputs_with_roots(
         &out,
         case,
@@ -1086,7 +1078,7 @@ fn catalogue_replacement_terminal_mdat_needs_actual_source_end_and_keeps_unknown
     p.replace_mp4_catalogue(&mut next, Selection::All, &mut WorkBudget::new(1), &off())
         .unwrap()
         .unwrap();
-    let out = read(&mut p);
+    let out = collect(&mut p, 1).unwrap();
     let mut packets = 0;
     for output in &out {
         assert_eq!(output.source_id(), SourceId(9602));
@@ -1183,7 +1175,7 @@ fn catalogue_existing_seek_intent_is_retained_but_not_applied_to_new_source_cloc
     assert_eq!(retired.seek_intent(), Some(intent));
     assert!(matches!(retired.pending_event(), Some(RawEvent::Seek(x)) if *x == intent));
     assert_eq!(p.seek_intent(), None);
-    let out = read(&mut p);
+    let out = collect(&mut p, 1).unwrap();
     check_outputs(&out, &gold::CASES[0], SourceId(9802));
     assert!(
         out.iter()
@@ -1501,15 +1493,8 @@ fn catalogue_stale_candidate_constructor_and_cancelled_opener_keep_active_source
 }
 
 fn finish_range_open(mut open: Mp4Open<Transport>) -> OpenedMp4<Transport> {
-    for _ in 0..200_000 {
-        if matches!(
-            open.advance(&mut WorkBudget::new(17), &off()).unwrap(),
-            OpenProgress::Ready
-        ) {
-            return open.finish().unwrap();
-        }
-    }
-    panic!("MP4 range open stalled")
+    run_open(&mut open, 17).unwrap();
+    open.finish().unwrap()
 }
 
 #[test]

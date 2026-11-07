@@ -1,3 +1,5 @@
+mod common;
+use common::{byte_input, collect, off, run_open};
 use std::sync::{
     Arc, Mutex,
     atomic::{AtomicBool, Ordering},
@@ -21,9 +23,6 @@ mod gold {
     include!("fixtures/mp4_golds.rs");
 }
 const ID: SourceId = SourceId(771);
-fn off() -> AtomicBool {
-    AtomicBool::new(false)
-}
 fn pool() -> Budget {
     Budget::new(64 * 1024 * 1024).unwrap()
 }
@@ -33,40 +32,19 @@ fn open(
     units: u64,
 ) -> Result<(mp4_open::OpenedMp4<ByteSource>, Budget)> {
     let b = pool();
-    let source = SourceOwner::new(ByteSource::new(
-        ID,
-        Bytes::copy_from_slice(&b, raw)?,
-        quantum,
-    )?);
-    let input = InputCursor::new(
-        &b,
-        ID,
-        SourceCapabilities {
-            length: Some(raw.len() as u64),
-            random_access: true,
-        },
-        4096,
-    )?;
+    let capabilities = SourceCapabilities {
+        length: Some(raw.len() as u64),
+        random_access: true,
+    };
     let mut job = Mp4Open::new(
-        SelectedInput {
-            input,
-            source,
-            format: Format::Mp4,
-        },
+        byte_input(&b, ID, raw, quantum, capabilities, 4096)?,
         OpenLimits {
             metadata_bytes: 1 << 20,
             ..OpenLimits::default()
         },
     )?;
-    for _ in 0..2_000_000 {
-        if matches!(
-            job.advance(&mut WorkBudget::new(units), &off())?,
-            OpenProgress::Ready
-        ) {
-            return Ok((job.finish()?, b));
-        }
-    }
-    panic!("real MP4 open did not make bounded progress");
+    run_open(&mut job, units)?;
+    Ok((job.finish()?, b))
 }
 fn mp4(
     raw: &[u8],
@@ -126,19 +104,6 @@ fn ts(
         )?,
         b,
     ))
-}
-fn collect<S: Source>(p: &mut Player<S>, units: u64) -> Result<Vec<Output>> {
-    let mut out = Vec::new();
-    for _ in 0..2_000_000 {
-        let progress = p.advance(&mut WorkBudget::new(units), &off())?;
-        while let Some(o) = p.pop() {
-            out.push(o);
-        }
-        if matches!(progress, Progress::Ended) {
-            return Ok(out);
-        }
-    }
-    panic!("fixture reader stalled");
 }
 fn first_packet<S: Source>(p: &mut Player<S>) -> Output {
     for _ in 0..2_000_000 {
@@ -1808,14 +1773,7 @@ fn front_moov_mp4_streams_real_samples_without_source_seek_or_preloading_mdat() 
     for q in [1, 7, 4096] {
         let (selected, b, calls) = probe(raw, q, true);
         let mut open = Mp4Open::new(selected, OpenLimits::default()).unwrap();
-        for _ in 0..100_000 {
-            if matches!(
-                open.advance(&mut WorkBudget::new(1), &off()).unwrap(),
-                OpenProgress::Ready
-            ) {
-                break;
-            }
-        }
+        run_open(&mut open, 1).unwrap();
         let opened = open.finish().unwrap();
         assert!(matches!(
             opened.movie.read_scope(),
@@ -2948,15 +2906,8 @@ fn open_with_timing_policy(
         OpenLimits::default(),
         policy,
     )?;
-    for _ in 0..100_000 {
-        if matches!(
-            opener.advance(&mut WorkBudget::new(17), &off())?,
-            OpenProgress::Ready
-        ) {
-            return Ok((opener.finish()?, calls, pool));
-        }
-    }
-    panic!("MP4 opener stalled");
+    run_open(&mut opener, 17)?;
+    Ok((opener.finish()?, calls, pool))
 }
 
 fn native_range_player(bytes: &[u8]) -> (Player<Observed>, mp4_open::Movie, Calls, Budget) {

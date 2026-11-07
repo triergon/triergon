@@ -1,3 +1,5 @@
+mod common;
+use common::{collect, off, packets, run_open};
 use std::sync::{
     Arc,
     atomic::{AtomicBool, AtomicU64, AtomicUsize, Ordering},
@@ -19,9 +21,6 @@ mod gold {
     include!("fixtures/native_terminal_golds.rs");
 }
 const ID: SourceId = SourceId(7611);
-fn off() -> AtomicBool {
-    AtomicBool::new(false)
-}
 #[derive(Default)]
 struct Signals {
     eof: AtomicBool,
@@ -223,27 +222,6 @@ fn make(
     eof: bool,
 ) -> (Player<SourceWithEnd>, Budget, Arc<Signals>) {
     make_mode(raw, known, chunk, quantum, eof, true)
-}
-fn collect(p: &mut Player<SourceWithEnd>, quantum: u64) -> Result<Vec<Output>> {
-    let mut out = Vec::new();
-    for _ in 0..500_000 {
-        let step = p.advance(&mut WorkBudget::new(quantum), &off())?;
-        while let Some(x) = p.pop() {
-            out.push(x);
-        }
-        if matches!(step, Progress::Ended) {
-            return Ok(out);
-        }
-    }
-    panic!("bounded whole native operation")
-}
-fn packets(out: &[Output]) -> Vec<&Mp4Packet> {
-    out.iter()
-        .filter_map(|x| match x.event() {
-            RawEvent::Mp4(Mp4Event::Packet(p)) => Some(p),
-            _ => None,
-        })
-        .collect()
 }
 fn check(out: &[Output], case: &gold::Case) {
     let got: Vec<_> = packets(out)
@@ -467,14 +445,7 @@ fn ordinary_progressive_native_context_stays_refused() {
         OpenLimits::default(),
     )
     .unwrap();
-    loop {
-        if matches!(
-            open.advance(&mut WorkBudget::new(4096), &off()).unwrap(),
-            OpenProgress::Ready
-        ) {
-            break;
-        }
-    }
+    run_open(&mut open, 4096).unwrap();
     let opened = open.finish().unwrap();
     let mut job = Mp4IndexJob::new(
         &opened.movie,
