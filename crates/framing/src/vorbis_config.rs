@@ -27,7 +27,9 @@ impl VorbisIdentification {
         if &packet[..7] != b"\x01vorbis" {
             return Err(Error::Invalid("Vorbis identification header"));
         }
-        let le32 = |at: usize| u32::from_le_bytes([packet[at], packet[at + 1], packet[at + 2], packet[at + 3]]);
+        let le32 = |at: usize| {
+            u32::from_le_bytes([packet[at], packet[at + 1], packet[at + 2], packet[at + 3]])
+        };
         if le32(7) != 0 {
             return Err(Error::Unsupported("Vorbis version"));
         }

@@ -37,13 +37,13 @@ mod dts_packing;
 mod dts_source;
 mod eac3_bsi;
 mod flac_config;
+mod header;
 mod mpeg_audio;
 mod opus_config;
-mod vorbis_config;
-mod header;
 mod raw_annex_b;
 mod reader;
 mod record_input;
+mod vorbis_config;
 mod vp9_config;
 
 pub use ac3::{
@@ -57,21 +57,6 @@ pub use ac3_config::{
 pub use annexb::{AnnexBOutput, AnnexBWriter, BuildStep};
 pub use audio_config::{
     canonical_flac_configuration, canonical_opus_configuration, canonical_vorbis_configuration,
-};
-pub use flac_config::{
-    FLAC_STREAMINFO, FLAC_VORBIS_COMMENT, FlacBlocking, FlacFrameHeader, FlacMetadataBlock,
-    FlacStreamInfo, flac_configuration_from_dfla, flac_configuration_from_ogg,
-    flac_metadata_blocks, flac_stream_info,
-};
-pub use mpeg_audio::{
-    LameTag, MpegAudioHeader, MpegChannelMode, MpegInfoFrame, MpegInfoKind, MpegVersion,
-    mpeg_audio_crc_ok, mpeg_info_frame,
-};
-pub use opus_config::{
-    OPUS_RATE, OpusHead, opus_frame_samples, opus_packet_frames, opus_packet_samples,
-};
-pub use vorbis_config::{
-    VorbisHeaders, VorbisIdentification, vorbis_header_type, xiph_join, xiph_split,
 };
 pub use av1::{
     Av1Leb128, Av1Obu, Av1ObuExtension, Av1ObuFacts, Av1ObuFraming, Av1ObuHeader,
@@ -94,6 +79,21 @@ pub use declared_config::{
 pub use dts_core::{
     DtsCoreFrame, DtsCoreFrameFacts, DtsCoreFrameLimits, DtsCoreFrameReader, DtsCoreHeader,
     probe_dts_core_header,
+};
+pub use flac_config::{
+    FLAC_STREAMINFO, FLAC_VORBIS_COMMENT, FlacBlocking, FlacChannelAssignment, FlacFrameHeader,
+    FlacMetadataBlock, FlacStreamInfo, flac_configuration_from_dfla, flac_configuration_from_ogg,
+    flac_metadata_blocks, flac_stream_info,
+};
+pub use mpeg_audio::{
+    LameTag, MpegAudioHeader, MpegChannelMode, MpegInfoFrame, MpegInfoKind, MpegLayer, MpegVersion,
+    mpeg_audio_crc_ok, mpeg_info_frame,
+};
+pub use opus_config::{
+    OPUS_RATE, OpusHead, opus_frame_samples, opus_packet_frames, opus_packet_samples,
+};
+pub use vorbis_config::{
+    VorbisHeaders, VorbisIdentification, vorbis_header_type, xiph_join, xiph_split,
 };
 pub use dts_inspect::{
     DtsCoreField, DtsHeaderInspector, DtsInspection, DtsInspectionIdentity, DtsInspectionIssues,
