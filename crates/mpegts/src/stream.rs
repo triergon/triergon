@@ -295,6 +295,46 @@ pub enum CompactTraceEvent {
     NullRun(NullCarrierRun),
 }
 
+// Select the returned event type before entering the shared parser loop. Ordinary
+// feeds never construct a compact event just to unpack its source event again.
+trait PollOutput: Sized {
+    const COMPACT: bool = false;
+
+    fn event(event: TraceEvent) -> Self;
+
+    fn null_run(
+        _framer: &mut TransportFramer,
+        _input: &mut InputCursor,
+        _work: &mut WorkBudget,
+        _cancel: &AtomicBool,
+    ) -> Result<Option<Self>> {
+        Ok(None)
+    }
+}
+
+impl PollOutput for TraceEvent {
+    fn event(event: Self) -> Self {
+        event
+    }
+}
+
+impl PollOutput for CompactTraceEvent {
+    const COMPACT: bool = true;
+
+    fn event(event: TraceEvent) -> Self {
+        Self::Event(event)
+    }
+
+    fn null_run(
+        framer: &mut TransportFramer,
+        input: &mut InputCursor,
+        work: &mut WorkBudget,
+        cancel: &AtomicBool,
+    ) -> Result<Option<Self>> {
+        Ok(framer.try_null_run(input, work, cancel)?.map(Self::NullRun))
+    }
+}
+
 /// The caller selects the program explicitly or requests single-program
 /// discovery. All PAT associations and raw transport/section facts remain
 /// visible.
@@ -1595,13 +1635,7 @@ impl TransportStream {
             &mut WorkBudget,
         ) -> Result<FeedContinuation>,
     ) -> Result<Step<TraceEvent>> {
-        match self.poll_inner::<false, DIRECT, RUNS>(input, work, cancel, consume)? {
-            Step::Ready(CompactTraceEvent::Event(event)) => Ok(Step::Ready(event)),
-            Step::Ready(CompactTraceEvent::NullRun(_)) => unreachable!("literal source mode"),
-            Step::NeedInput(request) => Ok(Step::NeedInput(request)),
-            Step::Yield => Ok(Step::Yield),
-            Step::End(location) => Ok(Step::End(location)),
-        }
+        self.poll_inner::<TraceEvent, DIRECT, RUNS>(input, work, cancel, consume)
     }
 
     pub fn poll_compact(
@@ -1610,12 +1644,12 @@ impl TransportStream {
         work: &mut WorkBudget,
         cancel: &AtomicBool,
     ) -> Result<Step<CompactTraceEvent>> {
-        self.poll_inner::<true, false, false>(input, work, cancel, |_, _, _, _| {
+        self.poll_inner::<CompactTraceEvent, false, false>(input, work, cancel, |_, _, _, _| {
             Ok(FeedContinuation::Emit)
         })
     }
 
-    fn poll_inner<const COMPACT: bool, const DIRECT: bool, const RUNS: bool>(
+    fn poll_inner<T: PollOutput, const DIRECT: bool, const RUNS: bool>(
         &mut self,
         input: &mut InputCursor,
         work: &mut WorkBudget,
@@ -1626,10 +1660,8 @@ impl TransportStream {
             SourceEpochs,
             &mut WorkBudget,
         ) -> Result<FeedContinuation>,
-    ) -> Result<Step<CompactTraceEvent>> {
-        fn ready(event: TraceEvent) -> Step<CompactTraceEvent> {
-            Step::Ready(CompactTraceEvent::Event(event))
-        }
+    ) -> Result<Step<T>> {
+        let ready = |event| Step::Ready(T::event(event));
         if self.finished {
             return Err(Error::Invalid("TS stream already finished"));
         }
@@ -1744,12 +1776,12 @@ impl TransportStream {
                     Step::End(location) => Ok(Step::End(location)),
                 };
             }
-            if COMPACT
+            if T::COMPACT
                 && matches!(self.find_route(0x1fff), Route::Ignore)
-                && let Some(run) = self.framer.try_null_run(input, work, cancel)?
+                && let Some(event) = T::null_run(&mut self.framer, input, work, cancel)?
             {
                 self.entity_end = None;
-                return Ok(Step::Ready(CompactTraceEvent::NullRun(run)));
+                return Ok(Step::Ready(event));
             }
             // Reading carriers advances the cursor within the same source
             // request. The feed callback never receives the cursor.

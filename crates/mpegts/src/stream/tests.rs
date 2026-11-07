@@ -33,6 +33,133 @@ fn provide(input: &mut InputCursor, bytes: &[u8]) {
         .unwrap();
 }
 
+#[test]
+fn output_modes_preserve_null_carriers_faults_and_cancelled_partial_input() {
+    fn collect(compact: bool, quantum: u64, window: usize) -> (Vec<(u64, u16, u8)>, usize, u64) {
+        let pool = Budget::new(64 * 1024).unwrap();
+        let mut wire = Vec::new();
+        for counter in 0..4 {
+            let mut packet = carrier(counter, false);
+            packet[1..3].copy_from_slice(&[0x1f, 0xff]);
+            if counter == 3 {
+                packet[0] = 0;
+            }
+            wire.extend_from_slice(&packet);
+        }
+        let mut input = InputCursor::new(
+            &pool,
+            SOURCE,
+            SourceCapabilities {
+                length: Some(wire.len() as u64),
+                random_access: false,
+            },
+            WINDOW,
+        )
+        .unwrap();
+        let mut stream =
+            TransportStream::new(pool.clone(), PacketFormat::Ts188, ParseLimits::default(), 1)
+                .unwrap();
+        let mut packets = Vec::new();
+        let mut runs = 0;
+        let mut spent = 0;
+        for _ in 0..10000 {
+            // Cancellation must not consume a partially read carrier or a ready run.
+            let before = (input.position(), pool.used());
+            let mut zero = WorkBudget::new(0);
+            let cancelled = if compact {
+                stream
+                    .poll_compact(&mut input, &mut zero, &AtomicBool::new(true))
+                    .map(|_| ())
+            } else {
+                stream
+                    .poll(&mut input, &mut zero, &AtomicBool::new(true))
+                    .map(|_| ())
+            };
+            assert_eq!(cancelled.unwrap_err(), Error::Cancelled);
+            assert_eq!((input.position(), pool.used()), before);
+            assert_eq!(zero.spent(), 0);
+            let mut work = WorkBudget::new(quantum);
+            let step = if compact {
+                stream.poll_compact(&mut input, &mut work, &AtomicBool::new(false))
+            } else {
+                stream
+                    .poll(&mut input, &mut work, &AtomicBool::new(false))
+                    .map(|step| match step {
+                        Step::Ready(event) => Step::Ready(CompactTraceEvent::Event(event)),
+                        Step::NeedInput(request) => Step::NeedInput(request),
+                        Step::Yield => Step::Yield,
+                        Step::End(location) => Step::End(location),
+                    })
+            }
+            .unwrap();
+            assert!(work.spent() <= quantum);
+            spent += work.spent();
+            let mut record = |packet: TransportPacket| {
+                let offset = packet.source_offset as usize;
+                assert_eq!(packet.source.as_ref(), &wire[offset..offset + TS188_BYTES]);
+                assert_eq!(packet.source_id, Some(SOURCE));
+                assert_eq!(
+                    packet.payload.as_ref().unwrap().as_ref(),
+                    &wire[offset + 4..offset + TS188_BYTES]
+                );
+                assert_eq!(packet.payload_source_offset, packet.source_offset + 4);
+                assert!(packet.adaptation.is_none());
+                assert!(
+                    !packet.payload_unit_start && !packet.transport_error && packet.scrambling == 0
+                );
+                packets.push((packet.source_offset, packet.pid, packet.continuity_counter));
+            };
+            match step {
+                Step::Ready(CompactTraceEvent::Event(TraceEvent::Transport(packet))) => {
+                    record(packet)
+                }
+                Step::Ready(CompactTraceEvent::NullRun(run)) => {
+                    runs += 1;
+                    for index in 0..run.len() {
+                        record(run.packet(index).unwrap());
+                    }
+                }
+                Step::Ready(CompactTraceEvent::Event(TraceEvent::Diagnostic(fault))) => {
+                    assert_eq!(fault.kind, FaultKind::Transport);
+                    assert_eq!(
+                        fault.location,
+                        SourceLocation {
+                            source: SOURCE,
+                            offset: 3 * TS188_BYTES as u64
+                        }
+                    );
+                    assert_eq!(fault.error, Error::Invalid("TS sync byte"));
+                    assert_eq!(
+                        fault.rejected.unwrap().bytes().as_ref(),
+                        &wire[3 * TS188_BYTES..]
+                    );
+                    return (packets, runs, spent);
+                }
+                Step::NeedInput(request) => {
+                    let offset = request.offset as usize;
+                    provide(&mut input, &wire[offset..wire.len().min(offset + window)]);
+                }
+                Step::Yield => {}
+                _ => panic!("unexpected source event before the malformed carrier"),
+            }
+        }
+        panic!("bounded source polling did not reach the malformed carrier")
+    }
+    let mut counts = Vec::new();
+    for (quantum, window) in [(1, 31), (17, 187), (4096, WINDOW)] {
+        let (source, runs, source_work) = collect(false, quantum, window);
+        assert_eq!(runs, 0);
+        let (compact, runs, compact_work) = collect(true, quantum, window);
+        assert_eq!(source, [(0, 0x1fff, 0), (188, 0x1fff, 1), (376, 0x1fff, 2)]);
+        assert_eq!(compact, source);
+        assert_eq!(runs, usize::from(quantum == 4096));
+        counts.push((source_work, compact_work));
+    }
+    // Preserve the prior work charges across short reads and small polls. Only
+    // the compact bulk poll can use its existing two-carrier null run.
+    assert_eq!(counts, [(771, 771), (771, 771), (771, 761)]);
+}
+
 struct PayloadFeed {
     stream: TransportStream,
     input: InputCursor,
