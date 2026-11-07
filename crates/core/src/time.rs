@@ -230,6 +230,22 @@ impl Time {
     pub fn to_ticks(self, base: TimeBase, rounding: Rounding) -> Result<i128> {
         let exact_denominator = self.denominator();
         if base.numerator() == 1
+            && let (Ok(magnitude), Ok(denominator)) = (
+                u64::try_from(self.numerator.unsigned_abs()),
+                u64::try_from(exact_denominator),
+            )
+            && let Some(scaled) = magnitude.checked_mul(base.denominator())
+        {
+            let remainder = scaled % denominator;
+            return rounded(
+                u128::from(scaled / denominator),
+                remainder != 0,
+                remainder >= denominator - remainder,
+                self.numerator < 0,
+                rounding,
+            );
+        }
+        if base.numerator() == 1
             && exact_denominator <= u128::from(u64::MAX)
             && base.denominator().is_multiple_of(exact_denominator as u64)
         {
