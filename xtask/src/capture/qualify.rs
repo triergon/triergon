@@ -29,14 +29,13 @@ use crate::harness::acceptance::active_cpu;
 use crate::harness::diff::equal;
 use crate::harness::gate_build;
 use crate::harness::memory;
+use crate::harness::policy;
 use crate::harness::timing::{TimedWorkers, competing_builds, cpu_snapshot, lock};
 use crate::json::{self, Value};
 use crate::process::{check_output, exit_code};
 use crate::pyrandom::PyRandom;
 use crate::{python, sha256, stats};
 
-const RUNTIME_GATE: f64 = 1.2;
-const RUNTIME_TARGET: f64 = 0.80;
 const RESAMPLES: usize = 4000;
 
 /// The arguments of `capture qualify`.
@@ -231,8 +230,9 @@ fn withhold_gates(timed: &mut Value) {
     }
 }
 
-#[allow(clippy::too_many_arguments)] // The workers, input and paired timing settings.
+#[allow(clippy::too_many_arguments)] // The workers, input, gate and paired timing settings.
 fn runtime(
+    gate: policy::Runtime,
     candidate: &str,
     reference: &str,
     case: &Value,
@@ -333,11 +333,11 @@ fn runtime(
         ("cpu_after", after),
         (
             "gate_pass",
-            Value::Bool(clean && stable && upper_95 <= RUNTIME_GATE),
+            Value::Bool(clean && stable && upper_95 <= gate.ceiling),
         ),
         (
             "target_pass",
-            Value::Bool(clean && stable && upper_95 <= RUNTIME_TARGET),
+            Value::Bool(clean && stable && upper_95 <= gate.target),
         ),
     ]))
 }
@@ -433,6 +433,7 @@ pub fn run(root: &Path, a: &Options) -> Result<(), String> {
     if observer != Value::str(file_sha(&root.join("target/harness/allocations.so"))?) {
         return Err("capture requires the observer built in target/harness".into());
     }
+    let gate = policy::Runtime::load(root)?;
     let refusals =
         gate_build::pair_refusals(root, Path::new(&a.candidate), Path::new(&a.reference));
     for reason in &refusals {
@@ -535,6 +536,7 @@ pub fn run(root: &Path, a: &Options) -> Result<(), String> {
         record.push(("correctness_summary".into(), correctness.clone()));
         let outputs = correctness.get("outputs");
         let mut timed = runtime(
+            gate,
             &a.candidate,
             &a.reference,
             case,
@@ -556,6 +558,7 @@ pub fn run(root: &Path, a: &Options) -> Result<(), String> {
             record.push((
                 "runtime_vs_small_config".into(),
                 runtime(
+                    gate,
                     &a.candidate,
                     small,
                     case,

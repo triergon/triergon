@@ -16,6 +16,7 @@ use std::time::Duration;
 
 use crate::harness::acceptance::active_cpu;
 use crate::harness::gate_build;
+use crate::harness::policy;
 use crate::harness::timing::{
     TimedWorkers, competing_builds, cpu_snapshot, lock, timing_module_state,
 };
@@ -28,10 +29,6 @@ const PAIRS: usize = 30;
 const SEED: u64 = 280;
 const RESAMPLES: usize = 4000;
 const WORKER_TIMEOUT: Duration = Duration::from_secs(600);
-/// Gate: upper 95% bound of the candidate/reference time ratio.
-const DELIVERY: f64 = 1.25;
-/// Optimisation target for the same bound.
-const OPTIMIZATION: f64 = 0.80;
 /// `kind` of a claim key; keys of ledgers written before the Rust runner
 /// differ.
 const KIND: &str = "codec-time";
@@ -120,6 +117,7 @@ pub fn run(options: &Options) -> Result<(), String> {
         Value::Object(Vec::new())
     };
     fs::create_dir_all(&options.out).map_err(|e| format!("{}: {e}", options.out.display()))?;
+    let gate = policy::Runtime::load(&options.repository)?;
     let refusals =
         gate_build::pair_refusals(&options.repository, &options.candidate, &options.reference);
     for reason in &refusals {
@@ -348,11 +346,11 @@ pub fn run(options: &Options) -> Result<(), String> {
                     let value = interval_value(&interval);
                     result.push(("ratio".into(), value.clone()));
                     let gate_build = refusals.is_empty();
-                    let passes = gate_build && interval.upper_95 <= DELIVERY;
+                    let passes = gate_build && interval.upper_95 <= gate.ceiling;
                     result.push(("delivery".into(), Value::Bool(passes)));
                     result.push((
                         "optimization".into(),
-                        Value::Bool(gate_build && interval.upper_95 <= OPTIMIZATION),
+                        Value::Bool(gate_build && interval.upper_95 <= gate.target),
                     ));
                     ratio = Some((value, interval.upper_95));
                     delivery = Some(passes);

@@ -14,6 +14,7 @@ mod linux_tests;
 pub mod memory;
 pub mod oracle;
 pub mod parity;
+pub mod policy;
 pub mod provenance;
 pub mod report;
 pub mod screen;
