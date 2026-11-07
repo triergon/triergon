@@ -32,6 +32,7 @@ pub fn matroska_inputs() -> Vec<String> {
         "xtask/src/harness/provenance.rs",
         "xtask/src/harness/report.rs",
         "xtask/src/harness/timing.rs",
+        "xtask/src/harness/validation.rs",
         "xtask/src/harness/vectors.rs",
         "xtask/src/harness/worker.rs",
         "harness/spec_oracle.py",
@@ -492,6 +493,8 @@ mod tests {
         assert!(
             shared.get("Cargo.toml").is_none()
                 && shared.get("xtask/src/harness/parity.rs").is_some()
+                && shared.get("xtask/src/harness/grade.rs").is_some()
+                && shared.get("xtask/src/harness/validation.rs").is_some()
         );
         assert_eq!(
             graph.get("sha256").and_then(Value::as_str).map(str::len),
