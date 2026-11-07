@@ -181,10 +181,13 @@ static void progressive_retire(ProgressiveStream *stream, ProgressiveHeld *held,
     }
     if (trace)
         putchar(' ');
-    for (int i = 0; i < packet->size; ++i) {
-        progressive_mix(&stream->digest, packet->data[i]);
-        if (trace)
+    if (trace) {
+        for (int i = 0; i < packet->size; ++i) {
+            progressive_mix(&stream->digest, packet->data[i]);
             printf("%02x", (unsigned)packet->data[i]);
+        }
+    } else {
+        fold_bytes(&stream->digest, packet->data, (size_t)packet->size);
     }
     if (trace)
         putchar('\n');

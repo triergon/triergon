@@ -12,6 +12,7 @@ use triergon_core::{
     Budget, Bytes, InputCursor, InputRequest, InputWindow, SourceCapabilities, SourceId, Time,
     WorkBudget,
 };
+use triergon_harness_protocol::digest::fold_bytes;
 use triergon_playback::{
     Source, SourceReply,
     ts_progressive::{
@@ -128,9 +129,7 @@ impl RetainedStream {
                 write!(out, "{byte:02x}")?;
             }
         } else {
-            for &byte in data {
-                mix(&mut self.digest, u64::from(byte));
-            }
+            fold_bytes(&mut self.digest, data);
         }
         self.bytes += data.len() as u64;
         Ok(())

@@ -10,6 +10,9 @@ strictly lower peak heap and total resident RSS at the upper paired 95% bound.
 The runtime optimization target is 0.80. Timing uses 50 complete sessions per
 sample and at least 30 pairs.
 
+Both numeric workers use the harness's exact grouped byte fold. Every payload
+byte contributes to the same ordered checksum as the scalar trace path.
+
 | Input | Rust functional outcome | Reference functional outcome | Timed |
 |---|---|---|---|
 | `continuous-44100` | positive output | identical output | yes |
