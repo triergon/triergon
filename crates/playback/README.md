@@ -151,6 +151,10 @@ Units are released only after EOF and both the video and audio assemblers drain.
 source, 64 MiB feed, 8,192 access units. A failed reader releases its source;
 retry with a new reader.
 
+**ADTS AAC.** Complete frames contained in one source span can share its charged
+backing storage when its capacity fits the configured maximum frame size. Split
+frames use charged assembly buffers.
+
 **Sinks.** `pump::Sink` owns accepted `Feed` envelopes until their callbacks
 retire; `Submission::Blocked` returns the same envelope. Threading and
 platform decoder configuration are the sink's responsibility; no `Send` bound

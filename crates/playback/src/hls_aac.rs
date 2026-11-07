@@ -201,7 +201,7 @@ impl HlsAac {
                     if !work.try_charge(1) {
                         return Ok(AssemblyStep::Yield);
                     }
-                    return self.publish(header);
+                    return self.publish(header, None);
                 }
             } else if self.prefix_used == PREFIX_BYTES {
                 if !work.try_charge(1) {
@@ -252,6 +252,19 @@ impl HlsAac {
             let needed = if let Some(header) = self.header {
                 let length = usize::from(header.frame_length());
                 if self.frame.is_empty() {
+                    let body = length - PREFIX_BYTES;
+                    // A split prefix consumes at most six bytes of its last
+                    // span. Otherwise retain a bounded owner and charge the
+                    // same staging, body and publication work as a copy.
+                    if input.offset >= PREFIX_BYTES
+                        && span.retained_capacity() <= self.maximum_frame_bytes
+                        && body <= bytes.len()
+                        && work.try_charge(body as u64 + 2)
+                    {
+                        let bytes = span.slice(input.offset - PREFIX_BYTES..input.offset + body)?;
+                        input.offset += body;
+                        return self.publish(header, Some(bytes));
+                    }
                     if !work.try_charge(1) {
                         return Ok(AssemblyStep::Yield);
                     }
@@ -309,7 +322,11 @@ impl HlsAac {
         Ok(header)
     }
 
-    fn publish(&mut self, header: AacAdtsHeader) -> Result<AssemblyStep<HlsAacFrame>> {
+    fn publish(
+        &mut self,
+        header: AacAdtsHeader,
+        shared: Option<Bytes>,
+    ) -> Result<AssemblyStep<HlsAacFrame>> {
         let rate = header
             .coded_frequency_hz()
             .ok_or(Error::Invalid("ADTS sampling index"))?;
@@ -321,12 +338,16 @@ impl HlsAac {
                 duration
             }
         };
-        let frame = std::mem::replace(&mut self.frame, BudgetVec::new(&self.pool));
-        let bytes = match frame.freeze() {
-            Ok(bytes) => bytes,
-            Err(error) => {
-                self.frame = error.buffer;
-                return Err(error.error);
+        let bytes = if let Some(bytes) = shared {
+            bytes
+        } else {
+            let frame = std::mem::replace(&mut self.frame, BudgetVec::new(&self.pool));
+            match frame.freeze() {
+                Ok(bytes) => bytes,
+                Err(error) => {
+                    self.frame = error.buffer;
+                    return Err(error.error);
+                }
             }
         };
         self.header = None;
@@ -496,6 +517,128 @@ mod tests {
             }
         }
         panic!("AAC reader stalled at work quantum 1");
+    }
+
+    #[test]
+    fn complete_frames_share_one_bounded_owner_without_new_capacity() {
+        let mut fixture = PesFixture::new();
+        let (mut packet, clock) = fixture.chunk(&[&F48[..], &F44_CRC[..]].concat(), 90_000, None);
+        let backing = packet.as_ref().unwrap().spans.as_slice()[0]
+            .backing_bytes()
+            .clone();
+        let mut reader = HlsAac::new(&fixture.pool, CONFIG, backing.retained_capacity()).unwrap();
+        assert!(reader.push(&mut packet, clock).unwrap());
+        let pressure = fixture.pool.reserve(fixture.pool.available()).unwrap();
+        let cancel = AtomicBool::new(false);
+        let mut frames = Vec::new();
+        for expected in [&F48[..], &F44_CRC[..]] {
+            let mut work = WorkBudget::new(expected.len() as u64 + 3);
+            let AssemblyStep::Output(frame) = reader.poll(&mut work, &cancel).unwrap() else {
+                panic!("complete frame must fit its full work budget");
+            };
+            assert_eq!(work.spent(), expected.len() as u64 + 3);
+            assert_eq!(frame.bytes.as_ref(), expected);
+            assert_eq!(frame.header, inspect_aac_adts_header(expected).unwrap());
+            assert!(frame.bytes.shares_storage_with(&backing));
+            assert!(frame.bytes.belongs_to(&fixture.pool));
+            frames.push(frame);
+        }
+        assert_eq!(frames[0].pts, Some(Time::new(1, 1).unwrap()));
+        assert_eq!(frames[1].pts, None);
+        assert_eq!((frames[0].dts, frames[1].dts), (None, None));
+        assert_eq!(frames[0].duration, Time::new(1024, 48_000).unwrap());
+        assert_eq!(frames[1].duration, Time::new(1024, 44_100).unwrap());
+        let pool = fixture.pool.clone();
+        drop(pressure);
+        drop(reader);
+        drop(fixture);
+        drop(backing);
+        assert_eq!(
+            pool.used(),
+            Budget::control_storage_bytes() + frames[0].bytes.retained_storage_bytes()
+        );
+        drop(frames);
+        assert_eq!(pool.used(), Budget::control_storage_bytes());
+    }
+
+    #[test]
+    fn complete_frame_uses_buffer_when_owner_or_work_exceeds_the_fast_path() {
+        for (maximum, units) in [(F48.len(), 13), (MAXIMUM_ADTS_BYTES, 12)] {
+            let mut fixture = PesFixture::new();
+            let (mut packet, clock) = fixture.chunk(&F48, 90_000, None);
+            let backing = packet.as_ref().unwrap().spans.as_slice()[0]
+                .backing_bytes()
+                .clone();
+            let mut reader = HlsAac::new(&fixture.pool, CONFIG, maximum).unwrap();
+            assert!(reader.push(&mut packet, clock).unwrap());
+            let cancel = AtomicBool::new(false);
+            let mut work = WorkBudget::new(units);
+            let step = reader.poll(&mut work, &cancel).unwrap();
+            assert_eq!(work.spent(), units);
+            let frame = match step {
+                AssemblyStep::Output(frame) => frame,
+                AssemblyStep::Yield => {
+                    assert_eq!(reader.frame.as_slice(), F48);
+                    let AssemblyStep::Output(frame) =
+                        reader.poll(&mut WorkBudget::new(1), &cancel).unwrap()
+                    else {
+                        panic!("buffered frame must resume publication");
+                    };
+                    frame
+                }
+                _ => panic!("complete frame must be buffered or published"),
+            };
+            assert_eq!(frame.bytes.as_ref(), F48);
+            assert!(!frame.bytes.shares_storage_with(&backing));
+            assert!(frame.bytes.retained_capacity() <= maximum);
+            assert_eq!(frame.pts, Some(Time::new(1, 1).unwrap()));
+        }
+    }
+
+    #[test]
+    fn a_valid_header_at_a_split_prefix_continuation_still_uses_the_buffer() {
+        let mut fixture = PesFixture::new();
+        let mut reader = fixture.reader();
+        // The staged header describes 15 bytes; the next span coincidentally
+        // begins with a different complete ADTS frame.
+        let prefix = [0xff, 0xf1, 0x4c, 0x40, 1];
+        let (mut first, clock) = fixture.chunk(&prefix, 90_000, None);
+        assert!(reader.push(&mut first, clock).unwrap());
+        let cancel = AtomicBool::new(false);
+        assert!(matches!(
+            reader.poll(&mut WorkBudget::new(64), &cancel).unwrap(),
+            AssemblyStep::NeedPayload
+        ));
+        let (mut second, clock) = fixture.chunk(&F44_CRC, 180_000, None);
+        let backing = second.as_ref().unwrap().spans.as_slice()[0]
+            .backing_bytes()
+            .clone();
+        assert!(reader.push(&mut second, clock).unwrap());
+        let AssemblyStep::Output(frame) = reader.poll(&mut WorkBudget::new(64), &cancel).unwrap()
+        else {
+            panic!("split prefix must complete its original frame");
+        };
+        assert_eq!(frame.bytes.as_ref(), [&prefix[..], &F44_CRC[..10]].concat());
+        assert!(!frame.bytes.shares_storage_with(&backing));
+        assert_eq!(frame.pts, Some(Time::new(1, 1).unwrap()));
+        assert_eq!(frame.duration, Time::new(1024, 48_000).unwrap());
+    }
+
+    #[test]
+    fn complete_frame_limit_is_checked_before_aliasing() {
+        let mut fixture = PesFixture::new();
+        let mut reader = HlsAac::new(&fixture.pool, CONFIG, F44_CRC.len() - 1).unwrap();
+        let (mut packet, clock) = fixture.chunk(&F44_CRC, 90_000, None);
+        assert!(reader.push(&mut packet, clock).unwrap());
+        let mut work = WorkBudget::new(64);
+        assert_eq!(
+            reader.poll(&mut work, &AtomicBool::new(false)).unwrap_err(),
+            Error::Limit {
+                requested: F44_CRC.len(),
+                maximum: F44_CRC.len() - 1,
+            }
+        );
+        assert_eq!(work.spent(), PREFIX_BYTES as u64 + 1);
     }
 
     #[test]
