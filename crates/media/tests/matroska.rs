@@ -1,4 +1,7 @@
 //! Original format-level fixtures, independent of the FFmpeg differential oracle.
+#[path = "support/ebml.rs"]
+mod ebml;
+use ebml::{cluster, element, mkv, simple, uint};
 use std::{
     io::{self, Cursor, Read},
     sync::{
@@ -8,32 +11,8 @@ use std::{
 };
 use triergon_matroska::{Error, Limits, typed::BlockingReader as Demuxer};
 
-fn size(n: usize) -> Vec<u8> {
-    let width = (1..=8)
-        .find(|w| (n as u64) < (1_u64 << (7 * w)) - 1)
-        .unwrap();
-    let value = (1_u64 << (7 * width)) | n as u64;
-    value.to_be_bytes()[8 - width..].to_vec()
-}
-fn element(id: u64, data: &[u8]) -> Vec<u8> {
-    let mut out = id
-        .to_be_bytes()
-        .into_iter()
-        .skip_while(|b| *b == 0)
-        .collect::<Vec<_>>();
-    out.extend(size(data.len()));
-    out.extend(data);
-    out
-}
-fn uint(id: u64, n: u64) -> Vec<u8> {
-    element(id, &n.to_be_bytes())
-}
 fn block(relative: i16, key: bool) -> Vec<u8> {
-    let [a, b] = relative.to_be_bytes();
-    element(0xa3, &[0x81, a, b, if key { 0x80 } else { 0 }, 1, 2, 3])
-}
-fn cluster(time: u64, blocks: Vec<u8>) -> Vec<u8> {
-    element(0x1f43b675, &[uint(0xe7, time), blocks].concat())
+    simple(1, relative, if key { 0x80 } else { 0 }, &[1, 2, 3])
 }
 fn fixture(clusters: Vec<u8>, unknown_segment: bool) -> Vec<u8> {
     fixture_with_duration(clusters, unknown_segment, true)
@@ -117,18 +96,11 @@ fn header_removed(header: &[u8], scope: u64, private: &[u8]) -> Vec<u8> {
         encoding,
     ]
     .concat();
-    [
-        element(0x1a45dfa3, &element(0x4282, b"matroska")),
-        element(
-            0x18538067,
-            &[
-                element(0x1654ae6b, &element(0xae, &track)),
-                cluster(0, element(0xa3, &[0x81, 0, 0, 0x80])),
-            ]
-            .concat(),
-        ),
+    mkv(&[
+        element(0x1654ae6b, &element(0xae, &track)),
+        cluster(0, element(0xa3, &[0x81, 0, 0, 0x80])),
     ]
-    .concat()
+    .concat())
 }
 
 #[test]
@@ -177,11 +149,7 @@ fn cyclic_seek_heads_are_bounded_and_cannot_fabricate_missing_tracks() {
         &[element(0x53ab, &[0x11, 0x4d, 0x9b, 0x74]), uint(0x53ac, 0)].concat(),
     );
     let body = [element(0x114d9b74, &entry), cluster(0, block(0, true))].concat();
-    let document = [
-        element(0x1a45dfa3, &element(0x4282, b"matroska")),
-        element(0x18538067, &body),
-    ]
-    .concat();
+    let document = mkv(&body);
     assert!(matches!(
         Demuxer::open_seekable(Cursor::new(document), Limits::default()),
         Err(Error::Invalid("missing Tracks"))
@@ -214,18 +182,11 @@ fn header_restore_handles_each_lace_and_rejects_duplicate_encoding_orders() {
         ]
         .concat();
         let laced = element(0xa3, &[0x81, 0, 0, 0x84, 1, b'x', b'y']);
-        let document = [
-            element(0x1a45dfa3, &element(0x4282, b"matroska")),
-            element(
-                0x18538067,
-                &[
-                    element(0x1654ae6b, &element(0xae, &track)),
-                    cluster(0, laced),
-                ]
-                .concat(),
-            ),
+        let document = mkv(&[
+            element(0x1654ae6b, &element(0xae, &track)),
+            cluster(0, laced),
         ]
-        .concat();
+        .concat());
         let result = collect(&document, Limits::default());
         if duplicate {
             assert!(matches!(
@@ -434,21 +395,14 @@ fn zlib_compressed_frames_and_private_restore_their_original_bytes() {
         encoding,
     ]
     .concat();
-    let bytes = [
-        element(0x1a45dfa3, &element(0x4282, b"matroska")),
-        element(
-            0x18538067,
-            &[
-                element(0x1654ae6b, &element(0xae, &track)),
-                cluster(
-                    0,
-                    element(0xa3, &[&[0x81, 0, 0, 0x80][..], &compressed].concat()),
-                ),
-            ]
-            .concat(),
+    let bytes = mkv(&[
+        element(0x1654ae6b, &element(0xae, &track)),
+        cluster(
+            0,
+            element(0xa3, &[&[0x81, 0, 0, 0x80][..], &compressed].concat()),
         ),
     ]
-    .concat();
+    .concat());
     let mut reader = Demuxer::open(Cursor::new(bytes), Limits::default()).unwrap();
     assert_eq!(reader.tracks()[0].codec_private, b"abc");
     assert_eq!(
@@ -532,11 +486,7 @@ fn indexed_fixture_with_sparse_tail(sparse: bool) -> Vec<u8> {
         element(0x1c53bb6b, &cues),
     ]
     .concat();
-    [
-        element(0x1a45dfa3, &element(0x4282, b"matroska")),
-        element(0x18538067, &body),
-    ]
-    .concat()
+    mkv(&body)
 }
 
 #[test]
@@ -663,11 +613,7 @@ fn extreme_cue_timestamps_never_overflow_during_lookup() {
         cluster(0, block(0, true)),
     ]
     .concat();
-    let bytes = [
-        element(0x1a45dfa3, &element(0x4282, b"matroska")),
-        element(0x18538067, &body),
-    ]
-    .concat();
+    let bytes = mkv(&body);
     let mut reader = Demuxer::open_seekable(Cursor::new(bytes), Limits::default()).unwrap();
     let _ = reader.seek_previous(0, 0, &AtomicBool::new(false));
 }
@@ -699,14 +645,7 @@ fn compressed_private_data_is_charged_to_the_shared_metadata_budget() {
             .concat(),
         ));
     }
-    let bytes = [
-        element(0x1a45dfa3, &element(0x4282, b"matroska")),
-        element(
-            0x18538067,
-            &[element(0x1654ae6b, &tracks), cluster(0, block(0, true))].concat(),
-        ),
-    ]
-    .concat();
+    let bytes = mkv(&[element(0x1654ae6b, &tracks), cluster(0, block(0, true))].concat());
     assert!(matches!(
         Demuxer::open(
             Cursor::new(bytes),
@@ -770,18 +709,11 @@ fn laced_decompression_shares_one_decoded_block_budget() {
         0xa3,
         &[&[0x81, 0, 0, 0x84, 1][..], &compressed, &compressed].concat(),
     );
-    let bytes = [
-        element(0x1a45dfa3, &element(0x4282, b"matroska")),
-        element(
-            0x18538067,
-            &[
-                element(0x1654ae6b, &element(0xae, &track)),
-                cluster(0, block),
-            ]
-            .concat(),
-        ),
+    let bytes = mkv(&[
+        element(0x1654ae6b, &element(0xae, &track)),
+        cluster(0, block),
     ]
-    .concat();
+    .concat());
     assert!(matches!(
         collect(
             &bytes,
@@ -831,18 +763,11 @@ fn colour_track_fixture(colour: &[u8]) -> Vec<u8> {
         ),
     ]
     .concat();
-    [
-        element(0x1a45dfa3, &element(0x4282, b"matroska")),
-        element(
-            0x18538067,
-            &[
-                element(0x1654ae6b, &element(0xae, &track)),
-                cluster(0, block(0, true)),
-            ]
-            .concat(),
-        ),
+    mkv(&[
+        element(0x1654ae6b, &element(0xae, &track)),
+        cluster(0, block(0, true)),
     ]
-    .concat()
+    .concat())
 }
 
 #[test]

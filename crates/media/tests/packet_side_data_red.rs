@@ -1,5 +1,9 @@
 //! Uses only the public API. These authored opaque payloads
 //! establish Matroska wire/transaction behavior, not compressed-codec validity.
+#[path = "support/ebml.rs"]
+mod ebml;
+use ebml::side_data::{additions, block, file, more};
+use ebml::{element as e, uint as u};
 use std::{io::Cursor, sync::atomic::AtomicBool};
 use triergon_core::Step;
 use triergon_core::{Budget, Bytes, InputWindow, SourceCapabilities, SourceId, WorkBudget};
@@ -8,62 +12,6 @@ use triergon_matroska::{
     typed::{BlockingReader, Event, Reader},
 };
 
-fn e(id: u64, bytes: &[u8]) -> Vec<u8> {
-    let mut out: Vec<_> = id
-        .to_be_bytes()
-        .into_iter()
-        .skip_while(|byte| *byte == 0)
-        .collect();
-    let width = (1..=8)
-        .find(|width| (bytes.len() as u64) < (1_u64 << (7 * width)) - 1)
-        .unwrap();
-    out.extend(((1_u64 << (7 * width)) | bytes.len() as u64).to_be_bytes()[8 - width..].iter());
-    out.extend(bytes);
-    out
-}
-fn u(id: u64, value: u64) -> Vec<u8> {
-    e(id, &value.to_be_bytes())
-}
-fn track(extra: &[u8]) -> Vec<u8> {
-    e(
-        0xae,
-        &[
-            u(0xd7, 1),
-            u(0x73c5, 1),
-            u(0x83, 1),
-            e(0x86, b"V_AUTHORED/OPAQUE"),
-            e(0x63a2, b"initial"),
-            extra.to_vec(),
-        ]
-        .concat(),
-    )
-}
-fn file(extra: &[u8], groups: &[Vec<u8>]) -> Vec<u8> {
-    let mut cluster = u(0xe7, 7);
-    for group in groups {
-        cluster.extend(group);
-    }
-    let payload = [e(0x1654ae6b, &track(extra)), e(0x1f43b675, &cluster)].concat();
-    [
-        e(0x1a45dfa3, &e(0x4282, b"matroska")),
-        e(0x18538067, &payload),
-    ]
-    .concat()
-}
-fn block() -> Vec<u8> {
-    e(0xa1, &[0x81, 0, 0, 0, b'V'])
-}
-fn additions(mores: &[Vec<u8>]) -> Vec<u8> {
-    e(0x75a1, &mores.concat())
-}
-fn more(id: Option<&[u8]>, bytes: &[u8]) -> Vec<u8> {
-    let mut raw = Vec::new();
-    if let Some(id) = id {
-        raw.extend(e(0xee, id));
-    }
-    raw.extend(e(0xa5, bytes));
-    e(0xa6, &raw)
-}
 fn drive(raw: &[u8], known: bool, events: &mut Vec<Event>) -> triergon_matroska::Result<()> {
     let pool = Budget::new(256 * 1024)?;
     let mut reader = Reader::new(

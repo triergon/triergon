@@ -1,20 +1,5 @@
 use super::*;
-fn e(id: u64, bytes: &[u8]) -> Vec<u8> {
-    let mut result: Vec<_> = id
-        .to_be_bytes()
-        .into_iter()
-        .skip_while(|b| *b == 0)
-        .collect();
-    let width = (1..=8)
-        .find(|w| (bytes.len() as u64) < (1_u64 << (7 * w)) - 1)
-        .unwrap();
-    result.extend(((1_u64 << (7 * width)) | bytes.len() as u64).to_be_bytes()[8 - width..].iter());
-    result.extend(bytes);
-    result
-}
-fn u(id: u64, n: u64) -> Vec<u8> {
-    e(id, &n.to_be_bytes())
-}
+use crate::ebml_kit::{element as e, uint as u};
 fn file(uid: u64, bytes: &[u8]) -> Vec<u8> {
     e(
         0x61a7,

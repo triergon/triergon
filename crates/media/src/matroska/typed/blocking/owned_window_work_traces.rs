@@ -1,5 +1,6 @@
 //! Literal whole-envelope work/read/event comparison, not a speed assertion.
 use super::*;
+use crate::ebml_kit::{element, mkv};
 use crate::{
     Limits,
     incremental::{ElementEvent, ElementReader, ParseStep},
@@ -8,40 +9,18 @@ use crate::{
 use std::io::Cursor;
 use triergon_core::{Budget, OwnedInputBytes, SourceCapabilities, SourceId};
 
-fn element(id: u64, body: &[u8]) -> Vec<u8> {
-    let mut out: Vec<_> = id
-        .to_be_bytes()
-        .into_iter()
-        .skip_while(|b| *b == 0)
-        .collect();
-    if body.len() < 127 {
-        out.push(0x80 | body.len() as u8);
-    } else {
-        assert!(body.len() < 16_383);
-        out.extend((0x4000_u16 | body.len() as u16).to_be_bytes());
-    }
-    out.extend_from_slice(body);
-    out
-}
 fn source(body_size: usize) -> Vec<u8> {
     let mut payload = vec![b'x'; body_size];
     payload[..4].copy_from_slice(&[0x81, 0, 0, 0x80]);
-    [
-        element(0x1a45dfa3, &element(0x4282, b"matroska")),
-        element(
-            0x18538067,
-            &element(
-                0x1f43b675,
-                &[
-                    element(0xe7, &[0]),
-                    element(0xa3, &payload),
-                    element(0xa3, &[0x81, 0, 1, 0x80, b'a', b'b']),
-                ]
-                .concat(),
-            ),
-        ),
-    ]
-    .concat()
+    mkv(&element(
+        0x1f43b675,
+        &[
+            element(0xe7, &[0]),
+            element(0xa3, &payload),
+            element(0xa3, &[0x81, 0, 1, 0x80, b'a', b'b']),
+        ]
+        .concat(),
+    ))
 }
 fn trace(raw: &[u8], owned: bool, quantum: u64, policy: PayloadOwnership) -> Vec<String> {
     let pool = Budget::new(4 * 1024 * 1024).unwrap();

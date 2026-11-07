@@ -1,26 +1,11 @@
 //! Independent budget-observation guards for the format's permanent-pressure
 //! proof. Pool observations are test oracles only; production visits owners.
 use super::*;
+use crate::ebml_kit::{element as e, mkv, uint as u};
 use crate::matroska::typed::usage::Pressure;
 use std::io::Cursor;
 use triergon_core::{Bytes, Reservation};
 
-fn e(id: u64, data: &[u8]) -> Vec<u8> {
-    let mut out: Vec<_> = id
-        .to_be_bytes()
-        .into_iter()
-        .skip_while(|byte| *byte == 0)
-        .collect();
-    let width = (1..=8)
-        .find(|width| (data.len() as u64) < (1_u64 << (7 * width)) - 1)
-        .unwrap();
-    out.extend(((1_u64 << (7 * width)) | data.len() as u64).to_be_bytes()[8 - width..].iter());
-    out.extend(data);
-    out
-}
-fn u(id: u64, value: u64) -> Vec<u8> {
-    e(id, &value.to_be_bytes())
-}
 const ABC: [u8; 14] = [120, 1, 1, 3, 0, 252, 255, 97, 98, 99, 2, 77, 1, 39];
 fn file() -> Vec<u8> {
     let encoding = |order, algorithm, settings: &[u8]| {
@@ -102,11 +87,7 @@ fn file() -> Vec<u8> {
             .concat(),
         ),
     );
-    [
-        e(0x1a45dfa3, &e(0x4282, b"matroska")),
-        e(SEGMENT, &[tracks, chapter, tags, cluster, cue].concat()),
-    ]
-    .concat()
+    mkv(&[tracks, chapter, tags, cluster, cue].concat())
 }
 fn supply(reader: &mut Reader, request: InputRequest, raw: &[u8], hidden_parent: bool) {
     let at = request.offset as usize;

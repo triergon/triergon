@@ -438,23 +438,13 @@ pub fn open_owned_seekable_in(
 #[cfg(test)]
 mod header_refill_blocking_tests {
     use super::*;
+    use crate::ebml_kit::{element, mkv};
     use std::{
         cell::RefCell,
         io::{self, Cursor},
         rc::Rc,
     };
     use triergon_core::Bytes;
-    fn element(id: u64, data: &[u8]) -> Vec<u8> {
-        let mut bytes: Vec<_> = id
-            .to_be_bytes()
-            .into_iter()
-            .skip_while(|b| *b == 0)
-            .collect();
-        assert!(data.len() < 127);
-        bytes.push(0x80 | data.len() as u8);
-        bytes.extend_from_slice(data);
-        bytes
-    }
     fn source() -> Vec<u8> {
         let tracks = element(
             0x1654ae6b,
@@ -473,11 +463,7 @@ mod header_refill_blocking_tests {
         for tick in 0..3 {
             body.extend(element(0xa3, &[0x81, 0, tick, 0x80, b'x', b'y']));
         }
-        [
-            element(0x1a45dfa3, &element(0x4282, b"matroska")),
-            element(0x18538067, &[tracks, element(0x1f43b675, &body)].concat()),
-        ]
-        .concat()
+        mkv(&[tracks, element(0x1f43b675, &body)].concat())
     }
     type Calls = Rc<RefCell<Vec<(u64, usize)>>>;
     struct Recorded {
@@ -611,6 +597,7 @@ mod header_refill_blocking_tests {
 #[cfg(test)]
 mod header_refill_runtime_red {
     use super::*;
+    use crate::ebml_kit::{element as e, mkv};
     use std::{
         cell::RefCell,
         io::{self, Cursor},
@@ -618,17 +605,6 @@ mod header_refill_runtime_red {
     };
     #[test]
     fn ordinary_default_header_refill_is_real_io_and_complete_output() {
-        fn e(id: u64, data: &[u8]) -> Vec<u8> {
-            let mut out: Vec<_> = id
-                .to_be_bytes()
-                .into_iter()
-                .skip_while(|b| *b == 0)
-                .collect();
-            assert!(data.len() < 127);
-            out.push(0x80 | data.len() as u8);
-            out.extend_from_slice(data);
-            out
-        }
         let tracks = e(
             0x1654ae6b,
             &e(
@@ -642,21 +618,14 @@ mod header_refill_runtime_red {
                 .concat(),
             ),
         );
-        let raw = [
-            e(0x1a45dfa3, &e(0x4282, b"matroska")),
+        let raw = mkv(&[
+            tracks,
             e(
-                0x18538067,
-                &[
-                    tracks,
-                    e(
-                        0x1f43b675,
-                        &[e(0xe7, &[0]), e(0xa3, &[0x81, 0, 0, 0x80, b'x', b'y'])].concat(),
-                    ),
-                ]
-                .concat(),
+                0x1f43b675,
+                &[e(0xe7, &[0]), e(0xa3, &[0x81, 0, 0, 0x80, b'x', b'y'])].concat(),
             ),
         ]
-        .concat();
+        .concat());
         struct Recorded {
             inner: Cursor<Vec<u8>>,
             calls: Rc<RefCell<Vec<usize>>>,

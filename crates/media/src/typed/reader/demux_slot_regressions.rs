@@ -1,25 +1,8 @@
 //! Exact public/shared progress, source, work and owner lifetime observations.
 use super::*;
+use crate::ebml_kit::{element, mkv, uint};
 use triergon_core::Bytes;
 
-fn element(id: u64, body: &[u8]) -> Vec<u8> {
-    let mut bytes: Vec<_> = id
-        .to_be_bytes()
-        .into_iter()
-        .skip_while(|b| *b == 0)
-        .collect();
-    let width = (1..=8)
-        .find(|n| (body.len() as u64) < (1_u64 << (7 * n)) - 1)
-        .unwrap();
-    bytes.extend_from_slice(
-        &((1_u64 << (7 * width)) | body.len() as u64).to_be_bytes()[8 - width..],
-    );
-    bytes.extend_from_slice(body);
-    bytes
-}
-fn uint(id: u64, value: u64) -> Vec<u8> {
-    element(id, &value.to_be_bytes())
-}
 fn track(number: u64, kind: u64, codec: &[u8], extra: &[u8]) -> Vec<u8> {
     element(
         0xae,
@@ -126,11 +109,7 @@ fn fixture(kind: u8) -> Vec<u8> {
     } else {
         tags
     };
-    [
-        element(0x1a45dfa3, &element(0x4282, b"matroska")),
-        element(SEGMENT, &[prefix, head, cluster, tail].concat()),
-    ]
-    .concat()
+    mkv(&[prefix, head, cluster, tail].concat())
 }
 fn make(kind: u8) -> (Budget, usize, Bytes, Reader) {
     let pool = Budget::new(256 * 1024).unwrap();

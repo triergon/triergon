@@ -1,27 +1,13 @@
 //! The Matroska reader through the neutral container model only.
+#[path = "support/ebml.rs"]
+mod ebml;
+use ebml::{element, mkv, uint};
 use std::sync::atomic::AtomicBool;
 use triergon_core::container::{
     ContainerReader, Event, MediaKind, Origin, PacketInfo, RandomAccess, TrackId, TrackInfo,
 };
 use triergon_core::{Budget, Bytes, InputWindow, SourceCapabilities, SourceId, Step, WorkBudget};
 use triergon_matroska::{Limits, typed::Reader};
-
-fn element(id: u64, data: &[u8]) -> Vec<u8> {
-    let mut out: Vec<_> = id
-        .to_be_bytes()
-        .into_iter()
-        .skip_while(|b| *b == 0)
-        .collect();
-    let width = (1..=8)
-        .find(|w| (data.len() as u64) < (1_u64 << (7 * w)) - 1)
-        .unwrap();
-    out.extend(((1_u64 << (7 * width)) | data.len() as u64).to_be_bytes()[8 - width..].iter());
-    out.extend(data);
-    out
-}
-fn uint(id: u64, value: u64) -> Vec<u8> {
-    element(id, &value.to_be_bytes())
-}
 
 /// One video track with explicit primaries and range only, then two blocks.
 fn source() -> Vec<u8> {
@@ -48,11 +34,7 @@ fn source() -> Vec<u8> {
         ]
         .concat(),
     );
-    [
-        element(0x1a45dfa3, &element(0x4282, b"matroska")),
-        element(0x18538067, &[element(0x1654ae6b, &track), cluster].concat()),
-    ]
-    .concat()
+    mkv(&[element(0x1654ae6b, &track), cluster].concat())
 }
 
 /// Generic over any container reader: what a generic caller sees.

@@ -1,5 +1,6 @@
 //! Runtime guards that use no optimization-specific API.
 use super::*;
+use crate::ebml_kit::mkv;
 use crate::incremental::{ElementEvent, ElementReader};
 use crate::matroska::typed::epoch::{EpochRestoreJob, EpochTarget};
 use std::io::Cursor;
@@ -12,11 +13,7 @@ fn prefix_anchor(
     crate::incremental::ClusterCheckpoint,
     Vec<u8>,
 ) {
-    let raw = [
-        element(0x1a45dfa3, &element(0x4282, b"matroska")),
-        element(0x18538067, tail),
-    ]
-    .concat();
+    let raw = mkv(tail);
     let mut reader = ElementReader::new(
         pool,
         SourceId(2011),
@@ -202,8 +199,8 @@ struct SeekFixture {
     all_clusters: usize,
 }
 fn checkpoint_file(indexed: bool, states: bool, bad_crc: bool, false_state: bool) -> SeekFixture {
-    let video = element(0xae, &track_entry(1, 1, &element(0x63a2, b"video-initial")));
-    let audio = element(0xae, &track_entry(2, 2, &element(0x63a2, b"audio-initial")));
+    let video = track(1, 1, &element(0x63a2, b"video-initial"));
+    let audio = track(2, 2, &element(0x63a2, b"audio-initial"));
     let tracks = element(0x1654ae6b, &[video, audio].concat());
     let simple = |track: u8, value: u8| element(0xa3, &[0x80 | track, 0, 0, 0x80, value]);
     let group = |track: u8, value: u8, state: &[u8], corrupt: bool| {
@@ -289,11 +286,7 @@ fn checkpoint_file(indexed: bool, states: bool, bad_crc: bool, false_state: bool
     assert_eq!(index.len(), index_size);
     let body = [tracks, index, first.clone(), second.clone(), third.clone()].concat();
     SeekFixture {
-        raw: [
-            element(0x1a45dfa3, &element(0x4282, b"matroska")),
-            element(0x18538067, &body),
-        ]
-        .concat(),
+        raw: mkv(&body),
         prefix: first.len(),
         target_prefix: second.len(),
         target_header: second.len() - second_body.len(),

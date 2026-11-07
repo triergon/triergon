@@ -1,21 +1,11 @@
 //! Authored ownership and incremental-input regressions. No reference code.
+#[path = "support/ebml.rs"]
+mod ebml;
+use ebml::{element as e, mkv};
 use std::{io::Cursor, sync::atomic::AtomicBool};
 use triergon_core::{Budget, Bytes, InputWindow, SourceCapabilities, SourceId, WorkBudget};
 use triergon_matroska::{Error, Limits, typed::BlockingReader as Demuxer};
 
-fn e(id: u64, bytes: &[u8]) -> Vec<u8> {
-    let mut out: Vec<_> = id
-        .to_be_bytes()
-        .into_iter()
-        .skip_while(|b| *b == 0)
-        .collect();
-    let width = (1..=8)
-        .find(|w| (bytes.len() as u64) < (1_u64 << (7 * w)) - 1)
-        .unwrap();
-    out.extend(((1_u64 << (7 * width)) | bytes.len() as u64).to_be_bytes()[8 - width..].iter());
-    out.extend(bytes);
-    out
-}
 fn fixture() -> Vec<u8> {
     let track = [
         e(0xd7, &[1]),
@@ -46,19 +36,12 @@ fn fixture() -> Vec<u8> {
         ]
         .concat(),
     );
-    [
-        e(0x1a45dfa3, &e(0x4282, b"matroska")),
-        e(
-            0x18538067,
-            &[
-                e(0x1654ae6b, &e(0xae, &track)),
-                e(0x1941a469, &attachment),
-                cluster,
-            ]
-            .concat(),
-        ),
+    mkv(&[
+        e(0x1654ae6b, &e(0xae, &track)),
+        e(0x1941a469, &attachment),
+        cluster,
     ]
-    .concat()
+    .concat())
 }
 
 #[test]
@@ -326,11 +309,7 @@ fn skipped_block_outside_cluster_does_not_reset_scan_policy() {
     // These elements are skipped at Segment level. Their Block ID alone must
     // not let an irrelevant scan repeatedly replenish its operation budget.
     let outside = e(0xa3, &[0x81, 0, 0, 0x80, 1]).repeat(32);
-    let bytes = [
-        e(0x1a45dfa3, &e(0x4282, b"matroska")),
-        e(0x18538067, &outside),
-    ]
-    .concat();
+    let bytes = mkv(&outside);
     let pool = Budget::new(64 * 1024).unwrap();
     let mut reader = ElementReader::new(
         &pool,
@@ -470,14 +449,7 @@ fn small_stored_zlib_laces_keep_the_existing_decoded_capacity_policy() {
     .concat();
     assert_eq!(block.len(), 33);
     let cluster = e(0x1f43b675, &[e(0xe7, &[0]), e(0xa3, &block)].concat());
-    let bytes = [
-        e(0x1a45dfa3, &e(0x4282, b"matroska")),
-        e(
-            0x18538067,
-            &[e(0x1654ae6b, &e(0xae, &track)), cluster].concat(),
-        ),
-    ]
-    .concat();
+    let bytes = mkv(&[e(0x1654ae6b, &e(0xae, &track)), cluster].concat());
     let mut reader = Demuxer::open(
         Cursor::new(bytes),
         Limits {

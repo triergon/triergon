@@ -1,6 +1,7 @@
 //! Source/API/resource controls for the legacy projection.
 //! The control is the exact legacy next_packet consumer, not a second parser.
 use super::*;
+use crate::ebml_kit::{cluster, element, mkv, simple, uint as unsigned};
 use crate::matroska::typed::usage::{Owner, Storage};
 use std::{
     cell::RefCell,
@@ -8,34 +9,6 @@ use std::{
     rc::Rc,
 };
 
-fn element(id: u64, data: &[u8]) -> Vec<u8> {
-    let mut out: Vec<_> = id
-        .to_be_bytes()
-        .into_iter()
-        .skip_while(|x| *x == 0)
-        .collect();
-    let width = (1..=8)
-        .find(|width| (data.len() as u64) < (1_u64 << (7 * width)) - 1)
-        .unwrap();
-    out.extend(((1_u64 << (7 * width)) | data.len() as u64).to_be_bytes()[8 - width..].iter());
-    out.extend_from_slice(data);
-    out
-}
-fn unsigned(id: u64, n: u64) -> Vec<u8> {
-    element(id, &n.to_be_bytes())
-}
-fn simple(track: u8, ticks: i16, flags: u8, data: &[u8]) -> Vec<u8> {
-    element(
-        0xa3,
-        &[
-            vec![0x80 | track],
-            ticks.to_be_bytes().to_vec(),
-            vec![flags],
-            data.to_vec(),
-        ]
-        .concat(),
-    )
-}
 fn group(extra: &[u8]) -> Vec<u8> {
     element(
         0xa0,
@@ -65,12 +38,8 @@ fn fixture(blocks: &[Vec<u8>]) -> Vec<u8> {
         ]
         .concat(),
     );
-    let cluster = element(0x1f43b675, &[unsigned(0xe7, 0), blocks.concat()].concat());
-    [
-        element(0x1a45dfa3, &element(0x4282, b"matroska")),
-        element(0x18538067, &[tracks, cluster].concat()),
-    ]
-    .concat()
+    let cluster = cluster(0, blocks.concat());
+    mkv(&[tracks, cluster].concat())
 }
 fn plain() -> Vec<u8> {
     fixture(&[
@@ -555,11 +524,7 @@ fn indexed_second_cluster_additions() -> Vec<u8> {
         )
     };
     let cues = cue((tracks.len() + cue(0).len() + first.len()) as u64);
-    [
-        element(0x1a45dfa3, &element(0x4282, b"matroska")),
-        element(0x18538067, &[tracks, cues, first, second].concat()),
-    ]
-    .concat()
+    mkv(&[tracks, cues, first, second].concat())
 }
 #[test]
 fn legacy_projection_additions_refusal_preserves_noninitial_cue_zero_state_epoch_io() {
