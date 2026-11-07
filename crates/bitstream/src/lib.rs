@@ -16,5 +16,5 @@ mod rbsp;
 mod reader;
 
 pub use checked::{BitCursor, BitError, BitSource, bits_at};
-pub use rbsp::Rbsp;
+pub use rbsp::{Rbsp, unescape};
 pub use reader::{BitReader, Cached, CachedBitReader, Direct, Reader, Window};

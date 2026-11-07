@@ -1,6 +1,6 @@
 //! Slice segment header (clause 7.3.6, semantics 7.4.7).
 
-use crate::bits::BitReader;
+use crate::bits::{BitCursor, BitSource, Ranged};
 use crate::error::{DecodeError, Result};
 use crate::nal;
 use crate::ps::{Pps, ShortTermRps, Sps, parse_st_rps};
@@ -101,7 +101,7 @@ fn ceil_log2(v: u32) -> u32 {
 
 /// Peek the PPS id and first_slice_segment_in_pic_flag without full parsing.
 pub fn peek_pps_id(rbsp: &[u8], nal_unit_type: u8) -> Result<(bool, u8)> {
-    let mut r = BitReader::new(rbsp);
+    let mut r = BitCursor::new(rbsp);
     let first = r.flag()?;
     if (nal::BLA_W_LP..=nal::RSV_IRAP_23).contains(&nal_unit_type) {
         r.skip(1)?;
@@ -110,7 +110,7 @@ pub fn peek_pps_id(rbsp: &[u8], nal_unit_type: u8) -> Result<(bool, u8)> {
     Ok((first, id))
 }
 
-fn parse_pwt(r: &mut BitReader<'_>, sh: &SliceHeader) -> Result<PredWeightTable> {
+fn parse_pwt(r: &mut BitCursor<'_>, sh: &SliceHeader) -> Result<PredWeightTable> {
     let luma_log2_denom = r.ue_max(7, "luma_log2_weight_denom")?;
     let dc = r.se()?;
     let chroma_log2_denom = luma_log2_denom as i32 + dc;
@@ -173,7 +173,7 @@ pub fn parse_slice_header(
     pps: &Pps,
     prev: Option<&SliceHeader>,
 ) -> Result<SliceHeader> {
-    let mut r = BitReader::new(rbsp);
+    let mut r = BitCursor::new(rbsp);
     let first_slice_segment_in_pic = r.flag()?;
     let mut no_output_of_prior_pics = false;
     if (nal::BLA_W_LP..=nal::RSV_IRAP_23).contains(&nal_unit_type) {
@@ -186,7 +186,7 @@ pub fn parse_slice_header(
         if pps.dependent_slice_segments_enabled {
             dependent = r.flag()?;
         }
-        segment_address = r.u(ceil_log2(sps.pic_size_ctb()))?;
+        segment_address = r.read(ceil_log2(sps.pic_size_ctb()))?;
         if segment_address >= sps.pic_size_ctb() {
             return Err(DecodeError::InvalidData("slice_segment_address"));
         }
@@ -252,7 +252,7 @@ pub fn parse_slice_header(
             sh.pic_output_flag = r.flag()?;
         }
         if !nal::is_idr(nal_unit_type) {
-            sh.poc_lsb = r.u(sps.log2_max_poc_lsb)?;
+            sh.poc_lsb = r.read(sps.log2_max_poc_lsb)?;
             let st_sps = r.flag()?;
             let num_st = sps.st_rps.len();
             if !st_sps {
@@ -265,7 +265,7 @@ pub fn parse_slice_header(
                     ));
                 }
                 let idx = if num_st > 1 {
-                    r.u(ceil_log2(num_st as u32))? as usize
+                    r.read(ceil_log2(num_st as u32))? as usize
                 } else {
                     0
                 };
@@ -289,14 +289,18 @@ pub fn parse_slice_header(
                 for i in 0..num_lt_sps + num_lt_pics {
                     let mut e = LongTermEntry::default();
                     if i < num_lt_sps {
-                        let idx = if nsps > 1 { r.u(ceil_log2(nsps))? } else { 0 };
+                        let idx = if nsps > 1 {
+                            r.read(ceil_log2(nsps))?
+                        } else {
+                            0
+                        };
                         if idx >= nsps {
                             return Err(DecodeError::InvalidData("lt_idx_sps"));
                         }
                         e.poc_lsb = sps.lt_ref_pic_poc_lsb[idx as usize];
                         e.used_by_curr = sps.lt_used_by_curr[idx as usize];
                     } else {
-                        e.poc_lsb = r.u(sps.log2_max_poc_lsb)?;
+                        e.poc_lsb = r.read(sps.log2_max_poc_lsb)?;
                         e.used_by_curr = r.flag()?;
                     }
                     e.msb_present = r.flag()?;
@@ -348,7 +352,7 @@ pub fn parse_slice_header(
                 sh.rpl_mod[0] = r.flag()?;
                 if sh.rpl_mod[0] {
                     for i in 0..sh.num_ref_idx[0] as usize {
-                        let v = r.u(bits)?;
+                        let v = r.read(bits)?;
                         if v >= total {
                             return Err(DecodeError::InvalidData("list_entry_l0"));
                         }
@@ -359,7 +363,7 @@ pub fn parse_slice_header(
                     sh.rpl_mod[1] = r.flag()?;
                     if sh.rpl_mod[1] {
                         for i in 0..sh.num_ref_idx[1] as usize {
-                            let v = r.u(bits)?;
+                            let v = r.read(bits)?;
                             if v >= total {
                                 return Err(DecodeError::InvalidData("list_entry_l1"));
                             }
@@ -429,7 +433,7 @@ pub fn parse_slice_header(
             let len = r.ue_max(31, "offset_len_minus1")? + 1;
             sh.entry_points.reserve(n as usize);
             for _ in 0..n {
-                let v = if len == 32 { r.u(32)? } else { r.u(len)? };
+                let v = if len == 32 { r.read(32)? } else { r.read(len)? };
                 sh.entry_points.push(v.wrapping_add(1));
             }
         }
@@ -444,6 +448,6 @@ pub fn parse_slice_header(
         return Err(DecodeError::InvalidData("slice header byte_alignment"));
     }
     r.align();
-    sh.data_offset = r.byte_pos();
+    sh.data_offset = r.position() >> 3;
     Ok(sh)
 }

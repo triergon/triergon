@@ -5,7 +5,7 @@ use super::{
     Cu, PART_2NX2N, PART_2NXN, PART_2NXND, PART_2NXNU, PART_NLX2N, PART_NRX2N, PART_NX2N, PART_NXN,
     SliceDecoder,
 };
-use crate::bits::BitReader;
+use crate::bits::{BitCursor, BitSource};
 use crate::cabac::ctx;
 use crate::error::{DecodeError, Result};
 use crate::picture::{Pixel, PuMotion};
@@ -404,7 +404,7 @@ impl<P: Pixel> SliceDecoder<'_, P> {
         if pos > self.data.len() {
             return Err(DecodeError::InvalidData("PCM data overrun"));
         }
-        let mut r = BitReader::new(&self.data[pos..]);
+        let mut r = BitCursor::new(&self.data[pos..]);
         let n = 1usize << log2;
         let bd_y = self.sps.pcm_bit_depth_luma;
         let bd_c = self.sps.pcm_bit_depth_chroma;
@@ -415,7 +415,7 @@ impl<P: Pixel> SliceDecoder<'_, P> {
             let stride = pl.stride;
             for j in 0..n {
                 for i in 0..n {
-                    let v = r.u(bd_y)? as i32;
+                    let v = r.read(bd_y)? as i32;
                     pl.data[(y0 as usize + j) * stride + x0 as usize + i] = P::from_i32(v << sy);
                 }
             }
@@ -425,13 +425,13 @@ impl<P: Pixel> SliceDecoder<'_, P> {
             let stride = pl.stride;
             for j in 0..nc {
                 for i in 0..nc {
-                    let v = r.u(bd_c)? as i32;
+                    let v = r.read(bd_c)? as i32;
                     pl.data[(y0 as usize / 2 + j) * stride + x0 as usize / 2 + i] =
                         P::from_i32(v << scy);
                 }
             }
         }
-        let consumed = r.bit_pos().div_ceil(8);
+        let consumed = r.position().div_ceil(8);
         self.cabac.reinit(pos + consumed);
         Ok(())
     }

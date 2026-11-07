@@ -2,6 +2,29 @@
 
 use crate::{BitError, BitSource};
 
+/// Copies a NAL unit payload into `out` without its emulation prevention bytes. Unlike
+/// [`Rbsp`] this validates nothing: every `03` after two zeros goes, whatever follows it.
+pub fn unescape(ebsp: &[u8], out: &mut Vec<u8>) {
+    out.clear();
+    out.reserve(ebsp.len());
+    let length = ebsp.len();
+    let mut i = 0;
+    let mut run = 0;
+    while i + 2 < length {
+        // A byte above 3 rules out a pattern at any of these three positions.
+        if ebsp[i + 2] > 3 {
+            i += 3;
+        } else if ebsp[i] == 0 && ebsp[i + 1] == 0 && ebsp[i + 2] == 3 {
+            out.extend_from_slice(&ebsp[run..i + 2]);
+            i += 3;
+            run = i;
+        } else {
+            i += 1;
+        }
+    }
+    out.extend_from_slice(&ebsp[run..]);
+}
+
 /// Reads the RBSP of a NAL unit payload in place, removing emulation prevention bytes as
 /// it goes, so parsing a prefix costs no copy of the suffix.
 ///
@@ -161,6 +184,35 @@ mod tests {
             bytes(Rbsp::lenient(&[0, 0, 0, 0, 3, 1])),
             Ok(vec![0, 0, 0, 0, 1])
         );
+    }
+
+    #[test]
+    fn unescape_matches_the_byte_by_byte_rule() {
+        let cases: [&[u8]; 8] = [
+            &[],
+            &[0, 0],
+            &[0, 0, 3],
+            &[0, 0, 0, 3, 3],
+            &[1, 0, 0, 3, 1, 0, 0, 3],
+            &[0, 0, 3, 0, 0, 3, 0, 0, 3],
+            &[9, 9, 9, 9, 0, 0, 3, 9],
+            &[0, 0, 3, 4, 0, 0, 1],
+        ];
+        for case in cases {
+            let mut expected = Vec::new();
+            let mut zeros = 0;
+            for &byte in case {
+                if zeros >= 2 && byte == 3 {
+                    zeros = 0;
+                    continue;
+                }
+                zeros = if byte == 0 { zeros + 1 } else { 0 };
+                expected.push(byte);
+            }
+            let mut out = vec![7];
+            unescape(case, &mut out);
+            assert_eq!(out, expected);
+        }
     }
 
     #[test]

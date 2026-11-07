@@ -108,6 +108,7 @@ dependencies = [
 name = "triergon-codec-hevc"
 version = "0.0.0"
 dependencies = [
+ "triergon-bitstream",
  "triergon-codec",
  "triergon-harness-protocol",
 ]

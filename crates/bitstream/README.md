@@ -52,7 +52,8 @@ assert_eq!(bits.read(8), Err(BitError::End));
 ```
 
 [`Rbsp`] is the same trait over a NAL unit payload: it removes emulation prevention bytes
-as it reads, so parsing a prefix copies nothing.
+as it reads, so parsing a prefix copies nothing. [`unescape`] copies a whole payload for a
+decoder.
 
 ```rust
 use triergon_bitstream::{BitSource, Rbsp};

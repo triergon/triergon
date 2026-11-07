@@ -2,6 +2,8 @@
 //! (clause 7.3.1.2), emulation prevention removal (clause 7.3.1.1) and an access unit
 //! splitter (clause 7.4.2.4.4) for elementary-stream input.
 
+use triergon_bitstream::unescape;
+
 pub const TRAIL_N: u8 = 0;
 pub const TRAIL_R: u8 = 1;
 pub const TSA_N: u8 = 2;
@@ -146,30 +148,7 @@ impl<'a> Iterator for AnnexBIter<'a> {
 /// Remove emulation prevention bytes (clause 7.3.1.1) from `src` (a NAL unit including its
 /// two header bytes) into `dst` (header bytes are dropped). Returns nothing; `dst` is cleared first.
 pub fn unescape_rbsp(src: &[u8], dst: &mut Vec<u8>) {
-    dst.clear();
-    if src.len() <= 2 {
-        return;
-    }
-    let s = &src[2..];
-    dst.reserve(s.len());
-    let mut zeros = 0u32;
-    let mut i = 0;
-    while i < s.len() {
-        let b = s[i];
-        if zeros >= 2 && b == 3 {
-            // Drop emulation_prevention_three_byte.
-            zeros = 0;
-            i += 1;
-            continue;
-        }
-        if b == 0 {
-            zeros += 1;
-        } else {
-            zeros = 0;
-        }
-        dst.push(b);
-        i += 1;
-    }
+    unescape(src.get(2..).unwrap_or(&[]), dst);
 }
 
 /// Splits an Annex B elementary stream into access units (clause 7.4.2.4.4 rules for the

@@ -1,7 +1,7 @@
 //! Parameter sets: VPS (clause 7.3.2.1), SPS (7.3.2.2), PPS (7.3.2.3), profile/tier/level
 //! (7.3.3), scaling lists (7.3.4 / 7.4.5), short-term RPS (7.3.7 / 7.4.8), VUI (E.2.1).
 
-use crate::bits::BitReader;
+use crate::bits::{BitCursor, BitSource, Ranged};
 use crate::error::{DecodeError, Result};
 use crate::tables::{DEFAULT_SCALING_INTER, DEFAULT_SCALING_INTRA, DIAG_SCAN_4X4, DIAG_SCAN_8X8};
 
@@ -39,7 +39,7 @@ impl ShortTermRps {
 
 /// st_ref_pic_set( stRpsIdx ). `sets` holds candidate RPSs 0..stRpsIdx-1.
 pub fn parse_st_rps(
-    r: &mut BitReader<'_>,
+    r: &mut BitCursor<'_>,
     st_rps_idx: usize,
     num_short_term_ref_pic_sets: usize,
     sets: &[ShortTermRps],
@@ -179,7 +179,7 @@ impl ScalingListRaw {
         }
     }
 
-    fn parse(r: &mut BitReader<'_>) -> Result<Self> {
+    fn parse(r: &mut BitCursor<'_>) -> Result<Self> {
         let mut s = ScalingListRaw::default_lists();
         for size_id in 0..4usize {
             let step = if size_id == 3 { 3 } else { 1 };
@@ -292,17 +292,17 @@ pub struct ProfileInfo {
     pub level_idc: u8,
 }
 
-fn parse_ptl(r: &mut BitReader<'_>, max_sub_layers_minus1: u32) -> Result<ProfileInfo> {
+fn parse_ptl(r: &mut BitCursor<'_>, max_sub_layers_minus1: u32) -> Result<ProfileInfo> {
     let mut p = ProfileInfo {
-        profile_space: r.u(2)? as u8,
+        profile_space: r.read(2)? as u8,
         tier: r.flag()?,
-        profile_idc: r.u(5)? as u8,
-        compat: r.u(32)?,
+        profile_idc: r.read(5)? as u8,
+        compat: r.read(32)?,
         level_idc: 0,
     };
     // progressive/interlaced/non_packed/frame_only (4) + 43 bits + 1 bit.
     r.skip(4 + 43 + 1)?;
-    p.level_idc = r.u(8)? as u8;
+    p.level_idc = r.read(8)? as u8;
     let mut prof_present = [false; 8];
     let mut lvl_present = [false; 8];
     for i in 0..max_sub_layers_minus1 as usize {
@@ -331,8 +331,8 @@ pub struct Vps {
 }
 
 pub fn parse_vps(rbsp: &[u8]) -> Result<Vps> {
-    let mut r = BitReader::new(rbsp);
-    let id = r.u(4)? as u8;
+    let mut r = BitCursor::new(rbsp);
+    let id = r.read(4)? as u8;
     Ok(Vps { id })
 }
 
@@ -371,7 +371,7 @@ const SAR_TABLE: [(u32, u32); 17] = [
     (2, 1),
 ];
 
-fn parse_sub_layer_hrd(r: &mut BitReader<'_>, cpb_cnt: u32, sub_pic: bool) -> Result<()> {
+fn parse_sub_layer_hrd(r: &mut BitCursor<'_>, cpb_cnt: u32, sub_pic: bool) -> Result<()> {
     for _ in 0..cpb_cnt {
         r.ue()?;
         r.ue()?;
@@ -384,7 +384,7 @@ fn parse_sub_layer_hrd(r: &mut BitReader<'_>, cpb_cnt: u32, sub_pic: bool) -> Re
     Ok(())
 }
 
-fn parse_hrd(r: &mut BitReader<'_>, common: bool, max_sub_layers_minus1: u32) -> Result<()> {
+fn parse_hrd(r: &mut BitCursor<'_>, common: bool, max_sub_layers_minus1: u32) -> Result<()> {
     let mut nal = false;
     let mut vcl = false;
     let mut sub_pic = false;
@@ -427,7 +427,7 @@ fn parse_hrd(r: &mut BitReader<'_>, common: bool, max_sub_layers_minus1: u32) ->
     Ok(())
 }
 
-fn parse_vui(r: &mut BitReader<'_>, max_sub_layers_minus1: u32) -> Result<Vui> {
+fn parse_vui(r: &mut BitCursor<'_>, max_sub_layers_minus1: u32) -> Result<Vui> {
     let mut v = Vui {
         sar: (0, 1),
         colour_primaries: 2,
@@ -437,10 +437,10 @@ fn parse_vui(r: &mut BitReader<'_>, max_sub_layers_minus1: u32) -> Result<Vui> {
         ..Default::default()
     };
     if r.flag()? {
-        let idc = r.u(8)?;
+        let idc = r.read(8)?;
         if idc == 255 {
-            let w = r.u(16)?;
-            let h = r.u(16)?;
+            let w = r.read(16)?;
+            let h = r.read(16)?;
             v.sar = (w, h);
         } else if (idc as usize) < SAR_TABLE.len() {
             v.sar = SAR_TABLE[idc as usize];
@@ -453,13 +453,13 @@ fn parse_vui(r: &mut BitReader<'_>, max_sub_layers_minus1: u32) -> Result<Vui> {
     }
     if r.flag()? {
         v.video_signal_type_present = true;
-        v.video_format = r.u(3)? as u8;
+        v.video_format = r.read(3)? as u8;
         v.full_range = r.flag()?;
         if r.flag()? {
             v.colour_description_present = true;
-            v.colour_primaries = r.u(8)? as u8;
-            v.transfer_characteristics = r.u(8)? as u8;
-            v.matrix_coeffs = r.u(8)? as u8;
+            v.colour_primaries = r.read(8)? as u8;
+            v.transfer_characteristics = r.read(8)? as u8;
+            v.matrix_coeffs = r.read(8)? as u8;
         }
     }
     if r.flag()? {
@@ -554,9 +554,9 @@ impl Sps {
 }
 
 pub fn parse_sps(rbsp: &[u8]) -> Result<Sps> {
-    let mut r = BitReader::new(rbsp);
-    let vps_id = r.u(4)? as u8;
-    let max_sub_layers_minus1 = r.u(3)?;
+    let mut r = BitCursor::new(rbsp);
+    let vps_id = r.read(4)? as u8;
+    let max_sub_layers_minus1 = r.read(3)?;
     if max_sub_layers_minus1 > 6 {
         return Err(DecodeError::InvalidData("sps_max_sub_layers_minus1"));
     }
@@ -682,8 +682,8 @@ pub fn parse_sps(rbsp: &[u8]) -> Result<Sps> {
         mut pcm_lf,
     ) = (8, 8, 3, 3, false);
     if pcm {
-        pcm_bit_depth_luma = r.u(4)? + 1;
-        pcm_bit_depth_chroma = r.u(4)? + 1;
+        pcm_bit_depth_luma = r.read(4)? + 1;
+        pcm_bit_depth_chroma = r.read(4)? + 1;
         if pcm_bit_depth_luma > bit_depth_luma || pcm_bit_depth_chroma > bit_depth_chroma {
             return Err(DecodeError::InvalidData("PCM bit depth exceeds bit depth"));
         }
@@ -708,7 +708,7 @@ pub fn parse_sps(rbsp: &[u8]) -> Result<Sps> {
     if long_term_refs_present {
         let n = r.ue_max(32, "num_long_term_ref_pics_sps")?;
         for _ in 0..n {
-            lt_ref_pic_poc_lsb.push(r.u(log2_max_poc_lsb)?);
+            lt_ref_pic_poc_lsb.push(r.read(log2_max_poc_lsb)?);
             lt_used_by_curr.push(r.flag()?);
         }
     }
@@ -731,7 +731,7 @@ pub fn parse_sps(rbsp: &[u8]) -> Result<Sps> {
         let _multilayer = r.flag()?;
         let _3d = r.flag()?;
         let scc = r.flag()?;
-        let _ext4 = r.u(4)?;
+        let _ext4 = r.read(4)?;
         if range {
             let names = [
                 "transform_skip_rotation_enabled_flag (RExt)",
@@ -860,12 +860,12 @@ pub struct Pps {
 }
 
 pub fn parse_pps(rbsp: &[u8]) -> Result<Pps> {
-    let mut r = BitReader::new(rbsp);
+    let mut r = BitCursor::new(rbsp);
     let id = r.ue_max(63, "pps_pic_parameter_set_id")? as u8;
     let sps_id = r.ue_max(15, "pps_seq_parameter_set_id")? as u8;
     let dependent_slice_segments_enabled = r.flag()?;
     let output_flag_present = r.flag()?;
-    let num_extra_slice_header_bits = r.u(3)?;
+    let num_extra_slice_header_bits = r.read(3)?;
     let sign_data_hiding = r.flag()?;
     let cabac_init_present = r.flag()?;
     let num_ref_idx_l0_default = r.ue_max(14, "num_ref_idx_l0_default_active_minus1")? + 1;
@@ -935,7 +935,7 @@ pub fn parse_pps(rbsp: &[u8]) -> Result<Pps> {
         let _ml = r.flag()?;
         let _3d = r.flag()?;
         let scc = r.flag()?;
-        let _e4 = r.u(4)?;
+        let _e4 = r.read(4)?;
         if range {
             // Parsed tolerantly; only refused at activation when the SPS signals a range
             // extensions (or higher) profile. For Main/Main 10 profiles the payload is ignored.
