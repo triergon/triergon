@@ -117,7 +117,8 @@ complete standard-harness reports and recomputes the existing acceptance gates
 from their raw paired samples. Both collections must contain every case in the
 registered corpus, with identical parity, inputs, contract, workers, source graphs,
 compiler settings, instrumentation and allowed CPUs. The memory build identity may
-add a kernel RSS proof pin. Every other identity field must match. Both input reports
+add a kernel RSS proof pin. CPU records are required in both reports. Every other
+identity field must match. Both input reports
 and their raw samples are hash-linked from the graded report.
 
 Timing requires the RSS kernel module to be unloaded throughout warm-up and every

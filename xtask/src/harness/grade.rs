@@ -266,6 +266,10 @@ impl Binding<'_> {
                 }
             }
             text(report, "target")?;
+            match kind {
+                Shape::Corpus => field(field(report, "environment")?, "cpus")?,
+                Shape::External => field(report, "cpus")?,
+            };
         }
         for key in [
             "target",
@@ -1642,6 +1646,13 @@ mod tests {
             ("corpus_manifest_sha256", Value::str(digest('b'))),
             ("collection_status", Value::str("complete")),
             ("fate_coverage", Value::Array(vec![])),
+            (
+                "environment",
+                object(&[(
+                    "cpus",
+                    object(&[("allowed", Value::str("1")), ("online", Value::str("0-1"))]),
+                )]),
+            ),
             ("cases", Value::Array(vec![fixture.timed])),
         ]);
         assert!(binding.headers(&header, &header).is_ok());
@@ -1674,6 +1685,48 @@ mod tests {
         )
         .unwrap();
         put(&mut report, "case", external.clone()).unwrap();
+        put(
+            &mut report,
+            "cpus",
+            field(field(&header, "environment").unwrap(), "cpus")
+                .unwrap()
+                .clone(),
+        )
+        .unwrap();
+        assert!(binding.headers(&report, &report).is_ok());
+        for base in [&header, &report] {
+            let parent = if shape(base).unwrap() == Shape::Corpus {
+                Some("environment")
+            } else {
+                None
+            };
+            for replacement in [
+                None,
+                Some(Value::Null),
+                Some(object(&[("allowed", Value::str("0"))])),
+            ] {
+                let missing = replacement
+                    .as_ref()
+                    .is_none_or(|value| *value == Value::Null);
+                let mut changed = base.clone();
+                let mut record = parent.map_or_else(
+                    || changed.clone(),
+                    |key| field(&changed, key).unwrap().clone(),
+                );
+                record = without(&record, &["cpus"]).unwrap();
+                if let Some(value) = replacement {
+                    put(&mut record, "cpus", value).unwrap();
+                }
+                match parent {
+                    Some(key) => put(&mut changed, key, record).unwrap(),
+                    None => changed = record,
+                }
+                assert!(binding.headers(base, &changed).is_err());
+                if missing {
+                    assert!(binding.headers(&changed, &changed).is_err());
+                }
+            }
+        }
         let expected = binding.expected(&report, Shape::External).unwrap();
         assert_eq!(
             membership(&expected, rows(&report, Shape::External).unwrap())
