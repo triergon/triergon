@@ -341,7 +341,7 @@ where
             limits.transport,
             matches!(tracks, TrackSelection::Media(_)),
         )?;
-        let mut player = Player::new(
+        let mut player = Player::new_direct(
             engine,
             owner,
             Selection::All,
