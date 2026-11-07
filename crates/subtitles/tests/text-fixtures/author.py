@@ -1,12 +1,13 @@
 #!/usr/bin/env python3
 """Author original text fixtures from named components, not a decoder.
 
-Only --write creates files; --check reconstructs authored components and checks
-the frozen bytes. Independent parsing belongs to oracle.py, not this builder.
+Only --write creates files; otherwise this reconstructs authored components and
+checks the frozen bytes. Independent parsing belongs to oracle.py, not this builder.
 """
 import argparse
 import hashlib
 import json
+import subprocess
 from fractions import Fraction
 from pathlib import Path
 
@@ -350,18 +351,30 @@ def rs_string(value):
     return json.dumps(value)
 
 
-def rs_option_file(path):
-    return "None" if path is None else f"Some(include_bytes!({rs_string(path)}))"
+def rs_file(path):
+    return f"Some(include_bytes!({rs_string(path)}))"
 
 
 def rs_time(value):
-    return "None" if value is None else f"Some(({value[0]}_i128, {value[1]}_u128))"
+    return f"Some(({value[0]}_i128, {value[1]}_u128))"
 
 
 def rs_field(field):
-    return "None" if field is None else (
-        "Some(ExpectedField { owner: FieldOwner::" + field["owner"] +
-        f", range: ({field['range'][0]}, {field['range'][1]}) }})")
+    return ("Some(ExpectedField { owner: FieldOwner::" + field["owner"] +
+            f", range: ({field['range'][0]}, {field['range'][1]}) }})")
+
+
+def rs_clock(clock):
+    return "Some(RawClock { " + ", ".join(
+        f"{key}: " + ("None" if value is None else f"Some({value})")
+        if key.endswith("ticks") else f"{key}: {value}"
+        for key, value in clock.items()) + " })"
+
+
+def rs_some(lines, indent, field, value, render):
+    # Absent values come from EMPTY and EMPTY_EVENT in tests/text.rs.
+    if value is not None:
+        lines.append(f"{indent}{field}: {render(value)},")
 
 
 def rust_cases():
@@ -374,42 +387,43 @@ def rust_cases():
             lines.append(f"        {field}: {value},")
         lines.append(f"        payload: include_bytes!({rs_string(item['input'])}),")
         for field in ("codec_id", "codec_private", "charset_label"):
-            lines.append(f"        {field}: {rs_option_file(item[field])},")
-        addition = item["addition"]
-        lines.append("        addition: " + ("None" if addition is None else
-                     f"Some(({addition['id']}, include_bytes!({rs_string(addition['path'])})))") + ",")
-        lines.append(f"        start: {rs_time(item['start'])}, duration: {rs_time(item['duration'])},")
-        clock = item["clock"]
-        lines.append("        clock: " + ("None" if clock is None else
-                     "Some(RawClock { " + ", ".join(
-                         f"{key}: " + ("None" if value is None else f"Some({value})")
-                         if key.endswith("ticks") else f"{key}: {value}"
-                         for key, value in clock.items()) + " })") + ",")
-        lines.append(f"        input_limit: {'None' if item['input_limit'] is None else 'Some(' + str(item['input_limit']) + ')'},")
-        error = item["error"]
-        lines.append("        error: " + ("None" if error is None else f"Some({rs_string(error)})") + ",")
-        lines.append("        events: &[")
+            rs_some(lines, " " * 8, field, item[field], rs_file)
+        rs_some(lines, " " * 8, "addition", item["addition"], lambda addition:
+                f"Some(({addition['id']}, include_bytes!({rs_string(addition['path'])})))")
+        for field in ("start", "duration"):
+            rs_some(lines, " " * 8, field, item[field], rs_time)
+        rs_some(lines, " " * 8, "clock", item["clock"], rs_clock)
+        rs_some(lines, " " * 8, "input_limit", item["input_limit"], lambda limit: f"Some({limit})")
+        rs_some(lines, " " * 8, "error", item["error"], lambda error: f"Some({rs_string(error)})")
+        if item["events"]:
+            lines.append("        events: &[")
         for event in item["events"] or []:
             lines.append("            ExpectedEvent { kind: ExpectedKind::" + event["kind"] + ",")
             for field in ("raw", "text"):
                 pair = event.get(field, [0, 0])
                 lines.append(f"                {field}: ({pair[0]}, {pair[1]}),")
-            lines.append(f"                decoded: {rs_option_file(event.get('decoded'))},")
+            rs_some(lines, " " * 16, "decoded", event.get("decoded"), rs_file)
             lines.append(f"                encoding: Encoding::{event.get('encoding', 'Utf8')},")
             for field in ("identifier", "settings", "comments"):
-                lines.append(f"                {field}: {rs_field(event.get(field))},")
+                rs_some(lines, " " * 16, field, event.get(field), rs_field)
             for field in ("start", "end", "duration"):
-                lines.append(f"                {field}: {rs_time(event.get(field))},")
+                rs_some(lines, " " * 16, field, event.get(field), rs_time)
             mods = []
             for modifier in event.get("modifiers", []):
                 kind = list(bytes.fromhex(modifier["kind"]))
                 a, b = modifier["range"]
                 mods.append(f"([{', '.join(map(str, kind))}], ({a}, {b}))")
-            lines.append("                modifiers: &[" + ", ".join(mods) + "],")
+            if mods:
+                lines.append("                modifiers: &[" + ", ".join(mods) + "],")
+            lines.append("                ..EMPTY_EVENT")
             lines.append("            },")
-        lines.append("        ],\n    },")
+        if item["events"]:
+            lines.append("        ],")
+        lines.append("        ..EMPTY\n    },")
     lines.append("];")
-    put("fixtures/cases.rs", "\n".join(lines) + "\n")
+    formatted = subprocess.run(["rustfmt", "--edition", "2024"], check=True, text=True,
+                               input="\n".join(lines) + "\n", stdout=subprocess.PIPE)
+    put("fixtures/cases.rs", formatted.stdout)
     put("fixtures/test_names.rs", "// Each authored case is an individually reported Rust test.\n" +
         "\n".join(f"fixture_test!({item['id'].replace('-', '_')}, {index});"
                   for index, item in enumerate(CASES)) + "\n")

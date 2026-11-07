@@ -3206,8 +3206,8 @@
     },
     {
       "path": "fixtures/cases.rs",
-      "bytes": 71500,
-      "sha256": "2c9d0d0a3fdea027a0f9cb5cd5127db3d3612599c8c31886c8d5d2a46413bc3e"
+      "bytes": 49195,
+      "sha256": "0aaabeac9fa915e238ae24baaa7671f021a8f0934cd8d943c94d37b1a799f41b"
     },
     {
       "path": "fixtures/config/ass-invalid-utf8-unvalidated.charset_label",
