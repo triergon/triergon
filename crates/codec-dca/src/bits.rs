@@ -3,6 +3,9 @@
 //! Reads past the end of the buffer return zero bits; callers check `overrun()` at
 //! structural checkpoints so that a truncated frame is reported as a typed error rather
 //! than a panic.
+//!
+//! The decoder keeps this reader instead of `triergon-bitstream`: both shared readers are
+//! slower on the subframe parser.
 
 use crate::tables::HuffBook;
 
