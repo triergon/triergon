@@ -16,7 +16,9 @@ use std::time::Duration;
 
 use crate::harness::acceptance::active_cpu;
 use crate::harness::gate_build;
-use crate::harness::timing::{competing_builds, cpu_snapshot, lock, timing_module_state};
+use crate::harness::timing::{
+    TimedWorkers, competing_builds, cpu_snapshot, lock, timing_module_state,
+};
 use crate::harness::worker::{self, data, status};
 use crate::json::{self, Value};
 use crate::pyrandom::PyRandom;
@@ -123,10 +125,6 @@ pub fn run(options: &Options) -> Result<(), String> {
     for reason in &refusals {
         println!("no gate result: {reason}");
     }
-    let workers = [
-        ("candidate", python::path(&options.candidate)),
-        ("reference", python::path(&options.reference)),
-    ];
     let hashes = Value::object([
         ("candidate", Value::str(sha(&options.candidate)?)),
         ("reference", Value::str(sha(&options.reference)?)),
@@ -206,6 +204,11 @@ pub fn run(options: &Options) -> Result<(), String> {
             ]
         };
         {
+            let timed = TimedWorkers::new(&options.candidate, &options.reference)?;
+            let workers = [
+                ("candidate", python::path(&timed.candidate)),
+                ("reference", python::path(&timed.reference)),
+            ];
             let _lock = lock()?;
             if !competing_builds()?.is_empty() {
                 state = "contaminated".into();
@@ -269,9 +272,9 @@ pub fn run(options: &Options) -> Result<(), String> {
         let (mut delivery, mut digest_equal) = (None, None);
         if state == "measured" {
             let failed = samples.iter().any(|r| {
-                workers
+                ["candidate", "reference"]
                     .iter()
-                    .any(|(name, _)| status(r.get(name).unwrap_or(&Value::Null)) != "ok")
+                    .any(|name| status(r.get(name).unwrap_or(&Value::Null)) != "ok")
             });
             if failed {
                 state = "worker-failure".into();

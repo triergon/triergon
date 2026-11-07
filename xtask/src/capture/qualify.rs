@@ -29,7 +29,7 @@ use crate::harness::acceptance::active_cpu;
 use crate::harness::diff::equal;
 use crate::harness::gate_build;
 use crate::harness::memory;
-use crate::harness::timing::{competing_builds, cpu_snapshot, lock};
+use crate::harness::timing::{TimedWorkers, competing_builds, cpu_snapshot, lock};
 use crate::json::{self, Value};
 use crate::process::{check_output, exit_code};
 use crate::pyrandom::PyRandom;
@@ -242,6 +242,11 @@ fn runtime(
     seed: u64,
     expected_outputs: Option<&Value>,
 ) -> Result<Value, String> {
+    let timed = TimedWorkers::new(Path::new(candidate), Path::new(reference))?;
+    let (candidate, reference) = (
+        python::path(&timed.candidate),
+        python::path(&timed.reference),
+    );
     let _lock = lock()?;
     let mut rng = PyRandom::new(seed);
     let mut contamination = Vec::new();
@@ -257,9 +262,9 @@ fn runtime(
         ];
         for role in order {
             let worker = if role == "candidate" {
-                candidate
+                &candidate
             } else {
-                reference
+                &reference
             };
             pair.push((
                 role.to_owned(),

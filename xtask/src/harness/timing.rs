@@ -488,15 +488,16 @@ pub fn benchmark(
 ///
 /// A freshly linked binary and a sequentially written copy of it sit differently in
 /// the page cache, and identical bytes then time about 0.7% apart, so neither worker
-/// runs from the file its build left behind.
-struct TimedWorkers {
+/// runs from the file its build left behind. Every timing runner (`report`, `codecs
+/// time`, `capture qualify`) times these copies.
+pub struct TimedWorkers {
     directory: PathBuf,
-    candidate: PathBuf,
-    reference: PathBuf,
+    pub candidate: PathBuf,
+    pub reference: PathBuf,
 }
 
 impl TimedWorkers {
-    fn new(candidate: &Path, reference: &Path) -> Result<Self, String> {
+    pub fn new(candidate: &Path, reference: &Path) -> Result<Self, String> {
         let directory = candidate.with_file_name(format!(".timed-{}", std::process::id()));
         let copy = |slot: &str, worker: &Path| -> Result<PathBuf, String> {
             let target = directory.join(slot);
