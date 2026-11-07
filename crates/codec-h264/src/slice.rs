@@ -150,9 +150,9 @@ pub(crate) fn parse_slice_header(
     let mut num_ref_idx_active = pps.num_ref_idx_default;
     if matches!(slice_type, SliceType::P | SliceType::SP | SliceType::B) {
         if r.bit() {
-            num_ref_idx_active[0] = r.ue() + 1;
+            num_ref_idx_active[0] = r.ue().wrapping_add(1);
             if slice_type == SliceType::B {
-                num_ref_idx_active[1] = r.ue() + 1;
+                num_ref_idx_active[1] = r.ue().wrapping_add(1);
             }
         }
         let max = if field_pic { 32 } else { 16 };
@@ -299,8 +299,8 @@ pub(crate) fn parse_slice_header(
             return Err(inval("disable_deblocking_filter_idc"));
         }
         if disable_deblocking_filter_idc != 1 {
-            slice_alpha_c0_offset = r.se() * 2;
-            slice_beta_offset = r.se() * 2;
+            slice_alpha_c0_offset = r.se().wrapping_mul(2);
+            slice_beta_offset = r.se().wrapping_mul(2);
             if !(-12..=12).contains(&slice_alpha_c0_offset)
                 || !(-12..=12).contains(&slice_beta_offset)
             {

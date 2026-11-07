@@ -65,7 +65,7 @@ pub struct Sps {
 
 impl Sps {
     pub fn frame_height_in_mbs(&self) -> u32 {
-        (2 - self.frame_mbs_only as u32) * self.pic_height_in_map_units
+        (2 - self.frame_mbs_only as u32).wrapping_mul(self.pic_height_in_map_units)
     }
     pub fn chroma_array_type(&self) -> u32 {
         if self.separate_colour_plane {
@@ -206,7 +206,7 @@ fn parse_scaling_matrix(
 }
 
 fn hrd(r: &mut BitReader<'_>, v: &mut Vui) -> R<()> {
-    let cpb_cnt = r.ue() + 1;
+    let cpb_cnt = r.ue().wrapping_add(1);
     if cpb_cnt > 32 {
         return Err(inval("cpb_cnt_minus1"));
     }
@@ -345,8 +345,8 @@ pub(crate) fn parse_sps(r: &mut BitReader<'_>) -> R<Sps> {
         if sps.chroma_format_idc == 3 {
             sps.separate_colour_plane = r.bit();
         }
-        sps.bit_depth_luma = r.ue() + 8;
-        sps.bit_depth_chroma = r.ue() + 8;
+        sps.bit_depth_luma = r.ue().wrapping_add(8);
+        sps.bit_depth_chroma = r.ue().wrapping_add(8);
         if sps.bit_depth_luma > 14 || sps.bit_depth_chroma > 14 {
             return Err(inval("bit_depth"));
         }
@@ -361,14 +361,14 @@ pub(crate) fn parse_sps(r: &mut BitReader<'_>) -> R<Sps> {
             sps.scaling8 = s8;
         }
     }
-    sps.log2_max_frame_num = r.ue() + 4;
+    sps.log2_max_frame_num = r.ue().wrapping_add(4);
     if sps.log2_max_frame_num > 16 {
         return Err(inval("log2_max_frame_num_minus4"));
     }
     sps.poc_type = r.ue();
     match sps.poc_type {
         0 => {
-            sps.log2_max_poc_lsb = r.ue() + 4;
+            sps.log2_max_poc_lsb = r.ue().wrapping_add(4);
             if sps.log2_max_poc_lsb > 16 {
                 return Err(inval("log2_max_pic_order_cnt_lsb_minus4"));
             }
@@ -393,8 +393,8 @@ pub(crate) fn parse_sps(r: &mut BitReader<'_>) -> R<Sps> {
         return Err(inval("max_num_ref_frames"));
     }
     sps.gaps_in_frame_num_allowed = r.bit();
-    sps.pic_width_in_mbs = r.ue() + 1;
-    sps.pic_height_in_map_units = r.ue() + 1;
+    sps.pic_width_in_mbs = r.ue().wrapping_add(1);
+    sps.pic_height_in_map_units = r.ue().wrapping_add(1);
     sps.frame_mbs_only = r.bit();
     if !sps.frame_mbs_only {
         sps.mb_adaptive_frame_field = r.bit();
@@ -425,7 +425,7 @@ pub(crate) fn parse_pps(r: &mut BitReader<'_>, spss: &[Option<Box<Sps>>]) -> R<P
     }
     let entropy_coding_mode = r.bit();
     let bottom_field_pic_order_in_frame_present = r.bit();
-    let num_slice_groups = r.ue() + 1;
+    let num_slice_groups = r.ue().wrapping_add(1);
     if num_slice_groups > 8 {
         return Err(inval("num_slice_groups_minus1"));
     }
@@ -449,7 +449,7 @@ pub(crate) fn parse_pps(r: &mut BitReader<'_>, spss: &[Option<Box<Sps>>]) -> R<P
                 r.ue();
             }
             6 => {
-                let n = r.ue() + 1;
+                let n = r.ue().wrapping_add(1);
                 let bits = 32 - (num_slice_groups - 1).leading_zeros();
                 for _ in 0..n.min(1 << 20) {
                     r.read(bits);
@@ -458,8 +458,8 @@ pub(crate) fn parse_pps(r: &mut BitReader<'_>, spss: &[Option<Box<Sps>>]) -> R<P
             _ => {}
         }
     }
-    let l0 = r.ue() + 1;
-    let l1 = r.ue() + 1;
+    let l0 = r.ue().wrapping_add(1);
+    let l1 = r.ue().wrapping_add(1);
     if l0 > 32 || l1 > 32 {
         return Err(inval("num_ref_idx_default_active_minus1"));
     }
