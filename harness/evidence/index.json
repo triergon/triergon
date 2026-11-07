@@ -7956,66 +7956,67 @@
    "sha256": "0b0499f5ce3e33bdb074397caca18984a60bc61fee7ef3e21eced1914fc1a4e3",
    "files": [
     {
-     "path": "MEMORY-EXPORT-FIRST.log",
+     "path": "progressive-ts188-access-units-linux-arm64/MEMORY-EXPORT-FIRST.log",
      "sha256": "afcc2d7651e4c7d0897487e42ec7d26c44c27c2093266e365b233a9e71b5534c"
     },
     {
-     "path": "MEMORY-RUNNER.log",
+     "path": "progressive-ts188-access-units-linux-arm64/MEMORY-RUNNER.log",
      "sha256": "afcc2d7651e4c7d0897487e42ec7d26c44c27c2093266e365b233a9e71b5534c"
     },
     {
-     "path": "MEMORY.log",
+     "path": "progressive-ts188-access-units-linux-arm64/MEMORY.log",
      "sha256": "b630edf0174c512412e4aeedfdd04f589b1a551c2b41c56c7d18f07ab983ab29"
     },
     {
-     "path": "MEMORY.sh",
+     "path": "progressive-ts188-access-units-linux-arm64/MEMORY.sh",
      "sha256": "234691aa6e28385fe2236e76d72e160419188f3fc03760ebc39ed086ae7c827e"
     },
     {
-     "path": "NATIVE.log",
+     "path": "progressive-ts188-access-units-linux-arm64/NATIVE.log",
      "sha256": "c9506edf541991432ead8486c32021ebf055332b60c73095e9b6a965fd02ae07"
     },
     {
-     "path": "NATIVE.sh",
+     "path": "progressive-ts188-access-units-linux-arm64/NATIVE.sh",
      "sha256": "f114930ea55f00553a1a9f6a1f51db2d5881ab816066467b7600a4a85cfc65df"
     },
     {
-     "path": "REBASED-CLIPPY.log",
+     "path": "progressive-ts188-access-units-linux-arm64/REBASED-CLIPPY.log",
      "sha256": "3a7e93f0ecc5a0aeb16e2bfff1ffb9beb2b25fec4558130a2e156e5b670e3a55"
     },
     {
-     "path": "REBASED-TEST.log",
+     "path": "progressive-ts188-access-units-linux-arm64/REBASED-TEST.log",
      "sha256": "6adbf9c5b0ffb9286056b9b9c15349d500602169dca1d2d5ca83e658bae05f44"
     },
     {
-     "path": "REV",
+     "path": "progressive-ts188-access-units-linux-arm64/REV",
      "sha256": "b8d948aefca3b51ba2526364add12a46c61abb9cffeb613e6a1d145095e692b9"
     },
     {
-     "path": "RUNNER.log",
+     "path": "progressive-ts188-access-units-linux-arm64/RUNNER.log",
      "sha256": "49f0c9a66f4b3f463927e60441e13a19eed62040a9691775ad7ce2f5e2a6902e"
     },
     {
-     "path": "TREE",
+     "path": "progressive-ts188-access-units-linux-arm64/TREE",
      "sha256": "ccf3c791a63d51ad6bb67fd2910f890966f8ab569ced3d8fbe51dbdaa121fac7"
     },
     {
-     "path": "comparison-inputs.tar.gz",
+     "path": "progressive-ts188-access-units-linux-arm64/comparison-inputs.tar.gz",
      "sha256": "6e39ba4e3e8abed6e82f7ae219225c295e7009a6d0ed3ad050807c75c8783df7"
     },
     {
-     "path": "memory-results.tar.gz",
+     "path": "progressive-ts188-access-units-linux-arm64/memory-results.tar.gz",
      "sha256": "9a4878a2b8d8e2036a9c51a9d32a4f68d1d01b54d65f02bbf221ceedc44aea94"
     },
     {
-     "path": "native-results.tar.gz",
+     "path": "progressive-ts188-access-units-linux-arm64/native-results.tar.gz",
      "sha256": "94d2e829f53327b798de4dcf0e9784de5968973a3032df14c4969c157b0dbce0"
     },
     {
-     "path": "source.bundle",
+     "path": "progressive-ts188-access-units-linux-arm64/source.bundle",
      "sha256": "c8d32b30e76343d57d4b0db5ddb805576f7d6b41c7fcae2fbce9a700aa6242ad"
     }
-   ]
+   ],
+   "path": "progressive-ts188-access-units-linux-arm64"
   },
   {
    "name": "progressive-ts188-comparison-linux-arm64",
@@ -8026,14 +8027,15 @@
    "bytes": 38360452,
    "files": [
     {
-     "path": "progressive-ts188/on-demand-spans.tar.gz",
+     "path": "progressive-ts188-comparison-linux-arm64/progressive-ts188/on-demand-spans.tar.gz",
      "sha256": "d7da488eda6923e979593cf5a1399556427590f9fb131cfe9ed9444dc61ad43f"
     },
     {
-     "path": "progressive-ts188/rounded-reservation.tar.gz",
+     "path": "progressive-ts188-comparison-linux-arm64/progressive-ts188/rounded-reservation.tar.gz",
      "sha256": "0186d64805bd75fe48194fa236d31ca3275584d50e04783081fb411dfc7de231"
     }
-   ]
+   ],
+   "path": "progressive-ts188-comparison-linux-arm64"
   },
   {
    "name": "hls-segments-progressive-comparison-linux-arm64",
@@ -8044,350 +8046,351 @@
    "bytes": 11251054,
    "files": [
     {
-     "path": "hls-progressive/CURRENT-API.h",
+     "path": "hls-segments-progressive-comparison-linux-arm64/hls-progressive/CURRENT-API.h",
      "sha256": "c1cf2b7391f5a747fce3fb4b6efeac5bfe4271c31fa3532add408157eed0b82b"
     },
     {
-     "path": "hls-progressive/CURRENT-MODULE.c",
+     "path": "hls-segments-progressive-comparison-linux-arm64/hls-progressive/CURRENT-MODULE.c",
      "sha256": "50bdddfe256759a2ac20c948dbfe54371c6d401010a47b6ac8fb71f868c088e7"
     },
     {
-     "path": "hls-progressive/GUEST.log",
+     "path": "hls-segments-progressive-comparison-linux-arm64/hls-progressive/GUEST.log",
      "sha256": "36dc7c6c7c5f31ef8c5d8790a6cc335943688e5b9f04aa73ac3b56fcc9e3dd17"
     },
     {
-     "path": "hls-progressive/HLS-RESULTS.json",
+     "path": "hls-segments-progressive-comparison-linux-arm64/hls-progressive/HLS-RESULTS.json",
      "sha256": "0ef9e352d87eeae40aa42cb0f6082295b6ded612fb23a963b1eb2c9760ce46b6"
     },
     {
-     "path": "hls-progressive/MODULE-REVIEW.json",
+     "path": "hls-segments-progressive-comparison-linux-arm64/hls-progressive/MODULE-REVIEW.json",
      "sha256": "31172449c147128b3b10758918e0dfd6387da03285d39d9ba5c5541f42e7fac7"
     },
     {
-     "path": "hls-progressive/PRIOR-RSS-PROOF.json",
+     "path": "hls-segments-progressive-comparison-linux-arm64/hls-progressive/PRIOR-RSS-PROOF.json",
      "sha256": "a2f7f6549eedec5b33465f090b65ba7b769f21bd88b649daecb8aa76d478510f"
     },
     {
-     "path": "hls-progressive/RAW-KERNEL.tar.gz",
+     "path": "hls-segments-progressive-comparison-linux-arm64/hls-progressive/RAW-KERNEL.tar.gz",
      "sha256": "21c0c432087ccf02af54b250bb821b40d8177cf46d230081eb1768e59a2e5b56"
     },
     {
-     "path": "hls-progressive/RAW-REPORTS.tar.gz",
+     "path": "hls-segments-progressive-comparison-linux-arm64/hls-progressive/RAW-REPORTS.tar.gz",
      "sha256": "8ac5f8e9bab7c7838fac6d6051afe5f8a3ec51f770dcfc3258f1005f396056de"
     },
     {
-     "path": "hls-progressive/SOURCE",
+     "path": "hls-segments-progressive-comparison-linux-arm64/hls-progressive/SOURCE",
      "sha256": "6382830fb93d0ece2749ec57df6fff5260490a63b31bc55d73700e4303489629"
     },
     {
-     "path": "hls-progressive/collect-kernel-memory.sh",
+     "path": "hls-segments-progressive-comparison-linux-arm64/hls-progressive/collect-kernel-memory.sh",
      "sha256": "73a929d47031b304f66cb15001a3ab331367799aa81e8a86790def504bbb8226"
     },
     {
-     "path": "hls-progressive/collect-reports.sh",
+     "path": "hls-segments-progressive-comparison-linux-arm64/hls-progressive/collect-reports.sh",
      "sha256": "680dca717777c51b8f5bfef3d0b34ca8a0a499fdb0805eba35a37ab0f5c91d6d"
     },
     {
-     "path": "hls-progressive/collect-time.sh",
+     "path": "hls-segments-progressive-comparison-linux-arm64/hls-progressive/collect-time.sh",
      "sha256": "5337f2471ac3b9f9ce10b8633c7481957d8bdb0d4dc4032f172e755e1b013ae4"
     },
     {
-     "path": "hls-progressive/contract.json",
+     "path": "hls-segments-progressive-comparison-linux-arm64/hls-progressive/contract.json",
      "sha256": "57e20b7d7c3a4b623abd1f4e878ed9a68937da89e7705768b662e95777c64dbc"
     },
     {
-     "path": "hls-progressive/corpus.json",
+     "path": "hls-segments-progressive-comparison-linux-arm64/hls-progressive/corpus.json",
      "sha256": "d892d9cd6e2e21a28c3b360b07e102ea88d6168a71885a401562887203115bb7"
     },
     {
-     "path": "hls-progressive/inputs/allocating-control.ts",
+     "path": "hls-segments-progressive-comparison-linux-arm64/hls-progressive/inputs/allocating-control.ts",
      "sha256": "6804ef2778e94087ae7a3df440cebe3896e94c3552160c1bc5f4189a1aba211d"
     },
     {
-     "path": "hls-progressive/inputs/dvb-avc-ac3-44100.ts",
+     "path": "hls-segments-progressive-comparison-linux-arm64/hls-progressive/inputs/dvb-avc-ac3-44100.ts",
      "sha256": "f37c2680e8165f3e594e43d8f76f5e529e83610b4b3fa189e6d2e26d69fcbd26"
     },
     {
-     "path": "hls-progressive/inputs/dvb-hevc-eac3-32000.ts",
+     "path": "hls-segments-progressive-comparison-linux-arm64/hls-progressive/inputs/dvb-hevc-eac3-32000.ts",
      "sha256": "67fbe16dea5d0466b122b69d4d03c46f2740080c5fa176fb4a0c3e4709e87969"
     },
     {
-     "path": "hls-progressive/inputs/dvb-preview-avc-ac3.ts",
+     "path": "hls-segments-progressive-comparison-linux-arm64/hls-progressive/inputs/dvb-preview-avc-ac3.ts",
      "sha256": "d256ee6020c3c2f0408ca4a7dd9040bbeba3f52de2c4d5d8220ec121d5db9796"
     },
     {
-     "path": "hls-progressive/inputs/dvb-preview-avc-eac3.ts",
+     "path": "hls-segments-progressive-comparison-linux-arm64/hls-progressive/inputs/dvb-preview-avc-eac3.ts",
      "sha256": "4818d5085da037a8cefa0acff0c20287591514f6c775b5c5f01d26def3f2e392"
     },
     {
-     "path": "hls-progressive/inputs/dvb-preview-hevc-ac3.ts",
+     "path": "hls-segments-progressive-comparison-linux-arm64/hls-progressive/inputs/dvb-preview-hevc-ac3.ts",
      "sha256": "5e30731634e31a126936dfbf5b55a18cabcb1d387b524be759976784588abad0"
     },
     {
-     "path": "hls-progressive/inputs/dvb-preview-hevc-eac3.ts",
+     "path": "hls-segments-progressive-comparison-linux-arm64/hls-progressive/inputs/dvb-preview-hevc-eac3.ts",
      "sha256": "41cb3fd515cd031c28a440d78dba8d3ce28794f5c65f0c1d6c447ce06570bf78"
     },
     {
-     "path": "hls-progressive/inputs/entry-avc-eac3-32000-00.ts",
+     "path": "hls-segments-progressive-comparison-linux-arm64/hls-progressive/inputs/entry-avc-eac3-32000-00.ts",
      "sha256": "989f5e3f16e55e7aaa3f85497123472d626e762c6fb56a31ae2040ce2f33f03e"
     },
     {
-     "path": "hls-progressive/inputs/entry-avc-eac3-32000-01.ts",
+     "path": "hls-segments-progressive-comparison-linux-arm64/hls-progressive/inputs/entry-avc-eac3-32000-01.ts",
      "sha256": "9493659b9bb78aa042218199bf60d76d550b6ffc4ce29b8d7c2ca7b9c73e4f1b"
     },
     {
-     "path": "hls-progressive/inputs/entry-hevc-aac-44100-00.ts",
+     "path": "hls-segments-progressive-comparison-linux-arm64/hls-progressive/inputs/entry-hevc-aac-44100-00.ts",
      "sha256": "3d93c63efa13a8b068d0eb3f5454703a69f9451953c131bff50ff3d16eca9f78"
     },
     {
-     "path": "hls-progressive/inputs/entry-hevc-aac-44100-01.ts",
+     "path": "hls-segments-progressive-comparison-linux-arm64/hls-progressive/inputs/entry-hevc-aac-44100-01.ts",
      "sha256": "b617cac2231d7d9527e8023f97ffebbe6ab05dc0c620d8787b8d3a955b06901b"
     },
     {
-     "path": "hls-progressive/inputs/replay-avc-aac-00.ts",
+     "path": "hls-segments-progressive-comparison-linux-arm64/hls-progressive/inputs/replay-avc-aac-00.ts",
      "sha256": "a82d7c74de5937692df6ab09c152e822c3b5cb11f7d7cf61cc5e98e9bb633cda"
     },
     {
-     "path": "hls-progressive/inputs/replay-avc-aac-01.ts",
+     "path": "hls-segments-progressive-comparison-linux-arm64/hls-progressive/inputs/replay-avc-aac-01.ts",
      "sha256": "4b8837f138cc18185c9f8e44808ddd49be3da53e22bdb06c9c13d2c297dd8686"
     },
     {
-     "path": "hls-progressive/inputs/replay-avc-aac-02.ts",
+     "path": "hls-segments-progressive-comparison-linux-arm64/hls-progressive/inputs/replay-avc-aac-02.ts",
      "sha256": "5c2a0dc296a2bc22f5b39a60082870f18fa5c971adc2aed23c9ab26bc3da8f4c"
     },
     {
-     "path": "hls-progressive/inputs/replay-avc-aac-03.ts",
+     "path": "hls-segments-progressive-comparison-linux-arm64/hls-progressive/inputs/replay-avc-aac-03.ts",
      "sha256": "ba7249f8059dd5afa4d0b89698e01a66a815b1fbce853184474abff940223035"
     },
     {
-     "path": "hls-progressive/inputs/replay-avc-aac-04.ts",
+     "path": "hls-segments-progressive-comparison-linux-arm64/hls-progressive/inputs/replay-avc-aac-04.ts",
      "sha256": "82904888e533ceb9b87437bf031fdb72f15aafcea1ad656a92a88bd69707450e"
     },
     {
-     "path": "hls-progressive/inputs/replay-avc-aac-05.ts",
+     "path": "hls-segments-progressive-comparison-linux-arm64/hls-progressive/inputs/replay-avc-aac-05.ts",
      "sha256": "f3852e2e68a373f3569e892e857db820a319a785204afff9f61f4598e16119a4"
     },
     {
-     "path": "hls-progressive/inputs/replay-avc-aac-06.ts",
+     "path": "hls-segments-progressive-comparison-linux-arm64/hls-progressive/inputs/replay-avc-aac-06.ts",
      "sha256": "f9a0ce0958458bb3b824250fb99593efd35f65c9cff89a72b08a719c61389593"
     },
     {
-     "path": "hls-progressive/inputs/replay-avc-aac-07.ts",
+     "path": "hls-segments-progressive-comparison-linux-arm64/hls-progressive/inputs/replay-avc-aac-07.ts",
      "sha256": "1cf2292715bfa3da1a8c95f2696b63c47669355b556ccf8c2f2ecd4d3a4f188f"
     },
     {
-     "path": "hls-progressive/inputs/replay-avc-aac-08.ts",
+     "path": "hls-segments-progressive-comparison-linux-arm64/hls-progressive/inputs/replay-avc-aac-08.ts",
      "sha256": "aaa82e6d2480d82bf42189ffa138d3b33641650eb269cea3af0f2a5cf91fa171"
     },
     {
-     "path": "hls-progressive/inputs/replay-avc-aac-09.ts",
+     "path": "hls-segments-progressive-comparison-linux-arm64/hls-progressive/inputs/replay-avc-aac-09.ts",
      "sha256": "0cd02f5ae6b6254dc8005aeec3af88e8ac1e7ab0c4383722cd323ef48503d233"
     },
     {
-     "path": "hls-progressive/inputs/replay-avc-ac3-00.ts",
+     "path": "hls-segments-progressive-comparison-linux-arm64/hls-progressive/inputs/replay-avc-ac3-00.ts",
      "sha256": "7efdc50ca87d044af2af8bfe5afd1e26c25daeca0e948193bc7e180db11a2510"
     },
     {
-     "path": "hls-progressive/inputs/replay-avc-ac3-01.ts",
+     "path": "hls-segments-progressive-comparison-linux-arm64/hls-progressive/inputs/replay-avc-ac3-01.ts",
      "sha256": "1c97f1e57fcba634fb7800379a16c2cae97530774c3deb8f96056f180d2607a8"
     },
     {
-     "path": "hls-progressive/inputs/replay-avc-ac3-02.ts",
+     "path": "hls-segments-progressive-comparison-linux-arm64/hls-progressive/inputs/replay-avc-ac3-02.ts",
      "sha256": "d4a38feda25ae9baebc4c438917f00639560ef9adf90f0a373c7cdfac521bfb9"
     },
     {
-     "path": "hls-progressive/inputs/replay-avc-ac3-03.ts",
+     "path": "hls-segments-progressive-comparison-linux-arm64/hls-progressive/inputs/replay-avc-ac3-03.ts",
      "sha256": "f50c5993bbb9f6811bf3aa4e1852e2c0ba18e56d5aaaa3b2f00072bcdc7bf173"
     },
     {
-     "path": "hls-progressive/inputs/replay-avc-ac3-04.ts",
+     "path": "hls-segments-progressive-comparison-linux-arm64/hls-progressive/inputs/replay-avc-ac3-04.ts",
      "sha256": "bd8972029987283442204579ff01b5299f074795b2b783dfb1ad3b11abca9949"
     },
     {
-     "path": "hls-progressive/inputs/replay-avc-ac3-05.ts",
+     "path": "hls-segments-progressive-comparison-linux-arm64/hls-progressive/inputs/replay-avc-ac3-05.ts",
      "sha256": "3ee4849b94bcd38b1905efead337df37f35c137edddf4362ee7d7eb1ce872ce5"
     },
     {
-     "path": "hls-progressive/inputs/replay-avc-ac3-06.ts",
+     "path": "hls-segments-progressive-comparison-linux-arm64/hls-progressive/inputs/replay-avc-ac3-06.ts",
      "sha256": "c104d0222a2e24fde97121ea059339ea3cb6c57544135b1c06a9135c53688083"
     },
     {
-     "path": "hls-progressive/inputs/replay-avc-ac3-07.ts",
+     "path": "hls-segments-progressive-comparison-linux-arm64/hls-progressive/inputs/replay-avc-ac3-07.ts",
      "sha256": "7b0bc9f5372990b3dcfd61433587c3b711476d35cc43eb5fcbd6a219b37ef3f2"
     },
     {
-     "path": "hls-progressive/inputs/replay-avc-ac3-08.ts",
+     "path": "hls-segments-progressive-comparison-linux-arm64/hls-progressive/inputs/replay-avc-ac3-08.ts",
      "sha256": "148e4dbba2c43b2884548f468d042c6c6a56e791cf1b27004c9c16cdf77a2080"
     },
     {
-     "path": "hls-progressive/inputs/replay-avc-ac3-09.ts",
+     "path": "hls-segments-progressive-comparison-linux-arm64/hls-progressive/inputs/replay-avc-ac3-09.ts",
      "sha256": "0c2292809c85ec85248e124f1b8c7a32bfd78c7bd78ed817fa56e877ee90670e"
     },
     {
-     "path": "hls-progressive/inputs/replay-avc-eac3-00.ts",
+     "path": "hls-segments-progressive-comparison-linux-arm64/hls-progressive/inputs/replay-avc-eac3-00.ts",
      "sha256": "330ce3642fee3469a310400097b9889d751943d4185e754a160646eaf67ab133"
     },
     {
-     "path": "hls-progressive/inputs/replay-avc-eac3-01.ts",
+     "path": "hls-segments-progressive-comparison-linux-arm64/hls-progressive/inputs/replay-avc-eac3-01.ts",
      "sha256": "81cdd62627d3f480d5fd57e8aa66e07e88d03bda6a252ded97f338cdad3ed5c7"
     },
     {
-     "path": "hls-progressive/inputs/replay-avc-eac3-02.ts",
+     "path": "hls-segments-progressive-comparison-linux-arm64/hls-progressive/inputs/replay-avc-eac3-02.ts",
      "sha256": "a8f8adc284c4a912944c46fece53f2a010eb689d54d101cc2760d69b85e3e988"
     },
     {
-     "path": "hls-progressive/inputs/replay-avc-eac3-03.ts",
+     "path": "hls-segments-progressive-comparison-linux-arm64/hls-progressive/inputs/replay-avc-eac3-03.ts",
      "sha256": "af865ec1b1d6e554cf54682289024febcd1bc11369095687911ea7d37e226b7b"
     },
     {
-     "path": "hls-progressive/inputs/replay-avc-eac3-04.ts",
+     "path": "hls-segments-progressive-comparison-linux-arm64/hls-progressive/inputs/replay-avc-eac3-04.ts",
      "sha256": "711c286622ee6b77f6620fa271f3cbfb22c1258be1d788d29294d6f13836a88c"
     },
     {
-     "path": "hls-progressive/inputs/replay-avc-eac3-05.ts",
+     "path": "hls-segments-progressive-comparison-linux-arm64/hls-progressive/inputs/replay-avc-eac3-05.ts",
      "sha256": "029217a0ec36668457cea69384289809dd178f795f1cc047d6bceffb53b72230"
     },
     {
-     "path": "hls-progressive/inputs/replay-avc-eac3-06.ts",
+     "path": "hls-segments-progressive-comparison-linux-arm64/hls-progressive/inputs/replay-avc-eac3-06.ts",
      "sha256": "779bad5ce8bbb80bd007f1b4542fdd2177e50b74075727a4a2c517661aaa3136"
     },
     {
-     "path": "hls-progressive/inputs/replay-avc-eac3-07.ts",
+     "path": "hls-segments-progressive-comparison-linux-arm64/hls-progressive/inputs/replay-avc-eac3-07.ts",
      "sha256": "f57c7e6d842d0803afeb573fc3140b2c2ef9c96e764127421fefb65252a9650d"
     },
     {
-     "path": "hls-progressive/inputs/replay-avc-eac3-08.ts",
+     "path": "hls-segments-progressive-comparison-linux-arm64/hls-progressive/inputs/replay-avc-eac3-08.ts",
      "sha256": "98968e7e372ddf750ff79fd81628f1f8127240200775bf77bf63c8edd405582b"
     },
     {
-     "path": "hls-progressive/inputs/replay-avc-eac3-09.ts",
+     "path": "hls-segments-progressive-comparison-linux-arm64/hls-progressive/inputs/replay-avc-eac3-09.ts",
      "sha256": "3e7c75b248f72480c0008c94eb78e5ee747ab0dc2c8d86b8a9cf1b24fcb30885"
     },
     {
-     "path": "hls-progressive/inputs/replay-hevc-aac-00.ts",
+     "path": "hls-segments-progressive-comparison-linux-arm64/hls-progressive/inputs/replay-hevc-aac-00.ts",
      "sha256": "828aef3657442bdf2f88064fb41edfc2acdfed5b91dbae5fbc08cfd3d55c569c"
     },
     {
-     "path": "hls-progressive/inputs/replay-hevc-aac-01.ts",
+     "path": "hls-segments-progressive-comparison-linux-arm64/hls-progressive/inputs/replay-hevc-aac-01.ts",
      "sha256": "d48ca1bd740a159a940d00a28fdb30a81d7620687b03c6f3d0feee62009772e4"
     },
     {
-     "path": "hls-progressive/inputs/replay-hevc-aac-02.ts",
+     "path": "hls-segments-progressive-comparison-linux-arm64/hls-progressive/inputs/replay-hevc-aac-02.ts",
      "sha256": "208134efac5a5a5494186c85c2bbe5a74527c933157e3780f1fe65f704a3b20a"
     },
     {
-     "path": "hls-progressive/inputs/replay-hevc-aac-03.ts",
+     "path": "hls-segments-progressive-comparison-linux-arm64/hls-progressive/inputs/replay-hevc-aac-03.ts",
      "sha256": "34b7cb62ef56a3fe8b9639614dbd29e9b37a2ed8adf21fc44e389c798e0868bf"
     },
     {
-     "path": "hls-progressive/inputs/replay-hevc-aac-04.ts",
+     "path": "hls-segments-progressive-comparison-linux-arm64/hls-progressive/inputs/replay-hevc-aac-04.ts",
      "sha256": "255d0cc2420e23a9a636cd011b6694868cfa26ede3480136fee0ca18804dba18"
     },
     {
-     "path": "hls-progressive/inputs/replay-hevc-aac-05.ts",
+     "path": "hls-segments-progressive-comparison-linux-arm64/hls-progressive/inputs/replay-hevc-aac-05.ts",
      "sha256": "ada4f5323442eb91d567da0aa2aab2d4fc2e2a53af562f5d465fb6f17b0e7e5b"
     },
     {
-     "path": "hls-progressive/inputs/replay-hevc-aac-06.ts",
+     "path": "hls-segments-progressive-comparison-linux-arm64/hls-progressive/inputs/replay-hevc-aac-06.ts",
      "sha256": "c728a3d55a0e51bdf268f9a7c95eab534643b66afd42e35c7a29747d53a1e35a"
     },
     {
-     "path": "hls-progressive/inputs/replay-hevc-aac-07.ts",
+     "path": "hls-segments-progressive-comparison-linux-arm64/hls-progressive/inputs/replay-hevc-aac-07.ts",
      "sha256": "61ab2a22246c4f69a7f417274b1f8e9af5c6e2d17e3f2771ef1e69c4e8d32136"
     },
     {
-     "path": "hls-progressive/inputs/replay-hevc-aac-08.ts",
+     "path": "hls-segments-progressive-comparison-linux-arm64/hls-progressive/inputs/replay-hevc-aac-08.ts",
      "sha256": "f084338f4f1c15b0d417d1888698923a62e240b48493c4a3c68ae028fcebc8c0"
     },
     {
-     "path": "hls-progressive/inputs/replay-hevc-aac-09.ts",
+     "path": "hls-segments-progressive-comparison-linux-arm64/hls-progressive/inputs/replay-hevc-aac-09.ts",
      "sha256": "095175f175302c7504a82589084c7a6678c8878538d7a33c09a8dff933057055"
     },
     {
-     "path": "hls-progressive/inputs/replay-hevc-ac3-00.ts",
+     "path": "hls-segments-progressive-comparison-linux-arm64/hls-progressive/inputs/replay-hevc-ac3-00.ts",
      "sha256": "9eb12adb6e3b5335ce96653870a65399e47416654e95c6c77c3997ba30bb92f7"
     },
     {
-     "path": "hls-progressive/inputs/replay-hevc-ac3-01.ts",
+     "path": "hls-segments-progressive-comparison-linux-arm64/hls-progressive/inputs/replay-hevc-ac3-01.ts",
      "sha256": "7ad41632640182573cccadf5a988899c58cf69afb7dbf494b130936bf3f972e4"
     },
     {
-     "path": "hls-progressive/inputs/replay-hevc-ac3-02.ts",
+     "path": "hls-segments-progressive-comparison-linux-arm64/hls-progressive/inputs/replay-hevc-ac3-02.ts",
      "sha256": "1aa8b7285937f004eef28be992bf7e73bf823ca82179c4acb12599bf2a29ab3c"
     },
     {
-     "path": "hls-progressive/inputs/replay-hevc-ac3-03.ts",
+     "path": "hls-segments-progressive-comparison-linux-arm64/hls-progressive/inputs/replay-hevc-ac3-03.ts",
      "sha256": "ec9e147c6955e3b59a7d98e8ce62fbcd2cc068830ef41c0e6258ad06e3c4c336"
     },
     {
-     "path": "hls-progressive/inputs/replay-hevc-ac3-04.ts",
+     "path": "hls-segments-progressive-comparison-linux-arm64/hls-progressive/inputs/replay-hevc-ac3-04.ts",
      "sha256": "f49f1622560930797989d537bf959ebf8cb54ff61cea0cfda88a7f04d3437db5"
     },
     {
-     "path": "hls-progressive/inputs/replay-hevc-ac3-05.ts",
+     "path": "hls-segments-progressive-comparison-linux-arm64/hls-progressive/inputs/replay-hevc-ac3-05.ts",
      "sha256": "1b4a4732b61aefee9c93159a3a0a736e96ce23b5efcd7f00707f76b6b71a675e"
     },
     {
-     "path": "hls-progressive/inputs/replay-hevc-ac3-06.ts",
+     "path": "hls-segments-progressive-comparison-linux-arm64/hls-progressive/inputs/replay-hevc-ac3-06.ts",
      "sha256": "bd7538bf89cab17962940cb4ce2829dac069720b2093bca6d2c816da5a86e50a"
     },
     {
-     "path": "hls-progressive/inputs/replay-hevc-ac3-07.ts",
+     "path": "hls-segments-progressive-comparison-linux-arm64/hls-progressive/inputs/replay-hevc-ac3-07.ts",
      "sha256": "ecf95ae04095fdac0f5e003b3570c81c5925ac599e33c3fd33501921e76c2c49"
     },
     {
-     "path": "hls-progressive/inputs/replay-hevc-ac3-08.ts",
+     "path": "hls-segments-progressive-comparison-linux-arm64/hls-progressive/inputs/replay-hevc-ac3-08.ts",
      "sha256": "ecedcd443159b31b42a6973a4f764111324454fd8a751ff2d81fbee4c7bcc17b"
     },
     {
-     "path": "hls-progressive/inputs/replay-hevc-ac3-09.ts",
+     "path": "hls-segments-progressive-comparison-linux-arm64/hls-progressive/inputs/replay-hevc-ac3-09.ts",
      "sha256": "3a4c661b2283501af7e6556e4d401c128c935dffd80d1d1120ac93f50d6ab808"
     },
     {
-     "path": "hls-progressive/inputs/replay-hevc-eac3-00.ts",
+     "path": "hls-segments-progressive-comparison-linux-arm64/hls-progressive/inputs/replay-hevc-eac3-00.ts",
      "sha256": "d1a6e64977ee6371f0daf3de48a99878093a74de8b16579fef4ddf66b525806c"
     },
     {
-     "path": "hls-progressive/inputs/replay-hevc-eac3-01.ts",
+     "path": "hls-segments-progressive-comparison-linux-arm64/hls-progressive/inputs/replay-hevc-eac3-01.ts",
      "sha256": "187812a6e1890a9cc7ae00aa228c564485ce45bf07a6c9acacd2329f688b9416"
     },
     {
-     "path": "hls-progressive/inputs/replay-hevc-eac3-02.ts",
+     "path": "hls-segments-progressive-comparison-linux-arm64/hls-progressive/inputs/replay-hevc-eac3-02.ts",
      "sha256": "87b3729d1c158a1523011306f5e78bb84645ca9bfabd91e2c3788646c6ef87cb"
     },
     {
-     "path": "hls-progressive/inputs/replay-hevc-eac3-03.ts",
+     "path": "hls-segments-progressive-comparison-linux-arm64/hls-progressive/inputs/replay-hevc-eac3-03.ts",
      "sha256": "35db45d648d84d6ea52256b07b8d22a2af50bbd48b9af2ed4363a2298d9eabec"
     },
     {
-     "path": "hls-progressive/inputs/replay-hevc-eac3-04.ts",
+     "path": "hls-segments-progressive-comparison-linux-arm64/hls-progressive/inputs/replay-hevc-eac3-04.ts",
      "sha256": "601254c12f673abc56c331f279ad86645f36deb7b0def77c4de687dce053fe81"
     },
     {
-     "path": "hls-progressive/inputs/replay-hevc-eac3-05.ts",
+     "path": "hls-segments-progressive-comparison-linux-arm64/hls-progressive/inputs/replay-hevc-eac3-05.ts",
      "sha256": "2734d759747f5de07cf77050d4d54f5d73eaa43def255d4630a68852fa819d57"
     },
     {
-     "path": "hls-progressive/inputs/replay-hevc-eac3-06.ts",
+     "path": "hls-segments-progressive-comparison-linux-arm64/hls-progressive/inputs/replay-hevc-eac3-06.ts",
      "sha256": "415b1ae0f88e987f2c9cc3af5cf175c52814627b7679ed00f850e54d92643c84"
     },
     {
-     "path": "hls-progressive/inputs/replay-hevc-eac3-07.ts",
+     "path": "hls-segments-progressive-comparison-linux-arm64/hls-progressive/inputs/replay-hevc-eac3-07.ts",
      "sha256": "e2694056effe68fe003c55bb8586a464547b483a47e51292700dc3462eae4436"
     },
     {
-     "path": "hls-progressive/inputs/replay-hevc-eac3-08.ts",
+     "path": "hls-segments-progressive-comparison-linux-arm64/hls-progressive/inputs/replay-hevc-eac3-08.ts",
      "sha256": "40cdc31aba4299a24ef39f212a96f006e01514febaed5b901fe35dbd75b7b225"
     },
     {
-     "path": "hls-progressive/inputs/replay-hevc-eac3-09.ts",
+     "path": "hls-segments-progressive-comparison-linux-arm64/hls-progressive/inputs/replay-hevc-eac3-09.ts",
      "sha256": "7797edb357708aaf2a2978e103aa3ba6ccfdb3b3d169301b29ce97078e57b28e"
     },
     {
-     "path": "hls-progressive/measured.json",
+     "path": "hls-segments-progressive-comparison-linux-arm64/hls-progressive/measured.json",
      "sha256": "dd37397d6b7638b7fdea123e5941dad6d94b71056a9468d8d11686df71243417"
     }
-   ]
+   ],
+   "path": "hls-segments-progressive-comparison-linux-arm64"
   }
  ]
 }
