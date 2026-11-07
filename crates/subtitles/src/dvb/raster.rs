@@ -825,9 +825,6 @@ impl Raster {
     pub fn decoded_pixels(&self) -> usize {
         self.decoded_pixels
     }
-    pub fn total_work(&self) -> usize {
-        self.total_work
-    }
 
     /// Both fields must be explicitly completed. For an ODS with absent bottom
     /// data, replay the bounded top field with Bottom parity; no bytes are copied.

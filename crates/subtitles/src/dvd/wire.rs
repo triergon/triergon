@@ -340,11 +340,6 @@ impl<'a> Commands<'a> {
             }
         })
     }
-
-    /// Uninterpreted bytes after END or an opaque command remain source data.
-    pub fn remainder(&self) -> &'a [u8] {
-        &self.input[self.at..]
-    }
 }
 
 impl<'a> Iterator for Commands<'a> {
