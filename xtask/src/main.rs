@@ -92,8 +92,8 @@ commands:
                  record their identity in target/harness/identity.json; anything but the
                  gate build is refused unless it is for paired comparisons only
   memory-admission CANDIDATE REFERENCE
-                 check the native AArch64 memory observer for two built workers
-                 and print the certificate
+                 check the native Linux memory observer (AArch64 or 32-bit ARMv7)
+                 for two built workers and print the certificate
   worker-tests   [FILTER]   integration tests of the built workers against the reference
                  workers and the independent oracles (tests whose name contains FILTER)
   report         [--contract F] [--manifest F] [--corpus DIR] [--output DIR] [--fate-cache DIR]
