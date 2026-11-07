@@ -26,7 +26,7 @@ fn main() {
             _ => {}
         }
     }
-    let mut dec = Decoder::with_options(opts);
+    let mut dec = Decoder::new().with_options(opts);
     let mut frame = AudioFrame::default();
     let mut out: Box<dyn Write> = if args[2] == "-" {
         Box::new(std::io::BufWriter::new(std::io::stdout().lock()))

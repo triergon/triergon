@@ -213,7 +213,7 @@ fn non_compatible_dependent_is_dropped() {
     assert_eq!(info.sample_rate, 48000);
     assert_eq!(out.planes, decode(&core8).1.planes);
     // Strict mode refuses the access unit instead.
-    let mut strict = Decoder::with_options(DecoderOptions {
+    let mut strict = Decoder::new().with_options(DecoderOptions {
         compat: Compat::Specification,
         ..Default::default()
     });
@@ -240,7 +240,7 @@ fn eac3_reduced_sample_rate_is_refused_like_ffmpeg() {
         Some(DecodeError::Unsupported(Feature::Eac3ReducedSampleRate))
     );
     // A/52 Annex E mode still decodes it.
-    let mut strict = Decoder::with_options(DecoderOptions {
+    let mut strict = Decoder::new().with_options(DecoderOptions {
         compat: Compat::Specification,
         ..Default::default()
     });
