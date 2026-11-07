@@ -3369,6 +3369,63 @@ fn native_range_cursor_matches_ffprobe_and_preserves_seek_lifecycle() {
 }
 
 #[test]
+fn repeated_range_seek_preserves_catalogue_order_with_video_second() {
+    let mut raw = include_bytes!("fixtures/mp4/r-multitrack.mov").to_vec();
+    let tracks: Vec<_> = raw
+        .windows(4)
+        .enumerate()
+        .filter(|(_, kind)| *kind == b"trak")
+        .map(|(at, _)| at - 4)
+        .collect();
+    let [first, second] = tracks[..] else {
+        panic!("expected two contiguous track boxes");
+    };
+    let size = |at| u32::from_be_bytes(raw[at..at + 4].try_into().unwrap()) as usize;
+    let first_len = size(first);
+    let end = second + size(second);
+    assert_eq!(first + first_len, second);
+    raw[first..end].rotate_left(first_len);
+
+    let (opened, _, _) = observed_mp4_open(&raw);
+    assert_eq!(opened.movie.tracks()[0].header().handler, *b"sbtl");
+    assert_eq!(opened.movie.tracks()[1].header().track_id, 1);
+    let mut open = Mp4RangeOpen::new(&opened.movie, None, PlanLimits::default()).unwrap();
+    assert!((0..1000).any(|_| open.poll(&mut WorkBudget::new(4096), &off()).unwrap()));
+    let mut player = open
+        .finish(
+            opened.input,
+            opened.source,
+            1 << 20,
+            Selection::All,
+            PlayerPolicy::default(),
+        )
+        .unwrap();
+    for _ in 0..2 {
+        let mut seek = player
+            .prepare_seek(Mp4NativeSeekRequest {
+                video: 1,
+                timestamp: 3500,
+                limits: triergon_isobmff::Mov9NativeSeekLimits::default(),
+            })
+            .unwrap();
+        assert!((0..1000).any(|_| seek.poll(&mut WorkBudget::new(4096), &off()).unwrap()));
+        let mut command = seek.finish().unwrap();
+        assert!(
+            player
+                .apply_seek(&mut command, &mut WorkBudget::new(1), &off())
+                .unwrap()
+        );
+        let output = std::iter::from_fn(|| next_range_output(&mut player))
+            .find(|item| item.event().track() == Some(TrackKey::Mp4(1)))
+            .unwrap();
+        let RawEvent::Mp4(Mp4Event::Packet(packet)) = output.event() else {
+            panic!("expected a video packet");
+        };
+        assert_eq!(packet.native.as_ref().unwrap().native.dts, Some(3000));
+    }
+}
+
+#[test]
 fn native_range_cursor_checks_all_extents_and_replays_after_duration_scan() {
     use triergon_core::{Rounding, TimeBase};
 
