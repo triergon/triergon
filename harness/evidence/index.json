@@ -7944,7 +7944,7 @@
   {
    "name": "progressive-ts188-linux-arm64",
    "retention": "retained",
-   "reason": "MPEG-TS progressive playback status row",
+   "reason": "Historical progressive TS188 comparison",
    "key": "evidence/progressive-ts188-linux-arm64/92611382d5e4301e028fb2135ffc1ca5aa3a7c00144defee6d29839a9c13ea48.tar.gz",
    "sha256": "92611382d5e4301e028fb2135ffc1ca5aa3a7c00144defee6d29839a9c13ea48"
   },
@@ -8038,7 +8038,7 @@
   {
    "name": "hls-segments-progressive-comparison-linux-arm64",
    "retention": "retained",
-   "reason": "HLS segment comparison in the measured revisions table",
+   "reason": "Historical HLS segment comparison for progressive transport",
    "key": "evidence/hls-segments-progressive-comparison-linux-arm64/2a4f131ee6fa1c6cda56524c16b841665173e1a2e330e3d47478acf811a6b94f.tar.gz",
    "sha256": "2a4f131ee6fa1c6cda56524c16b841665173e1a2e330e3d47478acf811a6b94f",
    "bytes": 11251054,
