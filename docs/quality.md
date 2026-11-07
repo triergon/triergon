@@ -27,7 +27,9 @@ resource limit becomes an explicit, reviewed rule for that case.
 
 - **FFmpeg pins.** `cargo xtask prepare-ffmpeg --profile P` builds FFmpeg from a pinned,
   hash-checked source with recorded configure flags, compiler and binary hashes, and
-  `cargo xtask build-workers` builds the reference worker of every prepared profile.
+  `cargo xtask build-workers` builds the reference worker of every prepared profile
+  and records the baseline version from the prepared installation. Version
+  discovery for an unpacked archive stops at the reference source boundary.
   Containers are measured against git revision `d32b387f` on the 9.0 branch: `matroska`
   for the container harness, `formats` for MOV, TS, subtitles and the HLS segment
   reference, and `video` (the Matroska build plus the H.264 and HEVC decoders that

@@ -266,24 +266,39 @@ pub fn prepare(
     let record = cache.join("configure-argv.json");
     let recorded = crate::checks::read_json(&record).ok();
     let wanted = Value::strings(argv.iter().cloned());
-    if !source.join("config.h").exists() || recorded.as_ref() != Some(&wanted) {
-        run(Command::new(&argv[0]).args(&argv[1..]).current_dir(&source))?;
-        fs::write(&record, json::to_python(&wanted, None))
+    let configuration = Value::object([
+        ("arguments", wanted.clone()),
+        ("git_discovery", Value::str("reference-source")),
+    ]);
+    // Keep version discovery inside the unpacked reference source.
+    let build = |program: &str| {
+        let mut command = Command::new(program);
+        command
+            .current_dir(&source)
+            .env_remove("GIT_DIR")
+            .env_remove("GIT_WORK_TREE")
+            .env("GIT_CEILING_DIRECTORIES", &cache);
+        command
+    };
+    let configured = source.join("config.h").exists();
+    if !configured || recorded.as_ref() != Some(&configuration) {
+        if configured {
+            run(build("make").arg("distclean"))?;
+        }
+        run(build(&argv[0]).args(&argv[1..]))?;
+        fs::write(&record, json::to_python(&configuration, None))
             .map_err(|e| format!("{}: {e}", record.display()))?;
     }
-    run(Command::new("make")
-        .arg(format!("-j{jobs}"))
-        .current_dir(&source))?;
-    run(Command::new("make").arg("install").current_dir(&source))?;
+    run(build("make").arg(format!("-j{jobs}")))?;
+    run(build("make").arg("install"))?;
     if profile.source() == Source::Release {
         return release_manifest(&cache, &prefix, profile, &archive_sha, wanted);
     }
     let samples = root.join(".research/fate-samples");
     let listing = output(
-        Command::new("make")
+        build("make")
             .args(["-s", "fate-list"])
-            .arg(format!("SAMPLES={}", samples.display()))
-            .current_dir(&source),
+            .arg(format!("SAMPLES={}", samples.display())),
     )?;
     let list = fate_list(&listing);
     fs::write(cache.join("fate-list.txt"), &list).map_err(|e| e.to_string())?;

@@ -703,6 +703,11 @@ pub fn build(root: &Path) -> R<PathBuf> {
             ]),
         ));
     }
+    let ffmpeg = if pinned_build.is_some() {
+        root.join(".research/reference/install/bin/ffmpeg")
+    } else {
+        PathBuf::from("ffmpeg")
+    };
     let updates: Vec<(&str, Value)> = vec![
         ("schema", Value::int(2)),
         (
@@ -756,7 +761,7 @@ pub fn build(root: &Path) -> R<PathBuf> {
         ),
         (
             "ffmpeg_version",
-            Value::str(output("ffmpeg", &["-version"], &[])?),
+            Value::str(output(&ffmpeg.to_string_lossy(), &["-version"], &[])?),
         ),
         ("rustc", Value::str(output("rustc", &["-Vv"], &[])?)),
         (
