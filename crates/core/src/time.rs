@@ -230,6 +230,17 @@ impl Time {
     pub fn to_ticks(self, base: TimeBase, rounding: Rounding) -> Result<i128> {
         let exact_denominator = self.denominator();
         if base.numerator() == 1
+            && exact_denominator <= u128::from(u64::MAX)
+            && base.denominator().is_multiple_of(exact_denominator as u64)
+        {
+            let magnitude = self
+                .numerator
+                .unsigned_abs()
+                .checked_mul(u128::from(base.denominator() / exact_denominator as u64))
+                .ok_or(Error::Overflow)?;
+            return signed(magnitude, self.numerator < 0);
+        }
+        if base.numerator() == 1
             && let (Ok(magnitude), Ok(denominator)) = (
                 u64::try_from(self.numerator.unsigned_abs()),
                 u64::try_from(exact_denominator),
@@ -244,17 +255,6 @@ impl Time {
                 self.numerator < 0,
                 rounding,
             );
-        }
-        if base.numerator() == 1
-            && exact_denominator <= u128::from(u64::MAX)
-            && base.denominator().is_multiple_of(exact_denominator as u64)
-        {
-            let magnitude = self
-                .numerator
-                .unsigned_abs()
-                .checked_mul(u128::from(base.denominator() / exact_denominator as u64))
-                .ok_or(Error::Overflow)?;
-            return signed(magnitude, self.numerator < 0);
         }
         // Cancel both cross factors before multiplication. This preserves large
         // source clocks, including unsigned tfdt values, without float conversion.
