@@ -218,8 +218,7 @@ static void hls_fold_segment(const HlsRetained *retained, int width, int height,
             }
             hls_mix(digest, size);
             work->bytes += size;
-            for (size_t n = 0; n < size; ++n)
-                hls_mix(digest, unit->packet.data[n]);
+            fold_bytes(digest, unit->packet.data, size);
             if (trace) {
                 for (size_t n = 0; n < size; ++n)
                     printf("%02x", (unsigned)unit->packet.data[n]);
