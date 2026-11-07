@@ -296,6 +296,26 @@ impl<T> BudgetVec<T> {
             charge: Reservation::empty(budget),
         }
     }
+    /// `len` copies of `value`, charged before they are allocated. A refused
+    /// charge or allocation is an error, never an abort.
+    pub fn try_filled(budget: &Budget, value: T, len: usize) -> Result<Self>
+    where
+        T: Clone,
+    {
+        let mut filled = Self::new(budget);
+        filled.try_resize(len, value)?;
+        Ok(filled)
+    }
+    /// A copy with its own charge on the same pool.
+    pub fn try_clone(&self) -> Result<Self>
+    where
+        T: Clone,
+    {
+        let mut copy = Self::new(self.budget());
+        copy.grow_to(self.len())?;
+        copy.data.extend_from_slice(&self.data);
+        Ok(copy)
+    }
     pub fn len(&self) -> usize {
         self.data.len()
     }

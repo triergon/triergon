@@ -1,4 +1,4 @@
-use triergon_core::{Budget, BudgetVec, Error};
+use triergon_core::{Budget, BudgetVec, Charged, Error};
 
 #[test]
 fn history_repetition_handles_overlap_and_retains_the_complete_charge() {
@@ -141,4 +141,51 @@ fn charged_vectors_read_and_write_as_slices_and_truncate_without_releasing() {
     samples.truncate(4);
     assert_eq!(&samples[..], &[[0, 0], [0, 0], [0, 0], [1, -1]]);
     assert_eq!(budget.used(), used);
+}
+
+#[test]
+fn filled_and_cloned_vectors_charge_their_capacity_and_refuse_without_charging() {
+    let budget = Budget::new(4096).unwrap();
+    let idle = budget.used();
+    let zeros = BudgetVec::try_filled(&budget, 0u32, 256).unwrap();
+    assert_eq!(budget.used(), idle + 1024);
+    let copy = zeros.try_clone().unwrap();
+    assert_eq!((&copy[..], budget.used()), (&zeros[..], idle + 2048));
+    assert!(matches!(
+        BudgetVec::try_filled(&budget, 7u8, 4096),
+        Err(Error::Limit { .. })
+    ));
+    assert!(matches!(
+        BudgetVec::try_filled(&budget, 0u64, usize::MAX),
+        Err(Error::Overflow)
+    ));
+    assert_eq!(budget.used(), idle + 2048);
+    drop((zeros, copy));
+    assert_eq!(budget.used(), idle);
+}
+
+#[test]
+fn charged_values_hold_their_charge_until_they_drop() {
+    let budget = Budget::new(4096).unwrap();
+    let idle = budget.used();
+    let mut state = Charged::try_new(&budget, 1000, || [0u8; 16]).unwrap();
+    state[3] = 9;
+    assert_eq!(
+        (state[3], state.charged_bytes(), budget.used()),
+        (9, 1000, idle + 1000)
+    );
+    assert!(Charged::try_new(&budget, 4096, || ()).is_err());
+    drop(state);
+    assert_eq!(budget.used(), idle);
+}
+
+#[test]
+fn boxed_values_charge_their_size() {
+    let budget = Budget::new(4096).unwrap();
+    let idle = budget.used();
+    let state = Charged::boxed(&budget, [7u32; 64]).unwrap();
+    assert_eq!((state[63], budget.used()), (7, idle + 256));
+    assert!(Charged::boxed(&budget, [0u8; 8192]).is_err());
+    drop(state);
+    assert_eq!(budget.used(), idle);
 }

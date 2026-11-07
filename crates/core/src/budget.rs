@@ -203,6 +203,50 @@ impl Reservation {
     }
 }
 
+/// A value whose storage stays charged for as long as it lives: state a stream
+/// creates per element, such as a substream, channel element or extension decoder.
+#[derive(Debug)]
+pub struct Charged<T> {
+    value: T,
+    charge: Reservation,
+}
+
+impl<T> Charged<T> {
+    /// Charges `bytes` to `budget`, then builds the value.
+    pub fn try_new(budget: &Budget, bytes: usize, make: impl FnOnce() -> T) -> Result<Self> {
+        let charge = budget.reserve(bytes)?;
+        Ok(Self {
+            value: make(),
+            charge,
+        })
+    }
+    /// `value` in a box charged for its size: state of fixed size that a stream
+    /// creates. Storage the value owns elsewhere charges itself (`BudgetVec`).
+    pub fn boxed(budget: &Budget, value: T) -> Result<Charged<Box<T>>> {
+        Charged::try_new(budget, size_of::<T>(), || Box::new(value))
+    }
+    /// The bytes charged for this value.
+    pub fn charged_bytes(&self) -> usize {
+        self.charge.bytes()
+    }
+}
+
+impl<T> std::ops::Deref for Charged<T> {
+    type Target = T;
+
+    #[inline]
+    fn deref(&self) -> &T {
+        &self.value
+    }
+}
+
+impl<T> std::ops::DerefMut for Charged<T> {
+    #[inline]
+    fn deref_mut(&mut self) -> &mut T {
+        &mut self.value
+    }
+}
+
 impl Drop for Reservation {
     fn drop(&mut self) {
         if self.bytes != 0 {
