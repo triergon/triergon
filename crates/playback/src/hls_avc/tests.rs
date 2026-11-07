@@ -129,3 +129,42 @@ fn eof_publication_retries_after_pressure_and_a_partial_next_nal_fails() {
         Err(Error::Truncated)
     ));
 }
+
+#[test]
+fn prefix_anchor_ring_preserves_clocks_for_short_and_long_zero_runs() {
+    for zeroes in 2_usize..=9 {
+        for switch in 0..=zeroes {
+            let (_pool, mut reader) = fixture();
+            let first = [DELIMITER, PREFIX, SPS, PREFIX, PPS, IDR].concat();
+            let delimiter = [vec![0; zeroes], vec![1, 9, 0xf0]].concat();
+            let next = [delimiter.as_slice(), IDR].concat();
+            let last = [DELIMITER, IDR].concat();
+            let raw = [first.as_slice(), &next, &last].concat();
+            let mut units = Vec::new();
+            reader.pes = Some(Anchor {
+                serial: 1,
+                clock: clock(9000),
+            });
+            for (offset, byte) in raw.iter().enumerate() {
+                if offset == first.len() + switch {
+                    reader.pes = Some(Anchor {
+                        serial: 2,
+                        clock: clock(12000),
+                    });
+                }
+                push_span(&mut reader, std::slice::from_ref(byte));
+                drain(&mut reader, &mut units);
+            }
+            reader.finish();
+            drain(&mut reader, &mut units);
+            let second_has_new_anchor = switch <= zeroes.saturating_sub(3);
+            assert_eq!(units.len(), 3);
+            assert_eq!(units[0].clock, Some(clock(9000)));
+            assert_eq!(units[1].clock, second_has_new_anchor.then(|| clock(12000)));
+            assert_eq!(
+                units[2].clock,
+                (!second_has_new_anchor).then(|| clock(12000))
+            );
+        }
+    }
+}
