@@ -116,8 +116,6 @@ pub use avc_config::{
     AvcConfigParser, AvcConfigSource, AvcConfiguration,
 };
 
-mod dts14_frame;
-pub use dts14_frame::{Dts14Frame, Dts14FrameReader};
 mod dts14_carrier;
 pub use dts14_carrier::{
     Dts14CarrierBoundary, Dts14CarrierLimits, Dts14CarrierPacket, Dts14CarrierProvision,
@@ -180,14 +178,12 @@ pub use nal_packet_config::{
 
 mod nal_receiver_config;
 
-// Compact configuration inspection and retained exports.
+// Compact configuration inspection.
 pub use avc_config::{
     AvcConfigArrayRef, AvcConfigNalRef, AvcConfigViewParser, AvcConfigurationView,
-    RetainedAvcConfigArray, RetainedAvcConfigNal,
 };
 pub use hevc_config::{
     HvcConfigArrayRef, HvcConfigNalRef, HvcConfigViewParser, HvcConfigurationView,
-    RetainedHvcConfigArray, RetainedHvcConfigNal,
 };
 
 pub use raw_annex_b::{RawAccessUnit, RawAnnexBLimits, RawAnnexBReader};

@@ -172,9 +172,12 @@ impl Dts14SyncReader {
             .as_ref()
             .map_or(self.last_request.offset, InputCursor::position)
     }
-    /// Edition-bound per-frame cadence. Geometry and every source bit are still
-    /// validated independently for each record; no universal FSIZE/tail rule.
-    pub(crate) fn per_frame(
+    /// Normal frames at a per-frame cadence (ETSI TS 102 114 V1.6.1 5.3). Each frame
+    /// ends at a following normal sync or the explicit end of the entity, and its
+    /// low14 payload matches the declared byte count exactly. Geometry and every
+    /// source bit are validated independently for each record; non-byte-aligned tails
+    /// and unresolved FSIZE domains are `Unsupported`.
+    pub fn per_frame(
         pool: &Budget,
         source: SourceId,
         capabilities: SourceCapabilities,

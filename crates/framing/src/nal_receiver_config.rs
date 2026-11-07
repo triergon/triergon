@@ -47,9 +47,6 @@ impl ReceiverHevcConfiguration {
     pub fn source_bytes(&self) -> &Bytes {
         self.inner.source_bytes()
     }
-    pub fn source(&self) -> HvcConfigSource {
-        self.inner.source()
-    }
     pub fn fields(&self) -> HvcConfigFields {
         self.inner.fields()
     }
@@ -138,9 +135,6 @@ impl ReceiverAvcConfigParser {
         let mut parser = Self::new(pool, source, raw, limits)?;
         parser.update_role = true;
         Ok(parser)
-    }
-    pub fn source_bytes(&self) -> &Bytes {
-        &self.raw
     }
     pub fn strict_source_refusal(&self) -> Option<Error> {
         (self.raw.len() >= 6 && self.raw[0] == 1 && self.raw[4] & 3 == 2)
@@ -233,9 +227,6 @@ impl ReceiverAvcConfigurationView {
     pub fn trailing_bytes(&self) -> &[u8] {
         self.inner.trailing_bytes()
     }
-    pub fn retain_trailing_bytes(&self) -> Result<Bytes> {
-        self.inner.retain_trailing_bytes()
-    }
     pub fn nal(&self, index: usize) -> Option<AvcConfigNalRef<'_>> {
         self.inner.nal(index)
     }
@@ -244,15 +235,6 @@ impl ReceiverAvcConfigurationView {
     }
     pub fn array_count(&self) -> usize {
         self.inner.array_count()
-    }
-    pub fn understood_end(&self) -> usize {
-        self.inner.understood_end()
-    }
-    pub fn descriptor_storage_bytes(&self) -> Result<usize> {
-        self.inner.descriptor_storage_bytes()
-    }
-    pub fn retained_storage_bytes(&self) -> Result<usize> {
-        self.inner.retained_storage_bytes()
     }
 
     pub fn source_bytes(&self) -> &Bytes {
@@ -291,9 +273,6 @@ impl ReceiverHevcConfigurationView {
     pub fn opaque_suffix(&self) -> &[u8] {
         self.inner.opaque_suffix()
     }
-    pub fn retain_opaque_suffix(&self) -> Result<Bytes> {
-        self.inner.retain_opaque_suffix()
-    }
     pub fn syntax_issues(&self) -> u32 {
         self.inner.syntax_issues()
     }
@@ -306,21 +285,9 @@ impl ReceiverHevcConfigurationView {
     pub fn array_count(&self) -> usize {
         self.inner.array_count()
     }
-    pub fn understood_end(&self) -> usize {
-        self.inner.understood_end()
-    }
-    pub fn descriptor_storage_bytes(&self) -> Result<usize> {
-        self.inner.descriptor_storage_bytes()
-    }
-    pub fn retained_storage_bytes(&self) -> Result<usize> {
-        self.inner.retained_storage_bytes()
-    }
 
     pub fn source_bytes(&self) -> &Bytes {
         self.inner.source_bytes()
-    }
-    pub fn source(&self) -> HvcConfigSource {
-        self.inner.source()
     }
     pub fn fields(&self) -> HvcConfigFields {
         self.inner.fields()

@@ -41,9 +41,6 @@ impl Dac3Fields {
     const fn word(self) -> u32 {
         u32::from_be_bytes([0, self.raw[0], self.raw[1], self.raw[2]])
     }
-    pub const fn raw_bytes(self) -> [u8; 3] {
-        self.raw
-    }
     pub const fn fscod(self) -> u8 {
         (self.word() >> 22) as u8
     }
@@ -129,9 +126,6 @@ impl Dec3Substream {
     };
     pub fn raw_bytes(&self) -> &[u8] {
         &self.raw[..usize::from(self.width)]
-    }
-    pub const fn offset(self) -> usize {
-        self.offset
     }
     pub const fn fscod(self) -> u8 {
         self.raw[0] >> 6
@@ -269,12 +263,6 @@ impl Ac3Configuration {
         match self {
             Self::Dac3(value) => value.source(),
             Self::Dec3(value) => value.source(),
-        }
-    }
-    pub fn generation(&self) -> u64 {
-        match self {
-            Self::Dac3(value) => value.generation(),
-            Self::Dec3(value) => value.generation(),
         }
     }
 }

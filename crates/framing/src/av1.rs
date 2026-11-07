@@ -283,9 +283,6 @@ impl Av1ObuReader {
     pub fn token(&self) -> InputToken {
         self.cursor.token()
     }
-    pub fn source(&self) -> SourceId {
-        self.cursor.source()
-    }
     pub fn generation(&self) -> u64 {
         self.cursor.generation()
     }

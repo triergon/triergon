@@ -23,9 +23,6 @@ pub struct Vp9ConfigFields {
 }
 
 impl Vp9ConfigFields {
-    pub const fn raw_bytes(self) -> [u8; 8] {
-        self.raw
-    }
     pub const fn profile(self) -> u8 {
         self.raw[0]
     }

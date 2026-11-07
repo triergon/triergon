@@ -7,8 +7,8 @@
 //! The reference revision is recorded once, on [`crate::reference_trace::dts`].
 use crate::dts14_parser_view::ParserHints;
 use crate::{
-    Dts14CarrierLimits, Dts14CarrierPacket, Dts14CarrierReader, Dts14CarrierSyntax, Dts14Frame,
-    Dts14FrameReader, Dts14SyncLimits, DtsCoreHeader, DtsSourceIdentity, DtsWordOrder,
+    Dts14CarrierLimits, Dts14CarrierPacket, Dts14CarrierReader, Dts14CarrierSyntax, Dts14SyncFrame,
+    Dts14SyncLimits, Dts14SyncReader, DtsCoreHeader, DtsSourceIdentity, DtsWordOrder,
 };
 use std::{
     ops::Range,
@@ -40,9 +40,6 @@ pub struct ParserOperationContext {
     fresh_zero_origin: bool,
 }
 impl ParserOperationContext {
-    pub fn source(&self) -> SourceId {
-        self.source
-    }
     pub fn source_generation(&self) -> u64 {
         self.source_generation
     }
@@ -240,7 +237,7 @@ pub enum ParserOperationTerminal {
 
 #[derive(Clone, Debug)]
 pub enum ParserOperationEvent {
-    SourceFrame(Dts14Frame),
+    SourceFrame(Dts14SyncFrame),
     ParserPacket(ParserPacket),
     /// A genuine terminal source/parser error remains a required outcome.
     ViewRefusal {
@@ -271,7 +268,7 @@ pub enum ParserOperationStep {
 /// A fatal cancellation/transport failure drops both private owners immediately;
 /// caller-held events continue owning their complete source/canonical storage.
 pub struct ParserOperation {
-    source: Option<Dts14FrameReader>,
+    source: Option<Dts14SyncReader>,
     parser: Option<Dts14CarrierReader>,
     context: ParserOperationContext,
     turn: ParserOperationLane,
@@ -295,7 +292,7 @@ impl ParserOperation {
         order: DtsWordOrder,
         limits: ParserOperationLimits,
     ) -> Result<Self> {
-        let facts = Dts14FrameReader::new(pool, source, capabilities, order, limits.source)?;
+        let facts = Dts14SyncReader::per_frame(pool, source, capabilities, order, limits.source)?;
         let parser = Dts14CarrierReader::new(pool, source, capabilities, order, limits.parser)?;
         let context = ParserOperationContext {
             source,
@@ -350,7 +347,7 @@ impl ParserOperation {
         self.healthy()?;
         match lane {
             ParserOperationLane::Source if self.source_end.is_none() => {
-                self.source.as_ref().map(Dts14FrameReader::request)
+                self.source.as_ref().map(Dts14SyncReader::request)
             }
             ParserOperationLane::ParserProjection if self.parser_end.is_none() => {
                 self.parser.as_ref().map(Dts14CarrierReader::request)
@@ -586,13 +583,13 @@ impl ParserOperation {
 /// native header or mistakes an opaque packet for one Source frame.
 #[derive(Clone, Debug)]
 pub struct FactAssociation {
-    source_frame: Dts14Frame,
+    source_frame: Dts14SyncFrame,
     parser_packet: ParserPacket,
     source_range: Range<u64>,
     packet_range: Range<u64>,
 }
 impl FactAssociation {
-    pub fn source_frame(&self) -> &Dts14Frame {
+    pub fn source_frame(&self) -> &Dts14SyncFrame {
         &self.source_frame
     }
     pub fn parser_packet(&self) -> &ParserPacket {
@@ -609,7 +606,7 @@ impl FactAssociation {
 /// One source frame may be contained in a coarser parser packet. Work charges
 /// each original byte comparison; output retains both complete backing owners.
 pub struct FactAssociationJob {
-    source: Option<Dts14Frame>,
+    source: Option<Dts14SyncFrame>,
     packet: Option<ParserPacket>,
     source_range: Range<u64>,
     packet_range: Range<u64>,
@@ -622,7 +619,7 @@ impl FactAssociationJob {
     pub fn new(
         pool: &Budget,
         context: ParserOperationContext,
-        source: &Dts14Frame,
+        source: &Dts14SyncFrame,
         packet: &ParserPacket,
     ) -> Result<Self> {
         if !source.physical_bytes().belongs_to(pool) || !packet.source_bytes().belongs_to(pool) {

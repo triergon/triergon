@@ -15,7 +15,7 @@
 ///
 /// [`ParserOperation`](dts::ParserOperation) reads one raw 14-bit DTS entity
 /// through two cursors fed from the same bytes: the complete source frames
-/// ([`Dts14FrameReader`](crate::Dts14FrameReader)) and the packets FFmpeg's `dca`
+/// ([`Dts14SyncReader::per_frame`](crate::Dts14SyncReader::per_frame)) and the packets FFmpeg's `dca`
 /// parser cuts ([`Dts14CarrierReader`](crate::Dts14CarrierReader)). Each
 /// [`ParserPacket`](dts::ParserPacket) carries the parser's clock
 /// ([`ParserClock`](dts::ParserClock)): the first accepted core sample rate is
