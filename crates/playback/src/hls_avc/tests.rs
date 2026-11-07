@@ -156,6 +156,115 @@ fn split_delimiter_keeps_first_byte_clock_and_cached_parameter_sets() {
 }
 
 #[test]
+fn identical_parameter_sets_reuse_parsing_and_storage_under_pressure() {
+    let pool = Budget::new(8192).unwrap();
+    let mut sets = BudgetVec::new(&pool);
+    let parses = std::cell::Cell::new(0);
+    let parse = |raw: &[u8]| {
+        parses.set(parses.get() + 1);
+        syntax::sps(raw)
+    };
+    remember(&mut sets, 1, SPS, parse).unwrap();
+    let original = sets.as_slice()[0].bytes.storage_address();
+    let used = pool.used();
+    let pressure = pool.reserve(pool.available()).unwrap();
+    remember(&mut sets, 2, SPS, parse).unwrap();
+    assert_eq!(parses.get(), 1);
+    assert_eq!(sets.as_slice()[0].seen_in_unit, 2);
+    assert_eq!(sets.as_slice()[0].bytes.storage_address(), original);
+
+    let mut changed = SPS.to_vec();
+    *changed.last_mut().unwrap() ^= 1;
+    assert_eq!(syntax::sps(&changed[1..]), syntax::sps(&SPS[1..]));
+    assert!(matches!(
+        remember(&mut sets, 3, &changed, parse),
+        Err(Error::Backpressure { .. })
+    ));
+    assert_eq!(parses.get(), 2);
+    assert_eq!(sets.as_slice()[0].seen_in_unit, 2);
+    assert_eq!(sets.as_slice()[0].bytes.storage_address(), original);
+    drop(pressure);
+    assert_eq!(pool.used(), used);
+    remember(&mut sets, 3, &changed, parse).unwrap();
+    assert_eq!(parses.get(), 3);
+    assert_eq!(sets.as_slice()[0].seen_in_unit, 3);
+    assert_eq!(sets.as_slice()[0].bytes.as_ref(), changed);
+
+    let invalid = &[0x67];
+    let expected = syntax::sps(&invalid[1..]).unwrap_err();
+    assert_eq!(remember(&mut sets, 4, invalid, parse), Err(expected));
+    assert_eq!(parses.get(), 4);
+    assert_eq!(sets.as_slice()[0].seen_in_unit, 3);
+    assert_eq!(sets.as_slice()[0].bytes.as_ref(), changed);
+
+    let mut pps = BudgetVec::new(&pool);
+    remember(&mut pps, 1, PPS, syntax::pps).unwrap();
+    remember(&mut pps, 1, &[0x68, 0x50], syntax::pps).unwrap();
+    let first = pps.as_slice()[0].bytes.storage_address();
+    remember(&mut pps, 2, PPS, syntax::pps).unwrap();
+    assert_eq!(pps.len(), 2);
+    assert_eq!(pps.as_slice()[0].bytes.storage_address(), first);
+    assert_eq!(pps.as_slice()[0].seen_in_unit, 2);
+    remember(&mut pps, 3, &[0x68, 0x50], |_| {
+        panic!("an identical cached PPS needs no new parse")
+    })
+    .unwrap();
+    assert_eq!(pps.as_slice()[1].seen_in_unit, 3);
+}
+
+#[test]
+fn repeated_in_band_sets_keep_complete_units_clocks_and_work() {
+    fn send_sync<T: Send + Sync>() {}
+    send_sync::<AvcTsReader>();
+    let unit = [DELIMITER, PREFIX, SPS, PREFIX, PPS, IDR].concat();
+    let raw = unit.repeat(3);
+    for quantum in [1, 4096] {
+        let (_pool, mut reader) = fixture();
+        reader.remember_clock(clock(9000)).unwrap();
+        push_span(&mut reader, &raw);
+        reader.finish();
+        let mut units = Vec::new();
+        let mut storage = None;
+        let mut spent = 0;
+        loop {
+            let mut work = WorkBudget::new(quantum);
+            let step = reader.step(&mut work, &AtomicBool::new(false)).unwrap();
+            spent += work.spent();
+            match step {
+                AvcTsStep::Yield => {}
+                AvcTsStep::Ready(output) => {
+                    let current = (
+                        reader.sps.as_slice()[0].bytes.storage_address(),
+                        reader.pps.as_slice()[0].bytes.storage_address(),
+                    );
+                    if let Some(expected) = storage {
+                        assert_eq!(current, expected);
+                    } else {
+                        storage = Some(current);
+                    }
+                    units.push(output);
+                }
+                AvcTsStep::End => break,
+                AvcTsStep::NeedInput => panic!("the complete segment was provided"),
+            }
+        }
+        assert_eq!(units.len(), 3);
+        assert_eq!(spent, raw.len() as u64 + 3 * 4 + 1);
+        assert_eq!(reader.sps.as_slice()[0].seen_in_unit, 3);
+        assert_eq!(reader.pps.as_slice()[0].seen_in_unit, 3);
+        for (index, output) in units.iter().enumerate() {
+            assert_eq!(output.source_bytes().as_ref(), unit);
+            assert_eq!(output.clock, (index == 0).then(|| clock(9000)));
+            assert!(output.sps.is_none() && output.pps.is_none());
+            assert_eq!(
+                output.feed_spans().collect::<Vec<_>>(),
+                vec![unit.as_slice()]
+            );
+        }
+    }
+}
+
+#[test]
 fn prefix_anchor_ring_keeps_full_clocks_across_pes_and_wraps() {
     for origin in 0..3 {
         for length in 2..=9 {

@@ -208,11 +208,19 @@ struct ParameterSet<T> {
 
 fn remember<T>(
     sets: &mut BudgetVec<ParameterSet<T>>,
-    id: u8,
     seen_in_unit: u64,
     raw: &[u8],
-    value: T,
+    parse: impl FnOnce(&[u8]) -> Result<(u8, T)>,
 ) -> Result<()> {
+    // Repeated in-band sets keep the same parsed value and storage. Check one
+    // cached set before parsing; other inputs follow the ordinary ID lookup.
+    if let Some(set) = sets.as_mut_slice().last_mut()
+        && set.bytes.as_ref() == raw
+    {
+        set.seen_in_unit = seen_in_unit;
+        return Ok(());
+    }
+    let (id, value) = parse(&raw[1..])?;
     let existing = sets.as_slice().iter().position(|set| set.id == id);
     if let Some(index) = existing
         && sets.as_slice()[index].bytes.as_ref() == raw
@@ -661,11 +669,9 @@ impl AvcTsReader {
                     });
                 }
                 if nal.kind == 7 {
-                    let (id, raster) = syntax::sps(payload)?;
-                    remember(&mut self.sps, id, self.unit_serial, raw, raster)?;
+                    remember(&mut self.sps, self.unit_serial, raw, syntax::sps)?;
                 } else {
-                    let (id, sps) = syntax::pps(payload)?;
-                    remember(&mut self.pps, id, self.unit_serial, raw, sps)?;
+                    remember(&mut self.pps, self.unit_serial, raw, syntax::pps)?;
                 }
             }
             SEI | 10 | 11 | 12 => {}
