@@ -131,6 +131,12 @@ be established. Use built workers you trust.
   copy of it sit differently in the page cache, and identical bytes then time about
   0.7% apart. The runner writes both workers afresh, at paths of equal length, before
   each timing session.
+- A change not meant to affect speed gets a quick check: `cargo xtask same-code`
+  on both workers, then one round of 30 pairs against a main build for every contract
+  the change reaches, graded by `cargo xtask screen`. It flags a case above 1.5% or a
+  group median above 0.75%, so a slowdown of 1% on one case passes. Where functions
+  sit moves a case by about 1% either way, so a flagged case with unchanged functions
+  and instruction counts is placement. A screen never replaces a recorded result.
 - Qualification runs on native AArch64 Linux. Results on one platform do not establish
   another; 32-bit ARMv7 needs its own runs.
 

@@ -79,6 +79,11 @@ commands:
   compare        --candidate W --reference W --input FILE --output DIR
                  [--operation plain|seek|colour|catalogue] [--content] [--no-short-reads]
                  compare one input across a candidate and a reference worker
+  same-code      CANDIDATE REFERENCE
+                 compare two worker binaries function by function; fails if any
+                 function differs beyond its position
+  screen         REPORTS   grade one paired timing round, with each contract's report
+                 under REPORTS/<contract>, against the quick-check tolerances
   fate-inventory --source DIR --output FILE [--configured-list FILE]
                  index FATE definitions as data; nothing is executed
   codecs         manifest|grade|summarize|time|equivalence   codec crates against the
@@ -103,6 +108,19 @@ fn main() -> ExitCode {
         Some("fixture") => fixture(&root, &args[1..]),
         Some("fate-inventory") => fate_inventory(&args[1..]),
         Some("compare") => compare(&root, &args[1..]),
+        Some("same-code") => match &args[1..] {
+            [candidate, reference] => {
+                return passing(harness::screen::same_code(
+                    Path::new(candidate),
+                    Path::new(reference),
+                ));
+            }
+            _ => Err("usage: cargo xtask same-code CANDIDATE REFERENCE".into()),
+        },
+        Some("screen") => match &args[1..] {
+            [reports] => return passing(harness::screen::screen(Path::new(reports))),
+            _ => Err("usage: cargo xtask screen REPORTS".into()),
+        },
         Some("report") => return report(&root, &args[1..]),
         Some("external-vector") => return external_vector(&root, &args[1..]),
         Some("fate-run") => return fate_run(&root, &args[1..]),
@@ -268,6 +286,18 @@ fn exit(result: Result<i32, String>) -> ExitCode {
         Err(message) => {
             eprintln!("{message}");
             ExitCode::from(2)
+        }
+    }
+}
+
+/// Success when a check holds; failure when it does not, or an error is printed.
+fn passing(result: Result<bool, String>) -> ExitCode {
+    match result {
+        Ok(true) => ExitCode::SUCCESS,
+        Ok(false) => ExitCode::FAILURE,
+        Err(message) => {
+            eprintln!("{message}");
+            ExitCode::FAILURE
         }
     }
 }
