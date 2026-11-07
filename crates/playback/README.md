@@ -135,7 +135,7 @@ groups while retaining emulation-prevention validation. The segment reader uses 
 `HlsMediaVideoUnit::feed_spans` borrows the complete AVC or HEVC Annex B
 feed, including any inserted parameter sets. Its spans remain valid while the
 video unit is retained.
-AVC delimiter lookbehind retains the three most recent zero-byte anchors.
+AVC delimiter lookbehind uses compact indices into four retained PES clocks.
 Units are released only after EOF and both the video and audio assemblers drain. Defaults: 64 MiB
 source, 64 MiB feed, 8,192 access units. A failed reader releases its source;
 retry with a new reader.
