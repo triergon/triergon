@@ -109,15 +109,13 @@ limit violation).
 Open structural work. Each step keeps worker traces byte-identical and re-runs the
 performance gates where it touches hot code.
 
-1. **Bitstream.** `triergon-bitstream` holds bit reading, exp-Golomb, RBSP unescaping,
-   CABAC and CRCs. The DTS decoder keeps its own reader: both shared forms are slower
-   on its subframe parser.
-2. **Formats.** MPEG-TS implements `ContainerReader` and becomes an `AnyReader`
+1. **Formats.** MPEG-TS implements `ContainerReader` and becomes an `AnyReader`
    variant. Track classification moves out of playback into the readers.
-3. **Reference compatibility.** `triergon-framing`, `triergon-matroska`,
+2. **Reference compatibility.** `triergon-framing`, `triergon-matroska`,
    `triergon-subtitles`, `triergon-mpegts` and `triergon-isobmff` follow the convention
    in [reference-compatible behaviour](#reference-compatible-behaviour). Playback moves
    to it next.
-4. **Codecs.** Codecs allocate through core budgets.
-5. **Composition.** Playback runs over `AnyReader`; HLS and codec bridges become
-   separate crates.
+3. **Codecs.** Codecs allocate through core budgets.
+4. **Composition.** HLS and codec bridges become separate crates. Playback keeps its own
+   container engines: it carries source and native clocks, range plans and per-step
+   parsing that `ContainerReader` does not.
