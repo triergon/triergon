@@ -31,3 +31,6 @@ and selected AVC/HEVC video with AAC, AC-3 or E-AC-3 audio. They retain every
 access unit through segment EOF, then fold complete borrowed video spans,
 audio bytes, timing and both stream tails in the order specified by
 `harness/features/hls-segments/contract.json`.
+
+HLS payloads use the shared ordered polynomial digest, including its grouped
+arithmetic for larger spans. Every byte contributes in feed order.
