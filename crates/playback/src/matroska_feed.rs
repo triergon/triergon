@@ -9,9 +9,6 @@ mod probe_clock;
 mod video_clock;
 mod video_seek;
 use crate::{Delivery, Output, RawEvent, Result};
-pub use aac_clock::{
-    MatroskaAacClock, MatroskaAacClockPrefix, MatroskaAacClockProbe, MatroskaAacTiming,
-};
 pub use bitmap::{
     MatroskaBitmapCodec, MatroskaBitmapSource, MatroskaBitmapTrack, MatroskaDvbPacket,
 };
@@ -22,10 +19,12 @@ pub use discovery::{
     MatroskaStartupSource,
 };
 pub use hevc_dolby::{
-    MatroskaDolbyClock, MatroskaDolbyClockPrefix, MatroskaDolbyClockProbe, MatroskaDolbyLimits,
-    MatroskaDolbyTiming, MatroskaHevcClock, MatroskaHevcDolbyFeed, MatroskaHevcDolbyJob,
+    MatroskaDolbyLimits, MatroskaHevcClock, MatroskaHevcDolbyFeed, MatroskaHevcDolbyJob,
     MatroskaHevcDolbyLimits, MatroskaHevcDolbyPacket, MatroskaHevcDolbyPayload,
     MatroskaHevcDolbySetup,
+};
+pub use probe_clock::{
+    MatroskaClock, MatroskaClockPrefix, MatroskaClockProbe, MatroskaPacketTiming,
 };
 use std::sync::atomic::{AtomicBool, Ordering};
 use triergon_core::{Budget, Bytes, Error, SourceId, WorkBudget};
@@ -35,7 +34,7 @@ use triergon_framing::{
     AvcConfigViewParser, BuildStep,
 };
 use triergon_matroska::typed::{Configuration, Event, Packet};
-pub use video_clock::{MatroskaAvcClock, MatroskaVideoTiming};
+pub use video_clock::MatroskaAvcClock;
 pub use video_seek::MatroskaVideoSeekGate;
 
 #[derive(Clone, Copy, Debug)]

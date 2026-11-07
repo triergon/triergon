@@ -2,7 +2,7 @@
 use super::{FeedCodec, MatroskaHevcDolbyFeed, MatroskaHevcDolbyPacket, MatroskaHevcDolbyPayload};
 use crate::{
     Result,
-    matroska_feed::{Association, MatroskaVideoTiming, video_clock::DecodeClock},
+    matroska_feed::{Association, MatroskaPacketTiming, video_clock::DecodeClock},
     raw_video::hevc_syntax as hevc,
 };
 use triergon_core::Error;
@@ -43,7 +43,10 @@ impl MatroskaHevcDolbyFeed {
 impl MatroskaHevcClock<'_> {
     /// Project one complete checked sample. A parameter-set change or
     /// unsupported sample ends this clock's continuity.
-    pub fn observe(&mut self, packet: &MatroskaHevcDolbyPacket<'_>) -> Result<MatroskaVideoTiming> {
+    pub fn observe(
+        &mut self,
+        packet: &MatroskaHevcDolbyPacket<'_>,
+    ) -> Result<MatroskaPacketTiming> {
         let MatroskaHevcDolbyPayload::Hevc(unit) = &packet.payload else {
             return Err(Error::Invalid("native HEVC clock packet codec"));
         };

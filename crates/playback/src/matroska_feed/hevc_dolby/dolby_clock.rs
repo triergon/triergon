@@ -5,30 +5,14 @@ use super::{
 };
 use crate::{
     Result,
-    matroska_feed::probe_clock::{NativePacketTiming, PacketClock, ProbeTimeline, Timeline},
+    matroska_feed::probe_clock::{
+        MatroskaClock, MatroskaClockPrefix, MatroskaClockProbe, MatroskaPacketTiming,
+        NativePacketTiming,
+    },
 };
-use triergon_core::{Budget, BudgetVec, Error};
+use triergon_core::{Budget, Error};
 use triergon_framing::Ac3Family;
 use triergon_matroska::typed::Packet;
-
-const MAX_PREFIX_PACKETS: usize = 4096;
-
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub struct MatroskaDolbyTiming {
-    pub pts_ns: Option<i64>,
-    pub dts_ns: Option<i64>,
-    pub duration_ns: Option<u64>,
-}
-
-impl From<NativePacketTiming> for MatroskaDolbyTiming {
-    fn from(timing: NativePacketTiming) -> Self {
-        Self {
-            pts_ns: timing.pts,
-            dts_ns: timing.dts,
-            duration_ns: timing.duration_ns,
-        }
-    }
-}
 
 impl MatroskaHevcDolbyFeed {
     /// Prepare one bounded prefix in the same generation as this feed.
@@ -37,20 +21,14 @@ impl MatroskaHevcDolbyFeed {
         &self,
         budget: &Budget,
         maximum_packets: usize,
-    ) -> Result<Option<MatroskaDolbyClockProbe<'_>>> {
+    ) -> Result<Option<MatroskaClockProbe<'_, Self>>> {
         if !matches!(self.codec, FeedCodec::Dolby(_)) {
             return Ok(None);
         }
         if !self.association.configuration.belongs_to(budget) {
             return Err(Error::ForeignPool);
         }
-        check_limit(maximum_packets, MAX_PREFIX_PACKETS)?;
-        Ok(Some(MatroskaDolbyClockProbe {
-            feed: self,
-            maximum_packets,
-            rows: BudgetVec::new(budget),
-            timeline: ProbeTimeline::default(),
-        }))
+        MatroskaClockProbe::new(self, budget, maximum_packets).map(Some)
     }
 
     fn dolby_timing(&self, packet: &MatroskaHevcDolbyPacket<'_>) -> Result<NativePacketTiming> {
@@ -107,94 +85,36 @@ fn integral_nominal_ac3_duration(rate: f64, scale: u64) -> Option<u64> {
     syncframe_duration_ns(1536, rate, scale)
 }
 
-/// Retain scalar timing rows for the caller's selected packets during discovery.
-pub struct MatroskaDolbyClockProbe<'feed> {
-    feed: &'feed MatroskaHevcDolbyFeed,
-    maximum_packets: usize,
-    rows: BudgetVec<PacketClock>,
-    timeline: ProbeTimeline,
-}
-
-impl<'feed> MatroskaDolbyClockProbe<'feed> {
+impl MatroskaClockProbe<'_, MatroskaHevcDolbyFeed> {
     /// Observe one checked packet and return its ordinal within this prefix.
     /// Allocation pressure leaves both the ordinal and the clock unchanged.
     pub fn push(&mut self, packet: &MatroskaHevcDolbyPacket<'_>) -> Result<usize> {
-        self.push_packet(|feed| feed.dolby_timing(packet))
+        self.push_timing(|feed| feed.dolby_timing(packet))
     }
 
     /// Project the original demux packet even when syncframe validation
     /// would refuse it for the decoder. The bytes stay with the caller.
     pub fn push_source(&mut self, packet: &Packet) -> Result<usize> {
-        self.push_packet(|feed| feed.dolby_source_timing(packet))
+        self.push_timing(|feed| feed.dolby_source_timing(packet))
     }
+}
 
-    fn push_packet(
+impl MatroskaClockPrefix<'_, MatroskaHevcDolbyFeed> {
+    pub fn timing(&self, ordinal: usize) -> Result<MatroskaPacketTiming> {
+        self.resolve(ordinal, "Dolby clock prefix ordinal")
+    }
+}
+
+impl MatroskaClock<'_, MatroskaHevcDolbyFeed> {
+    pub fn observe(
         &mut self,
-        project: impl FnOnce(&MatroskaHevcDolbyFeed) -> Result<NativePacketTiming>,
-    ) -> Result<usize> {
-        let ordinal = self.rows.len();
-        check_limit(
-            ordinal.checked_add(1).ok_or(Error::Overflow)?,
-            self.maximum_packets,
-        )?;
-        let timing = project(self.feed)?;
-        let mut next = self.timeline;
-        let row = next.push(ordinal, timing)?;
-        self.rows.try_push(row).map_err(|failure| failure.error)?;
-        self.timeline = next;
-        Ok(ordinal)
-    }
-
-    /// Freeze the observed prefix before delivering any of its clock rows.
-    pub fn finish(self) -> MatroskaDolbyClockPrefix<'feed> {
-        MatroskaDolbyClockPrefix(self)
-    }
-}
-
-/// Replays the probe's timestamp projection without retaining packet payloads.
-pub struct MatroskaDolbyClockPrefix<'feed>(MatroskaDolbyClockProbe<'feed>);
-
-impl<'feed> MatroskaDolbyClockPrefix<'feed> {
-    pub fn timing(&self, ordinal: usize) -> Result<MatroskaDolbyTiming> {
-        let row = self
-            .0
-            .rows
-            .as_slice()
-            .get(ordinal)
-            .ok_or(Error::Invalid("Dolby clock prefix ordinal"))?;
-        Ok(self.0.timeline.resolve(ordinal, *row)?.into())
-    }
-
-    /// Continue the same clock after the caller replays the prefix.
-    pub fn into_live(self) -> MatroskaDolbyClock<'feed> {
-        MatroskaDolbyClock {
-            feed: self.0.feed,
-            timeline: self.0.timeline.into_live(),
-        }
-    }
-}
-
-/// Forward clock for one feed binding. Rebuild it on a new seek generation.
-pub struct MatroskaDolbyClock<'feed> {
-    feed: &'feed MatroskaHevcDolbyFeed,
-    timeline: Timeline,
-}
-
-impl MatroskaDolbyClock<'_> {
-    pub fn observe(&mut self, packet: &MatroskaHevcDolbyPacket<'_>) -> Result<MatroskaDolbyTiming> {
-        self.advance(self.feed.dolby_timing(packet)?)
+        packet: &MatroskaHevcDolbyPacket<'_>,
+    ) -> Result<MatroskaPacketTiming> {
+        self.advance(|feed| feed.dolby_timing(packet))
     }
 
     /// Continue the source clock without requiring decoder admission.
-    pub fn observe_source(&mut self, packet: &Packet) -> Result<MatroskaDolbyTiming> {
-        self.advance(self.feed.dolby_source_timing(packet)?)
-    }
-
-    fn advance(&mut self, timing: NativePacketTiming) -> Result<MatroskaDolbyTiming> {
-        let mut next = self.timeline;
-        let row = next.push(timing)?;
-        let result = next.resolve(row)?;
-        self.timeline = next;
-        Ok(result.into())
+    pub fn observe_source(&mut self, packet: &Packet) -> Result<MatroskaPacketTiming> {
+        self.advance(|feed| feed.dolby_source_timing(packet))
     }
 }

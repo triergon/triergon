@@ -1131,7 +1131,7 @@ fn matroska_integral_packet_delivery_preserves_fractional_seek_targets() {
 
 #[test]
 fn matroska_dolby_clock_matches_pinned_startup_and_forward_lace_timestamps() {
-    use triergon_playback::matroska_feed::MatroskaDolbyTiming;
+    use triergon_playback::matroska_feed::MatroskaPacketTiming;
 
     let cases: &[(&[u8], usize, u64, &[i64])] = &[
         (
@@ -1207,7 +1207,7 @@ fn matroska_dolby_clock_matches_pinned_startup_and_forward_lace_timestamps() {
         }));
         let expected: Vec<_> = expected
             .iter()
-            .map(|time| MatroskaDolbyTiming {
+            .map(|time| MatroskaPacketTiming {
                 pts_ns: Some(time * 1_000_000),
                 dts_ns: Some(time * 1_000_000),
                 duration_ns: Some(duration_ns),
@@ -1219,7 +1219,7 @@ fn matroska_dolby_clock_matches_pinned_startup_and_forward_lace_timestamps() {
 
 #[test]
 fn matroska_aac_clock_matches_pinned_mixed_rates_from_probe_through_eof() {
-    use triergon_playback::matroska_feed::MatroskaAacTiming;
+    use triergon_playback::matroska_feed::MatroskaPacketTiming;
 
     let fixture = include_bytes!("fixtures/mkv-feed/audio-mixed-discovery.mkv");
     let (mut player, pool) = player_with_input(fixture, 7);
@@ -1261,7 +1261,7 @@ fn matroska_aac_clock_matches_pinned_mixed_rates_from_probe_through_eof() {
         timings.extend(packets.map(|output| live.observe(&frame(&feed, output)).unwrap()));
         let expected: Vec<_> = expected
             .iter()
-            .map(|pts| MatroskaAacTiming {
+            .map(|pts| MatroskaPacketTiming {
                 pts_ns: Some(pts * 1_000_000),
                 dts_ns: Some(pts * 1_000_000),
                 duration_ns: Some(duration_ns),
@@ -1273,7 +1273,7 @@ fn matroska_aac_clock_matches_pinned_mixed_rates_from_probe_through_eof() {
 
 #[test]
 fn matroska_dolby_source_clock_preserves_damaged_ac3_before_decoder_admission() {
-    use triergon_playback::matroska_feed::MatroskaDolbyTiming;
+    use triergon_playback::matroska_feed::MatroskaPacketTiming;
 
     let fixture = include_bytes!("fixtures/mkv-feed/audio-bad-first-discovery.mkv");
     let (mut player, pool) = player_with_input(fixture, 7);
@@ -1303,7 +1303,7 @@ fn matroska_dolby_source_clock_preserves_damaged_ac3_before_decoder_admission() 
     let mut probe = feed.native_dolby_clock_probe(&pool, 1).unwrap().unwrap();
     assert_eq!(probe.push_source(source).unwrap(), 0);
     let prefix = probe.finish();
-    let expected = |pts_ns| MatroskaDolbyTiming {
+    let expected = |pts_ns| MatroskaPacketTiming {
         pts_ns: Some(pts_ns),
         dts_ns: Some(pts_ns),
         duration_ns: Some(32_000_000),
