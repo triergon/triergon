@@ -64,7 +64,8 @@ commands:
                  deterministic, replayable mutation campaign through JSON workers
   graph          PACKAGE [FILE]...   print the provenance graph of a workspace package
   grade          TIMING MEMORY --contract F --manifest F --output DIR
-                 join complete timing and memory reports and recompute the feature gates
+                 [--additional-report F] [--require-slice-acceptance|--require-acceptance]
+                 join complete reports, recompute runtime and memory bounds, then apply gates
   build-workers  [--comparison-build]
                  build the candidate and reference workers and the memory observers, and
                  record their identity in target/harness/identity.json; anything but the

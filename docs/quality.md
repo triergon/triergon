@@ -113,13 +113,19 @@ be established. Use built workers you trust.
 ### Separate timing and memory collections
 
 `cargo xtask grade TIMING MEMORY --contract F --manifest F --output DIR` joins
-complete standard-harness reports and recomputes the existing acceptance gates
-from their raw paired samples. Both collections must contain every case in the
-registered corpus, with identical parity, inputs, contract, workers, source graphs,
-compiler settings, instrumentation and allowed CPUs. The memory build identity may
-add a kernel RSS proof pin. CPU records are required in both reports. Every other
-identity field must match. Both input reports
+complete standard-harness reports and recomputes runtime and memory bounds from
+their raw paired samples before applying the feature gates. Parity and FATE checks
+use the stored outcomes; grading does not rerun workers or oracles. Both collections
+must contain every case in the registered corpus, with identical parity, inputs,
+contract, workers, source graphs, compiler settings, instrumentation and allowed
+CPUs. CPU records are required in both reports. The memory build identity may add
+a kernel RSS proof pin; every other identity field must match. Both input reports
 and their raw samples are hash-linked from the graded report.
+
+Single external-vector reports can be graded as a pair too. Supply each required
+external grade with `--additional-report PATH` when grading its corpus.
+`--require-slice-acceptance` requires the feature gates; `--require-acceptance` also
+requires the recorded FATE coverage and complete module requirements.
 
 Timing requires the RSS kernel module to be unloaded throughout warm-up and every
 pair. Standard memory bounds need no kernel proof. For kernel-backed memory,
@@ -128,42 +134,6 @@ keep the module loaded through memory collection and grading. The grader validat
 the recorded module-absence observations for timing and rechecks the live memory
 proof. Rebuilding workers to record the proof must reproduce the same worker and
 instrumentation hashes.
-
-For example, on a prepared native AArch64 Linux host, use new output directories
-for each phase and grade. Begin with the module unloaded and the kernel proof
-variables unset. `REVIEW` names the reviewed module-source and kernel artifact
-required by the proof workflow.
-
-```sh
-export CARGO_INCREMENTAL=0
-cargo xtask build-workers
-TRIERGON_RSS_KERNEL_BOUND=0 cargo xtask report \
-  --contract harness/features/hls-segments/contract.json \
-  --manifest harness/features/hls-segments/corpus.json \
-  --corpus harness/fixtures/hls --benchmark --pairs 30 \
-  --output .research/hls-timing
-
-harness/rss-bound/prove.sh REVIEW .research/rss-bound
-TRIERGON_RSS_KERNEL_PROOF=.research/rss-bound/RSS-PROOF.json cargo xtask build-workers
-TRIERGON_RSS_KERNEL_BOUND=1 cargo xtask memory-admission \
-  target/release/playback-worker target/harness/ffmpeg-formats-worker
-TRIERGON_RSS_KERNEL_BOUND=1 cargo xtask report \
-  --contract harness/features/hls-segments/contract.json \
-  --manifest harness/features/hls-segments/corpus.json \
-  --corpus harness/fixtures/hls --memory --pairs 30 \
-  --output .research/hls-memory
-
-cargo xtask grade .research/hls-timing/report.json .research/hls-memory/report.json \
-  --contract harness/features/hls-segments/contract.json \
-  --manifest harness/features/hls-segments/corpus.json \
-  --output .research/hls-graded --require-slice-acceptance
-sudo rmmod triergon_rss_bound
-```
-
-The runtime ceiling remains 1.20 at the upper paired 95% bound, with a 0.80 target.
-Peak live heap and total resident peak RSS must each remain strictly below the
-reference at their upper paired 95% bounds. A required gate that remains open
-returns a nonzero exit code. Earlier failures and their reports stay recorded.
 
 ## Measuring performance
 

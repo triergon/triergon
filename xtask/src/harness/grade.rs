@@ -189,8 +189,8 @@ fn shape(report: &Value) -> R<Shape> {
             Ok(Shape::Corpus)
         }
         (None, Some(Value::Object(_))) => {
-            // The external-vector collector writes one complete document and
-            // has no checkpoint/collection_status field in its original format.
+            // External-vector reports contain one complete case. Their
+            // collection_status field is optional.
             if report.get("collection_status").is_some()
                 && text(report, "collection_status")? != "complete"
             {
@@ -227,8 +227,7 @@ impl Binding<'_> {
         {
             return Err("contract must name a registered feature".into());
         }
-        // A report may name a pilot manifest, but it cannot qualify that subset
-        // as the complete feature, or supply different gate values in a copy.
+        // The complete registered feature fixes case membership and gate values.
         for (name, expected) in [
             ("contract.json", self.contract_sha),
             ("corpus.json", self.manifest_sha),
