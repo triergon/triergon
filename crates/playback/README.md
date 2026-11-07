@@ -66,7 +66,7 @@ packet projections before merging the tracks for delivery.
 | Matroska | `Engine::matroska`, `Engine::matroska_reader` (an unstarted reader built with `Reader::new_with_payload_ownership`, `new_with_immutable_seek_index` or `compat::block_additions::new_reader`) |
 | Matroska feeds | `matroska_feed::MatroskaFeedSetup` (AVC Annex B, AAC ADTS), `MatroskaHevcDolbySetup` (HEVC Annex B, AC-3/E-AC-3), `MatroskaDiscovery`, `MatroskaCompactDiscovery`, `MatroskaVideoSeekGate` |
 | Matroska clocks | feed methods `native_avc_clock`, `native_aac_clock_probe` (`MatroskaTrackFeed`), `native_hevc_clock`, `native_dolby_clock_probe` (`MatroskaHevcDolbyFeed`); the audio probes are `MatroskaClockProbe`s; `MatroskaBitmapClockProbe` |
-| MP4 / MOV | `mp4_open::Mp4Open` (`new`, `new_progressive`, `new_pinned_mov_recovery`), `Engine::mp4`, `Engine::mp4_progressive`, `Engine::mp4_native_terminal_v1`, `Mp4RangeOpen` / `Mp4RangePlayer` |
+| MP4 / MOV | `mp4_open::Mp4Open` (`new`, `new_progressive`, `new_recovery`, `with_timing_policy`), `Engine::mp4`, `Engine::mp4_progressive`, `Engine::mp4_native_terminal_v1`, `Mp4RangeOpen` / `Mp4RangePlayer` |
 | MP4 seek | `Player::prepare_mp4_sync_seek` / `apply_mp4_sync_seek`, `prepare_mp4_native_seek` / `apply_mp4_native_seek`, progressive variants, `PreparedMp4::movie_seek` |
 | MP4 catalogue replacement | `catalogue::Mp4Catalogue`, `Player::prepare_mp4_catalogue` / `replace_mp4_catalogue` |
 | TS / M2TS | `Engine::ts`, `ts_with_namespace`, `ts_segmented`, `ts_native`, `ts_native_private_audio_v1`, `ts_native_program_v1`, `ts_native_segment_v1`; `native_startup::NativeStartup` |
@@ -96,7 +96,7 @@ packet clocks are explicit opt-in views (`ClockChoice::ExplicitNativeProjection`
 `Mp4View::PinnedMov9NoParseNoFillin`, the `native_*` Matroska clocks and the
 `*_native_*` TS engines); they never overwrite source facts. Native views can
 emit events the source view does not, such as `Mp4Event::NativeShortPacket`,
-`NativeMissingSample` and native refusals.
+`NativeEmptyPacket`, `NativeMissingSample` and native refusals.
 
 **Generations.** A seek, track switch or configuration change starts a new
 generation. Check outputs with `Player::may_deliver`. Feeds, bridges, clocks
@@ -123,6 +123,18 @@ For a file with surplus timing entries, `Mp4Open::with_timing_policy` can
 use the timing prefix covered by the sample sizes for forward playback and
 `Mp4RangeOpen`. Each track's table reports the unused timing occurrences. The source playback view
 requires exact coverage.
+
+The FFmpeg-compatible packet view opens with `Mp4Open::new_recovery`, indexes
+a front `moov` with `Mp4IndexJob::new_native_terminal_v1` (otherwise
+`Mp4View::PinnedMov9NoParseNoFillin`) and reads a nonseekable front file with
+`Engine::mp4_native_terminal_v1`. It recovers what FFmpeg recovers: a first
+sample outside the source ends the view with `NativeMissingSample`, a
+truncated sample becomes a corrupt `NativeShortPacket` carrying the available
+prefix, a zero media timescale reads in a 1/1 base, and a zero-size read ends
+native delivery, with a `NativeEmptyPacket` where FFmpeg emits one. On a
+seekable source the recovery opener refuses a zero-size fragment sample in
+the header, as FFmpeg does. `Mp4Open::new` refuses out-of-source, truncated
+and zero-timescale media and reads zero-size samples as declared.
 
 **MPEG-TS.** `ts_native_program_v1` selects up to 64 PIDs of one program.
 Private stream type `0x06` is audio only after explicit AC-3/E-AC-3 or DVB
@@ -200,7 +212,12 @@ native gate-build qualification remains pending.
 
 Integration tests in `tests/` replay authored and FFmpeg-generated fixtures
 and compare packet order, bytes, flags, PTS, DTS and duration with pinned
-FFprobe records. Fixture provenance: [AV1](tests/fixtures/av1/README.md),
+FFprobe records. `tests/native_terminal_matrix.rs` reads 39 terminal-media
+inputs through the native packet view in 499 source geometries (known and
+unknown length, three read sizes, two work quanta, nonseekable and seekable)
+and compares every packet object with FFprobe 9.0.2: 497 match with
+`Mp4Open::new_recovery`, and the other two are seekable inputs that FFprobe
+and the recovery opener both refuse. Fixture provenance: [AV1](tests/fixtures/av1/README.md),
 [Matroska feeds](tests/fixtures/mkv-feed/README.md),
 [Dolby clocks](tests/fixtures/dolby-clock/README.md),
 [subtitle probes](tests/fixtures/matroska-subtitle-probe/README.md).
