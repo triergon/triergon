@@ -172,7 +172,11 @@ pub fn timing_valid(row: &Value, contract: &Value, selected: &Value, require_lin
         return false;
     };
     let minimum = int(contract.get("minimum_pairs")).unwrap_or(i128::MAX);
-    let mut valid = raw.len() as i128 == pairs && raw.len() as i128 >= minimum && iterations > 0;
+    let mut valid = raw.len() as i128 == pairs
+        && raw.len() as i128 >= minimum
+        && timing
+            .get("iterations")
+            .is_some_and(|count| super::validation::iterations_valid(contract, count));
     valid &= timing
         .get("worker_hashes")
         .is_some_and(|h| equal(h, selected));

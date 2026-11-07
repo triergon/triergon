@@ -219,6 +219,42 @@ fn four_field_gate_fixture() -> (Value, Vec<Value>, Value) {
 }
 
 #[test]
+fn shared_acceptance_requires_the_declared_iteration_count() {
+    let (mut contract, rows, identity) = four_field_gate_fixture();
+    put(&mut contract, &[], "iterations", Value::int(50));
+    for (iterations, accepted) in [(50, true), (1, false), (100, false)] {
+        let mut row = rows[0].clone();
+        let mut timing = row.get("timing").unwrap().clone();
+        put(&mut timing, &[], "iterations", Value::int(iterations));
+        for key in ["samples", "warmups"] {
+            let mut observations = timing.get(key).unwrap().as_array().unwrap().to_vec();
+            for observation in &mut observations {
+                if key == "warmups" {
+                    put(
+                        observation,
+                        &["result", "data"],
+                        "iterations",
+                        Value::int(iterations),
+                    );
+                } else {
+                    for role in ["candidate", "reference"] {
+                        put(
+                            observation,
+                            &[role, "data"],
+                            "iterations",
+                            Value::int(iterations),
+                        );
+                    }
+                }
+            }
+            put(&mut timing, &[], key, Value::Array(observations));
+        }
+        put(&mut row, &[], "timing", timing);
+        assert_eq!(verdict(&contract, &[row], &identity), (accepted, accepted));
+    }
+}
+
+#[test]
 fn declared_work_fields_are_required_in_timing_warmups_samples_and_memory() {
     let (contract, rows, identity) = four_field_gate_fixture();
     assert_eq!(verdict(&contract, &rows, &identity), (true, true));

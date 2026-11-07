@@ -63,6 +63,22 @@ pub(super) fn hash<'a>(value: &'a Value, key: &str) -> Result<&'a str, String> {
     Ok(digest)
 }
 
+/// A declared iteration count fixes the measured operation.
+pub(super) fn iterations_valid(contract: &Value, observed: &Value) -> bool {
+    let Value::Number(value) = observed else {
+        return false;
+    };
+    let Some(count) = value
+        .as_i128()
+        .filter(|count| (1..=i128::from(u32::MAX)).contains(count))
+    else {
+        return false;
+    };
+    contract.get("iterations").is_none_or(
+        |required| matches!(required, Value::Number(value) if value.as_i128() == Some(count)),
+    )
+}
+
 /// The reference and operation recorded for a contract's exact case.
 pub(super) struct SelectedOperation<'a> {
     pub rule: Option<&'a Value>,
@@ -205,6 +221,30 @@ mod tests {
 
     use super::*;
     use crate::process::TempDir;
+
+    #[test]
+    fn iteration_counts_are_positive_integers_and_preserve_the_contract() {
+        let contract = Value::object([("iterations", Value::int(50))]);
+        assert!(iterations_valid(&contract, &Value::int(50)));
+        for count in [1, 49, 51, 100] {
+            assert!(!iterations_valid(&contract, &Value::int(count)));
+        }
+        let unspecified = Value::Object(vec![]);
+        assert!(iterations_valid(&unspecified, &Value::int(1)));
+        for invalid in [
+            Value::int(0),
+            Value::int(-1),
+            Value::int(i128::from(u32::MAX) + 1),
+            Value::Bool(true),
+            Value::float(50.0),
+            Value::str("50"),
+            Value::Null,
+        ] {
+            assert!(!iterations_valid(&unspecified, &invalid));
+            let malformed = Value::object([("iterations", invalid)]);
+            assert!(!iterations_valid(&malformed, &Value::int(50)));
+        }
+    }
 
     fn built_workers() -> (TempDir, Value) {
         let directory = TempDir::new(None).unwrap();
