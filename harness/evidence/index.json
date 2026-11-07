@@ -8555,6 +8555,48 @@
      "sha256": "42be59cd28c62d5fc421a068fa314eba4469188012f95a4e28dbae71efecd0bb"
     }
    ]
+  },
+  {
+   "name": "playback-paired-diagnostics",
+   "path": "playback-paired-diagnostics",
+   "retention": "retained",
+   "reason": "Paired playback diagnostic measurements",
+   "key": "evidence/playback-paired-diagnostics/8aa5701e42ff435cc7f1f9dc55623c3993c5939a03cc42e03c8c48be8ca2ddfa.tar.gz",
+   "sha256": "8aa5701e42ff435cc7f1f9dc55623c3993c5939a03cc42e03c8c48be8ca2ddfa",
+   "files": [
+    {
+     "path": "playback-paired-diagnostics/FINAL-STATE.txt",
+     "sha256": "f247a76b2893208aae7751dbf51f4c495efacfb6d9e743802870300f31ac45c8"
+    },
+    {
+     "path": "playback-paired-diagnostics/GUEST-PREFLIGHT.log",
+     "sha256": "d2b6fcab18876c5c38ffe85626adccc440ddec8c75d17482c2144c9ae3cfa02d"
+    },
+    {
+     "path": "playback-paired-diagnostics/NATIVE-EXIT.txt",
+     "sha256": "ce8bafb38615aeb5d44ebbabe78ec14ac35a5de87bdc5ad5ea82a72656024ce4"
+    },
+    {
+     "path": "playback-paired-diagnostics/NATIVE-RESULTS.sha256",
+     "sha256": "22bd1bca778e531e8a528720214c1ac5615f5d1b84a43b2b1a8250177968aaea"
+    },
+    {
+     "path": "playback-paired-diagnostics/NATIVE-RESULTS.tar.gz",
+     "sha256": "c4efc93579e34207eeeb711bdc2b12dea2736afa034a96edafceeb1c9ef9172a"
+    },
+    {
+     "path": "playback-paired-diagnostics/NATIVE.log",
+     "sha256": "eb60b1f2805bf64efb226200f332f15d0a58bc77af10b9331785039edf7ffbdd"
+    },
+    {
+     "path": "playback-paired-diagnostics/SOURCE.bundle",
+     "sha256": "aa2eb81f9a00c6c28b7fd944b9a00078b9e1f5a900ce9ce22c4ed481d01e1f0a"
+    },
+    {
+     "path": "playback-paired-diagnostics/STOP-UPSTREAM-CHANGE.log",
+     "sha256": "8a508a9571125909b3e082e84fc031e7f5ecb10a18d586647c94535ccdad41c3"
+    }
+   ]
   }
  ]
 }
