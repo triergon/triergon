@@ -1164,6 +1164,17 @@ impl<S: Source> Player<S> {
                         }
                     }
                     (
+                        ClockChoice::ExplicitNativeProjection,
+                        None,
+                        RawEvent::NativeTs { clock, .. },
+                    ) => {
+                        if clock.pts90.is_some() {
+                            Delivery::Present
+                        } else {
+                            Delivery::UnknownTime
+                        }
+                    }
+                    (
                         ClockChoice::SourceExact,
                         Some(ActiveSeek {
                             intent,
