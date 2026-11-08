@@ -726,20 +726,21 @@ impl<'a, 'o, C: Coordinate, O: Observe> Run<'a, 'o, C, O> {
         pen.path.move_to(&mut self.builder, (pen.x, pen.y))
     }
 
-    /// `rlineto` takes pairs; `hlineto` and `vlineto` alternate the axis.
+    /// `rlineto` takes pairs; `hlineto` and `vlineto` alternate the axis. A
+    /// pair missing its second operand fails the glyph, as in FreeType.
     fn lines<const N: usize>(
         &mut self,
         op: CharstringOperator,
         s: &mut State<'_, N>,
     ) -> Result<()> {
-        let (args, pen) = (s.stack.as_slice(), &mut s.pen);
+        let (args, pen) = (Operands(s.stack.as_slice()), &mut s.pen);
         if op == CharstringOperator::RLineTo {
-            for pair in args.chunks_exact(2) {
-                self.line_by(pen, pair[0], pair[1])?;
+            for i in (0..args.len()).step_by(2) {
+                self.line_by(pen, args.get(i)?, args.get(i + 1)?)?;
             }
         } else {
             let mut horizontal = op == CharstringOperator::HLineTo;
-            for &d in args {
+            for &d in args.0 {
                 let (dx, dy) = if horizontal { (d, 0) } else { (0, d) };
                 self.line_by(pen, dx, dy)?;
                 horizontal = !horizontal;
@@ -749,58 +750,75 @@ impl<'a, 'o, C: Coordinate, O: Observe> Run<'a, 'o, C, O> {
         Ok(())
     }
 
-    /// The curve operators, each consuming complete operand groups.
+    /// The curve operators, reading their operands as FreeType's CFF engine
+    /// does also for counts the format does not allow: whole groups from the
+    /// bottom, and for the `vv`, `hh`, `vh` and `hv` forms the two bottom
+    /// operands skipped when the count has bit 1 set. Reading past the
+    /// operands fails the glyph.
     fn curves<const N: usize>(
         &mut self,
         op: CharstringOperator,
         s: &mut State<'_, N>,
     ) -> Result<()> {
         use CharstringOperator as Op;
-        let (args, pen) = (s.stack.as_slice(), &mut s.pen);
+        let (args, pen) = (Operands(s.stack.as_slice()), &mut s.pen);
         let n = args.len();
+        let mut i = 0;
         match op {
-            Op::RRCurveTo => {
-                for d in args.chunks_exact(6) {
-                    self.curve_by(pen, six(d))?;
+            Op::RRCurveTo | Op::RCurveLine => {
+                while i + 6 <= n {
+                    self.curve_by(pen, args.six(i)?)?;
+                    i += 6;
+                }
+                if op == Op::RCurveLine {
+                    self.line_by(pen, args.get(i)?, args.get(i + 1)?)?;
                 }
             }
-            Op::RCurveLine if n >= 8 => {
-                let (curves, line) = args.split_at(6 * ((n - 2) / 6));
-                for d in curves.chunks_exact(6) {
-                    self.curve_by(pen, six(d))?;
+            Op::RLineCurve => {
+                while i + 6 < n {
+                    self.line_by(pen, args.get(i)?, args.get(i + 1)?)?;
+                    i += 2;
                 }
-                self.line_by(pen, line[0], line[1])?;
-            }
-            Op::RLineCurve if n >= 8 => {
-                let (lines, curve) = args.split_at(2 * ((n - 6) / 2));
-                for pair in lines.chunks_exact(2) {
-                    self.line_by(pen, pair[0], pair[1])?;
+                while i < n {
+                    self.curve_by(pen, args.six(i)?)?;
+                    i += 6;
                 }
-                self.curve_by(pen, six(curve))?;
             }
             Op::VVCurveTo | Op::HHCurveTo => {
-                // An odd first operand offsets the first curve across its axis.
-                let (mut extra, rest) = match args.split_first() {
-                    Some((&first, rest)) if n % 2 == 1 => (first, rest),
-                    _ => (0, args),
-                };
-                for a in rest.chunks_exact(4) {
+                let count = n & !2;
+                i = n - count;
+                while i < count {
+                    // An odd remainder offsets the curve across its axis.
+                    let extra = if (count - i) % 2 == 1 {
+                        i += 1;
+                        args.get(i - 1)?
+                    } else {
+                        0
+                    };
+                    let a = args.four(i)?;
                     let d = if op == Op::VVCurveTo {
                         [extra, a[0], a[1], a[2], 0, a[3]]
                     } else {
                         [a[0], extra, a[1], a[2], a[3], 0]
                     };
                     self.curve_by(pen, d)?;
-                    extra = 0;
+                    i += 4;
                 }
             }
             Op::VHCurveTo | Op::HVCurveTo => {
-                // Alternating axes; an odd last operand ends the final curve off its axis.
+                // Alternating axes; a fifth operand ends the final curve off
+                // its axis.
+                let count = n & !2;
+                i = n - count;
                 let mut horizontal = op == Op::HVCurveTo;
-                let mut i = 0;
-                while i + 4 <= n {
-                    let a = &args[i..i + 4];
-                    let last = if n - i == 5 { args[i + 4] } else { 0 };
+                while i < count {
+                    let a = args.four(i)?;
+                    let last = if count - i == 5 {
+                        i += 1;
+                        args.get(i + 3)?
+                    } else {
+                        0
+                    };
                     let d = if horizontal {
                         [a[0], 0, a[1], a[2], last, a[3]]
                     } else {
@@ -997,8 +1015,35 @@ fn roll<const N: usize>(stack: &mut Stack<Fixed, N>, count: i32, shift: i32) -> 
     Ok(())
 }
 
-fn six(a: &[Fixed]) -> [Fixed; 6] {
-    [a[0], a[1], a[2], a[3], a[4], a[5]]
+/// A path operator's operands, bottom first.
+#[derive(Clone, Copy)]
+struct Operands<'s>(&'s [Fixed]);
+
+impl Operands<'_> {
+    const fn len(self) -> usize {
+        self.0.len()
+    }
+
+    fn get(self, i: usize) -> Result<Fixed> {
+        self.0
+            .get(i)
+            .copied()
+            .ok_or(Error::Invalid("CFF path operator without enough operands"))
+    }
+
+    fn four(self, i: usize) -> Result<[Fixed; 4]> {
+        Ok([
+            self.get(i)?,
+            self.get(i + 1)?,
+            self.get(i + 2)?,
+            self.get(i + 3)?,
+        ])
+    }
+
+    fn six(self, i: usize) -> Result<[Fixed; 6]> {
+        let [a, b, c, d] = self.four(i)?;
+        Ok([a, b, c, d, self.get(i + 4)?, self.get(i + 5)?])
+    }
 }
 
 fn top1<const N: usize>(stack: &Stack<Fixed, N>) -> Result<Fixed> {

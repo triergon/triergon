@@ -80,14 +80,9 @@ impl Units for FontUnits {
     }
 
     fn offset(self, x: i32, y: i32, scaled: Option<Matrix>) -> (f64, f64) {
-        let (mut x, mut y) = (f64::from(x), f64::from(y));
-        // By the length of each matrix column (FreeType's reading of Apple's rule).
-        if let Some(m) = scaled {
-            let m = m.map(|v| f64::from(v) / 16384.0);
-            x *= m[0].hypot(m[2]);
-            y *= m[3].hypot(m[1]);
-        }
-        (x, y)
+        // A scaled offset is whole font units, as FreeType computes it.
+        let (x, y) = scaled_offset(x, y, scaled);
+        (x as f64, y as f64)
     }
 
     fn between(self, to: Point<f32>, from: Point<f32>) -> (f64, f64) {
@@ -103,6 +98,21 @@ impl Units for FontUnits {
             p.point.y = (f64::from(p.point.y) + dy) as f32;
         }
         Ok(())
+    }
+}
+
+/// A component offset in font units, scaled when the component asks for it
+/// by the length of each matrix row (FreeType's reading of Apple's rule) and
+/// rounded to whole units with `FT_MulFix`.
+fn scaled_offset(x: i32, y: i32, scaled: Option<Matrix>) -> (i64, i64) {
+    let (x, y) = (i64::from(x), i64::from(y));
+    match scaled {
+        // FreeType widens F2Dot14 to 16.16 by multiplying with 4.
+        Some(m) => {
+            let [xx, yx, xy, yy] = m.map(|v| i64::from(v) * 4);
+            (mul_fix(x, hypot(xx, xy)), mul_fix(y, hypot(yy, yx)))
+        }
+        None => (x, y),
     }
 }
 
@@ -142,12 +152,7 @@ impl Units for Scaled {
     }
 
     fn offset(self, x: i32, y: i32, scaled: Option<Matrix>) -> (i64, i64) {
-        let (mut x, mut y) = (i64::from(x), i64::from(y));
-        if let Some(m) = scaled {
-            let [xx, yx, xy, yy] = m.map(|v| i64::from(v) * 4);
-            x = mul_fix(x, hypot(xx, xy));
-            y = mul_fix(y, hypot(yy, yx));
-        }
+        let (x, y) = scaled_offset(x, y, scaled);
         (mul_fix(x, self.x), mul_fix(y, self.y))
     }
 
@@ -203,11 +208,14 @@ impl Glyf {
         Ok(Self { glyf, loca, long })
     }
 
-    /// The byte range of `glyph` in `glyf`, or `None` for an empty glyph. A range
-    /// that runs past the table is cut at its end, as FreeType reads it.
+    /// The byte range of `glyph` in `glyf`, or `None` for an empty glyph, with
+    /// FreeType's repairs of broken `loca` data: a glyph starting or (except
+    /// the last) ending past the table is empty, the last glyph is cut at the
+    /// table's end, and a glyph ending before it starts runs to the end.
     fn range(&self, data: &[u8], glyph: u16) -> Option<(usize, usize)> {
         let loca = self.loca.bytes(data);
         let index = usize::from(glyph);
+        let entry = if self.long { 4 } else { 2 };
         let at = |i: usize| -> Option<usize> {
             if self.long {
                 usize::try_from(u32_at(loca, 4 * i)?).ok()
@@ -215,8 +223,14 @@ impl Glyf {
                 u16_at(loca, 2 * i).map(|v| 2 * usize::from(v))
             }
         };
-        let start = at(index)?;
-        let end = at(index + 1).unwrap_or(self.glyf.len).min(self.glyf.len);
+        let table = self.glyf.len;
+        let start = at(index).filter(|&start| start <= table)?;
+        let end = match at(index + 1) {
+            None => table,
+            Some(end) if end > table => (index + 2 == loca.len() / entry).then_some(table)?,
+            Some(end) if end < start => table,
+            Some(end) => end,
+        };
         (start < end).then_some((start, end))
     }
 
@@ -353,46 +367,56 @@ impl Glyf {
         let first = outline.len();
         loop {
             charge(work, 1)?;
-            let Component {
-                flags,
-                glyph,
-                args: (a, b),
-                matrix,
-            } = component(r)?;
+            let c = component(r)?;
             let base = outline.len();
-            let component = self.load(cx, glyph, units, outline, work, depth + 1)?;
-            if flags & USE_MY_METRICS != 0 {
+            let component = self.load(cx, c.glyph, units, outline, work, depth + 1)?;
+            if c.flags & USE_MY_METRICS != 0 {
                 metrics = Some(component);
             }
-            if let Some(m) = matrix {
-                units.transform(&mut outline.points_mut()[base..], m)?;
+            // FreeType places only components that add points.
+            if outline.len() > base {
+                place(&c, units, outline, first, base)?;
             }
-            let offset = if flags & ARGS_ARE_XY_VALUES != 0 {
-                let scaled = matrix.filter(|_| flags & SCALED_COMPONENT_OFFSET != 0);
-                units.offset(a, b, scaled)
-            } else {
-                // Match point `a` of the composite so far with point `b` of the
-                // component.
-                let parent = usize::try_from(a)
-                    .ok()
-                    .map(|i| first + i)
-                    .filter(|&i| i < base);
-                let child = usize::try_from(b).ok().map(|i| base + i);
-                let all = outline.points();
-                match (parent.map(|i| all[i].point), child.and_then(|i| all.get(i))) {
-                    (Some(p), Some(c)) => units.between(p, c.point),
-                    _ => return Err(Error::Invalid("component attachment point")),
-                }
-            };
-            if offset != U::Offset::default() {
-                units.translate(&mut outline.points_mut()[base..], offset)?;
-            }
-            if flags & MORE_COMPONENTS == 0 {
+            if c.flags & MORE_COMPONENTS == 0 {
                 break;
             }
         }
         Ok(metrics)
     }
+}
+
+/// Transforms and moves the component points from `base` on: by its offset,
+/// or so that its point matches a point of the composite starting at `first`.
+fn place<U: Units>(
+    c: &Component,
+    units: U,
+    outline: &mut Outline<U::Coord>,
+    first: usize,
+    base: usize,
+) -> Result<()> {
+    let (a, b) = c.args;
+    if let Some(m) = c.matrix {
+        units.transform(&mut outline.points_mut()[base..], m)?;
+    }
+    let offset = if c.flags & ARGS_ARE_XY_VALUES != 0 {
+        let scaled = c.matrix.filter(|_| c.flags & SCALED_COMPONENT_OFFSET != 0);
+        units.offset(a, b, scaled)
+    } else {
+        let parent = usize::try_from(a)
+            .ok()
+            .map(|i| first + i)
+            .filter(|&i| i < base);
+        let child = usize::try_from(b).ok().map(|i| base + i);
+        let all = outline.points();
+        match (parent.map(|i| all[i].point), child.and_then(|i| all.get(i))) {
+            (Some(p), Some(c)) => units.between(p, c.point),
+            _ => return Err(Error::Invalid("component attachment point")),
+        }
+    };
+    if offset != U::Offset::default() {
+        units.translate(&mut outline.points_mut()[base..], offset)?;
+    }
+    Ok(())
 }
 
 /// One component record of a composite glyph.
