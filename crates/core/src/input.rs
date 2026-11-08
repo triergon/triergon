@@ -109,6 +109,24 @@ pub enum Step<T, B = std::convert::Infallible> {
     End(SourceLocation),
 }
 
+/// Why a cursor stopped for good. Every read tests it, so it is kept to one
+/// byte; the matching [`Error`] is built only when it is reported.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum Stopped {
+    Truncated,
+    Transport,
+    Cancelled,
+}
+impl From<Stopped> for Error {
+    fn from(stopped: Stopped) -> Self {
+        match stopped {
+            Stopped::Truncated => Error::Truncated,
+            Stopped::Transport => Error::Transport,
+            Stopped::Cancelled => Error::Cancelled,
+        }
+    }
+}
+
 #[derive(Debug)]
 pub struct InputCursor {
     pool: Budget,
@@ -122,7 +140,7 @@ pub struct InputCursor {
     inline_len: usize,
     consumed: usize,
     end: Option<u64>,
-    failure: Option<Error>,
+    failure: Option<Stopped>,
 }
 
 impl InputCursor {
@@ -237,7 +255,7 @@ impl InputCursor {
         Ok(())
     }
     fn healthy(&self) -> Result<()> {
-        self.failure.map_or(Ok(()), Err)
+        self.failure.map_or(Ok(()), |stopped| Err(stopped.into()))
     }
     fn remaining(&self) -> usize {
         self.window.as_ref().map_or(self.inline_len, Bytes::len) - self.consumed
@@ -347,7 +365,7 @@ impl InputCursor {
             .checked_add(u64::try_from(self.remaining()).map_err(|_| Error::Overflow)?)
             .ok_or(Error::Overflow)?;
         if self.capabilities.length.is_some_and(|length| length != end) {
-            self.failure = Some(Error::Truncated);
+            self.failure = Some(Stopped::Truncated);
             self.discard_window();
             return Err(Error::Truncated);
         }
@@ -364,8 +382,8 @@ impl InputCursor {
         self.verify(source, &token)?;
         self.healthy()?;
         self.failure = Some(match failure {
-            SourceFailure::Transport => Error::Transport,
-            SourceFailure::Cancelled => Error::Cancelled,
+            SourceFailure::Transport => Stopped::Transport,
+            SourceFailure::Cancelled => Stopped::Cancelled,
         });
         self.discard_window();
         Ok(())
@@ -373,7 +391,7 @@ impl InputCursor {
     fn check_cancel(&mut self, cancel: &AtomicBool) -> Result<()> {
         self.healthy()?;
         if cancel.load(Ordering::Relaxed) {
-            self.failure = Some(Error::Cancelled);
+            self.failure = Some(Stopped::Cancelled);
             self.discard_window();
             return Err(Error::Cancelled);
         }
