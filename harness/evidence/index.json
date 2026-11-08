@@ -10029,21 +10029,14 @@
    "sha256": "0cf93ddd1d397cf583716aef95464e8c498d0b928007239ca8a52d233b52ca94"
   },
   {
-   "reason": "Cited decoder and capture output identities and instruction counts of the codec storage budgets against main at b3177e36",
-   "key": "evidence/codec-budgets-linux-arm64/f527068172c954cca153263b44604178df42e3a8a3474be95168df97cfb3415b.tar.gz",
-   "sha256": "f527068172c954cca153263b44604178df42e3a8a3474be95168df97cfb3415b",
-   "bytes": 321067,
-   "source_revision": "6ee26acc21939adc44c7700e53a8229a29037b34"
-  },
-  {
    "name": "audio-formats-linux-arm64",
    "path": "audio-formats-linux-arm64",
    "retention": "retained",
    "reason": "Cited FLAC, MPEG audio, Vorbis and Opus correctness rows, paired timing of the ten file-format workloads, heap and RSS receipts and the gate-build identity",
-   "key": "evidence/audio-formats-linux-arm64/29a79a1337c7d350f61aafc5b679a4f25f1bff348589708ea65ad12ac21eb0c2.tar.gz",
-   "sha256": "29a79a1337c7d350f61aafc5b679a4f25f1bff348589708ea65ad12ac21eb0c2",
-   "bytes": 8903354,
-   "source_revision": "23ac47b0d4422a4c3d054fca9e800e31020e8cdd"
+   "key": "evidence/audio-formats-linux-arm64/5b2fca5cab8942cbe31335653dd11acfa46e85cc3a83a84b42a4f19539fb445a.tar.gz",
+   "sha256": "5b2fca5cab8942cbe31335653dd11acfa46e85cc3a83a84b42a4f19539fb445a",
+   "bytes": 8915135,
+   "source_revision": "b8ceb3c73ac3d832afe5d969398b92e035b4a0d6"
   }
  ]
 }
