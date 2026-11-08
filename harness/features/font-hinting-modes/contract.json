@@ -26,7 +26,6 @@
   "minimum_pairs": 30,
   "confidence": 0.95,
   "pending_module_requirements": [
-    "gating the hinting modes once their policy is decided",
     "FreeType auto-hinter for FT_LOAD_DEFAULT advances",
     "hinted outlines and extents for NATIVE, LIGHT and NORMAL hinting"
   ]
