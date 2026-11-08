@@ -542,7 +542,9 @@ fn work_is_charged_and_an_exhausted_budget_consumes_nothing() {
         decoder.decode(&a[..30], &mut WorkBudget::new(0)).unwrap(),
         Status::Nothing
     );
-    let need = (a.len() + 16 * 6) as u64;
+    // The unit's bytes, its two sequences' commands (`SHOW` and `0xff`, then
+    // `Stop` and `0xff`) and its pixels.
+    let need = (a.len() + 20 + 2 + 16 * 6) as u64;
     assert_eq!(
         decoder
             .decode(&a[30..], &mut WorkBudget::new(need - 1))

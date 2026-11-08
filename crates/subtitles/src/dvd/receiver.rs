@@ -194,7 +194,8 @@ pub enum Status<'a> {
     Nothing,
     /// The work budget ran out. Nothing was consumed but the work, which counts
     /// towards the next attempt: decode the same packet again. A unit needs its
-    /// bytes plus the pixels of every area it draws. Running out of memory
+    /// bytes, the command bytes each of its sequences reads and the pixels of
+    /// every area it draws. Running out of memory
     /// ([`Error::Backpressure`]) consumes nothing either.
     Yield,
 }
@@ -515,17 +516,26 @@ impl Pass<'_, '_> {
         let mut drawn = None;
         let mut failed = false;
         let mut at = header.control;
-        let link_bytes = header.sequence_header() - 2;
-        while let Some(head) = unit.get(at..at + header.sequence_header()) {
+        let head_bytes = header.sequence_header();
+        while let Some((head, body)) = unit
+            .get(at..)
+            .and_then(|rest| rest.split_at_checked(head_bytes))
+        {
             let date = u16::from_be_bytes([head[0], head[1]]);
             let next = head[2..]
                 .iter()
                 .fold(0_usize, |n, &b| n << 8 | usize::from(b));
-            let body = &unit[at + 2 + link_bytes..];
             let (mut area, mut fields) = (None, None);
             let mut commands = Commands::resume(body, 0, 0, usize::MAX);
             while commands.position() < body.len() {
+                let from = commands.position();
                 let command = commands.next().ok_or(Halt::Malformed)?;
+                // A sequence reads on to its end command, through the bytes of
+                // the sequences after it if need be: each sequence pays for
+                // what it reads.
+                if !self.work.try_charge((commands.position() - from) as u64) {
+                    return Err(Halt::Yield);
+                }
                 match command.map_err(|_| Halt::Malformed)? {
                     Command::ForcedStart => state.forced = true,
                     Command::Start => state.start = date,
