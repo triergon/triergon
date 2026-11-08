@@ -54,6 +54,9 @@ pub(crate) struct Tables {
     pub(crate) post: Option<Table>,
     pub(crate) fpgm: Option<Table>,
     pub(crate) prep: Option<Table>,
+    /// The bytes from `loca` to the next table that starts after it, or to the
+    /// end of the file: FreeType reads a short `loca` that far.
+    pub(crate) loca_room: usize,
 }
 
 impl Tables {
@@ -160,6 +163,21 @@ pub(crate) fn directory(
         if len > 0 {
             *slot = Some(Table { offset, len });
         }
+    }
+    if let Some(loca) = tables.loca {
+        let starts = records.chunks_exact(TABLE_RECORD).filter_map(|record| {
+            let tag: [u8; 4] = record[..4].try_into().ok()?;
+            let offset = usize::try_from(u32_be(record, 8)?).ok()?;
+            let len = usize::try_from(u32_be(record, 12)?).ok()?;
+            let kept = offset <= data.len()
+                && (len <= data.len() - offset
+                    || matches!(&tag, b"hmtx" | b"HMTX" | b"vmtx" | b"VMTX"));
+            kept.then_some(offset)
+        });
+        tables.loca_room = starts
+            .filter_map(|start| start.checked_sub(loca.offset).filter(|&gap| gap > 0))
+            .min()
+            .unwrap_or(data.len() - loca.offset);
     }
     let flavor = match signature {
         TRUETYPE | APPLE_TRUE if tables.glyf.is_some() => Flavor::TrueType,

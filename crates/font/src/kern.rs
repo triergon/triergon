@@ -3,9 +3,9 @@
 //! Horizontal, non-minimum format 0 subtables are used; their values add up unless
 //! a subtable sets the override bit, which replaces the sum so far. A pair count
 //! that exceeds its subtable is cut to the pairs present. At most 32 subtables are
-//! read. These rules, and searching unordered pairs linearly, follow FreeType.
-//! Apple's version 1 table and the other formats are not read; GPOS kerning is
-//! shaping.
+//! read; the table version is not checked. These rules, and searching unordered
+//! pairs linearly, follow FreeType. Apple's version 1 table and the other formats
+//! are not read; GPOS kerning is shaping.
 
 use crate::GlyphId;
 use crate::read::{Reader, slice, u16_at, u32_at};
@@ -49,13 +49,12 @@ impl Kern {
     ) -> Result<Self> {
         let mut kern = Self::new(budget);
         let bytes = slice(data, table.offset, table.len)?;
-        let Some(version) = u16_at(bytes, 0) else {
+        // FreeType skips the version; Apple's 32-bit version 1 then reads as
+        // a table without subtables.
+        let Some(count) = u16_at(bytes, 2) else {
             return Ok(kern);
         };
-        if version != 0 {
-            return Ok(kern);
-        }
-        let count = u16_at(bytes, 2).unwrap_or(0).min(MAX_SUBTABLES);
+        let count = count.min(MAX_SUBTABLES);
         let mut at = 4;
         for _ in 0..count {
             let mut r = Reader::at(bytes, at)?;

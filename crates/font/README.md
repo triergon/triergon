@@ -63,7 +63,8 @@ version is not checked.
 
 **Metrics and style.** `vertical_metrics` and `style` follow FreeType's choices:
 typographic metrics when `fsSelection` sets USE_TYPO_METRICS, else `hhea`, else
-(both zero) typographic and then Windows metrics; bold from `fsSelection` bit 5,
+(both zero) typographic and then Windows metrics, kept to 16 bits with a
+negative height made positive, as FreeType stores them; bold from `fsSelection` bit 5,
 italic from bits 0 or 9, or `macStyle` without `OS/2`.
 
 **Names.** Naming tables of any version, read as format 0 (format 1 language
@@ -86,8 +87,10 @@ matrix, nested to the depth limit. Offsets scale only with
 SCALED_COMPONENT_OFFSET, by the length of each matrix row, rounded to whole units.
 A composite takes the advance of its last USE_MY_METRICS component; a component
 that adds no points is not placed. As FreeType does, the outline is shifted
-horizontally by `lsb - xMin` of the glyph whose metrics apply, and broken `loca`
-data is repaired: a glyph starting, or (except the last) ending, past `glyf` is
+horizontally by `lsb - xMin` of the glyph whose metrics apply. `loca` is read
+as FreeType sizes it (at most 65536 entries; one too short for `maxp` is read on
+into the bytes before the next table when they hold every entry, else the glyph
+count drops to the glyphs it covers), and broken `loca` data is repaired: a glyph starting, or (except the last) ending, past `glyf` is
 empty, the last glyph is cut at the table's end, and one ending before it starts
 runs to the end. Instructions are skipped. In font units, component matrices
 apply in `f64`; at a size they apply as FreeType's `FT_MulFix`, so the two can
@@ -152,7 +155,8 @@ FreeType's fixed-point rounding (`FT_MulFix`, `FT_DivFix`, `FT_MulDiv`). A
   and `OS/2`, rounded as it rounds them).
 
 **Kerning.** Microsoft `kern` version 0: horizontal, non-minimum format 0
-subtables, at most 32, summed, with the override bit replacing the sum.
+subtables, at most 32, summed, with the override bit replacing the sum. As in
+FreeType the version is not checked; Apple's version 1 reads as no subtables.
 
 **Face matching.** `FaceInfo` and `select` score faces as libass 0.17.5 does for
 fonts it loads itself. Windows family names (or FreeType's family name when a face

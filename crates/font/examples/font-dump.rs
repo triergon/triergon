@@ -249,7 +249,8 @@ fn dump(font: &Font, budget: &Budget, out: &mut impl Write) -> io::Result<()> {
         v.ascender,
         v.descender,
         v.height,
-        font.horizontal_header().advance_max,
+        // FreeType's FT_Short.
+        font.horizontal_header().advance_max.cast_signed(),
         u8::from(style.bold),
         u8::from(style.italic)
     )?;
