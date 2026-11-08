@@ -31,8 +31,10 @@ fn decode(opus_head: &[u8], packets: &[&[u8]]) -> Result<(), DecodeError> {
 ```
 
 `Decoder::from_configuration_in` charges a caller's `Budget` instead of its own pool.
-`examples/decode_opus` decodes Matroska/WebM, Ogg or RFC 6716 `.bit` test vectors (whose
-recorded final range it checks per packet) to interleaved f32le.
+`examples/decode_opus` decodes the first Opus track of a file read through the `triergon`
+facade (Matroska/WebM, Ogg), or an RFC 6716 `.bit` test vector (whose recorded final
+range it checks per packet), to interleaved f32le: the decoder's whole output, without
+the pre-skip or other container trims.
 
 ## Supported
 

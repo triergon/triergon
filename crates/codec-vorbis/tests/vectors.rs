@@ -11,7 +11,7 @@ fn stream(name: &str) -> Option<Vec<Vec<u8>>> {
         .join("../../.research/fate-samples/vorbis")
         .join(name);
     let data = std::fs::read(path).ok()?;
-    let packets = triergon_ogg::read_packets(&data).ok()?;
+    let packets = triergon::ogg::read_packets(&data).ok()?;
     Some(packets.into_iter().map(|packet| packet.data).collect())
 }
 

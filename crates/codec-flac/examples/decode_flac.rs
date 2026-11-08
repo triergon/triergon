@@ -1,4 +1,7 @@
-//! Decode a native FLAC file to interleaved f32le, planes in FFmpeg's channel order.
+#![forbid(unsafe_code)]
+//! Decode the first FLAC track of a file to interleaved f32le, planes in FFmpeg's
+//! channel order. The container (native FLAC, Ogg, Matroska) is read through the
+//! `triergon` facade; the decoder's whole output is written, without container trims.
 //!
 //! usage: decode_flac INPUT OUTPUT.f32 [--reject-crc] [--per-frame]
 //!
@@ -8,22 +11,14 @@
 use std::io::Write;
 use std::process::ExitCode;
 
+use triergon::{Budget, CodecId, ContainerReader, MediaKind, PacketInfo};
 use triergon_codec_flac::{AudioFrame, ChannelLayout, CrcPolicy, Decoder, Limits};
-
-mod native;
 
 fn main() -> ExitCode {
     let args: Vec<String> = std::env::args().collect();
     let (Some(input), Some(output)) = (args.get(1), args.get(2)) else {
         eprintln!("usage: decode_flac INPUT OUTPUT.f32 [--reject-crc] [--per-frame]");
         return ExitCode::from(2);
-    };
-    let data = match std::fs::read(input) {
-        Ok(data) => data,
-        Err(error) => {
-            eprintln!("{input}: {error}");
-            return ExitCode::FAILURE;
-        }
     };
     let flag = |name: &str| args[3..].iter().any(|a| a == name);
     let per_frame = flag("--per-frame");
@@ -32,9 +27,14 @@ fn main() -> ExitCode {
     } else {
         CrcPolicy::Ignore
     };
-    let (configuration, frames) = native::split_header(&data);
-    let mut decoder = match Decoder::from_configuration(configuration, Limits::default()) {
-        Ok(decoder) => decoder.with_crc_policy(policy),
+    let opened = std::fs::File::open(input)
+        .map_err(|e| e.to_string())
+        .and_then(|file| {
+            let pool = Budget::new(256 << 20).map_err(|e| e.to_string())?;
+            triergon::open_blocking(std::io::BufReader::new(file), &pool).map_err(|e| e.to_string())
+        });
+    let mut source = match opened {
+        Ok(source) => source,
         Err(error) => {
             eprintln!("{input}: {error}");
             return ExitCode::FAILURE;
@@ -48,19 +48,61 @@ fn main() -> ExitCode {
         }
     };
 
+    let mut decoder: Option<(triergon::TrackId, Decoder)> = None;
     let mut frame = AudioFrame::default();
     let mut first = None;
-    let (mut decoded, mut samples, mut errors) = (0usize, 0usize, 0usize);
+    let (mut index, mut decoded, mut samples, mut errors) = (0usize, 0usize, 0usize, 0usize);
     let mut last_error = String::new();
     let mut interleaved = Vec::new();
-    for (index, au) in native::frames(frames).enumerate() {
-        match decoder.decode_float(au, &mut frame) {
+    loop {
+        let packet = match source.next_packet() {
+            Ok(Some(packet)) => packet,
+            Ok(None) => break,
+            Err(error) => {
+                errors += 1;
+                last_error = format!("read: {error}");
+                break;
+            }
+        };
+        if decoder.is_none() {
+            let reader = source.reader();
+            let Some(track) = (0..reader.track_count())
+                .filter_map(|i| reader.track(i))
+                .find(|t| t.kind() == MediaKind::Audio && t.codec() == CodecId::Flac)
+            else {
+                continue;
+            };
+            let mut configuration = Vec::new();
+            let built = triergon_framing::canonical_flac_configuration(
+                track.configuration(),
+                &mut configuration,
+            )
+            .map_err(|e| e.to_string())
+            .and_then(|()| {
+                Decoder::from_configuration(&configuration, Limits::default())
+                    .map_err(|e| e.to_string())
+            });
+            match built {
+                Ok(built) => decoder = Some((track.id(), built.with_crc_policy(policy))),
+                Err(error) => {
+                    eprintln!("{input}: {error}");
+                    return ExitCode::FAILURE;
+                }
+            }
+        }
+        let Some((track, decoder)) = decoder.as_mut() else {
+            continue;
+        };
+        if packet.track() != *track {
+            continue;
+        }
+        match decoder.decode_float(packet.payload(), &mut frame) {
             Ok(info) => {
                 if per_frame {
                     eprintln!(
                         "{{\"frame\":{index},\"sample_rate\":{},\"layout\":\"{}\",\"samples\":{}}}",
                         info.sample_rate,
-                        layout_name(&info.layout),
+                        info.layout.name(),
                         info.samples_per_channel
                     );
                 }
@@ -86,55 +128,21 @@ fn main() -> ExitCode {
                 last_error = error.to_string();
             }
         }
+        index += 1;
     }
     if let Err(error) = out.flush() {
         eprintln!("{output}: {error}");
         return ExitCode::FAILURE;
     }
-    let (rate, layout) = first.unwrap_or_default();
+    let (rate, layout) = first.unwrap_or((0, ChannelLayout::EMPTY));
     eprintln!(
         "{{\"sample_rate\":{rate},\"channels\":{},\"layout\":\"{}\",\"frames\":{decoded},\"samples_per_channel\":{samples},\"errors\":{errors},\"last_error\":\"{last_error}\"}}",
         layout.channels(),
-        layout_name(&layout),
+        if first.is_some() {
+            layout.name()
+        } else {
+            String::new()
+        },
     );
     ExitCode::SUCCESS
-}
-
-/// The name ffprobe prints for `layout`.
-fn layout_name(layout: &ChannelLayout) -> String {
-    const NAMES: [(&str, &str); 24] = [
-        ("mono", "FC"),
-        ("stereo", "FL+FR"),
-        ("2.1", "FL+FR+LFE"),
-        ("3.0", "FL+FR+FC"),
-        ("3.0(back)", "FL+FR+BC"),
-        ("4.0", "FL+FR+FC+BC"),
-        ("quad", "FL+FR+BL+BR"),
-        ("quad(side)", "FL+FR+SL+SR"),
-        ("3.1", "FL+FR+FC+LFE"),
-        ("5.0", "FL+FR+FC+BL+BR"),
-        ("5.0(side)", "FL+FR+FC+SL+SR"),
-        ("4.1", "FL+FR+FC+LFE+BC"),
-        ("5.1", "FL+FR+FC+LFE+BL+BR"),
-        ("5.1(side)", "FL+FR+FC+LFE+SL+SR"),
-        ("6.0", "FL+FR+FC+BC+SL+SR"),
-        ("6.0(front)", "FL+FR+FLC+FRC+SL+SR"),
-        ("3.1.2", "FL+FR+FC+LFE+TFL+TFR"),
-        ("hexagonal", "FL+FR+FC+BL+BR+BC"),
-        ("6.1", "FL+FR+FC+LFE+BC+SL+SR"),
-        ("6.1(back)", "FL+FR+FC+LFE+BL+BR+BC"),
-        ("6.1(front)", "FL+FR+LFE+FLC+FRC+SL+SR"),
-        ("7.0", "FL+FR+FC+BL+BR+SL+SR"),
-        ("7.0(front)", "FL+FR+FC+FLC+FRC+SL+SR"),
-        ("7.1", "FL+FR+FC+LFE+BL+BR+SL+SR"),
-    ];
-    let speakers: Vec<&str> = layout.speakers().iter().map(|s| s.name()).collect();
-    let speakers = speakers.join("+");
-    NAMES
-        .iter()
-        .find(|(_, decomposition)| *decomposition == speakers)
-        .map_or_else(
-            || format!("{} channels ({speakers})", layout.channels()),
-            |(name, _)| (*name).to_string(),
-        )
 }

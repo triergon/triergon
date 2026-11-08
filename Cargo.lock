@@ -115,6 +115,7 @@ dependencies = [
 name = "triergon-codec-flac"
 version = "0.0.0"
 dependencies = [
+ "triergon",
  "triergon-bitstream",
  "triergon-codec",
  "triergon-core",
@@ -143,6 +144,7 @@ dependencies = [
 name = "triergon-codec-mp3"
 version = "0.0.0"
 dependencies = [
+ "triergon",
  "triergon-bitstream",
  "triergon-codec",
  "triergon-core",
@@ -161,23 +163,22 @@ dependencies = [
 name = "triergon-codec-opus"
 version = "0.0.0"
 dependencies = [
+ "triergon",
  "triergon-bitstream",
  "triergon-codec",
  "triergon-core",
  "triergon-framing",
- "triergon-matroska",
- "triergon-ogg",
 ]
 
 [[package]]
 name = "triergon-codec-vorbis"
 version = "0.0.0"
 dependencies = [
+ "triergon",
  "triergon-bitstream",
  "triergon-codec",
  "triergon-core",
  "triergon-framing",
- "triergon-ogg",
 ]
 
 [[package]]
