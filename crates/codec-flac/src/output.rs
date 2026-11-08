@@ -1,7 +1,9 @@
 //! Where restored channels go: the float frame of the `AudioDecoder` contract, or the
 //! lossless integer samples.
 use crate::{DecodeError, FrameInfo};
-use triergon_codec::{AudioFrame, ChannelLayout, Reservation, SampleFormat, StorageError};
+use triergon_codec::{
+    AudioFrame, Budget, BudgetVec, ChannelLayout, Reservation, SampleFormat, StorageError,
+};
 
 /// A destination for one frame, plane by plane.
 pub(crate) trait Output {
@@ -100,8 +102,11 @@ fn fill(plane: &mut [f32], samples: impl Iterator<Item = i32>, convert: impl Fn(
         .for_each(|(out, x)| *out = convert(x));
 }
 
-/// Decoded samples as integers of the stream's sample size, planar.
-#[derive(Clone, Debug, Default)]
+/// Decoded samples as integers of the stream's sample size, planar. Its storage is
+/// charged to the pool of the decoder that made it ([`Decoder::integer_frame`]).
+///
+/// [`Decoder::integer_frame`]: crate::Decoder::integer_frame
+#[derive(Debug)]
 pub struct IntegerFrame {
     pub sample_rate: u32,
     pub layout: ChannelLayout,
@@ -109,10 +114,21 @@ pub struct IntegerFrame {
     pub bits_per_sample: u8,
     pub samples_per_channel: usize,
     /// Plane after plane, `samples_per_channel` each.
-    samples: Vec<i32>,
+    samples: BudgetVec<i32>,
 }
 
 impl IntegerFrame {
+    /// An empty frame whose samples are charged to `budget`.
+    pub(crate) fn new_in(budget: &Budget) -> Self {
+        IntegerFrame {
+            sample_rate: 0,
+            layout: ChannelLayout::EMPTY,
+            bits_per_sample: 0,
+            samples_per_channel: 0,
+            samples: BudgetVec::new(budget),
+        }
+    }
+
     /// The samples of plane `plane` (empty beyond the layout).
     pub fn plane(&self, plane: usize) -> &[i32] {
         let len = self.samples_per_channel;
@@ -127,30 +143,6 @@ impl IntegerFrame {
         (0..self.layout.channels()).map(|plane| self.plane(plane))
     }
 
-    /// Sizes the frame to `channels` planes of `len` samples, charging its capacity.
-    fn try_resize(
-        &mut self,
-        channels: usize,
-        len: usize,
-        charge: &mut Reservation,
-    ) -> Result<(), StorageError> {
-        let total = channels.checked_mul(len).ok_or(StorageError::Overflow)?;
-        let bytes = |count: usize| {
-            count
-                .checked_mul(size_of::<i32>())
-                .ok_or(StorageError::Overflow)
-        };
-        charge.resize_to(bytes(self.samples.capacity().max(total))?)?;
-        if total > self.samples.capacity() {
-            self.samples
-                .try_reserve_exact(total - self.samples.len())
-                .map_err(|_| StorageError::Allocation)?;
-            charge.resize_to(bytes(self.samples.capacity())?)?;
-        }
-        self.samples.resize(total, 0);
-        Ok(())
-    }
-
     fn plane_mut(&mut self, plane: usize) -> Option<&mut [i32]> {
         let len = self.samples_per_channel;
         let start = plane.checked_mul(len)?;
@@ -162,20 +154,23 @@ impl IntegerFrame {
 #[derive(Debug)]
 pub(crate) struct IntegerOutput<'a> {
     frame: &'a mut IntegerFrame,
-    charge: &'a mut Reservation,
 }
 
 impl<'a> IntegerOutput<'a> {
-    pub(crate) fn new(frame: &'a mut IntegerFrame, charge: &'a mut Reservation) -> Self {
-        IntegerOutput { frame, charge }
+    pub(crate) fn new(frame: &'a mut IntegerFrame) -> Self {
+        IntegerOutput { frame }
     }
 }
 
 impl Output for IntegerOutput<'_> {
     fn begin(&mut self, frame: &FrameInfo) -> Result<(), DecodeError> {
         let len = frame.samples_per_channel;
-        self.frame
-            .try_resize(frame.layout.channels(), len, self.charge)?;
+        let total = frame
+            .layout
+            .channels()
+            .checked_mul(len)
+            .ok_or(StorageError::Overflow)?;
+        self.frame.samples.try_resize(total, 0)?;
         self.frame.sample_rate = frame.sample_rate;
         self.frame.layout = frame.layout;
         self.frame.bits_per_sample = frame.bits_per_sample;

@@ -4,20 +4,14 @@ mod common;
 
 use common::{configuration, frame, rice_residual, subframe_header, verbatim};
 use triergon_codec::AudioDecoder;
-use triergon_codec_flac::{
-    AudioFrame, Budget, CrcPolicy, DecodeError, Decoder, IntegerFrame, Limits,
-};
+use triergon_codec_flac::{AudioFrame, Budget, CrcPolicy, DecodeError, Decoder, Limits};
 
 fn decoder(channels: u8, bits: u8) -> Decoder {
-    Decoder::from_configuration(
-        &configuration(44100, channels, bits, 4096, &[]),
-        Limits::default(),
-    )
-    .unwrap()
+    Decoder::new(&configuration(44100, channels, bits, 4096, &[])).unwrap()
 }
 
 fn integers(decoder: &mut Decoder, au: &[u8]) -> Result<Vec<Vec<i32>>, DecodeError> {
-    let mut out = IntegerFrame::default();
+    let mut out = decoder.integer_frame();
     decoder.decode_integer(au, &mut out)?;
     Ok(out.planes().map(<[i32]>::to_vec).collect())
 }
@@ -257,31 +251,68 @@ fn every_truncation_and_bit_flip_fails_cleanly() {
     assert_eq!(out.samples_per_channel, 64);
 }
 
+/// A frame of `channels` constant subframes (`assignment` codes them) at `bits` bits.
+fn constant_frame(block_size: u32, assignment: u8, size_code: u8, widths: &[u32]) -> Vec<u8> {
+    frame(block_size, assignment, size_code, &|b| {
+        for &width in widths {
+            subframe_header(b, 0);
+            b.put(0, width);
+        }
+    })
+}
+
+#[test]
+fn the_default_limit_holds_the_largest_frames_in_both_outputs() {
+    // Without STREAMINFO a block may have 65536 samples. A 32-bit stereo frame sizes the
+    // 33-bit side channel; eight channels then grow both outputs to 2 MiB, the second
+    // time while each holds almost as much.
+    let frames = [
+        constant_frame(65536, 8, 7, &[32, 33]),
+        constant_frame(65535, 7, 7, &[32; 8]),
+        constant_frame(65536, 7, 7, &[32; 8]),
+    ];
+    let mut flac = Decoder::new(&[]).unwrap();
+    let (mut float, mut integer) = (AudioFrame::default(), flac.integer_frame());
+    for au in &frames {
+        flac.decode_float(au, &mut float).unwrap();
+        flac.decode_integer(au, &mut integer).unwrap();
+    }
+    assert_eq!(integer.planes().count(), 8);
+    assert_eq!(float.samples_per_channel, 65536);
+}
+
 #[test]
 fn too_small_a_budget_is_a_budget_error() {
-    let au = frame(4096, 7, S16, &|b| {
-        for _ in 0..8 {
-            subframe_header(b, 0);
-            b.put(0, 16);
-        }
-    });
+    let au = constant_frame(4096, 7, S16, &[16; 8]);
+    let small = constant_frame(16, 7, S16, &[16; 8]);
     let config = configuration(44100, 8, 16, 4096, &[]);
     let limits = Limits {
         live_storage_bytes: 64 << 10,
     };
-    let mut flac = Decoder::from_configuration(&config, limits).unwrap();
+    let mut flac = Decoder::with_limits(&config, limits).unwrap();
     let mut out = AudioFrame::default();
     let failure = flac.decode(&au, &mut out).unwrap_err();
     assert!(failure.0.starts_with("Budget("), "{failure:?}");
+    let mut integer = flac.integer_frame();
+    assert!(matches!(
+        flac.decode_integer(&au, &mut integer),
+        Err(DecodeError::Budget(_))
+    ));
+    // The decoder resumes with a frame the budget holds.
+    flac.decode(&small, &mut out).unwrap();
+    assert_eq!(out.samples_per_channel, 16);
+    flac.decode_integer(&small, &mut integer).unwrap();
+    assert_eq!(integer.samples_per_channel, 16);
 
-    // A shared pool returns to its idle level once the decoder and its output drop.
+    // A shared pool returns to its idle level once the decoder and its outputs drop.
     let pool = Budget::new(1 << 20).unwrap();
     let idle = pool.used();
     {
-        let mut flac = Decoder::from_configuration_in(&config, &pool).unwrap();
-        let mut out = AudioFrame::default();
-        flac.decode(&au, &mut out).unwrap();
-        assert!(pool.used() >= idle + 8 * 4096 * 4);
+        let mut flac = Decoder::new_in(&config, &pool).unwrap();
+        let (mut float, mut integer) = (AudioFrame::default(), flac.integer_frame());
+        flac.decode(&au, &mut float).unwrap();
+        flac.decode_integer(&au, &mut integer).unwrap();
+        assert!(pool.used() >= idle + 2 * 8 * 4096 * 4);
     }
     assert_eq!(pool.used(), idle);
 }
@@ -312,19 +343,19 @@ fn channel_masks_and_headerless_streams() {
         out.layout.speakers().iter().map(|s| s.name()).collect()
     };
     let config = configuration(44100, 4, 16, 4096, &[(4, comments("0x603"))]);
-    let mut flac = Decoder::from_configuration(&config, Limits::default()).unwrap();
+    let mut flac = Decoder::new(&config).unwrap();
     let mut out = AudioFrame::default();
     flac.decode(&quad, &mut out).unwrap();
     assert_eq!(names(&out), ["FL", "FR", "SL", "SR"]);
     flac.decode(&stereo, &mut out).unwrap();
     assert_eq!(names(&out), ["FL", "FR"]);
 
-    let mut headerless = Decoder::from_configuration(&[], Limits::default()).unwrap();
+    let mut headerless = Decoder::new(&[]).unwrap();
     headerless.decode(&quad, &mut out).unwrap();
     assert_eq!(names(&out), ["FL", "FR", "BL", "BR"]);
     assert_eq!(out.sample_rate, 44100);
     let deferred = frame(2, 0, 0, &|b| verbatim(b, 16, &[1, 2]));
-    let mut fresh = Decoder::from_configuration(&[], Limits::default()).unwrap();
+    let mut fresh = Decoder::new(&[]).unwrap();
     assert!(
         fresh.decode(&deferred, &mut out).is_err(),
         "no sample size anywhere"
