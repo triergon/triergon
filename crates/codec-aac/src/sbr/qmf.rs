@@ -17,6 +17,8 @@
 
 use super::tables::QMF_WINDOW;
 use crate::fft::{Cpx, Dct4, Fft};
+use std::sync::OnceLock;
+use triergon_codec::{Budget, BudgetVec, StorageError};
 
 /// Prototype window c[n], n < 640, of the analysis (c[2n]) and synthesis (c[n]) banks:
 /// ETSI TS 101 980 V1.1.1 Annex I Table I.1 read in reverse order, c[n] = c_DRM[639 - n]
@@ -29,63 +31,81 @@ fn window(n: usize) -> f64 {
     QMF_WINDOW[639 - n]
 }
 
+/// Windows and the analysis modulation, shared by every bank.
+#[derive(Debug)]
+pub(crate) struct Tables {
+    /// analysis window c[2n], n < 320
+    analysis_win: [f32; 320],
+    /// synthesis window c[n], n < 640
+    synthesis_win: [f32; 640],
+    // analysis modulation via a 64-point complex transform
+    pre: [Cpx; 64],
+    post: [Cpx; 32],
+    fft: Fft,
+}
+
+fn tables() -> &'static Tables {
+    static T: OnceLock<Tables> = OnceLock::new();
+    T.get_or_init(|| {
+        // X(k) = sum_{n<64} 2 u[n] exp(i pi (k + 1/2)(2n + A) / 64), k < 32, A = -1/2:
+        // exp(i pi (k+1/2)(2n+A)/64) = exp(i pi (2n + A)/128) * exp(i 2 pi k n / 64) * exp(i pi k A / 64)
+        // i.e. a 64-point inverse DFT between a pre- and a post-twiddle.
+        let pi = std::f64::consts::PI;
+        let aoff: f64 = -0.5;
+        Tables {
+            analysis_win: std::array::from_fn(|n| window(2 * n) as f32),
+            synthesis_win: std::array::from_fn(|n| window(n) as f32),
+            pre: std::array::from_fn(|n| {
+                let a = pi * (2.0 * n as f64 + aoff) / 128.0;
+                Cpx::new((2.0 * a.cos()) as f32, (2.0 * a.sin()) as f32)
+            }),
+            post: std::array::from_fn(|k| {
+                let a = pi * k as f64 * aoff / 64.0;
+                Cpx::new(a.cos() as f32, a.sin() as f32)
+            }),
+            fft: Fft::new(64),
+        }
+    })
+}
+
 #[derive(Debug)]
 pub(crate) struct Analysis {
     /// Input history, newest first: the 320 samples x[0..320] live at x[pos..pos + 320]
     /// of a double-length buffer so no per-slot shifting is needed.
-    x: Vec<f32>,
+    x: BudgetVec<f32>,
     pos: usize,
-    win: Vec<f32>,
-    // modulation via a 64-point complex transform
-    pre: Vec<Cpx>,
-    post: Vec<Cpx>,
-    fft: Fft,
-    re: Vec<f32>,
-    im: Vec<f32>,
+    t: &'static Tables,
+    re: [f32; 64],
+    im: [f32; 64],
 }
 
 #[derive(Debug)]
 pub(crate) struct Synthesis {
-    v: Vec<f32>,
+    v: BudgetVec<f32>,
     /// write position of the circular v buffer (in units of 128)
     pos: usize,
-    win: Vec<f32>,
-    dct: Dct4,
+    t: &'static Tables,
     a: [f32; 64],
     b: [f32; 64],
     c: [f32; 64],
     d: [f32; 64],
 }
 
+/// The synthesis modulation: a DCT-IV with work space, which the decoder keeps one of for
+/// all its synthesis banks.
+pub(crate) fn synthesis_dct() -> Dct4 {
+    Dct4::new(64, 1.0 / 64.0)
+}
+
 impl Analysis {
-    pub(crate) fn new() -> Analysis {
-        // X(k) = sum_{n<64} 2 u[n] exp(i pi (k + 1/2)(2n + A) / 64), k < 32, A = -1/2:
-        // exp(i pi (k+1/2)(2n+A)/64) = exp(i pi (2n + A)/128) * exp(i 2 pi k n / 64) * exp(i pi k A / 64)
-        // i.e. a 64-point inverse DFT between a pre- and a post-twiddle.
-        let pi = std::f64::consts::PI;
-        let aoff: f64 = -0.5;
-        let pre = (0..64)
-            .map(|n| {
-                let a = pi * (2.0 * n as f64 + aoff) / 128.0;
-                Cpx::new((2.0 * a.cos()) as f32, (2.0 * a.sin()) as f32)
-            })
-            .collect();
-        let post = (0..32)
-            .map(|k| {
-                let a = pi * k as f64 * aoff / 64.0;
-                Cpx::new(a.cos() as f32, a.sin() as f32)
-            })
-            .collect();
-        Analysis {
-            x: vec![0.0; 640],
+    pub(crate) fn new(budget: &Budget) -> Result<Analysis, StorageError> {
+        Ok(Analysis {
+            x: BudgetVec::try_filled(budget, 0.0, 640)?,
             pos: 320,
-            win: (0..320).map(|n| window(2 * n) as f32).collect(),
-            pre,
-            post,
-            fft: Fft::new(64),
-            re: vec![0.0; 64],
-            im: vec![0.0; 64],
-        }
+            t: tables(),
+            re: [0.0; 64],
+            im: [0.0; 64],
+        })
     }
 
     pub(crate) fn reset(&mut self) {
@@ -105,7 +125,7 @@ impl Analysis {
             self.x[p + 31 - n] = input[n] * scale;
         }
         let x = &self.x[p..p + 320];
-        let w = &self.win[..320];
+        let w = &self.t.analysis_win;
         let mut u = [0f32; 64];
         for j in 0..5 {
             let xs = &x[64 * j..64 * j + 64];
@@ -116,31 +136,30 @@ impl Analysis {
         }
         // inverse DFT (sign +): use the forward FFT on conjugated data
         for n in 0..64 {
-            let t = self.pre[n];
-            let j = self.fft.perm(n);
+            let t = self.t.pre[n];
+            let j = self.t.fft.perm(n);
             self.re[j] = u[n] * t.re;
             self.im[j] = -(u[n] * t.im);
         }
-        self.fft.run_permuted(&mut self.re, &mut self.im);
+        self.t.fft.run_permuted(&mut self.re, &mut self.im);
         for k in 0..32 {
             let b = Cpx::new(self.re[k], -self.im[k]);
-            out[k] = b.mul(self.post[k]);
+            out[k] = b.mul(self.t.post[k]);
         }
     }
 }
 
 impl Synthesis {
-    pub(crate) fn new() -> Synthesis {
-        Synthesis {
-            v: vec![0.0; 2560],
+    pub(crate) fn new(budget: &Budget) -> Result<Synthesis, StorageError> {
+        Ok(Synthesis {
+            v: BudgetVec::try_filled(budget, 0.0, 2560)?,
             pos: 1280,
-            win: (0..640).map(|n| window(n) as f32).collect(),
-            dct: Dct4::new(64, 1.0 / 64.0),
+            t: tables(),
             a: [0.0; 64],
             b: [0.0; 64],
             c: [0.0; 64],
             d: [0.0; 64],
-        }
+        })
     }
 
     pub(crate) fn reset(&mut self) {
@@ -155,7 +174,7 @@ impl Synthesis {
     /// v[64 + m] = C[m] + S[m] and v[63 - m] = C[m] - S[m], where C is the DCT-IV of
     /// (-1)^k Im X(k) and S the DST-IV of (-1)^k Re X(k), both scaled by 1/64 (the DST-IV is
     /// a DCT-IV of the reversed input with alternating output signs).
-    pub(crate) fn run(&mut self, x: &[Cpx], scale: f32, out: &mut [f32]) {
+    pub(crate) fn run(&mut self, dct: &mut Dct4, x: &[Cpx], scale: f32, out: &mut [f32]) {
         if self.pos < 128 {
             self.v.copy_within(self.pos..self.pos + 1152, 2560 - 1152);
             self.pos = 2560 - 1152;
@@ -169,8 +188,8 @@ impl Synthesis {
             // reversed, with (-1)^(63 - j) = -(-1)^j
             self.b[k] = -sgn * x[63 - k].re;
         }
-        self.dct.run(&self.a, &mut self.c);
-        self.dct.run(&self.b, &mut self.d);
+        dct.run(&self.a, &mut self.c);
+        dct.run(&self.b, &mut self.d);
         let v = &mut self.v[p..p + 128];
         for m in 0..64 {
             let s = if m & 1 == 0 { self.d[m] } else { -self.d[m] };
@@ -178,7 +197,7 @@ impl Synthesis {
             v[63 - m] = self.c[m] - s;
         }
         let v = &self.v[p..p + 1280];
-        let w = &self.win[..640];
+        let w = &self.t.synthesis_win;
         let mut acc = [0f32; 64];
         for i in 0..5 {
             let v0 = &v[256 * i..256 * i + 64];
@@ -218,10 +237,11 @@ mod tests {
 
     #[test]
     fn passthrough_reconstructs_band_limited_input() {
+        let budget = Budget::new(1 << 20).unwrap();
         // analysis (32 bands) -> synthesis (64 bands, upper half zero) is a 2x interpolator
         // with a delay of 578 output samples; residual ripple / aliasing below -60 dB
-        let mut a = Analysis::new();
-        let mut sy = Synthesis::new();
+        let mut a = Analysis::new(&budget).unwrap();
+        let mut sy = Synthesis::new(&budget).unwrap();
         let f = 0.1f64;
         let mut x = [Cpx::default(); 64];
         let mut out = vec![0f32; 0];
@@ -233,7 +253,7 @@ mod tests {
             a.run(&inp, 1.0, &mut w);
             x[..32].copy_from_slice(&w);
             let mut o = [0f32; 64];
-            sy.run(&x, 1.0, &mut o);
+            sy.run(&mut synthesis_dct(), &x, 1.0, &mut o);
             out.extend_from_slice(&o);
         }
         let mut max = 0f64;
@@ -246,7 +266,8 @@ mod tests {
 
     #[test]
     fn analysis_matches_definition() {
-        let mut a = Analysis::new();
+        let budget = Budget::new(1 << 20).unwrap();
+        let mut a = Analysis::new(&budget).unwrap();
         let mut s = 7u32;
         let mut rnd = || {
             s = s.wrapping_mul(1664525).wrapping_add(1013904223);
@@ -291,7 +312,8 @@ mod tests {
 
     #[test]
     fn synthesis_matches_definition() {
-        let mut sy = Synthesis::new();
+        let budget = Budget::new(1 << 20).unwrap();
+        let mut sy = Synthesis::new(&budget).unwrap();
         let mut s = 9u32;
         let mut rnd = || {
             s = s.wrapping_mul(1664525).wrapping_add(1013904223);
@@ -301,7 +323,7 @@ mod tests {
         let mut out = vec![0f32; 64];
         for _slot in 0..14 {
             let x: Vec<Cpx> = (0..64).map(|_| Cpx::new(rnd(), rnd())).collect();
-            sy.run(&x, 1.0, &mut out);
+            sy.run(&mut synthesis_dct(), &x, 1.0, &mut out);
             v.copy_within(0..1152, 128);
             for n in 0..128 {
                 let mut acc = 0.0;
