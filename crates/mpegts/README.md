@@ -366,6 +366,14 @@ checks all 97 operations and 272 requests against the pinned FFmpeg formats work
 and unchanged recorded folds: 87 match and 10 remain failures. That source has no
 native timing or memory qualification; the native figures above apply to `5634f47d`.
 
+The source-boundary policies at `e7e1102c0afd466af24e9e8b969e823d5772a230`
+have a separate live macOS (`aarch64-apple-darwin`) comparison against the pinned
+FFmpeg formats worker and unchanged recorded folds: 90 of 97 operations match,
+with all 272 requests retained. The four malformed empty-reference operations
+remain refusals, and three operations across media entities lack a single-input
+reference equivalent. No timing or memory was collected for this source. These
+PES folds do not qualify the strict source clock or access units.
+
 
 Gates, harness and current results: [docs/quality.md](../../docs/quality.md)
 and [docs/status.md](../../docs/status.md).
