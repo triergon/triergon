@@ -69,7 +69,111 @@ pub(super) struct Object {
     fragments: usize,
 }
 
+/// What an ODS does to its object, decided and allocated before the object
+/// cache changes.
+enum Update<'a> {
+    /// The receiver rejects the fragment.
+    Keep,
+    /// The receiver refuses the packet at the fragment.
+    Refuse(Refusal),
+    /// An accepted first fragment: the object it starts.
+    Replace(Object),
+    /// An accepted continuation: bytes for which the object has room.
+    Append(&'a [u8]),
+}
+
+/// The count after one more fragment of an object.
+fn next_fragment(fragments: usize, limits: &DisplayLimits) -> Result<usize> {
+    if fragments >= limits.max_fragments {
+        return Err(Error::Limit {
+            requested: fragments + 1,
+            maximum: limits.max_fragments,
+        });
+    }
+    Ok(fragments + 1)
+}
+
 impl Object {
+    /// An object slot before any fragment of it is accepted.
+    fn empty(id: u16, budget: &Budget) -> Self {
+        Self {
+            id,
+            width: 0,
+            height: 0,
+            declared: 0,
+            encoded: BudgetVec::new(budget),
+            fragments: 0,
+        }
+    }
+
+    /// A first fragment (after its id, version and flags): the object it
+    /// starts, when it has data and a size inside the canvas and declares at
+    /// least that data.
+    fn start<'a>(
+        id: u16,
+        fragment: &'a [u8],
+        canvas: [u16; 2],
+        limits: &DisplayLimits,
+        budget: &Budget,
+    ) -> Result<Update<'a>> {
+        let [l0, l1, l2, w0, w1, h0, h1, data @ ..] = fragment else {
+            return Ok(Update::Keep);
+        };
+        let declared = usize::from(*l0) << 16 | usize::from(*l1) << 8 | usize::from(*l2);
+        let (width, height) = (
+            u16::from_be_bytes([*w0, *w1]),
+            u16::from_be_bytes([*h0, *h1]),
+        );
+        let [canvas_width, canvas_height] = canvas;
+        if data.is_empty()
+            || width == 0
+            || height == 0
+            || width > canvas_width
+            || height > canvas_height
+        {
+            return Ok(Update::Keep);
+        }
+        // The receiver cannot allocate a negative data length.
+        let Some(length) = declared.checked_sub(4) else {
+            return Ok(Update::Refuse(Refusal::ObjectLength));
+        };
+        if data.len() > length {
+            return Ok(Update::Keep);
+        }
+        let pixels = usize::from(width) * usize::from(height);
+        for (requested, maximum) in [
+            (pixels, limits.max_object_pixels),
+            (length, limits.max_encoded),
+        ] {
+            if requested > maximum {
+                return Err(Error::Limit { requested, maximum });
+            }
+        }
+        let fragments = next_fragment(0, limits)?;
+        let mut encoded = BudgetVec::new(budget);
+        encoded.try_reserve_exact(length)?;
+        encoded.try_extend_from_slice(data)?;
+        Ok(Update::Replace(Self {
+            id,
+            width,
+            height,
+            declared: length,
+            encoded,
+            fragments,
+        }))
+    }
+
+    /// A continuation fragment's data, accepted while it fits the length the
+    /// first fragment declared. Room for it is reserved here.
+    fn continuation<'a>(&mut self, data: &'a [u8], limits: &DisplayLimits) -> Result<Update<'a>> {
+        if self.width == 0 || data.len() > self.declared - self.encoded.len() {
+            return Ok(Update::Keep);
+        }
+        next_fragment(self.fragments, limits)?;
+        self.encoded.try_reserve_exact(data.len())?;
+        Ok(Update::Append(data))
+    }
+
     /// Whether the object has a bitmap to decode.
     pub(super) fn has_data(&self) -> bool {
         self.width != 0 && !self.encoded.is_empty()
@@ -287,94 +391,53 @@ impl Receiver {
 
     /// ODS: one fragment of an object (a new one while fewer than the limit
     /// exist, otherwise the segment is ignored). A first fragment that the
-    /// receiver accepts replaces the object; a rejected one leaves it as it was.
+    /// receiver accepts replaces the object; a rejected one leaves it as it was,
+    /// though a new id still takes a slot. The fragment is checked and its
+    /// storage allocated before the cache changes, so an error leaves the
+    /// cache as it was.
     pub(super) fn object_fragment(
         &mut self,
         body: &[u8],
         limits: &DisplayLimits,
         budget: &Budget,
     ) -> Result<Option<Refusal>> {
-        let [id_high, id_low, _version, flags, rest @ ..] = body else {
+        let [id_high, id_low, _version, flags, fragment @ ..] = body else {
             return Ok(None);
         };
         let id = u16::from_be_bytes([*id_high, *id_low]);
-        let index = match self.objects.as_slice().iter().position(|o| o.id == id) {
-            Some(index) => index,
-            None if self.objects.len() < limits.max_objects => {
-                self.objects
-                    .try_push(Object {
-                        id,
-                        width: 0,
-                        height: 0,
-                        declared: 0,
-                        encoded: BudgetVec::new(budget),
-                        fragments: 0,
-                    })
-                    .map_err(|e| e.error)?;
-                self.objects.len() - 1
-            }
-            None => return Ok(None),
-        };
-        let object = &mut self.objects.as_mut_slice()[index];
-        let data = if flags & 0x80 == 0 {
-            rest
-        } else {
-            let [l0, l1, l2, w0, w1, h0, h1, data @ ..] = rest else {
-                return Ok(None);
-            };
-            let declared = usize::from(*l0) << 16 | usize::from(*l1) << 8 | usize::from(*l2);
-            let (width, height) = (
-                u16::from_be_bytes([*w0, *w1]),
-                u16::from_be_bytes([*h0, *h1]),
-            );
-            let [canvas_width, canvas_height] = self.canvas;
-            if data.is_empty()
-                || width == 0
-                || height == 0
-                || width > canvas_width
-                || height > canvas_height
-            {
-                return Ok(None);
-            }
-            // The receiver cannot allocate a negative data length.
-            let Some(length) = declared.checked_sub(4) else {
-                return Ok(Some(Refusal::ObjectLength));
-            };
-            if data.len() > length {
-                return Ok(None);
-            }
-            let pixels = usize::from(width) * usize::from(height);
-            for (requested, maximum) in [
-                (pixels, limits.max_object_pixels),
-                (length, limits.max_encoded),
-            ] {
-                if requested > maximum {
-                    return Err(Error::Limit { requested, maximum });
-                }
-            }
-            *object = Object {
-                id,
-                width,
-                height,
-                declared: length,
-                encoded: BudgetVec::new(budget),
-                fragments: 0,
-            };
-            object.encoded.try_reserve_exact(length)?;
-            data
-        };
-        if object.width == 0 || data.len() > object.declared - object.encoded.len() {
+        let index = self.objects.as_slice().iter().position(|o| o.id == id);
+        if index.is_none() && self.objects.len() >= limits.max_objects {
             return Ok(None);
         }
-        if object.fragments == limits.max_fragments {
-            return Err(Error::Limit {
-                requested: object.fragments + 1,
-                maximum: limits.max_fragments,
-            });
+        let update = if flags & 0x80 != 0 {
+            Object::start(id, fragment, self.canvas, limits, budget)?
+        } else if let Some(index) = index {
+            self.objects.as_mut_slice()[index].continuation(fragment, limits)?
+        } else {
+            Update::Keep
+        };
+        let refusal = match update {
+            Update::Refuse(refusal) => Some(refusal),
+            _ => None,
+        };
+        match (index, update) {
+            (Some(index), Update::Replace(object)) => self.objects.as_mut_slice()[index] = object,
+            (Some(index), Update::Append(data)) => {
+                let object = &mut self.objects.as_mut_slice()[index];
+                object.encoded.try_extend_from_slice(data)?;
+                object.fragments += 1;
+            }
+            (Some(_), Update::Keep | Update::Refuse(_)) => {}
+            (None, Update::Replace(object)) => {
+                self.objects.try_push(object).map_err(|e| e.error)?;
+            }
+            (None, _) => {
+                self.objects
+                    .try_push(Object::empty(id, budget))
+                    .map_err(|e| e.error)?;
+            }
         }
-        object.encoded.try_extend_from_slice(data)?;
-        object.fragments += 1;
-        Ok(None)
+        Ok(refusal)
     }
 }
 

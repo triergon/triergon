@@ -10,18 +10,23 @@ fn segment(out: &mut Vec<u8>, kind: u8, body: &[u8]) {
     out.extend_from_slice(body);
 }
 
-/// A 16x1 epoch referencing object 7 once per `(flags, x)`: palette entries
-/// 1 and 2 and a two-pixel object.
-fn picture(references: &[(u8, u16)]) -> Vec<u8> {
-    let mut pcs = vec![0, 16, 0, 1, 0x10, 0, 1, 0x80, 0, 0];
+/// A 16x1 PCS with `state` referencing object 7 once per `(flags, x)`.
+fn composition(out: &mut Vec<u8>, state: u8, references: &[(u8, u16)]) {
+    let mut pcs = vec![0, 16, 0, 1, 0x10, 0, 1, state, 0, 0];
     pcs.push(u8::try_from(references.len()).unwrap());
     for &(flags, x) in references {
         pcs.extend_from_slice(&[0, 7, 0, flags]);
         pcs.extend_from_slice(&x.to_be_bytes());
         pcs.extend_from_slice(&[0, 0]);
     }
+    segment(out, 0x16, &pcs);
+}
+
+/// A 16x1 epoch referencing object 7 once per `(flags, x)`: palette entries
+/// 1 and 2 and a two-pixel object.
+fn picture(references: &[(u8, u16)]) -> Vec<u8> {
     let mut out = Vec::new();
-    segment(&mut out, 0x16, &pcs);
+    composition(&mut out, 0x80, references);
     segment(
         &mut out,
         0x14,
@@ -125,5 +130,55 @@ fn pressure_at_every_allocation_retries_without_repeating_work() {
     assert_eq!(
         (d.work_spent(), rect.pixels().to_vec(), *rect.palette()),
         expected
+    );
+}
+
+/// Each presented rectangle as `(x, y, width, height, stride, pixels)`.
+fn presented(packet: &crate::pgs::receiver_decoder::ReceiverPacket) -> Vec<Rectangle> {
+    packet
+        .receiver_output()
+        .unwrap()
+        .rectangles()
+        .iter()
+        .map(|r| (r.x, r.y, r.width, r.height, r.stride, r.pixels().to_vec()))
+        .collect()
+}
+type Rectangle = (u16, u16, u16, u16, u16, Vec<u8>);
+
+/// A display of object 7 at x 3 in the current epoch.
+fn redisplay() -> Vec<u8> {
+    let mut out = Vec::new();
+    composition(&mut out, 0, &[(0, 3)]);
+    segment(&mut out, 0x80, &[]);
+    out
+}
+
+#[test]
+fn an_object_fragment_refused_under_pressure_leaves_the_receiver_as_before() {
+    let b = Budget::new(1 << 20).unwrap();
+    let mut refused = receiver(&b, false);
+    let mut untouched = receiver(&b, false);
+    for d in [&mut refused, &mut untouched] {
+        decode(d, &b, &picture(&[(0, 3)]));
+    }
+    // A first fragment that would replace object 7 with a 4x1 bitmap.
+    let replacement = [0, 7, 0, 0xc0, 0, 0, 8, 0, 4, 0, 1, 3, 3, 3, 3];
+    let hold = b.reserve(b.available()).unwrap();
+    let result = refused
+        .receiver
+        .object_fragment(&replacement, &refused.limits, &refused.budget);
+    assert!(matches!(result, Err(Error::Backpressure { .. })));
+    drop(hold);
+    let expected = presented(&decode(&mut untouched, &b, &redisplay()));
+    assert_eq!(expected, [(3, 0, 2, 1, 2, vec![1, 2])]);
+    assert_eq!(presented(&decode(&mut refused, &b, &redisplay())), expected);
+    // Without pressure the same fragment does replace the object.
+    refused
+        .receiver
+        .object_fragment(&replacement, &refused.limits, &refused.budget)
+        .unwrap();
+    assert_eq!(
+        presented(&decode(&mut refused, &b, &redisplay())),
+        [(3, 0, 4, 1, 4, vec![3; 4])]
     );
 }
