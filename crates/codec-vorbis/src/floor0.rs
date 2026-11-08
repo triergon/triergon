@@ -3,11 +3,11 @@
 use core::f32::consts::PI;
 
 use triergon_bitstream::LsbReader;
+use triergon_codec::{Budget, BudgetVec};
 
 use crate::codebook::Codebook;
-use crate::storage::Meter;
 use crate::window::Block;
-use crate::{DecodeError, ilog};
+use crate::{DecodeError, ilog, push};
 
 /// The highest LSP order the 8-bit field allows.
 pub(crate) const MAX_ORDER: usize = 255;
@@ -22,10 +22,10 @@ pub(crate) struct Floor0 {
     amplitude_offset: f32,
     /// `amplitude_offset / (2^amplitude_bits - 1)`: the curve level of amplitude 1.
     amplitude_step: f64,
-    books: Vec<u8>,
+    books: BudgetVec<u8>,
     /// The spectral lines of the short and long block in runs that share one Bark map
     /// value (section 6.2.3).
-    bands: [Vec<Band>; 2],
+    bands: [BudgetVec<Band>; 2],
 }
 
 /// Consecutive spectral lines with one map value and so one curve value.
@@ -43,7 +43,7 @@ impl Floor0 {
         r: &mut LsbReader<'_>,
         codebooks: &[Codebook],
         blocksizes: [usize; 2],
-        meter: &mut Meter,
+        budget: &Budget,
     ) -> Result<Floor0, DecodeError> {
         let order = r.read(8) as usize;
         let rate = r.read(16);
@@ -51,7 +51,10 @@ impl Floor0 {
         let amplitude_bits = r.read(6);
         let amplitude_offset = r.read(8);
         // At most 16 books.
-        let books: Vec<u8> = (0..=r.read(4)).map(|_| r.read(8) as u8).collect();
+        let mut books = BudgetVec::try_filled(budget, 0, r.read(4) as usize + 1)?;
+        for book in books.iter_mut() {
+            *book = r.read(8) as u8;
+        }
         if r.overrun() {
             return Err(DecodeError::Invalid("truncated floor 0"));
         }
@@ -70,7 +73,7 @@ impl Floor0 {
         };
         let rate = f64::from(rate);
         let size = f64::from(bark_map_size);
-        let mut bands = [Vec::new(), Vec::new()];
+        let mut bands = [BudgetVec::new(budget), BudgetVec::new(budget)];
         for (bands, blocksize) in bands.iter_mut().zip(blocksizes) {
             let n = blocksize / 2;
             let map = |i: usize| {
@@ -79,15 +82,16 @@ impl Floor0 {
                 bin.min(size - 1.0) as u32
             };
             let count = (1..n).filter(|&i| map(i) != map(i - 1)).count() + 1;
-            *bands = meter.with_capacity(count)?;
+            bands.try_reserve_exact(count)?;
             let mut start = 0;
             while start < n {
                 let value = map(start);
                 let lines = (start..n).take_while(|&i| map(i) == value).count();
-                bands.push(Band {
+                let band = Band {
                     lines,
                     cos_omega: (PI * value as f32 / size as f32).cos(),
-                });
+                };
+                push(bands, band)?;
                 start += lines;
             }
         }
@@ -152,7 +156,7 @@ impl Floor0 {
         let cos_lsp = &cos_lsp[..self.order];
         let level = (amplitude as f64 * self.amplitude_step) as f32;
         let mut values = spectrum;
-        for band in &self.bands[block as usize] {
+        for band in self.bands[block as usize].iter() {
             if values.is_empty() {
                 break;
             }

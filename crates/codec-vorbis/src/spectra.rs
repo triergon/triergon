@@ -1,7 +1,6 @@
 //! Per-channel vectors of one block, stored back to back.
 
-use crate::storage::Meter;
-use triergon_codec::StorageError;
+use triergon_codec::{Budget, BudgetVec, StorageError};
 
 /// One vector of `len` values per channel.
 ///
@@ -10,7 +9,7 @@ use triergon_codec::StorageError;
 /// falsely wait on stores to another (4K aliasing), as in inverse coupling.
 #[derive(Debug)]
 pub(crate) struct Spectra {
-    data: Vec<f32>,
+    data: BudgetVec<f32>,
     len: usize,
     stride: usize,
 }
@@ -22,12 +21,12 @@ impl Spectra {
     pub(crate) fn new(
         channels: usize,
         len: usize,
-        meter: &mut Meter,
+        budget: &Budget,
     ) -> Result<Spectra, StorageError> {
         let stride = len + PAD;
         let size = channels.checked_mul(stride).ok_or(StorageError::Overflow)?;
         Ok(Spectra {
-            data: meter.vec(size, 0.0)?,
+            data: BudgetVec::try_filled(budget, 0.0, size)?,
             len,
             stride,
         })

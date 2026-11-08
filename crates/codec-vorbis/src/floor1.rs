@@ -1,8 +1,8 @@
 //! Floor type 1 (Vorbis I section 7): a piecewise linear curve on a dB scale.
 
-use triergon_bitstream::LsbReader;
+use triergon_bitstream::{LsbReader, LsbWindow};
+use triergon_codec::{Budget, BudgetVec};
 
-use crate::bits::BitWindow;
 use crate::codebook::Codebook;
 use crate::tables::INVERSE_DB;
 use crate::{DecodeError, ilog};
@@ -26,7 +26,7 @@ struct Class {
 #[derive(Debug)]
 pub(crate) struct Floor1 {
     /// Class of each partition, in order.
-    partitions: Vec<u8>,
+    partitions: BudgetVec<u8>,
     classes: [Class; 16],
     multiplier: i32,
     /// Number of X positions.
@@ -43,6 +43,7 @@ impl Floor1 {
     pub(crate) fn read(
         r: &mut LsbReader<'_>,
         codebooks: &[Codebook],
+        budget: &Budget,
     ) -> Result<Floor1, DecodeError> {
         let book = |number: u32| -> Result<u8, DecodeError> {
             if (number as usize) < codebooks.len() {
@@ -52,7 +53,10 @@ impl Floor1 {
             }
         };
         // Capped at 31 partitions by the field width.
-        let partitions: Vec<u8> = (0..r.read(5)).map(|_| r.read(4) as u8).collect();
+        let mut partitions = BudgetVec::try_filled(budget, 0, r.read(5) as usize)?;
+        for class in partitions.iter_mut() {
+            *class = r.read(4) as u8;
+        }
         let mut classes = [Class::default(); 16];
         let class_count = partitions
             .iter()
@@ -77,7 +81,7 @@ impl Floor1 {
         let mut x = [0; MAX_POINTS];
         x[1] = 1 << range_bits;
         let mut count = 2;
-        for &class in &partitions {
+        for &class in partitions.iter() {
             for _ in 0..classes[usize::from(class)].dimensions {
                 let slot = x
                     .get_mut(count)
@@ -145,12 +149,12 @@ impl Floor1 {
         codebooks: &[Codebook],
         y: &mut Points,
     ) -> Option<()> {
-        let r = &mut BitWindow::new(r);
+        let r = &mut LsbWindow::new(r);
         let bits = ilog(self.range() as u32 - 1);
         y[0] = r.read(bits) as i32;
         y[1] = r.read(bits) as i32;
         let mut points = y[2..].iter_mut();
-        for &class in &self.partitions {
+        for &class in self.partitions.iter() {
             let class = &self.classes[usize::from(class)];
             let mut choice = match class.master {
                 Some(master) => codebooks[usize::from(master)].entry(r)?,
