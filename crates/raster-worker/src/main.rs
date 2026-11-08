@@ -24,6 +24,18 @@ type Result<T> = std::result::Result<T, Box<dyn Error>>;
 const MAX_INPUT: u64 = 64 << 20;
 /// Glyphs one font case may select.
 const MAX_GLYPHS: usize = 4096;
+/// The storage budget: an accounting ceiling of 16 GiB, above the largest
+/// bitmap libass draws and its scratch, so only parity decides. A 32-bit
+/// target's address space is smaller, so there the ceiling is the whole of
+/// it and the allocator refuses first.
+const BUDGET_BYTES: usize = {
+    let ceiling: u64 = 1 << 34;
+    if ceiling > usize::MAX as u64 {
+        usize::MAX
+    } else {
+        ceiling as usize
+    }
+};
 const USAGE: &str = "usage: raster-worker OPERATION-fold FILE MODE...
        | OPERATION-bench FILE ITERATIONS MODE... | OPERATION-memory FILE MODE...
        | OPERATION-dump FILE MODE...
@@ -188,9 +200,7 @@ fn run(args: &[String]) -> Result<()> {
     if size > MAX_INPUT {
         return Err("input exceeds the size bound".into());
     }
-    // An accounting ceiling above the largest bitmap libass draws and its
-    // scratch, so only parity decides.
-    let budget = Budget::new(1 << 34)?;
+    let budget = Budget::new(BUDGET_BYTES)?;
     let file = Bytes::try_from_vec(&budget, std::fs::read(path)?).map_err(|e| e.error())?;
     let (selection, cases): (Option<Selection>, Vec<Option<Case>>) = match &input {
         Input::Glyphs {
