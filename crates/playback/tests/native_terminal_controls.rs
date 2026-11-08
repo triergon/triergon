@@ -738,10 +738,17 @@ fn native_out_of_source_first_sample_requires_a_physical_end() {
                 assert_eq!(refusal.end.source, ID);
                 assert_eq!(refusal.end.offset, raw.len() as u64);
                 assert_eq!(signals.ends.load(Ordering::Relaxed), 1);
-                assert!(
-                    try_make_source_mode(raw, known, chunk, work, true, TestView::Source, random)
-                        .is_err()
-                );
+                // The source view refuses the sample as outside the source:
+                // while indexing when the length is declared, at the physical
+                // end otherwise.
+                let source =
+                    try_make_source_mode(raw, known, chunk, work, true, TestView::Source, random);
+                let refusal = match source {
+                    Ok((mut source, _, _)) if !known => collect(&mut source, work).unwrap_err(),
+                    Ok(_) => panic!("a declared length shows the sample outside the source"),
+                    Err(error) => error,
+                };
+                assert_eq!(refusal, Error::Invalid("sample outside media extent"));
                 drop(native);
                 drop(out);
                 assert_eq!(pool.used(), Budget::control_storage_bytes());
@@ -793,6 +800,47 @@ fn native_missing_first_sample_does_not_infer_end_from_starvation_or_layout() {
             "native first sample starts before physical end"
         ))
     ));
+}
+
+#[test]
+fn strict_out_of_source_first_sample_waits_for_the_physical_end() {
+    let raw = include_bytes!("fixtures/mp4/bad-chunk-offset-outside-source.mov");
+    for view in [TestView::Source, TestView::Native] {
+        let (mut strict, _, signals) =
+            try_make_source_mode(raw, false, 7, 1, false, view, false).unwrap();
+        for _ in 0..30_000 {
+            assert!(matches!(
+                strict.advance(&mut WorkBudget::new(1), &off()),
+                Ok(progress) if !matches!(progress, Progress::Ended)
+            ));
+            assert!(strict.pop().is_none());
+            if strict
+                .pending_request()
+                .is_some_and(|r| r.offset == raw.len() as u64)
+            {
+                break;
+            }
+        }
+        assert_eq!(strict.pending_request().unwrap().offset, raw.len() as u64);
+        signals.eof.store(true, Ordering::Relaxed);
+        assert_eq!(
+            collect(&mut strict, 1).unwrap_err(),
+            Error::Invalid("sample outside media extent")
+        );
+
+        // A source that continues past the declared first sample may hold it
+        // in a later mdat, so the backward chunk order is refused as a layout.
+        let mut extended = raw.to_vec();
+        extended.extend_from_slice(&4097_u32.to_be_bytes());
+        extended.extend_from_slice(b"free");
+        extended.resize(raw.len() + 4097, 0);
+        let (mut strict, _, _) =
+            try_make_source_mode(&extended, false, 7, 1, true, view, false).unwrap();
+        assert_eq!(
+            collect(&mut strict, 1).unwrap_err(),
+            Error::Unsupported("physical merge needs nondecreasing per-track source offsets")
+        );
+    }
 }
 
 #[test]

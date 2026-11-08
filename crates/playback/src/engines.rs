@@ -1263,14 +1263,17 @@ impl Mp4Engine {
             .plan
             .unavailable_first
             .as_ref()
-            .ok_or(Error::Invalid("missing native refusal declaration"))?
+            .ok_or(Error::Invalid("missing first sample declaration"))?
             .sample
             .range
             .start;
+        let within_source = if self.plan.native_recovery {
+            Error::Invalid("native first sample starts before physical end")
+        } else {
+            crate::mp4_plan::BACKWARD_LAYOUT_REFUSAL
+        };
         if self.input.position() > start {
-            return Err(Error::Invalid(
-                "native first sample starts before physical end",
-            ));
+            return Err(within_source);
         }
         let step = self.poll_progressive(w, c)?;
         if !matches!(step, BackendStep::End) {
@@ -1279,9 +1282,10 @@ impl Mp4Engine {
         match self.input.read_discard(1, w, c)? {
             Step::End(end) => {
                 if end.offset > start {
-                    return Err(Error::Invalid(
-                        "native first sample starts before physical end",
-                    ));
+                    return Err(within_source);
+                }
+                if !self.plan.native_recovery {
+                    return Err(Error::Invalid("sample outside media extent"));
                 }
                 if !w.try_charge(1) {
                     return Ok(BackendStep::Yield);
@@ -1290,7 +1294,7 @@ impl Mp4Engine {
                     .plan
                     .unavailable_first
                     .as_ref()
-                    .ok_or(Error::Invalid("missing native refusal declaration"))?;
+                    .ok_or(Error::Invalid("missing first sample declaration"))?;
                 self.native_recovery_end = true;
                 Ok(BackendStep::Event(RawEvent::Mp4(
                     Mp4Event::NativeMissingSample(Mp4NativeMissingSample {
@@ -1302,7 +1306,7 @@ impl Mp4Engine {
             }
             Step::NeedInput(r) => Ok(BackendStep::NeedInput(r)),
             Step::Yield => Ok(BackendStep::Yield),
-            Step::Ready(_) => Err(Error::Invalid("native first sample requires source end")),
+            Step::Ready(_) => Err(Error::Invalid("first sample requires source end")),
         }
     }
 

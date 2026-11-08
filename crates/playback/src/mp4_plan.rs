@@ -151,6 +151,9 @@ impl SourceRow {
 pub struct PreparedMp4 {
     pub(crate) read_scope: crate::mp4_open::MetadataReadScope,
     pub(crate) native_recovery: bool,
+    /// A single track's first sample declared at or beyond the end of the media
+    /// read while indexing. Only the physical end of the source shows whether it
+    /// lies outside the source.
     pub(crate) unavailable_first: Option<SourceRow>,
     pub(crate) source: triergon_core::SourceId,
     pub(crate) opening_generation: u64,
@@ -305,6 +308,11 @@ pub struct Mp4IndexJob<'a> {
     zero_scale_clock: Option<MediaClock>,
     first_sample_probe: Option<(SampleCursor<'a>, Error)>,
 }
+
+const OUTSIDE_MEDIA: &str = "sample outside media extent";
+const BACKWARD_LAYOUT: &str = "physical merge needs nondecreasing per-track source offsets";
+/// The strict view's refusal of a first sample that the source continues past.
+pub(crate) const BACKWARD_LAYOUT_REFUSAL: Error = Error::Unsupported(BACKWARD_LAYOUT);
 
 struct RangeDuration {
     micros: i64,
@@ -834,16 +842,20 @@ impl<'a> Mp4IndexJob<'a> {
                         self.source_track_order = true;
                         return Ok(false);
                     }
-                    Err(
-                        error @ (Error::Invalid("sample outside media extent")
-                        | Error::Unsupported(
-                            "physical merge needs nondecreasing per-track source offsets",
-                        )),
-                    ) if p.native_recovery
-                        && p.source_rows.is_empty()
-                        && p.terminal_mdat.is_none()
-                        && !p.media.is_empty()
-                        && self.movie.trex().is_empty() =>
+                    Err(error)
+                        if match error {
+                            Error::Invalid(OUTSIDE_MEDIA) => p.native_recovery,
+                            // Without a source length the strict view cannot yet
+                            // tell a first sample in a later mdat from one beyond
+                            // the source end; the physical end decides.
+                            Error::Unsupported(BACKWARD_LAYOUT) => {
+                                p.native_recovery || p.source_length.is_none()
+                            }
+                            _ => false,
+                        } && p.source_rows.is_empty()
+                            && p.terminal_mdat.is_none()
+                            && !p.media.is_empty()
+                            && self.movie.trex().is_empty() =>
                     {
                         let [track] = self.movie.tracks() else {
                             return Err(error);
