@@ -275,10 +275,12 @@ fn collections_select_faces_and_matching_scores_styles() {
     let faces: Vec<FaceInfo<'_>> = fonts.iter().map(FaceInfo::new).collect();
     assert_eq!(faces[1].weight(), 700);
     assert!(faces[2].is_italic() && !faces[2].is_bold());
-    let request = |family, bold, italic| Request {
+    // Weights and slants as libass's font description gives them for the
+    // ASS bold and italic values 0 and 1.
+    let request = |family, bold: u32, italic: u32| Request {
         family,
-        bold,
-        italic,
+        weight: 400 + 300 * bold,
+        slant: 100 * italic,
         character: None,
     };
     assert_eq!(select(&faces, &request("test sans", 0, 0)), Some(0));
@@ -292,6 +294,12 @@ fn collections_select_faces_and_matching_scores_styles() {
     assert_eq!(select(&faces, &request("test sans bold", 0, 0)), Some(1));
     assert_eq!(select(&faces, &request("TestSans-Bold", 0, 0)), None);
     assert_eq!(select(&faces, &request("Arimo", 0, 0)), None);
+    // Any slant asks for italic, as `\i-1` (slant 2^32 - 1) does in libass.
+    let any_slant = Request {
+        slant: u32::MAX,
+        ..request("Test Sans", 0, 0)
+    };
+    assert_eq!(select(&faces, &any_slant), Some(2));
     let needs_c = Request {
         character: Some('C'),
         ..request("Test Sans", 0, 0)
