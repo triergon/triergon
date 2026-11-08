@@ -688,11 +688,14 @@ pub fn feature_manifest(root: &Path, feature: &Feature) -> R<(Value, usize)> {
         ),
     ]);
     // A listed open case is one the candidate fails today: its builds reject it.
+    // One open on some targets only (`targets`) is a difference from those
+    // targets' reference, which the candidate completes.
     let open: Vec<String> = crate::checks::read_json(&feature.contract)?
         .get("open_cases")
         .and_then(Value::as_array)
         .unwrap_or_default()
         .iter()
+        .filter(|entry| entry.get("targets").is_none())
         .filter_map(|entry| s(entry, "id").map(str::to_owned))
         .collect();
     let baseline = |id: &str| {

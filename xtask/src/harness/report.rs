@@ -530,7 +530,7 @@ pub fn run(root: &Path, options: &Options) -> Result<i32, String> {
     }
     let contract_sha = digest(&options.contract)?;
     let (manifest, manifest_sha) = super::manifest::read(root, &options.manifest)?;
-    let open = open_cases(&contract, &manifest)?;
+    let open = open_cases(&contract, &manifest, &host_target())?;
     let contract_id = s(&contract, "id").map(str::to_owned);
     let mut additional = Vec::new();
     for path in &options.additional_reports {
@@ -827,9 +827,15 @@ pub fn run(root: &Path, options: &Options) -> Result<i32, String> {
     Ok(i32::from(!ratchet(&label, &rows, &open)))
 }
 
-/// A contract's `open_cases`: case ids that fail today, each tied to one of its
-/// `pending_module_requirements`. Every id must be a case of the manifest.
-pub(super) fn open_cases(contract: &Value, manifest: &Value) -> Result<Vec<String>, String> {
+/// A contract's `open_cases` on `target`: case ids that fail today, each tied to
+/// one of its `pending_module_requirements`. An entry with `targets` is open on
+/// those of the contract's `required_targets` only, and must pass elsewhere.
+/// Every id must be a case of the manifest.
+pub(super) fn open_cases(
+    contract: &Value,
+    manifest: &Value,
+    target: &str,
+) -> Result<Vec<String>, String> {
     let list = |value: &Value, key: &str| -> Vec<Value> {
         value
             .get(key)
@@ -849,6 +855,18 @@ pub(super) fn open_cases(contract: &Value, manifest: &Value) -> Result<Vec<Strin
         }
         if !cases.iter().any(|case| s(case, "id") == Some(id)) {
             return Err(format!("open case {id}: not a case of the manifest"));
+        }
+        if let Some(scope) = entry.get("targets") {
+            let required = list(contract, "required_targets");
+            let scope = scope.as_array().unwrap_or_default();
+            if scope.is_empty() || scope.iter().any(|t| !required.contains(t)) {
+                return Err(format!(
+                    "open case {id}: its targets must be some of the required targets"
+                ));
+            }
+            if !scope.iter().any(|t| t.as_str() == Some(target)) {
+                continue;
+            }
         }
         open.push(id.to_owned());
     }
@@ -1003,13 +1021,39 @@ mod prefix_tests {
             .unwrap()
         };
         let manifest = parse(r#"{"cases": [{"id": "a"}, {"id": "b"}]}"#).unwrap();
-        assert_eq!(open_cases(&contract("x"), &manifest).unwrap(), open);
+        assert_eq!(open_cases(&contract("x"), &manifest, "t").unwrap(), open);
         assert!(
-            open_cases(&contract("y"), &manifest).is_err(),
+            open_cases(&contract("y"), &manifest, "t").is_err(),
             "requirement not pending"
         );
         let other = parse(r#"{"cases": [{"id": "a"}]}"#).unwrap();
-        assert!(open_cases(&contract("x"), &other).is_err(), "unknown case");
+        assert!(
+            open_cases(&contract("x"), &other, "t").is_err(),
+            "unknown case"
+        );
+        // An open case scoped to targets is open there only.
+        let scoped = |targets: &str| {
+            parse(&format!(
+                r#"{{"required_targets": ["t", "u"], "pending_module_requirements": ["x"],
+                    "open_cases": [{{"id": "b", "requirement": "x", "targets": {targets}}}]}}"#
+            ))
+            .unwrap()
+        };
+        assert_eq!(
+            open_cases(&scoped(r#"["t"]"#), &manifest, "t").unwrap(),
+            open
+        );
+        assert!(
+            open_cases(&scoped(r#"["t"]"#), &manifest, "u")
+                .unwrap()
+                .is_empty()
+        );
+        for wrong in ["[]", r#"["v"]"#] {
+            assert!(
+                open_cases(&scoped(wrong), &manifest, "t").is_err(),
+                "{wrong}"
+            );
+        }
     }
 }
 

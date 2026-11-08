@@ -640,6 +640,29 @@ fn target_pins(root: &Path, feature: &str) -> Vec<String> {
             ));
         }
     }
+    // An open case scoped to targets is compared there: it names some of the
+    // required targets, and in a feature pinned per target, ones it has pins for.
+    for entry in document
+        .get("open_cases")
+        .and_then(Value::as_array)
+        .unwrap_or_default()
+    {
+        let Some(listed) = entry.get("targets") else {
+            continue;
+        };
+        let id = entry.get("id").and_then(Value::as_str).unwrap_or_default();
+        let scope = targets(entry, "targets");
+        let skipped = unpinned(&document, id);
+        let compared = |t: &&str| required.contains(t) && !skipped.iter().any(|(u, _)| u == t);
+        let complete = listed
+            .as_array()
+            .is_some_and(|all| all.len() == scope.len());
+        if scope.is_empty() || !complete || !scope.iter().all(compared) {
+            errors.push(format!(
+                "{feature}: open case {id}: its targets must be required targets it is pinned for"
+            ));
+        }
+    }
     for (case, pin) in &pinned {
         if !per_target {
             if pin.get("packets").is_none() {

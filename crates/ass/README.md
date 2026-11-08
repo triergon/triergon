@@ -182,11 +182,15 @@ convention asks:
   through `core::ffi::c_long` in one module.
 - Out-of-range drawing coordinates are rejected as libass does on 32-bit ARM with
   GCC. A coordinate is rounded to 26.6 as `triergon_raster::pixels_26_6`
-  rounds, saturating, and a coordinate beyond the outline bound, `i32::MIN`
-  included, discards the drawing. libass's own result there is undefined in C
-  and differs by compiler on other targets.
+  rounds, saturating, and a coordinate beyond the outline bound discards the
+  drawing. libass's own result there is undefined in C and differs by compiler
+  on other targets.
+- The one exception: libass built with GCC accepts a coordinate landing exactly
+  on `INT_MIN` through `abs(INT_MIN)` overflow, and the crate rejects it, so
+  the raster stages never see that coordinate.
 
-Those cases are compared in `ass-parse-host`, pinned per target.
+Those cases are compared in `ass-parse-host`, pinned per target; the exception's
+two cases are listed there as open cases on the GCC targets.
 
 ## Behaviour and limits
 
