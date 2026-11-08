@@ -16,6 +16,7 @@
 //! the rest of it is not decoded, and the display set is not presented at
 //! its end.
 mod epoch;
+mod memory;
 mod palette;
 mod pixels;
 mod segment;
@@ -195,10 +196,10 @@ impl Pages {
     }
 }
 
-/// A packet whose decoding stopped before a segment, to continue there.
+/// A packet whose decoding stopped before a segment, to continue there. Its
+/// bytes are in [`ReceiverDecoder::held_packet`].
 #[derive(Clone, Copy, Debug)]
-struct Resume {
-    length: usize,
+struct Suspended {
     pts: Option<i64>,
     /// Where the next segment starts; the packet length once only the
     /// end-of-packet presentation remains.
@@ -209,12 +210,21 @@ struct Resume {
 #[derive(Clone, Copy, Debug)]
 enum Progress {
     Done,
-    /// Stopped before the segment at `at`, for want of work or by
-    /// cancellation.
+    /// Stopped before the segment at `at` (the packet length for the
+    /// end-of-packet presentation).
     Halted {
         at: usize,
-        cancelled: bool,
+        why: Halt,
     },
+}
+
+#[derive(Clone, Copy, Debug)]
+enum Halt {
+    /// The work ran out.
+    Yield,
+    Cancelled,
+    /// The segment's memory was refused.
+    Refused(Error),
 }
 
 /// A segment of a selected page as the receiver reads it; `None` where it
@@ -310,8 +320,10 @@ pub struct ReceiverDecoder {
     /// Output rectangles, reused across calls.
     slots: BudgetVec<Slot>,
     presented: Option<Presented>,
-    /// Where the packet that yielded or was cancelled continues.
-    resume: Option<Resume>,
+    /// Where the packet that yielded, was cancelled or refused continues.
+    suspended: Option<Suspended>,
+    /// The suspended packet's bytes.
+    held_packet: BudgetVec<u8>,
     /// Work granted to calls on the current packet and left unspent.
     credit: u64,
     budget: Budget,
@@ -337,7 +349,8 @@ impl ReceiverDecoder {
             census: Census::new(budget),
             slots: BudgetVec::new(budget),
             presented: None,
-            resume: None,
+            suspended: None,
+            held_packet: BudgetVec::new(budget),
             credit: 0,
             budget: budget.clone(),
         }
@@ -347,15 +360,19 @@ impl ReceiverDecoder {
     /// A packet of a segment header or less, or one that does not start with
     /// a segment, is refused (`Error::Invalid`) and changes nothing.
     ///
-    /// Each segment's work, one unit per byte, per object placement it visits
-    /// and per pixel it may draw, copy or present, is charged to `work` before
-    /// the segment is decoded. When the budget cannot pay for the next one,
-    /// the call yields ([`Status::Yield`]) before it. Call again with the same
-    /// packet and time to continue: the work left over counts towards the
-    /// next call, so the packet completes after enough calls. Cancellation is
-    /// checked before each segment and each object placement, and a cancelled
-    /// packet continues the same way. A different packet drops the rest of a
-    /// yielded or cancelled one.
+    /// The memory the packet's segments may allocate is reserved before any
+    /// of them is decoded: a packet the budget cannot hold is refused
+    /// (`Error::Backpressure`) and changes nothing. Each segment's work, one
+    /// unit per byte, per object placement it visits and per pixel it may
+    /// draw, copy or present, is charged to `work` before the segment is
+    /// decoded. When the budget cannot pay for the next one, the call yields
+    /// ([`Status::Yield`]) before it, and the decoder keeps the rest of the
+    /// packet: [`resume`](Self::resume) it, and the work left over counts
+    /// towards the next segment, or [`abandon`](Self::abandon) it.
+    /// Cancellation is checked before each segment and each object placement,
+    /// and a cancelled packet is kept the same way, as is one whose memory is
+    /// refused after some of its segments were decoded. `decode` refuses
+    /// another packet while one is kept.
     pub fn decode(
         &mut self,
         packet: &[u8],
@@ -363,38 +380,97 @@ impl ReceiverDecoder {
         work: &mut WorkBudget,
         cancel: &AtomicBool,
     ) -> Result<Status<'_>> {
+        if self.suspended.is_some() {
+            return Err(Error::Invalid(
+                "DVB receiver: resume or abandon the kept packet",
+            ));
+        }
         if packet.len() <= 6 || packet[0] != 0x0f {
             return Err(Error::Invalid("DVB subtitle packet"));
         }
-        let start = match self.resume.take() {
-            Some(resume) if resume.length == packet.len() && resume.pts == pts => resume.offset,
-            _ => {
-                self.credit = 0;
-                self.presented = None;
-                self.held = Held::default();
-                0
-            }
-        };
+        self.credit = 0;
+        self.presented = None;
+        self.held = Held::default();
+        drop(self.budget.reserve(self.packet_memory(packet))?);
+        self.step(Some(packet), 0, pts, work, cancel)
+    }
+
+    /// Continue the kept packet before its next segment.
+    pub fn resume(&mut self, work: &mut WorkBudget, cancel: &AtomicBool) -> Result<Status<'_>> {
+        let Suspended { pts, offset } = self
+            .suspended
+            .take()
+            .ok_or(Error::Invalid("DVB receiver: no kept packet"))?;
+        self.step(None, offset, pts, work, cancel)
+    }
+
+    /// Whether a packet is kept for [`resume`](Self::resume).
+    pub fn has_kept_packet(&self) -> bool {
+        self.suspended.is_some()
+    }
+
+    /// Drop the rest of the kept packet. The segments decoded before it
+    /// stopped stay decoded.
+    pub fn abandon(&mut self) {
+        self.suspended = None;
+        self.credit = 0;
+    }
+
+    /// Run `packet`, or the kept packet, from `start`, and keep it if it
+    /// stops before its end.
+    fn step(
+        &mut self,
+        packet: Option<&[u8]>,
+        start: usize,
+        pts: Option<i64>,
+        work: &mut WorkBudget,
+        cancel: &AtomicBool,
+    ) -> Result<Status<'_>> {
+        let mut held = std::mem::replace(&mut self.held_packet, BudgetVec::new(&self.budget));
         let granted = work.remaining();
         let mut banked = WorkBudget::new(granted.saturating_add(self.credit));
-        let progress = self.run(packet, start, pts, &mut banked, cancel);
-        if let Ok(Progress::Halted { at, cancelled }) = progress {
+        let progress = self.run(
+            packet.unwrap_or(held.as_slice()),
+            start,
+            pts,
+            &mut banked,
+            cancel,
+        );
+        let halt = match progress {
+            Progress::Done => None,
+            Progress::Halted { at, why } => Some((at, why)),
+        };
+        if let Some((_, Halt::Yield | Halt::Cancelled)) = halt {
             work.take(granted);
             self.credit = banked.remaining();
-            self.resume = Some(Resume {
-                length: packet.len(),
-                pts,
-                offset: at,
-            });
-            return if cancelled {
-                Err(Error::Cancelled)
-            } else {
-                Ok(Status::Yield)
-            };
+        } else {
+            work.take(banked.spent().saturating_sub(self.credit));
+            self.credit = 0;
         }
-        work.take(banked.spent().saturating_sub(self.credit));
-        self.credit = 0;
-        progress?;
+        // A packet keeps its place once any of it was decoded.
+        let kept = match halt {
+            Some((0, Halt::Refused(_))) => None,
+            Some((at, _)) => Some(at),
+            None => None,
+        };
+        let copied = match (kept, packet) {
+            (Some(_), Some(packet)) => {
+                held.clear();
+                held.try_extend_from_slice(packet)
+            }
+            _ => Ok(()),
+        };
+        self.held_packet = held;
+        if let Some(offset) = kept {
+            copied?;
+            self.suspended = Some(Suspended { pts, offset });
+        }
+        match halt {
+            Some((_, Halt::Yield)) => return Ok(Status::Yield),
+            Some((_, Halt::Cancelled)) => return Err(Error::Cancelled),
+            Some((_, Halt::Refused(error))) => return Err(error),
+            None => {}
+        }
         Ok(match self.presented {
             Some(p) => Status::Subtitle(Subtitle {
                 pts: p.pts,
@@ -417,7 +493,8 @@ impl ReceiverDecoder {
         pts: Option<i64>,
         work: &mut WorkBudget,
         cancel: &AtomicBool,
-    ) -> Result<Progress> {
+    ) -> Progress {
+        let halt = |at, why| Progress::Halted { at, why };
         let mut segments = Segments::new(&packet[start..]);
         loop {
             let at = packet.len() - segments.remaining();
@@ -425,53 +502,39 @@ impl ReceiverDecoder {
                 break;
             };
             if cancel.load(Ordering::Relaxed) {
-                return Ok(Progress::Halted {
-                    at,
-                    cancelled: true,
-                });
+                return halt(at, Halt::Cancelled);
             }
             let Ok(segment) = segment else {
-                return Ok(Progress::Done);
+                return Progress::Done;
             };
             let parsed = self.pages.admit(segment.page).then(|| Parsed::of(&segment));
             let bytes = 6 + segment.body.len() as u64;
             let cost = bytes + parsed.as_ref().map_or(0, |parsed| self.work(parsed));
             if !work.try_charge(cost) {
-                return Ok(Progress::Halted {
-                    at,
-                    cancelled: false,
-                });
+                return halt(at, Halt::Yield);
             }
             let Some(parsed) = parsed else {
                 continue;
             };
             match self.apply(parsed, pts, cancel) {
                 Ok(Flow::Continue) => {}
-                Ok(Flow::Stop) => return Ok(Progress::Done),
-                Err(Error::Cancelled) => {
-                    return Ok(Progress::Halted {
-                        at,
-                        cancelled: true,
-                    });
-                }
-                Err(error) => return Err(error),
+                Ok(Flow::Stop) => return Progress::Done,
+                Err(Error::Cancelled) => return halt(at, Halt::Cancelled),
+                Err(error) => return halt(at, Halt::Refused(error)),
             }
         }
         let presents = self.held.display_set() && !self.options.end_from_next;
         if presents && !work.try_charge(self.present_work().0) {
-            return Ok(Progress::Halted {
-                at: packet.len(),
-                cancelled: false,
-            });
+            return halt(packet.len(), Halt::Yield);
         }
         if self.held.display_set() {
             self.display_size.get_or_insert(DEFAULT_DISPLAY);
         }
-        if presents {
-            self.present(pts, self.timeout_ms())?;
+        if presents && let Err(error) = self.present(pts, self.timeout_ms()) {
+            return halt(packet.len(), Halt::Refused(error));
         }
         self.previous_pts = pts;
-        Ok(Progress::Done)
+        Progress::Done
     }
 
     fn timeout_ms(&self) -> u32 {

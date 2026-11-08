@@ -26,6 +26,8 @@ pub struct DvbTsBridge {
     parser: PesParser,
     decoder: ReceiverDecoder,
     pending: Option<Pending>,
+    /// The pending PES was handed to the decoder, which may keep it.
+    decoding: bool,
     /// Whether the last PES time was on the player's timeline, so that
     /// subtitles have a time.
     anchored: bool,
@@ -185,6 +187,7 @@ impl DvbTsBridge {
             decoder,
             binding,
             pending: None,
+            decoding: false,
             anchored: false,
             eof: false,
         })
@@ -195,12 +198,22 @@ impl DvbTsBridge {
         &self.configuration
     }
 
+    /// Drop the pending PES once the decoder no longer keeps it: the last call
+    /// ended it, or refused it without keeping it.
+    fn settle(&mut self) {
+        if self.decoding && !self.decoder.has_kept_packet() {
+            self.decoding = false;
+            self.pending = None;
+        }
+    }
+
     /// Move a selected strict PES only on acceptance. A busy bridge returns
     /// `false` and validation errors leave the caller's output intact.
     pub fn push(&mut self, mailbox: &mut Option<Output>) -> Result<bool> {
         if mailbox.is_some() && self.eof {
             return Err(Error::Invalid("DVB bridge input after EOF"));
         }
+        self.settle();
         if self.pending.is_some() {
             return Ok(false);
         }
@@ -234,11 +247,14 @@ impl DvbTsBridge {
     /// decoder refuses, or one that presents nothing, asks for the next.
     pub fn poll(&mut self, work: &mut WorkBudget, cancel: &AtomicBool) -> Result<DvbStep<'_>> {
         if cancel.load(Ordering::Relaxed) {
+            self.decoder.abandon();
+            self.decoding = false;
             self.pending = None;
             self.parser.reset();
             self.eof = true;
             return Err(Error::Cancelled);
         }
+        self.settle();
         let Some(pending) = &mut self.pending else {
             return Ok(if self.eof {
                 DvbStep::Finished
@@ -261,17 +277,26 @@ impl DvbTsBridge {
             .filter(|_| anchored)
             .map(|ticks| microseconds(ticks, self.configuration.clock()))
             .transpose()?;
-        let status = self.decoder.decode(codec.codec(), pts, work, cancel);
-        // A packet that yielded is decoded again at the next poll.
-        if !matches!(status, Ok(Status::Yield)) {
-            self.pending = None;
-        }
+        let status = if self.decoding {
+            self.decoder.resume(work, cancel)
+        } else {
+            self.decoding = true;
+            self.decoder.decode(codec.codec(), pts, work, cancel)
+        };
+        // A packet the decoder keeps is resumed at the next poll; whether a
+        // refused one is kept is settled there.
         match status {
             Ok(Status::Subtitle(subtitle)) => {
+                self.decoding = false;
+                self.pending = None;
                 Ok(DvbStep::Action(DvbQueueAction::from_subtitle(subtitle)))
             }
             Ok(Status::Yield) => Ok(DvbStep::Yield),
-            Ok(Status::Nothing) | Err(Error::Invalid(_)) => Ok(DvbStep::NeedPacket),
+            Ok(Status::Nothing) | Err(Error::Invalid(_)) => {
+                self.decoding = false;
+                self.pending = None;
+                Ok(DvbStep::NeedPacket)
+            }
             Err(error) => Err(error),
         }
     }

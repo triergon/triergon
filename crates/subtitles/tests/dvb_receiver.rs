@@ -99,12 +99,11 @@ fn run(case: &Case, quantum: u64) -> ([u64; 3], u64) {
     let text = |digest: &mut u64| fold(digest, 0);
     text(&mut digest);
     for (index, (pts, packet)) in case.packets.iter().enumerate() {
-        let status = loop {
-            match decoder.decode(packet, *pts, &mut WorkBudget::new(quantum), &cancel) {
-                Ok(Status::Yield) => yields += 1,
-                status => break status,
-            }
-        };
+        let mut status = decoder.decode(packet, *pts, &mut WorkBudget::new(quantum), &cancel);
+        while matches!(status, Ok(Status::Yield)) {
+            yields += 1;
+            status = decoder.resume(&mut WorkBudget::new(quantum), &cancel);
+        }
         let subtitle = match status {
             Ok(Status::Subtitle(subtitle)) => subtitle,
             Ok(_) | Err(Error::Invalid(_)) => continue,
@@ -164,8 +163,8 @@ fn reference_folds() {
     );
 }
 
-/// Decoded a little work at a time, yielding and called again with the same
-/// packet, every case presents what it presents with unlimited work.
+/// Decoded a little work at a time, yielding and resumed, every case presents
+/// what it presents with unlimited work.
 #[test]
 fn small_budgets_yield_to_the_same_output() {
     let cases = cases();
@@ -257,30 +256,49 @@ fn charges_work_and_respects_the_pool() {
     // one call with enough work does.
     let mut decoder = ReceiverDecoder::new(&pool, &case.configuration, case.options);
     let mut spent = 0;
-    for _ in 0..whole.div_ceil(64) - 1 {
+    for call in 0..whole.div_ceil(64) - 1 {
         let mut small = WorkBudget::new(64);
-        let status = decoder.decode(packet, *pts, &mut small, &cancel).unwrap();
-        assert!(matches!(status, Status::Yield));
+        let status = if call == 0 {
+            decoder.decode(packet, *pts, &mut small, &cancel)
+        } else {
+            decoder.resume(&mut small, &cancel)
+        };
+        assert!(matches!(status.unwrap(), Status::Yield));
         assert_eq!(small.remaining(), 0);
         spent += 64;
     }
+    // A kept packet is resumed, not replaced.
+    assert!(matches!(
+        decoder.decode(packet, *pts, &mut WorkBudget::new(64), &cancel),
+        Err(Error::Invalid(_))
+    ));
     let mut last = WorkBudget::new(64);
-    let status = decoder.decode(packet, *pts, &mut last, &cancel).unwrap();
+    let status = decoder.resume(&mut last, &cancel).unwrap();
     assert!(status.subtitle().is_some());
     assert_eq!(spent + last.spent(), whole);
+    assert!(matches!(
+        decoder.resume(&mut last, &cancel),
+        Err(Error::Invalid(_))
+    ));
     let pool = Budget::new(256).unwrap();
     let mut decoder = ReceiverDecoder::new(&pool, &case.configuration, case.options);
     let mut work = WorkBudget::new(u64::MAX);
     assert!(decoder.decode(packet, *pts, &mut work, &cancel).is_err());
-    // A cancelled packet continues where it stopped.
+    // A cancelled packet is kept, to be resumed or abandoned.
     let pool = Budget::new(1 << 20).unwrap();
     let mut decoder = ReceiverDecoder::new(&pool, &case.configuration, case.options);
     assert!(matches!(
         decoder.decode(packet, *pts, &mut work, &AtomicBool::new(true)),
         Err(Error::Cancelled)
     ));
-    let status = decoder.decode(packet, *pts, &mut work, &cancel).unwrap();
+    let status = decoder.resume(&mut work, &cancel).unwrap();
     assert!(status.subtitle().is_some());
+    assert!(matches!(
+        decoder.decode(packet, *pts, &mut work, &AtomicBool::new(true)),
+        Err(Error::Cancelled)
+    ));
+    decoder.abandon();
+    assert!(!decoder.has_kept_packet());
 }
 
 /// Every fixture packet with bytes flipped, cut short and extended decodes
@@ -454,12 +472,24 @@ fn refused_packet_changes_nothing() {
     // A new epoch whose page first presents the previous one, whose pixels
     // must then be copied out of the regions.
     let reset = packet(&[segments::page(1, true, &[(0, 10, 10)])]);
+    // A region shrunk, which fits, then a second region past the pool: the
+    // first keeps its pixels.
+    let shrunk_then_grown = packet(&[
+        segments::region(0, 320, 64, &[(1, 0, 0)]),
+        segments::region(1, 1280, 1024, &[(1, 0, 0)]),
+    ]);
     let next = Options {
         end_from_next: true,
         ..Options::default()
     };
     for (options, refused, after, room) in [
         (Options::default(), &grown, &present, 1280 * 1024 / 2),
+        (
+            Options::default(),
+            &shrunk_then_grown,
+            &present,
+            1280 * 1024 / 2,
+        ),
         (next, &reset, &moved, 640 * 64 / 2),
     ] {
         let (_, used) = decode_all(1 << 24, options, &[&drawn]);

@@ -11,7 +11,7 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use triergon_core::{Budget, BudgetVec, Error, Result};
 
 /// The largest region the receiver allocates.
-const MAX_REGION_PIXELS: usize = 1280 * 1024;
+pub(super) const MAX_REGION_PIXELS: usize = 1280 * 1024;
 
 #[derive(Debug)]
 pub(super) struct Region {
@@ -29,6 +29,9 @@ pub(super) struct Region {
     /// only the colours it ranks; the rest keep earlier values.
     automatic: [u32; 256],
     automatic_current: bool,
+    /// Every pixel value is below this: the widest depth composed since the
+    /// pixels were last cleared.
+    values: usize,
 }
 
 impl Region {
@@ -44,6 +47,7 @@ impl Region {
             pixels: BudgetVec::new(budget),
             automatic: [0; 256],
             automatic_current: false,
+            values: 1,
         }
     }
 
@@ -75,9 +79,39 @@ impl Region {
         self.width = width;
         self.height = height;
         self.drawn = false;
+        self.values = 1;
         Ok(())
     }
 }
+
+/// The allocations an epoch holds, for [`memory`](super::memory) to plan a
+/// packet's against.
+#[derive(Clone, Copy, Debug)]
+pub(super) struct Holdings {
+    /// By region id.
+    pub(super) regions: [Option<RegionHoldings>; 256],
+    pub(super) region_slots: (usize, usize),
+    /// By CLUT id: whether it is defined.
+    pub(super) cluts: [bool; 256],
+    pub(super) clut_slots: (usize, usize),
+    pub(super) object_set: bool,
+}
+
+/// One region's allocations: its pixel count and capacity, and its object
+/// placements' count and capacity, and the bound of its pixel values.
+#[derive(Clone, Copy, Debug)]
+pub(super) struct RegionHoldings {
+    pub(super) pixels: (usize, usize),
+    pub(super) objects: (usize, usize),
+    /// Every pixel value is below this.
+    pub(super) values: usize,
+}
+
+/// Bytes of one element of the epoch's vectors.
+pub(super) const REGION_BYTES: usize = size_of::<Region>();
+pub(super) const CLUT_BYTES: usize = size_of::<Clut>();
+pub(super) const PLACEMENT_BYTES: usize = size_of::<ObjectPlacement>();
+pub(super) const OBJECT_SET_BYTES: usize = ObjectSet::WORDS * size_of::<u64>();
 
 #[derive(Debug)]
 struct Clut {
@@ -161,6 +195,28 @@ impl Epoch {
             .enumerate()
             .find(|(_, r)| r.id == id)
             .filter(|(_, r)| r.drawn)
+    }
+
+    pub(super) fn holdings(&self) -> Holdings {
+        let mut regions = [None; 256];
+        for region in self.regions.as_slice() {
+            regions[usize::from(region.id)] = Some(RegionHoldings {
+                pixels: (region.pixels.len(), region.pixels.capacity()),
+                objects: (region.objects.len(), region.objects.capacity()),
+                values: region.values,
+            });
+        }
+        let mut cluts = [false; 256];
+        for clut in self.cluts.as_slice() {
+            cluts[usize::from(clut.id)] = true;
+        }
+        Holdings {
+            regions,
+            region_slots: (self.regions.len(), self.regions.capacity()),
+            cluts,
+            clut_slots: (self.cluts.len(), self.cluts.capacity()),
+            object_set: !self.objects.words.is_empty(),
+        }
     }
 
     pub(super) fn region_at(&self, index: usize) -> &Region {
@@ -248,6 +304,9 @@ impl Epoch {
             region.resize(composition.width, composition.height)?;
         }
         region.depth = composition.depth;
+        region.values = region
+            .values
+            .max(usize::from(composition.depth.maximum()) + 1);
         region.clut = composition.clut;
         if composition.fill {
             region.pixels.as_mut_slice().fill(composition.background);

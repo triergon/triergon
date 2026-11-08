@@ -89,13 +89,15 @@ impl Prepared for Dvb {
         let count = self.track.packets.len();
         sink.header(count, None)?;
         for (index, (packet, &pts)) in self.track.packets.iter().zip(&self.pts).enumerate() {
-            let status = loop {
-                let mut work = WorkBudget::new(crate::WORK_SLICE);
-                match decoder.decode(&packet.data, pts, &mut work, &cancel) {
-                    Ok(Status::Yield) => {}
-                    status => break status,
-                }
-            };
+            let mut status = decoder.decode(
+                &packet.data,
+                pts,
+                &mut WorkBudget::new(crate::WORK_SLICE),
+                &cancel,
+            );
+            while matches!(status, Ok(Status::Yield)) {
+                status = decoder.resume(&mut WorkBudget::new(crate::WORK_SLICE), &cancel);
+            }
             let subtitle = match status {
                 Ok(Status::Subtitle(subtitle)) => subtitle,
                 Ok(Status::Nothing | Status::Yield) => continue,

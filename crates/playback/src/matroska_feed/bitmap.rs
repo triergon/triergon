@@ -47,7 +47,12 @@ impl MatroskaDvbPacket {
             .pts
             .map(|value| microseconds(value.ticks, facts.configuration().clock()))
             .transpose()?;
-        let subtitle = match decoder.decode(&self.packet.payload, pts, work, cancel) {
+        let status = if decoder.has_kept_packet() {
+            decoder.resume(work, cancel)
+        } else {
+            decoder.decode(&self.packet.payload, pts, work, cancel)
+        };
+        let subtitle = match status {
             Ok(Status::Subtitle(subtitle)) => subtitle,
             Ok(Status::Yield) => return Ok(MatroskaDvbStep::Yield),
             Ok(Status::Nothing) | Err(Error::Invalid(_)) => return Ok(MatroskaDvbStep::Decoded),
@@ -72,7 +77,9 @@ pub enum MatroskaDvbStep<'a> {
     Action(DvbQueueAction<'a>),
     /// The packet is decoded with no action.
     Decoded,
-    /// The work budget ran out: decode the same packet again.
+    /// The work budget ran out. The decoder keeps the packet: decode the same
+    /// packet again to resume it, or drop it with
+    /// [`ReceiverDecoder::abandon`].
     Yield,
 }
 

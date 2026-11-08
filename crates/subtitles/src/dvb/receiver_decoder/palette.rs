@@ -149,6 +149,10 @@ impl Census {
         }
     }
 
+    pub(super) fn capacity(&self) -> usize {
+        self.touch.capacity()
+    }
+
     fn reset(&mut self, colours: usize) -> Result<&mut [u32]> {
         self.touch.clear();
         self.touch.try_resize((colours + 1) * colours, 0)?;
