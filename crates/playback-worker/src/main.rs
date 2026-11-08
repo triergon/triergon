@@ -5,9 +5,11 @@ mod matroska_audio;
 mod mp4_forward;
 mod mp4_range;
 mod packet_fold;
+mod pgs;
 mod progressive;
 mod raw_video;
 mod runner;
+mod subtitle_text;
 mod ts_program;
 use std::{
     io::{self, Write},

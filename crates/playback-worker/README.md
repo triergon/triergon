@@ -18,6 +18,12 @@ playback-worker {mkv-audio-,mp4-forward-,ts-program-,raw-video-}fold   FILE ARG
 playback-worker {mkv-audio-,mp4-forward-,ts-program-,raw-video-}bench  FILE ITERATIONS ARG
 playback-worker {mkv-audio-,mp4-forward-,ts-program-,raw-video-}memory FILE ARG
 playback-worker {mkv-audio-,mp4-forward-,ts-program-,raw-video-}trace  FILE ARG
+playback-worker pgs-fold    CAPSULE
+playback-worker pgs-bench   CAPSULE ITERATIONS
+playback-worker pgs-memory  CAPSULE
+playback-worker subtitle-text-fold   FILE KIND [ENCODING]
+playback-worker subtitle-text-bench  FILE ITERATIONS KIND [ENCODING]
+playback-worker subtitle-text-memory FILE KIND [ENCODING]
 ```
 
 The `feed-` modes open a Matroska file with a 4 KiB read window, discover the streams,
@@ -69,3 +75,27 @@ prints one line per packet before the result. The reference side is
 
 The contracts are in `harness/features/<contract>/`; their corpora name inputs relative
 to the repository root, which they record as their `directory`.
+
+The `pgs-` modes decode PGS packets through
+`triergon_subtitles::compat::pgs::ReceiverDecoder`. The input is a case capsule
+(`SMBMO001`): the packet time base, the forced-only option and up to 64 records,
+each a complete PGS packet with its raw PTS and DTS or a hard reset that reopens
+the decoder. Every published subtitle is folded with its packet, consumed bytes,
+PTS in microseconds, display window and canvas, and per rectangle the geometry,
+forced flag, stride, index plane, palette and the palette value of every pixel; a
+decoder refusal ends the fold with a refusal marker. The fold is the digest of the
+byte transcript stored as `expected.bin` beside each case in
+`crates/subtitles/tests/native-compatibility-gold/`, and a test checks all 229.
+The corpus is `harness/features/subtitles-pgs/`.
+
+The `subtitle-text-` modes take KIND `packets`, `srt` or `vtt`. `packets` reads a
+session capsule (`TRSTXT01`): a codec byte (1 tx3g/mov_text, 2 ASS), an optional
+charset label, then decoder opens (packet time base, frame size, extradata),
+packets (optional PTS and duration) and flushes. tx3g samples go through
+`compat::mov_text::Decoder`; ASS packets through the opaque ASS extractor, or with
+a label through `compat::charset::AssPacketJob` with the glibc receiver
+repertoire. `srt` and `vtt` read one SubRip or WebVTT document through
+`text::Extractor` with ENCODING `utf8` (default), `utf16-bom`, `utf16be` or
+`utf16le`, folding every cue's start, duration, text and WebVTT identifier and
+settings. The capsules are written by `harness/subtitle_corpus.py`; the corpus is
+`harness/features/subtitles-text/`.

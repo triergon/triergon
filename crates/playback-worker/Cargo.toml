@@ -16,6 +16,7 @@ triergon-isobmff = { path = "../isobmff" }
 triergon-matroska = { path = "../media" }
 triergon-mpegts = { path = "../mpegts" }
 triergon-playback = { path = "../playback" }
+triergon-subtitles = { path = "../subtitles" }
 
 [lints]
 workspace = true
