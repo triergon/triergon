@@ -505,8 +505,8 @@ impl TransportFramer {
                     .complete(work, cancel)
                     .map(|value| value.map_or(Step::Yield, ready));
             }
-            // Complete feed carriers need only the header and padding check
-            // for common layouts. Other fields use the full inspector.
+            // Inspect complete feed carriers directly for common flags/PCR
+            // layouts. Other fields use the incremental inspector.
             if self.buffered_carrier != BufferedCarrier::Carry
                 && carry.is_empty()
                 && input.buffered().len() >= missing
@@ -542,7 +542,7 @@ impl TransportFramer {
                     self.next = Some(input.position());
                     if self.format == PacketFormat::Ts188
                         && !cancel.load(Ordering::Relaxed)
-                        && let Some(carrier) = PlainCarrier::inspect_ts188(&source, work)
+                        && let Some(carrier) = PlainCarrier::inspect_ts188(&source, start, work)
                     {
                         self.last_packet_offset = Some(start);
                         if DIRECT
@@ -718,6 +718,87 @@ impl TransportFramer {
 mod tests {
     use super::*;
     use triergon_core::{InputWindow, SourceCapabilities};
+
+    #[test]
+    fn pcr_carriers_keep_the_packet_route_after_budget_and_cancel_retries() {
+        for (high, flags) in [(1, 0x10), (0x41, 0x50)] {
+            for initial_work in [188, 197, 198] {
+                let budget = Budget::new(8192).unwrap();
+                let mut input = InputCursor::new(
+                    &budget,
+                    SourceId(7),
+                    SourceCapabilities {
+                        length: Some(188),
+                        random_access: false,
+                    },
+                    188,
+                )
+                .unwrap();
+                let mut wire = [0x42; 188];
+                wire[..12].copy_from_slice(&[0x47, high, 7, 0x37, 7, flags, 0, 0, 0, 0, 0x7e, 0]);
+                let backing = Bytes::copy_from_slice(&budget, &wire).unwrap();
+                let request = input.request();
+                input
+                    .provide_owned(
+                        InputWindow::new(request.source, request.token, 0, backing).unwrap(),
+                    )
+                    .unwrap();
+                let mut framer = TransportFramer::new(budget, PacketFormat::Ts188);
+                framer.compact_progressive_input();
+                let cancel = AtomicBool::new(true);
+                let mut work = WorkBudget::new(initial_work);
+                assert!(matches!(
+                    framer.poll_carrier::<true>(&mut input, &mut work, &cancel),
+                    Err(Error::Cancelled)
+                ));
+                assert_eq!(work.spent(), 0);
+                assert_eq!(input.position(), 0);
+                cancel.store(false, Ordering::Relaxed);
+                let mut step = framer
+                    .poll_carrier::<true>(&mut input, &mut work, &cancel)
+                    .unwrap();
+                let mut spent = work.spent();
+                let packet = loop {
+                    match step {
+                        Step::Ready(FramedCarrier::Packet(packet)) => break packet,
+                        Step::Yield => {
+                            assert_eq!(input.position(), 188);
+                            cancel.store(true, Ordering::Relaxed);
+                            let mut retry = WorkBudget::new(1);
+                            assert!(matches!(
+                                framer.poll_carrier::<true>(&mut input, &mut retry, &cancel),
+                                Err(Error::Cancelled)
+                            ));
+                            assert_eq!(retry.spent(), 0);
+                            cancel.store(false, Ordering::Relaxed);
+                            step = framer
+                                .poll_carrier::<true>(&mut input, &mut retry, &cancel)
+                                .unwrap();
+                            spent += retry.spent();
+                        }
+                        _ => panic!("PCR carrier bypassed the ordinary packet route"),
+                    }
+                };
+                assert_eq!(spent, 198); // 188 input bytes plus ten inspector actions.
+                assert_eq!(input.position(), 188);
+                assert_eq!(packet.pcr_range, Some(6..12));
+                assert_eq!(
+                    packet.adaptation.as_ref().unwrap().pcr,
+                    Some(crate::Pcr {
+                        base: 0,
+                        extension: 0
+                    })
+                );
+                assert_eq!(
+                    packet.adaptation.as_ref().unwrap().source.as_ref(),
+                    &wire[4..12]
+                );
+                assert_eq!(packet.payload.as_ref().unwrap().as_ref(), &wire[12..]);
+                assert_eq!(packet.payload_source_offset, 12);
+                assert_eq!(packet.source_id, Some(SourceId(7)));
+            }
+        }
+    }
 
     #[test]
     fn shared_segment_carriers_keep_their_owner_and_rejection_offsets() {
