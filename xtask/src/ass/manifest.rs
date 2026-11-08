@@ -1,9 +1,10 @@
 //! The ASS parsing features' manifests, generated from the authored fixtures in
 //! `harness/fixtures/ass`: every script (`.ass`, `.ssa`) read whole, every
 //! stream (`.chunks`) run packet by packet, and the events of every fixture
-//! with `;@time` walked at those times. The work each case must fold is
-//! pinned in `harness/features/<id>/pins.json`, libass's folds (see
-//! [`crate::lanes`]).
+//! with `;@time` walked at those times; the operations of [`PER_TARGET`] are
+//! `ass-parse-host`'s instead. The work each case must fold is pinned in
+//! `harness/features/<id>/pins.json`, libass's folds (see [`crate::lanes`]),
+//! per target in `ass-parse-host`.
 
 use std::path::Path;
 
@@ -15,14 +16,38 @@ type R<T> = Result<T, String>;
 /// The fixtures, relative to the root; the cases' files are in it.
 pub const FIXTURES: &str = "harness/fixtures/ass";
 
+/// How a case runs its fixture.
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub enum Operation {
+    /// The script or stream read (`ass-parse-scripts`, `ass-parse-chunks`).
+    Read,
+    /// Its events walked (`ass-parse-events`).
+    Walk,
+}
+
+/// The operations whose libass result differs by target, each one fixture's:
+/// drawing coordinates out of `int`'s range in 26.6 or landing on `INT_MIN`,
+/// which the reference flags (`harness/reference_ass.h`), and values read
+/// through C `long` beyond `int` (an event time, a ReadOrder). They are
+/// `ass-parse-host`'s cases, pinned per target; `cargo xtask check-design`
+/// fails if one of them is the same on every target, and a flagged case
+/// fails any other feature.
+pub const PER_TARGET: [(&str, Operation); 5] = [
+    ("drawings-clip-overflow.ass", Operation::Walk),
+    ("drawings-infinite.ass", Operation::Walk),
+    ("drawings-int-min.ass", Operation::Walk),
+    ("events-time-overflow.ass", Operation::Read),
+    ("stream-read-order-overflow.chunks", Operation::Read),
+];
+
 /// The files case rows are generated from, besides the pins and the fixtures,
 /// which each row records by hash.
 pub const ROW_SOURCES: [&str; 1] = ["xtask/src/ass/manifest.rs"];
 
 /// The cases `cargo xtask check` mutates: the scripts with the most tag,
 /// style and header quirks, a stream with every command, and the walks over
-/// drawings, karaoke and animation.
-pub const SMOKE_CASES: [(&str, &[&str]); 3] = [
+/// drawings, karaoke, animation and out-of-range coordinates and values.
+pub const SMOKE_CASES: [(&str, &[&str]); 4] = [
     (
         "ass-parse-scripts",
         &[
@@ -36,9 +61,22 @@ pub const SMOKE_CASES: [(&str, &[&str]); 3] = [
         "ass-parse-events",
         &["drawings-ass", "karaoke-ass", "animation-ass"],
     ),
+    (
+        "ass-parse-host",
+        &[
+            "drawings-infinite-ass",
+            "drawings-int-min-ass",
+            "events-time-overflow-ass",
+        ],
+    ),
 ];
 
-pub const FEATURES: [&str; 3] = ["ass-parse-scripts", "ass-parse-chunks", "ass-parse-events"];
+pub const FEATURES: [&str; 4] = [
+    "ass-parse-scripts",
+    "ass-parse-chunks",
+    "ass-parse-events",
+    "ass-parse-host",
+];
 
 pub const LANE: Lane = Lane {
     command: "ass",
@@ -64,6 +102,9 @@ fn note(id: &str) -> &'static str {
         }
         "ass-parse-chunks" => {
             "Every authored stream run as a Matroska track: codec private, packets through ass_process_chunk with ReadOrder deduplication, more data, style lines, flushes and prunes, the track recorded after each step that asks and at the end."
+        }
+        "ass-parse-host" => {
+            "The walks whose result C leaves to the host, as ass-parse-events walks them: drawing coordinates converted out of long's range or landing on INT_MIN; pinned from the AArch64 reference."
         }
         _ => {
             "Every event of every authored script or stream with times, walked at those times: per glyph the state its override tags leave, the event state, drawing and clip outlines and karaoke over synthetic positions."
@@ -117,14 +158,28 @@ fn rows(root: &Path, id: &str) -> R<Vec<Value>> {
     let mut rows = Vec::new();
     for (name, data) in fixtures(root)? {
         let kind = kind(&name).ok_or_else(|| format!("{FIXTURES}/{name}: not a fixture"))?;
+        let walk = || match kind {
+            Kind::Script(_) => ("script", &["script", "events"][..]),
+            Kind::Stream => ("stream", &["chunks", "events"][..]),
+        };
+        let read = || match kind {
+            Kind::Script(dialect) => (dialect, &["script"][..]),
+            Kind::Stream => ("stream", &["chunks"][..]),
+        };
+        let per_target = |operation| PER_TARGET.contains(&(name.as_str(), operation));
         let (profile, arguments): (&str, &[&str]) = match (id, kind) {
-            ("ass-parse-scripts", Kind::Script(dialect)) => (dialect, &["script"]),
-            ("ass-parse-chunks", Kind::Stream) => ("stream", &["chunks"]),
-            ("ass-parse-events", Kind::Script(_)) if timed(&data) => {
-                ("script", &["script", "events"])
+            ("ass-parse-scripts", Kind::Script(_)) | ("ass-parse-chunks", Kind::Stream)
+                if !per_target(Operation::Read) =>
+            {
+                read()
             }
-            ("ass-parse-events", Kind::Stream) if timed(&data) => ("stream", &["chunks", "events"]),
-            ("ass-parse-scripts" | "ass-parse-chunks" | "ass-parse-events", _) => continue,
+            ("ass-parse-events", _) if timed(&data) && !per_target(Operation::Walk) => walk(),
+            ("ass-parse-host", _) if per_target(Operation::Read) => read(),
+            ("ass-parse-host", _) if timed(&data) && per_target(Operation::Walk) => walk(),
+            (
+                "ass-parse-scripts" | "ass-parse-chunks" | "ass-parse-events" | "ass-parse-host",
+                _,
+            ) => continue,
             _ => return Err(format!("{id}: not an ASS parsing feature")),
         };
         rows.push(Value::object([
@@ -151,38 +206,69 @@ fn check_inputs(root: &Path) -> Vec<String> {
     if !registered {
         return Vec::new();
     }
-    match fixtures(root) {
-        Ok(files) => files
+    let files = match fixtures(root) {
+        Ok(files) => files,
+        Err(error) => return vec![error],
+    };
+    let mut errors: Vec<String> = files
+        .iter()
+        .filter(|(name, _)| kind(name).is_none())
+        .map(|(name, _)| format!("{FIXTURES}/{name}: neither a script nor a stream"))
+        .collect();
+    for (name, operation) in PER_TARGET {
+        let walked = operation == Operation::Walk;
+        if !files
             .iter()
-            .filter(|(name, _)| kind(name).is_none())
-            .map(|(name, _)| format!("{FIXTURES}/{name}: neither a script nor a stream"))
-            .collect(),
-        Err(error) => vec![error],
+            .any(|(file, data)| file == name && (!walked || timed(data)))
+        {
+            errors.push(format!("{FIXTURES}/{name}: no fixture of that name to run"));
+        }
     }
+    errors
 }
 
 #[cfg(test)]
 mod tests {
-    use super::rows;
+    use super::{Operation, rows};
     use crate::json::Value;
     use std::path::Path;
 
     #[test]
-    fn every_fixture_is_a_case_and_streams_are_walked_too() {
+    fn every_operation_is_one_features_case() {
         let root = Path::new(env!("CARGO_MANIFEST_DIR")).parent().unwrap();
-        let count = |id: &str| rows(root, id).unwrap().len();
+        let files = |id: &str| -> Vec<String> {
+            rows(root, id)
+                .unwrap()
+                .iter()
+                .filter_map(|r| r.get("file").and_then(Value::as_str).map(str::to_owned))
+                .collect()
+        };
         let fixtures = std::fs::read_dir(root.join(super::FIXTURES))
             .unwrap()
             .count();
+        let reads = super::PER_TARGET
+            .iter()
+            .filter(|(_, operation)| *operation == Operation::Read)
+            .count();
         assert_eq!(
-            count("ass-parse-scripts") + count("ass-parse-chunks"),
+            files("ass-parse-scripts").len() + files("ass-parse-chunks").len() + reads,
             fixtures
         );
-        let events = rows(root, "ass-parse-events").unwrap();
-        let profiles: Vec<&str> = events
+        let profiles: Vec<String> = rows(root, "ass-parse-events")
+            .unwrap()
             .iter()
-            .filter_map(|r| r.get("profile").and_then(Value::as_str))
+            .filter_map(|r| r.get("profile").and_then(Value::as_str).map(str::to_owned))
             .collect();
-        assert!(profiles.contains(&"script") && profiles.contains(&"stream"));
+        assert!(profiles.iter().any(|p| p == "script") && profiles.iter().any(|p| p == "stream"));
+        // Each per-target operation is ass-parse-host's alone.
+        let host = files("ass-parse-host");
+        assert_eq!(host, super::PER_TARGET.map(|(name, _)| name));
+        for (name, operation) in super::PER_TARGET {
+            let other = match operation {
+                Operation::Read => ["ass-parse-scripts", "ass-parse-chunks"],
+                Operation::Walk => ["ass-parse-events", "ass-parse-events"],
+            };
+            assert!(other.iter().all(|id| !files(id).iter().any(|f| f == name)));
+        }
     }
 }

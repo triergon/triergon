@@ -2,9 +2,10 @@
  * ASS parsing reference: the libass build of harness/reference.c (tooling only;
  * never linked into the library). It includes libass's ass_render.c from the
  * pinned source tree, as reference_raster.h does, to reach the render context
- * and its static init_render_context and free_render_context, and links the
- * built libass.a for everything else. It is compiled with the flags libass
- * compiled itself with (libass-internal.pc).
+ * and its static init_render_context and free_render_context, and ass_drawing.c,
+ * to see the points its parser adds (below), and links the built libass.a for
+ * everything else. It is compiled with the flags libass compiled itself with
+ * (libass-internal.pc).
  *
  * Usage:
  *   reference ass-fold   FILE MODE
@@ -49,8 +50,43 @@
  * created once, outside it. The renderer has no font provider, so the font
  * lookups libass's tags make find no font. `ass-dump` prints the same records
  * as lines, identical to ass-worker's.
+ *
+ * A case whose result C leaves to the target is flagged. libass reads a
+ * drawing coordinate with double_to_d6, lrint(x * 64) narrowed from long to
+ * int, then bounds it with abs(pt.x) > OUTLINE_MAX in ass_outline_add_point.
+ * The result is the target's own in two ways:
+ *   - a 26.6 value outside int's range or NaN: lrint saturates at long's range
+ *     on ARM and gives LONG_MIN on x86-64, and long has 32 or 64 bits, so the
+ *     int differs. ass_drawing.c is compiled into this file with its calls of
+ *     double_to_d6 going through assr_double_to_d6, which notes such a value
+ *     (on every host, whatever its long) and returns libass's result. The
+ *     check is explicit: the floating-point invalid exception would also be
+ *     raised by results C defines (0 x inf in strtod, inf - inf in \t,
+ *     fmod(inf), and dtoi32, which Clang compiles to a conversion before its
+ *     range check).
+ *   - abs(INT_MIN), for a coordinate that lands on INT_MIN (Clang reads it as
+ *     out of bounds, GCC as in bounds): the calls of ass_outline_add_point go
+ *     through assr_add_point, which notes such a point and calls libass's.
+ * A flagged fold adds "host_dependent":true and ass-dump says so on stderr;
+ * ass-worker cannot know, so the flag comes from the reference alone.
  */
 #include "ass_render.c"
+
+/* Whether the case reached a step whose result C leaves to the target. */
+static bool assr_host_dependent;
+
+static int assr_double_to_d6(double x) {
+    double d6 = rint(x * 64);
+    if (!(d6 >= INT_MIN && d6 <= INT_MAX)) assr_host_dependent = true;
+    return double_to_d6(x);
+}
+
+static bool assr_add_point(ASS_Outline *outline, ASS_Vector pt, char segment);
+#define ass_outline_add_point assr_add_point
+#define double_to_d6 assr_double_to_d6
+#include "ass_drawing.c"
+#undef double_to_d6
+#undef ass_outline_add_point
 
 #include <inttypes.h>
 #include <stdint.h>
@@ -97,6 +133,12 @@ typedef struct {
 } AssWork;
 
 static void assr_fold(AssWork *w, uint64_t v) { w->digest = w->digest * 31 + v; }
+
+
+static bool assr_add_point(ASS_Outline *outline, ASS_Vector pt, char segment) {
+    if (pt.x == INT32_MIN || pt.y == INT32_MIN) assr_host_dependent = true;
+    return ass_outline_add_point(outline, pt, segment);
+}
 
 static void assr_begin(AssWork *w, int tag) {
     if (w->dump) {
@@ -824,6 +866,7 @@ int main(int argc, char **argv) {
         AssWork work = {0, 0, 0, stdout};
         if (!assr_operation(&work, mode, lib, data, (size_t)size, &fixture, renderer, walked))
             status = 2;
+        if (assr_host_dependent) fprintf(stderr, "%s: host-dependent\n", argv[2]);
     } else {
         if (memory && write(STDOUT_FILENO, "TRIERGON_BEGIN_V1\n", 18) != 18) status = 2;
         uint64_t start = assr_now_ns(), packets = 0, bytes = 0, digest = 0;
@@ -839,8 +882,10 @@ int main(int argc, char **argv) {
         if (memory && !status && write(STDOUT_FILENO, "TRIERGON_END_V1\n", 16) != 16) status = 2;
         if (!status)
             printf("{\"schema\":1,\"operation\":\"ass-parse\",\"iterations\":%lu,\"packets\":%" PRIu64
-                   ",\"bytes\":%" PRIu64 ",\"digest\":%" PRIu64 ",\"elapsed_ns\":%" PRIu64 ",\"eof\":true}\n",
-                   iterations, packets, bytes, digest, elapsed);
+                   ",\"bytes\":%" PRIu64 ",\"digest\":%" PRIu64 ",\"elapsed_ns\":%" PRIu64
+                   "%s,\"eof\":true}\n",
+                   iterations, packets, bytes, digest, elapsed,
+                   assr_host_dependent ? ",\"host_dependent\":true" : "");
     }
     fflush(stdout);
     if (status) fprintf(stderr, "%s: out of memory\n", argv[2]);

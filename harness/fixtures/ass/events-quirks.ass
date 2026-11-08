@@ -13,7 +13,6 @@ Dialogue: 0,0:00:01,0:00:02.00,Default,,0,0,0,,short start
 Dialogue: 0,0:00:01.00,garbage,Default,,0,0,0,,bad end
 Dialogue: 0,0:00:01.00,0: 00:02.00,Default,,0,0,0,,space after colon
 Dialogue: 0,0:00:01.00,0 :00:02.00,Default,,0,0,0,,space before colon
-Dialogue: 0,4294967296:00:00.00,99999999999999999999:0:0.0,Default,,0,0,0,,overflow
 Dialogue: 0,0:00:00.00,0:00:01.00,Default,,0,0,0,
 Dialogue: 0,0:00:00.00,0:00:01.00,Default,,0,0,0,,
 Dialogue: 0,0:00:00.00,0:00:01.00,Default,,0,0,0,,   leading kept, trailing cut

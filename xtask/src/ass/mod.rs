@@ -26,9 +26,11 @@ pub const USAGE: &str = "usage: cargo xtask ass prepare [--jobs N]
             (default .research/ass/manifests); with --record, first re-record
             every pin from the built reference
   compare   `cargo xtask report` on each ASS parsing feature (ass-parse-scripts,
-            ass-parse-chunks, ass-parse-events; --all adds none today); further
-            report options pass through, and each report goes to
-            OUTPUT/<feature> (OUTPUT: --output, default .research/ass-report)";
+            ass-parse-chunks, ass-parse-events, and ass-parse-host, which fails
+            the command only on the targets its contract requires; --all adds
+            none today); further report options pass through, and each report
+            goes to OUTPUT/<feature> (OUTPUT: --output, default
+            .research/ass-report)";
 
 pub fn main(root: &Path, args: &[String]) -> Result<(), String> {
     match args {

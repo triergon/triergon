@@ -23,10 +23,25 @@
       "bytes": 219,
       "digest": 13230381166904574992
     },
+    "drawings-clip-overflow-ass": {
+      "packets": 4,
+      "bytes": 131,
+      "digest": 17501278916572564
+    },
+    "drawings-infinite-ass": {
+      "packets": 4,
+      "bytes": 120,
+      "digest": 1962855781250135605
+    },
+    "drawings-int-min-ass": {
+      "packets": 4,
+      "bytes": 120,
+      "digest": 9303548372216402199
+    },
     "drawings-ass": {
-      "packets": 29,
-      "bytes": 1244,
-      "digest": 6112310084192754256
+      "packets": 26,
+      "bytes": 1122,
+      "digest": 7323773244044958012
     },
     "effects-ass": {
       "packets": 15,
@@ -39,9 +54,9 @@
       "digest": 10213742343294773418
     },
     "events-quirks-ass": {
-      "packets": 18,
-      "bytes": 517,
-      "digest": 10716053601865080958
+      "packets": 17,
+      "bytes": 509,
+      "digest": 3065945800291747632
     },
     "ffmpeg-legacy-ass": {
       "packets": 5,

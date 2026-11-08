@@ -1,6 +1,7 @@
 //! The `Banner` and `Scroll` transition effects of the event effect field.
 
-use crate::number::{atoi, ffmax};
+use crate::c_long::atoi;
+use crate::number::ffmax;
 
 /// Which way a transition moves the text.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]

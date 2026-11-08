@@ -261,6 +261,33 @@ fn rights_reviewed(reviewed: &[Value], case: &Value) -> bool {
     }
 }
 
+/// The work a case must fold on `target`: its `expected` pin, or, for a case
+/// pinned per target, its pin for `target`; `None` when it has none there.
+pub fn expected_for<'a>(case: &'a Value, target: &str) -> Option<&'a Value> {
+    case.get("expected").or_else(|| {
+        case.get(crate::lanes::EXPECTED_BY_TARGET)
+            .and_then(|pins| pins.get(target))
+    })
+}
+
+/// A case without a pin for `target`, run and reported, neither passing nor
+/// failing: `unpinned`, with the contract's reason when it gives one.
+fn unpinned(mut ran: Value, contract: &Value, id: &str, target: &str) -> Value {
+    let reason = crate::lanes::unpinned(contract, id)
+        .into_iter()
+        .find(|(t, _)| *t == target)
+        .map_or_else(
+            || format!("no pin for {target}; reported, not compared"),
+            |(_, why)| format!("not pinned for {target}, reported: {why}"),
+        );
+    if let Value::Object(members) = &mut ran {
+        members.retain(|(key, _)| key != "status" && key != "reason");
+        members.insert(0, ("status".into(), Value::str("unpinned")));
+        members.push(("reason".into(), Value::str(reason)));
+    }
+    ran
+}
+
 /// The arguments a prefix worker takes after a case's input.
 pub fn case_arguments(case: &Value) -> Vec<std::ffi::OsString> {
     case.get("arguments")
@@ -294,6 +321,8 @@ pub struct PrefixFeature {
     pub work_fields: Vec<String>,
     /// How long one worker run may take (the contract's `timeout_seconds`).
     pub timeout: Duration,
+    /// Whether the contract pins its cases per target.
+    pub per_target: bool,
 }
 
 impl PrefixFeature {
@@ -336,6 +365,7 @@ impl PrefixFeature {
             work_fields: super::comparison::work_fields(&document)?,
             timeout: worker::contract_timeout(&document)
                 .map_err(|e| format!("{}: {e}", contract.display()))?,
+            per_target: crate::lanes::pinned_per_target(&document),
             id,
         })
     }
@@ -609,13 +639,21 @@ pub fn run(root: &Path, options: &Options) -> Result<i32, String> {
                     timeout,
                 },
             ));
-            parity::feed_parity(
+            let per_target = crate::lanes::pinned_per_target(&contract);
+            let expected = expected_for(case, &target);
+            let ran = parity::feed_parity(
                 &run,
                 prefix,
                 &arguments,
-                case.get("expected").unwrap_or(&Value::Null),
+                expected.unwrap_or(&Value::Null),
                 &work_fields,
-            )?
+                per_target,
+            )?;
+            if expected.is_some() {
+                ran
+            } else {
+                unpinned(ran, &contract, &id, &target)
+            }
         } else {
             row.push(("input_sha256", Value::str(sha)));
             let seek = case
@@ -674,7 +712,13 @@ pub fn run(root: &Path, options: &Options) -> Result<i32, String> {
                 parity::seek_parity(&run, true, comparison.as_ref(), content)?
             }
         };
-        println!("{id} {}", s(&parity, "status").unwrap_or_default());
+        match s(&parity, "reason") {
+            Some(reason) => println!(
+                "{id} {}: {reason}",
+                s(&parity, "status").unwrap_or_default()
+            ),
+            None => println!("{id} {}", s(&parity, "status").unwrap_or_default()),
+        }
         let passed = s(&parity, "status") == Some("pass");
         row.push(("parity", parity));
         if let (true, Some((reference, input, operation))) = (passed, timed) {
@@ -823,7 +867,9 @@ pub(super) fn ratchet(label: &str, rows: &[Value], open: &[String]) -> bool {
             .filter_map(|row| s(row, "id"))
             .collect()
     };
-    let failing = ids(&|row| !passed(row) && !listed(row));
+    let unpinned = |row: &Value| row.get("parity").and_then(|p| s(p, "status")) == Some("unpinned");
+    let failing = ids(&|row| !passed(row) && !listed(row) && !unpinned(row));
+    let reported = ids(&unpinned);
     let still_open = ids(&|row| !passed(row) && listed(row));
     let closed = ids(&|row| passed(row) && listed(row));
     println!(
@@ -836,6 +882,13 @@ pub(super) fn ratchet(label: &str, rows: &[Value], open: &[String]) -> bool {
             "{label}: {} open failures, as listed: {}",
             still_open.len(),
             still_open.join(", ")
+        );
+    }
+    if !reported.is_empty() {
+        println!(
+            "{label}: {} cases not pinned for this target, reported only: {}",
+            reported.len(),
+            reported.join(", ")
         );
     }
     if !failing.is_empty() {

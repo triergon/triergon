@@ -14,9 +14,9 @@
       "digest": 8573572833369919279
     },
     "stream-read-order-chunks": {
-      "packets": 22,
-      "bytes": 552,
-      "digest": 12032571391584296880
+      "packets": 21,
+      "bytes": 538,
+      "digest": 4789214482941831784
     },
     "stream-styles-chunks": {
       "packets": 9,

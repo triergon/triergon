@@ -17,7 +17,8 @@
     "stream"
   ],
   "required_targets": [
-    "aarch64-unknown-linux-gnu"
+    "aarch64-unknown-linux-gnu",
+    "armv7-unknown-linux-gnueabihf"
   ],
   "iterations": 1,
   "minimum_pairs": 30,

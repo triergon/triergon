@@ -6,9 +6,9 @@
 //! level divides them by [`drawing_scale`] when they are placed.
 
 use triergon_core::{Result, WorkBudget};
-use triergon_raster::{Outline, Rect, SegmentKind, Vector};
+use triergon_raster::{Outline, Rect, SegmentKind, Vector, pixels_26_6};
 
-use crate::number::{lrint, strtod};
+use crate::number::strtod;
 use crate::{Limits, charge};
 
 /// The factor libass applies to a drawing at `\p` level `level`:
@@ -179,8 +179,10 @@ impl Tokenizer<'_, '_> {
     fn coordinate(&mut self) -> Option<i32> {
         let (value, used) = strtod(&self.text[self.at..]);
         self.at += used;
-        // As libass's `double_to_d6`: `lrint` to `long`, truncated to `int`.
-        (used != 0).then(|| lrint(value * 64.0) as i32)
+        // libass's `double_to_d6` narrows `lrint` to `int`; out of `int`'s
+        // range C leaves the result to the target, and libass on 32-bit ARM
+        // with GCC saturates, which puts the point out of bounds.
+        (used != 0).then(|| pixels_26_6(value))
     }
 
     fn emit(&mut self, token: Token, p: Vector) -> Result<()> {
@@ -351,9 +353,13 @@ mod tests {
         assert_eq!(parse("l 5 5 m 0 0 l 1 1").unwrap().0.len(), 2);
         assert!(parse("n 0 0 m 0 0 l 1 1").unwrap().0.is_empty());
         // A coordinate beyond 2^28/64 discards the drawing, as does one
-        // whose 26.6 value truncates to i32::MIN.
+        // whose 26.6 value is out of `int`'s range or lands on i32::MIN.
         assert!(parse("m 0 0 l 4194304 0").is_none());
         assert!(parse("m 0 0 l 33554432 0").is_none());
+        assert!(parse("m 0 0 l 0 -33554432").is_none());
+        assert!(parse("m 1e400 0 l 1 1").is_none());
+        assert!(parse("m -1e400 0 l 1 1").is_none());
+        assert!(parse("m 0 0 l 67108864.5 0").is_none());
         // Partial groups of a b command are consumed and dropped.
         let (points, segments, _) = parse("m 0 0 b 1 1 2 2").unwrap();
         assert!(points.is_empty() && segments.is_empty());

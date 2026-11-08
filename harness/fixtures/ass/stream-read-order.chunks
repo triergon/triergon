@@ -24,8 +24,6 @@ ScriptType: v4.00+
 6,0,Default
 @chunk 0 100
 6,0,Default,,0,0,0,,the bitmap remembers the rejected 6
-@chunk 0 100
-99999999999,0,Default,,0,0,0,,atoi truncates
 @chunk 100 50
 1000,0,Default,,0,0,0,,ends at 150
 @dump

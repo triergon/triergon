@@ -185,11 +185,6 @@ pub(crate) fn strtoi32(s: &[u8], base: u32) -> (i32, usize) {
     (value.clamp(i32::MIN.into(), i32::MAX.into()) as i32, used)
 }
 
-/// C's `atoi` as libass's C library implements it: `strtol` truncated to `int`.
-pub(crate) fn atoi(s: &[u8]) -> i32 {
-    strtoll(s, 10).0 as i32
-}
-
 /// libass's `parse_int_header`: an `&h` or `0x` prefix right at the start
 /// selects hexadecimal; then blanks, a sign, for hexadecimal another `0x`, and
 /// digits reduced modulo 2^32, as VSFilter's `scanf` does. No digits is 0.
@@ -221,12 +216,12 @@ pub(crate) fn header_int(s: &[u8]) -> i32 {
 /// libass's `parse_bool`: `yes` in any case, or a positive integer.
 pub(crate) fn header_bool(s: &[u8]) -> bool {
     let s = &s[s.iter().position(|&c| !is_blank(c)).unwrap_or(s.len())..];
-    starts_with_ignore_case(s, b"yes") || strtoll(s, 10).0 > 0
+    starts_with_ignore_case(s, b"yes") || crate::c_long::strtol(s).0 > 0
 }
 
-/// A `%d` conversion of the reference C library's `sscanf`: blanks, then at
-/// most 512 characters of sign and digits converted by `strtoimax` and
-/// truncated to `int`. `None` when no digit is read.
+/// A `%d` conversion of the C library's `sscanf`: blanks, then at most 512
+/// characters of sign and digits converted by `strtol` and narrowed to `int`
+/// ([`crate::c_long`]). `None` when no digit is read.
 pub(crate) fn scanf_int(s: &[u8]) -> Option<(i32, usize)> {
     const WIDTH: usize = 512;
     let at = s.iter().position(|&c| !is_space(c)).unwrap_or(s.len());
@@ -241,7 +236,7 @@ pub(crate) fn scanf_int(s: &[u8]) -> Option<(i32, usize)> {
         return None;
     }
     let field = &rest[..sign + digits];
-    Some((strtoll(field, 10).0 as i32, at + field.len()))
+    Some((crate::c_long::atoi(field), at + field.len()))
 }
 
 /// The `[&H]` prefix of override colour and alpha arguments: any run of `&`
@@ -262,12 +257,6 @@ pub(crate) fn dtoi32(value: f64) -> i32 {
     } else {
         value as i32
     }
-}
-
-/// C's `lrint` in the default rounding mode, as `long` on the reference
-/// platform (AArch64 saturates; NaN is 0).
-pub(crate) fn lrint(value: f64) -> i64 {
-    value.round_ties_even() as i64
 }
 
 /// C's `FFMAX` on doubles: `a > b ? a : b`, so a NaN `a` yields `b`.
@@ -308,7 +297,6 @@ mod tests {
         assert_eq!(strtoll(b"99999999999999999999", 10).0, i64::MAX);
         assert_eq!(strtoll(b"-99999999999999999999", 10).0, i64::MIN);
         assert_eq!(strtoi32(b"3000000000", 10).0, i32::MAX);
-        assert_eq!(atoi(b"4294967297"), 1);
         assert_eq!(header_int(b"&H10"), 16);
         assert_eq!(header_int(b" &H10"), 0);
         assert_eq!(header_int(b"4294967297"), 1);
@@ -323,7 +311,6 @@ mod tests {
         assert_eq!(hex_tag_value(b"&hFF"), 0);
         assert_eq!(dtoi32(f64::NAN), i32::MIN);
         assert_eq!(dtoi32(-2.9), -2);
-        assert_eq!(lrint(2.5), 2);
         assert_eq!(ffmax(f64::NAN, 0.0), 0.0);
     }
 }
