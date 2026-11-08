@@ -11182,6 +11182,12 @@
    "sha256": "168d82b8b981e37b3d03f071a8d712b1bee7e05b01db94ca9cf432054bebfaf9"
   },
   {
+   "name": "packet-framing-job-comparison",
+   "retention": "90 days",
+   "key": "qualification/repository/packet-framing-job-comparison/a6d31d0ef8e2173a90375e7a148ab363000eeeeb66e86673dee6095261e154bb.tar.gz",
+   "sha256": "a6d31d0ef8e2173a90375e7a148ab363000eeeeb66e86673dee6095261e154bb"
+  },
+  {
    "name": "packet-framing-resident-diagnostics",
    "retention": "90 days",
    "key": "qualification/repository/packet-framing-resident-diagnostics/2e72d7940fe328712d4505c259c32a2da3c61640d46a79f1c7185b67bcb404f5.tar.gz",
