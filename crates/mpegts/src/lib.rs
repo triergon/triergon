@@ -20,6 +20,7 @@ mod demux_input;
 mod demux_pes;
 #[cfg(feature = "reference-trace")]
 mod demux_recovery;
+mod demux_transport;
 mod framer;
 mod media_entity;
 pub mod mux;

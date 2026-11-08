@@ -3,12 +3,14 @@
 //! The strict source view (`TransportStream`) parses the input and selects the
 //! program. Its first active PMT binds a `compat::pes::DemuxObserver` to the
 //! program's one elementary stream; the transport packets of that PID feed the
-//! observer, and `compat::pes::DemuxClock` places each packet's timestamps.
+//! observer through `TransportFaultRecovery`, and `compat::pes::DemuxClock`
+//! places each packet's timestamps. Faulted extraction retains the actual source
+//! diagnostic and never becomes a validated source PES.
 //!
 //! This packet operation binds one observer. Anything beyond that scope ends
 //! the operation with its cause instead of a fold: a program with more than one
 //! stream or a carriage the observer has no constructor for, a later PMT, a clock or format boundary, a
-//! quarantined clock, a transport, PES-time, program or active PSI fault, or a second
+//! quarantined clock, an unsupported transport, PES-time, program or active PSI fault, or a second
 //! media entity. A single-entity program-policy refusal with no emitted packets
 //! can instead complete when `PacketCompletion` proves every physical carrier is
 //! control-only and the source reached actual EOF. The proof runs inside the
@@ -28,7 +30,7 @@ use triergon_harness_protocol::digest::{fold, fold_bytes, signed};
 use triergon_mpegts::compat::pes::{
     DemuxClock, DemuxObserver, DemuxPacket, DemuxProfile, DemuxScope, DvbSubtitlesDescriptors,
     NoMediaConfirmation, PacketCompletion, PrivateAudioCarriage, PrivateAudioDescriptors,
-    RegisteredCarriage, SourceContext,
+    RegisteredCarriage, SourceContext, TransportFaultRecovery, TransportObservation,
 };
 use triergon_mpegts::psi::{DescriptorNamespace, Descriptors, DvbNamespaceEvidence, ProgramMap};
 use triergon_mpegts::{
@@ -55,9 +57,8 @@ fn fold_packet(
     pts90: Option<i64>,
     dts90: Option<i64>,
 ) -> Result<()> {
-    let digest = &mut totals.digest;
     // One elementary stream: stream index zero.
-    for value in [
+    let fields = [
         0,
         u64::from(packet.pid),
         signed(pts90.unwrap_or(NO_TIME)),
@@ -66,19 +67,30 @@ fn fold_packet(
         signed(packet.position),
         u64::from(packet.flags),
         packet.payload_len as u64,
-    ] {
+    ];
+    fold_payload(totals, fields, packet.stream_id, packet.payload())
+}
+
+fn fold_payload<'a>(
+    totals: &mut Totals,
+    fields: [u64; 8],
+    stream_id: u8,
+    payload: impl Iterator<Item = &'a [u8]>,
+) -> Result<()> {
+    let digest = &mut totals.digest;
+    for value in fields {
         fold(digest, value);
     }
     let mut seen = 0;
-    for span in packet.payload() {
+    for span in payload {
         fold_bytes(digest, span);
         seen += span.len();
     }
-    if seen != packet.payload_len {
+    if seen as u64 != fields[7] {
         return Err("packet payload does not match its length".into());
     }
     // One side-data element: the PES stream ID.
-    for value in [1, STREAM_ID_SIDE_DATA, 1, u64::from(packet.stream_id)] {
+    for value in [1, STREAM_ID_SIDE_DATA, 1, u64::from(stream_id)] {
         fold(digest, value);
     }
     totals.packets += 1;
@@ -189,7 +201,7 @@ fn observer(
     program: u16,
     map: &ProgramMap,
     cause: Cause,
-) -> triergon_core::Result<DemuxObserver> {
+) -> triergon_core::Result<TransportFaultRecovery> {
     let unrouted = Error::Unsupported(UNROUTED);
     let [stream] = map.streams.as_slice() else {
         return Err(unrouted);
@@ -233,7 +245,7 @@ fn observer(
         epochs: cause.epochs,
     };
     let (budget, limits) = (pool.clone(), ParseLimits::default());
-    if let Some(carriage) = registered {
+    let observer = if let Some(carriage) = registered {
         DemuxObserver::new_registered(PROFILE, scope, carriage, budget, limits)
     } else if dvb_subtitles {
         DemuxObserver::new_dvb_subtitles(
@@ -253,13 +265,14 @@ fn observer(
         DemuxObserver::new_private_audio(PROFILE, scope, carriage, descriptors, budget, limits)
     } else {
         Err(unrouted)
-    }
+    }?;
+    TransportFaultRecovery::new(observer).map_err(|rejected| rejected.error)
 }
 
 /// The observer, its clock and the folded packets of one operation.
 struct Session {
     clock: DemuxClock,
-    observer: Option<DemuxObserver>,
+    observer: Option<TransportFaultRecovery>,
     finished: bool,
     totals: Totals,
 }
@@ -305,6 +318,17 @@ impl Session {
                 return Err(unrouted());
             }
             TraceEvent::Diagnostic(fault)
+                if self
+                    .observer
+                    .as_ref()
+                    .is_some_and(TransportFaultRecovery::awaiting_source_fault) =>
+            {
+                self.observer
+                    .as_mut()
+                    .ok_or_else(unrouted)?
+                    .confirm_source_fault(fault, cause.context()?)?;
+            }
+            TraceEvent::Diagnostic(fault)
                 if matches!(fault.kind, FaultKind::Transport | FaultKind::Program)
                     || (fault.kind == FaultKind::Pes
                         && matches!(
@@ -329,7 +353,7 @@ impl Session {
         };
         loop {
             match observer.poll(&mut WorkBudget::new(WORK), cancel)? {
-                AssemblyStep::Output(packet) => {
+                AssemblyStep::Output(TransportObservation::Accepted(packet)) => {
                     let time = self
                         .clock
                         .project_header(
@@ -345,6 +369,27 @@ impl Session {
                         &packet,
                         time64(time.pts90)?,
                         time64(time.dts90)?,
+                    )?;
+                }
+                AssemblyStep::Output(TransportObservation::Faulted(packet)) => {
+                    let time = self
+                        .clock
+                        .project_transport_fault(&packet, &mut WorkBudget::new(1), cancel)?
+                        .ok_or("clock yielded on a fixed grant")?;
+                    fold_payload(
+                        &mut self.totals,
+                        [
+                            0,
+                            u64::from(packet.pid),
+                            signed(i64::try_from(time.pts90)?),
+                            signed(i64::try_from(time.dts90)?),
+                            signed(packet.duration90_raw),
+                            signed(packet.position),
+                            u64::from(packet.flags),
+                            packet.payload_len as u64,
+                        ],
+                        packet.stream_id,
+                        packet.payload(),
                     )?;
                 }
                 AssemblyStep::Yield => {}

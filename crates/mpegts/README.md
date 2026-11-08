@@ -37,6 +37,24 @@ Use `required_work()` and `required_end_work()` for admission grants; an
 insufficient grant leaves the event unconsumed. Errors after admission are
 sticky, and cancellation cannot publish a confirmation.
 
+`compat::pes::TransportFaultRecovery` wraps a drained, unbound `DemuxObserver`.
+Ordinary input keeps the same assembly. Its opt-in fault path admits AVC-signalled
+TS188 with exactly one TEI or scrambling fault, one complete nonempty finite PES,
+and valid PTS-only encoding. Feed the selected carrier through `push`, then its
+actual source diagnostic through `confirm_source_fault`. Until that confirmation,
+`poll` retains the carrier and returns `NeedPayload`. Combined faults, incomplete
+PES, other headers and entity or epoch transitions remain unsupported.
+
+`TransportObservation::Faulted` retains the unchanged carrier, source diagnostic,
+event contexts, byte ranges and charged storage. Its payload may be damaged or
+scrambled: it is neither validated source PES nor a codec access unit.
+`DemuxClock::project_transport_fault` places the encoded PTS in the existing demux
+interval without creating a source clock anchor; encoded DTS remains absent.
+The policy allocates two charged one-entry descriptor tables and aliases the
+original payload. Cancellation and allocation pressure preserve pending input.
+An unavoidable storage total above the pool limit returns `Limit`; storage held
+by external outputs or reservations can instead cause retryable `Backpressure`.
+
 ## Usage
 
 ```rust
@@ -258,8 +276,9 @@ Verification:
   [`harness/features/mpegts-pes/`](../../harness/features/mpegts-pes/contract.json)
   through `playback-worker`'s `ts-` modes, which use the public API only:
   `TransportStream` selects the program, its first active PMT binds a
-  `compat::pes::DemuxObserver` to the one elementary stream, and `DemuxClock`
-  places the timestamps. A typed program-policy or empty-observation refusal
+  `compat::pes::DemuxObserver` to the one elementary stream, wrapped by
+  `TransportFaultRecovery`, and `DemuxClock` places the timestamps. A typed
+  program-policy or empty-observation refusal
   with no emitted packets and one entity can complete through a bounded
   control-only replay and a real `NoMediaConfirmation`. Other refusals remain
   failures. The replay runs inside the measured operation.
@@ -271,8 +290,9 @@ Verification:
   The 168 requests for the strict source view, 64
   of them for its native clock, are replayed as the compat-view operation on
   their inputs: the strict source view and its native clock are not compared.
-  The 16 unmatched operations cover clock and format boundaries, recovery of
-  rejected and damaged carriers, input across media entities, and malformed
+  That archived comparison's 16 unmatched operations cover clock and format
+  boundaries, recovery of rejected and damaged carriers, input across media
+  entities, and malformed
   transport or PES whose empty result the completion policy cannot prove. They
   are `pcr-timeline-discontinuity`, `pcr-extension-invalid`, `transport-tei`,
   `transport-scrambled`, `transport-afc-reserved`,
@@ -286,6 +306,10 @@ Verification:
   reference; peak heap is at most 0.073 and total resident RSS at most 0.980 of
   it. Every measured case passes those numeric gates. The 16 parity failures
   keep the feature unaccepted.
+
+The separate macOS host comparison of TEI/scrambling extraction matches 83 of
+97 operations, retaining all 272 requests. Its other 14 operations remain
+failures. That policy has not been qualified by the native measurement above.
 
 
 Gates, harness and current results: [docs/quality.md](../../docs/quality.md)
