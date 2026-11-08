@@ -37,7 +37,10 @@ pub use triergon_codec::{AudioFrame, ChannelLayout, Speaker};
 use lfe::{Lfe2x, LfeFir, LfeState};
 use qmf::{Qmf, QmfState};
 use subframe::{SideInfo, SubBuf};
-use triergon_codec::{AudioDecoder, DecodeFailure, DownmixLevels};
+use triergon_codec::{
+    AudioDecoder, Budget, BudgetVec, Charged, DecodeFailure, DownmixLevels, Reservation,
+    StorageError,
+};
 
 /// Typed decode failure. The decoder never panics on malformed input.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -48,6 +51,14 @@ pub enum DecodeError {
     InvalidData(&'static str),
     /// Input exceeds a resource bound.
     ResourceLimit(&'static str),
+    /// Storage the frame needs does not fit the decoder's budget.
+    Budget(StorageError),
+}
+
+impl From<StorageError> for DecodeError {
+    fn from(error: StorageError) -> Self {
+        DecodeError::Budget(error)
+    }
 }
 
 impl core::fmt::Display for DecodeError {
@@ -56,6 +67,7 @@ impl core::fmt::Display for DecodeError {
             DecodeError::Unsupported(s) => write!(f, "unsupported DTS feature: {s}"),
             DecodeError::InvalidData(s) => write!(f, "invalid DTS data: {s}"),
             DecodeError::ResourceLimit(s) => write!(f, "DTS resource limit: {s}"),
+            DecodeError::Budget(error) => write!(f, "storage budget: {error}"),
         }
     }
 }
@@ -73,6 +85,25 @@ const QMF_GAIN: f64 = 0.25 * 128.0 * std::f64::consts::SQRT_2;
 /// X96 64-band synthesis gain (black-box calibration).
 const QMF64_GAIN: f64 = 0.25 * 256.0 * std::f64::consts::SQRT_2;
 
+/// Storage limits of one decoder.
+#[derive(Clone, Copy, Debug)]
+pub struct Limits {
+    /// Live storage that depends on the stream: subband rows, the X96 extension's rows
+    /// and 64-band filter bank, synthesis scratch, the normalization
+    /// buffer of 14-bit and little-endian packings, and the output frame the decoder
+    /// fills. The default holds the largest frame the syntax allows (128 blocks, X96,
+    /// eight output planes) about three times over.
+    pub live_storage_bytes: usize,
+}
+
+impl Default for Limits {
+    fn default() -> Self {
+        Limits {
+            live_storage_bytes: 2 * 1024 * 1024,
+        }
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 struct Config {
     amode: u8,
@@ -85,27 +116,49 @@ struct Config {
 /// DTS core decoder.
 #[derive(Debug)]
 pub struct Decoder {
-    scratch: Vec<u8>,
+    /// 16-bit big-endian copy of a frame in another packing.
+    scratch: BudgetVec<u8>,
+    frames: FrameDecoder,
+}
+
+/// 32-band synthesis history of one slot.
+type History32 = QmfState<1024>;
+
+/// The X96 64-band filter bank, created when a stream first carries X96.
+#[derive(Debug)]
+struct X96Bank {
+    qmf: Qmf<1024>,
+    /// One history per coded slot.
+    state: BudgetVec<QmfState<2048>>,
+}
+
+/// Decoder state of the frame stages, apart from the normalization buffer.
+#[derive(Debug)]
+pub(crate) struct FrameDecoder {
     sub: SubBuf,
     side: Box<SideInfo>,
-    qmf_np: Qmf,
-    qmf_pr: Qmf,
-    qstate: Vec<QmfState>,
+    qmf_np: Qmf<512>,
+    qmf_pr: Qmf<512>,
+    /// One history per coded slot.
+    qstate: Box<[History32]>,
     lfe_fir: LfeFir,
     lfe_state: LfeState,
     lfe_dec: [f32; 128],
     /// Time-major synthesis input of one slot (blocks x bands).
-    tbuf: Vec<f32>,
+    tbuf: BudgetVec<f32>,
     prev: Option<Config>,
     prev_xch: bool,
     prev_x96: bool,
     max_blocks: usize,
     x96buf: Option<SubBuf>,
     x96side: Box<x96::X96Side>,
-    qmf64: Option<Qmf>,
-    q64state: Vec<QmfState>,
+    x96: Option<Charged<Box<X96Bank>>>,
     lfe2x: Lfe2x,
-    lfe48: Vec<f32>,
+    lfe48: BudgetVec<f32>,
+    /// Pool of the stream-dependent storage above.
+    budget: Budget,
+    /// Charge of the output frame the last frame sized.
+    output_charge: Reservation,
 }
 
 impl Default for Decoder {
@@ -115,62 +168,102 @@ impl Default for Decoder {
 }
 
 impl Decoder {
+    /// A decoder with a pool of the default limit.
     pub fn new() -> Self {
+        #[allow(clippy::expect_used)] // The default limit is far above a pool's own charge.
+        Self::with_limits(Limits::default()).expect("default storage budget")
+    }
+
+    /// A decoder with its own pool of `limits.live_storage_bytes`.
+    pub fn with_limits(limits: Limits) -> Result<Self, DecodeError> {
+        Ok(Self::new_in(&Budget::new(limits.live_storage_bytes)?))
+    }
+
+    /// A decoder charging the caller's pool.
+    pub fn new_in(budget: &Budget) -> Self {
         Self {
-            scratch: Vec::new(),
-            sub: SubBuf::new(MAX_SLOTS, 32),
+            scratch: BudgetVec::new(budget),
+            frames: FrameDecoder::new(budget),
+        }
+    }
+
+    /// Drop all history (filter bank, LFE and ADPCM) after a seek or discontinuity.
+    pub fn reset(&mut self) {
+        self.frames.reset();
+    }
+
+    /// Decode exactly one DTS core frame. Replaces the contents of `out`, reusing its
+    /// buffers.
+    pub fn decode(&mut self, au: &[u8], out: &mut AudioFrame) -> Result<(), DecodeError> {
+        // A failed frame is dropped without touching the synthesis, LFE or ADPCM history,
+        // so the next frame continues as if the failed one were absent (FFmpeg's
+        // behaviour; checked with the synthetic `bad_dsync5` stream).
+        let packing = Packing::detect(au).ok_or(DecodeError::InvalidData("no DTS core sync"))?;
+        let frame = match packing {
+            Packing::Be16 => au,
+            _ => pack::normalize(au, packing, &mut self.scratch)?,
+        };
+        self.frames.decode_normalized(frame, out)
+    }
+}
+
+impl X96Bank {
+    fn new(budget: &Budget) -> Result<Charged<Box<Self>>, StorageError> {
+        let state = BudgetVec::try_filled(budget, QmfState::new(), MAX_SLOTS)?;
+        Charged::boxed(
+            budget,
+            Self {
+                qmf: Qmf::new(&tables::X96_FIR, QMF64_GAIN * OUT_SCALE),
+                state,
+            },
+        )
+    }
+
+    fn reset(&mut self) {
+        for q in self.state.iter_mut() {
+            q.reset();
+        }
+    }
+}
+
+impl FrameDecoder {
+    fn new(budget: &Budget) -> Self {
+        Self {
+            sub: SubBuf::new(budget, MAX_SLOTS, 32),
             side: Box::new(SideInfo::new()),
             qmf_np: Qmf::new(&tables::QMF_NONPERFECT, QMF_GAIN * OUT_SCALE),
             // FFmpeg's effective PR prototype differs from Annex D.8 (see pr_table.rs).
             qmf_pr: Qmf::new(&pr_table::QMF_PERFECT_REF, QMF_GAIN * OUT_SCALE),
-            qstate: (0..MAX_SLOTS).map(|_| QmfState::new(32)).collect(),
+            qstate: (0..MAX_SLOTS).map(|_| QmfState::new()).collect(),
             lfe_fir: LfeFir::new(OUT_SCALE),
             lfe_state: LfeState::default(),
             lfe_dec: [0.0; 128],
-            tbuf: Vec::new(),
+            tbuf: BudgetVec::new(budget),
             prev: None,
             prev_xch: false,
             prev_x96: false,
             max_blocks: 0,
             x96buf: None,
             x96side: Box::new(x96::X96Side::new()),
-            qmf64: None,
-            q64state: Vec::new(),
+            x96: None,
             lfe2x: Lfe2x::default(),
-            lfe48: Vec::new(),
+            lfe48: BudgetVec::new(budget),
+            budget: budget.clone(),
+            output_charge: Reservation::empty(budget),
         }
     }
 
-    /// Drop all history (filter bank, LFE and ADPCM) after a seek or discontinuity.
-    pub fn reset(&mut self) {
+    pub(crate) fn reset(&mut self) {
         for q in &mut self.qstate {
             q.reset();
         }
-        for q in &mut self.q64state {
-            q.reset();
+        if let Some(bank) = &mut self.x96 {
+            bank.reset();
         }
         self.lfe_state.reset();
         self.lfe2x.reset();
         self.prev = None;
         self.max_blocks = 0;
-    }
-
-    /// Decode exactly one DTS core frame. Replaces the contents of `out`, reusing its
-    /// buffers.
-    pub fn decode(&mut self, au: &[u8], out: &mut AudioFrame) -> Result<(), DecodeError> {
-        let packing = Packing::detect(au).ok_or(DecodeError::InvalidData("no DTS core sync"))?;
-        let mut scratch = core::mem::take(&mut self.scratch);
-        let res = if packing == Packing::Be16 {
-            self.decode_normalized(au, out)
-        } else {
-            pack::normalize(au, packing, &mut scratch);
-            self.decode_normalized(&scratch, out)
-        };
-        self.scratch = scratch;
-        // A failed frame is dropped without touching the synthesis, LFE or ADPCM history,
-        // so the next frame continues as if the failed one were absent (FFmpeg's
-        // behaviour; checked with the synthetic `bad_dsync5` stream).
-        res
     }
 }
 

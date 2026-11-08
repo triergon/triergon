@@ -2,8 +2,8 @@
 
 DTS Coherent Acoustics core decoder (ETSI TS 102 114), including the XCh and X96
 extensions carried inside the core frame. It is a codec-layer crate whose only dependency
-is [triergon-codec](../codec/README.md) (`AudioDecoder`, `AudioFrame`, `ChannelLayout`,
-`Speaker`). It decodes one core frame at a time to planar `f32` in FFmpeg's native
+is [triergon-codec](../codec/README.md) (`AudioDecoder`, `AudioFrame`, `Budget`,
+`ChannelLayout`, `Speaker`). It decodes one core frame at a time to planar `f32` in FFmpeg's native
 channel order. It does not decode DTS-HD extension substreams (XBR, XLL, LBR, or XXCh/X96
 in an extension substream); the caller strips those.
 
@@ -47,7 +47,8 @@ substreams and writes interleaved f32le.
   FL FR FC LFE BC SL SR. `layout_name(&layout)` gives FFmpeg's layout name.
 - 14-bit packings are normalized to 16-bit big endian; FSIZE counts bytes of the 16-bit
   equivalent stream, as in FFmpeg.
-- Errors are typed: `Unsupported(&str)`, `InvalidData(&str)`, `ResourceLimit(&str)`.
+- Errors are typed: `Unsupported(&str)`, `InvalidData(&str)`, `ResourceLimit(&str)`,
+  `Budget(StorageError)`.
   Refused: AMODE 10–15, deficit samples (SHORT ≠ 31), XXCh inside the core frame, XCh with
   more than one channel. A DSYNC mismatch is `InvalidData`.
 - A failed frame is dropped without touching any history, so the next frame continues
@@ -55,7 +56,14 @@ substreams and writes interleaved f32le.
 - X96 with REVNO 0 or above 8 is ignored and the core is decoded at the core rate.
 - Not applied, as in FFmpeg: dynamic range (RANGE), dialog normalization. TIMES, AUX and
   OCRC are skipped; PSC is read and ignored.
-- Buffers are sized to the stream; there is no steady-state allocation.
+- Buffers are sized to the stream; there is no steady-state allocation. Subband sample
+  rows, the X96 rows and 64-band filter bank, synthesis scratch, the normalization buffer
+  of 14-bit and little-endian packings and the output frame are charged to the decoder's
+  budget before they grow (`Limits::live_storage_bytes`, 2 MiB by default; the largest
+  frame the syntax allows, 128 blocks with X96 and eight 8192-sample planes, needs about
+  0.7 MiB). `Decoder::with_limits` sets the limit and `Decoder::new_in` charges a caller's
+  `Budget`; a refused charge is `DecodeError::Budget` and drops the frame like any other
+  error.
 
 ### Behaviour taken from FFmpeg rather than the text
 
@@ -81,8 +89,9 @@ The Annex D.10 VQ codebooks (D.10.1 ADPCM, 4096×4; D.10.2 high-frequency VQ, 10
 are normative but not printed in any edition. They, and the perfect-reconstruction
 prototype in `src/pr_table.rs`, are recovered black-box from the reference decoder's
 output on synthetic probe streams; no decoder source was read. Running
-`harness/codecs/dca/regenerate_tables.sh` with FFmpeg 9.0.2 on `PATH` rebuilds `src/vq.rs`
-and `src/pr_table.rs` and checks that they are byte-identical to the committed files.
+`harness/codecs/dca/regenerate_tables.sh SPEC_V161_TXT` with FFmpeg 9.0.2 on `PATH` rebuilds
+`src/vq.rs` and `src/pr_table.rs` and checks that they are byte-identical to the committed
+files.
 
 ## Known gaps
 

@@ -7,7 +7,7 @@ mod synthesis;
 use crate::bits::BitReader;
 use crate::header::{FrameHeader, SetHeader};
 use crate::subframe::{self, SubBuf, SubframeParams};
-use crate::{AudioFrame, Config, DecodeError, Decoder, Speaker, x96};
+use crate::{AudioFrame, Config, DecodeError, FrameDecoder, Speaker, x96};
 
 /// Per-frame values shared by the decoding stages.
 struct CoreFrame<'a> {
@@ -25,7 +25,7 @@ struct CoreFrame<'a> {
     params: SubframeParams,
 }
 
-impl Decoder {
+impl FrameDecoder {
     pub(crate) fn decode_normalized(
         &mut self,
         data: &[u8],
@@ -67,8 +67,10 @@ impl Decoder {
             have_x96 = self.decode_x96(&f, pos)?;
         }
 
-        self.prepare_synthesis(&f, nslots, have_x96);
-        let (plane_of, lfe_plane) = synthesis::output_layout(out, &f, xch, have_x96);
+        // Storage is sized before the first history update, so a refused charge drops
+        // the frame like any other failure.
+        let (plane_of, lfe_plane) = self.output_layout(out, &f, xch, have_x96)?;
+        self.prepare_synthesis(&f, nslots, have_x96)?;
         self.postprocess_subbands(&f, xch, have_x96)?;
         self.synthesize(out, &f, nslots, have_x96, &plane_of)?;
         if let Some(lp) = lfe_plane {
@@ -128,8 +130,8 @@ impl Decoder {
             self.lfe_state.reset();
         }
         let keep = same && h.hflag && !grows;
-        self.sub.start_frame(0..set.nch, h.blocks, keep);
         self.prev = Some(cfg);
+        self.sub.start_frame(0..set.nch, h.blocks, keep)?;
 
         let params = SubframeParams {
             nssc: 0,
@@ -221,12 +223,13 @@ impl Decoder {
         if !self.prev_xch {
             // The Cs synthesis history starts fresh when XCh (re)appears.
             self.qstate[set.nch].reset();
-            if let Some(q) = self.q64state.get_mut(set.nch) {
-                q.reset();
+            if let Some(bank) = &mut self.x96 {
+                bank.state[set.nch].reset();
             }
         }
         let xkeep = f.keep && self.prev_xch;
-        self.sub.start_frame(set.nch..set.nch + 1, h.blocks, xkeep);
+        self.sub
+            .start_frame(set.nch..set.nch + 1, h.blocks, xkeep)?;
         let mut xt0 = 0;
         for &nssc in &f.sf_nssc[..f.nsubfs] {
             let p = SubframeParams {
@@ -261,8 +264,10 @@ impl Decoder {
         let Some(xh) = x96::X96Header::parse(&mut xb, set.nch, h.cpf)? else {
             return Ok(false);
         };
-        let buf = self.x96buf.get_or_insert_with(|| SubBuf::new(5, 64));
-        buf.start_frame(0..set.nch, h.blocks, f.keep && self.prev_x96);
+        let buf = self
+            .x96buf
+            .get_or_insert_with(|| SubBuf::new(&self.budget, 5, 64));
+        buf.start_frame(0..set.nch, h.blocks, f.keep && self.prev_x96)?;
         let mut xt0 = 0;
         for &nssc in &f.sf_nssc[..f.nsubfs] {
             x96::decode_subframe(

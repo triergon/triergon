@@ -7,11 +7,14 @@
 #
 # No FFmpeg source is read. Requires the pinned FFmpeg 9.0.2 `ffmpeg` on PATH and Python
 # with numpy (research tooling only, not a production dependency).
-#   usage: harness/codecs/dca/regenerate_tables.sh [PYTHON]
+# SPEC_V161_TXT is `pdftotext -layout` of ETSI TS 102 114 V1.6.1 (see gen_tables.py); the
+# Annex D.8 prototype in it is the baseline pr_table.rs records its deviation from.
+#   usage: harness/codecs/dca/regenerate_tables.sh SPEC_V161_TXT [PYTHON]
 # Exit status 0 means both generated files are identical to the committed ones.
 set -euo pipefail
 R=$(cd "$(dirname "$0")/../../.." && pwd)
-PY=${1:-python3}
+SPEC=${1:?usage: regenerate_tables.sh SPEC_V161_TXT [PYTHON]}
+PY=${2:-python3}
 T=${CARGO_TARGET_DIR:-$R/target}
 W=$T/dca-regenerate
 mkdir -p "$W"
@@ -26,7 +29,7 @@ done
 "$PY" -I "$R/harness/codecs/dca/recover_vq.py" "$W/hfvq_probe.dts.meta" "$W/hfvq_probe.ref.f32" "$W/hfvq.txt"
 "$PY" -I "$R/harness/codecs/dca/gen_vq.py" "$W/adpcm.txt" "$W/hfvq.txt" "$W/vq.rs"
 "$PY" -I "$R/harness/codecs/dca/recover_pr.py" "$W/pr_probe.dts.meta" "$W/pr_probe.ref.f32" \
-  "$R/crates/codec-dca/src/tables.rs" "$W/pr_table.rs"
+  "$SPEC" "$W/pr_table.rs"
 status=0
 for f in vq.rs pr_table.rs; do
   if cmp -s "$W/$f" "$R/crates/codec-dca/src/$f"; then
