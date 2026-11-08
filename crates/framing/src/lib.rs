@@ -24,6 +24,7 @@ pub use nal_packet::{
 mod ac3;
 mod ac3_config;
 mod annexb;
+mod audio_config;
 mod av1;
 mod av1_config;
 mod av1_temporal_unit;
@@ -35,10 +36,14 @@ mod dts_inspect;
 mod dts_packing;
 mod dts_source;
 mod eac3_bsi;
+mod flac_config;
 mod header;
+mod mpeg_audio;
+mod opus_config;
 mod raw_annex_b;
 mod reader;
 mod record_input;
+mod vorbis_config;
 mod vp9_config;
 
 pub use ac3::{
@@ -50,6 +55,9 @@ pub use ac3_config::{
     Dac3Configuration, Dac3Fields, Dec3Configuration, Dec3Substream,
 };
 pub use annexb::{AnnexBOutput, AnnexBWriter, BuildStep};
+pub use audio_config::{
+    canonical_flac_configuration, canonical_opus_configuration, canonical_vorbis_configuration,
+};
 pub use av1::{
     Av1Leb128, Av1Obu, Av1ObuExtension, Av1ObuFacts, Av1ObuFraming, Av1ObuHeader,
     Av1ObuHeaderIssues, Av1ObuLimits, Av1ObuReader,
@@ -83,8 +91,24 @@ pub use dts_source::DtsSourceIdentity;
 pub use eac3_bsi::{
     Eac3BitRange, Eac3BitSpan, Eac3Bsi, Eac3BsiFacts, Eac3BsiLimits, Eac3BsiParser, Eac3Trailer,
 };
+pub use flac_config::{
+    FLAC_STREAMINFO, FLAC_VORBIS_COMMENT, FlacBlocking, FlacChannelAssignment, FlacFrameHeader,
+    FlacMetadataBlock, FlacStreamInfo, flac_configuration_from_dfla, flac_configuration_from_ogg,
+    flac_metadata_blocks, flac_stream_info,
+};
 pub use header::{Codec, NalHeader, ParameterSetKind};
+pub use mpeg_audio::{
+    LameTag, MpegAudioHeader, MpegChannelMode, MpegEmphasis, MpegInfoFrame, MpegInfoKind,
+    MpegLayer, MpegVersion, mpeg_audio_crc_ok, mpeg_info_frame,
+};
+pub use opus_config::{
+    OPUS_RATE, OpusHead, opus_frame_samples, opus_packet_frames, opus_packet_samples,
+};
 pub use reader::{Framing, LengthSize, NalFacts, NalFraming, NalReader, NalUnit, ReaderLimits};
+pub use vorbis_config::{
+    VorbisBlock, VorbisHeaders, VorbisIdentification, VorbisModes, vorbis_header_type,
+    vorbis_packet_blocksize, xiph_join, xiph_split,
+};
 pub use vp9_config::{
     Vp9ConfigContext, Vp9ConfigFields, Vp9ConfigLimits, Vp9ConfigParser, Vp9ConfigSyntaxIssues,
     Vp9Configuration,

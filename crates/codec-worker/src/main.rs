@@ -2,8 +2,9 @@
 //! the decode build of `harness/reference.c`, through the session decoders.
 //!
 //! usage: codec-worker KIND-CODEC-bench FILE ITERATIONS | KIND-CODEC-memory FILE |
-//! KIND-CODEC-raw FILE OUT, KIND-CODEC one of video-h264, video-hevc, audio-ac3,
-//! audio-eac3, audio-aac, audio-dts. Bench prints {iterations, elapsed_ns, packets, bytes, digest} where
+//! KIND-CODEC-raw FILE OUT | packets FORMAT FILE, KIND-CODEC one of video-h264,
+//! video-hevc, audio-ac3, audio-eac3, audio-aac, audio-dts, audio-flac, audio-mp3,
+//! audio-vorbis, audio-opus. Bench prints {iterations, elapsed_ns, packets, bytes, digest} where
 //! packets counts output pictures/audio blocks and the digest
 //! ([`triergon_harness_protocol::interleaved`]) covers the exact converted output (RGBA or
 //! interleaved stereo s16le). File loading and process start are outside the timed
@@ -12,15 +13,21 @@
 //! The elementary-stream splitting below mirrors the reference worker's own parser
 //! (the decode build of `harness/reference.c`) so both decode the same
 //! units. It is measurement framing, not product framing:
-//! playback frames access units through `triergon-framing`.
+//! playback frames access units through `triergon-framing`. FLAC, MPEG audio, Vorbis
+//! and Opus lanes read their file format as a player does, through `AnyReader` and the
+//! session's track decoder, as the reference reads them through its demuxer.
+//! `packets` prints what a container reader emits per packet ([`packets`]).
 #![forbid(unsafe_code)]
+mod packets;
+
 use std::io::Write;
 use std::time::Instant;
+use triergon::{Budget, ContainerReader, MediaKind, PacketInfo, open_sequential};
 use triergon_codec::{AudioCodec, AudioFrame, VideoCodec};
 use triergon_harness_protocol::interleaved::InterleavedDigest;
 use triergon_pixel::letterbox::{CANVAS_BYTES, Scaler};
 use triergon_session::mix::Downmix;
-use triergon_session::{audio_decoder, video_decoder};
+use triergon_session::{TrackDecoder, audio_decoder, video_decoder};
 
 #[derive(Default)]
 struct Output {
@@ -136,6 +143,9 @@ fn audio_units<'a>(codec: AudioCodec, data: &'a [u8], mut each: impl FnMut(&'a [
                 .ok()
                 .map(|h| h.frame_length),
             AudioCodec::Dts => dts_frame_len(rest),
+            AudioCodec::Flac | AudioCodec::Opus | AudioCodec::Vorbis | AudioCodec::MpegAudio => {
+                unreachable!("file-format lanes read through their container")
+            }
         };
         match len {
             Some(len) if len > 0 && len <= rest.len() => {
@@ -154,7 +164,7 @@ fn audio_units<'a>(codec: AudioCodec, data: &'a [u8], mut each: impl FnMut(&'a [
 }
 
 fn audio(codec: AudioCodec, data: &[u8], out: &mut Output) {
-    let mut decoder = audio_decoder(codec);
+    let mut decoder = audio_decoder(codec, &[]).expect("decoder");
     let mut frame = AudioFrame::default();
     let mut downmix = Downmix::default();
     let mut pcm = Vec::new();
@@ -172,6 +182,59 @@ fn audio(codec: AudioCodec, data: &[u8], out: &mut Output) {
     });
 }
 
+/// A file-format lane: the first audio track of the file, decoded with its trims and
+/// mixed to stereo s16 like the elementary lanes. The file is read sequentially, as the
+/// reference reads its piped input.
+fn file_audio(data: &[u8], out: &mut Output) {
+    let pool = Budget::new(256 << 20).expect("pool");
+    let mut source = open_sequential(data, &pool).expect("open");
+    let mut decoder: Option<(triergon::TrackId, TrackDecoder)> = None;
+    let mut frame = AudioFrame::default();
+    let mut downmix = Downmix::default();
+    let (mut pcm, mut bytes) = (Vec::new(), Vec::new());
+    while let Some(packet) = source.next_packet().expect("read") {
+        let (track, decoder) = decoder.get_or_insert_with(|| {
+            let reader = source.reader();
+            let track = (0..reader.track_count())
+                .filter_map(|index| reader.track(index))
+                .find(|track| track.kind() == MediaKind::Audio)
+                .expect("an audio track");
+            (track.id(), TrackDecoder::new(track).expect("decoder"))
+        });
+        if packet.track() != *track {
+            continue;
+        }
+        let decoded = decoder.decode(&packet, &mut frame);
+        emit_mixed(decoded, &frame, &mut downmix, &mut pcm, &mut bytes, out);
+    }
+    if let Some((_, decoder)) = decoder.as_mut() {
+        let flushed = decoder.flush(&mut frame).map(|()| None);
+        emit_mixed(flushed, &frame, &mut downmix, &mut pcm, &mut bytes, out);
+    }
+}
+
+/// Mix one decode result to stereo s16 and emit it.
+fn emit_mixed(
+    decoded: Result<Option<triergon_codec::DownmixLevels>, triergon_codec::DecodeFailure>,
+    frame: &AudioFrame,
+    downmix: &mut Downmix,
+    pcm: &mut Vec<i16>,
+    bytes: &mut Vec<u8>,
+    out: &mut Output,
+) {
+    match decoded {
+        Ok(_) if frame.samples_per_channel == 0 => {}
+        Ok(levels) => {
+            pcm.clear();
+            downmix.mix(frame, levels.unwrap_or_default(), pcm);
+            bytes.clear();
+            bytes.extend(pcm.iter().flat_map(|s| s.to_le_bytes()));
+            out.emit(bytes);
+        }
+        Err(error) => eprintln!("decode error: {}", error.0),
+    }
+}
+
 fn run(op: &str, data: &[u8], out: &mut Output) {
     match op {
         "video-h264" => video(VideoCodec::H264, data, out),
@@ -180,6 +243,7 @@ fn run(op: &str, data: &[u8], out: &mut Output) {
         "audio-eac3" => audio(AudioCodec::Eac3, data, out),
         "audio-aac" => audio(AudioCodec::Aac, data, out),
         "audio-dts" => audio(AudioCodec::Dts, data, out),
+        "audio-flac" | "audio-mp3" | "audio-vorbis" | "audio-opus" => file_audio(data, out),
         _ => {
             eprintln!("unknown operation {op}");
             std::process::exit(2);
@@ -190,9 +254,18 @@ fn run(op: &str, data: &[u8], out: &mut Output) {
 fn main() {
     // <lane>-<codec>-bench FILE ITERATIONS | <lane>-<codec>-memory FILE | <lane>-<codec>-raw FILE OUT
     let args: Vec<String> = std::env::args().collect();
+    if let [_, command, format, path] = args.as_slice()
+        && command == "packets"
+    {
+        if let Err(error) = packets::run(format, path) {
+            eprintln!("{error}");
+            std::process::exit(2);
+        }
+        return;
+    }
     let Some((op, kind)) = args.get(1).and_then(|a| a.rsplit_once('-')) else {
         eprintln!(
-            "usage: codec-worker KIND-CODEC-bench FILE ITERATIONS | KIND-CODEC-memory FILE | KIND-CODEC-raw FILE OUT"
+            "usage: codec-worker KIND-CODEC-bench FILE ITERATIONS | KIND-CODEC-memory FILE | KIND-CODEC-raw FILE OUT | packets FORMAT FILE"
         );
         std::process::exit(2);
     };

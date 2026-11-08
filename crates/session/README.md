@@ -1,7 +1,7 @@
 # triergon-session
 
 A decode-session layer for desktop playback. It takes AVC/HEVC Annex B access
-units and AC-3, E-AC-3, ADTS AAC or DTS core frames, drives the pure-Rust codec
+units and AC-3, E-AC-3, ADTS AAC, DTS core, FLAC, Opus, Vorbis or MPEG audio frames, drives the pure-Rust codec
 crates through the [triergon-codec](../codec/README.md) traits, and publishes
 clock-gated 1920×1080 RGBA pictures and interleaved stereo s16 PCM. It is a
 composition-layer crate over triergon-codec and
@@ -41,7 +41,9 @@ fn play(
 ```
 
 `video_decoder`, `audio_decoder` and `StreamSelection::load` need the `codecs`
-feature, which adds the five decoder crates. Without it, implement `VideoDecoder`
+feature, which adds the nine decoder crates. `audio_decoder(codec, configuration)` takes
+the canonical configuration of FLAC, Opus and Vorbis (see `audio_configuration`) and
+ignores it for the others. Without it, implement `VideoDecoder`
 and `AudioDecoder` (re-exported from triergon-codec) yourself; the tests use
 scripted decoders. The `simd` feature forwards to the HEVC decoder's nightly-only
 SIMD kernels.
@@ -51,7 +53,18 @@ SIMD kernels.
 | Stream | Input | Output |
 |---|---|---|
 | Video | H.264, HEVC Annex B access units with optional PTS | 1920×1080 RGBA, letterboxed, 8- and 10-bit 4:2:0 sources |
-| Audio | AC-3, E-AC-3, AAC (ADTS), DTS core | interleaved stereo s16 at the decoder's rate |
+| Audio | AC-3, E-AC-3, AAC (ADTS), DTS core, FLAC, Opus, Vorbis, MPEG audio Layer I-III | interleaved stereo s16 at the decoder's rate |
+| Container track | any `TrackInfo` of a supported codec, its packets | `TrackDecoder`: decoded frames with the container's trims applied |
+
+`TrackDecoder::new(track)` picks the decoder from a track's codec (`audio_codec`) and
+configuration (`audio_configuration`: Matroska CodecPrivate, ISO BMFF `dfLa`/`dOps`,
+Ogg headers), and its `decode(packet, frame)` drops what the container marks for
+discarding: the packet's `Trim`, samples before time zero (Matroska CodecDelay, Ogg
+pre-skip) and the decoder's start delay (`AudioDecoder::delay`, the Opus pre-skip), a
+start trim carrying into the next packet when it is longer than one. `Discard::of(packet)`
+with `AudioSession::feed_discarding` does the same for a clock-paced session.
+`examples/decode_audio.rs` decodes the first audio track of any file `triergon::open_blocking`
+opens, as the harness grades it.
 
 Supporting modules: `mix` (stereo downmix and s16 conversion), `queue` (bounded
 input).
@@ -82,7 +95,9 @@ input).
 - **Downmix.** `mix::Downmix`: front pair at unity, centre and surrounds at −3 dB,
   LFE dropped, normalised so no output exceeds full scale; mono goes to both sides
   at −3 dB. The `DownmixLevels` an AC-3/E-AC-3 stream carries (mix levels, Dolby or
-  Pro Logic II surround encoding) are honoured.
+  Pro Logic II surround encoding) are honoured. A layout without speaker positions
+  mixes as FFmpeg's default layout for its channel count, and 16-bit frames (FLAC) mix
+  in integers as FFmpeg's resampler mixes them ([harness/codecs/downmix-integer.md](../../harness/codecs/downmix-integer.md)).
 - **Stream selection.** `StreamSelection` names a stream's video codec and its
   audio codec, if any. `StreamSelection::load` starts both sessions with the
   matching decoders; with `audio: None` the audio session stays `Idle`.

@@ -13,6 +13,7 @@ dependencies = [
 name = "codec-worker"
 version = "0.0.0"
 dependencies = [
+ "triergon",
  "triergon-codec",
  "triergon-codec-aac",
  "triergon-codec-ac3",
@@ -66,10 +67,12 @@ version = "0.0.0"
 dependencies = [
  "triergon",
  "triergon-core",
+ "triergon-elementary",
  "triergon-framing",
  "triergon-isobmff",
  "triergon-matroska",
  "triergon-mpegts",
+ "triergon-ogg",
  "triergon-subtitles",
 ]
 
@@ -119,6 +122,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "triergon-codec-flac"
+version = "0.0.0"
+dependencies = [
+ "triergon",
+ "triergon-bitstream",
+ "triergon-codec",
+ "triergon-core",
+ "triergon-framing",
+]
+
+[[package]]
 name = "triergon-codec-h264"
 version = "0.0.0"
 dependencies = [
@@ -137,6 +151,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "triergon-codec-mp3"
+version = "0.0.0"
+dependencies = [
+ "triergon",
+ "triergon-bitstream",
+ "triergon-codec",
+ "triergon-core",
+ "triergon-framing",
+]
+
+[[package]]
 name = "triergon-codec-mpeg1"
 version = "0.0.0"
 dependencies = [
@@ -145,8 +170,38 @@ dependencies = [
 ]
 
 [[package]]
+name = "triergon-codec-opus"
+version = "0.0.0"
+dependencies = [
+ "triergon",
+ "triergon-bitstream",
+ "triergon-codec",
+ "triergon-framing",
+]
+
+[[package]]
+name = "triergon-codec-vorbis"
+version = "0.0.0"
+dependencies = [
+ "triergon",
+ "triergon-bitstream",
+ "triergon-codec",
+ "triergon-core",
+ "triergon-framing",
+]
+
+[[package]]
 name = "triergon-core"
 version = "0.0.0"
+
+[[package]]
+name = "triergon-elementary"
+version = "0.0.0"
+dependencies = [
+ "triergon-bitstream",
+ "triergon-core",
+ "triergon-framing",
+]
 
 [[package]]
 name = "triergon-font"
@@ -196,6 +251,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "triergon-ogg"
+version = "0.0.0"
+dependencies = [
+ "triergon-bitstream",
+ "triergon-core",
+ "triergon-framing",
+]
+
+[[package]]
 name = "triergon-pixel"
 version = "0.0.0"
 
@@ -217,12 +281,19 @@ dependencies = [
 name = "triergon-session"
 version = "0.0.0"
 dependencies = [
+ "triergon",
  "triergon-codec",
  "triergon-codec-aac",
  "triergon-codec-ac3",
  "triergon-codec-dca",
+ "triergon-codec-flac",
  "triergon-codec-h264",
  "triergon-codec-hevc",
+ "triergon-codec-mp3",
+ "triergon-codec-opus",
+ "triergon-codec-vorbis",
+ "triergon-core",
+ "triergon-framing",
  "triergon-pixel",
 ]
 

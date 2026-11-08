@@ -2,9 +2,9 @@
 
 The decoder vocabulary shared by the codec crates: the `VideoDecoder` and
 `AudioDecoder` traits, decoded audio as `AudioFrame` with a `ChannelLayout` of
-`Speaker`s, stream downmix metadata, the codec selectors and the Kaiser-Bessel-derived
-window the AAC and AC-3 filterbanks share. It sits in the codec
-layer below the five decoders and depends only on
+`Speaker`s, stream downmix metadata, the codec selectors, the Kaiser-Bessel-derived
+window the AAC and AC-3 filterbanks share, and the inverse MDCT the Vorbis and Opus
+decoders share. It sits in the codec layer below the nine decoders and depends only on
 [triergon-core](../core/README.md), whose storage types it re-exports for the
 decoders' budgets, and [triergon-pixel](../pixel/README.md), whose picture views (`PictureView`, `Plane`,
 `Colour`) it re-exports. It contains no decoder; sessions and workers drive the
@@ -35,8 +35,9 @@ fn audio(decoder: &mut dyn AudioDecoder, au: &[u8]) -> Result<(), DecodeFailure>
 
 Implementations: `triergon_codec_h264::Decoder` and `triergon_codec_hevc::Decoder`
 (`VideoDecoder`); `triergon_codec_aac::Decoder`, `triergon_codec_ac3::Decoder` and
-`triergon_codec_dca::Decoder` (`AudioDecoder`). `VideoCodec` (`H264`, `Hevc`) and
-`AudioCodec` (`Ac3`, `Eac3`, `Aac`, `Dts`) name a decoder;
+`triergon_codec_dca::Decoder`, and the FLAC, Opus, Vorbis and MPEG audio decoders
+(`AudioDecoder`). `VideoCodec` (`H264`, `Hevc`) and `AudioCodec` (`Ac3`, `Eac3`, `Aac`,
+`Dts`, `Flac`, `Opus`, `Vorbis`, `MpegAudio`) name a decoder;
 [triergon-session](../session/README.md) maps them to boxed decoders.
 
 ## Supported
@@ -44,9 +45,11 @@ Implementations: `triergon_codec_h264::Decoder` and `triergon_codec_hevc::Decode
 | Item | Meaning |
 |---|---|
 | `VideoDecoder` | `send(au, pts)`, `receive() -> Option<PictureView>`, `flush`, `reset`; `Send` |
-| `AudioDecoder` | `decode(au, &mut AudioFrame) -> Result<Option<DownmixLevels>, DecodeFailure>`, `reset`; `Send` |
-| `AudioFrame` | `sample_rate`, `layout`, `samples_per_channel`, `planes`: planar `f32`, full scale 1.0 |
-| `ChannelLayout` | speaker of each plane in plane order; `new`, `speakers`, `channels`, `position`, `mask`, `EMPTY`, `CAPACITY` |
+| `AudioDecoder` | `decode(au, &mut AudioFrame) -> Result<Option<DownmixLevels>, DecodeFailure>`, `reset`; `delay()` (samples a stream starts with that carry no signal, 0 by default) and `flush(&mut AudioFrame)` (samples held back at the end, none by default); `Send` |
+| `AudioFrame` | `sample_rate`, `layout`, `samples_per_channel`, `planes`: planar `f32`, full scale 1.0; `sample_format` (`SampleFormat::Float`, `S16`, `S32`): the decoder's native format, for mixing as FFmpeg mixes it |
+| `ChannelLayout` | speaker of each plane in plane order; `new`, `unspecified(n)` (no positions), `default_for(n)` (FFmpeg's default), `speakers`, `channels`, `position`, `mask`, `name` (FFmpeg's layout name), `EMPTY`, `CAPACITY` |
+| `layout::{vorbis_order, flac_order, native_order}` | the Vorbis/Opus and FLAC coded channel orders, and the plane each coded channel goes to |
+| `mdct::Imdct` | inverse MDCT and DCT-IV for any `N` with `N / 4` a product of 2, 3 and 5: an iterative mixed-radix FFT over split real and imaginary planes; `table_bytes` charges a budget first |
 | `Speaker` | loudspeaker position; `name()` gives FFmpeg's short name, `mask()` its `AV_CH_*` bit |
 | `DownmixLevels` | `center`, `surround`, `lfe` gains and `SurroundEncoding` (`None`, `Dolby`, `ProLogicII`) |
 | `DecodeFailure` | the refusing codec error's `Debug` text; `from_error` builds one |

@@ -53,6 +53,10 @@ pub enum CodecId<'a> {
     Dts,
     Vorbis,
     Opus,
+    Flac,
+    /// MPEG-1, MPEG-2 or MPEG-2.5 audio, Layer I, II or III; each frame header names its
+    /// layer.
+    MpegAudio,
     /// Uncompressed integer audio samples.
     Pcm,
     /// UTF-8 subtitle text without styling markup.

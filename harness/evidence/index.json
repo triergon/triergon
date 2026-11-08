@@ -14691,6 +14691,430 @@
    "key": "evidence/playback-terminal-matrix-ffprobe/5eb191f3826461ffcc4c8fe47132fd03e060fb930f10b92e26b3031d9a3a465e.tar.zst",
    "sha256": "5eb191f3826461ffcc4c8fe47132fd03e060fb930f10b92e26b3031d9a3a465e",
    "bytes": 209168659
+  },
+  {
+   "name": "audio-review-linux-arm64",
+   "path": "audio-review-linux-arm64",
+   "retention": "retained",
+   "reason": "Cited FLAC, MPEG audio, Vorbis and Opus correctness rows, the reader lane, instruction counts against the previous revision, paired timing and paired memory of the ten file-format workloads, and the worker identity",
+   "key": "evidence/audio-review-linux-arm64/0ddcc517728bb39e2d74cd2e3bf4c00071a6f3815ad3409d5215d216af9a0a53.tar.gz",
+   "sha256": "0ddcc517728bb39e2d74cd2e3bf4c00071a6f3815ad3409d5215d216af9a0a53",
+   "bytes": 16341236,
+   "source_revision": "ccff5b5734c113c1d88160b84825157508c701c0",
+   "files": [
+    {
+     "path": "audio-review-linux-arm64/SOURCE.json",
+     "sha256": "11cc5ce5d55b662d21a5b86ace61a80479afcc46fd00f40c930001ebb101f62e"
+    },
+    {
+     "path": "audio-review-linux-arm64/correctness/manifest.json",
+     "sha256": "e7514d7a2d9e428ef0934c4ff8dec1da473cab62d61a3d69a9cab68b2c64a8d7"
+    },
+    {
+     "path": "audio-review-linux-arm64/correctness/run.jsonl",
+     "sha256": "a1828c7c8c3f49ce7de06382c6ecef4625f8b363549945df4b3eae69e0de5980"
+    },
+    {
+     "path": "audio-review-linux-arm64/correctness/summary.json",
+     "sha256": "8c01da5d97517bb6d9710ccf9d01c829836cbe990ea6a0f333ca3f44626be9ff"
+    },
+    {
+     "path": "audio-review-linux-arm64/correctness/summary.txt",
+     "sha256": "539a2c63431fdc5639d9c06a671e09b9617a7317636998dff68a5722b8d3b46e"
+    },
+    {
+     "path": "audio-review-linux-arm64/identity.json",
+     "sha256": "a0991a8bb4392b19c5604a7790f755474cc6f2bc31e09173226127dbaf2e7d57"
+    },
+    {
+     "path": "audio-review-linux-arm64/instruction-counts.txt",
+     "sha256": "31b2a06a99732c1c6d0f952014d178a632e0e36180e0f08609f96b603c101618"
+    },
+    {
+     "path": "audio-review-linux-arm64/memory/flac-16-44k-stereo.json",
+     "sha256": "547dde3e665a1902b06e64565d0f74f63095eacd3c04cfc275bb427ce0b6788e"
+    },
+    {
+     "path": "audio-review-linux-arm64/memory/flac-24-96k-5.1.json",
+     "sha256": "016282e54afdf7a7fa225de912716fa4c49dfeff5646c226d6721d89da232dd6"
+    },
+    {
+     "path": "audio-review-linux-arm64/memory/identity.json",
+     "sha256": "c0b24a542d9852e0f0e10a19cb9773f89ad48cf036058d37b61dc9b700a76173"
+    },
+    {
+     "path": "audio-review-linux-arm64/memory/mem.log",
+     "sha256": "419c9af16de8f951f821ab9c30ba7ea1cd1e749fc658f7b6376b57ff06ead72b"
+    },
+    {
+     "path": "audio-review-linux-arm64/memory/mp2-256-48k.json",
+     "sha256": "4e95a0ff310b043ea533bc7c5c5abcdb0233a425f19ee0e8c645708abdc3f02a"
+    },
+    {
+     "path": "audio-review-linux-arm64/memory/mp3-cbr-128-joint.json",
+     "sha256": "6443ea4bb648380be6c052831b7eb5d58b4852f1cbd97698b0f2d4c92348ff16"
+    },
+    {
+     "path": "audio-review-linux-arm64/memory/mp3-vbr-v2.json",
+     "sha256": "123e6ea0a0655411fbd9a6bb97965e896c5157b5c2306b7dbc8845223da0a087"
+    },
+    {
+     "path": "audio-review-linux-arm64/memory/opus-5.1-256.json",
+     "sha256": "f1ab4c3deb7f55cea91f2b078bc3336004fdebfb2a354cbb9f5380840d6a406e"
+    },
+    {
+     "path": "audio-review-linux-arm64/memory/opus-music-128-stereo.json",
+     "sha256": "83c2171f95da3318786b197f14953849fc2862344d52d9f71174184bf034de29"
+    },
+    {
+     "path": "audio-review-linux-arm64/memory/opus-speech-24-mono.json",
+     "sha256": "491a380a6ea6976c44d2b1192813095dbe216e2def9b6a833d7f03885a51a13e"
+    },
+    {
+     "path": "audio-review-linux-arm64/memory/summary.json",
+     "sha256": "a3e8f8c0b1c27066202c0b79d0098eecc3590a347538c6fba36e7dbbefe424dc"
+    },
+    {
+     "path": "audio-review-linux-arm64/memory/vorbis-q3-5.1.json",
+     "sha256": "9631a587cd3e770ace4418fde7ac4472b82179f9a935f6e6718cbbbd387b60aa"
+    },
+    {
+     "path": "audio-review-linux-arm64/memory/vorbis-q5-stereo.json",
+     "sha256": "fbec2f66bc486bb93f5f65fde8e94779d191f08c7cbf5244eb2e92f6cf82caf0"
+    },
+    {
+     "path": "audio-review-linux-arm64/readers/reader-manifest.json",
+     "sha256": "09861b1d0fa7dc8e03aea4c3d3af718f32b578c6995a1b6828bd95dd9010d060"
+    },
+    {
+     "path": "audio-review-linux-arm64/readers/reader-rules.json",
+     "sha256": "a5531a7fb0cf17a02276b0441c7031aa70b68c06d2004261f95c1a0526a88582"
+    },
+    {
+     "path": "audio-review-linux-arm64/readers/run.jsonl",
+     "sha256": "ee5371c6d1bca95fd3b9fed88a6162762d7acfa570539288f3120c2af4181659"
+    },
+    {
+     "path": "audio-review-linux-arm64/readers/run.log",
+     "sha256": "7246d970a8d79bdcf0d2bfbcc3f99a1d28408e5207a86052722fce3aa2dbffc9"
+    },
+    {
+     "path": "audio-review-linux-arm64/timing/flac-16-44k-stereo.json",
+     "sha256": "856ceb3d2ce301bbec546eac743cb1bd9525dbd268eb3817ed1dcbbd2cd7b2c9"
+    },
+    {
+     "path": "audio-review-linux-arm64/timing/flac-24-96k-5.1.json",
+     "sha256": "1b320563641cc3310e4a69c82ee15b438c69824be7eb449ed97f6285a3d2e1f4"
+    },
+    {
+     "path": "audio-review-linux-arm64/timing/ledger.json",
+     "sha256": "c40addd161bd84db1a121bd0766229c734a3383e51a1d8a59a8d4966279faf53"
+    },
+    {
+     "path": "audio-review-linux-arm64/timing/mp2-256-48k.json",
+     "sha256": "3c6f6b7454fdab935bdc71a6a739285bce41cfd2581ec4a7e6ebfa9b68453f39"
+    },
+    {
+     "path": "audio-review-linux-arm64/timing/mp3-cbr-128-joint.json",
+     "sha256": "35abd6cfd476e1316f03e9f2028da8c13881d3d027b8ff5a9a07ee982d6df806"
+    },
+    {
+     "path": "audio-review-linux-arm64/timing/mp3-vbr-v2.json",
+     "sha256": "9931f8da3072a73f6242e4fd267a3d63f4b5cb00e0fae25062246ceae10c1d58"
+    },
+    {
+     "path": "audio-review-linux-arm64/timing/opus-5.1-256.json",
+     "sha256": "553600f15919d4a42077be5c4563b526f41f53e45546eda4dd0fca0c48fa6dfc"
+    },
+    {
+     "path": "audio-review-linux-arm64/timing/opus-music-128-stereo.json",
+     "sha256": "4a5550d83f2bdf29bb563a073f056905449af2cc860f75a60dde3e37f07ff72e"
+    },
+    {
+     "path": "audio-review-linux-arm64/timing/opus-speech-24-mono.json",
+     "sha256": "c5e0bba1f253c3c04d101d551797a77598de99305d9120744169c16fe5738883"
+    },
+    {
+     "path": "audio-review-linux-arm64/timing/time.log",
+     "sha256": "3c995184437fdc1e6b06a069bead13b7aa7c9c2ae9432577c7966d80b1856507"
+    },
+    {
+     "path": "audio-review-linux-arm64/timing/vorbis-q3-5.1.json",
+     "sha256": "f99c2bacbf38e6868e3b0c7b53d08b1eacdbd0d0906f11cbe14ad09fec58cfb8"
+    },
+    {
+     "path": "audio-review-linux-arm64/timing/vorbis-q5-stereo.json",
+     "sha256": "ecd1198875d3392228f4ebc9e4ddcfccf1048cc6cfb58f9813b469ff7097d48f"
+    }
+   ]
+  },
+  {
+   "name": "audio-quick-check-linux-arm64",
+   "path": "audio-quick-check-linux-arm64",
+   "retention": "retained",
+   "reason": "Cited reader lane (both Ogg views) on the gate host with the generated Ogg inputs it compares, and the quick check of the head against main and against the measured build: same-code, instruction counts, output identity and one screened round of 30 pairs",
+   "key": "evidence/audio-quick-check-linux-arm64/8123e0f020a9c4ccedd83aea3e665d4486d55e26612e8bc29626e9a3026e2cd1.tar.gz",
+   "sha256": "8123e0f020a9c4ccedd83aea3e665d4486d55e26612e8bc29626e9a3026e2cd1",
+   "bytes": 17601363,
+   "source_revision": "ccd3090572433e79d8ab65a377fcd9896d2839d9",
+   "files": [
+    {
+     "path": "audio-quick-check-linux-arm64/SOURCE.json",
+     "sha256": "a194b66a7dab16e6ced788d487b7c4945fdd30cbfa8c2575b8591fde2566a7c4"
+    },
+    {
+     "path": "audio-quick-check-linux-arm64/counts/audio-output-vs-measured.txt",
+     "sha256": "4d4d9815c424fe6df300eb62c77ad9fb5cf64725e3236c5a56ce2429b7ab97c2"
+    },
+    {
+     "path": "audio-quick-check-linux-arm64/counts/audio-vs-measured.txt",
+     "sha256": "de6fb6955a2d5e4857514557416bad57cfa9e4b38f089d4a2e75b17ad01ba73c"
+    },
+    {
+     "path": "audio-quick-check-linux-arm64/counts/codecs-output-vs-main.txt",
+     "sha256": "25a71a96c3c0ef815ddf03496b29b2bd90de985c4be06eab08dbb845c1c0eee8"
+    },
+    {
+     "path": "audio-quick-check-linux-arm64/counts/codecs-vs-main.txt",
+     "sha256": "c115807554e504a35f0df41af2c33532705a3e2d62c303ea7e96241c79902291"
+    },
+    {
+     "path": "audio-quick-check-linux-arm64/counts/qcount.py",
+     "sha256": "f57f25096b1953de82279811c5945ac9b48ba0d50773f49006da69174136ff3d"
+    },
+    {
+     "path": "audio-quick-check-linux-arm64/counts/qdigest.py",
+     "sha256": "f9899c0bd3a7c7776e94b452562f1f021bf3744bf3a817b453e26f99267b3cfa"
+    },
+    {
+     "path": "audio-quick-check-linux-arm64/inputs/ogg-generated/a_flac.oga",
+     "sha256": "8f8c5a846e484931852b466a3e08ef33fb125630cebf921a1a00abcd716ad1da"
+    },
+    {
+     "path": "audio-quick-check-linux-arm64/inputs/ogg-generated/a_opus.opus",
+     "sha256": "c53015f62682fc2936cc1f29456445087e82b687b853490b89f9abf1b0146ae9"
+    },
+    {
+     "path": "audio-quick-check-linux-arm64/inputs/ogg-generated/a_vorbis.ogg",
+     "sha256": "ff3157d4b3b1ed595665a314a597a5d357ed5f1570bb22de57b02a1d9c8a3a7c"
+    },
+    {
+     "path": "audio-quick-check-linux-arm64/inputs/ogg-generated/b_opus.opus",
+     "sha256": "ed1b19e31297aad7db9fa663d4e6631341678b9da8abdcdef730d56e47ba2904"
+    },
+    {
+     "path": "audio-quick-check-linux-arm64/inputs/ogg-generated/b_vorbis.ogg",
+     "sha256": "f9bd978104bcaf4c02f0232c6102ba51d744370158a51570cc78d1a6dc6ee419"
+    },
+    {
+     "path": "audio-quick-check-linux-arm64/inputs/ogg-generated/chain_opus.opus",
+     "sha256": "8c4318d74908867bc5e56e44e6c9aaa609cbcbc5cf0886fb9e0cfabc7c534aab"
+    },
+    {
+     "path": "audio-quick-check-linux-arm64/inputs/ogg-generated/chain_vorbis.ogg",
+     "sha256": "19cd38a41bd876db81c5f7a881c7fa9bdfc4821be9b8588f7fe7265202932690"
+    },
+    {
+     "path": "audio-quick-check-linux-arm64/inputs/ogg-generated/crc_bad.opus",
+     "sha256": "58955283b54fc60407a235dc3579c6919619ca8d7f8f77ef7f0f41bd9430e614"
+    },
+    {
+     "path": "audio-quick-check-linux-arm64/inputs/ogg-generated/flac_51_24.oga",
+     "sha256": "4353a415af59ce3567aacb3cd040b81bb7afdd6b22475042c8d5db2a2901cdb8"
+    },
+    {
+     "path": "audio-quick-check-linux-arm64/inputs/ogg-generated/lost_page.opus",
+     "sha256": "553d074916d34d4687b6bea0bcd9d1004aa2e4b3a98713f0c4bc04fc4c819f13"
+    },
+    {
+     "path": "audio-quick-check-linux-arm64/inputs/ogg-generated/mc_opus.opus",
+     "sha256": "b814a5ddc354e41a63ac97aaabbf0c87aae5fe40c52e4de972b1ec606f058b8b"
+    },
+    {
+     "path": "audio-quick-check-linux-arm64/inputs/ogg-generated/mux2.opus",
+     "sha256": "504885e07bab8e7d19285f706d4d6437dd3859e8c26d9bec5cae42b3a32b4ec1"
+    },
+    {
+     "path": "audio-quick-check-linux-arm64/inputs/ogg-generated/truncated.opus",
+     "sha256": "ad8c5f58bd770cc5604e55fdd4ea506ea5d5eb56e0aa545e05c961d81f9f2446"
+    },
+    {
+     "path": "audio-quick-check-linux-arm64/readers/reader-differences.json",
+     "sha256": "cd4d340239382d47c7f4e77f94cc7e004e74d8530bae572adab0621f75b457fb"
+    },
+    {
+     "path": "audio-quick-check-linux-arm64/readers/reader-manifest.json",
+     "sha256": "09861b1d0fa7dc8e03aea4c3d3af718f32b578c6995a1b6828bd95dd9010d060"
+    },
+    {
+     "path": "audio-quick-check-linux-arm64/readers/reader-rules.json",
+     "sha256": "dca5dfa50fd824dcd859b175a88e9b00c70953dfa9f49d71b529c03d37213a6e"
+    },
+    {
+     "path": "audio-quick-check-linux-arm64/readers/readers.differences.json",
+     "sha256": "cd4d340239382d47c7f4e77f94cc7e004e74d8530bae572adab0621f75b457fb"
+    },
+    {
+     "path": "audio-quick-check-linux-arm64/readers/readers.jsonl",
+     "sha256": "5f8221b18437e0caf3bd2a07801a3cdf68959fd822639011c6c108f7b0cebf2e"
+    },
+    {
+     "path": "audio-quick-check-linux-arm64/readers/readers.log",
+     "sha256": "6ea4e503301b23aba718a1164b7e96101fe98fae1a2b549584d781f2a962be27"
+    },
+    {
+     "path": "audio-quick-check-linux-arm64/same-code/capture-worker.txt",
+     "sha256": "f492e2294f42bca6940ccee399413b3d626ddce201590b856f4803c824985df6"
+    },
+    {
+     "path": "audio-quick-check-linux-arm64/same-code/codec-worker.txt",
+     "sha256": "ab398da1bacb8afbadceec870cd0c34eb3a2f1107b0560144173a74ffabb70bc"
+    },
+    {
+     "path": "audio-quick-check-linux-arm64/same-code/font-worker.txt",
+     "sha256": "4de18ae43f289788a0f6d1ab27b14922e57ca7a73aee67012082186e0e594c58"
+    },
+    {
+     "path": "audio-quick-check-linux-arm64/same-code/media-worker.txt",
+     "sha256": "8cf1a9cf0bd7e3362bda276a0921db1cb8148cac82ce39fea6d2b558249163f0"
+    },
+    {
+     "path": "audio-quick-check-linux-arm64/same-code/playback-worker.txt",
+     "sha256": "48de7d428eb7cf3a8464e07cb97b5133d3898190f0f656e655a8f8dc244588bb"
+    },
+    {
+     "path": "audio-quick-check-linux-arm64/screen/ledger-main.json",
+     "sha256": "1ef5fc1758e53c2b581628e20257d9deb4a6d7b218c498a632cb716e71c8e92a"
+    },
+    {
+     "path": "audio-quick-check-linux-arm64/screen/ledger-meas.json",
+     "sha256": "c02d7eb34f690a11bc3a3bf91753f7c656aff8abfb68cbd54b855de419d8688d"
+    },
+    {
+     "path": "audio-quick-check-linux-arm64/screen/reports/audio-vs-measured/report.json",
+     "sha256": "36ad1a51b8174898264017e340185bd268814da836bd8b0029cf8a845a3e9fda"
+    },
+    {
+     "path": "audio-quick-check-linux-arm64/screen/reports/codecs-vs-main/report.json",
+     "sha256": "3495935e7daa8d6988a70487878cb1cc14810a21da8c37246cd3f2f5f03453c3"
+    },
+    {
+     "path": "audio-quick-check-linux-arm64/screen/screen.txt",
+     "sha256": "7aa8d41922dc5fbaf30447ff179af46b0b4ca393f811485b4da9e90c69e8252d"
+    },
+    {
+     "path": "audio-quick-check-linux-arm64/screen/vs-main/aac-lc-5.1.json",
+     "sha256": "133ccad4066030ee478c2b16cd91f35b2651e8492b590ec8ec5c95ea7ede9ee5"
+    },
+    {
+     "path": "audio-quick-check-linux-arm64/screen/vs-main/aac-lc-stereo.json",
+     "sha256": "3d5717f59fd20186e97242cd4d020a05de9c8c366d2671641da67f961698d708"
+    },
+    {
+     "path": "audio-quick-check-linux-arm64/screen/vs-main/ac3-2.0-192.json",
+     "sha256": "bb773e983a96dd445590ea2ffb183ccac366ff9ed8bbae3c73e6e30b80d332c4"
+    },
+    {
+     "path": "audio-quick-check-linux-arm64/screen/vs-main/ac3-4.0.json",
+     "sha256": "88b3e292c058632477429eb95ee824c4e042e86c0636ca864c0854d463045d59"
+    },
+    {
+     "path": "audio-quick-check-linux-arm64/screen/vs-main/ac3-5.1-448.json",
+     "sha256": "5d4bbf1ce43f75301ecbd2e0a79c028fe0f899945fcfda4634a4eefdbff65718"
+    },
+    {
+     "path": "audio-quick-check-linux-arm64/screen/vs-main/dts-core-7.1-master.json",
+     "sha256": "3bcb462aaf236ef54eafeefefb42c71a3b380ca05df78b46f768d531ec239946"
+    },
+    {
+     "path": "audio-quick-check-linux-arm64/screen/vs-main/dts-core-es-6.1.json",
+     "sha256": "17f548df491719f04e643c27346c3a4f8e9841dcea5eed9cd4d9d0e1f32f7e65"
+    },
+    {
+     "path": "audio-quick-check-linux-arm64/screen/vs-main/eac3-5.1-1536.json",
+     "sha256": "4cdb3a36da184e010a3a076ff932a626ed066137821c89de3f91637addf55127"
+    },
+    {
+     "path": "audio-quick-check-linux-arm64/screen/vs-main/eac3-5.1-spx.json",
+     "sha256": "14a96f589100c400fd1f5180a06849ad93db8719f76b19a17c6811f28ad407bb"
+    },
+    {
+     "path": "audio-quick-check-linux-arm64/screen/vs-main/eac3-7.1.json",
+     "sha256": "1a726fd08096e8087205d6681271d329e8b707bfc0912e75946cbcfdb3ed2bae"
+    },
+    {
+     "path": "audio-quick-check-linux-arm64/screen/vs-main/eac3-stereo-spx.json",
+     "sha256": "d120099e5fa387207ad1818cb931cfecad03099a7ab6b50be1ac5cf88e2d7dfd"
+    },
+    {
+     "path": "audio-quick-check-linux-arm64/screen/vs-main/h264-high-1080p.json",
+     "sha256": "35f5a6b82d180e7e50b8268dfb36779a503be6a8f600aead5549ae58cfd4d5bc"
+    },
+    {
+     "path": "audio-quick-check-linux-arm64/screen/vs-main/h264-high-720p.json",
+     "sha256": "4053b74fbd34389fbb6752e47ffba71e3c412303aabad73d97c64178e64e3196"
+    },
+    {
+     "path": "audio-quick-check-linux-arm64/screen/vs-main/h264-main-1920x800.json",
+     "sha256": "1efb4245413f5fe499a98442dcff0c798e15bf08fe8bea96b3ec6d40df008e54"
+    },
+    {
+     "path": "audio-quick-check-linux-arm64/screen/vs-main/hevc-main-1080p.json",
+     "sha256": "75321f50ea5a93a8da7b88294bf5ad0cf7ee5adcbd0650e1844ad59d0aab4d50"
+    },
+    {
+     "path": "audio-quick-check-linux-arm64/screen/vs-main/hevc-main10-1080p.json",
+     "sha256": "db1d2197d735fa042d94425f803649736a317cca03f407d97eb102c8aa8408c9"
+    },
+    {
+     "path": "audio-quick-check-linux-arm64/screen/vs-main/hevc-main10-2160p.json",
+     "sha256": "937047ad39417c25afab125442769336f4bc2dca61743e447d55737332b6486d"
+    },
+    {
+     "path": "audio-quick-check-linux-arm64/screen/vs-meas/flac-16-44k-stereo.json",
+     "sha256": "6f9f4369674e00f5486f38f9be9a7761c6cafbdcd72f44b5df1d1b466e0ece7a"
+    },
+    {
+     "path": "audio-quick-check-linux-arm64/screen/vs-meas/flac-24-96k-5.1.json",
+     "sha256": "d0bbf82c408b63b325b0a7b210304343b1e03d2a14c9df9b394d9954d720a042"
+    },
+    {
+     "path": "audio-quick-check-linux-arm64/screen/vs-meas/mp2-256-48k.json",
+     "sha256": "14c4dc11514eb65e2756e63ae363e9ba99ba116243ffa2983a48fb3562c1371b"
+    },
+    {
+     "path": "audio-quick-check-linux-arm64/screen/vs-meas/mp3-cbr-128-joint.json",
+     "sha256": "a4519b02096afc3654581a9edca800d6d53912c777d47760b0b9437ea8a6384b"
+    },
+    {
+     "path": "audio-quick-check-linux-arm64/screen/vs-meas/mp3-vbr-v2.json",
+     "sha256": "1dcdbffa8007070d27fdf7f1d5ed2cc7b3e97ae0bd1587c49248581166000c81"
+    },
+    {
+     "path": "audio-quick-check-linux-arm64/screen/vs-meas/opus-5.1-256.json",
+     "sha256": "e7ad2397a4518baccd8d9bc720bd4c9e27bab12d53ea85ec0b0600301a88fe93"
+    },
+    {
+     "path": "audio-quick-check-linux-arm64/screen/vs-meas/opus-music-128-stereo.json",
+     "sha256": "9831f3a54328956bc285d5dd69b9e78e037b464419a579b343770c0fd5e1c73d"
+    },
+    {
+     "path": "audio-quick-check-linux-arm64/screen/vs-meas/opus-speech-24-mono.json",
+     "sha256": "7de46b3daf9bd9488b17e89e166b10e8524701ddda5fd4c4ffdb64fa42d9da2f"
+    },
+    {
+     "path": "audio-quick-check-linux-arm64/screen/vs-meas/vorbis-q3-5.1.json",
+     "sha256": "5e93b04ab2e9951c684be2c433ee72ec70140a8174d1d9c7f45b7b4e1400c401"
+    },
+    {
+     "path": "audio-quick-check-linux-arm64/screen/vs-meas/vorbis-q5-stereo.json",
+     "sha256": "b11074ce82a65c2b5af0bac765ed143f40147cb055ba8738422a67c8a5e1015a"
+    },
+    {
+     "path": "audio-quick-check-linux-arm64/screen/workloads-regenerated.json",
+     "sha256": "98fbab2bc506344b1a41a3114bda5b0cddf9e761844701a10a8cf6d63c149e19"
+    }
+   ]
   }
  ]
 }

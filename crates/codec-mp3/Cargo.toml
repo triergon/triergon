@@ -1,0 +1,21 @@
+[package]
+name = "triergon-codec-mp3"
+version = "0.0.0"
+description = "MPEG-1/2 audio Layer I, II and III decoder"
+repository.workspace = true
+license.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+
+[dependencies]
+triergon-bitstream = { path = "../bitstream" }
+triergon-codec = { path = "../codec" }
+triergon-core = { path = "../core" }
+triergon-framing = { path = "../framing" }
+
+[dev-dependencies]
+triergon = { path = "../triergon", features = ["elementary"] }
+
+[lints]
+workspace = true

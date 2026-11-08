@@ -1,8 +1,11 @@
-//! `cargo xtask codecs`: correctness grading, its summary, paired timing and
-//! output identities of the codec crates against the pinned FFmpeg decoders.
+//! `cargo xtask codecs`: correctness grading, its summary, the reader packet
+//! comparison, paired timing and memory, and output identities of the codec crates
+//! against the pinned FFmpeg decoders.
 
 pub mod correctness;
 pub mod equivalence;
+pub mod memory;
+pub mod readers;
 pub mod summary;
 pub mod timing;
 
@@ -11,15 +14,27 @@ use std::path::{Path, PathBuf};
 pub const USAGE: &str = "usage: cargo xtask codecs <command>
 
   manifest --out M.json LANE=DIR[,DIR...]...
-                 hash every vector of each lane (h264, hevc, ac3, eac3, aac, dts)
+                 hash every vector of each lane (h264, hevc, ac3, eac3, aac, dts, flac,
+                 mp3, mp2, mp1, vorbis, opus; reader-ogg, reader-flac, reader-mp3,
+                 reader-aac, reader-ac3, reader-eac3)
   grade --manifest M.json --root R --bin DIR --ffmpeg FF --ffprobe FP --codec-worker W
         --reference R2 --out OUT.jsonl [--scratch DIR] [--only SUBSTR,...]
                  grade every vector by harness/codecs/numeric-rules.json; appends one row each
   summarize RUN.jsonl OUT.json
                  classify a grading run against the declared lane selection
+  readers --manifest M.json --root R --ffprobe FP --codec-worker W --out OUT.jsonl
+          [--only SUBSTR,...]
+                 compare every packet the container readers emit, and Ogg's compat view,
+                 with ffprobe by harness/codecs/reader-rules.json and the reviewed
+                 difference lists of reader-differences.json; appends one row per input
+                 and view, and writes the observed lists to OUT.differences.json
   time --candidate W --reference W --workloads F --root R --ledger F --out DIR --label L
        [--only ID,...] [--recollect-contaminated LABEL]
                  paired timing of the decoder workloads (30 pairs, seed 280)
+  memory --candidate W --reference W --workloads F --root R --out DIR
+         [--pairs N] [--seed S] [--only ID,...]
+                 paired peak heap and total resident peak RSS of the decoder workloads
+                 under the shared observer (30 pairs, seed 282)
   equivalence --output F [--compare F] [--jobs N]
                  record every decoder output identity; --compare checks an earlier record";
 
@@ -138,6 +153,49 @@ pub fn main(root: &Path, args: &[String]) -> Result<i32, String> {
                 rules: correctness::Rules::load(root)?,
             };
             correctness::grade(&grade)?;
+        }
+        "readers" => {
+            let a = Args::parse(
+                rest,
+                &["manifest", "root", "ffprobe", "codec-worker", "out", "only"],
+                &[],
+            )?;
+            readers::run(&readers::Options {
+                manifest: a.path("manifest")?,
+                root: a.path("root")?,
+                ffprobe: a.required("ffprobe")?.to_owned(),
+                codec_worker: a.path("codec-worker")?,
+                out: a.path("out")?,
+                only: a.get("only").filter(|o| !o.is_empty()).map(str::to_owned),
+                rules: readers::Rules::load(root)?,
+            })?;
+        }
+        "memory" => {
+            let a = Args::parse(
+                rest,
+                &[
+                    "candidate",
+                    "reference",
+                    "workloads",
+                    "root",
+                    "out",
+                    "pairs",
+                    "seed",
+                    "only",
+                ],
+                &[],
+            )?;
+            memory::run(&memory::Options {
+                repository: root.to_path_buf(),
+                candidate: a.path("candidate")?,
+                reference: a.path("reference")?,
+                workloads: a.path("workloads")?,
+                root: a.path("root")?,
+                out: a.path("out")?,
+                pairs: a.number("pairs")?.unwrap_or(memory::PAIRS),
+                seed: a.number("seed")?.map_or(memory::SEED, |s| s as u64),
+                only: a.get("only").filter(|o| !o.is_empty()).map(str::to_owned),
+            })?;
         }
         "summarize" => match rest {
             [run, out] => summary::summarize(run, Path::new(out))?,

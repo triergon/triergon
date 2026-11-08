@@ -1,10 +1,10 @@
 {
   "schema": "triergon.codecs.numeric-rules.v1",
-  "frozen_utc": "2026-11-02T23:45:00Z",
+  "frozen_utc": "2026-11-08T07:40:00Z",
   "frozen_before_grading": true,
-  "reference": "FFmpeg 9.0.2 native decoders (exact build pinned separately in the decode reference receipt); development-only oracle on macOS is Homebrew FFmpeg 9.0.2 and is never qualification evidence",
+  "reference": "FFmpeg 9.0.2 native decoders (exact build pinned separately in the decode reference receipt); MPEG audio Layer I and II against its float decoders mp1float and mp2float, whose fixed-point defaults output 16-bit samples (reviewed_rules: mpeg-audio-float-decoders); development-only oracle on macOS is Homebrew FFmpeg 9.0.2 and is never qualification evidence",
   "audio_decode": {
-    "applies_to": ["ac3", "eac3", "aac-lc", "he-aac-sbr", "he-aac-v2-ps", "dts-core"],
+    "applies_to": ["ac3", "eac3", "aac-lc", "he-aac-sbr", "he-aac-v2-ps", "dts-core", "mp3", "mp2", "mp1", "vorbis", "opus"],
     "exact": ["sample_rate", "channel_count", "channel_layout_and_order", "samples_per_frame", "total_sample_count", "frame_count", "first_output_sample_position (codec delay / priming)"],
     "float_tolerance_basis": "ISO/IEC 14496-4 / 13818-4 'full accuracy' 16-bit decoder criterion applied to candidate-minus-reference planar float output, full scale = 1.0",
     "per_channel_rms_max": 8.8e-06,
@@ -13,12 +13,31 @@
     "abs_formula": "max |candidate - reference|; 2^-14 = 6.1035e-05",
     "no_exclusions": "every decoded sample of every channel is compared; no normalization, delay search or gain fitting"
   },
+  "lossless_audio_decode": {
+    "applies_to": ["flac"],
+    "exact": ["sample_rate", "channel_count", "channel_layout_and_order", "samples_per_frame", "total_sample_count", "frame_count", "every decoded sample"],
+    "tolerance": "none: bit-exact (RFC 9639 decoding is integer-exact; the float output is the integer sample scaled by a power of two as FFmpeg converts it)"
+  },
   "audio_device_path": {
     "contract": "ffmpeg -f <demuxer> -i pipe:0 -vn -ac 2 -f pulse|alsa: decoder output -> swresample default stereo rematrix -> pcm_s16le interleaved at the decoder sample rate",
     "exact": ["sample_rate", "2 channels", "s16 interleaved", "sample count"],
     "per_sample_abs_max_lsb": 1,
     "basis": "float criterion above propagated through round-to-nearest s16 conversion can flip at most one rounding step"
   },
+  "reviewed_rules": [
+    {
+      "id": "mpeg-audio-float-decoders",
+      "scope": "mp1 and mp2 lanes: audio_decode and audio_device_path (the reference worker's audio-mp3 operation for Layer I and II streams)",
+      "rule": "the reference decodes MPEG audio Layer I and II with FFmpeg's float decoders mp1float and mp2float instead of the decoders FFmpeg picks by default (mp1 and mp2, fixed point); Layer III uses FFmpeg's default, mp3float",
+      "reason": "the fixed-point decoders output s16, whose rounding alone has an RMS of 2^-15/sqrt(12) = 8.8e-6, the whole audio_decode RMS limit, so a float decoder cannot be graded against them; the float decoders run the same bitstream decoding and synthesis in float. The device-path reference for Layer I and II is therefore not the ffmpeg command line's output, which would use the fixed-point decoders"
+    },
+    {
+      "id": "flac-integer-device-mix",
+      "scope": "flac lane: audio_device_path for streams of up to 16 bits per sample",
+      "rule": "the reference is FFmpeg's chain unchanged: its FLAC decoder outputs s16 for these streams, so the resampler mixes integer samples with Q15 gains, each output sample (sum(x * C) + 2^14) >> 15 truncated to 16 bits (it wraps, it does not clip); streams above 16 bits are s32 and take the float path of the other decoders",
+      "reason": "this is what the ffmpeg command line and a player using it produce for 16-bit FLAC; the candidate's mixer reproduces the integer path (harness/codecs/downmix-integer.md), and per_sample_abs_max_lsb still applies to every stream"
+    }
+  ],
   "video_decode": {
     "applies_to": ["h264", "hevc"],
     "exact": ["every output picture's complete Y/Cb/Cr samples at native bit depth", "output order and count", "coded/cropped dimensions", "sample aspect ratio", "colour description", "pts association"],

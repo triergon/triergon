@@ -86,6 +86,41 @@ impl Speaker {
         }
     }
 
+    /// The speaker whose `AV_CH_*` mask bit is `bit`.
+    pub fn from_bit(bit: u8) -> Option<Speaker> {
+        const ALL: [Speaker; 28] = [
+            Speaker::FrontLeft,
+            Speaker::FrontRight,
+            Speaker::FrontCenter,
+            Speaker::LowFrequency,
+            Speaker::BackLeft,
+            Speaker::BackRight,
+            Speaker::FrontLeftOfCenter,
+            Speaker::FrontRightOfCenter,
+            Speaker::BackCenter,
+            Speaker::SideLeft,
+            Speaker::SideRight,
+            Speaker::TopCenter,
+            Speaker::TopFrontLeft,
+            Speaker::TopFrontCenter,
+            Speaker::TopFrontRight,
+            Speaker::TopBackLeft,
+            Speaker::TopBackCenter,
+            Speaker::TopBackRight,
+            Speaker::WideLeft,
+            Speaker::WideRight,
+            Speaker::SurroundDirectLeft,
+            Speaker::SurroundDirectRight,
+            Speaker::LowFrequency2,
+            Speaker::TopSideLeft,
+            Speaker::TopSideRight,
+            Speaker::BottomFrontCenter,
+            Speaker::BottomFrontLeft,
+            Speaker::BottomFrontRight,
+        ];
+        ALL.into_iter().find(|speaker| *speaker as u8 == bit)
+    }
+
     /// FFmpeg `AV_CH_*` mask bit.
     pub fn mask(self) -> u64 {
         1u64 << (self as u8)
@@ -125,6 +160,27 @@ impl ChannelLayout {
         Some(layout)
     }
 
+    /// `channels` planes without speaker positions, FFmpeg's unspecified order (for
+    /// example an Opus family 255 stream). Its [`mask`](Self::mask) is 0 and its
+    /// [`name`](Self::name) `N channels`; `None` beyond [`Self::CAPACITY`].
+    pub fn unspecified(channels: usize) -> Option<ChannelLayout> {
+        ChannelLayout::new(core::iter::repeat_n(Speaker::FrontCenter, channels))
+    }
+
+    /// FFmpeg's default layout for `channels` channels: the first standard layout with
+    /// that many speakers (`stereo` for 2, `7.1` for 8). Mixing treats an unspecified
+    /// layout as this one, as FFmpeg's resampler does.
+    pub fn default_for(channels: usize) -> Option<ChannelLayout> {
+        let (mask, _) = STANDARD
+            .iter()
+            .find(|(mask, _)| mask.count_ones() as usize == channels)?;
+        ChannelLayout::new(
+            (0..64u8)
+                .filter(|bit| mask & (1 << bit) != 0)
+                .filter_map(Speaker::from_bit),
+        )
+    }
+
     /// Speakers in plane order.
     pub fn speakers(&self) -> &[Speaker] {
         &self.speakers[..usize::from(self.len)]
@@ -147,11 +203,69 @@ impl ChannelLayout {
         mask
     }
 
+    /// FFmpeg's name for the layout, as `ffprobe` reports `channel_layout`: a standard
+    /// layout's name (`stereo`, `5.1(side)`, ...), else the speaker names joined by `+`,
+    /// or `N channels` when a speaker repeats.
+    pub fn name(&self) -> String {
+        let mask = self.mask();
+        if mask == 0 {
+            return format!("{} channels", self.channels());
+        }
+        if let Some((_, name)) = STANDARD.iter().find(|(m, _)| *m == mask) {
+            return (*name).to_owned();
+        }
+        let names: Vec<&str> = self.speakers().iter().map(|s| s.name()).collect();
+        names.join("+")
+    }
+
     /// Plane index of `speaker`, if present.
     pub fn position(&self, speaker: Speaker) -> Option<usize> {
         self.speakers().iter().position(|&s| s == speaker)
     }
 }
+
+/// FFmpeg's standard layouts by mask (`ffmpeg -layouts`), in its order: the first match
+/// names a mask.
+const STANDARD: &[(u64, &str)] = &[
+    (0x4, "mono"),
+    (0x3, "stereo"),
+    (0xb, "2.1"),
+    (0x7, "3.0"),
+    (0x103, "3.0(back)"),
+    (0x107, "4.0"),
+    (0x33, "quad"),
+    (0x603, "quad(side)"),
+    (0xf, "3.1"),
+    (0x37, "5.0"),
+    (0x607, "5.0(side)"),
+    (0x10f, "4.1"),
+    (0x3f, "5.1"),
+    (0x60f, "5.1(side)"),
+    (0x707, "6.0"),
+    (0x6c3, "6.0(front)"),
+    (0x500f, "3.1.2"),
+    (0x137, "hexagonal"),
+    (0x70f, "6.1"),
+    (0x13f, "6.1(back)"),
+    (0x6cb, "6.1(front)"),
+    (0x637, "7.0"),
+    (0x6c7, "7.0(front)"),
+    (0x63f, "7.1"),
+    (0xff, "7.1(wide)"),
+    (0x6cf, "7.1(wide-side)"),
+    (0x560f, "5.1.2"),
+    (0x503f, "5.1.2(back)"),
+    (0x737, "octagonal"),
+    (0x2d033, "cube"),
+    (0x2d60f, "5.1.4"),
+    (0x563f, "7.1.2"),
+    (0x2d63f, "7.1.4"),
+    (0x80001563f, "7.2.3"),
+    (0x2d6ff, "9.1.4"),
+    (0x300002d6ff, "9.1.6"),
+    (0x18003f737, "hexadecagonal"),
+    (0x1f80003ffff, "22.2"),
+];
 
 impl Default for ChannelLayout {
     fn default() -> Self {
@@ -181,6 +295,114 @@ impl core::fmt::Debug for ChannelLayout {
     }
 }
 
+/// Speaker of each coded channel in the Vorbis I channel order (section 4.3.9), which
+/// Opus channel mapping family 1 also uses (RFC 7845 section 5.1.1.2), for 1 to 8
+/// channels. `None` beyond 8, where the order is application defined.
+#[must_use]
+pub fn vorbis_order(channels: usize) -> Option<&'static [Speaker]> {
+    use Speaker::{
+        BackCenter, BackLeft, BackRight, FrontCenter, FrontLeft, FrontRight, LowFrequency,
+        SideLeft, SideRight,
+    };
+    Some(match channels {
+        1 => &[FrontCenter],
+        2 => &[FrontLeft, FrontRight],
+        3 => &[FrontLeft, FrontCenter, FrontRight],
+        4 => &[FrontLeft, FrontRight, BackLeft, BackRight],
+        5 => &[FrontLeft, FrontCenter, FrontRight, BackLeft, BackRight],
+        6 => &[
+            FrontLeft,
+            FrontCenter,
+            FrontRight,
+            BackLeft,
+            BackRight,
+            LowFrequency,
+        ],
+        7 => &[
+            FrontLeft,
+            FrontCenter,
+            FrontRight,
+            SideLeft,
+            SideRight,
+            BackCenter,
+            LowFrequency,
+        ],
+        8 => &[
+            FrontLeft,
+            FrontCenter,
+            FrontRight,
+            SideLeft,
+            SideRight,
+            BackLeft,
+            BackRight,
+            LowFrequency,
+        ],
+        _ => return None,
+    })
+}
+
+/// Speaker of each coded channel in the FLAC default order (RFC 9639 section 9.1.3), for
+/// 1 to 8 channels.
+#[must_use]
+pub fn flac_order(channels: usize) -> Option<&'static [Speaker]> {
+    use Speaker::{
+        BackCenter, BackLeft, BackRight, FrontCenter, FrontLeft, FrontRight, LowFrequency,
+        SideLeft, SideRight,
+    };
+    Some(match channels {
+        1 => &[FrontCenter],
+        2 => &[FrontLeft, FrontRight],
+        3 => &[FrontLeft, FrontRight, FrontCenter],
+        4 => &[FrontLeft, FrontRight, BackLeft, BackRight],
+        5 => &[FrontLeft, FrontRight, FrontCenter, BackLeft, BackRight],
+        6 => &[
+            FrontLeft,
+            FrontRight,
+            FrontCenter,
+            LowFrequency,
+            BackLeft,
+            BackRight,
+        ],
+        7 => &[
+            FrontLeft,
+            FrontRight,
+            FrontCenter,
+            LowFrequency,
+            BackCenter,
+            SideLeft,
+            SideRight,
+        ],
+        8 => &[
+            FrontLeft,
+            FrontRight,
+            FrontCenter,
+            LowFrequency,
+            BackLeft,
+            BackRight,
+            SideLeft,
+            SideRight,
+        ],
+        _ => return None,
+    })
+}
+
+/// The output layout for channels coded in `coded` order, and the plane each coded
+/// channel goes to: planes follow ascending [`Speaker`] order, as everywhere in this crate.
+/// `None` if a speaker repeats or there are more than [`ChannelLayout::CAPACITY`].
+#[must_use]
+pub fn native_order(coded: &[Speaker]) -> Option<(ChannelLayout, [u8; ChannelLayout::CAPACITY])> {
+    let mut sorted = ChannelLayout::new(coded.iter().copied())?;
+    sorted.speakers[..coded.len()].sort_unstable();
+    if sorted.speakers().windows(2).any(|w| w[0] == w[1]) {
+        return None;
+    }
+    let mut plane = [0u8; ChannelLayout::CAPACITY];
+    for (i, speaker) in coded.iter().enumerate() {
+        plane[i] = sorted.position(*speaker)? as u8;
+    }
+    Some((sorted, plane))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -202,5 +424,51 @@ mod tests {
         assert_eq!(format!("{stereo:?}"), r#"["FL", "FR"]"#);
         assert!(ChannelLayout::new([FrontCenter; ChannelLayout::CAPACITY]).is_some());
         assert!(ChannelLayout::new([FrontCenter; ChannelLayout::CAPACITY + 1]).is_none());
+    }
+
+    #[test]
+    fn vorbis_and_flac_orders_map_to_ffmpeg_layouts() {
+        use Speaker::*;
+        // 5.1: Vorbis FL FC FR BL BR LFE -> FFmpeg 5.1(back) FL FR FC LFE BL BR.
+        let (layout, plane) = native_order(vorbis_order(6).unwrap()).unwrap();
+        assert_eq!(layout.mask(), 0x3f);
+        assert_eq!(&plane[..6], &[0, 2, 1, 4, 5, 3]);
+        // 7.1: FL FC FR SL SR BL BR LFE -> FL FR FC LFE BL BR SL SR.
+        let (layout, plane) = native_order(vorbis_order(8).unwrap()).unwrap();
+        assert_eq!(layout.mask(), 0x63f);
+        assert_eq!(&plane[..8], &[0, 2, 1, 6, 7, 4, 5, 3]);
+        assert_eq!(
+            native_order(vorbis_order(7).unwrap()).unwrap().0.speakers(),
+            &[
+                FrontLeft,
+                FrontRight,
+                FrontCenter,
+                LowFrequency,
+                BackCenter,
+                SideLeft,
+                SideRight
+            ]
+        );
+        for channels in 1..=8 {
+            let (_, plane) = native_order(flac_order(channels).unwrap()).unwrap();
+            assert!(
+                plane[..channels]
+                    .iter()
+                    .enumerate()
+                    .all(|(i, &p)| usize::from(p) == i)
+            );
+        }
+        assert!(vorbis_order(9).is_none());
+        let name = |coded: &[Speaker]| native_order(coded).unwrap().0.name();
+        assert_eq!(name(vorbis_order(2).unwrap()), "stereo");
+        assert_eq!(name(vorbis_order(6).unwrap()), "5.1");
+        assert_eq!(name(vorbis_order(7).unwrap()), "6.1");
+        assert_eq!(name(vorbis_order(8).unwrap()), "7.1");
+        assert_eq!(name(&[FrontLeft, LowFrequency]), "FL+LFE");
+        assert_eq!(
+            ChannelLayout::new([FrontCenter; 3]).unwrap().name(),
+            "3 channels"
+        );
+        assert!(native_order(&[FrontLeft, FrontLeft]).is_none());
     }
 }

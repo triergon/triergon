@@ -13,10 +13,11 @@ the library.
 codec-worker KIND-CODEC-bench  FILE ITERATIONS
 codec-worker KIND-CODEC-memory FILE
 codec-worker KIND-CODEC-raw    FILE OUT
+codec-worker packets FORMAT FILE
 ```
 
 `KIND-CODEC` is one of `video-h264`, `video-hevc`, `audio-ac3`, `audio-eac3`,
-`audio-aac`, `audio-dts`. The `simd` feature enables the HEVC decoder's nightly-only
+`audio-aac`, `audio-dts`, `audio-flac`, `audio-mp3`, `audio-vorbis`, `audio-opus`. The `simd` feature enables the HEVC decoder's nightly-only
 SIMD kernels; output is identical.
 
 Video is split into Annex B access units and audio into frames (AC-3/E-AC-3 by
@@ -38,3 +39,16 @@ audio frame. `packets` counts pictures or audio frames.
 
 `digest` is `triergon_harness_protocol::interleaved::InterleavedDigest` over the
 exact converted output: a fingerprint of equal output, not a cryptographic hash.
+
+## Reader packets
+
+`packets FORMAT FILE` prints one JSON line per packet a container reader emits, for
+`cargo xtask codecs readers`: `ogg` reads through `triergon_ogg::BlockingReader`, `flac`,
+`mp3`, `aac`, `ac3` and `eac3` through the `triergon_elementary` reader of that format.
+Each line holds the track index, `time_base`, `pts`, `dts`, `duration`, `trim_start` and
+`trim_end` as the reader reports them, the payload `size`, the source `position` (Ogg:
+the page that completes the packet; elementary streams: the first byte) and `complete`.
+Ogg packets also carry `compat`, the reader's FFmpeg-compatible view
+(`triergon_ogg::compat::clock`), and the reader's `resync` and `lost` events are lines
+of their own. The last line lists the tracks and how reading ended (`eof`, or `error` with the
+reader's message).

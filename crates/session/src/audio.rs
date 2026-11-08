@@ -4,6 +4,7 @@
 //! `pull` then decodes exactly those units and returns their stereo samples for
 //! the caller's device writer. A paused clock
 //! therefore yields nothing, and flush/stop discard everything queued.
+use crate::Discard;
 use crate::SessionState;
 use crate::mix::Downmix;
 use crate::queue::{FeedError, QueueLimits, UnitQueue};
@@ -22,6 +23,8 @@ pub const DEFAULT_LEAD_NS: i64 = 120_000_000;
 
 pub struct AudioSession {
     decoder: Option<Box<dyn AudioDecoder>>,
+    /// Samples of the decoder's start delay not discarded yet.
+    delay: usize,
     queue: UnitQueue,
     frame: AudioFrame,
     downmix: Downmix,
@@ -36,6 +39,7 @@ impl AudioSession {
     pub fn new(limits: QueueLimits) -> Self {
         Self {
             decoder: None,
+            delay: 0,
             queue: UnitQueue::new(limits),
             frame: AudioFrame::default(),
             downmix: Downmix::default(),
@@ -48,6 +52,7 @@ impl AudioSession {
     /// A new stream; `None` plays no audio.
     pub fn load(&mut self, decoder: Option<Box<dyn AudioDecoder>>) {
         self.reset();
+        self.delay = decoder.as_ref().map_or(0, |decoder| decoder.delay());
         self.decoder = decoder;
     }
     /// Flush and stop both end the fed timeline: queued audio is discarded.
@@ -75,6 +80,22 @@ impl AudioSession {
             return Err(FeedError::Invalid);
         }
         self.queue.push(au, pts)
+    }
+    /// [`feed`](Self::feed) a container packet's payload, whose decoded output then drops
+    /// the samples its container marks for discarding ([`Discard::of`]).
+    pub fn feed_discarding(
+        &mut self,
+        au: &[u8],
+        pts: Option<i64>,
+        discard: Discard,
+    ) -> Result<(), FeedError> {
+        if self.decoder.is_none() || self.failure.is_some() {
+            return Err(FeedError::Idle);
+        }
+        if self.ended {
+            return Err(FeedError::Invalid);
+        }
+        self.queue.push_discarding(au, pts, discard)
     }
     pub fn end_of_stream(&mut self) {
         if self.decoder.is_some() {
@@ -109,6 +130,9 @@ impl AudioSession {
             }
             let unit = self.queue.pop().expect("front unit");
             let result = decoder.decode(&unit.data, &mut self.frame);
+            if result.is_ok() {
+                unit.discard.apply(&mut self.frame, &mut self.delay);
+            }
             consumed += 1;
             match result {
                 Err(error) => {
