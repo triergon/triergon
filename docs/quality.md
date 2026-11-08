@@ -282,8 +282,8 @@ may override that count for diagnostic comparisons.
   group median above 0.75%, so a slowdown of 1% on one case passes. Where functions
   sit moves a case by about 1% either way, so a flagged case with unchanged functions
   and instruction counts is placement. A screen never replaces a recorded result.
-- Qualification runs on native AArch64 Linux. Results on one platform do not establish
-  another; 32-bit ARMv7 needs its own runs.
+- Qualification runs natively: on AArch64 Linux, and on 32-bit ARMv7 Linux in an armhf
+  user space (below). Results on one platform do not establish another.
 
 ### 32-bit ARMv7
 
@@ -300,9 +300,11 @@ space archived as evidence set `armv7-userland` (211 packages; the image holds n
 directory, toolchain or build output). Unpack it on the host and enter it:
 
 ```sh
+sha=f93de19128a5bc101c125a4a1f7c61f42062675186cfc86f627d220d1d079533
+aws s3 cp "$TRIERGON_EVIDENCE_ARCHIVE/evidence/armv7-userland/$sha.tar.gz" armv7-userland.tar.gz
+echo "$sha  armv7-userland.tar.gz" | sha256sum --check
 sudo mkdir -p /srv/armhf
-aws s3 cp "$TRIERGON_EVIDENCE_ARCHIVE/evidence/armv7-userland/f93de19128a5bc101c125a4a1f7c61f42062675186cfc86f627d220d1d079533.tar.gz" - |
-  sudo tar -xpz --numeric-owner -C /srv/armhf
+sudo tar -xpzf armv7-userland.tar.gz --numeric-owner -C /srv/armhf
 for d in proc sys dev dev/pts; do sudo mount --bind /$d /srv/armhf/$d; done
 sudo cp /etc/resolv.conf /srv/armhf/etc/resolv.conf
 sudo install -d -o 1000 -g 1000 /srv/armhf/home/ubuntu
@@ -347,5 +349,6 @@ lists every archived set:
 The index also records how identifiers were renamed. With `TRIERGON_EVIDENCE_ARCHIVE` set
 to the archive location, `cargo xtask evidence fetch SET` downloads a set, verifies it
 against the index and unpacks it into `.research/evidence/SET/`; a `.tar.zst` set is
-decompressed with the system `zstd`. `cargo xtask evidence pack DIR OUT` writes the
-deterministic archive a new set is uploaded as.
+decompressed with the system `zstd`. Both stream, hashing and writing each file as it
+leaves the archive, so a set larger than memory unpacks on a 32-bit host. `cargo xtask
+evidence pack DIR OUT` writes the deterministic archive a new set is uploaded as.

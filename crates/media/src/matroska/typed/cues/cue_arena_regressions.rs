@@ -87,5 +87,27 @@ fn cue_arena_peak_work_and_pressure_match_the_preimage() {
             ));
         }
     }
-    assert_eq!(rows, expected.lines().collect::<Vec<_>>());
+    let expected: Vec<_> = expected.lines().collect();
+    if cfg!(target_pointer_width = "64") {
+        assert_eq!(rows, expected);
+    } else {
+        // Pool bytes include storage headers sized by the pointer width, and the
+        // preimage was recorded on a 64-bit target. Entries, work and yields of
+        // the runs that never meet pressure do not depend on them; where the pool
+        // is bounded, the pressure point itself does.
+        let unpressured = |row: &str| {
+            row.find(" base ")
+                .filter(|_| row.contains(" unbounded: ") || row.contains(" chunk7: "))
+                .map(|end| row[..end].to_owned())
+        };
+        let portable: Vec<_> = rows.iter().filter_map(|r| unpressured(r)).collect();
+        assert_eq!(portable.len(), 4);
+        assert_eq!(
+            portable,
+            expected
+                .iter()
+                .filter_map(|r| unpressured(r))
+                .collect::<Vec<_>>()
+        );
+    }
 }

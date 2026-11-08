@@ -473,7 +473,7 @@ impl Av1ObuReader {
                     // that does not fit `usize` is a limit refusal on every target.
                     let wire = prefix.checked_add(payload).ok_or(Error::Overflow)?;
                     let maximum = self.limits.maximum_obu_bytes;
-                    if u64::try_from(maximum).is_ok_and(|maximum| wire > maximum) {
+                    if wire > u64::try_from(maximum).unwrap_or(u64::MAX) {
                         return Err(Error::Limit {
                             requested: usize::try_from(wire).unwrap_or(usize::MAX),
                             maximum,

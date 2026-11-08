@@ -118,6 +118,9 @@ comparison remains archived separately.
 | Ogg, audio elementary streams | `ccd3090572433e79d8ab65a377fcd9896d2839d9` | `8123e0f020a9c4ccedd83aea3e665d4486d55e26612e8bc29626e9a3026e2cd1` |
 | Capture, timing and memory | `ceb5076659e00ca9a2d3f3cb55ee4513d6d0710f` | `b75c8d6e6d64d294a385ec25b176e4ffb8f1a0d3c11b3ca956b3d352ac44c3b4` |
 | Matroska audio clocks and playback profiles | `b3579f729494a37a4dbebe03c475f7b38484046e` | `907bb7a35d70d09673ccbf0904a8b1ab85890a632454b8adf291d73a50672136` |
+| ARMv7: Matroska / WebM, startup and seek, HLS, codec timing, capture | `78a873dd983c878c861a7b5549639a58d5a599c1` | `773f9f077ec4e556f8692132c35d73b8256f24c9c26a5e407aa11df32820a116` |
+| ARMv7: ISO BMFF / MP4 | `9621f6063a2e517fecc1c28757e6bed50b5228a8` | `ca882ff82484e31c537ebb93cbc9899666343715219ae4411914392406259691` |
+| ARMv7: packet framing, codec conformance, tests | `9621f6063a2e517fecc1c28757e6bed50b5228a8` | `9eaa9347010b3c4aaf5c35bda715ee4ed1b2c7a14d3329b21976a2414455439e` |
 
 ## Platforms
 
@@ -178,11 +181,5 @@ RSS ceiling and its observed resident peak above the reference (observed up to 1
 every ISO BMFF output has its total RSS ceiling above the reference, and none its observed
 peak.
 
-Matroska, startup and seek, HLS, the external vector, codec timing and capture were
-measured at `78a873dd983c878c861a7b5549639a58d5a599c1` (raw samples
-`gate-build-linux-armv7`, `773f9f077ec4e556f8692132c35d73b8256f24c9c26a5e407aa11df32820a116`);
-ISO BMFF, packet framing, codec conformance and the tests at
-`9621f6063a2e517fecc1c28757e6bed50b5228a8` (`isobmff-gate-build-linux-armv7`,
-`ca882ff82484e31c537ebb93cbc9899666343715219ae4411914392406259691`, and
-`framing-codecs-checks-linux-armv7`,
-`9eaa9347010b3c4aaf5c35bda715ee4ed1b2c7a14d3329b21976a2414455439e`).
+The [measured revisions](#measured-revisions) table names the revision and raw samples
+behind each ARMv7 row.

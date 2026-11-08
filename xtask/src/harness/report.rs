@@ -66,9 +66,7 @@ impl Options {
 }
 
 fn digest(path: &Path) -> Result<String, String> {
-    Ok(sha256::hex(
-        &fs::read(path).map_err(|e| format!("{}: {e}", path.display()))?,
-    ))
+    sha256::file_hex(path).map_err(|e| format!("{}: {e}", path.display()))
 }
 
 fn s<'a>(value: &'a Value, key: &str) -> Option<&'a str> {
@@ -83,20 +81,34 @@ fn command_output(program: &str, args: &[&str]) -> String {
         .unwrap_or_default()
 }
 
-/// The Rust target triple this host qualifies for: the native target of the
-/// toolchain that built xtask, which builds the workers too. A 32-bit ARM user space
-/// on an AArch64 kernel reports `aarch64` or `armv8l` from `uname -m`, so the machine
-/// name cannot tell it apart from a 64-bit one.
+/// Targets a qualification run may name.
+const QUALIFIED_TARGETS: [&str; 4] = [
+    "aarch64-apple-darwin",
+    "aarch64-unknown-linux-gnu",
+    "x86_64-unknown-linux-gnu",
+    "armv7-unknown-linux-gnueabihf",
+];
+
+/// The Rust target triple this host qualifies for: the host triple of the
+/// toolchain that builds the workers (`rustc -vV`). A 32-bit ARM user space on an
+/// AArch64 kernel reports `aarch64` or `armv8l` from `uname -m`, so the machine
+/// name cannot tell it apart from a 64-bit one. Any other target, such as ARMv6 or
+/// `thumbv7neon`, is reported as unqualified.
 pub fn host_target() -> String {
-    let gnu = cfg!(target_env = "gnu");
-    match (std::env::consts::OS, std::env::consts::ARCH) {
-        ("macos", "aarch64") => "aarch64-apple-darwin".into(),
-        ("linux", "x86_64") if gnu => "x86_64-unknown-linux-gnu".into(),
-        ("linux", "aarch64") if gnu => "aarch64-unknown-linux-gnu".into(),
-        ("linux", "arm") if gnu && cfg!(target_abi = "eabihf") => {
-            "armv7-unknown-linux-gnueabihf".into()
-        }
-        (_, arch) => format!("unqualified-{arch}"),
+    static HOST: std::sync::OnceLock<String> = std::sync::OnceLock::new();
+    HOST.get_or_init(|| {
+        let version = command_output("rustc", &["-vV"]);
+        let host = version.lines().find_map(|line| line.strip_prefix("host: "));
+        qualified(host.unwrap_or("unknown"))
+    })
+    .clone()
+}
+
+fn qualified(target: &str) -> String {
+    if QUALIFIED_TARGETS.contains(&target) {
+        target.to_owned()
+    } else {
+        format!("unqualified-{target}")
     }
 }
 
@@ -941,6 +953,27 @@ mod prefix_tests {
 mod tests {
     use super::*;
     use std::sync::atomic::{AtomicU64, Ordering};
+
+    #[test]
+    fn only_the_listed_targets_qualify() {
+        assert_eq!(
+            qualified("armv7-unknown-linux-gnueabihf"),
+            "armv7-unknown-linux-gnueabihf"
+        );
+        for other in [
+            "arm-unknown-linux-gnueabihf",
+            "armv6-unknown-linux-gnueabihf",
+            "thumbv7neon-unknown-linux-gnueabihf",
+            "aarch64-unknown-linux-musl",
+        ] {
+            assert_eq!(qualified(other), format!("unqualified-{other}"));
+        }
+        let host = host_target();
+        assert!(
+            QUALIFIED_TARGETS.contains(&host.as_str()) || host.starts_with("unqualified-"),
+            "{host}"
+        );
+    }
 
     struct Output(PathBuf);
 
