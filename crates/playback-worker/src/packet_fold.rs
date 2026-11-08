@@ -5,11 +5,9 @@
 //! packet through the playback engine and folds it with [`Work::packet`]. The FFmpeg
 //! reference folds the same record per `AVPacket` (`harness/reference_*.h`).
 
-use crate::runner::{Invocation, Mode, Result, Totals, measure};
+use crate::runner::{Invocation, MAX_INPUT, Mode, Result, Totals, measure};
 use triergon_core::{Budget, Bytes};
 use triergon_harness_protocol::digest::{fold, fold_bytes, signed};
-
-const MAX_INPUT: u64 = 64 * 1024 * 1024;
 
 /// Packet count, payload bytes and the ordered digest of one or more operations.
 #[derive(Default)]
@@ -79,6 +77,7 @@ impl Work {
             packets: self.packets,
             bytes: self.bytes,
             digest: self.digest,
+            refusal: None,
         }
     }
 }

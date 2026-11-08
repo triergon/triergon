@@ -72,6 +72,7 @@ pub fn matroska_inputs() -> Vec<String> {
         "harness/reference_mp4_forward.h",
         "harness/reference_ts_program.h",
         "harness/reference_raw_video.h",
+        "harness/reference_ts.h",
     ]
     .map(String::from)
     .to_vec();
@@ -90,6 +91,7 @@ pub fn matroska_inputs() -> Vec<String> {
         "mp4-forward",
         "ts-program",
         "raw-annex-b",
+        "mpegts-pes",
     ] {
         for file in ["contract", "corpus"] {
             names.push(format!("harness/features/{feature}/{file}.json"));

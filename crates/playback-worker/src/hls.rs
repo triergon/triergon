@@ -4,7 +4,7 @@
 //! application audio clock, materialize each contiguous video feed, and fold
 //! video units first and audio units second, followed by their presentation tails.
 
-use crate::runner::{Invocation, Result, Totals, measure};
+use crate::runner::{Invocation, MAX_INPUT, Result, Totals, measure};
 use std::sync::atomic::AtomicBool;
 use triergon_core::{Budget, Bytes, InputCursor, SourceCapabilities, SourceId, WorkBudget};
 use triergon_playback::{
@@ -18,7 +18,6 @@ use triergon_playback::{
 };
 
 pub const PREFIX: &str = "hls-";
-const MAX_INPUT: u64 = 64 * 1024 * 1024;
 const OPERATION: &str = "hls-segment-feed";
 
 // One reader lives on the stack per operation; boxing the larger variant would add a
@@ -99,6 +98,7 @@ impl Work {
             packets: self.packets as u64,
             bytes: self.bytes as u64,
             digest: self.digest,
+            refusal: None,
         }
     }
 }

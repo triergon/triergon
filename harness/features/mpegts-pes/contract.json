@@ -1,0 +1,252 @@
+{
+  "schema": 1,
+  "id": "mpegts-pes",
+  "operation": "mpegts-pes-packets",
+  "candidate": "playback-worker",
+  "worker_operation": "ts-",
+  "reference": "ffmpeg-formats-native",
+  "contract": [
+    "one MPEG-TS input (TS188 or M2TS192) of authored synthetic streams, preloaded and read forward only, for one selected program",
+    "candidate: the public API only. TransportStream parses the input and selects the program; its first active PMT binds a compat::pes::DemuxObserver to the program's one elementary stream with the constructor its carriage selects, the transport packets of that PID feed the observer, and compat::pes::DemuxClock places each packet's timestamps",
+    "reference: FFmpeg's mpegts demuxer through custom AVIO (32 KiB buffer, reads of at most 64 KiB) with NOPARSE and NOFILLIN, no stream discovery and no decoders; every packet of the selected program in demuxer order",
+    "each packet folds stream index, PID, PTS and DTS in 90 kHz units (absent as INT64_MIN), duration, position, flags, payload length and bytes, and every side-data element (type, size, bytes); program and stream metadata are not compared",
+    "a case passes only when both reach EOF and both folds equal the expected fold recorded from the reference worker on the pinned build; those expected folds also equal the folds of the archived reference observations of the same inputs",
+    "a context the observer alone cannot take ends the operation with its cause and fails the case: a program without exactly one stream of a supported carriage, a later PMT, a clock or format boundary, a quarantined clock, a transport, PES-time, program or active PSI fault, a carrier the observer rejects, and a second media entity; an operation that finishes without a packet fails as an empty observation, because the program-level outcome is not compared",
+    "the recorded 272-request set is replayed as these 97 compat-view operations (104 of the requests are compat-view requests): requests with the same inputs, packet size, program and declared descriptor namespace (--dvb) are one operation and share a case. The 168 requests for the strict source view, 64 of them for its native source-clock projection, are replayed as the compat-view operation on their inputs; the strict source view itself is not compared. corpus.json lists every request under its case",
+    "requests over two media entities (a second segment, optionally after a discontinuity) stay cases without an expected fold: the candidate refuses at the entity boundary and the reference has no single-input equivalent"
+  ],
+  "required_profiles": [
+    "ts188-basic",
+    "m2ts192-opaque-prefix",
+    "pes-header-every-byte",
+    "psi-header-every-byte",
+    "pes-multiple-ts",
+    "pes-unbounded-next-pusi",
+    "pes-unbounded-definitive-eof",
+    "pes-time-unknown",
+    "pts-wrap-forward",
+    "pts-reorder",
+    "pts-dts-common-epoch",
+    "pts-negative-against-dts",
+    "pts-half-wrap-ambiguous",
+    "cc-wrap-15-to-zero",
+    "cc-one-duplicate",
+    "cc-third-copy",
+    "cc-same-counter-changed-payload",
+    "cc-adaptation-only",
+    "cc-duplicate-pcr-update",
+    "cc-loss-mid-pes",
+    "cc-loss-clean-pusi",
+    "pcr-timeline-discontinuity",
+    "pcr-extension-preserved",
+    "pcr-extension-invalid",
+    "transport-tei",
+    "transport-scrambled",
+    "transport-afc-reserved",
+    "transport-adaptation-overrun",
+    "transport-null-pid",
+    "transport-partial-final-packet",
+    "transport-sync-loss",
+    "psi-crc-invalid",
+    "psi-pointer-overrun",
+    "psi-length-over-policy",
+    "psi-pending-not-current",
+    "pat-atomic-two-sections",
+    "pat-incomplete-version",
+    "pat-network-pid-not-track",
+    "psi-pointer-finishes-old-starts-new",
+    "psi-two-sections-one-payload",
+    "pmt-version-wrap-retypes-pid",
+    "pmt-opaque-language-descriptors",
+    "pmt-descriptor-overrun",
+    "pmt-multi-section-forbidden",
+    "psi-stuffing-tail-invalid",
+    "psi-truncated-eof",
+    "carriage-ac3-dvb",
+    "carriage-eac3-dvb",
+    "carriage-ac3-direct",
+    "carriage-eac3-direct",
+    "carriage-aac-adts-direct",
+    "carriage-aac-latm-direct",
+    "carriage-hevc-direct",
+    "pes-timestamp-marker",
+    "pes-forbidden-time-flags",
+    "pes-optional-header-overrun",
+    "pes-start-prefix-invalid",
+    "pes-finite-truncated-eof",
+    "pes-finite-extra-payload",
+    "pes-audio-zero-length-invalid",
+    "elementary-bytes-cross-pes",
+    "hls-contiguous-pes-carry",
+    "hls-external-map",
+    "hls-explicit-discontinuity",
+    "dvb2-literals-fields",
+    "dvb-ancillary-pages",
+    "dvb-default-clut2",
+    "dvb-nonmodifying",
+    "dvb-partial-alpha-projection",
+    "dvb-truncated-segment",
+    "pat-pointer-then-clean-pusi",
+    "pmt-pointer-then-clean-pusi",
+    "di-continuous-pes-payload",
+    "di-continuous-pes-header",
+    "di-continuous-adaptation-only",
+    "di-duplicate-complete",
+    "di-duplicate-start",
+    "di-continuous-pat",
+    "di-continuous-pmt",
+    "partial-start-duplicate",
+    "partial-middle-duplicate",
+    "interleaved-other-pid-duplicate",
+    "m2ts-prefix-only-duplicate",
+    "same-content-new-counters",
+    "loss-then-clean-pusi",
+    "loss-at-clean-pusi",
+    "opcr-change-is-not-duplicate",
+    "third-middle-copy-then-clean",
+    "opcr-without-pcr-invalid",
+    "duplicate-middle-low-occupancy-finite",
+    "duplicate-middle-low-occupancy-unbounded",
+    "finite-continuation-body-400",
+    "finite-continuation-body-401",
+    "finite-continuation-body-408",
+    "finite-continuation-body-409",
+    "finite-continuation-body-414",
+    "finite-continuation-body-415"
+  ],
+  "required_targets": [
+    "aarch64-unknown-linux-gnu"
+  ],
+  "iterations": 50,
+  "minimum_pairs": 30,
+  "confidence": 0.95,
+  "pending_module_requirements": [
+    "a published MPEG-TS ContainerReader: program-level PAT/PMT routing, clock and format boundaries, recovery of rejected and damaged carriers, and input across media entities"
+  ],
+  "open_cases": [
+    {
+      "id": "pcr-timeline-discontinuity",
+      "requirement": "a published MPEG-TS ContainerReader: program-level PAT/PMT routing, clock and format boundaries, recovery of rejected and damaged carriers, and input across media entities"
+    },
+    {
+      "id": "pcr-extension-invalid",
+      "requirement": "a published MPEG-TS ContainerReader: program-level PAT/PMT routing, clock and format boundaries, recovery of rejected and damaged carriers, and input across media entities"
+    },
+    {
+      "id": "transport-tei",
+      "requirement": "a published MPEG-TS ContainerReader: program-level PAT/PMT routing, clock and format boundaries, recovery of rejected and damaged carriers, and input across media entities"
+    },
+    {
+      "id": "transport-scrambled",
+      "requirement": "a published MPEG-TS ContainerReader: program-level PAT/PMT routing, clock and format boundaries, recovery of rejected and damaged carriers, and input across media entities"
+    },
+    {
+      "id": "transport-afc-reserved",
+      "requirement": "a published MPEG-TS ContainerReader: program-level PAT/PMT routing, clock and format boundaries, recovery of rejected and damaged carriers, and input across media entities"
+    },
+    {
+      "id": "transport-adaptation-overrun",
+      "requirement": "a published MPEG-TS ContainerReader: program-level PAT/PMT routing, clock and format boundaries, recovery of rejected and damaged carriers, and input across media entities"
+    },
+    {
+      "id": "transport-partial-final-packet",
+      "requirement": "a published MPEG-TS ContainerReader: program-level PAT/PMT routing, clock and format boundaries, recovery of rejected and damaged carriers, and input across media entities"
+    },
+    {
+      "id": "transport-sync-loss",
+      "requirement": "a published MPEG-TS ContainerReader: program-level PAT/PMT routing, clock and format boundaries, recovery of rejected and damaged carriers, and input across media entities"
+    },
+    {
+      "id": "psi-crc-invalid",
+      "requirement": "a published MPEG-TS ContainerReader: program-level PAT/PMT routing, clock and format boundaries, recovery of rejected and damaged carriers, and input across media entities"
+    },
+    {
+      "id": "psi-pointer-overrun",
+      "requirement": "a published MPEG-TS ContainerReader: program-level PAT/PMT routing, clock and format boundaries, recovery of rejected and damaged carriers, and input across media entities"
+    },
+    {
+      "id": "psi-length-over-policy",
+      "requirement": "a published MPEG-TS ContainerReader: program-level PAT/PMT routing, clock and format boundaries, recovery of rejected and damaged carriers, and input across media entities"
+    },
+    {
+      "id": "psi-pending-not-current",
+      "requirement": "a published MPEG-TS ContainerReader: program-level PAT/PMT routing, clock and format boundaries, recovery of rejected and damaged carriers, and input across media entities"
+    },
+    {
+      "id": "pat-atomic-two-sections",
+      "requirement": "a published MPEG-TS ContainerReader: program-level PAT/PMT routing, clock and format boundaries, recovery of rejected and damaged carriers, and input across media entities"
+    },
+    {
+      "id": "pat-incomplete-version",
+      "requirement": "a published MPEG-TS ContainerReader: program-level PAT/PMT routing, clock and format boundaries, recovery of rejected and damaged carriers, and input across media entities"
+    },
+    {
+      "id": "pat-network-pid-not-track",
+      "requirement": "a published MPEG-TS ContainerReader: program-level PAT/PMT routing, clock and format boundaries, recovery of rejected and damaged carriers, and input across media entities"
+    },
+    {
+      "id": "psi-pointer-finishes-old-starts-new",
+      "requirement": "a published MPEG-TS ContainerReader: program-level PAT/PMT routing, clock and format boundaries, recovery of rejected and damaged carriers, and input across media entities"
+    },
+    {
+      "id": "psi-two-sections-one-payload",
+      "requirement": "a published MPEG-TS ContainerReader: program-level PAT/PMT routing, clock and format boundaries, recovery of rejected and damaged carriers, and input across media entities"
+    },
+    {
+      "id": "pmt-version-wrap-retypes-pid",
+      "requirement": "a published MPEG-TS ContainerReader: program-level PAT/PMT routing, clock and format boundaries, recovery of rejected and damaged carriers, and input across media entities"
+    },
+    {
+      "id": "pmt-opaque-language-descriptors",
+      "requirement": "a published MPEG-TS ContainerReader: program-level PAT/PMT routing, clock and format boundaries, recovery of rejected and damaged carriers, and input across media entities"
+    },
+    {
+      "id": "pmt-descriptor-overrun",
+      "requirement": "a published MPEG-TS ContainerReader: program-level PAT/PMT routing, clock and format boundaries, recovery of rejected and damaged carriers, and input across media entities"
+    },
+    {
+      "id": "pmt-multi-section-forbidden",
+      "requirement": "a published MPEG-TS ContainerReader: program-level PAT/PMT routing, clock and format boundaries, recovery of rejected and damaged carriers, and input across media entities"
+    },
+    {
+      "id": "psi-stuffing-tail-invalid",
+      "requirement": "a published MPEG-TS ContainerReader: program-level PAT/PMT routing, clock and format boundaries, recovery of rejected and damaged carriers, and input across media entities"
+    },
+    {
+      "id": "psi-truncated-eof",
+      "requirement": "a published MPEG-TS ContainerReader: program-level PAT/PMT routing, clock and format boundaries, recovery of rejected and damaged carriers, and input across media entities"
+    },
+    {
+      "id": "pes-timestamp-marker",
+      "requirement": "a published MPEG-TS ContainerReader: program-level PAT/PMT routing, clock and format boundaries, recovery of rejected and damaged carriers, and input across media entities"
+    },
+    {
+      "id": "pes-forbidden-time-flags",
+      "requirement": "a published MPEG-TS ContainerReader: program-level PAT/PMT routing, clock and format boundaries, recovery of rejected and damaged carriers, and input across media entities"
+    },
+    {
+      "id": "pes-optional-header-overrun",
+      "requirement": "a published MPEG-TS ContainerReader: program-level PAT/PMT routing, clock and format boundaries, recovery of rejected and damaged carriers, and input across media entities"
+    },
+    {
+      "id": "pes-start-prefix-invalid",
+      "requirement": "a published MPEG-TS ContainerReader: program-level PAT/PMT routing, clock and format boundaries, recovery of rejected and damaged carriers, and input across media entities"
+    },
+    {
+      "id": "hls-contiguous-pes-carry",
+      "requirement": "a published MPEG-TS ContainerReader: program-level PAT/PMT routing, clock and format boundaries, recovery of rejected and damaged carriers, and input across media entities"
+    },
+    {
+      "id": "hls-external-map",
+      "requirement": "a published MPEG-TS ContainerReader: program-level PAT/PMT routing, clock and format boundaries, recovery of rejected and damaged carriers, and input across media entities"
+    },
+    {
+      "id": "hls-explicit-discontinuity",
+      "requirement": "a published MPEG-TS ContainerReader: program-level PAT/PMT routing, clock and format boundaries, recovery of rejected and damaged carriers, and input across media entities"
+    },
+    {
+      "id": "opcr-without-pcr-invalid",
+      "requirement": "a published MPEG-TS ContainerReader: program-level PAT/PMT routing, clock and format boundaries, recovery of rejected and damaged carriers, and input across media entities"
+    }
+  ]
+}

@@ -10,12 +10,16 @@ use std::ops::RangeInclusive;
 use std::time::Instant;
 use triergon_core::Budget;
 use triergon_harness_protocol::digest::fold;
+use triergon_harness_protocol::push_quoted;
 
 pub type Result<T> = std::result::Result<T, Box<dyn std::error::Error>>;
 
+/// The largest input file a runner reads.
+pub const MAX_INPUT: u64 = 64 * 1024 * 1024;
+
 type Run = fn(&[String]) -> Result<()>;
 
-const RUNNERS: [(&str, Run); 8] = [
+const RUNNERS: [(&str, Run); 9] = [
     (crate::matroska_video::PREFIX, crate::matroska_video::run),
     (crate::matroska_audio::PREFIX, crate::matroska_audio::run),
     (crate::hls::PREFIX, crate::hls::run),
@@ -23,6 +27,7 @@ const RUNNERS: [(&str, Run); 8] = [
     (crate::mp4_forward::PREFIX, crate::mp4_forward::run),
     (crate::progressive::PREFIX, crate::progressive::run),
     (crate::ts_program::PREFIX, crate::ts_program::run),
+    (crate::ts::PREFIX, crate::ts::run),
     (crate::raw_video::PREFIX, crate::raw_video::run),
 ];
 
@@ -113,16 +118,27 @@ impl<'a> Invocation<'a> {
 }
 
 /// What one operation adds to the result line.
+#[derive(Default)]
 pub struct Totals {
     pub packets: u64,
     pub bytes: u64,
     pub digest: u64,
+    /// Why the operation ended without completing its work, if it did.
+    pub refusal: Option<Box<Refusal>>,
+}
+
+/// An operation that ended early: its error and the input event it is attributed
+/// to, as a JSON object.
+pub struct Refusal {
+    pub reason: String,
+    pub cause: String,
 }
 
 /// Run `operation` as often as the invocation asks and print the result line: the
 /// summed packets and bytes and the ordered fold of each operation's digest.
 /// `held` is the pool of a preloaded input; an operation that leaves more of it
-/// charged fails.
+/// charged fails. A refused operation ends the loop; the line then counts the
+/// operations that ran and carries the refusal and its cause.
 pub fn measure(
     invocation: &Invocation<'_>,
     name: &str,
@@ -138,11 +154,17 @@ pub fn measure(
     }
     let start = (invocation.mode == Mode::Bench).then(Instant::now);
     let (mut packets, mut bytes, mut digest) = (0, 0, 0);
-    for _ in 0..invocation.iterations {
+    let (mut runs, mut refusal) = (0, None);
+    while runs < invocation.iterations {
         let totals = operation()?;
+        runs += 1;
         packets += totals.packets;
         bytes += totals.bytes;
         fold(&mut digest, totals.digest);
+        if totals.refusal.is_some() {
+            refusal = totals.refusal;
+            break;
+        }
         if held.map(Budget::used) != retained {
             return Err("operation retained charged storage".into());
         }
@@ -152,11 +174,18 @@ pub fn measure(
         out.write_all(b"TRIERGON_END_V1\n")?;
         out.flush()?;
     }
-    writeln!(
-        out,
-        "{{\"schema\":1,\"operation\":\"{name}\",\"iterations\":{},\"packets\":{packets},\"bytes\":{bytes},\"digest\":{digest},\"elapsed_ns\":{elapsed},\"eof\":true}}",
-        invocation.iterations,
-    )?;
+    let mut line = format!(
+        "{{\"schema\":1,\"operation\":\"{name}\",\"iterations\":{runs},\"packets\":{packets},\"bytes\":{bytes},\"digest\":{digest},\"elapsed_ns\":{elapsed},\"eof\":{}",
+        refusal.is_none()
+    );
+    if let Some(refusal) = refusal {
+        line.push_str(",\"refusal\":");
+        push_quoted(&mut line, &refusal.reason);
+        line.push_str(",\"cause\":");
+        line.push_str(&refusal.cause);
+    }
+    line.push('}');
+    writeln!(out, "{line}")?;
     out.flush()?;
     Ok(())
 }
