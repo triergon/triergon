@@ -311,15 +311,37 @@ fn cancellation_releases_private_owners_and_stays_sticky() {
 #[test]
 fn exact_descriptor_reservation_retries_without_skipping_a_nal() {
     let pool = Budget::new(65536).unwrap();
-    let mut p = parser(&pool, &raw()).unwrap();
+    let mut record = vec![1, 66, 165, 40, 255, 228];
+    for tag in 0..4 {
+        record.extend_from_slice(&[0, 2, 0x67, 0x80 + tag]);
+    }
+    record.extend_from_slice(&[1, 0, 2, 0x68, 0x40]);
+    let mut p = parser(&pool, &record).unwrap();
     let block = pool.reserve(pool.available()).unwrap();
     let err = p.step(&mut WorkBudget::new(100), &AtomicBool::new(false));
     assert!(matches!(err, Err(Error::Backpressure { .. })));
     drop(block);
     let v = drive(&mut p, 1).unwrap();
-    assert_eq!(v.nals().len(), 2);
+    assert_eq!(v.nals().len(), 5);
     assert_eq!(v.nal(0).unwrap().source_bytes(), [0x67, 0x80]);
-    assert_eq!(v.nal(1).unwrap().source_bytes(), [0x68, 0x40]);
+    assert_eq!(v.nal(4).unwrap().source_bytes(), [0x68, 0x40]);
+}
+
+#[test]
+fn small_descriptor_storage_needs_no_additional_heap_capacity() {
+    for quantum in [1, 2, 7, 64] {
+        let pool = Budget::new(65536).unwrap();
+        let mut p = parser(&pool, &raw()).unwrap();
+        let block = pool.reserve(pool.available()).unwrap();
+        let charged = pool.used();
+        let value = drive(&mut p, quantum).unwrap();
+        assert_eq!(value.nals().len(), 2);
+        assert_eq!(value.descriptor_storage_bytes().unwrap(), 0);
+        assert_eq!(value.nal(0).unwrap().source_bytes(), [0x67, 0x80]);
+        assert_eq!(value.nal(1).unwrap().source_bytes(), [0x68, 0x40]);
+        assert_eq!(pool.used(), charged);
+        drop(block);
+    }
 }
 
 #[test]

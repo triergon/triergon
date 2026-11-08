@@ -111,9 +111,11 @@ size/type header); sample jobs take one complete container sample.
 generation. Raw and reserved fields stay readable; local violations are reported
 through `syntax_issues()` bitsets rather than cleared. Absent and present-zero
 fields are distinct (`None` vs `Some(0)`). Views share the pool-owned input; a
-retained view keeps the whole backing allocation charged. Small AVC records can
-reuse the checked offsets from the validation pass when the remaining work
-budget covers publishing the descriptors.
+retained view keeps the whole backing allocation charged. An AVC configuration
+keeps up to four NAL descriptors inline; larger records use charged heap storage.
+Small records reuse the checked offsets from the validation pass when the
+remaining work budget covers publishing the descriptors. Array counts and the
+validated end offset are derived from those descriptors and the extension fields.
 
 **Resources.** All arithmetic is checked. Every operation has caller limits
 (bytes, NAL/OBU/frame counts, input window). Work is charged per byte or field;
