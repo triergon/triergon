@@ -11230,6 +11230,12 @@
    "sha256": "d1e42e66fe5cee6f254f406e848dd21a11e6438d1ef03c9fcb2c08099277d884"
   },
   {
+   "name": "packet-framing-inline-comparison",
+   "retention": "90 days",
+   "key": "qualification/repository/packet-framing-inline-comparison/00e323c5bfcdb0f12a190defae773a86c4a6b9503a701d98a32b46bd9aab73ff.tar.gz",
+   "sha256": "00e323c5bfcdb0f12a190defae773a86c4a6b9503a701d98a32b46bd9aab73ff"
+  },
+  {
    "name": "progressive-cursor-gate-build",
    "path": "progressive-cursor-gate-build",
    "retention": "retained",
