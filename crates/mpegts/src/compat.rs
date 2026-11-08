@@ -49,13 +49,13 @@ pub mod pes {
         ReadyContinuation, RegisteredCarriage, SourceContext,
     };
     pub use crate::demux_transport::{
+        MalformedInputCompletion, MalformedInputFact, MalformedInputKind,
+        MalformedSourceDisposition, NoPacketsConfirmation,
+    };
+    pub use crate::demux_transport::{
         PesFaultCarrier, PesFaultHeader, PesFaultKind, PesFaultPacket, PesFaultPolicy,
         TransportFaultHeader, TransportFaultKind, TransportFaultPacket, TransportFaultRecovery,
         TransportObservation, TransportTailConfirmation,
-    };
-    pub use crate::demux_transport::{
-        MalformedInputCompletion, MalformedInputFact, MalformedInputKind,
-        MalformedSourceDisposition, NoPacketsConfirmation,
     };
     /// Control-only completion from complete physical carrier coverage and
     /// actual source EOF. The confirmation never creates a validated PES scope
