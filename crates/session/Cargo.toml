@@ -23,6 +23,9 @@ triergon-codec-mp3 = { path = "../codec-mp3", optional = true }
 triergon-codec-opus = { path = "../codec-opus", optional = true }
 triergon-codec-vorbis = { path = "../codec-vorbis", optional = true }
 
+[dev-dependencies]
+triergon = { path = "../triergon", features = ["matroska", "isobmff", "ogg", "elementary"] }
+
 [features]
 # The pure-Rust decoders behind `video_decoder` and `audio_decoder`.
 codecs = ["dep:triergon-codec-ac3", "dep:triergon-codec-aac", "dep:triergon-codec-dca", "dep:triergon-codec-h264", "dep:triergon-codec-hevc", "dep:triergon-codec-flac", "dep:triergon-codec-mp3", "dep:triergon-codec-opus", "dep:triergon-codec-vorbis"]
@@ -31,3 +34,7 @@ simd = ["triergon-codec-hevc?/simd"]
 
 [lints]
 workspace = true
+
+[[example]]
+name = "decode_audio"
+required-features = ["codecs"]

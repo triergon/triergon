@@ -275,12 +275,15 @@ static void one_pass(const char *codec_name, const AVCodecParameters *par, const
     av_parser_close(parser);
 }
 
-/* The demuxer of a file-format lane, or NULL for an elementary-stream lane. */
-static const char *lane_demuxer(const char *name) {
-    if (!strcmp(name, "flac")) return "flac";
-    if (!strcmp(name, "mp3")) return "mp3";
-    if (!strcmp(name, "vorbis") || !strcmp(name, "opus")) return "ogg";
-    return NULL;
+/* Whether a lane reads a file format, and its demuxer (NULL: probe; Opus vectors come
+ * in Ogg and Matroska). */
+static int file_lane(const char *name, const char **demuxer) {
+    *demuxer = NULL;
+    if (!strcmp(name, "flac")) *demuxer = "flac";
+    else if (!strcmp(name, "mp3")) *demuxer = "mp3";
+    else if (!strcmp(name, "vorbis")) *demuxer = "ogg";
+    else if (strcmp(name, "opus")) return 0;
+    return 1;
 }
 
 /* A file-format lane: the demuxer reads the piped (non-seekable) file, the decoder for
@@ -291,7 +294,7 @@ static void demux_pass(const char *demuxer, const uint8_t *data, size_t size, st
     AVIOContext *io = avio_alloc_context(buffer, 65536, 0, &m, memory_read, NULL, NULL);
     AVFormatContext *fmt = avformat_alloc_context();
     fmt->pb = io;
-    int r = avformat_open_input(&fmt, NULL, av_find_input_format(demuxer), NULL);
+    int r = avformat_open_input(&fmt, NULL, demuxer ? av_find_input_format(demuxer) : NULL, NULL);
     if (r < 0) die("open", r);
     /* The first audio stream, without probing: stream info would decode packets the
      * candidate does not, so the reference does the least work that yields the output. */
@@ -351,8 +354,8 @@ static void demux_pass(const char *demuxer, const uint8_t *data, size_t size, st
 
 static void pass(const char *name, const AVCodecParameters *par, const uint8_t *data, size_t size, int video,
                  struct out *o) {
-    const char *demuxer = video ? NULL : lane_demuxer(name);
-    if (demuxer)
+    const char *demuxer;
+    if (!video && file_lane(name, &demuxer))
         demux_pass(demuxer, data, size, o);
     else
         one_pass(name, par, data, size, video, o);

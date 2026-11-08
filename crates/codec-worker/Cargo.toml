@@ -9,6 +9,7 @@ rust-version.workspace = true
 publish.workspace = true
 
 [dependencies]
+triergon = { path = "../triergon", features = ["matroska", "ogg", "elementary"] }
 triergon-codec = { path = "../codec" }
 triergon-codec-aac = { path = "../codec-aac" }
 triergon-codec-ac3 = { path = "../codec-ac3" }

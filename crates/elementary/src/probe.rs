@@ -10,44 +10,74 @@ pub enum Kind {
     Ac3,
 }
 
-/// The elementary stream `bytes` starts, after any ID3v2 tag. MPEG audio, ADTS and AC-3
-/// are recognised only once `bytes` holds the start of a second frame that continues
-/// the first, and an ID3v2 tag must fit in `bytes` whole; `None` otherwise.
+/// The elementary stream `bytes` holds, after any ID3v2 tag: native FLAC by its marker,
+/// MPEG audio, ADTS and AC-3 by two frames that follow each other from the first byte.
+/// MPEG audio may also start later, as FFmpeg's probe allows, and then needs three
+/// frames. `None` when `bytes` is too short to tell, including an ID3v2 tag that does
+/// not fit in it.
 pub fn probe(bytes: &[u8]) -> Option<Kind> {
-    let start = id3v2_len(bytes).unwrap_or(0);
-    let bytes = bytes.get(start..)?;
+    let bytes = bytes.get(id3v2_len(bytes).unwrap_or(0)..)?;
     if bytes.starts_with(b"fLaC") {
         return Some(Kind::Flac);
     }
-    let confirmed = |len: Option<usize>, next: &dyn Fn(&[u8]) -> bool| {
-        len.is_some_and(|len| len > 0 && bytes.get(len..).is_some_and(next))
-    };
-    // ADTS sets the two layer bits MPEG audio reserves.
-    let adts = |b: &[u8]| b.len() >= 7 && b[0] == 0xff && b[1] & 0xf6 == 0xf0;
-    if adts(bytes) {
-        let len = (usize::from(bytes[3] & 3) << 11)
-            | (usize::from(bytes[4]) << 3)
-            | usize::from(bytes[5] >> 5);
-        if confirmed(Some(len), &adts) {
-            return Some(Kind::Adts);
-        }
-        return None;
+    if consecutive(bytes, 2, adts_frame, |(), ()| true) {
+        return Some(Kind::Adts);
     }
-    let mpeg = |b: &[u8]| MpegAudioHeader::from_bytes(b);
-    if let Some(header) = mpeg(bytes) {
-        let next = |b: &[u8]| mpeg(b).is_some_and(|h| h.same_stream(&header));
-        if confirmed(header.frame_bytes(), &next) {
-            return Some(Kind::MpegAudio);
-        }
-        return None;
+    if consecutive(bytes, 2, mpeg_frame, MpegAudioHeader::same_stream) {
+        return Some(Kind::MpegAudio);
     }
-    let ac3 = |b: &[u8]| probe_ac3_header(b).ok();
-    if let Some(header) = ac3(bytes)
-        && confirmed(Some(header.frame_bytes), &|b: &[u8]| ac3(b).is_some())
-    {
+    if consecutive(bytes, 2, ac3_frame, |(), ()| true) {
         return Some(Kind::Ac3);
     }
+    let later = (1..bytes.len()).filter(|&at| bytes[at] == 0xff);
+    for at in later {
+        if consecutive(&bytes[at..], 3, mpeg_frame, MpegAudioHeader::same_stream) {
+            return Some(Kind::MpegAudio);
+        }
+    }
     None
+}
+
+/// Whether `count` frames follow each other from the start of `bytes`, each agreeing
+/// with the first; the last needs only its header.
+fn consecutive<H>(
+    bytes: &[u8],
+    count: usize,
+    frame: impl Fn(&[u8]) -> Option<(H, usize)>,
+    agree: impl Fn(&H, &H) -> bool,
+) -> bool {
+    let Some((first, mut len)) = frame(bytes) else {
+        return false;
+    };
+    let mut at = 0;
+    for _ in 1..count {
+        at += len;
+        match bytes.get(at..).and_then(&frame) {
+            Some((header, next)) if agree(&first, &header) => len = next,
+            _ => return false,
+        }
+    }
+    true
+}
+
+/// An ADTS header and its frame length; ADTS sets the two layer bits MPEG audio
+/// reserves.
+fn adts_frame(b: &[u8]) -> Option<((), usize)> {
+    if b.len() < 7 || b[0] != 0xff || b[1] & 0xf6 != 0xf0 {
+        return None;
+    }
+    let len = (usize::from(b[3] & 3) << 11) | (usize::from(b[4]) << 3) | usize::from(b[5] >> 5);
+    (len >= 7).then_some(((), len))
+}
+
+fn mpeg_frame(b: &[u8]) -> Option<(MpegAudioHeader, usize)> {
+    let header = MpegAudioHeader::from_bytes(b)?;
+    Some((header, header.frame_bytes()?))
+}
+
+fn ac3_frame(b: &[u8]) -> Option<((), usize)> {
+    let header = probe_ac3_header(b).ok()?;
+    (header.frame_bytes > 0).then_some(((), header.frame_bytes))
 }
 
 /// Bytes of an ID3v2 tag at the start of `bytes`, footer included.
@@ -87,5 +117,11 @@ mod tests {
         let adts = [0xff, 0xf1, 0x50, 0x80, 0x01, 0x3f, 0xfc, 0, 0];
         assert_eq!(probe(&adts.repeat(2)), Some(Kind::Adts));
         assert_eq!(probe(&[0x47; 400]), None);
+        // MPEG audio after junk needs three frames.
+        let mut junk = vec![0x55; 215];
+        junk.extend_from_slice(&mp3_frames(2));
+        assert_eq!(probe(&junk), None);
+        junk.extend_from_slice(&mp3_frames(1));
+        assert_eq!(probe(&junk[..215 + 2 * 417 + 4]), Some(Kind::MpegAudio));
     }
 }
