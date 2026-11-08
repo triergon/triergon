@@ -204,9 +204,13 @@ impl Hmtx {
     }
 
     /// The left side bearing of `glyph`: from its long record, else from the
-    /// side-bearing array after the records; zero where the table lacks it.
+    /// side-bearing array after the records; zero where the table lacks it or
+    /// there are no records, as FreeType reads them.
     pub(crate) fn side_bearing(self, data: &[u8], glyph: u16) -> i16 {
         let (glyph, metrics) = (usize::from(glyph), usize::from(self.metrics));
+        if metrics == 0 {
+            return 0;
+        }
         let at = if glyph < metrics {
             4 * glyph + 2
         } else {
@@ -249,7 +253,8 @@ mod tests {
         // A record cut off reads as zero; so does a table without records.
         let short = Hmtx::new(Table { offset: 0, len: 7 }, 2, 3);
         assert_eq!([0, 1, 2].map(|g| short.advance(&data, g)), [100, 0, 200]);
-        assert_eq!(Hmtx::new(table, 0, 3).advance(&data, 1), 0);
+        let empty = Hmtx::new(table, 0, 3);
+        assert_eq!((empty.advance(&data, 1), empty.side_bearing(&data, 1)), (0, 0));
     }
 
     #[test]
