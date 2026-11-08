@@ -1,4 +1,4 @@
-//! Explicit flags48 control-only packet completion from physical source facts.
+//! Explicit control-only packet completion from physical source facts.
 //!
 //! H.222.0 (08/2023) 2.4.3.3 and 2.4.4 distinguish control PIDs/sections
 //! from PES payload. No validated PES scope, source table, timestamp or clock

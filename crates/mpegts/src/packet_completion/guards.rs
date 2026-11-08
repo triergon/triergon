@@ -1,4 +1,5 @@
 use super::*;
+use crate::compat::pes::PacketCompletion;
 use crate::{SourceEpochs, TransportStream};
 use triergon_core::{InputWindow, SourceCapabilities, SourceFailure};
 const BAD_CRC: &[u8] = include_bytes!(concat!(
@@ -339,6 +340,158 @@ fn original_control_only_bytes_complete_without_a_pes_scope() {
             );
         }
     }
+}
+
+#[test]
+fn atomic_pat_sections_prove_control_only_without_creating_a_scope() {
+    let data = include_bytes!(concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/tests/data/pat-atomic-two-sections.ts"
+    ));
+    let b = Budget::new(8 * 1024 * 1024).unwrap();
+    let mut run = source(data, &b);
+    let mut completion = view(&b);
+    all(&mut completion, &mut run).unwrap();
+    let confirmation = finish(&mut completion, &mut run.input).unwrap().unwrap();
+    assert_eq!(confirmation.physical_carriers(), 3);
+    assert_eq!(confirmation.pat_facts(), 2);
+    assert_eq!(confirmation.pmt_sections(), 1);
+    assert_eq!(
+        completion.raw_pat_facts()[0]
+            .section()
+            .header
+            .section_number,
+        0
+    );
+    assert_eq!(
+        completion.raw_pat_facts()[1]
+            .section()
+            .header
+            .section_number,
+        1
+    );
+}
+
+#[test]
+fn pmt_version_wrap_and_retyping_are_control_facts_without_media() {
+    let data = include_bytes!(concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/tests/data/pmt-version-wrap-retypes-pid.ts"
+    ));
+    let b = Budget::new(8 * 1024 * 1024).unwrap();
+    let mut run = source(data, &b);
+    let maps: Vec<_> = run
+        .items
+        .iter()
+        .filter_map(|item| match item {
+            Item::Event(
+                TraceEvent::ProgramMap {
+                    map, active: true, ..
+                },
+                _,
+            ) => Some((map.header.version, map.streams.as_slice()[0].stream_type)),
+            _ => None,
+        })
+        .collect();
+    assert_eq!(maps, [(31, 0x1b), (0, 0x24)]);
+    let mut completion = view(&b);
+    all(&mut completion, &mut run).unwrap();
+    let confirmation = finish(&mut completion, &mut run.input).unwrap().unwrap();
+    assert_eq!(confirmation.physical_carriers(), 3);
+    assert_eq!(confirmation.pmt_sections(), 2);
+    assert!(completion.source_diagnostics().is_empty());
+}
+
+#[test]
+fn opaque_pmt_descriptors_remain_original_control_bytes() {
+    let data = include_bytes!(concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/tests/data/pmt-opaque-language-descriptors.ts"
+    ));
+    let b = Budget::new(8 * 1024 * 1024).unwrap();
+    let mut run = source(data, &b);
+    let mut completion = view(&b);
+    all(&mut completion, &mut run).unwrap();
+    let confirmation = finish(&mut completion, &mut run.input).unwrap().unwrap();
+    assert_eq!(confirmation.physical_carriers(), 2);
+    assert_eq!(confirmation.pmt_sections(), 1);
+    assert_eq!(
+        completion.physical_carriers()[1].packet().source.as_ref(),
+        &data[188..]
+    );
+    assert!(completion.source_diagnostics().is_empty());
+}
+
+#[test]
+fn rejected_transport_and_malformed_pes_cannot_confirm_no_media() {
+    for data in [
+        include_bytes!(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/tests/data/transport-afc-reserved.ts"
+        ))
+        .as_slice(),
+        include_bytes!(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/tests/data/transport-adaptation-overrun.ts"
+        ))
+        .as_slice(),
+        include_bytes!(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/tests/data/pes-optional-header-overrun.ts"
+        ))
+        .as_slice(),
+        include_bytes!(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/tests/data/pes-start-prefix-invalid.ts"
+        ))
+        .as_slice(),
+    ] {
+        let b = Budget::new(8 * 1024 * 1024).unwrap();
+        let mut run = source(data, &b);
+        let mut completion = view(&b);
+        let admitted = all(&mut completion, &mut run);
+        assert!(admitted.is_err() || finish(&mut completion, &mut run.input).is_err());
+        assert!(completion.confirmation().is_none());
+    }
+}
+
+#[test]
+fn storage_pressure_cannot_become_a_no_media_confirmation() {
+    let b = Budget::new(8 * 1024 * 1024).unwrap();
+    let run = source(BAD_CRC, &b);
+    let mut completion = view(&b);
+    let Item::Event(event, context) = &run.items[0] else {
+        panic!("first carrier")
+    };
+    let before = b.used();
+    let pressure = b.reserve(b.available()).unwrap();
+    let work = completion.required_work(event).unwrap();
+    assert!(matches!(
+        completion.observe(
+            event,
+            SourceId(1),
+            *context,
+            &mut WorkBudget::new(work),
+            &AtomicBool::new(false)
+        ),
+        Err(Error::Backpressure { .. })
+    ));
+    assert!(completion.confirmation().is_none());
+    drop(pressure);
+    assert!(completion.fault().is_some());
+    assert!(
+        completion
+            .observe(
+                event,
+                SourceId(1),
+                *context,
+                &mut WorkBudget::new(work),
+                &AtomicBool::new(false)
+            )
+            .is_err()
+    );
+    drop(completion);
+    assert_eq!(b.used(), before);
 }
 #[test]
 fn inactive_pat_association_stays_inactive_and_raw() {

@@ -23,7 +23,6 @@ mod demux_recovery;
 mod framer;
 mod media_entity;
 pub mod mux;
-#[cfg(feature = "reference-trace")]
 mod packet_completion;
 pub mod pes;
 pub mod psi;
