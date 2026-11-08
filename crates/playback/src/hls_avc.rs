@@ -117,6 +117,47 @@ pub enum AvcTsStep {
     End,
 }
 
+/// Whether a PES belongs to an HLS lane's track and configuration epoch.
+pub(crate) fn lane_track(track: TrackKey, configuration_epoch: u64, packet: &DemuxPacket) -> bool {
+    track
+        == (TrackKey::Ts {
+            program: packet.program,
+            pid: packet.pid,
+        })
+        && packet.source_epochs.configuration == configuration_epoch
+}
+
+/// Whether the demux clock view describes this PES and its header's raw stamps.
+pub(crate) fn clock_describes(
+    clock: &DemuxTimeView,
+    packet: &DemuxPacket,
+    pts_raw33: Option<u64>,
+    dts_raw33: Option<u64>,
+) -> bool {
+    clock.program == packet.program
+        && clock.pid == packet.pid
+        && clock.profile == packet.profile
+        && clock.source_epochs == packet.source_epochs
+        && clock.source_pts_raw33 == pts_raw33
+        && clock.source_dts_raw33 == dts_raw33
+}
+
+/// The 90 kHz time whose ticks match a PES's raw 33-bit stamp. A PTS-only
+/// clock projection can mirror PTS into DTS; an absent stamp stays absent.
+pub(crate) fn pes_time(
+    raw: Option<u64>,
+    ticks: Option<i128>,
+    mismatch: &'static str,
+) -> Result<Option<triergon_core::Time>> {
+    let Some(raw) = raw else {
+        return Ok(None);
+    };
+    let ticks = ticks
+        .filter(|value| value.rem_euclid(1 << 33) == i128::from(raw))
+        .ok_or(Error::Invalid(mismatch))?;
+    Ok(Some(triergon_core::Time::new(ticks, 90_000)?))
+}
+
 #[derive(Clone, Copy)]
 struct Anchor {
     serial: u64,
@@ -283,12 +324,7 @@ impl AvcTsReader {
         let Some(packet) = mailbox.as_ref() else {
             return Ok(false);
         };
-        if self.config.track
-            != (TrackKey::Ts {
-                program: packet.program,
-                pid: packet.pid,
-            })
-            || packet.source_epochs.configuration != self.config.configuration_epoch
+        if !lane_track(self.config.track, self.config.configuration_epoch, packet)
             || packet.source_header.stream_id & 0xf0 != 0xe0
         {
             return Err(Error::Invalid("AVC TS PES track or configuration"));
@@ -311,13 +347,11 @@ impl AvcTsReader {
             return Err(Error::Invalid("AVC TS PES crosses source or clock epoch"));
         }
         let header = packet.time_header();
-        if clock.program != packet.program
-            || clock.pid != packet.pid
-            || clock.profile != packet.profile
-            || clock.source_epochs != packet.source_epochs
-            || clock.source_pts_raw33 != header.and_then(|header| header.pts_raw33)
-            || clock.source_dts_raw33 != header.and_then(|header| header.dts_raw33)
-        {
+        let (pts, dts) = (
+            header.and_then(|h| h.pts_raw33),
+            header.and_then(|h| h.dts_raw33),
+        );
+        if !clock_describes(&clock, packet, pts, dts) {
             return Err(Error::Invalid("AVC TS clock does not describe this PES"));
         }
         if header.is_some() {

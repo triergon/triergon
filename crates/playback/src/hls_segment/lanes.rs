@@ -3,7 +3,7 @@ use crate::{
     TsNativeCarriage, TsNativeConfiguration,
     hls_aac::{HlsAac, HlsAacFrame},
     hls_avc::{AvcRaster, AvcTsAccessUnit, AvcTsClock, AvcTsReader, AvcTsStep},
-    hls_dolby::{HlsDolby, HlsDolbyFrame},
+    hls_dolby::HlsDolby,
     hls_hevc::{HlsHevc, HlsHevcPicture},
 };
 use std::sync::atomic::AtomicBool;
@@ -230,6 +230,7 @@ impl LaneAssembler for VideoAssembler {
 }
 
 /// Complete feed bytes and the exact audio frame clock before playlist mapping.
+#[derive(Debug)]
 pub struct HlsMediaAudioUnit {
     pub bytes: Bytes,
     pub pts: Option<Time>,
@@ -239,17 +240,6 @@ pub struct HlsMediaAudioUnit {
 
 impl From<HlsAacFrame> for HlsMediaAudioUnit {
     fn from(frame: HlsAacFrame) -> Self {
-        Self {
-            bytes: frame.bytes,
-            pts: frame.pts,
-            dts: frame.dts,
-            duration: frame.duration,
-        }
-    }
-}
-
-impl From<HlsDolbyFrame> for HlsMediaAudioUnit {
-    fn from(frame: HlsDolbyFrame) -> Self {
         Self {
             bytes: frame.bytes,
             pts: frame.pts,
@@ -306,7 +296,7 @@ impl LaneAssembler for AudioAssembler {
     ) -> Result<AssemblyStep<Self::Unit>> {
         match self {
             Self::Aac(reader) => Ok(map_output(reader.poll(work, cancel)?, Into::into)),
-            Self::Dolby(reader) => Ok(map_output(reader.poll(work, cancel)?, Into::into)),
+            Self::Dolby(reader) => reader.poll(work, cancel),
         }
     }
 
