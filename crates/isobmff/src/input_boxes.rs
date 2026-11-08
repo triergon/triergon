@@ -103,10 +103,9 @@ impl BoxReader {
         self.phase == Phase::Announced && self.prefix[..8] == *b"\0\0\0\0mdat"
     }
     fn binding(&self, input: &InputCursor) -> Result<()> {
-        if self.source != input.source()
-            || self.token != input.token()
-            || self.position != input.position()
-        {
+        // The token changes with every request, reset and source continuation
+        // of its cursor, so an unchanged token also means an unchanged source.
+        if self.token != input.token() || self.position != input.position() {
             return Err(Error::Invalid(
                 "input changed outside box reader; reset format syntax state",
             ));
