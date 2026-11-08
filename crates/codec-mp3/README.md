@@ -99,3 +99,11 @@ mp2 and mp2fixed encodes at MPEG-1, 2 and 2.5 rates, and random Layer I/II frame
 `harness/codecs/mp3/grade.sh` decodes every vector and the ISO conformance streams and grades them
 with `harness/codecs/mp3/compare.py` (per channel RMS at most 8.8e-6, maximum difference at most
 6.1035e-5, exact sample counts).
+
+`cargo xtask codecs grade` runs the same streams through the container readers (the
+`mp1`, `mp2` and `mp3` lanes, [harness/codecs/STATUS.md](../../harness/codecs/STATUS.md));
+Layer I and II compare with FFmpeg's float decoders. On the gate build 62/64 pass
+(Layer I 5/5, Layer II 20/20, Layer III 37/39). Open: `he_mode` changes channel mode
+mid-stream, which FFmpeg's CLI converts to the first frame's format; `he_free` is free
+format, refused by both. Runtime and memory against the [gates](../../docs/quality.md#gates):
+[status](../../docs/status.md).

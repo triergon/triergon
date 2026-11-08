@@ -75,9 +75,12 @@ exceeding a limit is a typed error.
 
 `cargo run --release -p triergon-elementary --example ffprobe_compare -- [--seek] FILE...`
 compares every packet's size, position, timestamps and trim with `ffprobe -show_packets`.
-The packet sequences are identical on the IETF FLAC decoder testbench subset, the MPEG
-audio conformance bitstreams and streams FFmpeg writes (FLAC, MP3 with and without
-Xing/Info and LAME tags, MP2, ADTS, AC-3, E-AC-3), except where FFmpeg:
+Over the IETF FLAC decoder testbench, the MPEG audio conformance bitstreams, streams
+FFmpeg writes (FLAC, MP3 with and without Xing/Info and LAME tags, MP2, ADTS, AC-3,
+E-AC-3) and crafted damaged ones, the packet sequences are identical on 19/19 generated
+files, 10/10 MP3 conformance streams FFmpeg reads, 193/198 FLAC files both open and
+36/43 crafted files (archived as `audio-readers-mac-arm64`; gates:
+[docs/quality.md](../../docs/quality.md#gates)). The others differ only where FFmpeg:
 
 - delivers a FLAC frame's duration rescaled to the first frame's rate when the rate
   changes, no duration at 768 kHz, and the last frame of a stream with varying block

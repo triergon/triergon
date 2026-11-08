@@ -93,9 +93,12 @@ once output is released.
 `examples/ogg_compare.rs` pairs every packet with `ffprobe -show_packets` (FFmpeg
 9.0.2). On the 21 FATE Vorbis samples and on generated Opus, Vorbis, FLAC, multiplexed,
 chained, corrupted and truncated files, `compat::clock` equals FFmpeg's pts, dts,
-duration, size, skip samples and discard padding on every packet except one: FFmpeg
-reports a negative final duration (a last page whose granule position precedes its
-packet's start) modulo 2^32. The exact view differs from FFmpeg on the first Vorbis
+duration, size, skip samples and discard padding on 31/34 files (10,211/10,214 packets).
+In `b_vorbis.ogg` and `chain_vorbis.ogg` FFmpeg reports a negative final duration (a last
+page whose granule position precedes its packet's start) modulo 2^32; in `crc_bad.opus`,
+whose first audio page fails its CRC, FFmpeg times the first packet it keeps from that
+packet's page, this reader from the stream start. The inputs, commands and output are
+archived as `audio-readers-mac-arm64`; gates: [docs/quality.md](../../docs/quality.md#gates). The exact view differs from FFmpeg on the first Vorbis
 packet, on each short Vorbis block after a long one, on chained links' start offsets,
 and after lost pages, where it follows the granule position.
 

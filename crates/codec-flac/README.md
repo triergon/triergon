@@ -97,3 +97,11 @@ channel counts that change between frames.
   (every subframe type and stereo mode, the refusals, truncation at every byte, every bit
   flipped, a too-small budget) and, when the vectors are present, checks the integer
   output against each stream's STREAMINFO MD5 and the float output against it.
+- `cargo xtask codecs grade` runs the same files through the container readers (the
+  `flac` lane, [harness/codecs/STATUS.md](../../harness/codecs/STATUS.md)). On the gate
+  build 183/187 pass, bit-exact. Open: `01 - changing samplerate`, `02 - increasing
+  number of channels` and `03 - decreasing number of channels` change format mid-stream,
+  and FFmpeg's CLI converts them to the first frame's format (each decodes exactly on its
+  own); `flac_3ch_odd_mask` matches FFmpeg's decoder, but FFmpeg refuses its layout on the
+  stereo output. Runtime and memory against the [gates](../../docs/quality.md#gates):
+  [status](../../docs/status.md).
