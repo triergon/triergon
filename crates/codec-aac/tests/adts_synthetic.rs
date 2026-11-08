@@ -338,13 +338,22 @@ fn noise_block(pce: bool, cpe: bool, sbr: bool) -> Vec<u8> {
 /// Decode `units`; the access unit at `refused` is decoded with the pool exhausted and must
 /// be refused. Returns every other access unit's output, in order.
 fn decode_refusing(units: &[Vec<u8>], refused: Option<usize>) -> Vec<Vec<Vec<f32>>> {
+    decode_refusing_with(units, refused, 0)
+}
+
+/// [`decode_refusing`], with `spare` bytes of the pool left free for the refused one.
+fn decode_refusing_with(
+    units: &[Vec<u8>],
+    refused: Option<usize>,
+    spare: usize,
+) -> Vec<Vec<Vec<f32>>> {
     let budget = Budget::new(8 << 20).unwrap();
     let mut d = Decoder::new_in(&budget);
     let mut f = AudioFrame::default();
     let mut outputs = Vec::new();
     for (i, au) in units.iter().enumerate() {
         if refused == Some(i) {
-            let pressure = budget.reserve(budget.available()).unwrap();
+            let pressure = budget.reserve(budget.available() - spare).unwrap();
             let r = d.decode(au, &mut f);
             assert!(matches!(r, Err(DecodeError::Budget(_))), "{r:?}");
             assert_eq!(f.samples_per_channel, 0);
@@ -360,11 +369,19 @@ fn decode_refusing(units: &[Vec<u8>], refused: Option<usize>) -> Vec<Vec<Vec<f32
 /// After a refused in-band reconfiguration the decoder continues exactly as if the refused
 /// access unit had never arrived.
 fn a_refusal_is_as_if_the_access_unit_never_arrived(units: &[Vec<u8>], refused: usize) {
+    a_refusal_with_spare_is_as_if_the_access_unit_never_arrived(units, refused, 0);
+}
+
+fn a_refusal_with_spare_is_as_if_the_access_unit_never_arrived(
+    units: &[Vec<u8>],
+    refused: usize,
+    spare: usize,
+) {
     let mut without = units.to_vec();
     without.remove(refused);
     let expected = decode_refusing(&without, None);
     assert!(expected.iter().flatten().flatten().any(|&s| s != 0.0));
-    assert_eq!(decode_refusing(units, Some(refused)), expected);
+    assert_eq!(decode_refusing_with(units, Some(refused), spare), expected);
 }
 
 #[test]
@@ -409,4 +426,28 @@ fn a_refusal_after_a_decoded_block_leaves_a_consistent_decoder() {
         assert_eq!(f.samples_per_channel, 1024);
         assert!(f.planes.iter().flatten().all(|s| s.is_finite()));
     }
+}
+
+#[test]
+fn a_refused_cpe_in_a_mono_stream_leaves_the_decoder_as_it_was() {
+    let mono = adts(1, 4, 1, &[noise_block(false, false, false)], false);
+    let cpe = adts(1, 4, 1, &[noise_block(false, true, false)], false);
+    let units = [&mono, &mono, &cpe, &mono, &mono].map(Vec::clone);
+    a_refusal_is_as_if_the_access_unit_never_arrived(&units, 2);
+}
+
+#[test]
+fn a_refused_ps_start_leaves_the_decoder_as_it_was() {
+    // SBR on a mono stream's first frame starts PS, which makes the output stereo. Spare
+    // the pool what a plain first frame needs, so that the refusal is the start's.
+    let plain = adts(1, 4, 1, &[noise_block(false, false, false)], false);
+    let sbr = adts(1, 4, 1, &[noise_block(false, false, true)], false);
+    let budget = Budget::new(8 << 20).unwrap();
+    let idle = budget.used();
+    Decoder::new_in(&budget)
+        .decode(&plain, &mut AudioFrame::default())
+        .unwrap();
+    let first = budget.peak() - idle;
+    let units = [&sbr, &plain, &plain].map(Vec::clone);
+    a_refusal_with_spare_is_as_if_the_access_unit_never_arrived(&units, 0, first);
 }

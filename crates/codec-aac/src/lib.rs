@@ -44,16 +44,16 @@ use triergon_codec::{AudioDecoder, Budget, DecodeFailure, DownmixLevels};
 pub struct Limits {
     /// Live storage that depends on the stream: element and coupling-channel state
     /// (overlap, prediction, LTP, spectra, SBR and PS) and the output frame the decoder
-    /// fills. The default holds a switch between two of the largest PCE layouts (48
-    /// elements, 93 channels) with SBR and Main prediction, 16 coupling channels and four
-    /// raw data blocks of output.
+    /// fills. The default holds 48 elements (16 tags each of SCE, CPE and LFE, the most a
+    /// PCE switch between two layouts holds) with SBR and Main prediction, 16 coupling
+    /// channels and four raw data blocks of 93 channels.
     pub live_storage_bytes: usize,
 }
 
 impl Default for Limits {
     fn default() -> Self {
         Limits {
-            live_storage_bytes: 64 * 1024 * 1024,
+            live_storage_bytes: 32 * 1024 * 1024,
         }
     }
 }

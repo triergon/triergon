@@ -64,11 +64,11 @@ dec.reset(); // after a seek: drops overlap, prediction, PNS, SBR and PS history
   holds when the refusal comes before the access unit advanced other history; an earlier
   raw data block of the same ADTS frame, or an element with Main prediction before the
   refusal, stays decoded. `Decoder::with_limits(Limits { live_storage_bytes })` sets the
-  pool, `Decoder::new_in` charges a caller's `Budget`. The 64 MiB default holds a switch
-  between two of the largest layouts a PCE can declare, which keeps both while the new
-  one is built: 48 elements (93 channels) of 493 KiB each with SBR, PS and Main
-  prediction, twice, 16 coupling channels of 53 KiB and 93 planes of four SBR raw data
-  blocks (2.9 MiB), 49.9 MiB in all.
+  pool, `Decoder::new_in` charges a caller's `Budget`. An element is a kind and a 4-bit
+  tag, so a layout switch, which reuses the elements both layouts have, holds at most 48
+  (16 each of SCE, CPE and LFE). The 32 MiB default holds that many at 493 KiB each with
+  SBR, PS and Main prediction, 16 coupling channels of 53 KiB and 93 planes of four SBR
+  raw data blocks (2.9 MiB): 26.8 MiB in all.
 - Refused: SSR (`Feature::SsrGainControl`) and reserved sampling-frequency indices 13–15.
   ER, LD, ELD, USAC and 960-sample frames cannot be carried in ADTS; LATM/LOAS is not
   accepted.

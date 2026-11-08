@@ -126,6 +126,38 @@ impl ElementState {
             bs_tag: tag,
         })
     }
+
+    /// Return to the state of `new` in place: a layout switch reuses the element of an
+    /// identity both layouts have without charging it again.
+    fn renew(&mut self) {
+        let ElementState {
+            kind,
+            tag,
+            ch,
+            sbr,
+            out,
+            decoded,
+            nch,
+            cd,
+            bs_tag,
+            ch_decoded,
+        } = self;
+        for c in ch {
+            c.reset();
+        }
+        if let Some(s) = sbr {
+            s.renew();
+        }
+        *out = [[0.0; 2048]; 2];
+        *decoded = false;
+        *nch = if *kind == ID_CPE { 2 } else { 1 };
+        for cd in cd {
+            let cd: &mut ChannelData = cd;
+            *cd = ChannelData::new();
+        }
+        *bs_tag = *tag;
+        *ch_decoded = [false; 2];
+    }
 }
 
 #[derive(Debug)]
@@ -258,7 +290,7 @@ impl Core {
         } else {
             Vec::new()
         };
-        let elements = self.build_elements(aot, &slots, false)?;
+        let elements = self.build_elements(aot, &slots, false, &[])?;
         self.aot = aot;
         self.sf_index = h.sf_index as usize;
         self.channel_config = h.channel_config;
@@ -276,17 +308,20 @@ impl Core {
         Ok(true)
     }
 
-    /// The state of every element `slots` declare (once per element), with SBR when `sbr`,
-    /// built before a configuration applies so that a refused charge applies nothing.
+    /// The state of every element `slots` declare (once per element identity, a kind and
+    /// a tag) that `existing` lacks, with SBR when `sbr`, built before a configuration
+    /// applies so that a refused charge applies nothing.
     fn build_elements(
         &self,
         aot: u8,
         slots: &[Slot],
         sbr: bool,
+        existing: &[Charged<Box<ElementState>>],
     ) -> Result<Vec<Charged<Box<ElementState>>>> {
         let mut elements: Vec<Charged<Box<ElementState>>> = Vec::with_capacity(slots.len());
         for s in slots {
-            if elements.iter().any(|e| e.kind == s.kind && e.tag == s.tag) {
+            let has = |e: &Charged<Box<ElementState>>| e.kind == s.kind && e.tag == s.tag;
+            if elements.iter().any(has) || existing.iter().any(has) {
                 continue;
             }
             let mut e = ElementState::new(&self.budget, aot, s.kind, s.tag)?;
@@ -370,7 +405,26 @@ impl Core {
     ) -> Result<()> {
         let (layout, plane_of) = self.layout_of(&slots, unordered);
         self.make_room(out, layout.channels(), self.frame_len(), blocks)?;
-        self.elements = self.build_elements(self.aot, &slots, self.sbr_active)?;
+        // Both layouts together hold at most 48 identities (16 tags of each kind), so the
+        // switch never holds more element state than that.
+        let mut added = self.build_elements(self.aot, &slots, self.sbr_active, &self.elements)?;
+        let mut old = core::mem::take(&mut self.elements);
+        for s in &slots {
+            let has = |e: &Charged<Box<ElementState>>| e.kind == s.kind && e.tag == s.tag;
+            if self.elements.iter().any(has) {
+                continue;
+            }
+            let e = match old.iter().position(has) {
+                Some(i) => {
+                    let mut e = old.swap_remove(i);
+                    e.renew();
+                    e
+                }
+                None => added.remove(added.iter().position(has).expect("built above")),
+            };
+            self.elements.push(e);
+        }
+        drop(old);
         self.cce.clear();
         self.slots = slots;
         self.unordered = unordered;
@@ -1187,9 +1241,23 @@ fn is_libfaac_signature(t: &[u8]) -> bool {
 }
 
 #[cfg(test)]
-mod tests {
+pub(crate) mod tests {
     use super::*;
     use crate::cce::CceState;
+
+    /// `value`'s `Debug` text without the counters of the pools it is charged to.
+    pub(crate) fn without_pools(value: &impl core::fmt::Debug) -> String {
+        let text = format!("{value:?}");
+        let mut out = String::with_capacity(text.len());
+        let mut rest = text.as_str();
+        while let Some(at) = rest.find("Budget(") {
+            out.push_str(&rest[..at]);
+            let end = rest[at..].find("})").map_or(rest.len(), |e| at + e + 2);
+            rest = &rest[end..];
+        }
+        out.push_str(rest);
+        out
+    }
 
     /// The bytes `make` leaves charged to a fresh pool while its result lives.
     fn charge_of<T>(make: impl FnOnce(&Budget) -> Result<T>) -> usize {
@@ -1202,10 +1270,33 @@ mod tests {
     }
 
     #[test]
+    fn a_renewed_element_is_a_new_one() {
+        let budget = Budget::new(1 << 30).unwrap();
+        for aot in [AOT_LC, AOT_MAIN, AOT_LTP] {
+            for kind in [ID_SCE, ID_CPE] {
+                let fresh = || {
+                    let mut e = ElementState::new(&budget, aot, kind, 3).unwrap();
+                    e.sbr = Some(new_sbr(&budget, 4).unwrap());
+                    e
+                };
+                let mut e = fresh();
+                e.ch[0].overlap.fill(1.0);
+                e.ch[1].prev_shape = 1;
+                e.out[1][7] = 2.0;
+                (e.decoded, e.nch, e.bs_tag, e.ch_decoded) = (true, 2, 9, [true; 2]);
+                e.cd[0].global_gain = 120;
+                e.renew();
+                assert_eq!(without_pools(&e), without_pools(&fresh()), "{aot} {kind}");
+            }
+        }
+    }
+
+    #[test]
     fn the_default_limit_holds_a_switch_between_the_largest_layouts() {
-        // A PCE of 15 front, 15 side and 15 back CPEs and 3 LFEs: 48 elements, 93 channels,
-        // each with SBR and PS, in the profile with the largest channel state. A PCE switch
-        // builds the new layout's elements while the old ones still exist.
+        // An element is a kind and a 4-bit tag, so a PCE can list 45 CPEs but has at most
+        // 16 distinct ones, and two layouts together hold at most 48 elements (16 SCEs, 16
+        // CPEs, 16 LFEs): a switch reuses what both have. Each element here carries SBR and
+        // PS in the profile with the largest channel state.
         let element = [AOT_MAIN, AOT_LTP].map(|aot| {
             charge_of(|b| {
                 let mut e = Charged::boxed(b, ElementState::new(b, aot, ID_CPE, 0)?)?;
@@ -1223,7 +1314,7 @@ mod tests {
         });
         let limit = crate::Limits::default().live_storage_bytes;
         let pool = Budget::new(limit).unwrap().used();
-        let worst = pool + 2 * 48 * element + 16 * cce + output;
+        let worst = pool + 48 * element + 16 * cce + output;
         eprintln!("element {element}, cce {cce}, output {output}, worst {worst}");
         assert!(worst <= limit, "{worst} > {limit}");
     }

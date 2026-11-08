@@ -272,7 +272,7 @@ impl SliceDecoder<'_> {
                         }
                         let mvp = self.mvp(list, r, x, y, w, shape, p);
                         let d = self.mb.mvd[list][((y / 4) * 4 + x / 4) as usize];
-                        let mv = add_mvd(mvp, d);
+                        let mv = [mvp[0] + d[0], mvp[1] + d[1]];
                         self.store_mv(list, x, y, w, h, mv);
                         whole.0[list] = r;
                         whole.1[list] = clip_mv(mv);
@@ -320,7 +320,7 @@ impl SliceDecoder<'_> {
                             let y = y0 + sy;
                             let mvp = self.mvp(list, r, x, y, sw, 0, 0);
                             let d = self.mb.mvd[list][((y / 4) * 4 + x / 4) as usize];
-                            self.store_mv(list, x, y, sw, sh_, add_mvd(mvp, d));
+                            self.store_mv(list, x, y, sw, sh_, [mvp[0] + d[0], mvp[1] + d[1]]);
                         }
                     }
                 }
@@ -1391,11 +1391,4 @@ fn mc_part<'r, F: Fn(usize) -> &'r FrameBuf, O: McOut>(
             );
         }
     }
-}
-
-/// A motion vector from its prediction and coded difference (8.4.1). A corrupt stream's
-/// difference can leave the range 8.4.1 allows, and the sum then wraps.
-#[inline]
-fn add_mvd(mvp: [i32; 2], d: [i32; 2]) -> [i32; 2] {
-    [mvp[0].wrapping_add(d[0]), mvp[1].wrapping_add(d[1])]
 }

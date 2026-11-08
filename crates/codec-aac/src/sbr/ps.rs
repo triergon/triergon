@@ -360,6 +360,31 @@ impl Ps {
         })
     }
 
+    /// Return to the state of `new` in place, header included.
+    pub(crate) fn renew(&mut self) {
+        self.reset();
+        let Ps {
+            enable_iid,
+            enable_icc,
+            iid_mode,
+            icc_mode,
+            header_seen,
+            st: _,
+            qmf_hist: _,
+            s: _,
+            d: _,
+            delay: _,
+            ap_delay: _,
+            out_l: _,
+            out_r: _,
+        } = self; // the fields set to `_` are reset's
+        *enable_iid = false;
+        *enable_icc = false;
+        *iid_mode = 0;
+        *icc_mode = 0;
+        *header_seen = false;
+    }
+
     /// Return to the state of `new`, keeping the header.
     pub(crate) fn reset(&mut self) {
         self.st = State::INITIAL;

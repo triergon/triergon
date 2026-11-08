@@ -193,6 +193,72 @@ impl Chan {
         self.index_noise = 0;
         self.index_sine = 0;
     }
+
+    /// Return to the state of `new` in place. Every field is named, so a new one cannot
+    /// be missed.
+    fn renew(&mut self) {
+        self.reset_signal();
+        let Chan {
+            frame_class,
+            num_env,
+            t_env,
+            freq_res,
+            num_noise,
+            t_q,
+            l_a,
+            amp_res,
+            df_env,
+            df_noise,
+            invf,
+            invf_prev: _,
+            bw_prev: _,
+            env_q: _,
+            env_prev_res,
+            noise_q: _,
+            add_harmonic_flag,
+            add_harmonic,
+            s_index_prev: _,
+            e_orig,
+            q_orig,
+            prev_num_env: _,
+            prev_t_env_last: _,
+            l_a_prev: _,
+            analysis: _,
+            synthesis: _,
+            xl: _,
+            y_prev: _,
+            g_hist,
+            q_hist,
+            index_noise: _,
+            index_sine: _,
+            kx_prev: _,
+            m_prev: _,
+            xa,
+            xh,
+            y,
+        } = self; // the fields set to `_` are reset_signal's
+        *frame_class = 0;
+        *num_env = 0;
+        *t_env = [0; 6];
+        *freq_res = [false; 6];
+        *num_noise = 0;
+        *t_q = [0; 3];
+        *l_a = -1;
+        *amp_res = false;
+        *df_env = [false; 5];
+        *df_noise = [false; 2];
+        *invf = [0; 5];
+        *env_prev_res = false;
+        *add_harmonic_flag = false;
+        *add_harmonic = [false; 49];
+        *e_orig = [[0.0; 49]; 5];
+        *q_orig = [[0.0; 5]; 2];
+        *g_hist = [[0.0; 64]; 4];
+        *q_hist = [[0.0; 64]; 4];
+        xa.fill([Cpx::default(); 32]);
+        xh.fill([Cpx::default(); 40]);
+        y.fill([Cpx::default(); 64]);
+    }
 }
 
 #[derive(Debug)]
@@ -237,6 +303,37 @@ impl Sbr {
             c.reset_signal();
         }
         self.ps.reset();
+    }
+
+    /// Return to the state of `new` in place, header and frequency tables included.
+    pub(crate) fn renew(&mut self) {
+        let Sbr {
+            fs: _,
+            hdr,
+            have_header,
+            reset,
+            ft,
+            coupling,
+            ch,
+            data_ok,
+            ps,
+            ps_seen,
+            x,
+            x_r,
+        } = self; // the core rate, and so fs, is the same for every element of a layout
+        *hdr = Header::default();
+        *have_header = false;
+        *reset = false;
+        *ft = FreqTables::default();
+        *coupling = false;
+        for c in ch {
+            c.renew();
+        }
+        *data_ok = false;
+        ps.renew();
+        *ps_seen = false;
+        x.fill([Cpx::default(); 64]);
+        x_r.fill([Cpx::default(); 64]);
     }
 
     /// sbr_extension_data(): returns true when a PS extension was found.
@@ -1228,6 +1325,34 @@ fn hf_adjust(c: &mut Chan, ft: &FreqTables, hdr: &Header, reset: bool) {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn renew_returns_an_sbr_to_its_new_state() {
+        let budget = Budget::new(1 << 30).unwrap();
+        let fresh = || Sbr::new(44_100, &budget).unwrap();
+        let mut s = fresh();
+        let header = Header {
+            start_freq: 2,
+            stop_freq: 14,
+            freq_scale: 0,
+            alter_scale: false,
+            noise_bands: 1,
+            ..Header::default()
+        };
+        s.ft = freq::compute(&header, 48_000).unwrap();
+        s.hdr = header;
+        (s.have_header, s.reset, s.coupling, s.data_ok, s.ps_seen) = (true, true, true, true, true);
+        for c in &mut s.ch {
+            (c.num_env, c.l_a, c.kx_prev, c.index_sine) = (2, 1, 9, 3);
+            c.g_hist[1][3] = 1.0;
+            c.xa[3][4] = Cpx { re: 1.0, im: -1.0 };
+            c.xl[0][0].re = 2.0;
+        }
+        s.x[2][5].re = 3.0;
+        s.renew();
+        let without_pools = crate::decoder::tests::without_pools;
+        assert_eq!(without_pools(&s), without_pools(&fresh()));
+    }
 
     #[test]
     fn short_final_patch_does_not_synthesize_noise_past_the_limiter() {
