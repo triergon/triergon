@@ -273,8 +273,10 @@ impl Decoding {
                 mpeg2::USER_DATA => {
                     // FFmpeg reads announced constructs up to the picture's end.
                     let available = &picture[unit.offset + 4..];
+                    let (top_field_first, pending) =
+                        (coding.top_field_first, self.progress.pending);
                     self.captions
-                        .picture_user_data(available, coding.top_field_first)?;
+                        .picture_user_data(available, top_field_first, pending)?;
                 }
                 _ => {}
             }

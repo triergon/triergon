@@ -81,12 +81,17 @@ fn a_refused_mpeg2_packet_leaves_the_extractor_as_it_was() {
         })
         .collect();
     // It completes the picture being received and a captioned P picture,
-    // then a picture whose user data each announce 31 constructs read from
-    // the user data after them: more caption bytes than the pool holds.
+    // then P pictures whose user data each announce 31 constructs read from
+    // the bytes after them, nearly 6000 caption bytes a frame: more than the
+    // pool holds.
     let mut bad = mpeg2_picture(2, 0x7f, 16);
-    bad.extend_from_slice(&[0, 0, 1, 0x00, 0, 1 << 3, 0xff, 0xf8]);
-    for _ in 0..30_000 {
-        bad.extend_from_slice(b"\0\0\x01\xb2GA94\x03\x5f\xff");
+    for _ in 0..500 {
+        bad.extend_from_slice(&[0, 0, 1, 0x00, 0, 2 << 3, 0xff, 0xf8]);
+        for _ in 0..64 {
+            bad.extend_from_slice(b"\0\0\x01\xb2GA94\x03\x5f\xff");
+        }
+        bad.extend_from_slice(&[0, 0, 1, 0x01]);
+        bad.extend_from_slice(&[0x55; 100]);
     }
     bad.extend_from_slice(&[0, 0, 1, 0x00, 0, 2 << 3]);
     let refused = [

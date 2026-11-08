@@ -658,6 +658,207 @@
       }
     },
     {
+      "id": "mpeg2-scte20-empty-m2v",
+      "profile": "mpeg2-scte20-empty-m2v",
+      "file": "cc/mpeg2-scte20-empty.m2v",
+      "sha256": "3c4db1a2ce02eb84d78f22c38541ae05d4773d68b3b12f5dcf70878a9dd07087",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/cc_streams.py",
+      "arguments": [
+        "cc"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 879,
+        "digest": 4629395812624118799
+      }
+    },
+    {
+      "id": "mpeg2-scte20-empty-m2v-realtime",
+      "profile": "mpeg2-scte20-empty-m2v",
+      "file": "cc/mpeg2-scte20-empty.m2v",
+      "sha256": "3c4db1a2ce02eb84d78f22c38541ae05d4773d68b3b12f5dcf70878a9dd07087",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/cc_streams.py",
+      "arguments": [
+        "cc",
+        "opt:real_time=1"
+      ],
+      "expected": {
+        "packets": 7,
+        "bytes": 1113,
+        "digest": 3293981803159766504
+      }
+    },
+    {
+      "id": "mpeg2-scte20-empty-m2v-first",
+      "profile": "mpeg2-scte20-empty-m2v",
+      "file": "cc/mpeg2-scte20-empty.m2v",
+      "sha256": "3c4db1a2ce02eb84d78f22c38541ae05d4773d68b3b12f5dcf70878a9dd07087",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/cc_streams.py",
+      "arguments": [
+        "cc",
+        "opt:data_field=first"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 879,
+        "digest": 4629395812624118799
+      }
+    },
+    {
+      "id": "mpeg2-scte20-empty-m2v-second",
+      "profile": "mpeg2-scte20-empty-m2v",
+      "file": "cc/mpeg2-scte20-empty.m2v",
+      "sha256": "3c4db1a2ce02eb84d78f22c38541ae05d4773d68b3b12f5dcf70878a9dd07087",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/cc_streams.py",
+      "arguments": [
+        "cc",
+        "opt:data_field=second"
+      ],
+      "expected": {
+        "packets": 5,
+        "bytes": 1037,
+        "digest": 17921408622261457526
+      }
+    },
+    {
+      "id": "mpeg2-a53-limit-m2v",
+      "profile": "mpeg2-a53-limit-m2v",
+      "file": "cc/mpeg2-a53-limit.m2v",
+      "sha256": "11b7c5fcf64d568a3c904339f18c4d45b7ef8c381d83a7b3b8ae48363eb65687",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/cc_streams.py",
+      "arguments": [
+        "cc"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 963,
+        "digest": 2712304112099419897
+      }
+    },
+    {
+      "id": "mpeg2-a53-limit-m2v-realtime",
+      "profile": "mpeg2-a53-limit-m2v",
+      "file": "cc/mpeg2-a53-limit.m2v",
+      "sha256": "11b7c5fcf64d568a3c904339f18c4d45b7ef8c381d83a7b3b8ae48363eb65687",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/cc_streams.py",
+      "arguments": [
+        "cc",
+        "opt:real_time=1"
+      ],
+      "expected": {
+        "packets": 11,
+        "bytes": 1646,
+        "digest": 10044488238310060731
+      }
+    },
+    {
+      "id": "mpeg2-a53-limit-m2v-first",
+      "profile": "mpeg2-a53-limit-m2v",
+      "file": "cc/mpeg2-a53-limit.m2v",
+      "sha256": "11b7c5fcf64d568a3c904339f18c4d45b7ef8c381d83a7b3b8ae48363eb65687",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/cc_streams.py",
+      "arguments": [
+        "cc",
+        "opt:data_field=first"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 963,
+        "digest": 2712304112099419897
+      }
+    },
+    {
+      "id": "mpeg2-a53-limit-m2v-second",
+      "profile": "mpeg2-a53-limit-m2v",
+      "file": "cc/mpeg2-a53-limit.m2v",
+      "sha256": "11b7c5fcf64d568a3c904339f18c4d45b7ef8c381d83a7b3b8ae48363eb65687",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/cc_streams.py",
+      "arguments": [
+        "cc",
+        "opt:data_field=second"
+      ],
+      "expected": {
+        "packets": 9,
+        "bytes": 1367,
+        "digest": 2686512765351880059
+      }
+    },
+    {
+      "id": "mpeg2-a53-limit-ts",
+      "profile": "mpeg2-a53-limit-ts",
+      "file": "cc/mpeg2-a53-limit.ts",
+      "sha256": "bf971f438587a71d57ac00e9cd9f2fa44671bfb6b54957b030431f50373b134d",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/cc_streams.py",
+      "arguments": [
+        "cc"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 963,
+        "digest": 7488958337492721017
+      }
+    },
+    {
+      "id": "mpeg2-a53-limit-ts-realtime",
+      "profile": "mpeg2-a53-limit-ts",
+      "file": "cc/mpeg2-a53-limit.ts",
+      "sha256": "bf971f438587a71d57ac00e9cd9f2fa44671bfb6b54957b030431f50373b134d",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/cc_streams.py",
+      "arguments": [
+        "cc",
+        "opt:real_time=1"
+      ],
+      "expected": {
+        "packets": 11,
+        "bytes": 1646,
+        "digest": 6911251283874414011
+      }
+    },
+    {
+      "id": "mpeg2-a53-limit-ts-first",
+      "profile": "mpeg2-a53-limit-ts",
+      "file": "cc/mpeg2-a53-limit.ts",
+      "sha256": "bf971f438587a71d57ac00e9cd9f2fa44671bfb6b54957b030431f50373b134d",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/cc_streams.py",
+      "arguments": [
+        "cc",
+        "opt:data_field=first"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 963,
+        "digest": 7488958337492721017
+      }
+    },
+    {
+      "id": "mpeg2-a53-limit-ts-second",
+      "profile": "mpeg2-a53-limit-ts",
+      "file": "cc/mpeg2-a53-limit.ts",
+      "sha256": "bf971f438587a71d57ac00e9cd9f2fa44671bfb6b54957b030431f50373b134d",
+      "rights": "authored-synthetic",
+      "source": "harness/subtitles/cc_streams.py",
+      "arguments": [
+        "cc",
+        "opt:data_field=second"
+      ],
+      "expected": {
+        "packets": 9,
+        "bytes": 1367,
+        "digest": 7050997586400697587
+      }
+    },
+    {
       "id": "mpeg2-dvd-m2v",
       "profile": "mpeg2-dvd-m2v",
       "file": "cc/mpeg2-dvd.m2v",

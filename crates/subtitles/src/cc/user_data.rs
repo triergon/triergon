@@ -103,6 +103,14 @@ pub struct Scte20Captions<'a> {
     remaining: u8,
 }
 
+impl Scte20Captions<'_> {
+    /// The pairs announced and not yet read, present or not.
+    #[must_use]
+    pub fn remaining(&self) -> usize {
+        usize::from(self.remaining)
+    }
+}
+
 impl Iterator for Scte20Captions<'_> {
     type Item = Scte20Caption;
 

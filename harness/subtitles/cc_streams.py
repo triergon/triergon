@@ -658,6 +658,24 @@ def build():
                lambda n: ([unprocessed, a53_user_data(data[n]), scte20_user_data(scte20_entries(data[n]))]
                           if n % 7 else [overlong]), ts=False)
 
+    # SCTE 20 user data announcing no pairs does not lock the format.
+    mpeg2_case("mpeg2-scte20-empty", open_gop,
+               lambda n: [scte20_user_data([])] if n < 30 else [a53_user_data(data[n])], ts=False)
+
+    # More caption bytes than FFmpeg keeps for one picture (6000): blocks of
+    # padding constructs before the caption data. A block that would pass the
+    # limit is left out (the caption data when n % 4 == 0, a padding block when
+    # n % 4 == 2), a later one that fits is kept, and the data reaching exactly
+    # 6000 bytes (n % 4 == 1) is kept. The leading B pictures' bytes pass on to
+    # the next picture, which keeps none of its own.
+    def padding(count):
+        return a53_user_data(bytes([0xFA, 0x00, 0x00]) * count)
+
+    capped = {0: [padding(7)], 1: [padding(6)], 2: [padding(20)], 3: None}
+    mpeg2_case("mpeg2-a53-limit", open_gop,
+               lambda n: ([padding(31)] * 64 + capped[n % 4] if capped[n % 4] else [])
+               + [a53_user_data(data[n])])
+
     # DVD and Dish Network caption user data; a stream locked to DVD ignores
     # the A/53 data that follows.
     mpeg2_case("mpeg2-dvd", open_gop, lambda n: [dvd_user_data(data[n], n % 4 != 3, 15 if n % 3 else 1)])

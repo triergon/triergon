@@ -19,7 +19,9 @@
 //!   marked odd that stands first when `caption_odd_field_first` says so (or
 //!   second when it does not), `FD` otherwise; Dish Network pairs become `FC`
 //!   constructs. An MPEG-2 stream keeps the format of its first caption user
-//!   data and ignores user data of the others.
+//!   data that is kept (SCTE 20 user data announcing no pairs is not) and
+//!   ignores user data of the others. An MPEG-2 frame keeps at most 6000
+//!   caption bytes: user data that would pass that is left out.
 //! * **MPEG-2.** A B picture decoded before two reference pictures (the
 //!   leading B pictures of an open GOP at the start) is not output; its bytes
 //!   go to the next picture that is decoded. So do the bytes of a field

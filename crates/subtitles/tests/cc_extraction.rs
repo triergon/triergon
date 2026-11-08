@@ -283,3 +283,58 @@ fn hevc_skipped_pictures_pass_their_captions_on() {
         ]
     );
 }
+
+/// An MPEG-2 picture of `kind` (1 I, 2 P) with the user data `blocks`
+/// before its slice.
+fn mpeg2_picture(kind: u8, blocks: &[Vec<u8>]) -> Vec<u8> {
+    let mut picture = vec![0, 0, 1, 0x00, 0, kind << 3, 0xff, 0xf8];
+    for block in blocks {
+        picture.extend_from_slice(&[0, 0, 1, 0xb2]);
+        picture.extend_from_slice(block);
+    }
+    picture.extend_from_slice(&[0, 0, 1, 0x01, 0x55, 0x55]);
+    picture
+}
+
+/// `GA94` user data with `cc_data`.
+fn a53(cc_data: &[u8]) -> Vec<u8> {
+    let count = u8::try_from(cc_data.len() / 3).expect("count");
+    [b"GA94\x03", &[0x40 | count, 0xff][..], cc_data, b"\xff"].concat()
+}
+
+/// A 29.97 Hz sequence header.
+const MPEG2_SEQUENCE: &[u8] = b"\0\0\x01\xb3\x2d\x01\xe0\x24\xff\xff\xe0\x18";
+
+#[test]
+fn mpeg2_frames_keep_at_most_6000_caption_bytes() {
+    let padding = |count: usize| a53(&[0xfa, 0, 0].repeat(count));
+    let data = |n: u8| a53(&[0xfc, 0x80 + n, 0x80].repeat(10));
+    let blocks = |last: usize, n: u8| {
+        let mut blocks = vec![padding(31); 64];
+        blocks.extend([padding(last), data(n)]);
+        blocks
+    };
+    // The data passes the limit; reaches it exactly; follows padding that
+    // would pass it.
+    let mut es = MPEG2_SEQUENCE.to_vec();
+    es.extend(mpeg2_picture(1, &blocks(7, 1)));
+    es.extend(mpeg2_picture(2, &blocks(6, 2)));
+    es.extend(mpeg2_picture(2, &blocks(20, 3)));
+    let frames = extract(VideoCoding::Mpeg2Raw, [packet(&es, None)]);
+    let lengths: Vec<_> = frames.iter().map(|frame| frame.2.len()).collect();
+    assert_eq!(lengths, [5973, 6000, 5982]);
+    let carries = |frame: &Frame, n: u8| frame.2.ends_with(&[0xfc, 0x80 + n, 0x80]);
+    assert!(!carries(&frames[0], 1) && carries(&frames[1], 2) && carries(&frames[2], 3));
+}
+
+#[test]
+fn mpeg2_scte20_without_pairs_does_not_lock_the_format() {
+    let scte20 = vec![0x03, 0x81, 0x00, 0x00];
+    let mut es = MPEG2_SEQUENCE.to_vec();
+    es.extend(mpeg2_picture(1, &[scte20]));
+    es.extend(mpeg2_picture(2, &[a53(&[0xfc, 0x94, 0x2c])]));
+    es.extend(mpeg2_picture(2, &[]));
+    let frames = extract(VideoCoding::Mpeg2Raw, [packet(&es, None)]);
+    let data: Vec<_> = frames.iter().map(|frame| frame.2.clone()).collect();
+    assert_eq!(data, [vec![0xfc, 0x94, 0x2c]]);
+}

@@ -1,11 +1,20 @@
 //! The caption bytes of pictures: the user data and SEI formats FFmpeg reads
 //! and the constructs it makes of them.
+//!
+//! FFmpeg's MPEG-2 decoder keeps at most [`PICTURE_LIMIT`] caption bytes for
+//! the next frame: caption user data that would take them past it is left
+//! out, and later user data that fits is still kept. Its H.264 and HEVC
+//! decoders have no such limit.
 
 use crate::cc::text::Text;
 use crate::cc::user_data::{
     Scte20Captions, atsc_captions, dvd_captions, scte20_captions, t35_atsc_user_data,
 };
 use triergon_core::{Budget, Result};
+
+/// The caption bytes FFmpeg's MPEG-2 decoder keeps for one frame (`3 *
+/// A53_MAX_CC_COUNT`).
+pub(super) const PICTURE_LIMIT: usize = 6000;
 
 /// The caption bytes of one picture or access unit, gathered in a reused buffer.
 #[derive(Debug)]
@@ -38,6 +47,7 @@ fn atsc_constructs(available: &[u8]) -> Option<&[u8]> {
 enum PictureCaptions<'a> {
     /// A/53 constructs as sent.
     Atsc(&'a [u8]),
+    /// At least one pair announced.
     Scte20(Scte20Captions<'a>),
     /// Whole DVD caption blocks (two words each) and `caption_odd_field_first`.
     Dvd {
@@ -45,10 +55,7 @@ enum PictureCaptions<'a> {
         odd_field_first: bool,
     },
     /// Dish Network: one or two field 1 pairs.
-    Dish {
-        pairs: [[u8; 2]; 2],
-        count: usize,
-    },
+    Dish { pairs: [[u8; 2]; 2], count: usize },
 }
 
 impl<'a> PictureCaptions<'a> {
@@ -60,7 +67,7 @@ impl<'a> PictureCaptions<'a> {
             return Some(Self::Atsc(constructs));
         }
         if let Some(pairs) = scte20_captions(available) {
-            return Some(Self::Scte20(pairs));
+            return (pairs.remaining() > 0).then_some(Self::Scte20(pairs));
         }
         if let Some(dvd) = dvd_captions(available).filter(|_| available.len() >= 11) {
             // The announced counts are often wrong: blocks run while a block's
@@ -78,6 +85,17 @@ impl<'a> PictureCaptions<'a> {
         dish_pairs(available).map(|(pairs, count)| Self::Dish { pairs, count })
     }
 
+    /// The bytes FFmpeg makes of them: three per announced SCTE 20 pair,
+    /// present or not.
+    fn len(&self) -> usize {
+        match self {
+            Self::Atsc(constructs) => constructs.len(),
+            Self::Scte20(pairs) => 3 * pairs.remaining(),
+            Self::Dvd { blocks, .. } => blocks.len(),
+            Self::Dish { count, .. } => 3 * count,
+        }
+    }
+
     fn format(&self) -> Format {
         match self {
             Self::Atsc(_) => Format::Atsc,
@@ -92,6 +110,9 @@ impl<'a> PictureCaptions<'a> {
         match self {
             Self::Atsc(constructs) => out.put(constructs),
             Self::Scte20(pairs) => {
+                // A pair cut short and those after it are zero.
+                let announced = pairs.remaining();
+                let mut written = 0;
                 for pair in pairs {
                     let second_field = (pair.field == 2) == top_field_first;
                     let construct = match pair.field {
@@ -99,6 +120,10 @@ impl<'a> PictureCaptions<'a> {
                         _ => [0x04 | u8::from(second_field), pair.data[0], pair.data[1]],
                     };
                     out.put(&construct)?;
+                    written += 1;
+                }
+                for _ in written..announced {
+                    out.put(&[0; 3])?;
                 }
                 Ok(())
             }
@@ -190,20 +215,26 @@ impl Gathered {
         }
     }
 
-    /// A picture's caption user data. The stream locks to the format of its
-    /// first caption user data; user data of another format is ignored.
+    /// A picture's caption user data, the bytes for the next frame starting
+    /// at `pending`. The stream locks to the format of its first caption user
+    /// data that is kept; user data of another format is ignored.
     pub(super) fn picture_user_data(
         &mut self,
         available: &[u8],
         top_field_first: bool,
+        pending: usize,
     ) -> Result<()> {
-        match PictureCaptions::read(available) {
-            Some(captions)
-                if *self.format.get_or_insert(captions.format()) == captions.format() =>
-            {
-                captions.write(&mut self.bytes, top_field_first)
-            }
-            _ => Ok(()),
+        let Some(captions) = PictureCaptions::read(available) else {
+            return Ok(());
+        };
+        let format = captions.format();
+        let kept = self.bytes.len() - pending;
+        if self.format.is_some_and(|locked| locked != format)
+            || kept + captions.len() > PICTURE_LIMIT
+        {
+            return Ok(());
         }
+        self.format = Some(format);
+        captions.write(&mut self.bytes, top_field_first)
     }
 }
