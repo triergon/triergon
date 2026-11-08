@@ -2,8 +2,9 @@
 //!
 //! | Name | Polynomial | Bit order | Used by |
 //! |---|---|---|---|
-//! | [`crc16_a52`] | `0x8005` | MSB first | ATSC A/52 frames |
-//! | [`Crc32Mpeg`] | `0x04c11db7` | MSB first | ITU-T H.222.0 Annex A sections |
+//! | [`crc8`] | `0x07` | MSB first | FLAC frame headers |
+//! | [`crc16_a52`] | `0x8005` | MSB first | ATSC A/52 frames, FLAC frames, MPEG audio frames |
+//! | [`Crc32Mpeg`] | `0x04c11db7` | MSB first | ITU-T H.222.0 Annex A sections, Ogg pages |
 //! | [`Crc32Ieee`] | `0xedb88320` (reflected) | LSB first | EBML CRC-32 elements |
 
 const fn msb_table_16(polynomial: u16) -> [u16; 256] {
@@ -48,8 +49,35 @@ const fn a52_tables() -> [[u16; 256]; 4] {
 
 static A52: [[u16; 256]; 4] = a52_tables();
 
+static CRC8: [u8; 256] = {
+    let mut table = [0; 256];
+    let mut byte = 0;
+    while byte < 256 {
+        let mut register = byte as u8;
+        let mut bit = 0;
+        while bit < 8 {
+            register = (register << 1) ^ if register & 0x80 != 0 { 0x07 } else { 0 };
+            bit += 1;
+        }
+        table[byte] = register;
+        byte += 1;
+    }
+    table
+};
+
+/// Shifts `data` through the CRC-8 register (x^8 + x^2 + x + 1) starting from `crc`. A
+/// FLAC frame header (RFC 9639 section 9.1.8) starts from zero.
+#[must_use]
+pub fn crc8(mut crc: u8, data: &[u8]) -> u8 {
+    for &byte in data {
+        crc = CRC8[usize::from(crc ^ byte)];
+    }
+    crc
+}
+
 /// Shifts `data` through the A/52 register (x^16 + x^15 + x^2 + 1, section 7.10.1)
-/// starting from `crc`, and returns the register. A frame starts from zero.
+/// starting from `crc`, and returns the register. An A/52 or FLAC frame (RFC 9639 section
+/// 9.3) starts from zero, an MPEG audio frame (ISO/IEC 11172-3 2.4.3.1) from `0xffff`.
 #[must_use]
 pub fn crc16_a52(mut crc: u16, data: &[u8]) -> u16 {
     let t = &A52;
@@ -65,8 +93,10 @@ pub fn crc16_a52(mut crc: u16, data: &[u8]) -> u16 {
     crc
 }
 
-static MPEG: [u32; 256] = {
-    let mut table = [0; 256];
+/// Slicing-by-8 tables: entry `k` holds the contribution of a byte followed by `k` zero
+/// bytes; entry 0 is the plain byte table.
+static MPEG: [[u32; 256]; 8] = {
+    let mut tables = [[0; 256]; 8];
     let mut byte = 0;
     while byte < 256 {
         let mut register = (byte as u32) << 24;
@@ -80,10 +110,20 @@ static MPEG: [u32; 256] = {
                 };
             bit += 1;
         }
-        table[byte] = register;
+        tables[0][byte] = register;
         byte += 1;
     }
-    table
+    let mut k = 1;
+    while k < 8 {
+        let mut byte = 0;
+        while byte < 256 {
+            let previous = tables[k - 1][byte];
+            tables[k][byte] = (previous << 8) ^ tables[0][(previous >> 24) as usize];
+            byte += 1;
+        }
+        k += 1;
+    }
+    tables
 };
 
 /// The MPEG-2 section checksum (ITU-T H.222.0 Annex A): MSB first, register preset to all
@@ -98,11 +138,38 @@ impl Default for Crc32Mpeg {
 }
 
 impl Crc32Mpeg {
+    /// A register preset to `value`; an Ogg page (RFC 3533 section 6) starts from zero.
+    #[must_use]
+    pub fn from_register(value: u32) -> Self {
+        Self(value)
+    }
+
+    /// Shifts `bytes` through the register, eight bytes per step.
+    #[inline]
+    pub fn update(&mut self, bytes: &[u8]) {
+        let t = &MPEG;
+        let mut chunks = bytes.chunks_exact(8);
+        for c in &mut chunks {
+            let x = self.0 ^ u32::from_be_bytes([c[0], c[1], c[2], c[3]]);
+            self.0 = t[7][(x >> 24) as usize]
+                ^ t[6][(x >> 16) as usize & 0xff]
+                ^ t[5][(x >> 8) as usize & 0xff]
+                ^ t[4][x as usize & 0xff]
+                ^ t[3][usize::from(c[4])]
+                ^ t[2][usize::from(c[5])]
+                ^ t[1][usize::from(c[6])]
+                ^ t[0][usize::from(c[7])];
+        }
+        for &byte in chunks.remainder() {
+            self.update_byte(byte);
+        }
+    }
+
     /// Shifts one byte through the register.
     #[inline]
     pub fn update_byte(&mut self, byte: u8) {
         let index = (self.0 >> 24) as u8 ^ byte;
-        self.0 = (self.0 << 8) ^ MPEG[usize::from(index)];
+        self.0 = (self.0 << 8) ^ MPEG[0][usize::from(index)];
     }
 
     /// The current register value.
@@ -187,6 +254,10 @@ mod tests {
         assert_eq!(crc16_a52(0, b"123456789"), 0xfee8);
         assert_eq!(Crc32Mpeg::of(b"123456789"), 0x0376_e6e7);
         assert_eq!(Crc32Ieee::of(b"123456789"), 0xcbf4_3926);
+        assert_eq!(crc8(0, b"123456789"), 0xf4);
+        let mut ogg = Crc32Mpeg::from_register(0);
+        ogg.update(b"123456789");
+        assert_eq!(ogg.remainder(), 0x89a1_897f);
     }
 
     #[test]
@@ -204,6 +275,20 @@ mod tests {
                 }
             }
             assert_eq!(crc16_a52(0, &data), register);
+        }
+    }
+
+    #[test]
+    fn sliced_mpeg_matches_bytewise_updates() {
+        for length in [0, 1, 7, 8, 9, 16, 1001] {
+            let data = message(length);
+            let mut sliced = Crc32Mpeg::from_register(0x1234_5678);
+            sliced.update(&data);
+            let mut bytewise = Crc32Mpeg::from_register(0x1234_5678);
+            for &byte in &data {
+                bytewise.update_byte(byte);
+            }
+            assert_eq!(sliced.remainder(), bytewise.remainder(), "{length}");
         }
     }
 

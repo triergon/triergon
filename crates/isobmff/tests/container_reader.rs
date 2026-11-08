@@ -226,6 +226,39 @@ fn an_opus_entry_is_named_and_a_missing_record_stays_empty() {
 }
 
 #[test]
+fn a_flac_entry_is_named_with_its_dfla_record() {
+    let mut file = include_bytes!("fixtures/encoded-v1/control-ac3-front.mp4").to_vec();
+    for (from, to) in [(b"ac-3", b"fLaC"), (b"dac3", b"dfLa")] {
+        let at = file.windows(4).position(|w| w == from).unwrap();
+        file[at..at + 4].copy_from_slice(to);
+    }
+    let pool = Budget::new(16 << 20).unwrap();
+    let mut reader = open(&pool, &file);
+    read(&mut reader, &pool, &file, 1 << 20, 1 << 16).unwrap();
+    let track = reader.track(0).unwrap();
+    assert_eq!(track.codec(), CodecId::Flac);
+    assert_eq!(track.codec_tag(), b"fLaC");
+    assert_eq!(
+        track.configuration(),
+        [0x10, 0x09, 0x40],
+        "the dfLa payload"
+    );
+}
+
+#[test]
+fn an_mp3_entry_is_named_without_a_record() {
+    let mut file = include_bytes!("fixtures/encoded-v1/control-ac3-front.mp4").to_vec();
+    let at = file.windows(4).position(|w| w == b"ac-3").unwrap();
+    file[at..at + 4].copy_from_slice(b".mp3");
+    let pool = Budget::new(16 << 20).unwrap();
+    let mut reader = open(&pool, &file);
+    read(&mut reader, &pool, &file, 1 << 20, 1 << 16).unwrap();
+    let track = reader.track(0).unwrap();
+    assert_eq!(track.codec(), CodecId::MpegAudio);
+    assert_eq!(track.codec_tag(), b".mp3");
+}
+
+#[test]
 fn an_unknown_handler_is_not_given_a_kind() {
     let file = patched("r-front-stco", b"vide", 0, b"xyz1");
     let pool = Budget::new(16 << 20).unwrap();

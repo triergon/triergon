@@ -50,7 +50,7 @@ impl Window for Direct {
 
 /// The eight bytes at `byte`, when they lie inside `data`.
 #[inline(always)]
-fn load(data: &[u8], byte: usize) -> Option<[u8; 8]> {
+pub(crate) fn load(data: &[u8], byte: usize) -> Option<[u8; 8]> {
     let slice = data.get(byte..byte + 8)?;
     let mut bytes = [0; 8];
     bytes.copy_from_slice(slice);
@@ -59,7 +59,7 @@ fn load(data: &[u8], byte: usize) -> Option<[u8; 8]> {
 
 /// The last bytes of a slice, zero extended.
 #[cold]
-fn tail(data: &[u8], byte: usize) -> [u8; 8] {
+pub(crate) fn tail(data: &[u8], byte: usize) -> [u8; 8] {
     let mut bytes = [0; 8];
     if let Some(tail) = data.get(byte..) {
         bytes[..tail.len()].copy_from_slice(tail);

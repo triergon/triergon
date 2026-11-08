@@ -1,0 +1,485 @@
+{
+ "schema": "triergon.codecs.reader-rules.v2",
+ "frozen_utc": "2026-11-08T09:51:00Z",
+ "reference": "ffprobe of FFmpeg 9.0.2, the decode profile of cargo xtask prepare-ffmpeg (.research/reference-decode/install/bin/ffprobe), -show_packets with the demuxer forced",
+ "candidate": "codec-worker packets FORMAT FILE: every packet triergon_ogg::BlockingReader or the triergon_elementary reader of FORMAT emits, as the reader reports it, and for Ogg also the reader's FFmpeg-compatible view (triergon_ogg::compat::clock::packet_timing)",
+ "views": {
+  "native": "what the reader reports: its own times, durations and trims",
+  "compat": "the reader's FFmpeg-compatible policy of the same packets; a native difference this view does not have is reproduced-by-compat and needs no disposition"
+ },
+ "formats": {
+  "ogg": {
+   "streams": "position-in-link",
+   "align_by": "size",
+   "views": {
+    "native": {
+     "compare": [
+      "size",
+      "pts",
+      "dts",
+      "duration",
+      "trim_start",
+      "trim_end"
+     ],
+     "reference_duration_excludes_discard_padding": true
+    },
+    "compat": {
+     "compare": [
+      "size",
+      "pts",
+      "dts",
+      "duration",
+      "trim_start",
+      "trim_end"
+     ]
+    }
+   }
+  },
+  "flac": {
+   "streams": "first-audio",
+   "align_by": "position",
+   "views": {
+    "native": {
+     "compare": [
+      "size",
+      "position",
+      "pts",
+      "dts",
+      "duration",
+      "trim_start",
+      "trim_end"
+     ]
+    }
+   }
+  },
+  "mp3": {
+   "streams": "first-audio",
+   "align_by": "position",
+   "views": {
+    "native": {
+     "compare": [
+      "size",
+      "position",
+      "pts",
+      "dts",
+      "duration",
+      "trim_start",
+      "trim_end"
+     ]
+    }
+   }
+  },
+  "aac": {
+   "streams": "first-audio",
+   "align_by": "position",
+   "views": {
+    "native": {
+     "compare": [
+      "size",
+      "position",
+      "pts",
+      "dts",
+      "duration",
+      "trim_start",
+      "trim_end"
+     ]
+    }
+   }
+  },
+  "ac3": {
+   "streams": "first-audio",
+   "align_by": "position",
+   "views": {
+    "native": {
+     "compare": [
+      "size",
+      "position",
+      "pts",
+      "dts",
+      "duration",
+      "trim_start",
+      "trim_end"
+     ]
+    }
+   }
+  },
+  "eac3": {
+   "streams": "first-audio",
+   "align_by": "position",
+   "views": {
+    "native": {
+     "compare": [
+      "size",
+      "position",
+      "pts",
+      "dts",
+      "duration",
+      "trim_start",
+      "trim_end"
+     ]
+    }
+   }
+  }
+ },
+ "rules": [
+  {
+   "id": "forced-demuxer",
+   "scope": "every case",
+   "rule": "both sides read the file with the format of its manifest lane: ffprobe -f ogg|flac|mp3|aac|ac3|eac3, codec-worker the same reader",
+   "reason": "the comparison is of one reader against one demuxer; probing could pick a different one on either side"
+  },
+  {
+   "id": "aligned-pairing",
+   "scope": "every case",
+   "rule": "per stream, packets are aligned in order at the least cost (a pair costs the number of its aligned field and size that differ, an unpaired packet 1; of equal costs a pair is preferred); every unpaired packet is an 'unmatched' difference and every compared field of every pair is compared; a stream only one side has packets in is one 'packets' difference of the two counts; the set of streams and whether reading ended in an error are compared too",
+   "reason": "a reader emits packets in file order; aligning keeps one extra or merged packet from shifting every later pair, while nothing is skipped: an unpaired packet is a difference like any other"
+  },
+  {
+   "id": "time-base-projection",
+   "scope": "pts, dts and duration of both views",
+   "rule": "the reader's ticks are rescaled into the FFmpeg stream time base when every time converts exactly; otherwise each duration is rounded down and the times accumulate from the first packet's time",
+   "reason": "FFmpeg times elementary streams in a fixed base (MPEG audio 1/14112000, ADTS 1/28224000, AC-3 1/90000) and, where a frame's sample count does not divide it (AC-3 at 44.1 kHz), its parser rounds each duration down and adds them up"
+  },
+  {
+   "id": "absent-trim-is-zero",
+   "scope": "trim_start, trim_end",
+   "rule": "an absent trim equals a trim of zero: the reader's Trim::start and Trim::end (compat: skip_samples and discard_padding) against the skip_samples and discard_padding of FFmpeg's skip-samples side data",
+   "reason": "FFmpeg attaches the side data only to packets it trims and writes both values when it does"
+  },
+  {
+   "id": "ogg-streams-position-in-link",
+   "scope": "ogg",
+   "rule": "the reader's n-th track of every chain link is FFmpeg's stream n",
+   "reason": "FFmpeg's Ogg demuxer replaces a link's streams in place when a chained link starts, where the reader opens new tracks"
+  },
+  {
+   "id": "ogg-native-duration-includes-padding",
+   "scope": "ogg, native view",
+   "rule": "the reader's duration is compared with FFmpeg's duration plus the packet's discard padding",
+   "reason": "FFmpeg's Ogg demuxer shortens the last packet's duration by the discard padding it reports; the reader keeps the coded duration and reports the padding as Trim::end, which is compared separately. The compat view reports FFmpeg's shortened duration and is compared as it is"
+  },
+  {
+   "id": "ogg-compat-dts-is-pts",
+   "scope": "ogg, compat view",
+   "rule": "the compat view's dts is its pts",
+   "reason": "the policy reports one time for presentation and decode, as FFmpeg's Ogg demuxer does"
+  },
+  {
+   "id": "ogg-position-not-compared",
+   "scope": "ogg",
+   "rule": "packet positions are not compared; Ogg packets are aligned by size",
+   "reason": "the reader reports the page that completes a packet and FFmpeg the page it starts on, so the two differ by definition for every packet that spans pages"
+  },
+  {
+   "id": "elementary-first-audio-stream",
+   "scope": "flac, mp3, aac, ac3, eac3",
+   "rule": "the reader's one track is FFmpeg's first audio stream; packets of other streams are counted in the row (reference_other_packets) and not compared",
+   "reason": "FFmpeg turns an ID3v2 picture into an attached-picture video stream; the reader keeps tag bytes as tags, not packets"
+  },
+  {
+   "id": "scoped-dispositions",
+   "scope": "every difference that remains",
+   "rule": "a difference neither view explains must be one of the reviewed differences of its case and view in harness/codecs/reader-differences.json (by their SHA-256), and fall within the scope (view, field, packets and value relation) of exactly one disposition the case lists, the one it was reviewed under; a case listing a disposition that covers none of its differences fails",
+   "reason": "a disposition explains only the kind of difference it names, on the packets it names"
+  }
+ ],
+ "dispositions": [
+  {
+   "id": "ogg-negative-duration-unsigned",
+   "reason": "FFmpeg times the last Ogg page forwards from its first packet; when the page's granule position precedes its last packet's start, that packet's duration is negative and ffprobe prints it modulo 2^32. The compat view keeps it negative; the native view's coded duration is compared with FFmpeg's plus the padding, which carries the same 2^32",
+   "scope": [
+    {
+     "views": [
+      "native",
+      "compat"
+     ],
+     "fields": [
+      "duration"
+     ],
+     "packets": "last-of-stream",
+     "reference": "candidate-plus-2^32"
+    }
+   ]
+  },
+  {
+   "id": "ogg-first-packet-after-bad-page",
+   "reason": "when the first audio page fails its CRC, FFmpeg times the first packet it keeps from that packet's page; the compat view times it from the stream start, as if the lost packets had been delivered",
+   "scope": [
+    {
+     "views": [
+      "compat"
+     ],
+     "fields": [
+      "pts",
+      "dts"
+     ],
+     "packets": "after-resync",
+     "reference": "any"
+    }
+   ]
+  },
+  {
+   "id": "flac-rate-change-duration",
+   "reason": "when the sample rate changes, FFmpeg delivers each FLAC frame's duration rescaled to the first frame's rate; the reader times every frame at its own rate. The reader reports no per-frame rate, so the scope is every duration",
+   "scope": [
+    {
+     "views": [
+      "native"
+     ],
+     "fields": [
+      "duration"
+     ],
+     "packets": "any",
+     "reference": "any"
+    }
+   ]
+  },
+  {
+   "id": "flac-768k-no-duration",
+   "reason": "FFmpeg delivers FLAC frames at 768 kHz without a duration and the last one without a time; the reader times them from the frame headers",
+   "scope": [
+    {
+     "views": [
+      "native"
+     ],
+     "fields": [
+      "duration"
+     ],
+     "packets": "any",
+     "reference": "absent"
+    },
+    {
+     "views": [
+      "native"
+     ],
+     "fields": [
+      "pts",
+      "dts"
+     ],
+     "packets": "last-of-stream",
+     "reference": "absent"
+    }
+   ]
+  },
+  {
+   "id": "flac-last-frame-at-previous-end",
+   "reason": "FFmpeg's FLAC parser times the last frame of a stream at the previous packet's end (its time plus its duration as FFmpeg reports it), not from the frame's own number; this shows where block sizes vary under the fixed-blocking flag and where FFmpeg's durations differ from the frames' (a sample rate change, a time base taken from leading bytes); the reader times every frame from its frame number",
+   "scope": [
+    {
+     "views": [
+      "native"
+     ],
+     "fields": [
+      "pts",
+      "dts"
+     ],
+     "packets": "last-of-stream",
+     "reference": "any"
+    }
+   ]
+  },
+  {
+   "id": "flac-damaged-frame-merge",
+   "reason": "FFmpeg merges a damaged FLAC frame with the frames after it into one packet without times, spanning the bytes of the reader's packets; the reader ends the damaged frame at the next header its CRC-16 confirms",
+   "scope": [
+    {
+     "views": [
+      "native"
+     ],
+     "fields": [
+      "size",
+      "unmatched"
+     ],
+     "packets": "resplit",
+     "reference": "any"
+    },
+    {
+     "views": [
+      "native"
+     ],
+     "fields": [
+      "pts",
+      "dts",
+      "duration"
+     ],
+     "packets": "resplit",
+     "reference": "absent"
+    }
+   ]
+  },
+  {
+   "id": "flac-parser-position-after-gap",
+   "reason": "after a packet FFmpeg's FLAC parser assembled from bytes the reader does not deliver as that packet (leading bytes, a merged damaged frame), it reports the next packet's position as its own read position; the reader reports the frame's source offset",
+   "scope": [
+    {
+     "views": [
+      "native"
+     ],
+     "fields": [
+      "position"
+     ],
+     "packets": "after-unmatched",
+     "reference": "any"
+    }
+   ]
+  },
+  {
+   "id": "flac-time-base-from-leading-bytes",
+   "reason": "in a FLAC stream without STREAMINFO that starts with unparsable bytes, FFmpeg takes the stream time base (1/32000) from a frame header in those bytes but times packets in samples of the stream rate; its times are the reader's sample times unconverted",
+   "scope": [
+    {
+     "views": [
+      "native"
+     ],
+     "fields": [
+      "pts",
+      "dts"
+     ],
+     "packets": "any",
+     "reference": "candidate-unprojected"
+    }
+   ]
+  },
+  {
+   "id": "leading-bytes-packet",
+   "reason": "FFmpeg delivers the bytes before the first FLAC or AC-3 frame as a packet and times the frames after it from that packet's end; the reader keeps leading tags as tags and skips junk to the first confirmed frame",
+   "scope": [
+    {
+     "views": [
+      "native"
+     ],
+     "fields": [
+      "unmatched"
+     ],
+     "packets": "unmatched-before-first",
+     "reference": "any"
+    },
+    {
+     "views": [
+      "native"
+     ],
+     "fields": [
+      "pts",
+      "dts"
+     ],
+     "packets": "any",
+     "reference": "candidate-plus-unmatched-durations"
+    }
+   ]
+  },
+  {
+   "id": "trailing-id3v1-in-last-packet",
+   "reason": "FFmpeg delivers the 128-byte ID3v1 tag at the end of a FLAC or AC-3 stream as part of the last packet; the reader keeps it as a tag",
+   "scope": [
+    {
+     "views": [
+      "native"
+     ],
+     "fields": [
+      "size"
+     ],
+     "packets": "last-of-stream",
+     "reference": "candidate-plus-128"
+    }
+   ]
+  },
+  {
+   "id": "mpeg-foreign-frame",
+   "reason": "FFmpeg accepts an MPEG audio frame of another version or sample rate, or a header in junk that no frame follows, cutting the same bytes into other packets and timing later frames after them; the reader requires the frame after a header to confirm it",
+   "scope": [
+    {
+     "views": [
+      "native"
+     ],
+     "fields": [
+      "size",
+      "position",
+      "unmatched"
+     ],
+     "packets": "resplit",
+     "reference": "any"
+    },
+    {
+     "views": [
+      "native"
+     ],
+     "fields": [
+      "pts",
+      "dts"
+     ],
+     "packets": "any",
+     "reference": "candidate-plus-unmatched-durations"
+    }
+   ]
+  },
+  {
+   "id": "mpeg-free-format",
+   "reason": "FFmpeg 9.0.2 refuses free-format MPEG audio; the reader delivers its frames",
+   "scope": [
+    {
+     "views": [
+      "native"
+     ],
+     "fields": [
+      "packets",
+      "streams",
+      "end"
+     ],
+     "packets": "file",
+     "reference": "any"
+    }
+   ]
+  },
+  {
+   "id": "adts-position-after-junk",
+   "reason": "FFmpeg reports ADTS packet positions after junk as if the junk were not there; the reader reports each frame's source offset, one constant offset (the junk) later",
+   "scope": [
+    {
+     "views": [
+      "native"
+     ],
+     "fields": [
+      "position"
+     ],
+     "packets": "any",
+     "reference": "constant-offset"
+    }
+   ]
+  },
+  {
+   "id": "flac-small-max-blocksize",
+   "reason": "FFmpeg refuses to open a FLAC stream whose STREAMINFO declares a maximum block size below 16; that is a decoder decision, so the reader still delivers the frames",
+   "scope": [
+    {
+     "views": [
+      "native"
+     ],
+     "fields": [
+      "packets",
+      "streams",
+      "end"
+     ],
+     "packets": "file",
+     "reference": "any"
+    }
+   ]
+  },
+  {
+   "id": "flac-metadata-past-end",
+   "reason": "a metadata block whose length runs past the end of the file: FFmpeg declares the stream STREAMINFO describes and delivers no packets; the reader refuses the stream as truncated, since no frame can follow the metadata",
+   "scope": [
+    {
+     "views": [
+      "native"
+     ],
+     "fields": [
+      "streams",
+      "end"
+     ],
+     "packets": "file",
+     "reference": "any"
+    }
+   ]
+  }
+ ]
+}

@@ -11,12 +11,13 @@
 // Pending: `missing_docs`.
 
 pub mod layout;
+pub mod mdct;
 mod window;
 
 pub use layout::{ChannelLayout, Speaker};
 pub use triergon_core::{Budget, BudgetVec, Charged, Error as StorageError, Reservation};
 pub use triergon_pixel::{Colour, PictureView, Plane};
-pub use window::kbd_window;
+pub use window::{kbd_window, vorbis_window};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum VideoCodec {
@@ -30,6 +31,11 @@ pub enum AudioCodec {
     Eac3,
     Aac,
     Dts,
+    Flac,
+    Opus,
+    Vorbis,
+    /// MPEG-1/2 audio Layer I, II or III.
+    MpegAudio,
 }
 
 /// Why a decoder refused an access unit: the codec error's `Debug` text.
@@ -43,12 +49,28 @@ impl DecodeFailure {
     }
 }
 
+/// The sample format a decoder produces natively, before its samples become the
+/// frame's `f32` planes. Mixing follows it: FFmpeg's resampler mixes 16-bit input in
+/// fixed point.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum SampleFormat {
+    #[default]
+    Float,
+    /// Signed 16-bit; each sample is exactly `x / 2^15`.
+    S16,
+    /// Signed 32-bit, left-justified; each sample is `x / 2^31` rounded to `f32`,
+    /// exact for up to 24 significant bits.
+    S32,
+}
+
 /// Decoded audio of one access unit: planar `f32` at full scale 1.0.
 #[derive(Clone, Debug, Default)]
 pub struct AudioFrame {
     pub sample_rate: u32,
     pub layout: ChannelLayout,
     pub samples_per_channel: usize,
+    /// What the planes are images of.
+    pub sample_format: SampleFormat,
     /// One plane per speaker of `layout`, in its order, `samples_per_channel` samples each.
     pub planes: Vec<Vec<f32>>,
 }
@@ -174,6 +196,17 @@ pub trait AudioDecoder: Send {
         au: &[u8],
         out: &mut AudioFrame,
     ) -> Result<Option<DownmixLevels>, DecodeFailure>;
+    /// Samples at the start of the stream that carry no signal and are discarded unless
+    /// the container says otherwise (the Opus pre-skip); 0 for most decoders.
+    fn delay(&self) -> usize {
+        0
+    }
+    /// End of stream: replace `out` with any samples the decoder still holds back
+    /// (`samples_per_channel == 0` when there are none, as for most decoders).
+    fn flush(&mut self, out: &mut AudioFrame) -> Result<(), DecodeFailure> {
+        out.clear();
+        Ok(())
+    }
     /// Discontinuity: drop all signal history.
     fn reset(&mut self);
 }

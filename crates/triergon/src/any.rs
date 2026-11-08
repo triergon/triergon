@@ -8,9 +8,15 @@
 //! [`AnyReader::open`] refuses it explicitly.
 // With no format feature the enums are empty and their forwarding is dead code.
 #![cfg_attr(
-    not(any(feature = "matroska", feature = "isobmff")),
+    not(any(
+        feature = "matroska",
+        feature = "isobmff",
+        feature = "ogg",
+        feature = "elementary"
+    )),
     allow(unused_imports, unused_variables, unreachable_code)
 )]
+use std::io::Read as _;
 use std::sync::atomic::AtomicBool;
 use triergon_core::container::{
     ContainerReader, Event, PacketInfo, RandomAccess, ReaderStep, SeekRequest, TrackId, TrackInfo,
@@ -22,7 +28,12 @@ use triergon_core::{
 };
 
 /// The largest input window a reader asks for at once.
-#[cfg(any(feature = "matroska", feature = "isobmff"))]
+#[cfg(any(
+    feature = "matroska",
+    feature = "isobmff",
+    feature = "ogg",
+    feature = "elementary"
+))]
 const WINDOW: usize = 64 * 1024;
 
 /// What the first bytes of a source look like.
@@ -34,11 +45,24 @@ pub enum Probe {
     Isobmff,
     /// 188-byte MPEG transport packets.
     Ts,
+    /// An Ogg page (`OggS`).
+    Ogg,
+    /// Native FLAC (`fLaC`, or a frame header the next one numbers on from), possibly
+    /// after an ID3v2 tag.
+    Flac,
+    /// Two consecutive MPEG audio frames, possibly after an ID3v2 tag.
+    MpegAudio,
+    /// Two consecutive ADTS frames.
+    Adts,
+    /// Two consecutive AC-3 or E-AC-3 syncframes.
+    Ac3,
     /// Not recognised from these bytes.
     Unknown,
 }
 
-/// Classify a source from its first bytes. A short prefix may give `Unknown`.
+/// Classify a source from its first bytes. A short prefix may give `Unknown`: an
+/// elementary stream (MPEG audio, ADTS, AC-3) is recognised only once the prefix holds
+/// the start of its second frame, and an ID3v2 tag must fit in it whole.
 pub fn probe(bytes: &[u8]) -> Probe {
     if bytes.starts_with(&[0x1a, 0x45, 0xdf, 0xa3]) {
         return Probe::Matroska;
@@ -51,10 +75,33 @@ pub fn probe(bytes: &[u8]) -> Probe {
     {
         return Probe::Isobmff;
     }
+    if bytes.starts_with(b"OggS\0") {
+        return Probe::Ogg;
+    }
     if bytes.len() > 188 * 2 && bytes[0] == 0x47 && bytes[188] == 0x47 && bytes[376] == 0x47 {
         return Probe::Ts;
     }
-    Probe::Unknown
+    elementary(bytes)
+}
+
+/// The elementary stream `bytes` starts, when that reader is built in.
+fn elementary(bytes: &[u8]) -> Probe {
+    #[cfg(feature = "elementary")]
+    {
+        use triergon_elementary::Kind;
+        match triergon_elementary::probe(bytes) {
+            Some(Kind::Flac) => Probe::Flac,
+            Some(Kind::MpegAudio) => Probe::MpegAudio,
+            Some(Kind::Adts) => Probe::Adts,
+            Some(Kind::Ac3) => Probe::Ac3,
+            None => Probe::Unknown,
+        }
+    }
+    #[cfg(not(feature = "elementary"))]
+    {
+        let _ = bytes;
+        Probe::Unknown
+    }
 }
 
 /// Every reader the facade can open, one variant per enabled format.
@@ -66,6 +113,16 @@ pub enum AnyReader {
     Matroska(triergon_matroska::typed::Reader),
     #[cfg(feature = "isobmff")]
     Isobmff(triergon_isobmff::Reader),
+    #[cfg(feature = "ogg")]
+    Ogg(triergon_ogg::Reader),
+    #[cfg(feature = "elementary")]
+    Flac(triergon_elementary::FlacReader),
+    #[cfg(feature = "elementary")]
+    MpegAudio(triergon_elementary::MpegAudioReader),
+    #[cfg(feature = "elementary")]
+    Adts(triergon_elementary::AdtsReader),
+    #[cfg(feature = "elementary")]
+    Ac3(triergon_elementary::Ac3Reader),
 }
 
 /// The packet of whichever reader produced it.
@@ -77,6 +134,11 @@ pub enum AnyPacket {
     Matroska(triergon_matroska::typed::Packet),
     #[cfg(feature = "isobmff")]
     Isobmff(triergon_isobmff::Packet),
+    #[cfg(feature = "ogg")]
+    Ogg(triergon_ogg::Packet),
+    /// Every elementary stream reader's packet.
+    #[cfg(feature = "elementary")]
+    Elementary(triergon_elementary::Packet),
 }
 
 /// Non-packet events of whichever reader produced them.
@@ -88,6 +150,10 @@ pub enum AnyOther {
     Matroska(triergon_matroska::typed::Event),
     #[cfg(feature = "isobmff")]
     Isobmff(triergon_isobmff::ReaderEvent),
+    #[cfg(feature = "ogg")]
+    Ogg(triergon_ogg::ReaderEvent),
+    #[cfg(feature = "elementary")]
+    Elementary(triergon_elementary::ReaderEvent),
 }
 
 macro_rules! each {
@@ -97,14 +163,56 @@ macro_rules! each {
             Self::Matroska($inner) => $body,
             #[cfg(feature = "isobmff")]
             Self::Isobmff($inner) => $body,
-            #[cfg(not(any(feature = "matroska", feature = "isobmff")))]
+            #[cfg(feature = "ogg")]
+            Self::Ogg($inner) => $body,
+            #[cfg(feature = "elementary")]
+            Self::Flac($inner) => $body,
+            #[cfg(feature = "elementary")]
+            Self::MpegAudio($inner) => $body,
+            #[cfg(feature = "elementary")]
+            Self::Adts($inner) => $body,
+            #[cfg(feature = "elementary")]
+            Self::Ac3($inner) => $body,
+            #[cfg(not(any(
+                feature = "matroska",
+                feature = "isobmff",
+                feature = "ogg",
+                feature = "elementary"
+            )))]
+            _ => unreachable!("no format feature: the enum is uninhabited"),
+        }
+    };
+}
+
+macro_rules! each_packet {
+    ($value:expr, $inner:ident => $body:expr) => {
+        match $value {
+            #[cfg(feature = "matroska")]
+            Self::Matroska($inner) => $body,
+            #[cfg(feature = "isobmff")]
+            Self::Isobmff($inner) => $body,
+            #[cfg(feature = "ogg")]
+            Self::Ogg($inner) => $body,
+            #[cfg(feature = "elementary")]
+            Self::Elementary($inner) => $body,
+            #[cfg(not(any(
+                feature = "matroska",
+                feature = "isobmff",
+                feature = "ogg",
+                feature = "elementary"
+            )))]
             _ => unreachable!("no format feature: the enum is uninhabited"),
         }
     };
 }
 
 /// Wrap one reader's step in the closed enums.
-#[cfg(any(feature = "matroska", feature = "isobmff"))]
+#[cfg(any(
+    feature = "matroska",
+    feature = "isobmff",
+    feature = "ogg",
+    feature = "elementary"
+))]
 macro_rules! neutral_step {
     ($step:expr, $variant:ident) => {
         match $step {
@@ -144,6 +252,42 @@ impl AnyReader {
                 triergon_isobmff::ReaderLimits::default(),
                 WINDOW,
             )?)),
+            #[cfg(feature = "ogg")]
+            Probe::Ogg => Ok(Self::Ogg(triergon_ogg::Reader::new(
+                pool,
+                source,
+                capabilities,
+                triergon_ogg::Limits::default(),
+                WINDOW,
+            )?)),
+            #[cfg(feature = "elementary")]
+            Probe::Flac => Ok(Self::Flac(triergon_elementary::Reader::new(
+                pool,
+                source,
+                capabilities,
+                triergon_elementary::Limits::default(),
+            )?)),
+            #[cfg(feature = "elementary")]
+            Probe::MpegAudio => Ok(Self::MpegAudio(triergon_elementary::Reader::new(
+                pool,
+                source,
+                capabilities,
+                triergon_elementary::Limits::default(),
+            )?)),
+            #[cfg(feature = "elementary")]
+            Probe::Adts => Ok(Self::Adts(triergon_elementary::Reader::new(
+                pool,
+                source,
+                capabilities,
+                triergon_elementary::Limits::default(),
+            )?)),
+            #[cfg(feature = "elementary")]
+            Probe::Ac3 => Ok(Self::Ac3(triergon_elementary::Reader::new(
+                pool,
+                source,
+                capabilities,
+                triergon_elementary::Limits::default(),
+            )?)),
             Probe::Ts => Err(Error::Unsupported(
                 "the MPEG-TS reader does not implement ContainerReader yet",
             )),
@@ -155,38 +299,112 @@ impl AnyReader {
     }
 }
 
+/// A reader for whichever format `source` holds, fed from it: the first 64 KiB are
+/// probed, then the source is read from its start.
+pub fn open_blocking<S: std::io::Read + std::io::Seek>(
+    mut source: S,
+    pool: &Budget,
+) -> Result<triergon_core::blocking::Blocking<AnyReader, S>> {
+    let capabilities = triergon_core::blocking::seekable_capabilities(&mut source)?;
+    let mut prefix = Vec::with_capacity(PROBE_BYTES);
+    std::io::Read::by_ref(&mut source)
+        .take(PROBE_BYTES as u64)
+        .read_to_end(&mut prefix)
+        .map_err(|e| Error::Io(e.kind()))?;
+    source.rewind().map_err(|e| Error::Io(e.kind()))?;
+    let reader = AnyReader::open(&prefix, pool, SourceId(1), capabilities)?;
+    Ok(triergon_core::blocking::Blocking::seekable(
+        reader, source, pool,
+    ))
+}
+
+/// A reader for whichever format a sequential `source` holds (a pipe): the first 64 KiB
+/// are probed and replayed, and the reader neither seeks nor knows the source's length,
+/// so it behaves as FFmpeg does on a pipe.
+pub fn open_sequential<S: std::io::Read>(
+    mut source: S,
+    pool: &Budget,
+) -> Result<triergon_core::blocking::Blocking<AnyReader, Replayed<S>>> {
+    let mut prefix = Vec::with_capacity(PROBE_BYTES);
+    std::io::Read::by_ref(&mut source)
+        .take(PROBE_BYTES as u64)
+        .read_to_end(&mut prefix)
+        .map_err(|e| Error::Io(e.kind()))?;
+    let capabilities = SourceCapabilities {
+        length: None,
+        random_access: false,
+    };
+    let reader = AnyReader::open(&prefix, pool, SourceId(1), capabilities)?;
+    let source = Replayed {
+        prefix,
+        at: 0,
+        rest: source,
+    };
+    Ok(triergon_core::blocking::Blocking::sequential(
+        reader, source, pool,
+    ))
+}
+
+/// A sequential source with its probed prefix put back in front; the prefix is freed
+/// once it has been read.
+#[derive(Debug)]
+pub struct Replayed<S> {
+    prefix: Vec<u8>,
+    at: usize,
+    rest: S,
+}
+
+impl<S: std::io::Read> std::io::Read for Replayed<S> {
+    fn read(&mut self, out: &mut [u8]) -> std::io::Result<usize> {
+        if self.at < self.prefix.len() {
+            let count = out.len().min(self.prefix.len() - self.at);
+            out[..count].copy_from_slice(&self.prefix[self.at..self.at + count]);
+            self.at += count;
+            if self.at == self.prefix.len() {
+                self.prefix = Vec::new();
+                self.at = 0;
+            }
+            return Ok(count);
+        }
+        self.rest.read(out)
+    }
+}
+
+/// Bytes [`open_blocking`] and [`open_sequential`] probe.
+const PROBE_BYTES: usize = 64 * 1024;
+
 impl PacketInfo for AnyPacket {
     #[inline]
     fn track(&self) -> TrackId {
-        each!(self, p => p.track())
+        each_packet!(self, p => p.track())
     }
     #[inline]
     fn payload(&self) -> &[u8] {
-        each!(self, p => p.payload())
+        each_packet!(self, p => p.payload())
     }
     #[inline]
     fn time_base(&self) -> TimeBase {
-        each!(self, p => p.time_base())
+        each_packet!(self, p => p.time_base())
     }
     #[inline]
     fn pts(&self) -> Option<i64> {
-        each!(self, p => p.pts())
+        each_packet!(self, p => p.pts())
     }
     #[inline]
     fn dts(&self) -> Option<i64> {
-        each!(self, p => p.dts())
+        each_packet!(self, p => p.dts())
     }
     #[inline]
     fn duration(&self) -> Option<i64> {
-        each!(self, p => p.duration())
+        each_packet!(self, p => p.duration())
     }
     #[inline]
     fn random_access(&self) -> RandomAccess {
-        each!(self, p => p.random_access())
+        each_packet!(self, p => p.random_access())
     }
     #[inline]
     fn trim(&self) -> Trim {
-        each!(self, p => p.trim())
+        each_packet!(self, p => p.trim())
     }
 }
 
@@ -218,7 +436,30 @@ impl ContainerReader for AnyReader {
             Self::Isobmff(reader) => {
                 neutral_step!(ContainerReader::step(reader, work, cancel)?, Isobmff)
             }
-            #[cfg(not(any(feature = "matroska", feature = "isobmff")))]
+            #[cfg(feature = "ogg")]
+            Self::Ogg(reader) => neutral_step!(ContainerReader::step(reader, work, cancel)?, Ogg),
+            #[cfg(feature = "elementary")]
+            Self::Flac(reader) => {
+                neutral_step!(ContainerReader::step(reader, work, cancel)?, Elementary)
+            }
+            #[cfg(feature = "elementary")]
+            Self::MpegAudio(reader) => {
+                neutral_step!(ContainerReader::step(reader, work, cancel)?, Elementary)
+            }
+            #[cfg(feature = "elementary")]
+            Self::Adts(reader) => {
+                neutral_step!(ContainerReader::step(reader, work, cancel)?, Elementary)
+            }
+            #[cfg(feature = "elementary")]
+            Self::Ac3(reader) => {
+                neutral_step!(ContainerReader::step(reader, work, cancel)?, Elementary)
+            }
+            #[cfg(not(any(
+                feature = "matroska",
+                feature = "isobmff",
+                feature = "ogg",
+                feature = "elementary"
+            )))]
             _ => unreachable!("no format feature: the enum is uninhabited"),
         })
     }
