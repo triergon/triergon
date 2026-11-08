@@ -6,6 +6,8 @@
 //! error near 1/8 pixel. [`BitmapTransform`] is that quantised key;
 //! [`BitmapTransform::restore`] rebuilds the matrix the bitmap is drawn with.
 
+use triergon_core::round_ties_even_i32;
+
 use crate::fp;
 use crate::geometry::{Rect, Vector};
 
@@ -133,14 +135,15 @@ impl BitmapTransform {
             if !(centre[i].abs() < MAX_QUANTIZED) {
                 return None;
             }
-            qr[i] = fp::lrint32(centre[i]);
+            qr[i] = round_ties_even_i32(centre[i]);
         }
 
         // The least depth over the box, limited to a 1/16 of the centre depth.
         let z0 = m[2][2] - m[2][0].abs() * dx - m[2][1].abs() * dy;
         let w = 1.0 / POSITION_PRECISION / fp::max(z0, m[2][2] / MAX_PERSP_SCALE);
         let mut mul = [dx * w, dy * w];
-        let quantize = |value: f64| (value.abs() < MAX_QUANTIZED).then(|| fp::lrint32(value));
+        let quantize =
+            |value: f64| (value.abs() < MAX_QUANTIZED).then(|| round_ties_even_i32(value));
         let mut qm = [[0i32; 2]; 3];
         for i in 0..2 {
             for j in 0..2 {

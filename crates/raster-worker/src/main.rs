@@ -17,8 +17,7 @@ use std::io::{self, BufWriter, Write};
 use std::process::ExitCode;
 use std::time::Instant;
 use triergon_core::{Budget, Bytes};
-use triergon_font::{Font, GlyphId, Limits, PointKind as FontPointKind};
-use triergon_raster::{PointKind, SourcePoint};
+use triergon_font::{Font, GlyphId, Limits};
 
 type Result<T> = std::result::Result<T, Box<dyn Error>>;
 
@@ -72,19 +71,7 @@ fn load(file: &Bytes, budget: &Budget, height: i32, count: usize) -> Selection {
                 .outline_into(GlyphId(id), &mut outline)
                 .ok()
                 .map(|_| Glyph {
-                    points: outline
-                        .points()
-                        .iter()
-                        .map(|p| SourcePoint {
-                            x: p.point.x,
-                            y: p.point.y,
-                            kind: match p.kind {
-                                FontPointKind::On => PointKind::On,
-                                FontPointKind::Quadratic => PointKind::Quadratic,
-                                FontPointKind::Cubic => PointKind::Cubic,
-                            },
-                        })
-                        .collect(),
+                    points: outline.points().to_vec(),
                     ends: outline.contour_ends().to_vec(),
                 });
             (id, glyph)

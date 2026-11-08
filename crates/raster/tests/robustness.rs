@@ -9,11 +9,13 @@ use triergon_raster::Limits;
 
 fn limits() -> Limits {
     Limits {
-        work: 1 << 20,
         outline_points: 1 << 16,
         bitmap_bytes: 1 << 22,
     }
 }
+
+/// The work units each exercise may spend.
+const WORK: u64 = 1 << 20;
 
 #[test]
 fn mutated_outlines_never_panic() {
@@ -21,7 +23,7 @@ fn mutated_outlines_never_panic() {
     for _ in 0..40 {
         let mut source = Source::random(&mut rng);
         for _ in 0..8 {
-            exercise(&source, &mut rng, limits());
+            exercise(&source, &mut rng, limits(), WORK);
             source.mutate(&mut rng);
         }
     }
@@ -29,10 +31,9 @@ fn mutated_outlines_never_panic() {
 
 #[test]
 fn a_square_survives_every_operation() {
-    use triergon_raster::{PointKind, SourcePoint};
-    let corner = |x, y| SourcePoint {
-        x,
-        y,
+    use triergon_font::{OutlinePoint, Point, PointKind};
+    let corner = |x, y| OutlinePoint {
+        point: Point::new(x, y),
         kind: PointKind::On,
     };
     let source = Source {
@@ -46,15 +47,15 @@ fn a_square_survives_every_operation() {
     };
     let mut rng = Rng(99);
     for _ in 0..50 {
-        exercise(&source, &mut rng, limits());
+        exercise(&source, &mut rng, limits(), WORK);
     }
 }
 
 #[test]
 fn bitmaps_beyond_libass_s_bound_are_refused() {
-    use triergon_core::{Budget, Error};
+    use triergon_core::{Budget, Error, WorkBudget};
     use triergon_raster::{
-        Bitmap, Compositor, Effects, Filter, FrameScale, GlyphRef, MAX_BITMAP_BYTES, Vector,
+        Bitmap, Effects, Filter, FrameScale, GlyphRef, MAX_BITMAP_BYTES, Raster, Vector,
     };
     let budget = Budget::new(1 << 20).unwrap();
     for (width, height) in [
@@ -83,8 +84,12 @@ fn bitmaps_beyond_libass_s_bound_are_refused() {
         pixel_aspect: 1.0,
     };
     let filter = Filter::new(&Effects::default(), &frame);
-    let composite = Compositor::new(&budget, limits())
-        .compose(&filter, &[at(i32::MIN), at(i32::MAX)])
+    let composite = Raster::new(&budget, limits())
+        .compose(
+            &filter,
+            &[at(i32::MIN), at(i32::MAX)],
+            &mut WorkBudget::new(WORK),
+        )
         .unwrap();
     assert!(composite.fill.is_none());
 }

@@ -104,8 +104,8 @@ pub trait Sink {
         let hash = fnv(FNV_INIT, b.data());
         self.count_bytes(b.width() * b.height());
         self.values(&[
-            b.left.into(),
-            b.top.into(),
+            b.position.x.into(),
+            b.position.y.into(),
             b.width() as i64,
             b.height() as i64,
             b.stride() as i64,

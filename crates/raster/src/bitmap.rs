@@ -7,20 +7,17 @@ use crate::limits::{Limits, MAX_BITMAP_BYTES};
 
 /// Row alignment: strides are multiples of 16 bytes, as libass's C engine (and
 /// its NEON and SSE2 engines) lay bitmaps out.
-pub const ALIGNMENT: usize = 16;
+pub(crate) const ALIGNMENT: usize = 16;
 
-/// An 8-bit coverage bitmap placed at (`left`, `top`) whole pixels. Rows are
-/// [`Bitmap::stride`] bytes apart. The bytes past the width are zero, and every
-/// operation keeps them so, as libass's C engine does.
+/// An 8-bit coverage bitmap placed at `position`. Rows are [`Bitmap::stride`]
+/// bytes apart. The bytes past the width are zero, and every operation keeps
+/// them so, as libass's C engine does.
 #[derive(Debug)]
 pub struct Bitmap {
-    /// The column of the first pixel, whole pixels, relative to the origin the
-    /// bitmap is placed against: the glyph's position, or the run's for a
-    /// composite.
-    pub left: i32,
-    /// The row of the first pixel, whole pixels, y down, relative to the same
-    /// origin.
-    pub top: i32,
+    /// The first pixel's column and row (libass's `left` and `top`), whole
+    /// pixels, y down, relative to the origin the bitmap is placed against: the
+    /// glyph's position, or the run's for a composite.
+    pub position: Vector,
     width: usize,
     height: usize,
     stride: usize,
@@ -52,8 +49,7 @@ impl Bitmap {
         let mut data = BudgetVec::new(budget);
         data.try_resize(bytes, 0)?;
         Ok(Self {
-            left: 0,
-            top: 0,
+            position: Vector::new(0, 0),
             width,
             height,
             stride,
@@ -86,7 +82,7 @@ impl Bitmap {
         self.height
     }
 
-    /// Bytes from one row to the next: the width rounded up to [`ALIGNMENT`].
+    /// Bytes from one row to the next: the width rounded up to 16.
     pub fn stride(&self) -> usize {
         self.stride
     }
@@ -187,8 +183,8 @@ impl Bitmap {
     /// positions, changes; rows overlap over their whole strides, as libass
     /// computes it.
     pub fn subtract_fill(&mut self, glyph: &Self) {
-        let (sl, st) = (i64::from(self.left), i64::from(self.top));
-        let (gl, gt) = (i64::from(glyph.left), i64::from(glyph.top));
+        let (sl, st) = (i64::from(self.position.x), i64::from(self.position.y));
+        let (gl, gt) = (i64::from(glyph.position.x), i64::from(glyph.position.y));
         let (l, t) = (sl.max(gl), st.max(gt));
         let r = (sl + self.stride as i64).min(gl + glyph.stride as i64);
         let b = (st + self.height as i64).min(gt + glyph.height as i64);
@@ -214,8 +210,8 @@ impl Bitmap {
     /// `v · shift >> 6` of itself to its neighbour, from the far edge so moved
     /// coverage is not moved twice.
     pub fn shift_by(&mut self, offset: Vector) {
-        self.left = self.left.wrapping_add(offset.x >> 6);
-        self.top = self.top.wrapping_add(offset.y >> 6);
+        self.position.x = self.position.x.wrapping_add(offset.x >> 6);
+        self.position.y = self.position.y.wrapping_add(offset.y >> 6);
         let (shift_x, shift_y) = ((offset.x & 63) as u32, (offset.y & 63) as u32);
         if shift_x != 0 {
             for row in self.rows_mut() {

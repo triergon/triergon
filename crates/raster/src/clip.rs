@@ -69,17 +69,12 @@ pub struct ClipPart {
 
 /// Up to eight parts, in the order libass emits them.
 #[derive(Clone, Copy, Debug, Default)]
-pub struct ClipParts {
+struct ClipParts {
     parts: [ClipPart; 8],
     len: usize,
 }
 
 impl ClipParts {
-    /// The parts, in the order libass emits them.
-    pub fn as_slice(&self) -> &[ClipPart] {
-        &self.parts[..self.len]
-    }
-
     fn push(&mut self, part: ClipPart) {
         self.parts[self.len] = part;
         self.len += 1;
@@ -104,16 +99,17 @@ impl Span {
 impl Clip {
     /// The parts of `bitmap`, its position offset by `origin` pixels, that this
     /// clip leaves visible in `frame`, each split at frame column `split` into a
-    /// part in the first colour (left) and one in the second (right).
+    /// part in the first colour (left) and one in the second (right): at most
+    /// eight, in the order libass emits them (`render_glyph`).
     pub fn parts(
         &self,
         bitmap: &Bitmap,
         origin: Vector,
         split: i32,
         frame: &ClipFrame,
-    ) -> ClipParts {
-        let dst_x = i64::from(origin.x) + i64::from(bitmap.left);
-        let dst_y = i64::from(origin.y) + i64::from(bitmap.top);
+    ) -> impl ExactSizeIterator<Item = ClipPart> + use<> {
+        let dst_x = i64::from(origin.x) + i64::from(bitmap.position.x);
+        let dst_y = i64::from(origin.y) + i64::from(bitmap.position.y);
         let split = i64::from(split) - dst_x;
         let size = (bitmap.width() as i64, bitmap.height() as i64);
         let mut spans = [Span::default(); 4];
@@ -139,7 +135,7 @@ impl Clip {
                 parts.push(part(split.max(span.x0), span.x1, Colour::Second));
             }
         }
-        parts
+        parts.parts.into_iter().take(parts.len)
     }
 
     /// A normal clip: the clip rectangle clamped to the frame (as `FFMINMAX`

@@ -16,19 +16,6 @@ pub(crate) fn min(a: f64, b: f64) -> f64 {
     if a > b { b } else { a }
 }
 
-/// C `lrint` in the default rounding mode: nearest, ties to even. Out-of-range
-/// values saturate and NaN becomes 0, as AArch64's `frintx` + `fcvtzs` do.
-#[inline(always)]
-pub(crate) fn lrint(x: f64) -> i64 {
-    x.round_ties_even() as i64
-}
-
-/// `lrint` narrowed to 32 bits, for values the caller has bounded.
-#[inline(always)]
-pub(crate) fn lrint32(x: f64) -> i32 {
-    lrint(x) as i32
-}
-
 /// The 2⁶⁴ scale that lifts subnormals into the normal range.
 const TWO_64: f64 = 18_446_744_073_709_551_616.0;
 
@@ -73,7 +60,7 @@ pub(crate) fn ldexp(mut x: f64, mut n: i32) -> f64 {
 
 #[cfg(test)]
 mod tests {
-    use super::{frexp, ldexp, lrint, max, min};
+    use super::{frexp, ldexp, max, min};
 
     #[test]
     fn frexp_splits_normals_subnormals_and_specials() {
@@ -95,14 +82,6 @@ mod tests {
             let (m, e) = frexp(x);
             assert_eq!(ldexp(m, e), x);
         }
-    }
-
-    #[test]
-    fn lrint_rounds_ties_to_even_and_saturates() {
-        assert_eq!(lrint(2.5), 2);
-        assert_eq!(lrint(-3.5), -4);
-        assert_eq!(lrint(f64::NAN), 0);
-        assert_eq!(lrint(1e300), i64::MAX);
     }
 
     #[test]

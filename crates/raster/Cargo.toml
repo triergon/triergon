@@ -13,3 +13,4 @@ workspace = true
 
 [dependencies]
 triergon-core = { path = "../core" }
+triergon-font = { path = "../font" }

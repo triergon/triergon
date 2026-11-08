@@ -5,7 +5,7 @@
 //! [`FULL`]; the arithmetic wraps at 16 bits exactly where libass's engines
 //! truncate to `int16_t`.
 
-use super::{Line, LineFlags};
+use super::{Line, LineFlag};
 
 /// Tile edge in pixels and its log2.
 pub(super) const TILE: usize = 16;
@@ -107,16 +107,16 @@ pub(super) fn fill_generic(tile: &mut TileMut<'_>, lines: &[Line], winding: i32)
     let mut res = [[0i16; TILE]; TILE];
     let mut delta = [0i16; TILE + 2];
     for line in lines {
-        let mut up_delta: i16 = if line.flags.contains(LineFlags::DN) {
+        let mut up_delta: i16 = if line.flags.contains(LineFlag::Down) {
             4
         } else {
             0
         };
         let mut dn_delta = up_delta;
-        if line.x_min == 0 && line.flags.contains(LineFlags::EXACT_LEFT) {
+        if line.x_min == 0 && line.flags.contains(LineFlag::ExactLeft) {
             dn_delta ^= 4;
         }
-        if line.flags.contains(LineFlags::UL_DR) {
+        if line.flags.contains(LineFlag::UpLeftDownRight) {
             std::mem::swap(&mut up_delta, &mut dn_delta);
         }
         let mut up = (line.y_min >> 6) as usize;

@@ -4,28 +4,34 @@ The outline and bitmap stages of an ASS subtitle renderer, matching libass
 0.17.5 bit for bit: glyph outlines in 26.6 fixed point, their 3D transform and
 its quantisation, border stroking, the tile rasteriser, `\blur` and `\be`, the
 composition of a run's fill, border and shadow bitmaps, and rectangle clipping
-into image parts. It depends only on [`triergon-core`](../core) for `Budget`,
-`WorkBudget` and errors. Fonts, shaping, layout and ASS parsing belong to other
-crates.
+into image parts. It depends on [`triergon-core`](../core) for `Budget`,
+`WorkBudget` and errors, and takes glyph outlines in the point form of
+[`triergon-font`](../font). Fonts, shaping, layout and ASS parsing belong to
+other crates.
 
 ## Usage
 
+A `Raster` holds the scratch every stage reuses. Each stage takes the
+`WorkBudget` of the frame it belongs to, so one budget bounds all the work of a
+frame.
+
 ```rust
-use triergon_core::Budget;
+use triergon_core::{Budget, WorkBudget};
+use triergon_font::{OutlinePoint, Point, PointKind};
 use triergon_raster::{
-    BorderRequest, Compositor, Effects, Filter, FilterFlags, FrameScale, GlyphRaster, GlyphRef,
-    GlyphRequest, GlyphSource, Limits, Outline, Placement, PointKind, Run, Shape, SourcePoint,
-    Vector,
+    BorderRequest, Effects, Filter, FilterFlags, FrameScale, GlyphRef, GlyphRequest, Limits,
+    Outline, Placement, Raster, Run, Shape, Vector,
 };
 
 let budget = Budget::new(64 << 20)?;
-let limits = Limits::default();
+let mut raster = Raster::new(&budget, Limits::default());
+let mut work = WorkBudget::new(1 << 28);
 
 // A glyph outline as a font gives it at a size: 26.6, y up, tagged points.
-let on = |x, y| SourcePoint { x, y, kind: PointKind::On };
+let on = |x, y| OutlinePoint { point: Point::new(x, y), kind: PointKind::On };
 let points = [on(0, 0), on(640, 0), on(640, 640), on(0, 640)];
 let mut outline = Outline::new(&budget);
-outline.push_glyph(&GlyphSource { points: &points, contour_ends: &[4] })?;
+outline.push_glyph(&points, &[4])?;
 let shape = Shape::from_outlines(outline, Outline::new(&budget));
 
 // One glyph at (100, 50) pixels with a 2 pixel border, rotated by \frz15.
@@ -48,9 +54,8 @@ let request = GlyphRequest {
     border: BorderRequest::Outline { size: [2.0, 2.0] },
     karaoke: false,
 };
-let mut glyphs = GlyphRaster::new(&budget, limits);
 let mut run = Run::default();
-let bitmaps = glyphs.render(&request, &mut run)?;
+let bitmaps = raster.render(&request, &mut run, &mut work)?;
 
 // The run's fill, border and shadow, blurred with \blur1.
 let flags = FilterFlags { border: true, shadow: true, ..FilterFlags::default() };
@@ -64,22 +69,25 @@ let glyph = GlyphRef {
         bitmaps.border_position.y - bitmaps.position.y,
     ),
 };
-let mut compositor = Compositor::new(&budget, limits);
-let composite = compositor.compose(&Filter::new(&effects, &frame), &[glyph])?;
+let composite = raster.compose(&Filter::new(&effects, &frame), &[glyph], &mut work)?;
 assert!(composite.fill.is_some() && composite.border.is_some() && composite.shadow.is_some());
 # Ok::<(), Box<dyn std::error::Error>>(())
 ```
+
+A bitmap's `position` is its first pixel relative to the origin it is placed
+against; `GlyphBitmaps::position` and `GlyphRef::position` are those origins,
+for a glyph in the frame and for a run's glyphs relative to the run.
 
 ## What it matches
 
 | Stage | libass | Here |
 |---|---|---|
-| Outlines | `ass_outline.c`: conversion from font outlines, rectangles, rotation by 90°, affine and perspective transforms, the karaoke leftmost x, control boxes | `Outline`, `GlyphSource`, `Matrix`, `Projection` |
-| Borders | `ass_outline_stroke`, and the stroking scale `get_bitmap_glyph` chooses | `Outline::stroke_into`, `Pen` |
-| Rasteriser | `ass_rasterizer.c` with 16×16 tiles (the default build, without large tiles) | `Rasterizer`, `Shape` |
-| Glyph bitmaps | `calc_transform_matrix`, `quantize_transform`, `restore_transform`, `get_bitmap_glyph` with its border and the opaque box of `\bord` style 3 | `Placement`, `FrameScale`, `GlyphRaster`, `Run` |
-| Blur | `ass_blur.c` (the cascade Gaussian and its coefficient solver), the `\be` box blur, `ass_synth_blur` | `Blur` |
-| Composition | `quantize_blur`, `restore_blur`, `ass_composite_construct`, `ass_fix_outline`, `ass_shift_bitmap`, the additive blend | `Effects`, `Filter`, `Compositor`, `Bitmap` |
+| Outlines | `ass_outline.c`: conversion from font outlines, rectangles, rotation by 90°, affine and perspective transforms, the karaoke leftmost x, control boxes | `Outline`, `Matrix`, `Projection` |
+| Borders | `ass_outline_stroke`, and the stroking scale `get_bitmap_glyph` chooses | `Raster::stroke`, `Pen` |
+| Rasteriser | `ass_rasterizer.c` with 16×16 tiles (the default build, without large tiles) | `Raster::rasterize`, `Shape` |
+| Glyph bitmaps | `calc_transform_matrix`, `quantize_transform`, `restore_transform`, `get_bitmap_glyph` with its border and the opaque box of `\bord` style 3 | `Raster::render`, `GlyphRequest`, `Placement`, `FrameScale`, `Run` |
+| Blur | `ass_blur.c` (the cascade Gaussian and its coefficient solver), the `\be` box blur, `ass_synth_blur` | `Raster::blur` |
+| Composition | `quantize_blur`, `restore_blur`, `ass_composite_construct`, `ass_fix_outline`, `ass_shift_bitmap`, the additive blend | `Raster::compose`, `Effects`, `Filter`, `Bitmap` |
 | Clipping | `render_glyph`: `\clip` and `\iclip` rectangles and the `\kf` split; the multiply blends of vector clips | `Clip`, `ClipFrame`, `Bitmap::multiply`, `Bitmap::multiply_inverse` |
 
 The arithmetic is libass's own: 26.6 integer subdivision with its rounding, the
@@ -103,23 +111,29 @@ result does not depend on the target. Two further properties are matched:
 ## Behaviour and limits
 
 Every input-dependent allocation is charged to the `Budget` a value was created
-with: outlines, bitmaps and the rasteriser's and blur's scratch, which are kept
-and reused. `Limits` bounds one operation: its work (`work`: subdivision steps,
-emitted points, polyline segments, tiles and filter rows, charged to a
-`WorkBudget`), the points of a stroked outline (`outline_points`) and the bytes
-of a bitmap (`bitmap_bytes`). Exceeding one is `Error::Policy`. The bitmap
-default is `MAX_BITMAP_BYTES`, libass's own bound just under 2³¹ bytes, so only
-the budget limits what libass draws; a bitmap beyond that bound is not drawn,
-as in libass. Outline coordinates stay within ±(2²⁸ − 1); conversions and
-transforms that leave the range are `Error::Invalid`, and the glyph pipeline
-drops such outlines as libass does. No input panics, including arithmetic
-overflow in debug builds; non-finite transform and blur parameters behave as
-the AArch64 build does.
+with: outlines, bitmaps and the rasteriser's and blur's scratch, which a
+`Raster` keeps and reuses. Work is charged to the `WorkBudget` the caller passes
+to each stage, one per frame: subdivision steps, emitted points, polyline
+segments, tiles and filter rows. `Limits` bounds sizes: the points of a stroked
+outline (`outline_points`) and the bytes of a bitmap (`bitmap_bytes`). Running
+out of work or exceeding a limit is `Error::Policy`. The bitmap default is
+`MAX_BITMAP_BYTES`, libass's own bound just under 2³¹ bytes, so only the budget
+limits what libass draws; a bitmap beyond that bound is not drawn, as in
+libass, and a blur whose intermediate planes would pass libass's bound leaves
+the bitmap unblurred, as libass does. Outline coordinates stay within
+±(2²⁸ − 1); conversions and transforms that leave the range are
+`Error::Invalid`, and the glyph pipeline drops such outlines as libass does. No
+input panics, including arithmetic overflow in debug builds. Where libass's
+result depends on the target for values far out of range (conversions of
+doubles beyond the `long` range, shifts by 32 or more), the crate computes what
+libass built for 32-bit ARMv7 computes: conversions saturate, NaN converts to
+0 and such shifts give 0.
 
-Not covered: glyph loading, hinting and synthetic styles (`triergon-font`),
-underline and strike-out placement, which needs the source outline's
-orientation, drawing parsing and the image list itself. The large-tile build
-of libass (`--enable-large-tiles`) is not matched.
+Not covered: glyph loading, hinting, synthetic styles and decoration lines
+(`triergon-font` and the renderer); drawing parsing and the image list,
+including where vector clips overlap and how their images are allocated, which
+belong to the renderer. The large-tile build of libass
+(`--enable-large-tiles`) is not matched.
 
 ## Verification
 

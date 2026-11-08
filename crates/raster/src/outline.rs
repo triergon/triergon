@@ -1,7 +1,8 @@
 //! Outlines: closed contours of lines and quadratic and cubic splines with
 //! points in 26.6 fixed point, y down.
 
-use triergon_core::{Budget, BudgetVec, Error, Result};
+use triergon_core::{Budget, BudgetVec, Error, Result, round_ties_even_i32};
+use triergon_font::{OutlinePoint, Point, PointKind};
 
 use crate::fp;
 use crate::geometry::{OUTLINE_MAX, Rect, Vector};
@@ -42,7 +43,7 @@ pub struct Segment {
 
 /// A segment with its points resolved, start first.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum Curve {
+pub(crate) enum Curve {
     /// A line: start and end.
     Line([Vector; 2]),
     /// A quadratic spline: start, control point and end.
@@ -53,44 +54,11 @@ pub enum Curve {
 
 impl Curve {
     /// The first point.
-    pub const fn start(&self) -> Vector {
+    pub(crate) const fn start(&self) -> Vector {
         match self {
             Self::Line([p, _]) | Self::Quadratic([p, ..]) | Self::Cubic([p, ..]) => *p,
         }
     }
-}
-
-/// What a glyph point is, as a font outline tags it.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum PointKind {
-    /// On the curve.
-    On,
-    /// A quadratic control point; two in a row imply an on-curve point midway.
-    Quadratic,
-    /// A cubic control point; they come in pairs.
-    Cubic,
-}
-
-/// A glyph point in 26.6 fixed point, y up, as a scaled font outline gives it.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub struct SourcePoint {
-    /// The horizontal coordinate, increasing to the right.
-    pub x: i32,
-    /// The vertical coordinate, increasing upwards.
-    pub y: i32,
-    /// Whether the point is on the curve or a control point.
-    pub kind: PointKind,
-}
-
-/// A glyph outline as a font presents it: tagged points and the exclusive end
-/// index of each contour.
-#[derive(Clone, Copy, Debug)]
-pub struct GlyphSource<'a> {
-    /// The points of all contours, in order.
-    pub points: &'a [SourcePoint],
-    /// For each contour, the index one past its last point into `points`;
-    /// strictly increasing and at most `points.len()`.
-    pub contour_ends: &'a [u32],
 }
 
 /// An outline: points and the segments that own them. Each segment owns as many
@@ -141,7 +109,7 @@ impl Outline {
 
     /// The segments with their points. A trailing contour that is not closed, or
     /// a segment without its points, ends the walk.
-    pub fn curves(&self) -> Curves<'_> {
+    pub(crate) fn curves(&self) -> Curves<'_> {
         Curves {
             points: self.points(),
             segments: self.segments().iter(),
@@ -151,7 +119,7 @@ impl Outline {
     }
 
     /// The bounding box of all points, [`Rect::EMPTY`] without points.
-    pub fn control_box(&self) -> Rect {
+    pub(crate) fn control_box(&self) -> Rect {
         let mut rect = Rect::EMPTY;
         for &point in self.points() {
             rect.include_point(point);
@@ -260,30 +228,34 @@ impl Outline {
         self.append(&corners, &[line, line, line, close])
     }
 
-    /// Appends a glyph's contours, as libass converts font outlines: y is
+    /// Appends a glyph's contours from the points and exclusive contour ends of
+    /// a 26.6 font outline, y up (`triergon_font::Outline::points` and
+    /// `contour_ends`), as libass converts them (`ass_outline_convert`): y is
     /// negated, a contour that starts on a quadratic control point starts at its
     /// last point (or midway to it), implied on-curve points are made explicit
     /// with an arithmetic halving, and contours of one or two points are dropped.
-    /// A glyph without points adds nothing.
+    /// A glyph without points adds nothing. The font's own segment walk starts a
+    /// contour at its first on-curve point, as FreeType decomposes it; libass
+    /// starts at the first point, which this keeps.
     ///
     /// # Errors
     ///
     /// `Invalid` for a contour end out of order or past the points, a point
     /// beyond ±[`OUTLINE_MAX`], a lone cubic control point or a contour starting
     /// on one; the outline is then unchanged.
-    pub fn push_glyph(&mut self, glyph: &GlyphSource<'_>) -> Result<()> {
-        if glyph.points.is_empty() {
+    pub fn push_glyph(&mut self, points: &[OutlinePoint], contour_ends: &[u32]) -> Result<()> {
+        if points.is_empty() {
             return Ok(());
         }
-        let (points, segments) = (self.points.len(), self.segments.len());
+        let (n_points, n_segments) = (self.points.len(), self.segments.len());
         // Implied on-curve points at most double the points.
-        let n = glyph.points.len();
+        let n = points.len();
         self.points.try_reserve_exact(2 * n)?;
         self.segments.try_reserve_exact(n)?;
-        let result = Converter { out: self }.glyph(glyph);
+        let result = Converter { out: self }.glyph(points, contour_ends);
         if result.is_err() {
-            self.points.truncate(points);
-            self.segments.truncate(segments);
+            self.points.truncate(n_points);
+            self.segments.truncate(n_segments);
         }
         result
     }
@@ -370,7 +342,7 @@ impl Outline {
                 out.clear();
                 return Err(Error::Invalid("transformed outline out of range"));
             }
-            *o = Vector::new(fp::lrint32(x), fp::lrint32(y));
+            *o = Vector::new(round_ties_even_i32(x), round_ties_even_i32(y));
         }
         out.segments.try_extend_from_slice(self.segments())
     }
@@ -386,7 +358,7 @@ impl Outline {
             if px.is_nan() {
                 continue;
             }
-            min_x = min_x.min(fp::lrint32(fp::min(fp::max(px, -limit), limit)));
+            min_x = min_x.min(round_ties_even_i32(fp::min(fp::max(px, -limit), limit)));
         }
         min_x
     }
@@ -410,14 +382,14 @@ enum Pending {
 const MALFORMED: Error = Error::Invalid("malformed glyph outline");
 
 impl Converter<'_> {
-    fn glyph(&mut self, glyph: &GlyphSource<'_>) -> Result<()> {
+    fn glyph(&mut self, points: &[OutlinePoint], contour_ends: &[u32]) -> Result<()> {
         let mut first = 0usize;
-        for &end in glyph.contour_ends {
+        for &end in contour_ends {
             let end = end as usize;
-            if first >= end || end > glyph.points.len() {
+            if first >= end || end > points.len() {
                 return Err(MALFORMED);
             }
-            let contour = &glyph.points[first..end];
+            let contour = &points[first..end];
             first = end;
             // Degenerate contours from broken fonts are dropped.
             if contour.len() >= 3 {
@@ -450,7 +422,7 @@ impl Converter<'_> {
         self.segment(kind)
     }
 
-    fn contour(&mut self, contour: &[SourcePoint]) -> Result<()> {
+    fn contour(&mut self, contour: &[OutlinePoint]) -> Result<()> {
         let (head, mut body) = (&contour[0], &contour[1..]);
         let mut pending = match head.kind {
             PointKind::On => Pending::Nothing,
@@ -498,10 +470,11 @@ impl Converter<'_> {
 }
 
 /// A source point with y negated, within ±[`OUTLINE_MAX`].
-fn flip(p: &SourcePoint) -> Result<Vector> {
-    let point = Vector::new(p.x, p.y.wrapping_neg());
-    if p.x.unsigned_abs() <= OUTLINE_MAX.unsigned_abs()
-        && p.y.unsigned_abs() <= OUTLINE_MAX.unsigned_abs()
+fn flip(p: &OutlinePoint) -> Result<Vector> {
+    let Point { x, y } = p.point;
+    let point = Vector::new(x, y.wrapping_neg());
+    if x.unsigned_abs() <= OUTLINE_MAX.unsigned_abs()
+        && y.unsigned_abs() <= OUTLINE_MAX.unsigned_abs()
     {
         Ok(point)
     } else {
@@ -517,7 +490,7 @@ fn halfway(a: Vector, b: Vector) -> Vector {
 
 /// The iterator of [`Outline::curves`].
 #[derive(Clone, Debug)]
-pub struct Curves<'a> {
+pub(crate) struct Curves<'a> {
     points: &'a [Vector],
     segments: std::slice::Iter<'a, Segment>,
     /// The first point of the current contour.
@@ -528,7 +501,7 @@ pub struct Curves<'a> {
 
 impl Curves<'_> {
     /// Whether the next segment starts a contour.
-    pub fn at_contour_start(&self) -> bool {
+    pub(crate) fn at_contour_start(&self) -> bool {
         self.start == self.next
     }
 }
@@ -564,10 +537,9 @@ impl Iterator for Curves<'_> {
 mod tests {
     use super::*;
 
-    fn on(x: i32, y: i32) -> SourcePoint {
-        SourcePoint {
-            x,
-            y,
+    fn on(x: i32, y: i32) -> OutlinePoint {
+        OutlinePoint {
+            point: Point::new(x, y),
             kind: PointKind::On,
         }
     }
@@ -575,17 +547,13 @@ mod tests {
     #[test]
     fn conversion_negates_y_and_makes_implied_points_explicit() {
         let budget = Budget::new(1 << 16).unwrap();
-        let quadratic = |x, y| SourcePoint {
+        let quadratic = |x, y| OutlinePoint {
             kind: PointKind::Quadratic,
             ..on(x, y)
         };
         let points = [on(0, 0), quadratic(64, 64), quadratic(128, 0), on(128, -64)];
         let mut outline = Outline::new(&budget);
-        let glyph = GlyphSource {
-            points: &points,
-            contour_ends: &[4],
-        };
-        outline.push_glyph(&glyph).unwrap();
+        outline.push_glyph(&points, &[4]).unwrap();
         assert_eq!(
             outline.points(),
             [(0, 0), (64, -64), (96, -32), (128, 0), (128, 64)].map(|(x, y)| Vector::new(x, y))
@@ -610,11 +578,7 @@ mod tests {
             .push_rect(Vector::new(0, 0), Vector::new(64, 64))
             .unwrap();
         let points = [on(0, 0), on(1, 1), on(OUTLINE_MAX + 1, 0)];
-        let glyph = GlyphSource {
-            points: &points,
-            contour_ends: &[3],
-        };
-        assert!(outline.push_glyph(&glyph).is_err());
+        assert!(outline.push_glyph(&points, &[3]).is_err());
         assert_eq!((outline.points().len(), outline.segments().len()), (4, 4));
     }
 }

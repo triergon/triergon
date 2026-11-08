@@ -1,14 +1,13 @@
 //! Combining a run's glyph bitmaps into its fill, border and shadow bitmaps:
 //! blur, `\be`, the border's subtraction of the fill and the sub-pixel shadow.
 
-use triergon_core::{Budget, Result};
+use triergon_core::{Result, WorkBudget, round_ties_even_i32};
 
 use crate::bitmap::Bitmap;
-use crate::blur::Blur;
 use crate::fp;
 use crate::geometry::Vector;
 use crate::glyph::FrameScale;
-use crate::limits::Limits;
+use crate::raster::Raster;
 
 /// Blur error as a fraction of the full range.
 const BLUR_PRECISION: f64 = 1.0 / 256.0;
@@ -67,7 +66,8 @@ impl Filter {
         let (blur_y, mask_y) = quantize_blur(radius * (frame.blur[1] * radius_scale));
         let flags = effects.flags;
         let shadow = if flags.shadow {
-            let snap = |v: f64, mask: i32| (fp::lrint32(v * 64.0).wrapping_add(mask >> 1)) & !mask;
+            let snap =
+                |v: f64, mask: i32| (round_ties_even_i32(v * 64.0).wrapping_add(mask >> 1)) & !mask;
             Vector::new(
                 snap(effects.shadow[0] * frame.border[0], mask_x),
                 snap(effects.shadow[1] * frame.border[1], mask_y),
@@ -95,7 +95,7 @@ fn quantize_blur(radius: f64) -> (i32, i32) {
     let radius = radius * BLUR_SCALE;
     let (_, order) = fp::frexp((1.0 + radius) * (POSITION_PRECISION / 2.0));
     (
-        fp::lrint32(radius.ln_1p() / BLUR_PRECISION),
+        round_ties_even_i32(radius.ln_1p() / BLUR_PRECISION),
         shadow_mask(order),
     )
 }
@@ -132,11 +132,11 @@ pub struct GlyphRef<'a> {
     pub glyph: Option<&'a Bitmap>,
     /// The glyph's border bitmap, if it has one; it may be the fill bitmap.
     pub border: Option<&'a Bitmap>,
-    /// Where `glyph`'s `left` and `top` count from, whole pixels relative to
-    /// the run.
+    /// Where `glyph`'s [`position`](Bitmap::position) counts from, whole
+    /// pixels relative to the run.
     pub position: Vector,
-    /// Where `border`'s `left` and `top` count from, whole pixels relative to
-    /// the run.
+    /// Where `border`'s [`position`](Bitmap::position) counts from, whole
+    /// pixels relative to the run.
     pub border_position: Vector,
 }
 
@@ -154,35 +154,22 @@ pub struct Composite {
     pub shadow: Option<Bitmap>,
 }
 
-/// Composites runs; owns the blur scratch.
-#[derive(Debug)]
-pub struct Compositor {
-    blur: Blur,
-    budget: Budget,
-    limits: Limits,
-}
-
-impl Compositor {
-    /// A compositor whose bitmaps and blur scratch are charged to `budget`,
-    /// each operation bounded by `limits`.
-    pub fn new(budget: &Budget, limits: Limits) -> Self {
-        Self {
-            blur: Blur::new(budget, limits),
-            budget: budget.clone(),
-            limits,
-        }
-    }
-
-    /// Bytes of scratch storage currently charged.
-    pub fn retained_bytes(&self) -> usize {
-        self.blur.retained_bytes()
-    }
-
-    /// Combines `glyphs` under `filter`, as libass's composite cache builds a
-    /// run: glyphs and borders summed (one bitmap without `\be` is copied),
-    /// blurred, the fill taken out of the border where it shows through, and
-    /// the shadow copied from the border or fill and shifted.
-    pub fn compose(&mut self, filter: &Filter, glyphs: &[GlyphRef<'_>]) -> Result<Composite> {
+impl Raster {
+    /// Combines the glyphs of a run under `filter`, as libass's composite
+    /// cache builds a run (`ass_composite_construct`): glyphs and borders
+    /// summed (one bitmap without `\be` is copied), blurred, the fill taken out
+    /// of the border where it shows through, and the shadow copied from the
+    /// border or fill and shifted.
+    ///
+    /// # Errors
+    ///
+    /// `Policy` when `work` or the limits run out, and the budget's errors.
+    pub fn compose(
+        &mut self,
+        filter: &Filter,
+        glyphs: &[GlyphRef<'_>],
+        work: &mut WorkBudget,
+    ) -> Result<Composite> {
         let pad = be_padding(filter.be);
         let mut fill = self.combine(
             glyphs.iter().filter_map(|g| Some((g.glyph?, g.position))),
@@ -199,10 +186,12 @@ impl Compositor {
         if (!flags.border || flags.opaque_box)
             && let Some(fill) = &mut fill
         {
-            self.blur.apply(fill, filter.be, variance)?;
+            self.blur
+                .apply(fill, filter.be, variance, &self.limits, work)?;
         }
         if let Some(border) = &mut border {
-            self.blur.apply(border, filter.be, variance)?;
+            self.blur
+                .apply(border, filter.be, variance, &self.limits, work)?;
         }
         let subtract = |border: &mut Option<Bitmap>, fill: &Option<Bitmap>| {
             if let (Some(border), Some(fill)) = (border.as_mut(), fill) {
@@ -252,8 +241,8 @@ impl Compositor {
         let mut count = 0;
         let mut last = None;
         for (bitmap, pos) in parts.clone() {
-            let x = i64::from(pos.x) + i64::from(bitmap.left);
-            let y = i64::from(pos.y) + i64::from(bitmap.top);
+            let x = i64::from(pos.x) + i64::from(bitmap.position.x);
+            let y = i64::from(pos.y) + i64::from(bitmap.position.y);
             (x_min, y_min) = (x_min.min(x), y_min.min(y));
             x_max = x_max.max(x + bitmap.width() as i64);
             y_max = y_max.max(y + bitmap.height() as i64);
@@ -265,8 +254,8 @@ impl Compositor {
         };
         if pad == 0 && count == 1 {
             let mut copy = last.try_clone(&self.budget)?;
-            copy.left = copy.left.wrapping_add(last_pos.x);
-            copy.top = copy.top.wrapping_add(last_pos.y);
+            copy.position.x = copy.position.x.wrapping_add(last_pos.x);
+            copy.position.y = copy.position.y.wrapping_add(last_pos.y);
             return Ok(Some(copy));
         }
         let pad = i64::from(pad);
@@ -279,10 +268,10 @@ impl Compositor {
         let Some(mut out) = Bitmap::drawable(&self.budget, width, height, &self.limits)? else {
             return Ok(None);
         };
-        (out.left, out.top) = (left, top);
+        out.position = Vector::new(left, top);
         for (bitmap, pos) in parts {
-            let x = i64::from(pos.x) + i64::from(bitmap.left) - i64::from(left);
-            let y = i64::from(pos.y) + i64::from(bitmap.top) - i64::from(top);
+            let x = i64::from(pos.x) + i64::from(bitmap.position.x) - i64::from(left);
+            let y = i64::from(pos.y) + i64::from(bitmap.position.y) - i64::from(top);
             out.add(bitmap, x as i32, y as i32);
         }
         Ok(Some(out))

@@ -12,19 +12,19 @@ mod coeff;
 use triergon_core::{Budget, BudgetVec, Result, WorkBudget};
 
 use crate::bitmap::Bitmap;
+use crate::geometry::Vector;
 use crate::limits::{Limits, charge};
 use coeff::Method;
 
 /// libass's `\blur` and `\be`, with scratch storage reused across bitmaps.
 #[derive(Debug)]
-pub struct Blur {
+pub(crate) struct Blur {
     planes: [BudgetVec<i16>; 2],
     row: BudgetVec<i16>,
     halves: BudgetVec<i16>,
     zeros: BudgetVec<i16>,
     acc: BudgetVec<i32>,
     lines: BudgetVec<u16>,
-    limits: Limits,
 }
 
 /// Zeros on either side of a row for the horizontal filters: the widest reach,
@@ -32,11 +32,8 @@ pub struct Blur {
 const PAD: usize = 16;
 
 impl Blur {
-    /// A blur whose scratch is charged to `budget`, each operation bounded by
-    /// `limits`.
-    pub fn new(budget: &Budget, limits: Limits) -> Self {
+    pub(crate) fn new(budget: &Budget) -> Self {
         Self {
-            limits,
             planes: [BudgetVec::new(budget), BudgetVec::new(budget)],
             row: BudgetVec::new(budget),
             halves: BudgetVec::new(budget),
@@ -46,8 +43,7 @@ impl Blur {
         }
     }
 
-    /// Bytes of scratch storage currently charged.
-    pub fn retained_bytes(&self) -> usize {
+    pub(crate) fn retained_bytes(&self) -> usize {
         (self.planes[0].capacity()
             + self.planes[1].capacity()
             + self.row.capacity()
@@ -58,22 +54,20 @@ impl Blur {
             + self.lines.capacity() * 2
     }
 
-    /// Blurs `bitmap` as libass does (`ass_synth_blur`): with the Gaussian of
-    /// `variance` (x and y, in pixels²) when either exceeds 0.001, which
-    /// replaces the bitmap by a larger one covering the blur's reach, then with
-    /// `be` passes of the 3×3 box blur in place.
-    ///
-    /// # Errors
-    ///
-    /// `Policy` when the limits run out, and the budget's errors; the bitmap is
-    /// then unchanged or blurred by the Gaussian only.
-    pub fn apply(&mut self, bitmap: &mut Bitmap, be: u32, variance: [f64; 2]) -> Result<()> {
-        let mut work = self.limits.work();
+    /// libass's `ass_synth_blur`; see [`Raster::blur`](crate::Raster::blur).
+    pub(crate) fn apply(
+        &mut self,
+        bitmap: &mut Bitmap,
+        be: u32,
+        variance: [f64; 2],
+        limits: &Limits,
+        work: &mut WorkBudget,
+    ) -> Result<()> {
         let [r2x, r2y] = variance;
         if r2x > 0.001 || r2y > 0.001 {
-            self.gaussian(bitmap, r2x, r2y, &mut work)?;
+            self.gaussian(bitmap, [r2x, r2y], limits, work)?;
         }
-        self.box_blur(bitmap, be, &mut work)
+        self.box_blur(bitmap, be, work)
     }
 
     /// Blurs with the kernel [1, 2, 1] × [1, 2, 1] / 16 `times` times in place.
@@ -115,8 +109,8 @@ impl Blur {
     fn gaussian(
         &mut self,
         bitmap: &mut Bitmap,
-        r2x: f64,
-        r2y: f64,
+        [r2x, r2y]: [f64; 2],
+        limits: &Limits,
         work: &mut WorkBudget,
     ) -> Result<()> {
         let mx = Method::new(r2x);
@@ -193,13 +187,12 @@ impl Blur {
         }
         debug_assert_eq!(planes.size, (end_w, end_h));
 
-        let mut out = Bitmap::new(&budget, end_w, end_h, &self.limits)?;
-        out.left = bitmap
-            .left
-            .wrapping_sub((((mx.radius + 4) << mx.level) - 4) as i32);
-        out.top = bitmap
-            .top
-            .wrapping_sub((((my.radius + 4) << my.level) - 4) as i32);
+        let mut out = Bitmap::new(&budget, end_w, end_h, limits)?;
+        let reach = |m: &Method| (((m.radius + 4) << m.level) - 4) as i32;
+        out.position = Vector::new(
+            bitmap.position.x.wrapping_sub(reach(&mx)),
+            bitmap.position.y.wrapping_sub(reach(&my)),
+        );
         pack(&mut out, planes.src);
         *bitmap = out;
         Ok(())
