@@ -4,11 +4,17 @@
 //! the bit-reversed codewords, so a codeword of up to [`FAST_BITS`] bits costs one
 //! lookup. Longer codewords, rare in practice, are found by binary search over the
 //! remaining codewords sorted by their left-aligned value.
+//!
+//! Building a codebook costs work in proportion to the bits of the setup header it reads
+//! or to the storage it charges first: an ordered codebook declares any number of
+//! entries in a few bits, so its lengths are kept as counts per length and the tree's
+//! long-codeword table is charged before any entry is assigned.
 
-use triergon_bitstream::LsbReader;
+use core::iter::repeat_n;
 
-use crate::bits::BitWindow;
-use crate::storage::Meter;
+use triergon_bitstream::{LsbReader, LsbWindow};
+use triergon_codec::{Budget, BudgetVec};
+
 use crate::{DecodeError, ilog};
 
 /// Codeword lengths resolved by a single table lookup.
@@ -35,34 +41,32 @@ pub(crate) struct Codebook {
     entries: u32,
     tree: Tree,
     /// `dimensions` values per entry; empty without a lookup table.
-    vectors: Vec<f32>,
+    vectors: BudgetVec<f32>,
 }
 
 impl Codebook {
-    /// Reads one codebook (section 3.2.1), charging its tables to `meter`.
-    pub(crate) fn read(r: &mut LsbReader<'_>, meter: &mut Meter) -> Result<Codebook, DecodeError> {
+    /// Reads one codebook (section 3.2.1), charging its tables to `budget`.
+    pub(crate) fn read(r: &mut LsbReader<'_>, budget: &Budget) -> Result<Codebook, DecodeError> {
         if r.read(24) != 0x56_4342 {
             return Err(DecodeError::Invalid("codebook sync pattern"));
         }
         let dimensions = r.read(16) as usize;
         let entries = r.read(24);
-        let lengths = read_lengths(r, entries, meter)?;
+        let lengths = Lengths::read(r, entries, budget)?;
         let lookup = match r.read(4) {
             0 => LookupType::None,
             1 => LookupType::Lattice,
             2 => LookupType::Explicit,
             _ => return Err(DecodeError::Invalid("codebook lookup type")),
         };
-        let vectors = read_vectors(r, lookup, entries, dimensions, meter)?;
+        let vectors = read_vectors(r, lookup, entries, dimensions, budget)?;
         if r.overrun() {
             return Err(DecodeError::Invalid("truncated codebook"));
         }
-        let tree = Tree::build(&lengths, meter);
-        meter.release::<u8>(lengths.len());
         Ok(Codebook {
             dimensions,
             entries,
-            tree: tree?,
+            tree: Tree::build(&lengths, budget)?,
             vectors,
         })
     }
@@ -114,7 +118,7 @@ impl Codebook {
         count: usize,
         mut f: impl FnMut(&[f32]),
     ) -> bool {
-        let mut window = BitWindow::new(r);
+        let mut window = LsbWindow::new(r);
         for _ in 0..count {
             let Some(vector) = self.entry(&mut window).and_then(|e| self.vector_of(e)) else {
                 return false;
@@ -126,8 +130,8 @@ impl Codebook {
 
     /// The next entry number, cut from `window`; `None` as for [`Codebook::scalar`].
     #[inline(always)]
-    pub(crate) fn entry(&self, window: &mut BitWindow<'_, '_>) -> Option<u32> {
-        let fast = &self.tree.fast;
+    pub(crate) fn entry(&self, window: &mut LsbWindow<'_, '_>) -> Option<u32> {
+        let fast: &[u32] = &self.tree.fast;
         let mask = fast.len() - 1;
         let mut packed = fast[window.ahead() as usize & mask];
         if packed == 0 || !window.holds(packed & 0xff) {
@@ -142,46 +146,76 @@ impl Codebook {
     }
 }
 
-/// Codeword lengths in entry order, 0 for an unused entry.
-fn read_lengths(
-    r: &mut LsbReader<'_>,
-    entries: u32,
-    meter: &mut Meter,
-) -> Result<Vec<u8>, DecodeError> {
-    let count = entries as usize;
-    // Every entry costs at least one bit unless the lengths are ordered.
-    let ordered = r.bit();
-    if !ordered && count > r.left() {
-        return Err(DecodeError::Invalid("truncated codebook"));
-    }
-    let mut lengths = meter.vec(count, 0u8)?;
-    if ordered {
-        let mut length = r.read(5) + 1;
-        let mut entry = 0;
-        while entry < count {
-            if length > MAX_LENGTH {
-                return Err(DecodeError::Invalid("codeword length"));
+/// The codeword lengths of a codebook's entries.
+#[derive(Debug)]
+enum Lengths {
+    /// The number of entries of each length: entries ascend in length from the first,
+    /// every entry used.
+    Ordered([u32; MAX_LENGTH as usize + 1]),
+    /// The length of each entry in entry order, 0 for an unused entry.
+    Listed(BudgetVec<u8>),
+}
+
+impl Lengths {
+    /// Reads the lengths of `entries` entries. An entry costs at least one bit unless
+    /// the lengths are ordered, where each length costs one count.
+    fn read(r: &mut LsbReader<'_>, entries: u32, budget: &Budget) -> Result<Lengths, DecodeError> {
+        let count = entries as usize;
+        if r.bit() {
+            let mut counts = [0; MAX_LENGTH as usize + 1];
+            let mut length = r.read(5) + 1;
+            let mut entry = 0;
+            while entry < count {
+                let slot = counts
+                    .get_mut(length as usize)
+                    .ok_or(DecodeError::Invalid("codeword length"))?;
+                let number = r.read(ilog((count - entry) as u32));
+                if number as usize > count - entry {
+                    return Err(DecodeError::Invalid("codeword length count"));
+                }
+                *slot = number;
+                entry += number as usize;
+                length += 1;
+                if r.overrun() {
+                    return Err(DecodeError::Invalid("truncated codebook"));
+                }
             }
-            let number = r.read(ilog((count - entry) as u32)) as usize;
-            let run = lengths
-                .get_mut(entry..entry + number)
-                .ok_or(DecodeError::Invalid("codeword length count"))?;
-            run.fill(length as u8);
-            entry += number;
-            length += 1;
-            if r.overrun() {
-                return Err(DecodeError::Invalid("truncated codebook"));
-            }
+            return Ok(Lengths::Ordered(counts));
         }
-    } else {
+        if count > r.left() {
+            return Err(DecodeError::Invalid("truncated codebook"));
+        }
+        let mut lengths = BudgetVec::try_filled(budget, 0u8, count)?;
         let sparse = r.bit();
-        for length in &mut lengths {
+        for length in lengths.iter_mut() {
             if !sparse || r.bit() {
                 *length = r.read(5) as u8 + 1;
             }
         }
+        Ok(Lengths::Listed(lengths))
     }
-    Ok(lengths)
+
+    /// The longest codeword length, 0 without used entries.
+    fn max(&self) -> u32 {
+        match self {
+            Lengths::Ordered(counts) => counts.iter().rposition(|&n| n != 0).unwrap_or(0) as u32,
+            Lengths::Listed(lengths) => u32::from(lengths.iter().copied().max().unwrap_or(0)),
+        }
+    }
+
+    /// The number of used entries whose codewords are longer than `bits`.
+    fn longer_than(&self, bits: u32) -> usize {
+        match self {
+            Lengths::Ordered(counts) => counts[bits as usize + 1..]
+                .iter()
+                .map(|&n| n as usize)
+                .sum(),
+            Lengths::Listed(lengths) => lengths
+                .iter()
+                .filter(|&&length| u32::from(length) > bits)
+                .count(),
+        }
+    }
 }
 
 /// float32_unpack (section 9.2.2).
@@ -225,10 +259,10 @@ fn read_vectors(
     lookup: LookupType,
     entries: u32,
     dimensions: usize,
-    meter: &mut Meter,
-) -> Result<Vec<f32>, DecodeError> {
+    budget: &Budget,
+) -> Result<BudgetVec<f32>, DecodeError> {
     if lookup == LookupType::None {
-        return Ok(Vec::new());
+        return Ok(BudgetVec::new(budget));
     }
     if dimensions == 0 {
         return Err(DecodeError::Invalid("codebook dimensions"));
@@ -247,25 +281,30 @@ fn read_vectors(
     let size = (entries as usize)
         .checked_mul(dimensions)
         .ok_or(DecodeError::Invalid("codebook size"))?;
-    let mut vectors = meter.vec(size, 0f32)?;
+    let mut vectors = BudgetVec::try_filled(budget, 0f32, size)?;
+    if size == 0 {
+        return Ok(vectors);
+    }
     let unpack = |multiplicand: u32| multiplicand as f32 * delta + minimum;
     match lookup {
         LookupType::Lattice => {
             // The unpacked lattice values, and entry `e`'s digits in base `count`
             // (least significant first) stepped like an odometer.
             let count = lookup_values as usize;
-            let mut values = meter.with_capacity(count)?;
-            values.extend((0..count).map(|_| unpack(r.read(value_bits))));
-            let mut digits = meter.vec(dimensions, 0usize)?;
+            let mut values = BudgetVec::try_filled(budget, 0f32, count)?;
+            for value in values.iter_mut() {
+                *value = unpack(r.read(value_bits));
+            }
+            let mut digits = BudgetVec::try_filled(budget, 0usize, dimensions)?;
             for vector in vectors.chunks_exact_mut(dimensions) {
                 let mut last = 0.0;
-                for (value, &digit) in vector.iter_mut().zip(&digits) {
+                for (value, &digit) in vector.iter_mut().zip(digits.iter()) {
                     *value = values[digit] + last;
                     if sequence {
                         last = *value;
                     }
                 }
-                for digit in &mut digits {
+                for digit in digits.iter_mut() {
                     *digit += 1;
                     if *digit < count {
                         break;
@@ -273,8 +312,6 @@ fn read_vectors(
                     *digit = 0;
                 }
             }
-            meter.release::<f32>(values.len());
-            meter.release::<usize>(digits.len());
         }
         _ => {
             for vector in vectors.chunks_exact_mut(dimensions) {
@@ -298,10 +335,10 @@ struct Tree {
     fast_bits: u32,
     /// `entry << 8 | length` for every `fast_bits`-bit prefix that completes a codeword
     /// of at most `fast_bits` bits; 0 where a longer codeword starts.
-    fast: Vec<u32>,
+    fast: BudgetVec<u32>,
     /// Codewords longer than `fast_bits`: (left-aligned codeword, `entry << 8 | length`),
     /// ascending.
-    long: Vec<(u32, u32)>,
+    long: BudgetVec<(u32, u32)>,
 }
 
 impl Tree {
@@ -309,40 +346,60 @@ impl Tree {
     /// length (section 3.2.1). Over- and underspecified trees are errors, except a tree
     /// of a single entry, which must have length 1 and reads one bit of either value,
     /// and a tree without entries, from which nothing decodes (errata 20150226).
-    fn build(lengths: &[u8], meter: &mut Meter) -> Result<Tree, DecodeError> {
-        let mut used = lengths
-            .iter()
-            .enumerate()
-            .filter(|&(_, &length)| length != 0);
-        let max_length = lengths.iter().copied().max().unwrap_or(0);
-        let fast_bits = u32::from(max_length).clamp(1, FAST_BITS);
-        let mut fast = meter.vec(1usize << fast_bits, 0u32)?;
-        let long_count = lengths
-            .iter()
-            .filter(|&&length| u32::from(length) > fast_bits)
-            .count();
-        let mut long = meter.with_capacity(long_count)?;
-        let single = used.clone().nth(1).is_none();
-        if single {
-            if let Some((entry, &length)) = used.next() {
+    ///
+    /// Both tables are charged before the first assignment. At most `2^FAST_BITS` used
+    /// entries fit the fast table before the tree is overspecified; every other entry
+    /// takes a slot of the long table.
+    fn build(lengths: &Lengths, budget: &Budget) -> Result<Tree, DecodeError> {
+        let fast_bits = lengths.max().clamp(1, FAST_BITS);
+        let fast = BudgetVec::try_filled(budget, 0u32, 1 << fast_bits)?;
+        let long = BudgetVec::try_filled(budget, (0, 0), lengths.longer_than(fast_bits))?;
+        let mut tree = Tree {
+            fast_bits,
+            fast,
+            long,
+        };
+        match lengths {
+            Lengths::Ordered(counts) => tree.assign(
+                counts
+                    .iter()
+                    .enumerate()
+                    .flat_map(|(length, &n)| repeat_n(length as u32, n as usize))
+                    .enumerate(),
+            )?,
+            Lengths::Listed(lengths) => tree.assign(
+                lengths
+                    .iter()
+                    .map(|&length| u32::from(length))
+                    .enumerate()
+                    .filter(|&(_, length)| length != 0),
+            )?,
+        }
+        Ok(tree)
+    }
+
+    /// Fills the tables with the codewords of the `used` entries and their lengths.
+    fn assign(
+        &mut self,
+        mut used: impl Iterator<Item = (usize, u32)> + Clone,
+    ) -> Result<(), DecodeError> {
+        if used.clone().nth(1).is_none() {
+            if let Some((entry, length)) = used.next() {
                 if length != 1 {
                     return Err(DecodeError::Invalid("single-entry codebook length"));
                 }
-                fast.fill((entry as u32) << 8 | 1);
+                self.fast.fill((entry as u32) << 8 | 1);
             }
-            return Ok(Tree {
-                fast_bits,
-                fast,
-                long,
-            });
+            return Ok(());
         }
         // The free subtrees, at most one per depth (each assignment takes the deepest
         // free one that is not deeper than the codeword and frees its right siblings
         // on the way down), as MSB-first codeword prefixes.
         let mut free: [Option<u64>; MAX_LENGTH as usize + 1] = [None; MAX_LENGTH as usize + 1];
         free[0] = Some(0);
-        for (entry, &length) in used {
-            let length = usize::from(length);
+        let mut long = 0;
+        for (entry, length) in used {
+            let length = length as usize;
             let depth = (0..=length)
                 .rev()
                 .find(|&depth| free[depth].is_some())
@@ -353,24 +410,26 @@ impl Tree {
             }
             let codeword = (prefix << (length - depth)) as u32;
             let packed = (entry as u32) << 8 | length as u32;
-            if length as u32 <= fast_bits {
+            if length as u32 <= self.fast_bits {
                 let reversed = codeword.reverse_bits() >> (32 - length);
-                for slot in fast.iter_mut().skip(reversed as usize).step_by(1 << length) {
+                for slot in self
+                    .fast
+                    .iter_mut()
+                    .skip(reversed as usize)
+                    .step_by(1 << length)
+                {
                     *slot = packed;
                 }
             } else {
-                long.push((codeword << (32 - length), packed));
+                self.long[long] = (codeword << (32 - length), packed);
+                long += 1;
             }
         }
         if free.iter().any(Option::is_some) {
             return Err(DecodeError::Invalid("underspecified codebook"));
         }
-        long.sort_unstable_by_key(|&(codeword, _)| codeword);
-        Ok(Tree {
-            fast_bits,
-            fast,
-            long,
-        })
+        self.long.sort_unstable_by_key(|&(codeword, _)| codeword);
+        Ok(())
     }
 
     #[inline(always)]
@@ -405,12 +464,12 @@ impl Tree {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use triergon_codec::Budget;
 
     fn tree(lengths: &[u8]) -> Result<Tree, DecodeError> {
         let budget = Budget::new(1 << 20).unwrap();
-        let mut meter = Meter(triergon_codec::Reservation::empty(&budget));
-        Tree::build(lengths, &mut meter)
+        let mut listed = BudgetVec::new(&budget);
+        listed.try_extend_from_slice(lengths).unwrap();
+        Tree::build(&Lengths::Listed(listed), &budget)
     }
 
     /// Packs MSB-first codewords into an LSB-first Vorbis bitstream.
@@ -497,6 +556,63 @@ mod tests {
         );
         let empty = self::tree(&[0, 0]).unwrap();
         assert_eq!(empty.decode(&mut LsbReader::new(&[0xff])), None);
+    }
+
+    /// A codebook header without lookup table: `entries` entries whose lengths are
+    /// given as `(width, value)` fields after the ordered flag.
+    fn header(entries: u32, ordered: bool, fields: &[(u32, u32)]) -> Vec<u8> {
+        let mut fields = [
+            (24, 0x56_4342),
+            (16, 1),
+            (24, entries),
+            (1, u32::from(ordered)),
+        ]
+        .into_iter()
+        .chain(fields.iter().copied())
+        .chain([(4, 0)])
+        .collect::<Vec<_>>();
+        let mut out = Vec::new();
+        let mut at = 0usize;
+        for (width, value) in fields.drain(..) {
+            for bit in 0..width {
+                if at.is_multiple_of(8) {
+                    out.push(0);
+                }
+                *out.last_mut().unwrap() |= ((value >> bit & 1) as u8) << (at % 8);
+                at += 1;
+            }
+        }
+        out
+    }
+
+    #[test]
+    fn ordered_lengths_build_the_tree_listed_lengths_do() {
+        // Lengths 2, 2, 3, 3, 3, 4, 4: two runs from length 2, then one of length 4.
+        let data = header(7, true, &[(5, 1), (3, 2), (3, 3), (2, 2)]);
+        let budget = Budget::new(1 << 20).unwrap();
+        let ordered = Codebook::read(&mut LsbReader::new(&data), &budget).unwrap();
+        let listed = tree(&[2, 2, 3, 3, 3, 4, 4]).unwrap();
+        assert_eq!(ordered.tree.fast_bits, listed.fast_bits);
+        assert_eq!(&ordered.tree.fast[..], &listed.fast[..]);
+    }
+
+    #[test]
+    fn ordered_entries_cost_no_work_before_their_tables_are_charged() {
+        // 2^24 - 1 entries in under 100 bits: of length 24, a long table of 128 MiB,
+        // refused before any entry is assigned; of length 1, overspecified at the third.
+        let budget = Budget::new(64 << 20).unwrap();
+        let many = (1 << 24) - 1;
+        let long = header(many, true, &[(5, 23), (24, many)]);
+        assert!(matches!(
+            Codebook::read(&mut LsbReader::new(&long), &budget),
+            Err(DecodeError::Budget(_))
+        ));
+        let short = header(many, true, &[(5, 0), (24, many)]);
+        assert_eq!(
+            Codebook::read(&mut LsbReader::new(&short), &budget).unwrap_err(),
+            DecodeError::Invalid("overspecified codebook")
+        );
+        assert!(budget.peak() < 64 << 10, "peak {}", budget.peak());
     }
 
     #[test]

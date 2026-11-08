@@ -3,7 +3,7 @@
 
 use std::path::PathBuf;
 
-use triergon_codec::{AudioDecoder, AudioFrame};
+use triergon_codec::{AudioDecoder, AudioFrame, Budget};
 use triergon_codec_vorbis::{DecodeError, Decoder, Limits};
 
 fn stream(name: &str) -> Option<Vec<Vec<u8>>> {
@@ -16,7 +16,8 @@ fn stream(name: &str) -> Option<Vec<Vec<u8>>> {
 }
 
 fn decoder(packets: &[Vec<u8>], limits: Limits) -> Result<Decoder, DecodeError> {
-    Decoder::from_headers(&packets[0], &packets[1], &packets[2], limits)
+    let budget = Budget::new(limits.live_storage_bytes)?;
+    Decoder::from_headers_in(&packets[0], &packets[1], &packets[2], &budget)
 }
 
 #[test]
@@ -57,7 +58,30 @@ fn damaged_packets_leave_the_decoder_usable() {
 }
 
 #[test]
-fn setups_need_their_tables_charged() {
+fn the_default_limit_decodes_every_stream_and_a_small_one_is_refused() {
+    let directory =
+        PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../.research/fate-samples/vorbis");
+    let Ok(entries) = std::fs::read_dir(directory) else {
+        return;
+    };
+    for path in entries.flatten().map(|entry| entry.path()) {
+        if path.extension().is_none_or(|extension| extension != "ogg") {
+            continue;
+        }
+        let name = path.file_name().unwrap_or_default().to_string_lossy();
+        let Some(packets) = stream(&name) else {
+            continue;
+        };
+        let mut decoder = decoder(&packets, Limits::default()).unwrap();
+        let mut frame = AudioFrame::default();
+        // The first link's audio packets; a header packet starts the next link.
+        for packet in packets[3..]
+            .iter()
+            .take_while(|p| p.first().is_none_or(|b| b & 1 == 0))
+        {
+            decoder.decode(packet, &mut frame).unwrap();
+        }
+    }
     let Some(packets) = stream("1.0-test_small.ogg") else {
         return;
     };
@@ -68,5 +92,4 @@ fn setups_need_their_tables_charged() {
         decoder(&packets, small),
         Err(DecodeError::Budget(_))
     ));
-    assert!(decoder(&packets, Limits::default()).is_ok());
 }

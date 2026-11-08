@@ -1,50 +1,50 @@
 //! The setup header (Vorbis I section 4.2.4).
 
 use triergon_bitstream::LsbReader;
+use triergon_codec::{Budget, BudgetVec, Charged};
 
-use crate::DecodeError;
 use crate::codebook::Codebook;
 use crate::floor0::Floor0;
 use crate::floor1::Floor1;
 use crate::mapping::{Mapping, Mode};
 use crate::residue::Residue;
-use crate::storage::Meter;
+use crate::{DecodeError, push};
 
 #[derive(Debug)]
 pub(crate) enum Floor {
     Lsp(Floor0),
-    Linear(Box<Floor1>),
+    Linear(Charged<Box<Floor1>>),
 }
 
 /// Everything the setup header configures.
 #[derive(Debug)]
 pub(crate) struct Setup {
-    pub(crate) codebooks: Vec<Codebook>,
-    pub(crate) floors: Vec<Floor>,
-    pub(crate) residues: Vec<Residue>,
-    pub(crate) mappings: Vec<Mapping>,
-    pub(crate) modes: Vec<Mode>,
+    pub(crate) codebooks: BudgetVec<Codebook>,
+    pub(crate) floors: BudgetVec<Floor>,
+    pub(crate) residues: BudgetVec<Residue>,
+    pub(crate) mappings: BudgetVec<Mapping>,
+    pub(crate) modes: BudgetVec<Mode>,
 }
 
 impl Setup {
     /// Parses a setup header packet for a stream of `channels` channels and the given
-    /// block sizes, charging its tables to `meter`. The configuration lists are capped
+    /// block sizes, charging its tables to `budget`. The configuration lists are capped
     /// by their field widths (256 codebooks, 64 of everything else); the codebook tables
     /// and floor 0 maps are what scale with the stream.
     pub(crate) fn parse(
         packet: &[u8],
         channels: usize,
         blocksizes: [usize; 2],
-        meter: &mut Meter,
+        budget: &Budget,
     ) -> Result<Setup, DecodeError> {
         let body = packet
             .strip_prefix(b"\x05vorbis")
             .ok_or(DecodeError::Invalid("setup header"))?;
         let r = &mut LsbReader::new(body);
         let count = r.read(8) as usize + 1;
-        let mut codebooks = meter.with_capacity(count)?;
+        let mut codebooks = list(budget, count)?;
         for _ in 0..count {
-            codebooks.push(Codebook::read(r, meter)?);
+            push(&mut codebooks, Codebook::read(r, budget)?)?;
         }
         for _ in 0..=r.read(6) {
             if r.read(16) != 0 {
@@ -52,33 +52,33 @@ impl Setup {
             }
         }
         let count = r.read(6) as usize + 1;
-        let mut floors = meter.with_capacity(count)?;
+        let mut floors = list(budget, count)?;
         for _ in 0..count {
-            floors.push(match r.read(16) {
-                0 => Floor::Lsp(Floor0::read(r, &codebooks, blocksizes, meter)?),
-                1 => {
-                    meter.add::<Floor1>(1)?;
-                    Floor::Linear(Box::new(Floor1::read(r, &codebooks)?))
-                }
+            let floor = match r.read(16) {
+                0 => Floor::Lsp(Floor0::read(r, &codebooks, blocksizes, budget)?),
+                1 => Floor::Linear(Charged::boxed(
+                    budget,
+                    Floor1::read(r, &codebooks, budget)?,
+                )?),
                 _ => return Err(DecodeError::Invalid("floor type")),
-            });
+            };
+            push(&mut floors, floor)?;
         }
         let count = r.read(6) as usize + 1;
-        let mut residues = meter.with_capacity(count)?;
+        let mut residues = list(budget, count)?;
         for _ in 0..count {
-            meter.add::<[Option<u8>; 8]>(64)?;
-            residues.push(Residue::read(r, &codebooks)?);
+            push(&mut residues, Residue::read(r, &codebooks, budget)?)?;
         }
         let count = r.read(6) as usize + 1;
-        let mut mappings = meter.with_capacity(count)?;
+        let mut mappings = list(budget, count)?;
         for _ in 0..count {
-            meter.add::<u8>(channels + 3 * 256)?;
-            mappings.push(Mapping::read(r, channels, floors.len(), residues.len())?);
+            let mapping = Mapping::read(r, channels, floors.len(), residues.len(), budget)?;
+            push(&mut mappings, mapping)?;
         }
         let count = r.read(6) as usize + 1;
-        let mut modes = meter.with_capacity(count)?;
+        let mut modes = list(budget, count)?;
         for _ in 0..count {
-            modes.push(Mode::read(r, mappings.len())?);
+            push(&mut modes, Mode::read(r, mappings.len())?)?;
         }
         if !r.bit() || r.overrun() {
             return Err(DecodeError::Invalid("setup header framing"));
@@ -91,4 +91,11 @@ impl Setup {
             modes,
         })
     }
+}
+
+/// An empty list with room for `count` configurations, charged first.
+fn list<T>(budget: &Budget, count: usize) -> Result<BudgetVec<T>, DecodeError> {
+    let mut list = BudgetVec::new(budget);
+    list.try_reserve_exact(count)?;
+    Ok(list)
 }

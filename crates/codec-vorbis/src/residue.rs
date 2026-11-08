@@ -2,10 +2,11 @@
 //! structure.
 
 use triergon_bitstream::LsbReader;
+use triergon_codec::{Budget, BudgetVec};
 
-use crate::DecodeError;
 use crate::codebook::Codebook;
 use crate::spectra::Spectra;
+use crate::{DecodeError, push};
 
 /// How a residue lays its VQ vectors out over the coded vectors.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -26,7 +27,7 @@ pub(crate) struct Residue {
     partition_size: usize,
     classbook: u8,
     /// The book of each pass, per classification.
-    books: Vec<[Option<u8>; 8]>,
+    books: BudgetVec<[Option<u8>; 8]>,
     /// One more than the last pass any classification codes; at least 1, as pass 0 also
     /// reads the classifications.
     passes: usize,
@@ -89,6 +90,7 @@ impl Residue {
     pub(crate) fn read(
         r: &mut LsbReader<'_>,
         codebooks: &[Codebook],
+        budget: &Budget,
     ) -> Result<Residue, DecodeError> {
         let format = match r.read(16) {
             0 => Format::Strided,
@@ -101,15 +103,16 @@ impl Residue {
         let partition_size = r.read(24) as usize + 1;
         let classifications = r.read(6) + 1;
         let classbook = r.read(8) as u8;
-        let cascade: Vec<u32> = (0..classifications)
-            .map(|_| {
-                let low = r.read(3);
-                let high = if r.bit() { r.read(5) } else { 0 };
-                high << 3 | low
-            })
-            .collect();
-        let mut books = Vec::with_capacity(cascade.len());
-        for pattern in cascade {
+        let mut cascade = [0u32; 64];
+        let cascade = &mut cascade[..classifications as usize];
+        for pattern in &mut *cascade {
+            let low = r.read(3);
+            let high = if r.bit() { r.read(5) } else { 0 };
+            *pattern = high << 3 | low;
+        }
+        let mut books = BudgetVec::new(budget);
+        books.try_reserve_exact(cascade.len())?;
+        for &pattern in &*cascade {
             let mut passes = [None; 8];
             for (pass, slot) in passes.iter_mut().enumerate() {
                 if pattern & 1 << pass != 0 {
@@ -123,7 +126,7 @@ impl Residue {
                     *slot = Some(book);
                 }
             }
-            books.push(passes);
+            push(&mut books, passes)?;
         }
         if r.overrun() {
             return Err(DecodeError::Invalid("truncated residue"));
@@ -399,10 +402,10 @@ fn spread<const C: usize>(vector: &[f32], members: &[Member], half: usize, spect
 }
 
 /// Working storage of residue decode, sized at setup.
-#[derive(Debug, Default)]
+#[derive(Debug)]
 pub(crate) struct Scratch {
     /// Type 2's interleaved vector.
-    pub(crate) interleaved: Vec<f32>,
+    pub(crate) interleaved: BudgetVec<f32>,
     /// Classification of each partition of each vector.
-    pub(crate) classes: Vec<u8>,
+    pub(crate) classes: BudgetVec<u8>,
 }

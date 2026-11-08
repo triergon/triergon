@@ -2,9 +2,10 @@
 //! uses, square-polar channel coupling, and the block size of each mode.
 
 use triergon_bitstream::LsbReader;
+use triergon_codec::{Budget, BudgetVec};
 
 use crate::window::Block;
-use crate::{DecodeError, ilog};
+use crate::{DecodeError, ilog, push};
 
 /// One square-polar coupling step.
 #[derive(Clone, Copy, Debug)]
@@ -22,10 +23,10 @@ pub(crate) struct Submap {
 
 #[derive(Debug)]
 pub(crate) struct Mapping {
-    pub(crate) coupling: Vec<Coupling>,
+    pub(crate) coupling: BudgetVec<Coupling>,
     /// Submap of each channel.
-    pub(crate) mux: Vec<u8>,
-    pub(crate) submaps: Vec<Submap>,
+    pub(crate) mux: BudgetVec<u8>,
+    pub(crate) submaps: BudgetVec<Submap>,
 }
 
 impl Mapping {
@@ -36,16 +37,19 @@ impl Mapping {
         channels: usize,
         floors: usize,
         residues: usize,
+        budget: &Budget,
     ) -> Result<Mapping, DecodeError> {
         if r.read(16) != 0 {
             return Err(DecodeError::Invalid("mapping type"));
         }
         let submap_count = if r.bit() { r.read(4) as usize + 1 } else { 1 };
-        let mut coupling = Vec::new();
+        let mut coupling = BudgetVec::new(budget);
         if r.bit() {
             let bits = ilog(channels as u32 - 1);
             // At most 256 steps.
-            for _ in 0..=r.read(8) {
+            let steps = r.read(8) as usize + 1;
+            coupling.try_reserve_exact(steps)?;
+            for _ in 0..steps {
                 let step = Coupling {
                     magnitude: r.read(bits) as u8,
                     angle: r.read(bits) as u8,
@@ -54,36 +58,37 @@ impl Mapping {
                 if step.magnitude == step.angle || !valid(step.magnitude) || !valid(step.angle) {
                     return Err(DecodeError::Invalid("coupling channels"));
                 }
-                coupling.push(step);
+                push(&mut coupling, step)?;
             }
         }
         if r.read(2) != 0 {
             return Err(DecodeError::Invalid("mapping reserved field"));
         }
-        let mux = if submap_count > 1 {
-            (0..channels).map(|_| r.read(4) as u8).collect()
-        } else {
-            vec![0; channels]
-        };
+        let mut mux = BudgetVec::try_filled(budget, 0, channels)?;
+        if submap_count > 1 {
+            for submap in mux.iter_mut() {
+                *submap = r.read(4) as u8;
+            }
+        }
         if mux
             .iter()
             .any(|&submap| usize::from(submap) >= submap_count)
         {
             return Err(DecodeError::Invalid("mapping submap number"));
         }
-        let submaps = (0..submap_count)
-            .map(|_| {
-                r.read(8);
-                let submap = Submap {
-                    floor: r.read(8) as u8,
-                    residue: r.read(8) as u8,
-                };
-                if usize::from(submap.floor) >= floors || usize::from(submap.residue) >= residues {
-                    return Err(DecodeError::Invalid("mapping floor or residue number"));
-                }
-                Ok(submap)
-            })
-            .collect::<Result<Vec<_>, _>>()?;
+        let mut submaps = BudgetVec::new(budget);
+        submaps.try_reserve_exact(submap_count)?;
+        for _ in 0..submap_count {
+            r.read(8);
+            let submap = Submap {
+                floor: r.read(8) as u8,
+                residue: r.read(8) as u8,
+            };
+            if usize::from(submap.floor) >= floors || usize::from(submap.residue) >= residues {
+                return Err(DecodeError::Invalid("mapping floor or residue number"));
+            }
+            push(&mut submaps, submap)?;
+        }
         if r.overrun() {
             return Err(DecodeError::Invalid("truncated mapping"));
         }

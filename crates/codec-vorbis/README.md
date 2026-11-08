@@ -4,19 +4,20 @@ Vorbis I decoder written from the Vorbis I specification (Xiph.Org, 2020-07-04 r
 the 2015 errata). It decodes one audio packet per access unit to planar `f32` in FFmpeg's
 channel order (the [triergon-codec](../codec/README.md) `AudioDecoder` contract). It
 depends on [triergon-codec](../codec/README.md) (`AudioFrame`, layouts, the shared
-inverse MDCT), [triergon-bitstream](../bitstream/README.md) (`LsbReader`) and
+inverse MDCT and window slope, the storage budget),
+[triergon-bitstream](../bitstream/README.md) (`LsbReader`, `LsbWindow`) and
 [triergon-framing](../framing/README.md) (identification header, Xiph lacing).
 
 ## Usage
 
 ```rust
 use triergon_codec::{AudioDecoder, AudioFrame};
-use triergon_codec_vorbis::{DecodeError, Decoder, Limits};
+use triergon_codec_vorbis::{DecodeError, Decoder};
 
 fn decode(configuration: &[u8], packets: &[&[u8]]) -> Result<(), DecodeError> {
     // The identification, comment and setup headers, Xiph-laced (Matroska
-    // CodecPrivate); `Decoder::from_headers` takes the three packets of an Ogg stream.
-    let mut decoder = Decoder::from_configuration(configuration, Limits::default())?;
+    // CodecPrivate); `Decoder::from_headers_in` takes the three packets of an Ogg stream.
+    let mut decoder = Decoder::new(configuration)?;
     let mut frame = AudioFrame::default();
     for packet in packets {
         if decoder.decode(packet, &mut frame).is_ok() {
@@ -27,7 +28,8 @@ fn decode(configuration: &[u8], packets: &[&[u8]]) -> Result<(), DecodeError> {
 }
 ```
 
-`Decoder::from_headers_in` charges a caller's `Budget` instead of its own pool.
+`Decoder::with_limits` sets the decoder's own pool; `Decoder::new_in` and
+`Decoder::from_headers_in` charge a caller's `Budget` instead.
 `examples/decode_vorbis` decodes the first Vorbis track of a file, read through the
 `triergon` facade, to interleaved f32le: the decoder's whole output, without container
 trims. In a chained Ogg file each link's headers either continue the decoder (when they
@@ -66,13 +68,17 @@ layout holds) at any sample rate.
   unspecified order.
 - Malformed packets return `DecodeFailure` (an `Invalid` error inside) and leave the
   decoder usable; malformed headers are `Invalid`, a version other than 0 `Unsupported`.
-- Memory: the setup header's codebook tables (codeword lookup tables and unpacked VQ
-  vectors), floor 0 Bark maps, the per-channel spectrum, overlap and floor buffers, the
-  transform tables and the output frame are charged to the decoder's budget before they
-  are allocated (`Limits::live_storage_bytes`, 32 MiB by default); a refused charge is
-  `DecodeError::Budget`. The FATE vectors peak at 0.6 MiB (six channels); 93 channels of
-  8192-sample blocks need about 7 MiB of buffers, and the largest setup headers encoders
-  write a few MiB of tables. Nothing is allocated per packet.
+- Memory: everything the stream sizes is charged to the decoder's budget before it is
+  allocated (`Limits::live_storage_bytes`, 32 MiB by default): the setup header's
+  codebook, floor, residue and mapping tables, the per-channel spectrum, overlap and
+  floor buffers, the window slopes, the transform tables and the output frame. A refused
+  charge is `DecodeError::Budget` and, for the output frame, leaves the decoder as it
+  was. The FATE vectors peak at 0.6 MiB (six channels); 93 channels of 8192-sample
+  blocks need about 7 MiB of buffers. Nothing is allocated per packet.
+- Setup work is bounded by the header's size and the storage charged before it: an
+  ordered codebook, which declares up to 2^24 entries in a few bits, charges its
+  codeword tables before it assigns a codeword, so an oversized one is refused
+  (`Budget`) or rejected as an overspecified tree (`Invalid`) without per-entry work.
 
 ## Conformance
 

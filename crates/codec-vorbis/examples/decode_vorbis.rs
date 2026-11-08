@@ -186,12 +186,7 @@ fn start_link(configuration: &[u8], current: &mut Option<Current>, summary: &mut
             return false;
         }
     };
-    let decoder = match Decoder::from_headers_in(
-        headers.identification,
-        headers.comment,
-        headers.setup,
-        &budget,
-    ) {
+    let decoder = match Decoder::new_in(configuration, &budget) {
         Ok(decoder) => decoder,
         Err(error) => {
             summary.fail(error);
