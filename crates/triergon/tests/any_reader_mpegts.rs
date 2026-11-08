@@ -39,6 +39,7 @@ fn facade_delivers_source_aus_and_every_original_pes_without_decoder_injection()
                         &mut audio_packets
                     }
                     AccessUnit::Ac3(_) => panic!("authored AVC/AAC input"),
+                    AccessUnit::IncompleteAudio { .. } => panic!("default policy rejects fragments"),
                 };
                 target.extend_from_slice(packet.payload());
                 if retained.is_none() {
