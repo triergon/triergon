@@ -78,6 +78,7 @@ file.
 | Packets only | `parse_transport`, `TransportFramer`, `carrier::TransportInspector` |
 | Continuity | `Continuity::observe` → `ContinuityOutcome` |
 | PSI | `SectionAssembler`, `psi::{PatReader, PmtReader, PatCollector}` |
+| Track classification | `psi::ElementaryStream` implements `triergon_core::container::TrackInfo` |
 | Descriptors | `psi::Descriptor::{registration, languages, avc_video, hevc_video, dvb_ac3, dvb_eac3, dvb_subtitling}` |
 | Stream codec | `psi::ElementaryStream::{codec, dvb_descriptor_codec}` → `triergon_core::CodecId` |
 | PES | `PesAssembler` → `Pes`, `PesHeader::{raw_pts_time, raw_dts_time}` |
@@ -86,6 +87,17 @@ file.
 | FFmpeg-compatible streams | `compat::stream::{ProgramReader, codec, configuration, is_video}`: programs, stream codecs (adds 0x81, 0x87, 0x90 and DVB tags outside a DVB namespace) and subtitle configuration |
 | FFmpeg-compatible clock | `compat::pes::DemuxClock::{project_header, place}`, `compat::pes::pcr_bounded_pts` (teletext PTS) |
 | FFmpeg-compatible start position | `compat::input::InputBootstrap` |
+
+The PMT track view borrows its one-byte `stream_type` tag. It reports the codec
+identified by the stream type or, for private PES data in a DVB namespace, the
+first descriptor that names a codec. Unidentified codecs retain their tag in
+`CodecId::Other`. The descriptor bytes remain ordered source data.
+
+`compat::pes::selected_track_kind` preserves the playback view. DVB subtitles and
+teletext are classified from signalling. Other private PES entries require an
+admitted observer for the active map. The private types 0x81 and 0x87 indicate
+audio, and 0x90 indicates presentation graphics in this view. MPEG-1 video
+(0x01) keeps its source kind and is unknown in the selected PES view.
 
 The sequential feed keeps program tables, clock transitions and diagnostics.
 `TransportStream::poll_feed` can deliver validated PES continuations directly
