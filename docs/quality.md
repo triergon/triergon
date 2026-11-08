@@ -69,13 +69,17 @@ resource limit becomes an explicit, reviewed rule for that case.
   FriBidi with its own configure, HarfBuzz from its single-file amalgamation
   without optional integrations, both `-O2 -ffp-contract=off`, recorded in
   `.research/harfbuzz/build.json`; `cargo xtask build-workers` then links the
-  reference worker (`harness/reference_shape.h`). Its features shape the font
-  corpus with authored texts and seeded random strings (`shape-text`), resolve
-  bidi paragraphs and lines (`shape-bidi`), run libass's simple shaping level
-  (`shape-simple`) and read every code point's properties (`shape-unicode`), all
-  required by `cargo xtask check`; `shape-text-all`, every corpus face with every
-  script, runs on demand. `cargo xtask shape compare` reports the required four,
-  with `--all` all five.
+  reference worker (`harness/reference_shape.h`) with them and the pinned
+  FreeType. Its features shape the font corpus with authored texts and seeded
+  random strings as libass does, through FreeType-backed font functions at 256
+  pixels (`shape-libass`) and through HarfBuzz's own at units per em
+  (`shape-text`), resolve bidi paragraphs and lines (`shape-bidi`), run libass's
+  simple shaping level (`shape-simple`) and read every code point's properties
+  (`shape-unicode`), all required by `cargo xtask check`; `shape-text-all`, every
+  corpus face with every script at units per em, runs on demand. Acceptance of
+  the shaper rests on `shape-libass`, `shape-bidi`, `shape-simple` and
+  `shape-unicode`. `cargo xtask shape compare` reports the required five, with
+  `--all` all six.
 - **Generated manifests and pins.** The font and shaping features commit no case
   rows. `cargo xtask fonts manifest` and `cargo xtask shape manifest` generate them
   from `harness/fonts/corpus.json`, the shaping texts and each feature's settings

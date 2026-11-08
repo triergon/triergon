@@ -15,10 +15,6 @@ mod buffer;
 mod dump;
 mod face;
 mod fallback;
-#[allow(
-    missing_docs,
-    reason = "pending: the fields of Scale and Extents, Metrics::h_advance and Metrics::extents"
-)]
 mod metrics;
 mod normalize;
 mod ot;

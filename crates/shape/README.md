@@ -1,9 +1,9 @@
 # triergon-shape
 
-Text shaping for a subtitle renderer, giving exactly what libass 0.17.5 gets from
-HarfBuzz 14.6.0 and FriBidi 1.0.17: OpenType layout and the script shapers, the
-Unicode bidirectional algorithm as FriBidi resolves it, and libass's simple
-shaping level. It depends on [`triergon-core`](../core) and reads fonts through
+Text shaping for a subtitle renderer, as libass 0.17.5 shapes with HarfBuzz 14.6.0
+and FriBidi 1.0.17: OpenType layout and the script shapers, the Unicode
+bidirectional algorithm as FriBidi resolves it, and libass's simple shaping
+level. It depends on [`triergon-core`](../core) and reads fonts through
 [`triergon-font`](../font). Run splitting, script resolution, font fallback and
 line breaking belong to the renderer.
 
@@ -42,18 +42,22 @@ for (glyph, position) in buffer.glyphs() {
 `shape` shapes `text[item]` with the rest of `text` as context, as
 `hb_buffer_add_utf32` does; clusters are indices into `text` and glyphs come in
 visual order, positioned in the units of the metrics' `Scale`. `Metrics` is the
-font-function interface: `OtMetrics` answers as HarfBuzz's built-in functions do
-(its character map choice, `cmap` format 14 variation sequences, `hmtx` advances,
-`glyf` and CFF extents), and a renderer can implement it from its rasteriser, as
-libass does with FreeType. `Scale` reproduces HarfBuzz's scaling arithmetic,
+font-function interface. `SizedMetrics` answers as libass's FreeType-backed
+functions do over a face at a size (`triergon_font::SizedFont`): libass's
+character map choice, default-load advances and `FT_KERNING_DEFAULT` kerning, at
+the size's scale and pixels per em. `OtMetrics` answers as HarfBuzz's built-in
+functions do at units per em (its character map choice, `cmap` format 14
+variation sequences, `hmtx` advances, `glyf` and CFF extents). A callback that
+cannot answer as its font would ends the shaping call with its error. `Scale` reproduces HarfBuzz's scaling arithmetic,
 including hinting device tables when a ppem is set.
 
 The bidi API mirrors libass's `ass_shaper_shape` and `ass_shaper_reorder`:
 `bidi::BidiClass::of` and `bidi::Bracket::of` per character, `bidi::paragraphs`,
 `bidi::Resolver::resolve` per paragraph (base direction left-to-right,
 right-to-left or automatic, with or without bracket pairing), `bidi::reorder_line`
-per line (both within `bidi::Limits`), and `bidi::shape_simple` for libass's simple shaping level (FriBidi's
-joining, Arabic presentation forms and mirroring).
+per line (both within `bidi::Limits`), and `bidi::shape_simple` for libass's
+simple shaping level (FriBidi's joining, Arabic presentation forms and
+mirroring).
 
 ## What it covers
 
@@ -115,14 +119,19 @@ paragraph separator inside the text.
   OpenType `kern` table too (format 1 as Apple's state machine), and
   cross-stream kerning. Shaping a face that would need them is refused with
   `Error::Unsupported`.
-- `stch` stretching (refused when it would apply), the Windows-1256 Arabic
-  fallback lookups, fallback kerning through `Metrics::h_kerning` (HarfBuzz's
-  built-in functions have none).
-- CFF glyph extents where HarfBuzz's charstring interpreter departs from
-  FreeType's: it lacks the Type 2 arithmetic and storage operators and reads some
-  curve operands differently. `OtMetrics` takes CFF extents from FreeType's
-  interpretation, so fallback mark positioning in a CFF font without GPOS whose
-  glyphs use them can differ.
+- `stch` stretching (refused when it would apply) and the Windows-1256 Arabic
+  fallback lookups.
+- What libass reads from FreeType's hinted load: `SizedMetrics` gives no glyph
+  extents or contour points (`Unsupported`), so fallback mark positioning in a
+  font without GPOS marks fails, and no default-load advance that FreeType's
+  auto-hinter sets. Faces whose character map libass would convert (Windows
+  multibyte encodings) are refused. The vertical advances libass substitutes in
+  an `@` font are not covered.
+- `OtMetrics`'s CFF glyph extents where HarfBuzz's charstring interpreter
+  departs from FreeType's: it lacks the Type 2 arithmetic and storage operators
+  and reads some curve operands differently. `OtMetrics` takes CFF extents from
+  FreeType's interpretation, so fallback mark positioning in a CFF font without
+  GPOS whose glyphs use them can differ. libass never asks for these extents.
 - Variable font instances other than the default; the 24-bit "beyond 64K"
   layout formats.
 - Languages outside the table of `Language`: libass's script languages, the major
@@ -176,15 +185,31 @@ characters.
   which shapes with mutated copies of a font built in memory (GDEF, GSUB
   ligature, single and chaining lookups, GPOS pair and mark attachment), resolves
   random text of every bidi class and checks that the work limit stops a call.
-- Five harness features (`harness/features/shape-*`) run through
-  [`shape-worker`](../shape-worker/README.md) and the HarfBuzz 14.6.0 and FriBidi 1.0.17
-  reference worker (`harness/reference_shape.h`, HarfBuzz with its built-in font
-  functions at its default scale, FriBidi as libass calls it), and require both
-  to fold the same output:
-  - `shape-text`: 200 cases over 25 corpus files and 22 script profiles, 3,029
+- Six harness features (`harness/features/shape-*`) run through
+  [`shape-worker`](../shape-worker/README.md) and the HarfBuzz 14.6.0 and FriBidi
+  1.0.17 reference worker (`harness/reference_shape.h`, FriBidi as libass calls
+  it), and require both to fold the same output:
+  - `shape-libass`: 200 cases over 25 corpus files and 22 script profiles, 3,029
     runs with libass's features and with kerning, ligatures, direction and
-    language varied; every glyph's id, cluster, advances and offsets.
-  - `shape-text-all`: every corpus face and script, 1,724 cases and 100,351 runs.
+    language varied, shaped as libass 0.17.5 shapes them with hinting off; every
+    glyph's id, cluster, advances and offsets. The reference opens each face
+    with FreeType 2.15.0 and sets it up as libass does (`ass_charmap_magic`,
+    `set_font_metrics`, `ass_face_set_size` at 256 pixels, 16384 in 26.6), then
+    shapes with a HarfBuzz font over the face's tables carrying libass's font
+    functions at the size's scale and ppem, each restated over the pinned
+    FreeType: `ass_font_index_magic` with `FT_Get_Char_Index` and
+    `FT_Face_GetCharVariantIndex`, cached `FT_LOAD_DEFAULT` metrics for advances
+    and extents, that load's outline for contour points, and
+    `FT_KERNING_DEFAULT` kerning. The candidate shapes with `SizedMetrics` over
+    `Font::at_size`. This compares device tables, contour-point anchors and
+    FreeType's advances. Nine cases are open: eight in fonts whose default-load
+    advances FreeType's auto-hinter sets, and one CFF font without GPOS whose
+    fallback mark positioning reads hinted glyph extents.
+  - `shape-text` and `shape-text-all`: the same cases, and every corpus face and
+    script (1,724 cases, 100,351 runs), with HarfBuzz's built-in font functions
+    at units per em against `OtMetrics`. They cover the font tables' layout
+    without FreeType; each lists one open case, the CFF font whose glyphs use
+    operators HarfBuzz's charstring interpreter reads differently (above).
   - `shape-bidi`: 24 cases, authored and seeded random paragraphs and lines with
     each base direction, with and without bracket pairing; levels, visual order
     and paragraph directions.
@@ -192,11 +217,13 @@ characters.
   - `shape-unicode`: every Unicode scalar value's properties as HarfBuzz and
     FriBidi report them.
 
-  `cargo xtask check` requires `shape-text`, `shape-bidi`, `shape-simple` and
-  `shape-unicode` (`cargo xtask shape compare`); `shape-text-all` runs on demand
-  (`cargo xtask shape compare --all`). Both text features list one open case, a
-  CFF font whose glyphs use operators HarfBuzz's charstring interpreter reads
-  differently (above), which `check` still runs and reports. The case rows are
+  `cargo xtask check` requires `shape-libass`, `shape-text`, `shape-bidi`,
+  `shape-simple` and `shape-unicode` (`cargo xtask shape compare`);
+  `shape-text-all` runs on demand (`cargo xtask shape compare --all`). The
+  crate's acceptance rests on `shape-libass`, `shape-bidi`, `shape-simple` and
+  `shape-unicode`; the units-per-em features are additional coverage, and their
+  open case does not block it. `check` still runs and reports every open case.
+  The case rows are
   generated (`cargo xtask shape manifest`) from the font corpus in
   `harness/fonts/corpus.json`, authored texts and seeded random strings, and each
   case's expected output is pinned from the reference in `pins.json`.

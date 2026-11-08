@@ -9,7 +9,8 @@
     "one font file read from memory; every face of a collection, each with HarfBuzz's OpenType font functions at its default scale (units per em) and in triergon-shape with OtMetrics at units per em",
     "every text of the case shaped as one run, as libass 0.17.5 asks HarfBuzz to: hb_buffer_add_utf32 with the item and its context, the case's direction, script (hb_script_from_iso15924_tag) and language (hb_language_from_string), its global features in order; default buffer flags and cluster level",
     "per text: the glyph count, then every glyph's id, cluster, x and y advance and x and y offset; packets count glyphs and bytes the code points of the items",
-    "a face the candidate cannot open, a text it cannot parse and a run it cannot shape are recorded as such, so the case fails; the file is read before each timed and memory operation"
+    "a face the candidate cannot open, a text it cannot parse and a run it cannot shape are recorded as such, so the case fails; the file is read before each timed and memory operation",
+    "additional coverage at HarfBuzz's own font functions: triergon-shape's acceptance rests on shape-libass, shape-bidi, shape-simple and shape-unicode, and this feature's open cases do not block it"
   ],
   "required_profiles": [
     "latn",

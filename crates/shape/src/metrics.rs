@@ -11,9 +11,13 @@ use triergon_font::{CharEncoding, Charmap, ControlBox, Font, GlyphId, Platform, 
 /// which disables hinting device tables.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Scale {
+    /// Units per em horizontally: positions are in em / `x`.
     pub x: i32,
+    /// Units per em vertically.
     pub y: i32,
+    /// Horizontal pixels per em, for hinting device tables; zero for none.
     pub x_ppem: u32,
+    /// Vertical pixels per em; zero for none.
     pub y_ppem: u32,
 }
 
@@ -33,9 +37,13 @@ impl Scale {
 /// origin, y up, and a width and (negative) height.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct Extents {
+    /// From the origin to the box's left edge.
     pub x_bearing: i32,
+    /// From the origin to the box's top edge, y up.
     pub y_bearing: i32,
+    /// The box's width.
     pub width: i32,
+    /// The box's height, negative as it extends downwards.
     pub height: i32,
 }
 
