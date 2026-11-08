@@ -109,17 +109,15 @@ fn fold(work: &mut Work, event: &Mp4Event) -> Result<()> {
         }
         Mp4Event::Configuration(_) => return Ok(()),
     };
-    work.packet(
-        Packet::new(
-            u64::from(track),
-            demux.pts,
-            demux.dts,
-            payload.len(),
-            [payload],
-        )
-        .duration(u64::try_from(demux.duration).unwrap_or(0))
-        .flags(u64::from(demux.flags)),
-    )
+    work.packet(Packet {
+        track: u64::from(track),
+        pts: demux.pts,
+        dts: demux.dts,
+        duration: u64::try_from(demux.duration).unwrap_or(0),
+        flags: u64::from(demux.flags),
+        size: payload.len(),
+        payload: [payload],
+    })
 }
 
 fn operation(pool: &Budget, raw: &Bytes, layout: Layout, mut work: Work) -> Result<Work> {

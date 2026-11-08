@@ -33,30 +33,6 @@ pub struct Packet<I> {
     pub payload: I,
 }
 
-impl<I> Packet<I> {
-    pub fn new(track: u64, pts: Option<i64>, dts: Option<i64>, size: usize, payload: I) -> Self {
-        Self {
-            track,
-            pts,
-            dts,
-            duration: 0,
-            flags: 0,
-            size,
-            payload,
-        }
-    }
-
-    pub fn duration(mut self, duration: u64) -> Self {
-        self.duration = duration;
-        self
-    }
-
-    pub fn flags(mut self, flags: u64) -> Self {
-        self.flags = flags;
-        self
-    }
-}
-
 impl Work {
     /// Fold track, PTS, DTS, duration, flags, size and every payload byte.
     pub fn packet<'a, I: IntoIterator<Item = &'a [u8]>>(
@@ -124,7 +100,7 @@ pub fn drive(
     let pool = Budget::new(256 * 1024 * 1024)?;
     let raw = Bytes::try_from_vec(&pool, raw).map_err(|error| error.error())?;
     let trace = invocation.mode == Mode::Trace;
-    measure(&invocation, operation_name, &pool, || {
+    measure(&invocation, operation_name, Some(&pool), || {
         let start = Work {
             trace,
             ..Work::default()
@@ -148,24 +124,25 @@ mod tests {
     fn payload_segments_fold_as_one_contiguous_payload() {
         let bytes: Vec<u8> = (0..=255).cycle().take(777).collect();
         let (head, tail) = bytes.split_at(300);
+        let packet = |size, payload| Packet {
+            track: 1,
+            pts: Some(-1),
+            dts: None,
+            duration: 9,
+            flags: 0,
+            size,
+            payload,
+        };
         let mut split = Work::default();
-        split
-            .packet(Packet::new(1, Some(-1), None, bytes.len(), [head, tail]).duration(9))
-            .unwrap();
+        split.packet(packet(bytes.len(), vec![head, tail])).unwrap();
         let mut whole = Work::default();
-        whole
-            .packet(Packet::new(1, Some(-1), None, bytes.len(), [&bytes[..]]).duration(9))
-            .unwrap();
+        whole.packet(packet(bytes.len(), vec![&bytes[..]])).unwrap();
         assert_eq!(
             (split.packets, split.bytes, split.digest),
             (1, 777, whole.digest)
         );
         let mut short = Work::default();
-        assert!(
-            short
-                .packet(Packet::new(1, None, None, 778, [&bytes[..]]))
-                .is_err()
-        );
+        assert!(short.packet(packet(778, vec![&bytes[..]])).is_err());
     }
 
     /// One recorded case per runner, from the reference folds in each contract's corpus.

@@ -71,17 +71,15 @@ fn selections(argument: &str) -> Result<(PacketFormat, Vec<TsNativeTrackSelectio
 
 fn fold(work: &mut Work, packet: &DemuxPacket, clock: &DemuxTimeView) -> Result<()> {
     let time = |value: Option<i128>| value.map(i64::try_from).transpose();
-    work.packet(
-        Packet::new(
-            u64::from(packet.pid),
-            time(clock.pts90)?,
-            time(clock.dts90)?,
-            packet.payload_len,
-            packet.payload(),
-        )
-        .duration(u64::try_from(packet.duration90_raw).unwrap_or(0))
-        .flags(u64::from(packet.flags)),
-    )
+    work.packet(Packet {
+        track: u64::from(packet.pid),
+        pts: time(clock.pts90)?,
+        dts: time(clock.dts90)?,
+        duration: u64::try_from(packet.duration90_raw).unwrap_or(0),
+        flags: u64::from(packet.flags),
+        size: packet.payload_len,
+        payload: packet.payload(),
+    })
 }
 
 fn player(

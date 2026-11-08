@@ -8,21 +8,19 @@
 //! AAC packets pass through the ADTS feed before their clock; Dolby packets use the
 //! source clock, so a syncframe the decoder would refuse keeps its packet and time.
 
+use crate::matroska::{AVC_AAC, HEVC_DOLBY, WORK, ready};
 use crate::packet_fold::{Packet, Work, drive};
 use crate::runner::Result;
 use std::sync::atomic::AtomicBool;
+use triergon_core::container::{CodecId, MediaKind, TrackInfo};
 use triergon_core::{Budget, Bytes, SourceCapabilities, SourceId, WorkBudget};
-use triergon_framing::{
-    AacConfigLimits, AvcAnnexBLimits, AvcConfigLimits, BuildStep, HvcConfigLimits,
-};
 use triergon_matroska::typed::{Configuration, Event, Packet as MatroskaPacket};
 use triergon_playback::{
     ByteSource, Engine, Output, PlayerPolicy, Progress, RawEvent, Selection,
     io::SourceOwner,
     matroska_feed::{
         MatroskaClock, MatroskaClockPrefix, MatroskaDiscovery, MatroskaDiscoveryLimits,
-        MatroskaDiscoveryStep, MatroskaDolbyLimits, MatroskaFeedLimits, MatroskaFeedSetup,
-        MatroskaHevcDolbyFeed, MatroskaHevcDolbyLimits, MatroskaHevcDolbySetup,
+        MatroskaDiscoveryStep, MatroskaFeedSetup, MatroskaHevcDolbyFeed, MatroskaHevcDolbySetup,
         MatroskaPacketTiming, MatroskaTrackFeed,
     },
 };
@@ -30,41 +28,7 @@ use triergon_playback::{
 pub const PREFIX: &str = "mkv-audio-";
 const OPERATION: &str = "matroska-audio-clock";
 const QUANTUM: usize = 4096;
-const WORK: u64 = 4096;
 const MAX_TRACKS: usize = 64;
-
-const VIDEO: AvcAnnexBLimits = AvcAnnexBLimits {
-    maximum_packet_bytes: 32768,
-    maximum_output_bytes: 49152,
-    maximum_nals: 64,
-};
-const AAC: MatroskaFeedLimits = MatroskaFeedLimits {
-    avc_config: AvcConfigLimits {
-        maximum_record_bytes: 8192,
-        maximum_nals: 64,
-        maximum_nal_bytes: 4096,
-    },
-    avc_packet: VIDEO,
-    aac_config: AacConfigLimits {
-        maximum_record_bytes: 128,
-        maximum_pce_elements: 32,
-        maximum_comment_bytes: 64,
-    },
-    aac_output_bytes: 8191,
-};
-const DOLBY: MatroskaHevcDolbyLimits = MatroskaHevcDolbyLimits {
-    hevc_config: HvcConfigLimits {
-        maximum_record_bytes: 8192,
-        maximum_arrays: 16,
-        maximum_nals: 64,
-        maximum_nal_bytes: 4096,
-    },
-    hevc_packet: VIDEO,
-    dolby_packet: MatroskaDolbyLimits {
-        maximum_packet_bytes: 16384,
-        maximum_syncframes: 8,
-    },
-};
 
 #[derive(Clone, Copy, PartialEq, Eq)]
 enum Select {
@@ -73,12 +37,23 @@ enum Select {
     All,
 }
 
+/// The feed an audio track's codec family binds to.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum Family {
+    Aac,
+    Dolby,
+}
+
 impl Select {
-    fn admits(self, codec: &str) -> bool {
-        match codec {
-            "A_AAC" => self != Self::Dolby,
-            "A_AC3" | "A_EAC3" => self != Self::Aac,
-            _ => false,
+    /// The family of a selected track, by the codec the Matroska reader identifies
+    /// from its CodecID, so every CodecID the reader maps to a family is selected.
+    fn family(self, kind: MediaKind, codec: CodecId<'_>) -> Option<Family> {
+        match (kind, codec) {
+            (MediaKind::Audio, CodecId::Aac) if self != Self::Dolby => Some(Family::Aac),
+            (MediaKind::Audio, CodecId::Ac3 | CodecId::Eac3) if self != Self::Aac => {
+                Some(Family::Dolby)
+            }
+            _ => None,
         }
     }
 }
@@ -98,19 +73,6 @@ enum Clock<'a> {
     Dolby(MatroskaClock<'a, MatroskaHevcDolbyFeed>),
 }
 
-fn ready<T>(
-    mut step: impl FnMut(&mut WorkBudget) -> triergon_playback::Result<BuildStep<T>>,
-) -> Result<T> {
-    for _ in 0..4096 {
-        match step(&mut WorkBudget::new(WORK))? {
-            BuildStep::Ready(value) => return Ok(value),
-            BuildStep::Yield => {}
-            BuildStep::Complete => break,
-        }
-    }
-    Err("selected feed did not finish".into())
-}
-
 fn source_packet(output: &Output) -> Option<&MatroskaPacket> {
     match output.event() {
         RawEvent::Matroska(Event::Packet(packet)) => Some(packet),
@@ -120,17 +82,15 @@ fn source_packet(output: &Output) -> Option<&MatroskaPacket> {
 
 fn fold(work: &mut Work, packet: &MatroskaPacket, timing: MatroskaPacketTiming) -> Result<()> {
     let data = packet.packet.data.as_ref();
-    work.packet(
-        Packet::new(
-            packet.packet.track as u64,
-            timing.pts_ns,
-            timing.dts_ns,
-            data.len(),
-            [data],
-        )
-        .duration(timing.duration_ns.unwrap_or(0))
-        .flags(u64::from(packet.packet.keyframe)),
-    )
+    work.packet(Packet {
+        track: packet.packet.track as u64,
+        pts: timing.pts_ns,
+        dts: timing.dts_ns,
+        duration: timing.duration_ns.unwrap_or(0),
+        flags: u64::from(packet.packet.keyframe),
+        size: data.len(),
+        payload: [data],
+    })
 }
 
 fn feeds(
@@ -146,15 +106,17 @@ fn feeds(
     let cancel = AtomicBool::new(false);
     let mut feeds = Vec::with_capacity(tracks.len());
     for (track, descriptor) in tracks.iter().enumerate() {
-        let codec = descriptor.codec.as_str();
-        feeds.push(if descriptor.kind != 2 || !select.admits(codec) {
-            None
-        } else if codec == "A_AAC" {
-            let mut setup = MatroskaFeedSetup::new(pool, id, configuration, track, AAC)?;
-            Some(Feed::Aac(ready(|work| setup.step(work, &cancel))?))
-        } else {
-            let mut setup = MatroskaHevcDolbySetup::new(pool, id, configuration, track, DOLBY)?;
-            Some(Feed::Dolby(ready(|work| setup.step(work, &cancel))?))
+        feeds.push(match select.family(descriptor.kind(), descriptor.codec()) {
+            None => None,
+            Some(Family::Aac) => {
+                let mut setup = MatroskaFeedSetup::new(pool, id, configuration, track, AVC_AAC)?;
+                Some(Feed::Aac(ready(|work| setup.step(work, &cancel))?))
+            }
+            Some(Family::Dolby) => {
+                let mut setup =
+                    MatroskaHevcDolbySetup::new(pool, id, configuration, track, HEVC_DOLBY)?;
+                Some(Feed::Dolby(ready(|work| setup.step(work, &cancel))?))
+            }
         });
     }
     if feeds.iter().all(Option::is_none) {
@@ -306,4 +268,31 @@ pub fn operate(pool: &Budget, raw: &Bytes, argument: &str, work: Work) -> Result
         _ => return Err("expected aac, dolby or all".into()),
     };
     operation(pool, raw, select, work)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{Family, Select};
+    use triergon_core::container::{CodecId, MediaKind};
+
+    #[test]
+    fn selection_follows_the_codec_family_the_reader_identifies() {
+        let audio = MediaKind::Audio;
+        for (select, aac, dolby) in [
+            (Select::Aac, Some(Family::Aac), None),
+            (Select::Dolby, None, Some(Family::Dolby)),
+            (Select::All, Some(Family::Aac), Some(Family::Dolby)),
+        ] {
+            assert_eq!(select.family(audio, CodecId::Aac), aac);
+            // A_AC3, A_AC3/BSID9 and A_AC3/BSID10 are all AC-3.
+            assert_eq!(select.family(audio, CodecId::Ac3), dolby);
+            assert_eq!(select.family(audio, CodecId::Eac3), dolby);
+            assert_eq!(select.family(MediaKind::Video, CodecId::Aac), None);
+            assert_eq!(select.family(audio, CodecId::Opus), None);
+            assert_eq!(
+                select.family(audio, CodecId::Other(b"A_AAC/MPEG4/LC")),
+                None
+            );
+        }
+    }
 }

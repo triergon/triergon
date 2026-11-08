@@ -6,6 +6,8 @@
  * Every operation reads one preloaded input through a custom AVIO context and folds
  * each selected AVPacket as track, PTS, DTS, duration, flags, size and every payload
  * byte. An unknown time folds as INT64_MIN and an unknown duration as zero. */
+#ifndef TRIERGON_REFERENCE_PACKET_FOLD_H
+#define TRIERGON_REFERENCE_PACKET_FOLD_H
 #include <libavutil/mathematics.h>
 #include <libavutil/mem.h>
 
@@ -155,3 +157,4 @@ static int packet_main(int argc, char **argv, const uint8_t *data, long size, co
            operation_name, iterations, total.packets, total.bytes, total.digest, elapsed);
     return 0;
 }
+#endif

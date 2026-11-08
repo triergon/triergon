@@ -1,9 +1,9 @@
-//! The command line and measured loop shared by the per-input runners, the packet
-//! folds `mkv-audio-`, `mp4-forward-`, `ts-program-` and `raw-video-`.
+//! The command line and measured loop of every playback-worker mode.
 //!
-//! A runner prepares its input outside the measurement, then [`measure`] runs the
-//! operation and prints one JSON result line. Reading the input, process start-up
-//! and the result line are outside the timed loop and the allocation window.
+//! Each runner owns one mode prefix. It prepares its input outside the measurement,
+//! then [`measure`] runs the operation and prints one JSON result line. Reading the
+//! input, process start-up and the result line are outside the timed loop and the
+//! allocation window.
 
 use std::io::{self, Write};
 use std::ops::RangeInclusive;
@@ -15,20 +15,29 @@ pub type Result<T> = std::result::Result<T, Box<dyn std::error::Error>>;
 
 type Run = fn(&[String]) -> Result<()>;
 
-const RUNNERS: [(&str, Run); 4] = [
+const RUNNERS: [(&str, Run); 8] = [
+    (crate::matroska_video::PREFIX, crate::matroska_video::run),
     (crate::matroska_audio::PREFIX, crate::matroska_audio::run),
+    (crate::hls::PREFIX, crate::hls::run),
+    (crate::mp4_range::PREFIX, crate::mp4_range::run),
     (crate::mp4_forward::PREFIX, crate::mp4_forward::run),
+    (crate::progressive::PREFIX, crate::progressive::run),
     (crate::ts_program::PREFIX, crate::ts_program::run),
     (crate::raw_video::PREFIX, crate::raw_video::run),
 ];
 
-/// The runner that owns the mode in `args[0]`, if any.
-pub fn dispatch(args: &[String]) -> Option<Result<()>> {
-    let mode = args.first()?;
-    RUNNERS
-        .iter()
-        .find(|(prefix, _)| mode.starts_with(prefix))
-        .map(|(_, run)| run(args))
+/// Run the mode in `args[0]` with the runner that owns its prefix.
+pub fn dispatch(args: &[String]) -> Result<()> {
+    let mode = args.first().map_or("", String::as_str);
+    let Some((_, run)) = RUNNERS.iter().find(|(prefix, _)| mode.starts_with(prefix)) else {
+        let prefixes: Vec<&str> = RUNNERS.iter().map(|(prefix, _)| *prefix).collect();
+        return Err(format!(
+            "usage: playback-worker PREFIX{{fold,bench,memory}} FILE ...; prefixes: {}",
+            prefixes.join(" ")
+        )
+        .into());
+    };
+    run(args)
 }
 
 #[derive(Clone, Copy, PartialEq, Eq)]
@@ -39,7 +48,7 @@ pub enum Mode {
     Bench,
     /// One operation inside the allocation-window markers.
     Memory,
-    /// One operation that prints each folded record.
+    /// One operation that prints what it folds.
     Trace,
 }
 
@@ -111,15 +120,16 @@ pub struct Totals {
 }
 
 /// Run `operation` as often as the invocation asks and print the result line: the
-/// summed packets and bytes and the ordered fold of each operation's digest. `pool`
-/// holds the prepared input; an operation that leaves more charged fails.
+/// summed packets and bytes and the ordered fold of each operation's digest.
+/// `held` is the pool of a preloaded input; an operation that leaves more of it
+/// charged fails.
 pub fn measure(
     invocation: &Invocation<'_>,
     name: &str,
-    pool: &Budget,
+    held: Option<&Budget>,
     mut operation: impl FnMut() -> Result<Totals>,
 ) -> Result<()> {
-    let retained = pool.used();
+    let retained = held.map(Budget::used);
     let memory = invocation.mode == Mode::Memory;
     let mut out = io::stdout().lock();
     if memory {
@@ -133,7 +143,7 @@ pub fn measure(
         packets += totals.packets;
         bytes += totals.bytes;
         fold(&mut digest, totals.digest);
-        if pool.used() != retained {
+        if held.map(Budget::used) != retained {
             return Err("operation retained charged storage".into());
         }
     }

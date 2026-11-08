@@ -89,11 +89,15 @@ fn operation(pool: &Budget, raw: &Bytes, codec: Codec, mut work: Work) -> Result
             Step::Ready(packet) => {
                 let unit = &packet.unit;
                 let size = usize::try_from(unit.range.end - unit.range.start)?;
-                work.packet(
-                    Packet::new(0, None, None, size, unit.segments())
-                        .duration(picture_ticks(packet.configuration.as_ref())?)
-                        .flags(u64::from(unit.random_access)),
-                )?;
+                work.packet(Packet {
+                    track: 0,
+                    pts: None,
+                    dts: None,
+                    duration: picture_ticks(packet.configuration.as_ref())?,
+                    flags: u64::from(unit.random_access),
+                    size,
+                    payload: unit.segments(),
+                })?;
             }
             Step::End(at) if at.offset == raw.len() as u64 => break,
             Step::End(_) => return Err("raw feed ended before the source".into()),
