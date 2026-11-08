@@ -91,6 +91,21 @@ impl Kern {
         Ok(kern)
     }
 
+    /// The pairs of every subtable read, in table order, as stored: a pair may
+    /// repeat across subtables.
+    pub(crate) fn pairs<'a>(
+        &'a self,
+        data: &'a [u8],
+    ) -> impl Iterator<Item = (GlyphId, GlyphId)> + 'a {
+        self.subtables.as_slice().iter().flat_map(move |subtable| {
+            (0..subtable.count).map_while(move |i| {
+                let at = subtable.pairs + 6 * i;
+                let glyph = |at| u16_at(data, at).map(|g| GlyphId(u32::from(g)));
+                Some((glyph(at)?, glyph(at + 2)?))
+            })
+        })
+    }
+
     /// The kerning between `left` and `right` in font units.
     pub(crate) fn pair(&self, data: &[u8], left: GlyphId, right: GlyphId) -> i32 {
         let (Ok(left), Ok(right)) = (u16::try_from(left.0), u16::try_from(right.0)) else {
@@ -182,6 +197,8 @@ mod tests {
         assert_eq!(kern.pair(&data, GlyphId(1), GlyphId(2)), -57);
         assert_eq!(kern.pair(&data, GlyphId(3), GlyphId(4)), 1);
         assert_eq!(kern.pair(&data, GlyphId(2), GlyphId(1)), 0);
+        let pairs: Vec<_> = kern.pairs(&data).map(|(l, r)| (l.0, r.0)).collect();
+        assert_eq!(pairs, [(1, 2), (3, 4), (3, 4), (1, 2), (3, 4)]);
         let apple = [0, 1, 0, 0, 0, 0, 0, 0];
         let table = Table { offset: 0, len: 8 };
         let kern = Kern::parse(&apple, table, &budget, &mut Meter::new(100)).unwrap();

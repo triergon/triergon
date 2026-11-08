@@ -426,6 +426,12 @@ impl Font {
         self.kern.pair(self.data.as_ref(), left, right)
     }
 
+    /// Every pair the `kern` subtables used by [`Self::kerning`] list, in table
+    /// order. A pair listed by several subtables appears once for each.
+    pub fn kerning_pairs(&self) -> impl Iterator<Item = (GlyphId, GlyphId)> + '_ {
+        self.kern.pairs(self.data.as_ref())
+    }
+
     fn check(&self, glyph: GlyphId) -> Result<u16> {
         u16::try_from(glyph.0)
             .ok()
