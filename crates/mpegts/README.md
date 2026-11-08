@@ -55,6 +55,24 @@ original payload. Cancellation and allocation pressure preserve pending input.
 An unavoidable storage total above the pool limit returns `Limit`; storage held
 by external outputs or reservations can instead cause retryable `Backpressure`.
 
+`TransportFaultRecovery::with_policy` adds explicit `PesFaultPolicy` choices for
+isolated PES timing-header faults and fully checked PCR/OPCR rejections. The
+default constructor keeps both choices disabled. Accepted carriers with bad
+timing encoding must receive their matching later PES diagnostic before output.
+Rejected carriers must have only the selected clock fault, complete syntax
+inspection and no secondary error; their original bytes and rejection remain
+in `TransportObservation::PesFault`. Each admitted PES must be complete, finite
+and nonempty in one AVC-signalled TS188 carrier. No source clock, accepted
+transport packet or source PES is reconstructed.
+
+`PesFaultHeader` keeps raw header bytes, timing flags and optional encoded PTS.
+Missing marker bits can have a separate compatibility value; forbidden timing
+flags leave timestamps absent even if opaque optional bytes resemble a PTS.
+`DemuxClock::project_pes_fault` retains its existing interval when time is absent.
+It never updates the source clock. Fully checked rejected clock carriers retain
+their counters without claiming source continuity. Additional damage, partial
+PES and unknown clock/header contexts remain refusals.
+
 ## Usage
 
 ```rust
@@ -321,9 +339,9 @@ Verification:
   it. Every measured case passes those numeric gates. The 16 parity failures
   keep the feature unaccepted.
 
-The separate macOS host comparison of TEI/scrambling extraction matches 83 of
-97 operations, retaining all 272 requests. Its other 14 operations remain
-failures. That policy has not been qualified by the native measurement above.
+The separate macOS host comparison of the finite source-fault policies matches
+87 of 97 operations, retaining all 272 requests. Its other 10 operations remain
+failures. Those policies have not been qualified by the native measurement above.
 
 
 Gates, harness and current results: [docs/quality.md](../../docs/quality.md)

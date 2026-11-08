@@ -732,6 +732,37 @@ impl DemuxObserver {
             })
             .ok_or(Error::Overflow)
     }
+    pub(crate) fn rejected_fault_input(
+        &self,
+        packet: &crate::RejectedTransport,
+        context: SourceContext,
+    ) -> Result<&Budget> {
+        self.validate_input(None)?;
+        if !packet.bytes().belongs_to(&self.budget) {
+            return Err(Error::ForeignPool);
+        }
+        if !self.recovery_idle() {
+            return Err(Error::Invalid("selected diagnostic input not drained"));
+        }
+        if self.scope.stream_type != 0x1b
+            || self.scope.stream_id != 0xe0
+            || packet.source_id() != Some(self.scope.entity)
+            || context.epochs != self.scope.epochs
+            || context.byte_run_epoch.is_some()
+        {
+            return Err(Error::Unsupported(
+                "selected diagnostic source context unobserved",
+            ));
+        }
+        if !self.follows_input(context, packet.source_offset()) {
+            return Err(Error::Invalid("native PES source event order"));
+        }
+        packet
+            .source_offset()
+            .checked_add(u64::try_from(packet.bytes().len()).map_err(|_| Error::Overflow)?)
+            .ok_or(Error::Overflow)?;
+        Ok(&self.budget)
+    }
     #[allow(
         clippy::result_large_err,
         reason = "return original charged transport input inline"

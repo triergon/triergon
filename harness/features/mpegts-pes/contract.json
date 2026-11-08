@@ -129,10 +129,6 @@
       "requirement": "a published MPEG-TS ContainerReader: program-level PAT/PMT routing, clock and format boundaries, recovery of rejected and damaged carriers, and input across media entities"
     },
     {
-      "id": "pcr-extension-invalid",
-      "requirement": "a published MPEG-TS ContainerReader: program-level PAT/PMT routing, clock and format boundaries, recovery of rejected and damaged carriers, and input across media entities"
-    },
-    {
       "id": "transport-afc-reserved",
       "requirement": "a published MPEG-TS ContainerReader: program-level PAT/PMT routing, clock and format boundaries, recovery of rejected and damaged carriers, and input across media entities"
     },
@@ -146,14 +142,6 @@
     },
     {
       "id": "transport-sync-loss",
-      "requirement": "a published MPEG-TS ContainerReader: program-level PAT/PMT routing, clock and format boundaries, recovery of rejected and damaged carriers, and input across media entities"
-    },
-    {
-      "id": "pes-timestamp-marker",
-      "requirement": "a published MPEG-TS ContainerReader: program-level PAT/PMT routing, clock and format boundaries, recovery of rejected and damaged carriers, and input across media entities"
-    },
-    {
-      "id": "pes-forbidden-time-flags",
       "requirement": "a published MPEG-TS ContainerReader: program-level PAT/PMT routing, clock and format boundaries, recovery of rejected and damaged carriers, and input across media entities"
     },
     {
@@ -174,10 +162,6 @@
     },
     {
       "id": "hls-explicit-discontinuity",
-      "requirement": "a published MPEG-TS ContainerReader: program-level PAT/PMT routing, clock and format boundaries, recovery of rejected and damaged carriers, and input across media entities"
-    },
-    {
-      "id": "opcr-without-pcr-invalid",
       "requirement": "a published MPEG-TS ContainerReader: program-level PAT/PMT routing, clock and format boundaries, recovery of rejected and damaged carriers, and input across media entities"
     }
   ]
