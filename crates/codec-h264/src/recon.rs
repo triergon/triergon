@@ -699,9 +699,136 @@ pub(crate) fn pred_chroma8(
     }
 }
 
+/// Levels for overflow tests: the `i32` extremes, full-range values and small ones, from a
+/// xorshift sequence.
+#[cfg(test)]
+pub(crate) fn extreme_levels<const N: usize>(seed: u32) -> [i32; N] {
+    let mut x = seed.wrapping_mul(0x9e37_79b9) | 1;
+    std::array::from_fn(|_| {
+        x ^= x << 13;
+        x ^= x >> 17;
+        x ^= x << 5;
+        match x % 6 {
+            0 => i32::MAX,
+            1 => i32::MIN,
+            2 => (x as i32) >> 16,
+            _ => x as i32,
+        }
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// Truncation to C's 32-bit `int` before a right shift; `+`, `-` and `*` in `i64` agree
+    /// with 32-bit wrapping arithmetic after truncation.
+    fn sar(v: i64, k: u32) -> i64 {
+        ((v as i32) >> k) as i64
+    }
+
+    /// 8.5.12.2's 4-point inverse transform, one vector at a time.
+    fn ref4(x: [i64; 4]) -> [i64; 4] {
+        let (e0, e1) = (x[0] + x[2], x[0] - x[2]);
+        let (e2, e3) = (sar(x[1], 1) - x[3], x[1] + sar(x[3], 1));
+        [e0 + e3, e1 + e2, e1 - e2, e0 - e3]
+    }
+
+    /// 8.5.13.2's 8-point inverse transform, one vector at a time.
+    fn ref8(x: [i64; 8]) -> [i64; 8] {
+        let e0 = x[0] + x[4];
+        let e1 = -x[3] + x[5] - x[7] - sar(x[7], 1);
+        let e2 = x[0] - x[4];
+        let e3 = x[1] + x[7] - x[3] - sar(x[3], 1);
+        let e4 = sar(x[2], 1) - x[6];
+        let e5 = -x[1] + x[7] + x[5] + sar(x[5], 1);
+        let e6 = x[2] + sar(x[6], 1);
+        let e7 = x[3] + x[5] + x[1] + sar(x[1], 1);
+        let (f0, f1, f2, f3) = (e0 + e6, e1 + sar(e7, 2), e2 + e4, e3 + sar(e5, 2));
+        let (f4, f5, f6, f7) = (e2 - e4, sar(e3, 2) - e5, e0 - e6, e7 - sar(e1, 2));
+        [
+            f0 + f7,
+            f2 + f5,
+            f4 + f3,
+            f6 + f1,
+            f6 - f1,
+            f4 - f3,
+            f2 - f5,
+            f0 - f7,
+        ]
+    }
+
+    /// Rows, then columns, then rounding and the clipped addition to `base`.
+    fn ref_idct<const N: usize>(d: &[i32], tr: fn([i64; N]) -> [i64; N], base: u8) -> Vec<u8> {
+        let rows: Vec<[i64; N]> = (0..N)
+            .map(|i| tr(std::array::from_fn(|k| d[i * N + k] as i64)))
+            .collect();
+        let cols: Vec<[i64; N]> = (0..N)
+            .map(|k| tr(std::array::from_fn(|i| rows[i][k])))
+            .collect();
+        (0..N * N)
+            .map(|p| clip1(base as i32 + sar(cols[p % N][p / N] + 32, 6) as i32))
+            .collect()
+    }
+
+    #[test]
+    fn transforms_wrap_extreme_coefficients() {
+        for seed in 1..=64 {
+            let base = (seed * 37 % 256) as u8;
+            let d4: [i32; 16] = extreme_levels(seed);
+            let mut out = vec![base; 16];
+            idct4_add(&d4, &mut out, 0, 4);
+            assert_eq!(out, ref_idct::<4>(&d4, ref4, base), "4x4, seed {seed}");
+            let d8: [i32; 64] = extreme_levels(seed);
+            let mut out = vec![base; 64];
+            idct8_add(&d8, &mut out, 0, 8);
+            assert_eq!(out, ref_idct::<8>(&d8, ref8, base), "8x8, seed {seed}");
+            for (n, dc) in [(4, d4[0]), (8, d8[0]), (4, i32::MAX), (8, i32::MIN)] {
+                let mut out = vec![base; n * n];
+                dc_add(dc, n, &mut out, 0, n);
+                let v = clip1(base as i32 + sar(dc as i64 + 32, 6) as i32);
+                assert!(out.iter().all(|&p| p == v), "dc {dc}");
+            }
+        }
+    }
+
+    #[test]
+    fn dc_transforms_wrap_extreme_levels() {
+        // Equation 8-320's matrix and the 2x2 one of 8.5.11.1, both symmetric.
+        const M4: [[i64; 4]; 4] = [[1, 1, 1, 1], [1, 1, -1, -1], [1, -1, -1, 1], [1, -1, 1, -1]];
+        const M2: [[i64; 2]; 2] = [[1, 1], [1, -1]];
+        for seed in 1..=16 {
+            for (qp, ls) in (0..=51).flat_map(|qp| [(qp, 16), (qp, 255 * 25)]) {
+                let c: [i32; 16] = extreme_levels(seed);
+                let mut got = c;
+                luma_dc_dequant(&mut got, qp, ls);
+                for (p, &g) in got.iter().enumerate() {
+                    let (i, j) = (p / 4, p % 4);
+                    let f: i64 = (0..16)
+                        .map(|q| M4[i][q / 4] * c[q] as i64 * M4[q % 4][j])
+                        .sum();
+                    let v = f * ls as i64;
+                    let want = if qp >= 36 {
+                        (v << (qp / 6 - 6)) as i32
+                    } else {
+                        sar(v + (1 << (5 - qp / 6)), (6 - qp / 6) as u32) as i32
+                    };
+                    assert_eq!(g, want, "luma DC, seed {seed}, qp {qp}");
+                }
+                let c: [i32; 4] = extreme_levels(seed);
+                let mut got = c;
+                chroma_dc_dequant(&mut got, qp, ls);
+                for (p, &g) in got.iter().enumerate() {
+                    let (i, j) = (p / 2, p % 2);
+                    let f: i64 = (0..4)
+                        .map(|q| M2[i][q / 2] * c[q] as i64 * M2[q % 2][j])
+                        .sum();
+                    let want = sar((f * ls as i64) << (qp / 6), 5) as i32;
+                    assert_eq!(g, want, "chroma DC, seed {seed}, qp {qp}");
+                }
+            }
+        }
+    }
 
     #[test]
     fn idct_dc_matches_constant() {

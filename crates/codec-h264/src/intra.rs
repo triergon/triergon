@@ -26,6 +26,25 @@ fn dequant4(coef: &[i32; 16], ls: &[i32; 16], qp: i32) -> [i32; 16] {
     d
 }
 
+/// Scale an 8x8 block of levels (8.5.13.1), wrapping like `dequant4`.
+#[inline(always)]
+fn dequant8(coef: &[i32; 64], ls: &[i32; 64], qp: i32) -> [i32; 64] {
+    let mut d = [0i32; 64];
+    let sh = qp / 6;
+    if sh >= 6 {
+        for i in 0..64 {
+            d[i] = coef[i].wrapping_mul(ls[i]) << (sh - 6);
+        }
+    } else {
+        let add = 1 << (5 - sh);
+        let s = 6 - sh;
+        for i in 0..64 {
+            d[i] = coef[i].wrapping_mul(ls[i]).wrapping_add(add) >> s;
+        }
+    }
+    d
+}
+
 impl SliceDecoder<'_> {
     #[inline]
     fn intra_avail(&self, n: usize) -> bool {
@@ -417,19 +436,7 @@ impl SliceDecoder<'_> {
         let base = b8 * 64;
         let ls = &self.s.ls8[inter as usize][(qp % 6) as usize];
         let coef: &mut [i32; 64] = (&mut self.mb.coef[base..base + 64]).try_into().unwrap();
-        let mut d = [0i32; 64];
-        let sh = qp / 6;
-        if sh >= 6 {
-            for i in 0..64 {
-                d[i] = coef[i].wrapping_mul(ls[i]) << (sh - 6);
-            }
-        } else {
-            let add = 1 << (5 - sh);
-            let s = 6 - sh;
-            for i in 0..64 {
-                d[i] = coef[i].wrapping_mul(ls[i]).wrapping_add(add) >> s;
-            }
-        }
+        let d = dequant8(coef, ls, qp);
         let any_ac = coef[1..].iter().fold(0, |a, &c| a | c) != 0;
         coef.fill(0);
         let g = self.geom;
@@ -521,6 +528,37 @@ impl SliceDecoder<'_> {
         }
         if self.s.chroma && self.mb.cbp >> 4 != 0 {
             self.residual_chroma(false);
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Scaling as C's `int` arithmetic computes it: exact products, truncated to 32 bits
+    /// before the right shift.
+    fn scaled(c: i32, l: i32, qp: i32, base: i32) -> i32 {
+        let (p, sh) = (c as i64 * l as i64, qp / 6);
+        if sh >= base {
+            (p << (sh - base)) as i32
+        } else {
+            ((p + (1 << (base - 1 - sh))) as i32) >> (base - sh)
+        }
+    }
+
+    #[test]
+    fn scaling_wraps_extreme_levels() {
+        // The largest level scales: weight 255 times normAdjust 25 (4x4) and 32 (8x8).
+        for (seed, l) in [(1, 255 * 25), (2, 255 * 32), (3, 16)] {
+            let c4: [i32; 16] = extreme_levels(seed);
+            let c8: [i32; 64] = extreme_levels(seed);
+            for qp in 0..=51 {
+                let d4 = dequant4(&c4, &[l; 16], qp);
+                let d8 = dequant8(&c8, &[l; 64], qp);
+                assert!(d4.iter().zip(c4).all(|(&d, c)| d == scaled(c, l, qp, 4)));
+                assert!(d8.iter().zip(c8).all(|(&d, c)| d == scaled(c, l, qp, 6)));
+            }
         }
     }
 }
