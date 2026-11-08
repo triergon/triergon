@@ -14,7 +14,7 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
-use crate::fetch::Transport;
+use crate::fetch::{Source, Transport};
 use crate::json::Value;
 use crate::prepare::{PinnedRelease, output, run, unpack_release, verify_xz_tree};
 use crate::sha256;
@@ -25,7 +25,10 @@ const LIBASS: PinnedRelease<'static> = PinnedRelease {
     file: "libass-0.17.5.tar.xz",
     directory: "libass-0.17.5",
     url: "https://github.com/libass/libass/releases/download/0.17.5/libass-0.17.5.tar.xz",
-    mirrors: &[],
+    mirrors: &[Source::GitHubAsset {
+        repo: "libass/libass",
+        id: 456_215_356,
+    }],
     sha256: "2dca25c0e0c837ddf00b52011b3f82cac1e4ddd3ad018227806b0c2288864acc",
 };
 
