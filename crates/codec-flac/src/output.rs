@@ -1,7 +1,7 @@
 //! Where restored channels go: the float frame of the `AudioDecoder` contract, or the
 //! lossless integer samples.
 use crate::{DecodeError, FrameInfo};
-use triergon_codec::{AudioFrame, ChannelLayout, Reservation, StorageError};
+use triergon_codec::{AudioFrame, ChannelLayout, Reservation, SampleFormat, StorageError};
 
 /// A destination for one frame, plane by plane.
 pub(crate) trait Output {
@@ -30,6 +30,13 @@ impl Scale {
             Scale::Short(16 - bits)
         } else {
             Scale::Long(32 - bits)
+        }
+    }
+
+    fn format(self) -> SampleFormat {
+        match self {
+            Scale::Short(_) => SampleFormat::S16,
+            Scale::Long(_) => SampleFormat::S32,
         }
     }
 }
@@ -61,6 +68,7 @@ impl Output for FloatOutput<'_> {
         self.frame.layout = frame.layout;
         self.frame.samples_per_channel = len;
         self.scale = Scale::of(frame.bits_per_sample);
+        self.frame.sample_format = self.scale.format();
         Ok(())
     }
 
