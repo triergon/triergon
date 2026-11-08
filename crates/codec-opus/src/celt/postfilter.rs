@@ -57,9 +57,20 @@ impl Pitch {
     }
 }
 
-/// Filter `buf[start..start + len]` in place (the filter is recursive: it reads its own
-/// earlier output), cross-fading from `from` to `to` over the first `WINDOW.len() <= len`
-/// samples. `buf` holds at least [`MAX_REACH`] samples before `start`.
+/// The five samples a comb tap set reads for each output of a block: offsets -2..=2
+/// around the period, as slices parallel to the block.
+fn neighbours(past: &[f32], start: usize, period: usize, len: usize) -> [&[f32]; 5] {
+    let base = start - period - 2;
+    core::array::from_fn(|d| &past[base + d..base + d + len])
+}
+
+/// Filter `buf[start..start + len]` in place, cross-fading from `from` to `to` over the
+/// first `WINDOW.len() <= len` samples. `buf` holds at least [`MAX_REACH`] samples before
+/// `start`.
+///
+/// The filter is recursive (it reads its own output a period back), so it runs in blocks
+/// shorter than the period less the taps' reach: every sample a block reads lies before
+/// it, and the samples of a block are independent of each other.
 pub(super) fn comb(buf: &mut [f32], start: usize, len: usize, from: Pitch, to: Pitch) {
     if from.gain == 0.0 && to.gain == 0.0 {
         return;
@@ -68,28 +79,37 @@ pub(super) fn comb(buf: &mut [f32], start: usize, len: usize, from: Pitch, to: P
     let [t0, t1, t2] = to.taps();
     let (p0, p1) = (from.period, to.period);
     let overlap = WINDOW.len().min(len);
-    for i in start..start + overlap {
-        let w = WINDOW[i - start];
-        let f = w * w;
-        let g = 1.0 - f;
-        buf[i] = buf[i]
-            + (g * f0) * buf[i - p0]
-            + (g * f1) * buf[i - p0 - 1]
-            + (g * f1) * buf[i - p0 + 1]
-            + (g * f2) * buf[i - p0 - 2]
-            + (g * f2) * buf[i - p0 + 2]
-            + (f * t0) * buf[i - p1]
-            + (f * t1) * buf[i - p1 - 1]
-            + (f * t1) * buf[i - p1 + 1]
-            + (f * t2) * buf[i - p1 - 2]
-            + (f * t2) * buf[i - p1 + 2];
+    let mut i = start;
+    while i < start + overlap {
+        let end = (i + p0.min(p1) - 2).min(start + overlap);
+        let (past, now) = buf.split_at_mut(i);
+        let [a2, a1, a0, b1, b2] = neighbours(past, i, p0, end - i);
+        let [c2, c1, c0, d1, d2] = neighbours(past, i, p1, end - i);
+        let window = &WINDOW[i - start..end - start];
+        for (k, y) in now[..end - i].iter_mut().enumerate() {
+            let f = window[k] * window[k];
+            let g = 1.0 - f;
+            *y = *y
+                + (g * f0) * a0[k]
+                + (g * f1) * a1[k]
+                + (g * f1) * b1[k]
+                + (g * f2) * a2[k]
+                + (g * f2) * b2[k]
+                + (f * t0) * c0[k]
+                + (f * t1) * c1[k]
+                + (f * t1) * d1[k]
+                + (f * t2) * c2[k]
+                + (f * t2) * d2[k];
+        }
+        i = end;
     }
-    for i in start + overlap..start + len {
-        buf[i] = buf[i]
-            + t0 * buf[i - p1]
-            + t1 * buf[i - p1 - 1]
-            + t1 * buf[i - p1 + 1]
-            + t2 * buf[i - p1 - 2]
-            + t2 * buf[i - p1 + 2];
+    while i < start + len {
+        let end = (i + p1 - 2).min(start + len);
+        let (past, now) = buf.split_at_mut(i);
+        let [c2, c1, c0, d1, d2] = neighbours(past, i, p1, end - i);
+        for (k, y) in now[..end - i].iter_mut().enumerate() {
+            *y = *y + t0 * c0[k] + t1 * c1[k] + t1 * d1[k] + t2 * c2[k] + t2 * d2[k];
+        }
+        i = end;
     }
 }

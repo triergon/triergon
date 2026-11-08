@@ -311,7 +311,7 @@ impl CeltDecoder {
         let frame = HISTORY - n;
         self.pitch = self.pitch.bounded();
         self.pitch_old = self.pitch_old.bounded();
-        for (ch, out) in out.into_iter().enumerate().take(self.channels) {
+        for ch in 0..self.channels {
             let history = &mut self.history[ch];
             history.copy_within(n.., 0);
             let spectrum = &work.spectrum[ch * MAX_FRAME..ch * MAX_FRAME + n];
@@ -333,16 +333,36 @@ impl CeltDecoder {
                     pitch.bounded(),
                 );
             }
-            let mut memory = self.deemphasis[ch];
-            for (o, &v) in out[..n].iter_mut().zip(&history[frame..]) {
-                let t = v + memory;
-                memory = DEEMPHASIS * t;
-                *o = t;
-            }
-            self.deemphasis[ch] = memory;
         }
+        self.deemphasise(frame, out);
         self.pitch_old = if lm != 0 { pitch } else { self.pitch };
         self.pitch = pitch;
+    }
+
+    /// De-emphasis of the frame `history[..][frame..]` into `out`. The filter is a
+    /// one-pole recursion; both channels of a stereo stream run in one loop, so that
+    /// their chains overlap.
+    fn deemphasise(&mut self, frame: usize, out: [&mut [f32]; 2]) {
+        let [m0, m1] = &mut self.deemphasis;
+        let [h0, h1] = &self.history;
+        let [out0, out1] = out;
+        let step = |memory: &mut f32, v: f32| {
+            let t = v + *memory;
+            *memory = DEEMPHASIS * t;
+            t
+        };
+        if self.channels == 2 {
+            let n = out0.len().min(out1.len()).min(HISTORY - frame);
+            let pairs = h0[frame..].iter().zip(&h1[frame..]);
+            for ((o0, o1), (&v0, &v1)) in out0[..n].iter_mut().zip(&mut out1[..n]).zip(pairs) {
+                *o0 = step(m0, v0);
+                *o1 = step(m1, v1);
+            }
+        } else {
+            for (o, &v) in out0.iter_mut().zip(&h0[frame..]) {
+                *o = step(m0, v);
+            }
+        }
     }
 
     /// Keep the energies for the next frame's prediction and anti-collapse; bands

@@ -17,9 +17,8 @@ pub(crate) struct Synthesis {
     /// IMDCTs producing `2 * 120 << lm` samples.
     imdct: [Imdct; 4],
     coefficients: [f32; MAX_FRAME],
-    time: [f32; 2 * MAX_FRAME],
-    /// The frame and the overlap carried into the next one.
-    output: [f32; MAX_FRAME + OVERLAP],
+    /// The DCT-IV of one block, from which the IMDCT output unfolds.
+    dct: [f32; MAX_FRAME],
 }
 
 impl Synthesis {
@@ -32,8 +31,7 @@ impl Synthesis {
         Synthesis {
             imdct,
             coefficients: [0.0; MAX_FRAME],
-            time: [0.0; 2 * MAX_FRAME],
-            output: [0.0; MAX_FRAME + OVERLAP],
+            dct: [0.0; MAX_FRAME],
         }
     }
 
@@ -51,30 +49,61 @@ impl Synthesis {
         let n = freq.len();
         let block = n / blocks;
         let imdct = &mut self.imdct[if blocks > 1 { 0 } else { lm }];
-        let acc = &mut self.output[..n + OVERLAP];
-        acc[..OVERLAP].copy_from_slice(overlap);
-        // The window is zero for the first `(block - OVERLAP) / 2` samples of a block.
-        let lead = (block - OVERLAP) / 2;
-        for b in 0..blocks {
-            let coefficients = &mut self.coefficients[..block];
-            for (j, c) in coefficients.iter_mut().enumerate() {
-                *c = freq[b + j * blocks];
+        const HALF: usize = OVERLAP / 2;
+        for (b, out) in out.chunks_exact_mut(block).enumerate() {
+            let d = &mut self.dct[..block];
+            if blocks == 1 {
+                imdct.dct4(freq, d);
+            } else {
+                // Short blocks interleave their coefficients.
+                let coefficients = &mut self.coefficients[..block];
+                for (c, &f) in coefficients
+                    .iter_mut()
+                    .zip(freq[b..].iter().step_by(blocks))
+                {
+                    *c = f;
+                }
+                imdct.dct4(coefficients, d);
             }
-            let time = &mut self.time[..2 * block];
-            imdct.imdct(coefficients, time);
-            let y = &time[lead..lead + block + OVERLAP];
-            let dst = &mut acc[b * block..b * block + block + OVERLAP];
-            let (head, rest) = dst.split_at_mut(OVERLAP);
-            let (middle, tail) = rest.split_at_mut(block - OVERLAP);
-            for ((d, &v), &w) in head.iter_mut().zip(&y[..OVERLAP]).zip(&WINDOW) {
-                *d += w * v;
+            // The 2 * block outputs of the IMDCT unfold from its DCT-IV d (K = block):
+            // y[m] = d[m + K/2] below K/2, -d[3K/2 - 1 - m] up to 3K/2, -d[m - 3K/2]
+            // after. The window is zero before m = K/2 - OVERLAP/2, so output sample t
+            // of the block is y[K/2 - OVERLAP/2 + t]: the overlap-added head, the
+            // unwindowed middle and the windowed tail carried into the next block.
+            let (head, middle) = out.split_at_mut(OVERLAP);
+            let (rising, falling) = WINDOW.split_at(HALF);
+            let (head1, head2) = head.split_at_mut(HALF);
+            let (carry1, carry2) = overlap.split_at(HALF);
+            for (((o, &c), &w), &v) in head1
+                .iter_mut()
+                .zip(carry1)
+                .zip(rising)
+                .zip(&d[block - HALF..])
+            {
+                *o = c + w * v;
             }
-            middle.copy_from_slice(&y[OVERLAP..block]);
-            for ((d, &v), &w) in tail.iter_mut().zip(&y[block..]).zip(WINDOW.iter().rev()) {
-                *d = w * v;
+            for (((o, &c), &w), &v) in head2
+                .iter_mut()
+                .zip(carry2)
+                .zip(falling)
+                .zip(d[block - HALF..].iter().rev())
+            {
+                *o = c + w * -v;
+            }
+            for (o, &v) in middle.iter_mut().zip(d[HALF..block - HALF].iter().rev()) {
+                *o = -v;
+            }
+            let (tail1, tail2) = overlap.split_at_mut(HALF);
+            for ((o, &w), &v) in tail1
+                .iter_mut()
+                .zip(falling.iter().rev())
+                .zip(d[..HALF].iter().rev())
+            {
+                *o = w * -v;
+            }
+            for ((o, &w), &v) in tail2.iter_mut().zip(rising.iter().rev()).zip(&d[..HALF]) {
+                *o = w * -v;
             }
         }
-        out.copy_from_slice(&acc[..n]);
-        overlap.copy_from_slice(&acc[n..]);
     }
 }
