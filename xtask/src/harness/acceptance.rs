@@ -497,7 +497,7 @@ fn grade_case_with_runtime(
     }
 }
 
-fn parity_passes(row: &Value) -> bool {
+pub(super) fn parity_passes(row: &Value) -> bool {
     row.get("parity").is_some_and(|proof| {
         s(proof, "status") == Some("pass") && s(proof, "source_timing_status") == Some("pass")
     })
@@ -668,8 +668,18 @@ pub(crate) fn acceptance_iter(
             {
                 passed.insert(profile.to_owned());
             }
-            let verdict = grade_case_with_runtime(root, contract, &row, identity, target, runtime);
-            reasons.extend(verdict.reasons);
+            if row.get("open_case") == Some(&Value::Bool(true)) {
+                // A listed open case has no timing or memory to grade; its failing
+                // parity already withholds acceptance.
+                reasons.push(format!("{id}: listed open case"));
+                if let Err(error) = validate_case_evidence(&row, identity, s(contract, "id")) {
+                    reasons.push(format!("{id}: {error}"));
+                }
+            } else {
+                let verdict =
+                    grade_case_with_runtime(root, contract, &row, identity, target, runtime);
+                reasons.extend(verdict.reasons);
+            }
         }
     }
     if ids.is_empty() || !all_parity {
