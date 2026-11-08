@@ -18,6 +18,22 @@ pub(crate) struct RangeDecoder<'a> {
     rem: u32,
 }
 
+/// Where a [`RangeDecoder`] stands in its frame, without the frame: what
+/// [`RangeDecoder::resume`] continues from.
+#[derive(Clone, Copy, Debug, Default)]
+pub(crate) struct Position {
+    /// Bytes of the frame still read (fewer after [`RangeDecoder::shrink`]).
+    len: usize,
+    offset: usize,
+    end_offset: usize,
+    end_window: u32,
+    end_bits: u32,
+    total_bits: i32,
+    rng: u32,
+    val: u32,
+    rem: u32,
+}
+
 const SYM_BITS: u32 = 8;
 const CODE_EXTRA: u32 = 7;
 const CODE_TOP: u32 = 1 << 31;
@@ -49,6 +65,36 @@ impl<'a> RangeDecoder<'a> {
         decoder.val = decoder.rng - 1 - (decoder.rem >> (SYM_BITS - CODE_EXTRA));
         decoder.normalize();
         decoder
+    }
+
+    /// The decoder's position, to [`resume`](Self::resume) on the same frame.
+    pub(crate) fn position(&self) -> Position {
+        Position {
+            len: self.data.len(),
+            offset: self.offset,
+            end_offset: self.end_offset,
+            end_window: self.end_window,
+            end_bits: self.end_bits,
+            total_bits: self.total_bits,
+            rng: self.rng,
+            val: self.val,
+            rem: self.rem,
+        }
+    }
+
+    /// Continue decoding `data` from `position`, taken from a decoder of the same bytes.
+    pub(crate) fn resume(data: &'a [u8], position: Position) -> Self {
+        RangeDecoder {
+            data: &data[..position.len.min(data.len())],
+            offset: position.offset,
+            end_offset: position.end_offset,
+            end_window: position.end_window,
+            end_bits: position.end_bits,
+            total_bits: position.total_bits,
+            rng: position.rng,
+            val: position.val,
+            rem: position.rem,
+        }
     }
 
     #[inline(always)]
@@ -238,6 +284,25 @@ impl<'a> RangeDecoder<'a> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn a_resumed_decoder_continues_where_it_stood() {
+        let data: Vec<u8> = (0..40u32).map(|i| (i * 97 + 13) as u8).collect();
+        let mut rc = RangeDecoder::new(&data);
+        for _ in 0..20 {
+            rc.uint(37);
+        }
+        rc.shrink(3);
+        let mut resumed = RangeDecoder::resume(&data, rc.position());
+        for _ in 0..20 {
+            assert_eq!(resumed.uint(256), rc.uint(256));
+            assert_eq!(resumed.bits(5), rc.bits(5));
+        }
+        assert_eq!(
+            (resumed.tell_frac(), resumed.range()),
+            (rc.tell_frac(), rc.range())
+        );
+    }
 
     #[test]
     fn an_empty_frame_decodes_the_most_probable_symbols() {
