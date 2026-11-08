@@ -84,11 +84,11 @@ channel counts that change between frames.
 
 - Specification: RFC 9639.
 - Vectors (outside git): the IETF CELLAR decoder testbench
-  (`subset`, `uncommon`, `faulty`; CC0) and streams `tools/flac_vectors.py generate` makes
+  (`subset`, `uncommon`, `faulty`; CC0) and streams `harness/codecs/flac/flac_vectors.py generate` makes
   with FFmpeg's encoder and the reference `flac` encoder over bit depths 4 to 32, 1 to 8
   channels, sample rates 1 Hz to 768 kHz, block sizes 16 to 65535, every compression level,
   LPC type, stereo mode, partition order and prediction order 1 to 32.
-- `tools/flac_vectors.py grade target/release/examples/decode_flac DIR...` compares the
+- `harness/codecs/flac/flac_vectors.py grade target/release/examples/decode_flac DIR...` compares the
   output with `ffmpeg -f f32le -c:a pcm_f32le` byte for byte, and the per-frame layouts
   and sample counts with `ffprobe -show_frames`; FLAC is graded bit-exact.
 - `cargo test -p triergon-codec-flac` runs predictor, layout and hand-built frame tests
