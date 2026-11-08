@@ -19,6 +19,7 @@ mod fuzz;
 mod harness;
 mod isobmff_bench;
 mod json;
+mod lanes;
 mod numpy;
 mod playback_golds;
 mod prepare;
@@ -26,6 +27,7 @@ mod process;
 mod progressive_bench;
 mod pyrandom;
 mod python;
+mod raster;
 mod sha256;
 mod shape;
 mod stats;
@@ -43,9 +45,9 @@ const USAGE: &str = "usage: cargo xtask <command>
 commands:
   check          everything CI runs: format, tests, lints, builds and the checks below
   check-simd     clippy and tests of the opt-in HEVC SIMD lane on the pinned nightly
-  prepare-check  once before `check`: the pinned FFmpeg and FreeType references, the
-                 fixtures, the required vectors, the font corpus and the workers (built with
-                 the reference first on PATH)
+  prepare-check  once before `check`: the pinned FFmpeg, FreeType, HarfBuzz, FriBidi and
+                 libass references, the fixtures, the required vectors, the font corpus and
+                 the workers (built with the reference first on PATH)
   check-links    every relative link in the Markdown files resolves
   check-design   harness data files parse and recorded gates keep their values
   check-safety   owned packages only, no build scripts, no unsafe code
@@ -123,7 +125,9 @@ commands:
                  corpus and the font features' manifests; compare reports the required
                  font features, --all every one (see `cargo xtask fonts --help`)
   shape          prepare|manifest|compare|ucd   triergon-shape against the pinned
-                 HarfBuzz and FriBidi reference (see `cargo xtask shape --help`)";
+                 HarfBuzz and FriBidi reference (see `cargo xtask shape --help`)
+  raster         prepare|manifest|compare   triergon-raster against the pinned libass
+                 reference (see `cargo xtask raster --help`)";
 
 fn main() -> ExitCode {
     if let Some(code) = without_cargo_library_path() {
@@ -131,6 +135,9 @@ fn main() -> ExitCode {
     }
     let args: Vec<String> = std::env::args().skip(1).collect();
     let root = root();
+    if let Some(lane) = args.first().and_then(|command| lanes::lane_named(command)) {
+        return lane_main(&root, lane, &args[1..]);
+    }
     let result = match args.first().map(String::as_str) {
         Some("check") => check(&root),
         Some("progressive") => {
@@ -198,17 +205,6 @@ fn main() -> ExitCode {
         Some("trace-identities") => return trace_identities(&root, &args[1..]),
         Some("codecs") => return failing(codecs::main(&root, &args[1..]), codecs::USAGE),
         Some("capture") => return failing(capture::main(&root, &args[1..]), capture::USAGE),
-        Some("fonts") => match fonts::reports(&args[1..]) {
-            Some(reports) => return fonts_compare(&root, &reports),
-            None => fonts::main(&root, &args[1..]),
-        },
-        Some("shape") => match shape::reports(&args[1..]) {
-            Some(reports) => match shape::write_inputs(&root) {
-                Ok(()) => return fonts_compare(&root, &reports),
-                Err(error) => Err(error),
-            },
-            None => shape::main(&root, &args[1..]),
-        },
         Some("build-workers") => {
             harness::build::main(&root, &args[1..]).map(|path| println!("{}", path.display()))
         }
@@ -485,7 +481,7 @@ fn fuzz_campaign(root: &Path, args: &[String]) -> ExitCode {
         seed: 280,
         maximum_input_bytes: 4 << 20,
         maximum_output_bytes: 8 << 20,
-        timeout_seconds: 3.0,
+        timeout_seconds: None,
     };
     // With --contract, the campaign runs that feature's cases and --manifest names
     // the feature's corpus manifest (by default the one beside the contract).
@@ -516,7 +512,7 @@ fn fuzz_campaign(root: &Path, args: &[String]) -> ExitCode {
                 "--maximum-output-bytes" => campaign.maximum_output_bytes = number()? as usize,
                 "--timeout-seconds" => {
                     campaign.timeout_seconds =
-                        value.parse().map_err(|_| format!("{flag}: not a number"))?;
+                        Some(value.parse().map_err(|_| format!("{flag}: not a number"))?);
                 }
                 _ => return Err(USAGE.to_owned()),
             }
@@ -647,6 +643,7 @@ fn compare(root: &Path, args: &[String]) -> Task {
         reference: &reference,
         input: &input,
         raw: path("--output")?,
+        timeout: harness::worker::DEFAULT_TIMEOUT,
     };
     use harness::parity::{catalogue_parity, colour_parity, parity, seek_parity};
     let result = match values.get("--operation").map_or("plain", String::as_str) {
@@ -852,6 +849,7 @@ fn prepare_check() -> Task {
         &["fonts", "prepare"],
         &["fonts", "fetch"],
         &["shape", "prepare"],
+        &["raster", "prepare"],
         &["build-workers"],
     ] {
         run(Command::new(&exe).args(step))?;
@@ -915,8 +913,33 @@ const REFERENCE_TRACE_CRATES: [&str; 5] = [
     "triergon-subtitles",
 ];
 
-/// The reports `fonts compare` stands for; exits with the first failing one's code.
-fn fonts_compare(root: &Path, reports: &[Vec<String>]) -> ExitCode {
+/// `cargo xtask COMMAND ARGS` for a lane: `compare` runs the reports of the
+/// features it selects, anything else is the lane's own subcommand.
+fn lane_main(root: &Path, lane: &lanes::Lane, args: &[String]) -> ExitCode {
+    let result = match args {
+        [command, rest @ ..] if command == "compare" => {
+            match lane
+                .reports(root, rest)
+                .and_then(|reports| (lane.write_inputs)(root).map(|()| reports))
+            {
+                Ok(reports) => return lane_compare(root, &reports),
+                Err(error) => Err(error),
+            }
+        }
+        _ => (lane.main)(root, args),
+    };
+    match result {
+        Ok(()) => ExitCode::SUCCESS,
+        Err(message) => {
+            eprintln!("{message}");
+            ExitCode::FAILURE
+        }
+    }
+}
+
+/// The reports `COMMAND compare` stands for; exits with the first failing one's
+/// code.
+fn lane_compare(root: &Path, reports: &[Vec<String>]) -> ExitCode {
     let mut result = ExitCode::SUCCESS;
     for args in reports {
         println!("$ cargo xtask report {}", args.join(" "));
@@ -928,39 +951,22 @@ fn fonts_compare(root: &Path, reports: &[Vec<String>]) -> ExitCode {
     result
 }
 
-/// `fonts compare` on the required font features, then one round of mutations of
-/// each feature's smoke cases.
-fn fonts_check(root: &Path) -> Task {
-    let reports = fonts::reports(&["compare".to_owned()]).expect("compare is a report");
-    if fonts_compare(root, &reports) != ExitCode::SUCCESS {
-        return Err("cargo xtask fonts compare failed".into());
+/// A lane's generated inputs, `COMMAND compare` on its required features, then
+/// one round of mutations of each feature's smoke cases.
+fn lane_check(root: &Path, lane: &lanes::Lane) -> Task {
+    (lane.write_inputs)(root)?;
+    let reports = lane.reports(root, &[])?;
+    if lane_compare(root, &reports) != ExitCode::SUCCESS {
+        return Err(format!("cargo xtask {} compare failed", lane.command));
     }
-    let smoke = fonts::FEATURES
-        .iter()
-        .filter(|f| f.required)
-        .map(|f| (f.id, &fonts::SMOKE_CASES[..]));
-    smoke_campaigns(root, smoke)
-}
-
-/// The Unicode tables are what their generator writes, `shape compare` on the
-/// required shaping features passes, then one round of mutations of each
-/// feature's smoke cases, as for the fonts.
-fn shape_check(root: &Path) -> Task {
-    println!("$ cargo xtask shape ucd --check");
-    shape::main(root, &["ucd".to_owned(), "--check".to_owned()])?;
-    shape::write_inputs(root)?;
-    let reports = shape::reports(&["compare".to_owned()]).expect("compare is a report");
-    if fonts_compare(root, &reports) != ExitCode::SUCCESS {
-        return Err("cargo xtask shape compare failed".into());
-    }
-    smoke_campaigns(root, shape::SMOKE_CASES.iter().map(|(f, c)| (*f, c)))
+    smoke_campaigns(root, lane.smoke.iter().copied())
 }
 
 /// One fuzz round over the given cases of each feature through the release and
 /// dev builds of its worker; a campaign that finds nothing is removed.
-fn smoke_campaigns<'a, C: AsRef<[&'a str]>>(
+fn smoke_campaigns<'a>(
     root: &Path,
-    features: impl Iterator<Item = (&'a str, C)>,
+    features: impl Iterator<Item = (&'a str, &'a [&'a str])>,
 ) -> Task {
     for (feature, cases) in features {
         let contract = format!("harness/features/{feature}/contract.json");
@@ -975,7 +981,7 @@ fn smoke_campaigns<'a, C: AsRef<[&'a str]>>(
             "--timeout-seconds",
             "60",
         ];
-        for case in cases.as_ref() {
+        for case in cases {
             args.extend(["--case", case]);
         }
         println!("$ cargo xtask fuzz {}", args.join(" "));
@@ -1067,8 +1073,12 @@ fn check(root: &Path) -> Task {
     check_simd(root)?;
     println!("$ cargo xtask worker-tests");
     worker_tests::run(root, None)?;
-    fonts_check(root)?;
-    shape_check(root)?;
+    lane_check(root, &fonts::LANE)?;
+    // The Unicode tables are what their generator writes.
+    println!("$ cargo xtask shape ucd --check");
+    shape::main(root, &["ucd".to_owned(), "--check".to_owned()])?;
+    lane_check(root, &shape::LANE)?;
+    lane_check(root, &raster::LANE)?;
     check_safety(root)?;
     check_design(root)?;
     check_links(root)?;

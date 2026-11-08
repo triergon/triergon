@@ -17,13 +17,15 @@ Crates depend only on layers below them. Core never depends on a format.
 | Subtitles | [`triergon-subtitles`](../crates/subtitles) | Text cue extraction and bitmap subtitle decoding |
 | Fonts | [`triergon-font`](../crates/font) | OpenType and TrueType faces: tables, collections, cmap, names, `glyf` and CFF/CFF2 outlines, metrics, kerning, face matching |
 | Shaping | [`triergon-shape`](../crates/shape) | OpenType shaping with the script shapers, the bidirectional algorithm, Unicode properties |
+| Rasterising | [`triergon-raster`](../crates/raster) | Glyph outlines in 26.6 fixed point, their transforms, border stroking, the tile rasteriser, blur, composition and clipping of the alpha bitmaps a subtitle is drawn from |
 | Pixels | [`triergon-pixel`](../crates/pixel) | Decoded-picture views, coded YUV 4:2:0 pictures, BT.601 RGBA to YUV, letterbox into 1920×1080 RGBA |
 | Codecs | [`triergon-codec`](../crates/codec); [`triergon-codec-aac`](../crates/codec-aac), [`-ac3`](../crates/codec-ac3), [`-dca`](../crates/codec-dca), [`-flac`](../crates/codec-flac), [`-mp3`](../crates/codec-mp3), [`-opus`](../crates/codec-opus), [`-vorbis`](../crates/codec-vorbis), [`-h264`](../crates/codec-h264), [`-hevc`](../crates/codec-hevc); [`triergon-codec-mpeg1`](../crates/codec-mpeg1) | Decoder traits, audio vocabulary and the shared inverse MDCT; software decoders; MPEG-1 video encoder |
 | Composition | [`triergon`](../crates/triergon), [`triergon-playback`](../crates/playback), [`triergon-session`](../crates/session), [`triergon-capture`](../crates/capture) | Consumer facade with `AnyReader`; packet feeds over the readers; decode sessions over the codecs; capture sessions from RGBA to MPEG-TS |
-| Tooling | [`media-worker`](../crates/worker), [`codec-worker`](../crates/codec-worker), [`capture-worker`](../crates/capture-worker), [`playback-worker`](../crates/playback-worker), [`font-worker`](../crates/font-worker), [`shape-worker`](../crates/shape-worker), [`harness/`](../harness), [`tools/`](../tools) | Differential and benchmark workers; not part of the library |
+| Tooling | [`media-worker`](../crates/worker), [`codec-worker`](../crates/codec-worker), [`capture-worker`](../crates/capture-worker), [`playback-worker`](../crates/playback-worker), [`font-worker`](../crates/font-worker), [`shape-worker`](../crates/shape-worker), [`raster-worker`](../crates/raster-worker), [`harness/`](../harness), [`tools/`](../tools) | Differential and benchmark workers; not part of the library |
 
-The FFmpeg reference workers, the FreeType font reference and the HarfBuzz and FriBidi
-shaping reference live in `harness/` as separate processes. They are never linked into a library crate.
+The FFmpeg reference workers, the FreeType font reference, the HarfBuzz and FriBidi
+shaping reference and the libass rasterising reference live in `harness/` as separate
+processes. They are never linked into a library crate.
 
 ## Input and work model
 
@@ -133,11 +135,11 @@ performance gates where it touches hot code.
    |---|---|
    | `triergon-font` | Faces, `cmap`, names, outlines, metrics, `kern`, face matching, a budgeted value `Store`; raw table access for the shaper |
    | `triergon-shape` | Unicode data generated from the pinned UCD releases its references compiled, the bidirectional algorithm as FriBidi resolves it, and OpenType shaping (GDEF, GSUB, GPOS, `kern` fallback) with the script shapers libass reaches through HarfBuzz: default, Arabic, Hebrew, Indic, Khmer, Myanmar, Thai, Hangul and the Universal Shaping Engine |
-   | `triergon-raster` | Outlines in 26.6 fixed point, flattening, stroking for borders, the tile rasteriser, Gaussian and box blur, and the alpha bitmaps borders and shadows combine into |
+   | `triergon-raster` | Outlines in 26.6 fixed point, the glyph transform and its quantisation, flattening, stroking for borders, the tile rasteriser, Gaussian and box blur, the alpha bitmaps borders and shadows combine into, and their rectangle clipping |
    | `triergon-ass` | Script and Matroska-packet parsing, styles, typed override tags, animation, karaoke, drawings, line wrapping, alignment, collisions, `\clip`/`\iclip`, and the renderer |
 
-   `triergon-font` and `triergon-shape` exist; the other two are planned. A Triergon worker and a libass
-   worker will render the same script at the same times and frame sizes, and the harness
+   `triergon-font`, `triergon-shape` and `triergon-raster` exist; `triergon-ass` is
+   planned. A Triergon worker and a libass worker will render the same script at the same times and frame sizes, and the harness
    will compare every image and position exactly. Behaviour where libass departs from the
    ASS specification by choice will follow the compat-policy convention above.
    The renderer offers no hinting option until libass's hinting-enabled modes and

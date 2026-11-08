@@ -272,7 +272,7 @@ pub fn main(root: &Path, args: &[String]) -> Result<i32, String> {
                 seed: a.number("seed")?.unwrap_or(280) as u64,
                 maximum_input_bytes: 4 << 20,
                 maximum_output_bytes: 8 << 20,
-                timeout_seconds,
+                timeout_seconds: Some(timeout_seconds),
             };
             let only: Vec<String> = a
                 .get("only")

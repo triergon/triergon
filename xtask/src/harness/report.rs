@@ -8,6 +8,7 @@ use std::fs::{self, OpenOptions};
 use std::io::{BufWriter, Write};
 use std::path::{Path, PathBuf};
 use std::process::Command;
+use std::time::Duration;
 
 use super::acceptance::acceptance;
 use super::comparison::reference_summary;
@@ -16,6 +17,7 @@ use super::parity::{self, Comparison, Run};
 use super::provenance::source_identity_error;
 use super::timing::{Operation, benchmark};
 use super::validation::{self, selected_operation};
+use super::worker;
 use crate::checks::read_json;
 use crate::corpus::write_json;
 use crate::json::{self, Value};
@@ -290,6 +292,8 @@ pub struct PrefixFeature {
     pub corpus: PathBuf,
     /// The work values the contract compares.
     pub work_fields: Vec<String>,
+    /// How long one worker run may take (the contract's `timeout_seconds`).
+    pub timeout: Duration,
 }
 
 impl PrefixFeature {
@@ -330,6 +334,8 @@ impl PrefixFeature {
             manifest: manifest.to_path_buf(),
             corpus,
             work_fields: super::comparison::work_fields(&document)?,
+            timeout: worker::contract_timeout(&document)
+                .map_err(|e| format!("{}: {e}", contract.display()))?,
             id,
         })
     }
@@ -466,6 +472,7 @@ pub fn run(root: &Path, options: &Options) -> Result<i32, String> {
     let (candidate, native) = validation::current_workers(root, &identity)?;
     let contract = read_json(&options.contract)?;
     let work_fields = super::comparison::work_fields(&contract)?;
+    let timeout = worker::contract_timeout(&contract)?;
     let candidate_name = s(&contract, "candidate")
         .unwrap_or("media-worker")
         .to_owned();
@@ -589,6 +596,7 @@ pub fn run(root: &Path, options: &Options) -> Result<i32, String> {
                 reference: &reference,
                 input: &path,
                 raw: options.output.join(&id),
+                timeout,
             };
             timed = Some((
                 reference.clone(),
@@ -598,6 +606,7 @@ pub fn run(root: &Path, options: &Options) -> Result<i32, String> {
                     arguments: arguments.clone(),
                     candidate_options: vec![],
                     work_fields: work_fields.clone(),
+                    timeout,
                 },
             ));
             parity::feed_parity(
@@ -622,6 +631,7 @@ pub fn run(root: &Path, options: &Options) -> Result<i32, String> {
                 reference: &reference,
                 input: &path,
                 raw: options.output.join(&id),
+                timeout,
             };
             let comparison = rule.map(|rule| Comparison {
                 rule,
@@ -651,6 +661,7 @@ pub fn run(root: &Path, options: &Options) -> Result<i32, String> {
                     arguments,
                     candidate_options: vec![],
                     work_fields: work_fields.clone(),
+                    timeout,
                 },
             ));
             if catalogue {

@@ -1,0 +1,17 @@
+{
+  "schema": 1,
+  "reference": "libass-native",
+  "note": "libass 0.17.5's folds, recorded by `cargo xtask raster manifest --record`; never edited by hand.",
+  "pins": {
+    "bitmaps-required-0": {
+      "packets": 280,
+      "bytes": 5904295,
+      "digest": 17026255702179323931
+    },
+    "bitmaps-required-1": {
+      "packets": 280,
+      "bytes": 14527237,
+      "digest": 880646678962253778
+    }
+  }
+}

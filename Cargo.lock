@@ -53,6 +53,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "raster-worker"
+version = "0.0.0"
+dependencies = [
+ "triergon-core",
+ "triergon-font",
+ "triergon-harness-protocol",
+ "triergon-raster",
+]
+
+[[package]]
 name = "shape-worker"
 version = "0.0.0"
 dependencies = [
@@ -276,6 +286,14 @@ dependencies = [
  "triergon-mpegts",
  "triergon-session",
  "triergon-subtitles",
+]
+
+[[package]]
+name = "triergon-raster"
+version = "0.0.0"
+dependencies = [
+ "triergon-core",
+ "triergon-font",
 ]
 
 [[package]]

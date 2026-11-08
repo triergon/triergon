@@ -1,0 +1,67 @@
+{
+  "schema": 1,
+  "reference": "libass-native",
+  "note": "libass 0.17.5's folds, recorded by `cargo xtask raster manifest --record`; never edited by hand.",
+  "pins": {
+    "arimo-regular-ttf-853": {
+      "packets": 48,
+      "bytes": 119807,
+      "digest": 9944271903982486744
+    },
+    "arimo-regular-ttf-16384": {
+      "packets": 48,
+      "bytes": 78171229,
+      "digest": 11503633738340801275
+    },
+    "notosans-regular-otf-853": {
+      "packets": 48,
+      "bytes": 54905,
+      "digest": 16794276899384754780
+    },
+    "notosans-regular-otf-16384": {
+      "packets": 48,
+      "bytes": 7172210,
+      "digest": 9714635748040376871
+    },
+    "notosansjp-regular-otf-853": {
+      "packets": 48,
+      "bytes": 156792,
+      "digest": 700471380863694830
+    },
+    "notosansjp-regular-otf-16384": {
+      "packets": 48,
+      "bytes": 13995903,
+      "digest": 6325701183138036997
+    },
+    "notosansjp-vf-otf-853": {
+      "packets": 48,
+      "bytes": 130857,
+      "digest": 6323163064372305807
+    },
+    "notosansjp-vf-otf-16384": {
+      "packets": 48,
+      "bytes": 1812437,
+      "digest": 11374559777815552980
+    },
+    "notosanscjk-regular-ttc-853": {
+      "packets": 48,
+      "bytes": 144401,
+      "digest": 13600920902299982875
+    },
+    "notosanscjk-regular-ttc-16384": {
+      "packets": 48,
+      "bytes": 2670752,
+      "digest": 4132523919802118990
+    },
+    "authored-cff-features-otf-853": {
+      "packets": 48,
+      "bytes": 34135,
+      "digest": 10309762595279257093
+    },
+    "authored-cff-features-otf-16384": {
+      "packets": 48,
+      "bytes": 809960,
+      "digest": 2386119485020872017
+    }
+  }
+}

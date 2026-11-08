@@ -72,6 +72,8 @@ pub trait Host {
 /// The real host, with workers and instrumentation under `root/target/harness`.
 pub struct Native<'a> {
     pub root: &'a Path,
+    /// How long one observer run may take.
+    pub timeout: Duration,
 }
 
 impl Native<'_> {
@@ -107,6 +109,7 @@ impl Host for Native<'_> {
             mode,
             arguments,
             kernel,
+            self.timeout,
         )
     }
 
@@ -164,6 +167,7 @@ fn observe(
     mode: &str,
     arguments: &[String],
     kernel: bool,
+    timeout: Duration,
 ) -> Value {
     let linux = host.linux();
     if !library.exists() {
@@ -238,11 +242,12 @@ fn observe(
             code,
             stdout,
             stderr,
-        }) = worker::run(&argv, &env, Duration::from_secs(30))?
+        }) = worker::run(&argv, &env, timeout)?
         else {
             return Err(format!(
-                "Command '{}' timed out after 30 seconds",
-                argv[0].to_string_lossy()
+                "Command '{}' timed out after {} seconds",
+                argv[0].to_string_lossy(),
+                timeout.as_secs()
             ));
         };
         let raw = fs::read(&receipt).ok();
@@ -1092,6 +1097,8 @@ struct Invocation<'a> {
     candidate_arguments: Option<&'a [String]>,
     expected_outputs: Option<&'a Value>,
     work_fields: Option<&'a [String]>,
+    /// How long one observer run may take.
+    timeout: Duration,
 }
 
 impl Invocation<'_> {
@@ -1211,7 +1218,15 @@ pub fn admission(root: &Path, candidate: &Path, reference: &Path) -> R<()> {
         fs::canonicalize(candidate).map_err(|e| format!("{}: {e}", candidate.display()))?;
     let reference =
         fs::canonicalize(reference).map_err(|e| format!("{}: {e}", reference.display()))?;
-    let mut certificate = qualification(&Native { root }, root, &candidate, &reference);
+    let mut certificate = qualification(
+        &Native {
+            root,
+            timeout: worker::DEFAULT_TIMEOUT,
+        },
+        root,
+        &candidate,
+        &reference,
+    );
     let result = if s(&certificate, "status") != Some("qualified-selected-workers") {
         Err("memory observer refused admission".into())
     } else if !linux::certificate_current(root, &certificate) {
@@ -1264,6 +1279,7 @@ pub fn collect(
                 candidate_arguments: Some(&candidate_arguments),
                 expected_outputs: None,
                 work_fields: Some(&operation.work_fields),
+                timeout: operation.timeout,
             },
         );
     }
@@ -1286,6 +1302,7 @@ pub fn collect(
             candidate_arguments: None,
             expected_outputs: None,
             work_fields: Some(&operation.work_fields),
+            timeout: operation.timeout,
         },
     )
 }
@@ -1315,6 +1332,7 @@ pub(crate) fn collect_command(
             candidate_arguments: None,
             expected_outputs: Some(expected_outputs),
             work_fields: None,
+            timeout: worker::DEFAULT_TIMEOUT,
         },
     )
 }
@@ -1349,6 +1367,7 @@ pub(crate) fn collect_commands(
             candidate_arguments: Some(commands.candidate),
             expected_outputs: Some(commands.expected_outputs),
             work_fields: None,
+            timeout: worker::DEFAULT_TIMEOUT,
         },
     )
 }
@@ -1370,7 +1389,10 @@ fn collect_invocation(
             ("samples", Value::Array(vec![])),
         ]));
     }
-    let host = Native { root };
+    let host = Native {
+        root,
+        timeout: invocation.timeout,
+    };
     let before = cpu_snapshot()?;
     let certificate = qualification(&host, root, candidate, reference);
     let mut result = measure(
@@ -1586,6 +1608,7 @@ mod command_tests {
             candidate_arguments: Some(&candidate),
             expected_outputs: None,
             work_fields: None,
+            timeout: worker::DEFAULT_TIMEOUT,
         };
         assert_eq!(invocation.arguments_for(true), candidate);
         assert_eq!(invocation.arguments_for(false), reference);
@@ -1601,6 +1624,7 @@ mod command_tests {
             candidate_arguments: None,
             expected_outputs: None,
             work_fields: None,
+            timeout: worker::DEFAULT_TIMEOUT,
         };
         assert_eq!(invocation.arguments_for(true), arguments);
         assert_eq!(invocation.arguments_for(false), arguments);

@@ -264,7 +264,7 @@ struct Candidate {
     features: &'static [&'static str],
 }
 
-const ADDITIONAL_CANDIDATES: [Candidate; 7] = [
+const ADDITIONAL_CANDIDATES: [Candidate; 8] = [
     Candidate {
         name: "playback-worker",
         package: "playback-worker",
@@ -292,6 +292,12 @@ const ADDITIONAL_CANDIDATES: [Candidate; 7] = [
     Candidate {
         name: "shape-worker",
         package: "shape-worker",
+        example: None,
+        features: &[],
+    },
+    Candidate {
+        name: "raster-worker",
+        package: "raster-worker",
         example: None,
         features: &[],
     },
@@ -451,8 +457,8 @@ fn candidate_records(root: &Path, built: &[(&str, Vec<String>)]) -> R<Value> {
     Ok(Value::object(candidates))
 }
 
-/// A comparison reference linked against one pinned FFmpeg, FreeType or HarfBuzz
-/// profile, and possibly further profiles.
+/// A comparison reference linked against one pinned profile, and possibly
+/// further profiles.
 struct ProfileReference {
     profile: &'static str,
     /// Further pinned profiles it links: their pkg-config directories follow the
@@ -474,6 +480,9 @@ struct ProfileReference {
     /// decode, capture and font builds record their configuration in the profile's
     /// `build.json` instead).
     identity: bool,
+    /// Fails when the profile's `build.json` is not the build its prepare command
+    /// makes now.
+    prepared: Option<fn(&Value) -> R<()>>,
 }
 
 const CONTAINER_PACKAGES: &[&str] = &["libavformat", "libavcodec", "libavutil"];
@@ -489,9 +498,17 @@ const SHAPE_OPTIONS: &[&str] = &[
     "-Wextra",
     "-Werror",
 ];
+/// The rasterising reference takes libass's own compiler flags from
+/// `libass-internal.pc`, so its included stages compute as the library does.
+/// Those zero uninitialised locals in the harness's own code too, so a read of
+/// one stays an error there (`-Werror=uninitialized`; GCC's
+/// `-Wmaybe-uninitialized`, which clang does not know, through `-Wall
+/// -Werror`). libass's sources are included from an `-isystem` directory and
+/// compiled without warnings, as system headers are.
+const RASTER_OPTIONS: &[&str] = &["-Wall", "-Wextra", "-Werror", "-Werror=uninitialized"];
 const CAPTURE_PACKAGES: &[&str] = &["libavformat", "libavcodec", "libswscale", "libavutil"];
 
-const PROFILE_REFERENCES: [ProfileReference; 9] = [
+const PROFILE_REFERENCES: [ProfileReference; 10] = [
     ProfileReference {
         profile: ".research/reference-video",
         linked: &[],
@@ -505,6 +522,7 @@ const PROFILE_REFERENCES: [ProfileReference; 9] = [
         link_static: true,
         options: CONTAINER_OPTIONS,
         identity: true,
+        prepared: None,
     },
     ProfileReference {
         profile: ".research/reference-formats",
@@ -519,6 +537,7 @@ const PROFILE_REFERENCES: [ProfileReference; 9] = [
         link_static: true,
         options: CONTAINER_OPTIONS,
         identity: true,
+        prepared: None,
     },
     ProfileReference {
         profile: ".research/reference-decode",
@@ -540,6 +559,7 @@ const PROFILE_REFERENCES: [ProfileReference; 9] = [
         link_static: true,
         options: RELEASE_OPTIONS,
         identity: false,
+        prepared: None,
     },
     ProfileReference {
         profile: ".research/reference-capture-static",
@@ -554,6 +574,7 @@ const PROFILE_REFERENCES: [ProfileReference; 9] = [
         link_static: true,
         options: RELEASE_OPTIONS,
         identity: false,
+        prepared: None,
     },
     ProfileReference {
         profile: ".research/reference-capture-small-static",
@@ -568,6 +589,7 @@ const PROFILE_REFERENCES: [ProfileReference; 9] = [
         link_static: true,
         options: RELEASE_OPTIONS,
         identity: false,
+        prepared: None,
     },
     ProfileReference {
         profile: ".research/reference-formats",
@@ -582,6 +604,7 @@ const PROFILE_REFERENCES: [ProfileReference; 9] = [
         link_static: true,
         options: CONTAINER_OPTIONS,
         identity: false,
+        prepared: None,
     },
     ProfileReference {
         profile: ".research/reference-formats",
@@ -596,6 +619,7 @@ const PROFILE_REFERENCES: [ProfileReference; 9] = [
         link_static: true,
         options: CONTAINER_OPTIONS,
         identity: false,
+        prepared: None,
     },
     ProfileReference {
         profile: ".research/freetype",
@@ -610,6 +634,7 @@ const PROFILE_REFERENCES: [ProfileReference; 9] = [
         link_static: true,
         options: RELEASE_OPTIONS,
         identity: false,
+        prepared: None,
     },
     ProfileReference {
         profile: ".research/harfbuzz",
@@ -624,6 +649,22 @@ const PROFILE_REFERENCES: [ProfileReference; 9] = [
         link_static: true,
         options: SHAPE_OPTIONS,
         identity: false,
+        prepared: None,
+    },
+    ProfileReference {
+        profile: ".research/libass",
+        linked: &[".research/freetype", ".research/harfbuzz"],
+        binary: "libass-raster-worker",
+        source: "harness/reference.c",
+        define: Some("-DTRIERGON_RASTER_REFERENCE=1"),
+        record: "libass-native",
+        kind: "libass 0.17.5, static, against the FreeType, FriBidi and HarfBuzz references, without floating-point contraction, with uninitialised automatic variables zeroed; its outline, stroker, rasteriser, blur, composition and clipping stages on the plain C bitmap engine (c: tile order 4, align order 4) on every host, and on the host's own engine for raster-simd- operations",
+        libraries: "libass_reference",
+        packages: &["libass-internal"],
+        link_static: true,
+        options: RASTER_OPTIONS,
+        identity: false,
+        prepared: Some(crate::raster::check_prepared),
     },
 ];
 
@@ -713,6 +754,9 @@ fn build_selected(root: &Path, comparison_build: bool, only: Option<&str>) -> R<
         if !profiles().all(|profile| root.join(profile).join("build.json").exists()) {
             let _ = fs::remove_file(&path);
             continue;
+        }
+        if let Some(prepared) = reference.prepared {
+            prepared(&read_json(&build)?)?;
         }
         let pkgconfig = std::env::join_paths(
             profiles().map(|profile| root.join(profile).join("install/lib/pkgconfig")),

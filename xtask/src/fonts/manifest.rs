@@ -1,17 +1,13 @@
 //! The font features' corpus manifests, generated. Every file of the font corpus
 //! (`harness/fonts/corpus.json`) becomes cases of each feature's load settings; the
-//! work each case must fold is pinned in `harness/features/<id>/pins.json`. Pins are
-//! the FreeType reference's folds, written only by [`record`] and never edited by
-//! hand, so a change of pins is a change of reference output.
+//! work each case must fold is pinned in `harness/features/<id>/pins.json`, the
+//! FreeType reference's folds (see [`crate::lanes`]).
 
 use std::path::Path;
-use std::process::Command;
-use std::sync::Mutex;
-use std::sync::atomic::{AtomicUsize, Ordering};
 
 use super::{CORPUS, corpus};
-use crate::harness::manifest::canonical;
 use crate::json::Value;
+use crate::lanes::{self, Lane};
 
 type R<T> = Result<T, String>;
 
@@ -56,46 +52,40 @@ enum Load {
     Sized(&'static [i32]),
 }
 
-/// A font feature: its id and load settings, and whether `cargo xtask check`
-/// requires it.
-#[derive(Clone, Copy)]
-pub struct Feature {
-    pub id: &'static str,
-    load: Load,
-    pub required: bool,
-}
+pub const FEATURES: [&str; 3] = ["font-outlines", "font-hinting-none", "font-hinting-modes"];
 
-pub const FEATURES: [Feature; 3] = [
-    Feature {
-        id: "font-outlines",
-        load: Load::Faces,
-        required: true,
-    },
-    Feature {
-        id: "font-hinting-none",
-        load: Load::Sized(&[UNHINTED_HEIGHT]),
-        required: true,
-    },
-    Feature {
-        id: "font-hinting-modes",
-        load: Load::Sized(&HINTING_HEIGHTS),
-        required: false,
-    },
-];
+pub const LANE: Lane = Lane {
+    command: "fonts",
+    main: super::main,
+    features: &FEATURES,
+    reference: "freetype-native",
+    pin_note: "FreeType 2.15.0's folds, recorded by `cargo xtask fonts manifest --record`; never edited by hand.",
+    report_directory: ".research/font-report",
+    manifest_directory: ".research/fonts/manifests",
+    row_sources: &ROW_SOURCES,
+    rows,
+    note,
+    directory: |_| DIRECTORY,
+    write_inputs: lanes::no_inputs,
+    check_inputs: lanes::no_checks,
+    smoke: &[
+        ("font-outlines", &SMOKE_CASES),
+        ("font-hinting-none", &SMOKE_CASES),
+    ],
+};
 
-fn feature(id: &str) -> R<Feature> {
-    FEATURES
-        .into_iter()
-        .find(|f| f.id == id)
-        .ok_or_else(|| format!("{id}: not a font feature"))
-}
-
-fn pins_path(root: &Path, id: &str) -> std::path::PathBuf {
-    root.join("harness/features").join(id).join("pins.json")
+fn load(id: &str) -> R<Load> {
+    match id {
+        "font-outlines" => Ok(Load::Faces),
+        "font-hinting-none" => Ok(Load::Sized(&[UNHINTED_HEIGHT])),
+        "font-hinting-modes" => Ok(Load::Sized(&HINTING_HEIGHTS)),
+        _ => Err(format!("{id}: not a font feature")),
+    }
 }
 
 /// The case rows of a feature, without expected work, in corpus order.
-fn rows(root: &Path, feature: Feature) -> R<Vec<Value>> {
+fn rows(root: &Path, id: &str) -> R<Vec<Value>> {
+    let load = load(id)?;
     let mut rows = Vec::new();
     for (source, files) in corpus(root)? {
         if !super::serves(&source, "font") {
@@ -128,7 +118,7 @@ fn rows(root: &Path, feature: Feature) -> R<Vec<Value>> {
                 fields.push(("arguments", Value::strings(arguments)));
                 Value::object(fields)
             };
-            match feature.load {
+            match load {
                 Load::Faces => rows.push(row(stem.clone(), Vec::new())),
                 Load::Sized(heights) => {
                     for &height in heights {
@@ -144,8 +134,8 @@ fn rows(root: &Path, feature: Feature) -> R<Vec<Value>> {
     Ok(rows)
 }
 
-fn note(feature: Feature) -> &'static str {
-    match feature.id {
+fn note(id: &str) -> &'static str {
+    match id {
         "font-outlines" => {
             "Every file of the font corpus with every face: face data and unscaled outlines."
         }
@@ -158,201 +148,6 @@ fn note(feature: Feature) -> &'static str {
     }
 }
 
-/// The pins of `id`: case id to expected work.
-fn pins(root: &Path, id: &str) -> R<Vec<(String, Value)>> {
-    let path = pins_path(root, id);
-    let document =
-        crate::checks::read_json(&path).map_err(|e| format!("{}: {e}", path.display()))?;
-    match document.get("pins") {
-        Some(Value::Object(pins)) => Ok(pins.clone()),
-        _ => Err(format!("{}: no pins", path.display())),
-    }
-}
-
-/// The generated manifest of feature `id`: its rows with their pinned work. The
-/// case ids and the pinned ids must match exactly.
-pub fn manifest(root: &Path, id: &str) -> R<Value> {
-    let feature = feature(id)?;
-    let pins = pins(root, id)?;
-    let rows = rows(root, feature)?;
-    if rows.len() != pins.len() {
-        return Err(format!(
-            "{id}: {} cases but {} pins; re-record them",
-            rows.len(),
-            pins.len()
-        ));
-    }
-    let mut cases = Vec::new();
-    for (row, (pinned, expected)) in rows.into_iter().zip(pins) {
-        let case = row.get("id").and_then(Value::as_str).unwrap_or_default();
-        if case != pinned {
-            return Err(format!(
-                "{id}: case {case} is pinned as {pinned}; re-record them"
-            ));
-        }
-        let Value::Object(mut fields) = row else {
-            unreachable!("rows are objects")
-        };
-        fields.push(("expected".into(), expected));
-        cases.push(Value::Object(fields));
-    }
-    Ok(Value::object([
-        ("schema", Value::int(1)),
-        ("note", Value::str(note(feature))),
-        ("directory", Value::str(DIRECTORY)),
-        ("cases", Value::Array(cases)),
-    ]))
-}
-
-/// The pin file of `id` holding `pins` in case order.
-fn pin_file(pins: Vec<(String, Value)>) -> Value {
-    Value::object([
-        ("schema", Value::int(1)),
-        ("reference", Value::str("freetype-native")),
-        (
-            "note",
-            Value::str(
-                "FreeType 2.15.0's folds, recorded by `cargo xtask fonts manifest --record`; never edited by hand.",
-            ),
-        ),
-        ("pins", Value::Object(pins)),
-    ])
-}
-
-/// Every registered font feature's generated manifest builds and its pin file is
-/// exactly what [`record`] writes for its cases.
-pub fn check(root: &Path) -> Vec<String> {
-    let mut errors = Vec::new();
-    for feature in FEATURES {
-        let registered = root.join("harness/features").join(feature.id);
-        if !registered.join("contract.json").is_file() {
-            continue;
-        }
-        if let Err(error) = manifest(root, feature.id) {
-            errors.push(error);
-            continue;
-        }
-        let path = pins_path(root, feature.id);
-        let committed = std::fs::read_to_string(&path).unwrap_or_default();
-        let rewritten = pins(root, feature.id).map(|pins| canonical(&pin_file(pins)));
-        match rewritten {
-            Ok(text) if text == committed => {}
-            _ => errors.push(format!(
-                "{}: not in the form `cargo xtask fonts manifest --record` writes",
-                path.display()
-            )),
-        }
-    }
-    errors
-}
-
-/// Re-records the pins of every feature from the built FreeType reference.
-pub fn record(root: &Path) -> R<()> {
-    let identity = crate::checks::read_json(&root.join("target/harness/identity.json"))?;
-    let reference = crate::harness::comparison::reference_named(&identity, "freetype-native")?;
-    let worker = root.join(
-        reference
-            .get("path")
-            .and_then(Value::as_str)
-            .unwrap_or_default(),
-    );
-    let built = crate::sha256::hex(
-        &std::fs::read(&worker).map_err(|e| format!("{}: {e}", worker.display()))?,
-    );
-    if reference.get("sha256").and_then(Value::as_str) != Some(built.as_str()) {
-        return Err("the FreeType reference changed since build-workers; rebuild".into());
-    }
-    for feature in FEATURES {
-        let contract = root
-            .join("harness/features")
-            .join(feature.id)
-            .join("contract.json");
-        let contract = crate::checks::read_json(&contract)?;
-        let prefix = contract
-            .get("worker_operation")
-            .and_then(Value::as_str)
-            .ok_or_else(|| format!("{}: no worker_operation", feature.id))?;
-        let rows = rows(root, feature)?;
-        let folds = fold_all(root, &worker, &format!("{prefix}fold"), &rows)?;
-        let pins = rows
-            .iter()
-            .zip(folds)
-            .map(|(row, fold)| {
-                let id = row.get("id").and_then(Value::as_str).unwrap_or_default();
-                (id.to_owned(), fold)
-            })
-            .collect();
-        crate::corpus::write_json(&pins_path(root, feature.id), &pin_file(pins))?;
-        println!("{}: {} pins recorded", feature.id, rows.len());
-    }
-    Ok(())
-}
-
-/// The reference's `{packets, bytes, digest}` for every row, run in parallel.
-fn fold_all(root: &Path, worker: &Path, mode: &str, rows: &[Value]) -> R<Vec<Value>> {
-    let results: Mutex<Vec<Option<R<Value>>>> = Mutex::new(vec![None; rows.len()]);
-    let next = AtomicUsize::new(0);
-    let threads = std::thread::available_parallelism().map_or(4, std::num::NonZero::get);
-    std::thread::scope(|scope| {
-        for _ in 0..threads {
-            scope.spawn(|| {
-                loop {
-                    let at = next.fetch_add(1, Ordering::Relaxed);
-                    let Some(row) = rows.get(at) else { break };
-                    let result = fold(root, worker, mode, row);
-                    results.lock().expect("results")[at] = Some(result);
-                }
-            });
-        }
-    });
-    results
-        .into_inner()
-        .expect("results")
-        .into_iter()
-        .map(|r| r.unwrap_or_else(|| Err("not run".into())))
-        .collect()
-}
-
-fn fold(root: &Path, worker: &Path, mode: &str, row: &Value) -> R<Value> {
-    let file = row.get("file").and_then(Value::as_str).unwrap_or_default();
-    let arguments = row
-        .get("arguments")
-        .and_then(Value::as_array)
-        .unwrap_or_default()
-        .iter()
-        .filter_map(Value::as_str);
-    let output = Command::new(worker)
-        .arg(mode)
-        .arg(root.join(DIRECTORY).join(file))
-        .args(arguments)
-        .output()
-        .map_err(|e| format!("{}: {e}", worker.display()))?;
-    let id = row.get("id").and_then(Value::as_str).unwrap_or_default();
-    if !output.status.success() {
-        return Err(format!("{id}: the reference failed: {}", output.status));
-    }
-    let data = crate::json::parse(&String::from_utf8_lossy(&output.stdout))
-        .map_err(|e| format!("{id}: {e}"))?;
-    Ok(Value::object(["packets", "bytes", "digest"].map(|key| {
-        (key, data.get(key).cloned().unwrap_or(Value::Null))
-    })))
-}
-
-/// Writes every generated manifest to `directory/<id>/corpus.json` for reading.
-pub fn write(root: &Path, directory: &Path) -> R<()> {
-    for feature in FEATURES {
-        let path = directory.join(feature.id).join("corpus.json");
-        let manifest = manifest(root, feature.id)?;
-        let cases = manifest
-            .get("cases")
-            .and_then(Value::as_array)
-            .map_or(0, <[_]>::len);
-        crate::corpus::write_json(&path, &manifest)?;
-        println!("{}: {cases} cases", path.display());
-    }
-    Ok(())
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -360,9 +155,9 @@ mod tests {
     #[test]
     fn every_font_feature_generates_its_pinned_cases() {
         let root = Path::new(env!("CARGO_MANIFEST_DIR")).parent().unwrap();
-        assert!(check(root).is_empty(), "{:?}", check(root));
+        assert!(LANE.check(root).is_empty(), "{:?}", LANE.check(root));
         let count = |id| {
-            manifest(root, id)
+            LANE.manifest(root, id)
                 .unwrap()
                 .get("cases")
                 .and_then(Value::as_array)
@@ -370,14 +165,14 @@ mod tests {
                 .len()
         };
         assert_eq!(
-            FEATURES.map(|f| (f.id, count(f.id))),
+            FEATURES.map(|f| (f, count(f))),
             [
                 ("font-outlines", 51),
                 ("font-hinting-none", 102),
                 ("font-hinting-modes", 918)
             ]
         );
-        let none = manifest(root, "font-hinting-none").unwrap();
+        let none = LANE.manifest(root, "font-hinting-none").unwrap();
         let first = &none.get("cases").and_then(Value::as_array).unwrap()[1];
         assert_eq!(
             first.get("id").and_then(Value::as_str),
@@ -406,16 +201,19 @@ mod tests {
         };
         copy("contract.json");
         copy("pins.json");
-        assert!(check(&root).is_empty());
+        assert!(LANE.check(&root).is_empty());
         let pins = std::fs::read_to_string(feature.join("pins.json")).unwrap();
         std::fs::write(feature.join("pins.json"), pins.replace("\n  ", "\n ")).unwrap();
         assert!(
-            check(&root)[0].contains("not in the form"),
+            LANE.check(&root)[0].contains("not in the form"),
             "hand formatting"
         );
         let renamed = pins.replacen("arimo-bold-ttf", "arimo-bold", 1);
         std::fs::write(feature.join("pins.json"), renamed).unwrap();
-        assert!(check(&root)[0].contains("pinned as"), "a case id differs");
+        assert!(
+            LANE.check(&root)[0].contains("pinned as"),
+            "a case id differs"
+        );
         std::fs::remove_dir_all(root).unwrap();
     }
 }

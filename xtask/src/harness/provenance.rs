@@ -97,23 +97,8 @@ pub fn matroska_inputs() -> Vec<String> {
             names.push(format!("harness/features/{feature}/{file}.json"));
         }
     }
-    // Features whose manifests are generated from their pins and the font corpus.
-    for feature in crate::fonts::FEATURES {
-        for file in ["contract", "pins"] {
-            names.push(format!("harness/features/{}/{file}.json", feature.id));
-        }
-    }
-    names.extend(crate::fonts::ROW_SOURCES.map(String::from));
-    for feature in crate::shape::FEATURES {
-        for file in ["contract", "pins"] {
-            names.push(format!("harness/features/{}/{file}.json", feature.id));
-        }
-    }
-    for source in crate::shape::ROW_SOURCES {
-        if !names.iter().any(|name| name == source) {
-            names.push(source.into());
-        }
-    }
+    // Features whose manifests are generated from their pins and committed inputs.
+    names.extend(crate::lanes::provenance_inputs());
     names
 }
 
@@ -561,11 +546,11 @@ mod tests {
                 "missing source binding: {name}"
             );
         }
-        for feature in crate::fonts::FEATURES {
+        for feature in crate::lanes::LANES.iter().flat_map(|lane| lane.features) {
             for file in ["contract", "pins"] {
-                let name = format!("harness/features/{}/{file}.json", feature.id);
+                let name = format!("harness/features/{feature}/{file}.json");
                 assert!(
-                    shared.get(&name).is_some(),
+                    shared.get(&name).is_some() || !root.join(&name).exists(),
                     "missing source binding: {name}"
                 );
             }

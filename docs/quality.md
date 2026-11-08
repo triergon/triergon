@@ -3,7 +3,7 @@
 Every module is measured against a pinned reference implementation doing the same
 work: FFmpeg for containers, framing, subtitle decoding, codecs and capture, FreeType
 for font tables and outlines, HarfBuzz and FriBidi for shaping and bidi, and libass
-for subtitle rendering. The gates and the
+for rasterising and subtitle rendering. The gates and the
 measurement rules below are the same for every reference. A module is complete only
 when it passes all three gates on every case in its corpus.
 
@@ -80,16 +80,83 @@ resource limit becomes an explicit, reviewed rule for that case.
   the shaper rests on `shape-libass`, `shape-bidi`, `shape-simple` and
   `shape-unicode`. `cargo xtask shape compare` reports the required five, with
   `--all` all six.
-- **Generated manifests and pins.** The font and shaping features commit no case
-  rows. `cargo xtask fonts manifest` and `cargo xtask shape manifest` generate them
-  from `harness/fonts/corpus.json`, the shaping texts and each feature's settings
-  (`xtask/src/fonts/manifest.rs`, `xtask/src/shape/manifest.rs`), and take each
-  case's expected work from `harness/features/<feature>/pins.json`. Pins are the
-  reference's folds: re-record them with `cargo xtask fonts manifest --record` or
-  `cargo xtask shape manifest --record` after `cargo xtask build-workers`, and never
-  edit them by hand. `cargo xtask check-design` fails when the generated case ids
-  and the pins differ or a pin file is not in the form the recorder writes. Every
-  harness command reads such a manifest at `harness/features/<feature>/corpus.json`;
+- **libass pin.** `cargo xtask raster prepare` builds the libass 0.17.5 release
+  tarball (hash-checked, tree verified after the build) as a static library
+  without a system font provider (`--disable-fontconfig --disable-coretext
+  --disable-directwrite --disable-libunibreak
+  --disable-require-system-font-provider`), `-O2 -ffp-contract=off
+  -ftrivial-auto-var-init=zero`, against
+  the FreeType, FriBidi and HarfBuzz builds above, so each library has one
+  build, and records it in `.research/libass/build.json`. `cargo xtask
+  build-workers` then links the reference worker (`harness/reference_raster.h`):
+  it includes `ass_render.c` from the pinned tree to reach libass's internal
+  stages and is compiled with the flags libass compiled itself with
+  (`libass-internal.pc`). It replaces the engine `ass_renderer_init` picks for
+  the host with libass's plain C bitmap engine
+  (`ass_bitmap_engine_init(ASS_CPU_FLAG_NONE)`: C functions, 16×16 tiles and
+  16-byte rows), recorded in `build.json` and checked at startup, on every
+  host: it is what libass runs on 32-bit ARMv7, where it has no assembly, and
+  it does not depend on the host. Uninitialised automatic variables are zeroed
+  for the same reason: the pinned source reads one (the face `uid` in
+  `add_face`), and zero is the value both deployment targets' results agree
+  with. The flag also covers the reference worker's own code
+  (`harness/reference.c` and `harness/reference_raster.h`), which takes the
+  same flags; there a read of an uninitialised variable fails the build
+  (`-Wall -Werror -Werror=uninitialized`). libass's included sources are
+  compiled as system headers, without warnings. Runtime is not measured yet;
+  two rules hold when it is. Timing uses an unflagged build: the same source,
+  pins and configure flags without `-ftrivial-auto-var-init`, both recorded in
+  `build.json`, while parity keeps the flagged one. The flag changes the
+  reference's instruction counts by under 0.5% on the required workloads, but
+  its code layout makes small-glyph workloads 8% to 40% slower on Linux
+  AArch64 and x86_64. And the reference's timed region holds only the work
+  the candidate's does: libass's per-run cache reset (`ass_cache_empty`),
+  most of a small-glyph operation, leaves the clock, or both sides do the
+  equivalent reset inside it, whichever matches how a caller uses the
+  library; caches that would make repeats unfairly cheap are disabled for
+  timing, not reset inside the clock. The change that first times the
+  rasterising or rendering features makes `cargo xtask check-design` or the
+  timing code refuse a lane whose reference build is flagged. Its features run libass's outline, stroker,
+  rasteriser, blur, composition and clipping stages on glyphs of the font
+  corpus loaded as libass loads them with hinting off (FreeType in the
+  reference, `triergon-font` in the candidate; `raster-glyphs`) and on seeded
+  random outlines (`raster-outlines`) and bitmaps (`raster-bitmaps`), all
+  required by `cargo xtask check`; `raster-sweep`, every corpus file at three
+  heights with larger random sets, runs on demand. `raster-simd` runs the
+  required cases against the host's own SIMD engine (NEON, AVX2, SSSE3 or
+  SSE2) with their pins, the C engine's folds, and records where that engine
+  departs.
+  `cargo xtask raster compare` reports the required three, with `--all` also
+  the sweep, with `--diagnostic` `raster-simd`, and with both all five.
+- **Generated manifests and pins.** The font, shaping and rasterising features
+  commit no case rows. `cargo xtask fonts manifest`, `cargo xtask shape manifest`
+  and `cargo xtask raster manifest` generate them from `harness/fonts/corpus.json`,
+  the shaping texts, seeded random cases and each feature's settings
+  (`xtask/src/{fonts,shape,raster}/manifest.rs`, registered in
+  `xtask/src/lanes.rs`), and take each case's expected work from
+  `harness/features/<feature>/pins.json`. Pins are the reference's folds:
+  re-record them with `cargo xtask fonts manifest --record`, `cargo xtask shape
+  manifest --record` or `cargo xtask raster manifest --record` after `cargo
+  xtask build-workers`, and never edit them by hand. `cargo xtask check-design`
+  fails when the generated case ids and the pins differ or a pin file is not in
+  the form the recorder writes. Each feature's contract says when it runs in
+  `gate`: `"required"` (by `cargo xtask check` and `COMMAND compare`),
+  `"on-demand"` (also by `COMMAND compare --all`) or `"diagnostic"` (by `COMMAND
+  compare --diagnostic`); `cargo xtask check-design` fails when it is missing or
+  anything else.
+  A contract may set `timeout_seconds`, how long one worker run of its cases may
+  take: a whole number of seconds from 1 to 3600, 30 when absent. `report` (its
+  parity, timing and memory runs), `external-vector`, `trace-identities` and `fuzz
+  --contract` (unless `--timeout-seconds` is given) honour it, and `cargo xtask
+  check-design` fails on any other value. `raster-sweep` sets 120 for its heaviest
+  cases on 32-bit ARMv7.
+  Pins are recorded with the feature's `worker_operation`, the operation
+  `report`, `grade` and `fuzz` run. A diagnostic feature that compares another
+  reference with these pins names the features in `cases_from` (`raster-simd`
+  takes the required rasterising features'): its manifest is their rows and
+  pins, in order, and it commits no pin file; check-design fails if such a
+  feature is not diagnostic or has one.
+  Every harness command reads such a manifest at `harness/features/<feature>/corpus.json`;
   its identity is the SHA-256 of the generated JSON, the bytes the generator
   writes, so it is deterministic.
 - **Open cases.** A contract may list `open_cases`: case ids that fail today, each
@@ -99,7 +166,10 @@ resource limit becomes an explicit, reviewed rule for that case.
   to match must leave the list. `cargo xtask grade` applies the same rule: it grades
   a listed case's parity and skips its timing and memory, refuses a listed case that
   passes or is not in the corpus, and still needs measurements for any other failing
-  case. The module stays unaccepted while any is listed.
+  case. A module stays unaccepted while any case of one of its gating features is
+  listed. Features that a module's documentation names as additional coverage, such
+  as `shape-text` and `shape-text-all` for the shaper, keep their open cases listed
+  without blocking it.
 - **Input rights.** A case is measured only when its `rights` are
   `authored-synthetic`, or `reviewed-licence` with a `licence` under which a
   reviewed input manifest (`harness/fonts/corpus.json`) records the file's hash.
@@ -167,8 +237,9 @@ hash-pinned inputs live in `harness/features/progressive-ts188/`.
 (`--contract`, `--manifest`, `--corpus`; a manifest may record its corpus `directory`)
 and grades it. A contract may name its own candidate worker and reference, as
 `matroska-startup-seek` and `hls-segments` do with `playback-worker` and the `video`
-and `formats` references, the three font features with `font-worker` and FreeType, and
-the five shaping features with `shape-worker` and HarfBuzz and FriBidi.
+and `formats` references, the three font features with `font-worker` and FreeType,
+the five shaping features with `shape-worker` and HarfBuzz and FriBidi, and the
+five rasterising features with `raster-worker` and libass.
 Such a worker takes one input per operation through the contract's
 `worker_operation` prefix (`PREFIXfold`, `PREFIXbench`, `PREFIXmemory`). `--benchmark` adds paired
 runtime and `--memory` the heap and RSS measurement under the native observers
@@ -195,13 +266,14 @@ and compares the packets of the audio container readers with its `ffprobe`
 pipeline ([harness/capture](../harness/capture/README.md)).
 `cargo xtask fuzz` runs a deterministic, replayable byte-mutation campaign against
 debug, release and reference workers from a pinned manifest, with a timeout per
-input. With `--contract` it builds that manifest from a prefix feature's cases: the
+input (`--timeout-seconds`, 3 by default, or the contract's `timeout_seconds`). With `--contract` it builds that manifest from a prefix feature's cases: the
 release candidate and its dev build, plus the reference with `--reference`; listed
 open cases are expected to be rejected by both builds, and the campaign keeps the
 manifest as `manifest.json` for replay. `cargo xtask codecs fuzz --lane L` builds it
 from a codec lane's FATE vectors instead: release and `checked` builds of `codec-worker`
 (release optimisation with overflow checks and debug assertions) decode each mutation
-whole. `cargo xtask check` runs one round on each required font feature.
+whole. `cargo xtask check` runs one round on smoke cases of each required font,
+shaping and rasterising feature.
 
 On native AArch64 or 32-bit ARMv7 Linux, `cargo xtask memory-admission CANDIDATE REFERENCE`
 checks the worker libraries using the probe and observer in `target/harness`.
