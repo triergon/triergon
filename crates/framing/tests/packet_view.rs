@@ -42,10 +42,13 @@ impl Run {
     /// FNV-1a over the events with their charges, one per line. Charges include
     /// storage headers, which depend on the pointer width.
     fn digest(&self) -> u64 {
-        fnv(self.events.iter().map(|(e, charge)| match charge {
+        fnv(self.charged_lines())
+    }
+    fn charged_lines(&self) -> impl Iterator<Item = String> + '_ {
+        self.events.iter().map(|(e, charge)| match charge {
             Some(charge) => format!("{e} {charge}"),
             None => e.clone(),
-        }))
+        })
     }
     /// FNV-1a over the events without the charges, the same on every target.
     fn portable_digest(&self) -> u64 {
@@ -441,7 +444,7 @@ fn assert_receives(codec: Codec, record: &[u8], packets: &[Packet], label: &str)
             std::fs::create_dir_all(&directory).unwrap();
             std::fs::write(
                 directory.join(format!("{label}-{q}.trace")),
-                run.events.join("\n") + "\n",
+                run.charged_lines().collect::<Vec<_>>().join("\n") + "\n",
             )
             .unwrap();
             std::fs::write(
