@@ -4,8 +4,9 @@ use triergon_core::{
     Budget, Bytes, Error, InputCursor, InputWindow, SourceCapabilities, SourceId, Step, WorkBudget,
 };
 use triergon_mpegts::compat::pes::{
-    DemuxClock, DemuxObserver, DemuxProfile, DemuxScope, SourceContext, TransportFaultKind,
-    TransportFaultPacket, TransportFaultRecovery, TransportObservation,
+    DemuxClock, DemuxObserver, DemuxProfile, DemuxScope, PesFaultCarrier, PesFaultKind,
+    PesFaultPolicy, SourceContext, TransportFaultKind, TransportFaultPacket,
+    TransportFaultRecovery, TransportObservation,
 };
 use triergon_mpegts::{
     AssemblyStep, PacketFormat, ParseLimits, SourceEpochs, TraceEvent, TraceFault, TransportPacket,
@@ -697,6 +698,9 @@ fn faulted_then_valid_preserves_counter_order_and_shared_clock_interval() {
                         .unwrap();
                     (time.pts90.unwrap(), time.origin.unwrap())
                 }
+                TransportObservation::PesFault(packet) => {
+                    panic!("default policy admitted another source fault: {packet:?}")
+                }
             };
             times.push(time);
         }
@@ -786,4 +790,526 @@ fn plain_policy_pool_limits_and_full_width_locations_remain_explicit() {
             .error,
         Error::Overflow
     );
+}
+
+fn finite_policy(budget: &Budget) -> TransportFaultRecovery {
+    TransportFaultRecovery::with_policy(
+        observer(budget, ParseLimits::default()),
+        PesFaultPolicy {
+            timing_headers: true,
+            rejected_clock_fields: true,
+        },
+    )
+    .unwrap()
+}
+fn feed_finite(
+    policy: &mut TransportFaultRecovery,
+    event: &TraceEvent,
+    c: SourceContext,
+) -> triergon_core::Result<()> {
+    match event {
+        TraceEvent::Transport(packet) if packet.pid == 256 => policy
+            .push(packet.clone(), c)
+            .map_err(|failure| failure.error),
+        TraceEvent::Diagnostic(fault) if policy.awaiting_source_fault() => {
+            policy.confirm_source_fault(fault, c)
+        }
+        TraceEvent::Diagnostic(fault) if fault.rejected.is_some() => policy
+            .push_rejected_fault(fault.clone(), c)
+            .map_err(|failure| failure.error),
+        TraceEvent::Diagnostic(fault) => Err(fault.error),
+        _ => Ok(()),
+    }
+}
+const FINITE_CASES: [(&[u8], PesFaultKind, Option<u64>, usize); 4] = [
+    (
+        include_bytes!("data/pes-timestamp-marker.ts"),
+        PesFaultKind::TimestampMarkers,
+        Some(90000),
+        1,
+    ),
+    (
+        include_bytes!("data/pes-forbidden-time-flags.ts"),
+        PesFaultKind::ForbiddenTimeFlags,
+        None,
+        1,
+    ),
+    (
+        include_bytes!("data/pcr-extension-invalid.ts"),
+        PesFaultKind::PcrEncoding,
+        Some(90000),
+        1,
+    ),
+    (
+        include_bytes!("data/native-pes-v1/opcr-without-pcr-invalid.ts"),
+        PesFaultKind::OpcrWithoutPcr,
+        Some(90000),
+        2,
+    ),
+];
+
+#[test]
+fn finite_header_and_rejected_clock_policies_keep_strict_source_facts() {
+    for (data, kind, pts, count) in FINITE_CASES {
+        let budget = Budget::new(1 << 20).unwrap();
+        let events = source(data, &budget);
+        let mut policy = finite_policy(&budget);
+        let mut packets = Vec::new();
+        for (event, c) in &events {
+            feed_finite(&mut policy, event, *c).unwrap();
+            packets.extend(drain(&mut policy).unwrap());
+        }
+        assert_eq!(packets.len(), count);
+        let TransportObservation::PesFault(packet) = packets.remove(0) else {
+            panic!("source refusal became accepted PES");
+        };
+        assert_eq!(packet.kind, kind);
+        assert_eq!(packet.source_origin.offset, 376);
+        assert_eq!(packet.position, 376);
+        assert_eq!(packet.source_epochs, EPOCHS);
+        assert_eq!(packet.flags, 0);
+        assert_eq!(packet.duration90_raw, 0);
+        assert_eq!(packet.stream_id, 0xe0);
+        assert_eq!(
+            packet.payload().flatten().copied().collect::<Vec<_>>(),
+            ORIGINAL
+        );
+        assert_eq!(packet.payload_len, ORIGINAL.len());
+        assert_eq!(packet.encoded_header.encoded_pts_raw33(), pts);
+        assert_eq!(packet.encoded_header.encoded_dts_raw33(), None);
+        assert_eq!(
+            packet.encoded_header.markers_valid(),
+            pts.map(|_| matches!(
+                kind,
+                PesFaultKind::PcrEncoding | PesFaultKind::OpcrWithoutPcr
+            ))
+        );
+        assert_eq!(packet.input_context, context(8));
+        assert_eq!(
+            packet.diagnostic_context,
+            context(
+                if matches!(
+                    kind,
+                    PesFaultKind::PcrEncoding | PesFaultKind::OpcrWithoutPcr
+                ) {
+                    8
+                } else {
+                    10
+                }
+            )
+        );
+        assert_eq!(packet.carrier.backing_bytes().as_ref(), &data[376..564]);
+        assert!(
+            packet
+                .encoded_header
+                .backing_bytes()
+                .shares_storage_with(packet.carrier.backing_bytes())
+        );
+        assert!(
+            packet.spans.as_slice()[0]
+                .backing_bytes()
+                .shares_storage_with(packet.carrier.backing_bytes())
+        );
+        match &packet.carrier {
+            PesFaultCarrier::Rejected(rejected) => {
+                assert!(rejected.fully_checked());
+                assert_eq!(rejected.secondary_error(), None);
+                assert_eq!(packet.source_fault.pid, None);
+                assert_eq!(packet.source_fault.error, rejected.error());
+            }
+            PesFaultCarrier::Transport(_) => {
+                assert_eq!(packet.source_fault.pid, Some(256));
+                assert!(packet.source_fault.rejected.is_none());
+            }
+        }
+        let mut clock = DemuxClock::new(1).unwrap();
+        let time = clock
+            .project_pes_fault(&packet, &mut WorkBudget::new(1), &AtomicBool::new(false))
+            .unwrap()
+            .unwrap();
+        assert_eq!(time.encoded_pts_raw33, pts);
+        assert_eq!(time.encoded_dts_raw33, None);
+        assert_eq!(time.pts90, pts.map(i128::from));
+        assert_eq!(time.dts90, time.pts90);
+        assert_eq!(time.origin.is_some(), pts.is_some());
+        assert!(
+            !events
+                .iter()
+                .any(|(e, _)| matches!(e, TraceEvent::Timeline { .. }))
+        );
+        assert_eq!(
+            events
+                .iter()
+                .filter(|(e, _)| matches!(e, TraceEvent::Pes(_)))
+                .count(),
+            0
+        );
+        policy.end_of_source().unwrap();
+        assert!(matches!(
+            policy.poll(&mut WorkBudget::new(1), &AtomicBool::new(false)),
+            Ok(AssemblyStep::Finished)
+        ));
+    }
+}
+
+#[test]
+fn finite_fault_policies_are_opt_in_and_reject_additional_damage() {
+    for (data, _, _, _) in FINITE_CASES {
+        let budget = Budget::new(1 << 20).unwrap();
+        let mut policy =
+            TransportFaultRecovery::new(observer(&budget, ParseLimits::default())).unwrap();
+        let mut refused = false;
+        for (event, c) in source(data, &budget) {
+            if feed_finite(&mut policy, &event, c).is_err() || drain(&mut policy).is_err() {
+                refused = true;
+                break;
+            }
+        }
+        assert!(refused);
+    }
+    for data in [
+        include_bytes!("data/selected-faults-v1/pcr-and-stuffing.ts").as_slice(),
+        include_bytes!("data/selected-faults-v1/tei-and-marker.ts").as_slice(),
+        include_bytes!("data/selected-faults-v1/scrambling-and-forbidden.ts").as_slice(),
+        include_bytes!("data/selected-faults-v1/wrong-time-prefix.ts").as_slice(),
+        include_bytes!("data/pes-optional-header-overrun.ts").as_slice(),
+        include_bytes!("data/pes-start-prefix-invalid.ts").as_slice(),
+    ] {
+        let budget = Budget::new(1 << 20).unwrap();
+        let mut policy = finite_policy(&budget);
+        let mut refused = false;
+        for (event, c) in source(data, &budget) {
+            if feed_finite(&mut policy, &event, c).is_err() {
+                refused = true;
+                break;
+            }
+            match drain(&mut policy) {
+                Err(_) => {
+                    refused = true;
+                    break;
+                }
+                Ok(packets) => assert!(packets.is_empty()),
+            }
+        }
+        assert!(refused, "additional damage may not become empty success");
+    }
+}
+
+#[test]
+fn finite_fault_jobs_preserve_each_work_cancel_and_pressure_boundary() {
+    for (data, _, _, _) in FINITE_CASES {
+        let budget = Budget::new(1 << 20).unwrap();
+        let events = source(data, &budget);
+        for phase in 0..10 {
+            let mut policy = finite_policy(&budget);
+            for (event, c) in &events {
+                feed_finite(&mut policy, event, *c).unwrap();
+                if matches!(event, TraceEvent::Diagnostic(_)) {
+                    break;
+                }
+            }
+            assert!(matches!(
+                policy.poll(&mut WorkBudget::new(phase), &AtomicBool::new(false)),
+                Ok(AssemblyStep::Yield)
+            ));
+            let used = budget.used();
+            assert_eq!(
+                policy
+                    .poll(&mut WorkBudget::new(0), &AtomicBool::new(true))
+                    .unwrap_err(),
+                Error::Cancelled
+            );
+            assert_eq!(budget.used(), used);
+            assert_eq!(drain(&mut policy).unwrap().len(), 1);
+        }
+        for phase in [5, 7] {
+            let mut policy = finite_policy(&budget);
+            for (event, c) in &events {
+                feed_finite(&mut policy, event, *c).unwrap();
+                if matches!(event, TraceEvent::Diagnostic(_)) {
+                    break;
+                }
+            }
+            assert!(matches!(
+                policy.poll(&mut WorkBudget::new(phase), &AtomicBool::new(false)),
+                Ok(AssemblyStep::Yield)
+            ));
+            let blocker = budget.reserve(budget.available()).unwrap();
+            assert!(matches!(
+                policy.poll(&mut WorkBudget::new(1), &AtomicBool::new(false)),
+                Err(Error::Backpressure { .. })
+            ));
+            drop(blocker);
+            let mut output = drain(&mut policy).unwrap();
+            assert_eq!(output.len(), 1);
+            drop(policy);
+            let TransportObservation::PesFault(packet) = output.pop().unwrap() else {
+                panic!();
+            };
+            assert_eq!(packet.payload_len, ORIGINAL.len());
+            assert_eq!(packet.spans.len(), 1);
+            assert_eq!(packet.header_source_ranges.len(), 1);
+        }
+    }
+}
+
+#[test]
+fn finite_timing_variants_keep_absence_and_following_packet_order() {
+    for (data, pts, header_len, count) in [
+        (
+            include_bytes!("data/selected-faults-v1/marker-0.ts").as_slice(),
+            Some(180000),
+            14,
+            1,
+        ),
+        (
+            include_bytes!("data/selected-faults-v1/marker-2.ts").as_slice(),
+            Some(180000),
+            14,
+            1,
+        ),
+        (
+            include_bytes!("data/selected-faults-v1/marker-4.ts").as_slice(),
+            Some(180000),
+            14,
+            1,
+        ),
+        (
+            include_bytes!("data/selected-faults-v1/marker-all.ts").as_slice(),
+            Some(180000),
+            14,
+            1,
+        ),
+        (
+            include_bytes!("data/selected-faults-v1/forbidden-zero.ts").as_slice(),
+            None,
+            9,
+            1,
+        ),
+        (
+            include_bytes!("data/selected-faults-v1/forbidden-five.ts").as_slice(),
+            None,
+            14,
+            1,
+        ),
+        (
+            include_bytes!("data/selected-faults-v1/marker-then-valid.ts").as_slice(),
+            Some(180000),
+            14,
+            2,
+        ),
+        (
+            include_bytes!("data/selected-faults-v1/pcr-extension-300.ts").as_slice(),
+            Some(180000),
+            14,
+            1,
+        ),
+        (
+            include_bytes!("data/selected-faults-v1/pcr-extension-511.ts").as_slice(),
+            Some(180000),
+            14,
+            1,
+        ),
+        (
+            include_bytes!("data/selected-faults-v1/pcr-reserved-zero.ts").as_slice(),
+            Some(180000),
+            14,
+            1,
+        ),
+    ] {
+        let budget = Budget::new(1 << 20).unwrap();
+        let mut policy = finite_policy(&budget);
+        let mut packets = Vec::new();
+        for (event, c) in source(data, &budget) {
+            feed_finite(&mut policy, &event, c).unwrap();
+            packets.extend(drain(&mut policy).unwrap());
+        }
+        assert_eq!(packets.len(), count);
+        let TransportObservation::PesFault(packet) = packets.remove(0) else {
+            panic!();
+        };
+        assert_eq!(packet.encoded_header.encoded_pts_raw33(), pts);
+        assert_eq!(packet.encoded_header.as_bytes().len(), header_len);
+        assert_eq!(packet.header_source_ranges.as_slice()[0].bytes, header_len);
+        assert_eq!(
+            packet.payload().flatten().copied().collect::<Vec<_>>(),
+            b"fault-controls\0\x47\xff"
+        );
+        let mut clock = DemuxClock::new(1).unwrap();
+        let time = clock
+            .project_pes_fault(&packet, &mut WorkBudget::new(1), &AtomicBool::new(false))
+            .unwrap()
+            .unwrap();
+        assert_eq!(time.pts90, pts.map(i128::from));
+        if let Some(TransportObservation::Accepted(next)) = packets.pop() {
+            assert_eq!(next.source_origin.offset, 564);
+            assert_eq!(next.source_header.pts_raw33, Some(270000));
+            assert_eq!(next.source_header.dts_raw33, None);
+            let next_time = clock
+                .project_header(
+                    next.pid,
+                    next.source_epochs,
+                    next.time_header(),
+                    &mut WorkBudget::new(1),
+                    &AtomicBool::new(false),
+                )
+                .unwrap()
+                .unwrap();
+            assert_eq!(next_time.origin, time.origin);
+        }
+    }
+}
+
+#[test]
+fn finite_fault_budget_limits_count_rejected_aliases_and_full_width_ranges() {
+    use triergon_core::SourceLocation;
+    use triergon_mpegts::{TransportInspection, TransportInspector};
+    for (data, kind, _, _) in FINITE_CASES {
+        let proof_budget = Budget::new(1 << 20).unwrap();
+        let (mut fault, _) = source(data, &proof_budget)
+            .into_iter()
+            .find_map(|(e, c)| {
+                if let TraceEvent::Diagnostic(fault) = e {
+                    Some((fault, c))
+                } else {
+                    None
+                }
+            })
+            .unwrap();
+        for short in [true, false] {
+            let minimum = Budget::control_storage_bytes()
+                + Bytes::owner_overhead_bytes()
+                + 188
+                + size_of::<triergon_mpegts::SourceRange>()
+                + size_of::<triergon_mpegts::compat::pes::DemuxSpan>();
+            let budget = Budget::new(minimum - usize::from(short)).unwrap();
+            let offset = (1_u64 << 40) + 376;
+            let bytes = Bytes::copy_from_slice(&budget, &data[376..564]).unwrap();
+            let mut inspector = TransportInspector::new(
+                bytes,
+                PacketFormat::Ts188,
+                SourceLocation {
+                    source: SourceId(1),
+                    offset,
+                },
+                &budget,
+            )
+            .unwrap();
+            let AssemblyStep::Output(carrier) = inspector
+                .poll(&mut WorkBudget::new(4096), &AtomicBool::new(false))
+                .unwrap()
+            else {
+                panic!();
+            };
+            let mut policy = finite_policy(&budget);
+            fault.location.offset = offset;
+            match carrier {
+                TransportInspection::Accepted(packet) => {
+                    policy.push(packet, context(8)).unwrap();
+                    policy.confirm_source_fault(&fault, context(10)).unwrap();
+                }
+                TransportInspection::Rejected(rejected) => {
+                    let fault = TraceFault {
+                        rejected: Some(rejected),
+                        ..fault.clone()
+                    };
+                    policy.push_rejected_fault(fault, context(8)).unwrap();
+                }
+            }
+            let result = policy.poll(&mut WorkBudget::new(10), &AtomicBool::new(false));
+            if short {
+                assert_eq!(
+                    result.unwrap_err(),
+                    Error::Limit {
+                        requested: minimum,
+                        maximum: minimum - 1
+                    },
+                    "{kind:?}"
+                );
+            } else {
+                let AssemblyStep::Output(TransportObservation::PesFault(packet)) = result.unwrap()
+                else {
+                    panic!();
+                };
+                assert_eq!(packet.source_origin.offset, offset);
+                assert_eq!(packet.position, i64::try_from(offset).unwrap());
+                assert!(packet.header_source_ranges.as_slice()[0].offset > (1_u64 << 40));
+                assert_eq!(budget.used(), minimum);
+            }
+        }
+    }
+}
+
+#[test]
+fn header_faults_require_the_matching_later_diagnostic_before_eof() {
+    for (data, _, _, _) in FINITE_CASES.into_iter().take(2) {
+        let budget = Budget::new(1 << 20).unwrap();
+        let events = source(data, &budget);
+        let (packet, input) = events
+            .iter()
+            .find_map(|(event, c)| {
+                if let TraceEvent::Transport(packet) = event
+                    && packet.pid == 256
+                {
+                    Some((packet, *c))
+                } else {
+                    None
+                }
+            })
+            .unwrap();
+        let (fault, diagnostic) = events
+            .iter()
+            .find_map(|(event, c)| {
+                if let TraceEvent::Diagnostic(fault) = event {
+                    Some((fault, *c))
+                } else {
+                    None
+                }
+            })
+            .unwrap();
+        let mut policy = finite_policy(&budget);
+        policy.push(packet.clone(), input).unwrap();
+        assert!(policy.awaiting_source_fault());
+        assert!(drain(&mut policy).unwrap().is_empty());
+        assert!(policy.end_of_source().is_err());
+        let used = budget.used();
+        let mut wrong = fault.clone();
+        wrong.pid = Some(257);
+        assert!(policy.confirm_source_fault(&wrong, diagnostic).is_err());
+        assert!(policy.confirm_source_fault(fault, input).is_err());
+        assert_eq!(budget.used(), used);
+        policy.confirm_source_fault(fault, diagnostic).unwrap();
+        assert_eq!(drain(&mut policy).unwrap().len(), 1);
+    }
+}
+
+#[test]
+fn rejected_opcr_carriers_retain_every_raw_counter_without_source_continuity_claims() {
+    for counter in 0..16 {
+        let mut wire = include_bytes!("data/native-pes-v1/opcr-without-pcr-invalid.ts").to_vec();
+        wire[567] = (wire[567] & 0xf0) | counter;
+        let budget = Budget::new(1 << 20).unwrap();
+        let events = source(&wire, &budget);
+        assert!(
+            !events.iter().any(|(event, _)| matches!(
+                event,
+                TraceEvent::Pes(_) | TraceEvent::Timeline { .. }
+            ))
+        );
+        let mut policy = finite_policy(&budget);
+        let mut packets = Vec::new();
+        for (event, c) in &events {
+            feed_finite(&mut policy, event, *c).unwrap();
+            packets.extend(drain(&mut policy).unwrap());
+        }
+        assert_eq!(packets.len(), 2);
+        let TransportObservation::PesFault(second) = packets.pop().unwrap() else {
+            panic!();
+        };
+        assert_eq!(second.kind, PesFaultKind::OpcrWithoutPcr);
+        assert_eq!(second.carrier.backing_bytes().as_ref()[3] & 15, counter);
+        assert_eq!(second.position, 564);
+        assert_eq!(second.flags, 0);
+        assert_eq!(second.payload_len, ORIGINAL.len());
+    }
 }
