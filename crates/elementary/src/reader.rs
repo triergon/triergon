@@ -8,7 +8,7 @@
 //! FFmpeg's demuxer for that format puts them.
 use crate::input::{Input, Wait};
 use crate::stream::{Limits, Packet, ReaderEvent, SeekDetail, Track};
-use crate::syntax::{Gap, Length, Plan, Prelude, Probe, SeekBasis, Syntax, Verdict};
+use crate::syntax::{Gap, Length, Plan, Prelude, Probe, SeekBasis, Syntax};
 use crate::tags::{
     ID3V2_HEADER, Leading, TRAILING_DECIDE, TRAILING_PROBE, Tag, TagKind, Trailing, id3v2, trailing,
 };
@@ -170,13 +170,36 @@ fn scan(view: &[u8], from: usize, sync: u8, work: &mut WorkBudget) -> Scan {
         return Scan::Spent;
     }
     let rest = &rest[..rest.len().min(budget)];
-    if let Some(offset) = rest.iter().position(|&b| b == sync) {
+    if let Some(offset) = find(rest, sync) {
         work.take(offset as u64 + 1);
         Scan::Found(from + offset)
     } else {
         work.take(rest.len() as u64);
         Scan::Passed(from + rest.len())
     }
+}
+
+/// The first `byte` in `hay`, eight bytes at a time: frame payloads are long and sync
+/// bytes rare.
+#[inline]
+fn find(hay: &[u8], byte: u8) -> Option<usize> {
+    const LOW: u64 = 0x0101_0101_0101_0101;
+    const HIGH: u64 = 0x8080_8080_8080_8080;
+    let pattern = LOW * u64::from(byte);
+    let mut words = hay.chunks_exact(8);
+    for (index, word) in words.by_ref().enumerate() {
+        let word = u64::from_le_bytes(word.try_into().unwrap_or([0; 8])) ^ pattern;
+        let zero = word.wrapping_sub(LOW) & !word & HIGH;
+        if zero != 0 {
+            return Some(index * 8 + zero.trailing_zeros() as usize / 8);
+        }
+    }
+    let tail = hay.len() - words.remainder().len();
+    words
+        .remainder()
+        .iter()
+        .position(|&b| b == byte)
+        .map(|at| tail + at)
 }
 
 enum Flow<T> {
@@ -536,8 +559,7 @@ impl<F: Format> Reader<F> {
             match self.format.probe(&view[p..]) {
                 Probe::Header(next)
                     if self.format.continues(&header, &next)
-                        && self.format.verdict(&view[at..p], &header, Some(&next))
-                            == Verdict::Confirmed =>
+                        && self.format.checks(&view[at..p]) =>
                 {
                     return Ok(Some(p));
                 }
@@ -549,7 +571,7 @@ impl<F: Format> Reader<F> {
             return Ok(None);
         }
         if at_end {
-            let confirmed = self.format.verdict(&view[at..], &header, None) == Verdict::Confirmed;
+            let confirmed = self.format.checks(&view[at..]);
             return Ok(confirmed.then_some(view.len()));
         }
         Err((view.len() * 2)
@@ -920,7 +942,7 @@ impl<F: Format> Reader<F> {
                     continue;
                 }
                 Scan::Passed(_) => {
-                    return Ok(Flow::Ready(self.tail_end(cut.frame, header, minimum)));
+                    return Ok(Flow::Ready(self.tail_end(cut.frame, minimum)));
                 }
                 Scan::Spent => {
                     cut.search = p;
@@ -930,11 +952,8 @@ impl<F: Format> Reader<F> {
             match self.format.probe(&view[candidate..]) {
                 Probe::Header(next)
                     if self.continues(&next)
-                        && self.format.verdict(
-                            &view[cut.frame..candidate],
-                            &header,
-                            Some(&next),
-                        ) >= Verdict::Plausible =>
+                        && (self.format.numbers_on(&header, &next)
+                            || self.format.checks(&view[cut.frame..candidate])) =>
                 {
                     return Ok(Flow::Ready(candidate));
                 }
@@ -952,12 +971,10 @@ impl<F: Format> Reader<F> {
 
     /// The end of the last frame when the search reached the end of the source: before
     /// a trailing tag if the frame's own check confirms that end, else the source end.
-    fn tail_end(&self, frame: usize, header: F::Header, minimum: usize) -> usize {
+    fn tail_end(&self, frame: usize, minimum: usize) -> usize {
         let view = self.input.view();
         let earliest = frame + minimum;
-        let confirmed = |end: usize| {
-            self.format.verdict(&view[frame..end], &header, None) == Verdict::Confirmed
-        };
+        let confirmed = |end: usize| self.format.checks(&view[frame..end]);
         if let Some(ape) = view
             .get(earliest..)
             .and_then(|rest| rest.windows(8).position(|w| w == b"APETAGEX"))
