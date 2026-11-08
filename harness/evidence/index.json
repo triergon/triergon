@@ -15842,6 +15842,383 @@
      "sha256": "36b5908583c206ece13729d6f20a37e766fed2d7ee965ff676328658779662fb"
     }
    ]
+  },
+  {
+   "name": "progressive-pcr-timing",
+   "path": "progressive-pcr-timing",
+   "retention": "retained",
+   "reason": "Cited progressive timing measurements preserve all three cases, ten functional outcomes, source and binary identities, and the runtime failure. HLS timing, memory and grades were not collected.",
+   "key": "evidence/progressive-pcr-timing/2a755cd6b086f65e46d233496fe3e42afa4404a90f3e43c210fdafb5ce67d598.tar.gz",
+   "sha256": "2a755cd6b086f65e46d233496fe3e42afa4404a90f3e43c210fdafb5ce67d598",
+   "bytes": 49165501,
+   "source_revision": "96b01f8670da886a06d60429e207ae6eb6a54940",
+   "collection_status": "diagnostic-runtime-preflight-failure",
+   "files": [
+    {
+     "path": "progressive-pcr-timing/CONTROLS-SUMMARY.json",
+     "sha256": "72aef56beb0e74d3880c5eec3f938c720e9bce132ff38eb1e973245c31935e8c"
+    },
+    {
+     "path": "progressive-pcr-timing/HISTORY.json",
+     "sha256": "f360a8d8748e84c8c538d436b1e678808144b6d2f301f1ab11bcc1817d7d89d9"
+    },
+    {
+     "path": "progressive-pcr-timing/HLS-PARITY-METADATA.json",
+     "sha256": "af4d2fddbe769c97c124103a21de3b5782cd65f8a0d245673eaa339de4c4a845"
+    },
+    {
+     "path": "progressive-pcr-timing/INPUTS.json",
+     "sha256": "3b13775cb9662730b42270d95ee517ed056591806c567149a71cf439b7f54b7d"
+    },
+    {
+     "path": "progressive-pcr-timing/NATIVE-INVENTORY.json",
+     "sha256": "7f90fa846ce5a2f0ce9a7c306a8d804fc74c295a76e04fbf36eb049d929cd056"
+    },
+    {
+     "path": "progressive-pcr-timing/PER-CASE.csv",
+     "sha256": "6fb717a976a58e837b3cbe27a97bdbdb9a4f4d7fc123c4c96c007a92da65ab59"
+    },
+    {
+     "path": "progressive-pcr-timing/PER-CASE.json",
+     "sha256": "c793fd778682b27392fb295ce9c10c73f34daab7951f993a5170f7253a95fbc1"
+    },
+    {
+     "path": "progressive-pcr-timing/PROGRESSIVE-REPORT-METADATA.json",
+     "sha256": "0116831350f775114815d520ff2c31605fa5d6e9a7b381aa5ad1206083023c94"
+    },
+    {
+     "path": "progressive-pcr-timing/QUICK-SUMMARY.json",
+     "sha256": "780f4c5016e735659c1b972daaeed8f1f3f5365c65ef2f9976e0ec58e1bc0b8f"
+    },
+    {
+     "path": "progressive-pcr-timing/SELECTED-EXPORTS.json",
+     "sha256": "f4825d65fae059675eca65f17a3e20f96e911c73fb09199610e9ae6ea943d030"
+    },
+    {
+     "path": "progressive-pcr-timing/SOURCE-BUNDLE-VERIFY.log",
+     "sha256": "f265c615558d319bde17d6e77f97873b15cf7656ba8cd1e8cd74b99e5b20403d"
+    },
+    {
+     "path": "progressive-pcr-timing/SOURCE-CONTEXT.json",
+     "sha256": "0c65f1196be81fd7464ba453ac777e3b91d45f161d799e1d413b03feca85050e"
+    },
+    {
+     "path": "progressive-pcr-timing/SOURCE.bundle",
+     "sha256": "1c39f94e2e03a80e117af5ce42b57dacd6fd326910903de9e90a9a030d3a3542"
+    },
+    {
+     "path": "progressive-pcr-timing/SUMMARY.json",
+     "sha256": "29d8474bfec8e0789e751c85e0d09bdb0f67fd4c819b1b8fa7cd22f7c317c031"
+    },
+    {
+     "path": "progressive-pcr-timing/TESTS.json",
+     "sha256": "29a0d5eade467ef2792b954b9a3648c0dfe63da54613a297bdaa7deae2b09e94"
+    },
+    {
+     "path": "progressive-pcr-timing/collection/BASELINE-ARCHIVE.json",
+     "sha256": "88694363fb52f8185eb050316ed991be357808715c8299dbca37fc14ef7b9a11"
+    },
+    {
+     "path": "progressive-pcr-timing/collection/BINDING.json",
+     "sha256": "e62a7b9d1a5e52133d76639c8e4122c0a683e7ef7a159411f1a1b10b0a03a39c"
+    },
+    {
+     "path": "progressive-pcr-timing/collection/BUNDLE-HEADS.txt",
+     "sha256": "b4d9aa7ce0eace71e6b675fe77ddf0c76eced512e65d0321e03b9aa2f3d18b36"
+    },
+    {
+     "path": "progressive-pcr-timing/collection/BUNDLE-VERIFY.log",
+     "sha256": "b652a4921026b2eb5a7baee8ac461922d727c1a542668a0f3227daa9ddc85627"
+    },
+    {
+     "path": "progressive-pcr-timing/collection/CHECKLIST.md",
+     "sha256": "9ee060988c5fc416c336315b8c7100e2a7958892bf6230c4bd015b424f97a86b"
+    },
+    {
+     "path": "progressive-pcr-timing/collection/CONTROLLER-FILES.sha256",
+     "sha256": "7c0b02230c9fb6b40c74c3fa6d4b33ae7091acad60cf011019aa5f27f5692842"
+    },
+    {
+     "path": "progressive-pcr-timing/collection/CONTROLLER.log",
+     "sha256": "a45853956e1a217952d7912ae4d107fd2c3c04c022b0ed334cdc21d620b7d9b0"
+    },
+    {
+     "path": "progressive-pcr-timing/collection/EXPORT.exit",
+     "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+    },
+    {
+     "path": "progressive-pcr-timing/collection/EXPORT.stderr",
+     "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+     "path": "progressive-pcr-timing/collection/FINAL-STATE.txt",
+     "sha256": "f247a76b2893208aae7751dbf51f4c495efacfb6d9e743802870300f31ac45c8"
+    },
+    {
+     "path": "progressive-pcr-timing/collection/GUEST-PREFLIGHT.log",
+     "sha256": "161d8c62bc219ac7dd17781088da57e1d8d7cca9d7eb8b8d97afa411eef0889e"
+    },
+    {
+     "path": "progressive-pcr-timing/collection/HANDOFF.json",
+     "sha256": "acc65d2f879d74c026c2568e06ca0da7d548444051f86688395d15ea8442bb8d"
+    },
+    {
+     "path": "progressive-pcr-timing/collection/HOST-BINDING.json",
+     "sha256": "11d3adff4a8c78615673875a7357fadfe23e4de45484c528b9f67f0b5c4d9768"
+    },
+    {
+     "path": "progressive-pcr-timing/collection/NATIVE-EXIT.txt",
+     "sha256": "53c234e5e8472b6ac51c1ae1cab3fe06fad053beb8ebfd8977b010655bfdd3c3"
+    },
+    {
+     "path": "progressive-pcr-timing/collection/NATIVE-MEMBERS.txt",
+     "sha256": "543e07096fed046ab663ba15fbaa39b23c53e960015a20202f82c26b728ed6f9"
+    },
+    {
+     "path": "progressive-pcr-timing/collection/NATIVE-RESULTS.sha256",
+     "sha256": "362b9bd6730470c7ef4d8353bd996ef26c0e329f605099578152d008ba7d3127"
+    },
+    {
+     "path": "progressive-pcr-timing/collection/NATIVE-RESULTS.tar.gz",
+     "sha256": "eb764ee57c830a0e27f64d1dcbf3d1ac5a8fdc7d491606f482b79c094e484441"
+    },
+    {
+     "path": "progressive-pcr-timing/collection/NATIVE.log",
+     "sha256": "efb4f574b31aedb66e006a0af1a080c7f87bbb63f1e11e50b2f3c28309cd0126"
+    },
+    {
+     "path": "progressive-pcr-timing/collection/PR-COMMENTS-BEFORE-LAUNCH.txt",
+     "sha256": "f2fe32bbeafe326cb8bfe7e5e8600875e0b708f32830d77844bf53662e3e13ab"
+    },
+    {
+     "path": "progressive-pcr-timing/collection/PREPARATION.json",
+     "sha256": "acc65d2f879d74c026c2568e06ca0da7d548444051f86688395d15ea8442bb8d"
+    },
+    {
+     "path": "progressive-pcr-timing/collection/REVIEWED-BINDING.sha256",
+     "sha256": "5f59d333381b7ed12e47052e5aef8c1a5855e5c8c0d7e2938c56835b901252ee"
+    },
+    {
+     "path": "progressive-pcr-timing/collection/RSS-REVIEW.json",
+     "sha256": "35fcc38a12295baaefe8217d5a720ee351de7a3053c04bec08c3734ffc67a352"
+    },
+    {
+     "path": "progressive-pcr-timing/collection/RUNNER-ADDRESS",
+     "sha256": "6890ddb748dd55d740dc791672925fff399ee348e598fdf3c71e30cc32d7e94a"
+    },
+    {
+     "path": "progressive-pcr-timing/collection/SOURCE.bundle",
+     "sha256": "8e076e5ca7ea3e9ab72e0d6cefa93cbaa92616e75cb4892abe3eeda83c471a4f"
+    },
+    {
+     "path": "progressive-pcr-timing/collection/SSH-WAIT.log",
+     "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+     "path": "progressive-pcr-timing/collection/START-INSTANCE.json",
+     "sha256": "f72a9e3a724183d93017f1cbcea71f0d4b8321d9d534912be0741931e4f36660"
+    },
+    {
+     "path": "progressive-pcr-timing/collection/STOP-INSTANCE.json",
+     "sha256": "323daa66c70209032719102e3db2718e12c1b6d653d1cf1ece33dd6e1690642e"
+    },
+    {
+     "path": "progressive-pcr-timing/collection/TIMING-SUMMARY.json",
+     "sha256": "eeef7512c7e133e99c0c15aa55faa54846b4390bd488e7b74909e5fc152a6187"
+    },
+    {
+     "path": "progressive-pcr-timing/collection/exported/BASELINE-ARCHIVE.json",
+     "sha256": "88694363fb52f8185eb050316ed991be357808715c8299dbca37fc14ef7b9a11"
+    },
+    {
+     "path": "progressive-pcr-timing/collection/exported/BINDING.json",
+     "sha256": "e62a7b9d1a5e52133d76639c8e4122c0a683e7ef7a159411f1a1b10b0a03a39c"
+    },
+    {
+     "path": "progressive-pcr-timing/collection/exported/BLOCK-DEVICES.txt",
+     "sha256": "cc45eb6954636deb80a65b2d4b9f48ac62a63e35e24c88b0fa4c6e2a06e6af24"
+    },
+    {
+     "path": "progressive-pcr-timing/collection/exported/BOOT.txt",
+     "sha256": "69a3c431655868d0355f5ef70684c398aaa1a325a6c633e21955e3526d64517a"
+    },
+    {
+     "path": "progressive-pcr-timing/collection/exported/BUILD.log",
+     "sha256": "4fea621dfe74accc428f50dcb2f1c3d2696dc2a3be7cd727e4e9d7d68aaa60d6"
+    },
+    {
+     "path": "progressive-pcr-timing/collection/exported/CLIPPY.log",
+     "sha256": "16307ec8298e0a67c224a91b3046155120810aaa8c24f0c1afd4724e9f2356fd"
+    },
+    {
+     "path": "progressive-pcr-timing/collection/exported/CLOUD-INIT.exit",
+     "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+    },
+    {
+     "path": "progressive-pcr-timing/collection/exported/CLOUD-INIT.log",
+     "sha256": "a2c9a7f4d00ef458c07241366d6420d6f53d55b97dbac87865dbf02784acc344"
+    },
+    {
+     "path": "progressive-pcr-timing/collection/exported/COLLECTION-STATUS.json",
+     "sha256": "a81384b08235a1006b0335a13080cf86ed4f555ae73e895ce02bd483fdfafd42"
+    },
+    {
+     "path": "progressive-pcr-timing/collection/exported/COUNT-continuous-44100.exit",
+     "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+    },
+    {
+     "path": "progressive-pcr-timing/collection/exported/COUNT-continuous-44100.log",
+     "sha256": "67ad17b93607caf3d3380024b094e2084dc4c15983d5b246e973363e3dc5214c"
+    },
+    {
+     "path": "progressive-pcr-timing/collection/exported/COUNT-later-entry-48000.exit",
+     "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+    },
+    {
+     "path": "progressive-pcr-timing/collection/exported/COUNT-later-entry-48000.log",
+     "sha256": "429529d55ce41ffc0f228b7d9b0258f382269e7f917099e971af84cb04332530"
+    },
+    {
+     "path": "progressive-pcr-timing/collection/exported/COUNT-reordered-48000.exit",
+     "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+    },
+    {
+     "path": "progressive-pcr-timing/collection/exported/COUNT-reordered-48000.log",
+     "sha256": "f6ac9a59692889813c055dda69ec8760e6f7bc00178de146689c9d84b2d4d7ed"
+    },
+    {
+     "path": "progressive-pcr-timing/collection/exported/COUNTS-SUMMARY.json",
+     "sha256": "68d7fe1a6420abc53cc96834694bdd7733234bf5412cfea31885a7636ce7d657"
+    },
+    {
+     "path": "progressive-pcr-timing/collection/exported/CPU.txt",
+     "sha256": "132d1f769f4e510acca9a5d9863ac16fd532de89b651f9e04170bb8656be7bbb"
+    },
+    {
+     "path": "progressive-pcr-timing/collection/exported/DISK-END.txt",
+     "sha256": "6e4241094d7f047aa48c9950117c228d403c0f20b6b97fb4871fe5c5ad9f2775"
+    },
+    {
+     "path": "progressive-pcr-timing/collection/exported/DISK.txt",
+     "sha256": "dd3191a0aa96454e578d2b86fcb300839cb8ac180b9c71b8e61dc456c876b3eb"
+    },
+    {
+     "path": "progressive-pcr-timing/collection/exported/FMT.log",
+     "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+     "path": "progressive-pcr-timing/collection/exported/GATE-RESULT.json",
+     "sha256": "a15c485c00ed30e51c053c2a7115323bf3f09fe94150b20cff59a361b32cd877"
+    },
+    {
+     "path": "progressive-pcr-timing/collection/exported/HLS-PARITY.log",
+     "sha256": "01afd2005f0f11a36519af3523fe343bd771c4a11b758e7fe36536fe4741d11f"
+    },
+    {
+     "path": "progressive-pcr-timing/collection/exported/INSTRUMENTATION.sha256",
+     "sha256": "eba31c5fb4dca090649c64f68c47f1c9945dca3fec9059dd228c8d6da1cf81d6"
+    },
+    {
+     "path": "progressive-pcr-timing/collection/exported/LIBRARY-TESTS.log",
+     "sha256": "55b17301e90630c90e5184ce864187136a751e2896fd8cc0d775cd28b5a9f1ac"
+    },
+    {
+     "path": "progressive-pcr-timing/collection/exported/PLATFORM.txt",
+     "sha256": "d59dd32d3c0f10fa871108539b327b52374fa45911988fd0efe09916a6434bb3"
+    },
+    {
+     "path": "progressive-pcr-timing/collection/exported/PRESERVED-OUTPUTS.json",
+     "sha256": "c3a4240b49727cb564b837b4a8e3d1353af85f4e356d9db295e9a9466f58ada8"
+    },
+    {
+     "path": "progressive-pcr-timing/collection/exported/PREVIOUS-IDENTITY.json",
+     "sha256": "d280539ee3ae78eee47c6b24cf220dc905df84c6c1df804978f830bd05d0a132"
+    },
+    {
+     "path": "progressive-pcr-timing/collection/exported/PREVIOUS-SOURCE.txt",
+     "sha256": "cb755204c7445204ade61d0c6f50087d8ed96b916848bcbcda7a84fe668224dd"
+    },
+    {
+     "path": "progressive-pcr-timing/collection/exported/PREVIOUS-WORKER.sha256",
+     "sha256": "3d56e85ef94022e5873348b443baba51fa8adc45b6edb7515e2befdb53ce71fd"
+    },
+    {
+     "path": "progressive-pcr-timing/collection/exported/ROOT-MOUNT.txt",
+     "sha256": "a213dc396433f3a89a0af3d89f688791dc4510582c5a184e6af44c32b4301929"
+    },
+    {
+     "path": "progressive-pcr-timing/collection/exported/RSS-REVIEW.json",
+     "sha256": "35fcc38a12295baaefe8217d5a720ee351de7a3053c04bec08c3734ffc67a352"
+    },
+    {
+     "path": "progressive-pcr-timing/collection/exported/RUST.txt",
+     "sha256": "ba203e33fe4a5b8e05147bb6e57fb1ddace26d9f799f357420b666887dd7e2f1"
+    },
+    {
+     "path": "progressive-pcr-timing/collection/exported/TEST-CACHE-CLEANUP.log",
+     "sha256": "889a752209f0a21573147641e8fde0359aa7f48c2796592e27cd82c919622351"
+    },
+    {
+     "path": "progressive-pcr-timing/collection/exported/TIMING-CHECK.exit",
+     "sha256": "53c234e5e8472b6ac51c1ae1cab3fe06fad053beb8ebfd8977b010655bfdd3c3"
+    },
+    {
+     "path": "progressive-pcr-timing/collection/exported/TIMING-CHECK.json",
+     "sha256": "f3e2f632d9a205c0923e43175ce64132042720b06af2c02a625a006a59a48ceb"
+    },
+    {
+     "path": "progressive-pcr-timing/collection/exported/TIMING-IDENTITY.json",
+     "sha256": "e3b82d73edf151a7212ca9f2a7b0337b3a32171d8f9e040f878e153778195c75"
+    },
+    {
+     "path": "progressive-pcr-timing/collection/exported/TIMING.exit",
+     "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+    },
+    {
+     "path": "progressive-pcr-timing/collection/exported/TIMING.log",
+     "sha256": "e2c3934c65f84022ed7414c416380dd002d0944394ccf339b95971053a0750e7"
+    },
+    {
+     "path": "progressive-pcr-timing/collection/exported/TOOL-CACHE-CLEANUP.log",
+     "sha256": "67cff1f732086872c269f5996b660d5dd96bfb6f69f38faafd3e7ac1de6c0eb6"
+    },
+    {
+     "path": "progressive-pcr-timing/collection/exported/WORKERS.sha256",
+     "sha256": "0a48137ebed20a655e8f4bf12893074dac9ba3ae55b60b0f9d9050847b7bb85f"
+    },
+    {
+     "path": "progressive-pcr-timing/collection/exported/XTASK.log",
+     "sha256": "56ac4df90a217a894425727b4661dae02dd6a07e3d6ba00874205f839ddcafcb"
+    },
+    {
+     "path": "progressive-pcr-timing/collection/exported/candidate-SOURCE.txt",
+     "sha256": "47291d9f8ffdb3c5417175cfbfbe2f6bcc399011c9f85a32366dccd72993ed5e"
+    },
+    {
+     "path": "progressive-pcr-timing/collection/exported/previous-worker",
+     "sha256": "162ce016e397a5847d905deaac9ee383181a9d00aefabc4a9f3a5bfcb1a46b5f"
+    },
+    {
+     "path": "progressive-pcr-timing/collection/exported/workers/target/harness/ffmpeg-formats-worker",
+     "sha256": "41c751a11df180564629f011105178bb1fb657b072913372e04ada7da1b55302"
+    },
+    {
+     "path": "progressive-pcr-timing/collection/exported/workers/target/release/playback-worker",
+     "sha256": "d09c4de49bec3c9280fa5dad6f397e65ce26cb70812ddba7bdd7ed1a271ccfdc"
+    },
+    {
+     "path": "progressive-pcr-timing/collection/guest.sh",
+     "sha256": "ee05fff349d513a09c2a557db2501d827ba023b00539373794298737ae790a41"
+    },
+    {
+     "path": "progressive-pcr-timing/collection/host.sh",
+     "sha256": "0bf5368a535de67d95da30b652b4a2d3067dd05392fad5e7d2aef9136ee1f502"
+    },
+    {
+     "path": "progressive-pcr-timing/collection/preflight.py",
+     "sha256": "7a289b35f88e258e8d06b8cf1c4f3c4081964cab0170afc6be40718936c662b6"
+    }
+   ]
   }
  ]
 }
