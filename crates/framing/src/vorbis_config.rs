@@ -4,6 +4,10 @@
 //! identification header ([`VorbisIdentification`]), the comment header and the setup
 //! header. Ogg carries them as its first three packets; Matroska and the canonical
 //! decoder configuration join them with Xiph lacing ([`xiph_split`], [`xiph_join`]).
+//!
+//! [`VorbisModes`] recovers the block size of each mode from the setup header, and
+//! [`VorbisModes::block`] reads which block an audio packet codes, so a container can
+//! derive packet durations without decoding.
 use triergon_core::{Error, Result};
 
 /// The fields of a Vorbis identification header (Vorbis I section 4.2.2).
@@ -56,6 +60,140 @@ impl VorbisIdentification {
             blocksize,
         })
     }
+}
+
+/// The modes of a setup header: how many there are and which code long blocks.
+///
+/// The mode configurations end the setup header (Vorbis I section 4.2.4), each one a
+/// block flag, two 16-bit fields that must be zero, and an 8-bit mapping number,
+/// followed by the framing bit. [`VorbisModes::from_setup`] reads them backwards from
+/// the framing bit, so the codebooks, floors, residues and mappings before them need
+/// not be parsed. Reading backwards cannot see where the mode list starts; the longest
+/// run of well-formed modes whose preceding 6-bit count agrees is taken, with mapping
+/// numbers below 64 as the specification bounds them.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct VorbisModes {
+    count: u8,
+    /// Bit `m` is the block flag of mode `m`.
+    long: u64,
+}
+
+/// The block an audio packet codes (Vorbis I section 4.3.1).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct VorbisBlock {
+    pub long: bool,
+    /// For a long block, whether the previous window is long, as its window flag states;
+    /// `None` for a short block, whose window does not say.
+    pub previous_long: Option<bool>,
+}
+
+impl VorbisBlock {
+    /// The block size, given the identification header's short and long sizes.
+    pub fn size(self, blocksize: [u16; 2]) -> u16 {
+        blocksize[usize::from(self.long)]
+    }
+
+    /// Samples a packet coding this block completes after a block of size `previous`
+    /// (Vorbis I section 4.3.8): from the centre of the previous window to the centre
+    /// of this one. The first audio packet of a stream completes none.
+    pub fn samples_after(self, previous: u16, blocksize: [u16; 2]) -> u32 {
+        (u32::from(previous) + u32::from(self.size(blocksize))) / 4
+    }
+}
+
+impl VorbisModes {
+    /// The modes of a setup header packet.
+    pub fn from_setup(setup: &[u8]) -> Result<VorbisModes> {
+        if vorbis_header_type(setup) != Some(5) {
+            return Err(Error::Invalid("Vorbis setup header"));
+        }
+        let bit = |at: usize| setup[at >> 3] >> (at & 7) & 1 != 0;
+        let field = |at: usize, width: usize| {
+            (0..width).fold(0u32, |value, k| value | u32::from(bit(at + k)) << k)
+        };
+        // The framing bit is the last bit set; padding after it is zero.
+        let last = setup
+            .iter()
+            .rposition(|&byte| byte != 0)
+            .ok_or(Error::Truncated)?;
+        let framing = last * 8 + 7 - setup[last].leading_zeros() as usize;
+        // Bits of the header body after the 7-byte packet header.
+        let body = 7 * 8;
+        const MODE_BITS: usize = 41;
+        // Bit `k` of `from_end` is the block flag of the `k`-th mode before the framing bit.
+        let mut found = 0;
+        let mut from_end = 0u64;
+        while found < 64 {
+            let Some(start) = framing.checked_sub(MODE_BITS * (found + 1)) else {
+                break;
+            };
+            if start < body
+                || field(start + 1, 16) != 0
+                || field(start + 17, 16) != 0
+                || field(start + 33, 8) >= 64
+            {
+                break;
+            }
+            from_end |= u64::from(bit(start)) << found;
+            found += 1;
+        }
+        for count in (1..=found).rev() {
+            let start = framing - MODE_BITS * count;
+            if start >= body + 6 && field(start - 6, 6) as usize == count - 1 {
+                let mask = u64::MAX >> (64 - count);
+                return Ok(VorbisModes {
+                    count: count as u8,
+                    long: (from_end & mask).reverse_bits() >> (64 - count),
+                });
+            }
+        }
+        Err(Error::Invalid("Vorbis setup header mode configuration"))
+    }
+
+    /// Number of modes, 1 to 64.
+    pub fn count(&self) -> u8 {
+        self.count
+    }
+
+    /// Whether mode `mode` codes long blocks.
+    pub fn is_long(&self, mode: u8) -> bool {
+        mode < self.count && self.long >> mode & 1 != 0
+    }
+
+    /// The block an audio packet codes: its mode number follows the packet type bit,
+    /// and a long block's window flags follow the mode number.
+    pub fn block(&self, packet: &[u8]) -> Result<VorbisBlock> {
+        let first = *packet.first().ok_or(Error::Truncated)?;
+        if first & 1 != 0 {
+            return Err(Error::Invalid("Vorbis audio packet type"));
+        }
+        let bits = u32::from(packet.get(1).copied().unwrap_or(0)) << 8 | u32::from(first);
+        // ilog(count - 1) bits of mode number.
+        let width = u8::BITS - (self.count - 1).leading_zeros();
+        let mode = (bits >> 1 & ((1 << width) - 1)) as u8;
+        if mode >= self.count {
+            return Err(Error::Invalid("Vorbis mode number"));
+        }
+        let long = self.is_long(mode);
+        let flag_at = 1 + width;
+        if long && packet.len() * 8 < (flag_at + 2) as usize {
+            return Err(Error::Truncated);
+        }
+        Ok(VorbisBlock {
+            long,
+            previous_long: long.then_some(bits >> flag_at & 1 != 0),
+        })
+    }
+}
+
+/// The block size an audio packet codes, from the identification header's block sizes
+/// and the setup header's modes.
+pub fn vorbis_packet_blocksize(
+    modes: &VorbisModes,
+    blocksize: [u16; 2],
+    packet: &[u8],
+) -> Result<u16> {
+    Ok(modes.block(packet)?.size(blocksize))
 }
 
 /// The type byte a Vorbis header packet starts with: 1, 3 or 5 for identification,
@@ -170,6 +308,70 @@ mod tests {
         assert_eq!(&laced[ranges[1].clone()], &b[..]);
         assert_eq!(&laced[ranges[2].clone()], &c[..]);
         assert!(xiph_split(&laced[..40], &mut ranges).is_err());
+    }
+
+    /// A setup header whose body is `prefix` bits, then the mode count and modes, then
+    /// the framing bit.
+    fn setup_with_modes(prefix: &[(u32, usize)], modes: &[(bool, u8)]) -> Vec<u8> {
+        let mut bits = Vec::new();
+        let mut put =
+            |value: u32, width: usize| bits.extend((0..width).map(|k| value >> k & 1 != 0));
+        for &(value, width) in prefix {
+            put(value, width);
+        }
+        put(modes.len() as u32 - 1, 6);
+        for &(long, mapping) in modes {
+            put(u32::from(long), 1);
+            put(0, 32);
+            put(u32::from(mapping), 8);
+        }
+        put(1, 1);
+        let mut packet = b"\x05vorbis".to_vec();
+        packet.extend(bits.chunks(8).map(|byte| {
+            byte.iter()
+                .enumerate()
+                .fold(0u8, |v, (k, &b)| v | u8::from(b) << k)
+        }));
+        packet
+    }
+
+    #[test]
+    fn setup_modes_are_read_back_from_the_framing_bit() {
+        let setup = setup_with_modes(&[(0x2a5, 11), (0, 6)], &[(false, 0), (true, 1)]);
+        let modes = VorbisModes::from_setup(&setup).unwrap();
+        assert_eq!(modes.count(), 2);
+        assert!(!modes.is_long(0) && modes.is_long(1) && !modes.is_long(2));
+        // Mode 1 (long), previous window short, next long; then mode 0 (short).
+        let block = modes.block(&[0b0000_1010]).unwrap();
+        assert_eq!(
+            block,
+            VorbisBlock {
+                long: true,
+                previous_long: Some(false)
+            }
+        );
+        assert_eq!(block.samples_after(256, [256, 2048]), 576);
+        assert_eq!(
+            vorbis_packet_blocksize(&modes, [256, 2048], &[0]).unwrap(),
+            256
+        );
+        assert!(modes.block(&[1]).is_err());
+        assert!(modes.block(&[]).is_err());
+
+        // Zero bits before the list look like more modes; the count field decides.
+        let many: Vec<_> = (0..5).map(|m| (m % 2 == 1, m)).collect();
+        let setup = setup_with_modes(&[(0xffff, 16)], &many);
+        let modes = VorbisModes::from_setup(&setup).unwrap();
+        assert_eq!(modes.count(), 5);
+        assert!((0..5).all(|m| modes.is_long(m) == (m % 2 == 1)));
+        // Mode 3 of 5 takes three bits after the type bit.
+        assert!(modes.block(&[0b0000_0110]).unwrap().long);
+        assert!(modes.block(&[0b0000_1110]).is_err());
+
+        let single = setup_with_modes(&[(0x7fff, 15)], &[(true, 0)]);
+        assert_eq!(VorbisModes::from_setup(&single).unwrap().count(), 1);
+        assert!(VorbisModes::from_setup(b"\x05vorbis").is_err());
+        assert!(VorbisModes::from_setup(b"\x05vorbis\x01").is_err());
     }
 
     #[test]

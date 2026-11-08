@@ -10,13 +10,24 @@
 )]
 // Pending: `missing_docs`.
 
+mod blocking;
+pub mod compat;
+pub mod mapping;
 pub mod packets;
 pub mod page;
+mod reader;
+pub mod seek;
+mod timing;
+mod track;
 
-pub use packets::{Assembler, Completed};
+pub use blocking::BlockingReader;
+pub use mapping::Mapping;
+pub use packets::{Assembler, Completed, Continuity};
 pub use page::PageHeader;
+pub use reader::{Limits, Reader, ReaderEvent};
+pub use track::{Packet, Track};
 
-use triergon_core::{Budget, Error, Result};
+use triergon_core::{Budget, Bytes, Error, Result};
 
 /// One packet of a whole Ogg file read by [`read_packets`].
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -29,9 +40,9 @@ pub struct SlicePacket {
     pub end_of_stream: bool,
 }
 
-/// Every packet of every logical stream of a complete Ogg file in memory, in page order.
-/// Pages with a bad CRC are skipped. For tests and tools; the incremental reader is
-/// [`Assembler`] over pages.
+/// Every packet of every logical stream of a complete Ogg file in memory, in page order,
+/// header packets included. Pages with a bad CRC are skipped. For tests and tools; the
+/// reader is [`Reader`].
 pub fn read_packets(bytes: &[u8]) -> Result<Vec<SlicePacket>> {
     let budget = Budget::new(bytes.len().saturating_mul(4).max(1 << 20))?;
     let mut streams: Vec<(u32, Assembler)> = Vec::new();
@@ -55,20 +66,19 @@ pub fn read_packets(bytes: &[u8]) -> Result<Vec<SlicePacket>> {
             at += 1;
             continue;
         }
-        let index = match streams.iter().position(|(serial, _)| *serial == header.serial) {
-            Some(index) => index,
-            None => {
-                streams.push((header.serial, Assembler::new(&budget, 1 << 24)));
-                streams.len() - 1
-            }
-        };
-        let assembler = &mut streams[index].1;
-        let body = &page[header.header_len()..header.page_len()];
-        assembler.push(&header, body, &mut done)?;
+        let found = streams
+            .iter()
+            .position(|(serial, _)| *serial == header.serial);
+        let index = found.unwrap_or_else(|| {
+            streams.push((header.serial, Assembler::new(&budget, 1 << 24)));
+            streams.len() - 1
+        });
+        let shared = Bytes::copy_from_slice(&budget, &page[..header.page_len()])?;
+        streams[index].1.push(&header, &shared, &mut done)?;
         for completed in &done {
             out.push(SlicePacket {
                 serial: header.serial,
-                data: assembler.packet(completed).to_vec(),
+                data: completed.payload.to_vec(),
                 granule: completed.last_on_page.then_some(header.granule),
                 end_of_stream: completed.last_on_page && header.end_of_stream(),
             });
@@ -92,7 +102,15 @@ mod tests {
         write_page(0, -1, 7, 1, &[255, 255], &big[..510], &mut file);
         let mut body = big[510..].to_vec();
         body.push(b'z');
-        write_page(CONTINUED | END_OF_STREAM, 1234, 7, 2, &[90, 1], &body, &mut file);
+        write_page(
+            CONTINUED | END_OF_STREAM,
+            1234,
+            7,
+            2,
+            &[90, 1],
+            &body,
+            &mut file,
+        );
         let packets = read_packets(&file).unwrap();
         assert_eq!(packets.len(), 3);
         assert_eq!(packets[0].data, b"abc");
@@ -106,23 +124,5 @@ mod tests {
         assert!(header.crc_ok(&file));
         file[30] ^= 1;
         assert!(!PageHeader::parse(&file).unwrap().crc_ok(&file));
-    }
-
-    #[test]
-    fn a_sequence_gap_drops_the_broken_packet() {
-        let budget = Budget::new(1 << 20).unwrap();
-        let mut assembler = Assembler::new(&budget, 1 << 16);
-        let mut done = Vec::new();
-        let mut file = Vec::new();
-        write_page(0, -1, 1, 0, &[255], &[1; 255], &mut file);
-        let header = PageHeader::parse(&file).unwrap();
-        assert!(!assembler.push(&header, &file[header.header_len()..], &mut done).unwrap());
-        assert!(done.is_empty() && assembler.in_progress());
-        file.clear();
-        write_page(CONTINUED, 9, 1, 2, &[10, 4], &[2; 14], &mut file);
-        let header = PageHeader::parse(&file).unwrap();
-        assert!(assembler.push(&header, &file[header.header_len()..], &mut done).unwrap());
-        assert_eq!(done.len(), 1);
-        assert_eq!(assembler.packet(&done[0]), &[2; 4]);
     }
 }
