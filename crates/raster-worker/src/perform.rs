@@ -14,15 +14,18 @@ use crate::record::{Kind, Sink};
 
 /// Status values of a record. The first three are the reference's: the source
 /// or parameters are invalid, the operation succeeded, or it failed as libass
-/// fails it (`Error::Invalid`). The reference never records the last two, so a
+/// fails it (`Error::Invalid`). The reference never records the others, so a
 /// case that reaches them fails: the crate refused under a limit (the case's
 /// work, [`Limits`] or a fixed size bound: `Error::Policy` and
-/// `Error::Limit`), or because its storage budget ran out.
+/// `Error::Limit`), its storage budget ran out (`Error::Backpressure` and
+/// `Error::Allocation`), or it failed with any other error, which the crate
+/// does not return for these operations.
 const INVALID: i64 = 0;
 const OK: i64 = 1;
 const FAILED: i64 = 2;
 const POLICY: i64 = 3;
 const BUDGET: i64 = 4;
+const ERROR: i64 = 5;
 
 /// The work one case may do: the work of a frame, which a case stands for.
 const CASE_WORK: u64 = 1 << 32;
@@ -32,8 +35,8 @@ fn refused(error: &Error) -> i64 {
     match error {
         Error::Invalid(_) => FAILED,
         Error::Policy(_) | Error::Limit { .. } => POLICY,
-        // The storage budget ran out (`Backpressure`, `Allocation`).
-        _ => BUDGET,
+        Error::Backpressure { .. } | Error::Allocation => BUDGET,
+        _ => ERROR,
     }
 }
 
