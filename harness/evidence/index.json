@@ -16635,6 +16635,15 @@
    "sha256": "65161697b5c5a79289df268d63ff79ef6e776559db48b36b9e45e1c219cf51e7",
    "bytes": 14049861,
    "source_revision": "f99d893196908d562c897bccb20c6a972cd25d11"
+  },
+  {
+   "name": "mpegts-finite-recovery",
+   "path": "mpegts-finite-recovery",
+   "retention": "retained",
+   "reason": "finite PES fault-recovery host comparisons cited by docs/status.md",
+   "key": "evidence/mpegts-finite-recovery/69642daca51d9609dcd1cb5de3ca2c5828150f221b9937e37a7bef3bc8f99b9f.tar.gz",
+   "sha256": "69642daca51d9609dcd1cb5de3ca2c5828150f221b9937e37a7bef3bc8f99b9f",
+   "bytes": 39685608
   }
  ]
 }
