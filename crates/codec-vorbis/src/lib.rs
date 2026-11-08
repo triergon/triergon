@@ -10,6 +10,7 @@
 )]
 // Pending: `missing_docs`.
 
+mod bits;
 mod codebook;
 mod floor0;
 mod floor1;
@@ -37,7 +38,7 @@ use residue::Member;
 use setup::{Floor, Setup};
 use spectra::Spectra;
 use storage::Meter;
-use window::{Block, Slopes, overlap_add};
+use window::{Block, Slopes, fade_out, fold, overlap_add};
 
 /// Bounds of one decoder.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -127,11 +128,12 @@ pub struct Decoder {
     slopes: Slopes,
     /// The spectrum of each channel in the current block.
     spectra: Spectra,
-    /// The right half of each channel's previous IMDCT output.
+    /// The last output quarter of each channel's previous inverse MDCT, which with its
+    /// reverse makes the right half the next block laps.
     overlap: Spectra,
     floors: Vec<ChannelFloor>,
-    /// One block of IMDCT output.
-    time: Vec<f32>,
+    /// The DCT-IV of one channel's spectrum.
+    dct: Vec<f32>,
     scratch: residue::Scratch,
     /// The block size of the previous packet; `None` until a packet primed the overlap.
     previous: Option<Block>,
@@ -213,7 +215,7 @@ impl Decoder {
                 coefficients: [0.0; floor0::MAX_ORDER],
             },
         )?;
-        let time = meter.vec(blocksizes[1], 0.0)?;
+        let dct = meter.vec(half, 0.0)?;
         let interleaves = setup.residues.iter().any(residue::Residue::interleaves);
         let classes = setup
             .residues
@@ -236,7 +238,7 @@ impl Decoder {
             spectra,
             overlap,
             floors,
-            time,
+            dct,
             scratch,
             previous: None,
             _tables: meter.0,
@@ -268,13 +270,14 @@ impl Decoder {
         } = self;
         let mapping = &setup.mappings[usize::from(mode.mapping)];
         decode_floors(setup, mapping, r, floors)?;
-        decode_residues(setup, mapping, r, half, floors, spectra, scratch);
+        // Spectral lines past `coded` are zero in every channel until the transform.
+        let coded = decode_residues(setup, mapping, r, half, floors, spectra, scratch);
         for step in mapping.coupling.iter().rev() {
             let (magnitude, angle) =
                 spectra.pair_mut(usize::from(step.magnitude), usize::from(step.angle));
-            decouple(&mut magnitude[..half], &mut angle[..half]);
+            decouple(&mut magnitude[..coded], &mut angle[..coded]);
         }
-        apply_floors(setup, mapping, block, floors, spectra, half);
+        apply_floors(setup, mapping, block, floors, spectra, coded);
         self.synthesize(block, out)
     }
 
@@ -300,39 +303,40 @@ impl Decoder {
 
     /// Inverse MDCT and overlap-add of every channel into `out` (sections 4.3.7, 4.3.8).
     fn synthesize(&mut self, block: Block, out: &mut AudioFrame) -> Result<(), DecodeError> {
-        let n = self.blocksizes[block as usize];
-        let len = self
-            .previous
-            .map_or(0, |previous| self.blocksizes[previous as usize] / 4 + n / 4);
+        let half = self.blocksizes[block as usize] / 2;
+        let quarter = half / 2;
+        let len = self.previous.map_or(0, |previous| {
+            self.blocksizes[previous as usize] / 4 + quarter
+        });
         out.try_resize(self.layout.channels(), len, &mut self.output)?;
         out.layout = self.layout;
         out.sample_rate = self.sample_rate;
         out.samples_per_channel = len;
         let imdct = &mut self.imdct[block as usize];
-        let time = &mut self.time[..n];
-        let silent = |floor: &ChannelFloor| matches!(floor.curve, Curve::Unused);
-        for ((channel, saved), (floor, &plane)) in self
+        let dct = &mut self.dct[..half];
+        for ((spectrum, saved), (floor, &plane)) in self
             .spectra
             .channels_mut()
             .zip(self.overlap.channels_mut())
             .zip(self.floors.iter().zip(&self.planes))
         {
-            if silent(floor) {
-                time.fill(0.0);
+            let lapped = self.previous.map(|previous| {
+                let len = self.blocksizes[previous as usize] / 4;
+                (&saved[..len], self.slopes.between(previous, block))
+            });
+            let out = &mut out.planes[usize::from(plane)];
+            if matches!(floor.curve, Curve::Unused) {
+                if let Some((previous, slope)) = lapped {
+                    fade_out(previous, slope, out);
+                }
+                saved[..quarter].fill(0.0);
             } else {
-                imdct.imdct(&channel[..n / 2], time);
+                imdct.dct4(&spectrum[..half], dct);
+                if let Some((previous, slope)) = lapped {
+                    overlap_add(previous, dct, slope, out);
+                }
+                fold(dct, &mut saved[..quarter]);
             }
-            if let Some(previous) = self.previous {
-                let slope = self.slopes.between(previous, block);
-                let lapped = self.blocksizes[previous as usize] / 2;
-                overlap_add(
-                    &saved[..lapped],
-                    time,
-                    slope,
-                    &mut out.planes[usize::from(plane)],
-                );
-            }
-            saved[..n / 2].copy_from_slice(&time[n / 2..]);
         }
         self.previous = Some(block);
         Ok(())
@@ -366,7 +370,8 @@ fn decode_floors(
 }
 
 /// Residue decode by submap (sections 4.3.3, 4.3.4): a channel's residue is coded if
-/// its floor is used or it is coupled with a channel whose floor is.
+/// its floor is used or it is coupled with a channel whose floor is. Returns how many
+/// leading spectral lines of any channel may be nonzero.
 fn decode_residues(
     setup: &Setup,
     mapping: &Mapping,
@@ -375,7 +380,7 @@ fn decode_residues(
     floors: &[ChannelFloor],
     spectra: &mut Spectra,
     scratch: &mut residue::Scratch,
-) {
+) -> usize {
     let mut coded = [false; 256];
     for (coded, floor) in coded.iter_mut().zip(floors) {
         *coded = !matches!(floor.curve, Curve::Unused);
@@ -390,6 +395,7 @@ fn decode_residues(
     for channel in spectra.channels_mut() {
         channel[..half].fill(0.0);
     }
+    let mut coded_lines = 0;
     for (number, submap) in mapping.submaps.iter().enumerate() {
         let mut members = [Member::default(); 256];
         let mut count = 0;
@@ -405,7 +411,7 @@ fn decode_residues(
             };
             count += 1;
         }
-        setup.residues[usize::from(submap.residue)].decode(
+        let lines = setup.residues[usize::from(submap.residue)].decode(
             r,
             &setup.codebooks,
             half,
@@ -413,20 +419,23 @@ fn decode_residues(
             spectra,
             scratch,
         );
+        coded_lines = coded_lines.max(lines);
     }
+    coded_lines
 }
 
-/// The dot product of each channel's floor curve and residue (section 4.3.6).
+/// The dot product of each channel's floor curve and residue (section 4.3.6) over the
+/// first `coded` lines; the floor leaves the zero lines after them zero.
 fn apply_floors(
     setup: &Setup,
     mapping: &Mapping,
     block: Block,
     floors: &[ChannelFloor],
     spectra: &mut Spectra,
-    half: usize,
+    coded: usize,
 ) {
     for ((spectrum, floor), &submap) in spectra.channels_mut().zip(floors).zip(&mapping.mux) {
-        let spectrum = &mut spectrum[..half];
+        let spectrum = &mut spectrum[..coded];
         let number = mapping.submaps[usize::from(submap)].floor;
         match (floor.curve, &setup.floors[usize::from(number)]) {
             (Curve::Lsp(amplitude), Floor::Lsp(lsp)) => {

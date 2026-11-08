@@ -48,10 +48,12 @@ layout holds) at any sample rate.
   `reset` primes the overlap and yields none. Without that priming output, a stream's
   output starts where FFmpeg's does after its decoder skips it. The end trim of a stream
   (its last packet cut to the final granule position) belongs to the container reader.
-- Codewords decode by one table lookup on the next 10 bits; longer codewords by a binary
+- Codewords decode by one table lookup on the next 11 bits; longer codewords by a binary
   search over the remaining ones. Over- and underspecified Huffman trees are refused
   except a single-entry codebook of length 1, which reads one bit (errata 20150226),
   and a codebook without used entries, from which nothing decodes.
+- The inverse MDCT runs as the shared DCT-IV, its unfolding folded into the windowed
+  overlap-add; work past the last spectral line a packet's residues code is skipped.
 - Following FFmpeg 9.0.2: reads past the end of a packet return zero bits, so floor and
   residue decode run to their end instead of stopping at the end of the packet; inverse
   coupling treats a zero magnitude as positive (the specification's "greater than zero"
