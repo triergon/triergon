@@ -69,7 +69,7 @@ int main(int argc, char **argv) {
         free(data);
         return 74;
     }
-    uint64_t start = now_ns();
+    uint64_t start = timing ? now_ns() : 0;
     Outcome total = {0};
     int failed = 0;
     for (unsigned long long i = 0; i < iterations; ++i) {
