@@ -112,36 +112,60 @@ impl Fft {
     }
 
     /// Transform the planes `re` and `im`, already filled in [`Fft::order`].
+    #[cfg(test)]
     fn transform(&self, re: &mut [f32], im: &mut [f32]) {
         let (re, im) = (&mut re[..self.len], &mut im[..self.len]);
         // A one-point transform has no stage.
-        let Some((first, rest)) = self.stages.split_first() else {
+        let Some(first) = self.stages.first() else {
             return;
         };
-        // The innermost stage combines single points: its twiddles are all 1.
         if first.radix == 4 {
             for (r, i) in re.chunks_exact_mut(4).zip(im.chunks_exact_mut(4)) {
-                let (a0r, a0i, a1r, a1i) = (r[0] + r[2], i[0] + i[2], r[0] - r[2], i[0] - i[2]);
-                let (a2r, a2i) = (r[1] + r[3], i[1] + i[3]);
-                // (x1 - x3) times -i.
-                let (a3r, a3i) = (i[1] - i[3], -(r[1] - r[3]));
-                r[0] = a0r + a2r;
-                i[0] = a0i + a2i;
-                r[1] = a1r + a3r;
-                i[1] = a1i + a3i;
-                r[2] = a0r - a2r;
-                i[2] = a0i - a2i;
-                r[3] = a1r - a3r;
-                i[3] = a1i - a3i;
+                let x = |j: usize| (r[j], i[j]);
+                let y = leaf4([x(0), x(1), x(2), x(3)]);
+                for (j, (yr, yi)) in y.into_iter().enumerate() {
+                    (r[j], i[j]) = (yr, yi);
+                }
             }
         } else {
             run_stage(re, im, first);
         }
-        for stage in rest {
+        self.transform_after_first(re, im);
+    }
+
+    /// Whether the innermost stage is radix 4, which [`leaf4`] computes as the caller
+    /// fills the planes.
+    fn leaf_is_radix4(&self) -> bool {
+        self.stages.first().is_some_and(|stage| stage.radix == 4)
+    }
+
+    /// Every stage after the innermost one.
+    fn transform_after_first(&self, re: &mut [f32], im: &mut [f32]) {
+        let (re, im) = (&mut re[..self.len], &mut im[..self.len]);
+        for stage in self.stages.iter().skip(1) {
             run_stage(re, im, stage);
         }
     }
 }
+
+/// The innermost radix-4 stage on four points: it combines single points, so its
+/// twiddles are all 1.
+#[inline(always)]
+fn leaf4(x: [(f32, f32); 4]) -> [(f32, f32); 4] {
+    let [(r0, i0), (r1, i1), (r2, i2), (r3, i3)] = x;
+    let (a0r, a0i, a1r, a1i) = (r0 + r2, i0 + i2, r0 - r2, i0 - i2);
+    let (a2r, a2i) = (r1 + r3, i1 + i3);
+    // (x1 - x3) times -i.
+    let (a3r, a3i) = (i1 - i3, -(r1 - r3));
+    [
+        (a0r + a2r, a0i + a2i),
+        (a1r + a3r, a1i + a3i),
+        (a0r - a2r, a0i - a2i),
+        (a1r - a3r, a1i - a3i),
+    ]
+}
+
+impl Fft {}
 
 /// One stage over every block of the planes.
 fn run_stage(re: &mut [f32], im: &mut [f32], stage: &Stage) {
@@ -451,13 +475,32 @@ impl Imdct {
         let k = self.len / 2;
         let (x, w) = (&x[..k], &mut w[..k]);
         let (pre_re, pre_im) = (&self.pre.0, &self.pre.1);
-        // Pre-twiddle straight into the FFT's digit-reversed order.
-        let slots = self.re.iter_mut().zip(self.im.iter_mut());
-        for ((re, im), &j) in slots.zip(self.fft.order()) {
+        let twiddled = |j: u32| {
             let j = j as usize;
-            (*re, *im) = mul(x[2 * j], x[k - 1 - 2 * j], pre_re[j], pre_im[j]);
+            mul(x[2 * j], x[k - 1 - 2 * j], pre_re[j], pre_im[j])
+        };
+        // Pre-twiddle straight into the FFT's digit-reversed order, computing the
+        // innermost radix-4 stage on each four points before they are stored.
+        let order = self.fft.order();
+        if self.fft.leaf_is_radix4() {
+            let slots = self.re.chunks_exact_mut(4).zip(self.im.chunks_exact_mut(4));
+            for ((r, i), from) in slots.zip(order.chunks_exact(4)) {
+                let y = leaf4([from[0], from[1], from[2], from[3]].map(twiddled));
+                for (j, (yr, yi)) in y.into_iter().enumerate() {
+                    (r[j], i[j]) = (yr, yi);
+                }
+            }
+        } else {
+            let slots = self.re.iter_mut().zip(self.im.iter_mut());
+            for ((re, im), &j) in slots.zip(order) {
+                (*re, *im) = twiddled(j);
+            }
+            // A one-point transform has no stage at all.
+            if let Some(first) = self.fft.stages.first() {
+                run_stage(&mut self.re, &mut self.im, first);
+            }
         }
-        self.fft.transform(&mut self.re, &mut self.im);
+        self.fft.transform_after_first(&mut self.re, &mut self.im);
         let (post_re, post_im) = (&self.post.0, &self.post.1);
         for j in 0..k / 2 {
             let (ur, ui) = mul(self.re[j], self.im[j], post_re[j], post_im[j]);
@@ -557,6 +600,9 @@ mod tests {
                 );
             }
         }
+        let mut tiny = Imdct::new(4, 1.0).unwrap();
+        let mut y = [0.0; 4];
+        tiny.imdct(&[1.0, 0.0], &mut y);
         assert!(Imdct::new(28, 1.0).is_none());
         assert!(Imdct::new(30, 1.0).is_none());
     }
