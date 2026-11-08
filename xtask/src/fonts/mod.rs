@@ -41,6 +41,7 @@ pub const USAGE: &str = "usage: cargo xtask fonts prepare [--jobs N]
             report options pass through, and each report goes to OUTPUT/<feature>
             (OUTPUT: --output, default .research/font-report)";
 
+pub(crate) const CORPUS_FILES: &str = ".research/fonts/files";
 pub const VERSION: &str = "2.15.0";
 pub const ARCHIVE_SHA256: &str = "93cd47eb719c325107f2d3cf087d06299e944c3b48a40b55537302304dea1dd5";
 const ARCHIVE_LIMIT: usize = 16 * 1024 * 1024;
@@ -161,13 +162,22 @@ fn prepare(root: &Path, jobs: u32, net: &dyn Transport) -> Result<PathBuf, Strin
     fs::create_dir_all(&cache).map_err(|e| format!("{}: {e}", cache.display()))?;
     let archive_path = cache.join(format!("freetype-{VERSION}.tar.xz"));
     if !archive_path.exists() {
-        let url = format!(
-            "https://download.savannah.gnu.org/releases/freetype/freetype-{VERSION}.tar.xz"
-        );
-        let data = net.https(&url, "triergon-reference-builder", ARCHIVE_LIMIT)?;
-        if data.len() > ARCHIVE_LIMIT {
-            return Err("FreeType archive size limit".into());
-        }
+        let name = format!("freetype-{VERSION}.tar.xz");
+        let sources = [
+            format!("https://download.savannah.gnu.org/releases/freetype/{name}"),
+            format!("https://download-mirror.savannah.gnu.org/releases/freetype/{name}"),
+            format!(
+                "https://downloads.sourceforge.net/project/freetype/freetype2/{VERSION}/{name}"
+            ),
+        ];
+        let sources = sources.each_ref().map(|url| fetch::Source::Url(url));
+        let data = fetch::pinned(
+            net,
+            &sources,
+            ARCHIVE_SHA256,
+            ARCHIVE_LIMIT,
+            "triergon-reference-builder",
+        )?;
         fetch::publish(&archive_path, &data)?;
     }
     let archive = fetch::read_bounded(&archive_path, ARCHIVE_LIMIT)?;
@@ -229,13 +239,22 @@ fn prepare(root: &Path, jobs: u32, net: &dyn Transport) -> Result<PathBuf, Strin
 
 /// One corpus file: its path under `.research/fonts/files`, its SHA-256 and its
 /// outline format (`truetype`, `cff`, `cff-cid`, `cff2` or `collection`).
-struct CorpusFile {
-    path: String,
-    sha256: String,
-    format: String,
+pub(crate) struct CorpusFile {
+    pub(crate) path: String,
+    pub(crate) sha256: String,
+    pub(crate) format: String,
 }
 
-fn corpus(root: &Path) -> Result<Vec<(Value, Vec<CorpusFile>)>, String> {
+/// Whether a corpus source serves `lane` (`font` or `shape`): every lane, unless
+/// it lists its `lanes`.
+pub(crate) fn serves(source: &Value, lane: &str) -> bool {
+    source
+        .get("lanes")
+        .and_then(Value::as_array)
+        .is_none_or(|lanes| lanes.iter().any(|l| l.as_str() == Some(lane)))
+}
+
+pub(crate) fn corpus(root: &Path) -> Result<Vec<(Value, Vec<CorpusFile>)>, String> {
     let manifest =
         crate::checks::read_json(&root.join(CORPUS)).map_err(|e| format!("{CORPUS}: {e}"))?;
     let sources = manifest
@@ -321,10 +340,24 @@ fn fetch_corpus(root: &Path, net: &dyn Transport) -> Result<usize, String> {
         }
         let archive = downloads.join(name);
         if !archive.exists() {
-            let data = net.https(url, "triergon-font-corpus", FONT_LIMIT)?;
-            if data.len() > FONT_LIMIT {
-                return Err(format!("{name} exceeds the download bound"));
-            }
+            // A GitHub release asset may also be fetched through the API, which
+            // stays up when release downloads fail.
+            let asset = source.get("github_asset").map(|asset| {
+                let repo = asset.get("repo").and_then(Value::as_str);
+                let id = match asset.get("id") {
+                    Some(Value::Number(id)) if id.is_integer() => {
+                        id.as_i128().and_then(|id| u64::try_from(id).ok())
+                    }
+                    _ => None,
+                };
+                repo.zip(id)
+                    .map(|(repo, id)| fetch::Source::GitHubAsset { repo, id })
+                    .ok_or(format!("{name}: github_asset needs repo and id"))
+            });
+            let mut sources = vec![fetch::Source::Url(url)];
+            sources.extend(asset.transpose()?);
+            let data = fetch::pinned(net, &sources, expected, FONT_LIMIT, "triergon-font-corpus")
+                .map_err(|e| format!("{name}: {e}"))?;
             fetch::publish(&archive, &data)?;
         }
         let data = fetch::read_bounded(&archive, FONT_LIMIT)?;

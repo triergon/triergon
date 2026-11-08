@@ -1,0 +1,24 @@
+{
+  "schema": 1,
+  "id": "shape-bidi",
+  "operation": "shape-bidi",
+  "candidate": "shape-worker",
+  "worker_operation": "bidi-",
+  "reference": "harfbuzz-native",
+  "contract": [
+    "one text file read from memory: one text per line, upper-case hexadecimal code points, each optionally with line starts",
+    "as libass 0.17.5's ass_shaper_shape and ass_shaper_reorder with whole-text layout: FriBidi 1.0.17's bidi types (and bracket types when the case pairs brackets), embedding levels per paragraph (each ending after a BS character) with the case's base direction, then fribidi_reorder_line with flags 0 over each line (ending before each line start, after each BS character and at the end)",
+    "per line: its length, each paragraph's resolved direction, the levels after reordering and the visual-to-logical map; packets count lines and bytes code points",
+    "a line that does not parse is recorded as such; the file is read before each timed and memory operation"
+  ],
+  "required_profiles": [
+    "authored",
+    "random"
+  ],
+  "required_targets": [
+    "aarch64-unknown-linux-gnu"
+  ],
+  "iterations": 1,
+  "minimum_pairs": 30,
+  "confidence": 0.95
+}

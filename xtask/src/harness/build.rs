@@ -237,7 +237,7 @@ struct Candidate {
     features: &'static [&'static str],
 }
 
-const ADDITIONAL_CANDIDATES: [Candidate; 6] = [
+const ADDITIONAL_CANDIDATES: [Candidate; 7] = [
     Candidate {
         name: "playback-worker",
         package: "playback-worker",
@@ -259,6 +259,12 @@ const ADDITIONAL_CANDIDATES: [Candidate; 6] = [
     Candidate {
         name: "font-worker",
         package: "font-worker",
+        example: None,
+        features: &[],
+    },
+    Candidate {
+        name: "shape-worker",
+        package: "shape-worker",
         example: None,
         features: &[],
     },
@@ -386,9 +392,13 @@ fn additional_candidates(root: &Path) -> R<Vec<(&'static str, Vec<String>)>> {
     Ok(built)
 }
 
-/// A comparison reference linked against one pinned FFmpeg or FreeType profile.
+/// A comparison reference linked against one pinned FFmpeg, FreeType or HarfBuzz
+/// profile, and possibly further profiles.
 struct ProfileReference {
     profile: &'static str,
+    /// Further pinned profiles it links: their pkg-config directories follow the
+    /// profile's and their build records join its identity.
+    linked: &'static [&'static str],
     binary: &'static str,
     source: &'static str,
     define: Option<&'static str>,
@@ -411,11 +421,21 @@ const CONTAINER_PACKAGES: &[&str] = &["libavformat", "libavcodec", "libavutil"];
 const CONTAINER_OPTIONS: &[&str] = &["-O3", "-Wall", "-Wextra", "-Werror"];
 /// The options the decoder and capture comparisons were measured with.
 const RELEASE_OPTIONS: &[&str] = &["-std=c11", "-O2", "-Wall", "-Wextra", "-Werror"];
+/// The shaping reference is compiled like its libraries, without contraction.
+const SHAPE_OPTIONS: &[&str] = &[
+    "-std=c11",
+    "-O2",
+    "-ffp-contract=off",
+    "-Wall",
+    "-Wextra",
+    "-Werror",
+];
 const CAPTURE_PACKAGES: &[&str] = &["libavformat", "libavcodec", "libswscale", "libavutil"];
 
-const PROFILE_REFERENCES: [ProfileReference; 8] = [
+const PROFILE_REFERENCES: [ProfileReference; 9] = [
     ProfileReference {
         profile: ".research/reference-video",
+        linked: &[],
         binary: "ffmpeg-video-worker",
         source: "harness/reference.c",
         define: Some("-DTRIERGON_FEED_REFERENCE=1"),
@@ -429,6 +449,7 @@ const PROFILE_REFERENCES: [ProfileReference; 8] = [
     },
     ProfileReference {
         profile: ".research/reference-formats",
+        linked: &[],
         binary: "ffmpeg-formats-worker",
         source: "harness/reference.c",
         define: Some("-DTRIERGON_HLS_REFERENCE=1"),
@@ -442,6 +463,7 @@ const PROFILE_REFERENCES: [ProfileReference; 8] = [
     },
     ProfileReference {
         profile: ".research/reference-decode",
+        linked: &[],
         binary: "ffmpeg-decode-worker",
         source: "harness/reference.c",
         define: Some("-DTRIERGON_DECODE_REFERENCE=1"),
@@ -462,6 +484,7 @@ const PROFILE_REFERENCES: [ProfileReference; 8] = [
     },
     ProfileReference {
         profile: ".research/reference-capture-static",
+        linked: &[],
         binary: "ffmpeg-capture-worker",
         source: "harness/reference.c",
         define: Some("-DTRIERGON_CAPTURE_REFERENCE=1"),
@@ -475,6 +498,7 @@ const PROFILE_REFERENCES: [ProfileReference; 8] = [
     },
     ProfileReference {
         profile: ".research/reference-capture-small-static",
+        linked: &[],
         binary: "ffmpeg-capture-small-worker",
         source: "harness/reference.c",
         define: Some("-DTRIERGON_CAPTURE_REFERENCE=1"),
@@ -488,6 +512,7 @@ const PROFILE_REFERENCES: [ProfileReference; 8] = [
     },
     ProfileReference {
         profile: ".research/reference-formats",
+        linked: &[],
         binary: "ffmpeg-isobmff-worker",
         source: "harness/reference_isobmff.c",
         define: None,
@@ -501,6 +526,7 @@ const PROFILE_REFERENCES: [ProfileReference; 8] = [
     },
     ProfileReference {
         profile: ".research/reference-formats",
+        linked: &[],
         binary: "ffmpeg-framing-worker",
         source: "harness/reference_framing.c",
         define: None,
@@ -514,6 +540,7 @@ const PROFILE_REFERENCES: [ProfileReference; 8] = [
     },
     ProfileReference {
         profile: ".research/freetype",
+        linked: &[],
         binary: "freetype-font-worker",
         source: "harness/reference.c",
         define: Some("-DTRIERGON_FONT_REFERENCE=1"),
@@ -523,6 +550,20 @@ const PROFILE_REFERENCES: [ProfileReference; 8] = [
         packages: &["freetype2"],
         link_static: true,
         options: RELEASE_OPTIONS,
+        identity: false,
+    },
+    ProfileReference {
+        profile: ".research/harfbuzz",
+        linked: &[".research/freetype"],
+        binary: "harfbuzz-shape-worker",
+        source: "harness/reference.c",
+        define: Some("-DTRIERGON_SHAPE_REFERENCE=1"),
+        record: "harfbuzz-native",
+        kind: "HarfBuzz 14.6.0 from its amalgamation and FriBidi 1.0.17, static, without floating-point contraction, with FreeType 2.15.0 for libass's font functions; OpenType shaping, bidi and Unicode properties",
+        libraries: "harfbuzz_reference",
+        packages: &["harfbuzz", "fribidi", "freetype2"],
+        link_static: true,
+        options: SHAPE_OPTIONS,
         identity: false,
     },
 ];
@@ -603,11 +644,16 @@ pub fn build(root: &Path, comparison_build: bool) -> R<PathBuf> {
     for reference in PROFILE_REFERENCES {
         let path = out.join(reference.binary);
         let build = root.join(reference.profile).join("build.json");
-        if !build.exists() {
+        let profiles =
+            || std::iter::once(reference.profile).chain(reference.linked.iter().copied());
+        if !profiles().all(|profile| root.join(profile).join("build.json").exists()) {
             let _ = fs::remove_file(&path);
             continue;
         }
-        let pkgconfig = root.join(reference.profile).join("install/lib/pkgconfig");
+        let pkgconfig = std::env::join_paths(
+            profiles().map(|profile| root.join(profile).join("install/lib/pkgconfig")),
+        )
+        .map_err(|e| e.to_string())?;
         let mut query: Vec<&str> = Vec::new();
         if reference.link_static {
             query.push("--static");
@@ -617,7 +663,10 @@ pub fn build(root: &Path, comparison_build: bool) -> R<PathBuf> {
         let flags = output(
             "pkg-config",
             &query,
-            &[("PKG_CONFIG_LIBDIR", pkgconfig.display().to_string())],
+            &[(
+                "PKG_CONFIG_LIBDIR",
+                pkgconfig.to_string_lossy().into_owned(),
+            )],
         )?;
         let mut command: Vec<String> = vec![compiler.clone()];
         command.extend(reference.options.iter().map(ToString::to_string));
@@ -856,6 +905,19 @@ pub fn build(root: &Path, comparison_build: bool) -> R<PathBuf> {
                     Value::str(sha(&root.join(reference.source))?),
                 ),
                 ("reference_build", read_json(build)?),
+                (
+                    "linked_builds",
+                    Value::Object(
+                        reference
+                            .linked
+                            .iter()
+                            .map(|profile| {
+                                let build = root.join(profile).join("build.json");
+                                Ok(((*profile).to_owned(), read_json(&build)?))
+                            })
+                            .collect::<R<_>>()?,
+                    ),
+                ),
                 (
                     "worker_identity",
                     if reference.identity {

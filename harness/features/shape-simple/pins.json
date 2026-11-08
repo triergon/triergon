@@ -1,0 +1,37 @@
+{
+  "schema": 1,
+  "reference": "harfbuzz-native",
+  "note": "HarfBuzz 14.6.0's and FriBidi 1.0.17's folds, recorded by `cargo xtask shape manifest --record`; never edited by hand.",
+  "pins": {
+    "simple-authored-ltr": {
+      "packets": 12,
+      "bytes": 309,
+      "digest": 4856907232896384985
+    },
+    "simple-authored-rtl": {
+      "packets": 12,
+      "bytes": 309,
+      "digest": 4856907232896384984
+    },
+    "simple-authored-on": {
+      "packets": 12,
+      "bytes": 309,
+      "digest": 4856907232896384984
+    },
+    "simple-random-ltr": {
+      "packets": 1000,
+      "bytes": 12463,
+      "digest": 14037067154873264414
+    },
+    "simple-random-rtl": {
+      "packets": 1000,
+      "bytes": 12463,
+      "digest": 2972655790494552039
+    },
+    "simple-random-on": {
+      "packets": 1000,
+      "bytes": 12463,
+      "digest": 10089470076157823345
+    }
+  }
+}

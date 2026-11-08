@@ -2,12 +2,12 @@
 
 OpenType and TrueType faces for a subtitle renderer: the table directory and font
 collections, face metrics and names, character mapping, unhinted glyph outlines in
-font units with their advances, `kern` pair kerning, and choosing a face for an ASS
-font name, bold and italic value. At a pixel size it gives what libass obtains from
-FreeType: scaled 26.6 outlines, size metrics, advances, kerning, decoration lines
-and libass's synthetic oblique and bold. It depends only on
-[`triergon-core`](../core) for `Bytes`, `Budget` and errors. Shaping, rasterising
-and ASS parsing belong to other crates.
+font units with their advances, `kern` pair kerning, raw table bytes for other
+readers, and choosing a face for an ASS font name, bold and italic value. At a
+pixel size it gives what libass obtains from FreeType: scaled 26.6 outlines, size
+metrics, advances, kerning, decoration lines and libass's synthetic oblique and
+bold. It depends only on [`triergon-core`](../core) for `Bytes`, `Budget` and
+errors. Shaping, rasterising and ASS parsing belong to other crates.
 
 ## Usage
 
@@ -80,9 +80,14 @@ table's end, and a subtable is listed only when FreeType's default validation
 accepts it (lengths that fit, ascending non-overlapping groups for formats 12
 and 13, ordered segments and in-table glyph arrays for format 4). Lookups are bounded by the
 end of the `cmap` table rather than the declared subtable length. A glyph at or
-above the glyph count is unmapped. `text_charmap` is libass's selection: the first
-Windows Unicode subtable, else the first Windows subtable, else FreeType's default
-Unicode subtable; `glyph_index` looks a Windows Symbol charmap up at `0xF000 | c`.
+above the glyph count is unmapped. `text_charmap` is the subtable libass selects
+when it opens a face (`ass_charmap_magic`): the first Windows full-Unicode subtable
+(3, 10), else the first (3, 1), else the first other Windows subtable; without
+Windows subtables, the one FreeType selects (the last (0, 4) or format 13 (0, 6),
+else the last Unicode- or ISO-platform subtable), else the first. Subtables
+FreeType lists in formats 2, 8 and 14, and the Unicode charmap it builds from
+glyph names for a CFF face without one, take no part. `glyph_index` looks a Windows
+Symbol charmap up at `0xF000 | c`.
 
 **TrueType outlines.** `glyf` with short or long `loca`: simple glyphs and
 composites with offsets, point matching, one scale, x and y scales or a 2×2
@@ -120,6 +125,12 @@ matrix implies other units per em scales its glyphs by the ratio. Drawing
 operators read operand counts the format does not allow as FreeType's engine reads
 them, and a glyph whose operator reads past its operands fails; operand types are
 not tracked.
+
+**Control boxes.** `Font::control_box` reads a glyph's box without building its
+outline, so no point limit applies: a TrueType glyph's `glyf` header box as
+stored, or the box of every point a charstring draws, control points included,
+in unrounded 16.16 before the FontMatrix (`ControlBox::Empty` when there are no
+points). HarfBuzz takes glyph extents from them.
 
 **At a size.** `Font::at_size` takes a 26.6 pixel height and sets up the face as
 FreeType does when libass requests the size (`ass_face_set_size`:
@@ -269,14 +280,16 @@ composites) are
   its own and with `--benchmark` and `--memory` measures runtime and memory
   against FreeType. `font-dump` and `font-sized-dump` print the folded values as
   lines in both workers, for diffing a failing case.
-- The corpus includes three fonts the crate's test support writes
+- The corpus includes four fonts the crate's test support writes
   (`examples/authored-fonts.rs`): `seac`, the arithmetic, logic and storage operators,
   the flex forms, counter masks, subroutines nested twelve deep, curve operators with
-  operand counts the format does not allow, a skewing FontMatrix with an offset and
-  one cmap subtable of each supported format. With them the
+  operand counts the format does not allow, a skewing FontMatrix with an offset,
+  one cmap subtable of each supported format, and a collection with a face for each
+  step of the text charmap selection. With them the
   comparison exercises every charstring operator except `vsindex` (CFF2 fonts in the
-  corpus do not use it) and `random`, and every supported cmap format;
-  `examples/font-coverage.rs` reports this.
+  corpus do not use it) and `random`, every supported cmap format and every step of
+  the text charmap selection; `examples/font-coverage.rs` reports the operators and
+  formats.
 - `cargo xtask fuzz --contract harness/features/<feature>/contract.json` mutates
   every case's file through the release and dev builds of the worker (the dev build
   checks overflow), with a timeout per input, and with `--reference` compares each

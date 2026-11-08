@@ -367,10 +367,13 @@ fn revision_source(
     };
     if !archive_path.exists() {
         let url = format!("https://codeload.github.com/FFmpeg/FFmpeg/tar.gz/{REVISION}");
-        let data = net.https(&url, "triergon-reference-builder", ARCHIVE_LIMIT)?;
-        if data.len() > ARCHIVE_LIMIT {
-            return Err("source archive size limit".into());
-        }
+        let data = fetch::pinned(
+            net,
+            &[fetch::Source::Url(&url)],
+            ARCHIVE_SHA256,
+            ARCHIVE_LIMIT,
+            "triergon-reference-builder",
+        )?;
         fetch::publish(&archive_path, &data)?;
     }
     let archive = fetch::read_bounded(&archive_path, ARCHIVE_LIMIT)?;
@@ -404,10 +407,13 @@ fn release_source(
         .join(format!("ffmpeg-{RELEASE}.tar.xz"));
     if !archive_path.exists() {
         let url = format!("https://ffmpeg.org/releases/ffmpeg-{RELEASE}.tar.xz");
-        let data = net.https(&url, "triergon-reference-builder", ARCHIVE_LIMIT)?;
-        if data.len() > ARCHIVE_LIMIT {
-            return Err("release archive size limit".into());
-        }
+        let data = fetch::pinned(
+            net,
+            &[fetch::Source::Url(&url)],
+            RELEASE_SHA256,
+            ARCHIVE_LIMIT,
+            "triergon-reference-builder",
+        )?;
         let parent = archive_path.parent().expect("archive has a parent");
         fs::create_dir_all(parent).map_err(|e| format!("{}: {e}", parent.display()))?;
         fetch::publish(&archive_path, &data)?;
@@ -427,6 +433,64 @@ fn release_source(
     }
     verify_xz_tree(&archive_path, cache)?;
     Ok((source, archive_sha))
+}
+
+/// A release tarball pinned by URL and SHA-256.
+pub struct PinnedRelease<'a> {
+    /// The tarball's file name, which is also the cache entry.
+    pub file: &'a str,
+    /// The top-level directory it unpacks to.
+    pub directory: &'a str,
+    /// The release's own address, tried first.
+    pub url: &'a str,
+    /// Further sources of the same bytes, tried in order when `url` fails.
+    pub mirrors: &'a [fetch::Source<'a>],
+    pub sha256: &'a str,
+}
+
+impl<'a> PinnedRelease<'a> {
+    /// Where the archive is fetched from, in order: the release's own address,
+    /// then its mirrors.
+    pub fn sources(&self) -> Vec<fetch::Source<'a>> {
+        std::iter::once(fetch::Source::Url(self.url))
+            .chain(self.mirrors.iter().copied())
+            .collect()
+    }
+}
+
+/// Downloads `release` into `cache` once, checks its hash, unpacks it and verifies
+/// the unpacked tree. Returns the source directory.
+pub fn unpack_release(
+    cache: &Path,
+    release: &PinnedRelease<'_>,
+    net: &dyn Transport,
+) -> Result<PathBuf, String> {
+    fs::create_dir_all(cache).map_err(|e| format!("{}: {e}", cache.display()))?;
+    let archive_path = cache.join(release.file);
+    if !archive_path.exists() {
+        let data = fetch::pinned(
+            net,
+            &release.sources(),
+            release.sha256,
+            ARCHIVE_LIMIT,
+            "triergon-reference-builder",
+        )?;
+        fetch::publish(&archive_path, &data)?;
+    }
+    let archive = fetch::read_bounded(&archive_path, ARCHIVE_LIMIT)?;
+    if sha256::hex(&archive) != release.sha256 {
+        return Err(format!("Pinned archive hash mismatch: {}", release.file));
+    }
+    let source = cache.join(release.directory);
+    if !source.exists() {
+        run(Command::new("tar")
+            .arg("-xJf")
+            .arg(&archive_path)
+            .arg("-C")
+            .arg(cache))?;
+    }
+    verify_xz_tree(&archive_path, cache)?;
+    Ok(source)
 }
 
 /// Every regular file of an xz-compressed release archive must still match the tree
@@ -510,6 +574,25 @@ fn release_manifest(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn a_release_is_fetched_from_its_address_then_its_mirrors() {
+        let release = PinnedRelease {
+            file: "x.tar.xz",
+            directory: "x",
+            url: "https://example.org/x.tar.xz",
+            mirrors: &[fetch::Source::GitHubAsset {
+                repo: "owner/x",
+                id: 7,
+            }],
+            sha256: "0",
+        };
+        let sources = format!("{:?}", release.sources());
+        assert_eq!(
+            sources,
+            r#"[Url("https://example.org/x.tar.xz"), GitHubAsset { repo: "owner/x", id: 7 }]"#
+        );
+    }
 
     #[test]
     fn lists_unique_sorted_fate_names_only() {

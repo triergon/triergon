@@ -5,9 +5,10 @@ dependencies.
 
 Triergon reads Matroska/WebM, MP4/MOV and MPEG-TS, frames H.264, HEVC, AV1, VP9, AAC,
 AC-3 and DTS packets for hardware or software decoders, decodes text and bitmap
-subtitles, reads OpenType and TrueType fonts, and includes software decoders for H.264,
-HEVC, AAC, AC-3/E-AC-3 and DTS. It is written from the published standards and measured
-case by case against a pinned reference: FFmpeg for media, FreeType for fonts.
+subtitles, reads OpenType and TrueType fonts, shapes text, and includes software decoders
+for H.264, HEVC, AAC, AC-3/E-AC-3 and DTS. It is written from the published standards and
+measured case by case against a pinned reference: FFmpeg for media, FreeType for fonts,
+HarfBuzz and FriBidi for shaping.
 
 > **Status: experimental.** APIs change without notice and nothing is published to
 > crates.io yet. See [status](docs/status.md) for what is verified today.
@@ -17,7 +18,8 @@ case by case against a pinned reference: FFmpeg for media, FreeType for fonts.
 - **Safe Rust, zero dependencies.** Every crate forbids `unsafe`. The dependency graph
   is `std` and nothing else.
 - **As good as the reference, or it does not ship.** Each module must match its pinned
-  reference (FFmpeg for media, FreeType for fonts, libass for subtitle rendering) on its
+  reference (FFmpeg for media, FreeType for fonts, HarfBuzz and FriBidi for shaping,
+  libass for subtitle rendering) on its
   whole declared feature set, stay within the [runtime ceiling](docs/quality.md#gates) of
   the reference's time per case and use less memory. Results are measured, paired and
   published per case.

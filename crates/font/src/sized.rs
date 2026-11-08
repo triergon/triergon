@@ -368,7 +368,7 @@ impl<'f> SizedFont<'f> {
                         "hinted advances under a TrueType instruction control",
                     ));
                 }
-                let origin = i64::from(m.x_min) - i64::from(font.side_bearing(m.glyph));
+                let origin = i64::from(m.x_min) - i64::from(font.bearing(m.glyph));
                 let advance = i64::from(font.hmtx.advance(data, m.glyph));
                 let x = self.hinted_scale;
                 mul_fix(origin + advance, x) - mul_fix(origin, x)
