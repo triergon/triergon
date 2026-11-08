@@ -32,6 +32,9 @@ fn hvcc() -> Vec<u8> {
     b
 }
 fn avc(p: &Budget, tag: u8) -> AvcConfiguration {
+    avc_from_record(p, &avcc(tag))
+}
+fn avc_from_record(p: &Budget, raw: &[u8]) -> AvcConfiguration {
     let mut a = AvcConfigParser::new(
         p,
         AvcConfigSource {
@@ -39,7 +42,7 @@ fn avc(p: &Budget, tag: u8) -> AvcConfiguration {
             generation: 12,
             offset: 1_u64 << 34,
         },
-        bytes(p, &avcc(tag)),
+        bytes(p, raw),
         AvcConfigLimits {
             maximum_record_bytes: 4096,
             maximum_nals: 64,
@@ -57,6 +60,9 @@ fn avc(p: &Budget, tag: u8) -> AvcConfiguration {
     }
 }
 fn hevc(p: &Budget) -> HvcConfiguration {
+    hevc_from_record(p, &hvcc())
+}
+fn hevc_from_record(p: &Budget, raw: &[u8]) -> HvcConfiguration {
     let mut a = HvcConfigParser::new(
         p,
         HvcConfigSource {
@@ -64,7 +70,7 @@ fn hevc(p: &Budget) -> HvcConfiguration {
             generation: 12,
             offset: 1_u64 << 34,
         },
-        bytes(p, &hvcc()),
+        bytes(p, raw),
         HvcConfigLimits {
             maximum_record_bytes: 4096,
             maximum_arrays: 255,
@@ -779,6 +785,268 @@ fn spill_pressure_keeps_a_verified_update_until_resume_or_cancellation() {
         assert_eq!(p.used(), Budget::control_storage_bytes());
     }
 }
+
+#[test]
+fn refused_hevc_hint_keeps_inline_progress_and_retries_the_same_packet() {
+    for under_pressure in [false, true] {
+        let p = pool();
+        let mut s =
+            NalPacketSession::new(&p, NalPacketConfiguration::Hevc(hevc(&p)), limits()).unwrap();
+        // Lookahead already proves two packet NALs plus three injected NALs.
+        let source = packet(&p, &[&hn(19), &hn(1)]);
+        let original = source.bytes.to_vec();
+        let mut blocker = under_pressure.then(|| p.reserve(p.available()).unwrap());
+        let charge = p.used();
+        let mut pressure_count = 0;
+        let mut j = s.packet(source, None).unwrap();
+        let out = loop {
+            let mut work = WorkBudget::new(1);
+            match j.step(&mut work, &AtomicBool::new(false)) {
+                Ok(BuildStep::Yield) => (),
+                Ok(BuildStep::Ready(out)) => break out,
+                Err(Error::Backpressure { .. }) if blocker.is_some() => {
+                    pressure_count += 1;
+                    assert_eq!(work.remaining(), 0);
+                    assert_eq!(p.used(), charge);
+                    assert_eq!(j.source().unwrap().bytes.as_ref(), original);
+                    assert!(j.take_receiver_rejection().is_none());
+                    if pressure_count == 2 {
+                        drop(blocker.take());
+                    }
+                }
+                _ => panic!("hint refusal must preserve a retryable packet"),
+            }
+        };
+        drop(j);
+        assert_eq!(pressure_count, if under_pressure { 2 } else { 0 });
+        assert_eq!(s.receiver_epoch(), 0);
+        drop(s);
+        let expected: Vec<_> = [32, 33, 34, 19, 1]
+            .into_iter()
+            .flat_map(|kind| framed(4, &hn(kind)))
+            .collect();
+        assert_eq!(out.bytes().as_ref(), expected);
+        assert_eq!(out.source().bytes.as_ref(), original);
+        assert_eq!(out.source().fields, fields());
+        assert_eq!(out.segments().len(), 5);
+        for (index, kind) in [32, 33, 34, 19, 1].into_iter().enumerate() {
+            assert_eq!(out.segment_bytes(index), Some(hn(kind).as_slice()));
+        }
+        drop(out);
+        assert_eq!(p.used(), Budget::control_storage_bytes());
+    }
+}
+
+#[test]
+fn a_large_hint_does_not_preempt_logical_segment_or_output_refusal() {
+    for (maximum_segments, maximum_output_bytes, requested, maximum) in
+        [(4, 131072, 5, 4), (256, 34, 35, 34)]
+    {
+        for under_pressure in [false, true] {
+            let p = pool();
+            let mut l = limits();
+            l.maximum_segments = maximum_segments;
+            l.maximum_output_bytes = maximum_output_bytes;
+            let mut s =
+                NalPacketSession::new(&p, NalPacketConfiguration::Hevc(hevc(&p)), l).unwrap();
+            let source = packet(&p, &[&hn(19), &hn(1)]);
+            let blocker = under_pressure.then(|| p.reserve(p.available()).unwrap());
+            assert!(matches!(
+                run(&mut s, source, None, 1),
+                Err(Error::Limit { requested: r, maximum: m })
+                    if r == requested && m == maximum
+            ));
+            assert_eq!(s.receiver_epoch(), 0);
+            drop(blocker);
+            drop(s);
+            assert_eq!(p.used(), Budget::control_storage_bytes());
+        }
+    }
+}
+
+#[test]
+fn avc_upper_hints_preserve_tight_budget_admission_below_and_above_inline_capacity() {
+    fn record(count: u8) -> Vec<u8> {
+        let mut raw = vec![1, 66, 0, 40, 255, 0xe0 | count];
+        for index in 0..count {
+            raw.extend_from_slice(if index % 2 == 0 {
+                &[0, 4, 0x67, 0x64, 0, 0x28]
+            } else {
+                &[0, 2, 0x67, 1]
+            });
+        }
+        raw.push(count);
+        for _ in 0..count {
+            raw.extend_from_slice(&[0, 3, 0x68, 0xee, 0x3c]);
+        }
+        raw
+    }
+    fn setup(p: &Budget, raw: &[u8]) -> (NalPacketSession, NalPacket) {
+        (
+            NalPacketSession::new(
+                p,
+                NalPacketConfiguration::Avc(avc_from_record(p, raw)),
+                limits(),
+            )
+            .unwrap(),
+            packet(p, &[&[0x68, 0xee, 0x3c]]),
+        )
+    }
+    for (count, output_bytes) in [(2, 21), (4, 35)] {
+        let raw = record(count);
+        // Include the actual parsed configuration-table charge when it spills.
+        let base = {
+            let probe = pool();
+            let _inputs = setup(&probe, &raw);
+            probe.used()
+        };
+        let spare = if count == 2 {
+            120 // The five-entry upper hint fits, but the three-entry output must stay inline.
+        } else {
+            9 * size_of::<NalPacketSegment>() + Bytes::owner_overhead_bytes() + output_bytes
+        };
+        for quantum in [1, 4096] {
+            let p = Budget::new(base + spare).unwrap();
+            let (mut s, source) = setup(&p, &raw);
+            assert_eq!(p.available(), spare);
+            let out = run(&mut s, source, None, quantum)
+                .expect("an AVC upper hint must not starve an otherwise admitted output");
+            assert_eq!(out.segments().len(), usize::from(count) + 1);
+            assert_eq!(out.bytes().len(), output_bytes);
+            let mut expected = Vec::new();
+            for index in 0..count {
+                expected.extend(framed(
+                    4,
+                    if index % 2 == 0 {
+                        &[0x67, 0x64, 0, 0x28]
+                    } else {
+                        &[0x67, 1]
+                    },
+                ));
+            }
+            expected.extend(framed(4, &[0x68, 0xee, 0x3c]));
+            assert_eq!(out.bytes().as_ref(), expected);
+            assert_eq!(out.source().bytes.as_ref(), &[0, 0, 0, 3, 0x68, 0xee, 0x3c]);
+            assert_eq!(out.source().fields, fields());
+            assert_eq!(s.receiver_epoch(), 0);
+            if count == 2 {
+                assert_eq!(
+                    p.used(),
+                    base + Bytes::owner_overhead_bytes() + output_bytes
+                );
+            } else {
+                assert_eq!(p.used(), p.limit());
+            }
+            drop(s);
+            assert_eq!(out.configuration_bytes().as_ref(), raw);
+            assert_eq!(out.bytes().as_ref(), expected);
+            drop(out);
+            assert_eq!(p.used(), Budget::control_storage_bytes());
+        }
+    }
+}
+#[test]
+fn hevc_exact_counts_keep_in_band_duplicates_and_ignore_empty_admitted_arrays() {
+    let mut raw = hvcc();
+    raw[22] += 1;
+    raw.extend_from_slice(&[39, 0, 0]);
+    for (source_kinds, output_kinds, injected) in [
+        (vec![32, 19, 1], vec![32, 33, 34, 32, 19, 1], 3),
+        (vec![39, 19], vec![39, 32, 33, 34, 19], 3),
+        (vec![19, 19], vec![32, 33, 34, 19, 19], 3),
+        (vec![32, 33, 34, 1, 1], vec![32, 33, 34, 1, 1], 0),
+        (vec![], vec![], 0),
+    ] {
+        for quantum in [1, 4096] {
+            let p = pool();
+            let mut s = NalPacketSession::new(
+                &p,
+                NalPacketConfiguration::Hevc(hevc_from_record(&p, &raw)),
+                limits(),
+            )
+            .unwrap();
+            let nals: Vec<_> = source_kinds.iter().copied().map(hn).collect();
+            let borrowed: Vec<_> = nals.iter().map(<[u8; 3]>::as_slice).collect();
+            let source = packet(&p, &borrowed);
+            let original = source.bytes.to_vec();
+            let out = run(&mut s, source, None, quantum).unwrap();
+            assert_eq!(out.segments().len(), output_kinds.len());
+            assert_eq!(
+                out.segments()
+                    .iter()
+                    .filter(|part| matches!(part.origin(), NalPacketOrigin::Configuration { .. }))
+                    .count(),
+                injected
+            );
+            let expected: Vec<_> = output_kinds
+                .iter()
+                .copied()
+                .flat_map(|kind| framed(4, &hn(kind)))
+                .collect();
+            assert_eq!(out.bytes().as_ref(), expected);
+            assert_eq!(out.source().bytes.as_ref(), original);
+            assert_eq!(s.receiver_epoch(), 0);
+            drop(s);
+            assert_eq!(out.configuration_bytes().as_ref(), raw);
+            assert_eq!(out.bytes().as_ref(), expected);
+            drop(out);
+            assert_eq!(p.used(), Budget::control_storage_bytes());
+        }
+    }
+}
+
+#[test]
+fn hevc_zero_nals_and_unknown_arrays_fail_before_any_exact_reservation() {
+    for unknown_array in [false, true] {
+        for valid_prefix_nals in [0, 5] {
+            let p = pool();
+            let mut raw = hvcc();
+            if unknown_array {
+                raw[22] += 1;
+                raw.extend_from_slice(&[55, 0, 0]);
+            }
+            let mut s = NalPacketSession::new(
+                &p,
+                NalPacketConfiguration::Hevc(hevc_from_record(&p, &raw)),
+                limits(),
+            )
+            .unwrap();
+            let irap = hn(19);
+            let mut nals = vec![irap.as_slice(); valid_prefix_nals];
+            nals.push(&[]);
+            let source = packet(&p, &nals);
+            let original = source.bytes.to_vec();
+            let blocker = p.reserve(p.available()).unwrap();
+            let charge = p.used();
+            let mut j = s.packet(source, None).unwrap();
+            let result = j.step(&mut WorkBudget::new(4096), &AtomicBool::new(false));
+            assert_eq!(p.used(), charge);
+            assert_eq!(j.source().unwrap().bytes.as_ref(), original);
+            if unknown_array {
+                assert!(matches!(
+                    result,
+                    Err(Error::Unsupported("pinned HEVC decoder array type"))
+                ));
+                assert!(j.take_receiver_rejection().is_none());
+            } else {
+                assert!(matches!(
+                    result,
+                    Err(Error::Invalid("pinned HEVC empty NAL"))
+                ));
+                assert_eq!(
+                    j.take_receiver_rejection().unwrap().kind(),
+                    NalPacketReceiverErrorKind::EmptyHevcNal
+                );
+            }
+            drop(j);
+            assert_eq!(s.receiver_epoch(), 0);
+            drop(blocker);
+            drop(s);
+            assert_eq!(p.used(), Budget::control_storage_bytes());
+        }
+    }
+}
+
 #[test]
 fn strict_forbidden_header_refusal_does_not_erase_the_raw_packet() {
     let p = pool();
