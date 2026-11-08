@@ -3,10 +3,11 @@
 
 use crate::fixed::{hypot, mul_fix};
 use crate::outline::{Coordinate, Outline, OutlinePoint, Point, PointKind};
-use crate::read::{Meter, Reader, slice, u16_at, u32_at};
+use crate::read::{Reader, slice, u16_at, u32_at};
 use crate::sfnt::Table;
+use crate::work::charge;
 use crate::{GlyphId, Limits};
-use triergon_core::{Error, Result};
+use triergon_core::{Error, Result, WorkBudget};
 
 /// Simple-glyph point flags.
 const ON_CURVE: u8 = 0x01;
@@ -191,10 +192,11 @@ pub(crate) struct Context<'a> {
 }
 
 impl Glyf {
-    /// Checks that `loca` holds an entry for every glyph and one more.
+    /// Checks that `loca` holds the offset of every glyph. The final offset, which
+    /// ends the last glyph, may be missing, as FreeType accepts; the last glyph then
+    /// runs to the end of `glyf`.
     pub(crate) fn new(glyf: Table, loca: Table, long: bool, glyph_count: u16) -> Result<Self> {
         let entry = if long { 4 } else { 2 };
-        // FreeType accepts a loca one entry short; the last glyph is then empty.
         if loca.len < usize::from(glyph_count) * entry {
             return Err(Error::Invalid("loca shorter than the glyph count"));
         }
@@ -225,24 +227,24 @@ impl Glyf {
         &self,
         cx: &Context<'_>,
         glyph: u16,
-        meter: &mut Meter,
+        work: &mut WorkBudget,
         program: &mut dyn FnMut(&[u8]) -> Result<()>,
     ) -> Result<Metrics> {
-        self.walk_at(cx, glyph, meter, program, 0)
+        self.walk_at(cx, glyph, work, program, 0)
     }
 
     fn walk_at(
         &self,
         cx: &Context<'_>,
         glyph: u16,
-        meter: &mut Meter,
+        work: &mut WorkBudget,
         program: &mut dyn FnMut(&[u8]) -> Result<()>,
         depth: u32,
     ) -> Result<Metrics> {
         if glyph >= cx.glyph_count {
             return Err(Error::Invalid("glyph index outside the face"));
         }
-        meter.charge(1)?;
+        charge(work, 1)?;
         let Some((start, end)) = self.range(cx.data, glyph) else {
             return Ok(Metrics { glyph, x_min: 0 });
         };
@@ -261,9 +263,9 @@ impl Glyf {
                 return Err(Error::Policy("glyph nesting depth"));
             }
             let instructed = loop {
-                meter.charge(1)?;
+                charge(work, 1)?;
                 let c = component(&mut r)?;
-                let own = self.walk_at(cx, c.glyph, meter, program, depth + 1)?;
+                let own = self.walk_at(cx, c.glyph, work, program, depth + 1)?;
                 if c.flags & USE_MY_METRICS != 0 {
                     metrics = own;
                 }
@@ -288,10 +290,9 @@ impl Glyf {
         glyph: GlyphId,
         units: U,
         outline: &mut Outline<U::Coord>,
-        meter: &mut Meter,
+        work: &mut WorkBudget,
     ) -> Result<Metrics> {
-        let glyph = u16::try_from(glyph.0).map_err(|_| Error::Invalid("glyph index"))?;
-        self.load(cx, glyph, units, outline, meter, 0)
+        self.load(cx, glyph.0, units, outline, work, 0)
     }
 
     fn load<U: Units>(
@@ -300,13 +301,13 @@ impl Glyf {
         glyph: u16,
         units: U,
         outline: &mut Outline<U::Coord>,
-        meter: &mut Meter,
+        work: &mut WorkBudget,
         depth: u32,
     ) -> Result<Metrics> {
         if glyph >= cx.glyph_count {
             return Err(Error::Invalid("glyph index outside the face"));
         }
-        meter.charge(1)?;
+        charge(work, 1)?;
         let Some((start, end)) = self.range(cx.data, glyph) else {
             return Ok(Metrics { glyph, x_min: 0 });
         };
@@ -321,7 +322,7 @@ impl Glyf {
         }
         let mut metrics = Metrics { glyph, x_min };
         if contours > 0 {
-            simple(&mut r, contours.unsigned_abs(), units, outline, meter)?;
+            simple(&mut r, contours.unsigned_abs(), units, outline, work)?;
         } else {
             // FreeType reads every negative count as a composite.
             if depth >= MAX_COMPONENT_DEPTH {
@@ -330,7 +331,7 @@ impl Glyf {
             if depth >= cx.limits.depth {
                 return Err(Error::Policy("glyph nesting depth"));
             }
-            if let Some(own) = self.composite(cx, &mut r, units, outline, meter, depth)? {
+            if let Some(own) = self.composite(cx, &mut r, units, outline, work, depth)? {
                 metrics = own;
             }
         }
@@ -345,13 +346,13 @@ impl Glyf {
         r: &mut Reader<'_>,
         units: U,
         outline: &mut Outline<U::Coord>,
-        meter: &mut Meter,
+        work: &mut WorkBudget,
         depth: u32,
     ) -> Result<Option<Metrics>> {
         let mut metrics = None;
         let first = outline.len();
         loop {
-            meter.charge(1)?;
+            charge(work, 1)?;
             let Component {
                 flags,
                 glyph,
@@ -359,7 +360,7 @@ impl Glyf {
                 matrix,
             } = component(r)?;
             let base = outline.len();
-            let component = self.load(cx, glyph, units, outline, meter, depth + 1)?;
+            let component = self.load(cx, glyph, units, outline, work, depth + 1)?;
             if flags & USE_MY_METRICS != 0 {
                 metrics = Some(component);
             }
@@ -437,7 +438,7 @@ fn simple<U: Units>(
     contours: u16,
     units: U,
     outline: &mut Outline<U::Coord>,
-    meter: &mut Meter,
+    work: &mut WorkBudget,
 ) -> Result<()> {
     let ends = r.take(2 * usize::from(contours))?;
     let mut count = 0_usize;
@@ -448,7 +449,7 @@ fn simple<U: Units>(
         }
         count = end + 1;
     }
-    meter.charge(count)?;
+    charge(work, count)?;
     let instructions = usize::from(r.u16()?);
     r.skip(instructions)?;
     // First pass: the flags, to find where the x and y coordinates start.
@@ -476,10 +477,10 @@ fn simple<U: Units>(
         };
         outline.push_point(units.point(x, y)?, kind)?;
     }
-    for end in ends.chunks_exact(2) {
-        let end = u32::from(u16::from_be_bytes([end[0], end[1]])) + 1;
-        outline.extend_ends(&[end], base)?;
-    }
+    let ends = ends
+        .chunks_exact(2)
+        .map(|end| u32::from(u16::from_be_bytes([end[0], end[1]])) + 1);
+    outline.extend_ends(ends, base)?;
     *r = ys;
     Ok(())
 }

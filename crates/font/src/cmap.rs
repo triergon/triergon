@@ -263,7 +263,7 @@ impl<'f> Charmap<'f> {
         let glyph = u16::try_from(glyph)
             .ok()
             .filter(|&g| g != 0 && u32::from(g) < self.glyph_count)?;
-        Some(GlyphId(u32::from(glyph)))
+        Some(GlyphId(glyph))
     }
 
     /// Every (code, glyph) pair without glyph 0, by segment or group in subtable

@@ -239,7 +239,14 @@ mod tests {
         assert_eq!(request(-5, 0).weight(), 400);
         assert_eq!(request(300, 0).weight(), 300);
         assert!(request(0, 1).italic() && request(0, 7).italic());
-        assert_eq!((request(0, 1).slant(), request(0, 7).slant(), request(0, -3).slant()), (100, 7, 0));
+        assert_eq!(
+            (
+                request(0, 1).slant(),
+                request(0, 7).slant(),
+                request(0, -3).slant()
+            ),
+            (100, 7, 0)
+        );
         assert!(!request(0, -1).italic() && !request(0, 0).italic());
     }
 }

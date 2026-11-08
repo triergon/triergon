@@ -1,8 +1,9 @@
 //! The sfnt container: collection header and table directory (OpenType "Font file"
 //! and "Font collections").
 
-use crate::read::{Meter, Reader, TRUNCATED};
-use triergon_core::{Error, Result};
+use crate::read::{Reader, TRUNCATED};
+use crate::work::charge;
+use triergon_core::{Error, Result, WorkBudget};
 
 const TRUETYPE: u32 = 0x0001_0000;
 const APPLE_TRUE: u32 = u32::from_be_bytes(*b"true");
@@ -121,12 +122,16 @@ fn u32_be(data: &[u8], at: usize) -> Option<u32> {
 /// A table whose range starts beyond the file is absent. One that ends beyond it is
 /// absent too, except `hmtx`, which keeps the bytes that exist: its trailing side
 /// bearings are optional for outlines and advances.
-pub(crate) fn directory(data: &[u8], index: u32, meter: &mut Meter) -> Result<(Flavor, Tables)> {
+pub(crate) fn directory(
+    data: &[u8],
+    index: u32,
+    work: &mut WorkBudget,
+) -> Result<(Flavor, Tables)> {
     let mut r = Reader::at(data, face_offset(data, index)?)?;
     let signature = r.u32()?;
     let count = usize::from(r.u16()?);
     r.skip(6)?; // searchRange, entrySelector, rangeShift
-    meter.charge(count)?;
+    charge(work, count)?;
     let records = r.take(count.checked_mul(TABLE_RECORD).ok_or(Error::Overflow)?)?;
     let mut tables = Tables::default();
     for record in records.chunks_exact(TABLE_RECORD) {
@@ -163,8 +168,7 @@ pub(crate) fn directory(data: &[u8], index: u32, meter: &mut Meter) -> Result<(F
 #[cfg(test)]
 mod tests {
     use super::{Flavor, directory, face_count};
-    use crate::read::Meter;
-    use triergon_core::Error;
+    use triergon_core::{Error, WorkBudget};
 
     fn font(signature: &[u8; 4], tables: &[(&[u8; 4], u32, u32)]) -> Vec<u8> {
         let mut data = signature.to_vec();
@@ -191,7 +195,7 @@ mod tests {
             ],
         );
         data.extend([0; 4]);
-        let (flavor, tables) = directory(&data, 0, &mut Meter::new(100)).unwrap();
+        let (flavor, tables) = directory(&data, 0, &mut WorkBudget::new(100)).unwrap();
         assert_eq!(flavor, Flavor::TrueType);
         assert_eq!(tables.glyf.unwrap().len, 4);
         assert_eq!(tables.hmtx.unwrap().len, 2);
@@ -207,17 +211,17 @@ mod tests {
         data.extend(&face);
         assert_eq!(face_count(&data), Ok(2));
         assert_eq!(
-            directory(&data, 1, &mut Meter::new(100)).unwrap().0,
+            directory(&data, 1, &mut WorkBudget::new(100)).unwrap().0,
             Flavor::Cff
         );
         assert_eq!(
-            directory(&data, 2, &mut Meter::new(100)).unwrap_err(),
+            directory(&data, 2, &mut WorkBudget::new(100)).unwrap_err(),
             Error::Invalid("face index outside the font file")
         );
         assert_eq!(
             face_count(b"wOFF"),
             Err(Error::Unsupported("font file signature"))
         );
-        assert!(directory(&data, 0, &mut Meter::new(0)).is_err());
+        assert!(directory(&data, 0, &mut WorkBudget::new(0)).is_err());
     }
 }

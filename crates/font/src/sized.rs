@@ -5,10 +5,9 @@
 use crate::fixed::{div_fix, mul_div, mul_fix, pix_ceil, pix_floor, pix_round};
 use crate::glyf::{self, Scaled};
 use crate::outline::ScaledOutline;
-use crate::read::Meter;
 use crate::synthesis::Synthesis;
 use crate::{Font, GlyphId, Outlines, VerticalMetrics};
-use triergon_core::{Error, Result};
+use triergon_core::{Error, Result, WorkBudget};
 
 /// libass's largest outline coordinate, `OUTLINE_MAX`.
 const OUTLINE_MAX: i64 = (1 << 28) - 1;
@@ -322,7 +321,7 @@ impl<'f> SizedFont<'f> {
         let font = self.font;
         let index = font.check(glyph)?;
         let data = font.data.as_ref();
-        let mut meter = Meter::new(font.limits.work);
+        let mut work = WorkBudget::new(font.limits.work);
         match &font.outlines {
             Outlines::Glyf(table) => {
                 outline.begin(font.limits.points);
@@ -330,7 +329,7 @@ impl<'f> SizedFont<'f> {
                     x: self.metrics.x_scale,
                     y: self.metrics.y_scale,
                 };
-                let m = table.outline(&font.glyf_context(), glyph, units, outline, &mut meter)?;
+                let m = table.outline(&font.glyf_context(), glyph, units, outline, &mut work)?;
                 // FreeType's phantom points: the origin and the advance.
                 let origin = i64::from(m.x_min) - i64::from(font.side_bearing(m.glyph));
                 let advance = i64::from(font.hmtx.advance(data, m.glyph));
@@ -347,7 +346,7 @@ impl<'f> SizedFont<'f> {
                 if cff.has_matrix() {
                     return Err(Error::Unsupported("scaled CFF with a FontMatrix"));
                 }
-                cff.outline_units(data, glyph, outline, &font.limits, &mut meter)?;
+                cff.outline_units(data, glyph, outline, &font.limits, &mut work)?;
                 let (x, y) = (self.metrics.x_scale, self.metrics.y_scale);
                 for p in outline.points_mut() {
                     p.point.x = glyf::narrow(mul_fix(i64::from(p.point.x), x))?;
@@ -399,9 +398,9 @@ impl<'f> SizedFont<'f> {
         let data = font.data.as_ref();
         let advance = match &font.outlines {
             Outlines::Glyf(table) => {
-                let mut meter = Meter::new(font.limits.work);
+                let mut work = WorkBudget::new(font.limits.work);
                 let mut compatible = true;
-                let m = table.walk(&font.glyf_context(), index, &mut meter, &mut |program| {
+                let m = table.walk(&font.glyf_context(), index, &mut work, &mut |program| {
                     compatible &= keeps_compatibility(program);
                     Ok(())
                 })?;

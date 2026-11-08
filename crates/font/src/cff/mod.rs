@@ -1,17 +1,21 @@
 //! CFF and CFF2 outlines in OpenType (Adobe Technical Note 5176; OpenType `CFF2`).
 
 mod charstring;
+
+pub use charstring::{CharstringOperator, OperatorSet};
 mod dict;
 mod index;
+mod number;
 mod path;
 
 use crate::outline::{Coordinate, Outline};
-use crate::read::{Meter, Reader, slice, u16_at, u32_at};
+use crate::read::{Reader, slice, u16_at, u32_at};
 use crate::sfnt::Table;
+use crate::work::charge;
 use crate::{GlyphId, Limits};
 use dict::{CFF_OPERANDS, CFF2_OPERANDS, op};
 use index::Index;
-use triergon_core::{Budget, BudgetVec, Error, Result};
+use triergon_core::{Budget, BudgetVec, Error, Result, WorkBudget};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) enum Version {
@@ -73,7 +77,7 @@ impl Cff {
         version: Version,
         units_per_em: u16,
         budget: &Budget,
-        meter: &mut Meter,
+        work: &mut WorkBudget,
     ) -> Result<Self> {
         let bytes = slice(data, table.offset, table.len)?;
         let mut r = Reader::new(bytes);
@@ -115,7 +119,7 @@ impl Cff {
             }
             _ => return Err(Error::Invalid("CFF major version")),
         };
-        let top = cff.top_dict(top, meter)?;
+        let top = cff.top_dict(top, work)?;
         let mut charstrings = Reader::at(
             bytes,
             top.charstrings
@@ -133,7 +137,7 @@ impl Cff {
             return Err(Error::Unsupported("synthetic CFF font"));
         }
         if let Some(vstore) = top.vstore {
-            cff.variation_store(bytes, vstore, meter)?;
+            cff.variation_store(bytes, vstore, work)?;
         }
         cff.matrix = top.matrix.and_then(|m| font_units(m, units_per_em));
         cff.cid = top.ros;
@@ -156,19 +160,22 @@ impl Cff {
             if fonts.len() == 0 || fonts.len() > ceiling {
                 return Err(Error::Invalid("CFF FDArray size"));
             }
-            meter.charge(usize::try_from(fonts.len()).map_err(|_| Error::Overflow)?)?;
+            charge(
+                work,
+                usize::try_from(fonts.len()).map_err(|_| Error::Overflow)?,
+            )?;
             cff.privates
                 .try_reserve_exact(usize::try_from(fonts.len()).map_err(|_| Error::Overflow)?)?;
             for i in 0..fonts.len() {
                 let font = fonts.get(bytes, i)?;
                 let mut location = None;
-                cff.dict(font, meter, |operator, operands| {
+                cff.dict(font, work, |operator, operands| {
                     if operator == op::PRIVATE {
                         location = Some(private_location(operands)?);
                     }
                     Ok(())
                 })?;
-                let private = cff.private_dict(bytes, location, meter)?;
+                let private = cff.private_dict(bytes, location, work)?;
                 cff.privates.try_push(private).map_err(|e| e.error)?;
             }
             match top.fd_select {
@@ -177,7 +184,7 @@ impl Cff {
                 None => return Err(Error::Invalid("CFF without FDSelect")),
             }
         } else {
-            let private = cff.private_dict(bytes, top.private, meter)?;
+            let private = cff.private_dict(bytes, top.private, work)?;
             cff.privates.try_push(private).map_err(|e| e.error)?;
         }
         Ok(cff)
@@ -198,22 +205,22 @@ impl Cff {
     fn dict(
         &self,
         bytes: &[u8],
-        meter: &mut Meter,
+        work: &mut WorkBudget,
         apply: impl FnMut(u16, &[f64]) -> Result<()>,
     ) -> Result<()> {
         let scalars = |i| self.region_scalars(i);
         match self.version {
-            Version::Cff1 => dict::parse::<CFF_OPERANDS>(bytes, meter, &scalars, apply),
-            Version::Cff2 => dict::parse::<CFF2_OPERANDS>(bytes, meter, &scalars, apply),
+            Version::Cff1 => dict::parse::<CFF_OPERANDS>(bytes, work, &scalars, apply),
+            Version::Cff2 => dict::parse::<CFF2_OPERANDS>(bytes, work, &scalars, apply),
         }
     }
 
-    fn top_dict(&self, bytes: &[u8], meter: &mut Meter) -> Result<Top> {
+    fn top_dict(&self, bytes: &[u8], work: &mut WorkBudget) -> Result<Top> {
         let mut top = Top {
             charstring_type: 2,
             ..Top::default()
         };
-        self.dict(bytes, meter, |operator, operands| {
+        self.dict(bytes, work, |operator, operands| {
             match operator {
                 op::CHAR_STRINGS => top.charstrings = Some(dict::single(operands)?),
                 op::CHARSET => top.charset = dict::single(operands)?,
@@ -242,7 +249,7 @@ impl Cff {
         &self,
         table: &[u8],
         location: Option<(usize, usize)>,
-        meter: &mut Meter,
+        work: &mut WorkBudget,
     ) -> Result<Private> {
         let mut private = Private {
             subrs: Index::default(),
@@ -258,7 +265,7 @@ impl Cff {
         };
         let bytes = slice(table, offset, size)?;
         let mut subrs = None;
-        self.dict(bytes, meter, |operator, operands| {
+        self.dict(bytes, work, |operator, operands| {
             match operator {
                 op::SUBRS => subrs = Some(dict::single(operands)?),
                 op::DEFAULT_WIDTH_X => private.default_width = first(operands)?,
@@ -309,7 +316,12 @@ impl Cff {
             .ok_or(Error::Invalid("CFF FDSelect index outside FDArray"))
     }
 
-    fn variation_store(&mut self, table: &[u8], offset: usize, meter: &mut Meter) -> Result<()> {
+    fn variation_store(
+        &mut self,
+        table: &[u8],
+        offset: usize,
+        work: &mut WorkBudget,
+    ) -> Result<()> {
         // A 16-bit length precedes the ItemVariationStore.
         let start = offset.checked_add(2).ok_or(Error::Overflow)?;
         let mut r = Reader::at(table, start)?;
@@ -318,7 +330,7 @@ impl Cff {
         }
         let regions = usize::try_from(r.u32()?).map_err(|_| Error::Overflow)?;
         let count = r.u16()?;
-        meter.charge(usize::from(count))?;
+        charge(work, usize::from(count))?;
         let mut list = Reader::at(table, start.checked_add(regions).ok_or(Error::Overflow)?)?;
         let axes = usize::from(list.u16()?);
         let region_count = list.u16()?;
@@ -332,7 +344,8 @@ impl Cff {
             )?;
             item.skip(4)?; // itemCount, wordDeltaCount
             let indices = item.u16()?;
-            meter.charge(usize::from(indices) * axes)?;
+            // Every region index costs work, also when there are no axes.
+            charge(work, usize::from(indices) * axes.max(1))?;
             let first = u32::try_from(self.scalars.len()).map_err(|_| Error::Overflow)?;
             self.scalars.try_reserve_exact(usize::from(indices))?;
             for _ in 0..indices {
@@ -420,10 +433,29 @@ impl Cff {
         glyph: GlyphId,
         outline: &mut Outline<C>,
         limits: &Limits,
-        meter: &mut Meter,
+        work: &mut WorkBudget,
     ) -> Result<()> {
         let table = self.table.bytes(data);
-        charstring::outline(self, table, glyph.0, outline, limits, meter)
+        charstring::outline(self, table, u32::from(glyph.0), outline, limits, work)
+    }
+
+    /// The operators `glyph`'s program executes; `outline` is scratch storage.
+    pub(crate) fn operators(
+        &self,
+        data: &[u8],
+        glyph: GlyphId,
+        outline: &mut Outline,
+        limits: &Limits,
+        work: &mut WorkBudget,
+    ) -> Result<OperatorSet> {
+        charstring::operators(
+            self,
+            self.table.bytes(data),
+            u32::from(glyph.0),
+            outline,
+            limits,
+            work,
+        )
     }
 
     /// Loads `glyph` into `outline` in font units, the FontMatrix applied.
@@ -433,9 +465,9 @@ impl Cff {
         glyph: GlyphId,
         outline: &mut Outline,
         limits: &Limits,
-        meter: &mut Meter,
+        work: &mut WorkBudget,
     ) -> Result<()> {
-        self.outline_units(data, glyph, outline, limits, meter)?;
+        self.outline_units(data, glyph, outline, limits, work)?;
         if let Some([a, b, c, d, e, f]) = self.matrix {
             for p in outline.points_mut() {
                 let (x, y) = (f64::from(p.point.x), f64::from(p.point.y));

@@ -1,4 +1,4 @@
-//! Big-endian reads over font tables, and the work meter of one operation.
+//! Big-endian reads over font tables.
 //!
 //! Every read is bounds-checked. Data that ends early is malformed, so it is
 //! `Error::Invalid`; `Error::Truncated` is kept for a transport that ends early.
@@ -112,32 +112,9 @@ pub(crate) fn slice(data: &[u8], start: usize, len: usize) -> Result<&[u8]> {
     data.get(start..end).ok_or(TRUNCATED)
 }
 
-/// The work units one parse or one outline may spend.
-#[derive(Debug)]
-pub(crate) struct Meter {
-    remaining: u64,
-}
-
-impl Meter {
-    pub(crate) const fn new(units: u64) -> Self {
-        Self { remaining: units }
-    }
-
-    /// Charges `units` before the work is done.
-    pub(crate) fn charge(&mut self, units: usize) -> Result<()> {
-        let units = u64::try_from(units).map_err(|_| Error::Overflow)?;
-        if units > self.remaining {
-            return Err(Error::Policy("font work"));
-        }
-        self.remaining -= units;
-        Ok(())
-    }
-}
-
 #[cfg(test)]
 mod tests {
-    use super::{Meter, Reader, TRUNCATED, slice};
-    use triergon_core::Error;
+    use super::{Reader, TRUNCATED, slice};
 
     #[test]
     fn reads_are_big_endian_and_bounded() {
@@ -155,12 +132,5 @@ mod tests {
         assert_eq!(slice(&data, 8, 2), Ok(&data[8..]));
         assert_eq!(slice(&data, 9, 2), Err(TRUNCATED));
         assert_eq!(slice(&data, usize::MAX, 2), Err(TRUNCATED));
-    }
-
-    #[test]
-    fn the_meter_refuses_work_beyond_its_units() {
-        let mut meter = Meter::new(3);
-        assert_eq!(meter.charge(3), Ok(()));
-        assert_eq!(meter.charge(1), Err(Error::Policy("font work")));
     }
 }

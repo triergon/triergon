@@ -101,19 +101,14 @@ impl Kern {
         self.subtables.as_slice().iter().flat_map(move |subtable| {
             (0..subtable.count).filter_map(move |i| {
                 let at = subtable.pairs + 6 * i;
-                Some((
-                    GlyphId(u32::from(u16_at(data, at)?)),
-                    GlyphId(u32::from(u16_at(data, at + 2)?)),
-                ))
+                Some((GlyphId(u16_at(data, at)?), GlyphId(u16_at(data, at + 2)?)))
             })
         })
     }
 
     /// The kerning between `left` and `right` in font units.
     pub(crate) fn pair(&self, data: &[u8], left: GlyphId, right: GlyphId) -> i32 {
-        let (Ok(left), Ok(right)) = (u16::try_from(left.0), u16::try_from(right.0)) else {
-            return 0;
-        };
+        let (left, right) = (left.0, right.0);
         let key = u32::from(left) << 16 | u32::from(right);
         let mut total = 0;
         for subtable in self.subtables.as_slice() {

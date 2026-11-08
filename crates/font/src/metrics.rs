@@ -202,6 +202,18 @@ impl Hmtx {
         let record = glyph.min(self.metrics - 1);
         u16_at(self.table.bytes(data), 4 * usize::from(record)).unwrap_or(0)
     }
+
+    /// The left side bearing of `glyph`: from its long record, else from the
+    /// side-bearing array after the records; zero where the table lacks it.
+    pub(crate) fn side_bearing(self, data: &[u8], glyph: u16) -> i16 {
+        let (glyph, metrics) = (usize::from(glyph), usize::from(self.metrics));
+        let at = if glyph < metrics {
+            4 * glyph + 2
+        } else {
+            4 * metrics + 2 * (glyph - metrics)
+        };
+        u16_at(self.table.bytes(data), at).map_or(0, u16::cast_signed)
+    }
 }
 
 #[cfg(test)]
@@ -231,6 +243,10 @@ mod tests {
         let table = Table { offset: 0, len: 10 };
         let hmtx = Hmtx::new(table, 2, 3).unwrap();
         assert_eq!([0, 1, 2].map(|g| hmtx.advance(&data, g)), [100, 200, 200]);
+        assert_eq!(
+            [0, 1, 2, 3].map(|g| hmtx.side_bearing(&data, g)),
+            [0, 0, 5, 0]
+        );
         assert!(Hmtx::new(Table { offset: 0, len: 5 }, 2, 3).is_err());
         assert!(Hmtx::new(table, 0, 3).is_err());
     }

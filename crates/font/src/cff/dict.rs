@@ -1,7 +1,9 @@
 //! CFF DICT data (Adobe Technical Note 5176, section 4; OpenType CFF2 DICTs).
 
-use crate::read::{Meter, Reader};
-use triergon_core::{Error, Result};
+use super::number::shared_integer;
+use crate::read::Reader;
+use crate::work::charge;
+use triergon_core::{Error, Result, WorkBudget};
 
 /// The DICT operand stack ceilings: 48 in CFF, 513 in CFF2.
 pub(crate) const CFF_OPERANDS: usize = 48;
@@ -118,7 +120,7 @@ impl<const N: usize> Stack<f64, N> {
 /// `blend` is applied in place using `scalars(vsindex)`.
 pub(crate) fn parse<'s, const N: usize>(
     bytes: &[u8],
-    meter: &mut Meter,
+    work: &mut WorkBudget,
     scalars: &dyn Fn(usize) -> Result<&'s [f64]>,
     mut apply: impl FnMut(u16, &[f64]) -> Result<()>,
 ) -> Result<()> {
@@ -126,7 +128,7 @@ pub(crate) fn parse<'s, const N: usize>(
     let mut stack = Stack::<f64, N>::new();
     let mut vsindex = 0;
     while !r.at_end() {
-        meter.charge(1)?;
+        charge(work, 1)?;
         let byte = r.u8()?;
         let operator = match byte {
             12 => 0x0c00 | u16::from(r.u8()?),
@@ -155,15 +157,13 @@ pub(crate) fn parse<'s, const N: usize>(
 
 /// A number in DICT data (TN 5176 Table 3).
 fn number(byte: u8, r: &mut Reader<'_>) -> Result<f64> {
-    Ok(match byte {
-        28 => f64::from(r.i16()?),
-        29 => f64::from(r.i32()?),
-        30 => real(r)?,
-        32..=246 => f64::from(i16::from(byte) - 139),
-        247..=250 => f64::from((i16::from(byte) - 247) * 256 + i16::from(r.u8()?) + 108),
-        251..=254 => f64::from(-(i16::from(byte) - 251) * 256 - i16::from(r.u8()?) - 108),
-        _ => return Err(Error::Invalid("reserved CFF DICT byte")),
-    })
+    match byte {
+        29 => Ok(f64::from(r.i32()?)),
+        30 => real(r),
+        _ => shared_integer(byte, r)?
+            .map(f64::from)
+            .ok_or(Error::Invalid("reserved CFF DICT byte")),
+    }
 }
 
 /// A real number: nibbles of digits, point, exponent and sign (TN 5176 Table 5).
@@ -218,14 +218,14 @@ pub(crate) fn single(operands: &[f64]) -> Result<usize> {
 #[cfg(test)]
 mod tests {
     use super::{CFF_OPERANDS, CFF2_OPERANDS, Stack, op, parse, real};
-    use crate::read::{Meter, Reader};
-    use triergon_core::Result;
+    use crate::read::Reader;
+    use triergon_core::{Result, WorkBudget};
 
     fn entries<const N: usize>(bytes: &[u8], scalars: &[f64]) -> Result<Vec<(u16, Vec<f64>)>> {
         let mut out = Vec::new();
         parse::<N>(
             bytes,
-            &mut Meter::new(1000),
+            &mut WorkBudget::new(1000),
             &|_| Ok(scalars),
             |operator, operands| {
                 out.push((operator, operands.to_vec()));

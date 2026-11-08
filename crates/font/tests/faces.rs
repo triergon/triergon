@@ -13,7 +13,7 @@ fn parse(data: &[u8]) -> Font {
     Font::new(bytes, 0, &budget, Limits::default()).unwrap()
 }
 
-fn points(font: &Font, glyph: u32) -> (Vec<(f32, f32, PointKind)>, Vec<u32>, u16) {
+fn points(font: &Font, glyph: u16) -> (Vec<(f32, f32, PointKind)>, Vec<u32>, u16) {
     let budget = Budget::new(1 << 20).unwrap();
     let (outline, metrics) = font.outline(GlyphId(glyph), &budget).unwrap();
     let points = outline

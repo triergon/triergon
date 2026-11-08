@@ -25,6 +25,7 @@ mod store;
 mod synthesis;
 mod work;
 
+pub use cff::{CharstringOperator, OperatorSet};
 pub use cmap::{CharEncoding, Charmap, CmapFormat, Mappings};
 pub use matching::{FaceInfo, Request, select};
 pub use metrics::{FsSelection, Os2};
@@ -39,13 +40,12 @@ use glyf::{FontUnits, Glyf};
 use kern::Kern;
 use metrics::{Head, Hhea, Hmtx};
 use name::Names;
-use read::Meter;
 use sfnt::{Flavor, Tables};
 use triergon_core::{Budget, BudgetVec, Bytes, Error, Result, WorkBudget};
 
 /// A glyph index within one face.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub struct GlyphId(pub u32);
+pub struct GlyphId(pub u16);
 
 /// Format-policy limits. Allocation is bounded separately by the [`Budget`] a face
 /// and its outlines are charged to.
@@ -174,9 +174,9 @@ impl Font {
     /// required tables; `Policy` when `limits.work` runs out; and the budget's
     /// errors.
     pub fn new(data: Bytes, index: u32, budget: &Budget, limits: Limits) -> Result<Self> {
-        let mut meter = Meter::new(limits.work);
+        let mut work = WorkBudget::new(limits.work);
         let bytes = data.as_ref();
-        let (flavor, tables) = sfnt::directory(bytes, index, &mut meter)?;
+        let (flavor, tables) = sfnt::directory(bytes, index, &mut work)?;
         let required =
             |table: Option<sfnt::Table>| table.ok_or(Error::Invalid("missing required table"));
         let head = metrics::head(required(tables.head)?.bytes(bytes))?;
@@ -209,7 +209,7 @@ impl Font {
                     (None, Some(t)) => (t, Version::Cff2),
                     (None, None) => return Err(Error::Invalid("missing CFF table")),
                 };
-                let cff = Cff::parse(bytes, table, version, head.units_per_em, budget, &mut meter)?;
+                let cff = Cff::parse(bytes, table, version, head.units_per_em, budget, &mut work)?;
                 let count = u16::try_from(cff.glyph_count()).map_err(|_| Error::Overflow)?;
                 (Outlines::Cff(Box::new(cff)), count)
             }
@@ -248,8 +248,13 @@ impl Font {
         self.index
     }
 
-    pub const fn glyph_count(&self) -> u32 {
-        self.glyph_count as u32
+    pub const fn glyph_count(&self) -> u16 {
+        self.glyph_count
+    }
+
+    /// Every glyph of the face, in index order.
+    pub fn glyphs(&self) -> impl Iterator<Item = GlyphId> + use<> {
+        (0..self.glyph_count).map(GlyphId)
     }
 
     pub const fn units_per_em(&self) -> u16 {
@@ -409,7 +414,7 @@ impl Font {
     fn charmap(&self, subtable: cmap::Subtable) -> Charmap<'_> {
         Charmap::new(
             self.data.as_ref(),
-            self.glyph_count(),
+            u32::from(self.glyph_count),
             subtable,
             self.limits.work,
         )
@@ -474,9 +479,8 @@ impl Font {
     }
 
     fn check(&self, glyph: GlyphId) -> Result<u16> {
-        u16::try_from(glyph.0)
-            .ok()
-            .filter(|&g| g < self.glyph_count)
+        (glyph.0 < self.glyph_count)
+            .then_some(glyph.0)
             .ok_or(Error::Invalid("glyph index outside the face"))
     }
 
@@ -498,12 +502,12 @@ impl Font {
     pub fn outline_into(&self, glyph: GlyphId, outline: &mut Outline) -> Result<GlyphMetrics> {
         let index = self.check(glyph)?;
         let data = self.data.as_ref();
-        let mut meter = Meter::new(self.limits.work);
+        let mut work = WorkBudget::new(self.limits.work);
         match &self.outlines {
             Outlines::Glyf(glyf) => {
                 outline.begin(self.limits.points);
                 let cx = self.glyf_context();
-                let metrics = glyf.outline(&cx, glyph, FontUnits, outline, &mut meter)?;
+                let metrics = glyf.outline(&cx, glyph, FontUnits, outline, &mut work)?;
                 let shift = self.side_bearing(metrics.glyph) - i32::from(metrics.x_min);
                 if shift != 0 {
                     for p in outline.points_mut() {
@@ -515,10 +519,28 @@ impl Font {
                 })
             }
             Outlines::Cff(cff) => {
-                cff.outline(data, glyph, outline, &self.limits, &mut meter)?;
+                cff.outline(data, glyph, outline, &self.limits, &mut work)?;
                 Ok(GlyphMetrics {
                     advance: self.hmtx.advance(data, index),
                 })
+            }
+        }
+    }
+
+    /// The charstring operators `glyph`'s program executes, with its subroutines
+    /// and `seac` components; empty for TrueType outlines. Corpus tools use it to
+    /// show which operators a comparison exercises.
+    pub fn charstring_operators(
+        &self,
+        glyph: GlyphId,
+        scratch: &mut Outline,
+    ) -> Result<OperatorSet> {
+        self.check(glyph)?;
+        match &self.outlines {
+            Outlines::Glyf(_) => Ok(OperatorSet::default()),
+            Outlines::Cff(cff) => {
+                let mut work = WorkBudget::new(self.limits.work);
+                cff.operators(self.data.as_ref(), glyph, scratch, &self.limits, &mut work)
             }
         }
     }
@@ -551,20 +573,9 @@ impl Font {
         }
     }
 
-    /// The `hmtx` left side bearing of `glyph`, or zero where the table lacks it.
+    /// The `hmtx` left side bearing of `glyph`.
     fn side_bearing(&self, glyph: u16) -> i32 {
-        let Some(table) = self.tables.hmtx else {
-            return 0;
-        };
-        let bytes = table.bytes(self.data.as_ref());
-        let metrics = usize::from(self.hhea.metrics.min(self.glyph_count));
-        let glyph = usize::from(glyph);
-        let at = if glyph < metrics {
-            4 * glyph + 2
-        } else {
-            4 * metrics + 2 * (glyph - metrics)
-        };
-        read::u16_at(bytes, at).map_or(0, |v| i32::from(v.cast_signed()))
+        i32::from(self.hmtx.side_bearing(self.data.as_ref(), glyph))
     }
 
     /// Whether the face is CID-keyed CFF.

@@ -199,7 +199,7 @@ fn dump_size(
     let (mut outline, mut styled) = (ScaledOutline::new(budget), ScaledOutline::new(budget));
     let mut text = Vec::new();
     let synthetic = |oblique, embolden| Synthesis { oblique, embolden };
-    for glyph in (0..font.glyph_count()).map(GlyphId) {
+    for glyph in font.glyphs() {
         match sized.hinted_advance(glyph) {
             Ok(advance) => writeln!(out, "hinted {} {advance}", glyph.0)?,
             Err(Error::Unsupported(_)) => writeln!(out, "hinted {} unsupported", glyph.0)?,
@@ -302,7 +302,7 @@ fn dump(font: &Font, budget: &Budget, out: &mut impl Write) -> io::Result<()> {
     }
     let mut outline = Outline::new(budget);
     let mut text = Vec::new();
-    for glyph in (0..font.glyph_count()).map(GlyphId) {
+    for glyph in font.glyphs() {
         let advance = font.advance(glyph).map_or(-1, i64::from);
         match font.outline_into(glyph, &mut outline) {
             Ok(metrics) => {

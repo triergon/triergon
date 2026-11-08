@@ -234,10 +234,14 @@ impl<C: Coordinate> Outline<C> {
     }
 
     /// Appends the contour ends `ends`, which index points already pushed after
-    /// `base` points.
-    pub(crate) fn extend_ends(&mut self, ends: &[u32], base: u32) -> Result<()> {
-        self.ends.try_reserve_exact(ends.len())?;
-        for &end in ends {
+    /// `base` points. Storage grows geometrically, so a composite's components
+    /// append in amortised constant time.
+    pub(crate) fn extend_ends(
+        &mut self,
+        ends: impl IntoIterator<Item = u32>,
+        base: u32,
+    ) -> Result<()> {
+        for end in ends {
             let end = end.checked_add(base).ok_or(Error::Overflow)?;
             self.ends.try_push(end).map_err(|e| e.error)?;
         }
