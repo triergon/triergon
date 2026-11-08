@@ -6,8 +6,10 @@
 //! `fuzz --contract` like every other feature.
 
 mod manifest;
+mod observed;
 
 pub use manifest::LANE;
+pub use observed::observed_sources;
 
 use std::path::Path;
 
@@ -18,8 +20,10 @@ pub const USAGE: &str = "usage: cargo xtask ass prepare [--jobs N]
        cargo xtask ass compare [--all] [REPORT OPTION]...
 
   prepare   build the pinned libass, as `cargo xtask raster prepare` does: one
-            build serves both lanes; then `cargo xtask build-workers` builds its
-            reference worker
+            build serves both lanes; and write the copy of its ass_parse.c the
+            reference compiles, with each conversion C leaves undefined out of
+            range observed, to .research/libass/observed; then `cargo xtask
+            build-workers` builds its reference worker
   manifest  write each ASS parsing feature's generated manifest (one case per
             fixture of harness/fixtures/ass, with the pins of
             harness/features/<feature>/pins.json) to DIR/<feature>/corpus.json
@@ -48,6 +52,7 @@ pub fn main(root: &Path, args: &[String]) -> Result<(), String> {
             };
             let built = crate::raster::prepare_libass(root, jobs, &fetch::Network)?;
             println!("{}", built.display());
+            println!("{}", observed_sources(root)?.display());
             Ok(())
         }
         [command, rest @ ..] if command == "manifest" => LANE.manifest_command(root, rest, USAGE),

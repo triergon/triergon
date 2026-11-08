@@ -489,6 +489,9 @@ struct ProfileReference {
     /// Fails when the profile's `build.json` is not the build its prepare command
     /// makes now.
     prepared: Option<fn(&Value) -> R<()>>,
+    /// Writes generated sources the reference includes and returns their
+    /// directory, which joins its system include path.
+    generated: Option<fn(&Path) -> R<PathBuf>>,
 }
 
 const CONTAINER_PACKAGES: &[&str] = &["libavformat", "libavcodec", "libavutil"];
@@ -529,6 +532,7 @@ const PROFILE_REFERENCES: [ProfileReference; 11] = [
         options: CONTAINER_OPTIONS,
         identity: true,
         prepared: None,
+        generated: None,
     },
     ProfileReference {
         profile: ".research/reference-formats",
@@ -544,6 +548,7 @@ const PROFILE_REFERENCES: [ProfileReference; 11] = [
         options: CONTAINER_OPTIONS,
         identity: true,
         prepared: None,
+        generated: None,
     },
     ProfileReference {
         profile: ".research/reference-decode",
@@ -566,6 +571,7 @@ const PROFILE_REFERENCES: [ProfileReference; 11] = [
         options: RELEASE_OPTIONS,
         identity: false,
         prepared: None,
+        generated: None,
     },
     ProfileReference {
         profile: ".research/reference-capture-static",
@@ -581,6 +587,7 @@ const PROFILE_REFERENCES: [ProfileReference; 11] = [
         options: RELEASE_OPTIONS,
         identity: false,
         prepared: None,
+        generated: None,
     },
     ProfileReference {
         profile: ".research/reference-capture-small-static",
@@ -596,6 +603,7 @@ const PROFILE_REFERENCES: [ProfileReference; 11] = [
         options: RELEASE_OPTIONS,
         identity: false,
         prepared: None,
+        generated: None,
     },
     ProfileReference {
         profile: ".research/reference-formats",
@@ -611,6 +619,7 @@ const PROFILE_REFERENCES: [ProfileReference; 11] = [
         options: CONTAINER_OPTIONS,
         identity: false,
         prepared: None,
+        generated: None,
     },
     ProfileReference {
         profile: ".research/reference-formats",
@@ -626,6 +635,7 @@ const PROFILE_REFERENCES: [ProfileReference; 11] = [
         options: CONTAINER_OPTIONS,
         identity: false,
         prepared: None,
+        generated: None,
     },
     ProfileReference {
         profile: ".research/freetype",
@@ -641,6 +651,7 @@ const PROFILE_REFERENCES: [ProfileReference; 11] = [
         options: RELEASE_OPTIONS,
         identity: false,
         prepared: None,
+        generated: None,
     },
     ProfileReference {
         profile: ".research/harfbuzz",
@@ -656,6 +667,7 @@ const PROFILE_REFERENCES: [ProfileReference; 11] = [
         options: SHAPE_OPTIONS,
         identity: false,
         prepared: None,
+        generated: None,
     },
     ProfileReference {
         profile: ".research/libass",
@@ -671,6 +683,7 @@ const PROFILE_REFERENCES: [ProfileReference; 11] = [
         options: RASTER_OPTIONS,
         identity: false,
         prepared: Some(crate::raster::check_prepared),
+        generated: None,
     },
     ProfileReference {
         profile: ".research/libass",
@@ -686,6 +699,7 @@ const PROFILE_REFERENCES: [ProfileReference; 11] = [
         options: RASTER_OPTIONS,
         identity: false,
         prepared: Some(crate::raster::check_prepared),
+        generated: Some(crate::ass::observed_sources),
     },
 ];
 
@@ -801,6 +815,12 @@ fn build_selected(root: &Path, comparison_build: bool, only: Option<&str>) -> R<
         command.extend(reference.options.iter().map(ToString::to_string));
         if let Some(define) = reference.define {
             command.push(define.into());
+        }
+        if let Some(generate) = reference.generated {
+            // A system directory, as the pinned tree's own is: libass's code is
+            // compiled with its own warnings.
+            command.push("-isystem".into());
+            command.push(generate(root)?.display().to_string());
         }
         command.push(root.join(reference.source).display().to_string());
         command.extend(shell_words(&flags)?);

@@ -1,0 +1,11 @@
+;@time 1000
+[Script Info]
+ScriptType: v4.00+
+PlayResX: 2000000000
+PlayResY: 2000000000
+LayoutResX: 1
+LayoutResY: 1
+
+[Events]
+Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
+Dialogue: 0,0:00:00.00,0:00:02.00,Default,,0,0,0,Scroll up;0;100;1000000,x
