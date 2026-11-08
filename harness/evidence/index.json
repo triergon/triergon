@@ -46,6 +46,12 @@
  },
  "sets": [
   {
+   "name": "packet-framing-avc-update-comparison",
+   "retention": "90 days",
+   "key": "qualification/repository/packet-framing-avc-update-comparison/e649660bb52b77f2ce3343f8902de7e0b5a592f32af271fa1ffacdfd7cd47a18.tar.gz",
+   "sha256": "e649660bb52b77f2ce3343f8902de7e0b5a592f32af271fa1ffacdfd7cd47a18"
+  },
+  {
    "name": "worker-build-selection",
    "retention": "90 days",
    "key": "qualification/repository/worker-build-selection/67d70ab82906705f581bbb02215ab30a42aa505e1334cb1691fed9a8302d8dc4.tar.gz",
