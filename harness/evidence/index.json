@@ -46,6 +46,12 @@
  },
  "sets": [
   {
+   "name": "worker-build-selection",
+   "retention": "90 days",
+   "key": "qualification/repository/worker-build-selection/67d70ab82906705f581bbb02215ab30a42aa505e1334cb1691fed9a8302d8dc4.tar.gz",
+   "sha256": "67d70ab82906705f581bbb02215ab30a42aa505e1334cb1691fed9a8302d8dc4"
+  },
+  {
    "name": "shared-core-mac-arm64",
    "path": "research/qualification/shared-core-mac-arm64",
    "retention": "retained",
