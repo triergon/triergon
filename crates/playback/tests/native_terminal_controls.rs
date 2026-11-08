@@ -16,10 +16,8 @@ use triergon_playback::{
     progressive::ProgressiveLimits,
     *,
 };
-#[allow(dead_code)]
-mod gold {
-    include!("fixtures/native_terminal_golds.rs");
-}
+mod terminal_golds;
+use terminal_golds as gold;
 const ID: SourceId = SourceId(7611);
 #[derive(Default)]
 struct Signals {
@@ -228,14 +226,14 @@ fn check(out: &[Output], case: &gold::Case) {
         .into_iter()
         .filter(|p| p.native.is_some())
         .collect();
-    assert_eq!(got.len(), case.packets.len(), "{}", case.name);
-    for (p, w) in got.into_iter().zip(case.packets) {
-        assert_eq!(p.source.payload.as_ref(), w.bytes, "{} payload", case.name);
+    assert_eq!(got.len(), case.packets().len(), "{}", case.name);
+    for (p, w) in got.into_iter().zip(case.packets()) {
+        assert_eq!(p.source.payload.as_ref(), w.data, "{} payload", case.name);
         assert_eq!(
             p.source.sample.range,
-            w.offset..w.offset + w.bytes.len() as u64
+            w.offset()..w.offset() + w.data.len() as u64
         );
-        assert_eq!(p.configuration.track.track_id as usize, w.stream + 1);
+        assert_eq!(p.configuration.track.track_id as usize, w.stream_index + 1);
         let n = p.native.as_ref().expect("native occurrence required");
         assert_eq!(n.source, p.source.sample);
         assert_eq!(n.track_id, p.configuration.track.track_id);
@@ -249,8 +247,8 @@ fn check(out: &[Output], case: &gold::Case) {
         assert_eq!(n.demux.dts, w.dts);
         assert_eq!(n.demux.pts_field.api_ticks(), w.pts);
         assert_eq!(n.demux.dts_field.api_ticks(), w.dts);
-        assert_eq!(n.demux.duration, w.duration);
-        assert_eq!(n.demux.flags, w.flags);
+        assert_eq!(n.demux.duration, w.duration_ticks());
+        assert_eq!(n.demux.flags, w.flag_bits());
     }
 }
 #[test]
@@ -285,10 +283,7 @@ fn native_progressive_pending_forward_corpus_preserves_complete_ordered_objects(
 }
 #[test]
 fn native_terminal_unknown_source_clocks_and_literal_origin_chain_are_retained() {
-    let c = gold::CASES
-        .iter()
-        .find(|c| c.name == "open-ended--unknown-clock-terminal")
-        .unwrap();
+    let c = gold::case("open-ended--unknown-clock-terminal");
     let (mut p, _b, _s) = make(c.raw, false, 7, 1, true);
     let out = collect(&mut p, 1).unwrap();
     check(&out, c);
@@ -308,10 +303,7 @@ fn native_terminal_unknown_source_clocks_and_literal_origin_chain_are_retained()
 }
 #[test]
 fn native_terminal_pending_is_not_eof_and_zero_work_never_polls_source() {
-    let c = gold::CASES
-        .iter()
-        .find(|c| c.name == "open-ended--regular-terminal")
-        .unwrap();
+    let c = gold::case("open-ended--regular-terminal");
     let (mut p, _b, s) = make(c.raw, false, 7, 1, false);
     let mut out = Vec::new();
     for _ in 0..300_000 {
@@ -342,10 +334,7 @@ fn native_terminal_pending_is_not_eof_and_zero_work_never_polls_source() {
 }
 #[test]
 fn native_terminal_failure_never_advertises_eof() {
-    let c = gold::CASES
-        .iter()
-        .find(|c| c.name == "open-ended--regular-terminal")
-        .unwrap();
+    let c = gold::case("open-ended--regular-terminal");
     let (mut p, _b, s) = make(c.raw, false, 7, 1, false);
     s.fail.store(true, Ordering::Relaxed);
     let error = collect(&mut p, 1).unwrap_err();
@@ -354,10 +343,7 @@ fn native_terminal_failure_never_advertises_eof() {
 }
 #[test]
 fn native_terminal_payload_owners_survive_player_and_plan_retirement() {
-    let c = gold::CASES
-        .iter()
-        .find(|c| c.name == "open-ended--pending-terminal")
-        .unwrap();
+    let c = gold::case("open-ended--pending-terminal");
     let (mut p, b, _s) = make(c.raw, false, 1, 1, true);
     let out = collect(&mut p, 1).unwrap();
     drop(p);
@@ -368,10 +354,7 @@ fn native_terminal_payload_owners_survive_player_and_plan_retirement() {
 }
 #[test]
 fn native_terminal_output_queue_backpressure_keeps_every_packet() {
-    let c = gold::CASES
-        .iter()
-        .find(|c| c.name == "open-ended--pending-terminal")
-        .unwrap();
+    let c = gold::case("open-ended--pending-terminal");
     let (mut p, _b, _s) = make(c.raw, false, 1, 1, true);
     let mut saw = false;
     for _ in 0..300_000 {
@@ -393,10 +376,7 @@ fn native_terminal_output_queue_backpressure_keeps_every_packet() {
 }
 #[test]
 fn native_terminal_cancel_is_sticky_and_releases_owned_state() {
-    let c = gold::CASES
-        .iter()
-        .find(|c| c.name == "open-ended--pending-terminal")
-        .unwrap();
+    let c = gold::case("open-ended--pending-terminal");
     let (mut p, b, _s) = make(c.raw, false, 1, 1, true);
     let error = p
         .advance(&mut WorkBudget::new(1), &AtomicBool::new(true))
@@ -411,10 +391,7 @@ fn native_terminal_cancel_is_sticky_and_releases_owned_state() {
 }
 #[test]
 fn native_terminal_truncated_sample_is_not_a_clean_end() {
-    let c = gold::CASES
-        .iter()
-        .find(|c| c.name == "open-ended--pending-terminal")
-        .unwrap();
+    let c = gold::case("open-ended--pending-terminal");
     let (mut p, _b, _s) = make(&c.raw[..c.raw.len() - 1], false, 1, 1, true);
     assert!(matches!(collect(&mut p, 1), Err(Error::Truncated)));
 }
@@ -463,10 +440,7 @@ fn ordinary_progressive_native_context_stays_refused() {
 
 #[test]
 fn native_zero_boundary_preserves_all_nine_source_records_and_requires_physical_end() {
-    let c = gold::CASES
-        .iter()
-        .find(|c| c.name == "open-ended--empty-sample-terminal")
-        .unwrap();
+    let c = gold::case("open-ended--empty-sample-terminal");
     let (mut p, _b, s) = make(c.raw, false, 1, 1, false);
     let mut out = Vec::new();
     let mut parked = false;
@@ -510,10 +484,7 @@ fn native_zero_boundary_preserves_all_nine_source_records_and_requires_physical_
 }
 #[test]
 fn native_terminal_allocation_pressure_retries_complete_source_and_native_views() {
-    let c = gold::CASES
-        .iter()
-        .find(|c| c.name == "open-ended--pending-terminal")
-        .unwrap();
+    let c = gold::case("open-ended--pending-terminal");
     let (mut p, b, _s) = make(c.raw, false, 1, 1, true);
     let mut out = Vec::new();
     let mut ended = false;
@@ -550,10 +521,7 @@ fn native_terminal_allocation_pressure_retries_complete_source_and_native_views(
 }
 #[test]
 fn native_terminal_foreign_end_source_pool_and_stale_request_cannot_finish() {
-    let c = gold::CASES
-        .iter()
-        .find(|c| c.name == "open-ended--regular-terminal")
-        .unwrap();
+    let c = gold::case("open-ended--regular-terminal");
     let (mut p, _b, s) = make(c.raw, false, 1, 1, false);
     let mut out = Vec::new();
     for _ in 0..300_000 {
@@ -608,10 +576,7 @@ fn native_terminal_foreign_end_source_pool_and_stale_request_cannot_finish() {
 
 #[test]
 fn native_zero_run_start_boundary_independent_of_tail_and_input_geometry() {
-    let original = gold::CASES
-        .iter()
-        .find(|c| c.name == "open-ended--empty-sample-terminal")
-        .unwrap();
+    let original = gold::case("open-ended--empty-sample-terminal");
     let cases: [&[u8]; 4] = [
         include_bytes!("fixtures/native-terminal-controls/empty-plus-one-byte.mp4"),
         include_bytes!("fixtures/native-terminal-controls/empty-plus31opaque.mp4"),
@@ -1094,7 +1059,7 @@ fn native_empty_run_tail_uses_the_greatest_completed_run_end_once() {
 
 #[test]
 fn final_indexed_zero_read_preserves_the_literal_packet() {
-    let case = &gold::LATER_RUN_FINAL;
+    let case = gold::case("two-nonempty-then-empty");
     for known in [false, true] {
         for chunk in [1, 7, 4096] {
             for quantum in [1, 4096] {
@@ -1135,7 +1100,7 @@ fn final_indexed_zero_read_preserves_the_literal_packet() {
 
 #[test]
 fn final_indexed_zero_read_leaves_the_source_open_for_a_later_fragment() {
-    let case = &gold::LATER_RUN_FINAL;
+    let case = gold::case("two-nonempty-then-empty");
     let mut raw = case.raw.to_vec();
     // Make the terminal MDAT finite and append a new fragment at the next
     // decode time. The zero read has already ended native packet delivery.
@@ -1221,10 +1186,7 @@ fn final_zero_read_at_media_end_keeps_later_indexed_payloads() {
 }
 #[test]
 fn reversed_fragment_ranges_keep_native_decode_order_on_a_forward_source() {
-    let c = gold::CASES
-        .iter()
-        .find(|c| c.name == "progressive--pending-reverse-ranges")
-        .unwrap();
+    let c = gold::case("progressive--pending-reverse-ranges");
     for known in [false, true] {
         for chunk in [1, 7, 4096] {
             for work in [1, 4096] {
@@ -1253,10 +1215,7 @@ fn reversed_fragment_ranges_keep_native_decode_order_on_a_forward_source() {
 
 #[test]
 fn reversed_fragment_ranges_keep_physical_source_order_on_a_seekable_source() {
-    let c = gold::CASES
-        .iter()
-        .find(|c| c.name == "progressive--pending-reverse-ranges")
-        .unwrap();
+    let c = gold::case("progressive--pending-reverse-ranges");
     let (mut native, _, _) =
         try_make_source_mode(c.raw, true, 7, 1, true, TestView::Native, true).unwrap();
     let output = collect(&mut native, 1).unwrap();
@@ -1269,10 +1228,7 @@ fn reversed_fragment_ranges_keep_physical_source_order_on_a_seekable_source() {
 
 #[test]
 fn reversed_forward_fragments_require_a_complete_bounded_extent() {
-    let c = gold::CASES
-        .iter()
-        .find(|c| c.name == "progressive--pending-reverse-ranges")
-        .unwrap();
+    let c = gold::case("progressive--pending-reverse-ranges");
     let mut oversized = c.raw.to_vec();
     assert_eq!(&oversized[1095..1103], b"\0\0\0Pmdat");
     let length = 32 * 1024 + 1_u32;
@@ -1353,10 +1309,7 @@ fn native_from_start_origin_never_claims_complete_entity_or_source_clock() {
 }
 
 fn regular_multi_mdat() -> &'static gold::Case {
-    gold::CASES
-        .iter()
-        .find(|case| case.name == "mp4--r-multiple-mdats")
-        .unwrap()
+    gold::case("mp4--r-multiple-mdats")
 }
 
 #[test]
@@ -1394,10 +1347,7 @@ fn regular_multiple_finite_mdats_preserve_whole_native_and_source_packets() {
 
 #[test]
 fn forward_native_edits_replay_payloads_without_duplicating_source_samples() {
-    let case = gold::CASES
-        .iter()
-        .find(|case| case.name == "mp4--r-edits-repeat")
-        .unwrap();
+    let case = gold::case("mp4--r-edits-repeat");
     for known in [false, true] {
         for chunk in [1, 7, 4096] {
             for work in [1, 4096] {
@@ -1432,10 +1382,7 @@ fn forward_native_edits_replay_payloads_without_duplicating_source_samples() {
 
 #[test]
 fn forward_native_edit_replay_requires_a_complete_extent_within_the_cache_limit() {
-    let case = gold::CASES
-        .iter()
-        .find(|case| case.name == "mp4--r-edits-repeat")
-        .unwrap();
+    let case = gold::case("mp4--r-edits-repeat");
     let mut oversized = case.raw.to_vec();
     assert_eq!(&oversized[727..735], b"\0\0\0Pmdat");
     let length = 32 * 1024 + 1_u32;
@@ -1458,10 +1405,7 @@ fn forward_native_edit_replay_requires_a_complete_extent_within_the_cache_limit(
 
 #[test]
 fn forward_tail_moov_reuses_media_consumed_during_index_discovery() {
-    let case = gold::CASES
-        .iter()
-        .find(|case| case.name == "mp4--r-end-co64")
-        .unwrap();
+    let case = gold::case("mp4--r-end-co64");
     for known in [false, true] {
         for chunk in [1, 7, 4096] {
             for work in [1, 4096] {
@@ -1491,10 +1435,7 @@ fn forward_tail_moov_reuses_media_consumed_during_index_discovery() {
 
 #[test]
 fn forward_tail_moov_retains_only_whole_media_extents_within_the_cache_limit() {
-    let case = gold::CASES
-        .iter()
-        .find(|case| case.name == "mp4--r-end-co64")
-        .unwrap();
+    let case = gold::case("mp4--r-end-co64");
     for (payload_bytes, retained) in [(32 * 1024, true), (32 * 1024 + 1, false)] {
         let mut raw = case.raw[..100].to_vec();
         assert_eq!(&raw[20..28], b"\0\0\0Pmdat");
@@ -1521,10 +1462,7 @@ fn forward_tail_moov_retains_only_whole_media_extents_within_the_cache_limit() {
 
 #[test]
 fn forward_tail_moov_resolves_offsets_across_multiple_retained_mdats() {
-    let case = gold::CASES
-        .iter()
-        .find(|case| case.name == "mp4--r-end-co64")
-        .unwrap();
+    let case = gold::case("mp4--r-end-co64");
     let mut raw = case.raw.to_vec();
     let co64 = raw.windows(4).position(|bytes| bytes == b"co64").unwrap();
     let third_chunk = co64 + 12 + 2 * 8;
@@ -1535,11 +1473,11 @@ fn forward_tail_moov_resolves_offsets_across_multiple_retained_mdats() {
     let (mut player, _, signals) = make(&raw, true, 7, 11, true);
     let output = collect(&mut player, 11).unwrap();
     let got = packets(&output);
-    assert_eq!(got.len(), case.packets.len());
-    for (i, (packet, gold)) in got.iter().zip(case.packets).enumerate() {
-        let offset = gold.offset + if i < 3 { 0 } else { 8 };
+    assert_eq!(got.len(), case.packets().len());
+    for (i, (packet, gold)) in got.iter().zip(case.packets()).enumerate() {
+        let offset = gold.offset() + if i < 3 { 0 } else { 8 };
         assert_eq!(packet.source.sample.range, offset..offset + 12);
-        assert_eq!(packet.source.payload.as_ref(), gold.bytes);
+        assert_eq!(packet.source.payload.as_ref(), gold.data);
         assert_eq!(packet.native.as_ref().unwrap().demux.dts, gold.dts);
         assert!(
             packet
@@ -1586,10 +1524,10 @@ fn regular_forward_samples_in_a_terminal_mdat_require_actual_eof() {
             assert_eq!(p.pending_request().unwrap().offset, raw.len() as u64);
             assert_eq!(signals.ends.load(Ordering::Relaxed), 0);
             let got = packets(&out);
-            assert_eq!(got.len(), case.packets.len());
-            for (packet, expected) in got.iter().zip(case.packets) {
-                assert_eq!(packet.source.payload.as_ref(), expected.bytes);
-                assert_eq!(packet.source.sample.range.start, expected.offset);
+            assert_eq!(got.len(), case.packets().len());
+            for (packet, expected) in got.iter().zip(case.packets()) {
+                assert_eq!(packet.source.payload.as_ref(), expected.data);
+                assert_eq!(packet.source.sample.range.start, expected.offset());
                 assert_eq!(packet.source.sample.dts_ticks, expected.dts.map(i128::from));
             }
             if native {

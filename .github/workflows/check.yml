@@ -19,7 +19,7 @@ jobs:
       - name: Install check dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y build-essential pkg-config zlib1g-dev nasm rsync
+          sudo apt-get install -y build-essential pkg-config zlib1g-dev nasm rsync zstd
           rustup show active-toolchain || rustup toolchain install
           rustc -vV
       - name: Prepare pinned reference and fixtures
