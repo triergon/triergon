@@ -1,8 +1,9 @@
-//! Driving any [`ContainerReader`] from a [`std::io`] source.
+//! Driving any [`ContainerReader`], or a parser's [`InputCursor`], from a [`std::io`]
+//! source.
 use crate::container::{ContainerReader, Event, SeekRequest};
 use crate::{
-    Budget, BudgetVec, Bytes, Error, InputRequest, InputWindow, Result, SourceCapabilities,
-    SourceFailure, Step, WorkBudget,
+    Budget, BudgetVec, Bytes, Error, InputCursor, InputRequest, InputWindow, Result,
+    SourceCapabilities, SourceFailure, Step, WorkBudget,
 };
 use std::io::{ErrorKind, Read, Seek, SeekFrom};
 use std::sync::atomic::AtomicBool;
@@ -179,6 +180,123 @@ fn read_retrying(source: &mut impl Read, buffer: &mut [u8]) -> std::io::Result<u
         match source.read(buffer) {
             Err(error) if error.kind() == ErrorKind::Interrupted => {}
             result => return result,
+        }
+    }
+}
+
+/// Serves the requests of a parser's [`InputCursor`] from a blocking seekable source, for
+/// parsers driven below the [`ContainerReader`] level. The source is seeked only when a
+/// request does not continue the previous response. A response that fits the cursor's
+/// inline storage is copied there without an allocation; a larger one is copied into
+/// storage charged to the pool, sized to the bytes read.
+#[derive(Debug)]
+pub struct Feed<S> {
+    source: S,
+    pool: Budget,
+    /// The source's offset after the last response; unknown after a failed read.
+    position: Option<u64>,
+}
+
+impl<S: Read + Seek> Feed<S> {
+    /// Feed from `source`, rewound to its start; larger responses are charged to `pool`.
+    pub fn new(mut source: S, pool: &Budget) -> Result<Self> {
+        source.rewind()?;
+        Ok(Self {
+            source,
+            pool: pool.clone(),
+            position: Some(0),
+        })
+    }
+
+    pub fn source_mut(&mut self) -> &mut S {
+        &mut self.source
+    }
+
+    pub fn into_inner(self) -> S {
+        self.source
+    }
+
+    /// Answer `request` on `input`: with the bytes read, or with the end of the source
+    /// when none are left. A failed read marks the cursor's source as failed and returns
+    /// the error.
+    // Inlined into the caller's polling loop, which runs once per window: once per byte
+    // for one-byte windows.
+    #[inline(always)]
+    pub fn supply(&mut self, input: &mut InputCursor, request: InputRequest) -> Result<()> {
+        let maximum = request.maximum;
+        if maximum <= 1 {
+            self.supply_from::<1>(input, request)
+        } else if maximum <= InputCursor::INLINE_CAPACITY {
+            self.supply_from::<{ InputCursor::INLINE_CAPACITY }>(input, request)
+        } else if maximum <= 4096 {
+            self.supply_large::<4096>(input, request)
+        } else {
+            self.supply_large::<65536>(input, request)
+        }
+    }
+
+    // Keeps large read buffers out of the small-window path.
+    #[inline(never)]
+    fn supply_large<const CAPACITY: usize>(
+        &mut self,
+        input: &mut InputCursor,
+        request: InputRequest,
+    ) -> Result<()> {
+        self.supply_from::<CAPACITY>(input, request)
+    }
+
+    /// Read into `buffer` from `offset`, seeking only when the last response ended
+    /// elsewhere. Inlined, unlike `read_retrying`: one-byte windows read once per byte.
+    #[inline(always)]
+    fn read_at(&mut self, offset: u64, buffer: &mut [u8]) -> std::io::Result<usize> {
+        if self.position != Some(offset) {
+            self.position = None;
+            self.source.seek(SeekFrom::Start(offset))?;
+        }
+        loop {
+            match self.source.read(buffer) {
+                Err(error) if error.kind() == ErrorKind::Interrupted => {}
+                result => return result,
+            }
+        }
+    }
+
+    #[inline(always)]
+    fn supply_from<const CAPACITY: usize>(
+        &mut self,
+        input: &mut InputCursor,
+        request: InputRequest,
+    ) -> Result<()> {
+        let mut buffer = [0u8; CAPACITY];
+        let maximum = request.maximum.min(CAPACITY);
+        let read = self.read_at(request.offset, &mut buffer[..maximum]);
+        let count = match read {
+            Ok(count) => count,
+            Err(error) => {
+                self.position = None;
+                input.fail(request.source, request.token, SourceFailure::Transport)?;
+                return Err(error.into());
+            }
+        };
+        self.position = Some(
+            request
+                .offset
+                .checked_add(u64::try_from(count).map_err(|_| Error::Overflow)?)
+                .ok_or(Error::Overflow)?,
+        );
+        let bytes = &buffer[..count];
+        if bytes.is_empty() {
+            input.finish(request.source, request.token)
+        } else if count <= InputCursor::INLINE_CAPACITY {
+            input.provide_inline(request.source, request.token, request.offset, bytes)
+        } else {
+            let bytes = Bytes::copy_from_slice(&self.pool, bytes)?;
+            input.provide_owned(InputWindow::new(
+                request.source,
+                request.token,
+                request.offset,
+                bytes,
+            )?)
         }
     }
 }

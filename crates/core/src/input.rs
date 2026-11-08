@@ -16,6 +16,11 @@ pub struct SourceCapabilities {
 
 /// A response is valid only for this pool, parser generation and range request.
 /// Codec configuration and transport clock epochs belong to the format layer.
+///
+/// A cursor's token changes with every range request, reset and source continuation,
+/// and no two cursors share one: each takes a generation from its pool, and pools have
+/// distinct identities. An unchanged token therefore means the same cursor, source and
+/// request.
 #[derive(Clone, Debug)]
 pub struct InputToken {
     pool: crate::budget::PoolId,
