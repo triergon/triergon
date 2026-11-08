@@ -1,6 +1,6 @@
 //! Driving any [`ContainerReader`] from a [`std::io`] source.
 use crate::container::{ContainerReader, Event, SeekRequest};
-use crate::{Budget, Bytes, Error, InputRequest, InputWindow, Result, SourceCapabilities, Step};
+use crate::{Budget, BudgetVec, Error, InputRequest, InputWindow, Result, SourceCapabilities, Step};
 use crate::{SourceFailure, WorkBudget};
 use std::io::{Read, Seek, SeekFrom};
 use std::sync::atomic::AtomicBool;
@@ -11,7 +11,8 @@ const WORK: u64 = 1 << 20;
 type Reposition<S> = fn(&mut S, u64) -> std::io::Result<u64>;
 
 /// A reader fed from a blocking [`Read`] source, which is seeked on demand when it is
-/// also [`Seek`]. Each requested window is copied into the reader's pool.
+/// also [`Seek`]. Each requested window is read straight into charged storage of the
+/// reader's pool.
 #[derive(Debug)]
 pub struct Blocking<R, S> {
     reader: R,
@@ -19,7 +20,6 @@ pub struct Blocking<R, S> {
     pool: Budget,
     position: u64,
     reposition: Option<Reposition<S>>,
-    buffer: Vec<u8>,
     cancel: AtomicBool,
 }
 
@@ -49,7 +49,6 @@ impl<R: ContainerReader, S: Read> Blocking<R, S> {
             pool: pool.clone(),
             position: 0,
             reposition,
-            buffer: Vec::new(),
             cancel: AtomicBool::new(false),
         }
     }
@@ -108,9 +107,10 @@ impl<R: ContainerReader, S: Read> Blocking<R, S> {
             }
             self.position = request.offset;
         }
-        self.buffer.resize(request.maximum, 0);
+        let mut window = BudgetVec::new(&self.pool);
+        window.try_resize(request.maximum, 0)?;
         let read = loop {
-            match self.source.read(&mut self.buffer) {
+            match self.source.read(window.as_mut_slice()) {
                 Ok(read) => break read,
                 Err(error) if error.kind() == std::io::ErrorKind::Interrupted => {}
                 Err(error) => {
@@ -123,7 +123,8 @@ impl<R: ContainerReader, S: Read> Blocking<R, S> {
         if read == 0 {
             return self.reader.finish(request.source, request.token);
         }
-        let bytes = Bytes::copy_from_slice(&self.pool, &self.buffer[..read])?;
+        window.truncate(read);
+        let bytes = window.freeze().map_err(|refused| refused.error)?;
         self.position += read as u64;
         let window = InputWindow::new(request.source, request.token, request.offset, bytes)?;
         self.reader.provide(&window)
