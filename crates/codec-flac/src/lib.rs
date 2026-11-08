@@ -10,64 +10,124 @@
 )]
 // Pending: `missing_docs`.
 
-use triergon_codec::{AudioDecoder, AudioFrame, DecodeFailure, DownmixLevels, StorageError};
+mod error;
+mod frame;
+mod layout;
+mod output;
+mod predict;
+mod residual;
+mod sample;
+mod scratch;
+mod stereo;
+mod stream;
+mod subframe;
+
+pub use error::DecodeError;
+pub use output::IntegerFrame;
+pub use triergon_codec::{AudioFrame, Budget, ChannelLayout, StorageError};
+
+use frame::FrameDecoder;
+use output::{FloatOutput, IntegerOutput};
+use stream::Stream;
+use triergon_codec::{AudioDecoder, DecodeFailure, DownmixLevels, Reservation};
 
 /// Bounds of one decoder.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Limits {
-    /// Heap bytes the decoder may hold, output frame included.
+    /// Heap bytes the decoder may hold: its channel buffers and the output frames it
+    /// fills. The default holds the largest frame RFC 9639 allows (65536 samples of eight
+    /// channels) in both outputs, with the buffers of a 32-bit stereo frame.
     pub live_storage_bytes: usize,
 }
 
 impl Default for Limits {
     fn default() -> Self {
         Limits {
-            live_storage_bytes: 64 << 20,
+            live_storage_bytes: 6 << 20,
         }
     }
 }
 
-/// Why a decoder refused a configuration or an access unit.
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub enum DecodeError {
-    /// A feature this decoder does not implement.
-    Unsupported(&'static str),
-    /// Malformed data.
-    Invalid(&'static str),
-    /// The storage budget refused an allocation.
-    Budget(StorageError),
+/// What to do with the CRC-16 that ends every frame.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum CrcPolicy {
+    /// Do not compute it; a damaged frame decodes to whatever it holds. FFmpeg's default.
+    #[default]
+    Ignore,
+    /// Refuse a frame whose CRC-16 does not match with [`DecodeError::CrcMismatch`].
+    Reject,
 }
 
-impl From<StorageError> for DecodeError {
-    fn from(error: StorageError) -> Self {
-        DecodeError::Budget(error)
-    }
+/// The format of one decoded frame.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct FrameInfo {
+    pub sample_rate: u32,
+    pub bits_per_sample: u8,
+    pub layout: ChannelLayout,
+    pub samples_per_channel: usize,
 }
 
-impl core::fmt::Display for DecodeError {
-    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-        match self {
-            DecodeError::Unsupported(what) => write!(f, "unsupported: {what}"),
-            DecodeError::Invalid(what) => write!(f, "invalid data: {what}"),
-            DecodeError::Budget(error) => write!(f, "storage budget: {error}"),
-        }
-    }
-}
-
-impl std::error::Error for DecodeError {}
-
-/// The decoder.
+/// A FLAC decoder: one frame per access unit.
 #[derive(Debug)]
 pub struct Decoder {
-    _limits: Limits,
+    frames: FrameDecoder,
+    float_charge: Reservation,
+    integer_charge: Reservation,
 }
 
 impl Decoder {
-    /// A decoder for the canonical configuration `configuration`.
-    pub fn from_configuration(configuration: &[u8], limits: Limits) -> Result<Decoder, DecodeError> {
-        let _ = configuration;
-        let _ = limits;
-        Err(DecodeError::Unsupported("decoder not implemented"))
+    /// A decoder for the canonical configuration `configuration` (`fLaC` and the
+    /// metadata blocks, STREAMINFO first), with its own pool of `limits`.
+    ///
+    /// Empty `configuration` decodes a stream picked up at a frame header, as FFmpeg
+    /// does without extradata: each frame must code its sample rate and size.
+    pub fn from_configuration(
+        configuration: &[u8],
+        limits: Limits,
+    ) -> Result<Decoder, DecodeError> {
+        let budget = Budget::new(limits.live_storage_bytes)?;
+        Decoder::from_configuration_in(configuration, &budget)
+    }
+
+    /// As [`Decoder::from_configuration`], charging the caller's pool.
+    pub fn from_configuration_in(
+        configuration: &[u8],
+        budget: &Budget,
+    ) -> Result<Decoder, DecodeError> {
+        Ok(Decoder {
+            frames: FrameDecoder::new(Stream::from_configuration(configuration)?, budget),
+            float_charge: Reservation::empty(budget),
+            integer_charge: Reservation::empty(budget),
+        })
+    }
+
+    /// The decoder with `policy` for frame CRCs.
+    #[must_use]
+    pub fn with_crc_policy(mut self, policy: CrcPolicy) -> Decoder {
+        self.frames.crc = policy;
+        self
+    }
+
+    /// Replaces `out` with the frame `au` holds as planar `f32`, scaled as FFmpeg's FLAC
+    /// decoder output converts to `f32`. On failure `out` is left empty.
+    pub fn decode_float(
+        &mut self,
+        au: &[u8],
+        out: &mut AudioFrame,
+    ) -> Result<FrameInfo, DecodeError> {
+        let mut output = FloatOutput::new(out, &mut self.float_charge);
+        self.frames.decode(au, &mut output)
+    }
+
+    /// Replaces `out` with the frame `au` holds as the lossless integer samples. On
+    /// failure `out` is left empty.
+    pub fn decode_integer(
+        &mut self,
+        au: &[u8],
+        out: &mut IntegerFrame,
+    ) -> Result<FrameInfo, DecodeError> {
+        let mut output = IntegerOutput::new(out, &mut self.integer_charge);
+        self.frames.decode(au, &mut output)
     }
 }
 
@@ -77,9 +137,11 @@ impl AudioDecoder for Decoder {
         au: &[u8],
         out: &mut AudioFrame,
     ) -> Result<Option<DownmixLevels>, DecodeFailure> {
-        let _ = (au, out);
-        Err(DecodeFailure::from_error(DecodeError::Unsupported("decoder not implemented")))
+        self.decode_float(au, out)
+            .map(|_| None)
+            .map_err(DecodeFailure::from_error)
     }
 
+    /// FLAC frames are independent: there is no signal history to drop.
     fn reset(&mut self) {}
 }
