@@ -3,9 +3,9 @@ mod support;
 use support::{bytes, cff_tables, collection, font, truetype_tables};
 use triergon_core::{Budget, Bytes, Error};
 use triergon_font::{
-    Built, CharEncoding, CharstringBounds, CmapFormat, FaceInfo, Font, GlyphId, Limits, Orientation, Outline,
-    OutlineFormat, Platform, Point, PointKind, Request, Segment, Store, StoreKey, Style,
-    pixels_26_6, select,
+    Built, CharEncoding, CharstringBounds, CmapFormat, FaceInfo, Font, GlyphId, Limits,
+    Orientation, Outline, OutlineFormat, Platform, Point, PointKind, Request, Segment, Store,
+    StoreKey, Style, pixels_26_6, select,
 };
 
 fn parse(data: &[u8]) -> Font {
@@ -213,7 +213,10 @@ fn charstring_bounds_are_unrounded_and_include_control_points() {
     }
     let tables = truetype_tables(400, 0, "Test Sans", "Regular");
     let truetype = parse(&font(b"\0\x01\0\0", &tables));
-    assert_eq!(truetype.charstring_bounds(GlyphId(1), &mut scratch), Ok(None));
+    assert_eq!(
+        truetype.charstring_bounds(GlyphId(1), &mut scratch),
+        Ok(None)
+    );
 }
 
 #[test]
