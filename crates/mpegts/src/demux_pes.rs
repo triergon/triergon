@@ -6,11 +6,13 @@
 use crate::carrier::{PLAIN_PAYLOAD_BYTES, PlainContinuation, TS_PAYLOAD_START, TS188_BYTES};
 use crate::demux_clock::DemuxProfile;
 use crate::pes::{HEADER_MAX, parse_header, parse_timed_header};
+use crate::psi::ElementaryStream;
 use crate::{
     AssemblyStep, ParseLimits, PesHeader, SourceEpochs, SourceRange, TransportPacket, checked_pid,
     commit_range, limit, prepare_range,
 };
 use std::sync::atomic::{AtomicBool, Ordering};
+use triergon_core::container::{CodecId, MediaKind, TrackInfo};
 use triergon_core::{
     Budget, BudgetVec, Bytes, Error, PushError, Result, SourceId, SourceLocation, WorkBudget,
 };
@@ -60,6 +62,47 @@ impl RegisteredCarriage {
             Self::AacAdts => (0x0f, 0xc0),
             Self::AacLatm => (0x11, 0xc0),
         }
+    }
+}
+
+/// Kind exposed by a selected PES view. DVB subtitling and teletext descriptors
+/// identify subtitle tracks. Other type 0x06 entries need an admitted observer.
+/// MPEG-1 video (0x01) stays unknown in this view. The private types 0x81 and
+/// 0x87 indicate audio and 0x90 indicates presentation graphics in this view.
+/// The caller supplies the observer for this active program map.
+pub fn selected_track_kind(
+    stream: &ElementaryStream,
+    observer: Option<&DemuxObserver>,
+) -> MediaKind {
+    if stream.stream_type == 0x01 {
+        return MediaKind::Unknown;
+    }
+    if matches!(stream.stream_type, 0x81 | 0x87) {
+        return MediaKind::Audio;
+    }
+    if stream.stream_type == 0x90 {
+        return MediaKind::Subtitle;
+    }
+    if stream.stream_type != 0x06 {
+        return stream.kind();
+    }
+    if matches!(
+        stream.codec(),
+        Some(CodecId::DvbSubtitle | CodecId::DvbTeletext)
+    ) {
+        return MediaKind::Subtitle;
+    }
+    let Some(observer) = observer.filter(|observer| {
+        observer.scope.pid == stream.pid && observer.scope.stream_type == stream.stream_type
+    }) else {
+        return MediaKind::Unknown;
+    };
+    if observer.private_audio.is_some() {
+        MediaKind::Audio
+    } else if observer.payload_format == PayloadFormat::Dvb {
+        MediaKind::Subtitle
+    } else {
+        MediaKind::Unknown
     }
 }
 
