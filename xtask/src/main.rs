@@ -87,7 +87,7 @@ commands:
   grade          TIMING MEMORY --contract F --manifest F --output DIR
                  [--additional-report F] [--require-slice-acceptance|--require-acceptance]
                  join complete reports, recompute runtime and memory bounds, then apply gates
-  build-workers  [--comparison-build]
+  build-workers  [--comparison-build] [--only WORKER]
                  build the candidate and reference workers and the memory observers, and
                  record their identity in target/harness/identity.json; anything but the
                  gate build is refused unless it is for paired comparisons only
@@ -209,12 +209,9 @@ fn main() -> ExitCode {
             },
             None => shape::main(&root, &args[1..]),
         },
-        Some("build-workers") => match &args[1..] {
-            [] => harness::build::build(&root, false),
-            [flag] if flag == "--comparison-build" => harness::build::build(&root, true),
-            _ => Err("usage: cargo xtask build-workers [--comparison-build]".into()),
+        Some("build-workers") => {
+            harness::build::main(&root, &args[1..]).map(|path| println!("{}", path.display()))
         }
-        .map(|path| println!("{}", path.display())),
         Some("memory-admission") => match &args[1..] {
             [candidate, reference] => {
                 harness::memory::admission(&root, Path::new(candidate), Path::new(reference))
