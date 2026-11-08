@@ -33,6 +33,70 @@ fn path(row: &json::Value) -> std::path::PathBuf {
 }
 
 #[test]
+fn fields_preserve_numeric_trace_and_failed_write_folds() {
+    struct LimitedWriter {
+        limit: usize,
+        bytes: Vec<u8>,
+    }
+    impl Write for LimitedWriter {
+        fn write(&mut self, bytes: &[u8]) -> io::Result<usize> {
+            if !bytes.is_empty() && self.bytes.len() == self.limit {
+                return Err(io::ErrorKind::BrokenPipe.into());
+            }
+            let count = bytes.len().min(self.limit - self.bytes.len());
+            self.bytes.extend_from_slice(&bytes[..count]);
+            Ok(count)
+        }
+
+        fn flush(&mut self) -> io::Result<()> {
+            Ok(())
+        }
+    }
+
+    let seed = 17u64;
+    let words = [u64::from('v' as u32), u64::MAX, 2];
+    let expected = |words: &[u64]| {
+        words.iter().fold(seed, |digest, &word| {
+            digest.wrapping_mul(31).wrapping_add(word)
+        })
+    };
+    let mut numeric = RetainedStream {
+        digest: seed,
+        ..RetainedStream::default()
+    };
+    numeric.fields('v', &[-1, 2], &mut None).unwrap();
+    let mut traced = RetainedStream {
+        digest: seed,
+        ..RetainedStream::default()
+    };
+    let mut trace = Vec::new();
+    traced.fields('v', &[-1, 2], &mut Some(&mut trace)).unwrap();
+    assert_eq!(trace, b"v -1 2 ");
+    assert_eq!(numeric.digest, expected(&words));
+    assert_eq!(traced.digest, numeric.digest);
+
+    for (limit, mixed) in [(0, 1), (1, 2), (4, 3), (6, 3)] {
+        let mut stream = RetainedStream {
+            digest: seed,
+            ..RetainedStream::default()
+        };
+        let mut writer = LimitedWriter {
+            limit,
+            bytes: Vec::new(),
+        };
+        let error = stream
+            .fields('v', &[-1, 2], &mut Some(&mut writer))
+            .unwrap_err();
+        assert_eq!(
+            error.downcast_ref::<io::Error>().unwrap().kind(),
+            io::ErrorKind::BrokenPipe
+        );
+        assert_eq!(writer.bytes, &trace[..limit]);
+        assert_eq!(stream.digest, expected(&words[..mixed]));
+    }
+}
+
+#[test]
 fn all_five_complete_traces_and_work_match_the_original_observations() {
     let cases = cases();
     assert_eq!(cases.len(), 5);

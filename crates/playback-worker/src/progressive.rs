@@ -100,6 +100,7 @@ fn pair(time: Option<Time>) -> Result<[i64; 2]> {
 }
 
 impl RetainedStream {
+    #[inline]
     fn fields(
         &mut self,
         tag: char,
@@ -109,15 +110,15 @@ impl RetainedStream {
         mix(&mut self.digest, u64::from(tag as u32));
         if let Some(out) = out.as_deref_mut() {
             write!(out, "{tag}")?;
-        }
-        for &field in fields {
-            mix(&mut self.digest, field as u64);
-            if let Some(out) = out.as_deref_mut() {
+            for &field in fields {
+                mix(&mut self.digest, field as u64);
                 write!(out, " {field}")?;
             }
-        }
-        if let Some(out) = out.as_deref_mut() {
             write!(out, " ")?;
+        } else {
+            for &field in fields {
+                mix(&mut self.digest, field as u64);
+            }
         }
         Ok(())
     }
