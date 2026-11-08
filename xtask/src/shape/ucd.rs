@@ -166,13 +166,13 @@ fn run(root: &Path, check: bool, net: &dyn Transport) -> Result<String, String> 
     let fribidi = Loaded::fetch(root, &FRIBIDI, net)?;
     let shapers = Loaded::fetch(root, &SYLLABIC, net)?;
     let ignorables = Loaded::fetch(root, &USE_IGNORABLES, net)?;
-    let ms_use = syllabic::MsUse::load(root)?;
+    let tree = syllabic::TreeFiles::load(root)?;
     let outputs = [
         ("tables.rs", harfbuzz::generate(&harfbuzz)?),
         ("fribidi/tables.rs", fribidi::generate(&fribidi)?),
         (
             "syllabic_tables.rs",
-            syllabic::generate(&shapers, &ignorables, &ms_use)?,
+            syllabic::generate(&shapers, &ignorables, &tree)?,
         ),
     ];
     let mut stale = Vec::new();

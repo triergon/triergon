@@ -1,7 +1,9 @@
 //! The character categories of HarfBuzz 14.6.0's syllabic shapers, by the rules of
 //! `gen-indic-table.py` (Indic, Khmer and Myanmar), `gen-use-table.py` (the
 //! Universal Shaping Engine) and `gen-vowel-constraints.py`, read as evidence of
-//! what they produce.
+//! what they produce, and the scripts of the shapers: the ones whose letters
+//! join, by the rule of `gen-arabic-joining-list.py`, and the ones HarfBuzz gives
+//! the Universal Shaping Engine, which it lists by hand in `hb-ot-shaper.hh`.
 //!
 //! As in HarfBuzz, the USE table takes Default_Ignorable_Code_Point from Unicode
 //! 17.0.0 and everything else from 18.0.0, with Microsoft's override files from
@@ -18,8 +20,10 @@ use crate::{fetch, sha256};
 
 use crate::shape::reference::{CACHE, HARFBUZZ};
 
-/// Microsoft's override and constraint files, as HarfBuzz 14.6.0 ships them.
-const MS_USE: [(&str, &str); 3] = [
+/// The files of HarfBuzz 14.6.0's tree the tables are read from, as it ships
+/// them: Microsoft's override and constraint files, the shaper choice and the
+/// script tags.
+const TREE_FILES: [(&str, &str); 5] = [
     (
         "src/ms-use/IndicSyllabicCategory-Additional.txt",
         "b9472e3e72d5fba8cb3f2e0578e73012aaae786db25779de0f1a5a5ab69b84a6",
@@ -32,19 +36,29 @@ const MS_USE: [(&str, &str); 3] = [
         "src/ms-use/IndicShapingInvalidCluster.txt",
         "02024d4289864665721e14ec99eb320ce187f289514b793449b4f6a8ddaf5944",
     ),
+    (
+        "src/hb-ot-shaper.hh",
+        "3eb84b0a89a8c4dbee0930e66bd071bb374d76e9f2748ac441d84e79dc34cce3",
+    ),
+    (
+        "src/hb-script-list.h",
+        "898de25adaf9253471d9f1351a6c90e3547e1470dd2f468ab19a86561868182b",
+    ),
 ];
 
-/// The ms-use files, verified against their pinned hashes.
-pub struct MsUse {
+/// The files of [`TREE_FILES`], verified against their pinned hashes.
+pub struct TreeFiles {
     syllabic: String,
     positional: String,
     invalid_clusters: String,
+    shaper: String,
+    scripts: String,
 }
 
-impl MsUse {
+impl TreeFiles {
     pub fn load(root: &Path) -> Result<Self, String> {
         let mut texts = Vec::new();
-        for (path, hash) in MS_USE {
+        for (path, hash) in TREE_FILES {
             let path = root.join(CACHE).join(HARFBUZZ.directory).join(path);
             if !path.exists() {
                 return Err(format!(
@@ -60,12 +74,14 @@ impl MsUse {
                 String::from_utf8(data).map_err(|_| format!("{}: not UTF-8", path.display()))?,
             );
         }
-        let [syllabic, positional, invalid_clusters] =
-            <[String; 3]>::try_from(texts).map_err(|_| "three ms-use files")?;
+        let [syllabic, positional, invalid_clusters, shaper, scripts] =
+            <[String; 5]>::try_from(texts).map_err(|_| "five HarfBuzz tree files")?;
         Ok(Self {
             syllabic,
             positional,
             invalid_clusters,
+            shaper,
+            scripts,
         })
     }
 }
@@ -79,16 +95,16 @@ fn header(ucd: &Loaded, derived: &Loaded) -> String {
     let derived = derived.header("Default_Ignorable_Code_Point");
     header.extend(derived.lines().skip(1).map(|line| format!("{line}\n")));
     header.push_str(&format!(
-        "// and Microsoft's USE data in {}\n//     sha256 {}:\n",
+        "// and Microsoft's USE data and the shapers' scripts in {}\n//     sha256 {}:\n",
         HARFBUZZ.url, HARFBUZZ.sha256
     ));
-    for (path, hash) in MS_USE {
+    for (path, hash) in TREE_FILES {
         header.push_str(&format!("//   {path}\n//     sha256 {hash}\n"));
     }
     header
 }
 
-pub fn generate(ucd: &Loaded, derived: &Loaded, ms_use: &MsUse) -> Result<Generated, String> {
+pub fn generate(ucd: &Loaded, derived: &Loaded, tree: &TreeFiles) -> Result<Generated, String> {
     let mut w = Writer::new(&header(ucd, derived));
     w.raw(
         "\nuse super::syllabic::{IndicCategory, IndicPosition, UseCategory};\n\
@@ -96,8 +112,10 @@ pub fn generate(ucd: &Loaded, derived: &Loaded, ms_use: &MsUse) -> Result<Genera
          use crate::Script;\n",
     );
     indic(&mut w, ucd)?;
-    universal(&mut w, ucd, derived, ms_use)?;
-    vowel_constraints(&mut w, ucd, ms_use)?;
+    universal(&mut w, ucd, derived, tree)?;
+    vowel_constraints(&mut w, ucd, tree)?;
+    joining_scripts(&mut w, ucd)?;
+    use_scripts(&mut w, tree)?;
     Ok(w.finish())
 }
 
@@ -683,7 +701,12 @@ impl UseProperties<'_> {
     }
 }
 
-fn universal(w: &mut Writer, ucd: &Loaded, derived: &Loaded, ms_use: &MsUse) -> Result<(), String> {
+fn universal(
+    w: &mut Writer,
+    ucd: &Loaded,
+    derived: &Loaded,
+    tree: &TreeFiles,
+) -> Result<(), String> {
     // Field values per code point, as gen-use-table.py merges its files: entries
     // start with the syllabic, positional, joining or ignorable files, and
     // UnicodeData.txt (its range ends unexpanded), Scripts.txt and the
@@ -712,7 +735,7 @@ fn universal(w: &mut Writer, ucd: &Loaded, derived: &Loaded, ms_use: &MsUse) -> 
     for (cp, value) in listed(ucd.text("IndicSyllabicCategory.txt"), 1)? {
         entries.entry(cp).or_default().syllabic = value;
     }
-    for (cp, value) in listed(&ms_use.syllabic, 1)? {
+    for (cp, value) in listed(&tree.syllabic, 1)? {
         entries.entry(cp).or_default().syllabic = if value == "Consonant_Final_Modifier" {
             "Syllable_Modifier"
         } else {
@@ -722,7 +745,7 @@ fn universal(w: &mut Writer, ucd: &Loaded, derived: &Loaded, ms_use: &MsUse) -> 
     for (cp, value) in listed(ucd.text("IndicPositionalCategory.txt"), 1)? {
         entries.entry(cp).or_default().positional = value;
     }
-    for (cp, value) in listed(&ms_use.positional, 1)? {
+    for (cp, value) in listed(&tree.positional, 1)? {
         entries.entry(cp).or_default().positional = if value == "NA" {
             "Not_Applicable"
         } else {
@@ -881,14 +904,11 @@ impl Constraints {
 
 /// The prohibited sequences of each script, by its ISO 15924 code: a dotted
 /// circle goes before the last character of each.
-fn vowel_constraints(w: &mut Writer, ucd: &Loaded, ms_use: &MsUse) -> Result<(), String> {
-    let short: HashMap<&str, &str> = source::fields(ucd.text("PropertyValueAliases.txt"))
-        .filter(|f| f.len() >= 3 && f[0] == "sc")
-        .map(|f| (f[2], f[1]))
-        .collect();
+fn vowel_constraints(w: &mut Writer, ucd: &Loaded, tree: &TreeFiles) -> Result<(), String> {
+    let short = script_codes(ucd);
     let scripts: HashMap<u32, &str> = listed(ucd.text("Scripts.txt"), 1)?.into_iter().collect();
     let mut constraints: BTreeMap<&str, Constraints> = BTreeMap::new();
-    let mut lines = ms_use.invalid_clusters.lines();
+    let mut lines = tree.invalid_clusters.lines();
     lines
         .by_ref()
         .find(|line| line.trim() == "#")
@@ -950,9 +970,194 @@ fn vowel_constraints(w: &mut Writer, ucd: &Loaded, ms_use: &MsUse) -> Result<(),
     Ok(())
 }
 
+/// The ISO 15924 code of every script, by its long name.
+fn script_codes(ucd: &Loaded) -> HashMap<&str, &str> {
+    source::fields(ucd.text("PropertyValueAliases.txt"))
+        .filter(|f| f.len() >= 3 && f[0] == "sc")
+        .map(|f| (f[2], f[1]))
+        .collect()
+}
+
+/// `scripts` (ISO 15924 codes) as a sorted array of `Script` values named
+/// `name`.
+fn script_array(w: &mut Writer, doc: &str, name: &str, mut scripts: Vec<String>) {
+    scripts.sort_unstable();
+    scripts.dedup();
+    let items: Vec<String> = scripts
+        .iter()
+        .map(|code| format!("Script::from_code(*b\"{code}\")"))
+        .collect();
+    w.array(doc, name, "Script", &items, 4);
+}
+
+/// The scripts whose letters join as Arabic letters do, as
+/// `gen-arabic-joining-list.py` finds them: those of the characters
+/// ArabicShaping.txt gives a joining type other than T and U, but Common and
+/// Inherited.
+fn joining_scripts(w: &mut Writer, ucd: &Loaded) -> Result<(), String> {
+    let codes = script_codes(ucd);
+    let scripts: HashMap<u32, &str> = listed(ucd.text("Scripts.txt"), 1)?.into_iter().collect();
+    let mut joining = Vec::new();
+    for f in source::fields(ucd.text("ArabicShaping.txt")) {
+        let kind = *f.get(2).ok_or("ArabicShaping.txt: missing joining type")?;
+        if matches!(kind, "T" | "U") {
+            continue;
+        }
+        let cp = source::code_point(f[0])?;
+        let name = *scripts
+            .get(&cp)
+            .ok_or_else(|| format!("U+{cp:04X}: no script"))?;
+        if matches!(name, "Common" | "Inherited") {
+            continue;
+        }
+        let code = codes
+            .get(name)
+            .ok_or_else(|| format!("unknown script {name}"))?;
+        joining.push((*code).to_owned());
+    }
+    script_array(
+        w,
+        "Scripts whose letters join as Arabic letters do (ArabicShaping.txt gives\n\
+         them a joining type other than T and U), sorted.",
+        "JOINING_SCRIPTS",
+        joining,
+    );
+    Ok(())
+}
+
+/// The scripts `hb_ot_shaper_categorize` gives the Universal Shaping Engine,
+/// by their tags in `hb-script-list.h`.
+fn use_scripts(w: &mut Writer, tree: &TreeFiles) -> Result<(), String> {
+    let tags = script_tags(&tree.scripts)?;
+    let mut scripts = Vec::new();
+    for name in use_script_names(&tree.shaper)? {
+        let tag = tags
+            .get(name)
+            .ok_or_else(|| format!("hb-script-list.h: no HB_SCRIPT_{name}"))?;
+        scripts.push(tag.clone());
+    }
+    script_array(
+        w,
+        "Scripts HarfBuzz gives the Universal Shaping Engine, sorted.",
+        "USE_SCRIPTS",
+        scripts,
+    );
+    Ok(())
+}
+
+/// The ISO 15924 code of each `HB_SCRIPT_NAME = HB_TAG ('A','b','c','d')`, by
+/// name.
+fn script_tags(text: &str) -> Result<HashMap<&str, String>, String> {
+    let mut tags = HashMap::new();
+    for line in text.lines() {
+        let Some((name, value)) = line.trim().split_once('=') else {
+            continue;
+        };
+        let (Some(name), Some(value)) = (
+            name.trim().strip_prefix("HB_SCRIPT_"),
+            value.trim().strip_prefix("HB_TAG ("),
+        ) else {
+            continue;
+        };
+        let letters = value.split(')').next().unwrap_or_default();
+        let code: String = letters
+            .split(',')
+            .map(|letter| letter.trim().trim_matches('\''))
+            .collect();
+        if code.len() != 4 || !code.chars().all(|c| c.is_ascii_alphabetic()) {
+            return Err(format!("HB_SCRIPT_{name}: unexpected tag ({letters})"));
+        }
+        tags.insert(name, code);
+    }
+    Ok(tags)
+}
+
+/// The script names (`HB_SCRIPT_` stripped) of the case group of
+/// `hb_ot_shaper_categorize`'s switch whose last statement returns the
+/// Universal Shaping Engine. (The Indic group returns it too, but returns the
+/// Indic shaper last.)
+fn use_script_names(shaper: &str) -> Result<Vec<&str>, String> {
+    let start = shaper
+        .find("hb_ot_shaper_categorize (")
+        .ok_or("hb-ot-shaper.hh: no hb_ot_shaper_categorize")?;
+    // Each group: its labels and the shaper its last statement returns.
+    let mut groups: Vec<(Vec<&str>, Option<&str>)> = Vec::new();
+    let mut in_labels = false;
+    for line in shaper[start..].lines().skip(1) {
+        let line = line.trim();
+        if line == "}" {
+            break;
+        }
+        if let Some(label) = line
+            .strip_prefix("case HB_SCRIPT_")
+            .and_then(|rest| rest.strip_suffix(':'))
+        {
+            if !in_labels {
+                groups.push((Vec::new(), None));
+                in_labels = true;
+            }
+            if let Some((labels, _)) = groups.last_mut() {
+                labels.push(label);
+            }
+            continue;
+        }
+        if line.is_empty() || line.starts_with("/*") || line.starts_with('#') {
+            continue;
+        }
+        in_labels = false;
+        if let Some(returned) = line
+            .strip_prefix("return &_hb_ot_shaper_")
+            .and_then(|rest| rest.strip_suffix(';'))
+            && let Some((_, last)) = groups.last_mut()
+        {
+            *last = Some(returned);
+        }
+    }
+    let mut use_groups = groups
+        .into_iter()
+        .filter(|(_, last)| *last == Some("use"))
+        .map(|(labels, _)| labels);
+    match (use_groups.next(), use_groups.next()) {
+        (Some(labels), None) if !labels.is_empty() => Ok(labels),
+        _ => Err("hb-ot-shaper.hh: not one case group ending with the USE shaper".into()),
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn the_use_scripts_are_the_group_that_returns_the_use_shaper_last() {
+        let shaper = "hb_ot_shaper_categorize (hb_script_t script)
+{
+  switch ((hb_tag_t) script)
+  {
+    default:
+      return &_hb_ot_shaper_default;
+    case HB_SCRIPT_BENGALI:
+      if (x) return &_hb_ot_shaper_default;
+      else if (y) return &_hb_ot_shaper_use;
+      else return &_hb_ot_shaper_indic;
+#ifndef HB_NO_X
+    case HB_SCRIPT_TIBETAN:
+
+    /* Unicode-3.0 additions */
+    case HB_SCRIPT_SINHALA:
+      if (x)
+	return &_hb_ot_shaper_default;
+      else
+	return &_hb_ot_shaper_use;
+#endif
+  }
+}";
+        assert_eq!(use_script_names(shaper), Ok(vec!["TIBETAN", "SINHALA"]));
+        let scripts = "  HB_SCRIPT_TIBETAN\t\t\t= HB_TAG ('T','i','b','t'), /*2.0*/\n\
+                       HB_SCRIPT_INVALID = HB_TAG_NONE,";
+        let tags = script_tags(scripts).unwrap();
+        assert_eq!(tags.get("TIBETAN").map(String::as_str), Some("Tibt"));
+        assert_eq!(tags.len(), 1);
+    }
 
     #[test]
     fn constraints_keep_the_shorter_of_overlapping_sequences() {

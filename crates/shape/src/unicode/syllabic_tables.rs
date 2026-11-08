@@ -17,7 +17,7 @@
 // Default_Ignorable_Code_Point, from Unicode 17.0.0:
 //   https://www.unicode.org/Public/17.0.0/ucd/DerivedCoreProperties.txt
 //     sha256 24c7fed1195c482faaefd5c1e7eb821c5ee1fb6de07ecdbaa64b56a99da22c08
-// and Microsoft's USE data in https://github.com/harfbuzz/harfbuzz/releases/download/14.6.0/harfbuzz-14.6.0.tar.xz
+// and Microsoft's USE data and the shapers' scripts in https://github.com/harfbuzz/harfbuzz/releases/download/14.6.0/harfbuzz-14.6.0.tar.xz
 //     sha256 d07a007327277708a2a73ae437887cdbaf282937f6d03ca5467723e9099af586:
 //   src/ms-use/IndicSyllabicCategory-Additional.txt
 //     sha256 b9472e3e72d5fba8cb3f2e0578e73012aaae786db25779de0f1a5a5ab69b84a6
@@ -25,6 +25,10 @@
 //     sha256 2baa1c1efe5a5f108c304b1e27d0d97864c806764eb2b0a1bd91db80ae26b5b8
 //   src/ms-use/IndicShapingInvalidCluster.txt
 //     sha256 02024d4289864665721e14ec99eb320ce187f289514b793449b4f6a8ddaf5944
+//   src/hb-ot-shaper.hh
+//     sha256 3eb84b0a89a8c4dbee0930e66bd071bb374d76e9f2748ac441d84e79dc34cce3
+//   src/hb-script-list.h
+//     sha256 898de25adaf9253471d9f1351a6c90e3547e1470dd2f468ab19a86561868182b
 
 use super::syllabic::{IndicCategory, IndicPosition, UseCategory};
 use super::trie::Trie;
@@ -481,4 +485,49 @@ pub(super) static VOWEL_CONSTRAINTS: [(Script, &[&[u32]]); 16] = [
     (Script::from_code(*b"Taml"), &[&[0x0B85, 0x0BC2]]),
     (Script::from_code(*b"Telu"), &[&[0x0C12, 0x0C4C], &[0x0C12, 0x0C55], &[0x0C3F, 0x0C55], &[0x0C46, 0x0C55], &[0x0C4A, 0x0C55]]),
     (Script::from_code(*b"Tirh"), &[&[0x11481, 0x114B0], &[0x1148B, 0x114BA], &[0x1148D, 0x114BA], &[0x114AA, 0x114B5], &[0x114AA, 0x114B6]]),
+];
+
+/// Scripts whose letters join as Arabic letters do (ArabicShaping.txt gives
+/// them a joining type other than T and U), sorted.
+pub(super) static JOINING_SCRIPTS: [Script; 13] = [
+    Script::from_code(*b"Adlm"), Script::from_code(*b"Arab"), Script::from_code(*b"Chrs"),
+    Script::from_code(*b"Mand"), Script::from_code(*b"Mani"), Script::from_code(*b"Mong"),
+    Script::from_code(*b"Nkoo"), Script::from_code(*b"Ougr"), Script::from_code(*b"Phag"),
+    Script::from_code(*b"Phlp"), Script::from_code(*b"Rohg"), Script::from_code(*b"Sogd"),
+    Script::from_code(*b"Syrc"),
+];
+
+/// Scripts HarfBuzz gives the Universal Shaping Engine, sorted.
+pub(super) static USE_SCRIPTS: [Script; 91] = [
+    Script::from_code(*b"Adlm"), Script::from_code(*b"Ahom"), Script::from_code(*b"Bali"),
+    Script::from_code(*b"Batk"), Script::from_code(*b"Berf"), Script::from_code(*b"Bhks"),
+    Script::from_code(*b"Brah"), Script::from_code(*b"Bugi"), Script::from_code(*b"Buhd"),
+    Script::from_code(*b"Cakm"), Script::from_code(*b"Cham"), Script::from_code(*b"Chrs"),
+    Script::from_code(*b"Cpmn"), Script::from_code(*b"Diak"), Script::from_code(*b"Dogr"),
+    Script::from_code(*b"Dupl"), Script::from_code(*b"Egyp"), Script::from_code(*b"Elym"),
+    Script::from_code(*b"Gara"), Script::from_code(*b"Gong"), Script::from_code(*b"Gonm"),
+    Script::from_code(*b"Gran"), Script::from_code(*b"Gukh"), Script::from_code(*b"Hano"),
+    Script::from_code(*b"Hmng"), Script::from_code(*b"Hmnp"), Script::from_code(*b"Java"),
+    Script::from_code(*b"Jurc"), Script::from_code(*b"Kali"), Script::from_code(*b"Kawi"),
+    Script::from_code(*b"Khar"), Script::from_code(*b"Khoj"), Script::from_code(*b"Kits"),
+    Script::from_code(*b"Krai"), Script::from_code(*b"Kthi"), Script::from_code(*b"Lana"),
+    Script::from_code(*b"Lepc"), Script::from_code(*b"Limb"), Script::from_code(*b"Mahj"),
+    Script::from_code(*b"Maka"), Script::from_code(*b"Mand"), Script::from_code(*b"Mani"),
+    Script::from_code(*b"Marc"), Script::from_code(*b"Medf"), Script::from_code(*b"Modi"),
+    Script::from_code(*b"Mong"), Script::from_code(*b"Mtei"), Script::from_code(*b"Mult"),
+    Script::from_code(*b"Nagm"), Script::from_code(*b"Nand"), Script::from_code(*b"Newa"),
+    Script::from_code(*b"Nkoo"), Script::from_code(*b"Onao"), Script::from_code(*b"Ougr"),
+    Script::from_code(*b"Pcun"), Script::from_code(*b"Phag"), Script::from_code(*b"Phlp"),
+    Script::from_code(*b"Plrd"), Script::from_code(*b"Rjng"), Script::from_code(*b"Rohg"),
+    Script::from_code(*b"Saur"), Script::from_code(*b"Seal"), Script::from_code(*b"Shrd"),
+    Script::from_code(*b"Sidd"), Script::from_code(*b"Sidt"), Script::from_code(*b"Sind"),
+    Script::from_code(*b"Sinh"), Script::from_code(*b"Sogd"), Script::from_code(*b"Sogo"),
+    Script::from_code(*b"Soyo"), Script::from_code(*b"Sund"), Script::from_code(*b"Sunu"),
+    Script::from_code(*b"Sylo"), Script::from_code(*b"Tagb"), Script::from_code(*b"Takr"),
+    Script::from_code(*b"Tale"), Script::from_code(*b"Tavt"), Script::from_code(*b"Tayo"),
+    Script::from_code(*b"Tfng"), Script::from_code(*b"Tglg"), Script::from_code(*b"Tibt"),
+    Script::from_code(*b"Tirh"), Script::from_code(*b"Tnsa"), Script::from_code(*b"Todr"),
+    Script::from_code(*b"Tols"), Script::from_code(*b"Toto"), Script::from_code(*b"Tutg"),
+    Script::from_code(*b"Vith"), Script::from_code(*b"Wcho"), Script::from_code(*b"Yezi"),
+    Script::from_code(*b"Zanb"),
 ];

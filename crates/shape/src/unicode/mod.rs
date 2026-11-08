@@ -21,7 +21,8 @@ pub(crate) use arabic::{
     arabic_ligatures_3, arabic_mark_ligatures, arabic_presentation_forms,
 };
 pub(crate) use syllabic::{
-    IndicCategory, IndicPosition, UseCategory, indic_properties, use_category, vowel_constraints,
+    IndicCategory, IndicPosition, UseCategory, has_arabic_joining, indic_properties, is_use_script,
+    use_category, vowel_constraints,
 };
 
 use crate::Script;

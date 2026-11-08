@@ -101,7 +101,7 @@ impl Shaper {
                     Self::Myanmar
                 }
             }
-            code if USE_SCRIPTS.contains(&code) => {
+            _ if crate::unicode::is_use_script(script) => {
                 if dflt || latn {
                     Self::Default
                 } else {
@@ -247,17 +247,3 @@ impl Shaper {
         Ok(())
     }
 }
-
-/// Scripts HarfBuzz gives the Universal Shaping Engine.
-const USE_SCRIPTS: &[&[u8; 4]] = &[
-    b"Tibt", b"Mong", b"Sinh", b"Buhd", b"Hano", b"Tglg", b"Tagb", b"Limb", b"Tale", b"Bugi",
-    b"Khar", b"Sylo", b"Tfng", b"Bali", b"Nkoo", b"Phag", b"Cham", b"Kali", b"Lepc", b"Rjng",
-    b"Saur", b"Sund", b"Egyp", b"Java", b"Kthi", b"Mtei", b"Lana", b"Tavt", b"Batk", b"Brah",
-    b"Mand", b"Cakm", b"Plrd", b"Shrd", b"Takr", b"Dupl", b"Gran", b"Khoj", b"Sind", b"Mahj",
-    b"Mani", b"Modi", b"Hmng", b"Phlp", b"Sidd", b"Tirh", b"Ahom", b"Mult", b"Adlm", b"Bhks",
-    b"Marc", b"Newa", b"Gonm", b"Soyo", b"Zanb", b"Dogr", b"Gong", b"Rohg", b"Maka", b"Medf",
-    b"Sogo", b"Sogd", b"Elym", b"Nand", b"Hmnp", b"Wcho", b"Chrs", b"Diak", b"Kits", b"Yezi",
-    b"Cpmn", b"Ougr", b"Tnsa", b"Toto", b"Vith", b"Kawi", b"Nagm", b"Gara", b"Gukh", b"Krai",
-    b"Onao", b"Sunu", b"Todr", b"Tutg", b"Berf", b"Sidt", b"Tayo", b"Tols", b"Jurc", b"Pcun",
-    b"Seal",
-];

@@ -94,9 +94,11 @@ combining class when the font has no GPOS.
 Unicode 18.0.0 for HarfBuzz's tables (general category, combining class, script,
 mirroring, decomposition and composition, extended pictographic, Arabic joining
 and presentation forms, Indic and USE categories with Microsoft's overrides,
-vowel constraints) and Unicode 14.0.0 for FriBidi's (bidi class, bracket pairs,
-mirroring, joining type, presentation forms), each exactly as that reference's
-shipped tables hold them.
+vowel constraints, the scripts that join) and Unicode 14.0.0 for FriBidi's (bidi
+class, bracket pairs, mirroring, joining type, presentation forms), each exactly
+as that reference's shipped tables hold them; the scripts HarfBuzz gives the
+Universal Shaping Engine are read from its `hb-ot-shaper.hh`, which lists them
+by hand.
 
 **Bidi.** UAX #9 as FriBidi 1.0.17 computes it, including its choices: runs as
 FriBidi forms them, the level-125 limit and overflow counting, bracket pairing

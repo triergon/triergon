@@ -2,7 +2,9 @@
 //! categories and positions, the Universal Shaping Engine categories and the
 //! vowel sequences that get a dotted circle, as HarfBuzz 14.6.0 tabulates them.
 
-use super::syllabic_tables::{INDIC, INDIC_PROPERTIES, USE, USE_CATEGORIES, VOWEL_CONSTRAINTS};
+use super::syllabic_tables::{
+    INDIC, INDIC_PROPERTIES, JOINING_SCRIPTS, USE, USE_CATEGORIES, USE_SCRIPTS, VOWEL_CONSTRAINTS,
+};
 use crate::Script;
 
 /// How the Indic, Khmer and Myanmar shapers classify a character, from its
@@ -181,6 +183,17 @@ pub(crate) fn use_category(c: u32) -> UseCategory {
     USE_CATEGORIES[usize::from(USE.get(c))]
 }
 
+/// Whether HarfBuzz gives `script` the Universal Shaping Engine (when the font
+/// has the script's own features).
+pub(crate) fn is_use_script(script: Script) -> bool {
+    USE_SCRIPTS.binary_search(&script).is_ok()
+}
+
+/// Whether `script`'s letters join as Arabic letters do.
+pub(crate) fn has_arabic_joining(script: Script) -> bool {
+    JOINING_SCRIPTS.binary_search(&script).is_ok()
+}
+
 /// The vowel sequences of `script` that look like another vowel; a dotted
 /// circle goes before the last character of each.
 pub(crate) fn vowel_constraints(script: Script) -> &'static [&'static [u32]] {
@@ -219,5 +232,14 @@ mod tests {
         assert!(deva.contains(&&[0x0930, 0x094D, 0x0907][..]));
         assert!(vowel_constraints(Script::from_code(*b"Latn")).is_empty());
         assert!(VOWEL_CONSTRAINTS.is_sorted_by_key(|(s, _)| *s));
+    }
+
+    #[test]
+    fn scripts_of_the_shapers() {
+        let script = |code: &[u8; 4]| Script::from_code(*code);
+        assert!(is_use_script(script(b"Sinh")) && is_use_script(script(b"Seal")));
+        assert!(!is_use_script(script(b"Deva")) && !is_use_script(script(b"Arab")));
+        assert!(has_arabic_joining(script(b"Mong")) && has_arabic_joining(script(b"Syrc")));
+        assert!(!has_arabic_joining(script(b"Hebr")));
     }
 }

@@ -10,7 +10,6 @@ use super::syllabic::{self, ANY, DottedCircle, Expr, Machine, for_each_syllable,
 use crate::buffer::{Buffer, Info, ShaperProps};
 use crate::metrics::Scaled;
 use crate::plan::{Builder, FeatureFlags, Plan};
-use crate::tag::Script;
 use crate::unicode::{self, UseCategory as Cat};
 use std::ops::Range;
 use triergon_core::Result;
@@ -262,29 +261,9 @@ fn set_category(info: &mut Info, category: Cat) {
     info.shaper = ShaperProps::Use(category);
 }
 
-/// Scripts whose letters join as Arabic letters do.
-fn has_arabic_joining(script: Script) -> bool {
-    matches!(
-        &script.to_bytes(),
-        b"Adlm"
-            | b"Arab"
-            | b"Chrs"
-            | b"Rohg"
-            | b"Mand"
-            | b"Mani"
-            | b"Mong"
-            | b"Nkoo"
-            | b"Ougr"
-            | b"Phag"
-            | b"Phlp"
-            | b"Sogd"
-            | b"Syrc"
-    )
-}
-
 /// Joining forms for scripts that join, then every character's USE category.
 pub(super) fn setup_masks(plan: &Plan, buffer: &mut Buffer) {
-    if has_arabic_joining(plan.script) {
+    if unicode::has_arabic_joining(plan.script) {
         arabic::setup_masks(plan, buffer);
         if &plan.script.to_bytes() == b"Mong" {
             arabic::copy_to_mongolian_variation_selectors(plan, buffer);
@@ -319,7 +298,7 @@ pub(super) fn pause(
                     Ok(())
                 })?;
             }
-            if !has_arabic_joining(plan.script) {
+            if !unicode::has_arabic_joining(plan.script) {
                 setup_topographical_masks(plan, buffer)?;
             }
         }
