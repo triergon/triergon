@@ -749,8 +749,8 @@ impl<S: Source> Player<S> {
                 received: seek.candidate_generation,
             });
         }
-        if seek.intent.clock == ClockChoice::ExplicitNativeProjection
-            && self.clock != seek.intent.clock
+        if matches!(seek.landing, crate::engines::Mp4RangeLanding::Native(_))
+            && self.clock != ClockChoice::ExplicitNativeProjection
         {
             return Err(Error::Invalid("native seek clock changed"));
         }
