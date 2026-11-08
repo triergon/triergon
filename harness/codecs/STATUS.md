@@ -12,7 +12,7 @@ README. The comparison harness is the decode build of `harness/reference.c` with
 |---|---|
 | `numeric-rules.json` | Comparison rules `cargo xtask codecs grade` applies: audio per channel RMS ≤ 8.8e-6 and max ≤ 6.1035e-5 with exact rate, layout and counts; video bit-exact; RGBA output bit-exact; stereo s16 output ≤ 1 LSB |
 | `correctness-manifest.json` | The 454 correctness vectors |
-| `workloads.json`, [workloads.md](workloads.md) | The 17 timing and memory workloads and how they are generated |
+| `workloads.json`, `file-workloads.json`, [workloads.md](workloads.md) | The 17 elementary-stream and 10 file-format timing and memory workloads, and how they are generated |
 | [measurement-policy.md](measurement-policy.md) | What counts as equivalent work in timing and memory runs |
 | [adapter-contract.md](adapter-contract.md) | Session-layer contract for a host adapter |
 | `downmix-*.json` | Observed stereo downmix (`-ac 2`) rules |

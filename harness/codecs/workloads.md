@@ -15,3 +15,13 @@ AAC-LC 5.1 (384 kbit/s) and stereo come from sine sources (`-f adts`). The two D
 workloads are the cores of FATE `dts_es.dts` and `master_audio_7.1_24bit.dts`
 (`-bsf:a dca_core`); the AC-3 and E-AC-3 workloads are FATE vectors used as they are.
 Media stays outside git (`.research/codec-inputs`, `.research/fate-samples`).
+
+## FLAC, MPEG audio, Vorbis and Opus
+
+`file-workloads.json` holds 10 workloads in the formats these codecs come in: native
+FLAC (16-bit stereo at 44.1 kHz, 24-bit 5.1 at 96 kHz), MP3 (LAME CBR 128 kbit/s joint
+stereo and VBR `-V 2`), MP2 (256 kbit/s), Ogg Vorbis (`-q 5` stereo, `-q 3` 5.1) and Ogg
+Opus (128 kbit/s music, 24 kbit/s speech, 256 kbit/s 5.1).
+`harness/codecs/file-workloads.sh FFMPEG` regenerates them byte for byte from
+deterministic lavfi signals with flac 1.4.3, LAME 3.100, oggenc 1.4.2 and opusenc 0.2
+(libopus 1.4) on Ubuntu 24.04 and FFmpeg's mp2 encoder.
