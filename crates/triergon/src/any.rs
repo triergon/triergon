@@ -47,7 +47,8 @@ pub enum Probe {
     Ts,
     /// An Ogg page (`OggS`).
     Ogg,
-    /// Native FLAC (`fLaC`), possibly after an ID3v2 tag.
+    /// Native FLAC (`fLaC`, or a frame header the next one numbers on from), possibly
+    /// after an ID3v2 tag.
     Flac,
     /// Two consecutive MPEG audio frames, possibly after an ID3v2 tag.
     MpegAudio,
