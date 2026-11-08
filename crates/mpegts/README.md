@@ -57,7 +57,7 @@ by external outputs or reservations can instead cause retryable `Backpressure`.
 
 `TransportFaultRecovery::with_policy` adds explicit `PesFaultPolicy` choices for
 isolated PES timing-header faults and fully checked PCR/OPCR rejections. The
-default constructor keeps both choices disabled. Accepted carriers with bad
+default constructor keeps all additional choices disabled. Accepted carriers with bad
 timing encoding must receive their matching later PES diagnostic before output.
 Rejected carriers must have only the selected clock fault, complete syntax
 inspection and no secondary error; their original bytes and rejection remain
@@ -72,6 +72,27 @@ flags leave timestamps absent even if opaque optional bytes resemble a PTS.
 It never updates the source clock. Fully checked rejected clock carriers retain
 their counters without claiming source continuity. Additional damage, partial
 PES and unknown clock/header contexts remain refusals.
+
+`PesFaultPolicy::source_pcr_pid` binds a validated source PMT's PCR PID. For
+selected AVC, a drained TS188 PUSI carrier carrying valid PCR and a discontinuity
+indicator may emit a complete finite packet in its original source epoch. The
+actual later source `Timeline` must confirm exactly the next clock epoch through
+`confirm_source_timeline` before more input or EOF. Configuration and entity stay
+the same. Only future packet source epochs change; the existing `DemuxClock`
+interval stays intact. A missing Timeline or quarantined clock remains a refusal.
+
+`PesFaultPolicy::terminal_transport` can preserve completed nonempty finite AVC
+packets before one final partial or sync-invalid TS188 carrier. Its original
+transport diagnostic must immediately follow the last admitted carrier, with no
+unfinished PES. `hold_terminal_transport` only stages that diagnostic. Real
+`TransportStream::media_entity_end` and core EOF must seal the exact final extent
+through `seal_terminal_end`, followed by source `Finished` and another core EOF
+check through `confirm_terminal_finished`. Only then does `terminal_confirmation`
+expose a `TransportTailConfirmation` and permit logical completion. The diagnostic
+and any rejected bytes stay available as charged storage. No empty output,
+additional carrier, malformed adaptation/PES, entity transition or I/O failure is
+promoted to success. These boundary checks add fixed state and no allocation,
+payload copy or descriptor table; a rejected carrier shares its existing charge.
 
 ## Usage
 

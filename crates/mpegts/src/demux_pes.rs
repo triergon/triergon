@@ -520,6 +520,9 @@ impl DemuxObserver {
             && !self.ended
             && self.fault.is_none()
     }
+    pub(crate) fn recovery_budget(&self) -> &Budget {
+        &self.budget
+    }
     pub(crate) fn note_recovered(&mut self, counter: u8, offset: u64, ordinal: u64) {
         self.previous_counter = Some(counter);
         self.last_input = Some((ordinal, offset));
@@ -620,7 +623,6 @@ impl DemuxObserver {
     ) -> std::result::Result<(), PushError<TransportPacket>> {
         self.push_boundary(packet, context, false, None)
     }
-    #[cfg(feature = "reference-trace")]
     #[allow(
         clippy::result_large_err,
         reason = "return original charged transport input inline"
@@ -632,7 +634,6 @@ impl DemuxObserver {
     ) -> std::result::Result<(), PushError<TransportPacket>> {
         self.push_boundary(packet, context, true, None)
     }
-    #[cfg(feature = "reference-trace")]
     pub(crate) fn commit_clock_epoch(&mut self, epochs: SourceEpochs) {
         self.scope.epochs = epochs;
     }

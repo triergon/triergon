@@ -798,6 +798,7 @@ fn finite_policy(budget: &Budget) -> TransportFaultRecovery {
         PesFaultPolicy {
             timing_headers: true,
             rejected_clock_fields: true,
+            ..PesFaultPolicy::default()
         },
     )
     .unwrap()

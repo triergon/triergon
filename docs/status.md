@@ -111,6 +111,11 @@ The complete host observations and exact source are retained as
 `mpegts-finite-recovery`, SHA-256
 `69642daca51d9609dcd1cb5de3ca2c5828150f221b9937e37a7bef3bc8f99b9f`.
 
+Source-boundary policies additionally require a real Timeline for a selected
+PCR/DI transition, or real core/framer EOF and source Finished for one unusable
+final carrier after completed nonempty finite packets. These policies have no
+native timing or memory qualification.
+
 The earlier macOS parity comparison at
 `65eeada0888bcd112d4cbd90e68795fea93fd864` also matches 81 of 97 operations.
 It collected no timing or memory samples; its source, binaries and raw comparisons
