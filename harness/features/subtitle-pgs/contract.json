@@ -17,5 +17,8 @@
   ],
   "iterations": 50,
   "minimum_pairs": 30,
-  "confidence": 0.95
+  "confidence": 0.95,
+  "pending_module_requirements": [
+    "plane storage that does not fault its pages in again for every display set"
+  ]
 }

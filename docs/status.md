@@ -27,7 +27,7 @@ rasterising, ASS parsing and ASS rendering against libass 0.17.5
 | HLS segments | Independent TS188 segments with contiguous AVC or HEVC video and AAC, AC-3 or E-AC-3 audio | 71 packet comparisons, 71 measured workloads | 1.1520 (71/71 pass) | heap ≤0.022, total RSS ≤0.727 (71/71 lower) | other profiles |
 | Packet framing | AVC/HEVC configuration and NAL framing, AV1, VP9, AC-3, E-AC-3, DTS core | 125 AVC/HEVC reference comparisons; DTS core byte-exact on 37,125 projections and 1,172 FATE packets, recorded without a timing runner | 1.3846 (45/125 pass for AVC/HEVC) | heap ≤0.985 (125/125 lower), total RSS ≤1.048 (0/125 lower) | runtime and RSS optimization; full AVC/HEVC/ADTS grammar |
 | Subtitles, text | SRT, WebVTT, ASS passthrough, mov_text and tx3g to ASS, charset handling | 82 mov_text cases, 79 tx3g regressions | not measured | not measured | timing and memory |
-| Subtitles, PGS | Presentation, window, palette and object segments to display sets, with FFmpeg's recovery from damaged and incomplete segments | 317/317 cases (`subtitle-pgs`: TS, SUP and Matroska) | 0.8719 (317/317 pass) | heap ≤0.966 (317/317 lower), total RSS ≤1.002 (316/317 lower) | `long-movie-mkv` total RSS; FATE coverage |
+| Subtitles, PGS | Presentation, window, palette and object segments to display sets, with FFmpeg's recovery from damaged and incomplete segments | 317/317 cases (`subtitle-pgs`: TS, SUP and Matroska) | 0.8719 (317/317 pass) | heap ≤0.966 (317/317 lower), total RSS ≤1.002 (316/317 lower) | `long-movie-mkv` total RSS (plane storage that does not fault its pages in again for every display set); FATE coverage |
 | Subtitles, DVB | Display definition, page, region, CLUT and object segments to bitmap rectangles, including `compute_clut` | 221/221 cases (`subtitle-dvb`: TS and Matroska) | 0.7761 (221/221 pass) | heap ≤0.984, total RSS ≤0.782 (221/221 lower) | FATE coverage |
 | Subtitles, DVD | SPU assembly and control sequences, run-length raster, palettes from VobSub `.idx`, Matroska and MP4 private data, DVD program streams, HD SPU | 223/223 cases (`subtitle-dvd`) | 0.8606 (223/223 pass) | heap ≤0.873, total RSS ≤0.832 (223/223 lower) | FATE coverage |
 | Closed captions | CEA-608 captions from A/53 and SCTE 20 user data in MPEG-2 video, A/53 SEI in H.264 and HEVC, and SCC files, to ASS | 197/197 cases (`subtitle-cc`) | 0.9752 (197/197 pass) | heap ≤0.123, total RSS ≤0.955 (197/197 lower) | FATE coverage |
@@ -103,11 +103,14 @@ timing and memory reports. Only `pes-header-every-byte` is above the runtime tar
 (1.0029).
 
 The subtitle rows use the gate build at `efd61988a7c0d354df0ad07ecf74ef6f9e303323` on a
-c8g.xlarge pinned to CPU 1, with 30 timing pairs of 50 operations and 30 memory pairs under
-the kernel RSS proof; every row is a graded report. PGS `long-movie-mkv` total RSS is at the
-reference (1.002): its observed resident peak is lower than the reference's, but the proven
-ceiling also counts the pages faulted in again each time a display set's planes are freed
-and allocated.
+c8g.xlarge pinned to CPU 1, with 30 timing pairs of 50 operations and 30 memory pairs
+under the kernel RSS proof; every row is a graded report. PGS `long-movie-mkv` total RSS
+is 1.002, a median 6 KB (0.1%) over: its observed resident peak is lower than the
+reference's, but the proven ceiling grows 836 KB against 381 KB observed. A page-fault
+trace puts the difference in the first three object planes (143 to 184 KB), which glibc
+maps and unmaps again before its dynamic mmap threshold adapts. Recycling planes in the
+decoder measured worse (total RSS 1.13), so the case stays a named failure until the plane
+storage changes.
 
 ISO BMFF, plus codec and decode-session memory, await gate-build measurement with
 repository runners.
