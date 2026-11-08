@@ -16,24 +16,36 @@ const POSITION_PRECISION: f64 = 8.0;
 /// Quantised blur steps per (64 · radius) unit.
 const BLUR_SCALE: f64 = 64.0 * BLUR_PRECISION / POSITION_PRECISION;
 
-/// How a run's border bitmaps combine with its fill.
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
-pub enum RunBorder {
+/// A run's border (`\bord`, `\xbord`, `\ybord` and `BorderStyle`), and how
+/// it combines with the fill. Every glyph of the run is drawn with it, and
+/// the run is composed under it.
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
+pub enum Border {
     /// The run has no border.
     #[default]
     None,
-    /// Stroked outlines (`\bord` style 1). With `keeps_fill` the border also
-    /// covers the fill's area, which libass leaves when the fill and karaoke
-    /// colours are opaque and nothing fades; otherwise the fill is taken out of
-    /// it where the fill shows through.
+    /// Stroked outlines (`\bord` style 1). A border that rounds to nothing
+    /// takes the glyph's own bitmap. With `keeps_fill` the border also covers
+    /// the fill's area, which libass leaves when the fill and karaoke colours
+    /// are opaque and nothing fades; otherwise the fill is taken out of it
+    /// where the fill shows through.
     Outline {
+        /// `\xbord` and `\ybord` in script pixels, before the frame's border
+        /// scale.
+        size: [f64; 2],
         /// The border keeps its coverage under the fill.
         keeps_fill: bool,
     },
-    /// Opaque boxes (`\bord` style 3), which cover the fill's area. With
-    /// `shown` (a nonzero `\bord`) the box is the border and the shadow is a
-    /// copy of it; otherwise the box is the shadow alone.
+    /// Opaque boxes (`\bord` style 3) around each glyph's
+    /// [`advance`](crate::Placement::advance) and height, `size` beyond them,
+    /// which cover the fill's area. With `shown` (a nonzero `\bord`) the box
+    /// is the border and the shadow is a copy of it; otherwise the box is the
+    /// shadow alone, drawn only when the run casts one.
     OpaqueBox {
+        /// `\xbord` and `\ybord` in script pixels, before the frame's border
+        /// scale; the box reaches at least a pixel beyond the advance and the
+        /// height before the transform.
+        size: [f64; 2],
         /// The box is drawn as the border too.
         shown: bool,
     },
@@ -55,7 +67,7 @@ pub struct Shadow {
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
 pub struct Effects {
     /// The border, and how it combines with the fill.
-    pub border: RunBorder,
+    pub border: Border,
     /// The shadow.
     pub shadow: Shadow,
     /// `\blur` radius in script pixels, before the frame's blur scale.
@@ -80,13 +92,13 @@ pub struct EffectsKey(Filter);
 
 /// libass's filter flags, from a run's effects as its renderer sets them.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
-struct FilterFlags {
+pub(crate) struct FilterFlags {
     /// `\bord` style 3: the border is an opaque box.
-    opaque_box: bool,
+    pub(crate) opaque_box: bool,
     /// The run has a border bitmap.
-    border: bool,
+    pub(crate) border: bool,
     /// The run has a shadow bitmap.
-    shadow: bool,
+    pub(crate) shadow: bool,
     /// The shadow covers the fill's area too.
     fill_in_shadow: bool,
     /// The border covers the fill's area too.
@@ -94,11 +106,11 @@ struct FilterFlags {
 }
 
 impl FilterFlags {
-    fn new(effects: &Effects) -> Self {
+    pub(crate) fn new(effects: &Effects) -> Self {
         let (opaque_box, border, fill_in_border) = match effects.border {
-            RunBorder::None => (false, false, false),
-            RunBorder::Outline { keeps_fill } => (false, true, keeps_fill),
-            RunBorder::OpaqueBox { shown } => (true, shown, true),
+            Border::None => (false, false, false),
+            Border::Outline { keeps_fill, .. } => (false, true, keeps_fill),
+            Border::OpaqueBox { shown, .. } => (true, shown, true),
         };
         let [x, y] = effects.shadow.offset;
         let cast = x != 0.0 || y != 0.0;
