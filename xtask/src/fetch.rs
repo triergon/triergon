@@ -13,6 +13,16 @@ use crate::sha256;
 pub trait Transport {
     /// GET `url` over HTTPS; at most `limit + 1` bytes are returned.
     fn https(&self, url: &str, agent: &str, limit: usize) -> Result<Vec<u8>, String>;
+    /// GET the bytes of a GitHub release asset through the API, which serves them
+    /// only to a client asking for `application/octet-stream` and otherwise returns
+    /// the asset's metadata.
+    fn github_asset(
+        &self,
+        repo: &str,
+        id: u64,
+        agent: &str,
+        limit: usize,
+    ) -> Result<Vec<u8>, String>;
     /// Receive `url` over rsync into `target`, never writing more than `limit` bytes.
     fn rsync(&self, url: &str, target: &Path, limit: usize) -> Result<(), String>;
 }
@@ -21,32 +31,18 @@ pub struct Network;
 
 impl Transport for Network {
     fn https(&self, url: &str, agent: &str, limit: usize) -> Result<Vec<u8>, String> {
-        let dir = scratch_dir("download")?;
-        let target = dir.join("body");
-        let status = Command::new("curl")
-            .args([
-                "--fail",
-                "--silent",
-                "--show-error",
-                "--location",
-                "--proto",
-                "=https",
-                "--connect-timeout",
-                "30",
-            ])
-            .args(["--speed-limit", "1", "--speed-time", "60", "--max-filesize"])
-            .arg((limit + 1).to_string())
-            .args(["--user-agent", agent, "--output"])
-            .arg(&target)
-            .arg(url)
-            .status();
-        let result = match status {
-            Ok(status) if status.success() => read_bounded(&target, limit),
-            Ok(status) => Err(format!("curl {url}: {status}")),
-            Err(error) => Err(format!("cannot run curl: {error}")),
-        };
-        let _ = fs::remove_dir_all(dir);
-        result
+        get(url, None, agent, limit)
+    }
+
+    fn github_asset(
+        &self,
+        repo: &str,
+        id: u64,
+        agent: &str,
+        limit: usize,
+    ) -> Result<Vec<u8>, String> {
+        let url = format!("https://api.github.com/repos/{repo}/releases/assets/{id}");
+        get(&url, Some("application/octet-stream"), agent, limit)
     }
 
     fn rsync(&self, url: &str, target: &Path, limit: usize) -> Result<(), String> {
@@ -59,6 +55,40 @@ impl Transport for Network {
             Err(format!("rsync {url}: {status}"))
         }
     }
+}
+
+/// One bounded HTTPS GET through `curl`, optionally asking for a media type.
+fn get(url: &str, accept: Option<&str>, agent: &str, limit: usize) -> Result<Vec<u8>, String> {
+    let dir = scratch_dir("download")?;
+    let target = dir.join("body");
+    let mut command = Command::new("curl");
+    if let Some(accept) = accept {
+        command.arg("--header").arg(format!("Accept: {accept}"));
+    }
+    let status = command
+        .args([
+            "--fail",
+            "--silent",
+            "--show-error",
+            "--location",
+            "--proto",
+            "=https",
+            "--connect-timeout",
+            "30",
+        ])
+        .args(["--speed-limit", "1", "--speed-time", "60", "--max-filesize"])
+        .arg((limit + 1).to_string())
+        .args(["--user-agent", agent, "--output"])
+        .arg(&target)
+        .arg(url)
+        .status();
+    let result = match status {
+        Ok(status) if status.success() => read_bounded(&target, limit),
+        Ok(status) => Err(format!("curl {url}: {status}")),
+        Err(error) => Err(format!("cannot run curl: {error}")),
+    };
+    let _ = fs::remove_dir_all(dir);
+    result
 }
 
 /// The sender's file list can understate what arrives, so the receiver runs
@@ -124,13 +154,40 @@ fn download_cache() -> Option<PathBuf> {
         .map(PathBuf::from)
 }
 
+/// Where a pinned download may be fetched from.
+#[derive(Clone, Copy, Debug)]
+pub enum Source<'a> {
+    /// A plain HTTPS URL.
+    Url(&'a str),
+    /// A GitHub release asset through the API, by repository (`owner/name`) and id.
+    GitHubAsset { repo: &'a str, id: u64 },
+}
+
+impl Source<'_> {
+    fn fetch(self, net: &dyn Transport, agent: &str, limit: usize) -> Result<Vec<u8>, String> {
+        match self {
+            Source::Url(url) => net.https(url, agent, limit),
+            Source::GitHubAsset { repo, id } => net.github_asset(repo, id, agent, limit),
+        }
+    }
+}
+
+impl std::fmt::Display for Source<'_> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Source::Url(url) => f.write_str(url),
+            Source::GitHubAsset { repo, id } => write!(f, "GitHub asset {repo}#{id}"),
+        }
+    }
+}
+
 /// The bytes whose SHA-256 is `sha256`, at most `limit` of them: from the download
 /// cache if it holds them, otherwise from the first of `sources` that serves them.
 /// Every candidate is verified, so a stale cache entry or a mirror serving other
 /// bytes is passed over, never used.
 pub fn pinned(
     net: &dyn Transport,
-    sources: &[&str],
+    sources: &[Source<'_>],
     sha256: &str,
     limit: usize,
     agent: &str,
@@ -148,7 +205,7 @@ pub fn pinned(
 fn pinned_in(
     net: &dyn Transport,
     cache: Option<&Path>,
-    sources: &[&str],
+    sources: &[Source<'_>],
     sha256: &str,
     limit: usize,
     agent: &str,
@@ -158,8 +215,8 @@ fn pinned_in(
         return Ok(data);
     }
     let mut failures = Vec::new();
-    for url in sources {
-        match net.https(url, agent, limit) {
+    for &source in sources {
+        match source.fetch(net, agent, limit) {
             Ok(data) if matches(&data) => {
                 if let Some(dir) = cache {
                     let stored = fs::create_dir_all(dir)
@@ -171,9 +228,11 @@ fn pinned_in(
                 }
                 return Ok(data);
             }
-            Ok(data) if data.len() > limit => failures.push(format!("{url}: over {limit} bytes")),
-            Ok(_) => failures.push(format!("{url}: not the pinned SHA-256 {sha256}")),
-            Err(error) => failures.push(error),
+            Ok(data) if data.len() > limit => {
+                failures.push(format!("{source}: over {limit} bytes"));
+            }
+            Ok(_) => failures.push(format!("{source}: not the pinned SHA-256 {sha256}")),
+            Err(error) => failures.push(format!("{source}: {error}")),
         }
     }
     Err(format!(
@@ -450,6 +509,10 @@ mod tests {
             self.https.clone().ok_or_else(|| "timed out".to_owned())
         }
 
+        fn github_asset(&self, _: &str, _: u64, _: &str, _: usize) -> Result<Vec<u8>, String> {
+            unreachable!("vector and specification downloads use plain URLs")
+        }
+
         fn rsync(&self, url: &str, target: &Path, _: usize) -> Result<(), String> {
             self.calls.borrow_mut().push(url.to_owned());
             let data = self.rsync.clone().ok_or("connection refused")?;
@@ -681,9 +744,11 @@ mod tests {
 
     impl Transport for Sources {
         fn https(&self, url: &str, _: &str, _: usize) -> Result<Vec<u8>, String> {
-            self.calls.borrow_mut().push(url.to_owned());
-            let (_, answer) = self.answers.iter().find(|(u, _)| *u == url).unwrap();
-            answer.map(<[u8]>::to_vec).map_err(str::to_owned)
+            self.answer(url)
+        }
+
+        fn github_asset(&self, repo: &str, id: u64, _: &str, _: usize) -> Result<Vec<u8>, String> {
+            self.answer(&format!("asset:{repo}#{id}"))
         }
 
         fn rsync(&self, _: &str, _: &Path, _: usize) -> Result<(), String> {
@@ -691,7 +756,46 @@ mod tests {
         }
     }
 
+    impl Sources {
+        fn answer(&self, key: &str) -> Result<Vec<u8>, String> {
+            self.calls.borrow_mut().push(key.to_owned());
+            let (_, answer) = self.answers.iter().find(|(k, _)| *k == key).unwrap();
+            answer.map(<[u8]>::to_vec).map_err(str::to_owned)
+        }
+    }
+
     const PINNED: &[u8] = b"pinned archive";
+
+    fn urls<'a>(urls: &[&'a str]) -> Vec<Source<'a>> {
+        urls.iter().map(|&url| Source::Url(url)).collect()
+    }
+
+    #[test]
+    fn pinned_reaches_a_github_asset_through_the_api() {
+        let pin = sha256::hex(PINNED);
+        let net = Sources::new(vec![
+            (
+                "https://release",
+                Err("curl https://release: exit status: 22"),
+            ),
+            ("asset:owner/name#7", Ok(PINNED)),
+        ]);
+        let sources = [
+            Source::Url("https://release"),
+            Source::GitHubAsset {
+                repo: "owner/name",
+                id: 7,
+            },
+        ];
+        assert_eq!(
+            pinned_in(&net, None, &sources, &pin, 64, "test").unwrap(),
+            PINNED
+        );
+        assert_eq!(
+            *net.calls.borrow(),
+            ["https://release", "asset:owner/name#7"]
+        );
+    }
 
     #[test]
     fn pinned_falls_back_past_failing_and_wrong_sources_and_fills_the_cache() {
@@ -703,7 +807,7 @@ mod tests {
             ("https://mirror", Ok(PINNED)),
         ]);
         let sources = ["https://down", "https://other-bytes", "https://mirror"];
-        let data = pinned_in(&net, Some(&cache), &sources, &pin, 64, "test").unwrap();
+        let data = pinned_in(&net, Some(&cache), &urls(&sources), &pin, 64, "test").unwrap();
         assert_eq!(data, PINNED);
         assert_eq!(fs::read(cache.join(&pin)).unwrap(), PINNED);
         assert_eq!(net.calls.borrow().len(), 3);
@@ -716,7 +820,7 @@ mod tests {
         let pin = sha256::hex(PINNED);
         fs::write(cache.join(&pin), PINNED).unwrap();
         let net = Sources::new(vec![]);
-        let data = pinned_in(&net, Some(&cache), &["https://x"], &pin, 64, "test").unwrap();
+        let data = pinned_in(&net, Some(&cache), &urls(&["https://x"]), &pin, 64, "test").unwrap();
         assert_eq!(data, PINNED);
         assert!(net.calls.borrow().is_empty());
         fs::remove_dir_all(cache).unwrap();
@@ -728,7 +832,7 @@ mod tests {
         let pin = sha256::hex(PINNED);
         fs::write(cache.join(&pin), b"damaged").unwrap();
         let net = Sources::new(vec![("https://x", Ok(PINNED))]);
-        let data = pinned_in(&net, Some(&cache), &["https://x"], &pin, 64, "test").unwrap();
+        let data = pinned_in(&net, Some(&cache), &urls(&["https://x"]), &pin, 64, "test").unwrap();
         assert_eq!(data, PINNED);
         assert_eq!(fs::read(cache.join(&pin)).unwrap(), PINNED);
         fs::remove_dir_all(cache).unwrap();
@@ -744,7 +848,7 @@ mod tests {
         let error = pinned_in(
             &net,
             None,
-            &["https://down", "https://large"],
+            &urls(&["https://down", "https://large"]),
             &pin,
             16,
             "test",

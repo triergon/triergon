@@ -169,7 +169,7 @@ fn prepare(root: &Path, jobs: u32, net: &dyn Transport) -> Result<PathBuf, Strin
                 "https://downloads.sourceforge.net/project/freetype/freetype2/{VERSION}/{name}"
             ),
         ];
-        let sources = sources.each_ref().map(String::as_str);
+        let sources = sources.each_ref().map(|url| fetch::Source::Url(url));
         let data = fetch::pinned(
             net,
             &sources,
@@ -330,7 +330,23 @@ fn fetch_corpus(root: &Path, net: &dyn Transport) -> Result<usize, String> {
         }
         let archive = downloads.join(name);
         if !archive.exists() {
-            let data = fetch::pinned(net, &[url], expected, FONT_LIMIT, "triergon-font-corpus")
+            // A GitHub release asset may also be fetched through the API, which
+            // stays up when release downloads fail.
+            let asset = source.get("github_asset").map(|asset| {
+                let repo = asset.get("repo").and_then(Value::as_str);
+                let id = match asset.get("id") {
+                    Some(Value::Number(id)) if id.is_integer() => {
+                        id.as_i128().and_then(|id| u64::try_from(id).ok())
+                    }
+                    _ => None,
+                };
+                repo.zip(id)
+                    .map(|(repo, id)| fetch::Source::GitHubAsset { repo, id })
+                    .ok_or(format!("{name}: github_asset needs repo and id"))
+            });
+            let mut sources = vec![fetch::Source::Url(url)];
+            sources.extend(asset.transpose()?);
+            let data = fetch::pinned(net, &sources, expected, FONT_LIMIT, "triergon-font-corpus")
                 .map_err(|e| format!("{name}: {e}"))?;
             fetch::publish(&archive, &data)?;
         }

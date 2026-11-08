@@ -369,7 +369,7 @@ fn revision_source(
         let url = format!("https://codeload.github.com/FFmpeg/FFmpeg/tar.gz/{REVISION}");
         let data = fetch::pinned(
             net,
-            &[&url],
+            &[fetch::Source::Url(&url)],
             ARCHIVE_SHA256,
             ARCHIVE_LIMIT,
             "triergon-reference-builder",
@@ -409,7 +409,7 @@ fn release_source(
         let url = format!("https://ffmpeg.org/releases/ffmpeg-{RELEASE}.tar.xz");
         let data = fetch::pinned(
             net,
-            &[&url],
+            &[fetch::Source::Url(&url)],
             RELEASE_SHA256,
             ARCHIVE_LIMIT,
             "triergon-reference-builder",
