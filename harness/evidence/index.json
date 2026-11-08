@@ -16126,15 +16126,15 @@
    "name": "h264-dequant-linux-arm64",
    "path": "h264-dequant-linux-arm64",
    "retention": "retained",
-   "reason": "Cited decoder and capture identities, function comparison, instruction counts, H.264 fuzz campaigns and finding replays of the wrapping H.264 scaling and transform arithmetic against main at 290b3f15",
-   "key": "evidence/h264-dequant-linux-arm64/e0d9afc5da229228bb84c24abb0bb1b946e5c9cb07042201f2d2a37929454188.tar.gz",
-   "sha256": "e0d9afc5da229228bb84c24abb0bb1b946e5c9cb07042201f2d2a37929454188",
-   "bytes": 168141,
-   "source_revision": "5ea1269e767c07e1188b4ef299725c107cda31f6",
+   "reason": "Cited decoder and capture identities, function comparisons, instruction counts, H.264 fuzz campaigns and finding replays of the wrapping H.264 scaling and transform arithmetic against main at 290b3f15",
+   "key": "evidence/h264-dequant-linux-arm64/8c20b422624b6b6e355c89c6a99a1817d7635c756a0e884feabb60af7d30e202.tar.gz",
+   "sha256": "8c20b422624b6b6e355c89c6a99a1817d7635c756a0e884feabb60af7d30e202",
+   "bytes": 235103,
+   "source_revision": "137c38034b48bbafc80acf812a12aa332ac13bb1",
    "files": [
     {
      "path": "h264-dequant-linux-arm64/README.txt",
-     "sha256": "42f60afc15ed4df528d03c3cef377012c0f52f213da2c5bdcabd3fc2e4d87f2c"
+     "sha256": "98c703fbfcb4d107172d725183572a8753b575145f7ad0e138d395a24092ec1f"
     },
     {
      "path": "h264-dequant-linux-arm64/instance/setup.sh",
@@ -16291,6 +16291,66 @@
     {
      "path": "h264-dequant-linux-arm64/instance/fuzz-h264-291/progress.json",
      "sha256": "2beb0188ae84b2ff541f6c4b0986e0e81294fdb6338756a56061d07baf7336b7"
+    },
+    {
+     "path": "h264-dequant-linux-arm64/instance-137c3803/setup.sh",
+     "sha256": "7a316fddb8affe4f89517a5ab20c835a52527d56b87ec8b8e859c6ac2fed9a92"
+    },
+    {
+     "path": "h264-dequant-linux-arm64/instance-137c3803/cap-main.json",
+     "sha256": "983381b99f1532d1d0fcc6073e7e0113d8bf12476440844a8d8f85c02474f2bc"
+    },
+    {
+     "path": "h264-dequant-linux-arm64/instance-137c3803/run.log",
+     "sha256": "68b50be291825b323154235e4f6acf41d69a061d3e806cb753644585b3a49ffd"
+    },
+    {
+     "path": "h264-dequant-linux-arm64/instance-137c3803/main-rev.txt",
+     "sha256": "07c3956e1b0cb34e0d5c82286f51b31924933bbf6cb9aba35673fab2efd6ce33"
+    },
+    {
+     "path": "h264-dequant-linux-arm64/instance-137c3803/eq-main.json",
+     "sha256": "4dc96ff7dd6e806054dc5f3da37ac398bec0a450158dbd0c50623b1dd0557d36"
+    },
+    {
+     "path": "h264-dequant-linux-arm64/instance-137c3803/sc-capture-worker.txt",
+     "sha256": "f492e2294f42bca6940ccee399413b3d626ddce201590b856f4803c824985df6"
+    },
+    {
+     "path": "h264-dequant-linux-arm64/instance-137c3803/run.sh",
+     "sha256": "8e4e28341a0d01ecca8dcad7f8dcae7b404e67e7fbb5fdb65ab94364fea51944"
+    },
+    {
+     "path": "h264-dequant-linux-arm64/instance-137c3803/cap-cand.json",
+     "sha256": "983381b99f1532d1d0fcc6073e7e0113d8bf12476440844a8d8f85c02474f2bc"
+    },
+    {
+     "path": "h264-dequant-linux-arm64/instance-137c3803/sc-codec-worker.txt",
+     "sha256": "bbac8077cc6f66ef5a68d6f0cbcc37498e949866f60535d473eb48310917da41"
+    },
+    {
+     "path": "h264-dequant-linux-arm64/instance-137c3803/cand-rev.txt",
+     "sha256": "0a9428c7dcf95244cc7b75159727bf407aa71f5d73254b0c40bbebc208febd68"
+    },
+    {
+     "path": "h264-dequant-linux-arm64/instance-137c3803/sc-media-worker.txt",
+     "sha256": "8cf1a9cf0bd7e3362bda276a0921db1cb8148cac82ce39fea6d2b558249163f0"
+    },
+    {
+     "path": "h264-dequant-linux-arm64/instance-137c3803/count17.txt",
+     "sha256": "806d7e914596cc2d87fb35de5a2980e6643b78e0482ee13e15736dc42980b34e"
+    },
+    {
+     "path": "h264-dequant-linux-arm64/instance-137c3803/chain.sh",
+     "sha256": "3ea062696f249f9a89adb86cfb3d066a9e9455ef41f92eb5ed0cf5f42c584ccd"
+    },
+    {
+     "path": "h264-dequant-linux-arm64/instance-137c3803/eq-cand.json",
+     "sha256": "4dc96ff7dd6e806054dc5f3da37ac398bec0a450158dbd0c50623b1dd0557d36"
+    },
+    {
+     "path": "h264-dequant-linux-arm64/instance-137c3803/sc-playback-worker.txt",
+     "sha256": "48de7d428eb7cf3a8464e07cb97b5133d3898190f0f656e655a8f8dc244588bb"
     },
     {
      "path": "h264-dequant-linux-arm64/macos-fuzz/fuzz-h264-284.log",
