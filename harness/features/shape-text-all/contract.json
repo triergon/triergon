@@ -1,0 +1,54 @@
+{
+  "schema": 1,
+  "id": "shape-text-all",
+  "operation": "shape-text",
+  "candidate": "shape-worker",
+  "worker_operation": "shape-",
+  "reference": "harfbuzz-native",
+  "contract": [
+    "one font file read from memory; every face of a collection, each with HarfBuzz's OpenType font functions at its default scale (units per em) and in triergon-shape with OtMetrics at units per em",
+    "every text of the case shaped as one run, as libass 0.17.5 asks HarfBuzz to: hb_buffer_add_utf32 with the item and its context, the case's direction, script (hb_script_from_iso15924_tag) and language (hb_language_from_string), its global features in order; default buffer flags and cluster level",
+    "per text: the glyph count, then every glyph's id, cluster, x and y advance and x and y offset; packets count glyphs and bytes the code points of the items",
+    "a face the candidate cannot open, a text it cannot parse and a run it cannot shape are recorded as such, so the case fails; the file is read before each timed and memory operation"
+  ],
+  "required_profiles": [
+    "latn",
+    "grek",
+    "cyrl",
+    "hebr",
+    "arab",
+    "deva",
+    "hani",
+    "hira",
+    "kana",
+    "hang",
+    "beng",
+    "taml",
+    "gujr",
+    "guru",
+    "knda",
+    "mlym",
+    "telu",
+    "sinh",
+    "thai",
+    "khmr",
+    "mymr",
+    "zyyy"
+  ],
+  "required_targets": [
+    "aarch64-unknown-linux-gnu"
+  ],
+  "iterations": 1,
+  "minimum_pairs": 30,
+  "confidence": 0.95,
+  "pending_module_requirements": [
+    "gating the full shaping sweep: cargo xtask check runs shape-text; the sweep over every corpus font and script runs on demand (cargo xtask shape compare --all) until its run time fits the check budget",
+    "CFF glyph extents as HarfBuzz's own charstring interpreter computes them (it lacks the Type 2 arithmetic and storage operators and reads some curve operands differently from FreeType), for fallback mark positioning in CFF fonts without GPOS"
+  ],
+  "open_cases": [
+    {
+      "id": "authored-cff-features-otf-latn-libass",
+      "requirement": "CFF glyph extents as HarfBuzz's own charstring interpreter computes them (it lacks the Type 2 arithmetic and storage operators and reads some curve operands differently from FreeType), for fallback mark positioning in CFF fonts without GPOS"
+    }
+  ]
+}

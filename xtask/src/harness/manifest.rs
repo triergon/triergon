@@ -2,10 +2,11 @@
 //!
 //! A feature commits either its whole manifest (`harness/features/<id>/corpus.json`)
 //! or only its pins (`pins.json`: each case id with the work the reference folds),
-//! in which case the rows are generated (`cargo xtask fonts manifest`) and the
-//! manifest is read at that same `corpus.json` path. Either way its identity is the
-//! SHA-256 of its bytes: a generated manifest's are its canonical JSON, exactly what
-//! `fonts manifest` writes, so the identity is deterministic.
+//! in which case the rows are generated (`cargo xtask fonts manifest` or `cargo
+//! xtask shape manifest`) and the manifest is read at that same `corpus.json` path.
+//! Either way its identity is the SHA-256 of its bytes: a generated manifest's are
+//! its canonical JSON, exactly what the generator writes, so the identity is
+//! deterministic.
 
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -38,7 +39,17 @@ pub fn sources(root: &Path, path: &Path) -> Vec<PathBuf> {
         return vec![path.to_path_buf()];
     }
     let mut files = vec![path.with_file_name("pins.json")];
-    files.extend(crate::fonts::ROW_SOURCES.iter().map(|f| root.join(f)));
+    let id = path
+        .parent()
+        .and_then(Path::file_name)
+        .and_then(|n| n.to_str())
+        .unwrap_or_default();
+    let sources: &[&str] = if crate::shape::FEATURES.iter().any(|f| f.id == id) {
+        &crate::shape::ROW_SOURCES
+    } else {
+        &crate::fonts::ROW_SOURCES
+    };
+    files.extend(sources.iter().map(|f| root.join(f)));
     files
 }
 
@@ -50,5 +61,8 @@ fn generated(root: &Path, path: &Path) -> Option<Result<Value, String>> {
         return None;
     }
     let id = path.parent().and_then(Path::file_name)?.to_str()?;
+    if crate::shape::FEATURES.iter().any(|f| f.id == id) {
+        return Some(crate::shape::manifest(root, id));
+    }
     Some(crate::fonts::manifest(root, id))
 }

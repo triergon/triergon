@@ -1,0 +1,18 @@
+[package]
+name = "shape-worker"
+version = "0.0.0"
+description = "Shaping measurement worker: text shaped, bidi resolved and Unicode properties read through triergon-shape"
+repository.workspace = true
+license.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+
+[dependencies]
+triergon-core = { path = "../core" }
+triergon-font = { path = "../font" }
+triergon-shape = { path = "../shape" }
+triergon-harness-protocol = { path = "../harness-protocol" }
+
+[lints]
+workspace = true

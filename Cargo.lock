@@ -51,6 +51,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "shape-worker"
+version = "0.0.0"
+dependencies = [
+ "triergon-core",
+ "triergon-font",
+ "triergon-harness-protocol",
+ "triergon-shape",
+]
+
+[[package]]
 name = "triergon"
 version = "0.0.0"
 dependencies = [
@@ -214,6 +224,14 @@ dependencies = [
  "triergon-codec-h264",
  "triergon-codec-hevc",
  "triergon-pixel",
+]
+
+[[package]]
+name = "triergon-shape"
+version = "0.0.0"
+dependencies = [
+ "triergon-core",
+ "triergon-font",
 ]
 
 [[package]]

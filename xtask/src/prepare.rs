@@ -435,6 +435,48 @@ fn release_source(
     Ok((source, archive_sha))
 }
 
+/// A release tarball pinned by URL and SHA-256.
+pub struct PinnedRelease<'a> {
+    /// The tarball's file name, which is also the cache entry.
+    pub file: &'a str,
+    /// The top-level directory it unpacks to.
+    pub directory: &'a str,
+    pub url: &'a str,
+    pub sha256: &'a str,
+}
+
+/// Downloads `release` into `cache` once, checks its hash, unpacks it and verifies
+/// the unpacked tree. Returns the source directory.
+pub fn unpack_release(
+    cache: &Path,
+    release: &PinnedRelease<'_>,
+    net: &dyn Transport,
+) -> Result<PathBuf, String> {
+    fs::create_dir_all(cache).map_err(|e| format!("{}: {e}", cache.display()))?;
+    let archive_path = cache.join(release.file);
+    if !archive_path.exists() {
+        let data = net.https(release.url, "triergon-reference-builder", ARCHIVE_LIMIT)?;
+        if data.len() > ARCHIVE_LIMIT {
+            return Err(format!("{}: archive size limit", release.file));
+        }
+        fetch::publish(&archive_path, &data)?;
+    }
+    let archive = fetch::read_bounded(&archive_path, ARCHIVE_LIMIT)?;
+    if sha256::hex(&archive) != release.sha256 {
+        return Err(format!("Pinned archive hash mismatch: {}", release.file));
+    }
+    let source = cache.join(release.directory);
+    if !source.exists() {
+        run(Command::new("tar")
+            .arg("-xJf")
+            .arg(&archive_path)
+            .arg("-C")
+            .arg(cache))?;
+    }
+    verify_xz_tree(&archive_path, cache)?;
+    Ok(source)
+}
+
 /// Every regular file of an xz-compressed release archive must still match the tree
 /// unpacked under `cache`. xtask does not decode xz itself, so the concatenated
 /// contents of the files, in archive order as `tar` streams them, are compared

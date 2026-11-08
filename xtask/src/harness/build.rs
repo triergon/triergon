@@ -237,7 +237,7 @@ struct Candidate {
     features: &'static [&'static str],
 }
 
-const ADDITIONAL_CANDIDATES: [Candidate; 6] = [
+const ADDITIONAL_CANDIDATES: [Candidate; 7] = [
     Candidate {
         name: "playback-worker",
         package: "playback-worker",
@@ -259,6 +259,12 @@ const ADDITIONAL_CANDIDATES: [Candidate; 6] = [
     Candidate {
         name: "font-worker",
         package: "font-worker",
+        example: None,
+        features: &[],
+    },
+    Candidate {
+        name: "shape-worker",
+        package: "shape-worker",
         example: None,
         features: &[],
     },
@@ -411,9 +417,18 @@ const CONTAINER_PACKAGES: &[&str] = &["libavformat", "libavcodec", "libavutil"];
 const CONTAINER_OPTIONS: &[&str] = &["-O3", "-Wall", "-Wextra", "-Werror"];
 /// The options the decoder and capture comparisons were measured with.
 const RELEASE_OPTIONS: &[&str] = &["-std=c11", "-O2", "-Wall", "-Wextra", "-Werror"];
+/// The shaping reference is compiled like its libraries, without contraction.
+const SHAPE_OPTIONS: &[&str] = &[
+    "-std=c11",
+    "-O2",
+    "-ffp-contract=off",
+    "-Wall",
+    "-Wextra",
+    "-Werror",
+];
 const CAPTURE_PACKAGES: &[&str] = &["libavformat", "libavcodec", "libswscale", "libavutil"];
 
-const PROFILE_REFERENCES: [ProfileReference; 8] = [
+const PROFILE_REFERENCES: [ProfileReference; 9] = [
     ProfileReference {
         profile: ".research/reference-video",
         binary: "ffmpeg-video-worker",
@@ -523,6 +538,19 @@ const PROFILE_REFERENCES: [ProfileReference; 8] = [
         packages: &["freetype2"],
         link_static: true,
         options: RELEASE_OPTIONS,
+        identity: false,
+    },
+    ProfileReference {
+        profile: ".research/harfbuzz",
+        binary: "harfbuzz-shape-worker",
+        source: "harness/reference.c",
+        define: Some("-DTRIERGON_SHAPE_REFERENCE=1"),
+        record: "harfbuzz-native",
+        kind: "HarfBuzz 14.6.0 from its amalgamation and FriBidi 1.0.17, static, without floating-point contraction; OpenType shaping, bidi and Unicode properties",
+        libraries: "harfbuzz_reference",
+        packages: &["harfbuzz", "fribidi"],
+        link_static: true,
+        options: SHAPE_OPTIONS,
         identity: false,
     },
 ];

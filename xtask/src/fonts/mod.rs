@@ -41,6 +41,7 @@ pub const USAGE: &str = "usage: cargo xtask fonts prepare [--jobs N]
             report options pass through, and each report goes to OUTPUT/<feature>
             (OUTPUT: --output, default .research/font-report)";
 
+pub(crate) const CORPUS_FILES: &str = ".research/fonts/files";
 pub const VERSION: &str = "2.15.0";
 pub const ARCHIVE_SHA256: &str = "93cd47eb719c325107f2d3cf087d06299e944c3b48a40b55537302304dea1dd5";
 const ARCHIVE_LIMIT: usize = 16 * 1024 * 1024;
@@ -238,13 +239,22 @@ fn prepare(root: &Path, jobs: u32, net: &dyn Transport) -> Result<PathBuf, Strin
 
 /// One corpus file: its path under `.research/fonts/files`, its SHA-256 and its
 /// outline format (`truetype`, `cff`, `cff-cid`, `cff2` or `collection`).
-struct CorpusFile {
-    path: String,
-    sha256: String,
-    format: String,
+pub(crate) struct CorpusFile {
+    pub(crate) path: String,
+    pub(crate) sha256: String,
+    pub(crate) format: String,
 }
 
-fn corpus(root: &Path) -> Result<Vec<(Value, Vec<CorpusFile>)>, String> {
+/// Whether a corpus source serves `lane` (`font` or `shape`): every lane, unless
+/// it lists its `lanes`.
+pub(crate) fn serves(source: &Value, lane: &str) -> bool {
+    source
+        .get("lanes")
+        .and_then(Value::as_array)
+        .is_none_or(|lanes| lanes.iter().any(|l| l.as_str() == Some(lane)))
+}
+
+pub(crate) fn corpus(root: &Path) -> Result<Vec<(Value, Vec<CorpusFile>)>, String> {
     let manifest =
         crate::checks::read_json(&root.join(CORPUS)).map_err(|e| format!("{CORPUS}: {e}"))?;
     let sources = manifest

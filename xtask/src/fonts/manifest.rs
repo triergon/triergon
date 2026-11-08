@@ -98,6 +98,9 @@ fn pins_path(root: &Path, id: &str) -> std::path::PathBuf {
 fn rows(root: &Path, feature: Feature) -> R<Vec<Value>> {
     let mut rows = Vec::new();
     for (source, files) in corpus(root)? {
+        if !super::serves(&source, "font") {
+            continue;
+        }
         let rights = if source.get("generator").and_then(Value::as_str) == Some("authored-fonts") {
             vec![("rights", Value::str("authored-synthetic"))]
         } else {
