@@ -60,7 +60,9 @@ fn bitmaps_beyond_libass_s_bound_are_refused() {
         (usize::MAX, 1),
         (usize::MAX - 3, 2),
         (1, usize::MAX),
-        (1 << 40, 1 << 40),
+        (1 << 20, 1 << 20),
+        // A product beyond `usize` on every target.
+        (1 << (usize::BITS / 2), 1 << (usize::BITS / 2)),
     ] {
         let refused = Bitmap::new(&budget, width, height, &limits());
         assert!(
