@@ -9,6 +9,7 @@ use crate::error::{DecodeError, Result};
 use crate::huffman::books;
 use crate::ics::{ChannelData, CoreCfg, MAX_SFB, ZERO_HCB, parse_ics};
 use triergon_bitstream::CachedBitReader;
+use triergon_codec::{Budget, BudgetVec, Charged};
 
 /// cc_scale for gain_element_scale 0..3: 2^(1/8), 2^(1/4), 2^(1/2), 2.
 const CC_SCALE: [f64; 4] = [
@@ -31,30 +32,30 @@ pub(crate) struct CceState {
     pub tag: u8,
     pub ind_sw: bool,
     pub domain: bool,
-    pub targets: Vec<Target>,
+    pub targets: BudgetVec<Target>,
     /// gains[list][g * MAX_SFB + sfb]; for independent coupling only [list][0] is used.
-    pub gains: Vec<[f32; 8 * MAX_SFB]>,
-    pub cd: Box<ChannelData>,
-    pub overlap: Vec<f32>,
+    pub gains: BudgetVec<[f32; 8 * MAX_SFB]>,
+    pub cd: Charged<Box<ChannelData>>,
+    pub overlap: [f32; 1024],
     pub prev_shape: u8,
-    pub time: Vec<f32>,
+    pub time: [f32; 1024],
     pub decoded: bool,
 }
 
 impl CceState {
-    fn new(tag: u8) -> CceState {
-        CceState {
+    pub(crate) fn new(budget: &Budget, tag: u8) -> Result<CceState> {
+        Ok(CceState {
             tag,
             ind_sw: false,
             domain: false,
-            targets: Vec::new(),
-            gains: vec![[0.0; 8 * MAX_SFB]; 16],
-            cd: Box::new(ChannelData::new()),
-            overlap: vec![0.0; 1024],
+            targets: BudgetVec::new(budget),
+            gains: BudgetVec::try_filled(budget, [0.0; 8 * MAX_SFB], 16)?,
+            cd: Charged::boxed(budget, ChannelData::new())?,
+            overlap: [0.0; 1024],
             prev_shape: 0,
-            time: vec![0.0; 1024],
+            time: [0.0; 1024],
             decoded: false,
-        }
+        })
     }
 
     pub(crate) fn reset(&mut self, _aot: u8) {
@@ -75,16 +76,18 @@ pub(crate) fn parse_cce(
             if core.cce.len() >= 16 {
                 return Err(DecodeError::ResourceLimit("coupling channel elements"));
             }
-            core.cce.push(CceState::new(tag));
+            let c = CceState::new(&core.budget, tag)?;
+            core.cce.push(Charged::boxed(&core.budget, c)?);
             core.cce.len() - 1
         }
     };
-    let c = &mut core.cce[ci];
+    let c: &mut CceState = &mut core.cce[ci];
     c.ind_sw = br.bit();
     let n = br.read(3) as usize + 1;
     c.targets.clear();
+    c.targets.try_resize(n, Target::default())?;
     let mut lists = 0;
-    for _ in 0..n {
+    for target in c.targets.iter_mut() {
         lists += 1;
         let is_cpe = br.bit();
         let tag = br.read(4) as u8;
@@ -96,7 +99,7 @@ pub(crate) fn parse_cce(
                 lists += 1;
             }
         }
-        c.targets.push(Target { is_cpe, tag, l, r });
+        *target = Target { is_cpe, tag, l, r };
     }
     c.domain = br.bit();
     let sign = br.bit();
@@ -159,7 +162,7 @@ pub(crate) fn parse_cce(
 /// For each target channel (element index ei, channel ch) find the gain list index.
 fn list_for(c: &CceState, kind: u8, tag: u8, ch: usize) -> Option<usize> {
     let mut idx = 0;
-    for t in &c.targets {
+    for t in c.targets.iter() {
         let tkind = if t.is_cpe {
             ID_CPE
         } else {
@@ -183,14 +186,14 @@ fn list_for(c: &CceState, kind: u8, tag: u8, ch: usize) -> Option<usize> {
 
 /// Spectral-domain (dependently switched) coupling into a target channel.
 pub(crate) fn apply_spectral(
-    cce: &mut [CceState],
+    cce: &[Charged<Box<CceState>>],
     kind: u8,
     tag: u8,
     ch: usize,
     cd: &mut ChannelData,
     after_tns: bool,
 ) {
-    for c in cce.iter() {
+    for c in cce {
         if !c.decoded || c.ind_sw || c.domain != after_tns {
             continue;
         }
@@ -222,7 +225,13 @@ pub(crate) fn apply_spectral(
 }
 
 /// Time-domain (independently switched) coupling into a target channel's output.
-pub(crate) fn apply_time(cce: &[CceState], kind: u8, tag: u8, ch: usize, out: &mut [f32]) {
+pub(crate) fn apply_time(
+    cce: &[Charged<Box<CceState>>],
+    kind: u8,
+    tag: u8,
+    ch: usize,
+    out: &mut [f32],
+) {
     for c in cce {
         if !c.decoded || !c.ind_sw {
             continue;
@@ -244,6 +253,7 @@ pub(crate) fn process_cces(core: &mut Core) {
         sf_index: core.sf_index,
     };
     for c in &mut core.cce {
+        let c: &mut CceState = c;
         if !c.decoded {
             continue;
         }

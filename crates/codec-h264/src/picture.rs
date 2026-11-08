@@ -1,11 +1,14 @@
 //! Frame buffers, per-picture motion storage and decoded picture buffer entries.
 
-/// Planar 4:2:0 8-bit frame buffer (luma dimensions are multiples of 16).
-#[derive(Debug, Clone, Default)]
+use triergon_codec::{Budget, BudgetVec, StorageError};
+
+/// Planar 4:2:0 8-bit frame buffer (luma dimensions are multiples of 16). The planes carry
+/// their charge, so output pictures sharing the buffer keep it charged.
+#[derive(Debug)]
 pub(crate) struct FrameBuf {
-    pub y: Vec<u8>,
-    pub cb: Vec<u8>,
-    pub cr: Vec<u8>,
+    pub y: BudgetVec<u8>,
+    pub cb: BudgetVec<u8>,
+    pub cr: BudgetVec<u8>,
     pub width: usize,
     pub height: usize,
     pub cwidth: usize,
@@ -13,35 +16,60 @@ pub(crate) struct FrameBuf {
 }
 
 impl FrameBuf {
-    pub(crate) fn new(width: usize, height: usize, chroma: bool) -> FrameBuf {
-        let (cw, ch) = (width / 2, height / 2);
-        let _ = chroma; // monochrome streams keep 128-filled chroma planes
-        let csize = cw * ch;
+    /// A buffer without samples.
+    pub(crate) fn empty(budget: &Budget) -> FrameBuf {
         FrameBuf {
-            y: vec![0; width * height],
-            cb: vec![128; csize],
-            cr: vec![128; csize],
+            y: BudgetVec::new(budget),
+            cb: BudgetVec::new(budget),
+            cr: BudgetVec::new(budget),
+            width: 0,
+            height: 0,
+            cwidth: 0,
+            cheight: 0,
+        }
+    }
+
+    /// Monochrome streams keep the 128-filled chroma planes.
+    pub(crate) fn new(
+        width: usize,
+        height: usize,
+        budget: &Budget,
+    ) -> Result<FrameBuf, StorageError> {
+        let (cw, ch) = (width / 2, height / 2);
+        Ok(FrameBuf {
+            y: BudgetVec::try_filled(budget, 0, width * height)?,
+            cb: BudgetVec::try_filled(budget, 128, cw * ch)?,
+            cr: BudgetVec::try_filled(budget, 128, cw * ch)?,
             width,
             height,
             cwidth: cw,
             cheight: ch,
-        }
+        })
+    }
+
+    pub(crate) fn try_clone(&self) -> Result<FrameBuf, StorageError> {
+        Ok(FrameBuf {
+            y: self.y.try_clone()?,
+            cb: self.cb.try_clone()?,
+            cr: self.cr.try_clone()?,
+            ..*self
+        })
     }
 }
 
 /// Motion data of one coded picture (frame, or one field). Indexed MB-major:
 /// mv: `mb * 16 + raster4x4` (`mb * 4 + 8x8 index` when `corners`), ref_idx/ref_id:
 /// `mb * 4 + 8x8 index`.
-#[derive(Debug, Clone, Default)]
+#[derive(Debug)]
 pub(crate) struct Motion {
-    pub mv: [Vec<[i16; 2]>; 2],
+    pub mv: [BudgetVec<[i16; 2]>; 2],
     /// Only the corner 4x4 block of each 8x8 is kept (a stored reference of a frame-only
     /// stream with direct_8x8_inference_flag, whose co-located blocks are always corners).
     pub corners: bool,
-    pub ref_idx: [Vec<i8>; 2],
-    pub ref_id: [Vec<i32>; 2],
+    pub ref_idx: [BudgetVec<i8>; 2],
+    pub ref_id: [BudgetVec<i32>; 2],
     /// Per MB: bit 0 intra, bit 1 field macroblock.
-    pub mb_flags: Vec<u8>,
+    pub mb_flags: BudgetVec<u8>,
     pub mbs: usize,
 }
 
@@ -49,17 +77,49 @@ pub(crate) const MBF_INTRA: u8 = 1;
 pub(crate) const MBF_FIELD: u8 = 2;
 
 impl Motion {
-    pub(crate) fn alloc(&mut self, mbs: usize) {
-        if self.mbs != mbs || self.mb_flags.len() != mbs || self.corners {
-            self.corners = false;
-            for l in 0..2 {
-                self.mv[l] = vec![[0; 2]; mbs * 16];
-                self.ref_idx[l] = vec![-1; mbs * 4];
-                self.ref_id[l] = vec![-1; mbs * 4];
-            }
-            self.mb_flags = vec![0; mbs];
-            self.mbs = mbs;
+    /// Motion of no macroblocks.
+    pub(crate) fn empty(budget: &Budget) -> Motion {
+        Motion {
+            mv: [BudgetVec::new(budget), BudgetVec::new(budget)],
+            corners: false,
+            ref_idx: [BudgetVec::new(budget), BudgetVec::new(budget)],
+            ref_id: [BudgetVec::new(budget), BudgetVec::new(budget)],
+            mb_flags: BudgetVec::new(budget),
+            mbs: 0,
         }
+    }
+
+    /// Arrays for `mbs` macroblocks, all blocks unreferenced. The current arrays are freed
+    /// before the new ones are charged.
+    fn reset(&mut self, mbs: usize, corners: bool) -> Result<(), StorageError> {
+        let budget = self.mb_flags.budget().clone();
+        *self = Motion::empty(&budget);
+        let (mvs, blocks) = (mbs * if corners { 4 } else { 16 }, mbs * 4);
+        *self = Motion {
+            mv: [
+                BudgetVec::try_filled(&budget, [0; 2], mvs)?,
+                BudgetVec::try_filled(&budget, [0; 2], mvs)?,
+            ],
+            corners,
+            ref_idx: [
+                BudgetVec::try_filled(&budget, -1, blocks)?,
+                BudgetVec::try_filled(&budget, -1, blocks)?,
+            ],
+            ref_id: [
+                BudgetVec::try_filled(&budget, -1, blocks)?,
+                BudgetVec::try_filled(&budget, -1, blocks)?,
+            ],
+            mb_flags: BudgetVec::try_filled(&budget, 0, mbs)?,
+            mbs,
+        };
+        Ok(())
+    }
+
+    pub(crate) fn alloc(&mut self, mbs: usize) -> Result<(), StorageError> {
+        if self.mbs != mbs || self.corners {
+            self.reset(mbs, false)?;
+        }
+        Ok(())
     }
 }
 
@@ -76,17 +136,9 @@ impl Motion {
     }
 
     /// Store `full` into `self` keeping only corner motion vectors (allocation reused).
-    pub(crate) fn compact_from(&mut self, full: &Motion) {
-        let n = full.mbs;
-        if !self.corners || self.mbs != n {
-            *self = Motion {
-                mv: [vec![[0; 2]; n * 4], vec![[0; 2]; n * 4]],
-                corners: true,
-                ref_idx: [vec![-1; n * 4], vec![-1; n * 4]],
-                ref_id: [vec![-1; n * 4], vec![-1; n * 4]],
-                mb_flags: vec![0; n],
-                mbs: n,
-            };
+    pub(crate) fn compact_from(&mut self, full: &Motion) -> Result<(), StorageError> {
+        if !self.corners || self.mbs != full.mbs {
+            self.reset(full.mbs, true)?;
         }
         for l in 0..2 {
             for (d, s) in self.mv[l]
@@ -102,6 +154,7 @@ impl Motion {
             self.ref_id[l].copy_from_slice(&full.ref_id[l]);
         }
         self.mb_flags.copy_from_slice(&full.mb_flags);
+        Ok(())
     }
 }
 
@@ -130,10 +183,11 @@ pub(crate) struct OutputInfo {
 }
 
 /// A decoded picture buffer entry: a frame or complementary field pair (or a single field).
-#[derive(Debug, Default)]
+#[derive(Debug)]
 pub(crate) struct FrameStore {
-    /// Shared with output pictures; the decoder writes only into an unshared buffer.
-    pub buf: std::sync::Arc<FrameBuf>,
+    /// Shared with output pictures; the decoder writes only into an unshared buffer. None
+    /// before first use and while the store's picture is being decoded.
+    pub buf: Option<std::sync::Arc<FrameBuf>>,
     /// Frame motion in `motion[0]`, or top / bottom field motion in `motion[0]` / `motion[1]`.
     pub motion: [Motion; 2],
     pub uid: u32,
@@ -157,6 +211,28 @@ pub(crate) struct FrameStore {
 }
 
 impl FrameStore {
+    /// An unused entry without samples.
+    pub(crate) fn new(budget: &Budget) -> FrameStore {
+        FrameStore {
+            buf: None,
+            motion: [Motion::empty(budget), Motion::empty(budget)],
+            uid: 0,
+            in_use: false,
+            fields: 0,
+            coding: Coding::default(),
+            mark: [RefMark::None; 2],
+            frame_num: 0,
+            long_term_frame_idx: 0,
+            poc: [0; 2],
+            needed_for_output: false,
+            pts: None,
+            non_existing: false,
+            info: OutputInfo::default(),
+            mmco5: false,
+            idr: false,
+            decode_order: 0,
+        }
+    }
     pub(crate) fn is_ref(&self) -> bool {
         self.mark[0] != RefMark::None || self.mark[1] != RefMark::None
     }

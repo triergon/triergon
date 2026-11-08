@@ -2,27 +2,50 @@
 
 use crate::{BitError, BitSource};
 
-/// Copies a NAL unit payload into `out` without its emulation prevention bytes. Unlike
-/// [`Rbsp`] this validates nothing: every `03` after two zeros goes, whatever follows it.
-pub fn unescape(ebsp: &[u8], out: &mut Vec<u8>) {
-    out.clear();
-    out.reserve(ebsp.len());
-    let length = ebsp.len();
-    let mut i = 0;
-    let mut run = 0;
-    while i + 2 < length {
-        // A byte above 3 rules out a pattern at any of these three positions.
-        if ebsp[i + 2] > 3 {
-            i += 3;
-        } else if ebsp[i] == 0 && ebsp[i + 1] == 0 && ebsp[i + 2] == 3 {
-            out.extend_from_slice(&ebsp[run..i + 2]);
-            i += 3;
-            run = i;
-        } else {
-            i += 1;
-        }
+/// The pieces of a NAL unit payload between its emulation prevention bytes, in order;
+/// together they are the payload without those bytes. Unlike [`Rbsp`] this validates
+/// nothing: every `03` after two zeros goes, whatever follows it. A decoder extends its
+/// own buffer with the pieces, so the copy goes wherever that buffer is kept.
+pub fn runs(ebsp: &[u8]) -> Runs<'_> {
+    Runs {
+        ebsp,
+        at: 0,
+        start: Some(0),
     }
-    out.extend_from_slice(&ebsp[run..]);
+}
+
+/// The iterator of [`runs`].
+#[derive(Clone, Debug)]
+pub struct Runs<'a> {
+    ebsp: &'a [u8],
+    at: usize,
+    /// Start of the current piece; `None` once the last piece is out.
+    start: Option<usize>,
+}
+
+impl<'a> Iterator for Runs<'a> {
+    type Item = &'a [u8];
+
+    #[inline]
+    fn next(&mut self) -> Option<&'a [u8]> {
+        let start = self.start?;
+        let ebsp = self.ebsp;
+        while self.at + 2 < ebsp.len() {
+            let i = self.at;
+            // A byte above 3 rules out a pattern at any of these three positions.
+            if ebsp[i + 2] > 3 {
+                self.at += 3;
+            } else if ebsp[i] == 0 && ebsp[i + 1] == 0 && ebsp[i + 2] == 3 {
+                self.at += 3;
+                self.start = Some(self.at);
+                return Some(&ebsp[start..i + 2]);
+            } else {
+                self.at += 1;
+            }
+        }
+        self.start = None;
+        Some(&ebsp[start..])
+    }
 }
 
 /// Reads the RBSP of a NAL unit payload in place, removing emulation prevention bytes as
@@ -223,7 +246,7 @@ mod tests {
     }
 
     #[test]
-    fn unescape_matches_the_byte_by_byte_rule() {
+    fn runs_match_the_byte_by_byte_rule() {
         let cases: [&[u8]; 8] = [
             &[],
             &[0, 0],
@@ -245,9 +268,7 @@ mod tests {
                 zeros = if byte == 0 { zeros + 1 } else { 0 };
                 expected.push(byte);
             }
-            let mut out = vec![7];
-            unescape(case, &mut out);
-            assert_eq!(out, expected);
+            assert_eq!(runs(case).collect::<Vec<_>>().concat(), expected);
         }
     }
 

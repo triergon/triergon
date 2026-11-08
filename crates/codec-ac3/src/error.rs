@@ -1,6 +1,7 @@
 //! Typed decoder errors.
 
 use core::fmt;
+use triergon_codec::StorageError;
 
 /// A bitstream feature this decoder recognises but does not implement.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -38,6 +39,14 @@ pub enum DecodeError {
     OutputLayoutMismatch,
     /// The first syncframe of an E-AC-3 access unit is not independent substream 0.
     MissingIndependentSubstream,
+    /// Storage the access unit needs does not fit the decoder's budget.
+    Budget(StorageError),
+}
+
+impl From<StorageError> for DecodeError {
+    fn from(error: StorageError) -> Self {
+        DecodeError::Budget(error)
+    }
 }
 
 impl fmt::Display for DecodeError {
@@ -62,6 +71,7 @@ impl fmt::Display for DecodeError {
             DecodeError::MissingIndependentSubstream => {
                 write!(f, "access unit does not start with independent substream 0")
             }
+            DecodeError::Budget(error) => write!(f, "storage budget: {error}"),
         }
     }
 }

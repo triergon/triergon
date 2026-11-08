@@ -65,10 +65,11 @@ impl Bounds {
     }
 }
 
-/// 4×4-averaged copy of a coded luma plane (one sample per 4×4 block).
-pub(crate) fn decimate4(plane: &[u8], stride: usize, rows: usize, out: &mut Vec<u8>) {
+/// 4×4-averaged copy of a coded luma plane (one sample per 4×4 block) into `out`
+/// of `(stride / 4) * (rows / 4)` samples.
+pub(crate) fn decimate4(plane: &[u8], stride: usize, rows: usize, out: &mut [u8]) {
     let (w, h) = (stride / 4, rows / 4);
-    out.resize(w * h, 0);
+    debug_assert_eq!(out.len(), w * h);
     for (src, dst) in plane[..h * 4 * stride]
         .chunks_exact(4 * stride)
         .zip(out.chunks_exact_mut(w))
@@ -645,8 +646,8 @@ mod tests {
 
     #[test]
     fn coarse_luma_matches_scalar_average_across_rows_and_edges() {
-        let mut coarse = Vec::new();
         for (stride, rows) in [(496, 272), (32, 48), (16, 16)] {
+            let mut coarse = vec![0; stride / 4 * (rows / 4)];
             for plane in [
                 vec![255; stride * rows],
                 (0..stride * rows)
@@ -725,7 +726,7 @@ mod tests {
                 )
             })
             .collect();
-        let (mut cc, mut cr) = (Vec::new(), Vec::new());
+        let (mut cc, mut cr) = (vec![0; stride / 4 * 24], vec![0; stride / 4 * 24]);
         decimate4(&cur, stride, 96, &mut cc);
         decimate4(&reference, stride, 96, &mut cr);
         let coarse = Coarse {

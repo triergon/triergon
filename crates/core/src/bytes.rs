@@ -296,6 +296,26 @@ impl<T> BudgetVec<T> {
             charge: Reservation::empty(budget),
         }
     }
+    /// `len` copies of `value`, charged before they are allocated. A refused
+    /// charge or allocation is an error, never an abort.
+    pub fn try_filled(budget: &Budget, value: T, len: usize) -> Result<Self>
+    where
+        T: Clone,
+    {
+        let mut filled = Self::new(budget);
+        filled.try_resize(len, value)?;
+        Ok(filled)
+    }
+    /// A copy with its own charge on the same pool.
+    pub fn try_clone(&self) -> Result<Self>
+    where
+        T: Clone,
+    {
+        let mut copy = Self::new(self.budget());
+        copy.grow_to(self.len())?;
+        copy.data.extend_from_slice(&self.data);
+        Ok(copy)
+    }
     pub fn len(&self) -> usize {
         self.data.len()
     }
@@ -317,6 +337,10 @@ impl<T> BudgetVec<T> {
     }
     pub fn clear(&mut self) {
         self.data.clear();
+    }
+    /// Shortens the vector; its allocation and charge are kept.
+    pub fn truncate(&mut self, len: usize) {
+        self.data.truncate(len);
     }
     pub fn pop(&mut self) -> Option<T> {
         self.data.pop()
@@ -410,11 +434,27 @@ impl<T> BudgetVec<T> {
     /// Shrinking retains the allocation and its existing charge.
     pub fn try_resize(&mut self, new_len: usize, value: T) -> Result<()>
     where
-        T: Copy,
+        T: Clone,
     {
         self.grow_to(new_len)?;
         self.data.resize(new_len, value);
         Ok(())
+    }
+}
+
+impl<T> std::ops::Deref for BudgetVec<T> {
+    type Target = [T];
+
+    #[inline]
+    fn deref(&self) -> &[T] {
+        &self.data
+    }
+}
+
+impl<T> std::ops::DerefMut for BudgetVec<T> {
+    #[inline]
+    fn deref_mut(&mut self) -> &mut [T] {
+        &mut self.data
     }
 }
 

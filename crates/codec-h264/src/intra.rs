@@ -1,6 +1,6 @@
 //! Intra macroblock reconstruction (clause 8.3) and residual application (clause 8.5).
 
-use crate::DecodeError;
+use crate::SliceError;
 use crate::mbinfo::Kind;
 use crate::recon::*;
 use crate::slicedec::SliceDecoder;
@@ -148,7 +148,7 @@ impl SliceDecoder<'_> {
         }
     }
 
-    pub(crate) fn intra_mb(&mut self) -> Result<(), DecodeError> {
+    pub(crate) fn intra_mb(&mut self) -> Result<(), SliceError> {
         let qp = self.qp;
         match self.mb.kind {
             Kind::I4x4 => {
@@ -213,7 +213,7 @@ impl SliceDecoder<'_> {
                     _ => true,
                 };
                 if !ok {
-                    return Err(DecodeError::InvalidData(
+                    return Err(SliceError::InvalidData(
                         "Intra16x16 mode uses unavailable samples",
                     ));
                 }
@@ -267,7 +267,7 @@ impl SliceDecoder<'_> {
                 _ => true,
             };
             if !ok {
-                return Err(DecodeError::InvalidData(
+                return Err(SliceError::InvalidData(
                     "chroma intra mode uses unavailable samples",
                 ));
             }

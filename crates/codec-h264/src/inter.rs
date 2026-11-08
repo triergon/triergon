@@ -1,7 +1,7 @@
 //! Inter prediction: motion vector prediction (8.4.1.3), P_Skip (8.4.1.1), direct modes
 //! (8.4.1.2), and the motion compensation / weighted prediction dispatch (8.4.2).
 
-use crate::DecodeError;
+use crate::SliceError;
 use crate::mbinfo::Kind;
 use crate::mc::*;
 use crate::picture::*;
@@ -219,7 +219,7 @@ impl SliceDecoder<'_> {
 
     // ------------------------------------------------------------------ main entry
 
-    pub(crate) fn inter_mb(&mut self) -> Result<(), DecodeError> {
+    pub(crate) fn inter_mb(&mut self) -> Result<(), SliceError> {
         let cur = self.cur;
         let kind = self.mb.kind;
         let field = self.pic.mbs[cur].field;
@@ -358,7 +358,7 @@ impl SliceDecoder<'_> {
 
     // ------------------------------------------------------------------ direct
 
-    fn direct_8x8(&mut self, i: usize) -> Result<(), DecodeError> {
+    fn direct_8x8(&mut self, i: usize) -> Result<(), SliceError> {
         if self.s.sh.direct_spatial_mv_pred {
             self.direct_spatial(i)
         } else {
@@ -424,7 +424,7 @@ impl SliceDecoder<'_> {
     /// same derivation as `direct_spatial` on its four 8x8 blocks, with the shared reference
     /// indices stored once and colZeroFlag gathered as a 4x4-block mask. The MB's motion must
     /// have been reset (refIdx -1, zero vectors).
-    fn direct_spatial_mb(&mut self) -> Result<(), DecodeError> {
+    fn direct_spatial_mb(&mut self) -> Result<(), SliceError> {
         let (refs, mvps, zero) = self.spatial_refs();
         let cur = self.cur;
         for list in 0..2 {
@@ -441,7 +441,7 @@ impl SliceDecoder<'_> {
             self.mb_motion = Some((refs, [[0, 0]; 2]));
             return Ok(()); // all motion vectors are zero
         }
-        let col = self.s.col.ok_or(DecodeError::InvalidData(
+        let col = self.s.col.ok_or(SliceError::InvalidData(
             "direct prediction without RefPicList1",
         ))?;
         // colZeroFlag only matters for a list whose refIdx is 0 (8-190 / 8-191).
@@ -458,7 +458,7 @@ impl SliceDecoder<'_> {
             // 8x8 uses its corner 4x4 block, as in `colocated`.
             let motion = &self.refs.dpb[col.idx].motion[0];
             if cur >= motion.mbs {
-                return Err(DecodeError::InvalidData(
+                return Err(SliceError::InvalidData(
                     "co-located macroblock out of range",
                 ));
             }
@@ -525,7 +525,7 @@ impl SliceDecoder<'_> {
 
     #[inline(never)]
     #[allow(clippy::needless_range_loop)] // indexed form over parallel fixed-size arrays (mirrors the spec loops, keeps the hot loop vectorisable)
-    fn direct_spatial(&mut self, i: usize) -> Result<(), DecodeError> {
+    fn direct_spatial(&mut self, i: usize) -> Result<(), SliceError> {
         let (refs, mvps, zero) = self.spatial_refs();
         let x0 = (i as i32 & 1) * 8;
         let y0 = (i as i32 >> 1) * 8;
@@ -575,8 +575,8 @@ impl SliceDecoder<'_> {
         &self,
         xcol: i32,
         ycol: i32,
-    ) -> Result<([i32; 2], i32, i32, VertScale), DecodeError> {
-        let col = self.s.col.ok_or(DecodeError::InvalidData(
+    ) -> Result<([i32; 2], i32, i32, VertScale), SliceError> {
+        let col = self.s.col.ok_or(SliceError::InvalidData(
             "direct prediction without RefPicList1",
         ))?;
         let st = &self.refs.dpb[col.idx];
@@ -585,7 +585,7 @@ impl SliceDecoder<'_> {
             let motion = &st.motion[0];
             let mb_col = self.cur;
             if mb_col >= motion.mbs {
-                return Err(DecodeError::InvalidData(
+                return Err(SliceError::InvalidData(
                     "co-located macroblock out of range",
                 ));
             }
@@ -707,7 +707,7 @@ impl SliceDecoder<'_> {
             }
         }
         if mb_col >= motion.mbs {
-            return Err(DecodeError::InvalidData(
+            return Err(SliceError::InvalidData(
                 "co-located macroblock out of range",
             ));
         }
@@ -734,7 +734,7 @@ impl SliceDecoder<'_> {
     }
 
     #[inline(never)]
-    fn direct_temporal(&mut self, i: usize) -> Result<(), DecodeError> {
+    fn direct_temporal(&mut self, i: usize) -> Result<(), SliceError> {
         let x0 = (i as i32 & 1) * 8;
         let y0 = (i as i32 >> 1) * 8;
         let blocks: &[(i32, i32)] = if self.s.direct_8x8_inference {
@@ -765,10 +765,10 @@ impl SliceDecoder<'_> {
             }
             let p0 = self
                 .ref_pic(0, ref0)
-                .ok_or(DecodeError::InvalidData("direct ref_idx_l0"))?;
+                .ok_or(SliceError::InvalidData("direct ref_idx_l0"))?;
             let p1 = self
                 .ref_pic(1, 0)
-                .ok_or(DecodeError::InvalidData("direct ref_idx_l1"))?;
+                .ok_or(SliceError::InvalidData("direct ref_idx_l1"))?;
             let (mv0, mv1) = if p0.long || p1.poc - p0.poc == 0 {
                 (mv_col, [0, 0])
             } else {
@@ -791,7 +791,7 @@ impl SliceDecoder<'_> {
     }
 
     /// MapColToList0 (8.4.1.2.3) from the identity of refPicCol.
-    fn map_col_to_list0(&self, id: i32, vs: VertScale) -> Result<i32, DecodeError> {
+    fn map_col_to_list0(&self, id: i32, vs: VertScale) -> Result<i32, SliceError> {
         let l0 = &self.s.ref_list[0];
         let uid = id >> 2;
         let st_code = id & 3;
@@ -827,7 +827,7 @@ impl SliceDecoder<'_> {
             }
             VertScale::FldToFrm => find(&|p: &RefPic| uid_of(p) == uid),
         };
-        res.ok_or(DecodeError::InvalidData(
+        res.ok_or(SliceError::InvalidData(
             "temporal direct: co-located reference not in RefPicList0",
         ))
     }
@@ -835,14 +835,14 @@ impl SliceDecoder<'_> {
     // ------------------------------------------------------------------ MC
 
     #[inline(never)]
-    fn motion_compensate(&mut self, direct8: u8) -> Result<(), DecodeError> {
+    fn motion_compensate(&mut self, direct8: u8) -> Result<(), SliceError> {
         if let (Some((r, mv)), false) = (self.mb_motion.take(), self.self_ref_possible) {
             // One 16x16 prediction block with motion known from its derivation.
             let p = self.make_part(0, 0, 16, 16, r, mv)?;
-            let dpb = self.refs.dpb;
+            let refs = self.refs;
             for rp in p.refs.iter().flatten() {
-                if dpb[rp.idx].buf.y.is_empty() {
-                    return Err(DecodeError::InvalidData("reference picture missing"));
+                if refs.dpb[rp.idx].buf.is_none() {
+                    return Err(SliceError::InvalidData("reference picture missing"));
                 }
             }
             let ctx = McCtx {
@@ -852,7 +852,7 @@ impl SliceDecoder<'_> {
             };
             mc_part(
                 &ctx,
-                |i| &*dpb[i].buf,
+                |i| refs.samples(i),
                 &p,
                 &mut self.pic.buf,
                 &mut self.mc_tmp,
@@ -921,17 +921,17 @@ impl SliceDecoder<'_> {
                 g: self.geom,
                 field_dbl,
             };
-            let dpb = self.refs.dpb;
+            let refs = self.refs;
             for &(x, y, w, h) in &parts[..n] {
                 let p = self.part_motion(x, y, w, h)?;
                 for r in p.refs.iter().flatten() {
-                    if dpb[r.idx].buf.y.is_empty() {
-                        return Err(DecodeError::InvalidData("reference picture missing"));
+                    if refs.dpb[r.idx].buf.is_none() {
+                        return Err(SliceError::InvalidData("reference picture missing"));
                     }
                 }
                 mc_part(
                     &ctx,
-                    |i| &*dpb[i].buf,
+                    |i| refs.samples(i),
                     &p,
                     &mut self.pic.buf,
                     &mut self.mc_tmp,
@@ -944,22 +944,12 @@ impl SliceDecoder<'_> {
                 let (x, y, w, h) = parts[k];
                 pm[k] = self.part_motion(x, y, w, h)?;
                 for r in pm[k].refs.iter().flatten() {
-                    if r.idx != self.pic.store && self.refs.dpb[r.idx].buf.y.is_empty() {
-                        return Err(DecodeError::InvalidData("reference picture missing"));
+                    if r.idx != self.pic.store && self.refs.dpb[r.idx].buf.is_none() {
+                        return Err(SliceError::InvalidData("reference picture missing"));
                     }
                 }
             }
-            let mut tmp = McTmp::new();
             let g = self.geom;
-            let mut out = FrameBuf {
-                y: vec![0; 256],
-                cb: vec![0; 64],
-                cr: vec![0; 64],
-                width: 16,
-                height: 16,
-                cwidth: 8,
-                cheight: 8,
-            };
             let lctx = McCtx {
                 s: self.s,
                 g: MbGeom {
@@ -971,7 +961,7 @@ impl SliceDecoder<'_> {
                 },
                 field_dbl,
             };
-            let dpb = self.refs.dpb;
+            let refs = self.refs;
             let cur_store = self.pic.store;
             let cur_buf = &self.pic.buf;
             for p in &pm[..n] {
@@ -981,15 +971,15 @@ impl SliceDecoder<'_> {
                         if i == cur_store {
                             cur_buf
                         } else {
-                            &*dpb[i].buf
+                            refs.samples(i)
                         }
                     },
                     p,
-                    &mut out,
-                    &mut tmp,
+                    &mut *self.mb_out,
+                    &mut self.mc_tmp,
                 );
             }
-            let buf = &mut self.pic.buf;
+            let (buf, out) = (&mut self.pic.buf, &*self.mb_out);
             for yy in 0..16 {
                 let o = g.off_y + yy * g.stride_y;
                 buf.y[o..o + 16].copy_from_slice(&out.y[yy * 16..yy * 16 + 16]);
@@ -1006,7 +996,7 @@ impl SliceDecoder<'_> {
     }
 
     /// Motion of one prediction block (both lists) resolved for motion compensation.
-    fn part_motion(&self, x: i32, y: i32, w: i32, h: i32) -> Result<PartMv, DecodeError> {
+    fn part_motion(&self, x: i32, y: i32, w: i32, h: i32) -> Result<PartMv, SliceError> {
         let cur = self.cur;
         let b8 = ((y / 8) * 2 + x / 8) as usize;
         let b4 = ((y / 4) * 4 + x / 4) as usize;
@@ -1029,7 +1019,7 @@ impl SliceDecoder<'_> {
         h: i32,
         r: [i32; 2],
         mv: [[i32; 2]; 2],
-    ) -> Result<PartMv, DecodeError> {
+    ) -> Result<PartMv, SliceError> {
         let mut pm = PartMv {
             x,
             y,
@@ -1048,7 +1038,7 @@ impl SliceDecoder<'_> {
             pm.ref_idx[list] = r;
             pm.refs[list] = Some(
                 self.ref_pic(list, r)
-                    .ok_or(DecodeError::InvalidData("ref_idx beyond reference list"))?,
+                    .ok_or(SliceError::InvalidData("ref_idx beyond reference list"))?,
             );
             pm.mv[list] = mv[list];
         }
@@ -1110,6 +1100,62 @@ impl McTmp {
             y: [[0; 256]; 2],
             c: [[[0; 64]; 2]; 2],
         }
+    }
+}
+
+/// Planes motion-compensated prediction writes into.
+trait McOut {
+    fn y(&mut self) -> &mut [u8];
+    fn cb(&mut self) -> &mut [u8];
+    fn cr(&mut self) -> &mut [u8];
+}
+
+impl McOut for FrameBuf {
+    #[inline(always)]
+    fn y(&mut self) -> &mut [u8] {
+        &mut self.y
+    }
+    #[inline(always)]
+    fn cb(&mut self) -> &mut [u8] {
+        &mut self.cb
+    }
+    #[inline(always)]
+    fn cr(&mut self) -> &mut [u8] {
+        &mut self.cr
+    }
+}
+
+/// Prediction samples of one macroblock, for a second field whose references include its
+/// own first field: the prediction reads the picture, so it is built here first.
+#[derive(Debug)]
+pub(crate) struct MbSamples {
+    y: [u8; 256],
+    cb: [u8; 64],
+    cr: [u8; 64],
+}
+
+impl MbSamples {
+    pub(crate) fn new() -> Self {
+        MbSamples {
+            y: [0; 256],
+            cb: [0; 64],
+            cr: [0; 64],
+        }
+    }
+}
+
+impl McOut for MbSamples {
+    #[inline(always)]
+    fn y(&mut self) -> &mut [u8] {
+        &mut self.y
+    }
+    #[inline(always)]
+    fn cb(&mut self) -> &mut [u8] {
+        &mut self.cb
+    }
+    #[inline(always)]
+    fn cr(&mut self) -> &mut [u8] {
+        &mut self.cr
     }
 }
 
@@ -1205,11 +1251,11 @@ fn chroma_src<'a>(
 /// Motion-compensated prediction of one block (8.4.2.2) with weighted sample prediction
 /// (8.4.2.3), written into `out` at the geometry's offsets.
 #[inline]
-fn mc_part<'r, F: Fn(usize) -> &'r FrameBuf>(
+fn mc_part<'r, F: Fn(usize) -> &'r FrameBuf, O: McOut>(
     c: &McCtx<'_>,
     refbuf: F,
     p: &PartMv,
-    out: &mut FrameBuf,
+    out: &mut O,
     tmp: &mut McTmp,
 ) {
     let g = c.g;
@@ -1256,14 +1302,14 @@ fn mc_part<'r, F: Fn(usize) -> &'r FrameBuf>(
         let (a, sa) = luma_src(&l0, wu, hu, ty0);
         let (b, sb) = luma_src(&l1, wu, hu, ty1);
         let (lw, w0, w1, o) = wts[0];
-        weight_bi(&mut out.y[oy..], sy, a, sa, b, sb, wu, hu, lw, w0, w1, o);
+        weight_bi(&mut out.y()[oy..], sy, a, sa, b, sb, wu, hu, lw, w0, w1, o);
         if chroma {
             let [tc0, tc1] = &mut tmp.c;
             for (k, (t0, t1)) in tc0.iter_mut().zip(tc1.iter_mut()).enumerate() {
                 let (a, sa) = chroma_src(&l0, k, wc, hc, t0);
                 let (b, sb) = chroma_src(&l1, k, wc, hc, t1);
                 let (lw, w0, w1, o) = wts[1 + k];
-                let pl = if k == 0 { &mut out.cb } else { &mut out.cr };
+                let pl = if k == 0 { out.cb() } else { out.cr() };
                 weight_bi(&mut pl[oc..], sc, a, sa, b, sb, wc, hc, lw, w0, w1, o);
             }
         }
@@ -1282,7 +1328,7 @@ fn mc_part<'r, F: Fn(usize) -> &'r FrameBuf>(
         lp.fy,
         wu,
         hu,
-        &mut out.y[oy..],
+        &mut out.y()[oy..],
         sy,
     );
     if chroma {
@@ -1296,7 +1342,7 @@ fn mc_part<'r, F: Fn(usize) -> &'r FrameBuf>(
             lp.cfy,
             wc,
             hc,
-            &mut out.cb[oc..],
+            &mut out.cb()[oc..],
             sc,
         );
         chroma_mc(
@@ -1307,7 +1353,7 @@ fn mc_part<'r, F: Fn(usize) -> &'r FrameBuf>(
             lp.cfy,
             wc,
             hc,
-            &mut out.cr[oc..],
+            &mut out.cr()[oc..],
             sc,
         );
     }
@@ -1315,10 +1361,34 @@ fn mc_part<'r, F: Fn(usize) -> &'r FrameBuf>(
         let r = p.ref_idx[list];
         let r = if c.field_dbl { r >> 1 } else { r } as usize;
         let wt = s.weights[list][r];
-        weight_uni(&mut out.y[oy..], sy, wu, hu, s.log_wd[0], wt[0].0, wt[0].1);
+        weight_uni(
+            &mut out.y()[oy..],
+            sy,
+            wu,
+            hu,
+            s.log_wd[0],
+            wt[0].0,
+            wt[0].1,
+        );
         if chroma {
-            weight_uni(&mut out.cb[oc..], sc, wc, hc, s.log_wd[1], wt[1].0, wt[1].1);
-            weight_uni(&mut out.cr[oc..], sc, wc, hc, s.log_wd[1], wt[2].0, wt[2].1);
+            weight_uni(
+                &mut out.cb()[oc..],
+                sc,
+                wc,
+                hc,
+                s.log_wd[1],
+                wt[1].0,
+                wt[1].1,
+            );
+            weight_uni(
+                &mut out.cr()[oc..],
+                sc,
+                wc,
+                hc,
+                s.log_wd[1],
+                wt[2].0,
+                wt[2].1,
+            );
         }
     }
 }

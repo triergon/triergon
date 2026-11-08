@@ -8,12 +8,33 @@ use std::sync::Arc;
 use crate::ctu::{RefEntry, RefLists, Scratch, SliceDecoder};
 use crate::error::{DecodeError, Result};
 use crate::nal::{self, NalHeader};
-use crate::picture::{AnyFrame, ColMotion, ColMv, Frame, Pixel, Plane as SamplePlane};
-use crate::ps::{self, Layout, Pps, Sps};
+use crate::picture::{AnyFrame, ColMotion, ColMv, Frame, FramePool, Pixel, SharedFrame};
+use crate::ps::{self, Layout, Pps, Shared, Sps};
 use crate::slice::{self, SLICE_B, SLICE_I, SliceHeader};
 use crate::state::{PicState, SliceInfo};
 use crate::{deblock, sao};
-use triergon_codec::{Colour, DecodeFailure, PictureView, VideoDecoder};
+use triergon_codec::{
+    Budget, BudgetVec, Charged, Colour, DecodeFailure, PictureView, VideoDecoder,
+};
+
+/// Storage limits of one decoder.
+#[derive(Clone, Copy, Debug)]
+pub struct Limits {
+    /// Live storage that depends on the stream: decoded and reference pictures (also
+    /// while a caller holds them), the frame pool, collocated motion, per-picture maps,
+    /// tile and scan tables, and the RBSP of the NAL unit being parsed. The default
+    /// holds the largest DPB level 6.2 allows plus the frame pool and two held output
+    /// pictures, with about 30% to spare (see the crate README).
+    pub live_storage_bytes: usize,
+}
+
+impl Default for Limits {
+    fn default() -> Self {
+        Limits {
+            live_storage_bytes: 1280 << 20,
+        }
+    }
+}
 
 /// Colour description from the VUI (Annex E). Values 2 mean "unspecified".
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -43,7 +64,7 @@ pub enum Row<'a> {
 pub struct Plane {
     pub width: usize,
     pub height: usize,
-    frame: Arc<AnyFrame>,
+    frame: Arc<SharedFrame>,
     index: usize,
     x0: usize,
     y0: usize,
@@ -51,7 +72,7 @@ pub struct Plane {
 
 impl Plane {
     pub fn row(&self, y: usize) -> Row<'_> {
-        match &*self.frame {
+        match &**self.frame {
             AnyFrame::U8(f) => {
                 let p = &f.planes[self.index];
                 let o = (self.y0 + y) * p.stride + self.x0;
@@ -68,7 +89,7 @@ impl Plane {
     /// first visible (cropped) sample). Sample (x, y) of this plane is
     /// `slice[offset + y * stride + x]` for x < width, y < height.
     pub fn raw(&self) -> (Row<'_>, usize, usize) {
-        match &*self.frame {
+        match &**self.frame {
             AnyFrame::U8(f) => {
                 let p = &f.planes[self.index];
                 (Row::U8(&p.data), p.stride, self.y0 * p.stride + self.x0)
@@ -113,12 +134,12 @@ pub struct Picture {
 /// its frame returns to the pool exactly when the inherent API's would.
 impl VideoDecoder for Decoder {
     fn send(&mut self, au: &[u8], pts: Option<i64>) -> core::result::Result<(), DecodeFailure> {
-        self.held = None;
+        self.ctx.held = None;
         Decoder::send(self, au, pts).map_err(DecodeFailure::from_error)
     }
     fn receive(&mut self) -> Option<PictureView<'_>> {
-        self.held = self.out.pop_front();
-        let picture = self.held.as_ref()?;
+        self.ctx.held = self.ctx.out.pop_front();
+        let picture = self.ctx.held.as_ref()?;
         fn plane(p: &Plane) -> triergon_codec::Plane<'_> {
             match p.raw() {
                 (Row::U8(data), stride, offset) => triergon_codec::Plane::U8 {
@@ -151,11 +172,11 @@ impl VideoDecoder for Decoder {
         })
     }
     fn flush(&mut self) {
-        self.held = None;
+        self.ctx.held = None;
         Decoder::flush(self);
     }
     fn reset(&mut self) {
-        self.held = None;
+        self.ctx.held = None;
         Decoder::reset(self);
     }
 }
@@ -179,7 +200,7 @@ struct OutInfo {
 
 #[derive(Debug)]
 struct DpbPic {
-    frame: Arc<AnyFrame>,
+    frame: Arc<SharedFrame>,
     col: Arc<ColMotion>,
     poc: i32,
     mark: RefMark,
@@ -193,8 +214,8 @@ struct DpbPic {
 struct CurPic {
     frame: AnyFrame,
     poc: i32,
-    sps: Arc<Sps>,
-    pps: Arc<Pps>,
+    sps: Shared<Sps>,
+    pps: Shared<Pps>,
     layout: Arc<Layout>,
     output: bool,
     pts: Option<i64>,
@@ -205,15 +226,25 @@ struct CurPic {
     lt_curr: Vec<usize>,
     info: Arc<OutInfo>,
     slices: u16,
+    /// Collocated motion of this picture, filled when it is finished.
+    col: ColMotion,
 }
 
 #[derive(Debug)]
 pub struct Decoder {
+    /// The RBSP of the NAL unit being decoded, kept beside the context that reads it.
+    rbsp: BudgetVec<u8>,
+    ctx: Context,
+}
+
+/// Everything but the RBSP buffer: parameter sets, DPB, current picture and its state.
+#[derive(Debug)]
+struct Context {
     vps: Vec<Option<ps::Vps>>,
-    sps: Vec<Option<Arc<Sps>>>,
-    pps: Vec<Option<Arc<Pps>>>,
-    active_sps: Option<Arc<Sps>>,
-    layout_cache: Option<(Arc<Sps>, Arc<Pps>, Arc<Layout>)>,
+    sps: Vec<Option<Shared<Sps>>>,
+    pps: Vec<Option<Shared<Pps>>>,
+    active_sps: Option<Shared<Sps>>,
+    layout_cache: Option<(Shared<Sps>, Shared<Pps>, Arc<Layout>)>,
     dpb: Vec<DpbPic>,
     out: VecDeque<Picture>,
     /// The picture the last [`VideoDecoder::receive`] view borrows.
@@ -222,9 +253,9 @@ pub struct Decoder {
     st: PicState,
     scratch8: Scratch<u8>,
     scratch16: Scratch<u16>,
-    pool8: Vec<Frame<u8>>,
-    pool16: Vec<Frame<u16>>,
-    rbsp: Vec<u8>,
+    pool: Arc<FramePool>,
+    /// The pool every stream-sized buffer of this decoder is charged to.
+    budget: Budget,
     // POC / IRAP state
     prev_tid0_poc: i32,
     first_picture: bool,
@@ -242,8 +273,99 @@ impl Default for Decoder {
 }
 
 impl Decoder {
+    /// A decoder with a pool of the default limit.
     pub fn new() -> Self {
+        #[allow(clippy::expect_used)] // The default limit is far above a pool's own charge.
+        Self::with_limits(Limits::default()).expect("default storage budget")
+    }
+
+    /// A decoder with its own pool of `limits.live_storage_bytes`.
+    pub fn with_limits(limits: Limits) -> Result<Self> {
+        Ok(Self::new_in(&Budget::new(limits.live_storage_bytes)?))
+    }
+
+    /// A decoder charging the caller's pool.
+    pub fn new_in(budget: &Budget) -> Self {
         Decoder {
+            rbsp: BudgetVec::new(budget),
+            ctx: Context::new(budget),
+        }
+    }
+
+    /// Feed one Annex-B access unit with an opaque caller timestamp.
+    pub fn send(&mut self, au: &[u8], pts: Option<i64>) -> Result<()> {
+        self.ctx.pending_pts = pts;
+        self.ctx.pts_used = false;
+        let mut result = Ok(());
+        for nalu in nal::AnnexBIter::new(au) {
+            if let Err(e) = self.decode_nal(nalu) {
+                // Abandon the current picture on error but keep the decoder usable.
+                if self.ctx.cur.is_some() {
+                    let _ = self.ctx.finish_picture();
+                }
+                result = Err(e);
+                break;
+            }
+        }
+        // One access unit per call: the picture is complete.
+        if self.ctx.cur.is_some() {
+            self.ctx.finish_picture()?;
+        }
+        result
+    }
+
+    /// Feed a single NAL unit (without start code). Pictures are completed when the next
+    /// picture starts or on `flush`.
+    pub fn send_nal(&mut self, nalu: &[u8], pts: Option<i64>) -> Result<()> {
+        if pts.is_some() {
+            self.ctx.pending_pts = pts;
+            self.ctx.pts_used = false;
+        }
+        self.decode_nal(nalu)
+    }
+
+    /// Pop the next picture in output order, if one is ready.
+    pub fn receive(&mut self) -> Option<Picture> {
+        self.ctx.out.pop_front()
+    }
+
+    /// End of stream: output all remaining pictures.
+    pub fn flush(&mut self) {
+        self.ctx.flush();
+    }
+
+    /// Discontinuity: drop the DPB and any partially decoded picture.
+    pub fn reset(&mut self) {
+        self.ctx.reset();
+    }
+
+    fn decode_nal(&mut self, nalu: &[u8]) -> Result<()> {
+        let Some(h) = NalHeader::parse(nalu) else {
+            return Ok(());
+        };
+        if h.nuh_layer_id > 0 {
+            return Ok(());
+        }
+        match h.nal_unit_type {
+            nal::EOS_NUT | nal::EOB_NUT => {
+                if self.ctx.cur.is_some() {
+                    self.ctx.finish_picture()?;
+                }
+                self.ctx.after_eos = true;
+            }
+            0..=9 | 16..=21 | nal::VPS_NUT | nal::SPS_NUT | nal::PPS_NUT => {
+                nal::unescape_rbsp(nalu, &mut self.rbsp)?;
+                self.ctx.decode_rbsp(&self.rbsp, h)?;
+            }
+            _ => {}
+        }
+        Ok(())
+    }
+}
+
+impl Context {
+    fn new(budget: &Budget) -> Self {
+        Context {
             vps: (0..ps::MAX_VPS).map(|_| None).collect(),
             sps: (0..ps::MAX_SPS).map(|_| None).collect(),
             pps: (0..ps::MAX_PPS).map(|_| None).collect(),
@@ -253,12 +375,11 @@ impl Decoder {
             out: VecDeque::new(),
             held: None,
             cur: None,
-            st: PicState::new(),
-            scratch8: Scratch::new(),
-            scratch16: Scratch::new(),
-            pool8: Vec::new(),
-            pool16: Vec::new(),
-            rbsp: Vec::new(),
+            st: PicState::new(budget),
+            scratch8: Scratch::new(budget),
+            scratch16: Scratch::new(budget),
+            pool: Arc::default(),
+            budget: budget.clone(),
             prev_tid0_poc: 0,
             first_picture: true,
             after_eos: false,
@@ -269,45 +390,7 @@ impl Decoder {
         }
     }
 
-    /// Feed one Annex-B access unit with an opaque caller timestamp.
-    pub fn send(&mut self, au: &[u8], pts: Option<i64>) -> Result<()> {
-        self.pending_pts = pts;
-        self.pts_used = false;
-        let mut result = Ok(());
-        for nalu in nal::AnnexBIter::new(au) {
-            if let Err(e) = self.decode_nal(nalu) {
-                // Abandon the current picture on error but keep the decoder usable.
-                if self.cur.is_some() {
-                    let _ = self.finish_picture();
-                }
-                result = Err(e);
-                break;
-            }
-        }
-        // One access unit per call: the picture is complete.
-        if self.cur.is_some() {
-            self.finish_picture()?;
-        }
-        result
-    }
-
-    /// Feed a single NAL unit (without start code). Pictures are completed when the next
-    /// picture starts or on `flush`.
-    pub fn send_nal(&mut self, nalu: &[u8], pts: Option<i64>) -> Result<()> {
-        if pts.is_some() {
-            self.pending_pts = pts;
-            self.pts_used = false;
-        }
-        self.decode_nal(nalu)
-    }
-
-    /// Pop the next picture in output order, if one is ready.
-    pub fn receive(&mut self) -> Option<Picture> {
-        self.out.pop_front()
-    }
-
-    /// End of stream: output all remaining pictures.
-    pub fn flush(&mut self) {
+    fn flush(&mut self) {
         if self.cur.is_some() {
             let _ = self.finish_picture();
         }
@@ -315,8 +398,7 @@ impl Decoder {
         self.dpb.clear();
     }
 
-    /// Discontinuity: drop the DPB and any partially decoded picture.
-    pub fn reset(&mut self) {
+    fn reset(&mut self) {
         self.cur = None;
         self.dpb.clear();
         self.out.clear();
@@ -325,56 +407,24 @@ impl Decoder {
         self.no_rasl_output = true;
     }
 
-    fn decode_nal(&mut self, nalu: &[u8]) -> Result<()> {
-        let Some(h) = NalHeader::parse(nalu) else {
-            return Ok(());
-        };
-        if h.nuh_layer_id > 0 {
-            return Ok(());
-        }
-        let t = h.nal_unit_type;
-        match t {
+    fn decode_rbsp(&mut self, rbsp: &[u8], h: NalHeader) -> Result<()> {
+        match h.nal_unit_type {
             nal::VPS_NUT => {
-                let mut rb = std::mem::take(&mut self.rbsp);
-                nal::unescape_rbsp(nalu, &mut rb);
-                let r = ps::parse_vps(&rb);
-                self.rbsp = rb;
-                let v = r?;
+                let v = ps::parse_vps(rbsp)?;
                 let id = v.id as usize;
                 self.vps[id] = Some(v);
             }
             nal::SPS_NUT => {
-                let mut rb = std::mem::take(&mut self.rbsp);
-                nal::unescape_rbsp(nalu, &mut rb);
-                let r = ps::parse_sps(&rb);
-                self.rbsp = rb;
-                let s = r?;
+                let s = ps::parse_sps(rbsp)?;
                 let id = s.id as usize;
-                self.sps[id] = Some(Arc::new(s));
+                self.sps[id] = Some(Arc::new(Charged::boxed(&self.budget, s)?));
             }
             nal::PPS_NUT => {
-                let mut rb = std::mem::take(&mut self.rbsp);
-                nal::unescape_rbsp(nalu, &mut rb);
-                let r = ps::parse_pps(&rb);
-                self.rbsp = rb;
-                let p = r?;
+                let p = ps::parse_pps(rbsp)?;
                 let id = p.id as usize;
-                self.pps[id] = Some(Arc::new(p));
+                self.pps[id] = Some(Arc::new(Charged::boxed(&self.budget, p)?));
             }
-            nal::EOS_NUT | nal::EOB_NUT => {
-                if self.cur.is_some() {
-                    self.finish_picture()?;
-                }
-                self.after_eos = true;
-            }
-            0..=9 | 16..=21 => {
-                let mut rb = std::mem::take(&mut self.rbsp);
-                nal::unescape_rbsp(nalu, &mut rb);
-                let r = self.decode_slice_nal(&rb, h);
-                self.rbsp = rb;
-                r?;
-            }
-            _ => {}
+            _ => self.decode_slice_nal(rbsp, h)?,
         }
         Ok(())
     }
@@ -425,6 +475,7 @@ impl Decoder {
         if first {
             self.start_picture(&sh, h, sps.clone(), pps.clone())?;
         }
+        self.st.reserve_slice()?;
         let cur = self.cur.as_mut().unwrap();
         if !sh.dependent_slice_segment {
             cur.prev_sh = Some(sh.clone());
@@ -487,7 +538,8 @@ impl Decoder {
                 }
             }
         }
-        self.st.slices.push(info);
+        // Cannot fail: `reserve_slice` made room before the picture state changed.
+        self.st.slices.try_push(info).map_err(|e| e.error)?;
         let layout = cur.layout.clone();
         let poc = cur.poc;
 
@@ -527,8 +579,8 @@ impl Decoder {
         &mut self,
         sh: &SliceHeader,
         h: NalHeader,
-        sps: Arc<Sps>,
-        pps: Arc<Pps>,
+        sps: Shared<Sps>,
+        pps: Shared<Pps>,
     ) -> Result<()> {
         let t = h.nal_unit_type;
         let irap = nal::is_irap(t);
@@ -540,18 +592,12 @@ impl Decoder {
         if pps.scc_ext && sps.profile.profile_idc >= 9 {
             return Err(DecodeError::Unsupported("pps_scc_extension (SCC)"));
         }
-        // Activate SPS.
-        let sps_changed = match &self.active_sps {
-            Some(a) => !Arc::ptr_eq(a, &sps),
-            None => true,
-        };
-        if sps_changed {
-            self.active_sps = Some(sps.clone());
-        }
         let layout = match &self.layout_cache {
             Some((s, p, l)) if Arc::ptr_eq(s, &sps) && Arc::ptr_eq(p, &pps) => l.clone(),
             _ => {
-                let l = Arc::new(Layout::new(&sps, &pps)?);
+                // Release the previous layout before the new one is charged.
+                self.layout_cache = None;
+                let l = Arc::new(Layout::new(&sps, &pps, &self.budget)?);
                 self.layout_cache = Some((sps.clone(), pps.clone(), l.clone()));
                 l
             }
@@ -573,13 +619,6 @@ impl Decoder {
             }
         };
         let poc = poc_msb + lsb;
-        if h.temporal_id == 0
-            && !nal::is_rasl(t)
-            && !nal::is_radl(t)
-            && !nal::is_sub_layer_non_ref(t)
-        {
-            self.prev_tid0_poc = poc;
-        }
         // RPS (8.3.2)
         if irap && self.no_rasl_output {
             for p in &mut self.dpb {
@@ -609,7 +648,7 @@ impl Decoder {
                     st_foll_poc.push(poc + d);
                 }
             }
-            for lt in &sh.long_term {
+            for lt in sh.long_term() {
                 let mut p = lt.poc_lsb as i32;
                 if lt.msb_present {
                     p += poc
@@ -728,6 +767,28 @@ impl Decoder {
                 }
             }
         }
+        // The current picture's storage is charged once the removal above has freed what it
+        // can (into the frame pool), and before the missing references and the POC state.
+        let (w, hgt) = (sps.width as usize, sps.height as usize);
+        let frame = if sps.high_bit_depth() {
+            AnyFrame::U16(match self.pool.take(w, hgt) {
+                Some(f) => f,
+                None => Frame::try_new(&self.budget, w, hgt, 0)?,
+            })
+        } else {
+            AnyFrame::U8(match self.pool.take(w, hgt) {
+                Some(f) => f,
+                None => Frame::try_new(&self.budget, w, hgt, 0)?,
+            })
+        };
+        let ctb = sps.ctb_size as usize;
+        match &frame {
+            AnyFrame::U8(_) => prepare_band(&mut self.scratch8, w, ctb, &self.budget)?,
+            AnyFrame::U16(_) => prepare_band(&mut self.scratch16, w, ctb, &self.budget)?,
+        }
+        let col = ColMotion::try_new(&self.budget, w, hgt)?;
+        self.st
+            .reset(w, hgt, sps.pic_size_ctb() as usize, sps.pic_h_ctb as usize)?;
         // The indices computed above are invalid if the DPB changed; recompute by POC.
         let resolve = |dpb: &Vec<DpbPic>, p: i32| {
             dpb.iter()
@@ -740,14 +801,14 @@ impl Decoder {
         for (k, &p) in st_before_poc.iter().enumerate() {
             let i = match resolve(&self.dpb, p) {
                 Some(i) if st_before_idx[k].is_some() => i,
-                _ => self.generate_missing(&sps, p, RefMark::Short, info.clone()),
+                _ => self.generate_missing(&sps, p, RefMark::Short, info.clone())?,
             };
             st_before.push(i);
         }
         for (k, &p) in st_after_poc.iter().enumerate() {
             let i = match resolve(&self.dpb, p) {
                 Some(i) if st_after_idx[k].is_some() => i,
-                _ => self.generate_missing(&sps, p, RefMark::Short, info.clone()),
+                _ => self.generate_missing(&sps, p, RefMark::Short, info.clone())?,
             };
             st_after.push(i);
         }
@@ -766,36 +827,27 @@ impl Decoder {
             };
             let i = match found {
                 Some(i) => i,
-                None => self.generate_missing(&sps, p, RefMark::Long, info.clone()),
+                None => self.generate_missing(&sps, p, RefMark::Long, info.clone())?,
             };
             lt_curr.push(i);
         }
+        // Activate the SPS and commit the POC and IRAP state.
+        let sps_changed = match &self.active_sps {
+            Some(a) => !Arc::ptr_eq(a, &sps),
+            None => true,
+        };
+        if sps_changed {
+            self.active_sps = Some(sps.clone());
+        }
+        if h.temporal_id == 0
+            && !nal::is_rasl(t)
+            && !nal::is_radl(t)
+            && !nal::is_sub_layer_non_ref(t)
+        {
+            self.prev_tid0_poc = poc;
+        }
         self.first_picture = false;
         self.after_eos = false;
-        // Allocate the current frame.
-        let (w, hgt) = (sps.width as usize, sps.height as usize);
-        let frame = if sps.high_bit_depth() {
-            let f = loop {
-                match self.pool16.pop() {
-                    Some(f) if f.same_geometry(w, hgt) => break f,
-                    Some(_) => continue,
-                    None => break Frame::<u16>::new(w, hgt, 0),
-                }
-            };
-            AnyFrame::U16(f)
-        } else {
-            let f = loop {
-                match self.pool8.pop() {
-                    Some(f) if f.same_geometry(w, hgt) => break f,
-                    Some(_) => continue,
-                    None => break Frame::<u8>::new(w, hgt, 0),
-                }
-            };
-            AnyFrame::U8(f)
-        };
-        self.st.reset(w, hgt, sps.pic_size_ctb() as usize);
-        self.st.row_done.clear();
-        self.st.row_done.resize(sps.pic_h_ctb as usize, 0);
         let pts = if self.pts_used {
             None
         } else {
@@ -816,6 +868,7 @@ impl Decoder {
             lt_curr,
             info,
             slices: 0,
+            col,
         });
         Ok(())
     }
@@ -826,22 +879,21 @@ impl Decoder {
         poc: i32,
         mark: RefMark,
         info: Arc<OutInfo>,
-    ) -> usize {
+    ) -> Result<usize> {
         let (w, h) = (sps.width as usize, sps.height as usize);
         let frame = if sps.high_bit_depth() {
-            AnyFrame::U16(Frame::new(w, h, 1u16 << (sps.bit_depth_luma - 1)))
+            AnyFrame::U16(Frame::try_new(
+                &self.budget,
+                w,
+                h,
+                1u16 << (sps.bit_depth_luma - 1),
+            )?)
         } else {
-            AnyFrame::U8(Frame::new(w, h, 128u8))
+            AnyFrame::U8(Frame::try_new(&self.budget, w, h, 128u8)?)
         };
-        let w16 = w.div_ceil(16);
-        let h16 = h.div_ceil(16);
         self.dpb.push(DpbPic {
-            frame: Arc::new(frame),
-            col: Arc::new(ColMotion {
-                w16,
-                h16,
-                data: vec![ColMv::default(); w16 * h16],
-            }),
+            frame: SharedFrame::new(frame, &self.pool),
+            col: Arc::new(ColMotion::try_new(&self.budget, w, h)?),
             poc,
             mark,
             needed_for_output: false,
@@ -849,34 +901,16 @@ impl Decoder {
             pts: None,
             info,
         });
-        self.dpb.len() - 1
+        Ok(self.dpb.len() - 1)
     }
 
     fn remove_unused(&mut self) {
         let mut i = 0;
         while i < self.dpb.len() {
             if !self.dpb[i].needed_for_output && self.dpb[i].mark == RefMark::Unused {
-                let p = self.dpb.remove(i);
-                self.recycle(p.frame);
+                self.dpb.remove(i);
             } else {
                 i += 1;
-            }
-        }
-    }
-
-    fn recycle(&mut self, f: Arc<AnyFrame>) {
-        if let Ok(f) = Arc::try_unwrap(f) {
-            match f {
-                AnyFrame::U8(f) => {
-                    if self.pool8.is_empty() {
-                        self.pool8.push(f);
-                    }
-                }
-                AnyFrame::U16(f) => {
-                    if self.pool16.is_empty() {
-                        self.pool16.push(f);
-                    }
-                }
             }
         }
     }
@@ -895,8 +929,7 @@ impl Decoder {
         let pic = make_picture(p);
         self.out.push_back(pic);
         if self.dpb[i].mark == RefMark::Unused {
-            let p = self.dpb.remove(i);
-            self.recycle(p.frame);
+            self.dpb.remove(i);
         }
         true
     }
@@ -923,7 +956,7 @@ impl Decoder {
         let h = sps.height as usize;
         let w16 = w.div_ceil(16);
         let h16 = h.div_ceil(16);
-        let mut data = vec![ColMv::default(); w16 * h16];
+        let data = &mut cur.col.data;
         for y in 0..h16 {
             for x in 0..w16 {
                 let (lx, ly) = (x * 16, y * 16);
@@ -952,7 +985,7 @@ impl Decoder {
                 data[y * w16 + x] = c;
             }
         }
-        let col = Arc::new(ColMotion { w16, h16, data });
+        let col = Arc::new(cur.col);
 
         // C.5.2.3: marking and additional bumping.
         let highest = sps.max_sub_layers_minus1 as usize;
@@ -964,7 +997,7 @@ impl Decoder {
             }
         }
         self.dpb.push(DpbPic {
-            frame: Arc::new(cur.frame),
+            frame: SharedFrame::new(cur.frame, &self.pool),
             col,
             poc: cur.poc,
             mark: RefMark::Short,
@@ -1012,7 +1045,7 @@ pub(crate) fn filter_ready<P: Pixel>(
     pps: &Pps,
     layout: &Layout,
     band: &mut Option<Frame<P>>,
-    saved: &mut [Vec<P>; 3],
+    saved: &mut [BudgetVec<P>; 3],
     all: bool,
 ) {
     let nb = sps.pic_h_ctb as usize;
@@ -1049,31 +1082,12 @@ fn sao_row<P: Pixel>(
     pps: &Pps,
     layout: &Layout,
     band: &mut Option<Frame<P>>,
-    saved: &mut [Vec<P>; 3],
+    saved: &mut [BudgetVec<P>; 3],
     rr: usize,
 ) {
     let ctb = sps.ctb_size as usize;
     let wc = sps.pic_w_ctb as usize;
-    let w = f.planes[0].width;
-    let ok = band
-        .as_ref()
-        .is_some_and(|b| b.planes[0].width == w && b.planes[0].height == ctb + 2);
-    if !ok {
-        *band = Some(Frame {
-            planes: [
-                SamplePlane::new(w, ctb + 2, P::default()),
-                SamplePlane::new(w / 2, ctb / 2 + 2, P::default()),
-                SamplePlane::new(w / 2, ctb / 2 + 2, P::default()),
-            ],
-        });
-    }
-    for c in 0..3 {
-        let pw = f.planes[c].width;
-        if saved[c].len() != pw {
-            saved[c].clear();
-            saved[c].resize(pw, P::default());
-        }
-    }
+    // `prepare_band` sized the band and the saved lines for this picture.
     let band = band.as_mut().unwrap();
     let any_sao = st.sao[rr * wc..(rr + 1) * wc]
         .iter()
@@ -1107,6 +1121,36 @@ fn sao_row<P: Pixel>(
     if any_sao {
         sao::sao_band(f, band, y0s, st, sps, pps, layout, rr as i32);
     }
+}
+
+/// Size the SAO band buffer and the saved lines of `sc` for pictures `w` luma samples
+/// wide with `ctb`-sample CTBs. They are kept while the geometry stays the same.
+fn prepare_band<P: Pixel>(
+    sc: &mut Scratch<P>,
+    w: usize,
+    ctb: usize,
+    budget: &Budget,
+) -> Result<()> {
+    if sc
+        .band
+        .as_ref()
+        .is_some_and(|b| b.planes[0].width == w && b.planes[0].height == ctb + 2)
+    {
+        return Ok(());
+    }
+    // Release the old buffers before the new ones are charged.
+    sc.band = None;
+    sc.saved = core::array::from_fn(|_| BudgetVec::new(budget));
+    let chroma = (w / 2, ctb / 2 + 2);
+    sc.band = Some(Frame::with_planes(
+        budget,
+        [(w, ctb + 2), chroma, chroma],
+        P::default(),
+    )?);
+    for (saved, pw) in sc.saved.iter_mut().zip([w, w / 2, w / 2]) {
+        *saved = BudgetVec::try_filled(budget, P::default(), pw)?;
+    }
+    Ok(())
 }
 
 fn make_picture(p: &DpbPic) -> Picture {

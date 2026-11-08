@@ -17,6 +17,7 @@ use crate::ps::{Layout, Pps, Sps};
 use crate::slice::{SLICE_I, SLICE_P, SliceHeader};
 use crate::state::*;
 use crate::transform;
+use triergon_codec::{Budget, BudgetVec};
 
 /// Z-order (Morton) index of 4x4 units inside a 64x64 CTB, [y4 * 16 + x4] (6.5.2 within a CTB).
 const Z4: [u8; 256] = {
@@ -73,11 +74,11 @@ pub struct Scratch<P> {
     /// SAO source band (deblocked samples of one CTB row plus a line above and below) and
     /// the saved last deblocked line of the previous row, per component.
     pub band: Option<Frame<P>>,
-    pub saved: [Vec<P>; 3],
+    pub saved: [BudgetVec<P>; 3],
 }
 
 impl<P: Pixel> Scratch<P> {
-    pub fn new() -> Self {
+    pub fn new(budget: &Budget) -> Self {
         Scratch {
             coeffs: vec![0; 32 * 32],
             res: vec![0; 32 * 32],
@@ -85,14 +86,8 @@ impl<P: Pixel> Scratch<P> {
             mc: McScratch::new(),
             tr: transform::TransformScratch::new(),
             band: None,
-            saved: Default::default(),
+            saved: core::array::from_fn(|_| BudgetVec::new(budget)),
         }
-    }
-}
-
-impl<P: Pixel> Default for Scratch<P> {
-    fn default() -> Self {
-        Self::new()
     }
 }
 

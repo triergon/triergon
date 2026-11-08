@@ -1,13 +1,14 @@
 //! Slice data decoding (clause 7.3.4): macroblock loop, neighbour derivation (6.4.9 - 6.4.12)
 //! and the shared per-slice / per-picture contexts.
 
-use crate::DecodeError;
+use crate::SliceError;
 use crate::cabac::Cabac;
 use crate::cavlc::{self, CavlcTables};
 use crate::mbinfo::*;
 use crate::picture::*;
 use crate::slice::{SliceHeader, SliceType};
 use triergon_bitstream::BitReader;
+use triergon_codec::BudgetVec;
 
 /// Weighted prediction mode for a slice.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
@@ -59,7 +60,7 @@ pub(crate) struct CurPic {
     pub store: usize,
     pub buf: FrameBuf,
     pub motion: Motion,
-    pub mbs: Vec<MbInfo>,
+    pub mbs: BudgetVec<MbInfo>,
     /// Width in MBs and height in MBs of this picture (field: half the frame height).
     pub w: usize,
     pub h: usize,
@@ -67,7 +68,7 @@ pub(crate) struct CurPic {
     pub structure: u8,
     pub mbaff: bool,
     pub poc: [i32; 2],
-    pub slices: Vec<SliceDbk>,
+    pub slices: BudgetVec<SliceDbk>,
     pub decoded_mbs: usize,
     pub chroma: bool,
     pub dbk: crate::deblock::Progress,
@@ -84,8 +85,18 @@ impl CurPic {
 }
 
 /// Read-only access to reference frame stores during slice decoding.
+#[derive(Clone, Copy)]
 pub(crate) struct Refs<'a> {
     pub dpb: &'a [FrameStore],
+    /// Stands in for the samples of a store that has none; callers check first.
+    pub no_samples: &'a FrameBuf,
+}
+
+impl<'a> Refs<'a> {
+    #[inline(always)]
+    pub(crate) fn samples(&self, i: usize) -> &'a FrameBuf {
+        self.dpb[i].buf.as_deref().unwrap_or(self.no_samples)
+    }
 }
 
 /// Geometry of a macroblock in the current picture's planes.
@@ -136,6 +147,8 @@ pub(crate) struct SliceDecoder<'a> {
     pub self_ref_possible: bool,
     /// Second-list prediction scratch for motion compensation.
     pub mc_tmp: crate::inter::McTmp,
+    /// Prediction of the current macroblock when it may read its own picture.
+    pub mb_out: &'a mut crate::inter::MbSamples,
 }
 
 impl<'a> SliceDecoder<'a> {
@@ -145,6 +158,7 @@ impl<'a> SliceDecoder<'a> {
         refs: Refs<'a>,
         rbsp: &'a [u8],
         rbsp_len: usize,
+        mb_out: &'a mut crate::inter::MbSamples,
     ) -> SliceDecoder<'a> {
         let mut br = BitReader::with_end(rbsp, rbsp_len * 8);
         br.seek(s.sh.data_bit_pos);
@@ -170,6 +184,7 @@ impl<'a> SliceDecoder<'a> {
             mb_motion: None,
             self_ref_possible,
             mc_tmp: crate::inter::McTmp::new(),
+            mb_out,
         }
     }
 
@@ -506,12 +521,12 @@ impl<'a> SliceDecoder<'a> {
         false
     }
 
-    fn begin_mb(&mut self, addr: usize) -> Result<(), DecodeError> {
+    fn begin_mb(&mut self, addr: usize) -> Result<(), SliceError> {
         if addr >= self.pic_size() {
-            return Err(DecodeError::InvalidData("slice runs past picture end"));
+            return Err(SliceError::InvalidData("slice runs past picture end"));
         }
         if self.pic.mbs[addr].slice != 0 {
-            return Err(DecodeError::InvalidData("macroblock decoded twice"));
+            return Err(SliceError::InvalidData("macroblock decoded twice"));
         }
         self.cur = addr;
         let mut info = MbInfo {
@@ -542,7 +557,7 @@ impl<'a> SliceDecoder<'a> {
     }
 
     /// Decode all macroblocks of the slice (7.3.4 slice_data()).
-    pub(crate) fn run(&mut self) -> Result<(), DecodeError> {
+    pub(crate) fn run(&mut self) -> Result<(), SliceError> {
         let sh = &self.s.sh;
         let mbaff = self.pic.mbaff;
         let cabac = self.s.cabac;
@@ -574,7 +589,7 @@ impl<'a> SliceDecoder<'a> {
                 if !cabac {
                     let run = self.br.ue() as usize;
                     if run > self.pic_size() {
-                        return Err(DecodeError::InvalidData("mb_skip_run"));
+                        return Err(SliceError::InvalidData("mb_skip_run"));
                     }
                     prev_skipped = run > 0;
                     for i in 0..run {
@@ -644,7 +659,7 @@ impl<'a> SliceDecoder<'a> {
             if !cabac {
                 more = self.br.more_rbsp_data();
                 if self.br.overrun() {
-                    return Err(DecodeError::InvalidData("CAVLC data overrun"));
+                    return Err(SliceError::InvalidData("CAVLC data overrun"));
                 }
             } else {
                 if !is_i {
@@ -656,7 +671,7 @@ impl<'a> SliceDecoder<'a> {
                     let c = self.cabac.as_mut().unwrap();
                     more = c.terminate() == 0;
                     if c.overrun() {
-                        return Err(DecodeError::InvalidData("CABAC data overrun"));
+                        return Err(SliceError::InvalidData("CABAC data overrun"));
                     }
                 }
                 self.finish_mb();

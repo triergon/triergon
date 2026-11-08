@@ -1,7 +1,7 @@
 //! Macroblock layer parsing (clause 7.3.5) for CAVLC and CABAC, and the per-macroblock
 //! decoding driver (prediction + residual + bookkeeping).
 
-use crate::DecodeError;
+use crate::SliceError;
 use crate::cabac::{CBF_CAT_OFF, off};
 use crate::cavlc;
 use crate::mbinfo::*;
@@ -10,8 +10,8 @@ use crate::slicedec::SliceDecoder;
 use crate::tables::*;
 use triergon_bitstream::BitReader;
 
-fn inval(s: &'static str) -> DecodeError {
-    DecodeError::InvalidData(s)
+fn inval(s: &'static str) -> SliceError {
+    SliceError::InvalidData(s)
 }
 
 /// Parsed macroblock syntax (scratch, reused).
@@ -76,7 +76,7 @@ impl MbData {
 }
 
 /// Map I-slice mb_type (0..=25) to kind / Intra16x16 parameters.
-fn set_intra_type(mb: &mut MbData, t: u32) -> Result<(), DecodeError> {
+fn set_intra_type(mb: &mut MbData, t: u32) -> Result<(), SliceError> {
     match t {
         0 => mb.kind = Kind::I4x4,
         1..=24 => {
@@ -129,7 +129,7 @@ impl SliceDecoder<'_> {
         self.cabac.as_mut().unwrap().decision(off::FIELD + inc) == 1
     }
 
-    fn cabac_mb_type(&mut self) -> Result<u32, DecodeError> {
+    fn cabac_mb_type(&mut self) -> Result<u32, SliceError> {
         let st = self.s.sh.slice_type;
         let a = self.mb_a();
         let b = self.mb_b();
@@ -153,7 +153,7 @@ impl SliceDecoder<'_> {
                 let inc = ct(a) + ct(b);
                 self.cabac.as_mut().unwrap().mb_type_b(inc)
             }
-            SliceType::SI => return Err(DecodeError::Unsupported("SI slices")),
+            SliceType::SI => return Err(SliceError::Unsupported("SI slices")),
         })
     }
 
@@ -349,7 +349,7 @@ impl SliceDecoder<'_> {
     // ------------------------------------------------------------------ MB layer
 
     /// Decode a non-skipped macroblock (macroblock_layer()).
-    pub(crate) fn decode_coded_mb(&mut self) -> Result<(), DecodeError> {
+    pub(crate) fn decode_coded_mb(&mut self) -> Result<(), SliceError> {
         let st = self.s.sh.slice_type;
         let cabac = self.s.cabac;
         let mb = &mut self.mb;
@@ -375,7 +375,7 @@ impl SliceDecoder<'_> {
         // Map mb_type into kinds.
         match st {
             SliceType::I => set_intra_type(&mut self.mb, mb_type)?,
-            SliceType::SI => return Err(DecodeError::Unsupported("SI slices")),
+            SliceType::SI => return Err(SliceError::Unsupported("SI slices")),
             SliceType::P | SliceType::SP => match mb_type {
                 0 => {
                     self.mb.kind = Kind::P16x16;
@@ -543,7 +543,7 @@ impl SliceDecoder<'_> {
         self.reconstruct_mb()
     }
 
-    fn read_intra_mode(&mut self) -> Result<Option<u8>, DecodeError> {
+    fn read_intra_mode(&mut self) -> Result<Option<u8>, SliceError> {
         if self.s.cabac {
             Ok(self
                 .cabac
@@ -559,7 +559,7 @@ impl SliceDecoder<'_> {
     }
 
     /// ref_idx / mvd for 16x16, 16x8, 8x16 partitions (mb_pred()).
-    fn parse_ref_mvd_parts(&mut self) -> Result<(), DecodeError> {
+    fn parse_ref_mvd_parts(&mut self) -> Result<(), SliceError> {
         let nparts = match self.mb.kind {
             Kind::P16x16 | Kind::B16x16 => 1,
             _ => 2,
@@ -640,7 +640,7 @@ impl SliceDecoder<'_> {
     }
 
     /// ref_idx / mvd for P_8x8 / B_8x8 (sub_mb_pred()).
-    fn parse_ref_mvd_8x8(&mut self, p8x8ref0: bool) -> Result<(), DecodeError> {
+    fn parse_ref_mvd_8x8(&mut self, p8x8ref0: bool) -> Result<(), SliceError> {
         let field_dbl = self.pic.mbaff && self.field_mb();
         let is_b = self.mb.kind == Kind::B8x8;
         for list in 0..2 {
@@ -762,7 +762,7 @@ impl SliceDecoder<'_> {
     }
 
     /// Read mvd_lX for the (sub-)partition with top-left (x, y) (CAVLC se(v) / CABAC UEG3).
-    fn read_mvd(&mut self, list: usize, x: i32, y: i32) -> Result<[i32; 2], DecodeError> {
+    fn read_mvd(&mut self, list: usize, x: i32, y: i32) -> Result<[i32; 2], SliceError> {
         if !self.s.cabac {
             let a = self.br.se();
             let b = self.br.se();
@@ -811,7 +811,7 @@ impl SliceDecoder<'_> {
     // ------------------------------------------------------------------ residual
 
     #[inline(never)]
-    fn parse_residual(&mut self) -> Result<(), DecodeError> {
+    fn parse_residual(&mut self) -> Result<(), SliceError> {
         let kind = self.mb.kind;
         let cbp = self.mb.cbp;
         let field = self.field_mb();
@@ -1051,7 +1051,7 @@ impl SliceDecoder<'_> {
 
     // ------------------------------------------------------------------ I_PCM
 
-    fn decode_pcm(&mut self) -> Result<(), DecodeError> {
+    fn decode_pcm(&mut self) -> Result<(), SliceError> {
         let g = self.geom_of(self.cur);
         self.geom = g;
         let mut samples = [0u8; 384];
@@ -1125,7 +1125,7 @@ impl SliceDecoder<'_> {
 
     // ------------------------------------------------------------------ reconstruction
 
-    fn reconstruct_mb(&mut self) -> Result<(), DecodeError> {
+    fn reconstruct_mb(&mut self) -> Result<(), SliceError> {
         let cur = self.cur;
         self.geom = self.geom_of(cur);
         let kind = self.mb.kind;
@@ -1195,7 +1195,7 @@ impl SliceDecoder<'_> {
     }
 
     /// Decode a skipped macroblock (P_Skip / B_Skip).
-    pub(crate) fn decode_skip_mb(&mut self) -> Result<(), DecodeError> {
+    pub(crate) fn decode_skip_mb(&mut self) -> Result<(), SliceError> {
         let cur = self.cur;
         let is_b = self.s.sh.slice_type == SliceType::B;
         let kind = if is_b { Kind::BSkip } else { Kind::PSkip };

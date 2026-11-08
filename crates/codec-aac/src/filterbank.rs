@@ -4,35 +4,11 @@
 use crate::fft::Mdct;
 use crate::ics::{EIGHT_SHORT, LONG_START, LONG_STOP};
 
-fn bessel_i0(x: f64) -> f64 {
-    let mut sum = 1.0;
-    let mut term = 1.0;
-    let h = x / 2.0;
-    for k in 1..60 {
-        term *= h / k as f64;
-        sum += term * term;
-    }
-    sum
-}
-
 /// Rising half (n < N/2) of the KBD window of length `n2 * 2` (ISO/IEC 14496-3 4.6.11.3.2).
-pub(crate) fn kbd_window(n2: usize, alpha: f64) -> Vec<f32> {
-    let n = n2 * 2;
-    let q = n as f64 / 4.0;
-    let w: Vec<f64> = (0..=n2)
-        .map(|p| {
-            let r = (p as f64 - q) / q;
-            bessel_i0(std::f64::consts::PI * alpha * (1.0 - r * r).max(0.0).sqrt())
-        })
-        .collect();
-    let total: f64 = w.iter().sum();
-    let mut acc = 0.0;
-    (0..n2)
-        .map(|i| {
-            acc += w[i];
-            (acc / total).sqrt() as f32
-        })
-        .collect()
+fn kbd_window(n2: usize, alpha: f64) -> Vec<f32> {
+    let mut w = vec![0.0; n2];
+    triergon_codec::kbd_window(alpha, &mut w);
+    w
 }
 
 /// Rising half of the sine window of length `n2 * 2`.

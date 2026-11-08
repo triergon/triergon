@@ -4,6 +4,38 @@
 use super::Header;
 use crate::error::{DecodeError, Result};
 
+/// A band table: at most 65 QMF subband edges (`compute` refuses kx + M > 64).
+#[derive(Clone, Copy, Debug)]
+pub(crate) struct Bands {
+    len: usize,
+    v: [usize; 65],
+}
+
+impl Bands {
+    fn from_slice(v: &[usize]) -> Result<Bands> {
+        let mut b = Bands::default();
+        b.v.get_mut(..v.len())
+            .ok_or(DecodeError::InvalidData("SBR band table"))?
+            .copy_from_slice(v);
+        b.len = v.len();
+        Ok(b)
+    }
+}
+
+impl Default for Bands {
+    fn default() -> Bands {
+        Bands { len: 0, v: [0; 65] }
+    }
+}
+
+impl std::ops::Deref for Bands {
+    type Target = [usize];
+
+    fn deref(&self) -> &[usize] {
+        &self.v[..self.len]
+    }
+}
+
 #[derive(Clone, Default, Debug)]
 #[allow(dead_code)] // k0 / k2 / master kept for diagnostics
 pub(crate) struct FreqTables {
@@ -11,17 +43,17 @@ pub(crate) struct FreqTables {
     pub k2: usize,
     pub kx: usize,
     pub m: usize,
-    pub master: Vec<usize>,
-    pub high: Vec<usize>,
-    pub low: Vec<usize>,
-    pub noise: Vec<usize>,
-    pub lim: Vec<usize>,
+    pub master: Bands,
+    pub high: Bands,
+    pub low: Bands,
+    pub noise: Bands,
+    pub lim: Bands,
     pub n_high: usize,
     pub n_low: usize,
     pub n_q: usize,
     pub n_lim: usize,
-    pub patch_num: Vec<usize>,
-    pub patch_start: Vec<usize>,
+    pub patch_num: Bands,
+    pub patch_start: Bands,
 }
 
 /// startMin / stopMin offset table (ISO/IEC 14496-3 Table 4.82) rows by fs_SBR.
@@ -259,24 +291,24 @@ pub(crate) fn compute(h: &Header, fs: u32) -> Result<FreqTables> {
         return Err(DecodeError::InvalidData("SBR patches"));
     }
     // limiter table
-    let lim = limiter_table(h.limiter_bands, &low, kx, &patch_num);
+    let lim = limiter_table(h.limiter_bands, &low, kx, &patch_num)?;
     let n_lim = lim.len() - 1;
     Ok(FreqTables {
         k0,
         k2,
         kx,
         m,
-        master,
-        high,
-        low,
-        noise,
+        master: Bands::from_slice(&master)?,
+        high: Bands::from_slice(&high)?,
+        low: Bands::from_slice(&low)?,
+        noise: Bands::from_slice(&noise)?,
         lim,
         n_high,
         n_low,
         n_q,
         n_lim,
-        patch_num,
-        patch_start,
+        patch_num: Bands::from_slice(&patch_num)?,
+        patch_start: Bands::from_slice(&patch_start)?,
     })
 }
 
@@ -285,10 +317,10 @@ pub(crate) fn limiter_table(
     low: &[usize],
     kx: usize,
     patch_num: &[usize],
-) -> Vec<usize> {
+) -> Result<Bands> {
     let n_low = low.len() - 1;
     if limiter_bands == 0 {
-        return vec![low[0], low[n_low]];
+        return Bands::from_slice(&[low[0], low[n_low]]);
     }
     let lim_bands = [1.2f64, 2.0, 3.0][limiter_bands as usize - 1];
     let mut borders = vec![kx];
@@ -319,5 +351,5 @@ pub(crate) fn limiter_table(
             k += 1;
         }
     }
-    t
+    Bands::from_slice(&t)
 }

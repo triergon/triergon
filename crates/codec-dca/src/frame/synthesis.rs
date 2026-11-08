@@ -3,40 +3,54 @@
 //! synthesis and LFE interpolation.
 
 use super::CoreFrame;
+use crate::MAX_SLOTS;
 use crate::qmf::{Qmf, QmfState};
 use crate::subframe::{self, HIST, SubBuf};
-use crate::{
-    AudioFrame, ChannelLayout, DecodeError, Decoder, MAX_SLOTS, OUT_SCALE, QMF64_GAIN, Speaker,
-    tables,
-};
+use crate::{AudioFrame, ChannelLayout, DecodeError, FrameDecoder, Speaker, X96Bank};
+use triergon_codec::StorageError;
 
-impl Decoder {
-    /// Resets filter bank histories on an output rate change, allocates the 64-band
-    /// filter bank on first use and saves the subband histories for the next frame.
+impl FrameDecoder {
+    /// Allocates the 64-band filter bank on first use and sizes the synthesis scratch,
+    /// then resets filter bank histories on an output rate change and saves the subband
+    /// histories for the next frame. Storage is sized before any history changes.
     #[inline(always)]
-    pub(super) fn prepare_synthesis(&mut self, f: &CoreFrame<'_>, nslots: usize, have_x96: bool) {
+    pub(super) fn prepare_synthesis(
+        &mut self,
+        f: &CoreFrame<'_>,
+        nslots: usize,
+        have_x96: bool,
+    ) -> Result<(), StorageError> {
+        let blocks = f.h.blocks;
+        if have_x96 && self.x96.is_none() {
+            self.x96 = Some(X96Bank::new(&self.budget)?);
+        }
+        let bands = if have_x96 { 64 } else { 32 };
+        if self.tbuf.len() < blocks * bands {
+            self.tbuf.try_resize(blocks * bands, 0.0)?;
+        }
+        let n48 = blocks * 32;
+        if have_x96 && f.h.lff > 0 && self.lfe48.len() < n48 {
+            self.lfe48.try_resize(n48, 0.0)?;
+        }
+
         if have_x96 != self.prev_x96 {
             // Output rate changes: filter bank histories do not carry over.
             for q in &mut self.qstate {
                 q.reset();
             }
-            for q in &mut self.q64state {
-                q.reset();
+            if let Some(bank) = &mut self.x96 {
+                bank.reset();
             }
             self.lfe2x.reset();
         }
         self.prev_x96 = have_x96;
-        if have_x96 && self.qmf64.is_none() {
-            self.qmf64 = Some(Qmf::new(&tables::X96_FIR, QMF64_GAIN * OUT_SCALE));
-            self.q64state = (0..MAX_SLOTS).map(|_| QmfState::new(64)).collect();
-        }
-        let blocks = f.h.blocks;
 
         // Histories for the next frame are taken before any in-place post-processing.
         self.sub.save_history(0..nslots, blocks);
         if have_x96 && let Some(xb) = self.x96buf.as_mut() {
             xb.save_history(0..f.set.nch, blocks);
         }
+        Ok(())
     }
 
     /// Subband-domain post-processing, in place on the synthesis source rows.
@@ -135,18 +149,13 @@ impl Decoder {
         let h = &f.h;
         let bands = if have_x96 { 64 } else { 32 };
         let blocks = h.blocks;
-        let qmf = if have_x96 {
-            self.qmf64
-                .as_ref()
-                .ok_or(DecodeError::InvalidData("X96 filter bank"))?
-        } else if h.filts {
-            &self.qmf_pr
+        let mut x96 = if have_x96 {
+            let bank = self.x96.as_deref_mut();
+            Some(bank.ok_or(DecodeError::InvalidData("X96 filter bank"))?)
         } else {
-            &self.qmf_np
+            None
         };
-        if self.tbuf.len() < blocks * bands {
-            self.tbuf.resize(blocks * bands, 0.0);
-        }
+        let qmf = if h.filts { &self.qmf_pr } else { &self.qmf_np };
         for ch in 0..nslots {
             let (srcbuf, sb): (&SubBuf, usize) = match self.x96buf.as_ref() {
                 Some(xb) if have_x96 && ch < f.set.nch => (xb, 64),
@@ -162,18 +171,10 @@ impl Decoder {
                     tb[t * bands + b] = v;
                 }
             }
-            let st = if have_x96 {
-                &mut self.q64state[ch]
-            } else {
-                &mut self.qstate[ch]
-            };
             let plane = &mut out.planes[plane_of[ch]];
-            for t in 0..blocks {
-                qmf.synth(
-                    st,
-                    &mut tb[t * bands..t * bands + bands],
-                    &mut plane[t * bands..t * bands + bands],
-                );
+            match &mut x96 {
+                Some(bank) => run_bank(&bank.qmf, &mut bank.state[ch], tb, plane, blocks),
+                None => run_bank(qmf, &mut self.qstate[ch], tb, plane, blocks),
             }
         }
         Ok(())
@@ -196,9 +197,6 @@ impl Decoder {
         let ndec = n48 / factor;
         let plane = &mut out.planes[lp];
         if have_x96 {
-            if self.lfe48.len() < n48 {
-                self.lfe48.resize(n48, 0.0);
-            }
             self.lfe_state.interpolate(
                 &self.lfe_fir,
                 factor,
@@ -216,55 +214,74 @@ impl Decoder {
             );
         }
     }
+
+    /// Output plane order (FFmpeg native order) and output format, the frame's storage
+    /// charged first. Returns the plane of every coded slot and the LFE plane.
+    #[inline(always)]
+    pub(super) fn output_layout(
+        &mut self,
+        out: &mut AudioFrame,
+        f: &CoreFrame<'_>,
+        xch: bool,
+        have_x96: bool,
+    ) -> Result<([usize; MAX_SLOTS], Option<usize>), StorageError> {
+        let (h, set) = (&f.h, &f.set);
+        let nsamples = h.blocks * if have_x96 { 64 } else { 32 };
+        let mut order: [(Speaker, usize); MAX_SLOTS + 1] = [(Speaker::FrontLeft, 0); MAX_SLOTS + 1];
+        let mut n = 0;
+        for (ch, &sp) in f.speakers.iter().enumerate() {
+            order[n] = (sp, ch);
+            n += 1;
+        }
+        if xch {
+            order[n] = (Speaker::BackCenter, set.nch);
+            n += 1;
+        }
+        const LFE_SRC: usize = usize::MAX;
+        if h.lff > 0 {
+            order[n] = (Speaker::LowFrequency, LFE_SRC);
+            n += 1;
+        }
+        let order = &mut order[..n];
+        order.sort_by_key(|e| e.0);
+        let mut plane_of = [0usize; MAX_SLOTS];
+        let mut lfe_plane = None;
+        out.try_resize(n, nsamples, &mut self.output_charge)?;
+        out.sample_rate = if have_x96 {
+            h.sample_rate * 2
+        } else {
+            h.sample_rate
+        };
+        out.samples_per_channel = nsamples;
+        out.layout = ChannelLayout::new(order.iter().map(|e| e.0)).expect("at most 9 planes");
+        for (i, &(_, src)) in order.iter().enumerate() {
+            if src == LFE_SRC {
+                lfe_plane = Some(i);
+            } else {
+                plane_of[src] = i;
+            }
+        }
+        Ok((plane_of, lfe_plane))
+    }
 }
 
-/// Output plane order (FFmpeg native order) and output format. Returns the plane of
-/// every coded slot and the LFE plane.
+/// Run `qmf` over `blocks` time-major blocks of `tb` into `plane`.
 #[inline(always)]
-pub(super) fn output_layout(
-    out: &mut AudioFrame,
-    f: &CoreFrame<'_>,
-    xch: bool,
-    have_x96: bool,
-) -> ([usize; MAX_SLOTS], Option<usize>) {
-    let (h, set) = (&f.h, &f.set);
-    let nsamples = h.blocks * if have_x96 { 64 } else { 32 };
-    let mut order: [(Speaker, usize); MAX_SLOTS + 1] = [(Speaker::FrontLeft, 0); MAX_SLOTS + 1];
-    let mut n = 0;
-    for (ch, &sp) in f.speakers.iter().enumerate() {
-        order[n] = (sp, ch);
-        n += 1;
+fn run_bank<const TAPS: usize, const LEN: usize>(
+    qmf: &Qmf<TAPS>,
+    st: &mut QmfState<LEN>,
+    tb: &mut [f32],
+    plane: &mut [f32],
+    blocks: usize,
+) {
+    let bands = TAPS / 16;
+    for t in 0..blocks {
+        qmf.synth(
+            st,
+            &mut tb[t * bands..t * bands + bands],
+            &mut plane[t * bands..t * bands + bands],
+        );
     }
-    if xch {
-        order[n] = (Speaker::BackCenter, set.nch);
-        n += 1;
-    }
-    const LFE_SRC: usize = usize::MAX;
-    if h.lff > 0 {
-        order[n] = (Speaker::LowFrequency, LFE_SRC);
-        n += 1;
-    }
-    let order = &mut order[..n];
-    order.sort_by_key(|e| e.0);
-    let mut plane_of = [0usize; MAX_SLOTS];
-    let mut lfe_plane = None;
-    out.sample_rate = if have_x96 {
-        h.sample_rate * 2
-    } else {
-        h.sample_rate
-    };
-    out.samples_per_channel = nsamples;
-    out.layout = ChannelLayout::new(order.iter().map(|e| e.0)).expect("at most 9 planes");
-    out.planes.resize_with(n, Vec::new);
-    for (i, &(_, src)) in order.iter().enumerate() {
-        out.planes[i].resize(nsamples, 0.0);
-        if src == LFE_SRC {
-            lfe_plane = Some(i);
-        } else {
-            plane_of[src] = i;
-        }
-    }
-    (plane_of, lfe_plane)
 }
 
 /// Coded slot indices of the front and surround L/R pairs for sum/difference decoding.

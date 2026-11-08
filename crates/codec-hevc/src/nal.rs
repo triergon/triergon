@@ -2,18 +2,15 @@
 //! (clause 7.3.1.2), emulation prevention removal (clause 7.3.1.1) and an access unit
 //! splitter (clause 7.4.2.4.4) for elementary-stream input.
 
-use triergon_bitstream::unescape;
+use triergon_bitstream::runs;
+use triergon_codec::{BudgetVec, StorageError};
 
-pub const TRAIL_N: u8 = 0;
-pub const TRAIL_R: u8 = 1;
-pub const TSA_N: u8 = 2;
 pub const RADL_N: u8 = 6;
 pub const RADL_R: u8 = 7;
 pub const RASL_N: u8 = 8;
 pub const RASL_R: u8 = 9;
 pub const RSV_VCL_N14: u8 = 14;
 pub const BLA_W_LP: u8 = 16;
-pub const BLA_W_RADL: u8 = 17;
 pub const BLA_N_LP: u8 = 18;
 pub const IDR_W_RADL: u8 = 19;
 pub const IDR_N_LP: u8 = 20;
@@ -25,9 +22,7 @@ pub const PPS_NUT: u8 = 34;
 pub const AUD_NUT: u8 = 35;
 pub const EOS_NUT: u8 = 36;
 pub const EOB_NUT: u8 = 37;
-pub const FD_NUT: u8 = 38;
 pub const PREFIX_SEI: u8 = 39;
-pub const SUFFIX_SEI: u8 = 40;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct NalHeader {
@@ -146,9 +141,16 @@ impl<'a> Iterator for AnnexBIter<'a> {
 }
 
 /// Remove emulation prevention bytes (clause 7.3.1.1) from `src` (a NAL unit including its
-/// two header bytes) into `dst` (header bytes are dropped). Returns nothing; `dst` is cleared first.
-pub fn unescape_rbsp(src: &[u8], dst: &mut Vec<u8>) {
-    unescape(src.get(2..).unwrap_or(&[]), dst);
+/// two header bytes) into `dst` (header bytes are dropped). `dst` is cleared first and
+/// charged for the whole payload before it grows.
+pub fn unescape_rbsp(src: &[u8], dst: &mut BudgetVec<u8>) -> Result<(), StorageError> {
+    let ebsp = src.get(2..).unwrap_or(&[]);
+    dst.clear();
+    dst.try_reserve_exact(ebsp.len())?;
+    for run in runs(ebsp) {
+        dst.try_extend_from_slice(run)?;
+    }
+    Ok(())
 }
 
 /// Splits an Annex B elementary stream into access units (clause 7.4.2.4.4 rules for the
@@ -251,10 +253,11 @@ mod tests {
 
     #[test]
     fn unescape() {
+        let budget = triergon_codec::Budget::new(1 << 12).unwrap();
         let src = [0x40, 0x01, 0x00, 0x00, 0x03, 0x01, 0x00, 0x00, 0x03];
-        let mut d = Vec::new();
-        unescape_rbsp(&src, &mut d);
-        assert_eq!(d, vec![0, 0, 1, 0, 0]);
+        let mut d = BudgetVec::new(&budget);
+        unescape_rbsp(&src, &mut d).unwrap();
+        assert_eq!(&d[..], &[0, 0, 1, 0, 0]);
     }
 
     #[test]

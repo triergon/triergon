@@ -278,7 +278,7 @@ mod tests {
         write_dc(&mut w, 3, false); // 10 11
         write_dc(&mut w, -255, true); // 1111110 00000000
         let mut out = Vec::new();
-        w.take_into(&mut out);
+        w.take_into(&mut out).unwrap();
         let bits: String = out.iter().map(|b| format!("{b:08b}")).collect();
         assert!(bits.starts_with("100000101111111100000000"));
     }
@@ -291,7 +291,7 @@ mod tests {
         let mut w = BitWriter::default();
         write_coefficients(&mut w, &levels, nonzero(&levels), false);
         let mut out = Vec::new();
-        w.take_into(&mut out);
+        w.take_into(&mut out).unwrap();
         // 11 (first, -1) 110 (next run0 +1 = 11s) 10 (EOB)
         assert_eq!(format!("{:08b}", out[0]), "11110100");
     }
@@ -304,7 +304,7 @@ mod tests {
         let mut w = BitWriter::default();
         write_coefficients(&mut w, &levels, nonzero(&levels), true);
         let mut out = Vec::new();
-        w.take_into(&mut out);
+        w.take_into(&mut out).unwrap();
         let bits: String = out.iter().map(|b| format!("{b:08b}")).collect();
         let want = "000001".to_owned()
             + "000000"

@@ -4,6 +4,11 @@
 use crate::bits::{BitCursor, BitSource, Ranged};
 use crate::error::{DecodeError, Result};
 use crate::tables::{DEFAULT_SCALING_INTER, DEFAULT_SCALING_INTRA, DIAG_SCAN_4X4, DIAG_SCAN_8X8};
+use triergon_codec::{Budget, BudgetVec};
+
+/// A parameter set as the decoder keeps it: charged for its size, and shared with the
+/// pictures and layout that use it.
+pub type Shared<T> = std::sync::Arc<triergon_codec::Charged<Box<T>>>;
 
 pub const MAX_SPS: usize = 16;
 pub const MAX_PPS: usize = 64;
@@ -12,7 +17,7 @@ pub const MAX_VPS: usize = 16;
 pub const MAX_LUMA_PS: u64 = 35_651_584;
 pub const MAX_DIM: u32 = 16888;
 
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Copy, Debug, Default)]
 pub struct ShortTermRps {
     pub num_negative: u8,
     pub num_positive: u8,
@@ -150,9 +155,9 @@ pub struct ScalingList {
     /// sizeId 1: 6 matrices of 64.
     pub sl8: [[u8; 64]; 6],
     /// sizeId 2: 6 matrices of 256.
-    pub sl16: Box<[[u8; 256]; 6]>,
+    pub sl16: [[u8; 256]; 6],
     /// sizeId 3: 6 matrices of 1024 (only 0 and 3 used for 4:2:0).
-    pub sl32: Box<[[u8; 1024]; 6]>,
+    pub sl32: [[u8; 1024]; 6],
 }
 
 #[derive(Clone)]
@@ -244,8 +249,8 @@ impl ScalingListRaw {
         let mut out = ScalingList {
             sl4: [[16; 16]; 6],
             sl8: [[16; 64]; 6],
-            sl16: Box::new([[16; 256]; 6]),
-            sl32: Box::new([[16; 1024]; 6]),
+            sl16: [[16; 256]; 6],
+            sl32: [[16; 1024]; 6],
         };
         for m in 0..6 {
             for i in 0..16 {
@@ -528,10 +533,15 @@ pub struct Sps {
     pub log2_min_pcm: u32,
     pub log2_max_pcm: u32,
     pub pcm_loop_filter_disabled: bool,
-    pub st_rps: Vec<ShortTermRps>,
+    /// st_ref_pic_set(i), i < num_short_term_ref_pic_sets.
+    pub st_rps: [ShortTermRps; 64],
+    pub num_short_term_ref_pic_sets: usize,
     pub long_term_refs_present: bool,
-    pub lt_ref_pic_poc_lsb: Vec<u32>,
-    pub lt_used_by_curr: Vec<bool>,
+    /// lt_ref_pic_poc_lsb_sps[i] and used_by_curr_pic_lt_sps_flag[i],
+    /// i < num_long_term_ref_pics_sps.
+    pub lt_ref_pic_poc_lsb: [u32; 32],
+    pub lt_used_by_curr: [bool; 32],
+    pub num_long_term_ref_pics_sps: u32,
     pub temporal_mvp: bool,
     pub strong_intra_smoothing: bool,
     pub vui: Vui,
@@ -696,20 +706,20 @@ pub fn parse_sps(rbsp: &[u8]) -> Result<Sps> {
         pcm_lf = r.flag()?;
     }
     let num_st = r.ue_max(64, "num_short_term_ref_pic_sets")? as usize;
-    let mut st_rps: Vec<ShortTermRps> = Vec::with_capacity(num_st);
+    let mut st_rps = [ShortTermRps::default(); 64];
     let mdpb = max_dec_pic_buffering[max_sub_layers_minus1 as usize] - 1;
     for i in 0..num_st {
-        let s = parse_st_rps(&mut r, i, num_st, &st_rps, mdpb)?;
-        st_rps.push(s);
+        st_rps[i] = parse_st_rps(&mut r, i, num_st, &st_rps[..i], mdpb)?;
     }
     let long_term_refs_present = r.flag()?;
-    let mut lt_ref_pic_poc_lsb = Vec::new();
-    let mut lt_used_by_curr = Vec::new();
+    let mut lt_ref_pic_poc_lsb = [0; 32];
+    let mut lt_used_by_curr = [false; 32];
+    let mut num_lt = 0;
     if long_term_refs_present {
-        let n = r.ue_max(32, "num_long_term_ref_pics_sps")?;
-        for _ in 0..n {
-            lt_ref_pic_poc_lsb.push(r.read(log2_max_poc_lsb)?);
-            lt_used_by_curr.push(r.flag()?);
+        num_lt = r.ue_max(32, "num_long_term_ref_pics_sps")?;
+        for i in 0..num_lt as usize {
+            lt_ref_pic_poc_lsb[i] = r.read(log2_max_poc_lsb)?;
+            lt_used_by_curr[i] = r.flag()?;
         }
     }
     let temporal_mvp = r.flag()?;
@@ -800,9 +810,11 @@ pub fn parse_sps(rbsp: &[u8]) -> Result<Sps> {
         log2_max_pcm,
         pcm_loop_filter_disabled: pcm_lf,
         st_rps,
+        num_short_term_ref_pic_sets: num_st,
         long_term_refs_present,
         lt_ref_pic_poc_lsb,
         lt_used_by_curr,
+        num_long_term_ref_pics_sps: num_lt,
         temporal_mvp,
         strong_intra_smoothing,
         vui,
@@ -841,8 +853,10 @@ pub struct Pps {
     pub num_tile_columns: u32,
     pub num_tile_rows: u32,
     pub uniform_spacing: bool,
-    pub column_width_minus1: Vec<u32>,
-    pub row_height_minus1: Vec<u32>,
+    /// column_width_minus1[i], i < num_tile_columns - 1 (at most 19).
+    pub column_width_minus1: [u32; 19],
+    /// row_height_minus1[i], i < num_tile_rows - 1 (at most 21).
+    pub row_height_minus1: [u32; 21],
     pub loop_filter_across_tiles: bool,
     pub loop_filter_across_slices: bool,
     pub deblocking_override_enabled: bool,
@@ -890,19 +904,19 @@ pub fn parse_pps(rbsp: &[u8]) -> Result<Pps> {
     let mut num_tile_columns = 1;
     let mut num_tile_rows = 1;
     let mut uniform_spacing = true;
-    let mut column_width_minus1 = Vec::new();
-    let mut row_height_minus1 = Vec::new();
+    let mut column_width_minus1 = [0; 19];
+    let mut row_height_minus1 = [0; 21];
     let mut loop_filter_across_tiles = true;
     if tiles_enabled {
         num_tile_columns = r.ue_max(19, "num_tile_columns_minus1")? + 1;
         num_tile_rows = r.ue_max(21, "num_tile_rows_minus1")? + 1;
         uniform_spacing = r.flag()?;
         if !uniform_spacing {
-            for _ in 0..num_tile_columns - 1 {
-                column_width_minus1.push(r.ue_max(1024, "column_width_minus1")?);
+            for w in &mut column_width_minus1[..num_tile_columns as usize - 1] {
+                *w = r.ue_max(1024, "column_width_minus1")?;
             }
-            for _ in 0..num_tile_rows - 1 {
-                row_height_minus1.push(r.ue_max(1024, "row_height_minus1")?);
+            for h in &mut row_height_minus1[..num_tile_rows as usize - 1] {
+                *h = r.ue_max(1024, "row_height_minus1")?;
             }
         }
         loop_filter_across_tiles = r.flag()?;
@@ -1011,20 +1025,20 @@ pub fn parse_pps(rbsp: &[u8]) -> Result<Pps> {
 #[allow(dead_code)] // informative fields kept for diagnostics
 #[derive(Debug)]
 pub struct Layout {
-    pub ctb_addr_rs_to_ts: Vec<u32>,
-    pub ctb_addr_ts_to_rs: Vec<u32>,
-    pub tile_id: Vec<u16>, // indexed by ts
-    /// Column boundaries in CTBs (len = cols + 1).
-    pub col_bd: Vec<u32>,
-    pub row_bd: Vec<u32>,
+    pub ctb_addr_rs_to_ts: BudgetVec<u32>,
+    pub ctb_addr_ts_to_rs: BudgetVec<u32>,
+    pub tile_id: BudgetVec<u16>, // indexed by ts
+    /// Column and row boundaries in CTBs (cols + 1 and rows + 1 entries).
+    pub col_bd: [u32; 21],
+    pub row_bd: [u32; 23],
     /// MinTbAddrZs[y * w + x] in min TB units.
-    pub min_tb_addr_zs: Vec<u32>,
+    pub min_tb_addr_zs: BudgetVec<u32>,
     pub min_tb_w: u32,
     pub min_tb_h: u32,
 }
 
 impl Layout {
-    pub fn new(sps: &Sps, pps: &Pps) -> Result<Layout> {
+    pub fn new(sps: &Sps, pps: &Pps, budget: &Budget) -> Result<Layout> {
         let w = sps.pic_w_ctb;
         let h = sps.pic_h_ctb;
         let cols = pps.num_tile_columns;
@@ -1032,8 +1046,10 @@ impl Layout {
         if cols > w || rows > h {
             return Err(DecodeError::InvalidData("more tiles than CTBs"));
         }
-        let mut col_w = vec![0u32; cols as usize];
-        let mut row_h = vec![0u32; rows as usize];
+        // At most 20 tile columns and 22 rows (num_tile_columns_minus1 <= 19,
+        // num_tile_rows_minus1 <= 21).
+        let mut col_w = [0u32; 20];
+        let mut row_h = [0u32; 22];
         if pps.uniform_spacing {
             for i in 0..cols {
                 col_w[i as usize] = ((i + 1) * w) / cols - (i * w) / cols;
@@ -1061,16 +1077,16 @@ impl Layout {
             }
             row_h[rows as usize - 1] = rem as u32;
         }
-        let mut col_bd = vec![0u32; cols as usize + 1];
+        let mut col_bd = [0u32; 21];
         for i in 0..cols as usize {
             col_bd[i + 1] = col_bd[i] + col_w[i];
         }
-        let mut row_bd = vec![0u32; rows as usize + 1];
+        let mut row_bd = [0u32; 23];
         for j in 0..rows as usize {
             row_bd[j + 1] = row_bd[j] + row_h[j];
         }
         let n = (w * h) as usize;
-        let mut rs_to_ts = vec![0u32; n];
+        let mut rs_to_ts = BudgetVec::try_filled(budget, 0u32, n)?;
         for rs in 0..n as u32 {
             let tbx = rs % w;
             let tby = rs / w;
@@ -1092,11 +1108,11 @@ impl Layout {
             v += (tby - row_bd[tile_y]) * col_w[tile_x] + tbx - col_bd[tile_x];
             rs_to_ts[rs as usize] = v;
         }
-        let mut ts_to_rs = vec![0u32; n];
+        let mut ts_to_rs = BudgetVec::try_filled(budget, 0u32, n)?;
         for rs in 0..n {
             ts_to_rs[rs_to_ts[rs] as usize] = rs as u32;
         }
-        let mut tile_id = vec![0u16; n];
+        let mut tile_id = BudgetVec::try_filled(budget, 0u16, n)?;
         let mut tidx = 0u16;
         for j in 0..rows as usize {
             for i in 0..cols as usize {
@@ -1111,7 +1127,7 @@ impl Layout {
         let shift = sps.log2_ctb - sps.log2_min_tb;
         let mtw = w << shift;
         let mth = h << shift;
-        let mut zs = vec![0u32; (mtw * mth) as usize];
+        let mut zs = BudgetVec::try_filled(budget, 0u32, (mtw * mth) as usize)?;
         for y in 0..mth {
             for x in 0..mtw {
                 let tbx = (x << sps.log2_min_tb) >> sps.log2_ctb;
