@@ -120,7 +120,10 @@ resource limit becomes an explicit, reviewed rule for that case.
   to match must leave the list. `cargo xtask grade` applies the same rule: it grades
   a listed case's parity and skips its timing and memory, refuses a listed case that
   passes or is not in the corpus, and still needs measurements for any other failing
-  case. The module stays unaccepted while any is listed.
+  case. A module stays unaccepted while any case of one of its gating features is
+  listed. Features that a module's documentation names as additional coverage, such
+  as `shape-text` and `shape-text-all` for the shaper, keep their open cases listed
+  without blocking it.
 - **Input rights.** A case is measured only when its `rights` are
   `authored-synthetic`, or `reviewed-licence` with a `licence` under which a
   reviewed input manifest (`harness/fonts/corpus.json`) records the file's hash.
