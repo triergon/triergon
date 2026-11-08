@@ -75,12 +75,6 @@ impl<T> Set<T> {
     pub(crate) const fn minus(self, other: Self) -> Self {
         Self::from_bits(self.bits & !other.bits)
     }
-
-    /// The members in exactly one of the two sets.
-    #[inline(always)]
-    pub(crate) const fn symmetric_difference(self, other: Self) -> Self {
-        Self::from_bits(self.bits ^ other.bits)
-    }
 }
 
 impl<T: Member> Set<T> {
@@ -107,16 +101,6 @@ impl<T: Member> Set<T> {
     #[inline(always)]
     pub(crate) fn toggled(self, member: T) -> Self {
         Self::from_bits(self.bits ^ member.bit())
-    }
-
-    /// Adds `member` when `on`, removes it otherwise.
-    #[inline(always)]
-    pub(crate) fn set(&mut self, member: T, on: bool) {
-        *self = if on {
-            self.with(member)
-        } else {
-            self.without(member)
-        };
     }
 }
 

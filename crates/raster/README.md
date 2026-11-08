@@ -87,6 +87,16 @@ libass's cache keys are.
 | Composition | the filter flags `render_and_combine_glyphs` derives, `quantize_blur`, `restore_blur`, `ass_composite_construct`, `ass_fix_outline`, `ass_shift_bitmap`, the additive blend | `Raster::compose`, `Effects`, `Border`, `Shadow`, `Composite`, `Bitmap` |
 | Clipping | `render_glyph`: `\clip` and `\iclip` rectangles and the `\kf` split; the multiply blends of vector clips | `Clip`, `ClipFrame`, `Bitmap::multiply`, `Bitmap::multiply_inverse` |
 
+`Raster::stroke` writes the outer (+offset) and inner (−offset) outline of a
+border in one pass over the source's contours. Each segment is joined to the
+offset before it: nearly parallel normals merge, and a corner gets a round cap
+of quadratic arcs on one side and a spike to the corner on the side the turn
+folds over. A line offsets directly; a spline is fitted by one offset spline
+when libass's radial and angular error bounds allow and is halved otherwise.
+Where an offset intersects itself, that part is replaced by libass's polyline,
+and a contour that never leaves a point is drawn as a circle. The result
+matches libass point for point and segment for segment.
+
 The arithmetic is libass's own: 26.6 integer subdivision with its rounding, the
 16-bit wrapping of the tile and blur engines, `lrint` rounding to even, and the
 C `FFMAX`/`FFMIN` treatment of NaN. Floating-point expressions keep the C
@@ -122,7 +132,8 @@ properties are matched:
 Every input-dependent allocation is charged to the `Budget` a value was created
 with: outlines, bitmaps and the rasteriser's and blur's scratch, which a
 `Raster` keeps and reuses. Work is charged to the `WorkBudget` the caller passes
-to each stage, one per frame: subdivision steps, emitted points, polyline
+to each stage, one per frame: subdivision steps (each spline part the
+stroker offsets and each arc it subdivides), emitted points, polyline
 segments and 16×16 tiles filled, and every 16 pixels of a row a blur stage
 writes or a run's glyph bitmaps are summed into, charged before the stage
 allocates or runs. `Limits` bounds sizes: the points of a stroked

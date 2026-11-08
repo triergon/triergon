@@ -121,6 +121,27 @@ impl DVector {
     pub(crate) fn scale(self, factor: f64) -> Self {
         Self::new(self.x * factor, self.y * factor)
     }
+
+    /// `self / 2`.
+    #[inline(always)]
+    pub(crate) fn halved(self) -> Self {
+        Self::new(self.x / 2.0, self.y / 2.0)
+    }
+
+    /// `(self + other) / 2`.
+    #[inline(always)]
+    pub(crate) fn mean(self, other: Self) -> Self {
+        (self + other).halved()
+    }
+}
+
+impl std::ops::Add for DVector {
+    type Output = Self;
+
+    #[inline(always)]
+    fn add(self, other: Self) -> Self {
+        Self::new(self.x + other.x, self.y + other.y)
+    }
 }
 
 /// The halving of a quadratic spline at t = ½: five points sharing the middle

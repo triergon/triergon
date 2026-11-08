@@ -2,142 +2,130 @@
 
 use triergon_core::Result;
 
-use super::{Normal, Side, Sides, Stroker, halve, mean, sub, sum_scaled};
+use super::Stroker;
+use super::border::{Side, Sides};
+use super::segment::{Normal, Tolerances};
+use super::spline::{Plan, Shortcut, Spline};
 use crate::geometry::{DVector, Vector, split_quadratic};
-use crate::limits::charge;
 use crate::outline::SegmentKind;
 
-/// A quadratic spline being offset: its points, the normal-space derivatives
-/// of its two control legs and its end normals.
+/// A quadratic spline: its points, the normal-space legs of its control
+/// polygon and its end normals.
 #[derive(Clone, Copy, Debug)]
-struct Quadratic {
-    pt: [Vector; 3],
-    deriv: [DVector; 2],
-    normal: [Normal; 2],
+pub(super) struct Quadratic {
+    points: [Vector; 3],
+    legs: [DVector; 2],
+    normals: [Normal; 2],
 }
 
-impl Stroker<'_> {
-    pub(super) fn add_quadratic(&mut self, pt1: Vector, pt2: Vector, sides: Sides) -> Result<()> {
-        let d0 = sub(pt1, self.last_point);
-        let d1 = sub(pt2, pt1);
-        if self.tolerance.tiny(d0) || self.tolerance.tiny(d1) {
-            return self.add_line(pt2, sides);
-        }
-        let pt = [self.last_point, pt1, pt2];
-        self.last_point = pt2;
-        let deriv = [self.tolerance.derivative(d0), self.tolerance.derivative(d1)];
-        let piece = Quadratic {
-            pt,
-            deriv,
-            normal: deriv.map(Normal::of),
-        };
-        let first = self.joint.contour_start;
-        self.start_segment(pt[0], piece.normal[0].v, sides)?;
-        self.offset_quadratic(&piece, sides, first)
+impl Quadratic {
+    /// The spline through `points`, or `None` when a leg has no direction.
+    pub(super) fn new(points: [Vector; 3], tolerances: &Tolerances) -> Option<Self> {
+        let [p0, p1, p2] = points;
+        let legs = [tolerances.leg(p0, p1)?, tolerances.leg(p1, p2)?];
+        Some(Self {
+            points,
+            legs,
+            normals: legs.map(Normal::of),
+        })
     }
 
-    /// The offset control point of `q` when its error is within bounds; `c`
-    /// and `s` are the dot and cross products of its end normals.
-    fn estimate_quadratic(&self, q: &Quadratic, c: f64, s: f64) -> Option<DVector> {
-        let tolerance = &self.tolerance;
-        let normal = &q.normal;
+    /// The offset of the control point when it is within the error bounds;
+    /// `c` and `s` are the dot and cross products of the end normals.
+    fn fit(&self, tolerances: &Tolerances, c: f64, s: f64) -> Option<DVector> {
+        let [n0, n1] = self.normals;
         // Radial error.
-        if !((3.0 + c) * (3.0 + c) < tolerance.err_q * (1.0 + c)) {
+        if !((3.0 + c) * (3.0 + c) < tolerances.err_q * (1.0 + c)) {
             return None;
         }
         let mul = 1.0 / (1.0 + c);
-        let l0 = 2.0 * normal[0].len;
-        let l1 = 2.0 * normal[1].len;
-        let dot0 = l0 + normal[1].len * c;
-        let crs0 = (l0 * mul - normal[1].len) * s;
-        let dot1 = l1 + normal[0].len * c;
-        let crs1 = (l1 * mul - normal[0].len) * s;
+        let l0 = 2.0 * n0.len;
+        let l1 = 2.0 * n1.len;
+        let dot0 = l0 + n1.len * c;
+        let crs0 = (l0 * mul - n1.len) * s;
+        let dot1 = l1 + n0.len * c;
+        let crs1 = (l1 * mul - n0.len) * s;
         // Angular error.
-        if !(crs0.abs() < tolerance.err_a * dot0 && crs1.abs() < tolerance.err_a * dot1) {
+        if !(crs0.abs() < tolerances.err_a * dot0 && crs1.abs() < tolerances.err_a * dot1) {
             return None;
         }
-        Some(sum_scaled(normal[0].v, normal[1].v, mul))
+        Some((n0.unit + n1.unit).scale(mul))
+    }
+}
+
+impl Spline for Quadratic {
+    const KIND: SegmentKind = SegmentKind::Quadratic;
+
+    type Controls = [(Vector, DVector); 1];
+
+    fn start(&self) -> Vector {
+        self.points[0]
     }
 
-    fn offset_quadratic(&mut self, q: &Quadratic, mut sides: Sides, first: bool) -> Result<()> {
-        charge(self.work, 1)?;
-        let (pt, normal) = (&q.pt, &q.normal);
-        let c = normal[0].v.dot(normal[1].v);
-        let s = normal[0].v.cross(normal[1].v);
-        let mut check = sides;
+    fn end(&self) -> Vector {
+        self.points[2]
+    }
+
+    fn normals(&self) -> [Normal; 2] {
+        self.normals
+    }
+
+    fn plan(&self, tolerances: &Tolerances, sides: Sides) -> Plan<Self::Controls> {
+        let [n0, n1] = self.normals;
+        let c = n0.unit.dot(n1.unit);
+        let s = n0.unit.cross(n1.unit);
         let fold = Side::folded(s);
+        let mut shortcut = None;
+        let mut fitted = sides;
         if sides.contains(fold) {
-            let folded = Sides::of([fold]);
             let abs_s = s.abs();
-            let f0 = normal[0].len * c + normal[1].len;
-            let f1 = normal[1].len * c + normal[0].len;
-            let g0 = normal[0].len * abs_s;
-            let g1 = normal[1].len * abs_s;
+            let f0 = n0.len * c + n1.len;
+            let f1 = n1.len * c + n0.len;
+            let g0 = n0.len * abs_s;
+            let g1 = n1.len * abs_s;
             if f0 < abs_s && f1 < abs_s {
-                // The offset curve may intersect itself.
-                let d2 = (f0 * normal[1].len + f1 * normal[0].len) / 2.0;
+                // The offset may intersect itself.
+                let d2 = (f0 * n1.len + f1 * n0.len) / 2.0;
                 if d2 < g0 && d2 < g1 {
-                    self.prepare_skip(pt[0], folded, first)?;
-                    let line = Some(SegmentKind::Line);
-                    if f0 < 0.0 || f1 < 0.0 {
-                        self.emit(pt[0], DVector::ZERO, line, folded)?;
-                        self.emit(pt[2], DVector::ZERO, line, folded)?;
-                    } else {
-                        let offs = normal[0].v.scale(f0 / abs_s);
-                        self.emit(pt[0], offs, line, folded)?;
-                    }
-                    sides = sides.without(fold);
-                    if sides.is_empty() {
-                        self.joint.last_normal = normal[1].v;
-                        return Ok(());
-                    }
+                    shortcut = Some((fold, Shortcut::new([f0, f1], abs_s, n0.unit)));
                 }
-                check = check.toggled(fold);
+                fitted = fitted.without(fold);
             } else if c + g0 < 1.0 && c + g1 < 1.0 {
-                check = check.toggled(fold);
+                fitted = fitted.without(fold);
             }
         }
-
-        if !check.is_empty()
-            && let Some(control) = self.estimate_quadratic(q, c, s)
-        {
-            self.emit_first_point(pt[0], SegmentKind::Quadratic, check)?;
-            self.emit(pt[1], control, None, check)?;
-            sides = sides.minus(check);
-            if sides.is_empty() {
-                self.joint.last_normal = normal[1].v;
-                return Ok(());
-            }
-        }
-        self.split_quadratic(q, sides, first)
+        let fit = if fitted.is_empty() {
+            None
+        } else {
+            self.fit(tolerances, c, s)
+                .map(|control| (fitted, [(self.points[1], control)]))
+        };
+        Plan { shortcut, fit }
     }
 
-    /// Halves a quadratic whose estimate failed and offsets both halves, or
-    /// joins them with a cap where the middle has no direction.
-    fn split_quadratic(&mut self, q: &Quadratic, sides: Sides, first: bool) -> Result<()> {
-        let next = split_quadratic(&q.pt);
-        let d0 = halve(q.deriv[0]);
-        let d2 = halve(q.deriv[1]);
-        let d1 = mean(d0, d2);
-        let Some(middle) = Normal::directed(d1, self.tolerance.min_len) else {
-            // Degenerate: the middle has no direction.
-            let end = q.normal[1].v;
-            self.emit_first_point(next[0], SegmentKind::Line, sides)?;
-            self.start_segment(next[2], end, sides)?;
-            self.joint.last_skip = self.joint.last_skip.minus(sides);
-            return self.emit(next[2], end, Some(SegmentKind::Line), sides);
+    fn split(&self, stroker: &mut Stroker<'_>, sides: Sides) -> Result<()> {
+        let [p0, p1, p2, p3, p4] = split_quadratic(&self.points);
+        let [n0, n1] = self.normals;
+        let first = self.legs[0].halved();
+        let last = self.legs[1].halved();
+        let middle = first.mean(last);
+        let Some(normal) = Normal::directed(middle, stroker.tolerances.min_len) else {
+            // The middle has no direction: two lines meeting there.
+            stroker.resume(SegmentKind::Line, p0, sides)?;
+            stroker.join(p2, n1.unit, sides)?;
+            return stroker.resume_along(SegmentKind::Line, p2, n1.unit, sides);
         };
-        let low = Quadratic {
-            pt: [next[0], next[1], next[2]],
-            deriv: [d0, d1],
-            normal: [q.normal[0].halved(), middle],
+        let low = Self {
+            points: [p0, p1, p2],
+            legs: [first, middle],
+            normals: [n0.halved(), normal],
         };
-        let high = Quadratic {
-            pt: [next[2], next[3], next[4]],
-            deriv: [d1, d2],
-            normal: [middle, q.normal[1].halved()],
+        let high = Self {
+            points: [p2, p3, p4],
+            legs: [middle, last],
+            normals: [normal, n1.halved()],
         };
-        self.offset_quadratic(&low, sides, first)?;
-        self.offset_quadratic(&high, sides, false)
+        stroker.offset_spline(&low, sides)?;
+        stroker.offset_spline(&high, sides)
     }
 }
