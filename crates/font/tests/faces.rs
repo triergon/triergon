@@ -3,8 +3,9 @@ mod support;
 use support::{bytes, cff_tables, collection, font, truetype_tables};
 use triergon_core::{Budget, Bytes, Error};
 use triergon_font::{
-    Built, CharEncoding, CmapFormat, FaceInfo, Font, GlyphId, Limits, OutlineFormat, Platform,
-    Point, PointKind, Request, Segment, Store, StoreKey, Style, select,
+    Built, CharEncoding, CmapFormat, FaceInfo, Font, GlyphId, Limits, Orientation, OutlineFormat,
+    Platform, Point, PointKind, Request, ScaledOutline, Segment, Store, StoreKey, Style,
+    pixels_26_6, select,
 };
 
 fn parse(data: &[u8]) -> Font {
@@ -106,6 +107,71 @@ fn truetype_outlines_shift_to_the_side_bearing_and_compose() {
         ]
     );
     assert!(font.outline(GlyphId(0), &budget).unwrap().0.is_empty());
+}
+
+#[test]
+fn sizes_scale_as_freetype_does_for_libass() {
+    let face = parse(&font(
+        b"\0\x01\0\0",
+        &truetype_tables(400, 0, "Test Sans", "Regular"),
+    ));
+    // Windows metrics 1024 and 256: libass's span is 1280 font units.
+    let gdi = face.gdi_metrics();
+    assert_eq!(
+        (gdi.ascender, gdi.descender, gdi.height),
+        (1024, -256, 1280)
+    );
+    let sized = face.at_size(pixels_26_6(256.0)).unwrap();
+    let m = sized.metrics();
+    assert_eq!((m.x_scale, m.y_scale, m.x_ppem), (838_861, 838_861, 200));
+    assert_eq!((m.ascender, m.descender, m.height), (13120, -3328, 16384));
+    assert_eq!(sized.ascent_descent(), (13107, 3277));
+    assert_eq!(sized.harfbuzz_scale(), (12800, 12800));
+    assert_eq!(sized.embolden_strength(), 200);
+    assert_eq!(sized.kerning(GlyphId(1), GlyphId(2)), -512);
+    // No bytecode: FreeType would auto-hint, which this crate does not.
+    assert!(matches!(
+        sized.hinted_advance(GlyphId(1)),
+        Err(Error::Unsupported(_))
+    ));
+    let budget = Budget::new(1 << 20).unwrap();
+    let mut outline = ScaledOutline::new(&budget);
+    let metrics = sized.outline_into(GlyphId(1), &mut outline).unwrap();
+    let corners: Vec<_> = outline.points().iter().map(|p| p.point).collect();
+    // xMin 100 scales to 1280; the origin (xMin - lsb) to 640.
+    assert_eq!(
+        corners,
+        [
+            Point::new(640, 0),
+            Point::new(640, 2560),
+            Point::new(3200, 2560),
+            Point::new(3200, 0)
+        ]
+    );
+    assert_eq!(metrics.advance, 5120);
+    assert_eq!(outline.orientation(), Orientation::TrueType);
+    let synthesis = face.synthesis(700, 110);
+    assert_eq!((synthesis.oblique, synthesis.embolden), (true, true));
+    sized.synthesize(&mut outline, synthesis).unwrap();
+    assert_eq!(outline.points()[1].point, Point::new(1538, 2760));
+    let tricky = parse(&font(
+        b"\0\x01\0\0",
+        &truetype_tables(400, 0, "ABCDEF+PMingLiU", "Regular"),
+    ));
+    assert_eq!(
+        tricky.at_size(16384).unwrap().hinted_advance(GlyphId(1)),
+        Err(Error::Unsupported(
+            "hinted advances of a tricky TrueType font"
+        ))
+    );
+    assert!(face.at_size(-1).is_err());
+    assert!(face.at_size(1).is_err());
+
+    let cff = parse(&font(b"OTTO", &cff_tables()));
+    let sized = cff.at_size(16384).unwrap();
+    // hhea 800 and -200 without OS/2: 410 units are 6717.4 26.6 units, rounded to 105 pixels.
+    assert_eq!(sized.hinted_advance(GlyphId(1)), Ok(6720));
+    assert!(cff.is_postscript());
 }
 
 #[test]

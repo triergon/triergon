@@ -94,16 +94,6 @@ impl<'a> Reader<'a> {
         }
         Ok(value)
     }
-
-    /// A 2.14 fixed-point number.
-    pub(crate) fn f2dot14(&mut self) -> Result<f64> {
-        Ok(f64::from(self.i16()?) / 16384.0)
-    }
-
-    /// A 16.16 fixed-point number.
-    pub(crate) fn fixed(&mut self) -> Result<f64> {
-        Ok(f64::from(self.i32()?) / 65536.0)
-    }
 }
 
 /// The big-endian `u16` at `at`, if `data` holds it.
@@ -155,8 +145,8 @@ mod tests {
         let mut r = Reader::new(&data);
         assert_eq!(r.u16(), Ok(0x0102));
         assert_eq!(r.i16(), Ok(-2));
-        assert_eq!(r.f2dot14(), Ok(1.0));
-        assert_eq!(r.fixed(), Ok(-32768.0));
+        assert_eq!(r.i16(), Ok(0x4000));
+        assert_eq!(r.i32(), Ok(-0x8000_0000));
         assert_eq!(r.u8(), Err(TRUNCATED));
         assert_eq!(r.offset(), 10);
         let mut r = Reader::at(&data, 1).unwrap();

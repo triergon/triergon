@@ -7,6 +7,8 @@ use triergon_core::{Error, Result};
 /// The `head` fields a face needs.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) struct Head {
+    /// Bit 3: scale by integer pixels per em.
+    pub(crate) flags: u16,
     pub(crate) units_per_em: u16,
     pub(crate) bounds: [i16; 4],
     pub(crate) mac_style: u16,
@@ -16,7 +18,8 @@ pub(crate) struct Head {
 
 pub(crate) fn head(data: &[u8]) -> Result<Head> {
     let mut r = Reader::new(data);
-    r.skip(18)?; // version .. flags
+    r.skip(16)?; // version .. magicNumber
+    let flags = r.u16()?;
     let units_per_em = r.u16()?;
     if !(1..=16384).contains(&units_per_em) {
         return Err(Error::Invalid("unitsPerEm outside 1..16384"));
@@ -31,6 +34,7 @@ pub(crate) fn head(data: &[u8]) -> Result<Head> {
         _ => return Err(Error::Invalid("indexToLocFormat")),
     };
     Ok(Head {
+        flags,
         units_per_em,
         bounds,
         mac_style,
@@ -86,6 +90,8 @@ pub struct Os2 {
     pub weight_class: u16,
     pub width_class: u16,
     pub fs_type: u16,
+    pub strikeout_size: i16,
+    pub strikeout_position: i16,
     pub selection: FsSelection,
     pub typo_ascender: i16,
     pub typo_descender: i16,
@@ -146,6 +152,8 @@ pub(crate) fn os2(data: &[u8]) -> Option<Os2> {
         weight_class: at(4)?,
         width_class: at(6)?,
         fs_type: at(8)?,
+        strikeout_size: at(26)?.cast_signed(),
+        strikeout_position: at(28)?.cast_signed(),
         selection: FsSelection(at(62)?),
         typo_ascender: at(68)?.cast_signed(),
         typo_descender: at(70)?.cast_signed(),
@@ -153,6 +161,18 @@ pub(crate) fn os2(data: &[u8]) -> Option<Os2> {
         win_ascent: at(74)?,
         win_descent: at(76)?,
     })
+}
+
+/// The `post` underline position and thickness, both zero when the table is
+/// absent or shorter than its 32-byte header, as FreeType reports them.
+pub(crate) fn underline(data: Option<&[u8]>) -> (i16, i16) {
+    match data {
+        Some(post) if post.len() >= 32 => (
+            u16_at(post, 8).map_or(0, u16::cast_signed),
+            u16_at(post, 10).map_or(0, u16::cast_signed),
+        ),
+        _ => (0, 0),
+    }
 }
 
 /// Horizontal advances: `numberOfHMetrics` long records, then side bearings that

@@ -7,14 +7,27 @@
 
 use std::io::{self, BufWriter, Write};
 use std::process::ExitCode;
-use triergon_core::{Budget, Bytes};
-use triergon_font::{Font, GlyphId, Limits, NameRecord, Outline, PointKind};
+use triergon_core::{Budget, Bytes, Error};
+use triergon_font::{
+    Coordinate, Font, GlyphId, Limits, NameRecord, Outline, PointKind, ScaledOutline, Synthesis,
+};
 
 fn main() -> ExitCode {
     let args: Vec<String> = std::env::args().skip(1).collect();
-    let [path] = &args[..] else {
-        eprintln!("usage: font-dump FILE");
-        return ExitCode::from(2);
+    let (sizes, path) = match &args[..] {
+        [path] => (None, path),
+        [flag, sizes, path] if flag == "--scaled" => {
+            let parsed: Result<Vec<i32>, _> = sizes.split(',').map(str::parse).collect();
+            let Ok(sizes) = parsed else {
+                eprintln!("sizes must be 26.6 heights separated by commas");
+                return ExitCode::from(2);
+            };
+            (Some(sizes), path)
+        }
+        _ => {
+            eprintln!("usage: font-dump [--scaled HEIGHT,...] FILE");
+            return ExitCode::from(2);
+        }
     };
     let data = match std::fs::read(path) {
         Ok(data) => data,
@@ -36,7 +49,20 @@ fn main() -> ExitCode {
     let mut failed = false;
     for index in 0..faces {
         match Font::new(bytes.clone(), index, &budget, Limits::default()) {
-            Ok(font) => dump(&font, &budget, &mut out).expect("stdout"),
+            Ok(font) => match &sizes {
+                None => dump(&font, &budget, &mut out).expect("stdout"),
+                Some(sizes) => {
+                    writeln!(out, "face {index}").expect("stdout");
+                    for (i, &height) in sizes.iter().enumerate() {
+                        dump_size(&font, height, i == 0, &budget, &mut out).expect("stdout");
+                    }
+                }
+            },
+            Err(error) if sizes.is_some() => {
+                writeln!(out, "face {index} error").expect("stdout");
+                eprintln!("face {index}: {error}");
+                failed = true;
+            }
             Err(error) => {
                 writeln!(out, "face {index} error {error}").expect("stdout");
                 failed = true;
@@ -83,6 +109,132 @@ fn postscript(record: Option<NameRecord<'_>>) -> String {
         .map(char::from)
         .collect();
     if text.is_empty() { "-".into() } else { text }
+}
+
+/// The glyphs whose kerning is compared: the first 256 and the text glyphs of
+/// U+0020..U+00FF.
+fn kerned_glyphs(font: &Font) -> Vec<GlyphId> {
+    let mut kerned: Vec<GlyphId> = (0..font.glyph_count().min(256)).map(GlyphId).collect();
+    for code in 0x20..=0xff_u8 {
+        if let Some(glyph) = font.glyph_index(char::from(code)).filter(|g| g.0 >= 256) {
+            kerned.push(glyph);
+        }
+    }
+    kerned
+}
+
+/// The outline part of a `glyph` line: `n | ends | x y tag ...`.
+fn outline_text<C: Coordinate + Into<f64>>(outline: &Outline<C>, scale: f64, text: &mut Vec<u8>) {
+    text.clear();
+    write!(text, "{} |", outline.contour_ends().len()).expect("buffer");
+    for end in outline.contour_ends() {
+        write!(text, " {end}").expect("buffer");
+    }
+    write!(text, " |").expect("buffer");
+    for p in outline.points() {
+        let tag = match p.kind {
+            PointKind::On => 1,
+            PointKind::Quadratic => 0,
+            PointKind::Cubic => 2,
+        };
+        let v = |c: C| (c.into() * scale).round() as i64;
+        write!(text, " {} {} {tag}", v(p.point.x), v(p.point.y)).expect("buffer");
+    }
+}
+
+/// FNV-1a, 64 bits.
+fn digest(text: &[u8]) -> u64 {
+    text.iter().fold(0xcbf2_9ce4_8422_2325, |h, &b| {
+        (h ^ u64::from(b)).wrapping_mul(0x100_0000_01b3)
+    })
+}
+
+/// One size in the format of the reference's `--scaled` mode.
+fn dump_size(
+    font: &Font,
+    height: i32,
+    detailed: bool,
+    budget: &Budget,
+    out: &mut impl Write,
+) -> io::Result<()> {
+    let Ok(sized) = font.at_size(height) else {
+        return writeln!(out, "size {height} error");
+    };
+    let m = sized.metrics();
+    let (ascent, descent) = sized.ascent_descent();
+    let (hb_x, hb_y) = sized.harfbuzz_scale();
+    let strength = sized.embolden_strength();
+    write!(
+        out,
+        "size {height} {} {} {} {} {} {} {} {} {ascent} {descent} {hb_x} {hb_y} {strength} {}",
+        m.x_ppem,
+        m.y_ppem,
+        m.x_scale,
+        m.y_scale,
+        m.ascender,
+        m.descender,
+        m.height,
+        m.max_advance,
+        u8::from(font.is_postscript())
+    )?;
+    for (key, band) in [
+        ("underline", sized.underline()),
+        ("strikeout", sized.strikeout()),
+    ] {
+        match band {
+            Some(b) => write!(out, " {key} {} {}", b.y_min, b.y_max)?,
+            None => write!(out, " {key} -")?,
+        }
+    }
+    writeln!(out)?;
+    let kerned = kerned_glyphs(font);
+    for &a in &kerned {
+        for &b in &kerned {
+            let value = sized.kerning(a, b);
+            if value != 0 {
+                writeln!(out, "kern {} {} {value}", a.0, b.0)?;
+            }
+        }
+    }
+    let (mut outline, mut styled) = (ScaledOutline::new(budget), ScaledOutline::new(budget));
+    let mut text = Vec::new();
+    let synthetic = |oblique, embolden| Synthesis { oblique, embolden };
+    for glyph in (0..font.glyph_count()).map(GlyphId) {
+        match sized.hinted_advance(glyph) {
+            Ok(advance) => writeln!(out, "hinted {} {advance}", glyph.0)?,
+            Err(Error::Unsupported(_)) => writeln!(out, "hinted {} unsupported", glyph.0)?,
+            Err(_) => writeln!(out, "hinted {} error", glyph.0)?,
+        }
+        let Ok(metrics) = sized.outline_into(glyph, &mut outline) else {
+            writeln!(out, "glyph {} error", glyph.0)?;
+            continue;
+        };
+        outline_text(&outline, 1.0, &mut text);
+        write!(out, "glyph {} {} ", glyph.0, metrics.advance)?;
+        if detailed {
+            out.write_all(&text)?;
+        } else {
+            write!(out, "{:016x}", digest(&text))?;
+        }
+        for (key, oblique, embolden) in [
+            ("bold", false, true),
+            ("oblique", true, false),
+            ("both", true, true),
+        ] {
+            if styled.copy_from(&outline).is_err()
+                || sized
+                    .synthesize(&mut styled, synthetic(oblique, embolden))
+                    .is_err()
+            {
+                write!(out, " {key} error")?;
+                continue;
+            }
+            outline_text(&styled, 1.0, &mut text);
+            write!(out, " {key} {:016x}", digest(&text))?;
+        }
+        writeln!(out)?;
+    }
+    Ok(())
 }
 
 fn dump(font: &Font, budget: &Budget, out: &mut impl Write) -> io::Result<()> {
@@ -139,12 +291,7 @@ fn dump(font: &Font, budget: &Budget, out: &mut impl Write) -> io::Result<()> {
         )?,
         None => writeln!(out, "textmap -")?,
     }
-    let mut kerned: Vec<GlyphId> = (0..font.glyph_count().min(256)).map(GlyphId).collect();
-    for code in 0x20..=0xff_u8 {
-        if let Some(glyph) = font.glyph_index(char::from(code)).filter(|g| g.0 >= 256) {
-            kerned.push(glyph);
-        }
-    }
+    let kerned = kerned_glyphs(font);
     for &a in &kerned {
         for &b in &kerned {
             let value = font.kerning(a, b);
@@ -154,30 +301,14 @@ fn dump(font: &Font, budget: &Budget, out: &mut impl Write) -> io::Result<()> {
         }
     }
     let mut outline = Outline::new(budget);
+    let mut text = Vec::new();
     for glyph in (0..font.glyph_count()).map(GlyphId) {
         let advance = font.advance(glyph).map_or(-1, i64::from);
         match font.outline_into(glyph, &mut outline) {
             Ok(metrics) => {
-                write!(
-                    out,
-                    "glyph {} {advance} {} {} |",
-                    glyph.0,
-                    metrics.advance,
-                    outline.contour_ends().len()
-                )?;
-                for end in outline.contour_ends() {
-                    write!(out, " {end}")?;
-                }
-                write!(out, " |")?;
-                for p in outline.points() {
-                    let tag = match p.kind {
-                        PointKind::On => 1,
-                        PointKind::Quadratic => 0,
-                        PointKind::Cubic => 2,
-                    };
-                    let scale = |v: f32| (f64::from(v) * 64.0).round() as i64;
-                    write!(out, " {} {} {tag}", scale(p.point.x), scale(p.point.y))?;
-                }
+                outline_text(&outline, 64.0, &mut text);
+                write!(out, "glyph {} {advance} {} ", glyph.0, metrics.advance)?;
+                out.write_all(&text)?;
                 writeln!(out)?;
             }
             Err(error) => writeln!(out, "glyph {} error {error}", glyph.0)?,

@@ -28,6 +28,16 @@ impl Request<'_> {
         }
     }
 
+    /// The requested slant as libass passes it on: 100 for the ASS value 1, 0 for
+    /// values of 0 or less, and other values unchanged.
+    pub const fn slant(&self) -> u32 {
+        match self.italic {
+            1 => 100,
+            ..=0 => 0,
+            slant => slant.unsigned_abs(),
+        }
+    }
+
     /// Whether an italic face is requested.
     pub const fn italic(&self) -> bool {
         self.italic > 0
@@ -46,20 +56,7 @@ pub struct FaceInfo<'a> {
 impl<'a> FaceInfo<'a> {
     pub fn new(font: &'a Font) -> Self {
         let freetype = font.style();
-        let weight = match font.os2().map_or(0, |o| o.weight_class) {
-            0 if freetype.bold => 700,
-            0 => 400,
-            1 => 100,
-            2 => 200,
-            3 => 300,
-            4 => 350,
-            5 => 400,
-            6 => 600,
-            7 => 700,
-            8 => 800,
-            9 => 900,
-            weight => u32::from(weight),
-        };
+        let weight = font.weight();
         // With OS/2, only fsSelection's italic and bold bits count, as GDI reads them.
         let (bold, italic) = match font.os2() {
             Some(os2) => (os2.selection.bold(), os2.selection.italic()),
@@ -242,6 +239,7 @@ mod tests {
         assert_eq!(request(-5, 0).weight(), 400);
         assert_eq!(request(300, 0).weight(), 300);
         assert!(request(0, 1).italic() && request(0, 7).italic());
+        assert_eq!((request(0, 1).slant(), request(0, 7).slant(), request(0, -3).slant()), (100, 7, 0));
         assert!(!request(0, -1).italic() && !request(0, 0).italic());
     }
 }

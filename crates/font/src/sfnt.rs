@@ -50,6 +50,9 @@ pub(crate) struct Tables {
     pub(crate) cff: Option<Table>,
     pub(crate) cff2: Option<Table>,
     pub(crate) kern: Option<Table>,
+    pub(crate) post: Option<Table>,
+    pub(crate) fpgm: Option<Table>,
+    pub(crate) prep: Option<Table>,
 }
 
 impl Tables {
@@ -67,6 +70,9 @@ impl Tables {
             b"CFF " => &mut self.cff,
             b"CFF2" => &mut self.cff2,
             b"kern" => &mut self.kern,
+            b"post" => &mut self.post,
+            b"fpgm" => &mut self.fpgm,
+            b"prep" => &mut self.prep,
             _ => return None,
         })
     }

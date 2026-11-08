@@ -3,7 +3,7 @@
 #![allow(dead_code)]
 
 use triergon_core::{Budget, Bytes};
-use triergon_font::{FaceInfo, Font, GlyphId, Limits, Outline, Request, select};
+use triergon_font::{FaceInfo, Font, GlyphId, Limits, Outline, Request, ScaledOutline, select};
 
 pub fn u16s(values: &[u16]) -> Vec<u8> {
     values.iter().flat_map(|v| v.to_be_bytes()).collect()
@@ -425,6 +425,7 @@ pub fn exercise(data: &[u8], limits: Limits) {
         }
     }
     let mut outline = Outline::new(&budget);
+    let mut scaled = ScaledOutline::new(&budget);
     for font in &fonts {
         let _ = (
             font.vertical_metrics(),
@@ -446,11 +447,33 @@ pub fn exercise(data: &[u8], limits: Limits) {
         let count = font.glyph_count();
         let step = (count / 256).max(1);
         let spread = (0..count.min(48)).chain((48..count).step_by(step as usize));
+        // Sizes: libass's 256 pixels, a small one and the extremes.
+        let sized: Vec<_> = [16384, 538, 1, i32::MAX]
+            .into_iter()
+            .filter_map(|height| font.at_size(height).ok())
+            .collect();
+        let synthesis = font.synthesis(900, 110);
+        for size in &sized {
+            let _ = (
+                size.ascent_descent(),
+                size.harfbuzz_scale(),
+                size.underline(),
+            );
+            let _ = (size.strikeout(), size.embolden_strength());
+        }
         for glyph in spread.map(GlyphId) {
             let _ = font.advance(glyph);
             let _ = font.outline_into(glyph, &mut outline);
             let _ = outline.segments().count();
             let _ = font.kerning(glyph, GlyphId(1));
+            for size in &sized {
+                let _ = size.hinted_advance(glyph);
+                let _ = size.kerning(glyph, GlyphId(1));
+                if size.outline_into(glyph, &mut scaled).is_ok() {
+                    let _ = size.synthesize(&mut scaled, synthesis);
+                    let _ = scaled.segments().count();
+                }
+            }
         }
         let _ = font.glyph_index('A');
     }

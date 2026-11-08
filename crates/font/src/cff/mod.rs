@@ -3,8 +3,9 @@
 mod charstring;
 mod dict;
 mod index;
+mod path;
 
-use crate::outline::Outline;
+use crate::outline::{Coordinate, Outline};
 use crate::read::{Meter, Reader, slice, u16_at, u32_at};
 use crate::sfnt::Table;
 use crate::{GlyphId, Limits};
@@ -406,7 +407,26 @@ impl Cff {
         }
     }
 
-    /// Loads `glyph` into `outline`.
+    /// Whether the FontMatrix maps font units other than by 1/unitsPerEm.
+    pub(crate) const fn has_matrix(&self) -> bool {
+        self.matrix.is_some()
+    }
+
+    /// Loads `glyph` into `outline` in whole font units as FreeType's CFF engine
+    /// builds it, before the FontMatrix.
+    pub(crate) fn outline_units<C: Coordinate>(
+        &self,
+        data: &[u8],
+        glyph: GlyphId,
+        outline: &mut Outline<C>,
+        limits: &Limits,
+        meter: &mut Meter,
+    ) -> Result<()> {
+        let table = self.table.bytes(data);
+        charstring::outline(self, table, glyph.0, outline, limits, meter)
+    }
+
+    /// Loads `glyph` into `outline` in font units, the FontMatrix applied.
     pub(crate) fn outline(
         &self,
         data: &[u8],
@@ -415,8 +435,7 @@ impl Cff {
         limits: &Limits,
         meter: &mut Meter,
     ) -> Result<()> {
-        let table = self.table.bytes(data);
-        charstring::outline(self, table, glyph.0, outline, limits, meter)?;
+        self.outline_units(data, glyph, outline, limits, meter)?;
         if let Some([a, b, c, d, e, f]) = self.matrix {
             for p in outline.points_mut() {
                 let (x, y) = (f64::from(p.point.x), f64::from(p.point.y));

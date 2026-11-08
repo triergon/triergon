@@ -26,8 +26,9 @@ pub const USAGE: &str = "usage: cargo xtask fonts prepare [--jobs N]
   fetch    fetch and verify the font corpus (harness/fonts/corpus.json) into
            .research/fonts
   compare  run font-dump and the FreeType worker on every corpus file whose path
-           contains FILTER and compare their output; with --output, write
-           DIR/report.json
+           contains FILTER and compare their output: face data and unscaled
+           outlines, then what libass obtains at ten sizes (--scaled); with
+           --output, write DIR/report.json
   fuzz     run the crate's mutation smoke test (examples/fuzz.rs, dev profile, so
            overflow is checked) over every corpus file, N mutations each
            (default 40)";
@@ -325,14 +326,63 @@ fn fetch_corpus(root: &Path, net: &dyn Transport) -> Result<usize, String> {
     Ok(verified)
 }
 
-/// The comparison of one corpus file.
+/// The 26.6 heights the scaled comparison requests, as libass requests them
+/// (`FT_SIZE_REQUEST_TYPE_REAL_DIM`): 256 pixels, what libass asks for every
+/// glyph with hinting off; then font sizes scaled to frames, which it asks for
+/// with hinting on: 75 and 82.5 (ASS sizes 20 and 22 at PlayResY 288 on 1080
+/// lines), 50 (20 at 288 on 720), 48 (48 at 1080 on 1080), 37.5 and 33.75 (10
+/// and 9 at 288 on 1080), 13.33 (20 at 1080 on 720), 24.5 (below the 25 pixels
+/// per em where kerning shrinks) and 8.4.
+const SIZES: [i32; 10] = [16384, 4800, 5280, 3200, 3072, 2400, 2160, 853, 1568, 538];
+
+/// The two comparisons run on every corpus file.
+#[derive(Clone, Copy)]
+enum Pass {
+    /// Face data and unscaled outlines.
+    Faces,
+    /// What libass obtains at each of [`SIZES`].
+    Scaled,
+}
+
+impl Pass {
+    const ALL: [Self; 2] = [Self::Faces, Self::Scaled];
+
+    const fn name(self) -> &'static str {
+        match self {
+            Self::Faces => "faces",
+            Self::Scaled => "scaled",
+        }
+    }
+
+    fn args(self) -> Vec<String> {
+        match self {
+            Self::Faces => Vec::new(),
+            Self::Scaled => {
+                let sizes: Vec<String> = SIZES.iter().map(i32::to_string).collect();
+                vec!["--scaled".into(), sizes.join(",")]
+            }
+        }
+    }
+}
+
+/// The comparison of one corpus file in one pass.
 struct Outcome {
     lines: usize,
     faces: usize,
+    sizes: usize,
     glyphs: usize,
     mismatches: usize,
+    /// Lines where the crate declares the value unsupported instead of giving
+    /// one; counted apart from mismatches, never as agreement.
+    unsupported: usize,
     kept: Vec<(usize, String, String)>,
     exits: (i32, i32),
+}
+
+impl Outcome {
+    const fn pass(&self) -> bool {
+        self.mismatches == 0 && self.exits.0 == 0 && self.exits.1 == 0
+    }
 }
 
 fn compare(root: &Path, report: Option<&Path>, filter: Option<&str>) -> Result<(), String> {
@@ -355,8 +405,7 @@ fn compare(root: &Path, report: Option<&Path>, filter: Option<&str>) -> Result<(
     let candidate = root.join("target/release/examples/font-dump");
     let files = root.join(FONTS).join("files");
     let mut entries = Vec::new();
-    let mut failed = 0;
-    let mut compared = 0;
+    let (mut failed, mut compared, mut unsupported) = (0, 0, 0);
     for file in corpus(root)?.into_iter().flat_map(|(_, list)| list) {
         if filter.is_some_and(|f| !file.path.contains(f)) {
             continue;
@@ -367,49 +416,63 @@ fn compare(root: &Path, report: Option<&Path>, filter: Option<&str>) -> Result<(
         if sha256::hex(&data) != file.sha256 {
             return Err(format!("{}: hash mismatch", file.path));
         }
-        let outcome = compare_file(&reference, &candidate, &path)?;
-        let pass = outcome.mismatches == 0 && outcome.exits == (0, 0);
         compared += 1;
-        if !pass {
-            failed += 1;
+        let mut passes = Vec::new();
+        let mut file_failed = false;
+        for pass in Pass::ALL {
+            let outcome = compare_file(&reference, &candidate, &pass.args(), &path)?;
+            file_failed |= !outcome.pass();
+            unsupported += outcome.unsupported;
+            println!(
+                "{} {} {}: {} faces, {} sizes, {} glyphs, {} lines, {} differing, {} unsupported",
+                if outcome.pass() { "PASS" } else { "FAIL" },
+                pass.name(),
+                file.path,
+                outcome.faces,
+                outcome.sizes,
+                outcome.glyphs,
+                outcome.lines,
+                outcome.mismatches,
+                outcome.unsupported
+            );
+            for (line, expected, actual) in &outcome.kept {
+                println!("  line {line}\n    freetype: {expected}\n    triergon: {actual}");
+            }
+            passes.push(Value::object([
+                ("pass", Value::str(pass.name())),
+                ("faces", Value::int(outcome.faces as i64)),
+                ("sizes", Value::int(outcome.sizes as i64)),
+                ("glyphs", Value::int(outcome.glyphs as i64)),
+                ("lines", Value::int(outcome.lines as i64)),
+                ("differing_lines", Value::int(outcome.mismatches as i64)),
+                ("unsupported_lines", Value::int(outcome.unsupported as i64)),
+                ("reference_exit", Value::int(outcome.exits.0)),
+                ("candidate_exit", Value::int(outcome.exits.1)),
+                (
+                    "first_differences",
+                    Value::Array(
+                        outcome
+                            .kept
+                            .iter()
+                            .map(|(line, a, b)| {
+                                Value::object([
+                                    ("line", Value::int(*line as i64)),
+                                    ("freetype", Value::str(a.clone())),
+                                    ("triergon", Value::str(b.clone())),
+                                ])
+                            })
+                            .collect(),
+                    ),
+                ),
+            ]));
         }
-        println!(
-            "{} {}: {} faces, {} glyphs, {} lines, {} differing",
-            if pass { "PASS" } else { "FAIL" },
-            file.path,
-            outcome.faces,
-            outcome.glyphs,
-            outcome.lines,
-            outcome.mismatches
-        );
-        for (line, expected, actual) in &outcome.kept {
-            println!("  line {line}\n    freetype: {expected}\n    triergon: {actual}");
+        if file_failed {
+            failed += 1;
         }
         entries.push(Value::object([
             ("path", Value::str(file.path.clone())),
             ("sha256", Value::str(file.sha256.clone())),
-            ("faces", Value::int(outcome.faces as i64)),
-            ("glyphs", Value::int(outcome.glyphs as i64)),
-            ("lines", Value::int(outcome.lines as i64)),
-            ("differing_lines", Value::int(outcome.mismatches as i64)),
-            ("reference_exit", Value::int(outcome.exits.0)),
-            ("candidate_exit", Value::int(outcome.exits.1)),
-            (
-                "first_differences",
-                Value::Array(
-                    outcome
-                        .kept
-                        .iter()
-                        .map(|(line, a, b)| {
-                            Value::object([
-                                ("line", Value::int(*line as i64)),
-                                ("freetype", Value::str(a.clone())),
-                                ("triergon", Value::str(b.clone())),
-                            ])
-                        })
-                        .collect(),
-                ),
-            ),
+            ("passes", Value::Array(passes)),
         ]));
     }
     if compared == 0 {
@@ -423,17 +486,21 @@ fn compare(root: &Path, report: Option<&Path>, filter: Option<&str>) -> Result<(
         };
         let build = crate::checks::read_json(&root.join(CACHE).join("build.json"))?;
         let document = Value::object([
-            ("schema", Value::int(1)),
+            ("schema", Value::int(2)),
             ("reference_build", build),
             ("reference_worker_sha256", Value::str(hash(&reference)?)),
             ("candidate_sha256", Value::str(hash(&candidate)?)),
             ("corpus_sha256", Value::str(hash(&root.join(CORPUS))?)),
+            (
+                "sizes_26_6",
+                Value::Array(SIZES.iter().map(|&s| Value::int(i64::from(s))).collect()),
+            ),
             ("files", Value::Array(entries)),
         ]);
         crate::corpus::write_json(&dir.join("report.json"), &document)?;
     }
     println!(
-        "{} of {compared} corpus files match FreeType {VERSION}",
+        "{} of {compared} corpus files match FreeType {VERSION}; {unsupported} lines unsupported",
         compared - failed
     );
     if failed == 0 {
@@ -443,10 +510,18 @@ fn compare(root: &Path, report: Option<&Path>, filter: Option<&str>) -> Result<(
     }
 }
 
-/// Streams both workers' output for `font` and compares it line by line.
-fn compare_file(reference: &Path, candidate: &Path, font: &Path) -> Result<Outcome, String> {
+/// Streams both workers' output for `font` and compares it line by line. A
+/// candidate line ending in `unsupported` where the lines differ is counted as
+/// unsupported.
+fn compare_file(
+    reference: &Path,
+    candidate: &Path,
+    args: &[String],
+    font: &Path,
+) -> Result<Outcome, String> {
     let spawn = |program: &Path| {
         Command::new(program)
+            .args(args)
             .arg(font)
             .stdout(Stdio::piped())
             .spawn()
@@ -458,8 +533,10 @@ fn compare_file(reference: &Path, candidate: &Path, font: &Path) -> Result<Outco
     let mut outcome = Outcome {
         lines: 0,
         faces: 0,
+        sizes: 0,
         glyphs: 0,
         mismatches: 0,
+        unsupported: 0,
         kept: Vec::new(),
         exits: (0, 0),
     };
@@ -477,16 +554,23 @@ fn compare_file(reference: &Path, candidate: &Path, font: &Path) -> Result<Outco
             outcome.glyphs += 1;
         } else if la.starts_with(b"face ") {
             outcome.faces += 1;
+        } else if la.starts_with(b"size ") {
+            outcome.sizes += 1;
         }
-        if la != lb {
-            outcome.mismatches += 1;
-            if outcome.kept.len() < KEPT_MISMATCHES {
-                let show = |line: &[u8]| {
-                    let text = String::from_utf8_lossy(line).trim_end().to_owned();
-                    text.chars().take(160).collect::<String>()
-                };
-                outcome.kept.push((outcome.lines, show(&la), show(&lb)));
-            }
+        if la == lb {
+            continue;
+        }
+        if lb.trim_ascii_end().ends_with(b" unsupported") {
+            outcome.unsupported += 1;
+            continue;
+        }
+        outcome.mismatches += 1;
+        if outcome.kept.len() < KEPT_MISMATCHES {
+            let show = |line: &[u8]| {
+                let text = String::from_utf8_lossy(line).trim_end().to_owned();
+                text.chars().take(160).collect::<String>()
+            };
+            outcome.kept.push((outcome.lines, show(&la), show(&lb)));
         }
     }
     let code = |child: &mut std::process::Child| {
@@ -518,18 +602,22 @@ mod tests {
         };
         let a = script("a", "printf 'face 0\\nglyph 1 x\\nglyph 2 y\\n'");
         let b = script("b", "printf 'face 0\\nglyph 1 z\\n'; exit 3");
-        let same = compare_file(&a, &a, Path::new("font")).unwrap();
+        let same = compare_file(&a, &a, &[], Path::new("font")).unwrap();
         assert_eq!(
             (same.lines, same.faces, same.glyphs, same.mismatches),
             (3, 1, 2, 0)
         );
-        let outcome = compare_file(&a, &b, Path::new("font")).unwrap();
+        let outcome = compare_file(&a, &b, &[], Path::new("font")).unwrap();
         assert_eq!((outcome.mismatches, outcome.exits), (2, (0, 3)));
         assert_eq!(
             outcome.kept[0],
             (2, "glyph 1 x".to_owned(), "glyph 1 z".to_owned())
         );
         assert_eq!(outcome.kept[1].2, "");
+        let c = script("c", "printf 'face 0\\nglyph 1 x\\nhinted 2 unsupported\\n'");
+        let declined = compare_file(&a, &c, &[], Path::new("font")).unwrap();
+        assert_eq!((declined.mismatches, declined.unsupported), (0, 1));
+        assert!(declined.pass());
         fs::remove_dir_all(dir).unwrap();
     }
 

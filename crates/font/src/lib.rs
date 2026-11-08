@@ -11,6 +11,7 @@
 
 mod cff;
 mod cmap;
+mod fixed;
 mod glyf;
 mod kern;
 mod matching;
@@ -19,18 +20,22 @@ mod name;
 mod outline;
 mod read;
 mod sfnt;
+mod sized;
 mod store;
+mod synthesis;
 mod work;
 
 pub use cmap::{CharEncoding, Charmap, CmapFormat, Mappings};
 pub use matching::{FaceInfo, Request, select};
 pub use metrics::{FsSelection, Os2};
 pub use name::{NameChars, NameId, NameRecord, Platform};
-pub use outline::{Outline, OutlinePoint, Point, PointKind, Segment};
+pub use outline::{Coordinate, Outline, OutlinePoint, Point, PointKind, ScaledOutline, Segment};
+pub use sized::{Band, ScaledMetrics, SizeMetrics, SizedFont, pixels_26_6};
 pub use store::{Built, Store, StoreKey};
+pub use synthesis::{Orientation, Synthesis};
 
 use cff::{Cff, Version};
-use glyf::Glyf;
+use glyf::{FontUnits, Glyf};
 use kern::Kern;
 use metrics::{Head, Hhea, Hmtx};
 use name::Names;
@@ -149,6 +154,8 @@ pub struct Font {
     charmaps: BudgetVec<cmap::Subtable>,
     outlines: Outlines,
     kern: Kern,
+    /// `post` underline position and thickness.
+    underline: (i16, i16),
     limits: Limits,
 }
 
@@ -212,6 +219,7 @@ impl Font {
             Some(t) => Kern::parse(bytes, t, budget, &mut work)?,
             None => Kern::new(budget),
         };
+        let underline = metrics::underline(tables.post.map(|t| t.bytes(bytes)));
         Ok(Self {
             data,
             index,
@@ -225,6 +233,7 @@ impl Font {
             charmaps,
             outlines,
             kern,
+            underline,
             limits,
         })
     }
@@ -477,7 +486,9 @@ impl Font {
     ///
     /// A TrueType outline is shifted horizontally so that its left side bearing is
     /// the `hmtx` value, by `lsb - xMin` of the glyph whose metrics apply, as
-    /// FreeType places it. CFF outlines are unshifted.
+    /// FreeType places it. CFF outlines are unshifted and, as FreeType's CFF
+    /// engine builds them, in whole font units (rounded down) before the
+    /// FontMatrix. [`Font::at_size`] loads outlines scaled to pixels.
     ///
     /// # Errors
     ///
@@ -491,12 +502,8 @@ impl Font {
         match &self.outlines {
             Outlines::Glyf(glyf) => {
                 outline.begin(self.limits.points);
-                let cx = glyf::Context {
-                    data,
-                    glyph_count: self.glyph_count,
-                    limits: &self.limits,
-                };
-                let metrics = glyf.outline(&cx, glyph, outline, &mut meter)?;
+                let cx = self.glyf_context();
+                let metrics = glyf.outline(&cx, glyph, FontUnits, outline, &mut meter)?;
                 let shift = self.side_bearing(metrics.glyph) - i32::from(metrics.x_min);
                 if shift != 0 {
                     for p in outline.points_mut() {
@@ -521,6 +528,27 @@ impl Font {
         let mut outline = Outline::new(budget);
         let metrics = self.outline_into(glyph, &mut outline)?;
         Ok((outline, metrics))
+    }
+
+    fn glyf_context(&self) -> glyf::Context<'_> {
+        glyf::Context {
+            data: self.data.as_ref(),
+            glyph_count: self.glyph_count,
+            limits: &self.limits,
+        }
+    }
+
+    /// The weight libass assigns the face: `OS/2.usWeightClass`, with classes 1
+    /// to 9 read as 100 to 900 (4 as 350), and 400 or 700 by the bold style when
+    /// it is zero or `OS/2` is absent.
+    pub fn weight(&self) -> u32 {
+        match self.os2.map_or(0, |o| o.weight_class) {
+            0 if self.style().bold => 700,
+            0 => 400,
+            4 => 350,
+            class @ 1..=9 => u32::from(class) * 100,
+            class => u32::from(class),
+        }
     }
 
     /// The `hmtx` left side bearing of `glyph`, or zero where the table lacks it.
