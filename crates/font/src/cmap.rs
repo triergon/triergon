@@ -56,19 +56,77 @@ impl CmapFormat {
         }
     }
 
-    /// The bytes the fixed header and arrays need, read from the subtable header.
-    /// Format 4's glyph array is checked per lookup instead.
-    fn needed(self, table: &[u8]) -> Option<usize> {
-        let count = |offset| u16_at(table, offset).map(usize::from);
-        let wide = |offset| u32_at(table, offset).and_then(|n| usize::try_from(n).ok());
+    /// Whether FreeType's default validation accepts the subtable, given the
+    /// bytes from its start to the end of the `cmap` table.
+    fn valid(self, table: &[u8]) -> bool {
+        self.check(table).is_some()
+    }
+
+    fn check(self, table: &[u8]) -> Option<()> {
+        let short = |at| u16_at(table, at).map(usize::from);
+        let long = |at| u32_at(table, at).and_then(|n| usize::try_from(n).ok());
+        let limit = table.len();
+        let fits = |ok: bool| ok.then_some(());
         match self {
-            Self::ByteEncoding => Some(6 + 256),
-            Self::SegmentDelta => count(6).map(|twice| 16 + 4 * twice),
-            Self::Trimmed => count(8).map(|n| 10 + 2 * n),
-            Self::TrimmedArray => wide(16)?.checked_mul(2)?.checked_add(20),
-            Self::SegmentedCoverage | Self::ManyToOne => wide(12)?.checked_mul(12)?.checked_add(16),
+            Self::ByteEncoding => {
+                let length = short(2)?;
+                fits(length <= limit && length >= 262)
+            }
+            Self::SegmentDelta => segment_delta_valid(table),
+            Self::Trimmed => {
+                fits(limit >= 10)?;
+                let (length, count) = (short(2)?, short(8)?);
+                fits(length <= limit && length >= 10 + 2 * count)
+            }
+            Self::TrimmedArray => {
+                fits(limit >= 20)?;
+                let (length, count) = (long(4)?, long(16)?);
+                fits(length <= limit && length >= 20 && (length - 20) / 2 >= count)
+            }
+            Self::SegmentedCoverage | Self::ManyToOne => {
+                fits(limit >= 16)?;
+                let (length, groups) = (long(4)?, long(12)?);
+                fits(length <= limit && length >= 16 && (length - 16) / 12 >= groups)?;
+                // Groups ascend without overlapping.
+                let mut last = None;
+                for g in 0..groups {
+                    let start = u32_at(table, 16 + 12 * g)?;
+                    let end = u32_at(table, 20 + 12 * g)?;
+                    fits(start <= end && last.is_none_or(|last| start > last))?;
+                    last = Some(end);
+                }
+                Some(())
+            }
         }
     }
+}
+
+/// `tt_cmap4_validate` at FreeType's default level: the segment arrays fit the
+/// rest of the `cmap` table, no segment starts after it ends, and glyph-array
+/// offsets stay within the table (FreeType lets a final 0xFFFF segment off).
+fn segment_delta_valid(table: &[u8]) -> Option<()> {
+    let limit = table.len();
+    let fits = |ok: bool| ok.then_some(());
+    // FreeType measures the subtable to the end of `cmap`, whatever its length says.
+    fits(limit >= 16)?;
+    let segments = usize::from(u16_at(table, 6)? / 2);
+    fits(limit >= 16 + 8 * segments)?;
+    let (starts, offsets) = (16 + 2 * segments, 16 + 6 * segments);
+    let glyph_ids = offsets + 2 * segments;
+    for n in 0..segments {
+        let end = usize::from(u16_at(table, 14 + 2 * n)?);
+        let start = usize::from(u16_at(table, starts + 2 * n)?);
+        let offset = usize::from(u16_at(table, offsets + 2 * n)?);
+        fits(start <= end)?;
+        let sentinel = n == segments - 1 && start == 0xffff && end == 0xffff;
+        if offset == 0xffff {
+            fits(sentinel)?;
+        } else if offset != 0 && !sentinel {
+            let array = offsets + 2 * n + offset;
+            fits(array >= glyph_ids && array + 2 * (end - start + 1) <= limit)?;
+        }
+    }
+    Some(())
 }
 
 /// What a subtable's codes are, from its encoding record.
@@ -99,6 +157,8 @@ pub(crate) struct Subtable {
 }
 
 /// Reads the encoding records, keeping the supported subtables in directory order.
+/// As in FreeType, a table too short for its header has no subtables, records
+/// stop at the table's end, and a record at offset 0 is skipped.
 pub(crate) fn parse(
     data: &[u8],
     table: Table,
@@ -106,22 +166,25 @@ pub(crate) fn parse(
     work: &mut WorkBudget,
 ) -> Result<BudgetVec<Subtable>> {
     let bytes = slice(data, table.offset, table.len)?;
-    let mut r = Reader::new(bytes);
-    r.u16()?; // version: FreeType ignores it, as the format allows newer subtables
-    let count = r.u16()?;
-    charge(work, usize::from(count))?;
     let mut subtables = BudgetVec::new(budget);
-    for _ in 0..count {
+    // The version is ignored: the format allows newer subtables under 0.
+    let Some(count) = u16_at(bytes, 2) else {
+        return Ok(subtables);
+    };
+    let records = usize::from(count).min(bytes.len().saturating_sub(4) / 8);
+    charge(work, records)?;
+    let mut r = Reader::at(bytes, 4)?;
+    for _ in 0..records {
         let platform = Platform::from_id(r.u16()?);
         let encoding = r.u16()?;
         let offset = usize::try_from(r.u32()?).map_err(|_| Error::Overflow)?;
+        if offset == 0 {
+            continue;
+        }
         let Some(format) = u16_at(bytes, offset).and_then(CmapFormat::from_number) else {
             continue;
         };
-        let fits = bytes
-            .get(offset..)
-            .and_then(|sub| Some(format.needed(sub)? <= sub.len()));
-        if fits == Some(true) {
+        if bytes.get(offset..).is_some_and(|sub| format.valid(sub)) {
             let subtable = Subtable {
                 platform,
                 encoding,
@@ -496,7 +559,7 @@ mod tests {
 
     #[test]
     fn trimmed_byte_and_unsupported_subtables() {
-        let data = cmap(&words(&[6, 0, 0, 0x30, 2, 4, 5]));
+        let data = cmap(&words(&[6, 14, 0, 0x30, 2, 4, 5]));
         let charmap = charmaps(&data, 10, u64::MAX)[0];
         assert_eq!(
             [0x2f, 0x30, 0x31, 0x32].map(|c| charmap.glyph(c)),

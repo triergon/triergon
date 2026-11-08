@@ -75,7 +75,10 @@ the string storage are skipped. `family_name`, `style_name` and `postscript_name
 select the record FreeType reports.
 
 **Character mapping.** `cmap` formats 0, 4, 6, 10, 12 and 13 on any platform, in
-directory order; other formats (2, 8, 14) are not listed. Lookups are bounded by the
+directory order; other formats (2, 8, 14) are not listed. Records stop at the
+table's end, and a subtable is listed only when FreeType's default validation
+accepts it (lengths that fit, ascending non-overlapping groups for formats 12
+and 13, ordered segments and in-table glyph arrays for format 4). Lookups are bounded by the
 end of the `cmap` table rather than the declared subtable length. A glyph at or
 above the glyph count is unmapped. `text_charmap` is libass's selection: the first
 Windows Unicode subtable, else the first Windows subtable, else FreeType's default
@@ -183,7 +186,8 @@ only scanned for `INSTCTRL`, CFF hints are skipped), Apple `kern` version 1 and
 kern formats other than 0, GPOS and GSUB, and CFF features outside the above: Type
 1 charstrings (CharstringType 1), synthetic fonts and Expert charsets for `seac`.
 A face without a usable `glyf` or CFF table is `Error::Invalid`, where FreeType
-opens it and fails each glyph.
+opens it and fails each glyph. A format 4 subtable whose segments overlap or are out
+of order is searched in order rather than with FreeType's overlap handling.
 
 At a size, what needs hinting or vertical layout is not reproduced: hinted
 outlines, hence the glyph extents and contour points libass's HarfBuzz callbacks

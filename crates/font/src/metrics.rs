@@ -254,7 +254,10 @@ mod tests {
         let short = Hmtx::new(Table { offset: 0, len: 7 }, 2, 3);
         assert_eq!([0, 1, 2].map(|g| short.advance(&data, g)), [100, 0, 200]);
         let empty = Hmtx::new(table, 0, 3);
-        assert_eq!((empty.advance(&data, 1), empty.side_bearing(&data, 1)), (0, 0));
+        assert_eq!(
+            (empty.advance(&data, 1), empty.side_bearing(&data, 1)),
+            (0, 0)
+        );
     }
 
     #[test]
