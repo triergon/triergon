@@ -29,7 +29,9 @@ fn decode_stream(stream: &[u8]) -> Result<(), DecodeError> {
 ```
 
 `send_nal` takes one NAL unit without start code; `reset` drops the DPB and any partial
-picture. `Plane::raw()` gives zero-copy access to the backing plane and `write_raw`
+picture. `Decoder::with_limits(Limits { live_storage_bytes })` sets the storage budget (it
+fails only for a budget below a pool's own charge); `Decoder::new_in` charges a caller's
+`Budget` instead. `Plane::raw()` gives zero-copy access to the backing plane and `write_raw`
 appends u8 or little-endian u16 samples. `examples/decode_hevc.rs IN.hevc OUT.yuv|-|null`
 writes planar YUV and one JSON line per picture.
 
@@ -37,10 +39,10 @@ writes planar YUV and one JSON line per picture.
 
 | Feature | Default | Effect |
 |---|---|---|
-| `simd` | on | `std::simd` kernels for motion compensation, deblocking and SAO. Requires a nightly toolchain (`portable_simd`); `cargo xtask check-simd` uses the pinned one. |
+| `simd` | off | `std::simd` kernels for motion compensation, deblocking and SAO. Requires a nightly toolchain (`portable_simd`); `cargo xtask check-simd` uses the pinned one. |
 
-Without `simd` (`--no-default-features`) the crate builds on stable and uses the scalar
-code, which produces identical output.
+Without `simd` the crate builds on stable and uses the scalar code, which produces
+identical output.
 
 ## Supported
 
@@ -61,8 +63,8 @@ code, which produces identical output.
   sharing the decoder's frame buffers, `pts`, `poc`, `sar` and `colour`. Each picture
   keeps the timestamp of the access unit that carried it through reordering.
 - Errors are typed: `Unsupported(&str)` names the tool, `InvalidData(&str)`,
-  `ResourceLimit(&str)`, `MissingParameterSet(&str)`. The decoder does not panic on
-  malformed input.
+  `ResourceLimit(&str)`, `MissingParameterSet(&str)`, `Budget(StorageError)`. The decoder
+  does not panic on malformed input.
 - Refused with `Unsupported`: monochrome, 4:2:2, 4:4:4, separate colour planes, bit depth
   above 10, unequal luma and chroma bit depth, every SPS range-extension tool, PPS
   range-extension tools under RExt profiles, SCC extensions.
@@ -73,6 +75,16 @@ code, which produces identical output.
   nor output, as in FFmpeg.
 - Limits: picture size capped at level 6.2 (35,651,584 luma samples, 16,888 per side)
   before allocation; DPB size from `sps_max_dec_pic_buffering` (at most 16).
+- Storage: decoded and reference pictures (also while a caller holds a `Picture`), the
+  frame pool, collocated motion, per-picture block and CTB maps, parameter sets, tile and
+  scan tables, the SAO band buffer and the RBSP of the NAL unit being parsed are charged
+  to the budget before they are allocated; a refused charge is `DecodeError::Budget`,
+  the picture it was for is not started, and decoding resumes once the storage fits. A frame returns to the pool (one spare per bit depth) when the last picture
+  showing it drops; the maps follow the picture size in both directions. The default, 1.25 GiB, holds the largest picture the size cap accepts
+  (8192×4352, 107 MB in 10-bit storage) in the 6-picture DPB level 6.2 allows at that
+  size (A.4.2), plus the frame pool and two held output pictures: nine frames, 963 MB,
+  and about 70 MB of collocated motion, maps and tables, which leaves about 30% for slice
+  data. A 2160p Main 10 stream with a full 16-picture DPB needs about 0.5 GB.
 - A slice error abandons the rest of the picture; what was decoded is still output.
   Behaviour on corrupt streams is not compared with FFmpeg's concealment.
 
