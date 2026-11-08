@@ -102,5 +102,8 @@ fn any_reader_reads_matroska_through_the_neutral_model() {
         packet[0] = 0x47;
     }
     let refused = AnyReader::open(&ts, &pool, SourceId(2), capabilities);
+    #[cfg(not(feature = "mpegts"))]
     assert!(matches!(refused, Err(triergon::Error::Unsupported(_))));
+    #[cfg(feature = "mpegts")]
+    assert!(matches!(refused, Ok(AnyReader::MpegTs(_))));
 }
