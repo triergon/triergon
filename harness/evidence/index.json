@@ -16518,6 +16518,16 @@
    "sha256": "6f5c1b65540e9bbe2dc79a1f8c1dc41e684aba468cd8fdd082bf603d3bfb6ca1",
    "bytes": 241859625,
    "source_revision": "090c856df65f9247d24ea9f1c927e35cf5d528e8"
+  },
+  {
+   "name": "runners-gate-build-linux-armv7",
+   "path": "runners-gate-build-linux-armv7",
+   "retention": "retained",
+   "reason": "32-bit ARMv7 status rows for the Matroska audio clocks, MPEG-TS, MP4 forward, TS program and raw Annex B runner contracts: timing, memory and graded reports, with the CPU, kernel and user-space package list",
+   "key": "evidence/runners-gate-build-linux-armv7/b1df5b6f79fa2644106b8e87c61799b5c6fa9075c33096017bf4c50d89ef95a0.tar.gz",
+   "sha256": "b1df5b6f79fa2644106b8e87c61799b5c6fa9075c33096017bf4c50d89ef95a0",
+   "bytes": 676034441,
+   "source_revision": "7be886648e47f711b0f258412df82d214158a709"
   }
  ]
 }

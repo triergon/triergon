@@ -129,6 +129,7 @@ comparison remains archived separately.
 | ARMv7: Matroska / WebM, startup and seek, HLS, codec timing, capture | `78a873dd983c878c861a7b5549639a58d5a599c1` | `773f9f077ec4e556f8692132c35d73b8256f24c9c26a5e407aa11df32820a116` |
 | ARMv7: ISO BMFF / MP4 | `9621f6063a2e517fecc1c28757e6bed50b5228a8` | `ca882ff82484e31c537ebb93cbc9899666343715219ae4411914392406259691` |
 | ARMv7: packet framing, codec conformance, tests | `9621f6063a2e517fecc1c28757e6bed50b5228a8` | `9eaa9347010b3c4aaf5c35bda715ee4ed1b2c7a14d3329b21976a2414455439e` |
+| ARMv7: Matroska audio clocks, MPEG-TS, MP4 forward, TS program, raw Annex B | `7be886648e47f711b0f258412df82d214158a709` | `b1df5b6f79fa2644106b8e87c61799b5c6fa9075c33096017bf4c50d89ef95a0` |
 
 ## Platforms
 
@@ -157,6 +158,11 @@ peaks are given beside it.
 | Packet framing | 125/125 AVC/HEVC reference comparisons | 0.9195 (125/125 pass) | heap ≤0.765 (125/125 lower); total RSS ceiling ≤1.962, observed peaks ≤1.112 |
 | Codecs | 347/347 comparable H.264 and HEVC conformance vectors (of 383 run, 31 are outside the supported profiles and 5 are refused by both); the 71 derived audio streams were not run, because nothing in the repository generates them; the six video timing workloads decode to FFmpeg's digests | 1.7785 (8/17 pass) | no repository runner |
 | Capture | 0/15: mux and encoder pass on all 15, conversion fails on all 15 (below) | 3.7355 (2/15 pass) | heap ≤0.564, total RSS ≤0.981 (14/15; `c05-noise-960` has no valid observation) |
+| Matroska audio clocks | 10/10 packet folds (`matroska-audio-clocks`) | 0.9337 (10/10 pass) | heap ≤1.681 (8/10 lower); total RSS ceiling ≤2.007, observed peaks ≤1.317 |
+| MPEG-TS | 66/97 compat-view operations (`mpegts-pes`); the same 31 open cases as on AArch64 | 0.9298 (66/66 pass) | heap ≤0.101 (66/66 lower); total RSS ceiling ≤1.885, observed peaks ≤0.986 |
+| Playback: MP4 forward | 37/38 packet folds (`mp4-forward`); the same open case as on AArch64 | 2.6724 (23/37 pass) | heap ≤2.949 (36/37 lower); total RSS ceiling ≤2.002, observed peaks ≤1.254 |
+| Playback: TS program | 35/35 packet folds (`ts-program`) | 1.2915 (33/35 pass) | heap ≤0.141 (35/35 lower); total RSS ceiling ≤1.877, observed peaks ≤1.104 |
+| Playback: raw Annex B | 6/6 packet folds (`raw-annex-b`) | 0.6434 (6/6 pass) | heap ≤0.126 (6/6 lower); total RSS ceiling ≤1.833, observed peaks ≤0.984 |
 
 Above the ceiling on ARMv7: codecs `h264-high-1080p` 1.5371, `h264-main-1920x800`
 1.3155, `dts-core-es-6.1` 1.7268, `dts-core-7.1-master` 1.7785, `ac3-5.1-448` 1.3602,
@@ -171,7 +177,15 @@ Above the ceiling on ARMv7: codecs `h264-high-1080p` 1.5371, `h264-main-1920x800
 fragmented-file (`f-`, `trun18-`, `flag-`, `origin18-`, `follow-flag-`, `discard22-`,
 `discard24-`, `modern-iso6-`, `order-fragment-header-`), 64-bit clock (`clock27-`,
 `order27-`) and tx3g (`r-subtitle-`) groups, and 21 `clock27-` and `order27-` outputs read
-in `ordinary` windows. The raw samples' `report.json` lists each bound.
+in `ordinary` windows; MP4 forward `progressive-ten-sequential-batches` 2.6724,
+`progressive-pending-reverse-ranges` 1.8392, `progressive-pending-two-mdats` 1.7791,
+`progressive-pending-terminal` 1.7306, `progressive-pending-pair` 1.7203,
+`progressive-unknown-clock-terminal` 1.7099, `progressive-pending-unknown-clock` 1.7051,
+`progressive-first-source-clock-unknown` 1.7030, `progressive-pending-description` 1.6909,
+`regular-encoded-avc-aac-native-seek` 1.3406, `progressive-f-ctts-v1` 1.2993,
+`progressive-f-explicit` 1.2977, `progressive-f-no-second-tfdt` 1.2818 and
+`progressive-f-description-change` 1.2810; TS program `entry-hevc-aac-44100-00` 1.2915 and
+`entry-hevc-aac-44100-01` 1.2543. The raw samples' `report.json` lists each bound.
 
 Capture conversion must stay within ±1 of FFmpeg's on every sample. On
 `c01-ui-static-960`, Triergon's conversion output is byte-identical on ARMv7 and
@@ -188,6 +202,20 @@ and `seek-hevc-seek-no-default-2700-eof` 1.0163. Every packet-framing case has i
 RSS ceiling and its observed resident peak above the reference (observed up to 1.112);
 every ISO BMFF output has its total RSS ceiling above the reference, and none its observed
 peak.
+
+Every measured Matroska audio clocks, MPEG-TS, MP4 forward, TS program and raw Annex B
+case has a total RSS ceiling above the reference. Peak heap is above it in Matroska audio
+clocks `dolby-bad-first` 1.2145 and `no-absolute-anchor` 1.6808, and in MP4 forward
+`regular-encoded-avc-aac-native-seek` 2.9492. The observed resident peaks are above it in
+all 10 Matroska audio clocks cases (up to 1.317), all 37 measured MP4 forward cases (up to
+1.254) and 12 of the 35 TS program cases (`ts188-basic`, `program-eof-avc-aac`,
+`program-pmt-retype`, `program-private-avc-dvb`, `carriage-aac-adts-direct`,
+`carriage-hevc-direct`, `pts-negative-against-dts`, `transport-partial-final-packet`,
+`pmt-opaque-language-descriptors`, `entry-hevc-aac-44100-00`, `entry-hevc-aac-44100-01`,
+`m2ts-entry-hevc-aac-44100-01-video`, up to 1.104), and in no MPEG-TS or raw Annex B case.
+`cargo xtask grade` graded the Matroska audio clocks, TS program and raw Annex B reports.
+The MPEG-TS and MP4 forward numbers come from their complete timing and memory reports,
+because their open cases have no timing and the run predates grading of open cases.
 
 The [measured revisions](#measured-revisions) table names the revision and raw samples
 behind each ARMv7 row.
