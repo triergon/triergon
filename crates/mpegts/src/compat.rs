@@ -37,6 +37,13 @@ pub mod pes {
         DvbSubtitlesDescriptors, PayloadCursor, PrivateAudioCarriage, PrivateAudioDescriptors,
         ReadyContinuation, RegisteredCarriage, SourceContext,
     };
+    /// Control-only completion from complete physical carrier coverage and
+    /// actual source EOF. The confirmation never creates a validated PES scope
+    /// or accepts media from a rejected carrier.
+    pub use crate::packet_completion::{
+        ControlCarrierKind, ControlPatFact, NoMediaConfirmation, PacketCompletion, PhysicalCarrier,
+        PhysicalNullRun,
+    };
 }
 
 pub mod input {
