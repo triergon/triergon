@@ -1,5 +1,6 @@
 //! Self-contained ADTS tests with synthetic (self-authored) bitstreams.
-use triergon_codec_aac::{AudioFrame, DecodeError, Decoder, Feature, Speaker};
+use triergon_codec::Budget;
+use triergon_codec_aac::{AudioFrame, DecodeError, Decoder, Feature, Limits, Speaker};
 
 struct Bw {
     bits: Vec<u8>,
@@ -229,4 +230,53 @@ fn fixed_channel_configurations_map_like_ffmpeg() {
             .unwrap();
         assert_eq!(f.layout.speakers(), want, "chcfg {cfg}");
     }
+}
+
+#[test]
+fn a_budget_too_small_for_the_channel_state_is_a_typed_error() {
+    let mut d = Decoder::with_limits(Limits {
+        live_storage_bytes: 16 * 1024,
+    })
+    .unwrap();
+    let mut f = AudioFrame::default();
+    let frame = adts(1, 4, 1, &[block(false)], false);
+    for _ in 0..2 {
+        assert!(matches!(
+            d.decode(&frame, &mut f),
+            Err(DecodeError::Budget(_))
+        ));
+        assert_eq!(f.samples_per_channel, 0);
+    }
+}
+
+#[test]
+fn a_shared_budget_returns_to_idle_when_the_decoder_drops() {
+    let budget = Budget::new(1 << 20).unwrap();
+    let idle = budget.used();
+    let mut d = Decoder::new_in(&budget);
+    let mut f = AudioFrame::default();
+    d.decode(&adts(1, 4, 1, &[block(false)], false), &mut f)
+        .unwrap();
+    assert!(budget.used() >= idle + 2 * 2048 * size_of::<f32>() + 1024 * size_of::<f32>());
+    drop(d);
+    assert_eq!(budget.used(), idle);
+}
+
+#[test]
+fn decoding_resumes_after_a_refusal() {
+    let budget = Budget::new(1 << 20).unwrap();
+    let mut d = Decoder::new_in(&budget);
+    let mut f = AudioFrame::default();
+    let one = adts(1, 4, 1, &[block(false)], false);
+    let three = adts(1, 4, 1, &[block(false), block(false), block(false)], false);
+    // the first frame, then a frame that needs a longer output
+    for au in [&one, &three] {
+        let pressure = budget.reserve(budget.available()).unwrap();
+        assert!(matches!(d.decode(au, &mut f), Err(DecodeError::Budget(_))));
+        assert_eq!(f.samples_per_channel, 0);
+        drop(pressure);
+        d.decode(au, &mut f).unwrap();
+        assert!(f.planes[0].iter().all(|&s| s == 0.0));
+    }
+    assert_eq!(f.samples_per_channel, 3 * 1024);
 }

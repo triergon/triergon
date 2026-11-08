@@ -8,21 +8,28 @@
 use crate::filterbank::Filterbank;
 use crate::ics::{ChannelData, CoreCfg, EIGHT_SHORT, TNS_ANALYSIS};
 use crate::tables::{LTP_COEF, MAX_LTP_LONG_SFB};
+use triergon_codec::{Budget, BudgetVec, StorageError};
 
 #[derive(Debug)]
 pub(crate) struct LtpState {
-    hist: Vec<f32>,
-    time: Vec<f32>,
-    spec: Vec<f32>,
+    hist: BudgetVec<f32>,
+    time: BudgetVec<f32>,
+    spec: BudgetVec<f32>,
 }
 
 impl LtpState {
-    pub(crate) fn new() -> LtpState {
-        LtpState {
-            hist: vec![0.0; 3072],
-            time: vec![0.0; 2048],
-            spec: vec![0.0; 1024],
-        }
+    pub(crate) fn new(budget: &Budget) -> Result<LtpState, StorageError> {
+        Ok(LtpState {
+            hist: BudgetVec::try_filled(budget, 0.0, 3072)?,
+            time: BudgetVec::try_filled(budget, 0.0, 2048)?,
+            spec: BudgetVec::try_filled(budget, 0.0, 1024)?,
+        })
+    }
+
+    pub(crate) fn reset(&mut self) {
+        self.hist.fill(0.0);
+        self.time.fill(0.0);
+        self.spec.fill(0.0);
     }
 }
 
