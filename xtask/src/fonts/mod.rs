@@ -188,7 +188,7 @@ pub(crate) struct CorpusFile {
     pub(crate) format: String,
 }
 
-/// Whether a corpus source serves `lane` (`font` or `shape`): every lane, unless
+/// Whether a corpus source serves `lane` (`font`, `shape` or `raster`): every lane, unless
 /// it lists its `lanes`.
 pub(crate) fn serves(source: &Value, lane: &str) -> bool {
     source

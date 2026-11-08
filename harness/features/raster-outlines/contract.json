@@ -1,0 +1,23 @@
+{
+  "schema": 1,
+  "id": "raster-outlines",
+  "operation": "raster",
+  "candidate": "raster-worker",
+  "worker_operation": "raster-",
+  "reference": "libass-native",
+  "contract": [
+    "one case file read from memory, one case per line, generated from a seed: random outlines with valid, degenerate, malformed and out-of-range points and contours, each converted, rotated, stroked, transformed and rasterised, the small ones also drawn in runs, with transforms of moderate reach (rotations within 60 degrees, matrices near the target size)",
+    "every case performed with libass 0.17.5's own stages, as the pinned build compiles them (the 16x16 tile rasteriser and its AArch64 engine): ass_outline_convert, ass_outline_rotate_90, ass_outline_stroke, ass_outline_transform_2d and _3d, ass_outline_to_bitmap; a run through get_bitmap_glyph per glyph (the 3D glyph transform and its quantisation against the run, the stroked border or opaque box, the \\kf karaoke leftmost x) and ass_composite_construct (blur, \\be, the fill taken out of the border, the shifted shadow); ass_synth_blur, the engine's add, mul and imul blends, ass_fix_outline, ass_shift_bitmap and render_glyph's rectangle clipping with the karaoke split",
+    "per case: its status, then every outline's point and segment counts and FNV-1a hash and every bitmap's position, size and the FNV-1a hash of its rows, the run's glyph positions and the clip parts; packets count cases and bytes the outline points and bitmap pixels recorded",
+    "a case outside the grammar is recorded as unparsed, and a case the candidate refuses where libass draws is recorded as failed, so the case fails; the file is read, the glyphs loaded and the cases parsed before each timed and memory operation, and the reference's renderer is created once, outside it"
+  ],
+  "required_profiles": [
+    "outlines"
+  ],
+  "required_targets": [
+    "aarch64-unknown-linux-gnu"
+  ],
+  "iterations": 1,
+  "minimum_pairs": 30,
+  "confidence": 0.95
+}

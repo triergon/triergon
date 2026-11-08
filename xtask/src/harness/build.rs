@@ -264,7 +264,7 @@ struct Candidate {
     features: &'static [&'static str],
 }
 
-const ADDITIONAL_CANDIDATES: [Candidate; 7] = [
+const ADDITIONAL_CANDIDATES: [Candidate; 8] = [
     Candidate {
         name: "playback-worker",
         package: "playback-worker",
@@ -292,6 +292,12 @@ const ADDITIONAL_CANDIDATES: [Candidate; 7] = [
     Candidate {
         name: "shape-worker",
         package: "shape-worker",
+        example: None,
+        features: &[],
+    },
+    Candidate {
+        name: "raster-worker",
+        package: "raster-worker",
         example: None,
         features: &[],
     },
@@ -451,8 +457,8 @@ fn candidate_records(root: &Path, built: &[(&str, Vec<String>)]) -> R<Value> {
     Ok(Value::object(candidates))
 }
 
-/// A comparison reference linked against one pinned FFmpeg, FreeType or HarfBuzz
-/// profile, and possibly further profiles.
+/// A comparison reference linked against one pinned profile, and possibly
+/// further profiles.
 struct ProfileReference {
     profile: &'static str,
     /// Further pinned profiles it links: their pkg-config directories follow the
@@ -489,9 +495,12 @@ const SHAPE_OPTIONS: &[&str] = &[
     "-Wextra",
     "-Werror",
 ];
+/// The rasterising reference takes libass's own compiler flags from
+/// `libass-internal.pc`, so its included stages compute as the library does.
+const RASTER_OPTIONS: &[&str] = &["-Wall", "-Wextra", "-Werror"];
 const CAPTURE_PACKAGES: &[&str] = &["libavformat", "libavcodec", "libswscale", "libavutil"];
 
-const PROFILE_REFERENCES: [ProfileReference; 9] = [
+const PROFILE_REFERENCES: [ProfileReference; 10] = [
     ProfileReference {
         profile: ".research/reference-video",
         linked: &[],
@@ -623,6 +632,20 @@ const PROFILE_REFERENCES: [ProfileReference; 9] = [
         packages: &["harfbuzz", "fribidi", "freetype2"],
         link_static: true,
         options: SHAPE_OPTIONS,
+        identity: false,
+    },
+    ProfileReference {
+        profile: ".research/libass",
+        linked: &[".research/freetype", ".research/harfbuzz"],
+        binary: "libass-raster-worker",
+        source: "harness/reference.c",
+        define: Some("-DTRIERGON_RASTER_REFERENCE=1"),
+        record: "libass-native",
+        kind: "libass 0.17.5, static, against the FreeType, FriBidi and HarfBuzz references, without floating-point contraction; its outline, stroker, rasteriser, blur, composition and clipping stages",
+        libraries: "libass_reference",
+        packages: &["libass-internal"],
+        link_static: true,
+        options: RASTER_OPTIONS,
         identity: false,
     },
 ];

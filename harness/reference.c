@@ -1,5 +1,6 @@
 /* The reference worker. Native tooling only; never linked into Rust.
- * Uses public FFmpeg and FreeType headers. No code copied from their implementations.
+ * Uses public FFmpeg and FreeType headers, and libass's private ones for the raster
+ * reference. No code copied from their implementations.
  *
  * One source, built once per pinned reference profile; each build compiles only that
  * profile's operations:
@@ -9,6 +10,8 @@
  *   -DTRIERGON_FONT_REFERENCE     font faces and outlines with FreeType (reference_font.h)
  *   -DTRIERGON_SHAPE_REFERENCE    shaping, bidi and Unicode properties with HarfBuzz and
  *                                 FriBidi (reference_shape.h)
+ *   -DTRIERGON_RASTER_REFERENCE   outlines, strokes, rasterising, blur and composition
+ *                                 with libass's internal stages (reference_raster.h)
  *   otherwise                     the container operations below, with the feed
  *                                 and Matroska audio clock
  *                                 (TRIERGON_FEED_REFERENCE), HLS segment, MP4
@@ -23,6 +26,8 @@
 #include "reference_font.h"
 #elif defined(TRIERGON_SHAPE_REFERENCE)
 #include "reference_shape.h"
+#elif defined(TRIERGON_RASTER_REFERENCE)
+#include "reference_raster.h"
 #else
 #include <libavformat/avformat.h>
 #ifdef TRIERGON_COMBINED_REFERENCE
