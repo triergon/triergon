@@ -1283,6 +1283,7 @@ mod tests {
             ("mp4-forward", 38),
             ("ts-program", 35),
             ("raw-annex-b", 6),
+            ("mpegts-pes", 97),
         ] {
             let (manifest, manifest_sha) = super::super::manifest::read(
                 root,

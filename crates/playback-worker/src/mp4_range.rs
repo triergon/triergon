@@ -1,6 +1,6 @@
 //! Compare every packet of a regular AVC/AAC file through range playback.
 
-use crate::runner::{Invocation, Result, Totals, measure};
+use crate::runner::{Invocation, MAX_INPUT, Result, Totals, measure};
 use std::sync::atomic::AtomicBool;
 use triergon_core::{
     Budget, BudgetVec, Bytes, InputCursor, SourceCapabilities, SourceId, WorkBudget,
@@ -29,7 +29,6 @@ use triergon_playback::{
 pub const PREFIX: &str = "mp4-range-";
 const OPERATION: &str = "mp4-range-playback";
 const WINDOW: usize = 32 * 1024;
-const MAX_INPUT: usize = 64 * 1024 * 1024;
 
 #[derive(Default)]
 struct Work {
@@ -72,6 +71,7 @@ impl Work {
             packets: self.packets,
             bytes: self.bytes,
             digest: self.digest,
+            refusal: None,
         }
     }
 }
@@ -215,8 +215,8 @@ pub fn run(args: &[String]) -> Result<()> {
         .first()
         .map(|timestamp| timestamp.parse())
         .transpose()?;
-    let pool = Budget::new(MAX_INPUT * 2)?;
-    let raw = Bytes::copy_from_slice(&pool, &invocation.input(MAX_INPUT as u64)?)?;
+    let pool = Budget::new(2 * usize::try_from(MAX_INPUT)?)?;
+    let raw = Bytes::copy_from_slice(&pool, &invocation.input(MAX_INPUT)?)?;
     measure(&invocation, OPERATION, Some(&pool), || {
         session(&pool, &raw, seek)
     })

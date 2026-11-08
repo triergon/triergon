@@ -1,7 +1,7 @@
 //! A bounded forward-only AVC/AAC TS188 session with two retained units per stream.
 #![forbid(unsafe_code)]
 
-use crate::runner::{Invocation, Mode, Result, Totals, measure};
+use crate::runner::{Invocation, MAX_INPUT, Mode, Result, Totals, measure};
 use std::cell::Cell;
 use std::fs::File;
 use std::io::{self, Read, Write};
@@ -25,7 +25,6 @@ const OP: &str = "ProgressiveAvcAacTsOwnedFeedV1";
 const WINDOW: usize = 4096;
 const DEPTH: usize = 2;
 const LIVE_BYTES: usize = 256 * 1024;
-const MAX_INPUT: u64 = 64 * 1024 * 1024;
 const ID: SourceId = SourceId(1);
 
 #[derive(Default)]
@@ -441,6 +440,7 @@ pub(super) fn run(args: &[String]) -> Result<()> {
             packets: work.packets,
             bytes: work.bytes,
             digest: work.digest,
+            refusal: None,
         })
     })
 }

@@ -87,6 +87,7 @@ impl Work {
             packets: self.packets,
             bytes: self.bytes,
             digest: self.digest,
+            refusal: None,
         }
     }
 }
