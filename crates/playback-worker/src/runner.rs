@@ -1,5 +1,6 @@
-//! The command line and measured loop shared by the per-input runners, the packet
-//! folds `mkv-audio-`, `mp4-forward-`, `ts-program-` and `raw-video-`.
+//! The command line and measured loop shared by the per-input runners: the packet
+//! folds (`mkv-audio-`, `mp4-forward-`, `ts-program-` and `raw-video-`), `pgs-` and
+//! `subtitle-text-`.
 //!
 //! A runner prepares its input outside the measurement, then [`measure`] runs the
 //! operation and prints one JSON result line. Reading the input, process start-up
@@ -15,11 +16,13 @@ pub type Result<T> = std::result::Result<T, Box<dyn std::error::Error>>;
 
 type Run = fn(&[String]) -> Result<()>;
 
-const RUNNERS: [(&str, Run); 4] = [
+const RUNNERS: [(&str, Run); 6] = [
     (crate::matroska_audio::PREFIX, crate::matroska_audio::run),
     (crate::mp4_forward::PREFIX, crate::mp4_forward::run),
     (crate::ts_program::PREFIX, crate::ts_program::run),
     (crate::raw_video::PREFIX, crate::raw_video::run),
+    (crate::pgs::PREFIX, crate::pgs::run),
+    (crate::subtitle_text::PREFIX, crate::subtitle_text::run),
 ];
 
 /// The runner that owns the mode in `args[0]`, if any.

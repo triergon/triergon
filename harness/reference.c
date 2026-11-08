@@ -214,6 +214,9 @@ static uint64_t now_ns(void){struct timespec t;clock_gettime(CLOCK_MONOTONIC,&t)
 #include "reference_mp4_forward.h"
 #include "reference_ts_program.h"
 #include "reference_raw_video.h"
+/* The formats profile also carries the subtitle demuxers and decoders. */
+#include "reference_pgs.h"
+#include "reference_subtitle_text.h"
 #endif
 int main(int argc,char **argv){
     av_log_set_level(AV_LOG_ERROR);
@@ -244,6 +247,8 @@ int main(int argc,char **argv){
     if(!strncmp(argv[1],"mp4-forward-",12)){int result=mp4_forward_main(argc,argv,data,size);free(data);return result;}
     if(!strncmp(argv[1],"ts-program-",11)){int result=ts_program_main(argc,argv,data,size);free(data);return result;}
     if(!strncmp(argv[1],"raw-video-",10)){int result=raw_video_main(argc,argv,data,size);free(data);return result;}
+    if(!strncmp(argv[1],"pgs-",4)){int result=pgs_main(argc,argv,data,size);free(data);return result;}
+    if(!strncmp(argv[1],"subtitle-text-",14)){int result=text_main(argc,argv,data,size);free(data);return result;}
 #endif
     int metadata=!strncmp(argv[1],"catalogue-",10)?2:!strncmp(argv[1],"metadata-",9);
     int seek_mode=!strncmp(argv[1],"seek-",5);

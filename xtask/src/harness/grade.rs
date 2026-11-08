@@ -1276,6 +1276,8 @@ mod tests {
             ("mp4-forward", 38),
             ("ts-program", 35),
             ("raw-annex-b", 6),
+            ("subtitles-pgs", 229),
+            ("subtitles-text", 275),
         ] {
             let (manifest, manifest_sha) = super::super::manifest::read(
                 root,

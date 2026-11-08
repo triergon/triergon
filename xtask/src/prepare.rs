@@ -176,7 +176,7 @@ pub fn configure_argv(prefix: &Path, profile: Profile) -> Vec<String> {
             *flag = match flag.as_str() {
                 "--enable-demuxer=matroska" => "--enable-demuxer=matroska,mov,mpegts,h264,hevc,srt,ass,webvtt,sup,vobsub",
                 "--enable-decoder=pcm_s16le" => {
-                    "--enable-decoder=pcm_s16le,pgssub,dvdsub,dvbsub,ass,srt,subrip,text,mov_text,webvtt"
+                    "--enable-decoder=pcm_s16le,pgssub,dvdsub,dvbsub,ass,srt,subrip,text,movtext,webvtt"
                 }
                 "--enable-parser=h264,hevc,aac,ac3,vorbis" => "--enable-parser=h264,hevc,aac,ac3,vorbis,dvdsub,dvbsub",
                 other => other,

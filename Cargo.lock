@@ -49,6 +49,7 @@ dependencies = [
  "triergon-matroska",
  "triergon-mpegts",
  "triergon-playback",
+ "triergon-subtitles",
 ]
 
 [[package]]
