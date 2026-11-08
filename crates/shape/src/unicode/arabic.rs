@@ -49,15 +49,6 @@ pub(crate) enum ArabicForm {
     Isolated,
 }
 
-/// The presentation form HarfBuzz's fallback shaping substitutes for `cp` in
-/// `form`, if it has one (the `init`, `medi`, `fina` and `isol` lookups it
-/// synthesizes).
-pub(crate) fn arabic_presentation_form(cp: u32, form: ArabicForm) -> Option<u32> {
-    let row = cp.checked_sub(tables::ARABIC_SHAPING_FIRST)?;
-    let forms = tables::ARABIC_SHAPING.get(row as usize)?;
-    Some(u32::from(forms[form as usize])).filter(|&f| f != 0)
-}
-
 /// Every `(character, presentation form)` of `form`, in code point order: what
 /// HarfBuzz's fallback shaping considers for that feature's lookup.
 pub(crate) fn arabic_presentation_forms(form: ArabicForm) -> impl Iterator<Item = (u32, u32)> {
@@ -130,15 +121,17 @@ mod tests {
     #[test]
     fn presentation_forms() {
         use ArabicForm::*;
-        assert_eq!(arabic_presentation_form(0x0628, Initial), Some(0xFE91));
-        assert_eq!(arabic_presentation_form(0x0628, Medial), Some(0xFE92));
-        assert_eq!(arabic_presentation_form(0x0628, Final), Some(0xFE90));
-        assert_eq!(arabic_presentation_form(0x0628, Isolated), Some(0xFE8F));
-        assert_eq!(arabic_presentation_form(0x0627, Initial), None);
-        assert_eq!(arabic_presentation_form(0x0627, Final), Some(0xFE8E));
-        assert_eq!(arabic_presentation_form(0x0620, Isolated), None);
-        assert_eq!(arabic_presentation_form(0x0041, Isolated), None);
-        assert_eq!(arabic_presentation_form(u32::MAX, Isolated), None);
+        let form = |cp: u32, form| {
+            arabic_presentation_forms(form).find_map(|(c, f)| (c == cp).then_some(f))
+        };
+        assert_eq!(form(0x0628, Initial), Some(0xFE91));
+        assert_eq!(form(0x0628, Medial), Some(0xFE92));
+        assert_eq!(form(0x0628, Final), Some(0xFE90));
+        assert_eq!(form(0x0628, Isolated), Some(0xFE8F));
+        assert_eq!(form(0x0627, Initial), None);
+        assert_eq!(form(0x0627, Final), Some(0xFE8E));
+        assert_eq!(form(0x0620, Isolated), None);
+        assert_eq!(form(0x0041, Isolated), None);
         let finals: Vec<_> = arabic_presentation_forms(Final).take(2).collect();
         assert_eq!(finals, [(0x0622, 0xFE82), (0x0623, 0xFE84)]);
     }

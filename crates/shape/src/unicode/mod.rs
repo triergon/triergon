@@ -7,11 +7,6 @@
 //! function accepts any `u32`; values that are not code points get the reference's
 //! defaults.
 
-#![allow(
-    dead_code,
-    reason = "the shaper and bidi modules use these as they land"
-)]
-
 mod arabic;
 pub(crate) mod fribidi;
 mod syllabic;
@@ -21,10 +16,9 @@ mod syllabic_tables;
 mod tables;
 mod trie;
 
-#[allow(unused_imports, reason = "the shaper uses these as it lands")]
 pub(crate) use arabic::{
     ArabicForm, ArabicJoining, ArabicLigature, ArabicLigatureSet, arabic_joining, arabic_ligatures,
-    arabic_ligatures_3, arabic_mark_ligatures, arabic_presentation_form, arabic_presentation_forms,
+    arabic_ligatures_3, arabic_mark_ligatures, arabic_presentation_forms,
 };
 pub(crate) use syllabic::{
     IndicCategory, IndicPosition, UseCategory, indic_properties, use_category, vowel_constraints,
