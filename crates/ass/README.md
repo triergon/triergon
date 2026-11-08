@@ -245,7 +245,8 @@ selective style overrides), in the frame and storage size and margins of its
   when the run's composite key (its effects key, and each glyph's bitmap
   key, with its outline only where the bitmaps depend on it, and origin in
   the run) and the image's part and window are equal, so glyphs that draw
-  nothing but an opaque box compare equal whatever their outlines; pixels a vector clip or a `BorderStyle` 4 box makes are always new.
+  nothing but an opaque box compare equal whatever their outlines; pixels a
+  vector clip or a `BorderStyle` 4 box makes are always new.
   A frame of a script without events reports new content and leaves the
   previous frame in place for the next comparison, as libass does.
 
@@ -361,15 +362,16 @@ panics.
   pin. `cargo xtask fuzz --contract
   harness/features/<feature>/contract.json --reference` mutates the fixtures and
   compares both workers on every mutation.
-- `ass-render` renders the 24 scripts and 3 packet streams of
+- `ass-render` renders the 25 scripts and 3 packet streams of
   `harness/fixtures/ass-render` as a player configures libass (attached fonts,
   a default family and font file, no system font provider, no hinting) at
   1920×1080 over 1280×720 storage and at 1280×720 over anamorphic 720×576
   storage, and compares every image's kind, position, size, colour and alpha
   bytes in order, and every frame's change value, with libass's
   (`harness/reference_ass_render.h`, with libass's cache limits set to 1000
-  glyphs and 24 MiB): 52 of its 54 cases match. The two open cases are the
-  fixture with an `@` font.
+  glyphs and 24 MiB): 54/56 pass. The box behind a `BorderStyle` 4 event is
+  compared without its kind, since libass leaves its type uninitialised. The
+  two open cases are the fixture with an `@` font.
 
 The comparison establishes agreement with libass on that corpus, not conformance
 with any specification of the format.

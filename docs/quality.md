@@ -168,7 +168,9 @@ resource limit becomes an explicit, reviewed rule for that case.
   and at 1280×720 over anamorphic 720×576 storage, at the times the fixture
   names, and compares every frame's change value (`ass_detect_change`) and
   every image's type, position, size, colour and alpha bytes in list order
-  with `triergon_ass::Renderer`'s. It is required by
+  with `triergon_ass::Renderer`'s; the box behind a `BorderStyle` 4 event,
+  whose type libass leaves uninitialised, is told by its buffer and compared
+  without one. It is required by
   `cargo xtask check` and reported by `cargo xtask ass compare`.
 - **Generated manifests and pins.** The font, shaping, rasterising and ASS
   features commit no case rows. `cargo xtask fonts manifest`, `cargo

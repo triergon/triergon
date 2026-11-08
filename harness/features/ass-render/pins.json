@@ -53,6 +53,16 @@
       "bytes": 4208704,
       "digest": 4316713449644720740
     },
+    "box-background-ass-1080p": {
+      "packets": 73,
+      "bytes": 2780793,
+      "digest": 13124053403679425535
+    },
+    "box-background-ass-720p": {
+      "packets": 73,
+      "bytes": 1767339,
+      "digest": 11818739290203176974
+    },
     "box-borders-ass-1080p": {
       "packets": 84,
       "bytes": 982447,

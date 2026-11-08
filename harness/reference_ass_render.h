@@ -36,9 +36,9 @@
  * each image its type, position, size, colour and every row of alpha bytes, in
  * list order; `packets` counts images and `bytes` their alpha bytes. The box
  * libass draws behind a BorderStyle 4 event has no type (add_background leaves
- * it uninitialised), so a track with a BorderStyle 4 style fails. The file
- * and the fonts are read before the operation. `ass-render-dump` prints the
- * same values as lines:
+ * it uninitialised): it is told by its buffer (reference_ass.h) and folded
+ * without one, and dumped with `-` for it. The file and the fonts are read
+ * before the operation. `ass-render-dump` prints the same values as lines:
  *   frame TIME CHANGED IMAGES
  *   image TYPE X Y W H RRGGBBAA ROW-HEX...
  */
@@ -70,7 +70,7 @@ typedef struct {
 typedef struct {
     uint64_t packets, bytes, digest;
     FILE *dump;
-    int background; /* a style with BorderStyle 4 was rendered */
+    int unknown; /* an image's kind could not be told */
 } AssImages;
 
 static void assr_render_fold(AssImages *w, uint64_t v) { w->digest = w->digest * 31 + v; }
@@ -114,9 +114,16 @@ static void assr_frame(AssImages *w, long long now, int changed, ASS_Image *imag
         assr_render_fold(w, count);
     }
     for (ASS_Image *image = images; image; image = image->next) {
+        /* A BorderStyle 4 box: its own buffer, no composite behind it. */
+        int box = assr_is_box(image->bitmap);
+        if (box && ((ASS_ImagePriv *)image)->source) w->unknown = 1;
         if (w->dump) {
-            fprintf(w->dump, "image %d %d %d %d %d %08" PRIx32, image->type, image->dst_x, image->dst_y, image->w,
-                    image->h, image->color);
+            if (box)
+                fprintf(w->dump, "image - %d %d %d %d %08" PRIx32, image->dst_x, image->dst_y, image->w, image->h,
+                        image->color);
+            else
+                fprintf(w->dump, "image %d %d %d %d %d %08" PRIx32, image->type, image->dst_x, image->dst_y,
+                        image->w, image->h, image->color);
             for (int y = 0; y < image->h; y++) {
                 fputc(' ', w->dump);
                 for (int x = 0; x < image->w; x++)
@@ -128,7 +135,7 @@ static void assr_frame(AssImages *w, long long now, int changed, ASS_Image *imag
         const uint64_t fields[] = {(uint64_t)image->type,   (uint64_t)(int64_t)image->dst_x,
                                    (uint64_t)(int64_t)image->dst_y, (uint64_t)image->w,
                                    (uint64_t)image->h,      image->color};
-        for (size_t i = 0; i < sizeof fields / sizeof fields[0]; i++) assr_render_fold(w, fields[i]);
+        for (size_t i = box ? 1 : 0; i < sizeof fields / sizeof fields[0]; i++) assr_render_fold(w, fields[i]);
         for (int y = 0; y < image->h; y++)
             assr_fold_row(&w->digest, image->bitmap + (size_t)y * (size_t)image->stride, (size_t)image->w);
         w->packets++;
@@ -137,11 +144,6 @@ static void assr_frame(AssImages *w, long long now, int changed, ASS_Image *imag
 }
 
 static void assr_frames(AssImages *w, ASS_Renderer *r, ASS_Track *t, AssFrames f) {
-    /* add_background leaves the type of BorderStyle 4's box uninitialised, so
-     * a track that can draw one is refused rather than its type read. */
-    for (int i = 0; i < t->n_styles; i++)
-        if (t->styles[i].BorderStyle == 4) w->background = 1;
-    if (w->background) return;
     for (long long now = f.start; now <= f.end; now += f.step) {
         int changed = -1;
         ASS_Image *images = ass_render_frame(r, t, now, &changed);
@@ -152,14 +154,17 @@ static void assr_frames(AssImages *w, ASS_Renderer *r, ASS_Track *t, AssFrames f
 /* One operation; 0 when libass could not be set up. */
 static int assr_render(AssImages *w, const AssRenderCase *c, const char *data, size_t size, int stream,
                        const AssFixture *f) {
+    int ok = 0;
+    ASS_Renderer *r = NULL;
+    ASS_Track *track = NULL;
     ASS_Library *lib = ass_library_init();
     if (!lib) return 0;
     ass_set_message_cb(lib, assr_quiet, NULL);
     ass_set_extract_fonts(lib, 1);
     for (size_t i = 0; i < c->n_fonts; i++)
         ass_add_font(lib, c->fonts[i].path, c->fonts[i].data, (int)c->fonts[i].size);
-    ASS_Renderer *r = ass_renderer_init(lib);
-    if (!r) return 0;
+    r = ass_renderer_init(lib);
+    if (!r) goto done;
     /* libass's plain C engine on every host, as reference_raster.h sets it:
      * ass_renderer_init picks the host's SIMD engine (AVX2's 32-byte rows
      * change \be at a bitmap's right edge), so the C engine replaces it and
@@ -168,10 +173,10 @@ static int assr_render(AssImages *w, const AssRenderCase *c, const char *data, s
     r->engine = ass_bitmap_engine_init(ASS_CPU_FLAG_NONE);
     if (r->engine.tile_order != 4 || r->engine.align_order != 4) {
         fprintf(stderr, "the C engine is not 16x16 tiles with 16-byte rows\n");
-        return 0;
+        goto done;
     }
     ass_rasterizer_done(&r->state.rasterizer);
-    if (!ass_rasterizer_init(&r->engine, &r->state.rasterizer, RASTERIZER_PRECISION)) return 0;
+    if (!ass_rasterizer_init(&r->engine, &r->state.rasterizer, RASTERIZER_PRECISION)) goto done;
     ass_set_frame_size(r, c->frame_w, c->frame_h);
     ass_set_storage_size(r, c->storage_w, c->storage_h);
     ass_set_hinting(r, ASS_HINTING_NONE);
@@ -179,11 +184,10 @@ static int assr_render(AssImages *w, const AssRenderCase *c, const char *data, s
      * composites. */
     ass_set_cache_limits(r, 1000, 24);
     ass_set_fonts(r, c->default_font, c->default_family, ASS_FONTPROVIDER_NONE, NULL, 0);
-    ASS_Track *track = NULL;
     if (!stream) {
         /* libass may modify the buffer it reads. */
         char *copy = malloc(size + 1);
-        if (!copy) return 0;
+        if (!copy) goto done;
         memcpy(copy, data, size);
         copy[size] = 0;
         track = ass_read_memory(lib, copy, size, NULL);
@@ -191,7 +195,7 @@ static int assr_render(AssImages *w, const AssRenderCase *c, const char *data, s
         for (size_t i = 0; track && i < c->n_frames; i++) assr_frames(w, r, track, c->frames[i]);
     } else {
         track = ass_new_track(lib);
-        if (!track) return 0;
+        if (!track) goto done;
         for (size_t i = 0; i < f->n_commands; i++) {
             const AssCommand *k = f->commands + i;
             switch (k->kind) {
@@ -207,10 +211,12 @@ static int assr_render(AssImages *w, const AssRenderCase *c, const char *data, s
             }
         }
     }
+    ok = !assr_boxes_lost;
+done:
     if (track) ass_free_track(track);
-    ass_renderer_done(r);
+    if (r) ass_renderer_done(r);
     ass_library_done(lib);
-    return 1;
+    return ok;
 }
 
 /* A directive's argument: the rest of the line after the prefix. */
@@ -322,21 +328,23 @@ static int assr_render_main(int argc, char **argv) {
     size_t size = 0;
     char *data = assr_read_file(argv[2], ASSR_MAX_INPUT, &size);
     AssFixture fixture;
+    memset(&fixture, 0, sizeof fixture);
+    int status = 0;
     if (!data || !assr_read_fixture(data, size, stream, &fixture) ||
         !assr_render_directives(data, size, args[1], &c)) {
         fprintf(stderr, "%s: unreadable, too large, or out of memory\n", argv[2]);
-        return 2;
+        status = 2;
+        goto done;
     }
-    int status = 0;
     if (dump) {
         AssImages work = {0, 0, 0, stdout, 0};
-        if (!assr_render(&work, &c, data, size, stream, &fixture) || work.background) status = 2;
+        if (!assr_render(&work, &c, data, size, stream, &fixture) || work.unknown) status = 2;
     } else {
         if (memory && write(STDOUT_FILENO, "TRIERGON_BEGIN_V1\n", 18) != 18) status = 2;
         uint64_t start = assr_now_ns(), packets = 0, bytes = 0, digest = 0;
         for (unsigned long i = 0; i < iterations && !status; i++) {
             AssImages work = {0, 0, 0, NULL, 0};
-            if (!assr_render(&work, &c, data, size, stream, &fixture) || work.background) status = 2;
+            if (!assr_render(&work, &c, data, size, stream, &fixture) || work.unknown) status = 2;
             packets += work.packets;
             bytes += work.bytes;
             digest = digest * 31 + work.digest;
@@ -349,7 +357,8 @@ static int assr_render_main(int argc, char **argv) {
                    iterations, packets, bytes, digest, elapsed);
     }
     fflush(stdout);
-    if (status) fprintf(stderr, "%s: libass could not be set up, or a style has BorderStyle 4\n", argv[2]);
+    if (status) fprintf(stderr, "%s: libass could not be set up, or an image's kind could not be told\n", argv[2]);
+done:
     for (size_t i = 0; i < c.n_fonts; i++) {
         free(c.fonts[i].path);
         free(c.fonts[i].data);

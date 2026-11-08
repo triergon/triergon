@@ -1,0 +1,26 @@
+;@attach croscorefonts-1.31.0/Arimo-Regular.ttf
+;@default-family Arimo
+;@default-font dejavu-fonts-ttf-2.37/ttf/DejaVuSans.ttf
+;@frames 0 500 1500
+; The opaque box of BorderStyle 4 behind whole events: with a border and a
+; positive or negative shadow, faded, across lines, clipped by a vector clip,
+; reaching past the frame's edges, and around events that collide.
+[Script Info]
+ScriptType: v4.00+
+PlayResX: 1920
+PlayResY: 1080
+WrapStyle: 0
+ScaledBorderAndShadow: yes
+
+[V4+ Styles]
+Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
+Style: Back,Arimo,64,&H00FFFFFF,&H000000FF,&H00204060,&H60102030,0,0,0,0,100,100,0,0,4,3,5,2,40,40,40,1
+
+[Events]
+Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
+Dialogue: 0,0:00:00.00,0:00:02.00,Back,,0,0,0,,A box behind the line
+Dialogue: 0,0:00:00.00,0:00:02.00,Back,,0,0,0,,and one above it\Nacross two lines
+Dialogue: 0,0:00:00.00,0:00:02.00,Back,,0,0,0,,{\an7\pos(40,60)\xshad-6\yshad8\bord0}negative and positive shadow
+Dialogue: 0,0:00:00.00,0:00:02.00,Back,,0,0,0,,{\an9\pos(1950,-20)\fad(600,0)}past the edge, fading in
+Dialogue: 0,0:00:00.00,0:00:02.00,Back,,0,0,0,,{\an5\pos(960,540)\clip(m 700 450 l 1100 450 1100 600 700 600)}clipped by a drawing
+Dialogue: 1,0:00:00.00,0:00:02.00,Back,,0,0,0,,{\an5\pos(960,800)\shad0\alpha&H80&}half transparent, no shadow

@@ -22,20 +22,8 @@ pub enum ImageKind {
     /// Shadows (`IMAGE_TYPE_SHADOW`).
     Shadow,
     /// The opaque box of `BorderStyle` 4 behind an event, for which libass
-    /// leaves the type unset.
+    /// leaves the type uninitialised.
     Background,
-}
-
-impl ImageKind {
-    /// libass's number for the kind; the background's is the next free one.
-    pub const fn number(self) -> i32 {
-        match self {
-            Self::Fill => 0,
-            Self::Border => 1,
-            Self::Shadow => 2,
-            Self::Background => 3,
-        }
-    }
 }
 
 /// How a frame differs from the one rendered before it, as libass's
@@ -52,15 +40,6 @@ pub enum Change {
 }
 
 impl Change {
-    /// libass's number for the change.
-    pub const fn number(self) -> i32 {
-        match self {
-            Self::None => 0,
-            Self::Positions => 1,
-            Self::Content => 2,
-        }
-    }
-
     /// `ass_detect_change`: image by image, the greatest difference; a list
     /// longer or shorter than the previous one is new content.
     pub(super) fn between(previous: &[Image], current: &[Image]) -> Self {

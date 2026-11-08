@@ -77,7 +77,51 @@
  * A flagged fold adds "host_dependent":true and ass-dump says so on stderr;
  * ass-worker cannot know, so the flag comes from the reference alone.
  */
+/* The box add_background draws behind a BorderStyle 4 event is the only
+ * buffer ass_render.c allocates aligned to one byte (ass_render.c:2778; its
+ * other allocations, the vector clip's, are aligned to the engine's rows), and
+ * libass leaves its image type uninitialised. The render reference tells such
+ * an image by its buffer, noted while it is alive, and folds it without the
+ * type (reference_ass_render.h). */
+#include "ass_utils.h"
+static void **assr_boxes;
+static size_t assr_n_boxes, assr_cap_boxes;
+static bool assr_boxes_lost; /* a box could not be noted */
+static void *assr_aligned_alloc(size_t alignment, size_t size, bool zero) {
+    void *buffer = ass_aligned_alloc(alignment, size, zero);
+    if (buffer && alignment == 1) {
+        if (assr_n_boxes == assr_cap_boxes) {
+            size_t cap = assr_cap_boxes ? 2 * assr_cap_boxes : 64;
+            void **more = realloc(assr_boxes, cap * sizeof *more);
+            if (!more) {
+                assr_boxes_lost = true;
+                return buffer;
+            }
+            assr_boxes = more;
+            assr_cap_boxes = cap;
+        }
+        assr_boxes[assr_n_boxes++] = buffer;
+    }
+    return buffer;
+}
+static void assr_aligned_free(void *buffer) {
+    for (size_t i = 0; i < assr_n_boxes; i++)
+        if (assr_boxes[i] == buffer) {
+            assr_boxes[i] = assr_boxes[--assr_n_boxes];
+            break;
+        }
+    ass_aligned_free(buffer);
+}
+static bool assr_is_box(const void *buffer) {
+    for (size_t i = 0; i < assr_n_boxes; i++)
+        if (assr_boxes[i] == buffer) return true;
+    return false;
+}
+#define ass_aligned_alloc assr_aligned_alloc
+#define ass_aligned_free assr_aligned_free
 #include "ass_render.c"
+#undef ass_aligned_free
+#undef ass_aligned_alloc
 
 /* Whether the case reached a step whose result C leaves to the target. */
 static bool assr_host_dependent;

@@ -6,7 +6,9 @@ use std::io::{self, BufWriter, Write};
 use std::path::Path;
 use std::time::Instant;
 
-use triergon_ass::{CacheLimits, Change, Fonts, Image, Options, Renderer, Script, Settings};
+use triergon_ass::{
+    CacheLimits, Change, Fonts, Image, ImageKind, Options, Renderer, Script, Settings,
+};
 use triergon_core::{Budget, Bytes};
 use triergon_harness_protocol::digest::{fold, fold_bytes, signed};
 
@@ -71,6 +73,27 @@ pub struct Case<'a> {
     pub storage: Size,
 }
 
+/// libass's number for an image's kind (`IMAGE_TYPE_CHARACTER`, `_OUTLINE`,
+/// `_SHADOW`); `None` for the box behind a `BorderStyle` 4 event, whose type
+/// libass leaves uninitialised, so it is folded without one.
+const fn image_type(kind: ImageKind) -> Option<i64> {
+    match kind {
+        ImageKind::Fill => Some(0),
+        ImageKind::Border => Some(1),
+        ImageKind::Shadow => Some(2),
+        ImageKind::Background => None,
+    }
+}
+
+/// libass's number for a frame's change, as `ass_render_frame` reports it.
+const fn change_number(change: Change) -> i64 {
+    match change {
+        Change::None => 0,
+        Change::Positions => 1,
+        Change::Content => 2,
+    }
+}
+
 /// The images of every frame of one operation, folded or printed.
 trait Frames {
     fn frame(&mut self, now: i64, change: Change, images: &[Image]) -> io::Result<()>;
@@ -84,11 +107,13 @@ impl Frames for Folded {
     fn frame(&mut self, now: i64, change: Change, images: &[Image]) -> io::Result<()> {
         let work = &mut self.0;
         fold(&mut work.digest, signed(now));
-        fold(&mut work.digest, signed(change.number().into()));
+        fold(&mut work.digest, signed(change_number(change)));
         fold(&mut work.digest, images.len() as u64);
         for image in images {
+            if let Some(kind) = image_type(image.kind) {
+                fold(&mut work.digest, signed(kind));
+            }
             for value in [
-                i64::from(image.kind.number()),
                 i64::from(image.x),
                 i64::from(image.y),
                 image.width() as i64,
@@ -112,12 +137,20 @@ struct Printed<W: Write>(W);
 
 impl<W: Write> Frames for Printed<W> {
     fn frame(&mut self, now: i64, change: Change, images: &[Image]) -> io::Result<()> {
-        writeln!(self.0, "frame {now} {} {}", change.number(), images.len())?;
+        writeln!(
+            self.0,
+            "frame {now} {} {}",
+            change_number(change),
+            images.len()
+        )?;
         for image in images {
+            match image_type(image.kind) {
+                Some(kind) => write!(self.0, "image {kind}")?,
+                None => write!(self.0, "image -")?,
+            }
             write!(
                 self.0,
-                "image {} {} {} {} {} {:08x}",
-                image.kind.number(),
+                " {} {} {} {} {:08x}",
                 image.x,
                 image.y,
                 image.width(),
