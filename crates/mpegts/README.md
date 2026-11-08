@@ -243,7 +243,14 @@ Verification:
   FFmpeg reference; nonmatching cases are kept as failures, not normalised.
   `cargo xtask report` runs that comparison from
   [`harness/features/mpegts-pes/`](../../harness/features/mpegts-pes/contract.json)
-  through `playback-worker`'s `ts-` modes.
+  through `playback-worker`'s `ts-` modes: 272 recorded requests in 97 cases,
+  of which 73 match. Of the other 24, 18 end with a transport, PSI or PES
+  context outside the composed profile (FFmpeg emits a packet for two of them),
+  three reach the end without a packet, as FFmpeg does, and fail as empty
+  observations, and three span two media entities, which the view refuses and
+  the reference has no single-input operation for. On the 73, the worst runtime
+  bound is 1.073 of the reference, peak heap at most 0.073 and total resident
+  RSS at most 0.833 of it.
 
 Gates, harness and current results: [docs/quality.md](../../docs/quality.md)
 and [docs/status.md](../../docs/status.md).
