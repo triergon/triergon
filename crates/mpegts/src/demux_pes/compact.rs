@@ -243,6 +243,7 @@ impl PayloadCursor {
         self.current_bytes()
     }
 
+    #[inline]
     fn admit_next(&mut self) -> Option<()> {
         if self.active {
             return Some(());
@@ -274,6 +275,7 @@ impl PayloadCursor {
     }
     /// Release the active logical range. Other ranges keep its backing alive.
     /// Calling this without an active range has no effect.
+    #[inline]
     pub fn retire_current(&mut self) {
         if !self.active {
             return;

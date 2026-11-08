@@ -179,10 +179,11 @@ impl<S: Source> Transport<S> {
             match step {
                 TsPayloadStep::NeedInput(request) => {
                     let request = carrier_aligned_request(request);
-                    self.request = Some(request.clone());
                     if work.remaining() == 0 {
+                        self.request = Some(request.clone());
                         return Ok(TsPayloadStep::NeedInput(request));
                     }
+                    self.request = Some(request);
                 }
                 TsPayloadStep::Yield if work.remaining() < before => {}
                 other => return Ok(other),
