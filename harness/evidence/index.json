@@ -16458,7 +16458,7 @@
    "name": "runners-gate-build-linux-arm64",
    "path": "runners-gate-build-linux-arm64",
    "retention": "retained",
-   "reason": "AArch64 status rows for the matroska-audio-clocks, mp4-forward, ts-program, raw-annex-b, subtitles-pgs, subtitles-text and mpegts-pes contracts: timing pinned to one CPU, the kernel RSS proof and memory, 30 pairs each; also the 32-bit progressive reference check (same-code and instruction counts)",
+   "reason": "AArch64 status rows for the matroska-audio-clocks, mp4-forward, ts-program and raw-annex-b contracts (the archive also holds subtitles-pgs, subtitles-text and an earlier mpegts-pes run, which nothing cites): timing pinned to one CPU, the kernel RSS proof and memory, 30 pairs each; also the 32-bit progressive reference check (same-code and instruction counts)",
    "key": "evidence/runners-gate-build-linux-arm64/907bb7a35d70d09673ccbf0904a8b1ab85890a632454b8adf291d73a50672136.tar.gz",
    "sha256": "907bb7a35d70d09673ccbf0904a8b1ab85890a632454b8adf291d73a50672136",
    "bytes": 2385629442,
@@ -16502,6 +16502,16 @@
    "sha256": "ca882ff82484e31c537ebb93cbc9899666343715219ae4411914392406259691",
    "bytes": 2605870759,
    "source_revision": "9621f6063a2e517fecc1c28757e6bed50b5228a8"
+  },
+  {
+   "name": "mpegts-pes-gate-build-linux-arm64",
+   "path": "mpegts-pes-gate-build-linux-arm64",
+   "retention": "retained",
+   "reason": "AArch64 MPEG-TS status row: the mpegts-pes contract on the public API, timing pinned to one CPU, the kernel RSS proof and memory, 30 pairs each; the same-code comparison, worker output identity and instruction counts against main",
+   "key": "evidence/mpegts-pes-gate-build-linux-arm64/6f5c1b65540e9bbe2dc79a1f8c1dc41e684aba468cd8fdd082bf603d3bfb6ca1.tar.gz",
+   "sha256": "6f5c1b65540e9bbe2dc79a1f8c1dc41e684aba468cd8fdd082bf603d3bfb6ca1",
+   "bytes": 241859625,
+   "source_revision": "090c856df65f9247d24ea9f1c927e35cf5d528e8"
   }
  ]
 }

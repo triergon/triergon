@@ -243,7 +243,33 @@ Verification:
   FFmpeg reference; nonmatching cases are kept as failures, not normalised.
   `cargo xtask report` runs that comparison from
   [`harness/features/mpegts-pes/`](../../harness/features/mpegts-pes/contract.json)
-  through `playback-worker`'s `ts-` modes.
+  through `playback-worker`'s `ts-` modes, which use the public API only:
+  `TransportStream` selects the program, its first active PMT binds a
+  `compat::pes::DemuxObserver` to the one elementary stream, and `DemuxClock`
+  places the timestamps. The 272 recorded requests are 97 compat-view
+  operations, of which 66 match. The 168 requests for the strict source view, 64
+  of them for its native clock, are replayed as the compat-view operation on
+  their inputs: the strict source view and its native clock are not compared.
+  The 31 operations that do not match are open cases that need a program-level
+  reader (the MPEG-TS `ContainerReader`): PAT/PMT routing, clock and format
+  boundaries, recovery of rejected and damaged carriers, input across media
+  entities, or a program-level outcome where neither side emits a packet. They
+  are `pcr-timeline-discontinuity`, `pcr-extension-invalid`, `transport-tei`,
+  `transport-scrambled`, `transport-afc-reserved`,
+  `transport-adaptation-overrun`, `transport-partial-final-packet`,
+  `transport-sync-loss`, `psi-crc-invalid`, `psi-pointer-overrun`,
+  `psi-length-over-policy`, `psi-pending-not-current`,
+  `pat-atomic-two-sections`, `pat-incomplete-version`,
+  `pat-network-pid-not-track`, `psi-pointer-finishes-old-starts-new`,
+  `psi-two-sections-one-payload`, `pmt-version-wrap-retypes-pid`,
+  `pmt-opaque-language-descriptors`, `pmt-descriptor-overrun`,
+  `pmt-multi-section-forbidden`, `psi-stuffing-tail-invalid`,
+  `psi-truncated-eof`, `pes-timestamp-marker`, `pes-forbidden-time-flags`,
+  `pes-optional-header-overrun`, `pes-start-prefix-invalid`,
+  `hls-contiguous-pes-carry`, `hls-external-map`, `hls-explicit-discontinuity`,
+  `opcr-without-pcr-invalid`. On the 66, the worst runtime bound is 1.0029 of
+  the reference, peak heap at most 0.073 and total resident RSS at most 0.818 of
+  it.
 
 Gates, harness and current results: [docs/quality.md](../../docs/quality.md)
 and [docs/status.md](../../docs/status.md).
