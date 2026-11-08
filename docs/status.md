@@ -94,10 +94,11 @@ and `progressive-first-source-clock-unknown` cases (1.000 to 1.004).
 The MPEG-TS 81/97 parity result is a live macOS comparison
 (`aarch64-apple-darwin`, Rust 1.99.1) against the pinned FFmpeg formats worker;
 both workers are also checked against the unchanged recorded expected folds.
-Its measured code commit is `1ddf68eec67b9f2df549843b17b921ef9145abf0`,
-directly based on `9b8510b491a360f9aa25447f1e0f657e4b99beff`.
+Its measured code/contract commit is `65eeada0888bcd112d4cbd90e68795fea93fd864`,
+including completion code commit `08bf9e9ef6e4d932b3eb46d03893ca62797b273a`
+on main `1f7b54799e9a9716abbfec0e0c6515d384641835`.
 The complete 97-case comparison report has SHA-256
-`01a0a258d44b18e4cb8e53df73093e5e9da50c671ed1941ec9e6f504a8b16722`
+`345fd608c847f0b8fead1706f2ff73ef10fe34622be02f97fc26cdd8525d9586`
 and records source graph and worker binary identities. This comparison collected
 no runtime or memory measurements and does not qualify access units.
 
