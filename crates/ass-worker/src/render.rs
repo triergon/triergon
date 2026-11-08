@@ -281,10 +281,12 @@ pub fn run(args: &[String]) -> Result<()> {
             .map(|path| read_font(fonts, path))
             .collect::<Result<_>>()?,
         default_family: fixture.default_family,
+        // libass opens the default font file itself and goes without one it
+        // cannot open (an attached font is read by the player, and a missing
+        // one fails the case on both sides).
         default_font: fixture
             .default_font
-            .map(|path| read_font(fonts, path))
-            .transpose()?,
+            .and_then(|path| read_font(fonts, path).ok()),
         frame: Size::read(frame_w, frame_h)?,
         storage: Size::read(storage_w, storage_h)?,
         stream,
