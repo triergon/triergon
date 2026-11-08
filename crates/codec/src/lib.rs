@@ -64,9 +64,9 @@ impl AudioFrame {
 
     /// Size the frame to `channels` planes of `len` samples each, new samples zero.
     ///
-    /// The capacity the frame needs is charged to `charge` before any plane grows,
-    /// and the charge then matches the frame's whole capacity, so a decoder's budget
-    /// covers the output it fills. A refused charge leaves `charge` unchanged; the
+    /// The capacity the frame needs is charged to `charge` before any plane grows. The
+    /// charge only grows: it is the largest frame its decoder has sized or reserved with
+    /// [`charge_for`](Self::charge_for). A refused charge leaves `charge` unchanged; the
     /// frame may have dropped planes beyond `channels`.
     pub fn try_resize(
         &mut self,
@@ -75,24 +75,7 @@ impl AudioFrame {
         charge: &mut Reservation,
     ) -> Result<(), StorageError> {
         self.planes.truncate(channels);
-        let planes = |count: usize| {
-            count
-                .checked_mul(size_of::<Vec<f32>>())
-                .ok_or(StorageError::Overflow)
-        };
-        let samples = |count: usize| {
-            count
-                .checked_mul(size_of::<f32>())
-                .ok_or(StorageError::Overflow)
-        };
-        let mut bytes = planes(self.planes.capacity().max(channels))?;
-        for i in 0..channels {
-            let capacity = self.planes.get(i).map_or(0, Vec::capacity).max(len);
-            bytes = bytes
-                .checked_add(samples(capacity)?)
-                .ok_or(StorageError::Overflow)?;
-        }
-        charge.resize_to(bytes)?;
+        cover(charge, self.bytes_for(channels, len)?)?;
         let mut grew = false;
         if channels > self.planes.len() {
             self.planes
@@ -111,16 +94,54 @@ impl AudioFrame {
             plane.resize(len, 0.0);
         }
         if grew {
-            let mut bytes = planes(self.planes.capacity())?;
-            for plane in &self.planes {
-                bytes = bytes
-                    .checked_add(samples(plane.capacity())?)
-                    .ok_or(StorageError::Overflow)?;
-            }
-            charge.resize_to(bytes)?;
+            cover(charge, self.bytes_for(0, 0)?)?;
         }
         Ok(())
     }
+
+    /// Charge `charge` for the frame growing to `channels` planes of `len` samples,
+    /// without allocating, so that a later [`try_resize`](Self::try_resize) within that
+    /// size claims nothing. A decoder reserves an access unit's worst case this way before
+    /// decoding changes any state.
+    pub fn charge_for(
+        &self,
+        channels: usize,
+        len: usize,
+        charge: &mut Reservation,
+    ) -> Result<(), StorageError> {
+        cover(charge, self.bytes_for(channels, len)?)
+    }
+
+    /// The bytes of this frame's capacity once it holds `channels` planes of at least
+    /// `len` samples, counting the planes it already has.
+    fn bytes_for(&self, channels: usize, len: usize) -> Result<usize, StorageError> {
+        let overflow = || StorageError::Overflow;
+        let planes = self.planes.capacity().max(channels);
+        let mut samples: usize = 0;
+        for plane in &self.planes {
+            samples = samples
+                .checked_add(plane.capacity().max(len))
+                .ok_or_else(overflow)?;
+        }
+        let missing = channels.saturating_sub(self.planes.len());
+        samples = missing
+            .checked_mul(len)
+            .and_then(|m| samples.checked_add(m))
+            .ok_or_else(overflow)?;
+        planes
+            .checked_mul(size_of::<Vec<f32>>())
+            .zip(samples.checked_mul(size_of::<f32>()))
+            .and_then(|(p, s)| p.checked_add(s))
+            .ok_or_else(overflow)
+    }
+}
+
+/// Grow `charge` to at least `bytes`.
+fn cover(charge: &mut Reservation, bytes: usize) -> Result<(), StorageError> {
+    if bytes > charge.bytes() {
+        charge.resize_to(bytes)?;
+    }
+    Ok(())
 }
 
 /// Stereo downmix parameters a stream carries (AC-3/E-AC-3 centre/surround/LFE mix

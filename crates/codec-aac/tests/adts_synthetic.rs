@@ -264,7 +264,7 @@ fn a_shared_budget_returns_to_idle_when_the_decoder_drops() {
 
 #[test]
 fn decoding_resumes_after_a_refusal() {
-    let budget = Budget::new(1 << 20).unwrap();
+    let budget = Budget::new(8 << 20).unwrap();
     let mut d = Decoder::new_in(&budget);
     let mut f = AudioFrame::default();
     let one = adts(1, 4, 1, &[block(false)], false);
@@ -279,4 +279,12 @@ fn decoding_resumes_after_a_refusal() {
         assert!(f.planes[0].iter().all(|&s| s == 0.0));
     }
     assert_eq!(f.samples_per_channel, 3 * 1024);
+    // The worst case was charged up front, so with the pool exhausted the same access
+    // units decode without claiming anything more.
+    let pressure = budget.reserve(budget.available()).unwrap();
+    for au in [&one, &three] {
+        f.clear();
+        d.decode(au, &mut f).unwrap();
+    }
+    drop(pressure);
 }

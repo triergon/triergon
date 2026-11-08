@@ -17,7 +17,23 @@ fn resizing_charges_the_whole_frame_before_it_grows() {
     assert_eq!(budget.used(), charged);
     frame.try_resize(2, 1536, &mut charge).unwrap();
     assert_eq!(frame.planes.len(), 2);
-    assert!(budget.used() < charged);
+    assert_eq!(budget.used(), charged, "the charge keeps the largest frame");
+}
+
+#[test]
+fn a_reserved_bound_lets_the_frame_grow_without_another_claim() {
+    let budget = Budget::new(256 * 1024).unwrap();
+    let mut charge = budget.reserve(0).unwrap();
+    let mut frame = AudioFrame::default();
+    frame.try_resize(2, 1024, &mut charge).unwrap();
+    frame.charge_for(8, 4096, &mut charge).unwrap();
+    let reserved = charge.bytes();
+    assert!(reserved >= 8 * 4096 * size_of::<f32>());
+    assert_eq!(frame.planes.iter().map(Vec::len).sum::<usize>(), 2 * 1024);
+    let held = budget.reserve(budget.available()).unwrap();
+    frame.try_resize(8, 4096, &mut charge).unwrap();
+    assert_eq!(charge.bytes(), reserved);
+    drop(held);
 }
 
 #[test]
