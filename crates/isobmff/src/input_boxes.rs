@@ -1,9 +1,10 @@
 //! Top-level box framing over the parent's concrete InputCursor. No duplicate
 //! input windows, request tokens, generation, cancellation or allocator framework.
 use crate::{BoxHeader, BoxView, HeaderRead};
+use std::io::{Read, Seek};
 use std::sync::atomic::AtomicBool;
 use triergon_core::{
-    BudgetVec, Error, InputCursor, InputToken, Result, SourceId, Step, WorkBudget,
+    BudgetVec, Error, InputCursor, InputToken, Result, SourceId, Step, WorkBudget, blocking::Feed,
 };
 
 #[derive(Debug)]
@@ -169,6 +170,27 @@ impl BoxReader {
         }
         self.phase = Phase::Skipping;
         Ok(())
+    }
+    /// Polls, serving the input it asks for from `feed`, until the next box event;
+    /// `None` at the end of the source. Each poll gets `work` units. A window needs one
+    /// poll, so with one-byte windows this loop runs once per byte; it is kept out of
+    /// line so that its state stays in registers.
+    #[inline(never)]
+    pub fn next_event<S: Read + Seek>(
+        &mut self,
+        input: &mut InputCursor,
+        feed: &mut Feed<S>,
+        work: u64,
+        cancel: &AtomicBool,
+    ) -> Result<Option<BoxEvent>> {
+        loop {
+            match self.poll(input, &mut WorkBudget::new(work), cancel)? {
+                Step::Ready(event) => return Ok(Some(event)),
+                Step::NeedInput(request) => feed.supply(input, request)?,
+                Step::Yield => {}
+                Step::End(_) => return Ok(None),
+            }
+        }
     }
     #[inline(always)]
     pub fn poll(
