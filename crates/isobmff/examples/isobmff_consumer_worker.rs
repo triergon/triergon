@@ -5,14 +5,12 @@
 mod model;
 #[path = "isobmff_consumer/protocol.rs"]
 mod protocol;
-use model::{
-    DemuxOperation, DemuxSeekRequest, Driver, Failure, OpenPolicy, Result, SourceRequest, Transport,
-};
+use model::{DemuxOperation, DemuxSeekRequest, Driver, Failure, OpenPolicy, Result, SourceRequest};
 use protocol::{Retention, Stats};
 use std::{
     env,
     fs::File,
-    io::{self, Cursor, Read, Seek, SeekFrom, Write},
+    io::{self, Cursor, Read, Seek, Write},
     path::Path,
     time::Instant,
 };
@@ -26,7 +24,6 @@ use triergon_isobmff::{
 struct Options {
     window: usize,
     retain: usize,
-    file: bool,
     quantum: u64,
 }
 impl Default for Options {
@@ -34,7 +31,6 @@ impl Default for Options {
         Self {
             window: 65536,
             retain: 0,
-            file: false,
             quantum: 4096,
         }
     }
@@ -53,11 +49,13 @@ fn options(args: &[String], offset: usize) -> Result<Options> {
     }
     let window = argument(args, offset, 65536)?;
     let retain = argument(args, offset + 1, 0)?;
-    let file = match args.get(offset + 2).map_or("memory", String::as_str) {
-        "memory" => false,
-        "file" => true,
+    // The input is read into memory before any measured operation; the protocol's
+    // streaming `file` mode is not provided.
+    match args.get(offset + 2).map_or("memory", String::as_str) {
+        "memory" => {}
+        "file" => return Err(Error::Unsupported("file I/O mode").into()),
         _ => return Err(Error::Invalid("I/O mode").into()),
-    };
+    }
     let quantum = argument(args, offset + 3, 4096)?;
     if window == 0 || window > 65536 || retain > 64 || quantum == 0 {
         return Err(Error::Invalid("worker resource policy").into());
@@ -65,55 +63,30 @@ fn options(args: &[String], offset: usize) -> Result<Options> {
     Ok(Options {
         window,
         retain,
-        file,
         quantum,
     })
 }
-// The immutable corpus image / open file lives outside each measured operation,
-// as in the reference worker. Per-operation seek, parser/index creation and teardown stay inside.
-enum Input {
-    Memory(Cursor<Vec<u8>>),
-    File(File, u64),
+// The immutable corpus image lives outside each measured operation, as in the
+// reference worker. Per-operation seek, parser/index creation and teardown stay inside.
+type Input = Cursor<Vec<u8>>;
+fn load(path: &Path) -> Result<Input> {
+    let mut input = File::open(path)?;
+    let length = input.metadata()?.len();
+    if length > 64 * 1024 * 1024 {
+        return Err(Error::Unsupported("input exceeds 64 MiB").into());
+    }
+    let mut bytes = Vec::new();
+    bytes
+        .try_reserve_exact(usize::try_from(length).map_err(|_| Error::Overflow)?)
+        .map_err(|_| Error::Allocation)?;
+    input.read_to_end(&mut bytes)?;
+    if u64::try_from(bytes.len()).map_err(|_| Error::Overflow)? != length {
+        return Err(Error::Transport.into());
+    }
+    Ok(Cursor::new(bytes))
 }
-impl Input {
-    fn open(path: &Path, file: bool) -> Result<Self> {
-        let mut input = File::open(path)?;
-        let length = input.metadata()?.len();
-        if length > i64::MAX as u64 {
-            return Err(Error::Unsupported("native signed transport length").into());
-        }
-        if file {
-            return Ok(Self::File(input, length));
-        }
-        if length > 64 * 1024 * 1024 {
-            return Err(
-                Error::Unsupported("preloaded input exceeds 64 MiB; select file I/O").into(),
-            );
-        }
-        let mut bytes = Vec::new();
-        bytes
-            .try_reserve_exact(usize::try_from(length).map_err(|_| Error::Overflow)?)
-            .map_err(|_| Error::Allocation)?;
-        input.read_to_end(&mut bytes)?;
-        if u64::try_from(bytes.len()).map_err(|_| Error::Overflow)? != length {
-            return Err(Error::Transport.into());
-        }
-        Ok(Self::Memory(Cursor::new(bytes)))
-    }
-    fn transport(&mut self) -> (&mut dyn Transport, u64) {
-        match self {
-            Self::Memory(c) => {
-                let len = c.get_ref().len() as u64;
-                (c, len)
-            }
-            Self::File(f, n) => (f, *n),
-        }
-    }
-    fn rewind(&mut self) -> Result<()> {
-        let (t, _) = self.transport();
-        Seek::seek(t, SeekFrom::Start(0))?;
-        Ok(())
-    }
+fn length(input: &Input) -> Result<u64> {
+    Ok(u64::try_from(input.get_ref().len()).map_err(|_| Error::Overflow)?)
 }
 fn operation(
     input: &mut Input,
@@ -122,10 +95,10 @@ fn operation(
     policy: OpenPolicy,
     mut trace: Option<&mut String>,
 ) -> Result<Stats> {
-    let (transport, length) = input.transport();
+    let length = length(input)?;
     let mut stats = Stats::default();
-    stats.start(o.retain, o.window, o.file)?;
-    let mut driver = Driver::new(transport, length, o.window, o.quantum)?;
+    stats.start(o.retain, o.window)?;
+    let mut driver = Driver::new(input, length, o.window, o.quantum)?;
     let pool = driver.budget.clone();
     let mut retained = Retention::new(&pool, o.retain)?;
     if policy.regular_recovery {
@@ -240,7 +213,7 @@ fn main_result(mut args: Vec<String>) -> Result<()> {
         DemuxOperation::Open
     };
     let o = options(&args, option_offset)?;
-    let mut input = Input::open(Path::new(path), o.file)?;
+    let mut input = load(Path::new(path))?;
     match mode {
         "baseline" => {
             input.rewind()?;
@@ -270,7 +243,10 @@ fn main_result(mut args: Vec<String>) -> Result<()> {
             io::stdout().write_all(b"TRIERGON_BEGIN_V1\n")?;
             io::stdout().flush()?;
             let result = if mode == "open-memory-baseline" {
-                input.rewind().map(|()| Stats::default())
+                input
+                    .rewind()
+                    .map(|()| Stats::default())
+                    .map_err(Failure::from)
             } else {
                 operation(&mut input, o, op, policy, None)
             };
@@ -294,8 +270,8 @@ fn main_result(mut args: Vec<String>) -> Result<()> {
                 )
                 .into());
             }
-            let (t, length) = input.transport();
-            let mut driver = Driver::new(t, length, o.window, o.quantum)?;
+            let length = length(&input)?;
+            let mut driver = Driver::new(&mut input, length, o.window, o.quantum)?;
             let model = driver.open()?;
             let mut out = String::new();
             if mode == "index-trace" {
@@ -359,6 +335,7 @@ fn main() {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::io::SeekFrom;
     #[test]
     fn regular_recovery_rejects_conflicting_profiles() {
         for flag in [
@@ -398,18 +375,27 @@ mod tests {
         }
         let mut broken = Broken;
         let mut driver = Driver::new(&mut broken, 64, 1, 3).unwrap();
-        assert!(matches!(driver.open(), Err(Failure::Io(_))));
+        assert!(matches!(
+            driver.open(),
+            Err(Failure::Core(Error::Io(io::ErrorKind::Other)))
+        ));
     }
     #[test]
     fn parser_work_and_demux_io_settings_remain_explicit() {
-        let args: Vec<String> = ["worker", "open-trace", "x", "1", "64", "file", "3"]
+        let args: Vec<String> = ["worker", "open-trace", "x", "1", "64", "memory", "3"]
             .into_iter()
             .map(str::to_owned)
             .collect();
         let o = options(&args, 3).unwrap();
-        assert_eq!((o.window, o.retain, o.file, o.quantum), (1, 64, true, 3));
-        let mut changed = args;
+        assert_eq!((o.window, o.retain, o.quantum), (1, 64, 3));
+        let mut changed = args.clone();
         changed[4] = "65".into();
         assert!(options(&changed, 3).is_err());
+        let mut streamed = args;
+        streamed[5] = "file".into();
+        assert!(matches!(
+            options(&streamed, 3),
+            Err(Failure::Core(Error::Unsupported("file I/O mode")))
+        ));
     }
 }
