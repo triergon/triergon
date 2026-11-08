@@ -7,19 +7,20 @@ use crate::slicedec::SliceDecoder;
 use crate::tables::*;
 
 /// Scale a 4x4 block of levels (8.5.12.1); coefficient 0 is replaced by the caller for DC blocks.
+/// The arithmetic wraps, as in the transform kernels of `recon`.
 #[inline(always)]
 fn dequant4(coef: &[i32; 16], ls: &[i32; 16], qp: i32) -> [i32; 16] {
     let mut d = [0i32; 16];
     let sh = qp / 6;
     if sh >= 4 {
         for i in 0..16 {
-            d[i] = (coef[i] * ls[i]) << (sh - 4);
+            d[i] = coef[i].wrapping_mul(ls[i]) << (sh - 4);
         }
     } else {
         let add = 1 << (3 - sh);
         let s = 4 - sh;
         for i in 0..16 {
-            d[i] = (coef[i] * ls[i] + add) >> s;
+            d[i] = coef[i].wrapping_mul(ls[i]).wrapping_add(add) >> s;
         }
     }
     d
@@ -420,13 +421,13 @@ impl SliceDecoder<'_> {
         let sh = qp / 6;
         if sh >= 6 {
             for i in 0..64 {
-                d[i] = (coef[i] * ls[i]) << (sh - 6);
+                d[i] = coef[i].wrapping_mul(ls[i]) << (sh - 6);
             }
         } else {
             let add = 1 << (5 - sh);
             let s = 6 - sh;
             for i in 0..64 {
-                d[i] = (coef[i] * ls[i] + add) >> s;
+                d[i] = coef[i].wrapping_mul(ls[i]).wrapping_add(add) >> s;
             }
         }
         let any_ac = coef[1..].iter().fold(0, |a, &c| a | c) != 0;

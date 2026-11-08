@@ -1,4 +1,13 @@
 //! Intra prediction (clause 8.3) and inverse transforms / scaling (clause 8.5) kernels.
+//!
+//! The scaling and transform arithmetic wraps, as FFmpeg's int arithmetic does: a
+//! conforming stream keeps every value within 16 bits (8.5.12.1, 8.5.13.1), and a corrupt
+//! one's levels can take any i32.
+
+use std::num::Wrapping;
+
+/// A wrapping sample or coefficient of the scaling and transform kernels.
+type W = Wrapping<i32>;
 
 #[inline(always)]
 pub(crate) fn clip1(v: i32) -> u8 {
@@ -8,8 +17,8 @@ pub(crate) fn clip1(v: i32) -> u8 {
 // ---------------------------------------------------------------- transforms
 
 #[inline(always)]
-fn tr4(d: &[[i32; 4]; 4]) -> [[i32; 4]; 4] {
-    let mut o = [[0i32; 4]; 4];
+fn tr4(d: &[[W; 4]; 4]) -> [[W; 4]; 4] {
+    let mut o = [[W::default(); 4]; 4];
     for j in 0..4 {
         let e0 = d[0][j] + d[2][j];
         let e1 = d[0][j] - d[2][j];
@@ -28,14 +37,14 @@ fn tr4(d: &[[i32; 4]; 4]) -> [[i32; 4]; 4] {
 #[inline]
 pub(crate) fn idct4_add(d: &[i32; 16], dst: &mut [u8], off: usize, stride: usize) {
     // t[k][i] = d[i][k]: column k of all rows as one lane vector.
-    let mut t = [[0i32; 4]; 4];
+    let mut t = [[W::default(); 4]; 4];
     for i in 0..4 {
         for k in 0..4 {
-            t[k][i] = d[i * 4 + k];
+            t[k][i] = Wrapping(d[i * 4 + k]);
         }
     }
     let f = tr4(&t); // f[k][i]: row i, column k
-    let mut u = [[0i32; 4]; 4];
+    let mut u = [[W::default(); 4]; 4];
     for k in 0..4 {
         for i in 0..4 {
             u[i][k] = f[k][i];
@@ -47,7 +56,7 @@ pub(crate) fn idct4_add(d: &[i32; 16], dst: &mut [u8], off: usize, stride: usize
             .try_into()
             .unwrap();
         for j in 0..4 {
-            row[j] = (row[j] as i32 + ((h[i][j] + 32) >> 6)).clamp(0, 255) as u8;
+            row[j] = (row[j] as i32 + ((h[i][j] + Wrapping(32)) >> 6).0).clamp(0, 255) as u8;
         }
     }
 }
@@ -55,7 +64,7 @@ pub(crate) fn idct4_add(d: &[i32; 16], dst: &mut [u8], off: usize, stride: usize
 /// Add a constant residual (DC-only block) of size `n`x`n`.
 #[inline]
 pub(crate) fn dc_add(dc: i32, n: usize, dst: &mut [u8], off: usize, stride: usize) {
-    let v = (dc + 32) >> 6;
+    let v = dc.wrapping_add(32) >> 6;
     if v == 0 {
         return;
     }
@@ -69,7 +78,7 @@ pub(crate) fn dc_add(dc: i32, n: usize, dst: &mut [u8], off: usize, stride: usiz
 
 /// One 8-point 1-D inverse transform (8.5.13.2) applied lane-wise.
 #[inline(always)]
-fn tr8<const L: usize>(d: [&[i32; L]; 8], out: &mut [[i32; L]; 8]) {
+fn tr8<const L: usize>(d: [&[W; L]; 8], out: &mut [[W; L]; 8]) {
     for j in 0..L {
         let e0 = d[0][j] + d[4][j];
         let e1 = -d[3][j] + d[5][j] - d[7][j] - (d[7][j] >> 1);
@@ -102,25 +111,25 @@ fn tr8<const L: usize>(d: [&[i32; L]; 8], out: &mut [[i32; L]; 8]) {
 #[inline]
 pub(crate) fn idct8_add(d: &[i32; 64], dst: &mut [u8], off: usize, stride: usize) {
     // Transpose so the row transforms run lane-parallel over the 8 rows.
-    let mut t = [[0i32; 8]; 8];
+    let mut t = [[W::default(); 8]; 8];
     for i in 0..8 {
         for k in 0..8 {
-            t[k][i] = d[i * 8 + k];
+            t[k][i] = Wrapping(d[i * 8 + k]);
         }
     }
-    let mut rt = [[0i32; 8]; 8]; // rt[k][i]: row i, output column k
+    let mut rt = [[W::default(); 8]; 8]; // rt[k][i]: row i, output column k
     tr8::<8>(
         [&t[0], &t[1], &t[2], &t[3], &t[4], &t[5], &t[6], &t[7]],
         &mut rt,
     );
     // Transpose back: rows of the intermediate as lanes for the column transforms.
-    let mut f = [[0i32; 8]; 8]; // f[i][j]
+    let mut f = [[W::default(); 8]; 8]; // f[i][j]
     for k in 0..8 {
         for i in 0..8 {
             f[i][k] = rt[k][i];
         }
     }
-    let mut h = [[0i32; 8]; 8];
+    let mut h = [[W::default(); 8]; 8];
     tr8::<8>(
         [&f[0], &f[1], &f[2], &f[3], &f[4], &f[5], &f[6], &f[7]],
         &mut h,
@@ -128,16 +137,17 @@ pub(crate) fn idct8_add(d: &[i32; 64], dst: &mut [u8], off: usize, stride: usize
     for i in 0..8 {
         let row = &mut dst[off + i * stride..off + i * stride + 8];
         for j in 0..8 {
-            row[j] = (row[j] as i32 + ((h[i][j] + 32) >> 6)).clamp(0, 255) as u8;
+            row[j] = (row[j] as i32 + ((h[i][j] + Wrapping(32)) >> 6).0).clamp(0, 255) as u8;
         }
     }
 }
 
 /// Inverse Hadamard of the Intra16x16 DC (8.5.10) and scaling. `c` raster 4x4, output in place.
 pub(crate) fn luma_dc_dequant(c: &mut [i32; 16], qp: i32, ls00: i32) {
-    let mut f = [0i32; 16];
+    let ls00 = Wrapping(ls00);
+    let mut f = [W::default(); 16];
     for i in 0..4 {
-        let r = [c[i * 4], c[i * 4 + 1], c[i * 4 + 2], c[i * 4 + 3]];
+        let r = [c[i * 4], c[i * 4 + 1], c[i * 4 + 2], c[i * 4 + 3]].map(Wrapping);
         let a = r[0] + r[1];
         let b = r[0] - r[1];
         let cc = r[2] + r[3];
@@ -158,21 +168,23 @@ pub(crate) fn luma_dc_dequant(c: &mut [i32; 16], qp: i32, ls00: i32) {
         for i in 0..4 {
             let v = o[i];
             c[i * 4 + j] = if qp >= 36 {
-                (v * ls00) << (qp / 6 - 6)
+                (v * ls00) << (qp / 6 - 6) as usize
             } else {
-                (v * ls00 + (1 << (5 - qp / 6))) >> (6 - qp / 6)
-            };
+                (v * ls00 + Wrapping(1 << (5 - qp / 6))) >> (6 - qp / 6) as usize
+            }
+            .0;
         }
     }
 }
 
 /// Chroma DC 2x2 (4:2:0) transform and scaling (8.5.11), in place.
 pub(crate) fn chroma_dc_dequant(c: &mut [i32; 4], qp: i32, ls00: i32) {
-    let f0 = c[0] + c[1] + c[2] + c[3];
-    let f1 = c[0] - c[1] + c[2] - c[3];
-    let f2 = c[0] + c[1] - c[2] - c[3];
-    let f3 = c[0] - c[1] - c[2] + c[3];
-    let s = |f: i32| ((f * ls00) << (qp / 6)) >> 5;
+    let [c0, c1, c2, c3] = c.map(Wrapping);
+    let f0 = c0 + c1 + c2 + c3;
+    let f1 = c0 - c1 + c2 - c3;
+    let f2 = c0 + c1 - c2 - c3;
+    let f3 = c0 - c1 - c2 + c3;
+    let s = |f: W| (((f * Wrapping(ls00)) << (qp / 6) as usize) >> 5).0;
     c[0] = s(f0);
     c[1] = s(f1);
     c[2] = s(f2);
