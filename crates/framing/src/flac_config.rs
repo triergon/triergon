@@ -79,7 +79,7 @@ pub fn flac_metadata_blocks(
     bytes: &[u8],
 ) -> Result<impl Iterator<Item = Result<FlacMetadataBlock<'_>>>> {
     let mut rest = bytes
-        .strip_prefix(b"fLaC")
+        .strip_prefix(FLAC_MARKER)
         .ok_or(Error::Invalid("FLAC marker"))?;
     let mut done = false;
     Ok(core::iter::from_fn(move || {
@@ -119,22 +119,22 @@ pub fn flac_stream_info(configuration: &[u8]) -> Result<FlacStreamInfo> {
     FlacStreamInfo::parse(first.body)
 }
 
-/// The canonical configuration of an ISO BMFF `dfLa` box payload (version, flags, then
-/// metadata blocks).
-pub fn flac_configuration_from_dfla(payload: &[u8], out: &mut Vec<u8>) -> Result<()> {
+/// The marker a native FLAC stream, and its canonical configuration, starts with.
+pub(crate) const FLAC_MARKER: &[u8; 4] = b"fLaC";
+
+/// The metadata blocks of an ISO BMFF `dfLa` box payload (version, flags, then blocks).
+pub(crate) fn dfla_blocks(payload: &[u8]) -> Result<&[u8]> {
     let (header, blocks) = payload.split_at_checked(4).ok_or(Error::Truncated)?;
     if header[0] != 0 {
         return Err(Error::Unsupported("dfLa version"));
     }
-    out.extend_from_slice(b"fLaC");
-    out.extend_from_slice(blocks);
-    Ok(())
+    Ok(blocks)
 }
 
-/// The canonical configuration of the first packet of an Ogg FLAC stream (the Ogg
-/// mapping: `0x7f "FLAC"`, version 1.0, a header packet count, `fLaC` and STREAMINFO).
-/// Returns the number of further header packets the stream announces (0: unknown).
-pub fn flac_configuration_from_ogg(packet: &[u8], out: &mut Vec<u8>) -> Result<u16> {
+/// The native stream header inside the first packet of an Ogg FLAC stream (the Ogg
+/// mapping: `0x7f "FLAC"`, version 1.0, a header packet count, `fLaC` and STREAMINFO),
+/// and the number of further header packets it announces (0: unknown).
+pub(crate) fn ogg_native(packet: &[u8]) -> Result<(&[u8], u16)> {
     let rest = packet
         .strip_prefix(b"\x7fFLAC")
         .ok_or(Error::Invalid("Ogg FLAC mapping header"))?;
@@ -145,6 +145,22 @@ pub fn flac_configuration_from_ogg(packet: &[u8], out: &mut Vec<u8>) -> Result<u
     let headers = u16::from_be_bytes([header[2], header[3]]);
     let native = &rest[4..];
     flac_stream_info(native)?;
+    Ok((native, headers))
+}
+
+/// The canonical configuration of an ISO BMFF `dfLa` box payload (version, flags, then
+/// metadata blocks).
+pub fn flac_configuration_from_dfla(payload: &[u8], out: &mut Vec<u8>) -> Result<()> {
+    let blocks = dfla_blocks(payload)?;
+    out.extend_from_slice(FLAC_MARKER);
+    out.extend_from_slice(blocks);
+    Ok(())
+}
+
+/// The canonical configuration of the first packet of an Ogg FLAC stream. Returns the
+/// number of further header packets the stream announces (0: unknown).
+pub fn flac_configuration_from_ogg(packet: &[u8], out: &mut Vec<u8>) -> Result<u16> {
+    let (native, headers) = ogg_native(packet)?;
     out.extend_from_slice(native);
     Ok(headers)
 }

@@ -18,12 +18,13 @@ fn read(path: &Path) -> Option<(Vec<u8>, Vec<Vec<u8>>)> {
     while let Ok(Some(packet)) = source.next_packet() {
         frames.push(packet.payload().to_vec());
     }
-    let mut configuration = Vec::new();
     let track = source.reader().track(0)?;
+    let budget = Budget::new(1 << 20).ok()?;
+    let mut configuration = triergon_codec::BudgetVec::new(&budget);
     if canonical_flac_configuration(track.configuration(), &mut configuration).is_err() {
         configuration.clear();
     }
-    Some((configuration, frames))
+    Some((configuration.to_vec(), frames))
 }
 
 fn research(dir: &str) -> Vec<PathBuf> {

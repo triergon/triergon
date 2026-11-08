@@ -72,13 +72,18 @@ fn main() -> ExitCode {
             else {
                 continue;
             };
-            let mut configuration = Vec::new();
-            let built = triergon_framing::canonical_flac_configuration(
-                track.configuration(),
-                &mut configuration,
-            )
-            .map_err(|e| e.to_string())
-            .and_then(|()| Decoder::new(&configuration).map_err(|e| e.to_string()));
+            let built = Budget::new(track.configuration().len() + 64)
+                .map_err(|e| e.to_string())
+                .and_then(|pool| {
+                    let mut configuration = triergon_codec::BudgetVec::new(&pool);
+                    triergon_framing::canonical_flac_configuration(
+                        track.configuration(),
+                        &mut configuration,
+                    )
+                    .map(|()| configuration)
+                    .map_err(|e| e.to_string())
+                })
+                .and_then(|configuration| Decoder::new(&configuration).map_err(|e| e.to_string()));
             match built {
                 Ok(built) => decoder = Some((track.id(), built.with_crc_policy(policy))),
                 Err(error) => {

@@ -160,20 +160,34 @@ impl OpusHead {
         &self.mapping[..usize::from(self.channels)]
     }
 
-    /// The header as an `OpusHead` packet: the canonical configuration the decoder takes.
-    pub fn to_bytes(&self, out: &mut Vec<u8>) {
-        out.extend_from_slice(b"OpusHead");
-        out.push(self.version);
-        out.push(self.channels);
-        out.extend_from_slice(&self.pre_skip.to_le_bytes());
-        out.extend_from_slice(&self.input_sample_rate.to_le_bytes());
-        out.extend_from_slice(&self.output_gain.to_le_bytes());
-        out.push(self.mapping_family);
-        if self.mapping_family != 0 {
-            out.push(self.streams);
-            out.push(self.coupled_streams);
-            out.extend_from_slice(self.mapping());
+    /// Bytes of the longest `OpusHead` packet: 21 header bytes and 255 mapping entries.
+    pub const MAX_BYTES: usize = 21 + 255;
+
+    /// Write the header as an `OpusHead` packet, the canonical configuration the decoder
+    /// takes, to the start of `out`; returns its length.
+    pub fn write(&self, out: &mut [u8; Self::MAX_BYTES]) -> usize {
+        out[..8].copy_from_slice(b"OpusHead");
+        out[8] = self.version;
+        out[9] = self.channels;
+        out[10..12].copy_from_slice(&self.pre_skip.to_le_bytes());
+        out[12..16].copy_from_slice(&self.input_sample_rate.to_le_bytes());
+        out[16..18].copy_from_slice(&self.output_gain.to_le_bytes());
+        out[18] = self.mapping_family;
+        if self.mapping_family == 0 {
+            return 19;
         }
+        let mapping = self.mapping();
+        out[19] = self.streams;
+        out[20] = self.coupled_streams;
+        out[21..21 + mapping.len()].copy_from_slice(mapping);
+        21 + mapping.len()
+    }
+
+    /// The header as an `OpusHead` packet appended to `out`.
+    pub fn to_bytes(&self, out: &mut Vec<u8>) {
+        let mut packet = [0; Self::MAX_BYTES];
+        let len = self.write(&mut packet);
+        out.extend_from_slice(&packet[..len]);
     }
 }
 

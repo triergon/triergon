@@ -1,6 +1,6 @@
 //! Decoding the packets of one container audio track.
 use triergon_codec::{AudioDecoder, AudioFrame, Budget, DecodeFailure, DownmixLevels};
-use triergon_core::Bytes;
+use triergon_core::BudgetVec;
 use triergon_core::container::{PacketInfo, TrackInfo};
 
 use crate::{AudioCodec, Discard, audio_codec, audio_configuration, audio_decoder_in};
@@ -40,11 +40,9 @@ impl TrackDecoder {
     pub fn new_in(track: &dyn TrackInfo, budget: &Budget) -> Result<TrackDecoder, DecodeFailure> {
         let codec = audio_codec(track.codec())
             .ok_or_else(|| DecodeFailure(format!("unsupported codec {:?}", track.codec())))?;
-        let mut configuration = Vec::new();
+        let mut configuration = BudgetVec::new(budget);
         audio_configuration(codec, track.configuration(), &mut configuration)
             .map_err(DecodeFailure::from_error)?;
-        let configuration = Bytes::try_from_vec(budget, configuration)
-            .map_err(|refused| DecodeFailure::from_error(refused.error()))?;
         let decoder = audio_decoder_in(codec, &configuration, budget)?;
         Ok(TrackDecoder {
             codec,

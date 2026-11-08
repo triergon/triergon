@@ -80,7 +80,7 @@ pub fn audio_codec(codec: triergon_core::container::CodecId<'_>) -> Option<Audio
 pub fn audio_configuration(
     codec: AudioCodec,
     track_configuration: &[u8],
-    out: &mut Vec<u8>,
+    out: &mut triergon_core::BudgetVec<u8>,
 ) -> triergon_core::Result<()> {
     out.clear();
     match codec {
