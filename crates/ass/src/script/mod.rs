@@ -283,6 +283,11 @@ impl Script {
         self.events.as_slice()
     }
 
+    /// The events, for the renderer's records.
+    pub(crate) fn events_mut(&mut self) -> &mut [Event] {
+        self.events.as_mut_slice()
+    }
+
     /// The index into [`Script::styles`] of the style named `Default` last,
     /// else 0.
     pub const fn default_style(&self) -> usize {

@@ -301,4 +301,5 @@ composites) are
   of each required feature.
 
 The comparison establishes agreement with FreeType on that corpus, not conformance
-with the OpenType specification. Face matching is checked by unit tests only.
+with the OpenType specification. Face matching is checked by unit tests and
+through the renderer's comparison with libass (`ass-render`).

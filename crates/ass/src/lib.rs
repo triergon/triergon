@@ -16,6 +16,7 @@ mod effect;
 mod evaluate;
 mod karaoke;
 mod number;
+mod render;
 mod scan;
 mod script;
 mod strings;
@@ -28,6 +29,7 @@ pub use evaluate::{
     Context, EventState, FontDesc, Glyph, GlyphState, KaraokeMark, Placement, Symbol,
 };
 pub use karaoke::{KaraokeGlyph, Syllable, Syllables};
+pub use render::{Fonts, FrameMargins, Image, ImageKind, Renderer, Settings, Size};
 pub use script::{
     Alignment, Bold, BorderStyle, ColourSlot, Colours, EmbeddedFont, Event, HAlign, Info, Italic,
     Justify, Margins, Options, Rgba, Script, ScriptType, Style, VAlign, WrapStyle, YCbCrMatrix,

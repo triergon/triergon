@@ -2,10 +2,17 @@
 //! script or a stream fixture rendered frame by frame with the fonts its
 //! directives attach, every image folded in list order.
 
+use std::io::{self, BufWriter, Write};
 use std::path::Path;
+use std::time::Instant;
 
-use crate::fixture::{Command, Fixture, Frames};
-use crate::perform::Result;
+use triergon_ass::{Fonts, Image, Options, Renderer, Script, Settings};
+use triergon_core::{Budget, Bytes};
+use triergon_harness_protocol::digest::{fold, fold_bytes, signed};
+
+use crate::fixture::{Command, Fixture, Frames as Frames_};
+use crate::perform::{Result, parse};
+use crate::record::Work;
 
 const USAGE: &str =
     "usage: ass-worker ass-render-fold FILE MODE FONTS FRAME-W FRAME-H STORAGE-W STORAGE-H
@@ -40,19 +47,16 @@ impl Size {
 
 /// A font file the fixture names, read.
 pub struct FontFile {
-    pub name: String,
     pub data: Vec<u8>,
 }
 
 fn read_font(fonts: &Path, path: &[u8]) -> Result<FontFile> {
-    let name = std::str::from_utf8(path)?.to_owned();
-    let path = fonts.join(&name);
+    let path = fonts.join(std::str::from_utf8(path)?);
     if std::fs::metadata(&path)?.len() > MAX_FONT {
         return Err(format!("{}: too large", path.display()).into());
     }
     Ok(FontFile {
         data: std::fs::read(&path)?,
-        name,
     })
 }
 
@@ -67,35 +71,159 @@ pub struct Case<'a> {
     pub storage: Size,
 }
 
+/// The images of every frame of one operation, folded or printed.
+trait Frames {
+    fn frame(&mut self, now: i64, images: &[Image]) -> io::Result<()>;
+}
+
+/// The protocol's digest of the images.
+#[derive(Debug, Default)]
+struct Folded(Work);
+
+impl Frames for Folded {
+    fn frame(&mut self, now: i64, images: &[Image]) -> io::Result<()> {
+        let work = &mut self.0;
+        fold(&mut work.digest, signed(now));
+        fold(&mut work.digest, images.len() as u64);
+        for image in images {
+            for value in [
+                i64::from(image.kind.number()),
+                i64::from(image.x),
+                i64::from(image.y),
+                image.width() as i64,
+                image.height() as i64,
+                i64::from(image.colour.0),
+            ] {
+                fold(&mut work.digest, signed(value));
+            }
+            for row in image.rows() {
+                fold_bytes(&mut work.digest, row);
+            }
+            work.packets += 1;
+            work.bytes += (image.width() * image.height()) as u64;
+        }
+        Ok(())
+    }
+}
+
+/// The reference's dump lines.
+struct Printed<W: Write>(W);
+
+impl<W: Write> Frames for Printed<W> {
+    fn frame(&mut self, now: i64, images: &[Image]) -> io::Result<()> {
+        writeln!(self.0, "frame {now} {}", images.len())?;
+        for image in images {
+            write!(
+                self.0,
+                "image {} {} {} {} {} {:08x}",
+                image.kind.number(),
+                image.x,
+                image.y,
+                image.width(),
+                image.height(),
+                image.colour.0
+            )?;
+            for row in image.rows() {
+                self.0.write_all(b" ")?;
+                for byte in row {
+                    write!(self.0, "{byte:02x}")?;
+                }
+            }
+            writeln!(self.0)?;
+        }
+        Ok(())
+    }
+}
+
 impl Case<'_> {
-    /// The frames rendered, in order: the script's, or the stream's commands'.
-    pub fn frames(&self) -> impl Iterator<Item = Frames> + '_ {
-        let commands = self
-            .fixture
-            .commands
-            .iter()
-            .filter_map(|command| match command {
-                Command::Frames(frames) => Some(*frames),
-                _ => None,
-            });
-        let script = (!self.stream).then_some(self.fixture.frames.iter().copied());
-        script.into_iter().flatten().chain(commands)
+    /// The renderer's configuration.
+    fn fonts(&self, budget: &Budget) -> Result<Fonts> {
+        let bytes = |file: &FontFile| Bytes::copy_from_slice(budget, &file.data);
+        Ok(Fonts {
+            attached: self
+                .attached
+                .iter()
+                .map(bytes)
+                .collect::<std::result::Result<_, _>>()?,
+            default_family: self.default_family.map(<[u8]>::to_vec),
+            default_font: self.default_font.as_ref().map(bytes).transpose()?,
+        })
+    }
+
+    fn settings(&self) -> Settings {
+        let mut settings =
+            Settings::new(triergon_ass::Size::new(self.frame.width, self.frame.height));
+        settings.storage = Some(triergon_ass::Size::new(
+            self.storage.width,
+            self.storage.height,
+        ));
+        settings
+    }
+
+    /// One operation: a renderer, the script read or the stream run, and
+    /// every frame rendered.
+    fn render(
+        &self,
+        budget: &Budget,
+        data: &[u8],
+        fonts: &Fonts,
+        out: &mut impl Frames,
+    ) -> Result<()> {
+        let mut renderer = Renderer::new(budget, &self.settings(), fonts)?;
+        let options = Options {
+            extract_fonts: true,
+            ..Options::default()
+        };
+        let mut frames = |script: &mut Script, frames: Frames_| -> Result<()> {
+            for now in frames.times() {
+                let images = renderer.render(script, now)?;
+                out.frame(now, images)?;
+            }
+            Ok(())
+        };
+        if !self.stream {
+            if let Some(mut script) = parse(budget, data, &options)? {
+                for f in &self.fixture.frames {
+                    frames(&mut script, *f)?;
+                }
+            }
+            return Ok(());
+        }
+        let mut script = Script::new(budget, &options)?;
+        for command in &self.fixture.commands {
+            match command {
+                Command::Private(text) => script.process_codec_private(text)?,
+                Command::Data(text) => script.process_data(text)?,
+                Command::Styles(text) => script.process_styles(text)?,
+                Command::Chunk {
+                    start,
+                    duration,
+                    packet,
+                } => script.process_chunk(packet, *start, *duration)?,
+                Command::Flush => script.flush_events(),
+                Command::Prune(deadline) => script.prune_events(*deadline),
+                Command::CheckReadOrder(check) => script.set_check_read_order(*check),
+                Command::Frames(f) => frames(&mut script, *f)?,
+                Command::Dump => {}
+            }
+        }
+        Ok(())
     }
 }
 
 /// `ass-render-*` with its arguments after the program name.
 pub fn run(args: &[String]) -> Result<()> {
     let (action, rest) = args.split_first().ok_or(USAGE)?;
-    let (path, rest) = match (action.as_str(), rest) {
+    let (iterations, path, rest) = match (action.as_str(), rest) {
         ("ass-render-bench", [path, count, rest @ ..]) => {
             let count: u64 = count.parse()?;
             if !(1..=1_000_000).contains(&count) {
                 return Err(USAGE.into());
             }
-            (path, rest)
+            (count, path, rest)
         }
         ("ass-render-fold" | "ass-render-memory" | "ass-render-dump", [path, rest @ ..]) => {
-            (path, rest)
+            (1, path, rest)
         }
         _ => return Err(USAGE.into()),
     };
@@ -126,25 +254,37 @@ pub fn run(args: &[String]) -> Result<()> {
         stream,
         fixture,
     };
-    let frames = case.frames().flat_map(Frames::times).count();
-    Err(format!(
-        "rendering is not supported ({frames} frames of {}x{}, storage {}x{}, {} fonts{}{})",
-        case.frame.width,
-        case.frame.height,
-        case.storage.width,
-        case.storage.height,
-        case.attached.len(),
-        case.default_family.map_or(String::new(), |f| format!(
-            ", default family {}",
-            String::from_utf8_lossy(f)
-        )),
-        case.default_font
-            .as_ref()
-            .map_or(String::new(), |f| format!(
-                ", default font {} ({} bytes)",
-                f.name,
-                f.data.len()
-            )),
-    )
-    .into())
+    // An accounting ceiling far above any case of the corpus, so only parity
+    // decides.
+    let budget = Budget::new(1 << 34)?;
+    let fonts = case.fonts(&budget)?;
+    let mut out = io::stdout().lock();
+    if action == "ass-render-dump" {
+        let mut printed = Printed(BufWriter::new(out));
+        case.render(&budget, &data, &fonts, &mut printed)?;
+        return Ok(printed.0.flush()?);
+    }
+    let memory = action == "ass-render-memory";
+    if memory {
+        out.write_all(b"TRIERGON_BEGIN_V1\n")?;
+        out.flush()?;
+    }
+    let start = (action == "ass-render-bench").then(Instant::now);
+    let mut total = Work::default();
+    for _ in 0..iterations {
+        let mut folded = Folded::default();
+        case.render(&budget, std::hint::black_box(&data), &fonts, &mut folded)?;
+        total.accumulate(&folded.0);
+    }
+    let elapsed = start.map_or(0, |begin| begin.elapsed().as_nanos());
+    if memory {
+        out.write_all(b"TRIERGON_END_V1\n")?;
+        out.flush()?;
+    }
+    writeln!(
+        out,
+        "{{\"schema\":1,\"operation\":\"ass-render\",\"iterations\":{iterations},\"packets\":{},\"bytes\":{},\"digest\":{},\"elapsed_ns\":{elapsed},\"eof\":true}}",
+        total.packets, total.bytes, total.digest,
+    )?;
+    Ok(out.flush()?)
 }

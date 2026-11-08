@@ -165,8 +165,8 @@ resource limit becomes an explicit, reviewed rule for that case.
   stream of `harness/fixtures/ass-render` at 1920×1080 over 1280×720 storage
   and at 1280×720 over anamorphic 720×576 storage, at the times the fixture
   names, and compares every image's type, position, size, colour and alpha
-  bytes in list order. It is required by `cargo xtask check` and reported by
-  `cargo xtask ass compare`.
+  bytes in list order with `triergon_ass::Renderer`'s. It is required by
+  `cargo xtask check` and reported by `cargo xtask ass compare`.
 - **Generated manifests and pins.** The font, shaping, rasterising and ASS
   features commit no case rows. `cargo xtask fonts manifest`, `cargo
   xtask shape manifest`, `cargo xtask raster manifest` and `cargo xtask ass

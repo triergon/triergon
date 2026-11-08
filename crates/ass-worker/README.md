@@ -1,6 +1,6 @@
 # ass-worker
 
-ASS parsing measurement worker for the harness. It reads whole scripts, runs
+ASS parsing and rendering measurement worker for the harness. It reads whole scripts, runs
 Matroska packet streams and walks events through
 [triergon-ass](../ass/README.md), as the libass reference worker
 (`harness/reference_ass.h`) does with libass 0.17.5. It is tooling
@@ -44,6 +44,7 @@ The `ass-render-*` modes render a script (MODE `script`) or a stream fixture
 `;@default-font` directives name, relative to FONTS, at the frame and
 storage size given, at the times of its `;@frames` directive or `@frames`
 commands, as `harness/reference_ass_render.h` renders them with libass
-(feature `harness/features/ass-render/`). The renderer is not implemented
-yet: they read the fixture and its fonts and end with an error, so every
-case fails.
+(feature `harness/features/ass-render/`), with `triergon_ass::Renderer`:
+one operation creates the renderer, reads the script or runs the stream and
+renders every frame; every image is folded in list order (kind, position,
+size, colour, alpha rows), and the dump mode prints the reference's lines.
