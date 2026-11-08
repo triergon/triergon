@@ -502,3 +502,26 @@ fn an_eac3_access_unit_holds_its_dependent_substream() {
         (CodecId::Eac3, b"ec-3".as_slice())
     );
 }
+
+#[test]
+fn flac_without_its_marker_starts_at_the_first_confirmed_frame() {
+    let frames: Vec<Vec<u8>> = (0..5).map(|i| flac_frame(40 + i, 400)).collect();
+    let mut file = id3v2(20);
+    file.extend(noise(4, 900));
+    let start = file.len() as u64;
+    file.extend(frames.concat());
+    let reading = invariant::<Flac>(&file);
+    assert_eq!(reading.packets.len(), 5);
+    assert_eq!(
+        reading.packets[0].offset, start,
+        "the bytes before it are not a packet"
+    );
+    assert_eq!(reading.packets[0].pts, 40 * 4096);
+    let pool = Budget::new(16 << 20).unwrap();
+    let mut reader = open::<Flac>(&pool, &file, true);
+    read(&mut reader, &pool, &file, 1 << 20, 4096).unwrap();
+    let track = reader.stream().unwrap();
+    assert_eq!((track.sample_rate(), track.channels()), (44100, Some(1)));
+    assert!(track.configuration().is_empty());
+    assert!(reader.format().stream_info().is_none());
+}
