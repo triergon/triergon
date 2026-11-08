@@ -56,6 +56,7 @@ pub const FEATURES: [&str; 3] = ["font-outlines", "font-hinting-none", "font-hin
 
 pub const LANE: Lane = Lane {
     command: "fonts",
+    main: super::main,
     features: &FEATURES,
     reference: "freetype-native",
     pin_note: "FreeType 2.15.0's folds, recorded by `cargo xtask fonts manifest --record`; never edited by hand.",

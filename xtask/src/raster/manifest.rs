@@ -97,6 +97,7 @@ pub const FEATURES: [&str; 5] = [
 
 pub const LANE: Lane = Lane {
     command: "raster",
+    main: super::main,
     features: &FEATURES,
     reference: "libass-native",
     pin_note: "libass 0.17.5's folds, recorded by `cargo xtask raster manifest --record`; never edited by hand.",

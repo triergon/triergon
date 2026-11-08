@@ -45,6 +45,9 @@ impl Gate {
 pub struct Lane {
     /// The `cargo xtask` command of the lane.
     pub command: &'static str,
+    /// `cargo xtask COMMAND ARGS` for the lane's own subcommands: every one but
+    /// `compare`, which runs [`Lane::reports`].
+    pub main: fn(&Path, &[String]) -> R<()>,
     /// Its features' ids; each feature's gate is in its contract.
     pub features: &'static [&'static str],
     /// The reference worker the pins are recorded from, by its identity record.
