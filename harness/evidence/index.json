@@ -9879,6 +9879,16 @@
      "sha256": "f9e19db3d9c40f5ba719981562793ba2cc9d0b75b8a9e7da6d02b9609ab6be96"
     }
    ]
+  },
+  {
+   "name": "codec-budgets-linux-arm64",
+   "path": "codec-budgets-linux-arm64",
+   "retention": "retained",
+   "reason": "Cited decoder, capture and trace identities, function comparison, instruction counts and a paired codec timing screen of the codec storage budgets against main at cfa65d17",
+   "key": "evidence/codec-budgets-linux-arm64/8d88beeb36031151a6040855beec20cbd58f386942c32450749a7843159e4312.tar.gz",
+   "sha256": "8d88beeb36031151a6040855beec20cbd58f386942c32450749a7843159e4312",
+   "bytes": 11368312,
+   "source_revision": "e99f12ca2c398fa3cba559c2885b6e8845d3fd04"
   }
  ]
 }
