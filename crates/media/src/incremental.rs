@@ -15,7 +15,8 @@ use triergon_core::{
 };
 
 use crate::metadata::{
-    ATTACHMENTS, CHAPTERS, CLUSTER, CUES, INFO, SEEK_HEAD, SEGMENT, TAGS, TRACKS, is_level_one,
+    ATTACHMENTS, CHAPTERS, CLUSTER, CUES, INFO, SEEK_HEAD, SEGMENT, TAGS, TRACKS,
+    is_segment_metadata,
 };
 const EBML: u64 = 0x1a45dfa3;
 
@@ -224,6 +225,9 @@ pub(crate) enum Admit {
     Epoch(EpochAdmission),
 }
 impl ElementReader {
+    pub(crate) fn input(&self) -> &InputCursor {
+        &self.input
+    }
     pub fn new(
         pool: &Budget,
         source: SourceId,
@@ -363,7 +367,7 @@ impl ElementReader {
             return Err(Error::Unsupported("element after finite Segment"));
         }
         self.check_parent(header, self.segment.and_then(|m| m.end))?;
-        if (header.id == CLUSTER || is_level_one(header.id))
+        if (header.id == CLUSTER || is_segment_metadata(header.id))
             && let Some(cluster) = self.cluster
         {
             if cluster.end.is_some() {

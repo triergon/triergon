@@ -342,7 +342,7 @@ fn quantum<D: PacketProjection>(
                 reader.reader.envelope.range_input(),
                 &plan,
                 &AtomicBool::new(false),
-                reader.reposition,
+                reader.seek.map(|(reposition, _)| reposition),
             )
         } else {
             reader.input.feed_typed_request(
@@ -350,7 +350,7 @@ fn quantum<D: PacketProjection>(
                 &request,
                 header,
                 &AtomicBool::new(false),
-                reader.reposition,
+                reader.seek.map(|(reposition, _)| reposition),
             )
         }?;
         reader

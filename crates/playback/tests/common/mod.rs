@@ -99,13 +99,13 @@ pub fn annex_b_session(pool: &Budget, packet: &Mp4Packet) -> NalPacketSession {
         .description
         .extensions(EntryLayout::Visual, Limits::default())
         .unwrap();
-    let record = loop {
-        match children.poll(&mut WorkBudget::new(1)).unwrap() {
-            BoxStep::Box(raw) if matches!(&raw.header().kind, b"avcC" | b"hvcC") => break raw,
-            BoxStep::Box(_) | BoxStep::Yield => {}
+    let record = (0..STEPS)
+        .find_map(|_| match children.poll(&mut WorkBudget::new(1)).unwrap() {
+            BoxStep::Box(raw) if matches!(&raw.header().kind, b"avcC" | b"hvcC") => Some(raw),
+            BoxStep::Box(_) | BoxStep::Yield => None,
             BoxStep::End => panic!("sample entry has no avcC or hvcC"),
-        }
-    };
+        })
+        .expect("sample entry walk did not make bounded progress");
     let header = record.header();
     let bytes = record
         .bytes()

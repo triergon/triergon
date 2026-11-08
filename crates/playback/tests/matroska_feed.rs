@@ -1,5 +1,7 @@
 use std::sync::atomic::AtomicBool;
-use triergon_core::{Budget, Bytes, Error, SourceCapabilities, SourceId, Time, WorkBudget};
+use triergon_core::{
+    Budget, Bytes, Error, InputWindow, SourceCapabilities, SourceId, Step, Time, WorkBudget,
+};
 use triergon_framing::{
     AacConfigLimits, Ac3Family, AvcAnnexBLimits, AvcConfigLimits, BuildStep, HvcConfigLimits,
 };
@@ -92,7 +94,7 @@ fn matroska_source(
         ownership,
     )
     .unwrap();
-    let engine = Engine::matroska_reader(reader, ID);
+    let engine = Engine::matroska_reader(reader);
     let source =
         ByteSource::new(ID, Bytes::copy_from_slice(&pool, input).unwrap(), quantum).unwrap();
     (engine, SourceOwner::new(source), pool)
@@ -1315,4 +1317,54 @@ fn matroska_dolby_source_clock_preserves_damaged_ac3_before_decoder_admission() 
     for ((_, packet), pts_ns) in packets.zip([27_000_000, 59_000_000, 91_000_000]) {
         assert_eq!(live.observe_source(packet).unwrap(), expected(pts_ns));
     }
+}
+
+#[test]
+fn player_refuses_a_matroska_reader_that_has_read_input() {
+    let pool = Budget::new(2 << 20).unwrap();
+    let capabilities = SourceCapabilities {
+        length: Some(INPUT.len() as u64),
+        random_access: true,
+    };
+    let reader = |pool: &Budget| {
+        triergon_matroska::typed::Reader::new(
+            pool,
+            ID,
+            capabilities,
+            triergon_matroska::Limits::default(),
+            4096,
+        )
+        .unwrap()
+    };
+    let source = |pool: &Budget| {
+        SourceOwner::new(
+            ByteSource::new(ID, Bytes::copy_from_slice(pool, INPUT).unwrap(), 4096).unwrap(),
+        )
+    };
+    let player = |engine, pool: &Budget| {
+        Player::new(
+            engine,
+            source(pool),
+            Selection::All,
+            PlayerPolicy::default(),
+        )
+    };
+    assert!(player(Engine::matroska_reader(reader(&pool)), &pool).is_ok());
+    let mut started = reader(&pool);
+    let cancel = AtomicBool::new(false);
+    let Step::NeedInput(request) = started.step(&mut WorkBudget::new(64), &cancel).unwrap() else {
+        panic!("a new reader asks for input first");
+    };
+    let window = Bytes::copy_from_slice(&pool, &INPUT[..4096]).unwrap();
+    started
+        .provide(&InputWindow::new(request.source, request.token, request.offset, window).unwrap())
+        .unwrap();
+    while matches!(
+        started.step(&mut WorkBudget::new(64), &cancel).unwrap(),
+        Step::Yield
+    ) {}
+    assert!(matches!(
+        player(Engine::matroska_reader(started), &pool),
+        Err(Error::Invalid("Matroska engine needs an unstarted reader"))
+    ));
 }

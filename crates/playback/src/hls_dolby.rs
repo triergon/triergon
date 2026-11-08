@@ -1,7 +1,7 @@
 //! Aligned Dolby syncframes for one selected independent HLS TS segment.
 use crate::{
     TrackKey, TsNativeCarriage, TsNativeConfiguration,
-    hls_avc::{clock_describes, lane_track, pes_time},
+    hls_pes::{clock_describes, lane_track, pes_time},
     hls_segment::HlsMediaAudioUnit,
     ts_payload::PesInput,
 };

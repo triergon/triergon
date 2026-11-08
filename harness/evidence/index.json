@@ -14610,6 +14610,42 @@
    "key": "evidence/mp4-range-gate-build/bb59fb61a667c1010a0a8e46604ca9b10d8cab6a3f99e05c2b68170c18d82755.tar.gz",
    "sha256": "bb59fb61a667c1010a0a8e46604ca9b10d8cab6a3f99e05c2b68170c18d82755",
    "source_revision": "f58e444b72f94bb3962990dd515f28be1aaaa574"
+  },
+  {
+   "name": "review-follow-ups-quick-check-linux-arm64",
+   "retention": "retained",
+   "reason": "Cited same-code listings, instruction counts, paired timing screens of eight contracts and the unpaired 52-operation ISO BMFF runs of the review follow-ups against main",
+   "key": "evidence/review-follow-ups-quick-check-linux-arm64/09814ff9171abe0765ae6ff105c5a7aa8539ddce270b69d7757f85fbfb585045.tar.gz",
+   "sha256": "09814ff9171abe0765ae6ff105c5a7aa8539ddce270b69d7757f85fbfb585045",
+   "bytes": 602114945,
+   "source_revisions": {
+    "candidate": "c1ddf421dd4c9d629f926b79bd5645bc1489d935",
+    "baseline": "cf9ad665bfc96dd64a843828d4f57a2e1a73eed8"
+   }
+  },
+  {
+   "name": "review-follow-ups-rebase-check-linux-arm64",
+   "retention": "retained",
+   "reason": "Cited same-code listings and hls-segments and matroska-startup-seek instruction counts of the review follow-ups after their rebase onto main",
+   "key": "evidence/review-follow-ups-rebase-check-linux-arm64/39d34add2054e69ff80d58e62bc66ea78ba88b36c5da98b382e2ee6ceb9e63aa.tar.gz",
+   "sha256": "39d34add2054e69ff80d58e62bc66ea78ba88b36c5da98b382e2ee6ceb9e63aa",
+   "bytes": 129052,
+   "source_revisions": {
+    "candidate": "bfee053b44146096f7c7882de1160cba865b0d7c",
+    "baseline": "7fc34e9e4b2fd26a7c255c36cc1a05eb1da16a49"
+   }
+  },
+  {
+   "name": "review-follow-ups-rebase-check-75eac781-linux-arm64",
+   "retention": "retained",
+   "reason": "Cited same-code listings and hls-segments and matroska-startup-seek instruction counts of the review follow-ups after their rebase onto main at 75eac781",
+   "key": "evidence/review-follow-ups-rebase-check-75eac781-linux-arm64/435931dd0a0c29986d98f8ca9eaeef103c5a57e8a4f98d3f8c9d1cc0cc5fbce3.tar.gz",
+   "sha256": "435931dd0a0c29986d98f8ca9eaeef103c5a57e8a4f98d3f8c9d1cc0cc5fbce3",
+   "bytes": 125980,
+   "source_revisions": {
+    "candidate": "46710a9305af185f3f8a7ef87c8e94b0a235185c",
+    "baseline": "75eac781037de72fdd0a7399fbe03bd035ac0093"
+   }
   }
  ]
 }

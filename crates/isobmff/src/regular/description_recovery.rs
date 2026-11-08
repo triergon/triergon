@@ -304,8 +304,7 @@ impl DescriptionRecoveryTable {
             return Ok(DescriptionPacketCursor {
                 legacy: Some(legacy),
                 direct: None,
-                ready: None,
-                failed: None,
+                latch: Latched::default(),
                 legacy_visited: 0,
                 legacy_distance: 0,
             });
@@ -344,7 +343,7 @@ impl DescriptionRecoveryTable {
             });
         }
         let table = &self.base.storage;
-        count(table.sample_count(), limits.max_source_samples)?;
+        bounded(table.sample_count(), limits.max_source_samples)?;
         if table.ctts.as_ref().is_some_and(|t| t.count > 2) {
             return Err(Error::Unsupported(composition_error));
         }
@@ -368,8 +367,7 @@ impl DescriptionRecoveryTable {
                 root_walk_transport_model: None,
                 physical_reads,
             }),
-            ready: None,
-            failed: None,
+            latch: Latched::default(),
             legacy_visited: 0,
             legacy_distance: 0,
         })
@@ -600,7 +598,7 @@ impl Direct<'_> {
             SampleStep::End => return Ok(None),
             SampleStep::Sample(s) => s,
         };
-        count(
+        bounded(
             self.state.ordinal.checked_add(1).ok_or(Error::Overflow)?,
             self.limits.max_occurrences,
         )?;
@@ -693,20 +691,20 @@ impl Direct<'_> {
 pub struct DescriptionPacketCursor<'a> {
     legacy: Option<DirectPacketCursor<'a>>,
     direct: Option<Direct<'a>>,
-    ready: Option<DescriptionEvent>,
-    failed: Option<Error>,
+    latch: Latched<DescriptionEvent>,
     legacy_visited: u64,
     legacy_distance: u64,
 }
 impl DescriptionPacketCursor<'_> {
     pub fn poll(&mut self, work: &mut WorkBudget, cancel: &AtomicBool) -> Result<CursorStatus> {
-        poll_latched(
-            self,
-            |c| (&mut c.failed, &mut c.ready),
-            Self::poll_inner,
-            work,
-            cancel,
-        )
+        let result = match self.latch.early(cancel) {
+            Some(early) => early,
+            None => self.poll_inner(work, cancel),
+        };
+        self.latch.settle(result)
+    }
+    pub fn take_event(&mut self) -> Result<DescriptionEvent> {
+        self.latch.take("v3 no ready event")
     }
     fn poll_inner(&mut self, work: &mut WorkBudget, cancel: &AtomicBool) -> Result<CursorStatus> {
         if let Some(legacy) = &mut self.legacy {
@@ -718,7 +716,7 @@ impl DescriptionPacketCursor<'_> {
                     } else {
                         self.legacy_distance.checked_add(1).ok_or(Error::Overflow)?
                     };
-                    self.ready = Some(DescriptionEvent {
+                    self.latch.ready = Some(DescriptionEvent {
                         declaration: old.declaration,
                         raw_chunk_description: old.raw_chunk_description,
                         packet: Some(old.demux),
@@ -761,7 +759,7 @@ impl DescriptionPacketCursor<'_> {
             return Ok(CursorStatus::End);
         }
         if let Some(event) = direct.poll(work)? {
-            self.ready = Some(event);
+            self.latch.ready = Some(event);
             Ok(CursorStatus::Ready)
         } else if direct.ended() {
             Ok(CursorStatus::End)
@@ -769,13 +767,10 @@ impl DescriptionPacketCursor<'_> {
             Ok(CursorStatus::Yield)
         }
     }
-    pub fn take_event(&mut self) -> Result<DescriptionEvent> {
-        take_latched(self.failed, &mut self.ready, "v3 no ready event")
-    }
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub struct DescriptionIndexEntry {
+pub struct NativeIndexEntry {
     pub ordinal: u64,
     pub position: i64,
     pub timestamp: i64,
@@ -786,15 +781,14 @@ pub struct DescriptionIndexEntry {
 #[derive(Clone, Debug)]
 pub struct DescriptionIndexEvent {
     pub source_event: DescriptionEvent,
-    pub demux_entry: Option<DescriptionIndexEntry>,
+    pub demux_entry: Option<NativeIndexEntry>,
 }
 #[derive(Debug)]
 pub struct DescriptionIndexCursor<'a> {
     inner: DescriptionPacketCursor<'a>,
     next: u64,
     limit: u64,
-    ready: Option<DescriptionIndexEvent>,
-    failed: Option<Error>,
+    latch: Latched<DescriptionIndexEvent>,
 }
 impl<'a> DescriptionIndexCursor<'a> {
     fn new(inner: DescriptionPacketCursor<'a>, limit: u64) -> Self {
@@ -802,18 +796,18 @@ impl<'a> DescriptionIndexCursor<'a> {
             inner,
             next: 0,
             limit,
-            ready: None,
-            failed: None,
+            latch: Latched::default(),
         }
     }
     pub fn poll(&mut self, work: &mut WorkBudget, cancel: &AtomicBool) -> Result<CursorStatus> {
-        poll_latched(
-            self,
-            |c| (&mut c.failed, &mut c.ready),
-            Self::poll_inner,
-            work,
-            cancel,
-        )
+        let result = match self.latch.early(cancel) {
+            Some(early) => early,
+            None => self.poll_inner(work, cancel),
+        };
+        self.latch.settle(result)
+    }
+    pub fn take_event(&mut self) -> Result<DescriptionIndexEvent> {
+        self.latch.take("v3 no ready index event")
     }
     fn poll_inner(&mut self, work: &mut WorkBudget, cancel: &AtomicBool) -> Result<CursorStatus> {
         match self.inner.poll(work, cancel)? {
@@ -823,7 +817,7 @@ impl<'a> DescriptionIndexCursor<'a> {
                 }
                 let event = self.inner.take_event()?;
                 let demux_entry = if let Some(packet) = &event.packet {
-                    count(self.next.checked_add(1).ok_or(Error::Overflow)?, self.limit)?;
+                    bounded(self.next.checked_add(1).ok_or(Error::Overflow)?, self.limit)?;
                     let entry = native_index_entry(
                         packet,
                         self.next,
@@ -836,7 +830,7 @@ impl<'a> DescriptionIndexCursor<'a> {
                 } else {
                     None
                 };
-                self.ready = Some(DescriptionIndexEvent {
+                self.latch.ready = Some(DescriptionIndexEvent {
                     source_event: event,
                     demux_entry,
                 });
@@ -844,8 +838,5 @@ impl<'a> DescriptionIndexCursor<'a> {
             }
             other => Ok(other),
         }
-    }
-    pub fn take_event(&mut self) -> Result<DescriptionIndexEvent> {
-        take_latched(self.failed, &mut self.ready, "v3 no ready index event")
     }
 }

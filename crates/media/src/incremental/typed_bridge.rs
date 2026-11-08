@@ -3,7 +3,7 @@
 //! Internal ranges keep generation; the explicit seek transition resets once.
 use super::{
     Admit, CLUSTER, ClusterCheckpoint, EBML, ElementHeader, ElementReader, Master, ParseStep,
-    Phase, SEGMENT, ScanBody, is_level_one,
+    Phase, SEGMENT, ScanBody, is_segment_metadata,
 };
 use crate::matroska::typed::syntax::Required;
 use crate::{Error, Result};
@@ -726,7 +726,7 @@ impl ElementReader {
                             0xa3 if size <= self.limits.block_bytes as u64 => (),
                             0xe7 if size <= 8 => (),
                             CLUSTER | SEGMENT | EBML | 0xa0 | 0xa3 | 0xe7 => return None,
-                            id if is_level_one(id) => return None,
+                            id if is_segment_metadata(id) => return None,
                             _ => (),
                         }
                         consume(size, &mut left)?;
