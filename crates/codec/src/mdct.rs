@@ -128,20 +128,27 @@ impl Fft {
     /// Transform `data`, already filled in [`Fft::order`].
     fn transform(&self, data: &mut [Cpx]) {
         let data = &mut data[..self.len];
-        for stage in &self.stages {
-            let block = stage.radix * stage.span;
-            for chunk in data.chunks_exact_mut(block) {
-                match stage.radix {
-                    2 => butterfly2(chunk, stage),
-                    3 => butterfly3(chunk, stage),
-                    4 => butterfly4(chunk, stage),
-                    5 => butterfly5(chunk, stage),
-                    _ => unreachable!("radices are 2, 3, 4 and 5"),
-                }
+        // A one-point transform has no stage.
+        let Some((first, rest)) = self.stages.split_first() else {
+            return;
+        };
+        // The innermost stage combines single points: its twiddles are all 1.
+        if first.radix == 4 {
+            for x in data.chunks_exact_mut(4) {
+                let (a0, a1) = (x[0].add(x[2]), x[0].sub(x[2]));
+                let (a2, a3) = (x[1].add(x[3]), x[1].sub(x[3]).rot_neg());
+                x[0] = a0.add(a2);
+                x[1] = a1.add(a3);
+                x[2] = a0.sub(a2);
+                x[3] = a1.sub(a3);
             }
+        } else {
+            run_stage(data, first);
+        }
+        for stage in rest {
+            run_stage(data, stage);
         }
     }
-
     /// Transform `input` into `out` (both of the transform's length).
     #[cfg(test)]
     fn run(&self, input: &[Cpx], out: &mut [Cpx]) {
@@ -149,6 +156,20 @@ impl Fft {
             *slot = input[from as usize];
         }
         self.transform(out);
+    }
+}
+
+/// One stage over every block of `data`.
+fn run_stage(data: &mut [Cpx], stage: &Stage) {
+    let block = stage.radix * stage.span;
+    for chunk in data.chunks_exact_mut(block) {
+        match stage.radix {
+            2 => butterfly2(chunk, stage),
+            3 => butterfly3(chunk, stage),
+            4 => butterfly4(chunk, stage),
+            5 => butterfly5(chunk, stage),
+            _ => unreachable!("radices are 2, 3, 4 and 5"),
+        }
     }
 }
 
