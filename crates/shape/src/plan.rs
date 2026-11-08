@@ -4,10 +4,11 @@
 
 use crate::face::Face;
 use crate::ot::digest::Digest;
-use crate::ot::layout::LayoutTable;
-use crate::shapers::Shaper;
+use crate::ot::layout::{FeatureSubstitutions, LayoutTable};
+use crate::shapers::{Pause, Shaper};
 use crate::tag::{Direction, Language, Script, Tag};
-use triergon_core::{Budget, BudgetVec, Error, Result};
+use crate::work;
+use triergon_core::{Budget, BudgetVec, Error, Result, WorkBudget};
 
 /// A feature the caller sets for the whole item, such as `kern=0`.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -60,13 +61,6 @@ impl FeatureFlags {
     };
 }
 
-/// Work done between two lookup stages.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub(crate) enum Pause {
-    /// A shaper's own step.
-    Shaper(u8),
-}
-
 #[derive(Clone, Copy, Debug)]
 struct FeatureInfo {
     tag: Tag,
@@ -81,28 +75,40 @@ struct FeatureInfo {
 #[derive(Debug)]
 pub(crate) struct Builder<'a> {
     pub(crate) tables: [LayoutTable<'a>; 2],
+    /// Each table's feature substitutions at the default instance.
+    substitutions: [FeatureSubstitutions<'a>; 2],
     pub(crate) script: [Option<u16>; 2],
     pub(crate) chosen_script: [Option<Tag>; 2],
     language: [Option<u16>; 2],
     features: BudgetVec<FeatureInfo>,
     stage: [usize; 2],
     pauses: [BudgetVec<(usize, Option<Pause>)>; 2],
-    /// The first storage error of an addition, reported when the plan compiles.
+    /// The work of planning, bounded by the size of the face's tables.
+    work: WorkBudget,
+    /// The first error of an addition or a feature query, reported when the
+    /// plan compiles.
     error: Option<Error>,
 }
 
 impl<'a> Builder<'a> {
-    fn new(face: &Face<'a>, script: Script, language: &Language, budget: &Budget) -> Self {
+    fn new(face: &Face<'a>, script: Script, language: &Language, budget: &Budget) -> Result<Self> {
         let tables = [face.gsub, face.gpos];
+        let mut work = work::plan_budget(face);
+        let substitutions = [
+            tables[0].default_substitutions(&mut work)?,
+            tables[1].default_substitutions(&mut work)?,
+        ];
         let (script_tags, script_count) = script.ot_tags();
         let mut builder = Self {
             tables,
+            substitutions,
             script: [None; 2],
             chosen_script: [None; 2],
             language: [None; 2],
             features: BudgetVec::new(budget),
             stage: [0; 2],
             pauses: [BudgetVec::new(budget), BudgetVec::new(budget)],
+            work,
             error: None,
         };
         for (t, table) in tables.iter().enumerate() {
@@ -116,7 +122,7 @@ impl<'a> Builder<'a> {
                 .find_map(|&tag| script.find_lang_sys(tag))
                 .or_else(|| script.find_lang_sys(Tag::new(b"dflt")));
         }
-        builder
+        Ok(builder)
     }
 
     pub(crate) fn add_feature(&mut self, tag: &[u8; 4], flags: FeatureFlags, value: u32) {
@@ -132,7 +138,7 @@ impl<'a> Builder<'a> {
     }
 
     fn add(&mut self, tag: Tag, flags: FeatureFlags, value: u32) {
-        if tag.0 == 0 {
+        if tag == Tag::default() {
             return;
         }
         let info = FeatureInfo {
@@ -163,17 +169,39 @@ impl<'a> Builder<'a> {
         self.stage[table] += 1;
     }
 
-    /// Whether the selected language systems list `tag`.
-    pub(crate) fn has_feature(&self, tag: &[u8; 4]) -> bool {
+    /// The index of the first feature with `tag` the selected language system
+    /// of table `t` lists, each one looked at charged.
+    fn lang_sys_feature(&mut self, t: usize, tag: Tag) -> Result<Option<u16>> {
+        let table = &self.tables[t];
+        for index in table
+            .script(self.script[t])
+            .lang_sys(self.language[t])
+            .feature_indices()
+        {
+            work::charge(&mut self.work, 1)?;
+            if table.feature_tag(index) == tag {
+                return Ok(Some(index));
+            }
+        }
+        Ok(None)
+    }
+
+    /// Whether the selected language systems list `tag`. Running out of work
+    /// counts as not listed, and the plan then fails with the error.
+    pub(crate) fn has_feature(&mut self, tag: &[u8; 4]) -> bool {
         let tag = Tag::new(tag);
-        (0..2).any(|t| {
-            let table = &self.tables[t];
-            table
-                .script(self.script[t])
-                .lang_sys(self.language[t])
-                .feature_indices()
-                .any(|i| table.feature_tag(i) == tag)
-        })
+        let mut has =
+            || -> Result<bool> {
+                Ok(self.lang_sys_feature(0, tag)?.is_some()
+                    || self.lang_sys_feature(1, tag)?.is_some())
+            };
+        match has() {
+            Ok(has) => has,
+            Err(e) => {
+                self.error.get_or_insert(e);
+                false
+            }
+        }
     }
 }
 
@@ -215,6 +243,19 @@ pub(crate) struct LookupMap {
     pub(crate) per_syllable: bool,
     /// The glyphs the lookup can apply at.
     pub(crate) digest: Digest,
+}
+
+impl LookupMap {
+    /// Lookup 0 under no mask, with HarfBuzz's default settings.
+    const DEFAULT: Self = Self {
+        index: 0,
+        mask: 0,
+        auto_zwnj: true,
+        auto_zwj: true,
+        random: false,
+        per_syllable: false,
+        digest: Digest::EMPTY,
+    };
 }
 
 /// The lookups up to `last_lookup`, then an optional pause.
@@ -262,7 +303,8 @@ impl Plan {
     /// # Errors
     ///
     /// `Unsupported` for a face with Apple Advanced Typography tables HarfBuzz
-    /// would use; the budget's errors.
+    /// would use; `Policy` when planning would take more work than the face's
+    /// layout tables justify (see the crate's limits); the budget's errors.
     pub fn new(
         face: &Face<'_>,
         direction: Direction,
@@ -274,7 +316,7 @@ impl Plan {
         if face.has_aat_layout() {
             return Err(Error::Unsupported("AAT layout (morx, kerx or trak)"));
         }
-        let mut builder = Builder::new(face, script, language, budget);
+        let mut builder = Builder::new(face, script, language, budget)?;
         let shaper = Shaper::categorize(script, direction, builder.chosen_script[0]);
         builder.enable_feature(b"rvrn");
         builder.add_gsub_pause(None);
@@ -326,7 +368,7 @@ impl Plan {
             builder.add(feature.tag, FeatureFlags::GLOBAL, feature.value);
         }
         shaper.override_features(&mut builder);
-        let mut plan = compile(builder, budget, direction, script, shaper)?;
+        let mut plan = builder.compile(budget, direction, script, shaper)?;
         plan.decide(face);
         Ok(plan)
     }
@@ -404,201 +446,278 @@ impl Plan {
     }
 }
 
-/// Merges duplicate features, allocates mask bits and collects each stage's
-/// lookups, as `hb_ot_map_builder_t::compile` does.
-fn compile(
-    mut b: Builder<'_>,
-    budget: &Budget,
-    direction: Direction,
-    script: Script,
-    shaper: Shaper,
-) -> Result<Plan> {
-    if let Some(error) = b.error.take() {
-        return Err(error);
-    }
-    let mut required = [None; 2];
-    let mut required_stage = [0; 2];
-    for t in 0..2 {
-        required[t] = b.tables[t]
-            .script(b.script[t])
-            .lang_sys(b.language[t])
-            .required_feature();
-    }
-    // A stable sort by tag keeps the order features were added in.
-    b.features.sort_by_key(|f| (f.tag, f.seq));
-    let mut merged = BudgetVec::<FeatureInfo>::new(budget);
-    merged.try_reserve_exact(b.features.len())?;
-    for f in b.features.iter().copied() {
-        match merged.last_mut() {
-            Some(last) if last.tag == f.tag => {
-                if f.flags.global {
-                    last.flags.global = true;
-                    last.max_value = f.max_value;
-                    last.default_value = f.default_value;
-                } else {
-                    last.flags.global = false;
-                    last.max_value = last.max_value.max(f.max_value);
-                }
-                last.flags.has_fallback |= f.flags.has_fallback;
-                last.stage = [last.stage[0].min(f.stage[0]), last.stage[1].min(f.stage[1])];
-            }
-            _ => merged.try_push(f).map_err(|e| e.error)?,
+/// The features of a plan with their masks, and what the required features
+/// need.
+struct Features {
+    maps: BudgetVec<FeatureMap>,
+    global_mask: u32,
+    /// Each table's required feature and the stage it is applied in.
+    required: [Option<(u16, usize)>; 2],
+}
+
+impl Builder<'_> {
+    /// Compiles the plan as `hb_ot_map_builder_t::compile` does: merges
+    /// duplicate features, allocates their mask bits and collects each stage's
+    /// lookups.
+    fn compile(
+        mut self,
+        budget: &Budget,
+        direction: Direction,
+        script: Script,
+        shaper: Shaper,
+    ) -> Result<Plan> {
+        if let Some(error) = self.error.take() {
+            return Err(error);
         }
-    }
-    // The language systems' features, by tag; earlier entries win.
-    let lang_features = |t: usize, tag: Tag| {
-        let table = &b.tables[t];
-        table
-            .script(b.script[t])
-            .lang_sys(b.language[t])
-            .feature_indices()
-            .find(|&i| table.feature_tag(i) == tag)
-    };
-    let mut global_mask = 1 << GLOBAL_BIT_SHIFT;
-    let mut next_bit = 4; // After the three glyph flag bits HarfBuzz reserves.
-    let mut features = BudgetVec::new(budget);
-    for info in merged.iter() {
-        let bits = if info.flags.global && info.max_value == 1 {
-            0
-        } else {
-            MAX_BITS.min(u32::BITS - info.max_value.leading_zeros())
-        };
-        if info.max_value == 0 || next_bit + bits >= GLOBAL_BIT_SHIFT {
-            continue;
+        let merged = self.merge_features(budget)?;
+        let features = self.map_features(&merged, budget)?;
+        self.add_gsub_pause(None);
+        self.add_gpos_pause(None);
+        if let Some(error) = self.error.take() {
+            return Err(error);
         }
-        let mut index = [None; 2];
+        let mut lookups = [BudgetVec::new(budget), BudgetVec::new(budget)];
+        let mut stages = [BudgetVec::new(budget), BudgetVec::new(budget)];
         for t in 0..2 {
-            if required[t].is_some_and(|r| b.tables[t].feature_tag(r) == info.tag) {
-                required_stage[t] = info.stage[t];
-            }
-            index[t] = lang_features(t, info.tag);
+            self.collect_lookups(t, &features, &mut lookups[t], &mut stages[t])?;
+            self.fill_digests(t, &mut lookups[t], budget)?;
         }
-        let mut found = index.iter().any(Option::is_some);
-        if !found && info.flags.global_search {
-            for t in 0..2 {
-                index[t] = b.tables[t].find_feature(info.tag);
-            }
-            found = index.iter().any(Option::is_some);
-        }
-        if !found && !info.flags.has_fallback {
-            continue;
-        }
-        let (shift, mask) = if info.flags.global && info.max_value == 1 {
-            (GLOBAL_BIT_SHIFT, 1 << GLOBAL_BIT_SHIFT)
-        } else {
-            let mask = (1_u32 << (next_bit + bits)) - (1 << next_bit);
-            let shift = next_bit;
-            next_bit += bits;
-            global_mask |= (info.default_value << shift) & mask;
-            (shift, mask)
-        };
-        let map = FeatureMap {
-            tag: info.tag,
-            index,
-            stage: info.stage,
-            shift,
-            mask,
-            one_mask: (1 << shift) & mask,
-            auto_zwnj: !info.flags.manual_zwnj,
-            auto_zwj: !info.flags.manual_zwj,
-            random: info.flags.random,
-            per_syllable: info.flags.per_syllable,
-            needs_fallback: !found,
-        };
-        features.try_push(map).map_err(|e| e.error)?;
+        Ok(Plan {
+            direction,
+            script,
+            shaper,
+            global_mask: features.global_mask,
+            features: features.maps,
+            lookups,
+            stages,
+            chosen_script: self.chosen_script,
+            fallback_glyph_classes: false,
+            apply_gpos: false,
+            apply_kern: false,
+            apply_fallback_kern: false,
+            zero_marks: false,
+            has_gpos_mark: false,
+            adjust_mark_positioning_when_zeroing: false,
+            fallback_mark_positioning: false,
+            kern_mask: 0,
+            rtlm_mask: 0,
+            frac_mask: 0,
+            numr_mask: 0,
+            dnom_mask: 0,
+            has_frac: false,
+        })
     }
-    b.add_gsub_pause(None);
-    b.add_gpos_pause(None);
-    if let Some(error) = b.error.take() {
-        return Err(error);
-    }
-    let mut lookups = [BudgetVec::new(budget), BudgetVec::new(budget)];
-    let mut stages = [BudgetVec::new(budget), BudgetVec::new(budget)];
-    for t in 0..2 {
-        let table = b.tables[t];
-        let list = &mut lookups[t];
-        let mut pauses = b.pauses[t].iter().peekable();
-        let mut last = 0;
-        for stage in 0..b.stage[t] {
-            let mut add = |feature: Option<u16>, map: LookupMap| -> Result<()> {
-                let Some(feature) = feature else {
-                    return Ok(());
-                };
-                for index in table.feature_lookups(feature) {
-                    if let Some(lookup) = table.lookup(index) {
-                        let digest = Digest::of_lookup(&lookup, if t == 0 { 7 } else { 9 });
-                        list.try_push(LookupMap {
-                            index,
-                            digest,
-                            ..map
-                        })
-                        .map_err(|e| e.error)?;
+
+    /// The features added, one per tag: a stable sort by tag keeps the order
+    /// they were added in, and a later global feature replaces the value of
+    /// earlier ones.
+    fn merge_features(&mut self, budget: &Budget) -> Result<BudgetVec<FeatureInfo>> {
+        self.features.sort_by_key(|f| (f.tag, f.seq));
+        let mut merged = BudgetVec::<FeatureInfo>::new(budget);
+        merged.try_reserve_exact(self.features.len())?;
+        for f in self.features.iter().copied() {
+            match merged.last_mut() {
+                Some(last) if last.tag == f.tag => {
+                    if f.flags.global {
+                        last.flags.global = true;
+                        last.max_value = f.max_value;
+                        last.default_value = f.default_value;
+                    } else {
+                        last.flags.global = false;
+                        last.max_value = last.max_value.max(f.max_value);
                     }
+                    last.flags.has_fallback |= f.flags.has_fallback;
+                    last.stage = [last.stage[0].min(f.stage[0]), last.stage[1].min(f.stage[1])];
                 }
-                Ok(())
-            };
-            if required[t].is_some() && required_stage[t] == stage {
-                let map = LookupMap {
-                    index: 0,
-                    mask: 1 << GLOBAL_BIT_SHIFT,
-                    auto_zwnj: true,
-                    auto_zwj: true,
-                    random: false,
-                    per_syllable: false,
-                    digest: Digest::EMPTY,
-                };
-                add(required[t], map)?;
+                _ => merged.try_push(f).map_err(|e| e.error)?,
             }
-            for f in features.as_slice().iter().filter(|f| f.stage[t] == stage) {
+        }
+        Ok(merged)
+    }
+
+    /// Finds each merged feature in the font and gives the ones found (or
+    /// with a fallback) their mask bits: global features of value one share
+    /// the global bit, the others get the bits their largest value needs,
+    /// while bits are left.
+    fn map_features(
+        &mut self,
+        merged: &BudgetVec<FeatureInfo>,
+        budget: &Budget,
+    ) -> Result<Features> {
+        let required_index = |t: usize| {
+            self.tables[t]
+                .script(self.script[t])
+                .lang_sys(self.language[t])
+                .required_feature()
+        };
+        let required_index = [required_index(0), required_index(1)];
+        let mut required = [None; 2];
+        let mut global_mask = 1 << GLOBAL_BIT_SHIFT;
+        let mut next_bit = 4; // After the three glyph flag bits HarfBuzz reserves.
+        let mut maps = BudgetVec::new(budget);
+        for info in merged.iter() {
+            let bits = if info.flags.global && info.max_value == 1 {
+                0
+            } else {
+                MAX_BITS.min(u32::BITS - info.max_value.leading_zeros())
+            };
+            if info.max_value == 0 || next_bit + bits >= GLOBAL_BIT_SHIFT {
+                continue;
+            }
+            let mut index = [None; 2];
+            for t in 0..2 {
+                if let Some(r) = required_index[t]
+                    && self.tables[t].feature_tag(r) == info.tag
+                {
+                    required[t] = Some((r, info.stage[t]));
+                }
+                index[t] = self.lang_sys_feature(t, info.tag)?;
+            }
+            let mut found = index.iter().any(Option::is_some);
+            if !found && info.flags.global_search {
+                for t in 0..2 {
+                    index[t] = self.tables[t].find_feature(info.tag, &mut self.work)?;
+                }
+                found = index.iter().any(Option::is_some);
+            }
+            if !found && !info.flags.has_fallback {
+                continue;
+            }
+            let (shift, mask) = if info.flags.global && info.max_value == 1 {
+                (GLOBAL_BIT_SHIFT, 1 << GLOBAL_BIT_SHIFT)
+            } else {
+                let mask = (1_u32 << (next_bit + bits)) - (1 << next_bit);
+                let shift = next_bit;
+                next_bit += bits;
+                global_mask |= (info.default_value << shift) & mask;
+                (shift, mask)
+            };
+            let map = FeatureMap {
+                tag: info.tag,
+                index,
+                stage: info.stage,
+                shift,
+                mask,
+                one_mask: (1 << shift) & mask,
+                auto_zwnj: !info.flags.manual_zwnj,
+                auto_zwj: !info.flags.manual_zwj,
+                random: info.flags.random,
+                per_syllable: info.flags.per_syllable,
+                needs_fallback: !found,
+            };
+            maps.try_push(map).map_err(|e| e.error)?;
+        }
+        // A required feature the plan does not map still applies, in the first stage.
+        for t in 0..2 {
+            if required[t].is_none() {
+                required[t] = required_index[t].map(|r| (r, 0));
+            }
+        }
+        Ok(Features {
+            maps,
+            global_mask,
+            required,
+        })
+    }
+
+    /// Collects the lookups of table `t` stage by stage: those of the required
+    /// feature and of each feature in its stage, sorted and merged per stage,
+    /// and the pause that ends the stage.
+    fn collect_lookups(
+        &mut self,
+        t: usize,
+        features: &Features,
+        lookups: &mut BudgetVec<LookupMap>,
+        stages: &mut BudgetVec<StageMap>,
+    ) -> Result<()> {
+        let mut pause = 0;
+        let mut last = 0;
+        for stage in 0..self.stage[t] {
+            if let Some((index, required_stage)) = features.required[t]
+                && required_stage == stage
+            {
                 let map = LookupMap {
-                    index: 0,
+                    mask: 1 << GLOBAL_BIT_SHIFT,
+                    ..LookupMap::DEFAULT
+                };
+                self.add_lookups(t, index, map, lookups)?;
+            }
+            for f in features.maps.iter().filter(|f| f.stage[t] == stage) {
+                let Some(index) = f.index[t] else {
+                    continue;
+                };
+                let map = LookupMap {
                     mask: f.mask,
                     auto_zwnj: f.auto_zwnj,
                     auto_zwj: f.auto_zwj,
                     random: f.random,
                     per_syllable: f.per_syllable,
-                    digest: Digest::EMPTY,
+                    ..LookupMap::DEFAULT
                 };
-                add(f.index[t], map)?;
+                self.add_lookups(t, index, map, lookups)?;
             }
-            merge_stage_lookups(list, last);
-            last = list.len();
-            if let Some(&&(at, pause)) = pauses.peek().filter(|p| p.0 == stage) {
-                debug_assert_eq!(at, stage);
-                stages[t]
+            work::charge(&mut self.work, lookups.len() - last)?;
+            merge_stage_lookups(lookups, last);
+            last = lookups.len();
+            if let Some(&(_, after)) = self.pauses[t].get(pause).filter(|p| p.0 == stage) {
+                stages
                     .try_push(StageMap {
                         last_lookup: last,
-                        pause,
+                        pause: after,
                     })
                     .map_err(|e| e.error)?;
-                pauses.next();
+                pause += 1;
             }
         }
+        Ok(())
     }
-    Ok(Plan {
-        direction,
-        script,
-        shaper,
-        global_mask,
-        features,
-        lookups,
-        stages,
-        chosen_script: b.chosen_script,
-        fallback_glyph_classes: false,
-        apply_gpos: false,
-        apply_kern: false,
-        apply_fallback_kern: false,
-        zero_marks: false,
-        has_gpos_mark: false,
-        adjust_mark_positioning_when_zeroing: false,
-        fallback_mark_positioning: false,
-        kern_mask: 0,
-        rtlm_mask: 0,
-        frac_mask: 0,
-        numr_mask: 0,
-        dnom_mask: 0,
-        has_frac: false,
-    })
+
+    /// Adds the lookups of feature `feature` of table `t` as `map` says.
+    fn add_lookups(
+        &mut self,
+        t: usize,
+        feature: u16,
+        map: LookupMap,
+        lookups: &mut BudgetVec<LookupMap>,
+    ) -> Result<()> {
+        let table = self.tables[t];
+        for index in table.feature_lookups(self.substitutions[t], feature) {
+            work::charge(&mut self.work, 1)?;
+            if usize::from(index) < table.lookup_count() {
+                lookups
+                    .try_push(LookupMap { index, ..map })
+                    .map_err(|e| e.error)?;
+            }
+        }
+        Ok(())
+    }
+
+    /// Gives every lookup of table `t` its digest, computed once per lookup
+    /// however many features and stages apply it.
+    fn fill_digests(&mut self, t: usize, lookups: &mut [LookupMap], budget: &Budget) -> Result<()> {
+        let mut order = BudgetVec::<usize>::new(budget);
+        order.try_reserve_exact(lookups.len())?;
+        for i in 0..lookups.len() {
+            order.try_push(i).map_err(|e| e.error)?;
+        }
+        work::charge(&mut self.work, lookups.len())?;
+        order.sort_by_key(|&i| lookups[i].index);
+        let mut rest = order.as_slice();
+        while let Some(&first) = rest.first() {
+            let index = lookups[first].index;
+            let same = rest.partition_point(|&i| lookups[i].index == index);
+            let Some(lookup) = self.tables[t].lookup(index) else {
+                rest = &rest[same..];
+                continue;
+            };
+            let digest = Digest::of_lookup(&lookup, &mut self.work)?;
+            for &i in &rest[..same] {
+                lookups[i].digest = digest;
+            }
+            rest = &rest[same..];
+        }
+        Ok(())
+    }
 }
 
 /// Sorts the lookups a stage added by index and merges duplicates, joining their

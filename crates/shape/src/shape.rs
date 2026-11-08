@@ -1,16 +1,15 @@
 //! The shaping pipeline: HarfBuzz's `hb_ot_shape` from characters to positioned
 //! glyphs.
 
-use crate::buffer::{Buffer, Info, glyph_props};
+use crate::buffer::{Buffer, GlyphClass, GlyphProps, Info, LigProps};
 use crate::face::Face;
 use crate::metrics::{Metrics, Scaled};
 use crate::normalize::{self, normalize};
 use crate::ot::apply::{Apply, Stage};
 use crate::ot::digest::Digest;
-use crate::ot::gsub::REVERSE_CHAIN;
 use crate::ot::layout::{LayoutTable, Lookup};
 use crate::plan::{Plan, StageMap};
-use crate::shapers::ZeroMarks;
+use crate::shapers::{Shaper, ZeroMarks};
 use crate::tag::Direction;
 use crate::unicode::{self, GeneralCategory};
 use std::ops::Range;
@@ -120,17 +119,18 @@ impl Run<'_, '_> {
         let gdef = &self.face.gdef;
         for info in buffer.infos_mut() {
             info.glyph_props = gdef.glyph_props(info.glyph);
-            info.lig = crate::buffer::LigProps::default();
+            info.lig = LigProps::default();
         }
         if self.plan.fallback_glyph_classes {
             for info in buffer.infos_mut() {
                 let mark = info.category() == GeneralCategory::NonSpacingMark
                     && !info.is_default_ignorable();
-                info.glyph_props = if mark {
-                    glyph_props::MARK
+                let class = if mark {
+                    GlyphClass::Mark
                 } else {
-                    glyph_props::BASE_GLYPH
+                    GlyphClass::Base
                 };
+                info.glyph_props = GlyphProps::new(class, 0);
             }
         }
         self.apply_stages(Stage::Substitute, buffer)
@@ -233,9 +233,7 @@ impl Run<'_, '_> {
             }
             i = last_lookup;
             if let Some(pause) = pause {
-                self.plan
-                    .shaper
-                    .pause(pause, self.plan, self.face, buffer, self.font)?;
+                Shaper::pause(pause, self.plan, self.face, buffer, self.font)?;
                 buffer.update_digest();
             }
         }
@@ -432,20 +430,13 @@ pub(crate) fn apply_lookup_masked<'a>(
         return Ok(());
     }
     ctx.set_lookup_mask(mask);
-    ctx.set_lookup_props(lookup.props);
+    ctx.set_lookup_flags(lookup.flags);
     let substitute = ctx.stage == Stage::Substitute;
-    let reverse = substitute && {
-        let kind = if lookup.kind == 7 {
-            lookup.subtables().next().map_or(0, |s| s.u16(2))
-        } else {
-            lookup.kind
-        };
-        kind == REVERSE_CHAIN
-    };
+    let reverse = substitute && lookup.is_reverse_chain();
     let applies = |ctx: &Apply<'_, '_>, info: &Info| {
         digest.may_have(info.glyph)
             && info.mask & ctx.lookup_mask != 0
-            && ctx.check_glyph_property(info, ctx.lookup_props)
+            && ctx.check_glyph_property(info, ctx.lookup_flags)
     };
     if reverse {
         let mut idx = ctx.buffer.len();

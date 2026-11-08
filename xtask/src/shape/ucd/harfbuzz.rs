@@ -130,7 +130,7 @@ fn script(w: &mut Writer, ucd: &Loaded) -> Result<(), String> {
     );
     let items: Vec<String> = palette
         .iter()
-        .map(|t| format!("Script(*b\"{t}\")"))
+        .map(|t| format!("Script::from_code(*b\"{t}\")"))
         .collect();
     w.array(
         "The values of [`SCRIPT`]: ISO 15924 codes.",

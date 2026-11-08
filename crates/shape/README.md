@@ -26,7 +26,7 @@ let features = [b"vert", b"vkna", b"kern", b"liga", b"clig"]
     .map(|(tag, value)| Feature { tag: Tag::new(tag), value })
     .collect::<Vec<_>>();
 // Build a plan once per face and run properties, then reuse it.
-let plan = Plan::new(&face, Direction::RightToLeft, Script(*b"Arab"), &Language::new("ar")?, &features, &pool)?;
+let plan = Plan::new(&face, Direction::RightToLeft, Script::from_iso15924(*b"Arab"), &Language::new("ar")?, &features, &pool)?;
 
 let text: Vec<char> = "مرحبا بالعالم".chars().collect();
 // HarfBuzz's default scale: font units.
@@ -122,21 +122,35 @@ paragraph separator inside the text.
 - Languages outside the table of `Language`: libass's script languages, the major
   European, Middle Eastern and Asian languages and `c`.
 - Malformed tables are read leniently (an out-of-range structure reads as
-  absent) where HarfBuzz's sanitizer would reject or neuter them, so results on
-  damaged fonts can differ; they never panic.
+  absent, a count as the records that are present) where HarfBuzz's sanitizer
+  would reject or neuter them, so results on damaged fonts can differ; they
+  never panic.
 
 ## Behaviour and limits
 
-Faces read their tables from the font bytes without copying. Plans, buffers and
-bidi resolvers charge their storage to the `Budget` they are given and keep it
-for reuse. A buffer's `Limits` bound the work of one shaping call: every lookup's
-visit of a glyph, every subtable and rule tried, every glyph a match skips, every
-nested lookup, every glyph a buffer edit moves or a cluster merge touches and
-every link of an attachment chain is charged, by default within HarfBuzz's 4096
-operations per character (at least 65536). Running out, or nesting deeper than
-HarfBuzz's 64 levels, is `Error::Policy`. Each lookup carries a digest of the
-glyphs it can apply at, so lookups and glyphs that cannot match are skipped
-without reading the font.
+Faces read their tables from the font bytes without copying and do no work of
+their own. Plans, buffers and bidi resolvers charge their storage to the
+`Budget` they are given and keep it for reuse.
+
+Planning is bounded by the face: a plan may spend 65536 units of work and 4 per
+byte of the face's GSUB and GPOS, charged for every feature variation condition
+evaluated, every language system and feature record searched, every lookup a
+feature lists and every coverage record a lookup's digest reads. That is 13
+times the most a plan of the shaping corpus needs (0.3 per byte); a table whose
+shared structures would multiply the work, such as nested feature variation
+conditions that share their children, makes `Plan::new` fail with
+`Error::Policy`.
+
+A buffer's `Limits` bound one shaping call. Its work: every lookup's visit of a
+glyph, every subtable and rule tried, every glyph a match skips, every nested
+lookup, every glyph a buffer edit moves or a cluster merge touches, every link
+of an attachment chain and every subtable and rule asked whether it would apply
+is charged, by default within HarfBuzz's 4096 operations per character (at
+least 65536). Its length: by default HarfBuzz's 64 glyphs per character (at
+least 16384). Running out of either, or nesting lookups deeper than HarfBuzz's
+64 levels, is `Error::Policy`. Each lookup carries HarfBuzz's digest of the
+glyphs it can start at, computed once per plan, so lookups and glyphs that
+cannot match are skipped without reading the font.
 
 Bidi resolution and line reordering run under `bidi::Limits`: each paragraph a
 `Resolver` resolves and each line `reorder_line` reorders may spend

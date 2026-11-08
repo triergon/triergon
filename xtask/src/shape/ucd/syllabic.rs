@@ -933,7 +933,10 @@ fn vowel_constraints(w: &mut Writer, ucd: &Loaded, ms_use: &MsUse) -> Result<(),
                 format!("&[{}]", cps.join(", "))
             })
             .collect();
-        items.push(format!("(Script(*b\"{tag}\"), &[{}])", list.join(", ")));
+        items.push(format!(
+            "(Script::from_code(*b\"{tag}\"), &[{}])",
+            list.join(", ")
+        ));
     }
     w.array(
         "Vowel sequences that look like another vowel, from Microsoft's\n\

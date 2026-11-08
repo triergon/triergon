@@ -3,8 +3,9 @@
 
 use super::data::Data;
 use super::gdef::Gdef;
-use super::layout::{LayoutTable, Lookup, class, coverage};
-use crate::buffer::{Buffer, Info, LigProps, glyph_props};
+pub(crate) use super::layout::Stage;
+use super::layout::{LayoutTable, Lookup, LookupFlags, class, coverage};
+use crate::buffer::{Buffer, GlyphClass, GlyphProps, Info, LigProps, Substitution};
 use crate::metrics::Scaled;
 use crate::tag::Direction;
 use triergon_core::{Error, Result};
@@ -12,13 +13,6 @@ use triergon_core::{Error, Result};
 /// Glyphs one rule may match, as HarfBuzz bounds them.
 pub(crate) const MAX_CONTEXT_LENGTH: usize = 64;
 const MAX_NESTING_LEVEL: u8 = 64;
-
-/// Which table's lookups are applied.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub(crate) enum Stage {
-    Substitute,
-    Position,
-}
 
 /// Everything a subtable reads or changes while it applies.
 pub(crate) struct Apply<'a, 'b> {
@@ -30,7 +24,7 @@ pub(crate) struct Apply<'a, 'b> {
     pub(crate) font: &'b Scaled<'b>,
     pub(crate) direction: Direction,
     pub(crate) lookup_mask: u32,
-    pub(crate) lookup_props: u32,
+    pub(crate) lookup_flags: LookupFlags,
     pub(crate) auto_zwnj: bool,
     pub(crate) auto_zwj: bool,
     pub(crate) per_syllable: bool,
@@ -76,23 +70,30 @@ pub(crate) enum Values<'a> {
 }
 
 impl Values<'_> {
-    fn matches(self, info: &Info, i: usize) -> Option<bool> {
+    /// Whether `glyph` is what value `i` asks for; any glyph is for
+    /// [`Values::Any`].
+    pub(crate) fn matches_glyph(self, glyph: u32, i: usize) -> bool {
         let value = |data: Data<'_>| data.u16(2 * i);
-        Some(match self {
-            Self::Any => return None,
-            Self::Glyphs(glyphs) => u32::from(value(glyphs)) == info.glyph,
-            Self::Classes(values, classes) => class(classes, info.glyph) == value(values),
+        match self {
+            Self::Any => true,
+            Self::Glyphs(glyphs) => u32::from(value(glyphs)) == glyph,
+            Self::Classes(values, classes) => class(classes, glyph) == value(values),
             Self::Coverages(offsets, base) => {
-                coverage(base.at(usize::from(value(offsets))), info.glyph).is_some()
+                coverage(base.at(usize::from(value(offsets))), glyph).is_some()
             }
-        })
+        }
+    }
+
+    /// Whether `info` matches value `i`; `None` when any glyph would.
+    fn matches(self, info: &Info, i: usize) -> Option<bool> {
+        (!matches!(self, Self::Any)).then(|| self.matches_glyph(info.glyph, i))
     }
 }
 
 /// How one pass over the buffer matches glyphs: HarfBuzz's skipping iterator.
 #[derive(Clone, Copy)]
 pub(crate) struct Matcher<'a> {
-    lookup_props: u32,
+    flags: LookupFlags,
     mask: u32,
     ignore_zwnj: bool,
     ignore_zwj: bool,
@@ -135,7 +136,7 @@ impl<'a, 'b> Apply<'a, 'b> {
             font,
             direction,
             lookup_mask: 1,
-            lookup_props: 0,
+            lookup_flags: LookupFlags::default(),
             auto_zwnj: true,
             auto_zwj: true,
             per_syllable: false,
@@ -148,8 +149,10 @@ impl<'a, 'b> Apply<'a, 'b> {
         }
     }
 
-    pub(crate) fn set_lookup_props(&mut self, props: u32) {
-        self.lookup_props = self.gdef.sanitize_lookup_props(props);
+    /// Sets the flags lookups apply with, dropping a mark filtering set GDEF
+    /// does not have, as HarfBuzz sanitises them.
+    pub(crate) fn set_lookup_flags(&mut self, flags: LookupFlags) {
+        self.lookup_flags = flags.with_mark_sets(self.gdef.mark_set_count());
     }
 
     pub(crate) fn set_lookup_mask(&mut self, mask: u32) {
@@ -158,21 +161,20 @@ impl<'a, 'b> Apply<'a, 'b> {
         self.last_base_until = 0;
     }
 
-    /// Whether lookups with `props` see `info` at all.
-    pub(crate) fn check_glyph_property(&self, info: &Info, props: u32) -> bool {
-        let glyph = u32::from(info.glyph_props);
-        if glyph & props & Lookup::IGNORE_FLAGS != 0 {
+    /// Whether lookups with `flags` see `info` at all.
+    pub(crate) fn check_glyph_property(&self, info: &Info, flags: LookupFlags) -> bool {
+        let props = info.glyph_props;
+        let class = props.class();
+        if flags.ignores(class) {
             return false;
         }
-        if glyph & u32::from(glyph_props::MARK) != 0 {
-            if props & Lookup::USE_MARK_FILTERING_SET != 0 {
-                return self
-                    .gdef
-                    .mark_set_covers((props >> 16) as usize, info.glyph);
+        if class == GlyphClass::Mark {
+            if let Some(set) = flags.mark_filtering_set() {
+                return self.gdef.mark_set_covers(set, info.glyph);
             }
-            if props & Lookup::MARK_ATTACHMENT_TYPE != 0 {
-                return props & Lookup::MARK_ATTACHMENT_TYPE
-                    == glyph & Lookup::MARK_ATTACHMENT_TYPE;
+            let attachment = flags.mark_attachment_class();
+            if attachment != 0 {
+                return attachment == props.mark_attachment_class();
             }
         }
         true
@@ -181,6 +183,16 @@ impl<'a, 'b> Apply<'a, 'b> {
     /// The matcher for the glyphs a rule reads (`context` false, under the lookup
     /// mask) or the context around them (`context` true, any mask).
     pub(crate) fn matcher(&self, context: bool, values: Values<'a>) -> Matcher<'a> {
+        self.matcher_with(self.lookup_flags, context, values)
+    }
+
+    /// [`Self::matcher`] with other lookup flags.
+    pub(crate) fn matcher_with(
+        &self,
+        flags: LookupFlags,
+        context: bool,
+        values: Values<'a>,
+    ) -> Matcher<'a> {
         let gpos = self.stage == Stage::Position;
         let syllable = self
             .buffer
@@ -188,7 +200,7 @@ impl<'a, 'b> Apply<'a, 'b> {
             .get(self.buffer.idx)
             .map_or(0, |i| i.syllable);
         Matcher {
-            lookup_props: self.lookup_props,
+            flags,
             mask: if context { u32::MAX } else { self.lookup_mask },
             ignore_zwnj: gpos || (context && self.auto_zwnj),
             ignore_zwj: context || self.auto_zwj,
@@ -200,7 +212,7 @@ impl<'a, 'b> Apply<'a, 'b> {
     }
 
     fn may_skip(&self, m: &Matcher<'_>, info: &Info) -> Skip {
-        if !self.check_glyph_property(info, m.lookup_props) {
+        if !self.check_glyph_property(info, m.flags) {
             return Skip::Yes;
         }
         if info.is_default_ignorable()
@@ -397,58 +409,49 @@ impl<'a, 'b> Apply<'a, 'b> {
         Ok(true)
     }
 
-    /// Records a substitution of the current glyph by `glyph` in its glyph props.
-    fn set_glyph_class(&mut self, glyph: u32, class_guess: u16, ligature: bool, component: bool) {
-        let has_classes = self.gdef.has_glyph_classes();
-        let new_props = self.gdef.glyph_props(glyph);
+    /// Records in its glyph props that `how` put `glyph` in place of the
+    /// current glyph: GDEF's class of `glyph`, else `class_guess`, else the
+    /// class it had.
+    fn set_glyph_class(&mut self, glyph: u32, class_guess: Option<GlyphClass>, how: Substitution) {
+        let class = if self.gdef.has_glyph_classes() {
+            Some(self.gdef.glyph_props(glyph))
+        } else {
+            class_guess.map(|class| GlyphProps::new(class, 0))
+        };
         let syllable = self.new_syllables;
         self.buffer.digest.add(glyph);
         let cur = self.buffer.cur_mut();
         if let Some(syllable) = syllable {
             cur.syllable = syllable;
         }
-        let mut props = cur.glyph_props | glyph_props::SUBSTITUTED;
-        if ligature {
-            props |= glyph_props::LIGATED;
-            props &= !glyph_props::MULTIPLIED;
-        }
-        if component {
-            props |= glyph_props::MULTIPLIED;
-        }
-        cur.glyph_props = if has_classes {
-            (props & glyph_props::PRESERVE) | new_props
-        } else if class_guess != 0 {
-            (props & glyph_props::PRESERVE) | class_guess
-        } else {
-            props
-        };
+        cur.glyph_props = cur.glyph_props.substituted_by(how, class);
     }
 
     pub(crate) fn replace_glyph(&mut self, glyph: u32) -> Result<()> {
-        self.set_glyph_class(glyph, 0, false, false);
+        self.set_glyph_class(glyph, None, Substitution::Single);
         self.buffer.replace_glyph(glyph)
     }
 
     pub(crate) fn replace_glyph_inplace(&mut self, glyph: u32) {
-        self.set_glyph_class(glyph, 0, false, false);
+        self.set_glyph_class(glyph, None, Substitution::Single);
         self.buffer.cur_mut().glyph = glyph;
     }
 
     pub(crate) fn replace_glyph_with_ligature(
         &mut self,
         glyph: u32,
-        class_guess: u16,
+        class_guess: Option<GlyphClass>,
     ) -> Result<()> {
-        self.set_glyph_class(glyph, class_guess, true, false);
+        self.set_glyph_class(glyph, class_guess, Substitution::Ligature);
         self.buffer.replace_glyph(glyph)
     }
 
     pub(crate) fn output_glyph_for_component(
         &mut self,
         glyph: u32,
-        class_guess: u16,
+        class_guess: Option<GlyphClass>,
     ) -> Result<()> {
-        self.set_glyph_class(glyph, class_guess, false, true);
+        self.set_glyph_class(glyph, class_guess, Substitution::Component);
         self.buffer.output_glyph(glyph)
     }
 
@@ -470,11 +473,7 @@ impl<'a, 'b> Apply<'a, 'b> {
         let is_base_ligature = first.is_base_glyph() && rest_are_marks;
         let is_mark_ligature = first.is_mark() && rest_are_marks;
         let is_ligature = !is_base_ligature && !is_mark_ligature;
-        let class_guess = if is_ligature {
-            glyph_props::LIGATURE
-        } else {
-            0
-        };
+        let class_guess = is_ligature.then_some(GlyphClass::Ligature);
         let lig_id = if is_ligature {
             buffer.allocate_lig_id()
         } else {
@@ -615,24 +614,24 @@ impl<'a, 'b> Apply<'a, 'b> {
         let Some(lookup) = self.table.lookup(index) else {
             return Ok(false);
         };
-        let saved = self.lookup_props;
+        let saved = self.lookup_flags;
         // The nested lookup's matches must not overwrite the positions of the
         // rule that applies it.
         let positions = self.positions;
-        self.set_lookup_props(lookup.props);
+        self.set_lookup_flags(lookup.flags);
         let applied = self.apply_subtables(&lookup);
-        self.lookup_props = saved;
+        self.lookup_flags = saved;
         self.positions = positions;
         applied
     }
 
     /// Applies the first subtable of `lookup` that applies to the current glyph.
     pub(crate) fn apply_subtables(&mut self, lookup: &Lookup<'a>) -> Result<bool> {
-        for data in lookup.subtables() {
+        for (kind, data) in lookup.subtables() {
             self.buffer.charge(1)?;
             let applied = match self.stage {
-                Stage::Substitute => super::gsub::apply(self, lookup.kind, data)?,
-                Stage::Position => super::gpos::apply(self, lookup.kind, data)?,
+                Stage::Substitute => super::gsub::apply(self, kind, data)?,
+                Stage::Position => super::gpos::apply(self, kind, data)?,
             };
             if applied {
                 return Ok(true);

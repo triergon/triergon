@@ -4,17 +4,34 @@ use std::fmt;
 use triergon_core::{Error, Result};
 
 /// A four-byte OpenType tag, such as a feature (`liga`), script (`latn`) or
-/// language system (`ENG `) tag.
+/// language system (`ENG `) tag. Tags order as their big-endian numbers do.
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Default)]
-pub struct Tag(pub u32);
+pub struct Tag(u32);
 
 impl Tag {
+    /// The tag spelt by `bytes`.
+    #[must_use]
     pub const fn new(bytes: &[u8; 4]) -> Self {
         Self(u32::from_be_bytes(*bytes))
     }
 
+    /// The tag whose big-endian number is `value`, as OpenType stores tags and
+    /// HarfBuzz's `hb_tag_t` holds them.
+    #[must_use]
+    pub const fn from_u32(value: u32) -> Self {
+        Self(value)
+    }
+
+    /// The tag's four bytes.
+    #[must_use]
     pub const fn to_bytes(self) -> [u8; 4] {
         self.0.to_be_bytes()
+    }
+
+    /// The tag as a big-endian number.
+    #[must_use]
+    pub const fn to_u32(self) -> u32 {
+        self.0
     }
 }
 
@@ -26,7 +43,7 @@ impl fmt::Debug for Tag {
 
 /// An ISO 15924 script code, such as `Latn` or `Arab`, as HarfBuzz names scripts.
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub struct Script(pub [u8; 4]);
+pub struct Script([u8; 4]);
 
 impl Script {
     /// `Zyyy`: characters shared by several scripts.
@@ -35,6 +52,18 @@ impl Script {
     pub const INHERITED: Self = Self(*b"Zinh");
     /// `Zzzz`: unassigned code points.
     pub const UNKNOWN: Self = Self(*b"Zzzz");
+
+    /// The script whose canonical ISO 15924 code is `code`, unchecked: for
+    /// codes already in the canonical form, such as the generated tables'.
+    pub(crate) const fn from_code(code: [u8; 4]) -> Self {
+        Self(code)
+    }
+
+    /// The four letters of the script's ISO 15924 code, such as `*b"Arab"`.
+    #[must_use]
+    pub const fn to_bytes(self) -> [u8; 4] {
+        self.0
+    }
 
     /// The script an ISO 15924 code names, canonicalised as
     /// `hb_script_from_iso15924_tag` does: case is normalised, a few variant codes
@@ -82,7 +111,7 @@ impl Script {
     /// `hb_ot_tags_from_script_and_language` lists them: the third and second
     /// Indic tag versions first, then the original tag.
     pub(crate) fn ot_tags(self) -> ([Tag; 3], usize) {
-        let mut tags = [Tag(0); 3];
+        let mut tags = [Tag::default(); 3];
         let mut count = 0;
         let new = match &self.0 {
             b"Beng" => Some(*b"bng2"),

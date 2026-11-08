@@ -568,7 +568,7 @@ mod tests {
         let mut buffer = text_buffer(&budget, &text);
         let mut scratch = buffer.scratch;
         crate::props::set_all(buffer.infos_mut(), &mut scratch, 0);
-        insert_vowel_constraint_circles(Script(*b"Deva"), &mut buffer).unwrap();
+        insert_vowel_constraint_circles(Script::from_code(*b"Deva"), &mut buffer).unwrap();
         let glyphs: Vec<u32> = contents(&buffer).into_iter().map(|(g, _)| g).collect();
         assert_eq!(
             glyphs,

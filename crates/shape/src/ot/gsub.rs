@@ -1,37 +1,25 @@
 //! Glyph substitution subtables.
 
 use super::apply::{Apply, Values};
-use super::context::{apply_chain_context, apply_context};
+use super::context;
 use super::data::Data;
-use super::layout::coverage;
-use crate::buffer::{LigProps, glyph_props};
+use super::layout::{LookupType, coverage};
+use crate::buffer::{GlyphClass, LigProps};
 use triergon_core::Result;
-
-const SINGLE: u16 = 1;
-const MULTIPLE: u16 = 2;
-const ALTERNATE: u16 = 3;
-const LIGATURE: u16 = 4;
-const CONTEXT: u16 = 5;
-const CHAIN_CONTEXT: u16 = 6;
-const EXTENSION: u16 = 7;
-pub(crate) const REVERSE_CHAIN: u16 = 8;
 
 /// The largest value of a feature with several values (`rand` uses it).
 pub(crate) const MAX_VALUE: u32 = 255;
 
-/// Applies one subtable of lookup type `kind` at the current glyph.
-pub(crate) fn apply<'a>(ctx: &mut Apply<'a, '_>, kind: u16, data: Data<'a>) -> Result<bool> {
+/// Applies one subtable of type `kind` at the current glyph.
+pub(crate) fn apply<'a>(ctx: &mut Apply<'a, '_>, kind: LookupType, data: Data<'a>) -> Result<bool> {
     match kind {
-        SINGLE => single(ctx, data),
-        MULTIPLE => multiple(ctx, data),
-        ALTERNATE => alternate(ctx, data),
-        LIGATURE => ligature(ctx, data),
-        CONTEXT => apply_context(ctx, data),
-        CHAIN_CONTEXT => apply_chain_context(ctx, data),
-        EXTENSION if data.u16(0) == 1 && data.u16(2) != EXTENSION => {
-            apply(ctx, data.u16(2), data.offset32(4))
-        }
-        REVERSE_CHAIN => reverse_chain(ctx, data),
+        LookupType::Single => single(ctx, data),
+        LookupType::Multiple => multiple(ctx, data),
+        LookupType::Alternate => alternate(ctx, data),
+        LookupType::Ligature => ligature(ctx, data),
+        LookupType::Context => context::apply(ctx, data, false),
+        LookupType::ChainContext => context::apply(ctx, data, true),
+        LookupType::ReverseChain => reverse_chain(ctx, data),
         _ => Ok(false),
     }
 }
@@ -74,11 +62,7 @@ fn multiple(ctx: &mut Apply<'_, '_>, data: Data<'_>) -> Result<bool> {
         1 => ctx.replace_glyph(u32::from(sequence.u16(2)))?,
         _ => {
             ctx.buffer.charge(count)?;
-            let class_guess = if ctx.buffer.cur().is_ligature() {
-                glyph_props::BASE_GLYPH
-            } else {
-                0
-            };
+            let class_guess = ctx.buffer.cur().is_ligature().then_some(GlyphClass::Base);
             // A glyph that is part of a ligature keeps its ligature identity.
             let attached = ctx.buffer.cur().lig.id() != 0;
             for i in 0..count {
@@ -127,7 +111,7 @@ fn ligature<'a>(ctx: &mut Apply<'a, '_>, data: Data<'a>) -> Result<bool> {
         ctx.buffer.charge(1)?;
         let ligature = set.offset16(2 + 2 * l);
         let glyph = u32::from(ligature.u16(0));
-        let count = usize::from(ligature.u16(2));
+        let count = ligature.headless_count(2, 4, 2);
         if count == 0 {
             continue;
         }
@@ -152,9 +136,9 @@ fn reverse_chain<'a>(ctx: &mut Apply<'a, '_>, data: Data<'a>) -> Result<bool> {
     let Some(index) = covered(ctx, data) else {
         return Ok(false);
     };
-    let backtracks = usize::from(data.u16(4));
+    let backtracks = data.count(4, 6, 2);
     let lookahead_at = 6 + 2 * backtracks;
-    let lookaheads = usize::from(data.u16(lookahead_at));
+    let lookaheads = data.count(lookahead_at, lookahead_at + 2, 2);
     let substitutes_at = lookahead_at + 2 + 2 * lookaheads;
     if index >= data.count(substitutes_at, substitutes_at + 2, 2) {
         return Ok(false);

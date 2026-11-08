@@ -359,7 +359,7 @@ pub fn shape_latin_within(
     let plan = Plan::new(
         &face,
         Direction::LeftToRight,
-        Script(*b"Latn"),
+        Script::from_iso15924(*b"Latn"),
         &language,
         &[],
         &budget,
@@ -404,7 +404,7 @@ pub fn exercise(data: &[u8]) -> usize {
         let Ok(plan) = Plan::new(
             &face,
             direction,
-            Script(*script),
+            Script::from_iso15924(*script),
             &language,
             &features,
             &budget,

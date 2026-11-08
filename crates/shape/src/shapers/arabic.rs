@@ -1,10 +1,11 @@
 //! Arabic and Syriac: joining forms, `stch` stretching and the order of modifier
 //! combining marks.
 
+use super::Pause;
 use crate::buffer::{Buffer, Info};
 use crate::face::Face;
 use crate::metrics::Scaled;
-use crate::plan::{Builder, FeatureFlags, Pause, Plan};
+use crate::plan::{Builder, FeatureFlags, Plan};
 use crate::unicode::{ArabicJoining, arabic_joining};
 use triergon_core::{Error, Result};
 
@@ -59,16 +60,22 @@ impl Action {
     }
 }
 
-const RECORD_STCH: u8 = 0;
-const FALLBACK: u8 = 1;
-
 fn is_syriac(tag: &[u8; 4]) -> bool {
     matches!(tag[3], b'2' | b'3')
 }
 
+/// The steps this shaper takes between lookup stages.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum Step {
+    /// Records the glyphs `stch` substituted, for stretching.
+    RecordStretching,
+    /// Applies the fallback shaping from presentation forms.
+    Fallback,
+}
+
 pub(super) fn collect_features(b: &mut Builder<'_>, script_is_arabic: bool) {
     b.enable_feature(b"stch");
-    b.add_gsub_pause(Some(Pause::Shaper(RECORD_STCH)));
+    b.add_gsub_pause(Some(Pause::Arabic(Step::RecordStretching)));
     let manual_zwj = FeatureFlags {
         manual_zwj: true,
         ..FeatureFlags::GLOBAL
@@ -95,7 +102,7 @@ pub(super) fn collect_features(b: &mut Builder<'_>, script_is_arabic: bool) {
         1,
     );
     if script_is_arabic {
-        b.add_gsub_pause(Some(Pause::Shaper(FALLBACK)));
+        b.add_gsub_pause(Some(Pause::Arabic(Step::Fallback)));
     }
     b.add_feature(b"calt", manual_zwj, 1);
     if !b.has_feature(b"rclt") {
@@ -246,21 +253,21 @@ pub(super) fn copy_to_mongolian_variation_selectors(plan: &Plan, buffer: &mut Bu
 /// Whether the plan must synthesise the joining forms: Arabic in a font whose
 /// language system lacks all of the non-Syriac form features.
 fn needs_fallback(plan: &Plan) -> bool {
-    &plan.script.0 == b"Arab"
+    &plan.script.to_bytes() == b"Arab"
         && FEATURES
             .iter()
             .all(|tag| is_syriac(tag) || plan.needs_fallback(tag))
 }
 
 pub(super) fn pause(
-    step: u8,
+    step: Step,
     plan: &Plan,
     face: &Face<'_>,
     buffer: &mut Buffer,
     font: &Scaled<'_>,
 ) -> Result<bool> {
     match step {
-        RECORD_STCH => {
+        Step::RecordStretching => {
             if plan.one_mask(b"stch") != 0 {
                 let mut stretched = false;
                 for info in buffer.infos_mut() {
@@ -278,11 +285,11 @@ pub(super) fn pause(
             }
             Ok(false)
         }
-        _ if needs_fallback(plan) => {
+        Step::Fallback if needs_fallback(plan) => {
             super::arabic_fallback::shape(plan, face, buffer, font)?;
             Ok(true)
         }
-        _ => Ok(false),
+        Step::Fallback => Ok(false),
     }
 }
 

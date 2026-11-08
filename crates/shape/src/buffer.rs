@@ -100,31 +100,122 @@ impl UnicodeProps {
     }
 }
 
-/// Glyph classes and substitution history (HarfBuzz's glyph props).
-pub(crate) mod glyph_props {
-    pub(crate) const BASE_GLYPH: u16 = 0x02;
-    pub(crate) const LIGATURE: u16 = 0x04;
-    pub(crate) const MARK: u16 = 0x08;
-    pub(crate) const SUBSTITUTED: u16 = 0x10;
-    pub(crate) const LIGATED: u16 = 0x20;
-    pub(crate) const MULTIPLIED: u16 = 0x40;
-    pub(crate) const PRESERVE: u16 = SUBSTITUTED | LIGATED | MULTIPLIED;
+/// A glyph's class, from GDEF or guessed when the font has no classes. Each
+/// class's discriminant is the lookup flag bit that skips it.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+#[repr(u8)]
+pub(crate) enum GlyphClass {
+    /// No class, or GDEF's component class, which no lookup flag skips.
+    #[default]
+    Unclassified = 0,
+    Base = 0x02,
+    Ligature = 0x04,
+    Mark = 0x08,
+}
+
+/// How a substitution produced a glyph.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum Substitution {
+    /// One glyph for another.
+    Single,
+    /// A ligature of several glyphs.
+    Ligature,
+    /// One of the glyphs a multiple substitution produced.
+    Component,
+}
+
+/// A glyph's class, a mark's attachment class and what substitutions made the
+/// glyph: HarfBuzz's glyph props, kept in its two bytes.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub(crate) struct GlyphProps(u16);
+
+impl GlyphProps {
+    const CLASS: u16 = 0x0e;
+    const SUBSTITUTED: u16 = 0x10;
+    const LIGATED: u16 = 0x20;
+    const MULTIPLIED: u16 = 0x40;
+    const HISTORY: u16 = Self::SUBSTITUTED | Self::LIGATED | Self::MULTIPLIED;
+
+    /// A glyph of `class` that no substitution has touched; marks carry their
+    /// attachment class.
+    pub(crate) const fn new(class: GlyphClass, mark_attachment_class: u8) -> Self {
+        let attachment = match class {
+            GlyphClass::Mark => (mark_attachment_class as u16) << 8,
+            _ => 0,
+        };
+        Self(class as u16 | attachment)
+    }
+
+    pub(crate) const fn class(self) -> GlyphClass {
+        match self.0 & Self::CLASS {
+            0x02 => GlyphClass::Base,
+            0x04 => GlyphClass::Ligature,
+            0x08 => GlyphClass::Mark,
+            _ => GlyphClass::Unclassified,
+        }
+    }
+
+    /// A mark's attachment class (GDEF's MarkAttachClassDef), zero otherwise.
+    pub(crate) const fn mark_attachment_class(self) -> u8 {
+        (self.0 >> 8) as u8
+    }
+
+    pub(crate) const fn substituted(self) -> bool {
+        self.0 & Self::SUBSTITUTED != 0
+    }
+
+    pub(crate) const fn ligated(self) -> bool {
+        self.0 & Self::LIGATED != 0
+    }
+
+    pub(crate) const fn multiplied(self) -> bool {
+        self.0 & Self::MULTIPLIED != 0
+    }
+
+    /// The props of what `how` makes of this glyph: its history extended,
+    /// with the class of `class` if given and its own otherwise.
+    #[must_use]
+    pub(crate) const fn substituted_by(self, how: Substitution, class: Option<Self>) -> Self {
+        let mut history = self.0 | Self::SUBSTITUTED;
+        match how {
+            Substitution::Single => {}
+            Substitution::Ligature => history = (history | Self::LIGATED) & !Self::MULTIPLIED,
+            Substitution::Component => history |= Self::MULTIPLIED,
+        }
+        match class {
+            Some(class) => Self((history & Self::HISTORY) | class.0),
+            None => Self(history),
+        }
+    }
+
+    /// The props without the record of any substitution.
+    #[must_use]
+    pub(crate) const fn without_substitution(self) -> Self {
+        Self(self.0 & !Self::SUBSTITUTED)
+    }
+
+    /// The props without the record of ligation and multiplication.
+    #[must_use]
+    pub(crate) const fn without_ligation(self) -> Self {
+        Self(self.0 & !(Self::LIGATED | Self::MULTIPLIED))
+    }
 }
 
 /// Ligature identity of a glyph: a ligature's id and component count, or for a
 /// mark or component the ligature id and which component it belongs to.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
-pub(crate) struct LigProps(pub(crate) u8);
+pub(crate) struct LigProps(u8);
 
 impl LigProps {
     const IS_BASE: u8 = 0x10;
+    const COUNT: u8 = 0x0f;
 
     pub(crate) const fn ligature(id: u8, components: u8) -> Self {
-        Self((id << 5) | Self::IS_BASE | (components & 0x0f))
+        Self((id << 5) | Self::IS_BASE | (components & Self::COUNT))
     }
 
     pub(crate) const fn mark(id: u8, component: u8) -> Self {
-        Self((id << 5) | (component & 0x0f))
+        Self((id << 5) | (component & Self::COUNT))
     }
 
     pub(crate) const fn id(self) -> u8 {
@@ -140,7 +231,16 @@ impl LigProps {
         if self.is_ligature_base() {
             0
         } else {
-            self.0 & 0x0f
+            self.0 & Self::COUNT
+        }
+    }
+
+    /// A ligature's component count, if this is a ligature's identity.
+    const fn components(self) -> Option<u8> {
+        if self.is_ligature_base() {
+            Some(self.0 & Self::COUNT)
+        } else {
+            None
         }
     }
 }
@@ -153,7 +253,7 @@ pub(crate) struct Info {
     pub(crate) cluster: u32,
     pub(crate) mask: u32,
     pub(crate) unicode: UnicodeProps,
-    pub(crate) glyph_props: u16,
+    pub(crate) glyph_props: GlyphProps,
     pub(crate) lig: LigProps,
     pub(crate) syllable: u8,
     /// The nominal glyph the normaliser found for the character.
@@ -211,35 +311,34 @@ impl Info {
     }
 
     pub(crate) const fn is_base_glyph(&self) -> bool {
-        self.glyph_props & glyph_props::BASE_GLYPH != 0
+        matches!(self.glyph_props.class(), GlyphClass::Base)
     }
 
     pub(crate) const fn is_ligature(&self) -> bool {
-        self.glyph_props & glyph_props::LIGATURE != 0
+        matches!(self.glyph_props.class(), GlyphClass::Ligature)
     }
 
     pub(crate) const fn is_mark(&self) -> bool {
-        self.glyph_props & glyph_props::MARK != 0
+        matches!(self.glyph_props.class(), GlyphClass::Mark)
     }
 
     pub(crate) const fn substituted(&self) -> bool {
-        self.glyph_props & glyph_props::SUBSTITUTED != 0
+        self.glyph_props.substituted()
     }
 
     pub(crate) const fn ligated(&self) -> bool {
-        self.glyph_props & glyph_props::LIGATED != 0
+        self.glyph_props.ligated()
     }
 
     pub(crate) const fn multiplied(&self) -> bool {
-        self.glyph_props & glyph_props::MULTIPLIED != 0
+        self.glyph_props.multiplied()
     }
 
     /// The component count of a ligature glyph, one for anything else.
     pub(crate) const fn lig_components(&self) -> u8 {
-        if self.is_ligature() && self.lig.is_ligature_base() {
-            self.lig.0 & 0x0f
-        } else {
-            1
+        match self.lig.components() {
+            Some(components) if self.is_ligature() => components,
+            _ => 1,
         }
     }
 
@@ -311,6 +410,8 @@ pub struct Buffer {
     limits: Limits,
     /// The work left before the current call stops with a policy error.
     work: WorkBudget,
+    /// The most glyphs the current call may hold.
+    max_glyphs: usize,
     /// At least the glyphs in the buffer, for skipping lookups that cannot apply.
     pub(crate) digest: Digest,
 }
@@ -336,6 +437,7 @@ impl Buffer {
             random_state: 1,
             limits,
             work: WorkBudget::new(0),
+            max_glyphs: 0,
             digest: Digest::EMPTY,
         }
     }
@@ -387,6 +489,7 @@ impl Buffer {
         self.serial = 0;
         self.random_state = 1;
         self.work = self.limits.budget(chars.len());
+        self.max_glyphs = self.limits.max_glyphs(chars.len());
         self.context = [Context::default(); 2];
         for &c in text[..item.start].iter().rev().take(Context::LENGTH) {
             self.context[0].push(u32::from(c));
@@ -421,12 +524,22 @@ impl Buffer {
         work::charge(&mut self.work, units)
     }
 
+    /// The work left of the current call, for steps that charge it themselves.
+    pub(crate) fn work(&mut self) -> &mut WorkBudget {
+        &mut self.work
+    }
+
     pub(crate) fn infos(&self) -> &[Info] {
         self.info.as_slice()
     }
 
     pub(crate) fn infos_mut(&mut self) -> &mut [Info] {
         self.info.as_mut_slice()
+    }
+
+    /// The glyphs and the work left, for a step that charges as it edits.
+    pub(crate) fn infos_and_work(&mut self) -> (&mut [Info], &mut WorkBudget) {
+        (self.info.as_mut_slice(), &mut self.work)
     }
 
     pub(crate) fn cur(&self) -> &Info {
@@ -506,6 +619,14 @@ impl Buffer {
         self.out.clear();
     }
 
+    /// Whether the buffer may hold `len` glyphs under its [`Limits`].
+    fn check_glyphs(&self, len: usize) -> Result<()> {
+        if len > self.max_glyphs {
+            return Err(Error::Policy("glyphs in the buffer"));
+        }
+        Ok(())
+    }
+
     /// Prepares positions for every glyph, all zero.
     pub(crate) fn clear_positions(&mut self) -> Result<()> {
         self.have_output = false;
@@ -536,6 +657,7 @@ impl Buffer {
     /// Makes room to write `num_out` glyphs in place of `num_in`, leaving the
     /// in-place output once it would overtake the input.
     fn make_room_for(&mut self, num_in: usize, num_out: usize) -> Result<()> {
+        self.check_glyphs(self.out_len + num_out)?;
         if !self.separate && self.out_len + num_out > self.idx + num_in {
             self.out.clear();
             reserve(&mut self.out, self.out_len + num_out)?;
@@ -663,6 +785,7 @@ impl Buffer {
     /// Opens a gap of `count` glyphs before the input (only with separate output).
     fn shift_forward(&mut self, count: usize) -> Result<()> {
         let len = self.len();
+        self.check_glyphs(len + count)?;
         reserve(&mut self.info, len + count)?;
         self.info.try_resize(len + count, Info::default())?;
         self.info

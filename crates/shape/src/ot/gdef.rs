@@ -3,7 +3,7 @@
 
 use super::data::Data;
 use super::layout::{class, coverage};
-use crate::buffer::glyph_props;
+use crate::buffer::{GlyphClass, GlyphProps};
 
 #[derive(Clone, Copy, Debug, Default)]
 pub(crate) struct Gdef<'a> {
@@ -42,18 +42,20 @@ impl<'a> Gdef<'a> {
         !self.classes.is_empty()
     }
 
-    /// HarfBuzz's glyph props for `glyph`: its class bit, and a mark's attachment
-    /// class in the high byte.
-    pub(crate) fn glyph_props(&self, glyph: u32) -> u16 {
+    /// HarfBuzz's glyph props for `glyph`: its class, and a mark's attachment
+    /// class.
+    pub(crate) fn glyph_props(&self, glyph: u32) -> GlyphProps {
         match class(self.classes, glyph) {
-            1 => glyph_props::BASE_GLYPH,
-            2 => glyph_props::LIGATURE,
-            3 => glyph_props::MARK | (class(self.mark_classes, glyph) << 8),
-            _ => 0,
+            1 => GlyphProps::new(GlyphClass::Base, 0),
+            2 => GlyphProps::new(GlyphClass::Ligature, 0),
+            // The attachment class is kept in a byte, as in HarfBuzz.
+            3 => GlyphProps::new(GlyphClass::Mark, class(self.mark_classes, glyph) as u8),
+            _ => GlyphProps::default(),
         }
     }
 
-    fn mark_set_count(&self) -> usize {
+    /// The number of mark glyph sets.
+    pub(crate) fn mark_set_count(&self) -> usize {
         if self.mark_sets.u16(0) == 1 {
             self.mark_sets.count(2, 4, 4)
         } else {
@@ -62,22 +64,10 @@ impl<'a> Gdef<'a> {
     }
 
     /// Whether mark glyph set `set` holds `glyph`.
-    pub(crate) fn mark_set_covers(&self, set: usize, glyph: u32) -> bool {
+    pub(crate) fn mark_set_covers(&self, set: u16, glyph: u32) -> bool {
+        let set = usize::from(set);
         set < self.mark_set_count()
             && coverage(self.mark_sets.offset32(4 + 4 * set), glyph).is_some()
-    }
-
-    /// Lookup props with an out-of-range mark filtering set dropped, as HarfBuzz
-    /// sanitises them.
-    pub(crate) fn sanitize_lookup_props(&self, props: u32) -> u32 {
-        use super::layout::Lookup;
-        if props & Lookup::USE_MARK_FILTERING_SET != 0
-            && (props >> 16) as usize >= self.mark_set_count()
-        {
-            props & !Lookup::USE_MARK_FILTERING_SET
-        } else {
-            props
-        }
     }
 }
 

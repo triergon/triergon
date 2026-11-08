@@ -36,7 +36,7 @@ pub(super) fn preprocess_text(plan: &Plan, buffer: &mut Buffer, font: &Scaled<'_
     decompose_sara_am(buffer)?;
     let (tags, count) = plan.script.ot_tags();
     let has_thai_gsub = plan.chosen_script[0].is_some_and(|tag| tags[..count].contains(&tag));
-    if &plan.script.0 == b"Thai" && !has_thai_gsub {
+    if &plan.script.to_bytes() == b"Thai" && !has_thai_gsub {
         pua_shape(buffer, font);
     }
     Ok(())

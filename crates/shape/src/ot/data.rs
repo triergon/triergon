@@ -66,11 +66,28 @@ impl Data<'_> {
     }
 
     /// The number of `size`-byte records a count at `at` declares, cut to the
-    /// records that start at `first` and fit in the data.
+    /// records that start at `first` and fit in the data. Records of no bytes
+    /// always fit.
     pub(crate) fn count(self, at: usize, first: usize, size: usize) -> usize {
         let declared = usize::from(self.u16(at));
-        let room = self.0.len().saturating_sub(first) / size.max(1);
-        declared.min(room)
+        self.room(first, size)
+            .map_or(declared, |room| declared.min(room))
+    }
+
+    /// [`Self::count`] for a count that includes a first record held elsewhere
+    /// (the first glyph of a ligature or an input sequence), so that only the
+    /// records after it are stored from `first`.
+    pub(crate) fn headless_count(self, at: usize, first: usize, size: usize) -> usize {
+        let declared = usize::from(self.u16(at));
+        match self.room(first, size) {
+            Some(room) if declared > 0 => declared.min(room + 1),
+            _ => declared,
+        }
+    }
+
+    /// How many `size`-byte records fit from `first` on; `None` for empty records.
+    fn room(self, first: usize, size: usize) -> Option<usize> {
+        self.0.len().saturating_sub(first).checked_div(size)
     }
 }
 
@@ -108,6 +125,9 @@ mod tests {
         assert!(d.at(9).is_empty());
         assert!(d.offset16(0).is_empty());
         assert_eq!(Data(&[0, 9, 1, 2]).count(0, 2, 2), 1);
+        assert_eq!(Data(&[0, 9]).count(0, 2, 0), 9, "empty records always fit");
+        assert_eq!(Data(&[0, 9, 1, 2]).headless_count(0, 2, 2), 2);
+        assert_eq!(Data(&[0, 0, 1, 2]).headless_count(0, 2, 2), 0);
     }
 
     #[test]

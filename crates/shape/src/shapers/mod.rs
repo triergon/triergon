@@ -18,7 +18,7 @@ use crate::buffer::Buffer;
 use crate::face::Face;
 use crate::metrics::Scaled;
 use crate::normalize::Mode;
-use crate::plan::{Builder, Pause, Plan};
+use crate::plan::{Builder, Plan};
 use crate::tag::{Direction, Script, Tag};
 use triergon_core::Result;
 
@@ -40,6 +40,16 @@ pub(crate) enum Shaper {
     Zawgyi,
 }
 
+/// Work a shaper does between two lookup stages: one of its steps.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum Pause {
+    Arabic(arabic::Step),
+    Indic(indic::Step),
+    Universal(universal::Step),
+    Khmer(khmer::Step),
+    Myanmar(myanmar::Step),
+}
+
 /// When mark advances are zeroed, by their GDEF class.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) enum ZeroMarks {
@@ -54,9 +64,9 @@ impl Shaper {
     pub(crate) fn categorize(script: Script, direction: Direction, gsub: Option<Tag>) -> Self {
         let dflt = gsub == Some(Tag::new(b"DFLT"));
         let latn = gsub == Some(Tag::new(b"latn"));
-        match &script.0 {
+        match &script.to_bytes() {
             b"Arab" | b"Syrc" => {
-                if (!dflt || &script.0 == b"Arab")
+                if (!dflt || &script.to_bytes() == b"Arab")
                     && matches!(direction, Direction::LeftToRight | Direction::RightToLeft)
                 {
                     Self::Arabic
@@ -73,7 +83,7 @@ impl Shaper {
             | b"Telu" => {
                 if dflt || latn {
                     Self::Default
-                } else if gsub.is_some_and(|tag| tag.0 & 0xFF == u32::from(b'3')) {
+                } else if gsub.is_some_and(|tag| tag.to_u32() & 0xFF == u32::from(b'3')) {
                     // Fonts for the `dev3` generation of tags use the USE.
                     Self::Universal
                 } else {
@@ -101,7 +111,7 @@ impl Shaper {
 
     pub(crate) fn collect_features(self, builder: &mut Builder<'_>, script: Script) {
         match self {
-            Self::Arabic => arabic::collect_features(builder, &script.0 == b"Arab"),
+            Self::Arabic => arabic::collect_features(builder, &script.to_bytes() == b"Arab"),
             Self::Hangul => hangul::collect_features(builder),
             Self::Indic => indic::collect_features(builder),
             Self::Universal => universal::collect_features(builder),
@@ -207,7 +217,6 @@ impl Shaper {
 
     /// Runs a pause the shaper added; whether it changed glyphs.
     pub(crate) fn pause(
-        self,
         pause: Pause,
         plan: &Plan,
         face: &Face<'_>,
@@ -215,14 +224,11 @@ impl Shaper {
         font: &Scaled<'_>,
     ) -> Result<bool> {
         match pause {
-            Pause::Shaper(step) => match self {
-                Self::Arabic => arabic::pause(step, plan, face, buffer, font),
-                Self::Indic => indic::pause(step, plan, face, buffer, font),
-                Self::Universal => universal::pause(step, plan, buffer, font),
-                Self::Khmer => khmer::pause(step, plan, buffer, font),
-                Self::Myanmar => myanmar::pause(step, buffer, font),
-                _ => Ok(false),
-            },
+            Pause::Arabic(step) => arabic::pause(step, plan, face, buffer, font),
+            Pause::Indic(step) => indic::pause(step, plan, face, buffer, font),
+            Pause::Universal(step) => universal::pause(step, plan, buffer, font),
+            Pause::Khmer(step) => khmer::pause(step, plan, buffer, font),
+            Pause::Myanmar(step) => myanmar::pause(step, buffer, font),
         }
     }
 

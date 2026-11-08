@@ -1,26 +1,32 @@
 //! Khmer: syllables, the coeng Ro and pre-base vowels moved before the base,
 //! and the split vowels Unicode does not decompose.
 
+use super::Pause;
 use super::syllabic::{self, ANY, DottedCircle, Machine, for_each_syllable, syllable_type};
 use crate::buffer::{Buffer, Info};
 use crate::metrics::Scaled;
-use crate::plan::{Builder, FeatureFlags, Pause, Plan};
+use crate::plan::{Builder, FeatureFlags, Plan};
 use crate::unicode::{self, IndicCategory as Cat, IndicPosition as Pos};
 use std::ops::Range;
 use triergon_core::Result;
-
-// The steps between lookup stages.
-const SETUP_SYLLABLES: u8 = 0;
-const REORDER: u8 = 1;
 
 /// The basic features, applied together within syllables after reordering.
 const BASIC_FEATURES: [&[u8; 4]; 5] = [b"pref", b"blwf", b"abvf", b"pstf", b"cfar"];
 /// The presentation features, applied together after syllables are done.
 const OTHER_FEATURES: [&[u8; 4]; 4] = [b"pres", b"abvs", b"blws", b"psts"];
 
+/// The steps this shaper takes between lookup stages.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum Step {
+    /// Finds the syllables.
+    SetupSyllables,
+    /// Puts each syllable in visual order and gives it the basic feature masks.
+    Reorder,
+}
+
 pub(super) fn collect_features(b: &mut Builder<'_>) {
-    b.add_gsub_pause(Some(Pause::Shaper(SETUP_SYLLABLES)));
-    b.add_gsub_pause(Some(Pause::Shaper(REORDER)));
+    b.add_gsub_pause(Some(Pause::Khmer(Step::SetupSyllables)));
+    b.add_gsub_pause(Some(Pause::Khmer(Step::Reorder)));
     // Uniscribe applies the basic features without pauses between them.
     let per_syllable = FeatureFlags {
         per_syllable: true,
@@ -107,10 +113,15 @@ fn category(info: &Info) -> Cat {
     Cat::from_index(info.shaper[0])
 }
 
-pub(super) fn pause(step: u8, plan: &Plan, buffer: &mut Buffer, font: &Scaled<'_>) -> Result<bool> {
+pub(super) fn pause(
+    step: Step,
+    plan: &Plan,
+    buffer: &mut Buffer,
+    font: &Scaled<'_>,
+) -> Result<bool> {
     match step {
-        SETUP_SYLLABLES => syllabic::find_syllables(&MACHINE, buffer, |_, _| false)?,
-        REORDER => {
+        Step::SetupSyllables => syllabic::find_syllables(&MACHINE, buffer, |_, _| false)?,
+        Step::Reorder => {
             let circle = DottedCircle {
                 broken: Syllable::Broken as u8,
                 shaper: [Cat::DottedCircle as u8, Pos::Start as u8],
@@ -126,7 +137,6 @@ pub(super) fn pause(step: u8, plan: &Plan, buffer: &mut Buffer, font: &Scaled<'_
                 reorder_syllable(&masks, buffer, range)
             })?;
         }
-        _ => {}
     }
     Ok(false)
 }

@@ -2,7 +2,7 @@
 
 use crate::ot::gdef::Gdef;
 use crate::ot::kern::Kern;
-use crate::ot::layout::LayoutTable;
+use crate::ot::layout::{LayoutTable, Stage};
 use triergon_font::Font;
 
 /// The layout tables of one face, read from its bytes without copying.
@@ -23,8 +23,8 @@ impl<'a> Face<'a> {
         Self {
             font,
             gdef: Gdef::new(font.table(*b"GDEF"), len(gsub), len(gpos)),
-            gsub: gsub.map(LayoutTable::new).unwrap_or_default(),
-            gpos: gpos.map(LayoutTable::new).unwrap_or_default(),
+            gsub: LayoutTable::new(Stage::Substitute, gsub),
+            gpos: LayoutTable::new(Stage::Position, gpos),
             kern: Kern::new(font.table(*b"kern")),
         }
     }

@@ -2,40 +2,27 @@
 //! and resolve attachments.
 
 use super::apply::{Apply, Values};
-use super::context::{apply_chain_context, apply_context};
-use super::data::Data;
-use super::layout::{Lookup, coverage};
-use crate::buffer::{Attachment, Buffer, Position};
+use super::context;
+use super::data::{Data, bsearch};
+use super::layout::{LookupFlags, LookupType, class, coverage};
+use crate::buffer::{Attachment, Buffer, Info, Pos, Position};
 use crate::metrics::Scaled;
 use crate::tag::Direction;
 use triergon_core::Result;
 
-const SINGLE: u16 = 1;
-const PAIR: u16 = 2;
-const CURSIVE: u16 = 3;
-const MARK_TO_BASE: u16 = 4;
-const MARK_TO_LIGATURE: u16 = 5;
-const MARK_TO_MARK: u16 = 6;
-const CONTEXT: u16 = 7;
-const CHAIN_CONTEXT: u16 = 8;
-const EXTENSION: u16 = 9;
-
-/// Applies one subtable of lookup type `kind` at the current glyph.
-pub(crate) fn apply<'a>(ctx: &mut Apply<'a, '_>, kind: u16, data: Data<'a>) -> Result<bool> {
-    Ok(match kind {
-        SINGLE => single(ctx, data),
-        PAIR => return pair(ctx, data),
-        CURSIVE => return cursive(ctx, data),
-        MARK_TO_BASE => return mark_to_base(ctx, data, false),
-        MARK_TO_LIGATURE => return mark_to_base(ctx, data, true),
-        MARK_TO_MARK => return mark_to_mark(ctx, data),
-        CONTEXT => return apply_context(ctx, data),
-        CHAIN_CONTEXT => return apply_chain_context(ctx, data),
-        EXTENSION if data.u16(0) == 1 && data.u16(2) != EXTENSION => {
-            return apply(ctx, data.u16(2), data.offset32(4));
-        }
-        _ => false,
-    })
+/// Applies one subtable of type `kind` at the current glyph.
+pub(crate) fn apply<'a>(ctx: &mut Apply<'a, '_>, kind: LookupType, data: Data<'a>) -> Result<bool> {
+    match kind {
+        LookupType::Single => Ok(single(ctx, data)),
+        LookupType::Pair => pair(ctx, data),
+        LookupType::Cursive => cursive(ctx, data),
+        LookupType::MarkToBase => mark_to_base(ctx, data, false),
+        LookupType::MarkToLigature => mark_to_base(ctx, data, true),
+        LookupType::MarkToMark => mark_to_mark(ctx, data),
+        LookupType::Context => context::apply(ctx, data, false),
+        LookupType::ChainContext => context::apply(ctx, data, true),
+        _ => Ok(false),
+    }
 }
 
 /// A value record format: which adjustments a record holds.
@@ -119,13 +106,18 @@ fn device_delta(device: Data<'_>, ppem: u32, scale: i32) -> i32 {
     (i64::from(delta) * i64::from(scale) / i64::from(ppem)) as i32
 }
 
-/// An anchor point in scaled units, unrounded.
+/// An anchor point in scaled units, unrounded; (0, 0) for an anchor of an
+/// unknown format.
 fn anchor(ctx: &Apply<'_, '_>, anchor: Data<'_>, glyph: u32) -> (f32, f32) {
     let font = ctx.font;
+    let scale = font.scale;
+    let format = anchor.u16(0);
+    if !(1..=3).contains(&format) {
+        return (0.0, 0.0);
+    }
     let mut x = font.em_fscale_x(i32::from(anchor.i16(2)));
     let mut y = font.em_fscale_y(i32::from(anchor.i16(4)));
-    let scale = font.scale;
-    match anchor.u16(0) {
+    match format {
         2 if scale.x_ppem != 0 || scale.y_ppem != 0 => {
             if let Some((cx, cy)) = font.contour_point(glyph, anchor.u16(6)) {
                 if scale.x_ppem != 0 {
@@ -160,7 +152,7 @@ fn single(ctx: &mut Apply<'_, '_>, data: Data<'_>) -> bool {
     let format = ValueFormat(data.u16(4));
     let record = match data.u16(0) {
         1 => data.at(6),
-        2 if (index as usize) < usize::from(data.u16(6)) => {
+        2 if (index as usize) < data.count(6, 8, 2 * format.len()) => {
             data.at(8 + 2 * format.len() * index as usize)
         }
         _ => return false,
@@ -178,6 +170,10 @@ fn single(ctx: &mut Apply<'_, '_>, data: Data<'_>) -> bool {
 
 fn pair(ctx: &mut Apply<'_, '_>, data: Data<'_>) -> Result<bool> {
     let idx = ctx.buffer.idx;
+    let format = data.u16(0);
+    if !matches!(format, 1 | 2) {
+        return Ok(false);
+    }
     let Some(index) = coverage(data.offset16(2), ctx.buffer.cur().glyph) else {
         return Ok(false);
     };
@@ -188,36 +184,29 @@ fn pair(ctx: &mut Apply<'_, '_>, data: Data<'_>) -> Result<bool> {
     let (format1, format2) = (ValueFormat(data.u16(4)), ValueFormat(data.u16(6)));
     let (len1, len2) = (format1.len(), format2.len());
     let second_glyph = ctx.buffer.infos()[second].glyph;
-    let record = match data.u16(0) {
-        1 => {
-            let sets = data.count(8, 10, 2);
-            if index as usize >= sets {
-                return Ok(false);
-            }
-            let set = data.offset16(10 + 2 * index as usize);
-            let size = 2 + 2 * (len1 + len2);
-            let count = set.count(0, 2, size);
-            let Some(i) = super::data::bsearch(count, |i| {
-                u32::from(set.u16(2 + size * i)).cmp(&second_glyph)
-            }) else {
-                return Ok(false);
-            };
-            (set, set.at(2 + size * i + 2))
+    let record = if format == 1 {
+        let sets = data.count(8, 10, 2);
+        if index as usize >= sets {
+            return Ok(false);
         }
-        2 => {
-            let class1 = u32::from(super::layout::class(
-                data.offset16(8),
-                ctx.buffer.cur().glyph,
-            ));
-            let class2 = u32::from(super::layout::class(data.offset16(10), second_glyph));
-            let (count1, count2) = (u32::from(data.u16(12)), u32::from(data.u16(14)));
-            if class1 >= count1 || class2 >= count2 {
-                return Ok(false);
-            }
-            let index = (class1 * count2 + class2) as usize;
-            (data, data.at(16 + 2 * (len1 + len2) * index))
+        let set = data.offset16(10 + 2 * index as usize);
+        let size = 2 + 2 * (len1 + len2);
+        let count = set.count(0, 2, size);
+        let Some(i) = bsearch(count, |i| {
+            u32::from(set.u16(2 + size * i)).cmp(&second_glyph)
+        }) else {
+            return Ok(false);
+        };
+        (set, set.at(2 + size * i + 2))
+    } else {
+        let class1 = u32::from(class(data.offset16(8), ctx.buffer.cur().glyph));
+        let class2 = u32::from(class(data.offset16(10), second_glyph));
+        let (count1, count2) = (u32::from(data.u16(12)), u32::from(data.u16(14)));
+        if class1 >= count1 || class2 >= count2 {
+            return Ok(false);
         }
-        _ => return Ok(false),
+        let index = (class1 * count2 + class2) as usize;
+        (data, data.at(16 + 2 * (len1 + len2) * index))
     };
     let (base, values) = record;
     let pos = ctx.buffer.pos.as_mut_slice();
@@ -263,6 +252,9 @@ fn reverse_cursive_minor_offset(buffer: &mut Buffer, i: usize, new_parent: usize
 }
 
 fn cursive(ctx: &mut Apply<'_, '_>, data: Data<'_>) -> Result<bool> {
+    if data.u16(0) != 1 {
+        return Ok(false);
+    }
     let records = data.count(4, 6, 4);
     let record = |glyph: u32| coverage(data.offset16(2), glyph).filter(|&i| (i as usize) < records);
     let anchor_of = |index: u32, which: usize| data.offset16(6 + 4 * index as usize + which);
@@ -302,7 +294,7 @@ fn cursive(ctx: &mut Apply<'_, '_>, data: Data<'_>) -> Result<bool> {
         }
     }
     // The glyph that does not name the lookup's direction hangs off the other.
-    let (child, parent, y_offset) = if ctx.lookup_props & Lookup::RIGHT_TO_LEFT != 0 {
+    let (child, parent, y_offset) = if ctx.lookup_flags.right_to_left() {
         (i, j, round(entry_y - exit_y))
     } else {
         (j, i, -round(entry_y - exit_y))
@@ -327,7 +319,7 @@ fn cursive(ctx: &mut Apply<'_, '_>, data: Data<'_>) -> Result<bool> {
 /// Whether a glyph may take marks: not a later component of a multiple
 /// substitution (those leave marks to the first component), unless it is a mark
 /// base the lookup lists explicitly.
-fn accepts_marks(infos: &[crate::buffer::Info], idx: usize, ligature: bool) -> bool {
+fn accepts_marks(infos: &[Info], idx: usize, ligature: bool) -> bool {
     let info = &infos[idx];
     if !info.multiplied() || info.lig.component() == 0 {
         return true;
@@ -344,17 +336,65 @@ fn accepts_marks(infos: &[crate::buffer::Info], idx: usize, ligature: bool) -> b
     }
 }
 
+/// The marks of a mark attachment subtable: each one's class and anchor.
+#[derive(Clone, Copy)]
+struct MarkArray<'a>(Data<'a>);
+
+impl<'a> MarkArray<'a> {
+    /// The class and anchor of mark `index`; class zero and no anchor past the
+    /// marks the array holds, as HarfBuzz reads its null record.
+    fn record(self, index: u32) -> (u32, Data<'a>) {
+        let index = index as usize;
+        if index >= self.0.count(0, 2, 4) {
+            return (0, Data::EMPTY);
+        }
+        let at = 2 + 4 * index;
+        (u32::from(self.0.u16(at)), self.0.offset16(at + 2))
+    }
+}
+
+/// The anchors marks attach to on base glyphs, ligature components or marks:
+/// a row per glyph or component, a column per mark class.
+#[derive(Clone, Copy)]
+struct AnchorMatrix<'a> {
+    data: Data<'a>,
+    rows: u32,
+    columns: u32,
+}
+
+impl<'a> AnchorMatrix<'a> {
+    /// A matrix at `data` whose row count comes first.
+    fn counted(data: Data<'a>, columns: u32) -> Self {
+        Self {
+            data,
+            rows: u32::from(data.u16(0)),
+            columns,
+        }
+    }
+
+    /// The anchor at `row` and `column`, if the matrix has one there.
+    fn anchor(self, row: u32, column: u32) -> Option<Data<'a>> {
+        if row >= self.rows || column >= self.columns {
+            return None;
+        }
+        let anchor = self
+            .data
+            .offset16(2 + 2 * (row * self.columns + column) as usize);
+        (!anchor.is_empty()).then_some(anchor)
+    }
+}
+
 /// Mark-to-base (`ligature` false) and mark-to-ligature attachment.
 fn mark_to_base(ctx: &mut Apply<'_, '_>, data: Data<'_>, ligature: bool) -> Result<bool> {
+    if data.u16(0) != 1 {
+        return Ok(false);
+    }
     let idx = ctx.buffer.idx;
     let Some(mark_index) = coverage(data.offset16(2), ctx.buffer.cur().glyph) else {
         return Ok(false);
     };
     let bases = data.offset16(4);
-    let saved = ctx.lookup_props;
-    ctx.lookup_props = Lookup::IGNORE_MARKS;
-    let m = ctx.matcher(false, Values::Any);
-    ctx.lookup_props = saved;
+    let m = ctx.matcher_with(LookupFlags::IGNORE_MARKS, false, Values::Any);
     if ctx.last_base_until > idx {
         ctx.last_base_until = 0;
         ctx.last_base = None;
@@ -379,57 +419,40 @@ fn mark_to_base(ctx: &mut Apply<'_, '_>, data: Data<'_>, ligature: bool) -> Resu
     let Some(base_index) = coverage(bases, ctx.buffer.infos()[base].glyph) else {
         return Ok(false);
     };
-    let class_count = u32::from(data.u16(6));
-    let marks = data.offset16(8);
+    let classes = u32::from(data.u16(6));
+    let marks = MarkArray(data.offset16(8));
     let attach = data.offset16(10);
     if !ligature {
-        return attach_mark(
-            ctx,
-            marks,
-            mark_index,
-            attach,
-            base_index,
-            class_count,
-            base,
-        );
+        let anchors = AnchorMatrix::counted(attach, classes);
+        return attach_mark(ctx, marks, mark_index, anchors, base_index, base);
     }
-    let Some(matrix) = (base_index < u32::from(attach.u16(0)))
-        .then(|| attach.offset16(2 + 2 * base_index as usize))
-    else {
-        return Ok(false);
-    };
-    let components = u32::from(matrix.u16(0));
-    if components == 0 {
+    if base_index as usize >= attach.count(0, 2, 2) {
         return Ok(false);
     }
+    let components = AnchorMatrix::counted(attach.offset16(2 + 2 * base_index as usize), classes);
+    if components.rows == 0 {
+        return Ok(false);
+    }
+    // The component the mark follows, or the last.
     let lig_id = ctx.buffer.infos()[base].lig.id();
     let cur = ctx.buffer.cur().lig;
     let component = if lig_id != 0 && lig_id == cur.id() && cur.component() > 0 {
-        components.min(u32::from(cur.component())) - 1
+        components.rows.min(u32::from(cur.component())) - 1
     } else {
-        components - 1
+        components.rows - 1
     };
-    attach_mark_matrix(
-        ctx,
-        marks,
-        mark_index,
-        matrix,
-        components,
-        component,
-        class_count,
-        base,
-    )
+    attach_mark(ctx, marks, mark_index, components, component, base)
 }
 
 fn mark_to_mark(ctx: &mut Apply<'_, '_>, data: Data<'_>) -> Result<bool> {
+    if data.u16(0) != 1 {
+        return Ok(false);
+    }
     let idx = ctx.buffer.idx;
     let Some(mark1) = coverage(data.offset16(2), ctx.buffer.cur().glyph) else {
         return Ok(false);
     };
-    let saved = ctx.lookup_props;
-    ctx.lookup_props &= !Lookup::IGNORE_FLAGS;
-    let m = ctx.matcher(false, Values::Any);
-    ctx.lookup_props = saved;
+    let m = ctx.matcher_with(ctx.lookup_flags.skipping_no_class(), false, Values::Any);
     let Some(j) = ctx.prev(&m, idx, 0)? else {
         return Ok(false);
     };
@@ -451,69 +474,24 @@ fn mark_to_mark(ctx: &mut Apply<'_, '_>, data: Data<'_>) -> Result<bool> {
     let Some(mark2) = coverage(data.offset16(4), infos[j].glyph) else {
         return Ok(false);
     };
-    let class_count = u32::from(data.u16(6));
-    attach_mark(
-        ctx,
-        data.offset16(8),
-        mark1,
-        data.offset16(10),
-        mark2,
-        class_count,
-        j,
-    )
+    let anchors = AnchorMatrix::counted(data.offset16(10), u32::from(data.u16(6)));
+    attach_mark(ctx, MarkArray(data.offset16(8)), mark1, anchors, mark2, j)
 }
 
-/// Attaches the current mark to the glyph at `target` through the anchor in row
-/// `row` of the anchor matrix `matrix` (a base or mark-2 array).
+/// Attaches the current mark, `mark` of `marks`, to the glyph at `target`
+/// through the anchor of its class in `row` of `anchors`.
 fn attach_mark(
     ctx: &mut Apply<'_, '_>,
-    marks: Data<'_>,
-    mark_index: u32,
-    matrix: Data<'_>,
+    marks: MarkArray<'_>,
+    mark: u32,
+    anchors: AnchorMatrix<'_>,
     row: u32,
-    class_count: u32,
     target: usize,
 ) -> Result<bool> {
-    let rows = u32::from(matrix.u16(0));
-    attach_mark_matrix(
-        ctx,
-        marks,
-        mark_index,
-        matrix,
-        rows,
-        row,
-        class_count,
-        target,
-    )
-}
-
-#[allow(
-    clippy::too_many_arguments,
-    reason = "the parts of one mark record lookup"
-)]
-fn attach_mark_matrix(
-    ctx: &mut Apply<'_, '_>,
-    marks: Data<'_>,
-    mark_index: u32,
-    matrix: Data<'_>,
-    rows: u32,
-    row: u32,
-    class_count: u32,
-    target: usize,
-) -> Result<bool> {
-    if mark_index >= u32::from(marks.u16(0)) {
+    let (mark_class, mark_anchor) = marks.record(mark);
+    let Some(target_anchor) = anchors.anchor(row, mark_class) else {
         return Ok(false);
-    }
-    let record = 2 + 4 * mark_index as usize;
-    let mark_class = u32::from(marks.u16(record));
-    let mark_anchor = marks.offset16(record + 2);
-    if row >= rows || mark_class >= class_count {
-        return Ok(false);
-    }
-    let target_anchor = matrix.offset16(2 + 2 * (row * class_count + mark_class) as usize);
-    if target_anchor.is_empty() {
-        return Ok(false);
-    }
+    };
     let idx = ctx.buffer.idx;
     let (mark_x, mark_y) = anchor(ctx, mark_anchor, ctx.buffer.infos()[idx].glyph);
     let (base_x, base_y) = anchor(ctx, target_anchor, ctx.buffer.infos()[target].glyph);
@@ -590,7 +568,7 @@ pub(crate) fn finish_offsets(buffer: &mut Buffer, direction: Direction) -> Resul
     Ok(())
 }
 
-fn propagate(pos: &mut [crate::buffer::Pos], i: usize, direction: Direction, depth: u8) {
+fn propagate(pos: &mut [Pos], i: usize, direction: Direction, depth: u8) {
     let attachment = pos[i].attachment;
     pos[i].attachment = Attachment::None;
     let Some(j) = i

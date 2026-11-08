@@ -8,6 +8,7 @@ use crate::face::Face;
 use crate::metrics::Scaled;
 use crate::ot::apply::{Apply, Stage};
 use crate::ot::data::Data;
+use crate::ot::digest::Digest;
 use crate::ot::layout::Lookup;
 use crate::plan::Plan;
 use crate::unicode::{
@@ -16,6 +17,7 @@ use crate::unicode::{
 };
 use triergon_core::{Error, Result};
 
+/// The IgnoreMarks lookup flag, as the synthesised lookups are written.
 const IGNORE_MARKS: u16 = 0x0008;
 
 /// A lookup under construction, big-endian, in a fixed buffer: the synthesized
@@ -235,10 +237,10 @@ pub(super) fn shape(
         plan.direction,
     );
     for (mask, lookup) in lookups.iter().flatten() {
-        let lookup = Lookup::new(Data(lookup.bytes()));
+        let lookup = Lookup::new(Stage::Substitute, Data(lookup.bytes()));
         ctx.auto_zwj = true;
         ctx.auto_zwnj = true;
-        let digest = crate::ot::digest::Digest::of_lookup(&lookup, 7);
+        let digest = Digest::of_lookup(&lookup, ctx.buffer.work())?;
         crate::shape::apply_lookup_masked(&mut ctx, &lookup, *mask, digest)?;
     }
     Ok(())

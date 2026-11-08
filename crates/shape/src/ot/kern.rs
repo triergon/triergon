@@ -4,7 +4,7 @@
 
 use super::apply::{Apply, Next, Values};
 use super::data::{Data, bsearch};
-use super::layout::Lookup;
+use super::layout::LookupFlags;
 use triergon_core::{Error, Result};
 
 /// The OpenType (Microsoft) `kern` table.
@@ -112,7 +112,7 @@ pub(crate) fn kern_machine(
     value: impl Fn(u32, u32) -> i32,
 ) -> Result<()> {
     ctx.set_lookup_mask(kern_mask);
-    ctx.set_lookup_props(Lookup::IGNORE_MARKS);
+    ctx.set_lookup_flags(LookupFlags::IGNORE_MARKS);
     let m = ctx.matcher(false, Values::Any);
     let count = ctx.buffer.len();
     let mut idx = 0;

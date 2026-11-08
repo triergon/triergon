@@ -313,7 +313,7 @@ mod tests {
             (0xD800, b"Zzzz"),
             (0x110000, b"Zzzz"),
         ] {
-            assert_eq!(script(cp), Script(*tag), "U+{cp:04X}");
+            assert_eq!(script(cp), Script::from_code(*tag), "U+{cp:04X}");
         }
     }
 

@@ -4,22 +4,16 @@
 //! the USE categories; reph moves to the end and pre-base vowels to the start of
 //! their cluster after the basic forms.
 
+use super::Pause;
 use super::arabic;
 use super::syllabic::{self, ANY, DottedCircle, Expr, Machine, for_each_syllable, syllable_type};
 use crate::buffer::{Buffer, Info};
 use crate::metrics::Scaled;
-use crate::plan::{Builder, FeatureFlags, Pause, Plan};
+use crate::plan::{Builder, FeatureFlags, Plan};
 use crate::tag::Script;
 use crate::unicode::{self, UseCategory as Cat};
 use std::ops::Range;
 use triergon_core::Result;
-
-// The steps between lookup stages.
-const SETUP_SYLLABLES: u8 = 0;
-const CLEAR_SUBSTITUTION_FLAGS: u8 = 1;
-const RECORD_RPHF: u8 = 2;
-const RECORD_PREF: u8 = 3;
-const REORDER: u8 = 4;
 
 /// The basic features, applied together within syllables before reordering.
 const BASIC_FEATURES: [&[u8; 4]; 7] = [
@@ -39,6 +33,21 @@ enum Form {
 /// The presentation features, applied together after reordering.
 const OTHER_FEATURES: [&[u8; 4]; 5] = [b"abvs", b"blws", b"haln", b"pres", b"psts"];
 
+/// The steps this shaper takes between lookup stages.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum Step {
+    /// Finds the syllables and the glyphs that may form reph.
+    SetupSyllables,
+    /// Forgets which glyphs were substituted, before a feature whose substitutions are recorded.
+    ClearSubstitutionFlags,
+    /// Records which glyphs became reph.
+    RecordRphf,
+    /// Records which glyphs became pre-base forms.
+    RecordPref,
+    /// Moves reph and pre-base glyphs to their places.
+    Reorder,
+}
+
 pub(super) fn collect_features(b: &mut Builder<'_>) {
     let per_syllable = FeatureFlags {
         per_syllable: true,
@@ -48,28 +57,28 @@ pub(super) fn collect_features(b: &mut Builder<'_>) {
         manual_zwj: true,
         ..per_syllable
     };
-    b.add_gsub_pause(Some(Pause::Shaper(SETUP_SYLLABLES)));
+    b.add_gsub_pause(Some(Pause::Universal(Step::SetupSyllables)));
     // Default glyph pre-processing.
     b.add_feature(b"locl", per_syllable, 1);
     b.add_feature(b"ccmp", per_syllable, 1);
     b.add_feature(b"nukt", per_syllable, 1);
     b.add_feature(b"akhn", manual_zwj, 1);
     // Reordering.
-    b.add_gsub_pause(Some(Pause::Shaper(CLEAR_SUBSTITUTION_FLAGS)));
+    b.add_gsub_pause(Some(Pause::Universal(Step::ClearSubstitutionFlags)));
     let rphf = FeatureFlags {
         global: false,
         ..manual_zwj
     };
     b.add_feature(b"rphf", rphf, 1);
-    b.add_gsub_pause(Some(Pause::Shaper(RECORD_RPHF)));
-    b.add_gsub_pause(Some(Pause::Shaper(CLEAR_SUBSTITUTION_FLAGS)));
+    b.add_gsub_pause(Some(Pause::Universal(Step::RecordRphf)));
+    b.add_gsub_pause(Some(Pause::Universal(Step::ClearSubstitutionFlags)));
     b.add_feature(b"pref", manual_zwj, 1);
-    b.add_gsub_pause(Some(Pause::Shaper(RECORD_PREF)));
+    b.add_gsub_pause(Some(Pause::Universal(Step::RecordPref)));
     // Orthographic units.
     for tag in BASIC_FEATURES {
         b.add_feature(tag, manual_zwj, 1);
     }
-    b.add_gsub_pause(Some(Pause::Shaper(REORDER)));
+    b.add_gsub_pause(Some(Pause::Universal(Step::Reorder)));
     // Syllables are not needed after this.
     b.add_gsub_pause(None);
     for tag in TOPOGRAPHICAL_FEATURES {
@@ -253,7 +262,7 @@ fn set_category(info: &mut Info, category: Cat) {
 /// Scripts whose letters join as Arabic letters do.
 fn has_arabic_joining(script: Script) -> bool {
     matches!(
-        &script.0,
+        &script.to_bytes(),
         b"Adlm"
             | b"Arab"
             | b"Chrs"
@@ -274,7 +283,7 @@ fn has_arabic_joining(script: Script) -> bool {
 pub(super) fn setup_masks(plan: &Plan, buffer: &mut Buffer) {
     if has_arabic_joining(plan.script) {
         arabic::setup_masks(plan, buffer);
-        if &plan.script.0 == b"Mong" {
+        if &plan.script.to_bytes() == b"Mong" {
             arabic::copy_to_mongolian_variation_selectors(plan, buffer);
         }
     }
@@ -283,10 +292,15 @@ pub(super) fn setup_masks(plan: &Plan, buffer: &mut Buffer) {
     }
 }
 
-pub(super) fn pause(step: u8, plan: &Plan, buffer: &mut Buffer, font: &Scaled<'_>) -> Result<bool> {
+pub(super) fn pause(
+    step: Step,
+    plan: &Plan,
+    buffer: &mut Buffer,
+    font: &Scaled<'_>,
+) -> Result<bool> {
     let rphf = plan.one_mask(b"rphf");
     match step {
-        SETUP_SYLLABLES => {
+        Step::SetupSyllables => {
             syllabic::find_syllables(&MACHINE, buffer, hidden_from_grammar)?;
             if rphf != 0 {
                 for_each_syllable(buffer, |buffer, Range { start, end }| {
@@ -306,12 +320,15 @@ pub(super) fn pause(step: u8, plan: &Plan, buffer: &mut Buffer, font: &Scaled<'_
                 setup_topographical_masks(plan, buffer)?;
             }
         }
-        CLEAR_SUBSTITUTION_FLAGS => {
+        Step::ClearSubstitutionFlags => {
             for info in buffer.infos_mut() {
-                info.glyph_props &= !crate::buffer::glyph_props::SUBSTITUTED;
+                info.glyph_props = info.glyph_props.without_substitution();
             }
         }
-        RECORD_RPHF if rphf != 0 => {
+        Step::RecordRphf => {
+            if rphf == 0 {
+                return Ok(false);
+            }
             // A substituted repha becomes R.
             for_each_syllable(buffer, |buffer, range| {
                 if let Some(info) = buffer.infos_mut()[range]
@@ -324,7 +341,7 @@ pub(super) fn pause(step: u8, plan: &Plan, buffer: &mut Buffer, font: &Scaled<'_
                 Ok(())
             })?;
         }
-        RECORD_PREF => {
+        Step::RecordPref => {
             // A substituted pre-base form reorders as a pre-base vowel.
             for_each_syllable(buffer, |buffer, range| {
                 if let Some(info) = buffer.infos_mut()[range]
@@ -336,7 +353,7 @@ pub(super) fn pause(step: u8, plan: &Plan, buffer: &mut Buffer, font: &Scaled<'_
                 Ok(())
             })?;
         }
-        REORDER => {
+        Step::Reorder => {
             let circle = DottedCircle {
                 broken: Syllable::Broken as u8,
                 shaper: [Cat::B as u8, 0],
@@ -345,7 +362,6 @@ pub(super) fn pause(step: u8, plan: &Plan, buffer: &mut Buffer, font: &Scaled<'_
             syllabic::insert_dotted_circles(buffer, font, circle)?;
             for_each_syllable(buffer, reorder_syllable)?;
         }
-        _ => {}
     }
     Ok(false)
 }

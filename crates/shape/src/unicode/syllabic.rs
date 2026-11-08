@@ -289,7 +289,7 @@ pub(crate) fn use_category(c: u32) -> UseCategory {
 /// circle goes before the last character of each.
 pub(crate) fn vowel_constraints(script: Script) -> &'static [&'static [u32]] {
     VOWEL_CONSTRAINTS
-        .binary_search_by_key(&script.0, |(s, _)| s.0)
+        .binary_search_by_key(&script, |&(s, _)| s)
         .map_or(&[], |i| VOWEL_CONSTRAINTS[i].1)
 }
 
@@ -319,10 +319,10 @@ mod tests {
 
     #[test]
     fn vowel_constraints_are_found_by_script() {
-        let deva = vowel_constraints(Script(*b"Deva"));
+        let deva = vowel_constraints(Script::from_code(*b"Deva"));
         assert!(deva.contains(&&[0x0930, 0x094D, 0x0907][..]));
-        assert!(vowel_constraints(Script(*b"Latn")).is_empty());
-        assert!(VOWEL_CONSTRAINTS.is_sorted_by_key(|(s, _)| s.0));
+        assert!(vowel_constraints(Script::from_code(*b"Latn")).is_empty());
+        assert!(VOWEL_CONSTRAINTS.is_sorted_by_key(|(s, _)| *s));
     }
 
     #[test]

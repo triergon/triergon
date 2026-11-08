@@ -22,6 +22,7 @@ fn work_beyond_the_limits_is_a_policy_error() {
         let limits = triergon_shape::Limits {
             work_per_char,
             minimum_work: 0,
+            ..triergon_shape::Limits::default()
         };
         support::shape_latin_within(&text, limits)
     };

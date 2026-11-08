@@ -1,23 +1,29 @@
 //! Myanmar (fonts for the `mym2` OpenType tag): syllables, kinzi, and the
 //! reordering of medial Ra and pre-base vowels before the base.
 
+use super::Pause;
 use super::syllabic::{self, ANY, DottedCircle, Expr, Machine, for_each_syllable, syllable_type};
 use crate::buffer::{Buffer, Info};
 use crate::metrics::Scaled;
-use crate::plan::{Builder, FeatureFlags, Pause};
+use crate::plan::{Builder, FeatureFlags};
 use crate::unicode::{IndicCategory as Cat, IndicPosition as Pos};
 use std::ops::Range;
 use triergon_core::Result;
-
-// The steps between lookup stages.
-const SETUP_SYLLABLES: u8 = 0;
-const REORDER: u8 = 1;
 
 /// The basic features, applied one at a time within syllables after
 /// reordering.
 const BASIC_FEATURES: [&[u8; 4]; 4] = [b"rphf", b"pref", b"blwf", b"pstf"];
 /// The presentation features, applied together after syllables are done.
 const OTHER_FEATURES: [&[u8; 4]; 4] = [b"pres", b"abvs", b"blws", b"psts"];
+
+/// The steps this shaper takes between lookup stages.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum Step {
+    /// Finds the syllables.
+    SetupSyllables,
+    /// Puts each syllable in visual order.
+    Reorder,
+}
 
 pub(super) fn collect_features(b: &mut Builder<'_>) {
     let per_syllable = FeatureFlags {
@@ -28,10 +34,10 @@ pub(super) fn collect_features(b: &mut Builder<'_>) {
         manual_zwj: true,
         ..FeatureFlags::GLOBAL
     };
-    b.add_gsub_pause(Some(Pause::Shaper(SETUP_SYLLABLES)));
+    b.add_gsub_pause(Some(Pause::Myanmar(Step::SetupSyllables)));
     b.add_feature(b"locl", per_syllable, 1);
     b.add_feature(b"ccmp", per_syllable, 1);
-    b.add_gsub_pause(Some(Pause::Shaper(REORDER)));
+    b.add_gsub_pause(Some(Pause::Myanmar(Step::Reorder)));
     for tag in BASIC_FEATURES {
         let flags = FeatureFlags {
             per_syllable: true,
@@ -167,10 +173,10 @@ fn is_consonant(info: &Info) -> bool {
         )
 }
 
-pub(super) fn pause(step: u8, buffer: &mut Buffer, font: &Scaled<'_>) -> Result<bool> {
+pub(super) fn pause(step: Step, buffer: &mut Buffer, font: &Scaled<'_>) -> Result<bool> {
     match step {
-        SETUP_SYLLABLES => syllabic::find_syllables(&MACHINE, buffer, |_, _| false)?,
-        REORDER => {
+        Step::SetupSyllables => syllabic::find_syllables(&MACHINE, buffer, |_, _| false)?,
+        Step::Reorder => {
             let circle = DottedCircle {
                 broken: Syllable::Broken as u8,
                 shaper: [Cat::DottedCircle as u8, Pos::Start as u8],
@@ -185,7 +191,6 @@ pub(super) fn pause(step: u8, buffer: &mut Buffer, font: &Scaled<'_>) -> Result<
                 reorder_syllable(buffer, range)
             })?;
         }
-        _ => {}
     }
     Ok(false)
 }

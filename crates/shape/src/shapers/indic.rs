@@ -4,21 +4,17 @@
 //! shaper does it for both the old (`deva`) and new (`dev2`) OpenType script
 //! specifications.
 
+use super::Pause;
 use super::syllabic::{self, ANY, DottedCircle, Machine, for_each_syllable, syllable_type};
 use crate::buffer::{Buffer, Info};
 use crate::face::Face;
 use crate::metrics::Scaled;
 use crate::ot::would_apply::would_substitute;
-use crate::plan::{Builder, FeatureFlags, LookupMap, Pause, Plan};
+use crate::plan::{Builder, FeatureFlags, LookupMap, Plan};
 use crate::tag::Script;
 use crate::unicode::{self, IndicCategory as Cat, IndicPosition as Pos};
 use std::ops::Range;
-use triergon_core::Result;
-
-// The steps between lookup stages.
-const SETUP_SYLLABLES: u8 = 0;
-const INITIAL_REORDERING: u8 = 1;
-const FINAL_REORDERING: u8 = 2;
+use triergon_core::{Result, WorkBudget};
 
 /// How reph is written.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -48,7 +44,7 @@ struct Config {
 
 impl Config {
     fn of(script: Script) -> Self {
-        let (virama, reph_position, reph_mode) = match &script.0 {
+        let (virama, reph_position, reph_mode) = match &script.to_bytes() {
             b"Deva" => (0x094D, Pos::BeforePost, RephMode::Implicit),
             b"Beng" => (0x09CD, Pos::AfterSub, RephMode::Implicit),
             b"Guru" => (0x0A4D, Pos::BeforeSub, RephMode::Implicit),
@@ -73,7 +69,7 @@ impl Config {
             virama,
             reph_position,
             reph_mode,
-            below_forms_before_base: !matches!(&script.0, b"Telu" | b"Knda"),
+            below_forms_before_base: !matches!(&script.to_bytes(), b"Telu" | b"Knda"),
         }
     }
 }
@@ -129,6 +125,17 @@ impl Masks {
     }
 }
 
+/// The steps this shaper takes between lookup stages.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum Step {
+    /// Finds the syllables.
+    SetupSyllables,
+    /// Puts each syllable in visual order before the basic forms.
+    InitialReordering,
+    /// Moves reph, pre-base forms and left matras after the basic forms.
+    FinalReordering,
+}
+
 pub(super) fn collect_features(b: &mut Builder<'_>) {
     let per_syllable = |global| FeatureFlags {
         global,
@@ -137,19 +144,19 @@ pub(super) fn collect_features(b: &mut Builder<'_>) {
         per_syllable: true,
         ..FeatureFlags::NONE
     };
-    b.add_gsub_pause(Some(Pause::Shaper(SETUP_SYLLABLES)));
+    b.add_gsub_pause(Some(Pause::Indic(Step::SetupSyllables)));
     let early = FeatureFlags {
         per_syllable: true,
         ..FeatureFlags::GLOBAL
     };
     b.add_feature(b"locl", early, 1);
     b.add_feature(b"ccmp", early, 1);
-    b.add_gsub_pause(Some(Pause::Shaper(INITIAL_REORDERING)));
+    b.add_gsub_pause(Some(Pause::Indic(Step::InitialReordering)));
     for &(tag, global) in &FEATURES[..BASIC_FEATURES] {
         b.add_feature(tag, per_syllable(global), 1);
         b.add_gsub_pause(None);
     }
-    b.add_gsub_pause(Some(Pause::Shaper(FINAL_REORDERING)));
+    b.add_gsub_pause(Some(Pause::Indic(Step::FinalReordering)));
     for &(tag, global) in &FEATURES[BASIC_FEATURES..] {
         b.add_feature(tag, per_syllable(global), 1);
     }
@@ -307,8 +314,9 @@ pub(super) fn setup_masks(buffer: &mut Buffer) {
     }
 }
 
-/// What the reorderings need from the plan.
-struct IndicPlan<'a> {
+/// What the reorderings need from the plan and the face.
+struct IndicPlan<'a, 'f> {
+    face: &'a Face<'f>,
     script: Script,
     config: Config,
     /// Whether the font uses the old specification (`deva` rather than `dev2`).
@@ -323,18 +331,19 @@ struct IndicPlan<'a> {
     vatu: &'a [LookupMap],
 }
 
-impl<'a> IndicPlan<'a> {
-    fn new(plan: &'a Plan) -> Self {
+impl<'a, 'f> IndicPlan<'a, 'f> {
+    fn new(plan: &'a Plan, face: &'a Face<'f>) -> Self {
         let script = plan.script;
         let config = Config::of(script);
         let old_spec = config.has_old_spec
-            && plan.chosen_script[0].is_none_or(|tag| tag.0.to_be_bytes()[3] != b'2');
+            && plan.chosen_script[0].is_none_or(|tag| tag.to_u32().to_be_bytes()[3] != b'2');
         Self {
+            face,
             script,
             config,
             old_spec,
             masks: Masks::of(plan),
-            zero_context: !old_spec && &script.0 != b"Mlym",
+            zero_context: !old_spec && &script.to_bytes() != b"Mlym",
             rphf: plan.gsub_stage_lookups(b"rphf"),
             pref: plan.gsub_stage_lookups(b"pref"),
             blwf: plan.gsub_stage_lookups(b"blwf"),
@@ -344,52 +353,75 @@ impl<'a> IndicPlan<'a> {
     }
 
     fn is(&self, script: &[u8; 4]) -> bool {
-        &self.script.0 == script
+        &self.script.to_bytes() == script
     }
 
-    fn would_substitute(&self, face: &Face<'_>, lookups: &[LookupMap], glyphs: &[u32]) -> bool {
-        lookups
-            .iter()
-            .any(|l| would_substitute(&face.gsub, l.index, glyphs, self.zero_context))
+    /// Whether one of `lookups` would substitute `glyphs`, charged to `work`.
+    fn would_substitute(
+        &self,
+        lookups: &[LookupMap],
+        glyphs: &[u32],
+        work: &mut WorkBudget,
+    ) -> Result<bool> {
+        for lookup in lookups {
+            let gsub = &self.face.gsub;
+            if would_substitute(
+                gsub,
+                lookup.index,
+                &lookup.digest,
+                glyphs,
+                self.zero_context,
+                work,
+            )? {
+                return Ok(true);
+            }
+        }
+        Ok(false)
     }
 
     /// Where a consonant's form goes, by the forms the font has for it with a
     /// virama on either side (fonts copied from the old specification put the
     /// virama after).
-    fn consonant_position(&self, face: &Face<'_>, consonant: u32, virama: u32) -> Pos {
+    fn consonant_position(
+        &self,
+        consonant: u32,
+        virama: u32,
+        work: &mut WorkBudget,
+    ) -> Result<Pos> {
         let glyphs = [virama, consonant, virama];
-        let either = |lookups| {
-            self.would_substitute(face, lookups, &glyphs[..2])
-                || self.would_substitute(face, lookups, &glyphs[1..])
+        let mut either = |lookups| -> Result<bool> {
+            Ok(self.would_substitute(lookups, &glyphs[..2], work)?
+                || self.would_substitute(lookups, &glyphs[1..], work)?)
         };
-        if either(self.blwf) || either(self.vatu) {
+        Ok(if either(self.blwf)? || either(self.vatu)? {
             Pos::BelowC
-        } else if either(self.pstf) || either(self.pref) {
+        } else if either(self.pstf)? || either(self.pref)? {
             Pos::PostC
         } else {
             Pos::BaseC
-        }
+        })
     }
 }
 
 pub(super) fn pause(
-    step: u8,
+    step: Step,
     plan: &Plan,
     face: &Face<'_>,
     buffer: &mut Buffer,
     font: &Scaled<'_>,
 ) -> Result<bool> {
-    let indic = IndicPlan::new(plan);
+    let indic = IndicPlan::new(plan, face);
     match step {
-        SETUP_SYLLABLES => {
+        Step::SetupSyllables => {
             syllabic::find_syllables(&MACHINE, buffer, |_, _| false)?;
         }
-        INITIAL_REORDERING => {
+        Step::InitialReordering => {
             let virama = virama_glyph(&indic, font);
             if virama != 0 {
-                for info in buffer.infos_mut() {
+                let (infos, work) = buffer.infos_and_work();
+                for info in infos {
                     if position(info) == Pos::BaseC {
-                        let position = indic.consonant_position(face, info.glyph, virama);
+                        let position = indic.consonant_position(info.glyph, virama, work)?;
                         set_position(info, position);
                     }
                 }
@@ -405,22 +437,21 @@ pub(super) fn pause(
                 if kind == Syllable::Symbol as u8 || kind == Syllable::NonIndic as u8 {
                     return Ok(());
                 }
-                initial_reordering(&indic, face, buffer, range)
+                initial_reordering(&indic, buffer, range)
             })?;
         }
-        FINAL_REORDERING => {
+        Step::FinalReordering => {
             let virama = virama_glyph(&indic, font);
             for_each_syllable(buffer, |buffer, range| {
                 final_reordering(&indic, buffer, range, virama)
             })?;
         }
-        _ => {}
     }
     Ok(false)
 }
 
 /// The glyph of the script's virama, zero if it has none or the font lacks it.
-fn virama_glyph(indic: &IndicPlan<'_>, font: &Scaled<'_>) -> u32 {
+fn virama_glyph(indic: &IndicPlan<'_, '_>, font: &Scaled<'_>) -> u32 {
     if indic.config.virama == 0 {
         return 0;
     }
@@ -432,8 +463,7 @@ fn virama_glyph(indic: &IndicPlan<'_>, font: &Scaled<'_>) -> u32 {
 /// broken syllables (with their dotted circle) take a base as consonant
 /// syllables do.
 fn initial_reordering(
-    indic: &IndicPlan<'_>,
-    face: &Face<'_>,
+    indic: &IndicPlan<'_, '_>,
     buffer: &mut Buffer,
     range: Range<usize>,
 ) -> Result<()> {
@@ -449,7 +479,8 @@ fn initial_reordering(
             buffer.infos_mut().swap(start + 1, start + 2);
         }
     }
-    let (mut base, has_reph) = find_base(indic, face, buffer.infos(), start, end);
+    let (infos, work) = buffer.infos_and_work();
+    let (mut base, has_reph) = find_base(indic, infos, start, end, work)?;
 
     let infos = buffer.infos_mut();
     for info in &mut infos[start..base] {
@@ -483,8 +514,8 @@ fn initial_reordering(
     }
 
     base = sort_syllable(indic, buffer, start, end)?;
-    set_masks(indic, face, buffer.infos_mut(), start, base, end);
-    Ok(())
+    let (infos, work) = buffer.infos_and_work();
+    set_masks(indic, infos, start..end, base, work)
 }
 
 /// The base consonant of a syllable and whether it starts with a reph.
@@ -494,12 +525,12 @@ fn initial_reordering(
 /// consonant. A Ra and halant at the start (with ZWJ for explicit reph) that
 /// the font forms reph from is not a candidate, unless it is all there is.
 fn find_base(
-    indic: &IndicPlan<'_>,
-    face: &Face<'_>,
+    indic: &IndicPlan<'_, '_>,
     infos: &[Info],
     start: usize,
     end: usize,
-) -> (usize, bool) {
+    work: &mut WorkBudget,
+) -> Result<(usize, bool)> {
     let mut base = end;
     let mut has_reph = false;
     let mut limit = start;
@@ -519,8 +550,8 @@ fn find_base(
                 0
             },
         ];
-        if indic.would_substitute(face, indic.rphf, &glyphs[..2])
-            || (mode == RephMode::Explicit && indic.would_substitute(face, indic.rphf, &glyphs))
+        if indic.would_substitute(indic.rphf, &glyphs[..2], work)?
+            || (mode == RephMode::Explicit && indic.would_substitute(indic.rphf, &glyphs, work)?)
         {
             limit += 2;
             while limit < end && is_joiner(&infos[limit]) {
@@ -563,12 +594,12 @@ fn find_base(
     if has_reph && base == start && limit - base <= 2 {
         has_reph = false;
     }
-    (base, has_reph)
+    Ok((base, has_reph))
 }
 
 /// With the old specification, the first halant after the base moves after
 /// the last consonant (Kannada keeps it before a halant already there).
-fn move_first_post_base_halant(indic: &IndicPlan<'_>, after_base: &mut [Info]) {
+fn move_first_post_base_halant(indic: &IndicPlan<'_, '_>, after_base: &mut [Info]) {
     let disallow_double_halants = indic.is(b"Knda");
     let Some(i) = after_base
         .iter()
@@ -625,7 +656,7 @@ fn attach_marks(syllable: &mut [Info]) {
 /// Sorts the syllable by position, keeping left matras in their order, and
 /// merges the clusters of what moved after the base; returns the new base.
 fn sort_syllable(
-    indic: &IndicPlan<'_>,
+    indic: &IndicPlan<'_, '_>,
     buffer: &mut Buffer,
     start: usize,
     end: usize,
@@ -695,13 +726,12 @@ fn sort_syllable(
 
 /// Gives the glyphs of a sorted syllable the masks of the forms they may take.
 fn set_masks(
-    indic: &IndicPlan<'_>,
-    face: &Face<'_>,
+    indic: &IndicPlan<'_, '_>,
     infos: &mut [Info],
-    start: usize,
+    Range { start, end }: Range<usize>,
     base: usize,
-    end: usize,
-) {
+    work: &mut WorkBudget,
+) -> Result<()> {
     for info in infos[start..end]
         .iter_mut()
         .take_while(|info| position(info) == Pos::RaToBecomeReph)
@@ -738,11 +768,13 @@ fn set_masks(
     let pref = indic.masks.pref;
     if pref != 0 && base + 2 < end {
         // A halant and Ra after the base that form a pre-base form.
-        if let Some(i) = (base + 1..end - 1).find(|&i| {
-            indic.would_substitute(face, indic.pref, &[infos[i].glyph, infos[i + 1].glyph])
-        }) {
-            infos[i].mask |= pref;
-            infos[i + 1].mask |= pref;
+        for i in base + 1..end - 1 {
+            let pair = [infos[i].glyph, infos[i + 1].glyph];
+            if indic.would_substitute(indic.pref, &pair, work)? {
+                infos[i].mask |= pref;
+                infos[i + 1].mask |= pref;
+                break;
+            }
         }
     }
 
@@ -764,13 +796,14 @@ fn set_masks(
             }
         }
     }
+    Ok(())
 }
 
 /// After the basic forms: finds the base again, moves left matras, reph and
 /// pre-base forms to their places by what the font formed, and marks a word
 /// initial left matra for `init`.
 fn final_reordering(
-    indic: &IndicPlan<'_>,
+    indic: &IndicPlan<'_, '_>,
     buffer: &mut Buffer,
     range: Range<usize>,
     virama: u32,
@@ -782,8 +815,7 @@ fn final_reordering(
         for info in &mut buffer.infos_mut()[start..end] {
             if info.glyph == virama && info.ligated() && info.multiplied() {
                 info.shaper[0] = Cat::H as u8;
-                info.glyph_props &=
-                    !(crate::buffer::glyph_props::LIGATED | crate::buffer::glyph_props::MULTIPLIED);
+                info.glyph_props = info.glyph_props.without_ligation();
             }
         }
     }
@@ -846,7 +878,7 @@ fn final_reordering(
 /// The base of a syllable after the basic forms, and whether a pre-base form
 /// may still need moving.
 fn final_base(
-    indic: &IndicPlan<'_>,
+    indic: &IndicPlan<'_, '_>,
     infos: &mut [Info],
     start: usize,
     end: usize,
@@ -921,7 +953,7 @@ fn final_base(
 /// are chillus or explicit viramas, to right before the base), merging their
 /// clusters up to the base; returns the base.
 fn move_left_matras(
-    indic: &IndicPlan<'_>,
+    indic: &IndicPlan<'_, '_>,
     buffer: &mut Buffer,
     start: usize,
     mut base: usize,
@@ -970,7 +1002,7 @@ fn move_left_matras(
 
 /// Where reph goes, by the script's reph position and what formed.
 fn reph_target(
-    indic: &IndicPlan<'_>,
+    indic: &IndicPlan<'_, '_>,
     infos: &[Info],
     start: usize,
     base: usize,
@@ -1109,11 +1141,14 @@ mod tests {
 
     #[test]
     fn configs_match_the_scripts() {
-        let telugu = Config::of(Script(*b"Telu"));
+        let telugu = Config::of(Script::from_code(*b"Telu"));
         assert_eq!(telugu.reph_mode, RephMode::Explicit);
         assert!(!telugu.below_forms_before_base);
-        assert_eq!(Config::of(Script(*b"Mlym")).reph_mode, RephMode::Logical);
-        assert!(!Config::of(Script(*b"Latn")).has_old_spec);
+        assert_eq!(
+            Config::of(Script::from_code(*b"Mlym")).reph_mode,
+            RephMode::Logical
+        );
+        assert!(!Config::of(Script::from_code(*b"Latn")).has_old_spec);
     }
 
     #[test]

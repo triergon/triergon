@@ -69,7 +69,7 @@ pub fn reference_properties(cp: u32) -> ReferenceProperties {
     ReferenceProperties {
         general_category: unicode::general_category(cp) as u8,
         combining_class: unicode::combining_class(cp),
-        script: u32::from_be_bytes(unicode::script(cp).0),
+        script: u32::from_be_bytes(unicode::script(cp).to_bytes()),
         mirroring: unicode::mirroring(cp),
         bidi_type,
         bracket,
