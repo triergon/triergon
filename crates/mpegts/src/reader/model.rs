@@ -31,11 +31,17 @@ impl<T> Deref for Shared<T> {
 }
 
 impl<T> Shared<T> {
-    pub(super) fn reserve(pool: &Budget) -> Result<Reservation> {
+    pub(super) fn shares_storage_with(&self, other: &Self) -> bool {
+        Arc::ptr_eq(&self.0, &other.0)
+    }
+    pub(super) fn allocation_bytes() -> Result<usize> {
         let (layout, _) = Layout::new::<[AtomicUsize; 2]>()
             .extend(Layout::new::<Owned<T>>())
             .map_err(|_| Error::Overflow)?;
-        pool.reserve(layout.pad_to_align().size())
+        Ok(layout.pad_to_align().size())
+    }
+    pub(super) fn reserve(pool: &Budget) -> Result<Reservation> {
+        pool.reserve(Self::allocation_bytes()?)
     }
     pub(super) fn new(value: T, charge: Reservation) -> Self {
         Self(Arc::new(Owned {
@@ -153,6 +159,12 @@ pub enum AccessUnit {
     Video(RawAccessUnit),
     Adts(AacAdtsFrame),
     Ac3(Ac3Frame),
+    /// Unfinished audio at logical EOF. This is a source fragment, not an AU.
+    IncompleteAudio {
+        range: Range<u64>,
+        bytes: Bytes,
+        reason: Error,
+    },
 }
 
 impl AccessUnit {
@@ -165,6 +177,7 @@ impl AccessUnit {
             Self::Ac3(frame) => {
                 frame.facts().offset..frame.facts().offset + frame.bytes().len() as u64
             }
+            Self::IncompleteAudio { range, .. } => range.clone(),
         }
     }
     pub(super) fn anchor_offset(&self) -> u64 {
@@ -184,7 +197,7 @@ impl AccessUnit {
     }
     pub(super) fn duration(&self) -> Result<Option<Time>> {
         match self {
-            Self::Video(_) => Ok(None),
+            Self::Video(_) | Self::IncompleteAudio { .. } => Ok(None),
             Self::Adts(frame) => {
                 let rate = frame
                     .header()
@@ -212,7 +225,8 @@ pub(super) struct PacketData {
 }
 
 /// One retained framed source unit. The neutral packet stream contains only
-/// complete AUs; header-only units use [`ReaderEvent::VideoHeaders`]. Cloning
+/// complete AUs; header-only units use [`ReaderEvent::VideoHeaders`] and unfinished
+/// audio uses [`ReaderEvent::IncompleteAudio`]. Cloning
 /// shares charged storage, without cloning an input-sized vector or losing its charge.
 #[derive(Clone, Debug)]
 pub struct Packet(pub(super) Shared<PacketData>);
@@ -300,4 +314,7 @@ pub enum ReaderEvent {
     /// An Annex-B source group without an admitted primary/base-layer picture.
     /// Its original NALs remain inspectable outside the neutral packet stream.
     VideoHeaders(Packet),
+    /// Original unfinished audio bytes at logical EOF, with validated PES
+    /// provenance and an optional one-use source clock. No complete AU is asserted.
+    IncompleteAudio(Packet),
 }
