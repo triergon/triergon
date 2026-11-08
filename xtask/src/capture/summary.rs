@@ -116,7 +116,7 @@ fn row(r: &Value) -> Result<String, String> {
         fixed(float(get(ratio, "median")?)?, 3),
         fixed(float(get(ratio, "upper_95")?)?, 3),
         if truthy(rt, "target_pass") {
-            " ✓0.80"
+            " ✓target"
         } else {
             ""
         },

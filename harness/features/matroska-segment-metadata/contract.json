@@ -66,8 +66,6 @@
   "required_targets": [
     "aarch64-unknown-linux-gnu"
   ],
-  "runtime_ratio_max": 1.2,
-  "memory_ratio_max_exclusive": 1.0,
   "minimum_pairs": 30,
   "confidence": 0.95,
   "required_additional_vectors": [
@@ -83,7 +81,5 @@
     "complete applicable FATE coverage and external sample rights review",
     "deferred targets"
   ],
-  "reference_view": "schema2: media tracks/packets plus public global/track/chapter/attachment dictionaries and static attachments; names/languages occur once in dictionaries; exact source originals/trees/target lists independently mandatory",
-  "runtime_optimization_ratio_target": 0.8,
-  "runtime_policy": "runtime-ceiling-1.20"
+  "reference_view": "schema2: media tracks/packets plus public global/track/chapter/attachment dictionaries and static attachments; names/languages occur once in dictionaries; exact source originals/trees/target lists independently mandatory"
 }

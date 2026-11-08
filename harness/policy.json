@@ -1,7 +1,6 @@
 {
   "schema": 1,
   "runtime": {
-    "id": "runtime-ceiling-1.20",
     "ratio_max": 1.2,
     "bound": "per-case upper bound of the paired 95% bootstrap interval of candidate/reference time",
     "optimisation_target": 0.8,

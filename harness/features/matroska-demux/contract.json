@@ -44,8 +44,6 @@
     "armv7-unknown-linux-gnueabihf"
   ],
   "target_scope": "qualification runs on native Linux ARM64; runtime and memory gates follow harness/policy.json",
-  "runtime_ratio_max": 1.2,
-  "memory_ratio_max_exclusive": 1.0,
   "minimum_pairs": 30,
   "confidence": 0.95,
   "absolute_limits": {
@@ -65,7 +63,5 @@
     "32-bit device qualification",
     "sustained fuzzing",
     "live-allocation instrumentation"
-  ],
-  "runtime_optimization_ratio_target": 0.8,
-  "runtime_policy": "runtime-ceiling-1.20"
+  ]
 }

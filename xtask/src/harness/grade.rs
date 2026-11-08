@@ -1132,12 +1132,7 @@ mod tests {
             };
             assert!(pilot_binding.registered(root).is_err(), "{feature}");
             let mut changed_contract = contract.clone();
-            put(
-                &mut changed_contract,
-                "runtime_ratio_max",
-                Value::float(2.0),
-            )
-            .unwrap();
+            put(&mut changed_contract, "minimum_pairs", Value::int(31)).unwrap();
             let changed_sha = sha256::hex(json::to_python(&changed_contract, Some(2)).as_bytes());
             let changed_binding = Binding {
                 contract: &changed_contract,
@@ -1732,7 +1727,7 @@ mod tests {
     }
 
     #[test]
-    fn external_grading_preserves_pending_module_requirements_and_gate_values() {
+    fn external_grading_preserves_pending_module_requirements_and_other_fields() {
         let contract = object(&[
             ("required_profiles", Value::strings(["authored"])),
             (
@@ -1743,9 +1738,7 @@ mod tests {
                 "pending_module_requirements",
                 Value::strings(["FATE pending", "broader scope"]),
             ),
-            ("runtime_ratio_max", Value::float(1.20)),
-            ("runtime_optimization_ratio_target", Value::float(0.80)),
-            ("memory_ratio_max_exclusive", Value::float(1.0)),
+            ("minimum_pairs", Value::int(30)),
         ]);
         let derived = external_contract(&contract, "external.mkv").unwrap();
         assert_eq!(

@@ -16,8 +16,9 @@ It is written from the published standards and measured case by case against FFm
 - **Safe Rust, zero dependencies.** Every crate forbids `unsafe`. The dependency graph
   is `std` and nothing else.
 - **As good as FFmpeg, or it does not ship.** Each module must match FFmpeg on its whole
-  declared feature set, run in at most 1.20× FFmpeg's time per case (target 0.80×) and
-  use less memory. Results are measured, paired and published per case.
+  declared feature set, stay within the [runtime ceiling](docs/quality.md#gates) of
+  FFmpeg's time per case and use less memory. Results are measured, paired and published
+  per case.
 - **Built for untrusted input.** Every input-dependent allocation is budgeted, every
   loop is bounded, and malformed data produces an error, never a panic or a hang.
 - **You own the I/O.** Parsers take byte windows and tell you which bytes they need

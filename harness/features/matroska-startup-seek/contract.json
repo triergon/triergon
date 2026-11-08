@@ -62,10 +62,6 @@
     "aarch64-unknown-linux-gnu"
   ],
   "iterations": 50,
-  "runtime_ratio_max": 1.2,
-  "memory_ratio_max_exclusive": 1.0,
   "minimum_pairs": 30,
-  "confidence": 0.95,
-  "runtime_optimization_ratio_target": 0.8,
-  "runtime_policy": "runtime-ceiling-1.20"
+  "confidence": 0.95
 }

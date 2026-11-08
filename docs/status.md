@@ -2,8 +2,9 @@
 
 Everything is experimental. No module has yet passed every gate on its complete scope
 (see [quality](quality.md)). Runtime is the worst per-case upper bound of
-`T_triergon / T_ffmpeg` (ceiling 1.20, target 0.80). Memory is peak heap and total
-resident peak RSS relative to FFmpeg. Unless noted, measurements are native AArch64 Linux.
+`T_triergon / T_ffmpeg`, graded against the [ceiling](quality.md#gates). Memory is peak
+heap and total resident peak RSS relative to FFmpeg. Unless noted, measurements are native
+AArch64 Linux.
 Containers, framing, subtitles and playback are measured against FFmpeg git revision
 `d32b387f` on the 9.0 branch; codecs, decode sessions and capture against the FFmpeg 9.0.2
 release ([reference pins](quality.md#reference-and-corpus)).
@@ -11,19 +12,19 @@ release ([reference pins](quality.md#reference-and-corpus)).
 | Area | Implemented | Verified against FFmpeg | Runtime | Memory | Open |
 |---|---|---|---|---|---|
 | Core | Charged storage, exact time, input windows, work budgets, neutral container model with one codec identity | 51,235 exact-arithmetic cases against an independent oracle | via dependents | via dependents | 32-bit target runs, fuzzing |
-| Matroska / WebM | Incremental reader: lacing, header removal, bounded zlib, Cues and preroll, colour and static HDR, chapters, tags, attachments, side data | 116 workloads in six feature groups, including an external HDR sample, and four host FATE demux comparisons | 1.1590 (116/116 within 1.20) | heap ≤0.627, RSS ≤0.965 | full EBML/Matroska scope |
-| Matroska startup and seek | Startup and seek with lazy scan replay | 44 cases, 1,344 packets | 1.1606 (44/44 within 1.20) | heap ≤0.404, total RSS ≤0.849 | — |
+| Matroska / WebM | Incremental reader: lacing, header removal, bounded zlib, Cues and preroll, colour and static HDR, chapters, tags, attachments, side data | 116 workloads in six feature groups, including an external HDR sample, and four host FATE demux comparisons | 1.1590 (116/116 pass) | heap ≤0.627, RSS ≤0.965 | full EBML/Matroska scope |
+| Matroska startup and seek | Startup and seek with lazy scan replay | 44 cases, 1,344 packets | 1.1606 (44/44 pass) | heap ≤0.404, total RSS ≤0.849 | — |
 | Matroska audio clocks | AAC, AC-3, E-AC-3 startup and forward clocks | 10 inputs | 0.17 | heap 0.07, RSS 0.60 | audio seek |
-| ISO BMFF / MP4 | Regular and fragmented files, edit lists, seek and range plans, neutral `ContainerReader` over seekable sources, QuickTime compatibility, bounded AAC configuration and regular table recovery, timing, sync and terminal media prefixes; AVC, HEVC, AAC, AC-3, E-AC-3, DTS core, AV1, VP9 | 255 inputs, 1,020 open and index comparisons (972 matching outputs and 48 matching refusal outcomes with compatibility policies) | 1.1273 (972/972 within 1.20) | heap ≤0.4133, total RSS ≤0.7283 (972/972) | seek and range-plan timing; neutral reader not yet compared with FFmpeg |
+| ISO BMFF / MP4 | Regular and fragmented files, edit lists, seek and range plans, neutral `ContainerReader` over seekable sources, QuickTime compatibility, bounded AAC configuration and regular table recovery, timing, sync and terminal media prefixes; AVC, HEVC, AAC, AC-3, E-AC-3, DTS core, AV1, VP9 | 255 inputs, 1,020 open and index comparisons (972 matching outputs and 48 matching refusal outcomes with compatibility policies) | 1.1273 (972/972 pass) | heap ≤0.4133, total RSS ≤0.7283 (972/972) | seek and range-plan timing; neutral reader not yet compared with FFmpeg |
 | MPEG-TS | PSI, continuity, PES assembly; TS188 and M2TS192 | 272-request set (80 field matches, 23 open), recorded; no runner in the repository | not measured | not measured | access-unit demux, broader profiles |
-| HLS segments | Independent TS188 segments with contiguous AVC or HEVC video and AAC, AC-3 or E-AC-3 audio | 71 packet comparisons, 71 measured workloads | 1.1808 (71/71 within 1.20) | heap ≤0.022, total RSS ≤0.722 | other profiles |
-| Packet framing | AVC/HEVC configuration and NAL framing, AV1, VP9, AC-3, E-AC-3, DTS core | 125 reference matches for AVC/HEVC; DTS core byte-exact on 37,125 projections and 1,172 FATE packets, recorded; no runner in the repository | 1.1772 (125/125 within 1.20 for AVC/HEVC) | heap ≤0.985, total RSS ≤0.990 on the same 125 cases | full AVC/HEVC/ADTS grammar |
+| HLS segments | Independent TS188 segments with contiguous AVC or HEVC video and AAC, AC-3 or E-AC-3 audio | 71 packet comparisons, 71 measured workloads | 1.1808 (71/71 pass) | heap ≤0.022, total RSS ≤0.722 | other profiles |
+| Packet framing | AVC/HEVC configuration and NAL framing, AV1, VP9, AC-3, E-AC-3, DTS core | 125 reference matches for AVC/HEVC; DTS core byte-exact on 37,125 projections and 1,172 FATE packets, recorded; no runner in the repository | 1.1772 (125/125 pass for AVC/HEVC) | heap ≤0.985, total RSS ≤0.990 on the same 125 cases | full AVC/HEVC/ADTS grammar |
 | Subtitles, text | SRT, WebVTT, ASS passthrough, mov_text and tx3g to ASS, charset handling | 82 mov_text cases, 79 tx3g regressions | not measured | not measured | timing and memory |
 | Subtitles, bitmap | PGS, DVB display state and colour lookup, DVD units | 229 PGS cases, replayed by tests from recorded output; 5,300 DVB display sets, recorded; no runner in the repository | PGS 1.11 | PGS heap 0.62, RSS 0.90 | full PGS recovery, DVB and DVD decoding |
 | Playback | Matroska, MP4, TS and raw AVC/HEVC feeds; seeking; end-of-file continuation | 746 of 998 matrix rows | not measured | not measured | most profiles unmeasured |
-| Codecs | H.264 8-bit 4:2:0; HEVC Main and Main10; AAC LC, HE, HEv2; AC-3 and E-AC-3; DTS core with XCh and X96 | 417/417 comparable conformance and FATE vectors | 1.0524 (17/17 within 1.20) | heap 0.92, RSS 0.82 | error concealment, unverified tool paths |
+| Codecs | H.264 8-bit 4:2:0; HEVC Main and Main10; AAC LC, HE, HEv2; AC-3 and E-AC-3; DTS core with XCh and X96 | 417/417 comparable conformance and FATE vectors | 1.0524 (17/17 pass) | heap 0.92, RSS 0.82 | error concealment, unverified tool paths |
 | Decode sessions | Bounded queues, clock-gated output, flush and seek, RGBA letterbox, stereo mix | with the codecs | 1.0524 | with the codecs | — |
-| Capture | RGBA to YUV 4:2:0, MPEG-1 video, MPEG-TS mux | 15/15 quality cases against FFmpeg 9.0.2 | 1.1210 (15/15 within 1.20) | heap ≤0.548, total RSS ≤0.978 (15/15) | — |
+| Capture | RGBA to YUV 4:2:0, MPEG-1 video, MPEG-TS mux | 15/15 quality cases against FFmpeg 9.0.2 | 1.1210 (15/15 pass) | heap ≤0.548, total RSS ≤0.978 (15/15) | — |
 
 ## Measured revisions
 

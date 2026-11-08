@@ -5,7 +5,7 @@
  "root": "worktree root (paths relative)",
  "gates": [
   "correctness per NUMERIC-RULES.json / DOWNMIX-CONTRACT.json",
-  "paired TIME 30 pairs seed 280 upper95 <= 1.20 (target 0.80)",
+  "paired TIME 30 pairs seed 280, upper95 within the runtime gate of harness/policy.json",
   "MEM heap and attributable RSS upper95 < 1 (frozen memory engine)"
  ],
  "note": "Decoder conformance vectors are graded for correctness separately (all selected FATE conformance vectors); these workloads carry the performance and memory gates.",
