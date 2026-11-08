@@ -47,8 +47,8 @@
  "sets": [
   {
    "name": "packet-framing-cycle-profiles",
-   "retention": "90 days",
-   "key": "qualification/packet-framing-cycle-profiles/7783e7f734e2f5dc254ae31ac4253f2ceacc7d463e9d881b12df80a836fd2c7e.tar.gz",
+   "retention": "retained",
+   "key": "evidence/packet-framing-cycle-profiles/7783e7f734e2f5dc254ae31ac4253f2ceacc7d463e9d881b12df80a836fd2c7e.tar.gz",
    "sha256": "7783e7f734e2f5dc254ae31ac4253f2ceacc7d463e9d881b12df80a836fd2c7e"
   },
   {
@@ -62,8 +62,8 @@
   },
   {
    "name": "packet-framing-avc-update-comparison",
-   "retention": "90 days",
-   "key": "qualification/repository/packet-framing-avc-update-comparison/e649660bb52b77f2ce3343f8902de7e0b5a592f32af271fa1ffacdfd7cd47a18.tar.gz",
+   "retention": "retained",
+   "key": "evidence/repository/packet-framing-avc-update-comparison/e649660bb52b77f2ce3343f8902de7e0b5a592f32af271fa1ffacdfd7cd47a18.tar.gz",
    "sha256": "e649660bb52b77f2ce3343f8902de7e0b5a592f32af271fa1ffacdfd7cd47a18"
   },
   {
@@ -11204,8 +11204,8 @@
   },
   {
    "name": "packet-framing-job-comparison",
-   "retention": "90 days",
-   "key": "qualification/repository/packet-framing-job-comparison/a6d31d0ef8e2173a90375e7a148ab363000eeeeb66e86673dee6095261e154bb.tar.gz",
+   "retention": "retained",
+   "key": "evidence/repository/packet-framing-job-comparison/a6d31d0ef8e2173a90375e7a148ab363000eeeeb66e86673dee6095261e154bb.tar.gz",
    "sha256": "a6d31d0ef8e2173a90375e7a148ab363000eeeeb66e86673dee6095261e154bb"
   },
   {
@@ -11246,8 +11246,8 @@
   },
   {
    "name": "packet-framing-state-count",
-   "retention": "90 days",
-   "key": "qualification/repository/packet-framing-state-count/8aea98645aae1e87b73bc78bcf7c5582d448e56ad6e5e063977b52984468225d.tar.gz",
+   "retention": "retained",
+   "key": "evidence/repository/packet-framing-state-count/8aea98645aae1e87b73bc78bcf7c5582d448e56ad6e5e063977b52984468225d.tar.gz",
    "sha256": "8aea98645aae1e87b73bc78bcf7c5582d448e56ad6e5e063977b52984468225d"
   },
   {
@@ -11258,14 +11258,14 @@
   },
   {
    "name": "packet-framing-hevc-resource-traces",
-   "retention": "90 days",
-   "key": "qualification/repository/packet-framing-hevc-resource-traces/d1e42e66fe5cee6f254f406e848dd21a11e6438d1ef03c9fcb2c08099277d884.tar.gz",
+   "retention": "retained",
+   "key": "evidence/repository/packet-framing-hevc-resource-traces/d1e42e66fe5cee6f254f406e848dd21a11e6438d1ef03c9fcb2c08099277d884.tar.gz",
    "sha256": "d1e42e66fe5cee6f254f406e848dd21a11e6438d1ef03c9fcb2c08099277d884"
   },
   {
    "name": "packet-framing-inline-comparison",
-   "retention": "90 days",
-   "key": "qualification/repository/packet-framing-inline-comparison/00e323c5bfcdb0f12a190defae773a86c4a6b9503a701d98a32b46bd9aab73ff.tar.gz",
+   "retention": "retained",
+   "key": "evidence/repository/packet-framing-inline-comparison/00e323c5bfcdb0f12a190defae773a86c4a6b9503a701d98a32b46bd9aab73ff.tar.gz",
    "sha256": "00e323c5bfcdb0f12a190defae773a86c4a6b9503a701d98a32b46bd9aab73ff"
   },
   {
@@ -11276,8 +11276,8 @@
   },
   {
    "name": "packet-framing-segment-resource-traces",
-   "retention": "90 days",
-   "key": "qualification/repository/packet-framing-segment-resource-traces/1965e5119dba69d4ad03b1d3ca8c5503c091d45c1b13a46c2cdff21ed02a66a4.tar.gz",
+   "retention": "retained",
+   "key": "evidence/repository/packet-framing-segment-resource-traces/1965e5119dba69d4ad03b1d3ca8c5503c091d45c1b13a46c2cdff21ed02a66a4.tar.gz",
    "sha256": "1965e5119dba69d4ad03b1d3ca8c5503c091d45c1b13a46c2cdff21ed02a66a4"
   },
   {
