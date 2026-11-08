@@ -8,6 +8,7 @@ use crate::books;
 use crate::header::{MAX_SET_CH, SetHeader};
 use crate::tables::{JOINT_SCALE, SCALE_6BIT, SCALE_7BIT, STEP_LOSSLESS, STEP_LOSSY};
 use crate::vq::{ADPCM_VQ, HF_VQ};
+use triergon_codec::{Budget, BudgetVec, StorageError};
 
 /// ADPCM history length (NumADPCMCoeff).
 pub(crate) const HIST: usize = 4;
@@ -20,43 +21,51 @@ pub(crate) const MAX_T: usize = 128;
 /// 16 samples per band, a small fraction of the 128 the syntax allows).
 #[derive(Debug)]
 pub(crate) struct SubBuf {
-    data: Vec<f32>,
+    data: BudgetVec<f32>,
+    slots: usize,
     bands: usize,
     stride: usize,
     /// Last `HIST` reconstructed samples of every row, saved before synthesis-side
     /// in-place processing (sum/difference, down-mix removal, X96 recombination).
-    saved: Vec<f32>,
+    saved: BudgetVec<f32>,
 }
 
 impl SubBuf {
-    pub(crate) fn new(slots: usize, bands: usize) -> Self {
+    /// Rows for up to `slots` slots of `bands` bands, allocated by the first frame.
+    pub(crate) fn new(budget: &Budget, slots: usize, bands: usize) -> Self {
         Self {
-            data: Vec::new(),
+            data: BudgetVec::new(budget),
+            slots,
             bands,
             stride: HIST,
-            saved: vec![0.0; slots * bands * HIST],
+            saved: BudgetVec::new(budget),
         }
     }
 
     /// Room for `slots` slots of frames with `samples` subband samples. A longer frame
     /// changes the row layout, which is only valid before any row of the frame is
     /// written (the first `start_frame` of a frame); more slots only append rows.
-    fn reserve(&mut self, slots: usize, samples: usize) {
+    /// A refused charge changes nothing.
+    fn reserve(&mut self, slots: usize, samples: usize) -> Result<(), StorageError> {
+        if self.saved.is_empty() {
+            self.saved.try_resize(self.slots * self.bands * HIST, 0.0)?;
+        }
         let stride = self.stride.max(HIST + samples.min(MAX_T));
         let len = (slots * self.bands * stride).max(self.data.len() / self.stride * stride);
         if stride != self.stride || len > self.data.len() {
+            self.data.try_resize(len, 0.0)?;
             self.stride = stride;
-            self.data.resize(len, 0.0);
         }
+        Ok(())
     }
 
-    #[inline]
+    #[inline(always)]
     pub(crate) fn row_mut(&mut self, slot: usize, band: usize) -> &mut [f32] {
         let o = (slot * self.bands + band) * self.stride;
         &mut self.data[o..o + self.stride]
     }
 
-    #[inline]
+    #[inline(always)]
     pub(crate) fn row(&self, slot: usize, band: usize) -> &[f32] {
         let o = (slot * self.bands + band) * self.stride;
         &self.data[o..o + self.stride]
@@ -68,29 +77,34 @@ impl SubBuf {
         slots: core::ops::Range<usize>,
         samples: usize,
         keep: bool,
-    ) {
-        self.reserve(slots.end, samples);
-        for s in slots {
-            for b in 0..self.bands {
-                let r = s * self.bands + b;
-                let o = r * self.stride;
-                if keep {
-                    self.data[o..o + HIST].copy_from_slice(&self.saved[r * HIST..r * HIST + HIST]);
-                } else {
-                    self.data[o..o + HIST].iter_mut().for_each(|v| *v = 0.0);
-                }
+    ) -> Result<(), StorageError> {
+        self.reserve(slots.end, samples)?;
+        let (rows, stride) = (
+            slots.start * self.bands..slots.end * self.bands,
+            self.stride,
+        );
+        let data = &mut self.data[rows.start * stride..rows.end * stride];
+        let saved = &self.saved[rows.start * HIST..rows.end * HIST];
+        for (row, hist) in data.chunks_exact_mut(stride).zip(saved.chunks_exact(HIST)) {
+            if keep {
+                row[..HIST].copy_from_slice(hist);
+            } else {
+                row[..HIST].fill(0.0);
             }
         }
+        Ok(())
     }
 
     /// Save the last `HIST` samples of a frame of `len` samples as the next history.
     pub(crate) fn save_history(&mut self, slots: core::ops::Range<usize>, len: usize) {
-        for s in slots {
-            for b in 0..self.bands {
-                let r = s * self.bands + b;
-                let o = r * self.stride + len;
-                self.saved[r * HIST..r * HIST + HIST].copy_from_slice(&self.data[o..o + HIST]);
-            }
+        let (rows, stride) = (
+            slots.start * self.bands..slots.end * self.bands,
+            self.stride,
+        );
+        let data = &self.data[rows.start * stride..rows.end * stride];
+        let saved = &mut self.saved[rows.start * HIST..rows.end * HIST];
+        for (hist, row) in saved.chunks_exact_mut(HIST).zip(data.chunks_exact(stride)) {
+            hist.copy_from_slice(&row[len..len + HIST]);
         }
     }
 }

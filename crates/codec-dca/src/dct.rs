@@ -8,11 +8,11 @@ const MAX_M: usize = 32;
 #[derive(Debug)]
 pub(crate) struct Dct4 {
     n: usize,
-    pre: Vec<(f32, f32)>,
-    post: Vec<(f32, f32)>,
+    pre: [(f32, f32); MAX_M],
+    post: [(f32, f32); MAX_M],
     /// FFT twiddles e^{-2 pi i j / M}, j < M/2.
-    tw: Vec<(f32, f32)>,
-    rev: Vec<u8>,
+    tw: [(f32, f32); MAX_M / 2],
+    rev: [u8; MAX_M],
 }
 
 impl Dct4 {
@@ -21,27 +21,21 @@ impl Dct4 {
         let m = n / 2;
         let log2m = m.trailing_zeros();
         let pi = std::f64::consts::PI;
-        let pre = (0..m)
-            .map(|k| {
-                let a = -pi * (k as f64 + 0.25) / n as f64;
-                (a.cos() as f32, a.sin() as f32)
-            })
-            .collect();
-        let post = (0..m)
-            .map(|k| {
-                let a = -pi * k as f64 / n as f64;
-                (a.cos() as f32, a.sin() as f32)
-            })
-            .collect();
-        let tw = (0..m / 2)
-            .map(|j| {
-                let a = -2.0 * pi * j as f64 / m as f64;
-                (a.cos() as f32, a.sin() as f32)
-            })
-            .collect();
-        let rev = (0..m)
-            .map(|i| ((i as u32).reverse_bits() >> (32 - log2m)) as u8)
-            .collect();
+        let mut pre = [(0.0, 0.0); MAX_M];
+        let mut post = [(0.0, 0.0); MAX_M];
+        let mut tw = [(0.0, 0.0); MAX_M / 2];
+        let mut rev = [0; MAX_M];
+        for k in 0..m {
+            let a = -pi * (k as f64 + 0.25) / n as f64;
+            pre[k] = (a.cos() as f32, a.sin() as f32);
+            let a = -pi * k as f64 / n as f64;
+            post[k] = (a.cos() as f32, a.sin() as f32);
+            rev[k] = ((k as u32).reverse_bits() >> (32 - log2m)) as u8;
+        }
+        for (j, t) in tw[..m / 2].iter_mut().enumerate() {
+            let a = -2.0 * pi * j as f64 / m as f64;
+            *t = (a.cos() as f32, a.sin() as f32);
+        }
         Self {
             n,
             pre,

@@ -171,6 +171,7 @@ w('#![allow(clippy::unreadable_literal, clippy::excessive_precision)]')
 w('')
 w('/// Two-level Huffman lookup: `(symbol, len)`; `len > 0` leaf with total code length,')
 w('/// `len < 0` subtable at offset `symbol` indexed by the next `-len` bits.')
+w('#[derive(Debug)]')
 w('pub struct HuffBook { pub primary_bits: u32, pub max_len: u32, pub lut: &\'static [(i16, i8)] }')
 w('')
 for name in order:
@@ -252,16 +253,6 @@ assert sorted(js) == list(range(129)), sorted(js)
 w('/// ETSI TS 102 114 Annex D.3: joint intensity scale factors (index = code + 64).')
 w('pub static JOINT_SCALE: [f32; 129] = [%s];' % ', '.join(js[i] + ('' if '.' in js[i] else '.0') for i in range(129)))
 
-# D.4 dynamic range: log multiplier in dB, index 0..255
-d5start = find(r"^D\.5\s+Huffman Code Books")
-drc = {}
-for i in range(d4, d5start):
-    for m in re.finditer(r'(\d+)\s+(\d,\d+)\s+(\d+,\d+)\s+(-?\d+,\d+)', lines[i]):
-        drc[int(m.group(1))] = m.group(4).replace(',', '.')
-assert sorted(drc) == list(range(256)), (len(drc))
-w('/// ETSI TS 102 114 Annex D.4: dynamic range control log multiplier (dB) by RANGE index.')
-w('pub static DRC_DB: [f32; 256] = [%s];' % ', '.join(drc[i] for i in range(256)))
-
 # ---------------------------------------------------------------- D.8 / D.9 FIRs
 FLT = r'-?\d,\d+e[-+]\d+'
 d8 = find(r'^D\.8\s+32-Band Interpolation')
@@ -276,11 +267,12 @@ for i in range(d8, d9):
             cols[k][idx] = m.group(k + 2).replace(',', '.')
 for c in cols:
     assert sorted(c) == list(range(512)), len(c)
-names = [('QMF_PERFECT', 'perfect reconstruction 32-band interpolation FIR'),
-         ('QMF_NONPERFECT', 'non-perfect reconstruction 32-band interpolation FIR'),
+# Column 0, the perfect-reconstruction prototype, is not emitted: the decoder uses the one
+# FFmpeg applies (src/pr_table.rs, recover_pr.py).
+names = [('QMF_NONPERFECT', 'non-perfect reconstruction 32-band interpolation FIR'),
          ('LFE_FIR_64', 'LFE 64x interpolation FIR'),
          ('LFE_FIR_128', 'LFE 128x interpolation FIR')]
-for (n, desc), c in zip(names, cols):
+for (n, desc), c in zip(names, cols[1:]):
     w('/// ETSI TS 102 114 Annex D.8: %s.' % desc)
     w('pub static %s: [f64; 512] = [' % n)
     for k in range(0, 512, 8):

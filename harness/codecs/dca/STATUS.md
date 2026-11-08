@@ -10,9 +10,10 @@ Synthetic stream names below are scenarios of `examples/synth.rs`.
 
 - `gen_tables.py` writes `src/tables.rs` from the V1.6.1 text: 62 Huffman books (level
   set, exact Kraft sum, prefix freedom checked), scale factors, step sizes, joint scales,
-  DRC, and the D.8/D.9 FIRs. Errata: Table D129 prints level 37 twice (code 1581 is −37);
+  and the D.8/D.9 FIRs. Errata: Table D129 prints level 37 twice (code 1581 is −37);
   Table D65 drops ±31/±32 at a page break and is taken from V1.3.1 after checking every
-  row V1.6.1 prints.
+  row V1.6.1 prints. Neither the D.4 DRC table nor the D.8 perfect-reconstruction
+  prototype is emitted; the decoder uses neither.
 - D.10.1 ADPCM (4096×4) and D.10.2 HF VQ (1024×32) codebooks: recovered from FFmpeg's
   output on probe streams (`synth adpcm_probe|hfvq_probe` → `recover_vq.py` →
   `gen_vq.py` → `src/vq.rs`) by per-band impulse-response least squares and inversion of
@@ -21,7 +22,7 @@ Synthetic stream names below are scenarios of `examples/synth.rs`.
   100, 200) agree on all entries except one where q = 200 saturates.
 - Perfect-reconstruction prototype (`src/pr_table.rs`): measured from FFmpeg's FILTS = 1
   impulse responses (`recover_pr.py`, resynthesis error 1.25e-7). It differs from Annex
-  D.8 by up to 5.9e-6; FILTS = 0 matches D.8.
+  D.8 (read from the V1.6.1 text) by up to 5.9e-6; FILTS = 0 matches D.8.
 - `regenerate_tables.sh` reruns the whole chain and compares both files byte for byte.
 
 ## Calibrations
