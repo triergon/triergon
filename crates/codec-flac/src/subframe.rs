@@ -104,7 +104,7 @@ fn read_warm_up<S: Sample>(
 }
 
 /// Precision, shift and coefficients of an LPC subframe. The coefficients are returned
-/// oldest sample first, the order the restoring kernel reads them in.
+/// newest sample first, as coded.
 fn read_lpc(
     reader: &mut CachedBitReader<'_>,
     sample_bits: u32,
@@ -118,7 +118,7 @@ fn read_lpc(
     let shift = u32::try_from(reader.read_signed(5))
         .map_err(|_| DecodeError::Unsupported("negative LPC shift"))?;
     let mut coefficients = [0; MAX_ORDER];
-    for c in coefficients[..order].iter_mut().rev() {
+    for c in &mut coefficients[..order] {
         *c = reader.read_signed(precision);
     }
     let accumulator = Accumulator::for_lpc(sample_bits, precision, order);
