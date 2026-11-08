@@ -21,8 +21,21 @@ The crate exposes two views:
 
 The non-default `reference-trace` feature adds `reference_trace`, the projections
 that exist only to compare traces with FFmpeg: `recovery` (packets from rejected
-carriers), `catalogue` (programs and streams), `packet_completion` (inputs without
-media), `dvb` and `input`.
+carriers), `catalogue` (programs and streams), `dvb` and `input`.
+Its `packet_completion` module re-exports the consumer policy in `compat::pes`.
+
+`compat::pes::PacketCompletion` confirms that one physical input contained only
+control traffic. Feed it every source event with its actual `SourceContext`,
+seal the `TransportStream::media_entity_end` witness before logical EOF, then
+observe source `Finished` and call `confirm_no_media`. A `NoMediaConfirmation`
+requires contiguous physical carrier coverage and a matching core EOF. Only
+PAT, associated PMT, null and no-payload carriers qualify; unexplained payload,
+rejected transport, source PES and unfinished PMT sections remain refusals.
+Malformed PSI and its diagnostics stay source facts rather than becoming
+validated tables or a PES scope. `source_diagnostics()` retains those faults.
+Use `required_work()` and `required_end_work()` for admission grants; an
+insufficient grant leaves the event unconsumed. Errors after admission are
+sticky, and cancellation cannot publish a confirmation.
 
 ## Usage
 
@@ -260,28 +273,32 @@ Verification:
   through `playback-worker`'s `ts-` modes, which use the public API only:
   `TransportStream` selects the program, its first active PMT binds a
   `compat::pes::DemuxObserver` to the one elementary stream, and `DemuxClock`
-  places the timestamps. The 272 recorded requests are 97 compat-view
-  operations, of which 66 match. The 168 requests for the strict source view, 64
+  places the timestamps. A typed program-policy or empty-observation refusal
+  with no emitted packets and one entity can complete through a bounded
+  control-only replay and a real `NoMediaConfirmation`. Other refusals remain
+  failures. The replay runs inside the measured operation.
+  The 272 recorded requests are 97 compat-view operations. A live comparison on
+  macOS (`aarch64-apple-darwin`, Rust 1.99.1) runs all 97 through the candidate
+  and pinned FFmpeg formats worker and checks both against the unchanged recorded
+  expected folds: 81 match, including 15 control-only inputs. This result uses
+  source `6c0240a9` plus completion patch `6b62bb730412`; report `7558a50cdf03`
+  records the binaries and source graph. Full source and evidence hashes are in
+  [status](../../docs/status.md#measured-revisions).
+  The 168 requests for the strict source view, 64
   of them for its native clock, are replayed as the compat-view operation on
   their inputs: the strict source view and its native clock are not compared.
-  The 31 operations that do not match are open cases that need a program-level
-  reader (the MPEG-TS `ContainerReader`): PAT/PMT routing, clock and format
-  boundaries, recovery of rejected and damaged carriers, input across media
-  entities, or a program-level outcome where neither side emits a packet. They
+  The 16 unmatched operations cover clock and format boundaries, recovery of
+  rejected and damaged carriers, input across media entities, and malformed
+  transport or PES whose empty result the completion policy cannot prove. They
   are `pcr-timeline-discontinuity`, `pcr-extension-invalid`, `transport-tei`,
   `transport-scrambled`, `transport-afc-reserved`,
   `transport-adaptation-overrun`, `transport-partial-final-packet`,
-  `transport-sync-loss`, `psi-crc-invalid`, `psi-pointer-overrun`,
-  `psi-length-over-policy`, `psi-pending-not-current`,
-  `pat-atomic-two-sections`, `pat-incomplete-version`,
-  `pat-network-pid-not-track`, `psi-pointer-finishes-old-starts-new`,
-  `psi-two-sections-one-payload`, `pmt-version-wrap-retypes-pid`,
-  `pmt-opaque-language-descriptors`, `pmt-descriptor-overrun`,
-  `pmt-multi-section-forbidden`, `psi-stuffing-tail-invalid`,
-  `psi-truncated-eof`, `pes-timestamp-marker`, `pes-forbidden-time-flags`,
+  `transport-sync-loss`, `pes-timestamp-marker`, `pes-forbidden-time-flags`,
   `pes-optional-header-overrun`, `pes-start-prefix-invalid`,
   `hls-contiguous-pes-carry`, `hls-external-map`, `hls-explicit-discontinuity`,
-  `opcr-without-pcr-invalid`. On the 66, the worst runtime bound is 1.0029 of
+  `opcr-without-pcr-invalid`. These PES comparisons do not qualify source access
+  units. The last native gate covered 66 matching operations; this completion
+  policy has not been measured there. On those 66, the worst runtime bound is 1.0029 of
   the reference, peak heap at most 0.073 and total resident RSS at most 0.818 of
   it.
 

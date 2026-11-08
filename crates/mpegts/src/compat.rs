@@ -45,6 +45,13 @@ pub mod pes {
         PrivateAudioDescriptors, ReadyContinuation, RegisteredCarriage, SourceContext,
         pcr_bounded_pts, selected_track_kind,
     };
+    /// Control-only completion from complete physical carrier coverage and
+    /// actual source EOF. The confirmation never creates a validated PES scope
+    /// or accepts media from a rejected carrier.
+    pub use crate::packet_completion::{
+        ControlCarrierKind, ControlPatFact, NoMediaConfirmation, PacketCompletion, PhysicalCarrier,
+        PhysicalNullRun,
+    };
 }
 
 pub mod stream {
