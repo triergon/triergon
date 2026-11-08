@@ -768,8 +768,12 @@ static void raster_clip(const RasterCase *c, RasterWork *w) {
     raster_renderer->settings.top_margin = v[15];
     raster_renderer->frame_content_width = v[16] - v[14];
     raster_renderer->frame_content_height = v[17] - v[15];
-    ASS_Image *head = NULL, **tail = &head;
-    render_glyph(state, &bm, v[4], v[5], 1, 2, v[6], tail, IMAGE_TYPE_CHARACTER, NULL);
+    ASS_Image *head = NULL;
+    /* render_glyph leaves the last image's next unset and returns where it is;
+     * libass terminates the list (ass_render_frame's *tail = NULL). */
+    ASS_Image **tail = render_glyph(state, &bm, v[4], v[5], 1, 2, v[6], &head,
+                                    IMAGE_TYPE_CHARACTER, NULL);
+    *tail = NULL;
     int64_t count = 0;
     for (ASS_Image *img = head; img; img = img->next) count++;
     raster_value(w, RASTER_OK);
