@@ -16,6 +16,7 @@
     )),
     allow(unused_imports, unused_variables, unreachable_code)
 )]
+use std::io::Read as _;
 use std::sync::atomic::AtomicBool;
 use triergon_core::container::{
     ContainerReader, Event, PacketInfo, RandomAccess, ReaderStep, SeekRequest, TrackId, TrackInfo,
@@ -296,6 +297,28 @@ impl AnyReader {
         }
     }
 }
+
+/// A reader for whichever format `source` holds, fed from it: the first 64 KiB are
+/// probed, then the source is read from its start.
+pub fn open_blocking<S: std::io::Read + std::io::Seek>(
+    mut source: S,
+    pool: &Budget,
+) -> Result<triergon_core::blocking::Blocking<AnyReader, S>> {
+    let capabilities = triergon_core::blocking::seekable_capabilities(&mut source)?;
+    let mut prefix = Vec::with_capacity(PROBE_BYTES);
+    std::io::Read::by_ref(&mut source)
+        .take(PROBE_BYTES as u64)
+        .read_to_end(&mut prefix)
+        .map_err(|e| Error::Io(e.kind()))?;
+    source.rewind().map_err(|e| Error::Io(e.kind()))?;
+    let reader = AnyReader::open(&prefix, pool, SourceId(1), capabilities)?;
+    Ok(triergon_core::blocking::Blocking::seekable(
+        reader, source, pool,
+    ))
+}
+
+/// Bytes [`open_blocking`] probes.
+const PROBE_BYTES: usize = 64 * 1024;
 
 impl PacketInfo for AnyPacket {
     #[inline]
