@@ -427,7 +427,7 @@ impl<'f> SizedFont<'f> {
 
 /// libass's `double_to_d6`: pixels to 26.6, rounding half to even.
 pub fn pixels_26_6(pixels: f64) -> i32 {
-    (pixels * 64.0).round_ties_even() as i32
+    triergon_core::round_ties_even_i32(pixels * 64.0)
 }
 
 #[cfg(test)]
