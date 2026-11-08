@@ -16121,6 +16121,338 @@
      "sha256": "48de7d428eb7cf3a8464e07cb97b5133d3898190f0f656e655a8f8dc244588bb"
     }
    ]
+  },
+  {
+   "name": "h264-dequant-linux-arm64",
+   "path": "h264-dequant-linux-arm64",
+   "retention": "retained",
+   "reason": "Cited decoder and capture identities, function comparisons, instruction counts, H.264 fuzz campaigns and finding replays of the wrapping H.264 scaling and transform arithmetic against main at 290b3f15",
+   "key": "evidence/h264-dequant-linux-arm64/8c20b422624b6b6e355c89c6a99a1817d7635c756a0e884feabb60af7d30e202.tar.gz",
+   "sha256": "8c20b422624b6b6e355c89c6a99a1817d7635c756a0e884feabb60af7d30e202",
+   "bytes": 235103,
+   "source_revision": "137c38034b48bbafc80acf812a12aa332ac13bb1",
+   "files": [
+    {
+     "path": "h264-dequant-linux-arm64/README.txt",
+     "sha256": "98c703fbfcb4d107172d725183572a8753b575145f7ad0e138d395a24092ec1f"
+    },
+    {
+     "path": "h264-dequant-linux-arm64/instance/setup.sh",
+     "sha256": "7a316fddb8affe4f89517a5ab20c835a52527d56b87ec8b8e859c6ac2fed9a92"
+    },
+    {
+     "path": "h264-dequant-linux-arm64/instance/chain5.sh",
+     "sha256": "b5be415fe9adea326656ac38ecefcde79c94c7d71ff2817971d89368192585f1"
+    },
+    {
+     "path": "h264-dequant-linux-arm64/instance/cap-main.json",
+     "sha256": "983381b99f1532d1d0fcc6073e7e0113d8bf12476440844a8d8f85c02474f2bc"
+    },
+    {
+     "path": "h264-dequant-linux-arm64/instance/fuzz-h264-290.log",
+     "sha256": "0cd4a494d2db8e5072419f1a2ba76c024f36cb7f91313c9a7113749c8fe31ba4"
+    },
+    {
+     "path": "h264-dequant-linux-arm64/instance/run.log",
+     "sha256": "649dbcea02f2d812a00f23c7d7a572eca274b144cdf12b66996d31a982498509"
+    },
+    {
+     "path": "h264-dequant-linux-arm64/instance/fuzz-h264-291.log",
+     "sha256": "12c5fbe1e9c81f0b876f58f9316443e033ea3af1db8b627b543258fe0712eaf7"
+    },
+    {
+     "path": "h264-dequant-linux-arm64/instance/eq-main.json",
+     "sha256": "4dc96ff7dd6e806054dc5f3da37ac398bec0a450158dbd0c50623b1dd0557d36"
+    },
+    {
+     "path": "h264-dequant-linux-arm64/instance/sc-capture-worker.txt",
+     "sha256": "f492e2294f42bca6940ccee399413b3d626ddce201590b856f4803c824985df6"
+    },
+    {
+     "path": "h264-dequant-linux-arm64/instance/run.sh",
+     "sha256": "8e4e28341a0d01ecca8dcad7f8dcae7b404e67e7fbb5fdb65ab94364fea51944"
+    },
+    {
+     "path": "h264-dequant-linux-arm64/instance/cap-cand.json",
+     "sha256": "983381b99f1532d1d0fcc6073e7e0113d8bf12476440844a8d8f85c02474f2bc"
+    },
+    {
+     "path": "h264-dequant-linux-arm64/instance/sc-codec-worker.txt",
+     "sha256": "94e884f8e870899e5fa0bc6031df0a3240d5cc47b0847245c6706840a08991a2"
+    },
+    {
+     "path": "h264-dequant-linux-arm64/instance/fuzz3.sh",
+     "sha256": "3e85e04959d7acf44caff20753fa1adfddd2fa649a2303b3c6a8d2b7fb35a1e8"
+    },
+    {
+     "path": "h264-dequant-linux-arm64/instance/fuzz-h264-288.log",
+     "sha256": "98ca6e81333333abc4a7646cc51ad6778d898d6f41e32f16b7ee4ddd21669115"
+    },
+    {
+     "path": "h264-dequant-linux-arm64/instance/sc-media-worker.txt",
+     "sha256": "8cf1a9cf0bd7e3362bda276a0921db1cb8148cac82ce39fea6d2b558249163f0"
+    },
+    {
+     "path": "h264-dequant-linux-arm64/instance/fuzz-h264-289.log",
+     "sha256": "73bbee6c80b5fff6f3cf201fd1b967cfdb3f32a32b0e40f6976fe5e6ca1922ca"
+    },
+    {
+     "path": "h264-dequant-linux-arm64/instance/count17.txt",
+     "sha256": "a5a9828b4b016e1fde357d289f309437f858cef1e7c8b1199636de377f3db05e"
+    },
+    {
+     "path": "h264-dequant-linux-arm64/instance/eq-cand.json",
+     "sha256": "4dc96ff7dd6e806054dc5f3da37ac398bec0a450158dbd0c50623b1dd0557d36"
+    },
+    {
+     "path": "h264-dequant-linux-arm64/instance/sc-playback-worker.txt",
+     "sha256": "48de7d428eb7cf3a8464e07cb97b5133d3898190f0f656e655a8f8dc244588bb"
+    },
+    {
+     "path": "h264-dequant-linux-arm64/instance/revisions.txt",
+     "sha256": "774289c963116a8be07d34919a194a0d664bdba5a5fac191db9b8c19c21659d0"
+    },
+    {
+     "path": "h264-dequant-linux-arm64/instance/fuzz-h264-288/report.json",
+     "sha256": "2c8c1893fc1e351794ebe787f1d3abc1e9a65579fb6bfa88b41c30b86d74a1d4"
+    },
+    {
+     "path": "h264-dequant-linux-arm64/instance/fuzz-h264-288/identity.json",
+     "sha256": "c7a1184f0cf9a64bf15df3f631b1880cce4ee7ced82ab53a360eb2a8404b27d7"
+    },
+    {
+     "path": "h264-dequant-linux-arm64/instance/fuzz-h264-288/findings.jsonl",
+     "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+     "path": "h264-dequant-linux-arm64/instance/fuzz-h264-288/manifest.json",
+     "sha256": "e2c6c5e00e2f097313ca3911a952da2191d0be10505bfac19a09cc66591f243b"
+    },
+    {
+     "path": "h264-dequant-linux-arm64/instance/fuzz-h264-288/progress.json",
+     "sha256": "2beb0188ae84b2ff541f6c4b0986e0e81294fdb6338756a56061d07baf7336b7"
+    },
+    {
+     "path": "h264-dequant-linux-arm64/instance/fuzz-h264-289/report.json",
+     "sha256": "2c8c1893fc1e351794ebe787f1d3abc1e9a65579fb6bfa88b41c30b86d74a1d4"
+    },
+    {
+     "path": "h264-dequant-linux-arm64/instance/fuzz-h264-289/identity.json",
+     "sha256": "3a98665d0d8cf5e9faf5715183e7db2554a0fa6aa63b4e226bb3ca42690ca244"
+    },
+    {
+     "path": "h264-dequant-linux-arm64/instance/fuzz-h264-289/findings.jsonl",
+     "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+     "path": "h264-dequant-linux-arm64/instance/fuzz-h264-289/manifest.json",
+     "sha256": "e2c6c5e00e2f097313ca3911a952da2191d0be10505bfac19a09cc66591f243b"
+    },
+    {
+     "path": "h264-dequant-linux-arm64/instance/fuzz-h264-289/progress.json",
+     "sha256": "2beb0188ae84b2ff541f6c4b0986e0e81294fdb6338756a56061d07baf7336b7"
+    },
+    {
+     "path": "h264-dequant-linux-arm64/instance/fuzz-h264-290/report.json",
+     "sha256": "2c8c1893fc1e351794ebe787f1d3abc1e9a65579fb6bfa88b41c30b86d74a1d4"
+    },
+    {
+     "path": "h264-dequant-linux-arm64/instance/fuzz-h264-290/identity.json",
+     "sha256": "c2af268976a111982aac1c5977687e798ff583ced5e779010e56146fad553504"
+    },
+    {
+     "path": "h264-dequant-linux-arm64/instance/fuzz-h264-290/findings.jsonl",
+     "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+     "path": "h264-dequant-linux-arm64/instance/fuzz-h264-290/manifest.json",
+     "sha256": "e2c6c5e00e2f097313ca3911a952da2191d0be10505bfac19a09cc66591f243b"
+    },
+    {
+     "path": "h264-dequant-linux-arm64/instance/fuzz-h264-290/progress.json",
+     "sha256": "2beb0188ae84b2ff541f6c4b0986e0e81294fdb6338756a56061d07baf7336b7"
+    },
+    {
+     "path": "h264-dequant-linux-arm64/instance/fuzz-h264-291/report.json",
+     "sha256": "2c8c1893fc1e351794ebe787f1d3abc1e9a65579fb6bfa88b41c30b86d74a1d4"
+    },
+    {
+     "path": "h264-dequant-linux-arm64/instance/fuzz-h264-291/identity.json",
+     "sha256": "3dee8f9d6f85e8a184b55383ca34101c9f12e62e1ef9bbf81887ce7a772ff515"
+    },
+    {
+     "path": "h264-dequant-linux-arm64/instance/fuzz-h264-291/findings.jsonl",
+     "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+     "path": "h264-dequant-linux-arm64/instance/fuzz-h264-291/manifest.json",
+     "sha256": "e2c6c5e00e2f097313ca3911a952da2191d0be10505bfac19a09cc66591f243b"
+    },
+    {
+     "path": "h264-dequant-linux-arm64/instance/fuzz-h264-291/progress.json",
+     "sha256": "2beb0188ae84b2ff541f6c4b0986e0e81294fdb6338756a56061d07baf7336b7"
+    },
+    {
+     "path": "h264-dequant-linux-arm64/instance-137c3803/setup.sh",
+     "sha256": "7a316fddb8affe4f89517a5ab20c835a52527d56b87ec8b8e859c6ac2fed9a92"
+    },
+    {
+     "path": "h264-dequant-linux-arm64/instance-137c3803/cap-main.json",
+     "sha256": "983381b99f1532d1d0fcc6073e7e0113d8bf12476440844a8d8f85c02474f2bc"
+    },
+    {
+     "path": "h264-dequant-linux-arm64/instance-137c3803/run.log",
+     "sha256": "68b50be291825b323154235e4f6acf41d69a061d3e806cb753644585b3a49ffd"
+    },
+    {
+     "path": "h264-dequant-linux-arm64/instance-137c3803/main-rev.txt",
+     "sha256": "07c3956e1b0cb34e0d5c82286f51b31924933bbf6cb9aba35673fab2efd6ce33"
+    },
+    {
+     "path": "h264-dequant-linux-arm64/instance-137c3803/eq-main.json",
+     "sha256": "4dc96ff7dd6e806054dc5f3da37ac398bec0a450158dbd0c50623b1dd0557d36"
+    },
+    {
+     "path": "h264-dequant-linux-arm64/instance-137c3803/sc-capture-worker.txt",
+     "sha256": "f492e2294f42bca6940ccee399413b3d626ddce201590b856f4803c824985df6"
+    },
+    {
+     "path": "h264-dequant-linux-arm64/instance-137c3803/run.sh",
+     "sha256": "8e4e28341a0d01ecca8dcad7f8dcae7b404e67e7fbb5fdb65ab94364fea51944"
+    },
+    {
+     "path": "h264-dequant-linux-arm64/instance-137c3803/cap-cand.json",
+     "sha256": "983381b99f1532d1d0fcc6073e7e0113d8bf12476440844a8d8f85c02474f2bc"
+    },
+    {
+     "path": "h264-dequant-linux-arm64/instance-137c3803/sc-codec-worker.txt",
+     "sha256": "bbac8077cc6f66ef5a68d6f0cbcc37498e949866f60535d473eb48310917da41"
+    },
+    {
+     "path": "h264-dequant-linux-arm64/instance-137c3803/cand-rev.txt",
+     "sha256": "0a9428c7dcf95244cc7b75159727bf407aa71f5d73254b0c40bbebc208febd68"
+    },
+    {
+     "path": "h264-dequant-linux-arm64/instance-137c3803/sc-media-worker.txt",
+     "sha256": "8cf1a9cf0bd7e3362bda276a0921db1cb8148cac82ce39fea6d2b558249163f0"
+    },
+    {
+     "path": "h264-dequant-linux-arm64/instance-137c3803/count17.txt",
+     "sha256": "806d7e914596cc2d87fb35de5a2980e6643b78e0482ee13e15736dc42980b34e"
+    },
+    {
+     "path": "h264-dequant-linux-arm64/instance-137c3803/chain.sh",
+     "sha256": "3ea062696f249f9a89adb86cfb3d066a9e9455ef41f92eb5ed0cf5f42c584ccd"
+    },
+    {
+     "path": "h264-dequant-linux-arm64/instance-137c3803/eq-cand.json",
+     "sha256": "4dc96ff7dd6e806054dc5f3da37ac398bec0a450158dbd0c50623b1dd0557d36"
+    },
+    {
+     "path": "h264-dequant-linux-arm64/instance-137c3803/sc-playback-worker.txt",
+     "sha256": "48de7d428eb7cf3a8464e07cb97b5133d3898190f0f656e655a8f8dc244588bb"
+    },
+    {
+     "path": "h264-dequant-linux-arm64/macos-fuzz/fuzz-h264-284.log",
+     "sha256": "690cde6cad45a8500bf625f9527d08484f2d7d8239ec811a5a56bbc300eb0149"
+    },
+    {
+     "path": "h264-dequant-linux-arm64/macos-fuzz/fuzz-h264-285.log",
+     "sha256": "fd655f885b58d724e03f21d97363e92abcc66b5b631308f8ef77717b65d78e5c"
+    },
+    {
+     "path": "h264-dequant-linux-arm64/macos-fuzz/fuzz-h264-287.log",
+     "sha256": "fd655f885b58d724e03f21d97363e92abcc66b5b631308f8ef77717b65d78e5c"
+    },
+    {
+     "path": "h264-dequant-linux-arm64/macos-fuzz/fuzz-h264-286.log",
+     "sha256": "4676562e9c32d7b8bb73a2bff625f136494844ac300c940a10487d6914643501"
+    },
+    {
+     "path": "h264-dequant-linux-arm64/macos-fuzz/fuzz-h264-286/report.json",
+     "sha256": "2c8c1893fc1e351794ebe787f1d3abc1e9a65579fb6bfa88b41c30b86d74a1d4"
+    },
+    {
+     "path": "h264-dequant-linux-arm64/macos-fuzz/fuzz-h264-286/identity.json",
+     "sha256": "31cfc390c94e9e085fdda0bc34c83507d9dfb232846460edbd6f3fbc0ec898d6"
+    },
+    {
+     "path": "h264-dequant-linux-arm64/macos-fuzz/fuzz-h264-286/findings.jsonl",
+     "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+     "path": "h264-dequant-linux-arm64/macos-fuzz/fuzz-h264-286/manifest.json",
+     "sha256": "16bb1e6b6073c82b91f8c1189416f66ae49eb93d3547fe9aeac4567eb6e568e3"
+    },
+    {
+     "path": "h264-dequant-linux-arm64/macos-fuzz/fuzz-h264-286/progress.json",
+     "sha256": "2beb0188ae84b2ff541f6c4b0986e0e81294fdb6338756a56061d07baf7336b7"
+    },
+    {
+     "path": "h264-dequant-linux-arm64/macos-fuzz/fuzz-h264-287/report.json",
+     "sha256": "2c8c1893fc1e351794ebe787f1d3abc1e9a65579fb6bfa88b41c30b86d74a1d4"
+    },
+    {
+     "path": "h264-dequant-linux-arm64/macos-fuzz/fuzz-h264-287/identity.json",
+     "sha256": "d528975d9494cc56c0b33bfed44e4673d59e525349ad24c11c3fec8bcf073f48"
+    },
+    {
+     "path": "h264-dequant-linux-arm64/macos-fuzz/fuzz-h264-287/findings.jsonl",
+     "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+     "path": "h264-dequant-linux-arm64/macos-fuzz/fuzz-h264-287/manifest.json",
+     "sha256": "16bb1e6b6073c82b91f8c1189416f66ae49eb93d3547fe9aeac4567eb6e568e3"
+    },
+    {
+     "path": "h264-dequant-linux-arm64/macos-fuzz/fuzz-h264-287/progress.json",
+     "sha256": "2beb0188ae84b2ff541f6c4b0986e0e81294fdb6338756a56061d07baf7336b7"
+    },
+    {
+     "path": "h264-dequant-linux-arm64/macos-fuzz/fuzz-h264-285/report.json",
+     "sha256": "2c8c1893fc1e351794ebe787f1d3abc1e9a65579fb6bfa88b41c30b86d74a1d4"
+    },
+    {
+     "path": "h264-dequant-linux-arm64/macos-fuzz/fuzz-h264-285/identity.json",
+     "sha256": "7b0c65e72ef661f696936d4ea1a7ec770884c1ba866b5865dbe2e37c1ebfc057"
+    },
+    {
+     "path": "h264-dequant-linux-arm64/macos-fuzz/fuzz-h264-285/findings.jsonl",
+     "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+     "path": "h264-dequant-linux-arm64/macos-fuzz/fuzz-h264-285/manifest.json",
+     "sha256": "16bb1e6b6073c82b91f8c1189416f66ae49eb93d3547fe9aeac4567eb6e568e3"
+    },
+    {
+     "path": "h264-dequant-linux-arm64/macos-fuzz/fuzz-h264-285/progress.json",
+     "sha256": "2beb0188ae84b2ff541f6c4b0986e0e81294fdb6338756a56061d07baf7336b7"
+    },
+    {
+     "path": "h264-dequant-linux-arm64/macos-fuzz/fuzz-h264-284/report.json",
+     "sha256": "2c8c1893fc1e351794ebe787f1d3abc1e9a65579fb6bfa88b41c30b86d74a1d4"
+    },
+    {
+     "path": "h264-dequant-linux-arm64/macos-fuzz/fuzz-h264-284/identity.json",
+     "sha256": "b4a86f5cba921374732773087334b89e137421872bcedfc6c183caac01f1ca57"
+    },
+    {
+     "path": "h264-dequant-linux-arm64/macos-fuzz/fuzz-h264-284/findings.jsonl",
+     "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+     "path": "h264-dequant-linux-arm64/macos-fuzz/fuzz-h264-284/manifest.json",
+     "sha256": "16bb1e6b6073c82b91f8c1189416f66ae49eb93d3547fe9aeac4567eb6e568e3"
+    },
+    {
+     "path": "h264-dequant-linux-arm64/macos-fuzz/fuzz-h264-284/progress.json",
+     "sha256": "2beb0188ae84b2ff541f6c4b0986e0e81294fdb6338756a56061d07baf7336b7"
+    },
+    {
+     "path": "h264-dequant-linux-arm64/replay/replay.txt",
+     "sha256": "36715f9e8fa567874efa7cc8b5fb2d238753e71e7ee4cb90956e90f60a89424c"
+    }
+   ]
   }
  ]
 }

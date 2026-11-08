@@ -86,5 +86,8 @@ takes one NAL unit without start code. `reset` drops the DPB and keeps parameter
 - `cargo test -p triergon-codec-h264` runs unit tests; `tests/conformance.rs` checks all
   vectors against `tests/ffmpeg_framemd5_digests.txt` when
   `.research/fate-samples/h264-conformance/` is present (`H264_VECTOR` selects one)
-  and skips otherwise. `examples/fuzz.rs` mutates the vectors to check for panics.
+  and skips otherwise. `examples/fuzz.rs` mutates the vectors to check for panics, and
+  `tests/fuzz_regressions.rs` rebuilds earlier fuzz findings from the same vectors.
+- Scaling and inverse transforms wrap on overflow, as FFmpeg's `int` arithmetic does.
+  A conforming stream never overflows, so this only affects corrupt input.
 - Project-wide gates: [docs/quality.md](../../docs/quality.md).

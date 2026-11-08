@@ -1,4 +1,13 @@
 //! Intra prediction (clause 8.3) and inverse transforms / scaling (clause 8.5) kernels.
+//!
+//! The scaling and transform arithmetic wraps, as FFmpeg's int arithmetic does: a
+//! conforming stream keeps every value within 16 bits (8.5.12.1, 8.5.13.1), and a corrupt
+//! one's levels can take any i32.
+
+use std::num::Wrapping;
+
+/// A wrapping sample or coefficient of the scaling and transform kernels.
+type W = Wrapping<i32>;
 
 #[inline(always)]
 pub(crate) fn clip1(v: i32) -> u8 {
@@ -8,8 +17,8 @@ pub(crate) fn clip1(v: i32) -> u8 {
 // ---------------------------------------------------------------- transforms
 
 #[inline(always)]
-fn tr4(d: &[[i32; 4]; 4]) -> [[i32; 4]; 4] {
-    let mut o = [[0i32; 4]; 4];
+fn tr4(d: &[[W; 4]; 4]) -> [[W; 4]; 4] {
+    let mut o = [[W::default(); 4]; 4];
     for j in 0..4 {
         let e0 = d[0][j] + d[2][j];
         let e1 = d[0][j] - d[2][j];
@@ -28,14 +37,14 @@ fn tr4(d: &[[i32; 4]; 4]) -> [[i32; 4]; 4] {
 #[inline]
 pub(crate) fn idct4_add(d: &[i32; 16], dst: &mut [u8], off: usize, stride: usize) {
     // t[k][i] = d[i][k]: column k of all rows as one lane vector.
-    let mut t = [[0i32; 4]; 4];
+    let mut t = [[W::default(); 4]; 4];
     for i in 0..4 {
         for k in 0..4 {
-            t[k][i] = d[i * 4 + k];
+            t[k][i] = Wrapping(d[i * 4 + k]);
         }
     }
     let f = tr4(&t); // f[k][i]: row i, column k
-    let mut u = [[0i32; 4]; 4];
+    let mut u = [[W::default(); 4]; 4];
     for k in 0..4 {
         for i in 0..4 {
             u[i][k] = f[k][i];
@@ -47,7 +56,7 @@ pub(crate) fn idct4_add(d: &[i32; 16], dst: &mut [u8], off: usize, stride: usize
             .try_into()
             .unwrap();
         for j in 0..4 {
-            row[j] = (row[j] as i32 + ((h[i][j] + 32) >> 6)).clamp(0, 255) as u8;
+            row[j] = (row[j] as i32 + ((h[i][j] + Wrapping(32)) >> 6).0).clamp(0, 255) as u8;
         }
     }
 }
@@ -55,7 +64,7 @@ pub(crate) fn idct4_add(d: &[i32; 16], dst: &mut [u8], off: usize, stride: usize
 /// Add a constant residual (DC-only block) of size `n`x`n`.
 #[inline]
 pub(crate) fn dc_add(dc: i32, n: usize, dst: &mut [u8], off: usize, stride: usize) {
-    let v = (dc + 32) >> 6;
+    let v = dc.wrapping_add(32) >> 6;
     if v == 0 {
         return;
     }
@@ -69,7 +78,7 @@ pub(crate) fn dc_add(dc: i32, n: usize, dst: &mut [u8], off: usize, stride: usiz
 
 /// One 8-point 1-D inverse transform (8.5.13.2) applied lane-wise.
 #[inline(always)]
-fn tr8<const L: usize>(d: [&[i32; L]; 8], out: &mut [[i32; L]; 8]) {
+fn tr8<const L: usize>(d: [&[W; L]; 8], out: &mut [[W; L]; 8]) {
     for j in 0..L {
         let e0 = d[0][j] + d[4][j];
         let e1 = -d[3][j] + d[5][j] - d[7][j] - (d[7][j] >> 1);
@@ -102,25 +111,25 @@ fn tr8<const L: usize>(d: [&[i32; L]; 8], out: &mut [[i32; L]; 8]) {
 #[inline]
 pub(crate) fn idct8_add(d: &[i32; 64], dst: &mut [u8], off: usize, stride: usize) {
     // Transpose so the row transforms run lane-parallel over the 8 rows.
-    let mut t = [[0i32; 8]; 8];
+    let mut t = [[W::default(); 8]; 8];
     for i in 0..8 {
         for k in 0..8 {
-            t[k][i] = d[i * 8 + k];
+            t[k][i] = Wrapping(d[i * 8 + k]);
         }
     }
-    let mut rt = [[0i32; 8]; 8]; // rt[k][i]: row i, output column k
+    let mut rt = [[W::default(); 8]; 8]; // rt[k][i]: row i, output column k
     tr8::<8>(
         [&t[0], &t[1], &t[2], &t[3], &t[4], &t[5], &t[6], &t[7]],
         &mut rt,
     );
     // Transpose back: rows of the intermediate as lanes for the column transforms.
-    let mut f = [[0i32; 8]; 8]; // f[i][j]
+    let mut f = [[W::default(); 8]; 8]; // f[i][j]
     for k in 0..8 {
         for i in 0..8 {
             f[i][k] = rt[k][i];
         }
     }
-    let mut h = [[0i32; 8]; 8];
+    let mut h = [[W::default(); 8]; 8];
     tr8::<8>(
         [&f[0], &f[1], &f[2], &f[3], &f[4], &f[5], &f[6], &f[7]],
         &mut h,
@@ -128,16 +137,17 @@ pub(crate) fn idct8_add(d: &[i32; 64], dst: &mut [u8], off: usize, stride: usize
     for i in 0..8 {
         let row = &mut dst[off + i * stride..off + i * stride + 8];
         for j in 0..8 {
-            row[j] = (row[j] as i32 + ((h[i][j] + 32) >> 6)).clamp(0, 255) as u8;
+            row[j] = (row[j] as i32 + ((h[i][j] + Wrapping(32)) >> 6).0).clamp(0, 255) as u8;
         }
     }
 }
 
 /// Inverse Hadamard of the Intra16x16 DC (8.5.10) and scaling. `c` raster 4x4, output in place.
 pub(crate) fn luma_dc_dequant(c: &mut [i32; 16], qp: i32, ls00: i32) {
-    let mut f = [0i32; 16];
+    let ls00 = Wrapping(ls00);
+    let mut f = [W::default(); 16];
     for i in 0..4 {
-        let r = [c[i * 4], c[i * 4 + 1], c[i * 4 + 2], c[i * 4 + 3]];
+        let r = [c[i * 4], c[i * 4 + 1], c[i * 4 + 2], c[i * 4 + 3]].map(Wrapping);
         let a = r[0] + r[1];
         let b = r[0] - r[1];
         let cc = r[2] + r[3];
@@ -158,21 +168,23 @@ pub(crate) fn luma_dc_dequant(c: &mut [i32; 16], qp: i32, ls00: i32) {
         for i in 0..4 {
             let v = o[i];
             c[i * 4 + j] = if qp >= 36 {
-                (v * ls00) << (qp / 6 - 6)
+                (v * ls00) << (qp / 6 - 6) as usize
             } else {
-                (v * ls00 + (1 << (5 - qp / 6))) >> (6 - qp / 6)
-            };
+                (v * ls00 + Wrapping(1 << (5 - qp / 6))) >> (6 - qp / 6) as usize
+            }
+            .0;
         }
     }
 }
 
 /// Chroma DC 2x2 (4:2:0) transform and scaling (8.5.11), in place.
 pub(crate) fn chroma_dc_dequant(c: &mut [i32; 4], qp: i32, ls00: i32) {
-    let f0 = c[0] + c[1] + c[2] + c[3];
-    let f1 = c[0] - c[1] + c[2] - c[3];
-    let f2 = c[0] + c[1] - c[2] - c[3];
-    let f3 = c[0] - c[1] - c[2] + c[3];
-    let s = |f: i32| ((f * ls00) << (qp / 6)) >> 5;
+    let [c0, c1, c2, c3] = c.map(Wrapping);
+    let f0 = c0 + c1 + c2 + c3;
+    let f1 = c0 - c1 + c2 - c3;
+    let f2 = c0 + c1 - c2 - c3;
+    let f3 = c0 - c1 - c2 + c3;
+    let s = |f: W| (((f * Wrapping(ls00)) << (qp / 6) as usize) >> 5).0;
     c[0] = s(f0);
     c[1] = s(f1);
     c[2] = s(f2);
@@ -687,9 +699,136 @@ pub(crate) fn pred_chroma8(
     }
 }
 
+/// Levels for overflow tests: the `i32` extremes, full-range values and small ones, from a
+/// xorshift sequence.
+#[cfg(test)]
+pub(crate) fn extreme_levels<const N: usize>(seed: u32) -> [i32; N] {
+    let mut x = seed.wrapping_mul(0x9e37_79b9) | 1;
+    std::array::from_fn(|_| {
+        x ^= x << 13;
+        x ^= x >> 17;
+        x ^= x << 5;
+        match x % 6 {
+            0 => i32::MAX,
+            1 => i32::MIN,
+            2 => (x as i32) >> 16,
+            _ => x as i32,
+        }
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// Truncation to C's 32-bit `int` before a right shift; `+`, `-` and `*` in `i64` agree
+    /// with 32-bit wrapping arithmetic after truncation.
+    fn sar(v: i64, k: u32) -> i64 {
+        ((v as i32) >> k) as i64
+    }
+
+    /// 8.5.12.2's 4-point inverse transform, one vector at a time.
+    fn ref4(x: [i64; 4]) -> [i64; 4] {
+        let (e0, e1) = (x[0] + x[2], x[0] - x[2]);
+        let (e2, e3) = (sar(x[1], 1) - x[3], x[1] + sar(x[3], 1));
+        [e0 + e3, e1 + e2, e1 - e2, e0 - e3]
+    }
+
+    /// 8.5.13.2's 8-point inverse transform, one vector at a time.
+    fn ref8(x: [i64; 8]) -> [i64; 8] {
+        let e0 = x[0] + x[4];
+        let e1 = -x[3] + x[5] - x[7] - sar(x[7], 1);
+        let e2 = x[0] - x[4];
+        let e3 = x[1] + x[7] - x[3] - sar(x[3], 1);
+        let e4 = sar(x[2], 1) - x[6];
+        let e5 = -x[1] + x[7] + x[5] + sar(x[5], 1);
+        let e6 = x[2] + sar(x[6], 1);
+        let e7 = x[3] + x[5] + x[1] + sar(x[1], 1);
+        let (f0, f1, f2, f3) = (e0 + e6, e1 + sar(e7, 2), e2 + e4, e3 + sar(e5, 2));
+        let (f4, f5, f6, f7) = (e2 - e4, sar(e3, 2) - e5, e0 - e6, e7 - sar(e1, 2));
+        [
+            f0 + f7,
+            f2 + f5,
+            f4 + f3,
+            f6 + f1,
+            f6 - f1,
+            f4 - f3,
+            f2 - f5,
+            f0 - f7,
+        ]
+    }
+
+    /// Rows, then columns, then rounding and the clipped addition to `base`.
+    fn ref_idct<const N: usize>(d: &[i32], tr: fn([i64; N]) -> [i64; N], base: u8) -> Vec<u8> {
+        let rows: Vec<[i64; N]> = (0..N)
+            .map(|i| tr(std::array::from_fn(|k| d[i * N + k] as i64)))
+            .collect();
+        let cols: Vec<[i64; N]> = (0..N)
+            .map(|k| tr(std::array::from_fn(|i| rows[i][k])))
+            .collect();
+        (0..N * N)
+            .map(|p| clip1(base as i32 + sar(cols[p % N][p / N] + 32, 6) as i32))
+            .collect()
+    }
+
+    #[test]
+    fn transforms_wrap_extreme_coefficients() {
+        for seed in 1..=64 {
+            let base = (seed * 37 % 256) as u8;
+            let d4: [i32; 16] = extreme_levels(seed);
+            let mut out = vec![base; 16];
+            idct4_add(&d4, &mut out, 0, 4);
+            assert_eq!(out, ref_idct::<4>(&d4, ref4, base), "4x4, seed {seed}");
+            let d8: [i32; 64] = extreme_levels(seed);
+            let mut out = vec![base; 64];
+            idct8_add(&d8, &mut out, 0, 8);
+            assert_eq!(out, ref_idct::<8>(&d8, ref8, base), "8x8, seed {seed}");
+            for (n, dc) in [(4, d4[0]), (8, d8[0]), (4, i32::MAX), (8, i32::MIN)] {
+                let mut out = vec![base; n * n];
+                dc_add(dc, n, &mut out, 0, n);
+                let v = clip1(base as i32 + sar(dc as i64 + 32, 6) as i32);
+                assert!(out.iter().all(|&p| p == v), "dc {dc}");
+            }
+        }
+    }
+
+    #[test]
+    fn dc_transforms_wrap_extreme_levels() {
+        // Equation 8-320's matrix and the 2x2 one of 8.5.11.1, both symmetric.
+        const M4: [[i64; 4]; 4] = [[1, 1, 1, 1], [1, 1, -1, -1], [1, -1, -1, 1], [1, -1, 1, -1]];
+        const M2: [[i64; 2]; 2] = [[1, 1], [1, -1]];
+        for seed in 1..=16 {
+            for (qp, ls) in (0..=51).flat_map(|qp| [(qp, 16), (qp, 255 * 25)]) {
+                let c: [i32; 16] = extreme_levels(seed);
+                let mut got = c;
+                luma_dc_dequant(&mut got, qp, ls);
+                for (p, &g) in got.iter().enumerate() {
+                    let (i, j) = (p / 4, p % 4);
+                    let f: i64 = (0..16)
+                        .map(|q| M4[i][q / 4] * c[q] as i64 * M4[q % 4][j])
+                        .sum();
+                    let v = f * ls as i64;
+                    let want = if qp >= 36 {
+                        (v << (qp / 6 - 6)) as i32
+                    } else {
+                        sar(v + (1 << (5 - qp / 6)), (6 - qp / 6) as u32) as i32
+                    };
+                    assert_eq!(g, want, "luma DC, seed {seed}, qp {qp}");
+                }
+                let c: [i32; 4] = extreme_levels(seed);
+                let mut got = c;
+                chroma_dc_dequant(&mut got, qp, ls);
+                for (p, &g) in got.iter().enumerate() {
+                    let (i, j) = (p / 2, p % 2);
+                    let f: i64 = (0..4)
+                        .map(|q| M2[i][q / 2] * c[q] as i64 * M2[q % 2][j])
+                        .sum();
+                    let want = sar((f * ls as i64) << (qp / 6), 5) as i32;
+                    assert_eq!(g, want, "chroma DC, seed {seed}, qp {qp}");
+                }
+            }
+        }
+    }
 
     #[test]
     fn idct_dc_matches_constant() {
