@@ -1,9 +1,10 @@
 //! Self-authored synthetic syncframes: framing, CRC policy, truncation/concealment and
 //! typed errors. The frames are built bit by bit from the A/52:2018 syntax tables.
 
+use triergon_codec::{Budget, StorageError};
 use triergon_codec_ac3::{
-    AudioFrame, Compat, CrcPolicy, DecodeError, Decoder, DecoderOptions, Feature, NoiseMode,
-    Speaker, StreamType, Syntax, access_unit_len, crc16, parse_header,
+    AudioFrame, Compat, CrcPolicy, DecodeError, Decoder, DecoderOptions, Feature, Limits,
+    NoiseMode, Speaker, StreamType, Syntax, access_unit_len, crc16, parse_header,
 };
 
 #[derive(Default)]
@@ -204,7 +205,7 @@ fn compatible_reset_replays_the_first_dithered_frame() {
 fn noise_off_keeps_bap_zero_silent_with_either_compatibility_setting() {
     let frame = mono_frame_with_dither(0, true);
     for compat in [Compat::Specification, Compat::Reference] {
-        let mut decoder = Decoder::with_options(DecoderOptions {
+        let mut decoder = Decoder::new().with_options(DecoderOptions {
             compat,
             noise: NoiseMode::Off,
             ..Default::default()
@@ -227,7 +228,7 @@ fn crc_mismatch_is_reported_or_rejected() {
         !info.crc_ok,
         "default policy decodes and reports (FFmpeg-compatible)"
     );
-    let mut strict = Decoder::with_options(DecoderOptions {
+    let mut strict = Decoder::new().with_options(DecoderOptions {
         crc: CrcPolicy::Reject,
         ..Default::default()
     });
@@ -369,4 +370,43 @@ fn output_layout_mismatch_is_refused() {
     dec.reset();
     out.clear();
     assert!(dec.decode(&mono_frame(0), &mut out).is_ok());
+}
+
+#[test]
+fn a_refused_output_charge_is_a_typed_error_and_decoding_resumes() {
+    let budget = Budget::new(1 << 20).unwrap();
+    let mut decoder = Decoder::new_in(&budget);
+    let mut out = AudioFrame::default();
+    let held = budget.reserve(budget.available() - 1024).unwrap();
+    assert!(matches!(
+        decoder.decode(&mono_frame(0), &mut out),
+        Err(DecodeError::Budget(StorageError::Backpressure { .. }))
+    ));
+    drop(held);
+    out.clear();
+    let info = decoder.decode(&mono_frame(0), &mut out).unwrap();
+    assert_eq!(info.samples, 1536);
+}
+
+#[test]
+fn a_limit_below_the_frame_refuses_and_a_shared_pool_returns_to_idle() {
+    let mut out = AudioFrame::default();
+    let error = Decoder::with_limits(Limits {
+        live_storage_bytes: 4096,
+    })
+    .unwrap()
+    .decode(&mono_frame(0), &mut out)
+    .unwrap_err();
+    assert!(matches!(
+        error,
+        DecodeError::Budget(StorageError::Limit { .. })
+    ));
+    let budget = Budget::new(1 << 20).unwrap();
+    let idle = budget.used();
+    let mut decoder = Decoder::new_in(&budget);
+    out.clear();
+    decoder.decode(&mono_frame(0), &mut out).unwrap();
+    assert!(budget.used() >= idle + 1536 * size_of::<f32>());
+    drop(decoder);
+    assert_eq!(budget.used(), idle);
 }

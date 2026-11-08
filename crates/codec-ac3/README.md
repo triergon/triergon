@@ -26,9 +26,12 @@ fn decode_stream(stream: &[u8]) -> Result<(), DecodeError> {
 }
 ```
 
-`Decoder::with_options(DecoderOptions { crc, noise, compat })` selects the CRC policy
-(`CrcPolicy::Report` or `Reject`), the noise mode (`NoiseMode::Normal` or `Off`) and the
-output conventions (`Compat::Reference`, the default, or `Compat::Specification`). `examples/decode_ac3.rs` writes interleaved f32le.
+`Decoder::with_limits(Limits { live_storage_bytes })` gives the decoder its own storage
+pool (it fails only for a limit below a pool's own charge) and `Decoder::new_in(&budget)`
+charges a caller's `Budget`. `.with_options(DecoderOptions { crc, noise, compat })` then
+selects the CRC policy (`CrcPolicy::Report` or `Reject`), the noise mode
+(`NoiseMode::Normal` or `Off`) and the output conventions (`Compat::Reference`, the
+default, or `Compat::Specification`). `examples/decode_ac3.rs` writes interleaved f32le.
 
 ## Supported
 
@@ -62,7 +65,9 @@ Further independent programs are skipped.
 - `FrameInfo::downmix` mirrors FFmpeg's downmix side data: exported only for programs
   with more than two channels, taken from the last syncframe of the access unit.
 - Memory: about 80 KB per active substream plus about 30 KB of tables and buffers; no
-  steady-state allocation.
+  steady-state allocation. Each dependent substream's state and the output frame the
+  decoder sizes are charged to its budget first (`Limits::live_storage_bytes`, 4 MiB by
+  default); a refused charge is `DecodeError::Budget` and the decoder stays usable.
 
 ### FFmpeg compatibility (`Compat::Reference`, the default)
 
