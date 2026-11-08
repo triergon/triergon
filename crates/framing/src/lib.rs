@@ -80,22 +80,6 @@ pub use dts_core::{
     DtsCoreFrame, DtsCoreFrameFacts, DtsCoreFrameLimits, DtsCoreFrameReader, DtsCoreHeader,
     probe_dts_core_header,
 };
-pub use flac_config::{
-    FLAC_STREAMINFO, FLAC_VORBIS_COMMENT, FlacBlocking, FlacChannelAssignment, FlacFrameHeader,
-    FlacMetadataBlock, FlacStreamInfo, flac_configuration_from_dfla, flac_configuration_from_ogg,
-    flac_metadata_blocks, flac_stream_info,
-};
-pub use mpeg_audio::{
-    LameTag, MpegAudioHeader, MpegChannelMode, MpegEmphasis, MpegInfoFrame, MpegInfoKind,
-    MpegLayer, MpegVersion, mpeg_audio_crc_ok, mpeg_info_frame,
-};
-pub use opus_config::{
-    OPUS_RATE, OpusHead, opus_frame_samples, opus_packet_frames, opus_packet_samples,
-};
-pub use vorbis_config::{
-    VorbisBlock, VorbisHeaders, VorbisIdentification, VorbisModes, vorbis_header_type,
-    vorbis_packet_blocksize, xiph_join, xiph_split,
-};
 pub use dts_inspect::{
     DtsCoreField, DtsHeaderInspector, DtsInspection, DtsInspectionIdentity, DtsInspectionIssues,
     DtsInspectionSourceStatus, DtsInspectionStep, DtsInspectionViews, FieldObservation,
@@ -107,8 +91,24 @@ pub use dts_source::DtsSourceIdentity;
 pub use eac3_bsi::{
     Eac3BitRange, Eac3BitSpan, Eac3Bsi, Eac3BsiFacts, Eac3BsiLimits, Eac3BsiParser, Eac3Trailer,
 };
+pub use flac_config::{
+    FLAC_STREAMINFO, FLAC_VORBIS_COMMENT, FlacBlocking, FlacChannelAssignment, FlacFrameHeader,
+    FlacMetadataBlock, FlacStreamInfo, flac_configuration_from_dfla, flac_configuration_from_ogg,
+    flac_metadata_blocks, flac_stream_info,
+};
 pub use header::{Codec, NalHeader, ParameterSetKind};
+pub use mpeg_audio::{
+    LameTag, MpegAudioHeader, MpegChannelMode, MpegEmphasis, MpegInfoFrame, MpegInfoKind,
+    MpegLayer, MpegVersion, mpeg_audio_crc_ok, mpeg_info_frame,
+};
+pub use opus_config::{
+    OPUS_RATE, OpusHead, opus_frame_samples, opus_packet_frames, opus_packet_samples,
+};
 pub use reader::{Framing, LengthSize, NalFacts, NalFraming, NalReader, NalUnit, ReaderLimits};
+pub use vorbis_config::{
+    VorbisBlock, VorbisHeaders, VorbisIdentification, VorbisModes, vorbis_header_type,
+    vorbis_packet_blocksize, xiph_join, xiph_split,
+};
 pub use vp9_config::{
     Vp9ConfigContext, Vp9ConfigFields, Vp9ConfigLimits, Vp9ConfigParser, Vp9ConfigSyntaxIssues,
     Vp9Configuration,
