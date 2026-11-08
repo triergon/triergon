@@ -1,8 +1,7 @@
 //! Partitioned Rice residuals (RFC 9639 section 9.2.7).
 use crate::DecodeError;
-use crate::rice::RiceReader;
 use crate::sample::Sample;
-use triergon_bitstream::CachedBitReader;
+use triergon_bitstream::{CachedBitReader, RiceReader};
 
 /// The two Rice parameter widths of the residual coding method.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]

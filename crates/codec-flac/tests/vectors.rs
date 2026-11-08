@@ -5,7 +5,7 @@
 //! Bit-exactness against FFmpeg is graded by `harness/codecs/flac/flac_vectors.py`.
 use std::path::{Path, PathBuf};
 use triergon::{Budget, ContainerReader, PacketInfo};
-use triergon_codec_flac::{AudioFrame, Decoder, IntegerFrame, Limits};
+use triergon_codec_flac::{AudioFrame, Decoder};
 use triergon_framing::{canonical_flac_configuration, flac_stream_info};
 
 /// The configuration and frames of a native FLAC file, read by the elementary reader up
@@ -73,9 +73,8 @@ fn check_md5(max_bytes: u64) {
             let Ok(info) = flac_stream_info(&configuration) else {
                 continue;
             };
-            let mut decoder =
-                Decoder::from_configuration(&configuration, Limits::default()).unwrap();
-            let (mut integer, mut float) = (IntegerFrame::default(), AudioFrame::default());
+            let mut decoder = Decoder::new(&configuration).unwrap();
+            let (mut integer, mut float) = (decoder.integer_frame(), AudioFrame::default());
             let mut md5 = Md5::default();
             let mut uniform = true;
             for au in &frames {
@@ -121,13 +120,13 @@ fn damaged_files_never_panic() {
             // A file the reader refuses still reaches a decoder without a configuration,
             // in arbitrary pieces.
             let bytes = std::fs::read(&path).unwrap();
-            let mut decoder = Decoder::from_configuration(&[], Limits::default()).unwrap();
+            let mut decoder = Decoder::new(&[]).unwrap();
             for piece in bytes.chunks(4096) {
                 let _ = decoder.decode_float(piece, &mut out);
             }
             continue;
         };
-        let Ok(mut decoder) = Decoder::from_configuration(&configuration, Limits::default()) else {
+        let Ok(mut decoder) = Decoder::new(&configuration) else {
             continue;
         };
         for au in &frames {

@@ -1,13 +1,17 @@
-//! A bit reader for runs of Rice codes.
-//!
-//! Its 64-bit cache holds at least 56 unread bits after a refill, and a refill never
-//! branches on the stream: it loads the eight bytes after the cached bits and advances
-//! by the whole bytes that fit (the branch-free refill of Fabian Giesen's "Reading bits
-//! in far too many ways", variant 4). A Rice code is then one count of leading zeros
-//! and two shifts of the cache. Bits past the end of the data read as zero.
+//! The MSB-first reader of Rice and unary codes, as FLAC codes its residuals.
 
+use crate::reader::{load, tail};
+
+/// MSB-first bits of a slice, read in runs of Rice codes.
+///
+/// Its 64-bit cache holds at least 56 unread bits after a [`refill`](Self::refill), and a
+/// refill never branches on the stream: it loads the eight bytes after the cached bits and
+/// advances by the whole bytes that fit (the branch-free refill of Fabian Giesen's
+/// "Reading bits in far too many ways", variant 4). A Rice code is then one count of
+/// leading zeros and two shifts of the cache, so a decoder refills once for several short
+/// codes. Bits past the end of the data read as zero.
 #[derive(Clone, Copy, Debug)]
-pub(crate) struct RiceReader<'a> {
+pub struct RiceReader<'a> {
     data: &'a [u8],
     /// The byte the next refill loads from: the one after the cached bits.
     next: usize,
@@ -18,43 +22,49 @@ pub(crate) struct RiceReader<'a> {
 }
 
 impl<'a> RiceReader<'a> {
-    /// A reader at bit `position` of `data`.
-    pub(crate) fn at(data: &'a [u8], position: usize) -> Self {
+    /// A reader at bit `position` of `data`, with a full cache.
+    #[inline]
+    #[must_use]
+    pub fn at(data: &'a [u8], position: usize) -> Self {
         let skip = (position % 8) as u32;
         RiceReader {
             data,
             next: position / 8 + 7,
-            cache: load(data, position / 8) << skip,
+            cache: load_word(data, position / 8) << skip,
             valid: 56 - skip,
         }
     }
 
     /// Bits consumed since the start of the data.
-    pub(crate) fn position(&self) -> usize {
+    #[inline(always)]
+    #[must_use]
+    pub fn position(&self) -> usize {
         self.next * 8 - self.valid as usize
     }
 
     /// Tops the cache up to at least 56 unread bits.
     #[inline(always)]
-    pub(crate) fn refill(&mut self) {
-        self.cache |= load(self.data, self.next) >> self.valid;
+    pub fn refill(&mut self) {
+        self.cache |= load_word(self.data, self.next) >> self.valid;
         self.next += (63 - self.valid as usize) >> 3;
         self.valid |= 0x38; // 56 plus the bits short of a whole byte
     }
 
     /// The next `bits` bits (at most 32, and at most the unread bits).
     #[inline(always)]
-    pub(crate) fn take(&mut self, bits: u32) -> u32 {
+    pub fn take(&mut self, bits: u32) -> u32 {
         let value = ((self.cache >> 1) >> (63 - bits)) as u32;
         self.cache <<= bits;
         self.valid -= bits;
         value
     }
 
-    /// The next Rice code with parameter `k` (at most 30), zigzag folded; `None` past
-    /// `end` (a bit position) or above 32 bits.
+    /// The next Rice code with parameter `k` (below 32): a unary quotient of zeros ended
+    /// by a one, then `k` low bits, as the value `quotient << k | low`. `None` once the
+    /// code passes bit `end`, or when a code longer than the unread bits holds more than
+    /// 32 bits; a shorter code keeps the low 32 bits of its value.
     #[inline(always)]
-    pub(crate) fn rice(&mut self, k: u32, end: usize) -> Option<u32> {
+    pub fn rice(&mut self, k: u32, end: usize) -> Option<u32> {
         let zeros = self.cache.leading_zeros();
         let len = zeros + 1 + k;
         if len > self.valid {
@@ -91,31 +101,14 @@ fn long_rice(mut reader: RiceReader<'_>, k: u32, end: usize) -> (RiceReader<'_>,
         }
     }
     reader.refill();
-    let folded = (quotient << k) | u64::from(reader.take(k));
-    // RFC 9639 section 9.2.7.3: a residual fits 32-bit two's complement.
-    (reader, u32::try_from(folded).ok())
+    let value = (quotient << k) | u64::from(reader.take(k));
+    (reader, u32::try_from(value).ok())
 }
 
 /// The eight bytes at `byte`, big-endian, zero past the end of `data`.
 #[inline(always)]
-fn load(data: &[u8], byte: usize) -> u64 {
-    match data.get(byte..byte + 8) {
-        Some(bytes) => {
-            let mut word = [0; 8];
-            word.copy_from_slice(bytes);
-            u64::from_be_bytes(word)
-        }
-        None => load_tail(data, byte),
-    }
-}
-
-#[cold]
-fn load_tail(data: &[u8], byte: usize) -> u64 {
-    let mut word = [0; 8];
-    if let Some(tail) = data.get(byte..) {
-        word[..tail.len()].copy_from_slice(tail);
-    }
-    u64::from_be_bytes(word)
+fn load_word(data: &[u8], byte: usize) -> u64 {
+    u64::from_be_bytes(load(data, byte).unwrap_or_else(|| tail(data, byte)))
 }
 
 #[cfg(test)]

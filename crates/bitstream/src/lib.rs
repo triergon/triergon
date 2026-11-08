@@ -16,8 +16,10 @@ pub mod crc;
 mod lsb;
 mod rbsp;
 mod reader;
+mod rice;
 
 pub use checked::{BitCursor, BitError, BitSource, bits_at};
-pub use lsb::LsbReader;
+pub use lsb::{LsbReader, LsbWindow};
 pub use rbsp::{Rbsp, Runs, runs};
 pub use reader::{BitReader, Cached, CachedBitReader, Direct, Reader, Window};
+pub use rice::RiceReader;
