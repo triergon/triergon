@@ -54,16 +54,21 @@ dec.reset(); // after a seek: drops overlap, prediction, PNS, SBR and PS history
   `Unsupported(Feature)`, `InvalidData(&str)` naming the syntax element,
   `ResourceLimit(&str)`, `Truncated`, `Budget(StorageError)`.
 - Storage that depends on the stream is charged to the decoder's budget before it is
-  allocated: each channel element, its SBR/PS state and each coupling channel when the
-  stream first needs it, and the output frame for the configured layout before an access
-  unit's first raw data block. A PCE, a CPE in a mono stream or the start of SBR or PS
-  inside an access unit reconfigures the decoder in band: its state and the larger frame
-  are charged when it appears, and a refusal there drops the rest of the access unit.
-  `Decoder::with_limits(Limits { live_storage_bytes })` sets the pool, `Decoder::new_in`
-  charges a caller's `Budget`; a refused charge is `DecodeError::Budget` and the decoder
-  stays usable. The 32 MiB default holds the largest layout a PCE can declare: 48 elements
-  (93 channels) of 489 KiB each with SBR, PS and Main prediction, 16 coupling channels of
-  53 KiB and 93 planes of four SBR raw data blocks (2.9 MiB), 26.7 MiB in all.
+  allocated. What the ADTS header configures, the elements of a fixed channel
+  configuration and the output frame for the configured layout, is charged before an
+  access unit's first raw data block. In-band reconfiguration is charged when it appears:
+  a PCE, a CPE in a mono stream, the start of SBR or PS and a coupling channel build their
+  whole state, and the larger frame they need, before they apply. A refused charge is
+  `DecodeError::Budget`: the access unit is dropped and nothing of the reconfiguration is
+  applied, so the next access unit decodes as if the refused one had not arrived. That
+  holds when the refusal comes before the access unit advanced other history; an earlier
+  raw data block of the same ADTS frame, or an element with Main prediction before the
+  refusal, stays decoded. `Decoder::with_limits(Limits { live_storage_bytes })` sets the
+  pool, `Decoder::new_in` charges a caller's `Budget`. The 64 MiB default holds a switch
+  between two of the largest layouts a PCE can declare, which keeps both while the new
+  one is built: 48 elements (93 channels) of 493 KiB each with SBR, PS and Main
+  prediction, twice, 16 coupling channels of 53 KiB and 93 planes of four SBR raw data
+  blocks (2.9 MiB), 49.9 MiB in all.
 - Refused: SSR (`Feature::SsrGainControl`) and reserved sampling-frequency indices 13–15.
   ER, LD, ELD, USAC and 960-sample frames cannot be carried in ADTS; LATM/LOAS is not
   accepted.
