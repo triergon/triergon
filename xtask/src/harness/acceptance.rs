@@ -2,7 +2,7 @@
 //!
 //! Every recorded number is recomputed from its raw samples before it counts:
 //! timing intervals from the paired elapsed times, memory ratios from the raw
-//! observer receipts. Missing, contaminated or unequal evidence fails the case.
+//! observer data. Missing, contaminated or unequal evidence fails the case.
 
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::Path;
