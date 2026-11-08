@@ -16,7 +16,6 @@ mod layout;
 mod output;
 mod predict;
 mod residual;
-mod rice;
 mod sample;
 mod scratch;
 mod stereo;
@@ -37,14 +36,15 @@ use triergon_codec::{AudioDecoder, DecodeFailure, DownmixLevels, Reservation};
 pub struct Limits {
     /// Heap bytes the decoder may hold: its channel buffers and the output frames it
     /// fills. The default holds the largest frame RFC 9639 allows (65536 samples of eight
-    /// channels) in both outputs, with the buffers of a 32-bit stereo frame.
+    /// channels) in both outputs, the buffers of a 32-bit stereo frame, and a copy of the
+    /// largest buffer while it grows.
     pub live_storage_bytes: usize,
 }
 
 impl Default for Limits {
     fn default() -> Self {
         Limits {
-            live_storage_bytes: 6 << 20,
+            live_storage_bytes: 7 << 20,
         }
     }
 }
@@ -72,33 +72,33 @@ pub struct FrameInfo {
 #[derive(Debug)]
 pub struct Decoder {
     frames: FrameDecoder,
-    float_charge: Reservation,
-    integer_charge: Reservation,
+    /// Pool of the stream-sized storage, which [`IntegerFrame`]s charge as well.
+    budget: Budget,
+    /// Charge of the float frame the last access unit sized.
+    output_charge: Reservation,
 }
 
 impl Decoder {
     /// A decoder for the canonical configuration `configuration` (`fLaC` and the
-    /// metadata blocks, STREAMINFO first), with its own pool of `limits`.
+    /// metadata blocks, STREAMINFO first), with a pool of the default limit.
     ///
     /// Empty `configuration` decodes a stream picked up at a frame header, as FFmpeg
     /// does without extradata: each frame must code its sample rate and size.
-    pub fn from_configuration(
-        configuration: &[u8],
-        limits: Limits,
-    ) -> Result<Decoder, DecodeError> {
-        let budget = Budget::new(limits.live_storage_bytes)?;
-        Decoder::from_configuration_in(configuration, &budget)
+    pub fn new(configuration: &[u8]) -> Result<Decoder, DecodeError> {
+        Decoder::with_limits(configuration, Limits::default())
     }
 
-    /// As [`Decoder::from_configuration`], charging the caller's pool.
-    pub fn from_configuration_in(
-        configuration: &[u8],
-        budget: &Budget,
-    ) -> Result<Decoder, DecodeError> {
+    /// As [`Decoder::new`], with its own pool of `limits.live_storage_bytes`.
+    pub fn with_limits(configuration: &[u8], limits: Limits) -> Result<Decoder, DecodeError> {
+        Decoder::new_in(configuration, &Budget::new(limits.live_storage_bytes)?)
+    }
+
+    /// As [`Decoder::new`], charging the caller's pool.
+    pub fn new_in(configuration: &[u8], budget: &Budget) -> Result<Decoder, DecodeError> {
         Ok(Decoder {
             frames: FrameDecoder::new(Stream::from_configuration(configuration)?, budget),
-            float_charge: Reservation::empty(budget),
-            integer_charge: Reservation::empty(budget),
+            budget: budget.clone(),
+            output_charge: Reservation::empty(budget),
         })
     }
 
@@ -116,8 +116,13 @@ impl Decoder {
         au: &[u8],
         out: &mut AudioFrame,
     ) -> Result<FrameInfo, DecodeError> {
-        let mut output = FloatOutput::new(out, &mut self.float_charge);
+        let mut output = FloatOutput::new(out, &mut self.output_charge);
         self.frames.decode(au, &mut output)
+    }
+
+    /// An empty frame for [`Decoder::decode_integer`], charged to this decoder's pool.
+    pub fn integer_frame(&self) -> IntegerFrame {
+        IntegerFrame::new_in(&self.budget)
     }
 
     /// Replaces `out` with the frame `au` holds as the lossless integer samples. On
@@ -127,7 +132,7 @@ impl Decoder {
         au: &[u8],
         out: &mut IntegerFrame,
     ) -> Result<FrameInfo, DecodeError> {
-        let mut output = IntegerOutput::new(out, &mut self.integer_charge);
+        let mut output = IntegerOutput::new(out);
         self.frames.decode(au, &mut output)
     }
 }

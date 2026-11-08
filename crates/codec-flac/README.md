@@ -9,13 +9,13 @@ contract), or to the lossless integer samples. It depends on
 ## Usage
 
 ```rust
-use triergon_codec_flac::{AudioFrame, DecodeError, Decoder, IntegerFrame, Limits};
+use triergon_codec_flac::{AudioFrame, DecodeError, Decoder};
 
 fn decode(configuration: &[u8], frames: &[&[u8]]) -> Result<(), DecodeError> {
     // `fLaC` and the metadata blocks: the native stream header, Matroska CodecPrivate.
-    let mut decoder = Decoder::from_configuration(configuration, Limits::default())?;
+    let mut decoder = Decoder::new(configuration)?;
     let mut float = AudioFrame::default();
-    let mut integer = IntegerFrame::default();
+    let mut integer = decoder.integer_frame();
     for au in frames {
         let info = decoder.decode_float(au, &mut float)?; // or AudioDecoder::decode
         decoder.decode_integer(au, &mut integer)?; // integer.plane(0), ...
@@ -67,11 +67,12 @@ channel counts that change between frames.
   frame's.
 - A failed frame leaves the output empty and the decoder usable. FLAC frames carry no
   inter-frame state, so `reset` has nothing to drop.
-- Storage: the channel buffers (two blocks of `i32`, plus one of `i64` for 32-bit stereo)
-  and the output frames are charged to a `Budget` before they grow; a refusal is
-  `DecodeError::Budget`. The default `Limits::live_storage_bytes` is 6 MiB: the largest
-  frame RFC 9639 allows is 65536 samples of 8 channels, 2 MiB in each output, plus
-  1 MiB of channel buffers. No allocation once the largest block has been seen.
+- Storage: the channel buffers, the float output and the integer frames
+  (`Decoder::integer_frame`) are charged to the decoder's `Budget` as they grow, and a
+  refusal is `DecodeError::Budget`. The default `Limits::live_storage_bytes`, 7 MiB,
+  holds the largest frame RFC 9639 allows (65536 samples of 8 channels, 2 MiB) in both
+  outputs with the channel buffers of 32-bit stereo and a buffer's copy while it grows;
+  `with_limits` and `new_in` set another limit or a shared pool.
 
 ## Known gaps
 
@@ -90,15 +91,13 @@ channel counts that change between frames.
   with FFmpeg's encoder and the reference `flac` encoder over bit depths 4 to 32, 1 to 8
   channels, sample rates 1 Hz to 768 kHz, block sizes 16 to 65535, every compression level,
   LPC type, stereo mode, partition order and prediction order 1 to 32.
-- `harness/codecs/flac/flac_vectors.py grade target/release/examples/decode_flac DIR...` compares the
-  output with `ffmpeg -f f32le -c:a pcm_f32le` byte for byte, and the per-frame layouts
-  and sample counts with `ffprobe -show_frames`; FLAC is graded bit-exact.
 - `cargo test -p triergon-codec-flac` runs predictor, layout and hand-built frame tests
   (every subframe type and stereo mode, the refusals, truncation at every byte, every bit
   flipped, a too-small budget) and, when the vectors are present, checks the integer
   output against each stream's STREAMINFO MD5 and the float output against it.
-- `cargo xtask codecs grade` runs the same files through the container readers (the
-  `flac` lane, [harness/codecs/STATUS.md](../../harness/codecs/STATUS.md)). On the gate
+- `cargo xtask codecs grade` decodes them through the container readers and compares the
+  output with the pinned FFmpeg's byte for byte (the `flac` lane, under the lossless
+  section of the numeric rules; [harness/codecs/STATUS.md](../../harness/codecs/STATUS.md)). On the gate
   build 183/187 pass, bit-exact. Open: `01 - changing samplerate`, `02 - increasing
   number of channels` and `03 - decreasing number of channels` change format mid-stream,
   and FFmpeg's CLI converts them to the first frame's format (each decodes exactly on its

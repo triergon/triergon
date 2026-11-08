@@ -12,7 +12,7 @@ use std::io::Write;
 use std::process::ExitCode;
 
 use triergon::{Budget, CodecId, ContainerReader, MediaKind, PacketInfo};
-use triergon_codec_flac::{AudioFrame, ChannelLayout, CrcPolicy, Decoder, Limits};
+use triergon_codec_flac::{AudioFrame, ChannelLayout, CrcPolicy, Decoder};
 
 fn main() -> ExitCode {
     let args: Vec<String> = std::env::args().collect();
@@ -78,10 +78,7 @@ fn main() -> ExitCode {
                 &mut configuration,
             )
             .map_err(|e| e.to_string())
-            .and_then(|()| {
-                Decoder::from_configuration(&configuration, Limits::default())
-                    .map_err(|e| e.to_string())
-            });
+            .and_then(|()| Decoder::new(&configuration).map_err(|e| e.to_string()));
             match built {
                 Ok(built) => decoder = Some((track.id(), built.with_crc_policy(policy))),
                 Err(error) => {
