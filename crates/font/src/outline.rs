@@ -1,24 +1,74 @@
-//! Glyph outlines in font units: contours of on-curve and control points.
+//! Glyph outlines: contours of on-curve and control points, in font units
+//! (`f32`) or in 26.6 fixed-point pixels at a size (`i32`).
 
+use std::fmt::Debug;
 use triergon_core::{Budget, BudgetVec, Error, Result};
 
-/// A position in font units, y up.
-#[derive(Clone, Copy, Debug, Default, PartialEq)]
-pub struct Point {
-    pub x: f32,
-    pub y: f32,
+/// An outline coordinate: `f32` font units, or `i32` 26.6 fixed-point pixels
+/// (1/64 pixel) as FreeType scales them.
+pub trait Coordinate: Copy + Default + PartialEq + Debug + private::Sealed {
+    /// The value midway between two, as [`Outline::segments`] implies an
+    /// on-curve point between consecutive quadratic control points. 26.6
+    /// midpoints round down.
+    fn midpoint(a: Self, b: Self) -> Self;
 }
 
-impl Point {
-    pub const fn new(x: f32, y: f32) -> Self {
+impl Coordinate for f32 {
+    fn midpoint(a: Self, b: Self) -> Self {
+        Self::midpoint(a, b)
+    }
+}
+
+impl Coordinate for i32 {
+    fn midpoint(a: Self, b: Self) -> Self {
+        ((i64::from(a) + i64::from(b)) >> 1) as Self
+    }
+}
+
+mod private {
+    pub trait Sealed {
+        /// A whole number of units, exactly.
+        fn from_units(v: i32) -> Self;
+        /// A value [`Sealed::from_units`] made, back.
+        fn whole_units(self) -> i64;
+    }
+
+    impl Sealed for f32 {
+        fn from_units(v: i32) -> Self {
+            // Every caller passes values within ±2^24, which f32 holds exactly.
+            v as Self
+        }
+
+        fn whole_units(self) -> i64 {
+            self as i64
+        }
+    }
+
+    impl Sealed for i32 {
+        fn from_units(v: i32) -> Self {
+            v
+        }
+
+        fn whole_units(self) -> i64 {
+            i64::from(self)
+        }
+    }
+}
+
+/// A position, y up: font units, or 26.6 pixels in a [`ScaledOutline`].
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct Point<C = f32> {
+    pub x: C,
+    pub y: C,
+}
+
+impl<C: Coordinate> Point<C> {
+    pub const fn new(x: C, y: C) -> Self {
         Self { x, y }
     }
 
     fn midpoint(self, other: Self) -> Self {
-        Self::new(
-            f32::midpoint(self.x, other.x),
-            f32::midpoint(self.y, other.y),
-        )
+        Self::new(C::midpoint(self.x, other.x), C::midpoint(self.y, other.y))
     }
 }
 
@@ -35,41 +85,48 @@ pub enum PointKind {
 }
 
 /// One point of an outline.
-#[derive(Clone, Copy, Debug, PartialEq)]
-pub struct OutlinePoint {
-    pub point: Point,
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct OutlinePoint<C = f32> {
+    pub point: Point<C>,
     pub kind: PointKind,
 }
 
 /// A path element of [`Outline::segments`].
-#[derive(Clone, Copy, Debug, PartialEq)]
-pub enum Segment {
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Segment<C = f32> {
     /// Starts a contour.
-    MoveTo(Point),
-    LineTo(Point),
-    QuadTo(Point, Point),
-    CubicTo(Point, Point, Point),
+    MoveTo(Point<C>),
+    LineTo(Point<C>),
+    QuadTo(Point<C>, Point<C>),
+    CubicTo(Point<C>, Point<C>, Point<C>),
     /// Ends the contour with a line back to its start, if it is not there already.
     Close,
 }
 
-/// A glyph outline: closed contours of points in font units, as the font stores
-/// them. Contours are implicitly closed. TrueType contours keep their stored points,
-/// including single-point contours; CFF contours drop a final point that repeats the
-/// start, and a `moveto` that draws nothing makes no contour.
+/// A glyph outline: closed contours of points, in font units as the font stores
+/// them (`Outline`, `f32`) or in 26.6 pixels at a size ([`ScaledOutline`]).
+/// Contours are implicitly closed. TrueType contours keep their stored points,
+/// including single-point contours; CFF contours are built as FreeType's CFF
+/// engine builds them: a contour starts at its first segment, a final on-curve
+/// point repeating the start is dropped, and a contour left with one point is
+/// dropped.
 ///
 /// Storage is charged to the [`Budget`] the outline was created with and is reused
 /// across glyphs.
 #[derive(Debug)]
-pub struct Outline {
-    points: BudgetVec<OutlinePoint>,
+pub struct Outline<C = f32> {
+    points: BudgetVec<OutlinePoint<C>>,
     ends: BudgetVec<u32>,
     /// The first point of the contour under construction.
     start: usize,
     limit: usize,
 }
 
-impl Outline {
+/// An outline in 26.6 fixed-point pixels: what FreeType's `FT_Outline` holds
+/// after loading a glyph at a size.
+pub type ScaledOutline = Outline<i32>;
+
+impl<C: Coordinate> Outline<C> {
     pub fn new(budget: &Budget) -> Self {
         Self {
             points: BudgetVec::new(budget),
@@ -79,7 +136,7 @@ impl Outline {
         }
     }
 
-    pub fn points(&self) -> &[OutlinePoint] {
+    pub fn points(&self) -> &[OutlinePoint<C>] {
         self.points.as_slice()
     }
 
@@ -89,7 +146,7 @@ impl Outline {
     }
 
     /// The points of each contour.
-    pub fn contours(&self) -> impl Iterator<Item = &[OutlinePoint]> {
+    pub fn contours(&self) -> impl Iterator<Item = &[OutlinePoint<C>]> {
         let points = self.points();
         let mut start = 0;
         self.ends.as_slice().iter().map(move |&end| {
@@ -103,7 +160,7 @@ impl Outline {
     /// The outline as path segments, with TrueType's implied on-curve points made
     /// explicit. A contour that starts with control points starts at its last
     /// on-curve point, or midway between its last and first points when it has none.
-    pub fn segments(&self) -> impl Iterator<Item = Segment> + '_ {
+    pub fn segments(&self) -> impl Iterator<Item = Segment<C>> + '_ {
         self.contours().flat_map(contour_segments)
     }
 
@@ -117,9 +174,29 @@ impl Outline {
         self.start = 0;
     }
 
+    /// Replaces the contents with a copy of `other`'s, reusing this outline's
+    /// storage (for example to style a glyph while keeping the original).
+    ///
+    /// # Errors
+    ///
+    /// The budget's errors; the outline is then empty.
+    pub fn copy_from(&mut self, other: &Self) -> Result<()> {
+        self.clear();
+        self.points.try_reserve_exact(other.points.len())?;
+        self.ends.try_reserve_exact(other.ends.len())?;
+        for &p in other.points() {
+            self.points.try_push(p).map_err(|e| e.error)?;
+        }
+        for &e in other.contour_ends() {
+            self.ends.try_push(e).map_err(|e| e.error)?;
+        }
+        self.start = self.points.len();
+        Ok(())
+    }
+
     /// Bytes of storage currently charged.
     pub fn retained_bytes(&self) -> usize {
-        self.points.capacity() * size_of::<OutlinePoint>() + self.ends.capacity() * 4
+        self.points.capacity() * size_of::<OutlinePoint<C>>() + self.ends.capacity() * 4
     }
 
     pub(crate) fn begin(&mut self, limit: usize) {
@@ -131,11 +208,10 @@ impl Outline {
         self.points.len()
     }
 
-    pub(crate) fn push(&mut self, x: f64, y: f64, kind: PointKind) -> Result<()> {
+    pub(crate) fn push_point(&mut self, point: Point<C>, kind: PointKind) -> Result<()> {
         if self.points.len() >= self.limit {
             return Err(Error::Policy("outline points"));
         }
-        let point = Point::new(finite(x)?, finite(y)?);
         self.points
             .try_push(OutlinePoint { point, kind })
             .map_err(|e| e.error)
@@ -149,26 +225,33 @@ impl Outline {
         Ok(())
     }
 
-    /// The points of the contour under construction.
-    pub(crate) fn open_contour(&self) -> &[OutlinePoint] {
-        &self.points.as_slice()[self.start..]
+    /// Removes the last contour end; its points become the open contour.
+    pub(crate) fn pop_contour_end(&mut self) {
+        self.ends.pop();
+        self.start = self.ends.as_slice().last().map_or(0, |&e| e as usize);
     }
 
-    pub(crate) fn pop(&mut self) {
-        if self.points.len() > self.start {
+    /// Keeps the first `len` points.
+    pub(crate) fn truncate_points(&mut self, len: usize) {
+        while self.points.len() > len {
             self.points.pop();
         }
+        self.start = self.start.min(len);
     }
 
-    pub(crate) fn points_mut(&mut self) -> &mut [OutlinePoint] {
+    pub(crate) fn points_mut(&mut self) -> &mut [OutlinePoint<C>] {
         self.points.as_mut_slice()
     }
 
     /// Appends the contour ends `ends`, which index points already pushed after
-    /// `base` points.
-    pub(crate) fn extend_ends(&mut self, ends: &[u32], base: u32) -> Result<()> {
-        self.ends.try_reserve_exact(ends.len())?;
-        for &end in ends {
+    /// `base` points. Storage grows geometrically, so a composite's components
+    /// append in amortised constant time.
+    pub(crate) fn extend_ends(
+        &mut self,
+        ends: impl IntoIterator<Item = u32>,
+        base: u32,
+    ) -> Result<()> {
+        for end in ends {
             let end = end.checked_add(base).ok_or(Error::Overflow)?;
             self.ends.try_push(end).map_err(|e| e.error)?;
         }
@@ -177,31 +260,22 @@ impl Outline {
     }
 }
 
-fn finite(value: f64) -> Result<f32> {
-    let narrowed = value as f32;
-    if narrowed.is_finite() {
-        Ok(narrowed)
-    } else {
-        Err(Error::Invalid("glyph coordinate outside f32"))
-    }
-}
-
 /// The segments of one contour; see [`Outline::segments`].
 #[derive(Clone, Debug)]
-struct ContourSegments<'a> {
-    points: &'a [OutlinePoint],
-    start: Point,
+struct ContourSegments<'a, C> {
+    points: &'a [OutlinePoint<C>],
+    start: Point<C>,
     /// The index of the first point after `start`.
     offset: usize,
     /// Points left to visit.
     left: usize,
     began: bool,
     closed: bool,
-    pending: Option<Point>,
-    cubic: Option<Point>,
+    pending: Option<Point<C>>,
+    cubic: Option<Point<C>>,
 }
 
-fn contour_segments(points: &[OutlinePoint]) -> ContourSegments<'_> {
+fn contour_segments<C: Coordinate>(points: &[OutlinePoint<C>]) -> ContourSegments<'_, C> {
     let first_on = points.iter().position(|p| p.kind == PointKind::On);
     let (start, offset, left) = match (first_on, points.first(), points.last()) {
         (Some(index), _, _) => (points[index].point, index + 1, points.len() - 1),
@@ -220,10 +294,10 @@ fn contour_segments(points: &[OutlinePoint]) -> ContourSegments<'_> {
     }
 }
 
-impl Iterator for ContourSegments<'_> {
-    type Item = Segment;
+impl<C: Coordinate> Iterator for ContourSegments<'_, C> {
+    type Item = Segment<C>;
 
-    fn next(&mut self) -> Option<Segment> {
+    fn next(&mut self) -> Option<Segment<C>> {
         if !self.began {
             self.began = true;
             return Some(Segment::MoveTo(self.start));
@@ -257,8 +331,8 @@ impl Iterator for ContourSegments<'_> {
     }
 }
 
-impl ContourSegments<'_> {
-    fn curve_to(&mut self, end: Point) -> Segment {
+impl<C: Coordinate> ContourSegments<'_, C> {
+    fn curve_to(&mut self, end: Point<C>) -> Segment<C> {
         match (self.cubic.take(), self.pending.take()) {
             (Some(c1), Some(c2)) => Segment::CubicTo(c1, c2, end),
             (None, Some(control)) => Segment::QuadTo(control, end),
@@ -269,15 +343,15 @@ impl ContourSegments<'_> {
 
 #[cfg(test)]
 mod tests {
-    use super::{Outline, Point, PointKind, Segment};
+    use super::{Outline, Point, PointKind, ScaledOutline, Segment};
     use triergon_core::{Budget, Error};
 
-    fn outline(points: &[(f64, f64, PointKind)]) -> Outline {
+    fn outline(points: &[(f32, f32, PointKind)]) -> Outline {
         let budget = Budget::new(1 << 16).unwrap();
         let mut outline = Outline::new(&budget);
         outline.begin(usize::MAX);
         for &(x, y, kind) in points {
-            outline.push(x, y, kind).unwrap();
+            outline.push_point(Point::new(x, y), kind).unwrap();
         }
         outline.end_contour().unwrap();
         outline
@@ -337,11 +411,26 @@ mod tests {
         let budget = Budget::new(1 << 16).unwrap();
         let mut limited = Outline::new(&budget);
         limited.begin(1);
-        limited.push(0.0, 0.0, On).unwrap();
+        limited.push_point(Point::new(0.0, 0.0), On).unwrap();
         assert_eq!(
-            limited.push(0.0, 0.0, On),
+            limited.push_point(Point::new(0.0, 0.0), On),
             Err(Error::Policy("outline points"))
         );
-        assert!(limited.push(f64::MAX, 0.0, On).is_err());
+    }
+
+    #[test]
+    fn scaled_midpoints_round_down() {
+        let budget = Budget::new(1 << 16).unwrap();
+        let mut o = ScaledOutline::new(&budget);
+        o.begin(usize::MAX);
+        o.push_point(Point::new(0, 0), PointKind::Quadratic)
+            .unwrap();
+        o.push_point(Point::new(-3, 3), PointKind::Quadratic)
+            .unwrap();
+        o.end_contour().unwrap();
+        assert_eq!(
+            o.segments().next(),
+            Some(Segment::MoveTo(Point::new(-2, 1)))
+        );
     }
 }

@@ -11,6 +11,7 @@
 
 mod cff;
 mod cmap;
+mod fixed;
 mod glyf;
 mod kern;
 mod matching;
@@ -19,27 +20,32 @@ mod name;
 mod outline;
 mod read;
 mod sfnt;
+mod sized;
 mod store;
+mod synthesis;
+mod work;
 
-pub use cmap::Charmap;
+pub use cff::{CharstringOperator, OperatorSet};
+pub use cmap::{CharEncoding, Charmap, CmapFormat, Mappings};
 pub use matching::{FaceInfo, Request, select};
-pub use metrics::Os2;
-pub use name::{NameChars, NameRecord, id as name_id, platform};
-pub use outline::{Outline, OutlinePoint, Point, PointKind, Segment};
+pub use metrics::{FsSelection, Os2};
+pub use name::{NameChars, NameId, NameRecord, Platform};
+pub use outline::{Coordinate, Outline, OutlinePoint, Point, PointKind, ScaledOutline, Segment};
+pub use sized::{Band, ScaledMetrics, SizeMetrics, SizedFont, pixels_26_6};
 pub use store::{Built, Store, StoreKey};
+pub use synthesis::{Orientation, Synthesis};
 
-use cff::{Cff, Version};
-use glyf::Glyf;
+use cff::{Cff, Scale, Version};
+use glyf::{FontUnits, Glyf};
 use kern::Kern;
 use metrics::{Head, Hhea, Hmtx};
 use name::Names;
-use read::Meter;
 use sfnt::{Flavor, Tables};
-use triergon_core::{Budget, BudgetVec, Bytes, Error, Result};
+use triergon_core::{Budget, BudgetVec, Bytes, Error, Result, WorkBudget};
 
 /// A glyph index within one face.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub struct GlyphId(pub u32);
+pub struct GlyphId(pub u16);
 
 /// Format-policy limits. Allocation is bounded separately by the [`Budget`] a face
 /// and its outlines are charged to.
@@ -99,8 +105,27 @@ pub struct VerticalMetrics {
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct GlyphMetrics {
     /// The advance. A TrueType composite takes the advance of its last
-    /// `USE_MY_METRICS` component.
-    pub advance: u16,
+    /// `USE_MY_METRICS` component; a CFF FontMatrix scales and offsets it.
+    pub advance: i32,
+}
+
+/// The `head` bounding box of all glyphs, in font units.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct Bounds {
+    pub x_min: i16,
+    pub y_min: i16,
+    pub x_max: i16,
+    pub y_max: i16,
+}
+
+/// The `hhea` line metrics, in font units.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct HorizontalHeader {
+    pub ascender: i16,
+    pub descender: i16,
+    pub line_gap: i16,
+    /// `advanceWidthMax`.
+    pub advance_max: u16,
 }
 
 #[derive(Debug)]
@@ -126,9 +151,11 @@ pub struct Font {
     glyph_count: u16,
     hmtx: Hmtx,
     names: Names,
-    charmaps: BudgetVec<Charmap>,
+    charmaps: BudgetVec<cmap::Subtable>,
     outlines: Outlines,
     kern: Kern,
+    /// `post` underline position and thickness.
+    underline: (i16, i16),
     limits: Limits,
 }
 
@@ -147,9 +174,9 @@ impl Font {
     /// required tables; `Policy` when `limits.work` runs out; and the budget's
     /// errors.
     pub fn new(data: Bytes, index: u32, budget: &Budget, limits: Limits) -> Result<Self> {
-        let mut meter = Meter::new(limits.work);
+        let mut work = WorkBudget::new(limits.work);
         let bytes = data.as_ref();
-        let (flavor, tables) = sfnt::directory(bytes, index, &mut meter)?;
+        let (flavor, tables) = sfnt::directory(bytes, index, &mut work)?;
         let required =
             |table: Option<sfnt::Table>| table.ok_or(Error::Invalid("missing required table"));
         let head = metrics::head(required(tables.head)?.bytes(bytes))?;
@@ -160,8 +187,10 @@ impl Font {
             Some(t) => Names::new(bytes, t.offset, t.len)?,
             None => Names::default(),
         };
+        // Tables already on core's work budget share it.
+        let mut work = WorkBudget::new(limits.work);
         let charmaps = match tables.cmap {
-            Some(t) => cmap::parse(bytes, t, budget, &mut meter)?,
+            Some(t) => cmap::parse(bytes, t, budget, &mut work)?,
             None => BudgetVec::new(budget),
         };
         let (outlines, glyph_count) = match flavor {
@@ -180,16 +209,17 @@ impl Font {
                     (None, Some(t)) => (t, Version::Cff2),
                     (None, None) => return Err(Error::Invalid("missing CFF table")),
                 };
-                let cff = Cff::parse(bytes, table, version, head.units_per_em, budget, &mut meter)?;
+                let cff = Cff::parse(bytes, table, version, head.units_per_em, budget, &mut work)?;
                 let count = u16::try_from(cff.glyph_count()).map_err(|_| Error::Overflow)?;
                 (Outlines::Cff(Box::new(cff)), count)
             }
         };
         let hmtx = Hmtx::new(required(tables.hmtx)?, hhea.metrics, glyph_count)?;
         let kern = match tables.kern {
-            Some(t) => Kern::parse(bytes, t, budget, &mut meter)?,
+            Some(t) => Kern::parse(bytes, t, budget, &mut work)?,
             None => Kern::new(budget),
         };
+        let underline = metrics::underline(tables.post.map(|t| t.bytes(bytes)));
         Ok(Self {
             data,
             index,
@@ -203,6 +233,7 @@ impl Font {
             charmaps,
             outlines,
             kern,
+            underline,
             limits,
         })
     }
@@ -217,17 +248,27 @@ impl Font {
         self.index
     }
 
-    pub const fn glyph_count(&self) -> u32 {
-        self.glyph_count as u32
+    pub const fn glyph_count(&self) -> u16 {
+        self.glyph_count
+    }
+
+    /// Every glyph of the face, in index order.
+    pub fn glyphs(&self) -> impl Iterator<Item = GlyphId> + use<> {
+        (0..self.glyph_count).map(GlyphId)
     }
 
     pub const fn units_per_em(&self) -> u16 {
         self.head.units_per_em
     }
 
-    /// `head` bounding box: x min, y min, x max, y max.
-    pub const fn bounds(&self) -> [i16; 4] {
-        self.head.bounds
+    pub const fn bounds(&self) -> Bounds {
+        let [x_min, y_min, x_max, y_max] = self.head.bounds;
+        Bounds {
+            x_min,
+            y_min,
+            x_max,
+            y_max,
+        }
     }
 
     pub const fn mac_style(&self) -> u16 {
@@ -247,17 +288,22 @@ impl Font {
         self.os2
     }
 
-    /// `hhea` ascender, descender and line gap.
-    pub const fn horizontal_header(&self) -> (i16, i16, i16) {
-        (self.hhea.ascender, self.hhea.descender, self.hhea.line_gap)
-    }
-
-    pub const fn max_advance(&self) -> u16 {
-        self.hhea.advance_max
+    pub const fn horizontal_header(&self) -> HorizontalHeader {
+        HorizontalHeader {
+            ascender: self.hhea.ascender,
+            descender: self.hhea.descender,
+            line_gap: self.hhea.line_gap,
+            advance_max: self.hhea.advance_max,
+        }
     }
 
     pub fn vertical_metrics(&self) -> VerticalMetrics {
-        let (a, d, g) = self.horizontal_header();
+        let HorizontalHeader {
+            ascender: a,
+            descender: d,
+            line_gap: g,
+            ..
+        } = self.horizontal_header();
         let typo = |o: &Os2| VerticalMetrics {
             ascender: i32::from(o.typo_ascender),
             descender: i32::from(o.typo_descender),
@@ -265,7 +311,7 @@ impl Font {
                 + i32::from(o.typo_line_gap),
         };
         match self.os2 {
-            Some(os2) if os2.fs_selection & 0x80 != 0 => typo(&os2),
+            Some(os2) if os2.selection.use_typo_metrics() => typo(&os2),
             Some(os2) if a == 0 && d == 0 => {
                 if os2.typo_ascender != 0 || os2.typo_descender != 0 {
                     typo(&os2)
@@ -291,8 +337,8 @@ impl Font {
     pub fn style(&self) -> Style {
         match self.os2 {
             Some(os2) => Style {
-                bold: os2.fs_selection & 0x20 != 0,
-                italic: os2.fs_selection & 0x201 != 0,
+                bold: os2.selection.bold(),
+                italic: os2.selection.italic() || os2.selection.oblique(),
             },
             None => Style {
                 bold: self.head.mac_style & 1 != 0,
@@ -308,7 +354,7 @@ impl Font {
     }
 
     /// The record FreeType reports for `name_id` (see [`Self::family_name`]).
-    pub fn preferred_name(&self, name_id: u16) -> Option<NameRecord<'_>> {
+    pub fn preferred_name(&self, name_id: NameId) -> Option<NameRecord<'_>> {
         self.names.preferred(self.data.as_ref(), name_id)
     }
 
@@ -317,25 +363,21 @@ impl Font {
     /// `fsSelection` WWS bit skips ID 21. Each ID's record is chosen as
     /// [`Self::preferred_name`] does.
     pub fn family_name(&self) -> Option<NameRecord<'_>> {
-        self.first_name(&[
-            name_id::WWS_FAMILY,
-            name_id::TYPOGRAPHIC_FAMILY,
-            name_id::FAMILY,
-        ])
+        self.first_name(&[NameId::WwsFamily, NameId::TypographicFamily, NameId::Family])
     }
 
     /// The style name FreeType reports, by the rule of [`Self::family_name`] over
     /// IDs 22, 17 and 2.
     pub fn style_name(&self) -> Option<NameRecord<'_>> {
         self.first_name(&[
-            name_id::WWS_SUBFAMILY,
-            name_id::TYPOGRAPHIC_SUBFAMILY,
-            name_id::SUBFAMILY,
+            NameId::WwsSubfamily,
+            NameId::TypographicSubfamily,
+            NameId::Subfamily,
         ])
     }
 
-    fn first_name(&self, ids: &[u16; 3]) -> Option<NameRecord<'_>> {
-        let wws_only = self.os2.is_some_and(|o| o.fs_selection & 0x100 != 0);
+    fn first_name(&self, ids: &[NameId; 3]) -> Option<NameRecord<'_>> {
+        let wws_only = self.os2.is_some_and(|o| o.selection.wws());
         let ids = if wws_only { &ids[1..] } else { &ids[..] };
         ids.iter().find_map(|&id| self.preferred_name(id))
     }
@@ -345,61 +387,65 @@ impl Font {
     /// failing that, among Macintosh Roman records the last English one, else the
     /// first. FreeType then keeps only printable ASCII other than `[](){}<>/%`.
     pub fn postscript_name(&self) -> Option<NameRecord<'_>> {
-        let pick = |platform: u16, encodings: &[u16], language: u16| {
+        let pick = |platform: Platform, encodings: &[u16], language: u16| {
             let mut found: Option<NameRecord<'_>> = None;
             for r in self.names().filter(|r| {
-                r.name_id == name_id::POSTSCRIPT
+                r.name_id == NameId::PostScript
                     && r.platform == platform
-                    && encodings.contains(&r.encoding)
+                    && encodings.contains(&r.encoding_id)
             }) {
-                if found.is_none() || r.language == language {
+                if found.is_none() || r.language_id == language {
                     found = Some(r);
                 }
             }
             found
         };
-        pick(platform::WINDOWS, &[0, 1], 0x409).or_else(|| pick(platform::MACINTOSH, &[0], 0))
+        pick(Platform::Windows, &[0, 1], 0x409).or_else(|| pick(Platform::Macintosh, &[0], 0))
     }
 
     /// The supported cmap subtables, in directory order.
-    pub fn charmaps(&self) -> &[Charmap] {
-        self.charmaps.as_slice()
+    pub fn charmaps(&self) -> impl Iterator<Item = Charmap<'_>> + '_ {
+        self.charmaps
+            .as_slice()
+            .iter()
+            .map(|&subtable| self.charmap(subtable))
     }
 
-    /// The glyph `code` maps to in `charmap`, which must be one of
-    /// [`Self::charmaps`]. Codes the subtable does not map, and glyphs at or above
-    /// the glyph count, give `None`.
-    pub fn glyph_for_code(&self, charmap: &Charmap, code: u32) -> Option<GlyphId> {
-        let glyph = charmap.lookup(self.data.as_ref(), code)?;
-        (glyph != 0 && glyph < self.glyph_count()).then_some(GlyphId(glyph))
-    }
-
-    /// Every (code, glyph) pair of `charmap`, in code order, without glyph 0.
-    pub fn mappings<'a>(&'a self, charmap: &Charmap) -> impl Iterator<Item = (u32, GlyphId)> + 'a {
-        charmap.mappings(self.data.as_ref(), self.glyph_count())
+    fn charmap(&self, subtable: cmap::Subtable) -> Charmap<'_> {
+        Charmap::new(
+            self.data.as_ref(),
+            u32::from(self.glyph_count),
+            subtable,
+            self.limits.work,
+        )
     }
 
     /// The charmap for text: the first Windows Unicode subtable (3, 1) or (3, 10)
     /// in directory order, else the first Windows subtable, else the Unicode
-    /// subtable FreeType selects by default, else the first subtable. This is the
-    /// selection libass makes.
-    pub fn text_charmap(&self) -> Option<&Charmap> {
-        let all = self.charmaps();
-        let windows = |c: &&Charmap| c.platform == platform::WINDOWS;
+    /// subtable FreeType selects by default (the last full-Unicode one, else the
+    /// last Unicode-platform or Windows Unicode one), else the first subtable. This
+    /// is the selection libass makes.
+    pub fn text_charmap(&self) -> Option<Charmap<'_>> {
+        let all = self.charmaps.as_slice();
+        let windows = |c: &&cmap::Subtable| c.platform() == Platform::Windows;
+        let windows_unicode = |c: &&cmap::Subtable| {
+            windows(c)
+                && matches!(
+                    c.encoding(),
+                    CharEncoding::Unicode | CharEncoding::UnicodeFull
+                )
+        };
+        let full = |c: &&cmap::Subtable| c.encoding() == CharEncoding::UnicodeFull;
+        let unicode = |c: &&cmap::Subtable| {
+            c.platform() == Platform::Unicode && c.encoding_id() != 5 || windows_unicode(c)
+        };
         all.iter()
-            .find(|c| windows(c) && matches!(c.encoding, 1 | 10))
+            .find(windows_unicode)
             .or_else(|| all.iter().find(windows))
-            .or_else(|| {
-                let full = |c: &&Charmap| matches!((c.platform, c.encoding), (3, 10) | (0, 4 | 6));
-                let unicode = |c: &&Charmap| {
-                    c.platform == 0 && c.encoding != 5 || (c.platform, c.encoding) == (3, 1)
-                };
-                all.iter()
-                    .rev()
-                    .find(full)
-                    .or_else(|| all.iter().rev().find(unicode))
-            })
+            .or_else(|| all.iter().rev().find(full))
+            .or_else(|| all.iter().rev().find(unicode))
             .or_else(|| all.first())
+            .map(|&subtable| self.charmap(subtable))
     }
 
     /// The glyph for `c` through [`Self::text_charmap`]. A Windows Symbol charmap
@@ -407,12 +453,18 @@ impl Font {
     pub fn glyph_index(&self, c: char) -> Option<GlyphId> {
         let charmap = self.text_charmap()?;
         let code = u32::from(c);
-        let code = if (charmap.platform, charmap.encoding) == (3, 0) {
+        let code = if charmap.encoding() == CharEncoding::Symbol {
             code | 0xf000
         } else {
             code
         };
-        self.glyph_for_code(charmap, code)
+        charmap.glyph(code)
+    }
+
+    /// Every (left, right) pair the `kern` table lists, in table order, possibly
+    /// repeated; [`Self::kerning`] gives each pair's value.
+    pub fn kerning_pairs(&self) -> impl Iterator<Item = (GlyphId, GlyphId)> + '_ {
+        self.kern.pairs(self.data.as_ref())
     }
 
     /// The `hmtx` advance of `glyph` in font units.
@@ -426,16 +478,9 @@ impl Font {
         self.kern.pair(self.data.as_ref(), left, right)
     }
 
-    /// Every pair the `kern` subtables used by [`Self::kerning`] list, in table
-    /// order. A pair listed by several subtables appears once for each.
-    pub fn kerning_pairs(&self) -> impl Iterator<Item = (GlyphId, GlyphId)> + '_ {
-        self.kern.pairs(self.data.as_ref())
-    }
-
     fn check(&self, glyph: GlyphId) -> Result<u16> {
-        u16::try_from(glyph.0)
-            .ok()
-            .filter(|&g| g < self.glyph_count)
+        (glyph.0 < self.glyph_count)
+            .then_some(glyph.0)
             .ok_or(Error::Invalid("glyph index outside the face"))
     }
 
@@ -445,7 +490,10 @@ impl Font {
     ///
     /// A TrueType outline is shifted horizontally so that its left side bearing is
     /// the `hmtx` value, by `lsb - xMin` of the glyph whose metrics apply, as
-    /// FreeType places it. CFF outlines are unshifted.
+    /// FreeType places it. CFF outlines are unshifted and, as FreeType's CFF
+    /// engine builds them, in whole font units (rounded down), then through the
+    /// FontMatrix in fixed point. [`Font::at_size`] loads outlines scaled to
+    /// pixels.
     ///
     /// # Errors
     ///
@@ -455,16 +503,12 @@ impl Font {
     pub fn outline_into(&self, glyph: GlyphId, outline: &mut Outline) -> Result<GlyphMetrics> {
         let index = self.check(glyph)?;
         let data = self.data.as_ref();
-        let mut meter = Meter::new(self.limits.work);
+        let mut work = WorkBudget::new(self.limits.work);
         match &self.outlines {
             Outlines::Glyf(glyf) => {
                 outline.begin(self.limits.points);
-                let cx = glyf::Context {
-                    data,
-                    glyph_count: self.glyph_count,
-                    limits: &self.limits,
-                };
-                let metrics = glyf.outline(&cx, glyph, outline, &mut meter)?;
+                let cx = self.glyf_context();
+                let metrics = glyf.outline(&cx, glyph, FontUnits, outline, &mut work)?;
                 let shift = self.side_bearing(metrics.glyph) - i32::from(metrics.x_min);
                 if shift != 0 {
                     for p in outline.points_mut() {
@@ -472,14 +516,33 @@ impl Font {
                     }
                 }
                 Ok(GlyphMetrics {
-                    advance: self.hmtx.advance(data, metrics.glyph),
+                    advance: i32::from(self.hmtx.advance(data, metrics.glyph)),
                 })
             }
             Outlines::Cff(cff) => {
-                cff.outline(data, glyph, outline, &self.limits, &mut meter)?;
+                cff.load(data, glyph, Scale::UNITS, outline, &self.limits, &mut work)?;
+                let advance = self.hmtx.advance(data, index);
                 Ok(GlyphMetrics {
-                    advance: self.hmtx.advance(data, index),
+                    advance: glyf::narrow(cff.advance(data, glyph, advance, Scale::UNITS)?)?,
                 })
+            }
+        }
+    }
+
+    /// The charstring operators `glyph`'s program executes, with its subroutines
+    /// and `seac` components; empty for TrueType outlines. Corpus tools use it to
+    /// show which operators a comparison exercises.
+    pub fn charstring_operators(
+        &self,
+        glyph: GlyphId,
+        scratch: &mut Outline,
+    ) -> Result<OperatorSet> {
+        self.check(glyph)?;
+        match &self.outlines {
+            Outlines::Glyf(_) => Ok(OperatorSet::default()),
+            Outlines::Cff(cff) => {
+                let mut work = WorkBudget::new(self.limits.work);
+                cff.operators(self.data.as_ref(), glyph, scratch, &self.limits, &mut work)
             }
         }
     }
@@ -491,20 +554,30 @@ impl Font {
         Ok((outline, metrics))
     }
 
-    /// The `hmtx` left side bearing of `glyph`, or zero where the table lacks it.
+    fn glyf_context(&self) -> glyf::Context<'_> {
+        glyf::Context {
+            data: self.data.as_ref(),
+            glyph_count: self.glyph_count,
+            limits: &self.limits,
+        }
+    }
+
+    /// The weight libass assigns the face: `OS/2.usWeightClass`, with classes 1
+    /// to 9 read as 100 to 900 (4 as 350), and 400 or 700 by the bold style when
+    /// it is zero or `OS/2` is absent.
+    pub fn weight(&self) -> u32 {
+        match self.os2.map_or(0, |o| o.weight_class) {
+            0 if self.style().bold => 700,
+            0 => 400,
+            4 => 350,
+            class @ 1..=9 => u32::from(class) * 100,
+            class => u32::from(class),
+        }
+    }
+
+    /// The `hmtx` left side bearing of `glyph`.
     fn side_bearing(&self, glyph: u16) -> i32 {
-        let Some(table) = self.tables.hmtx else {
-            return 0;
-        };
-        let bytes = table.bytes(self.data.as_ref());
-        let metrics = usize::from(self.hhea.metrics.min(self.glyph_count));
-        let glyph = usize::from(glyph);
-        let at = if glyph < metrics {
-            4 * glyph + 2
-        } else {
-            4 * metrics + 2 * (glyph - metrics)
-        };
-        read::u16_at(bytes, at).map_or(0, |v| i32::from(v.cast_signed()))
+        i32::from(self.hmtx.side_bearing(self.data.as_ref(), glyph))
     }
 
     /// Whether the face is CID-keyed CFF.

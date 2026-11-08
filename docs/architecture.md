@@ -120,9 +120,9 @@ performance gates where it touches hot code.
 4. **Composition.** HLS and codec bridges become separate crates. Playback keeps its own
    container engines: it carries source and native clocks, range plans and per-step
    parsing that `ContainerReader` does not.
-5. **Subtitle rendering.** ASS/SSA scripts render to positioned alpha bitmaps that match
-   libass exactly, measured against a pinned libass build through the same gates. Four
-   crates, each depending only on those before it:
+5. **Subtitle rendering.** ASS/SSA scripts are to render to positioned alpha bitmaps that
+   match libass exactly, measured against a pinned libass build through the same gates.
+   Four crates, each depending only on those before it:
 
    | Crate | Role |
    |---|---|
@@ -131,21 +131,7 @@ performance gates where it touches hot code.
    | `triergon-raster` | Outlines in 26.6 fixed point, flattening, stroking for borders, the tile rasteriser, Gaussian and box blur, and the alpha bitmaps borders and shadows combine into |
    | `triergon-ass` | Script and Matroska-packet parsing, styles, typed override tags, animation, karaoke, drawings, line wrapping, alignment, collisions, `\clip`/`\iclip`, and the renderer |
 
-   The entry points:
-
-   ```rust
-   let track = triergon_ass::Track::parse(&script, &budget, limits)?; // or header + packets
-   let fonts = triergon_ass::Fonts::new(&budget).with_directory_faces(faces)?; // and embedded fonts
-   let mut renderer = triergon_ass::Renderer::new(&fonts, Frame { width, height, .. }, &budget);
-   for image in renderer.render(&track, time)?.images() {
-       // image.x, image.y, image.width, image.height, image.stride, image.alpha, image.colour
-   }
-   ```
-
-   `render` returns the frame's images in compositing order, as libass's image list
-   does, and reports whether they changed since the last frame. Glyphs, outlines,
-   bitmaps and shaped runs are cached in a `Store` charged to the renderer's budget.
-   Behaviour where libass departs from the ASS specification by choice follows the
-   compat-policy convention above. A Triergon worker and a libass worker render the same
-   script at the same times and frame sizes, and the harness compares every image and
-   position exactly.
+   `triergon-font` exists; the other three are planned. A Triergon worker and a libass
+   worker will render the same script at the same times and frame sizes, and the harness
+   will compare every image and position exactly. Behaviour where libass departs from the
+   ASS specification by choice will follow the compat-policy convention above.

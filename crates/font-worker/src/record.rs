@@ -1,15 +1,67 @@
-//! The values one font operation reads, and the two ways of consuming them: the
+//! The values the font operations read, and the two ways of consuming them: the
 //! ordered work digest of the harness protocol and the readable line format.
 
 use std::io::{self, Write};
-use triergon_font::{Charmap, Outline, PointKind};
+use triergon_font::{
+    Band, Charmap, Coordinate, Outline, PointKind, ScaledOutline, SizeMetrics, SizedFont,
+};
 use triergon_harness_protocol::digest::{fold, fold_framed, signed};
+
+/// What one size reports besides its glyphs.
+pub struct Size {
+    pub height: i32,
+    pub metrics: SizeMetrics,
+    pub ascent: i32,
+    pub descent: i32,
+    pub harfbuzz: (i32, i32),
+    pub strength: i32,
+    pub postscript: bool,
+    pub underline: Option<Band>,
+    pub strikeout: Option<Band>,
+}
+
+impl Size {
+    pub fn new(height: i32, sized: &SizedFont<'_>, postscript: bool) -> Self {
+        let (ascent, descent) = sized.ascent_descent();
+        Self {
+            height,
+            metrics: sized.metrics(),
+            ascent,
+            descent,
+            harfbuzz: sized.harfbuzz_scale(),
+            strength: sized.embolden_strength(),
+            postscript,
+            underline: sized.underline(),
+            strikeout: sized.strikeout(),
+        }
+    }
+}
+
+/// libass's synthetic styles, in the order it applies them to a glyph.
+#[derive(Clone, Copy)]
+pub enum Style {
+    Bold,
+    Oblique,
+    Both,
+}
+
+impl Style {
+    pub const ALL: [Self; 3] = [Self::Bold, Self::Oblique, Self::Both];
+
+    const fn name(self) -> &'static str {
+        match self {
+            Self::Bold => "bold",
+            Self::Oblique => "oblique",
+            Self::Both => "both",
+        }
+    }
+}
 
 /// One group of values, in the order `harness/reference_font.h` produces them.
 pub enum Record<'a> {
     Face {
         index: u32,
-        glyphs: u32,
+        glyphs: u16,
         units_per_em: u16,
         ascender: i32,
         descender: i32,
@@ -22,7 +74,7 @@ pub enum Record<'a> {
     FaceError(u32),
     /// The family, style and PostScript names in their ASCII forms.
     Family(Option<&'a str>),
-    Style(Option<&'a str>),
+    StyleName(Option<&'a str>),
     PostScript(Option<&'a str>),
     Weight(u16),
     Name {
@@ -32,27 +84,51 @@ pub enum Record<'a> {
         id: u16,
         bytes: &'a [u8],
     },
-    Charmap(&'a Charmap),
+    Charmap(Charmap<'a>),
     Map {
         code: u32,
-        glyph: u32,
+        glyph: u16,
     },
-    TextCharmap(Option<&'a Charmap>),
+    /// The mappings of a charmap ended with an error.
+    MapError,
+    TextCharmap(Option<Charmap<'a>>),
     Kern {
-        left: u32,
-        right: u32,
+        left: u16,
+        right: u16,
         value: i32,
     },
     Glyph {
-        index: u32,
+        index: u16,
         /// The `hmtx` advance, or -1 when it cannot be read.
         advance: i64,
         /// The advance of the loaded glyph.
-        loaded: i64,
+        loaded: i32,
         outline: &'a Outline,
     },
     /// A glyph the reader rejects.
-    GlyphError(u32),
+    GlyphError(u16),
+    /// A face of the scaled and hinted operations.
+    SizedFace(u32),
+    Size(&'a Size),
+    /// A size the face cannot be loaded at.
+    SizeError(i32),
+    ScaledGlyph {
+        index: u16,
+        /// The unhinted advance in 26.6.
+        advance: i32,
+        outline: &'a ScaledOutline,
+    },
+    /// A synthetic style of the last scaled glyph; `None` when it cannot be applied.
+    Styled {
+        style: Style,
+        index: u16,
+        outline: Option<&'a ScaledOutline>,
+    },
+    /// The default-load advance in 26.6; `None` when the glyph cannot be loaded.
+    Hinted {
+        index: u16,
+        advance: Option<i32>,
+    },
 }
 
 /// Consumes the records of one operation.
@@ -74,9 +150,16 @@ const TEXT_CHARMAP: u64 = 10;
 const KERN: u64 = 11;
 const GLYPH: u64 = 12;
 const GLYPH_ERROR: u64 = 13;
+const MAP_ERROR: u64 = 14;
+const SIZED_FACE: u64 = 20;
+const SIZE: u64 = 21;
+const SIZE_ERROR: u64 = 22;
+const SCALED_GLYPH: u64 = 23;
+const STYLED: u64 = 24;
+const HINTED: u64 = 25;
 const ABSENT: u64 = u64::MAX;
 
-/// Outline coordinates at 1/64 font unit, as FreeType's 26.6 values at a size of
+/// Unscaled coordinates at 1/64 font unit, as FreeType's 26.6 values at a size of
 /// one pixel per font unit.
 fn units_64(value: f32) -> i64 {
     (f64::from(value) * 64.0).round() as i64
@@ -90,7 +173,8 @@ const fn point_tag(kind: PointKind) -> u8 {
     }
 }
 
-/// The work of one or more operations: glyphs, outline points and the digest.
+/// The work of one or more operations: glyph outlines (or advances), their
+/// points and the digest.
 #[derive(Default)]
 pub struct Work {
     pub packets: u64,
@@ -111,6 +195,43 @@ impl Work {
             Some(text) => fold_framed(&mut self.digest, text.as_bytes()),
             None => fold(&mut self.digest, ABSENT),
         }
+    }
+
+    fn charmap(&mut self, tag: u64, charmap: Option<Charmap<'_>>) {
+        match charmap {
+            Some(c) => self.words(&[
+                tag,
+                c.platform().id().into(),
+                c.encoding_id().into(),
+                c.format().number().into(),
+            ]),
+            None => self.words(&[tag, ABSENT]),
+        }
+    }
+
+    fn band(&mut self, band: Option<Band>) {
+        match band {
+            Some(b) => self.words(&[signed(b.y_min.into()), signed(b.y_max.into())]),
+            None => fold(&mut self.digest, ABSENT),
+        }
+    }
+
+    /// Contours, points, contour ends, then x, y and tag of every point.
+    fn outline<C: Coordinate>(&mut self, outline: &Outline<C>, value: impl Fn(C) -> i64) {
+        let (ends, points) = (outline.contour_ends(), outline.points());
+        self.words(&[ends.len() as u64, points.len() as u64]);
+        for &end in ends {
+            fold(&mut self.digest, end.into());
+        }
+        for p in points {
+            self.words(&[
+                signed(value(p.point.x)),
+                signed(value(p.point.y)),
+                point_tag(p.kind).into(),
+            ]);
+        }
+        self.packets += 1;
+        self.bytes += points.len() as u64;
     }
 
     /// Adds the work of one operation, its digest folded as one value.
@@ -149,7 +270,7 @@ impl Sink for Work {
             ]),
             Record::FaceError(index) => self.words(&[FACE_ERROR, index.into()]),
             Record::Family(text) => self.text(FAMILY, text),
-            Record::Style(text) => self.text(STYLE, text),
+            Record::StyleName(text) => self.text(STYLE, text),
             Record::PostScript(text) => self.text(POSTSCRIPT, text),
             Record::Weight(weight) => self.words(&[WEIGHT, weight.into()]),
             Record::Name {
@@ -168,24 +289,10 @@ impl Sink for Work {
                 ]);
                 fold_framed(&mut self.digest, bytes);
             }
-            Record::Charmap(c) => {
-                self.words(&[
-                    CHARMAP,
-                    c.platform.into(),
-                    c.encoding.into(),
-                    c.format.into(),
-                ]);
-            }
+            Record::Charmap(c) => self.charmap(CHARMAP, Some(c)),
             Record::Map { code, glyph } => self.words(&[MAP, code.into(), glyph.into()]),
-            Record::TextCharmap(Some(c)) => {
-                self.words(&[
-                    TEXT_CHARMAP,
-                    c.platform.into(),
-                    c.encoding.into(),
-                    c.format.into(),
-                ]);
-            }
-            Record::TextCharmap(None) => self.words(&[TEXT_CHARMAP, ABSENT]),
+            Record::MapError => self.words(&[MAP_ERROR]),
+            Record::TextCharmap(c) => self.charmap(TEXT_CHARMAP, c),
             Record::Kern { left, right, value } => {
                 self.words(&[KERN, left.into(), right.into(), signed(value.into())]);
             }
@@ -195,40 +302,111 @@ impl Sink for Work {
                 loaded,
                 outline,
             } => {
-                let (ends, points) = (outline.contour_ends(), outline.points());
-                self.words(&[
-                    GLYPH,
-                    index.into(),
-                    signed(advance),
-                    signed(loaded),
-                    ends.len() as u64,
-                    points.len() as u64,
-                ]);
-                for &end in ends {
-                    fold(&mut self.digest, end.into());
-                }
-                for p in points {
-                    self.words(&[
-                        signed(units_64(p.point.x)),
-                        signed(units_64(p.point.y)),
-                        point_tag(p.kind).into(),
-                    ]);
-                }
-                self.packets += 1;
-                self.bytes += points.len() as u64;
+                self.words(&[GLYPH, index.into(), signed(advance), signed(loaded.into())]);
+                self.outline(outline, units_64);
             }
             Record::GlyphError(index) => self.words(&[GLYPH_ERROR, index.into()]),
+            Record::SizedFace(index) => self.words(&[SIZED_FACE, index.into()]),
+            Record::Size(size) => {
+                let m = &size.metrics;
+                self.words(&[
+                    SIZE,
+                    signed(size.height.into()),
+                    m.x_ppem.into(),
+                    m.y_ppem.into(),
+                    signed(m.x_scale),
+                    signed(m.y_scale),
+                    signed(m.ascender),
+                    signed(m.descender),
+                    signed(m.height),
+                    signed(m.max_advance),
+                    signed(size.ascent.into()),
+                    signed(size.descent.into()),
+                    signed(size.harfbuzz.0.into()),
+                    signed(size.harfbuzz.1.into()),
+                    signed(size.strength.into()),
+                    size.postscript.into(),
+                ]);
+                self.band(size.underline);
+                self.band(size.strikeout);
+            }
+            Record::SizeError(height) => self.words(&[SIZE_ERROR, signed(height.into())]),
+            Record::ScaledGlyph {
+                index,
+                advance,
+                outline,
+            } => {
+                self.words(&[SCALED_GLYPH, index.into(), signed(advance.into())]);
+                self.outline(outline, i64::from);
+            }
+            Record::Styled {
+                style,
+                index,
+                outline,
+            } => {
+                self.words(&[STYLED, style as u64, index.into()]);
+                match outline {
+                    Some(outline) => self.outline(outline, i64::from),
+                    None => fold(&mut self.digest, ABSENT),
+                }
+            }
+            Record::Hinted { index, advance } => {
+                let advance = advance.map_or(ABSENT, |a| signed(a.into()));
+                self.words(&[HINTED, index.into(), advance]);
+                self.packets += 1;
+            }
         }
         Ok(())
     }
 }
 
-/// Writes each record as one line, for diffing against the reference's `font-dump`.
+/// Writes each record as one line, for diffing against the reference's dump.
 pub struct Dump<W>(pub W);
+
+impl<W: Write> Dump<W> {
+    fn outline<C: Coordinate>(
+        &mut self,
+        outline: &Outline<C>,
+        value: impl Fn(C) -> i64,
+    ) -> io::Result<()> {
+        let out = &mut self.0;
+        let ends = outline.contour_ends();
+        write!(out, "{} |", ends.len())?;
+        for end in ends {
+            write!(out, " {end}")?;
+        }
+        write!(out, " |")?;
+        for p in outline.points() {
+            let (x, y, tag) = (value(p.point.x), value(p.point.y), point_tag(p.kind));
+            write!(out, " {x} {y} {tag}")?;
+        }
+        writeln!(out)
+    }
+
+    fn band(&mut self, key: &str, band: Option<Band>) -> io::Result<()> {
+        match band {
+            Some(b) => write!(self.0, " {key} {} {}", b.y_min, b.y_max),
+            None => write!(self.0, " {key} -"),
+        }
+    }
+}
+
+fn charmap_text(charmap: Option<Charmap<'_>>) -> String {
+    charmap.map_or_else(
+        || "-".into(),
+        |c| {
+            format!(
+                "{} {} {}",
+                c.platform().id(),
+                c.encoding_id(),
+                c.format().number()
+            )
+        },
+    )
+}
 
 impl<W: Write> Sink for Dump<W> {
     fn record(&mut self, record: Record<'_>) -> io::Result<()> {
-        let out = &mut self.0;
         match record {
             Record::Face {
                 index,
@@ -241,16 +419,16 @@ impl<W: Write> Sink for Dump<W> {
                 bold,
                 italic,
             } => writeln!(
-                out,
+                self.0,
                 "face {index} {glyphs} {units_per_em} {ascender} {descender} {height} {max_advance} {} {}",
                 u8::from(bold),
                 u8::from(italic)
             ),
-            Record::FaceError(index) => writeln!(out, "face {index} error"),
-            Record::Family(name) => writeln!(out, "family {}", name.unwrap_or("-")),
-            Record::Style(name) => writeln!(out, "style {}", name.unwrap_or("-")),
-            Record::PostScript(name) => writeln!(out, "postscript {}", name.unwrap_or("-")),
-            Record::Weight(weight) => writeln!(out, "weight {weight}"),
+            Record::FaceError(index) => writeln!(self.0, "face {index} error"),
+            Record::Family(name) => writeln!(self.0, "family {}", name.unwrap_or("-")),
+            Record::StyleName(name) => writeln!(self.0, "style {}", name.unwrap_or("-")),
+            Record::PostScript(name) => writeln!(self.0, "postscript {}", name.unwrap_or("-")),
+            Record::Weight(weight) => writeln!(self.0, "weight {weight}"),
             Record::Name {
                 platform,
                 encoding,
@@ -258,43 +436,75 @@ impl<W: Write> Sink for Dump<W> {
                 id,
                 bytes,
             } => {
-                write!(out, "name {platform} {encoding} {language} {id} ")?;
-                triergon_harness_protocol::write_hex(out, bytes)?;
-                writeln!(out)
+                write!(self.0, "name {platform} {encoding} {language} {id} ")?;
+                triergon_harness_protocol::write_hex(&mut self.0, bytes)?;
+                writeln!(self.0)
             }
-            Record::Charmap(c) => {
-                writeln!(out, "charmap {} {} {}", c.platform, c.encoding, c.format)
-            }
-            Record::Map { code, glyph } => writeln!(out, "map {code} {glyph}"),
-            Record::TextCharmap(Some(c)) => {
-                writeln!(out, "textmap {} {} {}", c.platform, c.encoding, c.format)
-            }
-            Record::TextCharmap(None) => writeln!(out, "textmap -"),
-            Record::Kern { left, right, value } => writeln!(out, "kern {left} {right} {value}"),
+            Record::Charmap(c) => writeln!(self.0, "charmap {}", charmap_text(Some(c))),
+            Record::Map { code, glyph } => writeln!(self.0, "map {code} {glyph}"),
+            Record::MapError => writeln!(self.0, "map error"),
+            Record::TextCharmap(c) => writeln!(self.0, "textmap {}", charmap_text(c)),
+            Record::Kern { left, right, value } => writeln!(self.0, "kern {left} {right} {value}"),
             Record::Glyph {
                 index,
                 advance,
                 loaded,
                 outline,
             } => {
-                let ends = outline.contour_ends();
-                write!(out, "glyph {index} {advance} {loaded} {} |", ends.len())?;
-                for end in ends {
-                    write!(out, " {end}")?;
-                }
-                write!(out, " |")?;
-                for p in outline.points() {
-                    write!(
-                        out,
-                        " {} {} {}",
-                        units_64(p.point.x),
-                        units_64(p.point.y),
-                        point_tag(p.kind)
-                    )?;
-                }
-                writeln!(out)
+                write!(self.0, "glyph {index} {advance} {loaded} ")?;
+                self.outline(outline, units_64)
             }
-            Record::GlyphError(index) => writeln!(out, "glyph {index} error"),
+            Record::GlyphError(index) => writeln!(self.0, "glyph {index} error"),
+            Record::SizedFace(index) => writeln!(self.0, "face {index}"),
+            Record::Size(size) => {
+                let m = &size.metrics;
+                write!(
+                    self.0,
+                    "size {} {} {} {} {} {} {} {} {} {} {} {} {} {} {}",
+                    size.height,
+                    m.x_ppem,
+                    m.y_ppem,
+                    m.x_scale,
+                    m.y_scale,
+                    m.ascender,
+                    m.descender,
+                    m.height,
+                    m.max_advance,
+                    size.ascent,
+                    size.descent,
+                    size.harfbuzz.0,
+                    size.harfbuzz.1,
+                    size.strength,
+                    u8::from(size.postscript)
+                )?;
+                self.band("underline", size.underline)?;
+                self.band("strikeout", size.strikeout)?;
+                writeln!(self.0)
+            }
+            Record::SizeError(height) => writeln!(self.0, "size {height} error"),
+            Record::ScaledGlyph {
+                index,
+                advance,
+                outline,
+            } => {
+                write!(self.0, "glyph {index} {advance} ")?;
+                self.outline(outline, i64::from)
+            }
+            Record::Styled {
+                style,
+                index,
+                outline,
+            } => match outline {
+                Some(outline) => {
+                    write!(self.0, "{} {index} ", style.name())?;
+                    self.outline(outline, i64::from)
+                }
+                None => writeln!(self.0, "{} {index} error", style.name()),
+            },
+            Record::Hinted { index, advance } => match advance {
+                Some(advance) => writeln!(self.0, "hinted {index} {advance}"),
+                None => writeln!(self.0, "hinted {index} error"),
+            },
         }
     }
 }

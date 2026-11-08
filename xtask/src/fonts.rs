@@ -1,9 +1,9 @@
-//! The FreeType reference and the font corpus: build the pinned FreeType release
-//! and fetch the corpus. `cargo xtask build-workers` links the reference worker
-//! (`harness/reference_font.h`) against the installed library, and the
-//! `font-outlines` feature runs through `cargo xtask report` and `cargo xtask fuzz`
-//! like every other feature; `fonts compare` and `fonts fuzz` are shorthands for
-//! those two.
+//! The FreeType reference and the font corpus: build the pinned FreeType release,
+//! fetch the corpus, and run the font features. `cargo xtask build-workers` links
+//! the reference worker (`harness/reference_font.h`) against the installed
+//! library; the features `font-outlines`, `font-scaled` and `font-hinted` run
+//! through `cargo xtask report`, `trace-identities` and `fuzz --contract` like
+//! every other feature, and `fonts compare` reports all three.
 //!
 //! FreeType is built from its hash-checked release tarball with recorded configure
 //! flags, as the FFmpeg references are.
@@ -20,16 +20,19 @@ use crate::sha256;
 pub const USAGE: &str = "usage: cargo xtask fonts prepare [--jobs N]
        cargo xtask fonts fetch
        cargo xtask fonts compare [REPORT OPTION]...
-       cargo xtask fonts fuzz --output DIR [FUZZ OPTION]...
+       cargo xtask fonts fuzz [--iters N] [--timeout SECONDS]
 
   prepare  build the pinned FreeType release into .research/freetype; then
            `cargo xtask build-workers` builds its reference worker
   fetch    fetch and verify the font corpus (harness/fonts/corpus.json) into
-           .research/fonts
-  compare  `cargo xtask report` on the font-outlines feature, with any further
-           report options (--benchmark, --memory, --output DIR, ...)
-  fuzz     `cargo xtask fuzz` on the font-outlines feature, with any further
-           campaign options (--rounds N, --case TEXT, ...)";
+           .research/fonts, writing the authored fonts with the crate's
+           authored-fonts example
+  compare  `cargo xtask report` on each font feature (font-outlines, font-scaled,
+           font-hinted), with any further report options; each report goes to
+           OUTPUT/<feature> (OUTPUT: --output, default .research/font-report)
+  fuzz     run the crate's mutation smoke test (examples/fuzz.rs, dev profile, so
+           overflow is checked; an input past the timeout is a hang) over every
+           corpus file, N mutations each (default 40)";
 
 pub const VERSION: &str = "2.15.0";
 pub const ARCHIVE_SHA256: &str = "93cd47eb719c325107f2d3cf087d06299e944c3b48a40b55537302304dea1dd5";
@@ -38,34 +41,47 @@ const FONT_LIMIT: usize = 64 * 1024 * 1024;
 const CACHE: &str = ".research/freetype";
 const FONTS: &str = ".research/fonts";
 const CORPUS: &str = "harness/fonts/corpus.json";
-/// The feature `compare` and `fuzz` run.
-const CONTRACT: &str = "harness/features/font-outlines/contract.json";
-const MANIFEST: &str = "harness/features/font-outlines/corpus.json";
+/// The font features: face data and unscaled outlines, what libass loads at a
+/// size, and default-load (hinted) advances.
+pub const FEATURES: [&str; 3] = ["font-outlines", "font-scaled", "font-hinted"];
 
-/// A `cargo xtask` command on the font-outlines feature, with its arguments.
-#[derive(Debug, PartialEq, Eq)]
-pub enum Shorthand {
-    /// `fonts compare`: `cargo xtask report`.
-    Report(Vec<String>),
-    /// `fonts fuzz`: `cargo xtask fuzz`.
-    Fuzz(Vec<String>),
-}
-
-/// What `fonts compare` and `fonts fuzz` stand for; `None` for the other commands.
-pub fn shorthand(args: &[String]) -> Option<Shorthand> {
+/// The `cargo xtask report` arguments `fonts compare ARGS` stands for, one list
+/// per feature; `None` for the other commands.
+pub fn reports(args: &[String]) -> Option<Vec<(&'static str, Vec<String>)>> {
     let (command, rest) = args.split_first()?;
-    let expanded = || {
-        let mut expanded: Vec<String> = ["--contract", CONTRACT, "--manifest", MANIFEST]
-            .map(String::from)
-            .to_vec();
-        expanded.extend(rest.iter().cloned());
-        expanded
-    };
-    match command.as_str() {
-        "compare" => Some(Shorthand::Report(expanded())),
-        "fuzz" => Some(Shorthand::Fuzz(expanded())),
-        _ => None,
+    if command != "compare" {
+        return None;
     }
+    let mut output = PathBuf::from(".research/font-report");
+    let mut options = Vec::new();
+    let mut rest = rest.iter();
+    while let Some(arg) = rest.next() {
+        match (arg.as_str(), rest.clone().next()) {
+            ("--output", Some(value)) => {
+                output = PathBuf::from(value);
+                rest.next();
+            }
+            _ => options.push(arg.clone()),
+        }
+    }
+    Some(
+        FEATURES
+            .iter()
+            .map(|&feature| {
+                let path = |file: &str| format!("harness/features/{feature}/{file}.json");
+                let mut list = vec![
+                    "--contract".to_owned(),
+                    path("contract"),
+                    "--manifest".to_owned(),
+                    path("corpus"),
+                    "--output".to_owned(),
+                    output.join(feature).display().to_string(),
+                ];
+                list.extend(options.iter().cloned());
+                (feature, list)
+            })
+            .collect(),
+    )
 }
 
 pub fn main(root: &Path, args: &[String]) -> Result<(), String> {
@@ -92,8 +108,48 @@ pub fn main(root: &Path, args: &[String]) -> Result<(), String> {
             );
             Ok(())
         }
+        [command, rest @ ..] if command == "fuzz" => {
+            let (mut iterations, mut timeout) = (40, 10);
+            let mut rest = rest.iter();
+            while let Some(flag) = rest.next() {
+                let value: u32 = rest
+                    .next()
+                    .and_then(|v| v.parse().ok())
+                    .ok_or_else(|| format!("{flag} needs a number"))?;
+                match flag.as_str() {
+                    "--iters" => iterations = value,
+                    "--timeout" => timeout = value,
+                    _ => return Err(USAGE.into()),
+                }
+            }
+            fuzz(root, iterations, timeout)
+        }
         _ => Err(USAGE.into()),
     }
+}
+
+/// The crate's fuzz example over every corpus file.
+fn fuzz(root: &Path, iterations: u32, timeout: u32) -> Result<(), String> {
+    run(Command::new("cargo")
+        .args(["build", "--locked", "-p", "triergon-font", "--example", "fuzz"])
+        .env("CARGO_INCREMENTAL", "0")
+        .current_dir(root))?;
+    let files = root.join(FONTS).join("files");
+    let paths: Vec<PathBuf> = corpus(root)?
+        .into_iter()
+        .flat_map(|(_, list)| list)
+        .map(|file| files.join(file.path))
+        .collect();
+    if let Some(missing) = paths.iter().find(|p| !p.exists()) {
+        return Err(format!(
+            "{}: missing (run `cargo xtask fonts fetch`)",
+            missing.display()
+        ));
+    }
+    run(Command::new(root.join("target/debug/examples/fuzz"))
+        .args(["--iters", &iterations.to_string(), "--timeout", &timeout.to_string()])
+        .args(&paths)
+        .current_dir(root.join(FONTS)))
 }
 
 pub fn configure_argv(prefix: &Path) -> Vec<String> {
@@ -234,6 +290,34 @@ fn fetch_corpus(root: &Path, net: &dyn Transport) -> Result<usize, String> {
     fs::create_dir_all(&files).map_err(|e| format!("{}: {e}", files.display()))?;
     let mut verified = 0;
     for (source, list) in corpus(root)? {
+        if source.get("generator").and_then(Value::as_str) == Some("authored-fonts") {
+            // Written by the font crate's own builder, then checked like any file.
+            run(Command::new("cargo")
+                .args([
+                    "run",
+                    "--quiet",
+                    "--locked",
+                    "-p",
+                    "triergon-font",
+                    "--example",
+                    "authored-fonts",
+                    "--",
+                ])
+                .arg(files.join("authored"))
+                .env("CARGO_INCREMENTAL", "0")
+                .current_dir(root))?;
+            for file in &list {
+                let data = fetch::read_bounded(&files.join(&file.path), FONT_LIMIT)?;
+                if sha256::hex(&data) != file.sha256 {
+                    return Err(format!(
+                        "{}: authored font changed; update its hash",
+                        file.path
+                    ));
+                }
+                verified += 1;
+            }
+            continue;
+        }
         let text = |key| {
             source
                 .get(key)
@@ -279,26 +363,29 @@ fn fetch_corpus(root: &Path, net: &dyn Transport) -> Result<usize, String> {
 
 #[cfg(test)]
 mod tests {
-    use super::{CONTRACT, MANIFEST, Shorthand, configure_argv, shorthand};
+    use super::{FEATURES, configure_argv, reports};
     use std::path::Path;
 
     #[test]
-    fn compare_and_fuzz_run_the_font_feature() {
+    fn compare_reports_every_font_feature() {
         let args = |list: &[&str]| list.iter().map(ToString::to_string).collect::<Vec<_>>();
-        let feature = |rest: &[&str]| {
-            let mut all = args(&["--contract", CONTRACT, "--manifest", MANIFEST]);
-            all.extend(args(rest));
-            all
-        };
+        let reports = reports(&args(&["compare", "--output", "out", "--memory"])).unwrap();
+        assert_eq!(reports.len(), FEATURES.len());
+        let (feature, scaled) = &reports[1];
+        assert_eq!(*feature, "font-scaled");
         assert_eq!(
-            shorthand(&args(&["compare", "--memory"])),
-            Some(Shorthand::Report(feature(&["--memory"])))
+            *scaled,
+            args(&[
+                "--contract",
+                "harness/features/font-scaled/contract.json",
+                "--manifest",
+                "harness/features/font-scaled/corpus.json",
+                "--output",
+                "out/font-scaled",
+                "--memory",
+            ])
         );
-        assert_eq!(
-            shorthand(&args(&["fuzz", "--rounds", "2"])),
-            Some(Shorthand::Fuzz(feature(&["--rounds", "2"])))
-        );
-        assert_eq!(shorthand(&args(&["prepare"])), None);
+        assert!(reports(&args(&["fuzz"])).is_none());
     }
 
     #[test]

@@ -108,7 +108,8 @@ commands:
   capture        compare|qualify|summarize|equivalence   capture pipeline against the
                  FFmpeg capture reference (see `cargo xtask capture --help`)
   fonts          prepare|fetch|compare|fuzz   the pinned FreeType reference and the font
-                 corpus; compare and fuzz run report and fuzz on the font-outlines feature
+                 corpus; compare reports the three font features, fuzz runs the
+                 crate's mutation test
                  (see `cargo xtask fonts --help`)";
 
 fn main() -> ExitCode {
@@ -166,9 +167,8 @@ fn main() -> ExitCode {
         Some("trace-identities") => return trace_identities(&root, &args[1..]),
         Some("codecs") => return failing(codecs::main(&root, &args[1..]), codecs::USAGE),
         Some("capture") => return failing(capture::main(&root, &args[1..]), capture::USAGE),
-        Some("fonts") => match fonts::shorthand(&args[1..]) {
-            Some(fonts::Shorthand::Report(expanded)) => return report(&root, &expanded),
-            Some(fonts::Shorthand::Fuzz(expanded)) => return fuzz_campaign(&root, &expanded),
+        Some("fonts") => match fonts::reports(&args[1..]) {
+            Some(reports) => return fonts_compare(&root, &reports),
             None => fonts::main(&root, &args[1..]),
         },
         Some("build-workers") => match &args[1..] {
@@ -879,34 +879,66 @@ const REFERENCE_TRACE_CRATES: [&str; 5] = [
     "triergon-subtitles",
 ];
 
-/// `fonts compare`, then `fonts fuzz` for one round of mutations of every font
-/// through the release and dev builds of the font worker; a campaign that finds
-/// nothing is removed.
-fn fonts_check(root: &Path) -> Task {
-    let output = root.join(format!(".research/check-fonts-fuzz-{}", std::process::id()));
-    let output = output.display().to_string();
-    let fuzz = [
-        "fuzz",
-        "--output",
-        &output,
-        "--rounds",
-        "1",
-        "--timeout-seconds",
-        "60",
-    ];
-    for args in [&["compare"][..], &fuzz] {
-        println!("$ cargo xtask fonts {}", args.join(" "));
-        let args: Vec<String> = args.iter().map(ToString::to_string).collect();
-        let code = match fonts::shorthand(&args) {
-            Some(fonts::Shorthand::Report(expanded)) => report(root, &expanded),
-            Some(fonts::Shorthand::Fuzz(expanded)) => fuzz_campaign(root, &expanded),
-            None => unreachable!("compare and fuzz are shorthands"),
-        };
-        if code != ExitCode::SUCCESS {
-            return Err(format!("cargo xtask fonts {} failed", args.join(" ")));
+/// `fonts compare`: the report of every font feature, then each feature's passing
+/// cases and failures. Exits with the first failing report's code.
+fn fonts_compare(root: &Path, reports: &[(&str, Vec<String>)]) -> ExitCode {
+    let mut result = ExitCode::SUCCESS;
+    let mut summary = Vec::new();
+    for (feature, args) in reports {
+        println!("$ cargo xtask report {}", args.join(" "));
+        let code = report(root, args);
+        if code != ExitCode::SUCCESS && result == ExitCode::SUCCESS {
+            result = code;
         }
+        let output = args
+            .iter()
+            .position(|a| a == "--output")
+            .map(|at| root.join(&args[at + 1]).join("report.json"));
+        let cases = output
+            .and_then(|path| checks::read_json(&path).ok())
+            .and_then(|r| r.get("cases").and_then(json::Value::as_array).map(<[_]>::to_vec))
+            .unwrap_or_default();
+        let status = |case: &json::Value| {
+            case.get("parity")
+                .and_then(|p| p.get("status"))
+                .and_then(json::Value::as_str)
+                .unwrap_or("missing")
+                .to_owned()
+        };
+        let failed: Vec<String> = cases
+            .iter()
+            .filter(|c| status(c) != "pass")
+            .map(|c| {
+                let id = c.get("id").and_then(json::Value::as_str).unwrap_or("?");
+                format!("{id} ({})", status(c))
+            })
+            .collect();
+        summary.push(format!(
+            "{feature}: {} of {} cases pass{}",
+            cases.len() - failed.len(),
+            cases.len(),
+            if failed.is_empty() {
+                String::new()
+            } else {
+                format!("; failing: {}", failed.join(", "))
+            }
+        ));
     }
-    std::fs::remove_dir_all(&output).map_err(|e| format!("{output}: {e}"))
+    for line in summary {
+        println!("{line}");
+    }
+    result
+}
+
+/// `fonts compare`, then `fonts fuzz` (the crate's mutation smoke test).
+fn fonts_check(root: &Path) -> Task {
+    println!("$ cargo xtask fonts compare");
+    let reports = fonts::reports(&["compare".to_owned()]).expect("compare is a report");
+    if fonts_compare(root, &reports) != ExitCode::SUCCESS {
+        return Err("cargo xtask fonts compare failed".into());
+    }
+    println!("$ cargo xtask fonts fuzz");
+    fonts::main(root, &["fuzz".to_owned()])
 }
 
 fn check(root: &Path) -> Task {

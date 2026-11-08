@@ -5,24 +5,50 @@
 
 mod record;
 
-use record::{Dump, Record, Sink, Work};
+use record::{Dump, Record, Sink, Size, Style, Work};
 use std::error::Error;
 use std::io::{self, BufWriter, Write};
 use std::process::ExitCode;
 use std::time::Instant;
 use triergon_core::{Budget, Bytes};
-use triergon_font::{Font, GlyphId, Limits, NameRecord, Outline, platform};
+use triergon_font::{
+    Font, GlyphId, Limits, NameRecord, Outline, ScaledOutline, SizedFont, Synthesis,
+};
 
 type Result<T> = std::result::Result<T, Box<dyn Error>>;
 
-const OPERATION: &str = "font-outlines";
 const MAX_INPUT: u64 = 64 << 20;
-const USAGE: &str = "usage: font-worker font-fold FILE | font-bench FILE ITERATIONS | font-memory FILE | font-dump FILE";
+const USAGE: &str = "usage: font-worker OPERATION-fold FILE [HEIGHT] | OPERATION-bench FILE ITERATIONS [HEIGHT]
+       | OPERATION-memory FILE [HEIGHT] | OPERATION-dump FILE [HEIGHT]
+  OPERATION is font (no HEIGHT), font-scaled or font-hinted (HEIGHT in 26.6 pixels)";
+
+/// What one operation reads from every face.
+#[derive(Clone, Copy)]
+enum Operation {
+    /// Face data and unscaled outlines.
+    Faces,
+    /// What libass obtains at a size with hinting off: size metrics, kerning, and
+    /// every glyph's unhinted outline and advance with its synthetic styles.
+    Scaled(i32),
+    /// The default-load (hinted) advance of every glyph at a size.
+    Hinted(i32),
+}
+
+impl Operation {
+    const fn name(self) -> &'static str {
+        match self {
+            Self::Faces => "font-outlines",
+            Self::Scaled(_) => "font-scaled",
+            Self::Hinted(_) => "font-hinted",
+        }
+    }
+}
 
 /// FreeType's ASCII form of a name: UTF-16 units, or bytes for Macintosh records,
 /// up to a NUL, with units outside 32..=127 shown as `?`.
 fn ascii(record: NameRecord<'_>) -> String {
-    units(&record)
+    record
+        .code_units()
         .take_while(|&u| u != 0)
         .map(|u| {
             u8::try_from(u)
@@ -36,7 +62,8 @@ fn ascii(record: NameRecord<'_>) -> String {
 /// FreeType's PostScript form: printable ASCII other than `[](){}<>/%`, absent
 /// when nothing remains.
 fn postscript(record: NameRecord<'_>) -> Option<String> {
-    let text: String = units(&record)
+    let text: String = record
+        .code_units()
         .filter_map(|u| u8::try_from(u).ok())
         .filter(|&b| (33..=126).contains(&b) && !b"[](){}<>/%".contains(&b))
         .map(char::from)
@@ -44,27 +71,40 @@ fn postscript(record: NameRecord<'_>) -> Option<String> {
     (!text.is_empty()).then_some(text)
 }
 
-fn units<'a>(record: &NameRecord<'a>) -> Box<dyn Iterator<Item = u32> + 'a> {
-    if record.platform == platform::MACINTOSH {
-        Box::new(record.bytes.iter().map(|&b| u32::from(b)))
-    } else {
-        Box::new(
-            record
-                .bytes
-                .chunks_exact(2)
-                .map(|u| u32::from(u16::from_be_bytes([u[0], u[1]]))),
-        )
-    }
+/// Every pair the `kern` subtables list, once, in glyph order.
+fn kerning_pairs(font: &Font) -> Vec<(GlyphId, GlyphId)> {
+    let mut pairs: Vec<(GlyphId, GlyphId)> = font.kerning_pairs().collect();
+    pairs.sort_unstable();
+    pairs.dedup();
+    pairs
 }
 
-/// One operation: parse every face of `file` and read everything about it.
-fn read(file: &Bytes, budget: &Budget, sink: &mut impl Sink) -> Result<()> {
+/// One operation: parse every face of `file` and read what `operation` covers.
+fn read(file: &Bytes, budget: &Budget, operation: Operation, sink: &mut impl Sink) -> Result<()> {
     let faces = Font::face_count(file.as_ref())?;
-    let mut outline = Outline::new(budget);
     for index in 0..faces {
-        match Font::new(file.clone(), index, budget, Limits::default()) {
-            Ok(font) => face(&font, &mut outline, sink)?,
-            Err(_) => sink.record(Record::FaceError(index))?,
+        let Ok(font) = Font::new(file.clone(), index, budget, Limits::default()) else {
+            sink.record(Record::FaceError(index))?;
+            continue;
+        };
+        match operation {
+            Operation::Faces => face(&font, &mut Outline::new(budget), sink)?,
+            Operation::Scaled(height) => {
+                sink.record(Record::SizedFace(index))?;
+                match font.at_size(height) {
+                    Ok(sized) => scaled(&font, &sized, height, budget, sink)?,
+                    Err(_) => sink.record(Record::SizeError(height))?,
+                }
+            }
+            Operation::Hinted(height) => {
+                sink.record(Record::SizedFace(index))?;
+                match font.at_size(height) {
+                    Ok(sized) => hinted(&font, &sized, sink).map_err(|e| {
+                        format!("face {index} at {height}: {e}")
+                    })?,
+                    Err(_) => sink.record(Record::SizeError(height))?,
+                }
+            }
         }
     }
     Ok(())
@@ -80,40 +120,42 @@ fn face(font: &Font, outline: &mut Outline, sink: &mut impl Sink) -> io::Result<
         ascender: metrics.ascender,
         descender: metrics.descender,
         height: metrics.height,
-        max_advance: font.max_advance(),
+        max_advance: font.horizontal_header().advance_max,
         bold: style.bold,
         italic: style.italic,
     })?;
     sink.record(Record::Family(font.family_name().map(ascii).as_deref()))?;
-    sink.record(Record::Style(font.style_name().map(ascii).as_deref()))?;
+    sink.record(Record::StyleName(font.style_name().map(ascii).as_deref()))?;
     sink.record(Record::PostScript(
         font.postscript_name().and_then(postscript).as_deref(),
     ))?;
     sink.record(Record::Weight(font.os2().map_or(0, |o| o.weight_class)))?;
     for name in font.names() {
         sink.record(Record::Name {
-            platform: name.platform,
-            encoding: name.encoding,
-            language: name.language,
-            id: name.name_id,
+            platform: name.platform.id(),
+            encoding: name.encoding_id,
+            language: name.language_id,
+            id: name.name_id.id(),
             bytes: name.bytes,
         })?;
     }
     for charmap in font.charmaps() {
         sink.record(Record::Charmap(charmap))?;
-        for (code, glyph) in font.mappings(charmap) {
-            sink.record(Record::Map {
-                code,
-                glyph: glyph.0,
-            })?;
+        for mapping in charmap.mappings() {
+            match mapping {
+                Ok((code, glyph)) => sink.record(Record::Map {
+                    code,
+                    glyph: glyph.0,
+                })?,
+                Err(_) => {
+                    sink.record(Record::MapError)?;
+                    break;
+                }
+            }
         }
     }
     sink.record(Record::TextCharmap(font.text_charmap()))?;
-    // Every pair the kerning subtables list, once, in glyph order.
-    let mut pairs: Vec<(GlyphId, GlyphId)> = font.kerning_pairs().collect();
-    pairs.sort_unstable();
-    pairs.dedup();
-    for (left, right) in pairs {
+    for (left, right) in kerning_pairs(font) {
         let value = font.kerning(left, right);
         if value != 0 {
             sink.record(Record::Kern {
@@ -123,13 +165,13 @@ fn face(font: &Font, outline: &mut Outline, sink: &mut impl Sink) -> io::Result<
             })?;
         }
     }
-    for glyph in (0..font.glyph_count()).map(GlyphId) {
+    for glyph in font.glyphs() {
         let advance = font.advance(glyph).map_or(-1, i64::from);
         match font.outline_into(glyph, outline) {
             Ok(loaded) => sink.record(Record::Glyph {
                 index: glyph.0,
                 advance,
-                loaded: loaded.advance.into(),
+                loaded: loaded.advance,
                 outline,
             })?,
             Err(_) => sink.record(Record::GlyphError(glyph.0))?,
@@ -138,13 +180,107 @@ fn face(font: &Font, outline: &mut Outline, sink: &mut impl Sink) -> io::Result<
     Ok(())
 }
 
-fn run(args: &[String]) -> Result<()> {
-    let (mode, path, iterations) = match args {
-        [mode, path] if matches!(mode.as_str(), "font-fold" | "font-memory" | "font-dump") => {
-            (mode.as_str(), path, 1)
+fn scaled(
+    font: &Font,
+    sized: &SizedFont<'_>,
+    height: i32,
+    budget: &Budget,
+    sink: &mut impl Sink,
+) -> io::Result<()> {
+    sink.record(Record::Size(&Size::new(
+        height,
+        sized,
+        font.is_postscript(),
+    )))?;
+    for (left, right) in kerning_pairs(font) {
+        let value = sized.kerning(left, right);
+        if value != 0 {
+            sink.record(Record::Kern {
+                left: left.0,
+                right: right.0,
+                value,
+            })?;
         }
-        [mode, path, count] if mode == "font-bench" => (mode.as_str(), path, count.parse::<u64>()?),
+    }
+    let (mut outline, mut styled) = (ScaledOutline::new(budget), ScaledOutline::new(budget));
+    for glyph in font.glyphs() {
+        let Ok(metrics) = sized.outline_into(glyph, &mut outline) else {
+            sink.record(Record::GlyphError(glyph.0))?;
+            continue;
+        };
+        sink.record(Record::ScaledGlyph {
+            index: glyph.0,
+            advance: metrics.advance,
+            outline: &outline,
+        })?;
+        for style in Style::ALL {
+            let synthesis = Synthesis {
+                oblique: !matches!(style, Style::Bold),
+                embolden: !matches!(style, Style::Oblique),
+            };
+            let applied = styled.copy_from(&outline).is_ok()
+                && sized.synthesize(&mut styled, synthesis).is_ok();
+            sink.record(Record::Styled {
+                style,
+                index: glyph.0,
+                outline: applied.then_some(&styled),
+            })?;
+        }
+    }
+    Ok(())
+}
+
+/// The default-load advances. An advance the crate cannot give (`Unsupported`)
+/// ends the operation with an error: it is not a value to compare.
+fn hinted(font: &Font, sized: &SizedFont<'_>, sink: &mut impl Sink) -> Result<()> {
+    for glyph in font.glyphs() {
+        let advance = match sized.hinted_advance(glyph) {
+            Ok(advance) => Some(advance),
+            Err(triergon_core::Error::Unsupported(what)) => {
+                return Err(format!("glyph {}: hinted advance unsupported: {what}", glyph.0).into());
+            }
+            Err(_) => None,
+        };
+        sink.record(Record::Hinted {
+            index: glyph.0,
+            advance,
+        })?;
+    }
+    Ok(())
+}
+
+enum Action {
+    Fold,
+    Bench(u64),
+    Memory,
+    Dump,
+}
+
+fn parse(args: &[String]) -> Result<(Action, Operation, &str)> {
+    let (mode, rest) = args.split_first().ok_or(USAGE)?;
+    let (operation, action) = mode.rsplit_once('-').ok_or(USAGE)?;
+    let (action, rest) = match (action, rest) {
+        ("bench", [path, count, rest @ ..]) => (Action::Bench(count.parse()?), (path, rest)),
+        ("fold", [path, rest @ ..]) => (Action::Fold, (path, rest)),
+        ("memory", [path, rest @ ..]) => (Action::Memory, (path, rest)),
+        ("dump", [path, rest @ ..]) => (Action::Dump, (path, rest)),
         _ => return Err(USAGE.into()),
+    };
+    let (path, arguments) = rest;
+    let operation = match (operation, arguments) {
+        ("font", []) => Operation::Faces,
+        ("font-scaled", [height]) => Operation::Scaled(height.parse()?),
+        ("font-hinted", [height]) => Operation::Hinted(height.parse()?),
+        _ => return Err(USAGE.into()),
+    };
+    Ok((action, operation, path))
+}
+
+fn run(args: &[String]) -> Result<()> {
+    let (action, operation, path) = parse(args)?;
+    let iterations = match action {
+        Action::Bench(count) => count,
+        _ => 1,
     };
     if !(1..=1_000_000).contains(&iterations) {
         return Err(USAGE.into());
@@ -157,21 +293,21 @@ fn run(args: &[String]) -> Result<()> {
     let file = Bytes::try_from_vec(&budget, std::fs::read(path)?).map_err(|e| e.error())?;
     let retained = budget.used();
     let mut out = io::stdout().lock();
-    if mode == "font-dump" {
+    if let Action::Dump = action {
         let mut dump = Dump(BufWriter::new(out));
-        read(&file, &budget, &mut dump)?;
+        read(&file, &budget, operation, &mut dump)?;
         return Ok(dump.0.flush()?);
     }
-    let memory = mode == "font-memory";
+    let memory = matches!(action, Action::Memory);
     if memory {
         out.write_all(b"TRIERGON_BEGIN_V1\n")?;
         out.flush()?;
     }
-    let start = (mode == "font-bench").then(Instant::now);
+    let start = matches!(action, Action::Bench(_)).then(Instant::now);
     let mut total = Work::default();
     for _ in 0..iterations {
         let mut work = Work::default();
-        read(std::hint::black_box(&file), &budget, &mut work)?;
+        read(std::hint::black_box(&file), &budget, operation, &mut work)?;
         total.accumulate(&work);
         if budget.used() != retained {
             return Err("font operation retained charged storage".into());
@@ -184,8 +320,11 @@ fn run(args: &[String]) -> Result<()> {
     }
     writeln!(
         out,
-        "{{\"schema\":1,\"operation\":\"{OPERATION}\",\"iterations\":{iterations},\"packets\":{},\"bytes\":{},\"digest\":{},\"elapsed_ns\":{elapsed},\"eof\":true}}",
-        total.packets, total.bytes, total.digest,
+        "{{\"schema\":1,\"operation\":\"{}\",\"iterations\":{iterations},\"packets\":{},\"bytes\":{},\"digest\":{},\"elapsed_ns\":{elapsed},\"eof\":true}}",
+        operation.name(),
+        total.packets,
+        total.bytes,
+        total.digest,
     )?;
     Ok(out.flush()?)
 }

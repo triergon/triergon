@@ -7,6 +7,8 @@ use triergon_core::{Error, Result};
 /// The `head` fields a face needs.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) struct Head {
+    /// Bit 3: scale by integer pixels per em.
+    pub(crate) flags: u16,
     pub(crate) units_per_em: u16,
     pub(crate) bounds: [i16; 4],
     pub(crate) mac_style: u16,
@@ -16,7 +18,8 @@ pub(crate) struct Head {
 
 pub(crate) fn head(data: &[u8]) -> Result<Head> {
     let mut r = Reader::new(data);
-    r.skip(18)?; // version .. flags
+    r.skip(16)?; // version .. magicNumber
+    let flags = r.u16()?;
     let units_per_em = r.u16()?;
     if !(1..=16384).contains(&units_per_em) {
         return Err(Error::Invalid("unitsPerEm outside 1..16384"));
@@ -31,6 +34,7 @@ pub(crate) fn head(data: &[u8]) -> Result<Head> {
         _ => return Err(Error::Invalid("indexToLocFormat")),
     };
     Ok(Head {
+        flags,
         units_per_em,
         bounds,
         mac_style,
@@ -86,12 +90,55 @@ pub struct Os2 {
     pub weight_class: u16,
     pub width_class: u16,
     pub fs_type: u16,
-    pub fs_selection: u16,
+    pub strikeout_size: i16,
+    pub strikeout_position: i16,
+    pub selection: FsSelection,
     pub typo_ascender: i16,
     pub typo_descender: i16,
     pub typo_line_gap: i16,
     pub win_ascent: u16,
     pub win_descent: u16,
+}
+
+/// The `OS/2.fsSelection` flags.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct FsSelection(u16);
+
+impl FsSelection {
+    /// Bit 0.
+    pub const fn italic(self) -> bool {
+        self.0 & 1 != 0
+    }
+
+    /// Bit 5.
+    pub const fn bold(self) -> bool {
+        self.0 & 1 << 5 != 0
+    }
+
+    /// Bit 6.
+    pub const fn regular(self) -> bool {
+        self.0 & 1 << 6 != 0
+    }
+
+    /// Bit 7, USE_TYPO_METRICS: line spacing comes from the typographic metrics.
+    pub const fn use_typo_metrics(self) -> bool {
+        self.0 & 1 << 7 != 0
+    }
+
+    /// Bit 8, WWS: the family name already separates weight, width and slope.
+    pub const fn wws(self) -> bool {
+        self.0 & 1 << 8 != 0
+    }
+
+    /// Bit 9.
+    pub const fn oblique(self) -> bool {
+        self.0 & 1 << 9 != 0
+    }
+
+    /// The stored bits, including those without a name here.
+    pub const fn bits(self) -> u16 {
+        self.0
+    }
 }
 
 /// The `OS/2` table, or `None` when it is shorter than version 0's 78 bytes.
@@ -105,13 +152,27 @@ pub(crate) fn os2(data: &[u8]) -> Option<Os2> {
         weight_class: at(4)?,
         width_class: at(6)?,
         fs_type: at(8)?,
-        fs_selection: at(62)?,
+        strikeout_size: at(26)?.cast_signed(),
+        strikeout_position: at(28)?.cast_signed(),
+        selection: FsSelection(at(62)?),
         typo_ascender: at(68)?.cast_signed(),
         typo_descender: at(70)?.cast_signed(),
         typo_line_gap: at(72)?.cast_signed(),
         win_ascent: at(74)?,
         win_descent: at(76)?,
     })
+}
+
+/// The `post` underline position and thickness, both zero when the table is
+/// absent or shorter than its 32-byte header, as FreeType reports them.
+pub(crate) fn underline(data: Option<&[u8]>) -> (i16, i16) {
+    match data {
+        Some(post) if post.len() >= 32 => (
+            u16_at(post, 8).map_or(0, u16::cast_signed),
+            u16_at(post, 10).map_or(0, u16::cast_signed),
+        ),
+        _ => (0, 0),
+    }
 }
 
 /// Horizontal advances: `numberOfHMetrics` long records, then side bearings that
@@ -140,6 +201,18 @@ impl Hmtx {
     pub(crate) fn advance(self, data: &[u8], glyph: u16) -> u16 {
         let record = glyph.min(self.metrics - 1);
         u16_at(self.table.bytes(data), 4 * usize::from(record)).unwrap_or(0)
+    }
+
+    /// The left side bearing of `glyph`: from its long record, else from the
+    /// side-bearing array after the records; zero where the table lacks it.
+    pub(crate) fn side_bearing(self, data: &[u8], glyph: u16) -> i16 {
+        let (glyph, metrics) = (usize::from(glyph), usize::from(self.metrics));
+        let at = if glyph < metrics {
+            4 * glyph + 2
+        } else {
+            4 * metrics + 2 * (glyph - metrics)
+        };
+        u16_at(self.table.bytes(data), at).map_or(0, u16::cast_signed)
     }
 }
 
@@ -170,6 +243,10 @@ mod tests {
         let table = Table { offset: 0, len: 10 };
         let hmtx = Hmtx::new(table, 2, 3).unwrap();
         assert_eq!([0, 1, 2].map(|g| hmtx.advance(&data, g)), [100, 200, 200]);
+        assert_eq!(
+            [0, 1, 2, 3].map(|g| hmtx.side_bearing(&data, g)),
+            [0, 0, 5, 0]
+        );
         assert!(Hmtx::new(Table { offset: 0, len: 5 }, 2, 3).is_err());
         assert!(Hmtx::new(table, 0, 3).is_err());
     }

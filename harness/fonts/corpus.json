@@ -324,6 +324,26 @@
         }
       ],
       "sha256": "61cf814eec46b294d6ea4401ac295d0cecd5207bd2331dcc5a15e7301d30ee44"
+    },
+    {
+      "name": "authored",
+      "generator": "authored-fonts",
+      "licence": "authored for this repository (MIT OR Apache-2.0)",
+      "origin": "crates/font/tests/support: seac, the charstring arithmetic, logic and storage operators, flex, counter masks, subroutines nested past ten, a non-default FontMatrix, every supported cmap format",
+      "files": [
+        {
+          "path": "authored/authored-cff-features.otf",
+          "sha256": "16ee723525f06ab9e72afe8799297874d07722b9f51e9514ab7c33d6b7511c39"
+        },
+        {
+          "path": "authored/authored-cff-matrix.otf",
+          "sha256": "5c85f989188339917965276d808a371ded5dc1808e530864ccddd0655b8297b8"
+        },
+        {
+          "path": "authored/authored-cmap-formats.ttf",
+          "sha256": "2dd8238413923c033680f98577fa797658f17f2e00908bdd8070647a3cb9486c"
+        }
+      ]
     }
   ]
 }

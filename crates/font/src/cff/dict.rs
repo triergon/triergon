@@ -1,7 +1,9 @@
 //! CFF DICT data (Adobe Technical Note 5176, section 4; OpenType CFF2 DICTs).
 
-use crate::read::{Meter, Reader};
-use triergon_core::{Error, Result};
+use super::number::shared_integer;
+use crate::read::Reader;
+use crate::work::charge;
+use triergon_core::{Error, Result, WorkBudget};
 
 /// The DICT operand stack ceilings: 48 in CFF, 513 in CFF2.
 pub(crate) const CFF_OPERANDS: usize = 48;
@@ -26,21 +28,21 @@ pub(crate) mod op {
     pub(crate) const FD_SELECT: u16 = 0x0c25;
 }
 
-/// The operand stack of one DICT.
-pub(crate) struct Stack<const N: usize> {
-    values: [f64; N],
+/// An operand stack: DICT numbers as `f64`, charstring numbers as 16.16.
+pub(crate) struct Stack<T, const N: usize> {
+    values: [T; N],
     len: usize,
 }
 
-impl<const N: usize> Stack<N> {
-    pub(crate) const fn new() -> Self {
+impl<T: Copy + Default, const N: usize> Stack<T, N> {
+    pub(crate) fn new() -> Self {
         Self {
-            values: [0.0; N],
+            values: [T::default(); N],
             len: 0,
         }
     }
 
-    pub(crate) fn push(&mut self, value: f64) -> Result<()> {
+    pub(crate) fn push(&mut self, value: T) -> Result<()> {
         let slot = self
             .values
             .get_mut(self.len)
@@ -50,7 +52,7 @@ impl<const N: usize> Stack<N> {
         Ok(())
     }
 
-    pub(crate) fn pop(&mut self) -> Result<f64> {
+    pub(crate) fn pop(&mut self) -> Result<T> {
         self.len = self
             .len
             .checked_sub(1)
@@ -58,7 +60,7 @@ impl<const N: usize> Stack<N> {
         Ok(self.values[self.len])
     }
 
-    pub(crate) fn as_slice(&self) -> &[f64] {
+    pub(crate) fn as_slice(&self) -> &[T] {
         &self.values[..self.len]
     }
 
@@ -78,21 +80,25 @@ impl<const N: usize> Stack<N> {
         self.len
     }
 
-    /// Replaces the top `count × (1 + scalars.len())` operands with `count` values
-    /// blended at the default instance: each default plus its deltas weighted by
-    /// the region scalars.
-    pub(crate) fn blend(&mut self, count: usize, scalars: &[f64]) -> Result<()> {
+    /// Replaces the top `count × (1 + regions)` operands with `count` values:
+    /// each default `mix`ed with its `regions` deltas.
+    pub(crate) fn blend(
+        &mut self,
+        count: usize,
+        regions: usize,
+        mix: impl Fn(T, &[T]) -> T,
+    ) -> Result<()> {
         let size = count
-            .checked_mul(scalars.len() + 1)
+            .checked_mul(regions + 1)
             .ok_or(Error::Invalid("CFF2 blend operands"))?;
         if size > self.len {
             return Err(Error::Invalid("CFF2 blend operands"));
         }
         let start = self.len - size;
         let (defaults, deltas) = self.values[start..self.len].split_at_mut(count);
-        if !scalars.is_empty() {
-            for (value, deltas) in defaults.iter_mut().zip(deltas.chunks_exact(scalars.len())) {
-                *value += scalars.iter().zip(deltas).map(|(s, d)| s * d).sum::<f64>();
+        if regions > 0 {
+            for (value, deltas) in defaults.iter_mut().zip(deltas.chunks_exact(regions)) {
+                *value = mix(*value, deltas);
             }
         }
         self.len = start + count;
@@ -100,19 +106,40 @@ impl<const N: usize> Stack<N> {
     }
 }
 
-/// Calls `apply` for each operator with its operands. In a CFF2 Private DICT,
-/// `blend` is applied in place using `scalars(vsindex)`.
+impl<const N: usize> Stack<f64, N> {
+    /// Blends at the default instance: each default plus its deltas weighted by
+    /// the region scalars.
+    pub(crate) fn blend_scalars(&mut self, count: usize, scalars: &[f64]) -> Result<()> {
+        self.blend(count, scalars.len(), |value, deltas| {
+            value + scalars.iter().zip(deltas).map(|(s, d)| s * d).sum::<f64>()
+        })
+    }
+}
+
+/// One DICT entry: an operator and its operands, as values and as encoded.
+pub(crate) struct Entry<'a> {
+    pub(crate) operator: u16,
+    pub(crate) operands: &'a [f64],
+    /// The operand bytes, for values read with more care than `f64` (the
+    /// FontMatrix); blends make them differ from `operands`.
+    pub(crate) encoded: &'a [u8],
+}
+
+/// Calls `apply` for each entry. In a CFF2 Private DICT, `blend` is applied in
+/// place using `scalars(vsindex)`.
 pub(crate) fn parse<'s, const N: usize>(
     bytes: &[u8],
-    meter: &mut Meter,
+    work: &mut WorkBudget,
     scalars: &dyn Fn(usize) -> Result<&'s [f64]>,
-    mut apply: impl FnMut(u16, &[f64]) -> Result<()>,
+    mut apply: impl FnMut(Entry<'_>) -> Result<()>,
 ) -> Result<()> {
     let mut r = Reader::new(bytes);
-    let mut stack = Stack::<N>::new();
+    let mut stack = Stack::<f64, N>::new();
     let mut vsindex = 0;
+    let mut start = 0;
     while !r.at_end() {
-        meter.charge(1)?;
+        charge(work, 1)?;
+        let end = r.offset();
         let byte = r.u8()?;
         let operator = match byte {
             12 => 0x0c00 | u16::from(r.u8()?),
@@ -129,27 +156,30 @@ pub(crate) fn parse<'s, const N: usize>(
             }
             op::BLEND if N == CFF2_OPERANDS => {
                 let count = integer(stack.pop()?)?;
-                stack.blend(count, scalars(vsindex)?)?;
+                stack.blend_scalars(count, scalars(vsindex)?)?;
                 continue;
             }
-            _ => apply(operator, stack.as_slice())?,
+            _ => apply(Entry {
+                operator,
+                operands: stack.as_slice(),
+                encoded: &bytes[start..end],
+            })?,
         }
         stack.clear();
+        start = r.offset();
     }
     Ok(())
 }
 
 /// A number in DICT data (TN 5176 Table 3).
 fn number(byte: u8, r: &mut Reader<'_>) -> Result<f64> {
-    Ok(match byte {
-        28 => f64::from(r.i16()?),
-        29 => f64::from(r.i32()?),
-        30 => real(r)?,
-        32..=246 => f64::from(i16::from(byte) - 139),
-        247..=250 => f64::from((i16::from(byte) - 247) * 256 + i16::from(r.u8()?) + 108),
-        251..=254 => f64::from(-(i16::from(byte) - 251) * 256 - i16::from(r.u8()?) - 108),
-        _ => return Err(Error::Invalid("reserved CFF DICT byte")),
-    })
+    match byte {
+        29 => Ok(f64::from(r.i32()?)),
+        30 => real(r),
+        _ => shared_integer(byte, r)?
+            .map(f64::from)
+            .ok_or(Error::Invalid("reserved CFF DICT byte")),
+    }
 }
 
 /// A real number: nibbles of digits, point, exponent and sign (TN 5176 Table 5).
@@ -204,17 +234,17 @@ pub(crate) fn single(operands: &[f64]) -> Result<usize> {
 #[cfg(test)]
 mod tests {
     use super::{CFF_OPERANDS, CFF2_OPERANDS, Stack, op, parse, real};
-    use crate::read::{Meter, Reader};
-    use triergon_core::Result;
+    use crate::read::Reader;
+    use triergon_core::{Result, WorkBudget};
 
     fn entries<const N: usize>(bytes: &[u8], scalars: &[f64]) -> Result<Vec<(u16, Vec<f64>)>> {
         let mut out = Vec::new();
         parse::<N>(
             bytes,
-            &mut Meter::new(1000),
+            &mut WorkBudget::new(1000),
             &|_| Ok(scalars),
-            |operator, operands| {
-                out.push((operator, operands.to_vec()));
+            |entry| {
+                out.push((entry.operator, entry.operands.to_vec()));
                 Ok(())
             },
         )?;
@@ -241,13 +271,13 @@ mod tests {
         let bytes = [149, 159, 169, 140, 23, 19];
         let parsed = entries::<CFF2_OPERANDS>(&bytes, &[0.0, 1.0]).unwrap();
         assert_eq!(parsed, [(op::SUBRS, vec![40.0])]);
-        let mut stack = Stack::<4>::new();
+        let mut stack = Stack::<f64, 4>::new();
         for v in [1.0, 2.0, 3.0, 4.0] {
             stack.push(v).unwrap();
         }
         assert!(stack.push(5.0).is_err());
-        assert!(stack.blend(2, &[1.0]).is_ok());
+        assert!(stack.blend_scalars(2, &[1.0]).is_ok());
         assert_eq!(stack.as_slice(), [4.0, 6.0]);
-        assert!(stack.blend(3, &[]).is_err());
+        assert!(stack.blend_scalars(3, &[]).is_err());
     }
 }

@@ -2,7 +2,7 @@
 //! whose retained bytes are charged to a [`Budget`].
 
 use std::any::{Any, TypeId};
-use std::collections::HashMap;
+use std::collections::{BTreeMap, HashMap};
 use std::hash::{DefaultHasher, Hash, Hasher};
 use std::sync::{Arc, Mutex, PoisonError};
 use triergon_core::{Budget, Reservation, Result};
@@ -26,7 +26,8 @@ pub struct Built<V> {
 /// [`Store::get_or_build`] returns the value held for a key or builds it. A new
 /// value's bytes, plus a fixed bookkeeping estimate, are reserved from the budget;
 /// when that fails, the least recently used values that only the store holds are
-/// dropped until it succeeds. A value someone else still holds is never dropped.
+/// dropped until it succeeds, oldest first, so eviction does not scan every value.
+/// A value someone else still holds is never dropped.
 /// A value that still does not fit is returned without being kept.
 ///
 /// The store is `Send + Sync`. Building happens outside its lock, so two threads
@@ -40,6 +41,8 @@ pub struct Store {
 #[derive(Debug, Default)]
 struct Inner {
     entries: HashMap<u64, Vec<Entry>>,
+    /// The hash of every entry by its last use; uses are unique clock values.
+    order: BTreeMap<u64, u64>,
     clock: u64,
 }
 
@@ -92,8 +95,11 @@ impl Store {
             .get_mut(&hash)?
             .iter_mut()
             .find(|entry| entry.key.downcast_ref::<K>() == Some(key))?;
-        entry.used = clock;
-        Arc::clone(&entry.value).downcast::<K::Value>().ok()
+        let previous = std::mem::replace(&mut entry.used, clock);
+        let value = Arc::clone(&entry.value).downcast::<K::Value>().ok();
+        inner.order.remove(&previous);
+        inner.order.insert(clock, hash);
+        value
     }
 
     /// The value held for `key`, or the one `build` returns, which is kept if
@@ -119,10 +125,17 @@ impl Store {
     /// Drops every value only the store holds.
     pub fn clear(&self) {
         let mut inner = self.lock();
-        for bucket in inner.entries.values_mut() {
-            bucket.retain(|entry| Arc::strong_count(&entry.value) > 1);
+        let Inner { entries, order, .. } = &mut *inner;
+        for bucket in entries.values_mut() {
+            bucket.retain(|entry| {
+                let held = Arc::strong_count(&entry.value) > 1;
+                if !held {
+                    order.remove(&entry.used);
+                }
+                held
+            });
         }
-        inner.entries.retain(|_, bucket| !bucket.is_empty());
+        entries.retain(|_, bucket| !bucket.is_empty());
     }
 
     fn insert<K: StoreKey>(&self, key: K, value: &Arc<K::Value>, bytes: usize) {
@@ -152,6 +165,7 @@ impl Store {
             charge,
             used: inner.clock,
         };
+        inner.order.insert(entry.used, hash);
         inner.entries.entry(hash).or_default().push(entry);
     }
 
@@ -162,21 +176,17 @@ impl Store {
 
 impl Inner {
     /// Drops the least recently used value only the store holds; false if none.
+    /// Values others hold are passed over in age order.
     fn evict_one(&mut self) -> bool {
-        let oldest = self
-            .entries
-            .iter()
-            .flat_map(|(&hash, bucket)| {
-                bucket
-                    .iter()
-                    .enumerate()
-                    .filter(|(_, entry)| Arc::strong_count(&entry.value) == 1)
-                    .map(move |(index, entry)| (entry.used, hash, index))
-            })
-            .min();
-        let Some((_, hash, index)) = oldest else {
+        let candidate = self.order.iter().find_map(|(&used, &hash)| {
+            let bucket = self.entries.get(&hash)?;
+            let index = bucket.iter().position(|e| e.used == used)?;
+            (Arc::strong_count(&bucket[index].value) == 1).then_some((used, hash, index))
+        });
+        let Some((used, hash, index)) = candidate else {
             return false;
         };
+        self.order.remove(&used);
         if let Some(bucket) = self.entries.get_mut(&hash) {
             bucket.swap_remove(index);
             if bucket.is_empty() {
