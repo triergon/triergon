@@ -20,7 +20,7 @@ const FRIBIDI: PinnedRelease<'static> = PinnedRelease {
     url: "https://github.com/fribidi/fribidi/releases/download/v1.0.17/fribidi-1.0.17.tar.xz",
     sha256: "6949dcde27d41cebad1fd741fcafc36d55a1020d2d872d4a6eb3914caabbada2",
 };
-const HARFBUZZ: PinnedRelease<'static> = PinnedRelease {
+pub const HARFBUZZ: PinnedRelease<'static> = PinnedRelease {
     file: "harfbuzz-14.6.0.tar.xz",
     directory: "harfbuzz-14.6.0",
     url: "https://github.com/harfbuzz/harfbuzz/releases/download/14.6.0/harfbuzz-14.6.0.tar.xz",

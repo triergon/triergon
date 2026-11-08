@@ -16,12 +16,7 @@ use super::source;
 use super::{FILE_LIMIT, Generated, Loaded};
 use crate::{fetch, sha256};
 
-/// Where the HarfBuzz reference tree is unpacked (`cargo xtask ass prepare`).
-const HARFBUZZ_SOURCE: &str = ".research/libass/harfbuzz-14.6.0";
-const HARFBUZZ_TARBALL: &str =
-    "https://github.com/harfbuzz/harfbuzz/releases/download/14.6.0/harfbuzz-14.6.0.tar.xz";
-const HARFBUZZ_TARBALL_SHA256: &str =
-    "d07a007327277708a2a73ae437887cdbaf282937f6d03ca5467723e9099af586";
+use crate::shape::reference::{CACHE, HARFBUZZ};
 
 /// Microsoft's override and constraint files, as HarfBuzz 14.6.0 ships them.
 const MS_USE: [(&str, &str); 3] = [
@@ -50,10 +45,10 @@ impl MsUse {
     pub fn load(root: &Path) -> Result<Self, String> {
         let mut texts = Vec::new();
         for (path, hash) in MS_USE {
-            let path = root.join(HARFBUZZ_SOURCE).join(path);
+            let path = root.join(CACHE).join(HARFBUZZ.directory).join(path);
             if !path.exists() {
                 return Err(format!(
-                    "{}: missing; `cargo xtask ass prepare` unpacks the HarfBuzz release",
+                    "{}: missing; `cargo xtask shape prepare` unpacks the HarfBuzz release",
                     path.display()
                 ));
             }
@@ -84,7 +79,8 @@ fn header(ucd: &Loaded, derived: &Loaded) -> String {
     let derived = derived.header("Default_Ignorable_Code_Point");
     header.extend(derived.lines().skip(1).map(|line| format!("{line}\n")));
     header.push_str(&format!(
-        "// and Microsoft's USE data in {HARFBUZZ_TARBALL}\n//     sha256 {HARFBUZZ_TARBALL_SHA256}:\n"
+        "// and Microsoft's USE data in {}\n//     sha256 {}:\n",
+        HARFBUZZ.url, HARFBUZZ.sha256
     ));
     for (path, hash) in MS_USE {
         header.push_str(&format!("//   {path}\n//     sha256 {hash}\n"));
