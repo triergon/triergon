@@ -125,9 +125,10 @@ the bitmap unblurred, as libass does. Outline coordinates stay within
 `Error::Invalid`, and the glyph pipeline drops such outlines as libass does. No
 input panics, including arithmetic overflow in debug builds. Where libass's
 result depends on the target for values far out of range (conversions of
-doubles beyond the `long` range, shifts by 32 or more), the crate computes what
-libass built for 32-bit ARMv7 computes: conversions saturate, NaN converts to
-0 and such shifts give 0.
+doubles beyond the `long` range, shifts by 32 or more), the crate follows
+libass on 32-bit ARM with GCC (`armv7-unknown-linux-gnueabihf`) on every
+target: conversions saturate, NaN converts to 0 and such shifts give 0, so a
+coordinate rounds out of range as libass does there.
 
 Not covered: glyph loading, hinting, synthetic styles and decoration lines
 (`triergon-font` and the renderer); drawing parsing and the image list,
