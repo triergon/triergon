@@ -7,6 +7,7 @@ use crate::{
     mp4_plan::{Mp4Configuration, PreparedMp4, SourceRow},
 };
 use std::sync::atomic::{AtomicBool, Ordering};
+use triergon_core::container::{MediaKind, TrackInfo};
 use triergon_core::{
     Budget, BudgetVec, Error, InputCursor, InputRequest, SourceCapabilities, SourceId,
     SourceLocation, Step, Time, TimeBase, WorkBudget,
@@ -30,7 +31,7 @@ use triergon_mpegts::{
 use ts::compat::pes::{
     CompactDemuxPacket, DemuxClock, DemuxObserver, DemuxPacket, DemuxProfile, DemuxScope,
     DemuxTimeView, DvbSubtitlesDescriptors, PrivateAudioCarriage, PrivateAudioDescriptors,
-    ReadyContinuation, RegisteredCarriage, SourceContext,
+    ReadyContinuation, RegisteredCarriage, SourceContext, selected_track_kind,
 };
 use ts::psi::{DescriptorNamespace, ProgramMap};
 #[derive(Clone, Debug)]
@@ -145,6 +146,16 @@ pub(crate) struct TrackFact {
     pub kind: TrackKind,
     pub enabled: bool,
 }
+
+fn track_kind(kind: MediaKind) -> TrackKind {
+    match kind {
+        MediaKind::Video => TrackKind::Video,
+        MediaKind::Audio => TrackKind::Audio,
+        MediaKind::Subtitle => TrackKind::Subtitle,
+        MediaKind::Data | MediaKind::Unknown => TrackKind::Other,
+    }
+}
+
 #[derive(Clone, Copy, Debug)]
 struct CachedDescription {
     track: u32,
@@ -961,12 +972,7 @@ impl Engine {
                 for t in r.tracks() {
                     out.try_push(TrackFact {
                         key: TrackKey::Matroska(t.number),
-                        kind: match t.kind {
-                            1 => TrackKind::Video,
-                            2 => TrackKind::Audio,
-                            17 => TrackKind::Subtitle,
-                            _ => TrackKind::Other,
-                        },
+                        kind: track_kind(t.kind()),
                         enabled: t.enabled,
                     })
                     .map_err(|e| e.error)?;
@@ -977,12 +983,7 @@ impl Engine {
                     let h = &t.snapshot;
                     out.try_push(TrackFact {
                         key: TrackKey::Mp4(h.track_id),
-                        kind: match &h.handler {
-                            b"vide" => TrackKind::Video,
-                            b"soun" => TrackKind::Audio,
-                            b"text" | b"subt" | b"sbtl" | b"subp" => TrackKind::Subtitle,
-                            _ => TrackKind::Other,
-                        },
+                        kind: track_kind(triergon_isobmff::media_kind(&h.handler)),
                         enabled: h.enabled,
                     })
                     .map_err(|e| e.error)?;
@@ -2244,35 +2245,11 @@ impl TsEngine {
                     .try_reserve_exact(map.streams.len().saturating_sub(self.facts.len()))?;
                 self.facts.clear();
                 for e in map.streams.as_slice() {
-                    let kind = match e.stream_type {
-                        0x1b | 0x24 | 0x02 => TrackKind::Video,
-                        0x0f | 0x11 | 0x03 | 0x04 | 0x81 | 0x87 => TrackKind::Audio,
-                        // HDMV presentation graphics (PGS) in BDAV and TS.
-                        0x90 => TrackKind::Subtitle,
-                        // DVB subtitling or teletext descriptors in a DVB namespace.
-                        0x06 if matches!(
-                            e.codec(),
-                            Some(
-                                triergon_core::container::CodecId::DvbSubtitle
-                                    | triergon_core::container::CodecId::DvbTeletext
-                            )
-                        ) =>
-                        {
-                            TrackKind::Subtitle
-                        }
-                        0x06 => self
-                            .native_tracks
-                            .index(e.pid)
-                            .map(|i| &self.native_tracks.as_slice()[i])
-                            .filter(|track| track.observer.is_some())
-                            .map_or(TrackKind::Other, |track| match track.selection.carriage {
-                                TsNativeCarriage::PrivateAudio(_)
-                                | TsNativeCarriage::AudioFromPmt => TrackKind::Audio,
-                                TsNativeCarriage::DvbSubtitles => TrackKind::Subtitle,
-                                TsNativeCarriage::Registered(_) => TrackKind::Other,
-                            }),
-                        _ => TrackKind::Other,
-                    };
+                    let observer = self
+                        .native_tracks
+                        .index(e.pid)
+                        .and_then(|i| self.native_tracks.as_slice()[i].observer.as_ref());
+                    let kind = track_kind(selected_track_kind(e, observer));
                     self.facts
                         .try_push(TrackFact {
                             key: TrackKey::Ts {

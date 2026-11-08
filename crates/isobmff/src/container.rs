@@ -85,7 +85,9 @@ fn configuration_box(codec: CodecId<'_>) -> Option<[u8; 4]> {
     })
 }
 
-fn media_kind(handler: &[u8; 4]) -> MediaKind {
+/// Classify an `hdlr` handler code without copying or allocating.
+/// Unrecognized handlers remain [`MediaKind::Unknown`].
+pub fn media_kind(handler: &[u8; 4]) -> MediaKind {
     match handler {
         b"vide" => MediaKind::Video,
         b"soun" => MediaKind::Audio,

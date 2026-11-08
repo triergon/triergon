@@ -11,6 +11,9 @@ I/O of its own, decodes no codec, and does not apply edits to presentation.
 works in generic code and inside `triergon::AnyReader`. The parts below stay
 available for finer control.
 
+`media_kind(&handler)` classifies an `hdlr` handler code without allocating,
+using the same mapping as `TrackInfo::kind`. Unknown handlers stay unknown.
+
 The crate exposes two views of the same file:
 
 - **Source view** (`BoxReader`, `SampleTable`, `FragmentIndex`, `SampleReader`,
