@@ -30,14 +30,19 @@ pub struct Placement {
     pub scale: [f64; 2],
     /// Offset of the glyph from the rotation origin, 26.6.
     pub shift: Vector,
-    /// Ascender and descender, 26.6.
+    /// The ascender, 26.6: the distance from the baseline up to the top of the
+    /// opaque box, which the `\fax` shear is also measured from.
     pub ascender: i32,
+    /// The descender, 26.6, positive below the baseline: the distance down to
+    /// the bottom of the opaque box.
     pub descender: i32,
     /// Position of the glyph origin in the frame, 26.6.
     pub position: Vector,
-    /// Scale and offset from outline units to 26.6 before the transform: the
-    /// font scale, or the drawing scale and baseline offset.
+    /// Scale (x and y) from outline units to 26.6 before the transform: the
+    /// font scale, or the drawing scale.
     pub outline_scale: [f64; 2],
+    /// Offset (x and y), 26.6, added after `outline_scale`: zero for a glyph,
+    /// the baseline offset of a drawing.
     pub outline_offset: [f64; 2],
 }
 
@@ -58,15 +63,25 @@ pub enum BorderRequest {
     /// No border bitmap.
     None,
     /// `\bord` style 1: the outline stroked by `size` (x and y) pixels.
-    Outline { size: [f64; 2] },
+    Outline {
+        /// `\xbord` and `\ybord` in script pixels, before the frame's border
+        /// scale.
+        size: [f64; 2],
+    },
     /// `\bord` style 3: an opaque box around the advance, `size` beyond it.
     /// `spacing` is the scaled `\fsp` and `advance` the glyph advance, both
     /// 26.6, and `scale_fix` the font scale correction the box is scaled by
     /// again.
     OpaqueBox {
+        /// `\xbord` and `\ybord` in script pixels, before the frame's border
+        /// scale; the box reaches at least a pixel beyond the advance and the
+        /// height before the transform.
         size: [f64; 2],
+        /// The scaled `\fsp` letter spacing, 26.6.
         spacing: i32,
+        /// The glyph advance, 26.6.
         advance: i32,
+        /// The font scale correction (libass's `scale_fix`).
         scale_fix: f64,
     },
 }
@@ -74,9 +89,14 @@ pub enum BorderRequest {
 /// What [`GlyphRaster::render`] draws: a glyph or drawing shape, where and how.
 #[derive(Clone, Copy, Debug)]
 pub struct GlyphRequest<'a> {
+    /// The glyph or drawing in outline units, y down; its first outline is
+    /// the one stroked for a border.
     pub shape: &'a Shape,
+    /// Where and how the glyph is placed.
     pub placement: Placement,
+    /// The renderer's frame-wide scales.
     pub frame: FrameScale,
+    /// The border to draw alongside the glyph.
     pub border: BorderRequest,
     /// The glyph is timed by `\kf` karaoke, so its run tracks the least x of
     /// its transformed outline.
@@ -285,18 +305,27 @@ impl Run {
 /// What a border bitmap is.
 #[derive(Debug)]
 pub enum Border {
+    /// No border: none was requested, or it could not be drawn.
     None,
     /// The border rounded to nothing: the glyph bitmap stands in for it.
     Glyph,
+    /// A bitmap of its own: the stroked outline or the opaque box.
     Own(Bitmap),
 }
 
 /// The bitmaps of one glyph and their whole-pixel positions.
 #[derive(Debug)]
 pub struct GlyphBitmaps {
+    /// The glyph's fill, `None` when it has nothing to draw or leaves the
+    /// coordinate range.
     pub glyph: Option<Bitmap>,
+    /// The border bitmap.
     pub border: Border,
+    /// The frame position, whole pixels, that the glyph bitmap's `left` and
+    /// `top` count from; the border's when only the border is drawn.
     pub position: Vector,
+    /// The frame position, whole pixels, that the border bitmap's `left` and
+    /// `top` count from; `position` unless the border has a bitmap of its own.
     pub border_position: Vector,
 }
 
@@ -326,6 +355,8 @@ pub struct GlyphRaster {
 }
 
 impl GlyphRaster {
+    /// A glyph rasteriser whose scratch is charged to `budget`, each operation
+    /// bounded by `limits`.
     pub fn new(budget: &Budget, limits: Limits) -> Self {
         Self {
             rasterizer: Rasterizer::new(budget, limits),

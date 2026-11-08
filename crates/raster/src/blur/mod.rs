@@ -32,6 +32,8 @@ pub struct Blur {
 const PAD: usize = 16;
 
 impl Blur {
+    /// A blur whose scratch is charged to `budget`, each operation bounded by
+    /// `limits`.
     pub fn new(budget: &Budget, limits: Limits) -> Self {
         Self {
             limits,

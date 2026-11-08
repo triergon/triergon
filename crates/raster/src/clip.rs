@@ -7,16 +7,22 @@ use crate::geometry::Vector;
 /// A rectangle in whole frame pixels, `right` and `bottom` exclusive.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
 pub struct PixelRect {
+    /// The first column inside.
     pub left: i32,
+    /// The first row inside.
     pub top: i32,
+    /// The first column past the right edge.
     pub right: i32,
+    /// The first row past the bottom edge.
     pub bottom: i32,
 }
 
 /// A `\clip` (or, `inverse`, `\iclip`) rectangle.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub struct Clip {
+    /// The clip rectangle in frame pixels (libass's `clip_x0` to `clip_y1`).
     pub rect: PixelRect,
+    /// The bitmap is visible outside `rect` rather than inside it.
     pub inverse: bool,
 }
 
@@ -24,8 +30,12 @@ pub struct Clip {
 /// clip, and the script's content area, which bounds an inverse one.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub struct ClipFrame {
+    /// The frame width in pixels; a normal clip is clamped to `0..=width`.
     pub width: i32,
+    /// The frame height in pixels; a normal clip is clamped to `0..=height`.
     pub height: i32,
+    /// The script's play area in frame pixels, which bounds the parts of an
+    /// inverse clip.
     pub content: PixelRect,
 }
 
@@ -43,11 +53,17 @@ pub enum Colour {
 /// `source_y`) of the bitmap, drawn at `position` in the frame.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct ClipPart {
+    /// The frame position of the part's top-left pixel, in whole pixels.
     pub position: Vector,
+    /// The bitmap column the part starts at.
     pub source_x: usize,
+    /// The bitmap row the part starts at.
     pub source_y: usize,
+    /// The part's width in pixels, never zero.
     pub width: usize,
+    /// The part's height in pixels, never zero.
     pub height: usize,
+    /// The karaoke colour the part is drawn in.
     pub colour: Colour,
 }
 
@@ -59,6 +75,7 @@ pub struct ClipParts {
 }
 
 impl ClipParts {
+    /// The parts, in the order libass emits them.
     pub fn as_slice(&self) -> &[ClipPart] {
         &self.parts[..self.len]
     }

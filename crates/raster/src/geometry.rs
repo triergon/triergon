@@ -9,11 +9,14 @@ pub const OUTLINE_MAX: i32 = (1 << 28) - 1;
 /// coverage, in whole pixels for bitmap and clip positions.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
 pub struct Vector {
+    /// The horizontal coordinate, increasing to the right.
     pub x: i32,
+    /// The vertical coordinate, increasing downwards.
     pub y: i32,
 }
 
 impl Vector {
+    /// The point (`x`, `y`).
     pub const fn new(x: i32, y: i32) -> Self {
         Self { x, y }
     }
@@ -28,13 +31,19 @@ impl Vector {
 /// [`Rect::include`] and reports [`Rect::is_empty`].
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub struct Rect {
+    /// The leftmost covered coordinate.
     pub x_min: i32,
+    /// The topmost covered coordinate.
     pub y_min: i32,
+    /// The rightmost covered coordinate, inclusive.
     pub x_max: i32,
+    /// The bottommost covered coordinate, inclusive.
     pub y_max: i32,
 }
 
 impl Rect {
+    /// The rectangle covering nothing: minima at `i32::MAX`, maxima at
+    /// `i32::MIN`, as libass's `rectangle_reset` leaves one.
     pub const EMPTY: Self = Self {
         x_min: i32::MAX,
         y_min: i32::MAX,
@@ -42,6 +51,8 @@ impl Rect {
         y_max: i32::MIN,
     };
 
+    /// The rectangle from (`x_min`, `y_min`) to (`x_max`, `y_max`), both
+    /// corners included.
     pub const fn new(x_min: i32, y_min: i32, x_max: i32, y_max: i32) -> Self {
         Self {
             x_min,
@@ -66,6 +77,7 @@ impl Rect {
         self.include(Self::new(point.x, point.y, point.x, point.y));
     }
 
+    /// Whether the rectangle covers nothing: a minimum exceeds its maximum.
     pub const fn is_empty(&self) -> bool {
         self.x_min > self.x_max || self.y_min > self.y_max
     }

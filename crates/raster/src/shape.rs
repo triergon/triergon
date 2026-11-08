@@ -40,6 +40,8 @@ impl Shape {
         Ok(Self::from_outlines(outline, Outline::new(budget)))
     }
 
+    /// The two outlines: the glyph, drawing, box or outer border first, the
+    /// inner border or nothing second.
     pub fn outlines(&self) -> &[Outline; 2] {
         &self.outlines
     }
@@ -50,10 +52,12 @@ impl Shape {
         &self.cbox
     }
 
+    /// Whether both outlines are empty.
     pub fn is_empty(&self) -> bool {
         self.outlines.iter().all(Outline::is_empty)
     }
 
+    /// Empties both outlines, keeping their storage.
     pub fn clear(&mut self) {
         for outline in &mut self.outlines {
             outline.clear();

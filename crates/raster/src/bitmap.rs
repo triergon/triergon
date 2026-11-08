@@ -15,7 +15,12 @@ pub const ALIGNMENT: usize = 16;
 /// in libass.
 #[derive(Debug)]
 pub struct Bitmap {
+    /// The column of the first pixel, whole pixels, relative to the origin the
+    /// bitmap is placed against: the glyph's position, or the run's for a
+    /// composite.
     pub left: i32,
+    /// The row of the first pixel, whole pixels, y down, relative to the same
+    /// origin.
     pub top: i32,
     width: usize,
     height: usize,
@@ -71,10 +76,12 @@ impl Bitmap {
         }
     }
 
+    /// The width in pixels.
     pub fn width(&self) -> usize {
         self.width
     }
 
+    /// The height in pixels: the number of rows.
     pub fn height(&self) -> usize {
         self.height
     }

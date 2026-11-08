@@ -12,8 +12,13 @@ const OUT_OF_RANGE: Error = Error::Invalid("outline point out of range");
 /// The order of one outline segment: how many points it owns.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum SegmentKind {
+    /// A straight line (`OUTLINE_LINE_SEGMENT`): one point, its start.
     Line = 1,
+    /// A quadratic spline (`OUTLINE_QUADRATIC_SPLINE`): its start and one
+    /// control point.
     Quadratic = 2,
+    /// A cubic spline (`OUTLINE_CUBIC_SPLINE`): its start and two control
+    /// points.
     Cubic = 3,
 }
 
@@ -28,16 +33,21 @@ impl SegmentKind {
 /// One segment of an outline.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub struct Segment {
+    /// The segment's order, which fixes how many points it owns.
     pub kind: SegmentKind,
-    /// The segment ends at its contour's first point.
+    /// The segment ends at its contour's first point (libass's
+    /// `OUTLINE_CONTOUR_END` flag).
     pub closes_contour: bool,
 }
 
 /// A segment with its points resolved, start first.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Curve {
+    /// A line: start and end.
     Line([Vector; 2]),
+    /// A quadratic spline: start, control point and end.
     Quadratic([Vector; 3]),
+    /// A cubic spline: start, two control points and end.
     Cubic([Vector; 4]),
 }
 
@@ -64,8 +74,11 @@ pub enum PointKind {
 /// A glyph point in 26.6 fixed point, y up, as a scaled font outline gives it.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct SourcePoint {
+    /// The horizontal coordinate, increasing to the right.
     pub x: i32,
+    /// The vertical coordinate, increasing upwards.
     pub y: i32,
+    /// Whether the point is on the curve or a control point.
     pub kind: PointKind,
 }
 
@@ -73,7 +86,10 @@ pub struct SourcePoint {
 /// index of each contour.
 #[derive(Clone, Copy, Debug)]
 pub struct GlyphSource<'a> {
+    /// The points of all contours, in order.
     pub points: &'a [SourcePoint],
+    /// For each contour, the index one past its last point into `points`;
+    /// strictly increasing and at most `points.len()`.
     pub contour_ends: &'a [u32],
 }
 
@@ -88,6 +104,7 @@ pub struct Outline {
 }
 
 impl Outline {
+    /// An empty outline whose storage is charged to `budget`.
     pub fn new(budget: &Budget) -> Self {
         Self {
             points: BudgetVec::new(budget),
@@ -95,18 +112,22 @@ impl Outline {
         }
     }
 
+    /// The points of all segments in order, 26.6, y down.
     pub fn points(&self) -> &[Vector] {
         self.points.as_slice()
     }
 
+    /// The segments in order, each owning the next `kind.points()` points.
     pub fn segments(&self) -> &[Segment] {
         self.segments.as_slice()
     }
 
+    /// Whether the outline has no points.
     pub fn is_empty(&self) -> bool {
         self.points.is_empty()
     }
 
+    /// Removes all points and segments, keeping the storage.
     pub fn clear(&mut self) {
         self.points.clear();
         self.segments.clear();

@@ -301,6 +301,8 @@ pub struct Rasterizer {
 }
 
 impl Rasterizer {
+    /// A rasteriser whose segment storage and bitmaps are charged to `budget`,
+    /// each operation bounded by `limits`.
     pub fn new(budget: &Budget, limits: Limits) -> Self {
         Self {
             lines: [BudgetVec::new(budget), BudgetVec::new(budget)],

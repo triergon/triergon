@@ -22,7 +22,9 @@ const BLUR_SCALE: f64 = 64.0 * BLUR_PRECISION / POSITION_PRECISION;
 pub struct FilterFlags {
     /// `\bord` style 3: the border is an opaque box.
     pub opaque_box: bool,
+    /// The run has a border bitmap (`FILTER_NONZERO_BORDER`).
     pub border: bool,
+    /// The run has a shadow bitmap (`FILTER_NONZERO_SHADOW`).
     pub shadow: bool,
     /// The shadow covers the fill's area too (transparent fill, karaoke).
     pub fill_in_shadow: bool,
@@ -33,6 +35,7 @@ pub struct FilterFlags {
 /// The effects of a run, as its style and override tags set them.
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
 pub struct Effects {
+    /// Which bitmaps the run's composite produces and how they overlap.
     pub flags: FilterFlags,
     /// `\be` passes.
     pub be: u32,
@@ -112,17 +115,29 @@ fn be_padding(be: u32) -> u32 {
 /// One glyph of a run: its bitmaps and their positions relative to the run.
 #[derive(Clone, Copy, Debug)]
 pub struct GlyphRef<'a> {
+    /// The glyph's fill bitmap, if it has one.
     pub glyph: Option<&'a Bitmap>,
+    /// The glyph's border bitmap, if it has one; it may be the fill bitmap.
     pub border: Option<&'a Bitmap>,
+    /// Where `glyph`'s `left` and `top` count from, whole pixels relative to
+    /// the run.
     pub position: Vector,
+    /// Where `border`'s `left` and `top` count from, whole pixels relative to
+    /// the run.
     pub border_position: Vector,
 }
 
 /// A run's composited bitmaps, positioned relative to the run.
 #[derive(Debug, Default)]
 pub struct Composite {
+    /// The summed glyph fills, blurred only without a stroked border.
     pub fill: Option<Bitmap>,
+    /// The summed and blurred borders with the fill subtracted, unless
+    /// `fill_in_border` keeps it; `None` when an opaque box becomes the shadow.
     pub border: Option<Bitmap>,
+    /// The shadow, shifted by the shadow offset: a copy of the stroked border
+    /// (the fill subtracted unless `fill_in_shadow` keeps it), the opaque box
+    /// itself, or a copy of the fill without a border.
     pub shadow: Option<Bitmap>,
 }
 
@@ -135,6 +150,8 @@ pub struct Compositor {
 }
 
 impl Compositor {
+    /// A compositor whose bitmaps and blur scratch are charged to `budget`,
+    /// each operation bounded by `limits`.
     pub fn new(budget: &Budget, limits: Limits) -> Self {
         Self {
             blur: Blur::new(budget, limits),
