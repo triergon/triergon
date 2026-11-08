@@ -343,6 +343,12 @@ impl<'s> Context<'s> {
         &self.state
     }
 
+    /// The per-glyph state as the tags read so far left it: after the walk,
+    /// what the event's last tags set.
+    pub const fn glyph_state(&self) -> &GlyphState<'s> {
+        &self.glyph
+    }
+
     /// The style in force: the event's, or the last `\r` style. Its margins
     /// apply where the event's are 0.
     pub const fn style(&self) -> &'s Style {

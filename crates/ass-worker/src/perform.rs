@@ -190,6 +190,7 @@ pub fn run_stream(
             Command::Flush => script.flush_events(),
             Command::Prune(deadline) => script.prune_events(*deadline),
             Command::CheckReadOrder(check) => script.set_check_read_order(*check),
+            Command::Frames(_) => {}
         }
     }
     record_script(sink, &script)?;

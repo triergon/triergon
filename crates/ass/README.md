@@ -1,16 +1,14 @@
 # triergon-ass
 
-ASS and SSA subtitle scripts as libass 0.17.5 reads them: whole scripts and
-Matroska packet streams, styles and events, typed override tags, the state each
-glyph of an event has at a given time (animation, movement, fades, clips,
-karaoke timing, transition effects) and the drawing language. It depends on
-[`triergon-core`](../core) for `Budget`, `Bytes`, `WorkBudget` and errors, and on
-[`triergon-raster`](../raster) for the `Outline` a drawing is read into, the one
-libass rasterises.
-
-This crate gives each glyph the state libass would give it, in script units.
-Layout, font selection, shaping, line wrapping, collisions, rendering and the
-image list are not here.
+ASS and SSA subtitle scripts as libass 0.17.5 reads and renders them: whole
+scripts and Matroska packet streams, styles and events, typed override tags,
+the state each glyph of an event has at a given time (animation, movement,
+fades, clips, karaoke timing, transition effects), the drawing language, and
+a `Renderer` that turns the events shown at a time into the positioned alpha
+images libass's `ass_render_frame` gives. It depends on
+[`triergon-core`](../core) for `Budget`, `Bytes`, `WorkBudget` and errors, on
+[`triergon-font`](../font) for faces, [`triergon-shape`](../shape) for bidi and
+OpenType shaping and [`triergon-raster`](../raster) for outlines and bitmaps.
 
 ## Usage
 
@@ -63,6 +61,37 @@ track.process_chunk(b"0,0,Default,,0,0,0,,the same ReadOrder is dropped", 1000, 
 assert_eq!(track.events().len(), 1);
 track.prune_events(4000);
 assert!(track.events().is_empty());
+# Ok::<(), Box<dyn std::error::Error>>(())
+```
+
+A player renders frames with the fonts it attaches:
+
+```rust,no_run
+use triergon_ass::{Change, Fonts, Options, Renderer, Script, Settings, Size};
+use triergon_core::{Budget, Bytes};
+
+let budget = Budget::new(256 << 20)?;
+let font = Bytes::copy_from_slice(&budget, &std::fs::read("Arimo-Regular.ttf")?)?;
+let fonts = Fonts {
+    attached: vec![font],
+    default_family: Some(b"Arimo".to_vec()),
+    default_font: None,
+};
+let mut settings = Settings::new(Size::new(1920, 1080));
+settings.storage = Some(Size::new(1280, 720)); // the video's size
+let mut renderer = Renderer::new(&budget, &settings, &fonts)?;
+let options = Options { extract_fonts: true, ..Options::default() };
+let mut script = Script::parse(&budget, &std::fs::read("episode.ass")?, &options)?;
+let frame = renderer.render(&mut script, 61_500)?;
+if frame.change == Change::None {
+    // Keep showing the previous frame's images.
+}
+for image in frame.images {
+    // Blend `image.colour` (alpha inverted) through each alpha row.
+    for (row, alpha) in image.rows().enumerate() {
+        let _ = (image.x, image.y + row as i32, alpha);
+    }
+}
 # Ok::<(), Box<dyn std::error::Error>>(())
 ```
 
@@ -162,6 +191,89 @@ commands before the first valid `m` are ignored, an `n` first rejects the drawin
 with libass's integer arithmetic, and a coordinate beyond ±(2^28 − 1) in 26.6 makes
 the drawing invalid (`None`). The `\p` level scales by `drawing_scale`.
 
+## How it renders
+
+`Renderer::render` draws the events shown at a time as libass's
+`ass_render_frame` does with its defaults (no hinting, complex shaping, no
+selective style overrides), in the frame and storage size and margins of its
+`Settings`:
+
+- **Fonts.** The `Fonts` a player gives (attached font files, a default
+  family and a default font file) and the script's embedded fonts, registered
+  at each frame as libass registers them (a renderer that draws several
+  scripts registers each one's as it first draws them, where libass, whose
+  tracks share one library, registers every track's as soon as it is read;
+  fonts registered once stay selectable in both), are matched by family, full
+  or PostScript name, weight and slant with `triergon_font::select`, as libass
+  matches fonts without a system font provider. Each requested font keeps the
+  faces it gathers: the one selected for it, then, for a character none of
+  them maps, one selected for that character from the requested family, the
+  default family or the default font file, so fallback depends on what was
+  drawn before, as in libass. The default font file's face gets an id of its
+  own, so a font never takes it for a face it already has: libass leaves
+  that id uninitialised, and this is its result whenever the id does not
+  collide with a registered face's; the reference is built with locals
+  zeroed, so it never does.
+- **Shaping.** Scripts per character, HarfBuzz's ignorables, runs of one face,
+  script and style, FriBidi levels per run (or per paragraph for `\fe-1`),
+  and OpenType shaping of each run at 256 pixels with libass's font functions
+  and features through `triergon-shape`.
+- **Layout.** Outlines at 256 pixels with libass's synthetic bold and oblique
+  and its underline and strike-out lines, scaled to the glyph's size; the
+  italic correction and letter spacing; wrapping (greedy, then rebalanced
+  unless `\q1`), whitespace trimming and line metrics; karaoke; the visual
+  order of each line; alignment and justification; the baseline shear; the
+  position by margins, `\pos`, `\move` or a scroll; and the rotation
+  origin.
+- **Bitmaps.** Each glyph's fill and border or opaque box through
+  `triergon_raster::Raster::render`, quantised against its run, and each run
+  composited with its blur, `\be` and shadow by `Raster::compose`; then each
+  run's shadow, border and fill as images, clipped by the clip rectangle (with `\kf`'s
+  split), multiplied by a vector clip, and the box of `BorderStyle` 4.
+- **The frame.** Events are taken in layer and read order, and in the
+  script's order where both are equal (libass's `qsort` leaves that order
+  unspecified; a whole script's events differ in ReadOrder, a stream's need
+  not); within a layer, events placed by their margins move clear of each
+  other and keep their place on later frames (the record lives with the event
+  in the `Script`, and a refused frame changes none); fully transparent
+  images are dropped.
+- **Change detection.** `Frame::change` is what libass's `ass_detect_change`
+  reports: `Change::Content` when the image count differs or an image's size,
+  stride, colour or bitmap does, `Change::Positions` when only places do,
+  else `Change::None`. Bitmaps are told apart as libass's caches tell them
+  apart: an image of a run shows the same bitmap as one of the previous frame
+  when the run's composite key (its effects key, and each glyph's bitmap
+  key, with its outline only where the bitmaps depend on it, and origin in
+  the run) and the image's part and window are equal, so glyphs that draw
+  nothing but an opaque box compare equal whatever their outlines; pixels a
+  vector clip or a `BorderStyle` 4 box makes are always new.
+  A frame of a script without events reports new content and leaves the
+  previous frame in place for the next comparison, as libass does.
+
+Settings beyond the frame and storage size (margins, `use_margins`, a pixel
+aspect, font scale, line spacing and position) follow libass's formulas but
+are not compared. Not rendered: the glyphs of `@` fonts, which libass draws
+rotated with vertical metrics (`Error::Unsupported`), libass's simple shaping
+level, its hinting modes, selective style overrides and track features.
+
+**Caches.** `Settings::cache` holds the cache limits (`CacheLimits`): its
+default is libass's (10,000 outlines, 128 MiB of glyph bitmaps, 64 MiB of
+composites), and `CacheLimits::new(glyphs, megabytes)` gives what
+`ass_set_cache_limits` sets. The outline count bounds the outline cache:
+glyph and drawing outlines are kept between frames and cut to it at each
+frame as libass cuts its outline cache, least recently used first, never one
+the previous frame's images were drawn from. Requested fonts and the faces
+they gathered are kept up to `CacheLimits::fonts` font descriptions (10,000
+by default), cut at each frame the same way, never one the previous frame
+asked for; libass keeps them all, so a font asked for again after it left
+starts over from its first face. A caller that wants libass's behaviour sets
+`CacheLimits::fonts` to `usize::MAX`. Shaping plans are kept up to 256. All of it
+is charged to the renderer's budget, family names and drawing texts by
+length, and looked up by the names and texts the script holds, without
+copying them. The byte limits bound nothing: there is no bitmap or composite
+cache, so glyph bitmaps and composites are drawn again each frame, with the
+same images.
+
 ## Arithmetic
 
 Floating-point operations follow libass's C source in order, without fused
@@ -200,6 +312,19 @@ two cases are open there on the GCC targets, as are, on
 `aarch64-unknown-linux-gnu`, the two drawings whose coordinates libass converts
 with a 64-bit `long` there.
 
+The renderer follows the same rule where libass's renderer converts: its
+`lrint`s (`triergon_core::round_ties_even_i32`: glyph boxes, advances and
+metrics), its `lround`s (the layout resolution, `\kf`'s split column, a
+`BorderStyle` 4 shadow, clip and scroll rectangles), its `(int)` casts (the
+collision box, line borders, the baseline shear, the content area) and
+`double_to_d6` (`triergon_raster::pixels_26_6`) all saturate at `int`'s range
+with NaN as 0, also where libass's `long` is 64 bits wide. Collision handling
+keeps the boxes placed so far in order of their top edges, compared as values;
+libass sorts them with `cmp_rect_y0`, which subtracts them and so overflows,
+undefined in C, for tops more than 2³¹ apart, and leaves equal tops in an
+unspecified order, where the crate keeps the order they were placed in. No
+fixture of `ass-render` converts out of range or places boxes that far apart.
+
 ## Behaviour and limits
 
 A `Script` charges its styles, events, strings (one allocation per style and per
@@ -210,14 +335,31 @@ drawing points; a `Context` takes one call's work for its whole walk), the style
 and the events held; exceeding one is `Error::Policy`, an exhausted budget
 `Error::Limit` or `Error::Backpressure`. A `\t` inside a `\t` continues in place,
 so tag evaluation recurses at most one level. `Syllables` is linear in the glyphs
-it is given. Evaluating an event allocates nothing. Malformed input is read as
-libass reads it, skipping what it skips, and never panics.
+it is given. Evaluating an event allocates nothing. A `Renderer` charges its
+glyph lists, outlines, plans, fonts, bitmaps, images and scratch to its
+`Budget`. `Settings::work` bounds the work of a whole frame, by default
+`Settings::DEFAULT_WORK` (2²⁸ units), and every stage of every shown event
+shares that one budget: evaluation (a pass over the effect and the text),
+font selection (each registered face matched, each gathered face tried),
+shaping (each run's characters and the few characters of context it reads),
+outlines (each one built and its points), layout (a pass per stage over the
+glyphs, and one for every rebalancing pass), drawing (glyph bitmaps,
+composites and vector clips, charged as `triergon-raster` charges them) and
+collision handling (each event against those placed before it in its
+layer). The charge grows linearly with the events and their text. Where
+libass would go on drawing, running out is `Error::Policy`; a caller that
+wants libass's unbounded behaviour raises the setting. Shaping and bidi also
+run under the limits of their crates.
+Malformed input is read as libass reads it, skipping what it skips, and never
+panics.
 
 ## Verification
 
-- `cargo test -p triergon-ass`: unit tests per module and a deterministic mutation
+- `cargo test -p triergon-ass`: unit tests per module, a deterministic mutation
   test (`tests/robustness.rs`) over authored scripts, including work, event and
-  budget limits.
+  budget limits, and `tests/render.rs`, which renders with a font built in
+  memory: image order, collisions across frames, clips and karaoke splits, an
+  exhausted budget and 300 mutated scripts.
 - `cargo xtask ass compare` runs [ass-worker](../ass-worker/README.md) and the
   libass reference worker (`harness/reference_ass.h`) on every authored fixture in
   `harness/fixtures/ass` and requires identical work: `ass-parse-scripts` (whole
@@ -227,16 +369,24 @@ libass reads it, skipping what it skips, and never panics.
   pin. `cargo xtask fuzz --contract
   harness/features/<feature>/contract.json --reference` mutates the fixtures and
   compares both workers on every mutation.
+- `ass-render` renders the 25 scripts and 3 packet streams of
+  `harness/fixtures/ass-render` as a player configures libass (attached fonts,
+  a default family and font file, no system font provider, no hinting) at
+  1920×1080 over 1280×720 storage and at 1280×720 over anamorphic 720×576
+  storage, and compares every image's kind, position, size, colour and alpha
+  bytes in order, and every frame's change value, with libass's
+  (`harness/reference_ass_render.h`, with libass's cache limits set to 1000
+  glyphs and 24 MiB): 54/56 pass. The box behind a `BorderStyle` 4 event is
+  compared without its kind, since libass leaves its type uninitialised. The
+  two open cases are the fixture with an `@` font.
 
 The comparison establishes agreement with libass on that corpus, not conformance
 with any specification of the format.
 
 ## Not here
 
-Rendering and everything it needs: layout, line wrapping, collisions, shaping,
-font selection and fallback, bidi, text glyph outlines, borders, blur, clips as
-bitmaps, compositing and the image list. Also not implemented: libass's selective
-style override (`ass_set_selective_style_override`; with libass's default settings
-it changes nothing), track features (`ass_track_set_feature`), `ass_step_sub`,
-`ass_configure_prune` (a renderer calls `prune_events`), reading files and
-charset conversion.
+Vertical text (`@` fonts), libass's simple shaping level and hinting modes,
+its selective style override (`ass_set_selective_style_override`; with libass's
+default settings it changes nothing), track features (`ass_track_set_feature`),
+`ass_step_sub`, `ass_configure_prune` (a player calls
+`prune_events`), reading files and charset conversion.

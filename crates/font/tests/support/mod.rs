@@ -1179,8 +1179,8 @@ pub fn exercise(data: &[u8], limits: Limits) {
     for family in ["Test Sans", "x"] {
         let request = Request {
             family,
-            bold: 1,
-            italic: 1,
+            weight: 700,
+            slant: 100,
             character: Some('A'),
         };
         let _ = select(&faces, &request);

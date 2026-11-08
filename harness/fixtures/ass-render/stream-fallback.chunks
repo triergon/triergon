@@ -1,0 +1,40 @@
+;@attach croscorefonts-1.31.0/Arimo-Regular.ttf
+;@attach croscorefonts-1.31.0/Arimo-Bold.ttf
+;@attach NotoSansCJK-Regular.ttc
+;@default-family Noto Sans CJK JP
+;@default-font NotoSansArabic-Regular.ttf
+@private
+[Script Info]
+ScriptType: v4.00+
+PlayResX: 1920
+PlayResY: 1080
+WrapStyle: 0
+ScaledBorderAndShadow: yes
+
+[V4+ Styles]
+Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
+Style: Default,Arimo,56,&H00FFFFFF,&H000000FF,&H00000000,&H80000000,0,0,0,0,100,100,0,0,1,3,2,2,60,60,50,1
+Style: Top,Arimo,48,&H0000FFFF,&H000000FF,&H00200000,&H80000000,-1,0,0,0,100,100,0,0,1,2,2,8,60,60,40,1
+
+[Events]
+Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
+@end
+@chunk 0 2000
+0,0,Default,,0,0,0,,Latin text, 日本語の字幕 and العربية in one Arimo line
+@chunk 250 2250
+1,0,Top,,0,0,0,,{\b0}Top line with 中文 and 한국어 after it
+@chunk 250 2250
+1,0,Top,,0,0,0,,a repeated ReadOrder is dropped
+@chunk 500 1500
+2,0,Default,,0,0,0,,{\i1}italic Arimo with مرحبا بالعالم{\i0} and カタカナ
+@frames 0 250 1000
+@prune 1000
+@chunk 1250 1750
+3,1,Default,,0,0,0,,{\an5\fs72}レイヤー 1 السلام
+@chunk 1500 1000
+4,0,Default,,0,0,0,,a later line stacks above the others
+@frames 1250 250 2250
+@prune 2250
+@chunk 2500 500
+0,0,Default,,0,0,0,,ReadOrder 0 was pruned, so it is read again
+@frames 2500 250 3000

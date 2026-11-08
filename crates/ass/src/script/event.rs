@@ -25,6 +25,8 @@ pub struct Event {
     /// 0 means the style's margin.
     pub margins: Margins,
     strings: Strings<3>,
+    /// Where collision handling placed the event, for later frames.
+    pub(crate) placed: crate::render::Placed,
 }
 
 impl Event {
@@ -117,6 +119,7 @@ impl Script {
                         &self.budget,
                         [Some(&values[..end_of_text]), name, effect],
                     )?,
+                    placed: crate::render::Placed::default(),
                 }));
             }
             let Some(token) = next_token(&mut values, false) else {

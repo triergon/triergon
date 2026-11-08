@@ -1,46 +1,31 @@
 //! Choosing a face for an ASS style's font name, bold and italic values, with
 //! libass's scoring.
 
+use std::borrow::Borrow;
+
 use crate::name::{NameId, NameRecord, Platform};
 use crate::{Font, OutlineFormat};
 
-/// What an ASS style or override asks for.
+/// What an ASS style or override asks for, as libass describes a font
+/// (`ASS_FontDesc`).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Request<'a> {
     /// The font name, without a leading `@` (vertical) marker.
     pub family: &'a str,
-    /// The ASS bold value: 1 or -1 is bold (weight 700), 0 or less regular (400),
-    /// and other values are weights.
-    pub bold: i32,
-    /// The ASS italic value: any positive value asks for an italic face.
-    pub italic: i32,
+    /// The requested weight: 700 for the ASS bold values 1 and -1, 400 for 0,
+    /// any other value read as unsigned.
+    pub weight: u32,
+    /// The requested slant: 100 for the ASS italic value 1, 0 for 0, any other
+    /// value read as unsigned. Any slant but 0 asks for an italic face.
+    pub slant: u32,
     /// A character the face must map, or `None`.
     pub character: Option<char>,
 }
 
 impl Request<'_> {
-    /// The requested weight.
-    pub const fn weight(&self) -> u32 {
-        match self.bold {
-            1 | -1 => 700,
-            ..=0 => 400,
-            weight => weight.unsigned_abs(),
-        }
-    }
-
-    /// The requested slant as libass passes it on: 100 for the ASS value 1, 0 for
-    /// values of 0 or less, and other values unchanged.
-    pub const fn slant(&self) -> u32 {
-        match self.italic {
-            1 => 100,
-            ..=0 => 0,
-            slant => slant.unsigned_abs(),
-        }
-    }
-
     /// Whether an italic face is requested.
     pub const fn italic(&self) -> bool {
-        self.italic > 0
+        self.slant != 0
     }
 }
 
@@ -89,6 +74,13 @@ impl<'a> FaceInfo<'a> {
     /// The bold flag: `fsSelection` bit 5, or FreeType's flag without `OS/2`.
     pub const fn is_bold(&self) -> bool {
         self.bold
+    }
+
+    /// Whether the face has a family name to be matched by: a Windows-platform
+    /// family name (ID 1), or the one FreeType reports. libass registers no
+    /// face without one.
+    pub fn has_family_name(&self) -> bool {
+        self.windows(NameId::Family).next().is_some() || self.font.family_name().is_some()
     }
 
     /// Whether a Windows-platform family name (ID 1) equals `name` ignoring ASCII
@@ -140,7 +132,7 @@ impl<'a> FaceInfo<'a> {
             (false, true) => 4,
             _ => 0,
         };
-        let wanted = request.weight();
+        let wanted = request.weight;
         let weight = if wanted > self.weight + 150 && !self.bold {
             self.weight + 120
         } else {
@@ -164,10 +156,17 @@ impl<'a> FaceInfo<'a> {
 /// A face whose family name matches scores [`FaceInfo::score`]; one whose full or
 /// PostScript name matches instead scores zero. The lowest score wins, the
 /// earlier face on a tie, and a face that does not map `request.character` is
-/// passed over. A face scoring zero ends the search.
-pub fn select(faces: &[FaceInfo<'_>], request: &Request<'_>) -> Option<usize> {
+/// passed over. A face scoring zero ends the search. `faces` is any sequence
+/// of infos, such as a slice of them or infos made as the search reaches each
+/// face, which needs no storage.
+pub fn select<'a, I>(faces: I, request: &Request<'_>) -> Option<usize>
+where
+    I: IntoIterator,
+    I::Item: Borrow<FaceInfo<'a>>,
+{
     let mut best: Option<(u32, usize)> = None;
-    for (index, face) in faces.iter().enumerate() {
+    for (index, face) in faces.into_iter().enumerate() {
+        let face = face.borrow();
         let score = if face.has_family(request.family) {
             face.score(request)
         } else if face.has_full_name(request.family) {
@@ -226,27 +225,14 @@ mod tests {
     use super::Request;
 
     #[test]
-    fn requests_map_ass_values() {
-        let request = |bold, italic| Request {
+    fn any_slant_asks_for_italic() {
+        let request = |slant| Request {
             family: "Arimo",
-            bold,
-            italic,
+            weight: 400,
+            slant,
             character: None,
         };
-        assert_eq!(request(1, 0).weight(), 700);
-        assert_eq!(request(-1, 0).weight(), 700);
-        assert_eq!(request(0, 0).weight(), 400);
-        assert_eq!(request(-5, 0).weight(), 400);
-        assert_eq!(request(300, 0).weight(), 300);
-        assert!(request(0, 1).italic() && request(0, 7).italic());
-        assert_eq!(
-            (
-                request(0, 1).slant(),
-                request(0, 7).slant(),
-                request(0, -3).slant()
-            ),
-            (100, 7, 0)
-        );
-        assert!(!request(0, -1).italic() && !request(0, 0).italic());
+        assert!(request(100).italic() && request(u32::MAX).italic());
+        assert!(!request(0).italic());
     }
 }

@@ -1,8 +1,10 @@
-//! The ASS parsing features' manifests, generated from the authored fixtures in
-//! `harness/fixtures/ass`: every script (`.ass`, `.ssa`) read whole, every
-//! stream (`.chunks`) run packet by packet, and the events of every fixture
-//! with `;@time` walked at those times; the operations of [`PER_TARGET`] are
-//! `ass-parse-host`'s instead. The work each case must fold is pinned in
+//! The ASS features' manifests, generated from the authored fixtures. Parsing
+//! reads `harness/fixtures/ass`: every script (`.ass`, `.ssa`) read whole,
+//! every stream (`.chunks`) run packet by packet, and the events of every
+//! fixture with `;@time` walked at those times; the operations of
+//! [`PER_TARGET`] are `ass-parse-host`'s instead. Rendering renders every
+//! script and stream of `harness/fixtures/ass-render` in each of
+//! [`RENDER_SIZES`]. The work each case must fold is pinned in
 //! `harness/features/<id>/pins.json`, libass's folds (see [`crate::lanes`]),
 //! per target in `ass-parse-host`.
 
@@ -13,8 +15,21 @@ use crate::lanes::Lane;
 
 type R<T> = Result<T, String>;
 
-/// The fixtures, relative to the root; the cases' files are in it.
+/// The parsing fixtures, relative to the root; the cases' files are in it.
 pub const FIXTURES: &str = "harness/fixtures/ass";
+/// The rendering fixtures.
+pub const RENDER_FIXTURES: &str = "harness/fixtures/ass-render";
+/// The directory the rendering fixtures' font paths are relative to, from
+/// the root: the font corpus `cargo xtask fonts fetch` unpacks.
+pub const FONTS: &str = ".research/fonts/files";
+
+/// The frame and storage sizes every rendering fixture is rendered at, with
+/// the suffix of their case ids: a 720p video on a 1080p frame, and an
+/// anamorphic 576-line video on a 720p frame, whose pixels are not square.
+pub const RENDER_SIZES: [(&str, [&str; 4]); 2] = [
+    ("1080p", ["1920", "1080", "1280", "720"]),
+    ("720p", ["1280", "720", "720", "576"]),
+];
 
 /// How a case runs its fixture.
 #[derive(Clone, Copy, PartialEq, Eq)]
@@ -58,8 +73,9 @@ pub const ROW_SOURCES: [&str; 1] = ["xtask/src/ass/manifest.rs"];
 
 /// The cases `cargo xtask check` mutates: the scripts with the most tag,
 /// style and header quirks, a stream with every command, and the walks over
-/// drawings, karaoke, animation and out-of-range coordinates and values.
-pub const SMOKE_CASES: [(&str, &[&str]); 4] = [
+/// drawings, karaoke, animation and out-of-range coordinates and values, and
+/// a rendered script and stream.
+pub const SMOKE_CASES: [(&str, &[&str]); 5] = [
     (
         "ass-parse-scripts",
         &[
@@ -81,13 +97,18 @@ pub const SMOKE_CASES: [(&str, &[&str]); 4] = [
             "events-time-overflow-ass",
         ],
     ),
+    (
+        "ass-render",
+        &["basic-ass-720p", "stream-fallback-chunks-1080p"],
+    ),
 ];
 
-pub const FEATURES: [&str; 4] = [
+pub const FEATURES: [&str; 5] = [
     "ass-parse-scripts",
     "ass-parse-chunks",
     "ass-parse-events",
     "ass-parse-host",
+    "ass-render",
 ];
 
 pub const LANE: Lane = Lane {
@@ -101,14 +122,25 @@ pub const LANE: Lane = Lane {
     row_sources: &ROW_SOURCES,
     rows,
     note,
-    directory: |_| FIXTURES,
+    directory,
     write_inputs: crate::lanes::no_inputs,
     check_inputs,
     smoke: &SMOKE_CASES,
 };
 
+fn directory(id: &str) -> &'static str {
+    if id == "ass-render" {
+        RENDER_FIXTURES
+    } else {
+        FIXTURES
+    }
+}
+
 fn note(id: &str) -> &'static str {
     match id {
+        "ass-render" => {
+            "Every authored script and stream rendered as a player embeds libass 0.17.5: attached fonts, a default family and font file, no system font provider, no hinting, a frame larger than the storage size; every image of every frame."
+        }
         "ass-parse-scripts" => {
             "Every authored script read whole as libass 0.17.5's ass_read_memory reads it, with the style overrides and font extraction its directives set: every track, style and event field and every embedded font."
         }
@@ -140,9 +172,9 @@ fn kind(name: &str) -> Option<Kind> {
     }
 }
 
-/// The fixtures: name and contents, by name.
-fn fixtures(root: &Path) -> R<Vec<(String, Vec<u8>)>> {
-    let directory = root.join(FIXTURES);
+/// The fixtures of `directory`: name and contents, by name.
+fn fixtures(root: &Path, directory: &str) -> R<Vec<(String, Vec<u8>)>> {
+    let directory = root.join(directory);
     let mut files = Vec::new();
     for entry in
         std::fs::read_dir(&directory).map_err(|e| format!("{}: {e}", directory.display()))?
@@ -167,8 +199,11 @@ fn timed(data: &[u8]) -> bool {
 }
 
 fn rows(root: &Path, id: &str) -> R<Vec<Value>> {
+    if id == "ass-render" {
+        return render_rows(root);
+    }
     let mut rows = Vec::new();
-    for (name, data) in fixtures(root)? {
+    for (name, data) in fixtures(root, FIXTURES)? {
         let kind = kind(&name).ok_or_else(|| format!("{FIXTURES}/{name}: not a fixture"))?;
         let walk = || match kind {
             Kind::Script(_) => ("script", &["script", "events"][..]),
@@ -192,7 +227,7 @@ fn rows(root: &Path, id: &str) -> R<Vec<Value>> {
                 "ass-parse-scripts" | "ass-parse-chunks" | "ass-parse-events" | "ass-parse-host",
                 _,
             ) => continue,
-            _ => return Err(format!("{id}: not an ASS parsing feature")),
+            _ => return Err(format!("{id}: not an ASS feature")),
         };
         rows.push(Value::object([
             ("id", Value::str(name.replace('.', "-"))),
@@ -206,7 +241,35 @@ fn rows(root: &Path, id: &str) -> R<Vec<Value>> {
     Ok(rows)
 }
 
-/// Every file of the fixture directory is a script or a stream; a tree
+/// Every rendering fixture in every size.
+fn render_rows(root: &Path) -> R<Vec<Value>> {
+    let mut rows = Vec::new();
+    for (name, data) in fixtures(root, RENDER_FIXTURES)? {
+        let (profile, mode) = match kind(&name) {
+            Some(Kind::Script(_)) => ("script", "script"),
+            Some(Kind::Stream) => ("stream", "chunks"),
+            None => return Err(format!("{RENDER_FIXTURES}/{name}: not a fixture")),
+        };
+        for (suffix, size) in RENDER_SIZES {
+            let mut arguments = vec![mode, FONTS];
+            arguments.extend(size);
+            rows.push(Value::object([
+                (
+                    "id",
+                    Value::str(format!("{}-{suffix}", name.replace('.', "-"))),
+                ),
+                ("profile", Value::str(profile)),
+                ("file", Value::str(&name)),
+                ("sha256", Value::str(crate::sha256::hex(&data))),
+                ("rights", Value::str("authored-synthetic")),
+                ("arguments", Value::strings(arguments)),
+            ]));
+        }
+    }
+    Ok(rows)
+}
+
+/// Every file of the fixture directories is a script or a stream; a tree
 /// without the lane's features needs no fixtures.
 fn check_inputs(root: &Path) -> Vec<String> {
     let registered = FEATURES.iter().any(|feature| {
@@ -218,15 +281,27 @@ fn check_inputs(root: &Path) -> Vec<String> {
     if !registered {
         return Vec::new();
     }
-    let files = match fixtures(root) {
-        Ok(files) => files,
-        Err(error) => return vec![error],
-    };
-    let mut errors: Vec<String> = files
-        .iter()
-        .filter(|(name, _)| kind(name).is_none())
-        .map(|(name, _)| format!("{FIXTURES}/{name}: neither a script nor a stream"))
-        .collect();
+    let mut errors = Vec::new();
+    let mut parsing = Vec::new();
+    for directory in [FIXTURES, RENDER_FIXTURES] {
+        match fixtures(root, directory) {
+            Ok(files) => {
+                errors.extend(
+                    files
+                        .iter()
+                        .filter(|(name, _)| kind(name).is_none())
+                        .map(|(name, _)| {
+                            format!("{directory}/{name}: neither a script nor a stream")
+                        }),
+                );
+                if directory == FIXTURES {
+                    parsing = files;
+                }
+            }
+            Err(error) => errors.push(error),
+        }
+    }
+    let files = parsing;
     for (name, operation) in PER_TARGET {
         let walked = operation == Operation::Walk;
         if !files
@@ -282,5 +357,12 @@ mod tests {
             };
             assert!(other.iter().all(|id| !files(id).iter().any(|f| f == name)));
         }
+        let rendered = std::fs::read_dir(root.join(super::RENDER_FIXTURES))
+            .unwrap()
+            .count();
+        assert_eq!(
+            rows(root, "ass-render").unwrap().len(),
+            rendered * super::RENDER_SIZES.len()
+        );
     }
 }

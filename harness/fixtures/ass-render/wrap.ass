@@ -1,0 +1,27 @@
+;@attach croscorefonts-1.31.0/Arimo-Regular.ttf
+;@attach croscorefonts-1.31.0/Arimo-Bold.ttf
+;@attach croscorefonts-1.31.0/Arimo-Italic.ttf
+;@attach croscorefonts-1.31.0/Arimo-BoldItalic.ttf
+;@default-family Arimo
+;@default-font dejavu-fonts-ttf-2.37/ttf/DejaVuSans.ttf
+;@frames 0 250 2000
+[Script Info]
+ScriptType: v4.00+
+PlayResX: 1280
+PlayResY: 720
+WrapStyle: 0
+ScaledBorderAndShadow: yes
+
+[V4+ Styles]
+Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
+Style: Default,Arimo,44,&H00FFFFFF,&H000000FF,&H00000000,&H80000000,0,0,0,0,100,100,0,0,1,2,1,2,60,60,30,1
+Style: Top,Arimo,40,&H00FFFFFF,&H000000FF,&H00000000,&H80000000,0,0,0,0,100,100,0,0,1,2,1,8,200,200,30,1
+
+[Events]
+Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
+Dialogue: 0,0:00:00.00,0:00:02.00,Default,,0,0,0,,This is a long subtitle line that has to wrap because it does not fit within the frame width at all
+Dialogue: 0,0:00:00.00,0:00:02.00,Top,,0,0,0,,{\q1}End-of-line wrapping fills the first line and moves only the remainder to the next line here
+Dialogue: 0,0:00:00.00,0:00:02.00,Top,,0,0,140,,{\q2}No wrapping at all, so this long line runs off the edges of the frame entirely
+Dialogue: 0,0:00:00.00,0:00:02.00,Top,,0,0,220,,{\q3}Smart wrapping with a lower line wider than the upper line when the text is split
+Dialogue: 0,0:00:00.00,0:00:02.00,Top,,0,0,380,,Manual\Nbreaks\Nin a{\q2} line\nwith soft\nbreaks
+Dialogue: 0,0:00:00.00,0:00:02.00,Top,,0,0,520,,Averyveryverylongwordthatcannotbebrokenanywhereatallbecauseithasnospaces then words

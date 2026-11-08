@@ -8,6 +8,7 @@
 mod fixture;
 mod perform;
 mod record;
+mod render;
 
 use fixture::Fixture;
 use perform::{Result, Walker, parse, record_script, run_stream};
@@ -91,6 +92,12 @@ fn operation(
 }
 
 fn run(args: &[String]) -> Result<()> {
+    if args
+        .first()
+        .is_some_and(|action| action.starts_with("ass-render-"))
+    {
+        return render::run(args);
+    }
     let (action, path, mode) = parse_args(args)?;
     let iterations = match action {
         Action::Bench(count) => count,

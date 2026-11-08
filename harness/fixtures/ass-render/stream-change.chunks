@@ -1,0 +1,35 @@
+;@attach croscorefonts-1.31.0/Arimo-Regular.ttf
+;@default-family Arimo
+;@default-font dejavu-fonts-ttf-2.37/ttf/DejaVuSans.ttf
+@private
+[Script Info]
+ScriptType: v4.00+
+PlayResX: 1920
+PlayResY: 1080
+ScaledBorderAndShadow: yes
+
+[V4+ Styles]
+Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
+Style: Default,Arimo,56,&H00FFFFFF,&H000000FF,&H00000000,&H80000000,0,0,0,0,100,100,0,0,1,3,2,2,60,60,50,1
+
+[Events]
+Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
+@end
+@chunk 0 2000
+0,0,Default,,0,0,0,,{\move(600,500,1000,500)}moving by whole pixels
+@chunk 0 4000
+1,0,Default,,0,0,0,,a steady line
+@frames 0 250 1000
+@flush
+@frames 1000 250 1250
+@chunk 0 4000
+1,0,Default,,0,0,0,,a steady line
+@frames 1500 250 2250
+@chunk 2500 500
+2,0,Default,,0,0,0,,{\pos(960,300)}a short line
+@frames 2500 250 3250
+@prune 4500
+@frames 4500 250 4750
+@chunk 5000 1000
+3,0,Default,,0,0,0,,a steady line
+@frames 5000 250 5250

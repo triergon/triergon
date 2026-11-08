@@ -347,8 +347,10 @@ impl GlyphBitmaps {
 /// What identifies a glyph's bitmaps besides its shape: the quantised
 /// transforms they were drawn with, the border's stroking scale and widths or
 /// opaque box, and where the border sits against the glyph. Bitmaps of the
-/// same shape with equal keys are equal, so a renderer can key its glyph and
-/// run caches with it, as libass keys its bitmap and composite caches.
+/// same shape with equal keys are equal. A renderer keys its glyph and run
+/// caches, as libass keys its bitmap and composite caches, with
+/// [`GlyphKey::with_shape`], which leaves the shape out where the bitmaps do
+/// not depend on it.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub struct GlyphKey {
     /// The glyph bitmap's transform, if it is drawn.
@@ -357,6 +359,33 @@ pub struct GlyphKey {
     border: Option<BorderId>,
     /// The border bitmap's own origin from the glyph's, in whole pixels.
     border_offset: Vector,
+}
+
+impl GlyphKey {
+    /// This key with `shape`, the caller's identity of the shape the bitmaps
+    /// were drawn from, kept only where they depend on it: a fill that draws
+    /// something, or a stroked border. An opaque box does not, and a glyph
+    /// whose fill draws nothing has none, so such glyphs of different shapes
+    /// have equal keys under the same transform, as libass's bitmap cache
+    /// keys the box by its own outline and its composite cache takes an empty
+    /// fill as none.
+    pub fn with_shape<S>(self, shape: S) -> ShapedKey<S> {
+        let stroked = matches!(self.border, Some(BorderId::Stroke(..)));
+        ShapedKey {
+            shape: (self.glyph.is_some() || stroked).then_some(shape),
+            key: self,
+        }
+    }
+}
+
+/// A [`GlyphKey`] with the identity of the shape its bitmaps were drawn
+/// from where they depend on it: equal exactly when libass's bitmap cache
+/// gives both glyphs the same fill and border bitmaps. See
+/// [`GlyphKey::with_shape`].
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub struct ShapedKey<S> {
+    shape: Option<S>,
+    key: GlyphKey,
 }
 
 /// What a border bitmap is drawn from.
@@ -583,5 +612,80 @@ impl Raster {
             Err(Error::Invalid(_)) => Ok(None),
             Err(error) => Err(error),
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use triergon_core::{Budget, WorkBudget};
+
+    use super::{FrameScale, GlyphRequest, Placement, Run};
+    use crate::{Border, Effects, Limits, Outline, Raster, Shape, Vector};
+
+    /// The key of `shape` drawn alone with an opaque box at a fixed place.
+    fn boxed_key(raster: &mut Raster, shape: &Shape, shape_id: u32) -> super::ShapedKey<u32> {
+        let effects = Effects {
+            border: Border::OpaqueBox {
+                size: [2.0, 2.0],
+                shown: true,
+            },
+            ..Effects::default()
+        };
+        let request = GlyphRequest {
+            shape,
+            placement: Placement {
+                rotation: [0.0; 3],
+                shear: [0.0; 2],
+                scale: [1.0, 1.0],
+                shift: Vector::new(0, 0),
+                ascender: 640,
+                descender: 128,
+                advance: 640,
+                scale_fix: 1.0,
+                position: Vector::new(100 * 64, 50 * 64),
+                outline_scale: [1.0, 1.0],
+                outline_offset: [0.0, 0.0],
+            },
+            frame: FrameScale {
+                blur: [1.0, 1.0],
+                border: [1.0, 1.0],
+                pixel_aspect: 1.0,
+            },
+            effects: &effects,
+            karaoke: false,
+        };
+        let mut work = WorkBudget::new(1 << 24);
+        let drawn = raster
+            .render(&request, &mut Run::default(), &mut work)
+            .unwrap()
+            .unwrap();
+        assert!(drawn.border().is_some());
+        drawn.key().with_shape(shape_id)
+    }
+
+    #[test]
+    fn an_opaque_box_is_keyed_without_the_shape_a_fill_with_it() {
+        let budget = Budget::new(16 << 20).unwrap();
+        let mut raster = Raster::new(&budget, Limits::default());
+        let [empty, other_empty] = [Shape::new(&budget), Shape::new(&budget)];
+        // Glyphs that draw nothing: only their boxes, which are equal.
+        assert_eq!(
+            boxed_key(&mut raster, &empty, 1),
+            boxed_key(&mut raster, &other_empty, 2)
+        );
+        let mut square = Outline::new(&budget);
+        square
+            .push_rect(Vector::new(0, -640), Vector::new(640, 0))
+            .unwrap();
+        let square = Shape::from_outlines(square, Outline::new(&budget));
+        // A drawn fill is the shape's own.
+        assert_ne!(
+            boxed_key(&mut raster, &square, 3),
+            boxed_key(&mut raster, &square, 4)
+        );
+        assert_eq!(
+            boxed_key(&mut raster, &square, 3),
+            boxed_key(&mut raster, &square, 3)
+        );
     }
 }

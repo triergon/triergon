@@ -1,0 +1,41 @@
+{
+  "schema": 1,
+  "id": "ass-render",
+  "operation": "ass-render",
+  "candidate": "ass-worker",
+  "worker_operation": "ass-render-",
+  "reference": "libass-ass-native",
+  "gate": "required",
+  "contract": [
+    "one authored script read whole with ass_read_memory, or one stream fixture run on a track from ass_new_track as ass-parse-chunks runs it (codec private, packets through ass_process_chunk with ReadOrder deduplication, flushes and ass_prune_events), configured as a player embeds libass 0.17.5: a library with font extraction on and the fixture's font files given to ass_add_font in order, a renderer with frame and storage size set (the storage smaller than the frame: 1280x720 on 1920x1080, and 720x576 on 1280x720, whose pixel aspect is not 1), ASS_HINTING_NONE, ass_set_cache_limits(renderer, 1000, 24), libass's plain C bitmap engine on every host, and ass_set_fonts with the fixture's default font file and family and ASS_FONTPROVIDER_NONE",
+    "frames rendered with ass_render_frame at the fixture's times: a whole script's ;@frames, a stream's @frames commands where they stand among its packets and prunes",
+    "every frame folds its time, the change ass_render_frame reports (0, 1 or 2, as ass_detect_change computes it) and its image count, then every image its type, position, width, height and colour and every row of its alpha bytes, in libass's list order; the box add_background draws behind a BorderStyle 4 event, whose type libass leaves uninitialised, is told by its buffer (the one ass_render.c allocates aligned to one byte) and folded without a type; packets count images and bytes their alpha bytes",
+    "the fixture and its fonts are read before each timed and memory operation, which creates the library and renderer, reads the script or runs the stream and renders every frame"
+  ],
+  "required_profiles": [
+    "script",
+    "stream"
+  ],
+  "required_targets": [
+    "aarch64-unknown-linux-gnu",
+    "armv7-unknown-linux-gnueabihf"
+  ],
+  "iterations": 1,
+  "minimum_pairs": 30,
+  "confidence": 0.95,
+  "pending_module_requirements": [
+    "triergon-font: vertical metrics (vhea/vmtx, linear vertical advance) for @ fonts, which libass draws rotated with them and with the typographic descender",
+    "triergon-shape's open shape-libass cases, which block qualifying triergon-ass: the default-load advances FreeType's auto-hinter sets (DejaVuMathTeXGyre, authored-cmap-formats and six Noto Emoji variants)",
+    "triergon-shape's open shape-libass case authored-cff-features-otf-latn-libass, which blocks qualifying triergon-ass: fallback mark positioning in a CFF font without GPOS reads FreeType's hinted glyph extents"
+  ],
+  "open_cases": [
+    {
+      "id": "cjk-ass-1080p",
+      "requirement": "triergon-font: vertical metrics (vhea/vmtx, linear vertical advance) for @ fonts, which libass draws rotated with them and with the typographic descender"
+    },
+    {
+      "id": "cjk-ass-720p",
+      "requirement": "triergon-font: vertical metrics (vhea/vmtx, linear vertical advance) for @ fonts, which libass draws rotated with them and with the typographic descender"
+    }
+  ]
+}

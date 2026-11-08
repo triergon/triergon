@@ -18,7 +18,7 @@ Crates depend only on layers below them. Core never depends on a format.
 | Fonts | [`triergon-font`](../crates/font) | OpenType and TrueType faces: tables, collections, cmap, names, `glyf` and CFF/CFF2 outlines, metrics, kerning, face matching |
 | Shaping | [`triergon-shape`](../crates/shape) | OpenType shaping with the script shapers, the bidirectional algorithm, Unicode properties |
 | Rasterising | [`triergon-raster`](../crates/raster) | Glyph outlines in 26.6 fixed point, their transforms, border stroking, the tile rasteriser, blur, composition and clipping of the alpha bitmaps a subtitle is drawn from |
-| Subtitle scripts | [`triergon-ass`](../crates/ass) | ASS and SSA scripts and Matroska packet streams, styles, typed override tags, the state of every glyph of an event at a time, karaoke, drawings |
+| Subtitle scripts | [`triergon-ass`](../crates/ass) | ASS and SSA scripts and Matroska packet streams, styles, typed override tags, the state of every glyph of an event at a time, karaoke, drawings, and rendering them to positioned alpha images |
 | Pixels | [`triergon-pixel`](../crates/pixel) | Decoded-picture views, coded YUV 4:2:0 pictures, BT.601 RGBA to YUV, letterbox into 1920×1080 RGBA |
 | Codecs | [`triergon-codec`](../crates/codec); [`triergon-codec-aac`](../crates/codec-aac), [`-ac3`](../crates/codec-ac3), [`-dca`](../crates/codec-dca), [`-flac`](../crates/codec-flac), [`-mp3`](../crates/codec-mp3), [`-opus`](../crates/codec-opus), [`-vorbis`](../crates/codec-vorbis), [`-h264`](../crates/codec-h264), [`-hevc`](../crates/codec-hevc); [`triergon-codec-mpeg1`](../crates/codec-mpeg1) | Decoder traits, audio vocabulary and the shared inverse MDCT; software decoders; MPEG-1 video encoder |
 | Composition | [`triergon`](../crates/triergon), [`triergon-playback`](../crates/playback), [`triergon-session`](../crates/session), [`triergon-capture`](../crates/capture) | Consumer facade with `AnyReader`; packet feeds over the readers; decode sessions over the codecs; capture sessions from RGBA to MPEG-TS |
@@ -137,16 +137,15 @@ performance gates where it touches hot code.
    | `triergon-font` | Faces, `cmap`, names, outlines, metrics, `kern`, face matching, a budgeted value `Store`; raw table access for the shaper |
    | `triergon-shape` | Unicode data generated from the pinned UCD releases its references compiled, the bidirectional algorithm as FriBidi resolves it, and OpenType shaping (GDEF, GSUB, GPOS, `kern` fallback) with the script shapers libass reaches through HarfBuzz: default, Arabic, Hebrew, Indic, Khmer, Myanmar, Thai, Hangul and the Universal Shaping Engine |
    | `triergon-raster` | Outlines in 26.6 fixed point, the glyph transform and its quantisation, flattening, stroking for borders, the tile rasteriser, Gaussian and box blur, the alpha bitmaps borders and shadows combine into, and their rectangle clipping |
-   | `triergon-ass` | Script and Matroska-packet parsing, styles, typed override tags, animation, karaoke, drawings, line wrapping, alignment, collisions, `\clip`/`\iclip`, and the renderer |
+   | `triergon-ass` | Script and Matroska-packet parsing, styles, typed override tags, animation, karaoke, drawings, font selection and fallback, line wrapping, alignment, collisions, `\clip`/`\iclip`, and the renderer |
 
-   `triergon-font`, `triergon-shape` and `triergon-raster` exist. `triergon-ass`
-   reads scripts and Matroska packets, styles, override tags, animation, karaoke and
-   drawings, and gives every glyph of an event the state libass gives it, compared
-   with libass exactly; it depends on `triergon-raster` for the outline a drawing is
-   read into. Layout, font selection, shaping, wrapping, collisions, `\clip` as
-   bitmaps and the renderer are to follow. A Triergon worker and a libass worker
-   will then render the same script at the same times and frame sizes, and the
-   harness will compare every image and position exactly. Behaviour where libass departs from the
-   ASS specification by choice will follow the compat-policy convention above.
+   All four exist. `triergon-ass` reads scripts and Matroska packets, styles,
+   override tags, animation, karaoke and drawings, and its `Renderer` selects
+   fonts with fallback, shapes, wraps, lays out, resolves collisions and draws
+   the image list through `triergon-raster`. A Triergon worker and a libass
+   worker render the same scripts and packet streams at the same times and
+   frame sizes, and the harness compares every image exactly; vertical text
+   (`@` fonts) is open. Behaviour where libass departs from the ASS
+   specification by choice will follow the compat-policy convention above.
    The renderer offers no hinting option until libass's hinting-enabled modes and
    FreeType's auto-hinter pass the reference and are gated.

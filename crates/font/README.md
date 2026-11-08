@@ -23,7 +23,7 @@ let faces: Vec<Font> = (0..Font::face_count(&file)?)
 
 // \fnArimo\b1: the face libass's scoring would pick.
 let infos: Vec<FaceInfo<'_>> = faces.iter().map(FaceInfo::new).collect();
-let request = Request { family: "Arimo", bold: 1, italic: 0, character: Some('g') };
+let request = Request { family: "Arimo", weight: 700, slant: 0, character: Some('g') };
 let font = &faces[select(&infos, &request).ok_or("no matching face")?];
 
 let glyph = font.glyph_index('g').ok_or("unmapped")?;
@@ -40,7 +40,7 @@ let _advance = f64::from(metrics.advance) / em;
 let sized = font.at_size(16_384)?;
 let mut scaled = Outline::new(&pool); // reuse it too
 let glyph_metrics = sized.outline_into(glyph, &mut scaled)?; // 26.6 pixels, y up
-sized.synthesize(&mut scaled, font.synthesis(request.weight(), request.slant()))?;
+sized.synthesize(&mut scaled, font.synthesis(request.weight, request.slant))?;
 let _shaping_advance = sized.hinted_advance(glyph)?; // what HarfBuzz receives
 let _drawn_advance = glyph_metrics.advance;
 # Ok::<(), Box<dyn std::error::Error>>(())
@@ -176,7 +176,9 @@ FreeType the version is not checked; Apple's version 1 reads as no subtables.
 `kerning_pairs` lists the pairs those subtables contain.
 
 **Face matching.** `FaceInfo` and `select` score faces as libass 0.17.5 does for
-fonts it loads itself. Windows family names (or FreeType's family name when a face
+fonts it loads itself. A `Request` carries the weight and slant of libass's font
+description (700 for the ASS bold values 1 and -1, 100 for the italic value 1,
+other values unsigned); any slant but 0 asks for an italic face. Windows family names (or FreeType's family name when a face
 has none) match the request ignoring ASCII case and score 1 for a missing italic, 4
 for an unwanted one, plus 73/256 of the weight difference, where a face not flagged
 bold counts as 120 heavier when the request is more than 150 heavier. A full or
@@ -184,7 +186,8 @@ PostScript name match scores 0 and ends the search; when only one of the two
 matches, CFF faces go by the PostScript name and others by the full name. A face
 whose text charmap lacks the requested character is skipped. Weights come from
 `usWeightClass`, with classes 1 to 9 read as 100 to 900; the italic and bold flags
-from `fsSelection` bits 0 and 5.
+from `fsSelection` bits 0 and 5. `FaceInfo::has_family_name` tells the faces
+libass registers at all.
 
 **Store.** `Store` caches built values, such as faces and outlines, by typed key.
 Held values keep a reservation on the store's `Budget`; when a reservation fails,
@@ -194,7 +197,8 @@ the least recently used values that only the store holds are dropped.
 
 `cmap` format 14 (variation selectors, which shaping will need), WOFF and WOFF2, bare CFF, Type 1 and Type 42, bitmap and colour glyphs (`EBDT`,
 `CBDT`, `sbix`, `COLR`, `SVG `), variation instances other than the default (`fvar`,
-`gvar`, `HVAR`, `avar`), vertical metrics (`vhea`, `vmtx`), `post` beyond the
+`gvar`, `HVAR`, `avar`), vertical metrics (`vhea`/`vmtx`, linear vertical advance)
+for `@` fonts, which leaves `ass-render`'s two `cjk-ass-*` cases open, `post` beyond the
 underline, hinting (`cvt ` is not read, `fpgm`, `prep` and glyph programs are
 only scanned for `INSTCTRL`, CFF hints are skipped), Apple `kern` version 1 and
 kern formats other than 0, GPOS and GSUB, and CFF features outside the above: Type
@@ -298,4 +302,5 @@ composites) are
   of each required feature.
 
 The comparison establishes agreement with FreeType on that corpus, not conformance
-with the OpenType specification. Face matching is checked by unit tests only.
+with the OpenType specification. Face matching is checked by unit tests and
+through the renderer's comparison with libass (`ass-render`).

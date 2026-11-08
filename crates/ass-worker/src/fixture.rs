@@ -5,6 +5,10 @@
 //! ;@force OVERRIDE       a [Style.]Field=Value style override (at most 255)
 //! ;@extract-fonts        keep the fonts of [Fonts]
 //! ;@time MS...           the times events are walked at (at most 64)
+//! ;@attach PATH            a font file a renderer is given (at most 64)
+//! ;@default-family NAME    the renderer's default font family
+//! ;@default-font PATH      the renderer's default font file
+//! ;@frames START STEP END  a whole script's frames, START to END milliseconds
 //! ```
 //!
 //! A stream fixture also holds commands, run in order on a new track:
@@ -18,6 +22,7 @@
 //! @flush                 ass_flush_events
 //! @prune DEADLINE        ass_prune_events
 //! @check-readorder N     ass_set_check_readorder
+//! @frames START STEP END renders those frames (rendering only)
 //! ```
 //!
 //! A block without `@end` runs to the end of the file. Numbers are an
@@ -28,6 +33,33 @@
 /// arrays do.
 const MAX_OVERRIDES: usize = 255;
 const MAX_TIMES: usize = 64;
+const MAX_FONTS: usize = 64;
+const MAX_FRAMES: usize = 64;
+
+/// Frames rendered every `step` milliseconds from `start` to `end`.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct Frames {
+    pub start: i64,
+    pub step: i64,
+    pub end: i64,
+}
+
+impl Frames {
+    /// Three numbers with a positive step.
+    fn read(s: &[u8]) -> Option<Self> {
+        let (start, rest) = number(s)?;
+        let (step, rest) = number(rest)?;
+        let (end, _) = number(rest)?;
+        (step > 0).then_some(Self { start, step, end })
+    }
+
+    /// The frame times.
+    pub fn times(self) -> impl Iterator<Item = i64> {
+        let Self { start, step, end } = self;
+        std::iter::successors(Some(start), move |&t| t.checked_add(step))
+            .take_while(move |&t| t <= end)
+    }
+}
 
 /// One command of a stream fixture.
 #[derive(Debug)]
@@ -44,6 +76,7 @@ pub enum Command<'a> {
     Flush,
     Prune(i64),
     CheckReadOrder(bool),
+    Frames(Frames),
 }
 
 /// A fixture's directives and, for a stream, its commands.
@@ -52,6 +85,10 @@ pub struct Fixture<'a> {
     pub overrides: Vec<&'a [u8]>,
     pub extract_fonts: bool,
     pub times: Vec<i64>,
+    pub attach: Vec<&'a [u8]>,
+    pub default_family: Option<&'a [u8]>,
+    pub default_font: Option<&'a [u8]>,
+    pub frames: Vec<Frames>,
     pub commands: Vec<Command<'a>>,
 }
 
@@ -100,6 +137,19 @@ impl<'a> Fixture<'a> {
                     fixture.times.push(time);
                     rest = after;
                 }
+            } else if let Some(path) = line.strip_prefix(b";@attach ") {
+                if fixture.attach.len() < MAX_FONTS {
+                    fixture.attach.push(path);
+                }
+            } else if let Some(name) = line.strip_prefix(b";@default-family ") {
+                fixture.default_family = Some(name);
+            } else if let Some(path) = line.strip_prefix(b";@default-font ") {
+                fixture.default_font = Some(path);
+            } else if let Some(frames) = line.strip_prefix(b";@frames ")
+                && let Some(frames) = Frames::read(frames)
+                && fixture.frames.len() < MAX_FRAMES
+            {
+                fixture.frames.push(frames);
             }
         }
         if stream {
@@ -148,6 +198,10 @@ fn commands<'a>(lines: &[&'a [u8]]) -> Vec<Command<'a>> {
                     packet: lines[i],
                 });
             }
+        } else if let Some(frames) = line.strip_prefix(b"@frames ") {
+            if let Some(frames) = Frames::read(frames) {
+                commands.push(Command::Frames(frames));
+            }
         } else if line.starts_with(b"@dump") {
             commands.push(Command::Dump);
         } else if line.starts_with(b"@flush") {
@@ -173,9 +227,12 @@ mod tests {
         assert_eq!(number(b"  -12 7"), Some((-12, &b" 7"[..])));
         assert_eq!(number(b"+1"), None);
         assert_eq!(number(b"1234567890123456789"), None);
-        let data = b";@time 0 500 x 9\n;@force A=B\n@chunk 1 2\npacket\n@chunk 1\n@prune 9\n";
+        let data = b";@time 0 500 x 9\n;@force A=B\n@chunk 1 2\npacket\n@chunk 1\n@prune 9\n\
+            @frames 0 250 600\n@frames 0 0 9\n;@frames 1 1 2\n;@attach a.ttf\n";
         let fixture = Fixture::read(data, true);
         assert_eq!(fixture.times, [0, 500]);
+        assert_eq!(fixture.attach, [&b"a.ttf"[..]]);
+        assert_eq!(fixture.frames[0].times().collect::<Vec<_>>(), [1, 2]);
         assert_eq!(fixture.overrides, [&b"A=B"[..]]);
         assert!(matches!(
             fixture.commands[..],
@@ -185,7 +242,12 @@ mod tests {
                     duration: 2,
                     packet: b"packet"
                 },
-                Command::Prune(9)
+                Command::Prune(9),
+                Command::Frames(super::Frames {
+                    start: 0,
+                    step: 250,
+                    end: 600
+                })
             ]
         ));
     }

@@ -46,9 +46,10 @@ impl Shape {
         &self.outlines
     }
 
-    /// The control box of both outlines, as libass keeps it: all zero when they
-    /// are empty.
-    pub(crate) fn cbox(&self) -> &Rect {
+    /// The control box of both outlines, as libass keeps it with an outline:
+    /// the bounds of all their points, on- and off-curve, and all zero when
+    /// both are empty. A renderer lays glyphs out by it.
+    pub fn cbox(&self) -> &Rect {
         &self.cbox
     }
 

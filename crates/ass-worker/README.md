@@ -1,6 +1,6 @@
 # ass-worker
 
-ASS parsing measurement worker for the harness. It reads whole scripts, runs
+ASS parsing and rendering measurement worker for the harness. It reads whole scripts, runs
 Matroska packet streams and walks events through
 [triergon-ass](../ass/README.md), as the libass reference worker
 (`harness/reference_ass.h`) does with libass 0.17.5. It is tooling
@@ -13,6 +13,10 @@ ass-worker ass-fold   FILE MODE
 ass-worker ass-bench  FILE ITERATIONS MODE
 ass-worker ass-memory FILE MODE
 ass-worker ass-dump   FILE MODE
+ass-worker ass-render-fold   FILE MODE FONTS FRAME-W FRAME-H STORAGE-W STORAGE-H
+ass-worker ass-render-bench  FILE ITERATIONS MODE FONTS FRAME-W FRAME-H STORAGE-W STORAGE-H
+ass-worker ass-render-memory FILE MODE FONTS FRAME-W FRAME-H STORAGE-W STORAGE-H
+ass-worker ass-render-dump   FILE MODE FONTS FRAME-W FRAME-H STORAGE-W STORAGE-H
 ```
 
 | MODE | FILE | Operation |
@@ -34,3 +38,14 @@ allocation-window markers. Reading the file, its directives and commands, and
 for a walk the script, are outside both. The dump mode prints the same records
 as lines, identical to the reference's dump. The features are
 `harness/features/ass-parse-*/`.
+
+The `ass-render-*` modes render a script (MODE `script`) or a stream fixture
+(`chunks`) with the fonts its `;@attach`, `;@default-family` and
+`;@default-font` directives name, relative to FONTS, at the frame and
+storage size given, at the times of its `;@frames` directive or `@frames`
+commands, as `harness/reference_ass_render.h` renders them with libass
+(feature `harness/features/ass-render/`), with `triergon_ass::Renderer`:
+one operation creates the renderer, reads the script or runs the stream and
+renders every frame, with libass's cache limits at 1000 glyphs and 24 MiB;
+each frame's change value is folded, then every image in list order (kind,
+position, size, colour, alpha rows), and the dump mode prints the reference's lines.

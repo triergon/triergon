@@ -80,8 +80,9 @@ pub struct Effects {
 impl Effects {
     /// What identifies the composite of these effects in a frame scaled by
     /// `frame`: the blur and the shadow offset quantised as libass quantises
-    /// them. Glyphs with equal [`GlyphKey`](crate::GlyphKey)s and offsets
-    /// compose into equal bitmaps under equal keys.
+    /// them. Glyphs with equal [`ShapedKey`](crate::ShapedKey)s and
+    /// offsets compose into equal bitmaps under equal keys, as libass's
+    /// composite cache finds them.
     pub fn key(&self, frame: &FrameScale) -> EffectsKey {
         EffectsKey(Filter::new(self, frame))
     }
